@@ -3,8 +3,12 @@
 //! cover, with grey art, and as the first preset.
 //!
 //! From the cover: once per track, the bar's cover (already in the memory cache) is copied
-//! out and its colours are extracted on tokio's blocking pool (`colour`), for both themes.
-//! Back on the UI thread they go into `Theme.follow-*`, crossfading over `Theme.t-colour`
+//! out and its colour is extracted on tokio's blocking pool (`colour`), with the accents for
+//! both themes. That happens whatever the setting and whatever page is shown: the same colour
+//! paints the lyrics' panel (`lyrics::set_cover`) and Now playing's wash
+//! (`now_playing::set_cover_colour`), so a song that changes on another page repaints them
+//! too, and no cover is worked out twice.
+//! Back on the UI thread the accents go into `Theme.follow-*`, crossfading over `Theme.t-colour`
 //! (300 ms; instant when Windows' animation effects are off, or while the window is
 //! minimized or hidden). Nothing else animates; nothing runs while the track stays the same,
 //! so a paused or idle player costs nothing.
@@ -181,7 +185,8 @@ fn refresh(ctx: &Rc<Ctx>) {
     }
 }
 
-/// The player changed: on a new cover, extract its colours and crossfade to them.
+/// The player changed: on a new cover, extract its colour and crossfade to it. Whatever the
+/// Accent setting: the lyrics' panel and Now playing's wash take the colour too.
 pub fn player_changed(ctx: &Rc<Ctx>, state: &PlayerState) {
     let url = state
         .current
@@ -190,7 +195,7 @@ pub fn player_changed(ctx: &Rc<Ctx>, state: &PlayerState) {
         .unwrap_or_default();
     let extract_for = STATE.with(|s| {
         let mut s = s.borrow_mut();
-        if !s.enabled || s.url == url {
+        if s.url == url {
             return None;
         }
         s.url = url.clone();
@@ -206,9 +211,20 @@ pub fn player_changed(ctx: &Rc<Ctx>, state: &PlayerState) {
     match extract_for {
         // Same cover: only the setting or the theme may have changed.
         None => refresh(ctx),
-        Some(_) if url.is_empty() => refresh(ctx),
+        Some(_) if url.is_empty() => {
+            cover_colour(ctx, None);
+            refresh(ctx);
+        }
         Some(generation) => extract(ctx, url, generation),
     }
+}
+
+/// The current cover's colour is known (`None`: no cover): what the lyrics' panel and Now
+/// playing's wash are made from.
+fn cover_colour(ctx: &Ctx, seed: Option<Lch>) {
+    let Some(ui) = ctx.window() else { return };
+    crate::lyrics::set_cover(&ui, seed);
+    crate::pages::now_playing::set_cover_colour(&ui, seed.map(washes_for));
 }
 
 fn extract(ctx: &Rc<Ctx>, url: String, generation: u64) {
@@ -225,12 +241,17 @@ fn extract(ctx: &Rc<Ctx>, url: String, generation: u64) {
         };
         c.load(
             move |_| async move {
-                tokio::task::spawn_blocking(move || colour::palettes(&pixels))
-                    .await
-                    .ok()
+                tokio::task::spawn_blocking(move || {
+                    let seed = colour::dominant(&pixels);
+                    (seed, colour::palettes_for(seed))
+                })
+                .await
+                .ok()
             },
-            move |ctx, _, palettes| {
-                let Some(palettes) = palettes else { return };
+            move |ctx, _, found| {
+                let Some((seed, palettes)) = found else {
+                    return;
+                };
                 let current = STATE.with(|s| {
                     let mut s = s.borrow_mut();
                     let current = s.generation == generation;
@@ -243,6 +264,7 @@ fn extract(ctx: &Rc<Ctx>, url: String, generation: u64) {
                     current
                 });
                 if current {
+                    cover_colour(ctx, Some(seed));
                     refresh(ctx);
                 }
             },
@@ -370,13 +392,22 @@ pub fn washes(ctx: &Rc<Ctx>, img: &slint::Image, done: impl FnOnce(Washes) + 'st
                 .ok()
         },
         move |_, _, washes| {
-            let Some((dark, light)) = washes else { return };
-            done(Washes {
-                dark: with_alpha(dark, colour::WASH_ALPHA_DARK),
-                light: with_alpha(light, colour::WASH_ALPHA_LIGHT),
-            });
+            let Some(washes) = washes else { return };
+            done(translucent(washes));
         },
     );
+}
+
+/// The washes for a cover's colour (`colour::washes`), as `washes` gives them.
+pub fn washes_for(seed: Lch) -> Washes {
+    translucent(colour::washes(seed))
+}
+
+fn translucent((dark, light): (Rgb, Rgb)) -> Washes {
+    Washes {
+        dark: with_alpha(dark, colour::WASH_ALPHA_DARK),
+        light: with_alpha(light, colour::WASH_ALPHA_LIGHT),
+    }
 }
 
 /// A wash's two shades (`colour::washes`) already laid over each theme's ground at the

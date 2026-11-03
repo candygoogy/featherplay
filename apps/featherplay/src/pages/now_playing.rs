@@ -19,7 +19,7 @@ use crate::app::Ctx;
 use crate::controller::{Action, PlayerState, QueueAction};
 use crate::router::Page;
 use crate::song_menu;
-use crate::ui::{Frame, NowPlayingData, Player, SongMenu};
+use crate::ui::{AppWindow, Frame, NowPlayingData, Player, SongMenu};
 use crate::ui_bridge::{model, to_rows};
 use crate::{follow, lyrics};
 
@@ -150,39 +150,16 @@ fn show(ctx: &Rc<Ctx>, state: &PlayerState) {
     if STATE.with(|s| s.borrow().cover_url != url) {
         STATE.with(|s| s.borrow_mut().cover_url = url.clone());
         data.set_cover(Default::default());
-        if url.is_empty() {
-            data.set_wash_dark(Default::default());
-            data.set_wash_light(Default::default());
-            crate::lyrics::set_cover(&ui, None);
-        } else {
+        // The wash comes from the cover's colour, which `follow` works out once per song
+        // whatever page is shown (`set_cover_colour`).
+        if !url.is_empty() {
             let weak = ui.as_weak();
             let wanted = url.clone();
-            let c = ctx.clone();
             ctx.covers.load(&url, COVER, move |img| {
                 let still = STATE.with(|s| s.borrow().cover_url == wanted);
-                let Some(ui) = weak.upgrade().filter(|_| still) else {
-                    return;
-                };
-                let ink_wanted = wanted.clone();
-                // The ambient wash, whatever the Accent setting is.
-                let wash_weak = ui.as_weak();
-                follow::washes(&c, &img, move |w| {
-                    let still = STATE.with(|s| s.borrow().cover_url == wanted);
-                    if still && let Some(ui) = wash_weak.upgrade() {
-                        let data = ui.global::<NowPlayingData>();
-                        data.set_wash_dark(w.dark);
-                        data.set_wash_light(w.light);
-                    }
-                });
-                // The lyrics' panel and line colours from the same cover.
-                let ink_weak = ui.as_weak();
-                follow::cover_seed(&c, &img, move |seed| {
-                    let still = STATE.with(|s| s.borrow().cover_url == ink_wanted);
-                    if still && let Some(ui) = ink_weak.upgrade() {
-                        crate::lyrics::set_cover(&ui, Some(seed));
-                    }
-                });
-                ui.global::<NowPlayingData>().set_cover(img);
+                if still && let Some(ui) = weak.upgrade() {
+                    ui.global::<NowPlayingData>().set_cover(img);
+                }
             });
         }
     }
@@ -194,6 +171,17 @@ fn show(ctx: &Rc<Ctx>, state: &PlayerState) {
         // Shown when the tab is picked.
         data.set_related(Default::default());
     }
+}
+
+/// The playing song's cover colour is known (`follow`; `None`: no cover): the stage's
+/// ambient wash, whatever the Accent setting is. Set whatever page is shown, so the page
+/// opens on the right colour; until the next colour is known the last one stays, and the
+/// stage crossfades from one to the other.
+pub fn set_cover_colour(ui: &AppWindow, washes: Option<follow::Washes>) {
+    let data = ui.global::<NowPlayingData>();
+    let (dark, light) = washes.map_or_else(Default::default, |w| (w.dark, w.light));
+    data.set_wash_dark(dark);
+    data.set_wash_light(light);
 }
 
 fn show_year(ctx: &Rc<Ctx>, track: Option<&Track>) {

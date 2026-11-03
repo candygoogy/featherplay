@@ -333,8 +333,11 @@ component SyncedLines inherits Rectangle {
 // tall), so the glide's frames stay cheap.
 component LyricsEdge inherits Rectangle {
     in property <bool> top;
+    // Crossfades with the panel when the song's colour changes.
+    property <color> ground: LyricsData.ink.ground;
+    animate ground { duration: Theme.t-colour; easing: Curves.ease-hover; }
     height: Theme.lyric-edge;
-    background: @linear-gradient(root.top ? 180deg : 0deg, LyricsData.ink.ground 0%, LyricsData.ink.ground.transparentize(1) 100%);
+    background: @linear-gradient(root.top ? 180deg : 0deg, root.ground 0%, root.ground.transparentize(1) 100%);
 }
 
 // The lyrics in any state, on the cover-colour panel. The side tab sets `card`: the panel is a

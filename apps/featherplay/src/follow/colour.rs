@@ -323,7 +323,11 @@ pub fn against_all(c: Rgb, surfaces: &[Rgb], min: f32) -> bool {
 
 /// Both themes' palettes for a cover; `None` for neutral art.
 pub fn palettes(cover: &RgbaImage) -> Option<(Palette, Palette)> {
-    let seed = dominant(cover);
+    palettes_for(dominant(cover))
+}
+
+/// Both themes' palettes for a cover's colour (`dominant`); `None` for neutral art.
+pub fn palettes_for(seed: Lch) -> Option<(Palette, Palette)> {
     Some((palette(seed, true)?, palette(seed, false)?))
 }
 

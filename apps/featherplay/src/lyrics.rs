@@ -233,7 +233,7 @@ pub fn init(ctx: &Rc<Ctx>) {
     refresh_inks(&ui);
 }
 
-/// The current cover's colour (`follow::cover_seed`; `None` without a cover): the lyrics'
+/// The playing song's cover colour (`follow`, once per song; `None` without a cover): the lyrics'
 /// panel and lines are made from it.
 pub fn set_cover(ui: &crate::ui::AppWindow, seed: Option<Lch>) {
     COVER.with(|c| c.set(seed));

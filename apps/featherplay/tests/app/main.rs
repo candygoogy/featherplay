@@ -37,6 +37,7 @@ mod instance;
 mod library_refresh;
 mod lyrics_arrive;
 mod lyrics_button;
+mod lyrics_cover;
 mod lyrics_debounce;
 mod lyrics_follow;
 mod lyrics_frames;
