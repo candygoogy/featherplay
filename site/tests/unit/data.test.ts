@@ -263,7 +263,7 @@ describe("the download's options", () => {
     const { release, sizeLabel } = await import("../../src/data/release");
     expect(release.installer?.name).toBe(`featherplay-setup-${release.version}.exe`);
     expect(release.version).toBe("0.1.0");
-    expect(release.installer?.bytes).toBe(10_618_354);
+    expect(release.installer?.bytes).toBe(10_618_613);
     expect(release.portable?.bytes).toBe(29_574_144);
     expect(release.installer?.url).toBe(
       "https://github.com/candygoogy/featherplay/releases/download/v0.1.0/featherplay-setup-0.1.0.exe",

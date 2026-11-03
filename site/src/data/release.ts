@@ -40,7 +40,7 @@ const file = (name: string, bytes: number | null): ReleaseFile => ({
   sizeMB: bytes == null ? null : toMB(bytes),
   url: `${releases}/download/v${version}/${name}`,
 });
-const installer: ReleaseFile | null = file(`featherplay-setup-${version}.exe`, 10_618_354);
+const installer: ReleaseFile | null = file(`featherplay-setup-${version}.exe`, 10_618_613);
 const portable: ReleaseFile | null = file("featherplay.exe", 29_574_144);
 
 export const release: Release = {

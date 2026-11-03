@@ -1,10 +1,10 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  // The website: static files only, no Worker code. Unknown paths get dist/404.html with
-  // status 404. Deploys and the custom domain (featherplay.candygoogy.dev) wait for the
-  // maintainer's OK.
+  // The website: static files only, no Worker code, served at featherplay.candygoogy.dev.
+  // Unknown paths get dist/404.html with status 404.
   "name": "featherplay-site",
   "compatibility_date": "2026-10-30",
+  "routes": [{ "pattern": "featherplay.candygoogy.dev", "custom_domain": true }],
   "assets": {
     "directory": "./dist",
     "not_found_handling": "404-page",
