@@ -1,4 +1,5 @@
-// The comparison counts up once, the first time it's 40 % on screen: each figure from zero
+// The comparison counts up once, the first time its top comes up past 60 % of the window
+// (not by how much of it shows: on a phone it's far taller than the window): each figure from zero
 // to its value, each bar from nothing to its length. A figure without `data-to` (a range of
 // processes, nothing to download) keeps its text and only its bar grows. The final values
 // are in the HTML, so without script (or with reduced motion) they simply show.
@@ -51,7 +52,9 @@ export function bindCountUp(chart: HTMLElement): void {
       };
       requestAnimationFrame(step);
     },
-    { threshold: 0.4 },
+    // The window's lower 40 % doesn't count, so any part of the chart above that line starts
+    // it: the same line as the check above.
+    { rootMargin: "0px 0px -40% 0px", threshold: 0 },
   );
   io.observe(chart);
 }

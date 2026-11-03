@@ -41,6 +41,24 @@ test("the count-up runs once", async ({ page }) => {
   await expect(fpMemory).toHaveText(final);
 });
 
+// On a phone the chart is far taller than the window (about 2150 px against 812), so it's
+// never mostly on screen: the count starts from where the chart is in the window instead.
+test.describe("on a phone", () => {
+  test.use({ viewport: { width: 375, height: 812 } });
+
+  test("the count-up runs once the chart comes up the window", async ({ page }) => {
+    await page.goto("/");
+    const chart = section(page).locator("[data-chart]");
+    const fpMemory = section(page).locator('[data-figure="featherplay:memoryMB"] [data-value]');
+    expect((await chart.boundingBox())!.height).toBeGreaterThan(812 / 0.4);
+    await expect(fpMemory).toHaveText(formatFigure("memoryMB", 0));
+    // Its top a third of the way down the window, the way a reader scrolls to it.
+    await chart.evaluate((el) => scrollTo({ top: el.getBoundingClientRect().top + scrollY - innerHeight / 3, behavior: "instant" }));
+    await expect(fpMemory).toHaveText(formatFigure("memoryMB", figures[0].memoryMB), { timeout: 4000 });
+    await expect(chart).toHaveAttribute("data-counted", "true");
+  });
+});
+
 test("what it leaves out: four quiet notes, none struck through, and no ads wording", async ({ page }) => {
   await page.goto("/");
   const items = section(page).locator("[data-leaves-out] li");
