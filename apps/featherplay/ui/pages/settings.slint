@@ -1132,15 +1132,15 @@ export component SettingsPage inherits Rectangle {
     // The content column: wide enough that the descriptions run one or two lines.
     property <length> col-max: 920px;
     // At wide windows a section index sits left of the column, when the column keeps at
-    // least 760 px beside it, and the two are centred in the page, so a wide window doesn't
-    // leave them against the sidebar with an empty side. Narrower, the column starts at the
-    // page's padding, as every page does.
+    // least 760 px beside it. The block starts at the page's padding, as every page's content
+    // does (level with the search field), whether the side panel is open or not; the column
+    // takes the rest, up to `col-max`, so the switches stay near their labels.
     property <length> index-w: 184px;
     property <length> index-gap: Theme.s7;
     property <bool> indexed: self.width >= 2 * Theme.page-pad + root.index-w + root.index-gap + 760px;
     property <length> index-room: root.indexed ? root.index-w + root.index-gap : 0px;
     property <length> col-w: min(self.width - 2 * Theme.page-pad - root.index-room, root.col-max);
-    property <length> block-x: root.indexed ? max(Theme.page-pad, floor((self.width - root.index-room - root.col-w) / 2 / 1px) * 1px) : Theme.page-pad;
+    property <length> block-x: Theme.page-pad;
     property <length> col-x: root.block-x + root.index-room;
     property <bool> confirm-sign-out: false;
     // How many of the sections below the fold (Integrations, Window, Account) are made: one

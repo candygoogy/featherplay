@@ -1,6 +1,6 @@
 //! Settings uses a wide window's room, on the offscreen platform with fixture data (no
 //! window is shown): the content column runs to 920 px, and at wide windows a section index
-//! sits beside it, the two centred in the page so no wide empty side is left. The index's
+//! sits beside it, the two starting at the page's padding like every page's content. The index's
 //! first entry is level with the first section's heading. A click on an entry scrolls to its
 //! section, and the entry of the section in view is marked in the accent. At narrow windows
 //! there's no index and the column starts at the page's padding.
@@ -10,10 +10,10 @@ use slint::platform::{PointerEventButton, WindowEvent};
 use slint::{ComponentHandle, LogicalPosition, Rgba8Pixel, SharedPixelBuffer};
 
 /// At 1920 wide the page is 1680 px past the 240 px sidebar; the index (184), its gap (40)
-/// and the column (920) are centred in it.
+/// and the column (920) start at the page's 40 px padding.
 const PAGE_LEFT: usize = 240;
 const BLOCK: usize = 184 + 40 + 920;
-const INDEX_LEFT: usize = PAGE_LEFT + (1680 - BLOCK) / 2;
+const INDEX_LEFT: usize = PAGE_LEFT + 40;
 const INDEX_RIGHT: usize = INDEX_LEFT + 184;
 /// The narrow layout's column starts at the page's 40 px padding.
 const NARROW_LEFT: usize = PAGE_LEFT + 40;
@@ -113,16 +113,16 @@ fn settings_widen_and_index_their_sections_at_wide_windows() {
         panel_colour,
         "the content column is narrower than 900 px"
     );
-    // Centred: the column ends as far from the window's right as the index starts from the
-    // sidebar.
+    // Lined up with the page's padding, not centred: the column ends 920 px past its start,
+    // the rest of the page left empty on the right.
     let ground = px(&s, INDEX_LEFT - 8, panel + 20);
     let col_right = (content_left + 900..1920)
         .find(|&x| px(&s, x + 1, panel + 20) != panel_colour)
         .expect("the panel's right edge");
-    let (left_gap, right_gap) = (INDEX_LEFT - PAGE_LEFT, 1920 - 1 - col_right);
     assert!(
-        left_gap.abs_diff(right_gap) <= 4,
-        "not centred: {left_gap} px left of the index, {right_gap} px right of the column"
+        col_right.abs_diff(INDEX_LEFT + BLOCK - 1) <= 2,
+        "the column ends at {col_right}, not {}",
+        INDEX_LEFT + BLOCK - 1
     );
     assert_ne!(ground, panel_colour);
 
