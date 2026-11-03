@@ -1,5 +1,4 @@
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.version.1.9.0.schema.json
-# TODO(release): set PackageVersion to the tag being released (without the "v").
 PackageIdentifier: candygoogy.featherplay
 PackageVersion: 0.1.0
 DefaultLocale: en-US
