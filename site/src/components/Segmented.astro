@@ -8,8 +8,8 @@
 // (--ease-glide, a 2 % overshoot). A copy of the labels in the first text colour is clipped
 // to the pill's box, so each label lights as the pill passes over it
 // (src/scripts/segmented.ts). Reduced motion: it moves at once. Without script the picked
-// segment simply has the pill's look. Each option may lead with an icon (monitor, sun,
-// moon, half-disc); `compact` hides the words on narrow screens, leaving the icon and a
+// segment simply has the pill's look. Each option may lead with an icon (half-disc for
+// following something, sun, moon); `compact` hides the words on narrow screens, leaving the icon and a
 // tooltip (the words stay the radio's name). Tones: "page" on the page's ground, "band" on
 // the footer's dark band.
 interface Option {
@@ -32,7 +32,7 @@ const { name, legend, options, checked, tone = "page", compact = false, class: c
 // 16 px glyphs on a 24 grid, drawn in the header toggle's line (1.8 stroke, round ends).
 const glyphs: Record<NonNullable<Option["icon"]>, string> = {
   system:
-    '<rect x="3" y="4.5" width="18" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M9 20h6M12 16.5V20" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
+    '<circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 4a8 8 0 0 1 0 16Z" fill="currentColor"/>',
   light:
     '<circle cx="12" cy="12" r="4" fill="currentColor"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
   dark: '<path d="M19.5 14.6A8 8 0 0 1 9.4 4.5a8 8 0 1 0 10.1 10.1Z" fill="currentColor"/>',
