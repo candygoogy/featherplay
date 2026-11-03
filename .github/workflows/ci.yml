@@ -101,3 +101,46 @@ jobs:
           if [ "$GITHUB_EVENT_NAME" = schedule ]; then profile=default; else profile=ci; fi
           cargo nextest run --workspace --profile "$profile"
           cargo test --workspace --doc
+
+  # The ARM64 build, natively on windows-11-arm: weekly and when run by hand, so an ARM64
+  # break shows before a release (release.yml tests ARM64 too). Not on every push, where it
+  # would be a second full build. The `ci` profile: the frame-cost and CPU-time ceilings were
+  # set on x64 machines.
+  arm64:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: windows-11-arm
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The ARM64 host toolchain, so nothing runs under x64 emulation.
+      - name: Rust toolchain
+        shell: bash
+        run: |
+          rustup set default-host aarch64-pc-windows-msvc
+          rustup toolchain install
+          rustup show active-toolchain
+          host=$(rustc -vV | sed -n 's/^host: //p')
+          if [ "$host" != aarch64-pc-windows-msvc ]; then
+            echo "::error::rustc's host is '$host', not aarch64-pc-windows-msvc"
+            exit 1
+          fi
+
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - uses: taiki-e/install-action@1919c4a95903d2c33e4a221102edca87309fc14b # v2.89.0
+        with:
+          tool: nextest
+
+      - name: Test
+        shell: bash
+        run: |
+          export FEATHERPLAY_HOME="$RUNNER_TEMP/featherplay-home"
+          mkdir -p "$FEATHERPLAY_HOME"
+          cargo nextest run --workspace --profile ci
+          cargo test --workspace --doc
