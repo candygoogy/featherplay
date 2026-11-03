@@ -1,17 +1,33 @@
 name: Release
 
-# On a `v*` tag: build featherplay.exe with the release profile from Cargo.toml (fat LTO,
-# one codegen unit, strip, opt-level "z", the audio crates at 3), check its size budget,
-# package the per-user installer with Inno Setup, and attach both to a draft GitHub Release
-# with their SHA256 checksums. Publishing the draft stays a manual step.
+# On a `v*` tag: build featherplay.exe for x64 and for ARM64 with the release profile from
+# Cargo.toml (fat LTO, one codegen unit, strip, opt-level "z", the audio crates at 3), check
+# their size budget, package a per-user installer for each with Inno Setup, and attach them
+# to a draft GitHub Release with their SHA256 checksums. Publishing the draft stays a manual
+# step.
 #
-# Release assets:
-#   featherplay.exe                    the portable exe
-#   featherplay-setup-<version>.exe    the installer (packaging/windows/featherplay.iss)
-#   featherplay.exe.sha256             `sha256sum` line for the exe (Scoop's autoupdate reads it)
-#   featherplay-setup-<version>.exe.sha256
-#   SHA256SUMS.txt                     all of the above, plus THIRD_PARTY.md: `sha256sum -c SHA256SUMS.txt`
-#   THIRD_PARTY.md                     the licence notices, which the portable exe needs beside it
+# Dry run, from any branch: Actions > Release > Run workflow, or
+#   gh workflow run release.yml --ref <branch>
+# It runs every job but the last: tests, both builds, both installers, the checksums and the
+# notes, all uploaded as the run's `release-assets` artifact. It creates no release and no
+# tag, whatever the branch. Only a pushed `v*` tag runs `publish`.
+#
+# Jobs:
+#   test         the whole x64 suite, on windows-2025
+#   test-arm64   the `ci` profile, on windows-11-arm
+#   build-arm64  the ARM64 exe, built natively on windows-11-arm after test-arm64
+#   package      the x64 exe, both installers (Inno runs on x64 only), the checksums
+#   publish      the draft release, from package's artifact (tags only)
+#
+# Release assets. The x64 names are the ones 0.1.0 shipped with: the site, the README, Scoop
+# and winget link to them, so they never change. ARM64 gets its own names beside them.
+#   featherplay.exe                          the portable exe, x64
+#   featherplay-setup-<version>.exe          the installer, x64 (packaging/windows/featherplay.iss)
+#   featherplay-arm64.exe                    the portable exe, ARM64
+#   featherplay-setup-<version>-arm64.exe    the installer, ARM64
+#   <each of the four>.sha256                its `sha256sum` line (Scoop's autoupdate reads featherplay.exe.sha256)
+#   SHA256SUMS.txt                           all four, plus THIRD_PARTY.md: `sha256sum -c SHA256SUMS.txt`
+#   THIRD_PARTY.md                           the licence notices, which a portable exe needs beside it
 # The release notes list each file's SHA256 as well.
 #
 # Build keys: three repository secrets, the same names as the variables in featherplay.env
@@ -24,8 +40,9 @@ name: Release
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
 
-# Nothing by default; the job below asks for what it needs.
+# Nothing by default; each job asks for what it needs. Only `publish` can write.
 permissions: {}
 
 concurrency:
@@ -34,13 +51,16 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
-  # featherplay.exe must stay at 31 MB or less (raised from 30 MB on 2026-10-31).
+  # Each featherplay.exe must stay at 31 MB or less (raised from 30 MB on 2026-10-31).
   # The helpers (yt-dlp, Deno) are downloaded at run time and don't count.
   MAX_EXE_BYTES: "31000000"
   # Inno Setup, pinned: the official installer from jrsoftware/issrc's GitHub release, checked
   # against this SHA256 (the release's own asset digest) before it runs.
   INNO_VERSION: "6.7.4"
   INNO_SHA256: "a549929319f9120716677c685535ca4671e4b937b5fdc87e2585f32d8eb30e8c"
+  # Where build-installer.sh --arch arm64 looks for the ARM64 exe (cargo's path for
+  # `--target aarch64-pc-windows-msvc`).
+  ARM64_EXE: target/aarch64-pc-windows-msvc/release/featherplay.exe
 
 jobs:
   # The whole test suite, the frame-cost and CPU-time ceilings included (CI's per-push run
@@ -75,16 +95,105 @@ jobs:
           cargo nextest run --workspace --locked
           cargo test --workspace --doc --locked
 
-  release:
-    needs: test
+  # The suite on ARM64, natively. The `ci` profile: everything but the frame-cost and
+  # CPU-time ceilings, whose numbers were set on x64 machines (the x64 job runs them).
+  test-arm64:
+    runs-on: windows-11-arm
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    env:
+      RUSTFLAGS: --cfg ci
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The ARM64 host toolchain, so the build and the tests are native ARM64, not x64 under
+      # emulation. Fails if rustc's host is anything else.
+      - name: Rust toolchain
+        shell: bash
+        run: |
+          rustup set default-host aarch64-pc-windows-msvc
+          rustup toolchain install
+          rustup show active-toolchain
+          host=$(rustc -vV | sed -n 's/^host: //p')
+          if [ "$host" != aarch64-pc-windows-msvc ]; then
+            echo "::error::rustc's host is '$host', not aarch64-pc-windows-msvc"
+            exit 1
+          fi
+
+      - uses: taiki-e/install-action@1919c4a95903d2c33e4a221102edca87309fc14b # v2.89.0
+        with:
+          tool: nextest
+
+      - name: Test
+        shell: bash
+        run: |
+          export FEATHERPLAY_HOME="$RUNNER_TEMP/featherplay-home"
+          mkdir -p "$FEATHERPLAY_HOME"
+          cargo nextest run --workspace --locked --profile ci
+          cargo test --workspace --doc --locked
+
+  # The ARM64 exe, built on ARM64 (Skia's prebuilt aarch64-pc-windows-msvc binaries, the
+  # image's ARM64 MSVC tools). package puts it into the release beside the x64 one.
+  build-arm64:
+    needs: test-arm64
+    runs-on: windows-11-arm
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Rust toolchain
+        shell: bash
+        run: |
+          rustup set default-host aarch64-pc-windows-msvc
+          rustup toolchain install
+          rustup show active-toolchain
+          host=$(rustc -vV | sed -n 's/^host: //p')
+          if [ "$host" != aarch64-pc-windows-msvc ]; then
+            echo "::error::rustc's host is '$host', not aarch64-pc-windows-msvc"
+            exit 1
+          fi
+
+      - name: Build
+        shell: bash
+        env:
+          LASTFM_API_KEY: ${{ secrets.LASTFM_API_KEY }}
+          LASTFM_API_SECRET: ${{ secrets.LASTFM_API_SECRET }}
+          DISCORD_CLIENT_ID: ${{ secrets.DISCORD_CLIENT_ID }}
+        run: cargo build --release --locked -p featherplay
+
+      - name: Check the exe size
+        shell: bash
+        run: |
+          size=$(stat -c %s target/release/featherplay.exe)
+          echo "featherplay.exe (ARM64): $size bytes (limit $MAX_EXE_BYTES)"
+          if [ "$size" -gt "$MAX_EXE_BYTES" ]; then
+            echo "::error::the ARM64 featherplay.exe is $size bytes, over the $MAX_EXE_BYTES byte budget"
+            exit 1
+          fi
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: featherplay-arm64-exe
+          path: target/release/featherplay.exe
+          if-no-files-found: error
+          retention-days: 7
+
+  package:
+    needs: [test, build-arm64]
     # Pinned rather than windows-latest, so an image change can't move the build under us.
     # (The image ships Inno Setup 6.7.1 too; we install 6.7.4, the version the installer was
     # tested with, so the result doesn't depend on the image.)
     runs-on: windows-2025
     timeout-minutes: 90
     permissions:
-      # gh release create.
-      contents: write
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -97,12 +206,13 @@ jobs:
           rustup toolchain install
           rustup show active-toolchain
 
-      - name: Check the tag matches the crate version
+      # A tag must match the crate version; a dry run takes the crate version as it is.
+      - name: Read the version
         shell: bash
         run: |
           pkgid=$(cargo pkgid -p featherplay)
           version=${pkgid##*[@#]}
-          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+          if [ "$GITHUB_REF_TYPE" = tag ] && [ "v$version" != "$GITHUB_REF_NAME" ]; then
             echo "::error::tag $GITHUB_REF_NAME does not match the crate version $version"
             exit 1
           fi
@@ -137,7 +247,8 @@ jobs:
           }
           "ISCC=$($iscc -replace '\\', '/')" >> $env:GITHUB_ENV
 
-      # Says whether the keys are there, never what they are.
+      # Says whether the keys are there, never what they are. build-arm64 compiled in the
+      # same secrets.
       - name: Check the build keys
         shell: bash
         env:
@@ -172,38 +283,64 @@ jobs:
             exit 1
           fi
 
-      # Packages the exe built above (--skip-build); the keys are already compiled in.
-      - name: Build the installer
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: featherplay-arm64-exe
+          path: target/aarch64-pc-windows-msvc/release
+
+      # Each exe is the architecture its name says: the PE header's machine field.
+      - name: Check the exes' architectures
         shell: bash
-        run: packaging/windows/build-installer.sh --skip-build
+        run: |
+          machine() {
+            local pe
+            pe=$(od -An -tu4 -j60 -N4 "$1" | tr -d ' ')
+            od -An -tx2 -j$((pe + 4)) -N2 "$1" | tr -d ' '
+          }
+          x64=$(machine target/release/featherplay.exe)
+          arm64=$(machine "$ARM64_EXE")
+          echo "machine: x64 exe $x64, ARM64 exe $arm64"
+          if [ "$x64" != 8664 ] || [ "$arm64" != aa64 ]; then
+            echo "::error::expected machine 8664 (x64) and aa64 (ARM64), got $x64 and $arm64"
+            exit 1
+          fi
+
+      # Packages the exes built above (--skip-build); the keys are already compiled in.
+      - name: Build the installers
+        shell: bash
+        run: |
+          packaging/windows/build-installer.sh --skip-build
+          packaging/windows/build-installer.sh --arch arm64 --skip-build
 
       - name: Checksums
         shell: bash
         run: |
           setup="featherplay-setup-$VERSION.exe"
+          setup_arm64="featherplay-setup-$VERSION-arm64.exe"
           mkdir dist
           cp target/release/featherplay.exe dist/
-          cp "target/installer/$setup" dist/
+          cp "$ARM64_EXE" dist/featherplay-arm64.exe
+          cp "target/installer/$setup" "target/installer/$setup_arm64" dist/
           cp THIRD_PARTY.md dist/
           cd dist
-          for f in featherplay.exe "$setup"; do
+          files=(featherplay.exe "$setup" featherplay-arm64.exe "$setup_arm64")
+          for f in "${files[@]}"; do
             sha256sum "$f" > "$f.sha256"
           done
-          sha256sum featherplay.exe "$setup" THIRD_PARTY.md > SHA256SUMS.txt
+          sha256sum "${files[@]}" THIRD_PARTY.md > SHA256SUMS.txt
           cat SHA256SUMS.txt
 
-      - name: Draft release
+      - name: Release notes
         shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           setup="featherplay-setup-$VERSION.exe"
-          hash() { cut -d' ' -f1 "dist/$1.sha256"; }
+          setup_arm64="featherplay-setup-$VERSION-arm64.exe"
           {
-            echo "featherplay $VERSION for Windows 10 and 11 (x64)."
+            echo "featherplay $VERSION for Windows 10 and 11, x64 and ARM64."
             echo
-            echo "- \`$setup\`: the installer (per user, no admin prompt)."
-            echo "- \`featherplay.exe\`: the portable exe. Keep \`THIRD_PARTY.md\` with it; it holds the licence notices."
+            echo "- \`$setup\`: the installer for x64 PCs (per user, no admin prompt). It also runs on ARM64 Windows 11, under emulation."
+            echo "- \`$setup_arm64\`: the installer for ARM64 PCs, such as Snapdragon laptops."
+            echo "- \`featherplay.exe\` (x64) and \`featherplay-arm64.exe\` (ARM64): the portable exes. Keep \`THIRD_PARTY.md\` with them; it holds the licence notices."
             echo
             echo "SHA256:"
             echo
@@ -215,10 +352,46 @@ jobs:
               echo "**Built without the secrets $MISSING_KEYS.** Without the Last.fm key and secret, Last.fm needs your own API key in this build; without the Discord client ID, Discord status is unavailable."
             fi
           } > dist/notes.md
+
+      # A dry run ends here: the run's page has every asset, the notes included.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-assets
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14
+
+  # Only for a pushed tag, and the only job that can write: it gets package's files and
+  # runs nothing from the repository.
+  publish:
+    needs: package
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      # gh release create.
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-assets
+          path: dist
+
+      - name: Draft release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=${GITHUB_REF_NAME#v}
+          setup="featherplay-setup-$version.exe"
+          setup_arm64="featherplay-setup-$version-arm64.exe"
           gh release create "$GITHUB_REF_NAME" \
             "dist/featherplay.exe" "dist/featherplay.exe.sha256" \
             "dist/$setup" "dist/$setup.sha256" \
+            "dist/featherplay-arm64.exe" "dist/featherplay-arm64.exe.sha256" \
+            "dist/$setup_arm64" "dist/$setup_arm64.sha256" \
             "dist/SHA256SUMS.txt" "dist/THIRD_PARTY.md" \
+            --repo "$GITHUB_REPOSITORY" \
             --draft \
             --verify-tag \
             --title "featherplay $GITHUB_REF_NAME" \
