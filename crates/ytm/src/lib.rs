@@ -31,6 +31,32 @@ pub struct SearchResults {
     pub playlists: Vec<PlaylistSummary>,
 }
 
+/// What YouTube Music suggests while a query is typed (`YtMusic::search_suggestions`):
+/// completions of the query, then a few direct results. Either list may be empty.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct SearchSuggestions {
+    pub queries: Vec<QuerySuggestion>,
+    pub results: Vec<SuggestedResult>,
+}
+
+/// A completion: the whole query it searches for.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct QuerySuggestion {
+    pub text: String,
+    /// How many bytes at the start of `text` the user typed (the reply's bold runs).
+    pub typed: usize,
+    /// One of the account's past searches rather than a prediction.
+    pub history: bool,
+}
+
+/// A direct result: a song or video (it plays), or an album, artist or playlist (it opens).
+#[derive(Clone, Debug, PartialEq)]
+pub struct SuggestedResult {
+    pub item: HomeItem,
+    /// The line under the title as the reply has it: `Song • Daft Punk • 111M plays`.
+    pub subtitle: String,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct AlbumSummary {
     pub id: AlbumId,

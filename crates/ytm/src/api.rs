@@ -34,15 +34,15 @@ use ytmapi_rs::query::{
     AddPlaylistItemsQuery, CreatePlaylistQuery, DeletePlaylistQuery, EditPlaylistQuery,
     GetAlbumQuery, GetArtistQuery, GetLibraryAlbumsQuery, GetLibraryArtistsQuery,
     GetLibraryPlaylistsQuery, GetLyricsIDQuery, GetLyricsQuery, GetMethod, GetPlaylistTracksQuery,
-    GetQuery, GetWatchPlaylistQuery, PostMethod, PostQuery, Query, RatePlaylistQuery,
-    RateSongQuery, SearchQuery,
+    GetQuery, GetSearchSuggestionsQuery, GetWatchPlaylistQuery, PostMethod, PostQuery, Query,
+    RatePlaylistQuery, RateSongQuery, SearchQuery,
 };
 
 use crate::convert::{self, map_error};
 use crate::{
     AccountIdentity, AccountInfo, Album, AlbumSummary, ApiError, Artist, ArtistSummary, Charts,
     HistoryDay, HomeFeed, HomeShelf, Identity, MoodPage, MoodSection, Playlist, PlaylistSummary,
-    SearchFilter, SearchResults, SongLyrics,
+    SearchFilter, SearchResults, SearchSuggestions, SongLyrics,
 };
 
 /// Upper bound on continuation pages for one list (about 100 rows per page).
@@ -156,6 +156,20 @@ impl YtMusic {
                 self.raw(&query).await
             }
         }
+    }
+
+    /// What YouTube Music suggests while `q` is typed: completions, then a few direct
+    /// results. One request, read-only.
+    pub async fn search_suggestions(&self, q: &str) -> Result<SearchSuggestions, ApiError> {
+        convert::search_suggestions(&self.search_suggestions_raw(q).await?)
+    }
+
+    /// What YouTube Music suggests while `q` is typed (`music/get_search_suggestions`), raw:
+    /// query completions, then a few direct results. ytmapi-rs 0.3.3 has the query but
+    /// parses only the completions. One request, read-only; for recording fixtures, scrub
+    /// it first (a signed-in reply lists the account's past searches).
+    pub async fn search_suggestions_raw(&self, q: &str) -> Result<String, ApiError> {
+        self.raw(&GetSearchSuggestionsQuery::new(q)).await
     }
 
     pub async fn liked_songs(&self) -> Result<Vec<Track>, ApiError> {

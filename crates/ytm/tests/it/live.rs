@@ -193,6 +193,25 @@ async fn live_account_info() {
     );
 }
 
+/// One read of the search suggestions for a partial query. With `FEATHERPLAY_RECORD_DIR`
+/// set, its raw JSON is written there as `search_suggestions.raw.json`, unscrubbed: a
+/// signed-in reply lists the account's past searches, so scrub it before it becomes the
+/// fixture. Prints counts only.
+#[tokio::test]
+#[ignore = "live: needs FEATHERPLAY_COOKIES_FILE"]
+async fn live_search_suggestions() {
+    let yt = connect().await;
+    let raw = yt
+        .search_suggestions_raw("daft pu")
+        .await
+        .expect("search suggestions");
+    if let Some(dir) = std::env::var_os("FEATHERPLAY_RECORD_DIR") {
+        let path = std::path::Path::new(&dir).join("search_suggestions.raw.json");
+        std::fs::write(&path, &raw).expect("write the recording");
+    }
+    println!("search suggestions: {} bytes", raw.len());
+}
+
 /// Switching identities, read-only: one account switcher list, then one library read
 /// (the library playlists) as each identity it lists. Prints only each identity's shape,
 /// its playlist count and which reads gave the same list (groups A, B, ...), never names

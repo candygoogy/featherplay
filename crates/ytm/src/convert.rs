@@ -38,7 +38,8 @@ use ytmapi_rs::query::{
 use crate::{
     AccountIdentity, AccountInfo, Album, AlbumSummary, ApiError, Artist, ArtistSummary,
     ChartArtist, Charts, Country, HistoryDay, HomeFeed, HomeItem, HomeShelf, Mood, MoodPage,
-    MoodSection, PlainLyrics, PlaylistSummary, TimedLine, TimedLyrics, Trend,
+    MoodSection, PlainLyrics, PlaylistSummary, QuerySuggestion, SearchSuggestions, SuggestedResult,
+    TimedLine, TimedLyrics, Trend,
 };
 
 const WATCH_PANEL: &str = "/contents/singleColumnMusicWatchNextResultsRenderer/tabbedRenderer/watchNextTabbedResultsRenderer/tabs/0/tabRenderer/content/musicQueueRenderer/content/playlistPanelRenderer/contents";
@@ -272,6 +273,126 @@ pub fn search_playlists(raw: &str) -> Result<Vec<PlaylistSummary>, ApiError> {
             _ => None,
         })
         .collect())
+}
+
+/// The suggestions while a query is typed (`music/get_search_suggestions`): a section of
+/// completions (predictions, and signed in, past searches), then one of direct results.
+/// Read from raw JSON: ytmapi-rs 0.3.3 parses the completions only. A row that opens
+/// nothing featherplay shows (a podcast, an episode) is left out; a reply without sections
+/// (a query too short to suggest for) has none.
+pub fn search_suggestions(raw: &str) -> Result<SearchSuggestions, ApiError> {
+    let v = json(raw)?;
+    check_error(&v)?;
+    let mut out = SearchSuggestions::default();
+    let items = v
+        .get("contents")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|s| s.pointer("/searchSuggestionsSectionRenderer/contents"))
+        .filter_map(Value::as_array)
+        .flatten();
+    for item in items {
+        if let Some(r) = item.get("searchSuggestionRenderer") {
+            out.queries.extend(query_suggestion(r, false));
+        } else if let Some(r) = item.get("historySuggestionRenderer") {
+            out.queries.extend(query_suggestion(r, true));
+        } else if let Some(r) = item.get("musicResponsiveListItemRenderer") {
+            out.results.extend(suggested_result(r));
+        }
+    }
+    Ok(out)
+}
+
+/// A completion: the query its search endpoint runs (else its runs' text), and how much of
+/// it was typed (the leading bold runs).
+fn query_suggestion(r: &Value, history: bool) -> Option<QuerySuggestion> {
+    let runs = r
+        .pointer("/suggestion/runs")
+        .and_then(Value::as_array)
+        .map(Vec::as_slice)
+        .unwrap_or_default();
+    let shown: String = runs.iter().map(run_text).collect();
+    let text = r
+        .pointer("/navigationEndpoint/searchEndpoint/query")
+        .and_then(Value::as_str)
+        .map(str::to_string)
+        .unwrap_or(shown);
+    let typed: usize = runs
+        .iter()
+        .take_while(|run| run.get("bold").and_then(Value::as_bool) == Some(true))
+        .map(|run| run_text(run).len())
+        .sum();
+    let typed = if text.is_char_boundary(typed) {
+        typed
+    } else {
+        0
+    };
+    non_empty(text).map(|text| QuerySuggestion {
+        typed: typed.min(text.len()),
+        text,
+        history,
+    })
+}
+
+fn run_text(run: &Value) -> &str {
+    run.get("text").and_then(Value::as_str).unwrap_or_default()
+}
+
+/// A direct result row: a song or video (a watch endpoint), or an album, artist or
+/// playlist page. Its second column starts with the kind (`Song • Daft Punk • 111M
+/// plays`), but for an artist (`68.2M monthly audience`).
+fn suggested_result(r: &Value) -> Option<SuggestedResult> {
+    let title = text(flex_column(r, 0)).unwrap_or_default();
+    let subtitle = text(flex_column(r, 1)).unwrap_or_default();
+    let runs = runs_of(flex_column(r, 1));
+    // The byline past the kind word and its separator.
+    let byline_runs = if runs.len() >= 3 && runs[0].get("navigationEndpoint").is_none() {
+        &runs[2..]
+    } else {
+        runs
+    };
+    let thumbnail = best_raw(r.pointer(ROW_THUMBNAILS));
+    let item = if let Some(w) = r
+        .pointer("/navigationEndpoint/watchEndpoint")
+        .or_else(|| r.pointer(PLAY_WATCH_ENDPOINT))
+    {
+        let (artists, mut album) = byline(byline_runs);
+        if album.is_none() {
+            album = byline(runs_of(flex_column(r, 2))).1;
+        }
+        HomeItem::Track(watch_track(w, title, artists, album, thumbnail)?)
+    } else {
+        let (id, page) = browse_target(r)?;
+        match page {
+            "MUSIC_PAGE_TYPE_ALBUM" | "MUSIC_PAGE_TYPE_AUDIOBOOK" => {
+                HomeItem::Album(AlbumSummary {
+                    id: AlbumId(id.to_string()),
+                    title,
+                    artists: byline(byline_runs).0,
+                    year: None,
+                    thumbnail,
+                })
+            }
+            "MUSIC_PAGE_TYPE_ARTIST" => HomeItem::Artist(ArtistSummary {
+                id: ArtistId(id.to_string()),
+                name: title,
+                thumbnail,
+            }),
+            "MUSIC_PAGE_TYPE_PLAYLIST" => HomeItem::Playlist(PlaylistSummary {
+                id: PlaylistId(bare_playlist_id(id).to_string()),
+                title,
+                author: card_author(byline_runs),
+                count: None,
+                views: None,
+                avatar: None,
+                thumbnail,
+                owned: false,
+            }),
+            _ => return None,
+        }
+    };
+    Some(SuggestedResult { item, subtitle })
 }
 
 // ---------------------------------------------------------------------------
