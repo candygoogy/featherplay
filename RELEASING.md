@@ -40,14 +40,24 @@ git tag -a vX.Y.Z -m "featherplay X.Y.Z"
 git push origin vX.Y.Z
 ```
 
-`release.yml` checks that the tag matches the crate version, builds `featherplay.exe` with
-the build keys from the repository secrets, fails if the exe is over 31 MB, builds the
-installer with Inno Setup, and creates a **draft** release with:
+`release.yml` runs the tests on x64 and on ARM64 (a `windows-11-arm` runner), checks that
+the tag matches the crate version, builds `featherplay.exe` for each with the build keys
+from the repository secrets, fails if either exe is over 31 MB, builds both installers with
+Inno Setup, and creates a **draft** release with:
 
-- `featherplay.exe` and `featherplay.exe.sha256`
-- `featherplay-setup-X.Y.Z.exe` and `featherplay-setup-X.Y.Z.exe.sha256`
-- `SHA256SUMS.txt`, covering both and `THIRD_PARTY.md`
+- `featherplay.exe` and `featherplay.exe.sha256` (x64)
+- `featherplay-setup-X.Y.Z.exe` and `featherplay-setup-X.Y.Z.exe.sha256` (x64)
+- `featherplay-arm64.exe` and `featherplay-arm64.exe.sha256`
+- `featherplay-setup-X.Y.Z-arm64.exe` and `featherplay-setup-X.Y.Z-arm64.exe.sha256`
+- `SHA256SUMS.txt`, covering all four and `THIRD_PARTY.md`
 - `THIRD_PARTY.md`
+
+The x64 names never change: 0.1.0's links, the site, the README, winget and Scoop use them.
+
+To try the workflow before tagging, run it on a branch:
+`gh workflow run release.yml --ref <branch>` (or Actions > Release > Run workflow). It does
+everything up to the draft and uploads the files as the run's `release-assets` artifact
+instead; it never creates a release.
 
 If the run warns that it built without some of the secrets (the draft's notes say so too),
 don't publish that build. Delete the draft, add the secrets under Settings > Secrets and
@@ -72,7 +82,10 @@ PC makes the last check fail.
 3. Run `powershell -File packaging/windows/check-uninstalled.ps1`. It lists everything
    featherplay keeps and exits with 0 only when all of it is gone.
 
-Run the portable `featherplay.exe` once too.
+Run the portable `featherplay.exe` once too. On an ARM64 PC, if you have one, do the same
+with `featherplay-setup-X.Y.Z-arm64.exe` and `featherplay-arm64.exe`; Task Manager's
+Details tab should show featherplay, yt-dlp and deno as ARM64, not x64. (Over an x64
+install, the yt-dlp and deno it downloaded stay, and keep running as x64.)
 
 Then, in one commit that you push after publishing (step 5):
 
