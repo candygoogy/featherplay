@@ -10,8 +10,11 @@ use crate::ui::{AppWindow, TopBarData};
 /// `page` is shown, after `before` (`None` for the first page): a search page (also by back
 /// and forward) puts its query in the field, and going to any other page clears it, so a
 /// finished search doesn't linger over Settings. The same page shown again (a rename, a Try
-/// again) leaves what's being typed.
+/// again) leaves what's being typed. Another page closes the suggestions.
 pub fn page_shown(ui: &AppWindow, page: &Page, before: Option<&Page>) {
+    if before != Some(page) {
+        crate::suggest::close(ui);
+    }
     let field = ui.global::<TopBarData>();
     match page.query() {
         Some(query) => field.set_query(query.into()),

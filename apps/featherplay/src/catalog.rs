@@ -11,7 +11,7 @@ use featherplay_core::sync::RwLockExt;
 use featherplay_ytm::{
     AccountIdentity, AccountInfo, Album, AlbumSummary, ApiError, Artist, ArtistSummary, Charts,
     HistoryDay, HomeFeed, HomeShelf, MoodPage, MoodSection, Playlist, PlaylistSummary,
-    SearchFilter, SearchResults, SongLyrics, YtMusic,
+    SearchFilter, SearchResults, SearchSuggestions, SongLyrics, YtMusic,
 };
 use tokio::runtime::Handle;
 
@@ -194,6 +194,17 @@ impl Source {
             Source::Unreachable => Err(unreachable()),
             Source::Live(api) => api.search(q, filter).await,
             Source::Fixtures(f) => f.search(filter),
+        }
+    }
+
+    /// What the top bar suggests while `q` is typed. Fixtures have the one recording (for
+    /// "daft pu"), whatever is typed; the demo set has none.
+    pub async fn search_suggestions(&self, q: &str) -> Result<SearchSuggestions, ApiError> {
+        match self {
+            Source::SignedOut => Err(ApiError::AuthExpired),
+            Source::Unreachable => Err(unreachable()),
+            Source::Live(api) => api.search_suggestions(q).await,
+            Source::Fixtures(f) => f.search_suggestions(),
         }
     }
 

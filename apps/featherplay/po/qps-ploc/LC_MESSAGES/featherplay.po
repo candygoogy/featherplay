@@ -335,7 +335,7 @@ msgstr "[Similar to]"
 msgid "More from {}"
 msgstr "[More from {}]"
 
-#: src/pages/now_playing.rs:278
+#: src/pages/now_playing.rs:266
 msgid "Couldn't load related tracks"
 msgstr "[Couldn't load related tracks]"
 
@@ -599,27 +599,27 @@ msgstr "[Added to Liked songs]"
 msgid "Removed from Liked songs"
 msgstr "[Removed from Liked songs]"
 
-#: src/updates.rs:385 src/updates.rs:518 ui/pages/about.slint:74
+#: src/updates.rs:388 src/updates.rs:521 ui/pages/about.slint:74
 msgid "Get it"
 msgstr "[Get it]"
 
-#: src/updates.rs:393
+#: src/updates.rs:396
 msgid "Details"
 msgstr "[Details]"
 
-#: src/updates.rs:459
+#: src/updates.rs:462
 msgid "featherplay {} is ready to install"
 msgstr "[featherplay {} is ready to install]"
 
-#: src/updates.rs:460 ui/pages/about.slint:74
+#: src/updates.rs:463 ui/pages/about.slint:74
 msgid "Restart to update"
 msgstr "[Restart to update]"
 
-#: src/updates.rs:495
+#: src/updates.rs:498
 msgid "The update couldn't start"
 msgstr "[The update couldn't start]"
 
-#: src/updates.rs:517 ui/pages/about.slint:44 ui/pages/about.slint:54
+#: src/updates.rs:520 ui/pages/about.slint:44 ui/pages/about.slint:54
 msgid "featherplay {} is out"
 msgstr "[featherplay {} is out]"
 
@@ -1078,11 +1078,11 @@ msgstr "[No lyrics for this song]"
 msgid "Plays from this line"
 msgstr "[Plays from this line]"
 
-#: ui/pages/lyrics.slint:445
+#: ui/pages/lyrics.slint:448
 msgid "Synced lyrics are unavailable right now"
 msgstr "[Synced lyrics are unavailable right now]"
 
-#: ui/pages/lyrics.slint:445
+#: ui/pages/lyrics.slint:448
 msgid "Not synced to the song"
 msgstr "[Not synced to the song]"
 
@@ -1115,7 +1115,7 @@ msgid "Songs added to it show up here."
 msgstr "[Songs added to it show up here.]"
 
 #. A link isn't repeated as the title: the field above shows it.
-#: ui/pages/search.slint:44 ui/top_bar.slint:132
+#: ui/pages/search.slint:44 ui/top_bar.slint:333
 msgid "Search"
 msgstr "[Search]"
 
@@ -1601,7 +1601,7 @@ msgstr "[Apps send it as \"Authorization: Bearer\" and the token. It stays hidde
 msgid "Token, hidden"
 msgstr "[Token, hidden]"
 
-#: ui/pages/settings.slint:1491 ui/top_bar.slint:97
+#: ui/pages/settings.slint:1491 ui/top_bar.slint:298
 msgid "Copy"
 msgstr "[Copy]"
 
@@ -1994,30 +1994,34 @@ msgstr "[Dislike]"
 msgid "Add to playlist"
 msgstr "[Add to playlist]"
 
-#: ui/top_bar.slint:80
+#: ui/top_bar.slint:185
+msgid "Search suggestions"
+msgstr "[Search suggestions]"
+
+#: ui/top_bar.slint:281
 msgid "Search songs, albums, artists, playlists"
 msgstr "[Search songs, albums, artists, playlists]"
 
-#: ui/top_bar.slint:92
+#: ui/top_bar.slint:293
 msgid "Cut"
 msgstr "[Cut]"
 
-#: ui/top_bar.slint:102
+#: ui/top_bar.slint:303
 msgid "Paste"
 msgstr "[Paste]"
 
-#: ui/top_bar.slint:111
+#: ui/top_bar.slint:312
 msgid "Select all"
 msgstr "[Select all]"
 
-#: ui/top_bar.slint:133
+#: ui/top_bar.slint:334
 msgid "Ctrl+K"
 msgstr "[Ctrl+K]"
 
-#: ui/top_bar.slint:162
+#: ui/top_bar.slint:392
 msgid "Ctrl"
 msgstr "[Ctrl]"
 
-#: ui/top_bar.slint:173
+#: ui/top_bar.slint:403
 msgid "Clear search"
 msgstr "[Clear search]"

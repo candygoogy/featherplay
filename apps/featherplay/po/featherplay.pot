@@ -335,7 +335,7 @@ msgstr ""
 msgid "More from {}"
 msgstr ""
 
-#: src/pages/now_playing.rs:278
+#: src/pages/now_playing.rs:266
 msgid "Couldn't load related tracks"
 msgstr ""
 
@@ -599,27 +599,27 @@ msgstr ""
 msgid "Removed from Liked songs"
 msgstr ""
 
-#: src/updates.rs:385 src/updates.rs:518 ui/pages/about.slint:74
+#: src/updates.rs:388 src/updates.rs:521 ui/pages/about.slint:74
 msgid "Get it"
 msgstr ""
 
-#: src/updates.rs:393
+#: src/updates.rs:396
 msgid "Details"
 msgstr ""
 
-#: src/updates.rs:459
+#: src/updates.rs:462
 msgid "featherplay {} is ready to install"
 msgstr ""
 
-#: src/updates.rs:460 ui/pages/about.slint:74
+#: src/updates.rs:463 ui/pages/about.slint:74
 msgid "Restart to update"
 msgstr ""
 
-#: src/updates.rs:495
+#: src/updates.rs:498
 msgid "The update couldn't start"
 msgstr ""
 
-#: src/updates.rs:517 ui/pages/about.slint:44 ui/pages/about.slint:54
+#: src/updates.rs:520 ui/pages/about.slint:44 ui/pages/about.slint:54
 msgid "featherplay {} is out"
 msgstr ""
 
@@ -1078,11 +1078,11 @@ msgstr ""
 msgid "Plays from this line"
 msgstr ""
 
-#: ui/pages/lyrics.slint:445
+#: ui/pages/lyrics.slint:448
 msgid "Synced lyrics are unavailable right now"
 msgstr ""
 
-#: ui/pages/lyrics.slint:445
+#: ui/pages/lyrics.slint:448
 msgid "Not synced to the song"
 msgstr ""
 
@@ -1115,7 +1115,7 @@ msgid "Songs added to it show up here."
 msgstr ""
 
 #. A link isn't repeated as the title: the field above shows it.
-#: ui/pages/search.slint:44 ui/top_bar.slint:132
+#: ui/pages/search.slint:44 ui/top_bar.slint:333
 msgid "Search"
 msgstr ""
 
@@ -1601,7 +1601,7 @@ msgstr ""
 msgid "Token, hidden"
 msgstr ""
 
-#: ui/pages/settings.slint:1491 ui/top_bar.slint:97
+#: ui/pages/settings.slint:1491 ui/top_bar.slint:298
 msgid "Copy"
 msgstr ""
 
@@ -1994,30 +1994,34 @@ msgstr ""
 msgid "Add to playlist"
 msgstr ""
 
-#: ui/top_bar.slint:80
+#: ui/top_bar.slint:185
+msgid "Search suggestions"
+msgstr ""
+
+#: ui/top_bar.slint:281
 msgid "Search songs, albums, artists, playlists"
 msgstr ""
 
-#: ui/top_bar.slint:92
+#: ui/top_bar.slint:293
 msgid "Cut"
 msgstr ""
 
-#: ui/top_bar.slint:102
+#: ui/top_bar.slint:303
 msgid "Paste"
 msgstr ""
 
-#: ui/top_bar.slint:111
+#: ui/top_bar.slint:312
 msgid "Select all"
 msgstr ""
 
-#: ui/top_bar.slint:133
+#: ui/top_bar.slint:334
 msgid "Ctrl+K"
 msgstr ""
 
-#: ui/top_bar.slint:162
+#: ui/top_bar.slint:392
 msgid "Ctrl"
 msgstr ""
 
-#: ui/top_bar.slint:173
+#: ui/top_bar.slint:403
 msgid "Clear search"
 msgstr ""

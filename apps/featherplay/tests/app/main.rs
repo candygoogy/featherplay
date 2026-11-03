@@ -71,6 +71,7 @@ mod row_menus;
 mod scroll_frames;
 mod search_link;
 mod search_paste;
+mod search_suggestions;
 mod settings_index;
 mod side_panel;
 mod sidebar_chips;

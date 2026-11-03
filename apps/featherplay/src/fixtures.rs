@@ -18,7 +18,7 @@ use featherplay_core::model::{AlbumId, PlaylistId, Track, TrackId};
 use featherplay_ytm::{
     AccountIdentity, AccountInfo, Album, AlbumSummary, ApiError, Artist, ArtistSummary, Charts,
     HistoryDay, HomeFeed, HomeShelf, Identity, MoodPage, MoodSection, Playlist, PlaylistSummary,
-    SearchFilter, SearchResults, convert,
+    SearchFilter, SearchResults, SearchSuggestions, convert,
 };
 use serde_json::Value;
 use sha1::{Digest, Sha1};
@@ -269,6 +269,14 @@ impl Fixtures {
             SearchFilter::Artists => out.artists = self.library_artists()?,
         }
         Ok(out)
+    }
+
+    /// The recorded suggestions for "daft pu"; the demo set has none.
+    pub fn search_suggestions(&self) -> Result<SearchSuggestions, ApiError> {
+        if self.demo.is_some() {
+            return Ok(SearchSuggestions::default());
+        }
+        convert::search_suggestions(&self.raw("search_suggestions")?)
     }
 
     /// The scrubbed account recording (a placeholder name). Its photo URL is a

@@ -61,6 +61,7 @@ pub mod shell;
 pub mod sidebar;
 pub mod snapshot;
 pub mod song_menu;
+pub mod suggest;
 pub mod toast;
 pub mod top_bar;
 pub mod ui_bridge;

@@ -56,6 +56,10 @@ pub const PAGES: &[&str] = &[
     // Search after a song link was pasted: that one song, no chips; or a link to no song.
     "search-link",
     "search-link-missing",
+    // Home with "daft pu" typed in the top bar and its suggestions under the field; or the
+    // same after Down eight times, the first song highlighted.
+    "search-suggestions",
+    "search-suggestions-key",
     "now-playing",
     // Now playing with titles and artists in other scripts and styled Unicode
     // (`SCRIPT_TITLES`), for the fonts they fall back to; `--queue` shows them in Up next.
@@ -456,6 +460,20 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
             settle();
         }
     }
+    if o.page.starts_with("search-suggestions") {
+        crate::suggest::show_for_snapshot(ctx);
+        settle();
+        if o.page == "search-suggestions-key" {
+            for _ in 0..8 {
+                let down = slint::SharedString::from(slint::platform::Key::DownArrow);
+                ui.window()
+                    .dispatch_event(WindowEvent::KeyPressed { text: down.clone() });
+                ui.window()
+                    .dispatch_event(WindowEvent::KeyReleased { text: down });
+            }
+            settle();
+        }
+    }
     if o.page == "home-shortcuts" {
         crate::pages::home::drop_mixes_for_snapshot(ctx);
         settle();
@@ -694,7 +712,9 @@ fn page(name: &str, f: &Fixtures) -> Result<Page, String> {
         | "sidebar-albums"
         | "sidebar-artists"
         | "sidebar-pinned"
-        | "home-shortcuts" => Page::Home,
+        | "home-shortcuts"
+        | "search-suggestions"
+        | "search-suggestions-key" => Page::Home,
         "library" => Page::Library {
             tab: LibraryTab::Liked,
         },

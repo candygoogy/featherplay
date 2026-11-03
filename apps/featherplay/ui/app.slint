@@ -39,7 +39,7 @@ export { Nav, PageKind, Frame } from "nav.slint";
 export { Probe } from "probe.slint";
 export { Player, Repeat } from "player.slint";
 export { SidebarData } from "sidebar.slint";
-export { TopBarData } from "top_bar.slint";
+export { TopBarData, Suggestion, SuggestionKind } from "top_bar.slint";
 export { QueueData } from "queue_panel.slint";
 
 export { HomeData, HomeShelfRow, ShelfShape, MoreState } from "pages/home.slint";
@@ -227,6 +227,7 @@ export component AppWindow inherits Window {
                 // In the search field: the first Escape clears it, the next leaves it.
                 if top-bar.searching && TopBarData.query != "" {
                     TopBarData.query = "";
+                    TopBarData.edited("");
                     return accept;
                 }
                 if root.full-page {
@@ -343,11 +344,20 @@ export component AppWindow inherits Window {
                 visible: !root.full-page;
                 clear: root.under-top || root.home-wash;
                 narrow: !root.wide;
+                area-h: parent.height;
                 submitted(q) => {
                     root.navigate-by-key();
                     Nav.search(q);
                     keys.focus();
                 }
+                picked(i, by-key) => {
+                    if by-key {
+                        root.navigate-by-key();
+                    }
+                    TopBarData.pick(i);
+                    keys.focus();
+                }
+                dismissed => { keys.focus(); }
             }
         }
 
@@ -405,6 +415,33 @@ export component AppWindow inherits Window {
             y: 0;
             width: root.width;
             height: root.height;
+        }
+
+        // While the search suggestions show, a click beside the pages (the sidebar, the bar,
+        // the Up next panel) closes them, as one on a page does (`TopBar`), and goes no
+        // further.
+        if top-bar.suggestions-open: Rectangle {
+            x: 0;
+            y: 0;
+            width: root.width;
+            height: root.height;
+            for area in [
+                { x: 0px, y: 0px, w: root.side-w, h: root.height },
+                { x: root.side-w, y: root.bar-top, w: root.width - root.side-w, h: root.height - root.bar-top },
+                { x: root.side-w + root.page-width, y: 0px, w: root.width - root.side-w - root.page-width, h: root.bar-top },
+            ]: TouchArea {
+                x: area.x;
+                y: area.y;
+                width: area.w;
+                height: area.h;
+                pointer-event(e) => {
+                    if e.kind == PointerEventKind.down {
+                        top-bar.close-suggestions(false);
+                        TopBarData.dismissed();
+                        keys.focus();
+                    }
+                }
+            }
         }
 
         // Toasts: bottom centre, 16 px above the bar.

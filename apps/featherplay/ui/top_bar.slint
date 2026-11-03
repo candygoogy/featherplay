@@ -1,8 +1,24 @@
 // The top bar: across the content area, above every page but Now playing, with the search
 // field. Ctrl+K focuses it, Enter searches, Escape clears it then leaves it (the window's
 // key handler), × clears it. The query is filled by `src/top_bar.rs` on every page shown.
+// While the user types, suggestions drop down under the field (`src/suggest.rs`): Down and
+// Up move through them, Enter picks the one highlighted, Escape closes them first.
 import { Theme, Icons, Curves } from "theme.slint";
-import { Icon, Body } from "parts.slint";
+import { Icon, Body, Cover } from "parts.slint";
+
+// What a suggestion row is.
+export enum SuggestionKind { query, history, song, album, artist, playlist }
+
+export struct Suggestion {
+    kind: SuggestionKind,
+    // A completion (`query`, or `history`, a past search): the part the user typed, then
+    // `rest`; the query is the two together. A result: its title, `rest` empty.
+    title: string,
+    rest: string,
+    // A result's line under the title, as YouTube Music writes it: `Song • Daft Punk • 111M plays`.
+    subtitle: string,
+    cover: image,
+}
 
 export global TopBarData {
     // The field's text: what the user types, and the search page's query once one is shown
@@ -14,6 +30,185 @@ export global TopBarData {
     // A paste is about to read the clipboard (Ctrl+V, Shift+Insert or the menu's Paste):
     // `top_bar::pasting` logs whether the system clipboard could be opened and holds text.
     callback pasting();
+
+    // The suggestions for the field's text (`src/suggest.rs`): `completions` completions
+    // first, then the direct results.
+    in property <[Suggestion]> suggestions;
+    in property <int> completions;
+    // The rows are wanted. Set by Rust when an answer for the field's text lands; cleared by
+    // Escape, Enter, a pick, a click outside them and a page change.
+    in-out property <bool> suggesting;
+    // The row the arrows or the pointer are on, -1 for none.
+    in-out property <int> highlighted: -1;
+    // The user changed the text: typing, a paste, ×, Escape's clear.
+    callback edited(string);
+    // Row `i` was picked: a completion is searched, a song plays, a page opens.
+    callback pick(int);
+    // The rows were closed without a pick: answers still on their way are dropped.
+    callback dismissed();
+}
+
+// Glyphs only the suggestions use, on the same 24 px grid as `Icons`.
+global SuggestIcons {
+    // A past search: a clock.
+    out property <string> history: "M12 4.5 a7.5 7.5 0 1 0 0.01 0 Z M12 8.5 V12 L14.5 14.5";
+}
+
+// One suggestion: a completion (its icon, the typed part in bold, the rest), or a result
+// (its cover, round for an artist, the title and YouTube Music's line under it).
+component SuggestionRow inherits Rectangle {
+    in property <Suggestion> item;
+    in property <bool> highlighted;
+    // Off while the rows fade out, so a click then does nothing.
+    in property <bool> enabled: true;
+    callback clicked();
+    callback hovered(bool);
+    property <bool> completion: root.item.kind == SuggestionKind.query || root.item.kind == SuggestionKind.history;
+    height: root.completion ? 40px : 56px;
+    border-radius: Theme.r-s;
+    background: Theme.state(ta.pressed, root.highlighted);
+    animate background { duration: Theme.t-hover; }
+    accessible-role: list-item;
+    accessible-label: root.completion ? root.item.title + root.item.rest : (root.item.subtitle != "" ? root.item.title + ", " + root.item.subtitle : root.item.title);
+    accessible-action-default => { root.clicked(); }
+    ta := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+        changed has-hover => { root.hovered(self.has-hover); }
+    }
+    // The icon and the text line up with the field's, above.
+    if root.completion: Icon {
+        x: Theme.s2;
+        width: 20px;
+        height: 20px;
+        commands: root.item.kind == SuggestionKind.history ? SuggestIcons.history : Icons.search;
+        stroke: Theme.text3;
+    }
+    if root.completion: HorizontalLayout {
+        x: 40px;
+        width: parent.width - self.x - Theme.s3;
+        alignment: start;
+        Body {
+            text: root.item.title;
+            font-weight: 700;
+            vertical-alignment: center;
+            overflow: clip;
+            horizontal-stretch: 0;
+        }
+        Body {
+            text: root.item.rest;
+            vertical-alignment: center;
+            horizontal-stretch: 1;
+        }
+    }
+    if !root.completion: Cover {
+        x: Theme.s2;
+        y: (parent.height - self.height) / 2;
+        width: 40px;
+        height: 40px;
+        radius: Theme.r-s;
+        round: root.item.kind == SuggestionKind.artist;
+        source: root.item.cover;
+    }
+    if !root.completion: VerticalLayout {
+        x: 60px;
+        width: parent.width - self.x - Theme.s3;
+        alignment: center;
+        spacing: 2px;
+        Body {
+            text: root.item.title;
+            font-weight: 600;
+        }
+        if root.item.subtitle != "": Body {
+            text: root.item.subtitle;
+            font-size: Theme.t-meta;
+            color: Theme.text3;
+        }
+    }
+}
+
+component Divider inherits Rectangle {
+    height: 9px;
+    Rectangle {
+        x: Theme.s2;
+        y: 4px;
+        width: parent.width - 2 * Theme.s2;
+        height: 1px;
+        background: Theme.hairline;
+    }
+}
+
+// The rows under the field. Stays instantiated so it can fade out; hidden once it has.
+component SuggestionsPanel inherits Rectangle {
+    in property <bool> open;
+    // Closed by a key or a pick: keyboard actions don't animate.
+    in property <bool> snap;
+    in property <length> room;
+    callback picked(int);
+
+    // Opening, it snaps to its start (clear, a little up toward the field), then eases
+    // down into place; closing, it fades. Nothing runs once it's in place or gone.
+    property <bool> settled: true;
+    changed open => {
+        if root.open {
+            root.settled = false;
+            settle.running = true;
+        }
+    }
+    settle := Timer {
+        interval: 1ms;
+        running: false;
+        triggered => {
+            self.running = false;
+            root.settled = true;
+        }
+    }
+    property <length> nudge: root.open && !root.settled ? -Theme.nudge : 0px;
+    animate nudge { duration: root.open && root.settled ? Theme.t-menu : 0ms; easing: Curves.ease-out; }
+    opacity: root.open && root.settled ? 1 : 0;
+    animate opacity {
+        duration: root.open ? (root.settled ? Theme.t-menu : 0ms) : (root.snap ? 0ms : Theme.t-fast);
+        easing: Curves.ease-out;
+    }
+    visible: self.opacity > 0;
+    height: min(rows.preferred-height, root.room);
+    border-radius: Theme.r-l;
+    background: Theme.panel;
+    border-width: 1px;
+    border-color: Theme.card-edge;
+    drop-shadow-blur: 24px;
+    drop-shadow-offset-y: 8px;
+    drop-shadow-color: Theme.cover-shadow;
+    clip: true;
+    accessible-role: list;
+    accessible-label: @tr("Search suggestions");
+
+    // Swallows clicks on the padding, and the wheel, which would scroll the page under it.
+    TouchArea {
+        enabled: root.open;
+        scroll-event(e) => { accept }
+    }
+    rows := VerticalLayout {
+        y: root.nudge;
+        padding: Theme.s2;
+        for item[i] in TopBarData.suggestions: VerticalLayout {
+            if i == TopBarData.completions && i > 0: Divider { }
+            SuggestionRow {
+                item: item;
+                enabled: root.open;
+                highlighted: TopBarData.highlighted == i;
+                clicked => { root.picked(i); }
+                hovered(over) => {
+                    if over {
+                        TopBarData.highlighted = i;
+                    } else if TopBarData.highlighted == i {
+                        TopBarData.highlighted = -1;
+                    }
+                }
+            }
+        }
+    }
 }
 
 // A key of a shortcut hint: its label in a small rounded cap with a hairline edge.
@@ -43,7 +238,13 @@ component Keycap inherits Rectangle {
 // The wide rounded field. Enter submits; Escape bubbles up to the window.
 component SearchField inherits Rectangle {
     callback submitted(string);
+    // A suggestion picked with Enter.
+    callback picked-by-key(int);
+    // Escape closed the suggestions.
+    callback escaped();
     out property <bool> focused: input.has-focus;
+    // The suggestions show: wanted, rows to show, and the field has the keys.
+    out property <bool> suggestions-open: TopBarData.suggesting && input.has-focus && TopBarData.query != "" && TopBarData.suggestions.length > 0;
     public function focus-input() {
         input.focus();
         input.select-all();
@@ -133,9 +334,35 @@ component SearchField inherits Rectangle {
                 accessible-description: @tr("Ctrl+K");
                 accepted => { root.submitted(self.text); }
                 // Paste keys are only noted here; the input still pastes them itself.
+                // The arrows move through the suggestions (Down past the last one comes back
+                // to the field), Enter picks the one highlighted, Escape closes them; with
+                // none highlighted, Enter searches for the text as it is.
                 key-pressed(e) => {
                     if (e.modifiers.control && (e.text == "v" || e.text == "V")) || (e.modifiers.shift && e.text == Key.Insert) {
                         TopBarData.pasting();
+                    }
+                    if e.text == Key.DownArrow && TopBarData.suggestions.length > 0 && TopBarData.query != "" {
+                        if root.suggestions-open {
+                            TopBarData.highlighted = Math.mod(TopBarData.highlighted + 2, TopBarData.suggestions.length + 1) - 1;
+                        } else {
+                            TopBarData.highlighted = -1;
+                            TopBarData.suggesting = true;
+                        }
+                        return accept;
+                    }
+                    if root.suggestions-open {
+                        if e.text == Key.UpArrow {
+                            TopBarData.highlighted = Math.mod(TopBarData.highlighted + TopBarData.suggestions.length + 1, TopBarData.suggestions.length + 1) - 1;
+                            return accept;
+                        }
+                        if e.text == Key.Escape {
+                            root.escaped();
+                            return accept;
+                        }
+                        if e.text == Key.Return && TopBarData.highlighted >= 0 && TopBarData.highlighted < TopBarData.suggestions.length {
+                            root.picked-by-key(TopBarData.highlighted);
+                            return accept;
+                        }
                     }
                     reject
                 }
@@ -147,6 +374,9 @@ component SearchField inherits Rectangle {
                         TopBarData.query = TopBarData.single-line(self.text);
                         self.set-selection-offsets(2147483647, 2147483647);
                     }
+                    // Typing brings the keys back to the field, off any row.
+                    TopBarData.highlighted = -1;
+                    TopBarData.edited(TopBarData.query);
                 }
             }
         }
@@ -173,6 +403,7 @@ component SearchField inherits Rectangle {
             accessible-label: @tr("Clear search");
             accessible-action-default => {
                 TopBarData.query = "";
+                TopBarData.edited("");
                 input.focus();
             }
             animate background { duration: Theme.t-hover; }
@@ -180,6 +411,7 @@ component SearchField inherits Rectangle {
                 mouse-cursor: pointer;
                 clicked => {
                     TopBarData.query = "";
+                    TopBarData.edited("");
                     input.focus();
                 }
             }
@@ -199,8 +431,27 @@ export component TopBar inherits Rectangle {
     // Over a page that runs up under it (album, playlist, artist): no ground of its own, so
     // the page's wash shows through; the page's `TopScrim` covers what scrolls under it.
     in property <bool> clear: false;
+    // The content area's height from the bar's top: the suggestions end above its foot.
+    in property <length> area-h: 0px;
     out property <bool> searching: field.focused;
+    out property <bool> suggestions-open: field.suggestions-open;
     callback submitted(string);
+    // Suggestion `i` was picked, by Enter (`by-key`) or a click: the window calls
+    // `TopBarData.pick`.
+    callback picked(int, bool);
+    // A click outside the suggestions closed them: the field lets the keys go.
+    callback dismissed();
+    public function close-suggestions(by-key: bool) {
+        root.snap = by-key;
+        TopBarData.suggesting = false;
+        TopBarData.highlighted = -1;
+    }
+    property <bool> snap;
+    changed suggestions-open => {
+        if root.suggestions-open {
+            root.snap = false;
+        }
+    }
     public function focus-search() {
         field.focus-input();
     }
@@ -208,11 +459,57 @@ export component TopBar inherits Rectangle {
     background: root.clear ? transparent : Theme.ground;
     // Clicks on the bar beside the field don't reach a page's rows scrolled under it.
     TouchArea { }
+    // While the suggestions show, a click anywhere else in the content area closes them
+    // (and goes no further); the field stays clickable above it. `app.slint` covers the
+    // rest of the window.
+    if root.suggestions-open: TouchArea {
+        x: 0;
+        y: 0;
+        width: root.width;
+        height: max(root.height, root.area-h);
+        pointer-event(e) => {
+            if e.kind == PointerEventKind.down {
+                root.close-suggestions(false);
+                TopBarData.dismissed();
+                root.dismissed();
+            }
+        }
+        scroll-event(e) => {
+            root.close-suggestions(false);
+            TopBarData.dismissed();
+            root.dismissed();
+            accept
+        }
+    }
     // Left-aligned with the pages' content, like their titles.
     field := SearchField {
         x: Theme.page-pad;
         y: (parent.height - self.height) / 2;
         width: max(0px, min(root.narrow ? Theme.top-search-narrow : Theme.top-search-w, parent.width - 2 * Theme.page-pad));
-        submitted(q) => { root.submitted(q); }
+        submitted(q) => {
+            root.close-suggestions(true);
+            TopBarData.dismissed();
+            root.submitted(q);
+        }
+        picked-by-key(i) => {
+            root.close-suggestions(true);
+            root.picked(i, true);
+        }
+        escaped => {
+            root.close-suggestions(true);
+            TopBarData.dismissed();
+        }
+    }
+    SuggestionsPanel {
+        x: field.x;
+        y: field.y + field.height + Theme.s2;
+        width: field.width;
+        room: max(0px, root.area-h - self.y - Theme.s4);
+        open: field.suggestions-open;
+        snap: root.snap;
+        picked(i) => {
+            root.close-suggestions(true);
+            root.picked(i, false);
+        }
     }
 }
