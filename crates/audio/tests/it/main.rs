@@ -10,5 +10,6 @@
 mod daily_play;
 mod engine_local;
 mod live;
+mod play_probe;
 mod tmp;
 mod volume;

@@ -1,0 +1,59 @@
+name: Play probe
+
+# A manual experiment for the daily play check's redesign: can a GitHub runner get a
+# playable stream at all? For a few public Creative Commons songs it tries every resolver
+# step on its own (the native request, yt-dlp as the app runs it, yt-dlp's defaults and
+# single yt-dlp clients) without sign-in, fetches the first 1 MiB of each URL, and records
+# works / blocked / broken (crates/audio/tests/it/play_probe.rs). It never fails on a
+# blocked or broken step: the table in the job summary and the artifact is the result.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: play-probe
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: --cfg ci
+
+jobs:
+  probe:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Rust toolchain
+        shell: bash
+        run: |
+          rustup toolchain install
+          rustup show active-toolchain
+
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+
+      - name: Build the audio crate's tests
+        run: cargo test -p featherplay-audio --no-run
+
+      - name: Probe every resolver step
+        shell: bash
+        run: |
+          export FEATHERPLAY_HOME="$RUNNER_TEMP/featherplay-home"
+          export PLAY_PROBE_OUT="$RUNNER_TEMP/play-probe.md"
+          mkdir -p "$FEATHERPLAY_HOME"
+          echo "Run at $(date -u '+%Y-%m-%d %H:%M UTC') on a GitHub-hosted $RUNNER_OS runner." | tee -a "$GITHUB_STEP_SUMMARY" > "$PLAY_PROBE_OUT"
+          cargo test -p featherplay-audio --test it -- play_probe::play_probe_sweeps_every_step --ignored --exact --nocapture
+
+      - name: Upload the table
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: play-probe-${{ github.run_id }}
+          path: ${{ runner.temp }}/play-probe.md
+          if-no-files-found: warn

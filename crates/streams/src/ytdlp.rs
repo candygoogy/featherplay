@@ -286,6 +286,26 @@ impl YtDlpResolver {
         }
     }
 
+    /// One step of `resolve` on its own, without cookies: no fallback, no `yt-dlp -U`, no
+    /// wait for `available_at`. For the play probe (`crates/audio/tests/it/play_probe.rs`),
+    /// which measures which steps get through from where. The error is the step's own text
+    /// (the native refusal, or yt-dlp's exit code and stderr tail).
+    pub async fn probe(&self, id: &TrackId, step: Probe<'_>) -> Result<ResolvedStream, String> {
+        let args = match step {
+            Probe::Native => {
+                let native = self
+                    .native
+                    .as_ref()
+                    .ok_or("no HTTP client for the native step")?;
+                return native.resolve(&id.0).await.map_err(|e| e.to_string());
+            }
+            Probe::Embedded => Some(EMBEDDED_ARGS),
+            Probe::Default => None,
+            Probe::Args(a) => Some(a),
+        };
+        self.run(id, None, args).await.map_err(|e| e.to_string())
+    }
+
     fn embedded_on(&self) -> bool {
         self.embedded_off
             .lock_or_recover()
@@ -434,6 +454,19 @@ impl StreamResolver for YtDlpResolver {
         wait_until_available(&stream).await;
         Ok(stream)
     }
+}
+
+/// A step for `YtDlpResolver::probe`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Probe<'a> {
+    /// Step 1: the embedded client asked from Rust.
+    Native,
+    /// Step 2: the embedded client through yt-dlp, with the app's `--extractor-args`.
+    Embedded,
+    /// Step 3: yt-dlp's default clients.
+    Default,
+    /// yt-dlp with these `--extractor-args`, such as `youtube:player_client=tv`.
+    Args(&'a str),
 }
 
 /// The steps of `YtDlpResolver::resolve`, as the log names them.

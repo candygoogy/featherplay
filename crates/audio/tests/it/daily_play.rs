@@ -101,7 +101,7 @@ async fn daily_play_decodes_ten_seconds() {
 }
 
 /// YouTube's challenge for suspected bots, as yt-dlp reports it.
-fn is_bot_check(error: &str) -> bool {
+pub(super) fn is_bot_check(error: &str) -> bool {
     error.contains("confirm you") && error.contains("not a bot")
 }
 

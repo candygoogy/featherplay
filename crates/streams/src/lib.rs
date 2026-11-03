@@ -21,7 +21,7 @@ use featherplay_core::model::TrackId;
 
 pub use expiry::expires_at_from_url;
 pub use sidecars::{Downloads, Sidecars};
-pub use ytdlp::{YtDlpResolver, classify_failure, parse_ytdlp_json};
+pub use ytdlp::{Probe, YtDlpResolver, classify_failure, parse_ytdlp_json};
 
 /// A directly fetchable audio stream. Fetch it with 1 MiB `Range` requests: plain GETs are throttled.
 #[derive(Clone, Debug, PartialEq)]
