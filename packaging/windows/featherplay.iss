@@ -79,7 +79,8 @@ WizardImageStretch=no
 
 ; A running featherplay is closed by the Restart Manager, which sends the end-session
 ; messages endsession.rs answers by saving and quitting. It isn't restarted that way; the
-; finish page's "Launch featherplay" does it.
+; finish page's "Launch featherplay" does it, or, for an update featherplay started itself
+; (/RELAUNCH), the second [Run] entry.
 CloseApplications=yes
 RestartApplications=no
 
@@ -112,6 +113,10 @@ Name: "{userdesktop}\{#AppName}"; Filename: "{app}\featherplay.exe"; WorkingDir:
 
 [Run]
 Filename: "{app}\featherplay.exe"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: nowait postinstall skipifsilent
+; An update featherplay downloaded and started itself, silently, with /RELAUNCH
+; (apps/featherplay/src/updates/install.rs: SETUP_ARGS): the new version starts once its
+; files are in place. A plain silent install (/VERYSILENT alone) still starts nothing.
+Filename: "{app}\featherplay.exe"; Flags: nowait; Check: Relaunch
 
 [UninstallDelete]
 ; The app never writes into {app}; Inno removes the files it installed and then the folder
@@ -355,6 +360,34 @@ begin
   RegDeleteKeyIncludingSubkeys(HKCU, 'Software\Classes\AppUserModelId\{#AppUserModelId}');
   // Windows' notification settings for featherplay's AppUserModelID.
   RegDeleteKeyIncludingSubkeys(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Notifications\Settings\{#AppUserModelId}');
+end;
+
+// featherplay started this setup to update itself: silent, with /RELAUNCH on the command
+// line (apps/featherplay/src/updates/install.rs: SETUP_ARGS).
+function Relaunch(): Boolean;
+var
+  I: Integer;
+begin
+  Result := False;
+  if not WizardSilent then
+    Exit;
+  for I := 1 to ParamCount do
+    if CompareText(ParamStr(I), '/RELAUNCH') = 0 then begin
+      Result := True;
+      Exit;
+    end;
+end;
+
+// For an update featherplay started, featherplay quits on its own right after; this waits
+// for it (and ends it if it hasn't gone in 10 seconds), so its exe isn't in use when the new
+// one is copied. Other installs leave it to the Restart Manager, as before.
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+begin
+  if Relaunch() then begin
+    Log('Update started by featherplay; waiting for it to close.');
+    CloseFeatherplay();
+  end;
+  Result := '';
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);

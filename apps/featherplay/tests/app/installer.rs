@@ -51,3 +51,16 @@ fn the_uninstaller_finds_the_end_session_window() {
         endsession::TITLE
     );
 }
+
+#[test]
+fn an_update_the_app_starts_relaunches_it() {
+    use featherplay::updates::install::SETUP_ARGS;
+
+    let iss = script();
+    // The app starts the setup silently with /RELAUNCH; the script reads that flag to close
+    // the app first and to start the new version after.
+    assert!(SETUP_ARGS.contains(&"/VERYSILENT") && SETUP_ARGS.contains(&"/RELAUNCH"));
+    assert!(iss.contains("CompareText(ParamStr(I), '/RELAUNCH') = 0"));
+    assert!(iss.contains(r#"Filename: "{app}\featherplay.exe"; Flags: nowait; Check: Relaunch"#));
+    assert!(iss.contains("if Relaunch() then begin"));
+}
