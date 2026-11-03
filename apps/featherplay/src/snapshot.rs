@@ -89,6 +89,9 @@ pub const PAGES: &[&str] = &[
     "about",
     // About with a newer release out: the banner above the logo.
     "about-update",
+    // About with the newer release's setup downloaded: Restart to update, in the banner and
+    // the toast.
+    "about-update-ready",
     // The album after songs kept failing to play: the toast saying featherplay may need an
     // update, with Get it; or the one while the helpers update.
     "album-stopped",
@@ -482,10 +485,14 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
         crate::toast::show_with(ctx, "Saved to Homework", "View", |_| {});
         settle();
     }
-    if o.page == "about-update" {
+    if o.page == "about-update" || o.page == "about-update-ready" {
+        if o.page == "about-update-ready" {
+            crate::updates::ready_for_snapshot(ctx);
+        }
         app::on_event(UiEvent::Release(crate::updates::Release {
             version: "0.2.0".into(),
             url: "https://github.com/candygoogy/featherplay/releases/tag/v0.2.0".into(),
+            assets: Vec::new(),
         }));
         settle();
     }
@@ -738,7 +745,7 @@ fn page(name: &str, f: &Fixtures) -> Result<Page, String> {
         | "settings-listenbrainz"
         | "settings-idle"
         | "settings-local-api" => Page::Settings,
-        "about" | "about-update" => Page::About,
+        "about" | "about-update" | "about-update-ready" => Page::About,
         "sign-in" | "sign-in-expired" => Page::SignIn,
         "explore" => Page::Explore {
             tab: ExploreTab::NewReleases,

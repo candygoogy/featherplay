@@ -1,16 +1,17 @@
 //! Whether a newer featherplay is out, from GitHub's latest release, and the open issue the
-//! daily play check keeps when YouTube breaks playback. No account, no token, nothing
-//! downloaded.
+//! daily play check keeps when YouTube breaks playback. No account, no token.
 //!
 //! At most once a day: at startup, once the first page's loads have all arrived, if
 //! Settings' "Check for updates" is on. The answer is kept in `{cache}/update-check.json`
 //! with the time of the check, so the banner in About survives a restart without a request.
-//! A failed request (the repository is private until launch, so 404 is normal) is logged
-//! once and counts as that day's check: no retry, no timer. When songs keep failing to play
-//! after the helpers were updated, the controller asks again at once (`help`), once a
-//! session.
+//! A failed request is logged once and counts as that day's check: no retry, no timer.
+//! When songs keep failing to play after the helpers were updated, the controller asks
+//! again at once (`help`), once a session.
 //!
-//! A newer release shows a toast once per version and a banner at the top of About.
+//! A newer release shows a toast once per version and a banner at the top of About. The
+//! installed copy, with "Install updates automatically" on, first downloads and checks the
+//! release's setup (`install`), once per version, and then offers "Restart to update" in
+//! the toast and the banner, at every start until it's clicked.
 
 use std::cell::{Cell, RefCell};
 use std::io;
@@ -25,6 +26,10 @@ use serde_json::Value;
 use crate::app::Ctx;
 use crate::{busy, pages, toast};
 
+pub mod install;
+
+use install::{Origin, Ready};
+
 /// The project's pages on GitHub; every URL opened from a reply must start with it.
 const PAGES: &str = "https://github.com/candygoogy/featherplay/";
 const LATEST: &str = "https://api.github.com/repos/candygoogy/featherplay/releases/latest";
@@ -37,10 +42,20 @@ const STAMP: &str = "update-check.json";
 /// The running version.
 pub const CURRENT: &str = env!("CARGO_PKG_VERSION");
 
-/// A published release: its version ("0.2.0") and its page.
+/// A published release: its version ("0.2.0"), its page, and its files.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Release {
     pub version: String,
+    pub url: String,
+    /// The files attached to it that are downloaded from `install::DOWNLOADS`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub assets: Vec<Asset>,
+}
+
+/// A file attached to a release: its name and its download URL.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Asset {
+    pub name: String,
     pub url: String,
 }
 
@@ -109,9 +124,24 @@ pub fn parse_release(json: &str) -> Option<Release> {
     }
     let url = v["html_url"].as_str().filter(|u| ours(u))?;
     let [major, minor, patch] = tag.core;
+    let assets = v["assets"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|a| {
+            let name = a["name"].as_str()?;
+            let url = a["browser_download_url"].as_str()?;
+            let downloadable = url.starts_with(install::DOWNLOADS) && ours(url);
+            downloadable.then(|| Asset {
+                name: name.to_string(),
+                url: url.to_string(),
+            })
+        })
+        .collect();
     Some(Release {
         version: format!("{major}.{minor}.{patch}"),
         url: url.to_string(),
+        assets,
     })
 }
 
@@ -132,6 +162,13 @@ pub struct Stamp {
     pub latest: Option<Release>,
     /// The version the toast last announced.
     pub announced: Option<String>,
+    /// The version whose setup was last downloaded, whatever came of it: each version is
+    /// downloaded once.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fetched: Option<String>,
+    /// The setup downloaded and checked, waiting for "Restart to update".
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ready: Option<Ready>,
 }
 
 fn unix(t: SystemTime) -> u64 {
@@ -186,6 +223,19 @@ impl Stamp {
     pub fn announced(&mut self, version: &str) {
         self.announced = Some(version.to_string());
     }
+
+    /// The downloaded setup, if it installs the newer release (not an older one, nor the
+    /// version running now).
+    pub fn pending(&self, current: &str) -> Option<&Ready> {
+        let newer = self.newer(current)?;
+        self.ready.as_ref().filter(|r| r.version == newer.version)
+    }
+
+    /// The newer release, if its setup hasn't been downloaded (or tried) yet.
+    pub fn to_fetch(&self, current: &str) -> Option<&Release> {
+        self.newer(current)
+            .filter(|r| self.fetched.as_deref() != Some(r.version.as_str()))
+    }
 }
 
 /// The stamp file in `cache`.
@@ -233,11 +283,13 @@ async fn find_issue() -> Result<Option<String>, String> {
     Ok(parse_issue(&get(url).await?))
 }
 
-/// What a check found: the newer release, for About's banner, and the one to announce.
+/// What a check found: the newer release, for About's banner, the one to announce, and its
+/// downloaded setup, to offer "Restart to update" with instead of announcing it.
 #[derive(Debug, Default)]
 pub struct Found {
     pub newer: Option<Release>,
     pub announce: Option<Release>,
+    pub ready: Option<Ready>,
 }
 
 /// Checks GitHub if the last check is a day old, or at once with `force`; else reads the
@@ -265,7 +317,66 @@ pub async fn check(path: PathBuf, force: bool) -> Found {
     Found {
         newer: stamp.newer(CURRENT).cloned(),
         announce,
+        ready: None,
     }
+}
+
+/// The startup check, then with `install` (the setting is on) for the installed copy: the
+/// setup already downloaded for the newer release, checked again, or else a download of it
+/// if this version hasn't been tried. A failed or mismatched download is logged and the
+/// release is only announced. Otherwise old setups are deleted.
+pub async fn startup(cache: PathBuf, install: bool) -> Found {
+    let path = stamp_path(&cache);
+    let mut found = check(path.clone(), false).await;
+    if !install || !install::installed() {
+        return found;
+    }
+    let mut stamp = Stamp::load(&path);
+    if let Some(ready) = stamp.pending(CURRENT).cloned() {
+        if ready.verified(&cache) {
+            install::clean(&cache, Some(&ready));
+            found.announce = None;
+            found.ready = Some(ready);
+            return found;
+        }
+        log!(
+            "update: the downloaded setup for {} is gone or changed",
+            ready.version
+        );
+    }
+    let stale = stamp.ready.take().is_some();
+    install::clean(&cache, None);
+    let plan = stamp.to_fetch(CURRENT).map(|r| {
+        let plan = install::plan(r, std::env::consts::ARCH);
+        if plan.is_none() {
+            log!(
+                "update: {} has no setup for {}; announcing it only",
+                r.version,
+                std::env::consts::ARCH
+            );
+        }
+        (r.version.clone(), plan)
+    });
+    if let Some((version, plan)) = plan {
+        stamp.fetched = Some(version);
+        if let Some(plan) = plan {
+            match install::fetch(&cache, &plan, &Origin::github()).await {
+                Ok(ready) => {
+                    log!("update: {} downloaded and checked", ready.version);
+                    stamp.ready = Some(ready.clone());
+                    found.announce = None;
+                    found.ready = Some(ready);
+                }
+                Err(e) => log!("update download: {e}"),
+            }
+        }
+    } else if !stale {
+        return found;
+    }
+    if let Err(e) = stamp.save(&path) {
+        log!("saving the update check: {}", e.kind());
+    }
+    found
 }
 
 /// When songs keep failing after the helpers were updated: a newer release (a fresh
@@ -298,6 +409,15 @@ thread_local! {
     /// The startup check is still to run (the real app only: never in tests or snapshots).
     static ARMED: Cell<bool> = const { Cell::new(false) };
     static CACHE: RefCell<Option<PathBuf>> = const { RefCell::new(None) };
+    /// The setup "Restart to update" starts, once one is downloaded and checked.
+    static READY: RefCell<Option<Ready>> = const { RefCell::new(None) };
+    /// "Restart to update" was clicked: the setup is being started.
+    static RESTARTING: Cell<bool> = const { Cell::new(false) };
+}
+
+/// The version "Restart to update" installs, if a setup is ready.
+pub fn ready_version() -> Option<String> {
+    READY.with(|r| r.borrow().as_ref().map(|r| r.version.clone()))
 }
 
 /// The app's window is up: the startup check runs once the first page has loaded.
@@ -320,15 +440,76 @@ pub fn page_settled(ctx: &Rc<Ctx>) {
     let Some(cache) = CACHE.with(|c| c.borrow().clone()) else {
         return;
     };
+    let install = pages::settings::install_updates();
     ctx.load(
-        move |_| check(stamp_path(&cache), false),
+        move |_| startup(cache, install),
         |ctx, _ui, found| {
+            READY.with(|r| *r.borrow_mut() = found.ready.clone());
             pages::about::show_update(ctx, found.newer.as_ref());
-            if let Some(r) = found.announce {
+            if let Some(ready) = &found.ready {
+                offer(ctx, ready);
+            } else if let Some(r) = found.announce {
                 announce(ctx, &r);
             }
         },
     );
+}
+
+/// The toast for a downloaded update: "Restart to update".
+pub fn offer(ctx: &Ctx, ready: &Ready) {
+    toast::show_with(
+        ctx,
+        &tr!("featherplay {} is ready to install", ready.version),
+        tr!("Restart to update"),
+        restart,
+    );
+}
+
+/// "Restart to update": starts the downloaded setup (checked once more), then quits; the
+/// setup starts the new version. If it can't be started, the release is offered as a page
+/// to open instead.
+pub fn restart(ctx: &Rc<Ctx>) {
+    let (Some(ready), Some(cache)) = (
+        READY.with(|r| r.borrow().clone()),
+        CACHE.with(|c| c.borrow().clone()),
+    ) else {
+        return;
+    };
+    if RESTARTING.with(|r| r.replace(true)) {
+        return;
+    }
+    log!("update: starting the setup for {}", ready.version);
+    ctx.load(
+        move |_| async move {
+            tokio::task::spawn_blocking(move || install::launch(&cache, &ready))
+                .await
+                .map_err(|e| format!("setup task: {e}"))?
+        },
+        |ctx, _ui, started| match started {
+            Ok(()) => {
+                log!("update: the setup is running; quitting");
+                ctx.quit();
+            }
+            Err(e) => {
+                log!("update: {e}");
+                RESTARTING.with(|r| r.set(false));
+                READY.with(|r| r.borrow_mut().take());
+                pages::about::refresh_update(ctx);
+                ctx.toast(tr!("The update couldn't start"));
+            }
+        },
+    );
+}
+
+/// `--snapshot about-update-ready`: a setup for 0.2.0 waiting, with its toast.
+pub fn ready_for_snapshot(ctx: &Ctx) {
+    let ready = Ready {
+        version: "0.2.0".into(),
+        file: "featherplay-setup-0.2.0.exe".into(),
+        sha256: String::new(),
+    };
+    READY.with(|r| *r.borrow_mut() = Some(ready.clone()));
+    offer(ctx, &ready);
 }
 
 /// The toast for a newer release.

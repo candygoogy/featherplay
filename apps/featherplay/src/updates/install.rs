@@ -1,0 +1,684 @@
+//! Automatic updates for the installed copy: the newer release's setup is downloaded in the
+//! background into `{cache}/updates/`, checked against the release's `SHA256SUMS.txt`, and
+//! offered as "Restart to update". Clicking it starts the setup silently and quits; the
+//! setup closes what's left of featherplay, installs over it and starts the new version
+//! (`packaging/windows/featherplay.iss`: `Relaunch`).
+//!
+//! Only the per-user install does this. It is told apart from a portable exe by the
+//! installer's own uninstall key: the running exe must be the `featherplay.exe` in the
+//! folder that key's `InstallLocation` names. A portable copy, or a dev build, is only told
+//! about a newer release, as before.
+//!
+//! Downloads come only from the project's release files on GitHub (`DOWNLOADS`), over
+//! HTTPS, following redirects only to GitHub's asset hosts. A setup whose sha256 doesn't
+//! match is deleted and the release is only announced.
+
+use std::io::{self, Read};
+use std::path::{Path, PathBuf};
+use std::time::Duration;
+
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use tokio::io::AsyncWriteExt;
+
+use super::{Asset, Release};
+
+/// Where every update download starts: the project's own release files.
+pub const DOWNLOADS: &str = "https://github.com/candygoogy/featherplay/releases/download/";
+/// The checksum file each release carries (`.github/workflows/release.yml`): `sha256sum`
+/// lines for the exe, the setup and THIRD_PARTY.md.
+pub const SUMS: &str = "SHA256SUMS.txt";
+/// How the setup is started: no wizard, no message boxes, no reboot, and `/RELAUNCH`, which
+/// the setup script reads to close featherplay first and start it again afterwards.
+pub const SETUP_ARGS: [&str; 4] = [
+    "/VERYSILENT",
+    "/SUPPRESSMSGBOXES",
+    "/NORESTART",
+    "/RELAUNCH",
+];
+/// The installer's uninstall key under HKCU: Inno Setup names it after the AppId in
+/// `featherplay.iss`, plus `_is1`.
+const UNINSTALL_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Uninstall\{F2D85B2D-D1BB-4404-AA87-B6D35D0F5283}_is1";
+/// The folder in the cache that holds the downloaded setup and the setup's log.
+const DIR: &str = "updates";
+const SETUP_PREFIX: &str = "featherplay-setup-";
+/// Far more than any setup (11 MB for 0.1.0) or checksum file; a larger reply is refused.
+const MAX_SETUP: u64 = 256 * 1024 * 1024;
+const MAX_SUMS: u64 = 64 * 1024;
+/// A download that can't connect, or stops sending, for this long fails.
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
+const READ_TIMEOUT: Duration = Duration::from_secs(30);
+/// GitHub sends release downloads on to a host under this domain
+/// (`release-assets.githubusercontent.com` in Nov 2026).
+const ASSET_DOMAIN: &str = ".githubusercontent.com";
+/// `CREATE_BREAKAWAY_FROM_JOB`: the setup must outlive featherplay even if a job object
+/// (a terminal, a launcher) would end featherplay's children with it.
+const CREATE_BREAKAWAY_FROM_JOB: u32 = 0x0100_0000;
+
+/// The setup's file name for this `version` on `arch` (`std::env::consts::ARCH`):
+/// `featherplay-setup-0.2.0.exe` on x64, `featherplay-setup-0.2.0-arm64.exe` on ARM64. No
+/// setup for other architectures, or for a version that isn't digits and dots.
+pub fn setup_name(version: &str, arch: &str) -> Option<String> {
+    let suffix = match arch {
+        "x86_64" => "",
+        "aarch64" => "-arm64",
+        _ => return None,
+    };
+    let plain = !version.is_empty()
+        && version.bytes().all(|b| b.is_ascii_digit() || b == b'.')
+        && !version.starts_with('.')
+        && !version.contains("..");
+    plain.then(|| format!("{SETUP_PREFIX}{version}{suffix}.exe"))
+}
+
+/// The sha256 (lower-case hex) `SHA256SUMS.txt` gives for `file`. Lines are `sha256sum`'s:
+/// `<hex>  <name>`, or `<hex> *<name>` in binary mode. None if the file isn't listed, or is
+/// listed with two different hashes.
+pub fn parse_sums(text: &str, file: &str) -> Option<String> {
+    let mut found: Option<String> = None;
+    for line in text.lines() {
+        let Some((hash, rest)) = line.trim_end().split_once(' ') else {
+            continue;
+        };
+        let name = rest.strip_prefix([' ', '*']).unwrap_or(rest);
+        if name != file || hash.len() != 64 || !hash.bytes().all(|b| b.is_ascii_hexdigit()) {
+            continue;
+        }
+        let hash = hash.to_ascii_lowercase();
+        match &found {
+            Some(seen) if *seen != hash => return None,
+            _ => found = Some(hash),
+        }
+    }
+    found
+}
+
+/// Whether `exe` is the installed copy: `featherplay.exe` directly in `install_location`
+/// (the uninstall key's `InstallLocation`, which Inno writes with a trailing backslash).
+/// Compared without case, as Windows paths are.
+pub fn is_installed(exe: &Path, install_location: &Path) -> bool {
+    fn plain(p: &Path) -> String {
+        let s = p.to_string_lossy().replace('/', "\\").to_lowercase();
+        s.trim_end_matches('\\').to_string()
+    }
+    let named = exe
+        .file_name()
+        .is_some_and(|n| n.eq_ignore_ascii_case("featherplay.exe"));
+    let location = plain(install_location);
+    named && !location.is_empty() && exe.parent().is_some_and(|dir| plain(dir) == location)
+}
+
+/// Whether this process is the installed copy (`is_installed`, read from the registry).
+pub fn installed() -> bool {
+    let Some(location) = install_location() else {
+        return false;
+    };
+    let Ok(exe) = std::env::current_exe() else {
+        return false;
+    };
+    // The same form for both (`\\?\`, long names), when the paths exist.
+    let canonical = |p: &Path| std::fs::canonicalize(p).unwrap_or_else(|_| p.to_path_buf());
+    is_installed(&canonical(&exe), &canonical(&location))
+}
+
+/// The installer's `InstallLocation`, if featherplay is installed for this user.
+fn install_location() -> Option<PathBuf> {
+    use windows::Win32::Foundation::ERROR_SUCCESS;
+    use windows::Win32::System::Registry::{HKEY_CURRENT_USER, RRF_RT_REG_SZ, RegGetValueW};
+    use windows::core::HSTRING;
+
+    let (key, name) = (
+        HSTRING::from(UNINSTALL_KEY),
+        HSTRING::from("InstallLocation"),
+    );
+    let mut buf = vec![0u16; 1024];
+    let mut len = (buf.len() * 2) as u32;
+    // SAFETY: the buffer and its size in bytes are passed together; RRF_RT_REG_SZ makes the
+    // result NUL-terminated.
+    let status = unsafe {
+        RegGetValueW(
+            HKEY_CURRENT_USER,
+            &key,
+            &name,
+            RRF_RT_REG_SZ,
+            None,
+            Some(buf.as_mut_ptr().cast()),
+            Some(&mut len),
+        )
+    };
+    if status != ERROR_SUCCESS {
+        return None;
+    }
+    let chars = (len as usize / 2).min(buf.len());
+    let end = buf[..chars].iter().position(|&c| c == 0).unwrap_or(chars);
+    let s = String::from_utf16_lossy(&buf[..end]).trim().to_string();
+    (!s.is_empty()).then(|| PathBuf::from(s))
+}
+
+/// What to download for a release: its setup for this architecture and its checksums.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Plan {
+    pub version: String,
+    pub setup: Asset,
+    pub sums: Asset,
+}
+
+/// The release's setup for `arch` and its `SHA256SUMS.txt`, if it has both.
+pub fn plan(release: &Release, arch: &str) -> Option<Plan> {
+    let name = setup_name(&release.version, arch)?;
+    let find = |name: &str| release.assets.iter().find(|a| a.name == name).cloned();
+    Some(Plan {
+        version: release.version.clone(),
+        setup: find(&name)?,
+        sums: find(SUMS)?,
+    })
+}
+
+/// A downloaded setup whose sha256 matched: the version it installs, its file in
+/// `{cache}/updates/`, and its sha256.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Ready {
+    pub version: String,
+    pub file: String,
+    pub sha256: String,
+}
+
+impl Ready {
+    /// The setup's path; none if the stamp names anything but a setup in that folder.
+    pub fn path(&self, cache: &Path) -> Option<PathBuf> {
+        let file = &self.file;
+        let safe = file.starts_with(SETUP_PREFIX)
+            && file.ends_with(".exe")
+            && !file.contains("..")
+            && file
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b == b'.' || b == b'-');
+        safe.then(|| dir(cache).join(file))
+    }
+
+    /// The setup is still there, with the sha256 it was checked with.
+    pub fn verified(&self, cache: &Path) -> bool {
+        self.path(cache)
+            .and_then(|p| sha256_file(&p).ok())
+            .is_some_and(|h| h == self.sha256)
+    }
+}
+
+fn dir(cache: &Path) -> PathBuf {
+    cache.join(DIR)
+}
+
+/// Where downloads may come from: the project's release files (with GitHub's redirects), or
+/// in tests a server on 127.0.0.1.
+pub struct Origin {
+    #[cfg(test)]
+    local: bool,
+}
+
+impl Origin {
+    pub fn github() -> Origin {
+        Origin {
+            #[cfg(test)]
+            local: false,
+        }
+    }
+
+    #[cfg(test)]
+    fn local() -> Origin {
+        Origin { local: true }
+    }
+
+    /// A URL a download may start from.
+    fn allows(&self, url: &str) -> bool {
+        #[cfg(test)]
+        if self.local {
+            return url.starts_with("http://127.0.0.1:");
+        }
+        // Compared as the client will send it: dot segments (`download/../../..`) are
+        // resolved by the parser, so they can't lead out of the project's releases.
+        url.is_ascii()
+            && !url.contains(char::is_whitespace)
+            && reqwest::Url::parse(url).is_ok_and(|u| u.as_str().starts_with(DOWNLOADS))
+    }
+
+    fn client(&self) -> Result<reqwest::Client, String> {
+        let builder = reqwest::Client::builder()
+            .user_agent(concat!("featherplay/", env!("CARGO_PKG_VERSION")))
+            .connect_timeout(CONNECT_TIMEOUT)
+            .read_timeout(READ_TIMEOUT);
+        #[cfg(test)]
+        if self.local {
+            return builder
+                .redirect(reqwest::redirect::Policy::none())
+                .build()
+                .map_err(|e| format!("http client: {e}"));
+        }
+        builder
+            .https_only(true)
+            .redirect(reqwest::redirect::Policy::custom(|attempt| {
+                if attempt.previous().len() < 5 && redirect_target(attempt.url()) {
+                    attempt.follow()
+                } else {
+                    attempt.error("redirect away from GitHub refused")
+                }
+            }))
+            .build()
+            .map_err(|e| format!("http client: {e}"))
+    }
+}
+
+/// Where GitHub may send a release download: its asset hosts, or the project's releases.
+fn redirect_target(url: &reqwest::Url) -> bool {
+    url.scheme() == "https"
+        && (url.as_str().starts_with(DOWNLOADS)
+            || url.host_str().is_some_and(|h| h.ends_with(ASSET_DOMAIN)))
+}
+
+/// Downloads the release's checksums and setup into `{cache}/updates/` and checks the
+/// setup's sha256. On a mismatch, or any failure, the partial file is deleted.
+pub async fn fetch(cache: &Path, plan: &Plan, origin: &Origin) -> Result<Ready, String> {
+    let http = origin.client()?;
+    let sums = small_text(&http, origin, &plan.sums.url).await?;
+    let expected = parse_sums(&sums, &plan.setup.name)
+        .ok_or_else(|| format!("{SUMS} has no sha256 for {}", plan.setup.name))?;
+    let ready = Ready {
+        version: plan.version.clone(),
+        file: plan.setup.name.clone(),
+        sha256: expected,
+    };
+    let dest = ready
+        .path(cache)
+        .ok_or_else(|| format!("not a setup's name: {}", plan.setup.name))?;
+    let part = dest.with_file_name(format!("{}.part", ready.file));
+    tokio::fs::create_dir_all(dir(cache))
+        .await
+        .map_err(|e| format!("creating the updates folder: {}", e.kind()))?;
+    let result = async {
+        let actual = download(&http, origin, &plan.setup.url, &part).await?;
+        if actual != ready.sha256 {
+            return Err(format!(
+                "sha256 mismatch for {}: expected {}, got {actual}",
+                ready.file, ready.sha256
+            ));
+        }
+        let _ = tokio::fs::remove_file(&dest).await;
+        tokio::fs::rename(&part, &dest)
+            .await
+            .map_err(|e| format!("moving the setup into place: {}", e.kind()))
+    }
+    .await;
+    if result.is_err() {
+        let _ = tokio::fs::remove_file(&part).await;
+    }
+    result.map(|()| ready)
+}
+
+async fn get(
+    http: &reqwest::Client,
+    origin: &Origin,
+    url: &str,
+    max: u64,
+) -> Result<reqwest::Response, String> {
+    if !origin.allows(url) {
+        return Err(format!("not a featherplay release file: {url}"));
+    }
+    let resp = http
+        .get(url)
+        .send()
+        .await
+        .map_err(|e| format!("request: {e}"))?;
+    let status = resp.status();
+    if !status.is_success() {
+        return Err(format!("HTTP {} for {url}", status.as_u16()));
+    }
+    if resp.content_length().is_some_and(|n| n > max) {
+        return Err(format!("{url} is larger than expected"));
+    }
+    Ok(resp)
+}
+
+/// A small text file (the checksums), at most `MAX_SUMS` bytes.
+async fn small_text(http: &reqwest::Client, origin: &Origin, url: &str) -> Result<String, String> {
+    let mut resp = get(http, origin, url, MAX_SUMS).await?;
+    let mut body = Vec::new();
+    while let Some(chunk) = resp
+        .chunk()
+        .await
+        .map_err(|e| format!("reading {url}: {e}"))?
+    {
+        body.extend_from_slice(&chunk);
+        if body.len() as u64 > MAX_SUMS {
+            return Err(format!("{url} is larger than expected"));
+        }
+    }
+    String::from_utf8(body).map_err(|_| format!("{url} isn't text"))
+}
+
+/// Streams `url` into `dest`, at most `MAX_SETUP` bytes; gives the sha256 of what arrived.
+async fn download(
+    http: &reqwest::Client,
+    origin: &Origin,
+    url: &str,
+    dest: &Path,
+) -> Result<String, String> {
+    let mut resp = get(http, origin, url, MAX_SETUP).await?;
+    let mut file = tokio::fs::File::create(dest)
+        .await
+        .map_err(|e| format!("creating the download file: {}", e.kind()))?;
+    let mut hasher = Sha256::new();
+    let mut done = 0u64;
+    while let Some(chunk) = resp
+        .chunk()
+        .await
+        .map_err(|e| format!("reading {url}: {e}"))?
+    {
+        done += chunk.len() as u64;
+        if done > MAX_SETUP {
+            return Err(format!("{url} is larger than expected"));
+        }
+        hasher.update(&chunk);
+        file.write_all(&chunk)
+            .await
+            .map_err(|e| format!("writing the download: {}", e.kind()))?;
+    }
+    file.flush()
+        .await
+        .map_err(|e| format!("writing the download: {}", e.kind()))?;
+    Ok(hex(&hasher.finalize()))
+}
+
+fn hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|b| format!("{b:02x}")).collect()
+}
+
+fn sha256_file(path: &Path) -> io::Result<String> {
+    let mut file = std::fs::File::open(path)?;
+    let mut hasher = Sha256::new();
+    let mut buf = vec![0u8; 1 << 16];
+    loop {
+        let n = file.read(&mut buf)?;
+        if n == 0 {
+            break;
+        }
+        hasher.update(&buf[..n]);
+    }
+    Ok(hex(&hasher.finalize()))
+}
+
+/// Deletes the setups (and partial downloads) in `{cache}/updates/` other than `keep`'s:
+/// an older one, or the one just installed. Only plain files named like a setup.
+pub fn clean(cache: &Path, keep: Option<&Ready>) {
+    let Ok(entries) = std::fs::read_dir(dir(cache)) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        let is_file = entry.file_type().is_ok_and(|t| t.is_file());
+        if !is_file || !name.starts_with(SETUP_PREFIX) || keep.is_some_and(|r| r.file == name) {
+            continue;
+        }
+        if let Err(e) = std::fs::remove_file(entry.path()) {
+            log!("removing an old update {name}: {}", e.kind());
+        }
+    }
+}
+
+/// Starts the downloaded setup (checked again first) with `SETUP_ARGS`, logging to
+/// `{cache}/updates/install.log`. featherplay quits right after.
+pub fn launch(cache: &Path, ready: &Ready) -> Result<(), String> {
+    use std::os::windows::process::CommandExt;
+    use std::process::Command;
+
+    let path = ready
+        .path(cache)
+        .ok_or_else(|| format!("not a setup's name: {}", ready.file))?;
+    if !ready.verified(cache) {
+        return Err(format!(
+            "{} is gone or no longer matches its sha256",
+            ready.file
+        ));
+    }
+    let command = || {
+        let mut c = Command::new(&path);
+        c.args(SETUP_ARGS)
+            .arg(format!("/LOG={}", dir(cache).join("install.log").display()));
+        c
+    };
+    // A job that doesn't allow breaking away refuses the flag: then start it plainly.
+    command()
+        .creation_flags(CREATE_BREAKAWAY_FROM_JOB)
+        .spawn()
+        .or_else(|_| command().spawn())
+        .map(drop)
+        .map_err(|e| format!("starting {}: {}", ready.file, e.kind()))
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::{BufRead, BufReader, Write};
+    use std::net::TcpListener;
+
+    use super::*;
+
+    const SETUP: &[u8] = b"not really a setup, but bytes to check";
+
+    fn test_cache(name: &str) -> PathBuf {
+        let base = std::env::var("FEATHERPLAY_HOME")
+            .map(PathBuf::from)
+            .unwrap_or_else(|_| std::env::temp_dir().join("featherplay-tests"));
+        let cache = base
+            .join("test-updates")
+            .join(format!("{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&cache);
+        std::fs::create_dir_all(&cache).unwrap();
+        cache
+    }
+
+    /// Answers each GET with `route(path)`, one connection at a time.
+    fn serve(route: impl Fn(&str) -> (u16, Vec<u8>) + Send + 'static) -> String {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let base = format!("http://{}", listener.local_addr().unwrap());
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let Ok(mut stream) = stream else { return };
+                let mut reader = BufReader::new(stream.try_clone().unwrap());
+                loop {
+                    let mut line = String::new();
+                    if reader.read_line(&mut line).unwrap_or(0) == 0 {
+                        break;
+                    }
+                    let path = line.split_whitespace().nth(1).unwrap_or("").to_string();
+                    loop {
+                        let mut h = String::new();
+                        if reader.read_line(&mut h).unwrap_or(0) == 0 || h.trim().is_empty() {
+                            break;
+                        }
+                    }
+                    let (status, body) = route(&path);
+                    let head = format!(
+                        "HTTP/1.1 {status} X\r\nContent-Length: {}\r\n\r\n",
+                        body.len()
+                    );
+                    if stream.write_all(head.as_bytes()).is_err()
+                        || stream.write_all(&body).is_err()
+                    {
+                        break;
+                    }
+                }
+            }
+        });
+        base
+    }
+
+    fn plan(base: &str) -> Plan {
+        let asset = |name: &str| Asset {
+            name: name.into(),
+            url: format!("{base}/{name}"),
+        };
+        Plan {
+            version: "0.2.0".into(),
+            setup: asset("featherplay-setup-0.2.0.exe"),
+            sums: asset(SUMS),
+        }
+    }
+
+    fn sums_for(bytes: &[u8]) -> Vec<u8> {
+        let hash = hex(&Sha256::digest(bytes));
+        format!(
+            "{}  featherplay.exe\n{hash}  featherplay-setup-0.2.0.exe\n",
+            "0".repeat(64)
+        )
+        .into_bytes()
+    }
+
+    #[tokio::test]
+    async fn a_setup_that_matches_its_checksum_is_kept() {
+        let cache = test_cache("match");
+        let base = serve(|path| match path {
+            "/SHA256SUMS.txt" => (200, sums_for(SETUP)),
+            "/featherplay-setup-0.2.0.exe" => (200, SETUP.to_vec()),
+            _ => (404, Vec::new()),
+        });
+
+        let ready = fetch(&cache, &plan(&base), &Origin::local()).await.unwrap();
+
+        assert_eq!(ready.version, "0.2.0");
+        assert_eq!(ready.file, "featherplay-setup-0.2.0.exe");
+        let path = ready.path(&cache).unwrap();
+        assert_eq!(std::fs::read(&path).unwrap(), SETUP);
+        assert!(ready.verified(&cache));
+        assert!(
+            !path
+                .with_file_name("featherplay-setup-0.2.0.exe.part")
+                .exists()
+        );
+        std::fs::remove_dir_all(&cache).unwrap();
+    }
+
+    #[tokio::test]
+    async fn a_setup_that_does_not_match_is_deleted() {
+        let cache = test_cache("mismatch");
+        let base = serve(|path| match path {
+            "/SHA256SUMS.txt" => (200, sums_for(b"the real setup")),
+            "/featherplay-setup-0.2.0.exe" => (200, b"something else".to_vec()),
+            _ => (404, Vec::new()),
+        });
+
+        let err = fetch(&cache, &plan(&base), &Origin::local())
+            .await
+            .unwrap_err();
+
+        assert!(err.contains("sha256 mismatch"), "{err}");
+        let left: Vec<_> = std::fs::read_dir(cache.join("updates"))
+            .unwrap()
+            .flatten()
+            .map(|e| e.file_name())
+            .collect();
+        assert!(left.is_empty(), "left behind: {left:?}");
+        std::fs::remove_dir_all(&cache).unwrap();
+    }
+
+    #[tokio::test]
+    async fn a_setup_missing_from_the_checksums_is_not_downloaded() {
+        let cache = test_cache("unlisted");
+        let base = serve(|path| match path {
+            "/SHA256SUMS.txt" => (200, format!("{}  featherplay.exe\n", "a".repeat(64)).into()),
+            _ => (200, SETUP.to_vec()),
+        });
+
+        let err = fetch(&cache, &plan(&base), &Origin::local())
+            .await
+            .unwrap_err();
+
+        assert!(err.contains("no sha256"), "{err}");
+        assert!(!cache.join("updates").exists());
+        std::fs::remove_dir_all(&cache).unwrap();
+    }
+
+    #[tokio::test]
+    async fn a_url_off_the_projects_releases_is_refused() {
+        let cache = test_cache("elsewhere");
+        let mut p = plan("https://example.com/candygoogy/featherplay/releases/download/v0.2.0");
+        p.sums.url = "https://example.com/SHA256SUMS.txt".into();
+
+        let err = fetch(&cache, &p, &Origin::github()).await.unwrap_err();
+
+        assert!(err.contains("not a featherplay release file"), "{err}");
+        std::fs::remove_dir_all(&cache).unwrap();
+    }
+
+    #[test]
+    fn a_release_url_that_climbs_out_of_the_projects_releases_is_refused() {
+        let gh = Origin::github();
+        assert!(gh.allows(&format!("{DOWNLOADS}v0.2.0/SHA256SUMS.txt")));
+        assert!(!gh.allows(&format!("{DOWNLOADS}../../../../someone/else/x.exe")));
+        assert!(!gh.allows(&format!("{DOWNLOADS}%2e%2e/%2e%2e/%2e%2e/%2e%2e/x/y/z.exe")));
+        assert!(!gh.allows(&DOWNLOADS.replace("https", "http")));
+    }
+
+    #[test]
+    fn github_downloads_and_asset_hosts_are_the_only_redirects() {
+        let ok = |u: &str| redirect_target(&reqwest::Url::parse(u).unwrap());
+        assert!(ok(
+            "https://release-assets.githubusercontent.com/github-production-release-asset/1/2"
+        ));
+        assert!(ok(
+            "https://github.com/candygoogy/featherplay/releases/download/v0.2.0/SHA256SUMS.txt"
+        ));
+        assert!(!ok("http://release-assets.githubusercontent.com/x"));
+        assert!(!ok(
+            "https://github.com/someone/else/releases/download/v1/x.exe"
+        ));
+        assert!(!ok("https://githubusercontent.com.example.net/x"));
+    }
+
+    #[test]
+    fn old_setups_are_cleaned_and_the_ready_one_kept() {
+        let cache = test_cache("clean");
+        let dir = cache.join("updates");
+        std::fs::create_dir_all(&dir).unwrap();
+        for f in [
+            "featherplay-setup-0.1.5.exe",
+            "featherplay-setup-0.2.0.exe",
+            "featherplay-setup-0.2.0.exe.part",
+            "install.log",
+        ] {
+            std::fs::write(dir.join(f), b"x").unwrap();
+        }
+        let ready = Ready {
+            version: "0.2.0".into(),
+            file: "featherplay-setup-0.2.0.exe".into(),
+            sha256: String::new(),
+        };
+
+        clean(&cache, Some(&ready));
+
+        let mut left: Vec<_> = std::fs::read_dir(&dir)
+            .unwrap()
+            .flatten()
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .collect();
+        left.sort();
+        assert_eq!(left, ["featherplay-setup-0.2.0.exe", "install.log"]);
+        std::fs::remove_dir_all(&cache).unwrap();
+    }
+
+    #[test]
+    fn a_stamp_naming_another_file_has_no_path() {
+        let cache = Path::new("D:/cache");
+        for file in [
+            "..\\featherplay.exe",
+            "featherplay-setup-0.2.0.exe\\..\\..\\x.exe",
+            "featherplay-setup-0.2.0.bat",
+            "other.exe",
+        ] {
+            let r = Ready {
+                version: "0.2.0".into(),
+                file: file.into(),
+                sha256: String::new(),
+            };
+            assert_eq!(r.path(cache), None, "{file}");
+        }
+    }
+}

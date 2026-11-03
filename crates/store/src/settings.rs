@@ -82,6 +82,10 @@ pub struct Settings {
     /// Ask GitHub once a day whether a newer featherplay is out (on by default). Off, the
     /// app doesn't contact GitHub about its own releases at all.
     pub check_for_updates: bool,
+    /// When a newer release is out and this is the installed copy, download its setup in
+    /// the background, check its sha256, and offer "Restart to update" (on by default).
+    /// Used only while `check_for_updates` is on; off, a newer release is only announced.
+    pub install_updates: bool,
     /// The local API for overlays and scripts (Settings > Integrations), off by default. Its
     /// token is in Credential Manager, not here.
     pub local_api: bool,
@@ -237,6 +241,7 @@ impl Default for Settings {
             autoplay: true,
             pins: BTreeMap::new(),
             check_for_updates: true,
+            install_updates: true,
             local_api: false,
             local_api_port: Settings::LOCAL_API_PORT,
             language: String::new(),

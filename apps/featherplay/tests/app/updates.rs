@@ -1,10 +1,15 @@
 //! The update check, offline: the version comparison, GitHub's replies (hand-written
-//! fixtures in `tests/fixtures/github/`), and the once-a-day stamp. No request is made.
+//! fixtures in `tests/fixtures/github/`), the once-a-day stamp, and what the automatic
+//! update picks: the setup for this architecture, its line in `SHA256SUMS.txt`, and whether
+//! this is the installed copy. No request is made.
 
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
 
-use featherplay::updates::{Release, Stamp, is_newer, parse_issue, parse_release};
+use std::path::Path;
+
+use featherplay::updates::install::{self, Ready, is_installed, parse_sums, setup_name};
+use featherplay::updates::{Asset, Release, Stamp, is_newer, parse_issue, parse_release};
 
 const RELEASE: &str = include_str!("../fixtures/github/release_latest.json");
 const ISSUES: &str = include_str!("../fixtures/github/issue_search.json");
@@ -18,6 +23,7 @@ fn release(version: &str) -> Release {
     Release {
         version: version.into(),
         url: format!("https://github.com/candygoogy/featherplay/releases/tag/v{version}"),
+        assets: Vec::new(),
     }
 }
 
@@ -65,7 +71,28 @@ fn a_malformed_version_is_never_newer() {
 
 #[test]
 fn the_latest_release_reply_gives_the_version_and_its_page() {
-    assert_eq!(parse_release(RELEASE), Some(release("0.2.0")));
+    let r = parse_release(RELEASE).expect("a release");
+    let want = release("0.2.0");
+    assert_eq!((r.version, r.url), (want.version, want.url));
+}
+
+#[test]
+fn the_reply_keeps_only_the_files_downloaded_from_the_projects_releases() {
+    let r = parse_release(RELEASE).expect("a release");
+    let names: Vec<_> = r.assets.iter().map(|a| a.name.as_str()).collect();
+    assert_eq!(
+        names,
+        [
+            "featherplay.exe",
+            "featherplay-setup-0.2.0.exe",
+            "SHA256SUMS.txt"
+        ]
+    );
+    assert!(
+        r.assets
+            .iter()
+            .all(|a| a.url.starts_with(install::DOWNLOADS))
+    );
 }
 
 #[test]
@@ -199,5 +226,178 @@ fn the_stamp_survives_a_restart() {
         Stamp::default(),
         "a broken file starts over"
     );
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+const SUMS: &str = "\
+1111111111111111111111111111111111111111111111111111111111111111  featherplay.exe
+AbCdEf0123456789abcdef0123456789ABCDEF0123456789abcdef0123456789  featherplay-setup-0.2.0.exe
+2222222222222222222222222222222222222222222222222222222222222222 *THIRD_PARTY.md
+";
+
+#[test]
+fn the_checksums_give_the_setups_sha256_in_lower_case() {
+    assert_eq!(
+        parse_sums(SUMS, "featherplay-setup-0.2.0.exe").as_deref(),
+        Some("abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789")
+    );
+    // Binary-mode lines (`*name`) and CRLF line ends read the same.
+    assert_eq!(
+        parse_sums(&SUMS.replace('\n', "\r\n"), "THIRD_PARTY.md").as_deref(),
+        Some("2222222222222222222222222222222222222222222222222222222222222222")
+    );
+}
+
+#[test]
+fn a_file_the_checksums_dont_list_has_no_sha256() {
+    assert_eq!(parse_sums(SUMS, "featherplay-setup-0.2.0-arm64.exe"), None);
+    // Not a prefix match either.
+    assert_eq!(parse_sums(SUMS, "featherplay-setup-0.2.0"), None);
+    assert_eq!(parse_sums("", "featherplay.exe"), None);
+}
+
+#[test]
+fn a_malformed_or_contradictory_checksum_is_refused() {
+    assert_eq!(parse_sums("abc  featherplay.exe", "featherplay.exe"), None);
+    let twice = format!("{SUMS}{}  featherplay.exe\n", "3".repeat(64));
+    assert_eq!(parse_sums(&twice, "featherplay.exe"), None);
+}
+
+#[test]
+fn the_setup_is_picked_by_architecture() {
+    assert_eq!(
+        setup_name("0.2.0", "x86_64").as_deref(),
+        Some("featherplay-setup-0.2.0.exe")
+    );
+    assert_eq!(
+        setup_name("0.2.0", "aarch64").as_deref(),
+        Some("featherplay-setup-0.2.0-arm64.exe")
+    );
+    assert_eq!(setup_name("0.2.0", "x86"), None);
+    assert_eq!(
+        setup_name("../0.2.0", "x86_64"),
+        None,
+        "only digits and dots"
+    );
+}
+
+fn with_assets(names: &[&str]) -> Release {
+    let mut r = release("0.2.0");
+    r.assets = names
+        .iter()
+        .map(|n| Asset {
+            name: (*n).into(),
+            url: format!("{}v0.2.0/{n}", install::DOWNLOADS),
+        })
+        .collect();
+    r
+}
+
+#[test]
+fn a_release_without_this_architectures_setup_is_only_announced() {
+    let x64_only = with_assets(&["featherplay-setup-0.2.0.exe", "SHA256SUMS.txt"]);
+    let plan = install::plan(&x64_only, "x86_64").expect("x64 has its setup");
+    assert_eq!(plan.setup.name, "featherplay-setup-0.2.0.exe");
+    assert_eq!(plan.sums.name, "SHA256SUMS.txt");
+    assert_eq!(install::plan(&x64_only, "aarch64"), None);
+
+    let both = with_assets(&[
+        "featherplay-setup-0.2.0.exe",
+        "featherplay-setup-0.2.0-arm64.exe",
+        "SHA256SUMS.txt",
+    ]);
+    let arm = install::plan(&both, "aarch64").expect("arm64 has its setup");
+    assert_eq!(arm.setup.name, "featherplay-setup-0.2.0-arm64.exe");
+}
+
+#[test]
+fn a_release_without_checksums_is_only_announced() {
+    let r = with_assets(&["featherplay-setup-0.2.0.exe"]);
+    assert_eq!(install::plan(&r, "x86_64"), None);
+}
+
+#[test]
+fn the_exe_in_the_install_folder_is_the_installed_copy() {
+    let location = Path::new(r"C:\Users\Ann\AppData\Local\Programs\featherplay\");
+    let exe = Path::new(r"C:\Users\Ann\AppData\Local\Programs\featherplay\featherplay.exe");
+    assert!(is_installed(exe, location));
+    // Windows paths compare without case, with either slash.
+    let shouty = Path::new("c:/users/ann/appdata/local/programs/FEATHERPLAY/FeatherPlay.exe");
+    assert!(is_installed(shouty, location));
+}
+
+#[test]
+fn a_portable_or_dev_exe_is_not_the_installed_copy() {
+    let location = Path::new(r"C:\Users\Ann\AppData\Local\Programs\featherplay\");
+    for exe in [
+        r"C:\Users\Ann\Downloads\featherplay.exe",
+        r"D:\src\featherplay\target\release\featherplay.exe",
+        r"C:\Users\Ann\AppData\Local\Programs\featherplay\old\featherplay.exe",
+        r"C:\Users\Ann\AppData\Local\Programs\featherplay\other.exe",
+    ] {
+        assert!(!is_installed(Path::new(exe), location), "{exe}");
+    }
+    assert!(!is_installed(
+        Path::new(r"C:\featherplay.exe"),
+        Path::new("")
+    ));
+}
+
+fn ready(version: &str) -> Ready {
+    Ready {
+        version: version.into(),
+        file: format!("featherplay-setup-{version}.exe"),
+        sha256: "ab".repeat(32),
+    }
+}
+
+#[test]
+fn each_newer_version_is_downloaded_once() {
+    let mut s = Stamp::default();
+    s.record(Ok(Some(release("0.2.0"))), now());
+    assert_eq!(s.to_fetch("0.1.0"), Some(&release("0.2.0")));
+    s.fetched = Some("0.2.0".into());
+    assert_eq!(s.to_fetch("0.1.0"), None, "tried, whatever came of it");
+    s.record(Ok(Some(release("0.3.0"))), now() + 25 * HOUR);
+    assert_eq!(s.to_fetch("0.1.0"), Some(&release("0.3.0")));
+}
+
+#[test]
+fn a_downloaded_setup_is_offered_until_it_is_installed() {
+    let mut s = Stamp::default();
+    s.record(Ok(Some(release("0.2.0"))), now());
+    s.ready = Some(ready("0.2.0"));
+    assert_eq!(s.pending("0.1.0"), Some(&ready("0.2.0")));
+    // Running 0.2.0: it's installed; nothing to offer.
+    assert_eq!(s.pending("0.2.0"), None);
+    // A newer release than the one downloaded: that setup isn't offered.
+    s.record(Ok(Some(release("0.3.0"))), now() + 25 * HOUR);
+    assert_eq!(s.pending("0.1.0"), None);
+}
+
+#[test]
+fn the_downloaded_setup_survives_a_restart() {
+    let dir = std::env::var("FEATHERPLAY_HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| std::env::temp_dir().join("featherplay-tests"))
+        .join("test-updates")
+        .join(format!("ready-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let path = dir.join("update-check.json");
+    let mut s = Stamp::default();
+    s.record(Ok(Some(with_assets(&["SHA256SUMS.txt"]))), now());
+    s.fetched = Some("0.2.0".into());
+    s.ready = Some(ready("0.2.0"));
+    s.save(&path).expect("saved");
+    assert_eq!(Stamp::load(&path), s);
+    // A stamp from before automatic updates still loads.
+    std::fs::write(
+        &path,
+        r#"{"checked":1,"latest":{"version":"0.2.0","url":"https://github.com/candygoogy/featherplay/releases/tag/v0.2.0"},"announced":null}"#,
+    )
+    .unwrap();
+    let old = Stamp::load(&path);
+    assert_eq!(old.latest, Some(release("0.2.0")));
+    assert_eq!((old.fetched, old.ready), (None, None));
     std::fs::remove_dir_all(&dir).unwrap();
 }

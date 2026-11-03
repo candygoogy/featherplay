@@ -139,6 +139,8 @@ pub enum Change {
     Pins(String, Vec<String>),
     /// Ask GitHub once a day whether a newer featherplay is out.
     CheckForUpdates(bool),
+    /// Download a newer release's setup and offer "Restart to update" (the installed copy).
+    InstallUpdates(bool),
     /// The local API on or off.
     LocalApi(bool),
     /// The local API's port (1024 or higher; the page checks it).
@@ -176,6 +178,7 @@ impl Change {
             Change::LyricsLrclib(v) => s.lyrics_lrclib = v,
             Change::Autoplay(v) => s.autoplay = v,
             Change::CheckForUpdates(v) => s.check_for_updates = v,
+            Change::InstallUpdates(v) => s.install_updates = v,
             Change::Pins(identity, pins) => {
                 if pins.is_empty() {
                     s.pins.remove(&identity);
@@ -978,6 +981,7 @@ mod tests {
             Change::LyricsLrclib(false),
             Change::Autoplay(false),
             Change::CheckForUpdates(false),
+            Change::InstallUpdates(false),
             Change::LocalApi(true),
             Change::LocalApiPort(31000),
         ];
@@ -1002,7 +1006,7 @@ mod tests {
         assert!(!s.discord_options.play_button);
         assert!(!s.lyrics && !s.lyrics_lrclib);
         assert!(!s.autoplay);
-        assert!(!s.check_for_updates);
+        assert!(!s.check_for_updates && !s.install_updates);
         assert_eq!(s.volume, d.volume, "the volume isn't a page setting");
     }
 

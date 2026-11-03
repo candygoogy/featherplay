@@ -94,6 +94,12 @@ pub fn check_for_updates() -> bool {
     SETTINGS.with(|s| s.borrow().check_for_updates)
 }
 
+/// Whether the installed copy may download a newer release's setup ("Install updates
+/// automatically").
+pub fn install_updates() -> bool {
+    SETTINGS.with(|s| s.borrow().install_updates)
+}
+
 /// What identity `key` pinned to the top of the sidebar's list, newest first.
 pub fn pins(key: &str) -> Vec<String> {
     SETTINGS.with(|s| s.borrow().pins.get(key).cloned().unwrap_or_default())
@@ -692,6 +698,7 @@ fn show(ctx: &Ctx) {
     data.set_lyrics(s.lyrics);
     data.set_lyrics_lrclib(s.lyrics_lrclib);
     data.set_check_for_updates(s.check_for_updates);
+    data.set_install_updates(s.install_updates);
     data.set_local_api(s.local_api);
     data.set_local_api_port(s.local_api_port.to_string().into());
     data.set_local_api_port_error("".into());
@@ -965,6 +972,10 @@ fn toggled(ctx: &Rc<Ctx>, key: SettingKey, on: bool) {
         SettingKey::CheckForUpdates => {
             data.set_check_for_updates(on);
             Change::CheckForUpdates(on)
+        }
+        SettingKey::InstallUpdates => {
+            data.set_install_updates(on);
+            Change::InstallUpdates(on)
         }
         SettingKey::LocalApi => {
             data.set_local_api(on);

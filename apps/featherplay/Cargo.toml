@@ -48,7 +48,7 @@ reqwest = { workspace = true, features = ["native-tls"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha1 = { workspace = true }
-# Names the files of the cover cache.
+# Names the files of the cover cache; checks a downloaded update's setup.
 sha2 = { workspace = true }
 # The user's Windows display languages, for the "Windows default" language.
 sys-locale = { workspace = true }
@@ -57,8 +57,9 @@ sys-locale = { workspace = true }
 # `unstable-winit-030` reaches winit's window: the wheel filter, and the tray's mini player
 # (a borderless popup with no taskbar button, closed when it loses the activation).
 slint = { workspace = true, features = ["std", "compat-1-2", "backend-winit", "renderer-skia", "raw-window-handle-06", "unstable-winit-030"] }
-# `signal` for Ctrl+C, so the session is saved on exit.
-tokio = { workspace = true, features = ["rt-multi-thread", "macros", "signal", "sync", "time"] }
+# `signal` for Ctrl+C, so the session is saved on exit. `fs` and `io-util` write a
+# downloaded update (`updates::install`); the streams crate has them on already.
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "signal", "sync", "time", "fs", "io-util"] }
 # The sign-in window: WebView2 in its own top-level window, never in the main one.
 webview2-com = { workspace = true }
 # The title bar, an opaque surface repainted when Windows drops it, the window icon,

@@ -58,17 +58,28 @@ fn credits() -> [(&'static str, &'static str); 11] {
 }
 
 thread_local! {
-    /// The page of the newer release the banner offers.
-    static UPDATE_URL: RefCell<Option<String>> = const { RefCell::new(None) };
+    /// The newer release the banner offers.
+    static UPDATE: RefCell<Option<Release>> = const { RefCell::new(None) };
 }
 
-/// The banner for a newer release, or none.
+/// The banner for a newer release, or none. With its setup downloaded and checked
+/// (`updates::ready_version`), the banner offers "Restart to update" instead of its page.
 pub fn show_update(ctx: &Ctx, release: Option<&Release>) {
-    UPDATE_URL.with(|u| *u.borrow_mut() = release.map(|r| r.url.clone()));
-    if let Some(ui) = ctx.window() {
-        let version = release.map_or("", |r| r.version.as_str());
-        ui.global::<AboutData>().set_update_version(version.into());
-    }
+    UPDATE.with(|u| *u.borrow_mut() = release.cloned());
+    refresh_update(ctx);
+}
+
+/// The banner again, after the downloaded setup was dropped.
+pub fn refresh_update(ctx: &Ctx) {
+    let Some(ui) = ctx.window() else { return };
+    let data = ui.global::<AboutData>();
+    let ready = updates::ready_version();
+    UPDATE.with(|u| {
+        let u = u.borrow();
+        let version = u.as_ref().map_or("", |r| r.version.as_str());
+        data.set_update_version(version.into());
+        data.set_update_ready(!version.is_empty() && ready.as_deref() == Some(version));
+    });
 }
 
 /// The component list, in the language shown now.
@@ -89,8 +100,13 @@ pub fn init(ctx: &Rc<Ctx>) {
     let data = ui.global::<AboutData>();
     let c = ctx.clone();
     data.on_get_update(move || {
-        if let Some(url) = UPDATE_URL.with(|u| u.borrow().clone()) {
-            updates::open(&c, &url);
+        let Some(release) = UPDATE.with(|u| u.borrow().clone()) else {
+            return;
+        };
+        if updates::ready_version().as_deref() == Some(release.version.as_str()) {
+            updates::restart(&c);
+        } else {
+            updates::open(&c, &release.url);
         }
     });
     data.set_version(env!("CARGO_PKG_VERSION").into());

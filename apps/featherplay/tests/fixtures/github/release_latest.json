@@ -14,10 +14,28 @@
   "published_at": "2026-11-20T10:05:00Z",
   "assets": [
     {
-      "name": "featherplay-0.2.0-setup.exe",
+      "name": "featherplay.exe",
+      "content_type": "application/x-msdownload",
+      "size": 30010000,
+      "browser_download_url": "https://github.com/candygoogy/featherplay/releases/download/v0.2.0/featherplay.exe"
+    },
+    {
+      "name": "featherplay-setup-0.2.0.exe",
       "content_type": "application/x-msdownload",
       "size": 10380000,
-      "browser_download_url": "https://github.com/candygoogy/featherplay/releases/download/v0.2.0/featherplay-0.2.0-setup.exe"
+      "browser_download_url": "https://github.com/candygoogy/featherplay/releases/download/v0.2.0/featherplay-setup-0.2.0.exe"
+    },
+    {
+      "name": "SHA256SUMS.txt",
+      "content_type": "text/plain",
+      "size": 330,
+      "browser_download_url": "https://github.com/candygoogy/featherplay/releases/download/v0.2.0/SHA256SUMS.txt"
+    },
+    {
+      "name": "elsewhere.exe",
+      "content_type": "application/x-msdownload",
+      "size": 1000,
+      "browser_download_url": "https://example.com/candygoogy/featherplay/releases/download/v0.2.0/elsewhere.exe"
     }
   ],
   "body": "A hand-written reply in the shape of GitHub's, for the tests."

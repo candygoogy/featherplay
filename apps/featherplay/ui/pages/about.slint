@@ -2,7 +2,7 @@
 // the version, the log folder and the diagnostics for a bug report, the licences and the Made
 // with Slint badge that Slint's royalty-free licence asks for (its `AboutSlint` widget).
 // Filled by `src/pages/about.rs`. When a newer release is out (`src/updates.rs`), a banner
-// above the logo says so and links to it.
+// above the logo says so and links to it, or, once its setup is downloaded, restarts into it.
 import { AboutSlint } from "std-widgets.slint";
 import { Theme } from "../theme.slint";
 import { Body, Display, Pill } from "../parts.slint";
@@ -21,7 +21,10 @@ export global AboutData {
     in property <[Credit]> credits;
     // A newer release ("0.2.0"), or "" for none: the banner at the top.
     in property <string> update-version;
-    // The banner's "Get it": opens the release page.
+    // Its setup is downloaded and checked: the banner offers "Restart to update".
+    in property <bool> update-ready;
+    // The banner's button: "Get it" opens the release page; "Restart to update" starts the
+    // setup and quits.
     callback get-update();
     // Opens the log folder in Explorer.
     callback open-log-folder();
@@ -55,7 +58,9 @@ component UpdateBanner inherits Rectangle {
                 wrap: word-wrap;
             }
             Body {
-                text: @tr("You have {}.", AboutData.version);
+                text: AboutData.update-ready
+                    ? @tr("You have {}. The update is downloaded and installs when featherplay restarts.", AboutData.version)
+                    : @tr("You have {}.", AboutData.version);
                 font-size: Theme.t-meta;
                 color: Theme.text2;
                 overflow: clip;
@@ -66,7 +71,7 @@ component UpdateBanner inherits Rectangle {
             alignment: center;
             horizontal-stretch: 0;
             Pill {
-                label: @tr("Get it");
+                label: AboutData.update-ready ? @tr("Restart to update") : @tr("Get it");
                 solid: true;
                 clicked => { AboutData.get-update(); }
             }

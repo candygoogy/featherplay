@@ -31,6 +31,7 @@ export enum SettingKey {
     lyrics-lrclib,
     autoplay,
     check-for-updates,
+    install-updates,
     local-api,
 }
 
@@ -187,6 +188,8 @@ export global SettingsData {
     in property <bool> lyrics-lrclib: true;
     // Ask GitHub once a day whether a newer featherplay is out.
     in property <bool> check-for-updates: true;
+    // Download a newer release's setup and offer "Restart to update" (the installed copy).
+    in property <bool> install-updates: true;
 
     callback toggled(SettingKey, bool);
     callback pick-device(int);
@@ -1632,9 +1635,16 @@ export component SettingsPage inherits Rectangle {
                     }
                     ToggleRow {
                         label: @tr("Check for updates");
-                        detail: @tr("Once a day, and when songs keep failing to play, ask GitHub whether a newer featherplay is out. Nothing is downloaded.");
+                        detail: @tr("Once a day, and when songs keep failing to play, ask GitHub whether a newer featherplay is out.");
                         key: SettingKey.check-for-updates;
                         checked: SettingsData.check-for-updates;
+                    }
+                    ToggleRow {
+                        label: @tr("Install updates automatically");
+                        detail: @tr("Download a newer version in the background, check it, and install it when you click Restart to update. Only for the installed featherplay, not the portable exe.");
+                        key: SettingKey.install-updates;
+                        checked: SettingsData.install-updates;
+                        enabled: SettingsData.check-for-updates;
                     }
                     SettingRow {
                         label: @tr("About featherplay");
