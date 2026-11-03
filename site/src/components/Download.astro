@@ -1,0 +1,296 @@
+---
+// The download: one card with the app's icon, the version and the systems it runs on, then
+// each way to get it (release.ts: the installer, recommended, and the portable exe; either
+// may be left out) with its size and its own button. In the card, under them, two small
+// notes for the first run: the SmartScreen warning and where it keeps things.
+import { downloadOptions, release, sizeLabel } from "../data/release";
+import Logo from "./Logo.astro";
+import Icon from "./Icon.astro";
+
+const options = downloadOptions();
+---
+
+<section id="download" class="download" aria-labelledby="download-title">
+  <div class="wrap">
+    <div class="card" data-download-card>
+      <div class="who">
+        <Logo size={88} class="icon" />
+        <h2 id="download-title">Download for Windows</h2>
+        <p class="meta">
+          <span>Version <span data-version>{release.version}</span></span>
+          <span>Windows 10 and 11, 64-bit</span>
+          <span>Free</span>
+        </p>
+      </div>
+
+      <ul class:list={["options", { single: options.length === 1 }]}>
+        {
+          options.map((o) => (
+            <li class="option" data-download-option={o.id}>
+              <div class="what">
+                <p class="o-title">
+                  {o.title}
+                  {o.primary && options.length > 1 && <span class="rec">Recommended</span>}
+                </p>
+                <p class="o-note">{o.note}</p>
+              </div>
+              <div class="get">
+                <a class:list={["button", { tonal: !o.primary, big: o.primary }]} href={o.file.url} data-release-link>
+                  {o.action}
+                </a>
+                <span class="size">
+                  <span class="visually-hidden">{o.file.name}, </span>
+                  {o.file.sizeMB == null ? (
+                    <span data-size aria-label="size not known yet">{sizeLabel(o.file)}</span>
+                  ) : (
+                    <span data-size>{sizeLabel(o.file)}</span>
+                  )}
+                </span>
+              </div>
+            </li>
+          ))
+        }
+      </ul>
+
+      <!-- Before the first run: two small notes, part of the card. -->
+      <div class="first-run" data-first-run>
+        <h3 class="visually-hidden">Before you run it</h3>
+        <div class="note">
+          <Icon name="shield" size={22} class="n-icon" />
+          <div>
+            <h4>"Windows protected your PC"</h4>
+            <p>
+              featherplay isn't code-signed yet, so SmartScreen may warn you once. Choose <strong>More info</strong>, then
+              <strong>Run anyway</strong>.
+            </p>
+          </div>
+        </div>
+        <div class="note">
+          <Icon name="folder" size={22} class="n-icon" />
+          <div>
+            <h4>Where it keeps things</h4>
+            <p>
+              Settings in <code>%APPDATA%\<wbr />featherplay</code>, the cache in <code>%LOCALAPPDATA%\<wbr />featherplay</code>, your
+              sign-in in Credential Manager. The uninstaller removes them all; with the exe, delete them and it's gone.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <p class="fine">
+        Free and unofficial. Not made by or affiliated with Google or YouTube.
+        <a href={release.url}>All releases and checksums on GitHub</a>
+      </p>
+    </div>
+  </div>
+</section>
+
+<style>
+  /* The page's last section: the usual way in at the top, and a short step down to the
+     footer, whose own ground above its band finishes the gap. */
+  .download {
+    padding-block: clamp(96px, 11vw, 180px) clamp(24px, 3vw, 56px);
+  }
+
+  /* The card: a step up from the ground, the download its only accent. Who it is on the
+     left, the ways to get it on the right. */
+  .card {
+    display: grid;
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    gap: clamp(20px, 2vw, 32px) clamp(28px, 4vw, 64px);
+    align-items: center;
+    padding: clamp(28px, 3vw, 48px);
+    border-radius: 32px;
+    background: var(--surface);
+  }
+  .who {
+    display: grid;
+    justify-items: start;
+    gap: 14px;
+  }
+  .who :global(.icon) {
+    margin-bottom: 6px;
+  }
+  h2 {
+    font-size: clamp(2.5rem, 4.6vw, 4.25rem);
+  }
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 0;
+    font-size: 1.0625rem;
+    font-weight: 600;
+  }
+  .meta > span:not(:last-child)::after {
+    content: "·";
+    padding-inline: 10px;
+    color: var(--text-muted);
+  }
+
+  .options {
+    display: grid;
+    gap: 10px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .option {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 16px 24px;
+    padding: 22px 22px 22px 26px;
+    border-radius: 22px;
+    background: var(--card);
+  }
+  .o-title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 12px;
+    font-size: 1.25rem;
+    font-weight: 800;
+    letter-spacing: -0.015em;
+  }
+  .rec {
+    color: var(--accent);
+    font-size: 0.9375rem;
+    font-weight: 700;
+    letter-spacing: 0;
+  }
+  .o-note {
+    max-width: 38ch;
+    margin-top: 4px;
+    color: var(--text-muted);
+    line-height: 1.5;
+  }
+  .get {
+    display: grid;
+    justify-items: center;
+    gap: 8px;
+  }
+  .size {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .get .button {
+    white-space: nowrap;
+  }
+  .big {
+    min-height: 56px;
+    padding: 0 28px;
+    font-size: 1.0625rem;
+  }
+  .button.tonal {
+    background: var(--selected);
+    color: var(--text);
+  }
+  .button.tonal:hover {
+    background: var(--pressed);
+  }
+  .fine {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 8px 24px;
+    color: var(--text-muted);
+    font-size: 0.9375rem;
+  }
+  .fine a {
+    color: var(--text);
+    font-weight: 700;
+    text-underline-offset: 0.2em;
+  }
+
+  /* Before the first run: two small notes inside the card, on a step down in tone, each
+     with its own small mark. */
+  .first-run {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 4px;
+    padding: 4px;
+    border-radius: 22px;
+    background: var(--card);
+  }
+  .note {
+    display: grid;
+    grid-template-columns: 22px minmax(0, 1fr);
+    gap: 14px;
+    padding: 18px 20px;
+  }
+  .note :global(.n-icon) {
+    margin-top: 1px;
+    color: var(--text-muted);
+  }
+  h4 {
+    margin: 0 0 4px;
+    font-size: 1rem;
+    letter-spacing: -0.01em;
+  }
+  .note p {
+    max-width: 52ch;
+    color: var(--text-muted);
+    font-size: 0.9375rem;
+    line-height: 1.5;
+  }
+  .note strong {
+    color: var(--text);
+  }
+  code {
+    font-family: var(--font-ui);
+    font-size: 0.9375em;
+    padding: 1px 6px;
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--text);
+    white-space: nowrap;
+  }
+
+  @media (max-width: 960px) {
+    .card {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+  @media (max-width: 640px) {
+    .card {
+      padding: 24px 18px;
+      border-radius: 24px;
+    }
+    h2 {
+      font-size: clamp(2rem, 10vw, 2.5rem);
+    }
+    .meta {
+      flex-direction: column;
+    }
+    .meta > span:not(:last-child)::after {
+      content: none;
+    }
+    .big {
+      padding: 0 22px;
+      font-size: 1rem;
+    }
+    .option {
+      grid-template-columns: minmax(0, 1fr);
+      padding: 18px;
+    }
+    .get {
+      justify-items: start;
+      grid-auto-flow: column;
+      align-items: center;
+      gap: 14px;
+    }
+    .first-run {
+      grid-template-columns: 1fr;
+    }
+    .note {
+      padding: 16px 14px;
+    }
+    /* A path breaks after its backslash, never inside a name. */
+    code {
+      white-space: normal;
+    }
+  }
+</style>

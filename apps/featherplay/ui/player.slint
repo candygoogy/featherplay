@@ -1,0 +1,55 @@
+// The current track and the transport, shared by the bottom bar, Now playing, the
+// queue panel and the Home hero. Filled by `src/bar.rs` from the controller's state.
+
+export enum Repeat { off, all, one }
+
+export global Player {
+    in property <bool> has-track;
+    in property <string> track-id;
+    in property <string> title;
+    in property <string> artist;
+    in property <string> artist-id;
+    in property <string> album;
+    in property <string> album-id;
+    // 48 px, for the bar. Larger sizes are loaded by the page that shows them.
+    in property <image> cover;
+    in property <string> cover-url;
+    // "Playing" as the buttons show it: audible, or loading with the intent to play.
+    in property <bool> playing;
+    // Resolving or buffering before the first sound: the progress line shimmers.
+    in property <bool> loading;
+    in property <bool> liked;
+    in property <bool> shuffle;
+    in property <Repeat> repeat;
+    in property <bool> radio;
+    // Updated once a second while playing, never per frame.
+    in property <float> position-s;
+    in property <float> duration-s;
+    in property <string> elapsed;
+    in property <string> total;
+    // The 0..1 slider value; the audio engine applies the perceptual curve.
+    in property <float> volume;
+
+    callback toggle();
+    callback next();
+    callback previous();
+    // `fraction` of the duration, 0..1.
+    callback seek(float);
+    // `commit` on release: the value is saved to the settings.
+    callback set-volume(float, bool);
+    callback toggle-like();
+    // "Not for me": rates the song Dislike and skips it; the toast offers Undo.
+    callback not-for-me();
+    callback toggle-shuffle();
+    callback cycle-repeat();
+
+    // "2:41", or "1:02:41" from an hour: the seek line's preview time.
+    public pure function clock(seconds: float) -> string {
+        let s = max(0, floor(seconds));
+        let h = floor(s / 3600);
+        let m = floor(mod(s, 3600) / 60);
+        let sec = mod(s, 60);
+        let mm = h > 0 && m < 10 ? "0" + m : "" + m;
+        return (h > 0 ? h + ":" : "") + mm + ":" + (sec < 10 ? "0" : "") + sec;
+    }
+}

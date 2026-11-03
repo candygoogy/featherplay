@@ -1,0 +1,232 @@
+// The tray's mini player: a small borderless window that opens over the notification area on
+// a left click of the tray icon (`src/mini.rs` creates it, places it and drops it on close).
+// Top: the cover, then the title (up to two lines) and the artist, with the button that opens
+// the main window in the top-right corner, level with the cover's top. Then the progress line
+// across the window, the time played and the length under its ends. Last, one row centred:
+// previous, play or pause and next, flanked by the like heart on the left and "not for me" on
+// the right, so play sits in the middle of the window.
+//
+// It has its own `Player` and `Theme` globals (globals belong to their window): Rust copies
+// the main window's into them. Nothing in it runs a timer; the position arrives with the
+// bar's once-a-second tick while sound plays.
+import { Theme, Icons, Curves } from "theme.slint";
+import { Body, Cover, Display, IconButton, PlayButton } from "parts.slint";
+import { Player } from "player.slint";
+
+export global MiniData {
+    // The cover the mini player loads for itself (`mini::COVER`).
+    in property <image> cover;
+    // Show the main window (then the mini player closes).
+    callback open-app();
+    // Escape, or the window lost activation: close.
+    callback dismiss();
+}
+
+// A time under an end of the progress line.
+component Time inherits Body {
+    width: 64px;
+    height: 14px;
+    font-size: Theme.t-meta;
+    color: Theme.text2;
+    vertical-alignment: center;
+    overflow: clip;
+}
+
+export component MiniPlayer inherits Window {
+    // The heart pops when a like is added, as in the bar.
+    property <bool> heart-pop: false;
+    property <length> pad: Theme.s3;
+    property <length> cover-size: 64px;
+    property <length> text-x: root.pad + root.cover-size + Theme.s3;
+    property <length> line-y: root.pad + root.cover-size + Theme.s3;
+    property <length> controls-y: root.line-y + 4px + Theme.s1 + 14px + Theme.s1;
+    property <float> progress: Player.duration-s > 0 ? clamp(Player.position-s / Player.duration-s, 0, 1) : 0;
+
+    title: @tr("featherplay mini player");
+    // `mini::SIZE`: 340 x 170.
+    width: 340px;
+    height: root.controls-y + 44px + root.pad;
+    no-frame: true;
+    always-on-top: true;
+    background: Theme.bar;
+    default-font-family: Theme.body-font;
+    default-font-size: Theme.t-body;
+    forward-focus: keys;
+
+    pop-end := Timer {
+        interval: 1ms;
+        running: false;
+        triggered => {
+            self.running = false;
+            root.heart-pop = false;
+        }
+    }
+
+    keys := FocusScope {
+        key-pressed(e) => {
+            if e.text == Key.Escape {
+                MiniData.dismiss();
+                return accept;
+            }
+            // As in the main window: a held Space flips playback once.
+            if e.text == " " && !e.modifiers.control && !e.modifiers.alt && !e.modifiers.meta {
+                if Player.has-track && !e.repeat {
+                    Player.toggle();
+                }
+                return accept;
+            }
+            reject
+        }
+        // Another window took the activation (a click elsewhere, Alt+Tab): close, as a flyout does.
+        focus-lost(reason) => {
+            if reason == FocusReason.window-activation {
+                MiniData.dismiss();
+            }
+        }
+    }
+
+    Cover {
+        x: root.pad;
+        y: root.pad;
+        width: root.cover-size;
+        height: root.cover-size;
+        radius: Theme.r-m;
+        source: MiniData.cover;
+        crossfade: true;
+    }
+
+    // The title on up to two lines, then the artist, centred beside the cover. "Nothing
+    // playing" in quiet body text, as the bar shows it.
+    VerticalLayout {
+        x: root.text-x;
+        y: root.pad;
+        width: open.x - Theme.s2 - self.x;
+        height: root.cover-size;
+        alignment: center;
+        spacing: 2px;
+        Display {
+            text: Player.has-track ? Player.title : @tr("Nothing playing");
+            font-family: Player.has-track ? Theme.display-font : Theme.body-font;
+            font-size: Player.has-track ? Theme.t-body-l : Theme.t-body;
+            font-weight: Player.has-track ? 700 : 600;
+            letter-spacing: Player.has-track ? self.font-size * Theme.display-tracking : 0px;
+            color: Player.has-track ? Theme.text1 : Theme.text3;
+            wrap: word-wrap;
+            max-lines: 2;
+        }
+        if Player.has-track && Player.artist != "": Body {
+            text: Player.artist;
+            font-size: Theme.t-meta;
+            color: Theme.text2;
+        }
+    }
+
+    // Opens the main window as it was left; the mini player closes. In the corner, its glyph
+    // level with the cover's top edge.
+    open := IconButton {
+        x: root.width - Theme.s2 - self.width;
+        y: root.pad - (self.height - self.glyph) / 2;
+        width: 32px;
+        height: 32px;
+        glyph: 18px;
+        // A window with an arrow out of its corner.
+        icon: "M13.5 4.5 H19.5 V10.5 M19.5 4.5 L12 12 M17.5 14 V18 A1.5 1.5 0 0 1 16 19.5 H6 A1.5 1.5 0 0 1 4.5 18 V8 A1.5 1.5 0 0 1 6 6.5 H10";
+        label: @tr("Open featherplay");
+        tint: Theme.text2;
+        clicked => { MiniData.open-app(); }
+    }
+
+    // The progress line across the window's padding, the accent up to the time played; under
+    // its ends, the time played and the length.
+    Rectangle {
+        x: root.pad;
+        y: root.line-y;
+        width: root.width - 2 * root.pad;
+        height: 4px;
+        border-radius: 2px;
+        background: Theme.track;
+        accessible-role: progress-indicator;
+        accessible-label: @tr("Progress");
+        accessible-value: Player.has-track ? @tr("{0} of {1}", Player.elapsed, Player.total) : "";
+        Rectangle {
+            x: 0;
+            width: parent.width * root.progress;
+            border-radius: parent.border-radius;
+            background: Theme.accent;
+        }
+    }
+    Time {
+        x: root.pad;
+        y: root.line-y + 4px + Theme.s1;
+        text: Player.has-track ? Player.elapsed : "";
+        horizontal-alignment: left;
+    }
+    Time {
+        x: root.width - root.pad - self.width;
+        y: root.line-y + 4px + Theme.s1;
+        text: Player.has-track ? Player.total : "";
+        horizontal-alignment: right;
+    }
+
+    // The controls, centred on the window: the transport with the play disc in the middle,
+    // the heart and "not for me" a step further out on either side.
+    HorizontalLayout {
+        x: (root.width - self.width) / 2;
+        y: root.controls-y;
+        width: self.preferred-width;
+        height: 44px;
+        alignment: center;
+        spacing: Theme.s2;
+        IconButton {
+            y: 4px;
+            icon: Icons.heart;
+            label: Player.liked ? @tr("Remove like") : @tr("Like");
+            filled: Player.liked;
+            tint: Player.liked ? Theme.text1 : Theme.text2;
+            enabled: Player.has-track;
+            glyph-scale: root.heart-pop && Theme.moving ? 0.8 : 1.0;
+            clicked => {
+                if !Player.liked {
+                    root.heart-pop = true;
+                    pop-end.running = true;
+                }
+                Player.toggle-like();
+            }
+        }
+        Rectangle { width: Theme.s1; }
+        IconButton {
+            y: 4px;
+            icon: Icons.prev;
+            label: @tr("Previous");
+            filled: true;
+            tint: Theme.text1;
+            enabled: Player.has-track;
+            clicked => { Player.previous(); }
+        }
+        // The bar's play button, smaller: the same morph, round paused and a rounded square
+        // playing.
+        PlayButton {
+            size: 44px;
+            glyph: 22px;
+        }
+        IconButton {
+            y: 4px;
+            icon: Icons.next;
+            label: @tr("Next");
+            filled: true;
+            tint: Theme.text1;
+            enabled: Player.has-track;
+            clicked => { Player.next(); }
+        }
+        Rectangle { width: Theme.s1; }
+        IconButton {
+            y: 4px;
+            icon: Icons.not-for-me;
+            label: @tr("Not for me");
+            description: @tr("Skips the song and tells YouTube Music you dislike it");
+            tint: self.hovered ? Theme.text2 : Theme.text3;
+            enabled: Player.has-track;
+            clicked => { Player.not-for-me(); }
+        }
+    }
+}

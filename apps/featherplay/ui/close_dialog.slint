@@ -1,0 +1,218 @@
+// The close dialog: what the window's close button should do, asked on close until the
+// user picks (Settings > Window, "When I close the window"). The same scrim and card as
+// Settings' dialogs, at the app level so it dims and blocks the whole window. Opened and
+// answered by `src/close.rs`.
+import { Theme, Curves } from "theme.slint";
+import { Body, Display, Pill } from "parts.slint";
+
+export global CloseChoice {
+    // Shown over the window.
+    in-out property <bool> open;
+    // "Remember my choice": checked each time the dialog opens.
+    in-out property <bool> remember: true;
+    // Which control the keyboard is on: 0 Close featherplay (the default, on Enter),
+    // 1 Keep playing in the tray, 2 Remember my choice.
+    in-out property <int> focused;
+    callback close-app();
+    callback keep-playing();
+    // Escape or a click on the scrim: the window stays open.
+    callback cancel();
+}
+
+// A dialog button with a ring when the keyboard is on it.
+component DialogButton inherits Pill {
+    in property <bool> focused;
+    height: 32px;
+    if root.focused: Rectangle {
+        x: -3px;
+        y: -3px;
+        width: parent.width + 6px;
+        height: parent.height + 6px;
+        border-radius: self.height / 2;
+        border-width: 2px;
+        border-color: Theme.accent;
+    }
+}
+
+// A checkbox and its label: the box fills with the accent and shows a tick when checked.
+component CheckRow inherits Rectangle {
+    in property <bool> checked;
+    in property <string> label;
+    in property <bool> focused;
+    callback toggled();
+    height: 32px;
+    width: lay.preferred-width;
+    accessible-role: checkbox;
+    accessible-label: root.label;
+    accessible-checkable: true;
+    accessible-checked: root.checked;
+    accessible-action-default => { root.toggled(); }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.toggled(); }
+    }
+    lay := HorizontalLayout {
+        spacing: Theme.s3;
+        alignment: start;
+        box := Rectangle {
+            y: (parent.height - self.height) / 2;
+            width: 18px;
+            height: 18px;
+            border-radius: Theme.r-s;
+            background: root.checked ? Theme.accent-state(ta.pressed, ta.has-hover) : Theme.state(ta.pressed, ta.has-hover);
+            border-width: root.checked ? 0px : 1.5px;
+            border-color: Theme.text2;
+            animate background { duration: Theme.t-hover; }
+            if root.checked: Path {
+                width: 14px;
+                height: 14px;
+                x: 2px;
+                y: 2px;
+                viewbox-width: 24;
+                viewbox-height: 24;
+                commands: "M5.5 12.5 L10 17 L18.5 7.5";
+                stroke: Theme.on-accent;
+                stroke-width: 3px;
+                stroke-line-cap: round;
+                stroke-line-join: round;
+                fill: transparent;
+            }
+            if root.focused: Rectangle {
+                x: -3px;
+                y: -3px;
+                width: parent.width + 6px;
+                height: parent.height + 6px;
+                border-radius: Theme.r-s + 3px;
+                border-width: 2px;
+                border-color: Theme.accent;
+            }
+        }
+        Body {
+            text: root.label;
+            vertical-alignment: center;
+        }
+    }
+}
+
+// The dialog over the whole window.
+export component CloseDialog inherits Rectangle {
+    // After a choice or a cancel, so the window takes the keys back.
+    callback closed();
+    property <bool> shown: false;
+    background: Theme.scrim;
+    opacity: root.shown ? 1 : 0;
+    animate opacity { duration: Theme.t-menu; easing: Curves.ease-out; }
+    init => {
+        root.shown = true;
+        scope.focus();
+    }
+
+    function close-app() {
+        CloseChoice.close-app();
+        root.closed();
+    }
+    function keep-playing() {
+        CloseChoice.keep-playing();
+        root.closed();
+    }
+    function cancel() {
+        CloseChoice.cancel();
+        root.closed();
+    }
+
+    scope := FocusScope {
+        key-pressed(e) => {
+            if e.text == Key.Escape {
+                root.cancel();
+                return accept;
+            }
+            if e.text == Key.Tab || e.text == Key.Backtab {
+                // Shift+Tab arrives as Backtab.
+                CloseChoice.focused = mod(CloseChoice.focused + (e.text == Key.Backtab || e.modifiers.shift ? 2 : 1), 3);
+                return accept;
+            }
+            if e.text == Key.LeftArrow || e.text == Key.RightArrow {
+                if CloseChoice.focused < 2 {
+                    CloseChoice.focused = 1 - CloseChoice.focused;
+                }
+                return accept;
+            }
+            if e.text == Key.Return || e.text == " " {
+                if CloseChoice.focused == 0 {
+                    root.close-app();
+                } else if CloseChoice.focused == 1 {
+                    root.keep-playing();
+                } else {
+                    CloseChoice.remember = !CloseChoice.remember;
+                }
+                return accept;
+            }
+            reject
+        }
+        TouchArea {
+            clicked => { root.cancel(); }
+            // The page under the scrim doesn't scroll.
+            scroll-event(e) => { accept }
+        }
+        card := Rectangle {
+            width: min(460px, root.width - 2 * Theme.s5);
+            height: lay.preferred-height;
+            x: (root.width - self.width) / 2;
+            y: max(Theme.s5, (root.height - self.height) / 2 - Theme.s6);
+            border-radius: Theme.r-l;
+            background: Theme.panel;
+            border-width: 1px;
+            border-color: Theme.card-edge;
+            transform-scale: root.shown ? 1 : (Theme.moving ? 0.98 : 1);
+            animate transform-scale { duration: Theme.t-menu; easing: Curves.ease-out; }
+            drop-shadow-blur: 24px;
+            drop-shadow-offset-y: 8px;
+            drop-shadow-color: Theme.cover-shadow;
+            accessible-role: groupbox;
+            accessible-label: @tr("Close featherplay?");
+            // Clicks on the card don't reach the scrim.
+            TouchArea { }
+            lay := VerticalLayout {
+                padding: Theme.s5;
+                spacing: Theme.s4;
+                Display {
+                    text: @tr("Close featherplay?");
+                    font-size: 20px;
+                }
+                Body {
+                    // Unchecked, the choice is for this once, and the text says so.
+                    text: CloseChoice.remember
+                        ? @tr("Choose what the close button does. Your choice becomes the default; you can change it later in Settings → Window.")
+                        : @tr("Choose what the close button does this time. featherplay will ask again next time.");
+                    color: Theme.text2;
+                    wrap: word-wrap;
+                }
+                CheckRow {
+                    label: @tr("Remember my choice");
+                    checked: CloseChoice.remember;
+                    focused: CloseChoice.focused == 2;
+                    toggled => {
+                        CloseChoice.focused = 2;
+                        CloseChoice.remember = !CloseChoice.remember;
+                    }
+                }
+                HorizontalLayout {
+                    padding-top: Theme.s2;
+                    spacing: Theme.s2;
+                    alignment: end;
+                    DialogButton {
+                        label: @tr("Keep playing in the tray");
+                        focused: CloseChoice.focused == 1;
+                        clicked => { root.keep-playing(); }
+                    }
+                    DialogButton {
+                        label: @tr("Close featherplay");
+                        solid: true;
+                        focused: CloseChoice.focused == 0;
+                        clicked => { root.close-app(); }
+                    }
+                }
+            }
+        }
+    }
+}

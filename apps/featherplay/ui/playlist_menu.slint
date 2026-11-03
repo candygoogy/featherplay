@@ -1,0 +1,83 @@
+// The sidebar's playlist menu (2026-10-30), in the song menu's style (song_menu.slint: the
+// same panel, rows, motion, placement and dismissal): Play, Shuffle, Start radio; Play next,
+// Add to queue; Copy link; then Rename and Delete for the account's own playlists, or Remove
+// from library for saved ones. Liked songs gets Play, Shuffle, Play next, Add to queue and
+// Copy link. Library playlists also get Pin to top (or Unpin). The sidebar's albums and
+// artists get a short menu: Play, Shuffle, Open, and Pin to top. A right-click on a sidebar
+// entry opens it with
+// `PlaylistMenu.show(item, x, y, top)` (window coordinates); `PlaylistMenuLayer` and
+// `PlaylistDialogLayer` (playlist_menu_layer.slint) draw the menu and its Rename and Delete
+// dialogs over everything. `src/playlist_menu.rs` connects the actions.
+//
+// This file holds only the state, so the sidebar can import it: the layers import Settings'
+// dialog, and Settings (through the pages' shared parts) imports the sidebar.
+import { CardItem } from "parts.slint";
+
+// Whose playlist it is, which decides the last rows; or an album or artist.
+export enum PlaylistKind { own, saved, liked, album, artist }
+
+export enum PlaylistDialog { none, rename, delete }
+
+export global PlaylistMenu {
+    out property <bool> open;
+    out property <CardItem> item;
+    // Set by Rust when the menu opens (`opened`), before the panel lays out.
+    in property <PlaylistKind> kind;
+    // The playlist's link, for Copy link; set with `kind`.
+    in property <string> link;
+    // The entry is pinned to the top of the sidebar's list; set with `kind`.
+    in property <bool> pinned;
+    out property <length> anchor-x;
+    out property <length> anchor-y;
+    // Where a menu that opens upward ends; for a right-click, the pointer.
+    out property <length> anchor-top;
+    // The open dialog, and the playlist it's for (the menu has closed by then).
+    in-out property <PlaylistDialog> dialog;
+    out property <CardItem> target;
+    // Rename's field.
+    in-out property <string> draft;
+    // Why Rename can't go ahead ("" when it can).
+    in-out property <string> dialog-error;
+
+    callback opened(string);
+    callback play(string);
+    callback shuffle(string);
+    callback start-radio(string);
+    callback play-next(string);
+    callback add-to-queue(string);
+    // The link is on the clipboard.
+    callback copied(string);
+    // An album or artist's Open.
+    callback open-item(string);
+    // Pin to top, or Unpin.
+    callback pin(string);
+    // Rust checks the name, closes the dialog and sends the write.
+    callback rename(string, string);
+    callback delete(string);
+    callback remove(string);
+
+    public function show(p: CardItem, x: length, y: length, top: length) {
+        self.item = p;
+        self.anchor-x = x;
+        self.anchor-y = y;
+        self.anchor-top = top;
+        self.open = true;
+        self.opened(p.id);
+    }
+    public function close() {
+        self.open = false;
+    }
+    // Closes the menu and opens `d` for its playlist.
+    public function ask(d: PlaylistDialog) {
+        self.target = self.item;
+        self.draft = self.item.title;
+        self.dialog-error = "";
+        self.open = false;
+        self.dialog = d;
+    }
+    public function close-dialog() {
+        self.dialog = PlaylistDialog.none;
+        self.dialog-error = "";
+    }
+}
+

@@ -1,0 +1,27 @@
+# Response headers for the static site (Cloudflare Workers static assets).
+#
+# The Content-Security-Policy allows only what the built pages load, all from the site itself:
+# - scripts: files under /_astro/ alone. Astro emits every script as a file and never inlines
+#   one (astro.config.mjs); the JSON-LD block is data, which CSP doesn't block.
+# - style sheets: files under /_astro/ alone, for the same reason.
+# - style attributes: allowed. The components set per-element values in markup (a bar's
+#   length, a song's colour, a word's place in the stagger), and those can't come from a file.
+#   style-src keeps 'unsafe-inline' so that browsers without style-src-elem and style-src-attr
+#   still draw the page; the two newer directives override it where they're known.
+# - images, audio, fonts: the site's own files; no data: or blob: URLs, no fetches elsewhere.
+# tests/csp.spec.ts loads every page under this header and fails on any violation.
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; style-src-elem 'self'; style-src-attr 'unsafe-inline'; img-src 'self'; media-src 'self'; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'none'; object-src 'none'; upgrade-insecure-requests
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Frame-Options: DENY
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+
+# Astro's build files carry a hash in their names: cache them for a year.
+/_astro/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# The workers.dev address stays out of search results; the site lives at featherplay.candygoogy.dev.
+https://featherplay-site.candygoogy.workers.dev/*
+  X-Robots-Tag: noindex

@@ -1,0 +1,1733 @@
+// Settings (a calm single column). Every field of `Settings`, grouped: Playback,
+// Scrobbling, Integrations, Window, Account. The Last.fm API settings and the ListenBrainz
+// token are entered in a small dialog over the window (`SettingsDialogLayer`). Filled and
+// applied by `src/pages/settings.rs`; changes apply at once and are saved by the controller.
+import { Theme, Curves, Icons, Appearance } from "../theme.slint";
+import { Body, Display, PageTitle, Pill, Icon, Cover } from "../parts.slint";
+import { Player } from "../player.slint";
+import { Chips } from "content.slint";
+import { Nav, PageKind } from "../nav.slint";
+import { SidebarData } from "../sidebar.slint";
+
+// The on/off settings, for `SettingsData.toggled`.
+export enum SettingKey {
+    prefer-song-versions,
+    skip-non-music,
+    sponsorblock,
+    scrobbling,
+    scrobble,
+    listenbrainz,
+    scrobble-other-media,
+    alternative-titles,
+    alternative-artists,
+    discord,
+    discord-auto-reconnect,
+    discord-clear-on-pause,
+    discord-play-button,
+    discord-links,
+    notifications,
+    hotkeys,
+    lyrics,
+    lyrics-lrclib,
+    autoplay,
+    check-for-updates,
+    local-api,
+}
+
+// The Discord connection, live from the presence worker.
+export enum DiscordState {
+    off,
+    // This build has no Discord app ID.
+    unavailable,
+    connecting,
+    connected,
+    not-connected,
+}
+
+// The local API's server.
+export enum LocalApiState {
+    off,
+    running,
+    // It couldn't listen; `local-api-message` says why.
+    failed,
+}
+
+// The Last.fm desktop sign-in, step by step.
+export enum LastfmState {
+    signed-out,
+    // Asking Last.fm for a token, then opening the browser.
+    opening,
+    // The approval page is open in the browser.
+    waiting,
+    // Exchanging the approved token for a session.
+    finishing,
+    signed-in,
+}
+
+// ListenBrainz, by its user token.
+export enum ListenBrainzState {
+    signed-out,
+    // Checking a new token with ListenBrainz.
+    checking,
+    signed-in,
+}
+
+// A fixed accent on the page: its name and its colour in each theme.
+export struct AccentSwatch {
+    name: string,
+    dark: color,
+    light: color,
+}
+
+// The Discord preview (`src/pages/settings.rs`, from the same card the presence sends): the
+// status line and the activity, for the current track or a sample when nothing plays.
+export struct DiscordPreview {
+    sample: bool,
+    // "Listening to …".
+    status: string,
+    title: string,
+    artist: string,
+    // 0 the progress bar, 1 time elapsed only, 2 no time.
+    time: int,
+    // The button's label, or empty when it's off.
+    button: string,
+    // The Links option: the title opens the song, the artist their page.
+    title-link: bool,
+    artist-link: bool,
+}
+
+// The dialog open over the page, if any.
+export enum SettingsDialog {
+    none,
+    lastfm-keys,
+    listenbrainz-token,
+}
+
+export global SettingsData {
+    // Playback.
+    in property <bool> prefer-song-versions;
+    in property <bool> skip-non-music;
+    in property <bool> autoplay: true;
+    in property <bool> sponsorblock;
+    // "System default" first, then the output devices by name.
+    in property <[string]> devices;
+    in property <int> device-index;
+    // Scrobbling. `scrobbling` turns every service on or off; `scrobble` is Last.fm's own
+    // switch and `listenbrainz` ListenBrainz's.
+    in property <bool> scrobbling;
+    in property <bool> scrobble-other-media;
+    in property <bool> alternative-titles;
+    in property <bool> alternative-artists;
+    // This build has a Last.fm API key of its own; the user has entered theirs.
+    in property <bool> lastfm-builtin-key;
+    in property <bool> lastfm-custom-key;
+    in property <LastfmState> lastfm-state;
+    in property <string> lastfm-message;
+    in property <bool> scrobble;
+    in property <ListenBrainzState> listenbrainz-state;
+    in property <string> listenbrainz-message;
+    in property <bool> listenbrainz;
+    // The dialog and its fields (cleared by Rust when it opens or closes).
+    in-out property <SettingsDialog> dialog;
+    in-out property <string> dialog-key;
+    in-out property <string> dialog-secret;
+    in-out property <string> dialog-token;
+    in property <string> dialog-error;
+    // Integrations.
+    in property <bool> discord;
+    in property <DiscordState> discord-state;
+    in property <bool> discord-auto-reconnect;
+    in property <bool> discord-clear-on-pause;
+    in property <int> discord-clear-minutes: 10;
+    // 0 the progress bar, 1 time elapsed only, 2 no time.
+    in property <int> discord-time;
+    // "Listening to …": 0 featherplay, 1 the artist, 2 the song title.
+    in property <int> discord-status-text: 2;
+    in property <bool> discord-play-button;
+    in property <bool> discord-links;
+    in property <DiscordPreview> discord-preview;
+    // The local API: the switch, the server's state, the port as typed (and why it was
+    // refused), and the token masked (Rust keeps the token itself for Copy).
+    in property <bool> local-api;
+    in property <LocalApiState> local-api-state;
+    in property <string> local-api-message;
+    in-out property <string> local-api-port: "26538";
+    in property <string> local-api-port-error;
+    in property <string> local-api-token;
+    // Window.
+    in property <bool> notifications;
+    // What the close button does: 0 ask, 1 close featherplay, 2 keep playing in the tray.
+    in property <int> close-action;
+    in property <Appearance> appearance;
+    // The Language setting: Windows default, English, then the bundled languages by their
+    // own names (Rust fills both lists); `language` is the picked one's index.
+    in property <[string]> language-names;
+    in property <[string]> language-codes;
+    in property <int> language;
+    // The Accent setting: 0 from the cover, then `accents` (Red first), then the custom
+    // colour (`accents.length + 1`).
+    in property <int> accent;
+    in property <[AccentSwatch]> accents;
+    // The custom colour: as typed ("#4390EE"), its place on the hue slider (degrees), and
+    // what each theme makes of it (empty when it shows as typed). Rust fills them.
+    in-out property <string> custom-hex;
+    in property <float> custom-hue;
+    in property <string> custom-note-dark;
+    in property <string> custom-note-light;
+    in property <string> custom-error;
+    in property <bool> hotkeys;
+    in-out property <string> hotkey-play-pause;
+    in-out property <string> hotkey-next;
+    in-out property <string> hotkey-previous;
+    in property <string> hotkeys-error;
+    // Account.
+    in property <bool> signed-in;
+    // Lyrics: shown at all ("Show lyrics"), and looked up on LRCLIB.
+    in property <bool> lyrics: true;
+    in property <bool> lyrics-lrclib: true;
+    // Ask GitHub once a day whether a newer featherplay is out.
+    in property <bool> check-for-updates: true;
+
+    callback toggled(SettingKey, bool);
+    callback pick-device(int);
+    callback pick-appearance(Appearance);
+    callback pick-language(int);
+    callback pick-accent(int);
+    // The hue slider moved (degrees); `done` when the button is let go or a key stepped it,
+    // which saves it.
+    callback custom-hue-moved(float, bool);
+    // Enter in the hex field, or leaving it, with the text as typed.
+    callback custom-hex-entered(string);
+    callback pick-close-action(int);
+    // 0 play/pause, 1 next, 2 previous; the text as typed.
+    callback hotkey-edited(int, string);
+    callback lastfm-connect();
+    callback lastfm-approved();
+    callback lastfm-cancel();
+    callback lastfm-sign-out();
+    callback open-dialog(SettingsDialog);
+    // OK in the Last.fm API settings, with the fields as typed.
+    callback lastfm-keys-save(string, string);
+    callback lastfm-keys-remove();
+    callback listenbrainz-save(string);
+    callback listenbrainz-remove();
+    callback close-dialog();
+    callback sign-out();
+    callback discord-connect();
+    callback discord-clear();
+    // -1 shorter, +1 longer.
+    callback discord-step-minutes(int);
+    callback discord-pick-time(int);
+    callback discord-pick-status-text(int);
+    // Enter in the port field, or leaving it, with the text as typed.
+    callback local-api-port-entered(string);
+    callback local-api-copy();
+    callback local-api-regenerate();
+}
+
+// An on/off switch: filled with the accent when on, outlined when off (Windows' toggle
+// shape). Enter toggles it when focused. Space doesn't: a click leaves the keys on it, and
+// Space plays and pauses from anywhere (app.slint), as on YouTube Music.
+export component Switch inherits Rectangle {
+    in property <bool> checked;
+    in property <string> label;
+    in property <bool> enabled: true;
+    callback toggled(bool);
+    width: 40px;
+    height: 22px;
+    border-radius: self.height / 2;
+    background: root.checked ? Theme.accent : transparent;
+    border-width: root.checked ? 0px : 1.5px;
+    border-color: Theme.text2;
+    opacity: root.enabled ? 1.0 : 0.4;
+    accessible-role: switch;
+    accessible-label: root.label;
+    accessible-checkable: true;
+    accessible-checked: root.checked;
+    accessible-action-default => { root.flip(); }
+    animate background { duration: Theme.t-hover; }
+
+    function flip() {
+        if root.enabled {
+            root.toggled(!root.checked);
+        }
+    }
+    // Hover and press: a soft halo over and around the track.
+    Rectangle {
+        x: -4px;
+        y: -4px;
+        width: parent.width + 8px;
+        height: parent.height + 8px;
+        border-radius: self.height / 2;
+        background: Theme.state(sta.pressed, sta.has-hover);
+        animate background { duration: Theme.t-hover; }
+    }
+    focus := FocusScope {
+        enabled: root.enabled;
+        key-pressed(e) => {
+            if e.text == Key.Return {
+                root.flip();
+                return accept;
+            }
+            reject
+        }
+    }
+    sta := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: pointer;
+        clicked => {
+            focus.focus();
+            root.flip();
+        }
+    }
+    // The focus ring, just outside the track.
+    if focus.has-focus: Rectangle {
+        x: -3px;
+        y: -3px;
+        width: parent.width + 6px;
+        height: parent.height + 6px;
+        border-radius: self.height / 2;
+        border-width: 2px;
+        border-color: Theme.accent;
+    }
+    Rectangle {
+        x: root.checked ? parent.width - self.width - 4px : 5px;
+        y: (parent.height - self.height) / 2;
+        width: root.checked ? 14px : 12px;
+        height: self.width;
+        border-radius: self.width / 2;
+        background: root.checked ? Theme.on-solid : Theme.text2;
+        animate x { duration: Theme.t-hover; easing: ease-out; }
+    }
+}
+
+// An accent: a dot of its colour, ringed in `text1` when it's the one picked.
+component Swatch inherits Rectangle {
+    in property <brush> colour;
+    in property <string> name;
+    in property <bool> selected;
+    callback clicked();
+    width: 32px;
+    height: 32px;
+    border-radius: self.height / 2;
+    background: Theme.state(ta.pressed, ta.has-hover);
+    border-width: root.selected ? 2px : 0px;
+    border-color: Theme.text1;
+    accessible-role: radio-button;
+    accessible-label: root.name;
+    accessible-checkable: true;
+    accessible-checked: root.selected;
+    accessible-action-default => { root.clicked(); }
+    animate background { duration: Theme.t-hover; }
+    Rectangle {
+        width: 22px;
+        height: 22px;
+        border-radius: self.height / 2;
+        background: root.colour;
+    }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+}
+
+// The custom colour's hue: a strip of every hue at the slider's lightness and chroma
+// (`follow::hue_colour`), and a thumb. Dragging shows the colour live and saves it on
+// release; the arrow keys step 5 degrees and save.
+component HueSlider inherits Rectangle {
+    in property <float> hue;
+    property <length> knob: 20px;
+    height: 24px;
+    accessible-role: slider;
+    accessible-label: @tr("Hue");
+    accessible-value: @tr("{n} degree" | "{n} degrees" % Math.round(root.hue));
+    accessible-value-minimum: 0;
+    accessible-value-maximum: 360;
+    accessible-value-step: 5;
+    accessible-action-increment => { root.step(5); }
+    accessible-action-decrement => { root.step(-5); }
+
+    function step(by: float) {
+        SettingsData.custom-hue-moved(mod(root.hue + by + 360, 360), true);
+    }
+    function at(x: length, done: bool) {
+        let usable = root.width - root.knob;
+        SettingsData.custom-hue-moved(((x - root.knob / 2) / usable).clamp(0, 1) * 359.9, done);
+    }
+
+    Rectangle {
+        x: root.knob / 2 - 6px;
+        y: (parent.height - self.height) / 2;
+        width: parent.width - root.knob + 12px;
+        height: 12px;
+        border-radius: self.height / 2;
+        background: @linear-gradient(90deg,
+            oklch(0.65, 0.16, 0) 0%, oklch(0.65, 0.16, 30) 8.33%, oklch(0.65, 0.16, 60) 16.67%,
+            oklch(0.65, 0.16, 90) 25%, oklch(0.65, 0.16, 120) 33.33%, oklch(0.65, 0.16, 150) 41.67%,
+            oklch(0.65, 0.16, 180) 50%, oklch(0.65, 0.16, 210) 58.33%, oklch(0.65, 0.16, 240) 66.67%,
+            oklch(0.65, 0.16, 270) 75%, oklch(0.65, 0.16, 300) 83.33%, oklch(0.65, 0.16, 330) 91.67%,
+            oklch(0.65, 0.16, 360) 100%);
+    }
+    focus := FocusScope {
+        key-pressed(e) => {
+            if e.text == Key.RightArrow || e.text == Key.UpArrow {
+                root.step(5);
+                return accept;
+            }
+            if e.text == Key.LeftArrow || e.text == Key.DownArrow {
+                root.step(-5);
+                return accept;
+            }
+            reject
+        }
+    }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        pointer-event(e) => {
+            if e.button == PointerEventButton.left && e.kind == PointerEventKind.down {
+                focus.focus();
+                root.at(self.mouse-x, false);
+            }
+            if e.button == PointerEventButton.left && e.kind == PointerEventKind.up {
+                root.at(self.mouse-x, true);
+            }
+        }
+        moved => {
+            if self.pressed {
+                root.at(self.mouse-x, false);
+            }
+        }
+    }
+    // The thumb, in the slider's colour at this hue, ringed so it reads on any hue.
+    Rectangle {
+        x: root.hue / 360 * (parent.width - root.knob);
+        y: (parent.height - self.height) / 2;
+        width: root.knob;
+        height: root.knob;
+        border-radius: self.height / 2;
+        background: oklch(0.65, 0.16, root.hue);
+        border-width: 2px;
+        border-color: Theme.text1;
+    }
+    if focus.has-focus: Rectangle {
+        x: root.hue / 360 * (parent.width - root.knob) - 4px;
+        y: (parent.height - self.height) / 2;
+        width: root.knob + 8px;
+        height: root.knob + 8px;
+        border-radius: self.height / 2;
+        border-width: 2px;
+        border-color: Theme.accent;
+    }
+}
+
+// A one-line text field (hotkeys).
+export component Field inherits Rectangle {
+    in-out property <string> text;
+    in property <string> placeholder;
+    in property <string> label;
+    in property <bool> enabled: true;
+    in property <InputType> input-type: InputType.text;
+    callback committed(string);
+    // Enter in the field.
+    callback accepted();
+    public function grab-focus() {
+        input.focus();
+    }
+    public function select-all() {
+        input.select-all();
+    }
+    height: 36px;
+    border-radius: Theme.r-m;
+    background: Theme.field;
+    border-width: input.has-focus ? 1px : (Theme.dark ? 0px : 1px);
+    border-color: input.has-focus ? Theme.accent : Theme.hairline;
+    opacity: root.enabled ? 1.0 : 0.4;
+    TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: MouseCursor.text;
+        clicked => { input.focus(); }
+    }
+    if input.text == "": Body {
+        // Starts just past the text cursor, so the cursor never draws over its first letter.
+        x: 12px + input.text-cursor-width + 2px;
+        width: parent.width - self.x - 12px;
+        height: parent.height;
+        text: root.placeholder;
+        color: Theme.text3;
+        vertical-alignment: center;
+    }
+    input := TextInput {
+        x: 12px;
+        width: parent.width - 24px;
+        height: parent.height;
+        text <=> root.text;
+        enabled: root.enabled;
+        input-type: root.input-type;
+        single-line: true;
+        vertical-alignment: center;
+        font-family: Theme.body-font;
+        font-size: Theme.t-body;
+        color: Theme.text1;
+        selection-background-color: Theme.accent;
+        selection-foreground-color: Theme.on-solid;
+        accessible-label: root.label;
+        accepted => {
+            root.committed(self.text);
+            root.accepted();
+        }
+        changed has-focus => {
+            if !self.has-focus {
+                root.committed(self.text);
+            }
+        }
+    }
+}
+
+// The custom colour, under the Accent row while it's picked: the colour as this theme
+// shows it, the hue slider and the hex field. A line below says when the theme adjusts the
+// colour to keep it visible, or why a typed code was refused.
+component CustomPicker inherits VerticalLayout {
+    property <string> note: Theme.dark ? SettingsData.custom-note-dark : SettingsData.custom-note-light;
+    padding-bottom: Theme.s4;
+    spacing: Theme.s2;
+    HorizontalLayout {
+        spacing: Theme.s4;
+        Rectangle {
+            width: 36px;
+            height: 36px;
+            border-radius: self.height / 2;
+            background: Theme.accent;
+            accessible-role: image;
+            accessible-label: @tr("Custom colour as shown");
+        }
+        VerticalLayout {
+            alignment: center;
+            horizontal-stretch: 1;
+            HueSlider {
+                hue: SettingsData.custom-hue;
+            }
+        }
+        Field {
+            width: 112px;
+            text <=> SettingsData.custom-hex;
+            label: @tr("Colour code");
+            placeholder: "#4390EE";
+            committed(t) => { SettingsData.custom-hex-entered(t); }
+        }
+    }
+    if SettingsData.custom-error != "": Body {
+        text: SettingsData.custom-error;
+        font-size: Theme.t-meta;
+        color: Theme.text1;
+        wrap: word-wrap;
+    }
+    if SettingsData.custom-error == "" && root.note != "": Body {
+        text: root.note;
+        font-size: Theme.t-meta;
+        color: Theme.text2;
+        wrap: word-wrap;
+    }
+}
+
+// A line of the preview's activity: elided, and underlined when the Links option makes it a
+// link on Discord (Discord underlines them on hover; the preview can't hover, so it always
+// shows the line).
+component PreviewLine inherits Rectangle {
+    in property <string> text;
+    in property <bool> link;
+    in property <length> font-size: Theme.t-body;
+    in property <int> font-weight: 400;
+    in property <color> tone: Theme.text1;
+    min-height: t.min-height;
+    preferred-height: t.preferred-height;
+    min-width: 0px;
+    horizontal-stretch: 1;
+    t := Body {
+        width: parent.width;
+        height: parent.height;
+        text: root.text;
+        font-size: root.font-size;
+        font-weight: root.font-weight;
+        color: root.tone;
+    }
+    if root.link: Rectangle {
+        x: 0;
+        y: root.height - 3px;
+        width: min(t.preferred-width, root.width);
+        height: 1px;
+        background: root.tone.transparentize(0.7);
+    }
+}
+
+// The Discord preview, under the options: what they give, drawn in the app's own style (no
+// Discord marks or colours). One card in two columns: on the left the status line as member
+// lists show it, with the account's photo (its initial until then); on the right the activity
+// on the profile, its cover badged with the Tri-vane. The time follows the player's
+// once-a-second position; nothing else moves.
+component ActivityPreview inherits Rectangle {
+    property <DiscordPreview> p: SettingsData.discord-preview;
+    property <bool> live: !root.p.sample && Player.has-track;
+    property <float> at: root.live ? Player.position-s : 72;
+    property <float> total: root.live ? Player.duration-s : 210;
+    property <length> cover: 72px;
+    min-height: lay.min-height;
+    preferred-height: lay.preferred-height;
+    accessible-role: groupbox;
+    accessible-label: @tr("Discord preview");
+    lay := VerticalLayout {
+        padding-bottom: Theme.s4;
+        Rectangle {
+            border-radius: Theme.r-m;
+            background: Theme.card;
+            HorizontalLayout {
+                padding: Theme.s4;
+                spacing: Theme.s4;
+                // Member lists and DMs: the avatar, the name and the status line.
+                VerticalLayout {
+                    width: 216px;
+                    alignment: start;
+                    spacing: Theme.s3;
+                    Body {
+                        text: @tr("In member lists");
+                        font-size: Theme.t-meta;
+                        color: Theme.text3;
+                    }
+                    HorizontalLayout {
+                        spacing: Theme.s3;
+                        VerticalLayout {
+                            alignment: center;
+                            Rectangle {
+                                width: 32px;
+                                height: 32px;
+                                border-radius: 16px;
+                                background: Theme.avatar;
+                                if SidebarData.initial != "": Text {
+                                    text: SidebarData.initial;
+                                    font-family: Theme.display-font;
+                                    font-weight: 700;
+                                    font-size: 14px;
+                                    color: Theme.text1;
+                                }
+                                if SidebarData.initial == "": Icon {
+                                    width: 18px;
+                                    height: 18px;
+                                    commands: Icons.person;
+                                    stroke: Theme.text1;
+                                }
+                                if SidebarData.signed-in && SidebarData.has-avatar: Cover {
+                                    width: parent.width;
+                                    height: parent.height;
+                                    round: true;
+                                    source: SidebarData.avatar;
+                                }
+                            }
+                        }
+                        VerticalLayout {
+                            alignment: center;
+                            spacing: 2px;
+                            Body {
+                                text: @tr("You");
+                                font-weight: 600;
+                            }
+                            Body {
+                                text: root.p.status;
+                                font-size: Theme.t-meta;
+                                color: Theme.text2;
+                            }
+                        }
+                    }
+                }
+                // One card, two columns: a hairline between them, as tall as the card.
+                Rectangle {
+                    width: 1px;
+                    background: Theme.hairline;
+                }
+                // The profile: the activity's name, the cover, title, artist and time, the
+                // button.
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    alignment: start;
+                    spacing: Theme.s3;
+                    Body {
+                        text: @tr("On your profile");
+                        font-size: Theme.t-meta;
+                        color: Theme.text3;
+                    }
+                    Body {
+                        text: @tr("Listening to featherplay");
+                        font-size: Theme.t-meta;
+                        font-weight: 600;
+                        color: Theme.text1;
+                    }
+                    HorizontalLayout {
+                        spacing: Theme.s4;
+                        // The cover and its app badge, which overhangs the corner a little,
+                        // ringed in the card's colour.
+                        VerticalLayout {
+                            alignment: start;
+                            Rectangle {
+                                width: root.cover;
+                                height: root.cover;
+                                Cover {
+                                    width: parent.width;
+                                    height: parent.height;
+                                    radius: Theme.r-m;
+                                    source: root.live ? Player.cover : @image-url("");
+                                }
+                                Rectangle {
+                                    x: parent.width - self.width + 6px;
+                                    y: parent.height - self.height + 6px;
+                                    width: 28px;
+                                    height: 28px;
+                                    border-radius: self.width / 2;
+                                    background: Theme.ground;
+                                    border-width: 3px;
+                                    border-color: Theme.card;
+                                    Image {
+                                        width: 18px;
+                                        height: 18px;
+                                        source: Theme.dark ? @image-url("../logo/tri-vane-24.svg") : @image-url("../logo/tri-vane-light-24.svg");
+                                    }
+                                }
+                            }
+                        }
+                        VerticalLayout {
+                            alignment: start;
+                            spacing: 2px;
+                            PreviewLine {
+                                text: root.p.title;
+                                link: root.p.title-link;
+                                font-weight: 600;
+                            }
+                            PreviewLine {
+                                text: root.p.artist;
+                                link: root.p.artist-link;
+                                tone: Theme.text2;
+                            }
+                            if root.p.time == 0: HorizontalLayout {
+                                padding-top: Theme.s2;
+                                spacing: Theme.s2;
+                                Body {
+                                    text: Player.clock(root.at);
+                                    font-size: Theme.t-meta;
+                                    color: Theme.text2;
+                                }
+                                Rectangle {
+                                    horizontal-stretch: 1;
+                                    Rectangle {
+                                        y: (parent.height - self.height) / 2;
+                                        height: 4px;
+                                        border-radius: 2px;
+                                        background: Theme.track;
+                                    }
+                                    Rectangle {
+                                        x: 0;
+                                        y: (parent.height - self.height) / 2;
+                                        width: parent.width * (root.at / max(root.total, 1)).clamp(0, 1);
+                                        height: 4px;
+                                        border-radius: 2px;
+                                        background: Theme.text1;
+                                    }
+                                }
+                                Body {
+                                    text: Player.clock(root.total);
+                                    font-size: Theme.t-meta;
+                                    color: Theme.text2;
+                                }
+                            }
+                            if root.p.time == 1: HorizontalLayout {
+                                padding-top: Theme.s2;
+                                Body {
+                                    text: @tr("{} elapsed", Player.clock(root.at));
+                                    font-size: Theme.t-meta;
+                                    color: Theme.text2;
+                                }
+                            }
+                            // Only when the option is on: a quiet outlined button, as wide
+                            // as its label.
+                            if root.p.button != "": HorizontalLayout {
+                                padding-top: Theme.s3;
+                                alignment: start;
+                                Rectangle {
+                                    height: 32px;
+                                    border-radius: Theme.r-m;
+                                    border-width: 1px;
+                                    border-color: Theme.field-edge-hover;
+                                    HorizontalLayout {
+                                        padding-left: Theme.s4;
+                                        padding-right: Theme.s4;
+                                        Body {
+                                            text: root.p.button;
+                                            font-size: Theme.t-meta;
+                                            font-weight: 600;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// The rows' measures, shared by the groups and the section index (which lines its first
+// entry up with the first group's title).
+global Rows {
+    out property <length> title-h: 32px;
+    out property <length> link-h: 36px;
+    // Inside a group's panel, left and right: the labels' indent and the controls' inset.
+    out property <length> inset: Theme.s5;
+    out property <length> pad-y: 18px;
+    // The detail under a label: a step brighter than `text2`, still from it (so it keeps the
+    // cover's tint while the accent follows it), for a clearer read on the panel.
+    out property <color> detail: Theme.text2.mix(Theme.text1, 0.75);
+}
+
+// A group heading above its rows.
+component GroupTitle inherits Display {
+    font-size: 20px;
+    height: Rows.title-h;
+    vertical-alignment: center;
+}
+
+// A group of settings: its title, then its rows on a rounded panel.
+component Group inherits VerticalLayout {
+    in property <string> title;
+    spacing: Theme.s3;
+    GroupTitle {
+        text: root.title;
+    }
+    Rectangle {
+        border-radius: Theme.r-l;
+        background: Theme.panel;
+        border-width: 1px;
+        border-color: Theme.card-edge;
+        VerticalLayout {
+            padding-top: 4px;
+            padding-bottom: 4px;
+            padding-left: Rows.inset;
+            padding-right: Rows.inset;
+            @children
+        }
+    }
+}
+
+// One setting: its name and a line of detail on the left, the control on the right.
+component SettingRow inherits Rectangle {
+    in property <string> label;
+    in property <string> detail;
+    in property <bool> divider: true;
+    min-height: lay.min-height;
+    preferred-height: lay.preferred-height;
+    if root.divider: Rectangle {
+        y: 0;
+        height: 1px;
+        background: Theme.hairline;
+    }
+    lay := HorizontalLayout {
+        padding-top: Rows.pad-y;
+        padding-bottom: Rows.pad-y;
+        spacing: Theme.s6;
+        VerticalLayout {
+            alignment: center;
+            spacing: Theme.s1;
+            horizontal-stretch: 1;
+            Body {
+                text: root.label;
+                font-size: Theme.t-body-l;
+                font-weight: 500;
+                overflow: clip;
+                wrap: word-wrap;
+            }
+            if root.detail != "": Body {
+                text: root.detail;
+                font-size: Theme.t-meta;
+                color: Rows.detail;
+                overflow: clip;
+                wrap: word-wrap;
+            }
+        }
+        VerticalLayout {
+            alignment: center;
+            horizontal-stretch: 0;
+            HorizontalLayout {
+                alignment: end;
+                spacing: Theme.s2;
+                @children
+            }
+        }
+    }
+}
+
+// A row with a switch.
+component ToggleRow inherits SettingRow {
+    in property <SettingKey> key;
+    in property <bool> checked;
+    in property <bool> enabled: true;
+    Switch {
+        checked: root.checked;
+        label: root.label;
+        enabled: root.enabled;
+        toggled(on) => { SettingsData.toggled(root.key, on); }
+    }
+}
+
+// A small pill for row controls.
+component RowButton inherits Pill {
+    height: 32px;
+}
+
+// One output device: a radio mark and the name.
+component DeviceRow inherits Rectangle {
+    in property <string> name;
+    in property <bool> selected;
+    callback clicked();
+    height: 40px;
+    border-radius: Theme.r-m;
+    background: Theme.state(ta.pressed, ta.has-hover);
+    accessible-role: radio-button;
+    accessible-label: root.name;
+    accessible-checkable: true;
+    accessible-checked: root.selected;
+    accessible-action-default => { root.clicked(); }
+    animate background { duration: Theme.t-hover; }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+    Rectangle {
+        x: 10px;
+        y: (parent.height - self.height) / 2;
+        width: 18px;
+        height: 18px;
+        border-radius: 9px;
+        border-width: root.selected ? 5px : 1.5px;
+        border-color: root.selected ? Theme.accent : Theme.text3;
+        animate border-width, border-color { duration: Theme.t-hover; }
+    }
+    Body {
+        x: 40px;
+        width: parent.width - 48px;
+        height: parent.height;
+        text: root.name;
+        color: root.selected ? Theme.text1 : Theme.text2;
+        vertical-alignment: center;
+    }
+}
+
+// The pause timeout: shorter, the minutes, longer.
+component MinutesStepper inherits HorizontalLayout {
+    in property <int> minutes;
+    in property <bool> enabled: true;
+    spacing: Theme.s2;
+    RowButton {
+        label: "−";
+        accessible-label: @tr("Shorter");
+        enabled: root.enabled;
+        clicked => { SettingsData.discord-step-minutes(-1); }
+    }
+    Body {
+        min-width: 56px;
+        text: @tr("{n} min" | "{n} min" % root.minutes);
+        color: root.enabled ? Theme.text1 : Theme.text3;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+    RowButton {
+        label: "+";
+        accessible-label: @tr("Longer");
+        enabled: root.enabled;
+        clicked => { SettingsData.discord-step-minutes(1); }
+    }
+}
+
+component HotkeyRow inherits Rectangle {
+    in property <string> label;
+    in property <int> index;
+    in-out property <string> text;
+    in property <string> placeholder;
+    height: 44px;
+    Body {
+        x: 0;
+        width: parent.width - 220px;
+        height: parent.height;
+        text: root.label;
+        color: Theme.text2;
+        vertical-alignment: center;
+    }
+    Field {
+        x: parent.width - self.width;
+        y: (parent.height - self.height) / 2;
+        width: 200px;
+        text <=> root.text;
+        placeholder: root.placeholder;
+        label: @tr("{} hotkey", root.label);
+        committed(t) => { SettingsData.hotkey-edited(root.index, t); }
+    }
+}
+
+// A labelled field in a dialog (Settings', and the playlist menu's Rename).
+export component DialogField inherits VerticalLayout {
+    in property <string> label;
+    in property <string> placeholder;
+    in property <InputType> input-type: InputType.text;
+    in-out property <string> text;
+    callback accepted();
+    public function grab-focus() {
+        field.grab-focus();
+    }
+    public function select-all() {
+        field.select-all();
+    }
+    spacing: Theme.s1;
+    Body {
+        text: root.label;
+        font-size: Theme.t-meta;
+        color: Theme.text2;
+    }
+    field := Field {
+        text <=> root.text;
+        label: root.label;
+        placeholder: root.placeholder;
+        input-type: root.input-type;
+        accepted => { root.accepted(); }
+    }
+}
+
+// A dialog over the page: a scrim, and a card with a title, a line of detail, the fields
+// (children) and the buttons. Escape or a click on the scrim cancels. Settings' dialogs, and
+// the playlist menu's Rename and Delete.
+export component Dialog inherits Rectangle {
+    in property <string> title;
+    in property <string> detail;
+    in property <string> error;
+    // A quiet button on the left ("Remove …"), shown when not empty.
+    in property <string> extra;
+    // The confirming button names its action ("Rename", "Delete").
+    in property <string> ok-label: @tr("OK");
+    callback ok();
+    callback cancel();
+    callback extra-clicked();
+    // For a dialog without a field: Escape reaches it at once.
+    public function focus-keys() {
+        keys.focus();
+    }
+    property <bool> shown: false;
+    background: Theme.scrim;
+    opacity: root.shown ? 1 : 0;
+    animate opacity { duration: Theme.t-menu; easing: Curves.ease-out; }
+    init => { root.shown = true; }
+    keys := FocusScope {
+        key-pressed(e) => {
+            if e.text == Key.Escape {
+                root.cancel();
+                return accept;
+            }
+            reject
+        }
+        TouchArea {
+            clicked => { root.cancel(); }
+            // The page under the scrim doesn't scroll.
+            scroll-event(e) => { accept }
+        }
+        card := Rectangle {
+            width: min(460px, root.width - 2 * Theme.s5);
+            height: lay.preferred-height;
+            x: (root.width - self.width) / 2;
+            y: max(Theme.s5, (root.height - self.height) / 2 - Theme.s6);
+            border-radius: Theme.r-l;
+            background: Theme.panel;
+            border-width: 1px;
+            border-color: Theme.card-edge;
+            transform-scale: root.shown ? 1 : (Theme.moving ? 0.98 : 1);
+            animate transform-scale { duration: Theme.t-menu; easing: Curves.ease-out; }
+            drop-shadow-blur: 24px;
+            drop-shadow-offset-y: 8px;
+            drop-shadow-color: Theme.cover-shadow;
+            accessible-role: groupbox;
+            accessible-label: root.title;
+            // Clicks on the card don't reach the scrim.
+            TouchArea { }
+            lay := VerticalLayout {
+                padding: Theme.s5;
+                spacing: Theme.s4;
+                Display {
+                    text: root.title;
+                    font-size: 20px;
+                    // A long playlist name in "Delete “…”?" wraps rather than being cut.
+                    wrap: word-wrap;
+                }
+                if root.detail != "": Body {
+                    text: root.detail;
+                    color: Theme.text2;
+                    wrap: word-wrap;
+                }
+                @children
+                if root.error != "": Body {
+                    text: root.error;
+                    font-size: Theme.t-meta;
+                    color: Theme.text1;
+                    wrap: word-wrap;
+                }
+                HorizontalLayout {
+                    padding-top: Theme.s2;
+                    spacing: Theme.s2;
+                    if root.extra != "": RowButton {
+                        label: root.extra;
+                        clicked => { root.extra-clicked(); }
+                    }
+                    Rectangle {
+                        horizontal-stretch: 1;
+                    }
+                    RowButton {
+                        label: @tr("Cancel");
+                        clicked => { root.cancel(); }
+                    }
+                    RowButton {
+                        label: root.ok-label;
+                        solid: true;
+                        clicked => { root.ok(); }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// An entry of Settings' section index: the section's name, marked while it's in view.
+// The marked entry wears the accent's tonal fill, as the selected chip and tab do.
+component SectionLink inherits Rectangle {
+    in property <string> text;
+    in property <bool> active;
+    callback clicked();
+    height: Rows.link-h;
+    border-radius: Theme.r-m;
+    background: ta.pressed ? Theme.pressed
+        : root.active ? (ta.has-hover ? Theme.accent-tonal-hover : Theme.accent-tonal)
+        : (ta.has-hover ? Theme.hover : transparent);
+    accessible-role: button;
+    accessible-label: root.text;
+    accessible-item-selected: root.active;
+    accessible-action-default => { root.clicked(); }
+    animate background { duration: Theme.t-hover; }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+    Body {
+        x: Theme.s3;
+        width: parent.width - 2 * Theme.s3;
+        height: parent.height;
+        text: root.text;
+        color: root.active ? Theme.text1 : Theme.text2;
+        font-weight: root.active ? 600 : 400;
+        vertical-alignment: center;
+    }
+}
+
+export component SettingsPage inherits Rectangle {
+    // The content column: wide enough that the descriptions run one or two lines.
+    property <length> col-max: 920px;
+    // At wide windows a section index sits left of the column, when the column keeps at
+    // least 760 px beside it, and the two are centred in the page, so a wide window doesn't
+    // leave them against the sidebar with an empty side. Narrower, the column starts at the
+    // page's padding, as every page does.
+    property <length> index-w: 184px;
+    property <length> index-gap: Theme.s7;
+    property <bool> indexed: self.width >= 2 * Theme.page-pad + root.index-w + root.index-gap + 760px;
+    property <length> index-room: root.indexed ? root.index-w + root.index-gap : 0px;
+    property <length> col-w: min(self.width - 2 * Theme.page-pad - root.index-room, root.col-max);
+    property <length> block-x: root.indexed ? max(Theme.page-pad, floor((self.width - root.index-room - root.col-w) / 2 / 1px) * 1px) : Theme.page-pad;
+    property <length> col-x: root.block-x + root.index-room;
+    property <bool> confirm-sign-out: false;
+    // How many of the sections below the fold (Integrations, Window, Account) are made: one
+    // more each tick after the page's first frame, not all with it. Making and laying out
+    // every row, its text shaped, was most of the page's first frame (~13 ms at 4K shown
+    // again, ~21 the first time; measured 2026-11-01). Until then a
+    // section is its title on an empty panel, out of sight.
+    property <int> made: 0;
+    Timer {
+        interval: 1ms;
+        running: root.made < 3;
+        triggered => { root.made += 1; }
+    }
+
+    // Where each section starts in the scrolled content, in the index's order.
+    property <[length]> tops: [
+        col.y + playback-section.y,
+        col.y + lyrics-section.y,
+        col.y + scrobbling-section.y,
+        col.y + integrations-section.y,
+        col.y + window-section.y,
+        col.y + account-section.y,
+    ];
+    // The section in view, derived from the scroll position (nothing is timed): the last one
+    // whose top has passed a third of the way down the visible page, or the last section once
+    // the page is scrolled to its end.
+    property <length> scrolled: -flick.content-y;
+    property <length> max-scroll: max(0px, flick.content-height - flick.height);
+    property <length> reading-line: root.scrolled + (flick.height - Theme.bar-clear) / 3;
+    property <int> in-view: root.max-scroll > 0 && root.scrolled >= root.max-scroll - 1px ? 5
+        : root.reading-line >= root.tops[5] ? 5
+        : root.reading-line >= root.tops[4] ? 4
+        : root.reading-line >= root.tops[3] ? 3
+        : root.reading-line >= root.tops[2] ? 2
+        : root.reading-line >= root.tops[1] ? 1 : 0;
+    // Brings section `i`'s title near the top (as far as the page scrolls).
+    function go-to(i: int) {
+        flick.content-y = -min(max(0px, root.tops[i] - Theme.s5), root.max-scroll);
+    }
+
+    flick := Flickable {
+        width: parent.width;
+        height: parent.height;
+        content-height: col.preferred-height + Theme.page-top + Theme.page-end;
+
+        col := VerticalLayout {
+            x: root.col-x;
+            y: Theme.page-top;
+            width: root.col-w;
+            height: self.preferred-height;
+            spacing: Theme.s7;
+
+            PageTitle {
+                text: @tr("Settings");
+            }
+
+            playback-section := Group {
+                title: @tr("Playback");
+                ToggleRow {
+                    divider: false;
+                    label: @tr("Prefer song versions");
+                    detail: @tr("Some uploads are music videos with intros or skits in the audio. Play the song version instead when there is one.");
+                    key: SettingKey.prefer-song-versions;
+                    checked: SettingsData.prefer-song-versions;
+                }
+                ToggleRow {
+                    label: @tr("Autoplay similar songs when a list ends");
+                    detail: @tr("When a playlist, album or other list ends, play on with songs like its last one. Off, the list starts again from the top. Repeat all always starts it again.");
+                    key: SettingKey.autoplay;
+                    checked: SettingsData.autoplay;
+                }
+                ToggleRow {
+                    label: @tr("Skip non-music in radio");
+                    detail: @tr("Radio and autoplay leave out user uploads and podcast episodes. Tracks you pick always play.");
+                    key: SettingKey.skip-non-music;
+                    checked: SettingsData.skip-non-music;
+                }
+                ToggleRow {
+                    label: @tr("Skip non-music parts");
+                    detail: @tr("Skips the intros and outros SponsorBlock users marked in music videos.");
+                    key: SettingKey.sponsorblock;
+                    checked: SettingsData.sponsorblock;
+                }
+                SettingRow {
+                    label: @tr("Output device");
+                    detail: @tr("If the device goes away, playback pauses and moves to the system default.");
+                }
+                VerticalLayout {
+                    padding-bottom: Theme.s2;
+                    for d[i] in SettingsData.devices: DeviceRow {
+                        name: d;
+                        selected: i == SettingsData.device-index;
+                        clicked => { SettingsData.pick-device(i); }
+                    }
+                }
+            }
+
+            lyrics-section := Group {
+                title: @tr("Lyrics");
+                ToggleRow {
+                    divider: false;
+                    label: @tr("Show lyrics");
+                    detail: @tr("The Lyrics button in the bar and on Now playing, and the Lyrics tab beside Up next. Off: they're hidden, and no lyrics are looked up.");
+                    key: SettingKey.lyrics;
+                    checked: SettingsData.lyrics;
+                }
+                ToggleRow {
+                    label: @tr("Look up synced lyrics on LRCLIB");
+                    detail: @tr("Lines follow the song. While lyrics are on screen, LRCLIB gets the song's title, artist, album and length. Off: only the lyrics that come with the song, synced for some songs.");
+                    key: SettingKey.lyrics-lrclib;
+                    checked: SettingsData.lyrics-lrclib;
+                    enabled: SettingsData.lyrics;
+                }
+            }
+
+            scrobbling-section := Group {
+                title: @tr("Scrobbling");
+                ToggleRow {
+                    divider: false;
+                    label: @tr("Scrobble");
+                    detail: @tr("Send what you play to Last.fm and ListenBrainz, once you've played half a track or 4 minutes of it.");
+                    key: SettingKey.scrobbling;
+                    checked: SettingsData.scrobbling;
+                }
+                ToggleRow {
+                    label: @tr("Scrobble other media");
+                    detail: @tr("Also scrobble user uploads and podcasts, not only songs and official music videos.");
+                    key: SettingKey.scrobble-other-media;
+                    checked: SettingsData.scrobble-other-media;
+                    enabled: SettingsData.scrobbling;
+                }
+                ToggleRow {
+                    label: @tr("Use alternative titles");
+                    detail: @tr("Send the video's original title rather than the translated or romanised one shown here.");
+                    key: SettingKey.alternative-titles;
+                    checked: SettingsData.alternative-titles;
+                    enabled: SettingsData.scrobbling;
+                }
+                ToggleRow {
+                    label: @tr("Use alternative artists");
+                    detail: @tr("Send the artist from the video's tags, spelled as the label has it, rather than the first artist shown.");
+                    key: SettingKey.alternative-artists;
+                    checked: SettingsData.alternative-artists;
+                    enabled: SettingsData.scrobbling;
+                }
+                SettingRow {
+                    label: "Last.fm";
+                    detail: SettingsData.lastfm-message != "" ? SettingsData.lastfm-message
+                        : SettingsData.lastfm-state == LastfmState.signed-in ? @tr("Connected. Scrobbles go to your Last.fm profile.")
+                        : SettingsData.lastfm-state == LastfmState.opening ? @tr("Opening Last.fm in your browser…")
+                        : SettingsData.lastfm-state == LastfmState.waiting ? @tr("Approve featherplay on the Last.fm page in your browser, then come back here.")
+                        : SettingsData.lastfm-state == LastfmState.finishing ? @tr("Connecting…")
+                        : !SettingsData.lastfm-builtin-key && !SettingsData.lastfm-custom-key ? @tr("Scrobble to your Last.fm profile. Enter an API key under API settings first.")
+                        : @tr("Scrobble what you play to your Last.fm profile.");
+                    if SettingsData.lastfm-state == LastfmState.signed-out || SettingsData.lastfm-state == LastfmState.signed-in: RowButton {
+                        label: @tr("API settings…");
+                        clicked => { SettingsData.open-dialog(SettingsDialog.lastfm-keys); }
+                    }
+                    if SettingsData.lastfm-state == LastfmState.signed-out: RowButton {
+                        label: @tr("Connect");
+                        clicked => { SettingsData.lastfm-connect(); }
+                    }
+                    if SettingsData.lastfm-state == LastfmState.waiting: RowButton {
+                        label: @tr("Cancel");
+                        clicked => { SettingsData.lastfm-cancel(); }
+                    }
+                    if SettingsData.lastfm-state == LastfmState.waiting: RowButton {
+                        label: @tr("I've approved it");
+                        solid: true;
+                        clicked => { SettingsData.lastfm-approved(); }
+                    }
+                    if SettingsData.lastfm-state == LastfmState.signed-in: RowButton {
+                        label: @tr("Disconnect");
+                        clicked => { SettingsData.lastfm-sign-out(); }
+                    }
+                }
+                if SettingsData.lastfm-state == LastfmState.signed-in: ToggleRow {
+                    label: @tr("Scrobble to Last.fm");
+                    detail: @tr("Off keeps the connection.");
+                    key: SettingKey.scrobble;
+                    checked: SettingsData.scrobble;
+                    enabled: SettingsData.scrobbling;
+                }
+                SettingRow {
+                    label: "ListenBrainz";
+                    detail: SettingsData.listenbrainz-message != "" ? SettingsData.listenbrainz-message
+                        : SettingsData.listenbrainz-state == ListenBrainzState.checking ? @tr("Checking the token with ListenBrainz…")
+                        : SettingsData.listenbrainz-state == ListenBrainzState.signed-in ? @tr("Connected. Listens go to your ListenBrainz profile.")
+                        : @tr("Send listens to your ListenBrainz profile with your user token.");
+                    if SettingsData.listenbrainz-state == ListenBrainzState.signed-out: RowButton {
+                        label: @tr("Add token…");
+                        clicked => { SettingsData.open-dialog(SettingsDialog.listenbrainz-token); }
+                    }
+                    if SettingsData.listenbrainz-state == ListenBrainzState.signed-in: RowButton {
+                        label: @tr("Change token…");
+                        clicked => { SettingsData.open-dialog(SettingsDialog.listenbrainz-token); }
+                    }
+                    if SettingsData.listenbrainz-state == ListenBrainzState.signed-in: RowButton {
+                        label: @tr("Remove");
+                        clicked => { SettingsData.listenbrainz-remove(); }
+                    }
+                }
+                if SettingsData.listenbrainz-state == ListenBrainzState.signed-in: ToggleRow {
+                    label: @tr("Scrobble to ListenBrainz");
+                    detail: @tr("Off keeps the token.");
+                    key: SettingKey.listenbrainz;
+                    checked: SettingsData.listenbrainz;
+                    enabled: SettingsData.scrobbling;
+                }
+            }
+
+            integrations-section := Group {
+                title: @tr("Integrations");
+                if root.made >= 1: VerticalLayout {
+                    SettingRow {
+                        divider: false;
+                        label: @tr("Discord status");
+                        detail: SettingsData.discord-state == DiscordState.unavailable ? @tr("This build has no Discord app ID.")
+                            : !SettingsData.discord ? @tr("Show \"Listening to\" with the track on your Discord profile.")
+                            : SettingsData.discord-state == DiscordState.connected ? @tr("Connected to Discord.")
+                            : SettingsData.discord-state == DiscordState.connecting ? @tr("Connecting to Discord…")
+                            : SettingsData.discord-auto-reconnect ? @tr("Not connected. Discord isn't running; featherplay tries again while music plays.")
+                            : @tr("Not connected. Discord isn't running, or it closed.");
+                        if SettingsData.discord && SettingsData.discord-state == DiscordState.not-connected: RowButton {
+                            label: @tr("Connect");
+                            clicked => { SettingsData.discord-connect(); }
+                        }
+                        VerticalLayout {
+                            alignment: center;
+                            Switch {
+                                checked: SettingsData.discord;
+                                label: @tr("Discord status");
+                                enabled: SettingsData.discord-state != DiscordState.unavailable;
+                                toggled(on) => { SettingsData.toggled(SettingKey.discord, on); }
+                            }
+                        }
+                    }
+                    if SettingsData.discord: VerticalLayout {
+                        ToggleRow {
+                            label: @tr("Reconnect automatically");
+                            detail: @tr("When Discord isn't running or restarts, try again while music plays.");
+                            key: SettingKey.discord-auto-reconnect;
+                            checked: SettingsData.discord-auto-reconnect;
+                        }
+                        SettingRow {
+                            label: @tr("Clear activity");
+                            detail: @tr("Remove the track from your profile until the next one starts or you resume.");
+                            RowButton {
+                                label: @tr("Clear");
+                                enabled: SettingsData.discord-state == DiscordState.connected;
+                                clicked => { SettingsData.discord-clear(); }
+                            }
+                        }
+                        SettingRow {
+                            label: @tr("Clear after a pause");
+                            detail: @tr("Remove the track when playback stays paused this long.");
+                            MinutesStepper {
+                                minutes: SettingsData.discord-clear-minutes;
+                                enabled: SettingsData.discord-clear-on-pause;
+                            }
+                            VerticalLayout {
+                                alignment: center;
+                                Switch {
+                                    checked: SettingsData.discord-clear-on-pause;
+                                    label: @tr("Clear after a pause");
+                                    toggled(on) => { SettingsData.toggled(SettingKey.discord-clear-on-pause, on); }
+                                }
+                            }
+                        }
+                        ToggleRow {
+                            label: @tr("Play song button");
+                            detail: @tr("A button under the activity that opens the song in a browser.");
+                            key: SettingKey.discord-play-button;
+                            checked: SettingsData.discord-play-button;
+                        }
+                        ToggleRow {
+                            label: @tr("Links");
+                            detail: @tr("The title opens the song, the artist their page and the cover the album.");
+                            key: SettingKey.discord-links;
+                            checked: SettingsData.discord-links;
+                        }
+                        SettingRow {
+                            label: @tr("Time");
+                            detail: @tr("What your profile shows of the track's time while it plays.");
+                        }
+                        VerticalLayout {
+                            padding-bottom: Theme.s2;
+                            for t[i] in [@tr("Progress bar with the time left"), @tr("Time elapsed only"), @tr("No time")]: DeviceRow {
+                                name: t;
+                                selected: i == SettingsData.discord-time;
+                                clicked => { SettingsData.discord-pick-time(i); }
+                            }
+                        }
+                        SettingRow {
+                            label: @tr("Status text");
+                            detail: @tr("What your status says in member lists and DMs.");
+                        }
+                        VerticalLayout {
+                            padding-bottom: Theme.s2;
+                            for t[i] in [@tr("Listening to featherplay"), @tr("Listening to the artist"), @tr("Listening to the song title")]: DeviceRow {
+                                name: t;
+                                selected: i == SettingsData.discord-status-text;
+                                clicked => { SettingsData.discord-pick-status-text(i); }
+                            }
+                        }
+                        SettingRow {
+                            label: @tr("Preview");
+                            detail: SettingsData.discord-preview.sample ? @tr("How Discord shows a song with these options. Nothing is playing, so a sample stands in.")
+                                : @tr("How Discord shows the current song with these options.");
+                        }
+                        ActivityPreview { }
+                    }
+                    ToggleRow {
+                        label: @tr("Local API");
+                        detail: !SettingsData.local-api ? @tr("Let stream overlays, Stream Deck and scripts on this PC show what's playing and control playback. Tools made for Pear's API Server work too.")
+                            : SettingsData.local-api-state == LocalApiState.failed ? SettingsData.local-api-message
+                            : SettingsData.local-api-state == LocalApiState.running ? @tr("On at http://127.0.0.1:{}. Only apps on this PC that have the token can use it.", SettingsData.local-api-port)
+                            : @tr("Starting…");
+                        key: SettingKey.local-api;
+                        checked: SettingsData.local-api;
+                    }
+                    if SettingsData.local-api: VerticalLayout {
+                        SettingRow {
+                            label: @tr("Port");
+                            detail: SettingsData.local-api-port-error != "" ? SettingsData.local-api-port-error
+                                : @tr("26538 is the one Pear Desktop uses, so its tools find featherplay.");
+                            Field {
+                                width: 96px;
+                                text <=> SettingsData.local-api-port;
+                                label: @tr("Local API port");
+                                placeholder: "26538";
+                                committed(t) => { SettingsData.local-api-port-entered(t); }
+                            }
+                        }
+                        SettingRow {
+                            label: @tr("Access token");
+                            detail: @tr("Apps send it as \"Authorization: Bearer\" and the token. It stays hidden here, so it doesn't show on stream. Regenerate disconnects the apps using the old one.");
+                            Body {
+                                text: SettingsData.local-api-token;
+                                color: Rows.detail;
+                                vertical-alignment: center;
+                                accessible-label: @tr("Token, hidden");
+                            }
+                            RowButton {
+                                label: @tr("Copy");
+                                enabled: SettingsData.local-api-token != "";
+                                clicked => { SettingsData.local-api-copy(); }
+                            }
+                            RowButton {
+                                label: @tr("Regenerate");
+                                clicked => { SettingsData.local-api-regenerate(); }
+                            }
+                        }
+                    }
+                }
+            }
+
+            window-section := Group {
+                title: @tr("Window");
+                if root.made >= 2: VerticalLayout {
+                    SettingRow {
+                        divider: false;
+                        label: @tr("When I close the window");
+                        detail: @tr("In the tray, the music keeps going; quit from the tray icon's menu.");
+                    }
+                    VerticalLayout {
+                        padding-bottom: Theme.s2;
+                        for t[i] in [@tr("Ask"), @tr("Close featherplay"), @tr("Keep playing in the tray")]: DeviceRow {
+                            name: t;
+                            selected: i == SettingsData.close-action;
+                            clicked => { SettingsData.pick-close-action(i); }
+                        }
+                    }
+                    SettingRow {
+                        label: @tr("Appearance");
+                        detail: @tr("System follows Windows' light or dark mode.");
+                        Chips {
+                            labels: [@tr("appearance" => "Dark"), @tr("appearance" => "Light"), @tr("appearance" => "System")];
+                            active: SettingsData.appearance == Appearance.dark ? 0 : (SettingsData.appearance == Appearance.light ? 1 : 2);
+                            selected(i) => {
+                                SettingsData.pick-appearance(i == 0 ? Appearance.dark : (i == 1 ? Appearance.light : Appearance.system));
+                            }
+                        }
+                    }
+                    SettingRow {
+                        label: @tr("Language");
+                        detail: @tr("Windows default follows Windows' display language when featherplay has it, and English otherwise.");
+                        Chips {
+                            labels: SettingsData.language-names;
+                            active: SettingsData.language;
+                            selected(i) => { SettingsData.pick-language(i); }
+                        }
+                    }
+                    SettingRow {
+                        label: @tr("Accent");
+                        detail: @tr("From the cover takes the colour of the song that's playing, and uses red when the art is grey.");
+                        Chips {
+                            labels: [@tr("From the cover")];
+                            active: SettingsData.accent == 0 ? 0 : -1;
+                            selected => { SettingsData.pick-accent(0); }
+                        }
+                        for swatch[i] in SettingsData.accents: Swatch {
+                            name: swatch.name;
+                            colour: Theme.dark ? swatch.dark : swatch.light;
+                            selected: SettingsData.accent == i + 1;
+                            clicked => { SettingsData.pick-accent(i + 1); }
+                        }
+                        // The custom colour: a hue wheel, the usual sign for "any colour".
+                        Swatch {
+                            name: @tr("Custom colour");
+                            colour: @conic-gradient(#E5484D 0deg, #E58A3C 45deg, #D9C23A 90deg, #5CB85C 135deg, #3BB5C9 180deg, #4C7EE5 225deg, #9061E0 270deg, #D9509E 315deg, #E5484D 360deg);
+                            selected: SettingsData.accent == SettingsData.accents.length + 1;
+                            clicked => { SettingsData.pick-accent(SettingsData.accents.length + 1); }
+                        }
+                    }
+                    if SettingsData.accent == SettingsData.accents.length + 1: CustomPicker { }
+                    ToggleRow {
+                        label: @tr("Track notifications");
+                        detail: @tr("Show a notification when the track changes.");
+                        key: SettingKey.notifications;
+                        checked: SettingsData.notifications;
+                    }
+                    ToggleRow {
+                        label: @tr("Global hotkeys");
+                        detail: @tr("Play, pause and skip from any app. Each key needs Ctrl, Alt, Shift or Win.");
+                        key: SettingKey.hotkeys;
+                        checked: SettingsData.hotkeys;
+                    }
+                    if SettingsData.hotkeys: VerticalLayout {
+                        padding-bottom: Theme.s3;
+                        HotkeyRow {
+                            label: @tr("Play or pause");
+                            index: 0;
+                            text <=> SettingsData.hotkey-play-pause;
+                            placeholder: @tr("Ctrl+Alt+Space");
+                        }
+                        HotkeyRow {
+                            label: @tr("Next");
+                            index: 1;
+                            text <=> SettingsData.hotkey-next;
+                            placeholder: @tr("Ctrl+Alt+Right");
+                        }
+                        HotkeyRow {
+                            label: @tr("Previous");
+                            index: 2;
+                            text <=> SettingsData.hotkey-previous;
+                            placeholder: @tr("Ctrl+Alt+Left");
+                        }
+                        if SettingsData.hotkeys-error != "": Body {
+                            text: SettingsData.hotkeys-error;
+                            font-size: Theme.t-meta;
+                            color: Theme.text1;
+                            overflow: clip;
+                            wrap: word-wrap;
+                        }
+                    }
+                }
+            }
+
+            account-section := Group {
+                title: @tr("Account");
+                if root.made >= 3: VerticalLayout {
+                    SettingRow {
+                        divider: false;
+                        label: @tr("Music account");
+                        detail: !SettingsData.signed-in ? @tr("Not signed in.")
+                            : root.confirm-sign-out ? @tr("Sign out? The saved session is deleted; the music keeps playing.")
+                            : @tr("Signed in. The session is kept in Windows Credential Manager.");
+                        if !SettingsData.signed-in: RowButton {
+                            label: @tr("Sign in");
+                            clicked => { Nav.go(PageKind.sign-in); }
+                        }
+                        if SettingsData.signed-in && !root.confirm-sign-out: RowButton {
+                            label: @tr("Sign out");
+                            clicked => { root.confirm-sign-out = true; }
+                        }
+                        if SettingsData.signed-in && root.confirm-sign-out: RowButton {
+                            label: @tr("Cancel");
+                            clicked => { root.confirm-sign-out = false; }
+                        }
+                        if SettingsData.signed-in && root.confirm-sign-out: RowButton {
+                            label: @tr("Sign out");
+                            solid: true;
+                            clicked => {
+                                root.confirm-sign-out = false;
+                                SettingsData.sign-out();
+                            }
+                        }
+                    }
+                    ToggleRow {
+                        label: @tr("Check for updates");
+                        detail: @tr("Once a day, and when songs keep failing to play, ask GitHub whether a newer featherplay is out. Nothing is downloaded.");
+                        key: SettingKey.check-for-updates;
+                        checked: SettingsData.check-for-updates;
+                    }
+                    SettingRow {
+                        label: @tr("About featherplay");
+                        detail: @tr("Version, licences and credits.");
+                        RowButton {
+                            label: @tr("About");
+                            clicked => { Nav.go(PageKind.about); }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // The section index, at wide windows. It rises with the first section until it reaches
+    // the page's top, then stays there while the sections scroll past.
+    // Its first entry's label is level with the first group's title.
+    if root.indexed: VerticalLayout {
+        x: root.block-x;
+        y: max(Theme.page-top, root.tops[0] + flick.content-y + (Rows.title-h - Rows.link-h) / 2);
+        width: root.index-w;
+        spacing: 2px;
+        accessible-role: list;
+        accessible-label: @tr("Settings sections");
+        for name[i] in [@tr("Playback"), @tr("Lyrics"), @tr("Scrobbling"), @tr("Integrations"), @tr("Window"), @tr("Account")]: SectionLink {
+            text: name;
+            active: i == root.in-view;
+            clicked => { root.go-to(i); }
+        }
+    }
+
+    // A quiet scroll indicator, shown only when the page is taller than the window.
+    // Its track ends above the floating bar.
+    if flick.content-height > flick.height: Rectangle {
+        property <length> track: flick.height - Theme.bar-clear - 8px;
+        property <length> thumb: max(32px, self.track * flick.height / flick.content-height);
+        x: parent.width - 8px;
+        y: 4px + (self.track - self.thumb) * (-flick.content-y / (flick.content-height - flick.height));
+        width: 4px;
+        height: self.thumb;
+        border-radius: 2px;
+        background: Theme.track;
+    }
+}
+
+// The open dialog, over the whole window (sidebar and bar too): AppWindow places it at the
+// app level so its scrim dims and blocks everything, like the song menu.
+export component SettingsDialogLayer inherits Rectangle {
+    if SettingsData.dialog == SettingsDialog.lastfm-keys: Dialog {
+        width: root.width;
+        height: root.height;
+        title: @tr("Last.fm API settings");
+        // Two sentences: whose API account is in use, then how to make one.
+        detail: (SettingsData.lastfm-custom-key ? @tr("Your own API account is in use.")
+            : SettingsData.lastfm-builtin-key ? @tr("featherplay's own API account is in use; you can use yours instead.")
+            : @tr("This build has no API account of its own, so Last.fm needs yours."))
+            + " " + @tr("Create one at last.fm/api/account/create, leaving the callback URL empty. Saving signs you out of Last.fm.");
+        error: SettingsData.dialog-error;
+        extra: SettingsData.lastfm-custom-key ? @tr("Remove your key") : "";
+        ok => { SettingsData.lastfm-keys-save(SettingsData.dialog-key, SettingsData.dialog-secret); }
+        cancel => { SettingsData.close-dialog(); }
+        extra-clicked => { SettingsData.lastfm-keys-remove(); }
+        DialogField {
+            init => { self.grab-focus(); }
+            label: @tr("API key");
+            placeholder: SettingsData.lastfm-custom-key ? @tr("Enter a new key to replace yours") : @tr("32 letters and digits");
+            text <=> SettingsData.dialog-key;
+            accepted => { SettingsData.lastfm-keys-save(SettingsData.dialog-key, SettingsData.dialog-secret); }
+        }
+        DialogField {
+            label: @tr("Shared secret");
+            placeholder: @tr("Shown below the key on Last.fm");
+            input-type: InputType.password;
+            text <=> SettingsData.dialog-secret;
+            accepted => { SettingsData.lastfm-keys-save(SettingsData.dialog-key, SettingsData.dialog-secret); }
+        }
+    }
+
+    if SettingsData.dialog == SettingsDialog.listenbrainz-token: Dialog {
+        width: root.width;
+        height: root.height;
+        title: @tr("ListenBrainz token");
+        detail: @tr("Paste the user token from listenbrainz.org/settings. featherplay checks it with ListenBrainz, then keeps it in Windows Credential Manager.");
+        error: SettingsData.dialog-error;
+        ok => { SettingsData.listenbrainz-save(SettingsData.dialog-token); }
+        cancel => { SettingsData.close-dialog(); }
+        DialogField {
+            init => { self.grab-focus(); }
+            label: @tr("User token");
+            placeholder: SettingsData.listenbrainz-state == ListenBrainzState.signed-in ? @tr("Paste a new token to replace yours") : @tr("Paste your user token");
+            input-type: InputType.password;
+            text <=> SettingsData.dialog-token;
+            accepted => { SettingsData.listenbrainz-save(SettingsData.dialog-token); }
+        }
+    }
+}

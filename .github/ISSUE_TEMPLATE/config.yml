@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security problem
+    url: https://github.com/candygoogy/featherplay/security/advisories/new
+    about: Report it privately, not in an issue. SECURITY.md says what's in scope.
+  - name: Ask a question
+    url: https://github.com/candygoogy/featherplay/discussions
+    about: Questions about using featherplay go in Discussions.

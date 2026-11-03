@@ -1,0 +1,54 @@
+---
+import "../styles/tokens.css";
+import "../styles/base.css";
+import Seo from "../components/Seo.astro";
+import { demoStart, songById } from "../data/songs";
+// A hashed file under /_astro/, never inlined: the CSP allows no inline script.
+import bootUrl from "../scripts/boot.js?url&no-inline";
+
+interface Props {
+  title: string;
+  description: string;
+  noindex?: boolean;
+  app?: boolean;
+}
+const { title, description, noindex, app } = Astro.props;
+// The cover glow starts on the demo's first song, on the root alone: every replica, wallpaper
+// and band reads it from there, so src/demo/glow.ts changes them all at once.
+const glow = songById(demoStart.songId)!.colour;
+---
+
+<!doctype html>
+<html lang="en" style={`--glow:${glow}`}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <Seo title={title} description={description} noindex={noindex} app={app} />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="theme-color" content="#0F0F0F" />
+    <!-- The Tri-vane at every size (scripts/icons.mjs): the SVG for browsers that take it (its
+         ring follows the browser's light or dark chrome), the ICO's own 16 px drawing for
+         anything that asks for /favicon.ico, and an opaque 180 px tile for home screens. -->
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="preload" href="/fonts/manrope-latin-400-800.woff2" as="font" type="font/woff2" crossorigin />
+    <!-- Before the first paint: the theme and how the page lands (src/scripts/boot.js). -->
+    <script is:inline src={bootUrl}></script>
+  </head>
+  <body>
+    <slot />
+    <script>
+      import { initTheme } from "../scripts/theme";
+      import { bindSelection } from "../scripts/selection";
+      import { bindAnchors } from "../scripts/anchors";
+      import { bindSmoothScroll } from "../scripts/smooth";
+      initTheme();
+      bindSelection();
+      bindAnchors();
+      bindSmoothScroll();
+    </script>
+  </body>
+</html>

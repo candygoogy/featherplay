@@ -1,0 +1,1566 @@
+/* The featherplay replica: the app's look at its own sizes (theme.slint), on the
+   1440x900 desktop. Colours come from tokens.css; the song's colour is --song. The shared
+   controls (IconButton, PlayButton, PlayingMark, tooltips) are in app-controls.css.
+   Its theme pairs are written color-mix(in srgb, LIGHT calc(var(--light) * 100%), DARK): --light
+   eases with the page's theme switch (tokens.css), and a window themed on its own resolves
+   them for itself. */
+
+.replica {
+  --title-h: 32px;
+  --app-h: 820px;
+  --bar-h: 88px;
+  --bar-inset: 10px;
+  --bar-clear: calc(var(--bar-h) + var(--bar-inset));
+  --panel: color-mix(in srgb, #f7f7f7 calc(var(--light) * 100%), #181818);
+  --side: color-mix(in srgb, #f7f7f7 calc(var(--light) * 100%), #030303);
+  --card-bg: color-mix(in srgb, #f2f2f2 calc(var(--light) * 100%), #212121);
+  --text2: color-mix(in srgb, #606060 calc(var(--light) * 100%), #aaaaaa);
+  --text3: color-mix(in srgb, #6b6b6b calc(var(--light) * 100%), #909090);
+  /* The bar, tinted with the cover's hue while the accent follows it (Theme.follow-bar). */
+  --bar-bg: color-mix(in srgb, color-mix(in srgb, var(--song) 9%, #f7f7f7) calc(var(--light) * 100%), color-mix(in srgb, var(--song) 14%, #181818));
+  /* The lyrics' panel: the cover's colour, deep in both themes. */
+  --stage: color-mix(in srgb, var(--song) 60%, #0f0f0f);
+  --cover-button: #000000a6;
+  --cover-playing: #000000d1;
+  --tonal: color-mix(in srgb, #0000001a calc(var(--light) * 100%), #ffffff21);
+  --accent-tonal: color-mix(in srgb, color-mix(in srgb, var(--accent) 14%, transparent) calc(var(--light) * 100%), color-mix(in srgb, var(--accent) 22%, transparent));
+  --accent-tonal-hover: color-mix(in srgb, color-mix(in srgb, var(--accent) 20%, transparent) calc(var(--light) * 100%), color-mix(in srgb, var(--accent) 30%, transparent));
+
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.35;
+  transform-origin: 790px 880px;
+  transition:
+    transform 240ms var(--ease-out),
+    opacity 200ms ease;
+}
+.replica[data-minimised] {
+  transform: scale(0.08);
+  opacity: 0;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .replica {
+    transition: opacity 150ms ease;
+  }
+  .replica[data-minimised] {
+    transform: none;
+  }
+}
+
+:where(.replica) :is(p, h3, ul, ol) {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+:where(.replica) h3 {
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+:where(.replica) :is(button, input) {
+  font: inherit;
+  color: inherit;
+}
+:where(.replica) button {
+  border: 0;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: inherit;
+}
+:where(.replica) img {
+  display: block;
+  object-fit: cover;
+}
+.replica :focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+.replica [hidden] {
+  display: none !important;
+}
+
+/* A page coming in: up 8 px and in (Theme.rise, t-page); just the fade without motion. */
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes queue-in {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+
+.replica {
+  /* ---------- Title bar (Windows' own, dark or light) ---------- */
+  .titlebar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    height: var(--title-h);
+    padding-left: 12px;
+    background: color-mix(in srgb, #f3f3f3 calc(var(--light) * 100%), #1f1f1f);
+    font-size: 12px;
+    flex: none;
+  }
+  .titlebar img {
+    width: 16px;
+    height: 16px;
+  }
+  .caption {
+    display: flex;
+    margin-left: auto;
+    align-self: stretch;
+  }
+  .cap {
+    display: grid;
+    place-items: center;
+    width: 46px;
+    color: inherit;
+    cursor: default;
+  }
+  button.cap {
+    cursor: pointer;
+    transition: background-color var(--t-hover) ease;
+  }
+  button.cap:hover {
+    background: var(--hover);
+  }
+
+  /* ---------- The app's frame ---------- */
+  .app {
+    position: relative;
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    grid-template-rows: var(--app-h);
+    height: var(--app-h);
+    background: var(--bg);
+  }
+  &[data-queue-open="true"]:not([data-view="now"], [data-view="lyrics"]) .app {
+    grid-template-columns: 240px 1fr 340px;
+  }
+  &:is([data-view="now"], [data-view="lyrics"]) .app {
+    grid-template-columns: 1fr 400px;
+  }
+  .main {
+    position: relative;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  /* Sidebar: the pages (icon and label in text2, text1 and 600 on the current one, which
+     rests on `selected`), the library's chips and lists. */
+  .sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 12px 8px calc(var(--bar-clear) + 8px);
+    background: var(--side);
+    overflow: hidden;
+  }
+  .side-nav {
+    display: grid;
+    gap: 2px;
+  }
+  .side-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    height: 40px;
+    padding: 0 12px;
+    border-radius: 10px;
+    color: var(--text2);
+    font-size: 14px;
+    transition: background-color var(--t-hover) ease;
+  }
+  .side-item svg {
+    width: 20px;
+    height: 20px;
+    flex: none;
+  }
+  button.side-item:hover {
+    background: var(--hover);
+  }
+  button.side-item:active {
+    background: var(--pressed);
+  }
+  .side-item[aria-current="page"] {
+    background: var(--selected);
+    color: var(--text);
+    font-weight: 600;
+  }
+  .side-item.muted {
+    color: var(--text2);
+  }
+  .side-rule {
+    display: block;
+    height: 1px; /* taste-skill-ignore: the app's own UI */
+    margin: 8px 14px;
+    background: var(--hairline);
+  }
+  .chips {
+    display: flex;
+    gap: 6px;
+    padding: 8px 8px 6px;
+  }
+  .chip {
+    padding: 5px 12px;
+    border-radius: 999px;
+    box-shadow: inset 0 0 0 1px var(--hairline); /* taste-skill-ignore: the app's own UI */
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text2);
+    transition:
+      background-color var(--t-hover) ease,
+      transform var(--t-release) var(--spring-release);
+  }
+  .chip:hover {
+    background: var(--hover);
+  }
+  .chip:active {
+    transform: scale(var(--press-scale));
+    transition:
+      background-color var(--t-hover) ease,
+      transform var(--t-press) var(--ease-out);
+  }
+  .chip[aria-selected="true"] {
+    background: var(--accent-tonal);
+    box-shadow: none; /* taste-skill-ignore: the app's own UI */
+    color: var(--text);
+  }
+  .chip[aria-selected="true"]:hover {
+    background: var(--accent-tonal-hover);
+  }
+  .side-list {
+    display: grid;
+    gap: 2px;
+    animation: fade-in var(--t-page) var(--ease-out);
+  }
+  .side-list li {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    height: 40px;
+    padding: 0 10px;
+    color: var(--text2);
+  }
+  .side-list img {
+    width: 32px;
+    height: 32px;
+    border-radius: 4px;
+  }
+  .side-list img.round {
+    border-radius: 50%;
+  }
+  .side-foot {
+    margin-top: auto;
+  }
+  .account {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 4px 6px;
+    font-weight: 700;
+  }
+  .avatar {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: color-mix(in srgb, #e0e0e0 calc(var(--light) * 100%), #3a3a3a);
+    font-size: 13px;
+  }
+
+  /* Top bar and its search field */
+  .topbar {
+    display: flex;
+    align-items: center;
+    height: 64px;
+    padding: 0 40px;
+  }
+  .field {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 600px;
+    height: 40px;
+    padding: 0 8px 0 16px;
+    border-radius: 999px;
+    background: color-mix(in srgb, #f2f2f2 calc(var(--light) * 100%), #262626);
+    box-shadow: inset 0 0 0 1px var(--field-edge); /* taste-skill-ignore: the app's own UI */
+    color: var(--text3);
+    transition: box-shadow var(--t-hover) ease;
+  }
+  .field:hover {
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, #00000038 calc(var(--light) * 100%), #ffffff40); /* taste-skill-ignore: the app's own UI */
+  }
+  .field:focus-within {
+    box-shadow: inset 0 0 0 2px var(--accent); /* taste-skill-ignore: the app's own UI */
+  }
+  .field svg {
+    flex: none;
+  }
+  .field input {
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+    border: 0;
+    background: none;
+    color: var(--text);
+    font-size: 14px;
+  }
+  .field input::placeholder {
+    color: var(--text3);
+  }
+  .field input:focus-visible {
+    outline: none;
+  }
+  .field input::-webkit-search-cancel-button {
+    display: none;
+  }
+  .keys {
+    display: flex;
+    gap: 4px;
+  }
+  .keys kbd {
+    padding: 1px 6px;
+    border-radius: 4px;
+    box-shadow: inset 0 0 0 1px var(--hairline); /* taste-skill-ignore: the app's own UI */
+    font: 11px/18px var(--font-ui);
+    color: var(--text3);
+  }
+
+  /* Pages */
+  .page {
+    padding: 32px 40px var(--bar-clear);
+    height: calc(var(--app-h) - 64px);
+    overflow: hidden;
+  }
+  .page-title {
+    margin-bottom: 24px;
+    font-family: var(--font);
+    font-size: 40px;
+    font-weight: 800;
+  }
+  .page-h {
+    margin-bottom: 16px;
+    font-family: var(--font);
+    font-size: 24px;
+    font-weight: 800;
+  }
+  .page-h:not(:first-child, .page-title + .page-h) {
+    margin-top: 36px;
+  }
+  .page > * {
+    animation: page-in var(--t-page) var(--ease-out) both;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .page > * {
+      animation-name: fade-in;
+    }
+  }
+  .songs {
+    display: grid;
+    max-width: 720px;
+  }
+  .moods {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .mood {
+    padding: 10px 18px;
+    border-radius: 10px;
+    background: var(--card-bg);
+    font-weight: 600;
+  }
+
+  /* Home: the resume card */
+  .resume {
+    display: grid;
+    grid-template-columns: 152px 1fr 420px;
+    gap: 24px;
+    padding: 16px;
+    border-radius: 16px;
+    background: var(--card-bg);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, #00000014 calc(var(--light) * 100%), #ffffff0d); /* taste-skill-ignore: the app's own UI */
+  }
+  &[data-queue-open="true"] .resume {
+    grid-template-columns: 152px 1fr;
+  }
+  &[data-queue-open="true"] .resume-next {
+    display: none;
+  }
+  &[data-queue-open="true"] .cards {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  .resume-cover {
+    width: 152px;
+    height: 152px;
+    border-radius: 10px;
+  }
+  .resume-text {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 0;
+  }
+  .resume-title {
+    font-family: var(--font);
+    font-size: 32px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .resume-artist {
+    margin-top: 4px;
+    color: var(--text2);
+    font-size: 16px;
+  }
+  .resume-progress {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 18px 0 16px;
+  }
+  .resume-progress .rail {
+    width: 200px;
+  }
+  .resume-time {
+    color: var(--text2);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+  }
+  .resume-actions {
+    display: flex;
+    gap: 8px;
+  }
+  /* Pill: solid (white on dark, black on light) or tonal; a press gives and springs back. */
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 40px;
+    padding: 0 20px 0 16px;
+    border-radius: 999px;
+    font-weight: 600;
+    transition:
+      background-color var(--t-hover) ease,
+      transform var(--t-release) var(--spring-release);
+  }
+  .pill:active {
+    transform: scale(var(--press-scale));
+    transition:
+      background-color var(--t-hover) ease,
+      transform var(--t-press) var(--ease-out);
+  }
+  .pill.solid {
+    background: var(--solid);
+    color: var(--on-solid);
+  }
+  .pill.solid:hover {
+    background: var(--solid-hover);
+  }
+  .pill.solid:active {
+    background: color-mix(in srgb, #474747 calc(var(--light) * 100%), #c8c8c8);
+  }
+  .pill.solid svg {
+    fill: currentColor;
+  }
+  .pill.tonal {
+    background: var(--tonal);
+  }
+  .pill.tonal:hover {
+    background: var(--tonal-hover);
+  }
+  .pill.tonal:active {
+    background: var(--tonal-pressed);
+  }
+  .pill .i-pause,
+  &[data-playing="true"] .pill .i-play {
+    display: none;
+  }
+  &[data-playing="true"] .pill .i-pause {
+    display: block;
+  }
+  .resume-next-h {
+    margin: 8px 0 12px;
+    font-weight: 700;
+  }
+  .mini-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 16px;
+  }
+  .mini {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 4px;
+    border-radius: 8px;
+    transition: background-color var(--t-hover) ease;
+  }
+  .mini:hover {
+    background: var(--hover);
+  }
+  .mini:active {
+    background: var(--pressed);
+  }
+  .mini img {
+    width: 40px;
+    height: 40px;
+    border-radius: 4px;
+    flex: none;
+  }
+  .mini-text,
+  .row-text,
+  .bar-text {
+    display: grid;
+    min-width: 0;
+  }
+  :is(.mini-text, .row-text, .bar-text, .card) :is(.t, .a, .bar-title, .bar-artist) {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  & .t {
+    font-weight: 600;
+  }
+  & .a {
+    color: var(--text2);
+    font-size: 12px;
+  }
+
+  /* Cards: the cover darkens a little on hover, a round play button rises in on it. */
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 20px;
+  }
+  .card {
+    display: grid;
+    gap: 2px;
+    width: 100%;
+    border-radius: 10px;
+    transition: transform var(--t-release) var(--spring-release);
+  }
+  .card:active {
+    transform: scale(var(--press-scale));
+    transition: transform var(--t-press) var(--ease-out);
+  }
+  .card-cover {
+    position: relative;
+    display: block;
+    margin-bottom: 8px;
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .card-cover::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: #0000002e;
+    opacity: 0;
+    transition: opacity var(--t-hover) ease;
+  }
+  .card:is(:hover, :focus-visible) .card-cover::after {
+    opacity: 1;
+  }
+  .card-cover img {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1;
+  }
+  .card-play {
+    position: absolute;
+    z-index: 1;
+    right: 10px;
+    bottom: 10px;
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--cover-button);
+    color: #fff;
+    opacity: 0;
+    transform: translateY(4px);
+    transition:
+      opacity var(--t-fast) ease,
+      transform var(--t-fast) var(--ease-out),
+      background-color var(--t-hover) ease;
+  }
+  .card-play svg {
+    fill: currentColor;
+  }
+  .card:is(:hover, :focus-visible) .card-play {
+    opacity: 1;
+    transform: none;
+  }
+  .card-play:hover {
+    background: #000000cc;
+  }
+
+  /* Search results */
+  .search .row {
+    max-width: 720px;
+  }
+  .empty {
+    color: var(--text2);
+    font-size: 16px;
+  }
+  .library .empty {
+    margin-bottom: 8px;
+    font-size: 14px;
+  }
+
+  /* ---------- Now playing ---------- */
+  /* The cover view: the window's ground with the cover's colour washed down from the top.
+     The lyrics view: the cover's colour, deep, fading in over the first half of the toggle
+     (t-lyrics, 300 ms), the lines over the second; closing runs it back. */
+  .stage {
+    position: relative;
+    height: 100%;
+    overflow: hidden;
+    color: var(--text);
+  }
+  .stage-wash,
+  .stage-panel {
+    position: absolute;
+    inset: 0;
+  }
+  .stage-wash {
+    background: linear-gradient( /* taste-skill-ignore: the app's cover wash */
+      /* The app's alphas (WASH_ALPHA_LIGHT 0.36, _DARK 0.55), then 0.6 of them at 55 %.
+         Each stop eases between the two with --light. */
+      color-mix(in srgb, color-mix(in srgb, var(--song) 36%, transparent) calc(var(--light) * 100%), color-mix(in srgb, var(--song) 55%, transparent)),
+      color-mix(in srgb, color-mix(in srgb, var(--song) 21.6%, transparent) calc(var(--light) * 100%), color-mix(in srgb, var(--song) 33%, transparent)) 55%,
+      transparent
+    );
+    animation: fade-in var(--t-page) var(--ease-out);
+  }
+  .stage-panel {
+    background: var(--stage);
+    opacity: 0;
+    transition:
+      opacity calc(var(--t-lyrics) / 2) var(--ease-in-out) calc(var(--t-lyrics) / 2),
+      background-color var(--t-colour) ease;
+  }
+  &[data-view="lyrics"] .stage-panel {
+    opacity: 1;
+    transition:
+      opacity calc(var(--t-lyrics) / 2) var(--ease-in-out),
+      background-color var(--t-colour) ease;
+  }
+  &[data-view="lyrics"][data-has-lyrics="true"] .stage,
+  &[data-view="lyrics"] .stage {
+    color: #fff;
+  }
+  .back {
+    position: absolute;
+    z-index: 2;
+    top: 16px;
+    left: 24px;
+    color: currentColor;
+  }
+  &[data-view="lyrics"] .back:hover {
+    background: #ffffff1f;
+  }
+  &[data-view="lyrics"] .back:active {
+    background: #ffffff33;
+  }
+  /* The Lyrics pill: tonal in the cover view; on the panel, solid white with the panel's
+     colour for its ink. */
+  .lyrics-pill {
+    position: absolute;
+    z-index: 2;
+    top: 16px;
+    right: 24px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 40px;
+    padding: 0 18px 0 14px;
+    border-radius: 999px;
+    background: var(--tonal);
+    color: var(--text);
+    font-weight: 600;
+    transition:
+      background-color var(--t-hover) ease,
+      color var(--t-hover) ease,
+      transform var(--t-release) var(--spring-release);
+  }
+  .lyrics-pill:hover {
+    background: var(--tonal-hover);
+  }
+  .lyrics-pill:active {
+    background: var(--tonal-pressed);
+    transform: scale(var(--press-scale));
+    transition:
+      background-color var(--t-hover) ease,
+      transform var(--t-press) var(--ease-out);
+  }
+  .lyrics-pill[aria-pressed="true"] {
+    background: #fff;
+    color: var(--stage);
+  }
+  .lyrics-pill[aria-pressed="true"]:hover {
+    background: #ebebeb;
+  }
+  .lyrics-pill[aria-pressed="true"]:active {
+    background: #d4d4d4;
+  }
+  &[data-lyrics-on="false"] [data-lyrics-toggle],
+  &[data-lyrics-on="false"] .lyr {
+    display: none;
+  }
+
+  /* The cover and its words: large and centred (the cover view), or small in a column
+     beside the lines (the lyrics view). The switch glides them (replica.ts, FLIP). */
+  .np {
+    position: absolute;
+    z-index: 1;
+    left: 50%;
+    top: 64px;
+    width: 400px;
+    transform: translateX(-50%);
+  }
+  .np-cover {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1;
+    border-radius: 20px;
+    box-shadow: /* taste-skill-ignore: the app's own UI */
+      0 0 0 1px color-mix(in srgb, #0000001a calc(var(--light) * 100%), #ffffff14),
+      0 16px 48px color-mix(in srgb, #00000033 calc(var(--light) * 100%), #00000099);
+  }
+  .np-text {
+    margin-top: 24px;
+  }
+  .np-row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .np-title {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-family: var(--font);
+    font-size: 32px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+  }
+  .np-actions {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    transition: opacity var(--t-lyrics) var(--ease-in-out);
+  }
+  .np-actions .nfm .fp-ib {
+    width: 32px;
+    height: 32px;
+    color: var(--text3);
+  }
+  .np-actions .nfm .fp-ib:hover {
+    color: var(--text2);
+  }
+  .np-actions .fp-tip {
+    right: 0;
+  }
+  .np-actions [aria-disabled="true"] {
+    cursor: default;
+  }
+  .np-artist {
+    margin-top: 6px;
+    color: var(--text2);
+    font-size: 16px;
+    font-weight: 600;
+  }
+  .np-from {
+    margin-top: 8px;
+    color: var(--text2);
+    font-size: 14px;
+  }
+  .np-note {
+    display: none;
+    margin-top: 14px;
+    font-size: 14px;
+  }
+
+  &[data-view="lyrics"] .np-artist,
+  &[data-view="lyrics"] .np-note {
+    color: #ffffffd9;
+  }
+  &[data-view="lyrics"] .np-from,
+  &[data-view="lyrics"] .np-actions {
+    opacity: 0;
+    visibility: hidden;
+  }
+  /* The lyrics view's column, as now_playing.slint lays it out in the 1200 px stage: the cover
+     240 px (fl-cover, a fifth of the stage) at x 88 (fl-x: the column and the 720 px of lines
+     centred) and y 96 (fl-top 72 + s5); the title 24 px under it in the display face at
+     t-display-s, wrapping in the cover's width; the artist s1 under it, in a 24 px row. */
+  &[data-view="lyrics"][data-has-lyrics="true"] .np {
+    left: 88px;
+    top: 96px;
+    width: 240px;
+    transform: none;
+  }
+  &[data-view="lyrics"][data-has-lyrics="true"] .np-title {
+    font-size: 24px;
+    font-weight: 700;
+    line-height: normal;
+    white-space: normal;
+  }
+  /* The song's buttons fade out over the title's row; they no longer take its width. */
+  &[data-view="lyrics"][data-has-lyrics="true"] .np-actions {
+    position: absolute;
+    top: 0;
+    right: 0;
+  }
+  &[data-view="lyrics"][data-has-lyrics="true"] .np-artist {
+    margin-top: 4px;
+    line-height: 24px;
+  }
+  &[data-view="lyrics"][data-has-lyrics="true"] .np-cover {
+    border-radius: 16px;
+  }
+  &[data-view="lyrics"][data-has-lyrics="false"] .np-note {
+    display: block;
+  }
+  &[data-view="lyrics"][data-has-lyrics="false"] .np-from {
+    display: none;
+  }
+
+  /* The lines: one bold weight, so a line never re-wraps when it becomes current. Their
+     panel starts under the back button's row (now_playing.slint fl-top, 72 px) and is a size
+     container: the room under the last line is half its height (cqh). As the app's
+     LyricsView: from fl-lyrics-x (392) less the hover tile's s3, 720 px of lines plus the
+     tile's s3 on either side. */
+  .lyrics {
+    position: absolute;
+    left: 380px;
+    width: 744px;
+    top: 72px;
+    bottom: var(--bar-clear);
+    overflow: clip;
+    container-type: size;
+    opacity: 0;
+    visibility: hidden;
+    /* The app's lyric-edge: the lines dissolve over 24 px where they leave the panel. */
+    mask-image: linear-gradient(transparent, #000 24px, #000 calc(100% - 24px), transparent); /* taste-skill-ignore: the app's own UI */
+    transition:
+      opacity calc(var(--t-lyrics) / 2) var(--ease-in-out),
+      visibility 0s linear calc(var(--t-lyrics) / 2);
+  }
+  &[data-view="lyrics"][data-has-lyrics="true"] .lyrics {
+    opacity: 1;
+    visibility: visible;
+    transition:
+      opacity calc(var(--t-lyrics) / 2) var(--ease-in-out) calc(var(--t-lyrics) / 2),
+      visibility 0s;
+  }
+  /* As the app's SyncedLines: the first line's top 24 px down (s5), level with the cover's
+     top, and half the panel below the last (src/demo/follow.ts keeps to that range). The
+     lines are size * 0.18 apart with no extra room between verses: the app adds a gap only
+     for an empty line in the lyrics, and the demo's have none. */
+  .lines {
+    display: grid;
+    gap: calc(26px * 0.18);
+    padding-top: 24px;
+    padding-bottom: 50cqh;
+    transition: transform var(--t-follow) var(--ease-out);
+  }
+  /* LyricLine: t-lyric-wide (26 px) in the display face with its tracking, a sixth of the
+     type above and below, s3 at the sides. The row is Manrope's own height (1.366 em), which
+     the app's render rounds up to the physical pixel at 125 %: 36 px, a line every 49.4 px. */
+  .line {
+    display: block;
+    padding: calc(26px / 6) 12px;
+    border-radius: 10px;
+    font-family: var(--font);
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 36px;
+    color: #ffffff9e;
+    transition:
+      color calc(400ms * var(--colour-easing)) ease,
+      background-color var(--t-hover) ease;
+  }
+  .line[data-state="next"] {
+    color: #ffffffc7;
+  }
+  .line[data-state="current"] {
+    color: #fff;
+  }
+  .line:hover {
+    background: #ffffff1f;
+  }
+  /* While the lines move by hand (src/demo/follow.ts): no highlight passing line to line. */
+  .lines[data-moving] .line:hover {
+    background: none;
+  }
+  .line:active {
+    background: #ffffff33;
+  }
+  /* The credit: s5 under the last line, in LyricsNote's body type, s3 in. */
+  .lines li.source {
+    margin-top: 24px;
+    padding-left: 12px;
+    font-family: var(--font-ui);
+    font-size: 14px;
+    line-height: 19px;
+    font-weight: 600;
+    color: #ffffffd9;
+  }
+
+  /* ---------- Up next / Related ---------- */
+  .queue {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    padding: 12px 16px var(--bar-clear);
+    background: var(--panel);
+    overflow: hidden;
+  }
+  &:not([data-view="now"], [data-view="lyrics"]) .queue {
+    animation: queue-in var(--t-panel) var(--ease-drawer);
+  }
+  /* The tabs: the pill glides from tab to tab (Curves.glide over t-morph). */
+  .tabs {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    height: 40px;
+    padding: 4px;
+    margin: 0 8px;
+    border-radius: 999px;
+    background: var(--hover);
+  }
+  .tab-pill {
+    position: absolute;
+    left: 4px;
+    top: 4px;
+    width: calc(50% - 4px);
+    height: 32px;
+    border-radius: 999px;
+    background: var(--accent-tonal);
+    transition: transform 240ms var(--ease-glide);
+  }
+  &[data-queue-tab="related"] .tab-pill {
+    transform: translateX(100%);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .tab-pill {
+      transition: none;
+    }
+  }
+  .tab {
+    position: relative;
+    display: grid;
+    place-items: center;
+    height: 32px;
+    border-radius: 999px;
+    color: var(--text2);
+    font-weight: 600;
+    text-align: center;
+    transition:
+      background-color var(--t-hover) ease,
+      color var(--t-hover) ease,
+      transform var(--t-release) var(--spring-release);
+  }
+  .tab:hover {
+    color: var(--text);
+  }
+  .tab[aria-selected="false"]:hover {
+    background: var(--hover);
+  }
+  .tab:active {
+    transform: scale(var(--press-scale));
+    transition:
+      background-color var(--t-hover) ease,
+      transform var(--t-press) var(--ease-out);
+  }
+  .tab[aria-selected="true"] {
+    color: var(--text);
+  }
+  .tab-panel {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    animation: fade-in var(--t-page) var(--ease-out);
+  }
+  .from {
+    display: grid;
+    padding: 18px 8px 12px;
+  }
+  .from-l {
+    color: var(--text3);
+    font-size: 12px;
+  }
+  .from-t {
+    font-weight: 700;
+  }
+  .similar {
+    padding: 14px 8px 10px;
+    color: var(--text3);
+    font-size: 12px;
+  }
+  .rows {
+    display: grid;
+    gap: 0;
+    overflow: auto;
+    overscroll-behavior: auto;
+  }
+  /* A song row (SongRow): hover and press overlays, the playing row on its light tile; over
+     the cover, a play (or pause, on the current row) under a dark veil. */
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    height: 56px;
+    padding: 0 12px 0 8px;
+    border-radius: 10px;
+    transition: background-color var(--t-hover) ease;
+  }
+  .row:hover {
+    background: var(--hover);
+  }
+  .row:active {
+    background: var(--pressed);
+  }
+  .row[aria-current="true"] {
+    background: var(--playing-row);
+  }
+  .row[aria-current="true"]:hover {
+    background: color-mix(in srgb, var(--playing-row), var(--hover));
+  }
+  .row-cover {
+    position: relative;
+    flex: none;
+    width: 40px;
+    height: 40px;
+  }
+  .row-cover img {
+    width: 40px;
+    height: 40px;
+    border-radius: 4px;
+  }
+  .cover-play {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    border-radius: 4px;
+    background: var(--cover-button);
+    color: #fff;
+    opacity: 0;
+    transition: opacity var(--t-hover) ease;
+  }
+  .cover-play svg {
+    grid-area: 1 / 1;
+    fill: currentColor;
+  }
+  .row:is(:hover, :focus-visible) .cover-play {
+    opacity: 1;
+  }
+  .cover-play .i-pause,
+  &[data-playing="true"] .row[aria-current="true"] .cover-play .i-play {
+    display: none;
+  }
+  &[data-playing="true"] .row[aria-current="true"] .cover-play .i-pause {
+    display: block;
+  }
+  .row-text {
+    flex: 1;
+    gap: 1px;
+  }
+  .row-end {
+    display: grid;
+    justify-items: end;
+  }
+  .row-end > * {
+    grid-area: 1 / 1;
+  }
+  .dur {
+    color: var(--text3);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+  }
+  .row .fp-mark {
+    display: none;
+  }
+  .row[aria-current="true"] .fp-mark {
+    display: block;
+  }
+  .row[aria-current="true"] .dur {
+    display: none;
+  }
+
+  /* ---------- The bar: a rounded panel floating over the window's foot ---------- */
+  .bar {
+    position: absolute;
+    z-index: 3;
+    left: var(--bar-inset);
+    right: var(--bar-inset);
+    bottom: var(--bar-inset);
+    display: grid;
+    grid-template-columns: 1fr 560px 1fr;
+    align-items: center;
+    height: var(--bar-h);
+    padding: 0 12px 0 8px;
+    border-radius: 20px;
+    background: var(--bar-bg);
+    box-shadow: /* taste-skill-ignore: the app's own UI */
+      0 0 0 1px color-mix(in srgb, #00000014 calc(var(--light) * 100%), #ffffff0d),
+      0 4px 24px color-mix(in srgb, #00000033 calc(var(--light) * 100%), #00000099);
+    transition: background-color var(--t-colour) ease;
+  }
+  /* The song: opens Now playing (or closes it); hovered, a veil and a chevron on the cover. */
+  .bar-song {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    height: 72px;
+    padding: 0 8px;
+    border-radius: 12px;
+    justify-self: start;
+    max-width: 100%;
+    transition: background-color var(--t-hover) ease;
+  }
+  .bar-song:hover {
+    background: var(--hover);
+  }
+  .bar-song:active {
+    background: var(--pressed);
+  }
+  .bar-cover-wrap {
+    position: relative;
+    flex: none;
+  }
+  .bar-cover {
+    width: 56px;
+    height: 56px;
+    border-radius: 10px;
+  }
+  .bar-veil {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    border-radius: 10px;
+    background: #0000002e;
+    color: #fff;
+    opacity: 0;
+    transition: opacity var(--t-hover) ease;
+  }
+  .bar-veil svg {
+    grid-area: 1 / 1;
+    stroke-width: 2px;
+  }
+  .bar-song:hover .bar-veil {
+    opacity: 1;
+  }
+  .bar-veil .i-down,
+  &:is([data-view="now"], [data-view="lyrics"]) .bar-veil .i-up {
+    display: none;
+  }
+  &:is([data-view="now"], [data-view="lyrics"]) .bar-veil .i-down {
+    display: block;
+  }
+  .bar-title {
+    font-weight: 600;
+  }
+  .bar-artist {
+    color: var(--text2);
+    font-size: 12px;
+  }
+  .bar-mid {
+    display: grid;
+    gap: 4px;
+    justify-items: center;
+    padding-top: 2px;
+  }
+  /* Play's tooltip names its shortcut, Space, as Lyrics' names Ctrl+L; it ends s2 above the
+     bar like the others (the button sits 11 px under the bar's top). */
+  .play-tipped .fp-tip {
+    --tip-gap: 19px;
+    left: 50%;
+    translate: -50% 0;
+  }
+  .transport {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .repeat .one {
+    position: absolute;
+    top: 3px;
+    right: 6px;
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--accent);
+    display: none;
+  }
+  .repeat[data-repeat="one"] .one {
+    display: block;
+  }
+  .seek {
+    display: grid;
+    grid-template-columns: 44px 1fr 44px;
+    align-items: center;
+    gap: 12px;
+    width: 560px;
+  }
+  .time {
+    color: var(--text2);
+    font-size: 12px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  .time.end {
+    text-align: left;
+  }
+  /* The seek line: 4 px, 6 px hovered; a thumb at the fill's end and the time under the
+     pointer above it, while hovered. */
+  .seek-line {
+    position: relative;
+    display: grid;
+    align-items: center;
+    height: 16px;
+  }
+  .rail {
+    position: relative;
+    display: block;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--track);
+    overflow: hidden;
+  }
+  .seek-line .rail {
+    transition: transform var(--t-hover) ease;
+  }
+  .seek-line:hover .rail,
+  .seek-line:has(:focus-visible) .rail {
+    transform: scaleY(1.5);
+  }
+  .fill {
+    position: absolute;
+    inset: 0;
+    background: var(--accent);
+    transform-origin: 0 50%;
+  }
+  .thumb {
+    position: absolute;
+    left: calc(var(--at, 0) * 100% - 7px);
+    top: 1px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 4px #00000066; /* taste-skill-ignore: the app's own seek thumb */
+    opacity: 0;
+    transform: scale(0.5);
+    pointer-events: none;
+    transition:
+      opacity var(--t-fast) var(--ease-out),
+      transform var(--t-fast) var(--ease-out);
+  }
+  .seek-line:hover .thumb,
+  .seek-line:has(:focus-visible) .thumb {
+    opacity: 1;
+    transform: none;
+    transition:
+      opacity var(--t-fast) var(--ease-out),
+      transform var(--t-release) var(--spring-release);
+  }
+  .seek-tip {
+    position: absolute;
+    left: 0;
+    bottom: calc(100% + 2px);
+    padding: 4px 6px;
+    border-radius: 4px;
+    background: var(--card-bg);
+    box-shadow: 0 2px 8px color-mix(in srgb, #00000033 calc(var(--light) * 100%), #00000099); /* taste-skill-ignore: the app's own tooltip */
+    font-size: 12px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--t-fast) var(--ease-out);
+  }
+  .seek-line:hover .seek-tip {
+    opacity: 1;
+  }
+  .seek-line input,
+  .volume input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+  .seek-line:has(input:focus-visible),
+  .volume:has(input:focus-visible) {
+    outline: 3px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+  .bar-end {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 4px;
+  }
+  .bar-end .fp-tip {
+    --tip-gap: 34px;
+    left: 50%;
+    translate: -50% 0;
+  }
+  .bar-end .nfm .fp-tip {
+    left: auto;
+    right: 0;
+    translate: none;
+  }
+  .row-tip {
+    grid-auto-flow: column;
+    gap: 8px;
+  }
+  .fp-ib.small {
+    width: 32px;
+    height: 32px;
+    color: var(--text3);
+  }
+  .fp-ib.small:hover {
+    color: var(--text2);
+  }
+  .fp-ib.small svg {
+    width: 18px;
+    height: 18px;
+  }
+  /* Liked: the heart fills, in text1 (not the accent). */
+  .like[aria-pressed="true"] {
+    color: var(--text);
+  }
+  .like[aria-pressed="true"] svg {
+    fill: currentColor;
+  }
+  .mute svg {
+    grid-area: 1 / 1;
+  }
+  .mute .i-off,
+  &[data-muted="true"] .mute .i-on {
+    display: none;
+  }
+  &[data-muted="true"] .mute .i-off {
+    display: block;
+  }
+  /* The volume: 88 px, the fill in text2, the accent while hovered or dragged. */
+  .volume {
+    position: relative;
+    display: grid;
+    align-items: center;
+    width: 88px;
+    height: 24px;
+  }
+  .vol-rail {
+    position: relative;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--track);
+    overflow: hidden;
+  }
+  .vol-fill {
+    position: absolute;
+    inset: 0;
+    border-radius: 2px;
+    background: var(--text2);
+    transform: scaleX(var(--vol, 0.7));
+    transform-origin: 0 50%;
+    transition: background-color var(--t-hover) ease;
+  }
+  &[data-muted="true"] .vol-fill {
+    transform: scaleX(0);
+  }
+  .volume:hover .vol-fill,
+  .volume:active .vol-fill {
+    background: var(--accent);
+  }
+  .queue-btn {
+    margin-left: 8px;
+  }
+
+  /* The toast over the bar: up 8 px and in (t-toast); out quicker, down 4 px. */
+  .toast {
+    position: absolute;
+    z-index: 4;
+    left: 50%;
+    bottom: calc(var(--bar-clear) + 16px);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 44px;
+    padding: 0 8px 0 16px;
+    border-radius: 10px;
+    background: var(--card-bg);
+    box-shadow: /* taste-skill-ignore: the app's own toast */
+      0 0 0 1px color-mix(in srgb, #00000014 calc(var(--light) * 100%), #ffffff0d),
+      0 4px 16px color-mix(in srgb, #00000033 calc(var(--light) * 100%), #00000099);
+    translate: -50% 0;
+    animation: toast-in var(--t-toast) var(--ease-out);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .toast {
+      animation-name: fade-in;
+    }
+  }
+  .toast-act {
+    height: 32px;
+    padding: 0 8px;
+    border-radius: 4px;
+    color: var(--text2);
+    font-weight: 600;
+    transition: background-color var(--t-hover) ease;
+  }
+  .toast-act:hover {
+    background: var(--hover);
+  }
+  .toast-act:active {
+    background: var(--pressed);
+  }
+}
+
+/* ---------- Phones: the window alone, at 600x800, so its text can be read ---------- */
+@media (max-width: 768px) {
+  .laptop--crop .replica {
+    --app-h: 768px;
+    right: auto;
+    bottom: auto;
+    width: 600px;
+    height: 800px;
+    transform-origin: 300px 800px;
+
+    & .titlebar {
+      font-size: 15px;
+    }
+    & .app {
+      grid-template-columns: 1fr !important;
+    }
+    & .sidebar,
+    & .queue,
+    & .resume-next,
+    & .bar-end,
+    & .seek,
+    & .np-actions,
+    & .np-from,
+    & [data-act="shuffle"],
+    & [data-act="repeat"] {
+      display: none !important;
+    }
+    & .topbar {
+      padding: 0 24px;
+    }
+    & .field {
+      width: 100%;
+    }
+    & .keys {
+      display: none;
+    }
+    & .page {
+      padding: 20px 24px var(--bar-clear);
+    }
+    & .resume {
+      grid-template-columns: 120px 1fr;
+    }
+    & .resume-cover {
+      width: 120px;
+      height: 120px;
+    }
+    & .resume-title {
+      font-size: 26px;
+    }
+    & .cards {
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+    & .np {
+      top: 70px;
+      width: 320px;
+    }
+    &[data-view="lyrics"][data-has-lyrics="true"] .np {
+      left: 24px;
+      top: 64px;
+      width: 552px;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+    }
+    &[data-view="lyrics"][data-has-lyrics="true"] .np-cover {
+      width: 112px;
+      flex: none;
+      border-radius: 12px;
+    }
+    &[data-view="lyrics"][data-has-lyrics="true"] .np-text {
+      margin-top: 0;
+    }
+    /* Under the cover's row (64 + 112 px), the first line's top 24 px below it; the words
+       24 px in from the sides, their hover tile s3 further out. */
+    & .lyrics {
+      left: 12px;
+      right: 12px;
+      width: auto;
+      top: 176px;
+    }
+    & .bar {
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+    }
+    & .bar-cover {
+      width: 60px;
+      height: 60px;
+    }
+    & .bar-title {
+      font-size: 18px;
+    }
+    & .bar-artist {
+      font-size: 15px;
+    }
+  }
+}

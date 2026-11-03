@@ -1,0 +1,478 @@
+// The main window: the frame (sidebar, top bar, content, Up next panel, bottom bar) and the page
+// switch. Pages live in pages/*.slint, one file each; see ui/README.md for who owns what.
+import "fonts/manrope/Manrope-Variable.ttf";
+
+import { Theme, Curves } from "theme.slint";
+import { Nav, PageKind, Frame } from "nav.slint";
+import { Mark, Bands } from "parts.slint";
+import { Player } from "player.slint";
+import { Probe, ProbeRegion } from "probe.slint";
+import { Sidebar } from "sidebar.slint";
+import { TopBar, TopBarData } from "top_bar.slint";
+import { BottomBar } from "bottom_bar.slint";
+import { QueuePanel } from "queue_panel.slint";
+import { HomePage, HomeData } from "pages/home.slint";
+import { LibraryPage } from "pages/library.slint";
+import { ExplorePage, MoodPage } from "pages/explore.slint";
+import { HistoryPage } from "pages/history.slint";
+import { AlbumPage } from "pages/album.slint";
+import { PlaylistPage } from "pages/playlist.slint";
+import { ArtistPage } from "pages/artist.slint";
+import { SearchPage } from "pages/search.slint";
+import { NowPlayingPage, SideTabs, LyricsWatch } from "pages/now_playing.slint";
+import { LyricsData } from "pages/lyrics.slint";
+import { SettingsPage, SettingsData, SettingsDialog, SettingsDialogLayer } from "pages/settings.slint";
+import { AboutPage } from "pages/about.slint";
+import { SignInPage } from "pages/sign_in.slint";
+import { SongMenuLayer } from "song_menu.slint";
+import { PlaylistMenu, PlaylistDialog } from "playlist_menu.slint";
+import { PlaylistMenuLayer, PlaylistDialogLayer } from "playlist_menu_layer.slint";
+import { AccountMenuLayer } from "account_menu.slint";
+import { ToastView } from "toast.slint";
+import { CloseDialog, CloseChoice } from "close_dialog.slint";
+
+// What Rust can reach. Shared pieces first, then one line per page: a page's owner adds its
+// own exported structs to its own line only (blank lines keep the merges clean).
+export { Theme, Icons, Appearance } from "theme.slint";
+export { TrackRow, CardItem, ItemKind, RowHover, Mark } from "parts.slint";
+export { Nav, PageKind, Frame } from "nav.slint";
+export { Probe } from "probe.slint";
+export { Player, Repeat } from "player.slint";
+export { SidebarData } from "sidebar.slint";
+export { TopBarData } from "top_bar.slint";
+export { QueueData } from "queue_panel.slint";
+
+export { HomeData, HomeShelfRow, ShelfShape, MoreState } from "pages/home.slint";
+
+export { SongMenu } from "song_menu.slint";
+
+export { PlaylistMenu, PlaylistKind, PlaylistDialog } from "playlist_menu.slint";
+
+export { AccountMenu, AccountItem } from "account_menu.slint";
+
+export { Toast } from "toast.slint";
+
+export { LibraryData } from "pages/library.slint";
+
+export { ExploreData, MoodData, ChartArtistRow, MoodTile, MoodGroup } from "pages/explore.slint";
+
+export { HistoryData } from "pages/history.slint";
+
+export { AlbumData } from "pages/album.slint";
+
+export { PlaylistData } from "pages/playlist.slint";
+
+export { ArtistData } from "pages/artist.slint";
+
+export { SearchData } from "pages/search.slint";
+
+export { NowPlayingData } from "pages/now_playing.slint";
+
+export { LyricsData, LyricsState, LyricInk } from "pages/lyrics.slint";
+
+export { SettingsData, SettingKey, LastfmState, DiscordState, ListenBrainzState, SettingsDialog, AccentSwatch, DiscordPreview } from "pages/settings.slint";
+
+export { AboutData, Credit } from "pages/about.slint";
+
+export { SignInData } from "pages/sign_in.slint";
+
+export { MiniPlayer, MiniData } from "mini_player.slint";
+
+export { CloseChoice } from "close_dialog.slint";
+
+export component AppWindow inherits Window {
+    title: "featherplay";
+    preferred-width: 1280px;
+    preferred-height: 800px;
+    min-width: 960px;
+    min-height: 600px;
+    background: Theme.ground;
+    default-font-family: Theme.body-font;
+    default-font-size: Theme.t-body;
+    forward-focus: keys;
+
+    property <bool> wide: self.width >= Theme.wide-min;
+    // Now playing takes the whole body; the sidebar and the panel step aside. From
+    // `Frame.full-page`, which Rust sets only when it changes: bound to `Nav.page` straight,
+    // everything it places (the sidebar, Up next, the bar's clear) was marked dirty by every
+    // page change, and the page's first frames repainted the whole window
+    // (measured 2026-11-01). Not a change handler: those run at the
+    // start of the event loop's next turn, after the click's frame is drawn.
+    property <bool> full-page: Frame.full-page;
+    property <length> side-w: root.full-page ? 0px : (root.wide ? Theme.sidebar-w : Theme.rail-w);
+    // The player bar floats over the bottom of everything (`Theme.bar-inset` in from the
+    // edges): the sidebar and the panel run the window's height behind it with their rows
+    // ending at its top; the pages end at its top, fading into the ground just above it.
+    property <length> bar-top: self.height - Theme.bar-clear;
+    // How far above the bar's top the pages start fading into the ground.
+    property <length> bar-fade: Theme.s5;
+    property <bool> panel-shown: Frame.queue-open && !root.full-page;
+    // The Up next panel: as wide as Now playing's side panel on a wide window, so titles
+    // aren't cut short; narrower below `panel-wide-min`.
+    property <length> panel-w: self.width >= Theme.panel-wide-min ? Theme.nowplaying-side-w : Theme.panel-w;
+    // Wide: the page makes room for the panel, laid out once at its new width rather than
+    // eased (that would lay it out and repaint it on every frame of the slide). Opening,
+    // the panel slides in over the page, which narrows when the slide ends; closing, the page
+    // widens at once under the panel as it slides away. Either way nothing shows empty.
+    // Narrow: the panel overlays the page.
+    property <length> panel-push: root.panel-shown && root.wide && root.panel-in ? root.panel-w : 0px;
+    // The panel has slid all the way in. Set from its slide's end (not bound to it), so the
+    // page's width depends on it alone and isn't re-evaluated on every frame of the slide.
+    property <bool> panel-in;
+    // The page's width, for the tests.
+    out property <length> page-width: root.width - root.side-w - root.panel-push;
+    // The top bar sits above every page but Now playing. Album, playlist and artist pages
+    // run up under it, clear, so their cover wash or photo reaches the window's top (each
+    // draws a `TopScrim` for when content scrolls under it); the others start below it.
+    property <bool> under-top: Nav.page == PageKind.album || Nav.page == PageKind.playlist || Nav.page == PageKind.artist;
+    property <length> top-h: root.full-page || root.under-top ? 0px : Theme.top-bar-h;
+    // Home's wash shows behind the top bar, from the window's top: the bar is clear and the
+    // fade below it is left out (Home still starts below the bar; it brings the ground back
+    // itself as it scrolls, then hands over to these).
+    property <bool> home-wash: Nav.page == PageKind.home && HomeData.wash-behind-bar;
+
+    // Page enter: a new page (another kind, or another album, playlist or artist) rises
+    // `rise` over `t-page`. It doesn't fade: a fade would draw the whole page through a layer
+    // on every frame of it. Keyboard navigation and Now playing (which has its own opening)
+    // skip it.
+    property <PageKind> page: Nav.page;
+    property <string> page-id: Nav.page-id;
+    property <bool> entered: true;
+    changed page => { root.page-changed(); }
+    changed page-id => { root.page-changed(); }
+    function page-changed() {
+        if Frame.instant || !Theme.fading || Nav.page == PageKind.now-playing {
+            root.entered = true;
+        } else {
+            // Snap to the start values, then ease in from there on the next tick.
+            root.entered = false;
+            enter.running = true;
+        }
+        Frame.instant = false;
+    }
+    enter := Timer {
+        interval: 1ms;
+        running: false;
+        triggered => {
+            self.running = false;
+            root.entered = true;
+        }
+    }
+    // The playing mark's one clock (`Mark`): steps only while sound plays and the window is
+    // on screen. Paused, stopped, loading, minimized, hidden in the tray or with reduced
+    // motion, it isn't armed.
+    Timer {
+        interval: Mark.step;
+        running: Player.playing && !Player.loading && Theme.moving && !root.minimized && !Frame.hidden;
+        triggered => { Mark.frame += 1; }
+    }
+    // The Lyrics tab's lines are timed only while it's on screen (pages/lyrics.slint).
+    LyricsWatch {
+        minimized: root.minimized;
+    }
+    // A keyboard navigation that didn't move (no history) mustn't leave `instant` set.
+    instant-clear := Timer {
+        interval: 50ms;
+        running: Frame.instant;
+        triggered => { Frame.instant = false; }
+    }
+    // Keyboard actions that navigate.
+    function navigate-by-key() {
+        Frame.instant = true;
+    }
+
+    keys := FocusScope {
+        key-pressed(e) => {
+            if e.modifiers.control && (e.text == "k" || e.text == "K") {
+                // Now playing hides the bar: leave it first.
+                if root.full-page {
+                    root.navigate-by-key();
+                    Nav.back();
+                }
+                top-bar.focus-search();
+                return accept;
+            }
+            // Lyrics on or off, as the bar's microphone does (off any page, Now playing opens
+            // on them). Nothing with lyrics off in Settings.
+            if e.modifiers.control && (e.text == "l" || e.text == "L") {
+                if LyricsData.on && (Player.has-track || LyricsData.showing) {
+                    if !LyricsData.showing && Nav.page != PageKind.now-playing {
+                        root.navigate-by-key();
+                    }
+                    LyricsData.toggle-view();
+                }
+                return accept;
+            }
+            if e.modifiers.alt && e.text == Key.LeftArrow {
+                root.navigate-by-key();
+                Nav.back();
+                return accept;
+            }
+            if e.modifiers.alt && e.text == Key.RightArrow {
+                root.navigate-by-key();
+                Nav.forward();
+                return accept;
+            }
+            // Space plays and pauses, as the bar's play button does, from any page. It reaches
+            // here only when nothing focused took it: a text field types it instead; buttons
+            // don't take the keys; Settings' switches leave it and flip on Enter. A held Space
+            // flips once (auto-repeats are dropped); with nothing loaded it does nothing.
+            if e.text == " " && !e.modifiers.control && !e.modifiers.alt && !e.modifiers.meta {
+                if Player.has-track && !e.repeat {
+                    Player.toggle();
+                }
+                return accept;
+            }
+            if e.text == Key.Escape {
+                // In the search field: the first Escape clears it, the next leaves it.
+                if top-bar.searching && TopBarData.query != "" {
+                    TopBarData.query = "";
+                    return accept;
+                }
+                if root.full-page {
+                    root.navigate-by-key();
+                    Nav.back();
+                }
+                keys.focus();
+                return accept;
+            }
+            reject
+        }
+
+        sidebar := Sidebar {
+            x: 0;
+            y: 0;
+            height: root.height;
+            clear: Theme.bar-clear;
+            visible: !root.full-page;
+            rail: !root.wide;
+        }
+
+        Rectangle {
+            x: root.side-w;
+            y: 0;
+            width: root.page-width;
+            // The pages end at the bar's top: below it, beside and under the floating bar, the
+            // window's ground shows, and nothing of a page is drawn there. A page is still laid
+            // out the window's height, so its content scrolls up from under the bar.
+            height: root.full-page ? root.height : root.bar-top;
+            clip: true;
+            Rectangle {
+                // Only the enter offset eases: where the page starts (below the top bar, or
+                // under it) steps at once with the page.
+                property <length> rise-by: root.entered ? 0px : Theme.rise;
+                animate rise-by { duration: root.entered ? Theme.t-page : 0ms; easing: Curves.ease-out; }
+                y: root.top-h + self.rise-by;
+                height: root.height - root.top-h;
+                if Nav.page == PageKind.home: HomePage {
+                    width: parent.width;
+                    height: parent.height;
+                }
+                if Nav.page == PageKind.library: LibraryPage {
+                    width: parent.width;
+                    height: parent.height;
+                }
+                if Nav.page == PageKind.explore: ExplorePage {
+                    width: parent.width;
+                    height: parent.height;
+                }
+                if Nav.page == PageKind.mood: MoodPage {
+                    width: parent.width;
+                    height: parent.height;
+                }
+                if Nav.page == PageKind.history: HistoryPage {
+                    width: parent.width;
+                    height: parent.height;
+                }
+                if Nav.page == PageKind.album: AlbumPage {
+                    width: parent.width;
+                    height: parent.height;
+                }
+                if Nav.page == PageKind.playlist: PlaylistPage {
+                    width: parent.width;
+                    height: parent.height;
+                }
+                if Nav.page == PageKind.artist: ArtistPage {
+                    width: parent.width;
+                    height: parent.height;
+                }
+                if Nav.page == PageKind.search: SearchPage {
+                    width: parent.width;
+                    height: parent.height;
+                }
+                if Nav.page == PageKind.now-playing: NowPlayingPage {
+                    width: parent.width;
+                    height: parent.height;
+                }
+                if Nav.page == PageKind.settings: SettingsPage {
+                    width: parent.width;
+                    height: parent.height;
+                }
+                if Nav.page == PageKind.about: AboutPage {
+                    width: parent.width;
+                    height: parent.height;
+                }
+                if Nav.page == PageKind.sign-in: SignInPage {
+                    width: parent.width;
+                    height: parent.height;
+                }
+            }
+            // Content scrolling down to the bar dissolves into the ground over the strip just
+            // above its top, rather than being cut. It repaints whenever content scrolls under
+            // it, so it's only this strip, not the bar's height, and solid bands rather than a
+            // gradient with alpha, the costliest fill to draw.
+            if !root.full-page: Bands {
+                y: root.bar-top - root.bar-fade;
+                height: root.bar-fade;
+                top: Theme.ground.transparentize(100%);
+                bottom: Theme.ground;
+            }
+            // Content scrolling up under the bar fades out rather than being cut. At rest the
+            // pages' top padding is blank ground, so the fade is invisible.
+            if !root.full-page && !root.under-top && !root.home-wash: Bands {
+                y: Theme.top-bar-h;
+                height: Theme.s4;
+                count: 16;
+                top: Theme.ground;
+                bottom: Theme.ground.transparentize(100%);
+            }
+            top-bar := TopBar {
+                x: 0;
+                y: 0;
+                width: parent.width;
+                visible: !root.full-page;
+                clear: root.under-top || root.home-wash;
+                narrow: !root.wide;
+                submitted(q) => {
+                    root.navigate-by-key();
+                    Nav.search(q);
+                    keys.focus();
+                }
+            }
+        }
+
+        // Narrow window: the panel overlays the content over a scrim; a click
+        // beside it closes it. Only at narrow windows: kept at a wide one, the scrim's fade
+        // (0 to 0 there) marked the whole window dirty for each frame of it when the panel
+        // opened or closed, ~35 full 4K repaints (measured 2026-11-01).
+        if !root.wide: Rectangle {
+            width: root.width;
+            height: root.height;
+            background: Theme.scrim;
+            opacity: root.panel-shown && !root.wide ? 1 : 0;
+            visible: self.opacity > 0;
+            animate opacity { duration: root.panel-shown ? Theme.t-menu : Theme.t-fast; easing: Curves.ease-out; }
+        }
+        if root.panel-shown && !root.wide: TouchArea {
+            x: 0;
+            y: 0;
+            width: root.width - root.panel-w;
+            height: root.height;
+            clicked => {
+                Frame.queue-open = false;
+                Frame.queue-toggled(false);
+            }
+        }
+        QueuePanel {
+            // How much of it is slid out past the right edge: that eases, not `x`, so
+            // the panel stays at the edge while the window resizes.
+            property <float> out: root.panel-shown ? 0 : 1;
+            animate out { duration: root.panel-shown ? Theme.t-panel : Theme.t-panel * 0.8; easing: Curves.ease-drawer; }
+            init => { root.panel-in = self.out <= 0; }
+            changed out => { root.panel-in = self.out <= 0; }
+            x: root.width - root.panel-w * (1 - self.out);
+            y: 0;
+            width: root.panel-w;
+            height: root.height;
+            visible: self.out < 1;
+            open: root.panel-shown;
+            drop-shadow-blur: root.wide ? 0px : 24px;
+            drop-shadow-color: root.wide ? transparent : Theme.cover-shadow;
+            SideTabs {
+                shown: root.panel-shown;
+            }
+        }
+
+        BottomBar {
+            x: Theme.bar-inset;
+            y: root.bar-top;
+            width: root.width - 2 * Theme.bar-inset;
+        }
+
+        // Settings' dialogs: their scrim covers the whole window and takes its clicks.
+        if Nav.page == PageKind.settings && SettingsData.dialog != SettingsDialog.none: SettingsDialogLayer {
+            x: 0;
+            y: 0;
+            width: root.width;
+            height: root.height;
+        }
+
+        // Toasts: bottom centre, 16 px above the bar.
+        ToastView {
+            x: (root.width - self.width) / 2;
+            y: root.bar-top - Theme.s4 - self.height;
+        }
+
+        // The account menu, from the sidebar's account row.
+        AccountMenuLayer {
+            x: 0;
+            y: 0;
+            width: root.width;
+            height: root.height;
+            closed => { keys.focus(); }
+        }
+
+        // The song menu, over everything while open.
+        SongMenuLayer {
+            x: 0;
+            y: 0;
+            width: root.width;
+            height: root.height;
+            bottom-limit: root.bar-top;
+            closed => { keys.focus(); }
+        }
+
+        // The sidebar's playlist menu, over everything while open, and its dialogs.
+        PlaylistMenuLayer {
+            x: 0;
+            y: 0;
+            width: root.width;
+            height: root.height;
+            bottom-limit: root.bar-top;
+            closed => { keys.focus(); }
+        }
+        if PlaylistMenu.dialog != PlaylistDialog.none: PlaylistDialogLayer {
+            x: 0;
+            y: 0;
+            width: root.width;
+            height: root.height;
+            closed => { keys.focus(); }
+        }
+
+        // The close dialog (src/close.rs): what the close button does, until the user picks.
+        if CloseChoice.open: CloseDialog {
+            x: 0;
+            y: 0;
+            width: root.width;
+            height: root.height;
+            closed => { keys.focus(); }
+        }
+
+        if Probe.region: ProbeRegion {
+            x: Probe.region-x;
+            y: Probe.region-y;
+        }
+
+        // While the wheel scrolls under a still pointer, this holds the hover, so the rows
+        // passing under it don't light up and fade one after another (each a repaint). The
+        // wheel passes through to the list; moving the pointer or pressing a button removes
+        // it first (`wheel.rs`), so hover and clicks are as before. It stops at the bar, which
+        // never scrolls: the volume slider under the wheel keeps its hover.
+        if Frame.scrolling: TouchArea {
+            x: 0;
+            y: 0;
+            width: root.width;
+            height: root.bar-top;
+        }
+    }
+}

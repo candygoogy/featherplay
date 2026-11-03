@@ -1,0 +1,165 @@
+---
+// The music in the demo, credited in full: each track with its cover (our own art), where it
+// comes from and its licence, then each artist's credit in their own requested wording. The
+// players on the home page carry the short credit and link here.
+import Base from "../layouts/Base.astro";
+import Header from "../components/Header.astro";
+import Footer from "../components/Footer.astro";
+import { musicCredits, musicCreditsNote, songs } from "../data/songs";
+---
+
+<Base
+  title="Music in the featherplay demo: credits"
+  description="The six tracks the featherplay website plays, who made them, where they come from and the licences they're shared under."
+>
+  <Header />
+  <main id="main" tabindex="-1" class="wrap credits-page" data-music-credits>
+    <h1>Music in the demo</h1>
+    <p class="lede">
+      The players on the home page play short clips of six tracks that their artists share under Creative Commons
+      licences. Thank you to them.
+    </p>
+
+    <ul class="tracks">
+      {
+        songs.map((s) => (
+          <li class="track" id={s.id}>
+            <img src={s.cover} width="72" height="72" alt="" loading="lazy" decoding="async" />
+            <div class="t-text">
+              <p class="t-title">“{s.title}”</p>
+              <p class="t-artist">{s.artist}</p>
+            </div>
+            {s.credit && (
+              <p class="t-links">
+                <a href={s.credit.sourceUrl}>The track</a>
+                <span class="dot" aria-hidden="true">·</span>
+                <a href={s.credit.licenceUrl}>{s.credit.licence}</a>
+              </p>
+            )}
+          </li>
+        ))
+      }
+    </ul>
+
+    <section class="wording" aria-labelledby="wording-title">
+      <h2 id="wording-title">As the artists ask to be credited</h2>
+      <ul class="lines">
+        {
+          musicCredits.map((parts) => (
+            <li>{parts.map((p) => (typeof p === "string" ? p : <a href={p.href}>{p.text}</a>))}</li>
+          ))
+        }
+      </ul>
+      <p class="note">{musicCreditsNote} The covers are featherplay's own drawings, not the tracks' artwork.</p>
+    </section>
+
+    <p class="back"><a href="/">Back to featherplay</a></p>
+  </main>
+  <Footer />
+</Base>
+
+<style>
+  .credits-page {
+    max-width: 960px;
+    padding-block: clamp(48px, 8vw, 120px) clamp(32px, 4vw, 64px);
+  }
+  h1 {
+    font-size: clamp(2.75rem, 7vw, 5.5rem);
+  }
+  .lede {
+    max-width: 44ch;
+    margin-top: 24px;
+    font-size: clamp(1.125rem, 1.6vw, 1.375rem);
+    font-weight: 600;
+    line-height: 1.35;
+  }
+  .tracks {
+    display: grid;
+    gap: 4px;
+    margin: clamp(40px, 5vw, 64px) 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .track {
+    display: grid;
+    grid-template-columns: 72px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 20px;
+    padding: 12px;
+    border-radius: 18px;
+    scroll-margin-top: 24px;
+  }
+  .track:nth-child(odd) {
+    background: var(--surface);
+  }
+  /* Arrived here from a player's credit: that track, marked. */
+  .track:target {
+    background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+  }
+  .track img {
+    width: 72px;
+    height: 72px;
+    border-radius: 12px;
+  }
+  .t-title {
+    font-size: 1.25rem;
+    font-weight: 800;
+    letter-spacing: -0.015em;
+  }
+  .t-artist {
+    color: var(--text-muted);
+  }
+  .t-links {
+    display: flex;
+    gap: 8px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .t-links a {
+    text-underline-offset: 0.2em;
+  }
+  .dot {
+    color: var(--text-muted);
+  }
+  .wording {
+    margin-top: clamp(56px, 7vw, 96px);
+  }
+  h2 {
+    font-size: clamp(1.75rem, 3.4vw, 2.5rem);
+    margin-bottom: 20px;
+  }
+  .lines {
+    display: grid;
+    gap: 14px;
+    max-width: 68ch;
+    padding: 0;
+    list-style: none;
+    line-height: 1.55;
+  }
+  .lines a,
+  .back a {
+    text-underline-offset: 0.2em;
+  }
+  .note {
+    max-width: 68ch;
+    margin-top: 20px;
+    color: var(--text-muted);
+  }
+  .back {
+    margin-top: 56px;
+    font-weight: 700;
+  }
+  @media (max-width: 640px) {
+    .track {
+      grid-template-columns: 56px minmax(0, 1fr);
+      gap: 14px;
+    }
+    .track img {
+      width: 56px;
+      height: 56px;
+    }
+    .t-links {
+      grid-column: 2;
+    }
+  }
+</style>

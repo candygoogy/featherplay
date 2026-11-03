@@ -1,0 +1,93 @@
+name: Sidecar pins
+
+# A first run downloads yt-dlp and Deno at the releases pinned (with their SHA256) in
+# crates/streams/src/sidecars.rs. yt-dlp then updates itself, but Deno never does, and a
+# stale yt-dlp pin means every new install starts on an old extractor. Once a week this
+# compares the pins with the latest releases and opens an issue (or comments on the open
+# one) when Deno is a minor version or more behind, or the yt-dlp pin is more than
+# YTDLP_MAX_DAYS older than the latest yt-dlp. Moving a pin means changing its URL and
+# SHA256 together, from that release's own checksum file.
+
+on:
+  schedule:
+    - cron: "0 7 * * 1"
+  workflow_dispatch:
+
+# contents: read only to check out sidecars.rs (the repository is private).
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: sidecar-pins
+  cancel-in-progress: false
+
+env:
+  YTDLP_MAX_DAYS: "60"
+
+jobs:
+  pins:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: crates/streams/src/sidecars.rs
+          sparse-checkout-cone-mode: false
+
+      - name: Compare the pins with the latest releases
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          file=crates/streams/src/sidecars.rs
+          ytdlp_pin=$(grep -oP 'yt-dlp/releases/download/\K[0-9][0-9.]*(?=/)' "$file" | head -n1 || true)
+          deno_pin=$(grep -oP 'denoland/deno/releases/download/v\K[0-9][0-9.]*(?=/)' "$file" | head -n1 || true)
+          ytdlp_latest=$(gh api repos/yt-dlp/yt-dlp/releases/latest --jq .tag_name)
+          deno_latest=$(gh api repos/denoland/deno/releases/latest --jq .tag_name)
+          deno_latest=${deno_latest#v}
+
+          # yt-dlp is versioned by release date (YYYY.MM.DD, sometimes with a fourth part),
+          # Deno by semver. Anything else means this check needs updating: fail loudly.
+          date_re='^[0-9]{4}\.[0-9]{2}\.[0-9]{2}(\.[0-9]+)?$'
+          semver_re='^[0-9]+\.[0-9]+\.[0-9]+$'
+          for pair in "yt-dlp pin:$ytdlp_pin:$date_re" "yt-dlp latest:$ytdlp_latest:$date_re" \
+                      "Deno pin:$deno_pin:$semver_re" "Deno latest:$deno_latest:$semver_re"; do
+            IFS=: read -r what value re <<< "$pair"
+            if ! [[ $value =~ $re ]]; then
+              echo "::error::could not read the $what version (got '$value')"
+              exit 1
+            fi
+          done
+
+          day() { IFS=. read -r y m d _ <<< "$1"; date -u -d "$y-$m-$d" +%s; }
+          ytdlp_days=$(( ($(day "$ytdlp_latest") - $(day "$ytdlp_pin")) / 86400 ))
+          IFS=. read -r pin_major pin_minor _ <<< "$deno_pin"
+          IFS=. read -r new_major new_minor _ <<< "$deno_latest"
+          echo "yt-dlp: pinned $ytdlp_pin, latest $ytdlp_latest ($ytdlp_days days newer)"
+          echo "Deno: pinned $deno_pin, latest $deno_latest"
+
+          stale=()
+          if (( ytdlp_days > YTDLP_MAX_DAYS )); then
+            stale+=("- yt-dlp is pinned at $ytdlp_pin; the latest release, $ytdlp_latest, is $ytdlp_days days newer (limit $YTDLP_MAX_DAYS).")
+          fi
+          if (( 10#$new_major > 10#$pin_major || (10#$new_major == 10#$pin_major && 10#$new_minor > 10#$pin_minor) )); then
+            stale+=("- Deno is pinned at $deno_pin; the latest release is $deno_latest.")
+          fi
+          if (( ${#stale[@]} == 0 )); then
+            echo "Both pins are current enough."
+            exit 0
+          fi
+
+          title="Sidecar pins are behind"
+          body=$(printf '%s\n' "The weekly sidecar check on $(date -u +%Y-%m-%d) found:" "" "${stale[@]}" "" \
+            "Update the URL and SHA256 together in \`crates/streams/src/sidecars.rs\` (and the versions in THIRD_PARTY.md). Run: $RUN_URL")
+          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "\"$title\" in:title" --json number --jq '.[0].number')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body "$body"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "$body"
+          fi

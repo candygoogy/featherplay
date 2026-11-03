@@ -1,0 +1,33 @@
+[package]
+name = "featherplay-audio"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "featherplay's audio engine: ranged HTTP downloads, AAC/MP4 decoding and playback on rodio"
+publish = false
+
+[dependencies]
+# Output (cpal 0.18.2 underneath). No Opus: the streams are AAC (itag 140).
+rodio = { workspace = true, features = ["playback", "mp4"] }
+# AAC-in-MP4 decode, driven directly (not through rodio's decoder) so the MP4 reader can
+# start on the first fragment of a download (`decoder.rs`). The same version and features
+# as rodio's, so nothing new is built. Not the workspace's `symphonia` (0.6.1, which was checked
+# for Opus and has no decoder for it).
+symphonia = { version = "=0.5.5", default-features = false, features = ["aac", "isomp4"] }
+reqwest = { workspace = true, features = ["native-tls"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "sync", "time", "macros"] }
+# The in-memory heads, and the temp file a stream downloads into under {cache}/tmp
+# (`download.rs`). Both were already in the lock tree (through reqwest and stream-download).
+bytes = "=1.12.1"
+tempfile = "=3.27.0"
+# Locks that survive a panicked holder (`featherplay_core::sync`).
+featherplay-core = { path = "../core" }
+
+[dev-dependencies]
+featherplay-streams = { path = "../streams" }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+
+[lints]
+workspace = true

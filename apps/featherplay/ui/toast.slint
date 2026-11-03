@@ -1,0 +1,96 @@
+// Toasts: one short confirmation at a time, bottom centre, 16 px
+// above the bar ("Added to queue: Revolution 909", "Saved to Homework"). `src/toast.rs` shows
+// them and closes them after 3 s (5 s with an action); hovering the toast holds it open.
+import { Theme, Curves } from "theme.slint";
+import { Body } from "parts.slint";
+
+export global Toast {
+    in property <bool> open;
+    in property <string> text;
+    // A text button ("View"), or "" for none.
+    in property <string> action;
+    callback action-clicked();
+    // The pointer entered (true) or left the toast.
+    callback hover-changed(bool);
+}
+
+export component ToastView inherits Rectangle {
+    // Rises `rise` as it fades in; sinks 4 px as it fades out. A new toast while one shows
+    // only replaces the text.
+    property <bool> open: Toast.open;
+    property <bool> settled: true;
+    property <bool> over: hover.has-hover;
+    changed open => {
+        if root.open {
+            root.settled = false;
+            settle.running = true;
+        }
+    }
+    changed over => { Toast.hover-changed(root.over); }
+    settle := Timer {
+        interval: 1ms;
+        running: false;
+        triggered => {
+            self.running = false;
+            root.settled = true;
+        }
+    }
+    width: min(480px, lay.preferred-width);
+    height: 44px;
+    opacity: root.open ? 1 : 0;
+    visible: self.opacity > 0;
+    accessible-role: text;
+    accessible-label: Toast.text;
+    animate opacity { duration: root.open ? Theme.t-toast : Theme.t-fast; easing: Curves.ease-out; }
+
+    card := Rectangle {
+        property <length> dy: !root.open ? (Theme.moving ? 4px : 0px) : (root.settled ? 0px : Theme.rise);
+        y: self.dy;
+        border-radius: Theme.r-m;
+        background: Theme.card;
+        border-width: 1px;
+        border-color: Theme.card-edge;
+        drop-shadow-blur: 16px;
+        drop-shadow-offset-y: 4px;
+        drop-shadow-color: Theme.cover-shadow;
+        animate dy {
+            duration: !root.open ? Theme.t-fast : (root.settled ? Theme.t-toast : 0ms);
+            easing: Curves.ease-out;
+        }
+        hover := TouchArea {
+            enabled: root.open;
+        }
+        lay := HorizontalLayout {
+            padding-left: Theme.s4;
+            padding-right: Toast.action != "" ? Theme.s2 : Theme.s4;
+            spacing: Theme.s2;
+            Body {
+                text: Toast.text;
+                color: Theme.text1;
+                vertical-alignment: center;
+            }
+            if Toast.action != "": Rectangle {
+                y: (parent.height - self.height) / 2;
+                width: label.preferred-width + 2 * Theme.s2;
+                height: 32px;
+                border-radius: Theme.r-s;
+                background: Theme.state(ata.pressed, ata.has-hover);
+                accessible-role: button;
+                accessible-label: Toast.action;
+                accessible-action-default => { Toast.action-clicked(); }
+                animate background { duration: Theme.t-hover; }
+                ata := TouchArea {
+                    enabled: root.open;
+                    mouse-cursor: pointer;
+                    clicked => { Toast.action-clicked(); }
+                }
+                label := Body {
+                    text: Toast.action;
+                    font-weight: 600;
+                    color: Theme.text2;
+                    vertical-alignment: center;
+                }
+            }
+        }
+    }
+}

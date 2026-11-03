@@ -1,0 +1,351 @@
+---
+// A slim metal laptop drawn in CSS and one SVG (inspired by a Zenbook: slim bezels, the
+// lid's lower edge dropping behind the deck on a slim hinge so the keyboard sits lifted, a
+// machined lip with a diamond-cut edge; no logos, no lid pattern). Its outline is 0.65 as
+// tall as it is wide (Hero.astro sizes it by that). Its screen holds a 1440x900 layout (the slot), shrunk with one transform to
+// whatever width the laptop has.
+//
+// The lid leans back by `--lid` (0 to 1; 1 faces you). The hero drives its transform from
+// scroll (src/scripts/lid.ts); elsewhere it stays upright.
+//
+// `crop`: on phones (768 px and under) the laptop gives way to its screen alone, cropped to
+// the app's window at a narrow 600x800 layout, so the text can be read.
+interface Props {
+  lid?: number;
+  class?: string;
+  label?: string;
+  crop?: boolean;
+}
+const { lid = 1, class: className = "", label, crop = false } = Astro.props;
+
+// The keyboard deck, seen from in front and a little above: a wedge whose back edge meets
+// the lid (88 % of the width) and whose front edge is the full width. The lifted hinge
+// (ErgoLift-style: the lid's lower edge drops behind the deck and props its back up) tilts
+// the deck towards you, so its top reads deeper than a flat deck would. Everything on it is
+// laid out in that perspective by interpolating between the back and the front edge.
+const W = 1000;
+const TOP = 70; // depth of the top surface in the drawing
+const H = 88; // the drawing's height: the top, then the machined lip
+const back = [60, 940];
+const front = [0, 1000];
+const at = (t: number, u: number) => {
+  // t: 0 back to 1 front; u: 0 left to 1 right
+  const l = back[0] + (front[0] - back[0]) * t;
+  const r = back[1] + (front[1] - back[1]) * t;
+  return [l + (r - l) * u, t * TOP] as const;
+};
+const quad = (t0: number, t1: number, u0: number, u1: number) =>
+  [at(t0, u0), at(t0, u1), at(t1, u1), at(t1, u0)].map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
+
+// The keyboard: a function row, then five rows in real key widths (units), normalised to
+// the well. Each key is its skirt (the front face you see from above) and its cap on top.
+const kb = { u0: 0.115, u1: 0.885 };
+const layout: { t: [number, number]; keys: number[] }[] = [
+  { t: [0.115, 0.165], keys: Array(16).fill(1) },
+  { t: [0.18, 0.262], keys: [...Array(13).fill(1), 2] },
+  { t: [0.262, 0.344], keys: [1.5, ...Array(12).fill(1), 1.5] },
+  { t: [0.344, 0.426], keys: [1.75, ...Array(11).fill(1), 2.25] },
+  { t: [0.426, 0.508], keys: [2.25, ...Array(10).fill(1), 2.75] },
+  { t: [0.508, 0.59], keys: [1.25, 1, 1.25, 1.25, 5.5, 1.25, 1, 1, 1, 1] },
+];
+const gapU = 0.0058;
+const skirts: string[] = [];
+const caps: string[] = [];
+for (const row of layout) {
+  const total = row.keys.reduce((a, b) => a + b, 0);
+  const [t0, t1] = row.t;
+  const tGap = 0.017;
+  const tCap = t1 - tGap - (t1 - tGap - t0) * 0.34;
+  let acc = 0;
+  for (const k of row.keys) {
+    const u0 = kb.u0 + ((kb.u1 - kb.u0) * acc) / total + gapU / 2;
+    acc += k;
+    const u1 = kb.u0 + ((kb.u1 - kb.u0) * acc) / total - gapU / 2;
+    skirts.push(quad(t0, t1 - tGap, u0, u1));
+    caps.push(quad(t0, tCap, u0 + 0.0008, u1 - 0.0008));
+  }
+}
+const well = quad(0.1, 0.605, kb.u0 - 0.01, kb.u1 + 0.01);
+const wellShade = quad(0.1, 0.112, kb.u0 - 0.01, kb.u1 + 0.01);
+// A large glass trackpad, its edge softened: a lit back edge and a shaded front one.
+const pad = quad(0.655, 0.955, 0.3, 0.7);
+const padBack = quad(0.655, 0.663, 0.3, 0.7);
+const padFront = quad(0.947, 0.955, 0.3, 0.7);
+const surface = quad(0, 1, 0, 1);
+// The hinge: the lid's lower edge, dropped just behind the deck (dark), with the light along
+// the barrel's top and a sliver of shade where it meets the deck.
+const hinge = quad(0, 0.08, 0.05, 0.95);
+const hingeHi = quad(0, 0.014, 0.05, 0.95);
+const hingeShade = quad(0.08, 0.1, 0.05, 0.95);
+// Brushed metal: faint lines along the deck, a fixed scatter (the same on every build).
+let seed = 7;
+const rand = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+const brush = Array.from({ length: 70 }, () => ({
+  y: (rand() * TOP).toFixed(2),
+  h: (0.18 + rand() * 0.3).toFixed(2),
+  o: (0.25 + rand() * 0.75).toFixed(2),
+  light: rand() > 0.5,
+}));
+// Unique per laptop on a page (the hero's and the features').
+const uid = `lt-${(className || "laptop").replace(/[^a-z0-9]/gi, "")}`;
+---
+
+<figure
+  class:list={["laptop", className, { "laptop--crop": crop }]}
+  data-laptop
+  style={`--lid:${lid}`}
+  aria-label={label}
+>
+  <div class="hinge">
+    <div class="lid" data-laptop-body>
+      <div class="glass">
+        <span class="camera" aria-hidden="true"></span>
+        <div class="screen" data-screen>
+          <slot />
+          <span class="sleep" data-screen-sleep aria-hidden="true"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <svg class="deck" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-hidden="true">
+    <defs>
+      <!-- The deck's top: a touch darker at the back, in the lid's shade. -->
+      <linearGradient id={`${uid}-fall`} x1="0" x2="0" y1="0" y2="1">
+        <stop offset="0" class="deck-back"></stop>
+        <stop offset="1" class="deck-front"></stop>
+      </linearGradient>
+      <!-- The machined lip: lit along its top edge, falling into shade underneath. -->
+      <linearGradient id={`${uid}-lip`} x1="0" x2="0" y1="0" y2="1">
+        <stop offset="0" class="hi"></stop>
+        <stop offset="0.4" class="mid"></stop>
+        <stop offset="1" class="lo"></stop>
+      </linearGradient>
+      <linearGradient id={`${uid}-sheen`} x1="0" x2="1" y1="0" y2="0">
+        <stop offset="0" class="sheen-off"></stop>
+        <stop offset="0.5" class="sheen-on"></stop>
+        <stop offset="1" class="sheen-off"></stop>
+      </linearGradient>
+      <clipPath id={`${uid}-top`}><polygon points={surface}></polygon></clipPath>
+    </defs>
+    <polygon points={surface} class="surface" fill={`url(#${uid}-fall)`}></polygon>
+    <g class="brush" clip-path={`url(#${uid}-top)`}>
+      {brush.map((b) => <rect x="0" y={b.y} width={W} height={b.h} class={b.light ? "b-hi" : "b-lo"} opacity={b.o} />)}
+    </g>
+    <polygon points={hinge} class="hinge"></polygon>
+    <polygon points={hingeHi} class="hinge-hi"></polygon>
+    <polygon points={hingeShade} class="hinge-shade"></polygon>
+    <polygon points={well} class="well"></polygon>
+    <polygon points={wellShade} class="well-shade"></polygon>
+    {skirts.map((k) => <polygon points={k} class="skirt" />)}
+    {caps.map((k) => <polygon points={k} class="cap" />)}
+    <polygon points={pad} class="pad"></polygon>
+    <polygon points={padBack} class="pad-back"></polygon>
+    <polygon points={padFront} class="pad-front"></polygon>
+    <path d={`M0 ${TOP} H${W} V${H - 8} Q${W} ${H} ${W - 14} ${H} H14 Q0 ${H} 0 ${H - 8} Z`} class="lip" fill={`url(#${uid}-lip)`}></path>
+    <path d={`M0 ${TOP} H${W} V${H - 8} Q${W} ${H} ${W - 14} ${H} H14 Q0 ${H} 0 ${H - 8} Z`} class="lip-sheen" fill={`url(#${uid}-sheen)`}></path>
+    <!-- The diamond-cut edge where the top meets the lip: a fine bright line. -->
+    <rect x="0" y={TOP - 0.6} width={W} height="1.4" class="cut"></rect>
+    <!-- The finger notch: a shallow scoop in the lip's middle, shaded inside, lit at its rim. -->
+    <path d={`M${W / 2 - 66} ${TOP} H${W / 2 + 66} Q${W / 2 + 58} ${TOP + 7} ${W / 2 + 44} ${TOP + 7} H${W / 2 - 44} Q${W / 2 - 58} ${TOP + 7} ${W / 2 - 66} ${TOP} Z`} class="notch"></path>
+    <path d={`M${W / 2 - 44} ${TOP + 7} H${W / 2 + 44}`} class="notch-rim"></path>
+  </svg>
+  <span class="contact" aria-hidden="true"></span>
+</figure>
+
+<style>
+  .laptop {
+    /* The metal's colours are theme pairs in tokens.css (--metal, --deck-top, ...). */
+    --glass: #050608;
+
+    position: relative;
+    margin: 0;
+    width: 100%;
+    container-type: inline-size;
+  }
+
+  /* The space the lid turns in. The eye sits a little above the deck, far enough back that
+     the closed lid covers the deck's top (its front edge as wide as the deck's front) and
+     shows its metal back. Units are the laptop's width, so every size looks the same. */
+  .hinge {
+    position: relative;
+    z-index: 1;
+    perspective: 450cqw;
+    /* In whole pixels where the browser can round, so the turning lid's edges don't
+       shimmer between pixels. */
+    perspective: round(450cqw, 1px);
+    perspective-origin: 50% 26%;
+  }
+
+  .lid {
+    position: relative;
+    width: 88cqw;
+    margin-inline: auto;
+    padding: 0.28cqw;
+    border-radius: 1.4cqw 1.4cqw 0.35cqw 0.35cqw;
+    /* The lid's edge: a soft sheen where the metal turns towards the light, and a fine
+       bright line round it where the edge is cut. */
+    background-color: var(--metal);
+    background-image: linear-gradient(180deg, var(--metal-hi), var(--metal) 2.2cqw); /* taste-skill-ignore: the metal sheen */
+    box-shadow: inset 0 0 0 0.06cqw color-mix(in srgb, var(--metal-hi) 55%, transparent); /* taste-skill-ignore: the lid's cut edge */
+    transform-origin: 50% 100%;
+    transform: rotateX(calc((1 - var(--lid)) * 16deg));
+  }
+  /* Seen from behind (the lid nearly shut): the plain metal back, no screen. The back has
+     no logo or pattern, so the lid's own face mirrored is the same metal. */
+  .lid[data-face="back"] > .glass {
+    opacity: 0;
+  }
+
+  /* The chamfer: the lid's front edge cut at an angle, catching the light along the top and
+     fading down the sides. */
+  .lid::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    border: 0.09cqw solid transparent;
+    background: linear-gradient(180deg, color-mix(in srgb, var(--metal-hi) 90%, #fff), transparent 38%) border-box; /* taste-skill-ignore: the chamfer's light */
+    mask:
+      linear-gradient(#000 0 0) padding-box,
+      linear-gradient(#000 0 0) border-box;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+
+  .glass {
+    position: relative;
+    /* Thin, even bezels, the chin a little deeper; the camera sits in the top one. */
+    padding: 0.85cqw 0.8cqw 1.5cqw;
+    border-radius: 1.15cqw 1.15cqw 0.28cqw 0.28cqw;
+    background: var(--glass);
+    /* Where the glass meets the metal: a hair of shade. */
+    box-shadow: 0 0 0 0.04cqw #00000066; /* taste-skill-ignore: the glass's seam */
+  }
+
+  .camera {
+    position: absolute;
+    top: 0.29cqw;
+    left: 50%;
+    width: 0.28cqw;
+    height: 0.28cqw;
+    margin-left: -0.14cqw;
+    border-radius: 50%;
+    background: #1a1f27;
+    box-shadow: inset 0 0 0 0.06cqw #2a313b; /* taste-skill-ignore: the laptop's lens ring */
+  }
+
+  .screen {
+    position: relative;
+    aspect-ratio: 16 / 10;
+    overflow: hidden;
+    border-radius: 0.2cqw;
+    background: #000;
+    container-type: inline-size;
+    contain: layout paint;
+  }
+  /* The panel's glass: the faintest reflection from the top left, above the picture. Weak
+     enough that text on it keeps its contrast (at most 3.5 % white, gone by a third in). */
+  .screen::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    background: linear-gradient(118deg, #ffffff09, #ffffff04 22%, transparent 34%); /* taste-skill-ignore: the screen's glass */
+    pointer-events: none;
+  }
+
+  /* The 1440x900 desktop inside, scaled to the screen's width without script:
+     tan(atan2(a, b)) is a / b as a plain number. */
+  .screen > :global(*:not([data-screen-sleep])) {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 1440px;
+    height: 900px;
+    transform-origin: 0 0;
+    transform: scale(tan(atan2(100cqw, 1440px)));
+  }
+
+  /* The screen asleep: dark glass over the desktop, until the hero wakes it (Hero.astro). */
+  .sleep {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    /* Dark glass catches a little light from above, so the lid reads as an object. */
+    background: linear-gradient(160deg, #ffffff12, transparent 45%) var(--glass); /* taste-skill-ignore: a glass reflection */
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 700ms ease;
+  }
+
+  /* The deck: the lid's lower edge sits just in front of its back edge (the lifted hinge). */
+  .deck {
+    position: relative;
+    display: block;
+    width: 100cqw;
+    height: 8.8cqw;
+    margin-top: -0.35cqw;
+  }
+
+  .deck .b-hi { fill: var(--brush-hi); fill-opacity: 0.07; }
+  .deck .b-lo { fill: var(--brush-lo); fill-opacity: 0.12; }
+  .deck .hinge { fill: var(--hinge); }
+  .deck .hinge-hi { fill: var(--hinge-hi); }
+  .deck .hinge-shade { fill: var(--metal-lo); opacity: 0.55; }
+  .deck .well { fill: var(--well); }
+  .deck .well-shade { fill: var(--well-shade); }
+  .deck .skirt { fill: var(--skirt); }
+  .deck .cap { fill: var(--cap); }
+  .deck .pad { fill: var(--pad); }
+  .deck .pad-back { fill: var(--pad-hi); }
+  .deck .pad-front { fill: var(--pad-lo); }
+  .deck .cut { fill: var(--metal-hi); }
+  .deck .notch { fill: var(--metal-lo); }
+  .deck .notch-rim { stroke: var(--metal-hi); stroke-width: 0.8; stroke-opacity: 0.5; fill: none; }
+  .deck .deck-back { stop-color: var(--deck-back); }
+  .deck .deck-front { stop-color: var(--deck-top); }
+  .deck .lo { stop-color: var(--metal-lo); }
+  .deck .mid { stop-color: var(--metal-mid); }
+  .deck .hi { stop-color: var(--metal-hi); }
+  .deck .sheen-off { stop-color: var(--metal-hi); stop-opacity: 0; }
+  .deck .sheen-on { stop-color: var(--metal-hi); stop-opacity: 0.55; }
+
+  /* Where the laptop meets the table: a tight, dark contact line right under the lip (the
+     two feet's occlusion), and a wide soft shade around it. */
+  .contact {
+    position: absolute;
+    left: -3%;
+    right: -3%;
+    bottom: -2.2cqw;
+    height: 4cqw;
+    background: /* taste-skill-ignore: the laptop's contact shadow and ambient occlusion on the table */
+      radial-gradient(50% 22% at 50% 45%, var(--laptop-contact), transparent),
+      radial-gradient(closest-side, var(--laptop-ao), transparent);
+    pointer-events: none;
+    z-index: -1;
+  }
+
+  /* Phones: just the screen, in its bezel, cropped to the app window at 600x800. */
+  @media (max-width: 768px) {
+    .laptop--crop .deck,
+    .laptop--crop .contact,
+    .laptop--crop .camera {
+      display: none;
+    }
+    .laptop--crop .lid {
+      width: 100cqw;
+      border-radius: 4.5cqw;
+      padding: 0.9cqw;
+    }
+    .laptop--crop .glass {
+      padding: 2.4cqw;
+      border-radius: 3.8cqw;
+    }
+    .laptop--crop .screen {
+      aspect-ratio: 3 / 4;
+      border-radius: 1.6cqw;
+    }
+    .laptop--crop .screen > :global(*:not([data-screen-sleep])) {
+      transform: scale(tan(atan2(100cqw, 600px)));
+    }
+  }
+</style>

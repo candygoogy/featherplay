@@ -1,0 +1,547 @@
+// Now playing: the cover-and-title block centred
+// in the stage, the title in the display face, "artist, album, year", a quiet "Playing
+// from …" line, "Not for me" (⊘), like and the song menu; on the right, Up next and Related
+// tabs. The stage sits on a soft wash from the cover (always on). Shown full width, without the
+// sidebar; the bottom bar stays. It opens with a 200 ms fade and scale from the bar's cover,
+// the side panel following 40 ms later (a fade only without motion). The Lyrics toggle
+// glides the cover from the centre to its column on the left over `t-lyrics`, the song's
+// title and artist sliding along, as the stage takes the lyrics' panel colour and the lines
+// fade in; one eased value (`lyr`) drives all of it. With no lines to show the cover stays
+// large and centred, a quiet line under the title saying why (`alone`). It reads the `Player` global;
+// the rest comes from `src/pages/now_playing.rs` through `NowPlayingData`.
+import { ListView } from "std-widgets.slint";
+import { Theme, Curves, Icons } from "../theme.slint";
+import { TrackRow, Body, Display, Cover, IconButton, SongRow, Tabs, Icon } from "../parts.slint";
+import { Nav, PageKind, Frame } from "../nav.slint";
+import { Player } from "../player.slint";
+import { QueueData, UpNext } from "../queue_panel.slint";
+import { SkeletonList, FadeIn } from "content.slint";
+import { LyricsData, LyricsState, LyricsView, NoLyricsLine } from "lyrics.slint";
+import { NotForMeButton } from "../not_for_me.slint";
+
+export global NowPlayingData {
+    // Related: loading and its error.
+    in property <bool> loading;
+    in property <string> error;
+    // The current track's cover at `Theme.nowplaying-cover`.
+    in property <image> cover;
+    // The stage's wash from the cover, per theme (`follow::washes`); transparent until known.
+    in property <color> wash-dark;
+    in property <color> wash-light;
+    // The album's year, once known ("" otherwise).
+    in property <string> year;
+    // 0 Up next, 1 Related, 2 Lyrics.
+    in-out property <int> tab: 0;
+    // The current track's radio, without the track itself.
+    in property <[TrackRow]> related;
+
+    callback tab-selected(int);
+    callback play-related(int);
+    // The song menu for the current track, at this point (window coordinates), ending at the
+    // last one when it opens upward.
+    callback more(length, length, length);
+}
+
+// Text that navigates: a hairline appears under it on hover.
+component LinkText inherits Rectangle {
+    in property <string> text;
+    in property <color> tint: Theme.text1;
+    in property <int> weight: 400;
+    in property <bool> enabled: true;
+    callback clicked();
+    width: t.preferred-width;
+    accessible-role: button;
+    accessible-label: root.text;
+    accessible-action-default => { root.clicked(); }
+    ta := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+    t := Body {
+        text: root.text;
+        font-size: Theme.t-body-l;
+        font-weight: root.weight;
+        color: root.tint;
+        vertical-alignment: center;
+        overflow: clip;
+    }
+    if ta.has-hover && root.enabled: Rectangle {
+        y: parent.height - 1px;
+        height: 1px;
+        background: root.tint;
+    }
+}
+
+// Up next and Related, under their pill tabs: Now playing's side panel, and the frame's
+// Up next panel (app.slint), so both read the same. `shown`: the frame's panel opened; with
+// Related picked it asks Rust for the current track's (cached per track).
+export component SideTabs inherits Rectangle {
+    in property <bool> shown: true;
+    changed shown => {
+        if root.shown && NowPlayingData.tab == 1 {
+            NowPlayingData.tab-selected(1);
+        }
+    }
+    // While the full lyrics view is open the lyrics show there, so the Lyrics tab steps aside
+    // and its place goes to Up next. The user's tab stays in `NowPlayingData.tab` and comes
+    // back when the full view closes. With lyrics off in Settings there's no Lyrics tab.
+    property <bool> lyrics-away: LyricsData.showing || !LyricsData.on;
+    // The tab shown. `lyrics-away` is read only with the Lyrics tab picked: read first, every
+    // tab's `visible` was marked dirty whenever the lyrics view opened or closed, though the
+    // tab stayed Up next, and the whole panel repainted in the toggle's first frame
+    // (measured 2026-11-01).
+    property <int> tab: NowPlayingData.tab == 2 && root.lyrics-away ? 0 : NowPlayingData.tab;
+    Tabs {
+        x: Theme.s5;
+        y: Theme.s3;
+        width: parent.width - 2 * Theme.s5;
+        labels: root.lyrics-away ? [@tr("Up next"), @tr("Related")] : [@tr("Up next"), @tr("Related"), @tr("Lyrics")];
+        active: root.tab;
+        selected(i) => {
+            NowPlayingData.tab = i;
+            NowPlayingData.tab-selected(i);
+        }
+    }
+    // The three tabs stay alive and only show or hide, so a switch creates no rows (the
+    // first frame of a switch cost 5–7 ms when it did). Anything that moves by itself
+    // (the skeletons) exists only while its tab shows.
+    UpNext {
+        x: 0;
+        y: 64px;
+        width: parent.width;
+        height: parent.height - self.y;
+        visible: root.tab == 0;
+    }
+    Rectangle {
+        x: 0;
+        y: 64px;
+        width: parent.width;
+        height: parent.height - self.y;
+        visible: root.tab == 1;
+        Body {
+            x: Theme.s5;
+            y: Theme.s2;
+            height: 16px;
+            text: @tr("Similar to {}", Player.title);
+            font-size: Theme.t-meta;
+            color: Theme.text3;
+            vertical-alignment: center;
+            width: parent.width - 2 * Theme.s5;
+        }
+        if NowPlayingData.loading && root.tab == 1: SkeletonList {
+            y: 32px;
+            height: parent.height - self.y;
+            pad: Theme.s4 + 8px;
+            count: 6;
+            // Shaped like the `SongRow`s that replace it.
+            compact: true;
+        }
+        if !NowPlayingData.loading && (NowPlayingData.error != "" || NowPlayingData.related.length == 0): Body {
+            x: Theme.s5;
+            y: 40px;
+            width: parent.width - 2 * Theme.s5;
+            height: Theme.row-h;
+            text: NowPlayingData.error != "" ? NowPlayingData.error : @tr("Nothing related found");
+            color: NowPlayingData.error != "" ? Theme.text2 : Theme.text3;
+            wrap: word-wrap;
+            vertical-alignment: center;
+        }
+        if NowPlayingData.related.length > 0: FadeIn {
+            ListView {
+                x: Theme.s4;
+                y: 32px;
+                width: parent.width - 2 * Theme.s4;
+                // Ends above the floating bar.
+                height: parent.height - self.y - Theme.bar-clear;
+                for t[i] in NowPlayingData.related: SongRow {
+                    track: t;
+                    clicked => { NowPlayingData.play-related(i); }
+                    play => { NowPlayingData.play-related(i); }
+                }
+            }
+        }
+    }
+    LyricsView {
+        size: Theme.t-lyric-side;
+        x: 0;
+        y: 64px;
+        width: parent.width;
+        height: parent.height - self.y;
+        visible: root.tab == 2;
+        shown: self.visible && root.shown;
+    }
+}
+
+// Whether the Lyrics tab is on screen: picked, in Now playing or the open Up next panel,
+// with the window neither minimized nor hidden in the tray. One instance, in `AppWindow`,
+// which passes its `minimized`; Rust asks for lyrics and times lines only while it holds.
+export component LyricsWatch {
+    in property <bool> minimized;
+    property <bool> live: LyricsData.on && ((NowPlayingData.tab == 2 && (Nav.page == PageKind.now-playing || Frame.queue-open)) || LyricsData.showing) && !Frame.hidden && !root.minimized;
+    changed live => { LyricsData.live-changed(self.live); }
+}
+
+// Lyrics on and off for the stage (the full lyrics view): a tonal pill with the microphone,
+// the filled pill while on (white on the lyrics' panel, the panel's colour for its ink).
+component LyricsToggle inherits Rectangle {
+    in property <bool> on;
+    callback clicked();
+    height: 40px;
+    width: lay.preferred-width;
+    border-radius: self.height / 2;
+    property <color> ink: root.on ? LyricsData.ink.ground : Theme.text1;
+    background: root.on
+        ? (ta.pressed ? Theme.panel-solid-pressed : (ta.has-hover ? Theme.panel-solid-hover : Theme.panel-solid))
+        : Theme.tonal(ta.pressed, ta.has-hover);
+    animate background { duration: Theme.t-hover; }
+    transform-scale: ta.pressed ? Theme.press-scale : 1.0;
+    animate transform-scale {
+        duration: ta.pressed ? Theme.t-press : Theme.t-release;
+        easing: ta.pressed ? Curves.ease-out : Curves.release;
+    }
+    accessible-role: button;
+    accessible-label: @tr("Lyrics");
+    accessible-checked: root.on;
+    accessible-action-default => { root.clicked(); }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+    lay := HorizontalLayout {
+        padding-left: 14px;
+        padding-right: 18px;
+        spacing: 8px;
+        alignment: center;
+        Icon {
+            y: (parent.height - self.height) / 2;
+            width: 18px;
+            height: 18px;
+            commands: Icons.lyrics;
+            stroke: root.ink;
+        }
+        Body {
+            text: @tr("Lyrics");
+            font-weight: 600;
+            color: root.ink;
+            vertical-alignment: center;
+        }
+    }
+}
+
+export component NowPlayingPage inherits Rectangle {
+    property <length> side-w: root.width >= Theme.wide-min ? Theme.nowplaying-side-w : Theme.panel-w;
+    property <length> stage-w: self.width - self.side-w;
+    // The page runs under the floating bar; the stage centres in the room above it.
+    property <length> stage-h: self.height - Theme.bar-clear;
+    // Title, artist line and playing-from line below the cover.
+    property <length> text-h: 124px;
+    property <length> cover-size: max(160px, min(Theme.nowplaying-cover, root.stage-w - 2 * Theme.s9, root.stage-h - root.text-h - 2 * Theme.s8));
+    property <length> cover-x: (root.stage-w - root.cover-size) / 2;
+    property <length> cover-y: (root.stage-h - root.cover-size - root.text-h) / 2;
+    property <bool> shown: false;
+    property <color> wash: Theme.dark ? NowPlayingData.wash-dark : NowPlayingData.wash-light;
+    animate wash { duration: Theme.t-colour; easing: Curves.ease-hover; }
+    // No ground of its own: the window's is under it, and the stage and the side panel are
+    // opaque, so a ground here would only be one more 4K fill under them in every frame.
+    init => { root.shown = true; }
+
+    // The full lyrics view: the cover small in a column on the left, the lyrics beside it.
+    property <bool> full: LyricsData.full;
+    property <length> fl-pad: Theme.page-pad;
+    property <length> fl-top: 72px;
+    property <length> fl-cover: clamp(root.stage-w * 0.2, 160px, 280px);
+    // The lyrics keep a readable measure; on wide windows the cover column and the lyrics
+    // centre as one group in the stage.
+    property <length> fl-lyrics-w: min(root.stage-w - 2 * root.fl-pad - root.fl-cover - Theme.s9, 720px);
+    property <length> fl-x: max(root.fl-pad, (root.stage-w - root.fl-cover - Theme.s9 - root.fl-lyrics-w) / 2);
+    property <length> fl-lyrics-x: root.fl-x + root.fl-cover + Theme.s9;
+    property <length> fl-title-y: root.fl-top + Theme.s5 + root.fl-cover + Theme.s5;
+    // The full view is made once the page has entered and its side panel slid in, in a frame
+    // where nothing else moves, so the first toggle finds it made (and the page's first
+    // frame doesn't make it either). One shot per visit; never with lyrics off.
+    property <bool> warm: false;
+    Timer {
+        interval: Theme.t-page + 120ms;
+        running: !root.warm && LyricsData.on;
+        triggered => { root.warm = true; }
+    }
+
+    // The toggle between the cover and the lyrics, as one eased value: 0 the cover view, 1 the
+    // lyrics view. Every position, size and colour of the switch is read from it, so it runs
+    // as one motion and reverses from wherever it is. The stage takes the panel's colour over
+    // the first half and the lines fade in over the second (closing: the other way round), so
+    // the lines only ever show on the solid panel. Instant without motion.
+    property <float> lyr: root.full ? 1 : 0;
+    animate lyr { duration: Theme.t-lyrics; easing: Curves.ease-in-out; }
+    // `tint` and `reveal` are set by their `-at` values' change handlers, which compare values:
+    // bound to `lyr` straight, everything they mix (the stage's ground, every line's colour)
+    // was marked dirty in every frame of the toggle, though each holds still over half of it,
+    // and the whole 4K stage repainted for nothing (`tests/app/lyrics_button.rs`).
+    property <float> tint-at: min(1, 2 * root.lyr);
+    property <float> reveal-at: max(0, 2 * root.lyr - 1);
+    property <float> tint: min(1, 2 * root.lyr);
+    property <float> reveal: max(0, 2 * root.lyr - 1);
+    changed tint-at => { root.tint = root.tint-at; }
+    changed reveal-at => { root.reveal = root.reveal-at; }
+    // No lines to show (none found, a failed lookup, nothing playing): the lyrics view keeps
+    // the cover view's layout, large and centred, on the panel's colour, with one quiet line
+    // under the title saying why. `alone` eases there and back over the toggle's time, so a
+    // lookup that ends without lines (or a Try again that finds some) glides the cover between
+    // the two; `column` is how far the lyrics' column layout is in, which every position reads.
+    property <bool> lone: LyricsData.state == LyricsState.none || LyricsData.state == LyricsState.error
+        || (LyricsData.state == LyricsState.idle && !Player.has-track);
+    property <float> alone: root.lone ? 1 : 0;
+    animate alone { duration: Theme.t-lyrics; easing: Curves.ease-in-out; }
+    property <float> column: root.lyr * (1 - root.alone);
+    // The panel's colour crossfades on its own when the cover changes; the toggle only fades
+    // it in and out.
+    property <color> panel: LyricsData.ink.ground;
+    animate panel { duration: Theme.t-colour; easing: Curves.ease-hover; }
+    // On the lyrics' panel, the page's own text takes the panel's inks.
+    property <color> ink1: LyricsData.ink.current.mix(Theme.text1, root.tint);
+    property <color> ink2: LyricsData.ink.next.mix(Theme.text2, root.tint);
+    // The cover, from its place in the cover view to its column in the lyrics view.
+    property <length> art-x: root.cover-x + (root.fl-x - root.cover-x) * root.column;
+    property <length> art-y: root.cover-y + (root.fl-top + Theme.s5 - root.cover-y) * root.column;
+    property <length> art-size: root.cover-size + (root.fl-cover - root.cover-size) * root.column;
+    // The cover's and its shadow's scale: 1 while the cover is within half a physical pixel
+    // of its full size, the toggle's first and last few frames (it eases in and out), so the
+    // art is copied there instead of resampled, ~a quarter of a 4K frame (measured
+    // 2026-11-01).
+    property <float> art-scale: abs(root.cover-size - root.art-size) < 0.5phx ? 1 : root.art-size / root.cover-size;
+    // The title's top: under the cover in either view, sliding with it.
+    property <length> title-y: root.cover-y + root.cover-size + 28px + (root.fl-title-y - root.cover-y - root.cover-size - 28px) * root.column;
+    property <length> title-size: Theme.t-display-m + (Theme.t-display-s - Theme.t-display-m) * root.column;
+
+    // The stage's ground, opaque: the ambient wash (the cover's colour from the top, fading
+    // out low) laid over the ground beforehand, then the lyrics' panel colour mixed in as the
+    // toggle runs, all panel at its end. Skia fills a gradient pixel by pixel
+    // (a see-through wash under a see-through panel cost ~40 ms a 4K frame of the toggle, an
+    // opaque one 16-25 ms), but a solid fill at memory speed, and the wash only changes down
+    // the stage: so it's `wash-bands` solid bands, each a colour level or so from the next,
+    // the steps an 8-bit gradient makes anyway (~1 ms a 4K frame).
+    property <float> wash-in: root.shown ? 1 : 0;
+    animate wash-in { duration: Theme.t-page; easing: Curves.ease-out; }
+    property <float> wash-a: root.wash.alpha / 255 * root.wash-in;
+    property <color> wash-solid: root.wash.with-alpha(1);
+    property <color> ground-top: root.panel.mix(root.wash-solid.mix(Theme.ground, root.wash-a), root.tint);
+    property <color> ground-mid: root.panel.mix(root.wash-solid.mix(Theme.ground, root.wash-a * 0.6), root.tint);
+    property <color> ground-low: root.panel.mix(Theme.ground, root.tint);
+    property <int> wash-bands: 128;
+    // The bands are always there, all the panel's colour once the stage is: a ground made by
+    // an `if` in the frame it was needed went unpainted in that frame, and the Lyrics pill
+    // above it was drawn twice (`tests/lyrics_lines.rs`).
+    Rectangle {
+        x: 0;
+        y: 0;
+        width: root.stage-w;
+        height: root.height;
+        for i in root.wash-bands: Rectangle {
+            // Down the stage at the band's middle: the wash's stops at 0, 55 and 100 %.
+            property <float> at: (i + 0.5) / root.wash-bands;
+            // Whole physical pixels, so neighbours meet without a seam.
+            y: Math.round(root.height * i / root.wash-bands / 1phx) * 1phx;
+            height: Math.round(root.height * (i + 1) / root.wash-bands / 1phx) * 1phx - self.y;
+            background: self.at < 0.55 ? root.ground-top.mix(root.ground-mid, 1 - self.at / 0.55) : root.ground-mid.mix(root.ground-low, 1 - (self.at - 0.55) / 0.45);
+        }
+    }
+
+    stage := Rectangle {
+        x: 0;
+        width: root.stage-w;
+        opacity: root.shown ? 1.0 : 0.0;
+        // From the bar's cover, bottom left.
+        transform-origin: { x: Theme.bar-inset + 44px, y: root.height - Theme.bar-inset - Theme.bar-h / 2 };
+        transform-scale: root.shown ? 1.0 : Theme.np-from;
+        animate opacity, transform-scale { duration: Theme.t-page; easing: Curves.ease-out; }
+
+        IconButton {
+            x: Theme.s5;
+            y: Theme.s4;
+            icon: Icons.back;
+            label: @tr("Back");
+            tint: root.ink1;
+            clicked => { Nav.back(); }
+        }
+        LyricsToggle {
+            x: root.stage-w - Theme.s5 - self.width;
+            y: Theme.s4;
+            visible: LyricsData.on;
+            on: root.full;
+            clicked => { LyricsData.toggle-view(); }
+        }
+
+        // The cover is laid out once at the cover view's size and scaled to the lyrics view's,
+        // so the toggle moves the art and its shadow as drawn instead of drawing them again at
+        // a new size on every frame. The shadow, under it, keeps one shape (its corners are
+        // blurred anyway), so skia blurs it once; it scales with the cover (48 to ~30 px).
+        // Its opaque ground, all under the cover (a pixel in from the cover's edges, its corners
+        // never outside the cover's at either end), lets the renderer skip the shadow under it
+        // (change 13): ~15 % of a 4K toggle frame was blending shadow the cover then hid.
+        Rectangle {
+            x: root.art-x + 1px * root.art-size / root.cover-size;
+            y: root.art-y + 1px * root.art-size / root.cover-size;
+            width: root.cover-size - 2px;
+            height: root.cover-size - 2px;
+            transform-origin: { x: 0, y: 0 };
+            transform-scale: root.art-scale;
+            border-radius: max(Theme.r-xl, Theme.r-l * root.cover-size / root.fl-cover);
+            background: Theme.cover-empty;
+            drop-shadow-blur: 48px;
+            drop-shadow-offset-y: 16px;
+            drop-shadow-color: Theme.cover-shadow;
+        }
+        Cover {
+            x: root.art-x;
+            y: root.art-y;
+            width: root.cover-size;
+            height: root.cover-size;
+            transform-origin: { x: 0, y: 0 };
+            transform-scale: root.art-scale;
+            // The corners as they look: r-xl in the cover view, r-l in the lyrics' column.
+            radius: (Theme.r-xl + (Theme.r-l - Theme.r-xl) * root.column) * root.cover-size / root.art-size;
+            source: NowPlayingData.cover;
+            crossfade: true;
+        }
+
+        // The title: one line beside the buttons in the cover view (the cover's width once
+        // they've gone, with no lyrics), wrapping in the lyrics' narrow column. Both slide
+        // with the cover at the same size, one fading into the other.
+        if root.column < 1: Display {
+            x: root.art-x;
+            y: root.title-y + (40px - self.preferred-height) / 2 * (1 - root.column);
+            width: (root.cover-size - 124px * (1 - root.lyr)) * (1 - root.column) + root.fl-cover * root.column;
+            text: Player.has-track ? Player.title : @tr("Nothing playing");
+            font-size: root.title-size;
+            color: (Player.has-track ? root.ink1 : LyricsData.ink.next.mix(Theme.text3, root.tint)).transparentize(root.column);
+            overflow: elide;
+        }
+        full-title := Display {
+            x: root.art-x;
+            y: root.title-y;
+            width: root.fl-cover;
+            visible: root.column > 0;
+            text: Player.has-track ? Player.title : @tr("Nothing playing");
+            font-size: root.title-size;
+            color: LyricsData.ink.current.transparentize(1 - root.column);
+            wrap: word-wrap;
+        }
+        // The song's buttons, beside the title in the cover view: they ride along and fade.
+        if Player.has-track && root.lyr < 1: NotForMeButton {
+            x: root.art-x + root.cover-size - 116px;
+            y: root.title-y + 2px;
+            fade: 1 - root.lyr;
+        }
+        if Player.has-track && root.lyr < 1: IconButton {
+            x: root.art-x + root.cover-size - 80px;
+            y: root.title-y + 2px;
+            fade: 1 - root.lyr;
+            icon: Icons.heart;
+            label: Player.liked ? @tr("Remove like") : @tr("Like");
+            filled: Player.liked;
+            tint: Player.liked ? Theme.text1 : Theme.text2;
+            clicked => { Player.toggle-like(); }
+        }
+        if Player.has-track && root.lyr < 1: IconButton {
+            x: root.art-x + root.cover-size - 36px;
+            y: root.title-y + 2px;
+            fade: 1 - root.lyr;
+            icon: Icons.more;
+            label: @tr("More");
+            filled: true;
+            clicked => {
+                NowPlayingData.more(self.absolute-position.x + self.width - 4px, self.absolute-position.y + self.height, self.absolute-position.y);
+            }
+        }
+        // "Artist, album, year" in the cover view; the artist alone under the wrapped title in
+        // the lyrics view, the rest fading out.
+        HorizontalLayout {
+            x: root.art-x;
+            y: root.title-y + 44px + (full-title.preferred-height + Theme.s1 - 44px) * root.column;
+            width: min(self.preferred-width, root.cover-size + (root.fl-cover - root.cover-size) * root.column);
+            height: 22px + 2px * root.column;
+            alignment: start;
+            LinkText {
+                text: Player.artist;
+                tint: root.ink1.mix(root.ink2, 1 - root.column);
+                weight: 600;
+                enabled: Player.artist-id != "";
+                clicked => { Nav.open-artist(Player.artist-id); }
+            }
+            // Commas between the parts, as on the cards: "Daft Punk, Homework, 1996".
+            if Player.album != "": Body {
+                text: ", ";
+                font-size: Theme.t-body-l;
+                color: Theme.text2.transparentize(root.lyr);
+                vertical-alignment: center;
+            }
+            if Player.album != "": LinkText {
+                text: Player.album;
+                tint: Theme.text2.transparentize(root.lyr);
+                enabled: Player.album-id != "" && root.lyr < 0.5;
+                clicked => { Nav.open-album(Player.album-id); }
+            }
+            if NowPlayingData.year != "": Body {
+                text: ", " + NowPlayingData.year;
+                font-size: Theme.t-body-l;
+                color: Theme.text2.transparentize(root.lyr);
+                vertical-alignment: center;
+                overflow: clip;
+            }
+        }
+        // The bar already shows the time, so this line only says where the music comes from.
+        // It has gone by the toggle's half way, where the no-lyrics line takes its place.
+        if Player.has-track && QueueData.playing-from != "" && root.tint < 1: Body {
+            x: root.art-x;
+            y: root.title-y + 76px;
+            width: root.cover-size;
+            height: 20px;
+            text: @tr("Playing from {}", QueueData.playing-from);
+            color: Theme.text2.transparentize(root.tint);
+            vertical-alignment: center;
+        }
+        // No lyrics: why, in its place, fading in as the lines would.
+        if root.lone && Player.has-track && root.reveal * root.alone > 0: NoLyricsLine {
+            x: root.art-x;
+            y: root.title-y + 72px;
+            width: self.preferred-width;
+            reveal: root.reveal * root.alone;
+        }
+
+        // The lyrics, in the main area under the back button's row. Once made (`warm`) the
+        // view stays, hidden while the cover view shows, so opening it makes no lines in its
+        // first frame: a song's 80 lines, shaped and laid out at this size, cost 7–10 ms
+        // there at 4K. Hidden, nothing in it moves (`shown`).
+        if root.warm || root.lyr > 0: LyricsView {
+            visible: root.lyr > 0;
+            shown: root.lyr > 0;
+            x: root.fl-lyrics-x - Theme.s3;
+            y: root.fl-top;
+            width: root.fl-lyrics-w + 2 * Theme.s3;
+            height: root.stage-h - root.fl-top;
+            size: root.stage-w >= Theme.lyric-wide-min ? Theme.t-lyric-wide : Theme.t-lyric-full;
+            pad-x: Theme.s3;
+            bottom: 0;
+            card: false;
+            note: false;
+            reveal: root.reveal * (1 - root.alone);
+        }
+    }
+
+    // Up next / Related: slides in 24 px behind the stage.
+    Rectangle {
+        x: root.stage-w + (root.shown ? 0px : (Theme.moving ? 24px : 0px));
+        width: root.side-w;
+        background: Theme.panel;
+        clip: true;
+        opacity: root.shown ? 1.0 : 0.0;
+        animate x, opacity { duration: Theme.t-page; delay: Theme.fading ? 40ms : 0ms; easing: Curves.ease-out; }
+        Rectangle {
+            x: 0;
+            width: 1px;
+            background: Theme.hairline;
+        }
+        SideTabs { }
+    }
+}

@@ -1,0 +1,145 @@
+//! What the window says when playback stops: plain words in a toast, the raw text in the
+//! log only.
+//!
+//! When the resolver broke (yt-dlp failed after the direct request), yt-dlp is brought up
+//! to date at once, once a session (`YtDlpResolver::update_helpers`; a failing resolve
+//! usually ran it already). If songs still fail after that, the toast says featherplay may
+//! need an update and links to a newer release, else to the open issue the daily play
+//! check keeps, if there is one. That lookup is a fresh update check plus at most one
+//! issue search, once a session, and only with "Check for updates" on.
+
+use featherplay_core::failure::{FailKind, Failure, Notice, notice};
+use featherplay_core::player::Stop;
+use featherplay_streams::ResolveError;
+
+use super::{Controller, Msg, UiEvent};
+use crate::updates::{self, Help, Release};
+
+/// The once-a-session lookup for the "may need an update" toast.
+#[derive(Debug, Default)]
+pub(super) enum Lookup {
+    #[default]
+    NotYet,
+    /// Its answer brings the toast.
+    Running,
+    Done(Option<Help>),
+}
+
+/// A failed resolve as the player counts it, with the raw text for the log.
+pub(super) fn failure(e: &ResolveError) -> Failure {
+    let kind = match e {
+        ResolveError::Unavailable(_) => FailKind::Unavailable,
+        ResolveError::ToolFailed { .. } => FailKind::Broken,
+        ResolveError::Sidecar(_) => FailKind::Setup,
+        ResolveError::ToolMissing => FailKind::Other,
+    };
+    Failure {
+        kind,
+        detail: describe(e),
+    }
+}
+
+fn describe(e: &ResolveError) -> String {
+    match e {
+        ResolveError::Unavailable(m) => format!("unavailable: {m}"),
+        ResolveError::ToolMissing => "yt-dlp or deno is missing".into(),
+        ResolveError::ToolFailed { code, stderr_tail } => {
+            format!("yt-dlp failed ({code}): {stderr_tail}")
+        }
+        ResolveError::Sidecar(m) => format!("sidecar: {m}"),
+    }
+}
+
+impl Controller {
+    /// `Effect::ShowError`: playback stopped after failures.
+    pub(super) fn stopped(&mut self, stop: Stop) {
+        log!("stopped ({:?}): {}", stop.cause, stop.detail);
+        let said = notice(stop.cause, self.resolver.helpers_tried());
+        match said {
+            Notice::Updating => {
+                self.tell(said, None);
+                let resolver = self.resolver.clone();
+                tokio::spawn(async move {
+                    resolver.update_helpers().await;
+                    log!("helpers updated after the stop");
+                });
+            }
+            Notice::UpdateNeeded => match &self.lookup {
+                Lookup::Done(help) => self.tell(said, help.clone()),
+                Lookup::Running => {}
+                Lookup::NotYet if !self.settings.check_for_updates => self.tell(said, None),
+                Lookup::NotYet => {
+                    self.lookup = Lookup::Running;
+                    let (cache, tx) = (self.paths.cache.clone(), self.tx.clone());
+                    tokio::spawn(async move {
+                        let (help, release) = updates::help(cache).await;
+                        let _ = tx.send(Msg::Help(help, release));
+                    });
+                }
+            },
+            Notice::Unavailable | Notice::CouldNotPlay | Notice::HelpersFailed => {
+                self.tell(said, None);
+            }
+        }
+    }
+
+    /// The lookup for the "may need an update" toast answered.
+    pub(super) fn helped(&mut self, help: Option<Help>, release: Option<Release>) {
+        if let Some(r) = release {
+            (self.ui.events)(UiEvent::Release(r));
+        }
+        self.lookup = Lookup::Done(help.clone());
+        self.tell(Notice::UpdateNeeded, help);
+    }
+
+    fn tell(&self, said: Notice, help: Option<Help>) {
+        (self.ui.events)(UiEvent::Stopped {
+            text: said.text(),
+            help,
+        });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_song_that_is_gone_is_unavailable() {
+        let f = failure(&ResolveError::Unavailable("Video unavailable".into()));
+        assert_eq!(f.kind, FailKind::Unavailable);
+    }
+
+    #[test]
+    fn a_failed_yt_dlp_is_a_broken_resolver() {
+        let failed = ResolveError::ToolFailed {
+            code: 1,
+            stderr_tail: "ERROR: [youtube] abc: Signature extraction failed".into(),
+        };
+        assert_eq!(failure(&failed).kind, FailKind::Broken);
+    }
+
+    /// Offline on a first run, or a download that didn't match its pin: not something a
+    /// `yt-dlp -U` could fix, and every song would fail the same way.
+    #[test]
+    fn a_failed_helpers_download_is_setup() {
+        let offline = ResolveError::Sidecar("https://github.com/…: connection refused".into());
+        assert_eq!(failure(&offline).kind, FailKind::Setup);
+        let sidecar = ResolveError::Sidecar("sha256 mismatch".into());
+        assert_eq!(failure(&sidecar).kind, FailKind::Setup);
+    }
+
+    #[test]
+    fn missing_helpers_are_other() {
+        assert_eq!(failure(&ResolveError::ToolMissing).kind, FailKind::Other);
+    }
+
+    #[test]
+    fn the_raw_text_is_kept_for_the_log() {
+        let failed = ResolveError::ToolFailed {
+            code: 1,
+            stderr_tail: "ERROR: boom".into(),
+        };
+        assert_eq!(failure(&failed).detail, "yt-dlp failed (1): ERROR: boom");
+    }
+}

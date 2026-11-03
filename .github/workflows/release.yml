@@ -1,0 +1,225 @@
+name: Release
+
+# On a `v*` tag: build featherplay.exe with the release profile from Cargo.toml (fat LTO,
+# one codegen unit, strip, opt-level "z", the audio crates at 3), check its size budget,
+# package the per-user installer with Inno Setup, and attach both to a draft GitHub Release
+# with their SHA256 checksums. Publishing the draft stays a manual step.
+#
+# Release assets:
+#   featherplay.exe                    the portable exe
+#   featherplay-setup-<version>.exe    the installer (packaging/windows/featherplay.iss)
+#   featherplay.exe.sha256             `sha256sum` line for the exe (Scoop's autoupdate reads it)
+#   featherplay-setup-<version>.exe.sha256
+#   SHA256SUMS.txt                     all of the above, plus THIRD_PARTY.md: `sha256sum -c SHA256SUMS.txt`
+#   THIRD_PARTY.md                     the licence notices, which the portable exe needs beside it
+# The release notes list each file's SHA256 as well.
+#
+# Build keys: three repository secrets, the same names as the variables in featherplay.env
+# (Settings > Secrets and variables > Actions > New repository secret):
+#   LASTFM_API_KEY, LASTFM_API_SECRET, DISCORD_CLIENT_ID
+# They are compiled in with `option_env!`. Without them (a fork, say) the build still
+# succeeds: Last.fm then needs the user's own API key and Discord status is unavailable.
+# The run warns, and the draft's notes say so.
+
+on:
+  push:
+    tags: ["v*"]
+
+# Nothing by default; the job below asks for what it needs.
+permissions: {}
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  # featherplay.exe must stay at 31 MB or less (raised from 30 MB on 2026-10-31).
+  # The helpers (yt-dlp, Deno) are downloaded at run time and don't count.
+  MAX_EXE_BYTES: "31000000"
+  # Inno Setup, pinned: the official installer from jrsoftware/issrc's GitHub release, checked
+  # against this SHA256 (the release's own asset digest) before it runs.
+  INNO_VERSION: "6.7.4"
+  INNO_SHA256: "a549929319f9120716677c685535ca4671e4b937b5fdc87e2585f32d8eb30e8c"
+
+jobs:
+  # The whole test suite, the frame-cost and CPU-time ceilings included (CI's per-push run
+  # leaves those out): a release is built only from a commit that passes all of it.
+  test:
+    runs-on: windows-2025
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    env:
+      RUSTFLAGS: --cfg ci
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Rust toolchain
+        shell: bash
+        run: |
+          rustup toolchain install
+          rustup show active-toolchain
+
+      - uses: taiki-e/install-action@1919c4a95903d2c33e4a221102edca87309fc14b # v2.89.0
+        with:
+          tool: nextest
+
+      - name: Test
+        shell: bash
+        run: |
+          export FEATHERPLAY_HOME="$RUNNER_TEMP/featherplay-home"
+          mkdir -p "$FEATHERPLAY_HOME"
+          cargo nextest run --workspace --locked
+          cargo test --workspace --doc --locked
+
+  release:
+    needs: test
+    # Pinned rather than windows-latest, so an image change can't move the build under us.
+    # (The image ships Inno Setup 6.7.1 too; we install 6.7.4, the version the installer was
+    # tested with, so the result doesn't depend on the image.)
+    runs-on: windows-2025
+    timeout-minutes: 90
+    permissions:
+      # gh release create.
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Installs the toolchain and components named in rust-toolchain.toml.
+      - name: Rust toolchain
+        shell: bash
+        run: |
+          rustup toolchain install
+          rustup show active-toolchain
+
+      - name: Check the tag matches the crate version
+        shell: bash
+        run: |
+          pkgid=$(cargo pkgid -p featherplay)
+          version=${pkgid##*[@#]}
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match the crate version $version"
+            exit 1
+          fi
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tag = 'is-' + ($env:INNO_VERSION -replace '\.', '_')
+          $url = "https://github.com/jrsoftware/issrc/releases/download/$tag/innosetup-$env:INNO_VERSION.exe"
+          $setup = Join-Path $env:RUNNER_TEMP "innosetup-$env:INNO_VERSION.exe"
+          Invoke-WebRequest -Uri $url -OutFile $setup
+          $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $setup).Hash.ToLowerInvariant()
+          if ($hash -ne $env:INNO_SHA256) {
+            Write-Output "::error::innosetup-$env:INNO_VERSION.exe has SHA256 $hash, expected $env:INNO_SHA256"
+            exit 1
+          }
+          # Portable mode for the current user: no admin, no uninstaller, no registry entries.
+          $dir = Join-Path $env:RUNNER_TEMP 'inno-setup'
+          $p = Start-Process -FilePath $setup -Wait -PassThru -ArgumentList @(
+            '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-',
+            '/CURRENTUSER', '/PORTABLE=1', '/NOICONS', "/DIR=`"$dir`"")
+          if ($p.ExitCode -ne 0) {
+            Write-Output "::error::the Inno Setup installer exited with $($p.ExitCode)"
+            exit 1
+          }
+          $iscc = Join-Path $dir 'ISCC.exe'
+          if (-not (Test-Path -LiteralPath $iscc)) {
+            Write-Output "::error::no ISCC.exe in $dir"
+            exit 1
+          }
+          "ISCC=$($iscc -replace '\\', '/')" >> $env:GITHUB_ENV
+
+      # Says whether the keys are there, never what they are.
+      - name: Check the build keys
+        shell: bash
+        env:
+          LASTFM_API_KEY: ${{ secrets.LASTFM_API_KEY }}
+          LASTFM_API_SECRET: ${{ secrets.LASTFM_API_SECRET }}
+          DISCORD_CLIENT_ID: ${{ secrets.DISCORD_CLIENT_ID }}
+        run: |
+          missing=
+          for name in LASTFM_API_KEY LASTFM_API_SECRET DISCORD_CLIENT_ID; do
+            if [ -z "${!name}" ]; then missing="$missing $name"; fi
+          done
+          if [ -n "$missing" ]; then
+            echo "::warning::building without the secrets:$missing. Without the Last.fm pair, Last.fm needs the user's own API key; without DISCORD_CLIENT_ID, Discord status is unavailable."
+          fi
+          echo "MISSING_KEYS=${missing# }" >> "$GITHUB_ENV"
+
+      - name: Build
+        shell: bash
+        env:
+          LASTFM_API_KEY: ${{ secrets.LASTFM_API_KEY }}
+          LASTFM_API_SECRET: ${{ secrets.LASTFM_API_SECRET }}
+          DISCORD_CLIENT_ID: ${{ secrets.DISCORD_CLIENT_ID }}
+        run: cargo build --release --locked -p featherplay
+
+      - name: Check the exe size
+        shell: bash
+        run: |
+          size=$(stat -c %s target/release/featherplay.exe)
+          echo "featherplay.exe: $size bytes (limit $MAX_EXE_BYTES)"
+          if [ "$size" -gt "$MAX_EXE_BYTES" ]; then
+            echo "::error::featherplay.exe is $size bytes, over the $MAX_EXE_BYTES byte budget"
+            exit 1
+          fi
+
+      # Packages the exe built above (--skip-build); the keys are already compiled in.
+      - name: Build the installer
+        shell: bash
+        run: packaging/windows/build-installer.sh --skip-build
+
+      - name: Checksums
+        shell: bash
+        run: |
+          setup="featherplay-setup-$VERSION.exe"
+          mkdir dist
+          cp target/release/featherplay.exe dist/
+          cp "target/installer/$setup" dist/
+          cp THIRD_PARTY.md dist/
+          cd dist
+          for f in featherplay.exe "$setup"; do
+            sha256sum "$f" > "$f.sha256"
+          done
+          sha256sum featherplay.exe "$setup" THIRD_PARTY.md > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Draft release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          setup="featherplay-setup-$VERSION.exe"
+          hash() { cut -d' ' -f1 "dist/$1.sha256"; }
+          {
+            echo "featherplay $VERSION for Windows 10 and 11 (x64)."
+            echo
+            echo "- \`$setup\`: the installer (per user, no admin prompt)."
+            echo "- \`featherplay.exe\`: the portable exe. Keep \`THIRD_PARTY.md\` with it; it holds the licence notices."
+            echo
+            echo "SHA256:"
+            echo
+            echo '```'
+            cat dist/SHA256SUMS.txt
+            echo '```'
+            if [ -n "$MISSING_KEYS" ]; then
+              echo
+              echo "**Built without the secrets $MISSING_KEYS.** Without the Last.fm key and secret, Last.fm needs your own API key in this build; without the Discord client ID, Discord status is unavailable."
+            fi
+          } > dist/notes.md
+          gh release create "$GITHUB_REF_NAME" \
+            "dist/featherplay.exe" "dist/featherplay.exe.sha256" \
+            "dist/$setup" "dist/$setup.sha256" \
+            "dist/SHA256SUMS.txt" "dist/THIRD_PARTY.md" \
+            --draft \
+            --verify-tag \
+            --title "featherplay $GITHUB_REF_NAME" \
+            --notes-file dist/notes.md

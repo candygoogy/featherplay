@@ -1,0 +1,103 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  # Once a week, the full suite (see the Test step).
+  schedule:
+    - cron: "0 4 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  # Runners have no audio output device: `--cfg ci` ignores the engine tests that open one
+  # (crates/audio/tests/it/engine_local.rs). Set for every step so they share one build cache.
+  RUSTFLAGS: --cfg ci
+  # The build keys (LASTFM_API_KEY, LASTFM_API_SECRET, DISCORD_CLIENT_ID) are read with
+  # `option_env!`, so CI builds and tests without them: Last.fm falls back to the user's own
+  # key, Discord status shows as unavailable. Only release.yml compiles them in.
+
+jobs:
+  # Known vulnerabilities, yanked crates, licences and crate sources, as deny.toml sets them.
+  # Its own job, on Linux (the action is a container), so it reports in a minute without
+  # waiting for the Windows build. The advisory database changes daily, so a run can fail
+  # on a dependency nobody touched: update it, or record the reason in deny.toml.
+  deny:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
+        with:
+          command: check
+          arguments: --all-features
+
+  # Nothing in the repository points at a developer's machine or at planning notes that
+  # contributors can't see: comments state their rules themselves. The pattern is written with
+  # character classes so this file doesn't match it.
+  paths:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: No local paths or plan references
+        shell: bash
+        run: |
+          if git grep -nIE 'D:/Work[s]pace|Docs/ytm[-]native|spec [§]|plan Tas[k]|Tas[k] 1[0-9]'; then
+            echo "::error::Remove the local paths and plan references listed above."
+            exit 1
+          fi
+
+  check:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Installs the toolchain and components named in rust-toolchain.toml.
+      - name: Rust toolchain
+        shell: bash
+        run: |
+          rustup toolchain install
+          rustup show active-toolchain
+          cargo --version
+
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+
+      - name: Format
+        run: cargo fmt --all --check
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      # Each crate's integration tests are one program, and the app's tests each install a Slint
+      # platform (one per process), so they run under nextest: one process per test, the timing
+      # tests alone (.config/nextest.toml). nextest skips doctests; the last line runs them.
+      - uses: taiki-e/install-action@1919c4a95903d2c33e4a221102edca87309fc14b # v2.89.0
+        with:
+          tool: nextest
+
+      - name: Test
+        shell: bash
+        run: |
+          export FEATHERPLAY_HOME="$RUNNER_TEMP/featherplay-home"
+          mkdir -p "$FEATHERPLAY_HOME"
+          # Pushes and pull requests leave out the frame-cost and CPU-time ceilings (the `ci`
+          # profile in .config/nextest.toml); the weekly run and release.yml run everything.
+          if [ "$GITHUB_EVENT_NAME" = schedule ]; then profile=default; else profile=ci; fi
+          cargo nextest run --workspace --profile "$profile"
+          cargo test --workspace --doc

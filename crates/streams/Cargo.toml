@@ -1,0 +1,28 @@
+[package]
+name = "featherplay-streams"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "featherplay's stream resolver: a native InnerTube request, else the yt-dlp sidecar, and the sidecar downloads"
+publish = false
+
+[dependencies]
+featherplay-core = { path = "../core" }
+# Each resolve step that fails logs a line (the app writes it to its log file).
+log = { workspace = true }
+reqwest = { workspace = true, features = ["native-tls", "gzip"] }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+tokio = { workspace = true, features = ["fs", "io-util", "macros", "process", "rt", "sync", "time"] }
+# Reads deno.exe out of deno's release zip, which is plain deflate. zip's defaults add
+# decoders for bzip2, lzma, xz, zstd (C), ppmd, deflate64, AES and a zopfli encoder;
+# flate2's own backend (already in the tree through png) does the inflating.
+zip = { workspace = true, features = ["deflate-flate2"] }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+
+[lints]
+workspace = true

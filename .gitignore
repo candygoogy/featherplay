@@ -1,0 +1,10 @@
+target/
+*.cookies.txt
+.env
+site/node_modules/
+site/dist/
+site/.astro/
+site/test-results/
+site/playwright-report/
+site/.taste-skill/
+site/.wrangler/

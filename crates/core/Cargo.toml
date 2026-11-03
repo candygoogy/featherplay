@@ -1,0 +1,15 @@
+[package]
+name = "featherplay-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "featherplay's pure logic: the track model, the play queue, the player state machine and the scrobble rules"
+publish = false
+
+[dependencies]
+serde = { workspace = true }
+
+[lints]
+workspace = true

@@ -1,0 +1,156 @@
+---
+// The 404: a state the app really has, Now playing with nothing to play and nothing up next.
+// A blank cover, "404" by "page not found", the bar at 0:00 of 4:04, and one way back. A
+// still frame of the app (replica.css), no demo script, so it stays light.
+import "../styles/app-controls.css";
+import "../styles/replica.css";
+import Base from "../layouts/Base.astro";
+import Header from "../components/Header.astro";
+import Laptop from "../components/Laptop.astro";
+import Desktop from "../components/Desktop.astro";
+import Icon from "../components/Icon.astro";
+---
+
+<Base
+  title="Page not found | featherplay"
+  description="This page isn't in the queue. Go back to featherplay's home page."
+  noindex
+>
+  <Header />
+  <main id="main" tabindex="-1" class="nf">
+    <div class="wrap nf-head">
+      <h1>Not in the queue</h1>
+      <p>The page you asked for isn't here. It may have moved, or the link may be wrong.</p>
+    </div>
+    <div class="wrap nf-stage">
+      <div class="glow" aria-hidden="true"></div>
+      <Laptop class="nf-laptop" label="featherplay showing an empty Now playing: 404, page not found" crop>
+        <Desktop id="nf-desktop" tooltip={["featherplay", "Nothing playing"]}>
+          <div class="replica" data-view="now" data-playing="false" data-lyrics-on="true" data-has-lyrics="false" style="--song:#808080">
+            <div class="titlebar">
+              <span class="art" aria-hidden="true">
+                <img class="only-dark" src="/tri-vane.svg" width="16" height="16" alt="" />
+                <img class="only-light" src="/tri-vane-light.svg" width="16" height="16" alt="" />
+              </span>
+              <span>featherplay</span>
+            </div>
+            <div class="app">
+              <div class="main">
+                <section class="stage" aria-label="Now playing">
+                  <span class="stage-wash" aria-hidden="true"></span>
+                  <div class="np">
+                    <div class="np-cover blank" aria-hidden="true"><Icon name="note" size={96} /></div>
+                    <div class="np-text">
+                      <div class="np-row"><p class="np-title" data-nf-title>404</p></div>
+                      <p class="np-artist" data-nf-artist>page not found</p>
+                      <p class="nf-line">This page isn't in the queue.</p>
+                      <a class="pill solid nf-home" href="/"><Icon name="play" size={18} /><span>Play from the start</span></a>
+                    </div>
+                  </div>
+                </section>
+              </div>
+              <aside class="queue" aria-label="Up next">
+                <div class="tabs" aria-hidden="true">
+                  <span class="tab-pill"></span><span class="tab">Up next</span><span class="tab">Related</span>
+                </div>
+                <p class="nf-empty">Nothing up next</p>
+              </aside>
+              <div class="bar" aria-hidden="true">
+                <span class="bar-song">
+                  <span class="bar-cover blank"></span>
+                  <span class="bar-text"><span class="bar-title">404</span><span class="bar-artist">page not found</span></span>
+                </span>
+                <div class="bar-mid">
+                  <div class="transport">
+                    <span class="fp-ib"><Icon name="shuffle" size={20} /></span>
+                    <span class="fp-ib t1"><Icon name="prev" size={20} /></span>
+                    <span class="fp-play"><Icon name="play" class="i-play" /></span>
+                    <span class="fp-ib t1"><Icon name="next" size={20} /></span>
+                    <span class="fp-ib"><Icon name="repeat" size={20} /></span>
+                  </div>
+                  <div class="seek">
+                    <span class="time" data-nf-time>0:00</span>
+                    <span class="seek-line"><span class="rail"></span></span>
+                    <span class="time end" data-nf-length>4:04</span>
+                  </div>
+                </div>
+                <div class="bar-end">
+                  <span class="fp-ib"><Icon name="heart" size={20} /></span>
+                  <span class="fp-ib"><Icon name="volume" size={20} /></span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Desktop>
+      </Laptop>
+    </div>
+  </main>
+</Base>
+
+<style>
+  /* The still picture's selected tab (Up next, on the tinted pill) in the full text colour,
+     as the live replica's selected tab is. */
+  .nf :global(.tabs .tab:nth-child(2)) {
+    color: var(--text);
+  }
+  .nf {
+    padding-bottom: clamp(48px, 8vw, 120px);
+  }
+  .nf-head {
+    padding-block: clamp(32px, 6vw, 72px) clamp(24px, 3vw, 40px);
+  }
+  h1 {
+    font-size: clamp(3rem, 9vw, 8rem);
+  }
+  .nf-head p {
+    max-width: 44ch;
+    margin-top: 16px;
+    font-size: clamp(1.0625rem, 1.4vw, 1.25rem);
+  }
+  .nf-stage {
+    position: relative;
+  }
+  .nf-stage :global(.nf-laptop) {
+    position: relative;
+    max-width: 1100px;
+    margin-inline: auto;
+  }
+  .glow {
+    position: absolute;
+    inset: -20% -10%;
+    background: radial-gradient(closest-side, color-mix(in srgb, var(--accent) 34%, transparent), transparent); /* taste-skill-ignore: the cover glow, in the plain accent with no cover */
+    pointer-events: none;
+  }
+  /* The empty cover: the app's cover-empty ground with its note. */
+  .blank {
+    display: grid;
+    place-items: center;
+    background: var(--cover-empty);
+    color: var(--text-faint);
+  }
+  .nf :global(.replica .app) {
+    grid-template-columns: 1fr 400px;
+  }
+  .nf :global(.replica .np-cover.blank) {
+    aspect-ratio: 1;
+  }
+  .nf :global(.replica .bar-cover.blank) {
+    display: block;
+    width: 56px;
+    height: 56px;
+    border-radius: 10px;
+  }
+  .nf-line {
+    margin-top: 18px;
+    color: var(--text-muted);
+    font-size: 16px;
+  }
+  .nf-home {
+    margin-top: 18px;
+    text-decoration: none;
+  }
+  .nf-empty {
+    padding: 24px 8px;
+    color: var(--text-faint);
+  }
+</style>

@@ -1,0 +1,531 @@
+{
+  "contents": {
+    "elementRenderer": {
+      "newElement": {
+        "type": {
+          "componentType": {
+            "model": {
+              "timedLyricsModel": {
+                "lyricsData": {
+                  "timedLyricsData": [
+                    {
+                      "lyricLine": "Placeholder line 1",
+                      "cueRange": {
+                        "startTimeMilliseconds": "250",
+                        "endTimeMilliseconds": "3980",
+                        "metadata": {
+                          "id": "0"
+                        }
+                      }
+                    },
+                    {
+                      "lyricLine": "Placeholder line 2",
+                      "cueRange": {
+                        "startTimeMilliseconds": "3980",
+                        "endTimeMilliseconds": "9820",
+                        "metadata": {
+                          "id": "1"
+                        }
+                      }
+                    },
+                    {
+                      "lyricLine": "Placeholder line 3",
+                      "cueRange": {
+                        "startTimeMilliseconds": "9820",
+                        "endTimeMilliseconds": "15320",
+                        "metadata": {
+                          "id": "2"
+                        }
+                      }
+                    },
+                    {
+                      "lyricLine": "Placeholder line 4",
+                      "cueRange": {
+                        "startTimeMilliseconds": "15320",
+                        "endTimeMilliseconds": "23030",
+                        "metadata": {
+                          "id": "3"
+                        }
+                      }
+                    },
+                    {
+                      "lyricLine": "Placeholder line 5",
+                      "cueRange": {
+                        "startTimeMilliseconds": "23030",
+                        "endTimeMilliseconds": "30180",
+                        "metadata": {
+                          "id": "4"
+                        }
+                      }
+                    },
+                    {
+                      "lyricLine": "Placeholder line 6",
+                      "cueRange": {
+                        "startTimeMilliseconds": "30180",
+                        "endTimeMilliseconds": "37530",
+                        "metadata": {
+                          "id": "5"
+                        }
+                      }
+                    },
+                    {
+                      "lyricLine": "Placeholder line 7",
+                      "cueRange": {
+                        "startTimeMilliseconds": "37530",
+                        "endTimeMilliseconds": "42800",
+                        "metadata": {
+                          "id": "6"
+                        }
+                      }
+                    },
+                    {
+                      "lyricLine": "Placeholder line 8",
+                      "cueRange": {
+                        "startTimeMilliseconds": "42800",
+                        "endTimeMilliseconds": "46720",
+                        "metadata": {
+                          "id": "7"
+                        }
+                      }
+                    },
+                    {
+                      "lyricLine": "Placeholder line 9",
+                      "cueRange": {
+                        "startTimeMilliseconds": "46720",
+                        "endTimeMilliseconds": "50330",
+                        "metadata": {
+                          "id": "8"
+                        }
+                      }
+                    },
+                    {
+                      "lyricLine": "Placeholder line 10",
+                      "cueRange": {
+                        "startTimeMilliseconds": "50330",
+                        "endTimeMilliseconds": "54180",
+                        "metadata": {
+                          "id": "9"
+                        }
+                      }
+                    },
+                    {
+                      "lyricLine": "Placeholder line 11",
+                      "cueRange": {
+                        "startTimeMilliseconds": "54180",
+                        "endTimeMilliseconds": "58970",
+                        "metadata": {
+                          "id": "10"
+                        }
+                      }
+                    },
+                    {
+                      "lyricLine": "Placeholder line 12",
+                      "cueRange": {
+                        "startTimeMilliseconds": "58970",
+                        "endTimeMilliseconds": "64050",
+                        "metadata": {
+                          "id": "11"
+                        }
+                      }
+                    },
+                    {
+                      "lyricLine": "Placeholder line 13",
+                      "cueRange": {
+                        "startTimeMilliseconds": "64050",
+                        "endTimeMilliseconds": "72800",
+                        "metadata": {
+                          "id": "12"
+                        }
+                      }
+                    },
+                    {
+                      "lyricLine": "Placeholder line 14",
+                      "cueRange": {
+                        "startTimeMilliseconds": "72800",
+                        "endTimeMilliseconds": "78830",
+                        "metadata": {
+                          "id": "13"
+                        }
+                      }
+                    },
+                    {
+                      "lyricLine": "Placeholder line 15",
+                      "cueRange": {
+                        "startTimeMilliseconds": "78830",
+                        "endTimeMilliseconds": "86500",
+                        "metadata": {
+                          "id": "14"
+                        }
+                      }
+                    },
+                    {
+                      "lyricLine": "Placeholder line 16",
+                      "cueRange": {
+                        "startTimeMilliseconds": "86500",
+                        "endTimeMilliseconds": "103570",
+                        "metadata": {
+                          "id": "15"
+                        }
+                      }
+                    },
+                    {
+                      "lyricLine": "Placeholder line 17",
+                      "cueRange": {
+                        "startTimeMilliseconds": "103570",
+                        "endTimeMilliseconds": "107260",
+                        "metadata": {
+                          "id": "16"
+                        }
+                      }
+                    },
+                    {
+                      "lyricLine": "Placeholder line 18",
+                      "cueRange": {
+                        "startTimeMilliseconds": "107260",
+                        "endTimeMilliseconds": "111350",
+                        "metadata": {
+                          "id": "17"
+                        }
+                      }
+                    },
+                    {
+                      "lyricLine": "Placeholder line 19",
+                      "cueRange": {
+                        "startTimeMilliseconds": "111350",
+                        "endTimeMilliseconds": "113430",
+                        "metadata": {
+                          "id": "18"
+                        }
+                      }
+                    },
+                    {
+                      "lyricLine": "Placeholder line 20",
+                      "cueRange": {
+                        "startTimeMilliseconds": "113430",
+                        "endTimeMilliseconds": "118250",
+                        "metadata": {
+                          "id": "19"
+                        }
+                      }
+                    },
+                    {
+                      "lyricLine": "Placeholder line 21",
+                      "cueRange": {
+                        "startTimeMilliseconds": "118250",
+                        "endTimeMilliseconds": "122140",
+                        "metadata": {
+                          "id": "20"
+                        }
+                      }
+                    },
+                    {
+                      "lyricLine": "Placeholder line 22",
+                      "cueRange": {
+                        "startTimeMilliseconds": "122140",
+                        "endTimeMilliseconds": "126100",
+                        "metadata": {
+                          "id": "21"
+                        }
+                      }
+                    },
+                    {
+                      "lyricLine": "Placeholder line 23",
+                      "cueRange": {
+                        "startTimeMilliseconds": "126100",
+                        "endTimeMilliseconds": "128170",
+                        "metadata": {
+                          "id": "22"
+                        }
+                      }
+                    },
+                    {
+                      "lyricLine": "Placeholder line 24",
+                      "cueRange": {
+                        "startTimeMilliseconds": "128170",
+                        "endTimeMilliseconds": "133470",
+                        "metadata": {
+                          "id": "23"
+                        }
+                      }
+                    },
+                    {
+                      "lyricLine": "Placeholder line 25",
+                      "cueRange": {
+                        "startTimeMilliseconds": "133470",
+                        "endTimeMilliseconds": "140710",
+                        "metadata": {
+                          "id": "24"
+                        }
+                      }
+                    },
+                    {
+                      "lyricLine": "Placeholder line 26",
+                      "cueRange": {
+                        "startTimeMilliseconds": "140710",
+                        "endTimeMilliseconds": "146490",
+                        "metadata": {
+                          "id": "25"
+                        }
+                      }
+                    },
+                    {
+                      "lyricLine": "Placeholder line 27",
+                      "cueRange": {
+                        "startTimeMilliseconds": "146490",
+                        "endTimeMilliseconds": "150160",
+                        "metadata": {
+                          "id": "26"
+                        }
+                      }
+                    },
+                    {
+                      "lyricLine": "Placeholder line 28",
+                      "cueRange": {
+                        "startTimeMilliseconds": "150160",
+                        "endTimeMilliseconds": "153710",
+                        "metadata": {
+                          "id": "27"
+                        }
+                      }
+                    },
+                    {
+                      "lyricLine": "Placeholder line 29",
+                      "cueRange": {
+                        "startTimeMilliseconds": "153710",
+                        "endTimeMilliseconds": "157530",
+                        "metadata": {
+                          "id": "28"
+                        }
+                      }
+                    },
+                    {
+                      "lyricLine": "Placeholder line 30",
+                      "cueRange": {
+                        "startTimeMilliseconds": "157530",
+                        "endTimeMilliseconds": "162310",
+                        "metadata": {
+                          "id": "29"
+                        }
+                      }
+                    },
+                    {
+                      "lyricLine": "Placeholder line 31",
+                      "cueRange": {
+                        "startTimeMilliseconds": "162310",
+                        "endTimeMilliseconds": "167470",
+                        "metadata": {
+                          "id": "30"
+                        }
+                      }
+                    },
+                    {
+                      "lyricLine": "Placeholder line 32",
+                      "cueRange": {
+                        "startTimeMilliseconds": "167470",
+                        "endTimeMilliseconds": "176290",
+                        "metadata": {
+                          "id": "31"
+                        }
+                      }
+                    },
+                    {
+                      "lyricLine": "Placeholder line 33",
+                      "cueRange": {
+                        "startTimeMilliseconds": "176290",
+                        "endTimeMilliseconds": "182290",
+                        "metadata": {
+                          "id": "32"
+                        }
+                      }
+                    },
+                    {
+                      "lyricLine": "Placeholder line 34",
+                      "cueRange": {
+                        "startTimeMilliseconds": "182290",
+                        "endTimeMilliseconds": "192190",
+                        "metadata": {
+                          "id": "33"
+                        }
+                      }
+                    },
+                    {
+                      "lyricLine": "Placeholder line 35",
+                      "cueRange": {
+                        "startTimeMilliseconds": "192190",
+                        "endTimeMilliseconds": "195820",
+                        "metadata": {
+                          "id": "34"
+                        }
+                      }
+                    },
+                    {
+                      "lyricLine": "Placeholder line 36",
+                      "cueRange": {
+                        "startTimeMilliseconds": "195820",
+                        "endTimeMilliseconds": "201730",
+                        "metadata": {
+                          "id": "35"
+                        }
+                      }
+                    },
+                    {
+                      "lyricLine": "Placeholder line 37",
+                      "cueRange": {
+                        "startTimeMilliseconds": "201730",
+                        "endTimeMilliseconds": "206780",
+                        "metadata": {
+                          "id": "36"
+                        }
+                      }
+                    },
+                    {
+                      "lyricLine": "Placeholder line 38",
+                      "cueRange": {
+                        "startTimeMilliseconds": "206780",
+                        "endTimeMilliseconds": "210650",
+                        "metadata": {
+                          "id": "37"
+                        }
+                      }
+                    },
+                    {
+                      "lyricLine": "Placeholder line 39",
+                      "cueRange": {
+                        "startTimeMilliseconds": "210650",
+                        "endTimeMilliseconds": "216640",
+                        "metadata": {
+                          "id": "38"
+                        }
+                      }
+                    },
+                    {
+                      "lyricLine": "Placeholder line 40",
+                      "cueRange": {
+                        "startTimeMilliseconds": "216640",
+                        "endTimeMilliseconds": "221300",
+                        "metadata": {
+                          "id": "39"
+                        }
+                      }
+                    },
+                    {
+                      "lyricLine": "Placeholder line 41",
+                      "cueRange": {
+                        "startTimeMilliseconds": "221300",
+                        "endTimeMilliseconds": "226290",
+                        "metadata": {
+                          "id": "40"
+                        }
+                      }
+                    },
+                    {
+                      "lyricLine": "Placeholder line 42",
+                      "cueRange": {
+                        "startTimeMilliseconds": "226290",
+                        "endTimeMilliseconds": "230320",
+                        "metadata": {
+                          "id": "41"
+                        }
+                      }
+                    },
+                    {
+                      "lyricLine": "Placeholder line 43",
+                      "cueRange": {
+                        "startTimeMilliseconds": "230320",
+                        "endTimeMilliseconds": "235380",
+                        "metadata": {
+                          "id": "42"
+                        }
+                      }
+                    },
+                    {
+                      "lyricLine": "Placeholder line 44",
+                      "cueRange": {
+                        "startTimeMilliseconds": "235380",
+                        "endTimeMilliseconds": "241150",
+                        "metadata": {
+                          "id": "43"
+                        }
+                      }
+                    },
+                    {
+                      "lyricLine": "Placeholder line 45",
+                      "cueRange": {
+                        "startTimeMilliseconds": "241150",
+                        "endTimeMilliseconds": "245020",
+                        "metadata": {
+                          "id": "44"
+                        }
+                      }
+                    },
+                    {
+                      "lyricLine": "Placeholder line 46",
+                      "cueRange": {
+                        "startTimeMilliseconds": "245020",
+                        "endTimeMilliseconds": "249710",
+                        "metadata": {
+                          "id": "45"
+                        }
+                      }
+                    },
+                    {
+                      "lyricLine": "Placeholder line 47",
+                      "cueRange": {
+                        "startTimeMilliseconds": "249710",
+                        "endTimeMilliseconds": "255020",
+                        "metadata": {
+                          "id": "46"
+                        }
+                      }
+                    },
+                    {
+                      "lyricLine": "Placeholder line 48",
+                      "cueRange": {
+                        "startTimeMilliseconds": "255020",
+                        "endTimeMilliseconds": "260890",
+                        "metadata": {
+                          "id": "47"
+                        }
+                      }
+                    },
+                    {
+                      "lyricLine": "Placeholder line 49",
+                      "cueRange": {
+                        "startTimeMilliseconds": "260890",
+                        "endTimeMilliseconds": "265870",
+                        "metadata": {
+                          "id": "48"
+                        }
+                      }
+                    },
+                    {
+                      "lyricLine": "Placeholder line 50",
+                      "cueRange": {
+                        "startTimeMilliseconds": "265870",
+                        "endTimeMilliseconds": "269750",
+                        "metadata": {
+                          "id": "49"
+                        }
+                      }
+                    },
+                    {
+                      "lyricLine": "Placeholder line 51",
+                      "cueRange": {
+                        "startTimeMilliseconds": "269750",
+                        "endTimeMilliseconds": "271640",
+                        "metadata": {
+                          "id": "50"
+                        }
+                      }
+                    }
+                  ],
+                  "sourceMessage": "Source: Musixmatch"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

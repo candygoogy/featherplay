@@ -1,0 +1,71 @@
+name: Daily play check
+
+# Playback depends on YouTube's side, which changes without notice, so a scheduled run must
+# catch breakage before users do: it downloads the yt-dlp and Deno helpers, resolves a fixed
+# public Creative Commons track without sign-in, and decodes 10 s of it to a null sink
+# (crates/audio/tests/it/daily_play.rs). A failure opens an issue, or comments on the open one.
+
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: daily-play
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: --cfg ci
+
+jobs:
+  play:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Rust toolchain
+        shell: bash
+        run: |
+          rustup toolchain install
+          rustup show active-toolchain
+
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+
+      - name: Build the streams and audio crates
+        run: cargo test -p featherplay-streams -p featherplay-audio --no-run
+
+      - name: Resolve and decode 10 s
+        shell: bash
+        run: |
+          export FEATHERPLAY_HOME="$RUNNER_TEMP/featherplay-home"
+          mkdir -p "$FEATHERPLAY_HOME"
+          cargo test -p featherplay-audio --test it -- daily_play:: --ignored --nocapture | tee "$RUNNER_TEMP/play.txt"
+          # YouTube can ask a runner's address to prove it isn't a bot: the test passes then,
+          # and the run says it couldn't check.
+          if grep -q "^INCONCLUSIVE" "$RUNNER_TEMP/play.txt"; then
+            echo "::warning::Inconclusive: YouTube asked this runner to confirm it isn't a bot, so playback couldn't be checked from here."
+          fi
+
+      - name: Report the failure
+        if: failure() && github.event_name == 'schedule'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title="Daily play check failed"
+          body="The daily play check failed on $(date -u +%Y-%m-%d): $RUN_URL"
+          existing=$(gh issue list --state open --search "\"$title\" in:title" --json number --jq '.[0].number')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$body"
+          else
+            gh issue create --title "$title" --body "$body"
+          fi

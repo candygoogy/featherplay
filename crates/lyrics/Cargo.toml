@@ -1,0 +1,21 @@
+[package]
+name = "featherplay-lyrics"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "featherplay's lyrics: the LRC format and the LRCLIB lookup"
+publish = false
+
+[dependencies]
+# The workspace's reqwest over the system TLS, like the other crates: no second TLS stack.
+reqwest = { workspace = true, features = ["native-tls"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt"] }
+
+[lints]
+workspace = true

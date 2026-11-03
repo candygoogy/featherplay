@@ -1,0 +1,51 @@
+// Navigation: which page is shown, and the calls that change it. `src/router.rs` owns the
+// history; these callbacks are the only way Slint code navigates.
+
+export enum PageKind { home, explore, mood, history, library, album, playlist, artist, search, now-playing, settings, about, sign-in }
+
+export global Nav {
+    // Set by the router; read-only for pages.
+    in property <PageKind> page: PageKind.home;
+    // The id of the album, playlist or artist shown, "" otherwise (sidebar highlight).
+    in property <string> page-id;
+    in property <bool> can-back;
+    in property <bool> can-forward;
+
+    // Pages without a parameter (home, explore, history, now-playing, settings, about,
+    // sign-in).
+    callback go(PageKind);
+    // 0 Liked, 1 Playlists, 2 Albums, 3 Artists.
+    callback open-library(int);
+    // 0 New releases, 1 Charts, 2 Moods & genres.
+    callback open-explore(int);
+    // A mood or genre's playlists: its params, and its name.
+    callback open-mood(string, string);
+    callback open-album(string);
+    callback open-playlist(string);
+    callback open-artist(string);
+    callback search(string);
+    callback back();
+    callback forward();
+    // The bar's cover and title: opens Now playing, or goes back if it's open.
+    callback toggle-now-playing();
+}
+
+// Frame state shared by the sidebar, the bar and the panel.
+export global Frame {
+    // The Up next panel (filled by `src/queue_panel.rs`). Toggled by the bar's queue button.
+    in-out property <bool> queue-open: false;
+    callback queue-toggled(bool);
+    // Set by keyboard actions (Alt+Left/Right, Enter in search) just before they navigate, so
+    // the page appears without its enter fade: keyboard actions don't animate. Cleared once
+    // the page changed.
+    in-out property <bool> instant: false;
+    // Now playing is the page (set by Rust with `Nav.page`; it takes the whole body). A
+    // property of its own, set only when it changes: read through `Nav.page`, everything it
+    // places was marked dirty by every page change (`AppWindow.full-page`).
+    in-out property <bool> full-page: false;
+    // The window is hidden in the tray (set by Rust): nothing animates then.
+    in-out property <bool> hidden: false;
+    // The wheel has scrolled and the pointer hasn't moved since (set by `wheel.rs`): rows
+    // passing under it don't take the hover.
+    in-out property <bool> scrolling: false;
+}

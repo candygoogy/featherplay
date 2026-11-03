@@ -1,0 +1,327 @@
+// featherplay's design tokens. Every colour, size, spacing and
+// duration the UI uses lives here; pages never hard-code colours.
+import { Palette } from "std-widgets.slint";
+
+// The Appearance setting (`Settings.theme`).
+export enum Appearance { dark, light, system }
+
+export global Theme {
+    // Light or dark: Dark until Rust applies the Appearance setting (`apply`); System follows
+    // Windows' app mode. `--snapshot --theme` applies Dark or Light the same way.
+    in-out property <bool> follow-system: false;
+    in-out property <bool> dark-override: true;
+    // Windows' app mode. Once `apply` has forced Slint's palette, System puts it back to
+    // `unknown`, where the Fluent palette follows Windows again; it's read off its background.
+    out property <bool> system-dark: Palette.color-scheme == ColorScheme.unknown ? Palette.background == #1C1C1C : Palette.color-scheme == ColorScheme.dark;
+    out property <bool> dark: follow-system ? system-dark : dark-override;
+    // Called whenever `dark` flips, so Rust can follow (the cover accent, the title bar).
+    callback dark-changed(bool);
+    changed dark => { dark-changed(dark); }
+
+    // Sets the theme, and Slint's own widgets (scroll bars, the About badge) to match it.
+    public function apply(mode: Appearance) {
+        follow-system = mode == Appearance.system;
+        dark-override = mode != Appearance.light;
+        Palette.color-scheme = mode == Appearance.dark ? ColorScheme.dark : (mode == Appearance.light ? ColorScheme.light : ColorScheme.unknown);
+    }
+
+    // Motion. `motion` is Windows' "Animation effects", set from Rust at
+    // startup; `still` is set only by `--snapshot`, so renders never catch a half-finished fade.
+    in-out property <bool> motion: true;
+    in-out property <bool> still: false;
+    out property <bool> moving: motion && !still;   // movement and scale allowed
+    out property <bool> fading: !still;             // fades stay, shorter, when motion is off
+
+    // The accent (the Accent setting, `src/follow.rs`). "From the cover", the default: Rust
+    // extracts the current cover's colours, clamps them for AA and crossfades `follow-*` to
+    // them over `t-colour`; `follow` is on while the setting is. No cover or grey art fades
+    // them to the plain colours (red). A fixed choice turns `follow` off: `preset-*` shows.
+    in-out property <bool> follow: false;
+    in-out property <color> follow-accent: #FF3B55;
+    in-out property <color> follow-bar: #181818;
+    in-out property <color> follow-text2: #AAAAAA;
+    in-out property <color> preset-dark: #FF3B55;
+    in-out property <color> preset-light: #CC1036;
+
+    // The logo's red, the two ends of its gradient (a bright red on dark, a deeper one on
+    // light): the Liked songs tile, and the accent's fallback.
+    out property <color> brand-accent: dark ? #FF3B55 : #CC1036;
+    // The accent, used boldly but only for fills and marks, never for body text: progress
+    // and the seek thumb, the play button, the playing mark, the selected chip and tab,
+    // switches, focus rings. AA (4.5:1) against the ground, the bar, panels and cards, so it
+    // also reads as a mark on every surface. Text on it is `on-accent`, black or white.
+    out property <color> plain-accent: dark ? preset-dark : preset-light;
+    out property <color> accent: follow ? follow-accent : plain-accent;
+    // On an accent fill: the ground's near-black on dark (the accent is light there), white
+    // on light (the accent is deep). The accent's AA against the ground carries over.
+    out property <color> on-accent: dark ? #0F0F0F : #FFFFFF;
+    // An accent fill hovered and pressed: a step towards `text1`, away from `on-accent`, so
+    // the glyph only gains contrast.
+    out property <color> accent-hover: accent.mix(text1, 0.84);
+    out property <color> accent-pressed: accent.mix(text1, 0.7);
+    // The accent's tonal fill (the selected pill tab or chip) and its hover, under `text1`.
+    out property <color> accent-tonal: accent.transparentize(dark ? 0.78 : 0.86);
+    out property <color> accent-tonal-hover: accent.transparentize(dark ? 0.7 : 0.8);
+
+    // The Tri-vane logo for the ground: on light, the play sits on a deep-crimson ring, so
+    // the white play doesn't read as a hole on white (the master drawing, 32 px and up).
+    out property <image> logo: dark ? @image-url("logo/tri-vane.svg") : @image-url("logo/tri-vane-light.svg");
+
+    // Grounds and surfaces, neutral greys. Dark is near-black, the sidebar a step darker,
+    // the bar and panels a step lighter, raised cards lighter again; light is white, with
+    // the sidebar, bar and cards in light greys.
+    out property <color> ground: dark ? #0F0F0F : #FFFFFF;
+    out property <color> surface: dark ? #030303 : #F7F7F7;      // sidebar
+    // The player bar: tinted, subtly, with the cover's hue while the accent follows it.
+    out property <color> plain-bar: dark ? #181818 : #F7F7F7;
+    out property <color> bar: follow ? follow-bar : plain-bar;
+    out property <color> panel: dark ? #181818 : #F7F7F7;        // Up next panel, settings cards
+    out property <color> card: dark ? #212121 : #F2F2F2;         // raised cards (Home hero)
+    out property <color> card-edge: dark ? #FFFFFF0D : #00000014;
+    out property <color> field: dark ? #FFFFFF14 : #F2F2F2;      // search field
+    // The top bar's search field: opaque, a step lighter than the cards on dark so it holds
+    // its own on a page's wash; `text3` keeps 4.7:1 on it in both themes. Its 1 px edge, a
+    // neutral step up on hover (the focus ring is the accent).
+    out property <color> field-solid: dark ? #262626 : #F2F2F2;
+    out property <color> field-edge: dark ? #FFFFFF1F : #0000001A;
+    out property <color> field-edge-hover: dark ? #FFFFFF40 : #00000038;
+    out property <color> hairline: dark ? #FFFFFF1A : #0000001A;
+    out property <color> cover-edge: dark ? #FFFFFF14 : #0000001A; // keeps pale and black art from dissolving
+    out property <color> cover-empty: dark ? #272727 : #E5E5E5;
+    out property <color> track: dark ? #FFFFFF26 : #0000001F;      // progress and volume rails
+    out property <color> cover-shadow: dark ? #00000099 : #00000033;
+    out property <color> avatar: dark ? #3A3A3A : #E0E0E0;
+    out property <color> scrim: dark ? #00000080 : #0000002E;      // under overlays
+    // The current song's row rests on a light tile (hover and press still apply on top).
+    out property <color> playing-row: dark ? #FFFFFF0F : #0000000A;
+    // Loading skeletons: the blocks, and the soft highlight that sweeps across them (only
+    // inside the blocks, `SkeletonBlock`), `skeleton-band` wide.
+    out property <color> skeleton: dark ? #FFFFFF0F : #0000000D;
+    out property <color> skeleton-hi: dark ? #FFFFFF17 : #00000016;
+    out property <length> skeleton-band: 320px;
+
+    // Interaction states: neutral overlays (white on dark, black on light) over whatever
+    // the item sits on, changing over `t-hover`. Hover is ~1.2:1 against every surface,
+    // pressed ~1.5-1.9:1, so both read everywhere, the near-black sidebar included;
+    // `selected` (the current page) sits between.
+    out property <color> hover: dark ? #FFFFFF17 : #00000012;
+    out property <color> selected: dark ? #FFFFFF21 : #0000001A;
+    out property <color> pressed: dark ? #FFFFFF33 : #0000002B;
+    // Tonal buttons (pills, chips, shelf arrows) rest on `selected`, then go a step deeper.
+    out property <color> tonal-hover: dark ? #FFFFFF2E : #00000026;
+    out property <color> tonal-pressed: dark ? #FFFFFF45 : #00000038;
+    // The filled button (`solid`) hovered and pressed.
+    out property <color> solid-hover: dark ? #E0E0E0 : #2E2E2E;
+    out property <color> solid-pressed: dark ? #C8C8C8 : #474747;
+    // Over artwork (cards): a darkening veil, since art can be any colour.
+    out property <color> cover-hover: #0000002E;
+    out property <color> cover-pressed: dark ? #00000057 : #0000004D;
+    // The round play button on a card's cover (any art, either theme): dark glass, white glyph.
+    out property <color> cover-button: #000000A6;
+    // The playing mark over a row's cover (any art, either theme): a deep veil, so the
+    // accent wave reads even on red art.
+    out property <color> cover-playing: #000000D1;
+    out property <color> cover-button-hover: #000000CC;
+    out property <color> cover-button-pressed: #000000E0;
+    // On the lyrics' cover-colour panel, in either theme: light overlays, since the panel is
+    // always deep.
+    out property <color> panel-hover: #FFFFFF1F;
+    out property <color> panel-pressed: #FFFFFF33;
+    out property <color> panel-solid: #FFFFFF;
+    out property <color> panel-solid-hover: #EBEBEB;
+    out property <color> panel-solid-pressed: #D4D4D4;
+    out property <color> panel-skeleton: #FFFFFF1A;
+    out property <color> panel-skeleton-hi: #FFFFFF2E;
+
+    // The overlay for a touch area's state: pressed, else hovered, else nothing.
+    public pure function state(down: bool, over: bool) -> color {
+        return down ? pressed : (over ? hover : transparent);
+    }
+    // The same over a `selected` item (the current page in the sidebar).
+    public pure function state-on(on: bool, down: bool, over: bool) -> color {
+        return down ? pressed : (on ? selected : (over ? hover : transparent));
+    }
+    // A tonal button's background.
+    public pure function tonal(down: bool, over: bool) -> color {
+        return down ? tonal-pressed : (over ? tonal-hover : selected);
+    }
+    // The filled button's background.
+    public pure function solid-state(down: bool, over: bool) -> color {
+        return down ? solid-pressed : (over ? solid-hover : solid);
+    }
+    // An overlay on the lyrics' cover-colour panel.
+    public pure function panel-state(down: bool, over: bool) -> color {
+        return down ? panel-pressed : (over ? panel-hover : transparent);
+    }
+    // An accent fill's background (the play button, the selected chip).
+    public pure function accent-state(down: bool, over: bool) -> color {
+        return down ? accent-pressed : (over ? accent-hover : accent);
+    }
+
+    // Text: three levels. Level 3 sits at ~55 % (not 40 %) so it keeps WCAG AA on every
+    // surface, the raised cards and the search field included.
+    out property <color> text1: dark ? #FFFFFF : #0F0F0F;
+    out property <color> plain-text2: dark ? #AAAAAA : #606060;
+    out property <color> text2: follow ? follow-text2 : plain-text2;
+    out property <color> text3: dark ? #909090 : #6B6B6B;
+    // The filled button (Play, the current chip): a white pill with black text on dark,
+    // a black pill with white text on light.
+    out property <color> solid: dark ? #FFFFFF : #0F0F0F;
+    out property <color> on-solid: dark ? #0F0F0F : #FFFFFF;
+
+    // Type: Manrope (embedded) for page and shelf titles, Segoe UI Variable for the rest.
+    out property <string> display-font: "Manrope";
+    out property <string> body-font: "Segoe UI Variable Text";
+    out property <length> t-display-xxl: 56px;  // the artist banner
+    out property <length> t-display-xl: 48px;   // album and playlist titles
+    out property <length> t-display-l: 40px;    // page titles
+    out property <length> t-display-m: 32px;    // now-playing and hero track titles
+    out property <length> t-display-s: 24px;    // shelf titles
+    out property <length> t-body-l: 16px;
+    out property <length> t-body: 14px;
+    out property <length> t-meta: 12px;
+    // Lyrics: one bold weight for every line, so a line never re-wraps when it becomes
+    // current; only its colour changes. All of them WCAG's large text (bold from 18.66 px).
+    // Sized near Apple Music's and Spotify's lyrics (2026-10-31: 30 / 34 / 24 px at 800 read
+    // too large at 4K): the lines are read along with the song, not from across the room.
+    out property <length> t-lyric-side: 20px;  // the side tab
+    out property <length> lyric-edge: 24px;    // the fade where the lines leave the panel
+    out property <length> t-lyric-full: 24px;  // the full view on Now playing
+    out property <length> t-lyric-wide: 26px;  // the same, from `lyric-wide-min` wide
+    out property <length> lyric-wide-min: 1200px;
+    out property <int> lyric-weight: 700;
+    out property <float> display-tracking: -0.02;   // em
+
+    // Spacing scale, 4 px base.
+    out property <length> s1: 4px;
+    out property <length> s2: 8px;
+    out property <length> s3: 12px;
+    out property <length> s4: 16px;
+    out property <length> s5: 24px;
+    out property <length> s6: 32px;
+    out property <length> s7: 40px;
+    out property <length> s8: 48px;
+    out property <length> s9: 64px;
+
+    // Radii: small for covers in rows, medium for cards, rows and fields, large for the hero,
+    // menus and panels, extra large for the floating bar and the Now playing cover.
+    out property <length> r-s: 4px;
+    out property <length> r-m: 10px;
+    out property <length> r-l: 16px;
+    out property <length> r-xl: 20px;
+
+    // Frame.
+    out property <length> sidebar-w: 240px;
+    out property <length> rail-w: 72px;            // the sidebar below `wide-min`
+    out property <length> wide-min: 1100px;        // below: icon rail, the queue panel overlays
+    // The player bar floats `bar-inset` in from the window's left, right and bottom edges,
+    // over the pages; `bar-clear` is the room it takes from the bottom (its top edge), which
+    // the sidebar and the panels keep clear and the pages scroll past (`page-end`).
+    out property <length> bar-h: 88px;
+    out property <length> bar-inset: 10px;
+    out property <length> bar-clear: bar-h + bar-inset;
+    out property <length> play-size: 48px;          // the bar's round play button, on every page
+    out property <length> top-bar-h: 64px;          // the search bar above the pages
+    out property <length> top-search-w: 600px;      // its field, at most
+    out property <length> top-search-narrow: 440px; // the same beside the rail
+    out property <length> panel-w: 340px;           // the Up next panel, below `panel-wide-min`
+    out property <length> panel-wide-min: 1280px;   // from here it's `nowplaying-side-w` wide
+    out property <length> nowplaying-side-w: 400px;
+    out property <length> nowplaying-cover: 440px;  // the largest now-playing cover
+    out property <length> queue-divider-h: 36px;    // "Autoplay: similar tracks"
+
+    // Density: comfortable.
+    out property <length> page-pad: 40px;
+    // Below a page's last row: past the floating bar, with the usual gap.
+    out property <length> page-end: bar-clear + s5;
+    out property <length> page-top: 32px;
+    out property <length> section-gap: 40px;
+    out property <length> row-h: 56px;
+    out property <length> track-row-h: 48px;     // album rows (no cover)
+    out property <length> row-cover: 40px;
+    out property <int> cards-per-row: 5;
+    out property <length> card-gap: 20px;
+    out property <length> card-text-gap: 8px;
+    // Home's hero: its cover, and the padding round it (the card is the cover plus twice it).
+    out property <length> hero-cover: 152px;
+    out property <length> hero-pad: s4;
+
+    // Motion follows user actions only, then stops. Durations:
+    out property <duration> t-hover: fading ? 100ms : 0ms;                    // hover/press colour
+    out property <duration> t-press: moving ? 100ms : 0ms;                    // press scale
+    out property <duration> t-release: moving ? 320ms : 0ms;                  // the spring back
+    out property <duration> t-morph: moving ? 240ms : 0ms;                    // play/pause shape, tab pill
+    out property <duration> t-fast: fading ? (motion ? 140ms : 100ms) : 0ms;  // exits, thumb, tooltips
+    out property <duration> t-menu: fading ? (motion ? 180ms : 120ms) : 0ms;  // menus, popovers in
+    out property <duration> t-page: fading ? (motion ? 200ms : 120ms) : 0ms;  // page enter
+    out property <duration> t-panel: moving ? 240ms : 0ms;                    // Up next slide
+    out property <duration> t-cover: fading ? 240ms : 0ms;                    // cover crossfade
+    out property <duration> t-toast: fading ? (motion ? 220ms : 120ms) : 0ms;
+    out property <duration> t-colour: fading ? 300ms : 0ms;                   // the cover accent's crossfade
+    out property <duration> t-shimmer: 1200ms;                                // one sweep (period)
+    out property <duration> t-skeleton-delay: 150ms;                          // no skeleton flash on fast loads
+    out property <duration> t-skeleton-sweep: 2200ms;                         // one skeleton sweep and its rest
+    out property <duration> t-lyrics: moving ? 300ms : 0ms;                   // the lyrics toggle: the cover glides to its column, the lines fade in
+    out property <duration> t-follow: moving ? 400ms : 0ms;                   // lyrics glide to the next line (ambient, so calmer than a UI move)
+    out property <duration> t-line: fading ? 400ms : 0ms;                    // a line's colour as it becomes current or sung (stays without motion)
+
+    // Distances: zero when motion is off, so the same code fades in place.
+    out property <length> rise: moving ? 8px : 0px;          // page and toast enter offset
+    out property <length> nudge: moving ? 4px : 0px;         // menu enter offset
+    out property <float> pop-from: moving ? 0.96 : 1.0;      // menu, popover start scale
+    out property <float> press-scale: moving ? 0.96 : 1.0;   // pills, play button, cards
+    out property <float> np-from: moving ? 0.96 : 1.0;       // now playing open scale
+    // Curves: in `Curves` below (Slint can't export easing properties to Rust).
+}
+
+// Motion curves (Emil Kowalski's set, Apple-like without overshoot). A global of
+// its own because Slint can't expose `easing` properties to Rust, and `Theme` is exported.
+export global Curves {
+    out property <easing> ease-out: cubic-bezier(0.23, 1, 0.32, 1);        // enter, press, release
+    out property <easing> ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);    // on-screen moves (shelf paging)
+    out property <easing> ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);     // Up next panel
+    out property <easing> ease-hover: ease;                                // colour changes
+    // Springs (Slint's duration and bounce, as SwiftUI's): they carry their velocity when
+    // interrupted, and settle and stop by themselves. A press springs back past rest a
+    // little; the play button's shape and the tab pill a little less.
+    out property <easing> release: spring(0.4);
+    out property <easing> morph: spring(0.25);
+    // The tab pill's glide: `ease-out` with its first handle lifted, so it leaves at speed
+    // (a tenth of the way in the first 8 ms, where a spring from rest has gone 2 %), passes
+    // its tab by 2 % and is back on it when the duration ends: nothing creeps on after.
+    out property <easing> glide: cubic-bezier(0.22, 1.25, 0.36, 1);
+}
+
+// Icons: one 24 px grid, 1.6 px rounded strokes, a few filled glyphs for transport.
+export global Icons {
+    out property <string> search: "M10.5 4.5 a6 6 0 1 0 0.01 0 Z M15 15 L19.5 19.5";
+    out property <string> home: "M4.5 10 L12 4 L19.5 10 V19 A1 1 0 0 1 18.5 20 H14.5 V14.5 H9.5 V20 H5.5 A1 1 0 0 1 4.5 19 Z";
+    out property <string> library: "M5 4.5 V19.5 M9.5 4.5 V19.5 M13.5 5.5 L18.5 19";
+    out property <string> heart: "M12 19.5 C12 19.5 4 14.8 4 9.3 C4 6.9 5.9 5 8.2 5 C9.9 5 11.3 6 12 7.4 C12.7 6 14.1 5 15.8 5 C18.1 5 20 6.9 20 9.3 C20 14.8 12 19.5 12 19.5 Z";
+    out property <string> plus: "M12 5.5 V18.5 M5.5 12 H18.5";
+    // "Not for me": a circle with a slash (⊘), the heart's quieter neighbour.
+    out property <string> not-for-me: "M12 4.5 a7.5 7.5 0 1 0 0.01 0 Z M17.3 6.7 L6.7 17.3";
+    out property <string> gear: "M18.95 10.14 L21.51 10.66 L21.51 13.34 L18.95 13.86 L18.24 15.60 L19.67 17.78 L17.78 19.67 L15.60 18.24 L13.86 18.95 L13.34 21.51 L10.66 21.51 L10.14 18.95 L8.40 18.24 L6.22 19.67 L4.33 17.78 L5.76 15.60 L5.05 13.86 L2.49 13.34 L2.49 10.66 L5.05 10.14 L5.76 8.40 L4.33 6.22 L6.22 4.33 L8.40 5.76 L10.14 5.05 L10.66 2.49 L13.34 2.49 L13.86 5.05 L15.60 5.76 L17.78 4.33 L19.67 6.22 L18.24 8.40 Z M9 12 a3 3 0 1 0 6 0 a3 3 0 1 0 -6 0 Z";
+    out property <string> chevron-left: "M14 6.5 L8.5 12 L14 17.5";
+    out property <string> chevron-right: "M10 6.5 L15.5 12 L10 17.5";
+    out property <string> chevron-down: "M7.5 10 L12 14.5 L16.5 10";
+    out property <string> chevron-up: "M7.5 14 L12 9.5 L16.5 14";
+    out property <string> person: "M12 4.5 a3.5 3.5 0 1 0 0.01 0 Z M5.5 19.5 C6.3 16.2 8.9 14.2 12 14.2 C15.1 14.2 17.7 16.2 18.5 19.5";
+    out property <string> play: "M8 5.2 V18.8 C8 19.4 8.7 19.8 9.2 19.4 L19.2 12.7 C19.7 12.4 19.7 11.6 19.2 11.3 L9.2 4.6 C8.7 4.2 8 4.6 8 5.2 Z";
+    out property <string> pause: "M7 5.5 C7 5.2 7.2 5 7.5 5 H9.5 C9.8 5 10 5.2 10 5.5 V18.5 C10 18.8 9.8 19 9.5 19 H7.5 C7.2 19 7 18.8 7 18.5 Z M14 5.5 C14 5.2 14.2 5 14.5 5 H16.5 C16.8 5 17 5.2 17 5.5 V18.5 C17 18.8 16.8 19 16.5 19 H14.5 C14.2 19 14 18.8 14 18.5 Z";
+    out property <string> prev: "M6 5.5 C6 5.2 6.2 5 6.5 5 H7.5 C7.8 5 8 5.2 8 5.5 V18.5 C8 18.8 7.8 19 7.5 19 H6.5 C6.2 19 6 18.8 6 18.5 Z M19 6 V18 C19 18.6 18.4 18.9 17.9 18.6 L9.6 12.6 C9.2 12.3 9.2 11.7 9.6 11.4 L17.9 5.4 C18.4 5.1 19 5.4 19 6 Z";
+    out property <string> next: "M18 5.5 C18 5.2 17.8 5 17.5 5 H16.5 C16.2 5 16 5.2 16 5.5 V18.5 C16 18.8 16.2 19 16.5 19 H17.5 C17.8 19 18 18.8 18 18.5 Z M5 6 V18 C5 18.6 5.6 18.9 6.1 18.6 L14.4 12.6 C14.8 12.3 14.8 11.7 14.4 11.4 L6.1 5.4 C5.6 5.1 5 5.4 5 6 Z";
+    out property <string> shuffle: "M4 7.5 H6.5 C10.5 7.5 12.5 16.5 16.5 16.5 H20 M17.5 14 L20 16.5 L17.5 19 M4 16.5 H6.5 C8.3 16.5 9.6 14.8 10.6 12.8 M13.4 10.2 C14.3 8.6 15.2 7.5 16.5 7.5 H20 M17.5 5 L20 7.5 L17.5 10";
+    out property <string> repeat: "M4.5 11.5 V10 A3 3 0 0 1 7.5 7 H19 M16.5 4.5 L19 7 L16.5 9.5 M19.5 12.5 V14 A3 3 0 0 1 16.5 17 H5 M7.5 14.5 L5 17 L7.5 19.5";
+    out property <string> volume: "M4 9.5 H7.5 L12 5.5 V18.5 L7.5 14.5 H4 Z M15.5 9.5 A3.5 3.5 0 0 1 15.5 14.5 M18 7 A7 7 0 0 1 18 17";
+    out property <string> volume-off: "M4 9.5 H7.5 L12 5.5 V18.5 L7.5 14.5 H4 Z M15.5 9.5 L20 14 M20 9.5 L15.5 14";
+    out property <string> queue: "M4 6.5 H15 M4 11.5 H15 M4 16.5 H10 M14 14 V20 L19 17 Z";
+    out property <string> back: "M14.5 5.5 L8 12 L14.5 18.5";
+    out property <string> more: "M3.4 12 a1.6 1.6 0 1 0 3.2 0 a1.6 1.6 0 1 0 -3.2 0 Z M10.4 12 a1.6 1.6 0 1 0 3.2 0 a1.6 1.6 0 1 0 -3.2 0 Z M17.4 12 a1.6 1.6 0 1 0 3.2 0 a1.6 1.6 0 1 0 -3.2 0 Z";
+    out property <string> radio: "M10.5 12 a1.5 1.5 0 1 0 3 0 a1.5 1.5 0 1 0 -3 0 Z M8.5 8.5 A5 5 0 0 0 8.5 15.5 M15.5 8.5 A5 5 0 0 1 15.5 15.5 M5.6 5.6 A9 9 0 0 0 5.6 18.4 M18.4 5.6 A9 9 0 0 1 18.4 18.4";
+    out property <string> close: "M6.5 6.5 L17.5 17.5 M17.5 6.5 L6.5 17.5";
+    // Lyrics: a microphone.
+    out property <string> lyrics: "M12 3.5 a3 3 0 0 0 -3 3 V11.5 a3 3 0 0 0 6 0 V6.5 a3 3 0 0 0 -3 -3 Z M6 11 A6 6 0 0 0 18 11 M12 17 V20.5";
+    // A single note: the placeholder on empty covers.
+    out property <string> note: "M11.5 17 V4.5 C13 6.5 17 6.5 17.5 10.5 M11.5 17 a2.5 2.5 0 1 1 -5 0 a2.5 2.5 0 1 1 5 0 Z";
+}

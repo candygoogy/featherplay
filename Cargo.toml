@@ -1,0 +1,133 @@
+[workspace]
+resolver = "3"
+members = ["crates/*", "apps/*"]
+# `vendor` holds patched third-party crates, which stay out of our clippy and fmt runs.
+exclude = ["vendor"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/candygoogy/featherplay"
+homepage = "https://featherplay.candygoogy.dev"
+
+# Every member opts in with `[lints] workspace = true`.
+[workspace.lints.rust]
+# An `unsafe fn` body is not one big unsafe block: each unsafe operation inside it needs its
+# own `unsafe {}` with its own SAFETY comment.
+unsafe_op_in_unsafe_fn = "deny"
+# `--cfg ci` (RUSTFLAGS) ignores the tests that need an output device.
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(ci)"] }
+
+[workspace.lints.clippy]
+# Every `unsafe` block says, in a `// SAFETY:` comment, which invariant makes it sound.
+undocumented_unsafe_blocks = "warn"
+# A release build is a GUI program: stdout and stderr go nowhere. Everything goes through
+# the app's log (`log!`, the `log` crate); only command-line output, the logger's own echo
+# and tests may print, each with an `#[allow]` saying why.
+print_stderr = "deny"
+print_stdout = "deny"
+
+# Exact pins for the whole workspace. Members add the features they need.
+# `default-features = false` is set where members must trim defaults
+# (a member cannot turn off defaults that the workspace entry leaves on).
+[workspace.dependencies]
+slint = { version = "=1.18.1", default-features = false }
+slint-build = "=1.18.1"
+ytmapi-rs = { version = "=0.3.3", default-features = false }
+rodio = { version = "=0.23.0", default-features = false }
+cpal = "=0.18.2"
+symphonia = { version = "=0.6.1", default-features = false }
+reqwest = { version = "=0.13.5", default-features = false }
+tokio = "=1.54.1"
+souvlaki = "=0.8.3"
+tray-icon = "=0.26.1"
+global-hotkey = "=0.9.0"
+tauri-winrt-notification = "=0.8.1"
+discord-rich-presence = "=1.1.0"
+webview2-com = "=0.39.1"
+# The keyring project's core API and its Windows Credential Manager store, used directly
+# rather than through the `keyring` crate: it turns on the store's `search` feature,
+# whose regex we never call.
+keyring-core = "=1.0.1"
+windows-native-keyring-store = { version = "=1.1.0", default-features = false }
+windows = "=0.62.2"
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.154"
+toml = "=1.1.8"
+md-5 = "=0.11.0"
+sha2 = "=0.11.1"
+zip = { version = "=9.1.0", default-features = false }
+# For the UI. Each one is already in the lock tree through slint or ytmapi-rs.
+# Cover decoding and resizing, and the PNGs that `--snapshot` writes.
+image = { version = "=0.25.10", default-features = false }
+# `--snapshot` renders offscreen by driving slint's skia renderer in software mode directly.
+i-slint-renderer-skia = { version = "=1.18.1", default-features = false }
+# Names the dirty region in the skia renderer's `RenderBuffer` trait, for the offscreen
+# windows that present like softbuffer does (`offscreen::install_presenting`).
+i-slint-core = { version = "=1.18.1", default-features = false }
+# Rasterises the Tri-vane logo into the window, exe and tray icons at build time.
+resvg = { version = "=0.48.1", default-features = false }
+# Embeds the logo `.ico` into featherplay.exe as its icon resource (rc.exe from the SDK).
+embed-resource = "=3.0.12"
+# `--fixtures` finds the design covers by the SHA-1 of their URL, the names they were saved under.
+sha1 = "=0.11.0"
+# The log facade: the crates log through it, the app writes the records to its log file.
+log = "=0.4.34"
+# The local API's server (crates/integrations/src/local_api). hyper and its helpers are
+# already in the tree through reqwest's client; the server adds hyper's `server` feature.
+hyper = { version = "=1.12.0", default-features = false }
+hyper-util = { version = "=0.1.21", default-features = false }
+http-body-util = "=0.1.5"
+bytes = "=1.12.1"
+# The WebSocket handshake's `Sec-WebSocket-Accept` (base64 of a SHA-1); in the tree already.
+base64 = { version = "=0.23.1", default-features = false }
+# The local API's token, from the system's CSPRNG; in the tree already (tempfile).
+getrandom = "=0.4.3"
+# Translations: the build script reads the `.po` files for the Rust side's catalogue with the
+# parser slint-build uses; the user's Windows display languages come from the crate Slint
+# itself asks. Both in the tree already.
+rspolib = "=0.1.2"
+sys-locale = "=0.3.2"
+
+# Slint's skia renderer with `wgpu-30` taken out of its default features (which
+# i-slint-backend-winit turns on), plus two stub constructors so winit still compiles.
+# We render with skia-software only, so wgpu was ~1 MB of dead code in the exe.
+# See vendor/i-slint-renderer-skia/VENDORED.md.
+[patch.crates-io]
+i-slint-renderer-skia = { path = "vendor/i-slint-renderer-skia" }
+
+# Full debug info made each UI test's PDB ~560 MB, and a workspace test run links dozens
+# of them. Line tables (~158 MB) keep file:line in panics and backtraces; dependencies
+# get none.
+[profile.dev]
+debug = "line-tables-only"
+[profile.dev.package."*"]
+debug = false
+
+# The exe must stay at 31 MB or less (`release.yml` checks it). Fat LTO with one codegen unit and
+# size-optimised code gets it there; the audio path keeps full speed below.
+[profile.release]
+lto = "fat"
+codegen-units = 1
+strip = true
+# "z" since the 2026-10-28 UI polish took "s" to 30.6 MB.
+opt-level = "z"
+
+# Decoding and output run all the time while playing, so they stay at opt-level 3.
+[profile.release.package.featherplay-audio]
+opt-level = 3
+[profile.release.package.rodio]
+opt-level = 3
+[profile.release.package.cpal]
+opt-level = 3
+[profile.release.package.dasp_sample]
+opt-level = 3
+[profile.release.package.symphonia]
+opt-level = 3
+[profile.release.package.symphonia-core]
+opt-level = 3
+[profile.release.package.symphonia-codec-aac]
+opt-level = 3
+[profile.release.package.symphonia-format-isomp4]
+opt-level = 3

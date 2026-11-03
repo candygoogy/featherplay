@@ -1,0 +1,365 @@
+// The Up next panel: "Playing from …", the current track pinned,
+// then the queue with drag to reorder, remove on hover and Clear, and a quiet divider
+// where a radio continuation starts. `UpNext` is also the now-playing page's Up next tab.
+// Filled by `src/queue_panel.rs`.
+import { ListView } from "std-widgets.slint";
+import { Theme, Icons, Curves } from "theme.slint";
+import { TrackRow, Body, SongRow, Cover, IconButton } from "parts.slint";
+
+export global QueueData {
+    in property <TrackRow> current;
+    in property <bool> has-current;
+    in property <[TrackRow]> upcoming;
+    // "Homework", "Around the World radio", "Liked songs"; empty when unknown.
+    in property <string> playing-from;
+    // The first upcoming track a radio continuation added, or -1.
+    in property <int> autoplay-at: -1;
+
+    // Indices are into `upcoming`.
+    callback move(int, int);
+    callback remove(int);
+    callback clear();
+    callback play(int);
+}
+
+// "Clear": a quiet text button.
+component TextButton inherits Rectangle {
+    in property <string> label;
+    in property <bool> enabled: true;
+    callback clicked();
+    width: t.preferred-width + 2 * Theme.s3;
+    height: 32px;
+    border-radius: Theme.r-m;
+    background: root.enabled ? Theme.state(ta.pressed, ta.has-hover) : transparent;
+    opacity: root.enabled ? 1.0 : 0.4;
+    accessible-role: button;
+    accessible-label: root.label;
+    accessible-action-default => { root.clicked(); }
+    animate background { duration: Theme.t-hover; }
+    ta := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+    t := Body {
+        text: root.label;
+        font-weight: 600;
+        color: ta.has-hover && root.enabled ? Theme.text1 : Theme.text2;
+        vertical-alignment: center;
+        overflow: clip;
+    }
+}
+
+// One upcoming track: click plays it, drag reorders it, the × on hover removes it.
+component QueueRow inherits Rectangle {
+    in property <TrackRow> track;
+    // The autoplay divider sits above this row.
+    in property <bool> divider;
+    // Being dragged: the row stays in place, dimmed, and a raised copy follows the pointer.
+    in property <bool> lifted;
+    in property <bool> drag-active;
+    // Space kept free on the right, where the list's scrollbar sits.
+    in property <length> gutter: 0px;
+    // The track the pointer last moved onto, and where it was then (window coordinates);
+    // kept by `UpNext` from every row's `pointer-moved`.
+    in property <string> hover-id;
+    in property <length> pointer-x;
+    in property <length> pointer-y;
+    // The pointer moved over this row: the row's track id, the pointer in window coordinates.
+    callback pointer-moved(string, length, length);
+    // Pointer y in the list's content coordinates, and in the row at the press.
+    callback drag(length, length);
+    callback drop();
+    callback cancel();
+    callback clicked();
+    callback remove();
+    property <length> top: root.divider ? Theme.queue-divider-h : 0px;
+    // Lit (hover tile, ×) while the pointer is on this row and moved onto this track. The
+    // touch area's own hover isn't enough: it stays with the element, so a row that slides
+    // away from a resting pointer (a row above was removed) would keep it, and a row that
+    // slides under it (the row it played left the list) takes it on any stray event.
+    property <bool> hot: ta.has-hover && root.hover-id == root.track.id
+        && root.pointer-x >= ta.absolute-position.x && root.pointer-x < ta.absolute-position.x + ta.width
+        && root.pointer-y >= ta.absolute-position.y && root.pointer-y < ta.absolute-position.y + ta.height;
+    height: root.top + Theme.row-h;
+    accessible-role: list-item;
+    accessible-label: root.track.title + ", " + root.track.artist;
+    accessible-action-default => { root.clicked(); }
+
+    if root.divider: Rectangle {
+        y: 0;
+        width: root.width - root.gutter;
+        height: Theme.queue-divider-h;
+        label := Body {
+            x: Theme.s2;
+            text: @tr("Autoplay: similar tracks");
+            font-size: Theme.t-meta;
+            color: Theme.text3;
+            vertical-alignment: center;
+            overflow: clip;
+        }
+        Rectangle {
+            x: label.x + label.width + Theme.s3;
+            y: (parent.height - 1px) / 2;
+            width: parent.width - self.x - Theme.s2;
+            height: 1px;
+            background: Theme.hairline;
+        }
+    }
+
+    ta := TouchArea {
+        x: 0;
+        y: root.top;
+        width: root.width - root.gutter;
+        height: Theme.row-h;
+        mouse-cursor: root.drag-active ? MouseCursor.grabbing : MouseCursor.pointer;
+        pointer-event(e) => {
+            if e.kind == PointerEventKind.move {
+                root.pointer-moved(root.track.id, self.absolute-position.x + self.mouse-x, self.absolute-position.y + self.mouse-y);
+            }
+            if e.button != PointerEventButton.left {
+                return;
+            }
+            if e.kind == PointerEventKind.up {
+                if root.drag-active {
+                    root.drop();
+                } else if self.has-hover {
+                    root.clicked();
+                }
+            } else if e.kind == PointerEventKind.cancel {
+                root.cancel();
+            }
+        }
+        moved => {
+            if self.pressed && (root.drag-active || abs(self.mouse-y - self.pressed-y) > Theme.s1) {
+                root.drag(root.y + root.top + self.mouse-y, self.pressed-y);
+            }
+        }
+
+        Rectangle {
+            border-radius: Theme.r-m;
+            background: root.drag-active ? transparent : Theme.state(ta.pressed, root.hot);
+            opacity: root.lifted ? 0.35 : 1.0;
+            animate background { duration: Theme.t-hover; }
+            Cover {
+                x: Theme.s2;
+                y: (parent.height - self.height) / 2;
+                width: Theme.row-cover;
+                height: Theme.row-cover;
+                radius: Theme.r-s;
+                source: root.track.cover;
+            }
+            VerticalLayout {
+                x: Theme.s2 + Theme.row-cover + Theme.s3;
+                width: parent.width - self.x - 56px;
+                alignment: center;
+                spacing: 1px;
+                Body {
+                    text: root.track.title;
+                    font-weight: 600;
+                }
+                Body {
+                    text: root.track.artist;
+                    font-size: Theme.t-meta;
+                    color: Theme.text2;
+                }
+            }
+            if !root.hot || root.drag-active: Body {
+                x: parent.width - self.width - Theme.s3;
+                height: parent.height;
+                text: root.track.duration;
+                font-size: Theme.t-meta;
+                color: Theme.text3;
+                vertical-alignment: center;
+            }
+        }
+        if root.hot && !root.drag-active: IconButton {
+            x: parent.width - self.width - Theme.s1;
+            y: (parent.height - self.height) / 2;
+            icon: Icons.close;
+            glyph: 16px;
+            label: @tr("Remove from queue");
+            clicked => { root.remove(); }
+        }
+    }
+}
+
+// "Playing from" and Clear, the current track, then the queue.
+export component UpNext inherits Rectangle {
+    // Drag to reorder: the row picked up, the row under the pointer, the pointer.
+    property <int> drag-from: -1;
+    property <int> drag-to: -1;
+    property <length> drag-y;
+    property <length> grab-y;
+    // Hover (see `QueueRow.hot`): the track the pointer last moved onto, and where it was.
+    property <string> hover-id;
+    property <length> pointer-x: -1px;
+    property <length> pointer-y: -1px;
+    property <int> at: QueueData.autoplay-at;
+    property <int> count: QueueData.upcoming.length;
+    // "Playing from …" and Clear; without a label only Clear, so no empty band is left.
+    property <bool> labelled: QueueData.playing-from != "";
+    property <length> head-h: root.labelled ? 64px : 32px + Theme.s2;
+    property <length> list-y: QueueData.has-current ? root.head-h + Theme.row-h + Theme.s2 : root.head-h;
+    // The rows end where the header and Clear end; the list's scrollbar sits in the gutter.
+    property <length> gutter: Theme.s2;
+    property <length> row-w: root.width - 2 * Theme.s4 - root.gutter;
+
+    // The top of row `i`'s track (below the divider, if it has one), in content coordinates.
+    pure function row-top(i: int) -> length {
+        return i * Theme.row-h + (root.at >= 0 && i >= root.at ? Theme.queue-divider-h : 0px);
+    }
+    // The row under content y `y`.
+    pure function index-at(y: length) -> int {
+        return clamp(floor((root.at >= 0 && y >= root.at * Theme.row-h + Theme.queue-divider-h ? y - Theme.queue-divider-h : (root.at >= 0 && y >= root.at * Theme.row-h ? root.at * Theme.row-h : y)) / Theme.row-h), 0, root.count - 1);
+    }
+    function end-drag() {
+        root.drag-from = -1;
+        root.drag-to = -1;
+    }
+
+    Body {
+        x: Theme.s5;
+        y: Theme.s2;
+        width: parent.width - 2 * Theme.s5 - clear.width;
+        height: 16px;
+        visible: root.labelled;
+        text: @tr("Playing from");
+        font-size: Theme.t-meta;
+        color: Theme.text3;
+        vertical-alignment: center;
+    }
+    Body {
+        x: Theme.s5;
+        y: 26px;
+        width: parent.width - 2 * Theme.s5 - clear.width - Theme.s2;
+        height: 20px;
+        visible: root.labelled;
+        text: QueueData.playing-from;
+        font-weight: 600;
+        vertical-alignment: center;
+    }
+    clear := TextButton {
+        x: parent.width - self.width - Theme.s3;
+        y: root.labelled ? Theme.s3 : 0px;
+        label: @tr("Clear");
+        enabled: root.count > 0;
+        clicked => {
+            root.end-drag();
+            QueueData.clear();
+        }
+    }
+
+    if QueueData.has-current: SongRow {
+        x: Theme.s4;
+        y: root.head-h;
+        width: root.row-w;
+        track: QueueData.current;
+        selected: true;
+    }
+    if !QueueData.has-current: Body {
+        x: Theme.s5;
+        y: root.head-h;
+        height: Theme.row-h;
+        text: @tr("Nothing playing");
+        color: Theme.text3;
+        vertical-alignment: center;
+    }
+    if QueueData.has-current && root.count == 0: Body {
+        x: Theme.s5;
+        y: root.list-y;
+        height: Theme.row-h;
+        text: @tr("Nothing up next");
+        color: Theme.text3;
+        vertical-alignment: center;
+    }
+
+    list := ListView {
+        x: Theme.s4;
+        y: root.list-y;
+        width: parent.width - 2 * Theme.s4;
+        // The panel runs down behind the floating bar; its list ends above it.
+        height: parent.height - self.y - Theme.bar-clear;
+        for t[i] in QueueData.upcoming: QueueRow {
+            track: t;
+            gutter: root.gutter;
+            divider: i == root.at;
+            lifted: i == root.drag-from;
+            drag-active: root.drag-from >= 0;
+            hover-id: root.hover-id;
+            pointer-x: root.pointer-x;
+            pointer-y: root.pointer-y;
+            pointer-moved(id, x, y) => {
+                // Windows sends moves without movement now and then; those don't hand the
+                // hover to a row that slid under the resting pointer.
+                if x != root.pointer-x || y != root.pointer-y {
+                    root.hover-id = id;
+                }
+                root.pointer-x = x;
+                root.pointer-y = y;
+            }
+            drag(y, grab) => {
+                if root.drag-from < 0 {
+                    root.drag-from = i;
+                    root.grab-y = grab;
+                }
+                root.drag-y = y;
+                root.drag-to = root.index-at(y);
+            }
+            drop => {
+                if root.drag-from >= 0 && root.drag-to >= 0 && root.drag-to != root.drag-from {
+                    QueueData.move(root.drag-from, root.drag-to);
+                }
+                root.end-drag();
+            }
+            cancel => { root.end-drag(); }
+            clicked => { QueueData.play(i); }
+            remove => { QueueData.remove(i); }
+        }
+    }
+
+    // Where the row will land: a line above or below the row under the pointer.
+    if root.drag-from >= 0 && root.drag-to >= 0 && root.drag-to != root.drag-from: Rectangle {
+        x: list.x + Theme.s2;
+        y: list.y + list.content-y + root.row-top(root.drag-to) + (root.drag-to > root.drag-from ? Theme.row-h : 0px) - 1px;
+        width: root.row-w - 2 * Theme.s2;
+        height: 2px;
+        border-radius: 1px;
+        background: Theme.accent;
+    }
+    // The raised copy under the pointer.
+    if root.drag-from >= 0: Rectangle {
+        x: list.x;
+        y: clamp(list.y + list.content-y + root.drag-y - root.grab-y, list.y - Theme.row-h / 2, list.y + list.height - Theme.row-h / 2);
+        width: root.row-w;
+        height: Theme.row-h;
+        border-radius: Theme.r-m;
+        background: Theme.card;
+        drop-shadow-blur: 16px;
+        drop-shadow-offset-y: 4px;
+        drop-shadow-color: Theme.cover-shadow;
+        SongRow {
+            track: QueueData.upcoming[root.drag-from];
+        }
+    }
+}
+
+// The frame's side panel: its ground, its left hairline, and its contents (app.slint gives
+// it Now playing's Up next and Related tabs, `SideTabs`, so the two panels read the same).
+export component QueuePanel inherits Rectangle {
+    // The panel is opening or open: its contents fade in as it slides, so a full
+    // list doesn't slide in as a slab.
+    in property <bool> open: true;
+    background: Theme.panel;
+    clip: true;
+    Rectangle {
+        x: 0;
+        width: 1px;
+        background: Theme.hairline;
+    }
+    Rectangle {
+        opacity: root.open ? 1 : 0;
+        animate opacity { duration: Theme.t-fast; easing: Curves.ease-out; }
+        @children
+    }
+}

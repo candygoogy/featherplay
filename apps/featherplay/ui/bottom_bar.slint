@@ -1,0 +1,570 @@
+// The player bar: a rounded panel floating over the bottom of the window,
+// `Theme.bar-inset` in from its edges (app.slint places it). The track on the left; in the
+// middle the transport around the round play button, with the time, the seek line and the
+// length under it; Lyrics (the microphone), "Not for me" (⊘), like, volume and the Up next
+// button on the right. It reads and drives the
+// `Player` global; `src/bar.rs` connects that to the controller.
+import { Theme, Icons, Curves } from "theme.slint";
+import { Body, Cover, IconButton, Icon, PlayButton } from "parts.slint";
+import { Player, Repeat } from "player.slint";
+import { Nav, PageKind, Frame } from "nav.slint";
+import { NotForMeButton } from "not_for_me.slint";
+import { LyricsData } from "pages/lyrics.slint";
+
+// The seek line, between the time and the length: 4 px, 6 px while hovered, with round ends;
+// click or drag anywhere on it to seek. Hovered, a thumb sits at the fill's end and a tooltip
+// shows the time under the pointer. The fill follows a drag directly and stays
+// where it was dropped until the next position arrives.
+component SeekLine inherits Rectangle {
+    property <bool> can-seek: Player.has-track && Player.duration-s > 0;
+    property <bool> dragging: ta.pressed && self.can-seek;
+    property <bool> active: (ta.has-hover || self.dragging) && self.can-seek;
+    property <float> preview: clamp(ta.mouse-x / max(1px, self.width), 0, 1);
+    // Where a seek was dropped, until the player reports a position (-1: none).
+    property <float> dropped: -1;
+    property <float> position: Player.position-s;
+    property <string> track: Player.track-id;
+    changed position => { root.dropped = -1; }
+    changed track => { root.dropped = -1; }
+    property <float> shown: self.dragging ? self.preview : (self.dropped >= 0 ? self.dropped : (Player.duration-s > 0 ? clamp(Player.position-s / Player.duration-s, 0, 1) : 0));
+    property <length> thickness: root.active ? 6px : 4px;
+    property <length> mid: self.height / 2;
+    height: 16px;
+    accessible-role: slider;
+    accessible-label: @tr("Seek");
+    accessible-value: Player.elapsed;
+    ta := TouchArea {
+        enabled: root.can-seek;
+        mouse-cursor: pointer;
+        pointer-event(e) => {
+            if e.kind == PointerEventKind.up && e.button == PointerEventButton.left {
+                root.dropped = root.preview;
+                Player.seek(root.preview);
+            }
+        }
+    }
+    Rectangle {
+        y: root.mid - self.height / 2;
+        height: root.thickness;
+        border-radius: self.height / 2;
+        background: Theme.track;
+        animate height { duration: Theme.t-hover; }
+    }
+    if root.shown > 0: Rectangle {
+        x: 0;
+        y: root.mid - self.height / 2;
+        width: max(self.height, root.width * root.shown);
+        height: root.thickness;
+        border-radius: self.height / 2;
+        background: Theme.accent;
+        animate height { duration: Theme.t-hover; }
+    }
+    // Until the first sound: a shimmer runs along the line (the only repeating animation,
+    // and only while loading). Without motion, a quiet static line instead.
+    if Player.loading && Theme.moving: Rectangle {
+        y: root.mid - 2px;
+        height: 4px;
+        border-radius: 2px;
+        clip: true;
+        Rectangle {
+            property <float> t: mod(animation-tick() / 1ms, Theme.t-shimmer / 1ms) / (Theme.t-shimmer / 1ms);
+            x: (self.t * 1.4 - 0.4) * parent.width;
+            width: parent.width * 0.4;
+            background: @linear-gradient(90deg, transparent 0%, Theme.accent 50%, transparent 100%);
+        }
+    }
+    if Player.loading && !Theme.moving: Rectangle {
+        y: root.mid - 2px;
+        height: 4px;
+        border-radius: 2px;
+        background: Theme.accent;
+        opacity: 0.4;
+    }
+    // The thumb: centred on the fill's end and the line.
+    Rectangle {
+        x: root.width * root.shown - self.width / 2;
+        y: root.mid - self.height / 2;
+        width: 14px;
+        height: 14px;
+        border-radius: 7px;
+        background: Theme.accent;
+        drop-shadow-blur: 4px;
+        drop-shadow-color: #00000066;
+        opacity: root.active ? 1 : 0;
+        visible: self.opacity > 0;
+        transform-scale: root.active || !Theme.moving ? 1.0 : 0.5;
+        animate opacity { duration: Theme.t-fast; easing: Curves.ease-out; }
+        animate transform-scale {
+            duration: root.active ? Theme.t-release : Theme.t-fast;
+            easing: root.active ? Curves.release : Curves.ease-out;
+        }
+    }
+    // The time under the pointer, 8 px above the line.
+    Rectangle {
+        property <length> w: tip.preferred-width + 12px;
+        x: clamp(ta.mouse-x - self.w / 2, -self.w / 2, root.width - self.w / 2);
+        y: root.mid - 3px - Theme.s2 - self.height;
+        width: self.w;
+        height: tip.preferred-height + 8px;
+        border-radius: Theme.r-s;
+        background: Theme.card;
+        drop-shadow-blur: 8px;
+        drop-shadow-color: Theme.cover-shadow;
+        opacity: root.active ? 1 : 0;
+        visible: self.opacity > 0;
+        animate opacity { duration: Theme.t-fast; easing: Curves.ease-out; }
+        tip := Body {
+            text: Player.clock(root.preview * Player.duration-s);
+            font-size: Theme.t-meta;
+            font-weight: 600;
+            color: Theme.text1;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+    }
+}
+
+component VolumeSlider inherits Rectangle {
+    property <float> preview: clamp(ta.mouse-x / max(1px, self.width), 0, 1);
+    // The wheel changed the volume and it isn't saved yet: saved once the wheel rests.
+    property <bool> wheeled: false;
+    width: 88px;
+    accessible-role: slider;
+    accessible-label: @tr("Volume");
+    accessible-value: round(Player.volume * 100) + " %";
+    Timer {
+        interval: 600ms;
+        running: root.wheeled;
+        triggered => {
+            root.wheeled = false;
+            Player.set-volume(Player.volume, true);
+        }
+    }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        // 5 % a notch (a notch is 60 px); a touchpad's smaller steps move it in proportion.
+        scroll-event(e) => {
+            if e.delta-y == 0 {
+                return reject;
+            }
+            Player.set-volume(clamp(Player.volume + e.delta-y / 60px * 0.05, 0, 1), false);
+            root.wheeled = true;
+            accept
+        }
+        pointer-event(e) => {
+            if e.button == PointerEventButton.left {
+                if e.kind == PointerEventKind.down {
+                    Player.set-volume(root.preview, false);
+                } else if e.kind == PointerEventKind.up {
+                    Player.set-volume(root.preview, true);
+                }
+            }
+        }
+        moved => {
+            if self.pressed {
+                Player.set-volume(root.preview, false);
+            }
+        }
+    }
+    Rectangle {
+        y: (parent.height - 4px) / 2;
+        height: 4px;
+        border-radius: 2px;
+        background: Theme.track;
+    }
+    Rectangle {
+        x: 0;
+        y: (parent.height - 4px) / 2;
+        width: parent.width * clamp(Player.volume, 0, 1);
+        height: 4px;
+        border-radius: 2px;
+        background: ta.has-hover || ta.pressed ? Theme.accent : Theme.text2;
+        animate background { duration: Theme.t-hover; }
+    }
+}
+
+// Lyrics, the microphone left of ⊘: Now playing's full lyrics view on and off from any page
+// (`LyricsData.toggle-view`; elsewhere it opens Now playing on the lyrics), in the accent
+// while the view shows. Resting on it shows a tooltip like ⊘'s, with the shortcut; the same
+// delay keeps it from flashing as the pointer crosses the bar.
+component LyricsButton inherits Rectangle {
+    // How far above the button the tooltip ends (the bar lifts it clear of itself).
+    in property <length> above: Theme.s2;
+    property <bool> over: btn.hovered;
+    // The pointer has rested long enough (at once in snapshots), and hasn't clicked since.
+    property <bool> rested: false;
+    property <bool> dismissed: false;
+    property <bool> tip: root.over && !root.dismissed && (root.rested || Theme.still);
+    changed over => {
+        if !root.over {
+            root.rested = false;
+            root.dismissed = false;
+        }
+    }
+    width: 36px;
+    height: 36px;
+    Timer {
+        interval: 500ms;
+        running: root.over && !root.rested;
+        triggered => { root.rested = true; }
+    }
+    btn := IconButton {
+        icon: Icons.lyrics;
+        label: @tr("Lyrics");
+        description: LyricsData.showing ? @tr("Hides the lyrics, back to the cover") : @tr("Shows the lyrics on Now playing");
+        active: LyricsData.showing;
+        // Off is always possible; on needs a song.
+        enabled: Player.has-track || LyricsData.showing;
+        clicked => {
+            root.dismissed = true;
+            LyricsData.toggle-view();
+        }
+    }
+    // The tooltip, `above` the button, centred over it.
+    Rectangle {
+        x: (root.width - self.width) / 2;
+        y: btn.y - root.above - self.height;
+        width: lay.preferred-width;
+        height: lay.preferred-height;
+        border-radius: Theme.r-s;
+        background: Theme.card;
+        border-width: 1px;
+        border-color: Theme.card-edge;
+        drop-shadow-blur: 8px;
+        drop-shadow-color: Theme.cover-shadow;
+        opacity: root.tip ? 1 : 0;
+        visible: self.opacity > 0;
+        animate opacity { duration: Theme.t-fast; easing: Curves.ease-out; }
+        lay := HorizontalLayout {
+            padding-left: Theme.s3;
+            padding-right: Theme.s3;
+            padding-top: Theme.s2;
+            padding-bottom: Theme.s2;
+            spacing: Theme.s2;
+            Body {
+                text: LyricsData.showing ? @tr("Hide lyrics") : @tr("Lyrics");
+                font-size: Theme.t-meta;
+                font-weight: 600;
+                color: Theme.text1;
+            }
+            Body {
+                text: @tr("Ctrl+L");
+                font-size: Theme.t-meta;
+                color: Theme.text2;
+            }
+        }
+    }
+}
+
+// The bar's play button, with a tooltip like the microphone's: Play or Pause, and its
+// shortcut, Space. The same delay; the timer runs only while the pointer is on it.
+component BarPlayButton inherits Rectangle {
+    // How far above the button the tooltip ends (the bar lifts it clear of itself).
+    in property <length> above: Theme.s2;
+    property <bool> over: btn.hovered;
+    // The pointer has rested long enough (at once in snapshots), and hasn't clicked since.
+    property <bool> rested: false;
+    property <bool> dismissed: false;
+    property <bool> tip: root.over && !root.dismissed && (root.rested || Theme.still);
+    changed over => {
+        if !root.over {
+            root.rested = false;
+            root.dismissed = false;
+        }
+    }
+    width: btn.width;
+    height: btn.height;
+    Timer {
+        interval: 500ms;
+        running: root.over && !root.rested;
+        triggered => { root.rested = true; }
+    }
+    btn := PlayButton {
+        clicked => { root.dismissed = true; }
+    }
+    // The tooltip, `above` the button, centred over it.
+    Rectangle {
+        x: (root.width - self.width) / 2;
+        y: btn.y - root.above - self.height;
+        width: lay.preferred-width;
+        height: lay.preferred-height;
+        border-radius: Theme.r-s;
+        background: Theme.card;
+        border-width: 1px;
+        border-color: Theme.card-edge;
+        drop-shadow-blur: 8px;
+        drop-shadow-color: Theme.cover-shadow;
+        opacity: root.tip ? 1 : 0;
+        visible: self.opacity > 0;
+        animate opacity { duration: Theme.t-fast; easing: Curves.ease-out; }
+        lay := HorizontalLayout {
+            padding-left: Theme.s3;
+            padding-right: Theme.s3;
+            padding-top: Theme.s2;
+            padding-bottom: Theme.s2;
+            spacing: Theme.s2;
+            Body {
+                text: Player.playing ? @tr("Pause") : @tr("Play");
+                font-size: Theme.t-meta;
+                font-weight: 600;
+                color: Theme.text1;
+            }
+            Body {
+                text: @tr("Space");
+                font-size: Theme.t-meta;
+                color: Theme.text2;
+            }
+        }
+    }
+}
+
+export component BottomBar inherits Rectangle {
+    // The volume to go back to when unmuting.
+    property <float> unmuted: 0.7;
+    // The like heart pops when a like is added from the bar.
+    property <bool> heart-pop: false;
+    pop-end := Timer {
+        interval: 1ms;
+        running: false;
+        triggered => {
+            self.running = false;
+            root.heart-pop = false;
+        }
+    }
+    // The middle column (the transport, the time and the line), and what's left either side
+    // for the title: it stays clear of the buttons on the right at the narrowest window.
+    property <length> center-w: max(320px, min(600px, self.width - 2 * (actions.preferred-width + 14px)));
+    property <length> left-w: max(80px, (self.width - root.center-w) / 2 - 100px);
+    // The transport row, and the time row under it.
+    property <length> transport-y: 8px;
+    property <length> time-y: 60px;
+    height: Theme.bar-h;
+    border-radius: Theme.r-xl;
+    background: Theme.bar;
+    border-width: 1px;
+    border-color: Theme.card-edge;
+    drop-shadow-blur: 24px;
+    drop-shadow-offset-y: 4px;
+    drop-shadow-color: Theme.cover-shadow;
+    animate background { duration: Theme.t-colour; }
+
+    // Cover, title and artist: open Now playing (or close it).
+    Rectangle {
+        x: 8px;
+        y: 8px;
+        width: root.left-w + 84px;
+        height: root.height - 16px;
+        border-radius: Theme.r-l - 4px;
+        background: Player.has-track ? Theme.state(ota.pressed, ota.has-hover) : transparent;
+        accessible-role: button;
+        accessible-label: Player.has-track ? @tr("Now playing: {}", Player.title) : @tr("Nothing playing");
+        accessible-action-default => { Nav.toggle-now-playing(); }
+        animate background { duration: Theme.t-hover; }
+        ota := TouchArea {
+            enabled: Player.has-track;
+            mouse-cursor: pointer;
+            clicked => { Nav.toggle-now-playing(); }
+        }
+        Cover {
+            x: 8px;
+            y: (parent.height - self.height) / 2;
+            width: 56px;
+            height: 56px;
+            radius: Theme.r-m;
+            source: Player.cover;
+            crossfade: true;
+            // Hovered: a veil and a chevron say it opens Now playing.
+            Rectangle {
+                background: Theme.cover-hover;
+                opacity: ota.has-hover && Player.has-track ? 1 : 0;
+                visible: self.opacity > 0;
+                animate opacity { duration: Theme.t-hover; easing: Curves.ease-hover; }
+                Icon {
+                    width: 20px;
+                    height: 20px;
+                    commands: Nav.page == PageKind.now-playing ? Icons.chevron-down : Icons.chevron-up;
+                    stroke: #FFFFFF;
+                    stroke-width: 2px;
+                }
+            }
+        }
+        Body {
+            x: 76px;
+            y: parent.height / 2 - 19px;
+            width: root.left-w;
+            text: Player.has-track ? Player.title : @tr("Nothing playing");
+            font-weight: 600;
+            color: Player.has-track ? Theme.text1 : Theme.text3;
+        }
+        // The artist links to the artist's page, underlined on hover.
+        artist := Rectangle {
+            property <bool> link: Player.artist-id != "";
+            x: 76px;
+            y: parent.height / 2 + 3px;
+            width: min(root.left-w, artist-text.preferred-width);
+            height: artist-text.preferred-height;
+            accessible-role: button;
+            accessible-label: Player.artist;
+            accessible-action-default => { Nav.open-artist(Player.artist-id); }
+            artist-text := Body {
+                width: parent.width;
+                text: Player.artist;
+                font-size: Theme.t-meta;
+                color: ata.has-hover && artist.link ? Theme.text1 : Theme.text2;
+            }
+            if ata.has-hover && artist.link: Rectangle {
+                y: parent.height - 1px;
+                height: 1px;
+                background: Theme.text1;
+            }
+            ata := TouchArea {
+                enabled: artist.link;
+                mouse-cursor: pointer;
+                clicked => { Nav.open-artist(Player.artist-id); }
+            }
+        }
+    }
+
+    // The transport, centred on the bar.
+    HorizontalLayout {
+        x: (parent.width - self.width) / 2;
+        y: root.transport-y;
+        height: Theme.play-size;
+        width: self.preferred-width;
+        spacing: 12px;
+        IconButton {
+            y: (Theme.play-size - self.height) / 2;
+            icon: Icons.shuffle;
+            label: @tr("Shuffle");
+            active: Player.shuffle;
+            enabled: Player.has-track;
+            clicked => { Player.toggle-shuffle(); }
+        }
+        IconButton {
+            y: (Theme.play-size - self.height) / 2;
+            icon: Icons.prev;
+            label: @tr("Previous");
+            filled: true;
+            tint: Theme.text1;
+            enabled: Player.has-track;
+            clicked => { Player.previous(); }
+        }
+        // Its tooltip ends `s2` above the bar.
+        BarPlayButton {
+            above: root.transport-y + Theme.s2;
+        }
+        IconButton {
+            y: (Theme.play-size - self.height) / 2;
+            icon: Icons.next;
+            label: @tr("Next");
+            filled: true;
+            tint: Theme.text1;
+            enabled: Player.has-track;
+            clicked => { Player.next(); }
+        }
+        IconButton {
+            y: (Theme.play-size - self.height) / 2;
+            icon: Icons.repeat;
+            label: Player.repeat == Repeat.one ? @tr("Repeat one") : (Player.repeat == Repeat.all ? @tr("Repeat all") : @tr("Repeat off"));
+            active: Player.repeat != Repeat.off;
+            enabled: Player.has-track;
+            clicked => { Player.cycle-repeat(); }
+            if Player.repeat == Repeat.one: Text {
+                x: parent.width - 13px;
+                y: 4px;
+                text: "1";
+                font-family: Theme.body-font;
+                font-size: 9px;
+                font-weight: 700;
+                color: Theme.accent;
+            }
+        }
+    }
+
+    // Under the transport: the time, the seek line and the length. Fixed widths for the
+    // times, so the line doesn't shift as they tick.
+    HorizontalLayout {
+        x: (parent.width - root.center-w) / 2;
+        y: root.time-y;
+        width: root.center-w;
+        height: 16px;
+        spacing: Theme.s3;
+        Body {
+            width: 44px;
+            text: Player.has-track ? Player.elapsed : "";
+            font-size: Theme.t-meta;
+            color: Theme.text2;
+            horizontal-alignment: right;
+            vertical-alignment: center;
+            overflow: clip;
+        }
+        SeekLine {
+            horizontal-stretch: 1;
+        }
+        Body {
+            width: 44px;
+            text: Player.has-track ? Player.total : "";
+            font-size: Theme.t-meta;
+            color: Theme.text2;
+            horizontal-alignment: left;
+            vertical-alignment: center;
+            overflow: clip;
+        }
+    }
+
+    actions := HorizontalLayout {
+        x: parent.width - self.width - Theme.s3;
+        y: (parent.height - 36px) / 2;
+        height: 36px;
+        width: self.preferred-width;
+        spacing: 4px;
+        // The tooltips end `s2` above the bar (the buttons sit centred in it).
+        // Not there with lyrics off in Settings (`if`: a hidden element keeps its room).
+        if LyricsData.on: LyricsButton {
+            above: (Theme.bar-h - 36px) / 2 + Theme.s2;
+        }
+        NotForMeButton {
+            above: (Theme.bar-h - 32px) / 2 + Theme.s2;
+        }
+        IconButton {
+            icon: Icons.heart;
+            label: Player.liked ? @tr("Remove like") : @tr("Like");
+            filled: Player.liked;
+            tint: Player.liked ? Theme.text1 : Theme.text2;
+            enabled: Player.has-track;
+            glyph-scale: root.heart-pop && Theme.moving ? 0.8 : 1.0;
+            clicked => {
+                if !Player.liked {
+                    root.heart-pop = true;
+                    pop-end.running = true;
+                }
+                Player.toggle-like();
+            }
+        }
+        IconButton {
+            icon: Player.volume > 0 ? Icons.volume : Icons.volume-off;
+            label: Player.volume > 0 ? @tr("Mute") : @tr("Unmute");
+            clicked => {
+                if Player.volume > 0 {
+                    root.unmuted = Player.volume;
+                    Player.set-volume(0, true);
+                } else {
+                    Player.set-volume(root.unmuted, true);
+                }
+            }
+        }
+        VolumeSlider { }
+        Rectangle {
+            width: 8px;
+        }
+        IconButton {
+            icon: Icons.queue;
+            label: @tr("Up next");
+            active: Frame.queue-open;
+            clicked => {
+                Frame.queue-open = !Frame.queue-open;
+                Frame.queue-toggled(Frame.queue-open);
+            }
+        }
+    }
+}

@@ -1,0 +1,416 @@
+// The sidebar (given more entries on 2026-10-30): Home, Library, Explore and
+// History, Liked songs, then the library as a list under three chips (Playlists, Albums,
+// Artists), pinned entries first, then Settings and the account. 240 px wide; an icon rail
+// below `Theme.wide-min` (the rail shows the list without its chips). Filled by
+// `src/sidebar.rs`. Search is the top bar's (top_bar.slint).
+import { ListView } from "std-widgets.slint";
+import { Theme, Icons, Curves } from "theme.slint";
+import { CardItem, ItemKind, Icon, Body, Cover, IconButton } from "parts.slint";
+import { Nav, PageKind } from "nav.slint";
+import { AccountMenu } from "account_menu.slint";
+import { PlaylistMenu } from "playlist_menu.slint";
+
+export global SidebarData {
+    // The library playlists in the library's order (the song menu's Add to playlist).
+    in property <[CardItem]> playlists;
+    // The chip shown: 0 Playlists, 1 Albums, 2 Artists.
+    in-out property <int> chip;
+    // The chip's list as the sidebar shows it (pinned first), with 24 px covers, and which
+    // of its entries are pinned, by index.
+    in property <[CardItem]> items;
+    in property <[bool]> pinned;
+    // Said under the chips when the chip's list loaded empty ("" otherwise).
+    in property <string> empty-text;
+    in property <bool> signed-in;
+    // The account's name, when known ("" shows the generic "Signed in" row).
+    in property <string> display-name;
+    // The channel handle under the name ("" shows the name alone).
+    in property <string> handle;
+    // The account photo (32 px, shown round) once `has-avatar`; until then the letter.
+    in property <image> avatar;
+    in property <bool> has-avatar;
+    // The avatar letter; "" shows the person glyph.
+    in property <string> initial;
+    callback chip-picked(int);
+}
+
+// Glyphs only the sidebar uses, on the `Icons` grid.
+global SideIcons {
+    // A compass: a ring and its needle.
+    out property <string> explore: "M12 3.5 a8.5 8.5 0 1 0 0.01 0 Z M14.8 9.2 L13.2 13.2 L9.2 14.8 L10.8 10.8 Z";
+    // A clock turning back: a ring open at the top left, its arrow, and the hands.
+    out property <string> history: "M4.6 9 A8 8 0 1 1 4 12 M4.6 9 L4.4 5.5 M4.6 9 L8 8.6 M12 8 V12 L14.8 13.8";
+    // A pushpin.
+    out property <string> pin: "M9 4.5 H15 M10.2 4.5 V10 L7.5 13.5 H16.5 L13.8 10 V4.5 M12 13.5 V19.5";
+}
+
+// Opens a list entry's page (content.slint's `Open` imports the sidebar, so not that one).
+global SideOpen {
+    public function item(it: CardItem) {
+        if it.kind == ItemKind.album {
+            Nav.open-album(it.id);
+        } else if it.kind == ItemKind.artist {
+            Nav.open-artist(it.id);
+        } else {
+            Nav.open-playlist(it.id);
+        }
+    }
+}
+
+// The library's chips: pills sized to their labels, as the Library's chips are, in the
+// sidebar's smaller type; the shown one on the accent's tonal fill, the others outlined.
+component SideChips inherits Rectangle {
+    in property <[string]> labels;
+    in property <int> active;
+    callback selected(int);
+    HorizontalLayout {
+        alignment: start;
+        spacing: 6px;
+        for label[i] in root.labels: Rectangle {
+            property <bool> on: i == root.active;
+            width: t.preferred-width + 2 * Theme.s3;
+            border-radius: self.height / 2;
+            border-width: self.on ? 0px : 1px;
+            border-color: Theme.hairline;
+            background: self.on ? (ta.has-hover || ta.pressed ? Theme.accent-tonal-hover : Theme.accent-tonal) : Theme.state(ta.pressed, ta.has-hover);
+            transform-scale: ta.pressed ? Theme.press-scale : 1.0;
+            accessible-role: tab;
+            accessible-label: label;
+            accessible-item-selected: self.on;
+            accessible-action-default => { root.selected(i); }
+            animate background { duration: Theme.t-hover; }
+            animate transform-scale {
+                duration: ta.pressed ? Theme.t-press : Theme.t-release;
+                easing: ta.pressed ? Curves.ease-out : Curves.release;
+            }
+            ta := TouchArea {
+                mouse-cursor: pointer;
+                clicked => { root.selected(i); }
+            }
+            t := Body {
+                text: label;
+                font-size: Theme.t-meta;
+                font-weight: 600;
+                color: parent.on ? Theme.text1 : Theme.text2;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+                overflow: clip;
+            }
+        }
+    }
+}
+
+component NavItem inherits Rectangle {
+    in property <string> icon;
+    in property <string> label;
+    in property <bool> active;
+    in property <bool> rail;
+    callback clicked();
+    // A right-click, in window coordinates.
+    callback right-clicked(length, length);
+    height: 40px;
+    border-radius: Theme.r-m;
+    background: Theme.state-on(root.active, ta.pressed, ta.has-hover);
+    accessible-role: button;
+    accessible-label: root.label;
+    accessible-action-default => { root.clicked(); }
+    animate background { duration: Theme.t-hover; }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+        pointer-event(e) => {
+            if e.button == PointerEventButton.right && e.kind == PointerEventKind.up {
+                root.right-clicked(self.absolute-position.x + self.mouse-x, self.absolute-position.y + self.mouse-y);
+            }
+        }
+    }
+    Icon {
+        x: root.rail ? (parent.width - self.width) / 2 : 12px;
+        commands: root.icon;
+        stroke: root.active ? Theme.text1 : Theme.text2;
+    }
+    if !root.rail: Body {
+        x: 44px;
+        width: parent.width - 52px;
+        height: parent.height;
+        text: root.label;
+        color: root.active ? Theme.text1 : Theme.text2;
+        font-weight: root.active ? 600 : 400;
+        vertical-alignment: center;
+    }
+}
+
+export component Sidebar inherits Rectangle {
+    in property <bool> rail: false;
+    // The sidebar runs the window's height, behind the floating bar; its rows end `clear`
+    // above the bottom, at the bar's top.
+    in property <length> clear: 0px;
+    property <length> foot: self.height - root.clear;
+    function account-clicked() {
+        if SidebarData.signed-in {
+            AccountMenu.show(account-row.absolute-position.x, account-row.absolute-position.y);
+        } else {
+            Nav.go(PageKind.sign-in);
+        }
+    }
+    property <length> inset: 8px;
+    property <length> item-w: self.width - 2 * self.inset;
+    // Liked songs, then the chips (not on the rail), then the list. The chips start at the
+    // rows' cover column (`inset` + 10 px) and keep `Theme.s3` of room above and below.
+    property <length> liked-y: 188px;
+    property <length> chips-x: root.inset + 10px;
+    property <length> chips-y: root.liked-y + 40px + Theme.s3;
+    property <length> chips-h: 28px;
+    property <length> list-top: root.rail ? root.liked-y + 48px : root.chips-y + root.chips-h + Theme.s3;
+    property <length> list-bottom: root.foot - 128px;
+    width: root.rail ? Theme.rail-w : Theme.sidebar-w;
+    background: Theme.surface;
+
+    NavItem {
+        x: root.inset;
+        y: 12px;
+        width: root.item-w;
+        rail: root.rail;
+        icon: Icons.home;
+        label: @tr("Home");
+        active: Nav.page == PageKind.home;
+        clicked => { Nav.go(PageKind.home); }
+    }
+    NavItem {
+        x: root.inset;
+        y: 52px;
+        width: root.item-w;
+        rail: root.rail;
+        icon: Icons.library;
+        label: @tr("Library");
+        active: Nav.page == PageKind.library;
+        clicked => { Nav.open-library(0); }
+    }
+    NavItem {
+        x: root.inset;
+        y: 92px;
+        width: root.item-w;
+        rail: root.rail;
+        icon: SideIcons.explore;
+        label: @tr("Explore");
+        active: Nav.page == PageKind.explore || Nav.page == PageKind.mood;
+        clicked => { Nav.go(PageKind.explore); }
+    }
+    NavItem {
+        x: root.inset;
+        y: 132px;
+        width: root.item-w;
+        rail: root.rail;
+        icon: SideIcons.history;
+        label: @tr("History");
+        active: Nav.page == PageKind.history;
+        clicked => { Nav.go(PageKind.history); }
+    }
+
+    Rectangle {
+        x: 20px;
+        y: 180px;
+        width: parent.width - 40px;
+        height: 1px;
+        background: Theme.hairline;
+    }
+
+    // Liked songs is the "LM" playlist.
+    NavItem {
+        x: root.inset;
+        y: root.liked-y;
+        width: root.item-w;
+        rail: root.rail;
+        icon: Icons.heart;
+        label: @tr("Liked songs");
+        active: Nav.page == PageKind.playlist && Nav.page-id == "LM";
+        clicked => { Nav.open-playlist("LM"); }
+        right-clicked(x, y) => {
+            PlaylistMenu.show({ id: "LM", kind: ItemKind.playlist, title: @tr("Liked songs") }, x, y, y);
+        }
+    }
+
+    if !root.rail: SideChips {
+        x: root.chips-x;
+        y: root.chips-y;
+        width: parent.width - 2 * root.chips-x;
+        height: root.chips-h;
+        labels: [@tr("Playlists"), @tr("Albums"), @tr("Artists")];
+        active: SidebarData.chip;
+        selected(i) => { SidebarData.chip-picked(i); }
+    }
+
+    // The list's rows: a 24 px cover in the icon column (round for artists), the name in
+    // the label column, and a pin at the end of a pinned one. Virtualised, so 200
+    // playlists cost what the visible ones do. A right-click opens the entry's menu.
+    playlists := ListView {
+        x: 0;
+        y: root.list-top;
+        width: parent.width;
+        height: max(0px, root.list-bottom - root.list-top);
+        // No bar, as before; the wheel scrolls, and the fades show there is more.
+        vertical-scrollbar-policy: always-off;
+        horizontal-scrollbar-policy: always-off;
+        for p[i] in SidebarData.items: Rectangle {
+            height: 40px;
+            entry := Rectangle {
+                property <bool> pinned: i < SidebarData.pinned.length && SidebarData.pinned[i];
+                property <bool> active: Nav.page-id == p.id && (p.kind == ItemKind.album ? Nav.page == PageKind.album : (p.kind == ItemKind.artist ? Nav.page == PageKind.artist : Nav.page == PageKind.playlist));
+                x: root.inset;
+                width: root.item-w;
+                height: 40px;
+                border-radius: Theme.r-m;
+                // Marked while its menu is open, as the account row is.
+                background: Theme.state-on(self.active || (PlaylistMenu.open && PlaylistMenu.item.id == p.id), pta.pressed, pta.has-hover);
+                accessible-role: button;
+                accessible-label: self.pinned ? @tr("{}, pinned", p.title) : p.title;
+                accessible-action-default => { SideOpen.item(p); }
+                animate background { duration: Theme.t-hover; }
+                pta := TouchArea {
+                    mouse-cursor: pointer;
+                    clicked => { SideOpen.item(p); }
+                    // The playlist menu, at the pointer.
+                    pointer-event(e) => {
+                        if e.button == PointerEventButton.right && e.kind == PointerEventKind.up {
+                            PlaylistMenu.show(p, self.absolute-position.x + self.mouse-x, self.absolute-position.y + self.mouse-y, self.absolute-position.y + self.mouse-y);
+                        }
+                    }
+                }
+                Cover {
+                    x: root.rail ? (parent.width - self.width) / 2 : 10px;
+                    y: 8px;
+                    width: 24px;
+                    height: 24px;
+                    radius: Theme.r-s;
+                    round: p.round;
+                    source: p.cover;
+                }
+                if !root.rail: Body {
+                    x: 44px;
+                    width: parent.width - 52px - (entry.pinned ? 20px : 0px);
+                    height: parent.height;
+                    text: p.title;
+                    color: parent.active ? Theme.text1 : Theme.text2;
+                    vertical-alignment: center;
+                }
+                if !root.rail && entry.pinned: Icon {
+                    x: parent.width - self.width - 10px;
+                    y: (parent.height - self.height) / 2;
+                    width: 14px;
+                    height: 14px;
+                    commands: SideIcons.pin;
+                    stroke: Theme.text3;
+                    stroke-width: 1.8px;
+                }
+            }
+        }
+    }
+    if !root.rail && SidebarData.items.length == 0 && SidebarData.empty-text != "": Body {
+        x: 20px;
+        y: root.list-top + 4px;
+        width: parent.width - 40px;
+        text: SidebarData.empty-text;
+        font-size: Theme.t-meta;
+        color: Theme.text2;
+        wrap: word-wrap;
+    }
+    // Soft edges where the list runs on: at the bottom while more rows lie below, at
+    // the top once it has scrolled.
+    if playlists.content-y < 0: Rectangle {
+        x: 0;
+        y: playlists.y;
+        width: parent.width;
+        height: 24px;
+        background: @linear-gradient(180deg, Theme.surface 0%, Theme.surface.transparentize(100%) 100%);
+    }
+    if playlists.content-y + playlists.content-height > playlists.visible-height + 1px: Rectangle {
+        x: 0;
+        y: playlists.y + playlists.height - self.height;
+        width: parent.width;
+        height: 24px;
+        background: @linear-gradient(0deg, Theme.surface 0%, Theme.surface.transparentize(100%) 100%);
+    }
+
+    // Settings, then the account.
+    NavItem {
+        x: root.inset;
+        y: root.foot - 120px;
+        width: root.item-w;
+        rail: root.rail;
+        icon: Icons.gear;
+        label: @tr("Settings");
+        active: Nav.page == PageKind.settings || Nav.page == PageKind.about;
+        clicked => { Nav.go(PageKind.settings); }
+    }
+    Rectangle {
+        x: 20px;
+        y: root.foot - 72px;
+        width: parent.width - 40px;
+        height: 1px;
+        background: Theme.hairline;
+    }
+    // Signed in, the account row opens the account menu above it; signed out, Sign in.
+    account-row := Rectangle {
+        x: root.inset;
+        y: root.foot - 64px;
+        width: root.item-w;
+        height: 56px;
+        border-radius: Theme.r-m;
+        background: Theme.state-on(AccountMenu.open, ata.pressed, ata.has-hover);
+        accessible-role: button;
+        accessible-label: !SidebarData.signed-in ? @tr("Sign in")
+            : SidebarData.display-name != "" ? @tr("Account, {}", SidebarData.display-name) : @tr("Account");
+        accessible-action-default => { root.account-clicked(); }
+        animate background { duration: Theme.t-hover; }
+        ata := TouchArea {
+            mouse-cursor: pointer;
+            clicked => { root.account-clicked(); }
+        }
+        Rectangle {
+            x: root.rail ? (parent.width - self.width) / 2 : 6px;
+            y: (parent.height - self.height) / 2;
+            width: 32px;
+            height: 32px;
+            border-radius: 16px;
+            background: Theme.avatar;
+            if SidebarData.initial != "": Text {
+                text: SidebarData.initial;
+                font-family: Theme.display-font;
+                font-weight: 700;
+                font-size: 14px;
+                color: Theme.text1;
+            }
+            if SidebarData.initial == "": Icon {
+                width: 18px;
+                height: 18px;
+                commands: Icons.person;
+                stroke: Theme.text1;
+            }
+            if SidebarData.signed-in && SidebarData.has-avatar: Cover {
+                width: parent.width;
+                height: parent.height;
+                round: true;
+                source: SidebarData.avatar;
+            }
+        }
+        if !root.rail: VerticalLayout {
+            x: 44px;
+            width: parent.width - 52px;
+            alignment: center;
+            spacing: 1px;
+            if SidebarData.display-name != "": Body {
+                text: SidebarData.display-name;
+                font-weight: 600;
+            }
+            if SidebarData.display-name != "" && SidebarData.handle != "": Body {
+                text: SidebarData.handle;
+                font-size: Theme.t-meta;
+                color: Theme.text3;
+            }
+            if SidebarData.display-name == "": Body {
+                text: SidebarData.signed-in ? @tr("Signed in") : @tr("Sign in");
+                font-weight: 600;
+            }
+        }
+    }
+}

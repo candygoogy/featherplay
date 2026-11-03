@@ -1,0 +1,103 @@
+name: Site
+
+# The website (site/): build it, check its unit tests and weight budget, then run the browser
+# tests against the built files, on Astro's preview server and on Cloudflare's runtime
+# (wrangler dev, local only). Nothing here deploys.
+
+on:
+  push:
+    paths: ["site/**", ".github/workflows/site.yml"]
+  pull_request:
+    paths: ["site/**", ".github/workflows/site.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: site-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: site
+    env:
+      ASTRO_TELEMETRY_DISABLED: "1"
+      WRANGLER_SEND_METRICS: "false"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # The pnpm the lockfile was written with.
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          version: 12.16.1
+
+      # The repo names no Node version; Astro 7 needs 22.12 or later, and the site is built
+      # with Node 26 locally.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 26
+          cache: pnpm
+          cache-dependency-path: site/pnpm-lock.yaml
+
+      # Dependency build scripts stay off (site/pnpm-workspace.yaml).
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Unit tests
+        run: pnpm unit
+
+      - name: Weight budget
+        run: pnpm budget
+
+      # Chromium only (the tests' one browser), cached by Playwright's version; the system
+      # libraries it needs are installed either way.
+      - name: Playwright version
+        id: playwright
+        run: echo "version=$(pnpm exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: browsers
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}-chromium
+
+      - name: Install Chromium
+        if: steps.browsers.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Install Chromium's system libraries
+        if: steps.browsers.outputs.cache-hit == 'true'
+        run: pnpm exec playwright install-deps chromium
+
+      # Two runs, each with its own results and report. The specs that time animations
+      # (playwright.config.ts, project "timing") go second, alone on the runner: run together,
+      # the other project's tests share its few cores and stretch the frames being measured.
+      - name: Browser tests
+        id: browser
+        env:
+          PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-report/chromium
+        run: pnpm exec playwright test --project=chromium --output=test-results/chromium
+
+      - name: Timing tests
+        if: ${{ !cancelled() && steps.browser.conclusion != 'skipped' }}
+        env:
+          PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-report/timing
+        run: pnpm exec playwright test --project=timing --output=test-results/timing
+
+      - name: Upload the Playwright report
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-report
+          path: |
+            site/playwright-report/
+            site/test-results/
+          retention-days: 14

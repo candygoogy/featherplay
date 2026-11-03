@@ -1,0 +1,51 @@
+---
+// The playing song's short credit, beside the demo player's controls, as the artists ask
+// (Josh Woodward: "by the play/pause/etc controls"): "Title" by Artist · site · licence ·
+// Credits (the full credits page, at that song).
+// Rendered for the song every player starts on; src/demo/credit.ts keeps it on the current one.
+// The separators carry their own even spacing (margins, not the font's narrow spaces, so
+// every gap is the same at every width) and there's no whitespace between the parts: a line
+// may break only after a separator (<wbr>), so it can end with one but never start with one.
+// Screen readers hear a comma there instead of the dot (the parts would run together).
+import { demoStart, songById } from "../data/songs";
+interface Props {
+  class?: string;
+  /** Next to a line that already names the song and artist: only the site and the licence. */
+  compact?: boolean;
+}
+const { class: className, compact = false } = Astro.props;
+const song = songById(demoStart.songId)!;
+const c = song.credit!;
+---
+
+<p class:list={["credit", className]} data-credit>
+  <span class="visually-hidden">Music: </span>
+  {!compact && <><span data-credit-text><b data-credit-title>“{song.title}”</b> by <span data-credit-artist>{song.artist}</span></span><span class="dot" aria-hidden="true">·</span><span class="visually-hidden">, </span><wbr /></>}<a data-credit-site href={c.site.url}>{c.site.label}</a><span class="dot" aria-hidden="true">·</span><span class="visually-hidden">, </span><wbr /><a data-credit-licence href={c.licenceUrl}>{c.licence}</a><span class="dot" aria-hidden="true">·</span><span class="visually-hidden">, </span><wbr /><a data-credit-all href={`/credits#${song.id}`}>Credits</a>
+</p>
+
+<style>
+  .credit {
+    color: var(--text);
+    font-size: 0.8125rem;
+    line-height: 1.4;
+    text-wrap: balance;
+  }
+  .credit b {
+    font-weight: 700;
+  }
+  .credit a {
+    text-decoration: underline;
+    text-decoration-color: color-mix(in srgb, currentColor 45%, transparent);
+    text-underline-offset: 0.2em;
+  }
+  .credit a:hover {
+    text-decoration-color: currentColor;
+  }
+  /* The same gap either side of every "·", in the line's own colour a little softened (the
+     muted grey vanished on the hero's cover glow), the same in both themes. */
+  .dot {
+    margin-inline: 0.5em;
+    font-weight: 800;
+    opacity: 0.7;
+  }
+</style>

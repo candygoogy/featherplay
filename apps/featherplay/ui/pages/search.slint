@@ -1,0 +1,120 @@
+// Search page: the query as the title, filter chips (Songs, Albums, Artists,
+// Playlists), then song rows or a card grid. The query comes from the top bar's field
+// (`Nav.search`); data from `src/pages/search.rs`. A song link pasted there shows that one
+// song, without the chips.
+import { ListView } from "std-widgets.slint";
+import { Theme, Icons } from "../theme.slint";
+import { TrackRow, CardItem, Body, PageTitle } from "../parts.slint";
+import { SongMenu } from "../song_menu.slint";
+import { SongListRow, CardGrid, SkeletonList, SkeletonGrid, ErrorState, EmptyState, FadeIn, Chips, Open } from "content.slint";
+
+export global SearchData {
+    in property <bool> loading;
+    in property <string> error;
+    in property <string> query;
+    // The query is a song link: its one song, no filter chips.
+    in property <bool> link;
+    // 0 Songs, 1 Albums, 2 Artists, 3 Playlists.
+    in property <int> filter;
+    in property <[TrackRow]> songs;
+    // Albums, artists or playlists, for the current filter.
+    in property <[CardItem]> cards;
+    callback set-filter(int);
+    // Plays song `i`, with radio after it.
+    callback play(int);
+    callback like(int);
+    // Searches again after an error.
+    callback retry();
+    // A card's play button: plays the album, playlist or artist without opening it.
+    callback play-card(CardItem);
+}
+
+export component SearchPage inherits Rectangle {
+    property <length> pad: Theme.page-pad;
+    // Without the chips, a link's song sits right under the title.
+    property <length> list-y: Theme.page-top + 20px + 48px + (SearchData.link ? Theme.s2 : Theme.s4 + 36px + Theme.s2);
+    property <bool> empty: !SearchData.loading && SearchData.error == "" && (SearchData.filter == 0 ? SearchData.songs.length == 0 : SearchData.cards.length == 0);
+
+    Body {
+        x: root.pad;
+        y: Theme.page-top;
+        width: parent.width - 2 * root.pad;
+        height: 20px;
+        // A link isn't repeated as the title: the field above shows it.
+        text: SearchData.link ? @tr("Search") : @tr("Results for");
+        font-size: Theme.t-meta;
+        font-weight: 600;
+        color: Theme.text3;
+        vertical-alignment: center;
+    }
+    PageTitle {
+        x: root.pad;
+        y: Theme.page-top + 20px;
+        width: parent.width - 2 * root.pad;
+        text: SearchData.link ? @tr("Song from a link") : @tr("\u{201C}{}\u{201D}", SearchData.query);
+    }
+    if !SearchData.link: Chips {
+        x: root.pad;
+        y: Theme.page-top + 20px + 48px + Theme.s4;
+        width: parent.width - 2 * root.pad;
+        labels: [@tr("Songs"), @tr("Albums"), @tr("Artists"), @tr("Playlists")];
+        active: SearchData.filter;
+        selected(i) => { SearchData.set-filter(i); }
+    }
+    Rectangle {
+        x: 0;
+        y: root.list-y;
+        width: parent.width;
+        height: parent.height - self.y;
+        clip: true;
+        if SearchData.loading && SearchData.filter == 0: SkeletonList {
+            top: Theme.s2;
+        }
+        if SearchData.loading && SearchData.filter != 0: SkeletonGrid {
+            top: Theme.s4;
+            round: SearchData.filter == 2;
+        }
+        if !SearchData.loading && SearchData.error != "": ErrorState {
+            x: root.pad;
+            y: Theme.s4;
+            width: min(480px, parent.width - 2 * root.pad);
+            message: SearchData.error;
+            retry => { SearchData.retry(); }
+        }
+        if root.empty: FadeIn {
+            EmptyState {
+                x: root.pad;
+                y: Theme.s4;
+                width: min(480px, parent.width - 2 * root.pad);
+                glyph: Icons.search;
+                title: SearchData.link ? @tr("No song at this link") : @tr("No results for \u{201C}{}\u{201D}", SearchData.query);
+                line: SearchData.link ? @tr("It may be private or removed. Try searching for its title.") : @tr("Check the spelling or try another filter.");
+            }
+        }
+        if !SearchData.loading && SearchData.filter == 0 && SearchData.songs.length > 0: FadeIn {
+            ListView {
+                for t[i] in SearchData.songs: Rectangle {
+                    height: Theme.row-h + (i == 0 ? Theme.s2 : 0px) + (i == SearchData.songs.length - 1 ? Theme.page-end : 0px);
+                    SongListRow {
+                        x: root.pad - 8px;
+                        y: i == 0 ? Theme.s2 : 0px;
+                        width: parent.width - 2 * root.pad + 16px;
+                        track: t;
+                        activated => { SearchData.play(i); }
+                        like-clicked => { SearchData.like(i); }
+                        menu-requested(x, y, top) => { SongMenu.show(t, x, y, top); }
+                    }
+                }
+            }
+        }
+        if !SearchData.loading && SearchData.filter != 0 && SearchData.cards.length > 0: FadeIn {
+            CardGrid {
+                items: SearchData.cards;
+                top: Theme.s4;
+                playable: true;
+                open(it) => { Open.item(it); }
+                play(it) => { SearchData.play-card(it); }
+            }
+        }
+    }
+}

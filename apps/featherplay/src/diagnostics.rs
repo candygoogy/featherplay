@@ -1,0 +1,282 @@
+//! Diagnostics: the log file, crash reports, and the text Settings > About copies for a bug
+//! report. A release build is a GUI program, so its stderr goes nowhere; these are what's
+//! left after something goes wrong.
+//!
+//! Every line (`log!`, and the crates' `log` macros through `Facade`) is redacted, then
+//! handed to the `featherplay-log` thread, which appends it to `featherplay.log` in
+//! `{cache}/logs`. The thread sleeps on its channel, so an idle app never wakes for the log.
+//! Debug builds print every line to stderr too, as does a process that never called `init`
+//! (the tests, `--snapshot`).
+
+mod clock;
+mod crash;
+mod logfile;
+mod redact;
+mod report;
+mod system;
+
+use std::collections::VecDeque;
+use std::fmt;
+use std::path::{Path, PathBuf};
+use std::sync::mpsc::{self, Receiver, Sender};
+use std::sync::{Mutex, OnceLock};
+use std::time::Duration;
+
+use featherplay_core::sync::LockExt;
+use featherplay_store::{Paths, Settings};
+
+use clock::Stamp;
+use logfile::LogFile;
+
+pub use redact::redact;
+pub use report::Report;
+
+/// How many resolver errors Copy diagnostics lists.
+const RECENT_ERRORS: usize = 5;
+/// How long `flush` waits for the log thread.
+const FLUSH_WAIT: Duration = Duration::from_secs(1);
+
+enum Msg {
+    Line(String),
+    /// Answered once every line before it is written.
+    Flush(mpsc::SyncSender<()>),
+}
+
+static LOG: OnceLock<Sender<Msg>> = OnceLock::new();
+/// The yt-dlp and Deno versions, once read.
+static TOOLS: Mutex<(Option<String>, Option<String>)> = Mutex::new((None, None));
+static RECENT: Mutex<VecDeque<String>> = Mutex::new(VecDeque::new());
+
+/// `{cache}/logs`: the log, the one before it and the crash files.
+pub fn log_dir(paths: &Paths) -> PathBuf {
+    paths.cache.join("logs")
+}
+
+/// At startup: the log file, the panic hook, and a first line saying which featherplay and
+/// which Windows this is. A log folder that can't be written leaves only stderr.
+pub fn start(paths: &Paths) {
+    let dir = log_dir(paths);
+    if let Err(e) = init(&dir) {
+        write(format_args!("no log file: {e}"));
+    }
+    install_panic_hook(dir);
+    write(format_args!(
+        "featherplay {} on {}",
+        env!("CARGO_PKG_VERSION"),
+        windows()
+    ));
+}
+
+/// Starts writing the log to `dir` and routes the `log` crate's records there. Only the
+/// first call in a process does anything.
+pub fn init(dir: &Path) -> Result<(), String> {
+    if LOG.get().is_some() {
+        return Ok(());
+    }
+    let file = LogFile::open(dir, logfile::LIMIT)
+        .map_err(|e| format!("{}: {e}", dir.join(logfile::CURRENT).display()))?;
+    let (tx, rx) = mpsc::channel();
+    std::thread::Builder::new()
+        .name("featherplay-log".into())
+        .spawn(move || run(file, rx))
+        .map_err(|e| format!("log thread: {e}"))?;
+    if LOG.set(tx).is_ok() {
+        // Another logger set first (none in the app) keeps its place.
+        if log::set_logger(&Facade).is_ok() {
+            log::set_max_level(log::LevelFilter::Info);
+        }
+    }
+    Ok(())
+}
+
+/// The log thread: blocks on the channel, writes what comes, and stops when the app ends.
+#[allow(
+    clippy::print_stderr,
+    reason = "the log can't report its own failure to itself"
+)]
+fn run(mut file: LogFile, rx: Receiver<Msg>) {
+    let mut failed = false;
+    while let Ok(msg) = rx.recv() {
+        match msg {
+            Msg::Line(line) => {
+                if let Err(e) = file.write(&line)
+                    && !std::mem::replace(&mut failed, true)
+                {
+                    eprintln!("featherplay: writing the log: {e}");
+                }
+            }
+            Msg::Flush(done) => {
+                let _ = file.flush();
+                let _ = done.send(());
+            }
+        }
+    }
+}
+
+/// Writes a crash file to `dir` for every panic, then runs the default hook.
+pub fn install_panic_hook(dir: PathBuf) {
+    crash::install(dir);
+}
+
+/// One log line: the seconds since start, then `args`. What `log!` calls.
+pub fn write(args: fmt::Arguments<'_>) {
+    line(&args.to_string());
+}
+
+#[allow(
+    clippy::print_stderr,
+    reason = "the logger's own echo: debug builds and runs before it starts"
+)]
+fn line(msg: &str) {
+    let msg = redact(msg);
+    let up = crate::controller::uptime().as_secs_f64();
+    let tagged = format!("[{up:>8.3}] {msg}");
+    let log = LOG.get();
+    if cfg!(debug_assertions) || log.is_none() {
+        eprintln!("{tagged}");
+    }
+    if let Some(tx) = log {
+        // A message of several lines (a stderr tail) keeps its lines under its stamp.
+        let indented = tagged.replace('\n', "\n    ");
+        let _ = tx.send(Msg::Line(format!("{} {indented}\n", Stamp::now().line())));
+    }
+}
+
+/// Waits (up to a second) until every line written so far is in the file.
+pub fn flush() {
+    let Some(tx) = LOG.get() else { return };
+    let (done, wait) = mpsc::sync_channel(1);
+    if tx.send(Msg::Flush(done)).is_ok() {
+        let _ = wait.recv_timeout(FLUSH_WAIT);
+    }
+}
+
+/// The crates' `log` records: featherplay's own from `info` up, other crates' warnings and
+/// errors only (their debug output would fill the file).
+struct Facade;
+
+fn ours(target: &str) -> bool {
+    target.starts_with("featherplay")
+}
+
+impl log::Log for Facade {
+    fn enabled(&self, m: &log::Metadata<'_>) -> bool {
+        let most = if ours(m.target()) {
+            log::Level::Info
+        } else {
+            log::Level::Warn
+        };
+        m.level() <= most
+    }
+
+    fn log(&self, r: &log::Record<'_>) {
+        if !self.enabled(r.metadata()) {
+            return;
+        }
+        if ours(r.target()) {
+            line(&r.args().to_string());
+        } else {
+            line(&format!("{} {}: {}", r.level(), r.target(), r.args()));
+        }
+    }
+
+    fn flush(&self) {
+        flush();
+    }
+}
+
+/// `Windows 11 25H2, build 26200.7171`, read once.
+pub fn windows() -> &'static str {
+    static WINDOWS: OnceLock<String> = OnceLock::new();
+    WINDOWS.get_or_init(system::windows)
+}
+
+/// The yt-dlp and Deno versions, once the controller has read them (`None`: not installed,
+/// or it failed). Logged once.
+pub fn set_tool_versions(ytdlp: Option<String>, deno: Option<String>) {
+    let shown = |v: &Option<String>| v.clone().unwrap_or_else(|| "unknown".into());
+    write(format_args!(
+        "yt-dlp {}, deno {}",
+        shown(&ytdlp),
+        shown(&deno)
+    ));
+    *TOOLS.lock_or_recover() = (ytdlp, deno);
+}
+
+/// A resolve failed: its log line (the stage lines from `featherplay-streams` come before
+/// it), and one of the errors Copy diagnostics lists.
+pub fn resolve_failed(id: &str, took_secs: f64, msg: &str) {
+    write(format_args!(
+        "resolve {id} failed in {took_secs:.1}s: {msg}"
+    ));
+    let mut recent = RECENT.lock_or_recover();
+    if recent.len() == RECENT_ERRORS {
+        recent.pop_front();
+    }
+    recent.push_back(format!("{} {id}: {msg}", Stamp::now().time()));
+}
+
+/// What Copy diagnostics says now. `signed_in` only: the account itself never reaches it.
+pub fn report(signed_in: bool, settings: &Settings) -> Report {
+    let (ytdlp, deno) = TOOLS.lock_or_recover().clone();
+    let errors = RECENT.lock_or_recover().iter().cloned().collect();
+    Report {
+        version: env!("CARGO_PKG_VERSION").to_string(),
+        windows: windows().to_string(),
+        ytdlp,
+        deno,
+        output_device: settings.output_device.clone(),
+        signed_in,
+        lastfm: settings.scrobbling && settings.lastfm_enabled,
+        listenbrainz: settings.scrobbling && settings.listenbrainz_enabled,
+        discord: settings.discord,
+        errors,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_last_five_resolve_errors_are_listed() {
+        for n in 0..7 {
+            resolve_failed(&format!("id{n}"), 1.0, &format!("failure {n}"));
+        }
+        let r = report(false, &Settings::default());
+        assert_eq!(r.errors.len(), RECENT_ERRORS);
+        assert!(r.errors[0].ends_with("id2: failure 2"), "{:?}", r.errors);
+        assert!(r.errors[4].ends_with("id6: failure 6"), "{:?}", r.errors);
+    }
+
+    #[test]
+    fn the_report_reads_the_settings() {
+        let settings = Settings {
+            output_device: Some("Speakers".into()),
+            scrobbling: true,
+            lastfm_enabled: true,
+            listenbrainz_enabled: false,
+            discord: true,
+            ..Settings::default()
+        };
+        set_tool_versions(Some("2026.10.26".into()), None);
+        let r = report(true, &settings);
+        assert_eq!(r.output_device.as_deref(), Some("Speakers"));
+        assert!(r.signed_in && r.lastfm && !r.listenbrainz && r.discord);
+        assert_eq!(r.ytdlp.as_deref(), Some("2026.10.26"));
+        assert_eq!(r.deno, None);
+        assert_eq!(r.version, env!("CARGO_PKG_VERSION"));
+    }
+
+    #[test]
+    fn scrobbling_off_turns_both_services_off() {
+        let settings = Settings {
+            scrobbling: false,
+            lastfm_enabled: true,
+            listenbrainz_enabled: true,
+            ..Settings::default()
+        };
+        let r = report(false, &settings);
+        assert!(!r.lastfm && !r.listenbrainz);
+    }
+}

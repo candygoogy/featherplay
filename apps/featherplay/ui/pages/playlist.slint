@@ -1,0 +1,123 @@
+// Playlist page, also Liked songs ("LM"): the same tall header as an album, then
+// song rows with covers, the artist and the album. Data comes from `src/pages/playlist.rs`.
+//
+// The list is a ListView; the header rides in its first row so it scrolls away with it.
+// Covers are asked for as rows appear (`cover-needed`), so long playlists load only what's seen.
+import { ListView } from "std-widgets.slint";
+import { Theme, Icons } from "../theme.slint";
+import { TrackRow } from "../parts.slint";
+import { SongMenu } from "../song_menu.slint";
+import { Nav, PageKind } from "../nav.slint";
+import { CollectionHeader, SongListRow, SkeletonCollection, SkeletonList, ErrorState, EmptyState, FadeIn, TopScrim } from "content.slint";
+
+export global PlaylistData {
+    in property <bool> loading;
+    in property <string> error;
+    // "LM" is Liked songs.
+    in property <string> id;
+    in property <bool> liked-songs;
+    in property <string> title;
+    // "Playlist".
+    in property <string> kind;
+    // The playlist's author, when it has one.
+    in property <string> byline;
+    // "42 songs, 2 hours 5 minutes".
+    in property <string> meta;
+    in property <image> cover;
+    // The header's wash from the cover, per theme (transparent until it's worked out).
+    in property <color> wash-dark;
+    in property <color> wash-light;
+    in property <[TrackRow]> tracks;
+    // Plays the playlist from track `i`.
+    callback play(int);
+    callback shuffle();
+    callback like(int);
+    // Row `i` is on screen and has no cover yet.
+    callback cover-needed(int);
+    // Loads the playlist again after an error.
+    callback retry();
+}
+
+component Header inherits CollectionHeader {
+    cover: PlaylistData.cover;
+    liked-tile: PlaylistData.liked-songs;
+    wash-dark: PlaylistData.liked-songs ? Theme.brand-accent.transparentize(0.7) : PlaylistData.wash-dark;
+    wash-light: PlaylistData.liked-songs ? Theme.brand-accent.transparentize(0.85) : PlaylistData.wash-light;
+    kind: PlaylistData.kind;
+    byline: PlaylistData.byline;
+    title: PlaylistData.title;
+    meta: PlaylistData.meta;
+    enabled: PlaylistData.tracks.length > 0;
+    primary-clicked => { PlaylistData.play(0); }
+    secondary-clicked => { PlaylistData.shuffle(); }
+}
+
+export component PlaylistPage inherits Rectangle {
+    // The page runs up under the clear top bar (app.slint), so its header starts below it.
+    property <length> header-h: Theme.top-bar-h + Theme.page-top + (root.width >= 900px ? 232px : 200px) + Theme.s6;
+    // Loading: the shape of the header and the rows. Liked songs knows its header already.
+    if PlaylistData.loading && PlaylistData.title == "": SkeletonCollection { }
+    if PlaylistData.loading && PlaylistData.title != "": Rectangle {
+        Header {
+            x: 0;
+            y: 0;
+            width: root.width;
+        }
+        SkeletonList {
+            y: root.header-h;
+            height: parent.height - self.y;
+            count: 6;
+        }
+    }
+    // No tracks (an error, an empty playlist): the header, if any, stands alone.
+    if !PlaylistData.loading && PlaylistData.tracks.length == 0: FadeIn {
+        if PlaylistData.title != "": Header {
+            x: 0;
+            y: 0;
+            width: root.width;
+        }
+        if PlaylistData.error != "": ErrorState {
+            x: Theme.page-pad;
+            y: PlaylistData.title != "" ? root.header-h : Theme.top-bar-h + Theme.page-top;
+            width: min(480px, root.width - 2 * Theme.page-pad);
+            message: PlaylistData.error;
+            retry => { PlaylistData.retry(); }
+        }
+        if PlaylistData.error == "" && PlaylistData.title != "": EmptyState {
+            x: Theme.page-pad;
+            y: root.header-h;
+            width: min(480px, root.width - 2 * Theme.page-pad);
+            glyph: PlaylistData.liked-songs ? Icons.heart : Icons.note;
+            title: PlaylistData.liked-songs ? @tr("Songs you like show up here") : @tr("This playlist is empty");
+            line: PlaylistData.liked-songs ? @tr("Like a song with its heart to keep it here.") : @tr("Songs added to it show up here.");
+            action: PlaylistData.liked-songs ? @tr("Go to Home") : "";
+            action-clicked => { Nav.go(PageKind.home); }
+        }
+    }
+    if PlaylistData.tracks.length > 0: FadeIn {
+        list := ListView {
+            for t[i] in PlaylistData.tracks: Rectangle {
+                height: (i == 0 ? root.header-h : 0px) + Theme.row-h + (i == PlaylistData.tracks.length - 1 ? Theme.page-end : 0px);
+                init => { PlaylistData.cover-needed(i); }
+                if i == 0: Header {
+                    x: 0;
+                    y: 0;
+                    width: parent.width;
+                }
+                SongListRow {
+                    x: Theme.page-pad - 8px;
+                    y: i == 0 ? root.header-h : 0px;
+                    width: parent.width - 2 * Theme.page-pad + 16px;
+                    track: t;
+                    show-liked: !PlaylistData.liked-songs;
+                    activated => { PlaylistData.play(i); }
+                    like-clicked => { PlaylistData.like(i); }
+                    menu-requested(x, y, top) => { SongMenu.show(t, x, y, top); }
+                }
+            }
+        }
+        TopScrim {
+            scrolled: -list.content-y;
+        }
+    }
+}

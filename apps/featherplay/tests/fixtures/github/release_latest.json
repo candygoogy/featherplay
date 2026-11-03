@@ -1,0 +1,24 @@
+{
+  "url": "https://api.github.com/repos/candygoogy/featherplay/releases/190000001",
+  "assets_url": "https://api.github.com/repos/candygoogy/featherplay/releases/190000001/assets",
+  "html_url": "https://github.com/candygoogy/featherplay/releases/tag/v0.2.0",
+  "id": 190000001,
+  "tag_name": "v0.2.0",
+  "target_commitish": "main",
+  "name": "featherplay 0.2.0",
+  "draft": false,
+  "immutable": false,
+  "prerelease": false,
+  "created_at": "2026-11-20T10:00:00Z",
+  "updated_at": "2026-11-20T10:05:00Z",
+  "published_at": "2026-11-20T10:05:00Z",
+  "assets": [
+    {
+      "name": "featherplay-0.2.0-setup.exe",
+      "content_type": "application/x-msdownload",
+      "size": 10380000,
+      "browser_download_url": "https://github.com/candygoogy/featherplay/releases/download/v0.2.0/featherplay-0.2.0-setup.exe"
+    }
+  ],
+  "body": "A hand-written reply in the shape of GitHub's, for the tests."
+}

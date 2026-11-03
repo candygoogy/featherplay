@@ -1,0 +1,655 @@
+---
+// Light, and it shows: featherplay next to Pear Desktop and YouTube Music in Edge, six
+// measures from the final measurement (1 November 2026), lower is better. Every value comes
+// from src/data/numbers.ts and is in the HTML; the "times less" lines are worked out from
+// the same figures. Then what featherplay leaves out.
+import { figures, installFolders, leftOutTotals, timesLess, valueOf, type FolderEntry, type LeftOut, type Metric } from "../data/numbers";
+import { formatBytes, figureText } from "../data/format";
+import { release, sizeLabel } from "../data/release";
+
+const both = (m: "memoryMB" | "memoryPausedMB" | "cpuPlayingPct" | "cpuPausedPct") =>
+  `About ${timesLess(m, "Pear Desktop")} times less than Pear Desktop and ${timesLess(m, "YouTube Music in Edge")} times less than Edge.`;
+const panels: { metric: Metric; title: string; note: string; ratio?: string }[] = [
+  { metric: "memoryMB", title: "Memory while playing", note: "Private memory of all its processes, window minimised.", ratio: both("memoryMB") },
+  { metric: "memoryPausedMB", title: "Memory while paused", note: "The same, with the song paused.", ratio: both("memoryPausedMB") },
+  { metric: "cpuPlayingPct", title: "CPU while playing", note: "Share of the whole processor, window minimised.", ratio: both("cpuPlayingPct") },
+  { metric: "cpuPausedPct", title: "CPU while paused", note: "The same, with the song paused.", ratio: both("cpuPausedPct") },
+  { metric: "processes", title: "Processes", note: "How many it runs at once, fewest to most seen. All are counted above." },
+  {
+    metric: "downloadMB",
+    title: "Download",
+    note: "What you download to install it. Edge comes with Windows.",
+    ratio: `About ${timesLess("downloadMB", "Pear Desktop")} times smaller than Pear Desktop's installer.`,
+  },
+];
+const max = (m: Metric) => Math.max(...figures.map((f) => valueOf(f, m)));
+// The figures that count up from zero: plain numbers above zero. A range of processes, or
+// nothing to download, simply shows.
+const counts = (m: Metric, v: number) => m !== "processes" && v > 0;
+
+// Explorer's own size column: kilobytes, rounded up, with thousands separators.
+const kb = (b: number) => `${Math.ceil(b / 1024).toLocaleString("en-GB")} KB`;
+// MB as Windows counts them (1,048,576 bytes), for every size here and on the card.
+const mb = (b: number) => formatBytes(b);
+const { pear, featherplay } = installFolders;
+// The files a note stands for in Pear's folder: the two largest by name, then how many more
+// and what they add up to.
+const filesOf = (g: LeftOut) => {
+  const list = pear.entries.filter((e) => e.group === g).sort((a, b) => b.bytes - a.bytes);
+  const named = list.slice(0, 2).map((e) => (e.files ? `${e.name} folder` : e.name));
+  const more = list.length - named.length;
+  return `${named.join(", ")}${more ? ` and ${more} more` : ""}: ${mb(leftOutTotals(g).bytes)} of Pear's folder`;
+};
+const leavesOut: { word: string; why: string; group?: LeftOut; files?: string }[] = (
+  [
+    {
+      word: "Chromium",
+      group: "chromium",
+      why: "No browser engine in the window. Signing in opens Windows' own WebView2 once, then closes it.",
+    },
+    {
+      word: "Electron",
+      group: "electron",
+      why: "One native program, written in Rust and drawn with Slint, instead of a web app in a frame.",
+    },
+    { word: "Video", group: "video", why: "It never plays video. A music video with a song version plays as the song." },
+    { word: "Telemetry", why: "No analytics and no tracking, and no server of its own." },
+  ] as { word: string; why: string; group?: LeftOut }[]
+).map((l) => ({ ...l, files: l.group ? filesOf(l.group) : undefined }));
+// Like with like: Pear's install folder against featherplay's (the exe and its uninstaller,
+// approximate), then the portable exe on its own.
+const installedBytes = featherplay.bytes + featherplay.installed.uninstallerBytes;
+const times = Math.round(pear.bytes / installedBytes);
+const exeLabel = release.portable ? sizeLabel(release.portable) : mb(featherplay.bytes);
+const kind = (e: FolderEntry) => (e.files ? "folder" : e.name.endsWith(".exe") ? "app" : "file");
+---
+
+<section id="light" class="compare" aria-labelledby="light-title">
+  <div class="wrap">
+    <div class="head">
+      <h2 id="light-title">Light, and it shows</h2>
+      <p class="lede">
+        Measured on one Windows PC on 1 November 2026, the same song in all three. Lower is better on every bar.
+      </p>
+    </div>
+
+    <div class="chart" data-chart>
+      {
+        panels.map((p) => (
+          <figure class="panel" aria-labelledby={`fig-${p.metric}`}>
+            <figcaption>
+              <h3 id={`fig-${p.metric}`}>{p.title}</h3>
+              <p class="note">{p.note}</p>
+            </figcaption>
+            <ul>
+              {figures.map((f) => {
+                const v = valueOf(f, p.metric);
+                const scale = v / max(p.metric);
+                return (
+                  <li
+                    class:list={["row", { ours: f.app === "featherplay" }]}
+                    data-figure={`${f.app}:${p.metric}`}
+                    data-metric={p.metric}
+                    data-to={counts(p.metric, v) ? v : undefined}
+                    data-scale={scale.toFixed(4)}
+                  >
+                    <span class="app">{f.app}</span>
+                    <span class="value" data-value>
+                      {figureText(f, p.metric)}
+                    </span>
+                    <span class="track" aria-hidden="true">
+                      {v > 0 && <i data-bar style={`transform:scaleX(${scale.toFixed(4)})`} />}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+            {p.ratio && <p class="ratio">{p.ratio}</p>}
+          </figure>
+        ))
+      }
+    </div>
+    <p class="method">
+      <a href="/method">How these were measured</a>
+    </p>
+
+    <!-- What it leaves out: the two folders side by side. Pear's as it really is, each entry
+         tied to what it's there for; featherplay's one file, the sizes weighed, and four
+         notes on what isn't there. Pointing at a note lights its files in Pear's folder. -->
+    <div class="out" data-out>
+      <div class="out-head">
+        <h3 class="out-h">What featherplay leaves out</h3>
+        <p class="out-lede">
+          Two folders, as Windows shows them: Pear Desktop 3.12 once it's installed, and featherplay, one program,
+          installed or portable. This is the portable exe; installed, it sits next to its uninstaller.
+        </p>
+      </div>
+      <div class="folders">
+        <figure class="folder" data-ui aria-labelledby="pear-folder">
+          <figcaption class="crumbs" id="pear-folder">
+            <span class="visually-hidden">Pear Desktop's install folder:</span>
+            {pear.path.map((p, i) => <span class:list={["crumb", { here: i === pear.path.length - 1 }]}>{p}</span>)}
+          </figcaption>
+          <ul class="files">
+            {
+              pear.entries.map((e) => (
+                <li data-kind={kind(e)} data-group={e.group}>
+                  <span class="glyph" aria-hidden="true" />
+                  <span class="fname">{e.name}</span>
+                  <span class="fsize">{e.files ? `${e.files} files` : kb(e.bytes)}</span>
+                </li>
+              ))
+            }
+          </ul>
+          <p class="sum"><strong>{pear.files} files</strong>, {mb(pear.bytes)}</p>
+        </figure>
+
+        <div class="side">
+          <figure class="folder ours" data-ui aria-labelledby="fp-folder">
+            <figcaption class="crumbs" id="fp-folder">
+              <span class="visually-hidden">featherplay's folder:</span>
+              {featherplay.path.map((p) => <span class="crumb here">{p}</span>)}
+            </figcaption>
+            <ul class="files">
+              {
+                featherplay.entries.map((e) => (
+                  <li data-kind="app">
+                    <span class="art" aria-hidden="true">
+                      <img class="glyph only-dark" src="/tri-vane.svg" width="16" height="16" alt="" />
+                      <img class="glyph only-light" src="/tri-vane-light.svg" width="16" height="16" alt="" />
+                    </span>
+                    <span class="fname">{e.name}</span>
+                    <span class="fsize">{kb(e.bytes)}</span>
+                  </li>
+                ))
+              }
+            </ul>
+            <p class="sum"><strong>{featherplay.files} file</strong>, {exeLabel}</p>
+          </figure>
+
+          <!-- The sizes, weighed like with like: the bars grow once, the first time they're in view. -->
+          <div class="weigh" data-weigh>
+            <p class="weigh-row" data-weigh-row="pear">
+              <span class="who">Pear Desktop, installed</span>
+              <span class="num">{mb(pear.bytes)}</span>
+              <span class="bar" aria-hidden="true"><i style="--w:1"></i></span>
+            </p>
+            <p class="weigh-row fp" data-weigh-row="installed">
+              <span class="who">featherplay, installed</span>
+              <span class="num"><span class="about">about </span>{Math.round(installedBytes / 1_048_576)} MB</span>
+              <span class="bar" aria-hidden="true"><i style={`--w:${(installedBytes / pear.bytes).toFixed(4)}`}></i></span>
+            </p>
+            <p class="weigh-row fp alt" data-weigh-row="portable">
+              <span class="who">featherplay, portable exe</span>
+              <span class="num">{exeLabel}</span>
+              <span class="bar" aria-hidden="true"><i style={`--w:${(featherplay.bytes / pear.bytes).toFixed(4)}`}></i></span>
+            </p>
+            <p class="weigh-sum">{times} times smaller, installed.</p>
+            <p class="weigh-what">
+              Installed means the exe plus its uninstaller, about {mb(featherplay.installed.uninstallerBytes)}.
+            </p>
+          </div>
+
+          <div class="notes">
+            <p class="notes-h">Not in featherplay's folder<span class="hint">. Point at one to find it in Pear's.</span></p>
+            <ul data-leaves-out>
+              {
+                leavesOut.map((l) => (
+                  <li data-note={l.group}>
+                    {l.group ? (
+                      <button class="note-name" type="button" data-note-for={l.group} aria-pressed="false">
+                        {l.word}
+                      </button>
+                    ) : (
+                      <span class="note-name">{l.word}</span>
+                    )}
+                    <p class="why">{l.why}</p>
+                    {l.files && <p class="which">{l.files}</p>}
+                  </li>
+                ))
+              }
+            </ul>
+          </div>
+        </div>
+      </div>
+      <p class="out-source">Listed on the measuring PC on 1 November 2026, sizes as Explorer shows them.</p>
+    </div>
+  </div>
+</section>
+
+<script>
+  import { bindCountUp } from "../scripts/countup";
+  const chart = document.querySelector<HTMLElement>("[data-chart]");
+  if (chart) bindCountUp(chart);
+
+  // The notes: pressing one keeps its files lit in Pear's folder (a tap on a phone); pressing
+  // it again, or another, lets go. Pointing and focus light them by CSS alone.
+  const notes = [...document.querySelectorAll<HTMLButtonElement>("[data-note-for]")];
+  for (const b of notes) {
+    b.addEventListener("click", () => {
+      const on = b.getAttribute("aria-pressed") !== "true";
+      for (const o of notes) o.setAttribute("aria-pressed", String(o === b && on));
+    });
+  }
+
+  // The two sizes grow once, the first time they're in view.
+  const weigh = document.querySelector<HTMLElement>("[data-weigh]");
+  if (weigh && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    const r = weigh.getBoundingClientRect();
+    if (r.top > innerHeight * 0.85 || r.bottom < 0) {
+      weigh.dataset.armed = "";
+      const io = new IntersectionObserver(
+        (entries) => {
+          if (!entries.some((e) => e.isIntersecting)) return;
+          io.disconnect();
+          delete weigh.dataset.armed;
+        },
+        { threshold: 0.6 },
+      );
+      io.observe(weigh);
+    }
+  }
+</script>
+
+<style>
+  .compare {
+    padding-block: clamp(96px, 12vw, 180px) clamp(72px, 9vw, 140px);
+  }
+  /* The heading's two columns are the charts' two, so the lede starts where the right-hand
+     charts do. */
+  .head {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: end;
+    gap: 24px clamp(32px, 6vw, 96px);
+    margin-bottom: clamp(40px, 5vw, 72px);
+  }
+  h2 {
+    font-size: clamp(2.75rem, 7vw, 6.5rem);
+  }
+  .lede {
+    max-width: 30ch;
+    font-size: clamp(1.125rem, 1.6vw, 1.5rem);
+    font-weight: 600;
+    line-height: 1.3;
+    letter-spacing: -0.01em;
+  }
+
+  /* Four small charts, one measure each, read the same way. */
+  .chart {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: clamp(36px, 4.5vw, 64px) clamp(32px, 6vw, 96px);
+  }
+  .panel {
+    margin: 0;
+  }
+  figcaption {
+    margin-bottom: 18px;
+  }
+  h3 {
+    font-size: clamp(1.375rem, 2vw, 1.75rem);
+    letter-spacing: -0.02em;
+  }
+  .note {
+    margin-top: 6px;
+    color: var(--text-muted);
+    font-size: 0.9375rem;
+  }
+  .panel ul {
+    display: grid;
+    gap: 16px;
+    padding: 0;
+    list-style: none;
+  }
+  .row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 8px 16px;
+    align-items: baseline;
+  }
+  .app {
+    font-weight: 600;
+  }
+  .value {
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    font-size: 1.125rem;
+  }
+  .ours .app,
+  .ours .value {
+    color: var(--text);
+  }
+  .ours .value {
+    font-size: 1.5rem;
+    font-weight: 800;
+  }
+  .track {
+    grid-column: 1 / -1;
+    height: 14px;
+    border-radius: 0 7px 7px 0;
+    background: var(--hover);
+    overflow: hidden;
+  }
+  .ratio {
+    margin-top: 16px;
+    font-weight: 600;
+  }
+  .track i {
+    display: block;
+    height: 100%;
+    border-radius: 0 7px 7px 0;
+    background: color-mix(in srgb, var(--text) 42%, var(--bg));
+    transform-origin: 0 50%;
+  }
+  .ours .track i {
+    background: var(--accent);
+  }
+  .method {
+    margin-top: clamp(32px, 4vw, 48px);
+    font-weight: 700;
+  }
+  .method a {
+    text-underline-offset: 0.2em;
+    text-decoration-thickness: 2px;
+  }
+
+  /* What it leaves out: two Explorer folders. Pear's is long and dense; beside it,
+     featherplay's single row, the sizes weighed, and four quiet notes. */
+  .out {
+    margin-top: clamp(96px, 11vw, 160px);
+  }
+  /* And here the folders' two, so the lede starts over featherplay's folder. */
+  .out-head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: end;
+    gap: 16px clamp(16px, 2vw, 28px);
+    margin-bottom: clamp(28px, 3.4vw, 44px);
+  }
+  .out-h {
+    font-size: clamp(2rem, 4.4vw, 3.75rem);
+  }
+  .out-lede {
+    max-width: 40ch;
+    font-size: 1.0625rem;
+  }
+  .folders {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: start;
+    gap: clamp(16px, 2vw, 28px);
+  }
+  .side {
+    display: grid;
+    gap: clamp(16px, 2vw, 28px);
+  }
+  .folder {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 6px 6px 0;
+    border-radius: 16px;
+    background: var(--surface);
+    font-family: var(--font-ui);
+  }
+  .crumbs {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    padding: 12px 14px 10px;
+    color: var(--text-muted);
+    font-size: 0.875rem;
+  }
+  .crumb + .crumb::before {
+    content: "›";
+    margin-right: 6px;
+  }
+  .crumb.here {
+    color: var(--text);
+    font-weight: 600;
+  }
+  .files {
+    display: grid;
+    padding: 0;
+    list-style: none;
+  }
+  .files li {
+    display: grid;
+    grid-template-columns: 16px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+    min-height: 28px;
+    padding: 0 14px;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    transition:
+      background-color calc(180ms * var(--colour-easing)) ease,
+      opacity 180ms ease;
+  }
+  .files li:nth-child(odd) {
+    background: var(--playing-row);
+  }
+  .fname {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .fsize {
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+  /* Explorer's shapes, drawn plainly: a folder, a page; featherplay's own icon. */
+  .glyph {
+    width: 16px;
+    height: 16px;
+  }
+  span.glyph {
+    justify-self: center;
+    width: 12px;
+    border-radius: 2px;
+    background: var(--text-faint);
+    opacity: 0.6;
+  }
+  [data-kind="folder"] span.glyph {
+    width: 16px;
+    height: 12px;
+    border-radius: 2px 2px 3px 3px;
+    background: var(--folder);
+    opacity: 1;
+  }
+  .sum {
+    margin-top: auto;
+    padding: 12px 14px 14px;
+    color: var(--text-muted);
+    font-size: 0.875rem;
+  }
+  .sum strong {
+    color: var(--text);
+  }
+  .ours .files li {
+    background: var(--file-ours);
+    font-weight: 600;
+  }
+
+  /* A note pointed at, focused or pressed: its files light up in Pear's folder and the
+     rest step back. One rule per group, so it needs no script. */
+  .out:has([data-note-for]:is(:hover, :focus-visible, [aria-pressed="true"])) .folder:not(.ours) .files li {
+    opacity: 0.4;
+  }
+  .out:has([data-note-for="chromium"]:is(:hover, :focus-visible, [aria-pressed="true"])) .folder:not(.ours) .files li[data-group="chromium"],
+  .out:has([data-note-for="electron"]:is(:hover, :focus-visible, [aria-pressed="true"])) .folder:not(.ours) .files li[data-group="electron"],
+  .out:has([data-note-for="video"]:is(:hover, :focus-visible, [aria-pressed="true"])) .folder:not(.ours) .files li[data-group="video"] {
+    opacity: 1;
+    background: var(--file-lit);
+  }
+
+  /* The two sizes, weighed. */
+  .weigh {
+    display: grid;
+    gap: 14px;
+    padding: 20px 20px 22px;
+    border-radius: 16px;
+    background: var(--surface);
+  }
+  .weigh-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: baseline;
+    gap: 6px 16px;
+  }
+  .who {
+    font-weight: 600;
+  }
+  .num {
+    font-size: 1.25rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+  .fp .num {
+    font-size: 1.75rem;
+  }
+  .fp.alt .num {
+    font-size: 1.25rem;
+  }
+  .about {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-muted);
+  }
+  .bar {
+    grid-column: 1 / -1;
+    height: 12px;
+    border-radius: 0 6px 6px 0;
+    background: var(--hover);
+    overflow: hidden;
+  }
+  .bar i {
+    display: block;
+    height: 100%;
+    border-radius: 0 6px 6px 0;
+    background: color-mix(in srgb, var(--text) 42%, var(--bg));
+    transform: scaleX(var(--w));
+    transform-origin: 0 50%;
+  }
+  .fp .bar i {
+    background: var(--accent);
+  }
+  .fp.alt .bar i {
+    background: color-mix(in srgb, var(--accent) 55%, var(--bg));
+  }
+  .weigh-sum {
+    font-size: 1.0625rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+  .weigh-what {
+    margin-top: -8px;
+    font-size: 0.875rem;
+    color: var(--text-muted);
+  }
+  /* Armed by the script until seen: then Pear's bar fills slowly, featherplay's in a blink,
+     and the sum follows. */
+  @media (prefers-reduced-motion: no-preference) {
+    .weigh[data-armed] .bar i {
+      transform: scaleX(0);
+    }
+    .weigh[data-armed] .weigh-sum,
+    .weigh[data-armed] .weigh-what {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    .weigh .bar i {
+      transition: transform 1100ms var(--ease-out);
+    }
+    .weigh .fp .bar i {
+      transition-duration: 260ms;
+      transition-delay: 200ms;
+    }
+    .weigh .weigh-sum,
+    .weigh .weigh-what {
+      transition:
+        opacity 400ms ease 700ms,
+        transform 400ms var(--ease-out) 700ms;
+    }
+  }
+
+  /* The four notes: a name, a line, and the files it stands for. */
+  .notes-h {
+    margin-bottom: 12px;
+    font-weight: 700;
+  }
+  .hint {
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+  @media (hover: none) {
+    .hint {
+      display: none;
+    }
+  }
+  .notes ul {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px 24px;
+    padding: 0;
+    list-style: none;
+  }
+  .note-name {
+    display: inline-flex;
+    align-items: center;
+    min-height: 34px;
+    margin-left: -10px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    font-size: 1.25rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    transition: background-color var(--t-hover) ease;
+  }
+  span.note-name {
+    margin-left: 0;
+    padding: 0;
+  }
+  button.note-name:hover,
+  button.note-name[aria-pressed="true"] {
+    background: var(--hover);
+  }
+  .why {
+    margin-top: 2px;
+    font-size: 0.9375rem;
+    line-height: 1.5;
+  }
+  .which {
+    margin-top: 6px;
+    color: var(--text-muted);
+    font-family: var(--font-ui);
+    font-size: 0.8125rem;
+    line-height: 1.45;
+  }
+  .out-source {
+    margin-top: 16px;
+    color: var(--text-muted);
+    font-size: 0.9375rem;
+  }
+
+  @media (max-width: 860px) {
+    .head,
+    .out-head,
+    .folders {
+      grid-template-columns: 1fr;
+    }
+    .notes ul {
+      grid-template-columns: 1fr;
+    }
+    .chart {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

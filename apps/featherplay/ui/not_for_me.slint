@@ -1,0 +1,84 @@
+// "Not for me" (the bar and Now playing): a ⊘ beside the heart, smaller and quieter than it
+// (32 px with an 18 px glyph in `text3`, `text2` hovered), since it's used far less. A click
+// rates the song Dislike and skips it (`src/not_for_me.rs`); the toast that follows offers
+// Undo. Resting on it for a moment shows a tooltip over its right end that says what it
+// does, so the skip never comes as a surprise. The delay keeps the tooltip from flashing as
+// the pointer crosses the bar; its timer runs only while the pointer is on the button.
+import { Theme, Curves, Icons } from "theme.slint";
+import { Body, IconButton } from "parts.slint";
+import { Player } from "player.slint";
+
+export component NotForMeButton inherits Rectangle {
+    // How far above the button the tooltip ends (the bar lifts it clear of itself).
+    in property <length> above: Theme.s2;
+    // Shows the button from 0 (gone) to 1, as `IconButton.fade`.
+    in property <float> fade: 1.0;
+    property <bool> over: btn.hovered;
+    // The pointer has rested long enough (at once in snapshots), and hasn't clicked since.
+    property <bool> rested: false;
+    property <bool> dismissed: false;
+    property <bool> tip: root.over && !root.dismissed && (root.rested || Theme.still);
+    changed over => {
+        if !root.over {
+            root.rested = false;
+            root.dismissed = false;
+        }
+    }
+    width: 32px;
+    height: 36px;
+    Timer {
+        interval: 500ms;
+        running: root.over && !root.rested;
+        triggered => { root.rested = true; }
+    }
+    btn := IconButton {
+        y: (parent.height - self.height) / 2;
+        width: 32px;
+        height: 32px;
+        icon: Icons.not-for-me;
+        glyph: 18px;
+        label: @tr("Not for me");
+        description: @tr("Skips the song and tells YouTube Music you dislike it");
+        tint: btn.hovered ? Theme.text2 : Theme.text3;
+        enabled: Player.has-track;
+        fade: root.fade;
+        clicked => {
+            root.dismissed = true;
+            Player.not-for-me();
+        }
+    }
+    // The tooltip, `above` the button, its right end over the button's.
+    Rectangle {
+        x: root.width - self.width;
+        y: btn.y - root.above - self.height;
+        width: lay.preferred-width;
+        height: lay.preferred-height;
+        border-radius: Theme.r-s;
+        background: Theme.card;
+        border-width: 1px;
+        border-color: Theme.card-edge;
+        drop-shadow-blur: 8px;
+        drop-shadow-color: Theme.cover-shadow;
+        opacity: root.tip ? 1 : 0;
+        visible: self.opacity > 0;
+        animate opacity { duration: Theme.t-fast; easing: Curves.ease-out; }
+        lay := VerticalLayout {
+            padding-left: Theme.s3;
+            padding-right: Theme.s3;
+            padding-top: Theme.s2;
+            padding-bottom: Theme.s2;
+            spacing: 2px;
+            Body {
+                text: @tr("Not for me");
+                font-size: Theme.t-meta;
+                font-weight: 600;
+                color: Theme.text1;
+            }
+            Body {
+                text: @tr("Skips the song and tells YouTube Music you dislike it");
+                font-size: Theme.t-meta;
+                color: Theme.text2;
+            }
+        }
+    }
+}

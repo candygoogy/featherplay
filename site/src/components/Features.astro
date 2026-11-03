@@ -1,0 +1,406 @@
+---
+// Everything you'd miss, kept: five things built in, one at a time. On wide screens the
+// laptop stays in view while the steps scroll past it; as each step reaches the middle of the
+// screen, its screen zooms to where that feature lives in Windows (the song in the bar, a
+// Discord status card, the media overlay, the seek line, the tray) and marks it. The laptop
+// itself stays whole in its frame: only what's on the screen moves. Hovering, focusing or
+// tapping a step does the same. Facts from the repo's README ("Coming from Pear?").
+import Laptop from "./Laptop.astro";
+import Desktop from "./Desktop.astro";
+import Replica from "./Replica.astro";
+import Icon from "./Icon.astro";
+import { links } from "../data/links";
+import { demoStart, songById } from "../data/songs";
+import { formatTime } from "../demo/player";
+
+const song = songById(demoStart.songId)!;
+const at = demoStart.positionMs;
+const features = [
+  { id: "scrobble", title: "Scrobbling", body: "Every song goes to Last.fm, ListenBrainz or both." },
+  { id: "discord", title: "Discord status", body: "Friends see what you're playing. Off until you turn it on." },
+  { id: "keys", title: "Media keys", body: "Your keyboard, the Windows media overlay and the taskbar buttons." },
+  { id: "sponsor", title: "SponsorBlock", body: "The talking in music videos is skipped, so you hear the song." },
+  { id: "tray", title: "The tray", body: "Closing the window asks to quit or play on in the tray, until you tell it to remember." },
+] as const;
+const tooltip: [string, string] = [song.title, `${song.artist}, paused at ${formatTime(at)}`];
+---
+
+<section id="kept" class="kept" aria-labelledby="kept-title" data-kept>
+  <div class="wrap">
+    <div class="head">
+      <h2 id="kept-title">Everything you'd miss, kept</h2>
+      <p class="lede">Built in and ready from the first run. Nothing to add.</p>
+    </div>
+    <div class="grid">
+      <ol class="steps" data-features>
+        {
+          features.map((f) => (
+            <li class="step" data-step={f.id}>
+              <button class="feature" type="button" data-feature={f.id} aria-pressed="false">
+                <span class="f-title">{f.title}</span>
+                <span class="f-body">{f.body}</span>
+              </button>
+            </li>
+          ))
+        }
+      </ol>
+
+      <!-- An illustration here (the hero's laptop is the one to play with): inert. -->
+      <div class="shot" inert>
+        <div class="frame" data-kept-frame>
+          <Laptop class="kept-laptop">
+            <div class="zoom-box">
+              <div class="zoom" data-kept-zoom>
+              <Desktop id="kept-desktop" tooltip={tooltip}>
+                <Replica id="replica-kept" songId={song.id} positionMs={at} view="lyrics" />
+                <!-- Where each one lives: drawn over the desktop, shown while its step is on. -->
+                <div class="spots" data-ui>
+                  <span class="spot ring bar-ring" data-spot="scrobble"></span>
+                  <div class="spot card status" data-spot="discord">
+                    <p class="status-h">Listening to featherplay</p>
+                    <div class="status-row">
+                      <img data-kept-cover src={song.cover} width="56" height="56" alt="" loading="lazy" decoding="async" />
+                      <div>
+                        <p class="status-t" data-kept-title>{song.title}</p>
+                        <p class="status-a" data-kept-artist>by {song.artist}</p>
+                        <p class="status-a" data-kept-time>{formatTime(at)} elapsed</p>
+                      </div>
+                    </div>
+                    <span class="status-btn">Play song</span>
+                  </div>
+                  <div class="spot card flyout" data-spot="keys">
+                    <div class="flyout-row">
+                      <img data-kept-cover src={song.cover} width="64" height="64" alt="" loading="lazy" decoding="async" />
+                      <div>
+                        <p class="flyout-app">featherplay</p>
+                        <p class="status-t" data-kept-title>{song.title}</p>
+                        <p class="status-a" data-kept-artist-plain>{song.artist}</p>
+                      </div>
+                    </div>
+                    <div class="flyout-keys">
+                      <Icon name="prev" size={18} /><Icon name="play" size={18} /><Icon name="next" size={18} />
+                    </div>
+                  </div>
+                  <span class="spot sponsor" data-spot="sponsor"><i style="left:0;width:6%"></i><i style="left:88%;width:12%"></i></span>
+                  <span class="spot ring tray-ring" data-spot="tray"></span>
+                </div>
+              </Desktop>
+              </div>
+            </div>
+          </Laptop>
+          <!-- Where the visitor is in the five: one short bar each, the one on long and red. -->
+          <div class="progress" aria-hidden="true">
+            {features.map((f) => <i data-progress={f.id} />)}
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="more">
+      Coming from Pear Desktop? <a href={links.comingFromPear}>See what carries over</a>.
+    </p>
+  </div>
+</section>
+
+<script>
+  import { bindReplicas } from "../demo/replica";
+  import { bindFeatures } from "../demo/features";
+  const root = document.querySelector<HTMLElement>("[data-kept]");
+  const player = bindReplicas();
+  if (root && player) bindFeatures(root, player);
+</script>
+
+<style>
+  .kept {
+    padding-block: clamp(96px, 11vw, 180px);
+  }
+  .head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    justify-content: space-between;
+    gap: 16px 64px;
+    margin-bottom: clamp(24px, 3vw, 48px);
+  }
+  h2 {
+    max-width: 12ch;
+    font-size: clamp(2.75rem, 6.4vw, 6rem);
+  }
+  /* The same lede as "Light, and it shows": one size for a section's line beside its name. */
+  .lede {
+    max-width: 30ch;
+    font-size: clamp(1.125rem, 1.6vw, 1.5rem);
+    font-weight: 600;
+    line-height: 1.3;
+    letter-spacing: -0.01em;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: minmax(0, 0.6fr) minmax(0, 1.4fr);
+    gap: clamp(28px, 3vw, 56px);
+    align-items: start;
+  }
+
+  /* The steps: on wide screens each one is most of a screen's scrolling, its words in the
+     middle, so one is on at a time. They're buttons too (hover, focus, tap). */
+  .steps {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .step {
+    display: flex;
+    align-items: center;
+    min-height: 52svh;
+  }
+  .feature {
+    display: grid;
+    gap: 10px;
+    width: calc(100% + 20px);
+    margin-left: -20px;
+    padding: 18px 20px 20px;
+    border: 0;
+    border-radius: 18px;
+    background: transparent;
+    color: var(--text-muted);
+    text-align: left;
+    transition:
+      color calc(360ms * var(--colour-easing)) var(--ease-out),
+      background-color var(--t-hover) ease;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .feature:hover {
+      background: var(--hover);
+    }
+  }
+  .feature[aria-pressed="true"] {
+    color: var(--text);
+  }
+  .f-title {
+    font-size: clamp(2rem, 3.4vw, 3.25rem);
+    font-weight: 800;
+    letter-spacing: -0.035em;
+    line-height: 1.02;
+  }
+  .f-body {
+    max-width: 24ch;
+    font-size: clamp(1.125rem, 1.5vw, 1.4375rem);
+    line-height: 1.4;
+  }
+
+  /* The laptop: whole, in view the whole way down the steps, in the middle of the screen
+     (its frame is about 0.4 as tall as the page's measure is wide). */
+  .shot {
+    position: sticky;
+    top: max(24px, calc(50svh - 0.22 * min(100vw, 1600px)));
+  }
+  .frame {
+    position: relative;
+    padding: 5% 4.5% 3%;
+    border-radius: 28px;
+    background: var(--surface);
+  }
+  /* The screen's content at the desktop's own 1440x900 (Laptop.astro scales this box), and
+     inside it the layer that zooms. Its centre and amount come from src/demo/features.ts. */
+  .zoom-box {
+    overflow: hidden;
+  }
+  .zoom {
+    position: relative;
+    width: 1440px;
+    height: 900px;
+    transform-origin: 0 0;
+    transition: transform 800ms var(--ease-in-out);
+  }
+  .zoom > :global([data-desktop]) {
+    position: absolute;
+    inset: 0;
+  }
+  /* The five, under the laptop. */
+  .progress {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    margin-top: 18px;
+  }
+  .progress i {
+    width: 18px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--track);
+    transition:
+      width 400ms var(--ease-out),
+      background-color calc(240ms * var(--colour-easing)) ease;
+  }
+  [data-highlight="scrobble"] [data-progress="scrobble"],
+  [data-highlight="discord"] [data-progress="discord"],
+  [data-highlight="keys"] [data-progress="keys"],
+  [data-highlight="sponsor"] [data-progress="sponsor"],
+  [data-highlight="tray"] [data-progress="tray"] {
+    width: 40px;
+    background: var(--accent);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .zoom {
+      transition: none;
+    }
+  }
+  .more {
+    max-width: 60ch;
+    margin-top: clamp(24px, 3vw, 40px);
+  }
+  .more a {
+    font-weight: 700;
+    text-underline-offset: 0.2em;
+  }
+
+  /* The places, at the desktop's 1440x900 size. */
+  .spots {
+    position: absolute;
+    inset: 0;
+    z-index: 6;
+    pointer-events: none;
+    font-family: var(--font-ui);
+  }
+  .spot {
+    position: absolute;
+    opacity: 0;
+    transition:
+      opacity var(--t-menu) var(--ease-out),
+      transform var(--t-menu) var(--ease-out);
+  }
+  .ring {
+    border-radius: 24px;
+    box-shadow: /* taste-skill-ignore: the pointer at a place on the laptop */
+      0 0 0 4px var(--accent),
+      0 0 0 12px color-mix(in srgb, var(--accent) 30%, transparent);
+  }
+  /* The rings and the marks are placed on their targets by src/demo/features.ts. */
+  .ring,
+  .sponsor {
+    left: 0;
+    top: 0;
+  }
+  /* The tray icon sits at the screen's bottom edge: its mark is drawn inside, not round it. */
+  .tray-ring {
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--accent) 22%, transparent);
+    box-shadow: inset 0 0 0 3px var(--accent); /* taste-skill-ignore: the pointer at a place on the laptop */
+  }
+  .card {
+    width: 360px;
+    padding: 16px;
+    border-radius: 12px;
+    background: var(--flyout);
+    color: var(--text);
+    box-shadow: 0 16px 48px #00000073; /* taste-skill-ignore: a floating card on the desktop */
+    transform: translateY(8px);
+  }
+  .status {
+    top: 60px;
+    right: 440px;
+  }
+  .flyout {
+    top: 24px;
+    left: 24px;
+  }
+  .status-h,
+  .flyout-app {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--flyout-ink-2);
+  }
+  .status-row,
+  .flyout-row {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    margin-top: 10px;
+  }
+  .status-row img,
+  .flyout-row img {
+    border-radius: 8px;
+  }
+  .status-t {
+    font-weight: 700;
+    font-size: 16px;
+  }
+  .status-a {
+    font-size: 14px;
+    color: var(--flyout-ink-3);
+  }
+  .status-btn {
+    display: block;
+    margin-top: 14px;
+    padding: 9px;
+    border-radius: 6px;
+    background: var(--flyout-button);
+    text-align: center;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .flyout-keys {
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+    margin-top: 12px;
+  }
+  .flyout-keys :global(svg) {
+    fill: currentColor;
+  }
+  .sponsor {
+    height: 6px;
+  }
+  .sponsor i {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    border-radius: 3px;
+    background: #00d400;
+  }
+
+  [data-highlight="scrobble"] [data-spot="scrobble"],
+  [data-highlight="discord"] [data-spot="discord"],
+  [data-highlight="keys"] [data-spot="keys"],
+  [data-highlight="sponsor"] [data-spot="sponsor"],
+  [data-highlight="tray"] [data-spot="tray"] {
+    opacity: 1;
+    transform: none;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .card {
+      transform: none;
+    }
+  }
+
+  /* Narrower: the laptop first, then the steps as a short list (tap one to see it). */
+  @media (max-width: 960px) {
+    .grid {
+      grid-template-columns: 1fr;
+    }
+    .shot {
+      position: static;
+      order: -1;
+    }
+    .step {
+      min-height: 0;
+    }
+    .feature {
+      width: 100%;
+      margin-left: 0;
+      padding: 14px 0;
+      color: var(--text);
+    }
+    .f-title {
+      font-size: 1.5rem;
+    }
+  }
+  /* Phones: the list alone; the laptop's places are too small to point at. */
+  @media (max-width: 768px) {
+    .shot {
+      display: none;
+    }
+    .feature {
+      cursor: default;
+    }
+  }
+</style>

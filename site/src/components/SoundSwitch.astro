@@ -1,0 +1,69 @@
+---
+// The page's sound switch for the demo: it shows only while a song
+// with sound is current (src/demo/audio.ts), and mutes or unmutes it, as the bar's own
+// mute does. Silent songs need no switch.
+import Icon from "./Icon.astro";
+interface Props {
+  class?: string;
+  /** The small round speaker for a player's credit line (NowPlaying.astro); the name stays "Sound". */
+  icon?: boolean;
+}
+const { class: className, icon = false } = Astro.props;
+---
+
+<button class:list={["sound", className, { "sound--icon": icon }]} type="button" data-sound aria-pressed="true" hidden>
+  <Icon name="volume" size={icon ? 18 : 20} class="on" /><Icon name="volumeOff" size={icon ? 18 : 20} class="off" />
+  <span class:list={{ "visually-hidden": icon }}>Sound</span>
+</button>
+
+<style>
+  .sound {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 0 18px 0 14px;
+    border: 0;
+    border-radius: 999px;
+    background: var(--selected);
+    color: var(--text);
+    font-weight: 700;
+    transition:
+      background-color var(--t-hover) ease,
+      transform var(--t-release) var(--spring-release);
+  }
+  .sound:hover {
+    background: var(--tonal-hover);
+  }
+  .sound:active {
+    transform: scale(var(--press-scale));
+    transition:
+      background-color var(--t-hover) ease,
+      transform var(--t-press) var(--ease-out);
+  }
+  .sound[hidden] {
+    display: none;
+  }
+  /* The icon form: a 36 px circle (44 px to touch), the speaker struck through when muted. */
+  .sound--icon {
+    position: relative;
+    justify-content: center;
+    width: 36px;
+    min-height: 36px;
+    height: 36px;
+    padding: 0;
+  }
+  .sound--icon::after {
+    content: "";
+    position: absolute;
+    inset: -6px;
+  }
+  /* The icons are Icon.astro's own elements, outside this component's scope. */
+  .sound :global(.off),
+  .sound[aria-pressed="false"] :global(.on) {
+    display: none;
+  }
+  .sound[aria-pressed="false"] :global(.off) {
+    display: block;
+  }
+</style>

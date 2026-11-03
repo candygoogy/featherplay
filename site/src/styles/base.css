@@ -1,0 +1,276 @@
+/* The site's foundation: the font, a small reset, the page's colours, focus and the
+   helpers every section uses. The tokens live in tokens.css. */
+
+@font-face {
+  font-family: "Manrope";
+  /* One variable file cut to 400–800 and to Latin (22 KB): fewer bytes than three
+     static weights, and the replica's 700 comes free. */
+  src: url("/fonts/manrope-latin-400-800.woff2") format("woff2");
+  font-weight: 400 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  hanging-punctuation: first last;
+}
+/* A link within the page glides there. With script that's set for the link's own scroll
+   (src/scripts/anchors.ts), so the browser's jumps on load (to a #section, or back to where
+   a reload left the page) are instant and never travel through the hero's scroll moment. */
+html:not(.js) {
+  scroll-behavior: smooth;
+}
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 1.0625rem;
+  line-height: 1.55;
+  font-optical-sizing: auto;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: clip;
+}
+
+h1,
+h2,
+h3,
+p,
+figure,
+blockquote,
+ol,
+ul,
+dl,
+dd {
+  margin: 0;
+}
+h1,
+h2,
+h3 {
+  font-weight: 800;
+  letter-spacing: var(--tracking-display);
+  line-height: 0.98;
+  text-wrap: balance;
+}
+p {
+  text-wrap: pretty;
+}
+/* Short headings and labels never leave one word on a line of its own. */
+h4,
+h5,
+legend,
+summary {
+  text-wrap: balance;
+}
+img,
+svg {
+  display: block;
+  max-width: 100%;
+}
+button,
+input {
+  font: inherit;
+  color: inherit;
+}
+button {
+  cursor: pointer;
+}
+a {
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+/* The skip link's target takes focus only to move the keyboard there; it shows no ring. */
+main:focus {
+  outline: none;
+}
+
+/* Selected text: a soft wash of the accent under the text's own colour (AA holds: the wash
+   is light on light grounds and deep on dark ones). Browsers can't animate ::selection, so
+   it's soft rather than moving.
+   The rules leave out <html>, <body>, <main> and the page's blocks while they take a theme
+   switch (.theme-quiet, src/scripts/theme.ts): Chrome works out a selection style for every
+   element it restyles, which doubles the work of each frame of the switch. */
+:where(:not(:root, body, main, .theme-quiet, .theme-quiet *))::selection {
+  background: light-dark(color-mix(in srgb, var(--accent) 20%, transparent), color-mix(in srgb, var(--accent) 34%, transparent));
+}
+/* On an accent fill (the buttons), the wash is the text's colour instead. */
+.button:where(:not(.theme-quiet *))::selection,
+.button :where(:not(.theme-quiet *))::selection {
+  background: color-mix(in srgb, var(--on-accent) 26%, transparent);
+}
+
+/* With script and motion the selection is drawn instead (src/scripts/selection.ts): rounded
+   pieces of the same wash that fade and grow in and follow the selection. The native
+   highlight steps aside (it still selects, copies and reads out); fields keep it. */
+:root.sel-drawn :where(:not(body, main, .theme-quiet, .theme-quiet *))::selection,
+:root.sel-drawn .button:where(:not(.theme-quiet *))::selection,
+:root.sel-drawn .button :where(:not(.theme-quiet *))::selection {
+  background: transparent;
+}
+:root.sel-drawn :is(input, textarea):where(:not(.theme-quiet *))::selection {
+  background: light-dark(color-mix(in srgb, var(--accent) 20%, transparent), color-mix(in srgb, var(--accent) 34%, transparent));
+}
+.sel-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  z-index: 60;
+  pointer-events: none;
+  /* Over the text, blended so it reads as under it: multiplied on light grounds (dark text
+     stays dark), screened on dark ones (light text stays light). The layer blends as one,
+     so overlapping pieces never darken. */
+  mix-blend-mode: multiply;
+  transition: opacity 140ms ease;
+}
+:root[data-theme="dark"] .sel-layer {
+  mix-blend-mode: screen;
+}
+.sel-layer[data-out="true"] {
+  opacity: 0;
+}
+.sel-layer > span {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border-radius: 6px;
+  background: color-mix(in srgb, color-mix(in srgb, var(--accent) 24%, transparent) calc(var(--light) * 100%), color-mix(in srgb, var(--accent) 40%, transparent));
+  transform-origin: 0 50%;
+  contain: strict;
+  transition:
+    opacity 140ms ease,
+    scale 180ms var(--ease-out);
+}
+@starting-style {
+  .sel-layer > span {
+    opacity: 0;
+    scale: 0.92 0.8;
+  }
+}
+/* Following a change of selection, the pieces glide to their new lines and lengths; while
+   the page scrolls they stay put on the text. */
+.sel-layer[data-glide="true"] > span {
+  transition:
+    opacity 140ms ease,
+    scale 180ms var(--ease-out),
+    translate 110ms var(--ease-out),
+    width 110ms var(--ease-out),
+    height 110ms var(--ease-out);
+}
+
+[hidden] {
+  display: none !important;
+}
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Art drawn per theme (the Tri-vane gets a crimson ring on light grounds): both drawings lie
+   in one .art box, and the other theme's fades out as --light eases with the colours. Inside
+   a window themed on its own ("Make it yours"), its [data-theme] sets --light for it. */
+.art {
+  display: inline-grid;
+  flex: none;
+}
+.art > * {
+  grid-area: 1 / 1;
+}
+.only-dark {
+  opacity: calc(1 - var(--light));
+}
+.only-light {
+  opacity: var(--light);
+}
+
+/* The page grid: one pair of margins everywhere, and one split for the sections that put a
+   name on the left and their content on the right (the lyrics, the questions, the footer), so
+   their right-hand columns start on the same line. */
+:root {
+  --split: minmax(0, 0.9fr) minmax(0, 1.4fr);
+  --split-gap: clamp(32px, 5vw, 80px);
+}
+.wrap {
+  width: 100%;
+  max-width: 1600px;
+  margin-inline: auto;
+  padding-inline: clamp(16px, 3.4vw, 48px);
+}
+
+/* The one button shape: fully round, one flat fill. */
+.button {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 0 24px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 700;
+  font-size: 1rem;
+  text-decoration: none;
+  transition:
+    background-color var(--t-hover) ease,
+    transform var(--t-hover) var(--ease-out);
+}
+.button:hover {
+  background: var(--accent-hover);
+}
+.button:active {
+  background: var(--accent-pressed);
+  transform: scale(0.97);
+}
+
+/* The plain sections below the first screen skip layout and paint until they come near the
+   viewport (each remembers its real height once seen; the estimate only places the ones
+   never rendered yet). Not the ones holding a featherplay window or synced lines: those
+   measure their lines as they start, and a skipped section gives them no size. A page that
+   loads part-way down (Base.astro's data-land) renders them all from the start: the browser
+   puts it back in place after the first layout, and a skipped section it lands on would show
+   for a frame as the bare ground. */
+:root:not([data-land]) :is(#light, #questions, #download),
+:root:not([data-land]) body > footer {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 1000px;
+}
+
+/* Starting up (Base.astro, until the page's styles are in and two frames have run): nothing
+   eases. A style worked out before the stylesheets arrive (an extension reading the page on a
+   reload, say) would otherwise make every link, band and control ease from the browser's own
+   colours to the page's. */
+:root.booting *,
+:root.booting *::before,
+:root.booting *::after {
+  transition: none !important;
+}

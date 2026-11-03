@@ -1,0 +1,237 @@
+// Artist page: a full-width photo banner with the name, Play and Radio over
+// its foot (a round photo header when the artist has no photo), then top songs, albums and
+// singles. Data comes from `src/pages/artist.rs`. Every list here is
+// short (the API gives a handful of top songs and one shelf each), so the page is one
+// Flickable.
+import { Theme, Curves, Icons } from "../theme.slint";
+import { TrackRow, CardItem, ShelfTitle, Shelf, Display, Body, Pill } from "../parts.slint";
+import { SongMenu } from "../song_menu.slint";
+import { CollectionHeader, SongListRow, Skeleton, SkeletonBlock, SkeletonBar, SkeletonRow, ErrorState, FadeIn, Grid, Open, TopScrim } from "content.slint";
+
+export global ArtistData {
+    in property <bool> loading;
+    in property <string> error;
+    in property <string> id;
+    in property <string> name;
+    in property <string> meta;
+    in property <image> photo;
+    // The artist has a photo (it may still be loading): the page opens on a banner.
+    in property <bool> has-photo;
+    in property <[TrackRow]> top-songs;
+    in property <[CardItem]> albums;
+    in property <[CardItem]> singles;
+    // Plays the top songs from `i`.
+    callback play(int);
+    // The radio of the first top song.
+    callback radio();
+    callback like(int);
+    // Loads the artist again after an error.
+    callback retry();
+    // A card's play button: plays the album, playlist or artist without opening it.
+    callback play-card(CardItem);
+}
+
+// The banner: the photo across the page, cropped from the top, fading into the ground
+// under the name, the meta line and the actions. Until the photo arrives it's a quiet grey.
+component Banner inherits Rectangle {
+    property <length> pad: Theme.page-pad;
+    property <length> buttons-y: root.height - 40px - Theme.s5;
+    property <length> meta-y: root.buttons-y - Theme.s4 - 20px;
+    property <length> name-y: root.meta-y - 68px;
+    background: Theme.cover-empty;
+    clip: true;
+    Image {
+        width: parent.width;
+        height: parent.height;
+        source: ArtistData.photo;
+        image-fit: cover;
+        vertical-alignment: top;
+        opacity: ArtistData.photo.width > 0 ? 1 : 0;
+        animate opacity { duration: Theme.t-cover; easing: Curves.ease-hover; }
+    }
+    // Keeps the name readable on any photo: clear at the top, the ground at the foot.
+    Rectangle {
+        background: @linear-gradient(180deg, Theme.ground.transparentize(1) 0%, Theme.ground.transparentize(0.9) 30%, Theme.ground.transparentize(0.3) 65%, Theme.ground 100%);
+    }
+    Display {
+        x: root.pad;
+        y: root.name-y;
+        width: root.width - 2 * root.pad;
+        height: 68px;
+        text: ArtistData.name;
+        font-size: Theme.t-display-xxl;
+        font-weight: 800;
+        vertical-alignment: center;
+    }
+    Body {
+        x: root.pad;
+        y: root.meta-y;
+        width: root.width - 2 * root.pad;
+        height: 20px;
+        text: ArtistData.meta;
+        color: Theme.text2;
+        vertical-alignment: center;
+    }
+    HorizontalLayout {
+        x: root.pad;
+        y: root.buttons-y;
+        height: 40px;
+        spacing: Theme.s2;
+        alignment: start;
+        Pill {
+            label: @tr("Play");
+            icon: Icons.play;
+            solid: true;
+            enabled: ArtistData.top-songs.length > 0;
+            clicked => { ArtistData.play(0); }
+        }
+        Pill {
+            label: @tr("Radio");
+            icon: Icons.radio;
+            icon-filled: false;
+            enabled: ArtistData.top-songs.length > 0;
+            clicked => { ArtistData.radio(); }
+        }
+    }
+}
+
+export component ArtistPage inherits Rectangle {
+    property <length> pad: Theme.page-pad;
+    property <length> inner: self.width - 2 * self.pad;
+    // The page runs up under the clear top bar (app.slint): the banner's photo reaches up
+    // behind it, and everything else starts below it.
+    property <length> inset: Theme.top-bar-h;
+    // The banner: 36 % of the page's height, between 280 and 400 px, below the top bar.
+    property <length> banner-h: max(280px, min(400px, floor(root.height * 0.36 / 1px) * 1px));
+    property <length> header-h: root.inset + (ArtistData.has-photo ? root.banner-h + Theme.s4 : Theme.page-top + (root.width >= 900px ? 232px : 200px) + Theme.s6);
+    property <length> songs-y: root.header-h + Theme.s2;
+    property <length> songs-h: ArtistData.top-songs.length == 0 ? 0px : 48px + ArtistData.top-songs.length * Theme.row-h + Theme.section-gap;
+    property <int> per-row: Grid.per-row(root.inner);
+    property <length> card: Grid.card(root.inner, root.per-row);
+    property <length> shelf-h: 48px + root.card + Theme.card-text-gap + 40px;
+    property <length> albums-y: root.songs-y + root.songs-h;
+    property <length> albums-h: ArtistData.albums.length == 0 ? 0px : root.shelf-h + Theme.section-gap;
+    property <length> singles-y: root.albums-y + root.albums-h;
+    property <length> singles-h: ArtistData.singles.length == 0 ? 0px : root.shelf-h + Theme.section-gap;
+
+    // Loading: the banner's shape, the name and the top songs.
+    if ArtistData.loading && ArtistData.name == "": sk := Skeleton {
+        SkeletonBlock {
+            x: 0;
+            y: 0;
+            width: root.width;
+            height: root.inset + root.banner-h;
+            sweep: sk.sweep;
+            fade: sk.fade;
+        }
+        SkeletonBlock {
+            x: root.pad;
+            y: root.inset + root.banner-h - 40px - Theme.s5 - Theme.s4 - 20px - 60px;
+            width: min(320px, root.inner);
+            height: 48px;
+            border-radius: Theme.r-m;
+            sweep: sk.sweep;
+            fade: sk.fade;
+        }
+        for i in 2: SkeletonBlock {
+            x: root.pad + i * 112px;
+            y: root.inset + root.banner-h - 40px - Theme.s5;
+            width: 100px;
+            height: 40px;
+            border-radius: 20px;
+            sweep: sk.sweep;
+            fade: sk.fade;
+        }
+        SkeletonBar {
+            x: root.pad;
+            y: root.inset + root.banner-h + Theme.s4 + 12px;
+            width: 140px;
+            height: 16px;
+            sweep: sk.sweep;
+            fade: sk.fade;
+        }
+        // Top songs have no duration: their album column takes its place.
+        for i in 5: SkeletonRow {
+            x: root.pad - 8px;
+            y: root.inset + root.banner-h + Theme.s4 + 48px + i * Theme.row-h;
+            width: root.inner + 16px;
+            index: i;
+            duration: false;
+            sweep: sk.sweep;
+            fade: sk.fade * min(1, (5 - i) / 3);
+        }
+    }
+    if !ArtistData.loading && ArtistData.error != "": ErrorState {
+        x: root.pad;
+        y: root.inset + Theme.page-top;
+        width: min(480px, root.inner);
+        message: ArtistData.error;
+        retry => { ArtistData.retry(); }
+    }
+    if ArtistData.name != "": FadeIn {
+        flick := Flickable {
+            content-height: root.singles-y + root.singles-h + Theme.bar-clear;
+            if ArtistData.has-photo: Banner {
+                x: 0;
+                y: 0;
+                width: root.width;
+                height: root.inset + root.banner-h;
+            }
+            // No photo: the round header.
+            if !ArtistData.has-photo: CollectionHeader {
+                x: 0;
+                y: 0;
+                width: root.width;
+                cover: ArtistData.photo;
+                round: true;
+                title: ArtistData.name;
+                meta: ArtistData.meta;
+                secondary: @tr("Radio");
+                secondary-icon: Icons.radio;
+                enabled: ArtistData.top-songs.length > 0;
+                primary-clicked => { ArtistData.play(0); }
+                secondary-clicked => { ArtistData.radio(); }
+            }
+            if ArtistData.top-songs.length > 0: ShelfTitle {
+                x: root.pad;
+                y: root.songs-y;
+                width: root.inner;
+                text: @tr("Top songs");
+            }
+            for t[i] in ArtistData.top-songs: SongListRow {
+                x: root.pad - 8px;
+                y: root.songs-y + 48px + i * Theme.row-h;
+                width: root.inner + 16px;
+                track: t;
+                activated => { ArtistData.play(i); }
+                like-clicked => { ArtistData.like(i); }
+                menu-requested(x, y, top) => { SongMenu.show(t, x, y, top); }
+            }
+            if ArtistData.albums.length > 0: Shelf {
+                x: root.pad;
+                y: root.albums-y;
+                width: root.inner;
+                title: @tr("Albums");
+                items: ArtistData.albums;
+                per-row: root.per-row;
+                playable: true;
+                open(it) => { Open.item(it); }
+                play(it) => { ArtistData.play-card(it); }
+            }
+            if ArtistData.singles.length > 0: Shelf {
+                x: root.pad;
+                y: root.singles-y;
+                width: root.inner;
+                title: @tr("Singles");
+                items: ArtistData.singles;
+                per-row: root.per-row;
+                playable: true;
+                open(it) => { Open.item(it); }
+                play(it) => { ArtistData.play-card(it); }
+            }
+        }
+        TopScrim {
+            scrolled: -flick.content-y;
+        }
+    }
+}

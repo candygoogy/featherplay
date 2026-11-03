@@ -1,0 +1,13 @@
+{
+  "id": 1000001,
+  "name": "Get Lucky",
+  "trackName": "Get Lucky",
+  "artistName": "Daft Punk",
+  "albumName": "Random Access Memories",
+  "duration": 367.0,
+  "instrumental": false,
+  "hasWordSync": false,
+  "plainLyrics": "Morning light on the harbour wall\nGulls above the ferry call\nCoffee cooling on the sill\nThe kettle sings, the street is still\n\nWe walk the long way into town\nPast the bakery, up and down\nEvery window wakes in turn\nEvery lamp has learned to burn\n\nHold the tune and keep the time\nEvery step a little rhyme\nHold the tune and keep the time\nCarry on and you'll be fine\n\nEvening folds the market stalls\nShadows lean on painted walls\nSomeone hums a borrowed song\nAnd the whole street hums along\n\nHold the tune and keep the time\nEvery step a little rhyme\nHold the tune and keep the time\nCarry on and you'll be fine",
+  "syncedLyrics": "[00:12.40] Morning light on the harbour wall\n[00:23.40] Gulls above the ferry call\n[00:34.40] Coffee cooling on the sill\n[00:45.40] The kettle sings, the street is still\n[00:56.40]\n[01:00.40] We walk the long way into town\n[01:11.40] Past the bakery, up and down\n[01:22.40] Every window wakes in turn\n[01:33.40] Every lamp has learned to burn\n[01:44.40]\n[01:48.40] Hold the tune and keep the time\n[01:59.40] Every step a little rhyme\n[02:10.40] Hold the tune and keep the time\n[02:21.40] Carry on and you'll be fine\n[02:32.40]\n[02:36.40] Evening folds the market stalls\n[02:47.40] Shadows lean on painted walls\n[02:58.40] Someone hums a borrowed song\n[03:09.40] And the whole street hums along\n[03:20.40]\n[03:24.40] Hold the tune and keep the time\n[03:35.40] Every step a little rhyme\n[03:46.40] Hold the tune and keep the time\n[03:57.40] Carry on and you'll be fine",
+  "lyricsfile": "version: '1.0'\n"
+}

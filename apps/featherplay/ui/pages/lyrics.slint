@@ -1,0 +1,486 @@
+// The lyrics: the Lyrics tab of `SideTabs` (now_playing.slint), in Now playing and in the
+// frame's Up next panel, and Now playing's full lyrics view. Filled by `src/lyrics.rs`:
+// synced lines from LRCLIB, or the plain lyrics that come with the song.
+//
+// The look (option A of the lyrics gate, 2026-10-30): the lines on a solid panel in the
+// cover's colour, with light text in three levels: sung, playing, to come. The light theme
+// keeps the panel, with less of the cover's colour (`colour::lyric_panel`).
+// Every line is one bold weight at one size, so becoming current never re-wraps it; only its
+// colour changes (past, current, to come), through the text's colour, never `opacity`. The
+// lines start at the top of the panel; once the current line passes a third of the way down,
+// the view glides to keep it there. A manual scroll pauses that for 5 s; a click on a line
+// seeks there. Nothing ticks: Rust sets `current` when the next
+// line starts (one single-shot timer per line, only while sound plays and the lyrics are on
+// screen), and only that glide and two lines' colours animate.
+import { Theme, Curves } from "../theme.slint";
+import { Body, Display } from "../parts.slint";
+import { Player } from "../player.slint";
+import { Nav, PageKind } from "../nav.slint";
+import { Skeleton, SkeletonBar } from "content.slint";
+
+export enum LyricsState { idle, loading, synced, plain, none, error }
+
+// The lyrics' panel and their three levels of text (`follow::lyric_inks`), checked against
+// the panel for each theme.
+export struct LyricInk {
+    ground: color,
+    current: color,
+    next: color,
+    past: color,
+}
+
+export global LyricsData {
+    in property <LyricsState> state: LyricsState.idle;
+    // Synced: one entry per timed line; "" is a gap between lines.
+    in property <[string]> lines;
+    // The line playing, or -1 before the first.
+    in property <int> current: -1;
+    // Plain: the whole text, and the same as lines ("" between verses).
+    in property <string> plain;
+    in property <[string]> plain-lines;
+    // The plain lyrics show because LRCLIB failed (an outage), not because it has no synced
+    // lines for the song: the note says so.
+    in property <bool> synced-unavailable;
+    // Where the lyrics come from ("Lyrics from LRCLIB", or the service's own source line).
+    in property <string> credit;
+    // Now playing shows the lyrics in its stage, the cover small beside them. Off at every
+    // start; once turned on it stays on for the session, song after song, until turned off.
+    in-out property <bool> full: false;
+    // Settings' "Show lyrics". Off, the Lyrics toggles and tab are hidden and nothing is
+    // looked up; Rust closes the full view.
+    in property <bool> on: true;
+    // The full view is on screen: what the toggles show as active.
+    out property <bool> showing: self.on && self.full && Nav.page == PageKind.now-playing;
+    // The cover's panel and lines, per theme.
+    in property <LyricInk> ink-dark;
+    in property <LyricInk> ink-light;
+    out property <LyricInk> ink: Theme.dark ? self.ink-dark : self.ink-light;
+    // The lyrics are on screen (`LyricsWatch`, now_playing.slint): Rust asks for lyrics and
+    // times the lines only then.
+    callback live-changed(bool);
+    // A click on line `i`: play from its start.
+    callback seek-line(int);
+    // Try again after a failed lookup.
+    callback retry();
+    // The lookup failed because LRCLIB is down and the song has no lyrics of its own (Rust
+    // asks LRCLIB once more a minute later); otherwise a failure is the lookup's own.
+    in property <bool> unavailable;
+    // What the view says when it has no lines to show.
+    out property <string> message: self.state == LyricsState.error
+        ? (self.unavailable ? @tr("Lyrics are unavailable right now") : @tr("Couldn't load lyrics"))
+        : (Player.has-track ? @tr("No lyrics for this song") : @tr("Nothing playing"));
+
+    // The Lyrics toggles (the stage's pill, the bar's microphone, Ctrl+L): on Now playing,
+    // lyrics on or off; anywhere else, Now playing opens on the lyrics. Nothing with lyrics off.
+    public function toggle-view() {
+        if self.showing {
+            self.full = false;
+        } else if self.on {
+            self.full = true;
+            if Nav.page != PageKind.now-playing {
+                Nav.go(PageKind.now-playing);
+            }
+        }
+    }
+}
+
+// One line. `level`: -1 sung, 0 playing, 1 to come; plain lyrics are all `plain`.
+component LyricLine inherits Rectangle {
+    in property <string> text;
+    in property <int> level: 1;
+    in property <bool> plain;
+    in property <length> size;
+    // The pointer moved onto this line since the lines last glided (`SyncedLines.hot`): a
+    // line that slides under a resting pointer doesn't light up.
+    in property <bool> hot;
+    // How far the line has faded in (the full view's toggle), through its colour.
+    in property <float> reveal: 1;
+    // The line is on screen: hidden, its colour steps at once (nothing animates out of sight).
+    in property <bool> on-screen: true;
+    callback clicked();
+    // The pointer moved over this line, to this point (window coordinates).
+    callback pointer-moved(length, length);
+    property <bool> gap: root.text == "";
+    property <bool> live: !root.gap && !root.plain;
+    // A verse break: a little more than the gap between lines.
+    property <length> gap-h: root.size * 0.6;
+    // The line's level eases on its own; the toggle's fade is applied over it, every frame.
+    property <color> ink: root.plain || root.level == 0 ? LyricsData.ink.current : (root.level < 0 ? LyricsData.ink.past : LyricsData.ink.next);
+    animate ink { duration: root.on-screen ? Theme.t-line : 0ms; easing: Curves.ease-out; }
+    min-height: root.gap ? root.gap-h : lay.min-height;
+    preferred-height: root.gap ? root.gap-h : lay.preferred-height;
+    border-radius: Theme.r-m;
+    background: !root.live ? transparent : Theme.panel-state(ta.pressed, ta.has-hover && root.hot);
+    animate background { duration: Theme.t-hover; }
+    accessible-role: button;
+    accessible-enabled: root.live;
+    accessible-label: root.text;
+    accessible-description: root.live ? @tr("Plays from this line") : "";
+    accessible-action-default => { root.clicked(); }
+    ta := TouchArea {
+        enabled: root.live;
+        mouse-cursor: root.live ? pointer : default;
+        clicked => { root.clicked(); }
+        pointer-event(e) => {
+            if e.kind == PointerEventKind.move {
+                root.pointer-moved(self.absolute-position.x + self.mouse-x, self.absolute-position.y + self.mouse-y);
+            }
+        }
+    }
+    lay := HorizontalLayout {
+        padding-left: Theme.s3;
+        padding-right: Theme.s3;
+        // A sixth of the type above and below: the lines keep their spacing at any size.
+        padding-top: root.size / 6;
+        padding-bottom: root.size / 6;
+        if !root.gap: Display {
+            text: root.text;
+            font-size: root.size;
+            font-weight: Theme.lyric-weight;
+            color: root.ink.transparentize(1 - root.reveal);
+            wrap: word-wrap;
+            overflow: clip;
+        }
+    }
+}
+
+// A quiet line under or above the lines: the credit, "Not synced".
+component LyricsNote inherits HorizontalLayout {
+    in property <string> text;
+    in property <float> reveal: 1;
+    padding-left: Theme.s3;
+    Body {
+        text: root.text;
+        font-size: Theme.t-body;
+        font-weight: 600;
+        color: LyricsData.ink.next.transparentize(1 - root.reveal);
+        wrap: word-wrap;
+    }
+}
+
+// Try again after a failed lookup, as text on the panel: the lines' hover tile shows it's
+// pressable.
+component TryAgain inherits Rectangle {
+    in property <float> reveal: 1;
+    width: label.preferred-width + 2 * Theme.s2;
+    height: 28px;
+    border-radius: Theme.r-m;
+    background: Theme.panel-state(ta.pressed, ta.has-hover).transparentize(1 - root.reveal);
+    animate background { duration: Theme.t-hover; }
+    accessible-role: button;
+    accessible-label: @tr("Try again");
+    accessible-action-default => { LyricsData.retry(); }
+    ta := TouchArea {
+        enabled: root.reveal > 0;
+        mouse-cursor: pointer;
+        clicked => { LyricsData.retry(); }
+    }
+    label := Body {
+        x: Theme.s2;
+        height: parent.height;
+        text: @tr("Try again");
+        font-weight: 600;
+        color: LyricsData.ink.current.transparentize(1 - root.reveal);
+        vertical-alignment: center;
+    }
+}
+
+// Why there are no lyrics, as one quiet line under the song's title in Now playing's full
+// view: "No lyrics for this song", or after a failed lookup what failed and Try again.
+export component NoLyricsLine inherits HorizontalLayout {
+    in property <float> reveal: 1;
+    height: 28px;
+    spacing: Theme.s1;
+    alignment: start;
+    Body {
+        text: LyricsData.message;
+        color: LyricsData.ink.next.transparentize(1 - root.reveal);
+        vertical-alignment: center;
+    }
+    if LyricsData.state == LyricsState.error: TryAgain {
+        reveal: root.reveal;
+    }
+}
+
+// The synced lines, following the song.
+component SyncedLines inherits Rectangle {
+    in property <length> size;
+    in property <length> pad-x;
+    in property <float> reveal: 1;
+    // On screen. Hidden (a view kept alive out of sight), it follows the song without gliding.
+    in property <bool> live: true;
+    // Following the song, or held still by a manual scroll.
+    property <bool> following: true;
+    // The glide is running: only then does `content-y` ease, so the user's own scrolling
+    // stays direct.
+    property <bool> gliding: false;
+    // Where the current line sits in the list, for resuming the follow.
+    property <length> line-y;
+    property <length> line-h;
+    // The line the pointer last moved onto (-1: none since the last glide), and where it was:
+    // Windows sends moves without movement now and then, and those don't count.
+    property <int> hot: -1;
+    property <length> pointer-x: -1px;
+    property <length> pointer-y: -1px;
+    // Another song's lines: start from the top, following again.
+    property <[string]> lines: LyricsData.lines;
+    changed lines => {
+        root.following = true;
+        root.gliding = false;
+        root.hot = -1;
+        flick.content-y = 0;
+    }
+
+    function follow(glide: bool) {
+        if !root.following || LyricsData.current < 0 {
+            return;
+        }
+        root.gliding = glide && Theme.moving && root.live;
+        if glide {
+            root.hot = -1;
+        }
+        flick.content-y = clamp(root.height / 3 - root.line-y - root.line-h / 2, min(0px, flick.height - flick.content-height), 0px);
+    }
+    function line-is(y: length, h: length, glide: bool) {
+        root.line-y = y;
+        root.line-h = h;
+        root.follow(glide);
+    }
+
+    flick := Flickable {
+        content-height: lines-lay.preferred-height;
+        animate content-y { duration: root.gliding ? Theme.t-follow : 0ms; easing: Curves.ease-in-out; }
+        flicked => {
+            root.gliding = false;
+            root.following = false;
+            resume.running = true;
+            resume.restart();
+        }
+        lines-lay := VerticalLayout {
+            // The lines start at the top, where the plain lyrics do; the view never scrolls
+            // above the first one (`follow` clamps at 0), so the glide only takes over once
+            // the line playing passes a third of the way down.
+            padding-top: Theme.s5;
+            padding-bottom: root.height / 2;
+            padding-left: root.pad-x - Theme.s3;
+            padding-right: root.pad-x - Theme.s3;
+            spacing: root.size * 0.18;
+            for line[i] in LyricsData.lines: LyricLine {
+                text: line;
+                size: root.size;
+                level: i == LyricsData.current ? 0 : (i < LyricsData.current ? -1 : 1);
+                hot: i == root.hot;
+                reveal: root.reveal;
+                on-screen: root.live;
+                init => {
+                    if self.level == 0 {
+                        root.line-is(self.y, self.height, false);
+                    }
+                }
+                changed level => {
+                    if self.level == 0 {
+                        root.line-is(self.y, self.height, true);
+                    }
+                }
+                // The layout settled or the panel was resized: stay on the line, at once.
+                changed y => {
+                    if self.level == 0 {
+                        root.line-is(self.y, self.height, false);
+                    }
+                }
+                pointer-moved(x, y) => {
+                    if x != root.pointer-x || y != root.pointer-y {
+                        root.hot = i;
+                    }
+                    root.pointer-x = x;
+                    root.pointer-y = y;
+                }
+                clicked => {
+                    root.following = true;
+                    LyricsData.seek-line(i);
+                }
+            }
+            if LyricsData.credit != "": VerticalLayout {
+                padding-top: Theme.s5;
+                LyricsNote {
+                    text: LyricsData.credit;
+                    reveal: root.reveal;
+                }
+            }
+        }
+    }
+    // Ends the glide's easing once it has run, so a wheel notch right after it isn't eased
+    // as a glide.
+    Timer {
+        interval: Theme.t-follow;
+        running: root.gliding;
+        triggered => { root.gliding = false; }
+    }
+    // A manual scroll holds the view for 5 s, then it follows the song again.
+    resume := Timer {
+        interval: 5s;
+        running: false;
+        triggered => {
+            self.running = false;
+            root.following = true;
+            root.follow(true);
+        }
+    }
+}
+
+// Where the lines run out at the top or bottom of the view: a short fade into the panel, so
+// a line half scrolled away dissolves instead of being cut. A small strip (`lyric-edge`
+// tall), so the glide's frames stay cheap.
+component LyricsEdge inherits Rectangle {
+    in property <bool> top;
+    height: Theme.lyric-edge;
+    background: @linear-gradient(root.top ? 180deg : 0deg, LyricsData.ink.ground 0%, LyricsData.ink.ground.transparentize(1) 100%);
+}
+
+// The lyrics in any state, on the cover-colour panel. The side tab sets `card`: the panel is a
+// rounded card inside the tab; the full view draws its own panel across the stage and leaves
+// it off.
+export component LyricsView inherits Rectangle {
+    in property <length> size: Theme.t-lyric-side;
+    // The lines' inset from the view's sides (the hover tile reaches `s3` past it).
+    in property <length> pad-x: Theme.s5;
+    // Room kept free at the bottom: the floating bar, in the side panel.
+    in property <length> bottom: Theme.bar-clear;
+    in property <bool> card: true;
+    // The view is on screen (the side tabs keep it alive while another tab shows): the
+    // loading skeleton, which moves by itself, exists only then.
+    in property <bool> shown: true;
+    // How far the lyrics have faded in: the full view's toggle fades them in over its second
+    // half, once the stage is the panel's colour (now_playing.slint), through their colours.
+    // Until then nothing of them shows.
+    in property <float> reveal: 1;
+    // Says why there are no lines (no lyrics, a failed lookup, nothing playing). The full
+    // view turns it off and says it under the song's title instead (`NoLyricsLine`).
+    in property <bool> note: true;
+    property <length> list-h: root.height - root.bottom;
+    // The panel's box: the card's in the side tab, all of the view in the full one.
+    property <length> box-x: root.card ? Theme.s4 : 0;
+    property <length> box-w: root.card ? root.width - 2 * Theme.s4 : root.width;
+    property <length> box-h: root.card ? root.list-h - Theme.s2 : root.list-h;
+    property <bool> moving: LyricsData.state == LyricsState.synced || LyricsData.state == LyricsState.plain;
+
+    // The panel, as a card in the side tab.
+    if root.card: Rectangle {
+        x: root.box-x;
+        y: 0;
+        width: root.box-w;
+        height: root.box-h;
+        border-radius: Theme.r-l;
+        background: LyricsData.ink.ground;
+        animate background { duration: Theme.t-colour; easing: Curves.ease-hover; }
+    }
+
+    body := Rectangle {
+        x: root.box-x;
+        y: 0;
+        width: root.box-w;
+        height: root.box-h;
+        border-radius: root.card ? Theme.r-l : 0;
+        clip: true;
+
+        if LyricsData.state == LyricsState.loading && root.shown && root.reveal > 0: sk := Skeleton {
+            x: root.pad-x;
+            y: Theme.s5;
+            width: parent.width - 2 * root.pad-x;
+            height: parent.height - self.y;
+            // Shaped like the lines that replace it: one bar per line, at the lines' height
+            // and spacing, light on the panel.
+            for i in 8: SkeletonBar {
+                x: 0;
+                y: i * root.size * 1.6 + root.size * 0.2;
+                height: root.size * 0.75;
+                width: parent.width * (mod(i, 3) == 0 ? 0.82 : (mod(i, 3) == 1 ? 0.64 : 0.74));
+                border-radius: Theme.r-m;
+                tone: Theme.panel-skeleton;
+                tone-hi: Theme.panel-skeleton-hi;
+                sweep: sk.sweep;
+                fade: sk.fade;
+            }
+        }
+
+        // No lyrics, a failed lookup, or nothing playing, in the side tab: one quiet line in
+        // the middle of the card, in the colour of the lines to come; after a failure, Try
+        // again under it. The full view leaves this to Now playing (`note` off), which keeps
+        // the cover large with the line under the title.
+        if root.note && (LyricsData.state == LyricsState.none || LyricsData.state == LyricsState.error || LyricsData.state == LyricsState.idle): VerticalLayout {
+            x: root.pad-x;
+            y: 0;
+            width: parent.width - 2 * root.pad-x;
+            height: parent.height;
+            alignment: center;
+            spacing: Theme.s2;
+            Display {
+                text: LyricsData.message;
+                font-size: Theme.t-body-l;
+                color: LyricsData.ink.next.transparentize(1 - root.reveal);
+                horizontal-alignment: center;
+                wrap: word-wrap;
+            }
+            if LyricsData.state == LyricsState.error && root.reveal > 0: HorizontalLayout {
+                alignment: center;
+                TryAgain {
+                    reveal: root.reveal;
+                }
+            }
+        }
+
+        // Plain lyrics: the same type, all readable, under a quiet note: "Not synced", or
+        // after an LRCLIB outage, that synced lyrics are unavailable for now.
+        if LyricsData.state == LyricsState.plain: Flickable {
+            content-height: plain-lay.preferred-height;
+            plain-lay := VerticalLayout {
+                padding-left: root.pad-x - Theme.s3;
+                padding-right: root.pad-x - Theme.s3;
+                padding-top: Theme.s5;
+                padding-bottom: Theme.s6;
+                spacing: root.size * 0.18;
+                VerticalLayout {
+                    padding-bottom: Theme.s3;
+                    LyricsNote {
+                        text: LyricsData.synced-unavailable ? @tr("Synced lyrics are unavailable right now") : @tr("Not synced to the song");
+                        reveal: root.reveal;
+                    }
+                }
+                for line in LyricsData.plain-lines: LyricLine {
+                    text: line;
+                    size: root.size;
+                    plain: true;
+                    reveal: root.reveal;
+                }
+                if LyricsData.credit != "": VerticalLayout {
+                    padding-top: Theme.s5;
+                    LyricsNote {
+                        text: LyricsData.credit;
+                        reveal: root.reveal;
+                    }
+                }
+            }
+        }
+
+        if LyricsData.state == LyricsState.synced: SyncedLines {
+            size: root.size;
+            pad-x: root.pad-x;
+            reveal: root.reveal;
+            live: root.shown;
+        }
+
+        // The lines dissolve into the panel at its edges.
+        if root.moving && root.reveal > 0: LyricsEdge {
+            x: 0;
+            y: 0;
+            width: parent.width;
+            top: true;
+        }
+        if root.moving && root.reveal > 0: LyricsEdge {
+            x: 0;
+            y: parent.height - self.height;
+            width: parent.width;
+            top: false;
+        }
+    }
+}

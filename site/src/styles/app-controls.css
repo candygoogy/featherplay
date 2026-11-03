@@ -1,0 +1,208 @@
+/* featherplay's own controls, as apps/featherplay/ui/parts.slint draws them: the round icon
+   button (IconButton), the play button that morphs (PlayButton) and the playing mark
+   (PlayingMark). Shared by the replica and the lyrics showcase's player card. Colours come
+   from tokens.css; the motion from the app's tokens (Theme.t-*, Curves). */
+
+/* ---------- IconButton: a 36 px round target, the glyph in text2 (or text1), the accent
+   when it's on. Hover and press lay the app's neutral overlay under the glyph; a press gives
+   a little (scale 0.96 over 100 ms) and springs back past rest on release. ---------- */
+.fp-ib {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text2, var(--text-muted));
+  cursor: pointer;
+  transition:
+    background-color var(--t-hover) ease,
+    color var(--t-hover) ease,
+    transform var(--t-release) var(--spring-release);
+}
+.fp-ib:hover {
+  background: var(--hover);
+}
+.fp-ib:active {
+  background: var(--pressed);
+  transform: scale(var(--press-scale));
+  transition:
+    background-color var(--t-hover) ease,
+    transform var(--t-press) var(--ease-out);
+}
+.fp-ib.t1 {
+  color: var(--text);
+}
+.fp-ib[aria-pressed="true"],
+.fp-ib[data-active="true"] {
+  color: var(--accent);
+}
+.fp-ib svg {
+  width: 20px;
+  height: 20px;
+  transition: transform var(--t-fast) var(--ease-out);
+}
+
+/* ---------- PlayButton: a solid accent disc that eases into a rounded square while playing
+   (spring 0.25 over 240 ms), play turning into pause as it does: the outgoing glyph shrinks
+   to 0.6 and turns 90° away while it fades (140 ms), the other turns in. ---------- */
+.fp-play {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: 0;
+  border-radius: 24px;
+  background: var(--accent);
+  color: var(--on-accent);
+  cursor: pointer;
+  /* The shape's morph is the app's own (its radius); the one non-transform animation here,
+     on a 48 px button. */
+  transition:
+    border-radius var(--t-morph) var(--spring-morph),
+    transform var(--t-release) var(--spring-release);
+}
+[data-playing="true"] .fp-play {
+  border-radius: 14.4px; /* 0.3 of its height */
+}
+.fp-play::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: transparent;
+  transition: background-color var(--t-hover) ease;
+}
+.fp-play:hover::after {
+  background: var(--hover);
+}
+.fp-play:active {
+  /* press-scale less 0.02: the play button gives a touch more */
+  transform: scale(var(--press-scale-play));
+  transition:
+    border-radius var(--t-morph) var(--spring-morph),
+    transform var(--t-press) var(--ease-out);
+}
+.fp-play:active::after {
+  background: var(--pressed);
+}
+.fp-play svg {
+  grid-area: 1 / 1;
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
+  transition:
+    opacity var(--t-fast) var(--ease-out),
+    transform var(--t-morph) var(--spring-morph);
+}
+.fp-play .i-pause {
+  opacity: 0;
+  transform: scale(0.6) rotate(-90deg);
+}
+[data-playing="true"] .fp-play .i-play {
+  opacity: 0;
+  transform: scale(0.6) rotate(90deg);
+}
+[data-playing="true"] .fp-play .i-pause {
+  opacity: 1;
+  transform: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fp-play .i-pause,
+  [data-playing="true"] .fp-play .i-play {
+    transform: none;
+  }
+}
+
+/* ---------- PlayingMark: one accent stroke, a short wave travelling through the mark while
+   the song plays (one wavelength each 0.8 s, swelling over 1.6 s); paused, or without
+   motion, a still wave that still says "this one". Drawn as a long wave moved under a mask
+   that pins it towards both ends: transform only. ---------- */
+.fp-mark {
+  display: block;
+  width: 18px;
+  height: 18px;
+  color: var(--accent);
+  mask-image: linear-gradient(90deg, transparent 6%, #000 24%, #000 76%, transparent 94%); /* taste-skill-ignore: the app's playing mark */
+}
+.fp-mark path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2px;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.fp-mark .swell {
+  transform-origin: 50% 50%;
+}
+@media (prefers-reduced-motion: no-preference) {
+  [data-playing="true"] .fp-mark .travel {
+    animation: fp-mark-travel 0.8s linear infinite;
+  }
+  [data-playing="true"] .fp-mark .swell {
+    animation: fp-mark-swell 1.6s ease-in-out infinite alternate;
+  }
+}
+@keyframes fp-mark-travel {
+  to {
+    transform: translateX(var(--wavelength, 6px));
+  }
+}
+@keyframes fp-mark-swell {
+  from {
+    transform: scaleY(0.4);
+  }
+  to {
+    transform: scaleY(1.65);
+  }
+}
+
+/* ---------- The app's tooltips: a small card above the control, after the pointer has
+   rested on it for half a second, gone at once on a click. ---------- */
+.fp-tip {
+  position: absolute;
+  bottom: calc(100% + var(--tip-gap, 8px));
+  display: grid;
+  gap: 2px;
+  padding: 8px 12px;
+  border-radius: 4px;
+  background: var(--card);
+  box-shadow: /* taste-skill-ignore: the app's own tooltip */
+    0 0 0 1px var(--tip-rim),
+    0 4px 8px var(--tip-shadow);
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.3;
+  white-space: nowrap;
+  text-align: left;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--t-fast) var(--ease-out);
+}
+.fp-tip b {
+  font-weight: 600;
+}
+.fp-tip span {
+  color: var(--text2, var(--text-muted));
+}
+.fp-tipped {
+  position: relative;
+  display: grid;
+}
+.fp-tipped:hover > .fp-tip {
+  opacity: 1;
+  transition-delay: 500ms;
+}
+.fp-tipped:has(:focus-visible) > .fp-tip {
+  opacity: 1;
+}
+.fp-tipped[data-dismissed] > .fp-tip {
+  opacity: 0;
+  transition-delay: 0ms;
+}

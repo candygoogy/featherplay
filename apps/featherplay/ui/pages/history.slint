@@ -1,0 +1,95 @@
+// History (2026-10-30): the songs played lately, on any device, newest first, under a
+// heading for each day ("Today", "Yesterday", then weeks and months as the music service
+// groups them). Rows are a playlist's: double-click plays the history from there, the heart
+// likes, right-click and ⋯ open the song menu. Data comes from `src/pages/history.rs`.
+import { ListView } from "std-widgets.slint";
+import { Theme, Icons } from "../theme.slint";
+import { TrackRow, PageTitle, Display } from "../parts.slint";
+import { Nav, PageKind } from "../nav.slint";
+import { SongMenu } from "../song_menu.slint";
+import { SongListRow, SkeletonList, ErrorState, EmptyState, FadeIn } from "content.slint";
+
+export global HistoryData {
+    in property <bool> loading;
+    in property <string> error;
+    in property <[TrackRow]> tracks;
+    // By row: the day's heading over its first row, "" for the rest.
+    in property <[string]> days;
+    // Plays the history from row `i`.
+    callback play(int);
+    callback like(int);
+    // Row `i` is on screen and has no cover yet.
+    callback cover-needed(int);
+    callback retry();
+}
+
+export component HistoryPage inherits Rectangle {
+    property <length> pad: Theme.page-pad;
+    property <length> list-y: Theme.page-top + 48px + Theme.s3;
+    property <length> day-h: 56px;
+
+    PageTitle {
+        x: root.pad;
+        y: Theme.page-top;
+        width: parent.width - 2 * root.pad;
+        text: @tr("History");
+    }
+    Rectangle {
+        x: 0;
+        y: root.list-y;
+        width: parent.width;
+        height: parent.height - self.y;
+        clip: true;
+        if HistoryData.loading && HistoryData.tracks.length == 0: SkeletonList {
+            top: root.day-h;
+        }
+        if !HistoryData.loading && HistoryData.error != "" && HistoryData.tracks.length == 0: ErrorState {
+            x: root.pad;
+            y: Theme.s5;
+            width: min(480px, parent.width - 2 * root.pad);
+            message: HistoryData.error;
+            retry => { HistoryData.retry(); }
+        }
+        if !HistoryData.loading && HistoryData.error == "" && HistoryData.tracks.length == 0: FadeIn {
+            EmptyState {
+                x: root.pad;
+                y: Theme.s5;
+                width: min(480px, parent.width - 2 * root.pad);
+                glyph: Icons.note;
+                title: @tr("Songs you play show up here");
+                line: @tr("Plays on your other devices count too.");
+                action: @tr("Go to Explore");
+                action-clicked => { Nav.go(PageKind.explore); }
+            }
+        }
+        if HistoryData.tracks.length > 0: FadeIn {
+            ListView {
+                for t[i] in HistoryData.tracks: day-row := Rectangle {
+                    property <string> day: i < HistoryData.days.length ? HistoryData.days[i] : "";
+                    property <length> head: self.day != "" ? root.day-h : 0px;
+                    height: self.head + Theme.row-h + (i == HistoryData.tracks.length - 1 ? Theme.page-end : 0px);
+                    init => { HistoryData.cover-needed(i); }
+                    if day-row.day != "": Display {
+                        x: root.pad;
+                        y: 0;
+                        width: parent.width - 2 * root.pad;
+                        height: root.day-h;
+                        text: day-row.day;
+                        font-size: Theme.t-display-s;
+                        vertical-alignment: center;
+                        accessible-role: text;
+                    }
+                    SongListRow {
+                        x: root.pad - 8px;
+                        y: day-row.head;
+                        width: parent.width - 2 * root.pad + 16px;
+                        track: t;
+                        activated => { HistoryData.play(i); }
+                        like-clicked => { HistoryData.like(i); }
+                        menu-requested(x, y, top) => { SongMenu.show(t, x, y, top); }
+                    }
+                }
+            }
+        }
+    }
+}

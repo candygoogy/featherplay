@@ -1,0 +1,208 @@
+// Sign in (a calm single column). The main button opens the sign-in window (a
+// separate WebView2 window; the main window never hosts a webview); the fallback takes a
+// pasted cookie header. Driven by `src/pages/sign_in.rs`.
+import { Theme } from "../theme.slint";
+import { Body, Display, Pill } from "../parts.slint";
+
+export global SignInData {
+    // The sign-in window is open, or a cookie header is being checked.
+    in property <bool> busy;
+    // What's happening, e.g. "Finish signing in in the other window."
+    in property <string> status;
+    in property <string> error;
+    // Shown after "Session expired, sign in again".
+    in property <bool> expired;
+    in-out property <bool> paste-open;
+    // The pasted header. Rust clears it once it has been taken.
+    in-out property <string> cookies;
+    callback open-window();
+    callback submit(string);
+}
+
+// The multi-line paste field. Its text is never logged.
+component PasteField inherits Rectangle {
+    in-out property <string> text;
+    callback submitted();
+    height: 128px;
+    border-radius: Theme.r-m;
+    background: Theme.field;
+    border-width: input.has-focus ? 1px : 1px;
+    border-color: input.has-focus ? Theme.accent : Theme.hairline;
+    clip: true;
+    TouchArea {
+        mouse-cursor: MouseCursor.text;
+        clicked => { input.focus(); }
+    }
+    if input.text == "": Body {
+        // Starts just past the text cursor, so the cursor never draws over its first letter.
+        x: 12px + input.text-cursor-width + 2px;
+        y: 10px;
+        width: parent.width - self.x - 12px;
+        text: "cookie: SID=…; HSID=…; SAPISID=…";
+        color: Theme.text3;
+        font-size: Theme.t-meta;
+    }
+    input := TextInput {
+        x: 12px;
+        y: 10px;
+        width: parent.width - 24px;
+        height: parent.height - 20px;
+        text <=> root.text;
+        single-line: false;
+        wrap: char-wrap;
+        font-family: "Cascadia Mono";
+        font-size: Theme.t-meta;
+        color: Theme.text2;
+        selection-background-color: Theme.accent;
+        selection-foreground-color: Theme.on-solid;
+        accessible-label: @tr("Cookie header");
+    }
+}
+
+// A text link (secondary actions).
+component Link inherits Rectangle {
+    in property <string> text;
+    callback clicked();
+    width: t.preferred-width;
+    height: 32px;
+    accessible-role: button;
+    accessible-label: root.text;
+    accessible-action-default => { root.clicked(); }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+    t := Body {
+        height: parent.height;
+        text: root.text;
+        font-weight: 600;
+        color: ta.has-hover ? Theme.text1 : Theme.text2;
+        vertical-alignment: center;
+        animate color { duration: Theme.t-hover; }
+    }
+    Rectangle {
+        y: parent.height - 7px;
+        height: 1px;
+        background: ta.has-hover ? Theme.text1 : Theme.hairline;
+    }
+}
+
+// A quiet note card: the expired session, an error.
+component Note inherits Rectangle {
+    in property <string> text;
+    min-height: lay.min-height;
+    preferred-height: lay.preferred-height;
+    border-radius: Theme.r-m;
+    background: Theme.card;
+    border-width: 1px;
+    border-color: Theme.card-edge;
+    lay := VerticalLayout {
+        padding-top: Theme.s3;
+        padding-bottom: Theme.s3;
+        padding-left: Theme.s4;
+        padding-right: Theme.s4;
+        Body {
+            text: root.text;
+            overflow: clip;
+            wrap: word-wrap;
+        }
+    }
+}
+
+export component SignInPage inherits Rectangle {
+    property <length> col-w: min(self.width - 2 * Theme.page-pad, 480px);
+
+    flick := Flickable {
+        width: parent.width;
+        height: parent.height;
+        content-height: max(self.height, col.preferred-height + Theme.s8 + Theme.page-end);
+
+        col := VerticalLayout {
+            x: (parent.width - root.col-w) / 2;
+            // Centred in the room above the floating bar.
+            y: max(Theme.s8, (flick.height - Theme.bar-clear - self.preferred-height) / 2 - Theme.s7);
+            width: root.col-w;
+            height: self.preferred-height;
+            spacing: Theme.s4;
+
+            Image {
+                width: 56px;
+                height: 56px;
+                source: Theme.logo;
+                accessible-role: none;
+            }
+            Display {
+                text: @tr("Sign in");
+                font-size: Theme.t-display-l;
+                height: 52px;
+                vertical-alignment: center;
+            }
+            Body {
+                text: @tr("featherplay plays your library, playlists and likes from YouTube Music. Sign in with your Google account in a separate window; featherplay keeps only the session, in Windows Credential Manager.");
+                font-size: Theme.t-body-l;
+                color: Theme.text2;
+                overflow: clip;
+                wrap: word-wrap;
+            }
+            if SignInData.expired: Note {
+                text: @tr("Your session expired. Sign in again; the music keeps playing.");
+            }
+            if SignInData.error != "": Note {
+                text: SignInData.error;
+            }
+            HorizontalLayout {
+                padding-top: Theme.s2;
+                alignment: start;
+                Pill {
+                    label: SignInData.busy && !SignInData.paste-open ? @tr("Signing in…") : @tr("Sign in");
+                    solid: true;
+                    enabled: !SignInData.busy;
+                    clicked => { SignInData.open-window(); }
+                }
+            }
+            if SignInData.status != "": Body {
+                text: SignInData.status;
+                font-size: Theme.t-meta;
+                color: Theme.text3;
+                overflow: clip;
+                wrap: word-wrap;
+            }
+
+            Rectangle {
+                height: Theme.s3;
+            }
+            Rectangle {
+                height: 1px;
+                background: Theme.hairline;
+            }
+            HorizontalLayout {
+                alignment: start;
+                Link {
+                    text: SignInData.paste-open ? @tr("Hide the cookie field") : @tr("Paste a cookie header instead");
+                    clicked => { SignInData.paste-open = !SignInData.paste-open; }
+                }
+            }
+            if SignInData.paste-open: VerticalLayout {
+                spacing: Theme.s3;
+                Body {
+                    text: @tr("In a browser signed in to music.youtube.com, press F12, open the Network tab and reload. Click a request named \"browse\" and copy the whole value of its cookie request header.");
+                    font-size: Theme.t-meta;
+                    color: Theme.text2;
+                    overflow: clip;
+                    wrap: word-wrap;
+                }
+                PasteField {
+                    text <=> SignInData.cookies;
+                }
+                HorizontalLayout {
+                    alignment: start;
+                    Pill {
+                        label: SignInData.busy && SignInData.paste-open ? @tr("Checking…") : @tr("Sign in with this cookie");
+                        enabled: !SignInData.busy && SignInData.cookies != "";
+                        clicked => { SignInData.submit(SignInData.cookies); }
+                    }
+                }
+            }
+        }
+    }
+}

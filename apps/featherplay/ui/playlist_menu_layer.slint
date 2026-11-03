@@ -1,0 +1,341 @@
+// The playlist menu's panel and its Rename and Delete dialogs (playlist_menu.slint holds the
+// state); app.slint draws them over everything.
+import { Theme, Icons, Curves } from "theme.slint";
+import { Icon, Body, Cover } from "parts.slint";
+import { MenuItem, Divider, MenuIcons } from "song_menu.slint";
+import { Dialog, DialogField } from "pages/settings.slint";
+import { PlaylistMenu, PlaylistKind, PlaylistDialog } from "playlist_menu.slint";
+
+// Glyphs only this menu uses, on the same 24 px grid as `Icons`.
+global PlaylistIcons {
+    // A chain link.
+    out property <string> link: "M10.2 13.8 a3.6 3.6 0 0 0 5.1 0 L18.4 10.7 a3.6 3.6 0 0 0 -5.1 -5.1 L11.8 7.1 M13.8 10.2 a3.6 3.6 0 0 0 -5.1 0 L5.6 13.3 a3.6 3.6 0 0 0 5.1 5.1 L12.2 16.9";
+    // A pencil.
+    out property <string> rename: "M4.5 19.5 L5.4 15.6 L15.3 5.7 a1.9 1.9 0 0 1 2.7 0 L18.3 6 a1.9 1.9 0 0 1 0 2.7 L8.4 18.6 Z M13.5 7.5 L16.5 10.5";
+    // A bin.
+    out property <string> delete: "M4.5 7 H19.5 M9.5 7 V5 H14.5 V7 M6.5 7 L7.5 19.5 H16.5 L17.5 7 M10.5 10.5 V16 M13.5 10.5 V16";
+    // A pushpin, as the sidebar marks a pinned entry.
+    out property <string> pin: "M9 4.5 H15 M10.2 4.5 V10 L7.5 13.5 H16.5 L13.8 10 V4.5 M12 13.5 V19.5";
+    // An arrow out of a box: go to the page.
+    out property <string> open: "M13.5 4.5 H19.5 V10.5 M19.5 4.5 L11.5 12.5 M17.5 13.5 V18.5 a1 1 0 0 1 -1 1 H5.5 a1 1 0 0 1 -1 -1 V7.5 a1 1 0 0 1 1 -1 H10.5";
+    // The list with a minus: Add to playlist's glyph, undone.
+    out property <string> remove: "M4 6.5 H16 M4 11.5 H16 M4 16.5 H11 M14 16.5 H21";
+}
+
+// Covers the window while the menu is open: a click outside closes it, Escape too.
+export component PlaylistMenuLayer inherits Rectangle {
+    callback closed();
+    // The menu stays above this (the bottom bar's top edge); the layer still covers the bar.
+    in property <length> bottom-limit: root.height;
+    property <length> w: 256px;
+    property <length> head-h: 56px;
+    property <bool> playlist: PlaylistMenu.kind == PlaylistKind.own || PlaylistMenu.kind == PlaylistKind.saved || PlaylistMenu.kind == PlaylistKind.liked;
+    property <int> rows: PlaylistMenu.kind == PlaylistKind.own ? 9 : (PlaylistMenu.kind == PlaylistKind.saved ? 8 : (PlaylistMenu.kind == PlaylistKind.liked ? 5 : 4));
+    property <int> dividers: PlaylistMenu.kind == PlaylistKind.own || PlaylistMenu.kind == PlaylistKind.saved ? 3 : (PlaylistMenu.kind == PlaylistKind.liked ? 2 : 1);
+    property <length> actions-h: root.rows * 36px + root.dividers * 9px;
+    property <length> h: 2 * Theme.s2 + root.head-h + 9px + root.actions-h;
+
+    // Motion, as the song menu: the panel stays instantiated so it can fade out.
+    // Opening, it snaps to its start (a little small, nudged toward the anchor), then grows
+    // from the anchor's corner.
+    property <bool> open: PlaylistMenu.open;
+    property <bool> settled: true;
+    // Closed by Escape: keyboard actions don't animate.
+    property <bool> snap: false;
+    property <bool> left: PlaylistMenu.anchor-x + root.w + 8px > root.width;
+    property <bool> up: PlaylistMenu.anchor-y + root.h + 8px > root.bottom-limit;
+    changed open => {
+        if root.open {
+            root.snap = false;
+            root.settled = false;
+            settle.running = true;
+            keys.focus();
+        }
+    }
+    settle := Timer {
+        interval: 1ms;
+        running: false;
+        triggered => {
+            self.running = false;
+            root.settled = true;
+        }
+    }
+
+    function close() {
+        PlaylistMenu.close();
+        root.closed();
+    }
+    function ask(d: PlaylistDialog) {
+        PlaylistMenu.ask(d);
+        // The dialog takes the keys; the window's get them back when it closes.
+    }
+    function copy-link() {
+        clip.select-all();
+        clip.copy();
+        clip.clear-selection();
+        PlaylistMenu.copied(PlaylistMenu.item.id);
+        root.close();
+    }
+
+    // Copy link goes through this: the platform's clipboard, as a copy from a field.
+    clip := TextInput {
+        width: 0;
+        height: 0;
+        visible: false;
+        read-only: true;
+        single-line: true;
+        text: PlaylistMenu.link;
+    }
+
+    if PlaylistMenu.open: TouchArea {
+        width: root.width;
+        height: root.height;
+        pointer-event(e) => {
+            if e.kind == PointerEventKind.down {
+                root.close();
+            }
+        }
+        scroll-event(e) => {
+            root.close();
+            accept
+        }
+    }
+    panel := Rectangle {
+        property <length> nudge: root.open && !root.settled ? (root.up ? Theme.nudge : -Theme.nudge) : 0px;
+        x: root.left ? max(8px, PlaylistMenu.anchor-x - root.w) : PlaylistMenu.anchor-x;
+        y: (root.up ? max(8px, PlaylistMenu.anchor-top - self.height) : PlaylistMenu.anchor-y) + self.nudge;
+        width: root.w;
+        height: root.h;
+        opacity: root.open ? 1 : 0;
+        visible: self.opacity > 0;
+        transform-origin: { x: root.left ? self.width : 0px, y: root.up ? self.height : 0px };
+        transform-scale: !root.open ? (Theme.moving ? 0.98 : 1.0) : (root.settled ? 1.0 : Theme.pop-from);
+        animate opacity { duration: root.open ? Theme.t-menu : (root.snap ? 0ms : Theme.t-fast); easing: Curves.ease-out; }
+        animate transform-scale, nudge {
+            duration: !root.open ? Theme.t-fast : (root.settled ? Theme.t-menu : 0ms);
+            easing: Curves.ease-out;
+        }
+        border-radius: Theme.r-l;
+        background: Theme.panel;
+        border-width: 1px;
+        border-color: Theme.card-edge;
+        drop-shadow-blur: 24px;
+        drop-shadow-offset-y: 8px;
+        drop-shadow-color: Theme.cover-shadow;
+        accessible-role: list;
+        accessible-label: root.playlist ? @tr("Playlist menu") : (PlaylistMenu.kind == PlaylistKind.album ? @tr("Album menu") : @tr("Artist menu"));
+
+        // Swallows clicks on the panel's padding.
+        TouchArea { enabled: root.open; }
+        keys := FocusScope {
+            enabled: root.open;
+            key-pressed(e) => {
+                if e.text == Key.Escape {
+                    root.snap = true;
+                    root.close();
+                    return accept;
+                }
+                reject
+            }
+        }
+
+        // The playlist the menu is for: its cover, or for Liked songs the heart.
+        if PlaylistMenu.kind != PlaylistKind.liked: Cover {
+            x: Theme.s2 + 8px;
+            y: Theme.s2 + 8px;
+            width: Theme.row-cover;
+            height: Theme.row-cover;
+            radius: Theme.r-s;
+            round: PlaylistMenu.item.round;
+            source: PlaylistMenu.item.cover;
+            crossfade: true;
+        }
+        if PlaylistMenu.kind == PlaylistKind.liked: Rectangle {
+            x: Theme.s2 + 8px;
+            y: Theme.s2 + 8px;
+            width: Theme.row-cover;
+            height: Theme.row-cover;
+            border-radius: Theme.r-s;
+            background: Theme.cover-empty;
+            Icon {
+                commands: Icons.heart;
+                stroke: Theme.text2;
+            }
+        }
+        VerticalLayout {
+            x: Theme.s2 + 8px + Theme.row-cover + 12px;
+            y: Theme.s2;
+            width: parent.width - self.x - Theme.s4;
+            height: root.head-h;
+            alignment: center;
+            spacing: 1px;
+            Body {
+                text: PlaylistMenu.item.title;
+                font-weight: 600;
+            }
+            if PlaylistMenu.item.subtitle != "": Body {
+                text: PlaylistMenu.item.subtitle;
+                font-size: Theme.t-meta;
+                color: Theme.text2;
+            }
+        }
+        Divider {
+            x: 0;
+            y: Theme.s2 + root.head-h;
+            width: parent.width;
+        }
+
+        VerticalLayout {
+            x: Theme.s2;
+            y: Theme.s2 + root.head-h + 9px;
+            width: parent.width - 2 * Theme.s2;
+            height: root.actions-h;
+            MenuItem {
+                enabled: root.open;
+                icon: Icons.play;
+                icon-filled: true;
+                label: @tr("Play");
+                clicked => {
+                    PlaylistMenu.play(PlaylistMenu.item.id);
+                    root.close();
+                }
+            }
+            MenuItem {
+                enabled: root.open;
+                icon: Icons.shuffle;
+                label: @tr("Shuffle");
+                clicked => {
+                    PlaylistMenu.shuffle(PlaylistMenu.item.id);
+                    root.close();
+                }
+            }
+            if PlaylistMenu.kind == PlaylistKind.own || PlaylistMenu.kind == PlaylistKind.saved: MenuItem {
+                enabled: root.open;
+                icon: Icons.radio;
+                label: @tr("Start radio");
+                clicked => {
+                    PlaylistMenu.start-radio(PlaylistMenu.item.id);
+                    root.close();
+                }
+            }
+            if !root.playlist: MenuItem {
+                enabled: root.open;
+                icon: PlaylistIcons.open;
+                label: PlaylistMenu.kind == PlaylistKind.album ? @tr("Go to album") : @tr("Go to artist");
+                clicked => {
+                    PlaylistMenu.open-item(PlaylistMenu.item.id);
+                    root.close();
+                }
+            }
+            if root.playlist: Divider { }
+            if root.playlist: MenuItem {
+                enabled: root.open;
+                icon: MenuIcons.play-next;
+                label: @tr("Play next");
+                clicked => {
+                    PlaylistMenu.play-next(PlaylistMenu.item.id);
+                    root.close();
+                }
+            }
+            if root.playlist: MenuItem {
+                enabled: root.open;
+                icon: MenuIcons.add-to-queue;
+                label: @tr("Add to queue");
+                clicked => {
+                    PlaylistMenu.add-to-queue(PlaylistMenu.item.id);
+                    root.close();
+                }
+            }
+            Divider { }
+            if root.playlist: MenuItem {
+                enabled: root.open;
+                icon: PlaylistIcons.link;
+                label: @tr("Copy link");
+                clicked => { root.copy-link(); }
+            }
+            if PlaylistMenu.kind != PlaylistKind.liked: MenuItem {
+                enabled: root.open;
+                icon: PlaylistIcons.pin;
+                label: PlaylistMenu.pinned ? @tr("Unpin") : @tr("Pin to top");
+                clicked => {
+                    PlaylistMenu.pin(PlaylistMenu.item.id);
+                    root.close();
+                }
+            }
+            if PlaylistMenu.kind == PlaylistKind.own || PlaylistMenu.kind == PlaylistKind.saved: Divider { }
+            if PlaylistMenu.kind == PlaylistKind.own: MenuItem {
+                enabled: root.open;
+                icon: PlaylistIcons.rename;
+                label: @tr("Rename…");
+                clicked => { root.ask(PlaylistDialog.rename); }
+            }
+            if PlaylistMenu.kind == PlaylistKind.own: MenuItem {
+                enabled: root.open;
+                icon: PlaylistIcons.delete;
+                label: @tr("Delete…");
+                clicked => { root.ask(PlaylistDialog.delete); }
+            }
+            if PlaylistMenu.kind == PlaylistKind.saved: MenuItem {
+                enabled: root.open;
+                icon: PlaylistIcons.remove;
+                label: @tr("Remove from library");
+                clicked => {
+                    PlaylistMenu.remove(PlaylistMenu.item.id);
+                    root.close();
+                }
+            }
+        }
+    }
+}
+
+// Rename and Delete, over the whole window like Settings' dialogs.
+export component PlaylistDialogLayer inherits Rectangle {
+    callback closed();
+    function save() {
+        PlaylistMenu.rename(PlaylistMenu.target.id, PlaylistMenu.draft);
+        // Rust closed it unless the name was refused.
+        if PlaylistMenu.dialog == PlaylistDialog.none {
+            root.closed();
+        }
+    }
+
+    if PlaylistMenu.dialog == PlaylistDialog.rename: Dialog {
+        width: root.width;
+        height: root.height;
+        title: @tr("Rename playlist");
+        error: PlaylistMenu.dialog-error;
+        ok-label: @tr("Rename");
+        ok => { root.save(); }
+        cancel => {
+            PlaylistMenu.close-dialog();
+            root.closed();
+        }
+        DialogField {
+            init => {
+                self.grab-focus();
+                self.select-all();
+            }
+            label: @tr("Name");
+            placeholder: @tr("Playlist name");
+            text <=> PlaylistMenu.draft;
+            accepted => { root.save(); }
+        }
+    }
+
+    if PlaylistMenu.dialog == PlaylistDialog.delete: Dialog {
+        init => { self.focus-keys(); }
+        width: root.width;
+        height: root.height;
+        title: @tr("Delete “{}”?", PlaylistMenu.target.title);
+        detail: @tr("It's removed from your library on every device. This can't be undone.");
+        ok-label: @tr("Delete");
+        ok => {
+            PlaylistMenu.delete(PlaylistMenu.target.id);
+            root.closed();
+        }
+        cancel => {
+            PlaylistMenu.close-dialog();
+            root.closed();
+        }
+    }
+}

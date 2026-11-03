@@ -1,0 +1,110 @@
+// Library page: chips Liked, Playlists, Albums, Artists, like Search's. Liked is a list of song
+// rows; the others are card grids (round for artists). Data comes from
+// `src/pages/library.rs`; the tab is part of the route (`Nav.open-library(tab)`).
+import { ListView } from "std-widgets.slint";
+import { Theme, Icons } from "../theme.slint";
+import { TrackRow, CardItem, PageTitle } from "../parts.slint";
+import { Nav, PageKind } from "../nav.slint";
+import { SongMenu } from "../song_menu.slint";
+import { SongListRow, CardGrid, Chips, SkeletonList, SkeletonGrid, ErrorState, EmptyState, FadeIn, Open } from "content.slint";
+
+export global LibraryData {
+    in property <bool> loading;
+    in property <string> error;
+    // 0 Liked, 1 Playlists, 2 Albums, 3 Artists.
+    in property <int> tab;
+    in property <[TrackRow]> liked;
+    // The current grid tab's cards.
+    in property <[CardItem]> cards;
+    // Plays the liked songs from `i`.
+    callback play(int);
+    callback like(int);
+    // Liked row `i` is on screen and has no cover yet.
+    callback cover-needed(int);
+    // Loads the tab again after an error.
+    callback retry();
+    // A card's play button: plays the album, playlist or artist without opening it.
+    callback play-card(CardItem);
+}
+
+export component LibraryPage inherits Rectangle {
+    property <length> pad: Theme.page-pad;
+    property <length> list-y: Theme.page-top + 48px + Theme.s4 + 36px + Theme.s2;
+    property <bool> empty: !LibraryData.loading && LibraryData.error == "" && (LibraryData.tab == 0 ? LibraryData.liked.length == 0 : LibraryData.cards.length == 0);
+
+    PageTitle {
+        x: root.pad;
+        y: Theme.page-top;
+        width: parent.width - 2 * root.pad;
+        text: @tr("Library");
+    }
+    Chips {
+        x: root.pad;
+        y: Theme.page-top + 48px + Theme.s4;
+        width: parent.width - 2 * root.pad;
+        labels: [@tr("Liked"), @tr("Playlists"), @tr("Albums"), @tr("Artists")];
+        active: LibraryData.tab;
+        selected(i) => { Nav.open-library(i); }
+    }
+    Rectangle {
+        x: 0;
+        y: root.list-y;
+        width: parent.width;
+        height: parent.height - self.y;
+        clip: true;
+        // Only with nothing to show: a list from the cache stays while it refreshes.
+        if LibraryData.loading && LibraryData.tab == 0 && LibraryData.liked.length == 0: SkeletonList {
+            top: Theme.s4;
+        }
+        if LibraryData.loading && LibraryData.tab != 0 && LibraryData.cards.length == 0: SkeletonGrid {
+            top: Theme.s5;
+            round: LibraryData.tab == 3;
+        }
+        if !LibraryData.loading && LibraryData.error != "": ErrorState {
+            x: root.pad;
+            y: Theme.s5;
+            width: min(480px, parent.width - 2 * root.pad);
+            message: LibraryData.error;
+            retry => { LibraryData.retry(); }
+        }
+        if root.empty: FadeIn {
+            EmptyState {
+                x: root.pad;
+                y: Theme.s5;
+                width: min(480px, parent.width - 2 * root.pad);
+                glyph: LibraryData.tab == 0 ? Icons.heart : (LibraryData.tab == 3 ? Icons.person : Icons.library);
+                title: LibraryData.tab == 0 ? @tr("Songs you like show up here") : (LibraryData.tab == 1 ? @tr("No playlists yet") : (LibraryData.tab == 2 ? @tr("Albums you save show up here") : @tr("Artists you follow show up here")));
+                line: LibraryData.tab == 0 ? @tr("Like a song with its heart to keep it here.") : (LibraryData.tab == 1 ? @tr("Playlists you make or save show up here.") : @tr("Find music on Home or with Search."));
+                action: @tr("Go to Home");
+                action-clicked => { Nav.go(PageKind.home); }
+            }
+        }
+        if LibraryData.tab == 0 && LibraryData.liked.length > 0: FadeIn {
+            ListView {
+                for t[i] in LibraryData.liked: Rectangle {
+                    height: Theme.row-h + (i == 0 ? Theme.s4 : 0px) + (i == LibraryData.liked.length - 1 ? Theme.page-end : 0px);
+                    init => { LibraryData.cover-needed(i); }
+                    SongListRow {
+                        x: root.pad - 8px;
+                        y: i == 0 ? Theme.s4 : 0px;
+                        width: parent.width - 2 * root.pad + 16px;
+                        track: t;
+                        show-liked: false;
+                        activated => { LibraryData.play(i); }
+                        like-clicked => { LibraryData.like(i); }
+                        menu-requested(x, y, top) => { SongMenu.show(t, x, y, top); }
+                    }
+                }
+            }
+        }
+        if LibraryData.tab != 0 && LibraryData.cards.length > 0: FadeIn {
+            CardGrid {
+                items: LibraryData.cards;
+                top: Theme.s5;
+                playable: true;
+                open(it) => { Open.item(it); }
+                play(it) => { LibraryData.play-card(it); }
+            }
+        }
+    }
+}

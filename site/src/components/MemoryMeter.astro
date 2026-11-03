@@ -1,0 +1,123 @@
+---
+// A flyout on the demo desktop, over the tray, shown while featherplay is minimised: the
+// memory each player uses minimised and playing, from the final measurement in
+// src/data/numbers.ts (the comparison's "Memory while playing" figures).
+import { figures } from "../data/numbers";
+
+const max = Math.max(...figures.map((f) => f.memoryMB));
+---
+
+<div class="meter" data-meter role="group" aria-label="Memory in use while minimised">
+  <p class="meter-h">Memory in use, minimised and playing</p>
+  <ul>
+    {
+      figures.map((f) => (
+        <li data-meter-app={f.app}>
+          <span class="name">{f.app}</span>
+          <span class="track">
+            <i style={`transform:scaleX(${(f.memoryMB / max).toFixed(4)})`} />
+          </span>
+          <span class="value" data-meter-value>{f.memoryMB} MB</span>
+        </li>
+      ))
+    }
+  </ul>
+  <p class="note">Private memory, all processes, the same song. Measured on 1 November 2026.</p>
+</div>
+
+<style>
+  .meter {
+    position: absolute;
+    right: 16px;
+    bottom: 12px;
+    width: 560px;
+    padding: 24px 26px 20px;
+    border-radius: 10px;
+    background: var(--meter);
+    color: var(--text);
+    font-family: var(--font-ui);
+    box-shadow: /* taste-skill-ignore: Windows' own flyout floats */
+      0 0 0 1px var(--meter-edge),
+      0 16px 40px #00000059; /* taste-skill-ignore: Windows' own flyout */
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(12px);
+    transition:
+      opacity 220ms ease,
+      transform 320ms var(--ease-out),
+      visibility 0s linear 320ms;
+  }
+  :global([data-desktop][data-minimised]) .meter {
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+    transition:
+      opacity 220ms ease 180ms,
+      transform 420ms var(--ease-out) 180ms,
+      visibility 0s;
+  }
+  .meter-h {
+    margin: 0 0 16px;
+    font-size: 25px;
+    font-weight: 700;
+  }
+  ul {
+    display: grid;
+    gap: 12px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  li {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 6px 12px;
+    font-size: 22px;
+  }
+  .name {
+    font-weight: 600;
+  }
+  .value {
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+  .track {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    height: 10px;
+    border-radius: 5px;
+    background: var(--meter-track);
+    overflow: hidden;
+  }
+  .track i {
+    display: block;
+    height: 100%;
+    background: var(--meter-bar);
+    transform-origin: 0 50%;
+  }
+  li[data-meter-app="featherplay"] .track i {
+    background: var(--accent);
+  }
+  .note {
+    margin: 16px 0 0;
+    font-size: 18px;
+    color: var(--text-muted);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .meter,
+    :global([data-desktop][data-minimised]) .meter {
+      transform: none;
+    }
+  }
+  /* Phones: the crop shows the left 600x800 of the desktop, so the flyout moves there. */
+  @media (max-width: 768px) {
+    :global(.laptop--crop) .meter {
+      left: 24px;
+      right: auto;
+      top: 120px;
+      bottom: auto;
+      width: 552px;
+      font-size: 20px;
+    }
+  }
+</style>

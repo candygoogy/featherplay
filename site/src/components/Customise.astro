@@ -1,0 +1,238 @@
+---
+// Make it yours: the app's theme for its own window (not the page's), and a cover to play,
+// on the same player as the hero. Every featherplay on the page restyles; the page's glow
+// follows the cover.
+import Replica from "./Replica.astro";
+import NowPlaying from "./NowPlaying.astro";
+import Segmented from "./Segmented.astro";
+import { demoStart, songs } from "../data/songs";
+
+const start = songs[0];
+const themes = [
+  { value: "page", label: "Match the page", icon: "match" },
+  { value: "dark", label: "Dark", icon: "dark" },
+  { value: "light", label: "Light", icon: "light" },
+];
+---
+
+<section id="yours" class="yours" aria-labelledby="yours-title">
+  <div class="wrap grid" data-yours>
+    <div class="side">
+      <h2 id="yours-title">Make it yours</h2>
+      <p class="lede">
+        featherplay comes in dark and light, and takes its accent from the cover that's playing. Try both on the window
+        here, and pick a song to see its colour.
+      </p>
+
+      <form class="picks" data-yours-form>
+        <Segmented class="themes" name="yours-theme" legend="featherplay's theme" options={themes} checked="page" compact />
+
+        <fieldset class="covers">
+          <legend>Play a cover</legend>
+          <div class="swatches">
+            {
+              songs.map((s, i) => (
+                <label class="swatch">
+                  <input type="radio" name="yours-song" value={s.id} checked={i === 0} />
+                  <img src={s.cover} width="72" height="72" alt="" loading="lazy" decoding="async" />
+                  <span class="visually-hidden">{s.title}</span>
+                </label>
+              ))
+            }
+          </div>
+        </fieldset>
+      </form>
+    </div>
+
+    <div class="stage">
+      <div class="glow" data-glow aria-hidden="true">
+        <span data-glow-layer data-on="true" style={`--c:${start.colour}`}></span>
+        <span data-glow-layer></span>
+      </div>
+      <!-- The app's window on its own, at its 1440x852 size, scaled to the column (phones:
+           the 600x800 crop the hero uses). -->
+      <div class="window laptop--crop" data-yours-window>
+        <div class="window-inner">
+          <Replica id="replica-yours" songId={start.id} positionMs={demoStart.positionMs} view="lyrics" />
+        </div>
+      </div>
+      <NowPlaying class="yours-np" live />
+    </div>
+  </div>
+</section>
+
+<script>
+  import { bindReplicas } from "../demo/replica";
+  import { bindCustomise } from "../demo/customise";
+  const root = document.querySelector<HTMLElement>("[data-yours]");
+  const player = bindReplicas();
+  if (root && player) bindCustomise(root, player);
+</script>
+
+<style>
+  .yours {
+    position: relative;
+    overflow-x: clip;
+    padding-block: clamp(80px, 8vw, 132px);
+  }
+  /* The controls in a column as wide as they need, the window taking the rest: on wide
+     screens the section runs wider than the page's measure, so the window is the size of a
+     real one and the controls sit close to it. */
+  .grid {
+    display: grid;
+    grid-template-columns: minmax(300px, 420px) minmax(0, 1fr);
+    gap: clamp(32px, 4vw, 72px);
+    align-items: center;
+    max-width: 1760px;
+  }
+  h2 {
+    font-size: clamp(2.75rem, 5.6vw, 5.75rem);
+  }
+  .lede {
+    max-width: 36ch;
+    margin-top: 20px;
+    font-size: clamp(1.0625rem, 1.4vw, 1.25rem);
+    line-height: 1.5;
+  }
+  .picks {
+    display: grid;
+    gap: 24px;
+    margin-top: 32px;
+  }
+  fieldset {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+  legend,
+  .picks :global(.themes legend) {
+    margin-bottom: 12px;
+    padding: 0;
+    font-weight: 700;
+  }
+
+  /* The covers: the art itself, the playing one ringed in the text colour. */
+  .swatches {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 64px));
+    gap: 12px;
+  }
+  .swatch {
+    position: relative;
+    display: block;
+    aspect-ratio: 1;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: transform var(--t-release) var(--spring-release);
+  }
+  .swatch img {
+    width: 100%;
+    height: 100%;
+    border-radius: 12px;
+    object-fit: cover;
+  }
+  .swatch input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+  .swatch::after {
+    content: "";
+    position: absolute;
+    inset: -4px;
+    border-radius: 15px;
+    pointer-events: none;
+    box-shadow: inset 0 0 0 2px transparent; /* taste-skill-ignore: the picked cover's ring */
+    transition: box-shadow var(--t-hover) ease;
+  }
+  .swatch:has(input:checked)::after {
+    box-shadow: inset 0 0 0 2px var(--text); /* taste-skill-ignore: the picked cover's ring */
+  }
+  .swatch:has(input:focus-visible)::after {
+    box-shadow: inset 0 0 0 3px var(--accent); /* taste-skill-ignore: the focus ring */
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .swatch:hover {
+      transform: translateY(-2px);
+    }
+  }
+  .swatch:active {
+    transform: scale(var(--press-scale));
+    transition: transform var(--t-press) var(--ease-out);
+  }
+  /* The window's line: the sound and the song's credit, under the window. */
+  .stage :global(.yours-np) {
+    position: relative;
+    justify-content: center;
+    margin-top: 12px;
+  }
+
+  /* The window, and the cover's colour behind it. */
+  .stage {
+    position: relative;
+  }
+  .glow {
+    /* The glow at its strongest: the cover's colour mixed this far into the ground. Text in
+       this section keeps AA over it for every cover (tests/customise.spec.ts). */
+    --glow-strength: calc(56% - 8% * var(--light));
+    position: absolute;
+    inset: -30% -20%;
+    pointer-events: none;
+  }
+  .glow span {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient( /* taste-skill-ignore: the cover glow, in the playing cover's colour */
+      closest-side,
+      color-mix(in srgb, var(--c) var(--glow-strength), transparent) 40%,
+      color-mix(in srgb, var(--c) calc(var(--glow-strength) * 0.5), transparent) 68%,
+      transparent
+    );
+    opacity: 0;
+    transition: opacity var(--t-glow) ease;
+  }
+  .glow span[data-on="true"] {
+    opacity: 1;
+  }
+  .window {
+    position: relative;
+    aspect-ratio: 1440 / 852;
+    overflow: hidden;
+    border-radius: 12px;
+    container-type: inline-size;
+    contain: layout paint;
+    box-shadow: 0 24px 64px #00000059; /* taste-skill-ignore: a window floats over the glow */
+  }
+  .window-inner {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 1440px;
+    height: 852px;
+    transform-origin: 0 0;
+    transform: scale(tan(atan2(100cqw, 1440px)));
+  }
+
+  @media (max-width: 960px) {
+    .grid {
+      grid-template-columns: 1fr;
+    }
+  }
+  @media (max-width: 768px) {
+    .window {
+      aspect-ratio: 600 / 800;
+      max-width: 520px;
+      margin-inline: auto;
+    }
+    .window-inner {
+      width: 600px;
+      height: 800px;
+      transform: scale(tan(atan2(100cqw, 600px)));
+    }
+  }
+</style>

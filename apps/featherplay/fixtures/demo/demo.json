@@ -1,0 +1,116 @@
+{
+  "account": "Listener",
+  "tracks": [
+    {
+      "slug": "california-lullabye",
+      "title": "California Lullabye",
+      "artist": "Josh Woodward",
+      "duration_ms": 54500,
+      "lyrics_credit": "Lyrics: Josh Woodward, CC BY 4.0"
+    },
+    {
+      "slug": "invisible-light",
+      "title": "Invisible Light",
+      "artist": "Josh Woodward",
+      "duration_ms": 59900,
+      "lyrics_credit": "Lyrics: Josh Woodward, CC BY 4.0"
+    },
+    {
+      "slug": "she-dreams-in-blue",
+      "title": "She Dreams in Blue",
+      "artist": "Josh Woodward",
+      "duration_ms": 60500,
+      "lyrics_credit": "Lyrics: Josh Woodward, CC BY 4.0"
+    },
+    {
+      "slug": "watching-seabirds-soar",
+      "title": "Watching Seabirds Soar (Harmony)",
+      "artist": "DoKashiteru feat. Snowflake",
+      "duration_ms": 58300
+    },
+    {
+      "slug": "origami",
+      "title": "Origami",
+      "artist": "Scott Buckley",
+      "duration_ms": 56000
+    },
+    {
+      "slug": "in-this-moment",
+      "title": "In This Moment",
+      "artist": "Scott Buckley",
+      "duration_ms": 56000
+    }
+  ],
+  "playlists": [
+    {
+      "id": "demo-quiet-hours",
+      "title": "Quiet hours",
+      "owned": true,
+      "cover": "she-dreams-in-blue",
+      "tracks": ["she-dreams-in-blue", "in-this-moment", "watching-seabirds-soar", "california-lullabye", "origami", "invisible-light"]
+    },
+    {
+      "id": "demo-road-trip",
+      "title": "Road trip",
+      "owned": true,
+      "cover": "invisible-light",
+      "tracks": ["invisible-light", "origami", "california-lullabye", "watching-seabirds-soar"]
+    },
+    {
+      "id": "demo-instrumentals",
+      "title": "Instrumentals for work",
+      "owned": true,
+      "cover": "origami",
+      "tracks": ["origami", "in-this-moment"]
+    },
+    {
+      "id": "demo-sunday-folk",
+      "title": "Sunday folk",
+      "cover": "california-lullabye",
+      "tracks": ["california-lullabye", "she-dreams-in-blue", "invisible-light"]
+    },
+    {
+      "id": "demo-by-the-sea",
+      "title": "By the sea",
+      "cover": "watching-seabirds-soar",
+      "tracks": ["watching-seabirds-soar", "she-dreams-in-blue", "in-this-moment"]
+    },
+    {
+      "id": "RDTMAKdemo-daily",
+      "title": "Daily mix",
+      "cover": "california-lullabye",
+      "tracks": ["california-lullabye", "origami", "she-dreams-in-blue", "invisible-light", "watching-seabirds-soar", "in-this-moment"]
+    },
+    {
+      "id": "RDTMAKdemo-discover",
+      "title": "Discover mix",
+      "cover": "watching-seabirds-soar",
+      "tracks": ["watching-seabirds-soar", "in-this-moment", "origami"]
+    },
+    {
+      "id": "RDTMAKdemo-replay",
+      "title": "Replay mix",
+      "cover": "invisible-light",
+      "tracks": ["invisible-light", "california-lullabye", "she-dreams-in-blue"]
+    }
+  ],
+  "home": [
+    {
+      "title": "Mixed for you",
+      "playlists": ["RDTMAKdemo-daily", "RDTMAKdemo-discover", "RDTMAKdemo-replay"]
+    },
+    {
+      "title": "Quick picks",
+      "tracks": ["she-dreams-in-blue", "origami", "watching-seabirds-soar", "in-this-moment", "invisible-light", "california-lullabye"]
+    },
+    {
+      "title": "Singles for you",
+      "singles": ["in-this-moment", "she-dreams-in-blue", "watching-seabirds-soar", "california-lullabye", "origami", "invisible-light"]
+    },
+    {
+      "title": "Playlists to try",
+      "playlists": ["demo-sunday-folk", "demo-by-the-sea", "demo-road-trip", "demo-instrumentals"]
+    }
+  ],
+  "liked": ["california-lullabye", "invisible-light", "origami", "she-dreams-in-blue"]
+}

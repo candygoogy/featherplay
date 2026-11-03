@@ -1,0 +1,31 @@
+{
+    "##": "TODO(release): set version, url and hash to the GitHub Release; then checkver and autoupdate keep them current.",
+    "version": "0.1.0",
+    "description": "A fast, lightweight desktop player for YouTube Music. Not affiliated with Google or YouTube.",
+    "homepage": "https://github.com/candygoogy/featherplay",
+    "license": "MIT",
+    "architecture": {
+        "64bit": {
+            "url": "https://github.com/candygoogy/featherplay/releases/download/v0.1.0/featherplay.exe",
+            "hash": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+    },
+    "bin": "featherplay.exe",
+    "shortcuts": [
+        [
+            "featherplay.exe",
+            "featherplay"
+        ]
+    ],
+    "checkver": "github",
+    "autoupdate": {
+        "architecture": {
+            "64bit": {
+                "url": "https://github.com/candygoogy/featherplay/releases/download/v$version/featherplay.exe",
+                "hash": {
+                    "url": "$url.sha256"
+                }
+            }
+        }
+    }
+}

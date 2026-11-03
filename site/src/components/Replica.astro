@@ -1,0 +1,545 @@
+---
+// A working copy of featherplay's window, laid out at the app's own sizes (theme.slint) on a
+// 1440x900 desktop, with the app's controls, states and motion (parts.slint, bottom_bar.slint,
+// pages/now_playing.slint, sidebar.slint). Rendered here in the state given (so without
+// script it's a still frame of the app), then bound to the shared player store by
+// src/demo/replica.ts.
+import "../styles/app-controls.css";
+import "../styles/replica.css";
+import Icon from "./Icon.astro";
+import Mark from "./Mark.astro";
+import { demoStart, songs, type Song } from "../data/songs";
+import { currentLineIndex, formatTime, lyricsSource, type View } from "../demo/player";
+
+interface Props {
+  songId?: string;
+  positionMs?: number;
+  view?: View;
+  id?: string;
+}
+const { songId = demoStart.songId, positionMs = demoStart.positionMs, view = "lyrics", id = "replica" } = Astro.props;
+const song: Song = songs.find((s) => s.id === songId) ?? songs[0];
+const current = currentLineIndex(song, positionMs);
+const lineState = (i: number) => (i < current ? "past" : i === current ? "current" : "next");
+const fraction = positionMs / song.durationMs;
+const isNow = view === "now" || view === "lyrics";
+const hasLyrics = song.lyrics.length > 0;
+const resume = song;
+const others = songs.filter((s) => s.id !== resume.id);
+const summaryId = `${id}-summary`;
+// Where the lines sit without script, by the app's rule (src/demo/follow.ts followOffset): the
+// current line's centre a third of the way down the panel, between the top and the list's
+// end. A line is a sixth of its 26 px type above and below plus 36 px a row of words, a long
+// one wraps to two rows in the 720 px column (about 12.1 px a character of the bold face),
+// lines are 26 * 0.18 px apart with no extra room between verses, and the credit under them
+// takes 24 + 19 (replica.css, as the app's lyrics.slint). The panel's height is left to CSS
+// (cqh, the .lyrics box is a size container), so the phone layout's shorter panel is right
+// too; the script measures it all exactly once it runs.
+const lineH = (i: number) => (2 * 26) / 6 + 36 * Math.max(1, Math.ceil((song.lyrics[i].line.length * 12.1) / 720));
+const GAP = 26 * 0.18;
+const PAD_TOP = 24;
+const lineTop = (i: number) => PAD_TOP + Array.from({ length: i }, (_, j) => lineH(j) + GAP).reduce((a, b) => a + b, 0);
+const n = song.lyrics.length;
+// The list above its bottom padding (half the panel): the lines, then the credit.
+const listTop = n ? lineTop(n - 1) + lineH(n - 1) + GAP + 24 + 19 : PAD_TOP;
+const centre = current >= 0 ? lineTop(current) + lineH(current) / 2 : 0;
+// clamp(0, centre - view / 3, list - view / 2): a max under the min resolves to 0, as the app's.
+const linesY = current < 0 ? "0px" : `clamp(0px, ${centre}px - 100cqh / 3, ${listTop}px - 50cqh)`;
+
+// The sidebar's library, under its three chips (made-up playlists of the demo's songs).
+const playlists: [string, Song][] = [
+  ["Night drives", songs[0]],
+  ["Kitchen radio", songs[1]],
+  ["Coast road", songs[4]],
+  ["Sunday, slowly", songs[3]],
+];
+const pages: { page: View; icon: "home" | "library" | "explore" | "history"; label: string }[] = [
+  { page: "home", icon: "home", label: "Home" },
+  { page: "library", icon: "library", label: "Library" },
+  { page: "explore", icon: "explore", label: "Explore" },
+  { page: "history", icon: "history", label: "History" },
+];
+---
+
+<div
+  class="replica"
+  id={id}
+  data-replica
+  data-view={view}
+  data-playing="false"
+  data-lyrics-on="true"
+  data-has-lyrics={String(hasLyrics)}
+  data-queue-open="false"
+  data-queue-tab="next"
+  data-song={song.id}
+  data-at={positionMs}
+  role="group"
+  aria-label="featherplay demo"
+  aria-describedby={summaryId}
+  style={`--song:${song.colour}`}
+>
+  <p class="visually-hidden" id={summaryId}>
+    A working demo of featherplay's window, playing short clips of six songs under free licences. You can play and pause, skip, like a
+    song or mark it not for you, open the lyrics and click a line to jump to it, scroll the lyrics, search, browse the
+    sidebar's pages, open Up next and Related, and minimise the window to the tray.
+  </p>
+
+  <div class="titlebar">
+    <span class="art" aria-hidden="true">
+      <img class="only-dark" src="/tri-vane.svg" width="16" height="16" alt="" />
+      <img class="only-light" src="/tri-vane-light.svg" width="16" height="16" alt="" />
+    </span>
+    <span class="titlebar-name">featherplay</span>
+    <span class="caption">
+      <button class="cap" type="button" data-act="minimise" aria-label="Minimise featherplay">
+        <svg viewBox="0 0 10 10" width="10" height="10" aria-hidden="true"
+          ><path d="M0 5.5h10" stroke="currentColor" stroke-width="1"></path></svg
+        >
+      </button>
+      <span class="cap" aria-hidden="true">
+        <svg viewBox="0 0 10 10" width="10" height="10"
+          ><rect x="0.5" y="0.5" width="9" height="9" rx="1.5" fill="none" stroke="currentColor" stroke-width="1"
+          ></rect></svg
+        >
+      </span>
+      <span class="cap" aria-hidden="true">
+        <svg viewBox="0 0 10 10" width="10" height="10"
+          ><path d="M0.5 0.5l9 9M9.5 0.5l-9 9" stroke="currentColor" stroke-width="1"></path></svg
+        >
+      </span>
+    </span>
+  </div>
+
+  <div class="app">
+    <!-- Sidebar (the browse pages) -->
+    <nav class="sidebar" aria-label="featherplay" data-chrome="browse" hidden={isNow}>
+      <ul class="side-nav">
+        {
+          pages.map((p) => (
+            <li>
+              <button
+                class="side-item"
+                type="button"
+                data-page={p.page}
+                aria-current={view === p.page ? "page" : undefined}
+              >
+                <Icon name={p.icon} size={20} />
+                <span>{p.label}</span>
+              </button>
+            </li>
+          ))
+        }
+      </ul>
+      <span class="side-rule" aria-hidden="true"></span>
+      <button class="side-item" type="button" data-page="library" data-liked-link>
+        <Icon name="heart" size={20} /><span>Liked songs</span>
+      </button>
+      <div class="chips" role="tablist" aria-label="Your library">
+        {
+          ["Playlists", "Albums", "Artists"].map((c, i) => (
+            <button class="chip" type="button" role="tab" data-chip={i} aria-selected={String(i === 0)}>
+              {c}
+            </button>
+          ))
+        }
+      </div>
+      <ul class="side-list" data-chip-list="0">
+        {
+          playlists.map(([name, s]) => (
+            <li>
+              <img src={s.cover} width="32" height="32" alt="" loading="lazy" decoding="async" />
+              <span>{name}</span>
+            </li>
+          ))
+        }
+      </ul>
+      <ul class="side-list" data-chip-list="1" hidden>
+        {
+          songs.slice(0, 5).map((s) => (
+            <li>
+              <img src={s.cover} width="32" height="32" alt="" loading="lazy" decoding="async" />
+              <span>{s.title}</span>
+            </li>
+          ))
+        }
+      </ul>
+      <ul class="side-list" data-chip-list="2" hidden>
+        {
+          songs.slice(0, 5).map((s) => (
+            <li>
+              <img class="round" src={s.cover} width="32" height="32" alt="" loading="lazy" decoding="async" />
+              <span>{s.artist}</span>
+            </li>
+          ))
+        }
+      </ul>
+      <div class="side-foot" aria-hidden="true">
+        <span class="side-item muted"><Icon name="gear" size={20} /><span>Settings</span></span>
+        <span class="side-rule"></span>
+        <span class="account"><span class="avatar">Y</span><span>You</span></span>
+      </div>
+    </nav>
+
+    <div class="main">
+      <!-- Top bar (the browse pages) -->
+      <form class="topbar" role="search" data-search data-chrome="browse" hidden={isNow}>
+        <label class="field">
+          <Icon name="search" size={20} />
+          <input
+            type="search"
+            name="q"
+            data-search-input
+            placeholder="Search songs, albums, artists, playlists"
+            aria-label="Search songs, albums, artists, playlists"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <span class="keys" aria-hidden="true"><kbd>Ctrl</kbd><kbd>K</kbd></span>
+        </label>
+      </form>
+
+      <!-- Home -->
+      <section class="page home" data-pane="home" aria-label="Home" hidden={view !== "home"}>
+        <h3 class="page-h">Pick up where you left off</h3>
+        <div class="resume">
+          <img class="resume-cover" data-resume-cover src={resume.cover} width="152" height="152" alt="" loading="lazy" decoding="async" />
+          <div class="resume-text">
+            <p class="resume-title" data-resume-title>{resume.title}</p>
+            <p class="resume-artist" data-resume-artist>{resume.artist}</p>
+            <div class="resume-progress">
+              <span class="rail"><span class="fill" data-progress style={`transform:scaleX(${fraction})`}></span></span>
+              <span class="resume-time" data-resume-time>{formatTime(positionMs)} of {formatTime(resume.durationMs)}</span>
+            </div>
+            <div class="resume-actions">
+              <button class="pill solid" type="button" data-act="toggle" data-play-label>
+                <Icon name="play" size={18} class="i-play" /><Icon name="pause" size={18} class="i-pause" />
+                <span data-play-text>Play</span>
+              </button>
+              <button class="pill tonal" type="button" data-act="lyrics">
+                <Icon name="lyrics" size={18} /><span>Lyrics</span>
+              </button>
+            </div>
+          </div>
+          <div class="resume-next">
+            <p class="resume-next-h">Next in queue</p>
+            <ul class="mini-grid">
+              {
+                others.slice(0, 4).map((s) => (
+                  <li>
+                    <button class="mini" type="button" data-play={s.id} aria-label={`Play ${s.title}`}>
+                      <img src={s.cover} width="40" height="40" alt="" loading="lazy" decoding="async" />
+                      <span class="mini-text">
+                        <span class="t">{s.title}</span>
+                        <span class="a">{s.artist}</span>
+                      </span>
+                    </button>
+                  </li>
+                ))
+              }
+            </ul>
+          </div>
+        </div>
+        <h3 class="page-h">Made for the demo</h3>
+        <ul class="cards">
+          {
+            songs.map((s) => (
+              <li>
+                <button class="card" type="button" data-play={s.id} aria-label={`Play ${s.title}`}>
+                  <span class="card-cover">
+                    <img src={s.cover} width="170" height="170" alt="" loading="lazy" decoding="async" />
+                    <span class="card-play" aria-hidden="true">
+                      <Icon name="play" size={20} />
+                    </span>
+                  </span>
+                  <span class="t">{s.title}</span>
+                  <span class="a">{s.artist}</span>
+                </button>
+              </li>
+            ))
+          }
+        </ul>
+      </section>
+
+      <!-- Library: the songs liked in the demo, and the playlists -->
+      <section class="page library" data-pane="library" aria-label="Library" hidden={view !== "library"}>
+        <h3 class="page-title">Library</h3>
+        <h3 class="page-h">Liked songs</h3>
+        <div class="songs" data-liked-list></div>
+        <p class="empty" data-liked-empty>Songs you like show up here. Press the heart in the bar.</p>
+        <h3 class="page-h">Playlists</h3>
+        <ul class="cards">
+          {
+            playlists.map(([name, s]) => (
+              <li>
+                <button class="card" type="button" data-play={s.id} aria-label={`Play ${name}`}>
+                  <span class="card-cover">
+                    <img src={s.cover} width="170" height="170" alt="" loading="lazy" decoding="async" />
+                    <span class="card-play" aria-hidden="true">
+                      <Icon name="play" size={20} />
+                    </span>
+                  </span>
+                  <span class="t">{name}</span>
+                  <span class="a">Playlist, made for the demo</span>
+                </button>
+              </li>
+            ))
+          }
+        </ul>
+      </section>
+
+      <!-- Explore -->
+      <section class="page explore" data-pane="explore" aria-label="Explore" hidden={view !== "explore"}>
+        <h3 class="page-title">Explore</h3>
+        <h3 class="page-h">New for the demo</h3>
+        <ul class="cards">
+          {
+            [...songs].reverse().map((s) => (
+              <li>
+                <button class="card" type="button" data-play={s.id} aria-label={`Play ${s.title}`}>
+                  <span class="card-cover">
+                    <img src={s.cover} width="170" height="170" alt="" loading="lazy" decoding="async" />
+                    <span class="card-play" aria-hidden="true">
+                      <Icon name="play" size={20} />
+                    </span>
+                  </span>
+                  <span class="t">{s.title}</span>
+                  <span class="a">{s.artist}</span>
+                </button>
+              </li>
+            ))
+          }
+        </ul>
+        <h3 class="page-h">Moods</h3>
+        <div class="moods" aria-hidden="true">
+          {["Late night", "Rain on the roof", "Coast", "Slow mornings", "Instrumental"].map((m) => <span class="mood">{m}</span>)}
+        </div>
+      </section>
+
+      <!-- History: what's been played here, the latest first -->
+      <section class="page history" data-pane="history" aria-label="History" hidden={view !== "history"}>
+        <h3 class="page-title">History</h3>
+        <h3 class="page-h">Today</h3>
+        <div class="songs" data-history-list></div>
+      </section>
+
+      <!-- Search -->
+      <section class="page search" data-pane="search" aria-label="Search results" hidden={view !== "search"}>
+        <h3 class="page-h" data-search-heading>Songs</h3>
+        <div data-search-result></div>
+        <p class="empty" data-search-empty hidden>No songs match that. Try a title, an artist or a song link.</p>
+      </section>
+
+      <!-- Now playing: the cover view, or the full lyrics view on the cover's colour -->
+      <section class="stage" data-pane="now" aria-label="Now playing" hidden={!isNow}>
+        <span class="stage-wash" aria-hidden="true"></span>
+        <span class="stage-panel" aria-hidden="true"></span>
+        <button class="fp-ib back" type="button" data-act="back" aria-label="Back">
+          <Icon name="back" size={20} />
+        </button>
+        <button class="lyrics-pill" type="button" data-act="lyrics" aria-pressed={String(view === "lyrics")} data-lyrics-toggle>
+          <Icon name="lyrics" size={18} /><span>Lyrics</span>
+        </button>
+        <div class="np">
+          <img class="np-cover" data-np-cover src={song.cover} width="440" height="440" alt="" decoding="async" />
+          <div class="np-text">
+            <div class="np-row">
+              <p class="np-title" data-np-title>{song.title}</p>
+              <span class="np-actions">
+                <span class="fp-tipped nfm">
+                  <button class="fp-ib" type="button" data-act="notforme" aria-label="Not for me" aria-describedby={`${id}-nfm`}>
+                    <Icon name="notForMe" size={18} />
+                  </button>
+                  <span class="fp-tip" id={`${id}-nfm`}>
+                    <b>Not for me</b><span>Skips the song and marks it as one you dislike</span>
+                  </span>
+                </span>
+                <button class="fp-ib like" type="button" data-act="like" aria-label="Like" aria-pressed="false">
+                  <Icon name="heart" size={20} />
+                </button>
+                <button class="fp-ib" type="button" data-act="more" aria-label="More" aria-disabled="true" tabindex="-1">
+                  <Icon name="more" size={20} />
+                </button>
+              </span>
+            </div>
+            <p class="np-artist" data-np-artist>{song.artist}</p>
+            <p class="np-from">Playing from Made for the demo</p>
+            <p class="np-note" data-no-lyrics>No lyrics for this song</p>
+          </div>
+        </div>
+        <div class="lyrics" data-lyrics>
+          <ol class="lines" data-lines style={`transform:translateY(calc(-1 * ${linesY}))`}>
+            {
+              song.lyrics.map((l, i) => (
+                <li>
+                  <button
+                    class="line"
+                    type="button"
+                    data-at={l.atMs}
+                    data-state={lineState(i)}
+                    aria-current={i === current ? "true" : undefined}
+                  >
+                    {l.line}
+                  </button>
+                </li>
+              ))
+            }
+            <li class="source">{lyricsSource(song)}</li>
+          </ol>
+        </div>
+      </section>
+    </div>
+
+    <!-- Up next and Related: beside Now playing, or opened over a page from the bar -->
+    <aside class="queue" data-queue aria-label="Up next" hidden={!isNow}>
+      <div class="tabs" role="tablist" aria-label="Up next and Related">
+        <span class="tab-pill" aria-hidden="true"></span>
+        <button class="tab" type="button" role="tab" data-tab="next" aria-selected="true" aria-controls={`${id}-next`}>Up next</button>
+        <button class="tab" type="button" role="tab" data-tab="related" aria-selected="false" aria-controls={`${id}-related`}>Related</button>
+      </div>
+      <div class="tab-panel" id={`${id}-next`} role="tabpanel" data-tab-panel="next">
+        <div class="from">
+          <span class="from-l">Playing from</span>
+          <span class="from-t">Made for the demo</span>
+        </div>
+        <ul class="rows">
+          {
+            songs.map((s) => (
+              <li>
+                <button
+                  class="row"
+                  type="button"
+                  data-play={s.id}
+                  data-row={s.id}
+                  aria-current={s.id === song.id ? "true" : undefined}
+                >
+                  <span class="row-cover">
+                    <img src={s.cover} width="40" height="40" alt="" loading="lazy" decoding="async" />
+                    <span class="cover-play" aria-hidden="true">
+                      <Icon name="play" size={20} class="i-play" />
+                      <Icon name="pause" size={20} class="i-pause" />
+                    </span>
+                  </span>
+                  <span class="row-text">
+                    <span class="visually-hidden" data-row-verb>Play </span>
+                    <span class="t">{s.title}</span>
+                    <span class="a">{s.artist}</span>
+                  </span>
+                  <span class="row-end">
+                    <Mark />
+                    <span class="dur">{formatTime(s.durationMs)}</span>
+                  </span>
+                </button>
+              </li>
+            ))
+          }
+        </ul>
+      </div>
+      <div class="tab-panel" id={`${id}-related`} role="tabpanel" data-tab-panel="related" hidden>
+        <p class="similar" data-similar>Similar to {song.title}</p>
+        <div class="songs" data-related-list></div>
+      </div>
+    </aside>
+
+    <!-- The player bar -->
+    <div class="bar" data-bar>
+      <button class="bar-song" type="button" data-act="nowplaying">
+        <span class="bar-cover-wrap">
+          <img class="bar-cover" data-bar-cover src={song.cover} width="56" height="56" alt="" decoding="async" />
+          <span class="bar-veil" aria-hidden="true">
+            <Icon name="chevronUp" size={20} class="i-up" /><Icon name="chevronDown" size={20} class="i-down" />
+          </span>
+        </span>
+        <span class="bar-text">
+          <span class="visually-hidden">Now playing: </span>
+          <span class="bar-title" data-bar-title>{song.title}</span>
+          <span class="bar-artist" data-bar-artist>{song.artist}</span>
+        </span>
+      </button>
+      <div class="bar-mid">
+        <div class="transport">
+          <button class="fp-ib" type="button" data-act="shuffle" aria-label="Shuffle" aria-pressed="false">
+            <Icon name="shuffle" size={20} />
+          </button>
+          <button class="fp-ib t1" type="button" data-act="previous" aria-label="Previous">
+            <Icon name="prev" size={20} />
+          </button>
+          <span class="fp-tipped play-tipped">
+            <button class="fp-play play" type="button" data-act="toggle" aria-label="Play" data-play-label>
+              <Icon name="play" class="i-play" /><Icon name="pause" class="i-pause" />
+            </button>
+            <span class="fp-tip row-tip" aria-hidden="true"><b data-play-text>Play</b><span>Space</span></span>
+          </span>
+          <button class="fp-ib t1" type="button" data-act="next" aria-label="Next">
+            <Icon name="next" size={20} />
+          </button>
+          <button class="fp-ib repeat" type="button" data-act="repeat" aria-label="Repeat off" aria-pressed="false" data-repeat="off">
+            <Icon name="repeat" size={20} /><span class="one" aria-hidden="true">1</span>
+          </button>
+        </div>
+        <div class="seek">
+          <span class="time" data-bar-time>{formatTime(positionMs)}</span>
+          <span class="seek-line" data-seek-line>
+            <span class="rail"><span class="fill" data-progress style={`transform:scaleX(${fraction})`}></span></span>
+            <span class="thumb" data-thumb style={`--at:${fraction}`} aria-hidden="true"></span>
+            <span class="seek-tip" data-seek-tip aria-hidden="true">0:00</span>
+            <input
+              type="range"
+              min="0"
+              max={song.durationMs}
+              step="1000"
+              value={positionMs}
+              data-seek
+              aria-label="Seek"
+              aria-valuetext={`${formatTime(positionMs)} of ${formatTime(song.durationMs)}`}
+            />
+          </span>
+          <span class="time end" data-bar-duration>{formatTime(song.durationMs)}</span>
+        </div>
+      </div>
+      <div class="bar-end">
+        <span class="fp-tipped lyr">
+          <button
+            class="fp-ib mic"
+            type="button"
+            data-act="lyrics"
+            data-lyrics-toggle
+            aria-label="Lyrics"
+            aria-pressed={String(view === "lyrics")}
+          >
+            <Icon name="lyrics" size={20} />
+          </button>
+          <span class="fp-tip row-tip" aria-hidden="true"><b data-lyrics-tip>{view === "lyrics" ? "Hide lyrics" : "Lyrics"}</b><span>Ctrl+L</span></span>
+        </span>
+        <span class="fp-tipped nfm">
+          <button class="fp-ib small" type="button" data-act="notforme" aria-label="Not for me" aria-describedby={`${id}-nfm-bar`}>
+            <Icon name="notForMe" size={18} />
+          </button>
+          <span class="fp-tip" id={`${id}-nfm-bar`}><b>Not for me</b><span>Skips the song and marks it as one you dislike</span></span>
+        </span>
+        <button class="fp-ib like" type="button" data-act="like" aria-label="Like" aria-pressed="false">
+          <Icon name="heart" size={20} />
+        </button>
+        <button class="fp-ib mute" type="button" data-act="mute" aria-label="Mute">
+          <Icon name="volume" size={20} class="i-on" /><Icon name="volumeOff" size={20} class="i-off" />
+        </button>
+        <span class="volume" data-volume-wrap style="--vol:0.7">
+          <span class="vol-rail"><span class="vol-fill"></span></span>
+          <input type="range" min="0" max="100" value="70" aria-label="Volume" data-volume />
+        </span>
+        <button class="fp-ib queue-btn" type="button" data-act="queue" aria-label="Up next" aria-pressed={String(isNow)}>
+          <Icon name="queue" size={20} />
+        </button>
+      </div>
+    </div>
+
+    <div class="toast" data-toast hidden>
+      <span data-toast-text></span>
+      <button class="toast-act" type="button" data-act="undo">Undo</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  import { bindReplicas } from "../demo/replica";
+  bindReplicas();
+</script>

@@ -1,0 +1,55 @@
+# cargo-deny: `cargo deny check` (CI runs it on every push and pull request).
+# https://embarkstudios.github.io/cargo-deny/
+
+[graph]
+# featherplay ships for Windows x64 only, so the macOS, Linux, Android and wasm crates in the
+# lockfile never build. Build and dev dependencies stay in: they run on our machines and CI.
+targets = ["x86_64-pc-windows-msvc"]
+
+[advisories]
+# The RustSec database, fetched on every run.
+yanked = "deny"
+unmaintained = "all"
+unsound = "all"
+ignore = []
+
+[licenses]
+# Exactly the licences in the Windows dependency tree (and so in THIRD_PARTY.md). A new
+# dependency under any other licence fails the check until it is reviewed and added here.
+allow = [
+  "MIT",
+  "Apache-2.0",
+  "Unicode-3.0",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "Zlib",
+  "MPL-2.0",
+  "ISC",
+  "BSL-1.0",
+  "Unlicense",
+  "0BSD",
+  # Slint (`slint`, `i-slint-*`) offers GPL-3.0-only OR this OR its Software License 3.0;
+  # featherplay takes the Royalty-free License 2.0, so only that one is allowed.
+  "LicenseRef-Slint-Royalty-free-2.0",
+]
+confidence-threshold = 0.9
+
+[licenses.private]
+# The workspace's own crates (`publish = false`) are MIT, from the root Cargo.toml.
+ignore = true
+
+[bans]
+# The Slint and windows-rs trees bring several versions of the same crates; report them,
+# don't fail on them.
+multiple-versions = "warn"
+wildcards = "deny"
+# Path dependencies inside the workspace (and the vendored crate) carry no version.
+allow-wildcard-paths = true
+
+[sources]
+# Only crates.io. The one patched crate is a path dependency in `vendor/`, which this check
+# doesn't cover; there are no git dependencies.
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

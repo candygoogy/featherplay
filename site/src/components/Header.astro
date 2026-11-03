@@ -1,0 +1,376 @@
+---
+// The header. At the top of the page a plain bar: the name on the left, the sections in the
+// middle, the theme and the download on the right. Once the page scrolls a little it stays at
+// the top of the window and the three groups become floating pills (src/scripts/header.ts
+// sets data-floating): each group's surface fades and grows in behind it, and the name and
+// the actions step in from the edges, on transform and opacity alone, so nothing is laid out
+// again. The section on screen is lit in the middle pill. Phones keep the name and the
+// actions; the sections are a scroll away.
+import Logo from "./Logo.astro";
+import Icon from "./Icon.astro";
+import type { IconName } from "../demo/icons";
+
+const sections: { id: string; label: string; icon: IconName }[] = [
+  { id: "light", label: "Numbers", icon: "gauge" },
+  { id: "lyrics", label: "Lyrics", icon: "lyrics" },
+  { id: "questions", label: "Questions", icon: "question" },
+];
+---
+
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header" data-site-header>
+  <div class="wrap bar">
+    <a class="home" href="/" aria-label="featherplay, home" data-pill>
+      <Logo size={28} />
+      <span class="word">featherplay</span>
+    </a>
+    <nav aria-label="Sections" data-pill>
+      <ul>
+        {
+          sections.map((s) => (
+            <li>
+              <a href={`/#${s.id}`} data-section={s.id}>
+                <Icon name={s.icon} size={18} />
+                {s.label}
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+    </nav>
+    <div class="actions" data-pill>
+      <button class="theme-toggle" type="button" data-theme-toggle data-choice="system" hidden aria-label="Theme: System. Switch to Light">
+        <svg class="system" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+          <rect x="3" y="4.25" width="18" height="12.5" rx="2.25" fill="none" stroke="currentColor" stroke-width="1.8"></rect>
+          <path d="M12 16.75v3.5M8.25 20.25h7.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+        </svg>
+        <svg class="sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+          <circle cx="12" cy="12" r="4.2" fill="currentColor"></circle>
+          <path
+            d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"></path>
+        </svg>
+        <svg class="moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+          <path d="M19.5 14.6A8 8 0 0 1 9.4 4.5a8 8 0 1 0 10.1 10.1Z" fill="currentColor"></path>
+        </svg>
+        <span class="tip" data-tip aria-hidden="true">Theme: System. Switch to Light</span>
+      </button>
+      <a class="button download" href="/#download">Download</a>
+    </div>
+  </div>
+</header>
+
+<script>
+  import { bindHeader } from "../scripts/header";
+  bindHeader();
+</script>
+
+<style>
+  /* The way past the header for the keyboard: unseen until it has focus. */
+  .skip {
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    z-index: 60;
+    padding: 10px 18px;
+    border-radius: 999px;
+    background: var(--solid);
+    color: var(--on-solid);
+    font-weight: 700;
+    font-size: 0.9375rem;
+    text-decoration: none;
+    translate: 0 -200%;
+  }
+  .skip:focus-visible {
+    translate: none;
+  }
+
+  /* The header keeps its place in the page; the bar itself is fixed to the window. */
+  .site-header {
+    position: relative;
+    z-index: 50;
+    height: var(--head-h);
+    --head-h: 72px;
+    /* How far the surfaces reach past their content, and how far the name and the actions
+       step in from the page's margins as pills (none where the margin is wide enough). */
+    --pill-x: 16px;
+    --pill-y: 4px;
+    --step-in: max(0px, calc(var(--pill-x) + 10px - clamp(16px, 3.4vw, 48px)));
+  }
+  .bar {
+    position: fixed;
+    inset: 0 0 auto;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center;
+    column-gap: 16px;
+    height: var(--head-h);
+    pointer-events: none;
+    transition: translate var(--t-morph) var(--ease-out);
+  }
+  .bar > * {
+    pointer-events: auto;
+  }
+
+  /* A group and its pill. The surface is the group's ::before, reaching past its content by
+     --pill-x and --pill-y, so the content sits where it does in the bar and only the surface
+     and the group's place move. */
+  [data-pill] {
+    position: relative;
+    isolation: isolate;
+    transition: translate var(--t-morph) var(--ease-out);
+  }
+  [data-pill]::before {
+    content: "";
+    position: absolute;
+    inset: calc(var(--pill-y) * -1) calc(var(--pill-x) * -1);
+    z-index: -1;
+    border-radius: 999px;
+    /* Frosted enough to read over anything that passes under it (the large lyrics, the
+       cover's glow, the footer): mostly the page's ground, and what shows through is blurred
+       past the shape of a letter and only a little more colourful. Its edge is a hairline in
+       the ink's colour, a lighter line along the top inside, and a soft shadow; all from the
+       theme's tokens, so it eases with them. Measured: the pills' text keeps AA contrast over
+       the page's worst stretches (tests/header.spec.ts). */
+    background: color-mix(in srgb, var(--bg) calc(88% + 4% * var(--light)), transparent);
+    -webkit-backdrop-filter: blur(24px) saturate(1.3);
+    backdrop-filter: blur(24px) saturate(1.3);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / calc(0.08 + 0.62 * var(--light))),
+      inset 0 0 0 1px color-mix(in srgb, var(--text) calc(14% - 3% * var(--light)), transparent),
+      0 1px 2px rgb(0 0 0 / calc(0.1 + 0.1 * (1 - var(--light)))),
+      0 10px 28px -10px rgb(0 0 0 / calc(0.22 + 0.33 * (1 - var(--light))));
+    opacity: 0;
+    scale: 0.94;
+    pointer-events: none;
+    transition:
+      opacity var(--t-morph) var(--ease-out),
+      scale var(--t-morph) var(--ease-out);
+  }
+  [data-floating] .bar {
+    translate: 0 6px;
+  }
+  [data-floating] [data-pill]::before {
+    opacity: 1;
+    scale: 1;
+  }
+  [data-floating] .home {
+    translate: var(--step-in) 0;
+  }
+  [data-floating] .actions {
+    translate: calc(var(--step-in) * -1) 0;
+  }
+
+  .home {
+    --pill-y: 8px;
+    justify-self: start;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 36px;
+    border-radius: 999px;
+    font-weight: 800;
+    font-size: 1.1875rem;
+    letter-spacing: -0.02em;
+    text-decoration: none;
+  }
+  nav {
+    --pill-x: 4px;
+    justify-self: center;
+  }
+  nav ul {
+    display: flex;
+    gap: 2px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  nav a {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 0 16px 0 14px;
+    border-radius: 999px;
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: 0.9375rem;
+    text-decoration: none;
+    transition:
+      color var(--t-hover) ease,
+      background-color var(--t-hover) ease;
+  }
+  nav a :global(svg) {
+    flex: none;
+  }
+  /* A focused link lights as a hovered one does, under the ring. */
+  nav a:hover,
+  nav a:focus-visible {
+    color: var(--text);
+    background: var(--hover);
+  }
+  /* The section on screen (header.ts). */
+  nav a[aria-current="true"] {
+    color: var(--text);
+    background: var(--selected);
+  }
+  .actions {
+    --pill-x: 4px;
+    justify-self: end;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .theme-toggle {
+    display: inline-grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--text-muted);
+    transition:
+      color var(--t-hover) ease,
+      background-color var(--t-hover) ease;
+  }
+  .theme-toggle[hidden] {
+    display: none;
+  }
+  .theme-toggle:hover,
+  .theme-toggle:focus-visible {
+    color: var(--text);
+    background: var(--hover);
+  }
+  /* The icon is the mode the toggle is in: a monitor for System (follow Windows), the sun for
+     Light, the moon for Dark. A click turns them over each other like a dial, the way the
+     cycle goes: the mode left turns on out (a quarter turn, a step down in size), the next
+     turns in from behind, on the theme's own time and curve, so it moves with the colours
+     (and at once with reduced motion, where --t-theme is 0). */
+  .theme-toggle svg {
+    grid-area: 1 / 1;
+    opacity: 0;
+    rotate: -90deg;
+    scale: 0.6;
+    transition-property: opacity, rotate, scale;
+    transition-duration: var(--t-theme);
+    transition-timing-function: var(--ease-theme);
+  }
+  /* The one before the current mode in the cycle has turned on out. */
+  [data-choice="system"] .moon,
+  [data-choice="light"] .system,
+  [data-choice="dark"] .sun {
+    rotate: 90deg;
+  }
+  [data-choice="system"] .system,
+  [data-choice="light"] .sun,
+  [data-choice="dark"] .moon {
+    opacity: 1;
+    rotate: 0deg;
+    scale: 1;
+  }
+
+  /* The tooltip: the mode and what a click does next (the button's name says the same). It
+     waits a moment under the pointer and comes at once with keyboard focus; Escape puts it
+     away (theme.ts). It hangs from the toggle's right edge, so it stays in the window. */
+  .theme-toggle {
+    position: relative;
+  }
+  .tip {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    padding: 7px 12px;
+    border-radius: 10px;
+    background: var(--solid);
+    color: var(--on-solid);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    line-height: 1.3;
+    white-space: nowrap;
+    box-shadow: 0 6px 18px -6px rgb(0 0 0 / 0.35);
+    opacity: 0;
+    translate: 0 -4px;
+    pointer-events: none;
+    transition:
+      opacity var(--t-fast) var(--ease-out),
+      translate var(--t-fast) var(--ease-out);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .theme-toggle:hover .tip {
+      opacity: 1;
+      translate: none;
+      transition-delay: 450ms;
+    }
+  }
+  .theme-toggle:focus-visible .tip {
+    opacity: 1;
+    translate: none;
+  }
+  .theme-toggle[data-tip-off] .tip {
+    opacity: 0;
+    transition-delay: 0ms;
+  }
+  .download {
+    min-height: 44px;
+    padding: 0 20px;
+  }
+  /* The surfaces' edges sit on the window's 2 px focus rings: pills keep them inside. */
+  [data-pill] :focus-visible {
+    outline-offset: -2px;
+  }
+  .home:focus-visible {
+    outline-offset: 6px;
+  }
+
+  /* Narrower: the sections' words go, their icons stay (each keeps its name for readers). */
+  @media (max-width: 1000px) {
+    nav a {
+      gap: 0;
+      padding: 0 13px;
+      font-size: 0;
+    }
+  }
+  /* Phones: the name and the actions; the sections are a scroll away. */
+  @media (max-width: 720px) {
+    .site-header {
+      --head-h: 64px;
+      --pill-x: 12px;
+    }
+    .bar {
+      grid-template-columns: auto auto;
+      justify-content: space-between;
+    }
+    nav {
+      display: none;
+    }
+    .actions {
+      --pill-x: 4px;
+    }
+  }
+  /* The narrowest: the Tri-vane stands for the name (the link keeps its name). */
+  @media (max-width: 379px) {
+    .word {
+      display: none;
+    }
+    .actions {
+      gap: 0;
+    }
+    .download {
+      padding: 0 16px;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .bar,
+    [data-pill],
+    [data-pill]::before {
+      transition: none;
+    }
+    .tip {
+      translate: none;
+      transition-property: opacity;
+    }
+  }
+</style>

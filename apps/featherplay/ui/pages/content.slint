@@ -1,0 +1,888 @@
+// Pieces the content pages share: Home, Library, album, playlist, artist and search.
+// Generic building blocks stay in parts.slint; these are the page-level ones.
+import { ListView } from "std-widgets.slint";
+import { Theme, Curves, Icons } from "../theme.slint";
+import { TrackRow, CardItem, ItemKind, Icon, Display, Body, Cover, CoverPlay, IconButton, Pill, Card, HoverIntent, Bands } from "../parts.slint";
+import { Nav, PageKind } from "../nav.slint";
+import { SidebarData } from "../sidebar.slint";
+
+// Opens an album, playlist or artist card. Songs are played by the page instead.
+export global Open {
+    public function item(it: CardItem) {
+        if it.kind == ItemKind.album {
+            Nav.open-album(it.id);
+        } else if it.kind == ItemKind.playlist {
+            Nav.open-playlist(it.id);
+        } else if it.kind == ItemKind.artist {
+            Nav.open-artist(it.id);
+        }
+    }
+}
+
+// Cards per row for a content width: 5 from 900 px, else 4 (so 4 or 5 at a 1280 px window).
+export global Grid {
+    public pure function per-row(width: length) -> int {
+        return width >= 900px ? Theme.cards-per-row : Theme.cards-per-row - 1;
+    }
+    public pure function card(width: length, per-row: int) -> length {
+        return floor((width - (per-row - 1) * Theme.card-gap) / per-row / 1px) * 1px;
+    }
+}
+
+/// Glyphs only the page states use.
+export global StateIcons {
+    // A circle with an exclamation mark (errors).
+    out property <string> alert: "M12 3.5 a8.5 8.5 0 1 0 0.01 0 Z M12 7.8 V12.8 M12 16.2 V16.3";
+}
+
+// Holds a page's skeleton. Hidden for `t-skeleton-delay`, so a fast load never
+// flashes it; then the placeholder blocks fade in through their colour (`fade`, no opacity
+// layer) and a soft band of light crosses them every `t-skeleton-sweep`: `sweep` is its
+// centre in window x, and each `SkeletonBlock` draws only its own slice, so the light never
+// shows on the empty page between them. Pages create it with `if loading`, so the
+// `animation-tick()` and the delay timer end with the load. Without motion nothing moves.
+export component Skeleton inherits Rectangle {
+    property <bool> shown: Theme.still;
+    property <float> period: Theme.t-skeleton-sweep / 1ms;
+    // The band crosses in the first three quarters of the period, then rests (linear: it's
+    // constant motion, not a response to the user).
+    property <float> travel: min(1, mod(animation-tick() / 1ms, root.period) / root.period / 0.75);
+    out property <float> fade: root.shown ? 1 : 0;
+    out property <length> sweep: root.shown && Theme.moving ? root.absolute-position.x - Theme.skeleton-band / 2 + root.travel * (root.width + Theme.skeleton-band) : -100000px;
+    animate fade { duration: Theme.t-fast; easing: Curves.ease-hover; }
+    clip: true;
+    accessible-role: text;
+    accessible-label: @tr("Loading");
+    Timer {
+        interval: Theme.t-skeleton-delay;
+        running: !root.shown;
+        triggered => { root.shown = true; }
+    }
+}
+
+// One placeholder shape. Lit where the skeleton's band passes over it: its own gradient,
+// so the light stays inside the shape.
+export component SkeletonBlock inherits Rectangle {
+    // The band's centre in window x (`Skeleton.sweep`); far away when nothing moves.
+    in property <length> sweep: -100000px;
+    // The skeleton's fade in (`Skeleton.fade`).
+    in property <float> fade: 1;
+    property <float> w: max(1px, self.width) / 1px;
+    // The band's centre and half width, as fractions of this block's width.
+    property <float> h: Theme.skeleton-band / 2px / root.w;
+    // `c` is set by `c-at`'s change handler, and held far away while the band is elsewhere:
+    // bound to `sweep` straight, every block was marked dirty in every frame of the sweep,
+    // though only those under the band change, and the whole page repainted
+    // (`tests/app/skeleton_frames.rs`).
+    property <float> c-at: (root.sweep - self.absolute-position.x) / 1px / root.w;
+    property <float> c: -1000000;
+    changed c-at => {
+        root.c = root.c-at + root.h > 0 && root.c-at - root.h < 1 ? root.c-at : -1000000;
+    }
+    property <float> a: clamp(root.c - root.h, 0, 1);
+    property <float> m: clamp(root.c, 0, 1);
+    property <float> b: clamp(root.c + root.h, 0, 1);
+    // Its colour and the band's (the lyrics' panel lights them).
+    in property <color> tone: Theme.skeleton;
+    in property <color> tone-hi: Theme.skeleton-hi;
+    property <color> base: root.tone.transparentize(1 - root.fade);
+    property <color> hi: root.tone-hi.transparentize(1 - root.fade);
+    property <bool> lit: root.c + root.h > 0 && root.c - root.h < 1;
+    pure function at(f: float) -> color {
+        return root.hi.mix(root.base, max(0, 1 - abs(f - root.c) / root.h));
+    }
+    background: root.lit ? @linear-gradient(90deg, root.at(0) 0%, root.at(root.a) root.a, root.at(root.m) root.m, root.at(root.b) root.b, root.at(1) 100%) : root.base;
+}
+
+// One line of text in a skeleton.
+export component SkeletonBar inherits SkeletonBlock {
+    height: 10px;
+    border-radius: Theme.r-s;
+}
+
+// A row's shape, laid out like the row it stands for, so nothing moves when the data lands:
+// - `SongListRow` (the default: Liked, playlists, search, an artist's top songs): cover,
+//   title and artist, the album column from 640 px wide (`album`), the duration;
+// - `SongRow` (`compact`: Related, Quick picks): cover, title and artist, the duration at
+//   the right edge;
+// - `TrackListRow` (`numbered`: albums): the number and the title, 48 px tall.
+// `index` varies the lines' lengths from row to row.
+export component SkeletonRow inherits Rectangle {
+    in property <length> sweep: -100000px;
+    in property <float> fade: 1;
+    in property <int> index;
+    in property <bool> cover: true;
+    in property <bool> album: true;
+    in property <bool> duration: true;
+    in property <bool> compact: false;
+    in property <bool> numbered: false;
+    property <int> k: mod(root.index, 8);
+    property <length> text-x: root.numbered ? 64px : (root.cover ? 8px + Theme.row-cover + 12px : 8px);
+    // SongListRow's columns: 156 px on the right for like, menu and duration, the album
+    // column left of them.
+    property <length> right-w: 156px;
+    property <length> album-col: root.album && !root.compact && !root.numbered && root.width >= 640px ? floor((root.width - root.text-x - root.right-w) * 0.38 / 1px) * 1px : 0px;
+    property <length> album-w: root.album-col > 0 ? root.album-col + (root.duration ? 0px : 48px) : 0px;
+    property <length> text-w: root.compact ? root.width - root.text-x - (root.duration ? 64px : 8px) : root.width - root.text-x - root.right-w - root.album-col - (root.album-col > 0 ? 16px : 0px);
+    height: root.numbered ? Theme.track-row-h : Theme.row-h;
+    if root.cover && !root.numbered: SkeletonBlock {
+        x: 8px;
+        y: (root.height - self.height) / 2;
+        width: Theme.row-cover;
+        height: Theme.row-cover;
+        border-radius: Theme.r-s;
+        sweep: root.sweep;
+        fade: root.fade;
+    }
+    if root.numbered: SkeletonBar {
+        x: 30px;
+        y: (root.height - self.height) / 2;
+        width: 10px;
+        sweep: root.sweep;
+        fade: root.fade;
+    }
+    SkeletonBar {
+        x: root.text-x;
+        y: root.numbered ? (root.height - self.height) / 2 : root.height / 2 - 14px;
+        width: floor(min(340px, root.text-w * [0.62, 0.46, 0.7, 0.52, 0.4, 0.66, 0.5, 0.58][root.k]) / 1px) * 1px;
+        sweep: root.sweep;
+        fade: root.fade;
+    }
+    if !root.numbered: SkeletonBar {
+        x: root.text-x;
+        y: root.height / 2 + 5px;
+        width: floor(min(200px, root.text-w * [0.34, 0.26, 0.4, 0.3, 0.22, 0.36, 0.28, 0.32][root.k]) / 1px) * 1px;
+        height: 8px;
+        sweep: root.sweep;
+        fade: root.fade;
+    }
+    if root.album-w > 0: SkeletonBar {
+        x: root.width - root.right-w - root.album-col;
+        y: (root.height - self.height) / 2;
+        width: floor(min(260px, root.album-w * [0.55, 0.7, 0.45, 0.62, 0.5, 0.66, 0.4, 0.58][root.k]) / 1px) * 1px;
+        sweep: root.sweep;
+        fade: root.fade;
+    }
+    if root.duration: SkeletonBar {
+        // SongListRow and TrackListRow right-align it 48 px from the edge; SongRow 12 px.
+        x: root.width - (root.compact ? 12px : 48px) - self.width;
+        y: (root.height - self.height) / 2;
+        width: root.compact ? 26px : 28px;
+        height: root.compact ? 8px : 10px;
+        sweep: root.sweep;
+        fade: root.fade;
+    }
+}
+
+// A card's shape: the square (or circle) and the title and subtitle lines.
+export component SkeletonCard inherits Rectangle {
+    in property <length> sweep: -100000px;
+    in property <float> fade: 1;
+    in property <int> index;
+    in property <length> size;
+    in property <bool> round: false;
+    property <int> k: mod(root.index, 5);
+    width: root.size;
+    height: root.size + Theme.card-text-gap + 40px;
+    SkeletonBlock {
+        x: 0;
+        y: 0;
+        width: root.size;
+        height: root.size;
+        border-radius: root.round ? self.width / 2 : Theme.r-m;
+        sweep: root.sweep;
+        fade: root.fade;
+    }
+    // Round cards (artists) centre their text.
+    SkeletonBar {
+        x: root.round ? (root.size - self.width) / 2 : 0;
+        y: root.size + Theme.card-text-gap + 4px;
+        width: floor(root.size * [0.72, 0.56, 0.64, 0.8, 0.5][root.k] / 1px) * 1px;
+        sweep: root.sweep;
+        fade: root.fade;
+    }
+    SkeletonBar {
+        x: root.round ? (root.size - self.width) / 2 : 0;
+        y: root.size + Theme.card-text-gap + 25px;
+        width: floor(root.size * [0.44, 0.36, 0.5, 0.3, 0.4][root.k] / 1px) * 1px;
+        height: 8px;
+        sweep: root.sweep;
+        fade: root.fade;
+    }
+}
+
+// Song rows for lists (Liked, search, a playlist's tracks, Related): as many as the height
+// shows, up to `count`; the last few fade out, so the list trails off instead of ending in
+// a hard edge.
+export component SkeletonList inherits Skeleton {
+    in property <int> count: 16;
+    in property <bool> cover: true;
+    in property <bool> album: true;
+    in property <bool> compact: false;
+    in property <length> pad: Theme.page-pad;
+    in property <length> top: 0px;
+    property <int> rows: max(1, min(root.count, ceil((root.height - root.top) / Theme.row-h)));
+    for i in root.rows: SkeletonRow {
+        x: root.pad - 8px;
+        y: root.top + i * Theme.row-h;
+        width: root.width - 2 * root.pad + 16px;
+        index: i;
+        cover: root.cover;
+        album: root.album;
+        compact: root.compact;
+        sweep: root.sweep;
+        fade: root.fade * min(1, (root.rows - i) / 4);
+    }
+}
+
+// Lines of cards for grids (Library, search), laid out as `CardGrid` lays them: as many lines
+// as the height shows, three at most.
+export component SkeletonGrid inherits Skeleton {
+    in property <bool> round: false;
+    in property <length> pad: Theme.page-pad;
+    in property <length> top: 0px;
+    property <length> inner: root.width - 2 * root.pad;
+    property <int> per-row: Grid.per-row(root.inner);
+    property <length> card: Grid.card(root.inner, root.per-row);
+    property <length> line-h: root.card + Theme.card-text-gap + 40px + Theme.s6;
+    property <int> lines: max(1, min(3, ceil((root.height - root.top) / root.line-h)));
+    for i in root.lines * root.per-row: SkeletonCard {
+        x: root.pad + mod(i, root.per-row) * (root.card + Theme.card-gap);
+        y: root.top + floor(i / root.per-row) * root.line-h;
+        size: root.card;
+        round: root.round;
+        index: i;
+        sweep: root.sweep;
+        fade: root.fade;
+    }
+}
+
+// Shelves of cards (Home, an artist's albums): a title bar, then a row of cards. The first
+// `grids` shelves are song grids instead (Home's Quick picks): columns of 4 rows, 3 columns
+// from 900 px (2 below), as Home's SongGrid lays them out.
+export component SkeletonShelves inherits Skeleton {
+    in property <int> count: 2;
+    in property <int> grids: 0;
+    in property <length> pad: Theme.page-pad;
+    in property <length> top: 0px;
+    property <length> inner: root.width - 2 * root.pad;
+    property <int> per-row: Grid.per-row(root.inner);
+    property <length> card: Grid.card(root.inner, root.per-row);
+    property <length> shelf-h: 48px + root.card + Theme.card-text-gap + 40px + Theme.section-gap;
+    property <length> grid-h: 48px + 4 * Theme.row-h + Theme.section-gap;
+    property <int> columns: root.inner >= 900px ? 3 : 2;
+    property <length> col-w: floor((root.inner - (root.columns - 1) * Theme.card-gap) / root.columns / 1px) * 1px;
+    for g in root.grids: Rectangle {
+        x: root.pad;
+        y: root.top + g * root.grid-h;
+        width: root.inner;
+        height: root.grid-h;
+        SkeletonBlock {
+            x: 0;
+            y: 8px;
+            width: 180px;
+            height: 16px;
+            border-radius: Theme.r-s;
+            sweep: root.sweep;
+            fade: root.fade;
+        }
+        for i in root.columns * 4: SkeletonRow {
+            x: floor(i / 4) * (root.col-w + Theme.card-gap) - 8px;
+            y: 48px + mod(i, 4) * Theme.row-h;
+            width: root.col-w + 16px;
+            index: i;
+            compact: true;
+            duration: false;
+            sweep: root.sweep;
+            fade: root.fade;
+        }
+    }
+    for s in root.count: Rectangle {
+        x: root.pad;
+        y: root.top + root.grids * root.grid-h + s * root.shelf-h;
+        width: root.inner;
+        height: root.shelf-h;
+        SkeletonBlock {
+            x: 0;
+            y: 8px;
+            width: 180px;
+            height: 16px;
+            border-radius: Theme.r-s;
+            sweep: root.sweep;
+            fade: root.fade;
+        }
+        for i in root.per-row: SkeletonCard {
+            x: i * (root.card + Theme.card-gap);
+            y: 48px;
+            size: root.card;
+            index: i + s;
+            sweep: root.sweep;
+            fade: root.fade;
+        }
+    }
+}
+
+// The header of an album or a playlist, then its rows: numbered rows without covers for an
+// album (`row-covers: false`), song rows for a playlist.
+export component SkeletonCollection inherits Skeleton {
+    in property <bool> round: false;
+    in property <bool> row-covers: true;
+    // These pages run up under the clear top bar (`TopScrim`), so they start below it.
+    property <length> top: Theme.top-bar-h + Theme.page-top;
+    property <length> pad: Theme.page-pad;
+    property <length> cover-size: root.width >= 900px ? 232px : 200px;
+    property <length> text-x: root.pad + root.cover-size + Theme.s6;
+    property <length> buttons-y: root.top + root.cover-size - 40px;
+    property <length> rows-y: root.top + root.cover-size + Theme.s6;
+    property <length> row-h: root.row-covers ? Theme.row-h : Theme.track-row-h;
+    property <int> rows: max(1, min(12, ceil((root.height - root.rows-y) / root.row-h)));
+    SkeletonBlock {
+        x: root.pad;
+        y: root.top;
+        width: root.cover-size;
+        height: root.cover-size;
+        border-radius: root.round ? self.width / 2 : Theme.r-m;
+        sweep: root.sweep;
+        fade: root.fade;
+    }
+    SkeletonBlock {
+        x: root.text-x;
+        y: root.buttons-y - Theme.s5 - 96px;
+        width: min(360px, root.width - root.text-x - root.pad);
+        height: 40px;
+        border-radius: Theme.r-m;
+        sweep: root.sweep;
+        fade: root.fade;
+    }
+    SkeletonBar {
+        x: root.text-x;
+        y: root.buttons-y - Theme.s5 - 40px;
+        width: 160px;
+        sweep: root.sweep;
+        fade: root.fade;
+    }
+    SkeletonBar {
+        x: root.text-x;
+        y: root.buttons-y - Theme.s5 - 18px;
+        width: 220px;
+        sweep: root.sweep;
+        fade: root.fade;
+    }
+    for i in 2: SkeletonBlock {
+        x: root.text-x + i * 112px;
+        y: root.buttons-y;
+        width: 100px;
+        height: 40px;
+        border-radius: 20px;
+        sweep: root.sweep;
+        fade: root.fade;
+    }
+    for i in root.rows: SkeletonRow {
+        x: root.pad - 8px;
+        y: root.rows-y + i * root.row-h;
+        width: root.width - 2 * root.pad + 16px;
+        index: i;
+        numbered: !root.row-covers;
+        sweep: root.sweep;
+        fade: root.fade * min(1, (root.rows - i) / 4);
+    }
+}
+
+// Over the top of a page that runs up under the clear top bar (album, playlist, artist):
+// clear at rest, so the page's wash or photo shows behind the search field; the ground,
+// fading out just below the bar, once content scrolls under it. It follows the scroll
+// (`scrolled`, how far the content has moved up), so nothing animates by itself.
+// A flat fill under the bar and a short fade of solid bands below it, their alpha following
+// the scroll: content scrolls under it, so it's filled again every frame, and a gradient with
+// alpha there cost a 4K playlist frame ~1.3 ms (an `opacity` would also draw it through a layer).
+export component TopScrim inherits Rectangle {
+    in property <length> scrolled;
+    property <color> ink: Theme.ground.transparentize(1 - clamp(root.scrolled / Theme.top-bar-h, 0, 1));
+    y: 0;
+    height: Theme.top-bar-h + Theme.s4;
+    Rectangle {
+        y: 0;
+        height: Theme.top-bar-h;
+        background: root.ink;
+    }
+    Bands {
+        y: Theme.top-bar-h;
+        height: Theme.s4;
+        count: 16;
+        top: root.ink;
+        bottom: root.ink.transparentize(1);
+    }
+}
+
+// Content that has just arrived fades in over `t-fast`, without moving.
+export component FadeIn inherits Rectangle {
+    property <bool> arrived: false;
+    opacity: root.arrived ? 1 : 0;
+    animate opacity { duration: Theme.t-fast; easing: Curves.ease-hover; }
+    init => { root.arrived = true; }
+}
+
+// A page that didn't load: a glyph, what happened, and a way on. Signed out, the way
+// on is signing in; otherwise it's trying again.
+export component ErrorState inherits Rectangle {
+    in property <string> message;
+    callback retry();
+    height: lay.preferred-height;
+    accessible-role: text;
+    accessible-label: @tr("This didn\u{2019}t load. {}", root.message);
+    lay := VerticalLayout {
+        alignment: start;
+        spacing: Theme.s2;
+        Icon {
+            width: 32px;
+            height: 32px;
+            commands: StateIcons.alert;
+            stroke: Theme.text3;
+            stroke-width: 1.6px;
+        }
+        Rectangle { height: 4px; }
+        Body {
+            text: @tr("This didn\u{2019}t load");
+            font-size: Theme.t-body-l;
+            font-weight: 600;
+            color: Theme.text1;
+        }
+        Body {
+            text: root.message;
+            color: Theme.text2;
+            wrap: word-wrap;
+        }
+        Rectangle { height: Theme.s2; }
+        HorizontalLayout {
+            alignment: start;
+            if SidebarData.signed-in: Pill {
+                label: @tr("Try again");
+                clicked => { root.retry(); }
+            }
+            if !SidebarData.signed-in: Pill {
+                label: @tr("Sign in");
+                solid: true;
+                clicked => { Nav.go(PageKind.sign-in); }
+            }
+        }
+    }
+}
+
+// Nothing to show: a glyph, a title, one line, and an optional action.
+export component EmptyState inherits Rectangle {
+    in property <string> glyph: Icons.note;
+    in property <string> title;
+    in property <string> line;
+    in property <string> action;
+    callback action-clicked();
+    height: lay.preferred-height;
+    lay := VerticalLayout {
+        alignment: start;
+        spacing: Theme.s2;
+        Icon {
+            width: 40px;
+            height: 40px;
+            commands: root.glyph;
+            stroke: Theme.text3;
+            stroke-width: 1.4px;
+        }
+        Rectangle { height: 4px; }
+        Body {
+            text: root.title;
+            font-size: Theme.t-body-l;
+            font-weight: 600;
+            color: Theme.text1;
+        }
+        if root.line != "": Body {
+            text: root.line;
+            color: Theme.text2;
+            wrap: word-wrap;
+        }
+        if root.action != "": Rectangle { height: Theme.s2; }
+        if root.action != "": HorizontalLayout {
+            alignment: start;
+            Pill {
+                label: root.action;
+                clicked => { root.action-clicked(); }
+            }
+        }
+    }
+}
+
+// Song row with a cover, for playlists, Liked, search and an artist's top songs: cover, title
+// and artist, the album (when there's room), like and menu on hover, the duration.
+// Double-click plays; right-click or the menu button asks for the song menu.
+export component SongListRow inherits Rectangle {
+    in property <TrackRow> track;
+    in property <bool> show-album: true;
+    // Keeps the heart of liked rows shown; lists of liked songs show it on hover only.
+    in property <bool> show-liked: true;
+    callback activated();
+    callback like-clicked();
+    // Window coordinates for the menu: where it opens down from, and where it ends upward.
+    callback menu-requested(length, length, length);
+    property <bool> hovered: ta.has-hover;
+    property <length> right-w: 156px;
+    property <length> text-x: 8px + Theme.row-cover + 12px;
+    // The album column starts where it does in every list. A row without a duration (an
+    // artist's top songs) moves the heart into the duration's slot and gives the room it
+    // leaves to the album, which still elides before the heart.
+    property <length> duration-w: root.track.duration == "" ? 48px : 0px;
+    property <length> album-col: root.show-album && root.width >= 640px ? floor((root.width - root.text-x - root.right-w) * 0.38 / 1px) * 1px : 0px;
+    property <length> album-x: root.width - root.right-w - root.album-col;
+    property <length> album-w: root.album-col > 0 ? root.album-col + root.duration-w : 0px;
+    height: Theme.row-h;
+    border-radius: Theme.r-m;
+    HoverIntent {
+        hovered: root.hovered && !root.track.playing;
+        pressed: ta.pressed || cover-play.pressed;
+        id: root.track.id;
+    }
+    // The playing row rests on a light tile; hover and press show over it.
+    background: root.track.playing && !ta.pressed && !root.hovered ? Theme.playing-row : Theme.state(ta.pressed, root.hovered);
+    accessible-role: list-item;
+    accessible-label: root.track.title + ", " + root.track.artist;
+    animate background { duration: Theme.t-hover; }
+    // Under the touch area, so the play button inside it draws over the art.
+    Cover {
+        x: 8px;
+        y: (parent.height - self.height) / 2;
+        width: Theme.row-cover;
+        height: Theme.row-cover;
+        radius: Theme.r-s;
+        source: root.track.cover;
+    }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        double-clicked => { root.activated(); }
+        pointer-event(e) => {
+            if e.button == PointerEventButton.right && e.kind == PointerEventKind.up {
+                root.menu-requested(root.absolute-position.x + self.mouse-x, root.absolute-position.y + self.mouse-y, root.absolute-position.y + self.mouse-y);
+            }
+        }
+        // Inside the touch area, so hovering the buttons keeps the row hovered. The current
+        // track's cover rests under a deep veil with the playing mark; hovering a cover
+        // shows play (pause on the current track), and clicking it plays as a double-click.
+        cover-play := CoverPlay {
+            x: 8px;
+            y: (parent.height - self.height) / 2;
+            width: Theme.row-cover;
+            height: Theme.row-cover;
+            current: root.track.playing;
+            title: root.track.title;
+            play => { root.activated(); }
+            right-clicked(x, y) => { root.menu-requested(x, y, y); }
+        }
+        if root.hovered || (root.track.liked && root.show-liked): IconButton {
+            x: parent.width - 140px + root.duration-w;
+            y: (parent.height - self.height) / 2;
+            icon: Icons.heart;
+            label: root.track.liked ? @tr("Remove like") : @tr("Like");
+            filled: root.track.liked;
+            tint: root.track.liked ? Theme.text1 : Theme.text2;
+            clicked => { root.like-clicked(); }
+        }
+        if root.hovered: IconButton {
+            x: parent.width - 44px;
+            y: (parent.height - self.height) / 2;
+            icon: Icons.more;
+            label: @tr("More");
+            filled: true;
+            clicked => {
+                root.menu-requested(self.absolute-position.x + self.width - 4px, self.absolute-position.y + self.height, root.absolute-position.y);
+            }
+        }
+    }
+    VerticalLayout {
+        x: root.text-x;
+        width: parent.width - self.x - root.right-w - root.album-col - (root.album-col > 0 ? 16px : 0px);
+        alignment: center;
+        spacing: 1px;
+        Body {
+            text: root.track.title;
+            font-weight: 600;
+            color: Theme.text1;
+        }
+        Body {
+            text: root.track.artist;
+            font-size: Theme.t-meta;
+            color: Theme.text2;
+        }
+    }
+    if root.album-w > 0: Rectangle {
+        x: root.album-x;
+        width: root.album-w;
+        height: parent.height;
+        album := Body {
+            x: 0;
+            width: parent.width;
+            height: parent.height;
+            text: root.track.album;
+            color: album-ta.has-hover ? Theme.text1 : Theme.text2;
+            vertical-alignment: center;
+        }
+        // Only the text itself is a link.
+        album-ta := TouchArea {
+            x: 0;
+            width: min(parent.width, album.preferred-width);
+            height: 24px;
+            enabled: root.track.album-id != "";
+            mouse-cursor: self.enabled ? pointer : default;
+            clicked => { Nav.open-album(root.track.album-id); }
+        }
+    }
+    Body {
+        x: parent.width - 92px;
+        width: 44px;
+        height: parent.height;
+        text: root.track.duration;
+        color: Theme.text2;
+        horizontal-alignment: right;
+        vertical-alignment: center;
+    }
+}
+
+// A virtualised grid of cards: one ListView row per line of cards. Fills its parent.
+export component CardGrid inherits Rectangle {
+    in property <[CardItem]> items;
+    // Left and right inset of the cards inside the list.
+    in property <length> pad: Theme.page-pad;
+    // Space above the first line (scrolls with the grid).
+    in property <length> top: 0px;
+    // Cards show a play button on hover (`play`).
+    in property <bool> playable: false;
+    callback open(CardItem);
+    callback play(CardItem);
+    property <length> inner: root.width - 2 * root.pad;
+    property <int> per-row: Grid.per-row(root.inner);
+    property <length> card: Grid.card(root.inner, root.per-row);
+    property <length> line-h: root.card + Theme.card-text-gap + 40px + Theme.s6;
+    ListView {
+        for r in ceil(root.items.length / root.per-row): Rectangle {
+            // The last line leaves room to scroll past the floating bar.
+            height: (r == 0 ? root.top : 0px) + root.line-h + (r == ceil(root.items.length / root.per-row) - 1 ? Theme.page-end - Theme.s6 : 0px);
+            for c in root.per-row: cell := Rectangle {
+                property <int> idx: r * root.per-row + c;
+                x: root.pad + c * (root.card + Theme.card-gap);
+                y: r == 0 ? root.top : 0px;
+                width: root.card;
+                height: root.line-h - Theme.s6;
+                if cell.idx < root.items.length: Card {
+                    size: root.card;
+                    item: root.items[cell.idx];
+                    playable: root.playable;
+                    clicked => { root.open(root.items[cell.idx]); }
+                    play => { root.play(root.items[cell.idx]); }
+                }
+            }
+        }
+    }
+}
+
+// Filter chips (Library, Search): pills, the active one on the accent's tonal fill (as the
+// Now playing tabs), the others outlined.
+export component Chips inherits Rectangle {
+    in property <[string]> labels;
+    in property <int> active;
+    callback selected(int);
+    height: 36px;
+    preferred-width: lay.preferred-width;
+    lay := HorizontalLayout {
+        alignment: start;
+        spacing: Theme.s2;
+        for label[i] in root.labels: Rectangle {
+            property <bool> on: i == root.active;
+            width: t.preferred-width + 2 * Theme.s4 + 4px;
+            border-radius: self.height / 2;
+            border-width: self.on ? 0px : 1px;
+            border-color: Theme.hairline;
+            background: self.on ? (ta.has-hover || ta.pressed ? Theme.accent-tonal-hover : Theme.accent-tonal) : Theme.state(ta.pressed, ta.has-hover);
+            // Press: a small give, then a short spring back.
+            transform-scale: ta.pressed ? Theme.press-scale : 1.0;
+            accessible-role: tab;
+            accessible-label: label;
+            accessible-action-default => { root.selected(i); }
+            animate background { duration: Theme.t-hover; }
+            animate transform-scale {
+                duration: ta.pressed ? Theme.t-press : Theme.t-release;
+                easing: ta.pressed ? Curves.ease-out : Curves.release;
+            }
+            ta := TouchArea {
+                mouse-cursor: pointer;
+                clicked => { root.selected(i); }
+            }
+            t := Body {
+                text: label;
+                font-weight: 600;
+                color: parent.on ? Theme.text1 : Theme.text2;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+                overflow: clip;
+            }
+        }
+    }
+}
+
+// The tall header of an album or a playlist: the cover's colour washes the
+// page top, up under the clear top bar (the page runs beneath it, so the header starts
+// `Theme.top-bar-h` down and its height includes it); a large cover on the left; beside it, stacked up from the cover's bottom edge,
+// the kind line ("Album, 1996"), the title in the display face, the byline (clickable),
+// the meta line and the actions. Liked songs gets its own tile instead of a cover.
+export component CollectionHeader inherits Rectangle {
+    in property <image> cover;
+    in property <bool> round: false;
+    // The cover's wash for each theme (`follow::washes`); transparent until it's known.
+    in property <color> wash-dark: transparent;
+    in property <color> wash-light: transparent;
+    // Liked songs: a red tile with a white heart instead of a cover.
+    in property <bool> liked-tile: false;
+    in property <string> kind;
+    in property <string> title;
+    in property <string> byline;
+    in property <bool> byline-link: false;
+    in property <string> meta;
+    in property <string> primary: @tr("Play");
+    in property <string> secondary: @tr("Shuffle");
+    in property <string> secondary-icon: Icons.shuffle;
+    in property <bool> enabled: true;
+    callback byline-clicked();
+    callback primary-clicked();
+    callback secondary-clicked();
+    property <length> pad: Theme.page-pad;
+    property <length> top: Theme.top-bar-h + Theme.page-top;
+    property <length> cover-size: root.width >= 900px ? 232px : 200px;
+    property <length> text-x: root.pad + root.cover-size + Theme.s6;
+    property <length> text-w: root.width - root.text-x - root.pad;
+    property <length> bottom: root.top + root.cover-size;
+    // From the bottom up: the buttons, a 24 px gap, the meta, the byline.
+    property <length> buttons-y: root.bottom - 40px;
+    property <length> meta-y: root.buttons-y - Theme.s5 - 20px;
+    property <length> byline-y: root.meta-y - (root.byline != "" ? 26px : 0px);
+    // A long title wraps to a second line when there's room above it for the kind line.
+    property <length> line-h: title.font-metrics.ascent - title.font-metrics.descent;
+    property <length> title-room: root.byline-y - root.top - (root.kind != "" ? 24px : 0px);
+    property <bool> two-lines: root.title-room >= 2 * root.line-h;
+    property <bool> wrapped: root.two-lines && title.preferred-height > 1.5 * root.line-h;
+    property <length> title-h: root.wrapped ? 2 * root.line-h : 56px;
+    property <length> title-y: root.byline-y - root.title-h + 4px;
+    property <color> wash: Theme.dark ? root.wash-dark : root.wash-light;
+    animate wash { duration: Theme.t-colour; easing: Curves.ease-hover; }
+    height: root.top + root.cover-size + Theme.s6;
+
+    // The wash: the cover's colour from under the top bar, fading to the ground over the
+    // 420 px below it. It reaches past the header, behind the first rows, which scroll over
+    // it: so solid bands, not a gradient (`Bands`).
+    Bands {
+        x: 0;
+        y: 0;
+        width: root.width;
+        height: Theme.top-bar-h + 420px;
+        count: 64;
+        top: root.wash;
+        bottom: root.wash.transparentize(1);
+    }
+    if !root.liked-tile: Cover {
+        x: root.pad;
+        y: root.top;
+        width: root.cover-size;
+        height: root.cover-size;
+        source: root.cover;
+        round: root.round;
+        drop-shadow-blur: 24px;
+        drop-shadow-offset-y: 8px;
+        drop-shadow-color: Theme.cover-shadow;
+    }
+    if root.liked-tile: Rectangle {
+        x: root.pad;
+        y: root.top;
+        width: root.cover-size;
+        height: root.cover-size;
+        border-radius: Theme.r-m;
+        background: @linear-gradient(135deg, Theme.brand-accent 0%, #7A0E20 100%);
+        drop-shadow-blur: 24px;
+        drop-shadow-offset-y: 8px;
+        drop-shadow-color: Theme.cover-shadow;
+        Icon {
+            width: 88px;
+            height: 88px;
+            commands: Icons.heart;
+            fill: #FFFFFF;
+            stroke: transparent;
+        }
+    }
+    if root.kind != "": Body {
+        x: root.text-x;
+        y: root.title-y - 20px;
+        width: root.text-w;
+        height: 20px;
+        text: root.kind;
+        font-size: Theme.t-meta;
+        font-weight: 600;
+        color: Theme.text2;
+        vertical-alignment: center;
+    }
+    title := Display {
+        x: root.text-x;
+        y: root.title-y;
+        width: root.text-w;
+        height: root.title-h;
+        text: root.title;
+        font-size: Theme.t-display-xl;
+        font-weight: 800;
+        wrap: root.two-lines ? word-wrap : no-wrap;
+        vertical-alignment: center;
+    }
+    if root.byline != "": Rectangle {
+        x: root.text-x;
+        y: root.byline-y;
+        width: root.text-w;
+        height: 22px;
+        by := Body {
+            x: 0;
+            width: parent.width;
+            height: parent.height;
+            text: root.byline;
+            font-size: Theme.t-body-l;
+            font-weight: 600;
+            color: by-ta.has-hover ? Theme.text2 : Theme.text1;
+            vertical-alignment: center;
+        }
+        by-ta := TouchArea {
+            x: 0;
+            width: min(parent.width, by.preferred-width);
+            enabled: root.byline-link;
+            mouse-cursor: self.enabled ? pointer : default;
+            clicked => { root.byline-clicked(); }
+        }
+    }
+    Body {
+        x: root.text-x;
+        y: root.meta-y;
+        width: root.text-w;
+        height: 20px;
+        text: root.meta;
+        color: Theme.text2;
+        vertical-alignment: center;
+    }
+    HorizontalLayout {
+        x: root.text-x;
+        y: root.buttons-y;
+        height: 40px;
+        spacing: Theme.s2;
+        alignment: start;
+        Pill {
+            label: root.primary;
+            icon: Icons.play;
+            solid: true;
+            enabled: root.enabled;
+            clicked => { root.primary-clicked(); }
+        }
+        if root.secondary != "": Pill {
+            label: root.secondary;
+            icon: root.secondary-icon;
+            icon-filled: false;
+            enabled: root.enabled;
+            clicked => { root.secondary-clicked(); }
+        }
+    }
+}

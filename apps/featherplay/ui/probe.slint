@@ -1,0 +1,43 @@
+// For the smoothness benchmark (`tests/smoothness.rs`) only: a small region it animates, to
+// price a continuously animated indicator. Off, it's nothing: an `if` with no instance.
+export global Probe {
+    // The animated stand-in for a playing indicator: 24 x 24 logical px at (x, y), three bars
+    // whose heights follow `tick`.
+    in-out property <bool> region: false;
+    in-out property <length> region-x: 0px;
+    in-out property <length> region-y: 0px;
+    in-out property <int> tick: 0;
+    // The region as one item (a single `Path`) instead of three rectangles.
+    in-out property <bool> region-single: false;
+}
+
+// Three bars stepping with `Probe.tick`, inside a 24 x 24 box: three rectangles (each its own
+// dirty rectangle), or one `Path` (one dirty rectangle).
+export component ProbeRegion inherits Rectangle {
+    width: 24px;
+    height: 24px;
+    function level(i: int) -> float {
+        return 0.3 + 0.7 * mod(Probe.tick * (i + 2) + i * 3, 7) / 6;
+    }
+    function bar(i: int) -> string {
+        return "M" + (4 + i * 6) + " 22 V" + (22 - max(2, round(20 * root.level(i)))) + " H" + (8 + i * 6) + " V22 Z ";
+    }
+    if Probe.region-single: Path {
+        width: 24px;
+        height: 24px;
+        viewbox-width: 24;
+        viewbox-height: 24;
+        commands: root.bar(0) + root.bar(1) + root.bar(2);
+        fill: #FF3B55;
+        stroke-width: 0;
+    }
+    if !Probe.region-single: Rectangle {
+        for i in 3: Rectangle {
+            x: 4px + i * 6px;
+            width: 4px;
+            height: max(2px, round(20px * root.level(i) / 1px) * 1px);
+            y: 22px - self.height;
+            background: #FF3B55;
+        }
+    }
+}

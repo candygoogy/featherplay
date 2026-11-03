@@ -1,0 +1,327 @@
+---
+// The close, on a dark band in both themes: a row of five short columns under bold headings
+// (what featherplay is and runs on, then Product, Project, Help and Legal); one thin legal row; and last the name across the page's measure,
+// the Tri-vane in its own colours and the word in white, nothing else. The theme is the
+// header's (its toggle); the footer has no control of its own. The band carries a
+// trace of the playing song's colour and eases to the next one's with the glow. Outside
+// links come from src/data/links.ts.
+import { release } from "../data/release";
+import { links } from "../data/links";
+import triVane from "../../public/tri-vane.svg?raw";
+
+const year = 2026;
+const groups = [
+  {
+    id: "foot-product",
+    title: "Product",
+    items: [
+      { label: "Download", href: "/#download" },
+      { label: "Features", href: "/#kept" },
+      { label: "Lyrics", href: "/#lyrics" },
+      { label: "How light?", href: "/#light" },
+      { label: "Make it yours", href: "/#yours" },
+    ],
+  },
+  {
+    id: "foot-project",
+    title: "Project",
+    items: [
+      { label: "GitHub", href: links.repo },
+      { label: "Releases and changes", href: links.releases },
+      { label: "Report a bug", href: links.issues },
+      { label: "How we measured", href: "/method" },
+    ],
+  },
+  {
+    id: "foot-help",
+    title: "Help",
+    items: [
+      { label: "Questions", href: "/#questions" },
+      { label: "What it connects to", href: "/#connects" },
+      { label: "Uninstalling", href: "/#uninstall" },
+      { label: "Coming from Pear", href: links.comingFromPear },
+    ],
+  },
+  {
+    id: "foot-legal",
+    title: "Legal",
+    items: [
+      { label: "MIT licence", href: links.licence },
+      { label: "Third-party licences", href: links.thirdParty },
+      { label: "Unofficial notice", href: "/#official" },
+      { label: "Music credits", href: "/credits" },
+    ],
+  },
+];
+// The Tri-vane's own outlines and colours (public/tri-vane.svg).
+const vane = (id: string) => triVane.match(new RegExp(`id="${id}"[^>]*\\sd="([^"]+)"`))?.[1] ?? "";
+---
+
+<footer class="site-footer">
+  <div class="band">
+    <div class="wrap">
+      <div class="columns">
+        <div class="group about">
+          <h2 id="foot-about">featherplay</h2>
+          <ul aria-labelledby="foot-about">
+            <li>Version {release.version}</li>
+            <li>Windows 10 and 11, 64-bit</li>
+            <li>Free and open source</li>
+          </ul>
+        </div>
+        <nav class="links" aria-label="More from featherplay">
+          {
+            groups.map((g) => (
+              <div class="group">
+                <h2 id={g.id}>{g.title}</h2>
+                <ul aria-labelledby={g.id}>
+                  {g.items.map((l) => (
+                    <li>
+                      <a href={l.href}>{l.label}</a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))
+          }
+        </nav>
+      </div>
+
+      <div class="legal">
+        <ul class="fine">
+          <li>© {year}&nbsp;<a href={links.author}>candygoogy</a></li>
+          <li>An unofficial player, not made by or affiliated with Google or YouTube</li>
+          <li><a href="/#connects">Privacy</a></li>
+        </ul>
+        <a class="top" href="#top">Back to top</a>
+      </div>
+    </div>
+
+    <!-- The name as a drawing: decoration (the name is the first column's heading), so it isn't
+         held to text contrast. Sized to the page's measure in container units, kerned by the
+         font, never stretched. -->
+    <div class="sign wrap" aria-hidden="true">
+      <div class="sign-fit">
+        <div class="sign-line">
+          <svg class="sign-mark" viewBox="0 0 64 64" focusable="false">
+            <path fill="#EE6283" d={vane("t1")}></path>
+            <path fill="#FF3B55" d={vane("t2")}></path>
+            <path fill="#CC1036" d={vane("t3")}></path>
+            <path fill="#FFFFFF" d={vane("play")}></path>
+          </svg><span class="sign-name">featherplay</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<style>
+  .site-footer {
+    padding-top: clamp(48px, 6vw, 96px);
+  }
+  /* The band: near black in both themes, a step above the dark page's ground, with a trace of
+     the song's colour. White text keeps far above AA on it for every cover. */
+  .band {
+    --band: color-mix(in srgb, var(--glow) 9%, #161616);
+    --ink: #fff;
+    --ink-soft: color-mix(in srgb, #fff 74%, var(--band));
+    position: relative;
+    overflow: clip;
+    padding-top: clamp(56px, 6vw, 96px);
+    background: var(--band);
+    color: var(--ink);
+    transition: background-color var(--t-glow) ease;
+  }
+  .band :focus-visible {
+    outline-color: #fff;
+  }
+
+  /* The columns: what featherplay is, then four groups of links. One grid for all five (the
+     link groups sit on it through a subgrid), so every column starts on the same rhythm; the
+     first is a little wider, for its longer lines. */
+  .columns {
+    display: grid;
+    grid-template-columns: minmax(0, 1.25fr) repeat(4, minmax(0, 1fr));
+    gap: 40px clamp(24px, 3vw, 56px);
+    align-items: start;
+  }
+  .links {
+    display: grid;
+    grid-column: 2 / 6;
+    grid-template-columns: subgrid;
+    row-gap: 40px;
+  }
+  .group h2 {
+    margin: 0 0 12px;
+    padding: 0;
+    font-size: 0.9375rem;
+    font-weight: 800;
+    letter-spacing: -0.005em;
+    line-height: 1.3;
+  }
+  .group ul {
+    display: grid;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 0.875rem;
+    line-height: 1.35;
+  }
+  .group li {
+    display: flex;
+    align-items: center;
+    min-height: 32px;
+  }
+  .about li {
+    color: var(--ink-soft);
+  }
+  .group a {
+    color: var(--ink-soft);
+    font-weight: 500;
+    text-decoration: none;
+    transition: color var(--t-hover) ease;
+  }
+  .group a:hover,
+  .group a:focus-visible {
+    color: var(--ink);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.25em;
+  }
+  @media (pointer: coarse) {
+    .group li {
+      min-height: 44px;
+    }
+  }
+
+  /* One thin row: the small print on the left, parted by short dividers; the way back up on
+     the right. */
+  .legal {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px 32px;
+    margin-top: clamp(48px, 5vw, 80px);
+    font-size: 0.8125rem;
+    line-height: 1.5;
+  }
+  .fine {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 0;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    color: var(--ink-soft);
+  }
+  .fine li {
+    display: inline-flex;
+    align-items: center;
+    text-wrap: balance;
+  }
+  .fine li + li::before {
+    content: "";
+    width: 1px;
+    height: 0.95em;
+    margin-inline: 12px;
+    background: color-mix(in srgb, #fff 32%, var(--band));
+  }
+  .fine li:first-child {
+    color: var(--ink);
+    font-weight: 600;
+  }
+  .legal a {
+    color: inherit;
+    text-decoration: none;
+  }
+  .legal a:hover,
+  .legal a:focus-visible {
+    color: var(--ink);
+    text-decoration: underline;
+    text-underline-offset: 0.25em;
+  }
+  .top {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    font-weight: 600;
+  }
+
+  /* The name. The line's ink (the Tri-vane, a gap, "featherplay" at -0.04em) is 6.154 em
+     wide, so 100cqi / 6.154 sets it edge to edge on the page's measure. The whole word shows,
+     the band ending a margin under its descenders. */
+  .sign {
+    margin-top: clamp(32px, 4vw, 64px);
+    padding-bottom: clamp(20px, 2.4vw, 40px);
+  }
+  .sign-fit {
+    container-type: inline-size;
+  }
+  .sign-line {
+    --size: calc(100cqi / 6.154);
+    display: flex;
+    align-items: flex-start;
+    height: calc(var(--size) * 1.04);
+    margin-inline-start: calc(var(--size) * -0.024);
+    font-family: var(--font);
+    font-size: var(--size);
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    line-height: 1;
+    white-space: nowrap;
+    font-kerning: normal;
+    color: var(--ink);
+  }
+  .sign-name {
+    margin-top: -0.149em;
+    margin-inline-start: 0.1em;
+  }
+  .sign-mark {
+    flex: none;
+    width: 0.78em;
+    height: 0.78em;
+    margin-top: -0.022em;
+    overflow: visible;
+  }
+
+  /* Narrower: what it is across the first row, its three facts on one line; the four groups
+     under it. */
+  @media (max-width: 1100px) {
+    .columns {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+    .about {
+      grid-column: 1 / -1;
+    }
+    .about ul {
+      display: flex;
+      flex-wrap: wrap;
+      column-gap: 24px;
+    }
+    .links {
+      grid-column: 1 / -1;
+    }
+  }
+  /* Phones: two columns of groups, the facts one a line, the small print one item a line. */
+  @media (max-width: 700px) {
+    .columns {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .about ul {
+      display: grid;
+    }
+    .legal {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    .fine {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    .fine li + li::before {
+      display: none;
+    }
+  }
+</style>

@@ -1,0 +1,299 @@
+---
+// The guided tour's card, the ring round each step's target, and the cursor that "Show me"
+// moves. Hidden until the script mounts it (no script: no tour, the page reads on).
+import { TOUR_LINK } from "../demo/tour";
+import Icon from "./Icon.astro";
+---
+
+<div class="tour" data-tour hidden>
+  <div class="card" data-tour-card role="group" aria-label="Tour of the demo">
+    <div class="head">
+      <div class="dots" aria-hidden="true">
+        {[0, 1, 2, 3, 4].map(() => <i data-tour-dot />)}
+      </div>
+      <button class="close" type="button" data-tour-skip aria-label="Close the tour">
+        <Icon name="close" size={18} />
+      </button>
+    </div>
+    <div class="text" aria-live="polite">
+      <p class="title" data-tour-title></p>
+      <p class="body" data-tour-body></p>
+    </div>
+    <p class="link" data-tour-linkrow hidden>
+      <span class="url" data-tour-link>{TOUR_LINK}</span>
+      <button class="copy" type="button" data-tour-copy>Copy</button>
+    </p>
+    <div class="actions">
+      <button class="button show" type="button" data-tour-show>
+        <span data-tour-show-label>Show me</span>
+      </button>
+      <button class="quiet" type="button" data-tour-next>Next step</button>
+      <a class="button" href="#download" data-tour-download hidden>Download for Windows</a>
+      <button class="quiet" type="button" data-tour-restart hidden>Start over</button>
+    </div>
+  </div>
+  <!-- Closed, the card leaves this in its place: the way back in while the name (and its
+       Take the tour) has scrolled away. -->
+  <button class="reopen" type="button" data-tour-reopen hidden>
+    <svg viewBox="0 0 20 24" width="13" height="16" aria-hidden="true"
+      ><path
+        d="M1.5 1.5 L1.5 19.5 L6.2 15.4 L9.3 22.2 L12.4 20.8 L9.4 14.2 L15.6 14.2 Z"
+        fill="currentColor"
+        stroke="currentColor"
+        stroke-width="1.4"
+        stroke-linejoin="round"></path></svg
+    >
+    <span>Take the tour</span>
+  </button>
+  <span class="ring" data-tour-ring hidden aria-hidden="true"></span>
+  <span class="cursor" data-tour-cursor hidden aria-hidden="true">
+    <svg viewBox="0 0 20 24" width="20" height="24"
+      ><path
+        d="M1.5 1.5 L1.5 19.5 L6.2 15.4 L9.3 22.2 L12.4 20.8 L9.4 14.2 L15.6 14.2 Z"
+        fill="#fff"
+        stroke="#000"
+        stroke-width="1.4"
+        stroke-linejoin="round"></path></svg
+    >
+    <!-- The keys "Show me" presses, beside the pointer (Ctrl V to paste). -->
+    <span class="keys" data-tour-keys hidden></span>
+  </span>
+</div>
+
+<script>
+  import { mountTour } from "../demo/tour";
+  import { bindReplicas } from "../demo/replica";
+  const root = document.querySelector<HTMLElement>("[data-tour]");
+  const player = bindReplicas();
+  if (root && player) mountTour(root, player);
+</script>
+
+<style>
+  .tour {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    pointer-events: none;
+  }
+  .card {
+    pointer-events: auto;
+  }
+  /* The tour waits for the lid to open and settle (src/scripts/lid.ts). */
+  :global([data-hero-stage]:has(.laptop:not([data-settled]))) .tour {
+    visibility: hidden;
+  }
+
+  .card {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: var(--tour-w, 216px);
+    padding: 14px;
+    border-radius: 16px;
+    background: var(--tour-card);
+    color: var(--text);
+    /* It floats beside the laptop. */
+    box-shadow: /* taste-skill-ignore: the tour floats over the demo */
+      0 0 0 1px var(--hairline),
+      0 18px 48px #00000059; /* taste-skill-ignore: a floating card over the demo */
+  }
+  .card[hidden],
+  .reopen[hidden] {
+    display: none;
+  }
+  .reopen {
+    position: absolute;
+    left: 0;
+    top: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 40px;
+    padding: 0 16px 0 14px;
+    border: 0;
+    border-radius: 999px;
+    background: var(--tour-card);
+    color: var(--text);
+    font-weight: 700;
+    font-size: 0.875rem;
+    pointer-events: auto;
+    box-shadow: 0 0 0 1px var(--hairline); /* taste-skill-ignore: the tour floats over the demo */
+    transition: background-color var(--t-hover) ease, scale 160ms var(--ease-out);
+  }
+  .reopen:hover {
+    background: var(--tour-card-hover);
+  }
+  .reopen:active {
+    scale: 0.97;
+  }
+  .head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: -4px -8px 8px 0;
+  }
+  .dots {
+    display: flex;
+    gap: 5px;
+  }
+  .dots i {
+    width: 18px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--track);
+    transition: background-color calc(240ms * var(--colour-easing)) ease;
+  }
+  .dots i[data-on="true"] {
+    background: var(--accent);
+  }
+  .close {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--text-muted);
+    transition: background-color var(--t-hover) ease;
+  }
+  .close:hover {
+    background: var(--hover);
+  }
+  .title {
+    font-size: 1.125rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+  }
+  .body {
+    margin-top: 6px;
+    font-size: 0.9375rem;
+    line-height: 1.45;
+  }
+  .link {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 12px;
+    padding: 4px 4px 4px 10px;
+    border-radius: 10px;
+    background: var(--field);
+  }
+  .link .url {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.8125rem;
+  }
+  .copy,
+  .quiet {
+    min-height: 36px;
+    padding: 0 12px;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--text);
+    font-weight: 700;
+    font-size: 0.875rem;
+    transition: background-color var(--t-hover) ease;
+  }
+  .copy {
+    background: var(--selected);
+  }
+  .copy:hover,
+  .quiet:hover {
+    background: var(--hover);
+  }
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin-top: 14px;
+  }
+  .actions .button {
+    min-height: 40px;
+    padding: 0 18px;
+    font-size: 0.9375rem;
+  }
+  /* The end card's download: the whole width, on one line. */
+  .actions [data-tour-download] {
+    flex: 1 0 100%;
+    justify-content: center;
+    padding: 0 12px;
+    font-size: 0.875rem;
+    white-space: nowrap;
+  }
+  /* While "Show me" runs it's the way to stop it: the same place, a quieter fill. */
+  .show[data-running="true"] {
+    background: var(--selected);
+    color: var(--text);
+  }
+  .ring {
+    position: absolute;
+    left: 0;
+    top: 0;
+    border-radius: 12px;
+    box-shadow: /* taste-skill-ignore: the tour floats over the demo */
+      0 0 0 2px var(--accent),
+      0 0 0 5px color-mix(in srgb, var(--accent) 30%, transparent); /* taste-skill-ignore: the tour's pointer at a control */
+    pointer-events: none;
+    transition: transform 320ms var(--ease-out);
+  }
+  .ring[hidden],
+  .cursor[hidden] {
+    display: none;
+  }
+  .cursor {
+    position: absolute;
+    left: 0;
+    top: 0;
+    pointer-events: none;
+  }
+  .cursor svg {
+    filter: drop-shadow(0 2px 3px #00000066); /* taste-skill-ignore: the tour floats over the demo */
+  }
+  .keys {
+    position: absolute;
+    left: 18px;
+    top: 20px;
+    padding: 3px 7px;
+    border-radius: 6px;
+    background: #111;
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ring {
+      transition: none;
+    }
+  }
+  /* Narrow desktops with no room beside the laptop: the card sits on the screen, and the
+     script keeps it off the step's target and the memory panel. */
+
+  /* Phones: the card sits under the screen, in the page's flow. */
+  @media (max-width: 768px) {
+    .tour {
+      position: static;
+      pointer-events: auto;
+    }
+    .reopen {
+      position: relative;
+      margin-top: 12px;
+      transform: none !important;
+    }
+    .card {
+      position: relative;
+      width: auto;
+      margin-top: 16px;
+      transform: none !important;
+      box-shadow: none; /* taste-skill-ignore: the tour floats over the demo */
+      background: var(--surface);
+    }
+  }
+</style>

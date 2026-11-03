@@ -1,0 +1,1995 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: featherplay\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: qps-ploc\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-Language-Name: Test language [qps-ploc]\n"
+
+#: ../../crates/core/src/failure.rs:79
+msgid "Getting ready to play: downloading helpers (one time)…"
+msgstr "[Getting ready to play: downloading helpers (one time)…]"
+
+#: ../../crates/core/src/failure.rs:99
+msgid "Songs can't play. featherplay is updating its helpers."
+msgstr "[Songs can't play. featherplay is updating its helpers.]"
+
+#: ../../crates/core/src/failure.rs:101
+msgid "Songs can't play. featherplay may need an update."
+msgstr "[Songs can't play. featherplay may need an update.]"
+
+#: ../../crates/core/src/failure.rs:102
+msgid "This song isn't available."
+msgstr "[This song isn't available.]"
+
+#: ../../crates/core/src/failure.rs:103
+msgid "Couldn't play this song. Check your connection."
+msgstr "[Couldn't play this song. Check your connection.]"
+
+#: ../../crates/core/src/failure.rs:105
+msgid "Couldn't download helpers. Check your connection."
+msgstr "[Couldn't download helpers. Check your connection.]"
+
+#: ../../crates/integrations/src/discord.rs:28
+msgid "Play song"
+msgstr "[Play song]"
+
+#: ../../crates/integrations/src/discord.rs:32 ui/parts.slint:353
+msgid "Paused"
+msgstr "[Paused]"
+
+#: ../../crates/integrations/src/discord.rs:82
+msgid "Unknown title"
+msgstr "[Unknown title]"
+
+#: ../../crates/integrations/src/taskbar.rs:176
+#: ../../crates/integrations/src/taskbar.rs:176 ui/bottom_bar.slint:307
+#: ../../crates/integrations/src/taskbar.rs:176 ui/bottom_bar.slint:307 ui/parts.slint:99
+msgid "Pause"
+msgstr "[Pause]"
+
+#: ../../crates/integrations/src/taskbar.rs:178
+#: ../../crates/integrations/src/taskbar.rs:178
+#: ../../crates/integrations/src/taskbar.rs:178 ui/bottom_bar.slint:307
+#: ../../crates/integrations/src/taskbar.rs:178 ui/bottom_bar.slint:307 ui/pages/content.slint:744 ui/pages/home.slint:606
+#: ../../crates/integrations/src/taskbar.rs:178 ui/bottom_bar.slint:307 ui/pages/content.slint:744 ui/pages/home.slint:606 ui/playlist_menu_layer.slint:197
+msgid "Play"
+msgstr "[Play]"
+
+#: ../../crates/integrations/src/taskbar.rs:181
+#: ../../crates/integrations/src/taskbar.rs:181 src/pages/settings.rs:1077
+#: ../../crates/integrations/src/taskbar.rs:181 src/pages/settings.rs:1077 ui/mini_player.slint:200
+#: ../../crates/integrations/src/taskbar.rs:181 src/pages/settings.rs:1077 ui/mini_player.slint:200
+msgid "Previous"
+msgstr "[Previous]"
+
+#: ../../crates/integrations/src/taskbar.rs:183
+#: ../../crates/integrations/src/taskbar.rs:183 src/pages/settings.rs:1076
+#: ../../crates/integrations/src/taskbar.rs:183 src/pages/settings.rs:1076 ui/mini_player.slint:215
+#: ../../crates/integrations/src/taskbar.rs:183 src/pages/settings.rs:1076 ui/mini_player.slint:215
+msgid "Next"
+msgstr "[Next]"
+
+#: ../../crates/integrations/src/tray.rs:273
+#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:360
+#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:360 ui/mini_player.slint:108 ui/pages/lyrics.slint:71
+#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:360 ui/mini_player.slint:108 ui/pages/lyrics.slint:71 ui/pages/now_playing.slint:425
+#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:360 ui/mini_player.slint:108 ui/pages/lyrics.slint:71 ui/pages/now_playing.slint:425
+msgid "Nothing playing"
+msgstr "[Nothing playing]"
+
+#: ../../crates/integrations/src/tray.rs:279 ui/mini_player.slint:150
+#: ../../crates/integrations/src/tray.rs:279 ui/mini_player.slint:150
+msgid "{0} of {1}"
+msgstr "[{0} of {1}]"
+
+#: ../../crates/integrations/src/tray.rs:281
+msgid "Paused at {}"
+msgstr "[Paused at {}]"
+
+#: ../../crates/integrations/src/tray.rs:282
+msgid "paused at {}"
+msgstr "[paused at {}]"
+
+#: ../../crates/integrations/src/tray_menu.rs:49 ui/mini_player.slint:225
+#: ../../crates/integrations/src/tray_menu.rs:49 ui/mini_player.slint:225 ui/not_for_me.slint:72
+msgid "Not for me"
+msgstr "[Not for me]"
+
+#: ../../crates/integrations/src/tray_menu.rs:52
+msgid "Show featherplay"
+msgstr "[Show featherplay]"
+
+#: ../../crates/integrations/src/tray_menu.rs:53
+msgid "Quit"
+msgstr "[Quit]"
+
+#: ../../crates/integrations/src/tray_menu.rs:242
+#: ../../crates/integrations/src/tray_menu.rs:242 ui/bottom_bar.slint:531
+#: ../../crates/integrations/src/tray_menu.rs:242 ui/bottom_bar.slint:531 ui/pages/content.slint:580
+#: ../../crates/integrations/src/tray_menu.rs:242 ui/bottom_bar.slint:531 ui/pages/content.slint:580 ui/parts.slint:860 ui/song_menu.slint:278
+msgid "Like"
+msgstr "[Like]"
+
+#: ../../crates/integrations/src/tray_menu.rs:250 ui/pages/library.slint:45
+msgid "Liked"
+msgstr "[Liked]"
+
+#: src/account_menu.rs:117
+msgid "Switched to {}"
+msgstr "[Switched to {}]"
+
+#: src/account_menu.rs:181
+msgid "Couldn't load your accounts. Open the menu to try again."
+msgstr "[Couldn't load your accounts. Open the menu to try again.]"
+
+#: src/account_menu.rs:237
+msgid "No channel"
+msgstr "[No channel]"
+
+#: src/close.rs:123
+msgid "featherplay is still playing in the tray"
+msgstr "[featherplay is still playing in the tray]"
+
+#: src/close.rs:125
+msgid "featherplay is still running in the tray"
+msgstr "[featherplay is still running in the tray]"
+
+#: src/close.rs:131
+msgid "Right-click the tray icon to show the window or quit."
+msgstr "[Right-click the tray icon to show the window or quit.]"
+
+#: src/controller/account.rs:401
+msgid "Your API key is saved. Connect to sign in to Last.fm with it."
+msgstr "[Your API key is saved. Connect to sign in to Last.fm with it.]"
+
+#: src/controller/account.rs:403
+msgid "Using featherplay's API key again. Connect to sign in."
+msgstr "[Using featherplay's API key again. Connect to sign in.]"
+
+#: src/controller/account.rs:404
+msgid "Your API key is removed. Last.fm needs one to connect."
+msgstr "[Your API key is removed. Last.fm needs one to connect.]"
+
+#: src/controller/account.rs:412
+msgid "Saving the API key failed: {}"
+msgstr "[Saving the API key failed: {}]"
+
+#: src/controller/account.rs:423
+msgid "Connected as {}. Listens go to your ListenBrainz profile."
+msgstr "[Connected as {}. Listens go to your ListenBrainz profile.]"
+
+#: src/controller/account.rs:656
+msgid "The browser didn't open: {}"
+msgstr "[The browser didn't open: {}]"
+
+#: src/controller/account.rs:682
+msgid "Saving the session failed: {}"
+msgstr "[Saving the session failed: {}]"
+
+#: src/controller/account.rs:688
+msgid ""
+"Last.fm hasn't been approved yet. Approve featherplay in the browser, then "
+"try again."
+msgstr "[Last.fm hasn't been approved yet. Approve featherplay in the browser, then try again.]"
+
+#: src/controller/account.rs:693
+msgid "That approval expired. Connect again."
+msgstr "[That approval expired. Connect again.]"
+
+#: src/controller/account.rs:741
+msgid "Saving the token failed: {}"
+msgstr "[Saving the token failed: {}]"
+
+#: src/controller/account.rs:804
+msgid ""
+"ListenBrainz didn't accept that token. Copy it again from listenbrainz.org/"
+"settings."
+msgstr "[ListenBrainz didn't accept that token. Copy it again from listenbrainz.org/settings.]"
+
+#: src/controller/account.rs:809
+msgid "Couldn't reach ListenBrainz. Check the connection and try again."
+msgstr "[Couldn't reach ListenBrainz. Check the connection and try again.]"
+
+#: src/controller/account.rs:862
+msgid ""
+"That session isn't signed in. Sign in again, or copy a fresh cookie header."
+msgstr "[That session isn't signed in. Sign in again, or copy a fresh cookie header.]"
+
+#: src/controller/account.rs:866
+msgid "Couldn't reach YouTube Music. Check the connection, then try again."
+msgstr "[Couldn't reach YouTube Music. Check the connection, then try again.]"
+
+#: src/controller/account.rs:869
+msgid ""
+"YouTube Music answered in a way featherplay doesn't understand. Try again "
+"later."
+msgstr "[YouTube Music answered in a way featherplay doesn't understand. Try again later.]"
+
+#: src/controller/account.rs:878
+msgid "Couldn't reach Last.fm. Check the connection and try again."
+msgstr "[Couldn't reach Last.fm. Check the connection and try again.]"
+
+#: src/controller/account.rs:880
+msgid "Last.fm said: {0} ({1})"
+msgstr "[Last.fm said: {0} ({1})]"
+
+#: src/controller/queue.rs:182
+msgid "Autoplay"
+msgstr "[Autoplay]"
+
+#: src/language.rs:41
+msgid "Windows default"
+msgstr "[Windows default]"
+
+#: src/lyrics.rs:46
+msgid "Lyrics from LRCLIB"
+msgstr "[Lyrics from LRCLIB]"
+
+#: src/lyrics.rs:860
+msgid "Source: LyricFind"
+msgstr "[Source: LyricFind]"
+
+#: src/not_for_me.rs:65
+msgid "Marked as not for me"
+msgstr "[Marked as not for me]"
+
+#: src/not_for_me.rs:65
+msgid "Undo"
+msgstr "[Undo]"
+
+#: src/pages/about.rs:32
+msgid "Skia, Slint's renderer"
+msgstr "[Skia, Slint's renderer]"
+
+#: src/pages/about.rs:34
+msgid "rodio and cpal"
+msgstr "[rodio and cpal]"
+
+#: src/pages/about.rs:36
+msgid "tokio and reqwest"
+msgstr "[tokio and reqwest]"
+
+#: src/pages/about.rs:47
+msgid "The Unlicense. Downloaded on first run, not bundled."
+msgstr "[The Unlicense. Downloaded on first run, not bundled.]"
+
+#: src/pages/about.rs:51
+msgid "MIT License. Downloaded on first run, not bundled."
+msgstr "[MIT License. Downloaded on first run, not bundled.]"
+
+#: src/pages/about.rs:54
+msgid "Every other component"
+msgstr "[Every other component]"
+
+#: src/pages/about.rs:55
+msgid "Listed with its licence in THIRD_PARTY.md in the source repository."
+msgstr "[Listed with its licence in THIRD_PARTY.md in the source repository.]"
+
+#: src/pages/about.rs:110
+msgid "Diagnostics copied"
+msgstr "[Diagnostics copied]"
+
+#: src/pages/album.rs:110
+msgid "Album"
+msgstr "[Album]"
+
+#: src/pages/artist.rs:94 src/pages/settings.rs:593 src/ui_bridge.rs:97
+msgid "Artist"
+msgstr "[Artist]"
+
+#: src/pages/content.rs:228
+msgid "{n} song"
+msgid_plural "{n} songs"
+msgstr[0] "[{n} song]"
+msgstr[1] "[{n} songs]"
+
+#: src/pages/content.rs:240
+msgid "{n} hour"
+msgid_plural "{n} hours"
+msgstr[0] "[{n} hour]"
+msgstr[1] "[{n} hours]"
+
+#: src/pages/content.rs:241
+msgid "{n} minute"
+msgid_plural "{n} minutes"
+msgstr[0] "[{n} minute]"
+msgstr[1] "[{n} minutes]"
+
+#: src/pages/content.rs:297
+msgid "Your session has ended. Sign in to see this."
+msgstr "[Your session has ended. Sign in to see this.]"
+
+#: src/pages/content.rs:299
+msgid "Can't reach the music service. Check the connection, then try again."
+msgstr "[Can't reach the music service. Check the connection, then try again.]"
+
+#: src/pages/content.rs:301
+msgid "This isn't available."
+msgstr "[This isn't available.]"
+
+#: src/pages/content.rs:302
+msgid "The music service sent something unexpected."
+msgstr "[The music service sent something unexpected.]"
+
+#: src/pages/history.rs:89 ui/pages/history.slint:35 ui/sidebar.slint:205
+msgid "History"
+msgstr "[History]"
+
+#: src/pages/home.rs:615 src/pages/playlist.rs:24 ui/sidebar.slint:225
+#: src/pages/home.rs:615 src/pages/playlist.rs:24 ui/sidebar.slint:225
+msgid "Liked songs"
+msgstr "[Liked songs]"
+
+#: src/pages/home.rs:632
+msgid "Shortcuts"
+msgstr "[Shortcuts]"
+
+#: src/pages/home.rs:689
+msgid "Similar to"
+msgstr "[Similar to]"
+
+#: src/pages/home.rs:740
+msgid "More from {}"
+msgstr "[More from {}]"
+
+#: src/pages/now_playing.rs:278
+msgid "Couldn't load related tracks"
+msgstr "[Couldn't load related tracks]"
+
+#: src/pages/playlist.rs:73
+msgid "Playlist"
+msgstr "[Playlist]"
+
+#: src/pages/settings.rs:381
+msgid "Enter both the API key and the shared secret."
+msgstr "[Enter both the API key and the shared secret.]"
+
+#: src/pages/settings.rs:382
+msgid ""
+"A Last.fm API key and its shared secret are 32 letters and digits each. Copy "
+"them again from last.fm/api/accounts."
+msgstr "[A Last.fm API key and its shared secret are 32 letters and digits each. Copy them again from last.fm/api/accounts.]"
+
+#: src/pages/settings.rs:397
+msgid "Paste your user token first."
+msgstr "[Paste your user token first.]"
+
+#: src/pages/settings.rs:455
+msgid "Token copied"
+msgstr "[Token copied]"
+
+#: src/pages/settings.rs:458
+msgid "Couldn't copy the token. Try again."
+msgstr "[Couldn't copy the token. Try again.]"
+
+#: src/pages/settings.rs:470
+msgid "Pick a port from 1024 to 65535."
+msgstr "[Pick a port from 1024 to 65535.]"
+
+#: src/pages/settings.rs:592
+msgid "Song title"
+msgstr "[Song title]"
+
+#: src/pages/settings.rs:623
+msgid "Listening to {}"
+msgstr "[Listening to {}]"
+
+#: src/pages/settings.rs:771 ui/pages/settings.slint:1541
+msgid "From the cover"
+msgstr "[From the cover]"
+
+#: src/pages/settings.rs:772
+msgid "Red"
+msgstr "[Red]"
+
+#: src/pages/settings.rs:773
+msgid "Rose"
+msgstr "[Rose]"
+
+#: src/pages/settings.rs:774
+msgid "Amber"
+msgstr "[Amber]"
+
+#: src/pages/settings.rs:775
+msgid "Teal"
+msgstr "[Teal]"
+
+#: src/pages/settings.rs:776
+msgid "Violet"
+msgstr "[Violet]"
+
+#: src/pages/settings.rs:777 ui/pages/settings.slint:1553
+msgid "Custom colour"
+msgstr "[Custom colour]"
+
+#: src/pages/settings.rs:831
+msgid "On the dark theme it shows as {}, so it stays easy to see."
+msgstr "[On the dark theme it shows as {}, so it stays easy to see.]"
+
+#: src/pages/settings.rs:836
+msgid "On the light theme it shows as {}, so it stays easy to see."
+msgstr "[On the light theme it shows as {}, so it stays easy to see.]"
+
+#: src/pages/settings.rs:866
+msgid "Type a colour as # and 6 letters or digits, like #4390EE."
+msgstr "[Type a colour as # and 6 letters or digits, like #4390EE.]"
+
+#: src/pages/settings.rs:1066
+msgid "Another app already uses one of these keys. Pick other keys."
+msgstr "[Another app already uses one of these keys. Pick other keys.]"
+
+#: src/pages/settings.rs:1075 ui/pages/settings.slint:1575
+msgid "Play or pause"
+msgstr "[Play or pause]"
+
+#: src/pages/settings.rs:1080
+msgid ""
+"{0}: \"{1}\" isn't a key featherplay can use. Write it like Ctrl+Alt+Space; "
+"it needs Ctrl, Alt, Shift or Win."
+msgstr "[{0}: \"{1}\" isn't a key featherplay can use. Write it like Ctrl+Alt+Space; it needs Ctrl, Alt, Shift or Win.]"
+
+#: src/pages/settings.rs:1083
+msgid "{} uses the same key as another action."
+msgstr "[{} uses the same key as another action.]"
+
+#: src/pages/settings.rs:1096
+msgid "System default"
+msgstr "[System default]"
+
+#: src/pages/settings.rs:1104
+msgid "{} (not connected)"
+msgstr "[{} (not connected)]"
+
+#: src/pages/sign_in.rs:109
+msgid "Finish signing in in the other window. It closes by itself."
+msgstr "[Finish signing in in the other window. It closes by itself.]"
+
+#: src/pages/sign_in.rs:111
+msgid "Pick or add a Google account in the sign-in window"
+msgstr "[Pick or add a Google account in the sign-in window]"
+
+#: src/pages/sign_in.rs:141
+msgid "The sign-in window closed before you signed in."
+msgstr "[The sign-in window closed before you signed in.]"
+
+#: src/pages/sign_in.rs:155
+msgid "The sign-in window didn't work: {}"
+msgstr "[The sign-in window didn't work: {}]"
+
+#: src/pages/sign_in.rs:198
+msgid "Paste the cookie header first."
+msgstr "[Paste the cookie header first.]"
+
+#: src/pages/sign_in.rs:201
+msgid ""
+"That doesn't look like a cookie header: it should be name=value pairs "
+"separated by semicolons."
+msgstr "[That doesn't look like a cookie header: it should be name=value pairs separated by semicolons.]"
+
+#: src/pages/sign_in.rs:210
+msgid ""
+"That cookie header has no SAPISID, so it isn't signed in. Copy it from a tab "
+"that is signed in."
+msgstr "[That cookie header has no SAPISID, so it isn't signed in. Copy it from a tab that is signed in.]"
+
+#: src/pages/sign_in/webview.rs:167
+msgid "Sign in to featherplay"
+msgstr "[Sign in to featherplay]"
+
+#: src/pages/sign_in/webview.rs:243
+msgid "WebView2 isn't available ({}). Paste a cookie header instead."
+msgstr "[WebView2 isn't available ({}). Paste a cookie header instead.]"
+
+#: src/playlist_menu.rs:69
+msgid "{} Sign in again, then try once more."
+msgstr "[{} Sign in again, then try once more.]"
+
+#: src/playlist_menu.rs:70
+msgid "{} Check the connection, then try again."
+msgstr "[{} Check the connection, then try again.]"
+
+#: src/playlist_menu.rs:71
+msgid "{} The playlist is gone."
+msgstr "[{} The playlist is gone.]"
+
+#: src/playlist_menu.rs:72
+msgid "{} The music service said no."
+msgstr "[{} The music service said no.]"
+
+#: src/playlist_menu.rs:115
+msgid "Pinned {} to the top"
+msgstr "[Pinned {} to the top]"
+
+#: src/playlist_menu.rs:117
+msgid "Unpinned {}"
+msgstr "[Unpinned {}]"
+
+#: src/playlist_menu.rs:136 src/song_menu.rs:82
+msgid "Playing next: {}"
+msgstr "[Playing next: {}]"
+
+#: src/playlist_menu.rs:143 src/song_menu.rs:90
+msgid "Added to queue: {}"
+msgstr "[Added to queue: {}]"
+
+#: src/playlist_menu.rs:150
+msgid "Link copied"
+msgstr "[Link copied]"
+
+#: src/playlist_menu.rs:192
+msgid "Couldn't load the playlist."
+msgstr "[Couldn't load the playlist.]"
+
+#: src/playlist_menu.rs:193
+msgid "Couldn't load the album."
+msgstr "[Couldn't load the album.]"
+
+#: src/playlist_menu.rs:194
+msgid "Couldn't load the artist."
+msgstr "[Couldn't load the artist.]"
+
+#: src/playlist_menu.rs:209
+msgid "{} has no songs yet"
+msgstr "[{} has no songs yet]"
+
+#: src/playlist_menu.rs:241
+msgid "This playlist has no radio"
+msgstr "[This playlist has no radio]"
+
+#: src/playlist_menu.rs:242
+msgid "Couldn't start the radio."
+msgstr "[Couldn't start the radio.]"
+
+#: src/playlist_menu.rs:254
+msgid "Enter a name for the playlist."
+msgstr "[Enter a name for the playlist.]"
+
+#: src/playlist_menu.rs:268
+msgid "Renamed to {}"
+msgstr "[Renamed to {}]"
+
+#: src/playlist_menu.rs:271
+msgid "Couldn't rename {}."
+msgstr "[Couldn't rename {}.]"
+
+#: src/playlist_menu.rs:290
+msgid "Deleted {}"
+msgstr "[Deleted {}]"
+
+#: src/playlist_menu.rs:294
+msgid "Couldn't delete {}."
+msgstr "[Couldn't delete {}.]"
+
+#: src/playlist_menu.rs:312
+msgid "Removed {} from your library"
+msgstr "[Removed {} from your library]"
+
+#: src/playlist_menu.rs:316
+msgid "Couldn't remove {}."
+msgstr "[Couldn't remove {}.]"
+
+#: src/sidebar.rs:415 ui/pages/library.slint:77
+msgid "Playlists you make or save show up here."
+msgstr "[Playlists you make or save show up here.]"
+
+#: src/sidebar.rs:416
+msgid "Albums you save show up here."
+msgstr "[Albums you save show up here.]"
+
+#: src/sidebar.rs:417
+msgid "Artists you follow show up here."
+msgstr "[Artists you follow show up here.]"
+
+#: src/song_menu.rs:114
+msgid "Saved to {}"
+msgstr "[Saved to {}]"
+
+#: src/song_menu.rs:114
+msgid "View"
+msgstr "[View]"
+
+#: src/song_menu.rs:132
+msgid "Added to Liked songs"
+msgstr "[Added to Liked songs]"
+
+#: src/song_menu.rs:134
+msgid "Removed from Liked songs"
+msgstr "[Removed from Liked songs]"
+
+#: src/updates.rs:277 src/updates.rs:340 ui/pages/about.slint:69
+msgid "Get it"
+msgstr "[Get it]"
+
+#: src/updates.rs:285
+msgid "Details"
+msgstr "[Details]"
+
+#: src/updates.rs:339 ui/pages/about.slint:41 ui/pages/about.slint:51
+msgid "featherplay {} is out"
+msgstr "[featherplay {} is out]"
+
+#: ui/account_menu.slint:114
+msgid "{}, current account"
+msgstr "[{}, current account]"
+
+#: ui/account_menu.slint:253
+msgid "Account menu"
+msgstr "[Account menu]"
+
+#: ui/account_menu.slint:274
+msgid "Accounts"
+msgstr "[Accounts]"
+
+#: ui/account_menu.slint:286
+msgid "Loading your accounts…"
+msgstr "[Loading your accounts…]"
+
+#: ui/account_menu.slint:287
+msgid "No accounts to show"
+msgstr "[No accounts to show]"
+
+#: ui/account_menu.slint:318
+msgid "Switch Google account"
+msgstr "[Switch Google account]"
+
+#: ui/account_menu.slint:327 ui/pages/settings.slint:1617
+#: ui/account_menu.slint:327 ui/pages/settings.slint:1617
+msgid "Sign out"
+msgstr "[Sign out]"
+
+#: ui/bottom_bar.slint:34
+msgid "Seek"
+msgstr "[Seek]"
+
+#: ui/bottom_bar.slint:133
+msgid "Volume"
+msgstr "[Volume]"
+
+#: ui/bottom_bar.slint:213 ui/bottom_bar.slint:245
+#: ui/bottom_bar.slint:213 ui/bottom_bar.slint:245 ui/pages/now_playing.slint:204
+#: ui/bottom_bar.slint:213 ui/bottom_bar.slint:245 ui/pages/now_playing.slint:204 ui/pages/settings.slint:1242
+#: ui/bottom_bar.slint:213 ui/bottom_bar.slint:245 ui/pages/now_playing.slint:204 ui/pages/settings.slint:1242
+msgid "Lyrics"
+msgstr "[Lyrics]"
+
+#: ui/bottom_bar.slint:214
+msgid "Hides the lyrics, back to the cover"
+msgstr "[Hides the lyrics, back to the cover]"
+
+#: ui/bottom_bar.slint:214
+msgid "Shows the lyrics on Now playing"
+msgstr "[Shows the lyrics on Now playing]"
+
+#: ui/bottom_bar.slint:245
+msgid "Hide lyrics"
+msgstr "[Hide lyrics]"
+
+#: ui/bottom_bar.slint:251
+msgid "Ctrl+L"
+msgstr "[Ctrl+L]"
+
+#. Its shortcut, in both windows.
+#: ui/bottom_bar.slint:313 ui/parts.slint:101
+msgid "Space"
+msgstr "[Space]"
+
+#: ui/bottom_bar.slint:360
+msgid "Now playing: {}"
+msgstr "[Now playing: {}]"
+
+#: ui/bottom_bar.slint:438 ui/pages/content.slint:745
+#: ui/bottom_bar.slint:438 ui/pages/content.slint:745
+msgid "Shuffle"
+msgstr "[Shuffle]"
+
+#: ui/bottom_bar.slint:468
+msgid "Repeat one"
+msgstr "[Repeat one]"
+
+#: ui/bottom_bar.slint:468
+msgid "Repeat all"
+msgstr "[Repeat all]"
+
+#: ui/bottom_bar.slint:468
+msgid "Repeat off"
+msgstr "[Repeat off]"
+
+#: ui/bottom_bar.slint:531 ui/mini_player.slint:183 ui/pages/content.slint:580
+#: ui/bottom_bar.slint:531 ui/mini_player.slint:183 ui/pages/content.slint:580 ui/parts.slint:860 ui/song_menu.slint:278
+msgid "Remove like"
+msgstr "[Remove like]"
+
+#: ui/bottom_bar.slint:546
+msgid "Mute"
+msgstr "[Mute]"
+
+#: ui/bottom_bar.slint:546
+msgid "Unmute"
+msgstr "[Unmute]"
+
+#: ui/bottom_bar.slint:562 ui/pages/now_playing.slint:99
+msgid "Up next"
+msgstr "[Up next]"
+
+#: ui/close_dialog.slint:172 ui/close_dialog.slint:179
+msgid "Close featherplay?"
+msgstr "[Close featherplay?]"
+
+#: ui/close_dialog.slint:185
+msgid ""
+"Choose what the close button does. Your choice becomes the default; you can "
+"change it later in Settings → Window."
+msgstr "[Choose what the close button does. Your choice becomes the default; you can change it later in Settings → Window.]"
+
+#: ui/close_dialog.slint:186
+msgid ""
+"Choose what the close button does this time. featherplay will ask again next "
+"time."
+msgstr "[Choose what the close button does this time. featherplay will ask again next time.]"
+
+#: ui/close_dialog.slint:191
+msgid "Remember my choice"
+msgstr "[Remember my choice]"
+
+#: ui/close_dialog.slint:204 ui/pages/settings.slint:1511
+msgid "Keep playing in the tray"
+msgstr "[Keep playing in the tray]"
+
+#: ui/close_dialog.slint:209 ui/pages/settings.slint:1511
+msgid "Close featherplay"
+msgstr "[Close featherplay]"
+
+#: ui/mini_player.slint:45
+msgid "featherplay mini player"
+msgstr "[featherplay mini player]"
+
+#: ui/mini_player.slint:134
+msgid "Open featherplay"
+msgstr "[Open featherplay]"
+
+#: ui/mini_player.slint:149
+msgid "Progress"
+msgstr "[Progress]"
+
+#: ui/mini_player.slint:226 ui/not_for_me.slint:41 ui/not_for_me.slint:78
+msgid "Skips the song and tells YouTube Music you dislike it"
+msgstr "[Skips the song and tells YouTube Music you dislike it]"
+
+#: ui/pages/about.slint:58
+msgid "You have {}."
+msgstr "[You have {}.]"
+
+#: ui/pages/about.slint:125
+msgid "Hide the licence of {}"
+msgstr "[Hide the licence of {}]"
+
+#: ui/pages/about.slint:125
+msgid "Show the licence of {}"
+msgstr "[Show the licence of {}]"
+
+#: ui/pages/about.slint:133
+msgid "Hide licence"
+msgstr "[Hide licence]"
+
+#: ui/pages/about.slint:133
+msgid "Show licence"
+msgstr "[Show licence]"
+
+#: ui/pages/about.slint:194
+msgid "A fast, lightweight desktop player for YouTube Music."
+msgstr "[A fast, lightweight desktop player for YouTube Music.]"
+
+#: ui/pages/about.slint:201
+msgid "Version {}"
+msgstr "[Version {}]"
+
+#: ui/pages/about.slint:206
+msgid "featherplay is not affiliated with Google or YouTube."
+msgstr "[featherplay is not affiliated with Google or YouTube.]"
+
+#: ui/pages/about.slint:216
+msgid "Logs and bug reports"
+msgstr "[Logs and bug reports]"
+
+#: ui/pages/about.slint:219
+msgid ""
+"If something goes wrong, the log folder holds what featherplay noted, with a "
+"crash file for each crash. Copy diagnostics puts the versions, which "
+"services are on and the last playback errors on the clipboard, for a bug "
+"report. Neither names your account."
+msgstr "[If something goes wrong, the log folder holds what featherplay noted, with a crash file for each crash. Copy diagnostics puts the versions, which services are on and the last playback errors on the clipboard, for a bug report. Neither names your account.]"
+
+#: ui/pages/about.slint:229
+msgid "Open log folder"
+msgstr "[Open log folder]"
+
+#: ui/pages/about.slint:234
+msgid "Copy diagnostics"
+msgstr "[Copy diagnostics]"
+
+#: ui/pages/about.slint:248
+msgid "Licences"
+msgstr "[Licences]"
+
+#: ui/pages/about.slint:258
+msgid "SIL Open Font License 1.1. The heading face, embedded."
+msgstr "[SIL Open Font License 1.1. The heading face, embedded.]"
+
+#: ui/pages/album.slint:80
+msgid "This album has no tracks to play"
+msgstr "[This album has no tracks to play]"
+
+#: ui/pages/album.slint:81
+msgid "They may not be available where you are."
+msgstr "[They may not be available where you are.]"
+
+#: ui/pages/artist.slint:89 ui/pages/artist.slint:189
+msgid "Radio"
+msgstr "[Radio]"
+
+#: ui/pages/artist.slint:199
+msgid "Top songs"
+msgstr "[Top songs]"
+
+#: ui/pages/artist.slint:214 ui/pages/library.slint:45
+#: ui/pages/artist.slint:214 ui/pages/library.slint:45 ui/sidebar.slint:238
+msgid "Albums"
+msgstr "[Albums]"
+
+#: ui/pages/artist.slint:225
+msgid "Singles"
+msgstr "[Singles]"
+
+#: ui/pages/content.slint:55
+msgid "Loading"
+msgstr "[Loading]"
+
+#: ui/pages/content.slint:432
+msgid "This didn’t load. {}"
+msgstr "[This didn’t load. {}]"
+
+#: ui/pages/content.slint:445
+msgid "This didn’t load"
+msgstr "[This didn’t load]"
+
+#: ui/pages/content.slint:459 ui/pages/home.slint:773
+#: ui/pages/content.slint:459 ui/pages/home.slint:773 ui/pages/lyrics.slint:181
+msgid "Try again"
+msgstr "[Try again]"
+
+#: ui/pages/content.slint:463 ui/pages/settings.slint:1613
+#: ui/pages/content.slint:463 ui/pages/settings.slint:1613 ui/pages/sign_in.slint:157 ui/sidebar.slint:361
+#: ui/pages/content.slint:463 ui/pages/settings.slint:1613 ui/pages/sign_in.slint:157 ui/sidebar.slint:361
+msgid "Sign in"
+msgstr "[Sign in]"
+
+#: ui/pages/content.slint:589 ui/pages/now_playing.slint:451
+#: ui/pages/content.slint:589 ui/pages/now_playing.slint:451 ui/parts.slint:873
+msgid "More"
+msgstr "[More]"
+
+#: ui/pages/explore.slint:188
+msgid "Country, {}"
+msgstr "[Country, {}]"
+
+#: ui/pages/explore.slint:244
+msgid "Countries"
+msgstr "[Countries]"
+
+#: ui/pages/explore.slint:297
+msgid "{0}. {1}, up"
+msgstr "[{0}. {1}, up]"
+
+#: ui/pages/explore.slint:298
+msgid "{0}. {1}, down"
+msgstr "[{0}. {1}, down]"
+
+#: ui/pages/explore.slint:380
+msgid "Top artists"
+msgstr "[Top artists]"
+
+#: ui/pages/explore.slint:436 ui/sidebar.slint:195
+msgid "Explore"
+msgstr "[Explore]"
+
+#: ui/pages/explore.slint:442
+msgid "New releases"
+msgstr "[New releases]"
+
+#: ui/pages/explore.slint:442
+msgid "Charts"
+msgstr "[Charts]"
+
+#: ui/pages/explore.slint:442
+msgid "Moods & genres"
+msgstr "[Moods & genres]"
+
+#: ui/pages/explore.slint:473
+msgid "No new releases right now"
+msgstr "[No new releases right now]"
+
+#: ui/pages/explore.slint:473
+msgid "No charts for this country"
+msgstr "[No charts for this country]"
+
+#: ui/pages/explore.slint:473
+msgid "No moods or genres right now"
+msgstr "[No moods or genres right now]"
+
+#: ui/pages/explore.slint:474
+msgid "Pick another country, or try again later."
+msgstr "[Pick another country, or try again later.]"
+
+#: ui/pages/explore.slint:474
+msgid "Try again in a little while."
+msgstr "[Try again in a little while.]"
+
+#: ui/pages/explore.slint:590
+msgid "No playlists here yet"
+msgstr "[No playlists here yet]"
+
+#: ui/pages/explore.slint:591
+msgid "Pick another mood or genre in Explore."
+msgstr "[Pick another mood or genre in Explore.]"
+
+#: ui/pages/explore.slint:592
+msgid "Back to Explore"
+msgstr "[Back to Explore]"
+
+#: ui/pages/history.slint:59
+msgid "Songs you play show up here"
+msgstr "[Songs you play show up here]"
+
+#: ui/pages/history.slint:60
+msgid "Plays on your other devices count too."
+msgstr "[Plays on your other devices count too.]"
+
+#: ui/pages/history.slint:61
+msgid "Go to Explore"
+msgstr "[Go to Explore]"
+
+#: ui/pages/home.slint:363 ui/parts.slint:388 ui/parts.slint:638
+#: ui/pages/home.slint:363 ui/parts.slint:388 ui/parts.slint:638
+msgid "Play {}"
+msgstr "[Play {}]"
+
+#: ui/pages/home.slint:596
+msgid "Resume"
+msgstr "[Resume]"
+
+#: ui/pages/home.slint:602 ui/pages/home.slint:612
+#: ui/pages/home.slint:602 ui/pages/home.slint:612
+msgid "Go to album"
+msgstr "[Go to album]"
+
+#: ui/pages/home.slint:612 ui/playlist_menu_layer.slint:224
+msgid "Go to artist"
+msgstr "[Go to artist]"
+
+#: ui/pages/home.slint:612
+msgid "Open playlist"
+msgstr "[Open playlist]"
+
+#: ui/pages/home.slint:628
+msgid "Next in queue"
+msgstr "[Next in queue]"
+
+#: ui/pages/home.slint:636
+msgid "Nothing after this one"
+msgstr "[Nothing after this one]"
+
+#: ui/pages/home.slint:738
+msgid "Loading more of Home"
+msgstr "[Loading more of Home]"
+
+#: ui/pages/home.slint:763 ui/pages/home.slint:768
+msgid "More of Home didn’t load"
+msgstr "[More of Home didn’t load]"
+
+#: ui/pages/home.slint:809
+msgid "Pick up where you left off"
+msgstr "[Pick up where you left off]"
+
+#: ui/pages/home.slint:809
+msgid "Start listening"
+msgstr "[Start listening]"
+
+#: ui/pages/home.slint:822
+msgid "Nothing on Home yet"
+msgstr "[Nothing on Home yet]"
+
+#: ui/pages/home.slint:823
+msgid "Home fills in as you listen. Use Search to find something to play."
+msgstr "[Home fills in as you listen. Use Search to find something to play.]"
+
+#: ui/pages/library.slint:39 ui/sidebar.slint:185
+msgid "Library"
+msgstr "[Library]"
+
+#: ui/pages/library.slint:45 ui/pages/search.slint:60 ui/sidebar.slint:238
+msgid "Playlists"
+msgstr "[Playlists]"
+
+#: ui/pages/library.slint:45 ui/pages/search.slint:60 ui/sidebar.slint:238
+msgid "Artists"
+msgstr "[Artists]"
+
+#: ui/pages/library.slint:76 ui/pages/playlist.slint:91
+msgid "Songs you like show up here"
+msgstr "[Songs you like show up here]"
+
+#: ui/pages/library.slint:76 ui/song_menu.slint:336
+msgid "No playlists yet"
+msgstr "[No playlists yet]"
+
+#: ui/pages/library.slint:76
+msgid "Albums you save show up here"
+msgstr "[Albums you save show up here]"
+
+#: ui/pages/library.slint:76
+msgid "Artists you follow show up here"
+msgstr "[Artists you follow show up here]"
+
+#: ui/pages/library.slint:77 ui/pages/playlist.slint:92
+msgid "Like a song with its heart to keep it here."
+msgstr "[Like a song with its heart to keep it here.]"
+
+#: ui/pages/library.slint:77
+msgid "Find music on Home or with Search."
+msgstr "[Find music on Home or with Search.]"
+
+#: ui/pages/library.slint:78 ui/pages/playlist.slint:93
+msgid "Go to Home"
+msgstr "[Go to Home]"
+
+#: ui/pages/lyrics.slint:70
+msgid "Lyrics are unavailable right now"
+msgstr "[Lyrics are unavailable right now]"
+
+#: ui/pages/lyrics.slint:70
+msgid "Couldn't load lyrics"
+msgstr "[Couldn't load lyrics]"
+
+#: ui/pages/lyrics.slint:71
+msgid "No lyrics for this song"
+msgstr "[No lyrics for this song]"
+
+#: ui/pages/lyrics.slint:118
+msgid "Plays from this line"
+msgstr "[Plays from this line]"
+
+#: ui/pages/lyrics.slint:445
+msgid "Synced lyrics are unavailable right now"
+msgstr "[Synced lyrics are unavailable right now]"
+
+#: ui/pages/lyrics.slint:445
+msgid "Not synced to the song"
+msgstr "[Not synced to the song]"
+
+#: ui/pages/now_playing.slint:99
+msgid "Related"
+msgstr "[Related]"
+
+#: ui/pages/now_playing.slint:126
+msgid "Similar to {}"
+msgstr "[Similar to {}]"
+
+#: ui/pages/now_playing.slint:145
+msgid "Nothing related found"
+msgstr "[Nothing related found]"
+
+#: ui/pages/now_playing.slint:363
+msgid "Back"
+msgstr "[Back]"
+
+#: ui/pages/now_playing.slint:500
+msgid "Playing from {}"
+msgstr "[Playing from {}]"
+
+#: ui/pages/playlist.slint:91
+msgid "This playlist is empty"
+msgstr "[This playlist is empty]"
+
+#: ui/pages/playlist.slint:92
+msgid "Songs added to it show up here."
+msgstr "[Songs added to it show up here.]"
+
+#. A link isn't repeated as the title: the field above shows it.
+#: ui/pages/search.slint:44 ui/top_bar.slint:132
+msgid "Search"
+msgstr "[Search]"
+
+#. A link isn't repeated as the title: the field above shows it.
+#: ui/pages/search.slint:44
+msgid "Results for"
+msgstr "[Results for]"
+
+#: ui/pages/search.slint:54
+msgid "Song from a link"
+msgstr "[Song from a link]"
+
+#: ui/pages/search.slint:54
+msgid "“{}”"
+msgstr "[“{}”]"
+
+#: ui/pages/search.slint:60
+msgid "Songs"
+msgstr "[Songs]"
+
+#: ui/pages/search.slint:90
+msgid "No song at this link"
+msgstr "[No song at this link]"
+
+#: ui/pages/search.slint:90
+msgid "No results for “{}”"
+msgstr "[No results for “{}”]"
+
+#: ui/pages/search.slint:91
+msgid "It may be private or removed. Try searching for its title."
+msgstr "[It may be private or removed. Try searching for its title.]"
+
+#: ui/pages/search.slint:91
+msgid "Check the spelling or try another filter."
+msgstr "[Check the spelling or try another filter.]"
+
+#: ui/pages/settings.slint:342
+msgid "Hue"
+msgstr "[Hue]"
+
+#: ui/pages/settings.slint:343
+msgid "{n} degree"
+msgid_plural "{n} degrees"
+msgstr[0] "[{n} degree]"
+msgstr[1] "[{n} degrees]"
+
+#: ui/pages/settings.slint:501
+msgid "Custom colour as shown"
+msgstr "[Custom colour as shown]"
+
+#: ui/pages/settings.slint:513
+msgid "Colour code"
+msgstr "[Colour code]"
+
+#: ui/pages/settings.slint:576
+msgid "Discord preview"
+msgstr "[Discord preview]"
+
+#: ui/pages/settings.slint:591
+msgid "In member lists"
+msgstr "[In member lists]"
+
+#: ui/pages/settings.slint:629
+msgid "You"
+msgstr "[You]"
+
+#: ui/pages/settings.slint:652
+msgid "On your profile"
+msgstr "[On your profile]"
+
+#: ui/pages/settings.slint:657 ui/pages/settings.slint:1443
+msgid "Listening to featherplay"
+msgstr "[Listening to featherplay]"
+
+#: ui/pages/settings.slint:741
+msgid "{} elapsed"
+msgstr "[{} elapsed]"
+
+#: ui/pages/settings.slint:928
+msgid "Shorter"
+msgstr "[Shorter]"
+
+#: ui/pages/settings.slint:934
+msgid "{n} min"
+msgid_plural "{n} min"
+msgstr[0] "[{n} min]"
+msgstr[1] "[{n} min]"
+
+#: ui/pages/settings.slint:941
+msgid "Longer"
+msgstr "[Longer]"
+
+#: ui/pages/settings.slint:967
+msgid "{} hotkey"
+msgstr "[{} hotkey]"
+
+#. The confirming button names its action ("Rename", "Delete").
+#: ui/pages/settings.slint:1010
+msgid "OK"
+msgstr "[OK]"
+
+#: ui/pages/settings.slint:1086 ui/pages/settings.slint:1307
+#: ui/pages/settings.slint:1086 ui/pages/settings.slint:1307
+msgid "Cancel"
+msgstr "[Cancel]"
+
+#: ui/pages/settings.slint:1197 ui/sidebar.slint:341
+msgid "Settings"
+msgstr "[Settings]"
+
+#: ui/pages/settings.slint:1201 ui/pages/settings.slint:1662
+msgid "Playback"
+msgstr "[Playback]"
+
+#: ui/pages/settings.slint:1204
+msgid "Prefer song versions"
+msgstr "[Prefer song versions]"
+
+#: ui/pages/settings.slint:1205
+msgid ""
+"Some uploads are music videos with intros or skits in the audio. Play the "
+"song version instead when there is one."
+msgstr "[Some uploads are music videos with intros or skits in the audio. Play the song version instead when there is one.]"
+
+#: ui/pages/settings.slint:1210
+msgid "Autoplay similar songs when a list ends"
+msgstr "[Autoplay similar songs when a list ends]"
+
+#: ui/pages/settings.slint:1211
+msgid ""
+"When a playlist, album or other list ends, play on with songs like its last "
+"one. Off, the list starts again from the top. Repeat all always starts it "
+"again."
+msgstr "[When a playlist, album or other list ends, play on with songs like its last one. Off, the list starts again from the top. Repeat all always starts it again.]"
+
+#: ui/pages/settings.slint:1216
+msgid "Skip non-music in radio"
+msgstr "[Skip non-music in radio]"
+
+#: ui/pages/settings.slint:1217
+msgid ""
+"Radio and autoplay leave out user uploads and podcast episodes. Tracks you "
+"pick always play."
+msgstr "[Radio and autoplay leave out user uploads and podcast episodes. Tracks you pick always play.]"
+
+#: ui/pages/settings.slint:1222
+msgid "Skip non-music parts"
+msgstr "[Skip non-music parts]"
+
+#: ui/pages/settings.slint:1223
+msgid "Skips the intros and outros SponsorBlock users marked in music videos."
+msgstr "[Skips the intros and outros SponsorBlock users marked in music videos.]"
+
+#: ui/pages/settings.slint:1228
+msgid "Output device"
+msgstr "[Output device]"
+
+#: ui/pages/settings.slint:1229
+msgid ""
+"If the device goes away, playback pauses and moves to the system default."
+msgstr "[If the device goes away, playback pauses and moves to the system default.]"
+
+#: ui/pages/settings.slint:1245
+msgid "Show lyrics"
+msgstr "[Show lyrics]"
+
+#: ui/pages/settings.slint:1246
+msgid ""
+"The Lyrics button in the bar and on Now playing, and the Lyrics tab beside "
+"Up next. Off: they're hidden, and no lyrics are looked up."
+msgstr "[The Lyrics button in the bar and on Now playing, and the Lyrics tab beside Up next. Off: they're hidden, and no lyrics are looked up.]"
+
+#: ui/pages/settings.slint:1251
+msgid "Look up synced lyrics on LRCLIB"
+msgstr "[Look up synced lyrics on LRCLIB]"
+
+#: ui/pages/settings.slint:1252
+msgid ""
+"Lines follow the song. While lyrics are on screen, LRCLIB gets the song's "
+"title, artist, album and length. Off: only the lyrics that come with the "
+"song, synced for some songs."
+msgstr "[Lines follow the song. While lyrics are on screen, LRCLIB gets the song's title, artist, album and length. Off: only the lyrics that come with the song, synced for some songs.]"
+
+#: ui/pages/settings.slint:1260 ui/pages/settings.slint:1662
+msgid "Scrobbling"
+msgstr "[Scrobbling]"
+
+#: ui/pages/settings.slint:1263
+msgid "Scrobble"
+msgstr "[Scrobble]"
+
+#: ui/pages/settings.slint:1264
+msgid ""
+"Send what you play to Last.fm and ListenBrainz, once you've played half a "
+"track or 4 minutes of it."
+msgstr "[Send what you play to Last.fm and ListenBrainz, once you've played half a track or 4 minutes of it.]"
+
+#: ui/pages/settings.slint:1269
+msgid "Scrobble other media"
+msgstr "[Scrobble other media]"
+
+#: ui/pages/settings.slint:1270
+msgid ""
+"Also scrobble user uploads and podcasts, not only songs and official music "
+"videos."
+msgstr "[Also scrobble user uploads and podcasts, not only songs and official music videos.]"
+
+#: ui/pages/settings.slint:1276
+msgid "Use alternative titles"
+msgstr "[Use alternative titles]"
+
+#: ui/pages/settings.slint:1277
+msgid ""
+"Send the video's original title rather than the translated or romanised one "
+"shown here."
+msgstr "[Send the video's original title rather than the translated or romanised one shown here.]"
+
+#: ui/pages/settings.slint:1283
+msgid "Use alternative artists"
+msgstr "[Use alternative artists]"
+
+#: ui/pages/settings.slint:1284
+msgid ""
+"Send the artist from the video's tags, spelled as the label has it, rather "
+"than the first artist shown."
+msgstr "[Send the artist from the video's tags, spelled as the label has it, rather than the first artist shown.]"
+
+#: ui/pages/settings.slint:1292
+msgid "Connected. Scrobbles go to your Last.fm profile."
+msgstr "[Connected. Scrobbles go to your Last.fm profile.]"
+
+#: ui/pages/settings.slint:1293
+msgid "Opening Last.fm in your browser…"
+msgstr "[Opening Last.fm in your browser…]"
+
+#: ui/pages/settings.slint:1294
+msgid ""
+"Approve featherplay on the Last.fm page in your browser, then come back here."
+msgstr "[Approve featherplay on the Last.fm page in your browser, then come back here.]"
+
+#: ui/pages/settings.slint:1295
+msgid "Connecting…"
+msgstr "[Connecting…]"
+
+#: ui/pages/settings.slint:1296
+msgid ""
+"Scrobble to your Last.fm profile. Enter an API key under API settings first."
+msgstr "[Scrobble to your Last.fm profile. Enter an API key under API settings first.]"
+
+#: ui/pages/settings.slint:1297
+msgid "Scrobble what you play to your Last.fm profile."
+msgstr "[Scrobble what you play to your Last.fm profile.]"
+
+#: ui/pages/settings.slint:1299
+msgid "API settings…"
+msgstr "[API settings…]"
+
+#: ui/pages/settings.slint:1303 ui/pages/settings.slint:1368
+msgid "Connect"
+msgstr "[Connect]"
+
+#: ui/pages/settings.slint:1311
+msgid "I've approved it"
+msgstr "[I've approved it]"
+
+#: ui/pages/settings.slint:1316
+msgid "Disconnect"
+msgstr "[Disconnect]"
+
+#: ui/pages/settings.slint:1321
+msgid "Scrobble to Last.fm"
+msgstr "[Scrobble to Last.fm]"
+
+#: ui/pages/settings.slint:1322
+msgid "Off keeps the connection."
+msgstr "[Off keeps the connection.]"
+
+#: ui/pages/settings.slint:1330
+msgid "Checking the token with ListenBrainz…"
+msgstr "[Checking the token with ListenBrainz…]"
+
+#: ui/pages/settings.slint:1331
+msgid "Connected. Listens go to your ListenBrainz profile."
+msgstr "[Connected. Listens go to your ListenBrainz profile.]"
+
+#: ui/pages/settings.slint:1332
+msgid "Send listens to your ListenBrainz profile with your user token."
+msgstr "[Send listens to your ListenBrainz profile with your user token.]"
+
+#: ui/pages/settings.slint:1334
+msgid "Add token…"
+msgstr "[Add token…]"
+
+#: ui/pages/settings.slint:1338
+msgid "Change token…"
+msgstr "[Change token…]"
+
+#: ui/pages/settings.slint:1342
+msgid "Remove"
+msgstr "[Remove]"
+
+#: ui/pages/settings.slint:1347
+msgid "Scrobble to ListenBrainz"
+msgstr "[Scrobble to ListenBrainz]"
+
+#: ui/pages/settings.slint:1348
+msgid "Off keeps the token."
+msgstr "[Off keeps the token.]"
+
+#: ui/pages/settings.slint:1356 ui/pages/settings.slint:1662
+msgid "Integrations"
+msgstr "[Integrations]"
+
+#: ui/pages/settings.slint:1360 ui/pages/settings.slint:1375
+msgid "Discord status"
+msgstr "[Discord status]"
+
+#: ui/pages/settings.slint:1361
+msgid "This build has no Discord app ID."
+msgstr "[This build has no Discord app ID.]"
+
+#: ui/pages/settings.slint:1362
+msgid "Show \"Listening to\" with the track on your Discord profile."
+msgstr "[Show \"Listening to\" with the track on your Discord profile.]"
+
+#: ui/pages/settings.slint:1363
+msgid "Connected to Discord."
+msgstr "[Connected to Discord.]"
+
+#: ui/pages/settings.slint:1364
+msgid "Connecting to Discord…"
+msgstr "[Connecting to Discord…]"
+
+#: ui/pages/settings.slint:1365
+msgid ""
+"Not connected. Discord isn't running; featherplay tries again while music "
+"plays."
+msgstr "[Not connected. Discord isn't running; featherplay tries again while music plays.]"
+
+#: ui/pages/settings.slint:1366
+msgid "Not connected. Discord isn't running, or it closed."
+msgstr "[Not connected. Discord isn't running, or it closed.]"
+
+#: ui/pages/settings.slint:1383
+msgid "Reconnect automatically"
+msgstr "[Reconnect automatically]"
+
+#: ui/pages/settings.slint:1384
+msgid "When Discord isn't running or restarts, try again while music plays."
+msgstr "[When Discord isn't running or restarts, try again while music plays.]"
+
+#: ui/pages/settings.slint:1389
+msgid "Clear activity"
+msgstr "[Clear activity]"
+
+#: ui/pages/settings.slint:1390
+msgid ""
+"Remove the track from your profile until the next one starts or you resume."
+msgstr "[Remove the track from your profile until the next one starts or you resume.]"
+
+#: ui/pages/settings.slint:1392 ui/queue_panel.slint:245
+msgid "Clear"
+msgstr "[Clear]"
+
+#: ui/pages/settings.slint:1398 ui/pages/settings.slint:1408
+msgid "Clear after a pause"
+msgstr "[Clear after a pause]"
+
+#: ui/pages/settings.slint:1399
+msgid "Remove the track when playback stays paused this long."
+msgstr "[Remove the track when playback stays paused this long.]"
+
+#: ui/pages/settings.slint:1414
+msgid "Play song button"
+msgstr "[Play song button]"
+
+#: ui/pages/settings.slint:1415
+msgid "A button under the activity that opens the song in a browser."
+msgstr "[A button under the activity that opens the song in a browser.]"
+
+#: ui/pages/settings.slint:1420
+msgid "Links"
+msgstr "[Links]"
+
+#: ui/pages/settings.slint:1421
+msgid "The title opens the song, the artist their page and the cover the album."
+msgstr "[The title opens the song, the artist their page and the cover the album.]"
+
+#: ui/pages/settings.slint:1426
+msgid "Time"
+msgstr "[Time]"
+
+#: ui/pages/settings.slint:1427
+msgid "What your profile shows of the track's time while it plays."
+msgstr "[What your profile shows of the track's time while it plays.]"
+
+#: ui/pages/settings.slint:1431
+msgid "Progress bar with the time left"
+msgstr "[Progress bar with the time left]"
+
+#: ui/pages/settings.slint:1431
+msgid "Time elapsed only"
+msgstr "[Time elapsed only]"
+
+#: ui/pages/settings.slint:1431
+msgid "No time"
+msgstr "[No time]"
+
+#: ui/pages/settings.slint:1438
+msgid "Status text"
+msgstr "[Status text]"
+
+#: ui/pages/settings.slint:1439
+msgid "What your status says in member lists and DMs."
+msgstr "[What your status says in member lists and DMs.]"
+
+#: ui/pages/settings.slint:1443
+msgid "Listening to the artist"
+msgstr "[Listening to the artist]"
+
+#: ui/pages/settings.slint:1443
+msgid "Listening to the song title"
+msgstr "[Listening to the song title]"
+
+#: ui/pages/settings.slint:1450
+msgid "Preview"
+msgstr "[Preview]"
+
+#: ui/pages/settings.slint:1451
+msgid ""
+"How Discord shows a song with these options. Nothing is playing, so a sample "
+"stands in."
+msgstr "[How Discord shows a song with these options. Nothing is playing, so a sample stands in.]"
+
+#: ui/pages/settings.slint:1452
+msgid "How Discord shows the current song with these options."
+msgstr "[How Discord shows the current song with these options.]"
+
+#: ui/pages/settings.slint:1457
+msgid "Local API"
+msgstr "[Local API]"
+
+#: ui/pages/settings.slint:1458
+msgid ""
+"Let stream overlays, Stream Deck and scripts on this PC show what's playing "
+"and control playback. Tools made for Pear's API Server work too."
+msgstr "[Let stream overlays, Stream Deck and scripts on this PC show what's playing and control playback. Tools made for Pear's API Server work too.]"
+
+#: ui/pages/settings.slint:1460
+msgid ""
+"On at http://127.0.0.1:{}. Only apps on this PC that have the token can use "
+"it."
+msgstr "[On at http://127.0.0.1:{}. Only apps on this PC that have the token can use it.]"
+
+#: ui/pages/settings.slint:1461
+msgid "Starting…"
+msgstr "[Starting…]"
+
+#: ui/pages/settings.slint:1467
+msgid "Port"
+msgstr "[Port]"
+
+#: ui/pages/settings.slint:1469
+msgid "26538 is the one Pear Desktop uses, so its tools find featherplay."
+msgstr "[26538 is the one Pear Desktop uses, so its tools find featherplay.]"
+
+#: ui/pages/settings.slint:1473
+msgid "Local API port"
+msgstr "[Local API port]"
+
+#: ui/pages/settings.slint:1479
+msgid "Access token"
+msgstr "[Access token]"
+
+#: ui/pages/settings.slint:1480
+msgid ""
+"Apps send it as \"Authorization: Bearer\" and the token. It stays hidden "
+"here, so it doesn't show on stream. Regenerate disconnects the apps using "
+"the old one."
+msgstr "[Apps send it as \"Authorization: Bearer\" and the token. It stays hidden here, so it doesn't show on stream. Regenerate disconnects the apps using the old one.]"
+
+#: ui/pages/settings.slint:1485
+msgid "Token, hidden"
+msgstr "[Token, hidden]"
+
+#: ui/pages/settings.slint:1488 ui/top_bar.slint:97
+msgid "Copy"
+msgstr "[Copy]"
+
+#: ui/pages/settings.slint:1493
+msgid "Regenerate"
+msgstr "[Regenerate]"
+
+#: ui/pages/settings.slint:1502 ui/pages/settings.slint:1662
+msgid "Window"
+msgstr "[Window]"
+
+#: ui/pages/settings.slint:1506
+msgid "When I close the window"
+msgstr "[When I close the window]"
+
+#: ui/pages/settings.slint:1507
+msgid "In the tray, the music keeps going; quit from the tray icon's menu."
+msgstr "[In the tray, the music keeps going; quit from the tray icon's menu.]"
+
+#: ui/pages/settings.slint:1511
+msgid "Ask"
+msgstr "[Ask]"
+
+#: ui/pages/settings.slint:1518
+msgid "Appearance"
+msgstr "[Appearance]"
+
+#: ui/pages/settings.slint:1519
+msgid "System follows Windows' light or dark mode."
+msgstr "[System follows Windows' light or dark mode.]"
+
+#: ui/pages/settings.slint:1521
+msgctxt "appearance"
+msgid "Dark"
+msgstr "[Dark]"
+
+#: ui/pages/settings.slint:1521
+msgctxt "appearance"
+msgid "Light"
+msgstr "[Light]"
+
+#: ui/pages/settings.slint:1521
+msgctxt "appearance"
+msgid "System"
+msgstr "[System]"
+
+#: ui/pages/settings.slint:1529
+msgid "Language"
+msgstr "[Language]"
+
+#: ui/pages/settings.slint:1530
+msgid ""
+"Windows default follows Windows' display language when featherplay has it, "
+"and English otherwise."
+msgstr "[Windows default follows Windows' display language when featherplay has it, and English otherwise.]"
+
+#: ui/pages/settings.slint:1538
+msgid "Accent"
+msgstr "[Accent]"
+
+#: ui/pages/settings.slint:1539
+msgid ""
+"From the cover takes the colour of the song that's playing, and uses red "
+"when the art is grey."
+msgstr "[From the cover takes the colour of the song that's playing, and uses red when the art is grey.]"
+
+#: ui/pages/settings.slint:1561
+msgid "Track notifications"
+msgstr "[Track notifications]"
+
+#: ui/pages/settings.slint:1562
+msgid "Show a notification when the track changes."
+msgstr "[Show a notification when the track changes.]"
+
+#: ui/pages/settings.slint:1567
+msgid "Global hotkeys"
+msgstr "[Global hotkeys]"
+
+#: ui/pages/settings.slint:1568
+msgid ""
+"Play, pause and skip from any app. Each key needs Ctrl, Alt, Shift or Win."
+msgstr "[Play, pause and skip from any app. Each key needs Ctrl, Alt, Shift or Win.]"
+
+#: ui/pages/settings.slint:1578
+msgid "Ctrl+Alt+Space"
+msgstr "[Ctrl+Alt+Space]"
+
+#: ui/pages/settings.slint:1584
+msgid "Ctrl+Alt+Right"
+msgstr "[Ctrl+Alt+Right]"
+
+#: ui/pages/settings.slint:1590
+msgid "Ctrl+Alt+Left"
+msgstr "[Ctrl+Alt+Left]"
+
+#: ui/pages/settings.slint:1604 ui/pages/settings.slint:1662
+#: ui/pages/settings.slint:1604 ui/pages/settings.slint:1662
+msgid "Account"
+msgstr "[Account]"
+
+#: ui/pages/settings.slint:1608
+msgid "Music account"
+msgstr "[Music account]"
+
+#: ui/pages/settings.slint:1609
+msgid "Not signed in."
+msgstr "[Not signed in.]"
+
+#: ui/pages/settings.slint:1610
+msgid "Sign out? The saved session is deleted; the music keeps playing."
+msgstr "[Sign out? The saved session is deleted; the music keeps playing.]"
+
+#: ui/pages/settings.slint:1611
+msgid "Signed in. The session is kept in Windows Credential Manager."
+msgstr "[Signed in. The session is kept in Windows Credential Manager.]"
+
+#: ui/pages/settings.slint:1634
+msgid "Check for updates"
+msgstr "[Check for updates]"
+
+#: ui/pages/settings.slint:1635
+msgid ""
+"Once a day, and when songs keep failing to play, ask GitHub whether a newer "
+"featherplay is out. Nothing is downloaded."
+msgstr "[Once a day, and when songs keep failing to play, ask GitHub whether a newer featherplay is out. Nothing is downloaded.]"
+
+#: ui/pages/settings.slint:1640
+msgid "About featherplay"
+msgstr "[About featherplay]"
+
+#: ui/pages/settings.slint:1641
+msgid "Version, licences and credits."
+msgstr "[Version, licences and credits.]"
+
+#: ui/pages/settings.slint:1643
+msgid "About"
+msgstr "[About]"
+
+#: ui/pages/settings.slint:1661
+msgid "Settings sections"
+msgstr "[Settings sections]"
+
+#: ui/pages/settings.slint:1689
+msgid "Last.fm API settings"
+msgstr "[Last.fm API settings]"
+
+#. Two sentences: whose API account is in use, then how to make one.
+#: ui/pages/settings.slint:1691
+msgid "Your own API account is in use."
+msgstr "[Your own API account is in use.]"
+
+#: ui/pages/settings.slint:1692
+msgid "featherplay's own API account is in use; you can use yours instead."
+msgstr "[featherplay's own API account is in use; you can use yours instead.]"
+
+#: ui/pages/settings.slint:1693
+msgid "This build has no API account of its own, so Last.fm needs yours."
+msgstr "[This build has no API account of its own, so Last.fm needs yours.]"
+
+#: ui/pages/settings.slint:1694
+msgid ""
+"Create one at last.fm/api/account/create, leaving the callback URL empty. "
+"Saving signs you out of Last.fm."
+msgstr "[Create one at last.fm/api/account/create, leaving the callback URL empty. Saving signs you out of Last.fm.]"
+
+#: ui/pages/settings.slint:1696
+msgid "Remove your key"
+msgstr "[Remove your key]"
+
+#: ui/pages/settings.slint:1702
+msgid "API key"
+msgstr "[API key]"
+
+#: ui/pages/settings.slint:1703
+msgid "Enter a new key to replace yours"
+msgstr "[Enter a new key to replace yours]"
+
+#: ui/pages/settings.slint:1703
+msgid "32 letters and digits"
+msgstr "[32 letters and digits]"
+
+#: ui/pages/settings.slint:1708
+msgid "Shared secret"
+msgstr "[Shared secret]"
+
+#: ui/pages/settings.slint:1709
+msgid "Shown below the key on Last.fm"
+msgstr "[Shown below the key on Last.fm]"
+
+#: ui/pages/settings.slint:1719
+msgid "ListenBrainz token"
+msgstr "[ListenBrainz token]"
+
+#: ui/pages/settings.slint:1720
+msgid ""
+"Paste the user token from listenbrainz.org/settings. featherplay checks it "
+"with ListenBrainz, then keeps it in Windows Credential Manager."
+msgstr "[Paste the user token from listenbrainz.org/settings. featherplay checks it with ListenBrainz, then keeps it in Windows Credential Manager.]"
+
+#: ui/pages/settings.slint:1726
+msgid "User token"
+msgstr "[User token]"
+
+#: ui/pages/settings.slint:1727
+msgid "Paste a new token to replace yours"
+msgstr "[Paste a new token to replace yours]"
+
+#: ui/pages/settings.slint:1727
+msgid "Paste your user token"
+msgstr "[Paste your user token]"
+
+#: ui/pages/sign_in.slint:58
+msgid "Cookie header"
+msgstr "[Cookie header]"
+
+#: ui/pages/sign_in.slint:141
+msgid ""
+"featherplay plays your library, playlists and likes from YouTube Music. Sign "
+"in with your Google account in a separate window; featherplay keeps only the "
+"session, in Windows Credential Manager."
+msgstr "[featherplay plays your library, playlists and likes from YouTube Music. Sign in with your Google account in a separate window; featherplay keeps only the session, in Windows Credential Manager.]"
+
+#: ui/pages/sign_in.slint:148
+msgid "Your session expired. Sign in again; the music keeps playing."
+msgstr "[Your session expired. Sign in again; the music keeps playing.]"
+
+#: ui/pages/sign_in.slint:157
+msgid "Signing in…"
+msgstr "[Signing in…]"
+
+#: ui/pages/sign_in.slint:181
+msgid "Hide the cookie field"
+msgstr "[Hide the cookie field]"
+
+#: ui/pages/sign_in.slint:181
+msgid "Paste a cookie header instead"
+msgstr "[Paste a cookie header instead]"
+
+#: ui/pages/sign_in.slint:188
+msgid ""
+"In a browser signed in to music.youtube.com, press F12, open the Network tab "
+"and reload. Click a request named \"browse\" and copy the whole value of its "
+"cookie request header."
+msgstr "[In a browser signed in to music.youtube.com, press F12, open the Network tab and reload. Click a request named \"browse\" and copy the whole value of its cookie request header.]"
+
+#: ui/pages/sign_in.slint:200
+msgid "Checking…"
+msgstr "[Checking…]"
+
+#: ui/pages/sign_in.slint:200
+msgid "Sign in with this cookie"
+msgstr "[Sign in with this cookie]"
+
+#: ui/parts.slint:353
+msgid "Playing"
+msgstr "[Playing]"
+
+#: ui/parts.slint:388 ui/parts.slint:837
+msgid "Pause {}"
+msgstr "[Pause {}]"
+
+#: ui/playlist_menu_layer.slint:126
+msgid "Playlist menu"
+msgstr "[Playlist menu]"
+
+#: ui/playlist_menu_layer.slint:126
+msgid "Album menu"
+msgstr "[Album menu]"
+
+#: ui/playlist_menu_layer.slint:126
+msgid "Artist menu"
+msgstr "[Artist menu]"
+
+#: ui/playlist_menu_layer.slint:215 ui/song_menu.slint:304
+msgid "Start radio"
+msgstr "[Start radio]"
+
+#: ui/playlist_menu_layer.slint:234 ui/song_menu.slint:258
+msgid "Play next"
+msgstr "[Play next]"
+
+#: ui/playlist_menu_layer.slint:243 ui/song_menu.slint:267
+msgid "Add to queue"
+msgstr "[Add to queue]"
+
+#: ui/playlist_menu_layer.slint:253
+msgid "Copy link"
+msgstr "[Copy link]"
+
+#: ui/playlist_menu_layer.slint:259
+msgid "Unpin"
+msgstr "[Unpin]"
+
+#: ui/playlist_menu_layer.slint:259
+msgid "Pin to top"
+msgstr "[Pin to top]"
+
+#: ui/playlist_menu_layer.slint:269
+msgid "Rename…"
+msgstr "[Rename…]"
+
+#: ui/playlist_menu_layer.slint:275
+msgid "Delete…"
+msgstr "[Delete…]"
+
+#: ui/playlist_menu_layer.slint:281
+msgid "Remove from library"
+msgstr "[Remove from library]"
+
+#: ui/playlist_menu_layer.slint:305
+msgid "Rename playlist"
+msgstr "[Rename playlist]"
+
+#: ui/playlist_menu_layer.slint:307
+msgid "Rename"
+msgstr "[Rename]"
+
+#: ui/playlist_menu_layer.slint:318
+msgid "Name"
+msgstr "[Name]"
+
+#: ui/playlist_menu_layer.slint:319
+msgid "Playlist name"
+msgstr "[Playlist name]"
+
+#: ui/playlist_menu_layer.slint:329
+msgid "Delete “{}”?"
+msgstr "[Delete “{}”?]"
+
+#: ui/playlist_menu_layer.slint:330
+msgid "It's removed from your library on every device. This can't be undone."
+msgstr "[It's removed from your library on every device. This can't be undone.]"
+
+#: ui/playlist_menu_layer.slint:331
+msgid "Delete"
+msgstr "[Delete]"
+
+#: ui/queue_panel.slint:95
+msgid "Autoplay: similar tracks"
+msgstr "[Autoplay: similar tracks]"
+
+#: ui/queue_panel.slint:181
+msgid "Remove from queue"
+msgstr "[Remove from queue]"
+
+#: ui/queue_panel.slint:227
+msgid "Playing from"
+msgstr "[Playing from]"
+
+#: ui/queue_panel.slint:272
+msgid "Nothing up next"
+msgstr "[Nothing up next]"
+
+#: ui/sidebar.slint:175
+msgid "Home"
+msgstr "[Home]"
+
+#: ui/sidebar.slint:266
+msgid "{}, pinned"
+msgstr "[{}, pinned]"
+
+#: ui/sidebar.slint:362
+msgid "Account, {}"
+msgstr "[Account, {}]"
+
+#: ui/sidebar.slint:411
+msgid "Signed in"
+msgstr "[Signed in]"
+
+#: ui/song_menu.slint:192
+msgid "Song menu"
+msgstr "[Song menu]"
+
+#: ui/song_menu.slint:287
+msgid "Dislike"
+msgstr "[Dislike]"
+
+#: ui/song_menu.slint:297 ui/song_menu.slint:328
+msgid "Add to playlist"
+msgstr "[Add to playlist]"
+
+#: ui/top_bar.slint:80
+msgid "Search songs, albums, artists, playlists"
+msgstr "[Search songs, albums, artists, playlists]"
+
+#: ui/top_bar.slint:92
+msgid "Cut"
+msgstr "[Cut]"
+
+#: ui/top_bar.slint:102
+msgid "Paste"
+msgstr "[Paste]"
+
+#: ui/top_bar.slint:111
+msgid "Select all"
+msgstr "[Select all]"
+
+#: ui/top_bar.slint:133
+msgid "Ctrl+K"
+msgstr "[Ctrl+K]"
+
+#: ui/top_bar.slint:162
+msgid "Ctrl"
+msgstr "[Ctrl]"
+
+#: ui/top_bar.slint:173
+msgid "Clear search"
+msgstr "[Clear search]"

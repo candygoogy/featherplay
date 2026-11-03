@@ -1,0 +1,116 @@
+// Album page: a tall header (large cover, the title in the display face, the
+// artist, a meta line, Play and Shuffle), then the numbered track list without a plays
+// column; an artist column only on compilations. Data comes from `src/pages/album.rs`.
+//
+// The list is a ListView; the header rides in its first row so it scrolls away with it.
+import { ListView } from "std-widgets.slint";
+import { Theme, Icons } from "../theme.slint";
+import { TrackRow, TrackListRow } from "../parts.slint";
+import { Nav } from "../nav.slint";
+import { SongMenu } from "../song_menu.slint";
+import { CollectionHeader, SkeletonCollection, ErrorState, EmptyState, FadeIn, TopScrim } from "content.slint";
+
+export global AlbumData {
+    in property <bool> loading;
+    in property <string> error;
+    in property <string> id;
+    in property <string> title;
+    in property <string> artist;
+    in property <string> artist-id;
+    // "Album, 1996".
+    in property <string> kind;
+    // "16 songs, 1 hour 14 minutes".
+    in property <string> meta;
+    in property <image> cover;
+    // The header's wash from the cover, per theme (transparent until it's worked out).
+    in property <color> wash-dark;
+    in property <color> wash-light;
+    // Tracks by several artists: shows the artist column.
+    in property <bool> compilation;
+    in property <[TrackRow]> tracks;
+    // Plays the album from track `i`.
+    callback play(int);
+    callback shuffle();
+    // Likes or unlikes track `i`.
+    callback like(int);
+    // Loads the album again after an error.
+    callback retry();
+}
+
+component Header inherits CollectionHeader {
+    cover: AlbumData.cover;
+    wash-dark: AlbumData.wash-dark;
+    wash-light: AlbumData.wash-light;
+    kind: AlbumData.kind;
+    title: AlbumData.title;
+    byline: AlbumData.artist;
+    byline-link: AlbumData.artist-id != "";
+    meta: AlbumData.meta;
+    enabled: AlbumData.tracks.length > 0;
+    byline-clicked => { Nav.open-artist(AlbumData.artist-id); }
+    primary-clicked => { AlbumData.play(0); }
+    secondary-clicked => { AlbumData.shuffle(); }
+}
+
+export component AlbumPage inherits Rectangle {
+    // The page runs up under the clear top bar (app.slint), so its header starts below it.
+    property <length> header-h: Theme.top-bar-h + Theme.page-top + (root.width >= 900px ? 232px : 200px) + Theme.s6;
+    // Loading: the shape of the header and the rows.
+    if AlbumData.loading && AlbumData.title == "": SkeletonCollection {
+        row-covers: false;
+    }
+    // No tracks (an error, an empty album): the header, if any, stands alone.
+    if !AlbumData.loading && AlbumData.tracks.length == 0: FadeIn {
+        if AlbumData.title != "": Header {
+            x: 0;
+            y: 0;
+            width: root.width;
+        }
+        if AlbumData.error != "": ErrorState {
+            x: Theme.page-pad;
+            y: AlbumData.title != "" ? root.header-h : Theme.top-bar-h + Theme.page-top;
+            width: min(480px, root.width - 2 * Theme.page-pad);
+            message: AlbumData.error;
+            retry => { AlbumData.retry(); }
+        }
+        if AlbumData.error == "" && AlbumData.title != "": EmptyState {
+            x: Theme.page-pad;
+            y: root.header-h;
+            width: min(480px, root.width - 2 * Theme.page-pad);
+            title: @tr("This album has no tracks to play");
+            line: @tr("They may not be available where you are.");
+        }
+    }
+    if AlbumData.tracks.length > 0: FadeIn {
+        list := ListView {
+            for t[i] in AlbumData.tracks: Rectangle {
+                height: (i == 0 ? root.header-h : 0px) + Theme.track-row-h + (i == AlbumData.tracks.length - 1 ? Theme.page-end : 0px);
+                if i == 0: Header {
+                    x: 0;
+                    y: 0;
+                    width: parent.width;
+                }
+                TrackListRow {
+                    x: Theme.page-pad - 8px;
+                    y: i == 0 ? root.header-h : 0px;
+                    width: parent.width - 2 * Theme.page-pad + 16px;
+                    // Album rows have no cover, so they're shorter than song rows.
+                    height: Theme.track-row-h;
+                    track: t;
+                    compilation: AlbumData.compilation;
+                    double-clicked => { AlbumData.play(i); }
+                    like-clicked => { AlbumData.like(i); }
+                    menu-clicked => {
+                        SongMenu.show(t, self.absolute-position.x + self.width - 8px, self.absolute-position.y + self.height - 8px, self.absolute-position.y);
+                    }
+                    context-menu(x, y) => {
+                        SongMenu.show(t, self.absolute-position.x + x, self.absolute-position.y + y, self.absolute-position.y + y);
+                    }
+                }
+            }
+        }
+        TopScrim {
+            scrolled: -list.content-y;
+        }
+    }
+}

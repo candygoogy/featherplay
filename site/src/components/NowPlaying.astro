@@ -1,0 +1,44 @@
+---
+// The line every player on the page carries, attached to it: the sound switch, then the
+// playing song's short credit, as the artists ask ("by the play/pause/etc controls").
+// One look wherever a player appears: under the hero's laptop, under the lyrics card,
+// under the window in Make it yours.
+import SoundSwitch from "./SoundSwitch.astro";
+import PlayerCredit from "./PlayerCredit.astro";
+interface Props {
+  class?: string;
+  /** Next to a line that already names the song and artist: only the site and the licence. */
+  compact?: boolean;
+  /** Announce the song when it changes (where the visitor picks it, Make it yours). */
+  live?: boolean;
+}
+const { class: className, compact = false, live = false } = Astro.props;
+---
+
+<div class:list={["np", className]} data-now-playing aria-live={live ? "polite" : undefined}>
+  <SoundSwitch icon class="np-sound" />
+  <PlayerCredit class="np-credit" compact={compact} />
+</div>
+
+<style>
+  /* One quiet line: a small speaker, then the credit, on the same baseline wherever a
+     player appears. */
+  .np {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 32px;
+  }
+  .np :global(.np-sound) {
+    width: 32px;
+    height: 32px;
+    min-height: 32px;
+    background: var(--hover);
+  }
+  .np :global(.np-sound) {
+    flex: none;
+  }
+  .np :global(.np-credit) {
+    min-width: 0;
+  }
+</style>

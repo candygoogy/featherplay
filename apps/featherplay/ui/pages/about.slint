@@ -1,0 +1,296 @@
+// About (a calm single column): the logo, the tagline and the not-affiliated disclaimer,
+// the version, the log folder and the diagnostics for a bug report, the licences and the Made
+// with Slint badge that Slint's royalty-free licence asks for (its `AboutSlint` widget).
+// Filled by `src/pages/about.rs`. When a newer release is out (`src/updates.rs`), a banner
+// above the logo says so and links to it.
+import { AboutSlint } from "std-widgets.slint";
+import { Theme } from "../theme.slint";
+import { Body, Display, Pill } from "../parts.slint";
+
+// A third-party component and its licence.
+export struct Credit {
+    name: string,
+    licence: string,
+}
+
+export global AboutData {
+    in property <string> version;
+    // featherplay's MIT licence and Manrope's OFL.txt, in full.
+    in property <string> mit-text;
+    in property <string> ofl-text;
+    in property <[Credit]> credits;
+    // A newer release ("0.2.0"), or "" for none: the banner at the top.
+    in property <string> update-version;
+    // The banner's "Get it": opens the release page.
+    callback get-update();
+    // Opens the log folder in Explorer.
+    callback open-log-folder();
+    // The plain text Copy diagnostics puts on the clipboard, made when it's clicked.
+    callback diagnostics() -> string;
+    // The text is on the clipboard: a toast says so.
+    callback copied();
+}
+
+// A newer release is out: its version, and a button to its page.
+component UpdateBanner inherits Rectangle {
+    border-radius: Theme.r-l;
+    background: Theme.accent-tonal;
+    min-height: lay.min-height;
+    preferred-height: lay.preferred-height;
+    accessible-role: groupbox;
+    accessible-label: @tr("featherplay {} is out", AboutData.update-version);
+    lay := HorizontalLayout {
+        padding: Theme.s4;
+        padding-left: Theme.s5;
+        spacing: Theme.s4;
+        VerticalLayout {
+            alignment: center;
+            spacing: 2px;
+            horizontal-stretch: 1;
+            Body {
+                text: @tr("featherplay {} is out", AboutData.update-version);
+                font-size: Theme.t-body-l;
+                font-weight: 600;
+                overflow: clip;
+                wrap: word-wrap;
+            }
+            Body {
+                text: @tr("You have {}.", AboutData.version);
+                font-size: Theme.t-meta;
+                color: Theme.text2;
+                overflow: clip;
+                wrap: word-wrap;
+            }
+        }
+        VerticalLayout {
+            alignment: center;
+            horizontal-stretch: 0;
+            Pill {
+                label: @tr("Get it");
+                solid: true;
+                clicked => { AboutData.get-update(); }
+            }
+        }
+    }
+}
+
+component SectionTitle inherits Display {
+    font-size: 20px;
+    height: 32px;
+    vertical-alignment: center;
+}
+
+// A licence line that opens its full text.
+component LicenceRow inherits Rectangle {
+    in property <string> name;
+    in property <string> licence;
+    in property <string> full-text;
+    in property <bool> divider: true;
+    property <bool> open: false;
+    min-height: lay.min-height;
+    preferred-height: lay.preferred-height;
+    if root.divider: Rectangle {
+        y: 0;
+        height: 1px;
+        background: Theme.hairline;
+    }
+    lay := VerticalLayout {
+        padding-top: 12px;
+        padding-bottom: 12px;
+        spacing: Theme.s3;
+        HorizontalLayout {
+            spacing: Theme.s4;
+            VerticalLayout {
+                alignment: center;
+                spacing: 2px;
+                horizontal-stretch: 1;
+                Body {
+                    text: root.name;
+                    font-weight: 600;
+                }
+                Body {
+                    text: root.licence;
+                    font-size: Theme.t-meta;
+                    color: Theme.text2;
+                    overflow: clip;
+                    wrap: word-wrap;
+                }
+            }
+            if root.full-text != "": Rectangle {
+                width: t.preferred-width + 24px;
+                height: 32px;
+                border-radius: 16px;
+                background: Theme.tonal(ta.pressed, ta.has-hover);
+                accessible-role: button;
+                accessible-label: root.open ? @tr("Hide the licence of {}", root.name) : @tr("Show the licence of {}", root.name);
+                accessible-action-default => { root.open = !root.open; }
+                animate background { duration: Theme.t-hover; }
+                ta := TouchArea {
+                    mouse-cursor: pointer;
+                    clicked => { root.open = !root.open; }
+                }
+                t := Body {
+                    text: root.open ? @tr("Hide licence") : @tr("Show licence");
+                    font-size: Theme.t-meta;
+                    font-weight: 600;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+        }
+        if root.open: Rectangle {
+            min-height: txt.min-height + 2 * Theme.s4;
+            preferred-height: txt.preferred-height + 2 * Theme.s4;
+            border-radius: Theme.r-m;
+            background: Theme.card;
+            border-width: 1px;
+            border-color: Theme.card-edge;
+            txt := Body {
+                x: Theme.s4;
+                y: Theme.s4;
+                width: parent.width - 2 * Theme.s4;
+                text: root.full-text;
+                font-size: Theme.t-meta;
+                color: Theme.text2;
+                overflow: clip;
+                wrap: word-wrap;
+            }
+        }
+    }
+}
+
+export component AboutPage inherits Rectangle {
+    property <length> col-w: min(self.width - 2 * Theme.page-pad, 640px);
+
+    flick := Flickable {
+        width: parent.width;
+        height: parent.height;
+        content-height: col.preferred-height + Theme.page-top + Theme.page-end;
+
+        col := VerticalLayout {
+            x: Theme.page-pad;
+            y: Theme.page-top;
+            width: root.col-w;
+            height: self.preferred-height;
+            spacing: Theme.s7;
+
+            if AboutData.update-version != "": UpdateBanner { }
+
+            VerticalLayout {
+                spacing: Theme.s3;
+                Image {
+                    width: 72px;
+                    height: 72px;
+                    source: Theme.logo;
+                    accessible-role: none;
+                }
+                Display {
+                    text: "featherplay";
+                    font-size: Theme.t-display-l;
+                    height: 52px;
+                    vertical-alignment: center;
+                }
+                Body {
+                    text: @tr("A fast, lightweight desktop player for YouTube Music.");
+                    font-size: Theme.t-body-l;
+                    color: Theme.text1;
+                    overflow: clip;
+                    wrap: word-wrap;
+                }
+                Body {
+                    text: @tr("Version {}", AboutData.version);
+                    font-size: Theme.t-meta;
+                    color: Theme.text3;
+                }
+                Body {
+                    text: @tr("featherplay is not affiliated with Google or YouTube.");
+                    color: Theme.text2;
+                    overflow: clip;
+                    wrap: word-wrap;
+                }
+            }
+
+            VerticalLayout {
+                spacing: Theme.s3;
+                SectionTitle {
+                    text: @tr("Logs and bug reports");
+                }
+                Body {
+                    text: @tr("If something goes wrong, the log folder holds what featherplay noted, with a crash file for each crash. Copy diagnostics puts the versions, which services are on and the last playback errors on the clipboard, for a bug report. Neither names your account.");
+                    color: Theme.text2;
+                    overflow: clip;
+                    wrap: word-wrap;
+                }
+                HorizontalLayout {
+                    alignment: start;
+                    spacing: Theme.s3;
+                    Pill {
+                        height: 32px;
+                        label: @tr("Open log folder");
+                        clicked => { AboutData.open-log-folder(); }
+                    }
+                    Pill {
+                        height: 32px;
+                        label: @tr("Copy diagnostics");
+                        clicked => {
+                            copy-field.text = AboutData.diagnostics();
+                            copy-field.select-all();
+                            copy-field.copy();
+                            copy-field.clear-selection();
+                            AboutData.copied();
+                        }
+                    }
+                }
+            }
+
+            VerticalLayout {
+                SectionTitle {
+                    text: @tr("Licences");
+                }
+                LicenceRow {
+                    divider: false;
+                    name: "featherplay";
+                    licence: "MIT License";
+                    full-text: AboutData.mit-text;
+                }
+                LicenceRow {
+                    name: "Manrope";
+                    licence: @tr("SIL Open Font License 1.1. The heading face, embedded.");
+                    full-text: AboutData.ofl-text;
+                }
+                for c in AboutData.credits: LicenceRow {
+                    name: c.name;
+                    licence: c.licence;
+                }
+            }
+
+            HorizontalLayout {
+                alignment: start;
+                AboutSlint {
+                    width: 200px;
+                }
+            }
+        }
+    }
+
+    // Copy diagnostics goes through this: the platform's clipboard, as a copy from a field.
+    copy-field := TextInput {
+        width: 0;
+        height: 0;
+        visible: false;
+        read-only: true;
+        single-line: false;
+    }
+
+    // Its track ends above the floating bar.
+    if flick.content-height > flick.height: Rectangle {
+        property <length> track: flick.height - Theme.bar-clear - 8px;
+        property <length> thumb: max(32px, self.track * flick.height / flick.content-height);
+        x: parent.width - 8px;
+        y: 4px + (self.track - self.thumb) * (-flick.content-y / (flick.content-height - flick.height));
+        width: 4px;
+        height: self.thumb;
+        border-radius: 2px;
+        background: Theme.track;
+    }
+}

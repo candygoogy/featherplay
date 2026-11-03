@@ -1,0 +1,89 @@
+[package]
+name = "featherplay"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "A light native Windows player for YouTube Music, in Rust and Slint"
+publish = false
+
+# The library holds everything but argument parsing, so `tests/` can reach `ui_bridge`.
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "featherplay"
+path = "src/main.rs"
+
+[features]
+# `FEATHERPLAY_COOKIES_FILE` (a plaintext cookie header) is read by debug builds only.
+# This turns it on in a release build too, for measuring a release build on the dev
+# cookie file. Never on in a published build.
+dev-cookies-file = []
+
+[dependencies]
+featherplay-audio = { path = "../../crates/audio" }
+featherplay-core = { path = "../../crates/core" }
+featherplay-integrations = { path = "../../crates/integrations" }
+featherplay-lastfm = { path = "../../crates/lastfm" }
+featherplay-listenbrainz = { path = "../../crates/listenbrainz" }
+featherplay-lyrics = { path = "../../crates/lyrics" }
+featherplay-store = { path = "../../crates/store" }
+featherplay-streams = { path = "../../crates/streams" }
+featherplay-ytm = { path = "../../crates/ytm" }
+# Offscreen `--snapshot`: skia in software mode, without a window.
+i-slint-renderer-skia = { workspace = true }
+# The dirty region type in that renderer's `RenderBuffer` trait.
+i-slint-core = { workspace = true }
+# Covers: decoded and resized off the UI thread; `--snapshot` writes PNGs.
+image = { workspace = true, features = ["jpeg", "png", "webp"] }
+# The crates' log records reach the app's log file through it (`diagnostics`). Already in
+# the lock tree through reqwest, symphonia and resvg.
+log = { workspace = true, features = ["std"] }
+# Reads the HWND out of `slint::WindowHandle`; slint doesn't re-export the trait.
+raw-window-handle = "=0.6.2"
+# Covers are fetched over the system TLS, like the other crates.
+reqwest = { workspace = true, features = ["native-tls"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha1 = { workspace = true }
+# Names the files of the cover cache.
+sha2 = { workspace = true }
+# The user's Windows display languages, for the "Windows default" language.
+sys-locale = { workspace = true }
+# The skia software renderer is picked at startup (`winit` + `skia-software`): measured
+# 2026-10-26, it idles at 32 MB where the GPU path idles at 291 MB.
+# `unstable-winit-030` reaches winit's window: the wheel filter, and the tray's mini player
+# (a borderless popup with no taskbar button, closed when it loses the activation).
+slint = { workspace = true, features = ["std", "compat-1-2", "backend-winit", "renderer-skia", "raw-window-handle-06", "unstable-winit-030"] }
+# `signal` for Ctrl+C, so the session is saved on exit.
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "signal", "sync", "time"] }
+# The sign-in window: WebView2 in its own top-level window, never in the main one.
+webview2-com = { workspace = true }
+# The title bar, an opaque surface repainted when Windows drops it, the window icon,
+# the animation setting; the sign-in window
+# (COM, HiDpi) and opening the Last.fm approval page (Shell); the Windows build for the
+# log and the diagnostics (Registry, already on for `featherplay-integrations`).
+windows = { workspace = true, features = [
+    "Win32_Foundation",
+    "Win32_Graphics_Dwm",
+    "Win32_Graphics_Gdi",
+    "Win32_Security",
+    "Win32_System_Com",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Registry",
+    "Win32_System_Threading",
+    "Win32_UI_HiDpi",
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
+] }
+
+[build-dependencies]
+embed-resource = { workspace = true }
+resvg = { workspace = true }
+rspolib = { workspace = true }
+slint-build = { workspace = true }
+
+[lints]
+workspace = true

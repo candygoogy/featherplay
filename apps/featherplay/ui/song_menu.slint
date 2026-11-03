@@ -1,0 +1,382 @@
+// The song menu: Play next, Add to queue, Like or Dislike, Add to
+// playlist, Start radio. Any track row opens it with `SongMenu.show(row, x, y, top)` (window
+// coordinates); `SongMenuLayer` in app.slint draws it over everything. `src/song_menu.rs`
+// connects the actions.
+import { ListView } from "std-widgets.slint";
+import { Theme, Icons, Curves } from "theme.slint";
+import { TrackRow, CardItem, Icon, Body, Cover } from "parts.slint";
+
+export global SongMenu {
+    out property <bool> open;
+    out property <TrackRow> track;
+    out property <length> anchor-x;
+    out property <length> anchor-y;
+    // Where a menu that opens upward ends: the top of the row or button it was opened from.
+    out property <length> anchor-top;
+    // The playlist list replaces the actions ("Add to playlist").
+    in-out property <bool> choosing;
+    // The user's playlists, set by Rust when the menu opens.
+    in property <[CardItem]> playlists;
+
+    callback opened(string);
+    callback play-next(string);
+    callback add-to-queue(string);
+    // Like (true) or remove the like (false).
+    callback like(string, bool);
+    callback dislike(string);
+    callback add-to-playlist(string, string);
+    callback start-radio(string);
+
+    // Opens down from (`x`, `y`), or up ending at `top` when there's no room below, so it
+    // doesn't cover its own row. For a right-click, `top` is `y`.
+    public function show(t: TrackRow, x: length, y: length, top: length) {
+        self.track = t;
+        self.anchor-x = x;
+        self.anchor-y = y;
+        self.anchor-top = top;
+        self.choosing = false;
+        self.open = true;
+        self.opened(t.id);
+    }
+    public function close() {
+        self.open = false;
+        self.choosing = false;
+    }
+}
+
+// Glyphs the menus use (this one and the playlist menu's), on the same 24 px grid as `Icons`.
+export global MenuIcons {
+    out property <string> play-next: "M10.5 7.5 H20 M4 12.5 H20 M4 17.5 H20 M4 4.5 V10.5 L8.5 7.5 Z";
+    out property <string> add-to-queue: "M4 6.5 H20 M4 11.5 H20 M4 16.5 H11.5 M17 13.5 V20 M13.8 16.8 H20.2";
+    out property <string> dislike: "M7.5 13.5 V4.5 M7.5 13.5 L10.6 20 C11.8 20 12.6 19.1 12.6 18 V15 H17.5 C18.8 15 19.7 13.9 19.5 12.7 L18.6 6.8 C18.4 5.5 17.4 4.5 16.1 4.5 H7.5 M7.5 4.5 H4.5 V13.5 H7.5";
+    out property <string> playlist-add: "M4 6.5 H16 M4 11.5 H16 M4 16.5 H11 M17.5 13 V20 M14 16.5 H21";
+}
+
+// A menu row (this menu and the playlist menu's).
+export component MenuItem inherits Rectangle {
+    in property <string> icon;
+    in property <bool> icon-filled: false;
+    in property <string> label;
+    in property <bool> more: false;
+    // Off while the menu fades out, so a click then does nothing.
+    in property <bool> enabled: true;
+    callback clicked();
+    height: 36px;
+    border-radius: Theme.r-s;
+    background: Theme.state(ta.pressed, ta.has-hover);
+    accessible-role: button;
+    accessible-label: root.label;
+    accessible-action-default => { root.clicked(); }
+    animate background { duration: Theme.t-hover; }
+    ta := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+    Icon {
+        x: 10px;
+        width: 18px;
+        height: 18px;
+        commands: root.icon;
+        stroke: root.icon-filled ? transparent : Theme.text2;
+        fill: root.icon-filled ? Theme.text2 : transparent;
+    }
+    Body {
+        x: 40px;
+        width: parent.width - 40px - (root.more ? 32px : 8px);
+        height: parent.height;
+        text: root.label;
+        vertical-alignment: center;
+    }
+    if root.more: Icon {
+        x: parent.width - 28px;
+        width: 18px;
+        height: 18px;
+        commands: Icons.chevron-right;
+        stroke: Theme.text3;
+    }
+}
+
+export component Divider inherits Rectangle {
+    height: 9px;
+    Rectangle {
+        x: 8px;
+        y: 4px;
+        width: parent.width - 16px;
+        height: 1px;
+        background: Theme.hairline;
+    }
+}
+
+// Covers the window while the menu is open: a click outside closes it, Escape too.
+export component SongMenuLayer inherits Rectangle {
+    callback closed();
+    // The menu stays above this (the bottom bar's top edge); the layer still covers the bar.
+    in property <length> bottom-limit: root.height;
+    property <length> w: 256px;
+    property <length> head-h: 56px;
+    property <length> actions-h: 6 * 36px + 2 * 9px;
+    property <length> list-h: min(8, max(1, SongMenu.playlists.length)) * 40px;
+    property <length> h: 2 * Theme.s2 + root.head-h + 9px + (SongMenu.choosing ? 36px + root.list-h : root.actions-h);
+
+    // Motion: the panel stays instantiated so it can fade out. Opening, it snaps to its
+    // start (a little small, nudged toward the anchor), then grows from the anchor's corner.
+    property <bool> open: SongMenu.open;
+    property <bool> settled: true;
+    // Closed by Escape: keyboard actions don't animate.
+    property <bool> snap: false;
+    property <bool> left: SongMenu.anchor-x + root.w + 8px > root.width;
+    property <bool> up: SongMenu.anchor-y + root.h + 8px > root.bottom-limit;
+    changed open => {
+        if root.open {
+            root.snap = false;
+            root.settled = false;
+            settle.running = true;
+            keys.focus();
+        }
+    }
+    settle := Timer {
+        interval: 1ms;
+        running: false;
+        triggered => {
+            self.running = false;
+            root.settled = true;
+        }
+    }
+
+    function close() {
+        SongMenu.close();
+        root.closed();
+    }
+
+    if SongMenu.open: TouchArea {
+        width: root.width;
+        height: root.height;
+        pointer-event(e) => {
+            if e.kind == PointerEventKind.down {
+                root.close();
+            }
+        }
+        scroll-event(e) => {
+            root.close();
+            accept
+        }
+    }
+    panel := Rectangle {
+        // Opens down and to the right of the anchor, flipped when there's no room (upward, it
+        // ends at the anchor's top).
+        property <length> nudge: root.open && !root.settled ? (root.up ? Theme.nudge : -Theme.nudge) : 0px;
+        x: root.left ? max(8px, SongMenu.anchor-x - root.w) : SongMenu.anchor-x;
+        y: (root.up ? max(8px, SongMenu.anchor-top - self.height) : SongMenu.anchor-y) + self.nudge;
+        width: root.w;
+        // Animated only while open, for the swap to and from the playlist list.
+        height: root.h;
+        opacity: root.open ? 1 : 0;
+        visible: self.opacity > 0;
+        transform-origin: { x: root.left ? self.width : 0px, y: root.up ? self.height : 0px };
+        transform-scale: !root.open ? (Theme.moving ? 0.98 : 1.0) : (root.settled ? 1.0 : Theme.pop-from);
+        animate opacity { duration: root.open ? Theme.t-menu : (root.snap ? 0ms : Theme.t-fast); easing: Curves.ease-out; }
+        animate transform-scale, nudge {
+            duration: !root.open ? Theme.t-fast : (root.settled ? Theme.t-menu : 0ms);
+            easing: Curves.ease-out;
+        }
+        animate height { duration: root.open && root.settled ? Theme.t-menu : 0ms; easing: Curves.ease-out; }
+        border-radius: Theme.r-l;
+        background: Theme.panel;
+        border-width: 1px;
+        border-color: Theme.card-edge;
+        drop-shadow-blur: 24px;
+        drop-shadow-offset-y: 8px;
+        drop-shadow-color: Theme.cover-shadow;
+        accessible-role: list;
+        accessible-label: @tr("Song menu");
+
+        // Swallows clicks on the panel's padding.
+        TouchArea { enabled: root.open; }
+        keys := FocusScope {
+            enabled: root.open;
+            key-pressed(e) => {
+                if e.text == Key.Escape {
+                    if SongMenu.choosing {
+                        SongMenu.choosing = false;
+                    } else {
+                        root.snap = true;
+                        root.close();
+                    }
+                    return accept;
+                }
+                reject
+            }
+        }
+
+        // The song the menu is for.
+        Cover {
+            x: Theme.s2 + 8px;
+            y: Theme.s2 + 8px;
+            width: Theme.row-cover;
+            height: Theme.row-cover;
+            radius: Theme.r-s;
+            source: SongMenu.track.cover;
+            crossfade: true;
+        }
+        VerticalLayout {
+            x: Theme.s2 + 8px + Theme.row-cover + 12px;
+            y: Theme.s2;
+            width: parent.width - self.x - Theme.s4;
+            height: root.head-h;
+            alignment: center;
+            spacing: 1px;
+            Body {
+                text: SongMenu.track.title;
+                font-weight: 600;
+            }
+            Body {
+                text: SongMenu.track.artist;
+                font-size: Theme.t-meta;
+                color: Theme.text2;
+            }
+        }
+        Divider {
+            x: 0;
+            y: Theme.s2 + root.head-h;
+            width: parent.width;
+        }
+
+        if !SongMenu.choosing: VerticalLayout {
+            // Back from the playlist list: slides in from the left.
+            property <bool> in: false;
+            init => { self.in = true; }
+            x: Theme.s2 - (self.in || !root.settled || !Theme.moving ? 0px : 12px);
+            opacity: self.in || !root.settled ? 1 : 0;
+            animate x, opacity { duration: Theme.t-menu; easing: Curves.ease-out; }
+            y: Theme.s2 + root.head-h + 9px;
+            width: parent.width - 2 * Theme.s2;
+            height: root.actions-h;
+            MenuItem {
+                enabled: root.open;
+                icon: MenuIcons.play-next;
+                label: @tr("Play next");
+                clicked => {
+                    SongMenu.play-next(SongMenu.track.id);
+                    root.close();
+                }
+            }
+            MenuItem {
+                enabled: root.open;
+                icon: MenuIcons.add-to-queue;
+                label: @tr("Add to queue");
+                clicked => {
+                    SongMenu.add-to-queue(SongMenu.track.id);
+                    root.close();
+                }
+            }
+            Divider { }
+            MenuItem {
+                enabled: root.open;
+                icon: Icons.heart;
+                icon-filled: SongMenu.track.liked;
+                label: SongMenu.track.liked ? @tr("Remove like") : @tr("Like");
+                clicked => {
+                    SongMenu.like(SongMenu.track.id, !SongMenu.track.liked);
+                    root.close();
+                }
+            }
+            MenuItem {
+                enabled: root.open;
+                icon: MenuIcons.dislike;
+                label: @tr("Dislike");
+                clicked => {
+                    SongMenu.dislike(SongMenu.track.id);
+                    root.close();
+                }
+            }
+            Divider { }
+            MenuItem {
+                enabled: root.open;
+                icon: MenuIcons.playlist-add;
+                label: @tr("Add to playlist");
+                more: true;
+                clicked => { SongMenu.choosing = true; }
+            }
+            MenuItem {
+                enabled: root.open;
+                icon: Icons.radio;
+                label: @tr("Start radio");
+                clicked => {
+                    SongMenu.start-radio(SongMenu.track.id);
+                    root.close();
+                }
+            }
+        }
+
+        if SongMenu.choosing: Rectangle {
+            // The playlist list slides in from the right.
+            property <bool> in: false;
+            init => { self.in = true; }
+            x: Theme.s2 + (self.in || !Theme.moving ? 0px : 12px);
+            opacity: self.in ? 1 : 0;
+            animate x, opacity { duration: Theme.t-menu; easing: Curves.ease-out; }
+            y: Theme.s2 + root.head-h + 9px;
+            width: parent.width - 2 * Theme.s2;
+            height: 36px + root.list-h;
+            MenuItem {
+                enabled: root.open;
+                x: 0;
+                y: 0;
+                width: parent.width;
+                icon: Icons.chevron-left;
+                label: @tr("Add to playlist");
+                clicked => { SongMenu.choosing = false; }
+            }
+            if SongMenu.playlists.length == 0: Body {
+                x: 40px;
+                y: 36px;
+                width: parent.width - 48px;
+                height: 40px;
+                text: @tr("No playlists yet");
+                color: Theme.text3;
+                vertical-alignment: center;
+            }
+            ListView {
+                x: 0;
+                y: 36px;
+                width: parent.width;
+                height: root.list-h;
+                for p in SongMenu.playlists: Rectangle {
+                    height: 40px;
+                    border-radius: Theme.r-s;
+                    background: Theme.state(pta.pressed, pta.has-hover);
+                    animate background { duration: Theme.t-hover; }
+                    accessible-role: button;
+                    accessible-label: p.title;
+                    accessible-action-default => {
+                        SongMenu.add-to-playlist(SongMenu.track.id, p.id);
+                        root.close();
+                    }
+                    pta := TouchArea {
+                        enabled: root.open;
+                        mouse-cursor: pointer;
+                        clicked => {
+                            SongMenu.add-to-playlist(SongMenu.track.id, p.id);
+                            root.close();
+                        }
+                    }
+                    Cover {
+                        x: 7px;
+                        width: 24px;
+                        height: 24px;
+                        radius: Theme.r-s;
+                        source: p.cover;
+                    }
+                    Body {
+                        x: 40px;
+                        width: parent.width - 48px;
+                        height: parent.height;
+                        text: p.title;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+        }
+    }
+}

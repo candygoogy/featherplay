@@ -1,0 +1,7 @@
+# Dependency build scripts stay off. esbuild and workerd only use theirs to check or copy the
+# native binary that their platform packages (optional dependencies) already install, so the
+# build and wrangler dev run without them. A new package that wants a script fails the install
+# until it's listed here, allowed or denied, after reading the script.
+allowBuilds:
+  esbuild: false
+  workerd: false

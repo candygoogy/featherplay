@@ -1,0 +1,66 @@
+# Changelog
+
+Notable changes to featherplay, newest first. The format follows
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the version numbers follow
+[Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+## [0.1.0] - 2026-11-03
+
+The first release: a native Windows player for YouTube Music, for Windows 10 and 11 (x64),
+as a per-user installer or a portable exe.
+
+### Added
+
+- Home, Explore (new releases, charts, moods and genres) and History, including what you
+  played on other devices.
+- Your library in the sidebar: liked songs, your own and saved playlists, albums and artists,
+  most recently played first.
+- Search for songs, albums, artists and playlists, with filters (`Ctrl+K`). A pasted YouTube
+  or YouTube Music link finds the song.
+- Album, playlist and artist pages, and a right-click menu on songs and playlists: play next,
+  add to queue, add to a playlist, start a radio, rename or delete your own playlists.
+- A click usually plays at once: the song under the pointer, the next one in the queue and
+  the one you left off on are fetched ahead.
+- Radio from any song, and autoplay of similar songs when a list ends (or the list repeats).
+- Up next: reorder, remove and clear the queue, with Related songs beside it.
+- Synced lyrics from LRCLIB or YouTube Music, in the cover's colour; click a line to jump to
+  it. They're looked up only while on screen, and a setting turns them off.
+- Audio only. When a music video has a song version, the song plays; radio can leave out
+  user uploads and podcast episodes, and SponsorBlock skips the non-music parts of music
+  videos.
+- The last session comes back paused: queue, song and position. Nothing starts on its own.
+- Like a song, or mark it "Not for me" to skip it and dislike it on YouTube Music.
+- Choice of output device, with a fallback to the default one if it goes away, and a volume
+  slider that follows a loudness curve.
+- Media keys and the Windows media overlay, Previous, Play and Next on the taskbar thumbnail,
+  and a notification-area icon with a mini player.
+- Keyboard and mouse: `Space` plays and pauses, `Ctrl+L` shows or hides lyrics, `Alt+Left`
+  and `Alt+Right` or the mouse's back and forward buttons move between pages.
+- Optional track-change notifications and global hotkeys, off by default.
+- Scrobbling to Last.fm, ListenBrainz or both, with cleaned-up titles and artists. Plays that
+  can't be sent wait and go later.
+- Discord status, off by default.
+- Switching between Google accounts and their brand channels.
+- Dark, light or follow Windows, with the accent taken from the cover or a colour you pick.
+- Sign-in through a small WebView2 window, or with a pasted `Cookie` header. The session is
+  kept in Windows Credential Manager.
+- A per-user installer with no admin prompt. It upgrades in place, and its uninstaller
+  removes settings, cache, helpers, sign-in data and Credential Manager entries.
+- A local API, off by default (Settings > Integrations): what's playing and the controls for
+  stream overlays, Stream Deck plugins and scripts, over HTTP and a WebSocket on 127.0.0.1.
+  It follows Pear Desktop's API Server (port 26538, its routes and events), and every request
+  needs the token shown in Settings.
+- A daily check for a newer featherplay on GitHub, shown as a toast and in Settings > About.
+  A setting turns it off.
+- When songs can't play, a plain message says why, and featherplay updates its helpers.
+- One featherplay at a time: starting it again brings up the window that's already open.
+- A log file and crash reports in `%LOCALAPPDATA%\featherplay\logs`, with cookies, tokens and
+  keys left out. Settings > About opens the folder and copies a diagnostics summary for bug
+  reports.
+- A Language setting. featherplay ships in English and is ready for translations
+  (CONTRIBUTING.md says how to add one).
+
+[Unreleased]: https://github.com/candygoogy/featherplay/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/candygoogy/featherplay/releases/tag/v0.1.0

@@ -1,0 +1,38 @@
+name: Feature request
+description: Something featherplay could do.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        featherplay stays small on purpose. Some requests are out of scope, whoever asks:
+
+        - **Audio only.** It never plays video, so no video player, quality picker or captions.
+        - **No downloads.** It streams; it won't save songs or videos to disk.
+        - **No telemetry.** No analytics, usage stats or crash uploads, and no server of its own.
+
+        The README's "Coming from Pear?" table lists which Pear plugins are planned.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What you're trying to do
+      description: The situation, and what gets in the way today.
+    validations:
+      required: true
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would help
+      description: How you'd like it to work. A Pear plugin or another app that does it is a useful pointer.
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope
+      options:
+        - label: This isn't about video, downloads or telemetry.
+          required: true

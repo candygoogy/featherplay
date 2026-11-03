@@ -1,0 +1,247 @@
+---
+// A segmented control: radios in a fieldset (so the arrows move the choice, Tab enters and
+// leaves it, and it works without script), compact like the app's Chips and Tabs
+// (apps/featherplay/ui/pages/content.slint, parts.slint): 36 px high, 13 px semibold
+// labels, the unpicked ones in the second text colour and the picked one in the first.
+// The pick sits on a raised pill, a lighter step of the track with a hairline edge and a
+// small shadow (not a solid fill), which glides to the next pick on the app's glide curve
+// (--ease-glide, a 2 % overshoot). A copy of the labels in the first text colour is clipped
+// to the pill's box, so each label lights as the pill passes over it
+// (src/scripts/segmented.ts). Reduced motion: it moves at once. Without script the picked
+// segment simply has the pill's look. Each option may lead with an icon (monitor, sun,
+// moon, half-disc); `compact` hides the words on narrow screens, leaving the icon and a
+// tooltip (the words stay the radio's name). Tones: "page" on the page's ground, "band" on
+// the footer's dark band.
+interface Option {
+  value: string;
+  label: string;
+  icon?: "system" | "light" | "dark" | "match";
+}
+interface Props {
+  name: string;
+  legend: string;
+  options: Option[];
+  checked?: string;
+  tone?: "page" | "band";
+  compact?: boolean;
+  class?: string;
+  [attr: string]: unknown;
+}
+const { name, legend, options, checked, tone = "page", compact = false, class: className, ...attrs } = Astro.props;
+
+// 16 px glyphs on a 24 grid, drawn in the header toggle's line (1.8 stroke, round ends).
+const glyphs: Record<NonNullable<Option["icon"]>, string> = {
+  system:
+    '<rect x="3" y="4.5" width="18" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M9 20h6M12 16.5V20" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
+  light:
+    '<circle cx="12" cy="12" r="4" fill="currentColor"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
+  dark: '<path d="M19.5 14.6A8 8 0 0 1 9.4 4.5a8 8 0 1 0 10.1 10.1Z" fill="currentColor"/>',
+  match:
+    '<circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 4a8 8 0 0 1 0 16Z" fill="currentColor"/>',
+};
+const glyph = (o: Option) =>
+  o.icon ? `<svg class="seg-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">${glyphs[o.icon]}</svg>` : "";
+---
+
+<fieldset class:list={["segmented", `tone-${tone}`, { compact }, className]} {...attrs}>
+  <legend>{legend}</legend>
+  <div class="track" data-seg>
+    {
+      options.map((o) => (
+        <label class="seg-option" title={compact ? o.label : undefined}>
+          <input type="radio" name={name} value={o.value} checked={o.value === checked} />
+          <Fragment set:html={glyph(o)} />
+          <span class="seg-word">{o.label}</span>
+        </label>
+      ))
+    }
+    <span class="pill" data-seg-pill aria-hidden="true"></span>
+    <div class="lit" data-seg-lit aria-hidden="true">
+      {
+        options.map((o) => (
+          <span class="seg-option">
+            <Fragment set:html={glyph(o)} />
+            <span class="seg-word">{o.label}</span>
+          </span>
+        ))
+      }
+    </div>
+  </div>
+</fieldset>
+
+<script>
+  import { initSegmented } from "../scripts/segmented";
+  initSegmented();
+</script>
+
+<style>
+  .segmented {
+    min-inline-size: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+  /* The app's steps: the track is Theme.hover laid over the ground (made opaque, so the
+     glow behind it never thins the labels' contrast); the pill one step up from the ground
+     (lighter in dark, white in light), edged like a field. The pairs are in tokens.css. */
+  .tone-page {
+    --seg-track: var(--seg-page-track);
+    --seg-ink: var(--text-muted);
+    --seg-ink-on: var(--text);
+    --seg-pill: var(--seg-page-pill);
+    --seg-edge: var(--seg-page-edge);
+    --seg-lift: var(--seg-page-lift);
+    --seg-hover: var(--hover);
+    --seg-ring: var(--accent);
+  }
+  /* On the footer's band (near black in both themes): the same steps in white. */
+  .tone-band {
+    --seg-track: color-mix(in srgb, #fff 7%, var(--band, #161616));
+    --seg-ink: #ffffffad;
+    --seg-ink-on: #fff;
+    --seg-pill: color-mix(in srgb, #fff 17%, var(--band, #161616));
+    --seg-edge: #ffffff1f;
+    --seg-lift: #00000080;
+    --seg-hover: #ffffff12;
+    --seg-ring: #fff;
+  }
+
+  .track {
+    position: relative;
+    display: inline-grid;
+    grid-auto-flow: column;
+    grid-auto-columns: auto;
+    padding: 3px;
+    border-radius: 999px;
+    background: var(--seg-track);
+    color: var(--seg-ink);
+  }
+  .seg-option {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 30px;
+    padding: 0 12px;
+    border-radius: 999px;
+    font-size: 0.8125rem;
+    font-weight: 650;
+    letter-spacing: -0.003em;
+    line-height: 1;
+    white-space: nowrap;
+  }
+  .seg-option:has(.seg-icon) {
+    padding-left: 10px;
+  }
+  .seg-icon {
+    flex: none;
+    width: 16px;
+    height: 16px;
+  }
+  /* A finger gets a taller row; the look stays the same. */
+  @media (pointer: coarse) {
+    .seg-option {
+      min-height: 38px;
+    }
+  }
+  /* Tight: the icon alone, the word in the tooltip and the radio's name. */
+  @media (max-width: 359px) {
+    .compact .seg-option {
+      padding: 0 13px;
+    }
+    .compact .seg-word {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+  }
+  label.seg-option {
+    cursor: pointer;
+  }
+  .track[data-glide-on] label.seg-option {
+    transition:
+      color var(--t-hover) ease,
+      background-color var(--t-hover) ease;
+  }
+  label.seg-option input {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+  /* Hover lights the word, as in the app's tabs, over a faint state fill. */
+  @media (hover: hover) and (pointer: fine) {
+    label.seg-option:not(:has(input:checked)):hover {
+      color: var(--seg-ink-on);
+      background: var(--seg-hover);
+    }
+  }
+  /* In a radio group the focused choice is the picked one, under the pill, so the ring goes
+     round the whole control. */
+  .track:has(input:focus-visible) {
+    outline: 2px solid var(--seg-ring);
+    outline-offset: 3px;
+  }
+
+  /* The raised pill: without script it's the picked segment's own look. */
+  label.seg-option:has(input:checked),
+  .pill {
+    background: var(--seg-pill);
+    box-shadow: /* taste-skill-ignore: the app's raised segment (a pill that floats over its track) */
+      inset 0 0 0 1px var(--seg-edge),
+      0 1px 2px var(--seg-lift),
+      0 1px 1px var(--seg-lift);
+  }
+  label.seg-option:has(input:checked) {
+    color: var(--seg-ink-on);
+  }
+  .pill,
+  .lit {
+    display: none;
+  }
+
+  /* With script: the pill is its own box that glides (a translate and a width), and the lit
+     copy of the labels lies exactly over the labels, clipped to the pill. */
+  .track[data-glide] label.seg-option:has(input:checked) {
+    background: none;
+    box-shadow: none;
+    color: inherit;
+  }
+  .track[data-glide] .pill {
+    position: absolute;
+    top: 3px;
+    bottom: 3px;
+    left: 0;
+    display: block;
+    width: 0;
+    border-radius: 999px;
+    pointer-events: none;
+  }
+  .track[data-glide] .lit {
+    position: absolute;
+    inset: 0;
+    display: inherit;
+    grid-auto-flow: column;
+    grid-auto-columns: auto;
+    padding: 3px;
+    color: var(--seg-ink-on);
+    pointer-events: none;
+    clip-path: inset(3px 100% 3px 0 round 999px);
+  }
+  .track[data-glide-on] .pill {
+    transition:
+      transform var(--t-morph) var(--ease-glide),
+      width var(--t-morph) var(--ease-glide);
+  }
+  .track[data-glide-on] .lit {
+    transition: clip-path var(--t-morph) var(--ease-glide);
+  }
+</style>

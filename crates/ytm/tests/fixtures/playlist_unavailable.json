@@ -1,0 +1,69 @@
+{
+  "responseContext": {
+    "visitorData": "VISITOR",
+    "serviceTrackingParams": [
+      {
+        "service": "GFEEDBACK",
+        "params": [
+          {
+            "key": "browse_id",
+            "value": "VLPLxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+          },
+          {
+            "key": "browse_id_prefix",
+            "value": "VL"
+          },
+          {
+            "key": "has_unlimited_entitlement",
+            "value": "True"
+          },
+          {
+            "key": "logged_in",
+            "value": "1"
+          }
+        ]
+      },
+      {
+        "service": "CSI",
+        "params": [
+          {
+            "key": "c",
+            "value": "WEB_REMIX"
+          },
+          {
+            "key": "cver",
+            "value": "1.20261027.10.00"
+          },
+          {
+            "key": "yt_li",
+            "value": "1"
+          },
+          {
+            "key": "GetBrowsePlaylistDetailPage_rid",
+            "value": "0x0000000000000000"
+          }
+        ]
+      },
+      {
+        "service": "ECATCHER",
+        "params": [
+          {
+            "key": "client.version",
+            "value": "1.20000101"
+          },
+          {
+            "key": "client.name",
+            "value": "WEB_REMIX"
+          }
+        ]
+      }
+    ],
+    "responseId": "RESPONSE"
+  },
+  "trackingParams": "TRACKING",
+  "microformat": {
+    "microformatDataRenderer": {
+      "noindex": true
+    }
+  }
+}

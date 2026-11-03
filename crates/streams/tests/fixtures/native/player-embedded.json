@@ -1,0 +1,75 @@
+{
+ "playabilityStatus": {
+  "status": "OK",
+  "playableInEmbed": true
+ },
+ "streamingData": {
+  "expiresInSeconds": "21540",
+  "adaptiveFormats": [
+   {
+    "itag": 140,
+    "mimeType": "audio/mp4; codecs=\"mp4a.40.2\"",
+    "bitrate": 131116,
+    "initRange": {
+     "start": "0",
+     "end": "758"
+    },
+    "indexRange": {
+     "start": "759",
+     "end": "1078"
+    },
+    "lastModified": "1764547564819928",
+    "contentLength": "3809688",
+    "quality": "tiny",
+    "projectionType": "RECTANGULAR",
+    "averageBitrate": 129567,
+    "highReplication": true,
+    "audioQuality": "AUDIO_QUALITY_MEDIUM",
+    "approxDurationMs": "235225",
+    "audioSampleRate": "44100",
+    "audioChannels": 2,
+    "loudnessDb": 7.17,
+    "signatureCipher": "s=3O3OrqOrxIdRUaQM2aeGj-qr_N4KH4mOopNtxbjzWnTw9T_EICsVkIAYGhc7dgbgLjsA6rmdkw2ddNrtf4pC2HBWMVPbPgIARwYl2s0ElEJ&sp=sig&url=https%3A%2F%2Frr1---sn-scrubbed.googlevideo.com%2Fvideoplayback%3Fexpire%3D1793234740%26id%3Do-SCRUBBED%26itag%3D140%26source%3Dyoutube%26requiressl%3Dyes%26mime%3Daudio%252Fmp4%26gir%3Dyes%26clen%3D3809688%26dur%3D235.225%26lmt%3D1764547564819928%26c%3DWEB_EMBEDDED_PLAYER%26n%3DtbgZJm7jUNULHGjSAEd%26sparams%3Dexpire%252Cei%252Cip%252Cid%252Citag%252Csource%252Crequiressl%252Cxpc%252Cgcr%252Cbui%252Cspc%252Cvprv%252Csvpuc%252Cmime%252Cns%252Crqh%252Cgir%252Cclen%252Cdur%252Clmt%26lsparams%3Dcps%252Cmet%252Cmh%252Cmm%252Cmn%252Cms%252Cmv%252Cmvi%252Cpl%252Crms%252Cinitcwndbps%26lsig%3DSCRUBBED",
+    "trackAbsoluteLoudnessLkfs": -6.83,
+    "qualityOrdinal": "QUALITY_ORDINAL_UNKNOWN"
+   },
+   {
+    "itag": 251,
+    "mimeType": "audio/webm; codecs=\"opus\"",
+    "bitrate": 139795,
+    "initRange": {
+     "start": "0",
+     "end": "258"
+    },
+    "indexRange": {
+     "start": "259",
+     "end": "663"
+    },
+    "lastModified": "1764547617657260",
+    "contentLength": "3856919",
+    "quality": "tiny",
+    "projectionType": "RECTANGULAR",
+    "averageBitrate": 131164,
+    "audioQuality": "AUDIO_QUALITY_MEDIUM",
+    "approxDurationMs": "235241",
+    "audioSampleRate": "48000",
+    "audioChannels": 2,
+    "loudnessDb": 7.17,
+    "signatureCipher": "s=8B8B-aB-mOhBcfHx0U1qnzaCBDs2LJBlZ3j3pWAWBbg-1U9BICIM0HA5f_2I4JttUNimYaZSJSiuBbQR47dOu9anXZfASgIARwY82s0E8EJ&sp=sig&url=https%3A%2F%2Frr1---sn-scrubbed.googlevideo.com%2Fvideoplayback%3Fexpire%3D1793234740%26id%3Do-SCRUBBED%26itag%3D251%26source%3Dyoutube%26requiressl%3Dyes%26mime%3Daudio%252Fwebm%26gir%3Dyes%26clen%3D3856919%26dur%3D235.241%26lmt%3D1764547617657260%26c%3DWEB_EMBEDDED_PLAYER%26n%3DtbgZJm7jUNULHGjSAEd%26sparams%3Dexpire%252Cei%252Cip%252Cid%252Citag%252Csource%252Crequiressl%252Cxpc%252Cgcr%252Cbui%252Cspc%252Cvprv%252Csvpuc%252Cmime%252Cns%252Crqh%252Cgir%252Cclen%252Cdur%252Clmt%26lsparams%3Dcps%252Cmet%252Cmh%252Cmm%252Cmn%252Cms%252Cmv%252Cmvi%252Cpl%252Crms%252Cinitcwndbps%26lsig%3DSCRUBBED",
+    "trackAbsoluteLoudnessLkfs": -6.83,
+    "qualityOrdinal": "QUALITY_ORDINAL_UNKNOWN"
+   }
+  ]
+ },
+ "videoDetails": {
+  "videoId": "h46YpWrg55Q",
+  "title": "affection",
+  "lengthSeconds": "235",
+  "keywords": [
+   "BETWEEN FRIENDS",
+   "we just need some time together",
+   "affection"
+  ],
+  "author": "BETWEEN FRIENDS - Topic"
+ }
+}

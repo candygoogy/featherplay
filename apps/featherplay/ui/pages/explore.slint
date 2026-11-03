@@ -1,0 +1,605 @@
+// Explore (2026-10-30, the user's "more in the sidebar"): New releases, Charts, and Moods &
+// genres, as chips under the title like the Library's. Data comes from
+// `src/pages/explore.rs`; the tab is part of the route (`Nav.open-explore(tab)`).
+//
+// - New releases: the music service's "Albums & singles" and "Music videos", shaped as Home
+//   shapes them (cards, 16:9 video tiles), a row a page.
+// - Charts: the country picker, the video charts (playlists), then the top artists as a
+//   ranked list: rank, where it moved, the face, the name and the subscribers.
+// - Moods & genres: each section's moods as a grid of tiles; a tile opens the mood's page
+//   (`MoodPage`), its curated playlists in shelves.
+//
+// Everything that grows is a ListView (shelves, chart rows, mood sections), and nothing
+// moves at rest.
+import { ListView } from "std-widgets.slint";
+import { Theme, Curves, Icons } from "../theme.slint";
+import { CardItem, ItemKind, Body, Display, Card, Cover, Icon, PageTitle, ShelfArrows } from "../parts.slint";
+import { Nav } from "../nav.slint";
+import { HomeShelfRow, ShelfShape, Shapes } from "home.slint";
+import { Chips, SkeletonShelves, SkeletonList, SkeletonGrid, ErrorState, EmptyState, FadeIn, Open } from "content.slint";
+
+// One of the top artists.
+export struct ChartArtistRow {
+    rank: string,
+    item: CardItem,
+    subscribers: string,
+    // 1 up, -1 down, 0 the same as last time.
+    trend: int,
+}
+
+export struct MoodTile {
+    title: string,
+    params: string,
+}
+
+export struct MoodGroup {
+    title: string,
+    moods: [MoodTile],
+}
+
+export global ExploreData {
+    // 0 New releases, 1 Charts, 2 Moods & genres.
+    in property <int> tab;
+    in property <bool> loading;
+    in property <string> error;
+    // New releases' shelves, or the charts' video charts.
+    in property <[HomeShelfRow]> shelves;
+    in property <[ChartArtistRow]> artists;
+    // The charts' countries by name, and the one shown (-1 before the charts load).
+    in property <[string]> countries;
+    in property <int> country: -1;
+    in property <[MoodGroup]> moods;
+    // A song or video tile: plays it, with radio after it.
+    callback play-song(string);
+    // A card's play button: plays the album, playlist or artist without opening it.
+    callback play-card(CardItem);
+    callback pick-country(int);
+    callback retry();
+}
+
+// A mood or genre's page: its curated playlists.
+export global MoodData {
+    in property <bool> loading;
+    in property <string> error;
+    in property <string> title;
+    in property <[HomeShelfRow]> shelves;
+    callback play-card(CardItem);
+    callback retry();
+}
+
+// Glyphs only Explore uses, on the `Icons` grid.
+global ExploreIcons {
+    // A small filled triangle pointing up, and down: a chart entry moved.
+    out property <string> up: "M12 8 L16 14 H8 Z";
+    out property <string> down: "M12 16 L8 10 H16 Z";
+    // A short dash: no change.
+    out property <string> same: "M9 12 H15";
+}
+
+// A row of tiles shaped for its shelf (as Home's: videos 16:9, playlists small, artists round
+// faces without a subtitle, the rest standard), paged a row at a time. `play-song` and
+// `play-card` say what the tiles do.
+export component ExploreShelf inherits Rectangle {
+    in property <HomeShelfRow> shelf;
+    callback play-song(string);
+    callback play-card(CardItem);
+    property <ShelfShape> shape: root.shelf.shape == ShelfShape.songs || root.shelf.shape == ShelfShape.mixes ? ShelfShape.cards : root.shelf.shape;
+    property <int> per-row: Shapes.per-row(root.shape, root.width);
+    property <length> tile-w: Shapes.tile-w(root.shape, root.width);
+    property <int> first: 0;
+    // The tile at the left edge, eased while paging; the tiles follow it, so a resize
+    // moves them at once.
+    property <float> at: root.first;
+    animate at { duration: Theme.moving ? Theme.t-panel + 40ms : 0ms; easing: Curves.ease-in-out; }
+    property <int> last-first: max(0, root.shelf.items.length - root.per-row);
+    height: Shapes.height(root.shape, root.width, root.shelf.items.length);
+    function open(it: CardItem) {
+        if it.kind == ItemKind.song {
+            root.play-song(it.id);
+        } else {
+            Open.item(it);
+        }
+    }
+    function play(it: CardItem) {
+        if it.kind == ItemKind.song {
+            root.play-song(it.id);
+        } else {
+            root.play-card(it);
+        }
+    }
+    hover := TouchArea {
+        Display {
+            x: 0;
+            y: 0;
+            width: parent.width - 88px;
+            height: Shapes.head-h - Theme.s2;
+            text: root.shelf.title;
+            font-size: Theme.t-display-s;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+        if hover.has-hover && root.shelf.items.length > root.per-row: ShelfArrows {
+            x: parent.width - self.width;
+            y: 0;
+            can-back: root.first > 0;
+            can-forward: root.first < root.last-first;
+            back => { root.first = max(0, root.first - root.per-row); }
+            forward => { root.first = min(root.last-first, root.first + root.per-row); }
+        }
+        Rectangle {
+            y: Shapes.head-h;
+            height: parent.height - Shapes.head-h;
+            clip: true;
+            for it[i] in root.shelf.items: Card {
+                x: (i - root.at) * (root.tile-w + Theme.card-gap);
+                y: 0;
+                size: root.tile-w;
+                art-h: Shapes.art-h(root.shape, root.width);
+                subtitle: root.shape != ShelfShape.artists;
+                item: it;
+                playable: true;
+                // Only the cards shown (or partly shown while paging) take a cover layer: Slint
+                // makes a layer even where it's clipped away, and a shelf's other pages made
+                // ~60 % of the layers drawn in the frame Explore showed again (`Cover.layered`).
+                on-page: i + 1 > root.at && i < root.at + root.per-row;
+                clicked => { root.open(it); }
+                play => { root.play(it); }
+            }
+        }
+    }
+}
+
+// Shelves, virtualised: one ListView row per shelf, `top` above the first (it scrolls with
+// them), the last leaving room to scroll past the floating bar.
+export component ShelfList inherits Rectangle {
+    in property <[HomeShelfRow]> shelves;
+    in property <length> top: 0px;
+    in property <length> pad: Theme.page-pad;
+    callback play-song(string);
+    callback play-card(CardItem);
+    ListView {
+        for s[i] in root.shelves: Rectangle {
+            height: (i == 0 ? root.top : 0px) + Shapes.height(s.shape == ShelfShape.songs ? ShelfShape.cards : s.shape, root.width - 2 * root.pad, s.items.length) + (i == root.shelves.length - 1 ? Theme.page-end : Theme.section-gap);
+            ExploreShelf {
+                x: root.pad;
+                y: i == 0 ? root.top : 0px;
+                width: root.width - 2 * root.pad;
+                shelf: s;
+                play-song(id) => { root.play-song(id); }
+                play-card(it) => { root.play-card(it); }
+            }
+        }
+    }
+}
+
+// The charts' country: a field-like button with the name and a chevron. The list opens
+// below it (`CountryList`, drawn by the page over everything).
+component CountryButton inherits Rectangle {
+    in property <string> name;
+    in property <bool> open;
+    callback clicked();
+    width: max(160px, label.preferred-width + 2 * Theme.s4 + 28px);
+    height: 36px;
+    border-radius: self.height / 2;
+    border-width: 1px;
+    border-color: ta.has-hover ? Theme.field-edge-hover : Theme.field-edge;
+    background: root.open ? Theme.selected : Theme.state(ta.pressed, ta.has-hover);
+    accessible-role: combobox;
+    accessible-label: @tr("Country, {}", root.name);
+    accessible-action-default => { root.clicked(); }
+    animate background, border-color { duration: Theme.t-hover; }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+    label := Body {
+        x: Theme.s4;
+        width: parent.width - self.x - 36px;
+        height: parent.height;
+        text: root.name;
+        font-weight: 600;
+        vertical-alignment: center;
+    }
+    Icon {
+        x: parent.width - self.width - Theme.s3;
+        width: 18px;
+        height: 18px;
+        commands: root.open ? Icons.chevron-up : Icons.chevron-down;
+        stroke: Theme.text2;
+    }
+}
+
+// The countries, in a panel under the button: the shown one marked, a click picks one.
+// Escape and a click outside close it.
+component CountryList inherits Rectangle {
+    in property <length> anchor-x;
+    in property <length> anchor-y;
+    callback closed();
+    callback picked(int);
+    TouchArea {
+        pointer-event(e) => {
+            if e.kind == PointerEventKind.down {
+                root.closed();
+            }
+        }
+        scroll-event(e) => {
+            root.closed();
+            accept
+        }
+    }
+    panel := Rectangle {
+        x: root.anchor-x;
+        y: root.anchor-y;
+        width: 240px;
+        height: min(360px, ExploreData.countries.length * 36px + 2 * Theme.s2);
+        border-radius: Theme.r-l;
+        background: Theme.panel;
+        border-width: 1px;
+        border-color: Theme.card-edge;
+        drop-shadow-blur: 24px;
+        drop-shadow-offset-y: 8px;
+        drop-shadow-color: Theme.cover-shadow;
+        clip: true;
+        accessible-role: list;
+        accessible-label: @tr("Countries");
+        // Swallows clicks on the padding.
+        TouchArea { }
+        keys := FocusScope {
+            init => { self.focus(); }
+            key-pressed(e) => {
+                if e.text == Key.Escape {
+                    root.closed();
+                    return accept;
+                }
+                reject
+            }
+        }
+        ListView {
+            x: Theme.s2;
+            y: Theme.s2;
+            width: parent.width - 2 * Theme.s2;
+            height: parent.height - 2 * Theme.s2;
+            for name[i] in ExploreData.countries: Rectangle {
+                property <bool> on: i == ExploreData.country;
+                height: 36px;
+                border-radius: Theme.r-m;
+                background: Theme.state-on(self.on, cta.pressed, cta.has-hover);
+                accessible-role: list-item;
+                accessible-label: name;
+                accessible-item-selected: self.on;
+                accessible-action-default => { root.picked(i); }
+                cta := TouchArea {
+                    mouse-cursor: pointer;
+                    clicked => { root.picked(i); }
+                }
+                Body {
+                    x: Theme.s3;
+                    width: parent.width - 2 * Theme.s3;
+                    height: parent.height;
+                    text: name;
+                    font-weight: parent.on ? 600 : 400;
+                    color: parent.on ? Theme.text1 : Theme.text2;
+                    vertical-alignment: center;
+                }
+            }
+        }
+    }
+}
+
+// One of the top artists: the rank, where it moved, the face, the name and subscribers.
+// A click opens the artist.
+component ChartArtistItem inherits Rectangle {
+    in property <ChartArtistRow> entry;
+    height: Theme.row-h;
+    border-radius: Theme.r-m;
+    background: Theme.state(ta.pressed, ta.has-hover);
+    accessible-role: button;
+    accessible-label: root.entry.trend > 0 ? @tr("{0}. {1}, up", root.entry.rank, root.entry.item.title)
+        : root.entry.trend < 0 ? @tr("{0}. {1}, down", root.entry.rank, root.entry.item.title)
+        : root.entry.rank + ". " + root.entry.item.title;
+    accessible-action-default => { Open.item(root.entry.item); }
+    animate background { duration: Theme.t-hover; easing: Curves.ease-hover; }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { Open.item(root.entry.item); }
+    }
+    Display {
+        x: 8px;
+        width: 32px;
+        height: parent.height;
+        text: root.entry.rank;
+        font-size: Theme.t-body-l;
+        color: Theme.text1;
+        horizontal-alignment: right;
+        vertical-alignment: center;
+    }
+    Icon {
+        x: 44px;
+        y: (parent.height - self.height) / 2;
+        width: 16px;
+        height: 16px;
+        commands: root.entry.trend > 0 ? ExploreIcons.up : (root.entry.trend < 0 ? ExploreIcons.down : ExploreIcons.same);
+        fill: root.entry.trend == 0 ? transparent : Theme.text2;
+        stroke: root.entry.trend == 0 ? Theme.text3 : Theme.text2;
+    }
+    Cover {
+        x: 72px;
+        y: (parent.height - self.height) / 2;
+        width: Theme.row-cover;
+        height: Theme.row-cover;
+        round: true;
+        source: root.entry.item.cover;
+    }
+    VerticalLayout {
+        x: 72px + Theme.row-cover + 12px;
+        width: parent.width - self.x - 8px;
+        alignment: center;
+        spacing: 1px;
+        Body {
+            text: root.entry.item.title;
+            font-weight: 600;
+        }
+        if root.entry.subscribers != "": Body {
+            text: root.entry.subscribers;
+            font-size: Theme.t-meta;
+            color: Theme.text2;
+        }
+    }
+}
+
+// The charts' top: the country, the video charts, the "Top artists" heading.
+component ChartsHead inherits Rectangle {
+    in property <length> pad;
+    out property <length> button-y: Theme.s4;
+    callback country-clicked(length, length);
+    in property <bool> list-open;
+    property <length> shelf-h: ExploreData.shelves.length > 0 ? Shapes.height(ExploreData.shelves[0].shape, root.width - 2 * root.pad, ExploreData.shelves[0].items.length) + Theme.section-gap : 0px;
+    height: Theme.s4 + 36px + Theme.s6 + root.shelf-h + Shapes.head-h;
+    if ExploreData.countries.length > 0 && ExploreData.country >= 0: button := CountryButton {
+        x: root.pad;
+        y: Theme.s4;
+        name: ExploreData.countries[ExploreData.country];
+        open: root.list-open;
+        clicked => { root.country-clicked(self.absolute-position.x, self.absolute-position.y + self.height + Theme.s1); }
+    }
+    // The video charts (a signed-in account's song shelves would follow; the head shows the
+    // first shelf, which is the video charts).
+    if ExploreData.shelves.length > 0: ExploreShelf {
+        x: root.pad;
+        y: Theme.s4 + 36px + Theme.s6;
+        width: root.width - 2 * root.pad;
+        shelf: ExploreData.shelves[0];
+        play-song(id) => { ExploreData.play-song(id); }
+        play-card(it) => { ExploreData.play-card(it); }
+    }
+    if ExploreData.artists.length > 0: Display {
+        x: root.pad;
+        y: root.height - Shapes.head-h;
+        width: root.width - 2 * root.pad;
+        height: Shapes.head-h - Theme.s2;
+        text: @tr("Top artists");
+        font-size: Theme.t-display-s;
+        vertical-alignment: center;
+    }
+}
+
+// One mood tile: the name on the raised card colour.
+component MoodButton inherits Rectangle {
+    in property <MoodTile> mood;
+    height: 56px;
+    border-radius: Theme.r-m;
+    background: Theme.card;
+    clip: true;
+    accessible-role: button;
+    accessible-label: root.mood.title;
+    accessible-action-default => { Nav.open-mood(root.mood.params, root.mood.title); }
+    transform-scale: ta.pressed ? Theme.press-scale : 1.0;
+    animate transform-scale {
+        duration: ta.pressed ? Theme.t-press : Theme.t-release;
+        easing: ta.pressed ? Curves.ease-out : Curves.release;
+    }
+    Rectangle {
+        background: Theme.state(ta.pressed, ta.has-hover);
+        animate background { duration: Theme.t-hover; easing: Curves.ease-hover; }
+    }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { Nav.open-mood(root.mood.params, root.mood.title); }
+    }
+    Body {
+        x: Theme.s4;
+        width: parent.width - 2 * Theme.s4;
+        height: parent.height;
+        text: root.mood.title;
+        font-weight: 600;
+        vertical-alignment: center;
+    }
+}
+
+export component ExplorePage inherits Rectangle {
+    property <length> pad: Theme.page-pad;
+    property <length> list-y: Theme.page-top + 48px + Theme.s4 + 36px + Theme.s2;
+    property <length> inner: root.width - 2 * root.pad;
+    // Moods: as many ~200 px tiles a row as fit.
+    property <length> mood-gap: Theme.s3;
+    property <int> mood-cols: max(2, floor((root.inner + root.mood-gap) / (200px + root.mood-gap)));
+    property <length> mood-w: floor((root.inner - (root.mood-cols - 1) * root.mood-gap) / root.mood-cols / 1px) * 1px;
+    property <bool> has-content: ExploreData.tab == 0 ? ExploreData.shelves.length > 0 : (ExploreData.tab == 1 ? ExploreData.artists.length > 0 || ExploreData.shelves.length > 0 : ExploreData.moods.length > 0);
+    property <bool> countries-open: false;
+    property <length> countries-x;
+    property <length> countries-y;
+
+    PageTitle {
+        x: root.pad;
+        y: Theme.page-top;
+        width: parent.width - 2 * root.pad;
+        text: @tr("Explore");
+    }
+    Chips {
+        x: root.pad;
+        y: Theme.page-top + 48px + Theme.s4;
+        width: parent.width - 2 * root.pad;
+        labels: [@tr("New releases"), @tr("Charts"), @tr("Moods & genres")];
+        active: ExploreData.tab;
+        selected(i) => {
+            root.countries-open = false;
+            Nav.open-explore(i);
+        }
+    }
+    body := Rectangle {
+        x: 0;
+        y: root.list-y;
+        width: parent.width;
+        height: parent.height - self.y;
+        clip: true;
+        if ExploreData.loading && !root.has-content && ExploreData.tab != 2: SkeletonShelves {
+            top: Theme.s5;
+        }
+        if ExploreData.loading && !root.has-content && ExploreData.tab == 2: SkeletonGrid {
+            top: Theme.s5;
+        }
+        if !ExploreData.loading && ExploreData.error != "" && !root.has-content: ErrorState {
+            x: root.pad;
+            y: Theme.s5;
+            width: min(480px, parent.width - 2 * root.pad);
+            message: ExploreData.error;
+            retry => { ExploreData.retry(); }
+        }
+        if !ExploreData.loading && ExploreData.error == "" && !root.has-content: FadeIn {
+            EmptyState {
+                x: root.pad;
+                y: Theme.s5;
+                width: min(480px, parent.width - 2 * root.pad);
+                title: ExploreData.tab == 0 ? @tr("No new releases right now") : (ExploreData.tab == 1 ? @tr("No charts for this country") : @tr("No moods or genres right now"));
+                line: ExploreData.tab == 1 ? @tr("Pick another country, or try again later.") : @tr("Try again in a little while.");
+            }
+        }
+        if ExploreData.tab == 0 && ExploreData.shelves.length > 0: FadeIn {
+            ShelfList {
+                shelves: ExploreData.shelves;
+                top: Theme.s5;
+                pad: root.pad;
+                play-song(id) => { ExploreData.play-song(id); }
+                play-card(it) => { ExploreData.play-card(it); }
+            }
+        }
+        // The head rides in the first row so it scrolls away with the list.
+        if ExploreData.tab == 1 && root.has-content: FadeIn {
+            if ExploreData.artists.length == 0: ChartsHead {
+                y: 0;
+                width: parent.width;
+                pad: root.pad;
+                list-open: root.countries-open;
+                country-clicked(x, y) => {
+                    root.countries-x = x - root.absolute-position.x;
+                    root.countries-y = y - root.absolute-position.y;
+                    root.countries-open = !root.countries-open;
+                }
+            }
+            charts := ListView {
+                for a[i] in ExploreData.artists: Rectangle {
+                    property <length> head-h: i == 0 ? head.height : 0px;
+                    height: self.head-h + Theme.row-h + (i == ExploreData.artists.length - 1 ? Theme.page-end : 0px);
+                    head := ChartsHead {
+                        y: 0;
+                        width: parent.width;
+                        visible: i == 0;
+                        pad: root.pad;
+                        list-open: root.countries-open;
+                        country-clicked(x, y) => {
+                            root.countries-x = x - root.absolute-position.x;
+                            root.countries-y = y - root.absolute-position.y;
+                            root.countries-open = !root.countries-open;
+                        }
+                    }
+                    ChartArtistItem {
+                        x: root.pad - 8px;
+                        y: parent.head-h;
+                        width: parent.width - 2 * root.pad + 16px;
+                        entry: a;
+                    }
+                }
+            }
+        }
+        if ExploreData.tab == 2 && ExploreData.moods.length > 0: FadeIn {
+            ListView {
+                for g[i] in ExploreData.moods: Rectangle {
+                    property <int> rows: ceil(g.moods.length / root.mood-cols);
+                    height: (i == 0 ? Theme.s5 : 0px) + Shapes.head-h + self.rows * 56px + (self.rows - 1) * root.mood-gap + (i == ExploreData.moods.length - 1 ? Theme.page-end : Theme.section-gap);
+                    Display {
+                        x: root.pad;
+                        y: i == 0 ? Theme.s5 : 0px;
+                        width: root.inner;
+                        height: Shapes.head-h - Theme.s2;
+                        text: g.title;
+                        font-size: Theme.t-display-s;
+                        vertical-alignment: center;
+                    }
+                    for m[j] in g.moods: MoodButton {
+                        x: root.pad + mod(j, root.mood-cols) * (root.mood-w + root.mood-gap);
+                        y: (i == 0 ? Theme.s5 : 0px) + Shapes.head-h + floor(j / root.mood-cols) * (56px + root.mood-gap);
+                        width: root.mood-w;
+                        mood: m;
+                    }
+                }
+            }
+        }
+    }
+    if root.countries-open: CountryList {
+        anchor-x: root.countries-x;
+        anchor-y: root.countries-y;
+        closed => { root.countries-open = false; }
+        picked(i) => {
+            root.countries-open = false;
+            ExploreData.pick-country(i);
+        }
+    }
+}
+
+// A mood or genre's page: its name, then its shelves of curated playlists.
+export component MoodPage inherits Rectangle {
+    property <length> pad: Theme.page-pad;
+    property <length> list-y: Theme.page-top + 48px;
+    PageTitle {
+        x: root.pad;
+        y: Theme.page-top;
+        width: parent.width - 2 * root.pad;
+        text: MoodData.title;
+    }
+    Rectangle {
+        x: 0;
+        y: root.list-y;
+        width: parent.width;
+        height: parent.height - self.y;
+        clip: true;
+        if MoodData.loading && MoodData.shelves.length == 0: SkeletonShelves {
+            top: Theme.s5;
+        }
+        if !MoodData.loading && MoodData.error != "": ErrorState {
+            x: root.pad;
+            y: Theme.s5;
+            width: min(480px, parent.width - 2 * root.pad);
+            message: MoodData.error;
+            retry => { MoodData.retry(); }
+        }
+        if !MoodData.loading && MoodData.error == "" && MoodData.shelves.length == 0: FadeIn {
+            EmptyState {
+                x: root.pad;
+                y: Theme.s5;
+                width: min(480px, parent.width - 2 * root.pad);
+                title: @tr("No playlists here yet");
+                line: @tr("Pick another mood or genre in Explore.");
+                action: @tr("Back to Explore");
+                action-clicked => { Nav.open-explore(2); }
+            }
+        }
+        if MoodData.shelves.length > 0: FadeIn {
+            ShelfList {
+                shelves: MoodData.shelves;
+                top: Theme.s5;
+                pad: root.pad;
+                play-card(it) => { MoodData.play-card(it); }
+            }
+        }
+    }
+}

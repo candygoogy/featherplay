@@ -1,0 +1,24 @@
+---
+import { filled, icons, type IconName } from "../demo/icons";
+
+interface Props {
+  name: IconName;
+  size?: number;
+  class?: string;
+}
+const { name, size = 24, class: className } = Astro.props;
+const solid = filled.has(name);
+---
+
+<svg
+  class={className}
+  viewBox="0 0 24 24"
+  width={size}
+  height={size}
+  aria-hidden="true"
+  fill={solid ? "currentColor" : "none"}
+  stroke={solid ? "none" : "currentColor"}
+  stroke-width="1.6"
+  stroke-linecap="round"
+  stroke-linejoin="round"><path d={icons[name]}></path></svg
+>

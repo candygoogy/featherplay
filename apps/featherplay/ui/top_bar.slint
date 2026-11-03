@@ -1,0 +1,218 @@
+// The top bar: across the content area, above every page but Now playing, with the search
+// field. Ctrl+K focuses it, Enter searches, Escape clears it then leaves it (the window's
+// key handler), × clears it. The query is filled by `src/top_bar.rs` on every page shown.
+import { Theme, Icons, Curves } from "theme.slint";
+import { Icon, Body } from "parts.slint";
+
+export global TopBarData {
+    // The field's text: what the user types, and the search page's query once one is shown
+    // (back and forward included).
+    in-out property <string> query;
+    // The text on one line: line breaks, tabs and other control characters become spaces,
+    // the ends trimmed (`top_bar::single_line`).
+    pure callback single-line(string) -> string;
+    // A paste is about to read the clipboard (Ctrl+V, Shift+Insert or the menu's Paste):
+    // `top_bar::pasting` logs whether the system clipboard could be opened and holds text.
+    callback pasting();
+}
+
+// A key of a shortcut hint: its label in a small rounded cap with a hairline edge.
+component Keycap inherits Rectangle {
+    in property <string> text;
+    height: 20px;
+    min-width: self.height;
+    border-radius: Theme.r-s;
+    border-width: 1px;
+    border-color: Theme.field-edge-hover;
+    accessible-role: none;
+    HorizontalLayout {
+        padding-left: 6px;
+        padding-right: 6px;
+        Text {
+            text: root.text;
+            font-family: Theme.body-font;
+            font-size: 11px;
+            font-weight: 600;
+            color: Theme.text2;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+    }
+}
+
+// The wide rounded field. Enter submits; Escape bubbles up to the window.
+component SearchField inherits Rectangle {
+    callback submitted(string);
+    out property <bool> focused: input.has-focus;
+    public function focus-input() {
+        input.focus();
+        input.select-all();
+    }
+    property <bool> has-text: TopBarData.query != "";
+    property <bool> hovered: ta.has-hover && !input.has-focus;
+    property <length> lead: 48px;
+    // Room on the right: the × button, or the Ctrl K keycaps.
+    property <length> trail: root.has-text ? 44px : (input.has-focus ? Theme.s4 : keycaps.width + Theme.s3 + Theme.s2);
+    height: 40px;
+    border-radius: self.height / 2;
+    // Opaque, so it reads the same over a page's wash or an artist's photo as on the ground,
+    // with a neutral 1 px edge that keeps its shape there. The fill never changes, so the
+    // placeholder keeps its contrast; hover lifts the edge, focus makes it a 2 px accent ring.
+    background: Theme.field-solid;
+    border-width: input.has-focus ? 2px : 1px;
+    border-color: input.has-focus ? Theme.accent : (root.hovered ? Theme.field-edge-hover : Theme.field-edge);
+    animate border-color { duration: Theme.t-hover; easing: Curves.ease-hover; }
+    ta := TouchArea {
+        mouse-cursor: text;
+        clicked => { input.focus(); }
+        Icon {
+            x: Theme.s4;
+            width: 20px;
+            height: 20px;
+            commands: Icons.search;
+            stroke: input.has-focus ? Theme.text1 : (root.hovered ? Theme.text2 : Theme.text3);
+        }
+        if !root.has-text: Body {
+            // Starts just past the text cursor, so the cursor never draws over its first letter.
+            x: root.lead + input.text-cursor-width + 2px;
+            width: parent.width - self.x - root.trail;
+            height: parent.height;
+            text: @tr("Search songs, albums, artists, playlists");
+            color: Theme.text3;
+            vertical-alignment: center;
+        }
+        // Right-click (or the Menu key): Cut, Copy, Paste and Select all, as any text field
+        // has. Paste calls `TopBarData.pasting` first, which logs whether the system
+        // clipboard could be read (the paste regression of 2026-10-31).
+        ContextMenuArea {
+            width: parent.width;
+            height: parent.height;
+            Menu {
+                MenuItem {
+                    title: @tr("Cut");
+                    enabled: root.has-text;
+                    activated => { input.cut(); }
+                }
+                MenuItem {
+                    title: @tr("Copy");
+                    enabled: root.has-text;
+                    activated => { input.copy(); }
+                }
+                MenuItem {
+                    title: @tr("Paste");
+                    activated => {
+                        input.focus();
+                        TopBarData.pasting();
+                        input.paste();
+                    }
+                }
+                MenuSeparator { }
+                MenuItem {
+                    title: @tr("Select all");
+                    enabled: root.has-text;
+                    activated => {
+                        input.focus();
+                        input.select-all();
+                    }
+                }
+            }
+            input := TextInput {
+                x: root.lead;
+                width: parent.width - root.lead - root.trail;
+                height: parent.height;
+                text <=> TopBarData.query;
+                single-line: true;
+                vertical-alignment: center;
+                font-family: Theme.body-font;
+                font-size: Theme.t-body;
+                color: Theme.text1;
+                selection-background-color: Theme.accent;
+                selection-foreground-color: Theme.on-solid;
+                accessible-role: text-input;
+                accessible-label: @tr("Search");
+                accessible-description: @tr("Ctrl+K");
+                accepted => { root.submitted(self.text); }
+                // Paste keys are only noted here; the input still pastes them itself.
+                key-pressed(e) => {
+                    if (e.modifiers.control && (e.text == "v" || e.text == "V")) || (e.modifiers.shift && e.text == Key.Insert) {
+                        TopBarData.pasting();
+                    }
+                    reject
+                }
+                // A paste can bring line breaks (Windows' CR LF, of which Slint turns only the LF
+                // into a space) and tabs, which would break the text onto a second line, above
+                // the field's middle. Put it back on one line, the cursor at its end.
+                edited => {
+                    if self.text.replace-all("\u{d}", "").replace-all("\u{a}", "").replace-all("\u{9}", "") != self.text {
+                        TopBarData.query = TopBarData.single-line(self.text);
+                        self.set-selection-offsets(2147483647, 2147483647);
+                    }
+                }
+            }
+        }
+        // The shortcut, as two small keycaps. Only a hint: screen readers hear it from the
+        // field's description instead.
+        keycaps := HorizontalLayout {
+            x: parent.width - self.width - Theme.s3;
+            y: (parent.height - self.height) / 2;
+            width: self.preferred-width;
+            height: self.preferred-height;
+            visible: !root.has-text && !input.has-focus;
+            spacing: Theme.s1;
+            Keycap { text: @tr("Ctrl"); }
+            Keycap { text: "K"; }
+        }
+        // Clears the field and keeps (or puts) the cursor in it.
+        if root.has-text: Rectangle {
+            x: parent.width - self.width - 4px;
+            width: 32px;
+            height: 32px;
+            border-radius: self.width / 2;
+            background: Theme.state(cta.pressed, cta.has-hover);
+            accessible-role: button;
+            accessible-label: @tr("Clear search");
+            accessible-action-default => {
+                TopBarData.query = "";
+                input.focus();
+            }
+            animate background { duration: Theme.t-hover; }
+            cta := TouchArea {
+                mouse-cursor: pointer;
+                clicked => {
+                    TopBarData.query = "";
+                    input.focus();
+                }
+            }
+            Icon {
+                width: 18px;
+                height: 18px;
+                commands: Icons.close;
+                stroke: cta.has-hover ? Theme.text1 : Theme.text2;
+            }
+        }
+    }
+}
+
+export component TopBar inherits Rectangle {
+    // Below `Theme.wide-min` (the rail) the field is narrower.
+    in property <bool> narrow: false;
+    // Over a page that runs up under it (album, playlist, artist): no ground of its own, so
+    // the page's wash shows through; the page's `TopScrim` covers what scrolls under it.
+    in property <bool> clear: false;
+    out property <bool> searching: field.focused;
+    callback submitted(string);
+    public function focus-search() {
+        field.focus-input();
+    }
+    height: Theme.top-bar-h;
+    background: root.clear ? transparent : Theme.ground;
+    // Clicks on the bar beside the field don't reach a page's rows scrolled under it.
+    TouchArea { }
+    // Left-aligned with the pages' content, like their titles.
+    field := SearchField {
+        x: Theme.page-pad;
+        y: (parent.height - self.height) / 2;
+        width: max(0px, min(root.narrow ? Theme.top-search-narrow : Theme.top-search-w, parent.width - 2 * Theme.page-pad));
+        submitted(q) => { root.submitted(q); }
+    }
+}

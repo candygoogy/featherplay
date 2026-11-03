@@ -1,0 +1,383 @@
+---
+// The hero: the name, one line, the download, and the laptop running featherplay in the
+// song's colour. The replica starts paused on the lyrics view (the tour starts here).
+import Laptop from "./Laptop.astro";
+import Desktop from "./Desktop.astro";
+import Replica from "./Replica.astro";
+import MemoryMeter from "./MemoryMeter.astro";
+import Tour from "./Tour.astro";
+import NowPlaying from "./NowPlaying.astro";
+import { demoStart, songById } from "../data/songs";
+import { formatTime } from "../demo/player";
+
+const start = { song: songById(demoStart.songId)!, positionMs: demoStart.positionMs };
+const tooltip: [string, string] = [start.song.title, `${start.song.artist}, paused at ${formatTime(start.positionMs)}`];
+const line = "A free, native Windows player for YouTube Music, light enough to forget it's running.";
+// One rising word each; the app's name rises as one word and never breaks across lines
+// (a nowrap span with a plain space, not a no-break space character).
+const words = line.split(/ (?!Music)/);
+---
+
+<section class="hero" data-hero aria-labelledby="hero-title">
+  <div class="hero-pin" data-hero-pin>
+    <div class="wrap hero-head" data-hero-head>
+      <h1 id="hero-title"><span class="rise" style="--i:0">featherplay</span></h1>
+      <div class="hero-side">
+        <p class="hero-line">
+          {
+            words.map((word, i) => (
+              <>
+                <span class:list={["rise", { keep: word.includes(" ") }]} style={`--i:${i + 1}`}>
+                  {word}
+                </span>{" "}
+              </>
+            ))
+          }
+        </p>
+        <div class="hero-act">
+          <a class="button" href="#download" data-before-replica>Download for Windows</a>
+          <!-- The tour's way in: beside the download, in the tour cursor's own shape. Shown
+               only with script (the class is set before the first paint, so nothing shifts). -->
+          <button class="button tonal tour-start" type="button" data-tour-start>
+            <svg viewBox="0 0 20 24" width="15" height="18" aria-hidden="true"
+              ><path
+                d="M1.5 1.5 L1.5 19.5 L6.2 15.4 L9.3 22.2 L12.4 20.8 L9.4 14.2 L15.6 14.2 Z"
+                fill="currentColor"
+                stroke="currentColor"
+                stroke-width="1.4"
+                stroke-linejoin="round"></path></svg
+            >
+            <span>Take the tour</span>
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="wrap hero-stage" data-hero-stage>
+      <!-- The glow sizes itself on the laptop alone, so the tour card under it on phones
+           never moves it. -->
+      <div class="laptop-wrap">
+        <div class="glow" data-glow aria-hidden="true">
+          <span data-glow-layer data-on="true" style={`--c:${start.song.colour}`}></span>
+          <span data-glow-layer></span>
+        </div>
+        <Laptop class="hero-laptop" label="featherplay running on a Windows laptop" crop>
+          <Desktop tooltip={tooltip}>
+            <Replica songId={start.song.id} positionMs={start.positionMs} view="lyrics" />
+            <MemoryMeter />
+          </Desktop>
+        </Laptop>
+      </div>
+      <Tour />
+      <NowPlaying class="hero-audio" />
+      <slot />
+    </div>
+  </div>
+</section>
+
+<script>
+  import { bindLid } from "../scripts/lid";
+  const hero = document.querySelector<HTMLElement>("[data-hero]");
+  const laptop = hero?.querySelector<HTMLElement>("[data-laptop]");
+  if (hero && laptop) bindLid(hero, laptop);
+</script>
+
+<style>
+  .hero {
+    --tour-w: 216px;
+    position: relative;
+    overflow-x: clip;
+    padding-block: clamp(16px, 3vh, 40px) clamp(48px, 8vh, 120px);
+  }
+
+  /* The name, as large as the width allows, with its line and the download beside it. */
+  .hero-head {
+    display: grid;
+    grid-template-columns: auto minmax(0, 440px);
+    align-items: end;
+    justify-content: space-between;
+    gap: 24px 48px;
+  }
+  .hero h1 {
+    font-size: clamp(3.5rem, 8.8vw, 10.5rem);
+    letter-spacing: -0.06em;
+    line-height: 0.82;
+    margin-left: -0.04em;
+    padding-bottom: 0.08em;
+  }
+  .hero-side {
+    display: grid;
+    gap: 22px;
+    padding-bottom: 0.4rem;
+  }
+  .hero-line {
+    font-size: clamp(1.25rem, 1.6vw, 1.5rem);
+    font-weight: 600;
+    line-height: 1.22;
+    letter-spacing: -0.02em;
+  }
+  .hero-act {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+  }
+  /* The secondary action: the same round shape as Download, in a tonal fill, so the
+     download stays the one accent on the first screen. */
+  .tour-start {
+    background: var(--selected);
+    color: var(--text);
+  }
+  .tour-start:hover {
+    background: var(--tonal-hover);
+  }
+  .tour-start:active {
+    background: var(--tonal-pressed);
+  }
+  .tour-start svg {
+    flex: none;
+    transition: transform 240ms var(--ease-out);
+  }
+  /* Hovered, the cursor leans in, as the tour's own cursor does before it clicks. */
+  @media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+    .tour-start:hover svg {
+      transform: translate(2px, -2px) rotate(-8deg);
+    }
+  }
+  :global(:root:not(.js)) .tour-start {
+    display: none;
+  }
+
+  /* The laptop, and the song's colour behind it. It grows to 1240 px, or nearly the page's
+     measure on very large screens (2400 x 1300 and up), where 1240 px left half the first
+     screen empty. */
+  .hero {
+    --lap-max: 1240px;
+  }
+  @media (min-width: 2400px) and (min-height: 1300px) {
+    .hero {
+      --lap-max: 1500px;
+    }
+  }
+  .hero-stage {
+    position: relative;
+    margin-top: clamp(20px, 3.4vh, 40px);
+  }
+  /* Wide screens: a little air between the name and the lid's top edge, in step with the
+     name's size (8.8vw) and the screen's height (about 55 px at 1440 x 900). The scroll
+     moment measures from here, so the laptop starts a touch smaller and settles where it
+     always did. */
+  @media (min-width: 769px) {
+    .hero-stage {
+      margin-top: clamp(32px, min(3.8vw, 6.4vh), 64px);
+    }
+  }
+  /* The laptop's outline is 0.65 as tall as it's wide (Laptop.astro). */
+  .hero-stage :global(.hero-laptop) {
+    position: relative;
+    max-width: min(var(--lap-max), calc((100svh - 316px) / 0.65));
+    min-width: min(100%, 780px);
+    margin-inline: auto;
+  }
+  /* Wide screens keep room beside the laptop's lid for the tour's card (Tour.astro), so it
+     never has to sit on the screen (the deck is 1/0.88 the lid's width). */
+  @media (min-width: 1200px) {
+    .hero-stage :global(.hero-laptop) {
+      max-width: min(var(--lap-max), calc((100svh - 316px) / 0.65), calc((100vw - 2 * (var(--tour-w) + 36px)) / 0.88));
+      min-width: 0;
+    }
+  }
+  /* A large field of the cover's colour: full strength across the middle, fading out well
+     past the laptop's edges. At its strongest it's the colour mixed 60 % into the ground,
+     where text keeps AA (tests/unit/data.test.ts). */
+  .laptop-wrap {
+    position: relative;
+    isolation: isolate;
+  }
+  /* Behind and below the laptop, never up into the name: the field is masked out towards
+     its top, so the colour starts under the heading and spreads out round the laptop. */
+  .glow {
+    /* 60 % in the dark theme, 52 % in the light, easing with it. */
+    --glow-strength: calc(60% - 8% * var(--light));
+    position: absolute;
+    inset: -8% -22% -34%;
+    z-index: -1;
+    pointer-events: none;
+    mask-image: linear-gradient(to bottom, transparent, #000 34%);
+  }
+  .glow span {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient( /* taste-skill-ignore: the cover glow, in the playing cover's colour */
+      closest-side,
+      color-mix(in srgb, var(--c) var(--glow-strength), transparent) 38%,
+      color-mix(in srgb, var(--c) calc(var(--glow-strength) * 0.5), transparent) 66%,
+      transparent
+    );
+    opacity: 0;
+    transition: opacity var(--t-glow) ease;
+  }
+  .glow span[data-on="true"] {
+    opacity: 1;
+  }
+
+  @media (max-width: 960px) {
+    .hero-head {
+      grid-template-columns: 1fr;
+    }
+    .hero h1 {
+      font-size: clamp(3.5rem, 17.5vw, 9rem);
+    }
+    .hero-side {
+      max-width: 34rem;
+    }
+    .hero-stage :global(.hero-laptop) {
+      min-width: 0;
+    }
+  }
+  /* The playing song's line (sound and credit), attached under the laptop, centred on it
+     (the artists ask for the credit by the controls). It fades in with the screen. */
+  .hero-stage :global(.hero-audio) {
+    position: absolute;
+    top: calc(100% + 16px);
+    left: 50%;
+    width: max-content;
+    max-width: calc(100% - 32px);
+    transform: translateX(-50%);
+    transition: opacity 600ms ease;
+  }
+  .hero-stage:has(:global(.laptop:not([data-awake]))) :global(.hero-audio) {
+    opacity: 0;
+  }
+  @media (max-width: 768px) {
+    .hero-stage :global(.hero-audio) {
+      position: static;
+      width: auto;
+      max-width: none;
+      margin-top: 10px;
+      transform: none;
+    }
+  }
+
+  /* Headline words rise in, once, on load. A blur can't run on the compositor, so it meets
+     start-up's long tasks on the main thread: only large screens with a fine pointer (where
+     the machine is likely up to it) get the words out of a blur. Phones, tablets and small
+     windows get a plain fade and rise on opacity and transform; reduced motion, none. */
+  .rise {
+    display: inline-block;
+  }
+  .keep {
+    white-space: nowrap;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .rise {
+      animation: word-rise 700ms var(--ease-out) both;
+      animation-delay: calc(80ms + var(--i) * 45ms);
+    }
+    .hero-act {
+      animation: fade-rise 800ms var(--ease-out) 650ms both;
+    }
+  }
+  @media (prefers-reduced-motion: no-preference) and (min-width: 1024px) and (hover: hover) and (pointer: fine) {
+    .rise {
+      animation: blur-rise 900ms var(--ease-out) both;
+      animation-delay: calc(80ms + var(--i) * 55ms);
+    }
+  }
+  @keyframes word-rise {
+    from {
+      opacity: 0;
+      transform: translateY(0.3em);
+    }
+  }
+  @keyframes blur-rise {
+    from {
+      opacity: 0;
+      transform: translateY(0.35em);
+      filter: blur(10px);
+    }
+  }
+  @keyframes fade-rise {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+  }
+
+  /* The scroll moment (src/scripts/lid.ts): on wide screens, with script and motion, the
+     hero pins for 1.1 viewport heights. The laptop is laid out at its settled size, just
+     under the name; before the script's first frame it's drawn as it starts: smaller (it
+     scales from its top, so it stays under the name) with the lid nearly shut, where the
+     first-load opening starts (lid.ts: LEAN 12 less FLOURISH_DEG 82), so a slow start-up
+     never shows it open, then snapping shut to open again. As you scroll it rises to the
+     middle of the screen, straightens and grows to full size. */
+  @media (min-width: 769px) and (prefers-reduced-motion: no-preference) {
+    :global(:root.js) .hero {
+      --lw: min(var(--lap-max), calc((100svh - 174px) / 0.65), calc(100vw - 48px));
+      height: 210svh;
+      padding-block: 0;
+    }
+    :global(:root.js) .hero-pin {
+      position: sticky;
+      top: 0;
+      height: 100svh;
+      padding-top: clamp(16px, 3vh, 40px);
+    }
+    /* The name blurs away as you scroll (lid.ts): on its own layer, so the blur, the fade and
+       the lift are applied to it as a whole and nothing under it repaints. */
+    :global(:root.js) .hero-head {
+      will-change: transform, opacity, filter;
+    }
+    :global(:root.js) .hero-stage {
+      transform: scale(0.74);
+      transform-origin: 50% 0;
+      will-change: transform;
+    }
+    :global(:root.js) .hero-stage :global(.hero-laptop) {
+      width: var(--lw);
+      max-width: none;
+      min-width: 0;
+    }
+    /* The lid that moves (the opening, the scroll) has its own layer ready, so its first
+       frame of motion never waits for one; the features' still laptop has none. */
+    :global(:root.js) .hero :global([data-laptop-body]) {
+      transform: rotateX(-70deg);
+      will-change: transform;
+    }
+    /* Loading part-way down (a reload, back or forward, a link to a #section: Base.astro's
+       data-land), the pinned screen waits unseen until lid.ts has placed it for where the
+       page lands, so the first frame shown is that moment, never the top's. Shown after 3 s
+       whatever happens. */
+    :global(:root.js[data-land]) .hero:not([data-placed]) .hero-pin {
+      visibility: hidden;
+      animation: hero-show 0s 3s forwards;
+    }
+  }
+  @keyframes hero-show {
+    to {
+      visibility: visible;
+    }
+  }
+  /* Nor does the name rise in again. */
+  :global(:root[data-land]) .rise,
+  :global(:root[data-land]) .hero-act {
+    animation: none;
+  }
+  @media (min-width: 1200px) and (prefers-reduced-motion: no-preference) {
+    :global(:root.js) .hero {
+      --lw: min(var(--lap-max), calc((100svh - 174px) / 0.65), calc((100vw - 2 * (var(--tour-w) + 36px)) / 0.88));
+    }
+  }
+
+  /* Phones: the screen alone, cropped to the window, and no gap after it. */
+  @media (max-width: 768px) {
+    .hero {
+      padding-bottom: 8px;
+    }
+    .hero-stage :global(.hero-laptop) {
+      max-width: 520px;
+    }
+    .glow {
+      inset: -12% -30% -10%;
+    }
+  }
+</style>

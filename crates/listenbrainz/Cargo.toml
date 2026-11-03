@@ -1,0 +1,19 @@
+[package]
+name = "featherplay-listenbrainz"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "featherplay's ListenBrainz client: now playing, listens and token checks"
+publish = false
+
+[dependencies]
+reqwest = { workspace = true, features = ["native-tls"] }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt", "time"] }
+
+[lints]
+workspace = true

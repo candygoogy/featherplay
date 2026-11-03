@@ -1,0 +1,379 @@
+---
+// Lyrics, up close: the demo's lyrics at reading size, on the same player as the hero.
+import { demoStart, songById, songs } from "../data/songs";
+import { currentLineIndex, formatTime, lyricsSource } from "../demo/player";
+import Icon from "./Icon.astro";
+import "../styles/app-controls.css";
+import NowPlaying from "./NowPlaying.astro";
+import { lyricInks } from "../data/colour";
+
+const song = songById(demoStart.songId)!;
+const at = demoStart.positionMs;
+const current = currentLineIndex(song, at);
+// The panel and its three levels of text, as the app's (src/data/colour.ts); showcase.ts
+// sets them again for each song.
+const ink = lyricInks(song.colour);
+// This section always shows lyrics: it offers only the songs that have them.
+const lyricSongs = songs.filter((s) => s.lyrics.length > 0);
+---
+
+<section id="lyrics" class="showcase" aria-labelledby="lyrics-title" style={`--song:${song.colour};--lyric-ground:${ink.ground};--lyric-next:${ink.nextCss};--lyric-past:${ink.pastCss}`}>
+  <div class="wrap grid">
+    <div class="side">
+      <h2 id="lyrics-title">Lyrics, up close</h2>
+      <p class="lede">
+        Synced lines that follow the song, in its cover's colour. Click a line to jump there. Off, and featherplay never
+        looks lyrics up at all.
+      </p>
+      <button class="switch" type="button" role="switch" aria-checked="true" data-showcase-switch>
+        <span class="track" aria-hidden="true"><span class="thumb"></span></span>
+        <span>Show lyrics</span>
+      </button>
+      <div class="now">
+        <img data-showcase-cover src={song.cover} width="64" height="64" alt="" loading="lazy" decoding="async" />
+        <div class="now-text">
+          <p class="t" data-showcase-title>{song.title}</p>
+          <p class="a" data-showcase-artist>{song.artist}</p>
+          <p class="time"><span data-showcase-time>{formatTime(at)}</span> of <span data-showcase-duration>{formatTime(song.durationMs)}</span></p>
+        </div>
+        <button class="fp-play" type="button" data-showcase-play aria-label="Play">
+          <Icon name="play" class="i-play" /><Icon name="pause" class="i-pause" />
+        </button>
+      </div>
+      <NowPlaying class="showcase-np" compact />
+      <div class="picks" role="group" aria-label="Songs with lyrics">
+        {
+          lyricSongs.map((s) => (
+            <button
+              class="pick"
+              type="button"
+              data-showcase-pick={s.id}
+              aria-pressed={String(s.id === song.id)}
+              aria-label={s.title}
+              title={s.title}
+            >
+              <img src={s.cover} width="48" height="48" alt="" loading="lazy" decoding="async" />
+            </button>
+          ))
+        }
+      </div>
+    </div>
+
+    <div class="panel-col">
+      <div class="panel" data-showcase-panel data-state="lines">
+        <div class="viewport" data-showcase-viewport>
+        <ol class="lines" data-showcase-lines>
+          {
+            song.lyrics.map((l, i) => (
+              <li class:list={{ verse: i > 0 && l.atMs - song.lyrics[i - 1].atMs > 5200 }}>
+                <button
+                  class="line"
+                  type="button"
+                  data-at={l.atMs}
+                  data-state={i < current ? "past" : i === current ? "current" : "next"}
+                  aria-current={i === current ? "true" : undefined}
+                >
+                  {l.line}
+                </button>
+              </li>
+            ))
+          }
+        </ol>
+        </div>
+        <p class="calm" data-showcase-calm hidden>No lyrics for this song</p>
+        <p class="calm off-note" data-showcase-off>
+          Lyrics are off. featherplay won't look them up until you turn Show lyrics back on.
+        </p>
+      </div>
+      <p class="source" data-showcase-source>{lyricsSource(song)}</p>
+    </div>
+  </div>
+</section>
+
+<script>
+  import { bindReplicas } from "../demo/replica";
+  import { bindShowcase } from "../demo/showcase";
+  const root = document.querySelector<HTMLElement>("#lyrics.showcase");
+  const player = bindReplicas();
+  if (root && player) bindShowcase(root, player);
+</script>
+
+<style>
+  .showcase {
+    padding-block: clamp(72px, 9vw, 140px);
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: var(--split);
+    gap: var(--split-gap);
+    align-items: center;
+  }
+  h2 {
+    font-size: clamp(2.75rem, 6.4vw, 6rem);
+  }
+  .lede {
+    max-width: 34ch;
+    margin-top: 24px;
+    font-size: clamp(1.0625rem, 1.4vw, 1.25rem);
+    line-height: 1.5;
+  }
+
+  /* The app's own switch, in the site's accent. */
+  .switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 44px;
+    margin-top: 28px;
+    padding: 0;
+    border: 0;
+    background: none;
+    font-weight: 700;
+  }
+  .switch .track {
+    position: relative;
+    width: 48px;
+    height: 28px;
+    border-radius: 999px;
+    background: var(--track);
+    transition: background-color calc(160ms * var(--colour-easing)) ease;
+  }
+  .switch .thumb {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--text);
+    transition: transform 240ms var(--ease-out);
+  }
+  .switch[aria-checked="true"] .track {
+    background: var(--accent);
+  }
+  .switch[aria-checked="true"] .thumb {
+    background: var(--on-accent);
+    transform: translateX(20px);
+  }
+
+  /* The card's line: the sound and whose song it is, attached under the card. */
+  .side :global(.showcase-np) {
+    max-width: 420px;
+    margin-top: 8px;
+    padding-inline: 12px;
+  }
+  .now {
+    display: grid;
+    grid-template-columns: 64px 1fr auto;
+    align-items: center;
+    gap: 16px;
+    max-width: 420px;
+    margin-top: 32px;
+    padding: 12px;
+    border-radius: 20px;
+    background: var(--surface);
+  }
+  /* The three songs with lyrics, as covers. */
+  .picks {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+    padding-inline: 12px;
+  }
+  .pick {
+    position: relative;
+    width: 48px;
+    height: 48px;
+    padding: 0;
+    border: 0;
+    border-radius: 10px;
+    background: none;
+    transition: transform var(--t-release) var(--spring-release);
+  }
+  .pick img {
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+  }
+  .pick::after {
+    content: "";
+    position: absolute;
+    inset: -4px;
+    border-radius: 13px;
+    box-shadow: inset 0 0 0 2px transparent; /* taste-skill-ignore: the picked cover's ring */
+    transition: box-shadow calc(200ms * var(--colour-easing)) ease;
+  }
+  .pick[aria-pressed="true"]::after {
+    box-shadow: inset 0 0 0 2px var(--text); /* taste-skill-ignore: the picked cover's ring */
+  }
+  .pick:active {
+    transform: scale(var(--press-scale));
+    transition: transform var(--t-press) var(--ease-out);
+  }
+  .now img {
+    width: 64px;
+    height: 64px;
+    border-radius: 8px;
+  }
+  .now-text {
+    min-width: 0;
+  }
+  .t {
+    font-weight: 700;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .a,
+  .time {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+  }
+  .time {
+    font-variant-numeric: tabular-nums;
+  }
+  /* The panel: one field of the cover's colour, deep in both themes, white lines. The
+     panel itself stays whole; only the lines fade as they leave it at the top or bottom,
+     through a short mask on the lines' own window. */
+  .panel {
+    /* The lines' inset from the panel's sides, and from its top: the first line's words sit
+       as far from the top edge as from the left one. */
+    --inset: clamp(24px, 4vw, 56px);
+    position: relative;
+    height: clamp(420px, 64vh, 620px);
+    border-radius: 24px;
+    background: var(--lyric-ground);
+    color: #fff;
+    overflow: clip;
+    transition: background-color calc(300ms * var(--colour-easing)) ease;
+  }
+  .viewport {
+    position: absolute;
+    inset: 0;
+    overflow: clip;
+    /* Its height is the lines' measure: the room below them is half of it (cqh). */
+    container-type: size;
+    /* The lines dissolve over the app's 24 px where they leave the panel (lyric-edge),
+       nothing more: at rest they're whole from the first line down. */
+    mask-image: linear-gradient(transparent, #000 24px, #000 calc(100% - 24px), transparent); /* taste-skill-ignore: a mask, not a fill */
+  }
+  /* As the app's: the lines start at the top (the line's own 6 px padding, then its words
+     at the inset) and half the panel's height runs on below the last one, so the follow can
+     bring it up to the middle and no further (src/demo/follow.ts). */
+  .lines {
+    display: grid;
+    gap: 6px;
+    margin: 0;
+    padding: calc(var(--inset) - 6px) var(--inset) 50cqh;
+    list-style: none;
+    transition: transform var(--t-follow) var(--ease-out);
+  }
+  .lines :global(li.verse) {
+    margin-top: 0.9em;
+  }
+  .lines :global(.line) {
+    display: block;
+    margin-left: -14px;
+    padding: 6px 14px;
+    border: 0;
+    border-radius: 12px;
+    background: none;
+    color: var(--lyric-past);
+    font-size: clamp(1.625rem, 2.8vw, 2.5rem);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+    text-align: left;
+    transition:
+      color calc(400ms * var(--colour-easing)) ease,
+      background-color var(--t-hover) ease;
+  }
+  /* Three levels, as the app's lyrics: the line playing white, the lines to come at 4.5:1 on
+     the panel, the sung ones dimmest at 3:1 (src/data/colour.ts lyricInks). */
+  .lines :global(.line[data-state="next"]) {
+    color: var(--lyric-next);
+  }
+  .lines :global(.line[data-state="current"]) {
+    color: #fff;
+  }
+  .lines :global(.line:hover) {
+    background: #ffffff1f;
+  }
+  /* While the lines move by hand (src/demo/follow.ts), a line passing under a still pointer
+     doesn't light up: the highlight comes back once they rest. */
+  .lines[data-moving] :global(.line:hover) {
+    background: none;
+  }
+  .lines :global(.line:focus-visible) {
+    outline-color: #fff;
+  }
+  /* Whose lyrics they are: a caption under the panel. */
+  .panel-col {
+    min-width: 0;
+  }
+  .source {
+    margin-top: 10px;
+    padding-inline: 4px;
+    color: var(--text-muted);
+    font-size: 0.8125rem;
+  }
+  /* Lyrics off: the caption keeps its line (nothing below moves), just empty of words. */
+  .source[data-off="true"] {
+    visibility: hidden;
+  }
+  /* The notes take the first line's place: its words' top-left corner. */
+  .calm {
+    position: absolute;
+    inset: var(--inset) var(--inset) auto;
+    max-width: 24ch;
+    font-size: clamp(1.25rem, 2vw, 1.75rem);
+    font-weight: 700;
+    line-height: 1.3;
+    text-wrap: balance;
+  }
+  /* Off and on, inside the panel: the lines fade out and the note fades in where they were
+     (and back), the panel never changing size. Hidden from the tab order once faded. */
+  .viewport,
+  .off-note {
+    transition:
+      opacity 220ms ease,
+      transform 260ms var(--ease-out),
+      visibility 0s linear 0s;
+  }
+  .off-note,
+  .panel[data-state="off"] .viewport {
+    opacity: 0;
+    visibility: hidden;
+    transition:
+      opacity 180ms ease,
+      transform 260ms var(--ease-out),
+      visibility 0s linear 180ms;
+  }
+  .off-note {
+    transform: translateY(8px);
+  }
+  .panel[data-state="off"] .off-note {
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+    transition:
+      opacity 220ms ease 80ms,
+      transform 260ms var(--ease-out) 80ms,
+      visibility 0s linear 0s;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .off-note {
+      transform: none;
+    }
+  }
+
+  @media (max-width: 860px) {
+    .grid {
+      grid-template-columns: 1fr;
+    }
+    .panel {
+      height: 70vh;
+      max-height: 560px;
+    }
+  }
+</style>

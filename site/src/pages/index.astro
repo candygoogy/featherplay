@@ -1,0 +1,30 @@
+---
+import Base from "../layouts/Base.astro";
+import Header from "../components/Header.astro";
+import Hero from "../components/Hero.astro";
+import Compare from "../components/Compare.astro";
+import LyricsShowcase from "../components/LyricsShowcase.astro";
+import Customise from "../components/Customise.astro";
+import Features from "../components/Features.astro";
+import Faq from "../components/Faq.astro";
+import Download from "../components/Download.astro";
+import Footer from "../components/Footer.astro";
+---
+
+<Base
+  app
+  title="featherplay: a light, native Windows player for your music"
+  description="featherplay is a small native Windows player for YouTube Music, with Last.fm scrobbling, Discord status, media keys and synced lyrics, and no browser running behind it."
+>
+  <Header />
+  <main id="main" tabindex="-1">
+    <Hero />
+    <Compare />
+    <LyricsShowcase />
+    <Customise />
+    <Features />
+    <Faq />
+    <Download />
+  </main>
+  <Footer />
+</Base>

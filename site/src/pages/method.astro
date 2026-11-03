@@ -1,0 +1,231 @@
+---
+// How the comparison's figures were measured, and where each one comes from. The setup is
+// the final measurement's (its write-up, kept outside the repo); the figures and the sizes
+// come from numbers.ts and release.ts.
+import Base from "../layouts/Base.astro";
+import Header from "../components/Header.astro";
+import { figureFor, figures, installFolders, metrics, type Metric } from "../data/numbers";
+import { figureText, formatBytes } from "../data/format";
+import { release, sizeLabel } from "../data/release";
+
+const names: Record<Metric, string> = {
+  memoryMB: "Memory while playing",
+  memoryPausedMB: "Memory while paused",
+  cpuPlayingPct: "CPU while playing",
+  cpuPausedPct: "CPU while paused",
+  processes: "Processes",
+  downloadMB: "Download",
+};
+const file = (path: string) => path.split("/").pop() ?? path;
+const fp = figureFor("featherplay");
+const pear = figureFor("Pear Desktop");
+const edge = figureFor("YouTube Music in Edge");
+const procs = (f: (typeof figures)[number]) => figureText(f, "processes");
+---
+
+<Base
+  title="How featherplay's figures were measured"
+  description="The PC, the versions and the method behind the memory, CPU and download figures that compare featherplay with Pear Desktop and YouTube Music in Edge."
+>
+  <Header />
+  <main id="main" tabindex="-1" class="wrap method">
+    <h1>How these were measured</h1>
+    <p class="lede">
+      All three players were measured on one PC on the evening of 1 November 2026, one after the other, playing the
+      same song. Every figure on the home page comes from that evening, and each one names its file below.
+    </p>
+
+    <section aria-labelledby="setup">
+      <h2 id="setup">The PC and the players</h2>
+      <ul class="facts">
+        <li>
+          An AMD Ryzen 7 9800X3D (8 cores, 16 logical processors) with 32 GB of memory, running Windows 11 Pro for
+          Workstations, build 26300.
+        </li>
+        <li>
+          featherplay {fp.version}, the release build that's offered for download: the exe is
+          {release.portable ? ` ${sizeLabel(release.portable)}` : ""}, the installer
+          {release.installer ? ` ${sizeLabel(release.installer)}` : ""}.
+        </li>
+        <li>Pear Desktop {pear.version}, installed, with its owner's settings left as they were.</li>
+        <li>
+          YouTube Music in Microsoft Edge {edge.version}: a separate Edge with a clean profile of its own and no
+          extensions, one tab, signed in.
+        </li>
+      </ul>
+    </section>
+
+    <section aria-labelledby="run">
+      <h2 id="run">How each one ran</h2>
+      <ul class="facts">
+        <li>The same song in all three, on repeat, at normal volume.</li>
+        <li>
+          Each was the only player running. Pear Desktop stayed open but paused while Edge was measured, and wasn't
+          counted.
+        </li>
+        <li>The window was minimised to the taskbar, and the PC was otherwise lightly used, with no games running.</li>
+        <li>Five minutes playing, then three minutes paused, with a sample every 5 seconds.</li>
+      </ul>
+    </section>
+
+    <section aria-labelledby="counted">
+      <h2 id="counted">What's counted</h2>
+      <ul class="facts">
+        <li>
+          Every process each player runs: {procs(fp)} for featherplay, {procs(pear)} for Pear Desktop and{" "}
+          {procs(edge)} for Edge. Edge's are picked out by the profile folder, so no other Edge window gets counted.
+        </li>
+        <li>
+          Memory is private memory, the memory those processes keep for themselves, averaged over the run. It's in MB
+          as Windows counts them: 1 MB is 1,048,576 bytes, here and for every size on the site.
+        </li>
+        <li>
+          CPU is a share of the whole processor: the CPU seconds the processes used, divided by the seconds measured,
+          divided by the 16 logical processors.
+        </li>
+        <li>
+          Download is what you download to install it: featherplay's installer (or the{" "}
+          {release.portable ? sizeLabel(release.portable) : ""} portable exe), Pear Desktop's {figureText(pear, "downloadMB")}{" "}
+          installer. Edge comes with Windows, so there's nothing to download.
+        </li>
+        <li>
+          The two folders under the comparison are Pear Desktop's install folder on the same PC, listed on 1 November
+          2026 ({installFolders.pear.files} files, {formatBytes(installFolders.pear.bytes)}), and featherplay's portable
+          exe. Source: {file(installFolders.source)}. Installed, featherplay's folder is the same exe plus its
+          uninstaller (about {formatBytes(installFolders.featherplay.installed.uninstallerBytes)}, source:{" "}
+          {file(installFolders.featherplay.installed.source)}), so its installed size is given as an approximation.
+        </li>
+      </ul>
+    </section>
+
+    <section aria-labelledby="dropped">
+      <h2 id="dropped">Left out, and measured again</h2>
+      <p class="para">Three runs were thrown away and done again:</p>
+      <ul class="facts">
+        <li>featherplay's first playing run, because the sound device changed partway through.</li>
+        <li>Edge's first playing run, because playback had stalled.</li>
+        <li>
+          Edge's second playing run, because a rounding bug in the script's CPU column spoiled its CPU figure. The bug
+          is fixed. That run's memory, 999 MB, agrees with the run that's used.
+        </li>
+      </ul>
+    </section>
+
+    <section aria-labelledby="scripts">
+      <h2 id="scripts">The scripts</h2>
+      <p class="para">
+        Three PowerShell scripts took the samples and wrote them to CSV files: <code>measure-pid-hwnd.ps1</code> for
+        featherplay, <code>measure-pear.ps1</code> for Pear Desktop and <code>measure-edge.ps1</code> for Edge, which
+        reads each process's CPU time from Windows' own process list (Win32_Process).
+      </p>
+    </section>
+
+    <section aria-labelledby="sources">
+      <h2 id="sources">Every figure and its source</h2>
+      {
+        figures.map((f) => (
+          <div class="app">
+            <h3>
+              {f.app} {f.version}
+            </h3>
+            <dl>
+              {metrics.map((m) => (
+                <div class="fact">
+                  <dt>{names[m]}</dt>
+                  <dd>
+                    <span class="v">{figureText(f, m)}</span>
+                    <span class="src">{file(f.sources[m])}</span>
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        ))
+      }
+    </section>
+
+    <p class="back"><a href="/#light">Back to the comparison</a></p>
+  </main>
+</Base>
+
+<style>
+  .method {
+    padding-block: clamp(48px, 8vw, 120px);
+    max-width: 960px;
+  }
+  h1 {
+    font-size: clamp(2.75rem, 7vw, 5.5rem);
+  }
+  .lede {
+    max-width: 44ch;
+    margin-top: 24px;
+    font-size: clamp(1.125rem, 1.6vw, 1.375rem);
+    font-weight: 600;
+    line-height: 1.35;
+  }
+  .para {
+    max-width: 64ch;
+    margin-bottom: 14px;
+  }
+  code {
+    font-size: 0.9375em;
+    white-space: nowrap;
+  }
+  section {
+    margin-top: clamp(56px, 7vw, 96px);
+  }
+  h2 {
+    font-size: clamp(1.75rem, 3.4vw, 2.75rem);
+    margin-bottom: 24px;
+  }
+  .facts {
+    display: grid;
+    gap: 14px;
+    max-width: 64ch;
+    padding-left: 1.2em;
+  }
+  .app {
+    margin-top: 40px;
+  }
+  h3 {
+    font-size: 1.375rem;
+    margin-bottom: 12px;
+  }
+  dl {
+    display: grid;
+    gap: 8px;
+  }
+  .fact {
+    display: grid;
+    grid-template-columns: minmax(0, 14rem) 1fr;
+    gap: 4px 24px;
+    padding: 10px 0;
+  }
+  dt {
+    color: var(--text-muted);
+  }
+  dd {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 16px;
+    margin: 0;
+  }
+  .v {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .src {
+    color: var(--text-muted);
+    font-size: 0.9375rem;
+    overflow-wrap: anywhere;
+  }
+  .back {
+    margin-top: 64px;
+    font-weight: 700;
+  }
+  @media (max-width: 640px) {
+    .fact {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

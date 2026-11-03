@@ -1,0 +1,88 @@
+name: Bug report
+description: Something in featherplay doesn't work as it should.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. If playback stopped working, update featherplay first: YouTube
+        changes things, and a new release is often the fix. For a security problem, don't
+        open an issue; see SECURITY.md.
+
+  - type: input
+    id: version
+    attributes:
+      label: featherplay version
+      description: Settings > About shows it.
+      placeholder: "0.1.0"
+    validations:
+      required: true
+
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      description: Press Win+R and run `winver`.
+      placeholder: "Windows 11 24H2 (build 26100)"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: signed-in
+    attributes:
+      label: Signed in?
+      options:
+        - "Yes, through the sign-in window"
+        - "Yes, with a pasted Cookie header"
+        - "No"
+    validations:
+      required: true
+
+  - type: input
+    id: link
+    attributes:
+      label: Song, album or playlist link
+      description: The music.youtube.com link where it happens, if it's about one. Leave out private playlists.
+      placeholder: "https://music.youtube.com/watch?v=..."
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps
+      description: What you did, one step per line.
+      placeholder: |
+        1. Open the album
+        2. Double-click the third song
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened
+      description: Error messages as written, or a screenshot.
+    validations:
+      required: true
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: Settings > About > Copy diagnostics, then paste here.
+      render: text
+
+  - type: textarea
+    id: log
+    attributes:
+      label: Log
+      description: |
+        Attach `%LOCALAPPDATA%\featherplay\logs\featherplay.log` (Settings > About > Open log
+        folder), or paste the lines from around the problem. featherplay leaves cookies,
+        tokens and keys out of its log, but read it before you post it anyway.
