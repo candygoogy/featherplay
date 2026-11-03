@@ -2,9 +2,9 @@
 # https://embarkstudios.github.io/cargo-deny/
 
 [graph]
-# featherplay ships for Windows x64 only, so the macOS, Linux, Android and wasm crates in the
-# lockfile never build. Build and dev dependencies stay in: they run on our machines and CI.
-targets = ["x86_64-pc-windows-msvc"]
+# featherplay ships for Windows x64 and ARM64 only, so the macOS, Linux, Android and wasm
+# crates in the lockfile never build. Build and dev dependencies stay in: they run on our machines and CI.
+targets = ["x86_64-pc-windows-msvc", "aarch64-pc-windows-msvc"]
 
 [advisories]
 # The RustSec database, fetched on every run.

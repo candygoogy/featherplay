@@ -1,7 +1,8 @@
 # cargo-about config for THIRD_PARTY.md. Regenerate from the repo root with:
 #   cargo about generate --offline -c packaging/third-party/about.toml --workspace \
 #     -o THIRD_PARTY.md packaging/third-party/about.hbs
-# Only what ships in featherplay.exe: the Windows x64 target, no build or dev dependencies.
+# Only what ships in featherplay.exe: the Windows x64 and ARM64 targets, no build or dev
+# dependencies.
 accepted = [
   "MIT",
   "Apache-2.0",
@@ -21,6 +22,6 @@ accepted = [
   # Slint ships no file for its licence; THIRD_PARTY.md links it (see about.hbs).
   "LicenseRef-Slint-Royalty-free-2.0",
 ]
-targets = ["x86_64-pc-windows-msvc"]
+targets = ["x86_64-pc-windows-msvc", "aarch64-pc-windows-msvc"]
 ignore-build-dependencies = true
 ignore-dev-dependencies = true
