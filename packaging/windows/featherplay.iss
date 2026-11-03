@@ -32,6 +32,22 @@
 #ifndef CredService
   #define CredService "featherplay"
 #endif
+; The exe's architecture: x64 (the default) or arm64. Both setups share the AppId, so either
+; one installs over the other in place. The x64 setup also installs on ARM64 Windows 11,
+; which runs it under emulation: 0.1.0 users there update through it, and its asset name
+; stays featherplay-setup-<version>.exe. The ARM64 setup installs only on ARM64.
+#ifndef Arch
+  #define Arch "x64"
+#endif
+#if Arch == "x64"
+  #define ArchAllowed "x64compatible"
+  #define SetupSuffix ""
+#elif Arch == "arm64"
+  #define ArchAllowed "arm64"
+  #define SetupSuffix "-arm64"
+#else
+  #error Arch must be x64 or arm64.
+#endif
 
 #define AppName "featherplay"
 ; crates/integrations/src/identity.rs: AUMID.
@@ -58,8 +74,8 @@ VersionInfoDescription={#AppName} setup
 ; Per user, no admin prompt, and no way to ask for one.
 PrivilegesRequired=lowest
 DefaultDirName={localappdata}\Programs\{#AppName}
-ArchitecturesAllowed=x64compatible
-ArchitecturesInstallIn64BitMode=x64compatible
+ArchitecturesAllowed={#ArchAllowed}
+ArchitecturesInstallIn64BitMode={#ArchAllowed}
 MinVersion=10.0
 
 ; A short wizard: the shortcuts choice, the progress, and the finish page with "Launch".
@@ -88,7 +104,7 @@ UninstallDisplayName={#AppName}
 UninstallDisplayIcon={app}\featherplay.exe
 
 OutputDir={#OutputDir}
-OutputBaseFilename=featherplay-setup-{#AppVersion}
+OutputBaseFilename=featherplay-setup-{#AppVersion}{#SetupSuffix}
 Compression=lzma2/max
 SolidCompression=yes
 

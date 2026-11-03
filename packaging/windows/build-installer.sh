@@ -1,9 +1,14 @@
 #!/usr/bin/env bash
 # Builds featherplay's per-user installer: the release exe, then
-# target/installer/featherplay-setup-<version>.exe (packaging/windows/featherplay.iss).
+# target/installer/featherplay-setup-<version>.exe (packaging/windows/featherplay.iss), or
+# featherplay-setup-<version>-arm64.exe with --arch arm64.
 #
-# Usage: packaging/windows/build-installer.sh [--skip-build] [extra ISCC arguments...]
-#   --skip-build  package the exe already in target/release instead of building it
+# Usage: packaging/windows/build-installer.sh [--arch x64|arm64] [--skip-build] [extra ISCC arguments...]
+#   --arch        the exe's architecture, x64 by default. arm64 packages
+#                 target/aarch64-pc-windows-msvc/release/featherplay.exe, where
+#                 `cargo build --target aarch64-pc-windows-msvc` puts it (release.yml puts
+#                 the exe it built on an ARM64 runner there too)
+#   --skip-build  package the exe already there instead of building it
 #   extra arguments go to ISCC as they are (no MSYS path conversion), e.g.
 #   /DCredService=<name> for the installer test, or /O<dir> for another output folder
 #
@@ -11,6 +16,8 @@
 # - Inno Setup 6.7 or later: ISCC=<path to ISCC.exe>, or ISCC on PATH, or a standard install.
 # - cargo. CARGO_CMD=<command> runs the build through something else, such as a wrapper
 #   that waits for a build lock (an exported `cargo` shell function is used as well).
+#   Building the arm64 exe on an x64 PC also needs the ARM64 MSVC build tools and
+#   `rustup target add aarch64-pc-windows-msvc`.
 # - The build keys LASTFM_API_KEY, LASTFM_API_SECRET and DISCORD_CLIENT_ID, compiled in with
 #   option_env!: in the environment, or in a KEY=value file named by FEATHERPLAY_ENV. The
 #   script refuses to build without them (ALLOW_NO_KEYS=1 builds a keyless exe anyway). It
@@ -20,16 +27,41 @@ set -euo pipefail
 root=$(cd "$(dirname "$0")/../.." && pwd)
 cd "$root"
 
-skip_build=
-if [ "${1:-}" = "--skip-build" ]; then
-    skip_build=1
-    shift
-fi
-
 die() {
     echo "build-installer: $*" >&2
     exit 1
 }
+
+arch=x64
+skip_build=
+while [ $# -gt 0 ]; do
+    case $1 in
+    --arch)
+        [ $# -ge 2 ] || die "--arch needs x64 or arm64"
+        arch=$2
+        shift 2
+        ;;
+    --skip-build)
+        skip_build=1
+        shift
+        ;;
+    *) break ;;
+    esac
+done
+
+case $arch in
+x64)
+    target_args=()
+    exe=target/release/featherplay.exe
+    setup_suffix=
+    ;;
+arm64)
+    target_args=(--target aarch64-pc-windows-msvc)
+    exe=target/aarch64-pc-windows-msvc/release/featherplay.exe
+    setup_suffix=-arm64
+    ;;
+*) die "--arch: '$arch' isn't x64 or arm64" ;;
+esac
 
 iscc=${ISCC:-}
 if [ -z "$iscc" ]; then
@@ -64,15 +96,17 @@ if [ -z "$skip_build" ]; then
             die "$name is not set (see the header of this script)"
         fi
     done
-    ${CARGO_CMD:-cargo} build --release --locked -p featherplay
+    ${CARGO_CMD:-cargo} build --release --locked -p featherplay "${target_args[@]}"
 fi
 
-exe=target/release/featherplay.exe
 [ -f "$exe" ] || die "no $exe; build it first, or drop --skip-build"
 
-# build.rs renders the icon and the wizard images into its OUT_DIR. Old build dirs can
-# linger, so take the newest.
-icon=$(ls -t target/release/build/featherplay-*/out/featherplay.ico 2>/dev/null | head -1)
+# build.rs renders the icon and the wizard images into its OUT_DIR. They don't depend on the
+# architecture, so an x64 build's serve the arm64 setup too. Old build dirs can linger, so
+# take the newest.
+icon=$(ls -t target/release/build/featherplay-*/out/featherplay.ico \
+    target/aarch64-pc-windows-msvc/release/build/featherplay-*/out/featherplay.ico 2>/dev/null |
+    head -1 || true)
 [ -n "$icon" ] || die "no featherplay.ico under target/release/build; build the release exe"
 art=$(dirname "$icon")
 for f in installer-small installer-panel installer-small-light installer-panel-light; do
@@ -84,11 +118,12 @@ win() { cygpath -w "$1"; }
 # ISCC's switches start with "/", which MSYS would otherwise rewrite as paths.
 MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' "$iscc" /Qp \
     "/DAppVersion=$version" \
+    "/DArch=$arch" \
     "/DExeFile=$(win "$root/$exe")" \
     "/DArtDir=$(win "$root/$art")" \
     "/O$(win "$root/target/installer")" \
     "$@" \
     "$(win "$root/packaging/windows/featherplay.iss")"
 
-echo "featherplay.exe: $(stat -c %s "$exe") bytes"
-ls -l target/installer/featherplay-setup-"$version".exe 2>/dev/null || true
+echo "featherplay.exe ($arch): $(stat -c %s "$exe") bytes"
+ls -l "target/installer/featherplay-setup-$version$setup_suffix.exe" 2>/dev/null || true
