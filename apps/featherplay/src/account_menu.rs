@@ -26,7 +26,7 @@ use crate::ui::{AccountItem, AccountMenu};
 use crate::ui_bridge::model;
 
 /// The photos, in logical pixels.
-const PHOTO: u32 = 32;
+pub(crate) const PHOTO: u32 = 32;
 
 #[derive(Default)]
 struct State {
@@ -135,6 +135,15 @@ pub fn active_handle(ctx: &Ctx, handle: Option<&str>) {
     }
 }
 
+/// The list the first sign-in's picker read, so the menu's first open needn't read it again.
+pub(crate) fn remember(list: Vec<AccountIdentity>) {
+    STATE.with_borrow_mut(|s| {
+        if s.list.is_none() && !s.fetching {
+            s.list = Some(list);
+        }
+    });
+}
+
 fn opened(ctx: &Rc<Ctx>) {
     if STATE.with_borrow(|s| s.list.is_some()) {
         show(ctx);
@@ -226,8 +235,9 @@ fn show(ctx: &Ctx) {
     });
 }
 
-/// One row: the name, then the handle, "No channel" or the channel's subscribers.
-fn item(a: &AccountIdentity, learned_handle: Option<&str>) -> AccountItem {
+/// One row: the name, then the handle, "No channel" or the channel's subscribers. The first
+/// sign-in's picker (`account_picker`) shows the same rows.
+pub(crate) fn item(a: &AccountIdentity, learned_handle: Option<&str>) -> AccountItem {
     let name = a.name.trim();
     let detail = a
         .handle

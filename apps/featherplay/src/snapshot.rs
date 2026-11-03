@@ -105,6 +105,8 @@ pub const PAGES: &[&str] = &[
     "sign-in-expired",
     // Home with the account menu open from the sidebar's account row (placeholder identities).
     "account-menu",
+    // A first sign-in whose cookies hold several identities: the picker over the sign-in page.
+    "account-picker",
     // The tray's mini player alone (its own 340 x 170 window), with the fixture track playing
     // or paused, the same with a title too long for two lines, or with nothing to play.
     "mini-player",
@@ -438,6 +440,10 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
         crate::close::show_for_snapshot(ctx);
         settle();
     }
+    if o.page == "account-picker" {
+        crate::account_picker::show_for_snapshot(ctx);
+        settle();
+    }
     if let Some(which) = o
         .page
         .strip_prefix("playlist-menu")
@@ -766,7 +772,7 @@ fn page(name: &str, f: &Fixtures) -> Result<Page, String> {
         | "settings-idle"
         | "settings-local-api" => Page::Settings,
         "about" | "about-update" | "about-update-ready" => Page::About,
-        "sign-in" | "sign-in-expired" => Page::SignIn,
+        "sign-in" | "sign-in-expired" | "account-picker" => Page::SignIn,
         "explore" => Page::Explore {
             tab: ExploreTab::NewReleases,
         },

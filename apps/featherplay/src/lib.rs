@@ -25,6 +25,7 @@ pub mod ui {
 }
 
 pub mod account_menu;
+pub mod account_picker;
 pub mod app;
 pub mod bar;
 pub mod busy;

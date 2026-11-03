@@ -348,6 +348,9 @@ impl Controller {
                 forget_library(&self.paths);
                 self.api = Some(api.clone());
                 self.ui.catalog.set(Source::Live(api));
+                // No identity is saved now: the window asks which one when there are several,
+                // holding the sign-in until it's chosen (`account_picker`).
+                (self.ui.events)(UiEvent::AskIdentity);
                 (self.ui.events)(UiEvent::Account { signed_in: true });
                 self.input(Input::SignedIn);
             }
@@ -498,6 +501,8 @@ impl Controller {
             Ok(next) => next,
             Err(e) => {
                 log!("switching identities failed: {e}");
+                // Still the same identity; the first sign-in's picker waits for an answer.
+                (self.ui.events)(UiEvent::Identity(api.identity().clone()));
                 return;
             }
         };

@@ -24,9 +24,9 @@ use crate::covers::Covers;
 use crate::router::{ExploreTab, History, LibraryTab, Page};
 use crate::ui::{AppWindow, Frame, Nav, PageKind, Theme};
 use crate::{
-    account_menu, bar, close, endsession, instance, language, link, memory, mini, native, pages,
-    playlist_menu, popup, queue_panel, repaint, shell, sidebar, song_menu, suggest, toast, top_bar,
-    updates, wheel,
+    account_menu, account_picker, bar, close, endsession, instance, language, link, memory, mini,
+    native, pages, playlist_menu, popup, queue_panel, repaint, shell, sidebar, song_menu, suggest,
+    toast, top_bar, updates, wheel,
 };
 
 /// Set once featherplay starts to quit. A second launch asking to show the window is told
@@ -355,6 +355,7 @@ pub fn wire(ctx: &Rc<Ctx>, ui: &AppWindow) {
     song_menu::init(ctx);
     playlist_menu::init(ctx);
     account_menu::init(ctx);
+    account_picker::init(ctx);
     toast::init(ctx);
     pages::init(ctx);
 }
@@ -369,6 +370,8 @@ pub fn on_event(ev: UiEvent) {
             queue_panel::update(&ctx, &state);
             pages::player_changed(&ctx, &state);
         }
+        // A new sign-in's, held while the account picker asks which identity to act as.
+        UiEvent::Account { signed_in } if account_picker::hold(&ctx, signed_in) => {}
         UiEvent::Account { signed_in } => {
             ctx.reconnecting.set(false);
             ctx.signed_in.set(signed_in);
@@ -394,7 +397,12 @@ pub fn on_event(ev: UiEvent) {
                 run();
             }
         }
-        UiEvent::Identity(identity) => account_menu::identity_changed(&ctx, &identity),
+        UiEvent::AskIdentity => account_picker::ask(&ctx),
+        UiEvent::Identity(identity) => {
+            if !account_picker::switched(&identity) {
+                account_menu::identity_changed(&ctx, &identity);
+            }
+        }
         UiEvent::ShowWindow => show_window(&ctx),
         UiEvent::AccountNotice(ev) => pages::sign_in::notice(&ctx, ev),
         UiEvent::Discord(status) => pages::settings::discord_changed(&ctx, status),

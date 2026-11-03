@@ -121,11 +121,11 @@ msgstr ""
 msgid "Switched to {}"
 msgstr ""
 
-#: src/account_menu.rs:181
+#: src/account_menu.rs:190
 msgid "Couldn't load your accounts. Open the menu to try again."
 msgstr ""
 
-#: src/account_menu.rs:237
+#: src/account_menu.rs:247
 msgid "No channel"
 msgstr ""
 
@@ -141,78 +141,78 @@ msgstr ""
 msgid "Right-click the tray icon to show the window or quit."
 msgstr ""
 
-#: src/controller/account.rs:404
+#: src/controller/account.rs:407
 msgid "Your API key is saved. Connect to sign in to Last.fm with it."
 msgstr ""
 
-#: src/controller/account.rs:406
+#: src/controller/account.rs:409
 msgid "Using featherplay's API key again. Connect to sign in."
 msgstr ""
 
-#: src/controller/account.rs:407
+#: src/controller/account.rs:410
 msgid "Your API key is removed. Last.fm needs one to connect."
 msgstr ""
 
-#: src/controller/account.rs:415
+#: src/controller/account.rs:418
 msgid "Saving the API key failed: {}"
 msgstr ""
 
-#: src/controller/account.rs:426
+#: src/controller/account.rs:429
 msgid "Connected as {}. Listens go to your ListenBrainz profile."
 msgstr ""
 
-#: src/controller/account.rs:659
+#: src/controller/account.rs:664
 msgid "The browser didn't open: {}"
 msgstr ""
 
-#: src/controller/account.rs:685
+#: src/controller/account.rs:690
 msgid "Saving the session failed: {}"
 msgstr ""
 
-#: src/controller/account.rs:691
+#: src/controller/account.rs:696
 msgid ""
 "Last.fm hasn't been approved yet. Approve featherplay in the browser, then "
 "try again."
 msgstr ""
 
-#: src/controller/account.rs:696
+#: src/controller/account.rs:701
 msgid "That approval expired. Connect again."
 msgstr ""
 
-#: src/controller/account.rs:744
+#: src/controller/account.rs:749
 msgid "Saving the token failed: {}"
 msgstr ""
 
-#: src/controller/account.rs:807
+#: src/controller/account.rs:812
 msgid ""
 "ListenBrainz didn't accept that token. Copy it again from listenbrainz.org/"
 "settings."
 msgstr ""
 
-#: src/controller/account.rs:812
+#: src/controller/account.rs:817
 msgid "Couldn't reach ListenBrainz. Check the connection and try again."
 msgstr ""
 
-#: src/controller/account.rs:865
+#: src/controller/account.rs:870
 msgid ""
 "That session isn't signed in. Sign in again, or copy a fresh cookie header."
 msgstr ""
 
-#: src/controller/account.rs:869
+#: src/controller/account.rs:874
 msgid "Couldn't reach YouTube Music. Check the connection, then try again."
 msgstr ""
 
-#: src/controller/account.rs:872
+#: src/controller/account.rs:877
 msgid ""
 "YouTube Music answered in a way featherplay doesn't understand. Try again "
 "later."
 msgstr ""
 
-#: src/controller/account.rs:881
+#: src/controller/account.rs:886
 msgid "Couldn't reach Last.fm. Check the connection and try again."
 msgstr ""
 
-#: src/controller/account.rs:883
+#: src/controller/account.rs:888
 msgid "Last.fm said: {0} ({1})"
 msgstr ""
 
@@ -623,33 +623,48 @@ msgstr ""
 msgid "featherplay {} is out"
 msgstr ""
 
-#: ui/account_menu.slint:114
+#: ui/account_menu.slint:119
 msgid "{}, current account"
 msgstr ""
 
-#: ui/account_menu.slint:253
+#: ui/account_menu.slint:270
 msgid "Account menu"
 msgstr ""
 
-#: ui/account_menu.slint:274
+#: ui/account_menu.slint:291
 msgid "Accounts"
 msgstr ""
 
-#: ui/account_menu.slint:286
+#: ui/account_menu.slint:303
 msgid "Loading your accounts…"
 msgstr ""
 
-#: ui/account_menu.slint:287
+#: ui/account_menu.slint:304
 msgid "No accounts to show"
 msgstr ""
 
-#: ui/account_menu.slint:318
+#: ui/account_menu.slint:335
 msgid "Switch Google account"
 msgstr ""
 
-#: ui/account_menu.slint:327 ui/pages/settings.slint:1620
-#: ui/account_menu.slint:327 ui/pages/settings.slint:1620
+#: ui/account_menu.slint:344 ui/pages/settings.slint:1620
+#: ui/account_menu.slint:344 ui/pages/settings.slint:1620
 msgid "Sign out"
+msgstr ""
+
+#: ui/account_menu.slint:446 ui/account_menu.slint:459
+msgid "Choose an account"
+msgstr ""
+
+#: ui/account_menu.slint:463
+msgid ""
+"Your Google sign-in has more than one account. Pick the one featherplay "
+"uses; you can switch later from the account menu."
+msgstr ""
+
+#: ui/account_menu.slint:473
+msgctxt "Account"
+msgid "Default"
 msgstr ""
 
 #: ui/bottom_bar.slint:34

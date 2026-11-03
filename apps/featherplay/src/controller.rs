@@ -180,9 +180,13 @@ pub enum UiEvent {
     Discord(crate::presence::Status),
     /// The local API's state and token, for Settings.
     LocalApi(LocalApiNotice),
-    /// The app acts as another identity of the session (the account menu): the window
-    /// reloads what belongs to the account.
+    /// The app acts as another identity of the session (the account menu, the first
+    /// sign-in's picker): the window reloads what belongs to the account. Also sent with the
+    /// identity unchanged when a switch fails, so a picker waiting for it carries on.
     Identity(featherplay_ytm::Identity),
+    /// A new sign-in, just before its `Account { signed_in: true }`: the window asks which
+    /// identity to act as when the session has several (`account_picker`).
+    AskIdentity,
     /// Playback stopped after failures: what to say, and a link to offer.
     Stopped {
         text: &'static str,

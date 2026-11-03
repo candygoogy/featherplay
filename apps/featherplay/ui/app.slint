@@ -27,7 +27,7 @@ import { SignInPage } from "pages/sign_in.slint";
 import { SongMenuLayer } from "song_menu.slint";
 import { PlaylistMenu, PlaylistDialog } from "playlist_menu.slint";
 import { PlaylistMenuLayer, PlaylistDialogLayer } from "playlist_menu_layer.slint";
-import { AccountMenuLayer } from "account_menu.slint";
+import { AccountMenuLayer, AccountPickerDialog, AccountPicker } from "account_menu.slint";
 import { ToastView } from "toast.slint";
 import { CloseDialog, CloseChoice } from "close_dialog.slint";
 
@@ -48,7 +48,7 @@ export { SongMenu } from "song_menu.slint";
 
 export { PlaylistMenu, PlaylistKind, PlaylistDialog } from "playlist_menu.slint";
 
-export { AccountMenu, AccountItem } from "account_menu.slint";
+export { AccountMenu, AccountItem, AccountPicker } from "account_menu.slint";
 
 export { Toast } from "toast.slint";
 
@@ -488,6 +488,15 @@ export component AppWindow inherits Window {
 
         // The close dialog (src/close.rs): what the close button does, until the user picks.
         if CloseChoice.open: CloseDialog {
+            x: 0;
+            y: 0;
+            width: root.width;
+            height: root.height;
+            closed => { keys.focus(); }
+        }
+
+        // The first sign-in's account picker (src/account_picker.rs), over everything.
+        if AccountPicker.open: AccountPickerDialog {
             x: 0;
             y: 0;
             width: root.width;

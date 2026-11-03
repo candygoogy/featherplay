@@ -5,7 +5,7 @@
 // and connects the actions.
 import { ListView } from "std-widgets.slint";
 import { Theme, Icons, Curves } from "theme.slint";
-import { Icon, Body, Cover } from "parts.slint";
+import { Icon, Body, Cover, Display } from "parts.slint";
 
 export struct AccountItem {
     // The identity's key (`Identity::key`), handed back by `pick`.
@@ -101,17 +101,23 @@ component Divider inherits Rectangle {
     }
 }
 
-// One identity: the round photo (or its letter), the name, the detail line, a check if active.
+// One identity: the round photo (or its letter), the name, the detail line, a check if active
+// (or, with a `badge`, that word instead: the first sign-in's picker marks Google's default).
 component IdentityRow inherits Rectangle {
     in property <AccountItem> item;
     in property <bool> enabled: true;
+    // The keyboard is on it (the picker).
+    in property <bool> selected;
+    in property <string> badge;
     callback clicked();
     height: 52px;
     border-radius: Theme.r-s;
-    background: Theme.state(ta.pressed, ta.has-hover);
+    background: Theme.state-on(root.selected, ta.pressed, ta.has-hover);
     accessible-role: button;
     property <string> who: root.item.detail != "" ? root.item.name + ", " + root.item.detail : root.item.name;
-    accessible-label: root.item.active ? @tr("{}, current account", root.who) : root.who;
+    accessible-label: root.badge != "" ? root.who + ", " + root.badge
+        : root.item.active ? @tr("{}, current account", root.who) : root.who;
+    property <length> trail: root.badge != "" ? 84px : 36px;
     accessible-action-default => { root.clicked(); }
     animate background { duration: Theme.t-hover; }
     ta := TouchArea {
@@ -148,7 +154,7 @@ component IdentityRow inherits Rectangle {
     }
     VerticalLayout {
         x: 52px;
-        width: parent.width - 52px - 36px;
+        width: parent.width - 52px - root.trail;
         alignment: center;
         spacing: 1px;
         Body {
@@ -161,12 +167,23 @@ component IdentityRow inherits Rectangle {
             color: Theme.text3;
         }
     }
-    if root.item.active: Icon {
+    if root.item.active && root.badge == "": Icon {
         x: parent.width - 30px;
         width: 18px;
         height: 18px;
         commands: AccountIcons.check;
         stroke: Theme.text1;
+    }
+    if root.badge != "": Body {
+        x: parent.width - root.trail;
+        width: root.trail - 12px;
+        height: parent.height;
+        text: root.badge;
+        font-size: Theme.t-meta;
+        font-weight: 600;
+        color: Theme.text3;
+        horizontal-alignment: right;
+        vertical-alignment: center;
     }
 }
 
@@ -328,6 +345,137 @@ export component AccountMenuLayer inherits Rectangle {
                 clicked => {
                     AccountMenu.sign-out();
                     root.close();
+                }
+            }
+        }
+    }
+}
+
+// The first sign-in's question, when the cookies hold more than one identity: which one
+// featherplay acts as. Asked before the pages load (src/account_picker.rs); the choice is
+// saved as a pick from the menu is.
+export global AccountPicker {
+    // Shown over the window.
+    in property <bool> open;
+    // The account menu's rows, with no check on them.
+    in property <[AccountItem]> accounts;
+    // The identity Google would use (marked "Default"); Escape picks it.
+    in property <int> default-row;
+    // The row the keyboard is on.
+    in-out property <int> focused;
+    // Act as the identity with this key.
+    callback choose(string);
+}
+
+// The picker over the whole window, in the close dialog's scrim and card. There is no
+// cancel: a click on the scrim does nothing, Escape takes the default.
+export component AccountPickerDialog inherits Rectangle {
+    // After the choice, so the window takes the keys back.
+    callback closed();
+    property <bool> shown: false;
+    property <length> row-h: 52px;
+    property <int> rows: AccountPicker.accounts.length;
+    // Five rows show; more scroll.
+    property <int> shown-rows: min(5, max(1, root.rows));
+    property <int> focused: AccountPicker.focused;
+    background: Theme.scrim;
+    opacity: root.shown ? 1 : 0;
+    animate opacity { duration: Theme.t-menu; easing: Curves.ease-out; }
+    init => {
+        root.shown = true;
+        scope.focus();
+    }
+
+    function choose(row: int) {
+        if row >= 0 && row < root.rows {
+            AccountPicker.choose(AccountPicker.accounts[row].key);
+            root.closed();
+        }
+    }
+    function step(by: int) {
+        AccountPicker.focused = max(0, min(root.rows - 1, AccountPicker.focused + by));
+    }
+    // The keyboard's row stays in view.
+    changed focused => {
+        if root.focused * root.row-h < -list.content-y {
+            list.content-y = -root.focused * root.row-h;
+        } else if (root.focused + 1) * root.row-h > list.visible-height - list.content-y {
+            list.content-y = list.visible-height - (root.focused + 1) * root.row-h;
+        }
+    }
+
+    scope := FocusScope {
+        key-pressed(e) => {
+            if e.text == Key.Escape {
+                root.choose(AccountPicker.default-row);
+                return accept;
+            }
+            if e.text == Key.UpArrow || e.text == Key.Backtab || (e.text == Key.Tab && e.modifiers.shift) {
+                root.step(-1);
+                return accept;
+            }
+            if e.text == Key.DownArrow || e.text == Key.Tab {
+                root.step(1);
+                return accept;
+            }
+            if e.text == Key.Return || e.text == " " {
+                root.choose(AccountPicker.focused);
+                return accept;
+            }
+            reject
+        }
+        TouchArea {
+            // The page under the scrim doesn't scroll or take clicks.
+            scroll-event(e) => { accept }
+        }
+        card := Rectangle {
+            width: min(420px, root.width - 2 * Theme.s5);
+            height: lay.preferred-height;
+            x: (root.width - self.width) / 2;
+            y: max(Theme.s5, (root.height - self.height) / 2 - Theme.s6);
+            border-radius: Theme.r-l;
+            background: Theme.panel;
+            border-width: 1px;
+            border-color: Theme.card-edge;
+            transform-scale: root.shown ? 1 : (Theme.moving ? 0.98 : 1);
+            animate transform-scale { duration: Theme.t-menu; easing: Curves.ease-out; }
+            drop-shadow-blur: 24px;
+            drop-shadow-offset-y: 8px;
+            drop-shadow-color: Theme.cover-shadow;
+            accessible-role: groupbox;
+            accessible-label: @tr("Choose an account");
+            // Clicks on the card don't reach the scrim.
+            TouchArea { }
+            lay := VerticalLayout {
+                // The rows' photos line up with the text: they sit 8 px into their row.
+                padding: Theme.s4;
+                padding-top: Theme.s5;
+                spacing: Theme.s4;
+                VerticalLayout {
+                    padding-left: Theme.s2;
+                    padding-right: Theme.s2;
+                    spacing: Theme.s2;
+                    Display {
+                        text: @tr("Choose an account");
+                        font-size: 20px;
+                    }
+                    Body {
+                        text: @tr("Your Google sign-in has more than one account. Pick the one featherplay uses; you can switch later from the account menu.");
+                        color: Theme.text2;
+                        wrap: word-wrap;
+                    }
+                }
+                list := ListView {
+                    height: root.shown-rows * root.row-h;
+                    for a[i] in AccountPicker.accounts: IdentityRow {
+                        item: a;
+                        selected: i == AccountPicker.focused;
+                        badge: i == AccountPicker.default-row ? @tr("Account" => "Default") : "";
+                        clicked => {
+                            AccountPicker.focused = i;
+                            root.choose(i);
+                        }
+                    }
                 }
             }
         }
