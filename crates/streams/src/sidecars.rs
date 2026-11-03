@@ -14,13 +14,45 @@ use crate::ResolveError;
 // from the same "latest" release would only catch a broken download, not a replaced
 // release. Each hash is the one in that release's own checksum file (yt-dlp's
 // `SHA2-256SUMS`, deno's `.sha256sum`), and matched the downloaded binaries on 2026-11-03.
-// yt-dlp then keeps itself current with `yt-dlp -U`.
-const YTDLP_URL: &str = "https://github.com/yt-dlp/yt-dlp/releases/download/2026.10.26/yt-dlp.exe";
-const YTDLP_SHA256: &str = "f5389d3698ecde4ef06f4e6b1ce0294fe9ac1396228c8990b8d3416d6d177a7d";
-const DENO_ZIP: &str = "deno-x86_64-pc-windows-msvc.zip";
-const DENO_URL: &str =
-    "https://github.com/denoland/deno/releases/download/v2.9.8/deno-x86_64-pc-windows-msvc.zip";
-const DENO_SHA256: &str = "cba84b26e0df5ae7f74fc66b86a95b866872a86292ebd84fa1e959927edd93bf";
+// yt-dlp then keeps itself current with `yt-dlp -U`, which fetches the build of its own
+// variant (`yt-dlp_arm64.exe` for the ARM64 one), whatever the file is called here.
+// Both architectures pin the same versions; `.github/workflows/sidecar-pins.yml` checks that.
+
+/// The helpers one architecture's build downloads.
+struct Pins {
+    ytdlp_url: &'static str,
+    ytdlp_sha256: &'static str,
+    /// The zip's file name; its download is kept as `{DENO_ZIP}.part`.
+    deno_zip: &'static str,
+    deno_url: &'static str,
+    deno_sha256: &'static str,
+}
+
+#[cfg(any(test, not(target_arch = "aarch64")))]
+const X64: Pins = Pins {
+    ytdlp_url: "https://github.com/yt-dlp/yt-dlp/releases/download/2026.10.26/yt-dlp.exe",
+    ytdlp_sha256: "f5389d3698ecde4ef06f4e6b1ce0294fe9ac1396228c8990b8d3416d6d177a7d",
+    deno_zip: "deno-x86_64-pc-windows-msvc.zip",
+    deno_url: "https://github.com/denoland/deno/releases/download/v2.9.8/deno-x86_64-pc-windows-msvc.zip",
+    deno_sha256: "cba84b26e0df5ae7f74fc66b86a95b866872a86292ebd84fa1e959927edd93bf",
+};
+
+#[cfg(any(test, target_arch = "aarch64"))]
+const ARM64: Pins = Pins {
+    ytdlp_url: "https://github.com/yt-dlp/yt-dlp/releases/download/2026.10.26/yt-dlp_arm64.exe",
+    ytdlp_sha256: "0066dbac3c124028e2dcae2a197fccee33cd91f456313d24f7af89fd54590e98",
+    deno_zip: "deno-aarch64-pc-windows-msvc.zip",
+    deno_url: "https://github.com/denoland/deno/releases/download/v2.9.8/deno-aarch64-pc-windows-msvc.zip",
+    deno_sha256: "b413b92b735b50c198e8fe3b85af1aa50e29d5f72e229aab701d132286e14cef",
+};
+
+/// The native helpers of the architecture this exe is built for, so an ARM64 featherplay
+/// doesn't run them under x64 emulation.
+#[cfg(target_arch = "aarch64")]
+const PINS: Pins = ARM64;
+#[cfg(not(target_arch = "aarch64"))]
+const PINS: Pins = X64;
+const DENO_ZIP: &str = PINS.deno_zip;
 /// GitHub sends release downloads on to a host under this domain
 /// (`release-assets.githubusercontent.com` in Oct 2026).
 const ASSET_DOMAIN: &str = ".githubusercontent.com";
@@ -60,12 +92,12 @@ impl Downloads {
     pub fn pinned() -> Downloads {
         Downloads {
             ytdlp: Asset {
-                url: YTDLP_URL.into(),
-                sha256: YTDLP_SHA256.into(),
+                url: PINS.ytdlp_url.into(),
+                sha256: PINS.ytdlp_sha256.into(),
             },
             deno: Asset {
-                url: DENO_URL.into(),
-                sha256: DENO_SHA256.into(),
+                url: PINS.deno_url.into(),
+                sha256: PINS.deno_sha256.into(),
             },
             #[cfg(test)]
             local: false,
@@ -493,7 +525,9 @@ mod tests {
     #[test]
     fn downloads_stay_on_github_over_https() {
         let ok = |u: &str| download_host(&reqwest::Url::parse(u).unwrap());
-        assert!(ok(YTDLP_URL) && ok(DENO_URL));
+        for pins in [&X64, &ARM64] {
+            assert!(ok(pins.ytdlp_url) && ok(pins.deno_url));
+        }
         assert!(ok(
             "https://release-assets.githubusercontent.com/github-production-release-asset/1"
         ));
@@ -523,14 +557,45 @@ mod tests {
 
     #[test]
     fn the_pins_are_sha256_hex() {
-        for h in [YTDLP_SHA256, DENO_SHA256] {
-            assert_eq!(h.len(), 64);
-            assert!(
-                h.bytes()
-                    .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
-            );
+        for pins in [&X64, &ARM64] {
+            for h in [pins.ytdlp_sha256, pins.deno_sha256] {
+                assert_eq!(h.len(), 64);
+                assert!(
+                    h.bytes()
+                        .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
+                );
+            }
+            assert!(!pins.ytdlp_url.contains("/latest/") && !pins.deno_url.contains("/latest/"));
+            assert!(pins.deno_url.ends_with(&format!("/{}", pins.deno_zip)));
         }
-        assert!(!YTDLP_URL.contains("/latest/") && !DENO_URL.contains("/latest/"));
+    }
+
+    /// Each architecture downloads its own build, and both pin the same releases, so the
+    /// weekly pin check (sidecar-pins.yml) reads one version for each helper.
+    #[test]
+    fn the_architectures_pin_the_same_releases_of_their_own_builds() {
+        let release = |url: &'static str| url.rsplit_once('/').map(|(dir, _)| dir);
+        assert_eq!(release(X64.ytdlp_url), release(ARM64.ytdlp_url));
+        assert_eq!(release(X64.deno_url), release(ARM64.deno_url));
+        assert!(X64.deno_zip.contains("x86_64") && ARM64.deno_zip.contains("aarch64"));
+        assert!(ARM64.ytdlp_url.ends_with("/yt-dlp_arm64.exe"));
+        assert!(X64.ytdlp_url.ends_with("/yt-dlp.exe"));
+        assert_ne!(X64.ytdlp_sha256, ARM64.ytdlp_sha256);
+        assert_ne!(X64.deno_sha256, ARM64.deno_sha256);
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    #[test]
+    fn an_arm64_build_downloads_the_arm64_helpers() {
+        assert_eq!(Downloads::pinned().deno.url, ARM64.deno_url);
+        assert_eq!(Downloads::pinned().ytdlp.url, ARM64.ytdlp_url);
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    #[test]
+    fn an_x64_build_downloads_the_x64_helpers() {
+        assert_eq!(Downloads::pinned().deno.url, X64.deno_url);
+        assert_eq!(Downloads::pinned().ytdlp.url, X64.ytdlp_url);
     }
 
     /// Downloads both pinned releases from GitHub (~60 MB) into a scratch dir.

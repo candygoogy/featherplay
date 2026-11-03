@@ -44,8 +44,18 @@ jobs:
         run: |
           set -euo pipefail
           file=crates/streams/src/sidecars.rs
-          ytdlp_pin=$(grep -oP 'yt-dlp/releases/download/\K[0-9][0-9.]*(?=/)' "$file" | head -n1 || true)
-          deno_pin=$(grep -oP 'denoland/deno/releases/download/v\K[0-9][0-9.]*(?=/)' "$file" | head -n1 || true)
+          # One pin per architecture (x64 and ARM64), always at the same release: more than
+          # one version of either means a pin was moved without the other.
+          ytdlp_pins=$(grep -oP 'yt-dlp/releases/download/\K[0-9][0-9.]*(?=/)' "$file" | sort -u || true)
+          deno_pins=$(grep -oP 'denoland/deno/releases/download/v\K[0-9][0-9.]*(?=/)' "$file" | sort -u || true)
+          for pins in "yt-dlp:$ytdlp_pins" "Deno:$deno_pins"; do
+            if [ "$(printf '%s\n' "${pins#*:}" | grep -c .)" -gt 1 ]; then
+              echo "::error::the ${pins%%:*} pins in $file differ between architectures: $(echo ${pins#*:})"
+              exit 1
+            fi
+          done
+          ytdlp_pin=$ytdlp_pins
+          deno_pin=$deno_pins
           ytdlp_latest=$(gh api repos/yt-dlp/yt-dlp/releases/latest --jq .tag_name)
           deno_latest=$(gh api repos/denoland/deno/releases/latest --jq .tag_name)
           deno_latest=${deno_latest#v}
