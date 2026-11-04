@@ -11,7 +11,8 @@
 //!     the part the media card needs.
 //!   - `HKCU\Software\Classes\AppUserModelId\<AUMID>` with `DisplayName` and `IconUri`, the
 //!     per-user registration Windows' notification platform reads for unpackaged apps.
-//!     Kept as a fallback and for toasts later; it costs two values.
+//!     Toasts go out under the AUMID once it is in place (`registered`), and take their
+//!     name and icon from it; it costs two values.
 //!
 //! Registration is per user and writes nothing outside the user's own Start menu, HKCU
 //! and the app's data dir. It only runs in a normal install (`registration_allowed`):
@@ -20,6 +21,7 @@
 
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use windows::Win32::Foundation::{ERROR_FILE_NOT_FOUND, ERROR_SUCCESS, RPC_E_CHANGED_MODE};
 use windows::Win32::Storage::EnhancedStorage::PKEY_AppUserModel_ID;
@@ -78,6 +80,22 @@ pub fn registration_allowed_here() -> bool {
         !cfg!(debug_assertions),
         std::env::var_os("FEATHERPLAY_HOME").as_deref(),
     )
+}
+
+/// Set by `mark_registered` once this run's `register` succeeded.
+static REGISTERED: AtomicBool = AtomicBool::new(false);
+
+/// Records that `register` succeeded in this run, so toasts can use `AUMID` from now on
+/// (`registered`). The caller sets it after `register` returns `Ok`, changed or not.
+pub fn mark_registered() {
+    REGISTERED.store(true, Ordering::Release);
+}
+
+/// Whether this run has the registration in place (`mark_registered`). False in dev runs
+/// and tests, after a failed registration, and while the startup registration is still
+/// running; one atomic load, so cheap enough for every toast.
+pub fn registered() -> bool {
+    REGISTERED.load(Ordering::Acquire)
 }
 
 /// The registry key under HKCU.
