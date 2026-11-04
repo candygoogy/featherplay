@@ -97,6 +97,10 @@ pub struct Settings {
     /// for English, or "" (the default) for Windows' display language when it's bundled
     /// and English otherwise. A code no longer bundled loads as it is and follows Windows.
     pub language: String,
+    /// How many percent of the volume slider a mouse-wheel notch and the Up and Down keys
+    /// move it: one of `VOLUME_STEPS`, 5 by default. Any other value loads as 5.
+    #[serde(deserialize_with = "lenient_volume_step")]
+    pub volume_step: u8,
 }
 
 /// The Appearance setting. `System` follows Windows' app mode.
@@ -245,6 +249,7 @@ impl Default for Settings {
             local_api: false,
             local_api_port: Settings::LOCAL_API_PORT,
             language: String::new(),
+            volume_step: Settings::VOLUME_STEP,
         }
     }
 }
@@ -346,6 +351,19 @@ where
         .unwrap_or(Settings::LOCAL_API_PORT))
 }
 
+/// Reads the volume step, or takes the default when it isn't one of the choices.
+fn lenient_volume_step<'de, D>(d: D) -> Result<u8, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value = toml::Value::deserialize(d)?;
+    Ok(value
+        .as_integer()
+        .and_then(|n| u8::try_from(n).ok())
+        .filter(|step| Settings::VOLUME_STEPS.contains(step))
+        .unwrap_or(Settings::VOLUME_STEP))
+}
+
 fn file(p: &Paths) -> PathBuf {
     p.config.join("settings.toml")
 }
@@ -396,6 +414,10 @@ impl Settings {
     pub const LOCAL_API_PORT: u16 = 26538;
     /// The lowest port the local API takes (below it, ports are the system's).
     pub const LOCAL_API_MIN_PORT: u16 = 1024;
+    /// The volume steps Settings offers, in percent.
+    pub const VOLUME_STEPS: [u8; 4] = [1, 2, 5, 10];
+    /// The default volume step, in percent: the wheel's step before it was a setting.
+    pub const VOLUME_STEP: u8 = 5;
 
     /// Loads the settings. A missing, unreadable or invalid file gives the defaults. An
     /// older file is migrated first; a newer one keeps its schema number.

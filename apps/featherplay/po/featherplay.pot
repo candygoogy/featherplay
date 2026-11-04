@@ -45,38 +45,38 @@ msgid "Unknown title"
 msgstr ""
 
 #: ../../crates/integrations/src/taskbar.rs:176
-#: ../../crates/integrations/src/taskbar.rs:176 ui/bottom_bar.slint:307
-#: ../../crates/integrations/src/taskbar.rs:176 ui/bottom_bar.slint:307 ui/parts.slint:99
+#: ../../crates/integrations/src/taskbar.rs:176 ui/bottom_bar.slint:366
+#: ../../crates/integrations/src/taskbar.rs:176 ui/bottom_bar.slint:366 ui/parts.slint:99
 msgid "Pause"
 msgstr ""
 
 #: ../../crates/integrations/src/taskbar.rs:178
 #: ../../crates/integrations/src/taskbar.rs:178
-#: ../../crates/integrations/src/taskbar.rs:178 ui/bottom_bar.slint:307
-#: ../../crates/integrations/src/taskbar.rs:178 ui/bottom_bar.slint:307 ui/pages/content.slint:744 ui/pages/home.slint:606
-#: ../../crates/integrations/src/taskbar.rs:178 ui/bottom_bar.slint:307 ui/pages/content.slint:744 ui/pages/home.slint:606 ui/playlist_menu_layer.slint:197
+#: ../../crates/integrations/src/taskbar.rs:178 ui/bottom_bar.slint:366
+#: ../../crates/integrations/src/taskbar.rs:178 ui/bottom_bar.slint:366 ui/pages/content.slint:744 ui/pages/home.slint:606
+#: ../../crates/integrations/src/taskbar.rs:178 ui/bottom_bar.slint:366 ui/pages/content.slint:744 ui/pages/home.slint:606 ui/playlist_menu_layer.slint:197
 msgid "Play"
 msgstr ""
 
 #: ../../crates/integrations/src/taskbar.rs:181
-#: ../../crates/integrations/src/taskbar.rs:181 src/pages/settings.rs:1088
-#: ../../crates/integrations/src/taskbar.rs:181 src/pages/settings.rs:1088 ui/mini_player.slint:200
-#: ../../crates/integrations/src/taskbar.rs:181 src/pages/settings.rs:1088 ui/mini_player.slint:200
+#: ../../crates/integrations/src/taskbar.rs:181 src/pages/settings.rs:1118
+#: ../../crates/integrations/src/taskbar.rs:181 src/pages/settings.rs:1118 ui/mini_player.slint:200
+#: ../../crates/integrations/src/taskbar.rs:181 src/pages/settings.rs:1118 ui/mini_player.slint:200
 msgid "Previous"
 msgstr ""
 
 #: ../../crates/integrations/src/taskbar.rs:183
-#: ../../crates/integrations/src/taskbar.rs:183 src/pages/settings.rs:1087
-#: ../../crates/integrations/src/taskbar.rs:183 src/pages/settings.rs:1087 ui/mini_player.slint:215
-#: ../../crates/integrations/src/taskbar.rs:183 src/pages/settings.rs:1087 ui/mini_player.slint:215
+#: ../../crates/integrations/src/taskbar.rs:183 src/pages/settings.rs:1117
+#: ../../crates/integrations/src/taskbar.rs:183 src/pages/settings.rs:1117 ui/mini_player.slint:215
+#: ../../crates/integrations/src/taskbar.rs:183 src/pages/settings.rs:1117 ui/mini_player.slint:215
 msgid "Next"
 msgstr ""
 
 #: ../../crates/integrations/src/tray.rs:273
-#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:360
-#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:360 ui/mini_player.slint:108 ui/pages/lyrics.slint:71
-#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:360 ui/mini_player.slint:108 ui/pages/lyrics.slint:71 ui/pages/now_playing.slint:425
-#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:360 ui/mini_player.slint:108 ui/pages/lyrics.slint:71 ui/pages/now_playing.slint:425
+#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:423
+#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:423 ui/mini_player.slint:108 ui/pages/lyrics.slint:71
+#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:423 ui/mini_player.slint:108 ui/pages/lyrics.slint:71 ui/pages/now_playing.slint:425
+#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:423 ui/mini_player.slint:108 ui/pages/lyrics.slint:71 ui/pages/now_playing.slint:425
 msgid "Nothing playing"
 msgstr ""
 
@@ -107,9 +107,9 @@ msgid "Quit"
 msgstr ""
 
 #: ../../crates/integrations/src/tray_menu.rs:242
-#: ../../crates/integrations/src/tray_menu.rs:242 ui/bottom_bar.slint:531
-#: ../../crates/integrations/src/tray_menu.rs:242 ui/bottom_bar.slint:531 ui/pages/content.slint:580
-#: ../../crates/integrations/src/tray_menu.rs:242 ui/bottom_bar.slint:531 ui/pages/content.slint:580 ui/parts.slint:860 ui/song_menu.slint:278
+#: ../../crates/integrations/src/tray_menu.rs:242 ui/bottom_bar.slint:594
+#: ../../crates/integrations/src/tray_menu.rs:242 ui/bottom_bar.slint:594 ui/pages/content.slint:580
+#: ../../crates/integrations/src/tray_menu.rs:242 ui/bottom_bar.slint:594 ui/pages/content.slint:580 ui/parts.slint:860 ui/song_menu.slint:278
 msgid "Like"
 msgstr ""
 
@@ -141,78 +141,78 @@ msgstr ""
 msgid "Right-click the tray icon to show the window or quit."
 msgstr ""
 
-#: src/controller/account.rs:407
+#: src/controller/account.rs:411
 msgid "Your API key is saved. Connect to sign in to Last.fm with it."
 msgstr ""
 
-#: src/controller/account.rs:409
+#: src/controller/account.rs:413
 msgid "Using featherplay's API key again. Connect to sign in."
 msgstr ""
 
-#: src/controller/account.rs:410
+#: src/controller/account.rs:414
 msgid "Your API key is removed. Last.fm needs one to connect."
 msgstr ""
 
-#: src/controller/account.rs:418
+#: src/controller/account.rs:422
 msgid "Saving the API key failed: {}"
 msgstr ""
 
-#: src/controller/account.rs:429
+#: src/controller/account.rs:433
 msgid "Connected as {}. Listens go to your ListenBrainz profile."
 msgstr ""
 
-#: src/controller/account.rs:664
+#: src/controller/account.rs:668
 msgid "The browser didn't open: {}"
 msgstr ""
 
-#: src/controller/account.rs:690
+#: src/controller/account.rs:694
 msgid "Saving the session failed: {}"
 msgstr ""
 
-#: src/controller/account.rs:696
+#: src/controller/account.rs:700
 msgid ""
 "Last.fm hasn't been approved yet. Approve featherplay in the browser, then "
 "try again."
 msgstr ""
 
-#: src/controller/account.rs:701
+#: src/controller/account.rs:705
 msgid "That approval expired. Connect again."
 msgstr ""
 
-#: src/controller/account.rs:749
+#: src/controller/account.rs:753
 msgid "Saving the token failed: {}"
 msgstr ""
 
-#: src/controller/account.rs:812
+#: src/controller/account.rs:816
 msgid ""
 "ListenBrainz didn't accept that token. Copy it again from listenbrainz.org/"
 "settings."
 msgstr ""
 
-#: src/controller/account.rs:817
+#: src/controller/account.rs:821
 msgid "Couldn't reach ListenBrainz. Check the connection and try again."
 msgstr ""
 
-#: src/controller/account.rs:870
+#: src/controller/account.rs:874
 msgid ""
 "That session isn't signed in. Sign in again, or copy a fresh cookie header."
 msgstr ""
 
-#: src/controller/account.rs:874
+#: src/controller/account.rs:878
 msgid "Couldn't reach YouTube Music. Check the connection, then try again."
 msgstr ""
 
-#: src/controller/account.rs:877
+#: src/controller/account.rs:881
 msgid ""
 "YouTube Music answered in a way featherplay doesn't understand. Try again "
 "later."
 msgstr ""
 
-#: src/controller/account.rs:886
+#: src/controller/account.rs:890
 msgid "Couldn't reach Last.fm. Check the connection and try again."
 msgstr ""
 
-#: src/controller/account.rs:888
+#: src/controller/account.rs:892
 msgid "Last.fm said: {0} ({1})"
 msgstr ""
 
@@ -276,7 +276,7 @@ msgstr ""
 msgid "Album"
 msgstr ""
 
-#: src/pages/artist.rs:94 src/pages/settings.rs:599 src/ui_bridge.rs:97
+#: src/pages/artist.rs:94 src/pages/settings.rs:601 src/ui_bridge.rs:97
 msgid "Artist"
 msgstr ""
 
@@ -343,103 +343,103 @@ msgstr ""
 msgid "Playlist"
 msgstr ""
 
-#: src/pages/settings.rs:387
+#: src/pages/settings.rs:389
 msgid "Enter both the API key and the shared secret."
 msgstr ""
 
-#: src/pages/settings.rs:388
+#: src/pages/settings.rs:390
 msgid ""
 "A Last.fm API key and its shared secret are 32 letters and digits each. Copy "
 "them again from last.fm/api/accounts."
 msgstr ""
 
-#: src/pages/settings.rs:403
+#: src/pages/settings.rs:405
 msgid "Paste your user token first."
 msgstr ""
 
-#: src/pages/settings.rs:461
+#: src/pages/settings.rs:463
 msgid "Token copied"
 msgstr ""
 
-#: src/pages/settings.rs:464
+#: src/pages/settings.rs:466
 msgid "Couldn't copy the token. Try again."
 msgstr ""
 
-#: src/pages/settings.rs:476
+#: src/pages/settings.rs:478
 msgid "Pick a port from 1024 to 65535."
 msgstr ""
 
-#: src/pages/settings.rs:598
+#: src/pages/settings.rs:600
 msgid "Song title"
 msgstr ""
 
-#: src/pages/settings.rs:629
+#: src/pages/settings.rs:631
 msgid "Listening to {}"
 msgstr ""
 
-#: src/pages/settings.rs:778 ui/pages/settings.slint:1544
+#: src/pages/settings.rs:781 ui/pages/settings.slint:1556
 msgid "From the cover"
 msgstr ""
 
-#: src/pages/settings.rs:779
+#: src/pages/settings.rs:782
 msgid "Red"
 msgstr ""
 
-#: src/pages/settings.rs:780
+#: src/pages/settings.rs:783
 msgid "Rose"
 msgstr ""
 
-#: src/pages/settings.rs:781
+#: src/pages/settings.rs:784
 msgid "Amber"
 msgstr ""
 
-#: src/pages/settings.rs:782
+#: src/pages/settings.rs:785
 msgid "Teal"
 msgstr ""
 
-#: src/pages/settings.rs:783
+#: src/pages/settings.rs:786
 msgid "Violet"
 msgstr ""
 
-#: src/pages/settings.rs:784 ui/pages/settings.slint:1556
+#: src/pages/settings.rs:787 ui/pages/settings.slint:1568
 msgid "Custom colour"
 msgstr ""
 
-#: src/pages/settings.rs:838
+#: src/pages/settings.rs:868
 msgid "On the dark theme it shows as {}, so it stays easy to see."
 msgstr ""
 
-#: src/pages/settings.rs:843
+#: src/pages/settings.rs:873
 msgid "On the light theme it shows as {}, so it stays easy to see."
 msgstr ""
 
-#: src/pages/settings.rs:873
+#: src/pages/settings.rs:903
 msgid "Type a colour as # and 6 letters or digits, like #4390EE."
 msgstr ""
 
-#: src/pages/settings.rs:1077
+#: src/pages/settings.rs:1107
 msgid "Another app already uses one of these keys. Pick other keys."
 msgstr ""
 
-#: src/pages/settings.rs:1086 ui/pages/settings.slint:1578
+#: src/pages/settings.rs:1116 ui/pages/settings.slint:1590
 msgid "Play or pause"
 msgstr ""
 
-#: src/pages/settings.rs:1091
+#: src/pages/settings.rs:1121
 msgid ""
 "{0}: \"{1}\" isn't a key featherplay can use. Write it like Ctrl+Alt+Space; "
 "it needs Ctrl, Alt, Shift or Win."
 msgstr ""
 
-#: src/pages/settings.rs:1094
+#: src/pages/settings.rs:1124
 msgid "{} uses the same key as another action."
 msgstr ""
 
-#: src/pages/settings.rs:1107
+#: src/pages/settings.rs:1137
 msgid "System default"
 msgstr ""
 
-#: src/pages/settings.rs:1115
+#: src/pages/settings.rs:1145
 msgid "{} (not connected)"
 msgstr ""
 
@@ -647,8 +647,8 @@ msgstr ""
 msgid "Switch Google account"
 msgstr ""
 
-#: ui/account_menu.slint:344 ui/pages/settings.slint:1620
-#: ui/account_menu.slint:344 ui/pages/settings.slint:1620
+#: ui/account_menu.slint:344 ui/pages/settings.slint:1632
+#: ui/account_menu.slint:344 ui/pages/settings.slint:1632
 msgid "Sign out"
 msgstr ""
 
@@ -671,73 +671,77 @@ msgstr ""
 msgid "Seek"
 msgstr ""
 
-#: ui/bottom_bar.slint:133
+#: ui/bottom_bar.slint:139
 msgid "Volume"
 msgstr ""
 
-#: ui/bottom_bar.slint:213 ui/bottom_bar.slint:245
-#: ui/bottom_bar.slint:213 ui/bottom_bar.slint:245 ui/pages/now_playing.slint:204
-#: ui/bottom_bar.slint:213 ui/bottom_bar.slint:245 ui/pages/now_playing.slint:204 ui/pages/settings.slint:1245
-#: ui/bottom_bar.slint:213 ui/bottom_bar.slint:245 ui/pages/now_playing.slint:204 ui/pages/settings.slint:1245
+#: ui/bottom_bar.slint:235 ui/pages/settings.slint:1237
+msgid "{} %"
+msgstr ""
+
+#: ui/bottom_bar.slint:272 ui/bottom_bar.slint:304
+#: ui/bottom_bar.slint:272 ui/bottom_bar.slint:304 ui/pages/now_playing.slint:204
+#: ui/bottom_bar.slint:272 ui/bottom_bar.slint:304 ui/pages/now_playing.slint:204 ui/pages/settings.slint:1257
+#: ui/bottom_bar.slint:272 ui/bottom_bar.slint:304 ui/pages/now_playing.slint:204 ui/pages/settings.slint:1257
 msgid "Lyrics"
 msgstr ""
 
-#: ui/bottom_bar.slint:214
+#: ui/bottom_bar.slint:273
 msgid "Hides the lyrics, back to the cover"
 msgstr ""
 
-#: ui/bottom_bar.slint:214
+#: ui/bottom_bar.slint:273
 msgid "Shows the lyrics on Now playing"
 msgstr ""
 
-#: ui/bottom_bar.slint:245
+#: ui/bottom_bar.slint:304
 msgid "Hide lyrics"
 msgstr ""
 
-#: ui/bottom_bar.slint:251
+#: ui/bottom_bar.slint:310
 msgid "Ctrl+L"
 msgstr ""
 
 #. Its shortcut, in both windows.
-#: ui/bottom_bar.slint:313 ui/parts.slint:101
+#: ui/bottom_bar.slint:372 ui/parts.slint:101
 msgid "Space"
 msgstr ""
 
-#: ui/bottom_bar.slint:360
+#: ui/bottom_bar.slint:423
 msgid "Now playing: {}"
 msgstr ""
 
-#: ui/bottom_bar.slint:438 ui/pages/content.slint:745
-#: ui/bottom_bar.slint:438 ui/pages/content.slint:745
+#: ui/bottom_bar.slint:501 ui/pages/content.slint:745
+#: ui/bottom_bar.slint:501 ui/pages/content.slint:745
 msgid "Shuffle"
 msgstr ""
 
-#: ui/bottom_bar.slint:468
+#: ui/bottom_bar.slint:531
 msgid "Repeat one"
 msgstr ""
 
-#: ui/bottom_bar.slint:468
+#: ui/bottom_bar.slint:531
 msgid "Repeat all"
 msgstr ""
 
-#: ui/bottom_bar.slint:468
+#: ui/bottom_bar.slint:531
 msgid "Repeat off"
 msgstr ""
 
-#: ui/bottom_bar.slint:531 ui/mini_player.slint:183 ui/pages/content.slint:580
-#: ui/bottom_bar.slint:531 ui/mini_player.slint:183 ui/pages/content.slint:580 ui/parts.slint:860 ui/song_menu.slint:278
+#: ui/bottom_bar.slint:594 ui/mini_player.slint:183 ui/pages/content.slint:580
+#: ui/bottom_bar.slint:594 ui/mini_player.slint:183 ui/pages/content.slint:580 ui/parts.slint:860 ui/song_menu.slint:278
 msgid "Remove like"
 msgstr ""
 
-#: ui/bottom_bar.slint:546
+#: ui/bottom_bar.slint:609
 msgid "Mute"
 msgstr ""
 
-#: ui/bottom_bar.slint:546
+#: ui/bottom_bar.slint:609
 msgid "Unmute"
 msgstr ""
 
-#: ui/bottom_bar.slint:562 ui/pages/now_playing.slint:99
+#: ui/bottom_bar.slint:625 ui/pages/now_playing.slint:99
 msgid "Up next"
 msgstr ""
 
@@ -761,11 +765,11 @@ msgstr ""
 msgid "Remember my choice"
 msgstr ""
 
-#: ui/close_dialog.slint:204 ui/pages/settings.slint:1514
+#: ui/close_dialog.slint:204 ui/pages/settings.slint:1526
 msgid "Keep playing in the tray"
 msgstr ""
 
-#: ui/close_dialog.slint:209 ui/pages/settings.slint:1514
+#: ui/close_dialog.slint:209 ui/pages/settings.slint:1526
 msgid "Close featherplay"
 msgstr ""
 
@@ -892,9 +896,9 @@ msgstr ""
 msgid "Try again"
 msgstr ""
 
-#: ui/pages/content.slint:463 ui/pages/settings.slint:1616
-#: ui/pages/content.slint:463 ui/pages/settings.slint:1616 ui/pages/sign_in.slint:157 ui/sidebar.slint:361
-#: ui/pages/content.slint:463 ui/pages/settings.slint:1616 ui/pages/sign_in.slint:157 ui/sidebar.slint:361
+#: ui/pages/content.slint:463 ui/pages/settings.slint:1628
+#: ui/pages/content.slint:463 ui/pages/settings.slint:1628 ui/pages/sign_in.slint:157 ui/sidebar.slint:361
+#: ui/pages/content.slint:463 ui/pages/settings.slint:1628 ui/pages/sign_in.slint:157 ui/sidebar.slint:361
 msgid "Sign in"
 msgstr ""
 
@@ -1167,675 +1171,683 @@ msgstr ""
 msgid "Check the spelling or try another filter."
 msgstr ""
 
-#: ui/pages/settings.slint:345
+#: ui/pages/settings.slint:348
 msgid "Hue"
 msgstr ""
 
-#: ui/pages/settings.slint:346
+#: ui/pages/settings.slint:349
 msgid "{n} degree"
 msgid_plural "{n} degrees"
 msgstr[0] ""
 msgstr[1] ""
 
-#: ui/pages/settings.slint:504
+#: ui/pages/settings.slint:507
 msgid "Custom colour as shown"
 msgstr ""
 
-#: ui/pages/settings.slint:516
+#: ui/pages/settings.slint:519
 msgid "Colour code"
 msgstr ""
 
-#: ui/pages/settings.slint:579
+#: ui/pages/settings.slint:582
 msgid "Discord preview"
 msgstr ""
 
-#: ui/pages/settings.slint:594
+#: ui/pages/settings.slint:597
 msgid "In member lists"
 msgstr ""
 
-#: ui/pages/settings.slint:632
+#: ui/pages/settings.slint:635
 msgid "You"
 msgstr ""
 
-#: ui/pages/settings.slint:655
+#: ui/pages/settings.slint:658
 msgid "On your profile"
 msgstr ""
 
-#: ui/pages/settings.slint:660 ui/pages/settings.slint:1446
+#: ui/pages/settings.slint:663 ui/pages/settings.slint:1458
 msgid "Listening to featherplay"
 msgstr ""
 
-#: ui/pages/settings.slint:744
+#: ui/pages/settings.slint:747
 msgid "{} elapsed"
 msgstr ""
 
-#: ui/pages/settings.slint:931
+#: ui/pages/settings.slint:934
 msgid "Shorter"
 msgstr ""
 
-#: ui/pages/settings.slint:937
+#: ui/pages/settings.slint:940
 msgid "{n} min"
 msgid_plural "{n} min"
 msgstr[0] ""
 msgstr[1] ""
 
-#: ui/pages/settings.slint:944
+#: ui/pages/settings.slint:947
 msgid "Longer"
 msgstr ""
 
-#: ui/pages/settings.slint:970
+#: ui/pages/settings.slint:973
 msgid "{} hotkey"
 msgstr ""
 
 #. The confirming button names its action ("Rename", "Delete").
-#: ui/pages/settings.slint:1013
+#: ui/pages/settings.slint:1016
 msgid "OK"
 msgstr ""
 
-#: ui/pages/settings.slint:1089 ui/pages/settings.slint:1310
-#: ui/pages/settings.slint:1089 ui/pages/settings.slint:1310
+#: ui/pages/settings.slint:1092 ui/pages/settings.slint:1322
+#: ui/pages/settings.slint:1092 ui/pages/settings.slint:1322
 msgid "Cancel"
 msgstr ""
 
-#: ui/pages/settings.slint:1200 ui/sidebar.slint:341
+#: ui/pages/settings.slint:1203 ui/sidebar.slint:341
 msgid "Settings"
 msgstr ""
 
-#: ui/pages/settings.slint:1204 ui/pages/settings.slint:1672
+#: ui/pages/settings.slint:1207 ui/pages/settings.slint:1684
 msgid "Playback"
 msgstr ""
 
-#: ui/pages/settings.slint:1207
+#: ui/pages/settings.slint:1210
 msgid "Prefer song versions"
 msgstr ""
 
-#: ui/pages/settings.slint:1208
+#: ui/pages/settings.slint:1211
 msgid ""
 "Some uploads are music videos with intros or skits in the audio. Play the "
 "song version instead when there is one."
 msgstr ""
 
-#: ui/pages/settings.slint:1213
+#: ui/pages/settings.slint:1216
 msgid "Autoplay similar songs when a list ends"
 msgstr ""
 
-#: ui/pages/settings.slint:1214
+#: ui/pages/settings.slint:1217
 msgid ""
 "When a playlist, album or other list ends, play on with songs like its last "
 "one. Off, the list starts again from the top. Repeat all always starts it "
 "again."
 msgstr ""
 
-#: ui/pages/settings.slint:1219
+#: ui/pages/settings.slint:1222
 msgid "Skip non-music in radio"
 msgstr ""
 
-#: ui/pages/settings.slint:1220
+#: ui/pages/settings.slint:1223
 msgid ""
 "Radio and autoplay leave out user uploads and podcast episodes. Tracks you "
 "pick always play."
 msgstr ""
 
-#: ui/pages/settings.slint:1225
+#: ui/pages/settings.slint:1228
 msgid "Skip non-music parts"
 msgstr ""
 
-#: ui/pages/settings.slint:1226
+#: ui/pages/settings.slint:1229
 msgid "Skips the intros and outros SponsorBlock users marked in music videos."
 msgstr ""
 
-#: ui/pages/settings.slint:1231
+#: ui/pages/settings.slint:1234
+msgid "Volume step"
+msgstr ""
+
+#: ui/pages/settings.slint:1235
+msgid "How much the mouse wheel and the Up and Down keys change the volume."
+msgstr ""
+
+#: ui/pages/settings.slint:1243
 msgid "Output device"
 msgstr ""
 
-#: ui/pages/settings.slint:1232
+#: ui/pages/settings.slint:1244
 msgid ""
 "If the device goes away, playback pauses and moves to the system default."
 msgstr ""
 
-#: ui/pages/settings.slint:1248
+#: ui/pages/settings.slint:1260
 msgid "Show lyrics"
 msgstr ""
 
-#: ui/pages/settings.slint:1249
+#: ui/pages/settings.slint:1261
 msgid ""
 "The Lyrics button in the bar and on Now playing, and the Lyrics tab beside "
 "Up next. Off: they're hidden, and no lyrics are looked up."
 msgstr ""
 
-#: ui/pages/settings.slint:1254
+#: ui/pages/settings.slint:1266
 msgid "Look up synced lyrics on LRCLIB"
 msgstr ""
 
-#: ui/pages/settings.slint:1255
+#: ui/pages/settings.slint:1267
 msgid ""
 "Lines follow the song. While lyrics are on screen, LRCLIB gets the song's "
 "title, artist, album and length. Off: only the lyrics that come with the "
 "song, synced for some songs."
 msgstr ""
 
-#: ui/pages/settings.slint:1263 ui/pages/settings.slint:1672
+#: ui/pages/settings.slint:1275 ui/pages/settings.slint:1684
 msgid "Scrobbling"
 msgstr ""
 
-#: ui/pages/settings.slint:1266
+#: ui/pages/settings.slint:1278
 msgid "Scrobble"
 msgstr ""
 
-#: ui/pages/settings.slint:1267
+#: ui/pages/settings.slint:1279
 msgid ""
 "Send what you play to Last.fm and ListenBrainz, once you've played half a "
 "track or 4 minutes of it."
 msgstr ""
 
-#: ui/pages/settings.slint:1272
+#: ui/pages/settings.slint:1284
 msgid "Scrobble other media"
 msgstr ""
 
-#: ui/pages/settings.slint:1273
+#: ui/pages/settings.slint:1285
 msgid ""
 "Also scrobble user uploads and podcasts, not only songs and official music "
 "videos."
 msgstr ""
 
-#: ui/pages/settings.slint:1279
+#: ui/pages/settings.slint:1291
 msgid "Use alternative titles"
 msgstr ""
 
-#: ui/pages/settings.slint:1280
+#: ui/pages/settings.slint:1292
 msgid ""
 "Send the video's original title rather than the translated or romanised one "
 "shown here."
 msgstr ""
 
-#: ui/pages/settings.slint:1286
+#: ui/pages/settings.slint:1298
 msgid "Use alternative artists"
 msgstr ""
 
-#: ui/pages/settings.slint:1287
+#: ui/pages/settings.slint:1299
 msgid ""
 "Send the artist from the video's tags, spelled as the label has it, rather "
 "than the first artist shown."
 msgstr ""
 
-#: ui/pages/settings.slint:1295
+#: ui/pages/settings.slint:1307
 msgid "Connected. Scrobbles go to your Last.fm profile."
 msgstr ""
 
-#: ui/pages/settings.slint:1296
+#: ui/pages/settings.slint:1308
 msgid "Opening Last.fm in your browser…"
 msgstr ""
 
-#: ui/pages/settings.slint:1297
+#: ui/pages/settings.slint:1309
 msgid ""
 "Approve featherplay on the Last.fm page in your browser, then come back here."
 msgstr ""
 
-#: ui/pages/settings.slint:1298
+#: ui/pages/settings.slint:1310
 msgid "Connecting…"
 msgstr ""
 
-#: ui/pages/settings.slint:1299
+#: ui/pages/settings.slint:1311
 msgid ""
 "Scrobble to your Last.fm profile. Enter an API key under API settings first."
 msgstr ""
 
-#: ui/pages/settings.slint:1300
+#: ui/pages/settings.slint:1312
 msgid "Scrobble what you play to your Last.fm profile."
 msgstr ""
 
-#: ui/pages/settings.slint:1302
+#: ui/pages/settings.slint:1314
 msgid "API settings…"
 msgstr ""
 
-#: ui/pages/settings.slint:1306 ui/pages/settings.slint:1371
+#: ui/pages/settings.slint:1318 ui/pages/settings.slint:1383
 msgid "Connect"
 msgstr ""
 
-#: ui/pages/settings.slint:1314
+#: ui/pages/settings.slint:1326
 msgid "I've approved it"
 msgstr ""
 
-#: ui/pages/settings.slint:1319
+#: ui/pages/settings.slint:1331
 msgid "Disconnect"
 msgstr ""
 
-#: ui/pages/settings.slint:1324
+#: ui/pages/settings.slint:1336
 msgid "Scrobble to Last.fm"
 msgstr ""
 
-#: ui/pages/settings.slint:1325
+#: ui/pages/settings.slint:1337
 msgid "Off keeps the connection."
 msgstr ""
 
-#: ui/pages/settings.slint:1333
+#: ui/pages/settings.slint:1345
 msgid "Checking the token with ListenBrainz…"
 msgstr ""
 
-#: ui/pages/settings.slint:1334
+#: ui/pages/settings.slint:1346
 msgid "Connected. Listens go to your ListenBrainz profile."
 msgstr ""
 
-#: ui/pages/settings.slint:1335
+#: ui/pages/settings.slint:1347
 msgid "Send listens to your ListenBrainz profile with your user token."
 msgstr ""
 
-#: ui/pages/settings.slint:1337
+#: ui/pages/settings.slint:1349
 msgid "Add token…"
 msgstr ""
 
-#: ui/pages/settings.slint:1341
+#: ui/pages/settings.slint:1353
 msgid "Change token…"
 msgstr ""
 
-#: ui/pages/settings.slint:1345
+#: ui/pages/settings.slint:1357
 msgid "Remove"
 msgstr ""
 
-#: ui/pages/settings.slint:1350
+#: ui/pages/settings.slint:1362
 msgid "Scrobble to ListenBrainz"
 msgstr ""
 
-#: ui/pages/settings.slint:1351
+#: ui/pages/settings.slint:1363
 msgid "Off keeps the token."
 msgstr ""
 
-#: ui/pages/settings.slint:1359 ui/pages/settings.slint:1672
+#: ui/pages/settings.slint:1371 ui/pages/settings.slint:1684
 msgid "Integrations"
 msgstr ""
 
-#: ui/pages/settings.slint:1363 ui/pages/settings.slint:1378
+#: ui/pages/settings.slint:1375 ui/pages/settings.slint:1390
 msgid "Discord status"
 msgstr ""
 
-#: ui/pages/settings.slint:1364
+#: ui/pages/settings.slint:1376
 msgid "This build has no Discord app ID."
 msgstr ""
 
-#: ui/pages/settings.slint:1365
+#: ui/pages/settings.slint:1377
 msgid "Show \"Listening to\" with the track on your Discord profile."
 msgstr ""
 
-#: ui/pages/settings.slint:1366
+#: ui/pages/settings.slint:1378
 msgid "Connected to Discord."
 msgstr ""
 
-#: ui/pages/settings.slint:1367
+#: ui/pages/settings.slint:1379
 msgid "Connecting to Discord…"
 msgstr ""
 
-#: ui/pages/settings.slint:1368
+#: ui/pages/settings.slint:1380
 msgid ""
 "Not connected. Discord isn't running; featherplay tries again while music "
 "plays."
 msgstr ""
 
-#: ui/pages/settings.slint:1369
+#: ui/pages/settings.slint:1381
 msgid "Not connected. Discord isn't running, or it closed."
 msgstr ""
 
-#: ui/pages/settings.slint:1386
+#: ui/pages/settings.slint:1398
 msgid "Reconnect automatically"
 msgstr ""
 
-#: ui/pages/settings.slint:1387
+#: ui/pages/settings.slint:1399
 msgid "When Discord isn't running or restarts, try again while music plays."
 msgstr ""
 
-#: ui/pages/settings.slint:1392
+#: ui/pages/settings.slint:1404
 msgid "Clear activity"
 msgstr ""
 
-#: ui/pages/settings.slint:1393
+#: ui/pages/settings.slint:1405
 msgid ""
 "Remove the track from your profile until the next one starts or you resume."
 msgstr ""
 
-#: ui/pages/settings.slint:1395 ui/queue_panel.slint:245
+#: ui/pages/settings.slint:1407 ui/queue_panel.slint:245
 msgid "Clear"
 msgstr ""
 
-#: ui/pages/settings.slint:1401 ui/pages/settings.slint:1411
+#: ui/pages/settings.slint:1413 ui/pages/settings.slint:1423
 msgid "Clear after a pause"
 msgstr ""
 
-#: ui/pages/settings.slint:1402
+#: ui/pages/settings.slint:1414
 msgid "Remove the track when playback stays paused this long."
 msgstr ""
 
-#: ui/pages/settings.slint:1417
+#: ui/pages/settings.slint:1429
 msgid "Play song button"
 msgstr ""
 
-#: ui/pages/settings.slint:1418
+#: ui/pages/settings.slint:1430
 msgid "A button under the activity that opens the song in a browser."
 msgstr ""
 
-#: ui/pages/settings.slint:1423
+#: ui/pages/settings.slint:1435
 msgid "Links"
 msgstr ""
 
-#: ui/pages/settings.slint:1424
+#: ui/pages/settings.slint:1436
 msgid "The title opens the song, the artist their page and the cover the album."
 msgstr ""
 
-#: ui/pages/settings.slint:1429
+#: ui/pages/settings.slint:1441
 msgid "Time"
 msgstr ""
 
-#: ui/pages/settings.slint:1430
+#: ui/pages/settings.slint:1442
 msgid "What your profile shows of the track's time while it plays."
 msgstr ""
 
-#: ui/pages/settings.slint:1434
+#: ui/pages/settings.slint:1446
 msgid "Progress bar with the time left"
 msgstr ""
 
-#: ui/pages/settings.slint:1434
+#: ui/pages/settings.slint:1446
 msgid "Time elapsed only"
 msgstr ""
 
-#: ui/pages/settings.slint:1434
+#: ui/pages/settings.slint:1446
 msgid "No time"
 msgstr ""
 
-#: ui/pages/settings.slint:1441
+#: ui/pages/settings.slint:1453
 msgid "Status text"
 msgstr ""
 
-#: ui/pages/settings.slint:1442
+#: ui/pages/settings.slint:1454
 msgid "What your status says in member lists and DMs."
 msgstr ""
 
-#: ui/pages/settings.slint:1446
+#: ui/pages/settings.slint:1458
 msgid "Listening to the artist"
 msgstr ""
 
-#: ui/pages/settings.slint:1446
+#: ui/pages/settings.slint:1458
 msgid "Listening to the song title"
 msgstr ""
 
-#: ui/pages/settings.slint:1453
+#: ui/pages/settings.slint:1465
 msgid "Preview"
 msgstr ""
 
-#: ui/pages/settings.slint:1454
+#: ui/pages/settings.slint:1466
 msgid ""
 "How Discord shows a song with these options. Nothing is playing, so a sample "
 "stands in."
 msgstr ""
 
-#: ui/pages/settings.slint:1455
+#: ui/pages/settings.slint:1467
 msgid "How Discord shows the current song with these options."
 msgstr ""
 
-#: ui/pages/settings.slint:1460
+#: ui/pages/settings.slint:1472
 msgid "Local API"
 msgstr ""
 
-#: ui/pages/settings.slint:1461
+#: ui/pages/settings.slint:1473
 msgid ""
 "Let stream overlays, Stream Deck and scripts on this PC show what's playing "
 "and control playback. Tools made for Pear's API Server work too."
 msgstr ""
 
-#: ui/pages/settings.slint:1463
+#: ui/pages/settings.slint:1475
 msgid ""
 "On at http://127.0.0.1:{}. Only apps on this PC that have the token can use "
 "it."
 msgstr ""
 
-#: ui/pages/settings.slint:1464
+#: ui/pages/settings.slint:1476
 msgid "Starting…"
 msgstr ""
 
-#: ui/pages/settings.slint:1470
+#: ui/pages/settings.slint:1482
 msgid "Port"
 msgstr ""
 
-#: ui/pages/settings.slint:1472
+#: ui/pages/settings.slint:1484
 msgid "26538 is the one Pear Desktop uses, so its tools find featherplay."
 msgstr ""
 
-#: ui/pages/settings.slint:1476
+#: ui/pages/settings.slint:1488
 msgid "Local API port"
 msgstr ""
 
-#: ui/pages/settings.slint:1482
+#: ui/pages/settings.slint:1494
 msgid "Access token"
 msgstr ""
 
-#: ui/pages/settings.slint:1483
+#: ui/pages/settings.slint:1495
 msgid ""
 "Apps send it as \"Authorization: Bearer\" and the token. It stays hidden "
 "here, so it doesn't show on stream. Regenerate disconnects the apps using "
 "the old one."
 msgstr ""
 
-#: ui/pages/settings.slint:1488
+#: ui/pages/settings.slint:1500
 msgid "Token, hidden"
 msgstr ""
 
-#: ui/pages/settings.slint:1491 ui/top_bar.slint:298
+#: ui/pages/settings.slint:1503 ui/top_bar.slint:298
 msgid "Copy"
 msgstr ""
 
-#: ui/pages/settings.slint:1496
+#: ui/pages/settings.slint:1508
 msgid "Regenerate"
 msgstr ""
 
-#: ui/pages/settings.slint:1505 ui/pages/settings.slint:1672
+#: ui/pages/settings.slint:1517 ui/pages/settings.slint:1684
 msgid "Window"
 msgstr ""
 
-#: ui/pages/settings.slint:1509
+#: ui/pages/settings.slint:1521
 msgid "When I close the window"
 msgstr ""
 
-#: ui/pages/settings.slint:1510
+#: ui/pages/settings.slint:1522
 msgid "In the tray, the music keeps going; quit from the tray icon's menu."
 msgstr ""
 
-#: ui/pages/settings.slint:1514
+#: ui/pages/settings.slint:1526
 msgid "Ask"
 msgstr ""
 
-#: ui/pages/settings.slint:1521
+#: ui/pages/settings.slint:1533
 msgid "Appearance"
 msgstr ""
 
-#: ui/pages/settings.slint:1522
+#: ui/pages/settings.slint:1534
 msgid "System follows Windows' light or dark mode."
 msgstr ""
 
-#: ui/pages/settings.slint:1524
+#: ui/pages/settings.slint:1536
 msgctxt "appearance"
 msgid "Dark"
 msgstr ""
 
-#: ui/pages/settings.slint:1524
+#: ui/pages/settings.slint:1536
 msgctxt "appearance"
 msgid "Light"
 msgstr ""
 
-#: ui/pages/settings.slint:1524
+#: ui/pages/settings.slint:1536
 msgctxt "appearance"
 msgid "System"
 msgstr ""
 
-#: ui/pages/settings.slint:1532
+#: ui/pages/settings.slint:1544
 msgid "Language"
 msgstr ""
 
-#: ui/pages/settings.slint:1533
+#: ui/pages/settings.slint:1545
 msgid ""
 "Windows default follows Windows' display language when featherplay has it, "
 "and English otherwise."
 msgstr ""
 
-#: ui/pages/settings.slint:1541
+#: ui/pages/settings.slint:1553
 msgid "Accent"
 msgstr ""
 
-#: ui/pages/settings.slint:1542
+#: ui/pages/settings.slint:1554
 msgid ""
 "From the cover takes the colour of the song that's playing, and uses red "
 "when the art is grey."
 msgstr ""
 
-#: ui/pages/settings.slint:1564
+#: ui/pages/settings.slint:1576
 msgid "Track notifications"
 msgstr ""
 
-#: ui/pages/settings.slint:1565
+#: ui/pages/settings.slint:1577
 msgid "Show a notification when the track changes."
 msgstr ""
 
-#: ui/pages/settings.slint:1570
+#: ui/pages/settings.slint:1582
 msgid "Global hotkeys"
 msgstr ""
 
-#: ui/pages/settings.slint:1571
+#: ui/pages/settings.slint:1583
 msgid ""
 "Play, pause and skip from any app. Each key needs Ctrl, Alt, Shift or Win."
 msgstr ""
 
-#: ui/pages/settings.slint:1581
+#: ui/pages/settings.slint:1593
 msgid "Ctrl+Alt+Space"
 msgstr ""
 
-#: ui/pages/settings.slint:1587
+#: ui/pages/settings.slint:1599
 msgid "Ctrl+Alt+Right"
 msgstr ""
 
-#: ui/pages/settings.slint:1593
+#: ui/pages/settings.slint:1605
 msgid "Ctrl+Alt+Left"
 msgstr ""
 
-#: ui/pages/settings.slint:1607 ui/pages/settings.slint:1672
-#: ui/pages/settings.slint:1607 ui/pages/settings.slint:1672
+#: ui/pages/settings.slint:1619 ui/pages/settings.slint:1684
+#: ui/pages/settings.slint:1619 ui/pages/settings.slint:1684
 msgid "Account"
 msgstr ""
 
-#: ui/pages/settings.slint:1611
+#: ui/pages/settings.slint:1623
 msgid "Music account"
 msgstr ""
 
-#: ui/pages/settings.slint:1612
+#: ui/pages/settings.slint:1624
 msgid "Not signed in."
 msgstr ""
 
-#: ui/pages/settings.slint:1613
+#: ui/pages/settings.slint:1625
 msgid "Sign out? The saved session is deleted; the music keeps playing."
 msgstr ""
 
-#: ui/pages/settings.slint:1614
+#: ui/pages/settings.slint:1626
 msgid "Signed in. The session is kept in Windows Credential Manager."
 msgstr ""
 
-#: ui/pages/settings.slint:1637
+#: ui/pages/settings.slint:1649
 msgid "Check for updates"
 msgstr ""
 
-#: ui/pages/settings.slint:1638
+#: ui/pages/settings.slint:1650
 msgid ""
 "Once a day, and when songs keep failing to play, ask GitHub whether a newer "
 "featherplay is out."
 msgstr ""
 
-#: ui/pages/settings.slint:1643
+#: ui/pages/settings.slint:1655
 msgid "Install updates automatically"
 msgstr ""
 
-#: ui/pages/settings.slint:1644
+#: ui/pages/settings.slint:1656
 msgid ""
 "Download a newer version in the background, check it, and install it when "
 "you click Restart to update. Only for the installed featherplay, not the "
 "portable exe."
 msgstr ""
 
-#: ui/pages/settings.slint:1650
+#: ui/pages/settings.slint:1662
 msgid "About featherplay"
 msgstr ""
 
-#: ui/pages/settings.slint:1651
+#: ui/pages/settings.slint:1663
 msgid "Version, licences and credits."
 msgstr ""
 
-#: ui/pages/settings.slint:1653
+#: ui/pages/settings.slint:1665
 msgid "About"
 msgstr ""
 
-#: ui/pages/settings.slint:1671
+#: ui/pages/settings.slint:1683
 msgid "Settings sections"
 msgstr ""
 
-#: ui/pages/settings.slint:1699
+#: ui/pages/settings.slint:1711
 msgid "Last.fm API settings"
 msgstr ""
 
 #. Two sentences: whose API account is in use, then how to make one.
-#: ui/pages/settings.slint:1701
+#: ui/pages/settings.slint:1713
 msgid "Your own API account is in use."
 msgstr ""
 
-#: ui/pages/settings.slint:1702
+#: ui/pages/settings.slint:1714
 msgid "featherplay's own API account is in use; you can use yours instead."
 msgstr ""
 
-#: ui/pages/settings.slint:1703
+#: ui/pages/settings.slint:1715
 msgid "This build has no API account of its own, so Last.fm needs yours."
 msgstr ""
 
-#: ui/pages/settings.slint:1704
+#: ui/pages/settings.slint:1716
 msgid ""
 "Create one at last.fm/api/account/create, leaving the callback URL empty. "
 "Saving signs you out of Last.fm."
 msgstr ""
 
-#: ui/pages/settings.slint:1706
+#: ui/pages/settings.slint:1718
 msgid "Remove your key"
 msgstr ""
 
-#: ui/pages/settings.slint:1712
+#: ui/pages/settings.slint:1724
 msgid "API key"
 msgstr ""
 
-#: ui/pages/settings.slint:1713
+#: ui/pages/settings.slint:1725
 msgid "Enter a new key to replace yours"
 msgstr ""
 
-#: ui/pages/settings.slint:1713
+#: ui/pages/settings.slint:1725
 msgid "32 letters and digits"
 msgstr ""
 
-#: ui/pages/settings.slint:1718
+#: ui/pages/settings.slint:1730
 msgid "Shared secret"
 msgstr ""
 
-#: ui/pages/settings.slint:1719
+#: ui/pages/settings.slint:1731
 msgid "Shown below the key on Last.fm"
 msgstr ""
 
-#: ui/pages/settings.slint:1729
+#: ui/pages/settings.slint:1741
 msgid "ListenBrainz token"
 msgstr ""
 
-#: ui/pages/settings.slint:1730
+#: ui/pages/settings.slint:1742
 msgid ""
 "Paste the user token from listenbrainz.org/settings. featherplay checks it "
 "with ListenBrainz, then keeps it in Windows Credential Manager."
 msgstr ""
 
-#: ui/pages/settings.slint:1736
+#: ui/pages/settings.slint:1748
 msgid "User token"
 msgstr ""
 
-#: ui/pages/settings.slint:1737
+#: ui/pages/settings.slint:1749
 msgid "Paste a new token to replace yours"
 msgstr ""
 
-#: ui/pages/settings.slint:1737
+#: ui/pages/settings.slint:1749
 msgid "Paste your user token"
 msgstr ""
 

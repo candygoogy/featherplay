@@ -79,3 +79,23 @@ fn a_notch_moves_the_volume_5_percent_and_saves_once_it_rests() {
     offscreen::wheel(w, at, 1.0);
     assert_eq!(player.get_volume(), 1.0, "a notch past full stops at 100 %");
 }
+
+#[test]
+fn a_notch_moves_the_volume_by_the_volume_step() {
+    let scene = Scene::new(1280, 800, true, false).expect("scene");
+    scene.play(false).expect("player");
+    scene.ui.show().expect("show");
+    scene.settle();
+    let player = scene.ui.global::<Player>();
+    player.set_volume_step(2);
+    player.set_volume(0.5);
+    let calls = record(&scene);
+    let at = slider(&scene, &calls);
+    let v = player.get_volume();
+    assert!((v - 0.52).abs() < 1e-4, "a notch up at 2 %: {v}");
+
+    player.set_volume_step(10);
+    offscreen::wheel(scene.ui.window(), at, -1.0);
+    let v = player.get_volume();
+    assert!((v - 0.42).abs() < 1e-4, "a notch down at 10 %: {v}");
+}

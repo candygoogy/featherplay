@@ -93,5 +93,6 @@ mod upnext_cover;
 mod upnext_hover;
 mod upnext_slide;
 mod volume_hover;
+mod volume_keys;
 mod volume_wheel;
 mod wheel_scroll;

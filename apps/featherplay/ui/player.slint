@@ -29,6 +29,8 @@ export global Player {
     in property <string> total;
     // The 0..1 slider value; the audio engine applies the perceptual curve.
     in property <float> volume;
+    // The Volume step setting, in percent: what a wheel notch and Up or Down move it.
+    in property <int> volume-step: 5;
 
     callback toggle();
     callback next();

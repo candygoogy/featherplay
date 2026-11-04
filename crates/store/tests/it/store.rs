@@ -62,6 +62,7 @@ fn settings_defaults_when_missing() {
             local_api: false,
             local_api_port: 26538,
             language: String::new(),
+            volume_step: 5,
         }
     );
     assert_eq!(s, Settings::default());
@@ -118,6 +119,7 @@ fn settings_roundtrip() {
         local_api: true,
         local_api_port: 31000,
         language: "de".into(),
+        volume_step: 2,
     };
     s.save(&p).unwrap();
     assert!(p.config.join("settings.toml").is_file());
@@ -644,6 +646,32 @@ fn the_language_follows_windows_in_older_files() {
     fs::create_dir_all(&p.config).unwrap();
     fs::write(p.config.join("settings.toml"), "notifications = true\n").unwrap();
     assert_eq!(Settings::load(&p).language, "");
+}
+
+#[test]
+fn the_volume_step_is_5_in_older_files_and_falls_back_to_5_when_not_a_choice() {
+    let Some(home) = TestHome::new("settings-volume-step") else {
+        return;
+    };
+    let p = home.paths();
+    fs::create_dir_all(&p.config).unwrap();
+    let file = p.config.join("settings.toml");
+
+    // A file written before the setting existed.
+    fs::write(&file, "notifications = true\n").unwrap();
+    assert_eq!(Settings::load(&p).volume_step, 5);
+
+    for bad in ["0", "3", "-1", "300", "2.5", "\"ten\""] {
+        fs::write(&file, format!("volume_step = {bad}\nvolume = 0.5\n")).unwrap();
+        let s = Settings::load(&p);
+        assert_eq!(s.volume_step, 5, "{bad}");
+        // The rest of the file still counts.
+        assert_eq!(s.volume, 0.5, "{bad}");
+    }
+    for step in Settings::VOLUME_STEPS {
+        fs::write(&file, format!("volume_step = {step}\n")).unwrap();
+        assert_eq!(Settings::load(&p).volume_step, step);
+    }
 }
 
 #[test]

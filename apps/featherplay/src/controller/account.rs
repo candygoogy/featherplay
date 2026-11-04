@@ -147,6 +147,9 @@ pub enum Change {
     LocalApiPort(u16),
     /// The Language setting: "" for Windows default, "en", or a bundled code.
     Language(String),
+    /// What a wheel notch and Up or Down move the volume, in percent (one of
+    /// `Settings::VOLUME_STEPS`; the window applies it).
+    VolumeStep(u8),
 }
 
 impl Change {
@@ -189,6 +192,7 @@ impl Change {
             Change::LocalApi(v) => s.local_api = v,
             Change::LocalApiPort(v) => s.local_api_port = v,
             Change::Language(v) => s.language = v,
+            Change::VolumeStep(v) => s.volume_step = v,
         }
     }
 }

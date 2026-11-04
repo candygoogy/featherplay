@@ -109,6 +109,8 @@ export global SettingsData {
     in property <bool> prefer-song-versions;
     in property <bool> skip-non-music;
     in property <bool> autoplay: true;
+    // The Volume step: 0 1 %, 1 2 %, 2 5 %, 3 10 %.
+    in property <int> volume-step: 2;
     in property <bool> sponsorblock;
     // "System default" first, then the output devices by name.
     in property <[string]> devices;
@@ -202,6 +204,7 @@ export global SettingsData {
     // Enter in the hex field, or leaving it, with the text as typed.
     callback custom-hex-entered(string);
     callback pick-close-action(int);
+    callback pick-volume-step(int);
     // 0 play/pause, 1 next, 2 previous; the text as typed.
     callback hotkey-edited(int, string);
     callback lastfm-connect();
@@ -1226,6 +1229,15 @@ export component SettingsPage inherits Rectangle {
                     detail: @tr("Skips the intros and outros SponsorBlock users marked in music videos.");
                     key: SettingKey.sponsorblock;
                     checked: SettingsData.sponsorblock;
+                }
+                SettingRow {
+                    label: @tr("Volume step");
+                    detail: @tr("How much the mouse wheel and the Up and Down keys change the volume.");
+                    Chips {
+                        labels: [@tr("{} %", 1), @tr("{} %", 2), @tr("{} %", 5), @tr("{} %", 10)];
+                        active: SettingsData.volume-step;
+                        selected(i) => { SettingsData.pick-volume-step(i); }
+                    }
                 }
                 SettingRow {
                     label: @tr("Output device");

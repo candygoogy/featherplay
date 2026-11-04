@@ -32,7 +32,7 @@ use crate::presence::Status as DiscordStatus;
 use crate::scrobbler::build_keys;
 use crate::ui::{
     AccentSwatch, Appearance, DiscordPreview, DiscordState, LastfmState, ListenBrainzState,
-    LocalApiState, SettingKey, SettingsData, SettingsDialog, Theme,
+    LocalApiState, Player, SettingKey, SettingsData, SettingsDialog, Theme,
 };
 use crate::{follow, language, lyrics, native, shell, toast};
 
@@ -247,6 +247,8 @@ pub fn init(ctx: &Rc<Ctx>) {
             set_close_action(&c, action);
         }
     });
+    let c = ctx.clone();
+    data.on_pick_volume_step(move |i| pick_volume_step(&c, i));
 }
 
 /// The page is being shown: refresh the devices and the Last.fm state.
@@ -673,6 +675,7 @@ fn show(ctx: &Ctx) {
     data.set_prefer_song_versions(s.prefer_song_versions);
     data.set_skip_non_music(s.skip_non_music_in_radio);
     data.set_autoplay(s.autoplay);
+    show_volume_step(ctx, s.volume_step);
     data.set_sponsorblock(s.sponsorblock);
     data.set_scrobbling(s.scrobbling);
     data.set_scrobble(s.lastfm_enabled);
@@ -788,6 +791,33 @@ fn accent_name(a: Accent) -> &'static str {
 /// The accent's place on the page: 0 is "From the cover", then the swatches.
 fn accent_index(a: Accent) -> i32 {
     Accent::ALL.iter().position(|&x| x == a).unwrap_or(0) as i32
+}
+
+/// Shows the volume step (percent) on the page and hands it to the bar's slider, which the
+/// wheel and the window's Up and Down keys move by it.
+fn show_volume_step(ctx: &Ctx, step: u8) {
+    let Some(ui) = ctx.window() else { return };
+    let place = |step: u8| Settings::VOLUME_STEPS.iter().position(|&s| s == step);
+    let at = place(step)
+        .or_else(|| place(Settings::VOLUME_STEP))
+        .unwrap_or_default();
+    ui.global::<SettingsData>()
+        .set_volume_step(i32::try_from(at).unwrap_or_default());
+    ui.global::<Player>().set_volume_step(i32::from(step));
+}
+
+/// The volume step at `i` in the page's chips, applied at once and saved.
+fn pick_volume_step(ctx: &Ctx, i: i32) {
+    let Some(&step) = usize::try_from(i)
+        .ok()
+        .and_then(|i| Settings::VOLUME_STEPS.get(i))
+    else {
+        return;
+    };
+    show_volume_step(ctx, step);
+    if SETTINGS.with(|s| s.borrow().volume_step != step) {
+        commit(ctx, Change::VolumeStep(step));
+    }
 }
 
 /// The close choice's place in the page's list.

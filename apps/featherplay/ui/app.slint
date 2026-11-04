@@ -223,6 +223,16 @@ export component AppWindow inherits Window {
                 }
                 return accept;
             }
+            // Up and Down move the volume one Volume step, from any page. Like Space, they reach
+            // here only when nothing focused took them: text fields move their cursor with them,
+            // the search suggestions, the account picker and the hue slider their own choice.
+            // Not under a dialog.
+            if (e.text == Key.UpArrow || e.text == Key.DownArrow) && !e.modifiers.control && !e.modifiers.alt && !e.modifiers.meta {
+                if !CloseChoice.open && SettingsData.dialog == SettingsDialog.none {
+                    bottom-bar.step-volume(e.text == Key.UpArrow);
+                }
+                return accept;
+            }
             if e.text == Key.Escape {
                 // In the search field: the first Escape clears it, the next leaves it.
                 if top-bar.searching && TopBarData.query != "" {
@@ -403,7 +413,7 @@ export component AppWindow inherits Window {
             }
         }
 
-        BottomBar {
+        bottom-bar := BottomBar {
             x: Theme.bar-inset;
             y: root.bar-top;
             width: root.width - 2 * Theme.bar-inset;

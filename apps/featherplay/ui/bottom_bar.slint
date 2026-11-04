@@ -124,39 +124,74 @@ component SeekLine inherits Rectangle {
     }
 }
 
+// The volume: a click or a drag sets it, a wheel notch and Up or Down (`step`) move it by the
+// Volume step. While it changes, its value shows above the line, until a second after the
+// last change.
 component VolumeSlider inherits Rectangle {
     property <float> preview: clamp(ta.mouse-x / max(1px, self.width), 0, 1);
-    // The wheel changed the volume and it isn't saved yet: saved once the wheel rests.
-    property <bool> wheeled: false;
+    // The wheel or the keys changed the volume and it isn't saved yet: saved once they rest.
+    property <bool> unsaved: false;
+    // The value shows: from a change until `rest` ends, and while the slider is pressed.
+    property <bool> changing: false;
+    property <bool> tip: root.changing || ta.pressed;
     width: 88px;
     accessible-role: slider;
     accessible-label: @tr("Volume");
     accessible-value: round(Player.volume * 100) + " %";
-    Timer {
-        interval: 600ms;
-        running: root.wheeled;
+    // Up or Down: one step onto the step's grid (37 % and Up at 5 % is 40 %), within 0–100 %.
+    // The small margin keeps a value a hair off the grid (0.4 as 39.99998 %) from counting as
+    // below it.
+    public function step(up: bool) {
+        let s = max(1, Player.volume-step);
+        let at = Player.volume * 100 / s;
+        let to = up ? floor(at + 0.01) + 1 : ceil(at - 0.01) - 1;
+        Player.set-volume(clamp(to * s / 100, 0, 1), false);
+        root.unsaved = true;
+        root.changed();
+    }
+    // Shows the value and starts its second again.
+    function changed() {
+        root.changing = true;
+        if rest.running {
+            rest.restart();
+        } else {
+            rest.running = true;
+        }
+    }
+    // Runs only while the value shows.
+    rest := Timer {
+        interval: 1s;
+        running: false;
         triggered => {
-            root.wheeled = false;
-            Player.set-volume(Player.volume, true);
+            self.running = false;
+            root.changing = false;
+            if root.unsaved {
+                root.unsaved = false;
+                Player.set-volume(Player.volume, true);
+            }
         }
     }
     ta := TouchArea {
         mouse-cursor: pointer;
-        // 5 % a notch (a notch is 60 px); a touchpad's smaller steps move it in proportion.
+        // A notch (60 px) moves it one step; a touchpad's smaller steps move it in proportion.
         scroll-event(e) => {
             if e.delta-y == 0 {
                 return reject;
             }
-            Player.set-volume(clamp(Player.volume + e.delta-y / 60px * 0.05, 0, 1), false);
-            root.wheeled = true;
+            Player.set-volume(clamp(Player.volume + e.delta-y / 60px * Player.volume-step / 100, 0, 1), false);
+            root.unsaved = true;
+            root.changed();
             accept
         }
         pointer-event(e) => {
             if e.button == PointerEventButton.left {
                 if e.kind == PointerEventKind.down {
                     Player.set-volume(root.preview, false);
+                    root.changed();
                 } else if e.kind == PointerEventKind.up {
                     Player.set-volume(root.preview, true);
+                    root.unsaved = false;
+                    root.changed();
                 }
             }
         }
@@ -180,6 +215,30 @@ component VolumeSlider inherits Rectangle {
         border-radius: 2px;
         background: ta.has-hover || ta.pressed ? Theme.accent : Theme.text2;
         animate background { duration: Theme.t-hover; }
+    }
+    // The value, 8 px above the line, over the fill's end and kept within the slider: like
+    // the seek line's time.
+    Rectangle {
+        property <length> w: value.preferred-width + 12px;
+        x: clamp(root.width * clamp(Player.volume, 0, 1) - self.w / 2, 0, root.width - self.w);
+        y: root.height / 2 - 2px - Theme.s2 - self.height;
+        width: self.w;
+        height: value.preferred-height + 8px;
+        border-radius: Theme.r-s;
+        background: Theme.card;
+        drop-shadow-blur: 8px;
+        drop-shadow-color: Theme.cover-shadow;
+        opacity: root.tip ? 1 : 0;
+        visible: self.opacity > 0;
+        animate opacity { duration: Theme.t-fast; easing: Curves.ease-out; }
+        value := Body {
+            text: @tr("{} %", round(Player.volume * 100));
+            font-size: Theme.t-meta;
+            font-weight: 600;
+            color: Theme.text1;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
     }
 }
 
@@ -323,6 +382,10 @@ export component BottomBar inherits Rectangle {
     property <float> unmuted: 0.7;
     // The like heart pops when a like is added from the bar.
     property <bool> heart-pop: false;
+    // Up or Down from the window's keys: the volume one step up or down.
+    public function step-volume(up: bool) {
+        volume.step(up);
+    }
     pop-end := Timer {
         interval: 1ms;
         running: false;
@@ -553,7 +616,7 @@ export component BottomBar inherits Rectangle {
                 }
             }
         }
-        VolumeSlider { }
+        volume := VolumeSlider { }
         Rectangle {
             width: 8px;
         }
