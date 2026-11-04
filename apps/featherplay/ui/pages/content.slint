@@ -19,10 +19,12 @@ export global Open {
     }
 }
 
-// Cards per row for a content width: 5 from 900 px, else 4 (so 4 or 5 at a 1280 px window).
+// Cards per row for a content width: 5 from 900 px, else 4 (so 4 or 5 at a 1280 px window),
+// down to 3 or 2 where 4 would make cards narrower than 120 px (a page beside the Up next panel
+// in a narrow window).
 export global Grid {
     public pure function per-row(width: length) -> int {
-        return width >= 900px ? Theme.cards-per-row : Theme.cards-per-row - 1;
+        return width >= 900px ? Theme.cards-per-row : max(2, min(Theme.cards-per-row - 1, floor((width + Theme.card-gap) / (120px + Theme.card-gap))));
     }
     public pure function card(width: length, per-row: int) -> length {
         return floor((width - (per-row - 1) * Theme.card-gap) / per-row / 1px) * 1px;

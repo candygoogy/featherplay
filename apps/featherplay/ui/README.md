@@ -215,7 +215,10 @@ times, gaps, wheel messages and the UI thread's CPU time inside the paints (`src
   restore lays the page out once instead of replaying the ease (`tests/app/render_surface.rs`
   checks it). Never ease a page's size: every frame would lay the page out and repaint it. The
   Up next panel slides in over the page, which narrows once when the slide ends, and slides
-  away over the page already at its full width (`tests/app/upnext_slide.rs`).
+  away over the page already at its full width (`tests/app/upnext_slide.rs`). Every page lays
+  out down to `Theme.page-min-w` (540 px) beside it; where making room would leave less, the
+  panel floats over the page on a scrim instead, and a click beside it or Escape closes it
+  (`tests/app/narrow_panel.rs`).
 - A page enters with a short rise, never a fade (see the `opacity` rule below).
 - The player bar floats over the bottom of the window (`Theme.bar-inset` in, `Theme.bar-clear`
   tall from the bottom edge). Pages end at its top (`app.slint` clips them there and fades
