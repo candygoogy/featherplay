@@ -14,12 +14,16 @@ import { LyricsData } from "pages/lyrics.slint";
 // The seek line, between the time and the length: 4 px, 6 px while hovered, with round ends;
 // click or drag anywhere on it to seek. Hovered, a thumb sits at the fill's end and a tooltip
 // shows the time under the pointer. The fill follows a drag directly and stays
-// where it was dropped until the next position arrives.
-component SeekLine inherits Rectangle {
+// where it was dropped until the next position arrives. The tray's mini player has one too.
+export component SeekLine inherits Rectangle {
+    // The time under the pointer stays between the line's ends (the mini player's line
+    // runs close to its window's edges); by default it may reach half its width past them.
+    in property <bool> tip-within: false;
     property <bool> can-seek: Player.has-track && Player.duration-s > 0;
-    property <bool> dragging: ta.pressed && self.can-seek;
+    out property <bool> dragging: ta.pressed && self.can-seek;
     property <bool> active: (ta.has-hover || self.dragging) && self.can-seek;
-    property <float> preview: clamp(ta.mouse-x / max(1px, self.width), 0, 1);
+    // Where the pointer is along the line, 0..1.
+    out property <float> preview: clamp(ta.mouse-x / max(1px, self.width), 0, 1);
     // Where a seek was dropped, until the player reports a position (-1: none).
     property <float> dropped: -1;
     property <float> position: Player.position-s;
@@ -102,7 +106,8 @@ component SeekLine inherits Rectangle {
     // The time under the pointer, 8 px above the line.
     Rectangle {
         property <length> w: tip.preferred-width + 12px;
-        x: clamp(ta.mouse-x - self.w / 2, -self.w / 2, root.width - self.w / 2);
+        property <length> reach: root.tip-within ? 0 : self.w / 2;
+        x: clamp(ta.mouse-x - self.w / 2, -self.reach, root.width - self.w + self.reach);
         y: root.mid - 3px - Theme.s2 - self.height;
         width: self.w;
         height: tip.preferred-height + 8px;

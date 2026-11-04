@@ -154,6 +154,15 @@ fn wire(ui: &MiniPlayer, main: &AppWindow) {
             update(&ctx);
         }
     });
+    // A seek on its line goes the bar's way, and shows here at once.
+    let m = main.as_weak();
+    player.on_seek(move |fraction| {
+        let Some(main) = m.upgrade() else { return };
+        main.global::<Player>().invoke_seek(fraction);
+        if let Some(ctx) = Ctx::get() {
+            update(&ctx);
+        }
+    });
     // ⊘ as the tray icon menu's: toast and Undo when the window is on screen, else just
     // rated and skipped.
     player.on_not_for_me(|| {

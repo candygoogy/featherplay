@@ -3,16 +3,18 @@
 // Top: the cover, then the title (up to two lines) and the artist, with the pin and the button
 // that opens the main window in the top-right corner, level with the cover's top. Pinned, it
 // stays open and on top until closed, the corner holds its × and a press off the controls
-// moves it. Then the progress line across the window, the time played and the length under
-// its ends. Last, one row centred: previous, play or pause and next, flanked by the like heart
-// on the left and "not for me" on the right, so play sits in the middle of the window.
+// moves it. Then the bar's seek line across the window (a click or a drag on it seeks), the
+// time played and the length under its ends. Last, one row centred: previous, play or pause
+// and next, flanked by the like heart on the left and "not for me" on the right, so play sits
+// in the middle of the window.
 //
 // It has its own `Player` and `Theme` globals (globals belong to their window): Rust copies
 // the main window's into them. Nothing in it runs a timer; the position arrives with the
-// bar's once-a-second tick while sound plays.
+// bar's once-a-second tick while sound plays (the seek line shimmers only while loading).
 import { Theme, Icons, Curves } from "theme.slint";
 import { Body, Cover, Display, IconButton, PlayButton } from "parts.slint";
 import { Player } from "player.slint";
+import { SeekLine } from "bottom_bar.slint";
 
 export global MiniData {
     // The cover the mini player loads for itself (`mini::COVER`).
@@ -48,7 +50,6 @@ export component MiniPlayer inherits Window {
     property <length> text-x: root.pad + root.cover-size + Theme.s3;
     property <length> line-y: root.pad + root.cover-size + Theme.s3;
     property <length> controls-y: root.line-y + 4px + Theme.s1 + 14px + Theme.s1;
-    property <float> progress: Player.duration-s > 0 ? clamp(Player.position-s / Player.duration-s, 0, 1) : 0;
     // The top-right buttons: 32 px each, the last 8 px from the edge.
     property <length> slot: 32px;
     property <length> corner-x: root.width - Theme.s2 - root.slot;
@@ -188,29 +189,20 @@ export component MiniPlayer inherits Window {
         clicked => { MiniData.dismiss(); }
     }
 
-    // The progress line across the window's padding, the accent up to the time played; under
-    // its ends, the time played and the length.
-    Rectangle {
+    // The seek line across the window's padding, the accent up to the time played; its 4 px
+    // line at `line-y`, in a 16 px band that takes the presses (so a drag on it seeks, never
+    // moves the window). Under its ends, the time played (where a drag would drop) and the
+    // length.
+    seek := SeekLine {
         x: root.pad;
-        y: root.line-y;
+        y: root.line-y + 2px - self.height / 2;
         width: root.width - 2 * root.pad;
-        height: 4px;
-        border-radius: 2px;
-        background: Theme.track;
-        accessible-role: progress-indicator;
-        accessible-label: @tr("Progress");
-        accessible-value: Player.has-track ? @tr("{0} of {1}", Player.elapsed, Player.total) : "";
-        Rectangle {
-            x: 0;
-            width: parent.width * root.progress;
-            border-radius: parent.border-radius;
-            background: Theme.accent;
-        }
+        tip-within: true;
     }
     Time {
         x: root.pad;
         y: root.line-y + 4px + Theme.s1;
-        text: Player.has-track ? Player.elapsed : "";
+        text: !Player.has-track ? "" : (seek.dragging ? Player.clock(seek.preview * Player.duration-s) : Player.elapsed);
         horizontal-alignment: left;
     }
     Time {

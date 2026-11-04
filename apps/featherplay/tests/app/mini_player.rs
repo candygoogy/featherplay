@@ -2,7 +2,8 @@
 //! window's track and theme, its play button goes through the main window's player, Escape
 //! and a lost activation close it, and while it shows nothing in it animates or keeps a
 //! timer. Pinned, it stays open without the activation, saves the pin, closes on its ×,
-//! and a press off its controls drags it. Prints what creating it costs.
+//! and a press off its controls drags it. A click or a drag on its progress line seeks, and
+//! never drags the window. Prints what creating it costs.
 
 use std::cell::Cell;
 use std::rc::Rc;
@@ -76,6 +77,84 @@ fn playing_scene() -> Scene {
     scene.settle();
     scene.take_actions();
     scene
+}
+
+/// The progress line: 316 px from x = 12, its middle 90 px down.
+const LINE: (f32, f32, f32) = (12.0, 316.0, 90.0);
+
+/// The seeks the window asked for since the last call, oldest first.
+fn seeks(scene: &Scene) -> Vec<Duration> {
+    scene
+        .take_actions()
+        .into_iter()
+        .filter_map(|a| match a {
+            Action::SeekTo(at) => Some(at),
+            _ => None,
+        })
+        .collect()
+}
+
+fn assert_near(at: Duration, fraction: f32, duration: f32) {
+    let want = fraction * duration;
+    assert!(
+        (at.as_secs_f32() - want).abs() <= duration * 0.01,
+        "sought {at:?}, not {want} s"
+    );
+}
+
+#[test]
+fn a_click_on_the_mini_players_line_seeks_there() {
+    let scene = playing_scene();
+    let mini = open(&scene);
+    let duration = mini.global::<Player>().get_duration_s();
+    assert!(duration > 0.0);
+
+    click(mini.window(), LINE.0 + LINE.1 * 0.25, LINE.2);
+    scene.settle();
+    let sought = seeks(&scene);
+    assert_eq!(sought.len(), 1, "{sought:?}");
+    assert_near(sought[0], 0.25, duration);
+    // The mini player shows the new place at once, as the bar does.
+    let own = mini.global::<Player>().get_position_s();
+    assert!(
+        (own - 0.25 * duration).abs() <= duration * 0.01,
+        "at {own} s"
+    );
+}
+
+#[test]
+fn pinned_a_drag_on_the_line_seeks_on_release_and_does_not_move_the_window() {
+    let scene = playing_scene();
+    let mini = open(&scene);
+    let duration = mini.global::<Player>().get_duration_s();
+    click(mini.window(), PIN.0, PIN.1);
+    scene.settle();
+    scene.take_actions();
+    let drags = Rc::new(Cell::new(0));
+    let count = drags.clone();
+    mini.global::<MiniData>()
+        .on_drag(move || count.set(count.get() + 1));
+
+    let w = mini.window();
+    let from = LogicalPosition::new(LINE.0 + LINE.1 * 0.3, LINE.2);
+    let to = LogicalPosition::new(LINE.0 + LINE.1 * 0.6, LINE.2 + 3.0);
+    w.dispatch_event(WindowEvent::PointerMoved { position: from });
+    w.dispatch_event(WindowEvent::PointerPressed {
+        position: from,
+        button: PointerEventButton::Left,
+    });
+    w.dispatch_event(WindowEvent::PointerMoved { position: to });
+    scene.settle();
+    assert!(seeks(&scene).is_empty(), "it sought before the release");
+    w.dispatch_event(WindowEvent::PointerReleased {
+        position: to,
+        button: PointerEventButton::Left,
+    });
+    scene.settle();
+    let sought = seeks(&scene);
+    assert_eq!(sought.len(), 1, "{sought:?}");
+    assert_near(sought[0], 0.6, duration);
+    assert_eq!(drags.get(), 0, "a drag on the line moved the window");
 }
 
 #[test]

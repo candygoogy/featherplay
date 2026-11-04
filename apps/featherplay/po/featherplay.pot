@@ -45,43 +45,42 @@ msgid "Unknown title"
 msgstr ""
 
 #: ../../crates/integrations/src/taskbar.rs:176
-#: ../../crates/integrations/src/taskbar.rs:176 ui/bottom_bar.slint:366
-#: ../../crates/integrations/src/taskbar.rs:176 ui/bottom_bar.slint:366 ui/parts.slint:99
+#: ../../crates/integrations/src/taskbar.rs:176 ui/bottom_bar.slint:371
+#: ../../crates/integrations/src/taskbar.rs:176 ui/bottom_bar.slint:371 ui/parts.slint:99
 msgid "Pause"
 msgstr ""
 
 #: ../../crates/integrations/src/taskbar.rs:178
 #: ../../crates/integrations/src/taskbar.rs:178
-#: ../../crates/integrations/src/taskbar.rs:178 ui/bottom_bar.slint:366
-#: ../../crates/integrations/src/taskbar.rs:178 ui/bottom_bar.slint:366 ui/pages/content.slint:744 ui/pages/home.slint:606
-#: ../../crates/integrations/src/taskbar.rs:178 ui/bottom_bar.slint:366 ui/pages/content.slint:744 ui/pages/home.slint:606 ui/playlist_menu_layer.slint:197
+#: ../../crates/integrations/src/taskbar.rs:178 ui/bottom_bar.slint:371
+#: ../../crates/integrations/src/taskbar.rs:178 ui/bottom_bar.slint:371 ui/pages/content.slint:744 ui/pages/home.slint:606
+#: ../../crates/integrations/src/taskbar.rs:178 ui/bottom_bar.slint:371 ui/pages/content.slint:744 ui/pages/home.slint:606 ui/playlist_menu_layer.slint:197
 msgid "Play"
 msgstr ""
 
 #: ../../crates/integrations/src/taskbar.rs:181
 #: ../../crates/integrations/src/taskbar.rs:181 src/pages/settings.rs:1135
-#: ../../crates/integrations/src/taskbar.rs:181 src/pages/settings.rs:1135 ui/mini_player.slint:252
-#: ../../crates/integrations/src/taskbar.rs:181 src/pages/settings.rs:1135 ui/mini_player.slint:252
+#: ../../crates/integrations/src/taskbar.rs:181 src/pages/settings.rs:1135 ui/mini_player.slint:244
+#: ../../crates/integrations/src/taskbar.rs:181 src/pages/settings.rs:1135 ui/mini_player.slint:244
 msgid "Previous"
 msgstr ""
 
 #: ../../crates/integrations/src/taskbar.rs:183
 #: ../../crates/integrations/src/taskbar.rs:183 src/pages/settings.rs:1134
-#: ../../crates/integrations/src/taskbar.rs:183 src/pages/settings.rs:1134 ui/mini_player.slint:267
-#: ../../crates/integrations/src/taskbar.rs:183 src/pages/settings.rs:1134 ui/mini_player.slint:267
+#: ../../crates/integrations/src/taskbar.rs:183 src/pages/settings.rs:1134 ui/mini_player.slint:259
+#: ../../crates/integrations/src/taskbar.rs:183 src/pages/settings.rs:1134 ui/mini_player.slint:259
 msgid "Next"
 msgstr ""
 
 #: ../../crates/integrations/src/tray.rs:273
-#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:423
-#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:423 ui/mini_player.slint:130 ui/pages/lyrics.slint:71
-#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:423 ui/mini_player.slint:130 ui/pages/lyrics.slint:71 ui/pages/now_playing.slint:425
-#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:423 ui/mini_player.slint:130 ui/pages/lyrics.slint:71 ui/pages/now_playing.slint:425
+#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:428
+#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:428 ui/mini_player.slint:131 ui/pages/lyrics.slint:71
+#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:428 ui/mini_player.slint:131 ui/pages/lyrics.slint:71 ui/pages/now_playing.slint:425
+#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:428 ui/mini_player.slint:131 ui/pages/lyrics.slint:71 ui/pages/now_playing.slint:425
 msgid "Nothing playing"
 msgstr ""
 
-#: ../../crates/integrations/src/tray.rs:279 ui/mini_player.slint:202
-#: ../../crates/integrations/src/tray.rs:279 ui/mini_player.slint:202
+#: ../../crates/integrations/src/tray.rs:279 ui/pages/home.slint:583
 msgid "{0} of {1}"
 msgstr ""
 
@@ -93,8 +92,8 @@ msgstr ""
 msgid "paused at {}"
 msgstr ""
 
-#: ../../crates/integrations/src/tray_menu.rs:49 ui/mini_player.slint:277
-#: ../../crates/integrations/src/tray_menu.rs:49 ui/mini_player.slint:277 ui/not_for_me.slint:72
+#: ../../crates/integrations/src/tray_menu.rs:49 ui/mini_player.slint:269
+#: ../../crates/integrations/src/tray_menu.rs:49 ui/mini_player.slint:269 ui/not_for_me.slint:72
 msgid "Not for me"
 msgstr ""
 
@@ -108,8 +107,8 @@ msgstr ""
 
 #: ../../crates/integrations/src/tray_menu.rs:242
 #: ../../crates/integrations/src/tray_menu.rs:242 src/album_actions.rs:236
-#: ../../crates/integrations/src/tray_menu.rs:242 src/album_actions.rs:236 ui/mini_player.slint:235 ui/pages/content.slint:580
-#: ../../crates/integrations/src/tray_menu.rs:242 src/album_actions.rs:236 ui/mini_player.slint:235 ui/pages/content.slint:580 ui/parts.slint:860 ui/song_menu.slint:278
+#: ../../crates/integrations/src/tray_menu.rs:242 src/album_actions.rs:236 ui/mini_player.slint:227 ui/pages/content.slint:580
+#: ../../crates/integrations/src/tray_menu.rs:242 src/album_actions.rs:236 ui/mini_player.slint:227 ui/pages/content.slint:580 ui/parts.slint:860 ui/song_menu.slint:278
 msgid "Like"
 msgstr ""
 
@@ -795,81 +794,81 @@ msgstr ""
 msgid "Dislike all songs"
 msgstr ""
 
-#: ui/bottom_bar.slint:34
+#: ui/bottom_bar.slint:38
 msgid "Seek"
 msgstr ""
 
-#: ui/bottom_bar.slint:139
+#: ui/bottom_bar.slint:144
 msgid "Volume"
 msgstr ""
 
-#: ui/bottom_bar.slint:235 ui/pages/settings.slint:1245
+#: ui/bottom_bar.slint:240 ui/pages/settings.slint:1245
 msgid "{} %"
 msgstr ""
 
-#: ui/bottom_bar.slint:272 ui/bottom_bar.slint:304
-#: ui/bottom_bar.slint:272 ui/bottom_bar.slint:304 ui/pages/now_playing.slint:204
-#: ui/bottom_bar.slint:272 ui/bottom_bar.slint:304 ui/pages/now_playing.slint:204 ui/pages/settings.slint:1265
-#: ui/bottom_bar.slint:272 ui/bottom_bar.slint:304 ui/pages/now_playing.slint:204 ui/pages/settings.slint:1265
+#: ui/bottom_bar.slint:277 ui/bottom_bar.slint:309
+#: ui/bottom_bar.slint:277 ui/bottom_bar.slint:309 ui/pages/now_playing.slint:204
+#: ui/bottom_bar.slint:277 ui/bottom_bar.slint:309 ui/pages/now_playing.slint:204 ui/pages/settings.slint:1265
+#: ui/bottom_bar.slint:277 ui/bottom_bar.slint:309 ui/pages/now_playing.slint:204 ui/pages/settings.slint:1265
 msgid "Lyrics"
 msgstr ""
 
-#: ui/bottom_bar.slint:273
+#: ui/bottom_bar.slint:278
 msgid "Hides the lyrics, back to the cover"
 msgstr ""
 
-#: ui/bottom_bar.slint:273
+#: ui/bottom_bar.slint:278
 msgid "Shows the lyrics on Now playing"
 msgstr ""
 
-#: ui/bottom_bar.slint:304
+#: ui/bottom_bar.slint:309
 msgid "Hide lyrics"
 msgstr ""
 
-#: ui/bottom_bar.slint:310
+#: ui/bottom_bar.slint:315
 msgid "Ctrl+L"
 msgstr ""
 
 #. Its shortcut, in both windows.
-#: ui/bottom_bar.slint:372 ui/parts.slint:101
+#: ui/bottom_bar.slint:377 ui/parts.slint:101
 msgid "Space"
 msgstr ""
 
-#: ui/bottom_bar.slint:423
+#: ui/bottom_bar.slint:428
 msgid "Now playing: {}"
 msgstr ""
 
-#: ui/bottom_bar.slint:501 ui/pages/content.slint:745
-#: ui/bottom_bar.slint:501 ui/pages/content.slint:745
+#: ui/bottom_bar.slint:506 ui/pages/content.slint:745
+#: ui/bottom_bar.slint:506 ui/pages/content.slint:745
 msgid "Shuffle"
 msgstr ""
 
-#: ui/bottom_bar.slint:531
+#: ui/bottom_bar.slint:536
 msgid "Repeat one"
 msgstr ""
 
-#: ui/bottom_bar.slint:531
+#: ui/bottom_bar.slint:536
 msgid "Repeat all"
 msgstr ""
 
-#: ui/bottom_bar.slint:531
+#: ui/bottom_bar.slint:536
 msgid "Repeat off"
 msgstr ""
 
-#: ui/bottom_bar.slint:594 ui/mini_player.slint:235 ui/pages/content.slint:580
-#: ui/bottom_bar.slint:594 ui/mini_player.slint:235 ui/pages/content.slint:580 ui/parts.slint:860 ui/song_menu.slint:278
+#: ui/bottom_bar.slint:599 ui/mini_player.slint:227 ui/pages/content.slint:580
+#: ui/bottom_bar.slint:599 ui/mini_player.slint:227 ui/pages/content.slint:580 ui/parts.slint:860 ui/song_menu.slint:278
 msgid "Remove like"
 msgstr ""
 
-#: ui/bottom_bar.slint:609
+#: ui/bottom_bar.slint:614
 msgid "Mute"
 msgstr ""
 
-#: ui/bottom_bar.slint:609
+#: ui/bottom_bar.slint:614
 msgid "Unmute"
 msgstr ""
 
-#: ui/bottom_bar.slint:625 ui/pages/now_playing.slint:99
+#: ui/bottom_bar.slint:630 ui/pages/now_playing.slint:99
 msgid "Up next"
 msgstr ""
 
@@ -901,35 +900,31 @@ msgstr ""
 msgid "Close featherplay"
 msgstr ""
 
-#: ui/mini_player.slint:56
+#: ui/mini_player.slint:57
 msgid "featherplay mini player"
 msgstr ""
 
-#: ui/mini_player.slint:156 ui/playlist_menu_layer.slint:259
+#: ui/mini_player.slint:157 ui/playlist_menu_layer.slint:259
 msgid "Unpin"
 msgstr ""
 
-#: ui/mini_player.slint:156
+#: ui/mini_player.slint:157
 msgid "Keep on top"
 msgstr ""
 
-#: ui/mini_player.slint:157
+#: ui/mini_player.slint:158
 msgid "Keeps the mini player open and above other windows"
 msgstr ""
 
-#: ui/mini_player.slint:173
+#: ui/mini_player.slint:174
 msgid "Open featherplay"
 msgstr ""
 
-#: ui/mini_player.slint:186
+#: ui/mini_player.slint:187
 msgid "Close"
 msgstr ""
 
-#: ui/mini_player.slint:201
-msgid "Progress"
-msgstr ""
-
-#: ui/mini_player.slint:278 ui/not_for_me.slint:41 ui/not_for_me.slint:78
+#: ui/mini_player.slint:270 ui/not_for_me.slint:41 ui/not_for_me.slint:78
 msgid "Skips the song and tells YouTube Music you dislike it"
 msgstr ""
 
