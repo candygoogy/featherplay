@@ -6,6 +6,45 @@ Notable changes to featherplay, newest first. The format follows
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-04
+
+### Added
+
+- Native ARM64 builds: `featherplay-arm64.exe` and an ARM64 installer, with ARM64 yt-dlp
+  and Deno.
+- Automatic updates for the installed copy. A newer release downloads in the background,
+  its checksum is checked, and "Restart to update" installs it. A setting turns this off.
+  The portable exe still only says that a new version is out.
+- Search suggestions while you type: completions, and songs, albums and artists to open
+  directly.
+- A Volume step setting (1, 2, 5 or 10 %) for the mouse wheel and the Up and Down keys.
+  The volume shows above the slider while it changes.
+- "Skip songs I've disliked", on by default. A disliked song is passed over when the queue
+  moves on, but still plays when you pick it.
+- Like or dislike a whole album, or remove those ratings, from the album's ⋯ menu.
+- A pin for the tray's mini player that keeps it open and on top. You can also click or
+  drag its progress line to jump within the song.
+- A setting to open the main window, instead of the mini player, with a left click on the
+  tray icon.
+- A sign-in whose cookies hold several accounts or brand channels asks which one to use.
+
+### Changed
+
+- Album likes and dislikes go out three at a time, so a whole album is done about three
+  times faster.
+- The main window comes back from the tray with Windows' restore animation.
+
+### Fixed
+
+- Audio no longer skips or stutters while the CPU is fully busy.
+- featherplay starts without a sound output, for example with the speakers off, and says
+  so when you press Play, instead of closing silently.
+- Pages fit next to the Up next panel in a narrow window instead of running under it.
+- Song notifications show featherplay's name and icon instead of "Windows PowerShell".
+- The lyrics take the playing song's colour on every page.
+- Settings lines up with the page's edge.
+- A song you disliked no longer plays when you start its list again from the page.
+
 ## [0.1.0] - 2026-11-03
 
 The first release: a native Windows player for YouTube Music, for Windows 10 and 11 (x64),
@@ -62,5 +101,6 @@ as a per-user installer or a portable exe.
 - A Language setting. featherplay ships in English and is ready for translations
   (CONTRIBUTING.md says how to add one).
 
-[Unreleased]: https://github.com/candygoogy/featherplay/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/candygoogy/featherplay/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/candygoogy/featherplay/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/candygoogy/featherplay/releases/tag/v0.1.0
