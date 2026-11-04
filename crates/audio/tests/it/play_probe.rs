@@ -20,7 +20,7 @@ use super::daily_play::is_bot_check;
 /// ("Kevin MacLeod [Official] - … - incompetech.com"). He offers all his music under CC BY
 /// 4.0 (incompetech.com's FAQ), and the channel says its uploads are CC BY 4.0.
 /// `Yy-NyPTRYU8`'s YouTube licence field read "Creative Commons Attribution license (reuse
-/// allowed)" on 2026-10-25 (`Docs/ytm-native/measurements/spike-ytdlp.csv`).
+/// allowed)" on 2026-10-25.
 const SONGS: &[(&str, &str)] = &[
     ("Yy-NyPTRYU8", "Exit the Premises"),
     ("9WQBzXr4gFc", "Fresh Air"),
