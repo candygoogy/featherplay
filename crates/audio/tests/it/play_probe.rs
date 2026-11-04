@@ -14,8 +14,6 @@ use std::time::{Duration, Instant, SystemTime};
 use featherplay_core::model::TrackId;
 use featherplay_streams::{Probe, ResolvedStream, Sidecars, YtDlpResolver};
 
-use super::daily_play::is_bot_check;
-
 /// Public Creative Commons songs, all Kevin MacLeod uploads on his own channel
 /// ("Kevin MacLeod [Official] - … - incompetech.com"). He offers all his music under CC BY
 /// 4.0 (incompetech.com's FAQ), and the channel says its uploads are CC BY 4.0.
@@ -214,6 +212,11 @@ async fn fetch_head(http: &reqwest::Client, s: &ResolvedStream) -> Result<usize,
         return Err(format!("fetch gave {} of {want} bytes", body.len()));
     }
     Ok(body.len())
+}
+
+/// YouTube's challenge for suspected bots, as yt-dlp reports it.
+fn is_bot_check(error: &str) -> bool {
+    error.contains("confirm you") && error.contains("not a bot")
 }
 
 /// `blocked` when YouTube refused this machine, as yt-dlp words it ("Sign in to confirm

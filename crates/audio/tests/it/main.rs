@@ -7,7 +7,6 @@
     reason = "tests report skips and measurements"
 )]
 
-mod daily_play;
 mod engine_local;
 mod live;
 mod play_probe;

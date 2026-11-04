@@ -1,0 +1,224 @@
+{
+  "total_count": 11,
+  "incomplete_results": false,
+  "items": [
+    {
+      "number": 17998,
+      "title": "video could not be downloaded",
+      "state": "open",
+      "created_at": "2026-11-04T15:53:59Z",
+      "closed_at": null,
+      "comments": 0,
+      "reactions": {
+        "total_count": 0
+      },
+      "labels": [
+        {
+          "name": "site-request"
+        },
+        {
+          "name": "triage"
+        }
+      ]
+    },
+    {
+      "number": 17994,
+      "title": "[AdultSwim] Downloads not working, Possible DRM Issues",
+      "state": "open",
+      "created_at": "2026-11-04T09:29:07Z",
+      "closed_at": null,
+      "comments": 3,
+      "reactions": {
+        "total_count": 0
+      },
+      "labels": [
+        {
+          "name": "site-bug"
+        },
+        {
+          "name": "triage"
+        }
+      ]
+    },
+    {
+      "number": 17992,
+      "title": "[Art19Show] 0 items found for a podcast's RSS feed",
+      "state": "open",
+      "created_at": "2026-11-04T06:20:21Z",
+      "closed_at": null,
+      "comments": 1,
+      "reactions": {
+        "total_count": 0
+      },
+      "labels": [
+        {
+          "name": "site-bug"
+        },
+        {
+          "name": "triage"
+        }
+      ]
+    },
+    {
+      "number": 17989,
+      "title": "[YouTube] 403 error even with deno (again)",
+      "state": "open",
+      "created_at": "2026-11-03T23:54:23Z",
+      "closed_at": null,
+      "comments": 0,
+      "reactions": {
+        "total_count": 0
+      },
+      "labels": [
+        {
+          "name": "site-bug"
+        },
+        {
+          "name": "triage"
+        }
+      ]
+    },
+    {
+      "number": 17985,
+      "title": "hls downloader crashes when using --write-pages",
+      "state": "open",
+      "created_at": "2026-11-03T09:07:57Z",
+      "closed_at": null,
+      "comments": 2,
+      "reactions": {
+        "total_count": 0
+      },
+      "labels": [
+        {
+          "name": "bug"
+        },
+        {
+          "name": "triage"
+        }
+      ]
+    },
+    {
+      "number": 17984,
+      "title": "Option to bind to an interface name in addition to binding to a source address",
+      "state": "open",
+      "created_at": "2026-11-03T08:13:05Z",
+      "closed_at": null,
+      "comments": 0,
+      "reactions": {
+        "total_count": 0
+      },
+      "labels": [
+        {
+          "name": "enhancement"
+        },
+        {
+          "name": "triage"
+        }
+      ]
+    },
+    {
+      "number": 17983,
+      "title": "[GoogleDrive] Unable to download JSON metadata: HTTP Error 429: Too Many Requests HELP",
+      "state": "open",
+      "created_at": "2026-11-03T07:02:18Z",
+      "closed_at": null,
+      "comments": 1,
+      "reactions": {
+        "total_count": 0
+      },
+      "labels": [
+        {
+          "name": "question"
+        }
+      ]
+    },
+    {
+      "number": 17982,
+      "title": "Attempting to extract info from Le Monde adds generic extractor even when the generic extractor is disabled",
+      "state": "open",
+      "created_at": "2026-11-03T03:59:10Z",
+      "closed_at": null,
+      "comments": 0,
+      "reactions": {
+        "total_count": 0
+      },
+      "labels": [
+        {
+          "name": "site-bug"
+        },
+        {
+          "name": "triage"
+        }
+      ]
+    },
+    {
+      "number": 17981,
+      "title": "douyin.com",
+      "state": "open",
+      "created_at": "2026-11-03T01:59:41Z",
+      "closed_at": null,
+      "comments": 2,
+      "reactions": {
+        "total_count": 0
+      },
+      "labels": [
+        {
+          "name": "site-bug"
+        },
+        {
+          "name": "triage"
+        }
+      ]
+    },
+    {
+      "number": 17979,
+      "title": "[drtv] Downloading from dr.dk/tv fails with HTTP error 400",
+      "state": "open",
+      "created_at": "2026-11-02T21:16:26Z",
+      "closed_at": null,
+      "comments": 1,
+      "reactions": {
+        "total_count": 0
+      },
+      "labels": [
+        {
+          "name": "account-needed"
+        },
+        {
+          "name": "geo-blocked"
+        },
+        {
+          "name": "site-bug"
+        },
+        {
+          "name": "triage"
+        }
+      ]
+    },
+    {
+      "number": 17976,
+      "title": "Unable to download file Seal plus",
+      "state": "open",
+      "created_at": "2026-11-02T19:53:18Z",
+      "closed_at": null,
+      "comments": 1,
+      "reactions": {
+        "total_count": 0
+      },
+      "labels": [
+        {
+          "name": "incomplete"
+        },
+        {
+          "name": "site-bug"
+        },
+        {
+          "name": "triage"
+        },
+        {
+          "name": "site:youtube"
+        }
+      ]
+    }
+  ]
+}

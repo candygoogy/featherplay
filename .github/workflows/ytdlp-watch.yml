@@ -1,0 +1,74 @@
+name: yt-dlp watch
+
+# GitHub's runners can't check playback: YouTube asks them to prove they aren't bots, every
+# time (the play probe, play-probe.yml, was blocked on every try). When YouTube breaks
+# yt-dlp, busy reports show up on yt-dlp's tracker within hours, so once a day this reads
+# that tracker instead, read-only through the API, and yt-dlp's latest release beside the
+# pin in crates/streams/src/sidecars.rs (.github/scripts/ytdlp-watch.js has the rules).
+#
+# Fresh breakage reports open one issue here, "yt-dlp reports YouTube breakage" with the
+# `canary` label, for the maintainer only; it's updated with one comment when the linked
+# reports change, and closed when they're all closed. The app never reads it. The app's
+# "may need an update" notice links an issue titled exactly "Playback broken", which the
+# maintainer opens by hand after checking playback on a home connection (RELEASING.md,
+# "When playback breaks").
+
+on:
+  schedule:
+    - cron: "30 5 * * *"
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/scripts/**
+      - .github/workflows/ytdlp-watch.yml
+  pull_request:
+    paths:
+      - .github/scripts/**
+      - .github/workflows/ytdlp-watch.yml
+
+permissions: {}
+
+concurrency:
+  group: ytdlp-watch-${{ github.event_name }}
+  cancel-in-progress: false
+
+jobs:
+  # The rules against recorded search replies, offline. Runs on every change to them.
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+      - name: Test the matching rules
+        run: node --test .github/scripts/ytdlp-watch.test.js
+
+  watch:
+    needs: test
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            .github/scripts/
+            crates/streams/src/sidecars.rs
+          sparse-checkout-cone-mode: false
+      - name: Read yt-dlp's tracker and release
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const fs = require('fs');
+            const watch = require('./.github/scripts/ytdlp-watch.js');
+            const pinSource = fs.readFileSync('crates/streams/src/sidecars.rs', 'utf8');
+            await watch.run({ github, context, core, pinSource });

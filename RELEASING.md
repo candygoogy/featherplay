@@ -153,6 +153,37 @@ files and show their sizes.
 
 ## 8. Afterwards
 
-Check that the daily play check passes on the released code: start it with
-`gh workflow run daily-play.yml` and follow it with `gh run watch`. It also runs every day
-at 06:00 UTC and opens an issue when it fails.
+Install the release on your own PC and play a few songs on a home connection. GitHub's
+runners can't check playback, because YouTube asks them to prove they aren't bots.
+
+## When playback breaks
+
+Nothing plays songs on a schedule. Instead, `.github/workflows/ytdlp-watch.yml` reads
+yt-dlp's issue tracker every day at 05:30 UTC, because YouTube breakage shows up there
+within hours. A report counts when it is:
+
+- open, and created in the last 48 hours;
+- about YouTube: labelled `site:youtube`, or with "YouTube" in its title, but not a
+  `[youtube:tab]`-style playlist, channel or search page;
+- labelled `site-bug` or `high-priority`, and none of `duplicate`, `incomplete`,
+  `question`, `cant-reproduce`, `external-issue` and the like;
+- busy: labelled `high-priority`, or with 10 or more comments and reactions together.
+
+Reports that count open one issue here, "yt-dlp reports YouTube breakage", labelled
+`canary`. The workflow comments on it when the linked reports change, and closes it once
+they're all closed. That issue is for you only: the app never reads it.
+
+The app's notice is a step you take by hand:
+
+1. When the canary opens, or users report songs that won't play, play a few songs on a
+   home connection. After a failure the app brings yt-dlp up to date by itself first.
+2. If playback is broken for everyone, open an issue titled exactly `Playback broken`
+   (`ISSUE_TITLE` in `apps/featherplay/src/updates.rs`). Say what fails and that a fix is
+   on the way. When a user's songs keep failing after the yt-dlp update, and no newer
+   featherplay is out, the "may need an update" toast links to that issue under
+   "Details". Only an open issue with exactly that title, opened by the owner, a member
+   or a collaborator, counts.
+3. When a yt-dlp release fixes it, move the pin in `crates/streams/src/sidecars.rs` so new
+   installs start on the fix (the URL and SHA256 together, as the "Sidecar pins" workflow
+   says). Installed copies get the fix with their daily `yt-dlp -U`. Then close
+   `Playback broken`.
