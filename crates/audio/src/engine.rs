@@ -7,7 +7,7 @@
 //! it again. The device stays open, so resuming is as quick as from a short pause.
 
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
@@ -17,7 +17,7 @@ use featherplay_core::sync::LockExt;
 use rodio::cpal;
 use tokio::runtime::Runtime;
 
-use crate::devices::{self, Output, is_device_lost};
+use crate::devices::{self, OpenError, Output, is_device_lost};
 use crate::head::{self, HeadCache};
 use crate::voice::{self, Controls, VoiceShared};
 use crate::{AudioEvent, StreamSource, perceptual_gain};
@@ -98,10 +98,12 @@ pub struct AudioEngine {
 impl AudioEngine {
     /// Opens the output device called `device` (from `output_devices()`); `None` or an unknown
     /// name opens the default device. HTTP streams are buffered in temp files under `temp_dir`
-    /// (pass `{cache}/tmp`), created on first use. Fails only when no output device opens.
-    /// The engine starts paused at full volume.
+    /// (pass `{cache}/tmp`), created on first use. With no output device at all it starts
+    /// without one, and `play()` opens one once it's there (`AudioEvent::NoDevice` until
+    /// then). Fails when a device is there but doesn't open. The engine starts paused at
+    /// full volume.
     pub fn new(device: Option<&str>, temp_dir: impl Into<PathBuf>) -> Result<AudioEngine, String> {
-        Self::start(device, temp_dir.into(), false, crate::http::READ_TIMEOUT)
+        Self::start(device, temp_dir.into(), None, crate::http::READ_TIMEOUT)
     }
 
     /// An engine whose output is a null sink: no device opens, the mix is consumed in real
@@ -117,13 +119,29 @@ impl AudioEngine {
         temp_dir: impl Into<PathBuf>,
         read_timeout: Duration,
     ) -> AudioEngine {
-        Self::start(None, temp_dir.into(), true, read_timeout).expect("null engine")
+        let plugged = Arc::new(AtomicBool::new(true));
+        Self::start(None, temp_dir.into(), Some(plugged), read_timeout).expect("null engine")
+    }
+
+    /// An engine whose only device is a null sink that is there while `plugged` is set,
+    /// and missing otherwise. For tests.
+    #[cfg(test)]
+    pub(crate) fn new_fake_device(
+        temp_dir: impl Into<PathBuf>,
+        plugged: Arc<AtomicBool>,
+    ) -> Result<AudioEngine, String> {
+        Self::start(
+            None,
+            temp_dir.into(),
+            Some(plugged),
+            crate::http::READ_TIMEOUT,
+        )
     }
 
     fn start(
         device: Option<&str>,
         tmp_dir: PathBuf,
-        null: bool,
+        null: Option<Arc<AtomicBool>>,
         read_timeout: Duration,
     ) -> Result<AudioEngine, String> {
         let (tx, rx) = mpsc::channel();
@@ -144,9 +162,15 @@ impl AudioEngine {
                                 return;
                             }
                         };
-                    if let Err(e) = engine.open_output(device) {
-                        let _ = ready_tx.send(Err(e));
-                        return;
+                    match engine.open_output(device.clone()) {
+                        Ok(()) => {}
+                        // Nothing to play on yet (the speakers are off): start with no
+                        // output, as after a lost device; `play()` opens one once it's there.
+                        Err(OpenError::NoDevice) => engine.device = device,
+                        Err(e) => {
+                            let _ = ready_tx.send(Err(e.to_string()));
+                            return;
+                        }
                     }
                     let _ = ready_tx.send(Ok(()));
                     engine.run(rx);
@@ -285,9 +309,10 @@ struct Engine {
     buffering_shown: bool,
     /// When the output stream stops, set by `Msg::Paused` and cleared by `play()`.
     stop_at: Option<Instant>,
-    /// Tests: a null output instead of a device.
+    /// Tests: a null output instead of a device, there while the flag is set. `None` opens
+    /// the real devices.
     #[cfg_attr(not(test), allow(dead_code))]
-    null: bool,
+    null: Option<Arc<AtomicBool>>,
 }
 
 impl Engine {
@@ -296,7 +321,7 @@ impl Engine {
         controls: Arc<Controls>,
         status: Arc<Mutex<Status>>,
         tmp_dir: PathBuf,
-        null: bool,
+        null: Option<Arc<AtomicBool>>,
         read_timeout: Duration,
     ) -> Result<Self, String> {
         let rt = tokio::runtime::Builder::new_multi_thread()
@@ -421,7 +446,7 @@ impl Engine {
             },
             Msg::SetDevice(name) => {
                 if let Err(e) = self.open_output(name) {
-                    self.emit(AudioEvent::Error(e));
+                    self.emit(AudioEvent::Error(e.to_string()));
                 }
             }
             Msg::EnsureOutput => {
@@ -430,8 +455,17 @@ impl Engine {
                     .sink
                     .as_mut()
                     .is_some_and(|s| s.set_playing(true).is_ok());
-                if !started && let Err(e) = self.open_output(self.device.clone()) {
-                    self.emit(AudioEvent::Error(e));
+                if started {
+                    return;
+                }
+                match self.open_output(self.device.clone()) {
+                    Ok(()) => {}
+                    Err(OpenError::NoDevice) => {
+                        // Nothing to hear it on, so it doesn't play on silently.
+                        self.controls.paused.store(true, Ordering::SeqCst);
+                        self.emit(AudioEvent::NoDevice);
+                    }
+                    Err(e) => self.emit(AudioEvent::Error(e.to_string())),
                 }
             }
             Msg::Paused => {
@@ -566,7 +600,7 @@ impl Engine {
 
     /// Opens the output (see `devices::open_output`), started unless paused, and moves the
     /// current voice onto it.
-    fn open_output(&mut self, name: Option<String>) -> Result<(), String> {
+    fn open_output(&mut self, name: Option<String>) -> Result<(), OpenError> {
         let gen_ = self.sink_gen + 1;
         let tx = self.tx.clone();
         let on_error = move |e: cpal::Error| {
@@ -576,10 +610,10 @@ impl Engine {
             });
         };
         #[cfg(test)]
-        let mut sink = if self.null {
-            devices::open_null()
-        } else {
-            devices::open_output(name.as_deref(), on_error)?
+        let mut sink = match &self.null {
+            Some(plugged) if plugged.load(Ordering::SeqCst) => devices::open_null(),
+            Some(_) => return Err(OpenError::NoDevice),
+            None => devices::open_output(name.as_deref(), on_error)?,
         };
         #[cfg(not(test))]
         let mut sink = devices::open_output(name.as_deref(), on_error)?;

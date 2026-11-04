@@ -64,9 +64,33 @@ impl Output {
     }
 }
 
+/// Why an output didn't open.
+#[derive(Debug)]
+pub(crate) enum OpenError {
+    /// There is no output device at all: nothing is plugged in, or it's switched off.
+    NoDevice,
+    /// A device is there but didn't open.
+    Failed(String),
+}
+
+impl From<String> for OpenError {
+    fn from(e: String) -> Self {
+        OpenError::Failed(e)
+    }
+}
+
+impl std::fmt::Display for OpenError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            OpenError::NoDevice => f.write_str("no audio output device"),
+            OpenError::Failed(e) => f.write_str(e),
+        }
+    }
+}
+
 /// Opens `name`, or the default device when `name` is `None`, unknown, or fails to open.
 /// `on_error` runs on the audio thread for every cpal stream error.
-pub(crate) fn open_output<E>(name: Option<&str>, on_error: E) -> Result<Output, String>
+pub(crate) fn open_output<E>(name: Option<&str>, on_error: E) -> Result<Output, OpenError>
 where
     E: FnMut(cpal::Error) + Send + Clone + 'static,
 {
@@ -77,8 +101,8 @@ where
     }
     let device = cpal::default_host()
         .default_output_device()
-        .ok_or("no audio output device")?;
-    open_device(&device, on_error)
+        .ok_or(OpenError::NoDevice)?;
+    Ok(open_device(&device, on_error)?)
 }
 
 /// The device's default format with a ~50 ms buffer, else its other formats; as rodio's

@@ -256,6 +256,10 @@ msgstr "[featherplay is still running in the tray]"
 msgid "Right-click the tray icon to show the window or quit."
 msgstr "[Right-click the tray icon to show the window or quit.]"
 
+#: src/controller.rs:1174
+msgid "No sound output found. Connect speakers or headphones, then press play."
+msgstr "[No sound output found. Connect speakers or headphones, then press play.]"
+
 #: src/controller/account.rs:417
 msgid "Your API key is saved. Connect to sign in to Last.fm with it."
 msgstr "[Your API key is saved. Connect to sign in to Last.fm with it.]"

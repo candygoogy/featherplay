@@ -17,6 +17,8 @@
 //!   An expired URL shows up here as `HTTP 403`.
 //! - `DeviceLost` when the output device disappeared: playback is paused and moved to the
 //!   default device (or back to the same one if it reappeared).
+//! - `NoDevice` when `play()` finds no output device at all (the speakers are off): the
+//!   engine stays paused, and the next `play()` looks again. No `Error` follows.
 #![cfg_attr(
     test,
     allow(
@@ -62,5 +64,6 @@ pub enum AudioEvent {
     Ended,
     Buffering(bool),
     DeviceLost,
+    NoDevice,
     Error(String),
 }

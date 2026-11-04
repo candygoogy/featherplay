@@ -256,6 +256,10 @@ msgstr ""
 msgid "Right-click the tray icon to show the window or quit."
 msgstr ""
 
+#: src/controller.rs:1174
+msgid "No sound output found. Connect speakers or headphones, then press play."
+msgstr ""
+
 #: src/controller/account.rs:417
 msgid "Your API key is saved. Connect to sign in to Last.fm with it."
 msgstr ""

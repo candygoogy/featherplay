@@ -30,6 +30,7 @@ use featherplay_audio::{AudioEngine, AudioEvent, StreamSource};
 use featherplay_core::model::{LikeStatus, PlaylistId, RepeatMode, Track, TrackId};
 use featherplay_core::player::{Effect, Input, ListEnd, PlaybackPrefs, Player, Status, StreamInfo};
 use featherplay_core::scrobble::Alternates;
+use featherplay_core::tr;
 use featherplay_integrations::sponsorblock::{self, Segment};
 use featherplay_integrations::{NowPlaying, UiCommand, notify_track};
 use featherplay_store::{Paths, SecretKey, Settings, get_secret, load_session, save_session};
@@ -998,6 +999,12 @@ impl Controller {
                     log!("audio device lost");
                     Input::DeviceLost
                 }
+                AudioEvent::NoDevice => {
+                    // The engine stayed paused; the player shows it, as for a lost device.
+                    log!("play: no audio output device");
+                    (self.ui.events)(UiEvent::Toast(no_sound_output()));
+                    Input::DeviceLost
+                }
                 AudioEvent::Error(msg) if msg.contains("HTTP 403") => {
                     log!("stream URL expired ({msg}), resolving again");
                     // The re-resolve must not get the same URL back from the cache.
@@ -1162,6 +1169,11 @@ impl Controller {
             None => format!("current at {at:.1}s"),
         }
     }
+}
+
+/// The toast for Play with no output device (`AudioEvent::NoDevice`).
+pub fn no_sound_output() -> &'static str {
+    tr!("No sound output found. Connect speakers or headphones, then press play.")
 }
 
 /// The integrations' view of a track (media card, taskbar, tray, Discord, toasts).

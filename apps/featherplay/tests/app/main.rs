@@ -56,6 +56,7 @@ mod lyrics_view;
 mod memory;
 mod mini_player;
 mod motion_idle;
+mod no_device_toast;
 mod not_for_me;
 mod not_for_me_toast;
 mod paused_idle;

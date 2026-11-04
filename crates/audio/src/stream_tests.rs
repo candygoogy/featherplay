@@ -6,7 +6,7 @@
 use std::io::{BufRead, BufReader, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -553,4 +553,44 @@ fn engine_reports_a_stream_that_stays_stalled() {
             Err(_) => panic!("no error within {limit:?}: the stalled stream hung"),
         }
     }
+}
+
+// With no output device (the speakers switched off): the engine starts anyway, and `play()`
+// opens a device once there is one.
+
+fn unplugged() -> (crate::AudioEngine, Arc<AtomicBool>) {
+    let plugged = Arc::new(AtomicBool::new(false));
+    let engine = crate::AudioEngine::new_fake_device(engine_tmp(), plugged.clone())
+        .expect("an engine with no output device");
+    (engine, plugged)
+}
+
+#[test]
+fn engine_starts_with_no_output_device() {
+    let plugged = Arc::new(AtomicBool::new(false));
+    let engine = crate::AudioEngine::new_fake_device(engine_tmp(), plugged);
+    assert!(engine.is_ok(), "start failed: {:?}", engine.err());
+}
+
+#[test]
+fn engine_play_with_no_output_device_says_so() {
+    let server = serve(fixture("tone-10s-frag.m4a"), 1 << 20, Duration::ZERO);
+    let (engine, _plugged) = unplugged();
+    let events = engine.events();
+    engine.load(src(&server.url), Duration::ZERO);
+    engine.play();
+    wait_event(&events, Duration::from_secs(3), crate::AudioEvent::NoDevice);
+}
+
+#[test]
+fn engine_plays_on_a_device_that_appears_after_start() {
+    let server = serve(fixture("tone-10s-frag.m4a"), 1 << 20, Duration::ZERO);
+    let (engine, plugged) = unplugged();
+    let events = engine.events();
+    engine.load(src(&server.url), Duration::ZERO);
+    engine.play();
+    wait_event(&events, Duration::from_secs(3), crate::AudioEvent::NoDevice);
+    plugged.store(true, Ordering::SeqCst);
+    engine.play();
+    wait_event(&events, Duration::from_secs(3), crate::AudioEvent::Started);
 }
