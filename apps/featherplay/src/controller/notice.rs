@@ -4,9 +4,9 @@
 //! When the resolver broke (yt-dlp failed after the direct request), yt-dlp is brought up
 //! to date at once, once a session (`YtDlpResolver::update_helpers`; a failing resolve
 //! usually ran it already). If songs still fail after that, the toast says featherplay may
-//! need an update and links to a newer release, else to the open issue the daily play
-//! check keeps, if there is one. That lookup is a fresh update check plus at most one
-//! issue search, once a session, and only with "Check for updates" on.
+//! need an update and links to a newer release, else to the open "Playback broken" issue
+//! the maintainer opens, if there is one. That lookup is a fresh update check plus at most
+//! one issue search, once a session, and only with "Check for updates" on.
 
 use featherplay_core::failure::{FailKind, Failure, Notice, notice};
 use featherplay_core::player::Stop;

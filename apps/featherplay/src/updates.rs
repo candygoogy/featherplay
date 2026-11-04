@@ -1,5 +1,5 @@
 //! Whether a newer featherplay is out, from GitHub's latest release, and the open issue the
-//! daily play check keeps when YouTube breaks playback. No account, no token.
+//! maintainer opens when YouTube breaks playback. No account, no token.
 //!
 //! At most once a day: at startup, once the first page's loads have all arrived, if
 //! Settings' "Check for updates" is on. The answer is kept in `{cache}/update-check.json`
@@ -34,8 +34,14 @@ use install::{Origin, Ready};
 const PAGES: &str = "https://github.com/candygoogy/featherplay/";
 const LATEST: &str = "https://api.github.com/repos/candygoogy/featherplay/releases/latest";
 const SEARCH: &str = "https://api.github.com/search/issues";
-/// The title `.github/workflows/daily-play.yml` gives its issue.
-const ISSUE_TITLE: &str = "Daily play check failed";
+/// The title of the issue the maintainer opens by hand once playback is confirmed broken for
+/// everyone (RELEASING.md, "When playback breaks"). No workflow opens it: the daily yt-dlp
+/// watch keeps its own issue under another title, which never reaches users.
+const ISSUE_TITLE: &str = "Playback broken";
+/// Who may open that issue: the owner and the people with write access to the repository.
+const MAINTAINERS: &[&str] = &["OWNER", "MEMBER", "COLLABORATOR"];
+/// Search results read for it: anyone can open an issue with those words in its title.
+const ISSUE_RESULTS: &str = "10";
 const TIMEOUT: Duration = Duration::from_secs(10);
 const CHECK_EVERY: Duration = Duration::from_secs(24 * 3600);
 const STAMP: &str = "update-check.json";
@@ -145,11 +151,22 @@ pub fn parse_release(json: &str) -> Option<Release> {
     })
 }
 
-/// GitHub's issue search reply: the first issue's page.
+/// GitHub's issue search reply: the page of the first issue titled exactly `ISSUE_TITLE`
+/// that a maintainer opened. The search matches the words anywhere in any title.
 pub fn parse_issue(json: &str) -> Option<String> {
     let v: Value = serde_json::from_str(json).ok()?;
-    let url = v["items"][0]["html_url"].as_str().filter(|u| ours(u))?;
-    Some(url.to_string())
+    v["items"].as_array()?.iter().find_map(|item| {
+        let by_maintainer = item["author_association"]
+            .as_str()
+            .is_some_and(|a| MAINTAINERS.contains(&a));
+        if !by_maintainer || item["title"].as_str() != Some(ISSUE_TITLE) {
+            return None;
+        }
+        item["html_url"]
+            .as_str()
+            .filter(|u| ours(u))
+            .map(str::to_string)
+    })
 }
 
 /// The last check, kept in the cache.
@@ -275,11 +292,11 @@ async fn fetch_latest() -> Result<Option<Release>, String> {
     Ok(parse_release(&get(url).await?))
 }
 
-/// The page of the open issue the daily play check keeps, if there is one.
+/// The page of the open "Playback broken" issue, if the maintainer opened one.
 async fn find_issue() -> Result<Option<String>, String> {
     let query = format!("repo:candygoogy/featherplay is:issue is:open in:title \"{ISSUE_TITLE}\"");
-    let url = reqwest::Url::parse_with_params(SEARCH, [("q", query.as_str()), ("per_page", "1")])
-        .map_err(|e| e.to_string())?;
+    let params = [("q", query.as_str()), ("per_page", ISSUE_RESULTS)];
+    let url = reqwest::Url::parse_with_params(SEARCH, params).map_err(|e| e.to_string())?;
     Ok(parse_issue(&get(url).await?))
 }
 
@@ -380,7 +397,8 @@ pub async fn startup(cache: PathBuf, install: bool) -> Found {
 }
 
 /// When songs keep failing after the helpers were updated: a newer release (a fresh
-/// check, whatever the stamp says), else the open daily play issue. At most two requests.
+/// check, whatever the stamp says), else the open "Playback broken" issue. At most two
+/// requests.
 pub async fn help(cache: PathBuf) -> (Option<Help>, Option<Release>) {
     let found = check(stamp_path(&cache), true).await;
     if let Some(r) = found.newer {

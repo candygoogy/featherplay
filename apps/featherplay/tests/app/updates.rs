@@ -149,6 +149,43 @@ fn an_empty_issue_search_gives_nothing() {
 }
 
 #[test]
+fn an_issue_anyone_else_opens_with_the_title_gives_nothing() {
+    // The notice reaches every user whose songs fail: only the maintainer's issue counts.
+    for association in ["NONE", "CONTRIBUTOR", "FIRST_TIME_CONTRIBUTOR"] {
+        let json = ISSUES.replace("\"OWNER\"", &format!("\"{association}\""));
+        assert_eq!(parse_issue(&json), None, "{association}");
+    }
+    let unknown = ISSUES.replace("\"author_association\": \"OWNER\",", "");
+    assert_eq!(parse_issue(&unknown), None);
+}
+
+#[test]
+fn a_title_that_only_holds_the_words_gives_nothing() {
+    // GitHub's `in:title` search matches the words anywhere in a title.
+    for title in [
+        "Playback broken on my laptop",
+        "playback broken",
+        "Daily play check failed",
+    ] {
+        let json = ISSUES.replace("\"Playback broken\"", &format!("\"{title}\""));
+        assert_eq!(parse_issue(&json), None, "{title}");
+    }
+}
+
+#[test]
+fn the_maintainers_issue_is_found_behind_a_users() {
+    let v: serde_json::Value = serde_json::from_str(ISSUES).unwrap();
+    let mut user = v["items"][0].clone();
+    user["author_association"] = "NONE".into();
+    user["html_url"] = "https://github.com/candygoogy/featherplay/issues/41".into();
+    let reply = serde_json::json!({ "total_count": 2, "items": [user, v["items"][0]] });
+    assert_eq!(
+        parse_issue(&reply.to_string()).as_deref(),
+        Some("https://github.com/candygoogy/featherplay/issues/42")
+    );
+}
+
+#[test]
 fn a_first_run_is_due_for_a_check() {
     assert!(Stamp::default().due(now()));
 }
