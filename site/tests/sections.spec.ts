@@ -178,9 +178,9 @@ test("the card offers the installer (recommended) and the portable exe, each wit
   await expect(card.locator("[data-download-option]")).toHaveCount(2);
   const installer = card.locator('[data-download-option="installer"]');
   await expect(installer).toContainText("Recommended");
-  await expect(installer).toContainText("featherplay-setup-0.1.0.exe");
-  await expect(installer.locator("[data-size]")).toHaveText("10.13 MB");
-  await expect(card.locator('[data-download-option="portable"] [data-size]')).toHaveText("28.20 MB");
+  await expect(installer).toContainText("featherplay-setup-0.1.1.exe");
+  await expect(installer.locator("[data-size]")).toHaveText("10.25 MB");
+  await expect(card.locator('[data-download-option="portable"] [data-size]')).toHaveText("28.91 MB");
 });
 test("the footer: short link columns, the plain unofficial line, the version and what it runs on; the music credits only as a link to their own page", async ({ page }) => {
   await page.goto("/");

@@ -16,8 +16,8 @@ test("index has title, description, canonical, og:image and SoftwareApplication 
   expect(ld.name).toBe("featherplay");
   expect(ld.operatingSystem).toMatch(/Windows/);
   expect(ld.offers.price).toBe("0");
-  expect(ld.softwareVersion).toBe("0.1.0");
-  expect(ld.fileSize).toBe("10.13 MB");
+  expect(ld.softwareVersion).toBe("0.1.1");
+  expect(ld.fileSize).toBe("10.25 MB");
   expect(ld.aggregateRating).toBeUndefined();
 });
 
