@@ -16,6 +16,7 @@ use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use slint::{ComponentHandle, Timer, TimerMode};
 
 use crate::app::{self, Ctx};
+use crate::pages::settings;
 use crate::ui::Player;
 
 /// How often to look for the HWND, which exists once the event loop has started.
@@ -100,8 +101,8 @@ pub fn start(
     INTEGRATIONS.with(|i| *i.borrow_mut() = Some(it));
 }
 
-/// The tray icon's events, on the UI thread: a left click toggles the mini player; a right
-/// click opens Windows' menu, so the mini player closes; the pointer over the icon brings the
+/// The tray icon's events, on the UI thread: a left click goes to `tray_click`; a right click
+/// opens Windows' menu, so the mini player closes; the pointer over the icon brings the
 /// hover text's time up to date, as the shell is about to show it.
 fn tray_event(ev: TrayEvent) {
     match ev {
@@ -110,9 +111,20 @@ fn tray_event(ev: TrayEvent) {
                 refresh_tooltip(at);
             }
         }
-        TrayEvent::Click { x, y } => crate::mini::toggle(x, y),
+        TrayEvent::Click { x, y } => tray_click(x, y),
         TrayEvent::Menu => crate::mini::close_unpinned(),
         TrayEvent::Chose(choice) => tray_choice(choice),
+    }
+}
+
+/// A left click on the tray icon at `(x, y)` (physical screen pixels): toggles the mini
+/// player there, or with "Tray click opens the main window" on, shows the main window and
+/// brings it to the front, as the menu's Show does.
+pub fn tray_click(x: i32, y: i32) {
+    if !settings::tray_click_opens_window() {
+        crate::mini::toggle(x, y);
+    } else if let Some(ctx) = Ctx::get() {
+        app::show_window(&ctx);
     }
 }
 

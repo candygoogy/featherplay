@@ -154,6 +154,8 @@ pub enum Change {
     VolumeStep(u8),
     /// The tray's mini player pinned (its pin button).
     MiniPinned(bool),
+    /// A left click on the tray icon opens the main window (on) or the mini player (off).
+    TrayClickOpensWindow(bool),
 }
 
 impl Change {
@@ -199,6 +201,7 @@ impl Change {
             Change::Language(v) => s.language = v,
             Change::VolumeStep(v) => s.volume_step = v,
             Change::MiniPinned(v) => s.mini_pinned = v,
+            Change::TrayClickOpensWindow(v) => s.tray_click_opens_window = v,
         }
     }
 }
@@ -1001,6 +1004,7 @@ mod tests {
             Change::LocalApi(true),
             Change::LocalApiPort(31000),
             Change::SkipDisliked(false),
+            Change::TrayClickOpensWindow(true),
         ];
         for c in &changes {
             c.apply(&mut s);
@@ -1024,6 +1028,7 @@ mod tests {
         assert!(!s.lyrics && !s.lyrics_lrclib);
         assert!(!s.autoplay);
         assert!(!s.skip_disliked);
+        assert!(s.tray_click_opens_window);
         assert!(!s.check_for_updates && !s.install_updates);
         assert_eq!(s.volume, d.volume, "the volume isn't a page setting");
     }

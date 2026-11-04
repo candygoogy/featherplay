@@ -107,6 +107,9 @@ pub struct Settings {
     /// The tray's mini player was pinned when it last showed: it opens pinned, staying open
     /// and above other windows until closed (off by default).
     pub mini_pinned: bool,
+    /// A left click on the tray icon shows and brings forward the main window (off by
+    /// default: it opens the mini player). A right click opens the menu either way.
+    pub tray_click_opens_window: bool,
 }
 
 /// The Appearance setting. `System` follows Windows' app mode.
@@ -258,6 +261,7 @@ impl Default for Settings {
             volume_step: Settings::VOLUME_STEP,
             skip_disliked: true,
             mini_pinned: false,
+            tray_click_opens_window: false,
         }
     }
 }

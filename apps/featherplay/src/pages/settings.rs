@@ -125,6 +125,12 @@ pub fn mini_pinned() -> bool {
     SETTINGS.with(|s| s.borrow().mini_pinned)
 }
 
+/// Whether a left click on the tray icon opens the main window instead of the mini player
+/// ("Tray click opens the main window").
+pub fn tray_click_opens_window() -> bool {
+    SETTINGS.with(|s| s.borrow().tray_click_opens_window)
+}
+
 /// Saves whether the tray's mini player is pinned (its pin button).
 pub fn set_mini_pinned(ctx: &Ctx, on: bool) {
     if mini_pinned() != on {
@@ -702,6 +708,7 @@ fn show(ctx: &Ctx) {
     show_custom(&data, s.custom_accent);
     data.set_notifications(s.notifications);
     data.set_close_action(close_action_index(s.close_action));
+    data.set_tray_click_opens_window(s.tray_click_opens_window);
     data.set_accent(accent_index(s.accent));
     data.set_appearance(appearance(s.theme));
     data.set_hotkeys(s.hotkeys.is_some());
@@ -1027,6 +1034,10 @@ fn toggled(ctx: &Rc<Ctx>, key: SettingKey, on: bool) {
         SettingKey::LocalApi => {
             data.set_local_api(on);
             Change::LocalApi(on)
+        }
+        SettingKey::TrayClickOpensWindow => {
+            data.set_tray_click_opens_window(on);
+            Change::TrayClickOpensWindow(on)
         }
         SettingKey::DiscordAutoReconnect => {
             discord_options(ctx, |o| o.auto_reconnect = on);

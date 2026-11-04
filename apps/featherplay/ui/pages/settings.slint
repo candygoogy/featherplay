@@ -34,6 +34,7 @@ export enum SettingKey {
     check-for-updates,
     install-updates,
     local-api,
+    tray-click-opens-window,
 }
 
 // The Discord connection, live from the presence worker.
@@ -163,6 +164,8 @@ export global SettingsData {
     in property <bool> notifications;
     // What the close button does: 0 ask, 1 close featherplay, 2 keep playing in the tray.
     in property <int> close-action;
+    // A left click on the tray icon opens the main window, not the mini player.
+    in property <bool> tray-click-opens-window;
     in property <Appearance> appearance;
     // The Language setting: Windows default, English, then the bundled languages by their
     // own names (Rust fills both lists); `language` is the picked one's index.
@@ -1536,6 +1539,12 @@ export component SettingsPage inherits Rectangle {
                             selected: i == SettingsData.close-action;
                             clicked => { SettingsData.pick-close-action(i); }
                         }
+                    }
+                    ToggleRow {
+                        label: @tr("Tray click opens the main window");
+                        detail: @tr("When off, clicking the tray icon opens the mini player. Right-clicking it always shows the menu.");
+                        key: SettingKey.tray-click-opens-window;
+                        checked: SettingsData.tray-click-opens-window;
                     }
                     SettingRow {
                         label: @tr("Appearance");

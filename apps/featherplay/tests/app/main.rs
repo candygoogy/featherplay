@@ -88,6 +88,7 @@ mod startup_session;
 mod tab_pill;
 mod top_search;
 mod translations;
+mod tray_click;
 mod ui_bridge;
 mod update_notice;
 mod updates;

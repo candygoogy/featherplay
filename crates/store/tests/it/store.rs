@@ -65,6 +65,7 @@ fn settings_defaults_when_missing() {
             volume_step: 5,
             skip_disliked: true,
             mini_pinned: false,
+            tray_click_opens_window: false,
         }
     );
     assert_eq!(s, Settings::default());
@@ -124,6 +125,7 @@ fn settings_roundtrip() {
         volume_step: 2,
         skip_disliked: false,
         mini_pinned: true,
+        tray_click_opens_window: true,
     };
     s.save(&p).unwrap();
     assert!(p.config.join("settings.toml").is_file());
@@ -640,6 +642,28 @@ fn update_checks_are_on_in_older_files_and_off_stays_off() {
     assert!(!off.check_for_updates);
     off.save(&p).unwrap();
     assert!(!Settings::load(&p).check_for_updates);
+}
+
+#[test]
+fn a_tray_click_opens_the_mini_player_in_older_files_and_on_stays_on() {
+    let Some(home) = TestHome::new("settings-tray-click") else {
+        return;
+    };
+    let p = home.paths();
+    fs::create_dir_all(&p.config).unwrap();
+    let file = p.config.join("settings.toml");
+
+    // A file written before the setting existed.
+    fs::write(&file, "notifications = true\n").unwrap();
+    let old = Settings::load(&p);
+    assert!(!old.tray_click_opens_window);
+    assert!(old.notifications, "the rest of the file still loads");
+
+    fs::write(&file, "tray_click_opens_window = true\n").unwrap();
+    let on = Settings::load(&p);
+    assert!(on.tray_click_opens_window);
+    on.save(&p).unwrap();
+    assert!(Settings::load(&p).tray_click_opens_window);
 }
 
 #[test]
