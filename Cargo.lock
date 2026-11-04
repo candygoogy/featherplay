@@ -1365,11 +1365,13 @@ dependencies = [
  "bytes",
  "featherplay-core",
  "featherplay-streams",
+ "log",
  "reqwest",
  "rodio",
  "symphonia",
  "tempfile",
  "tokio",
+ "windows 0.62.2",
 ]
 
 [[package]]

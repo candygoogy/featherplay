@@ -24,6 +24,13 @@ bytes = "=1.12.1"
 tempfile = "=3.27.0"
 # Locks that survive a panicked holder (`featherplay_core::sync`).
 featherplay-core = { path = "../core" }
+# Late output callbacks and dry rings reach the app's log file (`glitches.rs`).
+log = { workspace = true }
+
+[target.'cfg(windows)'.dependencies]
+# MMCSS for the output thread and a raised priority for the decoders (`priority.rs`). The
+# app builds `windows` with these features already.
+windows = { workspace = true, features = ["Win32_Foundation", "Win32_System_Threading"] }
 
 [dev-dependencies]
 featherplay-streams = { path = "../streams" }

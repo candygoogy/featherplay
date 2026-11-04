@@ -18,6 +18,7 @@ use rodio::cpal;
 use tokio::runtime::Runtime;
 
 use crate::devices::{self, OpenError, Output, is_device_lost};
+use crate::glitches::Counts;
 use crate::head::{self, HeadCache};
 use crate::voice::{self, Controls, VoiceShared};
 use crate::{AudioEvent, StreamSource, perceptual_gain};
@@ -252,6 +253,18 @@ impl AudioEngine {
         }
     }
 
+    /// The glitch counters so far. For tests.
+    #[cfg(test)]
+    pub(crate) fn glitches(&self) -> Counts {
+        self.controls.glitches.snapshot()
+    }
+
+    /// Starts the longest-gap counter over. For tests.
+    #[cfg(test)]
+    pub(crate) fn reset_max_gap(&self) {
+        self.controls.glitches.reset_max_gap();
+    }
+
     /// A new receiver for the events from now on. Each call gets its own copy of every event.
     pub fn events(&self) -> Receiver<AudioEvent> {
         let (tx, rx) = mpsc::channel();
@@ -309,6 +322,8 @@ struct Engine {
     buffering_shown: bool,
     /// When the output stream stops, set by `Msg::Paused` and cleared by `play()`.
     stop_at: Option<Instant>,
+    /// The glitch counters at the last report.
+    reported: Counts,
     /// Tests: a null output instead of a device, there while the flag is set. `None` opens
     /// the real devices.
     #[cfg_attr(not(test), allow(dead_code))]
@@ -350,6 +365,7 @@ impl Engine {
             starved_since: None,
             buffering_shown: false,
             stop_at: None,
+            reported: Counts::default(),
             null,
         })
     }
@@ -469,6 +485,7 @@ impl Engine {
                 }
             }
             Msg::Paused => {
+                self.report_glitches();
                 self.stop_at
                     .get_or_insert_with(|| Instant::now() + STOP_AFTER);
             }
@@ -530,6 +547,7 @@ impl Engine {
             Msg::Ended { voice } => {
                 if self.is_current(voice) {
                     self.clear_buffering();
+                    self.report_glitches();
                     self.emit(AudioEvent::Ended);
                 }
             }
@@ -611,12 +629,14 @@ impl Engine {
         };
         #[cfg(test)]
         let mut sink = match &self.null {
-            Some(plugged) if plugged.load(Ordering::SeqCst) => devices::open_null(),
+            Some(plugged) if plugged.load(Ordering::SeqCst) => {
+                devices::open_null(&self.controls.glitches)
+            }
             Some(_) => return Err(OpenError::NoDevice),
-            None => devices::open_output(name.as_deref(), on_error)?,
+            None => devices::open_output(name.as_deref(), on_error, &self.controls.glitches)?,
         };
         #[cfg(not(test))]
-        let mut sink = devices::open_output(name.as_deref(), on_error)?;
+        let mut sink = devices::open_output(name.as_deref(), on_error, &self.controls.glitches)?;
         if !self.controls.paused.load(Ordering::SeqCst) {
             sink.set_playing(true)?;
         }
@@ -657,6 +677,23 @@ impl Engine {
         if std::mem::take(&mut self.buffering_shown) {
             self.emit(AudioEvent::Buffering(false));
         }
+    }
+
+    /// Logs the late callbacks and dry rings since the last report, if there were any. On
+    /// a pause and at a track's end, so a glitch shows up in the log without a timer.
+    fn report_glitches(&mut self) {
+        let g = &self.controls.glitches;
+        let now = g.snapshot();
+        let late = now.late - self.reported.late;
+        let starved = now.starved - self.reported.starved;
+        if late > 0 || starved > 0 {
+            log::info!(
+                "audio: {late} late output callback(s), longest gap {} ms; ring ran dry {starved} time(s)",
+                now.max_gap.as_millis()
+            );
+        }
+        self.reported = now;
+        g.reset_max_gap();
     }
 
     fn emit(&mut self, ev: AudioEvent) {

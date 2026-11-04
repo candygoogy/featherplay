@@ -46,3 +46,10 @@ filter = 'package(featherplay-audio) & test(engine_sounds_long_before_the_downlo
 test-group = 'serial-perf'
 threads-required = 'num-test-threads'
 retries = 2
+
+# The audio engine beside a full CPU (ignored, a measurement): it fills every core itself,
+# so it runs alone.
+[[profile.default.overrides]]
+filter = 'package(featherplay-audio) & test(/^under_load::/)'
+test-group = 'serial-perf'
+threads-required = 'num-test-threads'
