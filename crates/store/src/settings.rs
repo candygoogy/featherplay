@@ -104,6 +104,9 @@ pub struct Settings {
     /// When the queue moves on (a track ends, Next, autoplay), pass over songs the user
     /// disliked (on by default). One the user starts directly still plays.
     pub skip_disliked: bool,
+    /// The tray's mini player was pinned when it last showed: it opens pinned, staying open
+    /// and above other windows until closed (off by default).
+    pub mini_pinned: bool,
 }
 
 /// The Appearance setting. `System` follows Windows' app mode.
@@ -254,6 +257,7 @@ impl Default for Settings {
             language: String::new(),
             volume_step: Settings::VOLUME_STEP,
             skip_disliked: true,
+            mini_pinned: false,
         }
     }
 }

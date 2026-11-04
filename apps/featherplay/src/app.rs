@@ -423,9 +423,9 @@ pub fn on_event(ev: UiEvent) {
 }
 
 /// Brings the main window back (from the tray, or minimized) and to the front; the tray's
-/// mini player closes.
+/// mini player closes unless it's pinned.
 pub fn show_window(ctx: &Ctx) {
-    mini::close();
+    mini::close_unpinned();
     if let Some(ui) = ctx.window() {
         ui.global::<Frame>().set_hidden(false);
         let _ = ui.show();

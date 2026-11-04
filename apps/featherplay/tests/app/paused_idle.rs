@@ -1,12 +1,12 @@
 //! Paused with the window on screen, nothing renders and no timer is armed (the paused CPU
 //! budget, 0.012 % of the machine), on the offscreen platform (no window is shown), with
 //! Windows' animation effects on: on each page once it has loaded, after pausing from the
-//! tray icon's menu, and after opening and closing the mini player.
+//! tray icon's menu, after opening and closing the mini player, and with it pinned.
 
 use std::time::{Duration, Instant};
 
 use featherplay::snapshot::Scene;
-use featherplay::ui::{Frame, Player, Theme};
+use featherplay::ui::{Frame, MiniData, Player, Theme};
 use featherplay::{mini, offscreen, shell};
 use featherplay_integrations::TrayChoice;
 use slint::ComponentHandle;
@@ -105,6 +105,28 @@ fn paused_nothing_renders_and_no_timer_is_armed() {
     assert!(!mini::is_open(), "the mini player didn't close");
     drop(player);
     assert_idle(&scene, &[main], "closing the mini player");
+    assert_eq!(
+        offscreen::windows_alive(),
+        1,
+        "a closed popup's window lives on"
+    );
+
+    // Pinned, it stays open without the activation, and still keeps no timer.
+    let player = mini::create(&scene.ctx).expect("mini player");
+    player.show().expect("show");
+    player
+        .window()
+        .dispatch_event(WindowEvent::WindowActiveChanged(true));
+    player.global::<MiniData>().invoke_toggle_pin();
+    player
+        .window()
+        .dispatch_event(WindowEvent::WindowActiveChanged(false));
+    scene.settle();
+    assert!(mini::is_open(), "the pinned mini player closed");
+    assert_idle(&scene, &[main, player.window()], "pinning the mini player");
+    mini::close();
+    drop(player);
+    assert_idle(&scene, &[main], "closing the pinned mini player");
     assert_eq!(
         offscreen::windows_alive(),
         1,

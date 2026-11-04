@@ -1,5 +1,8 @@
 //! The tray's mini player (`ui/mini_player.slint`): a left click on the tray icon opens it
 //! over the notification area, another click, Escape or a click elsewhere closes it.
+//! Pinned (its pin button, saved as `mini_pinned`), a click elsewhere, the tray icon's menu
+//! and showing the main window leave it open: it stays on top (the window always is), its ×
+//! closes it and a press off its controls drags it. It still opens at the tray.
 //!
 //! The window exists only while it shows: `open` creates it (a few milliseconds) and `close`
 //! drops it, so a closed mini player costs nothing, no window and no timer. While open it
@@ -16,6 +19,7 @@ use slint::ComponentHandle;
 use slint::winit_030::{EventResult, WinitWindowAccessor, winit};
 
 use crate::app::{self, Ctx};
+use crate::pages::settings;
 use crate::popup;
 use crate::ui::{AppWindow, MiniData, MiniPlayer, Player, SettingsData, Theme};
 use crate::ui_bridge::format_duration;
@@ -42,6 +46,14 @@ thread_local! {
 /// Whether the mini player shows.
 pub fn is_open() -> bool {
     MINI.with_borrow(Option::is_some)
+}
+
+/// Whether the mini player shows, pinned.
+fn is_pinned() -> bool {
+    MINI.with_borrow(|m| {
+        m.as_ref()
+            .is_some_and(|m| m.ui.global::<MiniData>().get_pinned())
+    })
 }
 
 /// A left click on the tray icon at `(x, y)` (physical screen pixels): opens the mini
@@ -72,6 +84,7 @@ pub fn create(ctx: &Rc<Ctx>) -> Result<MiniPlayer, String> {
         })
     })
     .map_err(|e| format!("window: {e}"))?;
+    ui.global::<MiniData>().set_pinned(settings::mini_pinned());
     wire(&ui, &main);
     let mini = Rc::new(Mini {
         ui: ui.clone_strong(),
@@ -103,6 +116,14 @@ pub fn close() {
         return;
     };
     let _ = mini.ui.hide();
+}
+
+/// Closes the mini player unless it's pinned: the tray icon's menu opens, or the main window
+/// shows.
+pub fn close_unpinned() {
+    if !is_pinned() {
+        close();
+    }
 }
 
 /// The player changed: the open mini player shows it.
@@ -151,13 +172,43 @@ fn wire(ui: &MiniPlayer, main: &AppWindow) {
         });
     });
     data.on_dismiss(dismiss);
+    data.on_activation_lost(activation_lost);
+    data.on_toggle_pin(toggle_pin);
+    let weak = ui.as_weak();
+    data.on_drag(move || {
+        let Some(ui) = weak.upgrade() else { return };
+        // Windows moves it from here until the button is released.
+        if let Some(Err(e)) = ui.window().with_winit_window(|w| w.drag_window()) {
+            log!("mini player: drag: {e}");
+        }
+    });
     // Winit's word on the activation, should the focus have left the key scope.
     ui.window().on_winit_window_event(|_, ev| {
         if matches!(ev, winit::event::WindowEvent::Focused(false)) {
-            dismiss();
+            activation_lost();
         }
         EventResult::Propagate
     });
+}
+
+/// Another window took the activation: a flyout closes, a pinned mini player stays.
+fn activation_lost() {
+    if !is_pinned() {
+        dismiss();
+    }
+}
+
+/// The pin button: pins or unpins the open mini player, and saves it for the next one.
+fn toggle_pin() {
+    let Some(mini) = MINI.with_borrow(Clone::clone) else {
+        return;
+    };
+    let data = mini.ui.global::<MiniData>();
+    let pinned = !data.get_pinned();
+    data.set_pinned(pinned);
+    if let Some(ctx) = Ctx::get() {
+        settings::set_mini_pinned(&ctx, pinned);
+    }
 }
 
 fn dismiss() {

@@ -111,11 +111,13 @@ pub const PAGES: &[&str] = &[
     // A first sign-in whose cookies hold several identities: the picker over the sign-in page.
     "account-picker",
     // The tray's mini player alone (its own 340 x 170 window), with the fixture track playing
-    // or paused, the same with a title too long for two lines, or with nothing to play.
+    // or paused, the same with a title too long for two lines, or with nothing to play; then
+    // pinned, with the fixture track playing.
     "mini-player",
     "mini-player-paused",
     "mini-player-long",
     "mini-player-idle",
+    "mini-player-pinned",
     // Home with the close dialog open, as the first close asks.
     "close-dialog",
     // Home after a scroll near its end loaded the next page (the community shelf), with that
@@ -594,6 +596,8 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
     }
     let mini = if o.page.starts_with("mini-player") {
         let mini = crate::mini::create(ctx)?;
+        mini.global::<crate::ui::MiniData>()
+            .set_pinned(o.page == "mini-player-pinned");
         mini.window()
             .dispatch_event(WindowEvent::ScaleFactorChanged {
                 scale_factor: o.scale,
@@ -713,6 +717,7 @@ fn page(name: &str, f: &Fixtures) -> Result<Page, String> {
         | "mini-player-paused"
         | "mini-player-long"
         | "mini-player-idle"
+        | "mini-player-pinned"
         | "close-dialog"
         | "home-more"
         | "home-more-loading"

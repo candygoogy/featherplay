@@ -1,10 +1,11 @@
 // The tray's mini player: a small borderless window that opens over the notification area on
 // a left click of the tray icon (`src/mini.rs` creates it, places it and drops it on close).
-// Top: the cover, then the title (up to two lines) and the artist, with the button that opens
-// the main window in the top-right corner, level with the cover's top. Then the progress line
-// across the window, the time played and the length under its ends. Last, one row centred:
-// previous, play or pause and next, flanked by the like heart on the left and "not for me" on
-// the right, so play sits in the middle of the window.
+// Top: the cover, then the title (up to two lines) and the artist, with the pin and the button
+// that opens the main window in the top-right corner, level with the cover's top. Pinned, it
+// stays open and on top until closed, the corner holds its × and a press off the controls
+// moves it. Then the progress line across the window, the time played and the length under
+// its ends. Last, one row centred: previous, play or pause and next, flanked by the like heart
+// on the left and "not for me" on the right, so play sits in the middle of the window.
 //
 // It has its own `Player` and `Theme` globals (globals belong to their window): Rust copies
 // the main window's into them. Nothing in it runs a timer; the position arrives with the
@@ -16,10 +17,17 @@ import { Player } from "player.slint";
 export global MiniData {
     // The cover the mini player loads for itself (`mini::COVER`).
     in property <image> cover;
-    // Show the main window (then the mini player closes).
+    // Show the main window (then the mini player closes, unless it's pinned).
     callback open-app();
-    // Escape, or the window lost activation: close.
+    // Escape or the ×: close.
     callback dismiss();
+    // The window lost activation: close, unless it's pinned.
+    callback activation-lost();
+    // Pinned (its pin button): it stays open and above other windows until closed.
+    in-out property <bool> pinned;
+    callback toggle-pin();
+    // A left press off the controls while pinned: move the window with the pointer.
+    callback drag();
 }
 
 // A time under an end of the progress line.
@@ -41,6 +49,9 @@ export component MiniPlayer inherits Window {
     property <length> line-y: root.pad + root.cover-size + Theme.s3;
     property <length> controls-y: root.line-y + 4px + Theme.s1 + 14px + Theme.s1;
     property <float> progress: Player.duration-s > 0 ? clamp(Player.position-s / Player.duration-s, 0, 1) : 0;
+    // The top-right buttons: 32 px each, the last 8 px from the edge.
+    property <length> slot: 32px;
+    property <length> corner-x: root.width - Theme.s2 - root.slot;
 
     title: @tr("featherplay mini player");
     // `mini::SIZE`: 340 x 170.
@@ -77,10 +88,21 @@ export component MiniPlayer inherits Window {
             }
             reject
         }
-        // Another window took the activation (a click elsewhere, Alt+Tab): close, as a flyout does.
+        // Another window took the activation (a click elsewhere, Alt+Tab): close, as a flyout
+        // does, unless it's pinned.
         focus-lost(reason) => {
             if reason == FocusReason.window-activation {
-                MiniData.dismiss();
+                MiniData.activation-lost();
+            }
+        }
+        // Pinned, a left press on the cover or the ground moves the window; the controls
+        // above it take their own presses.
+        TouchArea {
+            enabled: MiniData.pinned;
+            pointer-event(e) => {
+                if e.kind == PointerEventKind.down && e.button == PointerEventButton.left {
+                    MiniData.drag();
+                }
             }
         }
     }
@@ -100,7 +122,7 @@ export component MiniPlayer inherits Window {
     VerticalLayout {
         x: root.text-x;
         y: root.pad;
-        width: open.x - Theme.s2 - self.x;
+        width: min(open.x, pin.x) - Theme.s2 - self.x;
         height: root.cover-size;
         alignment: center;
         spacing: 2px;
@@ -121,19 +143,49 @@ export component MiniPlayer inherits Window {
         }
     }
 
-    // Opens the main window as it was left; the mini player closes. In the corner, its glyph
-    // level with the cover's top edge.
+    // Keeps the mini player open and on top. It holds its place either way, so a second
+    // click unpins it; pinned, the corner beside it is the ×.
+    pin := IconButton {
+        x: root.corner-x - root.slot;
+        y: open.y;
+        width: root.slot;
+        height: root.slot;
+        glyph: 18px;
+        // A push pin: its head, its body widening to the rim, the needle.
+        icon: "M8.5 4.5 H15.5 M10 4.5 V9.5 L7 13.5 H17 L14 9.5 V4.5 M12 13.5 V19.5";
+        label: MiniData.pinned ? @tr("Unpin") : @tr("Keep on top");
+        description: @tr("Keeps the mini player open and above other windows");
+        active: MiniData.pinned;
+        tint: Theme.text2;
+        clicked => { MiniData.toggle-pin(); }
+    }
+
+    // Opens the main window as it was left; unpinned, the mini player closes. In the corner,
+    // its glyph level with the cover's top edge; pinned, left of the pin.
     open := IconButton {
-        x: root.width - Theme.s2 - self.width;
+        x: MiniData.pinned ? root.corner-x - 2 * root.slot : root.corner-x;
         y: root.pad - (self.height - self.glyph) / 2;
-        width: 32px;
-        height: 32px;
+        width: root.slot;
+        height: root.slot;
         glyph: 18px;
         // A window with an arrow out of its corner.
         icon: "M13.5 4.5 H19.5 V10.5 M19.5 4.5 L12 12 M17.5 14 V18 A1.5 1.5 0 0 1 16 19.5 H6 A1.5 1.5 0 0 1 4.5 18 V8 A1.5 1.5 0 0 1 6 6.5 H10";
         label: @tr("Open featherplay");
         tint: Theme.text2;
         clicked => { MiniData.open-app(); }
+    }
+
+    // Pinned, the corner closes it; it opens pinned next time.
+    if MiniData.pinned: IconButton {
+        x: root.corner-x;
+        y: open.y;
+        width: root.slot;
+        height: root.slot;
+        glyph: 18px;
+        icon: Icons.close;
+        label: @tr("Close");
+        tint: Theme.text2;
+        clicked => { MiniData.dismiss(); }
     }
 
     // The progress line across the window's padding, the accent up to the time played; under

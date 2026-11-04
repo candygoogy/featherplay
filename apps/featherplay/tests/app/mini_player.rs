@@ -1,15 +1,18 @@
 //! The tray's mini player on the offscreen platform (no window is shown): it mirrors the main
 //! window's track and theme, its play button goes through the main window's player, Escape
 //! and a lost activation close it, and while it shows nothing in it animates or keeps a
-//! timer. Prints what creating it costs.
+//! timer. Pinned, it stays open without the activation, saves the pin, closes on its ×,
+//! and a press off its controls drags it. Prints what creating it costs.
 
 use std::cell::Cell;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
+use featherplay::controller::{AccountAction, Action, Change};
 use featherplay::mini;
+use featherplay::pages::settings;
 use featherplay::snapshot::Scene;
-use featherplay::ui::{MiniPlayer, Player, Theme, Toast};
+use featherplay::ui::{MiniData, MiniPlayer, Player, Theme, Toast};
 use slint::platform::{Key, PointerEventButton, WindowEvent};
 use slint::{ComponentHandle, LogicalPosition, Rgba8Pixel, SharedPixelBuffer};
 
@@ -41,6 +44,127 @@ fn open(scene: &Scene) -> MiniPlayer {
         .dispatch_event(WindowEvent::WindowActiveChanged(true));
     scene.settle();
     mini
+}
+
+/// The pin, just left of the top-right corner (32 px buttons, 8 px from the edge).
+const PIN: (f32, f32) = (284.0, 21.0);
+/// The corner: "Open featherplay" unpinned, the × pinned.
+const CORNER: (f32, f32) = (316.0, 21.0);
+
+/// The pins the window saved since the last call, oldest first.
+fn pins_saved(scene: &Scene) -> Vec<bool> {
+    scene
+        .take_actions()
+        .into_iter()
+        .filter_map(|a| match a {
+            Action::Account(AccountAction::Set(Change::MiniPinned(on))) => Some(on),
+            _ => None,
+        })
+        .collect()
+}
+
+fn lose_activation(mini: &MiniPlayer, scene: &Scene) {
+    mini.window()
+        .dispatch_event(WindowEvent::WindowActiveChanged(false));
+    scene.settle();
+}
+
+fn playing_scene() -> Scene {
+    let scene = Scene::new(1280, 800, true, false).expect("scene");
+    scene.play(false).expect("player");
+    scene.open("home").expect("home");
+    scene.settle();
+    scene.take_actions();
+    scene
+}
+
+#[test]
+fn pinned_mini_player_stays_open_without_the_activation_and_closes_on_its_cross() {
+    let scene = playing_scene();
+    let mini = open(&scene);
+    assert!(!mini.global::<MiniData>().get_pinned());
+
+    click(mini.window(), PIN.0, PIN.1);
+    scene.settle();
+    assert!(
+        mini.global::<MiniData>().get_pinned(),
+        "the pin didn't pin it"
+    );
+    assert_eq!(pins_saved(&scene), [true]);
+    assert!(settings::mini_pinned());
+
+    lose_activation(&mini, &scene);
+    assert!(mini::is_open(), "pinned, losing the activation closed it");
+
+    // The tray menu and showing the main window leave a pinned one open too.
+    mini::close_unpinned();
+    assert!(mini::is_open(), "pinned, the tray menu closed it");
+
+    // The × in the corner closes it, and it stays pinned for next time.
+    click(mini.window(), CORNER.0, CORNER.1);
+    scene.settle();
+    assert!(!mini::is_open(), "the × didn't close it");
+    assert!(settings::mini_pinned());
+    assert!(pins_saved(&scene).is_empty());
+}
+
+#[test]
+fn the_pin_is_remembered_and_unpinned_the_mini_player_closes_without_the_activation() {
+    let scene = playing_scene();
+    let mini = open(&scene);
+    click(mini.window(), PIN.0, PIN.1);
+    scene.settle();
+    mini.window().dispatch_event(WindowEvent::KeyPressed {
+        text: Key::Escape.into(),
+    });
+    scene.settle();
+    assert!(!mini::is_open(), "Escape didn't close it");
+    drop(mini);
+
+    // The next one opens pinned.
+    let mini = open(&scene);
+    assert!(
+        mini.global::<MiniData>().get_pinned(),
+        "the pin wasn't kept"
+    );
+    scene.take_actions();
+
+    // Unpinned again, it closes as a flyout does.
+    click(mini.window(), PIN.0, PIN.1);
+    scene.settle();
+    assert!(!mini.global::<MiniData>().get_pinned());
+    assert_eq!(pins_saved(&scene), [false]);
+    assert!(!settings::mini_pinned());
+    lose_activation(&mini, &scene);
+    assert!(
+        !mini::is_open(),
+        "unpinned, losing the activation didn't close it"
+    );
+}
+
+#[test]
+fn pinned_a_press_off_the_controls_drags_the_mini_player() {
+    let scene = playing_scene();
+    let mini = open(&scene);
+    let drags = Rc::new(Cell::new(0));
+    let count = drags.clone();
+    mini.global::<MiniData>()
+        .on_drag(move || count.set(count.get() + 1));
+
+    // Unpinned, nothing drags.
+    click(mini.window(), 44.0, 44.0);
+    assert_eq!(drags.get(), 0, "unpinned, a press on the cover dragged it");
+
+    click(mini.window(), PIN.0, PIN.1);
+    scene.settle();
+    assert_eq!(drags.get(), 0, "the pin's own click dragged it");
+    // The cover, and the ground beside the progress line's times.
+    click(mini.window(), 44.0, 44.0);
+    click(mini.window(), 170.0, 104.0);
+    assert_eq!(drags.get(), 2, "a press off the controls didn't drag it");
+    // A control is still a control.
+    click(mini.window(), 170.0, 136.0);
+    assert_eq!(drags.get(), 2, "the play button dragged it");
 }
 
 /// One test: the platform can be installed once per process.

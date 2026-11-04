@@ -64,6 +64,7 @@ fn settings_defaults_when_missing() {
             language: String::new(),
             volume_step: 5,
             skip_disliked: true,
+            mini_pinned: false,
         }
     );
     assert_eq!(s, Settings::default());
@@ -122,6 +123,7 @@ fn settings_roundtrip() {
         language: "de".into(),
         volume_step: 2,
         skip_disliked: false,
+        mini_pinned: true,
     };
     s.save(&p).unwrap();
     assert!(p.config.join("settings.toml").is_file());

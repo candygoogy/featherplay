@@ -152,6 +152,8 @@ pub enum Change {
     /// What a wheel notch and Up or Down move the volume, in percent (one of
     /// `Settings::VOLUME_STEPS`; the window applies it).
     VolumeStep(u8),
+    /// The tray's mini player pinned (its pin button).
+    MiniPinned(bool),
 }
 
 impl Change {
@@ -196,6 +198,7 @@ impl Change {
             Change::LocalApiPort(v) => s.local_api_port = v,
             Change::Language(v) => s.language = v,
             Change::VolumeStep(v) => s.volume_step = v,
+            Change::MiniPinned(v) => s.mini_pinned = v,
         }
     }
 }

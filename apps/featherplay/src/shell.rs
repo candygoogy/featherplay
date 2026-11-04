@@ -111,7 +111,7 @@ fn tray_event(ev: TrayEvent) {
             }
         }
         TrayEvent::Click { x, y } => crate::mini::toggle(x, y),
-        TrayEvent::Menu => crate::mini::close(),
+        TrayEvent::Menu => crate::mini::close_unpinned(),
         TrayEvent::Chose(choice) => tray_choice(choice),
     }
 }
