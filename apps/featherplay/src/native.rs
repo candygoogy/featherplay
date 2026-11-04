@@ -1,8 +1,8 @@
 //! Win32 touches on the main window: a title bar in the app's colours, an opaque surface
 //! that's repainted whole when Windows drops it, the Tri-vane icon for the title bar and
-//! taskbar (dark or light, as the taskbar is), bringing the window forward, and Windows'
-//! animation setting. For the tray's mini player: the work area and scale of the screen
-//! under a point, and the popup's border.
+//! taskbar (dark or light, as the taskbar is), minimising it and bringing it forward, its
+//! taskbar button showing up, and Windows' animation setting. For the tray's mini player:
+//! the work area and scale of the screen under a point, and the popup's border.
 
 use std::cell::RefCell;
 use std::ffi::c_void;
@@ -21,10 +21,10 @@ use windows::Win32::UI::HiDpi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI};
 use windows::Win32::UI::Shell::{DefSubclassProc, RemoveWindowSubclass, SetWindowSubclass};
 use windows::Win32::UI::WindowsAndMessaging::{
     CreateIconFromResourceEx, DestroyIcon, HICON, ICON_BIG, ICON_SMALL, IsIconic, LR_DEFAULTCOLOR,
-    SIZE_MAXIMIZED, SIZE_MINIMIZED, SIZE_RESTORED, SPI_GETCLIENTAREAANIMATION, SW_RESTORE,
-    SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS, SendMessageW, SetForegroundWindow, ShowWindow,
-    SystemParametersInfoW, WM_DISPLAYCHANGE, WM_DPICHANGED, WM_MOUSEWHEEL, WM_NCDESTROY, WM_PAINT,
-    WM_SETICON, WM_SETTINGCHANGE, WM_SIZE,
+    RegisterWindowMessageW, SC_MINIMIZE, SC_RESTORE, SIZE_MAXIMIZED, SIZE_MINIMIZED, SIZE_RESTORED,
+    SPI_GETCLIENTAREAANIMATION, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS, SendMessageW,
+    SetForegroundWindow, SystemParametersInfoW, WM_DISPLAYCHANGE, WM_DPICHANGED, WM_MOUSEWHEEL,
+    WM_NCDESTROY, WM_PAINT, WM_SETICON, WM_SETTINGCHANGE, WM_SIZE, WM_SYSCOMMAND,
 };
 
 /// The Tri-vane logo, 16 to 256 px, from `build.rs`, drawn for dark grounds: the play sits
@@ -546,15 +546,96 @@ fn entry(ico: &[u8], px: u32) -> Option<&[u8]> {
     best.map(|(_, d)| d)
 }
 
-/// Restores the window if it's minimized and brings it to the front.
+/// Restores the window if it's minimized and brings it to the front. The restore goes the
+/// way the title bar's and taskbar's do (WM_SYSCOMMAND), so winit's own minimised state
+/// follows and Windows plays its restore animation where it plays one; a window minimised
+/// from maximised comes back maximised.
 pub fn bring_forward(h: isize) {
     // SAFETY: handle-only calls; a stale handle makes them fail, nothing is dereferenced.
     unsafe {
         if IsIconic(hwnd(h)).as_bool() {
-            let _ = ShowWindow(hwnd(h), SW_RESTORE);
+            SendMessageW(
+                hwnd(h),
+                WM_SYSCOMMAND,
+                Some(WPARAM(SC_RESTORE as usize)),
+                None,
+            );
         }
         let _ = SetForegroundWindow(hwnd(h));
     }
+}
+
+/// Minimises the window as its title bar button does (WM_SYSCOMMAND, so winit's state
+/// follows), with Windows' minimise animation where it plays one.
+pub fn minimise(h: isize) {
+    // SAFETY: a handle-only message; a stale handle makes it fail.
+    unsafe {
+        SendMessageW(
+            hwnd(h),
+            WM_SYSCOMMAND,
+            Some(WPARAM(SC_MINIMIZE as usize)),
+            None,
+        );
+    }
+}
+
+/// Whether the window is minimised (hidden or not).
+pub fn is_minimised(h: isize) -> bool {
+    // SAFETY: a handle-only call; a stale handle reads as not minimised.
+    unsafe { IsIconic(hwnd(h)) }.as_bool()
+}
+
+/// The subclass that watches the taskbar button (`when_taskbar_button`).
+const BUTTON_SUBCLASS: usize = 0xfea7_0006;
+
+/// The registered "TaskbarButtonCreated" message and the callback, for `button_proc`.
+type Button = (u32, Box<dyn Fn()>);
+
+/// Calls `created` each time the taskbar has made the window's button ("TaskbarButtonCreated":
+/// when the window shows, and again after Explorer restarts), after the window has handled it.
+pub fn when_taskbar_button(h: isize, created: impl Fn() + 'static) -> Result<(), String> {
+    // SAFETY: a NUL-terminated static name.
+    let msg = unsafe { RegisterWindowMessageW(windows::core::w!("TaskbarButtonCreated")) };
+    if msg == 0 {
+        return Err("RegisterWindowMessage(TaskbarButtonCreated) failed".into());
+    }
+    let data = Box::into_raw(Box::new((msg, Box::new(created) as Box<dyn Fn()>)));
+    // SAFETY: a live HWND on this thread; `data` stays valid until WM_NCDESTROY frees it.
+    let ok =
+        unsafe { SetWindowSubclass(hwnd(h), Some(button_proc), BUTTON_SUBCLASS, data as usize) };
+    if !ok.as_bool() {
+        // SAFETY: never shared, the subclass wasn't installed.
+        drop(unsafe { Box::from_raw(data) });
+        return Err("SetWindowSubclass failed".into());
+    }
+    Ok(())
+}
+
+unsafe extern "system" fn button_proc(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+    _id: usize,
+    data: usize,
+) -> LRESULT {
+    if msg == WM_NCDESTROY {
+        // SAFETY: the window is going; nothing calls this subclass with `data` again.
+        unsafe {
+            let _ = RemoveWindowSubclass(hwnd, Some(button_proc), BUTTON_SUBCLASS);
+            drop(Box::from_raw(data as *mut Button));
+        }
+        // SAFETY: the arguments this subclass was called with.
+        return unsafe { DefSubclassProc(hwnd, msg, wparam, lparam) };
+    }
+    // SAFETY: the arguments this subclass was called with.
+    let result = unsafe { DefSubclassProc(hwnd, msg, wparam, lparam) };
+    // SAFETY: `data` is the box from `when_taskbar_button`, alive until WM_NCDESTROY.
+    let (created_msg, created) = unsafe { &*(data as *const Button) };
+    if msg == *created_msg {
+        created();
+    }
+    result
 }
 
 /// A screen rectangle in physical pixels: left, top, right, bottom.

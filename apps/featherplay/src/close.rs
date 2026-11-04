@@ -89,13 +89,15 @@ fn chosen(ctx: &Rc<Ctx>, action: CloseAction) {
     if remember {
         settings::set_close_action(ctx, action);
     }
-    // The close request kept the window shown for the dialog.
+    // The close request kept the window shown for the dialog. To the tray it's minimised
+    // first, while it still shows (`to_tray`).
+    if action == CloseAction::Tray {
+        to_tray(ctx);
+    }
     if let Err(e) = ui.hide() {
         log!("hide window: {e}");
     }
-    if action == CloseAction::Tray {
-        to_tray(ctx);
-    } else {
+    if action != CloseAction::Tray {
         quit(ctx);
     }
 }
@@ -108,9 +110,14 @@ fn quit(ctx: &Ctx) {
 
 /// Hides the window to the tray, where the music keeps playing. The first time, a
 /// notification says so; hidden, nothing in the window may animate (the playing mark's
-/// clock stops).
+/// clock stops). Called before the window hides: it's minimised first, so Windows plays its
+/// minimise animation into the taskbar, and it stays minimised in the tray, for the restore
+/// animation when it comes back (`app::show_window`).
 fn to_tray(ctx: &Ctx) {
     log!("window hidden to the tray");
+    if let Some(hwnd) = ctx.hwnd() {
+        crate::native::minimise(hwnd);
+    }
     if let Some(ui) = ctx.window() {
         ui.global::<Frame>().set_hidden(true);
     }

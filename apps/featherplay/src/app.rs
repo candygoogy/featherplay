@@ -62,7 +62,13 @@ pub struct Ctx {
 
 thread_local! {
     static CTX: RefCell<Option<Rc<Ctx>>> = const { RefCell::new(None) };
+    /// Back from the tray, the window waits on the taskbar for its button (`show_window`).
+    static RESTORE_PENDING: Cell<bool> = const { Cell::new(false) };
 }
+
+/// How long a window back from the tray waits for its taskbar button before it restores
+/// anyway (Explorer not running, or slow).
+const BUTTON_WAIT: std::time::Duration = std::time::Duration::from_millis(300);
 
 impl Ctx {
     pub fn new(
@@ -98,6 +104,11 @@ impl Ctx {
 
     pub fn window(&self) -> Option<AppWindow> {
         self.ui.upgrade()
+    }
+
+    /// The main window's HWND, once the real window exists (never offscreen).
+    pub fn hwnd(&self) -> Option<isize> {
+        self.hwnd.get()
     }
 
     /// Sends a request to the controller. Dropped silently once it has stopped (and in
@@ -424,14 +435,38 @@ pub fn on_event(ev: UiEvent) {
 
 /// Brings the main window back (from the tray, or minimized) and to the front; the tray's
 /// mini player closes unless it's pinned.
+///
+/// Windows plays its open animation only the first time a window shows: shown again after a
+/// hide, it just appears. So the tray keeps the window minimised (`close::to_tray`), and back
+/// from it the window restores, with Windows' restore animation out of its taskbar button.
+/// Shown, it sits minimised on the taskbar until Explorer has made that button (or
+/// `BUTTON_WAIT` has passed); restored before, the animation would have nowhere to start
+/// from. With Windows' animations off there's nothing to wait for.
 pub fn show_window(ctx: &Ctx) {
     mini::close_unpinned();
+    let hwnd = ctx.hwnd.get();
+    let from_tray = ctx.window().is_some_and(|ui| !ui.window().is_visible())
+        && hwnd.is_some_and(native::is_minimised);
+    // Before the show: the button may be made while it runs.
+    let wait = from_tray && native::animations_enabled();
+    RESTORE_PENDING.set(wait);
     if let Some(ui) = ctx.window() {
         ui.global::<Frame>().set_hidden(false);
         let _ = ui.show();
     }
     memory::hidden(ctx, false);
-    if let Some(hwnd) = ctx.hwnd.get() {
+    let Some(hwnd) = hwnd else { return };
+    if wait {
+        slint::Timer::single_shot(BUTTON_WAIT, move || restore_pending(hwnd));
+    } else {
+        native::bring_forward(hwnd);
+    }
+}
+
+/// The taskbar button of a window back from the tray is there, or the wait is over: it
+/// restores and comes to the front, once.
+fn restore_pending(hwnd: isize) {
+    if RESTORE_PENDING.replace(false) {
         native::bring_forward(hwnd);
     }
 }
@@ -637,6 +672,14 @@ fn run_window(
         // The tray icon follows the taskbar's theme and the primary display's scale.
         if let Err(e) = native::when_displays_change(hwnd, shell::refresh_tray_icon) {
             log!("tray icon on display change: {e}");
+        }
+        // A window back from the tray restores once its taskbar button is there
+        // (`show_window`); out of the message Explorer sent, on the event loop's next turn.
+        let watched = native::when_taskbar_button(hwnd, move || {
+            slint::Timer::single_shot(std::time::Duration::ZERO, move || restore_pending(hwnd));
+        });
+        if let Err(e) = watched {
+            log!("restore on taskbar button: {e}");
         }
         if let Some(ui) = weak.upgrade() {
             let t = ui.global::<Theme>();
