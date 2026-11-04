@@ -1,9 +1,10 @@
 //! The Up next panel's edits (play next, add to queue, reorder, remove, clear, skip to a
 //! track) and where the queue came from ("Playing from …").
 
+use std::collections::HashMap;
 use std::time::Duration;
 
-use featherplay_core::model::Track;
+use featherplay_core::model::{LikeStatus, Track, TrackId};
 use featherplay_core::player::Input;
 use featherplay_core::queue::Queue;
 use featherplay_core::tr;
@@ -64,6 +65,29 @@ pub fn add_input(edit: QueueAction) -> Option<Input> {
         QueueAction::Enqueue(tracks) => Some(Input::Enqueue(tracks)),
         _ => None,
     }
+}
+
+/// `input` with the ratings the user made this session on the tracks it brings. A page keeps
+/// its tracks as they were fetched, so without this a song disliked since would come back
+/// into the queue unrated, and play when the one before it ends.
+pub fn with_likes(mut input: Input, likes: &HashMap<TrackId, LikeStatus>) -> Input {
+    if likes.is_empty() {
+        return input;
+    }
+    let tracks: &mut [Track] = match &mut input {
+        Input::PlayTracks { tracks, .. }
+        | Input::PlayNextAll(tracks)
+        | Input::Enqueue(tracks)
+        | Input::ContinuationLoaded(_, tracks) => tracks,
+        Input::PlayNext(track) => std::slice::from_mut(track),
+        _ => &mut [],
+    };
+    for t in tracks {
+        if let Some(like) = likes.get(&t.id) {
+            t.like = *like;
+        }
+    }
+    input
 }
 
 /// What takes the player back to `track` at `at` (Undo after "Not for me"): when it's the

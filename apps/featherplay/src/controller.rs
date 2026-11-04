@@ -44,6 +44,7 @@ pub use account::{
 pub use local_api::{LocalApiNotice, LocalApiStatus};
 pub use queue::{
     QueueAction, QueueInfo, add_input, back_to_inputs, playing_from, queue_edit, queue_info,
+    with_likes,
 };
 
 use crate::catalog::{Catalog, Source};
@@ -261,7 +262,8 @@ pub struct Controller {
     shown_state: Option<PlayerState>,
     /// The engine's output is starved (`AudioEvent::Buffering`): the position stands still.
     buffering: bool,
-    /// Likes changed this session; the queue keeps the like status it was loaded with.
+    /// Likes changed this session. The queue takes them (`Input::SetLike`), and so do the
+    /// tracks that come into it later (`with_likes`).
     likes: HashMap<TrackId, LikeStatus>,
     /// Where the queue came from, for the Up next panel.
     playing_from: String,
@@ -727,7 +729,7 @@ impl Controller {
     fn feed(&mut self, first: Input) {
         let mut inputs = VecDeque::from([first]);
         while let Some(input) = inputs.pop_front() {
-            for effect in self.player.handle(input) {
+            for effect in self.player.handle(with_likes(input, &self.likes)) {
                 inputs.extend(self.effect(effect));
             }
         }

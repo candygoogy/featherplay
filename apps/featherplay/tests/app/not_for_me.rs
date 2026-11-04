@@ -2,12 +2,13 @@
 //! the rating back and returns to the song where it was. The actions run on a real player,
 //! as the controller runs them.
 
-use std::time::Duration;
+use std::collections::HashMap;
+use std::time::{Duration, SystemTime};
 
-use featherplay::controller::{Action, back_to_inputs};
+use featherplay::controller::{Action, back_to_inputs, with_likes};
 use featherplay::not_for_me;
 use featherplay_core::model::{LikeStatus, Track, TrackId, VideoType};
-use featherplay_core::player::{Input, PlaybackPrefs, Player};
+use featherplay_core::player::{Input, PlaybackPrefs, Player, StreamInfo};
 
 fn track(id: &str) -> Track {
     Track {
@@ -122,4 +123,73 @@ fn undo_after_moving_on_plays_the_song_again_where_it_was() {
     run(&mut player, back);
     assert_eq!(current(&player), Some("a"));
     assert_eq!(player.position(), AT);
+}
+
+/// As `run`, with the rating's write going through: the queue and the session's ratings
+/// take it, as the controller does on `Msg::Rated`.
+fn run_rated(player: &mut Player, likes: &mut HashMap<TrackId, LikeStatus>, actions: Vec<Action>) {
+    for action in actions {
+        match action {
+            Action::Rate(id, status) => {
+                player.handle(Input::SetLike(id.clone(), status));
+                likes.insert(id, status);
+            }
+            Action::Next => {
+                player.handle(Input::Next);
+            }
+            _ => {}
+        }
+    }
+}
+
+/// The current track `id` loads, starts and plays to its end.
+fn play_to_the_end(player: &mut Player, id: &str) {
+    player.handle(Input::Resolved {
+        id: TrackId(id.into()),
+        result: Ok(StreamInfo {
+            expires_at: SystemTime::now() + Duration::from_secs(6 * 3600),
+            duration: Some(Duration::from_secs(200)),
+        }),
+    });
+    player.handle(Input::AudioStarted);
+    player.handle(Input::AudioEnded);
+}
+
+/// A list's page plays its tracks as they were fetched, before any rating made since.
+fn play_page(player: &mut Player, likes: &HashMap<TrackId, LikeStatus>, ids: &[&str]) {
+    let play = Input::PlayTracks {
+        tracks: ids.iter().map(|id| track(id)).collect(),
+        start: 0,
+        radio: false,
+    };
+    player.handle(with_likes(play, likes));
+}
+
+#[test]
+fn a_song_set_aside_stays_passed_over_when_its_list_is_played_again() {
+    // ⊘ on the second song, then the first one picked again on the playlist's page.
+    let mut player = player_with(&["a", "b", "c"]);
+    let mut likes = HashMap::new();
+    player.handle(Input::Next);
+    let (actions, _) = not_for_me::actions(&track("b"), AT);
+    run_rated(&mut player, &mut likes, actions);
+    play_page(&mut player, &likes, &["a", "b", "c"]);
+
+    play_to_the_end(&mut player, "a");
+    assert_eq!(current(&player), Some("c"));
+}
+
+#[test]
+fn a_song_set_aside_still_plays_when_picked_on_its_page() {
+    let mut player = player_with(&["a", "b", "c"]);
+    let mut likes = HashMap::new();
+    let (actions, _) = not_for_me::actions(&track("a"), AT);
+    run_rated(&mut player, &mut likes, actions);
+    play_page(&mut player, &likes, &["a", "b", "c"]);
+
+    assert_eq!(current(&player), Some("a"));
+    assert_eq!(
+        player.queue().current().map(|t| t.like),
+        Some(LikeStatus::Dislike)
+    );
 }
