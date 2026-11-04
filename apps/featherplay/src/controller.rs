@@ -1173,7 +1173,7 @@ impl Controller {
 
 /// The toast for Play with no output device (`AudioEvent::NoDevice`).
 pub fn no_sound_output() -> &'static str {
-    tr!("No sound output found. Connect speakers or headphones, then press play.")
+    tr!("No sound output found. Connect speakers or headphones.")
 }
 
 /// The integrations' view of a track (media card, taskbar, tray, Discord, toasts).

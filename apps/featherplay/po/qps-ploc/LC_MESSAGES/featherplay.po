@@ -106,9 +106,9 @@ msgid "Quit"
 msgstr "[Quit]"
 
 #: ../../crates/integrations/src/tray_menu.rs:242
-#: ../../crates/integrations/src/tray_menu.rs:242 src/album_actions.rs:236
-#: ../../crates/integrations/src/tray_menu.rs:242 src/album_actions.rs:236 ui/mini_player.slint:227 ui/pages/content.slint:580
-#: ../../crates/integrations/src/tray_menu.rs:242 src/album_actions.rs:236 ui/mini_player.slint:227 ui/pages/content.slint:580 ui/parts.slint:860 ui/song_menu.slint:278
+#: ../../crates/integrations/src/tray_menu.rs:242 src/album_actions.rs:275
+#: ../../crates/integrations/src/tray_menu.rs:242 src/album_actions.rs:275 ui/mini_player.slint:227 ui/pages/content.slint:580
+#: ../../crates/integrations/src/tray_menu.rs:242 src/album_actions.rs:275 ui/mini_player.slint:227 ui/pages/content.slint:580 ui/parts.slint:860 ui/song_menu.slint:278
 msgid "Like"
 msgstr "[Like]"
 
@@ -128,119 +128,119 @@ msgstr "[Couldn't load your accounts. Open the menu to try again.]"
 msgid "No channel"
 msgstr "[No channel]"
 
-#: src/album_actions.rs:197
+#: src/album_actions.rs:222
 msgid "Nothing changed: {}"
 msgstr "[Nothing changed: {}]"
 
-#: src/album_actions.rs:199
+#: src/album_actions.rs:224
 msgid "Stopped after {} of {}: {}"
 msgstr "[Stopped after {} of {}: {}]"
 
-#: src/album_actions.rs:216
+#: src/album_actions.rs:255
 msgid "Like {n} song on {}?"
 msgid_plural "Like {n} songs on {}?"
 msgstr[0] "[Like {n} song on {}?]"
 msgstr[1] "[Like {n} songs on {}?]"
 
-#: src/album_actions.rs:217
+#: src/album_actions.rs:256
 msgid "Remove the like from {n} song on {}?"
 msgid_plural "Remove likes from {n} songs on {}?"
 msgstr[0] "[Remove the like from {n} song on {}?]"
 msgstr[1] "[Remove likes from {n} songs on {}?]"
 
-#: src/album_actions.rs:222
+#: src/album_actions.rs:261
 msgid "Dislike {n} song on {}?"
 msgid_plural "Dislike {n} songs on {}?"
 msgstr[0] "[Dislike {n} song on {}?]"
 msgstr[1] "[Dislike {n} songs on {}?]"
 
-#: src/album_actions.rs:227
+#: src/album_actions.rs:266
 msgid "Remove the dislike from {n} song on {}?"
 msgid_plural "Remove dislikes from {n} songs on {}?"
 msgstr[0] "[Remove the dislike from {n} song on {}?]"
 msgstr[1] "[Remove dislikes from {n} songs on {}?]"
 
-#: src/album_actions.rs:237 ui/album_menu.slint:163
+#: src/album_actions.rs:276 ui/album_menu.slint:163
 msgid "Remove likes"
 msgstr "[Remove likes]"
 
-#: src/album_actions.rs:238 ui/song_menu.slint:287
+#: src/album_actions.rs:277 ui/song_menu.slint:287
 msgid "Dislike"
 msgstr "[Dislike]"
 
-#: src/album_actions.rs:239 ui/album_menu.slint:176
+#: src/album_actions.rs:278 ui/album_menu.slint:176
 msgid "Remove dislikes"
 msgstr "[Remove dislikes]"
 
-#: src/album_actions.rs:245
+#: src/album_actions.rs:284
 msgid "Every song on this album is already liked"
 msgstr "[Every song on this album is already liked]"
 
-#: src/album_actions.rs:246
+#: src/album_actions.rs:285
 msgid "No liked songs on this album"
 msgstr "[No liked songs on this album]"
 
-#: src/album_actions.rs:247
+#: src/album_actions.rs:286
 msgid "Every song on this album is already disliked"
 msgstr "[Every song on this album is already disliked]"
 
-#: src/album_actions.rs:248
+#: src/album_actions.rs:287
 msgid "No disliked songs on this album"
 msgstr "[No disliked songs on this album]"
 
-#: src/album_actions.rs:255
+#: src/album_actions.rs:294
 msgid "Liking songs… {} of {}"
 msgstr "[Liking songs… {} of {}]"
 
-#: src/album_actions.rs:256
+#: src/album_actions.rs:295
 msgid "Removing likes… {} of {}"
 msgstr "[Removing likes… {} of {}]"
 
-#: src/album_actions.rs:257
+#: src/album_actions.rs:296
 msgid "Disliking songs… {} of {}"
 msgstr "[Disliking songs… {} of {}]"
 
-#: src/album_actions.rs:258
+#: src/album_actions.rs:297
 msgid "Removing dislikes… {} of {}"
 msgstr "[Removing dislikes… {} of {}]"
 
-#: src/album_actions.rs:264
+#: src/album_actions.rs:303
 msgid "Liked {n} song"
 msgid_plural "Liked {n} songs"
 msgstr[0] "[Liked {n} song]"
 msgstr[1] "[Liked {n} songs]"
 
-#: src/album_actions.rs:265
+#: src/album_actions.rs:304
 msgid "Removed {n} like"
 msgid_plural "Removed {n} likes"
 msgstr[0] "[Removed {n} like]"
 msgstr[1] "[Removed {n} likes]"
 
-#: src/album_actions.rs:266
+#: src/album_actions.rs:305
 msgid "Disliked {n} song"
 msgid_plural "Disliked {n} songs"
 msgstr[0] "[Disliked {n} song]"
 msgstr[1] "[Disliked {n} songs]"
 
-#: src/album_actions.rs:268
+#: src/album_actions.rs:307
 msgid "Removed {n} dislike"
 msgid_plural "Removed {n} dislikes"
 msgstr[0] "[Removed {n} dislike]"
 msgstr[1] "[Removed {n} dislikes]"
 
-#: src/album_actions.rs:276
+#: src/album_actions.rs:315
 msgid "sign in again"
 msgstr "[sign in again]"
 
-#: src/album_actions.rs:277
+#: src/album_actions.rs:316
 msgid "no connection"
 msgstr "[no connection]"
 
-#: src/album_actions.rs:278
+#: src/album_actions.rs:317
 msgid "a song wasn't found"
 msgstr "[a song wasn't found]"
 
-#: src/album_actions.rs:279
+#: src/album_actions.rs:318
 msgid "the music service said no"
 msgstr "[the music service said no]"
 
@@ -257,8 +257,8 @@ msgid "Right-click the tray icon to show the window or quit."
 msgstr "[Right-click the tray icon to show the window or quit.]"
 
 #: src/controller.rs:1176
-msgid "No sound output found. Connect speakers or headphones, then press play."
-msgstr "[No sound output found. Connect speakers or headphones, then press play.]"
+msgid "No sound output found. Connect speakers or headphones."
+msgstr "[No sound output found. Connect speakers or headphones.]"
 
 #: src/controller/account.rs:420
 msgid "Your API key is saved. Connect to sign in to Last.fm with it."

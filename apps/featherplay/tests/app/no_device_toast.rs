@@ -20,7 +20,7 @@ fn play_with_no_output_device_says_how_to_fix_it() {
     assert!(toast.get_open());
     assert_eq!(
         toast.get_text().as_str(),
-        "No sound output found. Connect speakers or headphones, then press play."
+        "No sound output found. Connect speakers or headphones."
     );
     assert_eq!(toast.get_action().as_str(), "", "nothing to click");
 }
