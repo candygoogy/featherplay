@@ -258,6 +258,8 @@ export global Theme {
     out property <duration> t-cover: fading ? 240ms : 0ms;                    // cover crossfade
     out property <duration> t-toast: fading ? (motion ? 220ms : 120ms) : 0ms;
     out property <duration> t-colour: fading ? 300ms : 0ms;                   // the cover accent's crossfade
+    out property <duration> t-linger: fading ? (motion ? 250ms : 120ms) : 0ms; // a passing value's fade-out once read (the volume)
+    out property <duration> t-step: moving ? 120ms : 0ms;                     // a value's label following a wheel or key step
     out property <duration> t-shimmer: 1200ms;                                // one sweep (period)
     out property <duration> t-skeleton-delay: 150ms;                          // no skeleton flash on fast loads
     out property <duration> t-skeleton-sweep: 2200ms;                         // one skeleton sweep and its rest

@@ -1,5 +1,6 @@
 //! The bar's volume slider follows the mouse wheel, offscreen: a notch up or down moves the
-//! volume 5 %, within 0–100 %, without saving; the setting is saved once the wheel rests.
+//! volume 5 %, within 0–100 %, without saving; the setting is saved a second after the wheel
+//! rests, and the value above the line stays 1.5 s, then fades.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -54,6 +55,7 @@ fn a_notch_moves_the_volume_5_percent_and_saves_once_it_rests() {
     scene.settle();
     offscreen::freeze_clock();
     let player = scene.ui.global::<Player>();
+    player.set_volume_step(5);
     player.set_volume(0.5);
     let calls = record(&scene);
     let at = slider(&scene, &calls);
@@ -78,6 +80,83 @@ fn a_notch_moves_the_volume_5_percent_and_saves_once_it_rests() {
     player.set_volume(0.98);
     offscreen::wheel(w, at, 1.0);
     assert_eq!(player.get_volume(), 1.0, "a notch past full stops at 100 %");
+}
+
+/// The pixels just above the slider, where its value shows (`at` is near its top left).
+fn above(w: &slint::Window, at: LogicalPosition) -> Vec<[u8; 3]> {
+    let shot = w.take_snapshot().expect("snapshot");
+    let (x0, y0) = (at.x as usize - 12, at.y as usize - 32);
+    (y0..y0 + 30)
+        .flat_map(|y| (x0..x0 + 112).map(move |x| (x, y)))
+        .map(|(x, y)| {
+            let px = shot.as_slice()[y * shot.width() as usize + x];
+            [px.r, px.g, px.b]
+        })
+        .collect()
+}
+
+#[test]
+fn the_value_stays_a_second_and_a_half_after_a_notch_then_fades() {
+    let scene = Scene::new(1280, 800, true, false).expect("scene");
+    scene.play(false).expect("player");
+    scene.ui.show().expect("show");
+    scene.settle();
+    offscreen::freeze_clock();
+    let player = scene.ui.global::<Player>();
+    player.set_volume_step(5);
+    player.set_volume(0.5);
+    let calls = record(&scene);
+    let at = slider(&scene, &calls);
+    let w = scene.ui.window();
+    // Each render starts the fade that the step before it set off, as frames do. The
+    // finding notch's value comes and goes first.
+    above(w, at);
+    offscreen::advance(Duration::from_millis(1600));
+    above(w, at);
+    offscreen::advance(Duration::from_secs(1));
+    let bare = above(w, at);
+    let saved = calls.borrow().iter().filter(|c| c.1).count();
+
+    offscreen::wheel(w, at, 1.0);
+    above(w, at);
+    offscreen::advance(Duration::from_millis(200));
+    assert_ne!(above(w, at), bare, "no value after a notch");
+    offscreen::advance(Duration::from_millis(1000));
+    assert_ne!(above(w, at), bare, "the value left before 1.5 s");
+    let saves = calls.borrow().iter().filter(|c| c.1).count() - saved;
+    assert_eq!(saves, 1, "not saved a second after the notch");
+
+    // Past 1.5 s it fades, and is gone once the fade ends.
+    offscreen::advance(Duration::from_millis(350));
+    above(w, at);
+    offscreen::advance(Duration::from_millis(300));
+    assert_eq!(
+        above(w, at),
+        bare,
+        "the value still shows after 1.5 s and its fade"
+    );
+
+    // A click shows it while pressed, and 0.4 s past the release before it fades. (The
+    // click moves the volume, so the value differs from the notch's, never from `bare`.)
+    let button = slint::platform::PointerEventButton::Left;
+    let press = LogicalPosition::new(at.x + 20.0, at.y + 8.0);
+    w.dispatch_event(WindowEvent::PointerPressed {
+        position: press,
+        button,
+    });
+    above(w, at);
+    offscreen::advance(Duration::from_secs(3));
+    assert_ne!(above(w, at), bare, "no value while pressed");
+    w.dispatch_event(WindowEvent::PointerReleased {
+        position: press,
+        button,
+    });
+    offscreen::advance(Duration::from_millis(300));
+    assert_ne!(above(w, at), bare, "the value left before 0.4 s");
+    offscreen::advance(Duration::from_millis(150));
+    above(w, at);
+    offscreen::advance(Duration::from_millis(300));
+    assert_eq!(above(w, at), bare, "the value still shows after a click");
 }
 
 #[test]

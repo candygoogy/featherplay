@@ -55,12 +55,14 @@ fn record(scene: &Scene) -> Calls {
     calls
 }
 
-/// The window at 1280 × 800 with the fixture radio playing, keys in it, the clock frozen.
+/// The window at 1280 × 800 with the fixture radio playing, keys in it, the clock frozen,
+/// at the default 5 % step (not the dev settings' step).
 fn scene() -> Scene {
     let scene = Scene::new(1280, 800, true, false).expect("scene");
     scene.play(false).expect("player");
     scene.open("home").expect("page");
     scene.settle();
+    scene.ui.global::<Player>().set_volume_step(5);
     scene
         .ui
         .window()
@@ -79,7 +81,6 @@ fn up_and_down_step_the_volume_on_the_grid_and_save_once_they_rest() {
     let scene = scene();
     let w = scene.ui.window();
     let player = scene.ui.global::<Player>();
-    player.set_volume_step(5);
     player.set_volume(0.37);
     let calls = record(&scene);
 

@@ -130,15 +130,19 @@ export component SeekLine inherits Rectangle {
 }
 
 // The volume: a click or a drag sets it, a wheel notch and Up or Down (`step`) move it by the
-// Volume step. While it changes, its value shows above the line, until a second after the
-// last change.
+// Volume step. While it changes, its value shows above the line: 1.5 s past the last wheel
+// or key change, while pressed and 0.4 s past the release; then it fades out.
 component VolumeSlider inherits Rectangle {
     property <float> preview: clamp(ta.mouse-x / max(1px, self.width), 0, 1);
-    // The wheel or the keys changed the volume and it isn't saved yet: saved once they rest.
+    // The wheel or the keys changed the volume and it isn't saved yet: `save` saves it a
+    // second after the last change.
     property <bool> unsaved: false;
     // The value shows: from a change until `rest` ends, and while the slider is pressed.
     property <bool> changing: false;
     property <bool> tip: root.changing || ta.pressed;
+    // How long the value stays after the last change: long enough to read after a wheel
+    // or key step, shorter after a drag, which showed it all along.
+    property <duration> hold: 1.5s;
     width: 88px;
     accessible-role: slider;
     accessible-label: @tr("Volume");
@@ -151,29 +155,47 @@ component VolumeSlider inherits Rectangle {
         let at = Player.volume * 100 / s;
         let to = up ? floor(at + 0.01) + 1 : ceil(at - 0.01) - 1;
         Player.set-volume(clamp(to * s / 100, 0, 1), false);
-        root.unsaved = true;
-        root.changed();
+        root.stepped();
     }
-    // Shows the value and starts its second again.
-    function changed() {
+    // A wheel or key change: shows the value for `hold` and saves it a second later.
+    function stepped() {
+        root.unsaved = true;
+        if save.running {
+            save.restart();
+        } else {
+            save.running = true;
+        }
+        root.linger(1.5s);
+    }
+    // Shows the value and starts its time `d` again.
+    function linger(d: duration) {
         root.changing = true;
+        root.hold = d;
         if rest.running {
             rest.restart();
         } else {
             rest.running = true;
         }
     }
-    // Runs only while the value shows.
-    rest := Timer {
+    // Saves an unsaved change; runs only after one, for a second.
+    save := Timer {
         interval: 1s;
         running: false;
         triggered => {
             self.running = false;
-            root.changing = false;
             if root.unsaved {
                 root.unsaved = false;
                 Player.set-volume(Player.volume, true);
             }
+        }
+    }
+    // Runs only while the value shows.
+    rest := Timer {
+        interval: root.hold;
+        running: false;
+        triggered => {
+            self.running = false;
+            root.changing = false;
         }
     }
     ta := TouchArea {
@@ -184,19 +206,21 @@ component VolumeSlider inherits Rectangle {
                 return reject;
             }
             Player.set-volume(clamp(Player.volume + e.delta-y / 60px * Player.volume-step / 100, 0, 1), false);
-            root.unsaved = true;
-            root.changed();
+            root.stepped();
             accept
         }
+        // Pressed, the value shows by `ta.pressed`; the release saves it.
         pointer-event(e) => {
             if e.button == PointerEventButton.left {
                 if e.kind == PointerEventKind.down {
+                    rest.running = false;
+                    root.changing = false;
                     Player.set-volume(root.preview, false);
-                    root.changed();
                 } else if e.kind == PointerEventKind.up {
                     Player.set-volume(root.preview, true);
                     root.unsaved = false;
-                    root.changed();
+                    save.running = false;
+                    root.linger(400ms);
                 }
             }
         }
@@ -222,7 +246,8 @@ component VolumeSlider inherits Rectangle {
         animate background { duration: Theme.t-hover; }
     }
     // The value, 8 px above the line, over the fill's end and kept within the slider: like
-    // the seek line's time.
+    // the seek line's time. It glides to a wheel or key step's value, but sticks to the
+    // pointer while pressed; it comes in quickly and leaves more gently.
     Rectangle {
         property <length> w: value.preferred-width + 12px;
         x: clamp(root.width * clamp(Player.volume, 0, 1) - self.w / 2, 0, root.width - self.w);
@@ -235,7 +260,8 @@ component VolumeSlider inherits Rectangle {
         drop-shadow-color: Theme.cover-shadow;
         opacity: root.tip ? 1 : 0;
         visible: self.opacity > 0;
-        animate opacity { duration: Theme.t-fast; easing: Curves.ease-out; }
+        animate opacity { duration: root.tip ? Theme.t-fast : Theme.t-linger; easing: Curves.ease-out; }
+        animate x { duration: ta.pressed ? 0ms : Theme.t-step; easing: Curves.ease-out; }
         value := Body {
             text: @tr("{} %", round(Player.volume * 100));
             font-size: Theme.t-meta;
