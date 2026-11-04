@@ -63,6 +63,7 @@ fn settings_defaults_when_missing() {
             local_api_port: 26538,
             language: String::new(),
             volume_step: 5,
+            skip_disliked: true,
         }
     );
     assert_eq!(s, Settings::default());
@@ -120,6 +121,7 @@ fn settings_roundtrip() {
         local_api_port: 31000,
         language: "de".into(),
         volume_step: 2,
+        skip_disliked: false,
     };
     s.save(&p).unwrap();
     assert!(p.config.join("settings.toml").is_file());
@@ -195,6 +197,7 @@ sponsorblock = false
     let old = Settings::load(&p);
     assert!(!old.queue_open);
     assert!(old.autoplay);
+    assert!(old.skip_disliked);
     assert_eq!((old.volume, old.sponsorblock), (0.4, false));
     fs::write(
         &file,

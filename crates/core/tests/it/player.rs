@@ -42,6 +42,7 @@ fn prefs(prefer_song_versions: bool, skip_non_music_in_radio: bool) -> PlaybackP
         skip_non_music_in_radio,
         scrobble_other_media: true,
         list_end: Default::default(),
+        skip_disliked: true,
     }
 }
 
@@ -1123,4 +1124,189 @@ fn previous_shows_the_restart_of_a_track_not_loaded() {
     let fx = p.handle(Input::Previous);
     assert_eq!(p.position(), Duration::ZERO);
     assert!(fx.contains(&Effect::StateChanged), "{fx:?}");
+}
+
+// "Skip songs I've disliked".
+
+fn disliked(s: &str) -> Track {
+    Track {
+        like: LikeStatus::Dislike,
+        ..track(s)
+    }
+}
+
+/// A player with `queue` (a list, not radio) and its `start` track audible, and the
+/// effects of that start (the next track's preload).
+fn audible_from(prefs: PlaybackPrefs, queue: Vec<Track>, start: usize) -> (Player, Vec<Effect>) {
+    let mut p = Player::new(prefs);
+    let first = queue[start].id.0.clone();
+    run(
+        &mut p,
+        Input::PlayTracks {
+            tracks: queue,
+            start,
+            radio: false,
+        },
+    );
+    run(&mut p, ok(&first, t0() + 6 * HOUR));
+    let fx = run(&mut p, Input::AudioStarted);
+    (p, fx)
+}
+
+fn current(p: &Player) -> Option<String> {
+    p.queue().current().map(|t| t.id.0.clone())
+}
+
+#[test]
+fn the_end_of_a_track_passes_over_a_disliked_next_one() {
+    let queue = vec![track("a"), disliked("b"), track("c")];
+    let (mut p, started) = audible_from(prefs(true, true), queue, 0);
+    // The track after the disliked one is the one buffered ahead.
+    assert_eq!(resolves(&started), ["c"]);
+
+    let fx = run(&mut p, Input::AudioEnded);
+    assert_eq!(current(&p).as_deref(), Some("c"));
+    assert!(stop_of(&fx).is_none());
+}
+
+#[test]
+fn next_passes_over_disliked_tracks_even_from_repeat_one() {
+    let queue = vec![track("a"), disliked("b"), disliked("c"), track("d")];
+    let (mut p, _) = audible_from(prefs(true, true), queue, 0);
+    run(&mut p, Input::SetRepeat(RepeatMode::One));
+    run(&mut p, Input::Next);
+    assert_eq!(current(&p).as_deref(), Some("d"));
+}
+
+#[test]
+fn a_disliked_track_started_directly_still_plays() {
+    let queue = vec![track("a"), disliked("b"), track("c")];
+    let mut p = Player::new(prefs(true, true));
+    let fx = run(
+        &mut p,
+        Input::PlayTracks {
+            tracks: queue.clone(),
+            start: 1,
+            radio: false,
+        },
+    );
+    assert_eq!(resolves(&fx), ["b"]);
+
+    // Picked from Up next.
+    let (mut p, _) = audible_from(prefs(true, true), queue, 0);
+    run(&mut p, Input::SkipTo(0));
+    assert_eq!(current(&p).as_deref(), Some("b"));
+}
+
+#[test]
+fn repeat_one_keeps_playing_a_disliked_track() {
+    let (mut p, _) = audible_from(prefs(true, true), vec![disliked("a"), track("b")], 0);
+    run(&mut p, Input::SetRepeat(RepeatMode::One));
+    let fx = run(&mut p, Input::AudioEnded);
+    assert_eq!(current(&p).as_deref(), Some("a"));
+    assert!(
+        fx.iter()
+            .any(|e| matches!(e, Effect::Load { id, .. } if id.0 == "a"))
+    );
+}
+
+#[test]
+fn only_disliked_tracks_left_stops_as_at_the_end_of_the_queue() {
+    let queue = vec![track("a"), disliked("b"), disliked("c")];
+    let (mut p, started) = audible_from(prefs(true, true), queue, 0);
+    assert_eq!(resolves(&started), Vec::<String>::new());
+
+    // Next does nothing, as on the last track.
+    let fx = run(&mut p, Input::Next);
+    assert_eq!(fx, Vec::<Effect>::new());
+    assert_eq!(p.status(), &Status::Playing);
+
+    // The end stops on the track that played, not as a failure.
+    let fx = run(&mut p, Input::AudioEnded);
+    assert_eq!(current(&p).as_deref(), Some("a"));
+    assert_eq!(p.status(), &Status::Idle);
+    assert!(stop_of(&fx).is_none());
+}
+
+#[test]
+fn repeat_all_over_disliked_tracks_does_not_spin() {
+    // Every track disliked, the first started directly: its end stops.
+    let (mut p, _) = audible_from(prefs(true, true), vec![disliked("a"), disliked("b")], 0);
+    run(&mut p, Input::SetRepeat(RepeatMode::All));
+    run(&mut p, Input::AudioEnded);
+    assert_eq!(p.status(), &Status::Idle);
+
+    // One track left that isn't: it plays again.
+    let (mut p, _) = audible_from(prefs(true, true), vec![track("a"), disliked("b")], 0);
+    run(&mut p, Input::SetRepeat(RepeatMode::All));
+    let fx = run(&mut p, Input::AudioEnded);
+    assert_eq!(current(&p).as_deref(), Some("a"));
+    assert!(
+        fx.iter()
+            .any(|e| matches!(e, Effect::Load { id, .. } if id.0 == "a"))
+    );
+}
+
+#[test]
+fn a_continuation_waited_for_passes_over_its_disliked_tracks() {
+    let mut p = Player::new(prefs(true, true));
+    run(
+        &mut p,
+        Input::PlayTracks {
+            tracks: vec![track("a")],
+            start: 0,
+            radio: true,
+        },
+    );
+    run(&mut p, ok("a", t0() + 6 * HOUR));
+    run(&mut p, Input::AudioStarted);
+    run(&mut p, Input::AudioEnded);
+    assert_eq!(p.status(), &Status::Loading);
+
+    run(
+        &mut p,
+        Input::ContinuationLoaded(id("a"), vec![disliked("b"), track("c")]),
+    );
+    assert_eq!(current(&p).as_deref(), Some("c"));
+}
+
+#[test]
+fn with_the_setting_off_a_disliked_track_plays() {
+    let off = PlaybackPrefs {
+        skip_disliked: false,
+        ..prefs(true, true)
+    };
+    let (mut p, _) = audible_from(off, vec![track("a"), disliked("b"), track("c")], 0);
+    run(&mut p, Input::AudioEnded);
+    assert_eq!(current(&p).as_deref(), Some("b"));
+}
+
+#[test]
+fn turning_the_setting_on_moves_the_preload_past_a_disliked_next_track() {
+    let off = PlaybackPrefs {
+        skip_disliked: false,
+        ..prefs(true, true)
+    };
+    let (mut p, started) = audible_from(off, vec![track("a"), disliked("b"), track("c")], 0);
+    assert_eq!(resolves(&started), ["b"]);
+
+    let fx = run(&mut p, Input::SetPrefs(prefs(true, true)));
+    assert_eq!(resolves(&fx), ["c"]);
+}
+
+#[test]
+fn a_track_disliked_while_queued_is_passed_over_when_it_comes_round() {
+    let (mut p, _) = audible_from(prefs(true, true), tracks(&["a", "b", "c"]), 0);
+    let fx = run(&mut p, Input::SetLike(id("b"), LikeStatus::Dislike));
+    // The preload moves on to the track that will play, and the queue is saved.
+    assert_eq!(resolves(&fx), ["c"]);
+    assert!(fx.contains(&Effect::PersistSession));
+
+    run(&mut p, Input::AudioEnded);
+    assert_eq!(current(&p).as_deref(), Some("c"));
+    assert_eq!(
+        p.session().queue[1].like,
+        LikeStatus::Dislike,
+        "the rating is saved with the session"
+    );
 }

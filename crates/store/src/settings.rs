@@ -101,6 +101,9 @@ pub struct Settings {
     /// move it: one of `VOLUME_STEPS`, 5 by default. Any other value loads as 5.
     #[serde(deserialize_with = "lenient_volume_step")]
     pub volume_step: u8,
+    /// When the queue moves on (a track ends, Next, autoplay), pass over songs the user
+    /// disliked (on by default). One the user starts directly still plays.
+    pub skip_disliked: bool,
 }
 
 /// The Appearance setting. `System` follows Windows' app mode.
@@ -250,6 +253,7 @@ impl Default for Settings {
             local_api_port: Settings::LOCAL_API_PORT,
             language: String::new(),
             volume_step: Settings::VOLUME_STEP,
+            skip_disliked: true,
         }
     }
 }

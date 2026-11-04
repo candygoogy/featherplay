@@ -26,6 +26,7 @@ fn player_with(ids: &[&str]) -> Player {
         skip_non_music_in_radio: true,
         scrobble_other_media: false,
         list_end: Default::default(),
+        skip_disliked: true,
     });
     player.handle(Input::PlayTracks {
         tracks: ids.iter().map(|id| track(id)).collect(),

@@ -13,6 +13,7 @@ import { SidebarData } from "../sidebar.slint";
 export enum SettingKey {
     prefer-song-versions,
     skip-non-music,
+    skip-disliked,
     sponsorblock,
     scrobbling,
     scrobble,
@@ -111,6 +112,7 @@ export global SettingsData {
     in property <bool> autoplay: true;
     // The Volume step: 0 1 %, 1 2 %, 2 5 %, 3 10 %.
     in property <int> volume-step: 2;
+    in property <bool> skip-disliked: true;
     in property <bool> sponsorblock;
     // "System default" first, then the output devices by name.
     in property <[string]> devices;
@@ -1229,6 +1231,12 @@ export component SettingsPage inherits Rectangle {
                     detail: @tr("Skips the intros and outros SponsorBlock users marked in music videos.");
                     key: SettingKey.sponsorblock;
                     checked: SettingsData.sponsorblock;
+                }
+                ToggleRow {
+                    label: @tr("Skip songs I've disliked");
+                    detail: @tr("Playlists, albums and radio move past songs you've disliked. A song you pick yourself still plays.");
+                    key: SettingKey.skip-disliked;
+                    checked: SettingsData.skip-disliked;
                 }
                 SettingRow {
                     label: @tr("Volume step");

@@ -106,6 +106,8 @@ pub enum AccountAction {
 pub enum Change {
     PreferSongVersions(bool),
     SkipNonMusicInRadio(bool),
+    /// Moving on passes over songs the user disliked.
+    SkipDisliked(bool),
     Sponsorblock(bool),
     /// `None` is the system default.
     OutputDevice(Option<String>),
@@ -157,6 +159,7 @@ impl Change {
         match self.clone() {
             Change::PreferSongVersions(v) => s.prefer_song_versions = v,
             Change::SkipNonMusicInRadio(v) => s.skip_non_music_in_radio = v,
+            Change::SkipDisliked(v) => s.skip_disliked = v,
             Change::Sponsorblock(v) => s.sponsorblock = v,
             Change::OutputDevice(v) => s.output_device = v,
             Change::Scrobbling(v) => s.scrobbling = v,
@@ -575,6 +578,7 @@ impl Controller {
             }
             // The autoplay tracks not played yet go when it's turned off.
             Change::Autoplay(_) => self.input(Input::SetPrefs(prefs(&self.settings))),
+            Change::SkipDisliked(_) => self.input(Input::SetPrefs(prefs(&self.settings))),
             Change::Sponsorblock(false) => self.segments = None,
             Change::OutputDevice(name) => self.audio.set_device(name.as_deref()),
             Change::Scrobbling(_) | Change::Scrobble(_) | Change::ListenBrainz(_) => {
@@ -993,6 +997,7 @@ mod tests {
             Change::InstallUpdates(false),
             Change::LocalApi(true),
             Change::LocalApiPort(31000),
+            Change::SkipDisliked(false),
         ];
         for c in &changes {
             c.apply(&mut s);
@@ -1015,6 +1020,7 @@ mod tests {
         assert!(!s.discord_options.play_button);
         assert!(!s.lyrics && !s.lyrics_lrclib);
         assert!(!s.autoplay);
+        assert!(!s.skip_disliked);
         assert!(!s.check_for_updates && !s.install_updates);
         assert_eq!(s.volume, d.volume, "the volume isn't a page setting");
     }
@@ -1026,6 +1032,15 @@ mod tests {
         s.autoplay = false;
         let off = crate::controller::prefs(&s).list_end;
         assert_eq!((on, off), (ListEnd::Autoplay, ListEnd::Restart));
+    }
+
+    #[test]
+    fn skip_disliked_reaches_the_player() {
+        let mut s = Settings::default();
+        let on = crate::controller::prefs(&s).skip_disliked;
+        s.skip_disliked = false;
+        let off = crate::controller::prefs(&s).skip_disliked;
+        assert_eq!((on, off), (true, false));
     }
 
     #[test]

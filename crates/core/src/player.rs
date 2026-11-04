@@ -10,7 +10,7 @@ use std::time::{Duration, SystemTime};
 
 use crate::failure::{FailKind, Failure, StopCause, stop_cause};
 pub use crate::model::ListEnd;
-use crate::model::{RepeatMode, Session, Track, TrackId, VideoType};
+use crate::model::{LikeStatus, RepeatMode, Session, Track, TrackId, VideoType};
 use crate::queue::{BackAction, Queue};
 use crate::scrobble::{ScrobbleTracker, eligible};
 
@@ -87,6 +87,9 @@ pub enum Input {
     Enqueue(Vec<Track>),
     /// Play the upcoming track at this index now; the ones before it go to history.
     SkipTo(usize),
+    /// The account took a rating: every queue entry of the track gets it, so one disliked
+    /// now is passed over when it comes round.
+    SetLike(TrackId, LikeStatus),
 }
 
 /// What core needs from a resolved stream.
@@ -151,6 +154,9 @@ pub struct PlaybackPrefs {
     pub scrobble_other_media: bool,
     /// What a list does when it runs out.
     pub list_end: ListEnd,
+    /// Moving on (a track ends, Next, a continuation) passes over disliked tracks. One the
+    /// user starts directly still plays, and Repeat One keeps playing it.
+    pub skip_disliked: bool,
 }
 
 /// Where the current track is in being made playable.
@@ -363,12 +369,15 @@ impl Player {
                 self.queue_edited(&mut out);
             }
             Input::SetPrefs(prefs) => {
-                let list_end = self.prefs.list_end;
+                let old = self.prefs;
                 self.prefs = prefs;
-                if prefs.list_end != list_end {
+                if prefs.list_end != old.list_end {
                     self.queue.set_list_end(prefs.list_end);
                     self.stop_continuing();
                     self.queue_edited(&mut out);
+                } else if prefs.skip_disliked != old.skip_disliked {
+                    // The next track may be another one now.
+                    self.replan_preload(&mut out);
                 }
             }
             Input::MoveUpcoming { from, to } => {
@@ -410,6 +419,11 @@ impl Player {
                 }
             }
             Input::SkipTo(index) => self.skip_to(index, &mut out),
+            Input::SetLike(id, like) => {
+                if self.queue.set_like(&id, like) {
+                    self.queue_edited(&mut out);
+                }
+            }
         }
         if self.position != position || (may_change && !out.is_empty()) {
             self.unsaved = true;
@@ -461,7 +475,7 @@ impl Player {
     /// uses a preload for the track it enters), and the new next track is resolved at once
     /// if the current one has already started.
     fn replan_preload(&mut self, out: &mut Vec<Effect>) {
-        let next = self.queue.peek_next().map(|t| self.play_id(t));
+        let next = self.next_track().map(|t| self.play_id(t));
         let planned = match &self.preload {
             Preload::Idle => None,
             Preload::Requested(id) | Preload::Ready(id, _) | Preload::Done(id) => Some(id),
@@ -598,7 +612,7 @@ impl Player {
         if self.repeat == RepeatMode::One {
             self.queue.set_repeat(RepeatMode::Off);
         }
-        let moved = self.queue.advance().is_some();
+        let moved = self.move_on();
         self.queue.set_repeat(self.repeat);
         if moved {
             self.silence_current(out);
@@ -694,7 +708,7 @@ impl Player {
             return;
         }
         // In radio the next track may still be on its way; check again on the next tick.
-        let Some(next) = self.queue.peek_next() else {
+        let Some(next) = self.next_track() else {
             return;
         };
         let next = self.play_id(next);
@@ -795,7 +809,7 @@ impl Player {
             return;
         }
         self.expired_retries = 0;
-        if self.queue.advance().is_some() {
+        if self.move_on() {
             self.enter_track(Duration::ZERO, out);
         } else if self.continuation_pending {
             self.waiting_for_continuation = true;
@@ -844,7 +858,7 @@ impl Player {
         out.push(Effect::StateChanged);
         if self.waiting_for_continuation {
             self.waiting_for_continuation = false;
-            if self.queue.advance().is_some() {
+            if self.move_on() {
                 self.enter_track(Duration::ZERO, out);
             } else {
                 self.play_intent = false;
@@ -907,7 +921,7 @@ impl Player {
             self.stop(detail, out);
             return;
         }
-        if self.queue.advance().is_some() {
+        if self.move_on() {
             self.enter_track(Duration::ZERO, out);
         } else if self.continuation_pending {
             self.waiting_for_continuation = true;
@@ -1081,6 +1095,19 @@ impl Player {
         self.queue.is_radio()
     }
 
+    /// Moves on to the next track (the end of one, Next, a failure, a continuation), past
+    /// the ones `passed_over` picks. Returns whether it moved.
+    fn move_on(&mut self) -> bool {
+        let prefs = self.prefs;
+        self.queue.advance_past(|t| passed_over(prefs, t)).is_some()
+    }
+
+    /// The track `move_on` would go to.
+    fn next_track(&self) -> Option<&Track> {
+        let prefs = self.prefs;
+        self.queue.peek_next_past(|t| passed_over(prefs, t))
+    }
+
     fn set_status(&mut self, status: Status, out: &mut Vec<Effect>) {
         self.status = status;
         out.push(Effect::StateChanged);
@@ -1095,6 +1122,11 @@ fn play_id(prefs: PlaybackPrefs, t: &Track) -> TrackId {
         }
         _ => t.id.clone(),
     }
+}
+
+/// Moving on passes over `t`: the user disliked it, and "Skip songs I've disliked" is on.
+fn passed_over(prefs: PlaybackPrefs, t: &Track) -> bool {
+    prefs.skip_disliked && t.like == LikeStatus::Dislike
 }
 
 /// Radio and continuations drop user uploads and podcast episodes.

@@ -7,7 +7,7 @@
 use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 
-use crate::model::{ListEnd, RepeatMode, Track};
+use crate::model::{LikeStatus, ListEnd, RepeatMode, Track, TrackId};
 
 /// Pressing "previous" more than this far into a track restarts it instead.
 const RESTART_THRESHOLD: Duration = Duration::from_secs(3);
@@ -74,27 +74,48 @@ impl Queue {
 
     /// The track `advance()` would move to, without moving.
     pub fn peek_next(&self) -> Option<&Track> {
-        match self.repeat {
-            RepeatMode::One => self.current(),
-            _ if self.wraps() => self.tracks.get(self.index + 1).or(self.tracks.first()),
-            _ => self.tracks.get(self.index + 1),
-        }
+        self.peek_next_past(|_| false)
+    }
+
+    /// The track `advance_past(skip)` would move to, without moving.
+    pub fn peek_next_past(&self, skip: impl Fn(&Track) -> bool) -> Option<&Track> {
+        self.tracks.get(self.next_index(skip)?)
     }
 
     /// Moves to the next track and returns it. Repeat One stays on the current track,
     /// Repeat All (or a list set to `ListEnd::Restart`) wraps to the first track, and
     /// otherwise it returns `None` at the end (the last track stays current).
     pub fn advance(&mut self) -> Option<&Track> {
-        if self.tracks.is_empty() {
-            return None;
-        }
-        match self.repeat {
-            RepeatMode::One => {}
-            _ if self.index + 1 < self.tracks.len() => self.index += 1,
-            _ if self.wraps() => self.index = 0,
-            _ => return None,
-        }
+        self.advance_past(|_| false)
+    }
+
+    /// `advance()`, passing over the tracks `skip` picks; they go to history. Repeat One
+    /// stays on the current track whatever `skip` says. When only skipped tracks are left
+    /// (Repeat All included, so it can't loop), it returns `None` and nothing moves.
+    pub fn advance_past(&mut self, skip: impl Fn(&Track) -> bool) -> Option<&Track> {
+        self.index = self.next_index(skip)?;
         self.current()
+    }
+
+    /// The index of the next track `skip` doesn't pick, at most one lap round the queue.
+    fn next_index(&self, skip: impl Fn(&Track) -> bool) -> Option<usize> {
+        if self.repeat == RepeatMode::One {
+            return (self.index < self.tracks.len()).then_some(self.index);
+        }
+        let mut at = self.index;
+        for _ in 0..self.tracks.len() {
+            at = if at + 1 < self.tracks.len() {
+                at + 1
+            } else if self.wraps() {
+                0
+            } else {
+                return None;
+            };
+            if !skip(&self.tracks[at]) {
+                return Some(at);
+            }
+        }
+        None
     }
 
     /// Whether the end of the queue goes back to its first track.
@@ -220,6 +241,15 @@ impl Queue {
         let mut changed = false;
         for t in self.tracks.iter_mut().filter(|t| matches(t)) {
             changed |= t.duration.replace(duration) != Some(duration);
+        }
+        changed
+    }
+
+    /// Sets `like` on every entry of the track `id`. Returns whether any entry changed.
+    pub fn set_like(&mut self, id: &TrackId, like: LikeStatus) -> bool {
+        let mut changed = false;
+        for t in self.tracks.iter_mut().filter(|t| t.id == *id) {
+            changed |= std::mem::replace(&mut t.like, like) != like;
         }
         changed
     }

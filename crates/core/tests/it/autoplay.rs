@@ -34,6 +34,7 @@ fn prefs(list_end: ListEnd) -> PlaybackPrefs {
         skip_non_music_in_radio: true,
         scrobble_other_media: true,
         list_end,
+        skip_disliked: true,
     }
 }
 

@@ -676,6 +676,7 @@ fn show(ctx: &Ctx) {
     data.set_skip_non_music(s.skip_non_music_in_radio);
     data.set_autoplay(s.autoplay);
     show_volume_step(ctx, s.volume_step);
+    data.set_skip_disliked(s.skip_disliked);
     data.set_sponsorblock(s.sponsorblock);
     data.set_scrobbling(s.scrobbling);
     data.set_scrobble(s.lastfm_enabled);
@@ -966,6 +967,10 @@ fn toggled(ctx: &Rc<Ctx>, key: SettingKey, on: bool) {
         SettingKey::Autoplay => {
             data.set_autoplay(on);
             Change::Autoplay(on)
+        }
+        SettingKey::SkipDisliked => {
+            data.set_skip_disliked(on);
+            Change::SkipDisliked(on)
         }
         SettingKey::Sponsorblock => {
             data.set_sponsorblock(on);

@@ -947,6 +947,9 @@ impl Controller {
             Msg::Rated(id, status, result) => {
                 match result {
                     Ok(()) => {
+                        // The queue's copy too, so a disliked track is passed over when it
+                        // comes round, and the rating is saved with the session.
+                        self.input(Input::SetLike(id.clone(), status));
                         self.likes.insert(id, status);
                     }
                     Err(e) => {
@@ -1207,6 +1210,7 @@ fn prefs(s: &Settings) -> PlaybackPrefs {
         } else {
             ListEnd::Restart
         },
+        skip_disliked: s.skip_disliked,
     }
 }
 

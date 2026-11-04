@@ -66,6 +66,7 @@ fn the_total_appears_once_the_stream_resolves() {
         skip_non_music_in_radio: true,
         scrobble_other_media: true,
         list_end: Default::default(),
+        skip_disliked: true,
     });
     p.handle(Input::PlayTracks {
         tracks: vec![quick_pick],
