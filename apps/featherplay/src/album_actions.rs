@@ -3,18 +3,21 @@
 //! already liked, Remove likes touches only the liked ones, and so on; when none do, a toast
 //! says so and nothing is sent. Each action asks first.
 //!
-//! Then a job rates the songs in the album's order, one write every half second (`GAP`), and
-//! stops at the first that fails. One job runs at a time, and leaving the page doesn't stop
-//! it. A toast shows how far it has got, then how it ended. Each song's heart changes as its
-//! write goes through, as a single like's does (`song_menu::show_rating`), and the controller
-//! hears of it for the bar and the queue (`Action::Rated`).
+//! Then a job rates the songs, starting the writes in the album's order with up to three on
+//! their way at once (`AT_ONCE`): the next starts as soon as one ends. After the first that
+//! fails no new write starts, and the ones on their way finish. One job runs at a time, and
+//! leaving the page doesn't stop it. A toast counts the songs done, then says how it ended.
+//! Each song's heart changes as its write goes through, as a single like's does
+//! (`song_menu::show_rating`), and the controller hears of it for the bar and the queue
+//! (`Action::Rated`).
 //!
 //! The writes go through `Rater`: the account's in the app (`Source::rate`), a fake in tests.
 
 use std::cell::RefCell;
-use std::future::Future;
+use std::future::{self, Future};
+use std::pin::Pin;
 use std::rc::Rc;
-use std::time::Duration;
+use std::task::Poll;
 
 use featherplay_core::model::{LikeStatus, Track, TrackId};
 use featherplay_core::{tr, trn};
@@ -28,37 +31,35 @@ use crate::pages::album;
 use crate::song_menu;
 use crate::ui::{AlbumAction, AlbumData, AlbumMenu};
 
-/// Between two writes, so a long album isn't a burst of requests.
-const GAP: Duration = Duration::from_millis(500);
+/// The most writes on their way at once: an album's worth goes out a few at a time, never
+/// as one burst.
+const AT_ONCE: usize = 3;
 
-/// What a job needs from outside: one song's write, and the wait before the next.
+/// What a job needs from outside: one song's write.
 pub trait Rater {
+    /// Starts the write at once, not when the future is first polled, so the job knows
+    /// what it has sent; the future is its outcome.
     fn rate(&self, id: &TrackId, status: LikeStatus) -> impl Future<Output = Result<(), ApiError>>;
-    fn pause(&self) -> impl Future<Output = ()>;
 }
 
 /// The account's: each write runs on the runtime with the data source of the moment (so a
-/// sign-out mid-job stops it), and the wait is a timer on the UI thread.
+/// sign-out mid-job stops it).
 struct Account(Rc<Ctx>);
 
 impl Rater for Account {
-    async fn rate(&self, id: &TrackId, status: LikeStatus) -> Result<(), ApiError> {
+    fn rate(&self, id: &TrackId, status: LikeStatus) -> impl Future<Output = Result<(), ApiError>> {
         let source = self.0.catalog.source();
         let id = id.clone();
-        self.0
+        let write = self
+            .0
             .catalog
             .runtime()
-            .spawn(async move { source.rate(&id, status).await })
-            .await
-            .unwrap_or_else(|e| Err(ApiError::Network(e.to_string())))
-    }
-
-    async fn pause(&self) {
-        let (tx, rx) = tokio::sync::oneshot::channel();
-        slint::Timer::single_shot(GAP, move || {
-            let _ = tx.send(());
-        });
-        let _ = rx.await;
+            .spawn(async move { source.rate(&id, status).await });
+        async move {
+            write
+                .await
+                .unwrap_or_else(|e| Err(ApiError::Network(e.to_string())))
+        }
     }
 }
 
@@ -176,33 +177,71 @@ pub fn confirm_with(ctx: &Rc<Ctx>, rater: impl Rater + 'static) {
     }
 }
 
-/// Rates the job's songs in order, stopping at the first write that fails, and says how it
-/// went.
+/// Rates the job's songs, starting the writes in order with up to `AT_ONCE` on their way.
+/// After the first that fails it starts no more and lets the others finish; then it says
+/// how it went.
 async fn run(ctx: &Ctx, job: &Job, rater: &impl Rater) -> String {
     let status = target(job.action);
     let total = job.ids.len();
     log!("album menu: rating {total} songs {status:?}");
-    for (done, id) in job.ids.iter().enumerate() {
-        if done > 0 {
-            rater.pause().await;
+    ctx.toast(&progress_text(job.action, 0, total));
+    let mut waiting = job.ids.iter();
+    let mut flying = Vec::with_capacity(AT_ONCE);
+    let mut done = 0;
+    let mut failed = None;
+    loop {
+        while failed.is_none() && flying.len() < AT_ONCE {
+            let Some(id) = waiting.next() else { break };
+            flying.push((id, Box::pin(rater.rate(id, status))));
         }
-        ctx.toast(&progress_text(job.action, done + 1, total));
-        if let Err(e) = rater.rate(id, status).await {
-            log!(
-                "album menu: rating {} failed after {done} of {total}: {e}",
-                id.0
-            );
-            let why = reason(&e);
-            return if done == 0 {
-                tr!("Nothing changed: {}", why)
-            } else {
-                tr!("Stopped after {} of {}: {}", done, total, why)
-            };
+        if flying.is_empty() {
+            break;
         }
-        song_menu::show_rating(ctx, id, status);
-        ctx.send(Action::Rated(id.clone(), status));
+        let (id, outcome) = next_to_end(&mut flying).await;
+        match outcome {
+            Ok(()) => {
+                done += 1;
+                song_menu::show_rating(ctx, id, status);
+                ctx.send(Action::Rated(id.clone(), status));
+                if failed.is_none() {
+                    ctx.toast(&progress_text(job.action, done, total));
+                }
+            }
+            Err(e) => {
+                log!("album menu: rating {} failed: {e}", id.0);
+                failed.get_or_insert(e);
+            }
+        }
     }
-    done_text(job.action, total)
+    let Some(e) = failed else {
+        return done_text(job.action, total);
+    };
+    log!("album menu: stopped after {done} of {total}");
+    let why = reason(&e);
+    if done == 0 {
+        tr!("Nothing changed: {}", why)
+    } else {
+        tr!("Stopped after {} of {}: {}", done, total, why)
+    }
+}
+
+/// Waits for the first of the writes on their way to end, and takes it out of `flying`.
+async fn next_to_end<'id, F: Future>(
+    flying: &mut Vec<(&'id TrackId, Pin<Box<F>>)>,
+) -> (&'id TrackId, F::Output) {
+    future::poll_fn(|cx| {
+        let ended = flying.iter_mut().enumerate().find_map(|(i, (_, write))| {
+            match write.as_mut().poll(cx) {
+                Poll::Ready(outcome) => Some((i, outcome)),
+                Poll::Pending => None,
+            }
+        });
+        match ended {
+            Some((i, outcome)) => Poll::Ready((flying.remove(i).0, outcome)),
+            None => Poll::Pending,
+        }
+    })
+    .await
 }
 
 /// `“Name”`, as the dialogs quote a title.
@@ -249,13 +288,13 @@ fn none_text(action: AlbumAction) -> &'static str {
     }
 }
 
-/// While the `at`th write of `total` is on its way.
-fn progress_text(action: AlbumAction, at: usize, total: usize) -> String {
+/// While the job runs, with `done` of its `total` songs rated so far.
+fn progress_text(action: AlbumAction, done: usize, total: usize) -> String {
     match action {
-        AlbumAction::LikeAll => tr!("Liking songs… {} of {}", at, total),
-        AlbumAction::RemoveLikes => tr!("Removing likes… {} of {}", at, total),
-        AlbumAction::DislikeAll => tr!("Disliking songs… {} of {}", at, total),
-        AlbumAction::RemoveDislikes => tr!("Removing dislikes… {} of {}", at, total),
+        AlbumAction::LikeAll => tr!("Liking songs… {} of {}", done, total),
+        AlbumAction::RemoveLikes => tr!("Removing likes… {} of {}", done, total),
+        AlbumAction::DislikeAll => tr!("Disliking songs… {} of {}", done, total),
+        AlbumAction::RemoveDislikes => tr!("Removing dislikes… {} of {}", done, total),
     }
 }
 

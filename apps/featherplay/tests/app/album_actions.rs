@@ -1,10 +1,14 @@
 //! The album page's ⋯ menu rates a whole album, on the offscreen platform with fixture data
-//! and a fake for the writes (nothing goes out): only the songs that need it get a write, in
-//! the album's order; the first failed write stops the job and the toast says how far it
-//! got; Cancel in the confirmation sends nothing.
+//! and a fake for the writes (nothing goes out): only the songs that need it get a write,
+//! started in the album's order, three on their way at a time; after the first failed write
+//! no new one starts, and the toast says how far it got; Cancel in the confirmation sends
+//! nothing.
 
 use std::cell::RefCell;
+use std::future::Future;
+use std::pin::Pin;
 use std::rc::Rc;
+use std::task::{Context, Poll};
 
 use featherplay::album_actions::{self, Rater};
 use featherplay::controller::Action;
@@ -15,24 +19,73 @@ use featherplay_ytm::ApiError;
 use slint::platform::{Key, PointerEventButton, WindowEvent};
 use slint::{ComponentHandle, LogicalPosition, Model};
 
+/// What the fake saw, in the order it happened.
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum Event {
+    Start,
+    Ok,
+    Failed,
+}
+
 /// Records every write; the `fail_at`th one (from 1) fails as a dropped connection would.
+/// Each write starts when asked for and ends a turn of the event loop later, so the job's
+/// other writes can start meanwhile.
 #[derive(Clone, Default)]
 struct Fake {
     calls: Rc<RefCell<Vec<(String, LikeStatus)>>>,
+    events: Rc<RefCell<Vec<Event>>>,
     fail_at: Option<usize>,
 }
 
 impl Rater for Fake {
-    async fn rate(&self, id: &TrackId, status: LikeStatus) -> Result<(), ApiError> {
-        let mut calls = self.calls.borrow_mut();
-        calls.push((id.0.clone(), status));
-        if Some(calls.len()) == self.fail_at {
-            return Err(ApiError::Network("connection reset".into()));
+    fn rate(&self, id: &TrackId, status: LikeStatus) -> impl Future<Output = Result<(), ApiError>> {
+        let n = {
+            let mut calls = self.calls.borrow_mut();
+            calls.push((id.0.clone(), status));
+            calls.len()
+        };
+        self.events.borrow_mut().push(Event::Start);
+        let (events, fails) = (self.events.clone(), Some(n) == self.fail_at);
+        async move {
+            OnTheWay(false).await;
+            if fails {
+                events.borrow_mut().push(Event::Failed);
+                return Err(ApiError::Network("connection reset".into()));
+            }
+            events.borrow_mut().push(Event::Ok);
+            Ok(())
         }
-        Ok(())
     }
+}
 
-    async fn pause(&self) {}
+/// Pending once, as a request on its way is.
+struct OnTheWay(bool);
+
+impl Future for OnTheWay {
+    type Output = ();
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
+        if self.0 {
+            return Poll::Ready(());
+        }
+        self.0 = true;
+        cx.waker().wake_by_ref();
+        Poll::Pending
+    }
+}
+
+/// The most writes that were on their way at once.
+fn most_at_once(events: &[Event]) -> usize {
+    let mut flying = 0usize;
+    let mut most = 0;
+    for e in events {
+        match e {
+            Event::Start => flying += 1,
+            Event::Ok | Event::Failed => flying -= 1,
+        }
+        most = most.max(flying);
+    }
+    most
 }
 
 fn album() -> Scene {
@@ -128,7 +181,24 @@ fn like_all_rates_only_the_songs_not_liked_yet_in_order() {
 }
 
 #[test]
-fn the_first_error_stops_the_job_and_the_toast_says_how_far_it_got() {
+fn three_writes_are_on_their_way_at_a_time() {
+    let scene = album();
+    let menu = scene.ui.global::<AlbumMenu>();
+    let n = ids(&scene).len();
+
+    menu.invoke_pick(AlbumAction::LikeAll);
+    let fake = Fake::default();
+    album_actions::confirm_with(&scene.ctx, fake.clone());
+    scene.settle();
+
+    assert_eq!(fake.calls.borrow().len(), n);
+    assert_eq!(most_at_once(&fake.events.borrow()), 3);
+    assert_eq!(toast(&scene), format!("Liked {n} songs"));
+    assert!(liked(&scene).iter().all(|l| *l), "a row's heart wasn't set");
+}
+
+#[test]
+fn no_write_starts_after_an_error_and_the_toast_says_how_far_it_got() {
     let scene = album();
     let menu = scene.ui.global::<AlbumMenu>();
     let all = ids(&scene);
@@ -141,19 +211,27 @@ fn the_first_error_stops_the_job_and_the_toast_says_how_far_it_got() {
     album_actions::confirm_with(&scene.ctx, fake.clone());
     scene.settle();
 
-    assert_eq!(
-        fake.calls.borrow().len(),
-        3,
-        "the job went on after an error"
+    let events = fake.events.borrow();
+    let failed = events
+        .iter()
+        .position(|e| *e == Event::Failed)
+        .expect("the third write didn't fail");
+    assert!(
+        !events[failed..].contains(&Event::Start),
+        "a write started after an error: {events:?}"
     );
+    let started = fake.calls.borrow().len();
+    assert!(started < all.len(), "the job went on after an error");
+    // The writes already on their way finish, and count.
+    let ok = events.iter().filter(|e| **e == Event::Ok).count();
+    assert_eq!(ok, started - 1, "a write on its way was dropped");
     assert_eq!(
         toast(&scene),
-        format!("Stopped after 2 of {}: no connection", all.len())
+        format!("Stopped after {ok} of {}: no connection", all.len())
     );
-    let hearts = liked(&scene);
-    assert_eq!(&hearts[..3], [true, true, false]);
-    assert!(hearts[3..].iter().all(|l| !l));
-    assert_eq!(rated(&scene.take_actions()), 2);
+    let wanted: Vec<bool> = (0..all.len()).map(|i| i < started && i != 2).collect();
+    assert_eq!(liked(&scene), wanted);
+    assert_eq!(rated(&scene.take_actions()), ok);
     assert!(!menu.get_busy());
 }
 
