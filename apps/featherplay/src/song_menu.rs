@@ -50,6 +50,11 @@ fn find(id: &str) -> Option<Track> {
     KNOWN.with(|k| k.borrow().get(id).cloned())
 }
 
+/// A remembered track's rating, with the likes made since it was loaded.
+pub fn like_of(id: &TrackId) -> Option<LikeStatus> {
+    KNOWN.with(|k| k.borrow().get(&id.0).map(|t| t.like))
+}
+
 pub fn init(ctx: &Rc<Ctx>) {
     let Some(ui) = ctx.window() else { return };
     let c = ctx.clone();
@@ -139,6 +144,13 @@ pub fn set_like(ctx: &Ctx, id: &TrackId, liked: bool) {
 /// controller's state puts the bar back if the write fails).
 pub fn rate(ctx: &Ctx, id: &TrackId, status: LikeStatus) {
     ctx.send(Action::Rate(id.clone(), status));
+    show_rating(ctx, id, status);
+}
+
+/// Shows a rating everywhere the track is: the hearts on every page's rows and in the bar,
+/// and the remembered track. `rate` sends the write first; the album menu's job, after its
+/// own write went through.
+pub fn show_rating(ctx: &Ctx, id: &TrackId, status: LikeStatus) {
     KNOWN.with(|k| {
         if let Some(t) = k.borrow_mut().get_mut(&id.0) {
             t.like = status;

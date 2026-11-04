@@ -107,9 +107,9 @@ msgid "Quit"
 msgstr ""
 
 #: ../../crates/integrations/src/tray_menu.rs:242
-#: ../../crates/integrations/src/tray_menu.rs:242 ui/bottom_bar.slint:594
-#: ../../crates/integrations/src/tray_menu.rs:242 ui/bottom_bar.slint:594 ui/pages/content.slint:580
-#: ../../crates/integrations/src/tray_menu.rs:242 ui/bottom_bar.slint:594 ui/pages/content.slint:580 ui/parts.slint:860 ui/song_menu.slint:278
+#: ../../crates/integrations/src/tray_menu.rs:242 src/album_actions.rs:236
+#: ../../crates/integrations/src/tray_menu.rs:242 src/album_actions.rs:236 ui/mini_player.slint:183 ui/pages/content.slint:580
+#: ../../crates/integrations/src/tray_menu.rs:242 src/album_actions.rs:236 ui/mini_player.slint:183 ui/pages/content.slint:580 ui/parts.slint:860 ui/song_menu.slint:278
 msgid "Like"
 msgstr ""
 
@@ -127,6 +127,122 @@ msgstr ""
 
 #: src/account_menu.rs:247
 msgid "No channel"
+msgstr ""
+
+#: src/album_actions.rs:197
+msgid "Nothing changed: {}"
+msgstr ""
+
+#: src/album_actions.rs:199
+msgid "Stopped after {} of {}: {}"
+msgstr ""
+
+#: src/album_actions.rs:216
+msgid "Like {n} song on {}?"
+msgid_plural "Like {n} songs on {}?"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/album_actions.rs:217
+msgid "Remove the like from {n} song on {}?"
+msgid_plural "Remove likes from {n} songs on {}?"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/album_actions.rs:222
+msgid "Dislike {n} song on {}?"
+msgid_plural "Dislike {n} songs on {}?"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/album_actions.rs:227
+msgid "Remove the dislike from {n} song on {}?"
+msgid_plural "Remove dislikes from {n} songs on {}?"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/album_actions.rs:237 ui/album_menu.slint:163
+msgid "Remove likes"
+msgstr ""
+
+#: src/album_actions.rs:238 ui/song_menu.slint:287
+msgid "Dislike"
+msgstr ""
+
+#: src/album_actions.rs:239 ui/album_menu.slint:176
+msgid "Remove dislikes"
+msgstr ""
+
+#: src/album_actions.rs:245
+msgid "Every song on this album is already liked"
+msgstr ""
+
+#: src/album_actions.rs:246
+msgid "No liked songs on this album"
+msgstr ""
+
+#: src/album_actions.rs:247
+msgid "Every song on this album is already disliked"
+msgstr ""
+
+#: src/album_actions.rs:248
+msgid "No disliked songs on this album"
+msgstr ""
+
+#: src/album_actions.rs:255
+msgid "Liking songs… {} of {}"
+msgstr ""
+
+#: src/album_actions.rs:256
+msgid "Removing likes… {} of {}"
+msgstr ""
+
+#: src/album_actions.rs:257
+msgid "Disliking songs… {} of {}"
+msgstr ""
+
+#: src/album_actions.rs:258
+msgid "Removing dislikes… {} of {}"
+msgstr ""
+
+#: src/album_actions.rs:264
+msgid "Liked {n} song"
+msgid_plural "Liked {n} songs"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/album_actions.rs:265
+msgid "Removed {n} like"
+msgid_plural "Removed {n} likes"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/album_actions.rs:266
+msgid "Disliked {n} song"
+msgid_plural "Disliked {n} songs"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/album_actions.rs:268
+msgid "Removed {n} dislike"
+msgid_plural "Removed {n} dislikes"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/album_actions.rs:276
+msgid "sign in again"
+msgstr ""
+
+#: src/album_actions.rs:277
+msgid "no connection"
+msgstr ""
+
+#: src/album_actions.rs:278
+msgid "a song wasn't found"
+msgstr ""
+
+#: src/album_actions.rs:279
+msgid "the music service said no"
 msgstr ""
 
 #: src/close.rs:123
@@ -272,7 +388,7 @@ msgstr ""
 msgid "Diagnostics copied"
 msgstr ""
 
-#: src/pages/album.rs:110
+#: src/pages/album.rs:120
 msgid "Album"
 msgstr ""
 
@@ -507,11 +623,11 @@ msgstr ""
 msgid "Unpinned {}"
 msgstr ""
 
-#: src/playlist_menu.rs:136 src/song_menu.rs:82
+#: src/playlist_menu.rs:136 src/song_menu.rs:87
 msgid "Playing next: {}"
 msgstr ""
 
-#: src/playlist_menu.rs:143 src/song_menu.rs:90
+#: src/playlist_menu.rs:143 src/song_menu.rs:95
 msgid "Added to queue: {}"
 msgstr ""
 
@@ -583,19 +699,19 @@ msgstr ""
 msgid "Artists you follow show up here."
 msgstr ""
 
-#: src/song_menu.rs:114
+#: src/song_menu.rs:119
 msgid "Saved to {}"
 msgstr ""
 
-#: src/song_menu.rs:114
+#: src/song_menu.rs:119
 msgid "View"
 msgstr ""
 
-#: src/song_menu.rs:132
+#: src/song_menu.rs:137
 msgid "Added to Liked songs"
 msgstr ""
 
-#: src/song_menu.rs:134
+#: src/song_menu.rs:139
 msgid "Removed from Liked songs"
 msgstr ""
 
@@ -665,6 +781,18 @@ msgstr ""
 #: ui/account_menu.slint:473
 msgctxt "Account"
 msgid "Default"
+msgstr ""
+
+#: ui/album_menu.slint:133 ui/playlist_menu_layer.slint:126
+msgid "Album menu"
+msgstr ""
+
+#: ui/album_menu.slint:157
+msgid "Like all songs"
+msgstr ""
+
+#: ui/album_menu.slint:170
+msgid "Dislike all songs"
 msgstr ""
 
 #: ui/bottom_bar.slint:34
@@ -854,11 +982,11 @@ msgstr ""
 msgid "SIL Open Font License 1.1. The heading face, embedded."
 msgstr ""
 
-#: ui/pages/album.slint:80
+#: ui/pages/album.slint:86
 msgid "This album has no tracks to play"
 msgstr ""
 
-#: ui/pages/album.slint:81
+#: ui/pages/album.slint:87
 msgid "They may not be available where you are."
 msgstr ""
 
@@ -902,8 +1030,8 @@ msgstr ""
 msgid "Sign in"
 msgstr ""
 
-#: ui/pages/content.slint:589 ui/pages/now_playing.slint:451
-#: ui/pages/content.slint:589 ui/pages/now_playing.slint:451 ui/parts.slint:873
+#: ui/pages/content.slint:589 ui/pages/content.slint:903
+#: ui/pages/content.slint:589 ui/pages/content.slint:903 ui/parts.slint:734 ui/parts.slint:873
 msgid "More"
 msgstr ""
 
@@ -1916,10 +2044,6 @@ msgid "Playlist menu"
 msgstr ""
 
 #: ui/playlist_menu_layer.slint:126
-msgid "Album menu"
-msgstr ""
-
-#: ui/playlist_menu_layer.slint:126
 msgid "Artist menu"
 msgstr ""
 
@@ -2021,10 +2145,6 @@ msgstr ""
 
 #: ui/song_menu.slint:192
 msgid "Song menu"
-msgstr ""
-
-#: ui/song_menu.slint:287
-msgid "Dislike"
 msgstr ""
 
 #: ui/song_menu.slint:297 ui/song_menu.slint:328

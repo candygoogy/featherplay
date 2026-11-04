@@ -5,7 +5,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Instant;
 
-use featherplay_core::model::AlbumId;
+use featherplay_core::model::{AlbumId, Track};
 use featherplay_core::tr;
 use slint::{ComponentHandle, Model};
 
@@ -39,6 +39,16 @@ pub fn init(ctx: &Rc<Ctx>) {
             open(&c, &id);
         }
     });
+}
+
+/// The album on screen: its tracks in order, as loaded (none until it has loaded).
+pub fn tracks() -> Vec<Track> {
+    LIST.with(|l| {
+        l.borrow()
+            .as_ref()
+            .map(|list| list.tracks.clone())
+            .unwrap_or_default()
+    })
 }
 
 fn with_list(f: impl FnOnce(&mut TrackList)) {

@@ -1,0 +1,201 @@
+// The album page's ⋯ menu (2026-11-04): Like all songs, Remove likes; Dislike all songs,
+// Remove dislikes. In the song menu's style (song_menu.slint: the same panel, rows, motion,
+// placement and dismissal), without a head, since it opens beside the album's own cover. The
+// header's ⋯ opens it with `AlbumMenu.show(x, y, top)` (window coordinates); each action asks
+// first in Settings' `Dialog`. `AlbumMenuLayer` and `AlbumDialogLayer` in app.slint draw them
+// over everything. `src/album_actions.rs` works out the songs, asks and sends the writes.
+import { Theme, Icons, Curves } from "theme.slint";
+import { MenuItem, Divider, MenuIcons } from "song_menu.slint";
+import { Dialog } from "pages/settings.slint";
+
+export enum AlbumAction { like-all, remove-likes, dislike-all, remove-dislikes }
+
+export global AlbumMenu {
+    out property <bool> open;
+    out property <length> anchor-x;
+    out property <length> anchor-y;
+    // Where a menu that opens upward ends: the top of the ⋯.
+    out property <length> anchor-top;
+    // Bumped by Rust to open the menu from the header's ⋯ as a click on it does
+    // (`--snapshot album-actions`, tests): only the header knows where its ⋯ is.
+    in-out property <int> open-asked;
+    // A job is rating the album's songs: the actions wait until it's done.
+    in property <bool> busy;
+    // The confirmation, set by Rust (`pick`): shown, its question, and its button.
+    in-out property <bool> dialog;
+    in property <string> question;
+    in property <string> ok-label;
+
+    // Rust works out which songs need it, then asks (`dialog`) or says there are none.
+    callback pick(AlbumAction);
+    callback confirm();
+    callback cancel();
+
+    public function show(x: length, y: length, top: length) {
+        self.anchor-x = x;
+        self.anchor-y = y;
+        self.anchor-top = top;
+        self.open = true;
+    }
+    public function close() {
+        self.open = false;
+    }
+}
+
+// A heart or a thumb with a stroke through it: the rating taken back.
+global AlbumIcons {
+    out property <string> unlike: Icons.heart + " M4.5 4.5 L19.5 19.5";
+    out property <string> undislike: MenuIcons.dislike + " M4 3.5 L20 20.5";
+}
+
+// Covers the window while the menu is open: a click outside closes it, Escape too.
+export component AlbumMenuLayer inherits Rectangle {
+    callback closed();
+    // The menu stays above this (the bottom bar's top edge); the layer still covers the bar.
+    in property <length> bottom-limit: root.height;
+    property <length> w: 232px;
+    property <length> h: 2 * Theme.s2 + 4 * 36px + 9px;
+
+    // Motion, as the song menu: the panel stays instantiated so it can fade out.
+    property <bool> open: AlbumMenu.open;
+    property <bool> settled: true;
+    // Closed by Escape: keyboard actions don't animate.
+    property <bool> snap: false;
+    property <bool> left: AlbumMenu.anchor-x + root.w + 8px > root.width;
+    property <bool> up: AlbumMenu.anchor-y + root.h + 8px > root.bottom-limit;
+    property <bool> live: root.open && !AlbumMenu.busy;
+    changed open => {
+        if root.open {
+            root.snap = false;
+            root.settled = false;
+            settle.running = true;
+            keys.focus();
+        }
+    }
+    settle := Timer {
+        interval: 1ms;
+        running: false;
+        triggered => {
+            self.running = false;
+            root.settled = true;
+        }
+    }
+
+    function close() {
+        AlbumMenu.close();
+        root.closed();
+    }
+    function pick(a: AlbumAction) {
+        AlbumMenu.close();
+        // The dialog takes the keys; the window's get them back when it closes.
+        AlbumMenu.pick(a);
+        if !AlbumMenu.dialog {
+            root.closed();
+        }
+    }
+
+    if AlbumMenu.open: TouchArea {
+        width: root.width;
+        height: root.height;
+        pointer-event(e) => {
+            if e.kind == PointerEventKind.down {
+                root.close();
+            }
+        }
+        scroll-event(e) => {
+            root.close();
+            accept
+        }
+    }
+    panel := Rectangle {
+        property <length> nudge: root.open && !root.settled ? (root.up ? Theme.nudge : -Theme.nudge) : 0px;
+        x: root.left ? max(8px, AlbumMenu.anchor-x - root.w) : AlbumMenu.anchor-x;
+        y: (root.up ? max(8px, AlbumMenu.anchor-top - self.height) : AlbumMenu.anchor-y) + self.nudge;
+        width: root.w;
+        height: root.h;
+        opacity: root.open ? 1 : 0;
+        visible: self.opacity > 0;
+        transform-origin: { x: root.left ? self.width : 0px, y: root.up ? self.height : 0px };
+        transform-scale: !root.open ? (Theme.moving ? 0.98 : 1.0) : (root.settled ? 1.0 : Theme.pop-from);
+        animate opacity { duration: root.open ? Theme.t-menu : (root.snap ? 0ms : Theme.t-fast); easing: Curves.ease-out; }
+        animate transform-scale, nudge {
+            duration: !root.open ? Theme.t-fast : (root.settled ? Theme.t-menu : 0ms);
+            easing: Curves.ease-out;
+        }
+        border-radius: Theme.r-l;
+        background: Theme.panel;
+        border-width: 1px;
+        border-color: Theme.card-edge;
+        drop-shadow-blur: 24px;
+        drop-shadow-offset-y: 8px;
+        drop-shadow-color: Theme.cover-shadow;
+        accessible-role: list;
+        accessible-label: @tr("Album menu");
+
+        // Swallows clicks on the panel's padding.
+        TouchArea { enabled: root.open; }
+        keys := FocusScope {
+            enabled: root.open;
+            key-pressed(e) => {
+                if e.text == Key.Escape {
+                    root.snap = true;
+                    root.close();
+                    return accept;
+                }
+                reject
+            }
+        }
+
+        VerticalLayout {
+            x: Theme.s2;
+            y: Theme.s2;
+            width: parent.width - 2 * Theme.s2;
+            height: root.h - 2 * Theme.s2;
+            MenuItem {
+                enabled: root.live;
+                icon: Icons.heart;
+                label: @tr("Like all songs");
+                clicked => { root.pick(AlbumAction.like-all); }
+            }
+            MenuItem {
+                enabled: root.live;
+                icon: AlbumIcons.unlike;
+                label: @tr("Remove likes");
+                clicked => { root.pick(AlbumAction.remove-likes); }
+            }
+            Divider { }
+            MenuItem {
+                enabled: root.live;
+                icon: MenuIcons.dislike;
+                label: @tr("Dislike all songs");
+                clicked => { root.pick(AlbumAction.dislike-all); }
+            }
+            MenuItem {
+                enabled: root.live;
+                icon: AlbumIcons.undislike;
+                label: @tr("Remove dislikes");
+                clicked => { root.pick(AlbumAction.remove-dislikes); }
+            }
+        }
+    }
+}
+
+// The confirmation, over the whole window like Settings' dialogs.
+export component AlbumDialogLayer inherits Rectangle {
+    callback closed();
+    Dialog {
+        init => { self.focus-keys(); }
+        width: root.width;
+        height: root.height;
+        title: AlbumMenu.question;
+        ok-label: AlbumMenu.ok-label;
+        ok => {
+            AlbumMenu.confirm();
+            root.closed();
+        }
+        cancel => {
+            AlbumMenu.cancel();
+            root.closed();
+        }
+    }
+}

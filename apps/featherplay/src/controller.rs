@@ -102,6 +102,9 @@ pub enum Action {
     },
     /// Like or unlike: one write to the account.
     Rate(TrackId, LikeStatus),
+    /// A rating the window wrote itself (the album menu's bulk job, `album_actions`): kept as
+    /// a `Rate` that went through is, for the bar and the queue. Nothing is sent.
+    Rated(TrackId, LikeStatus),
     /// Undo after "Not for me": back to `track`, at `at` (`queue::back_to_inputs`).
     BackTo {
         track: Track,
@@ -587,6 +590,12 @@ impl Controller {
                     let result = api.rate(&id, status).await;
                     let _ = tx.send(Msg::Rated(id, status, result));
                 });
+            }
+            Action::Rated(id, status) => {
+                self.input(Input::SetLike(id.clone(), status));
+                self.likes.insert(id, status);
+                self.shown_state = None;
+                self.push_state();
             }
             // The song menu's Play next and Add to queue are the Up next panel's edits.
             Action::PlayNext(_) | Action::AddToQueue(_) => {

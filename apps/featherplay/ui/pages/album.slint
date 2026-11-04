@@ -1,6 +1,7 @@
 // Album page: a tall header (large cover, the title in the display face, the
-// artist, a meta line, Play and Shuffle), then the numbered track list without a plays
-// column; an artist column only on compilations. Data comes from `src/pages/album.rs`.
+// artist, a meta line, Play, Shuffle and a ⋯ for the album menu, album_menu.slint), then the
+// numbered track list without a plays column; an artist column only on compilations. Data
+// comes from `src/pages/album.rs`.
 //
 // The list is a ListView; the header rides in its first row so it scrolls away with it.
 import { ListView } from "std-widgets.slint";
@@ -8,6 +9,7 @@ import { Theme, Icons } from "../theme.slint";
 import { TrackRow, TrackListRow } from "../parts.slint";
 import { Nav } from "../nav.slint";
 import { SongMenu } from "../song_menu.slint";
+import { AlbumMenu } from "../album_menu.slint";
 import { CollectionHeader, SkeletonCollection, ErrorState, EmptyState, FadeIn, TopScrim } from "content.slint";
 
 export global AlbumData {
@@ -47,6 +49,10 @@ component Header inherits CollectionHeader {
     byline-link: AlbumData.artist-id != "";
     meta: AlbumData.meta;
     enabled: AlbumData.tracks.length > 0;
+    more: true;
+    more-enabled: !AlbumMenu.busy;
+    more-asked: AlbumMenu.open-asked;
+    more-clicked(x, y, top) => { AlbumMenu.show(x, y, top); }
     byline-clicked => { Nav.open-artist(AlbumData.artist-id); }
     primary-clicked => { AlbumData.play(0); }
     secondary-clicked => { AlbumData.shuffle(); }

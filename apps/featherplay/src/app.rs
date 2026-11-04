@@ -24,9 +24,9 @@ use crate::covers::Covers;
 use crate::router::{ExploreTab, History, LibraryTab, Page};
 use crate::ui::{AppWindow, Frame, Nav, PageKind, Theme};
 use crate::{
-    account_menu, account_picker, bar, close, endsession, instance, language, link, memory, mini,
-    native, pages, playlist_menu, popup, queue_panel, repaint, shell, sidebar, song_menu, suggest,
-    toast, top_bar, updates, wheel,
+    account_menu, account_picker, album_actions, bar, close, endsession, instance, language, link,
+    memory, mini, native, pages, playlist_menu, popup, queue_panel, repaint, shell, sidebar,
+    song_menu, suggest, toast, top_bar, updates, wheel,
 };
 
 /// Set once featherplay starts to quit. A second launch asking to show the window is told
@@ -354,6 +354,7 @@ pub fn wire(ctx: &Rc<Ctx>, ui: &AppWindow) {
     queue_panel::init(ctx);
     song_menu::init(ctx);
     playlist_menu::init(ctx);
+    album_actions::init(ctx);
     account_menu::init(ctx);
     account_picker::init(ctx);
     toast::init(ctx);

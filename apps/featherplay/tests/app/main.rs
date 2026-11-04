@@ -14,6 +14,7 @@ mod support;
 
 mod account_menu;
 mod account_picker;
+mod album_actions;
 mod animations;
 mod bar_total;
 mod card_veil;

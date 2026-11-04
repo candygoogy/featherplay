@@ -27,6 +27,7 @@ import { SignInPage } from "pages/sign_in.slint";
 import { SongMenuLayer } from "song_menu.slint";
 import { PlaylistMenu, PlaylistDialog } from "playlist_menu.slint";
 import { PlaylistMenuLayer, PlaylistDialogLayer } from "playlist_menu_layer.slint";
+import { AlbumMenu, AlbumMenuLayer, AlbumDialogLayer } from "album_menu.slint";
 import { AccountMenuLayer, AccountPickerDialog, AccountPicker } from "account_menu.slint";
 import { ToastView } from "toast.slint";
 import { CloseDialog, CloseChoice } from "close_dialog.slint";
@@ -47,6 +48,8 @@ export { HomeData, HomeShelfRow, ShelfShape, MoreState } from "pages/home.slint"
 export { SongMenu } from "song_menu.slint";
 
 export { PlaylistMenu, PlaylistKind, PlaylistDialog } from "playlist_menu.slint";
+
+export { AlbumMenu, AlbumAction } from "album_menu.slint";
 
 export { AccountMenu, AccountItem, AccountPicker } from "account_menu.slint";
 
@@ -228,7 +231,7 @@ export component AppWindow inherits Window {
             // the search suggestions, the account picker and the hue slider their own choice.
             // Not under a dialog.
             if (e.text == Key.UpArrow || e.text == Key.DownArrow) && !e.modifiers.control && !e.modifiers.alt && !e.modifiers.meta {
-                if !CloseChoice.open && SettingsData.dialog == SettingsDialog.none {
+                if !CloseChoice.open && SettingsData.dialog == SettingsDialog.none && !AlbumMenu.dialog {
                     bottom-bar.step-volume(e.text == Key.UpArrow);
                 }
                 return accept;
@@ -489,6 +492,23 @@ export component AppWindow inherits Window {
             closed => { keys.focus(); }
         }
         if PlaylistMenu.dialog != PlaylistDialog.none: PlaylistDialogLayer {
+            x: 0;
+            y: 0;
+            width: root.width;
+            height: root.height;
+            closed => { keys.focus(); }
+        }
+
+        // The album page's ⋯ menu, over everything while open, and its confirmation.
+        AlbumMenuLayer {
+            x: 0;
+            y: 0;
+            width: root.width;
+            height: root.height;
+            bottom-limit: root.bar-top;
+            closed => { keys.focus(); }
+        }
+        if AlbumMenu.dialog: AlbumDialogLayer {
             x: 0;
             y: 0;
             width: root.width;

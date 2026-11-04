@@ -49,6 +49,9 @@ pub const PAGES: &[&str] = &[
     "album-menu",
     // The album with a toast above the bar.
     "album-toast",
+    // The album with its ⋯ menu open, and with the confirmation of Like all songs.
+    "album-actions",
+    "album-actions-confirm",
     "playlist",
     "liked",
     "artist",
@@ -432,6 +435,10 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
         crate::song_menu::show_for_snapshot(ctx);
         settle();
     }
+    if o.page.starts_with("album-actions") {
+        crate::album_actions::show_for_snapshot(ctx, o.page == "album-actions-confirm");
+        settle();
+    }
     if o.page == "account-menu" {
         crate::account_menu::show_for_snapshot(ctx);
         settle();
@@ -733,11 +740,15 @@ fn page(name: &str, f: &Fixtures) -> Result<Page, String> {
         "library-artists" => Page::Library {
             tab: LibraryTab::Artists,
         },
-        "album" | "album-menu" | "album-toast" | "album-stopped" | "album-stopped-updating" => {
-            Page::Album {
-                id: f.library_albums().map_err(e)?.remove(0).id,
-            }
-        }
+        "album"
+        | "album-menu"
+        | "album-toast"
+        | "album-actions"
+        | "album-actions-confirm"
+        | "album-stopped"
+        | "album-stopped-updating" => Page::Album {
+            id: f.library_albums().map_err(e)?.remove(0).id,
+        },
         "playlist" => Page::Playlist {
             id: f.library_playlists().map_err(e)?.remove(0).id,
         },

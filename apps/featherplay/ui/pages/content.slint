@@ -745,9 +745,20 @@ export component CollectionHeader inherits Rectangle {
     in property <string> secondary: @tr("Shuffle");
     in property <string> secondary-icon: Icons.shuffle;
     in property <bool> enabled: true;
+    // A ⋯ after the buttons (the album's menu), and whether it can be used now.
+    in property <bool> more: false;
+    in property <bool> more-enabled: true;
+    // Changing this opens the ⋯'s menu as a click does (`--snapshot`, tests).
+    in property <int> more-asked;
     callback byline-clicked();
     callback primary-clicked();
     callback secondary-clicked();
+    // The ⋯: where its menu opens (window coordinates), and the ⋯'s top for one that opens up.
+    callback more-clicked(length, length, length);
+    function open-more() {
+        root.more-clicked(more-btn.absolute-position.x, more-btn.absolute-position.y + more-btn.height + 4px, more-btn.absolute-position.y - 4px);
+    }
+    changed more-asked => { root.open-more(); }
     property <length> pad: Theme.page-pad;
     property <length> top: Theme.top-bar-h + Theme.page-top;
     property <length> cover-size: root.width >= 900px ? 232px : 200px;
@@ -883,6 +894,16 @@ export component CollectionHeader inherits Rectangle {
             icon-filled: false;
             enabled: root.enabled;
             clicked => { root.secondary-clicked(); }
+        }
+        more-btn := IconButton {
+            visible: root.more;
+            width: root.more ? 40px : 0px;
+            height: 40px;
+            icon: Icons.more;
+            label: @tr("More");
+            tint: Theme.text1;
+            enabled: root.enabled && root.more-enabled;
+            clicked => { root.open-more(); }
         }
     }
 }

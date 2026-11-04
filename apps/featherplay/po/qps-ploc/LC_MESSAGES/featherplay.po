@@ -107,9 +107,9 @@ msgid "Quit"
 msgstr "[Quit]"
 
 #: ../../crates/integrations/src/tray_menu.rs:242
-#: ../../crates/integrations/src/tray_menu.rs:242 ui/bottom_bar.slint:594
-#: ../../crates/integrations/src/tray_menu.rs:242 ui/bottom_bar.slint:594 ui/pages/content.slint:580
-#: ../../crates/integrations/src/tray_menu.rs:242 ui/bottom_bar.slint:594 ui/pages/content.slint:580 ui/parts.slint:860 ui/song_menu.slint:278
+#: ../../crates/integrations/src/tray_menu.rs:242 src/album_actions.rs:236
+#: ../../crates/integrations/src/tray_menu.rs:242 src/album_actions.rs:236 ui/mini_player.slint:183 ui/pages/content.slint:580
+#: ../../crates/integrations/src/tray_menu.rs:242 src/album_actions.rs:236 ui/mini_player.slint:183 ui/pages/content.slint:580 ui/parts.slint:860 ui/song_menu.slint:278
 msgid "Like"
 msgstr "[Like]"
 
@@ -128,6 +128,122 @@ msgstr "[Couldn't load your accounts. Open the menu to try again.]"
 #: src/account_menu.rs:247
 msgid "No channel"
 msgstr "[No channel]"
+
+#: src/album_actions.rs:197
+msgid "Nothing changed: {}"
+msgstr "[Nothing changed: {}]"
+
+#: src/album_actions.rs:199
+msgid "Stopped after {} of {}: {}"
+msgstr "[Stopped after {} of {}: {}]"
+
+#: src/album_actions.rs:216
+msgid "Like {n} song on {}?"
+msgid_plural "Like {n} songs on {}?"
+msgstr[0] "[Like {n} song on {}?]"
+msgstr[1] "[Like {n} songs on {}?]"
+
+#: src/album_actions.rs:217
+msgid "Remove the like from {n} song on {}?"
+msgid_plural "Remove likes from {n} songs on {}?"
+msgstr[0] "[Remove the like from {n} song on {}?]"
+msgstr[1] "[Remove likes from {n} songs on {}?]"
+
+#: src/album_actions.rs:222
+msgid "Dislike {n} song on {}?"
+msgid_plural "Dislike {n} songs on {}?"
+msgstr[0] "[Dislike {n} song on {}?]"
+msgstr[1] "[Dislike {n} songs on {}?]"
+
+#: src/album_actions.rs:227
+msgid "Remove the dislike from {n} song on {}?"
+msgid_plural "Remove dislikes from {n} songs on {}?"
+msgstr[0] "[Remove the dislike from {n} song on {}?]"
+msgstr[1] "[Remove dislikes from {n} songs on {}?]"
+
+#: src/album_actions.rs:237 ui/album_menu.slint:163
+msgid "Remove likes"
+msgstr "[Remove likes]"
+
+#: src/album_actions.rs:238 ui/song_menu.slint:287
+msgid "Dislike"
+msgstr "[Dislike]"
+
+#: src/album_actions.rs:239 ui/album_menu.slint:176
+msgid "Remove dislikes"
+msgstr "[Remove dislikes]"
+
+#: src/album_actions.rs:245
+msgid "Every song on this album is already liked"
+msgstr "[Every song on this album is already liked]"
+
+#: src/album_actions.rs:246
+msgid "No liked songs on this album"
+msgstr "[No liked songs on this album]"
+
+#: src/album_actions.rs:247
+msgid "Every song on this album is already disliked"
+msgstr "[Every song on this album is already disliked]"
+
+#: src/album_actions.rs:248
+msgid "No disliked songs on this album"
+msgstr "[No disliked songs on this album]"
+
+#: src/album_actions.rs:255
+msgid "Liking songs… {} of {}"
+msgstr "[Liking songs… {} of {}]"
+
+#: src/album_actions.rs:256
+msgid "Removing likes… {} of {}"
+msgstr "[Removing likes… {} of {}]"
+
+#: src/album_actions.rs:257
+msgid "Disliking songs… {} of {}"
+msgstr "[Disliking songs… {} of {}]"
+
+#: src/album_actions.rs:258
+msgid "Removing dislikes… {} of {}"
+msgstr "[Removing dislikes… {} of {}]"
+
+#: src/album_actions.rs:264
+msgid "Liked {n} song"
+msgid_plural "Liked {n} songs"
+msgstr[0] "[Liked {n} song]"
+msgstr[1] "[Liked {n} songs]"
+
+#: src/album_actions.rs:265
+msgid "Removed {n} like"
+msgid_plural "Removed {n} likes"
+msgstr[0] "[Removed {n} like]"
+msgstr[1] "[Removed {n} likes]"
+
+#: src/album_actions.rs:266
+msgid "Disliked {n} song"
+msgid_plural "Disliked {n} songs"
+msgstr[0] "[Disliked {n} song]"
+msgstr[1] "[Disliked {n} songs]"
+
+#: src/album_actions.rs:268
+msgid "Removed {n} dislike"
+msgid_plural "Removed {n} dislikes"
+msgstr[0] "[Removed {n} dislike]"
+msgstr[1] "[Removed {n} dislikes]"
+
+#: src/album_actions.rs:276
+msgid "sign in again"
+msgstr "[sign in again]"
+
+#: src/album_actions.rs:277
+msgid "no connection"
+msgstr "[no connection]"
+
+#: src/album_actions.rs:278
+msgid "a song wasn't found"
+msgstr "[a song wasn't found]"
+
+#: src/album_actions.rs:279
+msgid "the music service said no"
+msgstr "[the music service said no]"
 
 #: src/close.rs:123
 msgid "featherplay is still playing in the tray"
@@ -272,7 +388,7 @@ msgstr "[Listed with its licence in THIRD_PARTY.md in the source repository.]"
 msgid "Diagnostics copied"
 msgstr "[Diagnostics copied]"
 
-#: src/pages/album.rs:110
+#: src/pages/album.rs:120
 msgid "Album"
 msgstr "[Album]"
 
@@ -507,11 +623,11 @@ msgstr "[Pinned {} to the top]"
 msgid "Unpinned {}"
 msgstr "[Unpinned {}]"
 
-#: src/playlist_menu.rs:136 src/song_menu.rs:82
+#: src/playlist_menu.rs:136 src/song_menu.rs:87
 msgid "Playing next: {}"
 msgstr "[Playing next: {}]"
 
-#: src/playlist_menu.rs:143 src/song_menu.rs:90
+#: src/playlist_menu.rs:143 src/song_menu.rs:95
 msgid "Added to queue: {}"
 msgstr "[Added to queue: {}]"
 
@@ -583,19 +699,19 @@ msgstr "[Albums you save show up here.]"
 msgid "Artists you follow show up here."
 msgstr "[Artists you follow show up here.]"
 
-#: src/song_menu.rs:114
+#: src/song_menu.rs:119
 msgid "Saved to {}"
 msgstr "[Saved to {}]"
 
-#: src/song_menu.rs:114
+#: src/song_menu.rs:119
 msgid "View"
 msgstr "[View]"
 
-#: src/song_menu.rs:132
+#: src/song_menu.rs:137
 msgid "Added to Liked songs"
 msgstr "[Added to Liked songs]"
 
-#: src/song_menu.rs:134
+#: src/song_menu.rs:139
 msgid "Removed from Liked songs"
 msgstr "[Removed from Liked songs]"
 
@@ -666,6 +782,18 @@ msgstr "[Your Google sign-in has more than one account. Pick the one featherplay
 msgctxt "Account"
 msgid "Default"
 msgstr "[Default]"
+
+#: ui/album_menu.slint:133 ui/playlist_menu_layer.slint:126
+msgid "Album menu"
+msgstr "[Album menu]"
+
+#: ui/album_menu.slint:157
+msgid "Like all songs"
+msgstr "[Like all songs]"
+
+#: ui/album_menu.slint:170
+msgid "Dislike all songs"
+msgstr "[Dislike all songs]"
 
 #: ui/bottom_bar.slint:34
 msgid "Seek"
@@ -854,11 +982,11 @@ msgstr "[Licences]"
 msgid "SIL Open Font License 1.1. The heading face, embedded."
 msgstr "[SIL Open Font License 1.1. The heading face, embedded.]"
 
-#: ui/pages/album.slint:80
+#: ui/pages/album.slint:86
 msgid "This album has no tracks to play"
 msgstr "[This album has no tracks to play]"
 
-#: ui/pages/album.slint:81
+#: ui/pages/album.slint:87
 msgid "They may not be available where you are."
 msgstr "[They may not be available where you are.]"
 
@@ -902,8 +1030,8 @@ msgstr "[Try again]"
 msgid "Sign in"
 msgstr "[Sign in]"
 
-#: ui/pages/content.slint:589 ui/pages/now_playing.slint:451
-#: ui/pages/content.slint:589 ui/pages/now_playing.slint:451 ui/parts.slint:873
+#: ui/pages/content.slint:589 ui/pages/content.slint:903
+#: ui/pages/content.slint:589 ui/pages/content.slint:903 ui/parts.slint:734 ui/parts.slint:873
 msgid "More"
 msgstr "[More]"
 
@@ -1916,10 +2044,6 @@ msgid "Playlist menu"
 msgstr "[Playlist menu]"
 
 #: ui/playlist_menu_layer.slint:126
-msgid "Album menu"
-msgstr "[Album menu]"
-
-#: ui/playlist_menu_layer.slint:126
 msgid "Artist menu"
 msgstr "[Artist menu]"
 
@@ -2022,10 +2146,6 @@ msgstr "[Signed in]"
 #: ui/song_menu.slint:192
 msgid "Song menu"
 msgstr "[Song menu]"
-
-#: ui/song_menu.slint:287
-msgid "Dislike"
-msgstr "[Dislike]"
 
 #: ui/song_menu.slint:297 ui/song_menu.slint:328
 msgid "Add to playlist"
