@@ -317,11 +317,17 @@ fn fetch(ctx: &Rc<Ctx>) {
         s.paging.start(None, 0);
         s.account
     });
+    let asked = Instant::now();
     ctx.load(
         |source| async move { source.home().await },
         move |ctx, ui, result| {
             if STATE.with(|s| s.borrow().account) != account {
                 return;
+            }
+            let took = asked.elapsed().as_millis();
+            match &result {
+                Ok(feed) => log!("home: {} shelves in {took} ms", feed.shelves.len()),
+                Err(e) => log!("home: failed in {took} ms: {e}"),
             }
             let data = ui.global::<HomeData>();
             data.set_loading(false);

@@ -10,5 +10,6 @@
 mod engine_local;
 mod live;
 mod play_probe;
+mod resolve_steps;
 mod tmp;
 mod volume;

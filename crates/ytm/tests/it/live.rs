@@ -30,6 +30,38 @@ async fn live_sign_in_check() {
     println!("signed in: {} library playlists", playlists.len());
 }
 
+/// Startup's requests, timed: the sign-in, Home (its first page, then one continuation,
+/// one after the other), and one more continuation on its own, which is about what the
+/// second of Home's requests costs. Four reads; counts only.
+#[tokio::test]
+#[ignore = "live: needs FEATHERPLAY_COOKIES_FILE"]
+async fn live_startup_timing() {
+    let t = std::time::Instant::now();
+    let yt = connect().await;
+    let sign_in = t.elapsed();
+    let t = std::time::Instant::now();
+    let home = yt.home().await.expect("home");
+    let feed = t.elapsed();
+    let more = match &home.more {
+        Some(token) => {
+            let t = std::time::Instant::now();
+            let page = yt.home_more(token).await.expect("home, more");
+            format!(
+                "{} ms ({} shelves)",
+                t.elapsed().as_millis(),
+                page.shelves.len()
+            )
+        }
+        None => "none".into(),
+    };
+    println!(
+        "TIMING sign-in {} ms | home {} ms ({} shelves) | one continuation {more}",
+        sign_in.as_millis(),
+        feed.as_millis(),
+        home.shelves.len()
+    );
+}
+
 #[tokio::test]
 #[ignore = "live: needs FEATHERPLAY_COOKIES_FILE"]
 async fn live_reads() {
