@@ -118,7 +118,7 @@ fn tray_event(ev: TrayEvent) {
 }
 
 /// A left click on the tray icon at `(x, y)` (physical screen pixels): toggles the mini
-/// player there, or with "Tray click opens the main window" on, shows the main window and
+/// player there, or with "Turn off the mini player" on, shows the main window and
 /// brings it to the front, as the menu's Show does.
 pub fn tray_click(x: i32, y: i32) {
     if !settings::tray_click_opens_window() {

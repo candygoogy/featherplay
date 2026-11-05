@@ -164,7 +164,7 @@ export global SettingsData {
     in property <bool> notifications;
     // What the close button does: 0 ask, 1 close featherplay, 2 keep playing in the tray.
     in property <int> close-action;
-    // A left click on the tray icon opens the main window, not the mini player.
+    // "Turn off the mini player": a left click on the tray icon opens the main window instead.
     in property <bool> tray-click-opens-window;
     in property <Appearance> appearance;
     // The Language setting: Windows default, English, then the bundled languages by their
@@ -1541,8 +1541,8 @@ export component SettingsPage inherits Rectangle {
                         }
                     }
                     ToggleRow {
-                        label: @tr("Tray click opens the main window");
-                        detail: @tr("When off, clicking the tray icon opens the mini player. Right-clicking it always shows the menu.");
+                        label: @tr("Turn off the mini player");
+                        detail: @tr("Clicking the tray icon opens the main window instead. Right-click always shows the menu.");
                         key: SettingKey.tray-click-opens-window;
                         checked: SettingsData.tray-click-opens-window;
                     }

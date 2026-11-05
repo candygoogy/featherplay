@@ -1,5 +1,5 @@
 //! A left click on the tray icon, on the offscreen platform (no window is shown): it opens
-//! and closes the mini player by default; with "Tray click opens the main window" on, it
+//! and closes the mini player by default; with "Turn off the mini player" on, it
 //! brings the main window back from the tray instead, and the mini player stays shut.
 
 use featherplay::mini;

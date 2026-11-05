@@ -53,30 +53,30 @@ msgstr "[Pause]"
 #: ../../crates/integrations/src/taskbar.rs:178
 #: ../../crates/integrations/src/taskbar.rs:178
 #: ../../crates/integrations/src/taskbar.rs:178 ui/bottom_bar.slint:397
-#: ../../crates/integrations/src/taskbar.rs:178 ui/bottom_bar.slint:397 ui/pages/content.slint:744 ui/pages/home.slint:606
-#: ../../crates/integrations/src/taskbar.rs:178 ui/bottom_bar.slint:397 ui/pages/content.slint:744 ui/pages/home.slint:606 ui/playlist_menu_layer.slint:197
+#: ../../crates/integrations/src/taskbar.rs:178 ui/bottom_bar.slint:397 ui/pages/content.slint:746 ui/pages/home.slint:606
+#: ../../crates/integrations/src/taskbar.rs:178 ui/bottom_bar.slint:397 ui/pages/content.slint:746 ui/pages/home.slint:606 ui/playlist_menu_layer.slint:197
 msgid "Play"
 msgstr "[Play]"
 
 #: ../../crates/integrations/src/taskbar.rs:181
-#: ../../crates/integrations/src/taskbar.rs:181 src/pages/settings.rs:1146
-#: ../../crates/integrations/src/taskbar.rs:181 src/pages/settings.rs:1146 ui/mini_player.slint:244
-#: ../../crates/integrations/src/taskbar.rs:181 src/pages/settings.rs:1146 ui/mini_player.slint:244
+#: ../../crates/integrations/src/taskbar.rs:181 src/pages/settings.rs:1134
+#: ../../crates/integrations/src/taskbar.rs:181 src/pages/settings.rs:1134 ui/mini_player.slint:244
+#: ../../crates/integrations/src/taskbar.rs:181 src/pages/settings.rs:1134 ui/mini_player.slint:244
 msgid "Previous"
 msgstr "[Previous]"
 
 #: ../../crates/integrations/src/taskbar.rs:183
-#: ../../crates/integrations/src/taskbar.rs:183 src/pages/settings.rs:1145
-#: ../../crates/integrations/src/taskbar.rs:183 src/pages/settings.rs:1145 ui/mini_player.slint:259
-#: ../../crates/integrations/src/taskbar.rs:183 src/pages/settings.rs:1145 ui/mini_player.slint:259
+#: ../../crates/integrations/src/taskbar.rs:183 src/pages/settings.rs:1133
+#: ../../crates/integrations/src/taskbar.rs:183 src/pages/settings.rs:1133 ui/mini_player.slint:259
+#: ../../crates/integrations/src/taskbar.rs:183 src/pages/settings.rs:1133 ui/mini_player.slint:259
 msgid "Next"
 msgstr "[Next]"
 
 #: ../../crates/integrations/src/tray.rs:273
-#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:454
-#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:454 ui/mini_player.slint:131 ui/pages/lyrics.slint:71
-#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:454 ui/mini_player.slint:131 ui/pages/lyrics.slint:71 ui/pages/now_playing.slint:425
-#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:454 ui/mini_player.slint:131 ui/pages/lyrics.slint:71 ui/pages/now_playing.slint:425
+#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:444
+#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:444 ui/mini_player.slint:131 ui/pages/lyrics.slint:71
+#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:444 ui/mini_player.slint:131 ui/pages/lyrics.slint:71 ui/pages/now_playing.slint:465
+#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:444 ui/mini_player.slint:131 ui/pages/lyrics.slint:71 ui/pages/now_playing.slint:465
 msgid "Nothing playing"
 msgstr "[Nothing playing]"
 
@@ -92,8 +92,8 @@ msgstr "[Paused at {}]"
 msgid "paused at {}"
 msgstr "[paused at {}]"
 
-#: ../../crates/integrations/src/tray_menu.rs:49 ui/mini_player.slint:269
-#: ../../crates/integrations/src/tray_menu.rs:49 ui/mini_player.slint:269 ui/not_for_me.slint:72
+#: ../../crates/integrations/src/tray_menu.rs:49 ui/mini_player.slint:270
+#: ../../crates/integrations/src/tray_menu.rs:49 ui/mini_player.slint:270 ui/not_for_me.slint:101
 msgid "Not for me"
 msgstr "[Not for me]"
 
@@ -107,8 +107,8 @@ msgstr "[Quit]"
 
 #: ../../crates/integrations/src/tray_menu.rs:242
 #: ../../crates/integrations/src/tray_menu.rs:242 src/album_actions.rs:275
-#: ../../crates/integrations/src/tray_menu.rs:242 src/album_actions.rs:275 ui/mini_player.slint:227 ui/pages/content.slint:580
-#: ../../crates/integrations/src/tray_menu.rs:242 src/album_actions.rs:275 ui/mini_player.slint:227 ui/pages/content.slint:580 ui/parts.slint:860 ui/song_menu.slint:278
+#: ../../crates/integrations/src/tray_menu.rs:242 src/album_actions.rs:275 ui/not_for_me.slint:19 ui/pages/content.slint:582
+#: ../../crates/integrations/src/tray_menu.rs:242 src/album_actions.rs:275 ui/not_for_me.slint:19 ui/pages/content.slint:582 ui/song_menu.slint:277
 msgid "Like"
 msgstr "[Like]"
 
@@ -164,7 +164,7 @@ msgstr[1] "[Remove dislikes from {n} songs on {}?]"
 msgid "Remove likes"
 msgstr "[Remove likes]"
 
-#: src/album_actions.rs:277 ui/song_menu.slint:287
+#: src/album_actions.rs:277 ui/song_menu.slint:286
 msgid "Dislike"
 msgstr "[Dislike]"
 
@@ -244,15 +244,15 @@ msgstr "[a song wasn't found]"
 msgid "the music service said no"
 msgstr "[the music service said no]"
 
-#: src/close.rs:123
+#: src/close.rs:130
 msgid "featherplay is still playing in the tray"
 msgstr "[featherplay is still playing in the tray]"
 
-#: src/close.rs:125
+#: src/close.rs:132
 msgid "featherplay is still running in the tray"
 msgstr "[featherplay is still running in the tray]"
 
-#: src/close.rs:131
+#: src/close.rs:138
 msgid "Right-click the tray icon to show the window or quit."
 msgstr "[Right-click the tray icon to show the window or quit.]"
 
@@ -260,78 +260,78 @@ msgstr "[Right-click the tray icon to show the window or quit.]"
 msgid "No sound output found. Connect speakers or headphones."
 msgstr "[No sound output found. Connect speakers or headphones.]"
 
-#: src/controller/account.rs:420
+#: src/controller/account.rs:417
 msgid "Your API key is saved. Connect to sign in to Last.fm with it."
 msgstr "[Your API key is saved. Connect to sign in to Last.fm with it.]"
 
-#: src/controller/account.rs:422
+#: src/controller/account.rs:419
 msgid "Using featherplay's API key again. Connect to sign in."
 msgstr "[Using featherplay's API key again. Connect to sign in.]"
 
-#: src/controller/account.rs:423
+#: src/controller/account.rs:420
 msgid "Your API key is removed. Last.fm needs one to connect."
 msgstr "[Your API key is removed. Last.fm needs one to connect.]"
 
-#: src/controller/account.rs:431
+#: src/controller/account.rs:428
 msgid "Saving the API key failed: {}"
 msgstr "[Saving the API key failed: {}]"
 
-#: src/controller/account.rs:442
+#: src/controller/account.rs:439
 msgid "Connected as {}. Listens go to your ListenBrainz profile."
 msgstr "[Connected as {}. Listens go to your ListenBrainz profile.]"
 
-#: src/controller/account.rs:678
+#: src/controller/account.rs:675
 msgid "The browser didn't open: {}"
 msgstr "[The browser didn't open: {}]"
 
-#: src/controller/account.rs:704
+#: src/controller/account.rs:701
 msgid "Saving the session failed: {}"
 msgstr "[Saving the session failed: {}]"
 
-#: src/controller/account.rs:710
+#: src/controller/account.rs:707
 msgid ""
 "Last.fm hasn't been approved yet. Approve featherplay in the browser, then "
 "try again."
 msgstr "[Last.fm hasn't been approved yet. Approve featherplay in the browser, then try again.]"
 
-#: src/controller/account.rs:715
+#: src/controller/account.rs:712
 msgid "That approval expired. Connect again."
 msgstr "[That approval expired. Connect again.]"
 
-#: src/controller/account.rs:763
+#: src/controller/account.rs:760
 msgid "Saving the token failed: {}"
 msgstr "[Saving the token failed: {}]"
 
-#: src/controller/account.rs:826
+#: src/controller/account.rs:823
 msgid ""
 "ListenBrainz didn't accept that token. Copy it again from listenbrainz.org/"
 "settings."
 msgstr "[ListenBrainz didn't accept that token. Copy it again from listenbrainz.org/settings.]"
 
-#: src/controller/account.rs:831
+#: src/controller/account.rs:828
 msgid "Couldn't reach ListenBrainz. Check the connection and try again."
 msgstr "[Couldn't reach ListenBrainz. Check the connection and try again.]"
 
-#: src/controller/account.rs:884
+#: src/controller/account.rs:881
 msgid ""
 "That session isn't signed in. Sign in again, or copy a fresh cookie header."
 msgstr "[That session isn't signed in. Sign in again, or copy a fresh cookie header.]"
 
-#: src/controller/account.rs:888
+#: src/controller/account.rs:885
 msgid "Couldn't reach YouTube Music. Check the connection, then try again."
 msgstr "[Couldn't reach YouTube Music. Check the connection, then try again.]"
 
-#: src/controller/account.rs:891
+#: src/controller/account.rs:888
 msgid ""
 "YouTube Music answered in a way featherplay doesn't understand. Try again "
 "later."
 msgstr "[YouTube Music answered in a way featherplay doesn't understand. Try again later.]"
 
-#: src/controller/account.rs:900
+#: src/controller/account.rs:897
 msgid "Couldn't reach Last.fm. Check the connection and try again."
 msgstr "[Couldn't reach Last.fm. Check the connection and try again.]"
 
-#: src/controller/account.rs:902
+#: src/controller/account.rs:899
 msgid "Last.fm said: {0} ({1})"
 msgstr "[Last.fm said: {0} ({1})]"
 
@@ -351,11 +351,11 @@ msgstr "[Lyrics from LRCLIB]"
 msgid "Source: LyricFind"
 msgstr "[Source: LyricFind]"
 
-#: src/not_for_me.rs:65
+#: src/not_for_me.rs:62
 msgid "Marked as not for me"
 msgstr "[Marked as not for me]"
 
-#: src/not_for_me.rs:65
+#: src/not_for_me.rs:62
 msgid "Undo"
 msgstr "[Undo]"
 
@@ -395,7 +395,7 @@ msgstr "[Diagnostics copied]"
 msgid "Album"
 msgstr "[Album]"
 
-#: src/pages/artist.rs:94 src/pages/settings.rs:619 src/ui_bridge.rs:97
+#: src/pages/artist.rs:94 src/pages/settings.rs:607 src/ui_bridge.rs:97
 msgid "Artist"
 msgstr "[Artist]"
 
@@ -462,103 +462,103 @@ msgstr "[Couldn't load related tracks]"
 msgid "Playlist"
 msgstr "[Playlist]"
 
-#: src/pages/settings.rs:407
+#: src/pages/settings.rs:395
 msgid "Enter both the API key and the shared secret."
 msgstr "[Enter both the API key and the shared secret.]"
 
-#: src/pages/settings.rs:408
+#: src/pages/settings.rs:396
 msgid ""
 "A Last.fm API key and its shared secret are 32 letters and digits each. Copy "
 "them again from last.fm/api/accounts."
 msgstr "[A Last.fm API key and its shared secret are 32 letters and digits each. Copy them again from last.fm/api/accounts.]"
 
-#: src/pages/settings.rs:423
+#: src/pages/settings.rs:411
 msgid "Paste your user token first."
 msgstr "[Paste your user token first.]"
 
-#: src/pages/settings.rs:481
+#: src/pages/settings.rs:469
 msgid "Token copied"
 msgstr "[Token copied]"
 
-#: src/pages/settings.rs:484
+#: src/pages/settings.rs:472
 msgid "Couldn't copy the token. Try again."
 msgstr "[Couldn't copy the token. Try again.]"
 
-#: src/pages/settings.rs:496
+#: src/pages/settings.rs:484
 msgid "Pick a port from 1024 to 65535."
 msgstr "[Pick a port from 1024 to 65535.]"
 
-#: src/pages/settings.rs:618
+#: src/pages/settings.rs:606
 msgid "Song title"
 msgstr "[Song title]"
 
-#: src/pages/settings.rs:649
+#: src/pages/settings.rs:637
 msgid "Listening to {}"
 msgstr "[Listening to {}]"
 
-#: src/pages/settings.rs:801 ui/pages/settings.slint:1573
+#: src/pages/settings.rs:789 ui/pages/settings.slint:1573
 msgid "From the cover"
 msgstr "[From the cover]"
 
-#: src/pages/settings.rs:802
+#: src/pages/settings.rs:790
 msgid "Red"
 msgstr "[Red]"
 
-#: src/pages/settings.rs:803
+#: src/pages/settings.rs:791
 msgid "Rose"
 msgstr "[Rose]"
 
-#: src/pages/settings.rs:804
+#: src/pages/settings.rs:792
 msgid "Amber"
 msgstr "[Amber]"
 
-#: src/pages/settings.rs:805
+#: src/pages/settings.rs:793
 msgid "Teal"
 msgstr "[Teal]"
 
-#: src/pages/settings.rs:806
+#: src/pages/settings.rs:794
 msgid "Violet"
 msgstr "[Violet]"
 
-#: src/pages/settings.rs:807 ui/pages/settings.slint:1585
+#: src/pages/settings.rs:795 ui/pages/settings.slint:1585
 msgid "Custom colour"
 msgstr "[Custom colour]"
 
-#: src/pages/settings.rs:888
+#: src/pages/settings.rs:876
 msgid "On the dark theme it shows as {}, so it stays easy to see."
 msgstr "[On the dark theme it shows as {}, so it stays easy to see.]"
 
-#: src/pages/settings.rs:893
+#: src/pages/settings.rs:881
 msgid "On the light theme it shows as {}, so it stays easy to see."
 msgstr "[On the light theme it shows as {}, so it stays easy to see.]"
 
-#: src/pages/settings.rs:923
+#: src/pages/settings.rs:911
 msgid "Type a colour as # and 6 letters or digits, like #4390EE."
 msgstr "[Type a colour as # and 6 letters or digits, like #4390EE.]"
 
-#: src/pages/settings.rs:1135
+#: src/pages/settings.rs:1123
 msgid "Another app already uses one of these keys. Pick other keys."
 msgstr "[Another app already uses one of these keys. Pick other keys.]"
 
-#: src/pages/settings.rs:1144 ui/pages/settings.slint:1607
+#: src/pages/settings.rs:1132 ui/pages/settings.slint:1607
 msgid "Play or pause"
 msgstr "[Play or pause]"
 
-#: src/pages/settings.rs:1149
+#: src/pages/settings.rs:1137
 msgid ""
 "{0}: \"{1}\" isn't a key featherplay can use. Write it like Ctrl+Alt+Space; "
 "it needs Ctrl, Alt, Shift or Win."
 msgstr "[{0}: \"{1}\" isn't a key featherplay can use. Write it like Ctrl+Alt+Space; it needs Ctrl, Alt, Shift or Win.]"
 
-#: src/pages/settings.rs:1152
+#: src/pages/settings.rs:1140
 msgid "{} uses the same key as another action."
 msgstr "[{} uses the same key as another action.]"
 
-#: src/pages/settings.rs:1165
+#: src/pages/settings.rs:1153
 msgid "System default"
 msgstr "[System default]"
 
-#: src/pages/settings.rs:1173
+#: src/pages/settings.rs:1161
 msgid "{} (not connected)"
 msgstr "[{} (not connected)]"
 
@@ -718,27 +718,27 @@ msgstr "[Added to Liked songs]"
 msgid "Removed from Liked songs"
 msgstr "[Removed from Liked songs]"
 
-#: src/updates.rs:388 src/updates.rs:521 ui/pages/about.slint:74
+#: src/updates.rs:406 src/updates.rs:539 ui/pages/about.slint:74
 msgid "Get it"
 msgstr "[Get it]"
 
-#: src/updates.rs:396
+#: src/updates.rs:414
 msgid "Details"
 msgstr "[Details]"
 
-#: src/updates.rs:462
+#: src/updates.rs:480
 msgid "featherplay {} is ready to install"
 msgstr "[featherplay {} is ready to install]"
 
-#: src/updates.rs:463 ui/pages/about.slint:74
+#: src/updates.rs:481 ui/pages/about.slint:74
 msgid "Restart to update"
 msgstr "[Restart to update]"
 
-#: src/updates.rs:498
+#: src/updates.rs:516
 msgid "The update couldn't start"
 msgstr "[The update couldn't start]"
 
-#: src/updates.rs:520 ui/pages/about.slint:44 ui/pages/about.slint:54
+#: src/updates.rs:538 ui/pages/about.slint:44 ui/pages/about.slint:54
 msgid "featherplay {} is out"
 msgstr "[featherplay {} is out]"
 
@@ -811,9 +811,9 @@ msgid "{} %"
 msgstr "[{} %]"
 
 #: ui/bottom_bar.slint:303 ui/bottom_bar.slint:335
-#: ui/bottom_bar.slint:303 ui/bottom_bar.slint:335 ui/pages/now_playing.slint:204
-#: ui/bottom_bar.slint:303 ui/bottom_bar.slint:335 ui/pages/now_playing.slint:204 ui/pages/settings.slint:1268
-#: ui/bottom_bar.slint:303 ui/bottom_bar.slint:335 ui/pages/now_playing.slint:204 ui/pages/settings.slint:1268
+#: ui/bottom_bar.slint:303 ui/bottom_bar.slint:335 ui/pages/now_playing.slint:205
+#: ui/bottom_bar.slint:303 ui/bottom_bar.slint:335 ui/pages/now_playing.slint:205 ui/pages/settings.slint:1268
+#: ui/bottom_bar.slint:303 ui/bottom_bar.slint:335 ui/pages/now_playing.slint:205 ui/pages/settings.slint:1268
 msgid "Lyrics"
 msgstr "[Lyrics]"
 
@@ -838,41 +838,36 @@ msgstr "[Ctrl+L]"
 msgid "Space"
 msgstr "[Space]"
 
-#: ui/bottom_bar.slint:454
+#: ui/bottom_bar.slint:444
 msgid "Now playing: {}"
 msgstr "[Now playing: {}]"
 
-#: ui/bottom_bar.slint:532 ui/pages/content.slint:745
-#: ui/bottom_bar.slint:532 ui/pages/content.slint:745
+#: ui/bottom_bar.slint:522 ui/pages/content.slint:747
+#: ui/bottom_bar.slint:522 ui/pages/content.slint:747
 msgid "Shuffle"
 msgstr "[Shuffle]"
 
-#: ui/bottom_bar.slint:562
+#: ui/bottom_bar.slint:552
 msgid "Repeat one"
 msgstr "[Repeat one]"
 
-#: ui/bottom_bar.slint:562
+#: ui/bottom_bar.slint:552
 msgid "Repeat all"
 msgstr "[Repeat all]"
 
-#: ui/bottom_bar.slint:562
+#: ui/bottom_bar.slint:552
 msgid "Repeat off"
 msgstr "[Repeat off]"
 
-#: ui/bottom_bar.slint:625 ui/mini_player.slint:227 ui/pages/content.slint:580
-#: ui/bottom_bar.slint:625 ui/mini_player.slint:227 ui/pages/content.slint:580 ui/parts.slint:860 ui/song_menu.slint:278
-msgid "Remove like"
-msgstr "[Remove like]"
-
-#: ui/bottom_bar.slint:640
+#: ui/bottom_bar.slint:616
 msgid "Mute"
 msgstr "[Mute]"
 
-#: ui/bottom_bar.slint:640
+#: ui/bottom_bar.slint:616
 msgid "Unmute"
 msgstr "[Unmute]"
 
-#: ui/bottom_bar.slint:656 ui/pages/now_playing.slint:99
+#: ui/bottom_bar.slint:632 ui/pages/now_playing.slint:100
 msgid "Up next"
 msgstr "[Up next]"
 
@@ -928,7 +923,12 @@ msgstr "[Open featherplay]"
 msgid "Close"
 msgstr "[Close]"
 
-#: ui/mini_player.slint:270 ui/not_for_me.slint:41 ui/not_for_me.slint:78
+#: ui/mini_player.slint:227 ui/not_for_me.slint:19 ui/pages/content.slint:582
+#: ui/mini_player.slint:227 ui/not_for_me.slint:19 ui/pages/content.slint:582 ui/song_menu.slint:277
+msgid "Remove like"
+msgstr "[Remove like]"
+
+#: ui/mini_player.slint:271 ui/not_for_me.slint:70 ui/not_for_me.slint:107
 msgid "Skips the song and tells YouTube Music you dislike it"
 msgstr "[Skips the song and tells YouTube Music you dislike it]"
 
@@ -1022,31 +1022,31 @@ msgstr "[Albums]"
 msgid "Singles"
 msgstr "[Singles]"
 
-#: ui/pages/content.slint:55
+#: ui/pages/content.slint:57
 msgid "Loading"
 msgstr "[Loading]"
 
-#: ui/pages/content.slint:432
+#: ui/pages/content.slint:434
 msgid "This didn’t load. {}"
 msgstr "[This didn’t load. {}]"
 
-#: ui/pages/content.slint:445
+#: ui/pages/content.slint:447
 msgid "This didn’t load"
 msgstr "[This didn’t load]"
 
-#: ui/pages/content.slint:459 ui/pages/home.slint:773
-#: ui/pages/content.slint:459 ui/pages/home.slint:773 ui/pages/lyrics.slint:181
+#: ui/pages/content.slint:461 ui/pages/home.slint:773
+#: ui/pages/content.slint:461 ui/pages/home.slint:773 ui/pages/lyrics.slint:181
 msgid "Try again"
 msgstr "[Try again]"
 
-#: ui/pages/content.slint:463 ui/pages/settings.slint:1645
-#: ui/pages/content.slint:463 ui/pages/settings.slint:1645 ui/pages/sign_in.slint:157 ui/sidebar.slint:361
-#: ui/pages/content.slint:463 ui/pages/settings.slint:1645 ui/pages/sign_in.slint:157 ui/sidebar.slint:361
+#: ui/pages/content.slint:465 ui/pages/settings.slint:1645
+#: ui/pages/content.slint:465 ui/pages/settings.slint:1645 ui/pages/sign_in.slint:157 ui/sidebar.slint:361
+#: ui/pages/content.slint:465 ui/pages/settings.slint:1645 ui/pages/sign_in.slint:157 ui/sidebar.slint:361
 msgid "Sign in"
 msgstr "[Sign in]"
 
-#: ui/pages/content.slint:589 ui/pages/content.slint:903
-#: ui/pages/content.slint:589 ui/pages/content.slint:903 ui/parts.slint:734 ui/parts.slint:873
+#: ui/pages/content.slint:591 ui/pages/content.slint:905
+#: ui/pages/content.slint:591 ui/pages/content.slint:905 ui/parts.slint:734 ui/parts.slint:873
 msgid "More"
 msgstr "[More]"
 
@@ -1200,7 +1200,7 @@ msgstr "[Artists]"
 msgid "Songs you like show up here"
 msgstr "[Songs you like show up here]"
 
-#: ui/pages/library.slint:76 ui/song_menu.slint:336
+#: ui/pages/library.slint:76 ui/song_menu.slint:335
 msgid "No playlists yet"
 msgstr "[No playlists yet]"
 
@@ -1248,23 +1248,23 @@ msgstr "[Synced lyrics are unavailable right now]"
 msgid "Not synced to the song"
 msgstr "[Not synced to the song]"
 
-#: ui/pages/now_playing.slint:99
+#: ui/pages/now_playing.slint:100
 msgid "Related"
 msgstr "[Related]"
 
-#: ui/pages/now_playing.slint:126
+#: ui/pages/now_playing.slint:127
 msgid "Similar to {}"
 msgstr "[Similar to {}]"
 
-#: ui/pages/now_playing.slint:145
+#: ui/pages/now_playing.slint:146
 msgid "Nothing related found"
 msgstr "[Nothing related found]"
 
-#: ui/pages/now_playing.slint:363
+#: ui/pages/now_playing.slint:364
 msgid "Back"
 msgstr "[Back]"
 
-#: ui/pages/now_playing.slint:500
+#: ui/pages/now_playing.slint:513
 msgid "Playing from {}"
 msgstr "[Playing from {}]"
 
@@ -1806,14 +1806,14 @@ msgid "Ask"
 msgstr "[Ask]"
 
 #: ui/pages/settings.slint:1544
-msgid "Tray click opens the main window"
-msgstr "[Tray click opens the main window]"
+msgid "Turn off the mini player"
+msgstr "[Turn off the mini player]"
 
 #: ui/pages/settings.slint:1545
 msgid ""
-"When off, clicking the tray icon opens the mini player. Right-clicking it "
-"always shows the menu."
-msgstr "[When off, clicking the tray icon opens the mini player. Right-clicking it always shows the menu.]"
+"Clicking the tray icon opens the main window instead. Right-click always "
+"shows the menu."
+msgstr "[Clicking the tray icon opens the main window instead. Right-click always shows the menu.]"
 
 #: ui/pages/settings.slint:1550
 msgid "Appearance"
@@ -2072,15 +2072,15 @@ msgstr "[Playlist menu]"
 msgid "Artist menu"
 msgstr "[Artist menu]"
 
-#: ui/playlist_menu_layer.slint:215 ui/song_menu.slint:304
+#: ui/playlist_menu_layer.slint:215 ui/song_menu.slint:303
 msgid "Start radio"
 msgstr "[Start radio]"
 
-#: ui/playlist_menu_layer.slint:234 ui/song_menu.slint:258
+#: ui/playlist_menu_layer.slint:234 ui/song_menu.slint:257
 msgid "Play next"
 msgstr "[Play next]"
 
-#: ui/playlist_menu_layer.slint:243 ui/song_menu.slint:267
+#: ui/playlist_menu_layer.slint:243 ui/song_menu.slint:266
 msgid "Add to queue"
 msgstr "[Add to queue]"
 
@@ -2164,11 +2164,11 @@ msgstr "[Account, {}]"
 msgid "Signed in"
 msgstr "[Signed in]"
 
-#: ui/song_menu.slint:192
+#: ui/song_menu.slint:191
 msgid "Song menu"
 msgstr "[Song menu]"
 
-#: ui/song_menu.slint:297 ui/song_menu.slint:328
+#: ui/song_menu.slint:296 ui/song_menu.slint:327
 msgid "Add to playlist"
 msgstr "[Add to playlist]"
 

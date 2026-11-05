@@ -121,7 +121,7 @@ pub fn mark_tray_notice_shown(ctx: &Ctx) {
 }
 
 /// Whether a left click on the tray icon opens the main window instead of the mini player
-/// ("Tray click opens the main window").
+/// ("Turn off the mini player").
 pub fn tray_click_opens_window() -> bool {
     SETTINGS.with(|s| s.borrow().tray_click_opens_window)
 }
