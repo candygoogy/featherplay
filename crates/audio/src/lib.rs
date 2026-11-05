@@ -36,6 +36,7 @@ mod glitches;
 mod head;
 mod http;
 mod media;
+mod opus;
 mod priority;
 #[cfg(test)]
 mod stream_tests;

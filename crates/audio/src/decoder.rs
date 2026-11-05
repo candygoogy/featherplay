@@ -12,23 +12,36 @@
 //! puts the target fragment straight after the `moov`, so a seek fetches the bytes at the
 //! target (a `Range` request if they aren't downloaded) instead of walking every fragment
 //! before it. Files without an index (local, unfragmented m4a) seek through the reader.
+//!
+//! WebM (Opus, itag 251) has none of the MP4 layout: its reader opens on the header alone
+//! and seeks with the file's `Cues`, which YouTube puts before the first `Cluster`.
 
 use std::io::{self, Read, Seek, SeekFrom};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, LazyLock, Mutex};
 use std::time::Duration;
 
 use featherplay_core::sync::LockExt;
 use rodio::{ChannelCount, Sample, SampleRate};
 use symphonia::core::audio::SampleBuffer;
-use symphonia::core::codecs::{CODEC_TYPE_NULL, Decoder as Codec, DecoderOptions};
+use symphonia::core::codecs::{CODEC_TYPE_NULL, CodecRegistry, Decoder as Codec, DecoderOptions};
 use symphonia::core::errors::Error;
 use symphonia::core::formats::{FormatOptions, FormatReader, SeekMode, SeekTo};
 use symphonia::core::io::{MediaSource, MediaSourceStream, MediaSourceStreamOptions};
 use symphonia::core::meta::MetadataOptions;
 use symphonia::core::probe::Hint;
+use symphonia::default::codecs::AacDecoder;
 
 use crate::media::Media;
+use crate::opus::OpusCodec;
+
+/// The decoders: symphonia's AAC one and ours for Opus, which symphonia 0.5 lacks.
+static CODECS: LazyLock<CodecRegistry> = LazyLock::new(|| {
+    let mut codecs = CodecRegistry::new();
+    codecs.register_all::<AacDecoder>();
+    codecs.register_all::<OpusCodec>();
+    codecs
+});
 
 /// One reference of a `sidx`: where a fragment starts in the file and in time.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -130,6 +143,19 @@ pub(crate) struct Decoder {
     skip: u64,
     /// A seek went past the last packet: `next()` is `None` until the next seek.
     ended: bool,
+    /// A WebM file: no MP4 layout, and seeks go through `seek_webm`.
+    webm: bool,
+    /// Frames the codec puts before the stream's start (Opus's pre-skip), dropped from the
+    /// start of the track. 0 for AAC, whose reader trims its own priming.
+    lead: u64,
+}
+
+/// How long Opus decodes before a seek target to converge (RFC 7845 §4.6).
+const PRE_ROLL: Duration = Duration::from_millis(80);
+
+/// `d` in frames at `rate`.
+fn frames_in(d: Duration, rate: u32) -> u64 {
+    (d.as_secs_f64() * f64::from(rate)).round() as u64
 }
 
 impl Decoder {
@@ -142,7 +168,11 @@ impl Decoder {
             hint.with_extension(ext);
             hint.mime_type(mime.split(';').next().unwrap_or_default().trim());
         }
-        let layout = {
+        let webm = crate::media::hint_for(mime) == Some("webm");
+        let layout = if webm {
+            // The identity view: a header of 0 bytes, then the file.
+            Layout::default()
+        } else {
             let mut m = media.lock_or_recover();
             let layout =
                 read_layout(&mut *m, len).map_err(|e| format!("reading the header: {e}"))?;
@@ -163,7 +193,8 @@ impl Decoder {
             .find(|t| t.codec_params.codec != CODEC_TYPE_NULL)
             .ok_or("decoder: no supported audio track")?;
         let track_id = track.id;
-        let mut codec = symphonia::default::get_codecs()
+        let lead = crate::opus::pre_skip(&track.codec_params);
+        let mut codec = CODECS
             .make(&track.codec_params, &DecoderOptions::default())
             .map_err(|e| format!("decoder: {e}"))?;
         // The first packet gives the real channel count and rate.
@@ -202,8 +233,10 @@ impl Decoder {
             idx: 0,
             channels,
             rate,
-            skip: 0,
+            skip: lead * u64::from(channels.get()),
             ended: false,
+            webm,
+            lead,
         })
     }
 
@@ -218,6 +251,9 @@ impl Decoder {
     /// Moves to `to`. With a segment index this reads only the fragment at the target;
     /// without one the reader walks there. Past the end, the next `next()` is `None`.
     pub fn try_seek(&mut self, to: Duration) -> Result<(), String> {
+        if self.webm {
+            return self.seek_webm(to);
+        }
         let fragment = self.fragment_at(to);
         let within = match fragment {
             Some(f) => {
@@ -257,6 +293,47 @@ impl Decoder {
             let frames = (early.as_secs_f64() * self.rate.get() as f64).round() as u64;
             self.skip = frames * self.channels.get() as u64;
         }
+        Ok(())
+    }
+
+    /// Moves to `to` in a WebM file. The reader is reopened (its Cues come before the first
+    /// Cluster, so this reads only the header again), which also drops any frame a previous
+    /// seek left buffered in it. Opus needs about 80 ms of decoding before the target to
+    /// converge (RFC 7845 §4.6): the reader lands that much earlier, and the samples up to
+    /// the target are dropped. Positions count from after the pre-skip.
+    fn seek_webm(&mut self, to: Duration) -> Result<(), String> {
+        self.format =
+            reader(&self.media, &self.hint, 0, 0, self.len, false).map_err(|e| e.to_string())?;
+        self.codec.reset();
+        self.buf.clear();
+        self.idx = 0;
+        self.ended = false;
+        let rate = self.rate.get();
+        // In the stream's own frames, which start with the pre-skip.
+        let target = frames_in(to, rate) + self.lead;
+        let from = target.saturating_sub(frames_in(PRE_ROLL, rate));
+        let landed = if from == 0 {
+            0
+        } else {
+            let at = SeekTo::Time {
+                time: Duration::from_secs_f64(from as f64 / f64::from(rate)).into(),
+                track_id: Some(self.track),
+            };
+            let seeked = match self.format.seek(SeekMode::Accurate, at) {
+                Ok(s) => s,
+                // Past the last block: the track is over (a network failure shows up as the
+                // media's own error when the voice reads on).
+                Err(_) => {
+                    self.ended = true;
+                    return Ok(());
+                }
+            };
+            match self.codec.codec_params().time_base {
+                Some(tb) => frames_in(tb.calc_time(seeked.actual_ts).into(), rate),
+                None => from,
+            }
+        };
+        self.skip = target.saturating_sub(landed) * self.channels.get() as u64;
         Ok(())
     }
 

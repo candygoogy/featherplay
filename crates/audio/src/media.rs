@@ -204,6 +204,7 @@ fn percent_decode(s: &str) -> Option<String> {
 pub(crate) fn hint_for(mime: &str) -> Option<&'static str> {
     match mime.split(';').next()?.trim() {
         "audio/mp4" | "audio/m4a" | "audio/x-m4a" | "audio/aac" => Some("m4a"),
+        "audio/webm" => Some("webm"),
         "audio/mpeg" => Some("mp3"),
         "audio/wav" | "audio/x-wav" => Some("wav"),
         _ => None,
