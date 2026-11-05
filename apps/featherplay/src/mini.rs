@@ -6,6 +6,9 @@
 //! unpinned, at the tray. Unpinned with a click that brought it from behind another window,
 //! it closes, as it would have had it been unpinned all along.
 //!
+//! Unpinned, it also watches which window is in front, four times a second: opened from the
+//! hidden icons' flyout (^), it never gets the activation, so it can't lose it either.
+//!
 //! The window exists only while it shows: `open` creates it (a few milliseconds) and `close`
 //! drops it, so a closed mini player costs nothing, no window and no timer. While open it
 //! mirrors the main window's `Player` and `Theme` globals (each window has its own) on every
@@ -32,18 +35,59 @@ const COVER: u32 = 64;
 /// A click on the tray icon takes the activation from an open mini player, which closes;
 /// the click itself arrives just after and must not open it again.
 const REOPEN_GUARD: Duration = Duration::from_millis(400);
+/// How often the open, unpinned mini player looks at the window in front.
+pub const POLL: Duration = Duration::from_millis(250);
+
+pub use crate::native::Foreground;
+
+/// The window classes whose coming to the front doesn't close the mini player: the shell's
+/// own, which take the foreground on the way to it, and the tray icon's menu. Seen on
+/// Windows 11 (build 26300): the taskbar (`Shell_TrayWnd`, `Shell_SecondaryTrayWnd` on
+/// other screens), the hidden icons' flyout (`TopLevelWindowForOverflowXamlIsland`; Windows
+/// 10's is `NotifyIconOverflowWindow`), and Explorer's `ForegroundStaging`, which holds the
+/// foreground for a moment while it hands it on. tray-icon's own window (`tray_icon_app`)
+/// takes the foreground while its menu (`#32768`) shows.
+const NEUTRAL: [&str; 7] = [
+    "Shell_TrayWnd",
+    "Shell_SecondaryTrayWnd",
+    "TopLevelWindowForOverflowXamlIsland",
+    "NotifyIconOverflowWindow",
+    "ForegroundStaging",
+    "tray_icon_app",
+    "#32768",
+];
 
 struct Mini {
     ui: MiniPlayer,
     cover_url: RefCell<String>,
     /// The last press on it is what brought it to the front (`pressed`).
     pressed_from_behind: Cell<bool>,
+    /// Its window's handle, once it shows on screen (none on the offscreen platform).
+    hwnd: Cell<Option<isize>>,
+    /// Looks at the window in front every `POLL`, while it's unpinned (`watch`).
+    poll: slint::Timer,
+    /// The window in front when the poll last looked.
+    front: Cell<Option<isize>>,
 }
 
 thread_local! {
     static MINI: RefCell<Option<Rc<Mini>>> = const { RefCell::new(None) };
-    /// When the mini player last closed on its own (lost activation, Escape).
+    /// When the mini player last closed on its own (lost activation, Escape, the poll).
     static DISMISSED: Cell<Option<Instant>> = const { Cell::new(None) };
+    /// What the poll reads the window in front with: Windows', or a test's.
+    static READ_FOREGROUND: Cell<fn() -> Option<Foreground>> =
+        const { Cell::new(native::foreground) };
+}
+
+/// Has the foreground poll read the window in front with `read` from now on: the offscreen
+/// platform has no windows of its own in front, and tests put theirs there.
+pub fn read_foreground_with(read: fn() -> Option<Foreground>) {
+    READ_FOREGROUND.set(read);
+}
+
+/// Whether the foreground poll runs: only while the mini player shows, unpinned.
+pub fn polls() -> bool {
+    MINI.with_borrow(|m| m.as_ref().is_some_and(|m| m.poll.running()))
 }
 
 /// Whether the mini player shows.
@@ -92,10 +136,14 @@ pub fn create(ctx: &Rc<Ctx>) -> Result<MiniPlayer, String> {
         ui: ui.clone_strong(),
         cover_url: RefCell::new(String::new()),
         pressed_from_behind: Cell::new(false),
+        hwnd: Cell::new(None),
+        poll: slint::Timer::default(),
+        front: Cell::new(None),
     });
     // Registered first: a cover already decoded arrives inside `sync`.
     MINI.with_borrow_mut(|m| *m = Some(mini.clone()));
     sync(ctx, &mini, &main);
+    watch(&mini);
     Ok(ui)
 }
 
@@ -106,10 +154,11 @@ pub fn open(ctx: &Rc<Ctx>, x: i32, y: i32) -> Result<(), String> {
     let ui = create(ctx)?;
     let border = popup::border(&ui.global::<Theme>());
     let (left, top) = popup::show_at(ui.window(), (x, y), SIZE, border)?;
-    if let Some(hwnd) = shell::hwnd(ui.window())
-        && let Err(e) = native::when_pressed(hwnd, pressed)
-    {
-        log!("mini player: presses: {e}");
+    if let Some(hwnd) = shell::hwnd(ui.window()) {
+        MINI.with_borrow(|m| m.as_ref().map(|m| m.hwnd.set(Some(hwnd))));
+        if let Err(e) = native::when_pressed(hwnd, pressed) {
+            log!("mini player: presses: {e}");
+        }
     }
     log!(
         "mini player opened at {left},{top} ({:.1} ms)",
@@ -225,9 +274,56 @@ fn toggle_pin() {
     let data = mini.ui.global::<MiniData>();
     let pinned = !data.get_pinned();
     data.set_pinned(pinned);
-    if !pinned && mini.pressed_from_behind.take() {
+    if pinned {
+        mini.poll.stop();
+    } else if mini.pressed_from_behind.take() {
+        dismiss();
+    } else {
+        watch(&mini);
+    }
+}
+
+/// Starts the foreground poll from the window in front now: unpinned, the mini player
+/// closes once another app comes to the front (`moved_away`).
+fn watch(mini: &Mini) {
+    mini.front.set(READ_FOREGROUND.get()().map(|f| f.hwnd));
+    mini.poll
+        .start(slint::TimerMode::Repeated, POLL, look_at_the_front);
+}
+
+/// One round of the foreground poll.
+fn look_at_the_front() {
+    let Some(mini) = MINI.with_borrow(Clone::clone) else {
+        return;
+    };
+    let front = READ_FOREGROUND.get()();
+    let mut last = mini.front.get();
+    let away = moved_away(front.as_ref(), mini.hwnd.get(), &mut last);
+    mini.front.set(last);
+    if away {
+        mini.poll.stop();
         dismiss();
     }
+}
+
+/// Whether the window in front, `front`, means the user has moved on from the mini player
+/// (window `own`), given the one in front when the poll last looked (`last`, updated).
+///
+/// Only a change counts: whatever was in front when the poll started (the taskbar, the
+/// hidden icons' flyout the click came from, an app that kept the foreground) leaves it
+/// open. A change to the mini player itself, to a `NEUTRAL` shell window (the flyout
+/// handing the foreground to the taskbar as it closes, a second click on the tray icon,
+/// which then toggles it) or to no window at all (Windows between two) leaves it open too.
+/// Any other window, an app or the desktop (`Progman`, `WorkerW`), closes it.
+fn moved_away(front: Option<&Foreground>, own: Option<isize>, last: &mut Option<isize>) -> bool {
+    let Some(front) = front else {
+        return false;
+    };
+    if *last == Some(front.hwnd) {
+        return false;
+    }
+    *last = Some(front.hwnd);
+    Some(front.hwnd) != own && !NEUTRAL.contains(&front.class.as_str())
 }
 
 /// A mouse button, finger or pen went down on the open mini player; `from_behind` when that
@@ -280,4 +376,75 @@ fn sync(ctx: &Rc<Ctx>, mini: &Mini, main: &AppWindow) {
             ui.global::<MiniData>().set_cover(img);
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const OWN: isize = 0x1;
+    const APP: isize = 0x40;
+
+    fn front(hwnd: isize, class: &str) -> Foreground {
+        Foreground {
+            hwnd,
+            class: class.into(),
+        }
+    }
+
+    #[test]
+    fn the_window_in_front_at_the_start_leaves_it_open() {
+        let mut last = Some(APP);
+        let app = front(APP, "Chrome_WidgetWin_1");
+        assert!(!moved_away(Some(&app), Some(OWN), &mut last));
+    }
+
+    #[test]
+    fn another_app_coming_to_the_front_closes_it() {
+        let mut last = Some(0x10);
+        let app = front(APP, "Chrome_WidgetWin_1");
+        assert!(moved_away(Some(&app), Some(OWN), &mut last));
+    }
+
+    #[test]
+    fn the_desktop_coming_to_the_front_closes_it() {
+        for class in ["Progman", "WorkerW"] {
+            let mut last = Some(0x10);
+            let desktop = front(0x30, class);
+            assert!(moved_away(Some(&desktop), Some(OWN), &mut last), "{class}");
+        }
+    }
+
+    #[test]
+    fn the_mini_player_itself_coming_to_the_front_leaves_it_open() {
+        let mut last = Some(0x10);
+        let own = front(OWN, "Window Class");
+        assert!(!moved_away(Some(&own), Some(OWN), &mut last));
+        assert_eq!(last, Some(OWN));
+    }
+
+    #[test]
+    fn the_shell_and_the_tray_menu_coming_to_the_front_leave_it_open() {
+        for class in NEUTRAL {
+            let mut last = Some(APP);
+            let shell = front(0x20, class);
+            assert!(!moved_away(Some(&shell), Some(OWN), &mut last), "{class}");
+        }
+    }
+
+    #[test]
+    fn no_window_in_front_leaves_it_open_and_the_last_one_kept() {
+        let mut last = Some(0x10);
+        assert!(!moved_away(None, Some(OWN), &mut last));
+        assert_eq!(last, Some(0x10));
+    }
+
+    #[test]
+    fn the_first_app_coming_back_after_the_taskbar_closes_it() {
+        let mut last = Some(APP);
+        let taskbar = front(0x20, "Shell_TrayWnd");
+        let app = front(APP, "Chrome_WidgetWin_1");
+        assert!(!moved_away(Some(&taskbar), Some(OWN), &mut last));
+        assert!(moved_away(Some(&app), Some(OWN), &mut last));
+    }
 }

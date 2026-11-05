@@ -277,6 +277,9 @@ impl Scene {
         );
         let ctx = Ctx::new(&ui, catalog, covers, actions);
         app::wire(&ctx, &ui);
+        // No offscreen window is ever in front, so the mini player's poll mustn't read the
+        // desktop's: a test puts its own windows in front.
+        crate::mini::read_foreground_with(|| None);
         // English, whatever the machine's languages or settings, so renders don't depend on
         // them; a test picks another with `language::apply`.
         crate::language::apply("");

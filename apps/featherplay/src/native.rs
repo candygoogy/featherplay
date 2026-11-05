@@ -2,8 +2,8 @@
 //! that's repainted whole when Windows drops it, the Tri-vane icon for the title bar and
 //! taskbar (dark or light, as the taskbar is), minimising it and bringing it forward, its
 //! taskbar button showing up, and Windows' animation setting. For the tray's mini player:
-//! the work area and scale of the screen under a point, the popup's border, and whether a
-//! press is what brought it to the front.
+//! the work area and scale of the screen under a point, the popup's border, whether a press
+//! is what brought it to the front, and which window is in front.
 
 use std::cell::{Cell, RefCell};
 use std::ffi::c_void;
@@ -21,13 +21,13 @@ use windows::Win32::Graphics::Gdi::{
 use windows::Win32::UI::HiDpi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI};
 use windows::Win32::UI::Shell::{DefSubclassProc, RemoveWindowSubclass, SetWindowSubclass};
 use windows::Win32::UI::WindowsAndMessaging::{
-    CreateIconFromResourceEx, DestroyIcon, HICON, ICON_BIG, ICON_SMALL, IsIconic, LR_DEFAULTCOLOR,
-    RegisterWindowMessageW, SC_MINIMIZE, SC_RESTORE, SIZE_MAXIMIZED, SIZE_MINIMIZED, SIZE_RESTORED,
-    SPI_GETCLIENTAREAANIMATION, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS, SendMessageW,
-    SetForegroundWindow, SystemParametersInfoW, WM_DISPLAYCHANGE, WM_DPICHANGED, WM_LBUTTONDOWN,
-    WM_MBUTTONDOWN, WM_MOUSEACTIVATE, WM_MOUSEWHEEL, WM_NCDESTROY, WM_PAINT, WM_POINTERACTIVATE,
-    WM_POINTERDOWN, WM_RBUTTONDOWN, WM_SETICON, WM_SETTINGCHANGE, WM_SIZE, WM_SYSCOMMAND,
-    WM_XBUTTONDOWN,
+    CreateIconFromResourceEx, DestroyIcon, GetClassNameW, GetForegroundWindow, HICON, ICON_BIG,
+    ICON_SMALL, IsIconic, LR_DEFAULTCOLOR, RegisterWindowMessageW, SC_MINIMIZE, SC_RESTORE,
+    SIZE_MAXIMIZED, SIZE_MINIMIZED, SIZE_RESTORED, SPI_GETCLIENTAREAANIMATION,
+    SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS, SendMessageW, SetForegroundWindow, SystemParametersInfoW,
+    WM_DISPLAYCHANGE, WM_DPICHANGED, WM_LBUTTONDOWN, WM_MBUTTONDOWN, WM_MOUSEACTIVATE,
+    WM_MOUSEWHEEL, WM_NCDESTROY, WM_PAINT, WM_POINTERACTIVATE, WM_POINTERDOWN, WM_RBUTTONDOWN,
+    WM_SETICON, WM_SETTINGCHANGE, WM_SIZE, WM_SYSCOMMAND, WM_XBUTTONDOWN,
 };
 
 /// The Tri-vane logo, 16 to 256 px, from `build.rs`, drawn for dark grounds: the play sits
@@ -637,6 +637,33 @@ unsafe extern "system" fn pressed_proc(
     }
     // SAFETY: the arguments this subclass was called with.
     unsafe { DefSubclassProc(hwnd, msg, wparam, lparam) }
+}
+
+/// The window in front: what `foreground` reads.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Foreground {
+    pub hwnd: isize,
+    /// Its window class, as `GetClassNameW` gives it (`Shell_TrayWnd`).
+    pub class: String,
+}
+
+/// The window in front (`GetForegroundWindow`) and its class, or `None` while no window is
+/// in front, as for a moment while Windows switches.
+pub fn foreground() -> Option<Foreground> {
+    // SAFETY: no preconditions; it returns null when no window is in front.
+    let h = unsafe { GetForegroundWindow() };
+    if h.is_invalid() {
+        return None;
+    }
+    let mut name = [0u16; 256];
+    // SAFETY: a window handle and a buffer of the length the slice gives; a stale handle
+    // makes it return 0.
+    let len = unsafe { GetClassNameW(h, &mut name) };
+    let len = usize::try_from(len).unwrap_or(0).min(name.len());
+    Some(Foreground {
+        hwnd: h.0 as isize,
+        class: String::from_utf16_lossy(&name[..len]),
+    })
 }
 
 /// Whether the window is minimised (hidden or not).

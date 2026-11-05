@@ -1,18 +1,20 @@
 //! The tray's mini player on the offscreen platform (no window is shown): it mirrors the main
 //! window's track and theme, its play button goes through the main window's player, Escape
 //! and a lost activation close it, and while it shows nothing in it animates or keeps a
-//! timer. Pinned, it stays open without the activation, closes on its ×, and a press off
-//! its controls drags it; the pin lasts for that opening only, and unpinned from behind
-//! another window, it closes. A click or a drag on its progress line seeks, and never drags
-//! the window. Prints what creating it costs.
+//! timer but the foreground poll. Pinned, it stays open without the activation, closes on
+//! its ×, and a press off its controls drags it; the pin lasts for that opening only, and
+//! unpinned from behind another window, it closes. Unpinned, it closes once another app
+//! comes to the front, but not while the taskbar or the hidden icons' flyout it was opened
+//! from is in front (the poll reads an injected foreground). A click or a drag on its
+//! progress line seeks, and never drags the window. Prints what creating it costs.
 
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::path::Path;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
 use featherplay::controller::{AccountAction, Action};
-use featherplay::mini;
+use featherplay::mini::{self, Foreground};
 use featherplay::snapshot::Scene;
 use featherplay::ui::{MiniData, MiniPlayer, Player, Theme, Toast};
 use slint::platform::{Key, PointerEventButton, WindowEvent};
@@ -60,6 +62,36 @@ fn settings_saved(scene: &Scene) -> usize {
         .into_iter()
         .filter(|a| matches!(a, Action::Account(AccountAction::Set(_))))
         .count()
+}
+
+thread_local! {
+    /// The window the injected foreground reader reports.
+    static FRONT: RefCell<Option<Foreground>> = const { RefCell::new(None) };
+}
+
+/// Puts window `hwnd`, of `class`, in front, as the mini player's poll reads it.
+fn in_front((hwnd, class): (isize, &str)) {
+    FRONT.set(Some(Foreground {
+        hwnd,
+        class: class.into(),
+    }));
+}
+
+fn read_front() -> Option<Foreground> {
+    FRONT.with_borrow(Clone::clone)
+}
+
+/// The hidden icons' flyout (^) on Windows 11, the taskbar, the desktop and another app.
+const FLYOUT: (isize, &str) = (0x10, "TopLevelWindowForOverflowXamlIsland");
+const TASKBAR: (isize, &str) = (0x20, "Shell_TrayWnd");
+const DESKTOP: (isize, &str) = (0x30, "Progman");
+const OTHER_APP: (isize, &str) = (0x40, "Chrome_WidgetWin_1");
+
+/// Lets one round of the foreground poll run.
+fn poll(scene: &Scene) {
+    std::thread::sleep(mini::POLL + Duration::from_millis(30));
+    scene.settle_once();
+    scene.settle();
 }
 
 fn lose_activation(mini: &MiniPlayer, scene: &Scene) {
@@ -250,6 +282,88 @@ fn unpinned_in_front_the_mini_player_stays_open_until_it_loses_the_activation() 
         !mini::is_open(),
         "unpinned, losing the activation didn't close it"
     );
+}
+
+#[test]
+fn opened_from_the_flyout_the_poll_waits_while_the_shell_is_in_front() {
+    let scene = playing_scene();
+    mini::read_foreground_with(read_front);
+    in_front(FLYOUT);
+    let _mini = open(&scene);
+    assert!(mini::polls(), "unpinned, the poll isn't running");
+
+    // The flyout keeps the foreground, then the taskbar may take it as the flyout closes.
+    poll(&scene);
+    assert!(mini::is_open(), "the flyout in front closed it");
+    in_front(TASKBAR);
+    poll(&scene);
+    assert!(mini::is_open(), "the taskbar in front closed it");
+    // No window in front for a moment, as while Windows switches.
+    FRONT.set(None);
+    poll(&scene);
+    assert!(mini::is_open(), "no window in front closed it");
+}
+
+#[test]
+fn opened_from_the_flyout_the_poll_closes_it_when_another_app_comes_to_the_front() {
+    let scene = playing_scene();
+    mini::read_foreground_with(read_front);
+    in_front(FLYOUT);
+    let _mini = open(&scene);
+    poll(&scene);
+    assert!(mini::is_open());
+
+    in_front(OTHER_APP);
+    poll(&scene);
+    assert!(!mini::is_open(), "another app in front left it open");
+
+    // The click on the tray icon that follows doesn't open it again at once.
+    mini::toggle(200, 200);
+    assert!(!mini::is_open(), "the tray click reopened it");
+}
+
+#[test]
+fn the_poll_closes_it_when_the_desktop_comes_to_the_front() {
+    let scene = playing_scene();
+    mini::read_foreground_with(read_front);
+    in_front(TASKBAR);
+    let _mini = open(&scene);
+    poll(&scene);
+    assert!(mini::is_open());
+
+    in_front(DESKTOP);
+    poll(&scene);
+    assert!(!mini::is_open(), "a click on the desktop left it open");
+}
+
+#[test]
+fn the_poll_never_closes_a_pinned_mini_player_and_runs_only_while_unpinned() {
+    let scene = playing_scene();
+    mini::read_foreground_with(read_front);
+    in_front(FLYOUT);
+    let mini = open(&scene);
+    assert!(mini::polls());
+
+    click(mini.window(), PIN.0, PIN.1);
+    scene.settle();
+    assert!(!mini::polls(), "pinned, the poll still runs");
+    in_front(OTHER_APP);
+    poll(&scene);
+    assert!(mini::is_open(), "pinned, another app in front closed it");
+
+    // Unpinned in front, the poll runs again, from the window in front now.
+    mini::pressed(false);
+    click(mini.window(), PIN.0, PIN.1);
+    scene.settle();
+    assert!(mini::polls(), "unpinned, the poll didn't restart");
+    poll(&scene);
+    assert!(mini::is_open(), "the window already in front closed it");
+
+    mini.window().dispatch_event(WindowEvent::KeyPressed {
+        text: Key::Escape.into(),
+    });
+    scene.settle();
+    assert!(!mini::is_open());
 }
 
 #[test]

@@ -1,7 +1,8 @@
 //! Paused with the window on screen, nothing renders and no timer is armed (the paused CPU
 //! budget, 0.012 % of the machine), on the offscreen platform (no window is shown), with
 //! Windows' animation effects on: on each page once it has loaded, after pausing from the
-//! tray icon's menu, after opening and closing the mini player, and with it pinned.
+//! tray icon's menu, after opening and closing the mini player (open and unpinned, its
+//! foreground poll is the one timer), and with it pinned.
 
 use std::time::{Duration, Instant};
 
@@ -43,6 +44,24 @@ fn assert_idle(scene: &Scene, windows: &[&slint::Window], after: &str) {
         frames == 0 && !animating.contains(&true) && timer.is_none(),
         "after {after}: {frames} frame(s) asked for in 500 ms, animating {animating:?}, \
          next timer {timer:?}"
+    );
+}
+
+/// As `assert_idle`, with the open, unpinned mini player's foreground poll as the one timer
+/// allowed (pinning it next leaves none, which shows the poll was the only one).
+fn assert_idle_but_the_poll(scene: &Scene, windows: &[&slint::Window], after: &str) {
+    run_for(scene, windows, 800);
+    let frames = frames_over(scene, windows, 500);
+    let animating: Vec<bool> = windows.iter().map(|w| w.has_active_animations()).collect();
+    let timer = slint::platform::duration_until_next_timer_update();
+    assert!(
+        frames == 0
+            && !animating.contains(&true)
+            && mini::polls()
+            && timer.is_some_and(|t| t <= mini::POLL),
+        "after {after}: {frames} frame(s) asked for in 500 ms, animating {animating:?}, \
+         next timer {timer:?}, polling {}",
+        mini::polls()
     );
 }
 
@@ -90,14 +109,14 @@ fn paused_nothing_renders_and_no_timer_is_armed() {
     assert!(!scene.ui.global::<Player>().get_playing());
     assert_idle(&scene, &[main], "pausing from the tray menu");
 
-    // The mini player, opened and closed.
+    // The mini player, opened and closed: open and unpinned, only its foreground poll runs.
     let player = mini::create(&scene.ctx).expect("mini player");
     player.show().expect("show");
     player
         .window()
         .dispatch_event(WindowEvent::WindowActiveChanged(true));
     scene.settle();
-    assert_idle(&scene, &[main, player.window()], "opening the mini player");
+    assert_idle_but_the_poll(&scene, &[main, player.window()], "opening the mini player");
     player
         .window()
         .dispatch_event(WindowEvent::WindowActiveChanged(false));
