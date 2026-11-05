@@ -249,7 +249,8 @@ test("the FAQ and features say what the README says", async ({ page }) => {
   const text = (sel: string) => page.locator(sel).evaluate((el) => el.textContent!.replace(/\s+/g, " "));
   const faq = await text("#questions");
   // Signing in.
-  expect(faq).toContain("never sees your password");
+  expect(faq).toContain("doesn't read your password; the code is open");
+  expect(faq).toContain("Sign in with Microsoft Edge");
   expect(faq).toContain("Sign out");
   expect(faq).toContain("ListenBrainz token");
   // What it connects to, and what each service gets.

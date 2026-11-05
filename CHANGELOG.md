@@ -6,6 +6,13 @@ Notable changes to featherplay, newest first. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- "Sign in with Microsoft Edge", beside the regular sign-in and the cookie paste: Google's
+  sign-in in a real Edge window, with Edge's address bar, passkeys and Windows Hello, in a
+  temporary profile that's deleted afterwards. featherplay keeps only the YouTube Music
+  session from it. The regular sign-in window stays the default.
+
 ## [0.1.1] - 2026-11-04
 
 ### Added

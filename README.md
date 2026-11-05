@@ -105,9 +105,20 @@ that it updates yt-dlp at most once a day, because YouTube changes often. They l
 
 featherplay signs you in through a small window, Microsoft Edge WebView2, that shows Google's
 own sign-in page. Windows 11 includes WebView2, and most Windows 10 PCs have it with Edge. You
-sign in there as you would in a browser; featherplay never sees your password. Once you're in,
-it keeps the YouTube Music session from that window and closes it. The main window never
-contains a browser.
+sign in there as you would in a browser. featherplay doesn't read your password; the code is
+open. Once you're in, it keeps the YouTube Music session from that window and closes it. The
+main window never contains a browser.
+
+If you'd rather sign in in a browser you know, choose **Sign in with Microsoft Edge**. Edge
+opens with a temporary profile of its own, with Edge's address bar and padlock, and your
+passkeys and Windows Hello work as usual. featherplay never touches your own Edge profile. It
+talks to that Edge over a private pipe, not a network port, and the only things it can ask
+are the profile's cookies and for Edge to close. Once you're signed in, it keeps the YouTube
+Music session, drops every other cookie, closes Edge and deletes the temporary profile. If
+you close Edge or don't sign in within 10 minutes, nothing is kept. **Switch Google account**
+in the account menu still uses the small window, because it remembers the accounts you've
+signed in with. If an Edge policy on your PC turns that connection off
+(`RemoteDebuggingAllowed`), the Edge option is greyed out and says so.
 
 The session is stored in Windows Credential Manager. yt-dlp takes cookies as a file, so
 while it looks up a song's audio, featherplay writes the session to a temporary file in
@@ -311,7 +322,7 @@ needs a helper on the PC that talks to the API for it.
 ## What it leaves out
 
 - **Chromium.** There's no browser engine in the window. Signing in uses Windows' own
-  WebView2 once, then closes it.
+  WebView2 (or Microsoft Edge, if you choose it) once, then closes it.
 - **Electron.** featherplay is one native program, not a web app in a frame.
 - **Video.** It never plays video. A music video with a song version plays as the song.
 - **Telemetry.** No analytics and no tracking, and no server of its own.
@@ -321,6 +332,11 @@ needs a helper on the PC that talks to the API for it.
 **Is my account safe with it?** The session stays on your PC, in Credential Manager, and the
 code is public. It's still an unofficial client using YouTube Music in a way Google doesn't
 support; if that worries you, sign in with a second account.
+
+**I don't want to type my Google password into an app's window.** Choose **Sign in with
+Microsoft Edge** on the sign-in page. You sign in in Edge itself, with its own address bar,
+passkeys and Windows Hello, in a temporary profile that's deleted afterwards. featherplay
+doesn't read your password; the code is open.
 
 **Playback stopped working.** Update featherplay first. If the latest version fails too,
 [open an issue](https://github.com/candygoogy/featherplay/issues).
@@ -364,7 +380,9 @@ for apps on your PC that have its token.
 Your YouTube Music session, your Last.fm session, your ListenBrainz token and the local API's
 token are kept in Windows Credential Manager. Settings, the play queue and the scrobbles waiting to be sent are
 in `%APPDATA%\featherplay`; covers, the helpers and the sign-in window's data are in
-`%LOCALAPPDATA%\featherplay`.
+`%LOCALAPPDATA%\featherplay`. Signing in with Microsoft Edge uses a temporary Edge profile in
+that folder too, deleted as soon as the sign-in ends (or at the next start, if featherplay was
+killed meanwhile); featherplay keeps only its YouTube Music cookies.
 
 ## Build from source
 
