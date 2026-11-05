@@ -1,13 +1,12 @@
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::OnceLock;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::time::Instant;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use featherplay_core::model::TrackId;
-use featherplay_core::sync::LockExt;
 use serde_json::Value;
 
+use crate::chain::{Chain, Check, Steps};
 use crate::expiry::query_param;
 use crate::native::{NativeError, NativeResolver};
 use crate::sidecars::{Installer, tail};
@@ -122,47 +121,26 @@ pub fn classify_failure(code: i32, stderr: &str) -> ResolveError {
     }
 }
 
-/// The embedded client refused the video for its age check. yt-dlp's other clients ask
-/// for a sign-in then too ("Sign in to confirm your age"), so without cookies a yt-dlp
-/// run only adds ~4 s before the same answer. The client's message, if so.
-fn age_check(e: &NativeError) -> Option<&str> {
-    let NativeError::Skip(m) = e else {
-        return None;
-    };
-    let low = m.to_ascii_lowercase();
-    (low.starts_with("age_") || low.contains("age-restricted") || low.contains("confirm your age"))
-        .then_some(m.as_str())
-}
-
 /// The embedded player's client: no PO token, and no pre-roll ad gate, so its URL plays at
 /// once (Oct 2026). Only for videos that allow embedding. The webpage and the `next` call
 /// are skipped (the title and tags come from the player response), and so are the HLS
 /// manifests: ~2.5 s in all instead of ~4 s plus the ~5 s gate of the TV clients.
 const EMBEDDED_ARGS: &str =
     "youtube:player_client=web_embedded;player_skip=webpage,initial_data;skip=hls";
-/// The `c=` of the embedded client's stream URLs.
-const EMBEDDED_CLIENT: &str = "WEB_EMBEDDED_PLAYER";
-/// How long the embedded client stays off after one of its URLs was refused.
-const EMBEDDED_OFF: Duration = Duration::from_secs(30 * 60);
-
 /// Resolves streams, without cookies unless a cookie header is given (cookies made
-/// resolving ~2x slower with the same result, measured 2026-10-26). In order:
+/// resolving ~2x slower with the same result, measured 2026-10-26). The steps, in the
+/// order and with the rules of `Chain::resolve`:
 ///
 /// 1. The embedded player's client, asked from Rust (`native`: one request, ~0.3 s once
 ///    the player is cached). Not with cookies.
-/// 2. The same client through yt-dlp (`EMBEDDED_ARGS`, ~2.6 s), when step 1 failed on our
-///    side. Skipped when the client said no to the video itself (not embeddable).
+/// 2. The same client through yt-dlp (`EMBEDDED_ARGS`, ~2.6 s).
 /// 3. yt-dlp's default clients (the TV clients, which gate their URLs behind a pre-roll ad
-///    until `available_at`). Not for a video step 1 refused for its age check: without
-///    cookies these ask for a sign-in too.
+///    until `available_at`).
 pub struct YtDlpResolver {
     sidecars: Sidecars,
     cookie_header: Option<String>,
-    /// Until when the embedded client is skipped (`refused`).
-    embedded_off: Mutex<Option<Instant>>,
+    chain: Chain,
     native: Option<NativeResolver>,
-    /// Why the last resolve didn't come from step 1.
-    fallback: Mutex<Option<String>>,
     /// yt-dlp was forced up to date after a failure this session (`update_helpers`).
     forced: AtomicBool,
     /// Held while an update runs, so resolves failing together run one `yt-dlp -U`.
@@ -171,6 +149,8 @@ pub struct YtDlpResolver {
     updates: AtomicU64,
     /// Downloads the helpers when they're missing (`with_downloads`).
     installer: Option<Installer>,
+    /// For `first_byte`, made at the first check.
+    checks: OnceLock<Option<reqwest::Client>>,
 }
 
 impl YtDlpResolver {
@@ -190,13 +170,13 @@ impl YtDlpResolver {
         Self {
             sidecars,
             cookie_header,
-            embedded_off: Mutex::new(None),
+            chain: Chain::default(),
             native,
-            fallback: Mutex::new(None),
             forced: AtomicBool::new(false),
             updating: tokio::sync::Mutex::new(()),
             updates: AtomicU64::new(0),
             installer: None,
+            checks: OnceLock::new(),
         }
     }
 
@@ -271,18 +251,16 @@ impl YtDlpResolver {
 
     /// Why the last resolve went to yt-dlp instead of the native request, once.
     pub fn take_fallback_reason(&self) -> Option<String> {
-        self.fallback.lock_or_recover().take()
+        self.chain.take_fallback_reason()
     }
 
-    /// A stream URL from this resolver was refused (HTTP 403) before it expired. When it
-    /// came from the embedded client, that client is skipped for a while: YouTube may have
-    /// started to require a PO token for it.
+    /// A stream URL from this resolver was refused (HTTP 403) before it expired: see
+    /// `Chain::refused`. The native step starts from a fresh embed page next time.
     pub fn refused(&self, url: &str) {
-        if query_param(url, "c").as_deref() == Some(EMBEDDED_CLIENT) {
-            *self.embedded_off.lock_or_recover() = Some(Instant::now() + EMBEDDED_OFF);
-            if let Some(n) = &self.native {
-                n.refused();
-            }
+        if self.chain.refused(url)
+            && let Some(n) = &self.native
+        {
+            n.refused();
         }
     }
 
@@ -304,12 +282,6 @@ impl YtDlpResolver {
             Probe::Args(a) => Some(a),
         };
         self.run(id, None, args).await.map_err(|e| e.to_string())
-    }
-
-    fn embedded_on(&self) -> bool {
-        self.embedded_off
-            .lock_or_recover()
-            .is_none_or(|until| Instant::now() >= until)
     }
 
     async fn run(
@@ -392,7 +364,7 @@ impl StreamResolver for YtDlpResolver {
         if let Some(installer) = &self.installer {
             installer.install(&self.sidecars).await?;
         }
-        // Lives for both attempts; dropping it deletes the file, on every return path.
+        // Lives for every step; dropping it deletes the file, on every return path.
         let cookies = match &self.cookie_header {
             Some(header) => Some(
                 CookieFile::write(&self.sidecars.home().join("tmp"), header).map_err(|e| {
@@ -404,55 +376,77 @@ impl StreamResolver for YtDlpResolver {
             ),
             None => None,
         };
-        let mut embedded = self.embedded_on();
-        if embedded
-            && cookies.is_none()
-            && let Some(native) = &self.native
-        {
-            match native.resolve(&id.0).await {
-                Ok(stream) => return Ok(stream),
-                Err(e) => {
-                    if let Some(m) = age_check(&e) {
-                        let e = ResolveError::Unavailable(m.to_string());
-                        log::info!("{}", stage_failed(id, Stage::Native, &e));
-                        return Err(e);
-                    }
-                    // The client refused the video: yt-dlp's embedded run would too.
-                    embedded &= !matches!(e, NativeError::Skip(_));
-                    *self.fallback.lock_or_recover() = Some(e.to_string());
-                }
-            }
+        let steps = Live {
+            r: self,
+            cookies: cookies.as_ref(),
+        };
+        self.chain.resolve(&steps, id).await
+    }
+}
+
+/// The steps as `resolve` runs them, for `Chain::resolve`.
+struct Live<'a> {
+    r: &'a YtDlpResolver,
+    cookies: Option<&'a CookieFile>,
+}
+
+impl Steps for Live<'_> {
+    async fn native(&self, id: &TrackId) -> Option<Result<ResolvedStream, NativeError>> {
+        if self.cookies.is_some() {
+            return None;
         }
-        if embedded {
-            match self.run(id, cookies.as_ref(), Some(EMBEDDED_ARGS)).await {
-                Ok(stream) => {
-                    wait_until_available(&stream).await;
-                    return Ok(stream);
-                }
-                Err(e) => {
-                    log::warn!("{}", stage_failed(id, Stage::Embedded, &e));
-                    if e == ResolveError::ToolMissing {
-                        return Err(e);
-                    }
-                    // Not embeddable, or the client broke: the default clients decide.
-                }
-            }
-        }
-        let mut result = self.run(id, cookies.as_ref(), None).await;
-        if let Err(e) = &result {
-            log::warn!("{}", stage_failed(id, Stage::Default, e));
-        }
-        if matches!(result, Err(ResolveError::ToolFailed { .. })) && self.update_helpers().await {
-            // The retry is worth it even if the update fails (a transient error).
-            result = self.run(id, cookies.as_ref(), None).await;
-            if let Err(e) = &result {
-                log::warn!("{} (after yt-dlp -U)", stage_failed(id, Stage::Default, e));
-            }
-        }
-        drop(cookies);
-        let stream = result?;
+        Some(self.r.native.as_ref()?.resolve(&id.0).await)
+    }
+
+    async fn embedded(&self, id: &TrackId) -> Result<ResolvedStream, ResolveError> {
+        let stream = self.r.run(id, self.cookies, Some(EMBEDDED_ARGS)).await?;
         wait_until_available(&stream).await;
         Ok(stream)
+    }
+
+    async fn default_clients(&self, id: &TrackId) -> Result<ResolvedStream, ResolveError> {
+        let stream = self.r.run(id, self.cookies, None).await?;
+        wait_until_available(&stream).await;
+        Ok(stream)
+    }
+
+    async fn update(&self) -> bool {
+        self.r.update_helpers().await
+    }
+
+    async fn check(&self, url: &str) -> Check {
+        match self.r.checks.get_or_init(check_client) {
+            Some(http) => first_byte(http, url).await,
+            None => Check::Unknown,
+        }
+    }
+}
+
+/// A check that takes longer is no answer (a normal one takes ~0.2 s).
+const CHECK_TIMEOUT: Duration = Duration::from_secs(3);
+
+/// The client for `first_byte`: like the engine's (no User-Agent), and keeping no
+/// connection idle, so no reaper timer runs while paused.
+fn check_client() -> Option<reqwest::Client> {
+    reqwest::Client::builder()
+        .connect_timeout(CHECK_TIMEOUT)
+        .pool_max_idle_per_host(0)
+        .build()
+        .ok()
+}
+
+/// One `Range: bytes=0-0` request for `url`: the engine's first request, for one byte.
+async fn first_byte(http: &reqwest::Client, url: &str) -> Check {
+    let answer = http
+        .get(url)
+        .header(reqwest::header::RANGE, "bytes=0-0")
+        .timeout(CHECK_TIMEOUT)
+        .send()
+        .await;
+    match answer {
+        Ok(r) if r.status().is_success() => Check::Plays,
+        Ok(r) if r.status() == reqwest::StatusCode::FORBIDDEN => Check::Refused,
+        _ => Check::Unknown,
     }
 }
 
@@ -467,27 +461,6 @@ pub enum Probe<'a> {
     Default,
     /// yt-dlp with these `--extractor-args`, such as `youtube:player_client=tv`.
     Args(&'a str),
-}
-
-/// The steps of `YtDlpResolver::resolve`, as the log names them.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Stage {
-    /// The embedded client asked from Rust.
-    Native,
-    /// The embedded client through yt-dlp.
-    Embedded,
-    /// yt-dlp's default clients.
-    Default,
-}
-
-/// The log line for a step that failed.
-fn stage_failed(id: &TrackId, stage: Stage, e: &ResolveError) -> String {
-    let stage = match stage {
-        Stage::Native => "native",
-        Stage::Embedded => "embedded",
-        Stage::Default => "default",
-    };
-    format!("resolve {} [{stage}] failed: {e}", id.0)
 }
 
 /// The TV clients (the only ones that work without a PO token) gate the URL behind a pre-roll ad:
@@ -651,27 +624,6 @@ mod tests {
         std::fs::remove_dir_all(&home).unwrap();
     }
 
-    /// yt-dlp can't pass an age check without cookies either ("Sign in to confirm your
-    /// age", after ~4 s): the embedded client's refusal settles it.
-    #[test]
-    fn an_age_check_needs_no_yt_dlp_run() {
-        let said = |m: &str| age_check(&NativeError::Skip(m.into())).is_some();
-        assert!(said("UNPLAYABLE: Sorry, this content is age-restricted"));
-        assert!(said(
-            "LOGIN_REQUIRED: Sign in to confirm your age. This video may be inappropriate"
-        ));
-        assert!(said("AGE_CHECK_REQUIRED: no reason"));
-        // Other refusals still go to yt-dlp's other clients.
-        assert!(!said(
-            "UNPLAYABLE: Playback on other websites has been disabled"
-        ));
-        assert!(!said("LOGIN_REQUIRED: Sign in to confirm you're not a bot"));
-        assert!(!said("no format 140"));
-        // Our side failing is never an age check.
-        let ours = NativeError::Failed("player API: age-restricted".into());
-        assert_eq!(age_check(&ours), None);
-    }
-
     /// yt-dlp says why a format is missing only in a warning ("n challenge solving failed",
     /// "formats have been skipped"), so the stderr tail a failure logs must keep them.
     #[test]
@@ -697,33 +649,24 @@ mod tests {
         );
     }
 
-    #[test]
-    fn a_stage_failure_names_the_stage_the_exit_code_and_the_stderr_tail() {
-        let e = ResolveError::ToolFailed {
-            code: 1,
-            stderr_tail: "ERROR: [youtube] h46YpWrg55Q: Sign in to confirm you're not a bot".into(),
-        };
-        let line = stage_failed(&TrackId("h46YpWrg55Q".into()), Stage::Default, &e);
+    #[tokio::test]
+    async fn a_check_asks_for_the_first_byte_and_reads_the_answer() {
+        let (base, log) = test_server::serve(|_, path, _| match path {
+            "/plays" => (206, "x".into()),
+            "/refused" => (403, String::new()),
+            _ => (500, String::new()),
+        });
+        let http = reqwest::Client::new();
+        let at = |path: &str| format!("{base}{path}");
+        assert_eq!(first_byte(&http, &at("/plays")).await, Check::Plays);
+        assert_eq!(first_byte(&http, &at("/refused")).await, Check::Refused);
+        assert_eq!(first_byte(&http, &at("/broken")).await, Check::Unknown);
+        assert_eq!(log.lock().unwrap().len(), 3, "one request each, no retry");
+        // Nothing listens on port 1.
         assert_eq!(
-            line,
-            "resolve h46YpWrg55Q [default] failed: yt-dlp exited with code 1: \
-             ERROR: [youtube] h46YpWrg55Q: Sign in to confirm you're not a bot"
+            first_byte(&http, "http://127.0.0.1:1/x").await,
+            Check::Unknown
         );
-        let line = stage_failed(
-            &TrackId("x".into()),
-            Stage::Embedded,
-            &ResolveError::Unavailable("private video".into()),
-        );
-        assert_eq!(
-            line,
-            "resolve x [embedded] failed: unavailable: private video"
-        );
-        let line = stage_failed(
-            &TrackId("x".into()),
-            Stage::Native,
-            &ResolveError::ToolMissing,
-        );
-        assert_eq!(line, "resolve x [native] failed: yt-dlp or deno is missing");
     }
 
     #[tokio::test]

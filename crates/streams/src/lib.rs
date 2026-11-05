@@ -8,6 +8,7 @@
     )
 )]
 
+mod chain;
 mod expiry;
 mod native;
 mod sidecars;
