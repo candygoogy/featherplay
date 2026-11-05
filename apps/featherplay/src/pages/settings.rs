@@ -120,22 +120,10 @@ pub fn mark_tray_notice_shown(ctx: &Ctx) {
     commit(ctx, Change::TrayNoticeShown);
 }
 
-/// Whether the tray's mini player opens pinned.
-pub fn mini_pinned() -> bool {
-    SETTINGS.with(|s| s.borrow().mini_pinned)
-}
-
 /// Whether a left click on the tray icon opens the main window instead of the mini player
 /// ("Tray click opens the main window").
 pub fn tray_click_opens_window() -> bool {
     SETTINGS.with(|s| s.borrow().tray_click_opens_window)
-}
-
-/// Saves whether the tray's mini player is pinned (its pin button).
-pub fn set_mini_pinned(ctx: &Ctx, on: bool) {
-    if mini_pinned() != on {
-        commit(ctx, Change::MiniPinned(on));
-    }
 }
 
 /// Once at startup: load the settings, apply the theme and the accent, connect

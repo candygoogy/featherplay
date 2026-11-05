@@ -1,8 +1,10 @@
 //! The tray's mini player (`ui/mini_player.slint`): a left click on the tray icon opens it
 //! over the notification area, another click, Escape or a click elsewhere closes it.
-//! Pinned (its pin button, saved as `mini_pinned`), a click elsewhere, the tray icon's menu
-//! and showing the main window leave it open: it stays on top (the window always is), its ×
-//! closes it and a press off its controls drags it. It still opens at the tray.
+//! Pinned (its pin button), a click elsewhere, the tray icon's menu and showing the main
+//! window leave it open: it stays on top (the window always is), its × closes it and a press
+//! off its controls drags it. The pin lasts for that opening: every mini player opens
+//! unpinned, at the tray. Unpinned with a click that brought it from behind another window,
+//! it closes, as it would have had it been unpinned all along.
 //!
 //! The window exists only while it shows: `open` creates it (a few milliseconds) and `close`
 //! drops it, so a closed mini player costs nothing, no window and no timer. While open it
@@ -19,10 +21,9 @@ use slint::ComponentHandle;
 use slint::winit_030::{EventResult, WinitWindowAccessor, winit};
 
 use crate::app::{self, Ctx};
-use crate::pages::settings;
-use crate::popup;
 use crate::ui::{AppWindow, MiniData, MiniPlayer, Player, SettingsData, Theme};
 use crate::ui_bridge::format_duration;
+use crate::{native, popup, shell};
 
 /// The window's size in logical pixels.
 pub const SIZE: (f32, f32) = (340.0, 170.0);
@@ -35,6 +36,8 @@ const REOPEN_GUARD: Duration = Duration::from_millis(400);
 struct Mini {
     ui: MiniPlayer,
     cover_url: RefCell<String>,
+    /// The last press on it is what brought it to the front (`pressed`).
+    pressed_from_behind: Cell<bool>,
 }
 
 thread_local! {
@@ -84,11 +87,11 @@ pub fn create(ctx: &Rc<Ctx>) -> Result<MiniPlayer, String> {
         })
     })
     .map_err(|e| format!("window: {e}"))?;
-    ui.global::<MiniData>().set_pinned(settings::mini_pinned());
     wire(&ui, &main);
     let mini = Rc::new(Mini {
         ui: ui.clone_strong(),
         cover_url: RefCell::new(String::new()),
+        pressed_from_behind: Cell::new(false),
     });
     // Registered first: a cover already decoded arrives inside `sync`.
     MINI.with_borrow_mut(|m| *m = Some(mini.clone()));
@@ -103,6 +106,11 @@ pub fn open(ctx: &Rc<Ctx>, x: i32, y: i32) -> Result<(), String> {
     let ui = create(ctx)?;
     let border = popup::border(&ui.global::<Theme>());
     let (left, top) = popup::show_at(ui.window(), (x, y), SIZE, border)?;
+    if let Some(hwnd) = shell::hwnd(ui.window())
+        && let Err(e) = native::when_pressed(hwnd, pressed)
+    {
+        log!("mini player: presses: {e}");
+    }
     log!(
         "mini player opened at {left},{top} ({:.1} ms)",
         started.elapsed().as_secs_f64() * 1000.0
@@ -163,8 +171,8 @@ fn wire(ui: &MiniPlayer, main: &AppWindow) {
             update(&ctx);
         }
     });
-    // ⊘ as the tray icon menu's: toast and Undo when the window is on screen, else just
-    // rated and skipped.
+    // Not for me as the tray icon menu's: toast and Undo when the window is on screen, else
+    // just rated and skipped.
     player.on_not_for_me(|| {
         if let Some(ctx) = Ctx::get() {
             crate::not_for_me::from_tray(&ctx);
@@ -207,7 +215,9 @@ fn activation_lost() {
     }
 }
 
-/// The pin button: pins or unpins the open mini player, and saves it for the next one.
+/// The pin button: pins or unpins the open mini player, for this opening. Unpinned from
+/// behind another window (the click on the pin brought it forward), it closes: the user had
+/// moved on, and unpinned all along, it would have closed then.
 fn toggle_pin() {
     let Some(mini) = MINI.with_borrow(Clone::clone) else {
         return;
@@ -215,9 +225,20 @@ fn toggle_pin() {
     let data = mini.ui.global::<MiniData>();
     let pinned = !data.get_pinned();
     data.set_pinned(pinned);
-    if let Some(ctx) = Ctx::get() {
-        settings::set_mini_pinned(&ctx, pinned);
+    if !pinned && mini.pressed_from_behind.take() {
+        dismiss();
     }
+}
+
+/// A mouse button, finger or pen went down on the open mini player; `from_behind` when that
+/// press is what brought it to the front (`native::when_pressed`). The window is in front by
+/// the time a click's callback runs either way, so this is how the pin tells the two apart.
+pub fn pressed(from_behind: bool) {
+    MINI.with_borrow(|m| {
+        if let Some(mini) = m {
+            mini.pressed_from_behind.set(from_behind);
+        }
+    });
 }
 
 fn dismiss() {

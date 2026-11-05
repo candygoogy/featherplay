@@ -2,9 +2,10 @@
 //! that's repainted whole when Windows drops it, the Tri-vane icon for the title bar and
 //! taskbar (dark or light, as the taskbar is), minimising it and bringing it forward, its
 //! taskbar button showing up, and Windows' animation setting. For the tray's mini player:
-//! the work area and scale of the screen under a point, and the popup's border.
+//! the work area and scale of the screen under a point, the popup's border, and whether a
+//! press is what brought it to the front.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::ffi::c_void;
 
 use slint::Color;
@@ -23,8 +24,10 @@ use windows::Win32::UI::WindowsAndMessaging::{
     CreateIconFromResourceEx, DestroyIcon, HICON, ICON_BIG, ICON_SMALL, IsIconic, LR_DEFAULTCOLOR,
     RegisterWindowMessageW, SC_MINIMIZE, SC_RESTORE, SIZE_MAXIMIZED, SIZE_MINIMIZED, SIZE_RESTORED,
     SPI_GETCLIENTAREAANIMATION, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS, SendMessageW,
-    SetForegroundWindow, SystemParametersInfoW, WM_DISPLAYCHANGE, WM_DPICHANGED, WM_MOUSEWHEEL,
-    WM_NCDESTROY, WM_PAINT, WM_SETICON, WM_SETTINGCHANGE, WM_SIZE, WM_SYSCOMMAND,
+    SetForegroundWindow, SystemParametersInfoW, WM_DISPLAYCHANGE, WM_DPICHANGED, WM_LBUTTONDOWN,
+    WM_MBUTTONDOWN, WM_MOUSEACTIVATE, WM_MOUSEWHEEL, WM_NCDESTROY, WM_PAINT, WM_POINTERACTIVATE,
+    WM_POINTERDOWN, WM_RBUTTONDOWN, WM_SETICON, WM_SETTINGCHANGE, WM_SIZE, WM_SYSCOMMAND,
+    WM_XBUTTONDOWN,
 };
 
 /// The Tri-vane logo, 16 to 256 px, from `build.rs`, drawn for dark grounds: the play sits
@@ -579,6 +582,63 @@ pub fn minimise(h: isize) {
     }
 }
 
+/// The subclass that watches presses (`when_pressed`).
+const PRESSED_SUBCLASS: usize = 0xfea7_0007;
+
+/// Whether an activation by a press came since the last press, and the callback, for
+/// `pressed_proc`.
+type Pressed = (Cell<bool>, Box<dyn Fn(bool)>);
+
+/// Calls `pressed(from_behind)` each time a mouse button, a finger or a pen goes down in the
+/// window: `from_behind` when that press is what activates it (Windows sends an inactive
+/// window WM_MOUSEACTIVATE, or WM_POINTERACTIVATE for touch and pen, just before the press
+/// reaches it). By the time the press arrives, the window is already in front either way.
+pub fn when_pressed(h: isize, pressed: impl Fn(bool) + 'static) -> Result<(), String> {
+    let data = Box::into_raw(Box::new((
+        Cell::new(false),
+        Box::new(pressed) as Box<dyn Fn(bool)>,
+    )));
+    // SAFETY: a live HWND on this thread; `data` stays valid until WM_NCDESTROY frees it.
+    let ok =
+        unsafe { SetWindowSubclass(hwnd(h), Some(pressed_proc), PRESSED_SUBCLASS, data as usize) };
+    if !ok.as_bool() {
+        // SAFETY: never shared, the subclass wasn't installed.
+        drop(unsafe { Box::from_raw(data) });
+        return Err("SetWindowSubclass failed".into());
+    }
+    Ok(())
+}
+
+unsafe extern "system" fn pressed_proc(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+    _id: usize,
+    data: usize,
+) -> LRESULT {
+    if msg == WM_NCDESTROY {
+        // SAFETY: the window is going; nothing calls this subclass with `data` again.
+        unsafe {
+            let _ = RemoveWindowSubclass(hwnd, Some(pressed_proc), PRESSED_SUBCLASS);
+            drop(Box::from_raw(data as *mut Pressed));
+        }
+    } else if matches!(msg, WM_MOUSEACTIVATE | WM_POINTERACTIVATE) {
+        // SAFETY: `data` is the box from `when_pressed`, alive until WM_NCDESTROY.
+        let (activating, _) = unsafe { &*(data as *const Pressed) };
+        activating.set(true);
+    } else if matches!(
+        msg,
+        WM_LBUTTONDOWN | WM_RBUTTONDOWN | WM_MBUTTONDOWN | WM_XBUTTONDOWN | WM_POINTERDOWN
+    ) {
+        // SAFETY: `data` is the box from `when_pressed`, alive until WM_NCDESTROY.
+        let (activating, pressed) = unsafe { &*(data as *const Pressed) };
+        pressed(activating.take());
+    }
+    // SAFETY: the arguments this subclass was called with.
+    unsafe { DefSubclassProc(hwnd, msg, wparam, lparam) }
+}
+
 /// Whether the window is minimised (hidden or not).
 pub fn is_minimised(h: isize) -> bool {
     // SAFETY: a handle-only call; a stale handle reads as not minimised.
@@ -843,6 +903,64 @@ mod tests {
         assert_ne!(ICON, ICON_LIGHT);
         assert_eq!(icon_for(true), ICON_LIGHT);
         assert_eq!(icon_for(false), ICON);
+    }
+
+    #[test]
+    fn a_press_right_after_a_mouse_or_pointer_activation_is_from_behind() {
+        use std::rc::Rc;
+        use windows::Win32::UI::WindowsAndMessaging::{
+            CreateWindowExW, DestroyWindow, WINDOW_EX_STYLE, WS_OVERLAPPED,
+        };
+        use windows::core::w;
+
+        // A window of the system's static class, never shown.
+        // SAFETY: a system class and static strings.
+        let h = unsafe {
+            CreateWindowExW(
+                WINDOW_EX_STYLE(0),
+                w!("STATIC"),
+                w!(""),
+                WS_OVERLAPPED,
+                0,
+                0,
+                0,
+                0,
+                None,
+                None,
+                None,
+                None,
+            )
+        }
+        .expect("window");
+        let seen = Rc::new(RefCell::new(Vec::new()));
+        let s = seen.clone();
+        when_pressed(h.0 as isize, move |from_behind| {
+            s.borrow_mut().push(from_behind);
+        })
+        .expect("subclass");
+        let send = |msg| {
+            // SAFETY: a live window of this thread; these messages carry no pointers.
+            unsafe { SendMessageW(h, msg, None, None) };
+        };
+
+        send(WM_MOUSEACTIVATE);
+        send(WM_LBUTTONDOWN);
+        send(WM_LBUTTONDOWN);
+        send(WM_POINTERACTIVATE);
+        send(WM_POINTERDOWN);
+        send(WM_RBUTTONDOWN);
+        send(WM_MOUSEACTIVATE);
+        send(WM_XBUTTONDOWN);
+        send(WM_MBUTTONDOWN);
+        assert_eq!(*seen.borrow(), [true, false, true, false, true, false]);
+
+        // SAFETY: the window made above, on this thread.
+        unsafe { DestroyWindow(h) }.expect("destroy");
+        assert_eq!(
+            Rc::strong_count(&seen),
+            1,
+            "the subclass outlived its window"
+        );
     }
 
     #[test]

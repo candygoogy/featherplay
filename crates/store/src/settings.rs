@@ -104,11 +104,10 @@ pub struct Settings {
     /// When the queue moves on (a track ends, Next, autoplay), pass over songs the user
     /// disliked (on by default). One the user starts directly still plays.
     pub skip_disliked: bool,
-    /// The tray's mini player was pinned when it last showed: it opens pinned, staying open
-    /// and above other windows until closed (off by default).
-    pub mini_pinned: bool,
     /// A left click on the tray icon shows and brings forward the main window (off by
-    /// default: it opens the mini player). A right click opens the menu either way.
+    /// default: it opens the mini player). A right click opens the menu either way. Files up
+    /// to 0.1.1 may also hold `mini_pinned`, the mini player's pin, kept between openings
+    /// then; it's an unknown key now, so it's ignored and not written back.
     pub tray_click_opens_window: bool,
 }
 
@@ -260,7 +259,6 @@ impl Default for Settings {
             language: String::new(),
             volume_step: Settings::VOLUME_STEP,
             skip_disliked: true,
-            mini_pinned: false,
             tray_click_opens_window: false,
         }
     }

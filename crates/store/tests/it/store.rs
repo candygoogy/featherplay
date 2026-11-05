@@ -64,7 +64,6 @@ fn settings_defaults_when_missing() {
             language: String::new(),
             volume_step: 5,
             skip_disliked: true,
-            mini_pinned: false,
             tray_click_opens_window: false,
         }
     );
@@ -124,7 +123,6 @@ fn settings_roundtrip() {
         language: "de".into(),
         volume_step: 2,
         skip_disliked: false,
-        mini_pinned: true,
         tray_click_opens_window: true,
     };
     s.save(&p).unwrap();
@@ -664,6 +662,24 @@ fn a_tray_click_opens_the_mini_player_in_older_files_and_on_stays_on() {
     assert!(on.tray_click_opens_window);
     on.save(&p).unwrap();
     assert!(Settings::load(&p).tray_click_opens_window);
+}
+
+#[test]
+fn an_old_mini_player_pin_still_loads_and_is_not_written_again() {
+    let Some(home) = TestHome::new("settings-mini-pinned") else {
+        return;
+    };
+    let p = home.paths();
+    fs::create_dir_all(&p.config).unwrap();
+    let file = p.config.join("settings.toml");
+
+    // Files from 0.1.1 and before kept the mini player's pin between openings.
+    fs::write(&file, "mini_pinned = true\nvolume_step = 2\n").unwrap();
+    let old = Settings::load(&p);
+    assert_eq!(old.volume_step, 2, "the rest of the file still loads");
+    old.save(&p).unwrap();
+    let saved = fs::read_to_string(&file).unwrap();
+    assert!(!saved.contains("mini_pinned"), "{saved}");
 }
 
 #[test]
