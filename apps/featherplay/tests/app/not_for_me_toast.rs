@@ -1,5 +1,6 @@
-//! "Not for me" in the window (offscreen, no window is shown): the ⊘ shows the toast with
-//! Undo, and Undo closes it. What the actions do to the player is `tests/not_for_me.rs`.
+//! "Not for me" in the window (offscreen, no window is shown): the thumbs-down shows the
+//! toast with Undo, and Undo closes it. What the actions do to the player is
+//! `tests/not_for_me.rs`.
 
 use featherplay::snapshot::Scene;
 use featherplay::ui::{Player, Toast};

@@ -5,7 +5,7 @@
 // first in Settings' `Dialog`. `AlbumMenuLayer` and `AlbumDialogLayer` in app.slint draw them
 // over everything. `src/album_actions.rs` works out the songs, asks and sends the writes.
 import { Theme, Icons, Curves } from "theme.slint";
-import { MenuItem, Divider, MenuIcons } from "song_menu.slint";
+import { MenuItem, Divider } from "song_menu.slint";
 import { Dialog } from "pages/settings.slint";
 
 export enum AlbumAction { like-all, remove-likes, dislike-all, remove-dislikes }
@@ -45,7 +45,7 @@ export global AlbumMenu {
 // A heart or a thumb with a stroke through it: the rating taken back.
 global AlbumIcons {
     out property <string> unlike: Icons.heart + " M4.5 4.5 L19.5 19.5";
-    out property <string> undislike: MenuIcons.dislike + " M4 3.5 L20 20.5";
+    out property <string> undislike: Icons.dislike + " M4 3.5 L20 20.5";
 }
 
 // Covers the window while the menu is open: a click outside closes it, Escape too.
@@ -166,7 +166,7 @@ export component AlbumMenuLayer inherits Rectangle {
             Divider { }
             MenuItem {
                 enabled: root.live;
-                icon: MenuIcons.dislike;
+                icon: Icons.dislike;
                 label: @tr("Dislike all songs");
                 clicked => { root.pick(AlbumAction.dislike-all); }
             }

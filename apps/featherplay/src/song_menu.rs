@@ -172,6 +172,7 @@ pub fn show_rating(ctx: &Ctx, id: &TrackId, status: LikeStatus) {
     let player = ui.global::<Player>();
     if player.get_track_id().as_str() == id.0 {
         player.set_liked(liked);
+        player.set_disliked(status == LikeStatus::Dislike);
     }
 }
 

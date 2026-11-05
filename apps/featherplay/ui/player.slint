@@ -19,6 +19,8 @@ export global Player {
     // Resolving or buffering before the first sound: the progress line shimmers.
     in property <bool> loading;
     in property <bool> liked;
+    // Rated Dislike (played by choice, or rated while it plays): "Not for me" shows filled.
+    in property <bool> disliked;
     in property <bool> shuffle;
     in property <Repeat> repeat;
     in property <bool> radio;

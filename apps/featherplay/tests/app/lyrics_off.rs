@@ -25,7 +25,7 @@ fn region(scene: &Scene, (x0, y0): (u32, u32), (x1, y1): (u32, u32)) -> Vec<u8> 
         .collect()
 }
 
-/// The floating bar, where the microphone sits left of ⊘ and the heart.
+/// The floating bar, where the microphone sits left of the thumbs-down and the heart.
 fn bar(scene: &Scene) -> Vec<u8> {
     let clear = scene.ui.global::<Theme>().get_bar_clear() as u32;
     region(scene, (0, H - clear), (W, H))

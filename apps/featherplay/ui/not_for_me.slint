@@ -1,12 +1,42 @@
-// "Not for me" (the bar and Now playing): a ⊘ beside the heart, smaller and quieter than it
-// (32 px with an 18 px glyph in `text3`, `text2` hovered), since it's used far less. A click
-// rates the song Dislike and skips it (`src/not_for_me.rs`); the toast that follows offers
-// Undo. Resting on it for a moment shows a tooltip over its right end that says what it
-// does, so the skip never comes as a surprise. The delay keeps the tooltip from flashing as
-// the pointer crosses the bar; its timer runs only while the pointer is on the button.
+// "Not for me" (the bar and Now playing): a thumbs-down beside the heart, styled as the
+// heart is so the two read as a pair: the same 36 px button and 20 px glyph in `text2` (the
+// cover's tint while the colours follow it), the same hover and press, and filled in `text1`
+// for a song already rated Dislike, as the heart fills for a liked one. A click rates the
+// song Dislike (unless it already is) and skips it (`src/not_for_me.rs`); the toast that
+// follows offers Undo. Resting on it for a moment shows a tooltip over its right end that
+// says what it does, so the skip never comes as a surprise. The delay keeps the tooltip from
+// flashing as the pointer crosses the bar; its timer runs only while the pointer is on the
+// button. `LikeButton`, the heart, is here too: the bar and Now playing show the pair.
 import { Theme, Curves, Icons } from "theme.slint";
 import { Body, IconButton } from "parts.slint";
 import { Player } from "player.slint";
+
+// The current song's heart: filled in `text1` while it's liked, `text2` otherwise. A like
+// added here pops the glyph (it snaps smaller and eases back).
+export component LikeButton inherits IconButton {
+    property <bool> pop: false;
+    icon: Icons.heart;
+    label: Player.liked ? @tr("Remove like") : @tr("Like");
+    filled: Player.liked;
+    tint: Player.liked ? Theme.text1 : Theme.text2;
+    enabled: Player.has-track;
+    glyph-scale: root.pop && Theme.moving ? 0.8 : 1.0;
+    pop-end := Timer {
+        interval: 1ms;
+        running: false;
+        triggered => {
+            self.running = false;
+            root.pop = false;
+        }
+    }
+    clicked => {
+        if !Player.liked {
+            root.pop = true;
+            pop-end.running = true;
+        }
+        Player.toggle-like();
+    }
+}
 
 export component NotForMeButton inherits Rectangle {
     // How far above the button the tooltip ends (the bar lifts it clear of itself).
@@ -24,22 +54,21 @@ export component NotForMeButton inherits Rectangle {
             root.dismissed = false;
         }
     }
-    width: 32px;
-    height: 36px;
+    width: btn.width;
+    height: btn.height;
     Timer {
         interval: 500ms;
         running: root.over && !root.rested;
         triggered => { root.rested = true; }
     }
     btn := IconButton {
-        y: (parent.height - self.height) / 2;
-        width: 32px;
-        height: 32px;
-        icon: Icons.not-for-me;
-        glyph: 18px;
+        x: 0;
+        y: 0;
+        icon: Player.disliked ? Icons.dislike-filled : Icons.dislike;
+        filled: Player.disliked;
         label: @tr("Not for me");
         description: @tr("Skips the song and tells YouTube Music you dislike it");
-        tint: btn.hovered ? Theme.text2 : Theme.text3;
+        tint: Player.disliked ? Theme.text1 : Theme.text2;
         enabled: Player.has-track;
         fade: root.fade;
         clicked => {

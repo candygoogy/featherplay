@@ -48,7 +48,6 @@ export global SongMenu {
 export global MenuIcons {
     out property <string> play-next: "M10.5 7.5 H20 M4 12.5 H20 M4 17.5 H20 M4 4.5 V10.5 L8.5 7.5 Z";
     out property <string> add-to-queue: "M4 6.5 H20 M4 11.5 H20 M4 16.5 H11.5 M17 13.5 V20 M13.8 16.8 H20.2";
-    out property <string> dislike: "M7.5 13.5 V4.5 M7.5 13.5 L10.6 20 C11.8 20 12.6 19.1 12.6 18 V15 H17.5 C18.8 15 19.7 13.9 19.5 12.7 L18.6 6.8 C18.4 5.5 17.4 4.5 16.1 4.5 H7.5 M7.5 4.5 H4.5 V13.5 H7.5";
     out property <string> playlist-add: "M4 6.5 H16 M4 11.5 H16 M4 16.5 H11 M17.5 13 V20 M14 16.5 H21";
 }
 
@@ -283,7 +282,7 @@ export component SongMenuLayer inherits Rectangle {
             }
             MenuItem {
                 enabled: root.open;
-                icon: MenuIcons.dislike;
+                icon: Icons.dislike;
                 label: @tr("Dislike");
                 clicked => {
                     SongMenu.dislike(SongMenu.track.id);

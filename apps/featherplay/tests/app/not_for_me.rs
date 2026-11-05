@@ -1,6 +1,6 @@
-//! "Not for me" (the ⊘ beside the heart): it rates the song Dislike and skips it; Undo puts
-//! the rating back and returns to the song where it was. The actions run on a real player,
-//! as the controller runs them.
+//! "Not for me" (the thumbs-down beside the heart): it rates the song Dislike and skips it;
+//! Undo puts the rating back and returns to the song where it was. The actions run on a real
+//! player, as the controller runs them.
 
 use std::collections::HashMap;
 use std::time::{Duration, SystemTime};
@@ -88,6 +88,22 @@ fn not_for_me_dislikes_the_song_then_skips_it() {
 }
 
 #[test]
+fn a_song_already_disliked_is_only_skipped_and_undo_writes_no_rating() {
+    let mut player = player_with(&["a", "b", "c"]);
+    let mut disliked = track("a");
+    disliked.like = LikeStatus::Dislike;
+    let (actions, undo) = not_for_me::actions(&disliked, AT);
+    assert!(matches!(&actions[..], [Action::Next]), "{actions:?}");
+    run(&mut player, actions);
+    assert_eq!(current(&player), Some("b"));
+
+    let back = undo.actions();
+    assert!(matches!(&back[..], [Action::BackTo { .. }]), "{back:?}");
+    run(&mut player, back);
+    assert_eq!(current(&player), Some("a"));
+}
+
+#[test]
 fn undo_puts_the_like_back_and_returns_to_the_song_where_it_was() {
     let mut player = player_with(&["a", "b", "c"]);
     player.handle(Input::SeekTo(AT));
@@ -167,7 +183,7 @@ fn play_page(player: &mut Player, likes: &HashMap<TrackId, LikeStatus>, ids: &[&
 
 #[test]
 fn a_song_set_aside_stays_passed_over_when_its_list_is_played_again() {
-    // ⊘ on the second song, then the first one picked again on the playlist's page.
+    // "Not for me" on the second song, then the first one picked again on the playlist's page.
     let mut player = player_with(&["a", "b", "c"]);
     let mut likes = HashMap::new();
     player.handle(Input::Next);

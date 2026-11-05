@@ -139,6 +139,7 @@ pub fn sync_player(from: &Player, to: &Player) {
     to.set_playing(from.get_playing());
     to.set_loading(from.get_loading());
     to.set_liked(from.get_liked());
+    to.set_disliked(from.get_disliked());
     to.set_duration_s(from.get_duration_s());
     to.set_total(from.get_total());
     // The clock rather than the bar's properties, which stand still while it's minimized.

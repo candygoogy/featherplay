@@ -92,6 +92,8 @@ pub fn init(ctx: &Rc<Ctx>) {
         let liked = !p.get_liked();
         // Flipped at once; the controller sends the state back (reverted on failure).
         p.set_liked(liked);
+        // A like replaces a dislike, and removing one leaves no rating.
+        p.set_disliked(false);
         let status = if liked {
             LikeStatus::Like
         } else {
@@ -138,6 +140,7 @@ pub fn apply(ctx: &Rc<Ctx>, state: &PlayerState) {
         p.set_title("".into());
         p.set_artist("".into());
         p.set_cover(Default::default());
+        p.set_disliked(false);
         clock.timer.stop();
         clock.cover_url.borrow_mut().clear();
         clock.has_track.set(false);
@@ -176,6 +179,7 @@ pub fn apply(ctx: &Rc<Ctx>, state: &PlayerState) {
             .into(),
     );
     p.set_liked(track.like == LikeStatus::Like);
+    p.set_disliked(track.like == LikeStatus::Dislike);
     let duration = track.duration;
     p.set_duration_s(duration.map(|d| d.as_secs_f32()).unwrap_or(0.0));
     p.set_total(duration.map(format_duration).unwrap_or_default().into());

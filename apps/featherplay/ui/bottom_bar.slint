@@ -1,14 +1,14 @@
 // The player bar: a rounded panel floating over the bottom of the window,
 // `Theme.bar-inset` in from its edges (app.slint places it). The track on the left; in the
 // middle the transport around the round play button, with the time, the seek line and the
-// length under it; Lyrics (the microphone), "Not for me" (⊘), like, volume and the Up next
-// button on the right. It reads and drives the
-// `Player` global; `src/bar.rs` connects that to the controller.
+// length under it; Lyrics (the microphone), "Not for me" (a thumbs-down), like, volume and
+// the Up next button on the right. It reads and drives the `Player` global; `src/bar.rs`
+// connects that to the controller.
 import { Theme, Icons, Curves } from "theme.slint";
 import { Body, Cover, IconButton, Icon, PlayButton } from "parts.slint";
 import { Player, Repeat } from "player.slint";
 import { Nav, PageKind, Frame } from "nav.slint";
-import { NotForMeButton } from "not_for_me.slint";
+import { NotForMeButton, LikeButton } from "not_for_me.slint";
 import { LyricsData } from "pages/lyrics.slint";
 
 // The seek line, between the time and the length: 4 px, 6 px while hovered, with round ends;
@@ -273,10 +273,10 @@ component VolumeSlider inherits Rectangle {
     }
 }
 
-// Lyrics, the microphone left of ⊘: Now playing's full lyrics view on and off from any page
-// (`LyricsData.toggle-view`; elsewhere it opens Now playing on the lyrics), in the accent
-// while the view shows. Resting on it shows a tooltip like ⊘'s, with the shortcut; the same
-// delay keeps it from flashing as the pointer crosses the bar.
+// Lyrics, the microphone left of "Not for me": Now playing's full lyrics view on and off from
+// any page (`LyricsData.toggle-view`; elsewhere it opens Now playing on the lyrics), in the
+// accent while the view shows. Resting on it shows a tooltip like "Not for me"'s, with the
+// shortcut; the same delay keeps it from flashing as the pointer crosses the bar.
 component LyricsButton inherits Rectangle {
     // How far above the button the tooltip ends (the bar lifts it clear of itself).
     in property <length> above: Theme.s2;
@@ -411,19 +411,9 @@ component BarPlayButton inherits Rectangle {
 export component BottomBar inherits Rectangle {
     // The volume to go back to when unmuting.
     property <float> unmuted: 0.7;
-    // The like heart pops when a like is added from the bar.
-    property <bool> heart-pop: false;
     // Up or Down from the window's keys: the volume one step up or down.
     public function step-volume(up: bool) {
         volume.step(up);
-    }
-    pop-end := Timer {
-        interval: 1ms;
-        running: false;
-        triggered => {
-            self.running = false;
-            root.heart-pop = false;
-        }
     }
     // The middle column (the transport, the time and the line), and what's left either side
     // for the title: it stays clear of the buttons on the right at the narrowest window.
@@ -618,23 +608,9 @@ export component BottomBar inherits Rectangle {
             above: (Theme.bar-h - 36px) / 2 + Theme.s2;
         }
         NotForMeButton {
-            above: (Theme.bar-h - 32px) / 2 + Theme.s2;
+            above: (Theme.bar-h - 36px) / 2 + Theme.s2;
         }
-        IconButton {
-            icon: Icons.heart;
-            label: Player.liked ? @tr("Remove like") : @tr("Like");
-            filled: Player.liked;
-            tint: Player.liked ? Theme.text1 : Theme.text2;
-            enabled: Player.has-track;
-            glyph-scale: root.heart-pop && Theme.moving ? 0.8 : 1.0;
-            clicked => {
-                if !Player.liked {
-                    root.heart-pop = true;
-                    pop-end.running = true;
-                }
-                Player.toggle-like();
-            }
-        }
+        LikeButton { }
         IconButton {
             icon: Player.volume > 0 ? Icons.volume : Icons.volume-off;
             label: Player.volume > 0 ? @tr("Mute") : @tr("Unmute");
