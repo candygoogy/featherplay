@@ -20,7 +20,7 @@ your task owns; the shared files below change only when a page truly needs somet
 | `playlist_menu.slint`, `playlist_menu_layer.slint` | The sidebar list's right-click menu (albums and artists get Play, Shuffle, Go to, Pin to top; playlists also Pin to top), in the song menu's style: the state (`PlaylistMenu`, `PlaylistKind`, `PlaylistDialog`), then the panel and its Rename and Delete dialogs (Settings' `Dialog`). Split so the sidebar can import the state without an import cycle; `src/playlist_menu.rs` | menus |
 | `album_menu.slint` | The album page's ⋯ menu (`AlbumMenu`, `AlbumAction`): Like all songs, Remove likes, Dislike all songs, Remove dislikes, each confirmed in Settings' `Dialog`, in the song menu's style; `src/album_actions.rs` rates only the songs that need it, one at a time | menus |
 | `close_dialog.slint` | The close dialog (`CloseDialog`, `CloseChoice`): what the close button does, asked on close until the user picks; `src/close.rs` | close |
-| `not_for_me.slint` | `NotForMeButton`, the ⊘ beside the heart in the bar and on Now playing, with its tooltip: rates Dislike and skips, the toast offers Undo; `src/not_for_me.rs` | frame (shared) |
+| `not_for_me.slint` | `NotForMeButton`, the thumbs-down beside the heart (styled as it) in the bar and on Now playing, with its tooltip: rates Dislike and skips, the toast offers Undo; `src/not_for_me.rs` | frame (shared) |
 | `pages/home.slint` | `HomePage`, `HomeData`; `ShelfShape` and `Shapes`, how each shelf lays out from what it holds (`src/pages/home.rs::arrange`) | home |
 | `pages/{library,album,playlist,artist,search}.slint` | One page each, with its `…Data` global | content pages |
 | `pages/explore.slint` | `ExplorePage` (New releases, Charts with the country picker and the top artists, Moods & genres) and `MoodPage` (a mood's curated playlists), `ExploreData`, `MoodData`; `src/pages/explore.rs` | discovery |
@@ -159,15 +159,17 @@ FEATHERPLAY_HOME=<your dev home> cargo run -p featherplay -- \
 
 Pages: home, library, library-playlists, library-albums, library-artists, album, playlist,
 liked, artist, search, search-link and search-link-missing (a pasted song link: its one song,
-or a link to no song), now-playing, now-playing-lyrics (also -plain and -none; with
+or a link to no song), now-playing, now-playing-long (a title too long for its line),
+now-playing-disliked (the song rated Dislike: the thumbs-down filled there and in the bar),
+now-playing-lyrics (also -plain and -none; with
 `--hold-loading`, still loading; with `--hold-error`, the lookup failed),
 now-playing-lyrics-full (lyrics on; also -full-plain, -full-none and -full-outage, the plain fallback of an LRCLIB outage), settings, settings-idle (Settings with nothing to play),
 about, sign-in, account-menu (Home with the
-account menu open), mini-player, mini-player-paused, mini-player-long and mini-player-idle (the tray's mini
+account menu open), mini-player, mini-player-paused, mini-player-long, mini-player-disliked and mini-player-idle (the tray's mini
 player alone, 340 x 170 logical), close-dialog (Home with the close dialog open), home-more (Home after a scroll loaded the next
 page, the community shelf; use a tall `--size` to see the end), home-more-loading and
 home-more-failed (its loading and Try again rows), not-for-me (Now playing with the toast after
-⊘), playlist-menu, playlist-menu-saved and playlist-menu-liked (Home with the sidebar's
+"Not for me"), playlist-menu, playlist-menu-saved and playlist-menu-liked (Home with the sidebar's
 playlist menu open on the account's own playlist, a saved one or Liked songs),
 playlist-rename and playlist-delete (its dialogs), explore, explore-charts and explore-moods (Explore
 on each tab), mood (Chill's playlists), history, sidebar-albums, sidebar-artists and sidebar-pinned

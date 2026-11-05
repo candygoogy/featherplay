@@ -69,6 +69,10 @@ pub const PAGES: &[&str] = &[
     "now-playing-scripts",
     // Now playing with the song menu open from its ⋯ button.
     "now-playing-menu",
+    // Now playing with a title too long for its line (it elides before the song's buttons),
+    // or with the song rated Dislike (the thumbs-down filled, there and in the bar).
+    "now-playing-long",
+    "now-playing-disliked",
     // Now playing on the Lyrics tab: synced lines mid-song (placeholder lines; with
     // `--hold-loading`, still loading; with `--hold-error`, the lookup failed), plain
     // lyrics, or none.
@@ -111,11 +115,12 @@ pub const PAGES: &[&str] = &[
     // A first sign-in whose cookies hold several identities: the picker over the sign-in page.
     "account-picker",
     // The tray's mini player alone (its own 340 x 170 window), with the fixture track playing
-    // or paused, the same with a title too long for two lines, or with nothing to play; then
-    // pinned, with the fixture track playing.
+    // or paused, the same with a title too long for two lines or rated Dislike, or with
+    // nothing to play; then pinned, with the fixture track playing.
     "mini-player",
     "mini-player-paused",
     "mini-player-long",
+    "mini-player-disliked",
     "mini-player-idle",
     "mini-player-pinned",
     // Home with the close dialog open, as the first close asks.
@@ -153,6 +158,9 @@ pub const PAGES: &[&str] = &[
 
 /// A title too long for the mini player, of the kind classical recordings have.
 const LONG_TITLE: &str = "Symphony No. 9 in D Minor, Op. 125 \"Choral\": IV. Presto - Allegro assai (Live at the Musikverein, Vienna)";
+/// A title too long for Now playing's line beside the song's buttons.
+const NOW_PLAYING_LONG_TITLE: &str =
+    "In Love With Myself (feat. Somebody) – Extended Club Mix Remastered 2026";
 
 /// How long to wait for loads and covers at most. The wait ends as soon as they're in; the
 /// ceiling is for slow machines: a CI runner decoding a 4K Home's ~120 covers in a debug build
@@ -594,6 +602,12 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
     if o.page == "mini-player-long" {
         player.set_title(LONG_TITLE.into());
     }
+    if o.page == "now-playing-long" {
+        player.set_title(NOW_PLAYING_LONG_TITLE.into());
+    }
+    if o.page.ends_with("-disliked") {
+        player.set_disliked(true);
+    }
     let mini = if o.page.starts_with("mini-player") {
         let mini = crate::mini::create(ctx)?;
         mini.global::<crate::ui::MiniData>()
@@ -716,6 +730,7 @@ fn page(name: &str, f: &Fixtures) -> Result<Page, String> {
         | "mini-player"
         | "mini-player-paused"
         | "mini-player-long"
+        | "mini-player-disliked"
         | "mini-player-idle"
         | "mini-player-pinned"
         | "close-dialog"
@@ -773,6 +788,8 @@ fn page(name: &str, f: &Fixtures) -> Result<Page, String> {
         "now-playing"
         | "now-playing-scripts"
         | "now-playing-menu"
+        | "now-playing-long"
+        | "now-playing-disliked"
         | "now-playing-lyrics"
         | "now-playing-lyrics-plain"
         | "now-playing-lyrics-none"

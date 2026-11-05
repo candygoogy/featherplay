@@ -1,6 +1,7 @@
 // Now playing: the cover-and-title block centred
 // in the stage, the title in the display face, "artist, album, year", a quiet "Playing
-// from …" line, "Not for me" (⊘), like and the song menu; on the right, Up next and Related
+// from …" line, "Not for me" (thumbs-down), like and the song menu after the title, as the
+// bar has them; on the right, Up next and Related
 // tabs. The stage sits on a soft wash from the cover (always on). Shown full width, without the
 // sidebar; the bottom bar stays. It opens with a 200 ms fade and scale from the bar's cover,
 // the side panel following 40 ms later (a fade only without motion). The Lyrics toggle
@@ -17,7 +18,7 @@ import { Player } from "../player.slint";
 import { QueueData, UpNext } from "../queue_panel.slint";
 import { SkeletonList, FadeIn } from "content.slint";
 import { LyricsData, LyricsState, LyricsView, NoLyricsLine } from "lyrics.slint";
-import { NotForMeButton } from "../not_for_me.slint";
+import { NotForMeButton, LikeButton } from "../not_for_me.slint";
 
 export global NowPlayingData {
     // Related: loading and its error.
@@ -405,17 +406,56 @@ export component NowPlayingPage inherits Rectangle {
             crossfade: true;
         }
 
-        // The title: one line beside the buttons in the cover view (the cover's width once
-        // they've gone, with no lyrics), wrapping in the lyrics' narrow column. Both slide
-        // with the cover at the same size, one fading into the other.
-        if root.column < 1: Display {
+        // The title and the song's buttons in the cover view: one line, the title in the
+        // display face, then "Not for me", like and the song menu: the bar's own buttons
+        // (`NotForMeButton`, `LikeButton`; 36 px, a 20 px glyph in `text2`, the same hover
+        // and press), `Theme.s1` apart as there, `Theme.s3` after the title. The layout centres each on the title's line box
+        // (`cross-axis-alignment`), so the glyphs sit on the line, wherever the font's metrics
+        // put it. The title never wraps here: too long, it elides before the buttons, which
+        // stay on the line and inside the cover's width at any window size (it wraps only in
+        // the lyrics' column, where the buttons have gone). `title-room` is the title's most:
+        // the cover's width less the buttons', growing as they fade (to the cover's width,
+        // with no lyrics), and the lyrics' column at the toggle's end; the row is that and
+        // the buttons, which keep their room while hidden so it never jumps. A title that
+        // elides takes that room as it frees, so the fading buttons drift out with its end.
+        property <length> title-room: (root.cover-size - (song-buttons.preferred-width + Theme.s3) * (1 - root.lyr)) * (1 - root.column) + root.fl-cover * root.column;
+        title-row := HorizontalLayout {
             x: root.art-x;
             y: root.title-y + (40px - self.preferred-height) / 2 * (1 - root.column);
-            width: (root.cover-size - 124px * (1 - root.lyr)) * (1 - root.column) + root.fl-cover * root.column;
-            text: Player.has-track ? Player.title : @tr("Nothing playing");
-            font-size: root.title-size;
-            color: (Player.has-track ? root.ink1 : LyricsData.ink.next.mix(Theme.text3, root.tint)).transparentize(root.column);
-            overflow: elide;
+            width: stage.title-room + Theme.s3 + song-buttons.preferred-width;
+            height: self.preferred-height;
+            alignment: start;
+            cross-axis-alignment: center;
+            spacing: Theme.s3;
+            // Slides with the cover at the wrapped title's size, fading into it.
+            if root.column < 1: Display {
+                text: Player.has-track ? Player.title : @tr("Nothing playing");
+                font-size: root.title-size;
+                color: (Player.has-track ? root.ink1 : LyricsData.ink.next.mix(Theme.text3, root.tint)).transparentize(root.column);
+                overflow: elide;
+            }
+            // They ride along and fade with the toggle, and are hidden once it's done.
+            song-buttons := HorizontalLayout {
+                spacing: Theme.s1;
+                if Player.has-track: NotForMeButton {
+                    visible: root.lyr < 1;
+                    fade: 1 - root.lyr;
+                }
+                if Player.has-track: LikeButton {
+                    visible: root.lyr < 1;
+                    fade: 1 - root.lyr;
+                }
+                if Player.has-track: IconButton {
+                    visible: root.lyr < 1;
+                    fade: 1 - root.lyr;
+                    icon: Icons.more;
+                    label: @tr("More");
+                    filled: true;
+                    clicked => {
+                        NowPlayingData.more(self.absolute-position.x + self.width - 4px, self.absolute-position.y + self.height, self.absolute-position.y);
+                    }
+                }
+            }
         }
         full-title := Display {
             x: root.art-x;
@@ -426,33 +466,6 @@ export component NowPlayingPage inherits Rectangle {
             font-size: root.title-size;
             color: LyricsData.ink.current.transparentize(1 - root.column);
             wrap: word-wrap;
-        }
-        // The song's buttons, beside the title in the cover view: they ride along and fade.
-        if Player.has-track && root.lyr < 1: NotForMeButton {
-            x: root.art-x + root.cover-size - 116px;
-            y: root.title-y + 2px;
-            fade: 1 - root.lyr;
-        }
-        if Player.has-track && root.lyr < 1: IconButton {
-            x: root.art-x + root.cover-size - 80px;
-            y: root.title-y + 2px;
-            fade: 1 - root.lyr;
-            icon: Icons.heart;
-            label: Player.liked ? @tr("Remove like") : @tr("Like");
-            filled: Player.liked;
-            tint: Player.liked ? Theme.text1 : Theme.text2;
-            clicked => { Player.toggle-like(); }
-        }
-        if Player.has-track && root.lyr < 1: IconButton {
-            x: root.art-x + root.cover-size - 36px;
-            y: root.title-y + 2px;
-            fade: 1 - root.lyr;
-            icon: Icons.more;
-            label: @tr("More");
-            filled: true;
-            clicked => {
-                NowPlayingData.more(self.absolute-position.x + self.width - 4px, self.absolute-position.y + self.height, self.absolute-position.y);
-            }
         }
         // "Artist, album, year" in the cover view; the artist alone under the wrapped title in
         // the lyrics view, the rest fading out.

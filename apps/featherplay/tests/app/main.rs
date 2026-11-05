@@ -87,6 +87,7 @@ mod song_menu_queue;
 mod space_play;
 mod startup_session;
 mod tab_pill;
+mod title_row;
 mod top_search;
 mod translations;
 mod tray_click;
