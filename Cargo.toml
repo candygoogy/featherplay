@@ -96,6 +96,9 @@ sys-locale = "=0.3.2"
 # See vendor/i-slint-renderer-skia/VENDORED.md.
 [patch.crates-io]
 i-slint-renderer-skia = { path = "vendor/i-slint-renderer-skia" }
+# The pure-Rust Opus decoder with its naive DFT swapped for rustfft (4-5x realtime to ~325x).
+# See vendor/opus-decoder/VENDORED.md.
+opus-decoder = { path = "vendor/opus-decoder" }
 
 # Full debug info made each UI test's PDB ~560 MB, and a workspace test run links dozens
 # of them. Line tables (~158 MB) keep file:line in panics and backtraces; dependencies
@@ -131,3 +134,5 @@ opt-level = 3
 opt-level = 3
 [profile.release.package.symphonia-format-isomp4]
 opt-level = 3
+# The Opus path (symphonia-format-mkv, opus-decoder, rustfft) stays at "z": at opt-level 3 it
+# cost ~96 KB of the exe budget, and at "z" it still decodes at ~250x realtime (2026-11-06).

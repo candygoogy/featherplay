@@ -5,17 +5,20 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 homepage.workspace = true
-description = "featherplay's audio engine: ranged HTTP downloads, AAC/MP4 decoding and playback on rodio"
+description = "featherplay's audio engine: ranged HTTP downloads, AAC/MP4 and Opus/WebM decoding and playback on rodio"
 publish = false
 
 [dependencies]
-# Output (cpal 0.18.2 underneath). No Opus: the streams are AAC (itag 140).
+# Output (cpal 0.18.2 underneath). Decoding is ours (`decoder.rs`), not rodio's.
 rodio = { workspace = true, features = ["playback", "mp4"] }
-# AAC-in-MP4 decode, driven directly (not through rodio's decoder) so the MP4 reader can
-# start on the first fragment of a download (`decoder.rs`). The same version and features
-# as rodio's, so nothing new is built. Not the workspace's `symphonia` (0.6.1, which was checked
-# for Opus and has no decoder for it).
-symphonia = { version = "=0.5.5", default-features = false, features = ["aac", "isomp4"] }
+# AAC-in-MP4 (itag 140) and Opus-in-WebM (itag 251) demuxing, plus the AAC decoder, driven
+# directly (not through rodio's decoder) so the MP4 reader can start on the first fragment of
+# a download (`decoder.rs`). The same version as rodio's. Not the workspace's `symphonia`
+# (0.6.1, which was checked for Opus and has no decoder for it).
+symphonia = { version = "=0.5.5", default-features = false, features = ["aac", "isomp4", "mkv"] }
+# symphonia 0.5 has no Opus decoder: this pure-Rust one sits behind its `Decoder` trait
+# (`opus.rs`). Patched in from vendor/opus-decoder for a fast FFT (see its VENDORED.md).
+opus-decoder = "=0.1.1"
 reqwest = { workspace = true, features = ["native-tls"] }
 tokio = { workspace = true, features = ["rt-multi-thread", "sync", "time", "macros"] }
 # The in-memory heads, and the temp file a stream downloads into under {cache}/tmp
