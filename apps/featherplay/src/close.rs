@@ -3,21 +3,38 @@
 //!   featherplay or keep playing in the tray. With "Remember my choice" checked (it starts
 //!   checked) the answer becomes the setting; unchecked, it's for this once.
 //! - **Quit**: stops playback and exits, the way the tray's Quit does.
-//! - **Tray**: hides the window and keeps playing; the first time, a notification says where
-//!   featherplay went.
+//! - **Tray**: minimises the window into the taskbar, hides it once that has played, and
+//!   keeps playing; the first time, a notification says where featherplay went.
 //!
 //! Without a tray icon there would be no way back, so closing quits then.
 
-use std::rc::Rc;
+use std::rc::{Rc, Weak};
+use std::time::Duration;
 
 use featherplay_core::tr;
 use featherplay_store::CloseAction;
-use slint::{CloseRequestResponse, ComponentHandle};
+use slint::{CloseRequestResponse, ComponentHandle, Timer, TimerMode};
 
 use crate::app::{self, Ctx};
 use crate::pages::settings;
 use crate::shell;
 use crate::ui::{AppWindow, CloseChoice, Frame};
+
+/// How long a window going to the tray stays minimised on the taskbar before it hides, so
+/// Windows' minimise animation into its button plays out.
+///
+/// Nothing says when that animation ends. IsIconic and WM_SIZE's SIZE_MINIMIZED both turn
+/// true inside the minimise call, as the animation starts, so they only say the minimise
+/// took; DWM then plays it on its own for about a quarter of a second. Hidden before that,
+/// the window and its button go and the animation is cut. A little longer is harmless: the
+/// window is already off screen, only its taskbar button stays a moment more.
+pub const MINIMISE_WAIT: Duration = Duration::from_millis(350);
+
+thread_local! {
+    /// The hide that follows a minimise to the tray (`to_tray`). Single-shot: once it has
+    /// run, or `cancel_hide` stopped it, no timer runs.
+    static HIDE: Timer = Timer::default();
+}
 
 /// Connects the window's close button and the close dialog. `has_tray` says whether the
 /// tray icon exists (`shell::has_tray` in the app; the offscreen tests have none and pass
@@ -48,8 +65,9 @@ fn requested(ctx: &Rc<Ctx>, has_tray: bool) -> CloseRequestResponse {
             CloseRequestResponse::HideWindow
         }
         (CloseAction::Tray, true) => {
+            // Shown: `to_tray` hides it once the minimise has played.
             to_tray(ctx);
-            CloseRequestResponse::HideWindow
+            CloseRequestResponse::KeepWindowShown
         }
         (CloseAction::Ask, true) => {
             // Closed from the taskbar while minimized or hidden: the dialog needs the
@@ -90,16 +108,15 @@ fn chosen(ctx: &Rc<Ctx>, action: CloseAction) {
         settings::set_close_action(ctx, action);
     }
     // The close request kept the window shown for the dialog. To the tray it's minimised
-    // first, while it still shows (`to_tray`).
+    // first, and hidden once that has played (`to_tray`).
     if action == CloseAction::Tray {
         to_tray(ctx);
+        return;
     }
     if let Err(e) = ui.hide() {
         log!("hide window: {e}");
     }
-    if action != CloseAction::Tray {
-        quit(ctx);
-    }
+    quit(ctx);
 }
 
 /// Stops playback and exits, after the settings sent before it are saved.
@@ -108,18 +125,55 @@ fn quit(ctx: &Ctx) {
     ctx.quit();
 }
 
-/// Hides the window to the tray, where the music keeps playing. The first time, a
-/// notification says so; hidden, nothing in the window may animate (the playing mark's
-/// clock stops). Called before the window hides: it's minimised first, so Windows plays its
-/// minimise animation into the taskbar, and it stays minimised in the tray, for the restore
-/// animation when it comes back (`app::show_window`).
-fn to_tray(ctx: &Ctx) {
-    log!("window hidden to the tray");
-    if let Some(hwnd) = ctx.hwnd() {
-        crate::native::minimise(hwnd);
+/// Sends the shown window to the tray, where the music keeps playing. It's minimised first,
+/// so Windows plays its minimise animation into the taskbar, and hidden once that has played
+/// (`MINIMISE_WAIT`); at once with Windows' animations off, if it was minimised already
+/// (closed from its taskbar button) or if it didn't minimise. It stays minimised in the
+/// tray, for the restore animation when it comes back (`app::show_window`, which calls off
+/// a hide still waiting).
+fn to_tray(ctx: &Rc<Ctx>) {
+    let window = ctx.native();
+    let wait = window.as_ref().is_some_and(|w| {
+        let animates = w.animations_enabled() && !w.is_minimised();
+        w.minimise();
+        animates && w.is_minimised()
+    });
+    if !wait {
+        hide(ctx);
+        return;
     }
+    let ctx = Rc::downgrade(ctx);
+    HIDE.with(|t| {
+        t.start(TimerMode::SingleShot, MINIMISE_WAIT, move || {
+            minimise_played(&ctx);
+        });
+    });
+}
+
+/// Calls off a hide to the tray still waiting for the minimise: the window is being shown.
+pub fn cancel_hide() {
+    HIDE.with(Timer::stop);
+}
+
+/// The minimise to the tray has played: the window hides, unless featherplay is quitting or
+/// the window was restored meanwhile (its taskbar button was still there to click).
+fn minimise_played(ctx: &Weak<Ctx>) {
+    let Some(ctx) = ctx.upgrade() else { return };
+    if app::is_closing() || !ctx.native().is_some_and(|w| w.is_minimised()) {
+        return;
+    }
+    hide(&ctx);
+}
+
+/// Hides the window to the tray. The first time, a notification says so; hidden, nothing in
+/// the window may animate (the playing mark's clock stops).
+fn hide(ctx: &Ctx) {
+    log!("window hidden to the tray");
     if let Some(ui) = ctx.window() {
         ui.global::<Frame>().set_hidden(true);
+        if let Err(e) = ui.hide() {
+            log!("hide window: {e}");
+        }
     }
     crate::memory::hidden(ctx, true);
     // Only with the real tray icon: it's what the notice points at.

@@ -37,6 +37,46 @@ fn closing() {
     CLOSING.store(true, Ordering::Release);
 }
 
+/// Whether featherplay has started to quit (`Ctx::quit`, Windows' sign-out or shutdown, the
+/// controller stopping).
+pub fn is_closing() -> bool {
+    CLOSING.load(Ordering::Acquire)
+}
+
+/// The main window's Win32 side that going to the tray and back uses: `Win32` on the real
+/// window's HWND. The offscreen tests have no HWND and set a stand-in (`Ctx::set_native`).
+pub trait NativeWindow {
+    /// Minimises it as its title bar button does, with Windows' animation where it plays one.
+    fn minimise(&self);
+    /// Whether it's minimised, hidden or not.
+    fn is_minimised(&self) -> bool;
+    /// Restores it if it's minimised and brings it to the front.
+    fn bring_forward(&self);
+    /// Windows' "Animation effects" setting.
+    fn animations_enabled(&self) -> bool;
+}
+
+/// The real window, by its HWND.
+struct Win32(isize);
+
+impl NativeWindow for Win32 {
+    fn minimise(&self) {
+        native::minimise(self.0);
+    }
+
+    fn is_minimised(&self) -> bool {
+        native::is_minimised(self.0)
+    }
+
+    fn bring_forward(&self) {
+        native::bring_forward(self.0);
+    }
+
+    fn animations_enabled(&self) -> bool {
+        native::animations_enabled()
+    }
+}
+
 pub struct Ctx {
     pub ui: slint::Weak<AppWindow>,
     pub catalog: Catalog,
@@ -56,6 +96,8 @@ pub struct Ctx {
     /// for its answer (`UiEvent::Account` or `UiEvent::Unreachable`).
     reconnecting: Cell<bool>,
     hwnd: Cell<Option<isize>>,
+    /// The window's Win32 side, once the real window exists (`Win32`), or a test's.
+    native: RefCell<Option<Rc<dyn NativeWindow>>>,
     /// The page last shown, so showing it again (a rename, a Try again) isn't a navigation.
     shown: RefCell<Option<Page>>,
 }
@@ -68,7 +110,7 @@ thread_local! {
 
 /// How long a window back from the tray waits for its taskbar button before it restores
 /// anyway (Explorer not running, or slow).
-const BUTTON_WAIT: std::time::Duration = std::time::Duration::from_millis(300);
+pub const BUTTON_WAIT: std::time::Duration = std::time::Duration::from_millis(300);
 
 impl Ctx {
     pub fn new(
@@ -91,6 +133,7 @@ impl Ctx {
             parked: RefCell::new(Vec::new()),
             reconnecting: Cell::new(false),
             hwnd: Cell::new(None),
+            native: RefCell::new(None),
             shown: RefCell::new(None),
         });
         CTX.with(|c| *c.borrow_mut() = Some(ctx.clone()));
@@ -109,6 +152,17 @@ impl Ctx {
     /// The main window's HWND, once the real window exists (never offscreen).
     pub fn hwnd(&self) -> Option<isize> {
         self.hwnd.get()
+    }
+
+    /// The window's Win32 side, once the real window exists (never offscreen, unless a test
+    /// has set one).
+    pub fn native(&self) -> Option<Rc<dyn NativeWindow>> {
+        self.native.borrow().clone()
+    }
+
+    /// Sets the window's Win32 side: the real window's once it exists, or a test's stand-in.
+    pub fn set_native(&self, window: Rc<dyn NativeWindow>) {
+        *self.native.borrow_mut() = Some(window);
     }
 
     /// Sends a request to the controller. Dropped silently once it has stopped (and in
@@ -444,30 +498,32 @@ pub fn on_event(ev: UiEvent) {
 /// from. With Windows' animations off there's nothing to wait for.
 pub fn show_window(ctx: &Ctx) {
     mini::close_unpinned();
-    let hwnd = ctx.hwnd.get();
+    // Still on its way to the tray: it stays, and restores out of its taskbar button below.
+    close::cancel_hide();
+    let window = ctx.native();
     let from_tray = ctx.window().is_some_and(|ui| !ui.window().is_visible())
-        && hwnd.is_some_and(native::is_minimised);
+        && window.as_ref().is_some_and(|w| w.is_minimised());
     // Before the show: the button may be made while it runs.
-    let wait = from_tray && native::animations_enabled();
+    let wait = from_tray && window.as_ref().is_some_and(|w| w.animations_enabled());
     RESTORE_PENDING.set(wait);
     if let Some(ui) = ctx.window() {
         ui.global::<Frame>().set_hidden(false);
         let _ = ui.show();
     }
     memory::hidden(ctx, false);
-    let Some(hwnd) = hwnd else { return };
+    let Some(window) = window else { return };
     if wait {
-        slint::Timer::single_shot(BUTTON_WAIT, move || restore_pending(hwnd));
+        slint::Timer::single_shot(BUTTON_WAIT, move || restore_pending(&*window));
     } else {
-        native::bring_forward(hwnd);
+        window.bring_forward();
     }
 }
 
 /// The taskbar button of a window back from the tray is there, or the wait is over: it
 /// restores and comes to the front, once.
-fn restore_pending(hwnd: isize) {
+fn restore_pending(window: &dyn NativeWindow) {
     if RESTORE_PENDING.replace(false) {
-        native::bring_forward(hwnd);
+        window.bring_forward();
     }
 }
 
@@ -615,6 +671,7 @@ fn run_window(
     let timing = app.timing;
     shell::start(find_hwnd, tx, hotkeys, move |hwnd| {
         c.hwnd.set(Some(hwnd));
+        c.set_native(Rc::new(Win32(hwnd)));
         if timing {
             // The skia software surface has no rendering notifier. The window exists now;
             // its first frame is painted before the event loop's next turn.
@@ -676,7 +733,9 @@ fn run_window(
         // A window back from the tray restores once its taskbar button is there
         // (`show_window`); out of the message Explorer sent, on the event loop's next turn.
         let watched = native::when_taskbar_button(hwnd, move || {
-            slint::Timer::single_shot(std::time::Duration::ZERO, move || restore_pending(hwnd));
+            slint::Timer::single_shot(std::time::Duration::ZERO, move || {
+                restore_pending(&Win32(hwnd));
+            });
         });
         if let Err(e) = watched {
             log!("restore on taskbar button: {e}");
