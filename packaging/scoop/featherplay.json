@@ -3,6 +3,9 @@
     "description": "A fast, lightweight desktop player for YouTube Music. Not affiliated with Google or YouTube.",
     "homepage": "https://github.com/candygoogy/featherplay",
     "license": "MIT",
+    "suggest": {
+        "Visual C++ runtime": "extras/vcredist2022"
+    },
     "architecture": {
         "64bit": {
             "url": "https://github.com/candygoogy/featherplay/releases/download/v0.1.1/featherplay.exe",

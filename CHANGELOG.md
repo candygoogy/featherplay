@@ -13,6 +13,12 @@ Notable changes to featherplay, newest first. The format follows
   temporary profile that's deleted afterwards. featherplay keeps only the YouTube Music
   session from it. The regular sign-in window stays the default.
 
+### Fixed
+
+- featherplay starts on a Windows without the Visual C++ Redistributable: the installer
+  brings the runtime it needs, and winget installs it first. The portable exe still needs
+  it (Scoop suggests it).
+
 ## [0.1.1] - 2026-11-04
 
 ### Added

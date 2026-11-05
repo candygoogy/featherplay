@@ -178,10 +178,22 @@ jobs:
             exit 1
           fi
 
+      # The Visual C++ runtime the installer ships beside the exe, from this image: no older
+      # than the toolset that just linked the exe (packaging/windows/build-installer.sh).
+      - name: Collect the Visual C++ runtime
+        shell: bash
+        run: |
+          crt=$(packaging/windows/find-vcredist.sh arm64)
+          echo "Visual C++ runtime: $crt"
+          mkdir -p target/release/crt
+          cp "$crt"/*.dll target/release/crt/
+
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: featherplay-arm64-exe
-          path: target/release/featherplay.exe
+          path: |
+            target/release/featherplay.exe
+            target/release/crt/
           if-no-files-found: error
           retention-days: 7
 
@@ -310,7 +322,9 @@ jobs:
         shell: bash
         run: |
           packaging/windows/build-installer.sh --skip-build
-          packaging/windows/build-installer.sh --arch arm64 --skip-build
+          # The ARM64 runtime came with the ARM64 exe, from the image that built it.
+          VCREDIST_DIR="$(dirname "$ARM64_EXE")/crt" \
+            packaging/windows/build-installer.sh --arch arm64 --skip-build
 
       - name: Checksums
         shell: bash

@@ -24,6 +24,12 @@
 #ifndef ArtDir
   #error Pass /DArtDir=<the featherplay build script's OUT_DIR>.
 #endif
+; The Visual C++ runtime the exe links (through Skia), for Arch: the build tools'
+; Microsoft.VC14x.CRT folder (build-installer.sh finds it). Installed beside the exe, so
+; featherplay starts on a Windows without the VC++ Redistributable.
+#ifndef CrtDir
+  #error Pass /DCrtDir=<the Visual C++ runtime's Microsoft.VC14x.CRT folder for Arch>.
+#endif
 #ifndef OutputDir
   #define OutputDir "..\..\target\installer"
 #endif
@@ -116,6 +122,12 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Files]
 Source: "{#ExeFile}"; DestDir: "{app}"; DestName: "featherplay.exe"; Flags: ignoreversion
+; The Visual C++ runtime, app-local: Windows looks in the exe's folder first.
+Source: "{#CrtDir}\msvcp140.dll"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#CrtDir}\vcruntime140.dll"; DestDir: "{app}"; Flags: ignoreversion
+#if FileExists(CrtDir + "\vcruntime140_1.dll")
+Source: "{#CrtDir}\vcruntime140_1.dll"; DestDir: "{app}"; Flags: ignoreversion
+#endif
 ; featherplay's licence and the third-party notices, which the BSD, MIT and IJG licences of
 ; code linked into the exe ask to ship with it. As .txt, so a double click opens them.
 Source: "..\..\LICENSE"; DestDir: "{app}"; DestName: "LICENSE.txt"; Flags: ignoreversion

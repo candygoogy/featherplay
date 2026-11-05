@@ -65,6 +65,10 @@ cache, helpers, the sign-in window's data, and its entries in Credential Manager
 runs from any folder. Settings go to `%APPDATA%\featherplay` and the cache to
 `%LOCALAPPDATA%\featherplay`. To remove it, delete the exe and those two folders, then open
 Credential Manager and remove the Windows Credentials whose names end in `.featherplay`.
+It needs the
+[Visual C++ Redistributable](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist)
+(x64, or ARM64 for `featherplay-arm64.exe`), which most PCs already have; the installer brings
+its own copy.
 
 The release page lists each file's SHA256.
 

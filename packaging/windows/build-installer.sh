@@ -14,6 +14,9 @@
 #
 # Needs:
 # - Inno Setup 6.7 or later: ISCC=<path to ISCC.exe>, or ISCC on PATH, or a standard install.
+# - The Visual C++ runtime the exe was linked against, which the installer ships beside the
+#   exe: VCREDIST_DIR=<its Microsoft.VC14x.CRT folder>, or this machine's MSVC build tools
+#   for the architecture (find-vcredist.sh).
 # - cargo. CARGO_CMD=<command> runs the build through something else, such as a wrapper
 #   that waits for a build lock (an exported `cargo` shell function is used as well).
 #   Building the arm64 exe on an x64 PC also needs the ARM64 MSVC build tools and
@@ -113,6 +116,30 @@ for f in installer-small installer-panel installer-small-light installer-panel-l
     [ -f "$art/$f.png" ] || die "no $art/$f.png; rebuild the release exe"
 done
 
+# The Visual C++ runtime the exe links (Skia is C++): MSVCP140.dll, VCRUNTIME140.dll and
+# VCRUNTIME140_1.dll. A clean Windows doesn't have it, and without it the exe doesn't start
+# (STATUS_DLL_NOT_FOUND), so the installer puts it beside the exe (app-local). It must be no
+# older than the toolset that linked the exe: VCREDIST_DIR=<its Microsoft.VC14x.CRT folder>
+# names the one from the machine that built it (release.yml does for the ARM64 exe), else
+# find-vcredist.sh takes this machine's newest.
+crt=${VCREDIST_DIR:-}
+if [ -z "$crt" ]; then
+    crt=$(packaging/windows/find-vcredist.sh "$arch") || die "set VCREDIST_DIR, or install the MSVC build tools for $arch"
+fi
+# Every runtime DLL the exe imports is shipped: the .iss lists them by name, so a new one (a
+# toolset or Skia update) would install fine and fail on a PC without the redistributable.
+shipped="msvcp140.dll vcruntime140.dll"
+[ -f "$crt/vcruntime140_1.dll" ] && shipped="$shipped vcruntime140_1.dll"
+for f in $shipped; do
+    [ -f "$crt/$f" ] || die "no $f for $arch in '$crt'"
+done
+for dll in $(grep -aoiE '(msvcp|vcruntime|concrt|vccorlib)[0-9a-z_]*\.dll' "$exe" | tr 'A-Z' 'a-z' | sort -u); do
+    case " $shipped " in
+    *" $dll "*) ;;
+    *) die "$exe imports $dll, which the installer doesn't ship; add it to featherplay.iss and here" ;;
+    esac
+done
+
 mkdir -p target/installer
 win() { cygpath -w "$1"; }
 # ISCC's switches start with "/", which MSYS would otherwise rewrite as paths.
@@ -121,6 +148,7 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' "$iscc" /Qp \
     "/DArch=$arch" \
     "/DExeFile=$(win "$root/$exe")" \
     "/DArtDir=$(win "$root/$art")" \
+    "/DCrtDir=$(win "$crt")" \
     "/O$(win "$root/target/installer")" \
     "$@" \
     "$(win "$root/packaging/windows/featherplay.iss")"
