@@ -1,6 +1,6 @@
 # Vendored: opus-decoder 0.1.1
 
-This is the crate as published on crates.io, with one change. The workspace `Cargo.toml`
+This is the crate as published on crates.io, with two changes. The workspace `Cargo.toml`
 swaps it in with `[patch.crates-io]`. featherplay uses it to decode the Opus streams
 (YouTube's format 251, Opus in WebM) behind symphonia's `Decoder` trait
 (`crates/audio/src/opus.rs`); symphonia 0.5 has no Opus decoder of its own.
@@ -18,6 +18,14 @@ swaps it in with `[patch.crates-io]`. featherplay uses it to decode the Opus str
 
    `default-features = false` leaves out rustfft's SIMD back ends (`avx`, `sse`, `neon`),
    as the spike measured it; the scalar FFT is already far faster than needed.
+
+2. `src/celt/vq.rs`, `extract_collapse_mask` and `PvqDecodeInfo`: the collapse mask is a
+   `u32`, as libopus's `unsigned` (marked `featherplay patch`); the callers already carried
+   it as one. Upstream built it in a `u8`, but a band can have up to 16 blocks (a transient
+   frame whose time resolution is raised further), so `1 << i` overflowed: a panic in any
+   build with overflow checks (the tests), and in a release build bits 8-15 folded onto
+   0-7. The real 251 test track hit it 595 times (2026-11-05); with the fix it decodes in a
+   debug build, still 59.1 dB from libopus.
 
 ## Why
 
@@ -55,6 +63,7 @@ licence files). It's a port of libopus, BSD 3-Clause (see `README.md`).
 2. If `flat_fft_forward` (or whatever the inverse MDCT calls) is still a naive DFT, port the
    `featherplay patch` block in `src/celt/kiss_fft.rs` and the `rustfft` dependency (the git
    history of this folder has the diff).
+   Keep change 2 unless `extract_collapse_mask` already returns a 32-bit mask.
 3. Bump the `=x.y.z` pin in `crates/audio/Cargo.toml`, run the audio crate's tests, and
    measure the decode speed in a release build.
 

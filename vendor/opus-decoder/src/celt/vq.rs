@@ -10,7 +10,8 @@ pub(crate) const SPREAD_NONE: i32 = 0;
 /// PVQ band decode diagnostic information.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct PvqDecodeInfo {
-    pub collapse_mask: u8,
+    // featherplay patch: u32, as libopus's `unsigned` (see `extract_collapse_mask`).
+    pub collapse_mask: u32,
     pub nc: u32,
     pub index: u32,
 }
@@ -103,12 +104,16 @@ fn normalise_residual(iy: &[i32], x: &mut [f32], gain: f32) -> u32 {
 ///
 /// Params: decoded pulse vector, band length and block count.
 /// Returns: bit mask with one bit per short block.
-fn extract_collapse_mask(iy: &[i32], n: usize, b: usize) -> u8 {
+fn extract_collapse_mask(iy: &[i32], n: usize, b: usize) -> u32 {
+    // featherplay patch: the mask is a u32, as libopus's `unsigned`. A band can have up to
+    // 16 blocks (a transient frame whose time resolution is raised further), and `1 << i`
+    // into a u8 overflowed there: a panic with overflow checks, and in a release build bits
+    // 8-15 folded onto 0-7. The callers already carry the mask as a u32.
     if b <= 1 {
         return 1;
     }
     let n0 = n / b;
-    let mut mask = 0u8;
+    let mut mask = 0u32;
     for i in 0..b {
         let mut nonzero = 0i32;
         for j in 0..n0 {
