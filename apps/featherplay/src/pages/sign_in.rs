@@ -4,13 +4,18 @@
 //! The account menu's "Switch Google account" opens the same window on Google's account
 //! chooser (`switch_account`), from any page; its news then shows as toasts.
 //!
-//! Two ways in: the sign-in window (`webview`, a separate WebView2 window on its own
-//! thread) or a pasted cookie header, checked here for shape and by the controller with
-//! one read. Either way the controller stores the header and signs in without a restart.
-//! The header is never logged.
+//! Three ways in: the sign-in window (`webview`, a separate WebView2 window on its own
+//! thread, the default), Microsoft Edge with a temporary profile (`edge`), or a pasted
+//! cookie header, checked here for shape and by the controller with one read. The two
+//! windows build the same header (`session`). Every way, the controller stores the header
+//! and signs in without a restart. The header is never logged.
 
+mod edge;
+mod session;
 mod webview;
 
+use std::cell::RefCell;
+use std::path::Path;
 use std::rc::Rc;
 
 use featherplay_core::tr;
@@ -28,9 +33,30 @@ pub fn init(ctx: &Rc<Ctx>) {
     let Some(ui) = ctx.window() else { return };
     let data = ui.global::<SignInData>();
     let c = ctx.clone();
-    data.on_open_window(move || open_window(&c, webview::SIGN_IN_URL));
+    data.on_open_window(move || open_window(&c, session::SIGN_IN_URL));
+    let c = ctx.clone();
+    data.on_open_edge(move || open_edge(&c));
+    data.set_edge_blocked(edge::pipe_blocked());
+    data.on_cancel_edge(cancel_edge);
     let c = ctx.clone();
     data.on_submit(move |text| submit(&c, &text));
+}
+
+/// At startup: deletes the temporary Edge profiles a crash or a kill left in `cache`, on a
+/// thread of its own (a profile can hold thousands of files).
+pub fn sweep_edge_profiles(cache: &Path) {
+    let cache = cache.to_path_buf();
+    let swept = std::thread::Builder::new()
+        .name("featherplay-signin-sweep".into())
+        .spawn(move || {
+            let removed = edge::sweep(&cache);
+            if removed > 0 {
+                log!("removed {removed} leftover Edge sign-in profile(s)");
+            }
+        });
+    if let Err(e) = swept {
+        log!("sign-in profile sweep: {e}");
+    }
 }
 
 /// The page is being shown.
@@ -39,6 +65,8 @@ pub fn open(ctx: &Rc<Ctx>) {
     let data = ui.global::<SignInData>();
     if !data.get_busy() {
         data.set_status("".into());
+        // The policy may have changed since the app started.
+        data.set_edge_blocked(edge::pipe_blocked());
     }
 }
 
@@ -52,6 +80,7 @@ pub fn account_changed(ctx: &Rc<Ctx>, signed_in: bool) {
     let data = ui.global::<SignInData>();
     if signed_in {
         data.set_busy(false);
+        data.set_edge(false);
         data.set_status("".into());
         data.set_error("".into());
         data.set_expired(false);
@@ -61,7 +90,10 @@ pub fn account_changed(ctx: &Rc<Ctx>, signed_in: bool) {
             ctx.navigate(Page::Home);
         }
     } else {
-        data.set_busy(false);
+        // An Edge sign-in still running keeps the page busy until it ends.
+        if EDGE.with(|e| e.borrow().is_none()) {
+            data.set_busy(false);
+        }
         if ctx.current_page() != Page::SignIn {
             ctx.navigate(Page::SignIn);
         }
@@ -161,6 +193,95 @@ fn window_closed(outcome: webview::Outcome) {
     }
 }
 
+thread_local! {
+    /// The running Edge sign-in, for Cancel.
+    static EDGE: RefCell<Option<edge::Cancel>> = const { RefCell::new(None) };
+}
+
+/// "Sign in with Microsoft Edge": Google's sign-in in Edge, with a temporary profile.
+fn open_edge(ctx: &Rc<Ctx>) {
+    let Some(ui) = ctx.window() else { return };
+    let data = ui.global::<SignInData>();
+    if data.get_busy() || EDGE.with(|e| e.borrow().is_some()) {
+        return;
+    }
+    data.set_busy(true);
+    data.set_edge(true);
+    data.set_error("".into());
+    data.set_status(
+        tr!("Finish signing in in Microsoft Edge. featherplay closes it once you're in.").into(),
+    );
+    let started = edge::start(Paths::resolve().cache, |outcome| {
+        let _ = slint::invoke_from_event_loop(move || edge_done(outcome));
+    });
+    match started {
+        Ok(cancel) => EDGE.with(|e| *e.borrow_mut() = Some(cancel)),
+        Err(e) => {
+            log!("{e}");
+            edge_done(edge::Outcome::DidntStart(e));
+        }
+    }
+}
+
+/// Cancel while Edge is open: Edge closes and its profile is deleted; `edge_done` follows.
+fn cancel_edge() {
+    let running = EDGE.with(|e| e.borrow().as_ref().map(edge::Cancel::cancel).is_some());
+    if running
+        && let Some(ctx) = Ctx::get()
+        && let Some(ui) = ctx.window()
+    {
+        ui.global::<SignInData>()
+            .set_status(tr!("Closing Edge…").into());
+    }
+}
+
+/// On the UI thread, once Edge is gone and its profile deleted.
+fn edge_done(outcome: edge::Outcome) {
+    use edge::Outcome;
+    EDGE.with(|e| e.borrow_mut().take());
+    let Some(ctx) = Ctx::get() else { return };
+    let Some(ui) = ctx.window() else { return };
+    let data = ui.global::<SignInData>();
+    data.set_edge(false);
+    let why = match outcome {
+        Outcome::SignedIn(header) => {
+            data.set_status("Checking the session…".into());
+            ctx.send(Action::Account(AccountAction::SignIn(Cookies(header))));
+            return;
+        }
+        Outcome::Cancelled => None,
+        Outcome::Closed => Some(tr!("Edge closed before you signed in.")),
+        Outcome::TimedOut => Some(tr!(
+            "You didn't sign in within 10 minutes, so featherplay closed Edge."
+        )),
+        Outcome::NotFound => Some(tr!(
+            "featherplay can't find Microsoft Edge on this PC. Use Sign in instead."
+        )),
+        Outcome::DidntStart(e) => {
+            log!("edge sign-in: didn't start: {e}");
+            Some(tr!("Microsoft Edge didn't start. Use Sign in instead."))
+        }
+        Outcome::Blocked => Some(tr!(
+            "Edge didn't let featherplay read the sign-in. A policy on this PC may block it. Use Sign in instead."
+        )),
+        Outcome::PolicyOff => {
+            data.set_edge_blocked(true);
+            None
+        }
+        Outcome::Lost(e) => {
+            log!("edge sign-in: lost Edge: {e}");
+            Some(tr!(
+                "featherplay lost the connection to Edge. Try again, or use Sign in."
+            ))
+        }
+    };
+    data.set_busy(false);
+    data.set_status("".into());
+    if let Some(why) = why {
+        data.set_error(why.into());
+    }
+}
+
 fn submit(ctx: &Rc<Ctx>, text: &str) {
     let Some(ui) = ctx.window() else { return };
     let data = ui.global::<SignInData>();
@@ -202,11 +323,10 @@ pub fn check_cookie_header(text: &str) -> Result<String, &'static str> {
             "That doesn't look like a cookie header: it should be name=value pairs separated by semicolons."
         ));
     }
-    let session = pairs.iter().any(|p| {
-        let name = p.split('=').next().unwrap_or_default();
-        name == "SAPISID" || name == "__Secure-3PAPISID"
-    });
-    if !session {
+    let signed_in = pairs
+        .iter()
+        .any(|p| session::is_session_cookie(p.split('=').next().unwrap_or_default()));
+    if !signed_in {
         return Err(tr!(
             "That cookie header has no SAPISID, so it isn't signed in. Copy it from a tab that is signed in."
         ));

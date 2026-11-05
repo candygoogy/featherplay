@@ -1,12 +1,17 @@
 // Sign in (a calm single column). The main button opens the sign-in window (a
-// separate WebView2 window; the main window never hosts a webview); the fallback takes a
-// pasted cookie header. Driven by `src/pages/sign_in.rs`.
+// separate WebView2 window; the main window never hosts a webview); the second opens
+// Microsoft Edge with a temporary profile; the fallback takes a pasted cookie header.
+// Driven by `src/pages/sign_in.rs`.
 import { Theme } from "../theme.slint";
 import { Body, Display, Pill } from "../parts.slint";
 
 export global SignInData {
-    // The sign-in window is open, or a cookie header is being checked.
+    // The sign-in window or Edge is open, or a cookie header is being checked.
     in property <bool> busy;
+    // The Edge sign-in is running (Edge is open, or closing).
+    in property <bool> edge;
+    // A policy on this PC turns off the connection to Edge: the option can't work.
+    in property <bool> edge-blocked;
     // What's happening, e.g. "Finish signing in in the other window."
     in property <string> status;
     in property <string> error;
@@ -16,6 +21,9 @@ export global SignInData {
     // The pasted header. Rust clears it once it has been taken.
     in-out property <string> cookies;
     callback open-window();
+    callback open-edge();
+    // Closes Edge and deletes its profile.
+    callback cancel-edge();
     callback submit(string);
 }
 
@@ -154,13 +162,13 @@ export component SignInPage inherits Rectangle {
                 padding-top: Theme.s2;
                 alignment: start;
                 Pill {
-                    label: SignInData.busy && !SignInData.paste-open ? @tr("Signing in…") : @tr("Sign in");
+                    label: SignInData.busy && !SignInData.paste-open && !SignInData.edge ? @tr("Signing in…") : @tr("Sign in");
                     solid: true;
                     enabled: !SignInData.busy;
                     clicked => { SignInData.open-window(); }
                 }
             }
-            if SignInData.status != "": Body {
+            if SignInData.status != "" && !SignInData.edge: Body {
                 text: SignInData.status;
                 font-size: Theme.t-meta;
                 color: Theme.text3;
@@ -168,6 +176,50 @@ export component SignInPage inherits Rectangle {
                 wrap: word-wrap;
             }
 
+            Rectangle {
+                height: Theme.s3;
+            }
+            Rectangle {
+                height: 1px;
+                background: Theme.hairline;
+            }
+            // Edge: Google's sign-in in the user's own browser, with a throwaway profile.
+            VerticalLayout {
+                padding-top: Theme.s2;
+                spacing: Theme.s3;
+                HorizontalLayout {
+                    alignment: start;
+                    Pill {
+                        label: SignInData.edge ? @tr("Waiting for Edge…") : @tr("Sign in with Microsoft Edge");
+                        enabled: !SignInData.busy && !SignInData.edge-blocked;
+                        clicked => { SignInData.open-edge(); }
+                    }
+                }
+                Body {
+                    text: SignInData.edge-blocked ? @tr("A policy on this PC turns off the browser connection featherplay needs. Use Sign in instead.") : @tr("Opens Microsoft Edge with a temporary profile that's deleted afterwards. featherplay keeps only the YouTube Music session from it.");
+                    font-size: Theme.t-meta;
+                    color: Theme.text3;
+                    overflow: clip;
+                    wrap: word-wrap;
+                }
+                if SignInData.edge: VerticalLayout {
+                    spacing: Theme.s1;
+                    Body {
+                        text: SignInData.status;
+                        font-size: Theme.t-meta;
+                        color: Theme.text2;
+                        overflow: clip;
+                        wrap: word-wrap;
+                    }
+                    HorizontalLayout {
+                        alignment: start;
+                        Link {
+                            text: @tr("Cancel");
+                            clicked => { SignInData.cancel-edge(); }
+                        }
+                    }
+                }
+            }
             Rectangle {
                 height: Theme.s3;
             }
@@ -197,7 +249,7 @@ export component SignInPage inherits Rectangle {
                 HorizontalLayout {
                     alignment: start;
                     Pill {
-                        label: SignInData.busy && SignInData.paste-open ? @tr("Checking…") : @tr("Sign in with this cookie");
+                        label: SignInData.busy && SignInData.paste-open && !SignInData.edge ? @tr("Checking…") : @tr("Sign in with this cookie");
                         enabled: !SignInData.busy && SignInData.cookies != "";
                         clicked => { SignInData.submit(SignInData.cookies); }
                     }

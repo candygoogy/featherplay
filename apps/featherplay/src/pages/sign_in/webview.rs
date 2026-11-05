@@ -29,16 +29,16 @@ use windows::Win32::System::Com::{COINIT_APARTMENTTHREADED, CoInitializeEx, CoUn
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::HiDpi::GetDpiForSystem;
 use windows::Win32::UI::WindowsAndMessaging::*;
-use windows::core::{HSTRING, Interface, PCWSTR, PWSTR, w};
+use windows::core::{BOOL, HSTRING, Interface, PCWSTR, PWSTR, w};
 
-/// Where the window opens: signing in, or Google's account chooser (an already signed-in
-/// profile would pass straight through the sign-in page), to add or pick another login.
-pub const SIGN_IN_URL: &str =
-    "https://accounts.google.com/ServiceLogin?continue=https://music.youtube.com";
+use super::session::{self, Cookie, MUSIC_HOST};
+
+/// Where the window opens: signing in (`session::SIGN_IN_URL`), or Google's account chooser
+/// (an already signed-in profile would pass straight through the sign-in page), to add or
+/// pick another login.
 pub const CHOOSER_URL: &str =
     "https://accounts.google.com/AccountChooser?continue=https://music.youtube.com";
 const COOKIE_URL: &str = "https://music.youtube.com";
-const COOKIE_HOST: &str = "music.youtube.com";
 /// Logical size of the window.
 const SIZE: (i32, i32) = (520, 760);
 /// What the profile drops when the window closes: all but the cookies.
@@ -352,7 +352,7 @@ unsafe fn harden(webview: &ICoreWebView2) -> windows::core::Result<()> {
 /// The page is on the music site itself (not just a URL that starts like it).
 fn on_music_site(src: &str) -> bool {
     reqwest::Url::parse(src)
-        .is_ok_and(|u| u.scheme() == "https" && u.host_str() == Some(COOKIE_HOST))
+        .is_ok_and(|u| u.scheme() == "https" && u.host_str() == Some(MUSIC_HOST))
 }
 
 fn begin_read_cookies() {
@@ -399,6 +399,8 @@ fn begin_read_cookies() {
     }
 }
 
+/// The header from the cookies `GetCookies` gave for the music site, through the builder
+/// the Edge sign-in shares (`session`).
 fn build_header(list: &ICoreWebView2CookieList) -> Outcome {
     let mut count = 0u32;
     // SAFETY: `list` is the cookie list the completion handler was given, borrowed for the
@@ -408,38 +410,62 @@ fn build_header(list: &ICoreWebView2CookieList) -> Outcome {
             return Outcome::Failed(format!("cookie count: {e}"));
         }
     }
-    let mut parts = Vec::with_capacity(count as usize);
-    let mut session = false;
+    let mut cookies = Vec::with_capacity(count as usize);
     for i in 0..count {
-        // SAFETY: as above, and `i < count`. Name and Value hand back CoTaskMem strings,
-        // which `CoTaskMemPWSTR` takes ownership of and frees.
-        unsafe {
-            let Ok(c) = list.GetValueAtIndex(i) else {
-                continue;
-            };
-            let (mut n, mut v) = (PWSTR::null(), PWSTR::null());
-            if c.Name(&mut n).is_err() || c.Value(&mut v).is_err() {
-                continue;
-            }
-            let (n, v) = (
-                CoTaskMemPWSTR::from(n).to_string(),
-                CoTaskMemPWSTR::from(v).to_string(),
-            );
-            if n == "SAPISID" || n == "__Secure-3PAPISID" {
-                session = true;
-            }
-            parts.push(format!("{n}={v}"));
+        // SAFETY: as above, and `i < count`.
+        let Ok(c) = (unsafe { list.GetValueAtIndex(i) }) else {
+            continue;
+        };
+        // SAFETY: `c` is a live cookie from the list, used on this thread.
+        if let Some(c) = unsafe { read_cookie(&c) } {
+            cookies.push(c);
         }
     }
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs_f64();
+    let music = session::music_cookies(&cookies, now);
+    let signed_in = session::signed_in(&music);
     log!(
         "sign-in window: {} cookies, session cookie {}",
-        parts.len(),
-        if session { "present" } else { "missing" }
+        music.len(),
+        if signed_in { "present" } else { "missing" }
     );
-    if session {
-        Outcome::SignedIn(parts.join("; "))
+    if signed_in {
+        Outcome::SignedIn(session::header(&music))
     } else {
         Outcome::NotSignedIn
+    }
+}
+
+/// One WebView2 cookie, or `None` if a part of it can't be read.
+///
+/// # Safety
+/// COM calls: `c` must be alive and belong to this thread.
+unsafe fn read_cookie(c: &ICoreWebView2Cookie) -> Option<Cookie> {
+    // Name, Value, Domain and Path hand back CoTaskMem strings, which `CoTaskMemPWSTR`
+    // takes ownership of and frees.
+    fn text(get: impl FnOnce(&mut PWSTR) -> windows::core::Result<()>) -> Option<String> {
+        let mut p = PWSTR::null();
+        get(&mut p).ok()?;
+        Some(CoTaskMemPWSTR::from(p).to_string())
+    }
+    let (mut secure, mut is_session, mut expires) = (BOOL::default(), BOOL::default(), 0f64);
+    // SAFETY: the caller keeps `c` alive on its thread; every out pointer is live.
+    unsafe {
+        c.IsSecure(&mut secure).ok()?;
+        c.IsSession(&mut is_session).ok()?;
+        c.Expires(&mut expires).ok()?;
+        Some(Cookie {
+            name: text(|p| c.Name(p))?,
+            value: text(|p| c.Value(p))?,
+            domain: text(|p| c.Domain(p))?,
+            path: text(|p| c.Path(p))?,
+            secure: secure.as_bool(),
+            expires: (!is_session.as_bool()).then_some(expires),
+            partitioned: false,
+        })
     }
 }
 

@@ -110,6 +110,10 @@ pub const PAGES: &[&str] = &[
     "sign-in",
     // Sign in after the session expired: its note card.
     "sign-in-expired",
+    // Sign in while Microsoft Edge is open for it: the waiting line and Cancel; or with a
+    // policy that turns off the connection to Edge: the option off, and why.
+    "sign-in-edge",
+    "sign-in-edge-blocked",
     // Home with the account menu open from the sidebar's account row (placeholder identities).
     "account-menu",
     // A first sign-in whose cookies hold several identities: the picker over the sign-in page.
@@ -508,6 +512,24 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
         ui.global::<crate::ui::SignInData>().set_expired(true);
         settle();
     }
+    if o.page.starts_with("sign-in") {
+        // The same picture on every PC, whatever its Edge policy.
+        ui.global::<crate::ui::SignInData>()
+            .set_edge_blocked(o.page == "sign-in-edge-blocked");
+        settle();
+    }
+    if o.page == "sign-in-edge" {
+        let data = ui.global::<crate::ui::SignInData>();
+        data.set_busy(true);
+        data.set_edge(true);
+        data.set_status(
+            featherplay_core::tr!(
+                "Finish signing in in Microsoft Edge. featherplay closes it once you're in."
+            )
+            .into(),
+        );
+        settle();
+    }
     if o.page == "home-more" {
         ui.global::<HomeData>().invoke_near_end();
         settle();
@@ -808,7 +830,11 @@ fn page(name: &str, f: &Fixtures) -> Result<Page, String> {
         | "settings-idle"
         | "settings-local-api" => Page::Settings,
         "about" | "about-update" | "about-update-ready" => Page::About,
-        "sign-in" | "sign-in-expired" | "account-picker" => Page::SignIn,
+        "sign-in"
+        | "sign-in-expired"
+        | "sign-in-edge"
+        | "sign-in-edge-blocked"
+        | "account-picker" => Page::SignIn,
         "explore" => Page::Explore {
             tab: ExploreTab::NewReleases,
         },
