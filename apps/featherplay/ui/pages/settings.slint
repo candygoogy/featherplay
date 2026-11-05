@@ -540,15 +540,45 @@ component CustomPicker inherits VerticalLayout {
     }
 }
 
-// A line of the preview's activity: elided, and underlined when the Links option makes it a
-// link on Discord (Discord underlines them on hover; the preview can't hover, so it always
-// shows the line).
+// The preview's type, one scale for both columns: the caption saying where Discord shows
+// what follows, the main line (the name, the title) and the lines under it (the status,
+// the artist, the time). The activity's name is a line under, set bolder, as Discord sets
+// its "Listening to" heading.
+global PreviewType {
+    out property <length> main-size: Theme.t-body;
+    out property <int> main-weight: 600;
+    out property <color> main-color: Theme.text1;
+    out property <length> sub-size: Theme.t-meta;
+    out property <color> sub-color: Theme.text2;
+}
+
+component PreviewCaption inherits Body {
+    font-size: Theme.t-meta;
+    color: Theme.text3;
+}
+
+component PreviewMain inherits Body {
+    font-size: PreviewType.main-size;
+    font-weight: PreviewType.main-weight;
+    color: PreviewType.main-color;
+}
+
+component PreviewSub inherits Body {
+    font-size: PreviewType.sub-size;
+    color: PreviewType.sub-color;
+}
+
+component PreviewName inherits PreviewSub {
+    font-weight: 600;
+}
+
+// The title (a main line) or the artist (a line under): one line, elided. With the Links
+// option on, Discord underlines it under the pointer (it's plain otherwise), and so does the
+// preview.
 component PreviewLine inherits Rectangle {
     in property <string> text;
     in property <bool> link;
-    in property <length> font-size: Theme.t-body;
-    in property <int> font-weight: 400;
-    in property <color> tone: Theme.text1;
+    in property <bool> main;
     min-height: t.min-height;
     preferred-height: t.preferred-height;
     min-width: 0px;
@@ -557,228 +587,297 @@ component PreviewLine inherits Rectangle {
         width: parent.width;
         height: parent.height;
         text: root.text;
-        font-size: root.font-size;
-        font-weight: root.font-weight;
-        color: root.tone;
+        font-size: root.main ? PreviewType.main-size : PreviewType.sub-size;
+        font-weight: root.main ? PreviewType.main-weight : 400;
+        color: root.main ? PreviewType.main-color : PreviewType.sub-color;
     }
-    if root.link: Rectangle {
+    if root.link: hover := TouchArea {
         x: 0;
-        y: root.height - 3px;
         width: min(t.preferred-width, root.width);
-        height: 1px;
-        background: root.tone.transparentize(0.7);
+        if hover.has-hover: Rectangle {
+            x: 0;
+            y: parent.height - 2px;
+            height: 1px;
+            background: t.color;
+        }
+    }
+}
+
+// Member lists and DMs: the account's photo (its initial until then), the name and the
+// status line.
+component PreviewMember inherits HorizontalLayout {
+    in property <string> status;
+    spacing: Theme.s3;
+    VerticalLayout {
+        alignment: center;
+        Rectangle {
+            width: 40px;
+            height: 40px;
+            border-radius: self.width / 2;
+            background: Theme.avatar;
+            if SidebarData.initial != "": Text {
+                text: SidebarData.initial;
+                font-family: Theme.display-font;
+                font-weight: 700;
+                font-size: Theme.t-body-l;
+                color: Theme.text1;
+            }
+            if SidebarData.initial == "": Icon {
+                width: 20px;
+                height: 20px;
+                commands: Icons.person;
+                stroke: Theme.text1;
+            }
+            if SidebarData.signed-in && SidebarData.has-avatar: Cover {
+                width: parent.width;
+                height: parent.height;
+                round: true;
+                source: SidebarData.avatar;
+            }
+        }
+    }
+    VerticalLayout {
+        alignment: center;
+        spacing: 2px;
+        PreviewMain {
+            text: @tr("You");
+        }
+        PreviewSub {
+            text: root.status;
+        }
+    }
+}
+
+// A line over what follows (a caption, the activity's name), with the gap under it.
+component PreviewHead inherits VerticalLayout {
+    padding-bottom: Theme.s3;
+    @children
+}
+
+// The activity's cover with the app's badge on its corner, and beside it the title, the
+// artist and the time.
+component PreviewTrack inherits HorizontalLayout {
+    in property <DiscordPreview> p;
+    in property <bool> live;
+    in property <float> at;
+    in property <float> total;
+    property <length> cover: 72px;
+    property <length> badge: 20px;
+    horizontal-stretch: 1;
+    spacing: Theme.s4;
+    // A small badge, so the art stays whole, ringed in the card's colour where it overhangs
+    // the corner.
+    VerticalLayout {
+        alignment: start;
+        Rectangle {
+            width: root.cover;
+            height: root.cover;
+            Cover {
+                width: parent.width;
+                height: parent.height;
+                radius: Theme.r-m;
+                source: root.live ? Player.cover : @image-url("");
+            }
+            Rectangle {
+                x: parent.width - self.width + Theme.s1;
+                y: parent.height - self.height + Theme.s1;
+                width: root.badge;
+                height: root.badge;
+                border-radius: self.width / 2;
+                background: Theme.ground;
+                border-width: 2px;
+                border-color: Theme.card;
+                Image {
+                    width: 12px;
+                    height: 12px;
+                    source: Theme.dark ? @image-url("../logo/tri-vane-16.svg") : @image-url("../logo/tri-vane-light-16.svg");
+                }
+            }
+        }
+    }
+    // Centred on the cover, however many lines the Time option leaves.
+    VerticalLayout {
+        alignment: center;
+        spacing: 2px;
+        PreviewLine {
+            text: root.p.title;
+            link: root.p.title-link;
+            main: true;
+        }
+        PreviewLine {
+            text: root.p.artist;
+            link: root.p.artist-link;
+        }
+        if root.p.time == 0: HorizontalLayout {
+            padding-top: Theme.s2;
+            spacing: Theme.s2;
+            PreviewSub {
+                text: Player.clock(root.at);
+            }
+            Rectangle {
+                horizontal-stretch: 1;
+                Rectangle {
+                    y: (parent.height - self.height) / 2;
+                    height: 4px;
+                    border-radius: 2px;
+                    background: Theme.track;
+                }
+                Rectangle {
+                    x: 0;
+                    y: (parent.height - self.height) / 2;
+                    width: parent.width * (root.at / max(root.total, 1)).clamp(0, 1);
+                    height: 4px;
+                    border-radius: 2px;
+                    background: Theme.text1;
+                }
+            }
+            PreviewSub {
+                text: Player.clock(root.total);
+            }
+        }
+        if root.p.time == 1: HorizontalLayout {
+            padding-top: Theme.s2;
+            PreviewSub {
+                text: @tr("{} elapsed", Player.clock(root.at));
+            }
+        }
+    }
+}
+
+// The button under the activity, only when the option is on: a quiet outlined one as wide as
+// its label, where Discord stretches a grey slab across the card.
+component PreviewButton inherits HorizontalLayout {
+    in property <string> label;
+    alignment: start;
+    padding-top: root.label != "" ? Theme.s4 : 0px;
+    if root.label != "": Rectangle {
+        height: 32px;
+        border-radius: Theme.r-m;
+        border-width: 1px;
+        border-color: Theme.field-edge-hover;
+        HorizontalLayout {
+            padding-left: Theme.s4;
+            padding-right: Theme.s4;
+            Body {
+                text: root.label;
+                font-size: Theme.t-meta;
+                font-weight: 600;
+                vertical-alignment: center;
+            }
+        }
     }
 }
 
 // The Discord preview, under the options: what they give, drawn in the app's own style (no
-// Discord marks or colours). One card in two columns: on the left the status line as member
-// lists show it, with the account's photo (its initial until then); on the right the activity
-// on the profile, its cover badged with the Tri-vane. The time follows the player's
-// once-a-second position; nothing else moves.
-component ActivityPreview inherits Rectangle {
+// Discord marks or colours). On the left the status line as member lists show it, on the
+// right the activity on the profile. The captions share a line, and the member row is centred
+// on the cover's row, so the columns read as one card rather than a short column floating
+// beside a tall one. In a narrow column (beside Up next) the two stack. The time follows the
+// player's once-a-second position; nothing else moves.
+component ActivityPreview inherits VerticalLayout {
+    // Set by the page from its column's width. Not from the preview's own: its width would
+    // then depend on which layout it picked, a binding loop.
+    in property <bool> stacked;
     property <DiscordPreview> p: SettingsData.discord-preview;
     property <bool> live: !root.p.sample && Player.has-track;
     property <float> at: root.live ? Player.position-s : 72;
     property <float> total: root.live ? Player.duration-s : 210;
-    property <length> cover: 72px;
-    min-height: lay.min-height;
-    preferred-height: lay.preferred-height;
     accessible-role: groupbox;
     accessible-label: @tr("Discord preview");
-    lay := VerticalLayout {
-        padding-bottom: Theme.s4;
-        Rectangle {
-            border-radius: Theme.r-m;
-            background: Theme.card;
-            HorizontalLayout {
-                padding: Theme.s4;
-                spacing: Theme.s4;
-                // Member lists and DMs: the avatar, the name and the status line.
-                VerticalLayout {
+    padding-bottom: Theme.s4;
+    if !root.stacked: Rectangle {
+        border-radius: Theme.r-m;
+        background: Theme.card;
+        GridLayout {
+            padding: Theme.s5;
+            spacing-horizontal: Theme.s5;
+            Row {
+                // Its width is the member column's.
+                PreviewHead {
                     width: 216px;
-                    alignment: start;
-                    spacing: Theme.s3;
-                    Body {
+                    PreviewCaption {
                         text: @tr("In member lists");
-                        font-size: Theme.t-meta;
-                        color: Theme.text3;
-                    }
-                    HorizontalLayout {
-                        spacing: Theme.s3;
-                        VerticalLayout {
-                            alignment: center;
-                            Rectangle {
-                                width: 32px;
-                                height: 32px;
-                                border-radius: 16px;
-                                background: Theme.avatar;
-                                if SidebarData.initial != "": Text {
-                                    text: SidebarData.initial;
-                                    font-family: Theme.display-font;
-                                    font-weight: 700;
-                                    font-size: 14px;
-                                    color: Theme.text1;
-                                }
-                                if SidebarData.initial == "": Icon {
-                                    width: 18px;
-                                    height: 18px;
-                                    commands: Icons.person;
-                                    stroke: Theme.text1;
-                                }
-                                if SidebarData.signed-in && SidebarData.has-avatar: Cover {
-                                    width: parent.width;
-                                    height: parent.height;
-                                    round: true;
-                                    source: SidebarData.avatar;
-                                }
-                            }
-                        }
-                        VerticalLayout {
-                            alignment: center;
-                            spacing: 2px;
-                            Body {
-                                text: @tr("You");
-                                font-weight: 600;
-                            }
-                            Body {
-                                text: root.p.status;
-                                font-size: Theme.t-meta;
-                                color: Theme.text2;
-                            }
-                        }
                     }
                 }
-                // One card, two columns: a hairline between them, as tall as the card.
+                // One card, two columns: a hairline between them, from the captions down.
                 Rectangle {
+                    rowspan: 4;
                     width: 1px;
                     background: Theme.hairline;
                 }
-                // The profile: the activity's name, the cover, title, artist and time, the
-                // button.
-                VerticalLayout {
-                    horizontal-stretch: 1;
-                    alignment: start;
-                    spacing: Theme.s3;
-                    Body {
+                PreviewHead {
+                    PreviewCaption {
                         text: @tr("On your profile");
-                        font-size: Theme.t-meta;
-                        color: Theme.text3;
-                    }
-                    Body {
-                        text: @tr("Listening to featherplay");
-                        font-size: Theme.t-meta;
-                        font-weight: 600;
-                        color: Theme.text1;
-                    }
-                    HorizontalLayout {
-                        spacing: Theme.s4;
-                        // The cover and its app badge, which overhangs the corner a little,
-                        // ringed in the card's colour.
-                        VerticalLayout {
-                            alignment: start;
-                            Rectangle {
-                                width: root.cover;
-                                height: root.cover;
-                                Cover {
-                                    width: parent.width;
-                                    height: parent.height;
-                                    radius: Theme.r-m;
-                                    source: root.live ? Player.cover : @image-url("");
-                                }
-                                Rectangle {
-                                    x: parent.width - self.width + 6px;
-                                    y: parent.height - self.height + 6px;
-                                    width: 28px;
-                                    height: 28px;
-                                    border-radius: self.width / 2;
-                                    background: Theme.ground;
-                                    border-width: 3px;
-                                    border-color: Theme.card;
-                                    Image {
-                                        width: 18px;
-                                        height: 18px;
-                                        source: Theme.dark ? @image-url("../logo/tri-vane-24.svg") : @image-url("../logo/tri-vane-light-24.svg");
-                                    }
-                                }
-                            }
-                        }
-                        VerticalLayout {
-                            alignment: start;
-                            spacing: 2px;
-                            PreviewLine {
-                                text: root.p.title;
-                                link: root.p.title-link;
-                                font-weight: 600;
-                            }
-                            PreviewLine {
-                                text: root.p.artist;
-                                link: root.p.artist-link;
-                                tone: Theme.text2;
-                            }
-                            if root.p.time == 0: HorizontalLayout {
-                                padding-top: Theme.s2;
-                                spacing: Theme.s2;
-                                Body {
-                                    text: Player.clock(root.at);
-                                    font-size: Theme.t-meta;
-                                    color: Theme.text2;
-                                }
-                                Rectangle {
-                                    horizontal-stretch: 1;
-                                    Rectangle {
-                                        y: (parent.height - self.height) / 2;
-                                        height: 4px;
-                                        border-radius: 2px;
-                                        background: Theme.track;
-                                    }
-                                    Rectangle {
-                                        x: 0;
-                                        y: (parent.height - self.height) / 2;
-                                        width: parent.width * (root.at / max(root.total, 1)).clamp(0, 1);
-                                        height: 4px;
-                                        border-radius: 2px;
-                                        background: Theme.text1;
-                                    }
-                                }
-                                Body {
-                                    text: Player.clock(root.total);
-                                    font-size: Theme.t-meta;
-                                    color: Theme.text2;
-                                }
-                            }
-                            if root.p.time == 1: HorizontalLayout {
-                                padding-top: Theme.s2;
-                                Body {
-                                    text: @tr("{} elapsed", Player.clock(root.at));
-                                    font-size: Theme.t-meta;
-                                    color: Theme.text2;
-                                }
-                            }
-                            // Only when the option is on: a quiet outlined button, as wide
-                            // as its label.
-                            if root.p.button != "": HorizontalLayout {
-                                padding-top: Theme.s3;
-                                alignment: start;
-                                Rectangle {
-                                    height: 32px;
-                                    border-radius: Theme.r-m;
-                                    border-width: 1px;
-                                    border-color: Theme.field-edge-hover;
-                                    HorizontalLayout {
-                                        padding-left: Theme.s4;
-                                        padding-right: Theme.s4;
-                                        Body {
-                                            text: root.p.button;
-                                            font-size: Theme.t-meta;
-                                            font-weight: 600;
-                                            vertical-alignment: center;
-                                        }
-                                    }
-                                }
-                            }
-                        }
                     }
                 }
+            }
+            Row {
+                PreviewHead {
+                    col: 2;
+                    PreviewName {
+                        text: @tr("Listening to featherplay");
+                    }
+                }
+            }
+            Row {
+                PreviewMember {
+                    status: root.p.status;
+                }
+                PreviewTrack {
+                    col: 2;
+                    p: root.p;
+                    live: root.live;
+                    at: root.at;
+                    total: root.total;
+                }
+            }
+            Row {
+                PreviewButton {
+                    col: 2;
+                    label: root.p.button;
+                }
+            }
+        }
+    }
+    if root.stacked: Rectangle {
+        border-radius: Theme.r-m;
+        background: Theme.card;
+        VerticalLayout {
+            padding: Theme.s5;
+            PreviewHead {
+                PreviewCaption {
+                    text: @tr("In member lists");
+                }
+            }
+            PreviewMember {
+                status: root.p.status;
+            }
+            VerticalLayout {
+                padding-top: Theme.s5;
+                padding-bottom: Theme.s5;
+                Rectangle {
+                    height: 1px;
+                    background: Theme.hairline;
+                }
+            }
+            PreviewHead {
+                PreviewCaption {
+                    text: @tr("On your profile");
+                }
+            }
+            PreviewHead {
+                PreviewName {
+                    text: @tr("Listening to featherplay");
+                }
+            }
+            PreviewTrack {
+                p: root.p;
+                live: root.live;
+                at: root.at;
+                total: root.total;
+            }
+            PreviewButton {
+                label: root.p.button;
             }
         }
     }
@@ -1477,7 +1576,11 @@ export component SettingsPage inherits Rectangle {
                             detail: SettingsData.discord-preview.sample ? @tr("How Discord shows a song with these options. Nothing is playing, so a sample stands in.")
                                 : @tr("How Discord shows the current song with these options.");
                         }
-                        ActivityPreview { }
+                        ActivityPreview {
+                            // Two columns while the card (the column less the panel's
+                            // padding) keeps 600 px; narrower, beside Up next, they stack.
+                            stacked: root.col-w - 2 * Rows.inset < 600px;
+                        }
                     }
                     ToggleRow {
                         label: @tr("Local API");
