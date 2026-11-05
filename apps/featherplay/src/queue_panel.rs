@@ -85,14 +85,23 @@ pub fn init(ctx: &Rc<Ctx>) {
         log!("queue panel {open}");
         c.send(Action::Queue(QueueAction::PanelOpen(open)));
     });
+    let c = ctx.clone();
+    ui.global::<Frame>().on_side_toggled(move |open| {
+        log!("now playing side panel {open}");
+        c.send(Action::Queue(QueueAction::SidePanelOpen(open)));
+    });
 }
 
-/// Opens the panel if it was open when the app last ran. Not called for `--snapshot`.
+/// Opens the panel if it was open when the app last ran, and hides Now playing's side panel
+/// if it was hidden. Not called for `--snapshot`.
 pub fn restore(ctx: &Rc<Ctx>) {
-    if Settings::load(&Paths::resolve()).queue_open
-        && let Some(ui) = ctx.window()
-    {
+    let Some(ui) = ctx.window() else { return };
+    let settings = Settings::load(&Paths::resolve());
+    if settings.queue_open {
         ui.global::<Frame>().set_queue_open(true);
+    }
+    if !settings.nowplaying_side_open {
+        ui.global::<Frame>().set_side_open(false);
     }
 }
 

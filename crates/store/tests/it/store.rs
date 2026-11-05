@@ -30,6 +30,7 @@ fn settings_defaults_when_missing() {
             output_device: None,
             volume: 0.7,
             queue_open: false,
+            nowplaying_side_open: true,
             scrobbling: true,
             lastfm_enabled: false,
             listenbrainz_enabled: false,
@@ -89,6 +90,7 @@ fn settings_roundtrip() {
         output_device: Some("Speakers (Realtek(R) Audio) ♪".into()),
         volume: 0.25,
         queue_open: true,
+        nowplaying_side_open: false,
         scrobbling: false,
         lastfm_enabled: true,
         listenbrainz_enabled: true,
@@ -198,6 +200,10 @@ sponsorblock = false
     .unwrap();
     let old = Settings::load(&p);
     assert!(!old.queue_open);
+    assert!(
+        old.nowplaying_side_open,
+        "Now playing's side panel shows unless hidden"
+    );
     assert!(old.autoplay);
     assert!(old.skip_disliked);
     assert_eq!((old.volume, old.sponsorblock), (0.4, false));

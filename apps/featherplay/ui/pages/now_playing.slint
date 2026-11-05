@@ -174,12 +174,13 @@ export component SideTabs inherits Rectangle {
     }
 }
 
-// Whether the Lyrics tab is on screen: picked, in Now playing or the open Up next panel,
+// Whether the Lyrics tab is on screen: picked, in Now playing's side panel or the frame's
+// Up next panel, whichever the page shows and if it's open,
 // with the window neither minimized nor hidden in the tray. One instance, in `AppWindow`,
 // which passes its `minimized`; Rust asks for lyrics and times lines only while it holds.
 export component LyricsWatch {
     in property <bool> minimized;
-    property <bool> live: LyricsData.on && ((NowPlayingData.tab == 2 && (Nav.page == PageKind.now-playing || Frame.queue-open)) || LyricsData.showing) && !Frame.hidden && !root.minimized;
+    property <bool> live: LyricsData.on && ((NowPlayingData.tab == 2 && (Nav.page == PageKind.now-playing ? Frame.side-open : Frame.queue-open)) || LyricsData.showing) && !Frame.hidden && !root.minimized;
     changed live => { LyricsData.live-changed(self.live); }
 }
 
@@ -231,7 +232,22 @@ component LyricsToggle inherits Rectangle {
 }
 
 export component NowPlayingPage inherits Rectangle {
-    property <length> side-w: root.width >= Theme.wide-min ? Theme.nowplaying-side-w : Theme.panel-w;
+    // The side panel's width, and the room it takes from the stage. The bar's Up next button
+    // shows and hides it (`Frame.side-open`). It slides like the frame's Up next panel: the
+    // stage is laid out once at its new width rather than eased (that would lay it out and
+    // repaint it on every frame of the slide). Opening, the panel slides in over the stage,
+    // which narrows when the slide ends; closing, the stage widens at once under the panel
+    // as it slides away. Either way nothing shows empty.
+    property <length> panel-w: root.width >= Theme.wide-min ? Theme.nowplaying-side-w : Theme.panel-w;
+    // How much of the panel is slid out past the right edge: that eases, not `x`, so the
+    // panel stays at the edge while the window resizes.
+    property <float> side-out: Frame.side-open ? 0 : 1;
+    animate side-out { duration: Frame.side-open ? Theme.t-panel : Theme.t-panel * 0.8; easing: Curves.ease-drawer; }
+    // The panel has slid all the way in: set from the slide's end, not bound to it, so the
+    // stage's width depends on it alone and isn't re-evaluated on every frame of the slide.
+    property <bool> side-in;
+    changed side-out => { root.side-in = root.side-out <= 0; }
+    property <length> side-w: Frame.side-open && root.side-in ? root.panel-w : 0px;
     property <length> stage-w: self.width - self.side-w;
     // The page runs under the floating bar; the stage centres in the room above it.
     property <length> stage-h: self.height - Theme.bar-clear;
@@ -245,7 +261,10 @@ export component NowPlayingPage inherits Rectangle {
     animate wash { duration: Theme.t-colour; easing: Curves.ease-hover; }
     // No ground of its own: the window's is under it, and the stage and the side panel are
     // opaque, so a ground here would only be one more 4K fill under them in every frame.
-    init => { root.shown = true; }
+    init => {
+        root.shown = true;
+        root.side-in = Frame.side-open;
+    }
 
     // The full lyrics view: the cover small in a column on the left, the lyrics beside it.
     property <bool> full: LyricsData.full;
@@ -542,19 +561,25 @@ export component NowPlayingPage inherits Rectangle {
         }
     }
 
-    // Up next / Related: slides in 24 px behind the stage.
+    // Up next / Related: on the page's entry it comes in 24 px behind the stage. That offset
+    // eases on its own, not `x`: an eased `x` followed every resize of the window late.
+    property <length> side-enter: root.shown ? 0px : (Theme.moving ? 24px : 0px);
+    animate side-enter { duration: Theme.t-page; delay: Theme.fading ? 40ms : 0ms; easing: Curves.ease-out; }
     Rectangle {
-        x: root.stage-w + (root.shown ? 0px : (Theme.moving ? 24px : 0px));
-        width: root.side-w;
+        x: root.width - root.panel-w * (1 - root.side-out) + root.side-enter;
+        width: root.panel-w;
+        visible: root.side-out < 1;
         background: Theme.panel;
         clip: true;
         opacity: root.shown ? 1.0 : 0.0;
-        animate x, opacity { duration: Theme.t-page; delay: Theme.fading ? 40ms : 0ms; easing: Curves.ease-out; }
+        animate opacity { duration: Theme.t-page; delay: Theme.fading ? 40ms : 0ms; easing: Curves.ease-out; }
         Rectangle {
             x: 0;
             width: 1px;
             background: Theme.hairline;
         }
-        SideTabs { }
+        SideTabs {
+            shown: Frame.side-open;
+        }
     }
 }

@@ -10,7 +10,7 @@ your task owns; the shared files below change only when a page truly needs somet
 | `app.slint` | `AppWindow`: the frame (sidebar, top bar, content, Up next panel, bottom bar), the page switch, keyboard shortcuts, the exports to Rust | frame (shared) |
 | `theme.slint` | `Theme` (colours, interaction states, type, spacing, sizes, durations; dark, light or Windows' mode per the Appearance setting) and `Icons` | frame (shared) |
 | `parts.slint` | Shared pieces: `TrackRow`, `CardItem`, `Icon`, `Display`, `Body`, `PageTitle`, `ShelfTitle`, `Cover`, `IconButton`, `Pill`, `ProgressRail`, `Card`, `Shelf`, `SongRow`, `TrackListRow`, `Tabs`, `PageStub` | frame (shared) |
-| `nav.slint` | `PageKind`, `Nav` (the navigation callbacks) and `Frame` (`queue-open`) | frame (shared) |
+| `nav.slint` | `PageKind`, `Nav` (the navigation callbacks) and `Frame` (`queue-open`, Now playing's `side-open`, …) | frame (shared) |
 | `player.slint` | `Player`: the current track and the transport, for the bar, Now playing and the Home hero | frame (shared) |
 | `sidebar.slint`, `bottom_bar.slint` | The frame's sidebar (`SidebarData`: Home, Library, Explore, History, Liked songs, then the library as a list under the Playlists, Albums and Artists chips, pinned entries first; `src/sidebar.rs`, its order in `src/library_list.rs`) and bottom bar | frame |
 | `top_bar.slint` | The top bar above every page but Now playing: the search field (`TopBarData.query`, filled by `src/top_bar.rs` and cleared off search pages) with its right-click menu | frame |

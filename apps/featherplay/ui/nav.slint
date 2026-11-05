@@ -35,6 +35,10 @@ export global Frame {
     // The Up next panel (filled by `src/queue_panel.rs`). Toggled by the bar's queue button.
     in-out property <bool> queue-open: false;
     callback queue-toggled(bool);
+    // Now playing's side panel (Up next and Related), shown unless hidden with the bar's
+    // queue button there. Its own state: the frame's panel keeps `queue-open`.
+    in-out property <bool> side-open: true;
+    callback side-toggled(bool);
     // Set by keyboard actions (Alt+Left/Right, Enter in search) just before they navigate, so
     // the page appears without its enter fade: keyboard actions don't animate. Cleared once
     // the page changed.

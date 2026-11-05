@@ -36,6 +36,9 @@ pub enum QueueAction {
     },
     /// The panel was opened or closed; remembered for the next run.
     PanelOpen(bool),
+    /// Now playing's side panel shown or hidden (the bar's Up next button there): kept in the
+    /// settings for the next run.
+    SidePanelOpen(bool),
 }
 
 /// What the Up next panel shows besides the tracks.
@@ -184,6 +187,14 @@ impl Controller {
             QueueAction::PanelOpen(open) => {
                 if self.settings.queue_open != open {
                     self.settings.queue_open = open;
+                    if let Err(e) = self.settings.save(&self.paths) {
+                        log!("saving the settings failed: {}", e.kind());
+                    }
+                }
+            }
+            QueueAction::SidePanelOpen(open) => {
+                if self.settings.nowplaying_side_open != open {
+                    self.settings.nowplaying_side_open = open;
                     if let Err(e) = self.settings.save(&self.paths) {
                         log!("saving the settings failed: {}", e.kind());
                     }

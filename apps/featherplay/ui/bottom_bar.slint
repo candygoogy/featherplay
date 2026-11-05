@@ -630,10 +630,17 @@ export component BottomBar inherits Rectangle {
         IconButton {
             icon: Icons.queue;
             label: @tr("Up next");
-            active: Frame.queue-open;
+            // On Now playing it shows and hides the page's own side panel; elsewhere the
+            // frame's Up next panel. Each keeps its own state.
+            active: Frame.full-page ? Frame.side-open : Frame.queue-open;
             clicked => {
-                Frame.queue-open = !Frame.queue-open;
-                Frame.queue-toggled(Frame.queue-open);
+                if Frame.full-page {
+                    Frame.side-open = !Frame.side-open;
+                    Frame.side-toggled(Frame.side-open);
+                } else {
+                    Frame.queue-open = !Frame.queue-open;
+                    Frame.queue-toggled(Frame.queue-open);
+                }
             }
         }
     }

@@ -165,10 +165,10 @@ fn show(ctx: &Rc<Ctx>, state: &PlayerState) {
     }
 
     show_year(ctx, track);
-    if data.get_tab() == 1 {
+    if data.get_tab() == 1 && ui.global::<Frame>().get_side_open() {
         show_related(ctx);
     } else {
-        // Shown when the tab is picked.
+        // Shown when the tab is picked, or the hidden side panel shown again.
         data.set_related(Default::default());
     }
 }

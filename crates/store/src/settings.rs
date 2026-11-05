@@ -35,6 +35,9 @@ pub struct Settings {
     pub volume: f32,
     /// The Up next panel was open when the app last ran.
     pub queue_open: bool,
+    /// Now playing's side panel (Up next and Related) shows; hidden with the bar's Up next
+    /// button there.
+    pub nowplaying_side_open: bool,
     /// Scrobbling as a whole (Pear's Scrobbler "Enabled"); each service has its own switch.
     pub scrobbling: bool,
     pub lastfm_enabled: bool,
@@ -233,6 +236,7 @@ impl Default for Settings {
             output_device: None,
             volume: 0.7,
             queue_open: false,
+            nowplaying_side_open: true,
             scrobbling: true,
             lastfm_enabled: false,
             listenbrainz_enabled: false,
