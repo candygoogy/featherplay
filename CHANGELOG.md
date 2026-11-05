@@ -17,6 +17,8 @@ Notable changes to featherplay, newest first. The format follows
 
 - On Now playing, the player bar's Up next button now hides and shows the side panel (Up
   next and Related), and the page remembers your choice.
+- Resizing the window by its edge keeps up with the pointer better: on a 4K screen each step
+  of the drag takes a third to over half less time than before.
 - featherplay starts on a Windows without the Visual C++ Redistributable: the installer
   brings the runtime it needs, and winget installs it first. The portable exe still needs
   it (Scoop suggests it).

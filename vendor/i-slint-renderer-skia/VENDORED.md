@@ -1,6 +1,6 @@
 # Vendored: i-slint-renderer-skia 1.18.1
 
-This is the crate as published on crates.io, with fourteen changes. The workspace `Cargo.toml`
+This is the crate as published on crates.io, with fifteen changes. The workspace `Cargo.toml`
 swaps it in with `[patch.crates-io]`.
 
 1. `Cargo.toml`: `wgpu-30` is out of the default features.
@@ -109,6 +109,22 @@ Change 14 makes a page's first show cheaper (measured 2026-11-01):
     Variable at weight 500 cost ~5 ms of its first frame
     (`apps/featherplay/tests/app/first_frames.rs`).
 
+Change 15 makes a live resize follow the pointer (measured 2026-11-05):
+
+15. `software_surface.rs`, `LIVE_RESIZE`, `buffer_size` and `SoftbufferRenderBuffer`: while
+    the user drags the window's edge (featherplay sets `LIVE_RESIZE` between
+    WM_ENTERSIZEMOVE and WM_EXITSIZEMOVE, `apps/featherplay/src/live_resize.rs`), the
+    softbuffer surface keeps a buffer that only grows, a quarter larger than the window
+    each time it must, and each frame paints and presents the window's part of it (the
+    buffer's rows as the stride; age 0 whenever the window's size changed). Out of a live
+    resize the buffer is the window's size, as upstream. softbuffer's Win32 surface made a new
+    DIB section for every new size, 33 MB at 4K that Windows hands over zeroed a page at a
+    time: two thirds of each 4K step (17 ms against a 6 ms full repaint), and Windows applies
+    the drag's next step only after the window has painted, so the window trailed the
+    pointer. With the buffer kept, a 4K step on Home takes 11 ms widening and 5 ms growing
+    taller, against 17 and 12 ms before (`apps/featherplay/tests/app/resize_frames.rs`;
+    `live_resize.rs` checks every frame of a drag shows the whole window).
+
 ## Why
 
 `i-slint-backend-winit` depends on this crate with its default features, and our crates
@@ -129,7 +145,7 @@ licence, which allows modified copies).
 2. In its `Cargo.toml`, remove `wgpu-30` (or whichever `wgpu-*` is the new default) from
    `[features] default`.
 3. Keep change 3 unless the new `free_graphics_resources` already frees `layer_cache`,
-   change 4 (or an equivalent the frame log can read), change 5, changes 6–8 and 10–14 unless the
+   change 4 (or an equivalent the frame log can read), change 5, changes 6–8 and 10–15 unless the
    new renderer already does the same (then check `scroll_frames.rs` still passes optimised).
 4. Build. If `i-slint-backend-winit` still calls wgpu-only constructors, port the two
    wgpu `featherplay patch` blocks in `lib.rs` (the git history of this folder has the diff);

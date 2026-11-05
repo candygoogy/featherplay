@@ -25,7 +25,9 @@ use i_slint_core::lengths::LogicalPoint;
 use i_slint_core::partial_renderer::DirtyRegion;
 use i_slint_core::renderer::DrawOutcome;
 use i_slint_renderer_skia::skia_safe::ColorType;
-use i_slint_renderer_skia::software_surface::{RenderBuffer, SoftwareSurface, coalesce_damage};
+use i_slint_renderer_skia::software_surface::{
+    self, LIVE_RESIZE, RenderBuffer, SoftwareSurface, coalesce_damage,
+};
 use i_slint_renderer_skia::{SkiaRenderer, SkiaSharedContext};
 use slint::platform::{Clipboard, EventLoopProxy, Platform, Renderer, WindowAdapter, WindowEvent};
 use slint::{
@@ -50,7 +52,12 @@ struct OffscreenWindow {
 /// a fresh window surface: anything a frame doesn't paint stays transparent black.
 #[derive(Default)]
 struct Screen {
+    /// The window's size, which the last frame was painted at.
     size: Cell<(u32, u32)>,
+    /// The buffers' size (`software_surface::buffer_size`): larger than the window during a
+    /// live resize, as the window's softbuffer surface keeps it. Rows of this width are the
+    /// stride of both buffers.
+    capacity: Cell<(u32, u32)>,
     presented: Cell<bool>,
     buffer: RefCell<Vec<u8>>,
     shown: RefCell<Vec<u8>>,
@@ -77,16 +84,32 @@ impl RenderBuffer for Screen {
             return Ok(());
         };
         let (width, height) = (w.get(), h.get());
-        if self.size.get() != (width, height) {
-            let len = width as usize * height as usize * 4;
+        let live = LIVE_RESIZE.load(std::sync::atomic::Ordering::Relaxed);
+        let capacity = software_surface::buffer_size(self.capacity.get(), (width, height), live);
+        if self.capacity.get() != capacity {
+            let len = capacity.0 as usize * capacity.1 as usize * 4;
             *self.buffer.borrow_mut() = vec![0; len];
             *self.shown.borrow_mut() = vec![0; len];
-            self.size.set((width, height));
+            BUFFERS.set(BUFFERS.get() + 1);
+            self.capacity.set(capacity);
             self.presented.set(false);
         }
-        let age = u8::from(self.presented.get());
+        // A kept buffer holds the last frame at the window's old size: paint it whole.
+        let resized = self.size.replace((width, height)) != (width, height);
+        let age = if resized {
+            0
+        } else {
+            u8::from(self.presented.get())
+        };
+        let stride = capacity.0 as usize * 4;
         let mut buffer = self.buffer.borrow_mut();
-        let region = render(w, h, ColorType::BGRA8888, age, &mut buffer)?;
+        let region = render(
+            w,
+            h,
+            ColorType::BGRA8888,
+            age,
+            &mut buffer[..stride * height as usize],
+        )?;
         // Softbuffer's damage: each logical rectangle scaled and rounded out, clamped here
         // because a BitBlt clips to the window. No region means the whole buffer.
         let scale = window.scale_factor();
@@ -110,7 +133,6 @@ impl RenderBuffer for Screen {
         // Overlapping rectangles merged, as the window's present does (each pixel once).
         coalesce_damage(&mut rects);
         let mut shown = self.shown.borrow_mut();
-        let stride = width as usize * 4;
         let mut damaged = 0;
         let mut bounds: Option<(u32, u32, u32, u32)> = None;
         for [x0, y0, x1, y1] in rects {
@@ -137,6 +159,7 @@ impl RenderBuffer for Screen {
     fn release(&self) {
         *self.buffer.borrow_mut() = Vec::new();
         self.size.set((0, 0));
+        self.capacity.set((0, 0));
         self.presented.set(false);
     }
 }
@@ -183,6 +206,8 @@ thread_local! {
     static WINDOWS: RefCell<Vec<Weak<OffscreenWindow>>> = const { RefCell::new(Vec::new()) };
     /// The windows `present` and `shown` can reach (presenting platform only).
     static PRESENTING: RefCell<Vec<Weak<OffscreenWindow>>> = const { RefCell::new(Vec::new()) };
+    /// Pixel buffers the presenting windows have made (`buffers_made`).
+    static BUFFERS: Cell<u64> = const { Cell::new(0) };
     /// Slint's clock while frozen (`freeze_clock`), else it runs from `STARTED`.
     static CLOCK: Cell<Option<Duration>> = const { Cell::new(None) };
     /// The clipboard: what a copy put there, or `set_clipboard`; a paste reads it.
@@ -358,6 +383,21 @@ pub fn present(window: &Window) -> Result<Presented, String> {
     })
 }
 
+/// Pixel buffers the presenting windows have made so far: a new one for a new size, as
+/// softbuffer makes a new DIB section.
+pub fn buffers_made() -> u64 {
+    BUFFERS.get()
+}
+
+/// The size of the pixel buffer `window` renders into (physical pixels), which may be larger
+/// than the window during a live resize (`live_resize`).
+pub fn buffer_size(window: &Window) -> (u32, u32) {
+    presenting(window)
+        .ok()
+        .and_then(|w| w.screen.as_ref().map(|s| s.capacity.get()))
+        .unwrap_or((0, 0))
+}
+
 /// One mouse-wheel notch as the winit backend delivers it on Windows: `notches` × 60 logical
 /// pixels, phase "moved", which Flickable eases over 180 ms. (`WindowEvent::PointerScrolled`
 /// jumps instead: it carries no phase.)
@@ -384,16 +424,24 @@ pub fn shown(window: &Window) -> Result<SharedPixelBuffer<Rgba8Pixel>, String> {
     let adapter = presenting(window)?;
     let screen = adapter.screen.as_ref().ok_or("no screen")?;
     let (width, height) = screen.size.get();
+    let stride = screen.capacity.get().0 as usize * 4;
     let mut out = SharedPixelBuffer::<Rgba8Pixel>::new(width, height);
+    if width == 0 {
+        // Nothing presented yet, or let go (`release`).
+        return Ok(out);
+    }
     let shown = screen.shown.borrow();
-    for (to, [b, g, r, a]) in out
-        .make_mut_bytes()
-        .as_chunks_mut::<4>()
-        .0
-        .iter_mut()
-        .zip(shown.as_chunks::<4>().0)
-    {
-        *to = [*r, *g, *b, *a];
+    let rows = out.make_mut_bytes().chunks_exact_mut(width as usize * 4);
+    for (y, row) in rows.enumerate() {
+        let from = &shown[y * stride..y * stride + width as usize * 4];
+        for (to, [b, g, r, a]) in row
+            .as_chunks_mut::<4>()
+            .0
+            .iter_mut()
+            .zip(from.as_chunks::<4>().0)
+        {
+            *to = [*r, *g, *b, *a];
+        }
     }
     Ok(out)
 }
@@ -407,10 +455,9 @@ pub fn shown_row(window: &Window, y: u32) -> Result<Vec<[u8; 4]>, String> {
     if y >= height {
         return Err(format!("row {y} is outside the window's {height} rows"));
     }
-    let stride = width as usize * 4;
-    let start = y as usize * stride;
+    let start = y as usize * screen.capacity.get().0 as usize * 4;
     let shown = screen.shown.borrow();
-    Ok(shown[start..start + stride]
+    Ok(shown[start..start + width as usize * 4]
         .as_chunks::<4>()
         .0
         .iter()

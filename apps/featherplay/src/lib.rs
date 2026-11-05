@@ -44,6 +44,7 @@ pub mod instance;
 pub mod language;
 pub mod library_list;
 pub mod link;
+pub mod live_resize;
 pub mod lyrics;
 pub mod memory;
 pub mod mini;

@@ -705,6 +705,16 @@ fn run_window(
         if let Err(e) = watched {
             log!("memory on minimise: {e}");
         }
+        // Dragging the window's edge: the renderer keeps its buffer until the drag ends.
+        let sizing = weak.clone();
+        let watched = native::when_sizing(hwnd, move |live| {
+            if let Some(ui) = sizing.upgrade() {
+                crate::live_resize::set(ui.window(), live);
+            }
+        });
+        if let Err(e) = watched {
+            log!("live resize: {e}");
+        }
         let repaint = weak.clone();
         let watched = native::repaint_when_invalidated(hwnd, move || {
             if let Some(ui) = repaint.upgrade() {

@@ -39,6 +39,24 @@ pub trait RenderBuffer {
 /// featherplay's frame log reads it around each paint.
 pub static PRESENTED_PIXELS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
+/// featherplay patch (change 15, VENDORED.md): the user is moving or sizing featherplay's main
+/// window by its frame (between WM_ENTERSIZEMOVE and WM_EXITSIZEMOVE); featherplay sets it.
+/// Process-wide: another window drawn meanwhile (the mini player) may keep a buffer a little
+/// larger than itself until its next change of size.
+pub static LIVE_RESIZE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// featherplay patch (change 15): the pixel buffer to keep for a window of `want` physical
+/// pixels, given the one there is (`have`, `(0, 0)` for none), during a live resize or not.
+/// Out of one it's the window's size. During one it only grows: a side that fits stays, and a
+/// side that doesn't gets a quarter more than the window needs, so the drag's next steps fit.
+pub fn buffer_size(have: (u32, u32), want: (u32, u32), live: bool) -> (u32, u32) {
+    if !live {
+        return want;
+    }
+    let side = |have: u32, want: u32| if want <= have { have } else { want.saturating_add(want / 4) };
+    (side(have.0, want.0), side(have.1, want.1))
+}
+
 /// featherplay patch (change 10, VENDORED.md): merges a present's damage rectangles
 /// (`[x0, y0, x1, y1]`, physical pixels) that overlap or touch into their bounding box,
 /// wherever the box covers no more pixels than the two did, and drops empty ones. Slint's
@@ -75,6 +93,10 @@ struct SoftbufferRenderBuffer {
             Arc<dyn raw_window_handle::HasWindowHandle + Send + Sync>,
         >,
     >,
+    /// featherplay patch (change 15): the size the surface's buffer has (`buffer_size`), and
+    /// the window's size its last frame was painted at.
+    buffer: std::cell::Cell<(u32, u32)>,
+    painted: std::cell::Cell<(u32, u32)>,
 }
 
 #[cfg(feature = "softbuffer")]
@@ -94,7 +116,8 @@ impl RenderBuffer for SoftbufferRenderBuffer {
             i_slint_core::platform::PlatformError,
         >,
     ) -> Result<(), i_slint_core::platform::PlatformError> {
-        let Some((width, height)) = size.width.try_into().ok().zip(size.height.try_into().ok())
+        let Some((width, height)): Option<(NonZeroU32, NonZeroU32)> =
+            size.width.try_into().ok().zip(size.height.try_into().ok())
         else {
             // Nothing to render
             return Ok(());
@@ -102,21 +125,38 @@ impl RenderBuffer for SoftbufferRenderBuffer {
 
         let mut surface = self.surface.borrow_mut();
 
+        // featherplay patch (change 15): during a live resize the buffer may be larger than
+        // the window; the frame paints its top left, the buffer's rows as the stride.
+        let live = LIVE_RESIZE.load(std::sync::atomic::Ordering::Relaxed);
+        let (buffer_width, buffer_height) =
+            buffer_size(self.buffer.get(), (width.get(), height.get()), live);
+        let (Some(buffer_width), Some(buffer_height)) =
+            (NonZeroU32::new(buffer_width), NonZeroU32::new(buffer_height))
+        else {
+            return Ok(());
+        };
         surface
-            .resize(width, height)
+            .resize(buffer_width, buffer_height)
             .map_err(|e| format!("Error resizing softbuffer surface: {e}"))?;
+        self.buffer.set((buffer_width.get(), buffer_height.get()));
 
         let mut target_buffer = surface
             .buffer_mut()
             .map_err(|e| format!("Error retrieving softbuffer rendering buffer: {e}"))?;
 
+        // A kept buffer holds the last frame at the window's old size: paint it whole. The
+        // size counts as painted once the frame is (a failed one leaves it to the next).
+        let resized = self.painted.get() != (width.get(), height.get());
+        let age = if resized { 0 } else { target_buffer.age() };
+        let rows = buffer_width.get() as usize * height.get() as usize;
         let dirty_region = render_callback(
             width,
             height,
             skia_safe::ColorType::BGRA8888,
-            target_buffer.age(),
-            bytemuck::cast_slice_mut(target_buffer.as_mut()),
+            age,
+            bytemuck::cast_slice_mut(&mut target_buffer[..rows]),
         )?;
+        self.painted.set((width.get(), height.get()));
 
         if let Some(dirty_region) = dirty_region {
             let scale_factor = i_slint_core::lengths::ScaleFactor::new(window.scale_factor());
@@ -157,7 +197,8 @@ impl RenderBuffer for SoftbufferRenderBuffer {
                 u64::from(width.get()) * u64::from(height.get()),
                 std::sync::atomic::Ordering::Relaxed,
             );
-            target_buffer.present()
+            // featherplay patch (change 15): the window's part of the buffer.
+            target_buffer.present_with_damage(&[softbuffer::Rect { x: 0, y: 0, width, height }])
         }
         .map_err(|e| format!("Error presenting softbuffer buffer after skia rendering: {e}"))?;
 
@@ -171,6 +212,8 @@ impl RenderBuffer for SoftbufferRenderBuffer {
         let one = NonZeroU32::MIN;
         if let Ok(mut surface) = self.surface.try_borrow_mut() {
             let _ = surface.resize(one, one);
+            self.buffer.set((1, 1));
+            self.painted.set((0, 0));
         }
     }
 }
@@ -197,8 +240,12 @@ impl super::Surface for SoftwareSurface {
                 format!("Error creating softbuffer surface: {softbuffer_error}")
             })?;
 
-        let surface_access =
-            Box::new(SoftbufferRenderBuffer { _context, surface: RefCell::new(surface) });
+        let surface_access = Box::new(SoftbufferRenderBuffer {
+            _context,
+            surface: RefCell::new(surface),
+            buffer: Default::default(),
+            painted: Default::default(),
+        });
 
         Ok(Self { render_buffer: surface_access })
     }

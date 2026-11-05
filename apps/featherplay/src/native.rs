@@ -514,6 +514,60 @@ unsafe extern "system" fn displays_proc(
     result
 }
 
+/// The subclass that watches the user moving or sizing the window (`when_sizing`). Far from
+/// the others' numbers, which other changes may add to.
+const SIZING_SUBCLASS: usize = 0xfea7_0010;
+
+type Sizing = Box<dyn Fn(bool)>;
+
+/// Calls `changed(true)` when the user starts moving or sizing the window by its frame or
+/// title bar (WM_ENTERSIZEMOVE, before the window handles it) and `changed(false)` when they
+/// let go (WM_EXITSIZEMOVE, after). Windows runs its own loop in between, applying the
+/// drag's next step once the window has painted the last one.
+pub fn when_sizing(h: isize, changed: impl Fn(bool) + 'static) -> Result<(), String> {
+    let data = Box::into_raw(Box::new(Box::new(changed) as Sizing));
+    // SAFETY: a live HWND on this thread; `data` stays valid until WM_NCDESTROY frees it.
+    let ok =
+        unsafe { SetWindowSubclass(hwnd(h), Some(sizing_proc), SIZING_SUBCLASS, data as usize) };
+    if !ok.as_bool() {
+        // SAFETY: never shared, the subclass wasn't installed.
+        drop(unsafe { Box::from_raw(data) });
+        return Err("SetWindowSubclass failed".into());
+    }
+    Ok(())
+}
+
+unsafe extern "system" fn sizing_proc(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+    _id: usize,
+    data: usize,
+) -> LRESULT {
+    use windows::Win32::UI::WindowsAndMessaging::{WM_ENTERSIZEMOVE, WM_EXITSIZEMOVE};
+    if msg == WM_NCDESTROY {
+        // SAFETY: the window is going; nothing calls this subclass with `data` again.
+        unsafe {
+            let _ = RemoveWindowSubclass(hwnd, Some(sizing_proc), SIZING_SUBCLASS);
+            drop(Box::from_raw(data as *mut Sizing));
+        }
+        // SAFETY: the arguments this subclass was called with.
+        return unsafe { DefSubclassProc(hwnd, msg, wparam, lparam) };
+    }
+    // SAFETY: `data` is the box from `when_sizing`, alive until WM_NCDESTROY.
+    let changed = unsafe { &*(data as *const Sizing) };
+    if msg == WM_ENTERSIZEMOVE {
+        changed(true);
+    }
+    // SAFETY: the arguments this subclass was called with.
+    let result = unsafe { DefSubclassProc(hwnd, msg, wparam, lparam) };
+    if msg == WM_EXITSIZEMOVE {
+        changed(false);
+    }
+    result
+}
+
 /// Whether a WM_SETTINGCHANGE's LPARAM names "ImmersiveColorSet".
 ///
 /// # Safety
