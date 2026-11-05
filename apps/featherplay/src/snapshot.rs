@@ -95,6 +95,8 @@ pub const PAGES: &[&str] = &[
     "settings-listenbrainz",
     // Settings with nothing to play: the Discord preview's sample.
     "settings-idle",
+    // Settings playing a long title by many artists, for how the Discord preview elides.
+    "settings-long",
     // Settings with the local API on and running, its port and masked token.
     "settings-local-api",
     "about",
@@ -165,6 +167,15 @@ const LONG_TITLE: &str = "Symphony No. 9 in D Minor, Op. 125 \"Choral\": IV. Pre
 /// A title too long for Now playing's line beside the song's buttons.
 const NOW_PLAYING_LONG_TITLE: &str =
     "In Love With Myself (feat. Somebody) – Extended Club Mix Remastered 2026";
+
+/// A long list of artists, as collaborations and soundtracks credit them.
+const LONG_ARTISTS: &[&str] = &[
+    "Wiener Philharmoniker",
+    "Wiener Singverein",
+    "Herbert von Karajan",
+    "Gundula Janowitz",
+    "Christa Ludwig",
+];
 
 /// How long to wait for loads and covers at most. The wait ends as soon as they're in; the
 /// ceiling is for slow machines: a CI runner decoding a 4K Home's ~120 covers in a debug build
@@ -341,6 +352,24 @@ impl Scene {
         Ok(())
     }
 
+    /// The fixture radio with its `track`th track playing, renamed `title` and credited to
+    /// `artists`.
+    pub fn play_credited(&self, track: usize, title: &str, artists: &[&str]) -> Result<(), String> {
+        let mut state = player_state(&self.fixtures, track)?;
+        if let Some(current) = state.current.as_mut() {
+            current.title = title.to_owned();
+            current.artists = artists
+                .iter()
+                .map(|name| ArtistRef {
+                    id: None,
+                    name: (*name).to_owned(),
+                })
+                .collect();
+        }
+        app::on_event(UiEvent::Player(Box::new(state)));
+        Ok(())
+    }
+
     /// Opens one of `PAGES` the way the app does.
     pub fn open(&self, name: &str) -> Result<(), String> {
         let page = page(name, &self.fixtures)?;
@@ -419,6 +448,8 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
     // As the controller does at startup, home-fresh too: nothing to play, the saved volume.
     if o.page == "now-playing-scripts" {
         scene.play_titled(SCRIPT_TITLES)?;
+    } else if o.page == "settings-long" {
+        scene.play_credited(o.track, LONG_TITLE, LONG_ARTISTS)?;
     } else {
         scene.play_track(
             matches!(
@@ -828,6 +859,7 @@ fn page(name: &str, f: &Fixtures) -> Result<Page, String> {
         | "settings-lastfm-keys"
         | "settings-listenbrainz"
         | "settings-idle"
+        | "settings-long"
         | "settings-local-api" => Page::Settings,
         "about" | "about-update" | "about-update-ready" => Page::About,
         "sign-in"
