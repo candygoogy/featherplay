@@ -51,6 +51,8 @@ pub(super) struct Streams {
     waiting: VecDeque<TrackId>,
     /// The stream loaded last.
     loaded: Option<StreamSource>,
+    /// The last track whose refused preload was resolved again (`again_after_refusal`).
+    refused_preload: Option<TrackId>,
 }
 
 /// What a resolve the player asks for needs.
@@ -155,6 +157,22 @@ impl Streams {
         let i = self.cache.iter().position(|(c, _)| c == id)?;
         self.cache.remove(i).map(|(_, s)| s)
     }
+
+    /// Whether a refused preload of `id` is resolved again ahead: not when it was the last
+    /// one resolved again, so a URL refused every time can't loop while paused.
+    pub fn again_after_refusal(&mut self, id: &TrackId) -> bool {
+        if self.refused_preload.as_ref() == Some(id) {
+            return false;
+        }
+        self.refused_preload = Some(id.clone());
+        true
+    }
+
+    /// Drops the stream whose URL is `url` (refused while preloaded); returns its id.
+    pub fn forget_url(&mut self, url: &str) -> Option<TrackId> {
+        let i = self.cache.iter().position(|(_, s)| s.url == url)?;
+        self.cache.remove(i).map(|(id, _)| id)
+    }
 }
 
 impl Controller {
@@ -214,6 +232,28 @@ impl Controller {
             // After the load, so the engine no longer has a voice for it.
             self.audio.prefetch(&prev);
         }
+    }
+
+    /// A preloaded stream's URL was refused: it's resolved again ahead, so Play needn't wait
+    /// for the refusal and then the resolve (the restored track, 2026-11-05).
+    pub(super) fn preload_refused(&mut self, url: &str) {
+        self.resolver.refused(url);
+        let Some(id) = self.streams.forget_url(url) else {
+            return;
+        };
+        if !self.streams.again_after_refusal(&id) {
+            log!(
+                "preload {} refused again (HTTP 403): resolved at Play",
+                id.0
+            );
+            return;
+        }
+        log!(
+            "preload {} refused (HTTP 403), resolving it again ahead",
+            id.0
+        );
+        self.streams.hint(&id, SystemTime::now());
+        self.start_hints();
     }
 
     pub(super) fn start_hints(&mut self) {
@@ -366,6 +406,31 @@ mod tests {
         s.done(&id("a"), Some(&stream(HOURS)), &[]);
         assert!(s.forget(&id("a")).is_some());
         assert_eq!(s.want(&id("a"), now), Want::Start);
+    }
+
+    /// A refused preload names its URL only: the stream with that URL goes, and its id is
+    /// what gets resolved again.
+    #[test]
+    fn a_stream_is_forgotten_by_its_url() {
+        let mut s = Streams::default();
+        let now = SystemTime::now();
+        let mut a = stream(HOURS);
+        a.url = "https://example.invalid/a".into();
+        s.want(&id("a"), now);
+        s.done(&id("a"), Some(&a), &[]);
+        assert_eq!(s.forget_url("https://example.invalid/b"), None);
+        assert_eq!(s.forget_url(&a.url), Some(id("a")));
+        assert_eq!(s.want(&id("a"), now), Want::Start);
+    }
+
+    /// A preload refused again right after its re-resolve isn't resolved a third time
+    /// while paused: Play resolves it then. No request loop.
+    #[test]
+    fn a_refused_preload_is_resolved_again_once() {
+        let mut s = Streams::default();
+        assert!(s.again_after_refusal(&id("a")));
+        assert!(!s.again_after_refusal(&id("a")), "not twice in a row");
+        assert!(s.again_after_refusal(&id("b")));
     }
 
     #[test]

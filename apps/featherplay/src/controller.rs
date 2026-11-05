@@ -743,7 +743,8 @@ impl Controller {
             Effect::Resolve(id) => return self.resolve(id),
             Effect::Load { id, start } => {
                 let Some(src) = self.source(&id) else {
-                    // Dropped from the cache (a long session of hints): resolve it again.
+                    // Dropped from the cache (a long session of hints, or a refused
+                    // preload): resolve it again.
                     log!("load {}: no stream kept, resolving again", id.0);
                     return Some(Input::StreamExpired);
                 };
@@ -1019,6 +1020,10 @@ impl Controller {
                         self.resolver.refused(&s.url);
                     }
                     Input::StreamExpired
+                }
+                AudioEvent::PreloadRefused(url) => {
+                    self.preload_refused(&url);
+                    return;
                 }
                 AudioEvent::Error(msg) => {
                     log!("audio error: {msg}");

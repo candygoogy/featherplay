@@ -535,8 +535,13 @@ impl Engine {
                     .as_ref()
                     .is_some_and(|p| p.shared.id == voice)
                 {
-                    // Dropped quietly; a later load of the URL tries again and reports.
-                    self.preloaded = None;
+                    // Dropped; a later load of the URL tries again and reports. A refused
+                    // URL is told now, so the app can resolve it again before that load.
+                    if let Some(p) = self.preloaded.take()
+                        && msg.contains("HTTP 403 at byte 0")
+                    {
+                        self.emit(AudioEvent::PreloadRefused(p.shared.url.clone()));
+                    }
                 }
             }
             Msg::Started { voice } => {

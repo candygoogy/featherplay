@@ -64,10 +64,17 @@ const GATE_RETRIES: [Duration; 3] = [
     Duration::from_millis(1000),
 ];
 
+/// The `c=` of the embedded player's URLs, which have no ad gate: a 403 there is final.
+const UNGATED_CLIENT: &str = "c=WEB_EMBEDDED_PLAYER";
+
 /// The first chunk of a stream. A 403 is tried again a few times (see `GATE_RETRIES`)
-/// before it counts as an expired URL.
+/// before it counts as an expired URL, except on a URL without an ad gate.
 async fn first_range(client: &reqwest::Client, url: &str) -> Result<reqwest::Response, String> {
-    let mut tries = GATE_RETRIES.iter();
+    let gated = !url
+        .split_once('?')
+        .is_some_and(|(_, q)| q.split('&').any(|p| p == UNGATED_CLIENT));
+    let retries: &[Duration] = if gated { &GATE_RETRIES } else { &[] };
+    let mut tries = retries.iter();
     loop {
         match get_range(client, url, 0, CHUNK).await {
             Err(e) if e.starts_with("HTTP 403") => match tries.next() {

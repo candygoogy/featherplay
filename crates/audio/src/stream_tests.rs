@@ -351,6 +351,24 @@ fn a_short_gate_is_waited_out() {
     assert!(dec.next().is_some());
 }
 
+/// The embedded player's URLs have no ad gate: a 403 on their first request is final, so
+/// the app resolves again at once. Waiting 1.75 s first never helped (3 of 3, 2026-11-05).
+#[test]
+fn a_refused_url_without_an_ad_gate_fails_at_once() {
+    let server = serve(fixture("tone-10s-frag.m4a"), 1 << 20, Duration::ZERO);
+    server.log.refuse.store(2, Ordering::SeqCst);
+    let env = env();
+    let url = format!("{}?c=WEB_EMBEDDED_PLAYER&n=x", server.url);
+    let opened = env.rt.block_on(crate::http::open(&env.client, &url, None));
+    let err = opened.expect_err("refused");
+    assert!(err.starts_with("HTTP 403"), "{err}");
+    assert_eq!(
+        server.log.refuse.load(Ordering::SeqCst),
+        1,
+        "one request, not tried again"
+    );
+}
+
 /// Read timeout for the stall tests: short, so they take seconds.
 /// It must stay well above how long the local server takes to answer on a loaded machine:
 /// with 200 ms, 32 busy loops on 16 cores made requests time out before their first byte,
@@ -505,6 +523,20 @@ fn engine_starts_a_preloaded_stream_at_once() {
         started < Duration::from_millis(300),
         "Started after {started:?}"
     );
+}
+
+/// A preload whose URL is refused says so, so the app can resolve it again before Play
+/// instead of after it (2026-11-05: the restored track's URL, refused once Play was pressed).
+#[test]
+fn engine_reports_a_refused_preload() {
+    let server = serve(fixture("tone-10s-frag.m4a"), 1 << 20, Duration::ZERO);
+    server.log.refuse.store(u32::MAX, Ordering::SeqCst);
+    let engine = crate::AudioEngine::new_null(engine_tmp());
+    let events = engine.events();
+    let url = format!("{}?c=WEB_EMBEDDED_PLAYER", server.url);
+    engine.preload(src(&url));
+    let event = events.recv_timeout(Duration::from_secs(3));
+    assert_eq!(event, Ok(crate::AudioEvent::PreloadRefused(url)));
 }
 
 #[test]
