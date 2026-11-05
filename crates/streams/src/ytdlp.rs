@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU64, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use featherplay_core::model::TrackId;
@@ -11,11 +11,9 @@ use crate::expiry::query_param;
 use crate::native::{NativeError, NativeResolver};
 use crate::sidecars::{Installer, tail};
 use crate::{
-    Downloads, ResolveError, ResolvedStream, Sidecars, StreamResolver, expires_at_from_url,
+    Downloads, Quality, ResolveError, ResolvedStream, Sidecars, StreamResolver, expires_at_from_url,
 };
 
-/// m4a AAC ~129 kbps, chosen because symphonia 0.6.1 can't decode Opus.
-const FORMAT: &str = "140";
 const RESOLVE_TIMEOUT: Duration = Duration::from_secs(45);
 /// `available_at` has 1 s resolution and is set by YouTube's clock, so wait a little past it.
 /// The audio engine tries a 403 on a stream's first request again for ~1.75 s, so a URL
@@ -24,7 +22,9 @@ const GATE_MARGIN: Duration = Duration::from_millis(200);
 /// The gate is the length of a pre-roll ad (~6 s seen). Never wait longer than this.
 const MAX_GATE_WAIT: Duration = Duration::from_secs(20);
 
-/// Reads the `-J` output of `yt-dlp -f 140`: yt-dlp copies the selected format's fields to the top level.
+/// Reads the `-J` output of `yt-dlp -f 251/140` (or `-f 140`): yt-dlp copies the selected
+/// format's fields to the top level. Format 251 is Opus in WebM, which the `opus-decoder`
+/// crate in crates/audio decodes; 140 is AAC in m4a.
 pub fn parse_ytdlp_json(json: &str, now: SystemTime) -> Result<ResolvedStream, ResolveError> {
     let v: Value = serde_json::from_str(json).map_err(|e| ResolveError::ToolFailed {
         code: 0,
@@ -43,7 +43,7 @@ pub fn parse_ytdlp_json(json: &str, now: SystemTime) -> Result<ResolvedStream, R
     let url = v["url"]
         .as_str()
         .filter(|u| u.starts_with("https://"))
-        .ok_or_else(|| ResolveError::Unavailable(format!("no stream URL for format {FORMAT}")))?;
+        .ok_or_else(|| ResolveError::Unavailable("no stream URL for the selected format".into()))?;
     let itag = v["format_id"]
         .as_str()
         .and_then(|s| s.parse().ok())
@@ -109,7 +109,8 @@ pub fn classify_failure(code: i32, stderr: &str) -> ResolveError {
     ];
     if let Some(line) = stderr.lines().rev().find(|l| l.starts_with("ERROR:")) {
         let l = line.to_ascii_lowercase();
-        // A missing format 140 usually means signature solving broke, not that the track has none.
+        // A missing format (251 or 140) usually means signature solving broke, not that the
+        // track has none: yt-dlp says "Requested format is not available" for either.
         let tool_side = l.contains("http error") || l.contains("requested format");
         if !tool_side && UNPLAYABLE.iter().any(|p| l.contains(p)) {
             return ResolveError::Unavailable(line.trim_start_matches("ERROR:").trim().to_string());
@@ -151,6 +152,8 @@ pub struct YtDlpResolver {
     installer: Option<Installer>,
     /// For `first_byte`, made at the first check.
     checks: OnceLock<Option<reqwest::Client>>,
+    /// The `Quality` resolves ask for (`set_quality`), as `quality_to_u8`.
+    quality: AtomicU8,
 }
 
 impl YtDlpResolver {
@@ -177,6 +180,19 @@ impl YtDlpResolver {
             updates: AtomicU64::new(0),
             installer: None,
             checks: OnceLock::new(),
+            quality: AtomicU8::new(quality_to_u8(Quality::default())),
+        }
+    }
+
+    /// The format later resolves ask for; one running keeps the one it started with.
+    pub fn set_quality(&self, q: Quality) {
+        self.quality.store(quality_to_u8(q), Ordering::Relaxed);
+    }
+
+    fn quality(&self) -> Quality {
+        match self.quality.load(Ordering::Relaxed) {
+            1 => Quality::Standard,
+            _ => Quality::High,
         }
     }
 
@@ -269,19 +285,25 @@ impl YtDlpResolver {
     /// which measures which steps get through from where. The error is the step's own text
     /// (the native refusal, or yt-dlp's exit code and stderr tail).
     pub async fn probe(&self, id: &TrackId, step: Probe<'_>) -> Result<ResolvedStream, String> {
+        let quality = self.quality();
         let args = match step {
             Probe::Native => {
                 let native = self
                     .native
                     .as_ref()
                     .ok_or("no HTTP client for the native step")?;
-                return native.resolve(&id.0).await.map_err(|e| e.to_string());
+                return native
+                    .resolve(&id.0, quality)
+                    .await
+                    .map_err(|e| e.to_string());
             }
             Probe::Embedded => Some(EMBEDDED_ARGS),
             Probe::Default => None,
             Probe::Args(a) => Some(a),
         };
-        self.run(id, None, args).await.map_err(|e| e.to_string())
+        self.run(id, None, args, quality)
+            .await
+            .map_err(|e| e.to_string())
     }
 
     async fn run(
@@ -289,11 +311,12 @@ impl YtDlpResolver {
         id: &TrackId,
         cookies: Option<&CookieFile>,
         extractor_args: Option<&str>,
+        quality: Quality,
     ) -> Result<ResolvedStream, ResolveError> {
         if !self.sidecars.ytdlp().is_file() || !self.sidecars.deno().is_file() {
             return Err(ResolveError::ToolMissing);
         }
-        let mut cmd = self.command(id, cookies, extractor_args);
+        let mut cmd = self.command(id, cookies, extractor_args, quality);
         let out = match tokio::time::timeout(RESOLVE_TIMEOUT, cmd.output()).await {
             Ok(Ok(out)) => out,
             Ok(Err(e)) if e.kind() == std::io::ErrorKind::NotFound => {
@@ -321,17 +344,19 @@ impl YtDlpResolver {
         parse_ytdlp_json(&String::from_utf8_lossy(&out.stdout), SystemTime::now())
     }
 
-    /// One yt-dlp run for format 140 of `id`, printing its JSON. Warnings stay on (stderr):
-    /// when the format is missing, they say why (a challenge not solved, formats skipped
+    /// One yt-dlp run for `quality`'s formats of `id`, printing its JSON. Warnings stay on
+    /// (stderr): when the format is missing, they say why (a challenge not solved, formats skipped
     /// for a PO token or SABR), and a failure's log line ends with them.
     fn command(
         &self,
         id: &TrackId,
         cookies: Option<&CookieFile>,
         extractor_args: Option<&str>,
+        quality: Quality,
     ) -> tokio::process::Command {
         let mut cmd = self.sidecars.command(&self.sidecars.ytdlp());
-        cmd.args(["--ignore-config", "--no-playlist", "-J", "-f", FORMAT])
+        cmd.args(["--ignore-config", "--no-playlist", "-J", "-f"])
+            .arg(quality.formats("/"))
             .arg("--cache-dir")
             .arg(self.sidecars.home().join("yt-dlp-cache"))
             .arg("--js-runtimes")
@@ -360,6 +385,7 @@ impl StreamResolver for YtDlpResolver {
                 id.0
             )));
         }
+        let quality = self.quality();
         // A first run: wait for the helpers (or the download already running for them).
         if let Some(installer) = &self.installer {
             installer.install(&self.sidecars).await?;
@@ -379,6 +405,7 @@ impl StreamResolver for YtDlpResolver {
         let steps = Live {
             r: self,
             cookies: cookies.as_ref(),
+            quality,
         };
         self.chain.resolve(&steps, id).await
     }
@@ -388,6 +415,8 @@ impl StreamResolver for YtDlpResolver {
 struct Live<'a> {
     r: &'a YtDlpResolver,
     cookies: Option<&'a CookieFile>,
+    /// Read once when the resolve starts.
+    quality: Quality,
 }
 
 impl Steps for Live<'_> {
@@ -395,17 +424,20 @@ impl Steps for Live<'_> {
         if self.cookies.is_some() {
             return None;
         }
-        Some(self.r.native.as_ref()?.resolve(&id.0).await)
+        Some(self.r.native.as_ref()?.resolve(&id.0, self.quality).await)
     }
 
     async fn embedded(&self, id: &TrackId) -> Result<ResolvedStream, ResolveError> {
-        let stream = self.r.run(id, self.cookies, Some(EMBEDDED_ARGS)).await?;
+        let stream = self
+            .r
+            .run(id, self.cookies, Some(EMBEDDED_ARGS), self.quality)
+            .await?;
         wait_until_available(&stream).await;
         Ok(stream)
     }
 
     async fn default_clients(&self, id: &TrackId) -> Result<ResolvedStream, ResolveError> {
-        let stream = self.r.run(id, self.cookies, None).await?;
+        let stream = self.r.run(id, self.cookies, None, self.quality).await?;
         wait_until_available(&stream).await;
         Ok(stream)
     }
@@ -447,6 +479,13 @@ async fn first_byte(http: &reqwest::Client, url: &str) -> Check {
         Ok(r) if r.status().is_success() => Check::Plays,
         Ok(r) if r.status() == reqwest::StatusCode::FORBIDDEN => Check::Refused,
         _ => Check::Unknown,
+    }
+}
+
+fn quality_to_u8(q: Quality) -> u8 {
+    match q {
+        Quality::High => 0,
+        Quality::Standard => 1,
     }
 }
 
@@ -635,14 +674,15 @@ mod tests {
             None,
             None,
         );
-        let cmd = r.command(&TrackId("kXbeLiZY6jc".into()), None, Some(EMBEDDED_ARGS));
-        let args: Vec<_> = cmd
-            .as_std()
-            .get_args()
-            .map(|a| a.to_string_lossy().into_owned())
-            .collect();
+        let cmd = r.command(
+            &TrackId("kXbeLiZY6jc".into()),
+            None,
+            Some(EMBEDDED_ARGS),
+            Quality::Standard,
+        );
+        let args = command_args(&cmd);
         assert!(!args.iter().any(|a| a == "--no-warnings"), "{args:?}");
-        assert!(args.windows(2).any(|w| w == ["-f", FORMAT]), "{args:?}");
+        assert!(args.windows(2).any(|w| w == ["-f", "140"]), "{args:?}");
         assert_eq!(
             args.last().map(String::as_str),
             Some("https://music.youtube.com/watch?v=kXbeLiZY6jc")
@@ -896,5 +936,35 @@ mod tests {
             assert!(log.lock().unwrap().is_empty(), "{:?}", log.lock().unwrap());
             std::fs::remove_dir_all(&home).unwrap();
         }
+    }
+
+    /// High asks yt-dlp for Opus (251), else AAC (140); Standard for AAC only.
+    #[test]
+    fn the_quality_setting_picks_the_format_yt_dlp_is_asked_for() {
+        let r = YtDlpResolver::with_native(
+            Sidecars {
+                dir: PathBuf::from("sidecars"),
+            },
+            None,
+            None,
+        );
+        let id = TrackId("kXbeLiZY6jc".into());
+        let format = |r: &YtDlpResolver| {
+            let args = command_args(&r.command(&id, None, None, r.quality()));
+            let i = args.iter().position(|a| a == "-f").expect("-f");
+            args[i + 1].clone()
+        };
+        assert_eq!(format(&r), "251/140", "High by default");
+        r.set_quality(Quality::Standard);
+        assert_eq!(format(&r), "140");
+        r.set_quality(Quality::High);
+        assert_eq!(format(&r), "251/140");
+    }
+
+    fn command_args(cmd: &tokio::process::Command) -> Vec<String> {
+        cmd.as_std()
+            .get_args()
+            .map(|a| a.to_string_lossy().into_owned())
+            .collect()
     }
 }

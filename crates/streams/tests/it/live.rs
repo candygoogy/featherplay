@@ -30,8 +30,16 @@ async fn live_resolve_and_range_fetch() {
             t.elapsed().as_secs_f64(),
             s.itag
         );
-        assert_eq!(s.itag, 140);
-        assert_eq!(s.mime, "audio/mp4");
+        // High quality: Opus when the video has it, else AAC.
+        assert!(
+            matches!(
+                (s.itag, s.mime.as_str()),
+                (251, "audio/webm") | (140, "audio/mp4")
+            ),
+            "{id}: itag {} {}",
+            s.itag,
+            s.mime
+        );
         let resp = http
             .get(&s.url)
             .header("Range", "bytes=0-1048575")
@@ -89,6 +97,6 @@ async fn live_resolve_timing() {
             s.video_title
         );
         assert_eq!(status, 206, "{id}");
-        assert_eq!(s.itag, 140);
+        assert!(matches!(s.itag, 251 | 140), "{id}: itag {}", s.itag);
     }
 }

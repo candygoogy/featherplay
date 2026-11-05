@@ -26,7 +26,7 @@ use serde_json::{Value, json};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 use crate::expiry::{form_value, query_param};
-use crate::{ResolvedStream, Sidecars, expires_at_from_url};
+use crate::{Quality, ResolvedStream, Sidecars, expires_at_from_url};
 
 /// yt-dlp's EJS challenge solver, v0.8.0 (Unlicense; the lib bundles meriyah, ISC, and
 /// astring, MIT). Only preprocessing a new player needs them.
@@ -46,9 +46,6 @@ const CLIENT_VERSION: &str = "2.20260708.00.00";
 const USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.5 Safari/605.1.15,gzip(gfe)";
 /// The page the player is "embedded" in: any page outside YouTube (yt-dlp's choice).
 const EMBED_URL: &str = "https://www.reddit.com/";
-/// m4a AAC ~129 kbps, as `YtDlpResolver`.
-const FORMAT: u64 = 140;
-
 const REFRESH_AFTER: Duration = Duration::from_secs(12 * 3600);
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
 const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(30);
@@ -62,7 +59,8 @@ const OFF_FOR: Duration = Duration::from_secs(30 * 60);
 /// Why a native resolve didn't give a stream.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum NativeError {
-    /// The embedded client won't give this video (not embeddable, sign-in, no format 140):
+    /// The embedded client won't give this video (not embeddable, sign-in, none of the
+    /// formats wanted):
     /// yt-dlp's embedded run would fail the same way, so its other clients go next.
     Skip(String),
     /// Something on our side or the network failed: yt-dlp gets the whole resolve.
@@ -113,6 +111,8 @@ struct Ready {
 /// The `n`/`sig` resolve's fields before the challenges are answered.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Pending {
+    /// The format picked: the first one wanted that the answer has.
+    pub itag: u32,
     /// The format's URL, with the `n` challenge in it and no signature yet.
     pub url: String,
     pub n: Option<String>,
@@ -194,7 +194,11 @@ impl NativeResolver {
         self.inner.forget.store(true, Ordering::Relaxed);
     }
 
-    pub(crate) async fn resolve(&self, video: &str) -> Result<ResolvedStream, NativeError> {
+    pub(crate) async fn resolve(
+        &self,
+        video: &str,
+        quality: Quality,
+    ) -> Result<ResolvedStream, NativeError> {
         let inner = &self.inner;
         if !inner.sidecars.deno().is_file() {
             // Not installed yet (a first run): no request is worth it, and it's no failure
@@ -209,7 +213,7 @@ impl NativeResolver {
         {
             return Err(failed("off for a while after repeated failures"));
         }
-        let result = inner.resolve(video).await;
+        let result = inner.resolve(video, quality).await;
         let mut h = inner.health.lock_or_recover();
         match &result {
             Ok(_) | Err(NativeError::Skip(_)) => h.failures = 0,
@@ -253,7 +257,7 @@ impl NativeResolver {
 }
 
 impl Inner {
-    async fn resolve(&self, video: &str) -> Result<ResolvedStream, NativeError> {
+    async fn resolve(&self, video: &str, quality: Quality) -> Result<ResolvedStream, NativeError> {
         let ready = self.ready(video).await?;
         let player = ready.player.clone();
         // Loads the player while the request runs.
@@ -266,7 +270,7 @@ impl Inner {
                 return Err(e);
             }
         };
-        let pending = parse_player_response(&body, video).inspect_err(|e| {
+        let pending = parse_player_response(&body, video, quality.itags()).inspect_err(|e| {
             if matches!(e, NativeError::Failed(_)) {
                 self.forget.store(true, Ordering::Relaxed);
             }
@@ -563,8 +567,13 @@ pub(crate) fn player_headers(c: &EmbedConfig) -> Vec<(&'static str, String)> {
     h
 }
 
-/// Reads a player API answer: format 140's URL and its challenges, and the metadata.
-pub(crate) fn parse_player_response(body: &str, video: &str) -> Result<Pending, NativeError> {
+/// Reads a player API answer: the URL and challenges of the first format in `wanted` that
+/// it has (and isn't DRM-protected), and the metadata.
+pub(crate) fn parse_player_response(
+    body: &str,
+    video: &str,
+    wanted: &[u32],
+) -> Result<Pending, NativeError> {
     let v: Value =
         serde_json::from_str(body).map_err(|e| failed(format!("player API JSON: {e}")))?;
     let status = v["playabilityStatus"]["status"].as_str().unwrap_or("");
@@ -598,19 +607,35 @@ pub(crate) fn parse_player_response(body: &str, video: &str) -> Result<Pending, 
         // The URL would wait for the ad; yt-dlp knows how long.
         return Err(failed("a pre-roll ad"));
     }
-    let f = v["streamingData"]["adaptiveFormats"]
+    let formats = v["streamingData"]["adaptiveFormats"]
         .as_array()
-        .and_then(|a| a.iter().find(|f| f["itag"].as_u64() == Some(FORMAT)))
-        .ok_or_else(|| NativeError::Skip(format!("no format {FORMAT}")))?;
-    if f.get("drmFamilies").is_some() {
-        return Err(NativeError::Skip("the stream is DRM-protected".into()));
+        .map_or(&[][..], Vec::as_slice);
+    let there: Vec<(u32, &Value)> = wanted
+        .iter()
+        .filter_map(|&itag| {
+            let f = formats
+                .iter()
+                .find(|f| f["itag"].as_u64() == Some(u64::from(itag)))?;
+            Some((itag, f))
+        })
+        .collect();
+    if there.is_empty() {
+        let names: Vec<String> = wanted.iter().map(u32::to_string).collect();
+        return Err(NativeError::Skip(format!(
+            "no format {}",
+            names.join(" or ")
+        )));
     }
+    let (itag, f) = there
+        .into_iter()
+        .find(|(_, f)| f.get("drmFamilies").is_none())
+        .ok_or_else(|| NativeError::Skip("the stream is DRM-protected".into()))?;
     let (url, sig) = match f["url"].as_str() {
         Some(u) => (u.to_string(), None),
         None => {
             let sc = f["signatureCipher"]
                 .as_str()
-                .ok_or_else(|| failed("format 140 has no URL"))?;
+                .ok_or_else(|| failed(format!("format {itag} has no URL")))?;
             let url = form_value(sc, "url").ok_or_else(|| failed("a cipher without a URL"))?;
             let s = form_value(sc, "s").ok_or_else(|| failed("a cipher without s"))?;
             let sp = form_value(sc, "sp").unwrap_or_else(|| "signature".into());
@@ -618,7 +643,7 @@ pub(crate) fn parse_player_response(body: &str, video: &str) -> Result<Pending, 
         }
     };
     if !url.starts_with("https://") {
-        return Err(failed("format 140's URL isn't https"));
+        return Err(failed(format!("format {itag}'s URL isn't https")));
     }
     let mime = query_param(&url, "mime")
         .filter(|m| m.contains('/'))
@@ -634,6 +659,7 @@ pub(crate) fn parse_player_response(body: &str, video: &str) -> Result<Pending, 
         .unwrap_or(0);
     let d = &v["videoDetails"];
     Ok(Pending {
+        itag,
         n: query_param(&url, "n").filter(|n| !n.is_empty()),
         url,
         sig,
@@ -682,7 +708,7 @@ pub(crate) fn finish(
         expires_at: expires_at_from_url(&url, now),
         url,
         mime: p.mime,
-        itag: FORMAT as u32,
+        itag: p.itag,
         bitrate_kbps: p.bitrate_kbps,
         content_length: p.content_length,
         duration: p.duration,
@@ -1168,7 +1194,7 @@ _result.sig = (s) => s.slice(2).split("").reverse().join("");"#;
 
     #[test]
     fn a_recorded_answer_gives_format_140_and_its_challenges() {
-        let p = parse_player_response(PLAYER, VIDEO).unwrap();
+        let p = parse_player_response(PLAYER, VIDEO, Quality::Standard.itags()).unwrap();
         assert!(
             p.url
                 .starts_with("https://rr1---sn-scrubbed.googlevideo.com/videoplayback?")
@@ -1205,16 +1231,55 @@ _result.sig = (s) => s.slice(2).split("").reverse().join("");"#;
     }
 
     #[test]
+    fn high_quality_picks_format_251_as_webm() {
+        let p = parse_player_response(PLAYER, VIDEO, Quality::High.itags()).unwrap();
+        assert_eq!(query_param(&p.url, "itag").as_deref(), Some("251"));
+        assert_eq!(p.mime, "audio/webm");
+        assert_eq!(p.content_length, Some(3_856_919));
+        let (_, s) = p.sig.clone().unwrap();
+        let answers = Answers {
+            n: HashMap::from([("tbgZJm7jUNULHGjSAEd".into(), "solved-n".into())]),
+            sig: HashMap::from([(s, "solved-sig".into())]),
+        };
+        let stream = finish(p, &answers, SystemTime::now()).unwrap();
+        assert_eq!(stream.itag, 251);
+        assert_eq!(stream.mime, "audio/webm");
+    }
+
+    #[test]
+    fn high_quality_falls_back_to_format_140_without_251() {
+        let body = PLAYER.replace("\"itag\": 251", "\"itag\": 250");
+        let p = parse_player_response(&body, VIDEO, Quality::High.itags()).unwrap();
+        assert_eq!(query_param(&p.url, "itag").as_deref(), Some("140"));
+        assert_eq!(p.mime, "audio/mp4");
+        assert_eq!(p.itag, 140);
+    }
+
+    #[test]
+    fn a_missing_format_names_the_ones_wanted() {
+        let skip = |body: &str, q: Quality| match parse_player_response(body, VIDEO, q.itags()) {
+            Err(NativeError::Skip(m)) => m,
+            other => panic!("{other:?}"),
+        };
+        let neither = PLAYER
+            .replace("\"itag\": 251", "\"itag\": 250")
+            .replace("\"itag\": 140", "\"itag\": 139");
+        assert_eq!(skip(&neither, Quality::High), "no format 251 or 140");
+        let no_140 = PLAYER.replace("\"itag\": 140", "\"itag\": 139");
+        assert_eq!(skip(&no_140, Quality::Standard), "no format 140");
+    }
+
+    #[test]
     fn answers_that_mean_another_client_or_yt_dlp() {
         let skip = |body: &str| {
             matches!(
-                parse_player_response(body, VIDEO),
+                parse_player_response(body, VIDEO, Quality::Standard.itags()),
                 Err(NativeError::Skip(_))
             )
         };
         let fail = |body: &str| {
             matches!(
-                parse_player_response(body, VIDEO),
+                parse_player_response(body, VIDEO, Quality::Standard.itags()),
                 Err(NativeError::Failed(_))
             )
         };
@@ -1344,7 +1409,7 @@ _result.sig = (s) => s.slice(2).split("").reverse().join("");"#;
             }
         });
         let (r, dir) = seeded("resolve", sidecars, &base);
-        let s = r.resolve(VIDEO).await.unwrap();
+        let s = r.resolve(VIDEO, Quality::High).await.unwrap();
         assert_eq!(
             *log.lock().unwrap(),
             ["POST /youtubei/v1/player?prettyPrint=false"]
@@ -1353,9 +1418,14 @@ _result.sig = (s) => s.slice(2).split("").reverse().join("");"#;
             query_param(&s.url, "n").as_deref(),
             Some("dEASjGHLUNUj7mJZgbt")
         );
-        let s_in = parse_player_response(PLAYER, VIDEO).unwrap().sig.unwrap().1;
+        let s_in = parse_player_response(PLAYER, VIDEO, Quality::High.itags())
+            .unwrap()
+            .sig
+            .unwrap()
+            .1;
         let want: String = s_in[2..].chars().rev().collect();
         assert_eq!(query_param(&s.url, "sig"), Some(want));
+        assert_eq!((s.itag, s.mime.as_str()), (251, "audio/webm"));
         assert_eq!(s.video_title.as_deref(), Some("affection"));
         std::fs::remove_dir_all(&dir).unwrap();
     }
@@ -1368,17 +1438,17 @@ _result.sig = (s) => s.slice(2).split("").reverse().join("");"#;
         };
         let (base, log) = test_server::serve(|_, _, _| (500, String::new()));
         let (r, dir) = seeded("fails", sidecars, &base);
-        let e = r.resolve(VIDEO).await.unwrap_err();
+        let e = r.resolve(VIDEO, Quality::High).await.unwrap_err();
         assert!(matches!(e, NativeError::Failed(_)), "{e:?}");
         assert!(
             r.inner.forget.load(Ordering::Relaxed),
             "the next resolve fetches the embed page"
         );
         for _ in 0..2 {
-            let _ = r.resolve(VIDEO).await;
+            let _ = r.resolve(VIDEO, Quality::High).await;
         }
         let n = log.lock().unwrap().len();
-        assert!(r.resolve(VIDEO).await.is_err());
+        assert!(r.resolve(VIDEO, Quality::High).await.is_err());
         assert_eq!(
             log.lock().unwrap().len(),
             n,
@@ -1408,7 +1478,7 @@ _result.sig = (s) => s.slice(2).split("").reverse().join("");"#;
         let (base, log) = embed_and_player();
         let r = NativeResolver::with_dirs(sidecars, Some(dir.join("resolver")), &base).unwrap();
         for _ in 0..=MAX_FAILURES {
-            let e = r.resolve(VIDEO).await.unwrap_err();
+            let e = r.resolve(VIDEO, Quality::High).await.unwrap_err();
             assert_eq!(e, failed("deno is missing"));
         }
         assert!(log.lock().unwrap().is_empty(), "{:?}", log.lock().unwrap());
@@ -1426,7 +1496,11 @@ _result.sig = (s) => s.slice(2).split("").reverse().join("");"#;
         let (base, log) = embed_and_player();
         let r = NativeResolver::with_dirs(sidecars, Some(dir.join("resolver")), &base).unwrap();
         for _ in 0..2 {
-            let e = r.resolve(VIDEO).await.unwrap_err().to_string();
+            let e = r
+                .resolve(VIDEO, Quality::High)
+                .await
+                .unwrap_err()
+                .to_string();
             assert!(e.contains("starting deno"), "{e}");
         }
         let players = log

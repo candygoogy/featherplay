@@ -43,9 +43,36 @@ pub struct ResolvedStream {
     pub first_tag: Option<String>,
 }
 
+/// Which audio format a resolve asks for (`YtDlpResolver::set_quality`).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Quality {
+    /// Format 251 (Opus in WebM, ~130-160 kbps) when the video has it, else 140.
+    #[default]
+    High,
+    /// Format 140 (AAC in m4a, ~129 kbps) only.
+    Standard,
+}
+
+impl Quality {
+    /// The formats wanted, best first.
+    pub(crate) fn itags(self) -> &'static [u32] {
+        match self {
+            Quality::High => &[251, 140],
+            Quality::Standard => &[140],
+        }
+    }
+
+    /// The wanted formats as text, joined by `sep`: `251/140` is yt-dlp's `-f` for High.
+    pub(crate) fn formats(self, sep: &str) -> String {
+        let itags: Vec<String> = self.itags().iter().map(u32::to_string).collect();
+        itags.join(sep)
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ResolveError {
-    /// The track can't be played (deleted, private, region-locked, no format 140).
+    /// The track can't be played (deleted, private, region-locked, none of the formats
+    /// `Quality` asks for).
     Unavailable(String),
     /// The yt-dlp or deno sidecar isn't installed.
     ToolMissing,

@@ -53,6 +53,29 @@ fn parse_unavailable_maps_error() {
     ));
 }
 
+/// `-f 251/140` picked Opus: the mime is WebM's, from the URL or else from the extension.
+#[test]
+fn parse_reports_webm_for_format_251() {
+    let now = SystemTime::now();
+    let json =
+        |url: &str| format!(r#"{{"format_id":"251","ext":"webm","abr":135.2,"url":"{url}"}}"#);
+    let s = parse_ytdlp_json(
+        &json("https://media.example.invalid/videoplayback?itag=251&mime=audio%2Fwebm"),
+        now,
+    )
+    .unwrap();
+    assert_eq!(
+        (s.itag, s.mime.as_str(), s.bitrate_kbps),
+        (251, "audio/webm", 135)
+    );
+    let s = parse_ytdlp_json(
+        &json("https://media.example.invalid/videoplayback?itag=251"),
+        now,
+    )
+    .unwrap();
+    assert_eq!(s.mime, "audio/webm");
+}
+
 /// A fresh dir under FEATHERPLAY_HOME, laid out like the app's: `{home}/sidecars`, `{home}/tmp`.
 fn test_home(name: &str) -> PathBuf {
     let base =
