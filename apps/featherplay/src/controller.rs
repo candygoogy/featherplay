@@ -33,8 +33,12 @@ use featherplay_core::scrobble::Alternates;
 use featherplay_core::tr;
 use featherplay_integrations::sponsorblock::{self, Segment};
 use featherplay_integrations::{NowPlaying, UiCommand, notify_track};
-use featherplay_store::{Paths, SecretKey, Settings, get_secret, load_session, save_session};
-use featherplay_streams::{Downloads, ResolveError, ResolvedStream, Sidecars, YtDlpResolver};
+use featherplay_store::{
+    Paths, SecretKey, Settings, StreamingQuality, get_secret, load_session, save_session,
+};
+use featherplay_streams::{
+    Downloads, Quality, ResolveError, ResolvedStream, Sidecars, YtDlpResolver,
+};
 use featherplay_ytm::{ApiError, YtMusic};
 use tokio::sync::mpsc;
 
@@ -303,6 +307,7 @@ impl Controller {
             YtDlpResolver::new(Sidecars { dir: sidecars }, None)
                 .with_downloads(Downloads::pinned()),
         );
+        resolver.set_quality(stream_quality(settings.streaming_quality));
         let helpers = resolver.clone();
         tokio::spawn(async move {
             // A first run downloads yt-dlp and deno now, so they're usually there by the first
@@ -1241,6 +1246,14 @@ fn prefs(s: &Settings) -> PlaybackPrefs {
             ListEnd::Restart
         },
         skip_disliked: s.skip_disliked,
+    }
+}
+
+/// The resolver's format choice for the Streaming quality setting.
+fn stream_quality(q: StreamingQuality) -> Quality {
+    match q {
+        StreamingQuality::High => Quality::High,
+        StreamingQuality::Standard => Quality::Standard,
     }
 }
 

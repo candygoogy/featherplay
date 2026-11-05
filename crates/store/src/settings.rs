@@ -107,11 +107,26 @@ pub struct Settings {
     /// When the queue moves on (a track ends, Next, autoplay), pass over songs the user
     /// disliked (on by default). One the user starts directly still plays.
     pub skip_disliked: bool,
+    /// The audio format streams are asked for: `High` (the default) prefers Opus, `Standard`
+    /// always takes AAC. Files from before the setting, and a value this build doesn't know,
+    /// load as `High`. Applies from the next stream resolved.
+    #[serde(deserialize_with = "lenient")]
+    pub streaming_quality: StreamingQuality,
     /// A left click on the tray icon shows and brings forward the main window (off by
     /// default: it opens the mini player). A right click opens the menu either way. Files up
     /// to 0.1.1 may also hold `mini_pinned`, the mini player's pin, kept between openings
     /// then; it's an unknown key now, so it's ignored and not written back.
     pub tray_click_opens_window: bool,
+}
+
+/// The Streaming quality setting. `High` asks for Opus (format 251) when a track has it and
+/// AAC (140) otherwise; `Standard` always asks for AAC.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum StreamingQuality {
+    #[default]
+    High,
+    Standard,
 }
 
 /// The Appearance setting. `System` follows Windows' app mode.
@@ -263,6 +278,7 @@ impl Default for Settings {
             language: String::new(),
             volume_step: Settings::VOLUME_STEP,
             skip_disliked: true,
+            streaming_quality: StreamingQuality::High,
             tray_click_opens_window: false,
         }
     }

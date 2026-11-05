@@ -28,12 +28,12 @@ use featherplay_core::tr;
 use featherplay_lastfm::{LastFm, LastFmError};
 use featherplay_listenbrainz::{ListenBrainz, ListenBrainzError};
 use featherplay_store::{
-    Accent, AccentColour, CloseAction, DiscordOptions, Hotkeys, SecretKey, Settings, ThemeMode,
-    delete_secret, get_secret, set_secret,
+    Accent, AccentColour, CloseAction, DiscordOptions, Hotkeys, SecretKey, Settings,
+    StreamingQuality, ThemeMode, delete_secret, get_secret, set_secret,
 };
 use featherplay_ytm::{ApiError, Identity, YtMusic};
 
-use super::{Controller, Msg, UiEvent, prefs};
+use super::{Controller, Msg, UiEvent, prefs, stream_quality};
 use crate::catalog::Source;
 use crate::presence::{self, Presence};
 use crate::scrobbler::{LastfmKeys, Scrobblers, build_keys, lastfm_keys};
@@ -152,6 +152,8 @@ pub enum Change {
     /// What a wheel notch and Up or Down move the volume, in percent (one of
     /// `Settings::VOLUME_STEPS`; the window applies it).
     VolumeStep(u8),
+    /// The format streams are asked for, from the next resolve on.
+    StreamingQuality(StreamingQuality),
     /// A left click on the tray icon opens the main window (on) or the mini player (off).
     TrayClickOpensWindow(bool),
 }
@@ -198,6 +200,7 @@ impl Change {
             Change::LocalApiPort(v) => s.local_api_port = v,
             Change::Language(v) => s.language = v,
             Change::VolumeStep(v) => s.volume_step = v,
+            Change::StreamingQuality(v) => s.streaming_quality = v,
             Change::TrayClickOpensWindow(v) => s.tray_click_opens_window = v,
         }
     }
@@ -582,6 +585,8 @@ impl Controller {
             // The autoplay tracks not played yet go when it's turned off.
             Change::Autoplay(_) => self.input(Input::SetPrefs(prefs(&self.settings))),
             Change::SkipDisliked(_) => self.input(Input::SetPrefs(prefs(&self.settings))),
+            // Streams already resolved keep their format.
+            Change::StreamingQuality(q) => self.resolver.set_quality(stream_quality(q)),
             Change::Sponsorblock(false) => self.segments = None,
             Change::OutputDevice(name) => self.audio.set_device(name.as_deref()),
             Change::Scrobbling(_) | Change::Scrobble(_) | Change::ListenBrainz(_) => {
@@ -1001,6 +1006,7 @@ mod tests {
             Change::LocalApi(true),
             Change::LocalApiPort(31000),
             Change::SkipDisliked(false),
+            Change::StreamingQuality(StreamingQuality::Standard),
             Change::TrayClickOpensWindow(true),
         ];
         for c in &changes {
@@ -1025,6 +1031,7 @@ mod tests {
         assert!(!s.lyrics && !s.lyrics_lrclib);
         assert!(!s.autoplay);
         assert!(!s.skip_disliked);
+        assert_eq!(s.streaming_quality, StreamingQuality::Standard);
         assert!(s.tray_click_opens_window);
         assert!(!s.check_for_updates && !s.install_updates);
         assert_eq!(s.volume, d.volume, "the volume isn't a page setting");
@@ -1046,6 +1053,15 @@ mod tests {
         s.skip_disliked = false;
         let off = crate::controller::prefs(&s).skip_disliked;
         assert_eq!((on, off), (true, false));
+    }
+
+    #[test]
+    fn streaming_quality_picks_the_resolver_quality() {
+        use featherplay_streams::Quality;
+        let q = crate::controller::stream_quality;
+        assert_eq!(q(StreamingQuality::High), Quality::High);
+        assert_eq!(q(StreamingQuality::Standard), Quality::Standard);
+        assert_eq!(q(StreamingQuality::default()), Quality::default());
     }
 
     #[test]

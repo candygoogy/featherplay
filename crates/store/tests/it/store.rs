@@ -8,7 +8,7 @@ use featherplay_core::model::{
 use featherplay_store::settings::SCHEMA;
 use featherplay_store::{
     Accent, AccentColour, CloseAction, DiscordOptions, DiscordStatusText, DiscordTime, Hotkeys,
-    Paths, Settings, ThemeMode, load_session, save_session,
+    Paths, Settings, StreamingQuality, ThemeMode, load_session, save_session,
 };
 
 use crate::home::{self, TestHome};
@@ -65,6 +65,7 @@ fn settings_defaults_when_missing() {
             language: String::new(),
             volume_step: 5,
             skip_disliked: true,
+            streaming_quality: StreamingQuality::High,
             tray_click_opens_window: false,
         }
     );
@@ -125,6 +126,7 @@ fn settings_roundtrip() {
         language: "de".into(),
         volume_step: 2,
         skip_disliked: false,
+        streaming_quality: StreamingQuality::Standard,
         tray_click_opens_window: true,
     };
     s.save(&p).unwrap();
@@ -723,6 +725,59 @@ fn the_volume_step_is_5_in_older_files_and_falls_back_to_5_when_not_a_choice() {
         fs::write(&file, format!("volume_step = {step}\n")).unwrap();
         assert_eq!(Settings::load(&p).volume_step, step);
     }
+}
+
+#[test]
+fn streaming_quality_is_high_in_older_files_and_for_an_unknown_value() {
+    let Some(home) = TestHome::new("settings-streaming-quality") else {
+        return;
+    };
+    let p = home.paths();
+    fs::create_dir_all(&p.config).unwrap();
+    let file = p.config.join("settings.toml");
+
+    // A file written before the setting existed.
+    fs::write(
+        &file,
+        "notifications = true
+",
+    )
+    .unwrap();
+    assert_eq!(Settings::load(&p).streaming_quality, StreamingQuality::High);
+
+    for bad in ["\"lossless\"", "\"High\"", "3", "true"] {
+        fs::write(
+            &file,
+            format!(
+                "streaming_quality = {bad}
+volume = 0.5
+"
+            ),
+        )
+        .unwrap();
+        let s = Settings::load(&p);
+        assert_eq!(s.streaming_quality, StreamingQuality::High, "{bad}");
+        // The rest of the file still counts.
+        assert_eq!(s.volume, 0.5, "{bad}");
+    }
+}
+
+#[test]
+fn streaming_quality_round_trips_as_lowercase() {
+    let Some(home) = TestHome::new("settings-streaming-quality-rt") else {
+        return;
+    };
+    let p = home.paths();
+    for quality in [StreamingQuality::High, StreamingQuality::Standard] {
+        let s = Settings {
+            streaming_quality: quality,
+            ..Settings::default()
+        };
+        s.save(&p).unwrap();
+        assert_eq!(Settings::load(&p).streaming_quality, quality);
+    }
+    let text = fs::read_to_string(p.config.join("settings.toml")).unwrap();
+    assert!(text.contains("streaming_quality = \"standard\""), "{text}");
 }
 
 #[test]

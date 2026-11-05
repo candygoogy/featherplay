@@ -19,7 +19,7 @@ use featherplay_integrations::local_api::Token;
 use featherplay_integrations::{NowPlaying, discord, parse_hotkey};
 use featherplay_store::{
     Accent, AccentColour, CloseAction, DiscordOptions, DiscordStatusText, DiscordTime, Hotkeys,
-    Paths, Settings, ThemeMode,
+    Paths, Settings, StreamingQuality, ThemeMode,
 };
 use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
 
@@ -255,6 +255,8 @@ pub fn init(ctx: &Rc<Ctx>) {
     });
     let c = ctx.clone();
     data.on_pick_volume_step(move |i| pick_volume_step(&c, i));
+    let c = ctx.clone();
+    data.on_pick_streaming_quality(move |i| pick_streaming_quality(&c, i));
 }
 
 /// The page is being shown: refresh the devices and the Last.fm state.
@@ -682,6 +684,7 @@ fn show(ctx: &Ctx) {
     data.set_skip_non_music(s.skip_non_music_in_radio);
     data.set_autoplay(s.autoplay);
     show_volume_step(ctx, s.volume_step);
+    data.set_streaming_quality(streaming_quality_index(s.streaming_quality));
     data.set_skip_disliked(s.skip_disliked);
     data.set_sponsorblock(s.sponsorblock);
     data.set_scrobbling(s.scrobbling);
@@ -825,6 +828,35 @@ fn pick_volume_step(ctx: &Ctx, i: i32) {
     show_volume_step(ctx, step);
     if SETTINGS.with(|s| s.borrow().volume_step != step) {
         commit(ctx, Change::VolumeStep(step));
+    }
+}
+
+/// The Streaming quality chips, in the page's order.
+const STREAMING_QUALITIES: [StreamingQuality; 2] =
+    [StreamingQuality::High, StreamingQuality::Standard];
+
+/// The quality's place in the page's chips.
+fn streaming_quality_index(q: StreamingQuality) -> i32 {
+    STREAMING_QUALITIES
+        .iter()
+        .position(|&x| x == q)
+        .unwrap_or(0) as i32
+}
+
+/// The quality at `i` in the page's chips, shown and saved; the controller applies it from
+/// the next resolve.
+fn pick_streaming_quality(ctx: &Ctx, i: i32) {
+    let Some(&q) = usize::try_from(i)
+        .ok()
+        .and_then(|i| STREAMING_QUALITIES.get(i))
+    else {
+        return;
+    };
+    let Some(ui) = ctx.window() else { return };
+    ui.global::<SettingsData>()
+        .set_streaming_quality(streaming_quality_index(q));
+    if SETTINGS.with(|s| s.borrow().streaming_quality != q) {
+        commit(ctx, Change::StreamingQuality(q));
     }
 }
 
