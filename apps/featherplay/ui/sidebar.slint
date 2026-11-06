@@ -5,7 +5,7 @@
 // `src/sidebar.rs`. Search is the top bar's (top_bar.slint).
 import { ListView } from "std-widgets.slint";
 import { Theme, Icons, Curves } from "theme.slint";
-import { CardItem, ItemKind, Icon, Body, Cover, IconButton } from "parts.slint";
+import { CardItem, ItemKind, Icon, Body, Cover, IconButton, Pill } from "parts.slint";
 import { Nav, PageKind } from "nav.slint";
 import { AccountMenu } from "account_menu.slint";
 import { PlaylistMenu } from "playlist_menu.slint";
@@ -41,8 +41,6 @@ export global SidebarData {
 global SideIcons {
     // A compass: a ring and its needle.
     out property <string> explore: "M12 3.5 a8.5 8.5 0 1 0 0.01 0 Z M14.8 9.2 L13.2 13.2 L9.2 14.8 L10.8 10.8 Z";
-    // A clock turning back: a ring open at the top left, its arrow, and the hands.
-    out property <string> history: "M4.6 9 A8 8 0 1 1 4 12 M4.6 9 L4.4 5.5 M4.6 9 L8 8.6 M12 8 V12 L14.8 13.8";
     // A pushpin.
     out property <string> pin: "M9 4.5 H15 M10.2 4.5 V10 L7.5 13.5 H16.5 L13.8 10 V4.5 M12 13.5 V19.5";
 }
@@ -204,7 +202,7 @@ export component Sidebar inherits Rectangle {
         y: 132px;
         width: root.item-w;
         rail: root.rail;
-        icon: SideIcons.history;
+        icon: Icons.history;
         label: @tr("History");
         active: Nav.page == PageKind.history;
         clicked => { Nav.go(PageKind.history); }
@@ -321,15 +319,43 @@ export component Sidebar inherits Rectangle {
         color: Theme.text2;
         wrap: word-wrap;
     }
-    // Signed out, the library is the account's: one quiet line where the chips would be.
-    if !root.rail && SidebarData.signed-out: Body {
-        x: 20px;
-        y: root.chips-y + 4px;
-        width: parent.width - 40px;
-        text: @tr("Sign in to see your playlists, albums and artists here.");
-        font-size: Theme.t-meta;
-        color: Theme.text2;
-        wrap: word-wrap;
+    // Signed out, the library is the account's: where the chips would be, a small card says
+    // what the list is for, with its own Sign in. Only where it fits above Settings (a short
+    // window, a long translation); the account row says Sign in too.
+    if !root.rail && SidebarData.signed-out: Rectangle {
+        x: root.inset + 4px;
+        y: root.chips-y;
+        width: parent.width - 2 * self.x;
+        height: card.preferred-height;
+        visible: self.y + self.height <= root.foot - 120px - Theme.s2;
+        border-radius: Theme.r-l;
+        background: Theme.panel;
+        border-width: 1px;
+        border-color: Theme.card-edge;
+        card := VerticalLayout {
+            padding: 14px;
+            spacing: Theme.s1;
+            Body {
+                text: @tr("Your playlists go here");
+                font-weight: 600;
+                wrap: word-wrap;
+            }
+            Body {
+                text: @tr("Sign in and your playlists, albums and artists show up in this list.");
+                font-size: Theme.t-meta;
+                color: Theme.text2;
+                wrap: word-wrap;
+            }
+            Rectangle { height: Theme.s2; }
+            HorizontalLayout {
+                alignment: start;
+                Pill {
+                    label: @tr("Sign in");
+                    compact: true;
+                    clicked => { Nav.go(PageKind.sign-in); }
+                }
+            }
+        }
     }
     // Soft edges where the list runs on: at the bottom while more rows lie below, at
     // the top once it has scrolled.

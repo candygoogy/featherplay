@@ -477,15 +477,17 @@ export component IconButton inherits Rectangle {
     }
 }
 
-// Pill button: solid (primary, neutral) or tonal (secondary).
+// Pill button: solid (primary, neutral) or tonal (secondary). 40 px high; `compact`, 32 px in
+// the sidebar's smaller type.
 export component Pill inherits Rectangle {
     in property <string> label;
     in property <string> icon;
     in property <bool> solid: false;
     in property <bool> icon-filled: true;
     in property <bool> enabled: true;
+    in property <bool> compact: false;
     callback clicked();
-    height: 40px;
+    height: root.compact ? 32px : 40px;
     width: lay.preferred-width;
     border-radius: self.height / 2;
     // Dimmed through each part's colour, not `opacity` (see IconButton.fade).
@@ -507,8 +509,8 @@ export component Pill inherits Rectangle {
         clicked => { root.clicked(); }
     }
     lay := HorizontalLayout {
-        padding-left: root.icon == "" ? 20px : 16px;
-        padding-right: 20px;
+        padding-left: root.compact ? 14px : root.icon == "" ? 20px : 16px;
+        padding-right: root.compact ? 14px : 20px;
         spacing: 8px;
         alignment: center;
         if root.icon != "": Icon {
@@ -521,6 +523,7 @@ export component Pill inherits Rectangle {
         }
         Body {
             text: root.label;
+            font-size: root.compact ? Theme.t-meta : Theme.t-body;
             font-weight: 600;
             color: (root.solid ? Theme.on-solid : Theme.text1).transparentize(1 - root.alpha);
             vertical-alignment: center;
