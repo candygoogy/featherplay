@@ -51,9 +51,10 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
-  # Each featherplay.exe must stay at 31 MB or less (raised from 30 MB on 2026-10-31).
+  # Each featherplay.exe must stay at 32 MB or less (raised from 31 MB on 2026-11-06 for the
+  # Opus decoder, from 30 MB on 2026-10-31).
   # The helpers (yt-dlp, Deno) are downloaded at run time and don't count.
-  MAX_EXE_BYTES: "31000000"
+  MAX_EXE_BYTES: "32000000"
   # Inno Setup, pinned: the official installer from jrsoftware/issrc's GitHub release, checked
   # against this SHA256 (the release's own asset digest) before it runs.
   INNO_VERSION: "6.7.4"

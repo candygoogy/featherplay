@@ -127,7 +127,7 @@ ID or personal playlist titles.
 
 featherplay exists to be light, so these limits hold for every change:
 
-- The release `featherplay.exe` is at most 31 MB. `release.yml` fails a release over it.
+- The release `featherplay.exe` is at most 32 MB. `release.yml` fails a release over it.
 - Paused, stopped, minimised or hidden, it uses at most 0.012 % of the machine's CPU, so
   nothing may run a timer or an animation then (`apps/featherplay/tests/app/paused_idle.rs`).
   Playing, at most 0.2 %.

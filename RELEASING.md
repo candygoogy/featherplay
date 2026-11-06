@@ -42,7 +42,7 @@ git push origin vX.Y.Z
 
 `release.yml` runs the tests on x64 and on ARM64 (a `windows-11-arm` runner), checks that
 the tag matches the crate version, builds `featherplay.exe` for each with the build keys
-from the repository secrets, fails if either exe is over 31 MB, builds both installers with
+from the repository secrets, fails if either exe is over 32 MB, builds both installers with
 Inno Setup, and creates a **draft** release with:
 
 - `featherplay.exe` and `featherplay.exe.sha256` (x64)

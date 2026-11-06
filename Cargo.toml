@@ -108,7 +108,7 @@ debug = "line-tables-only"
 [profile.dev.package."*"]
 debug = false
 
-# The exe must stay at 31 MB or less (`release.yml` checks it). Fat LTO with one codegen unit and
+# The exe must stay at 32 MB or less (`release.yml` checks it). Fat LTO with one codegen unit and
 # size-optimised code gets it there; the audio path keeps full speed below.
 [profile.release]
 lto = "fat"
