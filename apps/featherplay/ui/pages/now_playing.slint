@@ -24,8 +24,12 @@ export global NowPlayingData {
     // Related: loading and its error.
     in property <bool> loading;
     in property <string> error;
-    // The current track's cover at `Theme.nowplaying-cover`.
+    // The current track's cover at `Theme.nowplaying-cover`, or at `nowplaying-cover-wide`
+    // while the page draws it larger than that (`cover-wide`, set by the page, which calls
+    // `cover-wide-changed` when it changes), so the art is never drawn larger than decoded.
     in property <image> cover;
+    in-out property <bool> cover-wide;
+    callback cover-wide-changed();
     // The stage's wash from the cover, per theme (`follow::washes_for`); transparent until known.
     in property <color> wash-dark;
     in property <color> wash-light;
@@ -43,14 +47,18 @@ export global NowPlayingData {
     callback more(length, length, length);
 }
 
-// Text that navigates: a hairline appears under it on hover.
+// Text that navigates: a hairline appears under it on hover. As wide as its text, at most
+// `room`, eliding past it.
 component LinkText inherits Rectangle {
     in property <string> text;
     in property <color> tint: Theme.text1;
     in property <int> weight: 400;
     in property <bool> enabled: true;
+    in property <length> room: 100000px;
+    // The text's own width, uncut.
+    out property <length> natural: t.preferred-width;
     callback clicked();
-    width: t.preferred-width;
+    width: min(t.preferred-width, max(0px, root.room));
     accessible-role: button;
     accessible-label: root.text;
     accessible-action-default => { root.clicked(); }
@@ -60,12 +68,14 @@ component LinkText inherits Rectangle {
         clicked => { root.clicked(); }
     }
     t := Body {
+        x: 0;
+        width: parent.width;
+        height: parent.height;
         text: root.text;
         font-size: Theme.t-body-l;
         font-weight: root.weight;
         color: root.tint;
         vertical-alignment: center;
-        overflow: clip;
     }
     if ta.has-hover && root.enabled: Rectangle {
         y: parent.height - 1px;
@@ -253,7 +263,21 @@ export component NowPlayingPage inherits Rectangle {
     property <length> stage-h: self.height - Theme.bar-clear;
     // Title, artist line and playing-from line below the cover.
     property <length> text-h: 124px;
-    property <length> cover-size: max(160px, min(Theme.nowplaying-cover, root.stage-w - 2 * Theme.s9, root.stage-h - root.text-h - 2 * Theme.s8));
+    // Beside the side panel the cover is at most `nowplaying-cover`. With the panel hidden
+    // the stage has the window's width, and the cover grows with it, up to
+    // `nowplaying-cover-wide` (about a third of the stage's width), so it doesn't sit small in the
+    // middle of a wide room. It changes with the stage's width, in its one relayout.
+    property <length> cover-cap: root.side-w > 0 ? Theme.nowplaying-cover : clamp(root.stage-w * 0.32, Theme.nowplaying-cover, Theme.nowplaying-cover-wide);
+    property <length> cover-size: max(160px, min(root.cover-cap, root.stage-w - 2 * Theme.s9, root.stage-h - root.text-h - 2 * Theme.s8));
+    // Rust decodes the art at the larger size while it's drawn larger than the usual one.
+    property <bool> cover-wide: root.cover-size > Theme.nowplaying-cover;
+    changed cover-wide => { root.ask-cover(); }
+    function ask-cover() {
+        if NowPlayingData.cover-wide != root.cover-wide {
+            NowPlayingData.cover-wide = root.cover-wide;
+            NowPlayingData.cover-wide-changed();
+        }
+    }
     property <length> cover-x: (root.stage-w - root.cover-size) / 2;
     property <length> cover-y: (root.stage-h - root.cover-size - root.text-h) / 2;
     property <bool> shown: false;
@@ -264,6 +288,7 @@ export component NowPlayingPage inherits Rectangle {
     init => {
         root.shown = true;
         root.side-in = Frame.side-open;
+        root.ask-cover();
     }
 
     // The full lyrics view: the cover small in a column on the left, the lyrics beside it.
@@ -486,15 +511,25 @@ export component NowPlayingPage inherits Rectangle {
             color: LyricsData.ink.current.transparentize(1 - root.column);
             wrap: word-wrap;
         }
-        // "Artist, album, year" in the cover view; the artist alone under the wrapped title in
-        // the lyrics view, the rest fading out.
-        HorizontalLayout {
+        // "Artist, album, year" in the cover view, within the cover's width like the lines
+        // around it, so long credits never run off to one side of the block: the artists
+        // elide at its width; an album too long for the rest of the line drops the year and
+        // elides at the line's end, and gives way when less than `album-least` would be left.
+        // In the lyrics view the artists alone under the wrapped title, eliding at the
+        // column's width; the rest fades out, keeping its place.
+        property <length> album-least: 48px;
+        property <length> album-max: root.cover-size - min(artists.natural, root.cover-size) - comma.preferred-width;
+        property <bool> album-whole: album.natural <= stage.album-max - (NowPlayingData.year != "" ? year.preferred-width : 0px);
+        property <bool> album-fits: Player.album != "" && stage.album-max >= stage.album-least;
+        Rectangle {
             x: root.art-x;
             y: root.title-y + 44px + (full-title.preferred-height + Theme.s1 - 44px) * root.column;
-            width: min(self.preferred-width, root.cover-size + (root.fl-cover - root.cover-size) * root.column);
+            width: root.art-size;
             height: 22px + 2px * root.column;
-            alignment: start;
-            LinkText {
+            artists := LinkText {
+                x: 0;
+                height: parent.height;
+                room: root.art-size;
                 text: Player.artist;
                 tint: root.ink1.mix(root.ink2, 1 - root.column);
                 weight: 600;
@@ -502,24 +537,37 @@ export component NowPlayingPage inherits Rectangle {
                 clicked => { Nav.open-artist(Player.artist-id); }
             }
             // Commas between the parts, as on the cards: "Daft Punk, Homework, 1996".
-            if Player.album != "": Body {
+            // After the artists as the cover view lays them out, so the rest keeps its place
+            // as it fades in the lyrics' column.
+            comma := Body {
+                x: min(artists.natural, root.cover-size);
+                y: 0;
+                height: parent.height;
+                visible: stage.album-fits;
                 text: ", ";
                 font-size: Theme.t-body-l;
                 color: Theme.text2.transparentize(root.lyr);
                 vertical-alignment: center;
             }
-            if Player.album != "": LinkText {
+            album := LinkText {
+                x: comma.x + comma.width;
+                height: parent.height;
+                visible: stage.album-fits;
+                room: stage.album-max;
                 text: Player.album;
                 tint: Theme.text2.transparentize(root.lyr);
-                enabled: Player.album-id != "" && root.lyr < 0.5;
+                enabled: stage.album-fits && Player.album-id != "" && root.lyr < 0.5;
                 clicked => { Nav.open-album(Player.album-id); }
             }
-            if NowPlayingData.year != "": Body {
+            year := Body {
+                x: album.x + album.width;
+                y: 0;
+                height: parent.height;
+                visible: stage.album-fits && stage.album-whole && NowPlayingData.year != "";
                 text: ", " + NowPlayingData.year;
                 font-size: Theme.t-body-l;
                 color: Theme.text2.transparentize(root.lyr);
                 vertical-alignment: center;
-                overflow: clip;
             }
         }
         // The bar already shows the time, so this line only says where the music comes from.

@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use featherplay::offscreen;
 use featherplay::snapshot::Scene;
-use featherplay::ui::{Frame, Theme};
+use featherplay::ui::{Frame, Player, Theme};
 use slint::platform::{PointerEventButton, WindowEvent};
 use slint::{ComponentHandle, LogicalPosition};
 
@@ -79,6 +79,32 @@ fn side_shown(scene: &Scene) -> bool {
     pixel(w, LogicalPosition::new(WIDTH - 6.0, y)) != pixel(w, LogicalPosition::new(6.0, y))
 }
 
+/// The leftmost and rightmost columns where the stage shows anything but its wash, between the
+/// back button's row and the bar (logical px, scale 1).
+fn drawn_across(scene: &Scene) -> (f32, f32) {
+    let w = scene.ui.window();
+    let shot = offscreen::shown(w).expect("shown");
+    let width = shot.width() as usize;
+    let bar_top = (HEIGHT - scene.ui.global::<Theme>().get_bar_clear()) as usize;
+    let (mut left, mut right) = (width, 0);
+    for y in 72..bar_top {
+        let row = &shot.as_slice()[y * width..(y + 1) * width];
+        let ground = row[2];
+        let near = |p: &slint::Rgba8Pixel| {
+            p.r.abs_diff(ground.r) <= 3
+                && p.g.abs_diff(ground.g) <= 3
+                && p.b.abs_diff(ground.b) <= 3
+        };
+        if let Some(x) = row.iter().position(|p| !near(p)) {
+            left = left.min(x);
+        }
+        if let Some(x) = row.iter().rposition(|p| !near(p)) {
+            right = right.max(x + 1);
+        }
+    }
+    (left as f32, right as f32)
+}
+
 /// One test: the platform can be installed once per process.
 #[test]
 fn the_up_next_button_hides_and_shows_now_playings_side_panel() {
@@ -111,6 +137,18 @@ fn the_up_next_button_hides_and_shows_now_playings_side_panel() {
     assert!(
         !frame.get_side_open(),
         "the side panel's state didn't follow"
+    );
+
+    // A soundtrack's credits, far wider than the cover: the cover and its lines still sit as
+    // one block centred in the stage.
+    let player = scene.ui.global::<Player>();
+    player.set_artist("Petite Meller, Kalman Chodakiewitz, Eli Shiffman".into());
+    player.set_album("Cyberpunk: Edgerunners 2 (Original Series Soundtrack)".into());
+    settle(&scene);
+    let (left, right) = drawn_across(&scene);
+    assert!(
+        (left + right - WIDTH).abs() <= 4.0,
+        "the block isn't centred in the stage: drawn from {left} to {right} of {WIDTH}"
     );
 
     click(scene.ui.window(), button);

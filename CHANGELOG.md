@@ -24,6 +24,9 @@ Notable changes to featherplay, newest first. The format follows
   unexpected".
 - On Now playing, the player bar's Up next button now hides and shows the side panel (Up
   next and Related), and the page remembers your choice.
+- With that side panel hidden, Now playing's cover and its title, artists and album sit as
+  one block in the middle of the window, the cover larger where there's room, and long
+  credits shorten with an ellipsis instead of running off to the right.
 - Opening Up next in a window just over 1100 px wide no longer darkens the page behind it:
   the sidebar folds to its icons while the panel is open, and the page makes room.
 - Resizing the window by its edge keeps up with the pointer better: on a 4K screen each step

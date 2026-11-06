@@ -23,8 +23,11 @@ use crate::ui::{AppWindow, Frame, NowPlayingData, Player, SongMenu};
 use crate::ui_bridge::{model, to_rows};
 use crate::{follow, lyrics};
 
-/// The cover's largest size, in logical pixels (`Theme.nowplaying-cover`).
+/// The cover's largest size beside the side panel, in logical pixels (`Theme.nowplaying-cover`).
 const COVER: u32 = 440;
+/// Its largest with the side panel hidden (`Theme.nowplaying-cover-wide`), decoded while the
+/// page draws it larger than `COVER` (`NowPlayingData.cover-wide`).
+const COVER_WIDE: u32 = 560;
 /// Related row covers.
 const ROW_COVER: u32 = 40;
 
@@ -78,7 +81,41 @@ pub fn init(ctx: &Rc<Ctx>) {
     });
     let c = ctx.clone();
     data.on_more(move |x, y, top| show_menu(&c, x, y, top));
+    let c = ctx.clone();
+    data.on_cover_wide_changed(move || {
+        let url = STATE.with(|s| s.borrow().cover_url.clone());
+        load_cover(&c, url);
+    });
     lyrics::init(ctx);
+}
+
+/// The size the page draws the cover at most, as it last said (`cover-wide`).
+fn cover_px(ui: &AppWindow) -> u32 {
+    if ui.global::<NowPlayingData>().get_cover_wide() {
+        COVER_WIDE
+    } else {
+        COVER
+    }
+}
+
+/// Loads the current track's cover at the size the page draws it; `url` is the one the page
+/// shows (`State::cover_url`). Nothing is set if the track or the size has changed by the
+/// time it's in, so a late load at the other size never replaces the right one.
+fn load_cover(ctx: &Ctx, url: String) {
+    let Some(ui) = ctx.window() else { return };
+    if url.is_empty() {
+        return;
+    }
+    let px = cover_px(&ui);
+    let weak = ui.as_weak();
+    let wanted = url.clone();
+    ctx.covers.load(&url, px, move |img| {
+        let Some(ui) = weak.upgrade() else { return };
+        let still = STATE.with(|s| s.borrow().cover_url == wanted) && cover_px(&ui) == px;
+        if still {
+            ui.global::<NowPlayingData>().set_cover(img);
+        }
+    });
 }
 
 /// Opens the song menu for the current track at `x`, `y` (window coordinates); upward, it
@@ -152,16 +189,7 @@ fn show(ctx: &Rc<Ctx>, state: &PlayerState) {
         data.set_cover(Default::default());
         // The wash comes from the cover's colour, which `follow` works out once per song
         // whatever page is shown (`set_cover_colour`).
-        if !url.is_empty() {
-            let weak = ui.as_weak();
-            let wanted = url.clone();
-            ctx.covers.load(&url, COVER, move |img| {
-                let still = STATE.with(|s| s.borrow().cover_url == wanted);
-                if still && let Some(ui) = weak.upgrade() {
-                    ui.global::<NowPlayingData>().set_cover(img);
-                }
-            });
-        }
+        load_cover(ctx, url);
     }
 
     show_year(ctx, track);

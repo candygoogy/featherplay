@@ -64,6 +64,10 @@ pub const PAGES: &[&str] = &[
     "search-suggestions",
     "search-suggestions-key",
     "now-playing",
+    // Now playing with its side panel hidden (the bar's Up next button), the stage the whole
+    // width, playing a soundtrack's long credits; and its full lyrics view the same way.
+    "now-playing-side-hidden",
+    "now-playing-lyrics-full-side-hidden",
     // Now playing with titles and artists in other scripts and styled Unicode
     // (`SCRIPT_TITLES`), for the fonts they fall back to; `--queue` shows them in Up next.
     "now-playing-scripts",
@@ -190,6 +194,11 @@ const SCRIPTS_LONG_ARTISTS: &[&str] = &[
     "Ελένη Βιτάλη",
     "宇多田ヒカル",
 ];
+
+/// A soundtrack's credits, artists and album, longer together than Now playing's cover is wide.
+const SOUNDTRACK_TITLE: &str = "In Love With Myself";
+const SOUNDTRACK_ARTISTS: &[&str] = &["Petite Meller", "Kalman Chodakiewitz", "Eli Shiffman"];
+const SOUNDTRACK_ALBUM: &str = "Cyberpunk: Edgerunners 2 (Original Series Soundtrack)";
 
 /// How long to wait for loads and covers at most. The wait ends as soon as they're in; the
 /// ceiling is for slow machines: a CI runner decoding a 4K Home's ~120 covers in a debug build
@@ -469,6 +478,8 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
         scene.play_credited(o.track, LONG_TITLE, LONG_ARTISTS)?;
     } else if o.page == "settings-scripts" {
         scene.play_credited(o.track, SCRIPTS_LONG_TITLE, SCRIPTS_LONG_ARTISTS)?;
+    } else if o.page.ends_with("-side-hidden") {
+        scene.play_credited(o.track, SOUNDTRACK_TITLE, SOUNDTRACK_ARTISTS)?;
     } else {
         scene.play_track(
             matches!(
@@ -480,6 +491,10 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
     }
     if o.signed_out {
         app::on_event(UiEvent::Account { signed_in: false });
+    }
+    // Before the page opens, as the saved choice is: it lays the stage out without the panel.
+    if o.page.ends_with("-side-hidden") {
+        ui.global::<Frame>().set_side_open(false);
     }
     scene.open(&o.page)?;
     if o.queue_open {
@@ -683,6 +698,9 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
     if o.page == "now-playing-long" {
         player.set_title(NOW_PLAYING_LONG_TITLE.into());
     }
+    if o.page.ends_with("-side-hidden") {
+        player.set_album(SOUNDTRACK_ALBUM.into());
+    }
     if o.page.ends_with("-disliked") {
         player.set_disliked(true);
     }
@@ -864,6 +882,8 @@ fn page(name: &str, f: &Fixtures) -> Result<Page, String> {
         // A song link the fixtures don't know: no song at this link.
         "search-link-missing" => crate::link::search_page("https://youtu.be/zzzzzzzzzzz"),
         "now-playing"
+        | "now-playing-side-hidden"
+        | "now-playing-lyrics-full-side-hidden"
         | "now-playing-scripts"
         | "now-playing-menu"
         | "now-playing-long"
