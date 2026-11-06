@@ -101,8 +101,8 @@ impl AudioEngine {
     /// name opens the default device. HTTP streams are buffered in temp files under `temp_dir`
     /// (pass `{cache}/tmp`), created on first use. With no output device at all it starts
     /// without one, and `play()` opens one once it's there (`AudioEvent::NoDevice` until
-    /// then). Fails when a device is there but doesn't open. The engine starts paused at
-    /// full volume.
+    /// then); a device that doesn't open is tried again the same way, and `play()` reports
+    /// its error. The engine starts paused at full volume.
     pub fn new(device: Option<&str>, temp_dir: impl Into<PathBuf>) -> Result<AudioEngine, String> {
         Self::start(device, temp_dir.into(), None, crate::http::READ_TIMEOUT)
     }
@@ -163,15 +163,13 @@ impl AudioEngine {
                                 return;
                             }
                         };
-                    match engine.open_output(device.clone()) {
-                        Ok(()) => {}
-                        // Nothing to play on yet (the speakers are off): start with no
-                        // output, as after a lost device; `play()` opens one once it's there.
-                        Err(OpenError::NoDevice) => engine.device = device,
-                        Err(e) => {
-                            let _ = ready_tx.send(Err(e.to_string()));
-                            return;
-                        }
+                    // Nothing to play on yet (the speakers are off), or a device that doesn't
+                    // open now (a broken driver, the audio service stopped, a virtual
+                    // machine's audio): start with no output, as after a lost device.
+                    // `play()` opens one once it can and reports what's wrong until then, so
+                    // the app still starts.
+                    if engine.open_output(device.clone()).is_err() {
+                        engine.device = device;
                     }
                     let _ = ready_tx.send(Ok(()));
                     engine.run(rx);
