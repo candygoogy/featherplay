@@ -539,6 +539,99 @@ async fn live_link_lookups() {
     println!("artist: {}", artist.summary.name);
 }
 
+/// Signed out, with no cookies at all: what the app reads as a visitor. One read each: the
+/// four search tabs, an album, an artist, a public
+/// playlist, Home (its first page and one continuation), a radio, a link's track, lyrics
+/// (two or three) and Explore's three pages. Counts only. The account's own calls answer
+/// `SignInRequired` without a request.
+#[tokio::test]
+#[ignore = "live: signed out, no cookies"]
+async fn live_signed_out() {
+    use featherplay_core::model::{ArtistId, LikeStatus, PlaylistId};
+    use featherplay_ytm::ApiError;
+
+    let yt = YtMusic::guest().expect("a visitor client");
+    assert!(!yt.signed_in());
+
+    let q = "in love with myself";
+    let songs = yt
+        .search(q, SearchFilter::Songs)
+        .await
+        .expect("songs")
+        .songs;
+    let albums = yt
+        .search(q, SearchFilter::Albums)
+        .await
+        .expect("albums")
+        .albums;
+    let artists = yt.search(q, SearchFilter::Artists).await.expect("artists");
+    let playlists = yt
+        .search(q, SearchFilter::Playlists)
+        .await
+        .expect("playlists");
+    assert!(!songs.is_empty() && !albums.is_empty());
+    println!(
+        "search: {} songs, {} albums, {} artists, {} playlists",
+        songs.len(),
+        albums.len(),
+        artists.artists.len(),
+        playlists.playlists.len()
+    );
+
+    let album = yt.album(&albums[0].id).await.expect("album");
+    assert!(!album.tracks.is_empty());
+    let artist = yt
+        .artist(&ArtistId("UCRr1xG_2WIDs18a6cIiCxeA".into()))
+        .await
+        .expect("artist");
+    assert!(!artist.top_songs.is_empty());
+    let list = PlaylistId("OLAK5uy_kfP7kUsS6hmTXdnO5JlTVRSn-LLt1bqtM".into());
+    let playlist = yt.playlist(&list).await.expect("public playlist");
+    assert!(!playlist.tracks.is_empty());
+    println!(
+        "album: {} tracks; artist: {} top songs, {} albums; playlist: {} tracks",
+        album.tracks.len(),
+        artist.top_songs.len(),
+        artist.albums.len(),
+        playlist.tracks.len()
+    );
+
+    let home = yt.home().await.expect("home");
+    let items: usize = home.shelves.iter().map(|s| s.items.len()).sum();
+    println!("home: {} shelves, {items} items", home.shelves.len());
+
+    let radio = yt.radio(&TrackId(SONG.into())).await.expect("radio");
+    assert!(radio.len() >= 10, "radio gave {} tracks", radio.len());
+    let track = yt.track(&TrackId(SONG.into())).await.expect("track");
+    assert!(track.is_some());
+    let lyrics = match yt
+        .lyrics(&TrackId(TIMED_SONG.into()))
+        .await
+        .expect("lyrics")
+    {
+        Some(SongLyrics::Timed(t)) => format!("timed, {} lines", t.lines.len()),
+        Some(SongLyrics::Plain(p)) => format!("plain, {} lines", p.text.lines().count()),
+        None => "none".into(),
+    };
+    println!("radio: {} tracks; lyrics: {lyrics}", radio.len());
+
+    let releases = yt.new_releases().await.expect("new releases");
+    let charts = yt.charts(None).await.expect("charts");
+    let moods = yt.moods().await.expect("moods");
+    println!(
+        "explore: {} release shelves, {} chart artists, {} mood sections",
+        releases.len(),
+        charts.artists.len(),
+        moods.len()
+    );
+
+    let needs = |r: Result<(), ApiError>| assert_eq!(r, Err(ApiError::SignInRequired));
+    needs(yt.library_playlists().await.map(drop));
+    needs(yt.liked_songs().await.map(drop));
+    needs(yt.history().await.map(drop));
+    needs(yt.rate(&TrackId(RATE_TRACK.into()), LikeStatus::Like).await);
+}
+
 fn first_mood_params(v: &serde_json::Value) -> Option<String> {
     match v {
         serde_json::Value::Object(o) => o

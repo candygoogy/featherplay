@@ -373,6 +373,9 @@ pub enum HomeItem {
 pub enum ApiError {
     /// The cookie session was rejected (401/403) or the response is signed out.
     AuthExpired,
+    /// Signed out (`YtMusic::guest`): this belongs to an account (the library, the
+    /// history, ratings, playlist edits). Not an error to show; the app asks to sign in.
+    SignInRequired,
     Network(String),
     Parse(String),
     NotFound,
@@ -382,6 +385,7 @@ impl fmt::Display for ApiError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ApiError::AuthExpired => f.write_str("session expired, sign in again"),
+            ApiError::SignInRequired => f.write_str("needs a signed-in account"),
             ApiError::Network(m) => write!(f, "network error: {m}"),
             ApiError::Parse(m) => write!(f, "unexpected response: {m}"),
             ApiError::NotFound => f.write_str("not found"),

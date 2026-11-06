@@ -3,6 +3,11 @@
 //! Every method sends its request once and never retries. A 401/403, or a
 //! signed-out response on a library call, becomes `ApiError::AuthExpired`.
 //!
+//! Signed out (`YtMusic::guest`), the client reads the catalogue as a visitor: search,
+//! albums, artists, public playlists, Home, Explore, radio and lyrics. What belongs to an
+//! account (the library, Liked songs, the history, ratings, playlist edits, the account
+//! menu) is `ApiError::SignInRequired`, without a request.
+//!
 //! Identities: one cookie session can act as any Google account signed in to its cookie
 //! jar, and as any of their brand (channel) accounts. The identity goes in two headers,
 //! as yt-dlp sends them: `X-Goog-AuthUser` (the account's index in the jar) and
@@ -14,13 +19,14 @@
 //! live: each identity's library reads differently). Switching builds a new client
 //! around the same `BrowserToken`, with no request.
 
+use std::borrow::Cow;
 use std::fmt;
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 use featherplay_core::model::{AlbumId, ArtistId, LikeStatus, PlaylistId, Track, TrackId};
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use ytmapi_rs::YtMusicBuilder;
-use ytmapi_rs::auth::BrowserToken;
+use ytmapi_rs::auth::{AuthToken, BrowserToken, RawResult};
 use ytmapi_rs::common::{
     AlbumID, ApiOutcome, ArtistChannelID, LikeStatus as YtLike, LyricsID, PlaylistID, VideoID,
     YoutubeID,
@@ -53,15 +59,25 @@ const AUTH_USER: &str = "x-goog-authuser";
 /// The brand account header (the delegated session's page id).
 const PAGE_ID: &str = "x-goog-pageid";
 
-/// A signed-in client acting as one identity. Cheap to clone.
+/// A client for YouTube Music: signed in and acting as one identity, or signed out
+/// (`guest`). Cheap to clone.
 #[derive(Clone)]
 pub struct YtMusic {
-    inner: ytmapi_rs::YtMusic<BrowserToken>,
-    /// Kept to build the client for another identity without signing in again.
-    token: BrowserToken,
+    session: Session,
     identity: Identity,
     /// Without the session or the identity headers: the mobile lyrics request.
     public: reqwest::Client,
+}
+
+#[derive(Clone)]
+enum Session {
+    Account {
+        inner: ytmapi_rs::YtMusic<BrowserToken>,
+        /// Kept to build the client for another identity without signing in again.
+        token: BrowserToken,
+    },
+    /// No cookies.
+    Guest(ytmapi_rs::YtMusic<GuestToken>),
 }
 
 impl fmt::Debug for YtMusic {
@@ -87,9 +103,32 @@ impl YtMusic {
         YtMusic::with_token(token, identity.clone())
     }
 
+    /// Signed out: the catalogue as a visitor, without cookies. Sends nothing.
+    pub fn guest() -> Result<YtMusic, ApiError> {
+        let client = ytmapi_rs::Client::new_from_reqwest_client(http_client(&Identity::default())?);
+        let inner = YtMusicBuilder::new_with_client(client)
+            .with_auth_token(GuestToken)
+            .build()
+            .map_err(map_error)?;
+        Ok(YtMusic {
+            session: Session::Guest(inner),
+            identity: Identity::default(),
+            public: http_client(&Identity::default())?,
+        })
+    }
+
+    /// Whether this client has an account (`connect`), rather than being a visitor
+    /// (`guest`).
+    pub fn signed_in(&self) -> bool {
+        matches!(self.session, Session::Account { .. })
+    }
+
     /// The same session acting as `identity`. Sends nothing.
     pub fn as_identity(&self, identity: &Identity) -> Result<YtMusic, ApiError> {
-        YtMusic::with_token(self.token.clone(), identity.clone())
+        match &self.session {
+            Session::Account { token, .. } => YtMusic::with_token(token.clone(), identity.clone()),
+            Session::Guest(_) => Err(ApiError::SignInRequired),
+        }
     }
 
     pub fn identity(&self) -> &Identity {
@@ -103,8 +142,7 @@ impl YtMusic {
             .build()
             .map_err(map_error)?;
         Ok(YtMusic {
-            inner,
-            token,
+            session: Session::Account { inner, token },
             identity,
             public: http_client(&Identity::default())?,
         })
@@ -173,6 +211,7 @@ impl YtMusic {
     }
 
     pub async fn liked_songs(&self) -> Result<Vec<Track>, ApiError> {
+        self.account()?;
         let query = GetPlaylistTracksQuery::new(PlaylistID::from_raw("VLLM"));
         let pages = self.playlist_pages(&query, true).await?;
         convert::playlist_tracks(&pages)
@@ -198,11 +237,14 @@ impl YtMusic {
 
     /// Accepts the id with or without the `VL` browse prefix. Liked songs
     /// (`LM`) is the account's own, so a signed-out page is `AuthExpired`,
-    /// as in `liked_songs`.
+    /// as in `liked_songs`, and a guest's is `SignInRequired`.
     pub async fn playlist(&self, id: &PlaylistId) -> Result<Playlist, ApiError> {
         let query =
             GetPlaylistTracksQuery::new(PlaylistID::from_raw(convert::browse_playlist_id(&id.0)));
         let signed_in = convert::bare_playlist_id(&id.0) == "LM";
+        if signed_in {
+            self.account()?;
+        }
         let pages = self.playlist_pages(&query, signed_in).await?;
         let first = pages.first().ok_or_else(empty)?;
         Ok(Playlist {
@@ -280,7 +322,7 @@ impl YtMusic {
             LikeStatus::Indifferent => YtLike::Indifferent,
         };
         let query = RateSongQuery::new(VideoID::from_raw(id.0.as_str()), rating);
-        self.inner.query(query).await.map_err(map_error)
+        self.account()?.query(query).await.map_err(map_error)
     }
 
     /// Fails if a track is already in the playlist (the API's default).
@@ -293,14 +335,18 @@ impl YtMusic {
             ids.iter().map(|t| VideoID::from_raw(t.0.as_str())),
             DuplicateHandlingMode::default(),
         );
-        self.inner.query(query).await.map(|_| ()).map_err(map_error)
+        self.account()?
+            .query(query)
+            .await
+            .map(|_| ())
+            .map_err(map_error)
     }
 
     /// Creates an empty private playlist and returns its id. One write. The app doesn't
     /// offer it yet; the live test makes its throwaway playlist with it.
     pub async fn create_playlist(&self, title: &str) -> Result<PlaylistId, ApiError> {
         let query = CreatePlaylistQuery::new(title, None, PrivacyStatus::Private);
-        let id = self.inner.query(query).await.map_err(map_error)?;
+        let id = self.account()?.query(query).await.map_err(map_error)?;
         Ok(PlaylistId(id.get_raw().to_string()))
     }
 
@@ -310,7 +356,7 @@ impl YtMusic {
             PlaylistID::from_raw(convert::bare_playlist_id(&p.0)),
             title,
         );
-        match self.inner.query(query).await.map_err(map_error)? {
+        match self.account()?.query(query).await.map_err(map_error)? {
             ApiOutcome::Success => Ok(()),
             ApiOutcome::Failure => Err(ApiError::Parse("the rename was refused".into())),
         }
@@ -319,7 +365,7 @@ impl YtMusic {
     /// Deletes one of the account's own playlists. One write; it can't be undone.
     pub async fn delete_playlist(&self, p: &PlaylistId) -> Result<(), ApiError> {
         let query = DeletePlaylistQuery::new(PlaylistID::from_raw(convert::bare_playlist_id(&p.0)));
-        self.inner.query(query).await.map_err(map_error)
+        self.account()?.query(query).await.map_err(map_error)
     }
 
     /// Removes someone else's playlist from the library (YouTube Music's "Remove playlist
@@ -329,7 +375,7 @@ impl YtMusic {
             PlaylistID::from_raw(convert::bare_playlist_id(&p.0)),
             YtLike::Indifferent,
         );
-        self.inner.query(query).await.map_err(map_error)
+        self.account()?.query(query).await.map_err(map_error)
     }
 
     /// The first batch of a playlist's radio: songs like the playlist's.
@@ -345,7 +391,7 @@ impl YtMusic {
     /// query. A continuation that fails (network or shape) leaves the first page's shelves.
     pub async fn home(&self) -> Result<HomeFeed, ApiError> {
         let first = self.raw(&HomeQuery).await?;
-        if convert::logged_in(&first) == Some(false) {
+        if self.signed_in() && convert::logged_in(&first) == Some(false) {
             return Err(ApiError::AuthExpired);
         }
         let token = convert::home_continuation(&first);
@@ -398,8 +444,9 @@ impl YtMusic {
     }
 
     /// The listening history, newest day first: the first page (about 200 plays across
-    /// devices). One request; signed out, `AuthExpired`.
+    /// devices). One request; signed out, `AuthExpired`; a guest's, `SignInRequired`.
     pub async fn history(&self) -> Result<Vec<HistoryDay>, ApiError> {
+        self.account()?;
         convert::history(&self.browse_raw("FEmusic_history", None, None).await?)
     }
 
@@ -414,13 +461,16 @@ impl YtMusic {
     /// cookie jar and their brand accounts), with the one this client acts as marked
     /// `active`. The request YouTube Music's own "Switch account" sends. Read-only.
     pub async fn accounts(&self) -> Result<Vec<AccountIdentity>, ApiError> {
-        convert::accounts(&self.raw(&AccountSwitcherQuery).await?, &self.identity)
+        convert::accounts(
+            &self.raw_account(&AccountSwitcherQuery).await?,
+            &self.identity,
+        )
     }
 
     /// The account menu's raw JSON, for recording the fixture. It holds the
     /// account's personal data: scrub it before it's stored anywhere.
     pub async fn account_menu_raw(&self) -> Result<String, ApiError> {
-        self.raw(&AccountMenuQuery).await
+        self.raw_account(&AccountMenuQuery).await
     }
 
     /// One `browse` page as raw JSON: `id` (`FEmusic_charts`, …), with the page's `params`
@@ -440,11 +490,38 @@ impl YtMusic {
         .await
     }
 
-    async fn raw<Q: Query<BrowserToken>>(&self, query: &Q) -> Result<String, ApiError> {
-        self.inner
+    /// A catalogue request, signed in or not. A guest is never told its session ended: a
+    /// 401/403 to a visitor asks for an account.
+    async fn raw<Q>(&self, query: &Q) -> Result<String, ApiError>
+    where
+        Q: Query<BrowserToken> + Query<GuestToken>,
+    {
+        match &self.session {
+            Session::Account { inner, .. } => {
+                inner.raw_json_query::<Q>(query).await.map_err(map_error)
+            }
+            Session::Guest(inner) => inner
+                .raw_json_query::<Q>(query)
+                .await
+                .map_err(|e| guest_error(map_error(e)))
+                .and_then(guest_reply),
+        }
+    }
+
+    /// A request about the account: `SignInRequired` for a guest, sending nothing.
+    async fn raw_account<Q: Query<BrowserToken>>(&self, query: &Q) -> Result<String, ApiError> {
+        self.account()?
             .raw_json_query::<Q>(query)
             .await
             .map_err(map_error)
+    }
+
+    /// The signed-in client, or `SignInRequired`.
+    fn account(&self) -> Result<&ytmapi_rs::YtMusic<BrowserToken>, ApiError> {
+        match &self.session {
+            Session::Account { inner, .. } => Ok(inner),
+            Session::Guest(_) => Err(ApiError::SignInRequired),
+        }
     }
 
     /// Raw pages of a library grid: the first page, then grid continuations
@@ -454,7 +531,7 @@ impl YtMusic {
     where
         Q: Query<BrowserToken> + PostQuery,
     {
-        let first = self.raw(base).await?;
+        let first = self.raw_account(base).await?;
         if convert::logged_in(&first) == Some(false) {
             return Err(ApiError::AuthExpired);
         }
@@ -463,7 +540,7 @@ impl YtMusic {
         while let Some(t) = token.take()
             && pages.len() < MAX_PAGES
         {
-            let page = self.raw(&Continuation { base, token: t }).await?;
+            let page = self.raw_account(&Continuation { base, token: t }).await?;
             token = convert::grid_continuation(&page);
             pages.push(page);
         }
@@ -477,7 +554,7 @@ impl YtMusic {
     /// more is fetched.
     async fn playlist_pages<Q>(&self, base: &Q, signed_in: bool) -> Result<Vec<String>, ApiError>
     where
-        Q: Query<BrowserToken> + PostQuery,
+        Q: Query<BrowserToken> + Query<GuestToken> + PostQuery,
     {
         let first = self.raw(base).await?;
         if signed_in && convert::logged_in(&first) == Some(false) {
@@ -504,7 +581,7 @@ impl YtMusic {
     where
         Q: Query<BrowserToken> + PostQuery,
     {
-        let first = self.raw(base).await?;
+        let first = self.raw_account(base).await?;
         if convert::logged_in(&first) == Some(false) {
             return Err(ApiError::AuthExpired);
         }
@@ -513,7 +590,7 @@ impl YtMusic {
         while let Some(t) = token.take()
             && pages.len() < MAX_PAGES
         {
-            let page = self.raw(&Continuation { base, token: t }).await?;
+            let page = self.raw_account(&Continuation { base, token: t }).await?;
             token = convert::shelf_continuation(&page);
             pages.push(page);
         }
@@ -521,10 +598,59 @@ impl YtMusic {
     }
 }
 
+/// A visitor's requests: no cookies and no visitor id, and the web client's version from
+/// today's date, as ytmapi-rs's visitor token and ytmusicapi send it. ytmapi-rs 0.3.3's own
+/// `NoAuthToken` first reads the YouTube Music page for its `VISITOR_DATA`, which the
+/// signed-out page no longer has in the config it reads (2026-11-06: only
+/// `EOM_VISITOR_DATA`), so it never gets built; the API answers without one.
+#[derive(Clone, Debug)]
+struct GuestToken;
+
+impl AuthToken for GuestToken {
+    fn headers(&self) -> ytmapi_rs::Result<impl IntoIterator<Item = (&str, Cow<'_, str>)>> {
+        Ok([
+            ("User-Agent", BROWSER_USER_AGENT.into()),
+            ("X-Origin", YTM_ORIGIN.into()),
+            ("Content-Type", "application/json".into()),
+        ])
+    }
+    /// Worked out for each request, so a long run never sends an old one.
+    fn client_version(&self) -> Cow<'_, str> {
+        web_client_version(SystemTime::now()).into()
+    }
+    fn deserialize_response<Q>(raw: RawResult<Q, Self>) -> ytmapi_rs::Result<ProcessedResult<Q>> {
+        ProcessedResult::try_from(raw)
+    }
+}
+
+/// The web client's version for `now`: `1.YYYYMMDD.01.00` (UTC).
+fn web_client_version(now: SystemTime) -> String {
+    let days = now
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .map(|d| d.as_secs() / 86_400)
+        .unwrap_or(0);
+    let (y, m, d) = civil_date(days);
+    format!("1.{y:04}{m:02}{d:02}.01.00")
+}
+
+/// The calendar date `days` after 1970-01-01 (Howard Hinnant's `civil_from_days`).
+fn civil_date(days: u64) -> (u64, u64, u64) {
+    let z = days + 719_468;
+    let era = z / 146_097;
+    let doe = z % 146_097;
+    let yoe = (doe - doe / 1_460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = yoe + era * 400 + u64::from(m <= 2);
+    (y, m, d)
+}
+
 /// The Home feed's first page (`FEmusic_home`), fetched as raw JSON.
 struct HomeQuery;
 
-impl Query<BrowserToken> for HomeQuery {
+impl<A: AuthToken> Query<A> for HomeQuery {
     type Output = Unparsed;
     type Method = PostMethod;
 }
@@ -558,7 +684,7 @@ struct Browse<'a> {
     country: Option<&'a str>,
 }
 
-impl Query<BrowserToken> for Browse<'_> {
+impl<A: AuthToken> Query<A> for Browse<'_> {
     type Output = Unparsed;
     type Method = PostMethod;
 }
@@ -702,7 +828,7 @@ struct Continuation<'a, Q> {
 #[derive(Debug)]
 struct Unparsed;
 
-impl<Q: PostQuery> Query<BrowserToken> for Continuation<'_, Q> {
+impl<Q: PostQuery, A: AuthToken> Query<A> for Continuation<'_, Q> {
     type Output = Unparsed;
     type Method = PostMethod;
 }
@@ -804,6 +930,37 @@ fn identity_headers(identity: &Identity) -> HeaderMap {
         put(PAGE_ID, page);
     }
     headers
+}
+
+/// What a guest is told: a refusal (401/403) means the request needs an account, as no
+/// session can have ended.
+fn guest_error(e: ApiError) -> ApiError {
+    match e {
+        ApiError::AuthExpired => ApiError::SignInRequired,
+        other => other,
+    }
+}
+
+/// A guest's answer as the parsers get it, unless it's a refusal: ytmapi-rs hands back the
+/// body whatever the HTTP status, and the parsers would read its `error.code` 401/403 as an
+/// ended session.
+fn guest_reply(raw: String) -> Result<String, ApiError> {
+    #[derive(serde::Deserialize)]
+    struct Reply {
+        error: Option<Code>,
+    }
+    #[derive(serde::Deserialize)]
+    struct Code {
+        code: Option<u64>,
+    }
+    let code = serde_json::from_str::<Reply>(&raw)
+        .ok()
+        .and_then(|r| r.error)
+        .and_then(|e| e.code);
+    match code {
+        Some(401 | 403) => Err(ApiError::SignInRequired),
+        _ => Ok(raw),
+    }
 }
 
 fn empty() -> ApiError {
@@ -937,6 +1094,49 @@ mod tests {
         assert_eq!(body["browseId"], "MPLYt_x");
         assert_eq!(body["context"]["client"]["clientName"], "ANDROID_MUSIC");
         assert_eq!(body["context"]["client"]["clientVersion"], "7.21.50");
+    }
+
+    #[test]
+    fn a_visitor_sends_the_web_client_version_for_the_day() {
+        let at = |days: u64| SystemTime::UNIX_EPOCH + Duration::from_secs(days * 86_400 + 3_600);
+        assert_eq!(web_client_version(at(20_763)), "1.20261106.01.00");
+        assert_eq!(web_client_version(at(11_016)), "1.20000229.01.00");
+    }
+
+    #[test]
+    fn a_refusal_to_a_visitor_asks_to_sign_in_never_ends_a_session() {
+        // ytmapi-rs hands back the body whatever the status: the refusal is in the JSON.
+        let refused = r#"{"error":{"code":403,"message":"The caller does not have permission"}}"#;
+        assert_eq!(guest_reply(refused.into()), Err(ApiError::SignInRequired));
+        let fine = r#"{"responseContext":{},"contents":{}}"#;
+        assert_eq!(guest_reply(fine.into()).as_deref(), Ok(fine));
+        let other = r#"{"error":{"code":500}}"#;
+        assert_eq!(guest_reply(other.into()).as_deref(), Ok(other));
+    }
+
+    #[tokio::test]
+    async fn a_visitor_is_asked_to_sign_in_for_the_account_without_a_request() {
+        // Nothing listens anywhere here: a request would fail as a network error instead.
+        let guest = YtMusic::guest().expect("guest");
+        assert!(!guest.signed_in());
+        let id = TrackId("x".into());
+        assert_eq!(
+            guest.library_playlists().await,
+            Err(ApiError::SignInRequired)
+        );
+        assert_eq!(guest.history().await, Err(ApiError::SignInRequired));
+        assert_eq!(
+            guest.playlist(&PlaylistId("LM".into())).await.map(drop),
+            Err(ApiError::SignInRequired)
+        );
+        assert_eq!(
+            guest.rate(&id, LikeStatus::Like).await,
+            Err(ApiError::SignInRequired)
+        );
+        assert_eq!(
+            guest.as_identity(&Identity::default()).map(drop),
+            Err(ApiError::SignInRequired)
+        );
     }
 
     #[test]
