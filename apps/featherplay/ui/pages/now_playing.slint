@@ -366,8 +366,13 @@ export component NowPlayingPage inherits Rectangle {
     // The stage's header row: the back button, "Playing from" and the Lyrics pill. The block
     // (the cover and the text under it) centres in the room between it and the bar's fade.
     property <length> head-h: Theme.top-bar-h;
-    property <length> room-top: root.head-h + Theme.s3;
-    property <length> room-h: root.stage-h - root.room-top - Theme.s5;
+    // The gaps stay small so the cover keeps its size in a 1280 x 800 window with the lyric
+    // strip's room kept: 408 px there (384 with the earlier gaps).
+    property <length> room-top: root.head-h + Theme.s2;
+    property <length> room-h: root.stage-h - root.room-top - Theme.s4;
+    // Under the cover, before the title; and between "album · year" and the lyric strip.
+    property <length> cover-gap: Theme.s4;
+    property <length> strip-gap: Theme.s3;
     // The block's text, all of it the cover's width: the title (the display face, two lines at
     // most), the artists, "album · year", and the lyric strip (`LyricStrip`). Its room is
     // kept whatever the song has, a second title line and the strip included, so the cover
@@ -377,8 +382,8 @@ export component NowPlayingPage inherits Rectangle {
     property <length> artists-h: 22px;
     property <length> album-h: 20px;
     property <length> strip-h: 40px;
-    property <length> text-h: Theme.s5 + 2 * root.title-line + Theme.s2 + root.artists-h + root.album-h
-        + (LyricsData.on ? Theme.s4 + root.strip-h : 0px);
+    property <length> text-h: root.cover-gap + 2 * root.title-line + Theme.s2 + root.artists-h + root.album-h
+        + (LyricsData.on ? root.strip-gap + root.strip-h : 0px);
     // Beside the side panel the cover is at most `nowplaying-cover`. With the panel hidden
     // the stage has the window's width, and the cover grows with it, up to
     // `nowplaying-cover-wide` (about a third of the stage's width), so it doesn't sit small in the
@@ -472,7 +477,7 @@ export component NowPlayingPage inherits Rectangle {
     // 2026-11-01).
     property <float> art-scale: abs(root.cover-size - root.art-size) < 0.5phx ? 1 : root.art-size / root.cover-size;
     // The title's top: under the cover in either view, sliding with it.
-    property <length> title-y: root.cover-y + root.cover-size + Theme.s5 + (root.fl-title-y - root.cover-y - root.cover-size - Theme.s5) * root.column;
+    property <length> title-y: root.cover-y + root.cover-size + root.cover-gap + (root.fl-title-y - root.cover-y - root.cover-size - root.cover-gap) * root.column;
     property <length> title-size: Theme.t-display-m + (Theme.t-display-s - Theme.t-display-m) * root.column;
 
     // The stage's ground, opaque: the ambient wash (the cover's colour from the top, fading
@@ -717,7 +722,7 @@ export component NowPlayingPage inherits Rectangle {
             }
         }
         // Row 4: the line playing, with synced lyrics and the lyrics view off.
-        property <length> strip-y: stage.album-y + root.album-h + Theme.s4;
+        property <length> strip-y: stage.album-y + root.album-h + root.strip-gap;
         if LyricsData.on && LyricsData.state == LyricsState.synced && Player.has-track && LyricsData.peek != "" && root.lyr < 1: LyricStrip {
             x: root.art-x;
             y: stage.strip-y;

@@ -152,3 +152,23 @@ fn the_lyric_strip_shows_only_with_synced_lyrics() {
     assert!(data.get_showing(), "the lyrics view didn't open");
     assert!(strip(&scene).is_none(), "it shows in the lyrics view");
 }
+
+#[test]
+fn the_cover_keeps_most_of_its_size_with_the_strip_in_a_1280_by_800_window() {
+    let scene = now_playing();
+    lyrics::show_for_snapshot(&scene.ctx, SnapshotLyrics::Synced);
+    scene.settle();
+    // The strip is the cover's width, so it tells the cover's size.
+    let at = strip(&scene).expect("no strip with synced lyrics");
+    assert!(
+        at.size.width >= 408.0,
+        "the cover is {} px beside the panel",
+        at.size.width
+    );
+    let theme = scene.ui.global::<Theme>();
+    let bar_top = 800.0 - theme.get_bar_clear();
+    assert!(
+        at.max_y() <= bar_top - theme.get_s4(),
+        "the strip runs into the player bar: {at:?}, the bar starts at {bar_top}"
+    );
+}
