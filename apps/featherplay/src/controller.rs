@@ -48,8 +48,8 @@ pub use account::{
 };
 pub use local_api::{LocalApiNotice, LocalApiStatus};
 pub use queue::{
-    QueueAction, QueueInfo, add_input, back_to_inputs, playing_from, queue_edit, queue_info,
-    with_likes,
+    PlayingFrom, QueueAction, QueueInfo, add_input, back_to_inputs, playing_from, queue_edit,
+    queue_info, with_likes,
 };
 
 use crate::catalog::{Catalog, Source};
@@ -270,8 +270,8 @@ pub struct Controller {
     /// Likes changed this session. The queue takes them (`Input::SetLike`), and so do the
     /// tracks that come into it later (`with_likes`).
     likes: HashMap<TrackId, LikeStatus>,
-    /// Where the queue came from, for the Up next panel.
-    playing_from: String,
+    /// Where the queue came from, for the Up next panel and Now playing's header.
+    playing_from: PlayingFrom,
     /// Sign-in and Last.fm state.
     account: account::AccountState,
     /// The stored session couldn't connect (network or parse failure): the reconnects.

@@ -12,7 +12,7 @@ use featherplay_ytm::ApiError;
 use slint::{Image, Model, ModelRc, VecModel};
 
 use crate::app::Ctx;
-use crate::controller::{Action, PlayerState, QueueAction};
+use crate::controller::{Action, PlayerState, PlayingFrom, QueueAction};
 use crate::covers::Covers;
 use crate::song_menu;
 use crate::ui::{CardItem, ItemKind, TrackRow};
@@ -30,8 +30,9 @@ pub struct TrackList {
     pub tracks: Vec<Track>,
     pub rows: Rc<VecModel<TrackRow>>,
     /// The Up next panel's "Playing from" for a play from this list ("Liked songs", a
-    /// playlist's title); empty lets the controller name it (an album, a radio).
-    pub from: String,
+    /// playlist's title) and its page; an empty label lets the controller name it (an
+    /// album, a radio).
+    pub from: PlayingFrom,
     asked: Vec<bool>,
     playing: Option<TrackId>,
 }
@@ -46,7 +47,7 @@ impl TrackList {
             asked: vec![false; tracks.len()],
             tracks,
             rows,
-            from: String::new(),
+            from: PlayingFrom::default(),
             playing: None,
         };
         list.mark_playing(current_id(ctx.player().as_ref()).as_ref());
@@ -180,7 +181,7 @@ impl TrackList {
 
     /// Plays `tracks`, labelled with `from` when the list has one.
     fn send_play(&self, ctx: &Ctx, tracks: Vec<Track>, start: usize, radio: bool) {
-        ctx.send(if self.from.is_empty() {
+        ctx.send(if self.from.label.is_empty() {
             Action::Play {
                 tracks,
                 start,
@@ -443,7 +444,7 @@ mod tests {
             asked: vec![true, true],
             tracks: old,
             rows,
-            from: String::new(),
+            from: PlayingFrom::default(),
             playing: None,
         };
         let cover = slint::Image::from_rgba8(slint::SharedPixelBuffer::new(2, 2));

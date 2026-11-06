@@ -11,8 +11,9 @@ use featherplay_ytm::HistoryDay;
 use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
 
 use crate::app::Ctx;
-use crate::controller::PlayerState;
+use crate::controller::{PlayerState, PlayingFrom};
 use crate::pages::content::{self, TrackList};
+use crate::router::Page;
 use crate::ui::HistoryData;
 
 thread_local! {
@@ -86,7 +87,7 @@ pub fn open(ctx: &Rc<Ctx>) {
                     });
                     if let Some(tracks) = fresh {
                         let (mut list, rows) = TrackList::new(tracks, ctx);
-                        list.from = tr!("History").into();
+                        list.from = PlayingFrom::on_page(tr!("History"), Page::History);
                         data.set_tracks(rows);
                         LIST.with_borrow_mut(|l| *l = Some(list));
                     }

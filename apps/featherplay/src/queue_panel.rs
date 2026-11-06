@@ -1,7 +1,8 @@
 //! The Up next panel (ui/queue_panel.slint); the now-playing page's Up next
 //! tab shows the same `QueueData`. Edits are applied to the list at once and sent to the
 //! controller, whose state then confirms them; the panel's open state is saved in the
-//! settings and restored at startup.
+//! settings and restored at startup. Now playing's "Playing from" opens the queue's source
+//! from here too.
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -13,7 +14,8 @@ use slint::{ComponentHandle, Image, Model, SharedString, VecModel};
 
 use crate::app::Ctx;
 use crate::controller::{Action, PlayerState, QueueAction};
-use crate::ui::{Frame, QueueData, TrackRow};
+use crate::router::Page;
+use crate::ui::{Frame, NowPlayingData, QueueData, TrackRow};
 use crate::ui_bridge::{model, to_rows};
 
 /// Row covers, in logical pixels.
@@ -28,6 +30,8 @@ struct Shown {
 
 thread_local! {
     static SHOWN: RefCell<Shown> = RefCell::new(Shown::default());
+    /// The page that shows where the queue came from, if one does.
+    static SOURCE: RefCell<Option<Page>> = const { RefCell::new(None) };
 }
 
 pub fn init(ctx: &Rc<Ctx>) {
@@ -81,6 +85,8 @@ pub fn init(ctx: &Rc<Ctx>) {
         }
     });
     let c = ctx.clone();
+    data.on_open_source(move || open_source(&c));
+    let c = ctx.clone();
     ui.global::<Frame>().on_queue_toggled(move |open| {
         log!("queue panel {open}");
         c.send(Action::Queue(QueueAction::PanelOpen(open)));
@@ -90,6 +96,28 @@ pub fn init(ctx: &Rc<Ctx>) {
         log!("now playing side panel {open}");
         c.send(Action::Queue(QueueAction::SidePanelOpen(open)));
     });
+}
+
+/// "Playing from" was clicked: the source's page; for one without a page (a radio,
+/// Autoplay), Up next, in Now playing's side panel there (shown if it was hidden) and in the
+/// frame's panel elsewhere.
+fn open_source(ctx: &Rc<Ctx>) {
+    let Some(ui) = ctx.window() else { return };
+    if let Some(page) = SOURCE.with(|s| s.borrow().clone()) {
+        ctx.navigate(page);
+        return;
+    }
+    ui.global::<NowPlayingData>().set_tab(0);
+    let frame = ui.global::<Frame>();
+    if ctx.current_page() == Page::NowPlaying {
+        if !frame.get_side_open() {
+            frame.set_side_open(true);
+            frame.invoke_side_toggled(true);
+        }
+    } else if !frame.get_queue_open() {
+        frame.set_queue_open(true);
+        frame.invoke_queue_toggled(true);
+    }
 }
 
 /// Opens the panel if it was open when the app last ran, and hides Now playing's side panel
@@ -119,7 +147,9 @@ fn edit(f: impl FnOnce(&mut Vec<TrackId>, &VecModel<TrackRow>) -> bool) -> bool 
 pub fn update(ctx: &Rc<Ctx>, state: &PlayerState) {
     let Some(ui) = ctx.window() else { return };
     let data = ui.global::<QueueData>();
-    data.set_playing_from(state.queue.playing_from.as_str().into());
+    let from = &state.queue.playing_from;
+    data.set_playing_from(from.label.as_str().into());
+    SOURCE.with(|s| s.borrow_mut().clone_from(&from.page));
     data.set_autoplay_at(
         state
             .queue

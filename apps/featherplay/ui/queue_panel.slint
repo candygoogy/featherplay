@@ -20,6 +20,9 @@ export global QueueData {
     callback remove(int);
     callback clear();
     callback play(int);
+    // Now playing's "Playing from" was clicked: its page (an album, a playlist), or for a
+    // source without one (a radio) the side panel on Up next.
+    callback open-source();
 }
 
 // "Clear": a quiet text button.

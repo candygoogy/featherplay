@@ -152,7 +152,7 @@ fn current_row_cover_and_liked_songs_label() {
     pdata.invoke_play(0);
     match sent.try_recv() {
         Ok(Action::Queue(QueueAction::PlayFrom { from, start, .. })) => {
-            assert_eq!(from, "Liked songs");
+            assert_eq!(from.label, "Liked songs");
             assert_eq!(start, 0);
         }
         other => panic!("expected a labelled play, got {other:?}"),
@@ -160,7 +160,7 @@ fn current_row_cover_and_liked_songs_label() {
     pdata.invoke_shuffle();
     match sent.try_recv() {
         Ok(Action::Queue(QueueAction::PlayFrom { from, .. })) => {
-            assert_eq!(from, "Liked songs")
+            assert_eq!(from.label, "Liked songs")
         }
         other => panic!("expected a labelled shuffle, got {other:?}"),
     }

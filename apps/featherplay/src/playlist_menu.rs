@@ -18,7 +18,7 @@ use featherplay_ytm::{ApiError, PlaylistSummary};
 use slint::ComponentHandle;
 
 use crate::app::Ctx;
-use crate::controller::{Action, QueueAction};
+use crate::controller::{Action, PlayingFrom, QueueAction};
 use crate::library_list::Kind;
 use crate::pages::content;
 use crate::router::Page;
@@ -101,12 +101,8 @@ pub fn init(ctx: &Rc<Ctx>) {
     let c = ctx.clone();
     menu.on_open_item(move |id| {
         let Some(ui) = c.window() else { return };
-        let id = id.to_string();
-        match ui.global::<PlaylistMenu>().get_item().kind {
-            ItemKind::Album => c.navigate(Page::Album { id: AlbumId(id) }),
-            ItemKind::Artist => c.navigate(Page::Artist { id: ArtistId(id) }),
-            _ => c.navigate(Page::Playlist { id: PlaylistId(id) }),
-        }
+        let kind = entry_kind(ui.global::<PlaylistMenu>().get_item().kind);
+        c.navigate(page_of(kind, &id));
     });
     let c = ctx.clone();
     menu.on_pin(move |id| {
@@ -124,25 +120,25 @@ pub fn init(ctx: &Rc<Ctx>) {
     menu.on_play(move |id| with_tracks(&c, &id, play));
     let c = ctx.clone();
     menu.on_shuffle(move |id| {
-        with_tracks(&c, &id, |c, name, tracks| {
+        with_tracks(&c, &id, |c, from, tracks| {
             let seed = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .map(|d| d.as_nanos() as u64)
                 .unwrap_or(1);
-            play(c, name, content::shuffled(&tracks, seed));
+            play(c, from, content::shuffled(&tracks, seed));
         })
     });
     let c = ctx.clone();
     menu.on_play_next(move |id| {
-        with_tracks(&c, &id, |c, name, tracks| {
-            c.toast(&tr!("Playing next: {}", name));
+        with_tracks(&c, &id, |c, from, tracks| {
+            c.toast(&tr!("Playing next: {}", from.label));
             c.send(Action::Queue(QueueAction::PlayNextAll(tracks)));
         })
     });
     let c = ctx.clone();
     menu.on_add_to_queue(move |id| {
-        with_tracks(&c, &id, |c, name, tracks| {
-            c.toast(&tr!("Added to queue: {}", name));
+        with_tracks(&c, &id, |c, from, tracks| {
+            c.toast(&tr!("Added to queue: {}", from.label));
             c.send(Action::Queue(QueueAction::Enqueue(tracks)));
         })
     });
@@ -181,14 +177,29 @@ fn entry_kind(kind: ItemKind) -> Kind {
     }
 }
 
+/// The entry's page.
+fn page_of(kind: Kind, id: &str) -> Page {
+    let id = id.to_string();
+    match kind {
+        Kind::Album => Page::Album { id: AlbumId(id) },
+        Kind::Artist => Page::Artist { id: ArtistId(id) },
+        Kind::Playlist => Page::Playlist { id: PlaylistId(id) },
+    }
+}
+
 /// Fetches the entry's tracks (one read: the playlist, the album, or the artist's top
-/// songs), then hands them to `then` with its name.
-fn with_tracks(ctx: &Rc<Ctx>, id: &str, then: impl FnOnce(&Ctx, &str, Vec<Track>) + 'static) {
+/// songs), then hands them to `then` with its name and page.
+fn with_tracks(
+    ctx: &Rc<Ctx>,
+    id: &str,
+    then: impl FnOnce(&Ctx, PlayingFrom, Vec<Track>) + 'static,
+) {
     let name = title_of(ctx, id);
     let kind = ctx
         .window()
         .map(|ui| entry_kind(ui.global::<PlaylistMenu>().get_item().kind))
         .unwrap_or(Kind::Playlist);
+    let from = PlayingFrom::on_page(name.clone(), page_of(kind, id));
     let id = id.to_string();
     let what = match kind {
         Kind::Playlist => tr!("Couldn't load the playlist."),
@@ -206,7 +217,7 @@ fn with_tracks(ctx: &Rc<Ctx>, id: &str, then: impl FnOnce(&Ctx, &str, Vec<Track>
         move |ctx, _, result| match result {
             Ok(tracks) if !tracks.is_empty() => {
                 song_menu::remember(&tracks);
-                then(ctx, &name, tracks);
+                then(ctx, from, tracks);
             }
             Ok(_) => ctx.toast(&tr!("{} has no songs yet", quoted(&name))),
             Err(e) => ctx.toast(&failure_text(what, &e)),
@@ -215,12 +226,12 @@ fn with_tracks(ctx: &Rc<Ctx>, id: &str, then: impl FnOnce(&Ctx, &str, Vec<Track>
 }
 
 /// Plays `tracks` from the top, with Up next saying where they're from.
-fn play(ctx: &Ctx, name: &str, tracks: Vec<Track>) {
+fn play(ctx: &Ctx, from: PlayingFrom, tracks: Vec<Track>) {
     ctx.send(Action::Queue(QueueAction::PlayFrom {
         tracks,
         start: 0,
         radio: false,
-        from: name.to_string(),
+        from,
     }));
 }
 
@@ -237,7 +248,7 @@ fn start_radio(ctx: &Rc<Ctx>, id: &str) {
                     tracks,
                     start: 0,
                     radio: true,
-                    from: format!("{name} radio"),
+                    from: PlayingFrom::named(format!("{name} radio")),
                 }));
             }
             Ok(_) => ctx.toast(tr!("This playlist has no radio")),

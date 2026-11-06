@@ -16,7 +16,7 @@ use featherplay_core::tr;
 use slint::ComponentHandle;
 
 use crate::app::Ctx;
-use crate::controller::{Action, PlayerState, QueueAction};
+use crate::controller::{Action, PlayerState, PlayingFrom, QueueAction};
 use crate::router::Page;
 use crate::song_menu;
 use crate::ui::{AppWindow, Frame, NowPlayingData, Player, SongMenu};
@@ -75,7 +75,7 @@ pub fn init(ctx: &Rc<Ctx>) {
                 tracks,
                 start,
                 radio: true,
-                from: format!("{} radio", seed.title),
+                from: PlayingFrom::named(format!("{} radio", seed.title)),
             }));
         }
     });

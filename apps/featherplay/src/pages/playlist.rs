@@ -10,9 +10,10 @@ use featherplay_core::tr;
 use slint::ComponentHandle;
 
 use crate::app::Ctx;
-use crate::controller::PlayerState;
+use crate::controller::{PlayerState, PlayingFrom};
 use crate::follow;
 use crate::pages::content::{self, HEADER_COVER, TrackList};
+use crate::router::Page;
 use crate::ui::PlaylistData;
 
 thread_local! {
@@ -84,6 +85,7 @@ pub fn open(ctx: &Rc<Ctx>, id: &PlaylistId) {
         return;
     }
 
+    let page = Page::Playlist { id: id.clone() };
     let id = id.clone();
     ctx.load_for_page(
         // Liked songs loads like any playlist; the header shown for it is ours.
@@ -148,11 +150,12 @@ pub fn open(ctx: &Rc<Ctx>, id: &PlaylistId) {
                 }
             }
             let (mut list, model) = TrackList::new(playlist.tracks, ctx);
-            list.from = if liked {
+            let label = if liked {
                 liked_songs().into()
             } else {
                 s.title.clone()
             };
+            list.from = PlayingFrom::on_page(label, page);
             list.hint_first(ctx);
             data.set_tracks(model);
             LIST.with(|l| *l.borrow_mut() = Some(list));
