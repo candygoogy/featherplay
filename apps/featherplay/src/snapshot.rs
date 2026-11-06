@@ -97,6 +97,8 @@ pub const PAGES: &[&str] = &[
     "settings-idle",
     // Settings playing a long title by many artists, for how the Discord preview elides.
     "settings-long",
+    // The same with a Cyrillic and Japanese title by artists in several scripts.
+    "settings-scripts",
     // Settings with the local API on and running, its port and masked token.
     "settings-local-api",
     "about",
@@ -175,6 +177,18 @@ const LONG_ARTISTS: &[&str] = &[
     "Herbert von Karajan",
     "Gundula Janowitz",
     "Christa Ludwig",
+];
+
+/// A long title in Japanese and Cyrillic, credited to artists in several scripts, as
+/// non-Latin catalogues and fan uploads name them.
+const SCRIPTS_LONG_TITLE: &str = "【和訳/歌詞付き】НЮША - Цунами ( SWEEQTY hardstyle remix )";
+const SCRIPTS_LONG_ARTISTS: &[&str] = &[
+    "НЮША",
+    "SWEEQTY",
+    "米津玄師",
+    "Кино",
+    "Ελένη Βιτάλη",
+    "宇多田ヒカル",
 ];
 
 /// How long to wait for loads and covers at most. The wait ends as soon as they're in; the
@@ -450,6 +464,8 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
         scene.play_titled(SCRIPT_TITLES)?;
     } else if o.page == "settings-long" {
         scene.play_credited(o.track, LONG_TITLE, LONG_ARTISTS)?;
+    } else if o.page == "settings-scripts" {
+        scene.play_credited(o.track, SCRIPTS_LONG_TITLE, SCRIPTS_LONG_ARTISTS)?;
     } else {
         scene.play_track(
             matches!(
@@ -860,6 +876,7 @@ fn page(name: &str, f: &Fixtures) -> Result<Page, String> {
         | "settings-listenbrainz"
         | "settings-idle"
         | "settings-long"
+        | "settings-scripts"
         | "settings-local-api" => Page::Settings,
         "about" | "about-update" | "about-update-ready" => Page::About,
         "sign-in"

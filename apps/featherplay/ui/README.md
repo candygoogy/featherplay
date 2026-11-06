@@ -166,7 +166,7 @@ now-playing-lyrics (also -plain and -none; with
 now-playing-lyrics-full (lyrics on; also -full-plain, -full-none and -full-outage, the plain fallback of an LRCLIB outage), settings, settings-idle (Settings with nothing to play),
 settings-long (a long title by five artists, for the Discord preview; the preview shows only
 with `discord = true` in the home's `config/settings.toml`, and needs a tall `--size`, about
-1280x3600),
+1280x3600), settings-scripts (the same with a Cyrillic and Japanese title),
 about, sign-in, account-menu (Home with the
 account menu open), mini-player, mini-player-paused, mini-player-long, mini-player-disliked and mini-player-idle (the tray's mini
 player alone, 340 x 170 logical), close-dialog (Home with the close dialog open), home-more (Home after a scroll loaded the next
