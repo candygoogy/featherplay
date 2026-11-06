@@ -49,6 +49,26 @@ fn advance_repeat_off_at_end_is_none() {
     assert_eq!(current_id(&q), Some("c"));
 }
 
+/// The tracks that will play next, in the order `advance_past` would reach them.
+#[test]
+fn peek_ahead_follows_the_play_order() {
+    let ahead = |q: &Queue, n| -> Vec<String> {
+        q.peek_ahead_past(n, |t| t.id.0 == "c")
+            .iter()
+            .map(|t| t.id.0.clone())
+            .collect()
+    };
+    let mut q = Queue::new();
+    q.replace(tracks(&["a", "b", "c", "d", "e"]), 2, false);
+    assert_eq!(ahead(&q, 3), ["d", "e"], "the end of the list");
+    q.set_repeat(RepeatMode::All);
+    assert_eq!(ahead(&q, 3), ["d", "e", "a"], "round to the start, past c");
+    q.replace(tracks(&["a", "b", "c"]), 0, false);
+    assert_eq!(ahead(&q, 5), ["b", "a"], "one lap at most");
+    q.set_repeat(RepeatMode::One);
+    assert_eq!(ahead(&q, 3), ["a"], "the current track again");
+}
+
 #[test]
 fn advance_repeat_one_returns_same() {
     let mut q = Queue::new();

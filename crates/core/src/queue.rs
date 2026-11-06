@@ -97,12 +97,33 @@ impl Queue {
         self.current()
     }
 
+    /// The next `n` tracks `advance_past(skip)` would move to, one after another, without
+    /// moving: at most one lap round the queue. Repeat One gives the current track.
+    pub fn peek_ahead_past(&self, n: usize, skip: impl Fn(&Track) -> bool) -> Vec<&Track> {
+        let mut out = Vec::with_capacity(n);
+        let mut seen = HashSet::new();
+        let mut at = self.index;
+        while out.len() < n
+            && let Some(next) = self.next_index_from(at, &skip)
+            && seen.insert(next)
+        {
+            out.push(&self.tracks[next]);
+            at = next;
+        }
+        out
+    }
+
     /// The index of the next track `skip` doesn't pick, at most one lap round the queue.
     fn next_index(&self, skip: impl Fn(&Track) -> bool) -> Option<usize> {
+        self.next_index_from(self.index, skip)
+    }
+
+    /// `next_index` as if the track at `from` were current.
+    fn next_index_from(&self, from: usize, skip: impl Fn(&Track) -> bool) -> Option<usize> {
         if self.repeat == RepeatMode::One {
-            return (self.index < self.tracks.len()).then_some(self.index);
+            return (from < self.tracks.len()).then_some(from);
         }
-        let mut at = self.index;
+        let mut at = from;
         for _ in 0..self.tracks.len() {
             at = if at + 1 < self.tracks.len() {
                 at + 1

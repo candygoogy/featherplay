@@ -1102,6 +1102,17 @@ impl Player {
         self.queue.advance_past(|t| passed_over(prefs, t)).is_some()
     }
 
+    /// The play ids of the next `n` tracks, in the order they'll play (shuffled, repeated,
+    /// past the ones passed over), the next one first.
+    pub fn ahead(&self, n: usize) -> Vec<TrackId> {
+        let prefs = self.prefs;
+        self.queue
+            .peek_ahead_past(n, |t| passed_over(prefs, t))
+            .into_iter()
+            .map(|t| play_id(prefs, t))
+            .collect()
+    }
+
     /// The track `move_on` would go to.
     fn next_track(&self) -> Option<&Track> {
         let prefs = self.prefs;
