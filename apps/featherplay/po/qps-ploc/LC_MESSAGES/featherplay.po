@@ -53,8 +53,8 @@ msgstr "[Pause]"
 #: ../../crates/integrations/src/taskbar.rs:178
 #: ../../crates/integrations/src/taskbar.rs:178
 #: ../../crates/integrations/src/taskbar.rs:178 ui/bottom_bar.slint:397
-#: ../../crates/integrations/src/taskbar.rs:178 ui/bottom_bar.slint:397 ui/pages/content.slint:781 ui/pages/home.slint:606
-#: ../../crates/integrations/src/taskbar.rs:178 ui/bottom_bar.slint:397 ui/pages/content.slint:781 ui/pages/home.slint:606 ui/playlist_menu_layer.slint:197
+#: ../../crates/integrations/src/taskbar.rs:178 ui/bottom_bar.slint:397 ui/pages/content.slint:841 ui/pages/home.slint:606
+#: ../../crates/integrations/src/taskbar.rs:178 ui/bottom_bar.slint:397 ui/pages/content.slint:841 ui/pages/home.slint:606 ui/playlist_menu_layer.slint:197
 msgid "Play"
 msgstr "[Play]"
 
@@ -75,8 +75,8 @@ msgstr "[Next]"
 #: ../../crates/integrations/src/tray.rs:273
 #: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:444
 #: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:444 ui/mini_player.slint:131 ui/pages/lyrics.slint:71
-#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:444 ui/mini_player.slint:131 ui/pages/lyrics.slint:71 ui/pages/now_playing.slint:484
-#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:444 ui/mini_player.slint:131 ui/pages/lyrics.slint:71 ui/pages/now_playing.slint:484
+#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:444 ui/mini_player.slint:131 ui/pages/lyrics.slint:71 ui/pages/now_playing.slint:509
+#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:444 ui/mini_player.slint:131 ui/pages/lyrics.slint:71 ui/pages/now_playing.slint:509
 msgid "Nothing playing"
 msgstr "[Nothing playing]"
 
@@ -107,8 +107,8 @@ msgstr "[Quit]"
 
 #: ../../crates/integrations/src/tray_menu.rs:242
 #: ../../crates/integrations/src/tray_menu.rs:242 src/album_actions.rs:275
-#: ../../crates/integrations/src/tray_menu.rs:242 src/album_actions.rs:275 ui/not_for_me.slint:19 ui/pages/content.slint:617
-#: ../../crates/integrations/src/tray_menu.rs:242 src/album_actions.rs:275 ui/not_for_me.slint:19 ui/pages/content.slint:617 ui/song_menu.slint:280
+#: ../../crates/integrations/src/tray_menu.rs:242 src/album_actions.rs:275 ui/not_for_me.slint:19 ui/pages/content.slint:677
+#: ../../crates/integrations/src/tray_menu.rs:242 src/album_actions.rs:275 ui/not_for_me.slint:19 ui/pages/content.slint:677 ui/song_menu.slint:280
 msgid "Like"
 msgstr "[Like]"
 
@@ -248,9 +248,9 @@ msgstr "[a song wasn't found]"
 msgid "the music service said no"
 msgstr "[the music service said no]"
 
-#: src/app.rs:183 ui/pages/content.slint:541 ui/pages/settings.slint:1692
-#: src/app.rs:183 ui/pages/content.slint:541 ui/pages/settings.slint:1692 ui/pages/sign_in.slint:165 ui/sidebar.slint:378
-#: src/app.rs:183 ui/pages/content.slint:541 ui/pages/settings.slint:1692 ui/pages/sign_in.slint:165 ui/sidebar.slint:378
+#: src/app.rs:183 ui/pages/content.slint:592 ui/pages/settings.slint:1692
+#: src/app.rs:183 ui/pages/content.slint:592 ui/pages/settings.slint:1692 ui/pages/sign_in.slint:165 ui/sidebar.slint:353
+#: src/app.rs:183 ui/pages/content.slint:592 ui/pages/settings.slint:1692 ui/pages/sign_in.slint:165 ui/sidebar.slint:353 ui/sidebar.slint:454
 msgid "Sign in"
 msgstr "[Sign in]"
 
@@ -451,12 +451,12 @@ msgstr "[This isn't available.]"
 msgid "The music service sent something unexpected."
 msgstr "[The music service sent something unexpected.]"
 
-#: src/pages/history.rs:89 ui/pages/history.slint:38 ui/sidebar.slint:208
+#: src/pages/history.rs:89 ui/pages/history.slint:38 ui/sidebar.slint:206
 msgid "History"
 msgstr "[History]"
 
-#: src/pages/home.rs:621 src/pages/playlist.rs:24 ui/sidebar.slint:228
-#: src/pages/home.rs:621 src/pages/playlist.rs:24 ui/sidebar.slint:228
+#: src/pages/home.rs:621 src/pages/playlist.rs:24 ui/sidebar.slint:226
+#: src/pages/home.rs:621 src/pages/playlist.rs:24 ui/sidebar.slint:226
 msgid "Liked songs"
 msgstr "[Liked songs]"
 
@@ -472,7 +472,7 @@ msgstr "[Similar to]"
 msgid "More from {}"
 msgstr "[More from {}]"
 
-#: src/pages/now_playing.rs:266
+#: src/pages/now_playing.rs:294
 msgid "Couldn't load related tracks"
 msgstr "[Couldn't load related tracks]"
 
@@ -596,7 +596,7 @@ msgstr "[The sign-in window closed before you signed in.]"
 msgid "The sign-in window didn't work: {}"
 msgstr "[The sign-in window didn't work: {}]"
 
-#: src/pages/sign_in.rs:213 src/snapshot.rs:579
+#: src/pages/sign_in.rs:213 src/snapshot.rs:594
 msgid ""
 "Finish signing in in Microsoft Edge. featherplay closes it once you're in."
 msgstr "[Finish signing in in Microsoft Edge. featherplay closes it once you're in.]"
@@ -743,7 +743,7 @@ msgstr "[Removed {} from your library]"
 msgid "Couldn't remove {}."
 msgstr "[Couldn't remove {}.]"
 
-#: src/sidebar.rs:416 ui/pages/library.slint:90
+#: src/sidebar.rs:416 ui/pages/library.slint:91
 msgid "Playlists you make or save show up here."
 msgstr "[Playlists you make or save show up here.]"
 
@@ -868,9 +868,9 @@ msgid "{} %"
 msgstr "[{} %]"
 
 #: ui/bottom_bar.slint:303 ui/bottom_bar.slint:335
-#: ui/bottom_bar.slint:303 ui/bottom_bar.slint:335 ui/pages/now_playing.slint:206
-#: ui/bottom_bar.slint:303 ui/bottom_bar.slint:335 ui/pages/now_playing.slint:206 ui/pages/settings.slint:1315
-#: ui/bottom_bar.slint:303 ui/bottom_bar.slint:335 ui/pages/now_playing.slint:206 ui/pages/settings.slint:1315
+#: ui/bottom_bar.slint:303 ui/bottom_bar.slint:335 ui/pages/now_playing.slint:216
+#: ui/bottom_bar.slint:303 ui/bottom_bar.slint:335 ui/pages/now_playing.slint:216 ui/pages/settings.slint:1315
+#: ui/bottom_bar.slint:303 ui/bottom_bar.slint:335 ui/pages/now_playing.slint:216 ui/pages/settings.slint:1315
 msgid "Lyrics"
 msgstr "[Lyrics]"
 
@@ -899,8 +899,8 @@ msgstr "[Space]"
 msgid "Now playing: {}"
 msgstr "[Now playing: {}]"
 
-#: ui/bottom_bar.slint:522 ui/pages/content.slint:782
-#: ui/bottom_bar.slint:522 ui/pages/content.slint:782
+#: ui/bottom_bar.slint:522 ui/pages/content.slint:842
+#: ui/bottom_bar.slint:522 ui/pages/content.slint:842
 msgid "Shuffle"
 msgstr "[Shuffle]"
 
@@ -924,7 +924,7 @@ msgstr "[Mute]"
 msgid "Unmute"
 msgstr "[Unmute]"
 
-#: ui/bottom_bar.slint:632 ui/pages/now_playing.slint:100
+#: ui/bottom_bar.slint:632 ui/pages/now_playing.slint:110
 msgid "Up next"
 msgstr "[Up next]"
 
@@ -980,8 +980,8 @@ msgstr "[Open featherplay]"
 msgid "Close"
 msgstr "[Close]"
 
-#: ui/mini_player.slint:227 ui/not_for_me.slint:19 ui/pages/content.slint:617
-#: ui/mini_player.slint:227 ui/not_for_me.slint:19 ui/pages/content.slint:617 ui/song_menu.slint:280
+#: ui/mini_player.slint:227 ui/not_for_me.slint:19 ui/pages/content.slint:677
+#: ui/mini_player.slint:227 ui/not_for_me.slint:19 ui/pages/content.slint:677 ui/song_menu.slint:280
 msgid "Remove like"
 msgstr "[Remove like]"
 
@@ -1071,7 +1071,7 @@ msgid "Top songs"
 msgstr "[Top songs]"
 
 #: ui/pages/artist.slint:214 ui/pages/library.slint:48
-#: ui/pages/artist.slint:214 ui/pages/library.slint:48 ui/sidebar.slint:245
+#: ui/pages/artist.slint:214 ui/pages/library.slint:48 ui/sidebar.slint:243
 msgid "Albums"
 msgstr "[Albums]"
 
@@ -1096,8 +1096,12 @@ msgstr "[This didn’t load]"
 msgid "Try again"
 msgstr "[Try again]"
 
-#: ui/pages/content.slint:626 ui/pages/content.slint:940
-#: ui/pages/content.slint:626 ui/pages/content.slint:940 ui/parts.slint:734 ui/parts.slint:873
+#: ui/pages/content.slint:597 ui/pages/history.slint:74
+msgid "Go to Explore"
+msgstr "[Go to Explore]"
+
+#: ui/pages/content.slint:686 ui/pages/content.slint:1003
+#: ui/pages/content.slint:686 ui/pages/content.slint:1003 ui/parts.slint:737 ui/parts.slint:876
 msgid "More"
 msgstr "[More]"
 
@@ -1121,7 +1125,7 @@ msgstr "[{0}. {1}, down]"
 msgid "Top artists"
 msgstr "[Top artists]"
 
-#: ui/pages/explore.slint:436 ui/sidebar.slint:198
+#: ui/pages/explore.slint:436 ui/sidebar.slint:196
 msgid "Explore"
 msgstr "[Explore]"
 
@@ -1169,11 +1173,11 @@ msgstr "[Pick another mood or genre in Explore.]"
 msgid "Back to Explore"
 msgstr "[Back to Explore]"
 
-#: ui/pages/history.slint:52
+#: ui/pages/history.slint:46
 msgid "Sign in to see your history"
 msgstr "[Sign in to see your history]"
 
-#: ui/pages/history.slint:53
+#: ui/pages/history.slint:47
 msgid "Your account keeps the songs you play, on every device."
 msgstr "[Your account keeps the songs you play, on every device.]"
 
@@ -1185,12 +1189,8 @@ msgstr "[Songs you play show up here]"
 msgid "Plays on your other devices count too."
 msgstr "[Plays on your other devices count too.]"
 
-#: ui/pages/history.slint:74
-msgid "Go to Explore"
-msgstr "[Go to Explore]"
-
-#: ui/pages/home.slint:363 ui/parts.slint:388 ui/parts.slint:638
-#: ui/pages/home.slint:363 ui/parts.slint:388 ui/parts.slint:638
+#: ui/pages/home.slint:363 ui/parts.slint:388 ui/parts.slint:641
+#: ui/pages/home.slint:363 ui/parts.slint:388 ui/parts.slint:641
 msgid "Play {}"
 msgstr "[Play {}]"
 
@@ -1243,53 +1243,53 @@ msgstr "[Nothing on Home yet]"
 msgid "Home fills in as you listen. Use Search to find something to play."
 msgstr "[Home fills in as you listen. Use Search to find something to play.]"
 
-#: ui/pages/library.slint:42 ui/sidebar.slint:188
+#: ui/pages/library.slint:42 ui/sidebar.slint:186
 msgid "Library"
 msgstr "[Library]"
 
-#: ui/pages/library.slint:48 ui/pages/search.slint:60 ui/sidebar.slint:245
+#: ui/pages/library.slint:48 ui/pages/search.slint:60 ui/sidebar.slint:243
 msgid "Playlists"
 msgstr "[Playlists]"
 
-#: ui/pages/library.slint:48 ui/pages/search.slint:60 ui/sidebar.slint:245
+#: ui/pages/library.slint:48 ui/pages/search.slint:60 ui/sidebar.slint:243
 msgid "Artists"
 msgstr "[Artists]"
 
-#: ui/pages/library.slint:64
+#: ui/pages/library.slint:59
 msgid "Sign in to see your library"
 msgstr "[Sign in to see your library]"
 
-#: ui/pages/library.slint:65
+#: ui/pages/library.slint:60
 msgid ""
-"Your playlists, saved albums, artists and liked songs come with your "
-"account. Everything else works without one."
-msgstr "[Your playlists, saved albums, artists and liked songs come with your account. Everything else works without one.]"
+"Your playlists, saved albums and artists come with your account. Search, "
+"Explore and radio work without one."
+msgstr "[Your playlists, saved albums and artists come with your account. Search, Explore and radio work without one.]"
 
-#: ui/pages/library.slint:89 ui/pages/playlist.slint:102
+#: ui/pages/library.slint:90 ui/pages/playlist.slint:106
 msgid "Songs you like show up here"
 msgstr "[Songs you like show up here]"
 
-#: ui/pages/library.slint:89 ui/song_menu.slint:345
+#: ui/pages/library.slint:90 ui/song_menu.slint:345
 msgid "No playlists yet"
 msgstr "[No playlists yet]"
 
-#: ui/pages/library.slint:89
+#: ui/pages/library.slint:90
 msgid "Albums you save show up here"
 msgstr "[Albums you save show up here]"
 
-#: ui/pages/library.slint:89
+#: ui/pages/library.slint:90
 msgid "Artists you follow show up here"
 msgstr "[Artists you follow show up here]"
 
-#: ui/pages/library.slint:90 ui/pages/playlist.slint:103
+#: ui/pages/library.slint:91 ui/pages/playlist.slint:107
 msgid "Like a song with its heart to keep it here."
 msgstr "[Like a song with its heart to keep it here.]"
 
-#: ui/pages/library.slint:90
+#: ui/pages/library.slint:91
 msgid "Find music on Home or with Search."
 msgstr "[Find music on Home or with Search.]"
 
-#: ui/pages/library.slint:91 ui/pages/playlist.slint:104
+#: ui/pages/library.slint:92 ui/pages/playlist.slint:108
 msgid "Go to Home"
 msgstr "[Go to Home]"
 
@@ -1317,40 +1317,39 @@ msgstr "[Synced lyrics are unavailable right now]"
 msgid "Not synced to the song"
 msgstr "[Not synced to the song]"
 
-#: ui/pages/now_playing.slint:100
+#: ui/pages/now_playing.slint:110
 msgid "Related"
 msgstr "[Related]"
 
-#: ui/pages/now_playing.slint:127
+#: ui/pages/now_playing.slint:137
 msgid "Similar to {}"
 msgstr "[Similar to {}]"
 
-#: ui/pages/now_playing.slint:146
+#: ui/pages/now_playing.slint:156
 msgid "Nothing related found"
 msgstr "[Nothing related found]"
 
-#: ui/pages/now_playing.slint:383
+#: ui/pages/now_playing.slint:408
 msgid "Back"
 msgstr "[Back]"
 
-#: ui/pages/now_playing.slint:532
+#: ui/pages/now_playing.slint:580
 msgid "Playing from {}"
 msgstr "[Playing from {}]"
 
-#: ui/pages/playlist.slint:87
+#: ui/pages/playlist.slint:91
 msgid "Sign in to see your liked songs"
 msgstr "[Sign in to see your liked songs]"
 
-#: ui/pages/playlist.slint:88
-msgid ""
-"Songs you like are kept in your account, so they follow you to every device."
-msgstr "[Songs you like are kept in your account, so they follow you to every device.]"
+#: ui/pages/playlist.slint:92
+msgid "Your account keeps the songs you like, on every device."
+msgstr "[Your account keeps the songs you like, on every device.]"
 
-#: ui/pages/playlist.slint:102
+#: ui/pages/playlist.slint:106
 msgid "This playlist is empty"
 msgstr "[This playlist is empty]"
 
-#: ui/pages/playlist.slint:103
+#: ui/pages/playlist.slint:107
 msgid "Songs added to it show up here."
 msgstr "[Songs added to it show up here.]"
 
@@ -1462,7 +1461,7 @@ msgstr "[OK]"
 msgid "Cancel"
 msgstr "[Cancel]"
 
-#: ui/pages/settings.slint:1246 ui/sidebar.slint:358
+#: ui/pages/settings.slint:1246 ui/sidebar.slint:384
 msgid "Settings"
 msgstr "[Settings]"
 
@@ -2178,7 +2177,7 @@ msgstr "[Sign in with this cookie]"
 msgid "Playing"
 msgstr "[Playing]"
 
-#: ui/parts.slint:388 ui/parts.slint:837
+#: ui/parts.slint:388 ui/parts.slint:840
 msgid "Pause {}"
 msgstr "[Pause {}]"
 
@@ -2266,23 +2265,27 @@ msgstr "[Playing from]"
 msgid "Nothing up next"
 msgstr "[Nothing up next]"
 
-#: ui/sidebar.slint:178
+#: ui/sidebar.slint:176
 msgid "Home"
 msgstr "[Home]"
 
-#: ui/sidebar.slint:273
+#: ui/sidebar.slint:271
 msgid "{}, pinned"
 msgstr "[{}, pinned]"
 
-#: ui/sidebar.slint:329
-msgid "Sign in to see your playlists, albums and artists here."
-msgstr "[Sign in to see your playlists, albums and artists here.]"
+#: ui/sidebar.slint:339
+msgid "Your playlists go here"
+msgstr "[Your playlists go here]"
 
-#: ui/sidebar.slint:379
+#: ui/sidebar.slint:344
+msgid "Sign in and your playlists, albums and artists show up in this list."
+msgstr "[Sign in and your playlists, albums and artists show up in this list.]"
+
+#: ui/sidebar.slint:405
 msgid "Account, {}"
 msgstr "[Account, {}]"
 
-#: ui/sidebar.slint:428
+#: ui/sidebar.slint:454
 msgid "Signed in"
 msgstr "[Signed in]"
 
