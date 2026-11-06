@@ -17,6 +17,8 @@ export global SongMenu {
     in-out property <bool> choosing;
     // The user's playlists, set by Rust when the menu opens.
     in property <[CardItem]> playlists;
+    // Signed out, Add to playlist asks to sign in (`add-signed-out`) instead of listing.
+    in property <bool> signed-in: true;
 
     callback opened(string);
     callback play-next(string);
@@ -25,6 +27,7 @@ export global SongMenu {
     callback like(string, bool);
     callback dislike(string);
     callback add-to-playlist(string, string);
+    callback add-signed-out();
     callback start-radio(string);
 
     // Opens down from (`x`, `y`), or up ending at `top` when there's no room below, so it
@@ -294,8 +297,15 @@ export component SongMenuLayer inherits Rectangle {
                 enabled: root.open;
                 icon: MenuIcons.playlist-add;
                 label: @tr("Add to playlist");
-                more: true;
-                clicked => { SongMenu.choosing = true; }
+                more: SongMenu.signed-in;
+                clicked => {
+                    if SongMenu.signed-in {
+                        SongMenu.choosing = true;
+                    } else {
+                        SongMenu.add-signed-out();
+                        root.close();
+                    }
+                }
             }
             MenuItem {
                 enabled: root.open;

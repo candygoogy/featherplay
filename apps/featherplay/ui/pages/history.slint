@@ -2,12 +2,14 @@
 // heading for each day ("Today", "Yesterday", then weeks and months as the music service
 // groups them). Rows are a playlist's: double-click plays the history from there, the heart
 // likes, right-click and ⋯ open the song menu. Data comes from `src/pages/history.rs`.
+// Signed out, the history is the account's: the page asks to sign in instead.
 import { ListView } from "std-widgets.slint";
 import { Theme, Icons } from "../theme.slint";
 import { TrackRow, PageTitle, Display } from "../parts.slint";
 import { Nav, PageKind } from "../nav.slint";
 import { SongMenu } from "../song_menu.slint";
-import { SongListRow, SkeletonList, ErrorState, EmptyState, FadeIn } from "content.slint";
+import { SidebarData } from "../sidebar.slint";
+import { SongListRow, SkeletonList, ErrorState, EmptyState, SignInPrompt, FadeIn } from "content.slint";
 
 export global HistoryData {
     in property <bool> loading;
@@ -27,6 +29,7 @@ export component HistoryPage inherits Rectangle {
     property <length> pad: Theme.page-pad;
     property <length> list-y: Theme.page-top + 48px + Theme.s3;
     property <length> day-h: 56px;
+    property <bool> account: !SidebarData.signed-out;
 
     PageTitle {
         x: root.pad;
@@ -40,17 +43,27 @@ export component HistoryPage inherits Rectangle {
         width: parent.width;
         height: parent.height - self.y;
         clip: true;
-        if HistoryData.loading && HistoryData.tracks.length == 0: SkeletonList {
+        if !root.account: FadeIn {
+            SignInPrompt {
+                x: root.pad;
+                y: Theme.s5;
+                width: min(480px, parent.width - 2 * root.pad);
+                glyph: Icons.note;
+                title: @tr("Sign in to see your history");
+                line: @tr("Your account keeps the songs you play, on every device.");
+            }
+        }
+        if root.account && HistoryData.loading && HistoryData.tracks.length == 0: SkeletonList {
             top: root.day-h;
         }
-        if !HistoryData.loading && HistoryData.error != "" && HistoryData.tracks.length == 0: ErrorState {
+        if root.account && !HistoryData.loading && HistoryData.error != "" && HistoryData.tracks.length == 0: ErrorState {
             x: root.pad;
             y: Theme.s5;
             width: min(480px, parent.width - 2 * root.pad);
             message: HistoryData.error;
             retry => { HistoryData.retry(); }
         }
-        if !HistoryData.loading && HistoryData.error == "" && HistoryData.tracks.length == 0: FadeIn {
+        if root.account && !HistoryData.loading && HistoryData.error == "" && HistoryData.tracks.length == 0: FadeIn {
             EmptyState {
                 x: root.pad;
                 y: Theme.s5;
@@ -62,7 +75,7 @@ export component HistoryPage inherits Rectangle {
                 action-clicked => { Nav.go(PageKind.explore); }
             }
         }
-        if HistoryData.tracks.length > 0: FadeIn {
+        if root.account && HistoryData.tracks.length > 0: FadeIn {
             ListView {
                 for t[i] in HistoryData.tracks: day-row := Rectangle {
                     property <string> day: i < HistoryData.days.length ? HistoryData.days[i] : "";

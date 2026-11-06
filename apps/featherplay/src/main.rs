@@ -9,7 +9,7 @@
 //! Debug flags: `--play <videoId>`, `--volume <0..1>` (this run only), `--start-at <secs>`,
 //! `--timing` (prints `first_frame_ms=<n>`), and the offscreen render
 //! `--snapshot <page> --fixtures [--theme dark|light] [--size WxH] [--scale F] [--queue]
-//! [--hover X,Y | --press X,Y] [--hold-loading | --hold-error] [--track N] [--language CODE] --out <png>`.
+//! [--hover X,Y | --press X,Y] [--hold-loading | --hold-error] [--signed-out] [--track N] [--language CODE] --out <png>`.
 //! `--unregister` removes the Start menu shortcut and registry entry that a normal start
 //! adds so the media card names the app (`identity`), then exits.
 //! Dev overrides: `FEATHERPLAY_COOKIES_FILE` (the cookie header, read instead of the
@@ -37,7 +37,7 @@ use featherplay_store::Paths;
 
 const USAGE: &str = "usage: featherplay [--play <videoId>] [--volume <0..1>] [--start-at <secs>] [--timing]
        featherplay --unregister
-       featherplay --snapshot <page> --fixtures [--theme dark|light] [--size WxH] [--scale F] [--queue] [--hover X,Y | --press X,Y] [--hold-loading | --hold-error] [--track N] [--language CODE] --out <png>";
+       featherplay --snapshot <page> --fixtures [--theme dark|light] [--size WxH] [--scale F] [--queue] [--hover X,Y | --press X,Y] [--hold-loading | --hold-error] [--signed-out] [--track N] [--language CODE] --out <png>";
 
 enum Mode {
     App(Options, AppOptions),
@@ -54,6 +54,7 @@ fn parse_args() -> Result<Mode, String> {
     let mut size = (1280, 800);
     let mut scale = 1.0;
     let mut queue_open = false;
+    let mut signed_out = false;
     let mut pointer: Option<(f32, f32)> = None;
     let mut press = false;
     let mut hold = Hold::None;
@@ -112,6 +113,7 @@ fn parse_args() -> Result<Mode, String> {
                 };
             }
             "--queue" => queue_open = true,
+            "--signed-out" => signed_out = true,
             "--hover" | "--press" => {
                 let name = if arg == "--hover" {
                     "--hover"
@@ -166,6 +168,7 @@ fn parse_args() -> Result<Mode, String> {
         height: size.1,
         scale,
         queue_open,
+        signed_out,
         pointer,
         press,
         hold,

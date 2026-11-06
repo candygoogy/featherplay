@@ -23,8 +23,8 @@ fn key(w: &slint::Window, k: impl Into<SharedString>) {
 /// Signed out on the sign-in page, then a new sign-in as the controller reports it.
 fn sign_in(scene: &Scene) {
     app::on_event(UiEvent::Account { signed_in: false });
+    scene.ctx.navigate(Page::SignIn);
     scene.settle();
-    assert_eq!(scene.ctx.current_page(), Page::SignIn);
     app::on_event(UiEvent::AskIdentity);
     app::on_event(UiEvent::Account { signed_in: true });
     scene.settle();

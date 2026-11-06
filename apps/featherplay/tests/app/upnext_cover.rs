@@ -86,7 +86,8 @@ fn current_row_cover_and_liked_songs_label() {
         .build()
         .expect("runtime");
     let fixtures = Arc::new(Fixtures::load().expect("fixtures"));
-    let catalog = Catalog::new(runtime.handle().clone(), Source::Fixtures(fixtures.clone()));
+    let catalog = Catalog::new(runtime.handle().clone()).expect("catalog");
+    catalog.set(Source::Fixtures(fixtures.clone()));
     let covers = Covers::new(
         runtime.handle().clone(),
         Paths::resolve().cache,

@@ -229,6 +229,8 @@ pub struct SnapshotOptions {
     /// The display's scale (Windows' 150 % is 1.5): logical pixels are this many physical.
     pub scale: f32,
     pub queue_open: bool,
+    /// Signed out, as with no session: the window as a visitor sees it.
+    pub signed_out: bool,
     /// Where the pointer rests, in logical pixels.
     pub pointer: Option<(f32, f32)>,
     /// The left button is held down at `pointer`.
@@ -290,7 +292,8 @@ impl Scene {
             .build()
             .map_err(|e| format!("tokio runtime: {e}"))?;
         let fixtures = Arc::new(Fixtures::load()?);
-        let catalog = Catalog::new(runtime.handle().clone(), Source::Fixtures(fixtures.clone()));
+        let catalog = Catalog::new(runtime.handle().clone()).map_err(|e| e.to_string())?;
+        catalog.set(Source::Fixtures(fixtures.clone()));
         // Nothing handles the actions: the bar's buttons do nothing here. The tests read
         // them (`take_actions`).
         let (actions, sent) = mpsc::unbounded_channel();
@@ -474,6 +477,9 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
             ),
             o.track,
         )?;
+    }
+    if o.signed_out {
+        app::on_event(UiEvent::Account { signed_in: false });
     }
     scene.open(&o.page)?;
     if o.queue_open {

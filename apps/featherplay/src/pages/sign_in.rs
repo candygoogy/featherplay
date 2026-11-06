@@ -73,8 +73,9 @@ pub fn open(ctx: &Rc<Ctx>) {
 /// The controller's state changed (track, play/pause, queue).
 pub fn player_changed(_ctx: &Rc<Ctx>, _state: &PlayerState) {}
 
-/// Signed in or out. Signed out (at startup, after a sign-out, when the session
-/// expired), the window shows this page; signed in from it, it goes Home.
+/// Signed in or out. Signed out, the app works as a visitor: only a session that ended
+/// (`expired`, told just before) brings the window to this page; signed in from it, it goes
+/// Home.
 pub fn account_changed(ctx: &Rc<Ctx>, signed_in: bool) {
     let Some(ui) = ctx.window() else { return };
     let data = ui.global::<SignInData>();
@@ -94,7 +95,7 @@ pub fn account_changed(ctx: &Rc<Ctx>, signed_in: bool) {
         if EDGE.with(|e| e.borrow().is_none()) {
             data.set_busy(false);
         }
-        if ctx.current_page() != Page::SignIn {
+        if data.get_expired() && ctx.current_page() != Page::SignIn {
             ctx.navigate(Page::SignIn);
         }
     }

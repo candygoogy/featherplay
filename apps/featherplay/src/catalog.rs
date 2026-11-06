@@ -20,8 +20,9 @@ use crate::fixtures::Fixtures;
 /// A snapshot of the data source. Cheap to clone.
 #[derive(Clone, Debug)]
 pub enum Source {
-    /// No session: every call fails with `ApiError::AuthExpired`.
-    SignedOut,
+    /// No session: the catalogue as a visitor (`YtMusic::guest`); what belongs to an
+    /// account fails with `ApiError::SignInRequired`.
+    SignedOut(YtMusic),
     /// A stored session exists, but connecting with it failed for a network or parse
     /// reason: every call fails with `ApiError::Network`, so pages offer Try again rather
     /// than Sign in. The controller reconnects (`controller/reconnect.rs`).
@@ -32,13 +33,13 @@ pub enum Source {
 
 impl Source {
     pub fn signed_in(&self) -> bool {
-        !matches!(self, Source::SignedOut)
+        !matches!(self, Source::SignedOut(_))
     }
 
     /// The signed-in account's name and photo. Fixtures give a placeholder account.
     pub async fn account_info(&self) -> Result<AccountInfo, ApiError> {
         match self {
-            Source::SignedOut => Err(ApiError::AuthExpired),
+            Source::SignedOut(_) => Err(ApiError::SignInRequired),
             Source::Unreachable => Err(unreachable()),
             Source::Live(api) => api.account_info().await,
             Source::Fixtures(f) => f.account_info(),
@@ -49,7 +50,7 @@ impl Source {
     /// placeholder identities.
     pub async fn accounts(&self) -> Result<Vec<AccountIdentity>, ApiError> {
         match self {
-            Source::SignedOut => Err(ApiError::AuthExpired),
+            Source::SignedOut(_) => Err(ApiError::SignInRequired),
             Source::Unreachable => Err(unreachable()),
             Source::Live(api) => api.accounts().await,
             Source::Fixtures(f) => f.accounts(),
@@ -58,9 +59,8 @@ impl Source {
 
     pub async fn home(&self) -> Result<HomeFeed, ApiError> {
         match self {
-            Source::SignedOut => Err(ApiError::AuthExpired),
             Source::Unreachable => Err(unreachable()),
-            Source::Live(api) => api.home().await,
+            Source::Live(api) | Source::SignedOut(api) => api.home().await,
             Source::Fixtures(f) => f.home(),
         }
     }
@@ -68,9 +68,8 @@ impl Source {
     /// The Home feed's next page, from `HomeFeed::more`.
     pub async fn home_more(&self, token: &str) -> Result<HomeFeed, ApiError> {
         match self {
-            Source::SignedOut => Err(ApiError::AuthExpired),
             Source::Unreachable => Err(unreachable()),
-            Source::Live(api) => api.home_more(token).await,
+            Source::Live(api) | Source::SignedOut(api) => api.home_more(token).await,
             Source::Fixtures(f) => f.home_more(token),
         }
     }
@@ -78,9 +77,8 @@ impl Source {
     /// Explore's new releases.
     pub async fn new_releases(&self) -> Result<Vec<HomeShelf>, ApiError> {
         match self {
-            Source::SignedOut => Err(ApiError::AuthExpired),
             Source::Unreachable => Err(unreachable()),
-            Source::Live(api) => api.new_releases().await,
+            Source::Live(api) | Source::SignedOut(api) => api.new_releases().await,
             Source::Fixtures(f) => f.new_releases(),
         }
     }
@@ -88,9 +86,8 @@ impl Source {
     /// Explore's charts for `country`, or the account's country. Fixtures have one country.
     pub async fn charts(&self, country: Option<&str>) -> Result<Charts, ApiError> {
         match self {
-            Source::SignedOut => Err(ApiError::AuthExpired),
             Source::Unreachable => Err(unreachable()),
-            Source::Live(api) => api.charts(country).await,
+            Source::Live(api) | Source::SignedOut(api) => api.charts(country).await,
             Source::Fixtures(f) => f.charts(),
         }
     }
@@ -98,9 +95,8 @@ impl Source {
     /// Explore's moods and genres.
     pub async fn moods(&self) -> Result<Vec<MoodSection>, ApiError> {
         match self {
-            Source::SignedOut => Err(ApiError::AuthExpired),
             Source::Unreachable => Err(unreachable()),
-            Source::Live(api) => api.moods().await,
+            Source::Live(api) | Source::SignedOut(api) => api.moods().await,
             Source::Fixtures(f) => f.moods(),
         }
     }
@@ -108,9 +104,8 @@ impl Source {
     /// A mood or genre's playlists. Fixtures have one mood's, for any params.
     pub async fn mood_playlists(&self, params: &str) -> Result<MoodPage, ApiError> {
         match self {
-            Source::SignedOut => Err(ApiError::AuthExpired),
             Source::Unreachable => Err(unreachable()),
-            Source::Live(api) => api.mood_playlists(params).await,
+            Source::Live(api) | Source::SignedOut(api) => api.mood_playlists(params).await,
             Source::Fixtures(f) => f.mood_playlists(),
         }
     }
@@ -118,7 +113,7 @@ impl Source {
     /// The listening history, newest day first.
     pub async fn history(&self) -> Result<Vec<HistoryDay>, ApiError> {
         match self {
-            Source::SignedOut => Err(ApiError::AuthExpired),
+            Source::SignedOut(_) => Err(ApiError::SignInRequired),
             Source::Unreachable => Err(unreachable()),
             Source::Live(api) => api.history().await,
             Source::Fixtures(f) => f.history(),
@@ -127,7 +122,7 @@ impl Source {
 
     pub async fn library_playlists(&self) -> Result<Vec<PlaylistSummary>, ApiError> {
         match self {
-            Source::SignedOut => Err(ApiError::AuthExpired),
+            Source::SignedOut(_) => Err(ApiError::SignInRequired),
             Source::Unreachable => Err(unreachable()),
             Source::Live(api) => api.library_playlists().await,
             Source::Fixtures(f) => f.library_playlists(),
@@ -136,7 +131,7 @@ impl Source {
 
     pub async fn liked_songs(&self) -> Result<Vec<Track>, ApiError> {
         match self {
-            Source::SignedOut => Err(ApiError::AuthExpired),
+            Source::SignedOut(_) => Err(ApiError::SignInRequired),
             Source::Unreachable => Err(unreachable()),
             Source::Live(api) => api.liked_songs().await,
             Source::Fixtures(f) => f.liked_songs(),
@@ -145,7 +140,7 @@ impl Source {
 
     pub async fn library_albums(&self) -> Result<Vec<AlbumSummary>, ApiError> {
         match self {
-            Source::SignedOut => Err(ApiError::AuthExpired),
+            Source::SignedOut(_) => Err(ApiError::SignInRequired),
             Source::Unreachable => Err(unreachable()),
             Source::Live(api) => api.library_albums().await,
             Source::Fixtures(f) => f.library_albums(),
@@ -154,7 +149,7 @@ impl Source {
 
     pub async fn library_artists(&self) -> Result<Vec<ArtistSummary>, ApiError> {
         match self {
-            Source::SignedOut => Err(ApiError::AuthExpired),
+            Source::SignedOut(_) => Err(ApiError::SignInRequired),
             Source::Unreachable => Err(unreachable()),
             Source::Live(api) => api.library_artists().await,
             Source::Fixtures(f) => f.library_artists(),
@@ -163,36 +158,32 @@ impl Source {
 
     pub async fn playlist(&self, id: &PlaylistId) -> Result<Playlist, ApiError> {
         match self {
-            Source::SignedOut => Err(ApiError::AuthExpired),
             Source::Unreachable => Err(unreachable()),
-            Source::Live(api) => api.playlist(id).await,
+            Source::Live(api) | Source::SignedOut(api) => api.playlist(id).await,
             Source::Fixtures(f) => f.playlist(id),
         }
     }
 
     pub async fn album(&self, id: &AlbumId) -> Result<Album, ApiError> {
         match self {
-            Source::SignedOut => Err(ApiError::AuthExpired),
             Source::Unreachable => Err(unreachable()),
-            Source::Live(api) => api.album(id).await,
+            Source::Live(api) | Source::SignedOut(api) => api.album(id).await,
             Source::Fixtures(f) => f.album(id),
         }
     }
 
     pub async fn artist(&self, id: &ArtistId) -> Result<Artist, ApiError> {
         match self {
-            Source::SignedOut => Err(ApiError::AuthExpired),
             Source::Unreachable => Err(unreachable()),
-            Source::Live(api) => api.artist(id).await,
+            Source::Live(api) | Source::SignedOut(api) => api.artist(id).await,
             Source::Fixtures(f) => f.artist(),
         }
     }
 
     pub async fn search(&self, q: &str, filter: SearchFilter) -> Result<SearchResults, ApiError> {
         match self {
-            Source::SignedOut => Err(ApiError::AuthExpired),
             Source::Unreachable => Err(unreachable()),
-            Source::Live(api) => api.search(q, filter).await,
+            Source::Live(api) | Source::SignedOut(api) => api.search(q, filter).await,
             Source::Fixtures(f) => f.search(filter),
         }
     }
@@ -201,18 +192,16 @@ impl Source {
     /// "daft pu"), whatever is typed; the demo set has none.
     pub async fn search_suggestions(&self, q: &str) -> Result<SearchSuggestions, ApiError> {
         match self {
-            Source::SignedOut => Err(ApiError::AuthExpired),
             Source::Unreachable => Err(unreachable()),
-            Source::Live(api) => api.search_suggestions(q).await,
+            Source::Live(api) | Source::SignedOut(api) => api.search_suggestions(q).await,
             Source::Fixtures(f) => f.search_suggestions(),
         }
     }
 
     pub async fn radio(&self, seed: &TrackId) -> Result<Vec<Track>, ApiError> {
         match self {
-            Source::SignedOut => Err(ApiError::AuthExpired),
             Source::Unreachable => Err(unreachable()),
-            Source::Live(api) => api.radio(seed).await,
+            Source::Live(api) | Source::SignedOut(api) => api.radio(seed).await,
             Source::Fixtures(f) => f.radio(),
         }
     }
@@ -221,9 +210,8 @@ impl Source {
     /// the tracks of their radio recordings.
     pub async fn track(&self, id: &TrackId) -> Result<Option<Track>, ApiError> {
         match self {
-            Source::SignedOut => Err(ApiError::AuthExpired),
             Source::Unreachable => Err(unreachable()),
-            Source::Live(api) => api.track(id).await,
+            Source::Live(api) | Source::SignedOut(api) => api.track(id).await,
             Source::Fixtures(f) => f.track(id),
         }
     }
@@ -232,9 +220,8 @@ impl Source {
     /// plain. Fixtures have none.
     pub async fn lyrics(&self, id: &TrackId) -> Result<Option<SongLyrics>, ApiError> {
         match self {
-            Source::SignedOut => Err(ApiError::AuthExpired),
             Source::Unreachable => Err(unreachable()),
-            Source::Live(api) => api.lyrics(id).await,
+            Source::Live(api) | Source::SignedOut(api) => api.lyrics(id).await,
             Source::Fixtures(_) => Ok(None),
         }
     }
@@ -242,7 +229,7 @@ impl Source {
     /// A live write. Fixtures accept it and change nothing.
     pub async fn rate(&self, id: &TrackId, status: LikeStatus) -> Result<(), ApiError> {
         match self {
-            Source::SignedOut => Err(ApiError::AuthExpired),
+            Source::SignedOut(_) => Err(ApiError::SignInRequired),
             Source::Unreachable => Err(unreachable()),
             Source::Live(api) => api.rate(id, status).await,
             Source::Fixtures(_) => Ok(()),
@@ -252,9 +239,8 @@ impl Source {
     /// The first batch of a playlist's radio. Fixtures give the radio recording.
     pub async fn playlist_radio(&self, id: &PlaylistId) -> Result<Vec<Track>, ApiError> {
         match self {
-            Source::SignedOut => Err(ApiError::AuthExpired),
             Source::Unreachable => Err(unreachable()),
-            Source::Live(api) => api.playlist_radio(id).await,
+            Source::Live(api) | Source::SignedOut(api) => api.playlist_radio(id).await,
             Source::Fixtures(f) => f.radio(),
         }
     }
@@ -262,7 +248,7 @@ impl Source {
     /// A live write. Fixtures accept it and change nothing.
     pub async fn rename_playlist(&self, id: &PlaylistId, title: &str) -> Result<(), ApiError> {
         match self {
-            Source::SignedOut => Err(ApiError::AuthExpired),
+            Source::SignedOut(_) => Err(ApiError::SignInRequired),
             Source::Unreachable => Err(unreachable()),
             Source::Live(api) => api.rename_playlist(id, title).await,
             Source::Fixtures(_) => Ok(()),
@@ -272,7 +258,7 @@ impl Source {
     /// A live write that can't be undone. Fixtures accept it and change nothing.
     pub async fn delete_playlist(&self, id: &PlaylistId) -> Result<(), ApiError> {
         match self {
-            Source::SignedOut => Err(ApiError::AuthExpired),
+            Source::SignedOut(_) => Err(ApiError::SignInRequired),
             Source::Unreachable => Err(unreachable()),
             Source::Live(api) => api.delete_playlist(id).await,
             Source::Fixtures(_) => Ok(()),
@@ -282,7 +268,7 @@ impl Source {
     /// A live write. Fixtures accept it and change nothing.
     pub async fn remove_playlist_from_library(&self, id: &PlaylistId) -> Result<(), ApiError> {
         match self {
-            Source::SignedOut => Err(ApiError::AuthExpired),
+            Source::SignedOut(_) => Err(ApiError::SignInRequired),
             Source::Unreachable => Err(unreachable()),
             Source::Live(api) => api.remove_playlist_from_library(id).await,
             Source::Fixtures(_) => Ok(()),
@@ -299,15 +285,26 @@ fn unreachable() -> ApiError {
 #[derive(Clone)]
 pub struct Catalog {
     source: Arc<RwLock<Source>>,
+    /// The visitor client, kept for every sign-out.
+    guest: YtMusic,
     rt: Handle,
 }
 
 impl Catalog {
-    pub fn new(rt: Handle, source: Source) -> Catalog {
-        Catalog {
-            source: Arc::new(RwLock::new(source)),
+    /// Signed out until the controller sets the session. Fails only if the HTTP client
+    /// can't be built.
+    pub fn new(rt: Handle) -> Result<Catalog, ApiError> {
+        let guest = YtMusic::guest()?;
+        Ok(Catalog {
+            source: Arc::new(RwLock::new(Source::SignedOut(guest.clone()))),
+            guest,
             rt,
-        }
+        })
+    }
+
+    /// Back to the visitor client: a sign-out, or a session that ended.
+    pub fn sign_out(&self) {
+        self.set(Source::SignedOut(self.guest.clone()));
     }
 
     /// The source is replaced whole, so a panic elsewhere never leaves it half-set: a
@@ -380,11 +377,20 @@ mod tests {
     }
 
     #[test]
-    fn playlist_writes_signed_out_are_auth_expired() {
+    fn the_account_signed_out_asks_to_sign_in_rather_than_ending_a_session() {
         let id = PlaylistId("PLx".into());
+        let signed_out = Source::SignedOut(YtMusic::guest().expect("guest"));
         assert!(matches!(
-            block_on(Source::SignedOut.delete_playlist(&id)),
-            Err(ApiError::AuthExpired)
+            block_on(signed_out.delete_playlist(&id)),
+            Err(ApiError::SignInRequired)
+        ));
+        assert!(matches!(
+            block_on(signed_out.library_playlists()),
+            Err(ApiError::SignInRequired)
+        ));
+        assert!(matches!(
+            block_on(signed_out.history()),
+            Err(ApiError::SignInRequired)
         ));
         assert!(matches!(
             block_on(Source::Unreachable.rename_playlist(&id, "x")),

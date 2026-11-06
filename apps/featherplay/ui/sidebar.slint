@@ -22,6 +22,9 @@ export global SidebarData {
     // Said under the chips when the chip's list loaded empty ("" otherwise).
     in property <string> empty-text;
     in property <bool> signed-in;
+    // Known to be signed out: false until the controller has told (a stored session is
+    // still connecting at startup), so a signed-in start never shows the signed-out look.
+    in property <bool> signed-out;
     // The account's name, when known ("" shows the generic "Signed in" row).
     in property <string> display-name;
     // The channel handle under the name ("" shows the name alone).
@@ -225,12 +228,16 @@ export component Sidebar inherits Rectangle {
         label: @tr("Liked songs");
         active: Nav.page == PageKind.playlist && Nav.page-id == "LM";
         clicked => { Nav.open-playlist("LM"); }
+        // Signed out, Liked songs is the account's: its page asks to sign in, and it has no
+        // menu.
         right-clicked(x, y) => {
-            PlaylistMenu.show({ id: "LM", kind: ItemKind.playlist, title: @tr("Liked songs") }, x, y, y);
+            if !SidebarData.signed-out {
+                PlaylistMenu.show({ id: "LM", kind: ItemKind.playlist, title: @tr("Liked songs") }, x, y, y);
+            }
         }
     }
 
-    if !root.rail: SideChips {
+    if !root.rail && !SidebarData.signed-out: SideChips {
         x: root.chips-x;
         y: root.chips-y;
         width: parent.width - 2 * root.chips-x;
@@ -305,11 +312,21 @@ export component Sidebar inherits Rectangle {
             }
         }
     }
-    if !root.rail && SidebarData.items.length == 0 && SidebarData.empty-text != "": Body {
+    if !root.rail && !SidebarData.signed-out && SidebarData.items.length == 0 && SidebarData.empty-text != "": Body {
         x: 20px;
         y: root.list-top + 4px;
         width: parent.width - 40px;
         text: SidebarData.empty-text;
+        font-size: Theme.t-meta;
+        color: Theme.text2;
+        wrap: word-wrap;
+    }
+    // Signed out, the library is the account's: one quiet line where the chips would be.
+    if !root.rail && SidebarData.signed-out: Body {
+        x: 20px;
+        y: root.chips-y + 4px;
+        width: parent.width - 40px;
+        text: @tr("Sign in to see your playlists, albums and artists here.");
         font-size: Theme.t-meta;
         color: Theme.text2;
         wrap: word-wrap;

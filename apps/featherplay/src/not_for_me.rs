@@ -54,6 +54,9 @@ pub fn actions(track: &Track, at: Duration) -> (Vec<Action>, Undo) {
 
 /// The thumbs-down button: the current track is not for me.
 pub fn start(ctx: &Rc<Ctx>) {
+    if ctx.needs_account(tr!("Sign in to rate songs")) {
+        return;
+    }
     let Some(state) = ctx.player() else { return };
     let Some(track) = state.current else { return };
     let at = bar::position().unwrap_or(state.position);
@@ -73,6 +76,10 @@ pub fn from_tray(ctx: &Rc<Ctx>) {
         .is_some_and(|ui| !ui.global::<Frame>().get_hidden() && !ui.window().is_minimized());
     if on_screen {
         start(ctx);
+        return;
+    }
+    // Hidden, nobody would see the toast asking to sign in.
+    if ctx.signed_out() {
         return;
     }
     let Some(state) = ctx.player() else { return };

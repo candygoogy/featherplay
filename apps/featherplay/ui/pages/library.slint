@@ -1,12 +1,14 @@
 // Library page: chips Liked, Playlists, Albums, Artists, like Search's. Liked is a list of song
 // rows; the others are card grids (round for artists). Data comes from
-// `src/pages/library.rs`; the tab is part of the route (`Nav.open-library(tab)`).
+// `src/pages/library.rs`; the tab is part of the route (`Nav.open-library(tab)`). Signed out,
+// the library is the account's: the page asks to sign in instead.
 import { ListView } from "std-widgets.slint";
 import { Theme, Icons } from "../theme.slint";
 import { TrackRow, CardItem, PageTitle } from "../parts.slint";
 import { Nav, PageKind } from "../nav.slint";
 import { SongMenu } from "../song_menu.slint";
-import { SongListRow, CardGrid, Chips, SkeletonList, SkeletonGrid, ErrorState, EmptyState, FadeIn, Open } from "content.slint";
+import { SidebarData } from "../sidebar.slint";
+import { SongListRow, CardGrid, Chips, SkeletonList, SkeletonGrid, ErrorState, EmptyState, SignInPrompt, FadeIn, Open } from "content.slint";
 
 export global LibraryData {
     in property <bool> loading;
@@ -30,7 +32,8 @@ export global LibraryData {
 export component LibraryPage inherits Rectangle {
     property <length> pad: Theme.page-pad;
     property <length> list-y: Theme.page-top + 48px + Theme.s4 + 36px + Theme.s2;
-    property <bool> empty: !LibraryData.loading && LibraryData.error == "" && (LibraryData.tab == 0 ? LibraryData.liked.length == 0 : LibraryData.cards.length == 0);
+    property <bool> account: !SidebarData.signed-out;
+    property <bool> empty: root.account && !LibraryData.loading && LibraryData.error == "" && (LibraryData.tab == 0 ? LibraryData.liked.length == 0 : LibraryData.cards.length == 0);
 
     PageTitle {
         x: root.pad;
@@ -38,7 +41,7 @@ export component LibraryPage inherits Rectangle {
         width: parent.width - 2 * root.pad;
         text: @tr("Library");
     }
-    Chips {
+    if root.account: Chips {
         x: root.pad;
         y: Theme.page-top + 48px + Theme.s4;
         width: parent.width - 2 * root.pad;
@@ -52,15 +55,25 @@ export component LibraryPage inherits Rectangle {
         width: parent.width;
         height: parent.height - self.y;
         clip: true;
+        if !root.account: FadeIn {
+            SignInPrompt {
+                x: root.pad;
+                y: Theme.s5;
+                width: min(480px, parent.width - 2 * root.pad);
+                glyph: Icons.library;
+                title: @tr("Sign in to see your library");
+                line: @tr("Your playlists, saved albums, artists and liked songs come with your account. Everything else works without one.");
+            }
+        }
         // Only with nothing to show: a list from the cache stays while it refreshes.
-        if LibraryData.loading && LibraryData.tab == 0 && LibraryData.liked.length == 0: SkeletonList {
+        if root.account && LibraryData.loading && LibraryData.tab == 0 && LibraryData.liked.length == 0: SkeletonList {
             top: Theme.s4;
         }
-        if LibraryData.loading && LibraryData.tab != 0 && LibraryData.cards.length == 0: SkeletonGrid {
+        if root.account && LibraryData.loading && LibraryData.tab != 0 && LibraryData.cards.length == 0: SkeletonGrid {
             top: Theme.s5;
             round: LibraryData.tab == 3;
         }
-        if !LibraryData.loading && LibraryData.error != "": ErrorState {
+        if root.account && !LibraryData.loading && LibraryData.error != "": ErrorState {
             x: root.pad;
             y: Theme.s5;
             width: min(480px, parent.width - 2 * root.pad);
@@ -79,7 +92,7 @@ export component LibraryPage inherits Rectangle {
                 action-clicked => { Nav.go(PageKind.home); }
             }
         }
-        if LibraryData.tab == 0 && LibraryData.liked.length > 0: FadeIn {
+        if root.account && LibraryData.tab == 0 && LibraryData.liked.length > 0: FadeIn {
             ListView {
                 for t[i] in LibraryData.liked: Rectangle {
                     height: Theme.row-h + (i == 0 ? Theme.s4 : 0px) + (i == LibraryData.liked.length - 1 ? Theme.page-end : 0px);
@@ -97,7 +110,7 @@ export component LibraryPage inherits Rectangle {
                 }
             }
         }
-        if LibraryData.tab != 0 && LibraryData.cards.length > 0: FadeIn {
+        if root.account && LibraryData.tab != 0 && LibraryData.cards.length > 0: FadeIn {
             CardGrid {
                 items: LibraryData.cards;
                 top: Theme.s5;

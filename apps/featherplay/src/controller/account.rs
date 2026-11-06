@@ -489,7 +489,7 @@ impl Controller {
         log!("session expired, sign in again");
         self.api = None;
         self.unreachable = None;
-        self.ui.catalog.set(Source::SignedOut);
+        self.ui.catalog.sign_out();
         (self.ui.events)(UiEvent::AccountNotice(AccountEvent::SessionExpired));
         (self.ui.events)(UiEvent::Account { signed_in: false });
     }
@@ -558,7 +558,7 @@ impl Controller {
         if self.settings.identity.take().is_some() {
             self.save_settings();
         }
-        self.ui.catalog.set(Source::SignedOut);
+        self.ui.catalog.sign_out();
         forget_library(&self.paths);
         // The sign-in window's profile too, so the next sign-in can pick another account.
         let profile = self.paths.cache.join("webview2");
@@ -882,7 +882,7 @@ async fn check_session(cookies: Cookies) -> Result<YtMusic, String> {
 pub fn sign_in_error(e: &ApiError) -> String {
     log!("sign-in: {e}");
     match e {
-        ApiError::AuthExpired => {
+        ApiError::AuthExpired | ApiError::SignInRequired => {
             tr!("That session isn't signed in. Sign in again, or copy a fresh cookie header.")
                 .into()
         }

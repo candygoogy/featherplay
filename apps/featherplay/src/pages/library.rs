@@ -128,8 +128,8 @@ impl CacheKey {
         match source {
             Source::Live(api) => Some(CacheKey::Known(api.identity().key())),
             Source::Unreachable => Some(CacheKey::Saved),
-            Source::SignedOut if pending => Some(CacheKey::Saved),
-            Source::SignedOut | Source::Fixtures(_) => None,
+            Source::SignedOut(_) if pending => Some(CacheKey::Saved),
+            Source::SignedOut(_) | Source::Fixtures(_) => None,
         }
     }
 

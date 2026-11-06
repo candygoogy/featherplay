@@ -78,6 +78,11 @@ pub fn open(ctx: &Rc<Ctx>, id: &PlaylistId) {
     data.set_wash_light(Default::default());
     data.set_tracks(Default::default());
     LIST.with(|l| *l.borrow_mut() = None);
+    // Signed out, Liked songs is the account's: the page asks to sign in instead.
+    if liked && ctx.signed_out() {
+        data.set_loading(false);
+        return;
+    }
 
     let id = id.clone();
     ctx.load_for_page(
@@ -161,5 +166,11 @@ pub fn player_changed(_ctx: &Rc<Ctx>, state: &PlayerState) {
     with_list(|l| l.mark_playing(id.as_ref()));
 }
 
-/// Signed in or out.
-pub fn account_changed(_ctx: &Rc<Ctx>, _signed_in: bool) {}
+/// Signed in or out: Liked songs on screen is another account's, or none, so it opens again.
+pub fn account_changed(ctx: &Rc<Ctx>, _signed_in: bool) {
+    if let crate::router::Page::Playlist { id } = ctx.current_page()
+        && is_liked_songs(&id)
+    {
+        open(ctx, &id);
+    }
+}

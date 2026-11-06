@@ -8,6 +8,11 @@ Notable changes to featherplay, newest first. The format follows
 
 ### Added
 
+- featherplay works without signing in. Search (every tab), artists, albums, public
+  playlists, Home, Explore, radio, lyrics and playback all work signed out, and the app
+  starts on Home rather than the sign-in page. The library, Liked songs and History ask you
+  to sign in where they would show, and so do likes, dislikes and Add to playlist. "Your
+  session has ended" now shows only when a session really ends.
 - "Sign in with Microsoft Edge", beside the regular sign-in and the cookie paste: Google's
   sign-in in a real Edge window, with Edge's address bar, passkeys and Windows Hello, in a
   temporary profile that's deleted afterwards. featherplay keeps only the YouTube Music
@@ -15,6 +20,8 @@ Notable changes to featherplay, newest first. The format follows
 
 ### Fixed
 
+- A search tab with no results says so instead of "The music service sent something
+  unexpected".
 - On Now playing, the player bar's Up next button now hides and shows the side panel (Up
   next and Related), and the page remembers your choice.
 - Resizing the window by its edge keeps up with the pointer better: on a 4K screen each step

@@ -38,7 +38,7 @@ fn pages_wait_for_the_stored_session_at_startup() {
         .expect("runtime");
     let fixtures = Arc::new(Fixtures::load().expect("fixtures"));
     // As in the app: the controller sets the source once it has signed in.
-    let catalog = Catalog::new(runtime.handle().clone(), Source::SignedOut);
+    let catalog = Catalog::new(runtime.handle().clone()).expect("catalog");
     let covers = Covers::new(
         runtime.handle().clone(),
         home.join("cache"),

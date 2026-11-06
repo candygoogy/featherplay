@@ -12,6 +12,7 @@ use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use featherplay_core::model::{AlbumId, ArtistId, PlaylistId};
+use featherplay_core::tr;
 use featherplay_integrations::UiCommand;
 use featherplay_store::{Paths, Settings};
 use slint::ComponentHandle;
@@ -172,6 +173,17 @@ impl Ctx {
         toast::show(self, text);
     }
 
+    /// For a control that writes to the account (a like, a rating, a playlist): signed out,
+    /// says `why` ("Sign in to like songs") in a toast with a Sign in button and returns
+    /// `true`, so the control does nothing more.
+    pub fn needs_account(&self, why: &str) -> bool {
+        if !self.signed_out() {
+            return false;
+        }
+        toast::show_with(self, why, tr!("Sign in"), |c| c.navigate(Page::SignIn));
+        true
+    }
+
     pub fn send(&self, action: Action) {
         let _ = self.actions.send(action);
     }
@@ -195,9 +207,15 @@ impl Ctx {
         self.signed_in.get()
     }
 
+    /// Known to be signed out: not while the stored session is still being restored at
+    /// startup, when `signed_in` is false only because it isn't back yet.
+    pub fn signed_out(&self) -> bool {
+        self.account_known.get() && !self.signed_in.get()
+    }
+
     /// At startup, while the controller is still restoring the stored session: the source
-    /// is signed out only because the session isn't back yet, so a call now would fail as
-    /// expired. `load` holds calls until then; a page that reloads on `account_changed`
+    /// is signed out only because the session isn't back yet, so a call now would go out
+    /// signed out. `load` holds calls until then; a page that reloads on `account_changed`
     /// (Home) can simply wait.
     /// Also while a reconnect asked by `reconnect` runs.
     pub fn session_pending(&self) -> bool {
@@ -568,7 +586,13 @@ pub fn run(opts: Options, app: AppOptions) -> ExitCode {
     let hotkeys = settings.hotkeys;
     language::install();
     featherplay_core::i18n::select(&language::for_setting(&settings.language));
-    let catalog = Catalog::new(runtime.handle().clone(), Source::SignedOut);
+    let catalog = match Catalog::new(runtime.handle().clone()) {
+        Ok(c) => c,
+        Err(e) => {
+            log!("featherplay: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
 
     let (tx, commands) = mpsc::unbounded_channel::<UiCommand>();
     let (action_tx, actions) = mpsc::unbounded_channel::<Action>();

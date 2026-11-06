@@ -7,7 +7,7 @@ use std::time::{Duration, SystemTime};
 
 use featherplay::app::Ctx;
 use featherplay::bar;
-use featherplay::catalog::{Catalog, Source};
+use featherplay::catalog::Catalog;
 use featherplay::controller::{PlayerState, QueueInfo};
 use featherplay::covers::Covers;
 use featherplay::offscreen;
@@ -43,7 +43,7 @@ fn the_total_appears_once_the_stream_resolves() {
         .build()
         .expect("runtime");
     let ui = AppWindow::new().expect("window");
-    let catalog = Catalog::new(rt.handle().clone(), Source::SignedOut);
+    let catalog = Catalog::new(rt.handle().clone()).expect("catalog");
     let cache = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("bar_total");
     let covers = Covers::new(rt.handle().clone(), cache, None);
     let (actions, _) = mpsc::unbounded_channel();

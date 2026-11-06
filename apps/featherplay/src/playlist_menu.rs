@@ -66,7 +66,9 @@ pub fn link(id: &str) -> String {
 pub fn failure_text(failed: &str, e: &ApiError) -> String {
     log!("playlist menu: {failed} {e}");
     match e {
-        ApiError::AuthExpired => tr!("{} Sign in again, then try once more.", failed),
+        ApiError::AuthExpired | ApiError::SignInRequired => {
+            tr!("{} Sign in again, then try once more.", failed)
+        }
         ApiError::Network(_) => tr!("{} Check the connection, then try again.", failed),
         ApiError::NotFound => tr!("{} The playlist is gone.", failed),
         ApiError::Parse(_) => tr!("{} The music service said no.", failed),

@@ -83,6 +83,7 @@ mod search_suggestions;
 mod settings_index;
 mod side_panel;
 mod sidebar_chips;
+mod signed_out;
 mod skeleton_frames;
 mod skeleton_sweep;
 mod smoothness;

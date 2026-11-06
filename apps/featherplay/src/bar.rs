@@ -12,6 +12,7 @@ use std::rc::Rc;
 use std::time::{Duration, Instant};
 
 use featherplay_core::model::{LikeStatus, RepeatMode, TrackId};
+use featherplay_core::tr;
 use slint::{ComponentHandle, Timer, TimerMode};
 
 use crate::app::Ctx;
@@ -86,7 +87,7 @@ pub fn init(ctx: &Rc<Ctx>) {
     player.on_toggle_like(move || {
         let Some(ui) = c.window() else { return };
         let p = ui.global::<Player>();
-        if !p.get_has_track() {
+        if !p.get_has_track() || c.needs_account(tr!("Sign in to like songs")) {
             return;
         }
         let liked = !p.get_liked();

@@ -571,14 +571,12 @@ impl Controller {
                 });
             }
             Action::Radio(seed) => {
-                let Some(api) = self.api.clone() else {
-                    log!("radio: signed out");
-                    return;
-                };
                 log!("fetch radio for {}", seed.0);
+                // The catalog's source: the account's, or signed out the visitor's.
+                let source = self.ui.catalog.source();
                 let tx = self.tx.clone();
                 tokio::spawn(async move {
-                    let result = api.radio(&seed).await;
+                    let result = source.radio(&seed).await;
                     let _ = tx.send(Msg::Radio(seed, result));
                 });
             }
@@ -775,13 +773,12 @@ impl Controller {
                 self.push_now_playing();
             }
             Effect::FetchContinuation(last) => {
-                let Some(api) = self.api.clone() else {
-                    return Some(Input::ContinuationLoaded(last, Vec::new()));
-                };
                 log!("fetch radio continuation after {}", last.0);
+                // Signed out too: the radio is the catalogue's.
+                let source = self.ui.catalog.source();
                 let tx = self.tx.clone();
                 tokio::spawn(async move {
-                    let result = api.radio(&last).await;
+                    let result = source.radio(&last).await;
                     let _ = tx.send(Msg::Continuation(last, result));
                 });
             }

@@ -122,7 +122,7 @@ fn rating_now(ctx: &Ctx, track: &Track) -> LikeStatus {
 fn pick(ctx: &Ctx, action: AlbumAction) {
     let Some(ui) = ctx.window() else { return };
     let menu = ui.global::<AlbumMenu>();
-    if menu.get_busy() {
+    if menu.get_busy() || ctx.needs_account(tr!("Sign in to rate songs")) {
         return;
     }
     let ids: Vec<TrackId> = album::tracks()
@@ -312,7 +312,7 @@ fn done_text(action: AlbumAction, n: usize) -> String {
 /// Why a write failed, short enough to follow "Stopped after 4 of 12: ".
 fn reason(e: &ApiError) -> &'static str {
     match e {
-        ApiError::AuthExpired => tr!("sign in again"),
+        ApiError::AuthExpired | ApiError::SignInRequired => tr!("sign in again"),
         ApiError::Network(_) => tr!("no connection"),
         ApiError::NotFound => tr!("a song wasn't found"),
         ApiError::Parse(_) => tr!("the music service said no"),

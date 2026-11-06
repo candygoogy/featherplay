@@ -290,11 +290,13 @@ fn seed() -> u64 {
 }
 
 /// What a page says when its data didn't load, under its "This didn't load" title (the page
-/// adds Try again, or Sign in when signed out). The details go to the log.
+/// adds Try again). The details go to the log. Pages that belong to the account don't load
+/// signed out: they ask to sign in instead (`SignInPrompt`).
 pub fn error_text(what: &str, e: &ApiError) -> String {
     log!("{what}: {e}");
     match e {
         ApiError::AuthExpired => tr!("Your session has ended. Sign in to see this.").into(),
+        ApiError::SignInRequired => tr!("Sign in to see this.").into(),
         ApiError::Network(_) => {
             tr!("Can't reach the music service. Check the connection, then try again.").into()
         }

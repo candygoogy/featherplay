@@ -3,8 +3,8 @@
 //! artists, playlists). Picking a completion searches for it; picking a result plays it or
 //! opens its page, as a row of the Search page does.
 //!
-//! One request per pause in the typing (`DEBOUNCE`), none for an empty field, a link (Enter
-//! opens what it points at) or while signed out. Only the latest edit's answer shows; the
+//! One request per pause in the typing (`DEBOUNCE`), signed in or not, none for an empty
+//! field or a link (Enter opens what it points at). Only the latest edit's answer shows; the
 //! last few answers are kept (`CACHED`), so typing back to an earlier query shows its
 //! suggestions at once. The keys and the motion are Slint's; nothing runs while closed.
 
@@ -190,8 +190,6 @@ fn edited(ctx: &Rc<Ctx>, text: &str) {
             stop_debounce();
             show(ctx, &ui, s);
         }
-        // Signed out, there's no session to ask with: nothing extra shows.
-        Next::Fetch { .. } if !ctx.signed_in() => hide(&ui),
         // The rows shown stay until the new answer replaces them.
         Next::Fetch { ask, query } => {
             let c = ctx.clone();

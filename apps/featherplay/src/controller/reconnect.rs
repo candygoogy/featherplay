@@ -146,7 +146,7 @@ impl Controller {
             None => {
                 log!("no cookies: signed out");
                 self.unreachable = None;
-                self.ui.catalog.set(Source::SignedOut);
+                self.ui.catalog.sign_out();
                 (self.ui.events)(UiEvent::Account { signed_in: false });
             }
         }

@@ -107,6 +107,11 @@ that it updates yt-dlp at most once a day, because YouTube changes often. They l
 
 ### Signing in
 
+You don't have to sign in. Without an account featherplay searches, opens artists, albums
+and public playlists, shows Home and Explore, and plays songs with their radio and lyrics.
+Your library, liked songs, history, likes and playlists need your account; their pages and
+buttons ask you to sign in.
+
 featherplay signs you in through a small window, Microsoft Edge WebView2, that shows Google's
 own sign-in page. Windows 11 includes WebView2, and most Windows 10 PCs have it with Edge. You
 sign in there as you would in a browser. featherplay doesn't read your password; the code is

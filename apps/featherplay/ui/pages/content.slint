@@ -4,7 +4,6 @@ import { ListView } from "std-widgets.slint";
 import { Theme, Curves, Icons } from "../theme.slint";
 import { TrackRow, CardItem, ItemKind, Icon, Display, Body, Cover, CoverPlay, IconButton, Pill, Card, HoverIntent, Bands } from "../parts.slint";
 import { Nav, PageKind } from "../nav.slint";
-import { SidebarData } from "../sidebar.slint";
 
 // Opens an album, playlist or artist card. Songs are played by the page instead.
 export global Open {
@@ -424,8 +423,8 @@ export component FadeIn inherits Rectangle {
     init => { root.arrived = true; }
 }
 
-// A page that didn't load: a glyph, what happened, and a way on. Signed out, the way
-// on is signing in; otherwise it's trying again.
+// A page that didn't load: a glyph, what happened, and a way on: trying again. Signed out
+// too, as the catalogue loads without an account; what needs one shows `SignInPrompt`.
 export component ErrorState inherits Rectangle {
     in property <string> message;
     callback retry();
@@ -457,14 +456,9 @@ export component ErrorState inherits Rectangle {
         Rectangle { height: Theme.s2; }
         HorizontalLayout {
             alignment: start;
-            if SidebarData.signed-in: Pill {
+            Pill {
                 label: @tr("Try again");
                 clicked => { root.retry(); }
-            }
-            if !SidebarData.signed-in: Pill {
-                label: @tr("Sign in");
-                solid: true;
-                clicked => { Nav.go(PageKind.sign-in); }
             }
         }
     }
@@ -506,6 +500,47 @@ export component EmptyState inherits Rectangle {
             Pill {
                 label: root.action;
                 clicked => { root.action-clicked(); }
+            }
+        }
+    }
+}
+
+// Signed out, in place of what belongs to an account (Library, Liked songs, History): what
+// it is and a way to sign in. Calm, as an empty page is: nothing went wrong.
+export component SignInPrompt inherits Rectangle {
+    in property <string> glyph: Icons.person;
+    in property <string> title;
+    in property <string> line;
+    height: lay.preferred-height;
+    lay := VerticalLayout {
+        alignment: start;
+        spacing: Theme.s2;
+        Icon {
+            width: 40px;
+            height: 40px;
+            commands: root.glyph;
+            stroke: Theme.text3;
+            stroke-width: 1.4px;
+        }
+        Rectangle { height: 4px; }
+        Body {
+            text: root.title;
+            font-size: Theme.t-body-l;
+            font-weight: 600;
+            color: Theme.text1;
+        }
+        Body {
+            text: root.line;
+            color: Theme.text2;
+            wrap: word-wrap;
+        }
+        Rectangle { height: Theme.s2; }
+        HorizontalLayout {
+            alignment: start;
+            Pill {
+                label: @tr("Sign in");
+                solid: true;
+                clicked => { Nav.go(PageKind.sign-in); }
             }
         }
     }

@@ -45,6 +45,7 @@ pub fn account_changed(ctx: &Rc<Ctx>, signed_in: bool) {
     let Some(ui) = ctx.window() else { return };
     let data = ui.global::<SidebarData>();
     data.set_signed_in(signed_in);
+    data.set_signed_out(!signed_in);
     // A new session (or none): what was fetched belonged to the old one.
     forget_account();
     forget_library(ctx);

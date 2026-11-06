@@ -94,7 +94,10 @@ pub fn open(ctx: &Rc<Ctx>, id: &AlbumId) {
 ```
 
 - `source` is a `catalog::Source`: the signed-in API, or the fixtures under `--fixtures`.
-  Signed out, every call returns `ApiError::AuthExpired`. Calls go out once; never loop.
+  Signed out, the catalogue loads as a visitor; what belongs to the account (the library,
+  Liked songs, the history, ratings, playlist edits) returns `ApiError::SignInRequired`, and
+  its page shows `SignInPrompt` (`SidebarData.signed-out`) instead. Calls go out once; never
+  loop.
 - Covers: `ctx.covers.load(url, px, |img| …)` or `ctx.covers.fill(model, urls, px, set)`.
   `px` is the displayed size in logical pixels; decoding happens off the UI thread.
 - Playing: `ctx.send(Action::Play { tracks, start, radio })`, `Action::Radio(id)`, etc.

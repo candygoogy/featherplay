@@ -77,8 +77,9 @@ pub fn init(ctx: &Rc<Ctx>) {
             .iter()
             .filter(|p| !matches!(p.id.as_str(), "LM" | "VLLM"))
             .collect();
-        ui.global::<SongMenu>()
-            .set_playlists(ModelRc::new(VecModel::from(playlists)));
+        let menu = ui.global::<SongMenu>();
+        menu.set_signed_in(!c.signed_out());
+        menu.set_playlists(ModelRc::new(VecModel::from(playlists)));
     });
 
     let c = ctx.clone();
@@ -100,7 +101,15 @@ pub fn init(ctx: &Rc<Ctx>) {
     let c = ctx.clone();
     menu.on_like(move |id, liked| set_like(&c, &TrackId(id.into()), liked));
     let c = ctx.clone();
-    menu.on_dislike(move |id| rate(&c, &TrackId(id.into()), LikeStatus::Dislike));
+    menu.on_dislike(move |id| {
+        if !c.needs_account(tr!("Sign in to rate songs")) {
+            rate(&c, &TrackId(id.into()), LikeStatus::Dislike);
+        }
+    });
+    let c = ctx.clone();
+    menu.on_add_signed_out(move || {
+        c.needs_account(tr!("Sign in to add songs to your playlists"));
+    });
     let c = ctx.clone();
     menu.on_add_to_playlist(move |track, playlist| {
         let name = c.window().and_then(|ui| {
@@ -127,6 +136,9 @@ pub fn init(ctx: &Rc<Ctx>) {
 
 /// Likes (`true`) or removes the like of a track.
 pub fn set_like(ctx: &Ctx, id: &TrackId, liked: bool) {
+    if ctx.needs_account(tr!("Sign in to like songs")) {
+        return;
+    }
     let status = if liked {
         LikeStatus::Like
     } else {

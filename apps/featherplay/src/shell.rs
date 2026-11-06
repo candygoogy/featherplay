@@ -139,6 +139,9 @@ pub fn tray_choice(choice: TrayChoice) {
         TrayChoice::PlayPause => player.invoke_toggle(),
         TrayChoice::Previous => player.invoke_previous(),
         TrayChoice::Next => player.invoke_next(),
+        // Signed out there's nothing to rate with, and a toast asking to sign in may be
+        // hidden with the window.
+        TrayChoice::Like if ctx.signed_out() => {}
         TrayChoice::Like => {
             // The bar's handler flips the heart at once and sends the rating.
             player.invoke_toggle_like();
