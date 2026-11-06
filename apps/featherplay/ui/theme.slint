@@ -177,6 +177,7 @@ export global Theme {
     out property <length> t-display-l: 40px;    // page titles
     out property <length> t-display-m: 32px;    // now-playing and hero track titles
     out property <length> t-display-s: 24px;    // shelf titles
+    out property <length> t-display-xs: 20px;   // gate titles
     out property <length> t-body-l: 16px;
     out property <length> t-body: 14px;
     out property <length> t-meta: 12px;
@@ -241,6 +242,9 @@ export global Theme {
     // Below a page's last row: past the floating bar, with the usual gap.
     out property <length> page-end: bar-clear + s5;
     out property <length> page-top: 32px;
+    // Where a page's gate (`AccountGate`) starts: under the page title (48 px), the same on
+    // every page, whatever the page shows under its title when it has content (chips).
+    out property <length> gate-y: page-top + 48px + s6;
     out property <length> section-gap: 40px;
     out property <length> row-h: 56px;
     out property <length> track-row-h: 48px;     // album rows (no cover)
@@ -306,6 +310,8 @@ export global Icons {
     out property <string> home: "M4.5 10 L12 4 L19.5 10 V19 A1 1 0 0 1 18.5 20 H14.5 V14.5 H9.5 V20 H5.5 A1 1 0 0 1 4.5 19 Z";
     out property <string> library: "M5 4.5 V19.5 M9.5 4.5 V19.5 M13.5 5.5 L18.5 19";
     out property <string> heart: "M12 19.5 C12 19.5 4 14.8 4 9.3 C4 6.9 5.9 5 8.2 5 C9.9 5 11.3 6 12 7.4 C12.7 6 14.1 5 15.8 5 C18.1 5 20 6.9 20 9.3 C20 14.8 12 19.5 12 19.5 Z";
+    // History: a clock turning back, a ring open at the top left, its arrow, and the hands.
+    out property <string> history: "M4.6 9 A8 8 0 1 1 4 12 M4.6 9 L4.4 5.5 M4.6 9 L8 8.6 M12 8 V12 L14.8 13.8";
     out property <string> plus: "M12 5.5 V18.5 M5.5 12 H18.5";
     // Dislike: a thumbs-down, the heart's neighbour wherever a song is rated ("Not for me" in
     // the bar, Now playing and the mini player; Dislike in the menus). Drawn in the heart's

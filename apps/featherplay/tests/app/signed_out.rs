@@ -9,9 +9,10 @@ use featherplay::app;
 use featherplay::controller::{AccountEvent, Action, UiEvent};
 use featherplay::router::Page;
 use featherplay::snapshot::Scene;
-use featherplay::ui::{Player, PlaylistData, Toast};
+use featherplay::ui::{Player, PlaylistData, Theme, Toast};
 use i_slint_core::accessibility::AccessibleStringProperty;
 use i_slint_core::item_tree::ItemRc;
+use i_slint_core::lengths::LogicalRect;
 use i_slint_core::window::WindowInner;
 use slint::{ComponentHandle, Model};
 
@@ -29,6 +30,33 @@ fn shown(scene: &Scene, label: &str) -> bool {
         }
     });
     found.is_some()
+}
+
+/// Where the shown elements saying `label` are, in window coordinates.
+fn rects(scene: &Scene, label: &str) -> Vec<LogicalRect> {
+    let root = ItemRc::new_root(WindowInner::from_pub(scene.ui.window()).component());
+    let mut found = Vec::new();
+    root.visit_descendants(|item| {
+        if item.is_visible()
+            && item
+                .accessible_string_property(AccessibleStringProperty::Label)
+                .is_some_and(|l| l == label)
+        {
+            let g = item.geometry();
+            found.push(LogicalRect::new(item.map_to_window(g.origin), g.size));
+        }
+        ControlFlow::<()>::Continue(())
+    });
+    found
+}
+
+/// The top of the topmost shown element saying `label`.
+fn top(scene: &Scene, label: &str) -> f32 {
+    rects(scene, label)
+        .iter()
+        .map(|r| r.origin.y)
+        .min_by(f32::total_cmp)
+        .unwrap_or_else(|| panic!("nothing shown says {label:?}"))
 }
 
 fn signed_out_on_home() -> Scene {
@@ -97,4 +125,45 @@ fn a_session_that_ended_goes_to_sign_in() {
     scene.settle();
 
     assert_eq!(scene.ctx.current_page(), Page::SignIn);
+}
+
+#[test]
+fn signed_out_library_and_history_ask_at_the_same_height() {
+    let scene = signed_out_on_home();
+    scene.open("library").expect("library");
+    scene.settle();
+    let library = top(&scene, "Sign in to see your library");
+
+    scene.open("history").expect("history");
+    scene.settle();
+    let history = top(&scene, "Sign in to see your history");
+
+    assert_eq!(library, history, "the gates sit at different heights");
+}
+
+#[test]
+fn signed_out_liked_songs_has_no_play_or_shuffle() {
+    let scene = signed_out_on_home();
+    scene.open("liked").expect("liked songs");
+    scene.settle();
+    // The header is there (its title right of the sidebar's entry), and the gate under it.
+    let sidebar = scene.ui.global::<Theme>().get_sidebar_w();
+    assert!(
+        rects(&scene, "Liked songs")
+            .iter()
+            .any(|r| r.origin.x > sidebar),
+        "no header"
+    );
+    assert!(shown(&scene, "Sign in to see your liked songs"));
+
+    // The bar at the bottom has a Shuffle of its own; the header's would be above it.
+    let bar = top(&scene, "Previous");
+    for label in ["Play", "Shuffle"] {
+        assert!(
+            rects(&scene, label)
+                .iter()
+                .all(|r| r.origin.y >= bar - 24.0),
+            "the header shows {label}"
+        );
+    }
 }

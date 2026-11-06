@@ -10,7 +10,7 @@ import { TrackRow } from "../parts.slint";
 import { SongMenu } from "../song_menu.slint";
 import { Nav, PageKind } from "../nav.slint";
 import { SidebarData } from "../sidebar.slint";
-import { CollectionHeader, SongListRow, SkeletonCollection, SkeletonList, ErrorState, EmptyState, SignInPrompt, FadeIn, TopScrim } from "content.slint";
+import { CollectionHeader, SongListRow, SkeletonCollection, SkeletonList, ErrorState, EmptyState, AccountGate, FadeIn, TopScrim } from "content.slint";
 
 export global PlaylistData {
     in property <bool> loading;
@@ -50,6 +50,8 @@ component Header inherits CollectionHeader {
     title: PlaylistData.title;
     meta: PlaylistData.meta;
     enabled: PlaylistData.tracks.length > 0;
+    // Signed out, Liked songs has nothing to play: no Play or Shuffle, rather than greyed ones.
+    actions: !(PlaylistData.liked-songs && SidebarData.signed-out);
     primary-clicked => { PlaylistData.play(0); }
     secondary-clicked => { PlaylistData.shuffle(); }
 }
@@ -79,13 +81,15 @@ export component PlaylistPage inherits Rectangle {
             y: 0;
             width: root.width;
         }
-        if root.sign-in: SignInPrompt {
+        // The header's tile is the heart already, so the gate has none of its own.
+        if root.sign-in: AccountGate {
             x: Theme.page-pad;
             y: root.header-h;
-            width: min(480px, root.width - 2 * Theme.page-pad);
-            glyph: Icons.heart;
+            width: min(460px, root.width - 2 * Theme.page-pad);
+            glyph: "";
+            explore: false;
             title: @tr("Sign in to see your liked songs");
-            line: @tr("Songs you like are kept in your account, so they follow you to every device.");
+            line: @tr("Your account keeps the songs you like, on every device.");
         }
         if PlaylistData.error != "" && !root.sign-in: ErrorState {
             x: Theme.page-pad;

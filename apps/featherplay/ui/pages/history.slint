@@ -9,7 +9,7 @@ import { TrackRow, PageTitle, Display } from "../parts.slint";
 import { Nav, PageKind } from "../nav.slint";
 import { SongMenu } from "../song_menu.slint";
 import { SidebarData } from "../sidebar.slint";
-import { SongListRow, SkeletonList, ErrorState, EmptyState, SignInPrompt, FadeIn } from "content.slint";
+import { SongListRow, SkeletonList, ErrorState, EmptyState, AccountGate, FadeIn } from "content.slint";
 
 export global HistoryData {
     in property <bool> loading;
@@ -37,22 +37,22 @@ export component HistoryPage inherits Rectangle {
         width: parent.width - 2 * root.pad;
         text: @tr("History");
     }
+    if !root.account: FadeIn {
+        AccountGate {
+            x: root.pad;
+            y: Theme.gate-y;
+            width: min(460px, parent.width - 2 * root.pad);
+            glyph: Icons.history;
+            title: @tr("Sign in to see your history");
+            line: @tr("Your account keeps the songs you play, on every device.");
+        }
+    }
     Rectangle {
         x: 0;
         y: root.list-y;
         width: parent.width;
         height: parent.height - self.y;
         clip: true;
-        if !root.account: FadeIn {
-            SignInPrompt {
-                x: root.pad;
-                y: Theme.s5;
-                width: min(480px, parent.width - 2 * root.pad);
-                glyph: Icons.note;
-                title: @tr("Sign in to see your history");
-                line: @tr("Your account keeps the songs you play, on every device.");
-            }
-        }
         if root.account && HistoryData.loading && HistoryData.tracks.length == 0: SkeletonList {
             top: root.day-h;
         }
@@ -68,7 +68,7 @@ export component HistoryPage inherits Rectangle {
                 x: root.pad;
                 y: Theme.s5;
                 width: min(480px, parent.width - 2 * root.pad);
-                glyph: Icons.note;
+                glyph: Icons.history;
                 title: @tr("Songs you play show up here");
                 line: @tr("Plays on your other devices count too.");
                 action: @tr("Go to Explore");

@@ -8,7 +8,7 @@ import { TrackRow, CardItem, PageTitle } from "../parts.slint";
 import { Nav, PageKind } from "../nav.slint";
 import { SongMenu } from "../song_menu.slint";
 import { SidebarData } from "../sidebar.slint";
-import { SongListRow, CardGrid, Chips, SkeletonList, SkeletonGrid, ErrorState, EmptyState, SignInPrompt, FadeIn, Open } from "content.slint";
+import { SongListRow, CardGrid, Chips, SkeletonList, SkeletonGrid, ErrorState, EmptyState, AccountGate, FadeIn, Open } from "content.slint";
 
 export global LibraryData {
     in property <bool> loading;
@@ -49,22 +49,23 @@ export component LibraryPage inherits Rectangle {
         active: LibraryData.tab;
         selected(i) => { Nav.open-library(i); }
     }
+    // Signed out there are no chips, so the gate keeps History's height, not the list's.
+    if !root.account: FadeIn {
+        AccountGate {
+            x: root.pad;
+            y: Theme.gate-y;
+            width: min(460px, parent.width - 2 * root.pad);
+            glyph: Icons.library;
+            title: @tr("Sign in to see your library");
+            line: @tr("Your playlists, saved albums and artists come with your account. Search, Explore and radio work without one.");
+        }
+    }
     Rectangle {
         x: 0;
         y: root.list-y;
         width: parent.width;
         height: parent.height - self.y;
         clip: true;
-        if !root.account: FadeIn {
-            SignInPrompt {
-                x: root.pad;
-                y: Theme.s5;
-                width: min(480px, parent.width - 2 * root.pad);
-                glyph: Icons.library;
-                title: @tr("Sign in to see your library");
-                line: @tr("Your playlists, saved albums, artists and liked songs come with your account. Everything else works without one.");
-            }
-        }
         // Only with nothing to show: a list from the cache stays while it refreshes.
         if root.account && LibraryData.loading && LibraryData.tab == 0 && LibraryData.liked.length == 0: SkeletonList {
             top: Theme.s4;

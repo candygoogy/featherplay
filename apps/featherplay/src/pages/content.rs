@@ -291,7 +291,7 @@ fn seed() -> u64 {
 
 /// What a page says when its data didn't load, under its "This didn't load" title (the page
 /// adds Try again). The details go to the log. Pages that belong to the account don't load
-/// signed out: they ask to sign in instead (`SignInPrompt`).
+/// signed out: they ask to sign in instead (`AccountGate`).
 pub fn error_text(what: &str, e: &ApiError) -> String {
     log!("{what}: {e}");
     match e {

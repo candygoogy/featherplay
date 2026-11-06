@@ -424,7 +424,7 @@ export component FadeIn inherits Rectangle {
 }
 
 // A page that didn't load: a glyph, what happened, and a way on: trying again. Signed out
-// too, as the catalogue loads without an account; what needs one shows `SignInPrompt`.
+// too, as the catalogue loads without an account; what needs one shows `AccountGate`.
 export component ErrorState inherits Rectangle {
     in property <string> message;
     callback retry();
@@ -505,44 +505,104 @@ export component EmptyState inherits Rectangle {
     }
 }
 
-// Signed out, in place of what belongs to an account (Library, Liked songs, History): what
-// it is and a way to sign in. Calm, as an empty page is: nothing went wrong.
-export component SignInPrompt inherits Rectangle {
-    in property <string> glyph: Icons.person;
+// A faint, still row of what a gated page will list: a cover and two lines, at `fade` of
+// the skeleton's ink (through the colours, not `opacity`, which would draw it in a layer).
+component GhostRow inherits Rectangle {
+    in property <length> title-w;
+    in property <length> line-w;
+    in property <float> fade: 1.0;
+    property <color> ink: Theme.skeleton.transparentize(1 - root.fade);
+    height: Theme.row-h;
+    Rectangle {
+        x: 0;
+        y: (parent.height - self.height) / 2;
+        width: Theme.row-cover;
+        height: Theme.row-cover;
+        border-radius: Theme.r-s;
+        background: root.ink;
+    }
+    Rectangle {
+        x: Theme.row-cover + Theme.s3;
+        y: 14px;
+        width: root.title-w;
+        height: 10px;
+        border-radius: 5px;
+        background: root.ink;
+    }
+    Rectangle {
+        x: Theme.row-cover + Theme.s3;
+        y: 32px;
+        width: root.line-w;
+        height: 8px;
+        border-radius: 4px;
+        background: Theme.skeleton.transparentize(1 - 0.6 * root.fade);
+    }
+}
+
+// Signed out, in place of what belongs to an account (Library, History, Liked songs): one
+// gate, at `Theme.gate-y` under the page title on every page. A 56 px tile with the page's
+// own icon (the sidebar's), a title, at most two lines, Sign in and a way on that works
+// signed out. Liked songs' header already shows its heart, so it drops the tile (`glyph`
+// ""). Under it, three faint rows of what will be there fade out: still, as nothing is
+// loading (no sweep, no timer). Calm, as an empty page is: nothing went wrong.
+export component AccountGate inherits Rectangle {
+    in property <string> glyph;
     in property <string> title;
     in property <string> line;
+    // The second action, "Go to Explore".
+    in property <bool> explore: true;
+    in property <bool> ghost: true;
     height: lay.preferred-height;
     lay := VerticalLayout {
         alignment: start;
-        spacing: Theme.s2;
-        Icon {
-            width: 40px;
-            height: 40px;
-            commands: root.glyph;
-            stroke: Theme.text3;
-            stroke-width: 1.4px;
+        if root.glyph != "": HorizontalLayout {
+            alignment: start;
+            Rectangle {
+                width: 56px;
+                height: 56px;
+                border-radius: Theme.r-l;
+                background: Theme.panel;
+                border-width: 1px;
+                border-color: Theme.card-edge;
+                Icon {
+                    width: 26px;
+                    height: 26px;
+                    commands: root.glyph;
+                    stroke: Theme.text2;
+                }
+            }
         }
-        Rectangle { height: 4px; }
-        Body {
+        if root.glyph != "": Rectangle { height: Theme.s4; }
+        Display {
             text: root.title;
-            font-size: Theme.t-body-l;
-            font-weight: 600;
-            color: Theme.text1;
+            font-size: Theme.t-display-xs;
+            wrap: word-wrap;
         }
+        Rectangle { height: Theme.s2; }
         Body {
             text: root.line;
             color: Theme.text2;
             wrap: word-wrap;
         }
-        Rectangle { height: Theme.s2; }
+        Rectangle { height: Theme.s5; }
         HorizontalLayout {
             alignment: start;
+            spacing: Theme.s2;
             Pill {
                 label: @tr("Sign in");
                 solid: true;
                 clicked => { Nav.go(PageKind.sign-in); }
             }
+            if root.explore: Pill {
+                label: @tr("Go to Explore");
+                clicked => { Nav.go(PageKind.explore); }
+            }
         }
+        if root.ghost: Rectangle { height: Theme.s6; }
+        // Each row a step fainter, down into the ground.
+        if root.ghost: GhostRow { title-w: 220px; line-w: 140px; fade: 0.85; }
+        if root.ghost: GhostRow { title-w: 180px; line-w: 140px; fade: 0.5; }
+        if root.ghost: GhostRow { title-w: 250px; line-w: 100px; fade: 0.3; }
     }
 }
 
@@ -782,6 +842,9 @@ export component CollectionHeader inherits Rectangle {
     in property <string> secondary: @tr("Shuffle");
     in property <string> secondary-icon: Icons.shuffle;
     in property <bool> enabled: true;
+    // The buttons. Without them (Liked songs signed out: nothing to play) the lines above
+    // stack down to the cover's bottom edge in their place.
+    in property <bool> actions: true;
     // A ⋯ after the buttons (the album's menu), and whether it can be used now.
     in property <bool> more: false;
     in property <bool> more-enabled: true;
@@ -804,7 +867,7 @@ export component CollectionHeader inherits Rectangle {
     property <length> bottom: root.top + root.cover-size;
     // From the bottom up: the buttons, a 24 px gap, the meta, the byline.
     property <length> buttons-y: root.bottom - 40px;
-    property <length> meta-y: root.buttons-y - Theme.s5 - 20px;
+    property <length> meta-y: root.actions ? root.buttons-y - Theme.s5 - 20px : root.bottom - (root.meta != "" ? 20px : 0px);
     property <length> byline-y: root.meta-y - (root.byline != "" ? 26px : 0px);
     // A long title wraps to a second line when there's room above it for the kind line.
     property <length> line-h: title.font-metrics.ascent - title.font-metrics.descent;
@@ -918,14 +981,14 @@ export component CollectionHeader inherits Rectangle {
         height: 40px;
         spacing: Theme.s2;
         alignment: start;
-        Pill {
+        if root.actions: Pill {
             label: root.primary;
             icon: Icons.play;
             solid: true;
             enabled: root.enabled;
             clicked => { root.primary-clicked(); }
         }
-        if root.secondary != "": Pill {
+        if root.actions && root.secondary != "": Pill {
             label: root.secondary;
             icon: root.secondary-icon;
             icon-filled: false;
@@ -933,8 +996,8 @@ export component CollectionHeader inherits Rectangle {
             clicked => { root.secondary-clicked(); }
         }
         more-btn := IconButton {
-            visible: root.more;
-            width: root.more ? 40px : 0px;
+            visible: root.more && root.actions;
+            width: self.visible ? 40px : 0px;
             height: 40px;
             icon: Icons.more;
             label: @tr("More");
