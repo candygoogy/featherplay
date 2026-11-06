@@ -55,8 +55,16 @@ impl Heads {
 }
 
 /// Fetches the head of `url` in the background, once: a URL already cached or on its way
-/// is left alone. A failure (an expired URL, no network) just leaves nothing cached.
-pub(crate) fn prefetch(cache: &HeadCache, rt: &Handle, client: &reqwest::Client, url: String) {
+/// is left alone. A failure (no network, a server that ignores `Range`) just leaves nothing
+/// cached; a refusal (HTTP 403 on the first byte) also calls `refused`, so the app can
+/// resolve the stream again before it's played.
+pub(crate) fn prefetch(
+    cache: &HeadCache,
+    rt: &Handle,
+    client: &reqwest::Client,
+    url: String,
+    refused: impl FnOnce(String) + Send + 'static,
+) {
     {
         let mut c = cache.lock_or_recover();
         if c.has(&url) {
@@ -69,19 +77,42 @@ pub(crate) fn prefetch(cache: &HeadCache, rt: &Handle, client: &reqwest::Client,
         let head = fetch(&client, &url).await;
         let mut c = cache.lock_or_recover();
         match head {
-            Some(h) => c.insert(url, h),
-            None => c.pending.retain(|u| *u != url),
+            Ok(h) => c.insert(url, h),
+            Err(miss) => {
+                c.pending.retain(|u| *u != url);
+                drop(c);
+                if miss == Miss::Refused {
+                    refused(url);
+                }
+            }
         }
     });
 }
 
-async fn fetch(client: &reqwest::Client, url: &str) -> Option<Head> {
-    let r = get_range(client, url, 0, HEAD_BYTES).await.ok()?;
+/// Why a head isn't there.
+#[derive(Debug, PartialEq, Eq)]
+enum Miss {
+    /// HTTP 403 on the first byte.
+    Refused,
+    Other,
+}
+
+async fn fetch(client: &reqwest::Client, url: &str) -> Result<Head, Miss> {
+    let r = get_range(client, url, 0, HEAD_BYTES).await.map_err(|e| {
+        if e.starts_with("HTTP 403") {
+            Miss::Refused
+        } else {
+            Miss::Other
+        }
+    })?;
     if r.status() != StatusCode::PARTIAL_CONTENT {
-        return None; // a server that ignores Range would send the whole file
+        return Err(Miss::Other); // a server that ignores Range would send the whole file
     }
-    let len = total_from_content_range(&r)?;
-    let bytes = r.bytes().await.ok()?;
-    let want = HEAD_BYTES.min(len);
-    (bytes.len() as u64 == want).then_some(Head { bytes, len })
+    let len = total_from_content_range(&r).ok_or(Miss::Other)?;
+    let bytes = r.bytes().await.map_err(|_| Miss::Other)?;
+    if bytes.len() as u64 == HEAD_BYTES.min(len) {
+        Ok(Head { bytes, len })
+    } else {
+        Err(Miss::Other)
+    }
 }

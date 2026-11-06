@@ -71,8 +71,8 @@ pub enum AudioEvent {
     DeviceLost,
     NoDevice,
     Error(String),
-    /// The URL of a stream `preload` was given was refused (HTTP 403 on its first
-    /// request). Other preload failures stay quiet: a later `load` of the URL tries again
-    /// and reports.
+    /// The URL of a stream `preload` or `prefetch` was given was refused (HTTP 403 on its
+    /// first request). Other preload failures stay quiet: a later `load` of the URL tries
+    /// again and reports.
     PreloadRefused(String),
 }

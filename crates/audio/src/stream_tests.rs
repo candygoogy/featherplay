@@ -307,7 +307,13 @@ fn a_fetched_head_starts_without_the_network() {
     // Every request takes 2 s to answer.
     let server = serve(data, 1 << 20, Duration::from_secs(2));
     let env = env();
-    head::prefetch(&env.heads, env.rt.handle(), &env.client, server.url.clone());
+    head::prefetch(
+        &env.heads,
+        env.rt.handle(),
+        &env.client,
+        server.url.clone(),
+        |_| {},
+    );
     let deadline = Instant::now() + Duration::from_secs(10);
     while env.heads.lock().unwrap().get(&server.url).is_none() {
         assert!(Instant::now() < deadline, "the head never arrived");
@@ -665,6 +671,20 @@ fn engine_reports_a_refused_preload() {
     let events = engine.events();
     let url = format!("{}?c=WEB_EMBEDDED_PLAYER", server.url);
     engine.preload(src(&url));
+    let event = events.recv_timeout(Duration::from_secs(3));
+    assert_eq!(event, Ok(crate::AudioEvent::PreloadRefused(url)));
+}
+
+/// A track resolved ahead gets its head fetched: that fetch is the probe that finds a
+/// refused URL before the track is played.
+#[test]
+fn engine_reports_a_refused_prefetch() {
+    let server = serve(fixture("tone-10s-frag.m4a"), 1 << 20, Duration::ZERO);
+    server.log.refuse.store(u32::MAX, Ordering::SeqCst);
+    let engine = crate::AudioEngine::new_null(engine_tmp());
+    let events = engine.events();
+    let url = format!("{}?c=WEB_EMBEDDED_PLAYER", server.url);
+    engine.prefetch(&src(&url));
     let event = events.recv_timeout(Duration::from_secs(3));
     assert_eq!(event, Ok(crate::AudioEvent::PreloadRefused(url)));
 }

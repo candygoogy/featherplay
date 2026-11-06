@@ -62,6 +62,8 @@ pub(crate) enum Msg {
         voice: u64,
         msg: String,
     },
+    /// From a head prefetch (`head::prefetch`): its URL was refused.
+    HeadRefused(String),
     // From the audio thread.
     Started {
         voice: u64,
@@ -205,7 +207,8 @@ impl AudioEngine {
 
     /// Fetches the first 256 KB of `src` into memory, so a later `load()` or `preload()`
     /// of the same URL starts without waiting for the network. Cheap to call again: a URL
-    /// already fetched or on its way is left alone. The 8 newest are kept.
+    /// already fetched or on its way is left alone. The 8 newest are kept. A refused URL
+    /// is told (`AudioEvent::PreloadRefused`).
     pub fn prefetch(&self, src: &StreamSource) {
         if src.url.starts_with("https://") || src.url.starts_with("http://") {
             self.send(Msg::Prefetch(src.url.clone()));
@@ -445,9 +448,16 @@ impl Engine {
                     .flatten()
                     .any(|v| v.shared.url == url);
                 if !playing {
-                    head::prefetch(&self.heads, self.rt.handle(), &self.client, url);
+                    let tx = self.tx.clone();
+                    let refused = move |url| {
+                        // Fails only if the engine thread is gone.
+                        let _ = tx.send(Msg::HeadRefused(url));
+                    };
+                    head::prefetch(&self.heads, self.rt.handle(), &self.client, url, refused);
                 }
             }
+            // Told like a refused preload: the app resolves the stream again.
+            Msg::HeadRefused(url) => self.emit(AudioEvent::PreloadRefused(url)),
             Msg::Seek { to, seq } => match &mut self.current {
                 Some(v) => {
                     // This seek replaces an unfinished load seek; attach after it instead.

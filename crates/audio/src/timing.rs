@@ -348,7 +348,13 @@ fn timing() {
         // The same stream with its head fetched ahead, as after a pre-resolve.
         let heads = HeadCache::default();
         let t = Instant::now();
-        head::prefetch(&heads, rt.handle(), &reqwest::Client::new(), r.url.clone());
+        head::prefetch(
+            &heads,
+            rt.handle(),
+            &reqwest::Client::new(),
+            r.url.clone(),
+            |_| {},
+        );
         while heads.lock().unwrap().get(&r.url).is_none() {
             assert!(t.elapsed() < Duration::from_secs(10), "no head");
             std::thread::sleep(Duration::from_millis(5));
