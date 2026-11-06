@@ -196,7 +196,7 @@ export component SignInPage inherits Rectangle {
                     }
                 }
                 Body {
-                    text: SignInData.edge-blocked ? @tr("A policy on this PC turns off the browser connection featherplay needs. Use Sign in instead.") : @tr("Opens Microsoft Edge with a temporary profile that's deleted afterwards. featherplay keeps only the YouTube Music session from it.");
+                    text: SignInData.edge-blocked ? @tr("Edge's RemoteDebuggingAllowed policy is off on this PC (an administrator or a tweaking tool set it), so featherplay can't read the sign-in. Use Sign in instead.") : @tr("Opens Microsoft Edge with a temporary profile that's deleted afterwards. featherplay keeps only the YouTube Music session from it.");
                     font-size: Theme.t-meta;
                     color: Theme.text3;
                     overflow: clip;

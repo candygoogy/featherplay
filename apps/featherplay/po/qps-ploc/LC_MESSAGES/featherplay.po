@@ -2097,9 +2097,10 @@ msgstr "[Sign in with Microsoft Edge]"
 
 #: ui/pages/sign_in.slint:199
 msgid ""
-"A policy on this PC turns off the browser connection featherplay needs. Use "
-"Sign in instead."
-msgstr "[A policy on this PC turns off the browser connection featherplay needs. Use Sign in instead.]"
+"Edge's RemoteDebuggingAllowed policy is off on this PC (an administrator or "
+"a tweaking tool set it), so featherplay can't read the sign-in. Use Sign in "
+"instead."
+msgstr "[Edge's RemoteDebuggingAllowed policy is off on this PC (an administrator or a tweaking tool set it), so featherplay can't read the sign-in. Use Sign in instead.]"
 
 #: ui/pages/sign_in.slint:199
 msgid ""
