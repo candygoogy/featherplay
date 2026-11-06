@@ -74,9 +74,9 @@ msgstr "[Next]"
 
 #: ../../crates/integrations/src/tray.rs:273
 #: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:444
-#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:444 ui/mini_player.slint:131 ui/pages/lyrics.slint:71
-#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:444 ui/mini_player.slint:131 ui/pages/lyrics.slint:71 ui/pages/now_playing.slint:509
-#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:444 ui/mini_player.slint:131 ui/pages/lyrics.slint:71 ui/pages/now_playing.slint:509
+#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:444 ui/mini_player.slint:131 ui/pages/lyrics.slint:75
+#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:444 ui/mini_player.slint:131 ui/pages/lyrics.slint:75 ui/pages/now_playing.slint:671
+#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:444 ui/mini_player.slint:131 ui/pages/lyrics.slint:75 ui/pages/now_playing.slint:671
 msgid "Nothing playing"
 msgstr "[Nothing playing]"
 
@@ -93,7 +93,7 @@ msgid "paused at {}"
 msgstr "[paused at {}]"
 
 #: ../../crates/integrations/src/tray_menu.rs:49 ui/mini_player.slint:270
-#: ../../crates/integrations/src/tray_menu.rs:49 ui/mini_player.slint:270 ui/not_for_me.slint:101
+#: ../../crates/integrations/src/tray_menu.rs:49 ui/mini_player.slint:270 ui/not_for_me.slint:106
 msgid "Not for me"
 msgstr "[Not for me]"
 
@@ -107,8 +107,8 @@ msgstr "[Quit]"
 
 #: ../../crates/integrations/src/tray_menu.rs:242
 #: ../../crates/integrations/src/tray_menu.rs:242 src/album_actions.rs:275
-#: ../../crates/integrations/src/tray_menu.rs:242 src/album_actions.rs:275 ui/not_for_me.slint:19 ui/pages/content.slint:677
-#: ../../crates/integrations/src/tray_menu.rs:242 src/album_actions.rs:275 ui/not_for_me.slint:19 ui/pages/content.slint:677 ui/song_menu.slint:280
+#: ../../crates/integrations/src/tray_menu.rs:242 src/album_actions.rs:275 ui/not_for_me.slint:20 ui/pages/content.slint:677
+#: ../../crates/integrations/src/tray_menu.rs:242 src/album_actions.rs:275 ui/not_for_me.slint:20 ui/pages/content.slint:677 ui/song_menu.slint:280
 msgid "Like"
 msgstr "[Like]"
 
@@ -349,7 +349,7 @@ msgstr "[Couldn't reach Last.fm. Check the connection and try again.]"
 msgid "Last.fm said: {0} ({1})"
 msgstr "[Last.fm said: {0} ({1})]"
 
-#: src/controller/queue.rs:217
+#: src/controller/queue.rs:249
 msgid "Autoplay"
 msgstr "[Autoplay]"
 
@@ -357,11 +357,11 @@ msgstr "[Autoplay]"
 msgid "Windows default"
 msgstr "[Windows default]"
 
-#: src/lyrics.rs:46
+#: src/lyrics.rs:49
 msgid "Lyrics from LRCLIB"
 msgstr "[Lyrics from LRCLIB]"
 
-#: src/lyrics.rs:860
+#: src/lyrics.rs:889
 msgid "Source: LyricFind"
 msgstr "[Source: LyricFind]"
 
@@ -413,50 +413,50 @@ msgstr "[Album]"
 msgid "Artist"
 msgstr "[Artist]"
 
-#: src/pages/content.rs:228
+#: src/pages/content.rs:229
 msgid "{n} song"
 msgid_plural "{n} songs"
 msgstr[0] "[{n} song]"
 msgstr[1] "[{n} songs]"
 
-#: src/pages/content.rs:240
+#: src/pages/content.rs:241
 msgid "{n} hour"
 msgid_plural "{n} hours"
 msgstr[0] "[{n} hour]"
 msgstr[1] "[{n} hours]"
 
-#: src/pages/content.rs:241
+#: src/pages/content.rs:242
 msgid "{n} minute"
 msgid_plural "{n} minutes"
 msgstr[0] "[{n} minute]"
 msgstr[1] "[{n} minutes]"
 
-#: src/pages/content.rs:298
+#: src/pages/content.rs:299
 msgid "Your session has ended. Sign in to see this."
 msgstr "[Your session has ended. Sign in to see this.]"
 
-#: src/pages/content.rs:299
+#: src/pages/content.rs:300
 msgid "Sign in to see this."
 msgstr "[Sign in to see this.]"
 
-#: src/pages/content.rs:301
+#: src/pages/content.rs:302
 msgid "Can't reach the music service. Check the connection, then try again."
 msgstr "[Can't reach the music service. Check the connection, then try again.]"
 
-#: src/pages/content.rs:303
+#: src/pages/content.rs:304
 msgid "This isn't available."
 msgstr "[This isn't available.]"
 
-#: src/pages/content.rs:304
+#: src/pages/content.rs:305
 msgid "The music service sent something unexpected."
 msgstr "[The music service sent something unexpected.]"
 
-#: src/pages/history.rs:89 ui/pages/history.slint:38 ui/sidebar.slint:206
+#: src/pages/history.rs:90 ui/pages/history.slint:38 ui/sidebar.slint:206
 msgid "History"
 msgstr "[History]"
 
-#: src/pages/home.rs:621 src/pages/playlist.rs:24 ui/sidebar.slint:226
-#: src/pages/home.rs:621 src/pages/playlist.rs:24 ui/sidebar.slint:226
+#: src/pages/home.rs:621 src/pages/playlist.rs:25 ui/sidebar.slint:226
+#: src/pages/home.rs:621 src/pages/playlist.rs:25 ui/sidebar.slint:226
 msgid "Liked songs"
 msgstr "[Liked songs]"
 
@@ -476,7 +476,7 @@ msgstr "[More from {}]"
 msgid "Couldn't load related tracks"
 msgstr "[Couldn't load related tracks]"
 
-#: src/pages/playlist.rs:73
+#: src/pages/playlist.rs:74
 msgid "Playlist"
 msgstr "[Playlist]"
 
@@ -596,7 +596,7 @@ msgstr "[The sign-in window closed before you signed in.]"
 msgid "The sign-in window didn't work: {}"
 msgstr "[The sign-in window didn't work: {}]"
 
-#: src/pages/sign_in.rs:213 src/snapshot.rs:594
+#: src/pages/sign_in.rs:213 src/snapshot.rs:607
 msgid ""
 "Finish signing in in Microsoft Edge. featherplay closes it once you're in."
 msgstr "[Finish signing in in Microsoft Edge. featherplay closes it once you're in.]"
@@ -671,75 +671,75 @@ msgstr "[{} The playlist is gone.]"
 msgid "{} The music service said no."
 msgstr "[{} The music service said no.]"
 
-#: src/playlist_menu.rs:117
+#: src/playlist_menu.rs:113
 msgid "Pinned {} to the top"
 msgstr "[Pinned {} to the top]"
 
-#: src/playlist_menu.rs:119
+#: src/playlist_menu.rs:115
 msgid "Unpinned {}"
 msgstr "[Unpinned {}]"
 
-#: src/playlist_menu.rs:138 src/song_menu.rs:88
+#: src/playlist_menu.rs:134 src/song_menu.rs:88
 msgid "Playing next: {}"
 msgstr "[Playing next: {}]"
 
-#: src/playlist_menu.rs:145 src/song_menu.rs:96
+#: src/playlist_menu.rs:141 src/song_menu.rs:96
 msgid "Added to queue: {}"
 msgstr "[Added to queue: {}]"
 
-#: src/playlist_menu.rs:152
+#: src/playlist_menu.rs:148
 msgid "Link copied"
 msgstr "[Link copied]"
 
-#: src/playlist_menu.rs:194
+#: src/playlist_menu.rs:205
 msgid "Couldn't load the playlist."
 msgstr "[Couldn't load the playlist.]"
 
-#: src/playlist_menu.rs:195
+#: src/playlist_menu.rs:206
 msgid "Couldn't load the album."
 msgstr "[Couldn't load the album.]"
 
-#: src/playlist_menu.rs:196
+#: src/playlist_menu.rs:207
 msgid "Couldn't load the artist."
 msgstr "[Couldn't load the artist.]"
 
-#: src/playlist_menu.rs:211
+#: src/playlist_menu.rs:222
 msgid "{} has no songs yet"
 msgstr "[{} has no songs yet]"
 
-#: src/playlist_menu.rs:243
+#: src/playlist_menu.rs:254
 msgid "This playlist has no radio"
 msgstr "[This playlist has no radio]"
 
-#: src/playlist_menu.rs:244
+#: src/playlist_menu.rs:255
 msgid "Couldn't start the radio."
 msgstr "[Couldn't start the radio.]"
 
-#: src/playlist_menu.rs:256
+#: src/playlist_menu.rs:267
 msgid "Enter a name for the playlist."
 msgstr "[Enter a name for the playlist.]"
 
-#: src/playlist_menu.rs:270
+#: src/playlist_menu.rs:281
 msgid "Renamed to {}"
 msgstr "[Renamed to {}]"
 
-#: src/playlist_menu.rs:273
+#: src/playlist_menu.rs:284
 msgid "Couldn't rename {}."
 msgstr "[Couldn't rename {}.]"
 
-#: src/playlist_menu.rs:292
+#: src/playlist_menu.rs:303
 msgid "Deleted {}"
 msgstr "[Deleted {}]"
 
-#: src/playlist_menu.rs:296
+#: src/playlist_menu.rs:307
 msgid "Couldn't delete {}."
 msgstr "[Couldn't delete {}.]"
 
-#: src/playlist_menu.rs:314
+#: src/playlist_menu.rs:325
 msgid "Removed {} from your library"
 msgstr "[Removed {} from your library]"
 
-#: src/playlist_menu.rs:318
+#: src/playlist_menu.rs:329
 msgid "Couldn't remove {}."
 msgstr "[Couldn't remove {}.]"
 
@@ -868,9 +868,9 @@ msgid "{} %"
 msgstr "[{} %]"
 
 #: ui/bottom_bar.slint:303 ui/bottom_bar.slint:335
-#: ui/bottom_bar.slint:303 ui/bottom_bar.slint:335 ui/pages/now_playing.slint:216
-#: ui/bottom_bar.slint:303 ui/bottom_bar.slint:335 ui/pages/now_playing.slint:216 ui/pages/settings.slint:1315
-#: ui/bottom_bar.slint:303 ui/bottom_bar.slint:335 ui/pages/now_playing.slint:216 ui/pages/settings.slint:1315
+#: ui/bottom_bar.slint:303 ui/bottom_bar.slint:335 ui/pages/now_playing.slint:219
+#: ui/bottom_bar.slint:303 ui/bottom_bar.slint:335 ui/pages/now_playing.slint:219 ui/pages/settings.slint:1315
+#: ui/bottom_bar.slint:303 ui/bottom_bar.slint:335 ui/pages/now_playing.slint:219 ui/pages/settings.slint:1315
 msgid "Lyrics"
 msgstr "[Lyrics]"
 
@@ -924,7 +924,7 @@ msgstr "[Mute]"
 msgid "Unmute"
 msgstr "[Unmute]"
 
-#: ui/bottom_bar.slint:632 ui/pages/now_playing.slint:110
+#: ui/bottom_bar.slint:632 ui/pages/now_playing.slint:112
 msgid "Up next"
 msgstr "[Up next]"
 
@@ -980,12 +980,12 @@ msgstr "[Open featherplay]"
 msgid "Close"
 msgstr "[Close]"
 
-#: ui/mini_player.slint:227 ui/not_for_me.slint:19 ui/pages/content.slint:677
-#: ui/mini_player.slint:227 ui/not_for_me.slint:19 ui/pages/content.slint:677 ui/song_menu.slint:280
+#: ui/mini_player.slint:227 ui/not_for_me.slint:20 ui/pages/content.slint:677
+#: ui/mini_player.slint:227 ui/not_for_me.slint:20 ui/pages/content.slint:677 ui/song_menu.slint:280
 msgid "Remove like"
 msgstr "[Remove like]"
 
-#: ui/mini_player.slint:271 ui/not_for_me.slint:70 ui/not_for_me.slint:107
+#: ui/mini_player.slint:271 ui/not_for_me.slint:75 ui/not_for_me.slint:112
 msgid "Skips the song and tells YouTube Music you dislike it"
 msgstr "[Skips the song and tells YouTube Music you dislike it]"
 
@@ -1092,7 +1092,7 @@ msgid "This didn’t load"
 msgstr "[This didn’t load]"
 
 #: ui/pages/content.slint:460 ui/pages/home.slint:773
-#: ui/pages/content.slint:460 ui/pages/home.slint:773 ui/pages/lyrics.slint:181
+#: ui/pages/content.slint:460 ui/pages/home.slint:773 ui/pages/lyrics.slint:185
 msgid "Try again"
 msgstr "[Try again]"
 
@@ -1293,49 +1293,57 @@ msgstr "[Find music on Home or with Search.]"
 msgid "Go to Home"
 msgstr "[Go to Home]"
 
-#: ui/pages/lyrics.slint:70
+#: ui/pages/lyrics.slint:74
 msgid "Lyrics are unavailable right now"
 msgstr "[Lyrics are unavailable right now]"
 
-#: ui/pages/lyrics.slint:70
+#: ui/pages/lyrics.slint:74
 msgid "Couldn't load lyrics"
 msgstr "[Couldn't load lyrics]"
 
-#: ui/pages/lyrics.slint:71
+#: ui/pages/lyrics.slint:75
 msgid "No lyrics for this song"
 msgstr "[No lyrics for this song]"
 
-#: ui/pages/lyrics.slint:118
+#: ui/pages/lyrics.slint:122
 msgid "Plays from this line"
 msgstr "[Plays from this line]"
 
-#: ui/pages/lyrics.slint:448
+#: ui/pages/lyrics.slint:452
 msgid "Synced lyrics are unavailable right now"
 msgstr "[Synced lyrics are unavailable right now]"
 
-#: ui/pages/lyrics.slint:448
+#: ui/pages/lyrics.slint:452
 msgid "Not synced to the song"
 msgstr "[Not synced to the song]"
 
-#: ui/pages/now_playing.slint:110
+#: ui/pages/now_playing.slint:112
 msgid "Related"
 msgstr "[Related]"
 
-#: ui/pages/now_playing.slint:137
+#: ui/pages/now_playing.slint:139
 msgid "Similar to {}"
 msgstr "[Similar to {}]"
 
-#: ui/pages/now_playing.slint:156
+#: ui/pages/now_playing.slint:158
 msgid "Nothing related found"
 msgstr "[Nothing related found]"
 
-#: ui/pages/now_playing.slint:408
-msgid "Back"
-msgstr "[Back]"
-
-#: ui/pages/now_playing.slint:580
+#: ui/pages/now_playing.slint:270
 msgid "Playing from {}"
 msgstr "[Playing from {}]"
+
+#: ui/pages/now_playing.slint:281 ui/queue_panel.slint:230
+msgid "Playing from"
+msgstr "[Playing from]"
+
+#: ui/pages/now_playing.slint:319
+msgid "Shows all the lyrics"
+msgstr "[Shows all the lyrics]"
+
+#: ui/pages/now_playing.slint:524
+msgid "Back"
+msgstr "[Back]"
 
 #: ui/pages/playlist.slint:91
 msgid "Sign in to see your liked songs"
@@ -1752,7 +1760,7 @@ msgid ""
 "Remove the track from your profile until the next one starts or you resume."
 msgstr "[Remove the track from your profile until the next one starts or you resume.]"
 
-#: ui/pages/settings.slint:1465 ui/queue_panel.slint:245
+#: ui/pages/settings.slint:1465 ui/queue_panel.slint:248
 msgid "Clear"
 msgstr "[Clear]"
 
@@ -2249,19 +2257,15 @@ msgstr "[It's removed from your library on every device. This can't be undone.]"
 msgid "Delete"
 msgstr "[Delete]"
 
-#: ui/queue_panel.slint:95
+#: ui/queue_panel.slint:98
 msgid "Autoplay: similar tracks"
 msgstr "[Autoplay: similar tracks]"
 
-#: ui/queue_panel.slint:181
+#: ui/queue_panel.slint:184
 msgid "Remove from queue"
 msgstr "[Remove from queue]"
 
-#: ui/queue_panel.slint:227
-msgid "Playing from"
-msgstr "[Playing from]"
-
-#: ui/queue_panel.slint:272
+#: ui/queue_panel.slint:275
 msgid "Nothing up next"
 msgstr "[Nothing up next]"
 

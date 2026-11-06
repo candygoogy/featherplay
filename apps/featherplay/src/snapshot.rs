@@ -25,7 +25,7 @@ use tokio::sync::mpsc;
 
 use crate::app::{self, Ctx};
 use crate::catalog::{Catalog, Source};
-use crate::controller::{Action, PlayerState, QueueInfo, UiEvent, playing_from};
+use crate::controller::{Action, PlayerState, PlayingFrom, QueueInfo, UiEvent, playing_from};
 use crate::covers::Covers;
 use crate::fixtures::Fixtures;
 use crate::pages::content;
@@ -73,9 +73,12 @@ pub const PAGES: &[&str] = &[
     "now-playing-scripts",
     // Now playing with the song menu open from its ⋯ button.
     "now-playing-menu",
-    // Now playing with a title too long for its line (it elides before the song's buttons),
-    // or with the song rated Dislike (the thumbs-down filled, there and in the bar).
+    // Now playing with a title too long for one line (it wraps to a second, then elides)
+    // and long credits (five artists, a soundtrack's album), beside the side panel or with
+    // it hidden; or with the song rated Dislike (the thumbs-down filled, there and in the
+    // bar).
     "now-playing-long",
+    "now-playing-long-side-hidden",
     "now-playing-disliked",
     // Now playing on the Lyrics tab: synced lines mid-song (placeholder lines; with
     // `--hold-loading`, still loading; with `--hold-error`, the lookup failed), plain
@@ -362,6 +365,14 @@ impl Scene {
         Ok(())
     }
 
+    /// The fixture radio's first track playing, the queue said to come `from` there.
+    pub fn play_from(&self, from: PlayingFrom) -> Result<(), String> {
+        let mut state = player_state(&self.fixtures, 0)?;
+        state.queue.playing_from = from;
+        app::on_event(UiEvent::Player(Box::new(state)));
+        Ok(())
+    }
+
     /// The fixture radio with its tracks retitled from `titles` (title, artist), the first
     /// one playing: the queue in other scripts.
     pub fn play_titled(&self, titles: &[(&str, &str)]) -> Result<(), String> {
@@ -478,6 +489,8 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
         scene.play_credited(o.track, LONG_TITLE, LONG_ARTISTS)?;
     } else if o.page == "settings-scripts" {
         scene.play_credited(o.track, SCRIPTS_LONG_TITLE, SCRIPTS_LONG_ARTISTS)?;
+    } else if o.page.starts_with("now-playing-long") {
+        scene.play_credited(o.track, NOW_PLAYING_LONG_TITLE, LONG_ARTISTS)?;
     } else if o.page.ends_with("-side-hidden") {
         scene.play_credited(o.track, SOUNDTRACK_TITLE, SOUNDTRACK_ARTISTS)?;
     } else {
@@ -695,10 +708,7 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
     if o.page == "mini-player-long" {
         player.set_title(LONG_TITLE.into());
     }
-    if o.page == "now-playing-long" {
-        player.set_title(NOW_PLAYING_LONG_TITLE.into());
-    }
-    if o.page.ends_with("-side-hidden") {
+    if o.page.starts_with("now-playing-long") || o.page.ends_with("-side-hidden") {
         player.set_album(SOUNDTRACK_ALBUM.into());
     }
     if o.page.ends_with("-disliked") {
@@ -887,6 +897,7 @@ fn page(name: &str, f: &Fixtures) -> Result<Page, String> {
         | "now-playing-scripts"
         | "now-playing-menu"
         | "now-playing-long"
+        | "now-playing-long-side-hidden"
         | "now-playing-disliked"
         | "now-playing-lyrics"
         | "now-playing-lyrics-plain"

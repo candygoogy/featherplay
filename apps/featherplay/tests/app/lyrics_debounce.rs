@@ -16,13 +16,12 @@ use slint::ComponentHandle;
 fn rapid_skips_look_up_only_the_track_that_stays() {
     let scene = Scene::new(1280, 800, true, true).expect("scene");
     scene.play(false).expect("player");
-    scene.open("now-playing").expect("now playing");
-    scene.ui.show().expect("show");
     let data = scene.ui.global::<LyricsData>();
 
-    // Opening the full view looks the song up at once.
+    // Opening Now playing (its lyric strip) looks the song up at once.
     let asked = lyrics::lookups();
-    data.set_full(true);
+    scene.open("now-playing").expect("now playing");
+    scene.ui.show().expect("show");
     scene.settle();
     assert_eq!(lyrics::lookups(), asked + 1);
     assert_eq!(data.get_state(), LyricsState::Synced);

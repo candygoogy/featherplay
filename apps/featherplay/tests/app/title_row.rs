@@ -1,8 +1,8 @@
 //! Now playing's title row, offscreen (no window is shown): "Not for me", like and the song
-//! menu after the title are the bar's buttons, one size and evenly spaced, centred on the
-//! title's line; a title too long for the line elides before them, so they stay on it and
-//! inside the stage, beside the Up next panel in a narrow window too. A song rated Dislike
-//! shows the thumbs-down filled.
+//! menu are 40 px targets, evenly spaced, pinned at the cover's right edge on the title's
+//! first line, so a title's length never moves them; a title too long for its line wraps to
+//! a second before them, and they stay inside the stage, beside the Up next panel in a
+//! narrow window too. A song rated Dislike shows the thumbs-down filled.
 
 use std::ops::ControlFlow;
 
@@ -58,7 +58,7 @@ fn stage_right(scene: &Scene, width: f32) -> f32 {
 }
 
 /// The title and its three buttons, left to right: in the stage, the topmost title (the
-/// bar's is at the bottom) and the buttons on its line (the bar has "Not for me" and like
+/// bar's is at the bottom) and the buttons beside it (the bar has "Not for me" and like
 /// too).
 fn row(scene: &Scene, right: f32) -> (LogicalRect, [LogicalRect; 3]) {
     let title = scene.ui.global::<Player>().get_title();
@@ -69,7 +69,7 @@ fn row(scene: &Scene, right: f32) -> (LogicalRect, [LogicalRect; 3]) {
     let on_line = |label: &str| {
         rects(scene, label, right)
             .into_iter()
-            .filter(|r| (centre_y(r) - centre_y(&title)).abs() < 24.0)
+            .filter(|r| centre_y(r) > title.origin.y && centre_y(r) < title.max_y())
             .min_by(|a, b| a.origin.x.total_cmp(&b.origin.x))
             .unwrap_or_else(|| panic!("no {label} button on the title's line"))
     };
@@ -79,25 +79,26 @@ fn row(scene: &Scene, right: f32) -> (LogicalRect, [LogicalRect; 3]) {
     )
 }
 
-/// Checks the row: one size, one gap, centred on the title's line, inside the cover's room.
+/// Checks the row: 40 px targets, one gap, top-aligned with the title (centred on its first
+/// line), clear of the title, inside the stage.
 fn check(scene: &Scene, width: f32) -> (LogicalRect, [LogicalRect; 3]) {
     let theme = scene.ui.global::<Theme>();
     let right = stage_right(scene, width);
     let (title, buttons) = row(scene, right);
+    let near = |a: f32, b: f32| (a - b).abs() < 0.01;
     for b in &buttons {
-        assert_eq!(
-            b.size, buttons[0].size,
-            "the buttons differ in size: {buttons:?}"
+        assert!(
+            near(b.size.width, 40.0) && near(b.size.height, 40.0),
+            "not 40 px targets: {buttons:?}"
         );
         assert!(
-            (centre_y(b) - centre_y(&title)).abs() < 0.5,
-            "a button isn't centred on the title's line: {b:?}, title {title:?}"
+            near(b.origin.y, buttons[0].origin.y),
+            "the buttons aren't on one line: {buttons:?}"
         );
     }
-    let near = |a: f32, b: f32| (a - b).abs() < 0.01;
     assert!(
-        near(buttons[0].size.width, 36.0),
-        "not the bar's 36 px buttons"
+        centre_y(&buttons[0]) > title.origin.y && centre_y(&buttons[0]) < title.origin.y + 48.0,
+        "the buttons aren't on the title's first line: {buttons:?}, title {title:?}"
     );
     let gaps = [
         buttons[1].origin.x - buttons[0].max_x(),
@@ -108,38 +109,34 @@ fn check(scene: &Scene, width: f32) -> (LogicalRect, [LogicalRect; 3]) {
         "uneven gaps between the buttons: {gaps:?}"
     );
     assert!(
-        near(buttons[0].origin.x - title.max_x(), theme.get_s3()),
-        "the gap after the title isn't `s3`: {title:?}, {buttons:?}"
+        buttons[0].origin.x - title.max_x() >= theme.get_s3() - 0.01,
+        "the title runs under the buttons: {title:?}, {buttons:?}"
     );
-    // The cover is centred in the stage with at least `s9` either side.
     assert!(
-        buttons[2].max_x() <= right - theme.get_s9(),
-        "the buttons run past the cover: {buttons:?}, the stage ends at {right}"
+        buttons[2].max_x() <= right - theme.get_s5(),
+        "the buttons run past the stage: {buttons:?}, the stage ends at {right}"
     );
     (title, buttons)
 }
 
 #[test]
-fn the_title_rows_buttons_match_and_stay_on_the_line() {
+fn the_title_rows_buttons_stay_put_whatever_the_title() {
     let scene = Scene::new(1280, 800, true, false).expect("scene");
     scene.play(false).expect("player");
     scene.open("now-playing").expect("now playing");
+    scene.ui.global::<Player>().set_title("Da Funk".into());
     scene.settle();
     let (short, at) = check(&scene, 1280.0);
 
-    // Too long for the line: the title elides before the buttons, which move out to the
-    // cover's right edge and no further.
+    // Too long for one line: the title wraps to a second; the buttons don't move.
     scene.ui.global::<Player>().set_title(LONG.into());
     scene.settle();
     let (long, moved) = check(&scene, 1280.0);
     assert!(
-        long.size.width > short.size.width,
-        "the long title didn't take the room"
+        long.size.height > short.size.height * 1.5,
+        "the long title didn't wrap: {long:?}, one line {short:?}"
     );
-    assert!(
-        moved[0].origin.x > at[0].origin.x,
-        "the buttons didn't follow the title"
-    );
+    assert_eq!(moved, at, "the buttons moved with the title");
     assert_eq!(
         long.origin.y, short.origin.y,
         "the row moved for a long title"

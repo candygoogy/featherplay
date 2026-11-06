@@ -62,6 +62,7 @@ mod no_device_toast;
 mod not_for_me;
 mod not_for_me_tint;
 mod not_for_me_toast;
+mod now_playing_info;
 mod nowplaying_side;
 mod paused_idle;
 mod playing_frames;

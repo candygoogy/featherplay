@@ -25,8 +25,8 @@ your task owns; the shared files below change only when a page truly needs somet
 | `pages/{library,album,playlist,artist,search}.slint` | One page each, with its `…Data` global | content pages |
 | `pages/explore.slint` | `ExplorePage` (New releases, Charts with the country picker and the top artists, Moods & genres) and `MoodPage` (a mood's curated playlists), `ExploreData`, `MoodData`; `src/pages/explore.rs` | discovery |
 | `pages/history.slint` | `HistoryPage`, `HistoryData`: the songs played lately, under a heading per day; `src/pages/history.rs` | discovery |
-| `pages/now_playing.slint` | `NowPlayingPage`, `NowPlayingData` | now playing |
-| `pages/lyrics.slint` | `LyricsView`, `LyricsData`: the lyrics on a panel in the cover's colour (the accent's for grey art; synced lines from LRCLIB or YouTube Music, or plain lyrics), in the Lyrics tab of `SideTabs` and in Now playing's full lyrics view. The full view is optional (`LyricsData.full`, off at every start, kept for the session) and toggled by the stage's Lyrics pill, the bar's microphone or Ctrl+L (`LyricsData.toggle-view`), the cover gliding to its column as the lines fade in (`Theme.t-lyrics`, one eased value); with no lines to show (none found, a failed lookup) the cover stays large and centred instead, one quiet line under the title saying why (`NoLyricsLine`, with Try again after a failure), and a lookup that ends so glides the cover back there; while it's open the side panel's Lyrics tab steps aside for Up next, and comes back when it closes; nothing is looked up until a lyrics view is on screen; with Settings' "Show lyrics" off (`LyricsData.on`) the toggles and the tab are gone and nothing is looked up at all; `src/lyrics.rs` | lyrics |
+| `pages/now_playing.slint` | `NowPlayingPage`, `NowPlayingData`: "Playing from" centred in the stage's header (`QueueData.open-source`: the album or playlist page, or Up next for a radio; `src/queue_panel.rs`), then one block the cover's width: the cover with a glow in the accent, the title (two lines at most) with the song's buttons pinned at the cover's right edge, the artists, "album · year", and the line playing in a strip (`LyricStrip`, `LyricsData.peek`; synced lyrics only) that opens the lyrics view | now playing |
+| `pages/lyrics.slint` | `LyricsView`, `LyricsData`: the lyrics on a panel in the cover's colour (the accent's for grey art; synced lines from LRCLIB or YouTube Music, or plain lyrics), in the Lyrics tab of `SideTabs` and in Now playing's full lyrics view. The full view is optional (`LyricsData.full`, off at every start, kept for the session) and toggled by the stage's Lyrics pill, the bar's microphone or Ctrl+L (`LyricsData.toggle-view`), the cover gliding to its column as the lines fade in (`Theme.t-lyrics`, one eased value); with no lines to show (none found, a failed lookup) the cover stays large and centred instead, one quiet line under the title saying why (`NoLyricsLine`, with Try again after a failure), and a lookup that ends so glides the cover back there; while it's open the side panel's Lyrics tab steps aside for Up next, and comes back when it closes; nothing is looked up until a lyrics view or Now playing (its lyric strip) is on screen; with Settings' "Show lyrics" off (`LyricsData.on`) the toggles and the tab are gone and nothing is looked up at all; `src/lyrics.rs` | lyrics |
 | `pages/{settings,about,sign_in}.slint` | One page each | account |
 
 Rust mirrors this in `src/`: one module per page in `src/pages/<page>.rs` (same owners),
@@ -162,7 +162,9 @@ FEATHERPLAY_HOME=<your dev home> cargo run -p featherplay -- \
 
 Pages: home, library, library-playlists, library-albums, library-artists, album, playlist,
 liked, artist, search, search-link and search-link-missing (a pasted song link: its one song,
-or a link to no song), now-playing, now-playing-long (a title too long for its line),
+or a link to no song), now-playing, now-playing-side-hidden (the side panel hidden, a
+soundtrack's credits), now-playing-long and now-playing-long-side-hidden (a title too long
+for one line and long credits),
 now-playing-disliked (the song rated Dislike: the thumbs-down filled there and in the bar),
 now-playing-lyrics (also -plain and -none; with
 `--hold-loading`, still loading; with `--hold-error`, the lookup failed),

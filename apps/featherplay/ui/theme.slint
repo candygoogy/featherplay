@@ -90,6 +90,8 @@ export global Theme {
     out property <color> cover-empty: dark ? #272727 : #E5E5E5;
     out property <color> track: dark ? #FFFFFF26 : #0000001F;      // progress and volume rails
     out property <color> cover-shadow: dark ? #00000099 : #00000033;
+    // Now playing's soft glow under the cover, in the accent (the cover's colour by default).
+    out property <color> cover-glow: accent.with-alpha(dark ? 0.33 : 0.22);
     out property <color> avatar: dark ? #3A3A3A : #E0E0E0;
     out property <color> scrim: dark ? #00000080 : #0000002E;      // under overlays
     // The current song's row rests on a light tile (hover and press still apply on top).
@@ -190,6 +192,7 @@ export global Theme {
     out property <length> t-lyric-full: 24px;  // the full view on Now playing
     out property <length> t-lyric-wide: 26px;  // the same, from `lyric-wide-min` wide
     out property <length> lyric-wide-min: 1200px;
+    out property <length> t-lyric-peek: 15px;  // Now playing's one-line strip under the credits (600, not the lines' bold)
     out property <int> lyric-weight: 700;
     out property <float> display-tracking: -0.02;   // em
 

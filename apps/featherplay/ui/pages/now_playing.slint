@@ -1,9 +1,10 @@
-// Now playing: the cover-and-title block centred
-// in the stage, the title in the display face, "artist, album, year", a quiet "Playing
-// from …" line, "Not for me" (thumbs-down), like and the song menu after the title, as the
-// bar has them; on the right, Up next and Related
-// tabs. The stage sits on a soft wash from the cover (always on). Shown full width, without the
-// sidebar; the bottom bar stays. It opens with a 200 ms fade and scale from the bar's cover,
+// Now playing: "Playing from …" centred in the stage's header (a click opens the source),
+// and under it one block the cover's width, centred in the stage: the cover with a soft
+// glow in its colour, the title in the display face (two lines at most) with "Not for me"
+// (thumbs-down), like and the song menu pinned at the cover's right edge, the artists,
+// "album · year", and the line playing in a quiet strip when the song has synced lyrics; on
+// the right, Up next and Related tabs. The stage sits on a soft wash from the cover (always
+// on). Shown full width, without the sidebar; the bottom bar stays. It opens with a 200 ms fade and scale from the bar's cover,
 // the side panel following 40 ms later (a fade only without motion). The Lyrics toggle
 // glides the cover from the centre to its column on the left over `t-lyrics`, the song's
 // title and artist sliding along, as the stage takes the lyrics' panel colour and the lines
@@ -53,6 +54,7 @@ component LinkText inherits Rectangle {
     in property <string> text;
     in property <color> tint: Theme.text1;
     in property <int> weight: 400;
+    in property <length> size: Theme.t-body-l;
     in property <bool> enabled: true;
     in property <length> room: 100000px;
     // The text's own width, uncut.
@@ -72,7 +74,7 @@ component LinkText inherits Rectangle {
         width: parent.width;
         height: parent.height;
         text: root.text;
-        font-size: Theme.t-body-l;
+        font-size: root.size;
         font-weight: root.weight;
         color: root.tint;
         vertical-alignment: center;
@@ -184,13 +186,14 @@ export component SideTabs inherits Rectangle {
     }
 }
 
-// Whether the Lyrics tab is on screen: picked, in Now playing's side panel or the frame's
-// Up next panel, whichever the page shows and if it's open,
-// with the window neither minimized nor hidden in the tray. One instance, in `AppWindow`,
-// which passes its `minimized`; Rust asks for lyrics and times lines only while it holds.
+// Whether lyrics are on screen: Now playing (its lyric strip under the credits, its side
+// panel's Lyrics tab or its full lyrics view), or the Lyrics tab picked in the frame's
+// Up next panel while it's open, with the window neither minimized nor hidden in the tray.
+// One instance, in `AppWindow`, which passes its `minimized`; Rust asks for lyrics and times
+// lines only while it holds.
 export component LyricsWatch {
     in property <bool> minimized;
-    property <bool> live: LyricsData.on && ((NowPlayingData.tab == 2 && (Nav.page == PageKind.now-playing ? Frame.side-open : Frame.queue-open)) || LyricsData.showing) && !Frame.hidden && !root.minimized;
+    property <bool> live: LyricsData.on && (Nav.page == PageKind.now-playing || (NowPlayingData.tab == 2 && Frame.queue-open)) && !Frame.hidden && !root.minimized;
     changed live => { LyricsData.live-changed(self.live); }
 }
 
@@ -241,6 +244,105 @@ component LyricsToggle inherits Rectangle {
     }
 }
 
+// Where the queue comes from, centred in the stage's header: a small "Playing from" over
+// the source's name and a chevron. A click opens the source (`QueueData.open-source`).
+// `ink`, `quiet`: its two text colours (the lyrics' inks on their panel); `on-panel`: its
+// hover and press are the panel's.
+component SourceButton inherits Rectangle {
+    in property <string> source;
+    in property <color> ink;
+    in property <color> quiet;
+    in property <bool> on-panel;
+    // The most it may take; the name elides past it.
+    in property <length> room;
+    callback clicked();
+    width: min(lay.preferred-width, root.room);
+    height: 44px;
+    border-radius: Theme.r-m;
+    background: root.on-panel ? Theme.panel-state(ta.pressed, ta.has-hover) : Theme.state(ta.pressed, ta.has-hover);
+    animate background { duration: Theme.t-hover; }
+    transform-scale: ta.pressed ? Theme.press-scale : 1.0;
+    animate transform-scale {
+        duration: ta.pressed ? Theme.t-press : Theme.t-release;
+        easing: ta.pressed ? Curves.ease-out : Curves.release;
+    }
+    accessible-role: button;
+    accessible-label: @tr("Playing from {}", root.source);
+    accessible-action-default => { root.clicked(); }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+    lay := VerticalLayout {
+        padding-left: Theme.s3;
+        padding-right: Theme.s3;
+        alignment: center;
+        Body {
+            text: @tr("Playing from");
+            font-size: Theme.t-meta;
+            color: root.quiet;
+            horizontal-alignment: center;
+        }
+        HorizontalLayout {
+            alignment: center;
+            spacing: 2px;
+            Body {
+                text: root.source;
+                font-weight: 600;
+                color: root.ink;
+                vertical-alignment: center;
+            }
+            Icon {
+                y: (parent.height - self.height) / 2;
+                width: 16px;
+                height: 16px;
+                commands: Icons.chevron-right;
+                stroke: root.quiet;
+            }
+        }
+    }
+}
+
+// The line playing, in a quiet strip under the credits (synced lyrics only, the lyrics view
+// off): the accent's microphone and the line, `LyricsData.peek` (in a gap the next line, in
+// `text2`). A click opens the lyrics view. `fade` takes it out with the view's toggle,
+// through its colours.
+component LyricStrip inherits Rectangle {
+    in property <float> fade: 1;
+    callback clicked();
+    height: 40px;
+    border-radius: Theme.r-m;
+    background: (ta.pressed ? Theme.pressed : (ta.has-hover ? Theme.hover : Theme.playing-row)).transparentize(1 - root.fade);
+    animate background { duration: Theme.t-hover; }
+    accessible-role: button;
+    accessible-label: LyricsData.peek;
+    accessible-description: @tr("Shows all the lyrics");
+    accessible-action-default => { root.clicked(); }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+    HorizontalLayout {
+        padding-left: Theme.s3;
+        padding-right: Theme.s4;
+        spacing: Theme.s3;
+        Icon {
+            y: (parent.height - self.height) / 2;
+            width: 20px;
+            height: 20px;
+            commands: Icons.lyrics;
+            stroke: Theme.accent.transparentize(1 - root.fade);
+        }
+        Body {
+            text: LyricsData.peek;
+            font-size: Theme.t-lyric-peek;
+            font-weight: 600;
+            color: (LyricsData.peek-ahead ? Theme.text2 : Theme.text1).transparentize(1 - root.fade);
+            vertical-alignment: center;
+        }
+    }
+}
+
 export component NowPlayingPage inherits Rectangle {
     // The side panel's width, and the room it takes from the stage. The bar's Up next button
     // shows and hides it (`Frame.side-open`). It slides like the frame's Up next panel: the
@@ -261,14 +363,28 @@ export component NowPlayingPage inherits Rectangle {
     property <length> stage-w: self.width - self.side-w;
     // The page runs under the floating bar; the stage centres in the room above it.
     property <length> stage-h: self.height - Theme.bar-clear;
-    // Title, artist line and playing-from line below the cover.
-    property <length> text-h: 124px;
+    // The stage's header row: the back button, "Playing from" and the Lyrics pill. The block
+    // (the cover and the text under it) centres in the room between it and the bar's fade.
+    property <length> head-h: Theme.top-bar-h;
+    property <length> room-top: root.head-h + Theme.s3;
+    property <length> room-h: root.stage-h - root.room-top - Theme.s5;
+    // The block's text, all of it the cover's width: the title (the display face, two lines at
+    // most), the artists, "album · year", and the lyric strip (`LyricStrip`). Its room is
+    // kept whatever the song has, a second title line and the strip included, so the cover
+    // never moves from song to song. The title keeps the face's own leading: below it
+    // (`line-height-factor` < 1) Slint 1.18's elision drops the first of two lines.
+    property <length> title-line: title-probe.preferred-height;
+    property <length> artists-h: 22px;
+    property <length> album-h: 20px;
+    property <length> strip-h: 40px;
+    property <length> text-h: Theme.s5 + 2 * root.title-line + Theme.s2 + root.artists-h + root.album-h
+        + (LyricsData.on ? Theme.s4 + root.strip-h : 0px);
     // Beside the side panel the cover is at most `nowplaying-cover`. With the panel hidden
     // the stage has the window's width, and the cover grows with it, up to
     // `nowplaying-cover-wide` (about a third of the stage's width), so it doesn't sit small in the
     // middle of a wide room. It changes with the stage's width, in its one relayout.
     property <length> cover-cap: root.side-w > 0 ? Theme.nowplaying-cover : clamp(root.stage-w * 0.32, Theme.nowplaying-cover, Theme.nowplaying-cover-wide);
-    property <length> cover-size: max(160px, min(root.cover-cap, root.stage-w - 2 * Theme.s9, root.stage-h - root.text-h - 2 * Theme.s8));
+    property <length> cover-size: max(160px, min(root.cover-cap, root.stage-w - 2 * Theme.s9, root.room-h - root.text-h));
     // Rust decodes the art at the larger size while it's drawn larger than the usual one.
     property <bool> cover-wide: root.cover-size > Theme.nowplaying-cover;
     changed cover-wide => { root.ask-cover(); }
@@ -279,7 +395,7 @@ export component NowPlayingPage inherits Rectangle {
         }
     }
     property <length> cover-x: (root.stage-w - root.cover-size) / 2;
-    property <length> cover-y: (root.stage-h - root.cover-size - root.text-h) / 2;
+    property <length> cover-y: root.room-top + max(0px, (root.room-h - root.cover-size - root.text-h) / 2);
     property <bool> shown: false;
     property <color> wash: Theme.dark ? NowPlayingData.wash-dark : NowPlayingData.wash-light;
     animate wash { duration: Theme.t-colour; easing: Curves.ease-hover; }
@@ -356,7 +472,7 @@ export component NowPlayingPage inherits Rectangle {
     // 2026-11-01).
     property <float> art-scale: abs(root.cover-size - root.art-size) < 0.5phx ? 1 : root.art-size / root.cover-size;
     // The title's top: under the cover in either view, sliding with it.
-    property <length> title-y: root.cover-y + root.cover-size + 28px + (root.fl-title-y - root.cover-y - root.cover-size - 28px) * root.column;
+    property <length> title-y: root.cover-y + root.cover-size + Theme.s5 + (root.fl-title-y - root.cover-y - root.cover-size - Theme.s5) * root.column;
     property <length> title-size: Theme.t-display-m + (Theme.t-display-s - Theme.t-display-m) * root.column;
 
     // The stage's ground, opaque: the ambient wash (the cover's colour from the top, fading
@@ -409,12 +525,24 @@ export component NowPlayingPage inherits Rectangle {
             tint: root.ink1;
             clicked => { Nav.back(); }
         }
-        LyricsToggle {
+        lyrics-pill := LyricsToggle {
             x: root.stage-w - Theme.s5 - self.width;
             y: Theme.s4;
             visible: LyricsData.on;
             on: root.full;
             clicked => { LyricsData.toggle-view(); }
+        }
+        // "Playing from" in the middle of the header row, clear of the pill on either side;
+        // only when the queue's source is known.
+        if Player.has-track && QueueData.playing-from != "": SourceButton {
+            x: (root.stage-w - self.width) / 2;
+            y: Theme.s4 + 20px - self.height / 2;
+            room: root.stage-w - 2 * (Theme.s5 + lyrics-pill.width + Theme.s3);
+            source: QueueData.playing-from;
+            ink: root.ink1;
+            quiet: root.ink2;
+            on-panel: root.tint > 0.5;
+            clicked => { QueueData.open-source(); }
         }
 
         // The cover is laid out once at the cover view's size and scaled to the lyrics view's,
@@ -437,6 +565,24 @@ export component NowPlayingPage inherits Rectangle {
             drop-shadow-offset-y: 16px;
             drop-shadow-color: Theme.cover-shadow;
         }
+        // A soft glow in the cover's colour (the accent) low under it: the shadow of a shape
+        // `glow-in` inside the cover, dropped well down and blurred wide, so it shows only
+        // below the cover's lower edge. Laid out, scaled and opaque under the cover as the
+        // shadow above is, for the same reasons.
+        property <length> glow-in: 24px;
+        Rectangle {
+            x: root.art-x + stage.glow-in * root.art-size / root.cover-size;
+            y: root.art-y + stage.glow-in * root.art-size / root.cover-size;
+            width: root.cover-size - 2 * stage.glow-in;
+            height: root.cover-size - 2 * stage.glow-in;
+            transform-origin: { x: 0, y: 0 };
+            transform-scale: root.art-scale;
+            border-radius: Theme.r-xl;
+            background: Theme.cover-empty;
+            drop-shadow-blur: 72px;
+            drop-shadow-offset-y: 36px;
+            drop-shadow-color: Theme.cover-glow;
+        }
         Cover {
             x: root.art-x;
             y: root.art-y;
@@ -450,54 +596,70 @@ export component NowPlayingPage inherits Rectangle {
             crossfade: true;
         }
 
-        // The title and the song's buttons in the cover view: one line, the title in the
-        // display face, then "Not for me", like and the song menu: the bar's own buttons
-        // (`NotForMeButton`, `LikeButton`; 36 px, a 20 px glyph in `text2`, the same hover
-        // and press), `Theme.s1` apart as there, `Theme.s3` after the title. The layout centres each on the title's line box
-        // (`cross-axis-alignment`), so the glyphs sit on the line, wherever the font's metrics
-        // put it. The title never wraps here: too long, it elides before the buttons, which
-        // stay on the line and inside the cover's width at any window size (it wraps only in
-        // the lyrics' column, where the buttons have gone). `title-room` is the title's most:
-        // the cover's width less the buttons', growing as they fade (to the cover's width,
-        // with no lyrics), and the lyrics' column at the toggle's end; the row is that and
-        // the buttons, which keep their room while hidden so it never jumps. A title that
-        // elides takes that room as it frees, so the fading buttons drift out with its end.
-        property <length> title-room: (root.cover-size - (song-buttons.preferred-width + Theme.s3) * (1 - root.lyr)) * (1 - root.column) + root.fl-cover * root.column;
-        title-row := HorizontalLayout {
+        // The cover view's text is one block the cover's width, every line starting at its
+        // left edge (the house style's "one edge, one width"):
+        // the title, then the artists, then "album · year", then the lyric strip, each on its
+        // own line and eliding at the block's width on its own.
+        //
+        // Row 1: the title in the display face, wrapping to a second line and eliding there,
+        // beside "Not for me", like and the song menu (the bar's buttons as 40 px targets, a
+        // 20 px glyph in `text2`, `Theme.s1` apart). The buttons are pinned at the cover's
+        // right edge (their glyphs reach it: the buttons hang `s2` past it, about the room
+        // round a glyph), centred on the title's first line, so they keep their place
+        // whatever the title is; the title stops `s3` before them. They ride along and fade
+        // with the lyrics toggle, and are hidden once it's done. The title slides with the
+        // cover and fades into the lyrics' column's wrapped title (`full-title`).
+        property <length> buttons-hang: Theme.s2;
+        // The title's width: the cover's less the buttons', growing as they fade with the toggle
+        // (all the cover's in the lyrics view with no lines, where the cover stays).
+        property <length> title-w: root.cover-size - (Player.has-track ? song-buttons.preferred-width - stage.buttons-hang + Theme.s3 : 0px) * (1 - root.lyr);
+        // One line of the title, for the buttons' place and the block's room.
+        title-probe := Display {
+            visible: false;
+            // Any text: a line's height comes from the face's metrics.
+            text: "0";
+            font-size: Theme.t-display-m;
+        }
+        title := Display {
             x: root.art-x;
-            y: root.title-y + (40px - self.preferred-height) / 2 * (1 - root.column);
-            width: stage.title-room + Theme.s3 + song-buttons.preferred-width;
+            y: root.title-y;
+            width: stage.title-w;
             height: self.preferred-height;
-            alignment: start;
-            cross-axis-alignment: center;
-            spacing: Theme.s3;
-            // Slides with the cover at the wrapped title's size, fading into it.
-            if root.column < 1: Display {
-                text: Player.has-track ? Player.title : @tr("Nothing playing");
-                font-size: root.title-size;
-                color: (Player.has-track ? root.ink1 : LyricsData.ink.next.mix(Theme.text3, root.tint)).transparentize(root.column);
-                overflow: elide;
+            visible: root.column < 1;
+            text: Player.has-track ? Player.title : @tr("Nothing playing");
+            font-size: root.title-size;
+            wrap: word-wrap;
+            max-lines: 2;
+            overflow: elide;
+            color: (Player.has-track ? root.ink1 : LyricsData.ink.next.mix(Theme.text3, root.tint)).transparentize(root.column);
+        }
+        song-buttons := HorizontalLayout {
+            x: root.art-x + root.cover-size + stage.buttons-hang - self.preferred-width;
+            y: root.title-y + (root.title-line - self.preferred-height) / 2;
+            width: self.preferred-width;
+            height: self.preferred-height;
+            spacing: Theme.s1;
+            if Player.has-track: NotForMeButton {
+                size: 40px;
+                visible: root.lyr < 1;
+                fade: 1 - root.lyr;
             }
-            // They ride along and fade with the toggle, and are hidden once it's done.
-            song-buttons := HorizontalLayout {
-                spacing: Theme.s1;
-                if Player.has-track: NotForMeButton {
-                    visible: root.lyr < 1;
-                    fade: 1 - root.lyr;
-                }
-                if Player.has-track: LikeButton {
-                    visible: root.lyr < 1;
-                    fade: 1 - root.lyr;
-                }
-                if Player.has-track: IconButton {
-                    visible: root.lyr < 1;
-                    fade: 1 - root.lyr;
-                    icon: Icons.more;
-                    label: @tr("More");
-                    filled: true;
-                    clicked => {
-                        NowPlayingData.more(self.absolute-position.x + self.width - 4px, self.absolute-position.y + self.height, self.absolute-position.y);
-                    }
+            if Player.has-track: LikeButton {
+                width: 40px;
+                height: 40px;
+                visible: root.lyr < 1;
+                fade: 1 - root.lyr;
+            }
+            if Player.has-track: IconButton {
+                width: 40px;
+                height: 40px;
+                visible: root.lyr < 1;
+                fade: 1 - root.lyr;
+                icon: Icons.more;
+                label: @tr("More");
+                filled: true;
+                clicked => {
+                    NowPlayingData.more(self.absolute-position.x + self.width - 4px, self.absolute-position.y + self.height, self.absolute-position.y);
                 }
             }
         }
@@ -511,80 +673,63 @@ export component NowPlayingPage inherits Rectangle {
             color: LyricsData.ink.current.transparentize(1 - root.column);
             wrap: word-wrap;
         }
-        // "Artist, album, year" in the cover view, within the cover's width like the lines
-        // around it, so long credits never run off to one side of the block: the artists
-        // elide at its width; an album too long for the rest of the line drops the year and
-        // elides at the line's end, and gives way when less than `album-least` would be left.
-        // In the lyrics view the artists alone under the wrapped title, eliding at the
-        // column's width; the rest fades out, keeping its place.
-        property <length> album-least: 48px;
-        property <length> album-max: root.cover-size - min(artists.natural, root.cover-size) - comma.preferred-width;
-        property <bool> album-whole: album.natural <= stage.album-max - (NowPlayingData.year != "" ? year.preferred-width : 0px);
-        property <bool> album-fits: Player.album != "" && stage.album-max >= stage.album-least;
-        Rectangle {
+        // Row 2: the artists, a link to the first, under the title as it wraps (one line or
+        // two). In the lyrics view they move under the column's wrapped title, eliding at the
+        // column's width.
+        property <length> artists-y: root.title-y + (title.height + Theme.s2) * (1 - root.column) + (full-title.preferred-height + Theme.s1) * root.column;
+        artists := LinkText {
             x: root.art-x;
-            y: root.title-y + 44px + (full-title.preferred-height + Theme.s1 - 44px) * root.column;
-            width: root.art-size;
-            height: 22px + 2px * root.column;
-            artists := LinkText {
+            y: stage.artists-y;
+            height: root.artists-h + 2px * root.column;
+            room: root.art-size;
+            text: Player.artist;
+            tint: root.ink1.mix(root.ink2, 1 - root.column);
+            weight: 600;
+            enabled: Player.artist-id != "";
+            clicked => { Nav.open-artist(Player.artist-id); }
+        }
+        // Row 3: "album · year" in `text2`, the album a link, eliding before the year. It
+        // fades out in the lyrics view, keeping its place.
+        property <length> album-y: stage.artists-y + root.artists-h;
+        if Player.album != "": Rectangle {
+            x: root.art-x;
+            y: stage.album-y;
+            width: root.cover-size;
+            height: root.album-h;
+            album := LinkText {
                 x: 0;
                 height: parent.height;
-                room: root.art-size;
-                text: Player.artist;
-                tint: root.ink1.mix(root.ink2, 1 - root.column);
-                weight: 600;
-                enabled: Player.artist-id != "";
-                clicked => { Nav.open-artist(Player.artist-id); }
-            }
-            // Commas between the parts, as on the cards: "Daft Punk, Homework, 1996".
-            // After the artists as the cover view lays them out, so the rest keeps its place
-            // as it fades in the lyrics' column.
-            comma := Body {
-                x: min(artists.natural, root.cover-size);
-                y: 0;
-                height: parent.height;
-                visible: stage.album-fits;
-                text: ", ";
-                font-size: Theme.t-body-l;
-                color: Theme.text2.transparentize(root.lyr);
-                vertical-alignment: center;
-            }
-            album := LinkText {
-                x: comma.x + comma.width;
-                height: parent.height;
-                visible: stage.album-fits;
-                room: stage.album-max;
+                room: parent.width - (NowPlayingData.year != "" ? year.preferred-width : 0px);
                 text: Player.album;
+                size: Theme.t-body;
                 tint: Theme.text2.transparentize(root.lyr);
-                enabled: stage.album-fits && Player.album-id != "" && root.lyr < 0.5;
+                enabled: Player.album-id != "" && root.lyr < 0.5;
                 clicked => { Nav.open-album(Player.album-id); }
             }
             year := Body {
-                x: album.x + album.width;
+                x: album.width;
                 y: 0;
                 height: parent.height;
-                visible: stage.album-fits && stage.album-whole && NowPlayingData.year != "";
-                text: ", " + NowPlayingData.year;
-                font-size: Theme.t-body-l;
+                visible: NowPlayingData.year != "";
+                text: " · " + NowPlayingData.year;
                 color: Theme.text2.transparentize(root.lyr);
                 vertical-alignment: center;
             }
         }
-        // The bar already shows the time, so this line only says where the music comes from.
-        // It has gone by the toggle's half way, where the no-lyrics line takes its place.
-        if Player.has-track && QueueData.playing-from != "" && root.tint < 1: Body {
+        // Row 4: the line playing, with synced lyrics and the lyrics view off.
+        property <length> strip-y: stage.album-y + root.album-h + Theme.s4;
+        if LyricsData.on && LyricsData.state == LyricsState.synced && Player.has-track && LyricsData.peek != "" && root.lyr < 1: LyricStrip {
             x: root.art-x;
-            y: root.title-y + 76px;
+            y: stage.strip-y;
             width: root.cover-size;
-            height: 20px;
-            text: @tr("Playing from {}", QueueData.playing-from);
-            color: Theme.text2.transparentize(root.tint);
-            vertical-alignment: center;
+            height: root.strip-h;
+            fade: 1 - root.lyr;
+            clicked => { LyricsData.toggle-view(); }
         }
-        // No lyrics: why, in its place, fading in as the lines would.
+        // No lyrics: why, in the strip's place, fading in as the lines would.
         if root.lone && Player.has-track && root.reveal * root.alone > 0: NoLyricsLine {
             x: root.art-x;
-            y: root.title-y + 72px;
+            y: stage.strip-y + (root.strip-h - self.height) / 2;
             width: self.preferred-width;
             reveal: root.reveal * root.alone;
         }

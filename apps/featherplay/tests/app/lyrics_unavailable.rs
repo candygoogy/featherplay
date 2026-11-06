@@ -57,11 +57,12 @@ fn a_failed_lookup_says_why_and_an_outage_is_asked_again() {
     wait(&scene, 300);
     assert_eq!(lyrics::lookups(), asked + 1, "asked in a loop");
 
-    // The view closes before the minute is up: nothing is asked.
+    // Now playing (the view and its lyric strip) is left before the minute is up: nothing
+    // is asked.
     lyrics::show_for_snapshot(&scene.ctx, SnapshotLyrics::Unavailable);
     scene.settle();
     let asked = lyrics::lookups();
-    data.set_full(false);
+    scene.open("home").expect("home");
     scene.settle();
     wait(&scene, 120);
     assert_eq!(lyrics::lookups(), asked, "asked with no lyrics view open");
