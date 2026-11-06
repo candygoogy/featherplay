@@ -399,6 +399,59 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
+## Opus decoder
+
+Opus streams are decoded by the `opus-decoder` crate (MIT OR Apache-2.0), a Rust port of
+libopus, built from a modified copy in `vendor/opus-decoder/` (a faster FFT and a 32-bit
+collapse mask; see its `VENDORED.md`). libopus is under the BSD 3-Clause License:
+
+```
+Copyright 2001-2023 Xiph.Org, Skype Limited, Octasic,
+                    Jean-Marc Valin, Timothy B. Terriberry,
+                    CSIRO, Gregory Maxwell, Mark Borgerding,
+                    Erik de Castro Lopo, Mozilla, Amazon
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions
+are met:
+
+- Redistributions of source code must retain the above copyright
+notice, this list of conditions and the following disclaimer.
+
+- Redistributions in binary form must reproduce the above copyright
+notice, this list of conditions and the following disclaimer in the
+documentation and/or other materials provided with the distribution.
+
+- Neither the name of Internet Society, IETF or IETF Trust, nor the
+names of specific contributors, may be used to endorse or promote
+products derived from this software without specific prior written
+permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER
+OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+Opus is subject to the royalty-free patent licenses which are
+specified at:
+
+Xiph.Org Foundation:
+https://datatracker.ietf.org/ipr/1524/
+
+Microsoft Corporation:
+https://datatracker.ietf.org/ipr/1914/
+
+Broadcom Corporation:
+https://datatracker.ietf.org/ipr/1526/
+```
+
 ## Crates
 
 | Crate | Version | Licence |
@@ -461,16 +514,16 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 | euclid | 0.22.14 | MIT OR Apache-2.0 |
 | fastrand | 2.5.0 | Apache-2.0 OR MIT |
 | fdeflate | 0.3.7 | MIT OR Apache-2.0 |
-| featherplay | 0.1.0 | MIT |
-| featherplay-audio | 0.1.0 | MIT |
-| featherplay-core | 0.1.0 | MIT |
-| featherplay-integrations | 0.1.0 | MIT |
-| featherplay-lastfm | 0.1.0 | MIT |
-| featherplay-listenbrainz | 0.1.0 | MIT |
-| featherplay-lyrics | 0.1.0 | MIT |
-| featherplay-store | 0.1.0 | MIT |
-| featherplay-streams | 0.1.0 | MIT |
-| featherplay-ytm | 0.1.0 | MIT |
+| featherplay | 0.1.1 | MIT |
+| featherplay-audio | 0.1.1 | MIT |
+| featherplay-core | 0.1.1 | MIT |
+| featherplay-integrations | 0.1.1 | MIT |
+| featherplay-lastfm | 0.1.1 | MIT |
+| featherplay-listenbrainz | 0.1.1 | MIT |
+| featherplay-lyrics | 0.1.1 | MIT |
+| featherplay-store | 0.1.1 | MIT |
+| featherplay-streams | 0.1.1 | MIT |
+| featherplay-ytm | 0.1.1 | MIT |
 | field-offset | 0.3.6 | MIT OR Apache-2.0 |
 | fixed_decimal | 0.7.3 | Unicode-3.0 |
 | flate2 | 1.1.10 | MIT OR Apache-2.0 |
@@ -576,12 +629,14 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 | multiversion_no_op | 1.0.0 | Apache-2.0 OR MIT |
 | native-tls | 0.2.18 | MIT OR Apache-2.0 |
 | num-bigint | 0.4.8 | MIT OR Apache-2.0 |
+| num-complex | 0.4.6 | MIT OR Apache-2.0 |
 | num-integer | 0.1.47 | MIT OR Apache-2.0 |
 | num-rational | 0.4.2 | MIT OR Apache-2.0 |
 | num-traits | 0.2.19 | MIT OR Apache-2.0 |
 | num_enum | 0.7.6 | BSD-3-Clause OR MIT OR Apache-2.0 |
 | num_enum_derive | 0.7.6 | BSD-3-Clause OR MIT OR Apache-2.0 |
 | once_cell | 1.21.4 | MIT OR Apache-2.0 |
+| opus-decoder | 0.1.1 | MIT OR Apache-2.0 |
 | parlance | 0.1.1 | Apache-2.0 OR MIT |
 | parley | 0.11.1 | Apache-2.0 OR MIT |
 | parley_data | 0.11.1 | Apache-2.0 OR MIT |
@@ -596,6 +651,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 | polycool | 0.4.0 | MIT OR Apache-2.0 |
 | portable-atomic | 1.15.0 | Apache-2.0 OR MIT |
 | potential_utf | 0.1.6 | Unicode-3.0 |
+| primal-check | 0.3.4 | MIT OR Apache-2.0 |
 | proc-macro-crate | 3.5.0 | MIT OR Apache-2.0 |
 | proc-macro2 | 1.0.107 | MIT OR Apache-2.0 |
 | pulldown-cmark | 0.13.6 | MIT |
@@ -613,6 +669,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 | rowan | 0.17.0 | MIT OR Apache-2.0 |
 | roxmltree | 0.21.2 | MIT OR Apache-2.0 |
 | rustc-hash | 1.1.0 | Apache-2.0 OR MIT |
+| rustfft | 6.4.1 | MIT OR Apache-2.0 |
 | rustls-pki-types | 1.15.1 | MIT OR Apache-2.0 |
 | rustversion | 1.0.23 | MIT OR Apache-2.0 |
 | ryu | 1.0.23 | Apache-2.0 OR BSL-1.0 |
@@ -647,6 +704,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 | souvlaki | 0.8.3 | MIT |
 | spin_on | 0.1.1 | Apache-2.0 OR MIT |
 | stable_deref_trait | 1.2.1 | MIT OR Apache-2.0 |
+| strength_reduce | 0.2.4 | MIT OR Apache-2.0 |
 | strict-num | 0.1.1 | MIT |
 | strum | 0.28.0 | MIT |
 | strum_macros | 0.28.0 | MIT |
@@ -655,6 +713,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 | symphonia-codec-aac | 0.5.5 | MPL-2.0 |
 | symphonia-core | 0.5.5 | MPL-2.0 |
 | symphonia-format-isomp4 | 0.5.5 | MPL-2.0 |
+| symphonia-format-mkv | 0.5.5 | MPL-2.0 |
 | symphonia-metadata | 0.5.5 | MPL-2.0 |
 | symphonia-utils-xiph | 0.5.5 | MPL-2.0 |
 | syn | 2.0.119 | MIT OR Apache-2.0 |
@@ -687,6 +746,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 | tower-service | 0.3.3 | MIT |
 | tracing | 0.1.44 | MIT |
 | tracing-core | 0.1.36 | MIT |
+| transpose | 0.2.3 | MIT OR Apache-2.0 |
 | tray-icon | 0.26.1 | MIT OR Apache-2.0 |
 | try-lock | 0.2.5 | MIT |
 | typed-index-collections | 3.5.0 | MIT OR Apache-2.0 |
@@ -2122,6 +2182,38 @@ THE SOFTWARE.
 
 ### MIT License
 
+Used by: primal-check 0.3.4
+
+```
+Copyright (c) 2014 Huon Wilson
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+```
+
+### MIT License
+
 Used by: mime 0.3.17
 
 ```
@@ -2150,7 +2242,7 @@ THE SOFTWARE.
 
 ### MIT License
 
-Used by: bitflags 1.3.2, bitflags 2.13.2, log 0.4.34, num-bigint 0.4.8, num-integer 0.1.47, num-rational 0.4.2, num-traits 0.2.19
+Used by: bitflags 1.3.2, bitflags 2.13.2, log 0.4.34, num-bigint 0.4.8, num-complex 0.4.6, num-integer 0.1.47, num-rational 0.4.2, num-traits 0.2.19
 
 ```
 Copyright (c) 2014 The Rust Project Developers
@@ -2426,6 +2518,33 @@ CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
 IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
+
+```
+
+### MIT License
+
+Used by: rustfft 6.4.1, strength_reduce 0.2.4
+
+```
+Copyright (c) 2015 The RustFFT Developers
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 
 ```
 
@@ -4124,6 +4243,39 @@ DEALINGS IN THE SOFTWARE.
 
 ### MIT License
 
+Used by: transpose 0.2.3
+
+```
+Copyright (c) 2022 The transpose Developers
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+
+```
+
+### MIT License
+
 Used by: strict-num 0.1.1
 
 ```
@@ -5019,7 +5171,7 @@ SOFTWARE.
 
 ### MIT License
 
-Used by: featherplay 0.1.0, featherplay-audio 0.1.0, featherplay-core 0.1.0, featherplay-integrations 0.1.0, featherplay-lastfm 0.1.0, featherplay-listenbrainz 0.1.0, featherplay-lyrics 0.1.0, featherplay-store 0.1.0, featherplay-streams 0.1.0, featherplay-ytm 0.1.0, chrono 0.4.45, dasp_sample 0.11.0, dpi 0.1.2, json-crawler 0.1.0, libm 0.2.16, lyon_algorithms 1.0.22, lyon_extra 1.1.0, lyon_geom 1.0.20, lyon_path 1.0.19, skia-bindings 0.153.3, skia-safe 0.153.3, taffy 0.10.1, tauri-winrt-notification 0.8.1, webview2-com-macros 0.8.1, webview2-com-sys 0.39.1, webview2-com 0.39.1, windows-collections 0.3.2, windows-core 0.62.2, windows-future 0.3.2, windows-implement 0.60.2, windows-interface 0.59.3, windows-link 0.2.1, windows-numerics 0.3.1, windows-result 0.4.1, windows-strings 0.5.1, windows-sys 0.52.0, windows-sys 0.59.0, windows-sys 0.61.2, windows-targets 0.42.2, windows-targets 0.52.6, windows-threading 0.2.1, windows-version 0.1.7, windows 0.44.0, windows 0.62.2, windows_aarch64_msvc 0.42.2, windows_aarch64_msvc 0.52.6, windows_x86_64_msvc 0.42.2, windows_x86_64_msvc 0.52.6, ytmapi-rs 0.3.3
+Used by: featherplay 0.1.1, featherplay-audio 0.1.1, featherplay-core 0.1.1, featherplay-integrations 0.1.1, featherplay-lastfm 0.1.1, featherplay-listenbrainz 0.1.1, featherplay-lyrics 0.1.1, featherplay-store 0.1.1, featherplay-streams 0.1.1, featherplay-ytm 0.1.1, opus-decoder 0.1.1, chrono 0.4.45, dasp_sample 0.11.0, dpi 0.1.2, json-crawler 0.1.0, libm 0.2.16, lyon_algorithms 1.0.22, lyon_extra 1.1.0, lyon_geom 1.0.20, lyon_path 1.0.19, skia-bindings 0.153.3, skia-safe 0.153.3, taffy 0.10.1, tauri-winrt-notification 0.8.1, webview2-com-macros 0.8.1, webview2-com-sys 0.39.1, webview2-com 0.39.1, windows-collections 0.3.2, windows-core 0.62.2, windows-future 0.3.2, windows-implement 0.60.2, windows-interface 0.59.3, windows-link 0.2.1, windows-numerics 0.3.1, windows-result 0.4.1, windows-strings 0.5.1, windows-sys 0.52.0, windows-sys 0.59.0, windows-sys 0.61.2, windows-targets 0.42.2, windows-targets 0.52.6, windows-threading 0.2.1, windows-version 0.1.7, windows 0.44.0, windows 0.62.2, windows_aarch64_msvc 0.42.2, windows_aarch64_msvc 0.52.6, windows_x86_64_msvc 0.42.2, windows_x86_64_msvc 0.52.6, ytmapi-rs 0.3.3
 
 ```
 MIT License
@@ -6027,7 +6179,7 @@ SOFTWARE.
 
 ### Mozilla Public License 2.0
 
-Used by: symphonia-codec-aac 0.5.5, symphonia-core 0.5.5, symphonia-format-isomp4 0.5.5, symphonia-metadata 0.5.5, symphonia-utils-xiph 0.5.5, symphonia 0.5.5
+Used by: symphonia-codec-aac 0.5.5, symphonia-core 0.5.5, symphonia-format-isomp4 0.5.5, symphonia-format-mkv 0.5.5, symphonia-metadata 0.5.5, symphonia-utils-xiph 0.5.5, symphonia 0.5.5
 
 ```
 Mozilla Public License Version 2.0
