@@ -171,6 +171,9 @@ fn timed_line(v: &Value) -> Option<TimedLine> {
 /// A row ytmapi-rs can't read is read from the raw JSON (`search_song_row`): the Songs
 /// filter also lists music videos, which have no album and no plays column.
 pub fn search_songs(raw: &str) -> Result<Vec<Track>, ApiError> {
+    if no_results(raw) {
+        return Ok(Vec::new());
+    }
     let extra = Extra::from_raw(raw)?;
     let q: SearchQuery<FilteredSearch<SongsFilter>> = "".into();
     let (songs, skipped): (Vec<SearchResultSong>, _) = process_lenient(raw, &q)?;
@@ -199,6 +202,26 @@ pub fn search_songs(raw: &str) -> Result<Vec<Track>, ApiError> {
     ))
 }
 
+/// A filtered search that found nothing: its page has no result shelf, only messages ("No
+/// results for …"), which ytmapi-rs 0.3.3 can't read.
+fn no_results(raw: &str) -> bool {
+    let Ok(v) = serde_json::from_str::<Value>(raw) else {
+        return false;
+    };
+    let sections = v
+        .pointer("/contents/tabbedSearchResultsRenderer/tabs/0/tabRenderer/content/sectionListRenderer/contents")
+        .and_then(Value::as_array);
+    sections.is_some_and(|s| {
+        !s.is_empty()
+            && s.iter().all(|section| {
+                section
+                    .pointer("/itemSectionRenderer/contents")
+                    .and_then(Value::as_array)
+                    .is_some_and(|items| items.iter().all(|i| i.get("messageRenderer").is_some()))
+            })
+    })
+}
+
 /// A song search row from the raw JSON: `playlist_row`, with the album and the length from
 /// the byline (`Artists • Album • 3:20`, or `Artists • 1.2M views • 2:36` for a video).
 fn search_song_row(item: &Value) -> Option<Track> {
@@ -218,6 +241,9 @@ fn search_song_row(item: &Value) -> Option<Track> {
 }
 
 pub fn search_albums(raw: &str) -> Result<Vec<AlbumSummary>, ApiError> {
+    if no_results(raw) {
+        return Ok(Vec::new());
+    }
     let extra = Extra::from_raw(raw)?;
     let q: SearchQuery<FilteredSearch<AlbumsFilter>> = "".into();
     let (albums, skipped): (Vec<SearchResultAlbum>, _) = process_lenient(raw, &q)?;
@@ -229,6 +255,9 @@ pub fn search_albums(raw: &str) -> Result<Vec<AlbumSummary>, ApiError> {
 }
 
 pub fn search_artists(raw: &str) -> Result<Vec<ArtistSummary>, ApiError> {
+    if no_results(raw) {
+        return Ok(Vec::new());
+    }
     let q: SearchQuery<FilteredSearch<ArtistsFilter>> = "".into();
     let (artists, skipped): (Vec<SearchResultArtist>, _) = process_lenient(raw, &q)?;
     log_left_out("search artists", &skipped);
@@ -244,6 +273,9 @@ pub fn search_artists(raw: &str) -> Result<Vec<ArtistSummary>, ApiError> {
 
 /// Podcasts in the results are dropped.
 pub fn search_playlists(raw: &str) -> Result<Vec<PlaylistSummary>, ApiError> {
+    if no_results(raw) {
+        return Ok(Vec::new());
+    }
     let q: SearchQuery<FilteredSearch<PlaylistsFilter>> = "".into();
     let (playlists, skipped): (Vec<SearchResultPlaylist>, _) = process_lenient(raw, &q)?;
     log_left_out("search playlists", &skipped);

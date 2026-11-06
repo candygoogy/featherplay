@@ -1089,6 +1089,15 @@ fn search_results_are_never_owned() {
     assert!(found.iter().all(|p| !p.owned));
 }
 
+/// "No results for …" (the Artists tab for "in love with myself", recorded signed out
+/// 2026-11-06): an empty tab, not an unexpected answer.
+#[test]
+fn a_search_with_no_results_is_empty() {
+    let raw = fixture("search_no_results");
+    assert_eq!(convert::search_artists(&raw), Ok(Vec::new()));
+    assert_eq!(convert::search_songs(&raw), Ok(Vec::new()));
+}
+
 // ---------------------------------------------------------------------------
 // Explore and the history. New releases, charts, moods and a mood's playlists were recorded
 // signed out (2026-10-30, so the charts are the IP's country); the history is ytmapi-rs's
