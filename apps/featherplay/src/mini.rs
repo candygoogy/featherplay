@@ -254,7 +254,7 @@ fn wire(ui: &MiniPlayer, main: &AppWindow) {
             }
         });
     });
-    data.on_dismiss(dismiss);
+    data.on_dismiss(|| dismiss("Escape or its ×"));
     data.on_activation_lost(activation_lost);
     data.on_toggle_pin(toggle_pin);
     let weak = ui.as_weak();
@@ -277,7 +277,7 @@ fn wire(ui: &MiniPlayer, main: &AppWindow) {
 /// Another window took the activation: a flyout closes, a pinned mini player stays.
 fn activation_lost() {
     if !is_pinned() {
-        dismiss();
+        dismiss("another window took the activation");
     }
 }
 
@@ -295,7 +295,7 @@ fn toggle_pin() {
         mini.poll.stop();
         mini.presses.take();
     } else if mini.pressed_from_behind.take() {
-        dismiss();
+        dismiss("unpinned from behind another window");
     } else {
         watch(&mini);
     }
@@ -318,7 +318,10 @@ fn listen(mini: &Mini) {
         return;
     }
     match native::watch_presses(pressed_on) {
-        Ok(watch) => *mini.presses.borrow_mut() = Some(watch),
+        Ok(watch) => {
+            log!("mini player: listening for presses");
+            *mini.presses.borrow_mut() = Some(watch);
+        }
         Err(e) => log!("mini player: presses on screen: {e}"),
     }
 }
@@ -327,8 +330,9 @@ fn listen(mini: &Mini) {
 /// from the UI thread's message loop and it can't unwind, so it only reads `MINI`: nothing
 /// may hold `MINI` mutably while it pumps messages.
 fn pressed_on(class: &str) {
+    log!("mini player: a press on {class:?}");
     if closes_on_press(class) {
-        dismiss();
+        dismiss("a press on the taskbar");
     }
 }
 
@@ -353,7 +357,7 @@ fn look_at_the_front() {
     mini.front.set(last);
     if away {
         mini.poll.stop();
-        dismiss();
+        dismiss("another window came to the front");
     }
 }
 
@@ -388,10 +392,12 @@ pub fn pressed(from_behind: bool) {
     });
 }
 
-fn dismiss() {
+/// Closes the open mini player for `why`, which the log keeps.
+fn dismiss(why: &str) {
     if !is_open() {
         return;
     }
+    log!("mini player closes: {why}");
     DISMISSED.set(Some(Instant::now()));
     let _ = slint::invoke_from_event_loop(close);
 }
