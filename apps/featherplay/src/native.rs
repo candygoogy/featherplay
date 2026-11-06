@@ -3,7 +3,7 @@
 //! taskbar (dark or light, as the taskbar is), minimising it and bringing it forward, its
 //! taskbar button showing up, and Windows' animation setting. For the tray's mini player:
 //! the work area and scale of the screen under a point, the popup's border, whether a press
-//! is what brought it to the front, and which window is in front.
+//! is what brought it to the front, which window is in front, and presses anywhere on screen.
 
 use std::cell::{Cell, RefCell};
 use std::ffi::c_void;
@@ -18,16 +18,19 @@ use windows::Win32::Graphics::Dwm::{
 use windows::Win32::Graphics::Gdi::{
     GetMonitorInfoW, GetUpdateRect, MONITOR_DEFAULTTONEAREST, MONITORINFO, MonitorFromPoint,
 };
+use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::HiDpi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI};
 use windows::Win32::UI::Shell::{DefSubclassProc, RemoveWindowSubclass, SetWindowSubclass};
 use windows::Win32::UI::WindowsAndMessaging::{
-    CreateIconFromResourceEx, DestroyIcon, GetClassNameW, GetForegroundWindow, HICON, ICON_BIG,
-    ICON_SMALL, IsIconic, LR_DEFAULTCOLOR, RegisterWindowMessageW, SC_MINIMIZE, SC_RESTORE,
-    SIZE_MAXIMIZED, SIZE_MINIMIZED, SIZE_RESTORED, SPI_GETCLIENTAREAANIMATION,
-    SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS, SendMessageW, SetForegroundWindow, SystemParametersInfoW,
-    WM_DISPLAYCHANGE, WM_DPICHANGED, WM_LBUTTONDOWN, WM_MBUTTONDOWN, WM_MOUSEACTIVATE,
-    WM_MOUSEWHEEL, WM_NCDESTROY, WM_PAINT, WM_POINTERACTIVATE, WM_POINTERDOWN, WM_RBUTTONDOWN,
-    WM_SETICON, WM_SETTINGCHANGE, WM_SIZE, WM_SYSCOMMAND, WM_XBUTTONDOWN,
+    CallNextHookEx, CreateIconFromResourceEx, DestroyIcon, GA_ROOT, GetAncestor, GetClassNameW,
+    GetForegroundWindow, HC_ACTION, HHOOK, HICON, ICON_BIG, ICON_SMALL, IsIconic, LR_DEFAULTCOLOR,
+    MSLLHOOKSTRUCT, RegisterWindowMessageW, SC_MINIMIZE, SC_RESTORE, SIZE_MAXIMIZED,
+    SIZE_MINIMIZED, SIZE_RESTORED, SPI_GETCLIENTAREAANIMATION, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS,
+    SendMessageW, SetForegroundWindow, SetWindowsHookExW, SystemParametersInfoW,
+    UnhookWindowsHookEx, WH_MOUSE_LL, WM_DISPLAYCHANGE, WM_DPICHANGED, WM_LBUTTONDOWN,
+    WM_MBUTTONDOWN, WM_MOUSEACTIVATE, WM_MOUSEWHEEL, WM_NCDESTROY, WM_PAINT, WM_POINTERACTIVATE,
+    WM_POINTERDOWN, WM_RBUTTONDOWN, WM_SETICON, WM_SETTINGCHANGE, WM_SIZE, WM_SYSCOMMAND,
+    WM_XBUTTONDOWN, WindowFromPoint,
 };
 
 /// The Tri-vane logo, 16 to 256 px, from `build.rs`, drawn for dark grounds: the play sits
@@ -709,15 +712,66 @@ pub fn foreground() -> Option<Foreground> {
     if h.is_invalid() {
         return None;
     }
-    let mut name = [0u16; 256];
-    // SAFETY: a window handle and a buffer of the length the slice gives; a stale handle
-    // makes it return 0.
-    let len = unsafe { GetClassNameW(h, &mut name) };
-    let len = usize::try_from(len).unwrap_or(0).min(name.len());
     Some(Foreground {
         hwnd: h.0 as isize,
-        class: String::from_utf16_lossy(&name[..len]),
+        class: class_of(h),
     })
+}
+
+/// A window's class, as `GetClassNameW` gives it; empty for no window or a stale handle.
+fn class_of(h: HWND) -> String {
+    let mut name = [0u16; 256];
+    // SAFETY: a window handle and a buffer of the length the slice gives; a null or stale
+    // handle makes it return 0.
+    let len = unsafe { GetClassNameW(h, &mut name) };
+    let len = usize::try_from(len).unwrap_or(0).min(name.len());
+    String::from_utf16_lossy(&name[..len])
+}
+
+thread_local! {
+    /// What `press_hook` tells of each press, while a `PressWatch` lives on this thread.
+    static ON_PRESS: Cell<Option<fn(&str)>> = const { Cell::new(None) };
+}
+
+/// The low-level mouse hook `watch_presses` installed; dropping it removes the hook.
+pub struct PressWatch(HHOOK);
+
+impl Drop for PressWatch {
+    fn drop(&mut self) {
+        ON_PRESS.set(None);
+        // SAFETY: the hook `watch_presses` installed on this thread, removed once, here.
+        let _ = unsafe { UnhookWindowsHookEx(self.0) };
+    }
+}
+
+/// Calls `on_press(class)` each time a mouse button goes down anywhere on screen, with the
+/// class of the top-level window under it (a touch or pen tap may never reach the hook), until the returned watch is dropped. One watch at a time per thread, on
+/// a thread that pumps messages (the UI thread): Windows calls the hook from its message
+/// loop, before the press reaches the window, and waits for it, so `on_press` must be quick.
+pub fn watch_presses(on_press: fn(&str)) -> Result<PressWatch, String> {
+    // SAFETY: no preconditions; null asks for the exe's own module.
+    let module = unsafe { GetModuleHandleW(None) }.map_err(|e| format!("module: {e}"))?;
+    // SAFETY: `press_hook` has the hook procedure's signature and lives as long as the exe.
+    let hook = unsafe { SetWindowsHookExW(WH_MOUSE_LL, Some(press_hook), Some(module.into()), 0) }
+        .map_err(|e| format!("SetWindowsHookExW: {e}"))?;
+    ON_PRESS.set(Some(on_press));
+    Ok(PressWatch(hook))
+}
+
+unsafe extern "system" fn press_hook(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    let down = matches!(
+        u32::try_from(wparam.0),
+        Ok(WM_LBUTTONDOWN | WM_RBUTTONDOWN | WM_MBUTTONDOWN | WM_XBUTTONDOWN)
+    );
+    if let (true, Ok(HC_ACTION), Some(on_press)) = (down, u32::try_from(code), ON_PRESS.get()) {
+        // SAFETY: for HC_ACTION, `lparam` points at this event's MSLLHOOKSTRUCT.
+        let at = unsafe { (*(lparam.0 as *const MSLLHOOKSTRUCT)).pt };
+        // SAFETY: plain lookups; no window under the point gives null, whose class is empty.
+        let root = unsafe { GetAncestor(WindowFromPoint(at), GA_ROOT) };
+        on_press(&class_of(root));
+    }
+    // SAFETY: the arguments this hook was called with.
+    unsafe { CallNextHookEx(None, code, wparam, lparam) }
 }
 
 /// Whether the window is minimised (hidden or not).

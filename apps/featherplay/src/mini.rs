@@ -7,7 +7,9 @@
 //! it closes, as it would have had it been unpinned all along.
 //!
 //! Unpinned, it also watches which window is in front, four times a second: opened from the
-//! hidden icons' flyout (^), it never gets the activation, so it can't lose it either.
+//! hidden icons' flyout (^), it never gets the activation, so it can't lose it either. And
+//! it hears every press on screen: one on the taskbar closes it, even with the taskbar
+//! already in front, where the window in front doesn't change.
 //!
 //! The window exists only while it shows: `open` creates it (a few milliseconds) and `close`
 //! drops it, so a closed mini player costs nothing, no window and no timer. While open it
@@ -47,6 +49,9 @@ pub use crate::native::Foreground;
 /// 10's is `NotifyIconOverflowWindow`), and Explorer's `ForegroundStaging`, which holds the
 /// foreground for a moment while it hands it on. tray-icon's own window (`tray_icon_app`)
 /// takes the foreground while its menu (`#32768`) shows.
+///
+/// The taskbar stays neutral here, as the shell hands the foreground through it on the way
+/// to the mini player; a press on it closes the mini player instead (`closes_on_press`).
 const NEUTRAL: [&str; 7] = [
     "Shell_TrayWnd",
     "Shell_SecondaryTrayWnd",
@@ -56,6 +61,10 @@ const NEUTRAL: [&str; 7] = [
     "tray_icon_app",
     "#32768",
 ];
+
+/// The taskbar's window classes (`Shell_SecondaryTrayWnd` on other screens): a press on it,
+/// anywhere (Start, an app's button, the tray, empty space), closes the mini player.
+const TASKBAR: [&str; 2] = ["Shell_TrayWnd", "Shell_SecondaryTrayWnd"];
 
 struct Mini {
     ui: MiniPlayer,
@@ -68,6 +77,8 @@ struct Mini {
     poll: slint::Timer,
     /// The window in front when the poll last looked.
     front: Cell<Option<isize>>,
+    /// Hears every press on screen while it shows unpinned (`listen`).
+    presses: RefCell<Option<native::PressWatch>>,
 }
 
 thread_local! {
@@ -139,6 +150,7 @@ pub fn create(ctx: &Rc<Ctx>) -> Result<MiniPlayer, String> {
         hwnd: Cell::new(None),
         poll: slint::Timer::default(),
         front: Cell::new(None),
+        presses: RefCell::new(None),
     });
     // Registered first: a cover already decoded arrives inside `sync`.
     MINI.with_borrow_mut(|m| *m = Some(mini.clone()));
@@ -155,7 +167,12 @@ pub fn open(ctx: &Rc<Ctx>, x: i32, y: i32) -> Result<(), String> {
     let border = popup::border(&ui.global::<Theme>());
     let (left, top) = popup::show_at(ui.window(), (x, y), SIZE, border)?;
     if let Some(hwnd) = shell::hwnd(ui.window()) {
-        MINI.with_borrow(|m| m.as_ref().map(|m| m.hwnd.set(Some(hwnd))));
+        MINI.with_borrow(|m| {
+            if let Some(mini) = m {
+                mini.hwnd.set(Some(hwnd));
+                listen(mini);
+            }
+        });
         if let Err(e) = native::when_pressed(hwnd, pressed) {
             log!("mini player: presses: {e}");
         }
@@ -276,6 +293,7 @@ fn toggle_pin() {
     data.set_pinned(pinned);
     if pinned {
         mini.poll.stop();
+        mini.presses.take();
     } else if mini.pressed_from_behind.take() {
         dismiss();
     } else {
@@ -283,12 +301,45 @@ fn toggle_pin() {
     }
 }
 
-/// Starts the foreground poll from the window in front now: unpinned, the mini player
-/// closes once another app comes to the front (`moved_away`).
+/// Starts the foreground poll from the window in front now, and listens for presses:
+/// unpinned, the mini player closes once another app comes to the front (`moved_away`) or
+/// the taskbar is pressed (`closes_on_press`).
 fn watch(mini: &Mini) {
     mini.front.set(READ_FOREGROUND.get()().map(|f| f.hwnd));
     mini.poll
         .start(slint::TimerMode::Repeated, POLL, look_at_the_front);
+    listen(mini);
+}
+
+/// Hears every press on screen from now on, once the mini player shows on screen (the
+/// offscreen platform has no screen to press). Pinning or closing it stops that.
+fn listen(mini: &Mini) {
+    if mini.hwnd.get().is_none() || mini.presses.borrow().is_some() {
+        return;
+    }
+    match native::watch_presses(pressed_on) {
+        Ok(watch) => *mini.presses.borrow_mut() = Some(watch),
+        Err(e) => log!("mini player: presses on screen: {e}"),
+    }
+}
+
+/// A press somewhere on screen, on a top-level window of class `class`. Windows calls this
+/// from the UI thread's message loop and it can't unwind, so it only reads `MINI`: nothing
+/// may hold `MINI` mutably while it pumps messages.
+fn pressed_on(class: &str) {
+    if closes_on_press(class) {
+        dismiss();
+    }
+}
+
+/// Whether a press on a top-level window of class `class` closes the unpinned mini player:
+/// one on the taskbar does. With the mini player in front, that press takes the activation
+/// from it anyway; opened from the flyout, the taskbar is already in front and stays there,
+/// so the poll can't see it. A press on the tray icon closes it before the click arrives,
+/// which then doesn't open it again (`REOPEN_GUARD`). Presses elsewhere are the poll's and
+/// the activation's to judge: the mini player itself, the flyout, the tray icon's menu.
+fn closes_on_press(class: &str) -> bool {
+    TASKBAR.contains(&class)
 }
 
 /// One round of the foreground poll.
@@ -446,5 +497,29 @@ mod tests {
         let app = front(APP, "Chrome_WidgetWin_1");
         assert!(!moved_away(Some(&taskbar), Some(OWN), &mut last));
         assert!(moved_away(Some(&app), Some(OWN), &mut last));
+    }
+
+    #[test]
+    fn a_press_on_the_taskbar_closes_it() {
+        for class in ["Shell_TrayWnd", "Shell_SecondaryTrayWnd"] {
+            assert!(closes_on_press(class), "{class}");
+        }
+    }
+
+    #[test]
+    fn a_press_anywhere_else_leaves_it_to_the_poll() {
+        let elsewhere = [
+            "TopLevelWindowForOverflowXamlIsland",
+            "NotifyIconOverflowWindow",
+            "ForegroundStaging",
+            "#32768",
+            "Window Class",
+            "Chrome_WidgetWin_1",
+            "Progman",
+            "",
+        ];
+        for class in elsewhere {
+            assert!(!closes_on_press(class), "{class}");
+        }
     }
 }
