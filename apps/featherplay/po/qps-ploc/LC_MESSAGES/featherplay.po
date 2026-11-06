@@ -269,7 +269,7 @@ msgstr "[featherplay is still running in the tray]"
 msgid "Right-click the tray icon to show the window or quit."
 msgstr "[Right-click the tray icon to show the window or quit.]"
 
-#: src/controller.rs:1185
+#: src/controller.rs:1189
 msgid "No sound output found. Connect speakers or headphones."
 msgstr "[No sound output found. Connect speakers or headphones.]"
 
@@ -579,82 +579,78 @@ msgstr "[System default]"
 msgid "{} (not connected)"
 msgstr "[{} (not connected)]"
 
-#: src/pages/sign_in.rs:142
+#: src/pages/sign_in.rs:147
 msgid "Finish signing in in the other window. It closes by itself."
 msgstr "[Finish signing in in the other window. It closes by itself.]"
 
-#: src/pages/sign_in.rs:144
+#: src/pages/sign_in.rs:149
 msgid "Pick or add a Google account in the sign-in window"
 msgstr "[Pick or add a Google account in the sign-in window]"
 
-#: src/pages/sign_in.rs:174
+#: src/pages/sign_in.rs:189
 msgid "The sign-in window closed before you signed in."
 msgstr "[The sign-in window closed before you signed in.]"
 
-#: src/pages/sign_in.rs:188
+#: src/pages/sign_in.rs:203
 msgid "The sign-in window didn't work: {}"
 msgstr "[The sign-in window didn't work: {}]"
 
-#: src/pages/sign_in.rs:213 src/snapshot.rs:616
+#: src/pages/sign_in.rs:228 src/snapshot.rs:623
 msgid ""
 "Finish signing in in Microsoft Edge. featherplay closes it once you're in."
 msgstr "[Finish signing in in Microsoft Edge. featherplay closes it once you're in.]"
 
-#: src/pages/sign_in.rs:235
+#: src/pages/sign_in.rs:250
 msgid "Closing Edge…"
 msgstr "[Closing Edge…]"
 
-#: src/pages/sign_in.rs:254
+#: src/pages/sign_in.rs:269
 msgid "Edge closed before you signed in."
 msgstr "[Edge closed before you signed in.]"
 
-#: src/pages/sign_in.rs:255
+#: src/pages/sign_in.rs:270
 msgid "You didn't sign in within 10 minutes, so featherplay closed Edge."
 msgstr "[You didn't sign in within 10 minutes, so featherplay closed Edge.]"
 
-#: src/pages/sign_in.rs:258
+#: src/pages/sign_in.rs:273
 msgid ""
 "featherplay can't find Microsoft Edge on this PC. Use Sign in with Google "
 "instead."
 msgstr "[featherplay can't find Microsoft Edge on this PC. Use Sign in with Google instead.]"
 
-#: src/pages/sign_in.rs:263
+#: src/pages/sign_in.rs:278
 msgid "Microsoft Edge didn't start. Use Sign in with Google instead."
 msgstr "[Microsoft Edge didn't start. Use Sign in with Google instead.]"
 
-#: src/pages/sign_in.rs:267
+#: src/pages/sign_in.rs:282
 msgid ""
 "Edge didn't let featherplay read the sign-in. A policy on this PC may block "
 "it. Use Sign in with Google instead."
 msgstr "[Edge didn't let featherplay read the sign-in. A policy on this PC may block it. Use Sign in with Google instead.]"
 
-#: src/pages/sign_in.rs:276
+#: src/pages/sign_in.rs:291
 msgid ""
 "featherplay lost the connection to Edge. Try again, or use Sign in with "
 "Google."
 msgstr "[featherplay lost the connection to Edge. Try again, or use Sign in with Google.]"
 
-#: src/pages/sign_in.rs:322
+#: src/pages/sign_in.rs:337
 msgid "Paste the cookie header first."
 msgstr "[Paste the cookie header first.]"
 
-#: src/pages/sign_in.rs:325
+#: src/pages/sign_in.rs:340
 msgid ""
 "That doesn't look like a cookie header: it should be name=value pairs "
 "separated by semicolons."
 msgstr "[That doesn't look like a cookie header: it should be name=value pairs separated by semicolons.]"
 
-#: src/pages/sign_in.rs:333
+#: src/pages/sign_in.rs:348
 msgid ""
 "That cookie header has no SAPISID, so it isn't signed in. Copy it from a tab "
 "that is signed in."
 msgstr "[That cookie header has no SAPISID, so it isn't signed in. Copy it from a tab that is signed in.]"
 
-#: src/pages/sign_in/webview.rs:167 ui/pages/sign_in.slint:121
-msgid "Sign in to featherplay"
-msgstr "[Sign in to featherplay]"
-
-#: src/pages/sign_in/webview.rs:243
+#: src/pages/sign_in/webview.rs:417
 msgid "WebView2 isn't available ({}). Paste a cookie header instead."
 msgstr "[WebView2 isn't available ({}). Paste a cookie header instead.]"
 
@@ -1344,7 +1340,7 @@ msgstr "[Playing from]"
 msgid "Shows all the lyrics"
 msgstr "[Shows all the lyrics]"
 
-#: ui/pages/now_playing.slint:524
+#: ui/pages/now_playing.slint:524 ui/sign_in_window.slint:50
 msgid "Back"
 msgstr "[Back]"
 
@@ -2125,6 +2121,10 @@ msgstr "[Paste your user token]"
 msgid "Cookie header"
 msgstr "[Cookie header]"
 
+#: ui/pages/sign_in.slint:121
+msgid "Sign in to featherplay"
+msgstr "[Sign in to featherplay]"
+
 #: ui/pages/sign_in.slint:131
 msgid ""
 "Bring your library, playlists and likes. Search, radio and everything else "
@@ -2310,6 +2310,35 @@ msgstr "[Account, {}]"
 #: ui/sidebar.slint:454
 msgid "Signed in"
 msgstr "[Signed in]"
+
+#: ui/sign_in_window.slint:25
+msgid "Sign in · featherplay"
+msgstr "[Sign in · featherplay]"
+
+#: ui/sign_in_window.slint:57
+msgid "Reload"
+msgstr "[Reload]"
+
+#: ui/sign_in_window.slint:68
+msgid "Address: {}, Google's page"
+msgstr "[Address: {}, Google's page]"
+
+#: ui/sign_in_window.slint:68
+msgid "Address: {}"
+msgstr "[Address: {}]"
+
+#. Plain http: no padlock, and a word saying so.
+#: ui/sign_in_window.slint:83
+msgid "Not secure"
+msgstr "[Not secure]"
+
+#: ui/sign_in_window.slint:129
+msgid "Google's page"
+msgstr "[Google's page]"
+
+#: ui/sign_in_window.slint:157
+msgid "This window closes by itself once you're signed in."
+msgstr "[This window closes by itself once you're signed in.]"
 
 #: ui/song_menu.slint:194
 msgid "Song menu"

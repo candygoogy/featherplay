@@ -114,9 +114,11 @@ buttons ask you to sign in.
 
 featherplay signs you in through a small window, Microsoft Edge WebView2, that shows Google's
 own sign-in page. Windows 11 includes WebView2, and most Windows 10 PCs have it with Edge. You
-sign in there as you would in a browser. featherplay doesn't read your password; the code is
-open. Once you're in, it keeps the YouTube Music session from that window and closes it. The
-main window never contains a browser.
+sign in there as you would in a browser. The window has a slim browser frame: back, reload,
+and the page's address with a padlock, read from WebView2 itself rather than from the page, so
+you can see you're on Google's own sign-in page (it says "Google's page" there). featherplay
+doesn't read your password; the code is open. Once you're in, it keeps the YouTube Music
+session from that window and closes it. The main window never contains a browser.
 
 If you'd rather sign in in a browser you know, choose **Use Microsoft Edge**. Edge
 opens with a temporary profile of its own, with Edge's address bar and padlock, and your

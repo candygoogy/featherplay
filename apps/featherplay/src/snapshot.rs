@@ -129,6 +129,13 @@ pub const PAGES: &[&str] = &[
     "sign-in-edge-why",
     // Sign in with the paste field open.
     "sign-in-paste",
+    // The sign-in window's frame alone (its own 540 x 780 window, the page's room empty):
+    // on Google's sign-in page; on a look-alike host (no "Google's page"); on plain http (no
+    // padlock); on a host wider than the pill (its end, the real domain, still shows).
+    "sign-in-window",
+    "sign-in-window-lookalike",
+    "sign-in-window-http",
+    "sign-in-window-long",
     // Home with the account menu open from the sidebar's account row (placeholder identities).
     "account-menu",
     // A first sign-in whose cookies hold several identities: the picker over the sign-in page.
@@ -736,11 +743,37 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
     } else {
         None
     };
-    let window = match &mini {
-        Some(m) => m.window(),
-        None => ui.window(),
+    let frame = if o.page.starts_with("sign-in-window") {
+        let source = match o.page.as_str() {
+            "sign-in-window-lookalike" => {
+                "https://accounts.google.com.evil.example/v3/signin/identifier"
+            }
+            "sign-in-window-http" => "http://example.com/login",
+            "sign-in-window-long" => {
+                "https://accounts.google.com.wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww.example/v3/signin"
+            }
+            _ => "https://accounts.google.com/v3/signin/identifier?flowName=GlifWebSignIn",
+        };
+        let frame = crate::pages::sign_in::frame_for_snapshot(ctx, source)?;
+        frame
+            .window()
+            .dispatch_event(WindowEvent::ScaleFactorChanged {
+                scale_factor: o.scale,
+            });
+        settle();
+        Some(frame)
+    } else {
+        None
     };
-    let logical = mini.as_ref().map(|_| crate::mini::SIZE);
+    let window = match (&mini, &frame) {
+        (Some(m), _) => m.window(),
+        (None, Some(f)) => f.window(),
+        (None, None) => ui.window(),
+    };
+    let logical = mini
+        .as_ref()
+        .map(|_| crate::mini::SIZE)
+        .or(frame.as_ref().map(|_| crate::pages::sign_in::WINDOW_SIZE));
     let (width, height) = match logical {
         Some((w, h)) => ((w * o.scale).round() as u32, (h * o.scale).round() as u32),
         None => (o.width, o.height),
@@ -931,6 +964,10 @@ fn page(name: &str, f: &Fixtures) -> Result<Page, String> {
         | "sign-in-edge-blocked"
         | "sign-in-edge-why"
         | "sign-in-paste"
+        | "sign-in-window"
+        | "sign-in-window-lookalike"
+        | "sign-in-window-http"
+        | "sign-in-window-long"
         | "account-picker" => Page::SignIn,
         "explore" => Page::Explore {
             tab: ExploreTab::NewReleases,

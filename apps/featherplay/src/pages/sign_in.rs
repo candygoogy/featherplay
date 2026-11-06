@@ -4,15 +4,20 @@
 //! The account menu's "Switch Google account" opens the same window on Google's account
 //! chooser (`switch_account`), from any page; its news then shows as toasts.
 //!
-//! Three ways in: the sign-in window (`webview`, a separate WebView2 window on its own
-//! thread, the default), Microsoft Edge with a temporary profile (`edge`), or a pasted
-//! cookie header, checked here for shape and by the controller with one read. The two
-//! windows build the same header (`session`). Every way, the controller stores the header
-//! and signs in without a restart. The header is never logged.
+//! Three ways in: the sign-in window (the default: a slim browser frame, `frame`, round
+//! Google's page in WebView2 on a thread of its own, `webview`, its address from the
+//! webview's `Source`, `address`), Microsoft Edge with a temporary profile (`edge`), or a
+//! pasted cookie header, checked here for shape and by the controller with one read. The
+//! two windows build the same header (`session`). Every way, the controller stores the
+//! header and signs in without a restart. The header is never logged.
 
+mod address;
 mod edge;
+mod frame;
 mod session;
 mod webview;
+
+pub use frame::SIZE as WINDOW_SIZE;
 
 use std::cell::RefCell;
 use std::path::Path;
@@ -144,7 +149,7 @@ fn open_window(ctx: &Rc<Ctx>, start: &'static str) {
         ctx.toast(tr!("Pick or add a Google account in the sign-in window"));
     }
     let profile = Paths::resolve().cache.join("webview2");
-    let opened = webview::open(profile, start, |outcome| {
+    let opened = frame::open(ctx, profile, start, |outcome| {
         let _ = slint::invoke_from_event_loop(move || window_closed(outcome));
     });
     if let Err(e) = opened {
@@ -158,8 +163,18 @@ fn open_window(ctx: &Rc<Ctx>, start: &'static str) {
     }
 }
 
+/// The sign-in window's frame showing `source` as its address, as `--snapshot` renders it.
+pub fn frame_for_snapshot(ctx: &Rc<Ctx>, source: &str) -> Result<crate::ui::SignInWindow, String> {
+    let ui = frame::create(ctx)?;
+    frame::show_address(&ui, &address::address(source));
+    ui.set_can_back(true);
+    Ok(ui)
+}
+
 /// On the UI thread, once the sign-in window has closed.
 fn window_closed(outcome: webview::Outcome) {
+    // The page thread has ended, so its parent can go.
+    frame::closed();
     let Some(ctx) = Ctx::get() else { return };
     let Some(ui) = ctx.window() else { return };
     let data = ui.global::<SignInData>();

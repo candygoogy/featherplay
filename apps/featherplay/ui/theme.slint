@@ -98,6 +98,9 @@ export global Theme {
     out property <color> playing-row: dark ? #FFFFFF0F : #0000000A;
     // The recommended row of a list of choices (`ChoiceRow.lit`), a shade over the panel.
     out property <color> choice-lit: dark ? #FFFFFF0A : #00000008;
+    // A checked fact, as text and its dot: the sign-in window's "Google's page". AA on the
+    // address field (9:1 on dark, 5.2:1 on light).
+    out property <color> verified: dark ? #9FD5A6 : #1A7431;
     // Loading skeletons: the blocks, and the soft highlight that sweeps across them (only
     // inside the blocks, `SkeletonBlock`), `skeleton-band` wide.
     out property <color> skeleton: dark ? #FFFFFF0F : #0000000D;
@@ -354,6 +357,8 @@ export global Icons {
     out property <string> browser: "M12 4.5 a7.5 7.5 0 1 0 0.01 0 Z M5 13 C8 9 16 9 19 12";
     // A clipboard (Paste a cookie header).
     out property <string> clipboard: "M9 4.5 H15 V7.5 H9 Z M7 6 H6 A1 1 0 0 0 5 7 V18.5 A1 1 0 0 0 6 19.5 H18 A1 1 0 0 0 19 18.5 V7 A1 1 0 0 0 18 6 H17";
+    // Reload: an open circle with its arrowhead (the sign-in window).
+    out property <string> reload: "M18.5 12 A6.5 6.5 0 1 1 16.5 7.3 M17 4.5 V8 H13.5";
     // A single note: the placeholder on empty covers.
     out property <string> note: "M11.5 17 V4.5 C13 6.5 17 6.5 17.5 10.5 M11.5 17 a2.5 2.5 0 1 1 -5 0 a2.5 2.5 0 1 1 5 0 Z";
 }

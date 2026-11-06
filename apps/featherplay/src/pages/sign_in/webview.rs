@@ -1,9 +1,19 @@
-//! The sign-in window: a separate top-level window with WebView2, on its own thread with
-//! its own COM apartment and message loop, so the main window never hosts a webview. It opens
-//! accounts.google.com, and once the page reaches music.youtube.com (or the user closes
-//! the window) it reads that site's cookies with `ICoreWebView2CookieManager::GetCookies`,
-//! builds the header in memory, closes the controller and the window, and hands the result
-//! back. Closing the controller lets the msedgewebview2.exe children exit.
+//! The sign-in window's page: WebView2 on a thread of its own, with its own COM apartment
+//! and message loop, inside the frame the UI thread draws (`frame`: back, reload, the
+//! address, the status strip). The webview is a child window of the frame's HWND, placed in
+//! the room between the toolbar and the strip (`content_bounds`), and kept there as the
+//! frame is resized or dragged to a screen of another scale: the frame posts to a
+//! message-only window of this thread (`Remote`). The child's thread and its parent's are
+//! two, so Windows joins their input, as it already does with WebView2's browser process:
+//! neither thread blocks for long. The main window never hosts a webview.
+//!
+//! It opens accounts.google.com, and once the page reaches music.youtube.com (or the user
+//! closes the window) it reads that site's cookies with `ICoreWebView2CookieManager::GetCookies`,
+//! builds the header in memory, closes the controller and hands the result back; the frame
+//! goes with it. Closing the controller lets the msedgewebview2.exe children exit.
+//!
+//! The frame shows the address from the webview's `Source` alone (`address`), never from the
+//! page. Pages that open a window open in this one instead, so every page has the frame.
 //!
 //! The cookie header is never printed, logged or written here.
 //!
@@ -16,21 +26,25 @@
 
 use std::cell::RefCell;
 use std::path::{Path, PathBuf};
+use std::sync::mpsc::SyncSender;
+use std::time::Duration;
 
 use featherplay_core::tr;
 use webview2_com::Microsoft::Web::WebView2::Win32::*;
 use webview2_com::{
     ClearBrowsingDataCompletedHandler, CoTaskMemPWSTR, CoreWebView2EnvironmentOptions,
     CreateCoreWebView2ControllerCompletedHandler, CreateCoreWebView2EnvironmentCompletedHandler,
-    GetCookiesCompletedHandler, SourceChangedEventHandler,
+    GetCookiesCompletedHandler, HistoryChangedEventHandler, NewWindowRequestedEventHandler,
+    SourceChangedEventHandler,
 };
 use windows::Win32::Foundation::{E_POINTER, HINSTANCE, HWND, LPARAM, LRESULT, RECT, WPARAM};
 use windows::Win32::System::Com::{COINIT_APARTMENTTHREADED, CoInitializeEx, CoUninitialize};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
-use windows::Win32::UI::HiDpi::GetDpiForSystem;
+use windows::Win32::UI::HiDpi::GetDpiForWindow;
 use windows::Win32::UI::WindowsAndMessaging::*;
 use windows::core::{BOOL, HSTRING, Interface, PCWSTR, PWSTR, w};
 
+use super::address::{Address, address};
 use super::session::{self, Cookie, MUSIC_HOST};
 
 /// Where the window opens: signing in (`session::SIGN_IN_URL`), or Google's account chooser
@@ -39,8 +53,6 @@ use super::session::{self, Cookie, MUSIC_HOST};
 pub const CHOOSER_URL: &str =
     "https://accounts.google.com/AccountChooser?continue=https://music.youtube.com";
 const COOKIE_URL: &str = "https://music.youtube.com";
-/// Logical size of the window.
-const SIZE: (i32, i32) = (520, 760);
 /// What the profile drops when the window closes: all but the cookies.
 const FORGET: COREWEBVIEW2_BROWSING_DATA_KINDS = COREWEBVIEW2_BROWSING_DATA_KINDS(
     COREWEBVIEW2_BROWSING_DATA_KINDS_ALL_DOM_STORAGE.0
@@ -54,6 +66,8 @@ const FORGET: COREWEBVIEW2_BROWSING_DATA_KINDS = COREWEBVIEW2_BROWSING_DATA_KIND
 /// How long the window waits for `FORGET` before it closes anyway.
 const FORGET_TIMEOUT_MS: u32 = 5000;
 const FORGET_TIMER: usize = 1;
+/// How long `open` waits for the thread's message window.
+const READY_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// How the sign-in window ended.
 pub enum Outcome {
@@ -66,9 +80,90 @@ pub enum Outcome {
     Failed(String),
 }
 
+/// What the frame shows, from this thread.
+pub enum Event {
+    /// The page moved: its address, from the webview's `Source`.
+    Address(Address),
+    /// Back can go somewhere.
+    CanGoBack(bool),
+    /// The sign-in is over: the frame hides while the profile is cleared.
+    Closing,
+}
+
+/// The room the page gets in the frame: logical pixels below the toolbar's top and above the
+/// window's bottom (`SignInWindow.page-top` and `page-bottom`).
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Room {
+    pub top: f32,
+    pub bottom: f32,
+}
+
+/// The UI thread's handle on a running sign-in: posts to this thread's message window.
+/// Copied into the frame's callbacks; dropped with the frame once the sign-in has ended.
+#[derive(Clone, Copy)]
+pub struct Remote {
+    control: isize,
+}
+
+impl Remote {
+    pub fn back(self) {
+        self.post(WM_BACK);
+    }
+
+    pub fn reload(self) {
+        self.post(WM_RELOAD);
+    }
+
+    /// The frame's close button: reads the cookies first, then closes.
+    pub fn close(self) {
+        self.post(WM_ASK_CLOSE);
+    }
+
+    /// The frame changed size or scale: the page follows.
+    pub fn relayout(self) {
+        self.post(WM_RELAYOUT);
+    }
+
+    /// The frame moved: the page's popups (a select's list) follow.
+    pub fn moved(self) {
+        self.post(WM_MOVED);
+    }
+
+    /// The frame came back to the front from the keyboard (Alt+Tab): typing goes to the
+    /// page again.
+    pub fn focus_page(self) {
+        self.post(WM_FOCUS_PAGE);
+    }
+
+    /// The page thread still takes messages (its message window exists until the end).
+    pub fn is_alive(self) -> bool {
+        // SAFETY: a handle-only query; a destroyed window just answers no.
+        unsafe { IsWindow(Some(HWND(self.control as *mut _))).as_bool() }
+    }
+
+    fn post(self, msg: u32) {
+        // SAFETY: PostMessageW only queues integers for the sign-in thread's message window;
+        // once that's destroyed the call fails rather than touching memory.
+        unsafe {
+            let _ = PostMessageW(
+                Some(HWND(self.control as *mut _)),
+                msg,
+                WPARAM(0),
+                LPARAM(0),
+            );
+        }
+    }
+}
+
+type Events = Box<dyn Fn(Event)>;
+
 #[derive(Default)]
 struct State {
+    /// This thread's message-only window: the frame's messages, the teardown's steps.
     hwnd: HWND,
+    /// The frame's window, on the UI thread: the webview's parent.
+    parent: HWND,
+    room: Room,
     controller: Option<ICoreWebView2Controller>,
     webview: Option<ICoreWebView2>,
     env: Option<ICoreWebView2Environment>,
@@ -84,46 +179,99 @@ struct State {
 
 thread_local! {
     static STATE: RefCell<State> = RefCell::new(State::default());
+    static EVENTS: RefCell<Option<Events>> = const { RefCell::new(None) };
 }
 
-/// Opens the window at `start` on a new thread; `done` runs on that thread when it has
-/// closed. `profile` is the WebView2 user data folder (`{cache}/webview2`).
+/// Opens Google's page at `start` in the frame `parent` (an HWND of the UI thread), on a new
+/// thread; `events` and `done` run on that thread, `done` once the page has closed.
+/// `profile` is the WebView2 user data folder (`{cache}/webview2`). Returns once the thread
+/// takes messages; an error then means `done` never runs.
 pub fn open(
+    parent: isize,
+    room: Room,
     profile: PathBuf,
     start: &'static str,
+    events: impl Fn(Event) + Send + 'static,
     done: impl FnOnce(Outcome) + Send + 'static,
-) -> Result<(), String> {
+) -> Result<Remote, String> {
+    let (ready, ready_rx) = std::sync::mpsc::sync_channel(1);
     std::thread::Builder::new()
         .name("featherplay-signin".into())
-        .spawn(move || done(run(&profile, start)))
-        .map(|_| ())
-        .map_err(|e| format!("sign-in thread: {e}"))
+        .spawn(move || {
+            EVENTS.with(|e| *e.borrow_mut() = Some(Box::new(events)));
+            if let Some(outcome) = run(HWND(parent as *mut _), room, &profile, start, &ready) {
+                done(outcome);
+            }
+        })
+        .map_err(|e| format!("sign-in thread: {e}"))?;
+    let control = ready_rx
+        .recv_timeout(READY_TIMEOUT)
+        .map_err(|_| "the sign-in thread didn't start".to_string())??;
+    Ok(Remote { control })
 }
 
-fn run(profile: &Path, start: &str) -> Outcome {
-    run_with(profile, |profile| open_and_pump(profile, start)).0
+/// The thread: its message window first (announced on `ready`; `None` if it can't be
+/// made), then the webview in `parent`, run to the end.
+fn run(
+    parent: HWND,
+    room: Room,
+    profile: &Path,
+    start: &str,
+    ready: &SyncSender<Result<isize, String>>,
+) -> Option<Outcome> {
+    let control = match create_control() {
+        Ok(h) => h,
+        Err(e) => {
+            let _ = ready.send(Err(e));
+            return None;
+        }
+    };
+    STATE.with(|s| {
+        let mut s = s.borrow_mut();
+        s.hwnd = control;
+        s.parent = parent;
+        s.room = room;
+        s.close_cancels = start == CHOOSER_URL;
+    });
+    let _ = ready.send(Ok(control.0 as isize));
+    Some(
+        run_with(profile, |profile| {
+            attach_and_pump(control, parent, profile, start)
+        })
+        .0,
+    )
 }
 
-/// `pump` creates the window and runs it to the end, inside this thread's COM apartment.
+/// `pump` creates the webview and runs it to the end, inside this thread's COM apartment.
 /// Also says whether the profile forgot everything but its cookies.
 fn run_with(profile: &Path, pump: impl FnOnce(&Path) -> Result<(), String>) -> (Outcome, bool) {
+    let control = STATE.with(|s| s.borrow().hwnd);
+    let fail = |why: String| {
+        // SAFETY: this thread's own message window; nothing is attached to it yet.
+        unsafe {
+            let _ = DestroyWindow(control);
+        }
+        STATE.with(|s| *s.borrow_mut() = State::default());
+        (Outcome::Failed(why), false)
+    };
     if let Err(e) = std::fs::create_dir_all(profile) {
-        let why = format!("can't create the sign-in profile: {}", e.kind());
-        return (Outcome::Failed(why), false);
+        return fail(format!("can't create the sign-in profile: {}", e.kind()));
     }
     // SAFETY: once per thread, released below.
     if unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED) }.is_err() {
-        return (Outcome::Failed("COM didn't start".into()), false);
+        return fail("COM didn't start".into());
     }
     let res = pump(profile);
-    let (outcome, forgot) = STATE.with(|s| {
+    let (outcome, forgot, closing) = STATE.with(|s| {
         let mut s = s.borrow_mut();
-        (s.outcome.take(), s.forgot)
+        (s.outcome.take(), s.forgot, s.forgetting)
     });
     STATE.with(|s| *s.borrow_mut() = State::default());
     // SAFETY: matches the CoInitializeEx above; every COM object of this thread is gone.
     unsafe { CoUninitialize() };
     let outcome = match (res, outcome) {
+        // Closed while WebView2 was starting: the start was cut short, not broken.
+        (Err(_), o) if closing => o.unwrap_or(Outcome::NotSignedIn),
         (Err(e), _) => Outcome::Failed(e),
         (Ok(()), Some(o)) => o,
         (Ok(()), None) => Outcome::NotSignedIn,
@@ -131,67 +279,53 @@ fn run_with(profile: &Path, pump: impl FnOnce(&Path) -> Result<(), String>) -> (
     (outcome, forgot)
 }
 
-fn open_and_pump(profile: &Path, start: &str) -> Result<(), String> {
-    let hwnd = create_window(WS_OVERLAPPEDWINDOW | WS_VISIBLE)?;
-    STATE.with(|s| {
-        let mut s = s.borrow_mut();
-        s.hwnd = hwnd;
-        s.close_cancels = start == CHOOSER_URL;
-    });
-    // SAFETY: `hwnd` was just created on this thread and is alive; these calls take only
-    // the handle (and `set_icon` documents the same requirement).
-    unsafe {
-        let scale = GetDpiForSystem() as f32 / 96.0;
-        let _ = crate::native::set_icon(hwnd.0 as isize, scale);
-        let _ = SetForegroundWindow(hwnd);
-    }
-    attach_and_pump(hwnd, profile, start)
-}
-
-/// Creates the webview in `hwnd` at `start` and runs the loop until the window is gone.
-fn attach_and_pump(hwnd: HWND, profile: &Path, start: &str) -> Result<(), String> {
-    let made = create_webview(hwnd, profile, start);
+/// Creates the webview in `parent` at `start` and runs the loop until `control` is gone.
+fn attach_and_pump(control: HWND, parent: HWND, profile: &Path, start: &str) -> Result<(), String> {
+    let made = create_webview(parent, profile, start);
     if let Err(e) = made {
-        // SAFETY: our window; no webview is attached.
+        // Closed while WebView2 was starting: the message window is already gone and the
+        // wait inside `create_webview` took its WM_QUIT. Never pump again then: WebView2's
+        // late completion would find its waiter gone, and webview2-com panics inside the
+        // COM callback, which aborts the app. The thread ends without dispatching it.
+        // SAFETY: handle-only calls on our message window; no webview is attached.
         unsafe {
-            let _ = DestroyWindow(hwnd);
+            if IsWindow(Some(control)).as_bool() {
+                let _ = DestroyWindow(control);
+                drain_messages();
+            }
         }
-        drain_messages();
         return Err(e);
     }
     drain_messages();
     Ok(())
 }
 
-fn create_window(style: WINDOW_STYLE) -> Result<HWND, String> {
-    let title = HSTRING::from(tr!("Sign in to featherplay"));
+/// This thread's message-only window: no frame, never shown, only posted to.
+fn create_control() -> Result<HWND, String> {
     // SAFETY: `wndproc` has the WNDPROC signature; the class name is a static NUL-terminated
-    // string and `title` an HSTRING that outlives the call, which copies it; `class` lives
-    // across RegisterClassW, which copies it.
-    // `instance` is this exe's module, never freed. The window belongs to this thread,
-    // which runs its message loop (`drain_messages`).
+    // string, and `class` lives across RegisterClassW, which copies it. `instance` is this
+    // exe's module, never freed. The window belongs to this thread, which runs its message
+    // loop (`drain_messages`).
     unsafe {
         let instance = GetModuleHandleW(None).map_err(|e| format!("GetModuleHandleW: {e}"))?;
         let class = WNDCLASSW {
             lpfnWndProc: Some(wndproc),
             hInstance: HINSTANCE(instance.0),
             lpszClassName: w!("featherplay-signin"),
-            hCursor: LoadCursorW(None, IDC_ARROW).unwrap_or_default(),
             ..Default::default()
         };
         // Fails harmlessly when a previous sign-in already registered it.
         RegisterClassW(&class);
-        let scale = GetDpiForSystem() as f32 / 96.0;
         CreateWindowExW(
             Default::default(),
             w!("featherplay-signin"),
-            &title,
-            style,
-            CW_USEDEFAULT,
-            CW_USEDEFAULT,
-            (SIZE.0 as f32 * scale) as i32,
-            (SIZE.1 as f32 * scale) as i32,
-            None,
+            w!(""),
+            WINDOW_STYLE(0),
+            0,
+            0,
+            0,
+            0,
+            Some(HWND_MESSAGE),
             None,
             Some(HINSTANCE(instance.0)),
             None,
@@ -200,7 +334,7 @@ fn create_window(style: WINDOW_STYLE) -> Result<HWND, String> {
     }
 }
 
-/// Runs this thread's message loop until the window's WM_QUIT (from WM_DESTROY).
+/// Runs this thread's message loop until the message window's WM_QUIT (from WM_DESTROY).
 fn drain_messages() {
     let mut msg = MSG::default();
     // SAFETY: `msg` is a live MSG; with no window filter GetMessageW fails only for a bad
@@ -213,7 +347,47 @@ fn drain_messages() {
     }
 }
 
-fn create_webview(hwnd: HWND, profile: &Path, start: &str) -> Result<(), String> {
+/// The page's rectangle in a client area `client` at `dpi`: below the toolbar, above the
+/// status strip, as the frame lays them out at that scale.
+fn content_bounds(client: RECT, dpi: u32, room: Room) -> RECT {
+    let scale = if dpi == 0 { 1.0 } else { dpi as f32 / 96.0 };
+    let top = client.top + (room.top * scale).round() as i32;
+    let bottom = client.bottom - (room.bottom * scale).round() as i32;
+    RECT {
+        left: client.left,
+        top,
+        right: client.right,
+        bottom: bottom.max(top),
+    }
+}
+
+/// The page's rectangle in the frame as it is now.
+fn bounds_now() -> RECT {
+    let (parent, room) = STATE.with(|s| {
+        let s = s.borrow();
+        (s.parent, s.room)
+    });
+    let mut client = RECT::default();
+    // SAFETY: handle-only queries and a live out pointer; a destroyed `parent` makes them
+    // fail (an empty rectangle, DPI 0) rather than touching memory.
+    let dpi = unsafe {
+        let _ = GetClientRect(parent, &mut client);
+        GetDpiForWindow(parent)
+    };
+    content_bounds(client, dpi, room)
+}
+
+fn emit(event: Event) {
+    EVENTS.with(|e| {
+        if let Ok(e) = e.try_borrow()
+            && let Some(f) = e.as_ref()
+        {
+            f(event);
+        }
+    });
+}
+
+fn create_webview(parent: HWND, profile: &Path, start: &str) -> Result<(), String> {
     let folder = HSTRING::from(profile.as_os_str());
     let env = {
         let (tx, rx) = std::sync::mpsc::channel();
@@ -255,10 +429,10 @@ fn create_webview(hwnd: HWND, profile: &Path, start: &str) -> Result<(), String>
         let env2 = env.clone();
         CreateCoreWebView2ControllerCompletedHandler::wait_for_async_operation(
             // SAFETY: `env2` is a live, reference-counted environment and `handler` a live
-            // COM object. `hwnd` is the sign-in window of this thread; if the user closed it
+            // COM object. `parent` is the frame's window on the UI thread; if it closed
             // meanwhile, the handle is stale and the call fails rather than touching memory.
             Box::new(move |handler| unsafe {
-                env2.CreateCoreWebView2Controller(hwnd, &handler)
+                env2.CreateCoreWebView2Controller(parent, &handler)
                     .map_err(webview2_com::Error::WindowsError)
             }),
             Box::new(move |hr, c| {
@@ -274,17 +448,16 @@ fn create_webview(hwnd: HWND, profile: &Path, start: &str) -> Result<(), String>
     }
     .map_err(|e| format!("WebView2 controller: {e}"))?;
 
-    // SAFETY: `controller` was just made for `hwnd` on this thread and we hold a reference
-    // to it; `rect` is a live out pointer for GetClientRect.
+    // SAFETY: `controller` was just made on this thread and we hold a reference to it.
     let webview = unsafe {
-        let mut rect = RECT::default();
-        let _ = GetClientRect(hwnd, &mut rect);
         controller
-            .SetBounds(rect)
+            .SetBounds(bounds_now())
             .map_err(|e| format!("SetBounds: {e}"))?;
         controller
             .SetIsVisible(true)
             .map_err(|e| format!("SetIsVisible: {e}"))?;
+        // The keyboard goes to the page, so the email field takes typing at once.
+        let _ = controller.MoveFocus(COREWEBVIEW2_MOVE_FOCUS_REASON_PROGRAMMATIC);
         controller
             .CoreWebView2()
             .map_err(|e| format!("CoreWebView2: {e}"))?
@@ -295,7 +468,7 @@ fn create_webview(hwnd: HWND, profile: &Path, start: &str) -> Result<(), String>
         log!("sign-in window: settings: {e}");
     }
 
-    // SAFETY: we hold `webview` and call it on its own thread. The handler is a COM object
+    // SAFETY: we hold `webview` and call it on its own thread. The handlers are COM objects
     // the webview keeps a reference to; `token` and `url` live across the calls that read
     // them.
     unsafe {
@@ -307,6 +480,7 @@ fn create_webview(hwnd: HWND, profile: &Path, start: &str) -> Result<(), String>
                     let mut src = PWSTR::null();
                     let _ = wv.Source(&mut src);
                     let src = CoTaskMemPWSTR::from(src).to_string();
+                    emit(Event::Address(address(&src)));
                     if on_music_site(&src) {
                         log!("sign-in window: reached the music site");
                         begin_read_cookies();
@@ -316,6 +490,39 @@ fn create_webview(hwnd: HWND, profile: &Path, start: &str) -> Result<(), String>
                 &mut token,
             )
             .map_err(|e| format!("add_SourceChanged: {e}"))?;
+        webview
+            .add_HistoryChanged(
+                &HistoryChangedEventHandler::create(Box::new(|sender, _args| {
+                    let Some(wv) = sender else { return Ok(()) };
+                    let mut back = BOOL::default();
+                    let _ = wv.CanGoBack(&mut back);
+                    emit(Event::CanGoBack(back.as_bool()));
+                    Ok(())
+                })),
+                &mut token,
+            )
+            .map_err(|e| format!("add_HistoryChanged: {e}"))?;
+        // A link that opens a window (Help, Privacy) opens here instead, under the frame's
+        // address, rather than in a bare window with none.
+        webview
+            .add_NewWindowRequested(
+                &NewWindowRequestedEventHandler::create(Box::new(|sender, args| {
+                    let (Some(wv), Some(args)) = (sender, args) else {
+                        return Ok(());
+                    };
+                    args.SetHandled(true)?;
+                    let mut uri = PWSTR::null();
+                    args.Uri(&mut uri)?;
+                    let uri = CoTaskMemPWSTR::from(uri).to_string();
+                    if opens_here(&uri) {
+                        let uri = HSTRING::from(uri);
+                        let _ = wv.Navigate(PCWSTR(uri.as_ptr()));
+                    }
+                    Ok(())
+                })),
+                &mut token,
+            )
+            .map_err(|e| format!("add_NewWindowRequested: {e}"))?;
         let url = HSTRING::from(start);
         webview
             .Navigate(PCWSTR(url.as_ptr()))
@@ -353,6 +560,11 @@ unsafe fn harden(webview: &ICoreWebView2) -> windows::core::Result<()> {
 fn on_music_site(src: &str) -> bool {
     reqwest::Url::parse(src)
         .is_ok_and(|u| u.scheme() == "https" && u.host_str() == Some(MUSIC_HOST))
+}
+
+/// A window a page asked for opens in this one: web pages only.
+fn opens_here(uri: &str) -> bool {
+    reqwest::Url::parse(uri).is_ok_and(|u| matches!(u.scheme(), "https" | "http"))
 }
 
 fn begin_read_cookies() {
@@ -472,6 +684,13 @@ unsafe fn read_cookie(c: &ICoreWebView2Cookie) -> Option<Cookie> {
 const WM_FINISH: u32 = WM_APP + 1;
 /// `FORGET` is done (or failed): close for real.
 const WM_FORGOT: u32 = WM_APP + 2;
+/// The frame's messages (`Remote`).
+const WM_ASK_CLOSE: u32 = WM_APP + 3;
+const WM_RELAYOUT: u32 = WM_APP + 4;
+const WM_MOVED: u32 = WM_APP + 5;
+const WM_BACK: u32 = WM_APP + 6;
+const WM_RELOAD: u32 = WM_APP + 7;
+const WM_FOCUS_PAGE: u32 = WM_APP + 8;
 
 /// Defers the teardown to the message loop: never close the controller from inside a
 /// WebView2 completion callback.
@@ -484,7 +703,7 @@ fn post_finish() {
     }
 }
 
-/// Hides the window, then clears everything in the profile but the cookies (`FORGET`);
+/// Hides the frame, then clears everything in the profile but the cookies (`FORGET`);
 /// `close` follows on `WM_FORGOT`, or after `FORGET_TIMEOUT_MS` at most.
 fn forget_then_close() {
     let (hwnd, webview) = STATE.with(|s| {
@@ -495,10 +714,7 @@ fn forget_then_close() {
         s.forgetting = true;
         (s.hwnd, s.webview.clone())
     });
-    // SAFETY: only a handle and a flag; a destroyed `hwnd` makes the call fail.
-    unsafe {
-        let _ = ShowWindow(hwnd, SW_HIDE);
-    }
+    emit(Event::Closing);
     let Some(webview) = webview else {
         close();
         return;
@@ -538,8 +754,8 @@ fn forget_then_close() {
     }
 }
 
-/// Closes the controller, releases every COM reference and destroys the window. Runs
-/// once.
+/// Closes the controller (the page's child window goes with it), releases every COM
+/// reference and destroys the message window, which ends the loop. Runs once.
 fn close() {
     let (hwnd, controller) = STATE.with(|s| {
         let mut s = s.borrow_mut();
@@ -570,39 +786,78 @@ fn close() {
     }
 }
 
+/// Closing: read the cookies first (the user may have signed in without the page moving
+/// on); `forget_then_close` follows once they're read. On the account chooser, closing
+/// keeps the current session.
+fn ask_close() {
+    let (reading, cancels) = STATE.with(|s| {
+        s.try_borrow()
+            .map(|s| (s.reading, s.close_cancels))
+            .unwrap_or((true, false))
+    });
+    if !reading && cancels {
+        STATE.with(|s| {
+            let mut s = s.borrow_mut();
+            s.reading = true;
+            s.outcome = Some(Outcome::Cancelled);
+        });
+        post_finish();
+    } else if !reading {
+        begin_read_cookies();
+    }
+}
+
 extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    let controller = || STATE.with(|s| s.try_borrow().ok().and_then(|s| s.controller.clone()));
+    let webview = || STATE.with(|s| s.try_borrow().ok().and_then(|s| s.webview.clone()));
     match msg {
-        WM_SIZE => {
-            let controller = STATE.with(|s| s.try_borrow().ok().and_then(|s| s.controller.clone()));
-            if let Some(c) = controller {
-                // SAFETY: a controller reference we hold, used on its thread; `rect` is a
-                // live out pointer and `hwnd` the window this procedure was called for.
+        WM_RELAYOUT => {
+            if let Some(c) = controller() {
+                // SAFETY: a controller reference we hold, used on its thread.
                 unsafe {
-                    let mut rect = RECT::default();
-                    let _ = GetClientRect(hwnd, &mut rect);
-                    let _ = c.SetBounds(rect);
+                    let _ = c.SetBounds(bounds_now());
                 }
             }
             LRESULT(0)
         }
-        WM_CLOSE => {
-            // Read the cookies first (the user may have signed in without the page moving
-            // on); `finish` destroys the window afterwards.
-            let (reading, cancels) = STATE.with(|s| {
-                s.try_borrow()
-                    .map(|s| (s.reading, s.close_cancels))
-                    .unwrap_or((true, false))
-            });
-            if !reading && cancels {
-                STATE.with(|s| {
-                    let mut s = s.borrow_mut();
-                    s.reading = true;
-                    s.outcome = Some(Outcome::Cancelled);
-                });
-                post_finish();
-            } else if !reading {
-                begin_read_cookies();
+        WM_MOVED => {
+            if let Some(c) = controller() {
+                // SAFETY: as above.
+                unsafe {
+                    let _ = c.NotifyParentWindowPositionChanged();
+                }
             }
+            LRESULT(0)
+        }
+        WM_FOCUS_PAGE => {
+            if let Some(c) = controller() {
+                // SAFETY: as above.
+                unsafe {
+                    let _ = c.MoveFocus(COREWEBVIEW2_MOVE_FOCUS_REASON_PROGRAMMATIC);
+                }
+            }
+            LRESULT(0)
+        }
+        WM_BACK => {
+            if let Some(wv) = webview() {
+                // SAFETY: a webview reference we hold, used on its thread.
+                unsafe {
+                    let _ = wv.GoBack();
+                }
+            }
+            LRESULT(0)
+        }
+        WM_RELOAD => {
+            if let Some(wv) = webview() {
+                // SAFETY: as above.
+                unsafe {
+                    let _ = wv.Reload();
+                }
+            }
+            LRESULT(0)
+        }
+        WM_ASK_CLOSE => {
+            ask_close();
             LRESULT(0)
         }
         WM_FINISH => {
@@ -632,6 +887,11 @@ extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
 mod tests {
     use super::*;
 
+    const ROOM: Room = Room {
+        top: 48.0,
+        bottom: 32.0,
+    };
+
     #[test]
     fn only_the_music_site_itself_starts_the_cookie_read() {
         assert!(on_music_site("https://music.youtube.com/"));
@@ -655,24 +915,114 @@ mod tests {
         );
     }
 
-    /// Opens the sign-in window hidden on about:blank with `profile`, runs `before` on the
-    /// webview, then closes it as the user would. No request leaves the machine and
-    /// nothing shows on screen.
-    fn close_hidden(profile: &Path, before: impl FnOnce(&ICoreWebView2)) -> (Outcome, bool) {
+    #[test]
+    fn the_page_sits_between_the_toolbar_and_the_strip_at_every_scale() {
+        let client = RECT {
+            left: 0,
+            top: 0,
+            right: 540,
+            bottom: 780,
+        };
+        let at = |dpi, client| content_bounds(client, dpi, ROOM);
+        assert_eq!(
+            at(96, client),
+            RECT {
+                left: 0,
+                top: 48,
+                right: 540,
+                bottom: 748
+            }
+        );
+        let big = RECT {
+            right: 810,
+            bottom: 1170,
+            ..client
+        };
+        assert_eq!((at(144, big).top, at(144, big).bottom), (72, 1122));
+        // 125 %: 60 and 40 physical pixels.
+        assert_eq!((at(120, client).top, at(120, client).bottom), (60, 740));
+        // Squeezed shorter than the bars: an empty page, never a negative one.
+        let flat = RECT {
+            bottom: 50,
+            ..client
+        };
+        assert_eq!(at(96, flat).top, at(96, flat).bottom);
+    }
+
+    #[test]
+    fn only_web_pages_open_in_the_window() {
+        assert!(opens_here("https://support.google.com/accounts"));
+        assert!(!opens_here("file:///C:/Windows/win.ini"));
+        assert!(!opens_here("javascript:alert(1)"));
+    }
+
+    /// A hidden window standing in for the frame, on the calling thread.
+    fn hidden_parent() -> Result<HWND, String> {
+        // SAFETY: a window of the system's STATIC class, created hidden on this thread with
+        // a static title; this thread pumps its messages.
+        unsafe {
+            CreateWindowExW(
+                Default::default(),
+                w!("STATIC"),
+                w!("featherplay sign-in test"),
+                WS_OVERLAPPEDWINDOW,
+                0,
+                0,
+                540,
+                780,
+                None,
+                None,
+                None,
+                None,
+            )
+            .map_err(|e| format!("CreateWindowExW: {e}"))
+        }
+    }
+
+    /// Opens the sign-in page on about:blank in `parent` (hidden) with `profile`, runs
+    /// `before` on the webview, then closes it as the frame's close button would. No
+    /// request leaves the machine and nothing shows on screen.
+    fn close_hidden(
+        parent: HWND,
+        profile: &Path,
+        before: impl FnOnce(&ICoreWebView2),
+    ) -> (Outcome, bool) {
+        let control = create_control().expect("message window");
+        STATE.with(|s| {
+            let mut s = s.borrow_mut();
+            s.hwnd = control;
+            s.parent = parent;
+            s.room = ROOM;
+        });
         run_with(profile, |profile| {
-            let hwnd = create_window(WS_OVERLAPPEDWINDOW)?;
-            STATE.with(|s| s.borrow_mut().hwnd = hwnd);
-            create_webview(hwnd, profile, "about:blank")?;
+            create_webview(parent, profile, "about:blank")?;
             let webview = STATE
                 .with(|s| s.borrow().webview.clone())
                 .ok_or("no webview")?;
             before(&webview);
-            // SAFETY: our window.
-            unsafe { PostMessageW(Some(hwnd), WM_CLOSE, WPARAM(0), LPARAM(0)) }
-                .map_err(|e| e.to_string())?;
+            Remote {
+                control: control.0 as isize,
+            }
+            .close();
             drain_messages();
             Ok(())
         })
+    }
+
+    fn scratch_profile(name: &str) -> PathBuf {
+        let home = std::env::var_os("FEATHERPLAY_HOME").expect("set FEATHERPLAY_HOME");
+        PathBuf::from(home).join(format!("test-webview2-{name}-{}", std::process::id()))
+    }
+
+    fn remove_profile(profile: &Path) {
+        // The WebView2 processes let go of the folder shortly after.
+        for _ in 0..20 {
+            if std::fs::remove_dir_all(profile).is_ok() {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(250));
+        }
+        assert!(!profile.exists(), "the scratch profile is still there");
     }
 
     /// A session cookie set in one window is still there in the next: closing clears
@@ -680,10 +1030,10 @@ mod tests {
     #[test]
     #[ignore = "starts WebView2 (hidden window, about:blank)"]
     fn live_closing_clears_all_but_the_cookies() {
-        let home = std::env::var_os("FEATHERPLAY_HOME").expect("set FEATHERPLAY_HOME");
-        let profile = PathBuf::from(home).join(format!("test-webview2-{}", std::process::id()));
+        let profile = scratch_profile("forget");
+        let parent = hidden_parent().expect("parent");
 
-        let (first, forgot) = close_hidden(&profile, |webview| {
+        let (first, forgot) = close_hidden(parent, &profile, |webview| {
             let expires = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
@@ -707,20 +1057,159 @@ mod tests {
         assert!(forgot, "the profile wasn't cleared");
         assert!(matches!(&first, Outcome::SignedIn(h) if h == "SAPISID=test"));
 
-        let (second, forgot) = close_hidden(&profile, |_| {});
+        let (second, forgot) = close_hidden(parent, &profile, |_| {});
         assert!(forgot, "the profile wasn't cleared the second time");
         assert!(
             matches!(&second, Outcome::SignedIn(h) if h == "SAPISID=test"),
             "the cookie didn't survive the clearing"
         );
-
-        // The WebView2 processes let go of the folder shortly after.
-        for _ in 0..20 {
-            if std::fs::remove_dir_all(&profile).is_ok() {
-                break;
-            }
-            std::thread::sleep(std::time::Duration::from_millis(250));
+        // SAFETY: our hidden window, on this thread.
+        unsafe {
+            let _ = DestroyWindow(parent);
         }
-        assert!(!profile.exists(), "the scratch profile is still there");
+        remove_profile(&profile);
+    }
+
+    /// A stand-in for the UI thread: it owns a hidden frame and pumps its messages, as the
+    /// real UI thread does, until it's stopped.
+    struct UiThread {
+        parent: HWND,
+        id: u32,
+        handle: std::thread::JoinHandle<()>,
+    }
+
+    impl UiThread {
+        fn start() -> Self {
+            let (tx, rx) = std::sync::mpsc::channel();
+            let handle = std::thread::spawn(move || {
+                let parent = hidden_parent().expect("parent");
+                // SAFETY: reads this thread's id.
+                let id = unsafe { windows::Win32::System::Threading::GetCurrentThreadId() };
+                tx.send((parent.0 as isize, id)).unwrap();
+                drain_messages();
+            });
+            let (parent, id) = rx.recv().unwrap();
+            Self {
+                parent: HWND(parent as *mut _),
+                id,
+                handle,
+            }
+        }
+
+        fn stop(self) {
+            // SAFETY: posts WM_QUIT to the stand-in's queue; its window goes with the thread.
+            unsafe {
+                let _ = PostThreadMessageW(self.id, WM_QUIT, WPARAM(0), LPARAM(0));
+            }
+            self.handle.join().unwrap();
+        }
+    }
+
+    /// Opens the sign-in page on about:blank in `ui`'s frame; the receiver says whether it
+    /// ended as not signed in.
+    fn open_in(ui: &UiThread, profile: &Path) -> (Remote, std::sync::mpsc::Receiver<bool>) {
+        let (tx, rx) = std::sync::mpsc::channel();
+        let remote = open(
+            ui.parent.0 as isize,
+            ROOM,
+            profile.to_path_buf(),
+            "about:blank",
+            |_| {},
+            move |outcome| {
+                let _ = tx.send(matches!(outcome, Outcome::NotSignedIn));
+            },
+        )
+        .expect("open");
+        (remote, rx)
+    }
+
+    /// The frame lives on the UI thread and the webview on its own: the page is a child of
+    /// another thread's window, placed below the toolbar and above the strip, and it
+    /// follows when the frame is resized. Hidden, about:blank.
+    #[test]
+    #[ignore = "starts WebView2 (hidden window, about:blank)"]
+    fn live_the_page_sits_in_another_threads_frame() {
+        let profile = scratch_profile("frame");
+        let ui = UiThread::start();
+        let parent = ui.parent;
+        let (remote, ended) = open_in(&ui, &profile);
+
+        let child_rect = || {
+            // SAFETY: handle-only queries and live out pointers; the windows are alive.
+            unsafe {
+                let child = GetWindow(parent, GW_CHILD).ok()?;
+                let mut r = RECT::default();
+                GetWindowRect(child, &mut r).ok()?;
+                let mut corner = [windows::Win32::Foundation::POINT {
+                    x: r.left,
+                    y: r.top,
+                }];
+                windows::Win32::Graphics::Gdi::MapWindowPoints(None, Some(parent), &mut corner);
+                Some((corner[0].y, r.bottom - r.top, r.right - r.left))
+            }
+        };
+        let room_now = || {
+            // SAFETY: handle-only queries on the live parent.
+            let want = unsafe {
+                let mut c = RECT::default();
+                let _ = GetClientRect(parent, &mut c);
+                content_bounds(c, GetDpiForWindow(parent), ROOM)
+            };
+            (want.top, want.bottom - want.top, want.right - want.left)
+        };
+        let settles_in_room = || {
+            (0..100).any(|_| {
+                let there = child_rect() == Some(room_now());
+                if !there {
+                    std::thread::sleep(Duration::from_millis(50));
+                }
+                there
+            })
+        };
+        assert!(
+            settles_in_room(),
+            "the page isn't in the room: {:?}",
+            child_rect()
+        );
+
+        // SAFETY: resizing our hidden window; SetWindowPos may be called from any thread.
+        unsafe {
+            SetWindowPos(
+                parent,
+                None,
+                0,
+                0,
+                700,
+                900,
+                SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE,
+            )
+            .unwrap();
+        }
+        remote.relayout();
+        assert!(
+            settles_in_room(),
+            "the page didn't follow the resize: {:?}",
+            child_rect()
+        );
+
+        remote.close();
+        assert_eq!(ended.recv_timeout(Duration::from_secs(20)), Ok(true));
+        ui.stop();
+        remove_profile(&profile);
+    }
+
+    /// Closed at once, while WebView2 is still starting: the sign-in ends as not signed in
+    /// rather than leaving its thread waiting for good. Hidden, about:blank.
+    #[test]
+    #[ignore = "starts WebView2 (hidden window, about:blank)"]
+    fn live_closing_while_it_starts_ends_the_sign_in() {
+        let profile = scratch_profile("early");
+        let ui = UiThread::start();
+        let (remote, ended) = open_in(&ui, &profile);
+        remote.close();
+        let ended = ended.recv_timeout(Duration::from_secs(20));
+        ui.stop();
+        assert_eq!(ended, Ok(true), "the sign-in didn't end as not signed in");
+        remove_profile(&profile);
     }
 }

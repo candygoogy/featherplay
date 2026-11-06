@@ -20,6 +20,7 @@ your task owns; the shared files below change only when a page truly needs somet
 | `playlist_menu.slint`, `playlist_menu_layer.slint` | The sidebar list's right-click menu (albums and artists get Play, Shuffle, Go to, Pin to top; playlists also Pin to top), in the song menu's style: the state (`PlaylistMenu`, `PlaylistKind`, `PlaylistDialog`), then the panel and its Rename and Delete dialogs (Settings' `Dialog`). Split so the sidebar can import the state without an import cycle; `src/playlist_menu.rs` | menus |
 | `album_menu.slint` | The album page's ⋯ menu (`AlbumMenu`, `AlbumAction`): Like all songs, Remove likes, Dislike all songs, Remove dislikes, each confirmed in Settings' `Dialog`, in the song menu's style; `src/album_actions.rs` rates only the songs that need it, one at a time | menus |
 | `close_dialog.slint` | The close dialog (`CloseDialog`, `CloseChoice`): what the close button does, asked on close until the user picks; `src/close.rs` | close |
+| `sign_in_window.slint` | `SignInWindow`, the sign-in window's slim browser frame: back, reload, the read-only address (padlock for https, the host in full weight, the path dimmed, "Google's page" for Google's sign-in hosts) and the status strip, round the room where the WebView2 page sits as a child window of another thread; `src/pages/sign_in/frame.rs`, the page in `webview.rs`, the address from the webview's `Source` in `address.rs` | account |
 | `not_for_me.slint` | `NotForMeButton`, the thumbs-down beside the heart (styled as it) in the bar and on Now playing, with its tooltip: rates Dislike and skips, the toast offers Undo; `src/not_for_me.rs` | frame (shared) |
 | `pages/home.slint` | `HomePage`, `HomeData`; `ShelfShape` and `Shapes`, how each shelf lays out from what it holds (`src/pages/home.rs::arrange`) | home |
 | `pages/{library,album,playlist,artist,search}.slint` | One page each, with its `…Data` global | content pages |
@@ -172,7 +173,7 @@ now-playing-lyrics-full (lyrics on; also -full-plain, -full-none and -full-outag
 settings-long (a long title by five artists, for the Discord preview; the preview shows only
 with `discord = true` in the home's `config/settings.toml`, and needs a tall `--size`, about
 1280x3600), settings-scripts (the same with a Cyrillic and Japanese title),
-about, sign-in (also -expired, -edge, -edge-blocked, -edge-why with the policy open, -paste with the paste field open), account-menu (Home with the
+about, sign-in (also -expired, -edge, -edge-blocked, -edge-why with the policy open, -paste with the paste field open), sign-in-window (the sign-in window's frame alone, 540 x 780 logical; also -lookalike, -http and -long, a host wider than the pill), account-menu (Home with the
 account menu open), mini-player, mini-player-paused, mini-player-long, mini-player-disliked and mini-player-idle (the tray's mini
 player alone, 340 x 170 logical), close-dialog (Home with the close dialog open), home-more (Home after a scroll loaded the next
 page, the community shelf; use a tall `--size` to see the end), home-more-loading and

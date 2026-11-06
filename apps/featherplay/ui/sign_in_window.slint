@@ -1,0 +1,164 @@
+// The sign-in window's frame: a slim browser frame round Google's page. Back, reload and a
+// read-only address pill above, a status strip below; the WebView2 page sits in the room
+// between (`page-top` to `page-bottom`), a child window the frame never draws over. The
+// address comes from WebView2's `Source` only, never from the page (`src/pages/sign_in/
+// address.rs`): the padlock for https, the host in full weight and the path dimmed, and
+// "Google's page" when the host is one of Google's sign-in hosts. No tabs, no typing.
+// Its greys are the plain ones (`plain-text2`): the cover's tint has no place in what
+// vouches for a page.
+// Driven by `src/pages/sign_in/frame.rs`.
+import { Theme, Icons } from "theme.slint";
+import { Body, Icon, IconButton } from "parts.slint";
+
+export component SignInWindow inherits Window {
+    in property <string> host;
+    in property <string> path;
+    in property <bool> secure;
+    in property <bool> google;
+    in property <bool> can-back;
+    callback back();
+    callback reload();
+    // The page's room, for the webview's bounds (logical pixels from the top and bottom).
+    out property <length> page-top: 48px;
+    out property <length> page-bottom: 32px;
+
+    title: @tr("Sign in · featherplay");
+    preferred-width: 540px;
+    preferred-height: 780px;
+    min-width: 460px;
+    min-height: 480px;
+    background: Theme.panel;
+    default-font-family: Theme.body-font;
+
+    // Under the webview: the ground until the page has drawn.
+    Rectangle {
+        y: root.page-top;
+        height: root.height - root.page-top - root.page-bottom;
+        background: Theme.ground;
+    }
+
+    HorizontalLayout {
+        y: 0;
+        height: root.page-top;
+        padding-left: Theme.s2;
+        padding-right: Theme.s2;
+        padding-top: 6px;
+        padding-bottom: 6px;
+        spacing: Theme.s1;
+        IconButton {
+            icon: Icons.back;
+            label: @tr("Back");
+            tint: Theme.text1;
+            enabled: root.can-back;
+            clicked => { root.back(); }
+        }
+        IconButton {
+            icon: Icons.reload;
+            label: @tr("Reload");
+            tint: Theme.text1;
+            clicked => { root.reload(); }
+        }
+        // The address: read-only, from WebView2's Source.
+        Rectangle {
+            horizontal-stretch: 1;
+            border-radius: self.height / 2;
+            background: Theme.field-solid;
+            clip: true;
+            accessible-role: text;
+            accessible-label: root.google ? @tr("Address: {}, Google's page", root.host + root.path) : @tr("Address: {}", root.host + root.path);
+            HorizontalLayout {
+                padding-left: 14px;
+                padding-right: 14px;
+                spacing: Theme.s2;
+                if root.secure: Icon {
+                    y: (parent.height - self.height) / 2;
+                    width: 15px;
+                    height: 15px;
+                    commands: Icons.lock;
+                    stroke: Theme.plain-text2;
+                    accessible-role: none;
+                }
+                if !root.secure && root.host != "": Body {
+                    // Plain http: no padlock, and a word saying so.
+                    text: @tr("Not secure");
+                    font-size: Theme.t-meta + 1px;
+                    color: Theme.plain-text2;
+                    vertical-alignment: center;
+                    accessible-role: none;
+                }
+                // The host never loses its end, where the real domain is: the path gives way
+                // first, and a host wider than the pill slides left, its start cut off.
+                Rectangle {
+                    horizontal-stretch: 1;
+                    min-width: 0;
+                    preferred-width: host.preferred-width + path.preferred-width;
+                    clip: true;
+                    host := Body {
+                        x: min(0, parent.width - self.width);
+                        width: self.preferred-width;
+                        height: parent.height;
+                        text: root.host;
+                        font-size: Theme.t-meta + 1px;
+                        font-weight: 600;
+                        vertical-alignment: center;
+                        overflow: clip;
+                        accessible-role: none;
+                    }
+                    path := Body {
+                        x: host.x + host.width;
+                        width: max(0, parent.width - self.x);
+                        height: parent.height;
+                        text: root.path;
+                        font-size: Theme.t-meta + 1px;
+                        color: Theme.text3;
+                        vertical-alignment: center;
+                        accessible-role: none;
+                    }
+                }
+                if root.google: HorizontalLayout {
+                    horizontal-stretch: 0;
+                    spacing: 6px;
+                    Rectangle {
+                        y: (parent.height - self.height) / 2;
+                        width: 6px;
+                        height: 6px;
+                        border-radius: 3px;
+                        background: Theme.verified;
+                    }
+                    Body {
+                        text: @tr("Google's page");
+                        font-size: Theme.t-meta;
+                        color: Theme.verified;
+                        vertical-alignment: center;
+                        accessible-role: none;
+                    }
+                }
+            }
+        }
+    }
+
+    // The status strip.
+    Rectangle {
+        y: root.height - root.page-bottom;
+        height: root.page-bottom;
+        HorizontalLayout {
+            padding-left: 14px;
+            padding-right: 14px;
+            spacing: Theme.s2;
+            Icon {
+                y: (parent.height - self.height) / 2;
+                width: 14px;
+                height: 14px;
+                commands: Icons.lock;
+                stroke: Theme.plain-text2;
+            }
+            Body {
+                horizontal-stretch: 1;
+                text: @tr("This window closes by itself once you're signed in.");
+                font-size: Theme.t-meta;
+                color: Theme.plain-text2;
+                vertical-alignment: center;
+            }
+        }
+    }
+}

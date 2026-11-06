@@ -25,6 +25,10 @@ Notable changes to featherplay, newest first. The format follows
   Enter. When Edge can't be used on your PC its row says so, and **Why?** shows the
   reason. A line says what featherplay keeps, and **Continue without signing in** takes you
   Home.
+- The sign-in window has a slim browser frame: back, reload, and a read-only address with
+  a padlock for https, the real host in full and "Google's page" on Google's own sign-in
+  hosts. The address comes from WebView2, never from the page. A link that would open a
+  new window opens in this one, under the same address.
 
 ### Fixed
 
