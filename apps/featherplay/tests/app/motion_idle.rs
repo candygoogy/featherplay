@@ -153,7 +153,7 @@ fn motion_settles_and_leaves_nothing_running() {
     over(640.0, 400.0);
     assert_idle(w, "leaving the seek line");
 
-    // The Up next panel slides in and out, wide and narrow (with its scrim).
+    // The Up next panel slides in and out, wide and narrow.
     let frame = ui.global::<Frame>();
     for (width, height) in [(1280.0, 800.0), (1000.0, 700.0)] {
         w.set_size(slint::LogicalSize::new(width, height));

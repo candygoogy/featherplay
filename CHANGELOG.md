@@ -24,6 +24,8 @@ Notable changes to featherplay, newest first. The format follows
   unexpected".
 - On Now playing, the player bar's Up next button now hides and shows the side panel (Up
   next and Related), and the page remembers your choice.
+- Opening Up next in a window just over 1100 px wide no longer darkens the page behind it:
+  the sidebar folds to its icons while the panel is open, and the page makes room.
 - Resizing the window by its edge keeps up with the pointer better: on a 4K screen each step
   of the drag takes a third to over half less time than before.
 - featherplay starts on a Windows without the Visual C++ Redistributable: the installer

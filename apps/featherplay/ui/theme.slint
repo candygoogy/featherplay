@@ -213,7 +213,7 @@ export global Theme {
     // Frame.
     out property <length> sidebar-w: 240px;
     out property <length> rail-w: 72px;            // the sidebar below `wide-min`
-    out property <length> wide-min: 1100px;        // below: icon rail
+    out property <length> wide-min: 1100px;        // below: icon rail (and while Up next needs the room)
     // The player bar floats `bar-inset` in from the window's left, right and bottom edges,
     // over the pages; `bar-clear` is the room it takes from the bottom (its top edge), which
     // the sidebar and the panels keep clear and the pages scroll past (`page-end`).
@@ -227,10 +227,10 @@ export global Theme {
     out property <length> panel-w: 340px;           // the Up next panel, below `panel-wide-min`
     out property <length> panel-wide-min: 1280px;   // from here it's `nowplaying-side-w` wide
     out property <length> nowplaying-side-w: 400px;
-    // The narrowest a page is laid out beside the Up next panel; narrower, the panel floats
-    // over the page instead. Home sets it: two shortcut tiles at their 220 px least, and the
-    // hero's Resume and Go to album beside its cover, each need about 530 px with the page's
-    // padding. Every other page fits there too.
+    // The narrowest a page is laid out beside the Up next panel; narrower beside the full
+    // sidebar, the sidebar folds to the rail (`app.slint`: `fold`). Home sets it: two shortcut
+    // tiles at their 220 px least, and the hero's Resume and Go to album beside its cover, each
+    // need about 530 px with the page's padding. Every other page fits there too.
     out property <length> page-min-w: 540px;
     out property <length> nowplaying-cover: 440px;  // the largest now-playing cover
     out property <length> queue-divider-h: 36px;    // "Autoplay: similar tracks"

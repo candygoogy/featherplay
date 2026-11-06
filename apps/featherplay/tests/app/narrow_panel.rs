@@ -2,20 +2,20 @@
 //!
 //! At the window's least width (960 logical px: 1440 px at 150 %, beside the rail) the page
 //! makes room for the panel: it ends at the panel's left edge, and Home's rows end at the
-//! page's padding left of it rather than running on under the panel. Where making room would
-//! leave the page narrower than `Theme.page-min-w` (1100 px, beside the full sidebar), the
-//! panel floats over the page at its full width instead, and Escape closes it.
+//! page's padding left of it rather than running on under the panel. Where making room beside
+//! the full sidebar would leave the page narrower than `Theme.page-min-w` (1100 px), the
+//! sidebar folds to the rail while the panel is open; nothing floats over a darkened page.
 
 use crate::support::{frames, home_at};
 use featherplay::offscreen;
 use featherplay::ui::{Frame, Theme};
-use slint::platform::{Key, WindowEvent};
+use slint::platform::WindowEvent;
 use slint::{ComponentHandle, LogicalSize, PhysicalSize};
 
 const SCALE: f32 = 1.5;
 
 #[test]
-fn the_page_ends_at_the_panel_and_floats_it_below_the_least_width() {
+fn the_page_ends_at_the_panel_and_the_sidebar_folds_to_make_room() {
     // The user's window: 1440 px at 150 %.
     let scene = home_at(1440, 1200, SCALE);
     let (ui, w) = (&scene.ui, scene.ui.window());
@@ -24,7 +24,6 @@ fn the_page_ends_at_the_panel_and_floats_it_below_the_least_width() {
     let panel_x = width - theme.get_panel_w();
     let pad = theme.get_page_pad();
 
-    assert!(!ui.get_panel_floats(), "the panel floats at {width} px");
     assert_eq!(
         theme.get_rail_w() + ui.get_page_width(),
         panel_x,
@@ -60,27 +59,40 @@ fn the_page_ends_at_the_panel_and_floats_it_below_the_least_width() {
         stray.first()
     );
 
-    // 1100 px beside the full sidebar: making room would leave the page 520 px.
+    // 1100 px: beside the full sidebar, making room would leave the page 520 px, so the
+    // sidebar folds to the rail while the panel is open, and the page makes room.
     w.set_size(PhysicalSize::new(1650, 1200));
     w.dispatch_event(WindowEvent::Resized {
         size: LogicalSize::new(1100.0, 800.0),
     });
-    let _ = frames(w, 60, |_| {});
-    assert!(ui.get_panel_floats(), "the panel doesn't float at 1100 px");
+    let _ = frames(w, 120, |_| {});
+    let beside = 1100.0 - theme.get_rail_w() - theme.get_panel_w();
     assert_eq!(
         ui.get_page_width(),
-        1100.0 - theme.get_sidebar_w(),
-        "the page doesn't keep its full width under the floating panel"
+        beside,
+        "the page doesn't make room beside the rail at 1100 px"
     );
+    assert!(ui.get_page_width() >= theme.get_page_min_w());
 
-    w.dispatch_event(WindowEvent::KeyPressed {
-        text: Key::Escape.into(),
-    });
-    w.dispatch_event(WindowEvent::KeyReleased {
-        text: Key::Escape.into(),
-    });
-    assert!(
-        !ui.global::<Frame>().get_queue_open(),
-        "Escape didn't close the floating panel"
+    // Closed, the sidebar is back at once, under the panel sliding away; opened again, it
+    // folds once the panel is in, with the page's one relayout.
+    let full = 1100.0 - theme.get_sidebar_w();
+    let frame = ui.global::<Frame>();
+    frame.set_queue_open(false);
+    let _ = frames(w, 1, |_| {});
+    assert_eq!(
+        ui.get_page_width(),
+        full,
+        "the sidebar didn't come back at once"
+    );
+    let _ = frames(w, 120, |_| {});
+    frame.set_queue_open(true);
+    let mut widths = Vec::new();
+    let _ = frames(w, 120, |_| widths.push(ui.get_page_width()));
+    widths.dedup();
+    assert_eq!(
+        widths,
+        [full, beside],
+        "the page didn't keep its width through the slide, then make room once"
     );
 }

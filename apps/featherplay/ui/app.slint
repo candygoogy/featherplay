@@ -102,7 +102,18 @@ export component AppWindow inherits Window {
     // (measured 2026-11-01). Not a change handler: those run at the
     // start of the event loop's next turn, after the click's frame is drawn.
     property <bool> full-page: Frame.full-page;
-    property <length> side-w: root.full-page ? 0px : (root.wide ? Theme.sidebar-w : Theme.rail-w);
+    // The sidebar shows as the icon rail below `wide-min`, and while the Up next panel is in
+    // where making room for it beside the full sidebar would leave the page narrower than
+    // `Theme.page-min-w` (from `wide-min` to 1120 px). Beside the rail there's always room:
+    // the window's least width (960) less the rail and the panel leaves the page 548 px.
+    // It folds with the page's one relayout once the panel is in, and unfolds at once
+    // as the panel leaves (`panel-push`). The width is read first and `panel-in` before
+    // `panel-shown`: read first, the panel's state marked the sidebar and the page dirty in
+    // the slide's first frame though nothing folds, and the whole window repainted there
+    // (`tests/app/first_frames.rs`).
+    property <bool> fold: root.width - Theme.sidebar-w - root.panel-w < Theme.page-min-w && root.panel-in && root.panel-shown;
+    property <bool> rail: !root.wide || root.fold;
+    property <length> side-w: root.full-page ? 0px : (root.rail ? Theme.rail-w : Theme.sidebar-w);
     // The player bar floats over the bottom of everything (`Theme.bar-inset` in from the
     // edges): the sidebar and the panel run the window's height behind it with their rows
     // ending at its top; the pages end at its top, fading into the ground just above it.
@@ -113,14 +124,11 @@ export component AppWindow inherits Window {
     // The Up next panel: as wide as Now playing's side panel on a wide window, so titles
     // aren't cut short; narrower below `panel-wide-min`.
     property <length> panel-w: self.width >= Theme.panel-wide-min ? Theme.nowplaying-side-w : Theme.panel-w;
-    // The panel floats over the page, over a scrim, when making room for it would leave the
-    // page narrower than `Theme.page-min-w`; otherwise the page makes room for it.
-    out property <bool> panel-floats: root.width - root.side-w - root.panel-w < Theme.page-min-w;
-    // Making room: the page is laid out once at its new width rather than eased (that would
-    // lay it out and repaint it on every frame of the slide). Opening, the panel slides in
-    // over the page, which narrows when the slide ends; closing, the page widens at once
-    // under the panel as it slides away. Either way nothing shows empty.
-    property <length> panel-push: root.panel-shown && !root.panel-floats && root.panel-in ? root.panel-w : 0px;
+    // The page makes room for the panel, laid out once at its new width rather than eased
+    // (that would lay it out and repaint it on every frame of the slide). Opening, the panel
+    // slides in over the page, which narrows when the slide ends; closing, the page widens at
+    // once under the panel as it slides away. Either way nothing shows empty.
+    property <length> panel-push: root.panel-shown && root.panel-in ? root.panel-w : 0px;
     // The panel has slid all the way in. Set from its slide's end (not bound to it), so the
     // page's width depends on it alone and isn't re-evaluated on every frame of the slide.
     property <bool> panel-in;
@@ -245,13 +253,6 @@ export component AppWindow inherits Window {
                     TopBarData.edited("");
                     return accept;
                 }
-                // The panel floating over the page closes, as a click beside it does.
-                if root.panel-shown && root.panel-floats {
-                    Frame.queue-open = false;
-                    Frame.queue-toggled(false);
-                    keys.focus();
-                    return accept;
-                }
                 if root.full-page {
                     root.navigate-by-key();
                     Nav.back();
@@ -268,7 +269,7 @@ export component AppWindow inherits Window {
             height: root.height;
             clear: Theme.bar-clear;
             visible: !root.full-page;
-            rail: !root.wide;
+            rail: root.rail;
         }
 
         Rectangle {
@@ -365,7 +366,7 @@ export component AppWindow inherits Window {
                 width: parent.width;
                 visible: !root.full-page;
                 clear: root.under-top || root.home-wash;
-                narrow: !root.wide;
+                narrow: root.rail;
                 area-h: parent.height;
                 submitted(q) => {
                     root.navigate-by-key();
@@ -383,28 +384,6 @@ export component AppWindow inherits Window {
             }
         }
 
-        // Too narrow to make room: the panel overlays the content over a scrim; a click
-        // beside it or Escape closes it. Only then: kept while the page makes room, the
-        // scrim's fade (0 to 0 there) marked the whole window dirty for each frame of it when
-        // the panel opened or closed, ~35 full 4K repaints (measured 2026-11-01).
-        if root.panel-floats: Rectangle {
-            width: root.width;
-            height: root.height;
-            background: Theme.scrim;
-            opacity: root.panel-shown ? 1 : 0;
-            visible: self.opacity > 0;
-            animate opacity { duration: root.panel-shown ? Theme.t-menu : Theme.t-fast; easing: Curves.ease-out; }
-        }
-        if root.panel-shown && root.panel-floats: TouchArea {
-            x: 0;
-            y: 0;
-            width: root.width - root.panel-w;
-            height: root.height;
-            clicked => {
-                Frame.queue-open = false;
-                Frame.queue-toggled(false);
-            }
-        }
         QueuePanel {
             // How much of it is slid out past the right edge: that eases, not `x`, so
             // the panel stays at the edge while the window resizes.
@@ -418,8 +397,6 @@ export component AppWindow inherits Window {
             height: root.height;
             visible: self.out < 1;
             open: root.panel-shown;
-            drop-shadow-blur: root.panel-floats ? 24px : 0px;
-            drop-shadow-color: root.panel-floats ? Theme.cover-shadow : transparent;
             SideTabs {
                 shown: root.panel-shown;
             }
