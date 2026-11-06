@@ -449,7 +449,7 @@ fn timing_engine() {
             .expect("resolve");
         let resolve_s = t.elapsed().as_secs_f64();
         let via = resolver
-            .take_fallback_reason()
+            .take_fallback_reason(&TrackId(id.clone()))
             .map_or("native".into(), |e| format!("yt-dlp after: {e}"));
         let src = StreamSource {
             url: s.url.clone(),

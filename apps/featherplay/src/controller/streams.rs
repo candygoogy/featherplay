@@ -1,18 +1,24 @@
 //! Resolved streams, kept until they near their expiry, and resolves started ahead of a
 //! click: a row hovered for 120 ms or pressed, the first row of a list page that opens,
-//! Home's featured song, the restored session's track, the track after next. A track whose
-//! stream is here starts without a resolve, and with its first 256 KB fetched into memory
-//! (`AudioEngine::prefetch`) without a request.
+//! Home's featured song, the restored session's track, and the queue's tracks after the
+//! next one (`AHEAD` in all with it, in play order: shuffled, repeated, past the ones
+//! passed over). A track whose stream is here starts without a resolve, and with its
+//! first 256 KB fetched into memory (`AudioEngine::prefetch`) without a request; a fetch
+//! that's refused (HTTP 403) is told, and the track resolved again ahead, once.
 //!
 //! The track played before the current one gets its first 256 KB fetched again when it's
 //! left (its download went with it), so Previous starts from memory too.
 //!
 //! The player's own resolves start at once. Resolves ahead ("hints") take at most
-//! `HINT_SLOTS` at a time; the newest hints go first and older ones are dropped past
-//! `HINT_QUEUE`. Nothing resolves twice: a hint for a stream that's here, running or
-//! waiting does nothing. No timers: hints start when they come in and when a resolve ends.
+//! `HINT_SLOTS` at a time; the newest hints go first, and older row hints are dropped past
+//! `HINT_QUEUE`. Their yt-dlp runs take turns (`YtDlpResolver::resolve_ahead`). Nothing
+//! resolves twice: a hint for a stream that's here, running or waiting does nothing. The
+//! queue's hints follow the queue: a track no longer ahead has its resolve stopped, and
+//! paused or stopped, none runs. No timers: hints start when they come in and when a
+//! resolve ends.
 
 use std::collections::VecDeque;
+use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
 
 use featherplay_audio::StreamSource;
@@ -20,26 +26,49 @@ use featherplay_core::failure::getting_ready;
 use featherplay_core::model::{Track, TrackId};
 use featherplay_core::player::Input;
 use featherplay_streams::ResolvedStream;
+use tokio::sync::Notify;
+use tokio::task::AbortHandle;
 
 use super::{Controller, Msg};
 
 /// Resolved streams kept, oldest dropped first (but never the ones `done` is told to keep).
 const KEEP: usize = 32;
-/// Resolves ahead running at once (the player's own come on top).
-const HINT_SLOTS: usize = 2;
-/// Hints waiting for a slot.
+/// Resolves ahead running at once (the player's own come on top): the queue's two and a
+/// hovered row.
+const HINT_SLOTS: usize = 3;
+/// Row hints waiting for a slot.
 const HINT_QUEUE: usize = 4;
+/// The queue's tracks resolved ahead, the next one (the player's own preload) included.
+const AHEAD: usize = 3;
+/// Tracks the queue doesn't resolve ahead again for `FAILED_FOR` (their resolve failed, or
+/// their stream was refused twice), and refused preloads remembered.
+const FAILED_KEPT: usize = 8;
+const FAILED_FOR: Duration = Duration::from_secs(10 * 60);
 /// A stream that expires sooner than this is resolved again (the player re-resolves at
 /// 30 s before expiry, so a stream handed to it must outlive that comfortably).
 const FRESH_FOR: Duration = Duration::from_secs(10 * 60);
 /// A resolve that takes longer logs its own time (a normal one takes ~0.4 s).
 const SLOW_RESOLVE: Duration = Duration::from_secs(1);
 
+/// Why a resolve ahead was asked for.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum Hint {
+    /// A row, a page's first row, Home's featured song, the restored track, a refused
+    /// preload.
+    Row,
+    /// One of the queue's tracks after the next one.
+    Queue,
+}
+
 struct Running {
     id: TrackId,
     since: Instant,
-    /// Started ahead of a click; the player hasn't asked for it.
-    hint: bool,
+    /// Started ahead of a click; `None` once the player asks for it.
+    hint: Option<Hint>,
+    /// Told when the player asks for a hint's track while it runs.
+    urgent: Arc<Notify>,
+    /// Stops a queue hint whose track is no longer ahead.
+    task: Option<AbortHandle>,
 }
 
 #[derive(Default)]
@@ -48,11 +77,13 @@ pub(super) struct Streams {
     cache: VecDeque<(TrackId, ResolvedStream)>,
     running: Vec<Running>,
     /// Newest last.
-    waiting: VecDeque<TrackId>,
+    waiting: VecDeque<(TrackId, Hint)>,
+    /// Tracks given up on ahead, and when (`give_up`), newest last.
+    failed: VecDeque<(TrackId, Instant)>,
     /// The stream loaded last.
     loaded: Option<StreamSource>,
-    /// The last track whose refused preload was resolved again (`again_after_refusal`).
-    refused_preload: Option<TrackId>,
+    /// The tracks whose refused preload was resolved again lately (`again_after_refusal`).
+    refused_preloads: VecDeque<TrackId>,
 }
 
 /// What a resolve the player asks for needs.
@@ -77,51 +108,118 @@ impl Streams {
 
     /// The player asks for `id`.
     pub fn want(&mut self, id: &TrackId, now: SystemTime) -> Want {
-        self.waiting.retain(|w| w != id);
+        self.waiting.retain(|(w, _)| w != id);
         if let Some(s) = self.fresh(id, now) {
             return Want::Cached(Box::new(s.clone()));
         }
         if let Some(r) = self.running.iter_mut().find(|r| r.id == *id) {
-            r.hint = false;
+            if r.hint.take().is_some() {
+                r.urgent.notify_one();
+            }
             return Want::Running;
         }
         self.running.push(Running {
             id: id.clone(),
             since: Instant::now(),
-            hint: false,
+            hint: None,
+            urgent: Arc::default(),
+            task: None,
         });
         Want::Start
     }
 
-    /// Queues a resolve ahead for `id` unless it's here, running or queued already.
-    pub fn hint(&mut self, id: &TrackId, now: SystemTime) {
-        if self.fresh(id, now).is_some()
+    /// Whether a hint for `id` would do nothing: its stream is here, running or waiting.
+    fn covered(&self, id: &TrackId, now: SystemTime) -> bool {
+        self.fresh(id, now).is_some()
             || self.running.iter().any(|r| r.id == *id)
-            || self.waiting.contains(id)
-        {
+            || self.waiting.iter().any(|(w, _)| w == id)
+    }
+
+    /// Queues a resolve ahead for `id` (a row) unless it's covered already.
+    pub fn hint(&mut self, id: &TrackId, now: SystemTime) {
+        if self.covered(id, now) {
             return;
         }
-        self.waiting.push_back(id.clone());
-        if self.waiting.len() > HINT_QUEUE {
-            self.waiting.pop_front();
+        self.waiting.push_back((id.clone(), Hint::Row));
+        if self.waiting.iter().filter(|(_, h)| *h == Hint::Row).count() > HINT_QUEUE
+            && let Some(i) = self.waiting.iter().position(|(_, h)| *h == Hint::Row)
+        {
+            self.waiting.remove(i);
         }
     }
 
-    /// The hints that can start now, newest first; they count as running.
-    pub fn start_hints(&mut self) -> Vec<TrackId> {
+    /// The queue's tracks to resolve ahead are now `ids`, nearest first (none while paused
+    /// or stopped). `next`, the player's own preload, isn't hinted, but a queue hint for it
+    /// keeps running for the player to take over. Queue hints for other tracks stop,
+    /// running or waiting; returns the running ones stopped. A track whose resolve ahead
+    /// failed (or whose stream was refused twice) isn't asked again for a while.
+    pub fn ahead(
+        &mut self,
+        next: Option<&TrackId>,
+        ids: &[TrackId],
+        now: SystemTime,
+    ) -> Vec<TrackId> {
+        let wanted = |id: &TrackId| ids.contains(id) || next == Some(id);
+        self.waiting
+            .retain(|(w, h)| *h == Hint::Row || ids.contains(w));
+        let mut stopped = Vec::new();
+        self.running.retain(|r| {
+            let stale = r.hint == Some(Hint::Queue) && !wanted(&r.id);
+            if stale {
+                if let Some(task) = &r.task {
+                    task.abort();
+                }
+                stopped.push(r.id.clone());
+            }
+            !stale
+        });
+        let since = Instant::now().checked_sub(FAILED_FOR);
+        self.failed
+            .retain(|(_, at)| since.is_none_or(|since| *at > since));
+        // The nearest last, so it starts first.
+        for id in ids.iter().rev() {
+            if !self.covered(id, now) && !self.failed.iter().any(|(f, _)| f == id) {
+                self.waiting.push_back((id.clone(), Hint::Queue));
+            }
+        }
+        stopped
+    }
+
+    /// `id` isn't resolved ahead again for `FAILED_FOR`.
+    fn give_up(&mut self, id: &TrackId) {
+        self.failed.retain(|(f, _)| f != id);
+        self.failed.push_back((id.clone(), Instant::now()));
+        if self.failed.len() > FAILED_KEPT {
+            self.failed.pop_front();
+        }
+    }
+
+    /// The hints that can start now, newest first, each with what tells it the player
+    /// asks for its track; they count as running.
+    pub fn start_hints(&mut self) -> Vec<(TrackId, Arc<Notify>)> {
         let mut out = Vec::new();
-        while self.running.iter().filter(|r| r.hint).count() < HINT_SLOTS {
-            let Some(id) = self.waiting.pop_back() else {
+        while self.running.iter().filter(|r| r.hint.is_some()).count() < HINT_SLOTS {
+            let Some((id, hint)) = self.waiting.pop_back() else {
                 break;
             };
+            let urgent = Arc::new(Notify::new());
             self.running.push(Running {
                 id: id.clone(),
                 since: Instant::now(),
-                hint: true,
+                hint: Some(hint),
+                urgent: urgent.clone(),
+                task: None,
             });
-            out.push(id);
+            out.push((id, urgent));
         }
         out
+    }
+
+    /// The hint for `id` runs as `task`, which `ahead` may stop.
+    pub fn started(&mut self, id: &TrackId, task: AbortHandle) {
+        if let Some(r) = self.running.iter_mut().find(|r| r.id == *id) {
+            r.task = Some(task);
+        }
     }
 
     /// A resolve ended: returns how long it took and whether it was a hint the player
@@ -138,18 +236,22 @@ impl Streams {
                 let r = self.running.swap_remove(i);
                 (r.since.elapsed(), r.hint)
             }
-            None => (Duration::ZERO, false),
+            None => (Duration::ZERO, None),
         };
-        if let Some(s) = stream {
-            self.cache.retain(|(c, _)| c != id);
-            self.cache.push_back((id.clone(), s.clone()));
-            if self.cache.len() > KEEP
-                && let Some(i) = self.cache.iter().position(|(c, _)| !keep.contains(c))
-            {
-                self.cache.remove(i);
+        match stream {
+            Some(s) => {
+                self.cache.retain(|(c, _)| c != id);
+                self.cache.push_back((id.clone(), s.clone()));
+                if self.cache.len() > KEEP
+                    && let Some(i) = self.cache.iter().position(|(c, _)| !keep.contains(c))
+                {
+                    self.cache.remove(i);
+                }
             }
+            None if hint == Some(Hint::Queue) => self.give_up(id),
+            None => {}
         }
-        (took, hint)
+        (took, hint.is_some())
     }
 
     /// Drops the stream of `id` (its URL was refused); returns it.
@@ -158,13 +260,18 @@ impl Streams {
         self.cache.remove(i).map(|(_, s)| s)
     }
 
-    /// Whether a refused preload of `id` is resolved again ahead: not when it was the last
-    /// one resolved again, so a URL refused every time can't loop while paused.
+    /// Whether a refused preload of `id` is resolved again ahead: not when it was one of
+    /// the last resolved again, so a URL refused every time can't loop while paused. Nor is
+    /// it resolved ahead for the queue again for a while then: the player resolves it.
     pub fn again_after_refusal(&mut self, id: &TrackId) -> bool {
-        if self.refused_preload.as_ref() == Some(id) {
+        if self.refused_preloads.contains(id) {
+            self.give_up(id);
             return false;
         }
-        self.refused_preload = Some(id.clone());
+        self.refused_preloads.push_back(id.clone());
+        if self.refused_preloads.len() > FAILED_KEPT {
+            self.refused_preloads.pop_front();
+        }
         true
     }
 
@@ -211,13 +318,35 @@ impl Controller {
             .collect()
     }
 
-    /// The track after the next one, once the current one plays (the next one is the
-    /// player's own preload).
+    /// While the current track plays: the tracks after the next one, up to `AHEAD` with it
+    /// (the next one is the player's own preload). Called again after each state change,
+    /// so a queue edit, shuffle or repeat moves them.
     pub(super) fn hint_queue(&mut self) {
-        let Some(t) = self.player.queue().upcoming().get(1).cloned() else {
-            return;
+        let mut ahead = self.player.ahead(AHEAD);
+        // Repeat All round a short queue: the current track's stream is the player's.
+        let current = self
+            .player
+            .queue()
+            .current()
+            .map(|t| self.player.play_id(t));
+        ahead.retain(|id| Some(id) != current.as_ref());
+        let (next, after) = match ahead.split_first() {
+            Some((next, after)) => (Some(next), after),
+            None => (None, &[][..]),
         };
-        self.hint(std::slice::from_ref(&t));
+        self.resolve_ahead(next, after);
+    }
+
+    /// Paused or stopped: the queue's resolves ahead stop.
+    pub(super) fn stop_ahead(&mut self) {
+        self.resolve_ahead(None, &[]);
+    }
+
+    fn resolve_ahead(&mut self, next: Option<&TrackId>, after: &[TrackId]) {
+        for id in self.streams.ahead(next, after, SystemTime::now()) {
+            log!("resolve {} ahead: stopped, no longer up next", id.0);
+        }
+        self.start_hints();
     }
 
     /// `src` was just loaded: the stream it replaced gets its head fetched, for Previous.
@@ -234,13 +363,14 @@ impl Controller {
         }
     }
 
-    /// A preloaded stream's URL was refused: it's resolved again ahead, so Play needn't wait
-    /// for the refusal and then the resolve (the restored track, 2026-11-05).
+    /// A preloaded or prefetched stream's URL was refused: it's resolved again ahead, so
+    /// Play needn't wait for the refusal and then the resolve (the restored track,
+    /// 2026-11-05).
     pub(super) fn preload_refused(&mut self, url: &str) {
-        self.resolver.refused(url);
         let Some(id) = self.streams.forget_url(url) else {
             return;
         };
+        self.resolver.refused(&id, url);
         if !self.streams.again_after_refusal(&id) {
             log!(
                 "preload {} refused again (HTTP 403): resolved at Play",
@@ -257,9 +387,10 @@ impl Controller {
     }
 
     pub(super) fn start_hints(&mut self) {
-        for id in self.streams.start_hints() {
+        for (id, urgent) in self.streams.start_hints() {
             log!("resolve {} ahead", id.0);
-            self.spawn_resolve(id);
+            let task = self.spawn_resolve(id.clone(), Some(urgent));
+            self.streams.started(&id, task);
         }
     }
 
@@ -286,21 +417,26 @@ impl Controller {
             }
             Want::Start => {
                 log!("resolve {} ({})", id.0, self.time_left());
-                self.spawn_resolve(id);
+                self.spawn_resolve(id, None);
                 None
             }
         }
     }
 
-    fn spawn_resolve(&self, id: TrackId) {
+    /// A resolve, ahead of a click when `urgent` is given (told when the player asks for
+    /// `id` meanwhile).
+    fn spawn_resolve(&self, id: TrackId, urgent: Option<Arc<Notify>>) -> AbortHandle {
         let (resolver, tx) = (self.resolver.clone(), self.tx.clone());
         tokio::spawn(async move {
             use featherplay_streams::StreamResolver;
             let started = Instant::now();
-            let result = resolver.resolve(&id).await;
+            let result = match &urgent {
+                Some(urgent) => resolver.resolve_ahead(&id, urgent).await,
+                None => resolver.resolve(&id).await,
+            };
             let took = started.elapsed();
-            if let Some(why) = resolver.take_fallback_reason() {
-                log!("resolve {} [native] failed, so through yt-dlp: {why}", id.0);
+            if let Some(why) = resolver.take_fallback_reason(&id) {
+                log!("resolve {} through yt-dlp, not natively: {why}", id.0);
             }
             // "resolved … in" counts until the controller reads the answer; a slow resolve
             // says here how much of that was the resolver itself.
@@ -312,7 +448,8 @@ impl Controller {
                 );
             }
             let _ = tx.send(Msg::Resolved(id, result));
-        });
+        })
+        .abort_handle()
     }
 }
 
@@ -335,8 +472,19 @@ mod tests {
         }
     }
 
+    /// The longest a test waits for a task or a notification before it fails.
+    const TEST_WAIT: Duration = Duration::from_secs(2);
+
     fn id(s: &str) -> TrackId {
         TrackId(s.into())
+    }
+
+    fn ids(started: Vec<(TrackId, Arc<Notify>)>) -> Vec<TrackId> {
+        started.into_iter().map(|(id, _)| id).collect()
+    }
+
+    fn waiting(s: &Streams) -> Vec<TrackId> {
+        s.waiting.iter().map(|(id, _)| id.clone()).collect()
     }
 
     const HOURS: Duration = Duration::from_secs(5 * 3600);
@@ -368,17 +516,17 @@ mod tests {
             s.hint(&id(x), now);
         }
         s.hint(&id("f"), now);
-        // The newest two start; the queue kept the four newest.
-        assert_eq!(s.start_hints(), vec![id("f"), id("e")]);
-        assert_eq!(s.start_hints(), Vec::<TrackId>::new(), "both slots taken");
-        assert_eq!(s.waiting, VecDeque::from([id("c"), id("d")]));
+        // The newest three start; the queue kept the four newest.
+        assert_eq!(ids(s.start_hints()), [id("f"), id("e"), id("d")]);
+        assert!(s.start_hints().is_empty(), "every slot taken");
+        assert_eq!(waiting(&s), [id("c")]);
         // Running or cached: no new hint.
         s.hint(&id("f"), now);
-        assert_eq!(s.waiting.len(), 2);
+        assert_eq!(s.waiting.len(), 1);
         let (_, hint) = s.done(&id("f"), Some(&stream(HOURS)), &[]);
         assert!(hint);
         s.hint(&id("f"), now);
-        assert_eq!(s.start_hints(), vec![id("d")]);
+        assert_eq!(ids(s.start_hints()), [id("c")]);
     }
 
     #[test]
@@ -395,7 +543,7 @@ mod tests {
         s.hint(&id("c"), now);
         s.hint(&id("d"), now);
         assert_eq!(s.want(&id("c"), now), Want::Start);
-        assert_eq!(s.waiting, VecDeque::from([id("d")]));
+        assert_eq!(waiting(&s), [id("d")]);
     }
 
     #[test]
@@ -431,6 +579,116 @@ mod tests {
         assert!(s.again_after_refusal(&id("a")));
         assert!(!s.again_after_refusal(&id("a")), "not twice in a row");
         assert!(s.again_after_refusal(&id("b")));
+    }
+
+    /// The queue's tracks ahead resolve nearest first, beside a hovered row.
+    #[test]
+    fn the_tracks_ahead_resolve_nearest_first() {
+        let mut s = Streams::default();
+        let now = SystemTime::now();
+        s.ahead(None, &[id("q1"), id("q2")], now);
+        assert_eq!(ids(s.start_hints()), [id("q1"), id("q2")]);
+        // Here already, or running: nothing more.
+        s.ahead(None, &[id("q1"), id("q2")], now);
+        assert!(s.start_hints().is_empty());
+        assert!(s.waiting.is_empty());
+    }
+
+    /// A queue edit, shuffle or repeat moves other tracks ahead: the ones no longer ahead
+    /// stop (running) or go (waiting); hovered rows stay.
+    #[test]
+    fn a_queue_change_cancels_the_resolves_ahead_it_made_stale() {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_time()
+            .build()
+            .unwrap();
+        let task = rt.spawn(std::future::pending::<()>());
+        let mut s = Streams::default();
+        let now = SystemTime::now();
+        s.ahead(None, &[id("q1"), id("q2")], now);
+        s.start_hints();
+        s.started(&id("q1"), task.abort_handle());
+        s.hint(&id("row"), now);
+        assert_eq!(s.ahead(None, &[id("q2"), id("q3")], now), [id("q1")]);
+        // A task never aborted would never end: the timeout fails the test instead.
+        let ended = rt.block_on(async { tokio::time::timeout(TEST_WAIT, task).await });
+        let ended = ended.expect("q1's task wasn't stopped");
+        assert!(ended.unwrap_err().is_cancelled(), "q1 stopped");
+        assert_eq!(ids(s.start_hints()), [id("q3"), id("row")]);
+        assert!(s.running.iter().all(|r| r.id != id("q1")));
+    }
+
+    /// Paused or stopped: the queue's resolves ahead stop and none starts.
+    #[test]
+    fn nothing_resolves_ahead_while_paused() {
+        let mut s = Streams::default();
+        let now = SystemTime::now();
+        s.ahead(None, &[id("q1"), id("q2"), id("q3")], now);
+        s.start_hints();
+        assert_eq!(s.ahead(None, &[], now), [id("q1"), id("q2"), id("q3")]);
+        assert!(s.running.is_empty() && s.waiting.is_empty());
+        assert!(s.start_hints().is_empty());
+    }
+
+    /// A resolve ahead that failed isn't asked again on every state change: no loop.
+    #[test]
+    fn a_failed_resolve_ahead_is_not_asked_again() {
+        let mut s = Streams::default();
+        let now = SystemTime::now();
+        s.ahead(None, &[id("q1")], now);
+        s.start_hints();
+        s.done(&id("q1"), None, &[]);
+        s.ahead(None, &[id("q1")], now);
+        assert!(s.start_hints().is_empty());
+        // The player still resolves it when it gets there.
+        assert_eq!(s.want(&id("q1"), now), Want::Start);
+    }
+
+    /// The player asking for a song whose resolve ahead runs tells that resolve, so it
+    /// stops waiting for its turn at yt-dlp.
+    #[test]
+    fn the_player_taking_over_a_resolve_ahead_hurries_it() {
+        let mut s = Streams::default();
+        let now = SystemTime::now();
+        s.ahead(None, &[id("q1")], now);
+        let started = s.start_hints();
+        let urgent = started[0].1.clone();
+        assert_eq!(s.want(&id("q1"), now), Want::Running);
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_time()
+            .build()
+            .unwrap();
+        let told = rt.block_on(async { tokio::time::timeout(TEST_WAIT, urgent.notified()).await });
+        assert!(told.is_ok());
+        // Taken over: a queue change no longer stops it.
+        assert!(s.ahead(None, &[], now).is_empty());
+    }
+
+    /// A song starts: the track two ahead is now the next one, the player's own preload.
+    /// Its resolve ahead keeps running, for the player to take over.
+    #[test]
+    fn the_track_moving_up_to_next_keeps_its_resolve_ahead() {
+        let mut s = Streams::default();
+        let now = SystemTime::now();
+        s.ahead(Some(&id("n")), &[id("q1"), id("q2")], now);
+        s.start_hints();
+        assert!(
+            s.ahead(Some(&id("q1")), &[id("q2"), id("q3")], now)
+                .is_empty()
+        );
+        assert_eq!(s.want(&id("q1"), now), Want::Running);
+    }
+
+    /// A stream refused, resolved again and refused again isn't resolved ahead on every
+    /// later state change: the player resolves it when it gets there.
+    #[test]
+    fn a_stream_refused_twice_is_not_resolved_ahead_again() {
+        let mut s = Streams::default();
+        let now = SystemTime::now();
+        assert!(s.again_after_refusal(&id("q1")));
+        assert!(!s.again_after_refusal(&id("q1")));
+        s.ahead(None, &[id("q1")], now);
+        assert!(s.start_hints().is_empty());
     }
 
     #[test]

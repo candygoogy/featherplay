@@ -813,9 +813,11 @@ impl Controller {
             Effect::StateChanged => {
                 self.log_state();
                 self.push_now_playing();
-                // A queue edit may have changed the track after next.
-                if matches!(self.player.status(), Status::Playing) {
-                    self.hint_queue();
+                // A queue edit may have changed the tracks ahead.
+                match self.player.status() {
+                    Status::Playing => self.hint_queue(),
+                    Status::Loading => {}
+                    Status::Idle | Status::Paused | Status::Stopped(_) => self.stop_ahead(),
                 }
             }
         }
@@ -1018,8 +1020,10 @@ impl Controller {
                         .queue()
                         .current()
                         .map(|t| self.player.play_id(t));
-                    if let Some(s) = current.and_then(|id| self.streams.forget(&id)) {
-                        self.resolver.refused(&s.url);
+                    if let Some(id) = current
+                        && let Some(s) = self.streams.forget(&id)
+                    {
+                        self.resolver.refused(&id, &s.url);
                     }
                     Input::StreamExpired
                 }

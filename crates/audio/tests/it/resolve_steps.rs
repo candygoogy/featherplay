@@ -85,31 +85,35 @@ async fn resolve_steps_time_each_step_and_its_first_chunk() {
     }
 }
 
-/// The app's whole chain after one refused URL: two more resolves.
+/// The app's whole chain after one refused URL: the refused song again, as the engine asks
+/// for it, then another song while URLs are in doubt.
 async fn chain_after_a_refusal(r: &YtDlpResolver, http: &reqwest::Client) {
-    let Ok(s) = r.probe(&TrackId(SONGS[1].into()), Probe::Native).await else {
+    let refused = TrackId(SONGS[1].into());
+    let Ok(s) = r.probe(&refused, Probe::Native).await else {
         return;
     };
-    r.refused(&s.url);
-    let t = Instant::now();
-    let resolved = r.resolve(&TrackId(SONGS[1].into())).await;
-    let resolve = t.elapsed();
-    let line = match resolved {
-        Ok(s) => format!(
-            "c={}, first chunk {} after {} ms",
-            param(&s.url, "c").unwrap_or("?"),
-            first_chunk(http, &s).await,
-            t.elapsed().as_millis()
-        ),
-        Err(e) => format!("failed: {e}"),
-    };
-    println!(
-        "CHAIN after a refusal | {} | resolve {} ms ({}) | {line}",
-        SONGS[1],
-        resolve.as_millis(),
-        r.take_fallback_reason()
-            .map_or("native".into(), |why| format!("not native: {why}"))
-    );
+    r.refused(&refused, &s.url);
+    for (name, song) in [("the refused song", SONGS[1]), ("another song", SONGS[2])] {
+        let id = TrackId(song.into());
+        let t = Instant::now();
+        let resolved = r.resolve(&id).await;
+        let resolve = t.elapsed();
+        let line = match resolved {
+            Ok(s) => format!(
+                "c={}, first chunk {} after {} ms",
+                param(&s.url, "c").unwrap_or("?"),
+                first_chunk(http, &s).await,
+                t.elapsed().as_millis()
+            ),
+            Err(e) => format!("failed: {e}"),
+        };
+        println!(
+            "CHAIN after a refusal, {name} | {song} | resolve {} ms ({}) | {line}",
+            resolve.as_millis(),
+            r.take_fallback_reason(&id)
+                .map_or("native".into(), |why| format!("not native: {why}"))
+        );
+    }
 }
 
 /// "206", "403 then 206" or "403 then 403": the first range, as the engine asks for it.

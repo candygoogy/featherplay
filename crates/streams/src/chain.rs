@@ -1,11 +1,13 @@
 //! The order of `YtDlpResolver::resolve`'s steps and the rules for skipping one, apart from
 //! the steps themselves (`Steps`), so that each rule is tested without a network or yt-dlp.
 
+use std::collections::VecDeque;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use featherplay_core::model::TrackId;
 use featherplay_core::sync::LockExt;
+use tokio::sync::{Notify, Semaphore, SemaphorePermit};
 
 use crate::expiry::query_param;
 use crate::native::NativeError;
@@ -17,8 +19,17 @@ const EMBEDDED_CLIENT: &str = "WEB_EMBEDDED_PLAYER";
 const EMBEDDED_OFF: Duration = Duration::from_secs(30 * 60);
 /// How long the embedded client's URLs are checked after one was refused. On 2026-11-05
 /// YouTube refused 6 of 12, and the one right after a refusal 3 times in 3, while 313
-/// before had all played: the refusals come in spells.
+/// before had all played: the refusals come in spells. On 2026-11-06 about half of each
+/// spell's checked native URLs played (23 of 43), all through the spell, so the native step
+/// stays first for other songs.
 const DOUBT_FOR: Duration = Duration::from_secs(30 * 60);
+/// How long a song whose native URL was refused (or had none) skips the native step. The
+/// same song's next native URL was refused or had none 5 times in 7 right after
+/// (2026-11-05 and 11-06), and a song without a URL had none again 3 hours later; one
+/// refused at 14:37 played at 18:07.
+const NATIVE_REFUSED_FOR: Duration = Duration::from_secs(30 * 60);
+/// Songs remembered for `NATIVE_REFUSED_FOR`, and fallback reasons not taken yet.
+const REMEMBER: usize = 32;
 
 /// What a stream URL's first byte said (`Steps::check`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -46,11 +57,26 @@ pub(crate) trait Steps {
 }
 
 /// What the chain remembers between resolves.
-#[derive(Default)]
 pub(crate) struct Chain {
     embedded: Mutex<Embedded>,
-    /// Why the last resolve didn't come from the native step.
-    fallback: Mutex<Option<String>>,
+    /// Why a resolve didn't come from the native step, by song, until taken.
+    fallback: Mutex<VecDeque<(TrackId, String)>>,
+    /// Songs whose native URL was refused or missing, and when: they skip the native step
+    /// for `NATIVE_REFUSED_FOR`.
+    native_refused: Mutex<VecDeque<(TrackId, Instant)>>,
+    /// Held by a resolve ahead while it runs yt-dlp, so they run one at a time.
+    ahead: Semaphore,
+}
+
+impl Default for Chain {
+    fn default() -> Self {
+        Self {
+            embedded: Mutex::default(),
+            fallback: Mutex::default(),
+            native_refused: Mutex::default(),
+            ahead: Semaphore::new(1),
+        }
+    }
 }
 
 /// How the embedded client's URLs fare.
@@ -64,14 +90,35 @@ struct Embedded {
     off_until: Option<Instant>,
 }
 
+/// How step 1 (the native step) ended.
+enum One {
+    Plays(ResolvedStream),
+    /// Refused, or failed on our side: step 2 next.
+    Next,
+    /// The client won't give this video (not embeddable): step 3 next.
+    NotEmbeddable,
+    /// The answer for the whole resolve (an age check).
+    Ends(ResolveError),
+}
+
+/// How step 2 (the embedded client through yt-dlp) ended.
+enum Two {
+    Plays(ResolvedStream),
+    /// Its checked URL was refused: the client really fails.
+    Refused,
+    Failed(ResolveError),
+}
+
 impl Chain {
-    /// A stream URL was refused (HTTP 403) before it expired. True when it came from the
-    /// embedded client. YouTube refuses some of its URLs while others, even for the same
-    /// song, play, so the client stays on: for `DOUBT_FOR`, resolves check their URL.
-    pub fn refused(&self, url: &str) -> bool {
+    /// A stream URL `id` got was refused (HTTP 403) before it expired. True when it came
+    /// from the embedded client. YouTube refuses some of its URLs while others play, so the
+    /// client stays on: for `DOUBT_FOR`, resolves check their URL. `id` itself skips the
+    /// native step for `NATIVE_REFUSED_FOR`.
+    pub fn refused(&self, id: &TrackId, url: &str) -> bool {
         let embedded = query_param(url, "c").as_deref() == Some(EMBEDDED_CLIENT);
         if embedded {
             self.doubt();
+            self.native_refused(id);
         }
         embedded
     }
@@ -80,9 +127,37 @@ impl Chain {
         self.embedded.lock_or_recover().doubt_until = Some(Instant::now() + DOUBT_FOR);
     }
 
-    /// Why the last resolve went to yt-dlp instead of the native request, once.
-    pub fn take_fallback_reason(&self) -> Option<String> {
-        self.fallback.lock_or_recover().take()
+    fn native_refused(&self, id: &TrackId) {
+        let mut r = self.native_refused.lock_or_recover();
+        r.retain(|(t, _)| t != id);
+        r.push_back((id.clone(), Instant::now() + NATIVE_REFUSED_FOR));
+        if r.len() > REMEMBER {
+            r.pop_front();
+        }
+    }
+
+    /// Whether `id`'s native URL was refused a moment ago.
+    fn skips_native(&self, id: &TrackId) -> bool {
+        let now = Instant::now();
+        let mut r = self.native_refused.lock_or_recover();
+        r.retain(|(_, until)| now < *until);
+        r.iter().any(|(t, _)| t == id)
+    }
+
+    fn fall_back(&self, id: &TrackId, why: String) {
+        let mut f = self.fallback.lock_or_recover();
+        f.retain(|(t, _)| t != id);
+        f.push_back((id.clone(), why));
+        if f.len() > REMEMBER {
+            f.pop_front();
+        }
+    }
+
+    /// Why `id`'s last resolve went to yt-dlp instead of the native request, once.
+    pub fn take_fallback_reason(&self, id: &TrackId) -> Option<String> {
+        let mut f = self.fallback.lock_or_recover();
+        let i = f.iter().position(|(t, _)| t == id)?;
+        f.remove(i).map(|(_, why)| why)
     }
 
     /// Whether the embedded client is on, and whether its URLs are in doubt.
@@ -105,9 +180,30 @@ impl Chain {
         }
     }
 
+    /// A resolve the player waits for: see `run`.
+    pub async fn resolve(
+        &self,
+        s: &impl Steps,
+        id: &TrackId,
+    ) -> Result<ResolvedStream, ResolveError> {
+        self.run(s, id, None).await
+    }
+
+    /// A resolve ahead of a click: see `run`. `urgent` is notified when the player asks
+    /// for `id` meanwhile.
+    pub async fn resolve_ahead(
+        &self,
+        s: &impl Steps,
+        id: &TrackId,
+        urgent: &Notify,
+    ) -> Result<ResolvedStream, ResolveError> {
+        self.run(s, id, Some(urgent)).await
+    }
+
     /// In order:
     ///
-    /// 1. The native step.
+    /// 1. The native step. Skipped for `NATIVE_REFUSED_FOR` after the song's native URL
+    ///    was refused or missing.
     /// 2. The embedded client through yt-dlp, when step 1 failed on our side. Skipped when
     ///    the client said no to the video itself (not embeddable).
     /// 3. yt-dlp's default clients (7-9 s with their ad gate). Not for a video step 1
@@ -118,67 +214,61 @@ impl Chain {
     /// For `DOUBT_FOR` after a refused embedded URL (`refused`), steps 1 and 2 check their
     /// URL's first byte (one request, ~0.2 s) before handing it over, so a refused one
     /// costs no failed start. A refused native URL goes on to step 2 (~3 s, which played
-    /// 3 times in 3 when the native one was refused). A refused step 2 URL means the client
-    /// really fails: steps 1 and 2 are skipped for `EMBEDDED_OFF`.
-    pub async fn resolve(
+    /// every time a native one was refused). A refused step 2 URL means the client really
+    /// fails: steps 1 and 2 are skipped for `EMBEDDED_OFF`. Meanwhile, a resolve the player
+    /// waits for runs steps 1 and 2 at once (`race`).
+    ///
+    /// A resolve ahead (`ahead`) runs its yt-dlp steps one resolve ahead at a time, unless
+    /// the player asks for its song meanwhile.
+    async fn run(
         &self,
         s: &impl Steps,
         id: &TrackId,
+        ahead: Option<&Notify>,
     ) -> Result<ResolvedStream, ResolveError> {
+        // Left by a resolve of the same song that was cancelled.
+        self.take_fallback_reason(id);
         let (mut embedded, doubt) = self.embedded();
-        if embedded && let Some(native) = s.native(id).await {
-            match native {
-                Ok(stream) if !doubt => return Ok(stream),
-                Ok(stream) => match self.checked(s, stream).await {
-                    Some(stream) => return Ok(stream),
-                    None => {
-                        let why = "its fresh URL was refused too (HTTP 403)";
-                        *self.fallback.lock_or_recover() = Some(why.into());
-                    }
-                },
-                Err(e) => {
-                    if let Some(m) = age_check(&e) {
-                        let e = ResolveError::Unavailable(m.to_string());
-                        log::info!("{}", stage_failed(id, Stage::Native, &e));
-                        return Err(e);
-                    }
-                    // The client refused the video: yt-dlp's embedded run would too.
-                    embedded &= !matches!(e, NativeError::Skip(_));
-                    *self.fallback.lock_or_recover() = Some(e.to_string());
-                }
+        let native = embedded && !self.skips_native(id);
+        if embedded && !native {
+            self.fall_back(
+                id,
+                "its native URL was refused (HTTP 403) a moment ago".into(),
+            );
+        }
+        if native && doubt && ahead.is_none() {
+            match self.race(s, id).await {
+                Some(r) => return r,
+                None => embedded = false,
+            }
+        } else if native {
+            match self.native_step(s, id, doubt).await {
+                Some(One::Plays(stream)) => return Ok(stream),
+                Some(One::Ends(e)) => return Err(e),
+                Some(One::NotEmbeddable) => embedded = false,
+                Some(One::Next) | None => {}
             }
         }
+        // yt-dlp from here on.
+        let _turn = self.turn(ahead).await;
         if embedded {
-            match s.embedded(id).await {
-                Ok(stream) if !doubt => return Ok(stream),
-                Ok(stream) => match self.checked(s, stream).await {
-                    Some(stream) => return Ok(stream),
-                    None => {
-                        let off = Instant::now() + EMBEDDED_OFF;
-                        let mut e = self.embedded.lock_or_recover();
-                        e.off_until = Some(off);
-                        // Its first URLs once it's back on are checked too.
-                        e.doubt_until = Some(off + DOUBT_FOR);
-                        log::warn!(
-                            "resolve {}: the embedded client's fresh URLs are refused too, \
-                             so the TV clients for {} min",
-                            id.0,
-                            EMBEDDED_OFF.as_secs() / 60
-                        );
-                    }
-                },
-                Err(e) => {
-                    log::warn!("{}", stage_failed(id, Stage::Embedded, &e));
-                    if e == ResolveError::ToolMissing {
-                        return Err(e);
-                    }
-                    // Not embeddable, or the client broke: the default clients decide.
-                }
+            let two = self.embedded_step(s, id, doubt).await;
+            if !native && matches!(two, Two::Refused) {
+                // Without a fresh native URL refused too, one song's refusals (they come
+                // by song) say nothing of the client: only this song goes to step 3.
+                log::warn!(
+                    "resolve {}: its yt-dlp URL was refused too, so the TV clients",
+                    id.0
+                );
+            } else if let Some(r) = self.after_embedded(id, two) {
+                return r;
             }
         }
+        let t = Instant::now();
         let mut result = s.default_clients(id).await;
-        if let Err(e) = &result {
-            log::warn!("{}", stage_failed(id, Stage::Default, e));
+        match &result {
+            Ok(_) => log::info!("{}", stage_took(id, Stage::Default, t.elapsed())),
+            Err(e) => log::warn!("{}", stage_failed(id, Stage::Default, e)),
         }
         if matches!(result, Err(ResolveError::ToolFailed { .. })) && s.update().await {
             // The retry is worth it even if the update fails (a transient error).
@@ -188,6 +278,139 @@ impl Chain {
             }
         }
         result
+    }
+
+    /// Steps 1 and 2 at once, while URLs are in doubt and the player waits: the first URL
+    /// that plays wins, and the other step is dropped (its yt-dlp run killed). About half
+    /// the native URLs of a spell play (~0.7 s with the check); for the others, yt-dlp's
+    /// ~3 s started with them instead of after them. `None`: on to step 3.
+    async fn race(
+        &self,
+        s: &impl Steps,
+        id: &TrackId,
+    ) -> Option<Result<ResolvedStream, ResolveError>> {
+        let native = self.native_step(s, id, true);
+        let ytdlp = self.embedded_step(s, id, true);
+        tokio::pin!(native, ytdlp);
+        // The native step first when both are ready: it has no process to wait for.
+        let first = tokio::select! {
+            biased;
+            one = &mut native => Ok(one),
+            two = &mut ytdlp => Err(two),
+        };
+        let (one, two) = match first {
+            Ok(one) => (one, None),
+            Err(Two::Plays(stream)) => {
+                self.fall_back(id, "yt-dlp's URL came before the native one".into());
+                return Some(Ok(stream));
+            }
+            Err(two) => (native.await, Some(two)),
+        };
+        match one {
+            Some(One::Plays(stream)) => Some(Ok(stream)),
+            Some(One::Ends(e)) => Some(Err(e)),
+            // yt-dlp's embedded run would be refused too.
+            Some(One::NotEmbeddable) => None,
+            Some(One::Next) | None => {
+                let two = match two {
+                    Some(two) => two,
+                    None => ytdlp.await,
+                };
+                self.after_embedded(id, two)
+            }
+        }
+    }
+
+    /// Step 1. `None` when there's no native step.
+    async fn native_step(&self, s: &impl Steps, id: &TrackId, doubt: bool) -> Option<One> {
+        let native = s.native(id).await?;
+        Some(match native {
+            Ok(stream) if !doubt => One::Plays(stream),
+            Ok(stream) => match self.checked(s, stream).await {
+                Some(stream) => One::Plays(stream),
+                None => {
+                    self.native_refused(id);
+                    self.fall_back(id, "its URL was refused (HTTP 403) at its check".into());
+                    One::Next
+                }
+            },
+            Err(e) => {
+                if let Some(m) = age_check(&e) {
+                    let e = ResolveError::Unavailable(m.to_string());
+                    log::info!("{}", stage_failed(id, Stage::Native, &e));
+                    return Some(One::Ends(e));
+                }
+                if matches!(e, NativeError::NoUrl(_)) {
+                    self.native_refused(id);
+                }
+                self.fall_back(id, e.to_string());
+                // The client refused the video: yt-dlp's embedded run would too.
+                if matches!(e, NativeError::Skip(_)) {
+                    One::NotEmbeddable
+                } else {
+                    One::Next
+                }
+            }
+        })
+    }
+
+    /// Step 2.
+    async fn embedded_step(&self, s: &impl Steps, id: &TrackId, doubt: bool) -> Two {
+        let t = Instant::now();
+        let answer = s.embedded(id).await;
+        if answer.is_ok() {
+            // Its time varies (3-8 s on 2026-11-06); the log tells which part was slow.
+            log::info!("{}", stage_took(id, Stage::Embedded, t.elapsed()));
+        }
+        match answer {
+            Ok(stream) if !doubt => Two::Plays(stream),
+            Ok(stream) => match s.check(&stream.url).await {
+                Check::Plays | Check::Unknown => Two::Plays(stream),
+                Check::Refused => Two::Refused,
+            },
+            Err(e) => Two::Failed(e),
+        }
+    }
+
+    /// The answer step 2 gives the resolve, or `None` for step 3.
+    fn after_embedded(
+        &self,
+        id: &TrackId,
+        two: Two,
+    ) -> Option<Result<ResolvedStream, ResolveError>> {
+        match two {
+            Two::Plays(stream) => Some(Ok(stream)),
+            Two::Refused => {
+                let off = Instant::now() + EMBEDDED_OFF;
+                let mut e = self.embedded.lock_or_recover();
+                e.off_until = Some(off);
+                // Its first URLs once it's back on are checked too.
+                e.doubt_until = Some(off + DOUBT_FOR);
+                log::warn!(
+                    "resolve {}: the embedded client's fresh URLs are refused too, \
+                     so the TV clients for {} min",
+                    id.0,
+                    EMBEDDED_OFF.as_secs() / 60
+                );
+                None
+            }
+            Two::Failed(e) => {
+                log::warn!("{}", stage_failed(id, Stage::Embedded, &e));
+                // Not embeddable, or the client broke: the default clients decide.
+                (e == ResolveError::ToolMissing).then_some(Err(e))
+            }
+        }
+    }
+
+    /// For a resolve ahead, its turn at yt-dlp (`ahead`): held until the resolve ends. A
+    /// resolve the player waits for, or one it asked for while this waited, goes at once.
+    async fn turn(&self, ahead: Option<&Notify>) -> Option<SemaphorePermit<'_>> {
+        let urgent = ahead?;
+        tokio::select! {
+            biased;
+            () = urgent.notified() => None,
+            permit = self.ahead.acquire() => permit.ok(),
+        }
     }
 }
 
@@ -214,20 +437,36 @@ enum Stage {
     Default,
 }
 
+impl Stage {
+    fn name(self) -> &'static str {
+        match self {
+            Stage::Native => "native",
+            Stage::Embedded => "embedded",
+            Stage::Default => "default",
+        }
+    }
+}
+
 /// The log line for a step that failed.
 fn stage_failed(id: &TrackId, stage: Stage, e: &ResolveError) -> String {
-    let stage = match stage {
-        Stage::Native => "native",
-        Stage::Embedded => "embedded",
-        Stage::Default => "default",
-    };
-    format!("resolve {} [{stage}] failed: {e}", id.0)
+    format!("resolve {} [{}] failed: {e}", id.0, stage.name())
+}
+
+/// The log line for a yt-dlp step that gave a URL.
+fn stage_took(id: &TrackId, stage: Stage, took: Duration) -> String {
+    format!(
+        "resolve {} [{}] answered in {:.1}s",
+        id.0,
+        stage.name(),
+        took.as_secs_f64()
+    )
 }
 
 #[cfg(test)]
 mod tests {
-    use std::collections::VecDeque;
     use std::time::SystemTime;
+
+    use tokio::time::timeout;
 
     use super::*;
 
@@ -258,24 +497,34 @@ mod tests {
     }
 
     /// Steps that answer from a script, in order, and log each call. A step with nothing
-    /// scripted fails the test.
+    /// scripted fails the test; a step scripted as `None` never answers.
     #[derive(Default)]
     struct Script {
-        native: Mutex<VecDeque<Result<ResolvedStream, NativeError>>>,
-        embedded: Mutex<VecDeque<Result<ResolvedStream, ResolveError>>>,
+        native: Mutex<VecDeque<Option<Result<ResolvedStream, NativeError>>>>,
+        embedded: Mutex<VecDeque<Option<Result<ResolvedStream, ResolveError>>>>,
         default: Mutex<VecDeque<Result<ResolvedStream, ResolveError>>>,
         checks: Mutex<VecDeque<Check>>,
         calls: Mutex<Vec<&'static str>>,
         no_native: bool,
+        /// The next native step answers only once the other steps have had a turn.
+        native_later: std::sync::atomic::AtomicBool,
     }
 
     impl Script {
         fn native(self, r: Result<&str, NativeError>) -> Self {
-            self.native.lock().unwrap().push_back(r.map(stream));
+            self.native.lock().unwrap().push_back(Some(r.map(stream)));
+            self
+        }
+        fn native_hangs(self) -> Self {
+            self.native.lock().unwrap().push_back(None);
             self
         }
         fn embedded(self, r: Result<&str, ResolveError>) -> Self {
-            self.embedded.lock().unwrap().push_back(r.map(stream));
+            self.embedded.lock().unwrap().push_back(Some(r.map(stream)));
+            self
+        }
+        fn embedded_hangs(self) -> Self {
+            self.embedded.lock().unwrap().push_back(None);
             self
         }
         fn default_clients(self, r: Result<&str, ResolveError>) -> Self {
@@ -301,10 +550,25 @@ mod tests {
 
     impl Steps for Script {
         async fn native(&self, _: &TrackId) -> Option<Result<ResolvedStream, NativeError>> {
-            (!self.no_native).then(|| self.next("native", &self.native))
+            if self.no_native {
+                return None;
+            }
+            if self
+                .native_later
+                .swap(false, std::sync::atomic::Ordering::SeqCst)
+            {
+                tokio::task::yield_now().await;
+            }
+            match self.next("native", &self.native) {
+                Some(r) => Some(r),
+                None => std::future::pending().await,
+            }
         }
         async fn embedded(&self, _: &TrackId) -> Result<ResolvedStream, ResolveError> {
-            self.next("embedded", &self.embedded)
+            match self.next("embedded", &self.embedded) {
+                Some(r) => r,
+                None => std::future::pending().await,
+            }
         }
         async fn default_clients(&self, _: &TrackId) -> Result<ResolvedStream, ResolveError> {
             self.next("default", &self.default)
@@ -318,8 +582,24 @@ mod tests {
         }
     }
 
+    /// `f`'s answer, or a failed test after a few seconds: some steps never answer, and a
+    /// chain that waits for one must fail, not hang.
+    async fn within<F: Future>(f: F) -> F::Output {
+        timeout(Duration::from_secs(2), f)
+            .await
+            .expect("the resolve didn't end")
+    }
+
     fn id() -> TrackId {
         TrackId("h46YpWrg55Q".into())
+    }
+
+    fn other() -> TrackId {
+        TrackId("9WQBzXr4gFc".into())
+    }
+
+    fn third() -> TrackId {
+        TrackId("XgBPZ68L6TE".into())
     }
 
     fn url(r: Result<ResolvedStream, ResolveError>) -> String {
@@ -329,9 +609,9 @@ mod tests {
     #[tokio::test]
     async fn a_native_stream_is_the_answer() {
         let (chain, s) = (Chain::default(), Script::default().native(Ok(NATIVE_URL)));
-        assert_eq!(url(chain.resolve(&s, &id()).await), NATIVE_URL);
+        assert_eq!(url(within(chain.resolve(&s, &id())).await), NATIVE_URL);
         assert_eq!(s.calls(), ["native"]);
-        assert_eq!(chain.take_fallback_reason(), None);
+        assert_eq!(chain.take_fallback_reason(&id()), None);
     }
 
     #[tokio::test]
@@ -340,9 +620,9 @@ mod tests {
         let s = Script::default()
             .native(Err(NativeError::Failed("deno timed out".into())))
             .embedded(Ok(EMBEDDED_URL));
-        assert_eq!(url(chain.resolve(&s, &id()).await), EMBEDDED_URL);
+        assert_eq!(url(within(chain.resolve(&s, &id())).await), EMBEDDED_URL);
         assert_eq!(s.calls(), ["native", "embedded"]);
-        let why = chain.take_fallback_reason().expect("a reason");
+        let why = chain.take_fallback_reason(&id()).expect("a reason");
         assert!(why.contains("deno timed out"), "{why}");
     }
 
@@ -354,7 +634,7 @@ mod tests {
                 "UNPLAYABLE: embedding disabled".into(),
             )))
             .default_clients(Ok(TV_URL));
-        assert_eq!(url(chain.resolve(&s, &id()).await), TV_URL);
+        assert_eq!(url(within(chain.resolve(&s, &id())).await), TV_URL);
         assert_eq!(s.calls(), ["native", "default"]);
     }
 
@@ -364,7 +644,7 @@ mod tests {
         let s = Script::default().native(Err(NativeError::Skip(
             "LOGIN_REQUIRED: Sign in to confirm your age".into(),
         )));
-        let e = chain.resolve(&s, &id()).await.unwrap_err();
+        let e = within(chain.resolve(&s, &id())).await.unwrap_err();
         assert!(matches!(e, ResolveError::Unavailable(_)), "{e:?}");
         assert_eq!(s.calls(), ["native"]);
     }
@@ -379,7 +659,7 @@ mod tests {
         .embedded(Err(failed("ERROR: Requested format is not available")))
         .default_clients(Err(failed("ERROR: signature extraction failed")))
         .default_clients(Ok(TV_URL));
-        assert_eq!(url(chain.resolve(&s, &id()).await), TV_URL);
+        assert_eq!(url(within(chain.resolve(&s, &id())).await), TV_URL);
         assert_eq!(s.calls(), ["embedded", "default", "update", "default"]);
     }
 
@@ -392,7 +672,7 @@ mod tests {
         }
         .embedded(Err(ResolveError::ToolMissing));
         assert_eq!(
-            chain.resolve(&s, &id()).await,
+            within(chain.resolve(&s, &id())).await,
             Err(ResolveError::ToolMissing)
         );
         assert_eq!(s.calls(), ["embedded"]);
@@ -401,16 +681,16 @@ mod tests {
     #[test]
     fn only_a_refused_embedded_url_counts() {
         let chain = Chain::default();
-        assert!(!chain.refused(TV_URL));
-        assert!(chain.refused(NATIVE_URL));
+        assert!(!chain.refused(&other(), TV_URL));
+        assert!(chain.refused(&other(), NATIVE_URL));
     }
 
     #[tokio::test]
     async fn a_refused_tv_url_changes_nothing() {
         let chain = Chain::default();
-        chain.refused(TV_URL);
+        chain.refused(&other(), TV_URL);
         let s = Script::default().native(Ok(NATIVE_URL));
-        assert_eq!(url(chain.resolve(&s, &id()).await), NATIVE_URL);
+        assert_eq!(url(within(chain.resolve(&s, &id())).await), NATIVE_URL);
         assert_eq!(s.calls(), ["native"], "no check");
     }
 
@@ -421,30 +701,30 @@ mod tests {
     #[tokio::test]
     async fn after_a_refused_url_fresh_native_ones_are_checked_for_a_while() {
         let chain = Chain::default();
-        chain.refused(NATIVE_URL);
+        chain.refused(&other(), NATIVE_URL);
         let s = Script::default()
             .native(Ok(NATIVE_URL))
             .check(Check::Plays)
             .native(Ok(NATIVE_URL))
             .check(Check::Plays)
             .native(Ok(NATIVE_URL));
-        assert_eq!(url(chain.resolve(&s, &id()).await), NATIVE_URL);
+        assert_eq!(url(within(chain.resolve(&s, &id())).await), NATIVE_URL);
         assert_eq!(s.calls(), ["native", "check"]);
-        assert_eq!(chain.take_fallback_reason(), None);
+        assert_eq!(chain.take_fallback_reason(&id()), None);
 
-        assert_eq!(url(chain.resolve(&s, &id()).await), NATIVE_URL);
+        assert_eq!(url(within(chain.resolve(&s, &id())).await), NATIVE_URL);
         assert_eq!(s.calls(), ["native", "check"], "still checked");
 
         // `DOUBT_FOR` later.
         chain.embedded.lock().unwrap().doubt_until = Some(Instant::now());
-        assert_eq!(url(chain.resolve(&s, &id()).await), NATIVE_URL);
+        assert_eq!(url(within(chain.resolve(&s, &id())).await), NATIVE_URL);
         assert_eq!(s.calls(), ["native"]);
     }
 
     #[tokio::test]
     async fn a_fresh_native_url_refused_too_goes_to_yt_dlps_embedded_client() {
         let chain = Chain::default();
-        chain.refused(NATIVE_URL);
+        chain.refused(&other(), NATIVE_URL);
         let s = Script::default()
             .native(Ok(NATIVE_URL))
             .check(Check::Refused)
@@ -452,14 +732,182 @@ mod tests {
             .check(Check::Plays)
             .native(Ok(NATIVE_URL))
             .check(Check::Plays);
-        assert_eq!(url(chain.resolve(&s, &id()).await), EMBEDDED_URL);
+        assert_eq!(url(within(chain.resolve(&s, &id())).await), EMBEDDED_URL);
         assert_eq!(s.calls(), ["native", "check", "embedded", "check"]);
-        let why = chain.take_fallback_reason().expect("a reason");
+        let why = chain.take_fallback_reason(&id()).expect("a reason");
         assert!(why.contains("refused"), "{why}");
 
-        // The client works: the native step comes first again, checked.
-        assert_eq!(url(chain.resolve(&s, &id()).await), NATIVE_URL);
+        // The client works: another song's native step comes first again, checked.
+        assert_eq!(url(within(chain.resolve(&s, &third())).await), NATIVE_URL);
         assert_eq!(s.calls(), ["native", "check"]);
+    }
+
+    /// A song whose native URL was refused gets another refused one (or none) 5 times in 7
+    /// right after (2026-11-05 and 11-06): its next resolves go to yt-dlp at once, checked,
+    /// with no second native request first (~0.7 s with its check).
+    #[tokio::test]
+    async fn a_song_whose_native_url_was_refused_goes_straight_to_yt_dlp() {
+        let chain = Chain::default();
+        chain.refused(&id(), NATIVE_URL);
+        let s = Script::default()
+            .embedded(Ok(EMBEDDED_URL))
+            .check(Check::Plays);
+        assert_eq!(url(within(chain.resolve(&s, &id())).await), EMBEDDED_URL);
+        assert_eq!(s.calls(), ["embedded", "check"], "no native call");
+        let why = chain.take_fallback_reason(&id()).expect("a reason");
+        assert!(why.contains("refused"), "{why}");
+    }
+
+    #[tokio::test]
+    async fn a_refused_check_sends_the_song_straight_to_yt_dlp_next_time() {
+        let chain = Chain::default();
+        chain.refused(&other(), NATIVE_URL);
+        let s = Script::default()
+            .native(Ok(NATIVE_URL))
+            .check(Check::Refused)
+            .embedded(Ok(EMBEDDED_URL))
+            .check(Check::Plays)
+            .embedded(Ok(EMBEDDED_URL))
+            .check(Check::Plays);
+        assert_eq!(url(within(chain.resolve(&s, &id())).await), EMBEDDED_URL);
+        s.calls();
+        assert_eq!(url(within(chain.resolve(&s, &id())).await), EMBEDDED_URL);
+        assert_eq!(s.calls(), ["embedded", "check"]);
+    }
+
+    /// A SABR-only answer ("format 251 has no URL") for a song came again on its next
+    /// resolves (3 of 3 on 2026-11-06, hours apart).
+    #[tokio::test]
+    async fn a_song_whose_format_had_no_url_goes_straight_to_yt_dlp_next_time() {
+        let chain = Chain::default();
+        let s = Script::default()
+            .native(Err(NativeError::NoUrl("format 251 has no URL".into())))
+            .embedded(Ok(EMBEDDED_URL))
+            .embedded(Ok(EMBEDDED_URL));
+        assert_eq!(url(within(chain.resolve(&s, &id())).await), EMBEDDED_URL);
+        assert_eq!(s.calls(), ["native", "embedded"]);
+        assert_eq!(url(within(chain.resolve(&s, &id())).await), EMBEDDED_URL);
+        assert_eq!(s.calls(), ["embedded"]);
+    }
+
+    /// Resolves run side by side: each one's reason is its own (the log gave one song's
+    /// refusal to another that had resolved natively in 0.6 s).
+    #[tokio::test]
+    async fn each_song_keeps_its_own_fallback_reason() {
+        let chain = Chain::default();
+        let s = Script::default()
+            .native(Err(NativeError::Failed("player API answered 500".into())))
+            .embedded(Ok(EMBEDDED_URL))
+            .native(Ok(NATIVE_URL));
+        within(chain.resolve(&s, &id())).await.expect("a stream");
+        within(chain.resolve(&s, &other())).await.expect("a stream");
+        assert_eq!(chain.take_fallback_reason(&other()), None);
+        let why = chain.take_fallback_reason(&id()).expect("a reason");
+        assert!(why.contains("500"), "{why}");
+        assert_eq!(chain.take_fallback_reason(&id()), None, "told once");
+    }
+
+    /// While URLs are in doubt, a resolve the player waits for starts yt-dlp beside the
+    /// native step: a native step that's slow to answer costs nothing.
+    #[tokio::test]
+    async fn in_doubt_the_players_resolve_takes_yt_dlps_url_when_it_comes_first() {
+        let chain = Chain::default();
+        chain.refused(&other(), NATIVE_URL);
+        let s = Script::default()
+            .native_hangs()
+            .embedded(Ok(EMBEDDED_URL))
+            .check(Check::Plays);
+        assert_eq!(url(within(chain.resolve(&s, &id())).await), EMBEDDED_URL);
+        assert_eq!(s.calls(), ["native", "embedded", "check"]);
+    }
+
+    /// yt-dlp's URL refused before the native one plays: the native one is the answer, and
+    /// the client stays on.
+    #[tokio::test]
+    async fn in_a_race_a_native_url_that_plays_after_a_refused_yt_dlp_one_keeps_the_client() {
+        let chain = Chain::default();
+        chain.refused(&other(), NATIVE_URL);
+        let s = Script {
+            native_later: true.into(),
+            ..Script::default()
+        }
+        .embedded(Ok(EMBEDDED_URL))
+        .check(Check::Refused)
+        .native(Ok(NATIVE_URL))
+        .check(Check::Plays)
+        .native(Ok(NATIVE_URL))
+        .check(Check::Plays);
+        assert_eq!(url(within(chain.resolve(&s, &id())).await), NATIVE_URL);
+        assert_eq!(s.calls(), ["embedded", "check", "native", "check"]);
+        assert_eq!(url(within(chain.resolve(&s, &third())).await), NATIVE_URL);
+        assert_eq!(s.calls(), ["native", "check"], "the client stays on");
+    }
+
+    /// A song that skips the native step: its yt-dlp URL refused too says nothing of the
+    /// client (the refusals come by song), so only that song goes to the TV clients.
+    #[tokio::test]
+    async fn a_refused_songs_refused_yt_dlp_url_sends_only_it_to_the_tv_clients() {
+        let chain = Chain::default();
+        chain.refused(&id(), NATIVE_URL);
+        let s = Script::default()
+            .embedded(Ok(EMBEDDED_URL))
+            .check(Check::Refused)
+            .default_clients(Ok(TV_URL))
+            .native(Ok(NATIVE_URL))
+            .check(Check::Plays);
+        assert_eq!(url(within(chain.resolve(&s, &id())).await), TV_URL);
+        assert_eq!(s.calls(), ["embedded", "check", "default"]);
+        assert_eq!(url(within(chain.resolve(&s, &other())).await), NATIVE_URL);
+        assert_eq!(s.calls(), ["native", "check"], "the client stays on");
+    }
+
+    /// Nobody waits for a resolve ahead: it runs the steps one after another, so yt-dlp
+    /// only starts once the native step has failed.
+    #[tokio::test]
+    async fn in_doubt_a_resolve_ahead_runs_no_yt_dlp_beside_the_native_step() {
+        let chain = Chain::default();
+        chain.refused(&other(), NATIVE_URL);
+        let s = Script::default().native_hangs();
+        let (urgent, song) = (Notify::new(), id());
+        let ahead = chain.resolve_ahead(&s, &song, &urgent);
+        assert!(timeout(Duration::from_millis(50), ahead).await.is_err());
+        assert_eq!(s.calls(), ["native"]);
+    }
+
+    /// At most one yt-dlp run for resolves ahead at a time; the player asking for a song
+    /// whose resolve ahead waits for it lets it go at once.
+    #[tokio::test]
+    async fn resolves_ahead_take_turns_at_yt_dlp_unless_the_player_waits() {
+        let chain = Chain::default();
+        let fail = || Err(NativeError::Failed("player API answered 500".into()));
+        let s = Script::default()
+            .native(fail())
+            .embedded_hangs()
+            .native(fail())
+            .embedded(Ok(EMBEDDED_URL));
+        let (first_urgent, second_urgent) = (Notify::new(), Notify::new());
+        let (first_song, second_song) = (id(), other());
+        let first = chain.resolve_ahead(&s, &first_song, &first_urgent);
+        tokio::pin!(first);
+        assert!(
+            timeout(Duration::from_millis(20), &mut first)
+                .await
+                .is_err()
+        );
+        assert_eq!(s.calls(), ["native", "embedded"]);
+
+        let second = chain.resolve_ahead(&s, &second_song, &second_urgent);
+        tokio::pin!(second);
+        assert!(
+            timeout(Duration::from_millis(50), &mut second)
+                .await
+                .is_err()
+        );
+        assert_eq!(s.calls(), ["native"], "waits for the first one's yt-dlp");
+
+        second_urgent.notify_one();
+        assert_eq!(url(within(second).await), EMBEDDED_URL);
+        assert_eq!(s.calls(), ["embedded"]);
     }
 
     /// "Really fails": after a refusal, a fresh native URL and a fresh yt-dlp one for the
@@ -467,7 +915,7 @@ mod tests {
     #[tokio::test]
     async fn when_both_fresh_embedded_urls_are_refused_the_client_goes_off() {
         let chain = Chain::default();
-        chain.refused(NATIVE_URL);
+        chain.refused(&other(), NATIVE_URL);
         let s = Script::default()
             .native(Ok(NATIVE_URL))
             .check(Check::Refused)
@@ -475,13 +923,13 @@ mod tests {
             .check(Check::Refused)
             .default_clients(Ok(TV_URL))
             .default_clients(Ok(TV_URL));
-        assert_eq!(url(chain.resolve(&s, &id()).await), TV_URL);
+        assert_eq!(url(within(chain.resolve(&s, &id())).await), TV_URL);
         assert_eq!(
             s.calls(),
             ["native", "check", "embedded", "check", "default"]
         );
 
-        assert_eq!(url(chain.resolve(&s, &id()).await), TV_URL);
+        assert_eq!(url(within(chain.resolve(&s, &id())).await), TV_URL);
         assert_eq!(s.calls(), ["default"], "off: straight to the TV clients");
 
         // The first URLs once it's back on are checked too.
@@ -493,13 +941,13 @@ mod tests {
     #[tokio::test]
     async fn in_doubt_a_video_the_embedded_client_refuses_still_goes_to_the_tv_clients() {
         let chain = Chain::default();
-        chain.refused(NATIVE_URL);
+        chain.refused(&other(), NATIVE_URL);
         let s = Script::default()
             .native(Err(NativeError::Skip(
                 "UNPLAYABLE: embedding disabled".into(),
             )))
             .default_clients(Ok(TV_URL));
-        assert_eq!(url(chain.resolve(&s, &id()).await), TV_URL);
+        assert_eq!(url(within(chain.resolve(&s, &id())).await), TV_URL);
         assert_eq!(
             s.calls(),
             ["native", "default"],
@@ -511,14 +959,14 @@ mod tests {
     #[tokio::test]
     async fn a_refused_check_keeps_the_doubt_going() {
         let chain = Chain::default();
-        chain.refused(NATIVE_URL);
+        chain.refused(&other(), NATIVE_URL);
         chain.embedded.lock().unwrap().doubt_until = Some(Instant::now() + Duration::from_secs(1));
         let s = Script::default()
             .native(Ok(NATIVE_URL))
             .check(Check::Refused)
             .embedded(Ok(EMBEDDED_URL))
             .check(Check::Plays);
-        assert_eq!(url(chain.resolve(&s, &id()).await), EMBEDDED_URL);
+        assert_eq!(url(within(chain.resolve(&s, &id())).await), EMBEDDED_URL);
         let until = chain.embedded.lock().unwrap().doubt_until.expect("doubt");
         assert!(until > Instant::now() + DOUBT_FOR - Duration::from_secs(60));
     }
@@ -527,15 +975,15 @@ mod tests {
     #[tokio::test]
     async fn a_check_without_an_answer_keeps_the_url() {
         let chain = Chain::default();
-        chain.refused(NATIVE_URL);
+        chain.refused(&other(), NATIVE_URL);
         let s = Script::default()
             .native(Ok(NATIVE_URL))
             .check(Check::Unknown)
             .native(Ok(NATIVE_URL))
             .check(Check::Plays);
-        assert_eq!(url(chain.resolve(&s, &id()).await), NATIVE_URL);
+        assert_eq!(url(within(chain.resolve(&s, &id())).await), NATIVE_URL);
         assert_eq!(s.calls(), ["native", "check"]);
-        assert_eq!(url(chain.resolve(&s, &id()).await), NATIVE_URL);
+        assert_eq!(url(within(chain.resolve(&s, &id())).await), NATIVE_URL);
         assert_eq!(s.calls(), ["native", "check"], "checked again");
     }
 
@@ -543,12 +991,12 @@ mod tests {
     #[tokio::test]
     async fn after_a_refusal_a_failing_native_step_goes_to_a_checked_yt_dlp_url() {
         let chain = Chain::default();
-        chain.refused(NATIVE_URL);
+        chain.refused(&other(), NATIVE_URL);
         let s = Script::default()
             .native(Err(NativeError::Failed("player API answered 500".into())))
             .embedded(Ok(EMBEDDED_URL))
             .check(Check::Plays);
-        assert_eq!(url(chain.resolve(&s, &id()).await), EMBEDDED_URL);
+        assert_eq!(url(within(chain.resolve(&s, &id())).await), EMBEDDED_URL);
         assert_eq!(s.calls(), ["native", "embedded", "check"]);
     }
 

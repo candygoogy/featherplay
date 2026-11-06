@@ -65,13 +65,16 @@ pub(crate) enum NativeError {
     Skip(String),
     /// Something on our side or the network failed: yt-dlp gets the whole resolve.
     Failed(String),
+    /// The format wanted came without a URL (a SABR-only answer). yt-dlp gets the whole
+    /// resolve, as for `Failed`; the same song tends to get such answers again.
+    NoUrl(String),
 }
 
 impl std::fmt::Display for NativeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Skip(m) => write!(f, "not with the embedded client: {m}"),
-            Self::Failed(m) => write!(f, "native resolve failed: {m}"),
+            Self::Failed(m) | Self::NoUrl(m) => write!(f, "native resolve failed: {m}"),
         }
     }
 }
@@ -217,7 +220,7 @@ impl NativeResolver {
         let mut h = inner.health.lock_or_recover();
         match &result {
             Ok(_) | Err(NativeError::Skip(_)) => h.failures = 0,
-            Err(NativeError::Failed(_)) => {
+            Err(NativeError::Failed(_) | NativeError::NoUrl(_)) => {
                 h.failures += 1;
                 if h.failures >= MAX_FAILURES {
                     h.failures = 0;
@@ -271,7 +274,7 @@ impl Inner {
             }
         };
         let pending = parse_player_response(&body, video, quality.itags()).inspect_err(|e| {
-            if matches!(e, NativeError::Failed(_)) {
+            if matches!(e, NativeError::Failed(_) | NativeError::NoUrl(_)) {
                 self.forget.store(true, Ordering::Relaxed);
             }
         })?;
@@ -635,7 +638,7 @@ pub(crate) fn parse_player_response(
         None => {
             let sc = f["signatureCipher"]
                 .as_str()
-                .ok_or_else(|| failed(format!("format {itag} has no URL")))?;
+                .ok_or_else(|| NativeError::NoUrl(format!("format {itag} has no URL")))?;
             let url = form_value(sc, "url").ok_or_else(|| failed("a cipher without a URL"))?;
             let s = form_value(sc, "s").ok_or_else(|| failed("a cipher without s"))?;
             let sp = form_value(sc, "sp").unwrap_or_else(|| "signature".into());

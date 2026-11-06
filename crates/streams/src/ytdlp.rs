@@ -5,6 +5,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use featherplay_core::model::TrackId;
 use serde_json::Value;
+use tokio::sync::Notify;
 
 use crate::chain::{Chain, Check, Steps};
 use crate::expiry::query_param;
@@ -265,19 +266,31 @@ impl YtDlpResolver {
         self.forced.load(Ordering::SeqCst)
     }
 
-    /// Why the last resolve went to yt-dlp instead of the native request, once.
-    pub fn take_fallback_reason(&self) -> Option<String> {
-        self.chain.take_fallback_reason()
+    /// Why `id`'s last resolve went to yt-dlp instead of the native request, once.
+    pub fn take_fallback_reason(&self, id: &TrackId) -> Option<String> {
+        self.chain.take_fallback_reason(id)
     }
 
-    /// A stream URL from this resolver was refused (HTTP 403) before it expired: see
-    /// `Chain::refused`. The native step starts from a fresh embed page next time.
-    pub fn refused(&self, url: &str) {
-        if self.chain.refused(url)
+    /// The stream URL this resolver gave for `id` was refused (HTTP 403) before it
+    /// expired: see `Chain::refused`. The native step starts from a fresh embed page next
+    /// time, and `id` skips it for a while.
+    pub fn refused(&self, id: &TrackId, url: &str) {
+        if self.chain.refused(id, url)
             && let Some(n) = &self.native
         {
             n.refused();
         }
+    }
+
+    /// `resolve`, ahead of a click: its yt-dlp steps wait for those of other resolves
+    /// ahead, so one yt-dlp runs ahead at a time. Notify `urgent` when the player asks for
+    /// `id` meanwhile: the resolve then stops waiting.
+    pub async fn resolve_ahead(
+        &self,
+        id: &TrackId,
+        urgent: &Notify,
+    ) -> Result<ResolvedStream, ResolveError> {
+        self.run_chain(id, Some(urgent)).await
     }
 
     /// One step of `resolve` on its own, without cookies: no fallback, no `yt-dlp -U`, no
@@ -374,6 +387,16 @@ impl YtDlpResolver {
 
 impl StreamResolver for YtDlpResolver {
     async fn resolve(&self, id: &TrackId) -> Result<ResolvedStream, ResolveError> {
+        self.run_chain(id, None).await
+    }
+}
+
+impl YtDlpResolver {
+    async fn run_chain(
+        &self,
+        id: &TrackId,
+        ahead: Option<&Notify>,
+    ) -> Result<ResolvedStream, ResolveError> {
         if id.0.is_empty()
             || !id
                 .0
@@ -407,7 +430,10 @@ impl StreamResolver for YtDlpResolver {
             cookies: cookies.as_ref(),
             quality,
         };
-        self.chain.resolve(&steps, id).await
+        match ahead {
+            Some(urgent) => self.chain.resolve_ahead(&steps, id, urgent).await,
+            None => self.chain.resolve(&steps, id).await,
+        }
     }
 }
 
@@ -739,7 +765,8 @@ mod tests {
         );
         let err = r.resolve(&TrackId("h46YpWrg55Q".into())).await.unwrap_err();
         assert_eq!(err, ResolveError::ToolMissing, "yt-dlp was tried next");
-        let why = r.take_fallback_reason().expect("a reason");
+        let id = TrackId("h46YpWrg55Q".into());
+        let why = r.take_fallback_reason(&id).expect("a reason");
         assert!(why.contains("deno"), "{why}");
         assert_eq!(
             *log.lock().unwrap(),
@@ -748,7 +775,7 @@ mod tests {
                 "GET /s/player/abcd1234/player_ias.vflset/en_US/base.js"
             ]
         );
-        assert_eq!(r.take_fallback_reason(), None, "told once");
+        assert_eq!(r.take_fallback_reason(&id), None, "told once");
         std::fs::remove_dir_all(&home).unwrap();
     }
 

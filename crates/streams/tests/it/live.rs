@@ -80,7 +80,7 @@ async fn live_resolve_timing() {
             .unwrap_or_else(|e| panic!("{id}: {e:?}"));
         let took = t.elapsed().as_secs_f64();
         let via = r
-            .take_fallback_reason()
+            .take_fallback_reason(&TrackId(id.into()))
             .map_or("native".into(), |e| format!("yt-dlp ({e})"));
         let t = Instant::now();
         let resp = http
