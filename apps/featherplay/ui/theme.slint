@@ -96,6 +96,8 @@ export global Theme {
     out property <color> scrim: dark ? #00000080 : #0000002E;      // under overlays
     // The current song's row rests on a light tile (hover and press still apply on top).
     out property <color> playing-row: dark ? #FFFFFF0F : #0000000A;
+    // The recommended row of a list of choices (`ChoiceRow.lit`), a shade over the panel.
+    out property <color> choice-lit: dark ? #FFFFFF0A : #00000008;
     // Loading skeletons: the blocks, and the soft highlight that sweeps across them (only
     // inside the blocks, `SkeletonBlock`), `skeleton-band` wide.
     out property <color> skeleton: dark ? #FFFFFF0F : #0000000D;
@@ -346,6 +348,12 @@ export global Icons {
     out property <string> close: "M6.5 6.5 L17.5 17.5 M17.5 6.5 L6.5 17.5";
     // Lyrics: a microphone.
     out property <string> lyrics: "M12 3.5 a3 3 0 0 0 -3 3 V11.5 a3 3 0 0 0 6 0 V6.5 a3 3 0 0 0 -3 -3 Z M6 11 A6 6 0 0 0 18 11 M12 17 V20.5";
+    // A padlock: a secure address, and what featherplay keeps of a sign-in.
+    out property <string> lock: "M7 10.5 H17 A1.5 1.5 0 0 1 18.5 12 V18 A1.5 1.5 0 0 1 17 19.5 H7 A1.5 1.5 0 0 1 5.5 18 V12 A1.5 1.5 0 0 1 7 10.5 Z M8.5 10.5 V8 A3.5 3.5 0 0 1 15.5 8 V10.5";
+    // A browser: a globe's edge with a sweep across it (Use Microsoft Edge).
+    out property <string> browser: "M12 4.5 a7.5 7.5 0 1 0 0.01 0 Z M5 13 C8 9 16 9 19 12";
+    // A clipboard (Paste a cookie header).
+    out property <string> clipboard: "M9 4.5 H15 V7.5 H9 Z M7 6 H6 A1 1 0 0 0 5 7 V18.5 A1 1 0 0 0 6 19.5 H18 A1 1 0 0 0 19 18.5 V7 A1 1 0 0 0 18 6 H17";
     // A single note: the placeholder on empty covers.
     out property <string> note: "M11.5 17 V4.5 C13 6.5 17 6.5 17.5 10.5 M11.5 17 a2.5 2.5 0 1 1 -5 0 a2.5 2.5 0 1 1 5 0 Z";
 }

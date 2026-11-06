@@ -9,7 +9,7 @@ your task owns; the shared files below change only when a page truly needs somet
 |---|---|---|
 | `app.slint` | `AppWindow`: the frame (sidebar, top bar, content, Up next panel, bottom bar), the page switch, keyboard shortcuts, the exports to Rust | frame (shared) |
 | `theme.slint` | `Theme` (colours, interaction states, type, spacing, sizes, durations; dark, light or Windows' mode per the Appearance setting) and `Icons` | frame (shared) |
-| `parts.slint` | Shared pieces: `TrackRow`, `CardItem`, `Icon`, `Display`, `Body`, `PageTitle`, `ShelfTitle`, `Cover`, `IconButton`, `Pill`, `ProgressRail`, `Card`, `Shelf`, `SongRow`, `TrackListRow`, `Tabs`, `PageStub` | frame (shared) |
+| `parts.slint` | Shared pieces: `TrackRow`, `CardItem`, `Icon`, `Display`, `Body`, `PageTitle`, `ShelfTitle`, `Cover`, `IconButton`, `Pill`, `ProgressRail`, `Card`, `Shelf`, `SongRow`, `TrackListRow`, `Tabs`, `PageStub`, `TextLink` (the underlined tertiary action), `ChoiceList` and `ChoiceRow` (several ways to do one thing as rows of one card: icon tile, title, one line, chevron or a "Why?"; the recommended one lit) | frame (shared) |
 | `nav.slint` | `PageKind`, `Nav` (the navigation callbacks) and `Frame` (`queue-open`, Now playing's `side-open`, …) | frame (shared) |
 | `player.slint` | `Player`: the current track and the transport, for the bar, Now playing and the Home hero | frame (shared) |
 | `sidebar.slint`, `bottom_bar.slint` | The frame's sidebar (`SidebarData`: Home, Library, Explore, History, Liked songs, then the library as a list under the Playlists, Albums and Artists chips, pinned entries first; `src/sidebar.rs`, its order in `src/library_list.rs`) and bottom bar | frame |
@@ -172,7 +172,7 @@ now-playing-lyrics-full (lyrics on; also -full-plain, -full-none and -full-outag
 settings-long (a long title by five artists, for the Discord preview; the preview shows only
 with `discord = true` in the home's `config/settings.toml`, and needs a tall `--size`, about
 1280x3600), settings-scripts (the same with a Cyrillic and Japanese title),
-about, sign-in, account-menu (Home with the
+about, sign-in (also -expired, -edge, -edge-blocked, -edge-why with the policy open, -paste with the paste field open), account-menu (Home with the
 account menu open), mini-player, mini-player-paused, mini-player-long, mini-player-disliked and mini-player-idle (the tray's mini
 player alone, 340 x 170 logical), close-dialog (Home with the close dialog open), home-more (Home after a scroll loaded the next
 page, the community shelf; use a tall `--size` to see the end), home-more-loading and

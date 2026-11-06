@@ -1095,3 +1095,235 @@ export component PageStub inherits Rectangle {
         vertical-alignment: center;
     }
 }
+
+// Underlined text, the tertiary action ("Continue without signing in", "Why?"): text1, the
+// underline brightening on hover; Enter presses it once tabbed to.
+export component TextLink inherits Rectangle {
+    in property <string> text;
+    in property <length> font-size: Theme.t-body;
+    in property <int> font-weight: 600;
+    // For screen readers, when the link opens or closes a detail.
+    in property <bool> expands;
+    in property <bool> expanded;
+    callback clicked();
+    width: t.preferred-width;
+    height: max(24px, t.preferred-height + 8px);
+    accessible-role: button;
+    accessible-label: root.text;
+    accessible-expandable: root.expands;
+    accessible-expanded: root.expanded;
+    accessible-action-default => { root.clicked(); }
+    // Focused from the keyboard: the ring shows (not after a click).
+    property <bool> ring;
+    fs := FocusScope {
+        focus-gained(reason) => { root.ring = reason == FocusReason.tab-navigation; }
+        focus-lost => { root.ring = false; }
+        key-pressed(e) => {
+            if e.text == Key.Return {
+                root.clicked();
+                return accept;
+            }
+            reject
+        }
+    }
+    // Above the focus scope, so a click is the touch area's.
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+    t := Text {
+        y: (parent.height - self.height) / 2 - 1px;
+        text: root.text;
+        font-family: Theme.body-font;
+        font-size: root.font-size;
+        font-weight: root.font-weight;
+        color: ta.pressed ? Theme.text2 : Theme.text1;
+        accessible-role: none;
+        animate color { duration: Theme.t-hover; }
+    }
+    Rectangle {
+        x: t.x;
+        y: t.y + t.height + 1px;
+        width: t.width;
+        height: 1px;
+        background: ta.has-hover ? Theme.text1 : Theme.text2;
+        animate background { duration: Theme.t-hover; }
+    }
+    if fs.has-focus && root.ring: Rectangle {
+        x: -4px;
+        width: parent.width + 8px;
+        border-radius: Theme.r-s;
+        border-width: 2px;
+        border-color: Theme.accent;
+    }
+}
+
+// Several ways to do one thing, as rows of one panel card (house style rule 5): the rows go
+// in as children, each a `ChoiceRow`, the first with `divider: false`.
+export component ChoiceList inherits Rectangle {
+    min-height: lay.min-height;
+    preferred-height: lay.preferred-height;
+    border-radius: Theme.r-l;
+    background: Theme.panel;
+    border-width: 1px;
+    border-color: Theme.card-edge;
+    clip: true;
+    lay := VerticalLayout {
+        @children
+    }
+}
+
+// One way in a `ChoiceList`: a 36 px icon tile, a title and one line, then a chevron, or a
+// text link in its place ("Why?", "Cancel"). The whole row is the target, with hover and
+// press, and Enter presses it once tabbed to. `lit` marks the recommended way (a lifted row,
+// a solid tile); `dimmed` greys one that can't work here while its line says so. Children
+// show under the line, at the title's edge, while `open` (an expander's detail).
+export component ChoiceRow inherits Rectangle {
+    in property <string> icon;
+    in property <string> title;
+    in property <string> line;
+    in property <bool> lit;
+    in property <bool> enabled: true;
+    in property <bool> dimmed;
+    in property <bool> divider: true;
+    // The row opens a detail under it: the chevron points down while it's open.
+    in property <bool> expands;
+    in property <bool> open;
+    // A text link in place of the chevron; `link-expands` when it opens the detail.
+    in property <string> link;
+    in property <bool> link-expands;
+    // Neither chevron nor link (a way that's under way).
+    in property <bool> bare;
+    callback clicked();
+    callback link-clicked();
+    property <length> pad-x: Theme.s4;
+    property <length> tile: 36px;
+    property <length> gap: 14px;
+    property <bool> ring;
+    property <float> alpha: root.dimmed ? 0.45 : 1.0;
+    min-height: lay.min-height;
+    preferred-height: lay.preferred-height;
+    background: root.lit ? Theme.choice-lit : transparent;
+
+    if root.divider: Rectangle {
+        y: 0;
+        height: 1px;
+        background: Theme.hairline;
+    }
+    lay := VerticalLayout {
+        // The row's button for screen readers: an ancestor of the focus scope, so a row
+        // reached with Tab is announced as itself.
+        Rectangle {
+            min-height: max(68px, head.min-height);
+            preferred-height: max(68px, head.preferred-height);
+            accessible-role: button;
+            accessible-label: root.title;
+            accessible-description: root.line;
+            accessible-enabled: root.enabled;
+            accessible-expandable: root.expands;
+            accessible-expanded: root.open;
+            accessible-action-default => {
+                if root.enabled {
+                    root.clicked();
+                }
+            }
+            Rectangle {
+                background: root.enabled ? Theme.state(ta.pressed, ta.has-hover) : transparent;
+                animate background { duration: Theme.t-hover; }
+            }
+            fs := FocusScope {
+                enabled: root.enabled;
+                focus-gained(reason) => { root.ring = reason == FocusReason.tab-navigation; }
+                focus-lost => { root.ring = false; }
+                key-pressed(e) => {
+                    if e.text == Key.Return {
+                        root.clicked();
+                        return accept;
+                    }
+                    reject
+                }
+            }
+            // Above the focus scope, so a click is the touch area's.
+            ta := TouchArea {
+                enabled: root.enabled;
+                mouse-cursor: pointer;
+                clicked => { root.clicked(); }
+            }
+            if fs.has-focus && root.ring: Rectangle {
+                x: 2px;
+                y: 2px;
+                width: parent.width - 4px;
+                height: parent.height - 4px;
+                border-radius: Theme.r-m;
+                border-width: 2px;
+                border-color: Theme.accent;
+            }
+            head := HorizontalLayout {
+                padding-left: root.pad-x;
+                padding-right: root.pad-x;
+                padding-top: Theme.s3;
+                padding-bottom: Theme.s3;
+                spacing: root.gap;
+                Rectangle {
+                    y: (parent.height - self.height) / 2;
+                    width: root.tile;
+                    height: root.tile;
+                    border-radius: Theme.r-m;
+                    background: (root.lit ? Theme.solid : Theme.card).transparentize(1 - root.alpha);
+                    Icon {
+                        commands: root.icon;
+                        stroke: (root.lit ? Theme.on-solid : Theme.text1).transparentize(1 - root.alpha);
+                    }
+                }
+                VerticalLayout {
+                    alignment: center;
+                    spacing: 2px;
+                    horizontal-stretch: 1;
+                    // Read once, as the row's label and description.
+                    Body {
+                        text: root.title;
+                        font-weight: 600;
+                        color: Theme.text1.transparentize(1 - root.alpha);
+                        overflow: clip;
+                        wrap: word-wrap;
+                        accessible-role: none;
+                    }
+                    if root.line != "": Body {
+                        text: root.line;
+                        font-size: Theme.t-meta + 1px;
+                        color: Theme.text2;
+                        overflow: clip;
+                        wrap: word-wrap;
+                        accessible-role: none;
+                    }
+                }
+                if root.link != "": VerticalLayout {
+                    alignment: center;
+                    TextLink {
+                        text: root.link;
+                        font-size: Theme.t-meta + 1px;
+                        font-weight: 400;
+                        expands: root.link-expands;
+                        expanded: root.open;
+                        clicked => { root.link-clicked(); }
+                    }
+                }
+                if root.link == "" && !root.bare: VerticalLayout {
+                    alignment: center;
+                    Icon {
+                        commands: root.expands && root.open ? Icons.chevron-down : Icons.chevron-right;
+                        stroke: Theme.text3.transparentize(1 - root.alpha);
+                    }
+                }
+            }
+        }
+        // The detail: at the title's left edge, under the line.
+        VerticalLayout {
+            padding-left: root.pad-x + root.tile + root.gap;
+            padding-right: root.pad-x;
+            padding-bottom: root.open ? Theme.s4 : 0;
+            spacing: Theme.s3;
+            @children
+        }
+    }
+}

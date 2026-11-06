@@ -13,10 +13,18 @@ Notable changes to featherplay, newest first. The format follows
   starts on Home rather than the sign-in page. The library, Liked songs and History ask you
   to sign in where they would show, and so do likes, dislikes and Add to playlist. "Your
   session has ended" now shows only when a session really ends.
-- "Sign in with Microsoft Edge", beside the regular sign-in and the cookie paste: Google's
+- "Use Microsoft Edge", beside the regular sign-in and the cookie paste: Google's
   sign-in in a real Edge window, with Edge's address bar, passkeys and Windows Hello, in a
   temporary profile that's deleted afterwards. featherplay keeps only the YouTube Music
   session from it. The regular sign-in window stays the default.
+
+### Changed
+
+- The sign-in page lists the ways in as one card: Sign in with Google (recommended), Use
+  Microsoft Edge and Paste a cookie header, each a row you can click or reach with Tab and
+  Enter. When Edge can't be used on your PC its row says so, and **Why?** shows the
+  reason. A line says what featherplay keeps, and **Continue without signing in** takes you
+  Home.
 
 ### Fixed
 

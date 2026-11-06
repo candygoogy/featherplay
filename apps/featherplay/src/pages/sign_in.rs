@@ -199,7 +199,7 @@ thread_local! {
     static EDGE: RefCell<Option<edge::Cancel>> = const { RefCell::new(None) };
 }
 
-/// "Sign in with Microsoft Edge": Google's sign-in in Edge, with a temporary profile.
+/// "Use Microsoft Edge": Google's sign-in in Edge, with a temporary profile.
 fn open_edge(ctx: &Rc<Ctx>) {
     let Some(ui) = ctx.window() else { return };
     let data = ui.global::<SignInData>();
@@ -256,14 +256,16 @@ fn edge_done(outcome: edge::Outcome) {
             "You didn't sign in within 10 minutes, so featherplay closed Edge."
         )),
         Outcome::NotFound => Some(tr!(
-            "featherplay can't find Microsoft Edge on this PC. Use Sign in instead."
+            "featherplay can't find Microsoft Edge on this PC. Use Sign in with Google instead."
         )),
         Outcome::DidntStart(e) => {
             log!("edge sign-in: didn't start: {e}");
-            Some(tr!("Microsoft Edge didn't start. Use Sign in instead."))
+            Some(tr!(
+                "Microsoft Edge didn't start. Use Sign in with Google instead."
+            ))
         }
         Outcome::Blocked => Some(tr!(
-            "Edge didn't let featherplay read the sign-in. A policy on this PC may block it. Use Sign in instead."
+            "Edge didn't let featherplay read the sign-in. A policy on this PC may block it. Use Sign in with Google instead."
         )),
         Outcome::PolicyOff => {
             data.set_edge_blocked(true);
@@ -272,7 +274,7 @@ fn edge_done(outcome: edge::Outcome) {
         Outcome::Lost(e) => {
             log!("edge sign-in: lost Edge: {e}");
             Some(tr!(
-                "featherplay lost the connection to Edge. Try again, or use Sign in."
+                "featherplay lost the connection to Edge. Try again, or use Sign in with Google."
             ))
         }
     };

@@ -118,7 +118,7 @@ sign in there as you would in a browser. featherplay doesn't read your password;
 open. Once you're in, it keeps the YouTube Music session from that window and closes it. The
 main window never contains a browser.
 
-If you'd rather sign in in a browser you know, choose **Sign in with Microsoft Edge**. Edge
+If you'd rather sign in in a browser you know, choose **Use Microsoft Edge**. Edge
 opens with a temporary profile of its own, with Edge's address bar and padlock, and your
 passkeys and Windows Hello work as usual. featherplay never touches your own Edge profile. It
 talks to that Edge over a private pipe, not a network port, and the only things it can ask
@@ -127,7 +127,8 @@ Music session, drops every other cookie, closes Edge and deletes the temporary p
 you close Edge or don't sign in within 10 minutes, nothing is kept. **Switch Google account**
 in the account menu still uses the small window, because it remembers the accounts you've
 signed in with. If an Edge policy on your PC turns that connection off
-(`RemoteDebuggingAllowed`), the Edge option is greyed out and says so.
+(`RemoteDebuggingAllowed`), the Edge option says it isn't available on this PC, and **Why?**
+explains.
 
 The session is stored in Windows Credential Manager. yt-dlp takes cookies as a file, so
 while it looks up a song's audio, featherplay writes the session to a temporary file in

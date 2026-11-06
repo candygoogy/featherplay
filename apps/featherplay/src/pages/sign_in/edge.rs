@@ -1,4 +1,4 @@
-//! "Sign in with Microsoft Edge": Google's sign-in in a real Edge window (its own address
+//! "Use Microsoft Edge": Google's sign-in in a real Edge window (its own address
 //! bar, padlock, passkeys and Windows Hello), for people who'd rather not type their
 //! password into a window of the app. The WebView2 window (`webview`) stays the default.
 //!

@@ -84,6 +84,7 @@ mod search_suggestions;
 mod settings_index;
 mod side_panel;
 mod sidebar_chips;
+mod sign_in_page;
 mod signed_out;
 mod skeleton_frames;
 mod skeleton_sweep;

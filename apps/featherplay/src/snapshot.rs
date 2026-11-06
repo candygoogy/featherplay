@@ -122,9 +122,13 @@ pub const PAGES: &[&str] = &[
     // Sign in after the session expired: its note card.
     "sign-in-expired",
     // Sign in while Microsoft Edge is open for it: the waiting line and Cancel; or with a
-    // policy that turns off the connection to Edge: the option off, and why.
+    // policy that turns off the connection to Edge: its row says so, with Why?, and the same
+    // with Why? open on the policy.
     "sign-in-edge",
     "sign-in-edge-blocked",
+    "sign-in-edge-why",
+    // Sign in with the paste field open.
+    "sign-in-paste",
     // Home with the account menu open from the sidebar's account row (placeholder identities).
     "account-menu",
     // A first sign-in whose cookies hold several identities: the picker over the sign-in page.
@@ -595,8 +599,13 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
     }
     if o.page.starts_with("sign-in") {
         // The same picture on every PC, whatever its Edge policy.
-        ui.global::<crate::ui::SignInData>()
-            .set_edge_blocked(o.page == "sign-in-edge-blocked");
+        let data = ui.global::<crate::ui::SignInData>();
+        data.set_edge_blocked(matches!(
+            o.page.as_str(),
+            "sign-in-edge-blocked" | "sign-in-edge-why"
+        ));
+        data.set_why_open(o.page == "sign-in-edge-why");
+        data.set_paste_open(o.page == "sign-in-paste");
         settle();
     }
     if o.page == "sign-in-edge" {
@@ -920,6 +929,8 @@ fn page(name: &str, f: &Fixtures) -> Result<Page, String> {
         | "sign-in-expired"
         | "sign-in-edge"
         | "sign-in-edge-blocked"
+        | "sign-in-edge-why"
+        | "sign-in-paste"
         | "account-picker" => Page::SignIn,
         "explore" => Page::Explore {
             tab: ExploreTab::NewReleases,

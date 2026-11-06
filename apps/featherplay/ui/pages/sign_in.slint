@@ -1,9 +1,12 @@
-// Sign in (a calm single column). The main button opens the sign-in window (a
-// separate WebView2 window; the main window never hosts a webview); the second opens
-// Microsoft Edge with a temporary profile; the fallback takes a pasted cookie header.
-// Driven by `src/pages/sign_in.rs`.
-import { Theme } from "../theme.slint";
-import { Body, Display, Pill } from "../parts.slint";
+// Sign in: the ways in as rows of one card (house style rule 5). Sign in with Google, the
+// recommended way, opens the sign-in window (a separate window with Google's page; the main
+// window never hosts a webview); Use Microsoft Edge opens Edge with a temporary profile, or
+// says calmly that it can't work on this PC, with "Why?" for the policy; Paste a cookie
+// header opens the paste field under its row. Under the card, what featherplay keeps, and
+// "Continue without signing in". Driven by `src/pages/sign_in.rs`.
+import { Theme, Icons } from "../theme.slint";
+import { Body, ChoiceList, ChoiceRow, Display, Icon, Pill, TextLink } from "../parts.slint";
+import { Nav, PageKind } from "../nav.slint";
 
 export global SignInData {
     // The sign-in window or Edge is open, or a cookie header is being checked.
@@ -18,6 +21,8 @@ export global SignInData {
     // Shown after "Session expired, sign in again".
     in property <bool> expired;
     in-out property <bool> paste-open;
+    // "Why?" under a blocked Edge: the policy detail is open.
+    in-out property <bool> why-open;
     // The pasted header. Rust clears it once it has been taken.
     in-out property <string> cookies;
     callback open-window();
@@ -30,11 +35,10 @@ export global SignInData {
 // The multi-line paste field. Its text is never logged.
 component PasteField inherits Rectangle {
     in-out property <string> text;
-    callback submitted();
-    height: 128px;
+    height: 112px;
     border-radius: Theme.r-m;
     background: Theme.field;
-    border-width: input.has-focus ? 1px : 1px;
+    border-width: 1px;
     border-color: input.has-focus ? Theme.accent : Theme.hairline;
     clip: true;
     TouchArea {
@@ -67,34 +71,6 @@ component PasteField inherits Rectangle {
     }
 }
 
-// A text link (secondary actions).
-component Link inherits Rectangle {
-    in property <string> text;
-    callback clicked();
-    width: t.preferred-width;
-    height: 32px;
-    accessible-role: button;
-    accessible-label: root.text;
-    accessible-action-default => { root.clicked(); }
-    ta := TouchArea {
-        mouse-cursor: pointer;
-        clicked => { root.clicked(); }
-    }
-    t := Body {
-        height: parent.height;
-        text: root.text;
-        font-weight: 600;
-        color: ta.has-hover ? Theme.text1 : Theme.text2;
-        vertical-alignment: center;
-        animate color { duration: Theme.t-hover; }
-    }
-    Rectangle {
-        y: parent.height - 7px;
-        height: 1px;
-        background: ta.has-hover ? Theme.text1 : Theme.hairline;
-    }
-}
-
 // A quiet note card: the expired session, an error.
 component Note inherits Rectangle {
     in property <string> text;
@@ -118,7 +94,10 @@ component Note inherits Rectangle {
 }
 
 export component SignInPage inherits Rectangle {
-    property <length> col-w: min(self.width - 2 * Theme.page-pad, 480px);
+    property <length> col-w: min(self.width - 2 * Theme.page-pad, 440px);
+    // Which way is under way.
+    property <bool> paste-busy: SignInData.busy && SignInData.paste-open && !SignInData.edge;
+    property <bool> window-busy: SignInData.busy && !SignInData.paste-open && !SignInData.edge;
 
     flick := Flickable {
         width: parent.width;
@@ -128,131 +107,144 @@ export component SignInPage inherits Rectangle {
         col := VerticalLayout {
             x: (parent.width - root.col-w) / 2;
             // Centred in the room above the floating bar.
-            y: max(Theme.s8, (flick.height - Theme.bar-clear - self.preferred-height) / 2 - Theme.s7);
+            y: max(Theme.s8, (flick.height - Theme.bar-clear - self.preferred-height) / 2 - Theme.s5);
             width: root.col-w;
             height: self.preferred-height;
-            spacing: Theme.s4;
 
             Image {
-                width: 56px;
-                height: 56px;
+                width: 48px;
+                height: 48px;
                 source: Theme.logo;
                 accessible-role: none;
             }
             Display {
-                text: @tr("Sign in");
-                font-size: Theme.t-display-l;
-                height: 52px;
-                vertical-alignment: center;
-            }
-            Body {
-                text: @tr("featherplay plays your library, playlists and likes from YouTube Music. Sign in with your Google account in a separate window; featherplay keeps only the session, in Windows Credential Manager.");
-                font-size: Theme.t-body-l;
-                color: Theme.text2;
+                text: @tr("Sign in to featherplay");
+                font-size: Theme.t-display-m;
+                height: 60px;
+                vertical-alignment: bottom;
                 overflow: clip;
                 wrap: word-wrap;
             }
-            if SignInData.expired: Note {
-                text: @tr("Your session expired. Sign in again; the music keeps playing.");
-            }
-            if SignInData.error != "": Note {
-                text: SignInData.error;
-            }
-            HorizontalLayout {
-                padding-top: Theme.s2;
-                alignment: start;
-                Pill {
-                    label: SignInData.busy && !SignInData.paste-open && !SignInData.edge ? @tr("Signing in…") : @tr("Sign in");
-                    solid: true;
-                    enabled: !SignInData.busy;
-                    clicked => { SignInData.open-window(); }
-                }
-            }
-            if SignInData.status != "" && !SignInData.edge: Body {
-                text: SignInData.status;
-                font-size: Theme.t-meta;
-                color: Theme.text3;
-                overflow: clip;
-                wrap: word-wrap;
-            }
-
-            Rectangle {
-                height: Theme.s3;
-            }
-            Rectangle {
-                height: 1px;
-                background: Theme.hairline;
-            }
-            // Edge: Google's sign-in in the user's own browser, with a throwaway profile.
             VerticalLayout {
                 padding-top: Theme.s2;
-                spacing: Theme.s3;
-                HorizontalLayout {
-                    alignment: start;
-                    Pill {
-                        label: SignInData.edge ? @tr("Waiting for Edge…") : @tr("Sign in with Microsoft Edge");
-                        enabled: !SignInData.busy && !SignInData.edge-blocked;
-                        clicked => { SignInData.open-edge(); }
-                    }
-                }
                 Body {
-                    text: SignInData.edge-blocked ? @tr("Edge's RemoteDebuggingAllowed policy is off on this PC (an administrator or a tweaking tool set it), so featherplay can't read the sign-in. Use Sign in instead.") : @tr("Opens Microsoft Edge with a temporary profile that's deleted afterwards. featherplay keeps only the YouTube Music session from it.");
-                    font-size: Theme.t-meta;
-                    color: Theme.text3;
-                    overflow: clip;
-                    wrap: word-wrap;
-                }
-                if SignInData.edge: VerticalLayout {
-                    spacing: Theme.s1;
-                    Body {
-                        text: SignInData.status;
-                        font-size: Theme.t-meta;
-                        color: Theme.text2;
-                        overflow: clip;
-                        wrap: word-wrap;
-                    }
-                    HorizontalLayout {
-                        alignment: start;
-                        Link {
-                            text: @tr("Cancel");
-                            clicked => { SignInData.cancel-edge(); }
-                        }
-                    }
-                }
-            }
-            Rectangle {
-                height: Theme.s3;
-            }
-            Rectangle {
-                height: 1px;
-                background: Theme.hairline;
-            }
-            HorizontalLayout {
-                alignment: start;
-                Link {
-                    text: SignInData.paste-open ? @tr("Hide the cookie field") : @tr("Paste a cookie header instead");
-                    clicked => { SignInData.paste-open = !SignInData.paste-open; }
-                }
-            }
-            if SignInData.paste-open: VerticalLayout {
-                spacing: Theme.s3;
-                Body {
-                    text: @tr("In a browser signed in to music.youtube.com, press F12, open the Network tab and reload. Click a request named \"browse\" and copy the whole value of its cookie request header.");
-                    font-size: Theme.t-meta;
+                    text: @tr("Bring your library, playlists and likes. Search, radio and everything else already work without an account.");
+                    font-size: Theme.t-body-l - 1px;
                     color: Theme.text2;
                     overflow: clip;
                     wrap: word-wrap;
                 }
-                PasteField {
-                    text <=> SignInData.cookies;
+            }
+            if SignInData.expired: VerticalLayout {
+                padding-top: Theme.s5;
+                Note {
+                    text: @tr("Your session expired. Sign in again; the music keeps playing.");
                 }
-                HorizontalLayout {
-                    alignment: start;
-                    Pill {
-                        label: SignInData.busy && SignInData.paste-open && !SignInData.edge ? @tr("Checking…") : @tr("Sign in with this cookie");
-                        enabled: !SignInData.busy && SignInData.cookies != "";
-                        clicked => { SignInData.submit(SignInData.cookies); }
+            }
+            if SignInData.error != "": VerticalLayout {
+                padding-top: SignInData.expired ? Theme.s2 : Theme.s5;
+                Note {
+                    text: SignInData.error;
+                }
+            }
+
+            VerticalLayout {
+                padding-top: Theme.s6 - Theme.s1;
+                ChoiceList {
+                    ChoiceRow {
+                        divider: false;
+                        lit: true;
+                        icon: Icons.person;
+                        title: @tr("Sign in with Google");
+                        line: root.window-busy && SignInData.status != "" ? SignInData.status : @tr("On Google's own page, in a featherplay window");
+                        enabled: !SignInData.busy;
+                        dimmed: SignInData.busy && !root.window-busy;
+                        bare: root.window-busy;
+                        clicked => { SignInData.open-window(); }
                     }
+                    // Edge: Google's sign-in in the user's own browser, with a throwaway profile.
+                    ChoiceRow {
+                        icon: Icons.browser;
+                        title: @tr("Use Microsoft Edge");
+                        line: SignInData.edge ? SignInData.status : (SignInData.edge-blocked ? @tr("Not available on this PC") : @tr("In your own browser, with a temporary profile"));
+                        enabled: !SignInData.busy && !SignInData.edge-blocked;
+                        dimmed: SignInData.edge-blocked || (SignInData.busy && !SignInData.edge);
+                        link: SignInData.edge ? @tr("Cancel") : (SignInData.edge-blocked ? @tr("Why?") : "");
+                        link-expands: SignInData.edge-blocked && !SignInData.edge;
+                        expands: SignInData.edge-blocked;
+                        open: SignInData.edge-blocked && SignInData.why-open;
+                        clicked => { SignInData.open-edge(); }
+                        link-clicked => {
+                            if SignInData.edge {
+                                SignInData.cancel-edge();
+                            } else {
+                                SignInData.why-open = !SignInData.why-open;
+                            }
+                        }
+                        if SignInData.edge-blocked && SignInData.why-open: Body {
+                            text: @tr("Edge's RemoteDebuggingAllowed policy is off on this PC (an administrator or a tweaking tool set it), so featherplay can't read the sign-in from Edge. Sign in with Google works without it.");
+                            font-size: Theme.t-meta + 1px;
+                            color: Theme.text2;
+                            overflow: clip;
+                            wrap: word-wrap;
+                        }
+                    }
+                    ChoiceRow {
+                        icon: Icons.clipboard;
+                        title: @tr("Paste a cookie header");
+                        line: @tr("For advanced users");
+                        enabled: !SignInData.busy;
+                        dimmed: SignInData.busy && !root.paste-busy;
+                        expands: true;
+                        open: SignInData.paste-open;
+                        clicked => { SignInData.paste-open = !SignInData.paste-open; }
+                        if SignInData.paste-open: Body {
+                            text: @tr("In a browser signed in to music.youtube.com, press F12, open the Network tab and reload. Click a request named \"browse\" and copy the whole value of its cookie request header.");
+                            font-size: Theme.t-meta + 1px;
+                            color: Theme.text2;
+                            overflow: clip;
+                            wrap: word-wrap;
+                        }
+                        if SignInData.paste-open: PasteField {
+                            text <=> SignInData.cookies;
+                        }
+                        if SignInData.paste-open: HorizontalLayout {
+                            alignment: start;
+                            Pill {
+                                label: root.paste-busy ? @tr("Checking…") : @tr("Sign in with this cookie");
+                                solid: true;
+                                enabled: !SignInData.busy && SignInData.cookies != "";
+                                clicked => { SignInData.submit(SignInData.cookies); }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // What featherplay keeps.
+            HorizontalLayout {
+                padding-top: Theme.s4 + 2px;
+                spacing: Theme.s2;
+                Icon {
+                    width: 16px;
+                    height: 16px;
+                    commands: Icons.lock;
+                    stroke: Theme.text3;
+                }
+                Body {
+                    text: @tr("featherplay never sees your password. It keeps only the session, in Windows Credential Manager, and you can sign out any time.");
+                    font-size: Theme.t-meta + 1px;
+                    color: Theme.text3;
+                    overflow: clip;
+                    wrap: word-wrap;
+                }
+            }
+            HorizontalLayout {
+                padding-top: Theme.s5;
+                alignment: start;
+                TextLink {
+                    text: @tr("Continue without signing in");
+                    clicked => { Nav.go(PageKind.home); }
                 }
             }
         }
