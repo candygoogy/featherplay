@@ -2,7 +2,8 @@
 //! every string in brackets) translates a rendered page and a toast the Rust side shows, and
 //! English comes back on the spot. The catalogue template, `po/featherplay.pot`, holds
 //! exactly the strings the sources mark (`@tr` in `ui/`, `tr!` and `trn!` in Rust), and the
-//! test language translates all of them; `po/update.sh` regenerates both.
+//! test language translates all of them; `po/update.sh` regenerates both. Release builds
+//! don't bundle the test language (`build.rs`), so the tests that show it are debug-only.
 
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
@@ -31,6 +32,7 @@ fn shows(scene: &Scene, text: &str) -> bool {
 }
 
 #[test]
+#[cfg_attr(not(debug_assertions), ignore)]
 fn the_test_language_translates_a_rendered_page() {
     let scene = Scene::new(1280, 800, true, false).expect("scene");
     scene.open("home").expect("home");
@@ -44,6 +46,7 @@ fn the_test_language_translates_a_rendered_page() {
 }
 
 #[test]
+#[cfg_attr(not(debug_assertions), ignore)]
 fn english_comes_back_on_the_spot() {
     let scene = Scene::new(1280, 800, true, false).expect("scene");
     scene.open("home").expect("home");
@@ -58,6 +61,7 @@ fn english_comes_back_on_the_spot() {
 }
 
 #[test]
+#[cfg_attr(not(debug_assertions), ignore)]
 fn the_test_language_translates_a_toast_from_rust() {
     let scene = Scene::new(1280, 800, true, false).expect("scene");
     scene.play(false).expect("player");
@@ -73,6 +77,7 @@ fn the_test_language_translates_a_toast_from_rust() {
 }
 
 #[test]
+#[cfg_attr(not(debug_assertions), ignore)]
 fn texts_rust_filled_in_follow_a_language_change() {
     let scene = Scene::new(1280, 800, true, false).expect("scene");
     scene.open("settings").expect("settings");
@@ -86,6 +91,7 @@ fn texts_rust_filled_in_follow_a_language_change() {
 }
 
 #[test]
+#[cfg_attr(not(debug_assertions), ignore)]
 fn picking_a_language_in_settings_applies_it() {
     let scene = Scene::new(1280, 800, true, false).expect("scene");
     scene.open("settings").expect("settings");

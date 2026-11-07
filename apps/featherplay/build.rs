@@ -6,7 +6,8 @@
 //!
 //! The translations in `po/<lang>/LC_MESSAGES/featherplay.po` are bundled twice: Slint
 //! compiles them into the UI's `@tr` strings, and `catalog.rs` in `OUT_DIR` holds them for
-//! the strings Rust shows (`featherplay_core::i18n`, loaded by `src/language.rs`).
+//! the strings Rust shows (`featherplay_core::i18n`, loaded by `src/language.rs`). Only a
+//! debug build's catalogue has the test language.
 #![allow(
     clippy::print_stdout,
     reason = "cargo reads a build script's instructions from its stdout"
@@ -14,7 +15,11 @@
 
 use std::collections::BTreeMap;
 use std::fmt::Write;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+
+/// The test language (`src/language.rs`), every string in brackets, for the tests and
+/// Settings' list in debug builds.
+const PSEUDO: &str = "qps-ploc";
 
 /// Icon sizes and the drawing each one is rendered from: the 16 and 24 px drawings are
 /// tuned for their size; 20 px uses the 24 px drawing, 32 px and up the master.
@@ -30,6 +35,9 @@ const SIZES: [(u32, &str); 6] = [
 fn main() {
     // No default context: a string means one thing wherever it's used, unless its `@tr`
     // names a context (`"verb" => "Like"`); `po/update.sh` extracts them the same way.
+    // Slint gets every language, the test language too in a release build: with no bundle,
+    // each `@tr` compiles to a call that builds its strings at runtime, and the exe came out
+    // 188 KB larger than with the bundle's string table (2026-11-07).
     let config = slint_build::CompilerConfiguration::new()
         .with_style("fluent".into())
         .with_bundled_translations("po")
@@ -39,7 +47,13 @@ fn main() {
     println!("cargo:rerun-if-changed=ui/logo");
     let out = std::env::var("OUT_DIR").expect("OUT_DIR");
     println!("cargo:rerun-if-changed=po");
-    std::fs::write(Path::new(&out).join("catalog.rs"), catalog(Path::new("po")))
+    // The catalogue is what `language` offers and picks from, so a release build leaves the
+    // test language out of it: the UI's bundle still has it, but nothing selects it there.
+    let languages = languages(
+        Path::new("po"),
+        std::env::var_os("CARGO_CFG_DEBUG_ASSERTIONS").is_some(),
+    );
+    std::fs::write(Path::new(&out).join("catalog.rs"), catalog(&languages))
         .expect("write catalog.rs");
     let ico = Path::new(&out).join("featherplay.ico");
     std::fs::write(&ico, icon("tri-vane")).expect("write icon");
@@ -71,19 +85,25 @@ fn main() {
 /// where it isn't translated).
 type Entries = BTreeMap<(String, String), (String, Vec<Option<Vec<String>>>)>;
 
-/// The Rust source of a `featherplay_core::i18n::Catalog` with every language under `po`
-/// (sorted by folder name, as Slint orders them) and every translated string, sorted by
-/// (context, id) for the lookups' binary search.
-fn catalog(po: &Path) -> String {
-    use rspolib::prelude::*;
-
+/// The language folders under `po`, sorted by name as Slint orders them; the test
+/// language only `with_pseudo`.
+fn languages(po: &Path, with_pseudo: bool) -> Vec<PathBuf> {
     let mut dirs: Vec<_> = std::fs::read_dir(po)
         .expect("read po/")
         .filter_map(|e| e.ok())
         .map(|e| e.path())
         .filter(|p| p.join("LC_MESSAGES/featherplay.po").exists())
+        .filter(|p| with_pseudo || !p.ends_with(PSEUDO))
         .collect();
     dirs.sort();
+    dirs
+}
+
+/// The Rust source of a `featherplay_core::i18n::Catalog` with the languages in `dirs` and
+/// every translated string, sorted by (context, id) for the lookups' binary search.
+fn catalog(dirs: &[PathBuf]) -> String {
+    use rspolib::prelude::*;
+
     let mut languages = String::new();
     let mut entries = Entries::new();
     for (i, dir) in dirs.iter().enumerate() {
