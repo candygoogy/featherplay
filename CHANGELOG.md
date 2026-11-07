@@ -23,9 +23,16 @@ Notable changes to featherplay, newest first. The format follows
   a song starts and after it ends, and Everywhere also shortens silences of 2 seconds or
   more inside a song to half a second. The player bar, Discord and Last.fm stay in step:
   the time jumps ahead, and skipped silence doesn't count as listening time.
+- Crossfade, off by default (Settings > Playback): the end of a song fades into the next
+  over 2, 5, 8 or 12 seconds. The fade starts before the music ends, not before a silent
+  outro. Songs from the same album, Repeat one and the end of the queue never fade. Next,
+  Previous and a click on another song cut, unless **Fade on skip** is on: then they fade
+  over 2 seconds.
 
 ### Fixed
 
+- Pausing, resuming and skipping no longer click: the sound ramps out and back in over
+  30 ms.
 - An update's toast waits until the window is back from the tray or the taskbar, and stays
   10 seconds, so it's no longer missed; a failed check tries again an hour later, not the
   next day.

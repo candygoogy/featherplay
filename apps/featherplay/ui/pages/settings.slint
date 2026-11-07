@@ -38,6 +38,7 @@ export enum SettingKey {
     local-api,
     amuse,
     tray-click-opens-window,
+    fade-on-skip,
 }
 
 // The Discord connection, live from the presence worker.
@@ -136,6 +137,9 @@ export global SettingsData {
     in property <bool> autoplay: true;
     // Skip silence: 0 Off, 1 Start and end, 2 Everywhere.
     in property <int> skip-silence: 0;
+    // Crossfade: 0 Off, 1 2 s, 2 5 s, 3 8 s, 4 12 s. Fade on skip shows only while it's on.
+    in property <int> crossfade: 0;
+    in property <bool> fade-on-skip;
     // The Volume step: 0 1 %, 1 2 %, 2 5 %, 3 10 %.
     in property <int> volume-step: 2;
     // Sound. The Equalizer: 0 Off, 1 Bass, 2 Treble, 3 Vocal, 4 Custom; the bands it plays
@@ -265,6 +269,7 @@ export global SettingsData {
     callback eq-reset();
     callback pick-loudness(int);
     callback pick-skip-silence(int);
+    callback pick-crossfade(int);
     callback pick-streaming-quality(int);
     // 0 play/pause, 1 next, 2 previous; the text as typed.
     callback hotkey-edited(int, string);
@@ -1822,6 +1827,21 @@ export component SettingsPage inherits Rectangle {
                         active: SettingsData.skip-silence;
                         selected(i) => { SettingsData.pick-skip-silence(i); }
                     }
+                }
+                SettingRow {
+                    label: @tr("Crossfade");
+                    detail: @tr("The end of a song fades into the next. Songs from the same album play without a fade, and Next and Previous cut.");
+                    RowChips {
+                        labels: [@tr("Off"), @tr("{} s", 2), @tr("{} s", 5), @tr("{} s", 8), @tr("{} s", 12)];
+                        active: SettingsData.crossfade;
+                        selected(i) => { SettingsData.pick-crossfade(i); }
+                    }
+                }
+                if SettingsData.crossfade != 0: ToggleRow {
+                    label: @tr("Fade on skip");
+                    detail: @tr("Next, Previous and a click on another song fade over 2 seconds instead of cutting.");
+                    key: SettingKey.fade-on-skip;
+                    checked: SettingsData.fade-on-skip;
                 }
                 SettingRow {
                     label: @tr("Volume step");

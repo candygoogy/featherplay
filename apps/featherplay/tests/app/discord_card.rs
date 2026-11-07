@@ -154,7 +154,8 @@ fn the_card_shows_the_account_picture_while_signed_in() {
 
 #[test]
 fn the_discord_group_ends_with_its_rows() {
-    let scene = settings(1568, 3400);
+    // Tall enough for the Local API group under Discord.
+    let scene = settings(1568, 3600);
     let discord = panel(&scene, "Discord");
     let local_api = panel(&scene, "Local API");
     assert!(
