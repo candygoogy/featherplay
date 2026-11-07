@@ -6,8 +6,19 @@ Notable changes to featherplay, newest first. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Check for updates** in Settings > About, beside the version, with when it last checked
+  or why it couldn't. The About banner also says when the update is downloading, when a
+  download didn't finish (it's tried again an hour later), and when the last update didn't
+  install, and it links to what's new. A Scoop install shows `scoop update featherplay`.
+  A long session checks again, once a day, when you resume playback or reopen the window.
+
 ### Fixed
 
+- An update's toast waits until the window is back from the tray or the taskbar, and stays
+  10 seconds, so it's no longer missed; a failed check tries again an hour later, not the
+  next day.
 - A toast's button does what it says. "Restart to update", "Undo", "View", "Sign in" and
   "Get it" closed the toast and did nothing; Settings > About's update button worked.
 
