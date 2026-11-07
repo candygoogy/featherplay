@@ -1,12 +1,12 @@
 //! The full lyrics view is optional: Now playing shows the cover until the user turns lyrics
 //! on, with the "Lyrics" pill on the stage or the microphone in the player bar. The bar's
 //! button works from any page: it opens Now playing in lyrics mode. The choice lasts the
-//! session (the next song keeps it, a restart doesn't), and no lyrics are looked up until
-//! Now playing (its lyric strip) or a lyrics view is on screen. On the offscreen platform with the fixtures; no window is shown.
+//! session (the next song keeps it, a restart doesn't), and no lyrics are looked up until a
+//! lyrics view is on screen. On the offscreen platform with the fixtures; no window is shown.
 
 use featherplay::router::Page;
 use featherplay::snapshot::Scene;
-use featherplay::ui::{LyricsData, LyricsState, Theme};
+use featherplay::ui::{LyricsData, LyricsState, NowPlayingData, Theme};
 use slint::platform::{PointerEventButton, WindowEvent};
 use slint::{ComponentHandle, LogicalPosition};
 
@@ -60,16 +60,21 @@ fn lyrics_are_an_optional_view_that_lasts_the_session() {
     assert!(!data.get_full(), "lyrics on at startup");
     assert!(untouched(&scene), "lyrics looked up on Home");
 
-    // Now playing on its cover: the song is looked up for the lyric strip under the
-    // credits, and the lyrics view stays off.
+    // Now playing on its cover, then with Related picked: still nothing looked up.
     scene.open("now-playing").expect("now playing");
     scene.settle();
     assert!(!data.get_full(), "Now playing opened on the lyrics");
-    assert_eq!(
-        data.get_state(),
-        LyricsState::Synced,
-        "no lines for the lyric strip"
+    assert!(
+        untouched(&scene),
+        "lyrics looked up with only the cover shown"
     );
+    let np = scene.ui.global::<NowPlayingData>();
+    np.set_tab(1);
+    np.invoke_tab_selected(1);
+    scene.settle();
+    assert!(untouched(&scene), "lyrics looked up with Related shown");
+    np.set_tab(0);
+    np.invoke_tab_selected(0);
     scene.ctx.back();
     scene.settle();
     assert_eq!(scene.ctx.current_page(), Page::Home);

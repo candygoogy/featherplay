@@ -1,7 +1,8 @@
 //! Now playing's info block, offscreen (no window is shown): "Playing from" sits in the
 //! stage's header, shown only when the queue has a source, and a click opens that source
-//! (its page, or Up next for a radio); under the credits, the current lyric line shows in a
-//! strip only with synced lyrics and the lyrics view off, and a click on it opens the view.
+//! (its page, or Up next for a radio). Under the cover, the title, the artists and "album ·
+//! year", and no lyric line: lyrics show only in their views. The cover has its full size in
+//! a 1280 x 800 window.
 
 use std::ops::ControlFlow;
 
@@ -9,23 +10,26 @@ use featherplay::controller::PlayingFrom;
 use featherplay::lyrics::{self, SnapshotLyrics};
 use featherplay::router::Page;
 use featherplay::snapshot::Scene;
-use featherplay::ui::{Frame, LyricsData, NowPlayingData, QueueData, Theme};
+use featherplay::ui::{Frame, LyricsData, NowPlayingData, Player, QueueData, Theme};
 use featherplay_core::model::AlbumId;
 use i_slint_core::accessibility::AccessibleStringProperty;
 use i_slint_core::item_tree::ItemRc;
 use i_slint_core::lengths::LogicalRect;
 use i_slint_core::window::WindowInner;
 use slint::platform::{PointerEventButton, WindowEvent};
-use slint::{ComponentHandle, LogicalPosition};
-
-const WIDTH: u32 = 1280;
+use slint::{ComponentHandle, LogicalPosition, Model};
 
 /// The stage's right edge: the side panel takes the rest.
 fn stage_right(scene: &Scene) -> f32 {
     let theme = scene.ui.global::<Theme>();
-    let width = WIDTH as f32;
+    let width = scene.ui.window().size().width as f32;
     if scene.ui.global::<Frame>().get_side_open() {
-        width - theme.get_nowplaying_side_w()
+        width
+            - if width >= theme.get_wide_min() {
+                theme.get_nowplaying_side_w()
+            } else {
+                theme.get_panel_w()
+            }
     } else {
         width
     }
@@ -63,15 +67,24 @@ fn header(scene: &Scene) -> Option<LogicalRect> {
         .next()
 }
 
-/// The lyric strip, if it shows.
-fn strip(scene: &Scene) -> Option<LogicalRect> {
-    shown(
-        scene,
-        AccessibleStringProperty::Description,
-        "Shows all the lyrics",
-    )
-    .into_iter()
-    .next()
+/// The block under the cover, above the bar: the cover's size (from the title's left edge,
+/// which is the cover's, to the song menu's button, which hangs `s2` past its right edge),
+/// the title, and the album line, the block's last.
+fn block(scene: &Scene) -> (f32, LogicalRect, LogicalRect) {
+    let theme = scene.ui.global::<Theme>();
+    let bar_top = scene.ui.window().size().height as f32 - theme.get_bar_clear();
+    let above_bar = |label: &str| {
+        shown(scene, AccessibleStringProperty::Label, label)
+            .into_iter()
+            .filter(|r| r.max_y() <= bar_top)
+            .min_by(|a, b| a.origin.y.total_cmp(&b.origin.y))
+            .unwrap_or_else(|| panic!("no {label:?} in the stage"))
+    };
+    let player = scene.ui.global::<Player>();
+    let title = above_bar(&player.get_title());
+    let more = above_bar("More");
+    let album = above_bar(&player.get_album());
+    (more.max_x() - theme.get_s2() - title.origin.x, title, album)
 }
 
 fn click(scene: &Scene, r: LogicalRect) {
@@ -84,8 +97,10 @@ fn click(scene: &Scene, r: LogicalRect) {
     scene.settle();
 }
 
+/// Now playing in a 1280 x 800 window, with lyrics on.
 fn now_playing() -> Scene {
-    let scene = Scene::new(WIDTH, 800, true, false).expect("scene");
+    let scene = Scene::new(1280, 800, true, false).expect("scene");
+    scene.ui.global::<LyricsData>().set_on(true);
     scene.play(false).expect("player");
     scene.open("now-playing").expect("now playing");
     scene.settle();
@@ -136,39 +151,43 @@ fn the_header_opens_the_source_or_up_next() {
 }
 
 #[test]
-fn the_lyric_strip_shows_only_with_synced_lyrics() {
+fn no_lyric_line_shows_under_the_credits() {
     let scene = now_playing();
     let data = scene.ui.global::<LyricsData>();
-    lyrics::show_for_snapshot(&scene.ctx, SnapshotLyrics::Plain);
-    scene.settle();
-    assert!(strip(&scene).is_none(), "it shows with plain lyrics");
-
     lyrics::show_for_snapshot(&scene.ctx, SnapshotLyrics::Synced);
     scene.settle();
-    let at = strip(&scene).expect("no strip with synced lyrics");
+    let lines: Vec<_> = data
+        .get_lines()
+        .iter()
+        .filter(|l| !l.trim().is_empty())
+        .collect();
+    assert!(!lines.is_empty(), "no synced lines");
+    let shows_a_line = |scene: &Scene| {
+        lines
+            .iter()
+            .any(|l| !shown(scene, AccessibleStringProperty::Label, l).is_empty())
+    };
+    assert!(
+        !shows_a_line(&scene),
+        "a lyric line shows on the cover view"
+    );
 
-    // A click opens the lyrics view, where the strip has no place.
-    click(&scene, at);
+    // The lyrics view shows them, so the probe above would see one.
+    data.invoke_toggle_view();
+    scene.settle();
     assert!(data.get_showing(), "the lyrics view didn't open");
-    assert!(strip(&scene).is_none(), "it shows in the lyrics view");
+    assert!(shows_a_line(&scene), "no lines in the lyrics view");
 }
 
 #[test]
-fn the_cover_keeps_most_of_its_size_with_the_strip_in_a_1280_by_800_window() {
+fn the_cover_has_its_full_size_with_lyrics_on_in_a_1280_by_800_window() {
     let scene = now_playing();
     lyrics::show_for_snapshot(&scene.ctx, SnapshotLyrics::Synced);
     scene.settle();
-    // The strip is the cover's width, so it tells the cover's size.
-    let at = strip(&scene).expect("no strip with synced lyrics");
+    let (cover, _, _) = block(&scene);
+    let full = scene.ui.global::<Theme>().get_nowplaying_cover();
     assert!(
-        at.size.width >= 408.0,
-        "the cover is {} px beside the panel",
-        at.size.width
-    );
-    let theme = scene.ui.global::<Theme>();
-    let bar_top = 800.0 - theme.get_bar_clear();
-    assert!(
-        at.max_y() <= bar_top - theme.get_s4(),
-        "the strip runs into the player bar: {at:?}, the bar starts at {bar_top}"
+        (cover - full).abs() < 0.5,
+        "the cover is {cover} px beside the panel, not {full}"
     );
 }

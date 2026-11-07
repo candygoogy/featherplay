@@ -1,18 +1,15 @@
 //! The Lyrics tab (ui/pages/lyrics.slint), beside Up next and Related in Now playing and
-//! in the Up next panel, Now playing's full lyrics view, and its strip under the credits
-//! (the line playing, `LyricsData.peek`).
+//! in the Up next panel, and Now playing's full lyrics view.
 //!
-//! Requests: only while lyrics are on screen (Now playing, or the tab in the Up next panel:
+//! Requests: only while lyrics are on screen (the full view, or the tab in either panel:
 //! `LyricsData.live-changed`, from `LyricsWatch`), for the current track, and again when the
 //! next track starts while they stay, once that track has stayed a second (`SKIP_WAIT`:
 //! skipping through songs asks nothing); never in the background; never with Settings'
-//! "Show lyrics" off. With plain lyrics the strip stays hidden, though an outage's fallback is
-//! still asked again once (below), so synced lines found then can show in it. LRCLIB's
-//! synced lyrics first, when Settings allows it (it gets the title, artist, album and length,
-//! and no cookies), then the song's own timed lyrics from YouTube Music, then LRCLIB's plain
-//! lyrics, then the song's own plain ones (`settle`). Results are kept per track for the
-//! session (a bounded map); failures aren't,
-//! so the tab asks again the next time it opens on that track. Nor is the song's plain
+//! "Show lyrics" off. LRCLIB's synced lyrics first, when Settings allows it (it gets the
+//! title, artist, album and length, and no cookies), then the song's own timed lyrics from
+//! YouTube Music, then LRCLIB's plain lyrics, then the song's own plain ones (`settle`).
+//! Results are kept per track for the session (a bounded map); failures aren't, so the tab
+//! asks again the next time it opens on that track. Nor is the song's plain
 //! text when LRCLIB failed rather than missed: a passing error mustn't hide synced lyrics.
 //! Shown, that fallback says synced lyrics are unavailable for now, and while the view stays
 //! open on it LRCLIB is asked once more a minute later (`RESYNC_AFTER`); synced lyrics
@@ -392,7 +389,6 @@ fn fill(data: &LyricsData, found: &Found) {
         Some(Lyrics::Synced(lines)) => {
             let texts: Vec<SharedString> = lines.iter().map(|l| l.text.as_str().into()).collect();
             data.set_current(-1);
-            data.set_peek("".into());
             data.set_lines(ModelRc::from(feed(texts)));
             STATE.with(|s| s.borrow_mut().lines = Rc::from(lines.as_slice()));
             data.set_state(LyricsState::Synced);
@@ -474,16 +470,10 @@ fn sync(ctx: &Rc<Ctx>) {
         return;
     };
     let data = ui.global::<LyricsData>();
-    let at_line = lrc::line_at(&lines, at);
-    let current = at_line.map_or(-1, |i| i32::try_from(i).unwrap_or(-1));
+    let current = lrc::line_at(&lines, at).map_or(-1, |i| i32::try_from(i).unwrap_or(-1));
     if data.get_current() != current {
         data.set_current(current);
     }
-    let (peek, ahead) = peek_line(&lines, at_line);
-    if data.get_peek() != peek {
-        data.set_peek(peek.into());
-    }
-    data.set_peek_ahead(ahead);
     let audible = ctx.player().is_some_and(|s| s.audible);
     match lrc::next_start(&lines, at) {
         Some(next) if live && audible && !SNAPSHOT.with(Cell::get) => {
@@ -498,25 +488,6 @@ fn sync(ctx: &Rc<Ctx>) {
         }
         _ => TIMER.with(Timer::stop),
     }
-}
-
-/// The line Now playing's strip shows under the credits (`LyricsData.peek`), and whether
-/// it's still to come (`peek-ahead`): the line playing; in a gap or before the first line,
-/// the next one; past the last, the last.
-fn peek_line(lines: &[Line], current: Option<usize>) -> (&str, bool) {
-    let sung = |l: &&Line| !l.text.trim().is_empty();
-    if let Some(l) = current.and_then(|i| lines.get(i)).filter(sung) {
-        return (&l.text, false);
-    }
-    let next = current.map_or(0, |i| i + 1);
-    if let Some(l) = lines.iter().skip(next).find(sung) {
-        return (&l.text, true);
-    }
-    lines
-        .iter()
-        .rev()
-        .find(sung)
-        .map_or(("", false), |l| (l.text.as_str(), false))
 }
 
 /// A click on line `i`: plays from its start.
@@ -1272,22 +1243,5 @@ mod tests {
         assert!(!retry.try_again(Some(&id("a"))));
         retry.failed(id("a"));
         assert!(retry.try_again(Some(&id("a"))));
-    }
-
-    #[test]
-    fn the_strip_should_show_the_line_playing_or_else_the_next_one() {
-        let line = |text: &str| Line {
-            start: Duration::ZERO,
-            text: text.into(),
-        };
-        let lines = [line("One"), line(""), line("Two")];
-        assert_eq!(peek_line(&lines, Some(0)), ("One", false));
-        // Before the first line and in a gap: the line to come.
-        assert_eq!(peek_line(&lines, None), ("One", true));
-        assert_eq!(peek_line(&lines, Some(1)), ("Two", true));
-        // A gap after the last line: the last line stays.
-        let lines = [line("One"), line("")];
-        assert_eq!(peek_line(&lines, Some(1)), ("One", false));
-        assert_eq!(peek_line(&[], None), ("", false));
     }
 }

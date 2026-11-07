@@ -66,3 +66,8 @@ slow-timeout = { period = "30s", terminate-after = 2 }
 [[profile.default.overrides]]
 filter = 'package(featherplay) & binary(app) & test(/^discord_card::/)'
 slow-timeout = { period = "30s", terminate-after = 2 }
+
+# Now playing's info block, settled offscreen in a few seconds: likewise.
+[[profile.default.overrides]]
+filter = 'package(featherplay) & binary(app) & test(/^now_playing_info::/)'
+slow-timeout = { period = "30s", terminate-after = 2 }

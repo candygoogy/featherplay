@@ -35,10 +35,6 @@ export global LyricsData {
     in property <[string]> lines;
     // The line playing, or -1 before the first.
     in property <int> current: -1;
-    // Synced: the line Now playing's strip shows under the credits, the one playing, or in a
-    // gap the one to come (`peek-ahead`).
-    in property <string> peek;
-    in property <bool> peek-ahead;
     // Plain: the whole text, and the same as lines ("" between verses).
     in property <string> plain;
     in property <[string]> plain-lines;
