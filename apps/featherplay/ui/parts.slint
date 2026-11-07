@@ -1177,7 +1177,9 @@ export component ChoiceList inherits Rectangle {
 // text link in its place ("Why?", "Cancel"). The whole row is the target, with hover and
 // press, and Enter presses it once tabbed to. `lit` marks the recommended way (a lifted row,
 // a solid tile); `dimmed` greys one that can't work here while its line says so. Children
-// show under the line, at the title's edge, while `open` (an expander's detail).
+// show under the line, at the title's edge, while `open` (an expander's detail): it eases
+// open and shut (height, with a fade), the chevron turning with it; with motion off it fades
+// in place. Children show while `row.showing` (their `visible`), so they stay as it shuts.
 export component ChoiceRow inherits Rectangle {
     in property <string> icon;
     in property <string> title;
@@ -1194,6 +1196,16 @@ export component ChoiceRow inherits Rectangle {
     in property <bool> link-expands;
     // Neither chevron nor link (a way that's under way).
     in property <bool> bare;
+    // How far open the detail is, 0 to 1, eased.
+    property <float> opened: root.open ? 1 : 0;
+    animate opened {
+        duration: Theme.t-expand;
+        easing: Curves.ease-out;
+    }
+    // The detail is open or still shutting: what the children's `visible` reads.
+    out property <bool> showing: root.open || root.opened > 0;
+    // The room the detail takes now, as it eases.
+    out property <length> detail-height: detail.height;
     callback clicked();
     callback link-clicked();
     property <length> pad-x: Theme.s4;
@@ -1311,19 +1323,39 @@ export component ChoiceRow inherits Rectangle {
                 if root.link == "" && !root.bare: VerticalLayout {
                     alignment: center;
                     Icon {
-                        commands: root.expands && root.open ? Icons.chevron-down : Icons.chevron-right;
+                        commands: Icons.chevron-right;
                         stroke: Theme.text3.transparentize(1 - root.alpha);
+                        // Turns to point down while the detail is open.
+                        transform-rotation: root.expands && root.open ? 90deg : 0deg;
+                        animate transform-rotation {
+                            duration: Theme.t-expand;
+                            easing: Curves.ease-out;
+                        }
                     }
                 }
             }
         }
-        // The detail: at the title's left edge, under the line.
-        VerticalLayout {
-            padding-left: root.pad-x + root.tile + root.gap;
-            padding-right: root.pad-x;
-            padding-bottom: root.open ? Theme.s4 : 0;
-            spacing: Theme.s3;
-            @children
+        // The detail: at the title's left edge, under the line. Its height eases between
+        // shut and the content's, the content fading with it, clipped as it goes.
+        detail := Rectangle {
+            clip: true;
+            height: body.preferred-height * root.opened;
+            Rectangle {
+                y: 0;
+                height: body.preferred-height;
+                opacity: root.open ? 1 : 0;
+                animate opacity {
+                    duration: root.open ? Theme.t-menu : Theme.t-fast;
+                    easing: Curves.ease-out;
+                }
+                body := VerticalLayout {
+                    padding-left: root.pad-x + root.tile + root.gap;
+                    padding-right: root.pad-x;
+                    padding-bottom: Theme.s4;
+                    spacing: Theme.s3;
+                    @children
+                }
+            }
         }
     }
 }
