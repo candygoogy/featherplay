@@ -137,6 +137,13 @@ pub struct Settings {
     /// or everywhere. A value this build doesn't know loads as Off.
     #[serde(deserialize_with = "lenient")]
     pub skip_silence: SkipSilence,
+    /// "Crossfade" (Settings > Playback): how many seconds the end of a song fades into the
+    /// next, one of `CROSSFADES`; 0 (the default) is off. Any other value loads as 0.
+    #[serde(deserialize_with = "lenient_crossfade")]
+    pub crossfade: u8,
+    /// "Fade on skip": with crossfade on, Next, Previous and a click on another song fade
+    /// too instead of cutting (off by default).
+    pub fade_on_skip: bool,
 }
 
 /// The Equalizer setting: off, one of three presets, or the user's own bands.
@@ -364,6 +371,8 @@ impl Default for Settings {
             equalizer_bands: [0; 5],
             loudness: Loudness::Off,
             skip_silence: SkipSilence::Off,
+            crossfade: 0,
+            fade_on_skip: false,
         }
     }
 }
@@ -478,6 +487,19 @@ where
         .unwrap_or(Settings::VOLUME_STEP))
 }
 
+/// Reads the crossfade: one of `Settings::CROSSFADES`, or off.
+fn lenient_crossfade<'de, D>(d: D) -> Result<u8, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value = toml::Value::deserialize(d)?;
+    Ok(value
+        .as_integer()
+        .and_then(|n| u8::try_from(n).ok())
+        .filter(|s| Settings::CROSSFADES.contains(s))
+        .unwrap_or(0))
+}
+
 /// Reads the Custom equalizer's bands: five numbers, each clamped to ±12 dB, or flat when
 /// the value isn't five numbers.
 fn lenient_bands<'de, D>(d: D) -> Result<[i8; 5], D::Error>
@@ -550,6 +572,8 @@ impl Settings {
     pub const VOLUME_STEPS: [u8; 4] = [1, 2, 5, 10];
     /// The default volume step, in percent: the wheel's step before it was a setting.
     pub const VOLUME_STEP: u8 = 5;
+    /// The crossfades Settings offers, in seconds; 0 is off.
+    pub const CROSSFADES: [u8; 5] = [0, 2, 5, 8, 12];
 
     /// Loads the settings. A missing, unreadable or invalid file gives the defaults. An
     /// older file is migrated first; a newer one keeps its schema number.

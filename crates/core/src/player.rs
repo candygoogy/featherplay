@@ -27,6 +27,12 @@ const MAX_EXPIRED_RETRIES: u32 = 2;
 /// Play time counted for one tick at most (ticks come every 250 ms), so a suspended
 /// process or a clock jump doesn't count as listening.
 const MAX_TICK_DELTA: Duration = Duration::from_secs(2);
+/// "Fade on skip" fades over the crossfade's length, at most this long: a skip asks for the
+/// next song now (`measurements/r74-crossfade-reference.md`).
+const SKIP_FADE: Duration = Duration::from_secs(2);
+/// The shortest crossfade, for one that starts late: after a seek into a song's last
+/// seconds, or past where its music ends.
+const MIN_FADE: Duration = Duration::from_secs(1);
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Input {
@@ -46,6 +52,10 @@ pub enum Input {
     Tick {
         position: Duration,
         now: SystemTime,
+        /// Where the current song's music ends, when the engine has found out (its tail
+        /// scan, while crossfade is on): a fade starts before that, not before trailing
+        /// silence.
+        music_end: Option<Duration>,
     },
     Resolved {
         id: TrackId,
@@ -109,6 +119,15 @@ pub enum Effect {
     },
     /// Buffer the last stream resolved for `id`.
     Preload(TrackId),
+    /// Play the last stream resolved for `id` from its start without pausing: whatever
+    /// still sounds fades out over `fade` while `id` fades in (equal power).
+    Crossfade {
+        id: TrackId,
+        fade: Duration,
+    },
+    /// The track being left fades out over this, instead of pausing at once ("Fade on
+    /// skip"); a `Crossfade` brings the next one in.
+    FadeOut(Duration),
     Play,
     Pause,
     Seek(Duration),
@@ -157,6 +176,12 @@ pub struct PlaybackPrefs {
     /// Moving on (a track ends, Next, a continuation) passes over disliked tracks. One the
     /// user starts directly still plays, and Repeat One keeps playing it.
     pub skip_disliked: bool,
+    /// How long the end of a song fades into the next; `None` is off. Never between songs
+    /// of one album, with Repeat One, or at the end of the queue.
+    pub crossfade: Option<Duration>,
+    /// With crossfade on, Next, Previous and a click on another song fade too
+    /// (`SKIP_FADE` at most) instead of cutting.
+    pub fade_on_skip: bool,
 }
 
 /// Where the current track is in being made playable.
@@ -167,7 +192,13 @@ enum Phase {
     /// Waiting for `Resolved { id }`, then load at `start`.
     Resolving { id: TrackId, start: Duration },
     /// `Load` was emitted. `started` once the engine reported `Started` for that load.
-    Loaded { id: TrackId, started: bool },
+    /// `crossfaded` when a `Crossfade` brought it in: until it starts, an `AudioEnded` is
+    /// the previous track's.
+    Loaded {
+        id: TrackId,
+        started: bool,
+        crossfaded: bool,
+    },
 }
 
 /// The next track's stream, resolved ahead of time.
@@ -197,6 +228,9 @@ pub struct Player {
     spare: Option<(TrackId, StreamInfo)>,
     /// Play once loaded; false when paused or while restoring.
     play_intent: bool,
+    /// The next load of the current track fades it in over this ("Fade on skip"), instead
+    /// of starting it with a cut.
+    fade_in: Option<Duration>,
     /// `TrackStarted` was sent for the current queue entry.
     announced: bool,
     /// The failures in a row since a track last started, oldest first.
@@ -238,6 +272,7 @@ impl Player {
             stream: None,
             spare: None,
             play_intent: false,
+            fade_in: None,
             announced: false,
             failures: Vec::new(),
             expired_retries: 0,
@@ -334,7 +369,11 @@ impl Player {
             Input::Next => self.next(&mut out),
             Input::Previous => self.previous(&mut out),
             Input::SeekTo(to) => self.seek(to, &mut out),
-            Input::Tick { position, now } => self.tick(position, now, &mut out),
+            Input::Tick {
+                position,
+                now,
+                music_end,
+            } => self.tick(position, now, music_end, &mut out),
             Input::Resolved { id, result } => self.resolved(id, result, &mut out),
             Input::AudioStarted => self.audio_started(&mut out),
             Input::AudioEnded => self.audio_ended(&mut out),
@@ -501,7 +540,7 @@ impl Player {
             self.queue.advance();
         }
         self.queue.set_repeat(self.repeat);
-        self.silence_current(out);
+        self.leave_current(out);
         self.failures.clear();
         self.play_intent = true;
         self.enter_track(Duration::ZERO, out);
@@ -541,7 +580,7 @@ impl Player {
         } else {
             (tracks, start)
         };
-        self.silence_current(out);
+        self.leave_current(out);
         if self.queue.is_shuffled() != self.shuffle {
             // A restored session keeps its saved order, so its queue isn't shuffled yet.
             let seed = self.shuffle_seed();
@@ -615,12 +654,12 @@ impl Player {
         let moved = self.move_on();
         self.queue.set_repeat(self.repeat);
         if moved {
-            self.silence_current(out);
+            self.leave_current(out);
             self.play_intent = true;
             self.enter_track(Duration::ZERO, out);
         } else if self.continuation_pending {
             // The last track: go on once the continuation lands.
-            self.silence_current(out);
+            self.leave_current(out);
             self.play_intent = true;
             self.waiting_for_continuation = true;
             self.set_status(Status::Loading, out);
@@ -646,7 +685,7 @@ impl Player {
                 }
             },
             BackAction::Previous => {
-                self.silence_current(out);
+                self.leave_current(out);
                 self.play_intent = true;
                 self.enter_track(Duration::ZERO, out);
             }
@@ -662,7 +701,13 @@ impl Player {
         }
     }
 
-    fn tick(&mut self, position: Duration, now: SystemTime, out: &mut Vec<Effect>) {
+    fn tick(
+        &mut self,
+        position: Duration,
+        now: SystemTime,
+        music_end: Option<Duration>,
+        out: &mut Vec<Effect>,
+    ) {
         // Wall-clock time since the last tick, so a seek doesn't count as play time.
         let delta = self
             .now
@@ -688,6 +733,7 @@ impl Player {
         }
         if self.status == Status::Playing {
             self.maybe_preload(out);
+            self.maybe_crossfade(music_end, out);
         }
         let last = *self.last_persist.get_or_insert(now);
         let due = !self.needs_ticks()
@@ -739,6 +785,47 @@ impl Player {
         }
         self.preload = Preload::Requested(next.clone());
         out.push(Effect::Resolve(next));
+    }
+
+    /// Near the end of the current track, moves on to the next one with a crossfade, if
+    /// that's on and allowed: the next track's stream is buffered, it's from another album,
+    /// and Repeat One is off. The fade is at most half of either track, so a short one's
+    /// fade-in and fade-out never overlap, and it ends where the music ends.
+    fn maybe_crossfade(&mut self, music_end: Option<Duration>, out: &mut Vec<Effect>) {
+        let Some(want) = self.prefs.crossfade else {
+            return;
+        };
+        if self.repeat == RepeatMode::One
+            || !matches!(self.phase, Phase::Loaded { started: true, .. })
+        {
+            return;
+        }
+        let (Preload::Ready(next_id, next_info), Some((_, info))) = (&self.preload, &self.stream)
+        else {
+            return;
+        };
+        let (Some(current), Some(next)) = (self.queue.current(), self.next_track()) else {
+            return;
+        };
+        if self.play_id(next) != *next_id || same_album(current, next) || !self.fresh(next_info) {
+            return;
+        }
+        let Some(length) = info.duration else {
+            return;
+        };
+        let end = music_end.map_or(length, |m| m.min(length));
+        let fade = want
+            .min(end / 2)
+            .min(next_info.duration.map_or(want, |d| d / 2));
+        if self.position + fade < end {
+            return;
+        }
+        let fade = fade.min(end.saturating_sub(self.position).max(MIN_FADE));
+        self.expired_retries = 0;
+        if self.move_on() {
+            self.fade_in = Some(fade);
+            self.enter_track(Duration::ZERO, out);
+        }
     }
 
     fn resolved(
@@ -808,6 +895,17 @@ impl Player {
         if !matches!(self.phase, Phase::Loaded { .. }) {
             return;
         }
+        if matches!(
+            self.phase,
+            Phase::Loaded {
+                started: false,
+                crossfaded: true,
+                ..
+            }
+        ) {
+            // The previous track's stream ended before the engine took the fade over.
+            return;
+        }
         self.expired_retries = 0;
         if self.move_on() {
             self.enter_track(Duration::ZERO, out);
@@ -838,6 +936,7 @@ impl Player {
         // The engine has already paused and moved to the default device.
         if matches!(self.status, Status::Playing | Status::Loading) {
             self.play_intent = false;
+            self.fade_in = None;
             out.push(Effect::Pause);
             self.set_status(Status::Paused, out);
         }
@@ -883,6 +982,7 @@ impl Player {
         self.stream = None;
         self.spare = None;
         self.play_intent = false;
+        self.fade_in = None;
         self.announced = false;
         self.scrobble = ScrobbleTracker::default();
         self.scrobble_start_pending = false;
@@ -933,6 +1033,7 @@ impl Player {
 
     fn stop(&mut self, detail: String, out: &mut Vec<Effect>) {
         self.play_intent = false;
+        self.fade_in = None;
         self.waiting_for_continuation = false;
         out.push(Effect::ShowError(Stop {
             cause: stop_cause(&self.failures),
@@ -941,12 +1042,26 @@ impl Player {
         self.set_status(Status::Stopped(detail), out);
     }
 
-    /// The user moved off a track that may still be audible: pause it now, since the next
-    /// one may take a resolve (~10 s) before its `Load` replaces it in the engine.
-    fn silence_current(&self, out: &mut Vec<Effect>) {
+    /// The user moved off a track that may still be audible. With "Fade on skip" it fades
+    /// out, and the next one fades in once it loads. Otherwise it's paused now, since the
+    /// next one may take a resolve (~10 s) before its `Load` replaces it in the engine.
+    fn leave_current(&mut self, out: &mut Vec<Effect>) {
+        self.fade_in = self.skip_fade().filter(|_| self.wants_play());
         if matches!(self.phase, Phase::Loaded { .. }) {
-            out.push(Effect::Pause);
+            out.push(match self.fade_in {
+                Some(fade) => Effect::FadeOut(fade),
+                None => Effect::Pause,
+            });
         }
+    }
+
+    /// How long a skip fades, if "Fade on skip" is on.
+    fn skip_fade(&self) -> Option<Duration> {
+        let prefs = self.prefs;
+        prefs
+            .crossfade
+            .filter(|_| prefs.fade_on_skip)
+            .map(|n| n.min(SKIP_FADE))
     }
 
     /// The queue's current entry changed: reset per-entry state and load it.
@@ -1032,12 +1147,38 @@ impl Player {
             let info = *info;
             self.learn_duration(&id, &info);
         }
+        self.position = start;
+        if let Some(fade) = self.fade_in.take()
+            && self.play_intent
+            && start.is_zero()
+        {
+            out.push(Effect::Crossfade {
+                id: id.clone(),
+                fade,
+            });
+            self.phase = Phase::Loaded {
+                id,
+                started: false,
+                crossfaded: true,
+            };
+            // The sound goes on through a crossfade.
+            let status = if self.status == Status::Playing {
+                Status::Playing
+            } else {
+                Status::Loading
+            };
+            self.set_status(status, out);
+            return;
+        }
         out.push(Effect::Load {
             id: id.clone(),
             start,
         });
-        self.phase = Phase::Loaded { id, started: false };
-        self.position = start;
+        self.phase = Phase::Loaded {
+            id,
+            started: false,
+            crossfaded: false,
+        };
         if self.play_intent {
             out.push(Effect::Play);
             self.set_status(Status::Loading, out);
@@ -1133,6 +1274,12 @@ fn play_id(prefs: PlaybackPrefs, t: &Track) -> TrackId {
         }
         _ => t.id.clone(),
     }
+}
+
+/// Two songs of one album play back to back without a crossfade: gapless albums and live
+/// sets stay seamless.
+fn same_album(a: &Track, b: &Track) -> bool {
+    matches!((&a.album, &b.album), (Some(x), Some(y)) if x.id == y.id)
 }
 
 /// Moving on passes over `t`: the user disliked it, and "Skip songs I've disliked" is on.

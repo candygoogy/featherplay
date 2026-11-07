@@ -43,6 +43,8 @@ fn prefs(prefer_song_versions: bool, skip_non_music_in_radio: bool) -> PlaybackP
         scrobble_other_media: true,
         list_end: Default::default(),
         skip_disliked: true,
+        crossfade: None,
+        fade_on_skip: false,
     }
 }
 
@@ -87,7 +89,11 @@ fn stop_of(fx: &[Effect]) -> Option<&Stop> {
 }
 
 fn tick(position: Duration, now: SystemTime) -> Input {
-    Input::Tick { position, now }
+    Input::Tick {
+        position,
+        now,
+        music_end: None,
+    }
 }
 
 /// The effects that drive playback; `StateChanged` only tells the UI to refresh.

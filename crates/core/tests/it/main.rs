@@ -8,6 +8,7 @@
 )]
 
 mod autoplay;
+mod crossfade;
 mod failure;
 mod i18n;
 mod player;

@@ -73,6 +73,8 @@ fn settings_defaults_when_missing() {
             equalizer_bands: [0; 5],
             loudness: Loudness::Off,
             skip_silence: SkipSilence::Off,
+            crossfade: 0,
+            fade_on_skip: false,
         }
     );
     assert_eq!(s, Settings::default());
@@ -139,6 +141,8 @@ fn settings_roundtrip() {
         equalizer_bands: [6, -2, 0, 3, 12],
         loudness: Loudness::Light,
         skip_silence: SkipSilence::Everywhere,
+        crossfade: 12,
+        fade_on_skip: true,
     };
     s.save(&p).unwrap();
     assert!(p.config.join("settings.toml").is_file());
@@ -857,6 +861,35 @@ volume = 0.5
     .unwrap();
     let s = Settings::load(&p);
     assert_eq!((s.skip_silence, s.volume), (SkipSilence::Off, 0.5));
+}
+
+#[test]
+fn crossfade_round_trips_and_loads_off_when_unknown() {
+    let Some(home) = TestHome::new("settings-crossfade") else {
+        return;
+    };
+    let p = home.paths();
+    assert_eq!(
+        (
+            Settings::default().crossfade,
+            Settings::default().fade_on_skip
+        ),
+        (0, false)
+    );
+    let s = Settings {
+        crossfade: 8,
+        fade_on_skip: true,
+        ..Settings::default()
+    };
+    s.save(&p).unwrap();
+    assert_eq!(Settings::load(&p), s);
+    let file = p.config.join("settings.toml");
+    let text = fs::read_to_string(&file).unwrap();
+    assert!(text.contains("crossfade = 8"), "{text}");
+
+    fs::write(&file, "crossfade = 7\nvolume = 0.5\n").unwrap();
+    let s = Settings::load(&p);
+    assert_eq!((s.crossfade, s.volume), (0, 0.5));
 }
 
 #[test]

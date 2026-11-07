@@ -470,6 +470,7 @@ impl Controller {
             .set_compressor(compressor(self.settings.loudness));
         self.audio
             .set_skip_silences(skip_silences(self.settings.skip_silence));
+        self.audio.set_crossfade(self.settings.crossfade > 0);
         self.restore_streams();
         // Unreachable keeps the signed-in look: the session is likely fine, and signed out
         // would send the window to Sign in.
@@ -740,12 +741,13 @@ impl Controller {
 
     /// One `Tick` with the engine's position; returns that position.
     fn tick(&mut self) -> Duration {
-        let position = self.audio.position();
+        let head = self.audio.playhead();
         self.feed(Input::Tick {
-            position,
+            position: head.position,
             now: SystemTime::now(),
+            music_end: head.music_end,
         });
-        position
+        head.position
     }
 
     fn feed(&mut self, first: Input) {
@@ -771,6 +773,16 @@ impl Controller {
                 self.audio.load(src.clone(), start);
                 self.loaded(src);
             }
+            Effect::Crossfade { id, fade } => {
+                let Some(src) = self.source(&id) else {
+                    log!("crossfade to {}: no stream kept, resolving again", id.0);
+                    return Some(Input::StreamExpired);
+                };
+                log!("crossfade to {} over {:.1}s", id.0, fade.as_secs_f64());
+                self.audio.crossfade_to(src.clone(), fade);
+                self.loaded(src);
+            }
+            Effect::FadeOut(fade) => self.audio.fade_out(fade),
             Effect::Preload(id) => {
                 if let Some(src) = self.source(&id) {
                     log!("preload {} ({})", id.0, self.time_left());
@@ -1297,6 +1309,8 @@ fn prefs(s: &Settings) -> PlaybackPrefs {
             ListEnd::Restart
         },
         skip_disliked: s.skip_disliked,
+        crossfade: (s.crossfade > 0).then(|| Duration::from_secs(u64::from(s.crossfade))),
+        fade_on_skip: s.fade_on_skip,
     }
 }
 

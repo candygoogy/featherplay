@@ -27,6 +27,8 @@ fn player_with(ids: &[&str]) -> Player {
         scrobble_other_media: false,
         list_end: Default::default(),
         skip_disliked: true,
+        crossfade: None,
+        fade_on_skip: false,
     });
     player.handle(Input::PlayTracks {
         tracks: ids.iter().map(|id| track(id)).collect(),

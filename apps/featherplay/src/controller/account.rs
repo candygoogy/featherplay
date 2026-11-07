@@ -165,6 +165,10 @@ pub enum Change {
     /// "Even out loudness", the compressor.
     Loudness(Loudness),
     SkipSilence(SkipSilence),
+    /// Seconds the end of a song fades into the next (one of `Settings::CROSSFADES`); 0 off.
+    Crossfade(u8),
+    /// With crossfade on, Next, Previous and a click fade too.
+    FadeOnSkip(bool),
 }
 
 impl Change {
@@ -218,6 +222,8 @@ impl Change {
             }
             Change::Loudness(v) => s.loudness = v,
             Change::SkipSilence(v) => s.skip_silence = v,
+            Change::Crossfade(v) => s.crossfade = v,
+            Change::FadeOnSkip(v) => s.fade_on_skip = v,
         }
     }
 }
@@ -600,7 +606,14 @@ impl Controller {
             }
             // The autoplay tracks not played yet go when it's turned off.
             Change::Autoplay(_) => self.input(Input::SetPrefs(prefs(&self.settings))),
-            Change::SkipDisliked(_) => self.input(Input::SetPrefs(prefs(&self.settings))),
+            Change::SkipDisliked(_) | Change::FadeOnSkip(_) => {
+                self.input(Input::SetPrefs(prefs(&self.settings)))
+            }
+            // From the next song's end; the decoders start finding where songs end.
+            Change::Crossfade(n) => {
+                self.audio.set_crossfade(n > 0);
+                self.input(Input::SetPrefs(prefs(&self.settings)));
+            }
             // Streams already resolved keep their format.
             Change::StreamingQuality(q) => self.resolver.set_quality(stream_quality(q)),
             // Heard within a device buffer, mid-song too.
@@ -1036,6 +1049,8 @@ mod tests {
             Change::Equalizer(Equalizer::Custom, [4, 0, -3, 0, 2]),
             Change::Loudness(Loudness::Strong),
             Change::SkipSilence(SkipSilence::Everywhere),
+            Change::Crossfade(8),
+            Change::FadeOnSkip(true),
         ];
         for c in &changes {
             c.apply(&mut s);
@@ -1068,6 +1083,7 @@ mod tests {
         );
         assert_eq!(s.loudness, Loudness::Strong);
         assert_eq!(s.skip_silence, SkipSilence::Everywhere);
+        assert_eq!((s.crossfade, s.fade_on_skip), (8, true));
         assert!(!s.check_for_updates && !s.install_updates);
         assert_eq!(s.volume, d.volume, "the volume isn't a page setting");
     }
@@ -1088,6 +1104,20 @@ mod tests {
         s.skip_disliked = false;
         let off = crate::controller::prefs(&s).skip_disliked;
         assert_eq!((on, off), (true, false));
+    }
+
+    #[test]
+    fn crossfade_reaches_the_player() {
+        let mut s = Settings::default();
+        let off = crate::controller::prefs(&s);
+        assert_eq!((off.crossfade, off.fade_on_skip), (None, false));
+        s.crossfade = 5;
+        s.fade_on_skip = true;
+        let on = crate::controller::prefs(&s);
+        assert_eq!(
+            (on.crossfade, on.fade_on_skip),
+            (Some(std::time::Duration::from_secs(5)), true)
+        );
     }
 
     #[test]

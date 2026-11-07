@@ -67,6 +67,8 @@ fn the_total_appears_once_the_stream_resolves() {
         scrobble_other_media: true,
         list_end: Default::default(),
         skip_disliked: true,
+        crossfade: None,
+        fade_on_skip: false,
     });
     p.handle(Input::PlayTracks {
         tracks: vec![quick_pick],

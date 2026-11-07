@@ -35,6 +35,8 @@ fn prefs(list_end: ListEnd) -> PlaybackPrefs {
         scrobble_other_media: true,
         list_end,
         skip_disliked: true,
+        crossfade: None,
+        fade_on_skip: false,
     }
 }
 
