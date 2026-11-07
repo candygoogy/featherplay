@@ -40,6 +40,7 @@ mod opus;
 mod priority;
 #[cfg(test)]
 mod stream_tests;
+mod stretch;
 #[cfg(test)]
 mod timing;
 mod tmp;
