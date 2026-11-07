@@ -15,6 +15,7 @@
 //! `YtDlpResolver` falls back to yt-dlp on any error here.
 
 use std::collections::{HashMap, HashSet};
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -29,8 +30,10 @@ use crate::expiry::{form_value, query_param};
 use crate::{Quality, ResolvedStream, Sidecars, expires_at_from_url};
 
 /// yt-dlp's EJS challenge solver, v0.8.0 (Unlicense; the lib bundles meriyah, ISC, and
-/// astring, MIT). Only preprocessing a new player needs them.
-const EJS_LIB: &str = include_str!("../ejs/yt.solver.lib.min.js");
+/// astring, MIT). Only preprocessing a new player needs them. The lib is deflated by
+/// `build.rs` ([`ejs_lib`]).
+const EJS_LIB_DEFLATED: &[u8] =
+    include_bytes!(concat!(env!("OUT_DIR"), "/yt.solver.lib.min.js.deflate"));
 const EJS_CORE: &str = include_str!("../ejs/yt.solver.core.min.js");
 /// Preprocessed players carry it; one made by other scripts is made again.
 const EJS_VERSION: &str = "0.8.0";
@@ -838,6 +841,15 @@ enum PreprocessError {
     Unsolved(NativeError),
 }
 
+/// The EJS library's source, inflated from what `build.rs` deflated.
+fn ejs_lib() -> String {
+    let mut js = String::new();
+    flate2::read::DeflateDecoder::new(EJS_LIB_DEFLATED)
+        .read_to_string(&mut js)
+        .expect("build.rs deflates the EJS library from a UTF-8 file");
+    js
+}
+
 /// Runs EJS on a player's JS once: the preprocessed player, which sets `_result.n` and
 /// `_result.sig` when run as `Function("_result", code)`. Checked on a test challenge each.
 async fn preprocess(sidecars: &Sidecars, js: &str) -> Result<String, PreprocessError> {
@@ -851,8 +863,9 @@ async fn preprocess(sidecars: &Sidecars, js: &str) -> Result<String, PreprocessE
         ],
         "output_preprocessed": true,
     });
+    let ejs = ejs_lib();
     let script = format!(
-        "{EJS_LIB}\nObject.assign(globalThis, lib);\n{EJS_CORE}\nconsole.log(JSON.stringify(jsc({input})));\n"
+        "{ejs}\nObject.assign(globalThis, lib);\n{EJS_CORE}\nconsole.log(JSON.stringify(jsc({input})));\n"
     );
     let mut cmd = deno(sidecars);
     cmd.args(["--ext=js", "--no-code-cache", "-"]);
@@ -1129,6 +1142,11 @@ _result.sig = (s) => s.slice(2).split("").reverse().join("");"#;
 
     fn config() -> EmbedConfig {
         parse_embed_page(EMBED).unwrap()
+    }
+
+    #[test]
+    fn the_ejs_library_inflates_to_its_source() {
+        assert_eq!(ejs_lib(), include_str!("../ejs/yt.solver.lib.min.js"));
     }
 
     #[test]

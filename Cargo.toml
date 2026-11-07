@@ -58,6 +58,8 @@ toml = "=1.1.8"
 md-5 = "=0.11.0"
 sha2 = "=0.11.1"
 zip = { version = "=9.1.0", default-features = false }
+# Deflates embedded data at build time and inflates it at runtime; in the tree already (zip, png).
+flate2 = "=1.1.10"
 # For the UI. Each one is already in the lock tree through slint or ytmapi-rs.
 # Cover decoding and resizing, and the PNGs that `--snapshot` writes.
 image = { version = "=0.25.10", default-features = false }

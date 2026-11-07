@@ -20,6 +20,11 @@ tokio = { workspace = true, features = ["fs", "io-util", "macros", "process", "r
 # decoders for bzip2, lzma, xz, zstd (C), ppmd, deflate64, AES and a zopfli encoder;
 # flate2's own backend (already in the tree through png) does the inflating.
 zip = { workspace = true, features = ["deflate-flate2"] }
+# Inflates the EJS library, which `build.rs` deflates; the same inflater zip uses.
+flate2 = { workspace = true }
+
+[build-dependencies]
+flate2 = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

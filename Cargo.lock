@@ -1458,6 +1458,7 @@ name = "featherplay-streams"
 version = "0.1.1"
 dependencies = [
  "featherplay-core",
+ "flate2",
  "log",
  "reqwest",
  "serde_json",
