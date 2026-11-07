@@ -788,6 +788,12 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
     if let Some((x, y)) = o.pointer {
         let position = slint::LogicalPosition::new(x, y);
         let w = window;
+        // Laid out at the snapshot's size first, so the pointer lands on what the picture
+        // shows there.
+        w.dispatch_event(WindowEvent::Resized {
+            size: slint::LogicalSize::new(width as f32 / o.scale, height as f32 / o.scale),
+        });
+        settle();
         w.dispatch_event(WindowEvent::PointerMoved { position });
         if o.press {
             w.dispatch_event(WindowEvent::PointerPressed {
