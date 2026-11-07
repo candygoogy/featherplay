@@ -71,3 +71,9 @@ slow-timeout = { period = "30s", terminate-after = 2 }
 [[profile.default.overrides]]
 filter = 'package(featherplay) & binary(app) & test(/^now_playing_info::/)'
 slow-timeout = { period = "30s", terminate-after = 2 }
+
+# The sign-in page waits up to two seconds for a sign-in window's handle: a test that hangs
+# is ended after a minute too.
+[[profile.default.overrides]]
+filter = 'package(featherplay) & binary(app) & test(/^sign_in_page::/)'
+slow-timeout = { period = "30s", terminate-after = 2 }

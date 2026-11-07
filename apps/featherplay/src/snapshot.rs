@@ -129,6 +129,8 @@ pub const PAGES: &[&str] = &[
     "sign-in-edge-why",
     // Sign in with the paste field open.
     "sign-in-paste",
+    // Sign in after the sign-in window didn't open: what happened, with Try again.
+    "sign-in-error",
     // The sign-in window's frame alone (its own 540 x 780 window, the page's room empty):
     // on Google's sign-in page; on a look-alike host (no "Google's page"); on plain http (no
     // padlock); on a host wider than the pill (its end, the real domain, still shows).
@@ -615,6 +617,10 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
         data.set_paste_open(o.page == "sign-in-paste");
         settle();
     }
+    if o.page == "sign-in-error" {
+        crate::pages::sign_in::didnt_open("for a snapshot");
+        settle();
+    }
     if o.page == "sign-in-edge" {
         let data = ui.global::<crate::ui::SignInData>();
         data.set_busy(true);
@@ -970,6 +976,7 @@ fn page(name: &str, f: &Fixtures) -> Result<Page, String> {
         | "sign-in-edge-blocked"
         | "sign-in-edge-why"
         | "sign-in-paste"
+        | "sign-in-error"
         | "sign-in-window"
         | "sign-in-window-lookalike"
         | "sign-in-window-http"

@@ -19,7 +19,7 @@ mod webview;
 
 pub use frame::SIZE as WINDOW_SIZE;
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::path::Path;
 use std::rc::Rc;
 
@@ -31,7 +31,7 @@ use crate::app::Ctx;
 use crate::controller::{AccountAction, AccountEvent, Action, Cookies, PlayerState};
 use crate::pages::settings;
 use crate::router::Page;
-use crate::ui::SignInData;
+use crate::ui::{SignInData, SignInWay};
 
 /// Once at startup: connect `SignInData`'s callbacks.
 pub fn init(ctx: &Rc<Ctx>) {
@@ -70,6 +70,8 @@ pub fn open(ctx: &Rc<Ctx>) {
     let data = ui.global::<SignInData>();
     if !data.get_busy() {
         data.set_status("".into());
+        // A failure told on another page (a toast) is old news here.
+        clear_problem(&data);
         // The policy may have changed since the app started.
         data.set_edge_blocked(edge::pipe_blocked());
     }
@@ -88,7 +90,7 @@ pub fn account_changed(ctx: &Rc<Ctx>, signed_in: bool) {
         data.set_busy(false);
         data.set_edge(false);
         data.set_status("".into());
-        data.set_error("".into());
+        clear_problem(&data);
         data.set_expired(false);
         data.set_cookies("".into());
         data.set_paste_open(false);
@@ -97,7 +99,7 @@ pub fn account_changed(ctx: &Rc<Ctx>, signed_in: bool) {
         }
     } else {
         // An Edge sign-in still running keeps the page busy until it ends.
-        if EDGE.with(|e| e.borrow().is_none()) {
+        if EDGE.with(|e| e.borrow().is_none()) && !frame::is_open() {
             data.set_busy(false);
         }
         if data.get_expired() && ctx.current_page() != Page::SignIn {
@@ -111,14 +113,9 @@ pub fn notice(ctx: &Rc<Ctx>, ev: AccountEvent) {
     let Some(ui) = ctx.window() else { return };
     let data = ui.global::<SignInData>();
     match ev {
+        // The session the way in brought back doesn't work: `why` says so in plain words.
         AccountEvent::SignInFailed(why) => {
-            data.set_busy(false);
-            data.set_status("".into());
-            // From the account menu, on another page: the page's error line isn't shown.
-            if ctx.current_page() != Page::SignIn {
-                ctx.toast(&why);
-            }
-            data.set_error(why.into());
+            problem(ctx, tr!("That sign-in didn't work"), &why, LAST_WAY.get())
         }
         AccountEvent::SessionExpired => data.set_expired(true),
         AccountEvent::Lastfm(status, message) => settings::lastfm_changed(ctx, status, message),
@@ -136,14 +133,57 @@ pub fn switch_account(ctx: &Rc<Ctx>) {
     open_window(ctx, webview::CHOOSER_URL);
 }
 
+thread_local! {
+    /// The way in last tried, for Try again after the session check fails.
+    static LAST_WAY: Cell<SignInWay> = const { Cell::new(SignInWay::None) };
+}
+
+/// A way in failed: the page says what happened (`title`) and what to do (`line`), with Try
+/// again for `retry`; on another page, a toast says what happened. The technical detail is
+/// for the log, never here.
+fn problem(ctx: &Rc<Ctx>, title: &str, line: &str, retry: SignInWay) {
+    let Some(ui) = ctx.window() else { return };
+    let data = ui.global::<SignInData>();
+    data.set_busy(false);
+    data.set_status("".into());
+    data.set_error_title(title.into());
+    data.set_error(line.into());
+    data.set_retry(retry);
+    if ctx.current_page() != Page::SignIn {
+        ctx.toast(title);
+    }
+}
+
+fn clear_problem(data: &SignInData) {
+    data.set_error_title("".into());
+    data.set_error("".into());
+    data.set_retry(SignInWay::None);
+    data.set_paste_error("".into());
+}
+
+/// The sign-in window didn't open (`why`, for the log): the page says so and offers Try
+/// again. On the UI thread.
+pub fn didnt_open(why: &str) {
+    log!("sign-in window: {why}");
+    if let Some(ctx) = Ctx::get() {
+        problem(
+            &ctx,
+            tr!("The sign-in window didn't open"),
+            tr!("Try again, or use another way below."),
+            SignInWay::Window,
+        );
+    }
+}
+
 fn open_window(ctx: &Rc<Ctx>, start: &'static str) {
     let Some(ui) = ctx.window() else { return };
     let data = ui.global::<SignInData>();
     if data.get_busy() {
         return;
     }
+    LAST_WAY.set(SignInWay::Window);
     data.set_busy(true);
-    data.set_error("".into());
+    clear_problem(&data);
     data.set_status(tr!("Finish signing in in the other window. It closes by itself.").into());
     if ctx.current_page() != Page::SignIn {
         ctx.toast(tr!("Pick or add a Google account in the sign-in window"));
@@ -152,14 +192,8 @@ fn open_window(ctx: &Rc<Ctx>, start: &'static str) {
     let opened = frame::open(ctx, profile, start, |outcome| {
         let _ = slint::invoke_from_event_loop(move || window_closed(outcome));
     });
-    if let Err(e) = opened {
-        log!("sign-in window: {e}");
-        data.set_busy(false);
-        data.set_status("".into());
-        if ctx.current_page() != Page::SignIn {
-            ctx.toast(&e);
-        }
-        data.set_error(e.into());
+    if let Err(why) = opened {
+        didnt_open(&why);
     }
 }
 
@@ -180,31 +214,27 @@ fn window_closed(outcome: webview::Outcome) {
     let data = ui.global::<SignInData>();
     match outcome {
         webview::Outcome::SignedIn(header) => {
-            data.set_status("Checking the session…".into());
+            data.set_status(tr!("Checking the session…").into());
             ctx.send(Action::Account(AccountAction::SignIn(Cookies(header))));
         }
-        webview::Outcome::NotSignedIn => {
-            data.set_busy(false);
-            data.set_status("".into());
-            let why = tr!("The sign-in window closed before you signed in.");
-            if ctx.current_page() != Page::SignIn {
-                ctx.toast(why);
-            }
-            data.set_error(why.into());
-        }
+        webview::Outcome::NotSignedIn => problem(
+            &ctx,
+            tr!("The sign-in window closed"),
+            tr!("It closed before you finished signing in. Try again when you're ready."),
+            SignInWay::Window,
+        ),
         webview::Outcome::Cancelled => {
             data.set_busy(false);
             data.set_status("".into());
         }
         webview::Outcome::Failed(e) => {
             log!("sign-in window failed: {e}");
-            data.set_busy(false);
-            data.set_status("".into());
-            let why = tr!("The sign-in window didn't work: {}", e);
-            if ctx.current_page() != Page::SignIn {
-                ctx.toast(&why);
-            }
-            data.set_error(why.into());
+            problem(
+                &ctx,
+                tr!("The sign-in window stopped"),
+                tr!("Something went wrong inside it. Try again, or use another way below."),
+                SignInWay::Window,
+            );
         }
     }
 }
@@ -221,9 +251,10 @@ fn open_edge(ctx: &Rc<Ctx>) {
     if data.get_busy() || EDGE.with(|e| e.borrow().is_some()) {
         return;
     }
+    LAST_WAY.set(SignInWay::Edge);
     data.set_busy(true);
     data.set_edge(true);
-    data.set_error("".into());
+    clear_problem(&data);
     data.set_status(
         tr!("Finish signing in in Microsoft Edge. featherplay closes it once you're in.").into(),
     );
@@ -259,45 +290,57 @@ fn edge_done(outcome: edge::Outcome) {
     let Some(ui) = ctx.window() else { return };
     let data = ui.global::<SignInData>();
     data.set_edge(false);
-    let why = match outcome {
+    let not_yet = tr!("It closed before you finished signing in. Try again when you're ready.");
+    let instead = tr!("Try again, or use Sign in with Google.");
+    let (title, line, retry) = match outcome {
         Outcome::SignedIn(header) => {
-            data.set_status("Checking the session…".into());
+            data.set_status(tr!("Checking the session…").into());
             ctx.send(Action::Account(AccountAction::SignIn(Cookies(header))));
             return;
         }
-        Outcome::Cancelled => None,
-        Outcome::Closed => Some(tr!("Edge closed before you signed in.")),
-        Outcome::TimedOut => Some(tr!(
-            "You didn't sign in within 10 minutes, so featherplay closed Edge."
-        )),
-        Outcome::NotFound => Some(tr!(
-            "featherplay can't find Microsoft Edge on this PC. Use Sign in with Google instead."
-        )),
-        Outcome::DidntStart(e) => {
-            log!("edge sign-in: didn't start: {e}");
-            Some(tr!(
-                "Microsoft Edge didn't start. Use Sign in with Google instead."
-            ))
+        Outcome::Cancelled => {
+            data.set_busy(false);
+            data.set_status("".into());
+            return;
         }
-        Outcome::Blocked => Some(tr!(
-            "Edge didn't let featherplay read the sign-in. A policy on this PC may block it. Use Sign in with Google instead."
-        )),
         Outcome::PolicyOff => {
             data.set_edge_blocked(true);
-            None
+            data.set_busy(false);
+            data.set_status("".into());
+            return;
         }
+        Outcome::Closed => (tr!("Edge closed"), not_yet, SignInWay::Edge),
+        Outcome::TimedOut => (
+            tr!("Edge closed after 10 minutes"),
+            tr!(
+                "featherplay closes it when the sign-in takes that long. Try again when you're ready."
+            ),
+            SignInWay::Edge,
+        ),
+        Outcome::NotFound => (
+            tr!("Microsoft Edge isn't on this PC"),
+            tr!("Sign in with Google works without it."),
+            SignInWay::None,
+        ),
+        Outcome::DidntStart(e) => {
+            log!("edge sign-in: didn't start: {e}");
+            (tr!("Microsoft Edge didn't start"), instead, SignInWay::Edge)
+        }
+        Outcome::Blocked => (
+            tr!("Edge didn't let featherplay in"),
+            tr!("A setting on this PC may block it. Sign in with Google works without it."),
+            SignInWay::None,
+        ),
         Outcome::Lost(e) => {
             log!("edge sign-in: lost Edge: {e}");
-            Some(tr!(
-                "featherplay lost the connection to Edge. Try again, or use Sign in with Google."
-            ))
+            (
+                tr!("featherplay lost touch with Edge"),
+                instead,
+                SignInWay::Edge,
+            )
         }
     };
-    data.set_busy(false);
-    data.set_status("".into());
-    if let Some(why) = why {
-        data.set_error(why.into());
-    }
+    problem(&ctx, title, line, retry);
 }
 
 fn submit(ctx: &Rc<Ctx>, text: &str) {
@@ -308,12 +351,17 @@ fn submit(ctx: &Rc<Ctx>, text: &str) {
     }
     match check_cookie_header(text) {
         Ok(header) => {
+            LAST_WAY.set(SignInWay::Paste);
             data.set_busy(true);
-            data.set_error("".into());
-            data.set_status("Checking the session…".into());
+            clear_problem(&data);
+            data.set_status(tr!("Checking the session…").into());
             ctx.send(Action::Account(AccountAction::SignIn(Cookies(header))));
         }
-        Err(why) => data.set_error(why.into()),
+        // Said under the field, where the text is fixed.
+        Err(why) => {
+            data.set_paste_open(true);
+            data.set_paste_error(why.into());
+        }
     }
 }
 

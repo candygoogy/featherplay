@@ -57,33 +57,59 @@ pub fn show_address(ui: &SignInWindow, address: &Address) {
 /// Opens the frame and Google's page in it at `start`; `done` runs on the sign-in thread
 /// once the page has closed (the frame is gone by the time it's called back on the UI
 /// thread through `closed`).
+///
+/// Winit makes the frame's window on a later turn of the event loop than `show`, so the
+/// page goes in once its handle exists (`shell::when_hwnd`). An error returned here, or one
+/// told to `super::didnt_open` later, means the window didn't open and `done` never runs.
 pub fn open(
     ctx: &Rc<Ctx>,
     profile: PathBuf,
     start: &'static str,
     done: impl FnOnce(Outcome) + Send + 'static,
 ) -> Result<(), String> {
-    if FRAME.with_borrow(Option::is_some) {
+    if is_open() {
         return Err("the sign-in window is already open".into());
     }
     let ui = create(ctx)?;
     ui.show().map_err(|e| format!("show: {e}"))?;
-    let Some(hwnd) = shell::hwnd(ui.window()) else {
-        let _ = ui.hide();
-        return Err("the sign-in window has no handle".into());
-    };
-    dress(&ui, hwnd);
+    // Kept here while the window is made: `when_hwnd` holds it weakly.
+    FRAME.with_borrow_mut(|f| *f = Some(ui.clone_strong()));
+    // Closed before the page went in (`embed` replaces this): nothing to wait for, and
+    // dropping the frame stops the wait.
+    ui.window().on_close_requested(|| {
+        let _ = slint::invoke_from_event_loop(|| super::window_closed(Outcome::Cancelled));
+        CloseRequestResponse::HideWindow
+    });
+    shell::when_hwnd(
+        &ui,
+        move |ui, hwnd| {
+            if let Err(e) = embed(ui, hwnd, profile, start, done) {
+                closed();
+                super::didnt_open(&e);
+            }
+        },
+        |_| {
+            closed();
+            super::didnt_open("the sign-in window got no handle within 2 s");
+        },
+    );
+    Ok(())
+}
+
+/// Once the frame's window exists: its colours, then Google's page in it.
+fn embed(
+    ui: &SignInWindow,
+    hwnd: isize,
+    profile: PathBuf,
+    start: &'static str,
+    done: impl FnOnce(Outcome) + Send + 'static,
+) -> Result<(), String> {
+    dress(ui, hwnd);
     let room = Room {
         top: ui.get_page_top(),
         bottom: ui.get_page_bottom(),
     };
-    let remote = match webview::open(hwnd, room, profile, start, tell, done) {
-        Ok(r) => r,
-        Err(e) => {
-            let _ = ui.hide();
-            return Err(e);
-        }
-    };
+    let remote = webview::open(hwnd, room, profile, start, tell, done)?;
     ui.on_back(move || remote.back());
     ui.on_reload(move || remote.reload());
     ui.window().on_close_requested(move || {
@@ -102,8 +128,12 @@ pub fn open(
     if let Err(e) = follow(hwnd, remote) {
         log!("sign-in window: can't follow its size: {e}");
     }
-    FRAME.with_borrow_mut(|f| *f = Some(ui));
     Ok(())
+}
+
+/// The frame is up, or waiting for its window.
+pub fn is_open() -> bool {
+    FRAME.with_borrow(Option::is_some)
 }
 
 /// On the UI thread, once the page thread has ended: the frame goes.
