@@ -54,7 +54,7 @@ or as one portable exe.
 <!-- The installer's file name carries the version: update this link with each release. -->
 
 **Installer (recommended).**
-[`featherplay-setup-0.1.1.exe`](https://github.com/candygoogy/featherplay/releases/download/v0.1.1/featherplay-setup-0.1.1.exe)
+[`featherplay-setup-0.1.2.exe`](https://github.com/candygoogy/featherplay/releases/download/v0.1.2/featherplay-setup-0.1.2.exe)
 installs for your Windows user only, with no admin prompt, and adds featherplay to the Start
 menu and to Settings > Apps. A newer setup upgrades in place and keeps your settings and
 sign-in. Uninstalling from Settings > Apps removes everything featherplay keeps: settings,
@@ -92,7 +92,7 @@ scoop install featherplay
 
 featherplay isn't code-signed yet, so Windows SmartScreen may warn you the first time you run
 it. Choose **More info**, then **Run anyway**. To check the file first, run
-`Get-FileHash featherplay-setup-0.1.1.exe` (or `Get-FileHash featherplay.exe`) in PowerShell
+`Get-FileHash featherplay-setup-0.1.2.exe` (or `Get-FileHash featherplay.exe`) in PowerShell
 and compare the hash with the one on the release page, or
 [build it yourself](#build-from-source).
 
@@ -245,14 +245,14 @@ its window minimised, on the same day. Lower is better.
      repo. The website's site/src/data/numbers.ts holds the same figures, so keep the two in
      step. -->
 
-| | featherplay 0.1.1 | Pear Desktop 3.12.0 | YouTube Music in Edge 156 |
+| | featherplay 0.1.2 | Pear Desktop 3.12.0 | YouTube Music in Edge 156 |
 |---|---|---|---|
 | Memory while playing | **81 MB** | 798 MB | 988 MB |
 | Memory while paused | **80 MB** | 782 MB | 973 MB |
 | CPU while playing | **0.022 %** | 0.17 % | 0.14 % |
 | CPU while paused | **0.005 %** | 0.05 % | 0.018 % |
 | Processes | **1** | 6 to 7 | 9 to 11 |
-| Download | **10.25 MB** installer (28.91 MB portable exe) | 274 MB installer | nothing (Edge comes with Windows) |
+| Download | **10.73 MB** installer (29.95 MB portable exe) | 274 MB installer | nothing (Edge comes with Windows) |
 
 <sub>Measured on 1 November 2026: each app playing the same song on repeat for 5 minutes, then paused for 3, window minimised. Memory is the private memory of all the app's processes (1 MB = 1,048,576 bytes); CPU is a share of the whole machine. [How these were measured](https://featherplay.candygoogy.dev/method).</sub>
 
