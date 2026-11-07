@@ -863,17 +863,17 @@ msgstr ""
 msgid "Sign out"
 msgstr ""
 
-#: ui/account_menu.slint:446 ui/account_menu.slint:459
+#: ui/account_menu.slint:452 ui/account_menu.slint:465
 msgid "Choose an account"
 msgstr ""
 
-#: ui/account_menu.slint:463
+#: ui/account_menu.slint:469
 msgid ""
 "Your Google sign-in has more than one account. Pick the one featherplay "
 "uses; you can switch later from the account menu."
 msgstr ""
 
-#: ui/account_menu.slint:473
+#: ui/account_menu.slint:479
 msgctxt "Account"
 msgid "Default"
 msgstr ""
@@ -1557,7 +1557,7 @@ msgid "OK"
 msgstr ""
 
 #: ui/pages/settings.slint:1363 ui/pages/settings.slint:1624
-#: ui/pages/settings.slint:1363 ui/pages/settings.slint:1624 ui/pages/sign_in.slint:275
+#: ui/pages/settings.slint:1363 ui/pages/settings.slint:1624 ui/pages/sign_in.slint:276
 msgid "Cancel"
 msgstr ""
 
@@ -2204,86 +2204,86 @@ msgstr ""
 msgid "Cookie header"
 msgstr ""
 
-#: ui/pages/sign_in.slint:207
+#: ui/pages/sign_in.slint:208
 msgid "Sign in to featherplay"
 msgstr ""
 
-#: ui/pages/sign_in.slint:217
+#: ui/pages/sign_in.slint:218
 msgid ""
 "Bring your library, playlists and likes. Search, radio and everything else "
 "already work without an account."
 msgstr ""
 
-#: ui/pages/sign_in.slint:230
+#: ui/pages/sign_in.slint:231
 msgid "Your session expired. Sign in again; the music keeps playing."
 msgstr ""
 
-#: ui/pages/sign_in.slint:261
+#: ui/pages/sign_in.slint:262
 msgid "Sign in with Google"
 msgstr ""
 
-#: ui/pages/sign_in.slint:262
+#: ui/pages/sign_in.slint:263
 msgid "On Google's own page, in a featherplay window"
 msgstr ""
 
-#: ui/pages/sign_in.slint:271
+#: ui/pages/sign_in.slint:272
 msgid "Use Microsoft Edge"
 msgstr ""
 
-#: ui/pages/sign_in.slint:272
+#: ui/pages/sign_in.slint:273
 msgid "Not available on this PC"
 msgstr ""
 
-#: ui/pages/sign_in.slint:272
+#: ui/pages/sign_in.slint:273
 msgid "In your own browser, with a temporary profile"
 msgstr ""
 
-#: ui/pages/sign_in.slint:275
+#: ui/pages/sign_in.slint:276
 msgid "Why?"
 msgstr ""
 
-#: ui/pages/sign_in.slint:292
+#: ui/pages/sign_in.slint:293
 msgid ""
 "Edge on this PC is set to keep apps from reading its sign-in, so featherplay "
 "can't use it. Sign in with Google works without it."
 msgstr ""
 
-#: ui/pages/sign_in.slint:300
+#: ui/pages/sign_in.slint:301
 msgid ""
 "Set by an administrator or a tweaking tool: the RemoteDebuggingAllowed "
 "policy is off."
 msgstr ""
 
-#: ui/pages/sign_in.slint:309
+#: ui/pages/sign_in.slint:310
 msgid "Paste a cookie header"
 msgstr ""
 
-#: ui/pages/sign_in.slint:310
+#: ui/pages/sign_in.slint:311
 msgid "For advanced users"
 msgstr ""
 
-#: ui/pages/sign_in.slint:318
+#: ui/pages/sign_in.slint:319
 msgid ""
 "In a browser signed in to music.youtube.com, press F12, open the Network tab "
 "and reload. Click a request named \"browse\" and copy the whole value of its "
 "cookie request header."
 msgstr ""
 
-#: ui/pages/sign_in.slint:352
+#: ui/pages/sign_in.slint:353
 msgid "Checking…"
 msgstr ""
 
-#: ui/pages/sign_in.slint:352
+#: ui/pages/sign_in.slint:353
 msgid "Sign in with this cookie"
 msgstr ""
 
-#: ui/pages/sign_in.slint:386
+#: ui/pages/sign_in.slint:387
 msgid ""
 "featherplay never sees your password. It keeps only the session, in Windows "
 "Credential Manager, and you can sign out any time."
 msgstr ""
 
-#: ui/pages/sign_in.slint:401
+#: ui/pages/sign_in.slint:402
 msgid "Continue without signing in"
 msgstr ""
 
