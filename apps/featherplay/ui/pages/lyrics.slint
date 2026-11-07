@@ -66,11 +66,15 @@ export global LyricsData {
     // or a lookup it holds through: a song with none keeps the cover view, and the Lyrics
     // pill says why.
     out property <bool> showing: self.wanted && (self.has-lines || (self.looking && self.held));
-    // The Lyrics pill's note under it, a few seconds after a toggle or a lookup that found
-    // nothing to show (`LyricsWatch` hides it again; `nudged` counts the toggles, each
-    // giving the note its full time).
+    // The Lyrics pill's note under it, for a few seconds after a press on the toggles: on a
+    // song with no lyrics, or one whose lookup the press waited on (`asked`) and that found
+    // nothing to show. Never on its own when a later song has none. `LyricsWatch` hides it
+    // again; `nudged` counts the presses, each giving the note its full time.
     in-out property <bool> hint: false;
     in-out property <int> nudged: 0;
+    // A press asked for the view while the song's lookup still ran: its answer shows the note
+    // if it finds nothing. Spent when the lookup ends.
+    in-out property <bool> asked: false;
     // The cover's panel and lines, per theme.
     in property <LyricInk> ink-dark;
     in property <LyricInk> ink-light;
@@ -118,16 +122,19 @@ export global LyricsData {
             } else {
                 self.full = true;
                 self.held = !self.missing;
+                self.asked = self.looking;
             }
             Nav.go(PageKind.now-playing);
         } else if self.state == LyricsState.error {
             self.full = true;
+            self.asked = true;
             self.retry();
         } else if self.state == LyricsState.none {
             self.nudge();
         } else {
             // Asked for, or called off while its lookup still runs.
             self.full = !self.full;
+            self.asked = self.full && self.looking;
         }
     }
 

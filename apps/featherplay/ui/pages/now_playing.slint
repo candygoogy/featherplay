@@ -200,10 +200,15 @@ export component LyricsWatch {
     changed live => { LyricsData.live-changed(self.live); }
     property <bool> showing: LyricsData.showing;
     changed showing => { LyricsData.held = self.showing; }
-    // A lookup the full view asked for found nothing to show: the pill's note says why. A new
-    // lookup, or lines, take it away.
+    // A lookup a press waited on found nothing to show: the pill's note says why. A new
+    // lookup, or lines, take it away. A lookup nobody pressed for shows no note.
     property <LyricsState> state: LyricsData.state;
-    changed state => { LyricsData.hint = LyricsData.missing && LyricsData.wanted; }
+    changed state => {
+        LyricsData.hint = LyricsData.missing && LyricsData.wanted && LyricsData.asked;
+        if !LyricsData.looking {
+            LyricsData.asked = false;
+        }
+    }
     // One shot, only while the note shows; a toggle while it shows starts its time again.
     note-time := Timer {
         interval: 4s;
@@ -218,7 +223,7 @@ export component LyricsWatch {
 // the filled pill while on (white on the lyrics' panel, the panel's colour for its ink). It
 // says what the lookup found: "Finding lyrics…" while the one it asked for runs, a quieter
 // "No lyrics" when there are none, "Retry lyrics" after a failure (a press asks again). A
-// press on "No lyrics", or a lookup that ends so while the view is asked for, shows a note
+// press on "No lyrics", or a lookup a press waited on that ends so, shows a note
 // under the pill for a few seconds saying where featherplay looked (`LyricsData.hint`); the
 // stage stays.
 component LyricsToggle inherits Rectangle {

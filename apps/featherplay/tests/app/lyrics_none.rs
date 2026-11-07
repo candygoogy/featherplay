@@ -131,7 +131,7 @@ fn no_lyrics_keep_the_cover_view_and_the_pill_says_so() {
         find(&scene, "No lyrics").is_some(),
         "the pill doesn't say so"
     );
-    assert!(data.get_hint(), "no note says why");
+    assert!(!data.get_hint(), "the note showed without a press");
 
     // The stage is as it was: its ground, and the cover large and in its place.
     let img = frame(&scene);
@@ -224,14 +224,15 @@ fn a_song_with_lyrics_still_opens_the_view_and_keeps_it_through_a_lookup() {
     scene.settle();
     assert!(data.get_showing(), "synced lyrics didn't open the view");
 
-    // A new song's lookup keeps it open; one that finds nothing closes it, saying why.
+    // A new song's lookup keeps it open; one that finds nothing closes it, with no note: nobody
+    // pressed anything.
     lyrics::show_for_snapshot(&scene.ctx, SnapshotLyrics::Loading);
     scene.settle();
     assert!(data.get_showing(), "the view closed during a lookup");
     lyrics::show_for_snapshot(&scene.ctx, SnapshotLyrics::None);
     scene.settle();
     assert!(!data.get_showing(), "the view stayed open on no lyrics");
-    assert!(data.get_hint(), "no note says why the view closed");
+    assert!(!data.get_hint(), "the note showed on its own");
 
     // The toggle still closes and opens it on a song with lyrics.
     lyrics::show_for_snapshot(&scene.ctx, SnapshotLyrics::Synced);
@@ -242,4 +243,42 @@ fn a_song_with_lyrics_still_opens_the_view_and_keeps_it_through_a_lookup() {
     data.invoke_toggle_view();
     scene.settle();
     assert!(data.get_showing());
+}
+
+#[test]
+fn the_note_shows_for_a_press_and_never_on_its_own_for_a_later_song() {
+    let scene = scene();
+    let data = scene.ui.global::<LyricsData>();
+
+    // Pressed while the song is still looked up: the pill waits, and the lookup that finds
+    // nothing shows the note.
+    lyrics::show_for_snapshot(&scene.ctx, SnapshotLyrics::Loading);
+    scene.settle();
+    press(&scene, "Lyrics");
+    assert!(
+        find(&scene, "Finding lyrics…").is_some(),
+        "the pill doesn't wait"
+    );
+    lyrics::show_for_snapshot(&scene.ctx, SnapshotLyrics::None);
+    scene.settle();
+    assert!(data.get_hint(), "the press got no answer");
+
+    // The next songs with none say "No lyrics" on the pill, with no note until it's pressed.
+    data.set_hint(false);
+    for _ in 0..2 {
+        lyrics::show_for_snapshot(&scene.ctx, SnapshotLyrics::Loading);
+        scene.settle();
+        lyrics::show_for_snapshot(&scene.ctx, SnapshotLyrics::None);
+        scene.settle();
+        assert!(
+            !data.get_hint(),
+            "the note showed on its own for a later song"
+        );
+        assert!(
+            find(&scene, "No lyrics").is_some(),
+            "the pill doesn't say so"
+        );
+    }
+    press(&scene, "No lyrics");
+    assert!(data.get_hint(), "a press didn't show the note");
 }
