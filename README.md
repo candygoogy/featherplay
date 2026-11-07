@@ -420,7 +420,9 @@ token are kept in Windows Credential Manager. Settings, the play queue and the s
 in `%APPDATA%\featherplay`; covers, the helpers and the sign-in window's data are in
 `%LOCALAPPDATA%\featherplay`. Signing in with Microsoft Edge uses a temporary Edge profile in
 that folder too, deleted as soon as the sign-in ends (or at the next start, if featherplay was
-killed meanwhile); featherplay keeps only its YouTube Music cookies.
+killed meanwhile); featherplay keeps only its YouTube Music cookies. The song links looked up
+in the last session are kept there until they expire (a few hours), so songs start sooner
+after a restart; like every YouTube stream link, each one contains your public IP address.
 
 ## Build from source
 
