@@ -20,21 +20,32 @@
 //!
 //! Controls go to the controller as `UiCommand`s on the channel the media keys, taskbar,
 //! tray and hotkeys use.
+//!
+//! `Amuse` is a second, separate server on the same stack: the read-only endpoint of Pear's
+//! Amuse plugin, for the Amuse widget (`amuse`).
 
+mod amuse;
 mod events;
 mod gate;
 mod routes;
 mod ws;
 
+use std::convert::Infallible;
 use std::fmt;
+use std::future::Future;
 use std::io;
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
+use std::pin::Pin;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
+use bytes::Bytes;
 use featherplay_core::model::{RepeatMode, Track};
+use http_body_util::Full;
+use hyper::body::Incoming;
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
+use hyper::{Request, Response};
 use hyper_util::rt::{TokioIo, TokioTimer};
 use tokio::net::TcpListener;
 use tokio::sync::{Semaphore, watch};
@@ -42,7 +53,9 @@ use tokio::task::JoinHandle;
 
 use crate::{Sender, UiCommand};
 
-/// Connections served at once (an open WebSocket counts in `MAX_SOCKETS` instead).
+pub use amuse::{AMUSE_PORT, Amuse};
+
+/// Connections a server serves at once (an open WebSocket counts in `MAX_SOCKETS` instead).
 const MAX_CONNECTIONS: usize = 32;
 /// WebSockets open at once.
 const MAX_SOCKETS: usize = 16;
@@ -146,13 +159,7 @@ impl LocalApi {
         commands: Sender<UiCommand>,
         now: Snapshot,
     ) -> io::Result<LocalApi> {
-        let v4 = std::net::TcpListener::bind((Ipv4Addr::LOCALHOST, port))?;
-        let port = v4.local_addr()?.port();
-        let mut sockets = vec![v4];
-        // A bonus: "localhost" may resolve to ::1 first. Without IPv6, 127.0.0.1 serves.
-        if let Ok(v6) = std::net::TcpListener::bind((Ipv6Addr::LOCALHOST, port)) {
-            sockets.push(v6);
-        }
+        let (port, sockets) = bind_loopback(port)?;
         let (state, rx) = watch::channel(now);
         let shared = Arc::new(Shared {
             port,
@@ -161,19 +168,10 @@ impl LocalApi {
             state: rx,
             sockets: Arc::new(Semaphore::new(MAX_SOCKETS)),
         });
-        let slots = Arc::new(Semaphore::new(MAX_CONNECTIONS));
-        let mut addresses = Vec::new();
-        let mut listeners = Vec::new();
-        for socket in sockets {
-            socket.set_nonblocking(true)?;
-            addresses.push(socket.local_addr()?);
-            let listener = TcpListener::from_std(socket)?;
-            listeners.push(tokio::spawn(accept(
-                listener,
-                Arc::clone(&shared),
-                Arc::clone(&slots),
-            )));
-        }
+        let (addresses, listeners) = serve(
+            sockets,
+            Arc::new(move |req| Box::pin(routes::handle(req, Arc::clone(&shared)))),
+        )?;
         Ok(LocalApi {
             port,
             addresses,
@@ -212,8 +210,50 @@ impl Drop for LocalApi {
     }
 }
 
+/// Binds 127.0.0.1:`port` (0 picks a free port), and [::1] at the same port where the
+/// machine has IPv6. Fails when the port is taken. Returns the port and the sockets.
+fn bind_loopback(port: u16) -> io::Result<(u16, Vec<std::net::TcpListener>)> {
+    let v4 = std::net::TcpListener::bind((Ipv4Addr::LOCALHOST, port))?;
+    let port = v4.local_addr()?.port();
+    let mut sockets = vec![v4];
+    // A bonus: "localhost" may resolve to ::1 first. Without IPv6, 127.0.0.1 serves.
+    if let Ok(v6) = std::net::TcpListener::bind((Ipv6Addr::LOCALHOST, port)) {
+        sockets.push(v6);
+    }
+    Ok((port, sockets))
+}
+
+/// A server's answer to a request.
+type Reply = Pin<Box<dyn Future<Output = Result<Response<Full<Bytes>>, Infallible>> + Send>>;
+/// What answers a server's requests. One type for both servers, so hyper's connection code is
+/// built once (generic over the handler, it was built per server: 33 KB more in the exe).
+type Handler = Arc<dyn Fn(Request<Incoming>) -> Reply + Send + Sync>;
+
+/// Serves `handle` on `sockets` on the current tokio runtime, `MAX_CONNECTIONS` at once
+/// between them. Returns where they listen and their accept tasks, which stop the server
+/// when aborted.
+fn serve(
+    sockets: Vec<std::net::TcpListener>,
+    handle: Handler,
+) -> io::Result<(Vec<SocketAddr>, Vec<JoinHandle<()>>)> {
+    let slots = Arc::new(Semaphore::new(MAX_CONNECTIONS));
+    let mut addresses = Vec::new();
+    let mut listeners = Vec::new();
+    for socket in sockets {
+        socket.set_nonblocking(true)?;
+        addresses.push(socket.local_addr()?);
+        let listener = TcpListener::from_std(socket)?;
+        listeners.push(tokio::spawn(accept(
+            listener,
+            Arc::clone(&slots),
+            Arc::clone(&handle),
+        )));
+    }
+    Ok((addresses, listeners))
+}
+
 /// Takes connections until the server stops; one more than `slots` allows is closed at once.
-async fn accept(listener: TcpListener, shared: Arc<Shared>, slots: Arc<Semaphore>) {
+async fn accept(listener: TcpListener, slots: Arc<Semaphore>, handle: Handler) {
     loop {
         let stream = match listener.accept().await {
             Ok((stream, _)) => stream,
@@ -226,10 +266,10 @@ async fn accept(listener: TcpListener, shared: Arc<Shared>, slots: Arc<Semaphore
         let Ok(slot) = Arc::clone(&slots).try_acquire_owned() else {
             continue;
         };
-        let shared = Arc::clone(&shared);
+        let handle = Arc::clone(&handle);
         tokio::spawn(async move {
             let _slot = slot;
-            let service = service_fn(move |req| routes::handle(req, Arc::clone(&shared)));
+            let service = service_fn(move |req| handle(req));
             // An error is the client's (a bad request, a timeout, a reset): nothing to do.
             let _ = http1::Builder::new()
                 .keep_alive(false)

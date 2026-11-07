@@ -292,7 +292,7 @@ fn ok(value: Value) -> Response<Full<Bytes>> {
     json_reply(&value)
 }
 
-fn json_reply(value: &Value) -> Response<Full<Bytes>> {
+pub(super) fn json_reply(value: &Value) -> Response<Full<Bytes>> {
     let mut reply = Response::new(Full::new(Bytes::from(value.to_string())));
     let h = reply.headers_mut();
     h.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));

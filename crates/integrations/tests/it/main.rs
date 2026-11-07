@@ -7,6 +7,7 @@
     reason = "tests report skips and measurements"
 )]
 
+mod amuse;
 mod discord;
 mod hotkeys_parse;
 mod local_api;

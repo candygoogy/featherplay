@@ -16,7 +16,7 @@ use tokio::sync::mpsc;
 
 const TOKEN: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
-fn track() -> Track {
+pub(crate) fn track() -> Track {
     Track {
         id: TrackId("dQw4w9WgXcQ".into()),
         title: "Song title".into(),
@@ -36,7 +36,7 @@ fn track() -> Track {
     }
 }
 
-fn playing() -> Snapshot {
+pub(crate) fn playing() -> Snapshot {
     Snapshot {
         track: Some(track()),
         playing: true,
@@ -61,20 +61,20 @@ fn start(now: Snapshot) -> Server {
     Server { api, commands }
 }
 
-struct Reply {
-    status: u16,
-    head: String,
-    body: String,
+pub(crate) struct Reply {
+    pub(crate) status: u16,
+    pub(crate) head: String,
+    pub(crate) body: String,
 }
 
 impl Reply {
-    fn json(&self) -> Value {
+    pub(crate) fn json(&self) -> Value {
         serde_json::from_str(&self.body).unwrap_or_else(|e| panic!("{e}: {:?}", self.body))
     }
 }
 
 /// Sends `raw` and reads the reply up to the server's close.
-async fn send(port: u16, raw: &[u8]) -> Reply {
+pub(crate) async fn send(port: u16, raw: &[u8]) -> Reply {
     let mut s = TcpStream::connect(("127.0.0.1", port))
         .await
         .expect("connect");

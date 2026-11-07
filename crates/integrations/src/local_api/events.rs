@@ -124,20 +124,30 @@ pub(super) fn player_info(s: &Snapshot, now: SystemTime) -> Value {
 /// Pear's song info. `views` is always 0: featherplay doesn't load the count.
 pub(super) fn song(t: &Track, s: &Snapshot, now: SystemTime) -> Value {
     let (elapsed, _) = clock(s, now);
-    let artist: Vec<&str> = t.artists.iter().map(|a| a.name.as_str()).collect();
     json!({
         "title": t.title,
-        "artist": artist.join(", "),
+        "artist": artists(t),
         "views": 0,
         "imageSrc": t.thumbnail,
         "isPaused": !s.playing,
         "songDuration": t.duration.map_or(0, |d| d.as_secs()),
         "elapsedSeconds": elapsed,
-        "url": format!("https://music.youtube.com/watch?v={}", t.id.0),
+        "url": watch_url(&t.id),
         "album": t.album.as_ref().map(|a| a.title.as_str()),
         "videoId": t.id.0,
         "mediaType": media_type(t.video_type),
     })
+}
+
+/// The track's artists in one line, as Pear's `artist`.
+pub(super) fn artists(t: &Track) -> String {
+    let names: Vec<&str> = t.artists.iter().map(|a| a.name.as_str()).collect();
+    names.join(", ")
+}
+
+/// The track's page on YouTube Music, as Pear's `url`.
+pub(super) fn watch_url(id: &TrackId) -> String {
+    format!("https://music.youtube.com/watch?v={}", id.0)
 }
 
 /// Pear's `RepeatMode`.
