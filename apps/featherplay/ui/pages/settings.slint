@@ -1891,9 +1891,9 @@ export component SettingsPage inherits Rectangle {
                     }
                     ToggleRow {
                         label: @tr("Amuse");
-                        detail: !SettingsData.amuse ? @tr("Let Amuse show what's playing on stream. Like Pear's Amuse plugin, it needs no token, so any app on this PC, and any website open in a browser here, can see the song.")
+                        detail: !SettingsData.amuse ? @tr("Lets Amuse show what's playing. It needs no token: any app or website on this PC can see it.")
                             : SettingsData.amuse-state == LocalApiState.failed ? SettingsData.amuse-message
-                            : SettingsData.amuse-state == LocalApiState.running ? @tr("On at http://127.0.0.1:9863. Any app on this PC, and any website open in a browser here, can see what's playing.")
+                            : SettingsData.amuse-state == LocalApiState.running ? @tr("On at http://127.0.0.1:9863. It needs no token: any app or website on this PC can see it.")
                             : @tr("Starting…");
                         key: SettingKey.amuse;
                         checked: SettingsData.amuse;
