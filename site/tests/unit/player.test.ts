@@ -308,6 +308,44 @@ describe("the app's controls in the store", () => {
     expect(p.state.queueOpen).toBe(true);
     p.setQueueTab("related");
     expect(p.state.queueTab).toBe("related");
+    p.setQueueTab("lyrics");
+    expect(p.state.queueTab).toBe("lyrics");
+  });
+  it("Clear leaves nothing up next: the song ends there, and a song from the list queues it all again", () => {
+    const p = createPlayer(songs, frames());
+    p.play(songs[1].id);
+    expect(p.state.queueEnd).toBe(songs.length);
+    p.clearQueue();
+    expect(p.state.queueEnd).toBe(2);
+    // With repeat off the song stops at its end, as at the end of the list.
+    p.seek(songs[1].durationMs - 100);
+    vi.advanceTimersByTime(300);
+    expect(p.state.song?.id).toBe(songs[1].id);
+    expect(p.state.playing).toBe(false);
+    // Next goes back to the queue's first song; the queue is still the two.
+    p.next();
+    expect(p.state.song?.id).toBe(songs[0].id);
+    expect(p.state.queueEnd).toBe(2);
+    p.play(songs[3].id);
+    expect(p.state.queueEnd).toBe(songs.length);
+  });
+  it("after Clear, shuffle still ends with the queue, and Undo keeps the song it brings back in it", () => {
+    const p = createPlayer(songs, { ...frames(), random: () => 0 });
+    p.play(songs[0].id);
+    p.toggleShuffle();
+    p.clearQueue();
+    p.seek(songs[0].durationMs - 100);
+    vi.advanceTimersByTime(300);
+    expect(p.state.playing).toBe(false);
+    // Not for me on the last song goes to the first; Clear there, then Undo.
+    p.toggleShuffle();
+    p.play(songs[5].id);
+    p.notForMe();
+    expect(p.state.song?.id).toBe(songs[0].id);
+    p.clearQueue();
+    p.undo();
+    expect(p.state.song?.id).toBe(songs[5].id);
+    expect(p.state.queueEnd).toBe(songs.length);
   });
   it("Now playing's side panel starts shown and keeps the visitor's choice across views", () => {
     const p = createPlayer(songs, frames());

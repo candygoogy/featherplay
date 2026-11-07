@@ -10,7 +10,7 @@ import type { Song } from "../data/songs";
 export type View = "home" | "now" | "lyrics" | "search" | "library" | "explore" | "history";
 export type Theme = "dark" | "light";
 export type Repeat = "off" | "all" | "one";
-export type QueueTab = "next" | "related";
+export type QueueTab = "next" | "related" | "lyrics";
 
 export const isNowView = (v: View) => v === "now" || v === "lyrics";
 
@@ -40,8 +40,14 @@ export type PlayerState = {
   /** The Up next panel beside a browse page (Now playing always has it), and its tab. */
   queueOpen: boolean;
   queueTab: QueueTab;
-  /** Now playing's side panel (Up next and Related): the bar's Up next button hides and shows
-   *  it there, and the page keeps the choice. */
+  /**
+   * The queue: the demo's songs up to this index (exclusive). Up next shows the song playing
+   * and the ones after it, up to here; Clear brings it to the song playing, as the app's
+   * Clear drops every song after it. Playing a song from the demo's list queues all of it.
+   */
+  queueEnd: number;
+  /** Now playing's side panel (Up next, Related, Lyrics): the bar's Up next button hides and
+   *  shows it there, and the page keeps the choice. */
   sideOpen: boolean;
   /** Songs played, the latest first (the History page). */
   history: string[];
@@ -86,6 +92,8 @@ export type Player = {
   toggleMute(): void;
   toggleQueue(open?: boolean): void;
   setQueueTab(tab: QueueTab): void;
+  /** Up next's Clear: no songs after the one playing. */
+  clearQueue(): void;
   /** Hides or shows Now playing's side panel. */
   toggleSide(open?: boolean): void;
   /** The songs Related shows for the current one. */
@@ -154,6 +162,7 @@ export function createPlayer(songs: Song[], options: PlayerOptions = {}): Player
     muted: false,
     queueOpen: false,
     queueTab: "next",
+    queueEnd: songs.length,
     sideOpen: true,
     history: first ? [first.id] : [],
     toast: null,
@@ -202,9 +211,11 @@ export function createPlayer(songs: Song[], options: PlayerOptions = {}): Player
         emit();
         return;
       }
-      // The end of the list, with repeat off: it stops there, as the app's queue does.
-      const last = indexOf(state.song) === songs.length - 1;
-      if (last && state.repeat === "off" && !state.shuffle) {
+      // The end of the queue, with repeat off: it stops there, as the app's queue does.
+      // Shuffle plays on through the whole list; after a Clear the queue ends here all the same.
+      const last = indexOf(state.song) === state.queueEnd - 1;
+      const cleared = state.queueEnd < songs.length;
+      if (last && state.repeat === "off" && (!state.shuffle || cleared)) {
         state.positionMs = state.song.durationMs;
         state.playing = false;
         emit();
@@ -229,16 +240,20 @@ export function createPlayer(songs: Song[], options: PlayerOptions = {}): Player
   const nextIndex = () => {
     if (!state.song) return 0;
     const at = indexOf(state.song);
-    if (state.shuffle && songs.length > 1) {
-      const pick = Math.floor(random() * (songs.length - 1));
+    const end = state.queueEnd;
+    if (state.shuffle && end > 1) {
+      const pick = Math.floor(random() * (end - 1));
       return pick >= at ? pick + 1 : pick;
     }
-    return at + 1;
+    // Nothing after it: back to the queue's first song.
+    return at + 1 < end ? at + 1 : 0;
   };
 
   function goTo(index: number) {
-    const song = songs[((index % songs.length) + songs.length) % songs.length];
+    const i = ((index % songs.length) + songs.length) % songs.length;
+    const song = songs[i];
     state.song = song;
+    state.queueEnd = Math.max(state.queueEnd, i + 1);
     state.positionMs = 0;
     state.playing = true;
     state.jumps++;
@@ -257,6 +272,8 @@ export function createPlayer(songs: Song[], options: PlayerOptions = {}): Player
       const song = songs.find((s) => s.id === id);
       if (!song) return;
       if (state.song?.id === id && !state.playing) return player.resume();
+      // From the demo's list: all of it is the queue again.
+      state.queueEnd = songs.length;
       goTo(indexOf(song));
     },
     pause() {
@@ -301,6 +318,7 @@ export function createPlayer(songs: Song[], options: PlayerOptions = {}): Player
       if (!song) return;
       stopClock();
       state.song = song;
+      state.queueEnd = songs.length;
       state.playing = false;
       state.positionMs = Math.max(0, Math.min(Math.round(positionMs), song.durationMs - 1));
       state.jumps++;
@@ -383,6 +401,7 @@ export function createPlayer(songs: Song[], options: PlayerOptions = {}): Player
       state.disliked = toggleIn(state.disliked, song.id, false);
       state.toast = null;
       state.song = song;
+      state.queueEnd = Math.max(state.queueEnd, indexOf(song) + 1);
       state.positionMs = positionMs;
       state.playing = true;
       state.jumps++;
@@ -423,6 +442,13 @@ export function createPlayer(songs: Song[], options: PlayerOptions = {}): Player
     setQueueTab(tab) {
       if (tab === state.queueTab) return;
       state.queueTab = tab;
+      emit();
+    },
+    clearQueue() {
+      if (!state.song) return;
+      const end = indexOf(state.song) + 1;
+      if (end === state.queueEnd) return;
+      state.queueEnd = end;
       emit();
     },
     toggleSide(open) {

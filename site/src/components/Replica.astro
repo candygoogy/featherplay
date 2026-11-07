@@ -24,6 +24,10 @@ const lineState = (i: number) => (i < current ? "past" : i === current ? "curren
 const fraction = positionMs / song.durationMs;
 const isNow = view === "now" || view === "lyrics";
 const hasLyrics = song.lyrics.length > 0;
+// Up next: the song playing pinned at the top, then the demo's songs after it.
+const at = songs.indexOf(song);
+// The side panel's Lyrics tab, there unless the full lyrics view shows the lines.
+const lyricsTab = !(view === "lyrics" && hasLyrics);
 const resume = song;
 const others = songs.filter((s) => s.id !== resume.id);
 const summaryId = `${id}-summary`;
@@ -73,6 +77,7 @@ const pages: { page: View; icon: "home" | "library" | "explore" | "history"; lab
   data-queue-open="false"
   data-side-open="true"
   data-queue-tab="next"
+  data-lyrics-tab={String(lyricsTab)}
   data-song={song.id}
   data-at={positionMs}
   role="group"
@@ -83,7 +88,7 @@ const pages: { page: View; icon: "home" | "library" | "explore" | "history"; lab
   <p class="visually-hidden" id={summaryId}>
     A working demo of featherplay's window, playing short clips of six songs under free licences. You can play and pause, skip, like a
     song or mark it not for you, open the lyrics and click a line to jump to it, scroll the lyrics, search, browse the
-    sidebar's pages, open Up next and Related, and minimise the window to the tray.
+    sidebar's pages, open Up next, Related and the lyrics beside the song, clear Up next, and minimise the window to the tray.
   </p>
 
   <div class="titlebar">
@@ -399,22 +404,28 @@ const pages: { page: View; icon: "home" | "library" | "explore" | "history"; lab
       </section>
     </div>
 
-    <!-- Up next and Related: beside Now playing, or opened over a page from the bar -->
+    <!-- Up next, Related and Lyrics: beside Now playing, or opened over a page from the bar.
+         The Lyrics tab steps aside while the full lyrics view shows them. -->
     <aside class="queue" data-queue aria-label="Up next" hidden={!isNow}>
-      <div class="tabs" role="tablist" aria-label="Up next and Related">
+      <div class="tabs" role="tablist" aria-label="Up next, Related and Lyrics">
         <span class="tab-pill" aria-hidden="true"></span>
         <button class="tab" type="button" role="tab" data-tab="next" aria-selected="true" aria-controls={`${id}-next`}>Up next</button>
         <button class="tab" type="button" role="tab" data-tab="related" aria-selected="false" aria-controls={`${id}-related`}>Related</button>
+        <button class="tab" type="button" role="tab" data-tab="lyrics" aria-selected="false" aria-controls={`${id}-lyrics`} hidden={!lyricsTab}>
+          Lyrics
+        </button>
       </div>
       <div class="tab-panel" id={`${id}-next`} role="tabpanel" data-tab-panel="next">
+        <!-- "Playing from" and Clear, then the song playing, pinned, and the songs after it. -->
         <div class="from">
           <span class="from-l">Playing from</span>
           <span class="from-t">Made for the demo</span>
+          <button class="clear" type="button" data-act="clear" aria-disabled={String(at + 1 >= songs.length)}>Clear</button>
         </div>
         <ul class="rows">
           {
-            songs.map((s) => (
-              <li>
+            songs.map((s, i) => (
+              <li hidden={i < at}>
                 <button
                   class="row"
                   type="button"
@@ -443,10 +454,35 @@ const pages: { page: View; icon: "home" | "library" | "explore" | "history"; lab
             ))
           }
         </ul>
+        <p class="up-empty" data-up-empty role="status" hidden={at + 1 < songs.length}>Nothing up next</p>
       </div>
       <div class="tab-panel" id={`${id}-related`} role="tabpanel" data-tab-panel="related" hidden>
         <p class="similar" data-similar>Similar to {song.title}</p>
         <div class="songs" data-related-list></div>
+      </div>
+      <!-- The song's lines on a card of its colour, following it; or why there are none. -->
+      <div class="tab-panel side-tab" id={`${id}-lyrics`} role="tabpanel" data-tab-panel="lyrics" hidden>
+        <div class="side-card">
+          <div class="side-lyrics" data-side-lyrics>
+            <ol class="lines" data-side-lines>
+              {
+                song.lyrics.map((l, i) => (
+                  <li>
+                    <button class="line" type="button" data-at={l.atMs} data-state={lineState(i)}>
+                      {l.line}
+                    </button>
+                  </li>
+                ))
+              }
+              {hasLyrics && <li class="source">{lyricsSource(song)}</li>}
+            </ol>
+          </div>
+        </div>
+        <div class="side-none">
+          <span class="side-none-tile" aria-hidden="true"><Icon name="lyrics" size={26} /></span>
+          <p class="side-none-h">No lyrics for this song</p>
+          <p class="side-none-why">Searched LRCLIB and YouTube Music.</p>
+        </div>
       </div>
     </aside>
 

@@ -11,6 +11,7 @@ import {
   lyricsSource,
   type Player,
   type PlayerState,
+  type QueueTab,
   type View,
 } from "./player";
 import { setGlow } from "./glow";
@@ -137,6 +138,9 @@ function bindReplica(root: HTMLElement, player: Player) {
   const canMinimise = !!desktop?.querySelector("[data-taskbar-app]") && !root.parentElement?.closest("[inert]");
   if (!desktop) setAll(root, '[data-act="minimise"]', (el) => (el.hidden = true));
   const lines = $<HTMLOListElement>(root, "[data-lines]")!;
+  // The side panel's Lyrics tab: the same lines on a card, following the song on their own.
+  const sideLines = $<HTMLOListElement>(root, "[data-side-lines]");
+  const sidePanel = $(root, "[data-side-lyrics]");
   const seek = $<HTMLInputElement>(root, "[data-seek]")!;
   const seekLine = $(root, "[data-seek-line]");
   const seekTip = $(root, "[data-seek-tip]");
@@ -169,7 +173,11 @@ function bindReplica(root: HTMLElement, player: Player) {
     lyricsKey?: string;
     queueOpen?: boolean;
     sideOpen?: boolean;
-    queueTab?: string;
+    tabs?: string;
+    queue?: string;
+    sideShown?: boolean;
+    sideOnNow?: boolean;
+    sideLine?: number;
     history?: string;
     likedList?: string;
     toast?: number | null;
@@ -178,6 +186,7 @@ function bindReplica(root: HTMLElement, player: Player) {
   // The lines follow the song; the wheel or a finger over them moves them for a while.
   const lyricsPanel = $(root, "[data-lyrics]");
   const follower = lyricsPanel ? followLyrics(lyricsPanel, lines) : null;
+  const sideFollower = sidePanel && sideLines ? followLyrics(sidePanel, sideLines) : null;
 
   // --- What the visitor does ---------------------------------------------------------
   root.addEventListener("click", (e) => {
@@ -191,6 +200,7 @@ function bindReplica(root: HTMLElement, player: Player) {
     }
     if (target.matches(".line")) {
       follower?.release();
+      sideFollower?.release();
       player.seek(Number(target.dataset.at));
       return;
     }
@@ -199,7 +209,7 @@ function bindReplica(root: HTMLElement, player: Player) {
       return;
     }
     if (target.dataset.tab) {
-      player.setQueueTab(target.dataset.tab as "next" | "related");
+      player.setQueueTab(target.dataset.tab as QueueTab);
       return;
     }
     if (target.dataset.chip) {
@@ -257,6 +267,10 @@ function bindReplica(root: HTMLElement, player: Player) {
         // "Playing from": the demo's songs are a list of its own, so it opens Up next.
         player.setQueueTab("next");
         player.toggleSide(true);
+        break;
+      case "clear":
+        // Up next's Clear: dimmed and inert with nothing after the song playing.
+        if (target.getAttribute("aria-disabled") !== "true") player.clearQueue();
         break;
       case "minimise":
         player.minimise();
@@ -440,6 +454,9 @@ function bindReplica(root: HTMLElement, player: Player) {
       fill($(root, "[data-related-list]"), player.related().map((r) => r.id), song.id);
       seek.max = String(song.durationMs);
       lines.replaceChildren(...lineItems(song));
+      sideLines?.replaceChildren(...lineItems(song));
+      sideFollower?.release();
+      last.sideShown = false; // placed at once on the new lines once they show
       follower?.release();
       // Back to the top for the new lines, then the first placement on them is instant (set
       // after, as glide() spends it).
@@ -481,11 +498,13 @@ function bindReplica(root: HTMLElement, player: Player) {
       }
       const line = currentLineIndex(song, s.positionMs);
       if (line !== last.line) {
-        $$<HTMLButtonElement>(lines, ".line").forEach((b, i) => {
-          b.dataset.state = i < line ? "past" : i === line ? "current" : "next";
-          if (i === line) b.setAttribute("aria-current", "true");
-          else b.removeAttribute("aria-current");
-        });
+        for (const list of sideLines ? [lines, sideLines] : [lines]) {
+          $$<HTMLButtonElement>(list, ".line").forEach((b, i) => {
+            b.dataset.state = i < line ? "past" : i === line ? "current" : "next";
+            if (i === line) b.setAttribute("aria-current", "true");
+            else b.removeAttribute("aria-current");
+          });
+        }
         if (s.view === "lyrics") glide(line);
         last.line = line;
       }
@@ -532,12 +551,66 @@ function bindReplica(root: HTMLElement, player: Player) {
       last.queueOpen = s.queueOpen;
       last.sideOpen = s.sideOpen;
     }
-    if (s.queueTab !== last.queueTab) {
-      root.dataset.queueTab = s.queueTab;
-      setAll(root, "[data-tab]", (el) => el.setAttribute("aria-selected", String(el.dataset.tab === s.queueTab)));
-      setAll(root, "[data-tab-panel]", (el) => (el.hidden = el.dataset.tabPanel !== s.queueTab));
-      last.queueTab = s.queueTab;
+    // The tabs: while the full lyrics view shows the lines (or with lyrics off) the Lyrics tab
+    // steps aside and Up next takes its place; the visitor's tab comes back after, as the app's.
+    const lyricsTab = s.lyricsOn && !(s.view === "lyrics" && hasLyrics);
+    const tab: QueueTab = s.queueTab === "lyrics" && !lyricsTab ? "next" : s.queueTab;
+    const tabs = `${tab}|${lyricsTab}`;
+    if (tabs !== last.tabs) {
+      // The tab count changing resizes the pill: it jumps to its place rather than glide
+      // there from where the old width put it.
+      const pill = $(root, ".tab-pill");
+      const recount = last.tabs !== undefined && last.tabs.endsWith(String(!lyricsTab));
+      if (pill && recount) pill.style.transition = "none";
+      root.dataset.queueTab = tab;
+      root.dataset.lyricsTab = String(lyricsTab);
+      if (pill && recount) {
+        void pill.offsetWidth;
+        pill.style.transition = "";
+      }
+      setAll(root, "[data-tab]", (el) => {
+        el.setAttribute("aria-selected", String(el.dataset.tab === tab));
+        if (el.dataset.tab === "lyrics") el.hidden = !lyricsTab;
+      });
+      setAll(root, "[data-tab-panel]", (el) => (el.hidden = el.dataset.tabPanel !== tab));
+      keepFocus(".queue [data-tab='next']");
+      last.tabs = tabs;
     }
+
+    // Up next: the song playing, pinned, then the songs after it in the queue; Clear drops
+    // those, and then there's nothing up next.
+    const at = song ? songs.findIndex((x) => x.id === song.id) : -1;
+    const queue = `${at}|${s.queueEnd}`;
+    if (queue !== last.queue) {
+      setAll(root, '[data-tab-panel="next"] [data-row]', (row) => {
+        const i = songs.findIndex((x) => x.id === row.dataset.row);
+        const li = row.closest("li");
+        if (li) li.hidden = i < at || i >= s.queueEnd;
+      });
+      const none = at + 1 >= s.queueEnd;
+      setAll(root, "[data-up-empty]", (el) => (el.hidden = !none));
+      setAll(root, '[data-act="clear"]', (el) => el.setAttribute("aria-disabled", String(none)));
+      keepFocus('[data-act="clear"]');
+      last.queue = queue;
+    }
+
+    // The Lyrics tab's lines follow the song while they're on screen; placed at once when the
+    // tab opens (hidden, they have no layout to follow by).
+    // The panel is narrower over a page than beside Now playing, so the lines re-wrap there:
+    // a move between the two places them again too.
+    const onNow = isNowView(s.view);
+    const sideShown = !!sideFollower && hasLyrics && tab === "lyrics" && !s.minimised && (onNow ? s.sideOpen : s.queueOpen);
+    if (sideShown && song && sideLines) {
+      const line = currentLineIndex(song, s.positionMs);
+      const fresh = !last.sideShown || onNow !== last.sideOnNow;
+      if (fresh || line !== last.sideLine) {
+        const li = line >= 0 ? (sideLines.children[line] as HTMLElement | undefined) : undefined;
+        sideFollower!.follow(li ?? null, fresh);
+        last.sideLine = line;
+      }
+    }
+    last.sideShown = sideShown;
+    last.sideOnNow = onNow;
 
     const history = s.history.join();
     if (history !== last.history) {

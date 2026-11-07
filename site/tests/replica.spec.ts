@@ -79,6 +79,78 @@ test('a song without lyrics keeps the cover view, and the pill says "No lyrics"'
   await expect(r.locator("[data-np-album]")).toHaveText("The Beautiful Machine · 2014");
 });
 
+test("the side panel's Lyrics tab follows the song beside the cover, and steps aside for the full view", async ({ page }) => {
+  await page.goto("/");
+  await wake(page);
+  await skipTour(page);
+  const r = replica(page);
+  const tab = r.getByRole("tab", { name: "Lyrics" });
+  // The full lyrics view shows the lines: no Lyrics tab beside them.
+  await expect(tab).toBeHidden();
+  await r.locator(".lyrics-pill").click();
+  await tab.click();
+  await expect(tab).toHaveAttribute("aria-selected", "true");
+  const side = r.locator("[data-side-lyrics]");
+  await expect(side).toBeVisible();
+  await expect(side.locator('.line[aria-current="true"]')).toHaveText("So let me shake away the cloudy skies");
+  // A line there seeks too.
+  await side.getByRole("button", { name: "With a California lullabye" }).click();
+  await expect(r.locator("[data-bar-time]")).toHaveText("0:25");
+  // The lines follow: the song's last line, sung, is moved up into the card.
+  await r.locator("[data-seek]").evaluate((el: HTMLInputElement) => {
+    el.value = "50000";
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  const lastLine = side.locator(".line").last();
+  await expect(lastLine).toHaveAttribute("aria-current", "true");
+  await expect
+    .poll(async () => {
+      const shift = await side
+        .locator("[data-side-lines]")
+        .evaluate((list) => -new DOMMatrixReadOnly(getComputedStyle(list).transform).m42);
+      const [box, line] = await Promise.all([side.boundingBox(), lastLine.boundingBox()]);
+      return shift > 0 && !!box && !!line && line.y >= box.y && line.y + line.height <= box.y + box.height;
+    })
+    .toBe(true);
+  // Back to the full view: Up next takes the tab's place; the tab comes back after.
+  await r.locator(".lyrics-pill").click();
+  await expect(tab).toBeHidden();
+  await expect(r.getByRole("tab", { name: "Up next" })).toHaveAttribute("aria-selected", "true");
+  await r.locator(".lyrics-pill").click();
+  await expect(tab).toHaveAttribute("aria-selected", "true");
+  // A song without lyrics: the tab says so.
+  await r.locator('.bar [data-act="previous"]').click();
+  await r.locator('.bar [data-act="previous"]').click();
+  await expect(r.locator("[data-bar-title]")).toHaveText("In This Moment");
+  await expect(r.locator(".side-none")).toContainText("No lyrics for this song");
+  await expect(side).toBeHidden();
+});
+
+test("Up next pins the song playing over the songs after it, and Clear leaves nothing up next", async ({ page }) => {
+  await page.goto("/");
+  await wake(page);
+  await skipTour(page);
+  const r = replica(page);
+  const next = r.locator('[data-tab-panel="next"]');
+  const rows = next.locator("[data-row]");
+  await r.locator('.bar [data-act="next"]').click();
+  await expect(r.locator("[data-bar-title]")).toHaveText("Invisible Light");
+  // California Lullabye is behind it now.
+  await expect(rows.filter({ visible: true })).toHaveCount(5);
+  await expect(rows.filter({ visible: true }).first()).toHaveAttribute("aria-current", "true");
+  const clear = next.getByRole("button", { name: "Clear" });
+  await clear.click();
+  await expect(rows.filter({ visible: true })).toHaveCount(1);
+  await expect(next.getByText("Nothing up next")).toBeVisible();
+  await expect(clear).toHaveAttribute("aria-disabled", "true");
+  // A song from the demo's list queues all of it again.
+  await r.getByRole("button", { name: "Back", exact: true }).click();
+  await r.locator(".cards").getByRole("button", { name: "Play Origami" }).first().click();
+  await r.locator('.bar [data-act="queue"]').click();
+  await expect(rows.filter({ visible: true })).toHaveCount(2);
+  await expect(clear).toHaveAttribute("aria-disabled", "false");
+});
+
 test("on Now playing, Up next hides and shows the side panel, and Playing from opens it", async ({ page }) => {
   await page.goto("/");
   await wake(page);

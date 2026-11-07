@@ -1052,11 +1052,14 @@
   &:not([data-view="now"], [data-view="lyrics"]) .queue {
     animation: queue-in var(--t-panel) var(--ease-drawer);
   }
-  /* The tabs: the pill glides from tab to tab (Curves.glide over t-morph). */
+  /* The tabs: the pill glides from tab to tab (Curves.glide over t-morph). Three, or two
+     while the full lyrics view has the Lyrics tab step aside. */
   .tabs {
+    --tabs: 2;
     position: relative;
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
     height: 40px;
     padding: 4px;
     margin: 0 8px;
@@ -1067,14 +1070,20 @@
     position: absolute;
     left: 4px;
     top: 4px;
-    width: calc(50% - 4px);
+    width: calc((100% - 8px) / var(--tabs));
     height: 32px;
     border-radius: 999px;
     background: var(--accent-tonal);
     transition: transform 240ms var(--ease-glide);
   }
+  &[data-lyrics-tab="true"] .tabs {
+    --tabs: 3;
+  }
   &[data-queue-tab="related"] .tab-pill {
     transform: translateX(100%);
+  }
+  &[data-queue-tab="lyrics"] .tab-pill {
+    transform: translateX(200%);
   }
   @media (prefers-reduced-motion: reduce) {
     .tab-pill {
@@ -1118,6 +1127,7 @@
   }
   .from {
     display: grid;
+    grid-template-columns: 1fr auto;
     padding: 18px 8px 12px;
   }
   .from-l {
@@ -1125,12 +1135,114 @@
     font-size: 12px;
   }
   .from-t {
+    grid-row: 2;
     font-weight: 700;
+  }
+  /* Clear (queue_panel.slint TextButton): quiet text, s3 from the panel's edge, level with the
+     header; the hover and press overlays; at 40 % with nothing up next. */
+  .clear {
+    grid-row: 1 / 3;
+    grid-column: 2;
+    align-self: center;
+    height: 32px;
+    margin-right: -12px;
+    padding: 0 12px;
+    border-radius: 10px;
+    color: var(--text2);
+    font-weight: 600;
+    transition:
+      background-color var(--t-hover) ease,
+      color var(--t-hover) ease;
+  }
+  .clear:hover {
+    background: var(--hover);
+    color: var(--text);
+  }
+  .clear:active {
+    background: var(--pressed);
+  }
+  .clear[aria-disabled="true"] {
+    opacity: 0.4;
+    background: none;
+    color: var(--text2);
+    cursor: default;
+  }
+  /* The song playing is pinned above the songs after it, s2 apart. */
+  [data-tab-panel="next"] .row[aria-current="true"] {
+    margin-bottom: 8px;
+  }
+  .up-empty {
+    display: flex;
+    align-items: center;
+    height: 56px;
+    padding: 0 8px;
+    color: var(--text3);
   }
   .similar {
     padding: 14px 8px 10px;
     color: var(--text3);
     font-size: 12px;
+  }
+  /* The Lyrics tab (lyrics.slint LyricsView as a card): from 64 px down, the cover's panel s4
+     in from the panel's sides and s2 above the bar's room, r-l round; the lines at
+     t-lyric-side (20 px, a 28 px row) s5 in, their hover tile s3 further out. They dissolve
+     over 24 px at the card's edges, inside it. */
+  .side-tab {
+    flex: 1;
+    padding: 12px 0 8px;
+  }
+  .side-card {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    border-radius: 16px;
+    background: var(--stage);
+    overflow: clip;
+    transition: background-color var(--t-colour) ease;
+  }
+  .side-lyrics {
+    --lyric: 20px;
+    --lyric-row: 28px;
+    position: absolute;
+    inset: 0 12px;
+    overflow: clip;
+    container-type: size;
+    mask-image: linear-gradient(transparent, #000 24px, #000 calc(100% - 24px), transparent); /* taste-skill-ignore: the app's own UI */
+  }
+  /* No lyrics (NoLyrics): on the panel's own ground, s5 in, a tile with the microphone, what
+     happened in the display face at t-display-xs, and where featherplay looked. */
+  .side-none {
+    display: none;
+    justify-items: start;
+    padding: 12px 8px 0;
+  }
+  &[data-has-lyrics="false"] .side-card {
+    display: none;
+  }
+  &[data-has-lyrics="false"] .side-none {
+    display: grid;
+  }
+  .side-none-tile {
+    display: grid;
+    place-items: center;
+    width: 56px;
+    height: 56px;
+    border-radius: 16px;
+    background: var(--card-bg);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, #00000014 calc(var(--light) * 100%), #ffffff0d); /* taste-skill-ignore: the app's own UI */
+    color: var(--text2);
+  }
+  .side-none-h {
+    margin-top: 16px;
+    font-family: var(--font);
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.3;
+  }
+  .side-none-why {
+    margin-top: 8px;
+    color: var(--text2);
   }
   .rows {
     display: grid;
