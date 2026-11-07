@@ -153,6 +153,8 @@ into one program that opens at once and stays quiet while it plays.
 
 ### Find your music
 
+- **No account needed to listen.** Search, artists, albums, public playlists, Home, Explore,
+  radio and lyrics work signed out. Sign in for your library, likes and history.
 - **Home, Explore and History.** Your Home shelves, new releases, charts, moods and genres,
   and what you played recently, including on other devices.
 - **Your library.** Liked songs, your playlists and saved ones, albums and artists, in the
@@ -172,6 +174,8 @@ into one program that opens at once and stays quiet while it plays.
 - **Synced lyrics.** Lines follow the song in its cover's colour, and a click on a line jumps
   there. They come from LRCLIB or YouTube Music, and only while lyrics are on screen; turn
   Show lyrics off and featherplay never looks them up.
+- **Opus where there is one.** Songs play YouTube Music's Opus stream, which sounds better than
+  AAC at about the same data use; Settings > Streaming quality switches to AAC.
 - **Songs, not videos.** featherplay never plays video. When a music video has a song version,
   the song plays, so there are no skits or intros, and radio leaves out user uploads and
   podcast episodes. SponsorBlock skips the talking in the music videos that remain.
@@ -199,7 +203,10 @@ into one program that opens at once and stays quiet while it plays.
 
 - **Scrobbling** to Last.fm, ListenBrainz or both, with clean titles and artists. Plays that
   couldn't be sent wait and go later.
-- **Discord status** shows what you're playing, off until you turn it on.
+- **Discord status** shows what you're playing, off until you turn it on. Settings shows a
+  preview of what your friends see.
+- **Stream overlays.** A [local API](#local-api) for Stream Deck, overlays and scripts, and
+  [Amuse](#amuse) support; both are off until you turn them on.
 - **Accounts.** Switch between your Google accounts and their brand channels from the
   account menu.
 
@@ -362,8 +369,8 @@ playing. It only reads: there are no controls.
 code is public. It's still an unofficial client using YouTube Music in a way Google doesn't
 support; if that worries you, sign in with a second account.
 
-**I don't want to type my Google password into an app's window.** Choose **Sign in with
-Microsoft Edge** on the sign-in page. You sign in in Edge itself, with its own address bar,
+**I don't want to type my Google password into an app's window.** Choose **Use Microsoft
+Edge** on the sign-in page. You sign in in Edge itself, with its own address bar,
 passkeys and Windows Hello, in a temporary profile that's deleted afterwards. featherplay
 doesn't read your password; the code is open.
 

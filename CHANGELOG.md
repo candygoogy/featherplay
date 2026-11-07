@@ -8,6 +8,9 @@ Notable changes to featherplay, newest first. The format follows
 
 ### Added
 
+- Opus playback. Songs play the Opus stream (about 130-140 kbps) when there is one, which
+  sounds better than AAC at about the same data use. A **Streaming quality** setting
+  chooses: High (Opus) by default, or Standard (AAC at 128 kbps).
 - featherplay works without signing in. Search (every tab), artists, albums, public
   playlists, Home, Explore, radio, lyrics and playback all work signed out, and the app
   starts on Home rather than the sign-in page. The library, Liked songs and History ask you
@@ -32,9 +35,35 @@ Notable changes to featherplay, newest first. The format follows
 - The sign-in window has a slim browser frame: back, reload, and a read-only address with
   a padlock for https, the real host in full and "Google's page" on Google's own sign-in
   hosts. The address comes from WebView2, never from the page. A link that would open a
-  new window opens in this one, under the same address.
+  new window opens in this one, under the same address. It opens centred over the page and
+  fits short screens.
+- The sign-in page has no search bar and sits in the middle of the space beside Up next.
+  **Why?** and **Paste a cookie header** ease open, and a way in that fails says what
+  happened and offers **Try again**, instead of a technical message.
+- Signed out, Library, History and Liked songs show the same sign-in card in the same
+  place, and the sidebar has a small card to sign in from.
+- Now playing shows "Playing from" at the top (click it to open the album, playlist or
+  Up next), the song's buttons beside the title, and the artists and the album with its
+  year on lines of their own. Long titles take two lines, and in small windows the title
+  steps down a size so nothing crowds the player bar.
+- A song with no lyrics keeps the cover view: the Lyrics button says "No lyrics" and the
+  Lyrics tab says where featherplay looked. After a failed lookup, both offer to try again.
+- Discord has a group of its own in Settings, its options beside a preview card with your
+  account photo, the status and the activity as your friends see them. Hovering an option
+  lights the part of the card it changes. The Play song button shows to your friends only:
+  Discord hides it from you, and the card says so. The local API moved to a Local API group.
 
 ### Fixed
+
+- Songs start sooner. The stream links YouTube sends before a short ad are no longer taken
+  as refused: featherplay waits the few seconds out in the background, and for a song you
+  click it races yt-dlp so the first that plays wins. Songs ahead in the queue are prepared
+  in play order.
+- yt-dlp's daily update ran at every start instead of once a day.
+- The tray's mini player closes when you click the taskbar or another app, and no longer
+  closes by itself right after opening, or when you press its buttons.
+- featherplay starts and plays nothing, instead of exiting, when the sound device can't be
+  opened.
 
 - A search tab with no results says so instead of "The music service sent something
   unexpected".
@@ -48,8 +77,7 @@ Notable changes to featherplay, newest first. The format follows
 - Resizing the window by its edge keeps up with the pointer better: on a 4K screen each step
   of the drag takes a third to over half less time than before.
 - featherplay starts on a Windows without the Visual C++ Redistributable: the installer
-  brings the runtime it needs, and winget installs it first. The portable exe still needs
-  it (Scoop suggests it).
+  brings the runtime it needs. The portable exe still needs it (Scoop suggests it).
 
 ## [0.1.1] - 2026-11-04
 
