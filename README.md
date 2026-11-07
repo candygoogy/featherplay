@@ -175,7 +175,7 @@ into one program that opens at once and stays quiet while it plays.
   there. They come from LRCLIB or YouTube Music, and only while lyrics are on screen; turn
   Show lyrics off and featherplay never looks them up.
 - **Opus where there is one.** Songs play YouTube Music's Opus stream, which sounds better than
-  AAC at about the same data use; Settings > Streaming quality switches to AAC.
+  AAC at about the same data use; Settings > Sound > Streaming quality switches to AAC.
 - **Songs, not videos.** featherplay never plays video. When a music video has a song version,
   the song plays, so there are no skits or intros, and radio leaves out user uploads and
   podcast episodes. SponsorBlock skips the talking in the music videos that remain.
@@ -289,7 +289,9 @@ Pear's plugins become settings here. This is what exists today.
 | Precise Volume | Later. |
 | Album Actions, Skip Disliked Songs | Later. |
 | Picture-in-picture, Ambient Mode, Transparent Player, Clock | Later. |
-| Crossfade, Equalizer, Skip Silences, Audio Compressor, Visualizer | Later. |
+| Equalizer | **Built in**, off by default (Settings > Sound): five bands with Bass, Treble and Vocal presets, or your own. |
+| Audio Compressor | **Built in**, off by default, as "Even out loudness" (Settings > Sound): Light, or Strong with Pear's settings. |
+| Crossfade, Skip Silences, Visualizer | Later. |
 | Playback Speed | Later. |
 | API Server | **Built in**, off by default, as the [local API](#local-api): Pear's port, routes and WebSocket, with a token from Settings. |
 | Amuse | **Built in**, off by default: [the same endpoint](#amuse) on port 9863, for the Amuse widget. |

@@ -7,8 +7,8 @@ use featherplay_core::model::{
 };
 use featherplay_store::settings::SCHEMA;
 use featherplay_store::{
-    Accent, AccentColour, CloseAction, DiscordOptions, DiscordStatusText, DiscordTime, Hotkeys,
-    Paths, Settings, StreamingQuality, ThemeMode, load_session, save_session,
+    Accent, AccentColour, CloseAction, DiscordOptions, DiscordStatusText, DiscordTime, Equalizer,
+    Hotkeys, Loudness, Paths, Settings, StreamingQuality, ThemeMode, load_session, save_session,
 };
 
 use crate::home::{self, TestHome};
@@ -68,6 +68,9 @@ fn settings_defaults_when_missing() {
             skip_disliked: true,
             streaming_quality: StreamingQuality::High,
             tray_click_opens_window: false,
+            equalizer: Equalizer::Off,
+            equalizer_bands: [0; 5],
+            loudness: Loudness::Off,
         }
     );
     assert_eq!(s, Settings::default());
@@ -130,6 +133,9 @@ fn settings_roundtrip() {
         skip_disliked: false,
         streaming_quality: StreamingQuality::Standard,
         tray_click_opens_window: true,
+        equalizer: Equalizer::Custom,
+        equalizer_bands: [6, -2, 0, 3, 12],
+        loudness: Loudness::Light,
     };
     s.save(&p).unwrap();
     assert!(p.config.join("settings.toml").is_file());
@@ -780,6 +786,57 @@ fn streaming_quality_round_trips_as_lowercase() {
     }
     let text = fs::read_to_string(p.config.join("settings.toml")).unwrap();
     assert!(text.contains("streaming_quality = \"standard\""), "{text}");
+}
+
+#[test]
+fn the_sound_settings_round_trip_and_load_off_or_flat_when_unknown() {
+    let Some(home) = TestHome::new("settings-sound") else {
+        return;
+    };
+    let p = home.paths();
+    let s = Settings {
+        equalizer: Equalizer::Vocal,
+        equalizer_bands: [-12, 0, 4, 0, 1],
+        loudness: Loudness::Strong,
+        ..Settings::default()
+    };
+    s.save(&p).unwrap();
+    assert_eq!(Settings::load(&p), s);
+    let text = fs::read_to_string(p.config.join("settings.toml")).unwrap();
+    assert!(text.contains("equalizer = \"vocal\""), "{text}");
+    assert!(text.contains("loudness = \"strong\""), "{text}");
+
+    // Out of range bands load clamped; anything but five numbers loads flat. An unknown
+    // choice loads as Off. The rest of the file still counts.
+    let file = p.config.join("settings.toml");
+    for (bands, want) in [
+        ("[20, -30, 1, 2, 3]", [12, -12, 1, 2, 3]),
+        ("[1, 2, 3]", [0; 5]),
+        ("\"loud\"", [0; 5]),
+        ("[1, 2, \"x\", 4, 5]", [0; 5]),
+    ] {
+        fs::write(
+            &file,
+            format!(
+                "equalizer = \"party\"\nequalizer_bands = {bands}\nloudness = 3\nvolume = 0.5\n"
+            ),
+        )
+        .unwrap();
+        let s = Settings::load(&p);
+        assert_eq!(s.equalizer_bands, want, "{bands}");
+        assert_eq!((s.equalizer, s.loudness), (Equalizer::Off, Loudness::Off));
+        assert_eq!(s.volume, 0.5, "{bands}");
+    }
+}
+
+#[test]
+fn the_equalizer_presets_give_their_bands() {
+    let custom = [1, 2, 3, 4, 5];
+    assert_eq!(Equalizer::Off.bands(custom), None);
+    assert_eq!(Equalizer::Bass.bands(custom), Some([8, 0, 0, 0, 0]));
+    assert_eq!(Equalizer::Treble.bands(custom), Some([0, 0, 0, 3, 6]));
+    assert_eq!(Equalizer::Vocal.bands(custom), Some([0, -2, 3, 4, 0]));
+    assert_eq!(Equalizer::Custom.bands(custom), Some(custom));
 }
 
 #[test]

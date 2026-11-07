@@ -110,6 +110,9 @@ pub const PAGES: &[&str] = &[
     "settings-scripts",
     // Settings with the local API on and running, its port and masked token.
     "settings-local-api",
+    // Settings with the Sound rows on (Bass, Light), and with the Equalizer's bands open.
+    "settings-sound",
+    "settings-equalizer",
     "about",
     // About's version row while a check runs; up to date (checked 2 hours ago); after a
     // check failed offline, rate limited, or with an HTTP error.
@@ -702,6 +705,10 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
         crate::pages::settings::show_local_api_for_snapshot(ctx);
         settle();
     }
+    if o.page == "settings-sound" || o.page == "settings-equalizer" {
+        crate::pages::settings::show_sound_for_snapshot(ctx, o.page == "settings-equalizer");
+        settle();
+    }
     if o.page == "now-playing-menu" {
         let (x, y, top) = now_playing_menu_anchor(ui);
         crate::pages::now_playing::show_menu(ctx, x, y, top);
@@ -985,7 +992,9 @@ fn page(name: &str, f: &Fixtures) -> Result<Page, String> {
         | "settings-idle"
         | "settings-long"
         | "settings-scripts"
-        | "settings-local-api" => Page::Settings,
+        | "settings-local-api"
+        | "settings-sound"
+        | "settings-equalizer" => Page::Settings,
         p if p == "about" || p.starts_with("about-") => Page::About,
         "sign-in"
         | "sign-in-expired"

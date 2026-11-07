@@ -13,6 +13,12 @@ Notable changes to featherplay, newest first. The format follows
   download didn't finish (it's tried again an hour later), and when the last update didn't
   install, and it links to what's new. A Scoop install shows `scoop update featherplay`.
   A long session checks again, once a day, when you resume playback or reopen the window.
+- An equalizer and "Even out loudness", in a new **Sound** section of Settings, both off by
+  default. The equalizer has five bands (60 Hz to 12 kHz, ±12 dB) with Bass, Treble and
+  Vocal presets, and Custom… opens the bands; boosts turn the overall level down a little,
+  so nothing distorts. Even out loudness is a compressor, Light or Strong (Pear's Audio
+  Compressor settings). Both apply while a song plays. Streaming quality and Output device
+  moved to Sound too.
 
 ### Fixed
 

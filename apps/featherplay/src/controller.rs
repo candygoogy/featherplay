@@ -26,7 +26,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, OnceLock};
 use std::time::{Duration, Instant, SystemTime};
 
-use featherplay_audio::{AudioEngine, AudioEvent, StreamSource};
+use featherplay_audio::{AudioEngine, AudioEvent, Compressor, StreamSource};
 use featherplay_core::model::{LikeStatus, PlaylistId, RepeatMode, Track, TrackId};
 use featherplay_core::player::{Effect, Input, ListEnd, PlaybackPrefs, Player, Status, StreamInfo};
 use featherplay_core::scrobble::Alternates;
@@ -34,7 +34,7 @@ use featherplay_core::tr;
 use featherplay_integrations::sponsorblock::{self, Segment};
 use featherplay_integrations::{NowPlaying, UiCommand, notify_track};
 use featherplay_store::{
-    Paths, SecretKey, Settings, StreamingQuality, get_secret, load_session, save_session,
+    Loudness, Paths, SecretKey, Settings, StreamingQuality, get_secret, load_session, save_session,
 };
 use featherplay_streams::{
     Downloads, Quality, ResolveError, ResolvedStream, Sidecars, YtDlpResolver,
@@ -464,6 +464,9 @@ impl Controller {
     /// Runs until Ctrl+C or `UiCommand::Quit`, then saves the session.
     pub async fn run(mut self) {
         self.audio.set_volume(self.slider_volume());
+        self.audio.set_equalizer(equalizer_bands(&self.settings));
+        self.audio
+            .set_compressor(compressor(self.settings.loudness));
         self.restore_streams();
         // Unreachable keeps the signed-in look: the session is likely fine, and signed out
         // would send the window to Sign in.
@@ -1289,6 +1292,22 @@ fn stream_quality(q: StreamingQuality) -> Quality {
     match q {
         StreamingQuality::High => Quality::High,
         StreamingQuality::Standard => Quality::Standard,
+    }
+}
+
+/// The bands the audio bus plays for the Equalizer setting, in dB; `None` when off.
+fn equalizer_bands(s: &Settings) -> Option<[f32; 5]> {
+    s.equalizer
+        .bands(s.equalizer_bands)
+        .map(|b| b.map(f32::from))
+}
+
+/// The audio bus's compressor for the "Even out loudness" setting.
+fn compressor(l: Loudness) -> Compressor {
+    match l {
+        Loudness::Off => Compressor::Off,
+        Loudness::Light => Compressor::Light,
+        Loudness::Strong => Compressor::Strong,
     }
 }
 

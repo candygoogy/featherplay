@@ -18,10 +18,10 @@ use featherplay_core::tr;
 use featherplay_integrations::local_api::{AMUSE_PORT, Token};
 use featherplay_integrations::{NowPlaying, discord, parse_hotkey};
 use featherplay_store::{
-    Accent, AccentColour, CloseAction, DiscordOptions, DiscordStatusText, DiscordTime, Hotkeys,
-    Paths, Settings, StreamingQuality, ThemeMode,
+    Accent, AccentColour, CloseAction, DiscordOptions, DiscordStatusText, DiscordTime, Equalizer,
+    Hotkeys, Loudness, Paths, Settings, StreamingQuality, ThemeMode,
 };
-use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
+use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 
 use crate::app::Ctx;
 use crate::controller::{
@@ -258,6 +258,17 @@ pub fn init(ctx: &Rc<Ctx>) {
     data.on_pick_volume_step(move |i| pick_volume_step(&c, i));
     let c = ctx.clone();
     data.on_pick_streaming_quality(move |i| pick_streaming_quality(&c, i));
+    // One model for the dialog's bands, updated row by row, so a band keeps its focus
+    // while it moves.
+    data.set_eq_bands(ModelRc::new(VecModel::from(vec![0; 5])));
+    let c = ctx.clone();
+    data.on_pick_equalizer(move |i| pick_equalizer(&c, i));
+    let c = ctx.clone();
+    data.on_eq_band_moved(move |band, db| eq_band_moved(&c, band, db));
+    let c = ctx.clone();
+    data.on_eq_reset(move || set_equalizer(&c, Equalizer::Off, [0; 5]));
+    let c = ctx.clone();
+    data.on_pick_loudness(move |i| pick_loudness(&c, i));
 }
 
 /// The page is being shown: refresh the devices and the Last.fm state.
@@ -717,6 +728,8 @@ fn show(ctx: &Ctx) {
     data.set_skip_non_music(s.skip_non_music_in_radio);
     data.set_autoplay(s.autoplay);
     show_volume_step(ctx, s.volume_step);
+    show_equalizer(&data, &s);
+    data.set_loudness(loudness_index(s.loudness));
     data.set_streaming_quality(streaming_quality_index(s.streaming_quality));
     data.set_skip_disliked(s.skip_disliked);
     data.set_sponsorblock(s.sponsorblock);
@@ -862,6 +875,118 @@ fn pick_volume_step(ctx: &Ctx, i: i32) {
     show_volume_step(ctx, step);
     if SETTINGS.with(|s| s.borrow().volume_step != step) {
         commit(ctx, Change::VolumeStep(step));
+    }
+}
+
+/// Shows the Equalizer row's choice, and the bands it plays (all 0 dB when off) for the
+/// dialog.
+fn show_equalizer(data: &SettingsData, s: &Settings) {
+    data.set_equalizer(
+        Equalizer::ALL
+            .iter()
+            .position(|&e| e == s.equalizer)
+            .unwrap_or(0) as i32,
+    );
+    let bands = s.equalizer.bands(s.equalizer_bands).unwrap_or_default();
+    let model = data.get_eq_bands();
+    let Some(rows) = model.as_any().downcast_ref::<VecModel<i32>>() else {
+        return;
+    };
+    for (i, &db) in bands.iter().enumerate() {
+        if rows.row_data(i) != Some(i32::from(db)) {
+            rows.set_row_data(i, i32::from(db));
+        }
+    }
+}
+
+/// The Equalizer chip at `i`. Custom… opens the bands as they play now; from Off or a preset
+/// it brings back the user's own bands first, if they set any, so a preset tried in between
+/// doesn't cost them.
+fn pick_equalizer(ctx: &Ctx, i: i32) {
+    let Some(&choice) = usize::try_from(i).ok().and_then(|i| Equalizer::ALL.get(i)) else {
+        return;
+    };
+    let (now, custom) = SETTINGS.with(|s| {
+        let s = s.borrow();
+        (s.equalizer, s.equalizer_bands)
+    });
+    if choice != Equalizer::Custom {
+        set_equalizer(ctx, choice, custom);
+        return;
+    }
+    if now != Equalizer::Custom && custom != [0; 5] {
+        set_equalizer(ctx, Equalizer::Custom, custom);
+    }
+    open_dialog(ctx, SettingsDialog::Equalizer);
+}
+
+/// A band in the dialog moved to `db`: the bands playing now, with that one changed,
+/// become the Custom bands.
+fn eq_band_moved(ctx: &Ctx, band: i32, db: i32) {
+    let mut bands = SETTINGS.with(|s| {
+        let s = s.borrow();
+        s.equalizer.bands(s.equalizer_bands).unwrap_or_default()
+    });
+    let Some(slot) = usize::try_from(band).ok().and_then(|b| bands.get_mut(b)) else {
+        return;
+    };
+    let max = i32::from(Equalizer::MAX_DB);
+    *slot = db.clamp(-max, max) as i8;
+    set_equalizer(ctx, Equalizer::Custom, bands);
+}
+
+/// Shows and saves the Equalizer's choice and Custom bands; the controller applies them.
+fn set_equalizer(ctx: &Ctx, choice: Equalizer, custom: [i8; 5]) {
+    let same = SETTINGS.with(|s| {
+        let s = s.borrow();
+        (s.equalizer, s.equalizer_bands) == (choice, custom)
+    });
+    if !same {
+        commit(ctx, Change::Equalizer(choice, custom));
+    }
+    if let Some(ui) = ctx.window() {
+        SETTINGS.with(|s| show_equalizer(&ui.global::<SettingsData>(), &s.borrow()));
+    }
+}
+
+/// The Even out loudness chips, in the page's order.
+const LOUDNESS: [Loudness; 3] = [Loudness::Off, Loudness::Light, Loudness::Strong];
+
+fn loudness_index(l: Loudness) -> i32 {
+    LOUDNESS.iter().position(|&x| x == l).unwrap_or(0) as i32
+}
+
+/// The Even out loudness chip at `i`, shown and saved; the controller applies it.
+fn pick_loudness(ctx: &Ctx, i: i32) {
+    let Some(&l) = usize::try_from(i).ok().and_then(|i| LOUDNESS.get(i)) else {
+        return;
+    };
+    let Some(ui) = ctx.window() else { return };
+    ui.global::<SettingsData>().set_loudness(loudness_index(l));
+    if SETTINGS.with(|s| s.borrow().loudness != l) {
+        commit(ctx, Change::Loudness(l));
+    }
+}
+
+/// `--snapshot settings-sound` and `settings-equalizer`: the Sound rows on (the Bass preset,
+/// Light), or the Equalizer dialog over the page with Custom bands. Shown only, not saved.
+pub fn show_sound_for_snapshot(ctx: &Rc<Ctx>, dialog: bool) {
+    let Some(ui) = ctx.window() else { return };
+    SETTINGS.with(|s| {
+        let mut s = s.borrow_mut();
+        if dialog {
+            s.equalizer = Equalizer::Custom;
+            s.equalizer_bands = [6, 2, 0, 3, 5];
+        } else {
+            s.equalizer = Equalizer::Bass;
+            s.loudness = Loudness::Light;
+        }
+    });
+    let data = ui.global::<SettingsData>();
+    SETTINGS.with(|s| show_equalizer(&data, &s.borrow()));
+    data.set_loudness(SETTINGS.with(|s| loudness_index(s.borrow().loudness)));
+    if dialog {
+        open_dialog(ctx, SettingsDialog::Equalizer);
     }
 }
 

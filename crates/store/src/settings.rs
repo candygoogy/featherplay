@@ -120,6 +120,66 @@ pub struct Settings {
     /// to 0.1.1 may also hold `mini_pinned`, the mini player's pin, kept between openings
     /// then; it's an unknown key now, so it's ignored and not written back.
     pub tray_click_opens_window: bool,
+    /// The equalizer (Settings > Sound): Off (the default), a preset, or the user's bands.
+    /// A value this build doesn't know loads as Off.
+    #[serde(deserialize_with = "lenient")]
+    pub equalizer: Equalizer,
+    /// The Custom equalizer's bands in dB (60 Hz, 250 Hz, 1 kHz, 4 kHz, 12 kHz), kept while
+    /// Off or a preset is picked. Values past ±12 load clamped; anything but five numbers
+    /// loads flat.
+    #[serde(deserialize_with = "lenient_bands")]
+    pub equalizer_bands: [i8; 5],
+    /// "Even out loudness", the compressor (Settings > Sound): Off (the default), Light or
+    /// Strong. A value this build doesn't know loads as Off.
+    #[serde(deserialize_with = "lenient")]
+    pub loudness: Loudness,
+}
+
+/// The Equalizer setting: off, one of three presets, or the user's own bands.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Equalizer {
+    #[default]
+    Off,
+    Bass,
+    Treble,
+    Vocal,
+    Custom,
+}
+
+impl Equalizer {
+    /// Every choice, in the order Settings shows them.
+    pub const ALL: [Equalizer; 5] = [
+        Equalizer::Off,
+        Equalizer::Bass,
+        Equalizer::Treble,
+        Equalizer::Vocal,
+        Equalizer::Custom,
+    ];
+    /// The most a band moves, in dB either way.
+    pub const MAX_DB: i8 = 12;
+
+    /// The bands in dB (60 Hz, 250 Hz, 1 kHz, 4 kHz, 12 kHz) this choice plays, with
+    /// `custom` as the Custom bands; `None` when off.
+    pub fn bands(self, custom: [i8; 5]) -> Option<[i8; 5]> {
+        match self {
+            Equalizer::Off => None,
+            Equalizer::Bass => Some([8, 0, 0, 0, 0]),
+            Equalizer::Treble => Some([0, 0, 0, 3, 6]),
+            Equalizer::Vocal => Some([0, -2, 3, 4, 0]),
+            Equalizer::Custom => Some(custom),
+        }
+    }
+}
+
+/// The "Even out loudness" setting: how hard the compressor works.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Loudness {
+    #[default]
+    Off,
+    Light,
+    Strong,
 }
 
 /// The Streaming quality setting. `High` asks for Opus (format 251) when a track has it and
@@ -284,6 +344,9 @@ impl Default for Settings {
             skip_disliked: true,
             streaming_quality: StreamingQuality::High,
             tray_click_opens_window: false,
+            equalizer: Equalizer::Off,
+            equalizer_bands: [0; 5],
+            loudness: Loudness::Off,
         }
     }
 }
@@ -396,6 +459,24 @@ where
         .and_then(|n| u8::try_from(n).ok())
         .filter(|step| Settings::VOLUME_STEPS.contains(step))
         .unwrap_or(Settings::VOLUME_STEP))
+}
+
+/// Reads the Custom equalizer's bands: five numbers, each clamped to ±12 dB, or flat when
+/// the value isn't five numbers.
+fn lenient_bands<'de, D>(d: D) -> Result<[i8; 5], D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value = toml::Value::deserialize(d)?;
+    let max = i64::from(Equalizer::MAX_DB);
+    let bands: Option<Vec<i8>> = value.as_array().and_then(|a| {
+        a.iter()
+            .map(|v| v.as_integer().map(|n| n.clamp(-max, max) as i8))
+            .collect()
+    });
+    Ok(bands
+        .and_then(|b| <[i8; 5]>::try_from(b).ok())
+        .unwrap_or_default())
 }
 
 fn file(p: &Paths) -> PathBuf {

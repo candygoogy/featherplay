@@ -28,12 +28,12 @@ use featherplay_core::tr;
 use featherplay_lastfm::{LastFm, LastFmError};
 use featherplay_listenbrainz::{ListenBrainz, ListenBrainzError};
 use featherplay_store::{
-    Accent, AccentColour, CloseAction, DiscordOptions, Hotkeys, SecretKey, Settings,
-    StreamingQuality, ThemeMode, delete_secret, get_secret, set_secret,
+    Accent, AccentColour, CloseAction, DiscordOptions, Equalizer, Hotkeys, Loudness, SecretKey,
+    Settings, StreamingQuality, ThemeMode, delete_secret, get_secret, set_secret,
 };
 use featherplay_ytm::{ApiError, Identity, YtMusic};
 
-use super::{Controller, Msg, UiEvent, prefs, stream_quality};
+use super::{Controller, Msg, UiEvent, compressor, equalizer_bands, prefs, stream_quality};
 use crate::catalog::Source;
 use crate::presence::{self, Presence};
 use crate::scrobbler::{LastfmKeys, Scrobblers, build_keys, lastfm_keys};
@@ -158,6 +158,10 @@ pub enum Change {
     StreamingQuality(StreamingQuality),
     /// A left click on the tray icon opens the main window (on) or the mini player (off).
     TrayClickOpensWindow(bool),
+    /// The equalizer's choice and the Custom bands (kept while another choice is picked).
+    Equalizer(Equalizer, [i8; 5]),
+    /// "Even out loudness", the compressor.
+    Loudness(Loudness),
 }
 
 impl Change {
@@ -205,6 +209,11 @@ impl Change {
             Change::VolumeStep(v) => s.volume_step = v,
             Change::StreamingQuality(v) => s.streaming_quality = v,
             Change::TrayClickOpensWindow(v) => s.tray_click_opens_window = v,
+            Change::Equalizer(v, bands) => {
+                s.equalizer = v;
+                s.equalizer_bands = bands;
+            }
+            Change::Loudness(v) => s.loudness = v,
         }
     }
 }
@@ -590,6 +599,9 @@ impl Controller {
             Change::SkipDisliked(_) => self.input(Input::SetPrefs(prefs(&self.settings))),
             // Streams already resolved keep their format.
             Change::StreamingQuality(q) => self.resolver.set_quality(stream_quality(q)),
+            // Heard within a device buffer, mid-song too.
+            Change::Equalizer(..) => self.audio.set_equalizer(equalizer_bands(&self.settings)),
+            Change::Loudness(l) => self.audio.set_compressor(compressor(l)),
             Change::Sponsorblock(false) => self.segments = None,
             Change::OutputDevice(name) => self.audio.set_device(name.as_deref()),
             Change::Scrobbling(_) | Change::Scrobble(_) | Change::ListenBrainz(_) => {
@@ -951,6 +963,7 @@ pub(crate) fn open_url(url: &str) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
+    use featherplay_audio::Compressor;
     use featherplay_core::player::ListEnd;
 
     use super::*;
@@ -1014,6 +1027,8 @@ mod tests {
             Change::SkipDisliked(false),
             Change::StreamingQuality(StreamingQuality::Standard),
             Change::TrayClickOpensWindow(true),
+            Change::Equalizer(Equalizer::Custom, [4, 0, -3, 0, 2]),
+            Change::Loudness(Loudness::Strong),
         ];
         for c in &changes {
             c.apply(&mut s);
@@ -1040,6 +1055,11 @@ mod tests {
         assert!(!s.skip_disliked);
         assert_eq!(s.streaming_quality, StreamingQuality::Standard);
         assert!(s.tray_click_opens_window);
+        assert_eq!(
+            (s.equalizer, s.equalizer_bands),
+            (Equalizer::Custom, [4, 0, -3, 0, 2])
+        );
+        assert_eq!(s.loudness, Loudness::Strong);
         assert!(!s.check_for_updates && !s.install_updates);
         assert_eq!(s.volume, d.volume, "the volume isn't a page setting");
     }
@@ -1060,6 +1080,27 @@ mod tests {
         s.skip_disliked = false;
         let off = crate::controller::prefs(&s).skip_disliked;
         assert_eq!((on, off), (true, false));
+    }
+
+    #[test]
+    fn the_sound_settings_reach_the_audio_bus() {
+        let mut s = Settings::default();
+        assert_eq!(crate::controller::equalizer_bands(&s), None);
+        assert_eq!(crate::controller::compressor(s.loudness), Compressor::Off);
+        s.equalizer = Equalizer::Bass;
+        s.equalizer_bands = [1, 1, 1, 1, 1];
+        assert_eq!(
+            crate::controller::equalizer_bands(&s),
+            Some([8.0, 0.0, 0.0, 0.0, 0.0])
+        );
+        assert_eq!(
+            crate::controller::compressor(Loudness::Light),
+            Compressor::Light
+        );
+        assert_eq!(
+            crate::controller::compressor(Loudness::Strong),
+            Compressor::Strong
+        );
     }
 
     #[test]
