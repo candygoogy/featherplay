@@ -285,7 +285,8 @@ Pear's plugins become settings here. This is what exists today.
 | Crossfade, Equalizer, Skip Silences, Audio Compressor, Visualizer | Later. |
 | Playback Speed | Later. |
 | API Server | **Built in**, off by default, as the [local API](#local-api): Pear's port, routes and WebSocket, with a token from Settings. |
-| Tuna OBS, Amuse, Lumia Stream | Not as such: overlays, bots and scripts can read the [local API](#local-api) instead. |
+| Amuse | **Built in**, off by default: [the same endpoint](#amuse) on port 9863, for the Amuse widget. |
+| Tuna OBS, Lumia Stream | Not as such: overlays, bots and scripts can read the [local API](#local-api) instead. |
 | Do Not Track, Auth Proxy | No: not needed. featherplay has no telemetry. |
 | Video Quality Changer, Captions Selector | No: there is no video. |
 | Music Together | No. |
@@ -330,6 +331,22 @@ It answers this PC only: it listens on 127.0.0.1 (and ::1), and refuses requests
 isn't that address and port, and requests from web pages (an `Origin` other than `null` or
 `file://`). It sends no CORS headers, so a page in a browser can't read it. A browser overlay
 needs a helper on the PC that talks to the API for it.
+
+### Amuse
+
+For 6K Labs' Amuse now-playing widget, turn on **Amuse** in Settings >
+Local API. featherplay then answers on `http://127.0.0.1:9863` as Pear's Amuse plugin does:
+`GET /query` (or `/api`) returns the song.
+
+```json
+{ "player": { "hasSong": true, "isPaused": false, "seekbarCurrentPosition": 42 },
+  "track": { "title": "…", "author": "…", "duration": 215, "cover": "https://…",
+             "url": "https://music.youtube.com/watch?v=…", "id": "…", "isAdvertisement": false } }
+```
+
+Times are whole seconds. Like Pear's plugin, it needs no token and answers web pages too, so
+while it's on, any app on this PC, and any website open in a browser on it, can see what's
+playing. It only reads: there are no controls.
 
 ## What it leaves out
 
@@ -387,7 +404,9 @@ featherplay sends no telemetry and has no server. It connects to:
 - **Discord**, only if you turn on the status, through the Discord app on your own PC.
 
 The [local API](#local-api), off by default, sends nothing anywhere: it listens on 127.0.0.1
-for apps on your PC that have its token.
+for apps on your PC that have its token. The [Amuse](#amuse) endpoint, off by default too,
+has no token: while it's on, any app on your PC, and any website open in a browser on it, can
+see what's playing.
 
 Your YouTube Music session, your Last.fm session, your ListenBrainz token and the local API's
 token are kept in Windows Credential Manager. Settings, the play queue and the scrobbles waiting to be sent are

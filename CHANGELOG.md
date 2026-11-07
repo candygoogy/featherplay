@@ -17,6 +17,10 @@ Notable changes to featherplay, newest first. The format follows
   sign-in in a real Edge window, with Edge's address bar, passkeys and Windows Hello, in a
   temporary profile that's deleted afterwards. featherplay keeps only the YouTube Music
   session from it. The regular sign-in window stays the default.
+- Amuse support: an **Amuse** switch in Settings > Local API, off by default, answers the
+  Amuse now-playing widget on port 9863 as Pear's Amuse plugin does. It only reads, and it
+  has no token, so while it's on, any app on your PC, and any website open in a browser on
+  it, can see what's playing.
 
 ### Changed
 
