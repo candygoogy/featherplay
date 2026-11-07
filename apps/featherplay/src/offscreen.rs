@@ -29,6 +29,8 @@ use i_slint_renderer_skia::software_surface::{
     self, LIVE_RESIZE, RenderBuffer, SoftwareSurface, coalesce_damage,
 };
 use i_slint_renderer_skia::{SkiaRenderer, SkiaSharedContext};
+use image::ImageEncoder;
+use image::codecs::png::PngEncoder;
 use slint::platform::{Clipboard, EventLoopProxy, Platform, Renderer, WindowAdapter, WindowEvent};
 use slint::{
     EventLoopError, PhysicalSize, PlatformError, Rgba8Pixel, SharedPixelBuffer, Window, WindowSize,
@@ -521,12 +523,17 @@ pub fn snapshot(window: &Window, width: u32, height: u32, out: &Path) -> Result<
     if let Some(dir) = out.parent() {
         std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     }
-    image::save_buffer(
-        out,
-        buffer.as_bytes(),
-        buffer.width(),
-        buffer.height(),
-        image::ExtendedColorType::Rgba8,
-    )
-    .map_err(|e| format!("write {}: {e}", out.display()))
+    // The PNG encoder by name: `image::save_buffer` picks one by the file's extension, which
+    // links every encoder the enabled formats have (JPEG and WebP too) into the exe. Encoded
+    // in memory, so a failed write of the file's end is reported too.
+    let mut png = Vec::new();
+    PngEncoder::new(&mut png)
+        .write_image(
+            buffer.as_bytes(),
+            buffer.width(),
+            buffer.height(),
+            image::ExtendedColorType::Rgba8,
+        )
+        .map_err(|e| format!("encode {}: {e}", out.display()))?;
+    std::fs::write(out, png).map_err(|e| format!("write {}: {e}", out.display()))
 }
