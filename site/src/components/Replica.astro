@@ -29,14 +29,15 @@ const others = songs.filter((s) => s.id !== resume.id);
 const summaryId = `${id}-summary`;
 // Where the lines sit without script, by the app's rule (src/demo/follow.ts followOffset): the
 // current line's centre a third of the way down the panel, between the top and the list's
-// end. A line is a sixth of its 26 px type above and below plus 36 px a row of words, a long
-// one wraps to two rows in the 720 px column (about 12.1 px a character of the bold face),
-// lines are 26 * 0.18 px apart with no extra room between verses, and the credit under them
-// takes 24 + 19 (replica.css, as the app's lyrics.slint). The panel's height is left to CSS
-// (cqh, the .lyrics box is a size container), so the phone layout's shorter panel is right
-// too; the script measures it all exactly once it runs.
-const lineH = (i: number) => (2 * 26) / 6 + 36 * Math.max(1, Math.ceil((song.lyrics[i].line.length * 12.1) / 720));
-const GAP = 26 * 0.18;
+// end. A line is a sixth of its 24 px type above and below plus 32.8 px a row of words, a
+// long one wraps to two rows in the 688 px column beside the side panel (about 11.2 px a
+// character of the bold face), lines are 24 * 0.18 px apart with no extra room between
+// verses, and the credit under them takes 24 + 19 (replica.css, as the app's lyrics.slint).
+// The panel's height is left to CSS (cqh, the .lyrics box is a size container), so the phone
+// layout's shorter panel is right too; the script measures it all exactly once it runs.
+const LYRIC = 24;
+const lineH = (i: number) => (2 * LYRIC) / 6 + 32.8 * Math.max(1, Math.ceil((song.lyrics[i].line.length * 11.2) / 688));
+const GAP = LYRIC * 0.18;
 const PAD_TOP = 24;
 const lineTop = (i: number) => PAD_TOP + Array.from({ length: i }, (_, j) => lineH(j) + GAP).reduce((a, b) => a + b, 0);
 const n = song.lyrics.length;

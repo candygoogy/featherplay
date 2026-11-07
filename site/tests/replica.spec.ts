@@ -274,7 +274,7 @@ test.describe("the lines start at the top, as in the app", () => {
     expect(Math.abs(end.shift - end.range)).toBeLessThan(1);
   });
 
-  test("the lyrics view has the app's metrics: a line every 49.4 px with no verse gaps, the 240 px cover, the title on one line", async ({ page }) => {
+  test("the lyrics view has the app's metrics beside the side panel: a line every 45.1 px with no verse gaps, the 208 px cover, the title in its width", async ({ page }) => {
     await page.goto("/");
     await wake(page);
     await skipTour(page);
@@ -295,10 +295,37 @@ test.describe("the lines start at the top, as in the app", () => {
         text: rel(r.querySelector("[data-lines] .line")!).x + 12,
       };
     });
+    for (const s of m.steps) expect(s).toBeCloseTo(45.12, 0);
+    for (const [k, v] of Object.entries({ x: 40, y: 96, w: 208, h: 208 })) expect(m.cover[k as keyof typeof m.cover]).toBeCloseTo(v, 1);
+    // s5 under the cover, wrapping in its width.
+    expect(m.title.y).toBeCloseTo(96 + 208 + 24, 0);
+    expect(m.title.w).toBeLessThanOrEqual(208.5);
+    expect(m.text).toBeCloseTo(312, 0);
+  });
+
+  test("with the side panel hidden the lyrics view is the app's at 1440 px: the 280 px cover, 26 px lines every 49.4 px", async ({ page }) => {
+    await page.goto("/");
+    await wake(page);
+    await skipTour(page);
+    await replica(page).locator('.bar [data-act="queue"]').click();
+    await page.waitForTimeout(100);
+    const m = await replica(page).evaluate((r) => {
+      const scale = r.getBoundingClientRect().height / r.offsetHeight;
+      const stage = r.querySelector(".stage")!.getBoundingClientRect();
+      const rel = (el: Element) => {
+        const b = el.getBoundingClientRect();
+        return { x: (b.x - stage.x) / scale, y: (b.y - stage.y) / scale, w: b.width / scale, h: b.height / scale };
+      };
+      const tops = [...r.querySelectorAll("[data-lines] .line")].map((l) => rel(l).y);
+      return {
+        steps: tops.slice(1).map((t, i) => t - tops[i]),
+        cover: rel(r.querySelector(".np-cover")!),
+        text: rel(r.querySelector("[data-lines] .line")!).x + 12,
+      };
+    });
     for (const s of m.steps) expect(s).toBeCloseTo(49.35, 0);
-    for (const [k, v] of Object.entries({ x: 88, y: 96, w: 240, h: 240 })) expect(m.cover[k as keyof typeof m.cover]).toBeCloseTo(v, 1);
-    expect(m.title.h).toBeLessThan(40);
-    expect(m.text).toBeCloseTo(392, 0);
+    for (const [k, v] of Object.entries({ x: 188, y: 96, w: 280, h: 280 })) expect(m.cover[k as keyof typeof m.cover]).toBeCloseTo(v, 1);
+    expect(m.text).toBeCloseTo(532, 0);
   });
 
   test("the lines fade over the app's 24 px at the panel's edges", async ({ page }) => {

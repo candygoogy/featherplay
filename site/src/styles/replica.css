@@ -906,15 +906,19 @@
     opacity: 0;
     visibility: hidden;
   }
-  /* The lyrics view's column, as now_playing.slint lays it out in the 1200 px stage: the cover
-     240 px (fl-cover, a fifth of the stage) at x 88 (fl-x: the column and the 720 px of lines
-     centred) and y 96 (fl-top 72 + s5); the title 24 px under it in the display face at
-     t-display-s, wrapping in the cover's width; the artist s1 under it, in a 24 px row. */
+  /* The lyrics view's column, as now_playing.slint lays it out in the 1040 px stage beside the
+     side panel: the cover 208 px (fl-cover, a fifth of the stage) at x 40 (fl-x: the page's
+     40 px pad, as the column and the 688 px of lines left for it fill the stage) and y 96
+     (fl-top 72 + s5); the title s5 under it in the display face at t-display-s, wrapping in
+     the cover's width; the artist s1 under it, in a 24 px row. */
   &[data-view="lyrics"][data-has-lyrics="true"] .np {
-    left: 88px;
+    left: 40px;
     top: 96px;
-    width: 240px;
+    width: 208px;
     transform: none;
+  }
+  &[data-view="lyrics"][data-has-lyrics="true"] .np-text {
+    margin-top: 24px;
   }
   &[data-view="lyrics"][data-has-lyrics="true"] .np-title {
     display: block;
@@ -936,23 +940,31 @@
   &[data-view="lyrics"][data-has-lyrics="true"] .np-cover {
     border-radius: 16px;
   }
-  /* With the side panel hidden the column and the lines centre as one group in the stage. */
+  /* With the side panel hidden the stage is the window's 1440 px: the cover at its 280 px cap,
+     and the column and the 720 px of lines centre as one group in the stage (fl-x 188). The
+     lines are t-lyric-wide there (a stage from lyric-wide-min, 1200 px, wide). */
   &[data-view="lyrics"][data-has-lyrics="true"][data-side-open="false"] .np {
-    left: 208px;
+    left: 188px;
+    width: 280px;
   }
-  &[data-view="lyrics"][data-has-lyrics="true"][data-side-open="false"] .lyrics {
-    left: 500px;
+  &[data-side-open="false"] .lyrics {
+    left: 520px;
+    width: 744px;
+    --lyric: 26px;
+    --lyric-row: 36px;
   }
 
   /* The lines: one bold weight, so a line never re-wraps when it becomes current. Their
      panel starts under the back button's row (now_playing.slint fl-top, 72 px) and is a size
      container: the room under the last line is half its height (cqh). As the app's
-     LyricsView: from fl-lyrics-x (392) less the hover tile's s3, 720 px of lines plus the
-     tile's s3 on either side. */
+     LyricsView: from fl-lyrics-x (312) less the hover tile's s3, 688 px of lines plus the
+     tile's s3 on either side, at t-lyric-full (24 px: the stage is under lyric-wide-min). */
   .lyrics {
+    --lyric: 24px;
+    --lyric-row: 32.8px;
     position: absolute;
-    left: 380px;
-    width: 744px;
+    left: 300px;
+    width: 712px;
     top: 72px;
     bottom: var(--bar-clear);
     overflow: clip;
@@ -978,23 +990,24 @@
      for an empty line in the lyrics, and the demo's have none. */
   .lines {
     display: grid;
-    gap: calc(26px * 0.18);
+    gap: calc(var(--lyric) * 0.18);
     padding-top: 24px;
     padding-bottom: 50cqh;
     transition: transform var(--t-follow) var(--ease-out);
   }
-  /* LyricLine: t-lyric-wide (26 px) in the display face with its tracking, a sixth of the
-     type above and below, s3 at the sides. The row is Manrope's own height (1.366 em), which
-     the app's render rounds up to the physical pixel at 125 %: 36 px, a line every 49.4 px. */
+  /* LyricLine: the view's size (--lyric) in the display face with its tracking, a sixth of
+     the type above and below, s3 at the sides. The row (--lyric-row) is Manrope's own height
+     (1.366 em), which the app's render rounds up to the physical pixel at 125 %: 32.8 px at
+     24 px, a line every 45.1 px; 36 px at 26 px, every 49.4 px. */
   .line {
     display: block;
-    padding: calc(26px / 6) 12px;
+    padding: calc(var(--lyric) / 6) 12px;
     border-radius: 10px;
     font-family: var(--font);
-    font-size: 26px;
+    font-size: var(--lyric);
     font-weight: 700;
     letter-spacing: -0.02em;
-    line-height: 36px;
+    line-height: var(--lyric-row);
     color: #ffffff9e;
     transition:
       color calc(400ms * var(--colour-easing)) ease,
@@ -1608,9 +1621,12 @@
       margin-top: 0;
     }
     /* Under the cover's row (64 + 112 px), the first line's top 24 px below it; the words
-       24 px in from the sides, their hover tile s3 further out. */
+       24 px in from the sides, their hover tile s3 further out; t-lyric-full, as the app's in
+       a stage this narrow. */
     & .lyrics,
     &[data-view="lyrics"][data-has-lyrics="true"][data-side-open="false"] .lyrics {
+      --lyric: 24px;
+      --lyric-row: 32.8px;
       left: 12px;
       right: 12px;
       width: auto;
