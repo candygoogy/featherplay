@@ -165,23 +165,48 @@ pub fn open(ctx: &Rc<Ctx>, x: i32, y: i32) -> Result<(), String> {
     let started = Instant::now();
     let ui = create(ctx)?;
     let border = popup::border(&ui.global::<Theme>());
-    let (left, top) = popup::show_at(ui.window(), (x, y), SIZE, border)?;
-    if let Some(hwnd) = shell::hwnd(ui.window()) {
-        MINI.with_borrow(|m| {
-            if let Some(mini) = m {
-                mini.hwnd.set(Some(hwnd));
-                listen(mini);
+    let (left, top) = popup::show_at(ui.window(), (x, y), SIZE)?;
+    // Winit makes the window on a later turn of the loop: what needs its handle waits for it.
+    shell::when_hwnd(
+        &ui,
+        move |_, hwnd| {
+            popup::dress(hwnd, border);
+            window_ready(hwnd);
+            if let Err(e) = native::when_pressed(hwnd, pressed) {
+                log!("mini player: presses: {e}");
             }
-        });
-        if let Err(e) = native::when_pressed(hwnd, pressed) {
-            log!("mini player: presses: {e}");
-        }
-    }
+        },
+        |_| log!("mini player: its window never came"),
+    );
     log!(
         "mini player opened at {left},{top} ({:.1} ms)",
         started.elapsed().as_secs_f64() * 1000.0
     );
     Ok(())
+}
+
+/// The open mini player's window exists now, with handle `hwnd`: the poll can tell it from
+/// other windows, and unpinned, it hears presses on screen.
+fn window_ready(hwnd: isize) {
+    MINI.with_borrow(|m| {
+        if let Some(mini) = m {
+            mini.hwnd.set(Some(hwnd));
+            if !mini.ui.global::<MiniData>().get_pinned() {
+                listen(mini);
+            }
+        }
+    });
+}
+
+/// Gives the open mini player window handle `hwnd` without listening for presses: the
+/// offscreen platform has no handles, and the poll judges nothing without one.
+#[doc(hidden)]
+pub fn own_window_for_tests(hwnd: isize) {
+    MINI.with_borrow(|m| {
+        if let Some(mini) = m {
+            mini.hwnd.set(Some(hwnd));
+        }
+    });
 }
 
 /// Closes and drops the mini player, if it shows.
@@ -371,14 +396,16 @@ fn look_at_the_front() {
 /// which then toggles it) or to no window at all (Windows between two) leaves it open too.
 /// Any other window, an app or the desktop (`Progman`, `WorkerW`), closes it.
 fn moved_away(front: Option<&Foreground>, own: Option<isize>, last: &mut Option<isize>) -> bool {
-    let Some(front) = front else {
+    // Until its own window is known (winit makes it after `show` returns), the mini player
+    // coming to the front can't be told from another app: nothing is judged, or taken as seen.
+    let (Some(front), Some(own)) = (front, own) else {
         return false;
     };
     if *last == Some(front.hwnd) {
         return false;
     }
     *last = Some(front.hwnd);
-    Some(front.hwnd) != own && !NEUTRAL.contains(&front.class.as_str())
+    front.hwnd != own && !NEUTRAL.contains(&front.class.as_str())
 }
 
 /// A mouse button, finger or pen went down on the open mini player; `from_behind` when that
@@ -478,6 +505,20 @@ mod tests {
         let own = front(OWN, "Window Class");
         assert!(!moved_away(Some(&own), Some(OWN), &mut last));
         assert_eq!(last, Some(OWN));
+    }
+
+    #[test]
+    fn nothing_closes_it_before_its_own_window_is_known() {
+        // Winit makes the window after `show` returns: until its handle is known, the mini
+        // player coming to the front (a press on its play button) looks like any other window.
+        let mut last = Some(0x20);
+        let itself = front(OWN, "Window Class");
+        assert!(!moved_away(Some(&itself), None, &mut last));
+        assert_eq!(
+            last,
+            Some(0x20),
+            "a window it couldn't judge was taken as seen"
+        );
     }
 
     #[test]

@@ -193,6 +193,50 @@ pub fn quit() {
 }
 
 /// The window's HWND, once it exists.
+/// How long `when_hwnd` waits for a window to be made.
+const HWND_WAIT: Duration = Duration::from_secs(2);
+
+/// Calls `ready` with `ui`'s window handle once Windows has made its window. Winit makes a
+/// window shown from inside the running event loop on a later turn of the loop, after `show`
+/// returns, so the handle usually isn't there yet (the main window waits for its own the
+/// same way, `HWND_POLL`). Tries at once, then every `HWND_POLL` for up to `HWND_WAIT`, then
+/// calls `gave_up`. Neither runs once `ui` is gone.
+pub fn when_hwnd<C: ComponentHandle + 'static>(
+    ui: &C,
+    ready: impl FnOnce(&C, isize) + 'static,
+    gave_up: impl FnOnce(&C) + 'static,
+) {
+    try_hwnd(
+        ui.as_weak(),
+        Box::new(ready),
+        Box::new(gave_up),
+        Instant::now() + HWND_WAIT,
+    );
+}
+
+type Ready<C> = Box<dyn FnOnce(&C, isize)>;
+type GaveUp<C> = Box<dyn FnOnce(&C)>;
+
+fn try_hwnd<C: ComponentHandle + 'static>(
+    weak: slint::Weak<C>,
+    ready: Ready<C>,
+    gave_up: GaveUp<C>,
+    deadline: Instant,
+) {
+    let Some(ui) = weak.upgrade() else {
+        return;
+    };
+    if let Some(h) = hwnd(ui.window()) {
+        ready(&ui, h);
+    } else if Instant::now() >= deadline {
+        gave_up(&ui);
+    } else {
+        Timer::single_shot(HWND_POLL, move || {
+            try_hwnd(weak, ready, gave_up, deadline);
+        });
+    }
+}
+
 pub fn hwnd(window: &slint::Window) -> Option<isize> {
     match window.window_handle().window_handle().ok()?.as_raw() {
         RawWindowHandle::Win32(h) => Some(h.hwnd.get()),

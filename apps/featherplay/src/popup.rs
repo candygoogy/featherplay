@@ -11,7 +11,6 @@ use slint::{ComponentHandle, PhysicalPosition};
 
 use crate::bar;
 use crate::native::{self, ScreenRect};
-use crate::shell;
 use crate::ui::{AppWindow, Appearance, Player, Theme};
 use crate::ui_bridge::format_duration;
 
@@ -48,12 +47,12 @@ pub fn window_attributes(attrs: WindowAttributes) -> WindowAttributes {
 }
 
 /// Shows `window`, `size` logical pixels, for a click on the tray icon at `(x, y)` (physical
-/// screen pixels), and gives it the activation. Returns where its top-left corner went.
+/// screen pixels). Returns where its top-left corner went. Once its window exists
+/// (`shell::when_hwnd`), `dress` it.
 pub fn show_at(
     window: &slint::Window,
     (x, y): (i32, i32),
     size: (f32, f32),
-    border: slint::Color,
 ) -> Result<(i32, i32), String> {
     let (work, scale) = native::work_area_at(x, y).ok_or("no monitor at the click")?;
     let physical = (
@@ -72,14 +71,17 @@ pub fn show_at(
         (left, top) = place((x, y), real, work, gap);
         window.set_position(PhysicalPosition::new(left, top));
     }
-    if let Some(hwnd) = shell::hwnd(window) {
-        if let Err(e) = native::opaque(hwnd) {
-            log!("popup: opaque: {e}");
-        }
-        let _ = native::popup_border(hwnd, border);
-        native::bring_forward(hwnd);
-    }
     Ok((left, top))
+}
+
+/// Makes the shown popup's window `hwnd` opaque, with a hairline `border`, and gives it the
+/// activation.
+pub fn dress(hwnd: isize, border: slint::Color) {
+    if let Err(e) = native::opaque(hwnd) {
+        log!("popup: opaque: {e}");
+    }
+    let _ = native::popup_border(hwnd, border);
+    native::bring_forward(hwnd);
 }
 
 /// Where a popup's top-left corner goes for a click at `point`, everything in physical

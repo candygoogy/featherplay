@@ -44,6 +44,8 @@ fn click(w: &slint::Window, x: f32, y: f32) {
 fn open(scene: &Scene) -> MiniPlayer {
     let mini = mini::create(&scene.ctx).expect("mini player");
     mini.show().expect("show");
+    // The offscreen platform has no window handles: a stand-in, as Windows gives one later.
+    mini::own_window_for_tests(0x1);
     mini.window()
         .dispatch_event(WindowEvent::WindowActiveChanged(true));
     scene.settle();
@@ -505,4 +507,46 @@ fn mini_player_mirrors_the_player_and_closes_on_escape_or_lost_activation() {
         slint::platform::duration_until_next_timer_update().is_none(),
         "a timer is still armed"
     );
+}
+
+/// Runs the event loop's timers for `ms`.
+fn run_timers_for(ms: u64) {
+    let end = std::time::Instant::now() + Duration::from_millis(ms);
+    while std::time::Instant::now() < end {
+        slint::platform::update_timers_and_animations();
+        std::thread::sleep(Duration::from_millis(5));
+    }
+}
+
+#[test]
+fn waiting_for_a_window_handle_gives_up_and_stays_quiet_once_the_window_is_gone() {
+    use std::rc::Rc;
+
+    let scene = playing_scene();
+    // The offscreen platform never makes a window handle: the wait ends with `gave_up`.
+    let mini = mini::create(&scene.ctx).expect("mini player");
+    let said = Rc::new(RefCell::new(Vec::new()));
+    let (r, g) = (said.clone(), said.clone());
+    featherplay::shell::when_hwnd(
+        &mini,
+        move |_, _| r.borrow_mut().push("ready"),
+        move |_| g.borrow_mut().push("gave up"),
+    );
+    run_timers_for(500);
+    assert!(said.borrow().is_empty(), "it stopped waiting too soon");
+    run_timers_for(2000);
+    assert_eq!(*said.borrow(), ["gave up"]);
+
+    // A window dropped while its handle is awaited: neither runs.
+    let gone = Rc::new(RefCell::new(0));
+    let (r, g) = (gone.clone(), gone.clone());
+    featherplay::shell::when_hwnd(
+        &mini,
+        move |_, _| *r.borrow_mut() += 1,
+        move |_| *g.borrow_mut() += 1,
+    );
+    mini::close();
+    drop(mini);
+    run_timers_for(2600);
+    assert_eq!(*gone.borrow(), 0, "it ran for a window that's gone");
 }
