@@ -11,7 +11,11 @@ targets = ["x86_64-pc-windows-msvc", "aarch64-pc-windows-msvc"]
 yanked = "deny"
 unmaintained = "all"
 unsound = "all"
-ignore = []
+ignore = [
+    # pin-utils, unmaintained: only Slint's build-time macros use it (slint-macros through
+    # spin_on), never the app at run time. No known vulnerability; it goes when Slint drops it.
+    { id = "RUSTSEC-2026-0441", reason = "build-time only, through slint-macros; no fix upstream yet" },
+]
 
 [licenses]
 # Exactly the licences in the Windows dependency tree (and so in THIRD_PARTY.md). A new
