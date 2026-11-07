@@ -12,7 +12,8 @@
 //! per round). `UNDER_LOAD_ROUNDS` sets the rounds (default 1); keep it at 3 or fewer, so
 //! the machine is never full for more than ~30 s in all. The master bus runs at its most
 //! work: the equalizer on Bass and the compressor on Strong, and skip silence looks at every
-//! block (Everywhere).
+//! block (Everywhere). Crossfade is on: each track's tail is scanned, and from 2 s to 7 s
+//! the tone crossfades into a second one, so two voices decode and sound at once.
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -23,9 +24,18 @@ use crate::glitches::Counts;
 use crate::{AudioEngine, AudioEvent, Compressor, SkipSilence, StreamSource};
 
 const PLAY: Duration = Duration::from_secs(8);
+/// When in each round the crossfade starts, and how long it takes.
+const FADE_AT: Duration = Duration::from_secs(2);
+const FADE: Duration = Duration::from_secs(5);
 
 fn tone() -> StreamSource {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/tone-10s.m4a");
+    fixture("tone-10s.m4a")
+}
+
+fn fixture(name: &str) -> StreamSource {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures")
+        .join(name);
     let path = path
         .to_string_lossy()
         .replace(std::path::MAIN_SEPARATOR, "/");
@@ -33,6 +43,7 @@ fn tone() -> StreamSource {
         url: format!("file:///{}", path.trim_start_matches('/')),
         mime: "audio/mp4".into(),
         content_length: None,
+        duration: Some(Duration::from_secs(10)),
     }
 }
 
@@ -109,9 +120,16 @@ fn play(engine: &AudioEngine, events: &std::sync::mpsc::Receiver<AudioEvent>) ->
     }
     let before = engine.glitches();
     engine.reset_max_gap();
+    let next = fixture("tone-10s-frag.m4a");
+    engine.preload(next.clone());
+    let mut faded = false;
     while t.elapsed() < PLAY {
         std::thread::sleep(Duration::from_millis(250));
-        let _ = engine.position();
+        let _ = engine.playhead();
+        if !faded && t.elapsed() >= FADE_AT {
+            faded = true;
+            engine.crossfade_to(next.clone(), FADE);
+        }
     }
     let after = engine.glitches();
     engine.pause();
@@ -133,6 +151,7 @@ fn playback_beside_a_full_cpu() {
     engine.set_equalizer(Some([8.0, 0.0, 0.0, 0.0, 0.0]));
     engine.set_compressor(Compressor::Strong);
     engine.set_skip_silences(SkipSilence::Everywhere);
+    engine.set_crossfade(true);
     let events = engine.events();
     let show = |what: &str, c: Counts| {
         println!(

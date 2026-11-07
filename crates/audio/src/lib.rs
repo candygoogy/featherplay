@@ -30,6 +30,8 @@
     )
 )]
 
+use std::time::Duration;
+
 mod decoder;
 mod devices;
 mod download;
@@ -45,6 +47,7 @@ mod silence;
 #[cfg(test)]
 mod stream_tests;
 mod stretch;
+mod tail;
 #[cfg(test)]
 mod timing;
 mod tmp;
@@ -68,6 +71,18 @@ pub struct StreamSource {
     pub mime: String,
     /// Used when the server doesn't report the total size.
     pub content_length: Option<u64>,
+    /// The stream's length, when known. While crossfade is on, the decoder reads the last
+    /// 20 s from here to find where the music ends (`AudioEngine::playhead`).
+    pub duration: Option<Duration>,
+}
+
+/// Where playback stands in the current track.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Playhead {
+    pub position: Duration,
+    /// Where the track's music ends, before any trailing silence, once the decoder has
+    /// read its last 20 s (only while crossfade is on; `AudioEngine::set_crossfade`).
+    pub music_end: Option<Duration>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

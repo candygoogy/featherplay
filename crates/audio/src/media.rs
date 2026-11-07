@@ -8,13 +8,34 @@ use featherplay_core::sync::LockExt;
 use tokio::runtime::Handle;
 
 use crate::StreamSource;
-use crate::download::{Download, First};
+use crate::download::{Download, DownloadView, First};
 use crate::head::HeadCache;
 use crate::http::ErrorSlot;
 
 enum Inner {
-    File(File),
+    /// The file and its path, for a second reader.
+    File(File, PathBuf),
     Http(Download),
+    View(DownloadView),
+}
+
+/// Opens a second reader over a stream's bytes (`Media::viewer`).
+pub(crate) enum Viewer {
+    File(PathBuf),
+    Http(DownloadView),
+}
+
+impl Viewer {
+    /// A second, independent reader over the same bytes, once all of them are there, so
+    /// it never waits on the network; `None` before that.
+    pub fn open(&self, len: u64) -> Option<Media> {
+        let inner = match self {
+            Viewer::File(path) => Inner::File(File::open(path).ok()?, path.clone()),
+            Viewer::Http(v) if v.is_complete() => Inner::View(DownloadView::clone(v)),
+            Viewer::Http(_) => return None,
+        };
+        Some(Media::new(inner, ErrorSlot::default(), len))
+    }
 }
 
 /// The decoder's byte source. Read failures are recorded in an `ErrorSlot`, because the
@@ -56,7 +77,7 @@ impl Media {
                 .map_err(|e| format!("{}: {e}", path.display()))?
                 .len();
             return Ok(Opened {
-                media: Media::new(Inner::File(f), error, len),
+                media: Media::new(Inner::File(f, path), error, len),
                 len,
                 cancel: None,
             });
@@ -110,6 +131,15 @@ impl Media {
         self.pos
     }
 
+    /// What opens a second reader over these bytes later.
+    pub fn viewer(&self) -> Viewer {
+        match &self.inner {
+            Inner::File(_, path) => Viewer::File(path.clone()),
+            Inner::Http(d) => Viewer::Http(d.view()),
+            Inner::View(v) => Viewer::Http(DownloadView::clone(v)),
+        }
+    }
+
     /// Lets tests reach the jump-ahead path with a small file.
     #[cfg(test)]
     pub fn set_jump_ahead(&mut self, n: u64) {
@@ -128,8 +158,9 @@ impl Media {
 impl Read for Media {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         let r = match &mut self.inner {
-            Inner::File(f) => f.read(buf),
+            Inner::File(f, _) => f.read(buf),
             Inner::Http(d) => d.read_at(self.pos, buf),
+            Inner::View(v) => v.read_at(self.pos, buf),
         };
         match r {
             Ok(n) => {
@@ -152,9 +183,9 @@ impl Seek for Media {
             SeekFrom::End(d) => self.len.checked_add_signed(d),
         };
         let r = match (&mut self.inner, target) {
-            (Inner::File(f), _) => f.seek(pos),
-            (Inner::Http(_), Some(t)) => Ok(t),
-            (Inner::Http(_), None) => Err(io::Error::new(
+            (Inner::File(f, _), _) => f.seek(pos),
+            (Inner::Http(_) | Inner::View(_), Some(t)) => Ok(t),
+            (Inner::Http(_) | Inner::View(_), None) => Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "seek before the start",
             )),

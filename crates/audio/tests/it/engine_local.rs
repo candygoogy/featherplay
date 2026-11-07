@@ -20,6 +20,7 @@ fn tone() -> StreamSource {
         url: format!("file:///{}", path.trim_start_matches('/')),
         mime: "audio/mp4".into(),
         content_length: None,
+        duration: None,
     }
 }
 

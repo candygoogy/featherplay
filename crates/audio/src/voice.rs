@@ -49,27 +49,61 @@ const RING: Duration = Duration::from_millis(1500);
 const NO_END: u64 = u64::MAX;
 /// `skip_at` while no skip waits for the reader.
 const NO_SKIP: u64 = u64::MAX;
+/// `music_end_ms` until the tail scan has found it.
+const UNKNOWN: u64 = u64::MAX;
+/// How long a cut takes: a pause, a stop or a skip ramps the sound out over this instead of
+/// clicking, and a resume ramps it back in (`measurements/r74-crossfade-reference.md`).
+pub(crate) const DECLICK: Duration = Duration::from_millis(30);
+/// The crossfade phase of a voice at full volume; its gain is `sin(phase)`.
+const FULL: f64 = std::f64::consts::FRAC_PI_2;
+
+/// Which way a crossfade ramp goes.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Fade {
+    /// Up to full volume.
+    In,
+    /// Down to silence; the source then ends and sends `Msg::FadedOut`.
+    Out,
+}
 
 /// Play state shared by every voice of one engine, and the output's master bus.
 pub(crate) struct Controls {
     pub paused: AtomicBool,
+    /// Crossfade is on: each decoder thread finds where its track's music ends (`tail`).
+    pub crossfade: AtomicBool,
     /// "Skip silence" (`SkipSilence::to_u8`), which decoder threads read once per batch.
     pub skip_silence: AtomicU8,
     /// The volume, the equalizer and the compressor, which the output's bus applies to the
     /// mix (`dsp`).
     pub bus: BusControls,
     pub glitches: Arc<Glitches>,
+    /// Sources in the mixer now. For tests.
+    #[cfg(test)]
+    pub sources: std::sync::atomic::AtomicUsize,
 }
 
 impl Controls {
     pub fn new() -> Self {
         Self {
             paused: AtomicBool::new(true),
+            crossfade: AtomicBool::new(false),
             skip_silence: AtomicU8::new(0),
             bus: BusControls::default(),
             glitches: Arc::default(),
+            #[cfg(test)]
+            sources: Default::default(),
         }
     }
+}
+
+/// Rings allocated and not freed yet, in this process. For tests.
+#[cfg(test)]
+static RINGS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+/// How many voices hold a ring now. For tests.
+#[cfg(test)]
+pub(crate) fn rings() -> usize {
+    RINGS.load(Ordering::SeqCst)
 }
 
 /// The ring's slots: `f32` bits in atomics, so neither side needs `unsafe` to share them.
@@ -120,6 +154,19 @@ pub(crate) struct VoiceShared {
     /// seek clears it.
     skip_at: AtomicU64,
     skip_frames: AtomicU64,
+    /// A crossfade ramp for the audio thread: `fade_out` and `fade_ms` (a whole sweep, from
+    /// silence to full), then `fade_seq` moves on. The ramp starts from where the gain is.
+    fade_seq: AtomicU32,
+    fade_out: AtomicBool,
+    fade_ms: AtomicU32,
+    /// The crossfade phase (`f64` bits; the gain is `sin(phase)`). The audio thread keeps it
+    /// up to date while a ramp runs, so a new source (another device) goes on from there.
+    fade_phase: AtomicU64,
+    /// Where the track's music ends, in ms (`tail`); `UNKNOWN` before the decoder thread
+    /// has read the end of the stream.
+    music_end_ms: AtomicU64,
+    /// The first source ramps in (`ramp_in_first`).
+    ramp_in: AtomicBool,
     /// A seek for the decoder thread: target and the engine's sequence number. The engine
     /// and the decoder thread lock it; the audio thread never does.
     seek: Mutex<Option<(Duration, u64)>>,
@@ -153,6 +200,12 @@ impl VoiceShared {
             played_frame: AtomicU64::new(0),
             skip_at: AtomicU64::new(NO_SKIP),
             skip_frames: AtomicU64::new(0),
+            fade_seq: AtomicU32::new(0),
+            fade_out: AtomicBool::new(false),
+            fade_ms: AtomicU32::new(0),
+            fade_phase: AtomicU64::new(FULL.to_bits()),
+            music_end_ms: AtomicU64::new(UNKNOWN),
+            ramp_in: AtomicBool::new(false),
             seek: Mutex::new(None),
             cv: Condvar::new(),
             stopped: AtomicBool::new(false),
@@ -195,6 +248,44 @@ impl VoiceShared {
         self.cv.notify_all();
     }
 
+    /// Ramps the voice in or out over `over` (equal power), from where its gain is now.
+    pub fn fade(&self, way: Fade, over: Duration) {
+        let ms = u32::try_from(over.as_millis()).unwrap_or(u32::MAX).max(1);
+        self.fade_out.store(way == Fade::Out, Ordering::Relaxed);
+        self.fade_ms.store(ms, Ordering::Relaxed);
+        self.fade_seq.fetch_add(1, Ordering::Release);
+    }
+
+    /// The first sound ramps in (`DECLICK`): the voice starts mid-song, after a load at a
+    /// position, so it would click in.
+    pub fn ramp_in_first(&self) {
+        self.ramp_in.store(true, Ordering::Relaxed);
+    }
+
+    /// A fading voice goes out within `over`: sooner if its ramp is longer, never later.
+    pub fn fade_out_within(&self, over: Duration) {
+        let ms = u32::try_from(over.as_millis()).unwrap_or(u32::MAX).max(1);
+        if !self.fade_out.load(Ordering::Relaxed) || self.fade_ms.load(Ordering::Relaxed) > ms {
+            self.fade(Fade::Out, over);
+        }
+    }
+
+    /// The voice starts silent, for a fade in. Before its first source only.
+    pub fn start_silent(&self) {
+        self.fade_phase.store(0.0_f64.to_bits(), Ordering::Relaxed);
+    }
+
+    /// Where the track's music ends, once the decoder thread has found it.
+    pub fn music_end(&self) -> Option<Duration> {
+        let ms = self.music_end_ms.load(Ordering::Relaxed);
+        (ms != UNKNOWN).then(|| Duration::from_millis(ms))
+    }
+
+    /// The audio source ran to the end and left the mixer (not cleared).
+    pub fn has_ended(&self) -> bool {
+        self.ended.load(Ordering::SeqCst)
+    }
+
     /// The audio source ran to the end and left the mixer; clears the flag.
     pub fn take_ended(&self) -> bool {
         self.ended.swap(false, Ordering::SeqCst)
@@ -212,6 +303,15 @@ impl VoiceShared {
     ) -> Option<RingSource> {
         let (channels, rate) = *self.format.get()?;
         let attach = self.attach.fetch_add(1, Ordering::SeqCst) + 1;
+        #[cfg(test)]
+        controls.sources.fetch_add(1, Ordering::SeqCst);
+        let ch = channels.get() as usize;
+        let declick = (DECLICK.as_secs_f64() * f64::from(rate.get()))
+            .round()
+            .max(1.0) as u64;
+        // A source for a voice already heard (another device, a seek after the end) comes
+        // in mid-song, as does one loaded at a position: it ramps in.
+        let mid_song = self.started.load(Ordering::Relaxed) || self.ramp_in.load(Ordering::Relaxed);
         Some(RingSource {
             voice: self.clone(),
             controls,
@@ -219,9 +319,18 @@ impl VoiceShared {
             attach,
             channels,
             rate,
-            local: Vec::with_capacity(TAKE.max(SILENCE_FRAMES * channels.get() as usize)),
+            // Room for any refill, so the audio thread never allocates.
+            local: Vec::with_capacity(TAKE.max(SILENCE_FRAMES * ch).max(declick as usize * ch)),
             idx: 0,
-            gain: 1.0,
+            phase: f64::from_bits(self.fade_phase.load(Ordering::Relaxed)),
+            phase_step: 0.0,
+            fade_seen: 0,
+            click: if mid_song { 0.0 } else { 1.0 },
+            click_step: 0.0,
+            declick,
+            live: false,
+            ending: false,
+            faded_out: false,
         })
     }
 
@@ -231,6 +340,8 @@ impl VoiceShared {
     fn set_format(&self, channels: ChannelCount, rate: SampleRate) {
         let frames = (RING.as_secs_f64() * rate.get() as f64) as usize;
         let _ = self.slots.set(Slots::new(frames * channels.get() as usize));
+        #[cfg(test)]
+        RINGS.fetch_add(1, Ordering::SeqCst);
         let _ = self.format.set((channels, rate));
     }
 
@@ -286,6 +397,15 @@ impl VoiceShared {
         self.failed.store(false, Ordering::Relaxed);
         // SeqCst: `RingSource::finish` relies on its order against `ended`.
         self.seek_seq.store(seq + 2, Ordering::SeqCst);
+    }
+}
+
+#[cfg(test)]
+impl Drop for VoiceShared {
+    fn drop(&mut self) {
+        if self.slots.get().is_some() {
+            RINGS.fetch_sub(1, Ordering::SeqCst);
+        }
     }
 }
 
@@ -348,6 +468,10 @@ fn decode(
     } = fetch;
     let Opened { media, len, cancel } =
         Media::open(src, rt.handle(), client, tmp_dir, heads, error.clone())?;
+    // For the tail scan, while crossfade is on; done once the stream is known not to have
+    // one (no length) or after one try with the whole file there.
+    let viewer = media.viewer();
+    let mut scanned = src.duration.is_none();
     *v.cancel.lock_or_recover() = cancel;
     if v.stopped.load(Ordering::SeqCst) {
         return Ok(());
@@ -372,6 +496,23 @@ fn decode(
     // The decoder reached the end of the stream (until the next seek).
     let mut at_end = false;
     loop {
+        // About to wait with the ring full (or the stream read): time for the tail scan,
+        // which never waits on the network. Seeks wait meanwhile (~0.1 s).
+        let idle = v.room(slots) < BATCH as u64 || (at_end && sent == out.len());
+        if !scanned
+            && idle
+            && controls.crossfade.load(Ordering::Relaxed)
+            && let Some(tail_media) = viewer.open(len)
+        {
+            scanned = true;
+            let length = src.duration.unwrap_or_default();
+            if let Some(end) =
+                crate::tail::music_end(tail_media, len, &src.mime, length, &v.stopped)
+            {
+                let ms = u64::try_from(end.as_millis()).unwrap_or(UNKNOWN - 1);
+                v.music_end_ms.store(ms, Ordering::Relaxed);
+            }
+        }
         // Wait for a seek, room in the ring, or stop.
         let seek = {
             let mut g = v.seek.lock_or_recover();
@@ -464,6 +605,14 @@ fn decode(
 
 /// The mixer side of a voice. Runs on the audio thread: no I/O, no locks, no allocation,
 /// and messages only on state changes.
+///
+/// Two gains shape what it plays, per frame and only while one of them moves:
+/// - the crossfade, `sin(phase)`, ramping between silence and full over seconds
+///   (`VoiceShared::fade`);
+/// - the de-click, which ramps out over `DECLICK` on a pause or a stop, and back in on a
+///   resume or after a dry ring, so none of them clicks.
+///
+/// Neither moves while the source plays silence (paused or starved): a pause holds a fade.
 pub(crate) struct RingSource {
     voice: Arc<VoiceShared>,
     controls: Arc<Controls>,
@@ -473,36 +622,156 @@ pub(crate) struct RingSource {
     rate: SampleRate,
     local: Vec<Sample>,
     idx: usize,
-    /// This voice's own gain, 1.0: the volume is applied to the mix, on the bus (`dsp`).
-    gain: f32,
+    /// The crossfade phase, and how far it moves per frame (0 while it holds).
+    phase: f64,
+    phase_step: f64,
+    /// The latest `fade_seq` taken.
+    fade_seen: u32,
+    /// The de-click gain, 0..=1, and how far it moves per frame.
+    click: f32,
+    click_step: f32,
+    /// `DECLICK` in frames.
+    declick: u64,
+    /// The last chunk was sound, not silence: a pause or a stop ramps it out.
+    live: bool,
+    /// The next refill ends the source: a stop's tail has played, or a fade out reached
+    /// silence (`faded_out`, told then).
+    ending: bool,
+    faded_out: bool,
+}
+
+/// What a refill found in the ring.
+enum Read {
+    Sound,
+    /// Nothing to play yet: a dry ring, or a seek being published.
+    Silence,
+    /// The end of the stream, at this seek sequence.
+    End(u64),
 }
 
 impl RingSource {
     /// Refills `local` at a frame boundary. `None` ends the source.
     fn refill(&mut self) -> Option<()> {
-        let v = &*self.voice;
-        if v.stopped.load(Ordering::Relaxed) || v.attach.load(Ordering::Relaxed) != self.attach {
+        if self.ending || self.voice.attach.load(Ordering::Relaxed) != self.attach {
+            if std::mem::take(&mut self.faded_out) {
+                let _ = self.tx.send(Msg::FadedOut {
+                    voice: self.voice.id,
+                });
+            }
             return None;
         }
         self.local.clear();
         self.idx = 0;
-        if self.controls.paused.load(Ordering::Relaxed) {
-            return self.silence();
+        self.take_fade();
+        let stopped = self.voice.stopped.load(Ordering::Relaxed);
+        let leaving = stopped || self.controls.paused.load(Ordering::Relaxed);
+        let ch = u64::from(self.channels.get());
+        let frames = if leaving {
+            if !self.live {
+                return if stopped { None } else { self.silence() };
+            }
+            // Out over the next few ms rather than with a click.
+            self.ending = stopped;
+            self.declick
+        } else {
+            TAKE as u64 / ch
+        };
+        match self.read(frames)? {
+            Read::Sound => {}
+            Read::Silence if stopped => return None,
+            Read::Silence => {
+                if std::mem::take(&mut self.live) {
+                    // The ring ran dry: the sound comes back with a ramp.
+                    self.click = 0.0;
+                    self.click_step = 0.0;
+                }
+                return self.silence();
+            }
+            Read::End(seq) => return self.finish(seq),
         }
+        if leaving {
+            self.live = false;
+            let n = (self.local.len() / ch as usize).max(1);
+            self.click_step = -self.click / n as f32;
+        } else if !std::mem::replace(&mut self.live, true) && self.click < 1.0 {
+            self.click_step = 1.0 / self.declick as f32;
+        }
+        self.apply_gains();
+        Some(())
+    }
+
+    /// Takes a new crossfade ramp, if the engine set one.
+    fn take_fade(&mut self) {
+        let v = &*self.voice;
+        let seq = v.fade_seq.load(Ordering::Acquire);
+        if seq == self.fade_seen {
+            return;
+        }
+        self.fade_seen = seq;
+        let frames = (f64::from(v.fade_ms.load(Ordering::Relaxed)) / 1000.0
+            * f64::from(self.rate.get()))
+        .max(1.0);
+        let step = FULL / frames;
+        self.phase_step = if v.fade_out.load(Ordering::Relaxed) {
+            -step
+        } else {
+            step
+        };
+    }
+
+    /// Applies the crossfade and the de-click to `local`, frame by frame, while either
+    /// moves or is below full.
+    fn apply_gains(&mut self) {
+        if self.phase_step == 0.0
+            && self.click_step == 0.0
+            && self.phase >= FULL
+            && self.click >= 1.0
+        {
+            return;
+        }
+        let ch = self.channels.get() as usize;
+        for frame in self.local.chunks_exact_mut(ch) {
+            let g = self.click * (self.phase as f32).sin();
+            for s in frame {
+                *s *= g;
+            }
+            self.click = (self.click + self.click_step).clamp(0.0, 1.0);
+            self.phase = (self.phase + self.phase_step).clamp(0.0, FULL);
+        }
+        if self.click <= 0.0 || self.click >= 1.0 {
+            self.click_step = 0.0;
+        }
+        if self.phase <= 0.0 && self.phase_step < 0.0 {
+            // Faded out: the source ends at the next refill.
+            self.ending = true;
+            self.faded_out = true;
+        }
+        if self.phase <= 0.0 || self.phase >= FULL {
+            self.phase_step = 0.0;
+        }
+        self.voice
+            .fade_phase
+            .store(self.phase.to_bits(), Ordering::Relaxed);
+    }
+
+    /// Takes up to `frames` from the ring into `local`, following seeks and skips. `None`
+    /// ends the source.
+    fn read(&mut self, frames: u64) -> Option<Read> {
+        let v = &*self.voice;
         let slots = v.slots.get()?;
         let ch = self.channels.get() as u64;
 
         // Move to the latest seek.
         let seq = v.seek_seq.load(Ordering::SeqCst);
         if seq % 2 == 1 {
-            return self.silence(); // being published; the next refill reads it
+            return Some(Read::Silence); // being published; the next refill reads it
         }
         if seq != v.seek_seen.load(Ordering::Relaxed) {
             let start = v.seek_start.load(Ordering::Relaxed);
             let frame = v.seek_frame.load(Ordering::Relaxed);
             fence(Ordering::Acquire);
             if v.seek_seq.load(Ordering::Relaxed) != seq {
-                return self.silence();
+                return Some(Read::Silence);
             }
             v.read.store(start, Ordering::Release);
             v.front_frame.store(frame, Ordering::Relaxed);
@@ -515,14 +784,14 @@ impl RingSource {
         let read = v.read.load(Ordering::Relaxed);
         let write = v.write.load(Ordering::Acquire);
         let skip_at = v.skip_at.load(Ordering::Acquire);
-        let mut n = (write - read).min(TAKE as u64 / ch * ch);
+        let mut n = (write - read).min(frames * ch);
         if skip_at > read && skip_at < read + n {
             // A chunk ends at a skip, so the position moves when that sample plays.
             n = skip_at - read;
         }
         if n == 0 {
             if v.end.load(Ordering::Acquire) == read {
-                return self.finish(seq);
+                return Some(Read::End(seq));
             }
             if v.started.load(Ordering::Relaxed) && !v.starved.swap(true, Ordering::Relaxed) {
                 self.controls.glitches.starved();
@@ -532,7 +801,7 @@ impl RingSource {
                 });
             }
             v.cv.notify_one();
-            return self.silence();
+            return Some(Read::Silence);
         }
         self.local
             .extend((read..read + n).map(|i| f32::from_bits(slots.at(i).load(Ordering::Relaxed))));
@@ -540,7 +809,7 @@ impl RingSource {
         fence(Ordering::Acquire);
         if v.seek_seq.load(Ordering::Relaxed) != seq {
             self.local.clear();
-            return self.silence();
+            return Some(Read::Silence);
         }
         v.read.store(read + n, Ordering::Release);
         let mut front = v.front_frame.load(Ordering::Relaxed);
@@ -573,7 +842,7 @@ impl RingSource {
                 on: false,
             });
         }
-        Some(())
+        Some(Read::Sound)
     }
 
     /// A step of silence (paused, starved, or waiting for a seek).
@@ -604,6 +873,13 @@ impl RingSource {
     }
 }
 
+#[cfg(test)]
+impl Drop for RingSource {
+    fn drop(&mut self) {
+        self.controls.sources.fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
 impl Iterator for RingSource {
     type Item = Sample;
 
@@ -614,7 +890,7 @@ impl Iterator for RingSource {
         }
         let s = self.local[self.idx];
         self.idx += 1;
-        Some(s * self.gain)
+        Some(s)
     }
 }
 
@@ -732,6 +1008,201 @@ mod tests {
             .filter(|m| matches!(m, Msg::Skipped { voice: 1 }))
             .count();
         assert_eq!(skipped, 1);
+    }
+
+    /// A voice holding `secs` of a constant 0.5 on both channels.
+    fn steady(secs: f64) -> Arc<VoiceShared> {
+        let v = voice();
+        let slots = v.slots.get().unwrap();
+        let n = (secs * 44_100.0) as usize * 2;
+        v.push(slots, &vec![0.5; n]);
+        v
+    }
+
+    /// The gain of each frame `src` plays next, for `frames` frames (the voices hold 0.5).
+    fn gains(src: &mut RingSource, frames: usize) -> Vec<f32> {
+        (0..frames)
+            .map(|_| {
+                let l = src.next().unwrap_or(0.0);
+                let _ = src.next();
+                l / 0.5
+            })
+            .collect()
+    }
+
+    #[test]
+    fn a_crossfade_keeps_the_power_steady_and_is_even_at_the_midpoint() {
+        let controls = playing();
+        let (tx, _rx) = mpsc::channel();
+        let (old, new) = (steady(2.0), steady(2.0));
+        let mut out = old.source(controls.clone(), tx.clone()).unwrap();
+        // Whole chunks, so both ramps start on the same frame.
+        let _ = gains(&mut out, 4096);
+        let fade = Duration::from_secs(1);
+        old.fade(Fade::Out, fade);
+        new.start_silent();
+        new.fade(Fade::In, fade);
+        let mut inc = new.source(controls, tx).unwrap();
+        let a = gains(&mut out, 44_100);
+        let b = gains(&mut inc, 44_100);
+        for (i, (a, b)) in a.iter().zip(&b).enumerate() {
+            let power = a * a + b * b;
+            assert!(
+                (power - 1.0).abs() < 1e-3,
+                "frame {i}: {a}² + {b}² = {power}"
+            );
+        }
+        let mid = 22_050;
+        assert!((a[mid] - b[mid]).abs() < 1e-3, "{} vs {}", a[mid], b[mid]);
+        assert!((a[mid] - std::f32::consts::FRAC_1_SQRT_2).abs() < 1e-3);
+    }
+
+    #[test]
+    fn a_pause_holds_a_fade_where_it_is() {
+        let controls = playing();
+        let (tx, _rx) = mpsc::channel();
+        let v = steady(3.0);
+        v.start_silent();
+        v.fade(Fade::In, Duration::from_secs(1));
+        let mut src = v.source(controls.clone(), tx).unwrap();
+        let before = gains(&mut src, 22_050);
+        controls.paused.store(true, Ordering::SeqCst);
+        // What was taken before the pause plays out, then a short tail, then silence.
+        let _ = gains(&mut src, 4410);
+        let held = f64::from_bits(v.fade_phase.load(Ordering::Relaxed));
+        let silent = gains(&mut src, 44_100);
+        assert!(silent.iter().all(|&g| g == 0.0));
+        assert_eq!(f64::from_bits(v.fade_phase.load(Ordering::Relaxed)), held);
+        controls.paused.store(false, Ordering::SeqCst);
+        let after = gains(&mut src, 4410);
+        let last = before[before.len() - 1];
+        // Back up past where it paused (after the short ramp in), and still below full.
+        assert!(
+            after[4409] > last && after[4409] < 0.9,
+            "{last} then {}",
+            after[4409]
+        );
+    }
+
+    #[test]
+    fn a_pause_ramps_out_instead_of_cutting() {
+        let controls = playing();
+        let (tx, _rx) = mpsc::channel();
+        let v = steady(2.0);
+        let mut src = v.source(controls.clone(), tx).unwrap();
+        let _ = gains(&mut src, 4410);
+        controls.paused.store(true, Ordering::SeqCst);
+        let g = gains(&mut src, 8820);
+        let biggest = g
+            .windows(2)
+            .map(|w| (w[0] - w[1]).abs())
+            .fold(0.0, f32::max);
+        assert!(biggest < 0.01, "a step of {biggest} between frames");
+        let ramp = g.iter().filter(|&&x| x > 0.0 && x < 1.0).count();
+        assert!((1000..=1400).contains(&ramp), "{ramp} frames of ramp");
+        assert_eq!(g[8819], 0.0);
+    }
+
+    #[test]
+    fn a_resume_ramps_in() {
+        let controls = playing();
+        let (tx, _rx) = mpsc::channel();
+        let v = steady(2.0);
+        let mut src = v.source(controls.clone(), tx).unwrap();
+        let _ = gains(&mut src, 4410);
+        controls.paused.store(true, Ordering::SeqCst);
+        let _ = gains(&mut src, 8820);
+        controls.paused.store(false, Ordering::SeqCst);
+        let g = gains(&mut src, 4410);
+        let biggest = g
+            .windows(2)
+            .map(|w| (w[0] - w[1]).abs())
+            .fold(0.0, f32::max);
+        assert!(biggest < 0.01, "a step of {biggest} between frames");
+        assert_eq!(g[4409], 1.0);
+    }
+
+    #[test]
+    fn a_stopped_voice_ramps_out_then_ends() {
+        let controls = playing();
+        let (tx, _rx) = mpsc::channel();
+        let v = steady(2.0);
+        let mut src = v.source(controls, tx).unwrap();
+        let _ = gains(&mut src, 4410);
+        v.stop();
+        let tail: Vec<f32> = src.by_ref().take(88_200 * 2).map(|s| s / 0.5).collect();
+        assert!(
+            tail.len() / 2 <= 2048 + 1323,
+            "{} frames after the stop",
+            tail.len() / 2
+        );
+        let biggest = tail
+            .windows(2)
+            .map(|w| (w[0] - w[1]).abs())
+            .fold(0.0, f32::max);
+        assert!(biggest < 0.01, "a step of {biggest}");
+        assert!(tail[tail.len() - 1] < 0.01);
+    }
+
+    #[test]
+    fn a_new_source_for_a_voice_already_heard_ramps_in() {
+        let controls = playing();
+        let (tx, _rx) = mpsc::channel();
+        let v = steady(2.0);
+        let mut first = v.source(controls.clone(), tx.clone()).unwrap();
+        let _ = gains(&mut first, 4096);
+        // Another device: a new source takes over mid-song.
+        let mut second = v.source(controls, tx).unwrap();
+        let g = gains(&mut second, 2048);
+        assert!(g[0] < 0.01, "starts at {}", g[0]);
+        assert_eq!(g[2047], 1.0);
+    }
+
+    #[test]
+    fn a_voice_loaded_mid_song_ramps_in() {
+        let controls = playing();
+        let (tx, _rx) = mpsc::channel();
+        let v = steady(2.0);
+        v.ramp_in_first();
+        let mut src = v.source(controls, tx).unwrap();
+        let g = gains(&mut src, 2048);
+        assert!(g[0] < 0.01, "starts at {}", g[0]);
+        assert_eq!(g[2047], 1.0);
+    }
+
+    #[test]
+    fn a_pause_at_48_khz_ramps_out_without_allocating() {
+        let controls = playing();
+        let (tx, _rx) = mpsc::channel();
+        let v = Arc::new(VoiceShared::new(1, "test".into()));
+        v.set_format(
+            ChannelCount::new(2).unwrap(),
+            SampleRate::new(48_000).unwrap(),
+        );
+        v.push(v.slots.get().unwrap(), &vec![0.5; 96_000]);
+        let mut src = v.source(controls.clone(), tx).unwrap();
+        let capacity = src.local.capacity();
+        let _ = src.by_ref().take(4096).count();
+        controls.paused.store(true, Ordering::SeqCst);
+        let _ = src.by_ref().take(8192).count();
+        assert_eq!(src.local.capacity(), capacity, "the audio thread allocated");
+    }
+
+    #[test]
+    fn a_voice_faded_out_ends_and_says_so() {
+        let controls = playing();
+        let (tx, rx) = mpsc::channel();
+        let v = steady(2.0);
+        let mut src = v.source(controls, tx).unwrap();
+        v.fade(Fade::Out, Duration::from_millis(100));
+        // Bounded: a source that never ends would hang the test.
+        let heard = src.by_ref().take(88_200 * 2).count() / 2;
+        assert!(heard < 4410 + 2048, "{heard} frames");
+        let faded = rx
+            .try_iter()
+            .filter(|m| matches!(m, Msg::FadedOut { voice: 1 }))
+            .count();
+        assert_eq!(faded, 1);
     }
 
     #[test]

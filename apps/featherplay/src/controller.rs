@@ -1268,6 +1268,7 @@ fn source(s: &ResolvedStream) -> StreamSource {
         url: s.url.clone(),
         mime: s.mime.clone(),
         content_length: s.content_length,
+        duration: s.duration,
     }
 }
 

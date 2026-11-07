@@ -46,8 +46,8 @@ impl SkipSilence {
 }
 
 /// A block whose peak is under this is silent: −60 dBFS.
-const THRESHOLD: Sample = 0.001;
-const BLOCK: Duration = Duration::from_millis(10);
+pub(crate) const THRESHOLD: Sample = 0.001;
+pub(crate) const BLOCK: Duration = Duration::from_millis(10);
 /// What a silent run keeps.
 const KEEP: Duration = Duration::from_millis(500);
 /// A silent run this long, inside a track, is shortened to `KEEP` (`Everywhere`).

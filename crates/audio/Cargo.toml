@@ -39,5 +39,9 @@ windows = { workspace = true, features = ["Win32_Foundation", "Win32_System_Thre
 featherplay-streams = { path = "../streams" }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 
+[target.'cfg(windows)'.dev-dependencies]
+# The process's cycle count, for the crossfade's CPU measurement (`stream_tests.rs`).
+windows = { workspace = true, features = ["Win32_System_WindowsProgramming"] }
+
 [lints]
 workspace = true

@@ -209,6 +209,50 @@ impl Download {
     }
 }
 
+impl Download {
+    /// Another reader over the same bytes (`DownloadView`).
+    pub fn view(&self) -> DownloadView {
+        DownloadView {
+            shared: self.shared.clone(),
+            file: self.file.clone(),
+        }
+    }
+}
+
+/// Another reader over a download's bytes, for a second decoder (`tail`). It doesn't keep
+/// the download going, and a read where bytes are missing fails instead of waiting.
+#[derive(Clone)]
+pub(crate) struct DownloadView {
+    shared: Arc<Shared>,
+    file: Arc<NamedTempFile>,
+}
+
+impl DownloadView {
+    /// Every byte has arrived.
+    pub fn is_complete(&self) -> bool {
+        let s = &*self.shared;
+        s.state
+            .lock_or_recover()
+            .run_end(0)
+            .is_some_and(|end| end >= s.len)
+    }
+
+    pub fn read_at(&self, pos: u64, buf: &mut [u8]) -> io::Result<usize> {
+        let s = &*self.shared;
+        if pos >= s.len || buf.is_empty() {
+            return Ok(0);
+        }
+        let end = s
+            .state
+            .lock_or_recover()
+            .run_end(pos)
+            .ok_or_else(|| io::Error::new(io::ErrorKind::WouldBlock, "not downloaded yet"))?;
+        let n = buf.len().min((end - pos) as usize);
+        read_exact_at(self.file.as_file(), &mut buf[..n], pos)?;
+        Ok(n)
+    }
+}
+
 impl Drop for Download {
     fn drop(&mut self) {
         self.canceller().cancel();

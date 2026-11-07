@@ -2,6 +2,10 @@
 //! `AudioEvent`s. API calls send it messages; play, pause and volume are atomics the audio
 //! thread reads directly, so they take effect without a round trip.
 //!
+//! A crossfade keeps the track being left playing, as a `fading` voice that ramps down
+//! while the new current one ramps up (`voice::Fade`); the mixer sums them. It stops once
+//! silent. A load, a seek or another device ends the fade at once.
+//!
 //! A running output wakes its device thread every few milliseconds even when it only plays
 //! silence, so `STOP_AFTER` into a pause the engine stops the output stream; `play()` starts
 //! it again. The device stays open, so resuming is as quick as from a short pause.
@@ -20,8 +24,8 @@ use tokio::runtime::Runtime;
 use crate::devices::{self, OpenError, Output, is_device_lost};
 use crate::glitches::Counts;
 use crate::head::{self, HeadCache};
-use crate::voice::{self, Controls, VoiceShared};
-use crate::{AudioEvent, Compressor, SkipSilence, StreamSource, perceptual_gain};
+use crate::voice::{self, Controls, DECLICK, Fade, VoiceShared};
+use crate::{AudioEvent, Compressor, Playhead, SkipSilence, StreamSource, perceptual_gain};
 
 /// How long the ring must stay empty before `Buffering(true)` goes out. Shorter gaps (a seek
 /// within downloaded data) would only make the UI flicker.
@@ -29,6 +33,9 @@ const BUFFERING_DELAY: Duration = Duration::from_millis(150);
 /// How long a paused output keeps running before its stream stops: enough to play out the
 /// device buffer as silence, so a resume never replays audio from before the pause.
 const STOP_AFTER: Duration = Duration::from_secs(1);
+/// Tracks fading out at once at most: a third (skips in a row, each fading) stops the
+/// oldest, which is the quietest.
+const MAX_FADING: usize = 2;
 
 pub(crate) enum Msg {
     Load {
@@ -37,6 +44,12 @@ pub(crate) enum Msg {
         seq: u64,
     },
     Preload(StreamSource),
+    Crossfade {
+        src: StreamSource,
+        fade: Duration,
+        seq: u64,
+    },
+    FadeOut(Duration),
     Prefetch(String),
     Seek {
         to: Duration,
@@ -73,6 +86,10 @@ pub(crate) enum Msg {
         voice: u64,
     },
     Ended {
+        voice: u64,
+    },
+    /// A voice ramped down to silence (`voice::Fade::Out`) and left the mixer.
+    FadedOut {
         voice: u64,
     },
     Starved {
@@ -219,6 +236,22 @@ impl AudioEngine {
         }
     }
 
+    /// Makes `src` the current track from its start without pausing, and plays: the track
+    /// playing now fades out over `fade` while `src` fades in (equal power), and stops once
+    /// silent. A preloaded `src` sounds at once; another fades in once it has loaded. A
+    /// `load`, a `seek` or another device ends the fade, the old track at once.
+    pub fn crossfade_to(&self, src: StreamSource, fade: Duration) {
+        let seq = self.pending(Duration::ZERO);
+        self.send(Msg::Crossfade { src, fade, seq });
+        self.play();
+    }
+
+    /// The current track fades out over `fade`, then stops; nothing is current until the
+    /// next `load` or `crossfade_to`.
+    pub fn fade_out(&self, fade: Duration) {
+        self.send(Msg::FadeOut(fade));
+    }
+
     pub fn play(&self) {
         self.controls.paused.store(false, Ordering::SeqCst);
         self.send(Msg::EnsureOutput);
@@ -268,20 +301,44 @@ impl AudioEngine {
         self.send(Msg::SetDevice(name.map(str::to_owned)));
     }
 
-    /// Position in the current track; zero when nothing is loaded.
-    pub fn position(&self) -> Duration {
+    /// Crossfade on: each track's decoder thread also reads the last 20 s of its stream
+    /// once, to find where the music ends (`Playhead::music_end`).
+    pub fn set_crossfade(&self, on: bool) {
+        self.controls.crossfade.store(on, Ordering::Relaxed);
+    }
+
+    /// The position in the current track, and where its music ends if known; read
+    /// together, so both are the same track's.
+    pub fn playhead(&self) -> Playhead {
         let s = self.status.lock_or_recover();
         match (&s.pending, &s.current) {
-            (Some((_, to)), _) => *to,
-            (None, Some(v)) => v.position(),
-            (None, None) => Duration::ZERO,
+            (Some((_, to)), _) => Playhead {
+                position: *to,
+                music_end: None,
+            },
+            (None, Some(v)) => Playhead {
+                position: v.position(),
+                music_end: v.music_end(),
+            },
+            (None, None) => Playhead::default(),
         }
+    }
+
+    /// Position in the current track; zero when nothing is loaded.
+    pub fn position(&self) -> Duration {
+        self.playhead().position
     }
 
     /// The glitch counters so far. For tests.
     #[cfg(test)]
     pub(crate) fn glitches(&self) -> Counts {
         self.controls.glitches.snapshot()
+    }
+
+    /// Sources in the mixer now. For tests.
+    #[cfg(test)]
+    pub(crate) fn sources(&self) -> usize {
+        self.controls.sources.load(Ordering::SeqCst)
     }
 
     /// Starts the longest-gap counter over. For tests.
@@ -340,6 +397,11 @@ struct Engine {
     device: Option<String>,
     current: Option<Voice>,
     preloaded: Option<Voice>,
+    /// Tracks fading out after a crossfade, oldest first; `MAX_FADING` at most.
+    fading: Vec<Voice>,
+    /// A preload asked for during a fade, started once the fade is over, so a fade never
+    /// holds a third ring.
+    deferred_preload: Option<StreamSource>,
     next_voice: u64,
     subscribers: Vec<Sender<AudioEvent>>,
     /// When the current voice's ring ran dry, until `Buffering(true)` is sent.
@@ -385,6 +447,8 @@ impl Engine {
             device: None,
             current: None,
             preloaded: None,
+            fading: Vec::new(),
+            deferred_preload: None,
             next_voice: 0,
             subscribers: Vec::new(),
             starved_since: None,
@@ -442,6 +506,7 @@ impl Engine {
         for v in [self.current.take(), self.preloaded.take()]
             .into_iter()
             .flatten()
+            .chain(self.fading.drain(..))
         {
             v.shared.stop();
         }
@@ -453,23 +518,26 @@ impl Engine {
         match m {
             Msg::Load { src, start_at, seq } => self.load(src, start_at, seq),
             Msg::Preload(src) => {
-                if self
-                    .preloaded
-                    .as_ref()
-                    .is_some_and(|p| p.shared.url == src.url)
-                {
-                    return;
+                if !self.fading.is_empty() {
+                    self.deferred_preload = Some(src);
+                } else {
+                    self.preload(src);
                 }
-                if let Some(old) = self.preloaded.take() {
-                    old.shared.stop();
+            }
+            Msg::Crossfade { src, fade, seq } => self.crossfade(src, fade, seq),
+            Msg::FadeOut(fade) => {
+                if let Some(old) = self.current.take() {
+                    self.clear_buffering();
+                    self.status.lock_or_recover().current = None;
+                    self.fade_away(old, fade);
                 }
-                self.preloaded = Some(self.spawn_voice(src));
             }
             Msg::Prefetch(url) => {
                 // A voice for the URL is downloading it already.
                 let playing = [&self.current, &self.preloaded]
                     .into_iter()
                     .flatten()
+                    .chain(&self.fading)
                     .any(|v| v.shared.url == url);
                 if !playing {
                     let tx = self.tx.clone();
@@ -482,16 +550,25 @@ impl Engine {
             }
             // Told like a refused preload: the app resolves the stream again.
             Msg::HeadRefused(url) => self.emit(AudioEvent::PreloadRefused(url)),
-            Msg::Seek { to, seq } => match &mut self.current {
-                Some(v) => {
-                    // This seek replaces an unfinished load seek; attach after it instead.
-                    if v.attach_after.is_some() {
-                        v.attach_after = Some(seq);
+            Msg::Seek { to, seq } => {
+                if !self.fading.is_empty() {
+                    // A seek ends the fade: the old track goes, the new one comes up.
+                    self.end_fades();
+                    if let Some(v) = &self.current {
+                        v.shared.fade(Fade::In, DECLICK);
                     }
-                    v.shared.request_seek(to, seq);
                 }
-                None => self.settle(seq),
-            },
+                match &mut self.current {
+                    Some(v) => {
+                        // This seek replaces an unfinished load seek; attach after it instead.
+                        if v.attach_after.is_some() {
+                            v.attach_after = Some(seq);
+                        }
+                        v.shared.request_seek(to, seq);
+                    }
+                    None => self.settle(seq),
+                }
+            }
             Msg::SetDevice(name) => {
                 if let Err(e) = self.open_output(name) {
                     self.emit(AudioEvent::Error(e.to_string()));
@@ -559,6 +636,9 @@ impl Engine {
                 }
             }
             Msg::VoiceError { voice, msg } => {
+                if self.drop_fading(voice) {
+                    return;
+                }
                 if self.is_current(voice) {
                     self.status.lock_or_recover().pending = None;
                     self.emit(AudioEvent::Error(msg));
@@ -591,7 +671,13 @@ impl Engine {
                     self.clear_buffering();
                     self.report_glitches();
                     self.emit(AudioEvent::Ended);
+                } else {
+                    // A fading track's stream ran out before its fade did.
+                    self.drop_fading(voice);
                 }
+            }
+            Msg::FadedOut { voice } => {
+                self.drop_fading(voice);
             }
             Msg::Starved { voice, on } => {
                 if !self.is_current(voice) {
@@ -610,6 +696,7 @@ impl Engine {
                 // Pause, then reopen: the same device if it's back, else the default one.
                 self.controls.paused.store(true, Ordering::SeqCst);
                 self.sink = None;
+                self.end_fades();
                 let _ = self.open_output(self.device.clone());
                 self.emit(AudioEvent::DeviceLost);
             }
@@ -621,6 +708,7 @@ impl Engine {
         if let Some(old) = self.current.take() {
             old.shared.stop();
         }
+        self.end_fades();
         let mut voice = match self.preloaded.take() {
             Some(p) if p.shared.url == src.url => p,
             other => {
@@ -632,12 +720,111 @@ impl Engine {
             // A new or preloaded voice is already at the start.
             self.settle(seq);
         } else {
+            voice.shared.ramp_in_first();
             voice.attach_after = Some(seq);
             voice.shared.request_seek(start_at, seq);
         }
         self.status.lock_or_recover().current = Some(voice.shared.clone());
         self.current = Some(voice);
         self.attach_current();
+    }
+
+    fn preload(&mut self, src: StreamSource) {
+        if self
+            .preloaded
+            .as_ref()
+            .is_some_and(|p| p.shared.url == src.url)
+        {
+            return;
+        }
+        if let Some(old) = self.preloaded.take() {
+            old.shared.stop();
+        }
+        self.preloaded = Some(self.spawn_voice(src));
+    }
+
+    /// `src` becomes current from its start, fading in over `fade`, while the current track
+    /// fades out. The preloaded voice is used if it's `src`.
+    fn crossfade(&mut self, src: StreamSource, fade: Duration, seq: u64) {
+        self.clear_buffering();
+        if let Some(old) = self.current.take() {
+            self.fade_away(old, fade);
+        }
+        // A preload waiting for the fade to end may be this track (Fade on skip): it's
+        // spawned here instead.
+        if self
+            .deferred_preload
+            .as_ref()
+            .is_some_and(|d| d.url == src.url)
+        {
+            self.deferred_preload = None;
+        }
+        let voice = match self.preloaded.take() {
+            Some(p) if p.shared.url == src.url => p,
+            other => {
+                self.preloaded = other;
+                self.spawn_voice(src)
+            }
+        };
+        // Not attached yet (a preloaded voice never is), so it starts from silence.
+        voice.shared.start_silent();
+        voice.shared.fade(Fade::In, fade);
+        self.settle(seq);
+        self.status.lock_or_recover().current = Some(voice.shared.clone());
+        self.current = Some(voice);
+        self.attach_current();
+    }
+
+    /// `v` is no longer current: it fades out over `fade` from where it is, or stops now if
+    /// it isn't sounding. Tracks already fading are gone within `fade` too.
+    fn fade_away(&mut self, v: Voice, fade: Duration) {
+        let sounding =
+            self.sink.is_some() && v.ready && v.attach_after.is_none() && !v.shared.has_ended();
+        if !sounding {
+            v.shared.stop();
+            return;
+        }
+        if self.fading.len() >= MAX_FADING {
+            // Stopping ramps it out over a few ms.
+            self.fading.remove(0).shared.stop();
+        }
+        for f in &self.fading {
+            f.shared.fade_out_within(fade);
+        }
+        v.shared.fade(Fade::Out, fade);
+        self.fading.push(v);
+    }
+
+    /// Stops the tracks fading out (each ramps out over a few ms), then starts a preload
+    /// that waited for them.
+    fn end_fades(&mut self) {
+        for v in self.fading.drain(..) {
+            v.shared.stop();
+        }
+        if let Some(src) = self.deferred_preload.take() {
+            self.preload(src);
+        }
+    }
+
+    /// Stops and forgets the fading voice `id`; false if it isn't one.
+    fn drop_fading(&mut self, id: u64) -> bool {
+        let Some(i) = self.fading.iter().position(|v| v.shared.id == id) else {
+            return false;
+        };
+        let v = self.fading.remove(i);
+        v.shared.stop();
+        // Its start is kept in memory, as for any track left (the app's `prefetch` skipped
+        // it while it played), so Previous back to it starts at once.
+        let url = v.shared.url.clone();
+        if url.starts_with("https://") || url.starts_with("http://") {
+            self.handle(Msg::Prefetch(url));
+        }
+        if self.fading.is_empty()
+            && let Some(src) = self.deferred_preload.take()
+        {
+            self.preload(src);
+        }
+        true
     }
 
     fn spawn_voice(&mut self, src: StreamSource) -> Voice {
@@ -680,6 +867,8 @@ impl Engine {
         };
         #[cfg(not(test))]
         let mut sink = devices::open_output(name.as_deref(), on_error, &self.controls)?;
+        // The fading tracks' sources were on the old output.
+        self.end_fades();
         if !self.controls.paused.load(Ordering::SeqCst) {
             sink.set_playing(true)?;
         }
