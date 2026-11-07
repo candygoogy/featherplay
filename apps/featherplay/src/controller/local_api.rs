@@ -1,4 +1,4 @@
-//! The local API (Settings > Integrations, off by default): the server in
+//! The local API (Settings > Local API, off by default): the server in
 //! `featherplay_integrations::local_api`, started at launch when it's on and from Settings.
 //!
 //! - Its token is made on the first start (`Token::generate`, the system's CSPRNG) and kept

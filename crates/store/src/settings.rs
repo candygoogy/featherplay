@@ -89,7 +89,7 @@ pub struct Settings {
     /// the background, check its sha256, and offer "Restart to update" (on by default).
     /// Used only while `check_for_updates` is on; off, a newer release is only announced.
     pub install_updates: bool,
-    /// The local API for overlays and scripts (Settings > Integrations), off by default. Its
+    /// The local API for overlays and scripts (Settings > Local API), off by default. Its
     /// token is in Credential Manager, not here.
     pub local_api: bool,
     /// The local API's port. A value that isn't a port from `LOCAL_API_MIN_PORT` up loads as
@@ -337,7 +337,7 @@ impl Default for DiscordOptions {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum DiscordTime {
-    /// The progress bar with the time left.
+    /// The progress bar, between the time elapsed and the track's length.
     #[default]
     Bar,
     /// Only the time elapsed (Pear's "Hide duration left" shows no time at all).

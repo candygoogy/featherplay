@@ -29,8 +29,9 @@ use crate::{account_menu, playlist_menu};
 
 /// The sidebar's list covers, in logical pixels.
 const COVER: u32 = 24;
-/// The account photo, in logical pixels.
-const AVATAR: u32 = 32;
+/// The account photo, in logical pixels: decoded for its largest use, the avatar on
+/// Settings' Discord card (76 inside its ring); the sidebar's 32 px row shows it smaller.
+const AVATAR: u32 = 76;
 /// Home's shortcuts after Liked songs.
 const SHORTCUTS: usize = 3;
 

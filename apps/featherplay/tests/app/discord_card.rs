@@ -5,11 +5,14 @@
 use std::ops::ControlFlow;
 use std::time::Duration;
 
+use featherplay::app;
+use featherplay::controller::UiEvent;
 use featherplay::offscreen;
 use featherplay::snapshot::Scene;
 use featherplay::ui::{DiscordPart, DiscordState, SettingsData};
 use i_slint_core::accessibility::AccessibleStringProperty;
 use i_slint_core::item_tree::ItemRc;
+use i_slint_core::items::AccessibleRole;
 use i_slint_core::lengths::LogicalRect;
 use i_slint_core::window::WindowInner;
 use slint::platform::WindowEvent;
@@ -38,12 +41,14 @@ fn settings(width: u32, height: u32) -> Scene {
     scene
 }
 
-/// Where the first shown element labelled `label` is, in window coordinates.
-fn shown(scene: &Scene, label: &str) -> Option<LogicalRect> {
+/// Where the first shown element labelled `label` (with `role`, if given) is, in window
+/// coordinates.
+fn shown_as(scene: &Scene, role: Option<AccessibleRole>, label: &str) -> Option<LogicalRect> {
     let root = ItemRc::new_root(WindowInner::from_pub(scene.ui.window()).component());
     let mut found = None;
     root.visit_descendants(|item| {
         if item.is_visible()
+            && role.is_none_or(|r| item.accessible_role() == r)
             && item
                 .accessible_string_property(AccessibleStringProperty::Label)
                 .is_some_and(|v| v == label)
@@ -57,8 +62,18 @@ fn shown(scene: &Scene, label: &str) -> Option<LogicalRect> {
     found
 }
 
+fn shown(scene: &Scene, label: &str) -> Option<LogicalRect> {
+    shown_as(scene, None, label)
+}
+
 fn find(scene: &Scene, label: &str) -> LogicalRect {
     shown(scene, label).unwrap_or_else(|| panic!("no {label:?} on the page"))
+}
+
+/// Where the settings group titled `title` has its panel.
+fn panel(scene: &Scene, title: &str) -> LogicalRect {
+    shown_as(scene, Some(AccessibleRole::Groupbox), title)
+        .unwrap_or_else(|| panic!("no {title:?} group on the page"))
 }
 
 fn hover(scene: &Scene, x: f32, y: f32) {
@@ -90,6 +105,11 @@ fn hovering_an_option_lights_the_part_of_the_card_it_changes() {
     hover(&scene, status.center().x, status.center().y);
     assert_eq!(data.get_discord_card_lit(), DiscordPart::Status);
 
+    // Discord status shows the card at all: the whole card.
+    let on = find(&scene, "Discord status");
+    hover(&scene, on.center().x, on.center().y);
+    assert_eq!(data.get_discord_card_lit(), DiscordPart::Card);
+
     // From one option to its neighbour that lights the same part: it stays lit.
     for label in ["Clear activity", "Clear after a pause"] {
         let row = find(&scene, label);
@@ -110,6 +130,60 @@ fn hovering_an_option_lights_the_part_of_the_card_it_changes() {
     // Off the options (over the sidebar): nothing is lit.
     hover(&scene, 100.0, 600.0);
     assert_eq!(data.get_discord_card_lit(), DiscordPart::None);
+}
+
+#[test]
+fn the_card_shows_the_account_picture_while_signed_in() {
+    // Art for every fixture thumbnail, so the fixture account has a photo, as the sidebar's
+    // account row shows it.
+    crate::support::fixture_covers();
+    let scene = settings(1568, 3400);
+    assert!(
+        shown(&scene, "Your profile picture").is_some(),
+        "the card's avatar isn't the account's picture"
+    );
+
+    // Signed out: the neutral avatar.
+    app::on_event(UiEvent::Account { signed_in: false });
+    scene.settle();
+    assert!(
+        shown(&scene, "Your profile picture").is_none(),
+        "the card still shows the account's picture signed out"
+    );
+}
+
+#[test]
+fn the_discord_group_ends_with_its_rows() {
+    let scene = settings(1568, 3400);
+    let discord = panel(&scene, "Discord");
+    let local_api = panel(&scene, "Local API");
+    assert!(
+        local_api.min_y() > discord.max_y(),
+        "Local API {local_api:?} isn't a group of its own below Discord {discord:?}"
+    );
+    // The options' last row and the card end the panel: nothing empty under them.
+    let last = find(&scene, "Listening to the song title");
+    let card = find(&scene, "Discord preview");
+    assert!(
+        card.max_y() <= discord.max_y(),
+        "the card {card:?} leaves {discord:?}"
+    );
+    assert!(
+        discord.max_y() - last.max_y() < 40.0,
+        "{:.0} px under the last option {last:?} in {discord:?}",
+        discord.max_y() - last.max_y()
+    );
+
+    // Off, the one row is shorter than the card: the panel ends under the card and its note.
+    scene.ui.global::<SettingsData>().set_discord(false);
+    scene.settle();
+    let discord = panel(&scene, "Discord");
+    let card = find(&scene, "Discord preview");
+    assert!(
+        discord.max_y() - card.max_y() < 120.0,
+        "{:.0} px under the card {card:?} in {discord:?}",
+        discord.max_y() - card.max_y()
+    );
 }
 
 #[test]
@@ -138,9 +212,16 @@ fn the_card_sits_above_the_options_in_a_narrow_window() {
         card.max_y() < row.min_y(),
         "the card {card:?} isn't above the options {row:?}"
     );
+    // On the right, at the switches' edge, its caption and note on its left as a row's text.
+    let switch = shown_as(&scene, Some(AccessibleRole::Switch), "Discord status").expect("switch");
     assert!(
-        (card.min_x() - row.min_x()).abs() < 2.0,
-        "the card {card:?} doesn't line up with the options {row:?}"
+        (card.max_x() - switch.max_x()).abs() < 2.0,
+        "the card {card:?} doesn't end at the switches' edge {switch:?}"
+    );
+    let caption = find(&scene, "Preview · how friends see you");
+    assert!(
+        caption.max_x() < card.min_x() && (caption.min_x() - row.min_x()).abs() < 2.0,
+        "the caption {caption:?} isn't left of the card {card:?}, under the options' edge"
     );
 }
 
@@ -148,9 +229,9 @@ fn the_card_sits_above_the_options_in_a_narrow_window() {
 fn the_card_stays_in_view_while_the_options_scroll() {
     let scene = settings(1568, 900);
     let w = scene.ui.window();
-    // Integrations to the top (its index entry), then on until the first options have
-    // scrolled away above the page.
-    let entry = find(&scene, "Integrations");
+    // Discord to the top (its index entry), then on until the first options have scrolled
+    // away above the page.
+    let entry = shown_as(&scene, Some(AccessibleRole::Button), "Discord").expect("index entry");
     hover(&scene, entry.center().x, entry.center().y);
     let button = slint::platform::PointerEventButton::Left;
     let at = LogicalPosition::new(entry.center().x, entry.center().y);
@@ -180,15 +261,18 @@ fn the_card_stays_in_view_while_the_options_scroll() {
     );
 
     // On past the Discord options: the card stops at their end and goes up with them, never
-    // over the Local API row after them.
+    // over the Local API group after them.
     for _ in 0..20 {
-        if shown(&scene, "Local API").is_some_and(|r| r.min_y() < 300.0) {
+        // Shown once it has scrolled into the page.
+        if shown_as(&scene, Some(AccessibleRole::Groupbox), "Local API")
+            .is_some_and(|r| r.min_y() < 300.0)
+        {
             break;
         }
         offscreen::wheel(w, page, -1.0);
         scene.settle();
     }
-    let local_api = find(&scene, "Local API");
+    let local_api = panel(&scene, "Local API");
     assert!(
         local_api.min_y() < 300.0,
         "Local API {local_api:?} didn't come up"

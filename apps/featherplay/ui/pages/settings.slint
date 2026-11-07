@@ -1,5 +1,5 @@
-// Settings (a calm single column). Every field of `Settings`, grouped: Playback,
-// Scrobbling, Integrations, Window, Account. The Last.fm API settings and the ListenBrainz
+// Settings (a calm single column). Every field of `Settings`, grouped: Playback, Lyrics,
+// Scrobbling, Discord, Local API, Window, Account. The Last.fm API settings and the ListenBrainz
 // token are entered in a small dialog over the window (`SettingsDialogLayer`). Filled and
 // applied by `src/pages/settings.rs`; changes apply at once and are saved by the controller.
 import { Theme, Curves, Icons, Appearance } from "../theme.slint";
@@ -8,6 +8,7 @@ import { Player } from "../player.slint";
 import { Chips } from "content.slint";
 import { NowPlayingData } from "now_playing.slint";
 import { Nav, PageKind } from "../nav.slint";
+import { SidebarData } from "../sidebar.slint";
 
 // The on/off settings, for `SettingsData.toggled`.
 export enum SettingKey {
@@ -112,8 +113,10 @@ export enum DiscordPart {
     button,
     // The title and the artist (Links).
     links,
-    // The whole activity: the options that show it or clear it.
+    // The whole activity: the options that clear it.
     activity,
+    // The whole card: Discord status, which shows it at all.
+    card,
 }
 
 // The dialog open over the page, if any.
@@ -158,7 +161,7 @@ export global SettingsData {
     in-out property <string> dialog-secret;
     in-out property <string> dialog-token;
     in property <string> dialog-error;
-    // Integrations.
+    // Discord and the local API.
     in property <bool> discord;
     in property <DiscordState> discord-state;
     in property <bool> discord-auto-reconnect;
@@ -661,7 +664,7 @@ component LitPart inherits Rectangle {
 
 // The profile card: how friends see you on Discord with these options, drawn in the app's
 // own style (no Discord marks or colours) at about the size of Discord's profile card. A
-// banner in the playing cover's colours (a neutral one for the sample), the avatar over its
+// banner in the playing cover's colours (the accent's for the sample), the avatar over its
 // edge with the online dot, "You" and the status line; then the activity as the profile
 // shows it. `lit` marks the part an option changes. The time follows the player's
 // once-a-second position; nothing else moves.
@@ -675,16 +678,21 @@ component ProfileCard inherits Rectangle {
     property <color> wash: Theme.dark ? NowPlayingData.wash-dark : NowPlayingData.wash-light;
     property <bool> tinted: root.live && root.wash.alpha > 0;
     // The banner's two ends: the cover's wash into its accent while the accent follows the
-    // cover, else into a lighter step of the wash; the sample's (and grey art's) are neutral.
-    property <color> from: root.tinted ? root.wash.with-alpha(1) : Theme.card;
-    property <color> to: !root.tinted ? Theme.avatar : Theme.follow ? Theme.accent : root.wash.with-alpha(1).brighter(0.4);
+    // cover, else into a lighter step of the wash; the sample's (and grey art's) go from a
+    // deep step of the accent into the accent, so they read as a banner, not a placeholder.
+    property <color> from: root.tinted ? root.wash.with-alpha(1) : Theme.accent.darker(0.6);
+    property <color> to: !root.tinted || Theme.follow ? Theme.accent : root.wash.with-alpha(1).brighter(0.4);
     animate from, to { duration: Theme.t-colour; easing: Curves.ease-hover; }
     property <length> pad: Theme.s4;
-    property <length> banner-h: 92px;
-    property <length> avatar: 76px;
+    // About Discord's own proportions (a 340 px card, a 120 px banner, an 80 px avatar), a
+    // little flatter so the activity stays the card's subject.
+    property <length> banner-h: 112px;
+    // The photo inside the ring is 76 px, the size `src/sidebar.rs` decodes it at.
+    property <length> avatar: 88px;
     property <length> ring: 6px;
     property <length> cover: 80px;
     property <length> badge: 26px;
+    property <bool> photo: SidebarData.signed-in && SidebarData.has-avatar;
     min-height: lay.min-height;
     preferred-height: lay.preferred-height;
     min-width: lay.min-width;
@@ -707,8 +715,10 @@ component ProfileCard inherits Rectangle {
         border-top-right-radius: Theme.r-l - 1px;
         background: @linear-gradient(120deg, root.from 0%, root.to 100%);
     }
-    // The avatar: a neutral person (featherplay doesn't have the Discord picture), ringed in
-    // the card's ground where it overhangs the banner, and the online dot on its edge.
+    // The avatar: the signed-in account's photo, as the sidebar shows it (most people use the
+    // same face on Discord), or a neutral person signed out, without a photo or until it
+    // loads. Ringed in the card's ground where it overhangs the banner, the online dot on its
+    // edge.
     Rectangle {
         x: root.pad;
         y: root.banner-h - root.avatar / 2;
@@ -719,10 +729,29 @@ component ProfileCard inherits Rectangle {
         border-width: root.ring;
         border-color: Theme.ground;
         Icon {
-            width: 32px;
-            height: 32px;
+            width: 36px;
+            height: 36px;
             commands: Icons.person;
             stroke: Theme.text1;
+        }
+        // Over the person, once it's there: a plain clipped image, as it never fades or
+        // crossfades and needs none of `Cover`'s machinery.
+        Rectangle {
+            x: root.ring;
+            y: root.ring;
+            width: parent.width - 2 * root.ring;
+            height: self.width;
+            border-radius: self.width / 2;
+            clip: true;
+            visible: root.photo;
+            accessible-role: image;
+            accessible-label: @tr("Your profile picture");
+            Image {
+                width: parent.width;
+                height: parent.height;
+                source: SidebarData.avatar;
+                image-fit: ImageFit.cover;
+            }
         }
         Rectangle {
             x: parent.width - self.width - 2px;
@@ -882,61 +911,97 @@ component ProfileCard inherits Rectangle {
                     }
                     // The button, only when the option is on: across the block as Discord
                     // draws it. A picture of the button, so it has no hover, and a fill a step
-                    // quieter than the app's own buttons.
-                    if root.p.button != "": Rectangle {
-                        height: 34px;
-                        border-radius: Theme.r-s + 2px;
-                        background: Theme.hover;
-                        LitMark {
-                            border-radius: parent.border-radius;
-                            lit: root.lit == DiscordPart.button;
+                    // quieter than the app's own buttons. Under it, why you won't find it on
+                    // your own profile: Discord hides an activity's buttons from its user.
+                    if root.p.button != "": VerticalLayout {
+                        spacing: Theme.s2;
+                        Rectangle {
+                            height: 34px;
+                            border-radius: Theme.r-s + 2px;
+                            background: Theme.hover;
+                            LitMark {
+                                border-radius: parent.border-radius;
+                                lit: root.lit == DiscordPart.button;
+                            }
+                            Body {
+                                text: root.p.button;
+                                font-size: Theme.t-meta;
+                                font-weight: 600;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
                         }
                         Body {
-                            text: root.p.button;
+                            text: @tr("Discord shows this button to others, not to you.");
                             font-size: Theme.t-meta;
-                            font-weight: 600;
+                            color: Theme.text3;
                             horizontal-alignment: center;
-                            vertical-alignment: center;
+                            wrap: word-wrap;
                         }
                     }
                 }
             }
         }
     }
+    // Discord status, which shows the card at all: a ring round the whole card.
+    Rectangle {
+        border-radius: root.border-radius;
+        border-width: 2px;
+        border-color: root.lit == DiscordPart.card ? Theme.accent : Theme.accent.transparentize(1);
+        animate border-color { duration: Theme.t-fast; easing: Curves.ease-hover; }
+    }
 }
 
 // The Discord options' preview: a caption saying whose view it is (or why it's dimmed), the
 // profile card, and a note on how it follows the options. Dimmed, with nothing lit, while
-// Discord status is off or not connected. `card-w` wide, from the left (each part sized to it,
-// so the note wraps at the card's width).
-component DiscordPane inherits VerticalLayout {
+// Discord status is off or not connected. Beside the options (or above them in a narrow
+// window), the caption, the card and the note are a column `card-w` wide, so the note wraps
+// at the card's width. With `text-beside`, the pane is a row like the options': the caption as
+// its label and the note as its detail on the left, the card on the right, at the switches'
+// edge.
+component DiscordPane inherits Rectangle {
     in property <length> card-w;
+    in property <bool> text-beside;
     property <bool> on: SettingsData.discord-live;
-    spacing: Theme.s3;
-    Body {
-        width: root.card-w;
-        text: root.on ? @tr("Preview · how friends see you")
-            : SettingsData.discord-state == DiscordState.unavailable ? @tr("Preview · This build has no Discord app ID")
-            : !SettingsData.discord ? @tr("Preview · Discord status is off")
-            : SettingsData.discord-state == DiscordState.connecting ? @tr("Preview · Connecting to Discord…")
-            : @tr("Preview · Not connected to Discord");
-        font-size: Theme.t-meta;
-        color: Theme.text3;
+    property <string> caption: root.on ? @tr("Preview · how friends see you")
+        : SettingsData.discord-state == DiscordState.unavailable ? @tr("Preview · This build has no Discord app ID")
+        : !SettingsData.discord ? @tr("Preview · Discord status is off")
+        : SettingsData.discord-state == DiscordState.connecting ? @tr("Preview · Connecting to Discord…")
+        : @tr("Preview · Not connected to Discord");
+    property <string> note: SettingsData.discord-preview.sample
+        ? @tr("Nothing is playing, so a sample song stands in. Hover an option to see what it changes.")
+        : @tr("Hover an option to see what it changes.");
+    // Placed by hand rather than in layouts, so the two arrangements share their three parts.
+    property <length> text-w: root.text-beside ? root.width - root.card-w - Theme.s6 : root.card-w;
+    preferred-height: root.text-beside ? max(card.y + card.height, note.y + note.height) : note.y + note.height;
+    caption := Body {
+        x: 0;
+        y: 0;
+        width: root.text-w;
+        height: self.preferred-height;
+        text: root.caption;
+        font-size: root.text-beside ? Theme.t-body-l : Theme.t-meta;
+        font-weight: root.text-beside ? 500 : 400;
+        color: root.text-beside ? Theme.text1 : Theme.text3;
+        wrap: word-wrap;
     }
-    ProfileCard {
+    card := ProfileCard {
+        x: root.text-beside ? root.width - root.card-w : 0;
+        y: root.text-beside ? 0 : caption.height + Theme.s3;
         width: root.card-w;
+        height: self.preferred-height;
         lit: SettingsData.discord-card-lit;
         opacity: root.on ? 1 : 0.5;
     }
-    Body {
-        width: root.card-w;
-        text: SettingsData.discord-preview.sample
-            ? @tr("Nothing is playing, so a sample song stands in. Changes show here as you make them; hover an option to see what it changes.")
-            : @tr("Changes show here as you make them. Hover an option to see what it changes.");
+    note := Body {
+        x: 0;
+        y: root.text-beside ? caption.height + Theme.s1 : card.y + card.height + Theme.s3;
+        width: root.text-w;
+        height: self.preferred-height;
+        text: root.note;
         font-size: Theme.t-meta;
-        color: Theme.text3;
+        color: root.text-beside ? Rows.detail : Theme.text3;
         wrap: word-wrap;
-        overflow: clip;
     }
 }
 
@@ -994,8 +1059,7 @@ component GroupTitle inherits Display {
 }
 
 // A group of settings: its title, then its rows on a rounded panel. The panel can reach
-// `extend` past the column on the right (Integrations, with the Discord card beside its
-// options).
+// `extend` past the column on the right (Discord, with its card beside the options).
 component Group inherits VerticalLayout {
     in property <string> title;
     in property <length> extend: 0px;
@@ -1011,6 +1075,8 @@ component Group inherits VerticalLayout {
             x: 0;
             width: parent.width + root.extend;
             height: parent.height;
+            accessible-role: groupbox;
+            accessible-label: root.title;
             border-radius: Theme.r-l;
             background: Theme.panel;
             border-width: 1px;
@@ -1353,7 +1419,7 @@ export component SettingsPage inherits Rectangle {
     property <length> col-w: min(self.width - 2 * Theme.page-pad - root.index-room, root.col-max);
     property <length> block-x: Theme.page-pad;
     property <length> col-x: root.block-x + root.index-room;
-    // The Discord profile card sits beside the Discord options when Integrations' panel can
+    // The Discord profile card sits beside the Discord options when the Discord panel can
     // hold both: the options at `options-min` or more, the gap, the card. The panel then
     // reaches past the column on the right, by the card and its gap at most, as far as the
     // page's padding. Otherwise the card sits above the options.
@@ -1362,13 +1428,13 @@ export component SettingsPage inherits Rectangle {
     property <length> options-min: 520px;
     property <length> wide-panel: min(self.width - Theme.page-pad - root.col-x, root.col-w + root.card-gap + root.card-w);
     property <bool> card-beside: root.wide-panel - 2 * Rows.inset >= root.options-min + root.card-gap + root.card-w;
-    // Where Integrations' rows start in the scrolled content, and how far the card stays
-    // below the page's top while the options scroll past it (its caption level with the
-    // section index's first entry).
-    property <length> integrations-top: col.y + integrations-section.y + Rows.title-h + Theme.s3 + Rows.pad-top;
+    // Where the Discord rows start in the scrolled content, and how far the card stays below
+    // the page's top while the options scroll past it (its caption level with the section
+    // index's first entry).
+    property <length> discord-top: col.y + discord-section.y + Rows.title-h + Theme.s3 + Rows.pad-top;
     property <length> card-stick: Theme.page-top - Rows.pad-y;
     property <bool> confirm-sign-out: false;
-    // How many of the sections below the fold (Integrations, Window, Account) are made: one
+    // How many of the sections below the fold (Discord, Window, Account) are made: one
     // more each tick after the page's first frame, not all with it. Making and laying out
     // every row, its text shaped, was most of the page's first frame (~13 ms at 4K shown
     // again, ~21 the first time; measured 2026-11-01). Until then a
@@ -1385,7 +1451,8 @@ export component SettingsPage inherits Rectangle {
         col.y + playback-section.y,
         col.y + lyrics-section.y,
         col.y + scrobbling-section.y,
-        col.y + integrations-section.y,
+        col.y + discord-section.y,
+        col.y + local-api-section.y,
         col.y + window-section.y,
         col.y + account-section.y,
     ];
@@ -1395,7 +1462,8 @@ export component SettingsPage inherits Rectangle {
     property <length> scrolled: -flick.content-y;
     property <length> max-scroll: max(0px, flick.content-height - flick.height);
     property <length> reading-line: root.scrolled + (flick.height - Theme.bar-clear) / 3;
-    property <int> in-view: root.max-scroll > 0 && root.scrolled >= root.max-scroll - 1px ? 5
+    property <int> in-view: root.max-scroll > 0 && root.scrolled >= root.max-scroll - 1px ? 6
+        : root.reading-line >= root.tops[6] ? 6
         : root.reading-line >= root.tops[5] ? 5
         : root.reading-line >= root.tops[4] ? 4
         : root.reading-line >= root.tops[3] ? 3
@@ -1601,14 +1669,20 @@ export component SettingsPage inherits Rectangle {
                 }
             }
 
-            integrations-section := Group {
-                title: @tr("Integrations");
+            discord-section := Group {
+                title: @tr("Discord");
                 extend: root.card-beside ? root.wide-panel - root.col-w : 0px;
                 // Two columns while the card fits beside the options: the rows on the left,
                 // the card's lane on the right. Otherwise the card sits above the options, in
                 // the room kept for it there. One card either way, placed over the layout.
                 if root.made >= 1: block := Rectangle {
-                    property <length> pane-w: root.card-beside ? root.card-w : min(root.card-w, root.col-w - 2 * Rows.inset);
+                    property <length> inner-w: root.col-w - 2 * Rows.inset;
+                    property <length> card-w: root.card-beside ? root.card-w : min(root.card-w, block.inner-w);
+                    // Above the options, the caption and the note go left of the card while
+                    // they keep a column of their own, so the card doesn't hang off the left
+                    // of an empty panel.
+                    property <bool> text-beside: !root.card-beside && block.inner-w - root.card-w - Theme.s6 >= 220px;
+                    property <length> pane-w: block.text-beside ? block.inner-w : block.card-w;
                     property <length> pane-h: pane.preferred-height + 2 * Rows.pad-y;
                     min-width: columns.min-width;
                     min-height: columns.min-height;
@@ -1624,7 +1698,7 @@ export component SettingsPage inherits Rectangle {
                             }
                             discord-rows := VerticalLayout {
                                 DiscordOption {
-                                    part: DiscordPart.activity;
+                                    part: DiscordPart.card;
                                     option: 1;
                                     SettingRow {
                                         divider: !root.card-beside;
@@ -1675,7 +1749,7 @@ export component SettingsPage inherits Rectangle {
                                         option: 3;
                                         SettingRow {
                                             label: @tr("Clear after a pause");
-                                            detail: @tr("Remove the track when playback stays paused this long.");
+                                            detail: @tr("Remove the track when paused this long.");
                                             MinutesStepper {
                                                 minutes: SettingsData.discord-clear-minutes;
                                                 enabled: SettingsData.discord-clear-on-pause;
@@ -1719,7 +1793,7 @@ export component SettingsPage inherits Rectangle {
                                         }
                                         VerticalLayout {
                                             padding-bottom: Theme.s2;
-                                            for t[i] in [@tr("Progress bar with the time left"), @tr("Time elapsed only"), @tr("No time")]: DeviceRow {
+                                            for t[i] in [@tr("Progress bar"), @tr("Time elapsed only"), @tr("No time")]: DeviceRow {
                                                 name: t;
                                                 selected: i == SettingsData.discord-time;
                                                 clicked => { SettingsData.discord-pick-time(i); }
@@ -1744,48 +1818,6 @@ export component SettingsPage inherits Rectangle {
                                     }
                                 }
                             }
-                            ToggleRow {
-                                label: @tr("Local API");
-                                detail: !SettingsData.local-api ? @tr("Let stream overlays, Stream Deck and scripts on this PC show what's playing and control playback. Tools made for Pear's API Server work too.")
-                                    : SettingsData.local-api-state == LocalApiState.failed ? SettingsData.local-api-message
-                                    : SettingsData.local-api-state == LocalApiState.running ? @tr("On at http://127.0.0.1:{}. Only apps on this PC that have the token can use it.", SettingsData.local-api-port)
-                                    : @tr("Starting…");
-                                key: SettingKey.local-api;
-                                checked: SettingsData.local-api;
-                            }
-                            if SettingsData.local-api: VerticalLayout {
-                                SettingRow {
-                                    label: @tr("Port");
-                                    detail: SettingsData.local-api-port-error != "" ? SettingsData.local-api-port-error
-                                        : @tr("26538 is the one Pear Desktop uses, so its tools find featherplay.");
-                                    Field {
-                                        width: 96px;
-                                        text <=> SettingsData.local-api-port;
-                                        label: @tr("Local API port");
-                                        placeholder: "26538";
-                                        committed(t) => { SettingsData.local-api-port-entered(t); }
-                                    }
-                                }
-                                SettingRow {
-                                    label: @tr("Access token");
-                                    detail: @tr("Apps send it as \"Authorization: Bearer\" and the token. It stays hidden here, so it doesn't show on stream. Regenerate disconnects the apps using the old one.");
-                                    Body {
-                                        text: SettingsData.local-api-token;
-                                        color: Rows.detail;
-                                        vertical-alignment: center;
-                                        accessible-label: @tr("Token, hidden");
-                                    }
-                                    RowButton {
-                                        label: @tr("Copy");
-                                        enabled: SettingsData.local-api-token != "";
-                                        clicked => { SettingsData.local-api-copy(); }
-                                    }
-                                    RowButton {
-                                        label: @tr("Regenerate");
-                                        clicked => { SettingsData.local-api-regenerate(); }
-                                    }
-                                }
-                            }
                         }
                         lane := Rectangle {
                             width: root.card-beside ? root.card-w : 0px;
@@ -1796,10 +1828,61 @@ export component SettingsPage inherits Rectangle {
                     // within their rows.
                     pane := DiscordPane {
                         x: root.card-beside ? lane.x : 0px;
-                        y: Rows.pad-y + (root.card-beside ? max(0px, min(root.scrolled + root.card-stick - root.integrations-top, discord-rows.height - block.pane-h)) : 0px);
+                        y: Rows.pad-y + (root.card-beside ? max(0px, min(root.scrolled + root.card-stick - root.discord-top, discord-rows.height - block.pane-h)) : 0px);
                         width: block.pane-w;
                         height: self.preferred-height;
-                        card-w: block.pane-w;
+                        card-w: block.card-w;
+                        text-beside: block.text-beside;
+                    }
+                }
+            }
+
+            local-api-section := Group {
+                title: @tr("Local API");
+                // Made with the page: off, as it mostly is, it's one row.
+                VerticalLayout {
+                    ToggleRow {
+                        divider: false;
+                        label: @tr("API server");
+                        detail: !SettingsData.local-api ? @tr("Let stream overlays, Stream Deck and scripts on this PC show what's playing and control playback. Tools made for Pear's API Server work too.")
+                            : SettingsData.local-api-state == LocalApiState.failed ? SettingsData.local-api-message
+                            : SettingsData.local-api-state == LocalApiState.running ? @tr("On at http://127.0.0.1:{}. Only apps on this PC that have the token can use it.", SettingsData.local-api-port)
+                            : @tr("Starting…");
+                        key: SettingKey.local-api;
+                        checked: SettingsData.local-api;
+                    }
+                    if SettingsData.local-api: VerticalLayout {
+                        SettingRow {
+                            label: @tr("Port");
+                            detail: SettingsData.local-api-port-error != "" ? SettingsData.local-api-port-error
+                                : @tr("26538 is the one Pear Desktop uses, so its tools find featherplay.");
+                            Field {
+                                width: 96px;
+                                text <=> SettingsData.local-api-port;
+                                label: @tr("Local API port");
+                                placeholder: "26538";
+                                committed(t) => { SettingsData.local-api-port-entered(t); }
+                            }
+                        }
+                        SettingRow {
+                            label: @tr("Access token");
+                            detail: @tr("Apps send it as \"Authorization: Bearer\" and the token. It stays hidden here, so it doesn't show on stream. Regenerate disconnects the apps using the old one.");
+                            Body {
+                                text: SettingsData.local-api-token;
+                                color: Rows.detail;
+                                vertical-alignment: center;
+                                accessible-label: @tr("Token, hidden");
+                            }
+                            RowButton {
+                                label: @tr("Copy");
+                                enabled: SettingsData.local-api-token != "";
+                                clicked => { SettingsData.local-api-copy(); }
+                            }
+                            RowButton {
+                                label: @tr("Regenerate");
+                                clicked => { SettingsData.local-api-regenerate(); }
+                            }
+                        }
                     }
                 }
             }
@@ -1978,7 +2061,7 @@ export component SettingsPage inherits Rectangle {
         spacing: 2px;
         accessible-role: list;
         accessible-label: @tr("Settings sections");
-        for name[i] in [@tr("Playback"), @tr("Lyrics"), @tr("Scrobbling"), @tr("Integrations"), @tr("Window"), @tr("Account")]: SectionLink {
+        for name[i] in [@tr("Playback"), @tr("Lyrics"), @tr("Scrobbling"), @tr("Discord"), @tr("Local API"), @tr("Window"), @tr("Account")]: SectionLink {
             text: name;
             active: i == root.in-view;
             clicked => { root.go-to(i); }

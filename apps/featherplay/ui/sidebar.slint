@@ -29,7 +29,8 @@ export global SidebarData {
     in property <string> display-name;
     // The channel handle under the name ("" shows the name alone).
     in property <string> handle;
-    // The account photo (32 px, shown round) once `has-avatar`; until then the letter.
+    // The account photo (shown round at 32 px here, decoded at 76 for Settings' Discord card)
+    // once `has-avatar`; until then the letter.
     in property <image> avatar;
     in property <bool> has-avatar;
     // The avatar letter; "" shows the person glyph.

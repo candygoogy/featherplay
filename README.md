@@ -293,7 +293,7 @@ Pear's plugins become settings here. This is what exists today.
 ## Local API
 
 For stream overlays, Stream Deck plugins and scripts on your PC: what's playing, and the
-controls. It's off by default; turn it on in Settings > Integrations > Local API. featherplay
+controls. It's off by default; turn it on in Settings > Local API. featherplay
 then listens on `http://127.0.0.1:26538`, the port of Pear Desktop's API Server (change it in
 Settings). Every request needs the token shown there: **Copy** puts it on the clipboard (kept
 out of the clipboard history), **Regenerate** replaces it and disconnects the apps using the
