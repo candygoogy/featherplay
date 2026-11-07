@@ -74,9 +74,9 @@ msgstr "[Next]"
 
 #: ../../crates/integrations/src/tray.rs:273
 #: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:444
-#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:444 ui/mini_player.slint:131 ui/pages/lyrics.slint:75
-#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:444 ui/mini_player.slint:131 ui/pages/lyrics.slint:75 ui/pages/now_playing.slint:676
-#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:444 ui/mini_player.slint:131 ui/pages/lyrics.slint:75 ui/pages/now_playing.slint:676
+#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:444 ui/mini_player.slint:131 ui/pages/lyrics.slint:71
+#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:444 ui/mini_player.slint:131 ui/pages/lyrics.slint:71 ui/pages/now_playing.slint:645
+#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:444 ui/mini_player.slint:131 ui/pages/lyrics.slint:71 ui/pages/now_playing.slint:645
 msgid "Nothing playing"
 msgstr "[Nothing playing]"
 
@@ -356,11 +356,11 @@ msgstr "[Autoplay]"
 msgid "Windows default"
 msgstr "[Windows default]"
 
-#: src/lyrics.rs:49
+#: src/lyrics.rs:46
 msgid "Lyrics from LRCLIB"
 msgstr "[Lyrics from LRCLIB]"
 
-#: src/lyrics.rs:889
+#: src/lyrics.rs:860
 msgid "Source: LyricFind"
 msgstr "[Source: LyricFind]"
 
@@ -867,9 +867,9 @@ msgid "{} %"
 msgstr "[{} %]"
 
 #: ui/bottom_bar.slint:303 ui/bottom_bar.slint:335
-#: ui/bottom_bar.slint:303 ui/bottom_bar.slint:335 ui/pages/now_playing.slint:219
-#: ui/bottom_bar.slint:303 ui/bottom_bar.slint:335 ui/pages/now_playing.slint:219 ui/pages/settings.slint:1491
-#: ui/bottom_bar.slint:303 ui/bottom_bar.slint:335 ui/pages/now_playing.slint:219 ui/pages/settings.slint:1491
+#: ui/bottom_bar.slint:303 ui/bottom_bar.slint:335 ui/pages/now_playing.slint:220
+#: ui/bottom_bar.slint:303 ui/bottom_bar.slint:335 ui/pages/now_playing.slint:220 ui/pages/settings.slint:1491
+#: ui/bottom_bar.slint:303 ui/bottom_bar.slint:335 ui/pages/now_playing.slint:220 ui/pages/settings.slint:1491
 msgid "Lyrics"
 msgstr "[Lyrics]"
 
@@ -923,7 +923,7 @@ msgstr "[Mute]"
 msgid "Unmute"
 msgstr "[Unmute]"
 
-#: ui/bottom_bar.slint:632 ui/pages/now_playing.slint:112
+#: ui/bottom_bar.slint:632 ui/pages/now_playing.slint:113
 msgid "Up next"
 msgstr "[Up next]"
 
@@ -1091,7 +1091,7 @@ msgid "This didn’t load"
 msgstr "[This didn’t load]"
 
 #: ui/pages/content.slint:460 ui/pages/home.slint:773
-#: ui/pages/content.slint:460 ui/pages/home.slint:773 ui/pages/lyrics.slint:185
+#: ui/pages/content.slint:460 ui/pages/home.slint:773 ui/pages/lyrics.slint:181
 msgid "Try again"
 msgstr "[Try again]"
 
@@ -1292,55 +1292,51 @@ msgstr "[Find music on Home or with Search.]"
 msgid "Go to Home"
 msgstr "[Go to Home]"
 
-#: ui/pages/lyrics.slint:74
+#: ui/pages/lyrics.slint:70
 msgid "Lyrics are unavailable right now"
 msgstr "[Lyrics are unavailable right now]"
 
-#: ui/pages/lyrics.slint:74
+#: ui/pages/lyrics.slint:70
 msgid "Couldn't load lyrics"
 msgstr "[Couldn't load lyrics]"
 
-#: ui/pages/lyrics.slint:75
+#: ui/pages/lyrics.slint:71
 msgid "No lyrics for this song"
 msgstr "[No lyrics for this song]"
 
-#: ui/pages/lyrics.slint:122
+#: ui/pages/lyrics.slint:118
 msgid "Plays from this line"
 msgstr "[Plays from this line]"
 
-#: ui/pages/lyrics.slint:452
+#: ui/pages/lyrics.slint:448
 msgid "Synced lyrics are unavailable right now"
 msgstr "[Synced lyrics are unavailable right now]"
 
-#: ui/pages/lyrics.slint:452
+#: ui/pages/lyrics.slint:448
 msgid "Not synced to the song"
 msgstr "[Not synced to the song]"
 
-#: ui/pages/now_playing.slint:112
+#: ui/pages/now_playing.slint:113
 msgid "Related"
 msgstr "[Related]"
 
-#: ui/pages/now_playing.slint:139
+#: ui/pages/now_playing.slint:140
 msgid "Similar to {}"
 msgstr "[Similar to {}]"
 
-#: ui/pages/now_playing.slint:158
+#: ui/pages/now_playing.slint:159
 msgid "Nothing related found"
 msgstr "[Nothing related found]"
 
-#: ui/pages/now_playing.slint:270
+#: ui/pages/now_playing.slint:271
 msgid "Playing from {}"
 msgstr "[Playing from {}]"
 
-#: ui/pages/now_playing.slint:281 ui/queue_panel.slint:230
+#: ui/pages/now_playing.slint:282 ui/queue_panel.slint:230
 msgid "Playing from"
 msgstr "[Playing from]"
 
-#: ui/pages/now_playing.slint:319
-msgid "Shows all the lyrics"
-msgstr "[Shows all the lyrics]"
-
-#: ui/pages/now_playing.slint:529 ui/sign_in_window.slint:50
+#: ui/pages/now_playing.slint:493 ui/sign_in_window.slint:50
 msgid "Back"
 msgstr "[Back]"
 
