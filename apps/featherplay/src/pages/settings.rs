@@ -34,7 +34,7 @@ use crate::ui::{
     AccentSwatch, Appearance, DiscordPart, DiscordPreview, DiscordState, LastfmState,
     ListenBrainzState, LocalApiState, Player, SettingKey, SettingsData, SettingsDialog, Theme,
 };
-use crate::{follow, language, lyrics, native, shell, toast};
+use crate::{follow, language, lyrics, native, shell, toast, updates};
 
 /// Offered when the hotkeys are first switched on.
 const DEFAULT_HOTKEYS: [&str; 3] = ["Ctrl+Alt+Space", "Ctrl+Alt+Right", "Ctrl+Alt+Left"];
@@ -89,7 +89,8 @@ pub fn lyrics_lrclib() -> bool {
     SETTINGS.with(|s| s.borrow().lyrics_lrclib)
 }
 
-/// Whether the app may ask GitHub about newer releases ("Check for updates").
+/// Whether the app may ask GitHub about newer releases on its own ("Check for updates");
+/// About's button asks whatever it says.
 pub fn check_for_updates() -> bool {
     SETTINGS.with(|s| s.borrow().check_for_updates)
 }
@@ -1082,7 +1083,12 @@ fn toggled(ctx: &Rc<Ctx>, key: SettingKey, on: bool) {
         }
         SettingKey::CheckForUpdates => {
             data.set_check_for_updates(on);
-            Change::CheckForUpdates(on)
+            commit(ctx, Change::CheckForUpdates(on));
+            // Turned on: a check, if one is due.
+            if on {
+                updates::maybe_run(ctx);
+            }
+            return;
         }
         SettingKey::InstallUpdates => {
             data.set_install_updates(on);

@@ -71,8 +71,9 @@ impl Controller {
                 Lookup::NotYet => {
                     self.lookup = Lookup::Running;
                     let (cache, tx) = (self.paths.cache.clone(), self.tx.clone());
+                    let install = self.settings.install_updates;
                     tokio::spawn(async move {
-                        let (help, release) = updates::help(cache).await;
+                        let (help, release) = updates::help(cache, install).await;
                         let _ = tx.send(Msg::Help(help, release));
                     });
                 }

@@ -121,6 +121,20 @@ pub fn installed() -> bool {
     is_installed(&canonical(&exe), &canonical(&location))
 }
 
+/// Whether `exe` is the copy Scoop installed (`packaging/scoop/featherplay.json`): Scoop
+/// keeps its apps in `…\scoop\apps\<name>\`, and updates them itself.
+pub fn is_scoop(exe: &Path) -> bool {
+    exe.to_string_lossy()
+        .replace('/', "\\")
+        .to_lowercase()
+        .contains(r"\scoop\apps\featherplay\")
+}
+
+/// Whether this process is the copy Scoop installed (`is_scoop`).
+pub fn scoop() -> bool {
+    std::env::current_exe().is_ok_and(|exe| is_scoop(&exe))
+}
+
 /// The installer's `InstallLocation`, if featherplay is installed for this user.
 fn install_location() -> Option<PathBuf> {
     use windows::Win32::Foundation::ERROR_SUCCESS;
@@ -224,8 +238,21 @@ impl Origin {
     }
 
     #[cfg(test)]
-    fn local() -> Origin {
+    pub(crate) fn local() -> Origin {
         Origin { local: true }
+    }
+
+    /// The client for GitHub's API (`releases/latest`, the issue search): HTTPS only, or
+    /// plain HTTP to the test server.
+    pub fn api_client(&self, timeout: Duration) -> Result<reqwest::Client, String> {
+        let builder = reqwest::Client::builder()
+            .user_agent(concat!("featherplay/", env!("CARGO_PKG_VERSION")))
+            .timeout(timeout);
+        #[cfg(test)]
+        let builder = builder.https_only(!self.local);
+        #[cfg(not(test))]
+        let builder = builder.https_only(true);
+        builder.build().map_err(|e| format!("http client: {e}"))
     }
 
     /// A URL a download may start from.
@@ -274,13 +301,38 @@ fn redirect_target(url: &reqwest::Url) -> bool {
             || url.host_str().is_some_and(|h| h.ends_with(ASSET_DOMAIN)))
 }
 
+/// Why a download gave no setup: `Refused` is final for that release (a checksum that
+/// doesn't match, a file the checksums don't list, a URL off the project's releases);
+/// `Failed` may work later (the network, the disk).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum FetchError {
+    Refused(String),
+    Failed(String),
+}
+
+impl std::fmt::Display for FetchError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FetchError::Refused(e) | FetchError::Failed(e) => f.write_str(e),
+        }
+    }
+}
+
 /// Downloads the release's checksums and setup into `{cache}/updates/` and checks the
 /// setup's sha256. On a mismatch, or any failure, the partial file is deleted.
-pub async fn fetch(cache: &Path, plan: &Plan, origin: &Origin) -> Result<Ready, String> {
-    let http = origin.client()?;
-    let sums = small_text(&http, origin, &plan.sums.url).await?;
+pub async fn fetch(cache: &Path, plan: &Plan, origin: &Origin) -> Result<Ready, FetchError> {
+    use FetchError::{Failed, Refused};
+    for url in [&plan.sums.url, &plan.setup.url] {
+        if !origin.allows(url) {
+            return Err(Refused(format!("not a featherplay release file: {url}")));
+        }
+    }
+    let http = origin.client().map_err(Failed)?;
+    let sums = small_text(&http, origin, &plan.sums.url)
+        .await
+        .map_err(Failed)?;
     let expected = parse_sums(&sums, &plan.setup.name)
-        .ok_or_else(|| format!("{SUMS} has no sha256 for {}", plan.setup.name))?;
+        .ok_or_else(|| Refused(format!("{SUMS} has no sha256 for {}", plan.setup.name)))?;
     let ready = Ready {
         version: plan.version.clone(),
         file: plan.setup.name.clone(),
@@ -288,23 +340,25 @@ pub async fn fetch(cache: &Path, plan: &Plan, origin: &Origin) -> Result<Ready, 
     };
     let dest = ready
         .path(cache)
-        .ok_or_else(|| format!("not a setup's name: {}", plan.setup.name))?;
+        .ok_or_else(|| Refused(format!("not a setup's name: {}", plan.setup.name)))?;
     let part = dest.with_file_name(format!("{}.part", ready.file));
     tokio::fs::create_dir_all(dir(cache))
         .await
-        .map_err(|e| format!("creating the updates folder: {}", e.kind()))?;
+        .map_err(|e| Failed(format!("creating the updates folder: {}", e.kind())))?;
     let result = async {
-        let actual = download(&http, origin, &plan.setup.url, &part).await?;
+        let actual = download(&http, origin, &plan.setup.url, &part)
+            .await
+            .map_err(Failed)?;
         if actual != ready.sha256 {
-            return Err(format!(
+            return Err(Refused(format!(
                 "sha256 mismatch for {}: expected {}, got {actual}",
                 ready.file, ready.sha256
-            ));
+            )));
         }
         let _ = tokio::fs::remove_file(&dest).await;
         tokio::fs::rename(&part, &dest)
             .await
-            .map_err(|e| format!("moving the setup into place: {}", e.kind()))
+            .map_err(|e| Failed(format!("moving the setup into place: {}", e.kind())))
     }
     .await;
     if result.is_err() {
@@ -424,6 +478,21 @@ pub fn clean(cache: &Path, keep: Option<&Ready>) {
     }
 }
 
+/// The last `n` lines of the setup's log (`{cache}/updates/install.log`), for featherplay's
+/// own log after an update didn't install. Inno writes it in the system's code page; the
+/// lines that matter are ASCII.
+pub fn install_log_tail(cache: &Path, n: usize) -> Vec<String> {
+    let Ok(bytes) = std::fs::read(dir(cache).join("install.log")) else {
+        return Vec::new();
+    };
+    let text = String::from_utf8_lossy(&bytes);
+    let lines: Vec<&str> = text.lines().filter(|l| !l.trim().is_empty()).collect();
+    lines[lines.len().saturating_sub(n)..]
+        .iter()
+        .map(|l| l.trim_end().to_string())
+        .collect()
+}
+
 /// Starts the downloaded setup (checked again first) with `SETUP_ARGS`, logging to
 /// `{cache}/updates/install.log`. featherplay quits right after.
 pub fn launch(cache: &Path, ready: &Ready) -> Result<(), String> {
@@ -455,15 +524,15 @@ pub fn launch(cache: &Path, ready: &Ready) -> Result<(), String> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(super) mod tests {
     use std::io::{BufRead, BufReader, Write};
     use std::net::TcpListener;
 
     use super::*;
 
-    const SETUP: &[u8] = b"not really a setup, but bytes to check";
+    pub(crate) const SETUP: &[u8] = b"not really a setup, but bytes to check";
 
-    fn test_cache(name: &str) -> PathBuf {
+    pub(crate) fn test_cache(name: &str) -> PathBuf {
         let base = std::env::var("FEATHERPLAY_HOME")
             .map(PathBuf::from)
             .unwrap_or_else(|_| std::env::temp_dir().join("featherplay-tests"));
@@ -476,7 +545,7 @@ mod tests {
     }
 
     /// Answers each GET with `route(path)`, one connection at a time.
-    fn serve(route: impl Fn(&str) -> (u16, Vec<u8>) + Send + 'static) -> String {
+    pub(crate) fn serve(route: impl Fn(&str) -> (u16, Vec<u8>) + Send + 'static) -> String {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let base = format!("http://{}", listener.local_addr().unwrap());
         std::thread::spawn(move || {
@@ -523,7 +592,7 @@ mod tests {
         }
     }
 
-    fn sums_for(bytes: &[u8]) -> Vec<u8> {
+    pub(crate) fn sums_for(bytes: &[u8]) -> Vec<u8> {
         let hash = hex(&Sha256::digest(bytes));
         format!(
             "{}  featherplay.exe\n{hash}  featherplay-setup-0.2.0.exe\n",
@@ -569,7 +638,10 @@ mod tests {
             .await
             .unwrap_err();
 
-        assert!(err.contains("sha256 mismatch"), "{err}");
+        assert!(
+            matches!(&err, FetchError::Refused(e) if e.contains("sha256 mismatch")),
+            "{err}"
+        );
         let left: Vec<_> = std::fs::read_dir(cache.join("updates"))
             .unwrap()
             .flatten()
@@ -591,7 +663,10 @@ mod tests {
             .await
             .unwrap_err();
 
-        assert!(err.contains("no sha256"), "{err}");
+        assert!(
+            matches!(&err, FetchError::Refused(e) if e.contains("no sha256")),
+            "{err}"
+        );
         assert!(!cache.join("updates").exists());
         std::fs::remove_dir_all(&cache).unwrap();
     }
@@ -604,7 +679,10 @@ mod tests {
 
         let err = fetch(&cache, &p, &Origin::github()).await.unwrap_err();
 
-        assert!(err.contains("not a featherplay release file"), "{err}");
+        assert!(
+            matches!(&err, FetchError::Refused(e) if e.contains("not a featherplay release file")),
+            "{err}"
+        );
         std::fs::remove_dir_all(&cache).unwrap();
     }
 

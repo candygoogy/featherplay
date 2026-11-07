@@ -1,16 +1,40 @@
-// About (a calm single column): the logo, the tagline and the not-affiliated disclaimer,
-// the version, the log folder and the diagnostics for a bug report, the licences and the Made
-// with Slint badge that Slint's royalty-free licence asks for (its `AboutSlint` widget).
-// Filled by `src/pages/about.rs`. When a newer release is out (`src/updates.rs`), a banner
-// above the logo says so and links to it, or, once its setup is downloaded, restarts into it.
+// About (a calm single column): the logo, the tagline, the version row with "Check for
+// updates" and what the last check found, the not-affiliated disclaimer, the log folder and
+// the diagnostics for a bug report, the licences and the Made with Slint badge that Slint's
+// royalty-free licence asks for (its `AboutSlint` widget). Filled by `src/pages/about.rs`.
+// When a newer release is out (`src/updates.rs`), a banner above the logo says so, in one of
+// the states of `UpdateState`, and the row's pill goes: the banner's button is the action.
 import { AboutSlint } from "std-widgets.slint";
 import { Theme } from "../theme.slint";
-import { Body, Display, Pill } from "../parts.slint";
+import { Body, Display, Pill, TextLink } from "../parts.slint";
 
 // A third-party component and its licence.
 export struct Credit {
     name: string,
     licence: string,
+}
+
+// The banner's state (the design board's B1-B8).
+export enum UpdateState {
+    // No newer release: no banner.
+    none,
+    // "Get it" opens the release page (a portable copy, automatic install off, a dev build).
+    get,
+    // The setup is downloading: no button.
+    downloading,
+    // The setup is downloaded and checked: "Restart to update".
+    ready,
+    // The download didn't finish: "Try again", or the release page.
+    download-failed,
+    // A checksum that didn't match, no setup for this PC, or a setup that wouldn't start:
+    // "Get it".
+    cannot-install,
+    // The last update didn't install: "Try again", or the log folder.
+    install-failed,
+    // Scoop's copy: the command, with "Copy command".
+    scoop,
+    // "Restart to update" was clicked, before featherplay quits: no button.
+    starting,
 }
 
 export global AboutData {
@@ -19,13 +43,22 @@ export global AboutData {
     in property <string> mit-text;
     in property <string> ofl-text;
     in property <[Credit]> credits;
-    // A newer release ("0.2.0"), or "" for none: the banner at the top.
+    // A newer release ("0.2.0"), or "" for none, and the banner's state.
     in property <string> update-version;
-    // Its setup is downloaded and checked: the banner offers "Restart to update".
-    in property <bool> update-ready;
-    // The banner's button: "Get it" opens the release page; "Restart to update" starts the
-    // setup and quits.
+    in property <UpdateState> update-state;
+    // The version row: the last check's line ("Up to date. Checked 2 hours ago.", or ""),
+    // and its pill's label ("Check for updates", "Checking…", "Try again", or "" for none).
+    in property <string> check-line;
+    in property <string> check-pill;
+    // A check is going: the pill ignores clicks (it isn't dimmed).
+    in property <bool> checking;
+    // The banner's solid (or tonal) button, and its text link.
     callback get-update();
+    callback update-secondary();
+    // The version row's pill.
+    callback check-now();
+    // The Scoop command is on the clipboard: a toast says so.
+    callback command-copied();
     // Opens the log folder in Explorer.
     callback open-log-folder();
     // The plain text Copy diagnostics puts on the clipboard, made when it's clicked.
@@ -34,14 +67,40 @@ export global AboutData {
     callback copied();
 }
 
-// A newer release is out: its version, and a button to its page.
+// What Scoop's copy is updated with, shown and copied as it's typed.
+global ScoopCommand {
+    out property <string> text: "scoop update featherplay";
+}
+
+// A newer release is out: its version, what's happening with it, and what to do.
 component UpdateBanner inherits Rectangle {
+    callback copy-command();
+    property <UpdateState> state: AboutData.update-state;
+    property <string> title: root.state == UpdateState.install-failed
+        ? @tr("The update to {} didn't install", AboutData.update-version)
+        : @tr("featherplay {} is out", AboutData.update-version);
+    property <string> line: root.state == UpdateState.downloading ? @tr("Downloading the update…")
+        : root.state == UpdateState.ready ? @tr("You have {}. The update is downloaded and installs when featherplay restarts.", AboutData.version)
+        : root.state == UpdateState.download-failed ? @tr("The download didn't finish. You have {}.", AboutData.version)
+        : root.state == UpdateState.cannot-install ? @tr("It can't be installed from here. You have {}.", AboutData.version)
+        : root.state == UpdateState.install-failed ? @tr("You still have {}. The log folder has the details.", AboutData.version)
+        : root.state == UpdateState.starting ? @tr("Starting the update…")
+        : @tr("You have {}.", AboutData.version);
+    property <string> primary: root.state == UpdateState.get || root.state == UpdateState.cannot-install ? @tr("Get it")
+        : root.state == UpdateState.ready ? @tr("Restart to update")
+        : root.state == UpdateState.download-failed || root.state == UpdateState.install-failed ? @tr("Try again")
+        : root.state == UpdateState.scoop ? @tr("Copy command")
+        : "";
+    property <string> secondary: root.state == UpdateState.download-failed ? @tr("Get it on GitHub")
+        : root.state == UpdateState.install-failed ? @tr("Open log folder")
+        : root.state == UpdateState.get || root.state == UpdateState.downloading || root.state == UpdateState.ready || root.state == UpdateState.scoop ? @tr("What's new")
+        : "";
     border-radius: Theme.r-l;
     background: Theme.accent-tonal;
-    min-height: lay.min-height;
-    preferred-height: lay.preferred-height;
+    min-height: max(72px, lay.min-height);
+    preferred-height: max(72px, lay.preferred-height);
     accessible-role: groupbox;
-    accessible-label: @tr("featherplay {} is out", AboutData.update-version);
+    accessible-label: root.title;
     lay := HorizontalLayout {
         padding: Theme.s4;
         padding-left: Theme.s5;
@@ -51,29 +110,122 @@ component UpdateBanner inherits Rectangle {
             spacing: 2px;
             horizontal-stretch: 1;
             Body {
-                text: @tr("featherplay {} is out", AboutData.update-version);
+                text: root.title;
                 font-size: Theme.t-body-l;
                 font-weight: 600;
                 overflow: clip;
                 wrap: word-wrap;
             }
-            Body {
-                text: AboutData.update-ready
-                    ? @tr("You have {}. The update is downloaded and installs when featherplay restarts.", AboutData.version)
-                    : @tr("You have {}.", AboutData.version);
+            if root.state != UpdateState.scoop: Body {
+                text: root.line;
                 font-size: Theme.t-meta;
                 color: Theme.text2;
                 overflow: clip;
                 wrap: word-wrap;
             }
+            // "Update with Scoop: `scoop update featherplay`", the command in a code span.
+            if root.state == UpdateState.scoop: HorizontalLayout {
+                alignment: start;
+                spacing: 6px;
+                Body {
+                    text: @tr("Update with Scoop:");
+                    font-size: Theme.t-meta;
+                    color: Theme.text2;
+                    vertical-alignment: center;
+                }
+                Rectangle {
+                    border-radius: 4px;
+                    background: Theme.selected;
+                    width: cmd.preferred-width + 12px;
+                    height: cmd.preferred-height + 2px;
+                    accessible-role: text;
+                    accessible-label: ScoopCommand.text;
+                    cmd := Text {
+                        text: ScoopCommand.text;
+                        font-family: "Cascadia Mono";
+                        font-size: Theme.t-meta;
+                        color: Theme.text2;
+                        accessible-role: none;
+                    }
+                }
+            }
         }
-        VerticalLayout {
+        if root.secondary != "": VerticalLayout {
+            alignment: center;
+            horizontal-stretch: 0;
+            padding-left: 12px;
+            padding-right: root.primary != "" ? 12px : 0px;
+            TextLink {
+                text: root.secondary;
+                clicked => { AboutData.update-secondary(); }
+            }
+        }
+        if root.primary != "": VerticalLayout {
             alignment: center;
             horizontal-stretch: 0;
             Pill {
-                label: AboutData.update-ready ? @tr("Restart to update") : @tr("Get it");
-                solid: true;
-                clicked => { AboutData.get-update(); }
+                label: root.primary;
+                solid: root.state != UpdateState.scoop;
+                clicked => {
+                    if root.state == UpdateState.scoop {
+                        root.copy-command();
+                    } else {
+                        AboutData.get-update();
+                    }
+                }
+            }
+        }
+    }
+}
+
+// The version, what the last check found, and "Check for updates", between hairlines: what
+// it is on the left, the thing itself on the right.
+component VersionRow inherits Rectangle {
+    min-height: lay.min-height;
+    preferred-height: lay.preferred-height;
+    Rectangle {
+        y: 0;
+        height: 1px;
+        background: Theme.hairline;
+    }
+    Rectangle {
+        y: parent.height - 1px;
+        height: 1px;
+        background: Theme.hairline;
+    }
+    lay := HorizontalLayout {
+        padding-top: 12px;
+        padding-bottom: 12px;
+        spacing: Theme.s5;
+        VerticalLayout {
+            alignment: center;
+            spacing: 3px;
+            horizontal-stretch: 1;
+            Body {
+                text: @tr("Version {}", AboutData.version);
+                font-size: Theme.t-body-l;
+                font-weight: 600;
+            }
+            if AboutData.check-line != "": Body {
+                text: AboutData.check-line;
+                font-size: Theme.t-meta;
+                color: Theme.text2;
+                overflow: clip;
+                wrap: word-wrap;
+                accessible-label: AboutData.checking ? @tr("Checking for updates") : self.text;
+            }
+        }
+        if AboutData.check-pill != "": VerticalLayout {
+            alignment: center;
+            horizontal-stretch: 0;
+            Pill {
+                compact: true;
+                label: AboutData.check-pill;
+                clicked => {
+                    if !AboutData.checking {
+                        AboutData.check-now();
+                    }
+                }
             }
         }
     }
@@ -179,7 +331,15 @@ export component AboutPage inherits Rectangle {
             height: self.preferred-height;
             spacing: Theme.s7;
 
-            if AboutData.update-version != "": UpdateBanner { }
+            if AboutData.update-state != UpdateState.none: UpdateBanner {
+                copy-command => {
+                    copy-field.text = ScoopCommand.text;
+                    copy-field.select-all();
+                    copy-field.copy();
+                    copy-field.clear-selection();
+                    AboutData.command-copied();
+                }
+            }
 
             VerticalLayout {
                 spacing: Theme.s3;
@@ -202,11 +362,7 @@ export component AboutPage inherits Rectangle {
                     overflow: clip;
                     wrap: word-wrap;
                 }
-                Body {
-                    text: @tr("Version {}", AboutData.version);
-                    font-size: Theme.t-meta;
-                    color: Theme.text3;
-                }
+                VersionRow { }
                 Body {
                     text: @tr("featherplay is not affiliated with Google or YouTube.");
                     color: Theme.text2;

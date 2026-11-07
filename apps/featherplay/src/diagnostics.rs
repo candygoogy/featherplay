@@ -8,7 +8,7 @@
 //! Debug builds print every line to stderr too, as does a process that never called `init`
 //! (the tests, `--snapshot`).
 
-mod clock;
+pub(crate) mod clock;
 mod crash;
 mod logfile;
 mod redact;

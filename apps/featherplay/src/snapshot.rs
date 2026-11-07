@@ -111,11 +111,27 @@ pub const PAGES: &[&str] = &[
     // Settings with the local API on and running, its port and masked token.
     "settings-local-api",
     "about",
+    // About's version row while a check runs; up to date (checked 2 hours ago); after a
+    // check failed offline, rate limited, or with an HTTP error.
+    "about-check-checking",
+    "about-check-latest",
+    "about-check-offline",
+    "about-check-limited",
+    "about-check-failed",
     // About with a newer release out: the banner above the logo.
     "about-update",
     // About with the newer release's setup downloaded: Restart to update, in the banner and
     // the toast.
     "about-update-ready",
+    // The banner while the setup downloads; after the download failed; when it can't be
+    // installed from here; after the update didn't install; on Scoop's copy; after Restart
+    // to update was clicked.
+    "about-update-downloading",
+    "about-update-failed-download",
+    "about-update-cannot-install",
+    "about-update-failed-install",
+    "about-update-scoop",
+    "about-update-starting",
     // The album after songs kept failing to play: the toast saying featherplay may need an
     // update, with Get it; or the one while the helpers update.
     "album-stopped",
@@ -656,15 +672,8 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
         crate::toast::show_with(ctx, "Saved to Homework", "View", |_| {});
         settle();
     }
-    if o.page == "about-update" || o.page == "about-update-ready" {
-        if o.page == "about-update-ready" {
-            crate::updates::ready_for_snapshot(ctx);
-        }
-        app::on_event(UiEvent::Release(crate::updates::Release {
-            version: "0.2.0".into(),
-            url: "https://github.com/candygoogy/featherplay/releases/tag/v0.2.0".into(),
-            assets: Vec::new(),
-        }));
+    if o.page.starts_with("about-") {
+        crate::updates::for_snapshot(ctx, &o.page);
         settle();
     }
     if o.page == "album-stopped" || o.page == "album-stopped-updating" {
@@ -673,6 +682,7 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
             let help = crate::updates::Help {
                 label: "Get it",
                 url: "https://github.com/candygoogy/featherplay/releases/tag/v0.2.0".into(),
+                restart: false,
             };
             (Notice::UpdateNeeded, Some(help))
         } else {
@@ -976,7 +986,7 @@ fn page(name: &str, f: &Fixtures) -> Result<Page, String> {
         | "settings-long"
         | "settings-scripts"
         | "settings-local-api" => Page::Settings,
-        "about" | "about-update" | "about-update-ready" => Page::About,
+        p if p == "about" || p.starts_with("about-") => Page::About,
         "sign-in"
         | "sign-in-expired"
         | "sign-in-edge"

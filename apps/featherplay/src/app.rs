@@ -449,10 +449,20 @@ pub fn on_event(ev: UiEvent) {
     let Some(ctx) = Ctx::get() else { return };
     match ev {
         UiEvent::Player(state) => {
+            let resumed = state.playing
+                && !ctx
+                    .player
+                    .borrow()
+                    .as_ref()
+                    .is_some_and(|before| before.playing);
             *ctx.player.borrow_mut() = Some((*state).clone());
             bar::apply(&ctx, &state);
             queue_panel::update(&ctx, &state);
             pages::player_changed(&ctx, &state);
+            // A long session: from paused to playing, a check if one is due.
+            if resumed {
+                updates::maybe_run(&ctx);
+            }
         }
         // A new sign-in's, held while the account picker asks which identity to act as.
         UiEvent::Account { signed_in } if account_picker::hold(&ctx, signed_in) => {}
@@ -491,6 +501,10 @@ pub fn on_event(ev: UiEvent) {
         UiEvent::AccountNotice(ev) => pages::sign_in::notice(&ctx, ev),
         UiEvent::Discord(status) => pages::settings::discord_changed(&ctx, status),
         UiEvent::Stopped { text, help } => match help {
+            // A setup downloaded for the newer release: the banner's "Restart to update".
+            Some(help) if help.restart => {
+                toast::show_with(&ctx, text, help.label, updates::restart);
+            }
             Some(help) => {
                 let url = help.url;
                 toast::show_with(&ctx, text, help.label, move |c| updates::open(c, &url));
@@ -529,6 +543,10 @@ pub fn show_window(ctx: &Ctx) {
         let _ = ui.show();
     }
     memory::hidden(ctx, false);
+    // An update's toast held while it was away, and a long session's check if one is due.
+    if let Some(ctx) = Ctx::get() {
+        updates::window_shown(&ctx);
+    }
     let Some(window) = window else { return };
     if wait {
         slint::Timer::single_shot(BUTTON_WAIT, move || restore_pending(&*window));
@@ -713,8 +731,11 @@ fn run_window(
         // Minimised, the window shows nothing: what it drew with goes (`memory`). After the
         // window has handled the WM_SIZE, on the event loop's next turn.
         let parked = Rc::downgrade(&c);
+        // Every size change says "not minimised"; only the first after a minimise is a return.
+        let was_minimised = Rc::new(Cell::new(false));
         let watched = native::when_minimised(hwnd, move |minimised| {
             let parked = parked.clone();
+            let restored = !minimised && was_minimised.replace(minimised);
             slint::Timer::single_shot(std::time::Duration::ZERO, move || {
                 let Some(ctx) = parked.upgrade() else { return };
                 // In the tray it stays let go until it's shown (`show_window`).
@@ -723,6 +744,10 @@ fn run_window(
                     .is_some_and(|ui| ui.global::<Frame>().get_hidden());
                 if minimised || !in_tray {
                     memory::hidden(&ctx, minimised);
+                }
+                // Back from the taskbar: what `show_window` does for the tray.
+                if restored && !in_tray {
+                    updates::window_shown(&ctx);
                 }
             });
         });

@@ -1,34 +1,48 @@
 //! Whether a newer featherplay is out, from GitHub's latest release, and the open issue the
 //! maintainer opens when YouTube breaks playback. No account, no token.
 //!
-//! At most once a day: at startup, once the first page's loads have all arrived, if
-//! Settings' "Check for updates" is on. The answer is kept in `{cache}/update-check.json`
-//! with the time of the check, so the banner in About survives a restart without a request.
-//! A failed request is logged once and counts as that day's check: no retry, no timer.
-//! When songs keep failing to play after the helpers were updated, the controller asks
-//! again at once (`help`), once a session.
+//! One runner (`run`) serves every trigger, one run at a time (`Running`):
+//! - startup, once the first page's loads have all arrived;
+//! - in a long session, when playback goes from paused to playing, the window comes back
+//!   from the tray or the taskbar, or "Check for updates" is turned on, if a check is due
+//!   (`maybe_run`: one comparison with `NEXT_DUE`, no timer);
+//! - About's "Check for updates" button, which works even with the setting off: a click is
+//!   consent for one request;
+//! - songs that keep failing to play after the helpers were updated (`help`).
+//!
+//! GitHub is asked at most once a day, or an hour after a failed check, and never within a
+//! minute of the last request or before a rate limit's reset (`may_request`). The answer is
+//! kept in `{cache}/update-check.json`, so About survives a restart without a request.
 //!
 //! A newer release shows a toast once per version and a banner at the top of About. The
 //! installed copy, with "Install updates automatically" on, first downloads and checks the
-//! release's setup (`install`), once per version, and then offers "Restart to update" in
-//! the toast and the banner, at every start until it's clicked.
+//! release's setup (`install`); a failed download is tried again an hour later, three times
+//! at most, a setup that doesn't match its checksum never. It then offers "Restart to
+//! update" in the toast and the banner, at every start until it's clicked. If the update
+//! doesn't install (the setup fails silently), the next start says so. A copy Scoop
+//! installed is told the Scoop command instead; Scoop updates it.
 
 use std::cell::{Cell, RefCell};
 use std::io;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
+use std::sync::{LazyLock, Mutex, MutexGuard, PoisonError};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use featherplay_core::tr;
+use reqwest::header::HeaderMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::app::Ctx;
+use crate::router::Page;
+use crate::ui::Frame;
 use crate::{busy, pages, toast};
+use slint::ComponentHandle;
 
 pub mod install;
 
-use install::{Origin, Ready};
+use install::{FetchError, Origin, Ready};
 
 /// The project's pages on GitHub; every URL opened from a reply must start with it.
 const PAGES: &str = "https://github.com/candygoogy/featherplay/";
@@ -43,7 +57,21 @@ const MAINTAINERS: &[&str] = &["OWNER", "MEMBER", "COLLABORATOR"];
 /// Search results read for it: anyone can open an issue with those words in its title.
 const ISSUE_RESULTS: &str = "10";
 const TIMEOUT: Duration = Duration::from_secs(10);
-const CHECK_EVERY: Duration = Duration::from_secs(24 * 3600);
+const CHECK_EVERY: u64 = 24 * 3600;
+/// A failed check is due again after this.
+const CHECK_RETRY: u64 = 3600;
+/// No request within this of the last one, whatever asks.
+const COOLDOWN: u64 = 60;
+/// A rate limit's reset further away than this is taken as this.
+const LIMIT_AT_MOST: u64 = 3600;
+/// A failed download is tried again after this, at most `FETCH_ATTEMPTS` times in all.
+const FETCH_RETRY: u64 = 3600;
+const FETCH_ATTEMPTS: u32 = 3;
+/// The lines of the setup's log copied to featherplay's own after an update didn't install.
+const INSTALL_LOG_LINES: usize = 20;
+/// How long an update's toast stays (hovering holds it): longer than a plain toast, as it
+/// comes once and unasked.
+const TOAST_FOR: Duration = Duration::from_secs(10);
 const STAMP: &str = "update-check.json";
 /// The running version.
 pub const CURRENT: &str = env!("CARGO_PKG_VERSION");
@@ -68,9 +96,11 @@ pub struct Asset {
 /// A link the "can't play" toast offers: the newer release, or the open issue.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Help {
-    /// The toast's button: "Get it" or "Details".
+    /// The toast's button: "Get it", "Restart to update" or "Details".
     pub label: &'static str,
     pub url: String,
+    /// The button starts the downloaded setup ("Restart to update") instead of opening `url`.
+    pub restart: bool,
 }
 
 /// `x.y.z`, `v` in front or not; `-…` marks a pre-release; `+…` (build data) is ignored.
@@ -169,57 +199,182 @@ pub fn parse_issue(json: &str) -> Option<String> {
     })
 }
 
+/// Why a check got no answer.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CheckError {
+    /// No connection, or no reply within the timeout.
+    Offline,
+    /// GitHub's rate limit: no request before `until` (seconds since 1970).
+    Limited { until: u64 },
+    /// Any other HTTP status.
+    Http(u16),
+    /// A reply that isn't JSON.
+    Unreadable,
+}
+
+/// What a failed reply's status and headers mean: GitHub's rate limit (403 with no requests
+/// left, or with `retry-after`; any 429) until its reset, or a plain HTTP error. The reset is
+/// taken as an hour at most, whatever the headers say.
+pub fn classify(status: u16, headers: &HeaderMap, now: SystemTime) -> CheckError {
+    let number = |name: &str| {
+        headers
+            .get(name)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.trim().parse::<u64>().ok())
+    };
+    let now = unix(now);
+    let retry_after = number("retry-after").map(|secs| now.saturating_add(secs));
+    let exhausted = number("x-ratelimit-remaining") == Some(0);
+    if status == 429 || (status == 403 && (exhausted || retry_after.is_some())) {
+        let until = retry_after
+            .or_else(|| number("x-ratelimit-reset"))
+            .unwrap_or(now + COOLDOWN);
+        return CheckError::Limited {
+            until: until.clamp(now, now + LIMIT_AT_MOST),
+        };
+    }
+    CheckError::Http(status)
+}
+
+/// Whether GitHub may be asked now: not within `COOLDOWN` of the last request (`last`,
+/// seconds since 1970; 0 for none; a clock set back allows it), nor before a rate limit's
+/// end.
+pub fn may_request(last: u64, now: SystemTime, limited_until: Option<u64>) -> bool {
+    let now = unix(now);
+    let cooled = last == 0 || now < last || now - last >= COOLDOWN;
+    cooled && limited_until.is_none_or(|until| now >= until)
+}
+
+/// The download of a newer release's setup: which version, how many times it was tried and
+/// when last, and whether it's refused for good (a checksum that didn't match, no setup for
+/// this PC).
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Fetch {
+    pub version: String,
+    pub attempts: u32,
+    pub last: u64,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub refused: bool,
+}
+
 /// The last check, kept in the cache.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Stamp {
-    /// When, in seconds since 1970; 0 for never.
+    /// When GitHub was last asked, answered or not, in seconds since 1970; 0 for never.
     pub checked: u64,
+    /// When it last answered ("Checked 2 hours ago"); 0 for never.
+    #[serde(skip_serializing_if = "is_zero")]
+    pub answered: u64,
+    /// Why the last check got no answer; none if it got one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<CheckError>,
     /// The latest release GitHub gave, newer or not.
     pub latest: Option<Release>,
     /// The version the toast last announced.
     pub announced: Option<String>,
-    /// The version whose setup was last downloaded, whatever came of it: each version is
-    /// downloaded once.
+    /// The newer release's setup download, whatever came of it.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub fetched: Option<String>,
+    pub fetch: Option<Fetch>,
     /// The setup downloaded and checked, waiting for "Restart to update".
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ready: Option<Ready>,
+    /// The version whose setup "Restart to update" last started. Running an older version
+    /// than it afterwards means that update didn't install.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub launched: Option<String>,
+    /// Before 0.1.3: the version whose setup was downloaded, once, whatever came of it.
+    #[serde(skip_serializing, rename = "fetched")]
+    old_fetched: Option<String>,
+}
+
+fn is_zero(n: &u64) -> bool {
+    *n == 0
 }
 
 fn unix(t: SystemTime) -> u64 {
     t.duration_since(UNIX_EPOCH).map_or(0, |d| d.as_secs())
 }
 
+/// Seconds since 1970, now.
+pub fn now_unix() -> u64 {
+    unix(SystemTime::now())
+}
+
 impl Stamp {
-    /// The stamp at `path`; a missing or broken file is no check yet.
+    /// The stamp at `path`; a missing or broken file is no check yet. A stamp from before
+    /// 0.1.3 reads as if its download was tried three times, and its last check answered.
     pub fn load(path: &Path) -> Stamp {
-        std::fs::read_to_string(path)
+        let mut stamp: Stamp = std::fs::read_to_string(path)
             .ok()
             .and_then(|text| serde_json::from_str(&text).ok())
-            .unwrap_or_default()
+            .unwrap_or_default();
+        if let Some(version) = stamp.old_fetched.take()
+            && stamp.fetch.is_none()
+        {
+            stamp.fetch = Some(Fetch {
+                version,
+                attempts: FETCH_ATTEMPTS,
+                last: stamp.checked,
+                refused: false,
+            });
+        }
+        if stamp.answered == 0 && stamp.error.is_none() {
+            stamp.answered = stamp.checked;
+        }
+        stamp
     }
 
+    /// Written whole or not at all: to a temporary file, then renamed over the stamp.
     pub fn save(&self, path: &Path) -> io::Result<()> {
         if let Some(dir) = path.parent() {
             std::fs::create_dir_all(dir)?;
         }
         let text = serde_json::to_string(self).map_err(io::Error::other)?;
-        std::fs::write(path, text)
+        let tmp = path.with_extension("json.tmp");
+        std::fs::write(&tmp, text)?;
+        std::fs::rename(&tmp, path)
     }
 
-    /// Whether a day has passed since the last check (or the clock went back past it).
+    /// When the next check is due: a day after the last, an hour after a failed one, and
+    /// not before a rate limit's end. 0 for at once.
+    pub fn check_due_at(&self) -> u64 {
+        if self.checked == 0 {
+            return 0;
+        }
+        let wait = if self.error.is_some() {
+            CHECK_RETRY
+        } else {
+            CHECK_EVERY
+        };
+        (self.checked + wait).max(self.limited_until().unwrap_or(0))
+    }
+
+    /// Whether a check is due (`check_due_at`), or the clock went back past the last one.
     pub fn due(&self, now: SystemTime) -> bool {
         let now = unix(now);
-        self.checked == 0 || now < self.checked || now - self.checked >= CHECK_EVERY.as_secs()
+        now < self.checked || now >= self.check_due_at()
     }
 
-    /// A check at `now`. A failed one keeps the last answer, and still waits a day.
-    pub fn record(&mut self, result: Result<Option<Release>, String>, now: SystemTime) {
+    /// The end of GitHub's rate limit, if the last check met it.
+    pub fn limited_until(&self) -> Option<u64> {
+        match self.error {
+            Some(CheckError::Limited { until }) => Some(until),
+            _ => None,
+        }
+    }
+
+    /// A check at `now`. A failed one keeps the last answer.
+    pub fn record(&mut self, result: Result<Option<Release>, CheckError>, now: SystemTime) {
         self.checked = unix(now);
-        if let Ok(latest) = result {
-            self.latest = latest;
+        match result {
+            Ok(latest) => {
+                self.latest = latest;
+                self.answered = self.checked;
+                self.error = None;
+            }
+            Err(e) => self.error = Some(e),
         }
     }
 
@@ -248,10 +403,48 @@ impl Stamp {
         self.ready.as_ref().filter(|r| r.version == newer.version)
     }
 
-    /// The newer release, if its setup hasn't been downloaded (or tried) yet.
-    pub fn to_fetch(&self, current: &str) -> Option<&Release> {
-        self.newer(current)
-            .filter(|r| self.fetched.as_deref() != Some(r.version.as_str()))
+    /// The newer release, if its setup is to be downloaded now: never tried; or tried and
+    /// failed fewer than `FETCH_ATTEMPTS` times, the last over an hour ago; or, asked for by
+    /// a click (`manual`), failed any number of times. Never once it's refused.
+    pub fn to_fetch(&self, current: &str, now: SystemTime, manual: bool) -> Option<&Release> {
+        let newer = self.newer(current)?;
+        let Some(f) = self.fetch.as_ref().filter(|f| f.version == newer.version) else {
+            return Some(newer);
+        };
+        let now = unix(now);
+        let waited = now < f.last || now - f.last >= FETCH_RETRY;
+        let again = !f.refused && (manual || (f.attempts < FETCH_ATTEMPTS && waited));
+        again.then_some(newer)
+    }
+
+    /// A download of `version`'s setup at `now`, counted whatever came of it; `refused`: it
+    /// can never work.
+    pub fn fetch_tried(&mut self, version: &str, now: SystemTime, refused: bool) {
+        let attempts = self
+            .fetch
+            .as_ref()
+            .filter(|f| f.version == version)
+            .map_or(0, |f| f.attempts);
+        self.fetch = Some(Fetch {
+            version: version.to_string(),
+            attempts: attempts + 1,
+            last: unix(now),
+            refused,
+        });
+    }
+
+    /// When a failed download of the newer release is to be tried again, if it is.
+    pub fn fetch_due_at(&self, current: &str) -> Option<u64> {
+        let newer = self.newer(current)?;
+        let f = self.fetch.as_ref().filter(|f| f.version == newer.version)?;
+        let again = !f.refused && f.attempts < FETCH_ATTEMPTS && self.pending(current).is_none();
+        again.then_some(f.last + FETCH_RETRY)
+    }
+
+    /// The version "Restart to update" started whose update didn't install: the setup ran,
+    /// and `current` is still older than it.
+    pub fn failed_install(&self, current: &str) -> Option<&str> {
+        self.launched.as_deref().filter(|v| is_newer(v, current))
     }
 }
 
@@ -260,18 +453,100 @@ pub fn stamp_path(cache: &Path) -> PathBuf {
     cache.join(STAMP)
 }
 
-fn client() -> Result<reqwest::Client, String> {
-    reqwest::Client::builder()
-        .user_agent(concat!("featherplay/", env!("CARGO_PKG_VERSION")))
-        .https_only(true)
-        .timeout(TIMEOUT)
-        .build()
-        .map_err(|e| format!("http client: {e}"))
+/// Where a run asks: GitHub, or in tests a server on 127.0.0.1; and whether this is the
+/// installed copy, which downloads setups.
+pub struct Remote {
+    latest: String,
+    origin: Origin,
+    installed: bool,
+    /// Tests: the release files' URLs (`install::DOWNLOADS…`) are fetched from here instead.
+    #[cfg(test)]
+    files: Option<String>,
 }
 
-/// One GET to GitHub's API, read-only and unauthenticated.
-async fn get(url: reqwest::Url) -> Result<String, String> {
-    let resp = client()?
+impl Remote {
+    /// GitHub, for this copy (`installed`: it's the installed copy).
+    pub fn github(installed: bool) -> Remote {
+        Remote {
+            latest: LATEST.to_string(),
+            origin: Origin::github(),
+            installed,
+            #[cfg(test)]
+            files: None,
+        }
+    }
+
+    #[cfg(test)]
+    fn local(base: &str, installed: bool) -> Remote {
+        Remote {
+            latest: format!("{base}/latest"),
+            origin: Origin::local(),
+            installed,
+            files: Some(base.to_string()),
+        }
+    }
+
+    /// The download plan for this remote: GitHub's URLs as they are, or the test server's.
+    fn localise(&self, plan: install::Plan) -> install::Plan {
+        #[cfg(test)]
+        if let Some(base) = &self.files {
+            let mut plan = plan;
+            for asset in [&mut plan.setup, &mut plan.sums] {
+                asset.url = format!("{base}/{}", asset.name);
+            }
+            return plan;
+        }
+        plan
+    }
+}
+
+/// The latest release on GitHub. A request that fails or times out is `Offline`.
+async fn fetch_latest(remote: &Remote) -> Result<Option<Release>, CheckError> {
+    let http = remote.origin.api_client(TIMEOUT).map_err(|e| {
+        log!("update check: {e}");
+        CheckError::Offline
+    })?;
+    let resp = http
+        .get(&remote.latest)
+        .header(reqwest::header::ACCEPT, "application/vnd.github+json")
+        .send()
+        .await
+        .map_err(|e| {
+            log!("update check: request: {e}");
+            CheckError::Offline
+        })?;
+    let status = resp.status();
+    if !status.is_success() {
+        let left = resp
+            .headers()
+            .get("x-ratelimit-remaining")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("?")
+            .to_string();
+        log!(
+            "update check: HTTP {} ({left} requests left)",
+            status.as_u16()
+        );
+        return Err(classify(status.as_u16(), resp.headers(), SystemTime::now()));
+    }
+    let body = resp.text().await.map_err(|e| {
+        log!("update check: reading the reply: {e}");
+        CheckError::Offline
+    })?;
+    if serde_json::from_str::<Value>(&body).is_err() {
+        log!("update check: the reply isn't JSON");
+        return Err(CheckError::Unreadable);
+    }
+    Ok(parse_release(&body))
+}
+
+/// The page of the open "Playback broken" issue, if the maintainer opened one.
+async fn find_issue() -> Result<Option<String>, String> {
+    let query = format!("repo:candygoogy/featherplay is:issue is:open in:title \"{ISSUE_TITLE}\"");
+    let params = [("q", query.as_str()), ("per_page", ISSUE_RESULTS)];
+    let url = reqwest::Url::parse_with_params(SEARCH, params).map_err(|e| e.to_string())?;
+    let resp = Origin::github()
+        .api_client(TIMEOUT)?
         .get(url)
         .header(reqwest::header::ACCEPT, "application/vnd.github+json")
         .send()
@@ -281,130 +556,384 @@ async fn get(url: reqwest::Url) -> Result<String, String> {
     if !status.is_success() {
         return Err(format!("HTTP {}", status.as_u16()));
     }
-    resp.text()
+    let body = resp
+        .text()
         .await
-        .map_err(|e| format!("reading the reply: {e}"))
+        .map_err(|e| format!("reading the reply: {e}"))?;
+    Ok(parse_issue(&body))
 }
 
-/// The latest release on GitHub.
-async fn fetch_latest() -> Result<Option<Release>, String> {
-    let url = reqwest::Url::parse(LATEST).map_err(|e| e.to_string())?;
-    Ok(parse_release(&get(url).await?))
+/// What asked for a run.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Trigger {
+    /// The first page is up.
+    Startup,
+    /// Playback resumed, the window came back, or the setting was turned on.
+    Resume,
+    /// About's "Check for updates" (or "Try again" after a failed check).
+    Manual,
+    /// The banner's "Try again" after a failed download: no check, the download again.
+    Retry,
+    /// Songs keep failing to play.
+    Help,
 }
 
-/// The page of the open "Playback broken" issue, if the maintainer opened one.
-async fn find_issue() -> Result<Option<String>, String> {
-    let query = format!("repo:candygoogy/featherplay is:issue is:open in:title \"{ISSUE_TITLE}\"");
-    let params = [("q", query.as_str()), ("per_page", ISSUE_RESULTS)];
-    let url = reqwest::Url::parse_with_params(SEARCH, params).map_err(|e| e.to_string())?;
-    Ok(parse_issue(&get(url).await?))
+impl Trigger {
+    /// A click asked: the setting is no bar, and a failed download is tried again whatever
+    /// its count.
+    fn clicked(self) -> bool {
+        matches!(self, Trigger::Manual | Trigger::Retry)
+    }
 }
 
-/// What a check found: the newer release, for About's banner, the one to announce, and its
-/// downloaded setup, to offer "Restart to update" with instead of announcing it.
+/// How this copy is updated.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Kind {
+    /// A portable exe or a dev build: told about a newer release, with its page.
+    #[default]
+    Portable,
+    /// The installer's copy (winget's too): downloads the setup, restarts into it.
+    Installed,
+    /// Scoop's copy: told the Scoop command.
+    Scoop,
+}
+
+impl Kind {
+    /// This process's: the installer's uninstall key, or Scoop's folder.
+    pub fn detect() -> Kind {
+        if install::installed() {
+            Kind::Installed
+        } else if install::scoop() {
+            Kind::Scoop
+        } else {
+            Kind::Portable
+        }
+    }
+}
+
+/// What About shows of the updater, shared by the runs (on the runtime, or the controller's
+/// thread for `help`) and the UI thread.
+#[derive(Clone, Debug, Default)]
+pub struct Status {
+    /// The stamp as the last run left it.
+    pub stamp: Stamp,
+    /// A run is going (`Running`).
+    pub running: bool,
+    /// It's asking GitHub (S1, "Checking…").
+    pub checking: bool,
+    /// It's downloading the setup (B2).
+    pub downloading: bool,
+    /// "Restart to update" was clicked: the setup is being started (B8).
+    pub restarting: bool,
+    /// The setup couldn't be started: it's offered as a page to open instead (B5).
+    pub launch_failed: bool,
+    pub kind: Kind,
+}
+
+/// The banner at the top of About (the board's B1-B8), or none.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Banner {
+    None,
+    /// B1: "Get it" opens the release page.
+    Get,
+    /// B2: the setup is downloading.
+    Downloading,
+    /// B3: "Restart to update".
+    Ready,
+    /// B4: the download didn't finish: "Try again".
+    DownloadFailed,
+    /// B5: it can't be installed from here (checksum, no setup for this PC, a setup that
+    /// wouldn't start): "Get it".
+    CannotInstall,
+    /// B6: the last update didn't install: "Try again" starts the setup once more.
+    InstallFailed,
+    /// B7: Scoop's copy: the command.
+    Scoop,
+    /// B8: "Restart to update" clicked, before featherplay quits.
+    Starting,
+}
+
+impl Status {
+    /// The setup "Restart to update" starts: downloaded and checked for the newer release,
+    /// on the installed copy with "Install updates automatically" on.
+    pub fn ready(&self, install_on: bool) -> Option<&Ready> {
+        let usable = self.kind == Kind::Installed && install_on && !self.launch_failed;
+        self.stamp.pending(CURRENT).filter(|_| usable)
+    }
+
+    pub fn banner(&self, install_on: bool) -> Banner {
+        let Some(newer) = self.stamp.newer(CURRENT) else {
+            return Banner::None;
+        };
+        if self.restarting {
+            return Banner::Starting;
+        }
+        let ready = self.ready(install_on).is_some();
+        if ready && self.stamp.failed_install(CURRENT) == Some(newer.version.as_str()) {
+            return Banner::InstallFailed;
+        }
+        if self.kind == Kind::Scoop {
+            return Banner::Scoop;
+        }
+        if ready {
+            return Banner::Ready;
+        }
+        if self.launch_failed {
+            return Banner::CannotInstall;
+        }
+        if self.kind != Kind::Installed || !install_on {
+            return Banner::Get;
+        }
+        if self.downloading {
+            return Banner::Downloading;
+        }
+        match self.stamp.fetch.as_ref() {
+            Some(f) if f.version == newer.version && f.refused => Banner::CannotInstall,
+            Some(f) if f.version == newer.version => Banner::DownloadFailed,
+            _ => Banner::Get,
+        }
+    }
+}
+
+static STATUS: LazyLock<Mutex<Status>> = LazyLock::new(Mutex::default);
+
+fn lock() -> MutexGuard<'static, Status> {
+    STATUS.lock().unwrap_or_else(PoisonError::into_inner)
+}
+
+/// The updater's state now, for About.
+pub fn status() -> Status {
+    lock().clone()
+}
+
+/// One run at a time: held from a run's start to its end. Dropping it ends the run.
+#[derive(Debug)]
+pub struct Running(());
+
+impl Running {
+    /// The run's token, unless one is going; `checking` shows "Checking…" until the request
+    /// is answered (or found not needed).
+    pub fn begin(checking: bool) -> Option<Running> {
+        let mut s = lock();
+        if s.running {
+            return None;
+        }
+        s.running = true;
+        s.checking = checking;
+        Some(Running(()))
+    }
+}
+
+impl Drop for Running {
+    fn drop(&mut self) {
+        let mut s = lock();
+        s.running = false;
+        s.checking = false;
+        s.downloading = false;
+    }
+}
+
+/// What a run found: the newer release, for About's banner; the one to announce; its
+/// downloaded setup, to offer "Restart to update" with instead; the update that didn't
+/// install; and when the next run is due.
 #[derive(Debug, Default)]
 pub struct Found {
     pub newer: Option<Release>,
     pub announce: Option<Release>,
     pub ready: Option<Ready>,
+    /// `ready` was downloaded by this run (not at an earlier one).
+    pub downloaded: bool,
+    pub failed_install: Option<String>,
+    /// Seconds since 1970; 0 for at once.
+    pub next_due: u64,
 }
 
-/// Checks GitHub if the last check is a day old, or at once with `force`; else reads the
-/// last answer. Marks the release it returns to announce as announced. A failure is logged.
-pub async fn check(path: PathBuf, force: bool) -> Found {
+/// About's banner and row may have changed off the UI thread: they're redrawn there.
+fn changed_elsewhere() {
+    let _ = slint::invoke_from_event_loop(|| {
+        if let Some(ctx) = Ctx::get() {
+            pages::about::refresh_update(&ctx);
+        }
+    });
+}
+
+/// The run behind every trigger. With `check_on` (the setting; ignored when a click asked)
+/// it asks GitHub if a check is due and allowed (`may_request`); then, on the installed copy
+/// with `install_on`, it checks a setup downloaded earlier, or downloads the newer
+/// release's if that's due (`Stamp::to_fetch`). Setups no longer pending are deleted. A
+/// release is marked announced; it's returned to announce only at startup or on resume, as
+/// a click is answered in About and `help` makes its own toast.
+pub async fn run(
+    running: Running,
+    cache: PathBuf,
+    trigger: Trigger,
+    check_on: bool,
+    install_on: bool,
+    remote: Remote,
+) -> Found {
+    let path = stamp_path(&cache);
     let now = SystemTime::now();
     let mut stamp = Stamp::load(&path);
     let mut changed = false;
-    if force || stamp.due(now) {
-        let result = fetch_latest().await;
-        if let Err(e) = &result {
-            log!("update check: {e}");
+    // The last "Restart to update": installed (this is that version or newer) or not.
+    if let Some(v) = stamp.launched.clone() {
+        if !is_newer(&v, CURRENT) {
+            stamp.launched = None;
+            changed = true;
+        } else if trigger == Trigger::Startup {
+            log!("update: the update to {v} didn't install; the setup's log ends:");
+            for line in install::install_log_tail(&cache, INSTALL_LOG_LINES) {
+                log!("  {line}");
+            }
         }
+    }
+    let allowed = may_request(stamp.checked, now, stamp.limited_until());
+    let ask = match trigger {
+        Trigger::Startup | Trigger::Resume => check_on && stamp.due(now) && allowed,
+        Trigger::Manual | Trigger::Help => allowed,
+        Trigger::Retry => false,
+    };
+    if ask {
+        // S1 shows only while GitHub is really being asked.
+        if !std::mem::replace(&mut lock().checking, true) {
+            changed_elsewhere();
+        }
+        let result = fetch_latest(&remote).await;
         stamp.record(result, now);
         changed = true;
     }
-    let announce = stamp.to_announce(CURRENT);
-    if let Some(r) = &announce {
+    {
+        let mut s = lock();
+        s.checking = false;
+        s.stamp = stamp.clone();
+    }
+    let mut announce = None;
+    if let Some(r) = stamp.to_announce(CURRENT) {
         stamp.announced(&r.version);
         changed = true;
+        if matches!(trigger, Trigger::Startup | Trigger::Resume) {
+            announce = Some(r);
+        }
     }
+    let mut ready = None;
+    let mut downloaded = false;
+    if install_on && remote.installed && (check_on || trigger.clicked()) {
+        if let Some(r) = stamp.pending(CURRENT).cloned() {
+            if r.verified(&cache) {
+                ready = Some(r);
+            } else {
+                log!(
+                    "update: the downloaded setup for {} is gone or changed",
+                    r.version
+                );
+                stamp.ready = None;
+                changed = true;
+            }
+        }
+        let due = stamp.to_fetch(CURRENT, now, trigger.clicked()).cloned();
+        if let (None, Some(release)) = (&ready, due) {
+            changed = true;
+            match install::plan(&release, std::env::consts::ARCH) {
+                None => {
+                    log!(
+                        "update: {} has no setup for {}; announcing it only",
+                        release.version,
+                        std::env::consts::ARCH
+                    );
+                    stamp.fetch_tried(&release.version, now, true);
+                }
+                Some(plan) => {
+                    lock().downloading = true;
+                    changed_elsewhere();
+                    let plan = remote.localise(plan);
+                    let began = std::time::Instant::now();
+                    match install::fetch(&cache, &plan, &remote.origin).await {
+                        Ok(r) => {
+                            log!(
+                                "update: {} downloaded and checked in {:.1} s",
+                                r.version,
+                                began.elapsed().as_secs_f32()
+                            );
+                            stamp.fetch_tried(&release.version, now, false);
+                            stamp.ready = Some(r.clone());
+                            ready = Some(r);
+                            downloaded = true;
+                        }
+                        Err(e) => {
+                            log!("update download: {e}");
+                            let refused = matches!(e, FetchError::Refused(_));
+                            stamp.fetch_tried(&release.version, now, refused);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if ready.is_some() {
+        announce = None;
+    }
+    // Nothing waits to install: the folder keeps no setup, whatever the switches say.
+    let pending = stamp.pending(CURRENT).cloned();
+    if pending.is_none() && stamp.ready.take().is_some() {
+        changed = true;
+    }
+    install::clean(&cache, pending.as_ref());
     if changed && let Err(e) = stamp.save(&path) {
         log!("saving the update check: {}", e.kind());
     }
-    Found {
+    let failed_install = stamp
+        .failed_install(CURRENT)
+        .filter(|v| ready.as_ref().is_some_and(|r| r.version == *v))
+        .map(str::to_string);
+    let mut next_due = stamp.check_due_at();
+    if install_on
+        && remote.installed
+        && let Some(at) = stamp.fetch_due_at(CURRENT)
+    {
+        next_due = next_due.min(at);
+    }
+    let found = Found {
         newer: stamp.newer(CURRENT).cloned(),
         announce,
-        ready: None,
+        ready,
+        downloaded,
+        failed_install,
+        next_due,
+    };
+    {
+        let mut s = lock();
+        s.stamp = stamp;
+        // A setup downloaded since one wouldn't start is offered again.
+        s.launch_failed &= !downloaded;
     }
-}
-
-/// The startup check, then with `install` (the setting is on) for the installed copy: the
-/// setup already downloaded for the newer release, checked again, or else a download of it
-/// if this version hasn't been tried. A failed or mismatched download is logged and the
-/// release is only announced. Otherwise old setups are deleted.
-pub async fn startup(cache: PathBuf, install: bool) -> Found {
-    let path = stamp_path(&cache);
-    let mut found = check(path.clone(), false).await;
-    if !install || !install::installed() {
-        return found;
-    }
-    let mut stamp = Stamp::load(&path);
-    if let Some(ready) = stamp.pending(CURRENT).cloned() {
-        if ready.verified(&cache) {
-            install::clean(&cache, Some(&ready));
-            found.announce = None;
-            found.ready = Some(ready);
-            return found;
-        }
-        log!(
-            "update: the downloaded setup for {} is gone or changed",
-            ready.version
-        );
-    }
-    let stale = stamp.ready.take().is_some();
-    install::clean(&cache, None);
-    let plan = stamp.to_fetch(CURRENT).map(|r| {
-        let plan = install::plan(r, std::env::consts::ARCH);
-        if plan.is_none() {
-            log!(
-                "update: {} has no setup for {}; announcing it only",
-                r.version,
-                std::env::consts::ARCH
-            );
-        }
-        (r.version.clone(), plan)
-    });
-    if let Some((version, plan)) = plan {
-        stamp.fetched = Some(version);
-        if let Some(plan) = plan {
-            match install::fetch(&cache, &plan, &Origin::github()).await {
-                Ok(ready) => {
-                    log!("update: {} downloaded and checked", ready.version);
-                    stamp.ready = Some(ready.clone());
-                    found.announce = None;
-                    found.ready = Some(ready);
-                }
-                Err(e) => log!("update download: {e}"),
-            }
-        }
-    } else if !stale {
-        return found;
-    }
-    if let Err(e) = stamp.save(&path) {
-        log!("saving the update check: {}", e.kind());
-    }
+    drop(running);
     found
 }
 
-/// When songs keep failing after the helpers were updated: a newer release (a fresh
-/// check, whatever the stamp says), else the open "Playback broken" issue. At most two
-/// requests.
-pub async fn help(cache: PathBuf) -> (Option<Help>, Option<Release>) {
-    let found = check(stamp_path(&cache), true).await;
+/// When songs keep failing after the helpers were updated: a newer release (a fresh check,
+/// unless one was made within a minute; on the installed copy, its setup downloaded as at
+/// startup), else the open "Playback broken" issue. If a run is going, it waits for that
+/// run's answer, which then needs no request of its own (`COOLDOWN`).
+pub async fn help(cache: PathBuf, install_on: bool) -> (Option<Help>, Option<Release>) {
+    let running = loop {
+        if let Some(running) = Running::begin(false) {
+            break running;
+        }
+        tokio::time::sleep(Duration::from_millis(250)).await;
+    };
+    let remote = Remote::github(install::installed());
+    let found = run(running, cache, Trigger::Help, true, install_on, remote).await;
     if let Some(r) = found.newer {
+        // A setup downloaded and checked: the banner's "Restart to update".
+        let restart = found.ready.is_some();
         let help = Help {
-            label: tr!("Get it"),
+            label: if restart {
+                tr!("Restart to update")
+            } else {
+                tr!("Get it")
+            },
             url: r.url.clone(),
+            restart,
         };
         return (Some(help), Some(r));
     }
@@ -413,6 +942,7 @@ pub async fn help(cache: PathBuf) -> (Option<Help>, Option<Release>) {
             issue.map(|url| Help {
                 label: tr!("Details"),
                 url,
+                restart: false,
             }),
             None,
         ),
@@ -423,29 +953,69 @@ pub async fn help(cache: PathBuf) -> (Option<Help>, Option<Release>) {
     }
 }
 
+/// A toast a run has for the user, held while the window is in the tray or minimised.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Notice {
+    /// "featherplay 0.2.0 is out", with "Get it" (or, for Scoop's copy, "View": About).
+    Out(Release),
+    /// "featherplay 0.2.0 is ready to install", with "Restart to update".
+    Ready(String),
+    /// "The update to 0.2.0 didn't install", with "Try again".
+    InstallFailed(String),
+}
+
+impl Notice {
+    /// What a run has to say: the banner's state, in a toast. A click is answered in About
+    /// and the "can't play" toast makes its own, so only startup and resume runs say
+    /// anything. A setup waiting, or an update that didn't install, is said at every start,
+    /// but in a long session only when the setup was just downloaded.
+    pub fn of(found: &Found, trigger: Trigger) -> Option<Notice> {
+        let fresh = match trigger {
+            Trigger::Startup => true,
+            Trigger::Resume => found.downloaded,
+            Trigger::Manual | Trigger::Retry | Trigger::Help => return None,
+        };
+        if let Some(v) = found.failed_install.as_ref().filter(|_| fresh) {
+            return Some(Notice::InstallFailed(v.clone()));
+        }
+        if let Some(r) = &found.ready {
+            return fresh.then(|| Notice::Ready(r.version.clone()));
+        }
+        found.announce.clone().map(Notice::Out)
+    }
+}
+
 thread_local! {
-    /// The startup check is still to run (the real app only: never in tests or snapshots).
+    /// The startup run is still to come (the real app only: never in tests or snapshots).
     static ARMED: Cell<bool> = const { Cell::new(false) };
     static CACHE: RefCell<Option<PathBuf>> = const { RefCell::new(None) };
-    /// The setup "Restart to update" starts, once one is downloaded and checked.
-    static READY: RefCell<Option<Ready>> = const { RefCell::new(None) };
-    /// "Restart to update" was clicked: the setup is being started.
-    static RESTARTING: Cell<bool> = const { Cell::new(false) };
+    /// When a long session's run is due (seconds since 1970); none until the startup run
+    /// has ended, and while one runs.
+    static NEXT_DUE: Cell<Option<u64>> = const { Cell::new(None) };
+    /// A toast that came while the window was hidden: shown when it's back.
+    static HELD: RefCell<Option<Notice>> = const { RefCell::new(None) };
+    /// What starts a run; tests put a stand-in here (`run_with`).
+    static STARTER: Cell<fn(&Rc<Ctx>, Trigger)> = const { Cell::new(start) };
 }
 
-/// The version "Restart to update" installs, if a setup is ready.
-pub fn ready_version() -> Option<String> {
-    READY.with(|r| r.borrow().as_ref().map(|r| r.version.clone()))
-}
-
-/// The app's window is up: the startup check runs once the first page has loaded.
+/// The app's window is up: the startup run comes once the first page has loaded.
 pub fn arm(cache: PathBuf) {
     CACHE.with(|c| *c.borrow_mut() = Some(cache));
     ARMED.with(|a| a.set(true));
+    let kind = Kind::detect();
+    lock().kind = kind;
+}
+
+/// Tests: runs start with `starter` instead of a request, and a long session's run is due
+/// at `due` (seconds since 1970).
+pub fn run_with(starter: fn(&Rc<Ctx>, Trigger), due: u64) {
+    STARTER.with(|s| s.set(starter));
+    NEXT_DUE.with(|d| d.set(Some(due)));
 }
 
 /// A load arrived, or the session became known: once nothing is loading any more, the
-/// first page is up, and the startup check runs (once).
+/// first page is up, and the startup run comes (once). With "Check for updates" off it
+/// asks nothing, but reads the stamp for About and tells of an update that didn't install.
 pub fn page_settled(ctx: &Rc<Ctx>) {
     if !ARMED.with(Cell::get) || ctx.session_pending() || busy::pending() > 0 {
         return;
@@ -453,55 +1023,176 @@ pub fn page_settled(ctx: &Rc<Ctx>) {
     ARMED.with(|a| a.set(false));
     if !pages::settings::check_for_updates() {
         log!("update check: off in Settings");
+    }
+    STARTER.with(Cell::get)(ctx, Trigger::Startup);
+}
+
+/// Playback resumed, the window came back, or "Check for updates" was turned on: a run if
+/// one is due. One comparison, nothing read from disk.
+pub fn maybe_run(ctx: &Rc<Ctx>) {
+    let Some(due) = NEXT_DUE.with(Cell::get) else {
+        return;
+    };
+    if now_unix() < due || !pages::settings::check_for_updates() {
         return;
     }
+    NEXT_DUE.with(|d| d.set(None));
+    STARTER.with(Cell::get)(ctx, Trigger::Resume);
+}
+
+/// About's "Check for updates", or "Try again" after a failed check.
+pub fn check_now(ctx: &Rc<Ctx>) {
+    STARTER.with(Cell::get)(ctx, Trigger::Manual);
+}
+
+/// The banner's "Try again" after a failed download.
+pub fn retry_download(ctx: &Rc<Ctx>) {
+    STARTER.with(Cell::get)(ctx, Trigger::Retry);
+}
+
+/// Starts a run on the runtime, unless one is going (then a startup or resume run is due
+/// again a minute later, so a long session doesn't stop checking).
+fn start(ctx: &Rc<Ctx>, trigger: Trigger) {
     let Some(cache) = CACHE.with(|c| c.borrow().clone()) else {
         return;
     };
-    let install = pages::settings::install_updates();
+    // A click shows "Checking…" at once; otherwise only once GitHub is asked.
+    let Some(running) = Running::begin(trigger == Trigger::Manual) else {
+        if matches!(trigger, Trigger::Startup | Trigger::Resume) {
+            NEXT_DUE.with(|d| d.set(Some(now_unix() + COOLDOWN)));
+        }
+        return;
+    };
+    let (check_on, install_on) = (
+        pages::settings::check_for_updates(),
+        pages::settings::install_updates(),
+    );
+    let installed = status().kind == Kind::Installed;
+    pages::about::refresh_update(ctx);
     ctx.load(
-        move |_| startup(cache, install),
-        |ctx, _ui, found| {
-            READY.with(|r| *r.borrow_mut() = found.ready.clone());
-            pages::about::show_update(ctx, found.newer.as_ref());
-            if let Some(ready) = &found.ready {
-                offer(ctx, ready);
-            } else if let Some(r) = found.announce {
-                announce(ctx, &r);
-            }
+        move |_| {
+            let remote = Remote::github(installed);
+            run(running, cache, trigger, check_on, install_on, remote)
         },
+        move |ctx, _ui, found| finished(ctx, trigger, &found),
     );
 }
 
-/// The toast for a downloaded update: "Restart to update".
-pub fn offer(ctx: &Ctx, ready: &Ready) {
-    toast::show_with(
-        ctx,
-        &tr!("featherplay {} is ready to install", ready.version),
-        tr!("Restart to update"),
-        restart,
-    );
+/// A run ended: About shows its answer, a long session's next run is set, and a startup or
+/// resume run's news is toasted, unless About is showing it already.
+pub fn finished(ctx: &Rc<Ctx>, trigger: Trigger, found: &Found) {
+    NEXT_DUE.with(|d| d.set(Some(found.next_due)));
+    pages::about::refresh_update(ctx);
+    if let Some(notice) = Notice::of(found, trigger) {
+        tell(ctx, notice);
+    }
 }
 
-/// "Restart to update": starts the downloaded setup (checked once more), then quits; the
-/// setup starts the new version. If it can't be started, the release is offered as a page
+/// Toasts `notice`, or holds it until the window is back from the tray or the taskbar. Not
+/// on About, whose banner says it.
+pub fn tell(ctx: &Rc<Ctx>, notice: Notice) {
+    if ctx.current_page() == Page::About {
+        return;
+    }
+    let hidden = ctx
+        .window()
+        .is_none_or(|ui| ui.global::<Frame>().get_hidden())
+        || ctx.native().is_some_and(|w| w.is_minimised());
+    if hidden {
+        HELD.with(|h| *h.borrow_mut() = Some(notice));
+    } else {
+        show(ctx, &notice);
+    }
+}
+
+/// The window is back (from the tray, or the taskbar): a toast held for it shows, and a
+/// run comes if one is due.
+pub fn window_shown(ctx: &Rc<Ctx>) {
+    if let Some(notice) = HELD.with(|h| h.borrow_mut().take())
+        && ctx.current_page() != Page::About
+    {
+        show(ctx, &notice);
+    }
+    maybe_run(ctx);
+}
+
+fn show(ctx: &Ctx, notice: &Notice) {
+    match notice {
+        Notice::Out(release) if status().kind == Kind::Scoop => toast::show_for(
+            ctx,
+            &tr!("featherplay {} is out", release.version),
+            tr!("View"),
+            |c| c.navigate(Page::About),
+            TOAST_FOR,
+        ),
+        Notice::Out(release) => {
+            let url = release.url.clone();
+            toast::show_for(
+                ctx,
+                &tr!("featherplay {} is out", release.version),
+                tr!("Get it"),
+                move |c| open(c, &url),
+                TOAST_FOR,
+            );
+        }
+        Notice::Ready(version) => toast::show_for(
+            ctx,
+            &tr!("featherplay {} is ready to install", version),
+            tr!("Restart to update"),
+            restart,
+            TOAST_FOR,
+        ),
+        Notice::InstallFailed(version) => toast::show_for(
+            ctx,
+            &tr!("The update to {} didn't install", version),
+            tr!("Try again"),
+            restart,
+            TOAST_FOR,
+        ),
+    }
+}
+
+/// "Restart to update" (the toast's and the banner's), or "Try again" after an update
+/// didn't install: starts the downloaded setup (checked once more), then quits; the setup
+/// starts the new version. The version is noted first, so the next start can tell if the
+/// update didn't install. If the setup can't be started, the release is offered as a page
 /// to open instead.
 pub fn restart(ctx: &Rc<Ctx>) {
+    let install_on = pages::settings::install_updates();
     let (Some(ready), Some(cache)) = (
-        READY.with(|r| r.borrow().clone()),
+        status().ready(install_on).cloned(),
         CACHE.with(|c| c.borrow().clone()),
     ) else {
         return;
     };
-    if RESTARTING.with(|r| r.replace(true)) {
+    // The stamp has one writer at a time: not while a run (a check, a download) is going.
+    let Some(running) = Running::begin(false) else {
+        return;
+    };
+    if std::mem::replace(&mut lock().restarting, true) {
         return;
     }
+    pages::about::refresh_update(ctx);
     log!("update: starting the setup for {}", ready.version);
     ctx.load(
         move |_| async move {
-            tokio::task::spawn_blocking(move || install::launch(&cache, &ready))
-                .await
-                .map_err(|e| format!("setup task: {e}"))?
+            tokio::task::spawn_blocking(move || {
+                let _running = running;
+                let path = stamp_path(&cache);
+                let mut stamp = Stamp::load(&path);
+                stamp.launched = Some(ready.version.clone());
+                if let Err(e) = stamp.save(&path) {
+                    log!("saving the update check: {}", e.kind());
+                }
+                let started = install::launch(&cache, &ready);
+                if started.is_err() {
+                    stamp.launched = None;
+                    let _ = stamp.save(&path);
+                }
+                started
+            })
+            .await
+            .map_err(|e| format!("setup task: {e}"))?
         },
         |ctx, _ui, started| match started {
             Ok(()) => {
@@ -510,8 +1201,11 @@ pub fn restart(ctx: &Rc<Ctx>) {
             }
             Err(e) => {
                 log!("update: {e}");
-                RESTARTING.with(|r| r.set(false));
-                READY.with(|r| r.borrow_mut().take());
+                {
+                    let mut s = lock();
+                    s.restarting = false;
+                    s.launch_failed = true;
+                }
                 pages::about::refresh_update(ctx);
                 ctx.toast(tr!("The update couldn't start"));
             }
@@ -519,26 +1213,91 @@ pub fn restart(ctx: &Rc<Ctx>) {
     );
 }
 
+/// The release used by About's snapshots and tests: 0.2.0, with its page.
+pub fn sample_release() -> Release {
+    Release {
+        version: "0.2.0".into(),
+        url: "https://github.com/candygoogy/featherplay/releases/tag/v0.2.0".into(),
+        assets: Vec::new(),
+    }
+}
+
+/// Sets the updater's state as `f` makes it, and redraws About: `--snapshot about-…` and
+/// tests.
+pub fn set_status(ctx: &Ctx, f: impl FnOnce(&mut Status)) {
+    f(&mut lock());
+    pages::about::refresh_update(ctx);
+}
+
 /// `--snapshot about-update-ready`: a setup for 0.2.0 waiting, with its toast.
 pub fn ready_for_snapshot(ctx: &Ctx) {
-    let ready = Ready {
+    set_status(ctx, |s| {
+        s.kind = Kind::Installed;
+        s.stamp.latest = Some(sample_release());
+        s.stamp.ready = Some(Ready {
+            version: "0.2.0".into(),
+            file: "featherplay-setup-0.2.0.exe".into(),
+            sha256: String::new(),
+        });
+    });
+    show(ctx, &Notice::Ready("0.2.0".into()));
+}
+
+/// `--snapshot about-…`: the version row and the banner in the state `page` names (the
+/// design board's S1-S4c and B1-B8; plain `about` is S0).
+pub fn for_snapshot(ctx: &Ctx, page: &str) {
+    if page == "about-update-ready" {
+        ready_for_snapshot(ctx);
+        return;
+    }
+    let now = now_unix();
+    let setup = Ready {
         version: "0.2.0".into(),
         file: "featherplay-setup-0.2.0.exe".into(),
         sha256: String::new(),
     };
-    READY.with(|r| *r.borrow_mut() = Some(ready.clone()));
-    offer(ctx, &ready);
-}
-
-/// The toast for a newer release.
-pub fn announce(ctx: &Ctx, release: &Release) {
-    let url = release.url.clone();
-    toast::show_with(
-        ctx,
-        &tr!("featherplay {} is out", release.version),
-        tr!("Get it"),
-        move |c| open(c, &url),
-    );
+    set_status(ctx, |s| {
+        s.stamp.checked = now;
+        let tried = |refused| Fetch {
+            version: "0.2.0".into(),
+            attempts: 1,
+            last: now,
+            refused,
+        };
+        match page.strip_prefix("about-") {
+            Some("check-checking") => {
+                s.running = true;
+                s.checking = true;
+            }
+            Some("check-latest") => s.stamp.answered = now - 2 * 3600,
+            Some("check-offline") => s.stamp.error = Some(CheckError::Offline),
+            Some("check-limited") => {
+                s.stamp.error = Some(CheckError::Limited { until: now + 1800 });
+            }
+            Some("check-failed") => s.stamp.error = Some(CheckError::Http(502)),
+            Some(state) if state.starts_with("update") => {
+                s.stamp.latest = Some(sample_release());
+                s.kind = Kind::Installed;
+                match state {
+                    "update-downloading" => s.downloading = true,
+                    "update-failed-download" => s.stamp.fetch = Some(tried(false)),
+                    "update-cannot-install" => s.stamp.fetch = Some(tried(true)),
+                    "update-failed-install" => {
+                        s.stamp.ready = Some(setup.clone());
+                        s.stamp.launched = Some("0.2.0".into());
+                    }
+                    "update-scoop" => s.kind = Kind::Scoop,
+                    "update-starting" => {
+                        s.stamp.ready = Some(setup.clone());
+                        s.restarting = true;
+                    }
+                    // B1: the portable copy.
+                    _ => s.kind = Kind::Portable,
+                }
+            }
+            _ => {}
+        }
+    });
 }
 
 /// Opens one of the project's pages in the browser, off the UI thread.
@@ -552,4 +1311,72 @@ pub fn open(ctx: &Ctx, url: &str) {
             log!("opening the release page: {e}");
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::install::tests::{SETUP, serve, sums_for, test_cache};
+    use super::*;
+
+    /// `releases/latest` for 9.0.0, its files on the project's releases, as GitHub gives.
+    fn reply() -> Vec<u8> {
+        let file = |name: &str| {
+            format!(
+                r#"{{"name":"{name}","browser_download_url":"{}v9.0.0/{name}"}}"#,
+                install::DOWNLOADS
+            )
+        };
+        format!(
+            r#"{{"tag_name":"v9.0.0","html_url":"{PAGES}releases/tag/v9.0.0","assets":[{},{}]}}"#,
+            file("featherplay-setup-9.0.0.exe"),
+            file("SHA256SUMS.txt")
+        )
+        .into_bytes()
+    }
+
+    #[tokio::test]
+    async fn a_manual_check_on_the_installed_copy_downloads_the_setup() {
+        let cache = test_cache("manual-run");
+        let sums = String::from_utf8(sums_for(SETUP))
+            .unwrap()
+            .replace("0.2.0", "9.0.0");
+        let base = serve(move |path| match path {
+            "/latest" => (200, reply()),
+            "/SHA256SUMS.txt" => (200, sums.clone().into_bytes()),
+            "/featherplay-setup-9.0.0.exe" => (200, SETUP.to_vec()),
+            _ => (404, Vec::new()),
+        });
+
+        // "Check for updates" off: the click asks all the same.
+        let running = Running::begin(true).expect("no run going");
+        let remote = Remote::local(&base, true);
+        let found = run(running, cache.clone(), Trigger::Manual, false, true, remote).await;
+
+        assert_eq!(
+            found.newer.as_ref().map(|r| r.version.as_str()),
+            Some("9.0.0")
+        );
+        let ready = found.ready.expect("the setup downloaded and checked");
+        assert!(ready.verified(&cache));
+        assert_eq!(found.announce, None, "a click is answered in About");
+        let stamp = Stamp::load(&stamp_path(&cache));
+        assert_eq!(stamp.ready, Some(ready));
+        assert_eq!(
+            stamp.announced.as_deref(),
+            Some("9.0.0"),
+            "nor toasted later"
+        );
+        assert!(!status().running);
+        std::fs::remove_dir_all(&cache).unwrap();
+    }
+
+    #[test]
+    fn a_second_run_while_one_is_running_does_nothing() {
+        let first = Running::begin(true).expect("no run going");
+        assert!(Running::begin(true).is_none(), "one run at a time");
+        assert!(status().checking);
+        drop(first);
+        assert!(!status().checking);
+        assert!(Running::begin(true).is_some(), "free again once it ended");
+    }
 }

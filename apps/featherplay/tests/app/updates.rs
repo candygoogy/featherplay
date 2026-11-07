@@ -1,22 +1,43 @@
 //! The update check, offline: the version comparison, GitHub's replies (hand-written
-//! fixtures in `tests/fixtures/github/`), the once-a-day stamp, and what the automatic
-//! update picks: the setup for this architecture, its line in `SHA256SUMS.txt`, and whether
-//! this is the installed copy. No request is made.
+//! fixtures in `tests/fixtures/github/`), the stamp (a day between checks, an hour after a
+//! failed one, the download's retries, the update that didn't install), the rate limit and
+//! the cooldown, and what the automatic update picks: the setup for this architecture, its
+//! line in `SHA256SUMS.txt`, and whether this is the installed copy, or Scoop's. No request
+//! is made.
 
-use std::path::PathBuf;
-use std::time::{Duration, SystemTime};
+use std::path::{Path, PathBuf};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use std::path::Path;
-
-use featherplay::updates::install::{self, Ready, is_installed, parse_sums, setup_name};
-use featherplay::updates::{Asset, Release, Stamp, is_newer, parse_issue, parse_release};
+use featherplay::updates::install::{self, Ready, is_installed, is_scoop, parse_sums, setup_name};
+use featherplay::updates::{
+    Asset, CheckError, Release, Stamp, classify, is_newer, may_request, parse_issue, parse_release,
+};
+use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 
 const RELEASE: &str = include_str!("../fixtures/github/release_latest.json");
 const ISSUES: &str = include_str!("../fixtures/github/issue_search.json");
+const SECOND: Duration = Duration::from_secs(1);
+const MINUTE: Duration = Duration::from_secs(60);
 const HOUR: Duration = Duration::from_secs(3600);
 
 fn now() -> SystemTime {
     SystemTime::UNIX_EPOCH + Duration::from_secs(1_800_000_000)
+}
+
+fn unix(t: SystemTime) -> u64 {
+    t.duration_since(UNIX_EPOCH).unwrap().as_secs()
+}
+
+fn headers(pairs: &[(&str, &str)]) -> HeaderMap {
+    pairs
+        .iter()
+        .map(|(k, v)| {
+            (
+                HeaderName::from_bytes(k.as_bytes()).unwrap(),
+                HeaderValue::from_str(v).unwrap(),
+            )
+        })
+        .collect()
 }
 
 fn release(version: &str) -> Release {
@@ -207,12 +228,85 @@ fn a_clock_set_back_makes_the_check_due() {
 }
 
 #[test]
-fn a_failed_check_keeps_the_last_answer_and_waits_a_day() {
+fn a_failed_check_is_due_again_after_an_hour() {
     let mut s = Stamp::default();
     s.record(Ok(Some(release("0.2.0"))), now());
-    s.record(Err("HTTP 404".into()), now() + 25 * HOUR);
-    assert_eq!(s.latest, Some(release("0.2.0")));
-    assert!(!s.due(now() + 26 * HOUR), "no retry before the next day");
+    s.record(Err(CheckError::Offline), now() + 25 * HOUR);
+    assert_eq!(s.latest, Some(release("0.2.0")), "the last answer stays");
+    assert_eq!(
+        s.answered,
+        unix(now()),
+        "\"Checked … ago\" is the last answer's"
+    );
+    assert!(!s.due(now() + 25 * HOUR + 59 * MINUTE));
+    assert!(s.due(now() + 26 * HOUR), "an hour later, not the next day");
+    // Answered again: a day.
+    s.record(Ok(Some(release("0.2.0"))), now() + 26 * HOUR);
+    assert!(!s.due(now() + 27 * HOUR));
+}
+
+#[test]
+fn a_403_with_no_remaining_requests_is_limited_until_reset() {
+    let reset = unix(now()) + 1200;
+    let headers = headers(&[
+        ("x-ratelimit-remaining", "0"),
+        ("x-ratelimit-reset", &reset.to_string()),
+    ]);
+    assert_eq!(
+        classify(403, &headers, now()),
+        CheckError::Limited { until: reset }
+    );
+    // Another 403 (a blocked network, a policy) is a plain HTTP error.
+    let left = self::headers(&[("x-ratelimit-remaining", "41")]);
+    assert_eq!(classify(403, &left, now()), CheckError::Http(403));
+    assert_eq!(
+        classify(502, &HeaderMap::new(), now()),
+        CheckError::Http(502)
+    );
+    // A reset far off is taken as an hour at most.
+    let far = self::headers(&[
+        ("x-ratelimit-remaining", "0"),
+        ("x-ratelimit-reset", "99999999999"),
+    ]);
+    assert_eq!(
+        classify(403, &far, now()),
+        CheckError::Limited {
+            until: unix(now()) + 3600
+        }
+    );
+}
+
+#[test]
+fn a_429_with_retry_after_is_limited() {
+    let headers = headers(&[("retry-after", "90")]);
+    assert_eq!(
+        classify(429, &headers, now()),
+        CheckError::Limited {
+            until: unix(now()) + 90
+        }
+    );
+    // The stamp holds the check back until then, whatever asks.
+    let mut s = Stamp::default();
+    s.record(Err(classify(429, &headers, now())), now());
+    assert!(!may_request(
+        s.checked,
+        now() + 80 * SECOND,
+        s.limited_until()
+    ));
+    assert!(may_request(
+        s.checked,
+        now() + 90 * SECOND,
+        s.limited_until()
+    ));
+}
+
+#[test]
+fn a_click_within_a_minute_makes_no_request() {
+    let last = unix(now());
+    assert!(may_request(0, now(), None), "never asked");
+    assert!(!may_request(last, now() + 59 * SECOND, None));
+    assert!(may_request(last, now() + MINUTE, None));
+    assert!(may_request(last, now() - HOUR, None), "the clock went back");
 }
 
 #[test]
@@ -380,6 +474,22 @@ fn a_portable_or_dev_exe_is_not_the_installed_copy() {
     ));
 }
 
+#[test]
+fn scoops_copy_is_told_apart() {
+    assert!(is_scoop(Path::new(
+        r"C:\Users\Ann\scoop\apps\featherplay\current\featherplay.exe"
+    )));
+    assert!(is_scoop(Path::new(
+        r"D:\Scoop\apps\featherplay\0.1.2\featherplay.exe"
+    )));
+    assert!(!is_scoop(Path::new(
+        r"C:\Users\Ann\AppData\Local\Programs\featherplay\featherplay.exe"
+    )));
+    assert!(!is_scoop(Path::new(
+        r"C:\Users\Ann\scoop\apps\featherplay-fork\current\featherplay.exe"
+    )));
+}
+
 fn ready(version: &str) -> Ready {
     Ready {
         version: version.into(),
@@ -389,14 +499,49 @@ fn ready(version: &str) -> Ready {
 }
 
 #[test]
-fn each_newer_version_is_downloaded_once() {
+fn a_failed_download_is_retried_after_an_hour_at_most_three_times() {
     let mut s = Stamp::default();
     s.record(Ok(Some(release("0.2.0"))), now());
-    assert_eq!(s.to_fetch("0.1.0"), Some(&release("0.2.0")));
-    s.fetched = Some("0.2.0".into());
-    assert_eq!(s.to_fetch("0.1.0"), None, "tried, whatever came of it");
-    s.record(Ok(Some(release("0.3.0"))), now() + 25 * HOUR);
-    assert_eq!(s.to_fetch("0.1.0"), Some(&release("0.3.0")));
+    assert_eq!(s.to_fetch("0.1.0", now(), false), Some(&release("0.2.0")));
+    let mut at = now();
+    for attempt in 1..=3 {
+        s.fetch_tried("0.2.0", at, false);
+        assert_eq!(
+            s.to_fetch("0.1.0", at + 59 * MINUTE, false),
+            None,
+            "not within the hour"
+        );
+        at += HOUR;
+        let again = s.to_fetch("0.1.0", at, false).is_some();
+        assert_eq!(again, attempt < 3, "attempt {attempt}");
+    }
+    // A click tries again all the same; the next release starts over.
+    assert!(s.to_fetch("0.1.0", at, true).is_some());
+    s.record(Ok(Some(release("0.3.0"))), at);
+    assert_eq!(s.to_fetch("0.1.0", at, false), Some(&release("0.3.0")));
+}
+
+#[test]
+fn a_checksum_mismatch_is_not_retried() {
+    let mut s = Stamp::default();
+    s.record(Ok(Some(release("0.2.0"))), now());
+    s.fetch_tried("0.2.0", now(), true);
+    assert_eq!(s.to_fetch("0.1.0", now() + 2 * HOUR, false), None);
+    assert_eq!(
+        s.to_fetch("0.1.0", now() + 2 * HOUR, true),
+        None,
+        "nor on a click"
+    );
+    assert_eq!(s.fetch_due_at("0.1.0"), None, "nothing to wake for");
+}
+
+#[test]
+fn an_older_running_version_after_launch_is_a_failed_install() {
+    let mut s = Stamp::default();
+    s.record(Ok(Some(release("0.2.0"))), now());
+    s.launched = Some("0.2.0".into());
+    assert_eq!(s.failed_install("0.1.0"), Some("0.2.0"), "0.1.0 still runs");
+    assert_eq!(s.failed_install("0.2.0"), None, "it installed");
 }
 
 #[test]
@@ -412,22 +557,40 @@ fn a_downloaded_setup_is_offered_until_it_is_installed() {
     assert_eq!(s.pending("0.1.0"), None);
 }
 
-#[test]
-fn the_downloaded_setup_survives_a_restart() {
+fn test_dir(name: &str) -> PathBuf {
     let dir = std::env::var("FEATHERPLAY_HOME")
         .map(PathBuf::from)
         .unwrap_or_else(|_| std::env::temp_dir().join("featherplay-tests"))
         .join("test-updates")
-        .join(format!("ready-{}", std::process::id()));
+        .join(format!("{name}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
+    dir
+}
+
+#[test]
+fn the_downloaded_setup_survives_a_restart() {
+    let dir = test_dir("ready");
     let path = dir.join("update-check.json");
     let mut s = Stamp::default();
     s.record(Ok(Some(with_assets(&["SHA256SUMS.txt"]))), now());
-    s.fetched = Some("0.2.0".into());
+    s.fetch_tried("0.2.0", now(), false);
     s.ready = Some(ready("0.2.0"));
+    s.launched = Some("0.2.0".into());
     s.save(&path).expect("saved");
     assert_eq!(Stamp::load(&path), s);
-    // A stamp from before automatic updates still loads.
+    assert!(
+        !dir.join("update-check.json.tmp").exists(),
+        "renamed into place"
+    );
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+fn an_old_stamp_with_fetched_still_loads() {
+    let dir = test_dir("old-stamp");
+    let path = dir.join("update-check.json");
+    std::fs::create_dir_all(&dir).unwrap();
+    // From before automatic updates.
     std::fs::write(
         &path,
         r#"{"checked":1,"latest":{"version":"0.2.0","url":"https://github.com/candygoogy/featherplay/releases/tag/v0.2.0"},"announced":null}"#,
@@ -435,6 +598,19 @@ fn the_downloaded_setup_survives_a_restart() {
     .unwrap();
     let old = Stamp::load(&path);
     assert_eq!(old.latest, Some(release("0.2.0")));
-    assert_eq!((old.fetched, old.ready), (None, None));
+    assert_eq!((old.fetch, old.ready), (None, None));
+    assert_eq!(old.answered, 1, "its check answered");
+    // From 0.1.0-0.1.2: the download was tried once, whatever came of it. It reads as tried
+    // three times, so it isn't retried by itself; a click still can.
+    std::fs::write(
+        &path,
+        r#"{"checked":1,"latest":{"version":"0.2.0","url":"https://github.com/candygoogy/featherplay/releases/tag/v0.2.0"},"announced":"0.2.0","fetched":"0.2.0"}"#,
+    )
+    .unwrap();
+    let old = Stamp::load(&path);
+    let fetch = old.fetch.clone().expect("migrated");
+    assert_eq!((fetch.version.as_str(), fetch.attempts), ("0.2.0", 3));
+    assert_eq!(old.to_fetch("0.1.0", now(), false), None);
+    assert!(old.to_fetch("0.1.0", now(), true).is_some());
     std::fs::remove_dir_all(&dir).unwrap();
 }

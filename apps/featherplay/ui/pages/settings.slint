@@ -2041,7 +2041,7 @@ export component SettingsPage inherits Rectangle {
                     }
                     ToggleRow {
                         label: @tr("Check for updates");
-                        detail: @tr("Once a day, and when songs keep failing to play, ask GitHub whether a newer featherplay is out.");
+                        detail: @tr("Once a day, and when songs keep failing to play, ask GitHub whether a newer featherplay is out. Off, featherplay only checks when you click Check for updates in About.");
                         key: SettingKey.check-for-updates;
                         checked: SettingsData.check-for-updates;
                     }

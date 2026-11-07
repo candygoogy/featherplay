@@ -319,6 +319,7 @@ const NOT_TRANSLATED: &[&str] = &[
     "LM",
     "#4390EE",
     "cookie: SID=…; HSID=…; SAPISID=…",
+    "scoop update featherplay",
     "K",
 ];
 

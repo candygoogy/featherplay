@@ -11,7 +11,7 @@ use slint::{ComponentHandle, Timer, TimerMode};
 use crate::app::Ctx;
 use crate::ui::Toast;
 
-/// How long a toast stays: plain, and with an action button.
+/// How long a toast stays: plain, and with an action button (unless `show_for` says).
 const PLAIN: Duration = Duration::from_secs(3);
 const WITH_ACTION: Duration = Duration::from_secs(5);
 
@@ -49,21 +49,31 @@ pub fn init(ctx: &Rc<Ctx>) {
 
 /// Shows `text` ("Added to queue: Da Funk").
 pub fn show(ctx: &Ctx, text: &str) {
-    put(ctx, text, "", None);
+    put(ctx, text, "", None, PLAIN);
 }
 
 /// Shows `text` with a text button (`label`, "View") that runs `action`.
 pub fn show_with(ctx: &Ctx, text: &str, label: &str, action: impl Fn(&Rc<Ctx>) + 'static) {
-    put(ctx, text, label, Some(Box::new(action)));
+    put(ctx, text, label, Some(Box::new(action)), WITH_ACTION);
 }
 
-fn put(ctx: &Ctx, text: &str, label: &str, action: Option<Action>) {
+/// `show_with`, for `shown_for` (news that comes once and unasked, as an update's).
+pub fn show_for(
+    ctx: &Ctx,
+    text: &str,
+    label: &str,
+    action: impl Fn(&Rc<Ctx>) + 'static,
+    shown_for: Duration,
+) {
+    put(ctx, text, label, Some(Box::new(action)), shown_for);
+}
+
+fn put(ctx: &Ctx, text: &str, label: &str, action: Option<Action>, shown_for: Duration) {
     let Some(ui) = ctx.window() else { return };
     let toast = ui.global::<Toast>();
     toast.set_text(text.into());
     toast.set_action(label.into());
     toast.set_open(true);
-    let shown_for = if action.is_some() { WITH_ACTION } else { PLAIN };
     ACTION.with(|a| *a.borrow_mut() = action);
     SHOWN_FOR.with(|d| d.set(shown_for));
     arm(shown_for);
