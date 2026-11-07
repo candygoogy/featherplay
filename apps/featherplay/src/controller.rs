@@ -237,6 +237,11 @@ enum Msg {
     Reconnected(Option<Result<YtMusic, ApiError>>),
     /// The link for the "may need an update" toast, and a newer release if one is out.
     Help(Option<updates::Help>, Option<updates::Release>),
+    /// The Amuse endpoint started, or why not; the number is the start's (`start_amuse`).
+    Amuse(
+        u32,
+        std::io::Result<featherplay_integrations::local_api::Amuse>,
+    ),
 }
 
 pub struct Controller {
@@ -479,6 +484,9 @@ impl Controller {
         self.push_state();
         if self.settings.local_api {
             self.start_local_api();
+        }
+        if self.settings.amuse {
+            self.start_amuse();
         }
         let mut tick = tokio::time::interval(TICK);
         tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
@@ -922,6 +930,10 @@ impl Controller {
             }
             Msg::Reconnected(result) => {
                 self.reconnected(result);
+                return;
+            }
+            Msg::Amuse(start, result) => {
+                self.amuse_started(start, result);
                 return;
             }
             Msg::Help(help, release) => {

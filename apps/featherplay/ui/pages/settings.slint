@@ -35,6 +35,7 @@ export enum SettingKey {
     check-for-updates,
     install-updates,
     local-api,
+    amuse,
     tray-click-opens-window,
 }
 
@@ -48,7 +49,7 @@ export enum DiscordState {
     not-connected,
 }
 
-// The local API's server.
+// The local API's server, and the Amuse endpoint.
 export enum LocalApiState {
     off,
     running,
@@ -192,6 +193,10 @@ export global SettingsData {
     in-out property <string> local-api-port: "26538";
     in property <string> local-api-port-error;
     in property <string> local-api-token;
+    // The Amuse endpoint: the switch and its server's state (`amuse-message` says why it failed).
+    in property <bool> amuse;
+    in property <LocalApiState> amuse-state;
+    in property <string> amuse-message;
     // Window.
     in property <bool> notifications;
     // What the close button does: 0 ask, 1 close featherplay, 2 keep playing in the tray.
@@ -1839,7 +1844,7 @@ export component SettingsPage inherits Rectangle {
 
             local-api-section := Group {
                 title: @tr("Local API");
-                // Made with the page: off, as it mostly is, it's one row.
+                // Made with the page: off, as it mostly is, it's two rows.
                 VerticalLayout {
                     ToggleRow {
                         divider: false;
@@ -1883,6 +1888,15 @@ export component SettingsPage inherits Rectangle {
                                 clicked => { SettingsData.local-api-regenerate(); }
                             }
                         }
+                    }
+                    ToggleRow {
+                        label: @tr("Amuse");
+                        detail: !SettingsData.amuse ? @tr("Let Amuse show what's playing on stream. Like Pear's Amuse plugin, it needs no token, so any app on this PC, and any website open in a browser here, can see the song.")
+                            : SettingsData.amuse-state == LocalApiState.failed ? SettingsData.amuse-message
+                            : SettingsData.amuse-state == LocalApiState.running ? @tr("On at http://127.0.0.1:9863. Any app on this PC, and any website open in a browser here, can see what's playing.")
+                            : @tr("Starting…");
+                        key: SettingKey.amuse;
+                        checked: SettingsData.amuse;
                     }
                 }
             }

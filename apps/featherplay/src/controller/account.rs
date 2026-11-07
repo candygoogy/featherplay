@@ -147,6 +147,8 @@ pub enum Change {
     LocalApi(bool),
     /// The local API's port (1024 or higher; the page checks it).
     LocalApiPort(u16),
+    /// The Amuse endpoint on or off.
+    Amuse(bool),
     /// The Language setting: "" for Windows default, "en", or a bundled code.
     Language(String),
     /// What a wheel notch and Up or Down move the volume, in percent (one of
@@ -198,6 +200,7 @@ impl Change {
             }
             Change::LocalApi(v) => s.local_api = v,
             Change::LocalApiPort(v) => s.local_api_port = v,
+            Change::Amuse(v) => s.amuse = v,
             Change::Language(v) => s.language = v,
             Change::VolumeStep(v) => s.volume_step = v,
             Change::StreamingQuality(v) => s.streaming_quality = v,
@@ -621,6 +624,8 @@ impl Controller {
             Change::LocalApi(true) => self.start_local_api(),
             Change::LocalApi(false) => self.stop_local_api(),
             Change::LocalApiPort(_) => self.local_api_port_changed(),
+            Change::Amuse(true) => self.start_amuse(),
+            Change::Amuse(false) => self.stop_amuse(),
             // Read when needed (notifications, SponsorBlock on) or applied by the window
             // (the close button, the accent, the theme, hotkeys).
             _ => {}
@@ -1005,6 +1010,7 @@ mod tests {
             Change::InstallUpdates(false),
             Change::LocalApi(true),
             Change::LocalApiPort(31000),
+            Change::Amuse(true),
             Change::SkipDisliked(false),
             Change::StreamingQuality(StreamingQuality::Standard),
             Change::TrayClickOpensWindow(true),
@@ -1027,6 +1033,7 @@ mod tests {
         assert_eq!(s.theme, ThemeMode::Light);
         assert!(s.local_api);
         assert_eq!(s.local_api_port, 31000);
+        assert!(s.amuse);
         assert!(!s.discord_options.play_button);
         assert!(!s.lyrics && !s.lyrics_lrclib);
         assert!(!s.autoplay);

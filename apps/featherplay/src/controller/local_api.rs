@@ -8,14 +8,18 @@
 //! - Its controls arrive as `UiCommand`s on the channel the media keys and the tray use.
 //! - `push_state` publishes every player state to it; the server decides what's worth a
 //!   WebSocket message, so a tick costs a comparison.
+//! - The Amuse endpoint (its own switch, off by default) is a second server on Pear's Amuse
+//!   port, 9863, with no token and no controls; it gets the same player states.
 
+use std::io;
 use std::time::{Duration, SystemTime};
 
 use featherplay_core::model::RepeatMode;
-use featherplay_integrations::local_api::{LocalApi, Snapshot, Token};
+use featherplay_core::tr;
+use featherplay_integrations::local_api::{AMUSE_PORT, Amuse, LocalApi, Snapshot, Token};
 use featherplay_store::{SecretKey, get_secret, set_secret};
 
-use super::{Controller, PlayerState, UiEvent};
+use super::{Controller, Msg, PlayerState, UiEvent};
 
 /// Where the local API stands, for Settings.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -28,12 +32,14 @@ pub enum LocalApiStatus {
     Failed(String),
 }
 
-/// The local API's state and its token, for Settings (the page copies the token; it only
-/// ever shows a masked form). `Token`'s `Debug` never shows it.
+/// The local API's state and its token, and the Amuse endpoint's state, for Settings (the
+/// page copies the token; it only ever shows a masked form). `Token`'s `Debug` never shows
+/// it.
 #[derive(Clone, Debug)]
 pub struct LocalApiNotice {
     pub status: LocalApiStatus,
     pub token: Option<Token>,
+    pub amuse: LocalApiStatus,
 }
 
 /// The controller's side of the server.
@@ -43,6 +49,11 @@ pub(super) struct ApiServer {
     /// Read or made on the first start, kept for the run.
     token: Option<Token>,
     failed: Option<String>,
+    amuse: Option<Amuse>,
+    amuse_failed: Option<String>,
+    /// Counts the Amuse endpoint's starts and stops, so a start that arrives late counts
+    /// only if nothing came after it.
+    amuse_starts: u32,
 }
 
 impl Controller {
@@ -89,6 +100,55 @@ impl Controller {
         self.report_local_api();
     }
 
+    /// Starts the Amuse endpoint on its port (the switch turned on). It first checks that no
+    /// other app answers there, which takes up to a few hundred ms, so it starts in a task
+    /// and comes back as `Msg::Amuse`; Settings says "Starting…" meanwhile.
+    pub(super) fn start_amuse(&mut self) {
+        self.local_api.amuse = None;
+        self.local_api.amuse_failed = None;
+        self.local_api.amuse_starts += 1;
+        let start = self.local_api.amuse_starts;
+        let now = self.api_snapshot();
+        let tx = self.tx.clone();
+        tokio::spawn(async move {
+            let result = Amuse::start(AMUSE_PORT, now).await;
+            // The controller is gone when this fails: the app is closing.
+            let _ = tx.send(Msg::Amuse(start, result));
+        });
+        self.report_local_api();
+    }
+
+    /// The Amuse endpoint started, or couldn't: kept only if it's the latest start and the
+    /// switch is still on (an older one is dropped, which stops it).
+    pub(super) fn amuse_started(&mut self, start: u32, result: io::Result<Amuse>) {
+        if start != self.local_api.amuse_starts || !self.settings.amuse {
+            return;
+        }
+        match result {
+            Ok(amuse) => {
+                log!("Amuse endpoint on 127.0.0.1:{}", amuse.port());
+                // The player may have moved on while it started.
+                amuse.publish(self.api_snapshot());
+                self.local_api.amuse = Some(amuse);
+            }
+            Err(e) => {
+                log!("Amuse endpoint on port {AMUSE_PORT} failed: {e}");
+                self.local_api.amuse_failed = Some(amuse_start_error(e.kind()));
+            }
+        }
+        self.report_local_api();
+    }
+
+    pub(super) fn stop_amuse(&mut self) {
+        // A start still on its way is dropped when it arrives.
+        self.local_api.amuse_starts += 1;
+        if self.local_api.amuse.take().is_some() {
+            log!("Amuse endpoint stopped");
+        }
+        self.local_api.amuse_failed = None;
+        self.report_local_api();
+    }
+
     /// A new token, stored, and the server restarted with it.
     pub(super) fn regenerate_api_token(&mut self) {
         let token = match Token::generate() {
@@ -120,23 +180,34 @@ impl Controller {
 
     /// Settings opened: report the state, and the token once there is one.
     pub(super) fn report_local_api(&self) {
-        let status = match (&self.local_api.server, &self.local_api.failed) {
-            (Some(server), _) => LocalApiStatus::Running {
-                port: server.port(),
-            },
-            (None, Some(why)) if self.settings.local_api => LocalApiStatus::Failed(why.clone()),
-            _ => LocalApiStatus::Off,
-        };
+        let api = &self.local_api;
         (self.ui.events)(UiEvent::LocalApi(LocalApiNotice {
-            status,
-            token: self.local_api.token.clone(),
+            status: status(
+                api.server.as_ref().map(LocalApi::port),
+                &api.failed,
+                self.settings.local_api,
+            ),
+            token: api.token.clone(),
+            amuse: status(
+                api.amuse.as_ref().map(Amuse::port),
+                &api.amuse_failed,
+                self.settings.amuse,
+            ),
         }));
     }
 
-    /// Hands the player's state to a running server.
+    /// Hands the player's state to the running servers.
     pub(super) fn publish_api(&self, state: &PlayerState) {
-        if let Some(server) = &self.local_api.server {
-            server.publish(api_snapshot(state, SystemTime::now()));
+        let now = || api_snapshot(state, SystemTime::now());
+        match (&self.local_api.server, &self.local_api.amuse) {
+            (Some(server), Some(amuse)) => {
+                let now = now();
+                amuse.publish(now.clone());
+                server.publish(now);
+            }
+            (Some(server), None) => server.publish(now()),
+            (None, Some(amuse)) => amuse.publish(now()),
+            (None, None) => {}
         }
     }
 
@@ -167,6 +238,33 @@ fn stored_or_new_token() -> Option<Token> {
         log!("local API: saving the token failed: {e}");
     }
     Some(token)
+}
+
+/// A server's state for Settings: running on `port`, or failed while its switch is on.
+fn status(port: Option<u16>, failed: &Option<String>, on: bool) -> LocalApiStatus {
+    match (port, failed) {
+        (Some(port), _) => LocalApiStatus::Running { port },
+        (None, Some(why)) if on => LocalApiStatus::Failed(why.clone()),
+        _ => LocalApiStatus::Off,
+    }
+}
+
+/// What Settings says when the Amuse endpoint can't listen.
+pub fn amuse_start_error(kind: std::io::ErrorKind) -> String {
+    match kind {
+        std::io::ErrorKind::AddrInUse => tr!(
+            "Port {} is in use, perhaps by Pear Desktop's Amuse plugin. Close that app, then turn Amuse off and on again.",
+            AMUSE_PORT
+        ),
+        std::io::ErrorKind::PermissionDenied => tr!(
+            "Windows keeps port {} for itself, so Amuse can't reach featherplay.",
+            AMUSE_PORT
+        ),
+        _ => tr!(
+            "featherplay couldn't listen on port {} for Amuse.",
+            AMUSE_PORT
+        ),
+    }
 }
 
 /// What Settings says when the server can't listen.
@@ -286,5 +384,12 @@ mod tests {
         assert!(text.starts_with("Port 26538 is in use"), "{text}");
         let text = start_error(5000, std::io::ErrorKind::PermissionDenied);
         assert!(text.contains("Windows keeps port 5000"), "{text}");
+    }
+
+    #[test]
+    fn a_taken_amuse_port_says_so() {
+        let text = amuse_start_error(std::io::ErrorKind::AddrInUse);
+        assert!(text.starts_with("Port 9863 is in use"), "{text}");
+        assert!(text.contains("Amuse plugin"), "{text}");
     }
 }

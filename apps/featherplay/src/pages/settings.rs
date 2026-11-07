@@ -15,7 +15,7 @@ use std::rc::Rc;
 use std::time::{Duration, SystemTime};
 
 use featherplay_core::tr;
-use featherplay_integrations::local_api::Token;
+use featherplay_integrations::local_api::{AMUSE_PORT, Token};
 use featherplay_integrations::{NowPlaying, discord, parse_hotkey};
 use featherplay_store::{
     Accent, AccentColour, CloseAction, DiscordOptions, DiscordStatusText, DiscordTime, Hotkeys,
@@ -430,25 +430,36 @@ fn listenbrainz_state(status: ListenBrainzStatus) -> ListenBrainzState {
     }
 }
 
-/// The local API's state and token, from the controller.
+/// The local API's and the Amuse endpoint's states and the token, from the controller.
 pub fn local_api_changed(ctx: &Ctx, notice: LocalApiNotice) {
     let Some(ui) = ctx.window() else { return };
     let data = ui.global::<SettingsData>();
-    let (state, message) = match notice.status {
-        LocalApiStatus::Off => (LocalApiState::Off, String::new()),
-        LocalApiStatus::Running { .. } => (LocalApiState::Running, String::new()),
-        LocalApiStatus::Failed(why) => (LocalApiState::Failed, why),
-    };
+    let (state, message) = server_state(notice.status);
     data.set_local_api_state(state);
     data.set_local_api_message(message.into());
+    let (state, message) = server_state(notice.amuse);
+    data.set_amuse_state(state);
+    data.set_amuse_message(message.into());
     data.set_local_api_token(notice.token.as_ref().map(mask).unwrap_or_default().into());
     API_TOKEN.with(|t| *t.borrow_mut() = notice.token);
 }
 
-/// `--snapshot settings-local-api`: the local API on, running, with a made-up token.
+/// A server's state for the page, and why it failed.
+fn server_state(status: LocalApiStatus) -> (LocalApiState, String) {
+    match status {
+        LocalApiStatus::Off => (LocalApiState::Off, String::new()),
+        LocalApiStatus::Running { .. } => (LocalApiState::Running, String::new()),
+        LocalApiStatus::Failed(why) => (LocalApiState::Failed, why),
+    }
+}
+
+/// `--snapshot settings-local-api`: the local API and Amuse on and running, with a
+/// made-up token.
 pub fn show_local_api_for_snapshot(ctx: &Ctx) {
     if let Some(ui) = ctx.window() {
-        ui.global::<SettingsData>().set_local_api(true);
+        let data = ui.global::<SettingsData>();
+        data.set_local_api(true);
+        data.set_amuse(true);
     }
     let token = Token::new("0123456789abcdef".repeat(4));
     local_api_changed(
@@ -456,6 +467,7 @@ pub fn show_local_api_for_snapshot(ctx: &Ctx) {
         LocalApiNotice {
             status: LocalApiStatus::Running { port: 26538 },
             token,
+            amuse: LocalApiStatus::Running { port: 9863 },
         },
     );
 }
@@ -481,13 +493,19 @@ fn copy_api_token() {
     }
 }
 
-/// The port as typed, if it's one the local API can use.
+/// The port as typed, if it's one the local API can use: not Amuse's, which its own switch
+/// takes.
 pub fn parse_port(text: &str) -> Result<u16, &'static str> {
-    text.trim()
+    let port = text
+        .trim()
         .parse::<u16>()
         .ok()
         .filter(|&p| p >= Settings::LOCAL_API_MIN_PORT)
-        .ok_or(tr!("Pick a port from 1024 to 65535."))
+        .ok_or(tr!("Pick a port from 1024 to 65535."))?;
+    if port == AMUSE_PORT {
+        return Err(tr!("9863 is the Amuse switch's port. Pick another one."));
+    }
+    Ok(port)
 }
 
 fn local_api_port_entered(ctx: &Ctx, text: &str) {
@@ -730,6 +748,7 @@ fn show(ctx: &Ctx) {
     data.set_local_api(s.local_api);
     data.set_local_api_port(s.local_api_port.to_string().into());
     data.set_local_api_port_error("".into());
+    data.set_amuse(s.amuse);
     data.set_lastfm_state(lastfm_state(LASTFM.with(Cell::get)));
     data.set_listenbrainz_state(listenbrainz_state(LISTENBRAINZ.with(Cell::get)));
 }
@@ -1073,6 +1092,10 @@ fn toggled(ctx: &Rc<Ctx>, key: SettingKey, on: bool) {
             data.set_local_api(on);
             Change::LocalApi(on)
         }
+        SettingKey::Amuse => {
+            data.set_amuse(on);
+            Change::Amuse(on)
+        }
         SettingKey::TrayClickOpensWindow => {
             data.set_tray_click_opens_window(on);
             Change::TrayClickOpensWindow(on)
@@ -1263,6 +1286,12 @@ mod tests {
         for bad in ["", "80", "1023", "65536", "0", "-1", "26538x"] {
             assert!(parse_port(bad).is_err(), "{bad}");
         }
+    }
+
+    #[test]
+    fn the_local_api_leaves_amuses_port_to_it() {
+        let why = parse_port("9863").expect_err("Amuse's port");
+        assert!(why.contains("Amuse"), "{why}");
     }
 
     #[test]
