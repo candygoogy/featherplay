@@ -128,6 +128,30 @@ fn discord_card_links_and_button_can_be_hidden() {
 }
 
 #[test]
+fn discord_activity_sends_the_play_song_button() {
+    // What goes down the pipe: Discord draws the button from `buttons` (for others only;
+    // it hides an activity's buttons from its own user).
+    let c = card(&playing(), read_at(), &DiscordOptions::default());
+    let sent = serde_json::to_value(discord::activity(&c)).expect("activity as JSON");
+    assert_eq!(
+        sent["buttons"],
+        serde_json::json!([{
+            "label": play_label(),
+            "url": "https://music.youtube.com/watch?v=vid123",
+        }])
+    );
+    assert_eq!(sent["type"], 2, "a Listening activity");
+
+    let off = DiscordOptions {
+        play_button: false,
+        ..Default::default()
+    };
+    let sent = serde_json::to_value(discord::activity(&card(&playing(), read_at(), &off)))
+        .expect("activity as JSON");
+    assert!(sent.get("buttons").is_none(), "{sent}");
+}
+
+#[test]
 fn discord_card_pads_short_and_drops_empty_fields() {
     let np = NowPlaying {
         title: "X".into(),

@@ -114,6 +114,55 @@ fn field(s: &str) -> Option<String> {
     Some(s)
 }
 
+/// `card` as the Listening activity [`Discord::set`] sends. Discord shows the button to
+/// everyone who sees the activity but its own user.
+pub fn activity(card: &Card) -> Activity<'_> {
+    let mut activity = Activity::new()
+        .activity_type(ActivityType::Listening)
+        .status_display_type(match card.status_text {
+            DiscordStatusText::App => StatusDisplayType::Name,
+            DiscordStatusText::Artist => StatusDisplayType::State,
+            DiscordStatusText::Title => StatusDisplayType::Details,
+        })
+        .details(card.details.as_str());
+    if let Some(url) = &card.details_url {
+        activity = activity.details_url(url.as_str());
+    }
+    if let Some(state) = &card.state {
+        activity = activity.state(state.as_str());
+    }
+    if let Some(url) = &card.state_url {
+        activity = activity.state_url(url.as_str());
+    }
+    if card.start.is_some() || card.end.is_some() {
+        let mut t = Timestamps::new();
+        if let Some(start) = card.start {
+            t = t.start(start);
+        }
+        if let Some(end) = card.end {
+            t = t.end(end);
+        }
+        activity = activity.timestamps(t);
+    }
+    if card.image.is_some() || card.image_text.is_some() {
+        let mut assets = Assets::new();
+        if let Some(image) = &card.image {
+            assets = assets.large_image(image.as_str());
+            if let Some(url) = &card.image_url {
+                assets = assets.large_url(url.as_str());
+            }
+        }
+        if let Some(text) = &card.image_text {
+            assets = assets.large_text(text.as_str());
+        }
+        activity = activity.assets(assets);
+    }
+    if let Some((label, url)) = &card.button {
+        activity = activity.buttons(vec![Button::new(label.as_str(), url.as_str())]);
+    }
+    activity
+}
+
 /// Why sending failed.
 #[derive(Debug, PartialEq, Eq)]
 pub enum SendError {
@@ -147,51 +196,8 @@ impl Discord {
 
     /// Shows `card` as a Listening activity.
     pub fn set(&mut self, card: &Card) -> Result<(), SendError> {
-        let mut activity = Activity::new()
-            .activity_type(ActivityType::Listening)
-            .status_display_type(match card.status_text {
-                DiscordStatusText::App => StatusDisplayType::Name,
-                DiscordStatusText::Artist => StatusDisplayType::State,
-                DiscordStatusText::Title => StatusDisplayType::Details,
-            })
-            .details(card.details.as_str());
-        if let Some(url) = &card.details_url {
-            activity = activity.details_url(url.as_str());
-        }
-        if let Some(state) = &card.state {
-            activity = activity.state(state.as_str());
-        }
-        if let Some(url) = &card.state_url {
-            activity = activity.state_url(url.as_str());
-        }
-        if card.start.is_some() || card.end.is_some() {
-            let mut t = Timestamps::new();
-            if let Some(start) = card.start {
-                t = t.start(start);
-            }
-            if let Some(end) = card.end {
-                t = t.end(end);
-            }
-            activity = activity.timestamps(t);
-        }
-        if card.image.is_some() || card.image_text.is_some() {
-            let mut assets = Assets::new();
-            if let Some(image) = &card.image {
-                assets = assets.large_image(image.as_str());
-                if let Some(url) = &card.image_url {
-                    assets = assets.large_url(url.as_str());
-                }
-            }
-            if let Some(text) = &card.image_text {
-                assets = assets.large_text(text.as_str());
-            }
-            activity = activity.assets(assets);
-        }
-        if let Some((label, url)) = &card.button {
-            activity = activity.buttons(vec![Button::new(label.as_str(), url.as_str())]);
-        }
         self.client
-            .set_activity(activity)
+            .set_activity(activity(card))
             .map_err(|e| SendError::Gone(e.to_string()))?;
         self.reply()
     }
