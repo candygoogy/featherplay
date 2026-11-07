@@ -67,9 +67,10 @@ slow-timeout = { period = "30s", terminate-after = 2 }
 filter = '(package(featherplay) & binary(app) & test(/^discord_card::/)) | (package(featherplay-integrations) & test(/^discord::/))'
 slow-timeout = { period = "30s", terminate-after = 2 }
 
-# Now playing's info block, settled offscreen in a few seconds: likewise.
+# Now playing's info block and its no-lyrics state, settled offscreen in a few seconds:
+# likewise.
 [[profile.default.overrides]]
-filter = 'package(featherplay) & binary(app) & test(/^now_playing_info::/)'
+filter = 'package(featherplay) & binary(app) & test(/^(now_playing_info|lyrics_none)::/)'
 slow-timeout = { period = "30s", terminate-after = 2 }
 
 # The sign-in page waits up to two seconds for a sign-in window's handle: a test that hangs

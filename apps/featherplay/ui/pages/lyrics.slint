@@ -12,8 +12,8 @@
 // seeks there. Nothing ticks: Rust sets `current` when the next
 // line starts (one single-shot timer per line, only while sound plays and the lyrics are on
 // screen), and only that glide and two lines' colours animate.
-import { Theme, Curves } from "../theme.slint";
-import { Body, Display } from "../parts.slint";
+import { Theme, Curves, Icons } from "../theme.slint";
+import { Body, Display, Icon, Pill } from "../parts.slint";
 import { Player } from "../player.slint";
 import { Nav, PageKind } from "../nav.slint";
 import { Skeleton, SkeletonBar } from "content.slint";
@@ -49,8 +49,28 @@ export global LyricsData {
     // Settings' "Show lyrics". Off, the Lyrics toggles and tab are hidden and nothing is
     // looked up; Rust closes the full view.
     in property <bool> on: true;
-    // The full view is on screen: what the toggles show as active.
-    out property <bool> showing: self.on && self.full && Nav.page == PageKind.now-playing;
+    // Settings' "Lyrics from LRCLIB": where a lookup looks, for the line saying so.
+    in property <bool> lrclib: true;
+    // The full view is asked for and Now playing shows: Rust looks the song up.
+    out property <bool> wanted: self.on && self.full && Nav.page == PageKind.now-playing;
+    // Lines to show, or a lookup for them still going.
+    out property <bool> has-lines: self.state == LyricsState.synced || self.state == LyricsState.plain;
+    out property <bool> looking: self.state == LyricsState.loading || (self.state == LyricsState.idle && Player.has-track);
+    // The lookup ended with nothing to show: none found, or it failed.
+    out property <bool> missing: self.state == LyricsState.none || self.state == LyricsState.error;
+    // The full view showed when the lookup began (a new song, Try again), or Now playing
+    // opened on it: it shows through the lookup (its skeleton), rather than opening once the
+    // lines are in. Kept by `LyricsWatch` and Now playing's `init`.
+    in-out property <bool> held: false;
+    // The full view is on screen: what the toggles show as active. Only with lines to show,
+    // or a lookup it holds through: a song with none keeps the cover view, and the Lyrics
+    // pill says why.
+    out property <bool> showing: self.wanted && (self.has-lines || (self.looking && self.held));
+    // The Lyrics pill's note under it, a few seconds after a toggle or a lookup that found
+    // nothing to show (`LyricsWatch` hides it again; `nudged` counts the toggles, each
+    // giving the note its full time).
+    in-out property <bool> hint: false;
+    in-out property <int> nudged: 0;
     // The cover's panel and lines, per theme.
     in property <LyricInk> ink-dark;
     in property <LyricInk> ink-light;
@@ -69,18 +89,52 @@ export global LyricsData {
     out property <string> message: self.state == LyricsState.error
         ? (self.unavailable ? @tr("Lyrics are unavailable right now") : @tr("Couldn't load lyrics"))
         : (Player.has-track ? @tr("No lyrics for this song") : @tr("Nothing playing"));
+    // Under it: where featherplay looked, or what to do next.
+    out property <string> why: self.state == LyricsState.error
+        ? (self.unavailable ? @tr("LRCLIB isn't answering. featherplay asks again in a minute.") : @tr("Check your connection and try again."))
+        : (!Player.has-track ? @tr("Play a song to see its lyrics here.")
+        : (self.lrclib ? @tr("Searched LRCLIB and YouTube Music.") : @tr("Searched YouTube Music. LRCLIB is off in Settings.")));
 
     // The Lyrics toggles (the stage's pill, the bar's microphone, Ctrl+L): on Now playing,
     // lyrics on or off; anywhere else, Now playing opens on the lyrics. Nothing with lyrics off.
+    // A song with no lyrics keeps the cover view and changes nothing: the pill says so, and
+    // its note why. After a failed lookup the toggle asks again. On Now playing, a song not
+    // looked up yet opens the view once its lines are in, the pill saying "Finding lyrics…"
+    // meanwhile; from another page Now playing opens on the view at once, as it always did.
     public function toggle-view() {
+        if !self.on {
+            return;
+        }
         if self.showing {
             self.full = false;
-        } else if self.on {
-            self.full = true;
-            if Nav.page != PageKind.now-playing {
-                Nav.go(PageKind.now-playing);
-            }
+            return;
         }
+        if !Player.has-track {
+            return;
+        }
+        if Nav.page != PageKind.now-playing {
+            if self.state == LyricsState.none {
+                self.nudge();
+            } else {
+                self.full = true;
+                self.held = !self.missing;
+            }
+            Nav.go(PageKind.now-playing);
+        } else if self.state == LyricsState.error {
+            self.full = true;
+            self.retry();
+        } else if self.state == LyricsState.none {
+            self.nudge();
+        } else {
+            // Asked for, or called off while its lookup still runs.
+            self.full = !self.full;
+        }
+    }
+
+    // The pill's note, for its full time.
+    function nudge() {
+        self.hint = true;
+        self.nudged += 1;
     }
 }
 
@@ -158,47 +212,52 @@ component LyricsNote inherits HorizontalLayout {
     }
 }
 
-// Try again after a failed lookup, as text on the panel: the lines' hover tile shows it's
-// pressable.
-component TryAgain inherits Rectangle {
-    in property <float> reveal: 1;
-    width: label.preferred-width + 2 * Theme.s2;
-    height: 28px;
-    border-radius: Theme.r-m;
-    background: Theme.panel-state(ta.pressed, ta.has-hover).transparentize(1 - root.reveal);
-    animate background { duration: Theme.t-hover; }
-    accessible-role: button;
-    accessible-label: @tr("Try again");
-    accessible-action-default => { LyricsData.retry(); }
-    ta := TouchArea {
-        enabled: root.reveal > 0;
-        mouse-cursor: pointer;
-        clicked => { LyricsData.retry(); }
-    }
-    label := Body {
-        x: Theme.s2;
-        height: parent.height;
-        text: @tr("Try again");
-        font-weight: 600;
-        color: LyricsData.ink.current.transparentize(1 - root.reveal);
-        vertical-alignment: center;
-    }
-}
-
-// Why there are no lyrics, as one quiet line under the song's title in Now playing's full
-// view: "No lyrics for this song", or after a failed lookup what failed and Try again.
-export component NoLyricsLine inherits HorizontalLayout {
-    in property <float> reveal: 1;
-    height: 28px;
-    spacing: Theme.s1;
-    alignment: start;
-    Body {
-        text: LyricsData.message;
-        color: LyricsData.ink.next.transparentize(1 - root.reveal);
-        vertical-alignment: center;
-    }
-    if LyricsData.state == LyricsState.error: TryAgain {
-        reveal: root.reveal;
+// No lines to show, in the side tab: the house's empty state on the panel's own ground (the
+// cover's colour is for lyrics), a tile with the microphone, what happened, where featherplay
+// looked or what to do, and after a failed lookup Try again.
+component NoLyrics inherits Rectangle {
+    height: lay.preferred-height;
+    accessible-role: text;
+    accessible-label: LyricsData.message + ". " + LyricsData.why;
+    lay := VerticalLayout {
+        alignment: start;
+        HorizontalLayout {
+            alignment: start;
+            Rectangle {
+                width: 56px;
+                height: 56px;
+                border-radius: Theme.r-l;
+                background: Theme.card;
+                border-width: 1px;
+                border-color: Theme.card-edge;
+                Icon {
+                    width: 26px;
+                    height: 26px;
+                    commands: Icons.lyrics;
+                    stroke: Theme.text2;
+                }
+            }
+        }
+        Rectangle { height: Theme.s4; }
+        Display {
+            text: LyricsData.message;
+            font-size: Theme.t-display-xs;
+            wrap: word-wrap;
+        }
+        Rectangle { height: Theme.s2; }
+        Body {
+            text: LyricsData.why;
+            color: Theme.text2;
+            wrap: word-wrap;
+        }
+        if LyricsData.state == LyricsState.error: Rectangle { height: Theme.s5; }
+        if LyricsData.state == LyricsState.error: HorizontalLayout {
+            alignment: start;
+            Pill {
+                label: @tr("Try again");
+                clicked => { LyricsData.retry(); }
+            }
+        }
     }
 }
 
@@ -357,18 +416,18 @@ export component LyricsView inherits Rectangle {
     // half, once the stage is the panel's colour (now_playing.slint), through their colours.
     // Until then nothing of them shows.
     in property <float> reveal: 1;
-    // Says why there are no lines (no lyrics, a failed lookup, nothing playing). The full
-    // view turns it off and says it under the song's title instead (`NoLyricsLine`).
-    in property <bool> note: true;
     property <length> list-h: root.height - root.bottom;
     // The panel's box: the card's in the side tab, all of the view in the full one.
     property <length> box-x: root.card ? Theme.s4 : 0;
     property <length> box-w: root.card ? root.width - 2 * Theme.s4 : root.width;
     property <length> box-h: root.card ? root.list-h - Theme.s2 : root.list-h;
-    property <bool> moving: LyricsData.state == LyricsState.synced || LyricsData.state == LyricsState.plain;
+    property <bool> moving: LyricsData.has-lines;
+    // No lines to show (none found, a failed lookup, nothing playing): the side tab says why
+    // (`NoLyrics`); the full view never shows then (`LyricsData.showing`).
+    property <bool> empty: LyricsData.missing || (LyricsData.state == LyricsState.idle && !Player.has-track);
 
-    // The panel, as a card in the side tab.
-    if root.card: Rectangle {
+    // The panel, as a card in the side tab, for lyrics only.
+    if root.card && !root.empty: Rectangle {
         x: root.box-x;
         y: 0;
         width: root.box-w;
@@ -403,32 +462,6 @@ export component LyricsView inherits Rectangle {
                 tone-hi: Theme.panel-skeleton-hi;
                 sweep: sk.sweep;
                 fade: sk.fade;
-            }
-        }
-
-        // No lyrics, a failed lookup, or nothing playing, in the side tab: one quiet line in
-        // the middle of the card, in the colour of the lines to come; after a failure, Try
-        // again under it. The full view leaves this to Now playing (`note` off), which keeps
-        // the cover large with the line under the title.
-        if root.note && (LyricsData.state == LyricsState.none || LyricsData.state == LyricsState.error || LyricsData.state == LyricsState.idle): VerticalLayout {
-            x: root.pad-x;
-            y: 0;
-            width: parent.width - 2 * root.pad-x;
-            height: parent.height;
-            alignment: center;
-            spacing: Theme.s2;
-            Display {
-                text: LyricsData.message;
-                font-size: Theme.t-body-l;
-                color: LyricsData.ink.next.transparentize(1 - root.reveal);
-                horizontal-alignment: center;
-                wrap: word-wrap;
-            }
-            if LyricsData.state == LyricsState.error && root.reveal > 0: HorizontalLayout {
-                alignment: center;
-                TryAgain {
-                    reveal: root.reveal;
-                }
             }
         }
 
@@ -485,5 +518,11 @@ export component LyricsView inherits Rectangle {
             width: parent.width;
             top: false;
         }
+    }
+
+    if root.card && root.empty: NoLyrics {
+        x: Theme.s5;
+        y: Theme.s5;
+        width: min(root.width - 2 * Theme.s5, 460px);
     }
 }

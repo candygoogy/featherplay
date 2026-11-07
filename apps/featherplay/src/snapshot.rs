@@ -87,7 +87,9 @@ pub const PAGES: &[&str] = &[
     "now-playing-lyrics-plain",
     "now-playing-lyrics-none",
     // Now playing's full lyrics view (lyrics on: the stage shows them, the cover small), the
-    // same states.
+    // same states. With none to show (none, a failure, still loading) the stage keeps the
+    // cover view, the Lyrics pill saying so with its note, and the side panel shows the
+    // Lyrics tab's empty state.
     "now-playing-lyrics-full",
     "now-playing-lyrics-full-plain",
     "now-playing-lyrics-full-none",
@@ -712,9 +714,14 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
         let lyrics = ui.global::<crate::ui::LyricsData>();
         let full = o.page.starts_with("now-playing-lyrics-full");
         lyrics.set_full(full);
-        // The full view shows the lyrics in the stage; the side panel keeps Up next.
+        // The full view shows the lyrics in the stage; the side panel keeps Up next. With
+        // none to show the stage keeps the cover, and the side panel shows the Lyrics tab.
+        let lines = matches!(
+            kind,
+            SnapshotLyrics::Synced | SnapshotLyrics::Plain | SnapshotLyrics::Outage
+        );
         ui.global::<NowPlayingData>()
-            .set_tab(if full { 0 } else { 2 });
+            .set_tab(if full && lines { 0 } else { 2 });
         // A failure shows on a view already open: opening it after a failed lookup asks again.
         if matches!(kind, SnapshotLyrics::Failed | SnapshotLyrics::Unavailable) {
             settle();

@@ -9,7 +9,7 @@ import { Body, Cover, IconButton, Icon, PlayButton } from "parts.slint";
 import { Player, Repeat } from "player.slint";
 import { Nav, PageKind, Frame } from "nav.slint";
 import { NotForMeButton, LikeButton } from "not_for_me.slint";
-import { LyricsData } from "pages/lyrics.slint";
+import { LyricsData, LyricsState } from "pages/lyrics.slint";
 
 // The seek line, between the time and the length: 4 px, 6 px while hovered, with round ends;
 // click or drag anywhere on it to seek. Hovered, a thumb sits at the fill's end and a tooltip
@@ -276,7 +276,9 @@ component VolumeSlider inherits Rectangle {
 // Lyrics, the microphone left of "Not for me": Now playing's full lyrics view on and off from
 // any page (`LyricsData.toggle-view`; elsewhere it opens Now playing on the lyrics), in the
 // accent while the view shows. Resting on it shows a tooltip like "Not for me"'s, with the
-// shortcut; the same delay keeps it from flashing as the pointer crosses the bar.
+// shortcut; the same delay keeps it from flashing as the pointer crosses the bar. For a song
+// with no lyrics it says so, and a press does what the stage's pill does: the stage stays and
+// the pill's note says why.
 component LyricsButton inherits Rectangle {
     // How far above the button the tooltip ends (the bar lifts it clear of itself).
     in property <length> above: Theme.s2;
@@ -301,7 +303,7 @@ component LyricsButton inherits Rectangle {
     btn := IconButton {
         icon: Icons.lyrics;
         label: @tr("Lyrics");
-        description: LyricsData.showing ? @tr("Hides the lyrics, back to the cover") : @tr("Shows the lyrics on Now playing");
+        description: LyricsData.showing ? @tr("Hides the lyrics, back to the cover") : (LyricsData.missing ? LyricsData.message : @tr("Shows the lyrics on Now playing"));
         active: LyricsData.showing;
         // Off is always possible; on needs a song.
         enabled: Player.has-track || LyricsData.showing;
@@ -332,7 +334,7 @@ component LyricsButton inherits Rectangle {
             padding-bottom: Theme.s2;
             spacing: Theme.s2;
             Body {
-                text: LyricsData.showing ? @tr("Hide lyrics") : @tr("Lyrics");
+                text: LyricsData.showing ? @tr("Hide lyrics") : (LyricsData.state == LyricsState.none ? @tr("No lyrics") : (LyricsData.state == LyricsState.error ? @tr("Retry lyrics") : @tr("Lyrics")));
                 font-size: Theme.t-meta;
                 font-weight: 600;
                 color: Theme.text1;

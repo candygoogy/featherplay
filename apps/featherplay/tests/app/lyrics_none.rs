@@ -1,21 +1,25 @@
-//! Lyrics on, but none to show: Now playing's full view doesn't turn into an empty lyrics
-//! page. The cover stays large and centred in the stage, on the lyrics' panel colour, with the
-//! title and artist under it and one quiet line under those saying why. After a failed
-//! lookup that line ends in Try again, a text button that asks again (`LyricsData.retry`);
-//! "No lyrics for this song" is an answer, so it has none. On the offscreen platform with the
-//! fixtures and art on every cover; no window is shown.
+//! Lyrics on, but none to show: Now playing's stage keeps the cover view (it never turns into
+//! an empty lyrics page). The Lyrics pill says "No lyrics", and a press on it leaves the stage
+//! as it is, with a note under the pill saying where featherplay looked. The side panel's
+//! Lyrics tab stays and shows an empty state; after a failed lookup it, and the pill, offer to
+//! ask again. A song with lyrics still opens the view, and the view stays open through a new
+//! song's lookup. On the offscreen platform with the fixtures and art on every cover; no
+//! window is shown.
 
 use std::cell::Cell;
+use std::ops::ControlFlow;
 use std::rc::Rc;
 
 use featherplay::fixtures::Fixtures;
 use featherplay::lyrics::{self, SnapshotLyrics};
 use featherplay::offscreen;
 use featherplay::snapshot::Scene;
-use featherplay::ui::{LyricsData, LyricsState, Theme};
+use featherplay::ui::{LyricsData, LyricsState, Nav, NowPlayingData, PageKind, Theme};
+use i_slint_core::accessibility::{AccessibilityAction, AccessibleStringProperty};
+use i_slint_core::item_tree::ItemRc;
+use i_slint_core::window::WindowInner;
 use image::RgbaImage;
-use slint::platform::{PointerEventButton, WindowEvent};
-use slint::{ComponentHandle, LogicalPosition};
+use slint::ComponentHandle;
 
 use crate::support;
 
@@ -29,85 +33,55 @@ fn frame(scene: &Scene) -> RgbaImage {
     RgbaImage::from_raw(px.width(), px.height(), px.as_bytes().to_vec()).expect("image")
 }
 
-fn save(img: &RgbaImage, name: &str) {
-    if let Some(dir) = std::env::var_os("LYRICS_NONE_SHOTS") {
-        img.save(std::path::Path::new(&dir).join(name))
-            .expect("png");
-    }
-}
-
 fn far(p: [u8; 4], q: [u8; 4]) -> bool {
     (0..3).map(|i| u32::from(p[i].abs_diff(q[i]))).sum::<u32>() > 120
 }
 
-/// What the stage shows below its top row of buttons: the cover's box (left, right, top,
-/// bottom) and, under it, the runs of rows with text (top, bottom, and the text's right end).
-struct Stage {
-    cover: (u32, u32, u32, u32),
-    runs: Vec<(u32, u32, u32)>,
+/// The first visible element whose accessible label is `label`.
+fn find(scene: &Scene, label: &str) -> Option<ItemRc> {
+    let root = ItemRc::new_root(WindowInner::from_pub(scene.ui.window()).component());
+    root.visit_descendants(|item| {
+        let says = item
+            .accessible_string_property(AccessibleStringProperty::Label)
+            .is_some_and(|l| l == label);
+        if says && item.is_visible() {
+            ControlFlow::Break(item.clone())
+        } else {
+            ControlFlow::Continue(())
+        }
+    })
 }
 
-fn read_stage(scene: &Scene, img: &RgbaImage) -> Stage {
+fn press(scene: &Scene, label: &str) {
+    find(scene, label)
+        .unwrap_or_else(|| panic!("nothing visible says {label:?}"))
+        .accessible_action(&AccessibilityAction::Default);
+    scene.settle();
+}
+
+/// The cover on the stage, left to right: the first row well under the header where most of
+/// a wide stretch differs from the stage's ground.
+fn cover(scene: &Scene, img: &RgbaImage) -> (u32, u32) {
     let t = scene.ui.global::<Theme>();
-    let side = if W as f32 >= t.get_wide_min() {
-        t.get_nowplaying_side_w()
-    } else {
-        t.get_panel_w()
-    };
-    let stage = (W as f32 - side) as u32 - 8;
-    let bottom = (H as f32 - t.get_bar_clear()) as u32;
-    // The stage's ground, left of the cover and the text.
+    let stage = (W as f32 - t.get_nowplaying_side_w()) as u32 - 8;
     let ground = img.get_pixel(4, 300).0;
-    // The cover: the first block of rows where most of a wide stretch differs from the
-    // ground (the art), ending at the first row that doesn't (the gap above the title).
-    let mut cover: Option<(u32, u32, u32, u32)> = None;
-    for y in 72..bottom {
+    // Below the pill and its note, which may reach over the cover's top corner.
+    for y in 140..H / 2 {
         let hits: Vec<u32> = (0..stage)
             .filter(|&x| far(img.get_pixel(x, y).0, ground))
             .collect();
-        let art = match (hits.first(), hits.last()) {
-            (Some(&l), Some(&r)) if r - l > 120 && hits.len() as u32 * 2 > r - l => Some((l, r)),
-            _ => None,
-        };
-        match (art, cover) {
-            (Some((l, r)), None) => cover = Some((l, r, y, y)),
-            (Some((l, r)), Some((l0, r0, t0, _))) => cover = Some((l0.min(l), r0.max(r), t0, y)),
-            (None, Some(_)) => break,
-            (None, None) => {}
+        if let (Some(&l), Some(&r)) = (hits.first(), hits.last())
+            && r - l > 120
+            && hits.len() as u32 * 2 > r - l
+        {
+            return (l, r);
         }
     }
-    let cover = cover.expect("no cover on the stage");
-    // Under it, every row with text from the cover's left edge on.
-    let mut runs: Vec<(u32, u32, u32)> = Vec::new();
-    for y in cover.3 + 1..bottom {
-        let right = (cover.0..stage)
-            .rev()
-            .find(|&x| far(img.get_pixel(x, y).0, ground));
-        let Some(right) = right else { continue };
-        match runs.last_mut() {
-            Some(run) if y <= run.1 + 2 => {
-                run.1 = y;
-                run.2 = run.2.max(right);
-            }
-            _ => runs.push((y, y, right)),
-        }
-    }
-    // A single row is the cover's rounded bottom edge, not a line of text.
-    runs.retain(|run| run.1 > run.0);
-    Stage { cover, runs }
+    panic!("no cover on the stage");
 }
 
-fn lyrics_on(scene: &Scene, kind: SnapshotLyrics) {
-    let data = scene.ui.global::<LyricsData>();
-    data.set_full(true);
-    scene.settle();
-    lyrics::show_for_snapshot(&scene.ctx, kind);
-    scene.settle();
-}
-
-/// The playing track (the radio's first) wears a dark cover with a narrow red stripe, whatever
-/// the machine has cached: the panel takes the red, and every row of the art is mostly dark,
-/// clear of it, so the stage reading finds the cover's edges.
+/// The playing track (the radio's first) wears a light cover with a narrow red stripe, whatever
+/// the machine has cached: every row of the art is mostly light, clear of the dark stage.
 fn covers() {
     let f = Fixtures::load().expect("fixtures");
     let radio = f.radio().expect("radio");
@@ -116,7 +90,7 @@ fn covers() {
         if (50..70).contains(&x) {
             image::Rgb([210, 40, 50])
         } else {
-            image::Rgb([16, 16, 20])
+            image::Rgb([225, 225, 230])
         }
     });
     support::home_with_covers("lyrics-none-home", &[(&url, art)]);
@@ -134,121 +108,138 @@ fn scene() -> Scene {
     scene
 }
 
-#[test]
-fn no_lyrics_keep_the_cover_centred_with_a_quiet_line_under_the_title() {
-    let scene = scene();
-    lyrics_on(&scene, SnapshotLyrics::None);
-    assert_eq!(
-        scene.ui.global::<LyricsData>().get_state(),
-        LyricsState::None
-    );
-    let img = frame(&scene);
-    save(&img, "none.png");
-    let s = read_stage(&scene, &img);
-    let t = scene.ui.global::<Theme>();
-    let stage = W as f32 - t.get_nowplaying_side_w();
-    let (l, r, top, bottom) = s.cover;
-
-    // Large and centred, as the cover view has it: not the lyrics view's small column.
-    assert!(r - l > 300, "the cover is {} px wide", r - l);
-    let mid = (l + r) as f32 / 2.0;
-    assert!(
-        (mid - stage / 2.0).abs() <= 6.0,
-        "the cover's centre is at x {mid}, the stage's at {}",
-        stage / 2.0
-    );
-    assert!(bottom > top);
-
-    // Under it: the title, the artist, then the quiet line, and nothing else.
-    assert_eq!(
-        s.runs.len(),
-        3,
-        "under the cover, text at {:?} (title, artist and the note expected)",
-        s.runs
-    );
-    let note = s.runs[2];
-    assert!(note.0 > s.runs[1].1, "the note isn't under the artist");
-    // The note is quieter than the title: smaller.
-    assert!(
-        note.1 - note.0 < s.runs[0].1 - s.runs[0].0,
-        "the note is as tall as the title"
-    );
+/// The full view asked for, then the lookup ends with `kind`.
+fn lyrics_on(scene: &Scene, kind: SnapshotLyrics) {
+    scene.ui.global::<LyricsData>().set_full(true);
+    scene.settle();
+    lyrics::show_for_snapshot(&scene.ctx, kind);
+    scene.settle();
 }
 
 #[test]
-fn only_a_failed_lookup_offers_try_again_and_it_asks_again() {
+fn no_lyrics_keep_the_cover_view_and_the_pill_says_so() {
     let scene = scene();
     let data = scene.ui.global::<LyricsData>();
-    let w = scene.ui.window();
-    let press = |at: LogicalPosition| {
-        w.dispatch_event(WindowEvent::PointerMoved { position: at });
-        w.dispatch_event(WindowEvent::PointerPressed {
-            position: at,
-            button: PointerEventButton::Left,
-        });
-        w.dispatch_event(WindowEvent::PointerReleased {
-            position: at,
-            button: PointerEventButton::Left,
-        });
-        w.dispatch_event(WindowEvent::PointerExited);
-        scene.settle();
-    };
+    let before = frame(&scene);
+    let ground = before.get_pixel(4, 300).0;
+    let (l0, r0) = cover(&scene, &before);
 
-    // "No lyrics for this song": the line ends where its words do.
     lyrics_on(&scene, SnapshotLyrics::None);
-    let none = read_stage(&scene, &frame(&scene));
-    let none_note = *none.runs.last().expect("note");
+    assert_eq!(data.get_state(), LyricsState::None);
+    assert!(!data.get_showing(), "the full view opened on no lyrics");
+    assert!(
+        find(&scene, "No lyrics").is_some(),
+        "the pill doesn't say so"
+    );
+    assert!(data.get_hint(), "no note says why");
 
-    // A failed lookup: the same layout, the line running on into Try again.
+    // The stage is as it was: its ground, and the cover large and in its place.
+    let img = frame(&scene);
+    assert!(
+        !far(img.get_pixel(4, 300).0, ground),
+        "the stage took another colour"
+    );
+    assert_eq!(cover(&scene, &img), (l0, r0), "the cover moved");
+
+    // A press on the pill changes nothing but the note.
+    data.set_hint(false);
+    press(&scene, "No lyrics");
+    assert!(!data.get_showing(), "a press opened the full view");
+    assert!(data.get_full(), "a press turned lyrics off for the session");
+    assert!(data.get_hint(), "a press didn't show the note");
+    assert_eq!(
+        cover(&scene, &frame(&scene)),
+        (l0, r0),
+        "a press moved the cover"
+    );
+
+    // The bar's microphone (or Ctrl+L) from another page: Now playing opens on the cover,
+    // with the same note.
+    scene.open("home").expect("home");
+    data.set_hint(false);
+    data.invoke_toggle_view();
+    scene.settle();
+    assert_eq!(scene.ui.global::<Nav>().get_page(), PageKind::NowPlaying);
+    assert!(!data.get_showing(), "the microphone opened the full view");
+    assert!(data.get_hint(), "the microphone didn't show the note");
+}
+
+#[test]
+fn the_lyrics_tab_stays_and_says_why() {
+    let scene = scene();
+    let np = scene.ui.global::<NowPlayingData>();
+    np.set_tab(2);
+    np.invoke_tab_selected(2);
+    lyrics_on(&scene, SnapshotLyrics::None);
+    assert!(
+        find(
+            &scene,
+            "No lyrics for this song. Searched LRCLIB and YouTube Music."
+        )
+        .is_some(),
+        "the Lyrics tab has no empty state"
+    );
+    assert!(
+        find(&scene, "Try again").is_none(),
+        "none found is an answer: nothing to try again"
+    );
+    assert_eq!(np.get_tab(), 2);
+}
+
+#[test]
+fn a_failed_lookup_offers_try_again_in_the_tab_and_the_pill() {
+    let scene = scene();
+    let data = scene.ui.global::<LyricsData>();
+    let np = scene.ui.global::<NowPlayingData>();
+    np.set_tab(2);
+    np.invoke_tab_selected(2);
     lyrics_on(&scene, SnapshotLyrics::Failed);
     assert_eq!(data.get_state(), LyricsState::Error);
+    assert!(!data.get_showing(), "the full view opened on a failure");
     let asked = Rc::new(Cell::new(0));
     let a = asked.clone();
     data.on_retry(move || a.set(a.get() + 1));
-    let img = frame(&scene);
-    save(&img, "failed.png");
-    let failed = read_stage(&scene, &img);
-    assert_eq!(failed.cover, none.cover, "a failure moved the cover");
-    assert_eq!(failed.runs.len(), 3, "under the cover: {:?}", failed.runs);
-    let note = failed.runs[2];
-    // Try again is the line's last words: press its middle, a little in from the end.
-    let at = LogicalPosition::new((note.2 as f32) - 24.0, ((note.0 + note.1) as f32) / 2.0);
 
-    // It shows it's pressable: a hover lights it.
-    let before = frame(&scene);
-    w.dispatch_event(WindowEvent::PointerMoved { position: at });
-    scene.settle();
-    let after = frame(&scene);
-    let lit = (note.0 - 8..note.1 + 8)
-        .flat_map(|y| (note.2 - 120..note.2 + 16).map(move |x| (x, y)))
-        .filter(|&(x, y)| before.get_pixel(x, y) != after.get_pixel(x, y))
-        .count();
-    assert!(lit > 50, "Try again didn't answer the pointer ({lit} px)");
-    w.dispatch_event(WindowEvent::PointerExited);
-    scene.settle();
+    press(&scene, "Try again");
+    assert_eq!(asked.get(), 1, "the tab's Try again didn't ask");
+    press(&scene, "Retry lyrics");
+    assert_eq!(asked.get(), 2, "the pill didn't ask again");
 
-    press(at);
-    assert_eq!(asked.get(), 1, "Try again didn't ask");
-
-    // LRCLIB down: the same offer.
+    // LRCLIB down: the same offer, saying so.
     lyrics_on(&scene, SnapshotLyrics::Unavailable);
     assert_eq!(data.get_message(), "Lyrics are unavailable right now");
-    let down = read_stage(&scene, &frame(&scene));
-    let down_note = *down.runs.last().expect("note");
-    press(LogicalPosition::new(
-        (down_note.2 as f32) - 24.0,
-        ((down_note.0 + down_note.1) as f32) / 2.0,
-    ));
-    assert_eq!(asked.get(), 2, "Try again didn't ask after an outage");
+    press(&scene, "Try again");
+    assert_eq!(asked.get(), 3, "Try again didn't ask after an outage");
+}
 
-    // Nothing to try again for "No lyrics for this song".
+#[test]
+fn a_song_with_lyrics_still_opens_the_view_and_keeps_it_through_a_lookup() {
+    let scene = scene();
+    let data = scene.ui.global::<LyricsData>();
+
+    // Asked for on a song with none, the view opens once a song has some.
     lyrics_on(&scene, SnapshotLyrics::None);
-    press(at);
-    assert_eq!(asked.get(), 2, "a none-found view asked again");
-    assert!(
-        none_note.2 + 40 < note.2,
-        "the none-found line ({}) reaches as far as the failed one ({})",
-        none_note.2,
-        note.2
-    );
+    assert!(!data.get_showing());
+    lyrics::show_for_snapshot(&scene.ctx, SnapshotLyrics::Synced);
+    scene.settle();
+    assert!(data.get_showing(), "synced lyrics didn't open the view");
+
+    // A new song's lookup keeps it open; one that finds nothing closes it, saying why.
+    lyrics::show_for_snapshot(&scene.ctx, SnapshotLyrics::Loading);
+    scene.settle();
+    assert!(data.get_showing(), "the view closed during a lookup");
+    lyrics::show_for_snapshot(&scene.ctx, SnapshotLyrics::None);
+    scene.settle();
+    assert!(!data.get_showing(), "the view stayed open on no lyrics");
+    assert!(data.get_hint(), "no note says why the view closed");
+
+    // The toggle still closes and opens it on a song with lyrics.
+    lyrics::show_for_snapshot(&scene.ctx, SnapshotLyrics::Synced);
+    scene.settle();
+    data.invoke_toggle_view();
+    scene.settle();
+    assert!(!data.get_showing() && !data.get_full());
+    data.invoke_toggle_view();
+    scene.settle();
+    assert!(data.get_showing());
 }

@@ -269,6 +269,7 @@ fn plain_lines(text: &str) -> Vec<SharedString> {
 
 /// Settings' "Show lyrics" was loaded or changed. Off, the full view closes and the Lyrics
 /// toggles and tab go (`LyricsData.on`), so no view is on screen and nothing is looked up.
+/// Also tells the views whether LRCLIB is asked, for the line saying where featherplay looked.
 pub fn on_changed(ctx: &Rc<Ctx>, on: bool) {
     let Some(ui) = ctx.window() else { return };
     let data = ui.global::<LyricsData>();
@@ -276,11 +277,13 @@ pub fn on_changed(ctx: &Rc<Ctx>, on: bool) {
         data.set_full(false);
     }
     data.set_on(on);
+    data.set_lrclib(settings::lyrics_lrclib());
 }
 
 /// The tab came on screen, or left it. Never on screen with lyrics off in Settings.
 pub fn live_changed(ctx: &Rc<Ctx>, live: bool) {
     let live = live && settings::lyrics_shown();
+    let mut dropped = false;
     let ask = STATE.with(|s| {
         let mut s = s.borrow_mut();
         s.live = live;
@@ -290,6 +293,7 @@ pub fn live_changed(ctx: &Rc<Ctx>, live: bool) {
             // A lookup still waiting is dropped; reopening looks the track up.
             if stop_wait() {
                 s.shown = None;
+                dropped = true;
             }
             return false;
         }
@@ -302,6 +306,10 @@ pub fn live_changed(ctx: &Rc<Ctx>, live: bool) {
         show(ctx, false);
     } else {
         TIMER.with(Timer::stop);
+        // Not "Finding lyrics…" for a lookup that won't happen.
+        if dropped && let Some(ui) = ctx.window() {
+            ui.global::<LyricsData>().set_state(LyricsState::Idle);
+        }
     }
 }
 
@@ -312,16 +320,43 @@ fn ask_again(ctx: &Rc<Ctx>) {
 }
 
 /// The controller's state changed (track, play/pause, seek). A new track is looked up only
-/// once it has stayed `SKIP_WAIT`.
+/// once it has stayed `SKIP_WAIT`. With no lyrics on screen nothing is looked up, but the state
+/// goes back to idle for a new track, so the Lyrics toggles never say "No lyrics" for a song
+/// that wasn't looked up.
 pub fn player_changed(ctx: &Rc<Ctx>) {
-    if STATE.with(|s| s.borrow().live) {
+    let (live, shown) = STATE.with(|s| {
+        let s = s.borrow();
+        (s.live, s.shown.clone())
+    });
+    if live {
         show(ctx, true);
+        return;
+    }
+    let current = ctx.player().and_then(|s| s.current).map(|t| t.id);
+    if shown.is_some() && current == shown {
+        return;
+    }
+    // Shown again later, the track is taken as new (from the cache, or looked up).
+    STATE.with(|s| {
+        let mut s = s.borrow_mut();
+        s.shown = None;
+        s.lines = Rc::from([]);
+    });
+    if let Some(ui) = ctx.window() {
+        let data = ui.global::<LyricsData>();
+        if data.get_state() != LyricsState::Idle {
+            data.set_state(LyricsState::Idle);
+        }
     }
 }
 
 /// The LRCLIB setting changed: what was found under the old one is forgotten.
 pub fn setting_changed(ctx: &Rc<Ctx>) {
     RESYNC.with(Timer::stop);
+    if let Some(ui) = ctx.window() {
+        ui.global::<LyricsData>()
+            .set_lrclib(settings::lyrics_lrclib());
+    }
     STATE.with(|s| {
         let mut s = s.borrow_mut();
         s.cache.clear();

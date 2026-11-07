@@ -9,9 +9,9 @@
 // fade only without motion). The Lyrics toggle glides the cover from the centre to its
 // column on the left over `t-lyrics`, the song's title and artist sliding along, as the stage
 // takes the lyrics' panel colour and the lines fade in; one eased value (`lyr`) drives all of
-// it. With no lines to show the cover stays large and centred, a quiet line in the album's
-// place saying why (`alone`). It reads the `Player` global; the rest comes from
-// `src/pages/now_playing.rs` through `NowPlayingData`.
+// it. A song with no lines to show (none found, a failed lookup) keeps the cover view: the
+// Lyrics pill says so, with a note under it saying why. It reads the `Player` global; the
+// rest comes from `src/pages/now_playing.rs` through `NowPlayingData`.
 import { ListView } from "std-widgets.slint";
 import { Theme, Curves, Icons } from "../theme.slint";
 import { TrackRow, Body, Display, Cover, IconButton, SongRow, Tabs, Icon } from "../parts.slint";
@@ -19,7 +19,7 @@ import { Nav, PageKind, Frame } from "../nav.slint";
 import { Player } from "../player.slint";
 import { QueueData, UpNext } from "../queue_panel.slint";
 import { SkeletonList, FadeIn } from "content.slint";
-import { LyricsData, LyricsState, LyricsView, NoLyricsLine } from "lyrics.slint";
+import { LyricsData, LyricsState, LyricsView } from "lyrics.slint";
 import { NotForMeButton, LikeButton } from "../not_for_me.slint";
 
 export global NowPlayingData {
@@ -99,7 +99,8 @@ export component SideTabs inherits Rectangle {
     }
     // While the full lyrics view is open the lyrics show there, so the Lyrics tab steps aside
     // and its place goes to Up next. The user's tab stays in `NowPlayingData.tab` and comes
-    // back when the full view closes. With lyrics off in Settings there's no Lyrics tab.
+    // back when the full view closes. With lyrics off in Settings there's no Lyrics tab. A
+    // song with no lyrics never opens the full view, so the tab stays and says why.
     property <bool> lyrics-away: LyricsData.showing || !LyricsData.on;
     // The tab shown. `lyrics-away` is read only with the Lyrics tab picked: read first, every
     // tab's `visible` was marked dirty whenever the lyrics view opened or closed, though the
@@ -191,22 +192,47 @@ export component SideTabs inherits Rectangle {
 // Now playing's side panel or the frame's Up next panel, whichever the page shows and if it's
 // open, with the window neither minimized nor hidden in the tray. One instance, in
 // `AppWindow`, which passes its `minimized`; Rust asks for lyrics and times lines only while
-// it holds.
+// it holds. It also keeps the full view through a lookup that began while it showed
+// (`LyricsData.held`), and the Lyrics pill's note for a few seconds (`LyricsData.hint`).
 export component LyricsWatch {
     in property <bool> minimized;
-    property <bool> live: LyricsData.on && ((NowPlayingData.tab == 2 && (Nav.page == PageKind.now-playing ? Frame.side-open : Frame.queue-open)) || LyricsData.showing) && !Frame.hidden && !root.minimized;
+    property <bool> live: LyricsData.on && ((NowPlayingData.tab == 2 && (Nav.page == PageKind.now-playing ? Frame.side-open : Frame.queue-open)) || LyricsData.wanted) && !Frame.hidden && !root.minimized;
     changed live => { LyricsData.live-changed(self.live); }
+    property <bool> showing: LyricsData.showing;
+    changed showing => { LyricsData.held = self.showing; }
+    // A lookup the full view asked for found nothing to show: the pill's note says why. A new
+    // lookup, or lines, take it away.
+    property <LyricsState> state: LyricsData.state;
+    changed state => { LyricsData.hint = LyricsData.missing && LyricsData.wanted; }
+    // One shot, only while the note shows; a toggle while it shows starts its time again.
+    note-time := Timer {
+        interval: 4s;
+        running: LyricsData.hint;
+        triggered => { LyricsData.hint = false; }
+    }
+    property <int> nudged: LyricsData.nudged;
+    changed nudged => { note-time.restart(); }
 }
 
 // Lyrics on and off for the stage (the full lyrics view): a tonal pill with the microphone,
-// the filled pill while on (white on the lyrics' panel, the panel's colour for its ink).
+// the filled pill while on (white on the lyrics' panel, the panel's colour for its ink). It
+// says what the lookup found: "Finding lyrics…" while the one it asked for runs, a quieter
+// "No lyrics" when there are none, "Retry lyrics" after a failure (a press asks again). A
+// press on "No lyrics", or a lookup that ends so while the view is asked for, shows a note
+// under the pill for a few seconds saying where featherplay looked (`LyricsData.hint`); the
+// stage stays.
 component LyricsToggle inherits Rectangle {
     in property <bool> on;
     callback clicked();
     height: 40px;
     width: lay.preferred-width;
     border-radius: self.height / 2;
-    property <color> ink: root.on ? LyricsData.ink.ground : Theme.text1;
+    property <bool> none: !root.on && LyricsData.state == LyricsState.none;
+    property <bool> failed: !root.on && LyricsData.state == LyricsState.error;
+    // Only for a view asked for: a lookup for the side tab alone leaves the pill as it is.
+    property <bool> finding: !root.on && LyricsData.wanted && LyricsData.looking;
+    property <string> label: root.failed ? @tr("Retry lyrics") : (root.none ? @tr("No lyrics") : (root.finding ? @tr("Finding lyrics…") : @tr("Lyrics")));
+    property <color> ink: root.on ? LyricsData.ink.ground : (root.none || root.finding ? Theme.text2 : Theme.text1);
     background: root.on
         ? (ta.pressed ? Theme.panel-solid-pressed : (ta.has-hover ? Theme.panel-solid-hover : Theme.panel-solid))
         : Theme.tonal(ta.pressed, ta.has-hover);
@@ -217,7 +243,8 @@ component LyricsToggle inherits Rectangle {
         easing: ta.pressed ? Curves.ease-out : Curves.release;
     }
     accessible-role: button;
-    accessible-label: @tr("Lyrics");
+    accessible-label: root.label;
+    accessible-description: root.none || root.failed ? LyricsData.message + ". " + LyricsData.why : "";
     accessible-checked: root.on;
     accessible-action-default => { root.clicked(); }
     ta := TouchArea {
@@ -237,10 +264,46 @@ component LyricsToggle inherits Rectangle {
             stroke: root.ink;
         }
         Body {
-            text: @tr("Lyrics");
+            text: root.label;
             font-weight: 600;
             color: root.ink;
             vertical-alignment: center;
+        }
+    }
+    // The note, under the pill and ending at its right edge, as the bar's tooltips look; it
+    // drops in a few pixels from the pill as it fades.
+    property <bool> note: LyricsData.hint && (root.none || root.failed);
+    Rectangle {
+        x: root.width - self.width;
+        y: root.height + Theme.s2 - (root.note ? 0px : 4px);
+        width: note-lay.preferred-width;
+        height: note-lay.preferred-height;
+        border-radius: Theme.r-s;
+        background: Theme.card;
+        border-width: 1px;
+        border-color: Theme.card-edge;
+        drop-shadow-blur: 8px;
+        drop-shadow-color: Theme.cover-shadow;
+        opacity: root.note ? 1 : 0;
+        visible: self.opacity > 0;
+        animate opacity, y { duration: Theme.t-fast; easing: Curves.ease-out; }
+        note-lay := VerticalLayout {
+            padding-left: Theme.s3;
+            padding-right: Theme.s3;
+            padding-top: Theme.s2;
+            padding-bottom: Theme.s2;
+            spacing: 2px;
+            Body {
+                text: LyricsData.message;
+                font-size: Theme.t-meta;
+                font-weight: 600;
+                color: Theme.text1;
+            }
+            Body {
+                text: LyricsData.why;
+                font-size: Theme.t-meta;
+                color: Theme.text2;
+            }
         }
     }
 }
@@ -374,10 +437,16 @@ export component NowPlayingPage inherits Rectangle {
         root.shown = true;
         root.side-in = Frame.side-open;
         root.ask-cover();
+        // Back on the page with lyrics on: it opens on the view, through a lookup if the song
+        // changed meanwhile, as when it showed.
+        if LyricsData.wanted && !LyricsData.missing {
+            LyricsData.held = true;
+        }
     }
 
     // The full lyrics view: the cover small in a column on the left, the lyrics beside it.
-    property <bool> full: LyricsData.full;
+    // Only with lines to show (`LyricsData.showing`): a song with none keeps the cover view.
+    property <bool> full: LyricsData.showing;
     property <length> fl-pad: Theme.page-pad;
     property <length> fl-top: 72px;
     property <length> fl-cover: clamp(root.stage-w * 0.2, 160px, 280px);
@@ -414,16 +483,6 @@ export component NowPlayingPage inherits Rectangle {
     property <float> reveal: max(0, 2 * root.lyr - 1);
     changed tint-at => { root.tint = root.tint-at; }
     changed reveal-at => { root.reveal = root.reveal-at; }
-    // No lines to show (none found, a failed lookup, nothing playing): the lyrics view keeps
-    // the cover view's layout, large and centred, on the panel's colour, with one quiet line
-    // under the title saying why. `alone` eases there and back over the toggle's time, so a
-    // lookup that ends without lines (or a Try again that finds some) glides the cover between
-    // the two; `column` is how far the lyrics' column layout is in, which every position reads.
-    property <bool> lone: LyricsData.state == LyricsState.none || LyricsData.state == LyricsState.error
-        || (LyricsData.state == LyricsState.idle && !Player.has-track);
-    property <float> alone: root.lone ? 1 : 0;
-    animate alone { duration: Theme.t-lyrics; easing: Curves.ease-in-out; }
-    property <float> column: root.lyr * (1 - root.alone);
     // The panel's colour crossfades on its own when the cover changes; the toggle only fades
     // it in and out.
     property <color> panel: LyricsData.ink.ground;
@@ -432,17 +491,17 @@ export component NowPlayingPage inherits Rectangle {
     property <color> ink1: LyricsData.ink.current.mix(Theme.text1, root.tint);
     property <color> ink2: LyricsData.ink.next.mix(Theme.text2, root.tint);
     // The cover, from its place in the cover view to its column in the lyrics view.
-    property <length> art-x: root.cover-x + (root.fl-x - root.cover-x) * root.column;
-    property <length> art-y: root.cover-y + (root.fl-top + Theme.s5 - root.cover-y) * root.column;
-    property <length> art-size: root.cover-size + (root.fl-cover - root.cover-size) * root.column;
+    property <length> art-x: root.cover-x + (root.fl-x - root.cover-x) * root.lyr;
+    property <length> art-y: root.cover-y + (root.fl-top + Theme.s5 - root.cover-y) * root.lyr;
+    property <length> art-size: root.cover-size + (root.fl-cover - root.cover-size) * root.lyr;
     // The cover's and its shadow's scale: 1 while the cover is within half a physical pixel
     // of its full size, the toggle's first and last few frames (it eases in and out), so the
     // art is copied there instead of resampled, ~a quarter of a 4K frame (measured
     // 2026-11-01).
     property <float> art-scale: abs(root.cover-size - root.art-size) < 0.5phx ? 1 : root.art-size / root.cover-size;
     // The title's top: under the cover in either view, sliding with it.
-    property <length> title-y: root.cover-y + root.cover-size + root.cover-gap + (root.fl-title-y - root.cover-y - root.cover-size - root.cover-gap) * root.column;
-    property <length> title-size: root.block-title + (Theme.t-display-s - root.block-title) * root.column;
+    property <length> title-y: root.cover-y + root.cover-size + root.cover-gap + (root.fl-title-y - root.cover-y - root.cover-size - root.cover-gap) * root.lyr;
+    property <length> title-size: root.block-title + (Theme.t-display-s - root.block-title) * root.lyr;
 
     // The stage's ground, opaque: the ambient wash (the cover's colour from the top, fading
     // out low) laid over the ground beforehand, then the lyrics' panel colour mixed in as the
@@ -493,13 +552,6 @@ export component NowPlayingPage inherits Rectangle {
             label: @tr("Back");
             tint: root.ink1;
             clicked => { Nav.back(); }
-        }
-        lyrics-pill := LyricsToggle {
-            x: root.stage-w - Theme.s5 - self.width;
-            y: Theme.s4;
-            visible: LyricsData.on;
-            on: root.full;
-            clicked => { LyricsData.toggle-view(); }
         }
         // "Playing from" in the middle of the header row, clear of the pill on either side;
         // only when the queue's source is known.
@@ -560,7 +612,7 @@ export component NowPlayingPage inherits Rectangle {
             transform-origin: { x: 0, y: 0 };
             transform-scale: root.art-scale;
             // The corners as they look: r-xl in the cover view, r-l in the lyrics' column.
-            radius: (Theme.r-xl + (Theme.r-l - Theme.r-xl) * root.column) * root.cover-size / root.art-size;
+            radius: (Theme.r-xl + (Theme.r-l - Theme.r-xl) * root.lyr) * root.cover-size / root.art-size;
             source: NowPlayingData.cover;
             crossfade: true;
         }
@@ -579,8 +631,7 @@ export component NowPlayingPage inherits Rectangle {
         // with the lyrics toggle, and are hidden once it's done. The title slides with the
         // cover and fades into the lyrics' column's wrapped title (`full-title`).
         property <length> buttons-hang: Theme.s2;
-        // The title's width: the cover's less the buttons', growing as they fade with the toggle
-        // (all the cover's in the lyrics view with no lines, where the cover stays).
+        // The title's width: the cover's less the buttons', growing as they fade with the toggle.
         property <length> title-w: root.cover-size - (Player.has-track ? song-buttons.preferred-width - stage.buttons-hang + Theme.s3 : 0px) * (1 - root.lyr);
         // One line of the title at either size, for the buttons' place and the block's room.
         title-probe := Display {
@@ -599,13 +650,13 @@ export component NowPlayingPage inherits Rectangle {
             y: root.title-y;
             width: stage.title-w;
             height: self.preferred-height;
-            visible: root.column < 1;
+            visible: root.lyr < 1;
             text: Player.has-track ? Player.title : @tr("Nothing playing");
             font-size: root.title-size;
             wrap: word-wrap;
             max-lines: 2;
             overflow: elide;
-            color: (Player.has-track ? root.ink1 : LyricsData.ink.next.mix(Theme.text3, root.tint)).transparentize(root.column);
+            color: (Player.has-track ? root.ink1 : LyricsData.ink.next.mix(Theme.text3, root.tint)).transparentize(root.lyr);
         }
         song-buttons := HorizontalLayout {
             x: root.art-x + root.cover-size + stage.buttons-hang - self.preferred-width;
@@ -641,30 +692,29 @@ export component NowPlayingPage inherits Rectangle {
             x: root.art-x;
             y: root.title-y;
             width: root.fl-cover;
-            visible: root.column > 0;
+            visible: root.lyr > 0;
             text: Player.has-track ? Player.title : @tr("Nothing playing");
             font-size: root.title-size;
-            color: LyricsData.ink.current.transparentize(1 - root.column);
+            color: LyricsData.ink.current.transparentize(1 - root.lyr);
             wrap: word-wrap;
         }
         // Row 2: the artists, a link to the first, under the title as it wraps (one line or
         // two). In the lyrics view they move under the column's wrapped title, eliding at the
         // column's width.
-        property <length> artists-y: root.title-y + (title.height + Theme.s2) * (1 - root.column) + (full-title.preferred-height + Theme.s1) * root.column;
+        property <length> artists-y: root.title-y + (title.height + Theme.s2) * (1 - root.lyr) + (full-title.preferred-height + Theme.s1) * root.lyr;
         artists := LinkText {
             x: root.art-x;
             y: stage.artists-y;
-            height: root.artists-h + 2px * root.column;
+            height: root.artists-h + 2px * root.lyr;
             room: root.art-size;
             text: Player.artist;
-            tint: root.ink1.mix(root.ink2, 1 - root.column);
+            tint: root.ink1.mix(root.ink2, 1 - root.lyr);
             weight: 600;
             enabled: Player.artist-id != "";
             clicked => { Nav.open-artist(Player.artist-id); }
         }
         // Row 3: "album · year" in `text2`, the album a link, eliding before the year. It
-        // fades out over the first half of the lyrics toggle, keeping its place, which the
-        // lyrics view with no lines gives to its line saying why.
+        // fades out over the first half of the lyrics toggle, keeping its place.
         property <length> album-y: stage.artists-y + root.artists-h;
         if Player.album != "": Rectangle {
             x: root.art-x;
@@ -691,15 +741,6 @@ export component NowPlayingPage inherits Rectangle {
                 vertical-alignment: center;
             }
         }
-        // No lyrics: why, in the album's place (from its top, so Try again stays clear of the
-        // artists' link), fading in as the lines would.
-        if root.lone && Player.has-track && root.reveal * root.alone > 0: NoLyricsLine {
-            x: root.art-x;
-            y: stage.album-y;
-            width: self.preferred-width;
-            reveal: root.reveal * root.alone;
-        }
-
         // The lyrics, in the main area under the back button's row. Once made (`warm`) the
         // view stays, hidden while the cover view shows, so opening it makes no lines in its
         // first frame: a song's 80 lines, shaped and laid out at this size, cost 7–10 ms
@@ -715,8 +756,17 @@ export component NowPlayingPage inherits Rectangle {
             pad-x: Theme.s3;
             bottom: 0;
             card: false;
-            note: false;
-            reveal: root.reveal * (1 - root.alone);
+            reveal: root.reveal;
+        }
+
+        // Last, so the note under it shows over the cover. Not there without a song: nothing
+        // to look up.
+        lyrics-pill := LyricsToggle {
+            x: root.stage-w - Theme.s5 - self.width;
+            y: Theme.s4;
+            visible: LyricsData.on && (Player.has-track || root.full);
+            on: root.full;
+            clicked => { LyricsData.toggle-view(); }
         }
     }
 
