@@ -45,16 +45,16 @@ msgid "Unknown title"
 msgstr "[Unknown title]"
 
 #: ../../crates/integrations/src/taskbar.rs:176
-#: ../../crates/integrations/src/taskbar.rs:176 ui/bottom_bar.slint:397
-#: ../../crates/integrations/src/taskbar.rs:176 ui/bottom_bar.slint:397 ui/parts.slint:99
+#: ../../crates/integrations/src/taskbar.rs:176 ui/bottom_bar.slint:399
+#: ../../crates/integrations/src/taskbar.rs:176 ui/bottom_bar.slint:399 ui/parts.slint:99
 msgid "Pause"
 msgstr "[Pause]"
 
 #: ../../crates/integrations/src/taskbar.rs:178
 #: ../../crates/integrations/src/taskbar.rs:178
-#: ../../crates/integrations/src/taskbar.rs:178 ui/bottom_bar.slint:397
-#: ../../crates/integrations/src/taskbar.rs:178 ui/bottom_bar.slint:397 ui/pages/content.slint:841 ui/pages/home.slint:606
-#: ../../crates/integrations/src/taskbar.rs:178 ui/bottom_bar.slint:397 ui/pages/content.slint:841 ui/pages/home.slint:606 ui/playlist_menu_layer.slint:197
+#: ../../crates/integrations/src/taskbar.rs:178 ui/bottom_bar.slint:399
+#: ../../crates/integrations/src/taskbar.rs:178 ui/bottom_bar.slint:399 ui/pages/content.slint:841 ui/pages/home.slint:606
+#: ../../crates/integrations/src/taskbar.rs:178 ui/bottom_bar.slint:399 ui/pages/content.slint:841 ui/pages/home.slint:606 ui/playlist_menu_layer.slint:197
 msgid "Play"
 msgstr "[Play]"
 
@@ -73,10 +73,10 @@ msgid "Next"
 msgstr "[Next]"
 
 #: ../../crates/integrations/src/tray.rs:273
-#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:444
-#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:444 ui/mini_player.slint:131 ui/pages/lyrics.slint:71
-#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:444 ui/mini_player.slint:131 ui/pages/lyrics.slint:71 ui/pages/now_playing.slint:645
-#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:444 ui/mini_player.slint:131 ui/pages/lyrics.slint:71 ui/pages/now_playing.slint:645
+#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:446
+#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:446 ui/mini_player.slint:131 ui/pages/lyrics.slint:91
+#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:446 ui/mini_player.slint:131 ui/pages/lyrics.slint:91 ui/pages/now_playing.slint:696
+#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:446 ui/mini_player.slint:131 ui/pages/lyrics.slint:91 ui/pages/now_playing.slint:696
 msgid "Nothing playing"
 msgstr "[Nothing playing]"
 
@@ -360,7 +360,7 @@ msgstr "[Windows default]"
 msgid "Lyrics from LRCLIB"
 msgstr "[Lyrics from LRCLIB]"
 
-#: src/lyrics.rs:860
+#: src/lyrics.rs:895
 msgid "Source: LyricFind"
 msgstr "[Source: LyricFind]"
 
@@ -619,7 +619,7 @@ msgstr "[The sign-in window stopped]"
 msgid "Something went wrong inside it. Try again, or use another way below."
 msgstr "[Something went wrong inside it. Try again, or use another way below.]"
 
-#: src/pages/sign_in.rs:259 src/snapshot.rs:629
+#: src/pages/sign_in.rs:259 src/snapshot.rs:631
 msgid ""
 "Finish signing in in Microsoft Edge. featherplay closes it once you're in."
 msgstr "[Finish signing in in Microsoft Edge. featherplay closes it once you're in.]"
@@ -902,64 +902,71 @@ msgstr "[Volume]"
 msgid "{} %"
 msgstr "[{} %]"
 
-#: ui/bottom_bar.slint:303 ui/bottom_bar.slint:335
-#: ui/bottom_bar.slint:303 ui/bottom_bar.slint:335 ui/pages/now_playing.slint:220
-#: ui/bottom_bar.slint:303 ui/bottom_bar.slint:335 ui/pages/now_playing.slint:220 ui/pages/settings.slint:1559
-#: ui/bottom_bar.slint:303 ui/bottom_bar.slint:335 ui/pages/now_playing.slint:220 ui/pages/settings.slint:1559
+#: ui/bottom_bar.slint:305 ui/bottom_bar.slint:337
+#: ui/bottom_bar.slint:305 ui/bottom_bar.slint:337 ui/pages/now_playing.slint:234
+#: ui/bottom_bar.slint:305 ui/bottom_bar.slint:337 ui/pages/now_playing.slint:234 ui/pages/settings.slint:2064
 msgid "Lyrics"
 msgstr "[Lyrics]"
 
-#: ui/bottom_bar.slint:304
+#: ui/bottom_bar.slint:306
 msgid "Hides the lyrics, back to the cover"
 msgstr "[Hides the lyrics, back to the cover]"
 
-#: ui/bottom_bar.slint:304
+#: ui/bottom_bar.slint:306
 msgid "Shows the lyrics on Now playing"
 msgstr "[Shows the lyrics on Now playing]"
 
-#: ui/bottom_bar.slint:335
+#: ui/bottom_bar.slint:337
 msgid "Hide lyrics"
 msgstr "[Hide lyrics]"
 
-#: ui/bottom_bar.slint:341
+#: ui/bottom_bar.slint:337 ui/pages/now_playing.slint:234
+msgid "No lyrics"
+msgstr "[No lyrics]"
+
+#: ui/bottom_bar.slint:337 ui/pages/now_playing.slint:234
+msgid "Retry lyrics"
+msgstr "[Retry lyrics]"
+
+#: ui/bottom_bar.slint:343
 msgid "Ctrl+L"
 msgstr "[Ctrl+L]"
 
 #. Its shortcut, in both windows.
-#: ui/bottom_bar.slint:403 ui/parts.slint:101
+#: ui/bottom_bar.slint:405 ui/parts.slint:101
 msgid "Space"
 msgstr "[Space]"
 
-#: ui/bottom_bar.slint:444
+#: ui/bottom_bar.slint:446
 msgid "Now playing: {}"
 msgstr "[Now playing: {}]"
 
-#: ui/bottom_bar.slint:522 ui/pages/content.slint:842
-#: ui/bottom_bar.slint:522 ui/pages/content.slint:842
+#: ui/bottom_bar.slint:524 ui/pages/content.slint:842
+#: ui/bottom_bar.slint:524 ui/pages/content.slint:842
 msgid "Shuffle"
 msgstr "[Shuffle]"
 
-#: ui/bottom_bar.slint:552
+#: ui/bottom_bar.slint:554
 msgid "Repeat one"
 msgstr "[Repeat one]"
 
-#: ui/bottom_bar.slint:552
+#: ui/bottom_bar.slint:554
 msgid "Repeat all"
 msgstr "[Repeat all]"
 
-#: ui/bottom_bar.slint:552
+#: ui/bottom_bar.slint:554
 msgid "Repeat off"
 msgstr "[Repeat off]"
 
-#: ui/bottom_bar.slint:616
+#: ui/bottom_bar.slint:618
 msgid "Mute"
 msgstr "[Mute]"
 
-#: ui/bottom_bar.slint:616
+#: ui/bottom_bar.slint:618
 msgid "Unmute"
 msgstr "[Unmute]"
 
-#: ui/bottom_bar.slint:632 ui/pages/now_playing.slint:113
+#: ui/bottom_bar.slint:634 ui/pages/now_playing.slint:114
 msgid "Up next"
 msgstr "[Up next]"
 
@@ -1127,8 +1134,7 @@ msgid "This didn’t load"
 msgstr "[This didn’t load]"
 
 #: ui/pages/content.slint:460 ui/pages/home.slint:773
-#: ui/pages/content.slint:460 ui/pages/home.slint:773 ui/pages/lyrics.slint:181
-#: ui/pages/content.slint:460 ui/pages/home.slint:773 ui/pages/lyrics.slint:181
+#: ui/pages/content.slint:460 ui/pages/home.slint:773 ui/pages/sign_in.slint:163
 msgid "Try again"
 msgstr "[Try again]"
 
@@ -1329,51 +1335,75 @@ msgstr "[Find music on Home or with Search.]"
 msgid "Go to Home"
 msgstr "[Go to Home]"
 
-#: ui/pages/lyrics.slint:70
+#: ui/pages/lyrics.slint:90
 msgid "Lyrics are unavailable right now"
 msgstr "[Lyrics are unavailable right now]"
 
-#: ui/pages/lyrics.slint:70
+#: ui/pages/lyrics.slint:90
 msgid "Couldn't load lyrics"
 msgstr "[Couldn't load lyrics]"
 
-#: ui/pages/lyrics.slint:71
+#: ui/pages/lyrics.slint:91
 msgid "No lyrics for this song"
 msgstr "[No lyrics for this song]"
 
-#: ui/pages/lyrics.slint:118
+#: ui/pages/lyrics.slint:94
+msgid "LRCLIB isn't answering. featherplay asks again in a minute."
+msgstr "[LRCLIB isn't answering. featherplay asks again in a minute.]"
+
+#: ui/pages/lyrics.slint:94
+msgid "Check your connection and try again."
+msgstr "[Check your connection and try again.]"
+
+#: ui/pages/lyrics.slint:95
+msgid "Play a song to see its lyrics here."
+msgstr "[Play a song to see its lyrics here.]"
+
+#: ui/pages/lyrics.slint:96
+msgid "Searched LRCLIB and YouTube Music."
+msgstr "[Searched LRCLIB and YouTube Music.]"
+
+#: ui/pages/lyrics.slint:96
+msgid "Searched YouTube Music. LRCLIB is off in Settings."
+msgstr "[Searched YouTube Music. LRCLIB is off in Settings.]"
+
+#: ui/pages/lyrics.slint:172
 msgid "Plays from this line"
 msgstr "[Plays from this line]"
 
-#: ui/pages/lyrics.slint:448
+#: ui/pages/lyrics.slint:481
 msgid "Synced lyrics are unavailable right now"
 msgstr "[Synced lyrics are unavailable right now]"
 
-#: ui/pages/lyrics.slint:448
+#: ui/pages/lyrics.slint:481
 msgid "Not synced to the song"
 msgstr "[Not synced to the song]"
 
-#: ui/pages/now_playing.slint:113
+#: ui/pages/now_playing.slint:114
 msgid "Related"
 msgstr "[Related]"
 
-#: ui/pages/now_playing.slint:140
+#: ui/pages/now_playing.slint:141
 msgid "Similar to {}"
 msgstr "[Similar to {}]"
 
-#: ui/pages/now_playing.slint:159
+#: ui/pages/now_playing.slint:160
 msgid "Nothing related found"
 msgstr "[Nothing related found]"
 
-#: ui/pages/now_playing.slint:271
+#: ui/pages/now_playing.slint:234
+msgid "Finding lyrics…"
+msgstr "[Finding lyrics…]"
+
+#: ui/pages/now_playing.slint:334
 msgid "Playing from {}"
 msgstr "[Playing from {}]"
 
-#: ui/pages/now_playing.slint:282 ui/queue_panel.slint:230
+#: ui/pages/now_playing.slint:345 ui/queue_panel.slint:230
 msgid "Playing from"
 msgstr "[Playing from]"
 
-#: ui/pages/now_playing.slint:493 ui/sign_in_window.slint:50
+#: ui/pages/now_playing.slint:552 ui/sign_in_window.slint:50
 msgid "Back"
 msgstr "[Back]"
 
