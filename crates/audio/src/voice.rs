@@ -27,6 +27,7 @@ use tokio::runtime::Runtime;
 
 use crate::StreamSource;
 use crate::decoder::Decoder;
+use crate::dsp::BusControls;
 use crate::engine::Msg;
 use crate::glitches::Glitches;
 use crate::head::HeadCache;
@@ -46,10 +47,12 @@ const RING: Duration = Duration::from_millis(1500);
 /// `end` while the decoder hasn't reached the end of the stream.
 const NO_END: u64 = u64::MAX;
 
-/// Play state shared by every voice of one engine.
+/// Play state shared by every voice of one engine, and the output's master bus.
 pub(crate) struct Controls {
     pub paused: AtomicBool,
-    gain: AtomicU32,
+    /// The volume, the equalizer and the compressor, which the output's bus applies to the
+    /// mix (`dsp`).
+    pub bus: BusControls,
     pub glitches: Arc<Glitches>,
 }
 
@@ -57,15 +60,9 @@ impl Controls {
     pub fn new() -> Self {
         Self {
             paused: AtomicBool::new(true),
-            gain: AtomicU32::new(1.0f32.to_bits()),
+            bus: BusControls::default(),
             glitches: Arc::default(),
         }
-    }
-    pub fn set_gain(&self, g: f32) {
-        self.gain.store(g.to_bits(), Ordering::Relaxed);
-    }
-    fn gain(&self) -> f32 {
-        f32::from_bits(self.gain.load(Ordering::Relaxed))
     }
 }
 
@@ -210,7 +207,7 @@ impl VoiceShared {
             rate,
             local: Vec::with_capacity(TAKE.max(SILENCE_FRAMES * channels.get() as usize)),
             idx: 0,
-            gain: 0.0,
+            gain: 1.0,
         })
     }
 
@@ -401,6 +398,7 @@ pub(crate) struct RingSource {
     rate: SampleRate,
     local: Vec<Sample>,
     idx: usize,
+    /// This voice's own gain, 1.0: the volume is applied to the mix, on the bus (`dsp`).
     gain: f32,
 }
 
@@ -411,7 +409,6 @@ impl RingSource {
         if v.stopped.load(Ordering::Relaxed) || v.attach.load(Ordering::Relaxed) != self.attach {
             return None;
         }
-        self.gain = self.controls.gain();
         self.local.clear();
         self.idx = 0;
         if self.controls.paused.load(Ordering::Relaxed) {

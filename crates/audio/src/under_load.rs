@@ -10,7 +10,8 @@
 //! Each round plays the 10 s tone for 8 s, first on a quiet machine, then beside another
 //! process that busy-loops one thread per logical core at normal priority (8.5 s of burn
 //! per round). `UNDER_LOAD_ROUNDS` sets the rounds (default 1); keep it at 3 or fewer, so
-//! the machine is never full for more than ~30 s in all.
+//! the machine is never full for more than ~30 s in all. The master bus runs at its most
+//! work: the equalizer on Bass and the compressor on Strong.
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -18,7 +19,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 use crate::glitches::Counts;
-use crate::{AudioEngine, AudioEvent, StreamSource};
+use crate::{AudioEngine, AudioEvent, Compressor, StreamSource};
 
 const PLAY: Duration = Duration::from_secs(8);
 
@@ -128,6 +129,8 @@ fn playback_beside_a_full_cpu() {
         .and_then(|v| v.parse().ok())
         .unwrap_or(1);
     let engine = AudioEngine::new_null(tmp());
+    engine.set_equalizer(Some([8.0, 0.0, 0.0, 0.0, 0.0]));
+    engine.set_compressor(Compressor::Strong);
     let events = engine.events();
     let show = |what: &str, c: Counts| {
         println!(

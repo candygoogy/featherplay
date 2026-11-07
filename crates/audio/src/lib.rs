@@ -31,6 +31,7 @@
 mod decoder;
 mod devices;
 mod download;
+mod dsp;
 mod engine;
 mod glitches;
 mod head;
@@ -50,6 +51,7 @@ mod voice;
 mod volume;
 
 pub use devices::output_devices;
+pub use dsp::Compressor;
 pub use engine::AudioEngine;
 pub use tmp::clear_stale_temp;
 pub use volume::perceptual_gain;

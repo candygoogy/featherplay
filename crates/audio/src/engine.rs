@@ -21,7 +21,7 @@ use crate::devices::{self, OpenError, Output, is_device_lost};
 use crate::glitches::Counts;
 use crate::head::{self, HeadCache};
 use crate::voice::{self, Controls, VoiceShared};
-use crate::{AudioEvent, StreamSource, perceptual_gain};
+use crate::{AudioEvent, Compressor, StreamSource, perceptual_gain};
 
 /// How long the ring must stay empty before `Buffering(true)` goes out. Shorter gaps (a seek
 /// within downloaded data) would only make the UI flicker.
@@ -235,7 +235,19 @@ impl AudioEngine {
 
     /// `slider` is the 0..=1 volume control; see `perceptual_gain`.
     pub fn set_volume(&self, slider: f32) {
-        self.controls.set_gain(perceptual_gain(slider));
+        self.controls.bus.set_gain(perceptual_gain(slider));
+    }
+
+    /// The equalizer's five bands in dB (60 Hz, 250 Hz, 1 kHz, 4 kHz, 12 kHz), each within
+    /// ±12; `None` turns it off. Boosts lower the overall level by the largest one, so
+    /// nothing clips. Heard within one device buffer (~50 ms).
+    pub fn set_equalizer(&self, bands: Option<[f32; 5]>) {
+        self.controls.bus.set_equalizer(bands);
+    }
+
+    /// "Even out loudness". Heard within one device buffer (~50 ms).
+    pub fn set_compressor(&self, c: Compressor) {
+        self.controls.bus.set_compressor(c);
     }
 
     /// Moves playback to the named device (`None` or unknown: the default device), keeping
@@ -642,14 +654,12 @@ impl Engine {
         };
         #[cfg(test)]
         let mut sink = match &self.null {
-            Some(plugged) if plugged.load(Ordering::SeqCst) => {
-                devices::open_null(&self.controls.glitches)
-            }
+            Some(plugged) if plugged.load(Ordering::SeqCst) => devices::open_null(&self.controls),
             Some(_) => return Err(OpenError::NoDevice),
-            None => devices::open_output(name.as_deref(), on_error, &self.controls.glitches)?,
+            None => devices::open_output(name.as_deref(), on_error, &self.controls)?,
         };
         #[cfg(not(test))]
-        let mut sink = devices::open_output(name.as_deref(), on_error, &self.controls.glitches)?;
+        let mut sink = devices::open_output(name.as_deref(), on_error, &self.controls)?;
         if !self.controls.paused.load(Ordering::SeqCst) {
             sink.set_playing(true)?;
         }
