@@ -6,6 +6,8 @@ Notable changes to featherplay, newest first. The format follows
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-11-07
+
 ### Added
 
 - Opus playback. Songs play the Opus stream (about 130-140 kbps) when there is one, which
@@ -64,7 +66,6 @@ Notable changes to featherplay, newest first. The format follows
   closes by itself right after opening, or when you press its buttons.
 - featherplay starts and plays nothing, instead of exiting, when the sound device can't be
   opened.
-
 - A search tab with no results says so instead of "The music service sent something
   unexpected".
 - On Now playing, the player bar's Up next button now hides and shows the side panel (Up
@@ -174,6 +175,7 @@ as a per-user installer or a portable exe.
 - A Language setting. featherplay ships in English and is ready for translations
   (CONTRIBUTING.md says how to add one).
 
-[Unreleased]: https://github.com/candygoogy/featherplay/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/candygoogy/featherplay/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/candygoogy/featherplay/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/candygoogy/featherplay/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/candygoogy/featherplay/releases/tag/v0.1.0

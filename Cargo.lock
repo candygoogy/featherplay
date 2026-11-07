@@ -1326,7 +1326,7 @@ dependencies = [
 
 [[package]]
 name = "featherplay"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "embed-resource",
  "featherplay-audio",
@@ -1360,7 +1360,7 @@ dependencies = [
 
 [[package]]
 name = "featherplay-audio"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "bytes",
  "featherplay-core",
@@ -1377,14 +1377,14 @@ dependencies = [
 
 [[package]]
 name = "featherplay-core"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "featherplay-integrations"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "base64 0.23.1",
  "bytes",
@@ -1413,7 +1413,7 @@ dependencies = [
 
 [[package]]
 name = "featherplay-lastfm"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "featherplay-core",
  "md-5",
@@ -1425,7 +1425,7 @@ dependencies = [
 
 [[package]]
 name = "featherplay-listenbrainz"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "reqwest",
  "serde_json",
@@ -1434,7 +1434,7 @@ dependencies = [
 
 [[package]]
 name = "featherplay-lyrics"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "reqwest",
  "serde",
@@ -1444,7 +1444,7 @@ dependencies = [
 
 [[package]]
 name = "featherplay-store"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "featherplay-core",
  "keyring-core",
@@ -1456,7 +1456,7 @@ dependencies = [
 
 [[package]]
 name = "featherplay-streams"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "featherplay-core",
  "flate2",
@@ -1470,7 +1470,7 @@ dependencies = [
 
 [[package]]
 name = "featherplay-ytm"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "featherplay-core",
  "log",
