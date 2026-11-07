@@ -19,6 +19,16 @@ swaps it in with `[patch.crates-io]`. featherplay uses it to decode the Opus str
    `default-features = false` leaves out rustfft's SIMD back ends (`avx`, `sse`, `neon`),
    as the spike measured it; the scalar FFT is already far faster than needed.
 
+   The FFTs are built by hand, not by rustfft's planner (2026-11-07): the planner can pick
+   any of rustfft's algorithms for a size, so all of them were linked, 0.31 MB of the release
+   exe. CELT's FFT sizes are 60, 120, 240 and 480 (the MDCTs of 240 to 1920 samples), a
+   power of two times 15, so each is `GoodThomasAlgorithmSmall` over a 4-, 8-, 16- or
+   32-point butterfly and a 15-point Good-Thomas of the 3- and 5-point ones. Any other size
+   falls back to rustfft's `Dft`. Decoding the 212 s test track, the output differs from the
+   planner's in 10,189 of 20.4 M samples, each by one 16-bit step (the planner's `RadixN`
+   rounds differently); it's still 59.1 dB from libopus with the same peak difference, and
+   decodes at the same speed (~110–130× realtime at opt-level "z", both, under load).
+
 2. `src/celt/vq.rs`, `extract_collapse_mask` and `PvqDecodeInfo`: the collapse mask is a
    `u32`, as libopus's `unsigned` (marked `featherplay patch`); the callers already carried
    it as one. Upstream built it in a `u8`, but a band can have up to 16 blocks (a transient
@@ -62,7 +72,8 @@ licence files). It's a port of libopus, BSD 3-Clause (see `README.md`).
    Delete `.cargo-ok`.
 2. If `flat_fft_forward` (or whatever the inverse MDCT calls) is still a naive DFT, port the
    `featherplay patch` block in `src/celt/kiss_fft.rs` and the `rustfft` dependency (the git
-   history of this folder has the diff).
+   history of this folder has the diff). If the inverse MDCT's sizes changed, extend `plan`
+   there so none of them lands on the slow `Dft`.
    Keep change 2 unless `extract_collapse_mask` already returns a 32-bit mask.
 3. Bump the `=x.y.z` pin in `crates/audio/Cargo.toml`, run the audio crate's tests, and
    measure the decode speed in a release build.

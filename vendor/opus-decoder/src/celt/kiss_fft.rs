@@ -114,23 +114,42 @@ impl KissFft {
 /// number of complex samples.
 /// Returns: nothing; writes the forward transform to `output`.
 pub(crate) fn flat_fft_forward(input: &[f32], output: &mut [f32], n: usize) {
-    // featherplay patch: rustfft, with one plan per size cached per thread, instead of the
-    // naive O(N²) DFT that computed `sin_cos` in f64 in its inner loop. It decoded at 4-5×
-    // realtime; this runs at ~325× with the same output. See VENDORED.md.
+    // featherplay patch: rustfft, with one FFT per size cached per thread, instead of the
+    // naive O(N²) DFT that computed `sin_cos` in f64 in its inner loop: that decoded at 4-5×
+    // realtime, the FFT at over 100× (2026-11-05/07). The FFTs are built here, not by
+    // rustfft's planner, which links every algorithm it might pick (0.31 MB of the exe):
+    // CELT's sizes are 60, 120, 240 and 480, a power of two times 15, so each is Good-Thomas
+    // over a butterfly and 15 = 3 × 5. Any other size gets rustfft's plain DFT. See
+    // VENDORED.md.
     use std::cell::RefCell;
     use std::collections::HashMap;
     use std::sync::Arc;
-    use rustfft::{Fft, FftPlanner, num_complex::Complex};
+    use rustfft::algorithm::butterflies::{
+        Butterfly3, Butterfly4, Butterfly5, Butterfly8, Butterfly16, Butterfly32,
+    };
+    use rustfft::algorithm::{Dft, GoodThomasAlgorithmSmall};
+    use rustfft::{Fft, FftDirection, num_complex::Complex};
     thread_local! {
-        static PLANS: RefCell<(FftPlanner<f32>, HashMap<usize, Arc<dyn Fft<f32>>>)> = RefCell::new((FftPlanner::new(), HashMap::new()));
+        static PLANS: RefCell<HashMap<usize, Arc<dyn Fft<f32>>>> = RefCell::new(HashMap::new());
+    }
+    fn plan(n: usize) -> Arc<dyn Fft<f32>> {
+        let dir = FftDirection::Forward;
+        let two: Arc<dyn Fft<f32>> = match (n % 15, n / 15) {
+            (0, 4) => Arc::new(Butterfly4::new(dir)),
+            (0, 8) => Arc::new(Butterfly8::new(dir)),
+            (0, 16) => Arc::new(Butterfly16::new(dir)),
+            (0, 32) => Arc::new(Butterfly32::new(dir)),
+            _ => return Arc::new(Dft::new(n, dir)),
+        };
+        let fifteen = GoodThomasAlgorithmSmall::new(
+            Arc::new(Butterfly3::new(dir)),
+            Arc::new(Butterfly5::new(dir)),
+        );
+        Arc::new(GoodThomasAlgorithmSmall::new(two, Arc::new(fifteen)))
     }
     assert!(input.len() >= 2 * n && output.len() >= 2 * n);
     let mut buf: Vec<Complex<f32>> = (0..n).map(|j| Complex::new(input[2 * j], input[2 * j + 1])).collect();
-    let fft = PLANS.with(|p| {
-        let mut p = p.borrow_mut();
-        let (planner, map) = &mut *p;
-        map.entry(n).or_insert_with(|| planner.plan_fft_forward(n)).clone()
-    });
+    let fft = PLANS.with(|p| p.borrow_mut().entry(n).or_insert_with(|| plan(n)).clone());
     fft.process(&mut buf);
     for (k, c) in buf.iter().enumerate() {
         output[2 * k] = c.re;
