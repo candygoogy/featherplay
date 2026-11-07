@@ -14,18 +14,31 @@ const faqs = [
     ],
   },
   {
+    q: "Do I need an account?",
+    a: [
+      "No. Without signing in, featherplay searches, opens artists, albums and public playlists, shows Home and Explore, and plays songs with their radio and lyrics.",
+      "Sign in for your library, liked songs, history, likes and playlists.",
+    ],
+  },
+  {
     q: "How does signing in work?",
     a: [
       "featherplay opens a small sign-in window, Microsoft Edge WebView2, with Google's own sign-in page. You sign in there as you would in a browser. featherplay doesn't read your password; the code is open. Once you're in, it keeps the YouTube Music session from that window and closes it. The main window never contains a browser.",
-      "If you'd rather sign in in a browser you know, choose Sign in with Microsoft Edge. Edge opens with a temporary profile, with its own address bar, passkeys and Windows Hello. featherplay keeps only the YouTube Music session from it, then closes Edge and deletes the profile. Your own Edge profile is never touched.",
-      "The session is kept in Windows Credential Manager, never in a file. It gives the same access to your account as a signed-in browser, so treat it like a password; Sign out in Settings removes it. Windows 11 includes WebView2, and most Windows 10 PCs have it with Edge.",
+      "If you'd rather sign in in a browser you know, choose Use Microsoft Edge. Edge opens with a temporary profile, with its own address bar, passkeys and Windows Hello. featherplay keeps only the YouTube Music session from it, then closes Edge and deletes the profile. Your own Edge profile is never touched.",
+      "The session is kept in Windows Credential Manager. While yt-dlp looks up a song's audio it reads the session from a temporary file, which featherplay deletes as soon as yt-dlp is done. The session gives the same access to your account as a signed-in browser, so treat it like a password; Sign out in Settings removes it. Windows 11 includes WebView2, and most Windows 10 PCs have it with Edge.",
     ],
   },
   {
     q: "Is my account safe with it?",
     a: [
-      "Your YouTube Music session, your Last.fm session and your ListenBrainz token stay on your PC, in Windows Credential Manager. The code is public for anyone to read.",
-      "It is still an unofficial client, using YouTube Music in a way Google doesn't support. If that worries you, sign in with a second account.",
+      "Your YouTube Music session, your Last.fm session and your ListenBrainz token stay on your PC, in Windows Credential Manager. The YouTube Music session also goes into a temporary file while yt-dlp looks up a song, deleted as soon as it's done. The code is public for anyone to read.",
+      "It is still an unofficial client, using YouTube Music in a way Google doesn't support. If that worries you, sign in with a second account, or listen without signing in.",
+    ],
+  },
+  {
+    q: "What does it sound like?",
+    a: [
+      "featherplay plays YouTube Music's Opus stream, about 130 to 140 kbps, where a song has one. It sounds better than AAC at about the same data use. Settings > Streaming quality switches to Standard, AAC at 128 kbps.",
     ],
   },
   {
@@ -35,6 +48,13 @@ const faqs = [
       "featherplay sends no telemetry and has no server of its own. It connects to YouTube Music and Google for your music, covers, streams and sign-in, and to GitHub to fetch yt-dlp and Deno on the first run and to update yt-dlp.",
       "LRCLIB gets the song's title, artist, album and length, only while lyrics are on screen. SponsorBlock, on by default, is asked only about music videos and uploads (songs have nothing to skip), by the first four characters of a hash of the video's ID, so it doesn't learn which video you play.",
       "Last.fm and ListenBrainz hear from it only if you connect them, and Discord only if you turn on the status, through the Discord app on your own PC.",
+    ],
+  },
+  {
+    q: "Does it work with stream overlays and Stream Deck?",
+    a: [
+      "Yes, once you turn on the local API in Settings > Local API. It uses the port, routes and WebSocket of Pear Desktop's API Server, with a token from Settings, so overlays, Stream Deck plugins and scripts on your PC can see what's playing and control it.",
+      "Amuse support, a switch in the same place, answers the Amuse now-playing widget on port 9863. It only reads, and it has no token, so while it's on, any app on your PC, and any website open in a browser on it, can see what's playing.",
     ],
   },
   {

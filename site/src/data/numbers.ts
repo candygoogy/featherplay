@@ -103,8 +103,11 @@ export function leftOutTotals(group: LeftOut): { entries: number; bytes: number 
 // on the measuring PC, and featherplay's portable exe. Sizes in bytes.
 // Installed (%LOCALAPPDATA%/Programs/featherplay), featherplay is the same exe plus Inno
 // Setup's uninstaller, unins000.exe (about 4.4 million bytes, measured; Inno 6.7.4's
-// Setup.e32 it's made from is 4,427,264) and its small unins000.dat log: not listed byte for
-// byte, so the installed total is shown as "about".
+// Setup.e32 it's made from is 4,427,264) and its small unins000.dat log, and since 0.1.2 the
+// Visual C++ runtime the exe links (packaging/windows/build-installer.sh: msvcp140.dll,
+// vcruntime140.dll and vcruntime140_1.dll: 872,240 bytes from MSVC 14.51's redistributable,
+// recorded in installer.md; the release's own come from the build machine's tools and differ
+// a little). Not listed byte for byte, so the installed total is shown as "about".
 // Each of Pear's entries is tagged with what it's there for, where that's clear from the
 // file: Chromium (the browser engine and its pieces), Electron (the app shell and the web
 // app it runs) or video (media decoding and the software graphics fallback).
@@ -146,7 +149,7 @@ export const installFolders = {
     files: 1,
     bytes: release.portable?.bytes ?? 0,
     entries: [{ name: "featherplay.exe", bytes: release.portable?.bytes ?? 0 }] as FolderEntry[],
-    /** The installed folder: the exe and the uninstaller (approximate). */
-    installed: { uninstallerBytes: 4_427_264, source: "installer.md" },
+    /** The installed folder: the exe, the uninstaller and the Visual C++ runtime (approximate). */
+    installed: { uninstallerBytes: 4_427_264, runtimeBytes: 872_240, source: "installer.md" },
   },
 };

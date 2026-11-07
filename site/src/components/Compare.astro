@@ -56,9 +56,9 @@ const leavesOut: { word: string; why: string; group?: LeftOut; files?: string }[
     { word: "Telemetry", why: "No analytics and no tracking, and no server of its own." },
   ] as { word: string; why: string; group?: LeftOut }[]
 ).map((l) => ({ ...l, files: l.group ? filesOf(l.group) : undefined }));
-// Like with like: Pear's install folder against featherplay's (the exe and its uninstaller,
-// approximate), then the portable exe on its own.
-const installedBytes = featherplay.bytes + featherplay.installed.uninstallerBytes;
+// Like with like: Pear's install folder against featherplay's (the exe, its uninstaller and
+// the Visual C++ runtime, approximate), then the portable exe on its own.
+const installedBytes = featherplay.bytes + featherplay.installed.uninstallerBytes + featherplay.installed.runtimeBytes;
 const times = Math.round(pear.bytes / installedBytes);
 const exeLabel = release.portable ? sizeLabel(release.portable) : mb(featherplay.bytes);
 const kind = (e: FolderEntry) => (e.files ? "folder" : e.name.endsWith(".exe") ? "app" : "file");
@@ -121,7 +121,8 @@ const kind = (e: FolderEntry) => (e.files ? "folder" : e.name.endsWith(".exe") ?
         <h3 class="out-h">What featherplay leaves out</h3>
         <p class="out-lede">
           Two folders, as Windows shows them: Pear Desktop 3.12 once it's installed, and featherplay, one program,
-          installed or portable. This is the portable exe; installed, it sits next to its uninstaller.
+          installed or portable. This is the portable exe; installed, it sits next to its uninstaller and the Visual C++
+          runtime.
         </p>
       </div>
       <div class="folders">
@@ -186,7 +187,8 @@ const kind = (e: FolderEntry) => (e.files ? "folder" : e.name.endsWith(".exe") ?
             </p>
             <p class="weigh-sum">{times} times smaller, installed.</p>
             <p class="weigh-what">
-              Installed means the exe plus its uninstaller, about {mb(featherplay.installed.uninstallerBytes)}.
+              Installed means the exe, its uninstaller (about {mb(featherplay.installed.uninstallerBytes)}) and the Visual
+              C++ runtime (about {mb(featherplay.installed.runtimeBytes)}).
             </p>
           </div>
 

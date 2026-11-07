@@ -77,8 +77,11 @@ test("the FAQ answers the questions people ask, before the download", async ({ p
   const faq = page.locator("#questions");
   for (const q of [
     "Is featherplay official?",
+    "Do I need an account?",
     "How does signing in work?",
     "Is my account safe with it?",
+    "What does it sound like?",
+    "Does it work with stream overlays and Stream Deck?",
     "Why only Windows?",
     "Is it free?",
     "How do I report a bug?",
@@ -250,7 +253,7 @@ test("the FAQ and features say what the README says", async ({ page }) => {
   const faq = await text("#questions");
   // Signing in.
   expect(faq).toContain("doesn't read your password; the code is open");
-  expect(faq).toContain("Sign in with Microsoft Edge");
+  expect(faq).toContain("Use Microsoft Edge");
   expect(faq).toContain("Sign out");
   expect(faq).toContain("ListenBrainz token");
   // What it connects to, and what each service gets.
@@ -263,6 +266,12 @@ test("the FAQ and features say what the README says", async ({ page }) => {
   // The helpers.
   expect(faq).toContain("SHA256");
   expect(faq).toContain("at most once a day");
+  // 0.1.2: listening signed out, Opus, the local API and Amuse.
+  expect(faq).toContain("Without signing in, featherplay searches");
+  expect(faq).toContain("Opus");
+  expect(faq).toContain("Settings > Streaming quality");
+  expect(faq).toContain("Settings > Local API");
+  expect(faq).toContain("port 9863");
   // The close button asks, until you tell it to remember.
   expect(await text("#kept")).toContain("remember");
   // What it leaves out: no server of its own (SponsorBlock and LRCLIB aren't "turned on").

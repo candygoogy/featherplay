@@ -92,8 +92,9 @@ const procs = (f: (typeof figures)[number]) => figureText(f, "processes");
           The two folders under the comparison are Pear Desktop's install folder on the same PC, listed on 1 November
           2026 ({installFolders.pear.files} files, {formatBytes(installFolders.pear.bytes)}), and featherplay's portable
           exe. Source: {file(installFolders.source)}. Installed, featherplay's folder is the same exe plus its
-          uninstaller (about {formatBytes(installFolders.featherplay.installed.uninstallerBytes)}, source:{" "}
-          {file(installFolders.featherplay.installed.source)}), so its installed size is given as an approximation.
+          uninstaller (about {formatBytes(installFolders.featherplay.installed.uninstallerBytes)}) and the Visual C++
+          runtime the exe needs (about {formatBytes(installFolders.featherplay.installed.runtimeBytes)}), source:{" "}
+          {file(installFolders.featherplay.installed.source)}, so its installed size is given as an approximation.
         </li>
       </ul>
     </section>

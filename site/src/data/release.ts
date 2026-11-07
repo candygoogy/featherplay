@@ -71,7 +71,7 @@ export function downloadOptions(r: Release = release): DownloadOption[] {
     out.push({
       id: "installer",
       title: "Installer",
-      note: "No admin prompt. Adds featherplay to Start, and its uninstaller leaves nothing behind.",
+      note: "No admin prompt, and it brings the Visual C++ runtime it needs. Adds featherplay to Start, and its uninstaller leaves nothing behind.",
       action: "Download the installer",
       file: r.installer,
       primary: true,
@@ -80,7 +80,7 @@ export function downloadOptions(r: Release = release): DownloadOption[] {
     out.push({
       id: "portable",
       title: "Portable exe",
-      note: "One file, nothing to install. Keep it anywhere and run it.",
+      note: "One file, nothing to install. Keep it anywhere and run it. It needs the Visual C++ runtime, which most PCs have.",
       action: out.length ? "Download the exe" : "Download for Windows",
       file: r.portable,
       primary: out.length === 0,
