@@ -246,8 +246,14 @@ fn the_card_stays_in_view_while_the_options_scroll() {
     scene.settle();
     let page = LogicalPosition::new(900.0, 500.0);
     hover(&scene, page.x, page.y);
-    for _ in 0..4 {
-        offscreen::wheel(w, page, -2.0);
+    // A small step at a time, and no further than that: how far the options reach depends on
+    // the text's measures, which differ between PCs (CI's Windows Server may lack Segoe UI
+    // Variable).
+    for _ in 0..40 {
+        if shown(&scene, "Discord status").is_none() {
+            break;
+        }
+        offscreen::wheel(w, page, -0.5);
         scene.settle();
     }
     assert!(
