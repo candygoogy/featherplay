@@ -2,7 +2,8 @@
 // and under it one block the cover's width, centred in the stage: the cover with a soft
 // glow in its colour, the title in the display face (two lines at most) with "Not for me"
 // (thumbs-down), like and the song menu pinned at the cover's right edge, the artists, and
-// "album · year"; on the right, Up next and Related tabs. The stage sits on a soft wash from the
+// "album · year"; in a short or narrow stage the title steps down a size and the cover gives
+// way first. On the right, Up next and Related tabs. The stage sits on a soft wash from the
 // cover (always on). Shown full width, without the sidebar; the bottom bar stays. It opens
 // with a 200 ms fade and scale from the bar's cover, the side panel following 40 ms later (a
 // fade only without motion). The Lyrics toggle glides the cover from the centre to its
@@ -326,9 +327,10 @@ export component NowPlayingPage inherits Rectangle {
     // The stage's header row: the back button, "Playing from" and the Lyrics pill. The block
     // (the cover and the text under it) centres in the room between it and the bar's fade.
     property <length> head-h: Theme.top-bar-h;
-    // The gaps stay small so the cover keeps its size in a 1280 x 800 window.
+    // Small gaps under the header and under the cover, so a 1280 x 800 window has the
+    // full-size cover; a wider one above the bar, so the block never crowds it.
     property <length> room-top: root.head-h + Theme.s2;
-    property <length> room-h: root.stage-h - root.room-top - Theme.s4;
+    property <length> room-h: root.stage-h - root.room-top - Theme.s5;
     property <length> cover-gap: Theme.s4;
     // The block's text, all of it the cover's width: the title (the display face, two lines at
     // most), the artists and "album · year". Its room is kept whatever the song has, a second
@@ -337,8 +339,15 @@ export component NowPlayingPage inherits Rectangle {
     // first of two lines.
     property <length> artists-h: 22px;
     property <length> album-h: 20px;
-    property <length> title-line: title-probe.preferred-height;
-    property <length> text-h: root.cover-gap + 2 * root.title-line + Theme.s2 + root.artists-h + root.album-h;
+    property <length> text-rest: root.cover-gap + Theme.s2 + root.artists-h + root.album-h;
+    // A short or narrow stage, where the title's display size would leave the cover under
+    // `compact-cover`: the title steps down a size, so it stays in proportion to the cover
+    // and the cover keeps more of the room.
+    property <length> compact-cover: 360px;
+    property <bool> compact: min(root.stage-w - 2 * Theme.s9, root.room-h - root.text-rest - 2 * title-probe.preferred-height) < root.compact-cover;
+    property <length> block-title: root.compact ? Theme.t-display-s : Theme.t-display-m;
+    property <length> title-line: root.compact ? title-probe-s.preferred-height : title-probe.preferred-height;
+    property <length> text-h: root.text-rest + 2 * root.title-line;
     // Beside the side panel the cover is at most `nowplaying-cover`. With the panel hidden
     // the stage has the window's width, and the cover grows with it, up to
     // `nowplaying-cover-wide` (about a third of the stage's width), so it doesn't sit small in the
@@ -433,7 +442,7 @@ export component NowPlayingPage inherits Rectangle {
     property <float> art-scale: abs(root.cover-size - root.art-size) < 0.5phx ? 1 : root.art-size / root.cover-size;
     // The title's top: under the cover in either view, sliding with it.
     property <length> title-y: root.cover-y + root.cover-size + root.cover-gap + (root.fl-title-y - root.cover-y - root.cover-size - root.cover-gap) * root.column;
-    property <length> title-size: Theme.t-display-m + (Theme.t-display-s - Theme.t-display-m) * root.column;
+    property <length> title-size: root.block-title + (Theme.t-display-s - root.block-title) * root.column;
 
     // The stage's ground, opaque: the ambient wash (the cover's colour from the top, fading
     // out low) laid over the ground beforehand, then the lyrics' panel colour mixed in as the
@@ -573,12 +582,17 @@ export component NowPlayingPage inherits Rectangle {
         // The title's width: the cover's less the buttons', growing as they fade with the toggle
         // (all the cover's in the lyrics view with no lines, where the cover stays).
         property <length> title-w: root.cover-size - (Player.has-track ? song-buttons.preferred-width - stage.buttons-hang + Theme.s3 : 0px) * (1 - root.lyr);
-        // One line of the title, for the buttons' place and the block's room.
+        // One line of the title at either size, for the buttons' place and the block's room.
         title-probe := Display {
             visible: false;
             // Any text: a line's height comes from the face's metrics.
             text: "0";
             font-size: Theme.t-display-m;
+        }
+        title-probe-s := Display {
+            visible: false;
+            text: "0";
+            font-size: Theme.t-display-s;
         }
         title := Display {
             x: root.art-x;

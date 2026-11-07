@@ -2,7 +2,7 @@
 //! stage's header, shown only when the queue has a source, and a click opens that source
 //! (its page, or Up next for a radio). Under the cover, the title, the artists and "album ·
 //! year", and no lyric line: lyrics show only in their views. The cover has its full size in
-//! a 1280 x 800 window.
+//! a 1280 x 800 window, and in smaller ones the block gives way so it ends above the bar.
 
 use std::ops::ControlFlow;
 
@@ -190,4 +190,41 @@ fn the_cover_has_its_full_size_with_lyrics_on_in_a_1280_by_800_window() {
         (cover - full).abs() < 0.5,
         "the cover is {cover} px beside the panel, not {full}"
     );
+}
+
+#[test]
+fn in_small_windows_the_title_steps_down_and_the_block_ends_above_the_bar() {
+    let scene = now_playing();
+    // A title that wraps to its second line.
+    scene
+        .ui
+        .global::<Player>()
+        .set_title("Harder, Better, Faster, Stronger (Alive 2007 Live Edit)".into());
+    scene.settle();
+    let (_, large, _) = block(&scene);
+    let theme = scene.ui.global::<Theme>();
+    // The last is a 1456 x 1000 window at 150 %.
+    for (width, height) in [(1100, 700), (1000, 650), (970, 667)] {
+        let w = scene.ui.window();
+        w.set_size(slint::PhysicalSize::new(width, height));
+        w.dispatch_event(WindowEvent::Resized {
+            size: slint::LogicalSize::new(width as f32, height as f32),
+        });
+        scene.settle();
+        let (cover, title, album) = block(&scene);
+        assert!(
+            title.size.height < large.size.height,
+            "{width} x {height}: the title didn't step down: {title:?}, {large:?} at 1280 x 800"
+        );
+        let bar_top = height as f32 - theme.get_bar_clear();
+        assert!(
+            album.max_y() <= bar_top - theme.get_s5() + 0.5,
+            "{width} x {height}: the credits end at {}, the bar starts at {bar_top}",
+            album.max_y()
+        );
+        assert!(
+            cover >= 280.0,
+            "{width} x {height}: the cover is only {cover} px"
+        );
+    }
 }
