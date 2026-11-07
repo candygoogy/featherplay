@@ -579,72 +579,108 @@ msgstr ""
 msgid "{} (not connected)"
 msgstr ""
 
-#: src/pages/sign_in.rs:147
+#: src/pages/sign_in.rs:118
+msgid "That sign-in didn't work"
+msgstr ""
+
+#: src/pages/sign_in.rs:171
+msgid "The sign-in window didn't open"
+msgstr ""
+
+#: src/pages/sign_in.rs:172
+msgid "Try again, or use another way below."
+msgstr ""
+
+#: src/pages/sign_in.rs:187
 msgid "Finish signing in in the other window. It closes by itself."
 msgstr ""
 
-#: src/pages/sign_in.rs:149
+#: src/pages/sign_in.rs:189
 msgid "Pick or add a Google account in the sign-in window"
 msgstr ""
 
-#: src/pages/sign_in.rs:189
-msgid "The sign-in window closed before you signed in."
+#: src/pages/sign_in.rs:217 src/pages/sign_in.rs:297 src/pages/sign_in.rs:357
+msgid "Checking the session…"
 msgstr ""
 
-#: src/pages/sign_in.rs:203
-msgid "The sign-in window didn't work: {}"
+#: src/pages/sign_in.rs:222
+msgid "The sign-in window closed"
 msgstr ""
 
-#: src/pages/sign_in.rs:228 src/snapshot.rs:623
+#: src/pages/sign_in.rs:223 src/pages/sign_in.rs:293
+msgid "It closed before you finished signing in. Try again when you're ready."
+msgstr ""
+
+#: src/pages/sign_in.rs:234
+msgid "The sign-in window stopped"
+msgstr ""
+
+#: src/pages/sign_in.rs:235
+msgid "Something went wrong inside it. Try again, or use another way below."
+msgstr ""
+
+#: src/pages/sign_in.rs:259 src/snapshot.rs:629
 msgid ""
 "Finish signing in in Microsoft Edge. featherplay closes it once you're in."
 msgstr ""
 
-#: src/pages/sign_in.rs:250
+#: src/pages/sign_in.rs:281
 msgid "Closing Edge…"
 msgstr ""
 
-#: src/pages/sign_in.rs:269
-msgid "Edge closed before you signed in."
+#: src/pages/sign_in.rs:294
+msgid "Try again, or use Sign in with Google."
 msgstr ""
 
-#: src/pages/sign_in.rs:270
-msgid "You didn't sign in within 10 minutes, so featherplay closed Edge."
+#: src/pages/sign_in.rs:312
+msgid "Edge closed"
 msgstr ""
 
-#: src/pages/sign_in.rs:273
+#: src/pages/sign_in.rs:314
+msgid "Edge closed after 10 minutes"
+msgstr ""
+
+#: src/pages/sign_in.rs:315
 msgid ""
-"featherplay can't find Microsoft Edge on this PC. Use Sign in with Google "
-"instead."
+"featherplay closes it when the sign-in takes that long. Try again when "
+"you're ready."
 msgstr ""
 
-#: src/pages/sign_in.rs:278
-msgid "Microsoft Edge didn't start. Use Sign in with Google instead."
+#: src/pages/sign_in.rs:321
+msgid "Microsoft Edge isn't on this PC"
 msgstr ""
 
-#: src/pages/sign_in.rs:282
-msgid ""
-"Edge didn't let featherplay read the sign-in. A policy on this PC may block "
-"it. Use Sign in with Google instead."
+#: src/pages/sign_in.rs:322
+msgid "Sign in with Google works without it."
 msgstr ""
 
-#: src/pages/sign_in.rs:291
-msgid ""
-"featherplay lost the connection to Edge. Try again, or use Sign in with "
-"Google."
+#: src/pages/sign_in.rs:327
+msgid "Microsoft Edge didn't start"
+msgstr ""
+
+#: src/pages/sign_in.rs:330
+msgid "Edge didn't let featherplay in"
+msgstr ""
+
+#: src/pages/sign_in.rs:331
+msgid "A setting on this PC may block it. Sign in with Google works without it."
 msgstr ""
 
 #: src/pages/sign_in.rs:337
+msgid "featherplay lost touch with Edge"
+msgstr ""
+
+#: src/pages/sign_in.rs:385
 msgid "Paste the cookie header first."
 msgstr ""
 
-#: src/pages/sign_in.rs:340
+#: src/pages/sign_in.rs:388
 msgid ""
 "That doesn't look like a cookie header: it should be name=value pairs "
 "separated by semicolons."
 msgstr ""
 
-#: src/pages/sign_in.rs:348
+#: src/pages/sign_in.rs:396
 msgid ""
 "That cookie header has no SAPISID, so it isn't signed in. Copy it from a tab "
 "that is signed in."
@@ -1092,6 +1128,7 @@ msgstr ""
 
 #: ui/pages/content.slint:460 ui/pages/home.slint:773
 #: ui/pages/content.slint:460 ui/pages/home.slint:773 ui/pages/lyrics.slint:181
+#: ui/pages/content.slint:460 ui/pages/home.slint:773 ui/pages/lyrics.slint:181
 msgid "Try again"
 msgstr ""
 
@@ -1490,7 +1527,7 @@ msgid "OK"
 msgstr ""
 
 #: ui/pages/settings.slint:1363 ui/pages/settings.slint:1624
-#: ui/pages/settings.slint:1363 ui/pages/settings.slint:1624 ui/pages/sign_in.slint:172
+#: ui/pages/settings.slint:1363 ui/pages/settings.slint:1624 ui/pages/sign_in.slint:275
 msgid "Cancel"
 msgstr ""
 
@@ -2133,85 +2170,90 @@ msgstr ""
 msgid "Paste your user token"
 msgstr ""
 
-#: ui/pages/sign_in.slint:70
+#: ui/pages/sign_in.slint:84
 msgid "Cookie header"
 msgstr ""
 
-#: ui/pages/sign_in.slint:121
+#: ui/pages/sign_in.slint:207
 msgid "Sign in to featherplay"
 msgstr ""
 
-#: ui/pages/sign_in.slint:131
+#: ui/pages/sign_in.slint:217
 msgid ""
 "Bring your library, playlists and likes. Search, radio and everything else "
 "already work without an account."
 msgstr ""
 
-#: ui/pages/sign_in.slint:141
+#: ui/pages/sign_in.slint:230
 msgid "Your session expired. Sign in again; the music keeps playing."
 msgstr ""
 
-#: ui/pages/sign_in.slint:158
+#: ui/pages/sign_in.slint:261
 msgid "Sign in with Google"
 msgstr ""
 
-#: ui/pages/sign_in.slint:159
+#: ui/pages/sign_in.slint:262
 msgid "On Google's own page, in a featherplay window"
 msgstr ""
 
-#: ui/pages/sign_in.slint:168
+#: ui/pages/sign_in.slint:271
 msgid "Use Microsoft Edge"
 msgstr ""
 
-#: ui/pages/sign_in.slint:169
+#: ui/pages/sign_in.slint:272
 msgid "Not available on this PC"
 msgstr ""
 
-#: ui/pages/sign_in.slint:169
+#: ui/pages/sign_in.slint:272
 msgid "In your own browser, with a temporary profile"
 msgstr ""
 
-#: ui/pages/sign_in.slint:172
+#: ui/pages/sign_in.slint:275
 msgid "Why?"
 msgstr ""
 
-#: ui/pages/sign_in.slint:185
+#: ui/pages/sign_in.slint:292
 msgid ""
-"Edge's RemoteDebuggingAllowed policy is off on this PC (an administrator or "
-"a tweaking tool set it), so featherplay can't read the sign-in from Edge. "
-"Sign in with Google works without it."
+"Edge on this PC is set to keep apps from reading its sign-in, so featherplay "
+"can't use it. Sign in with Google works without it."
 msgstr ""
 
-#: ui/pages/sign_in.slint:194
+#: ui/pages/sign_in.slint:300
+msgid ""
+"Set by an administrator or a tweaking tool: the RemoteDebuggingAllowed "
+"policy is off."
+msgstr ""
+
+#: ui/pages/sign_in.slint:309
 msgid "Paste a cookie header"
 msgstr ""
 
-#: ui/pages/sign_in.slint:195
+#: ui/pages/sign_in.slint:310
 msgid "For advanced users"
 msgstr ""
 
-#: ui/pages/sign_in.slint:202
+#: ui/pages/sign_in.slint:318
 msgid ""
 "In a browser signed in to music.youtube.com, press F12, open the Network tab "
 "and reload. Click a request named \"browse\" and copy the whole value of its "
 "cookie request header."
 msgstr ""
 
-#: ui/pages/sign_in.slint:214
+#: ui/pages/sign_in.slint:352
 msgid "Checking…"
 msgstr ""
 
-#: ui/pages/sign_in.slint:214
+#: ui/pages/sign_in.slint:352
 msgid "Sign in with this cookie"
 msgstr ""
 
-#: ui/pages/sign_in.slint:235
+#: ui/pages/sign_in.slint:386
 msgid ""
 "featherplay never sees your password. It keeps only the session, in Windows "
 "Credential Manager, and you can sign out any time."
 msgstr ""
 
-#: ui/pages/sign_in.slint:246
+#: ui/pages/sign_in.slint:401
 msgid "Continue without signing in"
 msgstr ""
 
