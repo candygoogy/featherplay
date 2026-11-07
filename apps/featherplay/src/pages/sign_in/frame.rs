@@ -9,7 +9,7 @@ use std::ffi::c_void;
 use std::path::PathBuf;
 use std::rc::Rc;
 
-use slint::{CloseRequestResponse, ComponentHandle, LogicalSize};
+use slint::{CloseRequestResponse, ComponentHandle, LogicalSize, PhysicalPosition};
 use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::UI::Shell::{DefSubclassProc, RemoveWindowSubclass, SetWindowSubclass};
 use windows::Win32::UI::WindowsAndMessaging::{
@@ -19,10 +19,10 @@ use windows::Win32::UI::WindowsAndMessaging::{
 use super::address::Address;
 use super::webview::{self, Event, Outcome, Remote, Room};
 use crate::app::Ctx;
-use crate::native;
+use crate::native::{self, ScreenRect};
 use crate::popup;
 use crate::shell;
-use crate::ui::{SettingsData, SignInWindow, Theme};
+use crate::ui::{AppWindow, SettingsData, SignInWindow, Theme};
 
 /// Logical size the window opens at.
 pub const SIZE: (f32, f32) = (540.0, 780.0);
@@ -71,6 +71,9 @@ pub fn open(
         return Err("the sign-in window is already open".into());
     }
     let ui = create(ctx)?;
+    if let Some(main) = ctx.window() {
+        place_over_page(&main, &ui);
+    }
     ui.show().map_err(|e| format!("show: {e}"))?;
     // Kept here while the window is made: `when_hwnd` holds it weakly.
     FRAME.with_borrow_mut(|f| *f = Some(ui.clone_strong()));
@@ -129,6 +132,74 @@ fn embed(
         log!("sign-in window: can't follow its size: {e}");
     }
     Ok(())
+}
+
+/// The frame's least height, logical pixels (`min-height` in `ui/sign_in_window.slint`).
+const LEAST_H: f32 = 480.0;
+
+/// Before it's shown, puts the frame's window over the main window's page: centred on the
+/// room the page has (right of the sidebar, left of Up next while it's open, above the bar;
+/// on the sign-in page, round its block), inside that screen's work area, and no taller than
+/// it (down to its least height). With the main window minimised or not there yet, Windows
+/// places it.
+fn place_over_page(main: &AppWindow, ui: &SignInWindow) {
+    let window = main.window();
+    let Some(h) = shell::hwnd(window) else { return };
+    if native::is_minimised(h) {
+        return;
+    }
+    let Some((left, top)) = native::client_origin(h) else {
+        return;
+    };
+    let main_scale = window.scale_factor();
+    let height = window.size().height as f32 / main_scale;
+    let x = main.get_page_x() + main.get_page_width() / 2.0;
+    let y = (height - main.global::<Theme>().get_bar_clear()) / 2.0;
+    let centre = (
+        left + (x * main_scale).round() as i32,
+        top + (y * main_scale).round() as i32,
+    );
+    // The frame opens on that screen, at its scale.
+    let Some((work, scale)) = native::work_area_at(centre.0, centre.1) else {
+        return;
+    };
+    let px = |v: f32| (v * scale).round() as i32;
+    let client = (px(SIZE.0), px(SIZE.1));
+    let (x, y, client_h) = place(
+        centre,
+        client,
+        px(LEAST_H),
+        native::frame_insets(scale),
+        work,
+    );
+    if client_h != client.1 {
+        ui.window()
+            .set_size(LogicalSize::new(SIZE.0, client_h as f32 / scale));
+    }
+    ui.window().set_position(PhysicalPosition::new(x, y));
+}
+
+/// Where a window goes whose client area is `client` big (at least `least` high) inside a
+/// frame of `insets` (left, top, right, bottom), all in physical pixels: its frame's top-left
+/// corner, centred on `centre`, title bar included, and moved inside the work area `work`;
+/// and its client area's height, cut to fit the work area's (its title bar then at the top).
+fn place(
+    centre: (i32, i32),
+    client: (i32, i32),
+    least: i32,
+    insets: ScreenRect,
+    work: ScreenRect,
+) -> (i32, i32, i32) {
+    let (l, t, r, b) = insets;
+    let (left, top, right, bottom) = work;
+    let client_h = client.1.min(bottom - top - t - b).max(least);
+    let (w, h) = (client.0 + l + r, client_h + t + b);
+    let inside = |v: i32, lo: i32, hi: i32| v.min(hi).max(lo);
+    (
+        inside(centre.0 - w / 2, left, right - w),
+        inside(centre.1 - h / 2, top, bottom - h),
+        client_h,
+    )
 }
 
 /// The frame is up, or waiting for its window.
@@ -227,4 +298,48 @@ unsafe extern "system" fn follow_proc(
         _ => {}
     }
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::place;
+
+    // A 1920 x 1080 screen at 100 %, its taskbar 40 px; a window frame of 8 px with a 31 px
+    // title bar; the frame's 540 x 780 client area, 480 high at least.
+    const WORK: (i32, i32, i32, i32) = (0, 0, 1920, 1040);
+    const INSETS: (i32, i32, i32, i32) = (8, 31, 8, 8);
+    const CLIENT: (i32, i32) = (540, 780);
+    const LEAST: i32 = 480;
+    const OUTER: (i32, i32) = (556, 819);
+
+    #[test]
+    fn the_window_centres_on_the_room() {
+        let (x, y, h) = place((1000, 500), CLIENT, LEAST, INSETS, WORK);
+        assert_eq!((x + OUTER.0 / 2, y + OUTER.1 / 2), (1000, 500));
+        assert_eq!(h, CLIENT.1);
+    }
+
+    #[test]
+    fn the_window_stays_on_the_screen() {
+        // A room near the right edge, the window moved in.
+        assert_eq!(
+            place((1800, 500), CLIENT, LEAST, INSETS, WORK).0,
+            1920 - OUTER.0
+        );
+        // A second screen left of the first.
+        assert_eq!(
+            place((-1800, 500), CLIENT, LEAST, INSETS, (-1920, 0, 0, 1040)).0,
+            -1920
+        );
+    }
+
+    #[test]
+    fn on_a_short_screen_the_window_fits_its_height() {
+        // 1366 x 768 at 100 %: the window shrinks to the work area, its title bar at the top.
+        let (_, y, h) = place((683, 350), CLIENT, LEAST, INSETS, (0, 0, 1366, 728));
+        assert_eq!((y, h), (0, 728 - 39));
+        // Shorter than its least height: that, from the top.
+        let (_, y, h) = place((683, 250), CLIENT, LEAST, INSETS, (0, 0, 1366, 500));
+        assert_eq!((y, h), (0, LEAST));
+    }
 }

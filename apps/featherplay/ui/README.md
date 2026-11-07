@@ -13,7 +13,7 @@ your task owns; the shared files below change only when a page truly needs somet
 | `nav.slint` | `PageKind`, `Nav` (the navigation callbacks) and `Frame` (`queue-open`, Now playing's `side-open`, …) | frame (shared) |
 | `player.slint` | `Player`: the current track and the transport, for the bar, Now playing and the Home hero | frame (shared) |
 | `sidebar.slint`, `bottom_bar.slint` | The frame's sidebar (`SidebarData`: Home, Library, Explore, History, Liked songs, then the library as a list under the Playlists, Albums and Artists chips, pinned entries first; `src/sidebar.rs`, its order in `src/library_list.rs`) and bottom bar | frame |
-| `top_bar.slint` | The top bar above every page but Now playing: the search field (`TopBarData.query`, filled by `src/top_bar.rs` and cleared off search pages) with its right-click menu | frame |
+| `top_bar.slint` | The top bar above every page but Now playing and Sign in: the search field (`TopBarData.query`, filled by `src/top_bar.rs` and cleared off search pages) with its right-click menu | frame |
 | `queue_panel.slint` | The Up next panel (`QueueData`) | now playing |
 | `mini_player.slint` | The tray's mini player (`MiniPlayer`, `MiniData`): its own small window, opened by a left click on the tray icon; `src/mini.rs` | tray |
 | `account_menu.slint` | The account menu from the sidebar's account row (`AccountMenu`, `AccountItem`): identities, Switch Google account, Sign out | account |
@@ -121,7 +121,11 @@ points at, `src/link.rs`: a song or video link shows that one song on Search, a 
 the playlist, a music-site channel or `MPRE` album link the artist or album; Escape clears it,
 then leaves it; × clears it), Alt+Left and Alt+Right go back and forward, Escape leaves Now
 playing, Ctrl+L turns the full lyrics view on or off (from another page it opens Now playing
-on the lyrics). Pages start below the 64 px top bar (`Theme.top-bar-h`); Now playing has none.
+on the lyrics). Pages start below the 64 px top bar (`Theme.top-bar-h`); Now playing and
+Sign in have none (Ctrl+K leaves Now playing first, and goes Home from Sign in). Sign in
+centres its block, its error row, its toasts, the account picker and the sign-in window
+itself in the page's room: right of the sidebar, left of Up next while it's open, above the
+bar.
 Album, playlist and artist pages run up under it instead, clear, so their wash or photo
 reaches the window's top: they start their content `Theme.top-bar-h` down and draw a
 `TopScrim` (content.slint) that brings the ground back as content scrolls under the bar.

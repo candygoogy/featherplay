@@ -4,22 +4,24 @@
 //! taskbar button showing up, and Windows' animation setting. For the tray's mini player:
 //! the work area and scale of the screen under a point, the popup's border, whether a press
 //! is what brought it to the front, which window is in front, and presses anywhere on screen.
+//! For the sign-in window: where the main window's client area is, and a window frame's size.
 
 use std::cell::{Cell, RefCell};
 use std::ffi::c_void;
 
 use slint::Color;
-use windows::Win32::Foundation::{COLORREF, HWND, LPARAM, LRESULT, POINT, WPARAM};
+use windows::Win32::Foundation::{COLORREF, HWND, LPARAM, LRESULT, POINT, RECT, WPARAM};
 use windows::Win32::Graphics::Dwm::{
     DWM_BB_ENABLE, DWM_BLURBEHIND, DWMWA_BORDER_COLOR, DWMWA_CAPTION_COLOR, DWMWA_TEXT_COLOR,
     DWMWA_USE_IMMERSIVE_DARK_MODE, DWMWINDOWATTRIBUTE, DwmEnableBlurBehindWindow,
     DwmSetWindowAttribute,
 };
 use windows::Win32::Graphics::Gdi::{
-    GetMonitorInfoW, GetUpdateRect, MONITOR_DEFAULTTONEAREST, MONITORINFO, MonitorFromPoint,
+    ClientToScreen, GetMonitorInfoW, GetUpdateRect, MONITOR_DEFAULTTONEAREST, MONITORINFO,
+    MonitorFromPoint,
 };
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
-use windows::Win32::UI::HiDpi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI};
+use windows::Win32::UI::HiDpi::{AdjustWindowRectExForDpi, GetDpiForMonitor, MDT_EFFECTIVE_DPI};
 use windows::Win32::UI::Shell::{DefSubclassProc, RemoveWindowSubclass, SetWindowSubclass};
 use windows::Win32::UI::WindowsAndMessaging::{
     CallNextHookEx, CreateIconFromResourceEx, DestroyIcon, GA_ROOT, GetAncestor, GetClassNameW,
@@ -27,10 +29,10 @@ use windows::Win32::UI::WindowsAndMessaging::{
     MSLLHOOKSTRUCT, RegisterWindowMessageW, SC_MINIMIZE, SC_RESTORE, SIZE_MAXIMIZED,
     SIZE_MINIMIZED, SIZE_RESTORED, SPI_GETCLIENTAREAANIMATION, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS,
     SendMessageW, SetForegroundWindow, SetWindowsHookExW, SystemParametersInfoW,
-    UnhookWindowsHookEx, WH_MOUSE_LL, WM_DISPLAYCHANGE, WM_DPICHANGED, WM_LBUTTONDOWN,
-    WM_MBUTTONDOWN, WM_MOUSEACTIVATE, WM_MOUSEWHEEL, WM_NCDESTROY, WM_PAINT, WM_POINTERACTIVATE,
-    WM_POINTERDOWN, WM_RBUTTONDOWN, WM_SETICON, WM_SETTINGCHANGE, WM_SIZE, WM_SYSCOMMAND,
-    WM_XBUTTONDOWN, WindowFromPoint,
+    UnhookWindowsHookEx, WH_MOUSE_LL, WINDOW_EX_STYLE, WM_DISPLAYCHANGE, WM_DPICHANGED,
+    WM_LBUTTONDOWN, WM_MBUTTONDOWN, WM_MOUSEACTIVATE, WM_MOUSEWHEEL, WM_NCDESTROY, WM_PAINT,
+    WM_POINTERACTIVATE, WM_POINTERDOWN, WM_RBUTTONDOWN, WM_SETICON, WM_SETTINGCHANGE, WM_SIZE,
+    WM_SYSCOMMAND, WM_XBUTTONDOWN, WS_OVERLAPPEDWINDOW, WindowFromPoint,
 };
 
 /// The Tri-vane logo, 16 to 256 px, from `build.rs`, drawn for dark grounds: the play sits
@@ -778,6 +780,32 @@ unsafe extern "system" fn press_hook(code: i32, wparam: WPARAM, lparam: LPARAM) 
 pub fn is_minimised(h: isize) -> bool {
     // SAFETY: a handle-only call; a stale handle reads as not minimised.
     unsafe { IsIconic(hwnd(h)) }.as_bool()
+}
+
+/// Where the window's client area starts on screen, in physical pixels.
+pub fn client_origin(h: isize) -> Option<(i32, i32)> {
+    let mut p = POINT::default();
+    // SAFETY: a handle and an out-parameter; a stale handle fails.
+    unsafe { ClientToScreen(hwnd(h), &mut p) }
+        .as_bool()
+        .then_some((p.x, p.y))
+}
+
+/// The frame Windows draws round a titled, resizable window's client area at `scale` (the
+/// borders, invisible ones included, and the title bar): left, top, right, bottom, in
+/// physical pixels; none where Windows can't say. The style is the one winit gives a window
+/// with decorations that can be resized (the sign-in window); a fixed-size one has a thinner
+/// frame.
+pub fn frame_insets(scale: f32) -> ScreenRect {
+    let mut r = RECT::default();
+    let dpi = (scale * 96.0).round() as u32;
+    // SAFETY: an in-out rectangle; the styles are plain flags.
+    match unsafe {
+        AdjustWindowRectExForDpi(&mut r, WS_OVERLAPPEDWINDOW, false, WINDOW_EX_STYLE(0), dpi)
+    } {
+        Ok(()) => (-r.left, -r.top, r.right, r.bottom),
+        Err(_) => (0, 0, 0, 0),
+    }
 }
 
 /// The subclass that watches the taskbar button (`when_taskbar_button`).
