@@ -19,7 +19,7 @@ use featherplay_integrations::local_api::{AMUSE_PORT, Token};
 use featherplay_integrations::{NowPlaying, discord, parse_hotkey};
 use featherplay_store::{
     Accent, AccentColour, CloseAction, DiscordOptions, DiscordStatusText, DiscordTime, Equalizer,
-    Hotkeys, Loudness, Paths, Settings, StreamingQuality, ThemeMode,
+    Hotkeys, Loudness, Paths, Settings, SkipSilence, StreamingQuality, ThemeMode,
 };
 use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 
@@ -269,6 +269,8 @@ pub fn init(ctx: &Rc<Ctx>) {
     data.on_eq_reset(move || set_equalizer(&c, Equalizer::Off, [0; 5]));
     let c = ctx.clone();
     data.on_pick_loudness(move |i| pick_loudness(&c, i));
+    let c = ctx.clone();
+    data.on_pick_skip_silence(move |i| pick_skip_silence(&c, i));
 }
 
 /// The page is being shown: refresh the devices and the Last.fm state.
@@ -730,6 +732,7 @@ fn show(ctx: &Ctx) {
     show_volume_step(ctx, s.volume_step);
     show_equalizer(&data, &s);
     data.set_loudness(loudness_index(s.loudness));
+    data.set_skip_silence(skip_silence_index(s.skip_silence));
     data.set_streaming_quality(streaming_quality_index(s.streaming_quality));
     data.set_skip_disliked(s.skip_disliked);
     data.set_sponsorblock(s.sponsorblock);
@@ -968,8 +971,33 @@ fn pick_loudness(ctx: &Ctx, i: i32) {
     }
 }
 
-/// `--snapshot settings-sound` and `settings-equalizer`: the Sound rows on (the Bass preset,
-/// Light), or the Equalizer dialog over the page with Custom bands. Shown only, not saved.
+/// The Skip silence chips, in the page's order.
+const SKIP_SILENCE: [SkipSilence; 3] = [
+    SkipSilence::Off,
+    SkipSilence::StartAndEnd,
+    SkipSilence::Everywhere,
+];
+
+fn skip_silence_index(m: SkipSilence) -> i32 {
+    SKIP_SILENCE.iter().position(|&x| x == m).unwrap_or(0) as i32
+}
+
+/// The Skip silence chip at `i`, shown and saved; the controller applies it.
+fn pick_skip_silence(ctx: &Ctx, i: i32) {
+    let Some(&m) = usize::try_from(i).ok().and_then(|i| SKIP_SILENCE.get(i)) else {
+        return;
+    };
+    let Some(ui) = ctx.window() else { return };
+    ui.global::<SettingsData>()
+        .set_skip_silence(skip_silence_index(m));
+    if SETTINGS.with(|s| s.borrow().skip_silence != m) {
+        commit(ctx, Change::SkipSilence(m));
+    }
+}
+
+/// `--snapshot settings-sound` and `settings-equalizer`: the new sound rows on (Skip
+/// silence at Start and end, the Bass preset, Light), or the Equalizer dialog over the page
+/// with Custom bands. Shown only, not saved.
 pub fn show_sound_for_snapshot(ctx: &Rc<Ctx>, dialog: bool) {
     let Some(ui) = ctx.window() else { return };
     SETTINGS.with(|s| {
@@ -980,11 +1008,13 @@ pub fn show_sound_for_snapshot(ctx: &Rc<Ctx>, dialog: bool) {
         } else {
             s.equalizer = Equalizer::Bass;
             s.loudness = Loudness::Light;
+            s.skip_silence = SkipSilence::StartAndEnd;
         }
     });
     let data = ui.global::<SettingsData>();
     SETTINGS.with(|s| show_equalizer(&data, &s.borrow()));
     data.set_loudness(SETTINGS.with(|s| loudness_index(s.borrow().loudness)));
+    data.set_skip_silence(SETTINGS.with(|s| skip_silence_index(s.borrow().skip_silence)));
     if dialog {
         open_dialog(ctx, SettingsDialog::Equalizer);
     }

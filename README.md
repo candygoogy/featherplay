@@ -291,7 +291,8 @@ Pear's plugins become settings here. This is what exists today.
 | Picture-in-picture, Ambient Mode, Transparent Player, Clock | Later. |
 | Equalizer | **Built in**, off by default (Settings > Sound): five bands with Bass, Treble and Vocal presets, or your own. |
 | Audio Compressor | **Built in**, off by default, as "Even out loudness" (Settings > Sound): Light, or Strong with Pear's settings. |
-| Crossfade, Skip Silences, Visualizer | Later. |
+| Skip Silences | **Built in**, off by default, as "Skip silence" (Settings > Playback): the start and end of a song, or everywhere (silences of 2 s or more inside a song shortened). |
+| Crossfade, Visualizer | Later. |
 | Playback Speed | Later. |
 | API Server | **Built in**, off by default, as the [local API](#local-api): Pear's port, routes and WebSocket, with a token from Settings. |
 | Amuse | **Built in**, off by default: [the same endpoint](#amuse) on port 9863, for the Amuse widget. |

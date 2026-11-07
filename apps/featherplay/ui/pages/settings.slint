@@ -134,6 +134,8 @@ export global SettingsData {
     in property <bool> prefer-song-versions;
     in property <bool> skip-non-music;
     in property <bool> autoplay: true;
+    // Skip silence: 0 Off, 1 Start and end, 2 Everywhere.
+    in property <int> skip-silence: 0;
     // The Volume step: 0 1 %, 1 2 %, 2 5 %, 3 10 %.
     in property <int> volume-step: 2;
     // Sound. The Equalizer: 0 Off, 1 Bass, 2 Treble, 3 Vocal, 4 Custom; the bands it plays
@@ -262,6 +264,7 @@ export global SettingsData {
     // Reset in the Equalizer dialog: every band at 0 dB, and the equalizer off.
     callback eq-reset();
     callback pick-loudness(int);
+    callback pick-skip-silence(int);
     callback pick-streaming-quality(int);
     // 0 play/pause, 1 next, 2 previous; the text as typed.
     callback hotkey-edited(int, string);
@@ -1810,6 +1813,15 @@ export component SettingsPage inherits Rectangle {
                     detail: @tr("Playlists, albums and radio move past songs you've disliked. A song you pick yourself still plays.");
                     key: SettingKey.skip-disliked;
                     checked: SettingsData.skip-disliked;
+                }
+                SettingRow {
+                    label: @tr("Skip silence");
+                    detail: @tr("Skips the silence before a song starts and after it ends. Everywhere also shortens silences of 2 seconds or more inside a song.");
+                    RowChips {
+                        labels: [@tr("Off"), @tr("Start and end"), @tr("Everywhere")];
+                        active: SettingsData.skip-silence;
+                        selected(i) => { SettingsData.pick-skip-silence(i); }
+                    }
                 }
                 SettingRow {
                     label: @tr("Volume step");

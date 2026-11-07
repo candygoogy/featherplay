@@ -110,7 +110,8 @@ pub const PAGES: &[&str] = &[
     "settings-scripts",
     // Settings with the local API on and running, its port and masked token.
     "settings-local-api",
-    // Settings with the Sound rows on (Bass, Light), and with the Equalizer's bands open.
+    // Settings with the new sound rows on (Skip silence at Start and end, Bass, Light), and
+    // with the Equalizer's bands open.
     "settings-sound",
     "settings-equalizer",
     "about",

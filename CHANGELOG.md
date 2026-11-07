@@ -19,6 +19,10 @@ Notable changes to featherplay, newest first. The format follows
   so nothing distorts. Even out loudness is a compressor, Light or Strong (Pear's Audio
   Compressor settings). Both apply while a song plays. Streaming quality and Output device
   moved to Sound too.
+- Skip silence, off by default (Settings > Playback): Start and end skips the silence before
+  a song starts and after it ends, and Everywhere also shortens silences of 2 seconds or
+  more inside a song to half a second. The player bar, Discord and Last.fm stay in step:
+  the time jumps ahead, and skipped silence doesn't count as listening time.
 
 ### Fixed
 
