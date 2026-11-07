@@ -38,8 +38,10 @@ pub fn init(ctx: &Rc<Ctx>) {
     });
     let c = ctx.clone();
     toast.on_action_clicked(move || {
+        // Taken before `close`, which drops it.
+        let action = ACTION.with(|a| a.borrow_mut().take());
         close();
-        if let Some(action) = ACTION.with(|a| a.borrow_mut().take()) {
+        if let Some(action) = action {
             action(&c);
         }
     });

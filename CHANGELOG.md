@@ -6,6 +6,11 @@ Notable changes to featherplay, newest first. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- A toast's button does what it says. "Restart to update", "Undo", "View", "Sign in" and
+  "Get it" closed the toast and did nothing; Settings > About's update button worked.
+
 ## [0.1.2] - 2026-11-07
 
 ### Added
