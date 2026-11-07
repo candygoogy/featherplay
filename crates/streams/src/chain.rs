@@ -3,7 +3,7 @@
 
 use std::collections::VecDeque;
 use std::sync::Mutex;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime};
 
 use featherplay_core::model::TrackId;
 use featherplay_core::sync::LockExt;
@@ -30,6 +30,16 @@ const DOUBT_FOR: Duration = Duration::from_secs(30 * 60);
 const NATIVE_REFUSED_FOR: Duration = Duration::from_secs(30 * 60);
 /// Songs remembered for `NATIVE_REFUSED_FOR`, and fallback reasons not taken yet.
 const REMEMBER: usize = 32;
+/// `available_at` has 1 s resolution and is set by YouTube's clock, so wait a little past it.
+/// The audio engine tries a 403 on a TV client's first request again for ~1.75 s; an
+/// embedded URL that had a gate is checked once open instead (`Chain::opened`).
+const GATE_MARGIN: Duration = Duration::from_millis(200);
+/// A gated URL's check that's refused is asked once more this much later.
+const GATE_RECHECK: Duration = Duration::from_secs(1);
+/// The gate is the time before an ad could be skipped (5-6 s seen), or its length (~6 s on
+/// the TV clients). A longer one isn't waited for: an embedded URL goes on to the next step,
+/// a TV one is handed over after this.
+const MAX_GATE_WAIT: Duration = Duration::from_secs(20);
 
 /// What a stream URL's first byte said (`Steps::check`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -41,14 +51,15 @@ pub(crate) enum Check {
     Unknown,
 }
 
-/// The steps of a resolve, each on its own.
+/// The steps of a resolve, each on its own. A URL a step gives may be refused until its
+/// `available_at` (the ads before the song): the chain waits that out.
 pub(crate) trait Steps {
     /// The embedded client asked from Rust. `None` when there's no such step (no HTTP
     /// client, or cookies, which it doesn't take).
     async fn native(&self, id: &TrackId) -> Option<Result<ResolvedStream, NativeError>>;
     /// The embedded client through yt-dlp.
     async fn embedded(&self, id: &TrackId) -> Result<ResolvedStream, ResolveError>;
-    /// yt-dlp's default clients. The URL is usable once this returns (its gate waited out).
+    /// yt-dlp's default clients.
     async fn default_clients(&self, id: &TrackId) -> Result<ResolvedStream, ResolveError>;
     /// `yt-dlp -U` after a failure: true when trying again may help.
     async fn update(&self) -> bool;
@@ -168,15 +179,16 @@ impl Chain {
         (on, e.doubt_until.is_some_and(|until| now < until))
     }
 
-    /// `stream`, unless its first byte is refused (which starts the doubt over). The native
-    /// step's embed page is kept then: URLs from one page were refused and played in turn.
-    async fn checked(&self, s: &impl Steps, stream: ResolvedStream) -> Option<ResolvedStream> {
-        match s.check(&stream.url).await {
-            Check::Plays | Check::Unknown => Some(stream),
-            Check::Refused => {
-                self.doubt();
-                None
+    /// What `url`'s first byte gets. A URL that was `gated` is asked once more
+    /// `GATE_RECHECK` later when refused: its gate is only known to the second, and the
+    /// engine takes a 403 on an embedded URL as final.
+    async fn opened(s: &impl Steps, url: &str, gated: bool) -> Check {
+        match s.check(url).await {
+            Check::Refused if gated => {
+                tokio::time::sleep(GATE_RECHECK).await;
+                s.check(url).await
             }
+            check => check,
         }
     }
 
@@ -211,6 +223,13 @@ impl Chain {
     ///    there that a newer yt-dlp may fix runs `yt-dlp -U` (`Steps::update`), then step 3
     ///    again.
     ///
+    /// A URL with ads before the song (`available_at`) is refused until each could be
+    /// skipped (5 s for one, 2026-11-07): it's handed over once its gate has passed and its
+    /// first byte plays (`opened`). A resolve ahead just waits; a resolve the player waits
+    /// for runs step 2 beside the wait and takes the first URL that opens (`race`), as
+    /// yt-dlp's request may have come without an ad. A gate past `MAX_GATE_WAIT` sends an
+    /// embedded URL on to the next step.
+    ///
     /// For `DOUBT_FOR` after a refused embedded URL (`refused`), steps 1 and 2 check their
     /// URL's first byte (one request, ~0.2 s) before handing it over, so a refused one
     /// costs no failed start. A refused native URL goes on to step 2 (~3 s, which played
@@ -219,7 +238,7 @@ impl Chain {
     /// waits for runs steps 1 and 2 at once (`race`).
     ///
     /// A resolve ahead (`ahead`) runs its yt-dlp steps one resolve ahead at a time, unless
-    /// the player asks for its song meanwhile.
+    /// the player asks for its song meanwhile; a gate's wait isn't part of its turn.
     async fn run(
         &self,
         s: &impl Steps,
@@ -236,23 +255,57 @@ impl Chain {
                 "its native URL was refused (HTTP 403) a moment ago".into(),
             );
         }
-        if native && doubt && ahead.is_none() {
-            match self.race(s, id).await {
+        let mut ahead = ahead;
+        let one = if !native {
+            None
+        } else if doubt && ahead.is_none() {
+            match self.race(s, id, self.native_step(s, id, true), true).await {
                 Some(r) => return r,
-                None => embedded = false,
+                None => Some(One::NotEmbeddable),
             }
-        } else if native {
-            match self.native_step(s, id, doubt).await {
-                Some(One::Plays(stream)) => return Ok(stream),
-                Some(One::Ends(e)) => return Err(e),
-                Some(One::NotEmbeddable) => embedded = false,
-                Some(One::Next) | None => {}
+        } else {
+            match self.native_answer(s, id).await {
+                Some(Answer::Gated(stream)) => {
+                    let wait = self.native_ready(s, id, stream, doubt);
+                    tokio::pin!(wait);
+                    // Ahead, the wait is all; once the player asks, yt-dlp runs beside it.
+                    let waited = match ahead {
+                        Some(urgent) => tokio::select! {
+                            biased;
+                            one = &mut wait => Some(one),
+                            () = urgent.notified() => None,
+                        },
+                        None => None,
+                    };
+                    match waited {
+                        Some(one) => Some(one),
+                        None => {
+                            ahead = None;
+                            let rest = async { Some(wait.await) };
+                            match self.race(s, id, rest, doubt).await {
+                                Some(r) => return r,
+                                None => Some(One::NotEmbeddable),
+                            }
+                        }
+                    }
+                }
+                Some(Answer::Now(stream)) => Some(self.native_ready(s, id, stream, doubt).await),
+                Some(Answer::Done(one)) => Some(one),
+                None => None,
             }
+        };
+        match one {
+            Some(One::Plays(stream)) => return Ok(stream),
+            Some(One::Ends(e)) => return Err(e),
+            Some(One::NotEmbeddable) => embedded = false,
+            Some(One::Next) | None => {}
         }
         // yt-dlp from here on.
-        let _turn = self.turn(ahead).await;
         if embedded {
-            let two = self.embedded_step(s, id, doubt).await;
+            let turn = self.turn(&mut ahead).await;
+            let answer = self.embedded_answer(s, id).await;
+            drop(turn);
+            let two = self.embedded_ready(s, answer, doubt).await;
             if !native && matches!(two, Two::Refused) {
                 // Without a fresh native URL refused too, one song's refusals (they come
                 // by song) say nothing of the client: only this song goes to step 3.
@@ -264,33 +317,43 @@ impl Chain {
                 return r;
             }
         }
-        let t = Instant::now();
+        let turn = self.turn(&mut ahead).await;
+        let mut t = Instant::now();
         let mut result = s.default_clients(id).await;
-        match &result {
-            Ok(_) => log::info!("{}", stage_took(id, Stage::Default, t.elapsed())),
-            Err(e) => log::warn!("{}", stage_failed(id, Stage::Default, e)),
+        if let Err(e) = &result {
+            log::warn!("{}", stage_failed(id, Stage::Default, e));
         }
         if matches!(result, Err(ResolveError::ToolFailed { .. })) && s.update().await {
             // The retry is worth it even if the update fails (a transient error).
+            t = Instant::now();
             result = s.default_clients(id).await;
             if let Err(e) = &result {
                 log::warn!("{} (after yt-dlp -U)", stage_failed(id, Stage::Default, e));
             }
         }
+        drop(turn);
+        if let Ok(stream) = &result {
+            let took = stage_took(id, Stage::Default, t.elapsed(), gate_left(stream));
+            log::info!("{took}");
+            wait_gate(stream).await;
+        }
         result
     }
 
-    /// Steps 1 and 2 at once, while URLs are in doubt and the player waits: the first URL
-    /// that plays wins, and the other step is dropped (its yt-dlp run killed). About half
-    /// the native URLs of a spell play (~0.7 s with the check); for the others, yt-dlp's
-    /// ~3 s started with them instead of after them. `None`: on to step 3.
+    /// Steps 1 and 2 at once, the player waiting: the first URL that plays wins, and the
+    /// other step is dropped (its yt-dlp run killed). `native` is step 1 from its request
+    /// (URLs in doubt: about half of a spell's native URLs played, ~0.7 s with the check;
+    /// for the others, yt-dlp's ~3 s started with them instead of after them), or from a
+    /// gated answer's wait (yt-dlp's answer may come without an ad, ~3 s instead of the
+    /// gate's ~6 s). `doubt`: step 2's URL is checked. `None`: on to step 3.
     async fn race(
         &self,
         s: &impl Steps,
         id: &TrackId,
+        native: impl Future<Output = Option<One>>,
+        doubt: bool,
     ) -> Option<Result<ResolvedStream, ResolveError>> {
-        let native = self.native_step(s, id, true);
-        let ytdlp = self.embedded_step(s, id, true);
+        let ytdlp = self.embedded_step(s, id, doubt);
         tokio::pin!(native, ytdlp);
         // The native step first when both are ready: it has no process to wait for.
         let first = tokio::select! {
@@ -321,54 +384,122 @@ impl Chain {
         }
     }
 
-    /// Step 1. `None` when there's no native step.
+    /// Step 1, its URL handed over once it opens (and, in doubt, plays). `None` when
+    /// there's no native step.
     async fn native_step(&self, s: &impl Steps, id: &TrackId, doubt: bool) -> Option<One> {
-        let native = s.native(id).await?;
-        Some(match native {
-            Ok(stream) if !doubt => One::Plays(stream),
-            Ok(stream) => match self.checked(s, stream).await {
-                Some(stream) => One::Plays(stream),
-                None => {
-                    self.native_refused(id);
-                    self.fall_back(id, "its URL was refused (HTTP 403) at its check".into());
-                    One::Next
+        Some(match self.native_answer(s, id).await? {
+            Answer::Now(stream) | Answer::Gated(stream) => {
+                self.native_ready(s, id, stream, doubt).await
+            }
+            Answer::Done(one) => one,
+        })
+    }
+
+    /// Step 1's answer, before its gate and check.
+    async fn native_answer(&self, s: &impl Steps, id: &TrackId) -> Option<Answer> {
+        Some(match s.native(id).await? {
+            Ok(stream) => match gate_left(&stream) {
+                Some(gate) if gate > MAX_GATE_WAIT => {
+                    // yt-dlp's request may come with shorter ads, or none.
+                    self.fall_back(id, too_long(gate));
+                    Answer::Done(One::Next)
                 }
+                Some(gate) => {
+                    log::info!("resolve {} [native] {}", id.0, opens_in(gate));
+                    Answer::Gated(stream)
+                }
+                None => Answer::Now(stream),
             },
             Err(e) => {
                 if let Some(m) = age_check(&e) {
                     let e = ResolveError::Unavailable(m.to_string());
                     log::info!("{}", stage_failed(id, Stage::Native, &e));
-                    return Some(One::Ends(e));
+                    return Some(Answer::Done(One::Ends(e)));
                 }
                 if matches!(e, NativeError::NoUrl(_)) {
                     self.native_refused(id);
                 }
                 self.fall_back(id, e.to_string());
                 // The client refused the video: yt-dlp's embedded run would too.
-                if matches!(e, NativeError::Skip(_)) {
+                Answer::Done(if matches!(e, NativeError::Skip(_)) {
                     One::NotEmbeddable
                 } else {
                     One::Next
-                }
+                })
             }
         })
     }
 
+    /// Step 1's URL once its gate has passed and, if it had one or URLs are in doubt, its
+    /// first byte plays. A refusal starts the doubt over; the native step's embed page is
+    /// kept then (URLs from one page were refused and played in turn).
+    async fn native_ready(
+        &self,
+        s: &impl Steps,
+        id: &TrackId,
+        stream: ResolvedStream,
+        doubt: bool,
+    ) -> One {
+        let gated = wait_gate(&stream).await;
+        if !doubt && !gated {
+            return One::Plays(stream);
+        }
+        match Self::opened(s, &stream.url, gated).await {
+            Check::Plays | Check::Unknown => One::Plays(stream),
+            Check::Refused => {
+                self.doubt();
+                self.native_refused(id);
+                self.fall_back(id, "its URL was refused (HTTP 403) at its check".into());
+                One::Next
+            }
+        }
+    }
+
     /// Step 2.
     async fn embedded_step(&self, s: &impl Steps, id: &TrackId, doubt: bool) -> Two {
+        let answer = self.embedded_answer(s, id).await;
+        self.embedded_ready(s, answer, doubt).await
+    }
+
+    /// Step 2's answer, before its gate and check.
+    async fn embedded_answer(
+        &self,
+        s: &impl Steps,
+        id: &TrackId,
+    ) -> Result<ResolvedStream, ResolveError> {
         let t = Instant::now();
         let answer = s.embedded(id).await;
-        if answer.is_ok() {
-            // Its time varies (3-8 s on 2026-11-06); the log tells which part was slow.
-            log::info!("{}", stage_took(id, Stage::Embedded, t.elapsed()));
+        if let Ok(stream) = &answer {
+            // Its time varies (2.5-8 s on 2026-11-07, the gate apart); the log tells which
+            // part was slow.
+            let took = stage_took(id, Stage::Embedded, t.elapsed(), gate_left(stream));
+            log::info!("{took}");
         }
-        match answer {
-            Ok(stream) if !doubt => Two::Plays(stream),
-            Ok(stream) => match s.check(&stream.url).await {
-                Check::Plays | Check::Unknown => Two::Plays(stream),
-                Check::Refused => Two::Refused,
-            },
-            Err(e) => Two::Failed(e),
+        answer
+    }
+
+    /// Step 2's URL once its gate has passed and, if it had one or URLs are in doubt, its
+    /// first byte plays. A gate past `MAX_GATE_WAIT` leaves the resolve to step 3.
+    async fn embedded_ready(
+        &self,
+        s: &impl Steps,
+        answer: Result<ResolvedStream, ResolveError>,
+        doubt: bool,
+    ) -> Two {
+        let stream = match answer {
+            Ok(stream) => stream,
+            Err(e) => return Two::Failed(e),
+        };
+        if let Some(gate) = gate_left(&stream).filter(|g| *g > MAX_GATE_WAIT) {
+            return Two::Failed(ResolveError::Unavailable(too_long(gate)));
+        }
+        let gated = wait_gate(&stream).await;
+        if !doubt && !gated {
+            return Two::Plays(stream);
+        }
+        match Self::opened(s, &stream.url, gated).await {
+            Check::Plays | Check::Unknown => Two::Plays(stream),
+            Check::Refused => Two::Refused,
         }
     }
 
@@ -402,16 +533,49 @@ impl Chain {
         }
     }
 
-    /// For a resolve ahead, its turn at yt-dlp (`ahead`): held until the resolve ends. A
-    /// resolve the player waits for, or one it asked for while this waited, goes at once.
-    async fn turn(&self, ahead: Option<&Notify>) -> Option<SemaphorePermit<'_>> {
-        let urgent = ahead?;
+    /// For a resolve ahead, its turn at yt-dlp (`ahead`), for one yt-dlp run. A resolve the
+    /// player waits for, or one it asked for while this waited, goes at once (and so do its
+    /// later runs: `ahead` is cleared).
+    async fn turn(&self, ahead: &mut Option<&Notify>) -> Option<SemaphorePermit<'_>> {
+        let urgent = (*ahead)?;
         tokio::select! {
             biased;
-            () = urgent.notified() => None,
+            () = urgent.notified() => {
+                *ahead = None;
+                None
+            }
             permit = self.ahead.acquire() => permit.ok(),
         }
     }
+}
+
+/// Step 1's answer (`Chain::native_answer`).
+enum Answer {
+    /// A URL that opens at once.
+    Now(ResolvedStream),
+    /// A URL refused until its `available_at` (ads before the song).
+    Gated(ResolvedStream),
+    Done(One),
+}
+
+/// How long `stream`'s URL stays refused (`available_at`), if it does.
+fn gate_left(stream: &ResolvedStream) -> Option<Duration> {
+    let at = stream.available_at?;
+    at.duration_since(SystemTime::now())
+        .ok()
+        .filter(|d| !d.is_zero())
+}
+
+/// Waits until `stream`'s URL opens (its `available_at` and `GATE_MARGIN`, at most
+/// `MAX_GATE_WAIT`); true when it had to. The TV clients' URLs wait for a pre-roll ad, and
+/// since 2026-11-05 the embedded client's often wait 5 s for one: yt-dlp's own downloader
+/// waits too.
+async fn wait_gate(stream: &ResolvedStream) -> bool {
+    let Some(left) = gate_left(stream) else {
+        return false;
+    };
+    tokio::time::sleep((left + GATE_MARGIN).min(MAX_GATE_WAIT)).await;
+    true
 }
 
 /// The embedded client refused the video for its age check. yt-dlp's other clients ask
@@ -452,14 +616,30 @@ fn stage_failed(id: &TrackId, stage: Stage, e: &ResolveError) -> String {
     format!("resolve {} [{}] failed: {e}", id.0, stage.name())
 }
 
-/// The log line for a yt-dlp step that gave a URL.
-fn stage_took(id: &TrackId, stage: Stage, took: Duration) -> String {
-    format!(
+/// The log line for a yt-dlp step that gave a URL, opening `gate` later.
+fn stage_took(id: &TrackId, stage: Stage, took: Duration, gate: Option<Duration>) -> String {
+    let line = format!(
         "resolve {} [{}] answered in {:.1}s",
         id.0,
         stage.name(),
         took.as_secs_f64()
+    );
+    match gate {
+        Some(gate) => format!("{line}, {}", opens_in(gate)),
+        None => line,
+    }
+}
+
+fn opens_in(gate: Duration) -> String {
+    format!(
+        "its URL opens in {:.1}s (ads before the song)",
+        gate.as_secs_f64()
     )
+}
+
+/// Why a URL whose gate is past `MAX_GATE_WAIT` isn't waited for.
+fn too_long(gate: Duration) -> String {
+    format!("{}, too long a wait", opens_in(gate))
 }
 
 #[cfg(test)]
@@ -505,6 +685,8 @@ mod tests {
         default: Mutex<VecDeque<Result<ResolvedStream, ResolveError>>>,
         checks: Mutex<VecDeque<Check>>,
         calls: Mutex<Vec<&'static str>>,
+        /// When each check was made (tokio's clock, paused in the gate tests).
+        checked_at: Mutex<Vec<tokio::time::Instant>>,
         no_native: bool,
         /// The next native step answers only once the other steps have had a turn.
         native_later: std::sync::atomic::AtomicBool,
@@ -519,8 +701,23 @@ mod tests {
             self.native.lock().unwrap().push_back(None);
             self
         }
+        /// A native URL refused for `secs` (ads before the song).
+        fn native_gated(self, url: &str, secs: u64) -> Self {
+            self.native
+                .lock()
+                .unwrap()
+                .push_back(Some(Ok(gated_stream(url, secs))));
+            self
+        }
         fn embedded(self, r: Result<&str, ResolveError>) -> Self {
             self.embedded.lock().unwrap().push_back(Some(r.map(stream)));
+            self
+        }
+        fn embedded_gated(self, url: &str, secs: u64) -> Self {
+            self.embedded
+                .lock()
+                .unwrap()
+                .push_back(Some(Ok(gated_stream(url, secs))));
             self
         }
         fn embedded_hangs(self) -> Self {
@@ -578,8 +775,27 @@ mod tests {
             true
         }
         async fn check(&self, _: &str) -> Check {
+            self.checked_at
+                .lock()
+                .unwrap()
+                .push(tokio::time::Instant::now());
             self.next("check", &self.checks)
         }
+    }
+
+    fn gated_stream(url: &str, secs: u64) -> ResolvedStream {
+        ResolvedStream {
+            available_at: Some(SystemTime::now() + Duration::from_secs(secs)),
+            ..stream(url)
+        }
+    }
+
+    /// `within`, for the tests on tokio's paused clock: gates of a few seconds pass at once,
+    /// and a resolve that never ends fails the test at once too.
+    async fn within_gates<F: Future>(f: F) -> F::Output {
+        timeout(Duration::from_secs(60), f)
+            .await
+            .expect("the resolve didn't end")
     }
 
     /// `f`'s answer, or a failed test after a few seconds: some steps never answer, and a
@@ -998,6 +1214,205 @@ mod tests {
             .check(Check::Plays);
         assert_eq!(url(within(chain.resolve(&s, &id())).await), EMBEDDED_URL);
         assert_eq!(s.calls(), ["native", "embedded", "check"]);
+    }
+
+    /// Since 2026-11-05 the embedded client often answers with ads before the song: its
+    /// URL is refused for the 5 s before the ad could be skipped, then plays (seen live,
+    /// yt-dlp's URLs alike). Nobody waits for a resolve ahead: it waits the gate out, with
+    /// no yt-dlp run (those URLs were "refused at their check", then resolved by yt-dlp).
+    /// Once open, its first byte is asked for: the engine takes a 403 there as final.
+    #[tokio::test(start_paused = true)]
+    async fn a_resolve_ahead_waits_out_a_gated_native_url_with_no_yt_dlp() {
+        let chain = Chain::default();
+        let s = Script::default()
+            .native_gated(NATIVE_URL, 5)
+            .check(Check::Plays);
+        let (urgent, song, t) = (Notify::new(), id(), tokio::time::Instant::now());
+        let ahead = chain.resolve_ahead(&s, &song, &urgent);
+        assert_eq!(url(within_gates(ahead).await), NATIVE_URL);
+        assert!(t.elapsed() >= Duration::from_secs(5), "{:?}", t.elapsed());
+        assert_eq!(s.calls(), ["native", "check"]);
+        let checked = s.checked_at.lock().unwrap()[0];
+        assert!(checked - t >= Duration::from_secs(5), "{:?}", checked - t);
+        assert_eq!(chain.take_fallback_reason(&id()), None);
+    }
+
+    /// The gate is only known to the second: a check refused just as it should open is
+    /// asked once more a second later, before the song counts as refused.
+    #[tokio::test(start_paused = true)]
+    async fn a_gated_url_refused_once_open_is_asked_again_a_second_later() {
+        let chain = Chain::default();
+        let s = Script::default()
+            .native_gated(NATIVE_URL, 5)
+            .check(Check::Refused)
+            .check(Check::Plays);
+        let (urgent, song) = (Notify::new(), id());
+        let ahead = chain.resolve_ahead(&s, &song, &urgent);
+        assert_eq!(url(within_gates(ahead).await), NATIVE_URL);
+        assert_eq!(s.calls(), ["native", "check", "check"]);
+        let at = s.checked_at.lock().unwrap().clone();
+        assert!(at[1] - at[0] >= GATE_RECHECK, "{:?}", at[1] - at[0]);
+        assert!(!chain.skips_native(&song), "not refused");
+    }
+
+    /// Ads past `MAX_GATE_WAIT` (two unskippable ones, say) aren't waited for: yt-dlp's
+    /// request may come with shorter ones, or none.
+    #[tokio::test(start_paused = true)]
+    async fn a_gate_too_long_to_wait_goes_on_to_yt_dlp() {
+        let chain = Chain::default();
+        let s = Script::default()
+            .native_gated(NATIVE_URL, 30)
+            .embedded(Ok(EMBEDDED_URL));
+        let (urgent, song) = (Notify::new(), id());
+        let ahead = chain.resolve_ahead(&s, &song, &urgent);
+        assert_eq!(url(within_gates(ahead).await), EMBEDDED_URL);
+        assert_eq!(s.calls(), ["native", "embedded"]);
+        let why = chain.take_fallback_reason(&song).expect("a reason");
+        assert!(why.contains("too long"), "{why}");
+        assert!(!chain.skips_native(&song), "not refused");
+    }
+
+    /// The TV clients' URLs wait for their ad too; the wait moved from the yt-dlp step
+    /// into the chain.
+    #[tokio::test(start_paused = true)]
+    async fn a_gated_tv_url_is_waited_out() {
+        let chain = Chain::default();
+        let s = Script {
+            no_native: true,
+            ..Script::default()
+        }
+        .embedded(Err(failed("ERROR: Requested format is not available")))
+        .default_clients(Ok(TV_URL));
+        s.default.lock().unwrap()[0].as_mut().unwrap().available_at =
+            Some(SystemTime::now() + Duration::from_secs(6));
+        let t = tokio::time::Instant::now();
+        assert_eq!(url(within_gates(chain.resolve(&s, &id())).await), TV_URL);
+        assert!(t.elapsed() >= Duration::from_secs(6), "{:?}", t.elapsed());
+    }
+
+    /// A hovered row is clicked while its URL's gate runs (a hover comes 0.1-1 s before
+    /// the click): from then on yt-dlp runs beside the rest of the wait.
+    #[tokio::test(start_paused = true)]
+    async fn a_resolve_ahead_the_player_asks_for_during_its_gate_runs_yt_dlp_beside_it() {
+        let chain = Chain::default();
+        let s = Script::default()
+            .native_gated(NATIVE_URL, 5)
+            .embedded(Ok(EMBEDDED_URL));
+        let (urgent, song, t) = (Notify::new(), id(), tokio::time::Instant::now());
+        let ahead = chain.resolve_ahead(&s, &song, &urgent);
+        tokio::pin!(ahead);
+        assert!(
+            timeout(Duration::from_secs(1), &mut ahead).await.is_err(),
+            "waits the gate"
+        );
+        assert_eq!(s.calls(), ["native"]);
+        urgent.notify_one();
+        assert_eq!(url(within_gates(ahead).await), EMBEDDED_URL);
+        assert!(t.elapsed() < Duration::from_secs(2), "{:?}", t.elapsed());
+        assert_eq!(s.calls(), ["embedded"]);
+    }
+
+    /// The player waits: yt-dlp's request may have come without an ad (2.5 s instead of
+    /// the gate's ~6 s), so it runs beside the gate and the first URL that opens wins.
+    #[tokio::test(start_paused = true)]
+    async fn the_players_resolve_takes_yt_dlps_url_when_it_opens_before_a_gated_native_one() {
+        let chain = Chain::default();
+        let s = Script::default()
+            .native_gated(NATIVE_URL, 5)
+            .embedded(Ok(EMBEDDED_URL));
+        let t = tokio::time::Instant::now();
+        assert_eq!(
+            url(within_gates(chain.resolve(&s, &id())).await),
+            EMBEDDED_URL
+        );
+        assert!(t.elapsed() < Duration::from_secs(1), "{:?}", t.elapsed());
+        assert_eq!(s.calls(), ["native", "embedded"], "no check outside doubt");
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn the_players_resolve_keeps_a_gated_native_url_that_opens_first() {
+        let chain = Chain::default();
+        let s = Script::default()
+            .native_gated(NATIVE_URL, 5)
+            .embedded_gated(EMBEDDED_URL, 10)
+            .check(Check::Plays);
+        let t = tokio::time::Instant::now();
+        assert_eq!(
+            url(within_gates(chain.resolve(&s, &id())).await),
+            NATIVE_URL
+        );
+        let took = t.elapsed();
+        assert!(
+            took >= Duration::from_secs(5) && took < Duration::from_secs(10),
+            "{took:?}"
+        );
+    }
+
+    /// In doubt, a gated URL is checked once it has opened, not before (it would be
+    /// refused then, and the song sent to yt-dlp for half an hour).
+    #[tokio::test(start_paused = true)]
+    async fn in_doubt_a_gated_url_is_checked_once_its_gate_has_passed() {
+        let chain = Chain::default();
+        chain.refused(&other(), NATIVE_URL);
+        let s = Script::default()
+            .native_gated(NATIVE_URL, 5)
+            .check(Check::Plays);
+        let (urgent, song, t) = (Notify::new(), id(), tokio::time::Instant::now());
+        let ahead = chain.resolve_ahead(&s, &song, &urgent);
+        assert_eq!(url(within_gates(ahead).await), NATIVE_URL);
+        assert_eq!(s.calls(), ["native", "check"]);
+        let checked = s.checked_at.lock().unwrap()[0];
+        assert!(checked - t >= Duration::from_secs(5), "{:?}", checked - t);
+    }
+
+    /// Resolves ahead take turns at yt-dlp, not at waiting for a gate: the next one's
+    /// yt-dlp run starts while the first one's URL is still closed.
+    #[tokio::test(start_paused = true)]
+    async fn a_gates_wait_is_not_part_of_a_resolve_aheads_turn_at_yt_dlp() {
+        let chain = Chain::default();
+        let fail = || Err(NativeError::Failed("player API answered 500".into()));
+        let s = Script::default()
+            .native(fail())
+            .embedded_gated(EMBEDDED_URL, 5)
+            .native(fail())
+            .embedded(Ok(EMBEDDED_URL))
+            .check(Check::Plays);
+        let (first_urgent, second_urgent) = (Notify::new(), Notify::new());
+        let (first_song, second_song) = (id(), other());
+        let t = tokio::time::Instant::now();
+        let ended = |r: Result<ResolvedStream, ResolveError>| (url(r), t.elapsed());
+        let (first, second) = within_gates(async {
+            tokio::join!(
+                async { ended(chain.resolve_ahead(&s, &first_song, &first_urgent).await) },
+                async { ended(chain.resolve_ahead(&s, &second_song, &second_urgent).await) },
+            )
+        })
+        .await;
+        assert!(first.1 >= Duration::from_secs(5), "{:?}", first.1);
+        assert!(second.1 < Duration::from_secs(1), "{:?}", second.1);
+    }
+
+    #[test]
+    fn a_gated_url_says_when_it_opens() {
+        let id = TrackId("x".into());
+        let line = stage_took(
+            &id,
+            Stage::Embedded,
+            Duration::from_millis(2_540),
+            Some(Duration::from_millis(5_620)),
+        );
+        assert_eq!(
+            line,
+            "resolve x [embedded] answered in 2.5s, its URL opens in 5.6s (ads before the song)"
+        );
+        assert_eq!(
+            stage_took(&id, Stage::Embedded, Duration::from_millis(2_540), None),
+            "resolve x [embedded] answered in 2.5s"
+        );
+        assert_eq!(
+            too_long(Duration::from_secs(30)),
+            "its URL opens in 30.0s (ads before the song), too long a wait"
+        );
     }
 
     /// yt-dlp can't pass an age check without cookies either ("Sign in to confirm your

@@ -64,7 +64,8 @@ const GATE_RETRIES: [Duration; 3] = [
     Duration::from_millis(1000),
 ];
 
-/// The `c=` of the embedded player's URLs, which have no ad gate: a 403 there is final.
+/// The `c=` of the embedded player's URLs: a 403 there is final. The resolver hands one
+/// over at once, or, when it had an ad gate, once a check found it open.
 const UNGATED_CLIENT: &str = "c=WEB_EMBEDDED_PLAYER";
 
 /// The first chunk of a stream. A 403 is tried again a few times (see `GATE_RETRIES`)

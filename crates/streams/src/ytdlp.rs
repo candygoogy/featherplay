@@ -16,12 +16,6 @@ use crate::{
 };
 
 const RESOLVE_TIMEOUT: Duration = Duration::from_secs(45);
-/// `available_at` has 1 s resolution and is set by YouTube's clock, so wait a little past it.
-/// The audio engine tries a 403 on a stream's first request again for ~1.75 s, so a URL
-/// that opens a little later than this still plays.
-const GATE_MARGIN: Duration = Duration::from_millis(200);
-/// The gate is the length of a pre-roll ad (~6 s seen). Never wait longer than this.
-const MAX_GATE_WAIT: Duration = Duration::from_secs(20);
 
 /// Reads the `-J` output of `yt-dlp -f 251/140` (or `-f 140`): yt-dlp copies the selected
 /// format's fields to the top level. Format 251 is Opus in WebM, which the `opus-decoder`
@@ -123,10 +117,11 @@ pub fn classify_failure(code: i32, stderr: &str) -> ResolveError {
     }
 }
 
-/// The embedded player's client: no PO token, and no pre-roll ad gate, so its URL plays at
-/// once (Oct 2026). Only for videos that allow embedding. The webpage and the `next` call
-/// are skipped (the title and tags come from the player response), and so are the HLS
-/// manifests: ~2.5 s in all instead of ~4 s plus the ~5 s gate of the TV clients.
+/// The embedded player's client: no PO token, and its URL plays at once unless the answer
+/// had ads before the song (often since 2026-11-05: then 5 s later, which the chain waits
+/// out). Only for videos that allow embedding. The webpage and the `next` call are skipped
+/// (the title and tags come from the player response), and so are the HLS manifests:
+/// ~2.5 s in all instead of ~4 s plus the ~5 s gate of the TV clients.
 const EMBEDDED_ARGS: &str =
     "youtube:player_client=web_embedded;player_skip=webpage,initial_data;skip=hls";
 /// Resolves streams, without cookies unless a cookie header is given (cookies made
@@ -454,18 +449,13 @@ impl Steps for Live<'_> {
     }
 
     async fn embedded(&self, id: &TrackId) -> Result<ResolvedStream, ResolveError> {
-        let stream = self
-            .r
+        self.r
             .run(id, self.cookies, Some(EMBEDDED_ARGS), self.quality)
-            .await?;
-        wait_until_available(&stream).await;
-        Ok(stream)
+            .await
     }
 
     async fn default_clients(&self, id: &TrackId) -> Result<ResolvedStream, ResolveError> {
-        let stream = self.r.run(id, self.cookies, None, self.quality).await?;
-        wait_until_available(&stream).await;
-        Ok(stream)
+        self.r.run(id, self.cookies, None, self.quality).await
     }
 
     async fn update(&self) -> bool {
@@ -526,16 +516,6 @@ pub enum Probe<'a> {
     Default,
     /// yt-dlp with these `--extractor-args`, such as `youtube:player_client=tv`.
     Args(&'a str),
-}
-
-/// The TV clients (the only ones that work without a PO token) gate the URL behind a pre-roll ad:
-/// it returns 403 until `available_at`. yt-dlp's own downloader waits for it too.
-async fn wait_until_available(s: &ResolvedStream) {
-    if let Some(at) = s.available_at
-        && let Ok(left) = (at + GATE_MARGIN).duration_since(SystemTime::now())
-    {
-        tokio::time::sleep(left.min(MAX_GATE_WAIT)).await;
-    }
 }
 
 /// A Netscape cookie file for yt-dlp's `--cookies`: plaintext, so it lives only for one

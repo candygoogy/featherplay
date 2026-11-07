@@ -130,6 +130,9 @@ pub(crate) struct Pending {
     pub duration: Option<Duration>,
     pub video_title: Option<String>,
     pub first_tag: Option<String>,
+    /// How long the URL is refused for (HTTP 403) after the answer: the ads before the
+    /// song, until each could be skipped.
+    pub gate: Option<Duration>,
 }
 
 pub(crate) struct NativeResolver {
@@ -276,6 +279,8 @@ impl Inner {
                 return Err(e);
             }
         };
+        // A gate counts from the answer, not from the solved challenges.
+        let answered = SystemTime::now();
         let pending = parse_player_response(&body, video, quality.itags()).inspect_err(|e| {
             if matches!(e, NativeError::Failed(_) | NativeError::NoUrl(_)) {
                 self.forget.store(true, Ordering::Relaxed);
@@ -295,7 +300,7 @@ impl Inner {
                 }
             }
         };
-        finish(pending, &answers, SystemTime::now())
+        finish(pending, &answers, answered)
     }
 
     /// The config and player to use: in memory, else on disk, else fetched.
@@ -603,16 +608,7 @@ pub(crate) fn parse_player_response(
     if v["videoDetails"]["videoId"].as_str() != Some(video) {
         return Err(failed("the answer is for another video"));
     }
-    let preroll = v["adPlacements"].as_array().is_some_and(|a| {
-        a.iter().any(|p| {
-            p["adPlacementRenderer"]["config"]["adPlacementConfig"]["kind"]
-                == "AD_PLACEMENT_KIND_START"
-        })
-    });
-    if preroll {
-        // The URL would wait for the ad; yt-dlp knows how long.
-        return Err(failed("a pre-roll ad"));
-    }
+    let gate = preroll_gate(&v)?;
     let formats = v["streamingData"]["adaptiveFormats"]
         .as_array()
         .map_or(&[][..], Vec::as_slice);
@@ -678,7 +674,67 @@ pub(crate) fn parse_player_response(
             .or_else(|| num(&f["approxDurationMs"]).map(Duration::from_millis)),
         video_title: text(&d["title"]),
         first_tag: text(&d["keywords"][0]),
+        gate,
     })
+}
+
+/// How long the URL of an answer with ads before the song is refused: each ad until it
+/// could be skipped, else its length, added up (as yt-dlp reads them). The embedded client
+/// sends them as `adSlots` since 2026-11-05; `adPlacements` is the older form. An ad before
+/// the song whose length isn't given is an error: yt-dlp gets the resolve.
+fn preroll_gate(v: &Value) -> Result<Option<Duration>, NativeError> {
+    let mut ads: Vec<&Value> = Vec::new();
+    let mut unreadable = false;
+    for p in v["adPlacements"].as_array().into_iter().flatten() {
+        let p = &p["adPlacementRenderer"];
+        if p["config"]["adPlacementConfig"]["kind"] == "AD_PLACEMENT_KIND_START" {
+            let ad = &p["renderer"]["instreamVideoAdRenderer"];
+            if ad.is_object() {
+                ads.push(ad);
+            } else {
+                unreadable = true;
+            }
+        }
+    }
+    for s in v["adSlots"].as_array().into_iter().flatten() {
+        let s = &s["adSlotRenderer"];
+        if s["adSlotMetadata"]["triggerEvent"] != "SLOT_TRIGGER_EVENT_BEFORE_CONTENT" {
+            continue;
+        }
+        let content = &s["fulfillmentContent"]["fulfilledLayout"]["playerBytesAdLayoutRenderer"]["renderingContent"];
+        let pod = content["playerBytesSequentialLayoutRenderer"]["sequentialLayouts"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .map(|l| &l["playerBytesAdLayoutRenderer"]["renderingContent"]);
+        let before = ads.len();
+        ads.extend(
+            std::iter::once(content)
+                .chain(pod)
+                .map(|c| &c["instreamVideoAdRenderer"])
+                .filter(|ad| ad.is_object()),
+        );
+        unreadable |= ads.len() == before;
+    }
+    let mut gate = Duration::ZERO;
+    for ad in ads {
+        let skip = ad["skipOffsetMilliseconds"].as_f64().map(|ms| ms / 1000.0);
+        let length = ad["playerVars"]
+            .as_str()
+            .and_then(|q| form_value(q, "length_seconds"))
+            .and_then(|s| s.parse::<f64>().ok());
+        match skip
+            .or(length)
+            .and_then(|s| Duration::try_from_secs_f64(s).ok())
+        {
+            Some(wait) => gate = gate.saturating_add(wait),
+            None => unreadable = true,
+        }
+    }
+    if unreadable {
+        return Err(failed("an ad before the song, of unknown length"));
+    }
+    Ok((!gate.is_zero()).then_some(gate))
 }
 
 fn text(v: &Value) -> Option<String> {
@@ -710,6 +766,12 @@ pub(crate) fn finish(
         let answer = a.sig.get(s).ok_or_else(|| failed("no answer for sig"))?;
         url = with_param(&url, sp, answer);
     }
+    // Counted from the next whole second, as yt-dlp does (its URLs played so, 2026-11-07).
+    let available_at = p.gate.map(|gate| {
+        let since = now.duration_since(UNIX_EPOCH).unwrap_or_default();
+        let whole = since.as_secs() + u64::from(since.subsec_nanos() > 0);
+        UNIX_EPOCH + Duration::from_secs(whole) + gate
+    });
     Ok(ResolvedStream {
         expires_at: expires_at_from_url(&url, now),
         url,
@@ -718,7 +780,7 @@ pub(crate) fn finish(
         bitrate_kbps: p.bitrate_kbps,
         content_length: p.content_length,
         duration: p.duration,
-        available_at: None,
+        available_at,
         video_title: p.video_title,
         first_tag: p.first_tag,
     })
@@ -1328,7 +1390,64 @@ _result.sig = (s) => s.slice(2).split("").reverse().join("");"#;
             r#"{"adPlacements":[{"adPlacementRenderer":{"config":{"adPlacementConfig":{"kind":"AD_PLACEMENT_KIND_START"}}}}],"#,
             1,
         );
-        assert!(fail(&preroll), "a gated URL is left to yt-dlp");
+        assert!(
+            fail(&preroll),
+            "a pre-roll of unknown length is left to yt-dlp"
+        );
+    }
+
+    /// `PLAYER` with `ads` (a JSON member) in front.
+    fn with_ads(ads: &str) -> String {
+        PLAYER.replacen('{', &format!("{{{ads},"), 1)
+    }
+
+    /// A pre-roll ad slot as the embedded client got them from 2026-11-05: the URL answers
+    /// 403 until the ad could be skipped (seen live: 403 at once, 206 after the 5 s).
+    const AD_SLOT: &str = r#""adSlots":[{"adSlotRenderer":{"adSlotMetadata":{"triggerEvent":"SLOT_TRIGGER_EVENT_BEFORE_CONTENT"},"fulfillmentContent":{"fulfilledLayout":{"playerBytesAdLayoutRenderer":{"renderingContent":{"instreamVideoAdRenderer":{"skipOffsetMilliseconds":5000,"playerVars":"length_seconds=15&x=1"}}}}}}},{"adSlotRenderer":{"adSlotMetadata":{"triggerEvent":"SLOT_TRIGGER_EVENT_LAYOUT_ID_ENTERED"}}}]"#;
+
+    #[test]
+    fn a_pre_roll_ad_slot_gates_the_url_until_it_could_be_skipped() {
+        let p = parse_player_response(&with_ads(AD_SLOT), VIDEO, Quality::High.itags()).unwrap();
+        assert_eq!(p.gate, Some(Duration::from_secs(5)));
+        let (_, s) = p.sig.clone().unwrap();
+        let answers = Answers {
+            n: HashMap::from([("tbgZJm7jUNULHGjSAEd".into(), "solved-n".into())]),
+            sig: HashMap::from([(s, "solved-sig".into())]),
+        };
+        // As yt-dlp counts it: from the next whole second.
+        let now = UNIX_EPOCH + Duration::from_millis(1_794_043_690_250);
+        let stream = finish(p, &answers, now).unwrap();
+        assert_eq!(
+            stream.available_at,
+            Some(UNIX_EPOCH + Duration::from_secs(1_794_043_696))
+        );
+    }
+
+    #[test]
+    fn an_ad_that_cant_be_skipped_gates_the_url_for_its_length() {
+        let ads = AD_SLOT.replace(r#""skipOffsetMilliseconds":5000,"#, "");
+        let p = parse_player_response(&with_ads(&ads), VIDEO, Quality::High.itags()).unwrap();
+        assert_eq!(p.gate, Some(Duration::from_secs(15)));
+    }
+
+    /// A pod of two ads before the song, and an older-style placement: the waits add up.
+    #[test]
+    fn the_waits_of_every_ad_before_the_song_add_up() {
+        let pod = r#""adSlots":[{"adSlotRenderer":{"adSlotMetadata":{"triggerEvent":"SLOT_TRIGGER_EVENT_BEFORE_CONTENT"},"fulfillmentContent":{"fulfilledLayout":{"playerBytesAdLayoutRenderer":{"renderingContent":{"playerBytesSequentialLayoutRenderer":{"sequentialLayouts":[{"playerBytesAdLayoutRenderer":{"renderingContent":{"instreamVideoAdRenderer":{"skipOffsetMilliseconds":5000}}}},{"playerBytesAdLayoutRenderer":{"renderingContent":{"instreamVideoAdRenderer":{"playerVars":"length_seconds=6"}}}}]}}}}}}}],"adPlacements":[{"adPlacementRenderer":{"config":{"adPlacementConfig":{"kind":"AD_PLACEMENT_KIND_START"}},"renderer":{"instreamVideoAdRenderer":{"skipOffsetMilliseconds":2500}}}},{"adPlacementRenderer":{"config":{"adPlacementConfig":{"kind":"AD_PLACEMENT_KIND_END"}},"renderer":{"instreamVideoAdRenderer":{"skipOffsetMilliseconds":9000}}}}]"#;
+        let p = parse_player_response(&with_ads(pod), VIDEO, Quality::High.itags()).unwrap();
+        assert_eq!(p.gate, Some(Duration::from_millis(13_500)));
+    }
+
+    #[test]
+    fn an_answer_without_ads_before_the_song_is_not_gated() {
+        let after = AD_SLOT.replace(
+            "SLOT_TRIGGER_EVENT_BEFORE_CONTENT",
+            "SLOT_TRIGGER_EVENT_LAYOUT_ID_ENTERED",
+        );
+        let p = parse_player_response(&with_ads(&after), VIDEO, Quality::High.itags()).unwrap();
+        assert_eq!(p.gate, None);
+        let p = parse_player_response(PLAYER, VIDEO, Quality::High.itags()).unwrap();
+        assert_eq!(p.gate, None);
     }
 
     #[test]
