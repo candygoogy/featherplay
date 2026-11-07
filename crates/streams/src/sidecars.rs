@@ -261,7 +261,7 @@ impl Sidecars {
                 .await
                 .map_err(|e| sidecar_err("installing yt-dlp.exe", e))?;
             // The pinned release counts as today's update: no `yt-dlp -U` right after it.
-            let _ = tokio::fs::write(self.dir.join(UPDATE_STAMP), b"").await;
+            touch(&self.dir.join(UPDATE_STAMP)).await;
         }
 
         if !self.deno().is_file() {
@@ -369,7 +369,7 @@ impl Sidecars {
                 stderr_tail: tail(&String::from_utf8_lossy(&out.stderr), 600),
             });
         }
-        let _ = tokio::fs::write(&stamp, b"").await;
+        touch(&stamp).await;
         Ok(())
     }
 
@@ -404,6 +404,16 @@ pub(crate) fn tail(s: &str, max: usize) -> String {
         start += 1;
     }
     s[start..].trim().to_string()
+}
+
+/// Marks the update stamp as made now. Its time is set, not left to the write: an empty file
+/// written over an empty one keeps its old time on Windows.
+async fn touch(stamp: &Path) {
+    let stamp = stamp.to_path_buf();
+    let _ = tokio::task::spawn_blocking(move || {
+        std::fs::File::create(&stamp)?.set_modified(SystemTime::now())
+    })
+    .await;
 }
 
 fn is_recent(stamp: &Path) -> bool {
@@ -610,6 +620,32 @@ mod tests {
         let sidecars = Sidecars { dir: dir.clone() };
         sidecars.ensure(|_, _, _| {}).await.unwrap();
         assert!(sidecars.ytdlp().is_file() && sidecars.deno().is_file());
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// The update stamp of 2026-11-03 stayed that old through the daily updates after it
+    /// (writing an empty file over an empty one leaves its time), so every start ran
+    /// `yt-dlp -U` (~10 s, beside the first resolves).
+    #[tokio::test]
+    async fn an_old_update_stamp_is_made_recent() {
+        let base =
+            std::env::var("FEATHERPLAY_HOME").expect("set FEATHERPLAY_HOME to a D: dir for tests");
+        let dir = PathBuf::from(base)
+            .join("test-streams")
+            .join(format!("stamp-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let stamp = dir.join(UPDATE_STAMP);
+        std::fs::write(&stamp, b"").unwrap();
+        let day_old = SystemTime::now() - Duration::from_secs(25 * 3600);
+        std::fs::File::options()
+            .write(true)
+            .open(&stamp)
+            .unwrap()
+            .set_modified(day_old)
+            .unwrap();
+        assert!(!is_recent(&stamp));
+        touch(&stamp).await;
+        assert!(is_recent(&stamp));
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
