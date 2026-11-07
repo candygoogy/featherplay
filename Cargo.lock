@@ -1391,6 +1391,7 @@ dependencies = [
  "discord-rich-presence",
  "featherplay-core",
  "featherplay-store",
+ "flate2",
  "getrandom 0.4.3",
  "global-hotkey",
  "http-body-util",

@@ -3,13 +3,18 @@
 //! `tri-vane-light*.svg` (the play on a crimson ring) for a light one, the same drawings as
 //! the window and taskbar icon. Every size is drawn from a vector at that size, never scaled
 //! from another: 16 px from the 16 px drawing, 20 and 24 px from the 24 px one, 32 px and up
-//! from the master. `icons::tray_icon` picks one at runtime.
+//! from the master. They're stored deflated; `icons::tray_icon` inflates them and picks one
+//! at runtime.
 #![allow(
     clippy::print_stdout,
     reason = "cargo reads a build script's instructions from its stdout"
 )]
 
+use std::io::Write;
 use std::path::Path;
+
+use flate2::Compression;
+use flate2::write::DeflateEncoder;
 
 /// Must match `icons::TRAY_SIZES`; each with the drawing it's rendered from.
 const SIZES: [(u32, &str); 7] = [
@@ -47,7 +52,14 @@ fn main() {
                 all.extend_from_slice(&[c.red(), c.green(), c.blue(), c.alpha()]);
             }
         }
-        std::fs::write(Path::new(&out).join(format!("tray-{theme}.rgba")), all)
-            .expect("write tray icon");
+        // Deflated, a tenth of the raw pixels' size in the exe.
+        let mut deflate = DeflateEncoder::new(Vec::new(), Compression::best());
+        deflate.write_all(&all).expect("deflate tray icon");
+        let deflated = deflate.finish().expect("deflate tray icon");
+        std::fs::write(
+            Path::new(&out).join(format!("tray-{theme}.rgba.deflate")),
+            deflated,
+        )
+        .expect("write tray icon");
     }
 }

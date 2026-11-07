@@ -35,6 +35,8 @@ base64 = { workspace = true, features = ["std"] }
 sha1 = { workspace = true }
 getrandom = { workspace = true }
 tray-icon = { workspace = true }
+# Inflates the tray icons, which `build.rs` deflates.
+flate2 = { workspace = true }
 # `identity`: the AppUserModelID, the Start menu shortcut (IShellLink and its property
 # store) and the HKCU registration, so the media card names the app.
 windows = { workspace = true, features = [
@@ -58,6 +60,7 @@ windows = { workspace = true, features = [
 [build-dependencies]
 # Renders the colour Tri-vane (apps/featherplay/ui/logo/tri-vane{,-light}{,-16,-24}.svg) for the tray.
 resvg = { workspace = true }
+flate2 = { workspace = true }
 
 [lints]
 workspace = true

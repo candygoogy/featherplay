@@ -1,6 +1,10 @@
 //! Small icons drawn at runtime: the thumb button glyphs and the tray icon. Shapes are
 //! given in a unit square and rasterised with 4×4 supersampling into straight-alpha RGBA.
 
+use std::io::Read;
+
+use flate2::read::DeflateDecoder;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Glyph {
     Previous,
@@ -33,14 +37,18 @@ pub fn glyph(g: Glyph, size: u32, color: Rgb) -> Vec<u8> {
 
 /// The sizes `build.rs` renders the tray icon at, in order.
 const TRAY_SIZES: [u32; 7] = [16, 20, 24, 32, 40, 48, 64];
-/// The colour Tri-vane, for a dark taskbar and (the play on a crimson ring) a light one.
-const TRAY_DARK: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/tray-dark.rgba"));
-const TRAY_LIGHT: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/tray-light.rgba"));
+/// The colour Tri-vane, for a dark taskbar and (the play on a crimson ring) a light one:
+/// every size's RGBA in turn, deflated by `build.rs` (41 KB each raw, mostly transparent).
+const TRAY_DARK: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/tray-dark.rgba.deflate"));
+const TRAY_LIGHT: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/tray-light.rgba.deflate"));
 
 /// The tray icon for a `size`-pixel slot: the smallest rendering at least that big (the
 /// largest above 64 px), as straight-alpha RGBA, and its size.
 pub fn tray_icon(size: u32, light_taskbar: bool) -> (Vec<u8>, u32) {
-    let all = if light_taskbar { TRAY_LIGHT } else { TRAY_DARK };
+    let mut all = Vec::new();
+    DeflateDecoder::new(if light_taskbar { TRAY_LIGHT } else { TRAY_DARK })
+        .read_to_end(&mut all)
+        .expect("build.rs deflates the tray icons");
     let pick = TRAY_SIZES
         .iter()
         .position(|&s| s >= size)
