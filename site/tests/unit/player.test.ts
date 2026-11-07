@@ -309,6 +309,16 @@ describe("the app's controls in the store", () => {
     p.setQueueTab("related");
     expect(p.state.queueTab).toBe("related");
   });
+  it("Now playing's side panel starts shown and keeps the visitor's choice across views", () => {
+    const p = createPlayer(songs, frames());
+    expect(p.state.sideOpen).toBe(true);
+    p.toggleSide();
+    p.show("home");
+    p.show("now");
+    expect(p.state.sideOpen).toBe(false);
+    p.toggleSide(true);
+    expect(p.state.sideOpen).toBe(true);
+  });
   it("with repeat off, the last song pauses at its end instead of starting the list again", () => {
     const p = createPlayer(songs, frames());
     const last = songs[songs.length - 1];

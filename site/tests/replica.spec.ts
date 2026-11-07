@@ -46,15 +46,57 @@ test("the lyrics view highlights the current line and clicking a line seeks to i
   await expect(r.locator("[data-bar-time]")).toHaveText("0:25");
 });
 
-test('the song without lyrics shows the calm layout ("No lyrics for this song")', async ({ page }) => {
+test('a song without lyrics keeps the cover view, and the pill says "No lyrics"', async ({ page }) => {
   await page.goto("/");
   await wake(page);
   await skipTour(page);
   const r = replica(page);
   await r.getByRole("button", { name: /^Play In This Moment/ }).first().click();
   await expect(r.locator("[data-bar-title]")).toHaveText("In This Moment");
-  await expect(r.getByText("No lyrics for this song")).toBeVisible();
+  await expect(r.locator(".lyrics-pill")).toHaveAccessibleName("No lyrics");
   await expect(r.locator("[data-lyrics]")).toBeHidden();
+  await expect(r.locator(".stage-panel")).toHaveCSS("opacity", "0");
+  await expect(r.locator("[data-np-artist]")).toHaveText("Scott Buckley");
+  await expect(r.locator("[data-np-album]")).toBeVisible();
+  // Never pressed, and no note until the visitor presses it.
+  const mic = r.locator(".bar [data-lyrics-toggle]");
+  await expect(r.locator(".lyrics-pill")).toHaveAttribute("aria-pressed", "false");
+  await expect(mic).toHaveAttribute("aria-pressed", "false");
+  await expect(r.locator("[data-lyrics-tip]")).toHaveText("No lyrics");
+  const note = r.locator("[data-no-lyrics]");
+  await expect(note).toBeHidden();
+  await r.locator(".lyrics-pill").click();
+  await expect(note).toHaveText("No lyrics for this song");
+  await expect(r.locator("[data-lyrics]")).toBeHidden();
+  // A song with lyrics: the note goes, and the lines show (the view stayed on lyrics).
+  await r.locator('[data-tab-panel="next"] [data-row="california-lullabye"]').click();
+  await expect(note).toBeHidden();
+  await expect(r.locator("[data-lyrics]")).toBeVisible();
+});
+
+test("on Now playing, Up next hides and shows the side panel, and Playing from opens it", async ({ page }) => {
+  await page.goto("/");
+  await wake(page);
+  await skipTour(page);
+  const r = replica(page);
+  const upNext = r.locator('.bar [data-act="queue"]');
+  const panel = r.locator("[data-queue]");
+  await expect(panel).toBeVisible();
+  await upNext.click();
+  await expect(panel).toBeHidden();
+  await expect(upNext).toHaveAttribute("aria-pressed", "false");
+  // Still on Now playing, the stage across the window.
+  await expect(r).toHaveAttribute("data-view", "lyrics");
+  await upNext.click();
+  await expect(panel).toBeVisible();
+  await expect(upNext).toHaveAttribute("aria-pressed", "true");
+  // Playing from opens the panel on Up next, from Related and with the panel hidden.
+  await r.getByRole("tab", { name: "Related" }).click();
+  await upNext.click();
+  await expect(panel).toBeHidden();
+  await r.getByRole("button", { name: "Playing from Made for the demo" }).click();
+  await expect(panel).toBeVisible();
+  await expect(r.getByRole("tab", { name: "Up next" })).toHaveAttribute("aria-selected", "true");
 });
 
 test("the play button pauses and plays, and time moves only while playing", async ({ page }) => {

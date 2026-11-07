@@ -514,6 +514,8 @@ export function mountTour(root: HTMLElement, player: Player): Tour | null {
     // The first song, paused where the tour began: cued, never played, so no sound loads.
     player.cue(startSong, startAt);
     player.show("lyrics");
+    // Up next beside it, for the step that picks a song from it.
+    player.toggleSide(true);
     tour.start();
     show.focus({ preventScroll: true });
   });

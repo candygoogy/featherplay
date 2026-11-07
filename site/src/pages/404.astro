@@ -131,6 +131,11 @@ import Icon from "../components/Icon.astro";
   .nf :global(.replica .app) {
     grid-template-columns: 1fr 400px;
   }
+  /* A smaller cover than the player's, so the line and the button under it clear the bar. */
+  .nf :global(.replica .np) {
+    top: 64px;
+    width: 400px;
+  }
   .nf :global(.replica .np-cover.blank) {
     aspect-ratio: 1;
   }

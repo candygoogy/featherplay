@@ -70,6 +70,7 @@ const pages: { page: View; icon: "home" | "library" | "explore" | "history"; lab
   data-lyrics-on="true"
   data-has-lyrics={String(hasLyrics)}
   data-queue-open="false"
+  data-side-open="true"
   data-queue-tab="next"
   data-song={song.id}
   data-at={positionMs}
@@ -336,8 +337,14 @@ const pages: { page: View; icon: "home" | "library" | "explore" | "history"; lab
         <button class="fp-ib back" type="button" data-act="back" aria-label="Back">
           <Icon name="back" size={20} />
         </button>
+        <!-- Where the queue comes from, centred in the header row; it opens Up next. -->
+        <button class="np-source" type="button" data-act="source">
+          <span class="src-l">Playing from</span>
+          <span class="src-t">Made for the demo<Icon name="chevronRight" size={16} /></span>
+        </button>
+        <!-- A song with no lyrics keeps the cover view, and the pill says so. -->
         <button class="lyrics-pill" type="button" data-act="lyrics" aria-pressed={String(view === "lyrics")} data-lyrics-toggle>
-          <Icon name="lyrics" size={18} /><span>Lyrics</span>
+          <Icon name="lyrics" size={18} /><span class="pill-has">Lyrics</span><span class="pill-none">No lyrics</span>
         </button>
         <div class="np">
           <img class="np-cover" data-np-cover src={song.cover} width="440" height="440" alt="" decoding="async" />
@@ -347,7 +354,7 @@ const pages: { page: View; icon: "home" | "library" | "explore" | "history"; lab
               <span class="np-actions">
                 <span class="fp-tipped nfm">
                   <button class="fp-ib" type="button" data-act="notforme" aria-label="Not for me" aria-describedby={`${id}-nfm`}>
-                    <Icon name="notForMe" size={18} />
+                    <Icon name="notForMe" size={20} />
                   </button>
                   <span class="fp-tip" id={`${id}-nfm`}>
                     <b>Not for me</b><span>Skips the song and marks it as one you dislike</span>
@@ -362,8 +369,10 @@ const pages: { page: View; icon: "home" | "library" | "explore" | "history"; lab
               </span>
             </div>
             <p class="np-artist" data-np-artist>{song.artist}</p>
-            <p class="np-from">Playing from Made for the demo</p>
-            <p class="np-note" data-no-lyrics>No lyrics for this song</p>
+            <!-- The album: each demo song is a single of its own, as in the app's demo. -->
+            <p class="np-album" data-np-album>{song.title}</p>
+            <!-- Filled only when the visitor presses "No lyrics", so a screen reader hears it. -->
+            <p class="np-note" data-no-lyrics role="status"></p>
           </div>
         </div>
         <div class="lyrics" data-lyrics>
@@ -511,8 +520,8 @@ const pages: { page: View; icon: "home" | "library" | "explore" | "history"; lab
           <span class="fp-tip row-tip" aria-hidden="true"><b data-lyrics-tip>{view === "lyrics" ? "Hide lyrics" : "Lyrics"}</b><span>Ctrl+L</span></span>
         </span>
         <span class="fp-tipped nfm">
-          <button class="fp-ib small" type="button" data-act="notforme" aria-label="Not for me" aria-describedby={`${id}-nfm-bar`}>
-            <Icon name="notForMe" size={18} />
+          <button class="fp-ib" type="button" data-act="notforme" aria-label="Not for me" aria-describedby={`${id}-nfm-bar`}>
+            <Icon name="notForMe" size={20} />
           </button>
           <span class="fp-tip" id={`${id}-nfm-bar`}><b>Not for me</b><span>Skips the song and marks it as one you dislike</span></span>
         </span>

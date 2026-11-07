@@ -156,7 +156,9 @@ function bindReplica(root: HTMLElement, player: Player) {
     repeat?: string;
     volume?: number;
     muted?: boolean;
+    lyricsKey?: string;
     queueOpen?: boolean;
+    sideOpen?: boolean;
     queueTab?: string;
     history?: string;
     likedList?: string;
@@ -230,13 +232,21 @@ function bindReplica(root: HTMLElement, player: Player) {
         player.undo();
         break;
       case "lyrics":
-        player.show(s.view === "lyrics" ? "now" : "lyrics");
+        // No lyrics for this song: a press says so under the song (the app's Lyrics tab).
+        if (s.song && s.song.lyrics.length === 0) {
+          if (!isNowView(s.view)) player.show("now");
+          setAll(root, "[data-no-lyrics]", (el) => (el.textContent = el.textContent ? "" : "No lyrics for this song"));
+        } else player.show(s.view === "lyrics" ? "now" : "lyrics");
         break;
       case "queue":
-        if (isNowView(s.view)) {
-          player.toggleQueue(true);
-          player.back();
-        } else player.toggleQueue();
+        // On Now playing it hides and shows the side panel; over a page, Up next.
+        if (isNowView(s.view)) player.toggleSide();
+        else player.toggleQueue();
+        break;
+      case "source":
+        // "Playing from": the demo's songs are a list of its own, so it opens Up next.
+        player.setQueueTab("next");
+        player.toggleSide(true);
         break;
       case "minimise":
         player.minimise();
@@ -367,8 +377,6 @@ function bindReplica(root: HTMLElement, player: Player) {
           ? el.setAttribute("aria-current", "page")
           : el.removeAttribute("aria-current"),
       );
-      setAll(root, "[data-lyrics-toggle]", (el) => el.setAttribute("aria-pressed", String(s.view === "lyrics")));
-      setAll(root, "[data-lyrics-tip]", (el) => (el.textContent = s.view === "lyrics" ? "Hide lyrics" : "Lyrics"));
       keepFocus(browse ? ".side-item" : ".back");
       last.line = undefined; // re-glide once the lines are laid out again
       last.queueOpen = undefined;
@@ -376,6 +384,19 @@ function bindReplica(root: HTMLElement, player: Player) {
       if (fromCover && npCover) glideFrom(npCover, fromCover, 300);
       if (fromText && npText) glideFrom(npText, fromText, 300);
     }
+
+    // The lyrics toggles: pressed while the lyrics show. A song without lyrics keeps the cover
+    // view and the toggles say "No lyrics", never pressed; the note under the song is only for
+    // a press on them, and goes with the song.
+    const hasLyrics = !!song && song.lyrics.length > 0;
+    const lyricsKey = `${s.view}|${hasLyrics}`;
+    if (lyricsKey !== last.lyricsKey) {
+      const showing = s.view === "lyrics" && hasLyrics;
+      setAll(root, "[data-lyrics-toggle]", (el) => el.setAttribute("aria-pressed", String(showing)));
+      setAll(root, "[data-lyrics-tip]", (el) => (el.textContent = !hasLyrics ? "No lyrics" : showing ? "Hide lyrics" : "Lyrics"));
+      last.lyricsKey = lyricsKey;
+    }
+    if (songChanged) setAll(root, "[data-no-lyrics]", (el) => (el.textContent = ""));
 
     if (s.lyricsOn !== last.lyricsOn) root.dataset.lyricsOn = String(s.lyricsOn);
 
@@ -394,7 +415,9 @@ function bindReplica(root: HTMLElement, player: Player) {
       for (const img of $$<HTMLImageElement>(root, "[data-bar-cover], [data-np-cover], [data-resume-cover]")) {
         img.src = song.cover;
       }
-      setAll(root, "[data-bar-title], [data-np-title], [data-resume-title]", (el) => (el.textContent = song.title));
+      // Each demo song is a single of its own (as in the app's demo fixtures), so the album
+      // line under the artist is its title.
+      setAll(root, "[data-bar-title], [data-np-title], [data-resume-title], [data-np-album]", (el) => (el.textContent = song.title));
       setAll(root, "[data-bar-artist], [data-np-artist], [data-resume-artist]", (el) => (el.textContent = song.artist));
       setAll(root, "[data-bar-duration]", (el) => (el.textContent = formatTime(song.durationMs)));
       setAll(root, "[data-similar]", (el) => (el.textContent = `Similar to ${song.title}`));
@@ -487,12 +510,14 @@ function bindReplica(root: HTMLElement, player: Player) {
       last.muted = s.muted;
     }
 
-    if (s.queueOpen !== last.queueOpen) {
+    if (s.queueOpen !== last.queueOpen || s.sideOpen !== last.sideOpen) {
       root.dataset.queueOpen = String(s.queueOpen);
-      const shown = isNowView(s.view) || s.queueOpen;
+      root.dataset.sideOpen = String(s.sideOpen);
+      const shown = isNowView(s.view) ? s.sideOpen : s.queueOpen;
       setAll(root, "[data-queue]", (el) => (el.hidden = !shown));
       setAll(root, '[data-act="queue"]', (el) => el.setAttribute("aria-pressed", String(shown)));
       last.queueOpen = s.queueOpen;
+      last.sideOpen = s.sideOpen;
     }
     if (s.queueTab !== last.queueTab) {
       root.dataset.queueTab = s.queueTab;

@@ -164,6 +164,10 @@
   &:is([data-view="now"], [data-view="lyrics"]) .app {
     grid-template-columns: 1fr 400px;
   }
+  /* The bar's Up next button hides Now playing's side panel: the stage takes the width. */
+  &:is([data-view="now"], [data-view="lyrics"])[data-side-open="false"] .app {
+    grid-template-columns: 1fr;
+  }
   .main {
     position: relative;
     min-width: 0;
@@ -674,14 +678,14 @@
       opacity calc(var(--t-lyrics) / 2) var(--ease-in-out) calc(var(--t-lyrics) / 2),
       background-color var(--t-colour) ease;
   }
-  &[data-view="lyrics"] .stage-panel {
+  /* Only with lines to show: a song with none keeps the cover view. */
+  &[data-view="lyrics"][data-has-lyrics="true"] .stage-panel {
     opacity: 1;
     transition:
       opacity calc(var(--t-lyrics) / 2) var(--ease-in-out),
       background-color var(--t-colour) ease;
   }
-  &[data-view="lyrics"][data-has-lyrics="true"] .stage,
-  &[data-view="lyrics"] .stage {
+  &[data-view="lyrics"][data-has-lyrics="true"] .stage {
     color: #fff;
   }
   .back {
@@ -691,11 +695,58 @@
     left: 24px;
     color: currentColor;
   }
-  &[data-view="lyrics"] .back:hover {
+  &[data-view="lyrics"][data-has-lyrics="true"] :is(.back, .np-source):hover {
     background: #ffffff1f;
   }
-  &[data-view="lyrics"] .back:active {
+  &[data-view="lyrics"][data-has-lyrics="true"] :is(.back, .np-source):active {
     background: #ffffff33;
+  }
+  /* "Playing from" and the list's name, centred in the header row (now_playing.slint,
+     SourceButton): the label in t-meta, the name in 600 with a chevron, 44 px tall. */
+  .np-source {
+    position: absolute;
+    z-index: 2;
+    top: 14px;
+    left: 50%;
+    display: grid;
+    justify-items: center;
+    align-content: center;
+    height: 44px;
+    padding: 0 12px;
+    border-radius: 10px;
+    translate: -50% 0;
+    transition:
+      background-color var(--t-hover) ease,
+      scale var(--t-release) var(--spring-release);
+  }
+  .np-source:hover {
+    background: var(--hover);
+  }
+  .np-source:active {
+    background: var(--pressed);
+    scale: var(--press-scale);
+    transition:
+      background-color var(--t-hover) ease,
+      scale var(--t-press) var(--ease-out);
+  }
+  .src-l {
+    color: var(--text2);
+    font-size: 12px;
+    line-height: 16px;
+  }
+  .src-t {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    font-weight: 600;
+    line-height: 19px;
+    white-space: nowrap;
+  }
+  .src-t svg {
+    color: var(--text2);
+  }
+  &[data-view="lyrics"][data-has-lyrics="true"] :is(.src-l, .src-t svg) {
+    color: #ffffffd9; /* the credit's ink under the lines */
   }
   /* The Lyrics pill: tonal in the cover view; on the panel, solid white with the panel's
      colour for its ink. */
@@ -728,15 +779,26 @@
       background-color var(--t-hover) ease,
       transform var(--t-press) var(--ease-out);
   }
-  .lyrics-pill[aria-pressed="true"] {
+  &[data-has-lyrics="true"] .lyrics-pill[aria-pressed="true"] {
     background: #fff;
     color: var(--stage);
   }
-  .lyrics-pill[aria-pressed="true"]:hover {
+  &[data-has-lyrics="true"] .lyrics-pill[aria-pressed="true"]:hover {
     background: #ebebeb;
   }
-  .lyrics-pill[aria-pressed="true"]:active {
+  &[data-has-lyrics="true"] .lyrics-pill[aria-pressed="true"]:active {
     background: #d4d4d4;
+  }
+  /* No lyrics: the pill stays tonal and says so, in the quieter ink. */
+  &[data-has-lyrics="false"] .lyrics-pill {
+    color: var(--text2);
+  }
+  .pill-none,
+  &[data-has-lyrics="false"] .pill-has {
+    display: none;
+  }
+  &[data-has-lyrics="false"] .pill-none {
+    display: inline;
   }
   &[data-lyrics-on="false"] [data-lyrics-toggle],
   &[data-lyrics-on="false"] .lyr {
@@ -744,14 +806,22 @@
   }
 
   /* The cover and its words: large and centred (the cover view), or small in a column
-     beside the lines (the lyrics view). The switch glides them (replica.ts, FLIP). */
+     beside the lines (the lyrics view). The switch glides them (replica.ts, FLIP). As
+     now_playing.slint lays out the 1040 x 722 stage beside the side panel: the cover at
+     nowplaying-cover (440 px), centred with its text in the room under the 64 px header,
+     the room for a two-line title kept. With the panel hidden the cover grows with the
+     stage, to 0.32 of its width between 440 and 560 px (cover-cap): 461 px of 1440. */
   .np {
     position: absolute;
     z-index: 1;
     left: 50%;
-    top: 64px;
-    width: 400px;
+    top: 88px;
+    width: 440px;
     transform: translateX(-50%);
+  }
+  &[data-side-open="false"] .np {
+    top: 78px;
+    width: 461px;
   }
   .np-cover {
     width: 100%;
@@ -763,20 +833,24 @@
       0 16px 48px color-mix(in srgb, #00000033 calc(var(--light) * 100%), #00000099);
   }
   .np-text {
-    margin-top: 24px;
+    margin-top: 16px;
   }
+  /* The title wraps to a second line and ends there; the buttons stay at the cover's right
+     edge, level with its first line. */
   .np-row {
     position: relative;
     display: flex;
-    align-items: center;
-    gap: 8px;
+    align-items: start;
+    gap: 12px;
   }
   .np-title {
     flex: 1;
     min-width: 0;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
     overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
     font-family: var(--font);
     font-size: 32px;
     font-weight: 800;
@@ -787,15 +861,8 @@
     display: flex;
     align-items: center;
     gap: 0;
+    margin-top: 1px;
     transition: opacity var(--t-lyrics) var(--ease-in-out);
-  }
-  .np-actions .nfm .fp-ib {
-    width: 32px;
-    height: 32px;
-    color: var(--text3);
-  }
-  .np-actions .nfm .fp-ib:hover {
-    color: var(--text2);
   }
   .np-actions .fp-tip {
     right: 0;
@@ -803,29 +870,39 @@
   .np-actions [aria-disabled="true"] {
     cursor: default;
   }
+  /* The artists, then the album, each on its own line and eliding on its own. */
+  .np-artist,
+  .np-album {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
   .np-artist {
-    margin-top: 6px;
-    color: var(--text2);
+    margin-top: 8px;
     font-size: 16px;
     font-weight: 600;
+    line-height: 22px;
   }
-  .np-from {
-    margin-top: 8px;
+  .np-album {
+    color: var(--text2);
+    font-size: 14px;
+    line-height: 20px;
+  }
+  /* After a press on "No lyrics": the reason, under the song. */
+  .np-note {
+    margin-top: 12px;
     color: var(--text2);
     font-size: 14px;
   }
-  .np-note {
+  .np-note:empty {
     display: none;
-    margin-top: 14px;
-    font-size: 14px;
   }
 
-  &[data-view="lyrics"] .np-artist,
-  &[data-view="lyrics"] .np-note {
+  &[data-view="lyrics"][data-has-lyrics="true"] .np-artist {
     color: #ffffffd9;
   }
-  &[data-view="lyrics"] .np-from,
-  &[data-view="lyrics"] .np-actions {
+  &[data-view="lyrics"][data-has-lyrics="true"] .np-album,
+  &[data-view="lyrics"][data-has-lyrics="true"] .np-actions {
     opacity: 0;
     visibility: hidden;
   }
@@ -840,6 +917,7 @@
     transform: none;
   }
   &[data-view="lyrics"][data-has-lyrics="true"] .np-title {
+    display: block;
     font-size: 24px;
     font-weight: 700;
     line-height: normal;
@@ -858,11 +936,12 @@
   &[data-view="lyrics"][data-has-lyrics="true"] .np-cover {
     border-radius: 16px;
   }
-  &[data-view="lyrics"][data-has-lyrics="false"] .np-note {
-    display: block;
+  /* With the side panel hidden the column and the lines centre as one group in the stage. */
+  &[data-view="lyrics"][data-has-lyrics="true"][data-side-open="false"] .np {
+    left: 208px;
   }
-  &[data-view="lyrics"][data-has-lyrics="false"] .np-from {
-    display: none;
+  &[data-view="lyrics"][data-has-lyrics="true"][data-side-open="false"] .lyrics {
+    left: 500px;
   }
 
   /* The lines: one bold weight, so a line never re-wraps when it becomes current. Their
@@ -1363,18 +1442,6 @@
     grid-auto-flow: column;
     gap: 8px;
   }
-  .fp-ib.small {
-    width: 32px;
-    height: 32px;
-    color: var(--text3);
-  }
-  .fp-ib.small:hover {
-    color: var(--text2);
-  }
-  .fp-ib.small svg {
-    width: 18px;
-    height: 18px;
-  }
   /* Liked: the heart fills, in text1 (not the accent). */
   .like[aria-pressed="true"] {
     color: var(--text);
@@ -1489,7 +1556,7 @@
     & .bar-end,
     & .seek,
     & .np-actions,
-    & .np-from,
+    & .np-source,
     & [data-act="shuffle"],
     & [data-act="repeat"] {
       display: none !important;
@@ -1542,7 +1609,8 @@
     }
     /* Under the cover's row (64 + 112 px), the first line's top 24 px below it; the words
        24 px in from the sides, their hover tile s3 further out. */
-    & .lyrics {
+    & .lyrics,
+    &[data-view="lyrics"][data-has-lyrics="true"][data-side-open="false"] .lyrics {
       left: 12px;
       right: 12px;
       width: auto;

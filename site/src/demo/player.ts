@@ -40,6 +40,9 @@ export type PlayerState = {
   /** The Up next panel beside a browse page (Now playing always has it), and its tab. */
   queueOpen: boolean;
   queueTab: QueueTab;
+  /** Now playing's side panel (Up next and Related): the bar's Up next button hides and shows
+   *  it there, and the page keeps the choice. */
+  sideOpen: boolean;
   /** Songs played, the latest first (the History page). */
   history: string[];
   /** The toast over the bar ("Marked as not for me", Undo), or none. */
@@ -83,6 +86,8 @@ export type Player = {
   toggleMute(): void;
   toggleQueue(open?: boolean): void;
   setQueueTab(tab: QueueTab): void;
+  /** Hides or shows Now playing's side panel. */
+  toggleSide(open?: boolean): void;
   /** The songs Related shows for the current one. */
   related(): Song[];
   subscribe(fn: (s: PlayerState) => void): () => void;
@@ -149,6 +154,7 @@ export function createPlayer(songs: Song[], options: PlayerOptions = {}): Player
     muted: false,
     queueOpen: false,
     queueTab: "next",
+    sideOpen: true,
     history: first ? [first.id] : [],
     toast: null,
     jumps: 0,
@@ -417,6 +423,12 @@ export function createPlayer(songs: Song[], options: PlayerOptions = {}): Player
     setQueueTab(tab) {
       if (tab === state.queueTab) return;
       state.queueTab = tab;
+      emit();
+    },
+    toggleSide(open) {
+      const next = open ?? !state.sideOpen;
+      if (next === state.sideOpen) return;
+      state.sideOpen = next;
       emit();
     },
     related() {
