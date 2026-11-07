@@ -72,8 +72,10 @@ export global LyricsData {
     // again; `nudged` counts the presses, each giving the note its full time.
     in-out property <bool> hint: false;
     in-out property <int> nudged: 0;
-    // A press asked for the view while the song's lookup still ran: its answer shows the note
-    // if it finds nothing. Spent when the lookup ends.
+    // A press on the playing song is waiting for its lookup: if one runs (it may start only
+    // once Now playing shows) and finds nothing, the note answers the press. Spent when a
+    // lookup ends, the song changes or the note's time runs out with no lookup running
+    // (`LyricsWatch`), so a later song never shows the note on its own.
     in-out property <bool> asked: false;
     // The cover's panel and lines, per theme.
     in property <LyricInk> ink-dark;
@@ -122,7 +124,7 @@ export global LyricsData {
             } else {
                 self.full = true;
                 self.held = !self.missing;
-                self.asked = self.looking;
+                self.asked = !self.has-lines;
             }
             Nav.go(PageKind.now-playing);
         } else if self.state == LyricsState.error {
@@ -142,6 +144,7 @@ export global LyricsData {
     function nudge() {
         self.hint = true;
         self.nudged += 1;
+        self.asked = true;
     }
 }
 

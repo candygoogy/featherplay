@@ -281,4 +281,27 @@ fn the_note_shows_for_a_press_and_never_on_its_own_for_a_later_song() {
     }
     press(&scene, "No lyrics");
     assert!(data.get_hint(), "a press didn't show the note");
+
+    // The microphone from another page, where Now playing then looks the song up again: the
+    // lookup that ends with none still answers the press.
+    scene.open("home").expect("home");
+    data.set_hint(false);
+    data.invoke_toggle_view();
+    scene.settle();
+    lyrics::show_for_snapshot(&scene.ctx, SnapshotLyrics::Loading);
+    scene.settle();
+    lyrics::show_for_snapshot(&scene.ctx, SnapshotLyrics::None);
+    scene.settle();
+    assert!(
+        data.get_hint(),
+        "a lookup after the press hid its note for good"
+    );
+
+    // Spent once answered: the next lookup that finds nothing shows no note.
+    data.set_hint(false);
+    lyrics::show_for_snapshot(&scene.ctx, SnapshotLyrics::Loading);
+    scene.settle();
+    lyrics::show_for_snapshot(&scene.ctx, SnapshotLyrics::None);
+    scene.settle();
+    assert!(!data.get_hint(), "the press was answered twice");
 }

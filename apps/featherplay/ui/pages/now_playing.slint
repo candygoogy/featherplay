@@ -213,10 +213,18 @@ export component LyricsWatch {
     note-time := Timer {
         interval: 4s;
         running: LyricsData.hint;
-        triggered => { LyricsData.hint = false; }
+        triggered => {
+            LyricsData.hint = false;
+            if !LyricsData.looking {
+                LyricsData.asked = false;
+            }
+        }
     }
     property <int> nudged: LyricsData.nudged;
     changed nudged => { note-time.restart(); }
+    // A press was for the song it was made on.
+    property <string> track: Player.track-id;
+    changed track => { LyricsData.asked = false; }
 }
 
 // Lyrics on and off for the stage (the full lyrics view): a tonal pill with the microphone,
