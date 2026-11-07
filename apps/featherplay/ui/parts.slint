@@ -19,7 +19,7 @@ export struct TrackRow {
 
 export enum ItemKind { album, artist, playlist, song }
 
-// A song row the pointer has rested on for a moment, or pressed (`HoverIntent`): the app
+// A song row or card the pointer has rested on for a moment, or pressed (`HoverIntent`): the app
 // resolves its stream then, so a click plays at once (`song_menu.rs`).
 export global RowHover {
     callback rested(string /* videoId */);
@@ -545,9 +545,9 @@ export component ProgressRail inherits Rectangle {
     }
 }
 
-// Album, artist or playlist card on a shelf or grid. `playable`: hovering shows a round play
-// button on the cover that plays without opening (`play`). `art-h`: the art's height when it
-// isn't square (Home's 16:9 video tiles); `subtitle: false` leaves only the title (Home's
+// Album, artist, playlist or song card on a shelf or grid. `playable`: hovering shows a round
+// play button on the cover that plays without opening (`play`). `art-h`: the art's height
+// when it isn't square (Home's 16:9 video tiles); `subtitle: false` leaves only the title (Home's
 // artist faces).
 export component Card inherits Rectangle {
     in property <CardItem> item;
@@ -565,6 +565,12 @@ export component Card inherits Rectangle {
     accessible-role: button;
     accessible-label: root.item.title;
     accessible-action-default => { root.clicked(); }
+    // A song card resolves ahead as a song row does: its click plays it.
+    HoverIntent {
+        hovered: ta.has-hover && root.playable && root.item.kind == ItemKind.song;
+        pressed: ta.pressed;
+        id: root.item.kind == ItemKind.song ? root.item.id : "";
+    }
     // The art and its hover veil, pressed together.
     Rectangle {
         x: 0;

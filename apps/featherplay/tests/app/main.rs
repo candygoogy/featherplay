@@ -17,6 +17,7 @@ mod account_picker;
 mod album_actions;
 mod animations;
 mod bar_total;
+mod card_hint;
 mod card_veil;
 mod close_choice;
 mod content_fade;

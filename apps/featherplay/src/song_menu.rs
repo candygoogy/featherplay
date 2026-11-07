@@ -5,8 +5,8 @@
 //! Likes from the menu and from the hearts in the rows go through `set_like`, which sends one
 //! `Action::Rate` and flips the heart on every page's rows at once.
 //!
-//! A row the pointer rests on (`RowHover`) sends `Action::Prefetch` with its remembered
-//! track, so the controller resolves it before the click.
+//! A song row or card the pointer rests on (`RowHover`) sends `Action::Prefetch` with its
+//! remembered track, so the controller resolves it before the click.
 
 use std::cell::RefCell;
 use std::collections::HashMap;
