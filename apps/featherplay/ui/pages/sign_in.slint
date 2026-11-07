@@ -176,7 +176,8 @@ export component SignInPage inherits Rectangle {
     // The block's height with its rows' details shut: the block is centred on it, so a
     // detail opens downwards and the row clicked stays where it was, while there's room.
     property <length> rest-h: col.preferred-height - edge-row.detail-height - paste-row.detail-height;
-    // The room the page shows (under the search field), above the floating bar.
+    // The room the page shows: its full height (it has no search bar above it), less the
+    // floating bar's. The page itself is the width beside the sidebar and Up next.
     property <length> room-h: flick.height - Theme.bar-clear;
 
     flick := Flickable {

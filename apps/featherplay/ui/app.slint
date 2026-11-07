@@ -134,13 +134,24 @@ export component AppWindow inherits Window {
     // The panel has slid all the way in. Set from its slide's end (not bound to it), so the
     // page's width depends on it alone and isn't re-evaluated on every frame of the slide.
     property <bool> panel-in;
-    // The page's width, for the tests.
+    // The page's room: from the sidebar's edge, `page-width` wide (for the tests, and for
+    // where the sign-in window opens).
+    out property <length> page-x: root.side-w;
     out property <length> page-width: root.width - root.side-w - root.panel-push;
-    // The top bar sits above every page but Now playing. Album, playlist and artist pages
-    // run up under it, clear, so their cover wash or photo reaches the window's top (each
-    // draws a `TopScrim` for when content scrolls under it); the others start below it.
+    // The top bar sits above every page but Now playing and Sign in (whose block centres in
+    // the page's full height). Album, playlist and artist pages run up under it, clear, so
+    // their cover wash or photo reaches the window's top (each draws a `TopScrim` for when
+    // content scrolls under it); the others start below it.
+    property <bool> no-top: Nav.page == PageKind.sign-in;
+    // The search field, still focused as Sign in hides it (a session that ended while the user
+    // typed), would take the keys out of sight: the window takes them back.
+    changed no-top => {
+        if root.no-top && top-bar.searching {
+            keys.focus();
+        }
+    }
     property <bool> under-top: Nav.page == PageKind.album || Nav.page == PageKind.playlist || Nav.page == PageKind.artist;
-    property <length> top-h: root.full-page || root.under-top ? 0px : Theme.top-bar-h;
+    property <length> top-h: root.full-page || root.under-top || root.no-top ? 0px : Theme.top-bar-h;
     // Home's wash shows behind the top bar, from the window's top: the bar is clear and the
     // fade below it is left out (Home still starts below the bar; it brings the ground back
     // itself as it scrolls, then hands over to these).
@@ -199,10 +210,18 @@ export component AppWindow inherits Window {
     keys := FocusScope {
         key-pressed(e) => {
             if e.modifiers.control && (e.text == "k" || e.text == "K") {
-                // Now playing hides the bar: leave it first.
+                // Now playing hides the bar: leave it first. Sign in has none: search from
+                // Home, as "Continue without signing in" goes, but not from under the account
+                // picker, which keeps the keys.
+                if AccountPicker.open {
+                    return accept;
+                }
                 if root.full-page {
                     root.navigate-by-key();
                     Nav.back();
+                } else if root.no-top {
+                    root.navigate-by-key();
+                    Nav.go(PageKind.home);
                 }
                 top-bar.focus-search();
                 return accept;
@@ -355,7 +374,7 @@ export component AppWindow inherits Window {
             }
             // Content scrolling up under the bar fades out rather than being cut. At rest the
             // pages' top padding is blank ground, so the fade is invisible.
-            if !root.full-page && !root.under-top && !root.home-wash: Bands {
+            if !root.full-page && !root.under-top && !root.home-wash && !root.no-top: Bands {
                 y: Theme.top-bar-h;
                 height: Theme.s4;
                 count: 16;
@@ -366,7 +385,7 @@ export component AppWindow inherits Window {
                 x: 0;
                 y: 0;
                 width: parent.width;
-                visible: !root.full-page;
+                visible: !root.full-page && !root.no-top;
                 clear: root.under-top || root.home-wash;
                 narrow: root.rail;
                 area-h: parent.height;
@@ -445,9 +464,10 @@ export component AppWindow inherits Window {
             }
         }
 
-        // Toasts: bottom centre, 16 px above the bar.
+        // Toasts: bottom centre, 16 px above the bar. On Sign in, centred under its block, in
+        // the page's room (beside Up next while it's open).
         ToastView {
-            x: (root.width - self.width) / 2;
+            x: root.no-top ? root.page-x + (root.page-width - self.width) / 2 : (root.width - self.width) / 2;
             y: root.bar-top - Theme.s4 - self.height;
         }
 
@@ -513,12 +533,16 @@ export component AppWindow inherits Window {
             closed => { keys.focus(); }
         }
 
-        // The first sign-in's account picker (src/account_picker.rs), over everything.
+        // The first sign-in's account picker (src/account_picker.rs), over everything, its
+        // card centred in the page's room, where the sign-in page's block is.
         if AccountPicker.open: AccountPickerDialog {
             x: 0;
             y: 0;
             width: root.width;
             height: root.height;
+            room-x: root.page-x;
+            room-w: root.page-width;
+            room-h: root.bar-top;
             closed => { keys.focus(); }
         }
 

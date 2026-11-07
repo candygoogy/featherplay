@@ -372,6 +372,11 @@ export global AccountPicker {
 export component AccountPickerDialog inherits Rectangle {
     // After the choice, so the window takes the keys back.
     callback closed();
+    // Where the card centres: the page's room (right of the sidebar, left of Up next while
+    // it's open, above the bar), as the sign-in page's block does. The scrim covers it all.
+    in property <length> room-x: 0;
+    in property <length> room-w: self.width;
+    in property <length> room-h: self.height;
     property <bool> shown: false;
     property <length> row-h: 52px;
     property <int> rows: AccountPicker.accounts.length;
@@ -429,10 +434,11 @@ export component AccountPickerDialog inherits Rectangle {
             scroll-event(e) => { accept }
         }
         card := Rectangle {
-            width: min(420px, root.width - 2 * Theme.s5);
+            width: min(420px, root.room-w - 2 * Theme.s5);
             height: lay.preferred-height;
-            x: (root.width - self.width) / 2;
-            y: max(Theme.s5, (root.height - self.height) / 2 - Theme.s6);
+            x: root.room-x + (root.room-w - self.width) / 2;
+            // A touch above the middle, as the sign-in block sits.
+            y: max(Theme.s5, (root.room-h - self.height) * 0.45);
             border-radius: Theme.r-l;
             background: Theme.panel;
             border-width: 1px;
