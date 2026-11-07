@@ -448,6 +448,19 @@ impl Steps for Live<'_> {
         Some(self.r.native.as_ref()?.resolve(&id.0, self.quality).await)
     }
 
+    async fn native_fresh(&self, id: &TrackId) -> Option<Result<ResolvedStream, NativeError>> {
+        if self.cookies.is_some() {
+            return None;
+        }
+        Some(
+            self.r
+                .native
+                .as_ref()?
+                .resolve_fresh(&id.0, self.quality)
+                .await,
+        )
+    }
+
     async fn embedded(&self, id: &TrackId) -> Result<ResolvedStream, ResolveError> {
         self.r
             .run(id, self.cookies, Some(EMBEDDED_ARGS), self.quality)

@@ -57,6 +57,9 @@ pub(crate) trait Steps {
     /// The embedded client asked from Rust. `None` when there's no such step (no HTTP
     /// client, or cookies, which it doesn't take).
     async fn native(&self, id: &TrackId) -> Option<Result<ResolvedStream, NativeError>>;
+    /// The native step once more, from a fresh embed page (a new visitor, as each yt-dlp
+    /// run is), kept for this one answer. `None` as for `native`.
+    async fn native_fresh(&self, id: &TrackId) -> Option<Result<ResolvedStream, NativeError>>;
     /// The embedded client through yt-dlp.
     async fn embedded(&self, id: &TrackId) -> Result<ResolvedStream, ResolveError>;
     /// yt-dlp's default clients.
@@ -226,9 +229,9 @@ impl Chain {
     /// A URL with ads before the song (`available_at`) is refused until each could be
     /// skipped (5 s for one, 2026-11-07): it's handed over once its gate has passed and its
     /// first byte plays (`opened`). A resolve ahead just waits; a resolve the player waits
-    /// for runs step 2 beside the wait and takes the first URL that opens (`race`), as
-    /// yt-dlp's request may have come without an ad. A gate past `MAX_GATE_WAIT` sends an
-    /// embedded URL on to the next step.
+    /// for runs one fresh native answer (`gated_for_player`) and step 2 beside the wait and
+    /// takes the first URL that opens (`race`), as their requests may have come without an
+    /// ad. A gate past `MAX_GATE_WAIT` sends an embedded URL on to the next step.
     ///
     /// For `DOUBT_FOR` after a refused embedded URL (`refused`), steps 1 and 2 check their
     /// URL's first byte (one request, ~0.2 s) before handing it over, so a refused one
@@ -281,7 +284,8 @@ impl Chain {
                         Some(one) => Some(one),
                         None => {
                             ahead = None;
-                            let rest = async { Some(wait.await) };
+                            let rest =
+                                async { Some(self.gated_for_player(s, id, wait, doubt).await) };
                             match self.race(s, id, rest, doubt).await {
                                 Some(r) => return r,
                                 None => Some(One::NotEmbeddable),
@@ -388,11 +392,63 @@ impl Chain {
     /// there's no native step.
     async fn native_step(&self, s: &impl Steps, id: &TrackId, doubt: bool) -> Option<One> {
         Some(match self.native_answer(s, id).await? {
-            Answer::Now(stream) | Answer::Gated(stream) => {
-                self.native_ready(s, id, stream, doubt).await
+            Answer::Now(stream) => self.native_ready(s, id, stream, doubt).await,
+            Answer::Gated(stream) => {
+                let wait = self.native_ready(s, id, stream, doubt);
+                self.gated_for_player(s, id, wait, doubt).await
             }
             Answer::Done(one) => one,
         })
+    }
+
+    /// A gated native answer the player waits for: its gate's `wait`, beside one more
+    /// native answer from a fresh embed page, which plays at once if it came without ads.
+    /// On 2026-11-07 yt-dlp's runs (a fresh visitor each) came without the ads of the
+    /// native answer just before them 5 times in 6, but in ~2.7 s; a native answer takes
+    /// ~0.5 s with its embed page. A fresh answer with ads too is dropped: the first one's
+    /// gate ends sooner. One answer per wait, so no loop.
+    async fn gated_for_player(
+        &self,
+        s: &impl Steps,
+        id: &TrackId,
+        wait: impl Future<Output = One>,
+        doubt: bool,
+    ) -> One {
+        let fresh = self.fresh_step(s, id, doubt);
+        tokio::pin!(wait, fresh);
+        tokio::select! {
+            biased;
+            one = &mut wait => one,
+            Some(stream) = &mut fresh => {
+                log::info!("resolve {}: a fresh native answer came without ads", id.0);
+                One::Plays(stream)
+            }
+        }
+    }
+
+    /// `Steps::native_fresh`'s URL if it opens at once (and, in doubt, plays), else `None`.
+    async fn fresh_step(
+        &self,
+        s: &impl Steps,
+        id: &TrackId,
+        doubt: bool,
+    ) -> Option<ResolvedStream> {
+        let stream = match s.native_fresh(id).await? {
+            Ok(stream) => stream,
+            Err(e) => {
+                log::info!("resolve {} [fresh] failed: {e}", id.0);
+                return None;
+            }
+        };
+        if let Some(gate) = gate_left(&stream) {
+            log::info!("resolve {} [fresh] {}", id.0, opens_in(gate));
+            return None;
+        }
+        if doubt && Self::opened(s, &stream.url, false).await == Check::Refused {
+            log::info!("resolve {} [fresh] its URL was refused at its check", id.0);
+            return None;
+        }
+        Some(stream)
     }
 
     /// Step 1's answer, before its gate and check.
@@ -653,6 +709,7 @@ mod tests {
     const NATIVE_URL: &str = "https://r1.example/videoplayback?c=WEB_EMBEDDED_PLAYER&n=1";
     const EMBEDDED_URL: &str = "https://r2.example/videoplayback?c=WEB_EMBEDDED_PLAYER&n=2";
     const TV_URL: &str = "https://r3.example/videoplayback?c=TVHTML5&n=3";
+    const FRESH_URL: &str = "https://r4.example/videoplayback?c=WEB_EMBEDDED_PLAYER&n=4";
 
     fn stream(url: &str) -> ResolvedStream {
         ResolvedStream {
@@ -681,6 +738,8 @@ mod tests {
     #[derive(Default)]
     struct Script {
         native: Mutex<VecDeque<Option<Result<ResolvedStream, NativeError>>>>,
+        /// Unscripted, the fresh native step never answers.
+        fresh: Mutex<VecDeque<Result<ResolvedStream, NativeError>>>,
         embedded: Mutex<VecDeque<Option<Result<ResolvedStream, ResolveError>>>>,
         default: Mutex<VecDeque<Result<ResolvedStream, ResolveError>>>,
         checks: Mutex<VecDeque<Check>>,
@@ -707,6 +766,10 @@ mod tests {
                 .lock()
                 .unwrap()
                 .push_back(Some(Ok(gated_stream(url, secs))));
+            self
+        }
+        fn fresh(self, r: Result<ResolvedStream, NativeError>) -> Self {
+            self.fresh.lock().unwrap().push_back(r);
             self
         }
         fn embedded(self, r: Result<&str, ResolveError>) -> Self {
@@ -757,6 +820,17 @@ mod tests {
                 tokio::task::yield_now().await;
             }
             match self.next("native", &self.native) {
+                Some(r) => Some(r),
+                None => std::future::pending().await,
+            }
+        }
+        async fn native_fresh(&self, _: &TrackId) -> Option<Result<ResolvedStream, NativeError>> {
+            if self.no_native {
+                return None;
+            }
+            self.calls.lock().unwrap().push("fresh");
+            let next = self.fresh.lock().unwrap().pop_front();
+            match next {
                 Some(r) => Some(r),
                 None => std::future::pending().await,
             }
@@ -1291,7 +1365,8 @@ mod tests {
     }
 
     /// A hovered row is clicked while its URL's gate runs (a hover comes 0.1-1 s before
-    /// the click): from then on yt-dlp runs beside the rest of the wait.
+    /// the click): from then on a fresh native answer and yt-dlp run beside the rest of
+    /// the wait.
     #[tokio::test(start_paused = true)]
     async fn a_resolve_ahead_the_player_asks_for_during_its_gate_runs_yt_dlp_beside_it() {
         let chain = Chain::default();
@@ -1309,7 +1384,7 @@ mod tests {
         urgent.notify_one();
         assert_eq!(url(within_gates(ahead).await), EMBEDDED_URL);
         assert!(t.elapsed() < Duration::from_secs(2), "{:?}", t.elapsed());
-        assert_eq!(s.calls(), ["embedded"]);
+        assert_eq!(s.calls(), ["fresh", "embedded"]);
     }
 
     /// The player waits: yt-dlp's request may have come without an ad (2.5 s instead of
@@ -1326,7 +1401,11 @@ mod tests {
             EMBEDDED_URL
         );
         assert!(t.elapsed() < Duration::from_secs(1), "{:?}", t.elapsed());
-        assert_eq!(s.calls(), ["native", "embedded"], "no check outside doubt");
+        assert_eq!(
+            s.calls(),
+            ["native", "fresh", "embedded"],
+            "no check outside doubt"
+        );
     }
 
     #[tokio::test(start_paused = true)]
@@ -1346,6 +1425,38 @@ mod tests {
             took >= Duration::from_secs(5) && took < Duration::from_secs(10),
             "{took:?}"
         );
+    }
+
+    /// The player waits for a gated native answer: one more native answer, from a fresh
+    /// embed page, came without ads, so it plays at once.
+    #[tokio::test(start_paused = true)]
+    async fn the_players_resolve_takes_a_fresh_native_answer_without_ads() {
+        let chain = Chain::default();
+        let s = Script::default()
+            .native_gated(NATIVE_URL, 5)
+            .fresh(Ok(stream(FRESH_URL)))
+            .embedded_hangs();
+        let t = tokio::time::Instant::now();
+        assert_eq!(url(within_gates(chain.resolve(&s, &id())).await), FRESH_URL);
+        assert!(t.elapsed() < Duration::from_secs(1), "{:?}", t.elapsed());
+        assert_eq!(s.calls(), ["native", "fresh"]);
+    }
+
+    /// A fresh answer with ads too isn't used: the first one's gate ends sooner.
+    #[tokio::test(start_paused = true)]
+    async fn a_fresh_native_answer_with_ads_too_leaves_the_gate_to_be_waited_out() {
+        let chain = Chain::default();
+        let s = Script::default()
+            .native_gated(NATIVE_URL, 5)
+            .fresh(Ok(gated_stream(FRESH_URL, 5)))
+            .embedded_hangs()
+            .check(Check::Plays);
+        let t = tokio::time::Instant::now();
+        assert_eq!(
+            url(within_gates(chain.resolve(&s, &id())).await),
+            NATIVE_URL
+        );
+        assert!(t.elapsed() >= Duration::from_secs(5), "{:?}", t.elapsed());
     }
 
     /// In doubt, a gated URL is checked once it has opened, not before (it would be

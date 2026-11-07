@@ -241,6 +241,38 @@ impl NativeResolver {
         result
     }
 
+    /// `resolve` from a fresh embed page (a new visitor), for this answer only: the kept
+    /// page, the failure count and the next resolves stay as they were. For a gated answer
+    /// the player waits for (`Chain`): the page's player is the kept one unless YouTube
+    /// moved on, then it's installed as for a refresh. Its URL refused later drops the kept
+    /// page as any refused URL does (`refused`): rare, and a fresh page is cheap.
+    pub(crate) async fn resolve_fresh(
+        &self,
+        video: &str,
+        quality: Quality,
+    ) -> Result<ResolvedStream, NativeError> {
+        let inner = &self.inner;
+        if !inner.sidecars.deno().is_file() {
+            return Err(failed("deno is missing"));
+        }
+        if inner
+            .health
+            .lock_or_recover()
+            .off_until
+            .is_some_and(|t| Instant::now() < t)
+        {
+            return Err(failed("off for a while after repeated failures"));
+        }
+        // Not waiting for a resolve that holds the state while it fetches a page.
+        let kept = inner
+            .state
+            .try_lock()
+            .ok()
+            .and_then(|st| st.as_ref().map(|r| r.player.clone()));
+        let ready = inner.fetch_ready(video, kept).await?;
+        inner.answer(video, quality, &ready, false).await
+    }
+
     /// Fetches the embed page again in the background once the one in use is old.
     fn refresh_if_stale(&self, video: &str) {
         let inner = self.inner.clone();
@@ -268,14 +300,31 @@ impl NativeResolver {
 impl Inner {
     async fn resolve(&self, video: &str, quality: Quality) -> Result<ResolvedStream, NativeError> {
         let ready = self.ready(video).await?;
+        self.answer(video, quality, &ready, true).await
+    }
+
+    /// One resolve from `ready`. `kept`: `ready` is the state resolves share, which a
+    /// failed request or a bad answer drops.
+    async fn answer(
+        &self,
+        video: &str,
+        quality: Quality,
+        ready: &Ready,
+        kept: bool,
+    ) -> Result<ResolvedStream, NativeError> {
         let player = ready.player.clone();
+        let forget = || {
+            if kept {
+                self.forget.store(true, Ordering::Relaxed);
+            }
+        };
         // Loads the player while the request runs.
         let solver = Solver::start(&self.sidecars, &self.solve_script()?, &player.path)
             .map_err(|e| failed(format!("starting deno: {e}")))?;
-        let body = match self.player_request(video, &ready).await {
+        let body = match self.player_request(video, ready).await {
             Ok(b) => b,
             Err(e) => {
-                self.forget.store(true, Ordering::Relaxed);
+                forget();
                 return Err(e);
             }
         };
@@ -283,7 +332,7 @@ impl Inner {
         let answered = SystemTime::now();
         let pending = parse_player_response(&body, video, quality.itags()).inspect_err(|e| {
             if matches!(e, NativeError::Failed(_) | NativeError::NoUrl(_)) {
-                self.forget.store(true, Ordering::Relaxed);
+                forget();
             }
         })?;
         let n: Vec<String> = pending.n.iter().cloned().collect();
@@ -295,7 +344,7 @@ impl Inner {
                 Ok(a) => a,
                 Err(e) => {
                     self.health.lock_or_recover().bad.insert(player.id.clone());
-                    self.forget.store(true, Ordering::Relaxed);
+                    forget();
                     return Err(failed(format!("player {}: {e}", player.id)));
                 }
             }
@@ -1567,6 +1616,45 @@ _result.sig = (s) => s.slice(2).split("").reverse().join("");"#;
         assert_eq!(query_param(&s.url, "sig"), Some(want));
         assert_eq!((s.itag, s.mime.as_str()), (251, "audio/webm"));
         assert_eq!(s.video_title.as_deref(), Some("affection"));
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// A fresh answer asks with a new embed page's visitor, and leaves the kept page to
+    /// the resolves after it.
+    #[tokio::test]
+    async fn a_fresh_resolve_uses_a_new_embed_page_once() {
+        let Some(sidecars) = deno_sidecars() else {
+            eprintln!("skipped: no deno in FEATHERPLAY_SIDECARS_DIR");
+            return;
+        };
+        let kept = config().visitor_data.unwrap();
+        let page = EMBED.replace(&kept, "fresh-visitor");
+        let bodies = Arc::new(Mutex::new(Vec::new()));
+        let seen = bodies.clone();
+        let (base, log) = test_server::serve(move |method, path, body| {
+            match (method, path.split('?').next().unwrap()) {
+                ("GET", p) if p == format!("/embed/{VIDEO}") => (200, page.clone()),
+                ("POST", "/youtubei/v1/player") => {
+                    seen.lock().unwrap().push(body.to_string());
+                    (200, PLAYER.to_string())
+                }
+                _ => (404, String::new()),
+            }
+        });
+        let (r, dir) = seeded("fresh", sidecars, &base);
+        r.resolve_fresh(VIDEO, Quality::High).await.unwrap();
+        r.resolve(VIDEO, Quality::High).await.unwrap();
+        assert_eq!(
+            *log.lock().unwrap(),
+            [
+                format!("GET /embed/{VIDEO}?html5=1"),
+                "POST /youtubei/v1/player?prettyPrint=false".into(),
+                "POST /youtubei/v1/player?prettyPrint=false".into(),
+            ]
+        );
+        let bodies = bodies.lock().unwrap();
+        assert!(bodies[0].contains("fresh-visitor"), "{}", bodies[0]);
+        assert!(bodies[1].contains(&kept), "{}", bodies[1]);
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
