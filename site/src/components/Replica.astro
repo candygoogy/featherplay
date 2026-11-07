@@ -9,7 +9,7 @@ import "../styles/replica.css";
 import Icon from "./Icon.astro";
 import Mark from "./Mark.astro";
 import { demoStart, songs, type Song } from "../data/songs";
-import { currentLineIndex, formatTime, lyricsSource, type View } from "../demo/player";
+import { albumLine, currentLineIndex, formatTime, lyricsSource, type View } from "../demo/player";
 
 interface Props {
   songId?: string;
@@ -369,8 +369,8 @@ const pages: { page: View; icon: "home" | "library" | "explore" | "history"; lab
               </span>
             </div>
             <p class="np-artist" data-np-artist>{song.artist}</p>
-            <!-- The album: each demo song is a single of its own, as in the app's demo. -->
-            <p class="np-album" data-np-album>{song.title}</p>
+            <!-- "album · year"; left out for a track without an album, as the app does. -->
+            <p class="np-album" data-np-album hidden={!song.album}>{albumLine(song)}</p>
             <!-- Filled only when the visitor presses "No lyrics", so a screen reader hears it. -->
             <p class="np-note" data-no-lyrics role="status"></p>
           </div>

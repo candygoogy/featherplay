@@ -21,6 +21,12 @@ export type Song = {
   id: string;
   title: string;
   artist: string;
+  /**
+   * The album it's from, as Now playing's third line shows it ("album · year"), the year as
+   * the artist's page gives it. None for a track that isn't on one (a remix upload, a single
+   * of its own): the app leaves the line out for a track without an album.
+   */
+  album?: { title: string; year: string };
   /** Under public/, 600 px webp. */
   cover: string;
   /** The cover's colour: the glow and the lyrics panel. AA-checked in tests/unit/data.test.ts. */
@@ -51,6 +57,7 @@ export const songs: Song[] = [
     id: "california-lullabye",
     title: "California Lullabye",
     artist: "Josh Woodward",
+    album: { title: "The Beautiful Machine", year: "2014" },
     ...media("california-lullabye"),
     colour: "#E8894A",
     durationMs: 54_500,
@@ -74,6 +81,7 @@ export const songs: Song[] = [
     id: "invisible-light",
     title: "Invisible Light",
     artist: "Josh Woodward",
+    album: { title: "The Wake", year: "2012" },
     ...media("invisible-light"),
     colour: "#3E4FA8",
     durationMs: 59_900,
@@ -96,6 +104,7 @@ export const songs: Song[] = [
     id: "she-dreams-in-blue",
     title: "She Dreams in Blue",
     artist: "Josh Woodward",
+    album: { title: "Not Quite Connected", year: "2007" },
     ...media("she-dreams-in-blue"),
     colour: "#5B7FB8",
     durationMs: 60_500,

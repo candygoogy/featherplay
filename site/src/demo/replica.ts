@@ -2,7 +2,17 @@
 // around it (the taskbar button, the tray icon and its hover text) to the same state.
 
 import { songs, type Song } from "../data/songs";
-import { createPlayer, currentLineIndex, formatTime, isNowView, lyricsSource, type Player, type PlayerState, type View } from "./player";
+import {
+  albumLine,
+  createPlayer,
+  currentLineIndex,
+  formatTime,
+  isNowView,
+  lyricsSource,
+  type Player,
+  type PlayerState,
+  type View,
+} from "./player";
 import { setGlow } from "./glow";
 import { followLyrics } from "./follow";
 import { bindAudio } from "./audio";
@@ -415,9 +425,12 @@ function bindReplica(root: HTMLElement, player: Player) {
       for (const img of $$<HTMLImageElement>(root, "[data-bar-cover], [data-np-cover], [data-resume-cover]")) {
         img.src = song.cover;
       }
-      // Each demo song is a single of its own (as in the app's demo fixtures), so the album
-      // line under the artist is its title.
-      setAll(root, "[data-bar-title], [data-np-title], [data-resume-title], [data-np-album]", (el) => (el.textContent = song.title));
+      setAll(root, "[data-bar-title], [data-np-title], [data-resume-title]", (el) => (el.textContent = song.title));
+      // "album · year" under the artist; no line for a track without an album.
+      setAll(root, "[data-np-album]", (el) => {
+        el.textContent = albumLine(song);
+        el.hidden = !song.album;
+      });
       setAll(root, "[data-bar-artist], [data-np-artist], [data-resume-artist]", (el) => (el.textContent = song.artist));
       setAll(root, "[data-bar-duration]", (el) => (el.textContent = formatTime(song.durationMs)));
       setAll(root, "[data-similar]", (el) => (el.textContent = `Similar to ${song.title}`));

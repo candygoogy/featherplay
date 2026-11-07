@@ -57,7 +57,8 @@ test('a song without lyrics keeps the cover view, and the pill says "No lyrics"'
   await expect(r.locator("[data-lyrics]")).toBeHidden();
   await expect(r.locator(".stage-panel")).toHaveCSS("opacity", "0");
   await expect(r.locator("[data-np-artist]")).toHaveText("Scott Buckley");
-  await expect(r.locator("[data-np-album]")).toBeVisible();
+  // A single of its own, on no album: no album line, as the app leaves it out.
+  await expect(r.locator("[data-np-album]")).toBeHidden();
   // Never pressed, and no note until the visitor presses it.
   const mic = r.locator(".bar [data-lyrics-toggle]");
   await expect(r.locator(".lyrics-pill")).toHaveAttribute("aria-pressed", "false");
@@ -68,10 +69,14 @@ test('a song without lyrics keeps the cover view, and the pill says "No lyrics"'
   await r.locator(".lyrics-pill").click();
   await expect(note).toHaveText("No lyrics for this song");
   await expect(r.locator("[data-lyrics]")).toBeHidden();
-  // A song with lyrics: the note goes, and the lines show (the view stayed on lyrics).
-  await r.locator('[data-tab-panel="next"] [data-row="california-lullabye"]').click();
+  // A song with lyrics (Next, from the list's last song, goes back to its first): the note
+  // goes, and the lines show (the view stayed on lyrics).
+  await r.locator('.bar [data-act="next"]').click();
+  await expect(r.locator("[data-bar-title]")).toHaveText("California Lullabye");
   await expect(note).toBeHidden();
   await expect(r.locator("[data-lyrics]")).toBeVisible();
+  // Its album, with the year, under the artist ("album · year").
+  await expect(r.locator("[data-np-album]")).toHaveText("The Beautiful Machine · 2014");
 });
 
 test("on Now playing, Up next hides and shows the side panel, and Playing from opens it", async ({ page }) => {

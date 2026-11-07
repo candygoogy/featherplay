@@ -494,6 +494,11 @@ export function lyricsSource(song: Song): string {
   return song.credit ? `Lyrics: ${song.artist}, ${song.credit.licence}` : `Lyrics: ${song.artist}`;
 }
 
+/** Now playing's line under the artist: "album · year", or "" for a track without an album. */
+export function albumLine(song: Song): string {
+  return song.album ? `${song.album.title} · ${song.album.year}` : "";
+}
+
 /** 0:00, as the app's bar shows it. */
 export function formatTime(ms: number): string {
   const total = Math.floor(Math.max(0, ms) / 1000);
