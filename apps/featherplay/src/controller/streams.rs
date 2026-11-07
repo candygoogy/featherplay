@@ -1,13 +1,16 @@
 //! Resolved streams, kept until they near their expiry, and resolves started ahead of a
-//! click: a row hovered for 120 ms or pressed, the first row of a list page that opens,
-//! Home's featured song, the restored session's track, and the queue's tracks after the
-//! next one (`AHEAD` in all with it, in play order: shuffled, repeated, past the ones
-//! passed over). A track whose stream is here starts without a resolve, and with its
+//! click: a song row or card hovered for 120 ms or pressed, the first row of a list page
+//! that opens, Home's featured song, the restored session's track, and the queue's tracks
+//! after the next one (`AHEAD` in all with it, in play order: shuffled, repeated, past the
+//! ones passed over). A track whose stream is here starts without a resolve, and with its
 //! first 256 KB fetched into memory (`AudioEngine::prefetch`) without a request; a fetch
 //! that's refused (HTTP 403) is told, and the track resolved again ahead, once.
 //!
 //! The track played before the current one gets its first 256 KB fetched again when it's
 //! left (its download went with it), so Previous starts from memory too.
+//!
+//! The streams outlive a restart (`SAVED_STREAMS`, written at quit): the next session uses
+//! one until it nears its expiry, once a resolve has shown the same address.
 //!
 //! The player's own resolves start at once. Resolves ahead ("hints") take at most
 //! `HINT_SLOTS` at a time; the newest hints go first, and older row hints are dropped past
@@ -19,13 +22,14 @@
 
 use std::collections::VecDeque;
 use std::sync::Arc;
-use std::time::{Duration, Instant, SystemTime};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use featherplay_audio::StreamSource;
 use featherplay_core::failure::getting_ready;
 use featherplay_core::model::{Track, TrackId};
 use featherplay_core::player::Input;
 use featherplay_streams::ResolvedStream;
+use serde_json::{Value, json};
 use tokio::sync::Notify;
 use tokio::task::AbortHandle;
 
@@ -49,6 +53,16 @@ const FAILED_FOR: Duration = Duration::from_secs(10 * 60);
 const FRESH_FOR: Duration = Duration::from_secs(10 * 60);
 /// A resolve that takes longer logs its own time (a normal one takes ~0.4 s).
 const SLOW_RESOLVE: Duration = Duration::from_secs(1);
+/// The streams kept for the next session, in the cache dir (`Streams::saved`).
+pub(super) const SAVED_STREAMS: &str = "streams.json";
+
+/// The address a stream URL is for (its `ip=`).
+fn address(url: &str) -> Option<&str> {
+    url.split_once('?')?
+        .1
+        .split('&')
+        .find_map(|kv| kv.strip_prefix("ip="))
+}
 
 /// Why a resolve ahead was asked for.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -84,6 +98,11 @@ pub(super) struct Streams {
     loaded: Option<StreamSource>,
     /// The tracks whose refused preload was resolved again lately (`again_after_refusal`).
     refused_preloads: VecDeque<TrackId>,
+    /// Streams of the last session (`restore`) not resolved again since.
+    restored: Vec<TrackId>,
+    /// The `ip=` of the last stream resolved this session: a restored one answers only for
+    /// the same address.
+    address: Option<String>,
 }
 
 /// What a resolve the player asks for needs.
@@ -102,8 +121,13 @@ impl Streams {
     }
 
     /// The stream resolved for `id`, if it stays valid for `FRESH_FOR` from `now`.
+    /// One from the last session, only if a resolve showed that it's for this address.
     fn fresh(&self, id: &TrackId, now: SystemTime) -> Option<&ResolvedStream> {
-        self.get(id).filter(|s| s.expires_at > now + FRESH_FOR)
+        self.get(id).filter(|s| {
+            s.expires_at > now + FRESH_FOR
+                && (!self.restored.contains(id)
+                    || self.address.is_some() && address(&s.url) == self.address.as_deref())
+        })
     }
 
     /// The player asks for `id`.
@@ -240,6 +264,10 @@ impl Streams {
         };
         match stream {
             Some(s) => {
+                if let Some(ip) = address(&s.url) {
+                    self.address = Some(ip.to_string());
+                }
+                self.restored.retain(|r| r != id);
                 self.cache.retain(|(c, _)| c != id);
                 self.cache.push_back((id.clone(), s.clone()));
                 if self.cache.len() > KEEP
@@ -273,6 +301,84 @@ impl Streams {
             self.refused_preloads.pop_front();
         }
         true
+    }
+
+    /// The streams that stay valid for `FRESH_FOR` from `now`, for `restore` in the next
+    /// session (`SAVED_STREAMS`).
+    pub fn saved(&self, now: SystemTime) -> String {
+        let secs = |t: SystemTime| t.duration_since(UNIX_EPOCH).ok().map(|d| d.as_secs());
+        let ms = |d: Duration| u64::try_from(d.as_millis()).ok();
+        let streams: Vec<Value> = self
+            .cache
+            .iter()
+            .filter(|(_, s)| s.expires_at > now + FRESH_FOR)
+            .map(|(id, s)| {
+                json!({
+                    "id": id.0,
+                    "url": s.url,
+                    "mime": s.mime,
+                    "itag": s.itag,
+                    "kbps": s.bitrate_kbps,
+                    "length": s.content_length,
+                    "expires": secs(s.expires_at),
+                    "duration_ms": s.duration.and_then(ms),
+                    "available_at": s.available_at.and_then(secs),
+                    "title": s.video_title,
+                    "tag": s.first_tag,
+                })
+            })
+            .collect();
+        json!({ "streams": streams }).to_string()
+    }
+
+    /// Keeps the streams `saved` gave in the last session that stay valid for `FRESH_FOR`
+    /// from `now`. Each answers once a resolve shows that its URL is for this address (its
+    /// `ip=`): the network may have changed since.
+    pub fn restore(&mut self, text: &str, now: SystemTime) {
+        let Ok(v) = serde_json::from_str::<Value>(text) else {
+            return;
+        };
+        let at = |v: &Value| v.as_u64().map(|s| UNIX_EPOCH + Duration::from_secs(s));
+        let text = |v: &Value| v.as_str().map(str::to_string);
+        for s in v["streams"].as_array().into_iter().flatten() {
+            let (Some(id), Some(url), Some(expires_at)) =
+                (text(&s["id"]), text(&s["url"]), at(&s["expires"]))
+            else {
+                continue;
+            };
+            if expires_at <= now + FRESH_FOR || address(&url).is_none() || self.cache.len() >= KEEP
+            {
+                continue;
+            }
+            let stream = ResolvedStream {
+                url,
+                mime: text(&s["mime"]).unwrap_or_default(),
+                itag: s["itag"]
+                    .as_u64()
+                    .and_then(|i| u32::try_from(i).ok())
+                    .unwrap_or(0),
+                bitrate_kbps: s["kbps"]
+                    .as_u64()
+                    .and_then(|k| u32::try_from(k).ok())
+                    .unwrap_or(0),
+                content_length: s["length"].as_u64(),
+                expires_at,
+                duration: s["duration_ms"].as_u64().map(Duration::from_millis),
+                available_at: at(&s["available_at"]),
+                video_title: text(&s["title"]),
+                first_tag: text(&s["tag"]),
+            };
+            let id = TrackId(id);
+            self.cache.retain(|(c, _)| *c != id);
+            self.cache.push_back((id.clone(), stream));
+            self.restored.push(id);
+        }
+    }
+
+    /// Whether `id`'s stream (or the one just dropped) came from the last session: its
+    /// refusal says nothing of this session's URLs, so the resolver isn't told.
+    pub fn is_from_last_session(&self, id: &TrackId) -> bool {
+        self.restored.contains(id)
     }
 
     /// Drops the stream whose URL is `url` (refused while preloaded); returns its id.
@@ -370,7 +476,9 @@ impl Controller {
         let Some(id) = self.streams.forget_url(url) else {
             return;
         };
-        self.resolver.refused(&id, url);
+        if !self.streams.is_from_last_session(&id) {
+            self.resolver.refused(&id, url);
+        }
         if !self.streams.again_after_refusal(&id) {
             log!(
                 "preload {} refused again (HTTP 403): resolved at Play",
@@ -706,5 +814,52 @@ mod tests {
         assert_eq!(s.cache.len(), KEEP);
         assert!(s.get(&id("current")).is_some());
         assert!(s.get(&id("h0")).is_none(), "the oldest hint went");
+    }
+
+    fn from(ip: &str, expires_in: Duration) -> ResolvedStream {
+        ResolvedStream {
+            url: format!("https://example.invalid/videoplayback?expire=1&ip={ip}&c=X"),
+            video_title: Some("Title".into()),
+            duration: Some(Duration::from_secs(200)),
+            ..stream(expires_in)
+        }
+    }
+
+    /// The streams of the last session answer once a resolve of this one shows the same
+    /// address in its URL (YouTube's URLs are for one address); until then, none does.
+    #[test]
+    fn saved_streams_answer_after_a_restart_from_the_same_address() {
+        let now = SystemTime::now();
+        let mut before = Streams::default();
+        before.done(&id("a"), Some(&from("1.2.3.4", HOURS)), &[]);
+        before.done(&id("old"), Some(&from("1.2.3.4", FRESH_FOR / 2)), &[]);
+        let mut s = Streams::default();
+        s.restore(&before.saved(now), now);
+        assert!(
+            s.fresh(&id("a"), now).is_none(),
+            "the address isn't known yet"
+        );
+        s.done(&id("b"), Some(&from("1.2.3.4", HOURS)), &[]);
+        let parts = |x: &ResolvedStream| (x.url.clone(), x.video_title.clone(), x.duration);
+        assert_eq!(
+            s.fresh(&id("a"), now).map(parts),
+            before.get(&id("a")).map(parts)
+        );
+        assert!(
+            s.get(&id("old")).is_none(),
+            "one about to expire isn't kept"
+        );
+    }
+
+    #[test]
+    fn saved_streams_from_another_address_are_not_used() {
+        let now = SystemTime::now();
+        let mut before = Streams::default();
+        before.done(&id("a"), Some(&from("1.2.3.4", HOURS)), &[]);
+        let mut s = Streams::default();
+        s.restore(&before.saved(now), now);
+        s.done(&id("b"), Some(&from("5.6.7.8", HOURS)), &[]);
+        assert!(s.fresh(&id("a"), now).is_none());
+        assert_eq!(s.want(&id("a"), now), Want::Start);
     }
 }

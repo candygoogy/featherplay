@@ -464,6 +464,7 @@ impl Controller {
     /// Runs until Ctrl+C or `UiCommand::Quit`, then saves the session.
     pub async fn run(mut self) {
         self.audio.set_volume(self.slider_volume());
+        self.restore_streams();
         // Unreachable keeps the signed-in look: the session is likely fine, and signed out
         // would send the window to Sign in.
         (self.ui.events)(UiEvent::Account {
@@ -555,6 +556,7 @@ impl Controller {
         }
         self.audio.pause();
         self.persist();
+        self.save_streams();
         if let Some(presence) = self.presence.take() {
             presence.quit();
         }
@@ -1034,6 +1036,7 @@ impl Controller {
                         .map(|t| self.player.play_id(t));
                     if let Some(id) = current
                         && let Some(s) = self.streams.forget(&id)
+                        && !self.streams.is_from_last_session(&id)
                     {
                         self.resolver.refused(&id, &s.url);
                     }
@@ -1097,6 +1100,25 @@ impl Controller {
 
     fn source(&self, id: &TrackId) -> Option<StreamSource> {
         self.streams.get(id).map(source)
+    }
+
+    /// The last session's streams that are still good (`Streams::restore`), so a click on
+    /// a song played or resolved ahead then needs no resolve (nor its ads' wait).
+    fn restore_streams(&mut self) {
+        let path = self.paths.cache.join(streams::SAVED_STREAMS);
+        if let Ok(text) = std::fs::read_to_string(&path) {
+            self.streams.restore(&text, SystemTime::now());
+        }
+    }
+
+    /// At quit: the streams resolved this session, for the next one (`Streams::saved`).
+    fn save_streams(&self) {
+        let path = self.paths.cache.join(streams::SAVED_STREAMS);
+        let saved = std::fs::create_dir_all(&self.paths.cache)
+            .and_then(|()| std::fs::write(&path, self.streams.saved(SystemTime::now())));
+        if let Err(e) = saved {
+            log!("saving the streams failed: {e}");
+        }
     }
 
     fn persist(&self) {
