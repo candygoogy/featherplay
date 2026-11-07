@@ -126,6 +126,8 @@ crt=${VCREDIST_DIR:-}
 if [ -z "$crt" ]; then
     crt=$(packaging/windows/find-vcredist.sh "$arch") || die "set VCREDIST_DIR, or install the MSVC build tools for $arch"
 fi
+# Absolute: ISCC reads a relative source path from the .iss's folder, not from here.
+crt=$(cd "$crt" 2>/dev/null && pwd) || die "no folder '${VCREDIST_DIR:-$crt}' for the Visual C++ runtime"
 # Every runtime DLL the exe imports is shipped: the .iss lists them by name, so a new one (a
 # toolset or Skia update) would install fine and fail on a PC without the redistributable.
 shipped="msvcp140.dll vcruntime140.dll"
