@@ -3,7 +3,9 @@
 //! line per step and never fails on a refusal. Without sign-in, five resolves by default;
 //! `RESOLVE_STEPS=retry` asks one song natively three times instead (is a refused URL a
 //! one-off?), `RESOLVE_STEPS=keys` asks one song three times and prints the URLs' query
-//! keys, and `RESOLVE_STEPS=chain` runs only the app's chain after a refused URL:
+//! keys, `RESOLVE_STEPS=chain` runs only the app's chain after a refused URL, and
+//! `RESOLVE_STEPS=gate` asks each of `GATE_IDS` (comma-separated, else the songs below) once
+//! natively and tries its URL at once and after its gate (ads before the song):
 //! `FEATHERPLAY_HOME=<dir> cargo nextest run -p featherplay-audio --run-ignored only -E 'test(resolve_steps)' --no-capture`
 
 use std::path::PathBuf;
@@ -34,7 +36,7 @@ async fn resolve_steps_time_each_step_and_its_first_chunk() {
     let http = reqwest::Client::new();
     let r = YtDlpResolver::new(sidecars(), None);
     let mode = std::env::var("RESOLVE_STEPS").unwrap_or_default();
-    let steps: Vec<(&str, &str, Probe<'_>)> = if mode == "chain" {
+    let steps: Vec<(&str, &str, Probe<'_>)> = if mode == "chain" || mode == "gate" {
         Vec::new()
     } else if mode == "keys" {
         // Which query keys a refused URL has that a playing one hasn't.
@@ -82,6 +84,41 @@ async fn resolve_steps_time_each_step_and_its_first_chunk() {
     }
     if mode == "chain" {
         chain_after_a_refusal(&r, &http).await;
+    }
+    if mode == "gate" {
+        gates(&r, &http).await;
+    }
+}
+
+/// One native answer per song: how long its URL is said to stay closed (ads before the
+/// song), what its first byte gets at once, and what its first chunk gets after the gate.
+async fn gates(r: &YtDlpResolver, http: &reqwest::Client) {
+    let ids = std::env::var("GATE_IDS").unwrap_or_else(|_| SONGS.join(","));
+    for song in ids.split(',').map(str::trim).filter(|s| !s.is_empty()) {
+        let t = Instant::now();
+        let line = match r.probe(&TrackId(song.into()), Probe::Native).await {
+            Err(e) => format!("failed: {e}"),
+            Ok(s) => {
+                let gate = s
+                    .available_at
+                    .and_then(|at| at.duration_since(SystemTime::now()).ok());
+                let at_once = http
+                    .get(&s.url)
+                    .header("Range", "bytes=0-0")
+                    .send()
+                    .await
+                    .map_or(0, |r| r.status().as_u16());
+                format!(
+                    "gate {} | first byte at once {at_once} | first chunk after the gate {}",
+                    gate.map_or("none".into(), |g| format!("{:.1} s", g.as_secs_f64())),
+                    first_chunk(http, &s).await
+                )
+            }
+        };
+        println!(
+            "GATE {song} | {} ms in all | {line}",
+            t.elapsed().as_millis()
+        );
     }
 }
 
