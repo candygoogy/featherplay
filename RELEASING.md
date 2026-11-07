@@ -10,7 +10,9 @@ On `main`, with everything for the release merged:
 
 1. Set `version` under `[workspace.package]` in the root `Cargo.toml`. Every crate inherits
    it. Run `cargo build -p featherplay` once so `Cargo.lock` follows, and commit both:
-   `release.yml` builds with `--locked` and fails on a stale lock file.
+   `release.yml` builds with `--locked` and fails on a stale lock file. `THIRD_PARTY.md`
+   lists the workspace's own crates with that version too: update those rows in the same
+   commit.
 2. In `CHANGELOG.md`, rename `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD`, put a fresh,
    empty `## [Unreleased]` above it, and update the links at the bottom:
 
@@ -118,14 +120,16 @@ Now push the README and site commit from step 4.
 
 ## 6. winget and Scoop
 
-From the published `SHA256SUMS.txt`, take the `featherplay.exe` line. Both manifests install
-the portable exe.
+The hashes come from the published `SHA256SUMS.txt`. winget installs the installers, which
+bring their own Visual C++ runtime, so the manifest has no runtime dependency; Scoop installs
+the portable exes, which need the runtime (the manifest suggests it).
 
 winget, the three files in `packaging/winget/`:
 
 - `PackageVersion: X.Y.Z` in all three;
-- `ReleaseDate`, `InstallerUrl` (`.../releases/download/vX.Y.Z/featherplay.exe`) and
-  `InstallerSha256` in `candygoogy.featherplay.installer.yaml`;
+- in `candygoogy.featherplay.installer.yaml`: `ReleaseDate`, and for each architecture its
+  `InstallerUrl` (`.../releases/download/vX.Y.Z/featherplay-setup-X.Y.Z.exe` and
+  `featherplay-setup-X.Y.Z-arm64.exe`) and `InstallerSha256` (the setup's line, upper case);
 - `ReleaseNotesUrl` in the locale file.
 
 Check them with `winget validate --manifest packaging/winget` and
@@ -133,8 +137,9 @@ Check them with `winget validate --manifest packaging/winget` and
 [microsoft/winget-pkgs](https://github.com/microsoft/winget-pkgs) adding them as
 `manifests/c/candygoogy/featherplay/X.Y.Z/`.
 
-Scoop, `packaging/scoop/featherplay.json`: set `version`, and the `64bit` `url` and `hash`,
-then open a pull request to [ScoopInstaller/Extras](https://github.com/ScoopInstaller/Extras)
+Scoop, `packaging/scoop/featherplay.json`: set `version`, and the `64bit` and `arm64` `url`
+and `hash` (the portable exes' lines), then open a pull request to
+[ScoopInstaller/Extras](https://github.com/ScoopInstaller/Extras)
 adding it as `bucket/featherplay.json`. Once Extras has it, its `checkver` and `autoupdate`
 pick up later releases from `featherplay.exe.sha256`.
 

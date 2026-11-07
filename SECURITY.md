@@ -28,6 +28,18 @@ it.
   (`CookieFile` in `crates/streams/src/ytdlp.rs`). If featherplay was killed in between, it
   deletes the leftover the next time it starts signed in. A way to make that file outlive
   the lookup, land somewhere else, or be read by another Windows user is in scope.
+- The Edge sign-in's temporary profile. "Use Microsoft Edge" runs Edge with a new profile in
+  `%LOCALAPPDATA%\featherplay\cache\signin-*`, keeps only the YouTube Music session from it
+  and deletes the folder afterwards; a start deletes any that a crash left behind
+  (`apps/featherplay/src/pages/sign_in/edge/profile.rs`). A way to make it keep more than
+  that session, or outlive the sign-in, is in scope.
+- The local listeners, both off by default and on 127.0.0.1 only. The local API (port 26538)
+  answers only requests that carry its token, name the loopback address as their host, and
+  don't come from a web page (`crates/integrations/src/local_api/gate.rs`). The Amuse
+  endpoint (port 9863) has no token, as Pear Desktop's Amuse plugin has none: it only says
+  what's playing, and any app or web page on the PC can read that while it's on. Reaching
+  either from another PC, controlling playback through the Amuse endpoint, or using the local
+  API without its token is in scope.
 - The helpers. featherplay downloads yt-dlp and Deno on the first run and checks each file
   against a SHA256 hash pinned in its code (`crates/streams/src/sidecars.rs`), then lets
   yt-dlp update itself. A way to get featherplay to run a file that wasn't checked is in scope.
