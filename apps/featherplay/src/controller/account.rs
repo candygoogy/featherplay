@@ -29,11 +29,13 @@ use featherplay_lastfm::{LastFm, LastFmError};
 use featherplay_listenbrainz::{ListenBrainz, ListenBrainzError};
 use featherplay_store::{
     Accent, AccentColour, CloseAction, DiscordOptions, Equalizer, Hotkeys, Loudness, SecretKey,
-    Settings, StreamingQuality, ThemeMode, delete_secret, get_secret, set_secret,
+    Settings, SkipSilence, StreamingQuality, ThemeMode, delete_secret, get_secret, set_secret,
 };
 use featherplay_ytm::{ApiError, Identity, YtMusic};
 
-use super::{Controller, Msg, UiEvent, compressor, equalizer_bands, prefs, stream_quality};
+use super::{
+    Controller, Msg, UiEvent, compressor, equalizer_bands, prefs, skip_silences, stream_quality,
+};
 use crate::catalog::Source;
 use crate::presence::{self, Presence};
 use crate::scrobbler::{LastfmKeys, Scrobblers, build_keys, lastfm_keys};
@@ -162,6 +164,7 @@ pub enum Change {
     Equalizer(Equalizer, [i8; 5]),
     /// "Even out loudness", the compressor.
     Loudness(Loudness),
+    SkipSilence(SkipSilence),
 }
 
 impl Change {
@@ -214,6 +217,7 @@ impl Change {
                 s.equalizer_bands = bands;
             }
             Change::Loudness(v) => s.loudness = v,
+            Change::SkipSilence(v) => s.skip_silence = v,
         }
     }
 }
@@ -602,6 +606,8 @@ impl Controller {
             // Heard within a device buffer, mid-song too.
             Change::Equalizer(..) => self.audio.set_equalizer(equalizer_bands(&self.settings)),
             Change::Loudness(l) => self.audio.set_compressor(compressor(l)),
+            // From the next silence the decoder reaches.
+            Change::SkipSilence(m) => self.audio.set_skip_silences(skip_silences(m)),
             Change::Sponsorblock(false) => self.segments = None,
             Change::OutputDevice(name) => self.audio.set_device(name.as_deref()),
             Change::Scrobbling(_) | Change::Scrobble(_) | Change::ListenBrainz(_) => {
@@ -1029,6 +1035,7 @@ mod tests {
             Change::TrayClickOpensWindow(true),
             Change::Equalizer(Equalizer::Custom, [4, 0, -3, 0, 2]),
             Change::Loudness(Loudness::Strong),
+            Change::SkipSilence(SkipSilence::Everywhere),
         ];
         for c in &changes {
             c.apply(&mut s);
@@ -1060,6 +1067,7 @@ mod tests {
             (Equalizer::Custom, [4, 0, -3, 0, 2])
         );
         assert_eq!(s.loudness, Loudness::Strong);
+        assert_eq!(s.skip_silence, SkipSilence::Everywhere);
         assert!(!s.check_for_updates && !s.install_updates);
         assert_eq!(s.volume, d.volume, "the volume isn't a page setting");
     }
@@ -1100,6 +1108,14 @@ mod tests {
         assert_eq!(
             crate::controller::compressor(Loudness::Strong),
             Compressor::Strong
+        );
+        assert_eq!(
+            crate::controller::skip_silences(s.skip_silence),
+            featherplay_audio::SkipSilence::Off
+        );
+        assert_eq!(
+            crate::controller::skip_silences(SkipSilence::StartAndEnd),
+            featherplay_audio::SkipSilence::StartAndEnd
         );
     }
 

@@ -11,7 +11,8 @@
 //! process that busy-loops one thread per logical core at normal priority (8.5 s of burn
 //! per round). `UNDER_LOAD_ROUNDS` sets the rounds (default 1); keep it at 3 or fewer, so
 //! the machine is never full for more than ~30 s in all. The master bus runs at its most
-//! work: the equalizer on Bass and the compressor on Strong.
+//! work: the equalizer on Bass and the compressor on Strong, and skip silence looks at every
+//! block (Everywhere).
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -19,7 +20,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 use crate::glitches::Counts;
-use crate::{AudioEngine, AudioEvent, Compressor, StreamSource};
+use crate::{AudioEngine, AudioEvent, Compressor, SkipSilence, StreamSource};
 
 const PLAY: Duration = Duration::from_secs(8);
 
@@ -131,6 +132,7 @@ fn playback_beside_a_full_cpu() {
     let engine = AudioEngine::new_null(tmp());
     engine.set_equalizer(Some([8.0, 0.0, 0.0, 0.0, 0.0]));
     engine.set_compressor(Compressor::Strong);
+    engine.set_skip_silences(SkipSilence::Everywhere);
     let events = engine.events();
     let show = |what: &str, c: Counts| {
         println!(

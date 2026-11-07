@@ -34,7 +34,8 @@ use featherplay_core::tr;
 use featherplay_integrations::sponsorblock::{self, Segment};
 use featherplay_integrations::{NowPlaying, UiCommand, notify_track};
 use featherplay_store::{
-    Loudness, Paths, SecretKey, Settings, StreamingQuality, get_secret, load_session, save_session,
+    Loudness, Paths, SecretKey, Settings, SkipSilence, StreamingQuality, get_secret, load_session,
+    save_session,
 };
 use featherplay_streams::{
     Downloads, Quality, ResolveError, ResolvedStream, Sidecars, YtDlpResolver,
@@ -467,6 +468,8 @@ impl Controller {
         self.audio.set_equalizer(equalizer_bands(&self.settings));
         self.audio
             .set_compressor(compressor(self.settings.loudness));
+        self.audio
+            .set_skip_silences(skip_silences(self.settings.skip_silence));
         self.restore_streams();
         // Unreachable keeps the signed-in look: the session is likely fine, and signed out
         // would send the window to Sign in.
@@ -1019,6 +1022,15 @@ impl Controller {
                     self.push_now_playing();
                     return;
                 }
+                AudioEvent::Skipped => {
+                    // Skipped silence moved the position on: like a seek, the bar's and
+                    // Discord's clocks restart from the engine's position.
+                    self.tick();
+                    self.shown = None;
+                    self.shown_state = None;
+                    self.push_now_playing();
+                    return;
+                }
                 AudioEvent::DeviceLost => {
                     log!("audio device lost");
                     Input::DeviceLost
@@ -1300,6 +1312,15 @@ fn equalizer_bands(s: &Settings) -> Option<[f32; 5]> {
     s.equalizer
         .bands(s.equalizer_bands)
         .map(|b| b.map(f32::from))
+}
+
+/// What the audio engine drops for the "Skip silence" setting.
+fn skip_silences(s: SkipSilence) -> featherplay_audio::SkipSilence {
+    match s {
+        SkipSilence::Off => featherplay_audio::SkipSilence::Off,
+        SkipSilence::StartAndEnd => featherplay_audio::SkipSilence::StartAndEnd,
+        SkipSilence::Everywhere => featherplay_audio::SkipSilence::Everywhere,
+    }
 }
 
 /// The audio bus's compressor for the "Even out loudness" setting.

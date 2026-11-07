@@ -14,5 +14,5 @@ pub use secrets::{SecretKey, StoreError, delete_secret, get_secret, set_secret};
 pub use session::{load_session, save_session};
 pub use settings::{
     Accent, AccentColour, CloseAction, DiscordOptions, DiscordStatusText, DiscordTime, Equalizer,
-    Hotkeys, Loudness, Settings, StreamingQuality, ThemeMode,
+    Hotkeys, Loudness, Settings, SkipSilence, StreamingQuality, ThemeMode,
 };

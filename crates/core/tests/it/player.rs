@@ -565,6 +565,37 @@ fn scrobbles_once_on_play_time_not_seeks() {
 }
 
 #[test]
+fn skipped_silence_does_not_count_as_play_time() {
+    let mut long = track("a");
+    long.duration = Some(secs(600));
+    let mut p = Player::new(prefs(true, true));
+    run(
+        &mut p,
+        Input::PlayTracks {
+            tracks: vec![long, track("b")],
+            start: 0,
+            radio: false,
+        },
+    );
+    run(&mut p, ok_len("a", secs(600)));
+    run(&mut p, Input::AudioStarted);
+    run(&mut p, tick(Duration::ZERO, t0()));
+
+    // The engine skipped 30 s of silence at 10 s: from then on the position runs 30 s
+    // ahead of the time played.
+    let mut fired = Vec::new();
+    for i in 1..=300 {
+        let at = if i < 10 { secs(i) } else { secs(i + 30) };
+        for e in run(&mut p, tick(at, t0() + secs(i))) {
+            if let Effect::Scrobble(t, _) = e {
+                fired.push((i, t.id));
+            }
+        }
+    }
+    assert_eq!(fired, [(240, id("a"))]);
+}
+
+#[test]
 fn stale_continuation_is_ignored() {
     let mut p = Player::new(prefs(true, true));
     let radio = |ids: &[&str]| Input::PlayTracks {

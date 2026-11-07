@@ -8,7 +8,8 @@ use featherplay_core::model::{
 use featherplay_store::settings::SCHEMA;
 use featherplay_store::{
     Accent, AccentColour, CloseAction, DiscordOptions, DiscordStatusText, DiscordTime, Equalizer,
-    Hotkeys, Loudness, Paths, Settings, StreamingQuality, ThemeMode, load_session, save_session,
+    Hotkeys, Loudness, Paths, Settings, SkipSilence, StreamingQuality, ThemeMode, load_session,
+    save_session,
 };
 
 use crate::home::{self, TestHome};
@@ -71,6 +72,7 @@ fn settings_defaults_when_missing() {
             equalizer: Equalizer::Off,
             equalizer_bands: [0; 5],
             loudness: Loudness::Off,
+            skip_silence: SkipSilence::Off,
         }
     );
     assert_eq!(s, Settings::default());
@@ -136,6 +138,7 @@ fn settings_roundtrip() {
         equalizer: Equalizer::Custom,
         equalizer_bands: [6, -2, 0, 3, 12],
         loudness: Loudness::Light,
+        skip_silence: SkipSilence::Everywhere,
     };
     s.save(&p).unwrap();
     assert!(p.config.join("settings.toml").is_file());
@@ -827,6 +830,33 @@ fn the_sound_settings_round_trip_and_load_off_or_flat_when_unknown() {
         assert_eq!((s.equalizer, s.loudness), (Equalizer::Off, Loudness::Off));
         assert_eq!(s.volume, 0.5, "{bands}");
     }
+}
+
+#[test]
+fn skip_silence_round_trips_and_loads_off_when_unknown() {
+    let Some(home) = TestHome::new("settings-skip-silence") else {
+        return;
+    };
+    let p = home.paths();
+    let s = Settings {
+        skip_silence: SkipSilence::StartAndEnd,
+        ..Settings::default()
+    };
+    s.save(&p).unwrap();
+    assert_eq!(Settings::load(&p), s);
+    let file = p.config.join("settings.toml");
+    let text = fs::read_to_string(&file).unwrap();
+    assert!(text.contains("skip_silence = \"start_and_end\""), "{text}");
+
+    fs::write(
+        &file,
+        "skip_silence = \"always\"
+volume = 0.5
+",
+    )
+    .unwrap();
+    let s = Settings::load(&p);
+    assert_eq!((s.skip_silence, s.volume), (SkipSilence::Off, 0.5));
 }
 
 #[test]

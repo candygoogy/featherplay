@@ -12,6 +12,8 @@
 //! - `Started` once per `load`, when its first audio reaches the device after `play()`.
 //! - `Buffering(true)` when the output has been starved for 150 ms (a stalled download, a
 //!   seek past the downloaded data), then `Buffering(false)` when audio resumes.
+//! - `Skipped` each time playback reaches silence that skip silence dropped: the position
+//!   jumped ahead.
 //! - `Ended` when the track played to its end. A seek after that plays again.
 //! - `Error(msg)` when the stream can't be opened, decoded or downloaded; no `Ended` follows.
 //!   An expired URL shows up here as `HTTP 403`.
@@ -39,6 +41,7 @@ mod http;
 mod media;
 mod opus;
 mod priority;
+mod silence;
 #[cfg(test)]
 mod stream_tests;
 mod stretch;
@@ -53,6 +56,7 @@ mod volume;
 pub use devices::output_devices;
 pub use dsp::Compressor;
 pub use engine::AudioEngine;
+pub use silence::SkipSilence;
 pub use tmp::clear_stale_temp;
 pub use volume::perceptual_gain;
 
@@ -69,6 +73,9 @@ pub struct StreamSource {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum AudioEvent {
     Started,
+    /// Silence was skipped (`AudioEngine::set_skip_silences`): `position()` jumped ahead,
+    /// as after a seek.
+    Skipped,
     Ended,
     Buffering(bool),
     DeviceLost,

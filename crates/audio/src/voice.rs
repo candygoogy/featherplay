@@ -16,7 +16,7 @@
 //! once it's done and drops what it copied.
 
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering, fence};
+use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU32, AtomicU64, Ordering, fence};
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Condvar, Mutex, OnceLock};
 use std::time::Duration;
@@ -33,6 +33,7 @@ use crate::glitches::Glitches;
 use crate::head::HeadCache;
 use crate::http::ErrorSlot;
 use crate::media::{Cancel, Media, Opened};
+use crate::silence::{Skip, SkipSilence, Trimmer};
 
 /// Samples the decoder thread decodes between ring updates.
 const BATCH: usize = 4096;
@@ -46,10 +47,14 @@ const SILENCE_FRAMES: usize = 256;
 const RING: Duration = Duration::from_millis(1500);
 /// `end` while the decoder hasn't reached the end of the stream.
 const NO_END: u64 = u64::MAX;
+/// `skip_at` while no skip waits for the reader.
+const NO_SKIP: u64 = u64::MAX;
 
 /// Play state shared by every voice of one engine, and the output's master bus.
 pub(crate) struct Controls {
     pub paused: AtomicBool,
+    /// "Skip silence" (`SkipSilence::to_u8`), which decoder threads read once per batch.
+    pub skip_silence: AtomicU8,
     /// The volume, the equalizer and the compressor, which the output's bus applies to the
     /// mix (`dsp`).
     pub bus: BusControls,
@@ -60,6 +65,7 @@ impl Controls {
     pub fn new() -> Self {
         Self {
             paused: AtomicBool::new(true),
+            skip_silence: AtomicU8::new(0),
             bus: BusControls::default(),
             glitches: Arc::default(),
         }
@@ -108,6 +114,12 @@ pub(crate) struct VoiceShared {
     front_frame: AtomicU64,
     /// Frame index of the chunk the audio thread is playing now; this is `position()`.
     played_frame: AtomicU64,
+    /// Skipped silence (`silence`), one at a time: the decoder dropped `skip_frames` frames
+    /// just before the sample at `skip_at`. The decoder sets both, `skip_at` last; the audio
+    /// thread adds the frames to `front_frame` when it gets there and sets `NO_SKIP`. A
+    /// seek clears it.
+    skip_at: AtomicU64,
+    skip_frames: AtomicU64,
     /// A seek for the decoder thread: target and the engine's sequence number. The engine
     /// and the decoder thread lock it; the audio thread never does.
     seek: Mutex<Option<(Duration, u64)>>,
@@ -139,6 +151,8 @@ impl VoiceShared {
             seek_seen: AtomicU64::new(0),
             front_frame: AtomicU64::new(0),
             played_frame: AtomicU64::new(0),
+            skip_at: AtomicU64::new(NO_SKIP),
+            skip_frames: AtomicU64::new(0),
             seek: Mutex::new(None),
             cv: Condvar::new(),
             stopped: AtomicBool::new(false),
@@ -239,6 +253,19 @@ impl VoiceShared {
             .store(w + samples.len() as u64, Ordering::Release);
     }
 
+    /// The reader has taken the last skip, so the decoder may drop again.
+    fn can_skip(&self) -> bool {
+        self.skip_at.load(Ordering::Acquire) == NO_SKIP
+    }
+
+    /// `frames` were dropped just before the next sample pushed; the caller checked
+    /// `can_skip`.
+    fn mark_skip(&self, frames: u64) {
+        self.skip_frames.store(frames, Ordering::Relaxed);
+        self.skip_at
+            .store(self.write.load(Ordering::Relaxed), Ordering::Release);
+    }
+
     /// The stream ends after the samples written so far.
     fn mark_end(&self, failed: bool) {
         self.failed.store(failed, Ordering::Relaxed);
@@ -254,6 +281,7 @@ impl VoiceShared {
         self.seek_start
             .store(self.write.load(Ordering::Relaxed), Ordering::Relaxed);
         self.seek_frame.store(frame, Ordering::Relaxed);
+        self.skip_at.store(NO_SKIP, Ordering::Relaxed);
         self.end.store(NO_END, Ordering::Relaxed);
         self.failed.store(false, Ordering::Relaxed);
         // SeqCst: `RingSource::finish` relies on its order against `ended`.
@@ -261,16 +289,22 @@ impl VoiceShared {
     }
 }
 
+/// What a decoder thread opens its stream with.
+pub(crate) struct Fetch {
+    pub rt: Arc<Runtime>,
+    pub client: reqwest::Client,
+    pub tmp_dir: PathBuf,
+    pub heads: HeadCache,
+}
+
 /// Starts a voice: its decoder thread opens `src`, then sends `Msg::Ready` and decodes ahead
-/// until the ring is full. The thread holds `rt` so a cancelled download can still wind
-/// down after the engine is gone.
+/// until the ring is full. The thread holds `fetch.rt` so a cancelled download can still
+/// wind down after the engine is gone.
 pub(crate) fn spawn(
     id: u64,
     src: StreamSource,
-    rt: Arc<Runtime>,
-    client: reqwest::Client,
-    tmp_dir: PathBuf,
-    heads: HeadCache,
+    fetch: Fetch,
+    controls: Arc<Controls>,
     tx: Sender<Msg>,
 ) -> Arc<VoiceShared> {
     let shared = Arc::new(VoiceShared::new(id, src.url.clone()));
@@ -280,7 +314,7 @@ pub(crate) fn spawn(
         .name(format!("featherplay-decode-{id}"))
         .spawn(move || {
             crate::priority::raise_decoder();
-            if let Err(e) = decode(&v, &src, &rt, &client, &tmp_dir, &heads, &tx) {
+            if let Err(e) = decode(&v, &src, &fetch, &controls, &tx) {
                 v.failed.store(true, Ordering::Relaxed);
                 let _ = tx.send(Msg::VoiceError {
                     voice: v.id,
@@ -301,13 +335,17 @@ pub(crate) fn spawn(
 fn decode(
     v: &VoiceShared,
     src: &StreamSource,
-    rt: &Runtime,
-    client: &reqwest::Client,
-    tmp_dir: &std::path::Path,
-    heads: &HeadCache,
+    fetch: &Fetch,
+    controls: &Controls,
     tx: &Sender<Msg>,
 ) -> Result<(), String> {
     let error = ErrorSlot::default();
+    let Fetch {
+        rt,
+        client,
+        tmp_dir,
+        heads,
+    } = fetch;
     let Opened { media, len, cancel } =
         Media::open(src, rt.handle(), client, tmp_dir, heads, error.clone())?;
     *v.cancel.lock_or_recover() = cancel;
@@ -324,6 +362,13 @@ fn decode(
     let _ = tx.send(Msg::Ready { voice: v.id });
 
     let mut batch: Vec<Sample> = Vec::with_capacity(BATCH);
+    // What goes into the ring next (the batch after skip silence), and how much of it has.
+    let mut out: Vec<Sample> = Vec::with_capacity(BATCH);
+    let mut sent = 0;
+    // Silence dropped just before `out[skip.at]`.
+    let mut skip: Option<Skip> = None;
+    let mut trimmer = Trimmer::new(channels, rate);
+    let ch = channels.get() as usize;
     // The decoder reached the end of the stream (until the next seek).
     let mut at_end = false;
     loop {
@@ -337,7 +382,7 @@ fn decode(
                 if let Some(s) = g.take() {
                     break Some(s);
                 }
-                if !at_end && v.room(slots) >= BATCH as u64 {
+                if (sent < out.len() || !at_end) && v.room(slots) >= BATCH as u64 {
                     break None;
                 }
                 g = v.cv.wait_or_recover(g);
@@ -350,8 +395,14 @@ fn decode(
             let error =
                 match dec.try_seek(to) {
                     Ok(()) => {
-                        v.publish_seek((to.as_secs_f64() * rate.get() as f64).round() as u64);
+                        let to_frame = (to.as_secs_f64() * rate.get() as f64).round() as u64;
+                        v.publish_seek(to_frame);
                         at_end = false;
+                        // What's waiting is from before the seek.
+                        out.clear();
+                        sent = 0;
+                        skip = None;
+                        trimmer.seeked(to_frame);
                         None
                     }
                     Err(e) => Some(take_error().unwrap_or_else(|| {
@@ -366,18 +417,42 @@ fn decode(
             continue;
         }
 
-        batch.clear();
-        while batch.len() < BATCH {
-            match dec.next() {
-                Some(s) => batch.push(s),
-                None => {
-                    at_end = true;
-                    break;
+        if sent == out.len() {
+            batch.clear();
+            while batch.len() < BATCH {
+                match dec.next() {
+                    Some(s) => batch.push(s),
+                    None => {
+                        at_end = true;
+                        break;
+                    }
+                }
+            }
+            let mode = SkipSilence::from_u8(controls.skip_silence.load(Ordering::Relaxed));
+            sent = 0;
+            if mode == SkipSilence::Off && trimmer.is_idle() {
+                std::mem::swap(&mut batch, &mut out);
+                trimmer.passed();
+            } else {
+                out.clear();
+                skip = trimmer.feed(mode, v.can_skip(), &batch, &mut out);
+                if at_end {
+                    skip = skip.or(trimmer.finish(mode, v.can_skip(), &mut out));
                 }
             }
         }
-        v.push(slots, &batch);
-        if at_end {
+        // As much as fits, in whole frames; a skip is told just before its sample goes in.
+        let room = v.room(slots) as usize;
+        let upto = (sent + room / ch * ch).min(out.len());
+        if let Some(s) = skip.filter(|s| s.at <= upto) {
+            v.push(slots, &out[sent..s.at]);
+            v.mark_skip(s.frames);
+            sent = s.at;
+            skip = None;
+        }
+        v.push(slots, &out[sent..upto]);
+        sent = upto;
+        if at_end && sent == out.len() {
             let error = take_error();
             v.mark_end(error.is_some());
             if let Some(msg) = error {
@@ -439,7 +514,12 @@ impl RingSource {
 
         let read = v.read.load(Ordering::Relaxed);
         let write = v.write.load(Ordering::Acquire);
-        let n = (write - read).min(TAKE as u64 / ch * ch);
+        let skip_at = v.skip_at.load(Ordering::Acquire);
+        let mut n = (write - read).min(TAKE as u64 / ch * ch);
+        if skip_at > read && skip_at < read + n {
+            // A chunk ends at a skip, so the position moves when that sample plays.
+            n = skip_at - read;
+        }
         if n == 0 {
             if v.end.load(Ordering::Acquire) == read {
                 return self.finish(seq);
@@ -463,7 +543,19 @@ impl RingSource {
             return self.silence();
         }
         v.read.store(read + n, Ordering::Release);
-        let front = v.front_frame.load(Ordering::Relaxed);
+        let mut front = v.front_frame.load(Ordering::Relaxed);
+        let mut skipped = false;
+        if skip_at == read {
+            let frames = v.skip_frames.load(Ordering::Relaxed);
+            // Fails only if a seek cleared it meanwhile; the next refill moves there.
+            if v.skip_at
+                .compare_exchange(read, NO_SKIP, Ordering::AcqRel, Ordering::Relaxed)
+                .is_ok()
+            {
+                front += frames;
+                skipped = true;
+            }
+        }
         v.played_frame.store(front, Ordering::Relaxed);
         v.front_frame.store(front + n / ch, Ordering::Relaxed);
         if write - (read + n) < slots.len() / 2 {
@@ -471,6 +563,9 @@ impl RingSource {
         }
         if !v.started.swap(true, Ordering::Relaxed) {
             let _ = self.tx.send(Msg::Started { voice: v.id });
+        }
+        if skipped {
+            let _ = self.tx.send(Msg::Skipped { voice: v.id });
         }
         if v.starved.swap(false, Ordering::Relaxed) {
             let _ = self.tx.send(Msg::Starved {
@@ -611,5 +706,42 @@ mod tests {
         }
         v.publish_seek(0);
         assert_eq!(v.room(slots), slots.len());
+    }
+
+    #[test]
+    fn a_skip_moves_the_position_when_playback_reaches_it_not_before() {
+        let v = voice();
+        let slots = v.slots.get().unwrap();
+        v.push(slots, &ramp(0, 3000));
+        // A second of silence was dropped here (`silence`).
+        v.mark_skip(44_100);
+        v.push(slots, &ramp(3000, 3000));
+        let (tx, rx) = mpsc::channel();
+        let mut src = v.source(playing(), tx).unwrap();
+        let frames = |f: u64| Duration::from_secs_f64(f as f64 / 44_100.0);
+        let heard: Vec<Sample> = src.by_ref().take(3000).collect();
+        assert_eq!(heard, ramp(0, 3000));
+        // The chunk playing now is the one just before the skip.
+        assert_eq!(v.position(), frames(1024));
+        assert!(!rx.try_iter().any(|m| matches!(m, Msg::Skipped { .. })));
+
+        assert_eq!(src.next(), Some(3000.0));
+        assert_eq!(v.position(), frames(1500 + 44_100));
+        let skipped = rx
+            .try_iter()
+            .filter(|m| matches!(m, Msg::Skipped { voice: 1 }))
+            .count();
+        assert_eq!(skipped, 1);
+    }
+
+    #[test]
+    fn a_seek_clears_a_skip_not_yet_reached() {
+        let v = voice();
+        let slots = v.slots.get().unwrap();
+        v.push(slots, &ramp(0, 3000));
+        v.mark_skip(44_100);
+        v.push(slots, &ramp(3000, 3000));
+        v.publish_seek(0);
+        assert!(v.can_skip());
     }
 }

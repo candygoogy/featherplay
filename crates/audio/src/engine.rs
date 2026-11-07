@@ -21,7 +21,7 @@ use crate::devices::{self, OpenError, Output, is_device_lost};
 use crate::glitches::Counts;
 use crate::head::{self, HeadCache};
 use crate::voice::{self, Controls, VoiceShared};
-use crate::{AudioEvent, Compressor, StreamSource, perceptual_gain};
+use crate::{AudioEvent, Compressor, SkipSilence, StreamSource, perceptual_gain};
 
 /// How long the ring must stay empty before `Buffering(true)` goes out. Shorter gaps (a seek
 /// within downloaded data) would only make the UI flicker.
@@ -66,6 +66,10 @@ pub(crate) enum Msg {
     HeadRefused(String),
     // From the audio thread.
     Started {
+        voice: u64,
+    },
+    /// Playback reached silence the decoder dropped: the position jumped ahead.
+    Skipped {
         voice: u64,
     },
     Ended {
@@ -243,6 +247,14 @@ impl AudioEngine {
     /// nothing clips. Heard within one device buffer (~50 ms).
     pub fn set_equalizer(&self, bands: Option<[f32; 5]>) {
         self.controls.bus.set_equalizer(bands);
+    }
+
+    /// "Skip silence": from the next silence the decoder reaches, about 1.5 s ahead of
+    /// what plays. A skip that's heard sends `AudioEvent::Skipped`.
+    pub fn set_skip_silences(&self, mode: SkipSilence) {
+        self.controls
+            .skip_silence
+            .store(mode.to_u8(), Ordering::Relaxed);
     }
 
     /// "Even out loudness". Heard within one device buffer (~50 ms).
@@ -569,6 +581,11 @@ impl Engine {
                     self.emit(AudioEvent::Started);
                 }
             }
+            Msg::Skipped { voice } => {
+                if self.is_current(voice) {
+                    self.emit(AudioEvent::Skipped);
+                }
+            }
             Msg::Ended { voice } => {
                 if self.is_current(voice) {
                     self.clear_buffering();
@@ -628,10 +645,13 @@ impl Engine {
         let shared = voice::spawn(
             self.next_voice,
             src,
-            self.rt.clone(),
-            self.client.clone(),
-            self.tmp_dir.clone(),
-            self.heads.clone(),
+            voice::Fetch {
+                rt: self.rt.clone(),
+                client: self.client.clone(),
+                tmp_dir: self.tmp_dir.clone(),
+                heads: self.heads.clone(),
+            },
+            self.controls.clone(),
             self.tx.clone(),
         );
         Voice {

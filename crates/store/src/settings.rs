@@ -133,6 +133,10 @@ pub struct Settings {
     /// Strong. A value this build doesn't know loads as Off.
     #[serde(deserialize_with = "lenient")]
     pub loudness: Loudness,
+    /// "Skip silence" (Settings > Playback): Off (the default), the start and end of a song,
+    /// or everywhere. A value this build doesn't know loads as Off.
+    #[serde(deserialize_with = "lenient")]
+    pub skip_silence: SkipSilence,
 }
 
 /// The Equalizer setting: off, one of three presets, or the user's own bands.
@@ -170,6 +174,18 @@ impl Equalizer {
             Equalizer::Custom => Some(custom),
         }
     }
+}
+
+/// The "Skip silence" setting: which silences playback passes over.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SkipSilence {
+    #[default]
+    Off,
+    /// The silence before a song starts and after it ends.
+    StartAndEnd,
+    /// Also silences of 2 seconds or more inside a song, shortened.
+    Everywhere,
 }
 
 /// The "Even out loudness" setting: how hard the compressor works.
@@ -347,6 +363,7 @@ impl Default for Settings {
             equalizer: Equalizer::Off,
             equalizer_bands: [0; 5],
             loudness: Loudness::Off,
+            skip_silence: SkipSilence::Off,
         }
     }
 }
