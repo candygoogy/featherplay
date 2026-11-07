@@ -6,8 +6,8 @@ import { Theme, Curves, Icons, Appearance } from "../theme.slint";
 import { Body, Display, PageTitle, Pill, Icon, Cover } from "../parts.slint";
 import { Player } from "../player.slint";
 import { Chips } from "content.slint";
+import { NowPlayingData } from "now_playing.slint";
 import { Nav, PageKind } from "../nav.slint";
-import { SidebarData } from "../sidebar.slint";
 
 // The on/off settings, for `SettingsData.toggled`.
 export enum SettingKey {
@@ -97,6 +97,23 @@ export struct DiscordPreview {
     // The Links option: the title opens the song, the artist their page.
     title-link: bool,
     artist-link: bool,
+    // The cover's hover text, which Discord shows as a line under the artist; empty if none.
+    album: string,
+}
+
+// The part of the Discord profile card an option changes, lit while the option is hovered.
+export enum DiscordPart {
+    none,
+    // The status line under the name (Status text).
+    status,
+    // The progress bar, or the time elapsed (Time).
+    time,
+    // The Play song button.
+    button,
+    // The title and the artist (Links).
+    links,
+    // The whole activity: the options that show it or clear it.
+    activity,
 }
 
 // The dialog open over the page, if any.
@@ -154,6 +171,16 @@ export global SettingsData {
     in property <bool> discord-play-button;
     in property <bool> discord-links;
     in property <DiscordPreview> discord-preview;
+    // The card's part for the option under the pointer, and which option lit it
+    // (`DiscordOption.option`, -1 for none), so an option the pointer leaves clears only its
+    // own (neighbours light the same part). Set by the page; Rust clears them when the page
+    // opens and when Discord status is turned off, as the rows go away under the pointer.
+    in-out property <DiscordPart> discord-lit;
+    in-out property <int> discord-lit-option: -1;
+    // What the card shows lit: nothing while Discord status is off or not connected, when
+    // the card is dimmed.
+    out property <bool> discord-live: discord && discord-state == DiscordState.connected;
+    out property <DiscordPart> discord-card-lit: discord-live ? discord-lit : DiscordPart.none;
     // The local API: the switch, the server's state, the port as typed (and why it was
     // refused), and the token masked (Rust keeps the token itself for Copy).
     in property <bool> local-api;
@@ -553,12 +580,6 @@ global PreviewType {
     out property <color> sub-color: Theme.text2;
 }
 
-component PreviewMain inherits Body {
-    font-size: PreviewType.main-size;
-    font-weight: PreviewType.main-weight;
-    color: PreviewType.main-color;
-}
-
 component PreviewSub inherits Body {
     font-size: PreviewType.sub-size;
     color: PreviewType.sub-color;
@@ -570,16 +591,6 @@ component PreviewHeading inherits Body {
     font-size: PreviewType.sub-size;
     font-weight: 600;
     color: Theme.text1;
-}
-
-// Where Discord shows the part (member lists, the profile), at the end of the part's first
-// line, on its baseline. Not part of the mock, so the quietest grey and never elided.
-component PreviewTag inherits Body {
-    font-size: Theme.t-meta;
-    color: Theme.text3;
-    overflow: clip;
-    horizontal-alignment: right;
-    vertical-alignment: bottom;
 }
 
 // The title (a main line) or the artist (a line under): one line, elided. With the Links
@@ -613,211 +624,349 @@ component PreviewLine inherits Rectangle {
     }
 }
 
-// Member lists and DMs: the account's photo (its initial until then), the name and the
-// status line, at the size Discord lists members.
-component PreviewMember inherits HorizontalLayout {
-    in property <string> status;
-    spacing: Theme.s3;
-    VerticalLayout {
-        alignment: center;
-        Rectangle {
-            width: 32px;
-            height: 32px;
-            border-radius: self.width / 2;
-            background: Theme.avatar;
-            if SidebarData.initial != "": Text {
-                text: SidebarData.initial;
-                font-family: Theme.display-font;
-                font-weight: 700;
-                font-size: Theme.t-body;
-                color: Theme.text1;
-            }
-            if SidebarData.initial == "": Icon {
-                width: 16px;
-                height: 16px;
-                commands: Icons.person;
-                stroke: Theme.text1;
-            }
-            if SidebarData.signed-in && SidebarData.has-avatar: Cover {
-                width: parent.width;
-                height: parent.height;
-                round: true;
-                source: SidebarData.avatar;
-            }
-        }
+// A lit part's mark: the accent's tonal fill and a thin outline in the accent, eased in and
+// out over `t-fast`; clear while the part isn't lit.
+component LitMark inherits Rectangle {
+    in property <bool> lit;
+    border-width: 1px;
+    background: root.lit ? Theme.accent-tonal : Theme.accent-tonal.transparentize(1);
+    border-color: root.lit ? Theme.accent : Theme.accent.transparentize(1);
+    animate background, border-color { duration: Theme.t-fast; easing: Curves.ease-hover; }
+}
+
+// A part of the card an option changes (the time, the title and artist), marked round its
+// edge while the option is hovered.
+component LitPart inherits Rectangle {
+    in property <bool> lit;
+    // How far the mark reaches past the part, across and up and down.
+    property <length> reach: 8px;
+    property <length> rise: 4px;
+    min-width: lay.min-width;
+    preferred-width: lay.preferred-width;
+    min-height: lay.min-height;
+    preferred-height: lay.preferred-height;
+    horizontal-stretch: 1;
+    LitMark {
+        x: -root.reach;
+        y: -root.rise;
+        width: parent.width + 2 * root.reach;
+        height: parent.height + 2 * root.rise;
+        border-radius: Theme.r-s + root.rise;
+        lit: root.lit;
     }
-    VerticalLayout {
-        alignment: center;
-        spacing: 2px;
-        HorizontalLayout {
-            spacing: Theme.s3;
-            PreviewMain {
-                text: @tr("You");
-                vertical-alignment: bottom;
-            }
-            PreviewTag {
-                horizontal-stretch: 1;
-                text: @tr("In member lists");
-            }
-        }
-        PreviewSub {
-            text: root.status;
-        }
+    lay := VerticalLayout {
+        @children
     }
 }
 
-// The activity on the profile: its heading, the cover with the app's badge on its corner and
-// beside it the title, the artist and the time elapsed; then the progress bar and the button
-// across the card, as Discord lays them out.
-component PreviewActivity inherits VerticalLayout {
-    in property <DiscordPreview> p;
-    in property <bool> live;
-    in property <float> at;
-    in property <float> total;
-    property <length> cover: 64px;
-    property <length> badge: 20px;
-    spacing: Theme.s3;
-    HorizontalLayout {
-        spacing: Theme.s3;
-        PreviewHeading {
-            text: @tr("Listening to featherplay");
-        }
-        PreviewTag {
-            horizontal-stretch: 1;
-            text: @tr("On your profile");
-        }
-    }
-    HorizontalLayout {
-        spacing: Theme.s3;
-        // A small badge, so the art stays whole, ringed in the card's colour where it
-        // overhangs the corner.
-        VerticalLayout {
-            alignment: start;
-            Rectangle {
-                width: root.cover;
-                height: root.cover;
-                Cover {
-                    width: parent.width;
-                    height: parent.height;
-                    radius: Theme.r-m;
-                    source: root.live ? Player.cover : @image-url("");
-                }
-                Rectangle {
-                    x: parent.width - self.width + Theme.s1;
-                    y: parent.height - self.height + Theme.s1;
-                    width: root.badge;
-                    height: root.badge;
-                    border-radius: self.width / 2;
-                    background: Theme.ground;
-                    border-width: 2px;
-                    border-color: Theme.card;
-                    Image {
-                        width: 12px;
-                        height: 12px;
-                        source: Theme.dark ? @image-url("../logo/tri-vane-16.svg") : @image-url("../logo/tri-vane-light-16.svg");
-                    }
-                }
-            }
-        }
-        // Centred on the cover, however many lines the Time option leaves.
-        VerticalLayout {
-            alignment: center;
-            spacing: 2px;
-            PreviewLine {
-                text: root.p.title;
-                link: root.p.title-link;
-                main: true;
-            }
-            PreviewLine {
-                text: root.p.artist;
-                link: root.p.artist-link;
-            }
-            if root.p.time == 1: PreviewSub {
-                text: @tr("{} elapsed", Player.clock(root.at));
-            }
-        }
-    }
-    if root.p.time == 0: HorizontalLayout {
-        spacing: Theme.s2;
-        PreviewSub {
-            text: Player.clock(root.at);
-        }
-        Rectangle {
-            horizontal-stretch: 1;
-            Rectangle {
-                y: (parent.height - self.height) / 2;
-                height: 4px;
-                border-radius: 2px;
-                background: Theme.track;
-            }
-            Rectangle {
-                x: 0;
-                y: (parent.height - self.height) / 2;
-                width: parent.width * (root.at / max(root.total, 1)).clamp(0, 1);
-                height: 4px;
-                border-radius: 2px;
-                background: Theme.text1;
-            }
-        }
-        PreviewSub {
-            text: Player.clock(root.total);
-        }
-    }
-    // The button, only when the option is on: across the card as Discord draws it. A picture
-    // of the button, so it has no hover, and a fill a step quieter than the app's own buttons.
-    if root.p.button != "": Rectangle {
-        height: 32px;
-        border-radius: Theme.r-s;
-        background: Theme.hover;
-        Body {
-            text: root.p.button;
-            font-size: Theme.t-meta;
-            font-weight: 600;
-            horizontal-alignment: center;
-            vertical-alignment: center;
-        }
-    }
-}
-
-// The Discord preview, under the options: what they give, drawn in the app's own style (no
-// Discord marks or colours). One card about as wide as Discord's profile card, so the
-// proportions are Discord's: the member-list row on top, as the small part it is, then a
-// hairline and the activity as the profile shows it. A tag at the end of each part's first
-// line says where it shows. The card narrows with the column (beside Up next) and keeps its
-// layout. The time follows the player's once-a-second position; nothing else moves.
-component ActivityPreview inherits HorizontalLayout {
+// The profile card: how friends see you on Discord with these options, drawn in the app's
+// own style (no Discord marks or colours) at about the size of Discord's profile card. A
+// banner in the playing cover's colours (a neutral one for the sample), the avatar over its
+// edge with the online dot, "You" and the status line; then the activity as the profile
+// shows it. `lit` marks the part an option changes. The time follows the player's
+// once-a-second position; nothing else moves.
+component ProfileCard inherits Rectangle {
+    in property <DiscordPart> lit;
     property <DiscordPreview> p: SettingsData.discord-preview;
     property <bool> live: !root.p.sample && Player.has-track;
     property <float> at: root.live ? Player.position-s : 72;
     property <float> total: root.live ? Player.duration-s : 210;
+    // The stage's wash from the cover (`NowPlayingData`); clear until it's known.
+    property <color> wash: Theme.dark ? NowPlayingData.wash-dark : NowPlayingData.wash-light;
+    property <bool> tinted: root.live && root.wash.alpha > 0;
+    // The banner's two ends: the cover's wash into its accent while the accent follows the
+    // cover, else into a lighter step of the wash; the sample's (and grey art's) are neutral.
+    property <color> from: root.tinted ? root.wash.with-alpha(1) : Theme.card;
+    property <color> to: !root.tinted ? Theme.avatar : Theme.follow ? Theme.accent : root.wash.with-alpha(1).brighter(0.4);
+    animate from, to { duration: Theme.t-colour; easing: Curves.ease-hover; }
+    property <length> pad: Theme.s4;
+    property <length> banner-h: 92px;
+    property <length> avatar: 76px;
+    property <length> ring: 6px;
+    property <length> cover: 80px;
+    property <length> badge: 26px;
+    min-height: lay.min-height;
+    preferred-height: lay.preferred-height;
+    min-width: lay.min-width;
+    border-radius: Theme.r-l;
+    background: Theme.ground;
+    border-width: 1px;
+    border-color: Theme.card-edge;
+    drop-shadow-blur: 24px;
+    drop-shadow-offset-y: 8px;
+    drop-shadow-color: Theme.cover-shadow;
     accessible-role: groupbox;
     accessible-label: @tr("Discord preview");
-    alignment: start;
-    padding-bottom: Theme.s4;
+
     Rectangle {
-        preferred-width: 420px;
-        max-width: 420px;
-        border-radius: Theme.r-m;
-        background: Theme.card;
+        x: 1px;
+        y: 1px;
+        width: parent.width - 2px;
+        height: root.banner-h;
+        border-top-left-radius: Theme.r-l - 1px;
+        border-top-right-radius: Theme.r-l - 1px;
+        background: @linear-gradient(120deg, root.from 0%, root.to 100%);
+    }
+    // The avatar: a neutral person (featherplay doesn't have the Discord picture), ringed in
+    // the card's ground where it overhangs the banner, and the online dot on its edge.
+    Rectangle {
+        x: root.pad;
+        y: root.banner-h - root.avatar / 2;
+        width: root.avatar;
+        height: root.avatar;
+        border-radius: self.width / 2;
+        background: Theme.avatar;
+        border-width: root.ring;
+        border-color: Theme.ground;
+        Icon {
+            width: 32px;
+            height: 32px;
+            commands: Icons.person;
+            stroke: Theme.text1;
+        }
+        Rectangle {
+            x: parent.width - self.width - 2px;
+            y: parent.height - self.height - 2px;
+            width: 24px;
+            height: 24px;
+            border-radius: self.width / 2;
+            background: Theme.verified;
+            border-width: 5px;
+            border-color: Theme.ground;
+        }
+    }
+
+    lay := VerticalLayout {
+        padding-top: root.banner-h + root.avatar / 2 + Theme.s2;
+        padding-bottom: root.pad;
+        spacing: Theme.s4;
         VerticalLayout {
-            padding: Theme.s4;
-            PreviewMember {
-                status: root.p.status;
+            padding-left: root.pad;
+            padding-right: root.pad;
+            spacing: Theme.s1;
+            Display {
+                text: @tr("You");
+                font-size: Theme.t-display-xs;
             }
-            VerticalLayout {
-                padding-top: Theme.s4;
-                padding-bottom: Theme.s4;
+            // The status line, as a pill under the name.
+            HorizontalLayout {
+                alignment: start;
                 Rectangle {
-                    height: 1px;
-                    background: Theme.hairline;
+                    border-radius: Theme.r-s + 2px;
+                    background: Theme.hover;
+                    min-width: 0px;
+                    preferred-width: status.preferred-width + 2 * Theme.s2;
+                    LitMark {
+                        border-radius: parent.border-radius;
+                        lit: root.lit == DiscordPart.status;
+                    }
+                    HorizontalLayout {
+                        padding-left: Theme.s2;
+                        padding-right: Theme.s2;
+                        padding-top: 3px;
+                        padding-bottom: 3px;
+                        status := PreviewSub {
+                            text: root.p.status;
+                            color: root.lit == DiscordPart.status ? Theme.text1 : PreviewType.sub-color;
+                        }
+                    }
                 }
             }
-            PreviewActivity {
-                p: root.p;
-                live: root.live;
-                at: root.at;
-                total: root.total;
+        }
+        // The activity: its heading, the cover with the app's badge on its corner and beside
+        // it the title, the artist and the album (and the time elapsed); then the progress
+        // bar and the button across the block, as Discord lays them out.
+        HorizontalLayout {
+            padding-left: root.pad;
+            padding-right: root.pad;
+            Rectangle {
+                border-radius: Theme.r-m + 2px;
+                background: Theme.panel;
+                LitMark {
+                    border-radius: parent.border-radius;
+                    lit: root.lit == DiscordPart.activity;
+                }
+                VerticalLayout {
+                    padding: Theme.s3 + 2px;
+                    spacing: Theme.s3;
+                    PreviewHeading {
+                        text: @tr("Listening to featherplay");
+                    }
+                    HorizontalLayout {
+                        spacing: Theme.s3 + 2px;
+                        VerticalLayout {
+                            alignment: start;
+                            Rectangle {
+                                width: root.cover;
+                                height: root.cover;
+                                Cover {
+                                    width: parent.width;
+                                    height: parent.height;
+                                    radius: Theme.r-m;
+                                    source: root.live ? Player.cover : @image-url("");
+                                }
+                                // A small badge, so the art stays whole, ringed in the block's
+                                // colour where it overhangs the corner.
+                                Rectangle {
+                                    x: parent.width - self.width + Theme.s1 + 2px;
+                                    y: parent.height - self.height + Theme.s1 + 2px;
+                                    width: root.badge;
+                                    height: root.badge;
+                                    border-radius: self.width / 2;
+                                    background: Theme.ground;
+                                    border-width: 3px;
+                                    border-color: Theme.panel;
+                                    Image {
+                                        width: 14px;
+                                        height: 14px;
+                                        source: Theme.dark ? @image-url("../logo/tri-vane-16.svg") : @image-url("../logo/tri-vane-light-16.svg");
+                                    }
+                                }
+                            }
+                        }
+                        // Centred on the cover, however many lines the options leave.
+                        VerticalLayout {
+                            alignment: center;
+                            spacing: 2px;
+                            LitPart {
+                                lit: root.lit == DiscordPart.links;
+                                PreviewLine {
+                                    text: root.p.title;
+                                    link: root.p.title-link;
+                                    main: true;
+                                }
+                                PreviewLine {
+                                    text: root.p.artist;
+                                    link: root.p.artist-link;
+                                }
+                            }
+                            if root.p.album != "": PreviewSub {
+                                text: root.p.album;
+                            }
+                            if root.p.time == 1: LitPart {
+                                lit: root.lit == DiscordPart.time;
+                                PreviewSub {
+                                    text: @tr("{} elapsed", Player.clock(root.at));
+                                }
+                            }
+                        }
+                    }
+                    if root.p.time == 0: LitPart {
+                        lit: root.lit == DiscordPart.time;
+                        HorizontalLayout {
+                            spacing: Theme.s2 + 2px;
+                            PreviewSub {
+                                text: Player.clock(root.at);
+                            }
+                            Rectangle {
+                                horizontal-stretch: 1;
+                                Rectangle {
+                                    y: (parent.height - self.height) / 2;
+                                    height: 4px;
+                                    border-radius: 2px;
+                                    background: Theme.track;
+                                }
+                                Rectangle {
+                                    x: 0;
+                                    y: (parent.height - self.height) / 2;
+                                    width: parent.width * (root.at / max(root.total, 1)).clamp(0, 1);
+                                    height: 4px;
+                                    border-radius: 2px;
+                                    background: Theme.text1;
+                                }
+                            }
+                            PreviewSub {
+                                text: Player.clock(root.total);
+                            }
+                        }
+                    }
+                    // The button, only when the option is on: across the block as Discord
+                    // draws it. A picture of the button, so it has no hover, and a fill a step
+                    // quieter than the app's own buttons.
+                    if root.p.button != "": Rectangle {
+                        height: 34px;
+                        border-radius: Theme.r-s + 2px;
+                        background: Theme.hover;
+                        LitMark {
+                            border-radius: parent.border-radius;
+                            lit: root.lit == DiscordPart.button;
+                        }
+                        Body {
+                            text: root.p.button;
+                            font-size: Theme.t-meta;
+                            font-weight: 600;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
             }
+        }
+    }
+}
+
+// The Discord options' preview: a caption saying whose view it is (or why it's dimmed), the
+// profile card, and a note on how it follows the options. Dimmed, with nothing lit, while
+// Discord status is off or not connected. `card-w` wide, from the left (each part sized to it,
+// so the note wraps at the card's width).
+component DiscordPane inherits VerticalLayout {
+    in property <length> card-w;
+    property <bool> on: SettingsData.discord-live;
+    spacing: Theme.s3;
+    Body {
+        width: root.card-w;
+        text: root.on ? @tr("Preview · how friends see you")
+            : SettingsData.discord-state == DiscordState.unavailable ? @tr("Preview · This build has no Discord app ID")
+            : !SettingsData.discord ? @tr("Preview · Discord status is off")
+            : SettingsData.discord-state == DiscordState.connecting ? @tr("Preview · Connecting to Discord…")
+            : @tr("Preview · Not connected to Discord");
+        font-size: Theme.t-meta;
+        color: Theme.text3;
+    }
+    ProfileCard {
+        width: root.card-w;
+        lit: SettingsData.discord-card-lit;
+        opacity: root.on ? 1 : 0.5;
+    }
+    Body {
+        width: root.card-w;
+        text: SettingsData.discord-preview.sample
+            ? @tr("Nothing is playing, so a sample song stands in. Changes show here as you make them; hover an option to see what it changes.")
+            : @tr("Changes show here as you make them. Hover an option to see what it changes.");
+        font-size: Theme.t-meta;
+        color: Theme.text3;
+        wrap: word-wrap;
+        overflow: clip;
+    }
+}
+
+// A Discord option's rows: hovering them lights the part of the profile card the option
+// changes (`SettingsData.discord-lit`), and tints the rows a shade.
+component DiscordOption inherits Rectangle {
+    in property <DiscordPart> part;
+    // Unique among the options.
+    in property <int> option;
+    min-height: lay.min-height;
+    preferred-height: lay.preferred-height;
+    Rectangle {
+        x: -Theme.s3;
+        width: parent.width + 2 * Theme.s3;
+        border-radius: Theme.r-m;
+        background: ta.has-hover ? Theme.choice-lit : Theme.choice-lit.transparentize(1);
+        animate background { duration: Theme.t-hover; easing: Curves.ease-hover; }
+    }
+    ta := TouchArea {
+        changed has-hover => {
+            if self.has-hover {
+                SettingsData.discord-lit = root.part;
+                SettingsData.discord-lit-option = root.option;
+            } else if SettingsData.discord-lit-option == root.option {
+                SettingsData.discord-lit = DiscordPart.none;
+                SettingsData.discord-lit-option = -1;
+            }
+        }
+        lay := VerticalLayout {
+            @children
         }
     }
 }
@@ -829,6 +978,8 @@ global Rows {
     out property <length> link-h: 36px;
     // Inside a group's panel, left and right: the labels' indent and the controls' inset.
     out property <length> inset: Theme.s5;
+    // Above a panel's first row.
+    out property <length> pad-top: 4px;
     out property <length> pad-y: 18px;
     // The detail under a label: a step brighter than `text2`, still from it (so it keeps the
     // cover's tint while the accent follows it), for a clearer read on the panel.
@@ -842,24 +993,35 @@ component GroupTitle inherits Display {
     vertical-alignment: center;
 }
 
-// A group of settings: its title, then its rows on a rounded panel.
+// A group of settings: its title, then its rows on a rounded panel. The panel can reach
+// `extend` past the column on the right (Integrations, with the Discord card beside its
+// options).
 component Group inherits VerticalLayout {
     in property <string> title;
+    in property <length> extend: 0px;
     spacing: Theme.s3;
     GroupTitle {
         text: root.title;
     }
     Rectangle {
-        border-radius: Theme.r-l;
-        background: Theme.panel;
-        border-width: 1px;
-        border-color: Theme.card-edge;
-        VerticalLayout {
-            padding-top: 4px;
-            padding-bottom: 4px;
-            padding-left: Rows.inset;
-            padding-right: Rows.inset;
-            @children
+        min-width: max(0px, rows.min-width - root.extend);
+        min-height: rows.min-height;
+        preferred-height: rows.preferred-height;
+        Rectangle {
+            x: 0;
+            width: parent.width + root.extend;
+            height: parent.height;
+            border-radius: Theme.r-l;
+            background: Theme.panel;
+            border-width: 1px;
+            border-color: Theme.card-edge;
+            rows := VerticalLayout {
+                padding-top: Rows.pad-top;
+                padding-bottom: 4px;
+                padding-left: Rows.inset;
+                padding-right: Rows.inset;
+                @children
+            }
         }
     }
 }
@@ -1191,6 +1353,20 @@ export component SettingsPage inherits Rectangle {
     property <length> col-w: min(self.width - 2 * Theme.page-pad - root.index-room, root.col-max);
     property <length> block-x: Theme.page-pad;
     property <length> col-x: root.block-x + root.index-room;
+    // The Discord profile card sits beside the Discord options when Integrations' panel can
+    // hold both: the options at `options-min` or more, the gap, the card. The panel then
+    // reaches past the column on the right, by the card and its gap at most, as far as the
+    // page's padding. Otherwise the card sits above the options.
+    property <length> card-w: 400px;
+    property <length> card-gap: Theme.s7;
+    property <length> options-min: 520px;
+    property <length> wide-panel: min(self.width - Theme.page-pad - root.col-x, root.col-w + root.card-gap + root.card-w);
+    property <bool> card-beside: root.wide-panel - 2 * Rows.inset >= root.options-min + root.card-gap + root.card-w;
+    // Where Integrations' rows start in the scrolled content, and how far the card stays
+    // below the page's top while the options scroll past it (its caption level with the
+    // section index's first entry).
+    property <length> integrations-top: col.y + integrations-section.y + Rows.title-h + Theme.s3 + Rows.pad-top;
+    property <length> card-stick: Theme.page-top - Rows.pad-y;
     property <bool> confirm-sign-out: false;
     // How many of the sections below the fold (Integrations, Window, Account) are made: one
     // more each tick after the page's first frame, not all with it. Making and laying out
@@ -1427,146 +1603,203 @@ export component SettingsPage inherits Rectangle {
 
             integrations-section := Group {
                 title: @tr("Integrations");
-                if root.made >= 1: VerticalLayout {
-                    SettingRow {
-                        divider: false;
-                        label: @tr("Discord status");
-                        detail: SettingsData.discord-state == DiscordState.unavailable ? @tr("This build has no Discord app ID.")
-                            : !SettingsData.discord ? @tr("Show \"Listening to\" with the track on your Discord profile.")
-                            : SettingsData.discord-state == DiscordState.connected ? @tr("Connected to Discord.")
-                            : SettingsData.discord-state == DiscordState.connecting ? @tr("Connecting to Discord…")
-                            : SettingsData.discord-auto-reconnect ? @tr("Not connected. Discord isn't running; featherplay tries again while music plays.")
-                            : @tr("Not connected. Discord isn't running, or it closed.");
-                        if SettingsData.discord && SettingsData.discord-state == DiscordState.not-connected: RowButton {
-                            label: @tr("Connect");
-                            clicked => { SettingsData.discord-connect(); }
-                        }
+                extend: root.card-beside ? root.wide-panel - root.col-w : 0px;
+                // Two columns while the card fits beside the options: the rows on the left,
+                // the card's lane on the right. Otherwise the card sits above the options, in
+                // the room kept for it there. One card either way, placed over the layout.
+                if root.made >= 1: block := Rectangle {
+                    property <length> pane-w: root.card-beside ? root.card-w : min(root.card-w, root.col-w - 2 * Rows.inset);
+                    property <length> pane-h: pane.preferred-height + 2 * Rows.pad-y;
+                    min-width: columns.min-width;
+                    min-height: columns.min-height;
+                    preferred-height: columns.preferred-height;
+                    columns := HorizontalLayout {
+                        spacing: root.card-beside ? root.card-gap : 0px;
                         VerticalLayout {
-                            alignment: center;
-                            Switch {
-                                checked: SettingsData.discord;
-                                label: @tr("Discord status");
-                                enabled: SettingsData.discord-state != DiscordState.unavailable;
-                                toggled(on) => { SettingsData.toggled(SettingKey.discord, on); }
+                            horizontal-stretch: 1;
+                            // At the top, when the card beside them is the taller.
+                            alignment: start;
+                            Rectangle {
+                                height: root.card-beside ? 0px : block.pane-h;
                             }
-                        }
-                    }
-                    if SettingsData.discord: VerticalLayout {
-                        ToggleRow {
-                            label: @tr("Reconnect automatically");
-                            detail: @tr("When Discord isn't running or restarts, try again while music plays.");
-                            key: SettingKey.discord-auto-reconnect;
-                            checked: SettingsData.discord-auto-reconnect;
-                        }
-                        SettingRow {
-                            label: @tr("Clear activity");
-                            detail: @tr("Remove the track from your profile until the next one starts or you resume.");
-                            RowButton {
-                                label: @tr("Clear");
-                                enabled: SettingsData.discord-state == DiscordState.connected;
-                                clicked => { SettingsData.discord-clear(); }
+                            discord-rows := VerticalLayout {
+                                DiscordOption {
+                                    part: DiscordPart.activity;
+                                    option: 1;
+                                    SettingRow {
+                                        divider: !root.card-beside;
+                                        label: @tr("Discord status");
+                                        detail: SettingsData.discord-state == DiscordState.unavailable ? @tr("This build has no Discord app ID.")
+                                            : !SettingsData.discord ? @tr("Show \"Listening to\" with the track on your Discord profile.")
+                                            : SettingsData.discord-state == DiscordState.connected ? @tr("Connected to Discord.")
+                                            : SettingsData.discord-state == DiscordState.connecting ? @tr("Connecting to Discord…")
+                                            : SettingsData.discord-auto-reconnect ? @tr("Not connected. Discord isn't running; featherplay tries again while music plays.")
+                                            : @tr("Not connected. Discord isn't running, or it closed.");
+                                        if SettingsData.discord && SettingsData.discord-state == DiscordState.not-connected: RowButton {
+                                            label: @tr("Connect");
+                                            clicked => { SettingsData.discord-connect(); }
+                                        }
+                                        VerticalLayout {
+                                            alignment: center;
+                                            Switch {
+                                                checked: SettingsData.discord;
+                                                label: @tr("Discord status");
+                                                enabled: SettingsData.discord-state != DiscordState.unavailable;
+                                                toggled(on) => { SettingsData.toggled(SettingKey.discord, on); }
+                                            }
+                                        }
+                                    }
+                                }
+                                if SettingsData.discord: VerticalLayout {
+                                    ToggleRow {
+                                        label: @tr("Reconnect automatically");
+                                        detail: @tr("When Discord isn't running or restarts, try again while music plays.");
+                                        key: SettingKey.discord-auto-reconnect;
+                                        checked: SettingsData.discord-auto-reconnect;
+                                    }
+                                    DiscordOption {
+                                        part: DiscordPart.activity;
+                                        option: 2;
+                                        SettingRow {
+                                            label: @tr("Clear activity");
+                                            detail: @tr("Remove the track from your profile until the next one starts or you resume.");
+                                            RowButton {
+                                                label: @tr("Clear");
+                                                enabled: SettingsData.discord-state == DiscordState.connected;
+                                                clicked => { SettingsData.discord-clear(); }
+                                            }
+                                        }
+                                    }
+                                    DiscordOption {
+                                        part: DiscordPart.activity;
+                                        option: 3;
+                                        SettingRow {
+                                            label: @tr("Clear after a pause");
+                                            detail: @tr("Remove the track when playback stays paused this long.");
+                                            MinutesStepper {
+                                                minutes: SettingsData.discord-clear-minutes;
+                                                enabled: SettingsData.discord-clear-on-pause;
+                                            }
+                                            VerticalLayout {
+                                                alignment: center;
+                                                Switch {
+                                                    checked: SettingsData.discord-clear-on-pause;
+                                                    label: @tr("Clear after a pause");
+                                                    toggled(on) => { SettingsData.toggled(SettingKey.discord-clear-on-pause, on); }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    DiscordOption {
+                                        part: DiscordPart.button;
+                                        option: 4;
+                                        ToggleRow {
+                                            label: @tr("Play song button");
+                                            detail: @tr("A button under the activity that opens the song in a browser.");
+                                            key: SettingKey.discord-play-button;
+                                            checked: SettingsData.discord-play-button;
+                                        }
+                                    }
+                                    DiscordOption {
+                                        part: DiscordPart.links;
+                                        option: 5;
+                                        ToggleRow {
+                                            label: @tr("Links");
+                                            detail: @tr("The title opens the song, the artist their page and the cover the album.");
+                                            key: SettingKey.discord-links;
+                                            checked: SettingsData.discord-links;
+                                        }
+                                    }
+                                    DiscordOption {
+                                        part: DiscordPart.time;
+                                        option: 6;
+                                        SettingRow {
+                                            label: @tr("Time");
+                                            detail: @tr("What your profile shows of the track's time while it plays.");
+                                        }
+                                        VerticalLayout {
+                                            padding-bottom: Theme.s2;
+                                            for t[i] in [@tr("Progress bar with the time left"), @tr("Time elapsed only"), @tr("No time")]: DeviceRow {
+                                                name: t;
+                                                selected: i == SettingsData.discord-time;
+                                                clicked => { SettingsData.discord-pick-time(i); }
+                                            }
+                                        }
+                                    }
+                                    DiscordOption {
+                                        part: DiscordPart.status;
+                                        option: 7;
+                                        SettingRow {
+                                            label: @tr("Status text");
+                                            detail: @tr("What your status says in member lists and DMs.");
+                                        }
+                                        VerticalLayout {
+                                            padding-bottom: Theme.s2;
+                                            for t[i] in [@tr("Listening to featherplay"), @tr("Listening to the artist"), @tr("Listening to the song title")]: DeviceRow {
+                                                name: t;
+                                                selected: i == SettingsData.discord-status-text;
+                                                clicked => { SettingsData.discord-pick-status-text(i); }
+                                            }
+                                        }
+                                    }
+                                }
                             }
-                        }
-                        SettingRow {
-                            label: @tr("Clear after a pause");
-                            detail: @tr("Remove the track when playback stays paused this long.");
-                            MinutesStepper {
-                                minutes: SettingsData.discord-clear-minutes;
-                                enabled: SettingsData.discord-clear-on-pause;
+                            ToggleRow {
+                                label: @tr("Local API");
+                                detail: !SettingsData.local-api ? @tr("Let stream overlays, Stream Deck and scripts on this PC show what's playing and control playback. Tools made for Pear's API Server work too.")
+                                    : SettingsData.local-api-state == LocalApiState.failed ? SettingsData.local-api-message
+                                    : SettingsData.local-api-state == LocalApiState.running ? @tr("On at http://127.0.0.1:{}. Only apps on this PC that have the token can use it.", SettingsData.local-api-port)
+                                    : @tr("Starting…");
+                                key: SettingKey.local-api;
+                                checked: SettingsData.local-api;
                             }
-                            VerticalLayout {
-                                alignment: center;
-                                Switch {
-                                    checked: SettingsData.discord-clear-on-pause;
-                                    label: @tr("Clear after a pause");
-                                    toggled(on) => { SettingsData.toggled(SettingKey.discord-clear-on-pause, on); }
+                            if SettingsData.local-api: VerticalLayout {
+                                SettingRow {
+                                    label: @tr("Port");
+                                    detail: SettingsData.local-api-port-error != "" ? SettingsData.local-api-port-error
+                                        : @tr("26538 is the one Pear Desktop uses, so its tools find featherplay.");
+                                    Field {
+                                        width: 96px;
+                                        text <=> SettingsData.local-api-port;
+                                        label: @tr("Local API port");
+                                        placeholder: "26538";
+                                        committed(t) => { SettingsData.local-api-port-entered(t); }
+                                    }
+                                }
+                                SettingRow {
+                                    label: @tr("Access token");
+                                    detail: @tr("Apps send it as \"Authorization: Bearer\" and the token. It stays hidden here, so it doesn't show on stream. Regenerate disconnects the apps using the old one.");
+                                    Body {
+                                        text: SettingsData.local-api-token;
+                                        color: Rows.detail;
+                                        vertical-alignment: center;
+                                        accessible-label: @tr("Token, hidden");
+                                    }
+                                    RowButton {
+                                        label: @tr("Copy");
+                                        enabled: SettingsData.local-api-token != "";
+                                        clicked => { SettingsData.local-api-copy(); }
+                                    }
+                                    RowButton {
+                                        label: @tr("Regenerate");
+                                        clicked => { SettingsData.local-api-regenerate(); }
+                                    }
                                 }
                             }
                         }
-                        ToggleRow {
-                            label: @tr("Play song button");
-                            detail: @tr("A button under the activity that opens the song in a browser.");
-                            key: SettingKey.discord-play-button;
-                            checked: SettingsData.discord-play-button;
+                        lane := Rectangle {
+                            width: root.card-beside ? root.card-w : 0px;
+                            min-height: root.card-beside ? block.pane-h : 0px;
                         }
-                        ToggleRow {
-                            label: @tr("Links");
-                            detail: @tr("The title opens the song, the artist their page and the cover the album.");
-                            key: SettingKey.discord-links;
-                            checked: SettingsData.discord-links;
-                        }
-                        SettingRow {
-                            label: @tr("Time");
-                            detail: @tr("What your profile shows of the track's time while it plays.");
-                        }
-                        VerticalLayout {
-                            padding-bottom: Theme.s2;
-                            for t[i] in [@tr("Progress bar with the time left"), @tr("Time elapsed only"), @tr("No time")]: DeviceRow {
-                                name: t;
-                                selected: i == SettingsData.discord-time;
-                                clicked => { SettingsData.discord-pick-time(i); }
-                            }
-                        }
-                        SettingRow {
-                            label: @tr("Status text");
-                            detail: @tr("What your status says in member lists and DMs.");
-                        }
-                        VerticalLayout {
-                            padding-bottom: Theme.s2;
-                            for t[i] in [@tr("Listening to featherplay"), @tr("Listening to the artist"), @tr("Listening to the song title")]: DeviceRow {
-                                name: t;
-                                selected: i == SettingsData.discord-status-text;
-                                clicked => { SettingsData.discord-pick-status-text(i); }
-                            }
-                        }
-                        SettingRow {
-                            label: @tr("Preview");
-                            detail: SettingsData.discord-preview.sample ? @tr("How Discord shows a song with these options. Nothing is playing, so a sample stands in.")
-                                : @tr("How Discord shows the current song with these options.");
-                        }
-                        ActivityPreview { }
                     }
-                    ToggleRow {
-                        label: @tr("Local API");
-                        detail: !SettingsData.local-api ? @tr("Let stream overlays, Stream Deck and scripts on this PC show what's playing and control playback. Tools made for Pear's API Server work too.")
-                            : SettingsData.local-api-state == LocalApiState.failed ? SettingsData.local-api-message
-                            : SettingsData.local-api-state == LocalApiState.running ? @tr("On at http://127.0.0.1:{}. Only apps on this PC that have the token can use it.", SettingsData.local-api-port)
-                            : @tr("Starting…");
-                        key: SettingKey.local-api;
-                        checked: SettingsData.local-api;
-                    }
-                    if SettingsData.local-api: VerticalLayout {
-                        SettingRow {
-                            label: @tr("Port");
-                            detail: SettingsData.local-api-port-error != "" ? SettingsData.local-api-port-error
-                                : @tr("26538 is the one Pear Desktop uses, so its tools find featherplay.");
-                            Field {
-                                width: 96px;
-                                text <=> SettingsData.local-api-port;
-                                label: @tr("Local API port");
-                                placeholder: "26538";
-                                committed(t) => { SettingsData.local-api-port-entered(t); }
-                            }
-                        }
-                        SettingRow {
-                            label: @tr("Access token");
-                            detail: @tr("Apps send it as \"Authorization: Bearer\" and the token. It stays hidden here, so it doesn't show on stream. Regenerate disconnects the apps using the old one.");
-                            Body {
-                                text: SettingsData.local-api-token;
-                                color: Rows.detail;
-                                vertical-alignment: center;
-                                accessible-label: @tr("Token, hidden");
-                            }
-                            RowButton {
-                                label: @tr("Copy");
-                                enabled: SettingsData.local-api-token != "";
-                                clicked => { SettingsData.local-api-copy(); }
-                            }
-                            RowButton {
-                                label: @tr("Regenerate");
-                                clicked => { SettingsData.local-api-regenerate(); }
-                            }
-                        }
+                    // Beside the options, the card keeps in view while they scroll past it,
+                    // within their rows.
+                    pane := DiscordPane {
+                        x: root.card-beside ? lane.x : 0px;
+                        y: Rows.pad-y + (root.card-beside ? max(0px, min(root.scrolled + root.card-stick - root.integrations-top, discord-rows.height - block.pane-h)) : 0px);
+                        width: block.pane-w;
+                        height: self.preferred-height;
+                        card-w: block.pane-w;
                     }
                 }
             }

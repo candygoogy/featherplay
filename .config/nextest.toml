@@ -60,3 +60,9 @@ threads-required = 'num-test-threads'
 [[profile.default.overrides]]
 filter = 'package(featherplay-streams) | (package(featherplay) & test(/^controller::/))'
 slow-timeout = { period = "30s", terminate-after = 2 }
+
+# Settings' Discord card, settled offscreen in a few seconds: a test that hangs is ended after
+# a minute too.
+[[profile.default.overrides]]
+filter = 'package(featherplay) & binary(app) & test(/^discord_card::/)'
+slow-timeout = { period = "30s", terminate-after = 2 }

@@ -21,6 +21,7 @@ mod card_veil;
 mod close_choice;
 mod content_fade;
 mod diagnostics;
+mod discord_card;
 mod first_frames;
 mod first_run_toast;
 mod frame;

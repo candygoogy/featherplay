@@ -31,8 +31,8 @@ use crate::controller::{
 use crate::presence::Status as DiscordStatus;
 use crate::scrobbler::build_keys;
 use crate::ui::{
-    AccentSwatch, Appearance, DiscordPreview, DiscordState, LastfmState, ListenBrainzState,
-    LocalApiState, Player, SettingKey, SettingsData, SettingsDialog, Theme,
+    AccentSwatch, Appearance, DiscordPart, DiscordPreview, DiscordState, LastfmState,
+    ListenBrainzState, LocalApiState, Player, SettingKey, SettingsData, SettingsDialog, Theme,
 };
 use crate::{follow, language, lyrics, native, shell, toast};
 
@@ -262,6 +262,10 @@ pub fn init(ctx: &Rc<Ctx>) {
 /// The page is being shown: refresh the devices and the Last.fm state.
 pub fn open(ctx: &Rc<Ctx>) {
     show(ctx);
+    if let Some(ui) = ctx.window() {
+        // No option is under the pointer yet (one hovered as the page was left is gone).
+        unlight(&ui.global::<SettingsData>());
+    }
     if ctx.catalog.fixtures().is_some() {
         let names = FIXTURE_DEVICES.iter().map(|d| d.to_string()).collect();
         set_devices(ctx, names);
@@ -513,6 +517,12 @@ pub fn discord_changed(ctx: &Ctx, status: DiscordStatus) {
     });
 }
 
+/// No Discord option lights the profile card.
+fn unlight(data: &SettingsData) {
+    data.set_discord_lit(DiscordPart::None);
+    data.set_discord_lit_option(-1);
+}
+
 fn show_discord(data: &SettingsData, o: &DiscordOptions) {
     data.set_discord_auto_reconnect(o.auto_reconnect);
     data.set_discord_clear_on_pause(o.clear_on_pause);
@@ -591,6 +601,8 @@ pub struct Preview {
     pub title_link: bool,
     /// The artist opens their page on Discord.
     pub artist_link: bool,
+    /// The line under the artist (the cover's hover text): the album, if there is one.
+    pub album: Option<String>,
 }
 
 /// The track's time on the card.
@@ -609,7 +621,7 @@ fn sample_track() -> NowPlaying {
         artist: tr!("Artist").into(),
         // So the sample shows the artist's link as a real track would.
         artist_id: Some("sample".into()),
-        album: None,
+        album: Some(tr!("Album").into()),
         album_id: None,
         art_url: None,
         playing: true,
@@ -643,6 +655,7 @@ pub fn discord_preview(o: &DiscordOptions, np: Option<&NowPlaying>) -> Preview {
         button: card.button.map(|(label, _)| label),
         title_link: card.details_url.is_some(),
         artist_link: card.state_url.is_some(),
+        album: card.image_text,
     }
 }
 
@@ -671,6 +684,7 @@ fn show_preview(ctx: &Ctx, o: &DiscordOptions, state: Option<&PlayerState>) {
             button: p.button.as_deref().unwrap_or_default().into(),
             title_link: p.title_link,
             artist_link: p.artist_link,
+            album: p.album.as_deref().unwrap_or_default().into(),
         });
     PREVIEW.with(|shown| *shown.borrow_mut() = Some(p));
 }
@@ -1041,6 +1055,10 @@ fn toggled(ctx: &Rc<Ctx>, key: SettingKey, on: bool) {
         }
         SettingKey::Discord => {
             data.set_discord(on);
+            if !on {
+                // The other options go, perhaps from under the pointer.
+                unlight(&data);
+            }
             Change::Discord(on)
         }
         SettingKey::CheckForUpdates => {
@@ -1311,6 +1329,7 @@ mod tests {
             ("Song title", "Artist")
         );
         assert_eq!(p.status, "Listening to Song title");
+        assert_eq!(p.album.as_deref(), Some("Album"));
         assert!(!discord_preview(&DiscordOptions::default(), Some(&playing())).sample);
     }
 
