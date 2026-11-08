@@ -98,6 +98,8 @@ pub enum Mark {
     CoverShown,
     /// Search suggestions were shown.
     Suggest,
+    /// Search suggestions for the field's whole text were shown (not an earlier prefix's).
+    SuggestTyped,
     /// The account is known (signed in or out).
     Account,
 }
@@ -1153,8 +1155,8 @@ impl Driver {
     }
 
     /// `type <ms per key> <text>`: the field's text grows a letter every `ms`, as typed; then
-    /// the suggestions for the whole text. Writes the time from each key to the next
-    /// suggestions shown, and from the last key to its suggestions.
+    /// the suggestions for the whole text. Writes the time from the first key to the first
+    /// suggestions shown, and from the last key to the whole text's suggestions.
     async fn typing(&mut self, words: &[String]) -> Result<(), String> {
         let ui = self.ui()?;
         let every: u64 = words
@@ -1175,7 +1177,7 @@ impl Driver {
         }
         let last = keys.last().copied().unwrap_or(t0);
         let shown = until(Duration::from_secs(10), || {
-            first_mark(Mark::Suggest, last).is_some()
+            first_mark(Mark::SuggestTyped, last).is_some()
         })
         .await;
         let mut m = Map::new();
@@ -1186,7 +1188,7 @@ impl Driver {
         );
         m.insert(
             "last_key_to_suggestions".into(),
-            ms_since(last, first_mark(Mark::Suggest, last)),
+            ms_since(last, first_mark(Mark::SuggestTyped, last)),
         );
         m.insert(
             "suggestions_shown".into(),

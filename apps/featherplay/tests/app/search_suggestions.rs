@@ -1,6 +1,7 @@
 //! The suggestions under the top bar's search field, with the recorded reply for "daft pu"
 //! on the offscreen platform and a frozen clock (no window is shown, no request goes out):
-//! nothing is asked until the typing pauses; Enter with no row highlighted searches for the
+//! one or two letters are asked for once the typing pauses, the third at once, and the
+//! answers show while the typing goes on; Enter with no row highlighted searches for the
 //! text as typed, Enter on a highlighted row picks it (a completion searches for itself, a
 //! song plays with its radio); Escape closes the rows first, then clears the field; a link
 //! asks for nothing.
@@ -11,7 +12,7 @@ use featherplay::controller::Action;
 use featherplay::offscreen;
 use featherplay::router::Page;
 use featherplay::snapshot::Scene;
-use featherplay::suggest::DEBOUNCE;
+use featherplay::suggest::{INTERVAL, PAUSE};
 use featherplay::ui::TopBarData;
 use featherplay_core::model::TrackId;
 use slint::platform::{Key, WindowEvent};
@@ -39,8 +40,13 @@ fn ctrl_k(w: &slint::Window) {
 
 /// Ctrl+K, then `text` typed a key every 50 ms: quicker than the pause that asks.
 fn type_in_field(scene: &Scene, text: &str) {
+    ctrl_k(scene.ui.window());
+    keys(scene, text);
+}
+
+/// `text` typed into the field that has the keys, a key every 50 ms.
+fn keys(scene: &Scene, text: &str) {
     let w = scene.ui.window();
-    ctrl_k(w);
     for c in text.chars() {
         tap(w, c.to_string().into());
         offscreen::advance(Duration::from_millis(50));
@@ -77,15 +83,16 @@ fn suggestions_follow_the_typing_and_the_keys() {
     let w = scene.ui.window();
     let field = scene.ui.global::<TopBarData>();
 
-    // While the keys come quicker than the pause, nothing is asked; once it passes, the
-    // answer shows.
-    type_in_field(&scene, "daft pu");
-    assert_eq!(
-        rows(&scene),
-        0,
-        "suggestions asked for before the typing paused"
-    );
-    offscreen::advance(DEBOUNCE);
+    // Two letters quicker than the pause ask for nothing; the third asks at once, and its
+    // answer shows while the typing goes on.
+    type_in_field(&scene, "da");
+    scene.settle();
+    assert_eq!(rows(&scene), 0, "two letters asked for before a pause");
+    keys(&scene, "f");
+    scene.settle();
+    assert_eq!(rows(&scene), ROWS, "the third letter's answer didn't show");
+    keys(&scene, "t pu");
+    offscreen::advance(INTERVAL);
     scene.settle();
     assert_eq!(rows(&scene), ROWS);
     assert!(open(&scene));
@@ -149,7 +156,7 @@ fn suggestions_follow_the_typing_and_the_keys() {
 
     // A link asks for nothing: Enter opens what it points at.
     type_in_field(&scene, "https://youtu.be/Jb6gcoR266U");
-    offscreen::advance(DEBOUNCE);
+    offscreen::advance(PAUSE.max(INTERVAL));
     scene.settle();
     assert!(!open(&scene));
     assert_eq!(rows(&scene), 0);

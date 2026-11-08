@@ -56,6 +56,8 @@ Notable changes to featherplay, newest first. The format follows
   never waits for it: a video clicked before its song version is ready plays as the video,
   to its end. The player bar, the media card, lyrics, Discord and the scrobble name the
   song that plays, with its cover.
+- Search suggestions come while you type, from the third letter, instead of only after you
+  stop: at most five requests a second, and an answer never replaces a newer one.
 
 ### Fixed
 
