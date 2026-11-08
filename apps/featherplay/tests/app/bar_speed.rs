@@ -40,7 +40,7 @@ fn at_1_5x_the_clock_runs_one_and_a_half_seconds_a_second() {
         video_type: VideoType::Song,
         thumbnail: None,
         like: LikeStatus::Indifferent,
-        song_version: None,
+        counterpart: None,
     };
     let from = Duration::from_secs(10);
     let state = PlayerState {

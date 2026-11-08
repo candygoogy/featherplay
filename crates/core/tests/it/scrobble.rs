@@ -13,7 +13,7 @@ fn track(secs: u64) -> Track {
         video_type: VideoType::Song,
         thumbnail: None,
         like: LikeStatus::Indifferent,
-        song_version: None,
+        counterpart: None,
     }
 }
 

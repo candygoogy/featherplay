@@ -105,6 +105,15 @@ pub(super) struct Streams {
     address: Option<String>,
 }
 
+/// How far a track's stream is from playing (`Streams::readiness`), least ready first.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(super) enum Readiness {
+    /// A resolve would start from nothing (a hint still waiting for its turn too).
+    Unresolved,
+    Resolving,
+    Here,
+}
+
 /// What a resolve the player asks for needs.
 #[derive(Debug, PartialEq)]
 pub(super) enum Want {
@@ -150,6 +159,17 @@ impl Streams {
             task: None,
         });
         Want::Start
+    }
+
+    /// How soon the player could load `id` if it asked now.
+    pub fn readiness(&self, id: &TrackId, now: SystemTime) -> Readiness {
+        if self.fresh(id, now).is_some() {
+            Readiness::Here
+        } else if self.running.iter().any(|r| r.id == *id) {
+            Readiness::Resolving
+        } else {
+            Readiness::Unresolved
+        }
     }
 
     /// Whether a hint for `id` would do nothing: its stream is here, running or waiting.
@@ -395,7 +415,9 @@ impl Controller {
     pub(super) fn hint(&mut self, tracks: &[Track]) {
         let now = SystemTime::now();
         for t in tracks {
-            let id = self.player.play_id(t);
+            let mut t = t.clone();
+            self.song_versions.fill(&mut t);
+            let id = self.player.play_id(&t);
             self.streams.hint(&id, now);
         }
         self.start_hints();
@@ -443,6 +465,7 @@ impl Controller {
             None => (None, &[][..]),
         };
         self.resolve_ahead(next, after);
+        self.look_up_ahead(AHEAD);
     }
 
     /// Paused or stopped: the queue's resolves ahead stop.

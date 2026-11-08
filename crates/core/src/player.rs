@@ -100,6 +100,13 @@ pub enum Input {
     /// The account took a rating: every queue entry of the track gets it, so one disliked
     /// now is passed over when it comes round.
     SetLike(TrackId, LikeStatus),
+    /// The song version of the music video `video`, found after it was queued: its entries
+    /// still to come play the song (with "prefer song versions" on). The current one plays
+    /// on as it started.
+    SongVersion {
+        video: TrackId,
+        song: Track,
+    },
 }
 
 /// What core needs from a resolved stream.
@@ -369,6 +376,7 @@ impl Player {
     pub fn handle(&mut self, input: Input) -> Vec<Effect> {
         let mut out = Vec::new();
         let position = self.position;
+        let input = self.song_versions(input);
         // A restored session is the one on disk. Any other input that did something may
         // have changed it (on the safe side: a spurious save is cheap); a tick changes it
         // only by moving the position.
@@ -425,6 +433,12 @@ impl Player {
             Input::SetPrefs(prefs) => {
                 let old = self.prefs;
                 self.prefs = prefs;
+                if prefs.prefer_song_versions != old.prefer_song_versions
+                    && self.queue.set_versions(prefs.prefer_song_versions)
+                {
+                    // The tracks to come; the current one plays on as it is.
+                    self.queue_edited(&mut out);
+                }
                 if prefs.list_end != old.list_end {
                     self.queue.set_list_end(prefs.list_end);
                     self.stop_continuing();
@@ -478,6 +492,20 @@ impl Player {
                     self.queue_edited(&mut out);
                 }
             }
+            Input::SongVersion { video, song } => {
+                // The video's stream is already on its way as the next track's: the song
+                // would make that start wait for another resolve, so the video plays.
+                let preloading = matches!(
+                    &self.preload,
+                    Preload::Requested(p) | Preload::Ready(p, _) if *p == video
+                );
+                if self.prefs.prefer_song_versions
+                    && !preloading
+                    && self.queue.set_song_version(&video, &song)
+                {
+                    self.queue_edited(&mut out);
+                }
+            }
         }
         if self.position != position || (may_change && !out.is_empty()) {
             self.unsaved = true;
@@ -486,6 +514,33 @@ impl Player {
             self.unsaved = false;
         }
         out
+    }
+
+    /// With "prefer song versions" on, the music videos coming into the queue whose song
+    /// version is known come in as that song (`Track::into_song_version`).
+    fn song_versions(&self, input: Input) -> Input {
+        if !self.prefs.prefer_song_versions {
+            return input;
+        }
+        let songs = |tracks: Vec<Track>| tracks.into_iter().map(Track::into_song_version).collect();
+        match input {
+            Input::PlayTracks {
+                tracks,
+                start,
+                radio,
+            } => Input::PlayTracks {
+                tracks: songs(tracks),
+                start,
+                radio,
+            },
+            Input::ContinuationLoaded(seed, tracks) => {
+                Input::ContinuationLoaded(seed, songs(tracks))
+            }
+            Input::PlayNext(t) => Input::PlayNext(t.into_song_version()),
+            Input::PlayNextAll(tracks) => Input::PlayNextAll(songs(tracks)),
+            Input::Enqueue(tracks) => Input::Enqueue(songs(tracks)),
+            other => other,
+        }
     }
 
     /// Repeat All or another list end turned autoplay off: the autoplay tracks not played
@@ -1286,12 +1341,11 @@ impl Player {
     }
 }
 
-/// The id actually played for `t`: its song version when preferred.
+/// The id actually played for `t`: its song version when preferred. (A music video that
+/// came in with a known song version is usually that song already: `into_song_version`.)
 fn play_id(prefs: PlaybackPrefs, t: &Track) -> TrackId {
-    match &t.song_version {
-        Some(song) if prefs.prefer_song_versions && t.video_type == VideoType::MusicVideo => {
-            song.clone()
-        }
+    match t.song_version() {
+        Some(song) if prefs.prefer_song_versions => song.id.clone(),
         _ => t.id.clone(),
     }
 }

@@ -60,7 +60,7 @@ fn the_total_appears_once_the_stream_resolves() {
         video_type: VideoType::Song,
         thumbnail: None,
         like: LikeStatus::Indifferent,
-        song_version: None,
+        counterpart: None,
     };
     let mut p = Player::new(PlaybackPrefs {
         prefer_song_versions: true,

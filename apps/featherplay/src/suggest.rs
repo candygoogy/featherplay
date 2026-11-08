@@ -426,7 +426,7 @@ mod tests {
             video_type: featherplay_core::model::VideoType::Song,
             thumbnail: Some("https://example.test/song".into()),
             like: featherplay_core::model::LikeStatus::Indifferent,
-            song_version: None,
+            counterpart: None,
         };
         SearchSuggestions {
             queries: vec![

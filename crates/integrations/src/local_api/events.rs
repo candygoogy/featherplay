@@ -235,7 +235,7 @@ mod tests {
             video_type: VideoType::MusicVideo,
             thumbnail: None,
             like: LikeStatus::Like,
-            song_version: None,
+            counterpart: None,
         }
     }
 

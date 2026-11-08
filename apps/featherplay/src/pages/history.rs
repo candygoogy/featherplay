@@ -77,7 +77,7 @@ pub fn open(ctx: &Rc<Ctx>) {
                     let (tracks, heads) = flatten(days);
                     let heads: Vec<SharedString> = heads.into_iter().map(Into::into).collect();
                     data.set_days(ModelRc::new(VecModel::from(heads)));
-                    let playing = content::current_id(ctx.player().as_ref());
+                    let playing = content::playing(ctx.player().as_ref());
                     let fresh = LIST.with_borrow_mut(|l| match l.as_mut() {
                         Some(list) => {
                             list.replace(tracks.clone(), playing.as_ref());
@@ -99,8 +99,8 @@ pub fn open(ctx: &Rc<Ctx>) {
 }
 
 pub fn player_changed(_ctx: &Rc<Ctx>, state: &PlayerState) {
-    let id = content::current_id(Some(state));
-    with_list(|l| l.mark_playing(id.as_ref()));
+    let playing = content::playing(Some(state));
+    with_list(|l| l.mark_playing(playing.as_ref()));
 }
 
 /// A new session (or none): the old one's history goes.
@@ -128,7 +128,7 @@ mod tests {
             video_type: VideoType::Song,
             thumbnail: None,
             like: LikeStatus::Indifferent,
-            song_version: None,
+            counterpart: None,
         }
     }
 

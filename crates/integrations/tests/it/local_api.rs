@@ -32,7 +32,7 @@ pub(crate) fn track() -> Track {
         video_type: VideoType::Song,
         thumbnail: Some("https://example.com/cover.jpg".into()),
         like: LikeStatus::Indifferent,
-        song_version: None,
+        counterpart: None,
     }
 }
 

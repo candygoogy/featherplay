@@ -25,7 +25,7 @@ fn track(title: &str, artists: &[&str]) -> Track {
         video_type: VideoType::Song,
         thumbnail: None,
         like: LikeStatus::Indifferent,
-        song_version: None,
+        counterpart: None,
     }
 }
 

@@ -338,7 +338,7 @@ fn show(ctx: &Rc<Ctx>, ui: &AppWindow, tab: LibraryTab, lists: Lists) {
 
 /// The first list builds the rows; later ones update them in place.
 fn show_liked(ctx: &Rc<Ctx>, ui: &AppWindow, tracks: Vec<Track>) {
-    let playing = content::current_id(ctx.player().as_ref());
+    let playing = content::playing(ctx.player().as_ref());
     let updated = LIKED.with(|l| match l.borrow_mut().as_mut() {
         Some(list) => {
             list.replace(tracks.clone(), playing.as_ref());
@@ -407,8 +407,8 @@ fn show_cards(
 
 /// The controller's state changed (track, play/pause, queue).
 pub fn player_changed(_ctx: &Rc<Ctx>, state: &PlayerState) {
-    let id = content::current_id(Some(state));
-    with_liked(|l| l.mark_playing(id.as_ref()));
+    let playing = content::playing(Some(state));
+    with_liked(|l| l.mark_playing(playing.as_ref()));
 }
 
 /// Signed in or out, or another session: the lists were someone else's (startup's first

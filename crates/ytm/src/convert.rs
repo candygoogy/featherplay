@@ -188,7 +188,7 @@ pub fn search_songs(raw: &str) -> Result<Vec<Track>, ApiError> {
                 video_type: extra.video_type_or(&id, VideoType::Song),
                 thumbnail: best(&s.thumbnails),
                 like: LikeStatus::Indifferent,
-                song_version: None,
+                counterpart: None,
                 title: s.title,
                 id: TrackId(id),
             }
@@ -539,7 +539,7 @@ fn playlist_row(item: &Value) -> Option<Track> {
         video_type,
         thumbnail: best_raw(r.pointer(ROW_THUMBNAILS)),
         like: row_like(r),
-        song_version: None,
+        counterpart: None,
     })
 }
 
@@ -1042,7 +1042,7 @@ pub fn album(raw: &str, id: &AlbumId) -> Result<Album, ApiError> {
                 video_type,
                 thumbnail: summary.thumbnail.clone(),
                 like: row_like(r),
-                song_version: None,
+                counterpart: None,
                 title,
                 id: TrackId(tid.to_string()),
             })
@@ -1090,7 +1090,7 @@ pub fn artist(raw: &str) -> Result<Artist, ApiError> {
                 video_type: extra.video_type_or(&id, VideoType::Song),
                 thumbnail: extra.rows.get(&id).and_then(|r| r.thumbnail.clone()),
                 like: like(&s.like_status),
-                song_version: None,
+                counterpart: None,
                 title: s.title,
                 id: TrackId(id),
             }
@@ -1123,7 +1123,7 @@ pub fn artist(raw: &str) -> Result<Artist, ApiError> {
 
 /// Tracks of the watch playlist. Items without a video id (automix
 /// previews and the like) are skipped. A music video whose counterpart is a
-/// song gets that song as `song_version`.
+/// song gets that song as its `counterpart` (its song version).
 pub fn radio(raw: &str) -> Result<Vec<Track>, ApiError> {
     let v = json(raw)?;
     check_error(&v)?;
@@ -1155,10 +1155,18 @@ fn watch_item(item: &Value) -> Option<Track> {
     };
     let mut track = panel_track(primary)?;
     if track.video_type == VideoType::MusicVideo
-        && let Some(song) = counterpart.and_then(panel_track)
+        && let Some(mut song) = counterpart.and_then(panel_track)
         && song.video_type == VideoType::Song
     {
-        track.song_version = Some(song.id);
+        // The counterpart's byline names its artists without links; the video's has them.
+        for a in song.artists.iter_mut().filter(|a| a.id.is_none()) {
+            a.id = track
+                .artists
+                .iter()
+                .find(|v| v.name == a.name)
+                .and_then(|v| v.id.clone());
+        }
+        track.counterpart = Some(Box::new(song));
     }
     Some(track)
 }
@@ -1194,7 +1202,7 @@ fn panel_track(r: &Value) -> Option<Track> {
         thumbnail: best_raw(r.pointer("/thumbnail/thumbnails")),
         // The watch playlist carries no rating.
         like: LikeStatus::Indifferent,
-        song_version: None,
+        counterpart: None,
     })
 }
 
@@ -1673,7 +1681,7 @@ fn watch_track(
             .unwrap_or(VideoType::Other),
         thumbnail,
         like: LikeStatus::Indifferent,
-        song_version: None,
+        counterpart: None,
     })
 }
 

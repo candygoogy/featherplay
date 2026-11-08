@@ -7,7 +7,7 @@
 use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 
-use crate::model::{LikeStatus, ListEnd, RepeatMode, Track, TrackId};
+use crate::model::{LikeStatus, ListEnd, RepeatMode, Track, TrackId, VideoType};
 
 /// Pressing "previous" more than this far into a track restarts it instead.
 const RESTART_THRESHOLD: Duration = Duration::from_secs(3);
@@ -275,6 +275,46 @@ impl Queue {
         changed
     }
 
+    /// The upcoming entries of the music video `video` that know no song version become
+    /// `song` (`Track::into_song_version`). Returns whether any did.
+    pub fn set_song_version(&mut self, video: &TrackId, song: &Track) -> bool {
+        let mut changed = false;
+        let base = (self.index + 1).min(self.tracks.len());
+        for t in &mut self.tracks[base..] {
+            if t.id == *video && t.video_type == VideoType::MusicVideo && t.counterpart.is_none() {
+                let mut v = t.clone();
+                v.counterpart = Some(Box::new(song.clone()));
+                *t = v.into_song_version();
+                changed = true;
+            }
+        }
+        changed
+    }
+
+    /// The upcoming entries with a known counterpart play as their song versions (`songs`)
+    /// or as the videos. Returns whether any changed.
+    pub fn set_versions(&mut self, songs: bool) -> bool {
+        let base = (self.index + 1).min(self.tracks.len());
+        let mut changed = false;
+        for t in &mut self.tracks[base..] {
+            let swap = if songs {
+                t.song_version().is_some()
+            } else {
+                t.video_version().is_some()
+            };
+            if swap {
+                let entry = t.clone();
+                *t = if songs {
+                    entry.into_song_version()
+                } else {
+                    entry.into_video_version()
+                };
+                changed = true;
+            }
+        }
+        changed
+    }
+
     /// Whether this is a radio queue (it continues by itself).
     pub fn is_radio(&self) -> bool {
         self.radio
@@ -329,11 +369,13 @@ impl Queue {
     }
 
     /// Appends radio continuation tracks, skipping ids already in the queue (history
-    /// included) and repeats within `tracks`.
+    /// included) and repeats within `tracks`. A music video and its song version count as
+    /// one recording.
     pub fn append_continuation(&mut self, tracks: Vec<Track>) {
-        let mut seen: HashSet<_> = self.tracks.iter().map(|t| t.id.clone()).collect();
+        let mut seen: HashSet<TrackId> = self.tracks.iter().flat_map(Track::ids).cloned().collect();
         for track in tracks {
-            if seen.insert(track.id.clone()) {
+            if track.ids().all(|id| !seen.contains(id)) {
+                seen.extend(track.ids().cloned());
                 let key = self.push(track);
                 self.continued.insert(key);
             }

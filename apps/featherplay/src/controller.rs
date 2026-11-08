@@ -20,6 +20,7 @@ mod notice;
 mod queue;
 mod reconnect;
 mod silences;
+mod song_versions;
 mod streams;
 
 use std::collections::{HashMap, VecDeque};
@@ -236,6 +237,8 @@ enum Msg {
     Scrobbled(Sent),
     Segments(TrackId, Result<Vec<Segment>, String>),
     Radio(TrackId, Result<Vec<Track>, ApiError>),
+    /// A music video's watch playlist, asked for its song version (`song_versions.rs`).
+    SongVersion(TrackId, Result<Vec<Track>, ApiError>),
     Rated(TrackId, LikeStatus, Result<(), ApiError>),
     /// Sign-in, sign-out and Last.fm results.
     Account(account::AccountMsg),
@@ -270,6 +273,8 @@ pub struct Controller {
     initial: Vec<Input>,
     /// Resolved streams and the resolves running (`streams.rs`).
     streams: streams::Streams,
+    /// Music videos' song versions looked up (`song_versions.rs`).
+    song_versions: song_versions::SongVersions,
     tx: mpsc::UnboundedSender<Msg>,
     rx: mpsc::UnboundedReceiver<Msg>,
     last_state: Option<(Status, Option<TrackId>)>,
@@ -458,6 +463,7 @@ impl Controller {
             volume: opts.volume,
             initial,
             streams: Default::default(),
+            song_versions: Default::default(),
             tx,
             rx,
             last_state: None,
@@ -665,7 +671,10 @@ impl Controller {
             Action::Account(a) => self.account_action(a),
             Action::Reconnect => self.reconnect(),
             Action::Prefetch { id, track } => match track {
-                Some(t) => self.hint(std::slice::from_ref(&t)),
+                Some(t) => {
+                    self.look_up_song_version(&t);
+                    self.hint(std::slice::from_ref(&t));
+                }
                 None => self.hint_id(id),
             },
             // `run` stops for it before it gets here.
@@ -771,6 +780,17 @@ impl Controller {
     fn feed(&mut self, first: Input) {
         let mut inputs = VecDeque::from([first]);
         while let Some(input) = inputs.pop_front() {
+            let input = if self.settings.prefer_song_versions {
+                let now = SystemTime::now();
+                song_versions::with_song_versions(
+                    input,
+                    &self.song_versions,
+                    self.player.queue().current().is_none(),
+                    |id| self.streams.readiness(id, now),
+                )
+            } else {
+                input
+            };
             for effect in self.player.handle(with_likes(input, &self.likes)) {
                 inputs.extend(self.effect(effect));
             }
@@ -822,6 +842,14 @@ impl Controller {
                 self.push_now_playing();
             }
             Effect::FetchContinuation(last) => {
+                if let Some(tracks) = self.song_versions.radio(&last, Instant::now()) {
+                    log!(
+                        "radio continuation after {}: the song version lookup's, {} tracks",
+                        last.0,
+                        tracks.len()
+                    );
+                    return Some(Input::ContinuationLoaded(last, tracks));
+                }
                 log!("fetch radio continuation after {}", last.0);
                 // Signed out too: the radio is the catalogue's.
                 let source = self.ui.catalog.source();
@@ -929,6 +957,7 @@ impl Controller {
             Msg::Continuation(last, result) => match result {
                 Ok(tracks) => {
                     log!("continuation after {}: {} tracks", last.0, tracks.len());
+                    self.song_versions.learn(&tracks);
                     Input::ContinuationLoaded(last, tracks)
                 }
                 Err(e) => {
@@ -988,12 +1017,17 @@ impl Controller {
                 }
                 return;
             }
+            Msg::SongVersion(video, result) => {
+                self.song_version_found(video, result);
+                return;
+            }
             Msg::Scrobbled(sent) => {
                 self.scrobblers.sent(sent);
                 return;
             }
             Msg::Radio(seed, result) => match result {
                 Ok(tracks) if !tracks.is_empty() => {
+                    self.song_versions.learn(&tracks);
                     let start = tracks.iter().position(|t| t.id == seed).unwrap_or(0);
                     log!("radio for {}: {} tracks", seed.0, tracks.len());
                     self.playing_from = playing_from(&tracks, start, true);

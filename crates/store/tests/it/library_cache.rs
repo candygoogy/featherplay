@@ -23,7 +23,7 @@ fn track(id: &str) -> Track {
         video_type: VideoType::Song,
         thumbnail: Some(format!("https://example.invalid/{id}.jpg")),
         like: LikeStatus::Like,
-        song_version: None,
+        counterpart: None,
     }
 }
 

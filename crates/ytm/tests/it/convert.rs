@@ -112,16 +112,24 @@ fn music_video_has_song_version() {
         .find(|t| t.id == TrackId("K0HSD_i2DvA".into()))
         .expect("seed music video");
     assert_eq!(mv.video_type, VideoType::MusicVideo);
-    assert_eq!(mv.song_version, Some(TrackId("Jb6gcoR266U".into())));
+    // The song comes whole: what plays in the video's place is shown as the song.
+    let song = mv.song_version().expect("song version");
+    assert_eq!(song.id, TrackId("Jb6gcoR266U".into()));
+    assert_eq!(song.video_type, VideoType::Song);
+    assert_eq!(song.title, "Around the World");
+    assert!(song.thumbnail.is_some() && song.duration.is_some());
+    // The counterpart's byline is unlinked; the artist link is the video's.
+    assert_eq!(song.artists, mv.artists);
+    assert!(song.artists[0].id.is_some());
 
-    // Radio seeded on the song: an ATV primary keeps no song_version.
+    // Radio seeded on the song: an ATV primary keeps no counterpart.
     let tracks = convert::radio(&fixture("radio")).expect("parse");
     let song = tracks
         .iter()
         .find(|t| t.id == TrackId("Jb6gcoR266U".into()))
         .expect("seed song");
     assert_eq!(song.video_type, VideoType::Song);
-    assert_eq!(song.song_version, None);
+    assert_eq!(song.counterpart, None);
 }
 
 #[test]
@@ -266,14 +274,23 @@ fn home_parses_shelves() {
 #[test]
 fn home_leaves_out_the_music_videos_shelf() {
     let pages = home_pages();
-    assert!(pages[1].contains("Music videos for you"), "the fixture has it");
+    assert!(
+        pages[1].contains("Music videos for you"),
+        "the fixture has it"
+    );
     let shelves = home();
     assert!(shelves.iter().all(|s| s.title != "Music videos for you"));
-    let ids = shelves.iter().flat_map(|s| &s.items).filter_map(|i| match i {
-        HomeItem::Track(t) => Some(t.id.0.as_str()),
-        _ => None,
-    });
-    assert!(ids.into_iter().all(|id| id != "roPiy2JydwA" && id != "bzPr09snprY"));
+    let ids = shelves
+        .iter()
+        .flat_map(|s| &s.items)
+        .filter_map(|i| match i {
+            HomeItem::Track(t) => Some(t.id.0.as_str()),
+            _ => None,
+        });
+    assert!(
+        ids.into_iter()
+            .all(|id| id != "roPiy2JydwA" && id != "bzPr09snprY")
+    );
 }
 
 /// A shelf with a music video among other cards (a genre's) stays.
@@ -281,7 +298,9 @@ fn home_leaves_out_the_music_videos_shelf() {
 fn home_keeps_a_shelf_with_other_cards_beside_music_videos() {
     let mut second: Value = serde_json::from_str(&home_pages()[1]).unwrap();
     let shelf = second
-        .pointer_mut("/continuationContents/sectionListContinuation/contents/1/musicCarouselShelfRenderer")
+        .pointer_mut(
+            "/continuationContents/sectionListContinuation/contents/1/musicCarouselShelfRenderer",
+        )
         .unwrap();
     shelf["contents"][1]["musicTwoRowItemRenderer"]["aspectRatio"] =
         json!("MUSIC_TWO_ROW_ITEM_THUMBNAIL_ASPECT_RATIO_SQUARE");

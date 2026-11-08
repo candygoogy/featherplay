@@ -28,7 +28,7 @@ fn typed(s: &str, video_type: VideoType) -> Track {
         video_type,
         thumbnail: None,
         like: LikeStatus::Indifferent,
-        song_version: None,
+        counterpart: None,
     }
 }
 
@@ -252,15 +252,24 @@ fn radio_fetches_continuation() {
     );
 }
 
+/// Music video "v" whose song version is "s".
+fn video_with_song() -> Track {
+    let mut video = typed("v", VideoType::MusicVideo);
+    video.counterpart = Some(Box::new(Track {
+        title: "Song s".into(),
+        thumbnail: Some("square".into()),
+        ..track("s")
+    }));
+    video
+}
+
 #[test]
 fn music_video_plays_song_version() {
-    let mut video = typed("v", VideoType::MusicVideo);
-    video.song_version = Some(id("s"));
     let play = |p: &mut Player| {
         run(
             p,
             Input::PlayTracks {
-                tracks: vec![video.clone()],
+                tracks: vec![video_with_song()],
                 start: 0,
                 radio: false,
             },
@@ -272,6 +281,148 @@ fn music_video_plays_song_version() {
 
     let mut p = Player::new(prefs(false, true));
     assert_eq!(play(&mut p), [Effect::Resolve(id("v"))]);
+}
+
+/// What plays is the song, so what's shown and scrobbled is the song's; the entry keeps
+/// the video, for the list it was started from.
+#[test]
+fn a_music_video_with_a_song_version_is_queued_as_the_song() {
+    let mut p = Player::new(prefs(true, true));
+    run(
+        &mut p,
+        Input::PlayTracks {
+            tracks: vec![video_with_song()],
+            start: 0,
+            radio: false,
+        },
+    );
+    let current = p.queue().current().unwrap();
+    assert_eq!(current.id, id("s"));
+    assert_eq!(current.title, "Song s");
+    assert_eq!(current.video_type, VideoType::Song);
+    assert_eq!(current.video_version(), Some(&id("v")));
+
+    let mut p = Player::new(prefs(false, true));
+    run(&mut p, Input::Enqueue(vec![video_with_song()]));
+    assert_eq!(p.queue().current().unwrap().id, id("v"), "videos preferred");
+}
+
+/// A song version found once the video is queued: the entries to come play the song; the
+/// current one plays on as it started, never switching mid-song.
+#[test]
+fn a_song_version_found_later_changes_only_the_entries_to_come() {
+    let video = typed("v", VideoType::MusicVideo);
+    let mut p = Player::new(prefs(true, true));
+    run(
+        &mut p,
+        Input::PlayTracks {
+            tracks: vec![video.clone(), track("x"), video],
+            start: 0,
+            radio: false,
+        },
+    );
+    let song = video_with_song().counterpart.unwrap();
+    let fx = p.handle(Input::SongVersion {
+        video: id("v"),
+        song: *song,
+    });
+    assert!(fx.contains(&Effect::StateChanged), "{fx:?}");
+    assert_eq!(p.queue().current().unwrap().id, id("v"));
+    let upcoming: Vec<&str> = p
+        .queue()
+        .upcoming()
+        .iter()
+        .map(|t| t.id.0.as_str())
+        .collect();
+    assert_eq!(upcoming, ["x", "s"]);
+    assert_eq!(p.queue().upcoming()[1].video_version(), Some(&id("v")));
+}
+
+/// The video plays (its song version wasn't ready), and its radio starts with the video
+/// again, as its song: that's the same recording, not the next song.
+#[test]
+fn a_continuation_does_not_repeat_the_video_playing_as_its_song() {
+    let mut p = Player::new(prefs(true, true));
+    run(
+        &mut p,
+        Input::PlayTracks {
+            tracks: vec![typed("v", VideoType::MusicVideo)],
+            start: 0,
+            radio: true,
+        },
+    );
+    run(
+        &mut p,
+        Input::ContinuationLoaded(id("v"), vec![video_with_song(), track("a")]),
+    );
+    let upcoming: Vec<&str> = p
+        .queue()
+        .upcoming()
+        .iter()
+        .map(|t| t.id.0.as_str())
+        .collect();
+    assert_eq!(upcoming, ["a"]);
+}
+
+/// The setting turned off: the entries to come play as the videos again; turned on, as
+/// the songs.
+#[test]
+fn turning_song_versions_off_and_on_swaps_the_entries_to_come() {
+    let mut p = Player::new(prefs(true, true));
+    run(
+        &mut p,
+        Input::PlayTracks {
+            tracks: vec![track("a"), video_with_song()],
+            start: 0,
+            radio: false,
+        },
+    );
+    assert_eq!(p.queue().upcoming()[0].id, id("s"));
+    run(&mut p, Input::SetPrefs(prefs(false, true)));
+    assert_eq!(p.queue().upcoming()[0].id, id("v"));
+    assert_eq!(p.play_id(&p.queue().upcoming()[0]), id("v"));
+    run(&mut p, Input::SetPrefs(prefs(true, true)));
+    assert_eq!(p.queue().upcoming()[0].id, id("s"));
+}
+
+/// The next video's stream is already being fetched: a song version found now would make
+/// its start wait for another, so it plays as the video.
+#[test]
+fn a_song_version_found_after_the_next_video_is_preloaded_waits() {
+    let mut p = playing(&["a"]);
+    run(
+        &mut p,
+        Input::Enqueue(vec![typed("v", VideoType::MusicVideo)]),
+    );
+    assert_eq!(p.ahead(1), [id("v")]);
+    let song = video_with_song().counterpart.unwrap();
+    run(
+        &mut p,
+        Input::SongVersion {
+            video: id("v"),
+            song: *song,
+        },
+    );
+    assert_eq!(p.queue().upcoming()[0].id, id("v"));
+}
+
+/// A radio's continuation comes in as song versions too.
+#[test]
+fn a_continuation_queues_song_versions() {
+    let mut p = Player::new(prefs(true, true));
+    run(
+        &mut p,
+        Input::PlayTracks {
+            tracks: vec![track("a")],
+            start: 0,
+            radio: true,
+        },
+    );
+    run(
+        &mut p,
+        Input::ContinuationLoaded(id("a"), vec![video_with_song()]),
+    );
+    assert_eq!(p.queue().upcoming()[0].id, id("s"));
 }
 
 #[test]
@@ -1125,8 +1276,7 @@ fn a_reused_stream_fills_in_the_duration_of_a_new_queue() {
 
 #[test]
 fn the_song_versions_length_replaces_the_videos() {
-    let mut video = typed("v", VideoType::MusicVideo);
-    video.song_version = Some(id("s"));
+    let mut video = video_with_song();
     video.duration = Some(secs(260));
     let mut p = Player::new(prefs(true, true));
     run(

@@ -56,8 +56,60 @@ pub struct Track {
     pub video_type: VideoType,
     pub thumbnail: Option<String>,
     pub like: LikeStatus,
-    /// The ATV counterpart of a `MusicVideo`, if known.
-    pub song_version: Option<TrackId>,
+    /// The same recording's other version, if known: a `MusicVideo`'s song (ATV), or for
+    /// the song that plays in a music video's place (`into_song_version`), that video.
+    /// Missing from what earlier versions saved.
+    #[serde(default)]
+    pub counterpart: Option<Box<Track>>,
+}
+
+impl Track {
+    /// A music video's song version, when it has one.
+    pub fn song_version(&self) -> Option<&Track> {
+        self.counterpart
+            .as_deref()
+            .filter(|s| self.video_type == VideoType::MusicVideo && s.video_type == VideoType::Song)
+    }
+
+    /// The video a song version plays for: what the list it started from shows.
+    pub fn video_version(&self) -> Option<&TrackId> {
+        self.counterpart
+            .as_deref()
+            .filter(|v| self.video_type == VideoType::Song && v.video_type == VideoType::MusicVideo)
+            .map(|v| &v.id)
+    }
+
+    /// A music video with a song version becomes that song, with the video as its
+    /// counterpart: the bar, the media card, the lyrics and the scrobble then name the
+    /// song that plays. Anything else stays as it is.
+    pub fn into_song_version(mut self) -> Track {
+        if self.song_version().is_none() {
+            return self;
+        }
+        let Some(mut song) = self.counterpart.take() else {
+            return self;
+        };
+        song.counterpart = Some(Box::new(self));
+        *song
+    }
+
+    /// The other way round: a song version becomes the music video it plays for again,
+    /// with the song as its counterpart. Anything else stays as it is.
+    pub fn into_video_version(mut self) -> Track {
+        if self.video_version().is_none() {
+            return self;
+        }
+        let Some(mut video) = self.counterpart.take() else {
+            return self;
+        };
+        video.counterpart = Some(Box::new(self));
+        *video
+    }
+
+    /// The ids this entry stands for: its own, and its counterpart's.
+    pub fn ids(&self) -> impl Iterator<Item = &TrackId> {
+        std::iter::once(&self.id).chain(self.counterpart.as_deref().map(|c| &c.id))
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]

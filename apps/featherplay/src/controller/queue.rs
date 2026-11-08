@@ -116,6 +116,12 @@ pub fn with_likes(mut input: Input, likes: &HashMap<TrackId, LikeStatus>) -> Inp
         if let Some(like) = likes.get(&t.id) {
             t.like = *like;
         }
+        // A song version takes the queue entry's place (`Track::into_song_version`).
+        if let Some(song) = t.counterpart.as_deref_mut()
+            && let Some(like) = likes.get(&song.id)
+        {
+            song.like = *like;
+        }
     }
     input
 }

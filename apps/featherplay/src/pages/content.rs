@@ -34,7 +34,22 @@ pub struct TrackList {
     /// album, a radio).
     pub from: PlayingFrom,
     asked: Vec<bool>,
-    playing: Option<TrackId>,
+    playing: Option<Playing>,
+}
+
+/// What a list marks as playing: the current track, and the music video it plays in the
+/// place of when it's that video's song version (`Track::into_song_version`), since the
+/// list shows the video.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Playing {
+    id: TrackId,
+    video: Option<TrackId>,
+}
+
+impl Playing {
+    fn is(&self, id: &TrackId) -> bool {
+        self.id == *id || self.video.as_ref() == Some(id)
+    }
 }
 
 impl TrackList {
@@ -50,14 +65,14 @@ impl TrackList {
             from: PlayingFrom::default(),
             playing: None,
         };
-        list.mark_playing(current_id(ctx.player().as_ref()).as_ref());
+        list.mark_playing(playing(ctx.player().as_ref()).as_ref());
         (list, model)
     }
 
     /// Shows `tracks` in place of the current ones, in the same model: only the rows that
     /// changed are set, so a list on screen keeps its scroll position and doesn't flash. A
     /// song still in the list keeps the cover already loaded for it, wherever it moved.
-    pub fn replace(&mut self, tracks: Vec<Track>, playing: Option<&TrackId>) {
+    pub fn replace(&mut self, tracks: Vec<Track>, playing: Option<&Playing>) {
         song_menu::remember(&tracks);
         let mut covers: HashMap<String, Image> = HashMap::new();
         for (i, asked) in self.asked.iter().enumerate() {
@@ -136,14 +151,14 @@ impl TrackList {
         });
     }
 
-    /// Marks the rows of `id` as playing and clears the old mark; cheap when unchanged.
-    pub fn mark_playing(&mut self, id: Option<&TrackId>) {
-        if self.playing.as_ref() == id {
+    /// Marks the rows `playing` names and clears the old mark; cheap when unchanged.
+    pub fn mark_playing(&mut self, playing: Option<&Playing>) {
+        if self.playing.as_ref() == playing {
             return;
         }
         for (i, t) in self.tracks.iter().enumerate() {
-            let now = Some(&t.id) == id;
-            let was = self.playing.as_ref() == Some(&t.id);
+            let now = playing.is_some_and(|p| p.is(&t.id));
+            let was = self.playing.as_ref().is_some_and(|p| p.is(&t.id));
             if now != was
                 && let Some(mut row) = self.rows.row_data(i)
             {
@@ -151,7 +166,7 @@ impl TrackList {
                 self.rows.set_row_data(i, row);
             }
         }
-        self.playing = id.cloned();
+        self.playing = playing.cloned();
     }
 
     /// Plays the list from `start`.
@@ -206,9 +221,13 @@ impl TrackList {
     }
 }
 
-/// The current track's id.
-pub fn current_id(state: Option<&PlayerState>) -> Option<TrackId> {
-    state.and_then(|s| s.current.as_ref()).map(|t| t.id.clone())
+/// What the lists mark as playing: the current track.
+pub fn playing(state: Option<&PlayerState>) -> Option<Playing> {
+    let t = state.and_then(|s| s.current.as_ref())?;
+    Some(Playing {
+        id: t.id.clone(),
+        video: t.video_version().cloned(),
+    })
 }
 
 /// Sets `liked` on every row of `id` in `rows`.
@@ -384,7 +403,7 @@ mod tests {
             video_type: VideoType::Song,
             thumbnail: None,
             like: LikeStatus::Indifferent,
-            song_version: None,
+            counterpart: None,
         }
     }
 

@@ -183,7 +183,7 @@ impl Demo {
             } else {
                 LikeStatus::Indifferent
             },
-            song_version: None,
+            counterpart: None,
         }
     }
 

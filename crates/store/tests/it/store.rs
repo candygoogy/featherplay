@@ -571,7 +571,17 @@ fn session_roundtrip() {
         video_type: VideoType::MusicVideo,
         thumbnail: Some("https://example.invalid/t.jpg".into()),
         like: LikeStatus::Like,
-        song_version: Some(TrackId("atv123".into())),
+        counterpart: Some(Box::new(Track {
+            id: TrackId("atv123".into()),
+            title: "Song".into(),
+            artists: Vec::new(),
+            album: None,
+            duration: None,
+            video_type: VideoType::Song,
+            thumbnail: None,
+            like: LikeStatus::Indifferent,
+            counterpart: None,
+        })),
     };
     let s = Session {
         queue: vec![
@@ -580,7 +590,7 @@ fn session_roundtrip() {
                 album: None,
                 duration: None,
                 thumbnail: None,
-                song_version: None,
+                counterpart: None,
                 video_type: VideoType::Song,
                 like: LikeStatus::Indifferent,
                 ..track("bbb", &"long ".repeat(60))
@@ -594,6 +604,14 @@ fn session_roundtrip() {
     };
     save_session(&s, &p).unwrap();
     assert_eq!(load_session(&p), Some(s));
+
+    // Saved by 0.1.2 and before: a music video's song version as a bare id.
+    let old = r#"{"queue":[{"id":"v","title":"T","artists":[],"album":null,"duration":null,
+        "video_type":"MusicVideo","thumbnail":null,"like":"Indifferent","song_version":"atv123"}],
+        "index":0,"position_ms":0,"radio":true,"shuffle":false,"repeat":"Off"}"#;
+    fs::write(p.config.join("session.json"), old).unwrap();
+    let restored = load_session(&p).expect("an older session still loads");
+    assert_eq!(restored.queue[0].counterpart, None);
 
     fs::write(p.config.join("session.json"), "{\"queue\": [").unwrap();
     assert_eq!(load_session(&p), None);
