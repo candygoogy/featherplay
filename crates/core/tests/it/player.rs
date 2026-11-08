@@ -45,6 +45,7 @@ fn prefs(prefer_song_versions: bool, skip_non_music_in_radio: bool) -> PlaybackP
         skip_disliked: true,
         crossfade: None,
         fade_on_skip: false,
+        speed_percent: 100,
     }
 }
 
@@ -568,6 +569,38 @@ fn scrobbles_once_on_play_time_not_seeks() {
     }
     // Once, after 240 s of play time; the seek's 300 s jump didn't count.
     assert_eq!(fired, [(240, id("a"), t0())]);
+}
+
+#[test]
+fn a_tick_at_2x_counts_twice_its_wall_time_towards_the_scrobble() {
+    let mut long = track("a");
+    long.duration = Some(secs(600));
+    let mut p = Player::new(PlaybackPrefs {
+        speed_percent: 200,
+        ..prefs(true, true)
+    });
+    run(
+        &mut p,
+        Input::PlayTracks {
+            tracks: vec![long, track("b")],
+            start: 0,
+            radio: false,
+        },
+    );
+    run(&mut p, ok_len("a", secs(600)));
+    run(&mut p, Input::AudioStarted);
+    run(&mut p, tick(Duration::ZERO, t0()));
+
+    let mut fired = Vec::new();
+    for i in 1..=200 {
+        for e in run(&mut p, tick(secs(2 * i), t0() + secs(i))) {
+            if let Effect::Scrobble(t, _) = e {
+                fired.push((i, t.id));
+            }
+        }
+    }
+    // 240 s of the song heard, in 120 s.
+    assert_eq!(fired, [(120, id("a"))]);
 }
 
 #[test]

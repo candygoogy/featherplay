@@ -13,6 +13,7 @@ use std::time::{Duration, Instant};
 
 use featherplay_core::model::{LikeStatus, RepeatMode, TrackId};
 use featherplay_core::tr;
+use featherplay_integrations::NowPlaying;
 use slint::{ComponentHandle, Timer, TimerMode};
 
 use crate::app::Ctx;
@@ -29,6 +30,8 @@ struct Clock {
     /// Position at `since`, and whether it advances (sound is playing).
     at: Cell<Duration>,
     since: Cell<Option<Instant>>,
+    /// The playback speed: the song's seconds per second since `since` (unset: 1).
+    speed: Cell<f32>,
     duration: Cell<Option<Duration>>,
     has_track: Cell<bool>,
     timer: Timer,
@@ -36,8 +39,14 @@ struct Clock {
 }
 
 impl Clock {
+    fn speed(&self) -> f32 {
+        let s = self.speed.get();
+        if s > 0.0 { s } else { 1.0 }
+    }
+
     fn now(&self) -> Duration {
-        let at = self.at.get() + self.since.get().map(|s| s.elapsed()).unwrap_or_default();
+        let played = self.since.get().map(|s| s.elapsed()).unwrap_or_default();
+        let at = self.at.get() + played.mul_f32(self.speed());
         match self.duration.get() {
             Some(d) => at.min(d),
             None => at,
@@ -202,12 +211,16 @@ pub fn apply(ctx: &Rc<Ctx>, state: &PlayerState) {
 
     clock.has_track.set(true);
     clock.at.set(state.position);
+    clock.speed.set(state.speed);
     clock.since.set(state.audible.then(Instant::now));
     clock.duration.set(duration);
     show_position(ctx, state.position);
     schedule(ctx);
 
-    shell::apply(now_playing(track, state.playing, state.position));
+    shell::apply(NowPlaying {
+        speed: state.speed,
+        ..now_playing(track, state.playing, state.position)
+    });
     shell::set_tray_menu(&p);
     mini::update(ctx);
 }
@@ -234,7 +247,9 @@ fn schedule(ctx: &Rc<Ctx>) {
         return;
     }
     let ms = clock.now().as_millis() % 1000;
-    let wait = Duration::from_millis((1000 - ms) as u64 + 5);
+    // The next whole second of the song comes sooner when it plays faster.
+    let wait =
+        Duration::from_millis((1000 - ms) as u64).div_f32(clock.speed()) + Duration::from_millis(5);
     let weak = Rc::downgrade(ctx);
     clock.timer.start(TimerMode::SingleShot, wait, move || {
         let Some(ctx) = weak.upgrade() else { return };

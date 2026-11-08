@@ -182,6 +182,21 @@ pub struct PlaybackPrefs {
     /// With crossfade on, Next, Previous and a click on another song fade too
     /// (`SKIP_FADE` at most) instead of cutting.
     pub fade_on_skip: bool,
+    /// The playback speed in percent (100 is normal). Scrobbling counts the song's time
+    /// heard, and a crossfade's length stays in listening time.
+    pub speed_percent: u16,
+}
+
+impl PlaybackPrefs {
+    /// How much of the song `listening` plays at the speed (exact at 100 %).
+    fn song_time(&self, listening: Duration) -> Duration {
+        listening * u32::from(self.speed_percent.max(1)) / 100
+    }
+
+    /// How long listening to `song` of the song takes at the speed.
+    fn listening_time(&self, song: Duration) -> Duration {
+        song * 100 / u32::from(self.speed_percent.max(1))
+    }
 }
 
 /// Where the current track is in being made playable.
@@ -726,7 +741,8 @@ impl Player {
                 self.scrobble.start(t, now);
             }
         } else if self.status == Status::Playing
-            && let Some((track, started)) = self.scrobble.played(delta)
+            // The song's time heard, so the threshold means the same at any speed.
+            && let Some((track, started)) = self.scrobble.played(self.prefs.song_time(delta))
             && eligible(track.video_type, self.prefs.scrobble_other_media)
         {
             out.push(Effect::Scrobble(track, started));
@@ -814,13 +830,17 @@ impl Player {
             return;
         };
         let end = music_end.map_or(length, |m| m.min(length));
-        let fade = want
+        // The fade lasts `want` of listening, which plays `want × speed` of each song.
+        let span = self
+            .prefs
+            .song_time(want)
             .min(end / 2)
-            .min(next_info.duration.map_or(want, |d| d / 2));
-        if self.position + fade < end {
+            .min(next_info.duration.map_or(Duration::MAX, |d| d / 2));
+        if self.position + span < end {
             return;
         }
-        let fade = fade.min(end.saturating_sub(self.position).max(MIN_FADE));
+        let left = self.prefs.listening_time(end.saturating_sub(self.position));
+        let fade = self.prefs.listening_time(span).min(left.max(MIN_FADE));
         self.expired_retries = 0;
         if self.move_on() {
             self.fade_in = Some(fade);

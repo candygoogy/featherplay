@@ -30,6 +30,7 @@ fn state(p: &Player) -> PlayerState {
         radio: false,
         volume: 0.7,
         queue: QueueInfo::default(),
+        speed: 1.0,
     }
 }
 
@@ -69,6 +70,7 @@ fn the_total_appears_once_the_stream_resolves() {
         skip_disliked: true,
         crossfade: None,
         fade_on_skip: false,
+        speed_percent: 100,
     });
     p.handle(Input::PlayTracks {
         tracks: vec![quick_pick],

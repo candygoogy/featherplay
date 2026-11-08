@@ -48,6 +48,7 @@ fn prefs(crossfade: Option<Duration>, fade_on_skip: bool) -> PlaybackPrefs {
         skip_disliked: true,
         crossfade,
         fade_on_skip,
+        speed_percent: 100,
     }
 }
 
@@ -154,6 +155,21 @@ fn the_end_of_a_song_fades_into_the_next_one() {
     assert_eq!(current(&p), "b");
     // The sound never stops, so the player shows playing throughout.
     assert_eq!(p.status(), &Status::Playing);
+}
+
+#[test]
+fn at_2x_a_fade_starts_twice_as_far_from_the_end_and_lasts_as_long() {
+    let mut p = playing_with(
+        PlaybackPrefs {
+            speed_percent: 200,
+            ..prefs(Some(secs(5)), false)
+        },
+        vec![track("a", Some("x")), track("b", Some("y"))],
+        secs(200),
+    );
+    // 5 s of listening is 10 s of the song.
+    assert!(run(&mut p, tick(ms(189_900))).is_empty());
+    assert_eq!(run(&mut p, tick(secs(190))), [crossfade("b", secs(5))]);
 }
 
 #[test]

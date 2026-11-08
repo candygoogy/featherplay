@@ -168,6 +168,8 @@ pub struct PlayerState {
     pub volume: f32,
     /// "Playing from …" and the Autoplay divider.
     pub queue: QueueInfo,
+    /// The playback speed (1.0 is normal): the position advances this much per second.
+    pub speed: f32,
 }
 
 /// Sent to the UI thread through `UiLink::events`.
@@ -471,6 +473,7 @@ impl Controller {
         self.audio
             .set_skip_silences(skip_silences(self.settings.skip_silence));
         self.audio.set_crossfade(self.settings.crossfade > 0);
+        self.audio.set_speed(playback_speed(&self.settings));
         self.restore_streams();
         // Unreachable keeps the signed-in look: the session is likely fine, and signed out
         // would send the window to Sign in.
@@ -1189,7 +1192,10 @@ impl Controller {
         // Loading with the intent to play shows playing, so the play/pause buttons offer
         // pause. Sent again when the sound starts: Discord's timer runs on from the last
         // update.
-        let np = now_playing(track, self.player.wants_play(), self.player.position());
+        let np = NowPlaying {
+            speed: playback_speed(&self.settings),
+            ..now_playing(track, self.player.wants_play(), self.player.position())
+        };
         let audible = matches!(self.player.status(), Status::Playing);
         if self.shown.as_ref() != Some(&(np.clone(), audible)) {
             if let Some(presence) = &self.presence {
@@ -1222,6 +1228,7 @@ impl Controller {
             radio: queue.is_radio(),
             volume: self.slider_volume(),
             queue: self.queue_info(),
+            speed: playback_speed(&self.settings),
         };
         // Every time, not only on a change: the API takes the position's progress too.
         self.publish_api(&state);
@@ -1272,6 +1279,7 @@ pub fn now_playing(t: &Track, playing: bool, position: Duration) -> NowPlaying {
         playing,
         position,
         duration: t.duration,
+        speed: 1.0,
     }
 }
 
@@ -1311,7 +1319,13 @@ fn prefs(s: &Settings) -> PlaybackPrefs {
         skip_disliked: s.skip_disliked,
         crossfade: (s.crossfade > 0).then(|| Duration::from_secs(u64::from(s.crossfade))),
         fade_on_skip: s.fade_on_skip,
+        speed_percent: u16::from(s.playback_speed),
     }
+}
+
+/// The Playback speed setting as the engine and the integrations take it (1.0 is normal).
+fn playback_speed(s: &Settings) -> f32 {
+    f32::from(s.playback_speed) / 100.0
 }
 
 /// The resolver's format choice for the Streaming quality setting.

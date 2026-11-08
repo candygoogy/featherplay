@@ -294,7 +294,7 @@ Pear's plugins become settings here. This is what exists today.
 | Skip Silences | **Built in**, off by default, as "Skip silence" (Settings > Playback): the start and end of a song, or everywhere (silences of 2 s or more inside a song shortened). |
 | Crossfade | **Built in**, off by default (Settings > Playback): 2-12 s, equal power, from where the music ends. Never between songs of one album; Next and Previous cut unless Fade on skip is on. |
 | Visualizer | Later. |
-| Playback Speed | Later. |
+| Playback Speed | **Built in** (Settings > Playback and the player bar): 0.5-2×, with the pitch kept. |
 | API Server | **Built in**, off by default, as the [local API](#local-api): Pear's port, routes and WebSocket, with a token from Settings. |
 | Amuse | **Built in**, off by default: [the same endpoint](#amuse) on port 9863, for the Amuse widget. |
 | Tuna OBS, Lumia Stream | Not as such: overlays, bots and scripts can read the [local API](#local-api) instead. |

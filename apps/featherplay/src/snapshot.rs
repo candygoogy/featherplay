@@ -114,6 +114,10 @@ pub const PAGES: &[&str] = &[
     // with Fade on skip, Bass, Light), and with the Equalizer's bands open.
     "settings-sound",
     "settings-equalizer",
+    // Settings at 1.25x: the Playback speed row and the bar's speed pill; and Home with the
+    // pill's popup open.
+    "settings-speed",
+    "speed-popup",
     "about",
     // About's version row while a check runs; up to date (checked 2 hours ago); after a
     // check failed offline, rate limited, or with an HTTP error.
@@ -706,6 +710,10 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
         crate::pages::settings::show_local_api_for_snapshot(ctx);
         settle();
     }
+    if o.page == "settings-speed" || o.page == "speed-popup" {
+        crate::pages::settings::show_speed_for_snapshot(ctx, 125, o.page == "speed-popup");
+        settle();
+    }
     if o.page == "settings-sound" || o.page == "settings-equalizer" {
         crate::pages::settings::show_sound_for_snapshot(ctx, o.page == "settings-equalizer");
         settle();
@@ -919,6 +927,7 @@ fn page(name: &str, f: &Fixtures) -> Result<Page, String> {
         | "mini-player-idle"
         | "mini-player-pinned"
         | "close-dialog"
+        | "speed-popup"
         | "home-more"
         | "home-more-loading"
         | "home-more-failed"
@@ -995,7 +1004,8 @@ fn page(name: &str, f: &Fixtures) -> Result<Page, String> {
         | "settings-scripts"
         | "settings-local-api"
         | "settings-sound"
-        | "settings-equalizer" => Page::Settings,
+        | "settings-equalizer"
+        | "settings-speed" => Page::Settings,
         p if p == "about" || p.starts_with("about-") => Page::About,
         "sign-in"
         | "sign-in-expired"
@@ -1068,6 +1078,7 @@ fn idle_state() -> PlayerState {
         radio: false,
         volume: VOLUME,
         queue: QueueInfo::default(),
+        speed: 1.0,
     }
 }
 
@@ -1121,5 +1132,6 @@ fn player_state(f: &Fixtures, track: usize) -> Result<PlayerState, String> {
             playing_from: from,
             autoplay_at: None,
         },
+        speed: 1.0,
     })
 }

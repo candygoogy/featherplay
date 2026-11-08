@@ -1844,6 +1844,15 @@ export component SettingsPage inherits Rectangle {
                     checked: SettingsData.fade-on-skip;
                 }
                 SettingRow {
+                    label: @tr("Playback speed");
+                    detail: @tr("Faster or slower, at the same pitch. While it isn't 1×, the player bar shows it.");
+                    RowChips {
+                        labels: Player.speed-labels;
+                        active: Player.speed;
+                        selected(i) => { Player.pick-speed(i); }
+                    }
+                }
+                SettingRow {
                     label: @tr("Volume step");
                     detail: @tr("How much the mouse wheel and the Up and Down keys change the volume.");
                     RowChips {

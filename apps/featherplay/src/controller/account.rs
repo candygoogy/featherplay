@@ -169,6 +169,8 @@ pub enum Change {
     Crossfade(u8),
     /// With crossfade on, Next, Previous and a click fade too.
     FadeOnSkip(bool),
+    /// The playback speed in percent, one of `Settings::SPEEDS` (100 is normal).
+    PlaybackSpeed(u8),
 }
 
 impl Change {
@@ -224,6 +226,7 @@ impl Change {
             Change::SkipSilence(v) => s.skip_silence = v,
             Change::Crossfade(v) => s.crossfade = v,
             Change::FadeOnSkip(v) => s.fade_on_skip = v,
+            Change::PlaybackSpeed(v) => s.playback_speed = v,
         }
     }
 }
@@ -613,6 +616,14 @@ impl Controller {
             Change::Crossfade(n) => {
                 self.audio.set_crossfade(n > 0);
                 self.input(Input::SetPrefs(prefs(&self.settings)));
+            }
+            // Heard within ~30 ms. Scrobbling counts the song's time from the next tick;
+            // the bar, Discord and the media card follow the new rate.
+            Change::PlaybackSpeed(_) => {
+                self.audio
+                    .set_speed(crate::controller::playback_speed(&self.settings));
+                self.input(Input::SetPrefs(prefs(&self.settings)));
+                self.push_now_playing();
             }
             // Streams already resolved keep their format.
             Change::StreamingQuality(q) => self.resolver.set_quality(stream_quality(q)),
@@ -1051,6 +1062,7 @@ mod tests {
             Change::SkipSilence(SkipSilence::Everywhere),
             Change::Crossfade(8),
             Change::FadeOnSkip(true),
+            Change::PlaybackSpeed(150),
         ];
         for c in &changes {
             c.apply(&mut s);
@@ -1084,6 +1096,7 @@ mod tests {
         assert_eq!(s.loudness, Loudness::Strong);
         assert_eq!(s.skip_silence, SkipSilence::Everywhere);
         assert_eq!((s.crossfade, s.fade_on_skip), (8, true));
+        assert_eq!(s.playback_speed, 150);
         assert!(!s.check_for_updates && !s.install_updates);
         assert_eq!(s.volume, d.volume, "the volume isn't a page setting");
     }
@@ -1118,6 +1131,16 @@ mod tests {
             (on.crossfade, on.fade_on_skip),
             (Some(std::time::Duration::from_secs(5)), true)
         );
+    }
+
+    #[test]
+    fn playback_speed_reaches_the_player_and_the_engine() {
+        let mut s = Settings::default();
+        assert_eq!(crate::controller::prefs(&s).speed_percent, 100);
+        assert_eq!(crate::controller::playback_speed(&s), 1.0);
+        s.playback_speed = 75;
+        assert_eq!(crate::controller::prefs(&s).speed_percent, 75);
+        assert_eq!(crate::controller::playback_speed(&s), 0.75);
     }
 
     #[test]

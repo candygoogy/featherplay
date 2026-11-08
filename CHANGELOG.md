@@ -28,6 +28,10 @@ Notable changes to featherplay, newest first. The format follows
   outro. Songs from the same album, Repeat one and the end of the queue never fade. Next,
   Previous and a click on another song cut, unless **Fade on skip** is on: then they fade
   over 2 seconds.
+- Playback speed (Settings > Playback): 0.5×, 0.75×, 1.25×, 1.5× or 2×, at the same pitch,
+  remembered across restarts. Away from 1× the player bar shows the speed as a small pill
+  that opens the same choices. Times stay in the song's minutes; Discord, the media card
+  and scrobbling follow the speed (a scrobble counts the song's time heard).
 
 ### Fixed
 

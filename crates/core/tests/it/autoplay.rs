@@ -37,6 +37,7 @@ fn prefs(list_end: ListEnd) -> PlaybackPrefs {
         skip_disliked: true,
         crossfade: None,
         fade_on_skip: false,
+        speed_percent: 100,
     }
 }
 

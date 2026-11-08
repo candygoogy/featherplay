@@ -20,6 +20,7 @@ fn playing() -> NowPlaying {
         playing: true,
         position: Duration::from_secs(10),
         duration: Some(Duration::from_secs(100)),
+        speed: 1.0,
     }
 }
 
@@ -50,6 +51,19 @@ fn discord_card_defaults_show_the_bar_links_and_button() {
             play_label().to_string(),
             "https://music.youtube.com/watch?v=vid123".to_string()
         ))
+    );
+}
+
+#[test]
+fn at_2x_discords_bar_ends_when_the_song_does() {
+    let fast = NowPlaying {
+        speed: 2.0,
+        ..playing()
+    };
+    // 10 s into a 100 s song is 5 s of listening, with 45 s to go.
+    assert_eq!(
+        timeline(&fast, read_at()),
+        Some((1_699_999_995_000, 1_700_000_045_000))
     );
 }
 

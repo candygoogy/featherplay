@@ -144,6 +144,10 @@ pub struct Settings {
     /// "Fade on skip": with crossfade on, Next, Previous and a click on another song fade
     /// too instead of cutting (off by default).
     pub fade_on_skip: bool,
+    /// "Playback speed" (Settings > Playback and the bar), in percent, with the pitch kept:
+    /// one of `SPEEDS`, 100 (the default) being normal. Any other value loads as 100.
+    #[serde(deserialize_with = "lenient_speed")]
+    pub playback_speed: u8,
 }
 
 /// The Equalizer setting: off, one of three presets, or the user's own bands.
@@ -373,6 +377,7 @@ impl Default for Settings {
             skip_silence: SkipSilence::Off,
             crossfade: 0,
             fade_on_skip: false,
+            playback_speed: Settings::NORMAL_SPEED,
         }
     }
 }
@@ -500,6 +505,19 @@ where
         .unwrap_or(0))
 }
 
+/// Reads the playback speed: one of `Settings::SPEEDS`, or normal.
+fn lenient_speed<'de, D>(d: D) -> Result<u8, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value = toml::Value::deserialize(d)?;
+    Ok(value
+        .as_integer()
+        .and_then(|n| u8::try_from(n).ok())
+        .filter(|s| Settings::SPEEDS.contains(s))
+        .unwrap_or(Settings::NORMAL_SPEED))
+}
+
 /// Reads the Custom equalizer's bands: five numbers, each clamped to ±12 dB, or flat when
 /// the value isn't five numbers.
 fn lenient_bands<'de, D>(d: D) -> Result<[i8; 5], D::Error>
@@ -574,6 +592,10 @@ impl Settings {
     pub const VOLUME_STEP: u8 = 5;
     /// The crossfades Settings offers, in seconds; 0 is off.
     pub const CROSSFADES: [u8; 5] = [0, 2, 5, 8, 12];
+    /// The playback speeds Settings offers, in percent.
+    pub const SPEEDS: [u8; 6] = [50, 75, 100, 125, 150, 200];
+    /// Normal speed, in percent.
+    pub const NORMAL_SPEED: u8 = 100;
 
     /// Loads the settings. A missing, unreadable or invalid file gives the defaults. An
     /// older file is migrated first; a newer one keeps its schema number.

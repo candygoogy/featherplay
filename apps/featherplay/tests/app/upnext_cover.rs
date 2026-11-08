@@ -57,6 +57,7 @@ fn state(current: &Track, upcoming: &[Track]) -> PlayerState {
         radio: false,
         volume: 0.5,
         queue: QueueInfo::default(),
+        speed: 1.0,
     }
 }
 

@@ -1,5 +1,6 @@
 //! System Media Transport Controls (the Win+A media card and media keys) through
-//! souvlaki, bound to the app window's HWND.
+//! souvlaki, bound to the app window's HWND. The playback rate, which souvlaki leaves out,
+//! is set on the same controls directly.
 
 use std::ffi::c_void;
 use std::sync::Arc;
@@ -8,6 +9,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use souvlaki::{
     MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, MediaPosition, PlatformConfig,
 };
+use windows::Media::SystemMediaTransportControls;
+use windows::Win32::Foundation::HWND;
+use windows::Win32::System::WinRT::ISystemMediaTransportControlsInterop;
 
 use crate::{NowPlaying, Sender, UiCommand};
 
@@ -17,6 +21,10 @@ pub struct Smtc {
     playing: Arc<AtomicBool>,
     /// The metadata last sent; the thumbnail is only re-set when the track changes.
     shown: Option<NowPlaying>,
+    /// The window's controls again (the ones souvlaki drives), for the playback rate, and
+    /// the rate they were given.
+    rate: Option<SystemMediaTransportControls>,
+    speed: f32,
 }
 
 impl Smtc {
@@ -54,6 +62,8 @@ impl Smtc {
             controls,
             playing,
             shown: None,
+            rate: window_controls(hwnd),
+            speed: 1.0,
         })
     }
 
@@ -86,9 +96,28 @@ impl Smtc {
         if let Err(e) = self.controls.set_playback(playback) {
             log::warn!("smtc: set_playback: {e:?}");
         }
+        if np.speed != self.speed
+            && let Some(rate) = &self.rate
+        {
+            match rate.SetPlaybackRate(f64::from(np.speed)) {
+                Ok(()) => self.speed = np.speed,
+                Err(e) => log::warn!("smtc: set playback rate: {e:?}"),
+            }
+        }
         self.playing.store(np.playing, Ordering::Relaxed);
         self.shown = Some(np.clone());
     }
+}
+
+/// The media controls of `hwnd`: the same object souvlaki was given.
+fn window_controls(hwnd: isize) -> Option<SystemMediaTransportControls> {
+    let interop = windows::core::factory::<
+        SystemMediaTransportControls,
+        ISystemMediaTransportControlsInterop,
+    >()
+    .ok()?;
+    // SAFETY: `hwnd` is the live window souvlaki just attached to, on its thread.
+    unsafe { interop.GetForWindow(HWND(hwnd as *mut c_void)) }.ok()
 }
 
 impl Drop for Smtc {

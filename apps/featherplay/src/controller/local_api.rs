@@ -356,6 +356,7 @@ mod tests {
             radio: false,
             volume: 0.456,
             queue: Default::default(),
+            speed: 1.0,
         }
     }
 

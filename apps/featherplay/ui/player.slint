@@ -33,6 +33,11 @@ export global Player {
     in property <float> volume;
     // The Volume step setting, in percent: what a wheel notch and Up or Down move it.
     in property <int> volume-step: 5;
+    // The Playback speed setting: its place in `speed-labels` (2 is 1x). Away from 1x the
+    // bar shows it as a pill that opens the speed popup (`SpeedLayer`).
+    in property <int> speed: 2;
+    out property <[string]> speed-labels: [@tr("0.5×"), @tr("0.75×"), @tr("1×"), @tr("1.25×"), @tr("1.5×"), @tr("2×")];
+    in-out property <bool> speed-open;
 
     callback toggle();
     callback next();
@@ -46,6 +51,8 @@ export global Player {
     callback not-for-me();
     callback toggle-shuffle();
     callback cycle-repeat();
+    // A speed chip, in Settings or the bar's popup.
+    callback pick-speed(int);
 
     // "2:41", or "1:02:41" from an hour: the seek line's preview time.
     public pure function clock(seconds: float) -> string {

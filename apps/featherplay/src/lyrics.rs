@@ -509,12 +509,14 @@ fn sync(ctx: &Rc<Ctx>) {
     if data.get_current() != current {
         data.set_current(current);
     }
-    let audible = ctx.player().is_some_and(|s| s.audible);
+    let (audible, speed) = ctx.player().map_or((false, 1.0), |s| (s.audible, s.speed));
     match lrc::next_start(&lines, at) {
         Some(next) if live && audible && !SNAPSHOT.with(Cell::get) => {
             let weak = Rc::downgrade(ctx);
             TIMER.with(|t| {
-                t.start(TimerMode::SingleShot, next - at + LATE, move || {
+                // The song's time to the next line, played at the speed.
+                let wait = (next - at).div_f32(speed.max(0.5)) + LATE;
+                t.start(TimerMode::SingleShot, wait, move || {
                     if let Some(ctx) = weak.upgrade() {
                         sync(&ctx);
                     }

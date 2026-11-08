@@ -79,7 +79,7 @@ pub enum TrayEvent {
 }
 
 /// The current track and playback state, as the integrations show it.
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct NowPlaying {
     /// The video ID.
     pub track_id: Option<String>,
@@ -92,6 +92,27 @@ pub struct NowPlaying {
     pub album_id: Option<String>,
     pub art_url: Option<String>,
     pub playing: bool,
+    /// Where the song is, in the song's time.
     pub position: Duration,
     pub duration: Option<Duration>,
+    /// The playback speed: the position advances this much per second (1.0 is normal).
+    pub speed: f32,
+}
+
+impl Default for NowPlaying {
+    fn default() -> Self {
+        Self {
+            track_id: None,
+            title: String::new(),
+            artist: String::new(),
+            artist_id: None,
+            album: None,
+            album_id: None,
+            art_url: None,
+            playing: false,
+            position: Duration::ZERO,
+            duration: None,
+            speed: 1.0,
+        }
+    }
 }

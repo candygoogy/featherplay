@@ -75,6 +75,7 @@ fn settings_defaults_when_missing() {
             skip_silence: SkipSilence::Off,
             crossfade: 0,
             fade_on_skip: false,
+            playback_speed: 100,
         }
     );
     assert_eq!(s, Settings::default());
@@ -143,6 +144,7 @@ fn settings_roundtrip() {
         skip_silence: SkipSilence::Everywhere,
         crossfade: 12,
         fade_on_skip: true,
+        playback_speed: 125,
     };
     s.save(&p).unwrap();
     assert!(p.config.join("settings.toml").is_file());
@@ -890,6 +892,34 @@ fn crossfade_round_trips_and_loads_off_when_unknown() {
     fs::write(&file, "crossfade = 7\nvolume = 0.5\n").unwrap();
     let s = Settings::load(&p);
     assert_eq!((s.crossfade, s.volume), (0, 0.5));
+}
+
+#[test]
+fn playback_speed_round_trips_and_loads_normal_when_unknown() {
+    let Some(home) = TestHome::new("settings-speed") else {
+        return;
+    };
+    let p = home.paths();
+    assert_eq!(Settings::default().playback_speed, 100);
+    let s = Settings {
+        playback_speed: 150,
+        ..Settings::default()
+    };
+    s.save(&p).unwrap();
+    assert_eq!(Settings::load(&p), s);
+    let file = p.config.join("settings.toml");
+    let text = fs::read_to_string(&file).unwrap();
+    assert!(text.contains("playback_speed = 150"), "{text}");
+
+    fs::write(
+        &file,
+        "playback_speed = 25
+volume = 0.5
+",
+    )
+    .unwrap();
+    let s = Settings::load(&p);
+    assert_eq!((s.playback_speed, s.volume), (100, 0.5));
 }
 
 #[test]

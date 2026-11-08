@@ -232,16 +232,25 @@ impl Drop for Discord {
 }
 
 /// The progress bar for `np`, read at `read_at`: the Unix times in ms the track started
-/// (`read_at` minus the position) and ends (start plus the duration). `None` while paused
-/// or when the duration is unknown.
+/// (`read_at` minus the position) and ends (start plus the duration). Discord's bar runs
+/// on the clock, so away from 1x both are in listening time (the song's divided by the
+/// speed): the bar then ends when the song does. `None` while paused or when the duration
+/// is unknown.
 pub fn timeline(np: &NowPlaying, read_at: SystemTime) -> Option<(i64, i64)> {
     let duration = np.duration.filter(|d| !d.is_zero())?;
     if !np.playing {
         return None;
     }
     let ms = |d: Duration| i64::try_from(d.as_millis()).ok();
-    let start = ms(read_at.duration_since(UNIX_EPOCH).ok()?)? - ms(np.position)?;
-    Some((start, start + ms(duration)?))
+    let listening = |d: Duration| {
+        if np.speed > 0.0 && np.speed != 1.0 {
+            d.div_f64(f64::from(np.speed))
+        } else {
+            d
+        }
+    };
+    let start = ms(read_at.duration_since(UNIX_EPOCH).ok()?)? - ms(listening(np.position))?;
+    Some((start, start + ms(listening(duration))?))
 }
 
 /// `prefix` + `id`, or `None` when there's no id or the URL is too long. A cut URL would

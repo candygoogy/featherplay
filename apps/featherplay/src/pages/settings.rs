@@ -273,6 +273,10 @@ pub fn init(ctx: &Rc<Ctx>) {
     data.on_pick_skip_silence(move |i| pick_skip_silence(&c, i));
     let c = ctx.clone();
     data.on_pick_crossfade(move |i| pick_crossfade(&c, i));
+    // Settings' row and the bar's popup share the chips.
+    let c = ctx.clone();
+    ui.global::<Player>()
+        .on_pick_speed(move |i| pick_speed(&c, i));
 }
 
 /// The page is being shown: refresh the devices and the Last.fm state.
@@ -661,6 +665,7 @@ fn sample_track() -> NowPlaying {
         playing: true,
         position: Duration::from_secs(72),
         duration: Some(Duration::from_secs(210)),
+        speed: 1.0,
     }
 }
 
@@ -737,6 +742,7 @@ fn show(ctx: &Ctx) {
     data.set_skip_silence(skip_silence_index(s.skip_silence));
     data.set_crossfade(crossfade_index(s.crossfade));
     data.set_fade_on_skip(s.fade_on_skip);
+    show_speed(ctx, s.playback_speed);
     data.set_streaming_quality(streaming_quality_index(s.streaming_quality));
     data.set_skip_disliked(s.skip_disliked);
     data.set_sponsorblock(s.sponsorblock);
@@ -1020,6 +1026,40 @@ fn pick_crossfade(ctx: &Ctx, i: i32) {
     if SETTINGS.with(|s| s.borrow().crossfade != secs) {
         commit(ctx, Change::Crossfade(secs));
     }
+}
+
+/// Shows the Playback speed (percent) on its chips and the bar's pill.
+fn show_speed(ctx: &Ctx, percent: u8) {
+    let Some(ui) = ctx.window() else { return };
+    let place = |p: u8| Settings::SPEEDS.iter().position(|&s| s == p);
+    let at = place(percent)
+        .or_else(|| place(Settings::NORMAL_SPEED))
+        .unwrap_or_default();
+    ui.global::<Player>()
+        .set_speed(i32::try_from(at).unwrap_or_default());
+}
+
+/// The speed chip at `i` (Settings or the bar's popup), shown and saved; the controller
+/// applies it.
+fn pick_speed(ctx: &Ctx, i: i32) {
+    let Some(&percent) = usize::try_from(i)
+        .ok()
+        .and_then(|i| Settings::SPEEDS.get(i))
+    else {
+        return;
+    };
+    show_speed(ctx, percent);
+    if SETTINGS.with(|s| s.borrow().playback_speed != percent) {
+        commit(ctx, Change::PlaybackSpeed(percent));
+    }
+}
+
+/// `--snapshot` at a playback speed (`--speed`): the row and the bar's pill show it, and
+/// `open` opens the pill's popup. Shown only, not saved.
+pub fn show_speed_for_snapshot(ctx: &Rc<Ctx>, percent: u8, open: bool) {
+    show_speed(ctx, percent);
+    let Some(ui) = ctx.window() else { return };
+    ui.global::<Player>().set_speed_open(open);
 }
 
 /// `--snapshot settings-sound` and `settings-equalizer`: the new sound rows on (Skip
@@ -1530,6 +1570,7 @@ mod tests {
             playing: false,
             position: std::time::Duration::from_secs(72),
             duration: Some(std::time::Duration::from_secs(320)),
+            speed: 1.0,
         }
     }
 

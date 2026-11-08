@@ -10,6 +10,7 @@ import { Player, Repeat } from "player.slint";
 import { Nav, PageKind, Frame } from "nav.slint";
 import { NotForMeButton, LikeButton } from "not_for_me.slint";
 import { LyricsData, LyricsState } from "pages/lyrics.slint";
+import { Chips } from "pages/content.slint";
 
 // The seek line, between the time and the length: 4 px, 6 px while hovered, with round ends;
 // click or drag anywhere on it to seek. Hovered, a thumb sits at the fill's end and a tooltip
@@ -410,6 +411,112 @@ component BarPlayButton inherits Rectangle {
     }
 }
 
+// The speed while it isn't 1x, just before the bar's right-hand group: a 28 px pill on the
+// accent's tonal fill, as a selected chip. A click opens the speed popup over it.
+component SpeedPill inherits Rectangle {
+    width: pill.width;
+    height: 36px;
+    pill := Rectangle {
+        y: 4px;
+        height: 28px;
+        width: t.preferred-width + 2 * Theme.s3;
+        border-radius: self.height / 2;
+        background: ta.has-hover || ta.pressed || Player.speed-open ? Theme.accent-tonal-hover : Theme.accent-tonal;
+        accessible-role: button;
+        accessible-label: @tr("Playback speed, {}", Player.speed-labels[Player.speed]);
+        accessible-action-default => { Player.speed-open = true; }
+        animate background { duration: Theme.t-hover; }
+        ta := TouchArea {
+            mouse-cursor: pointer;
+            clicked => { Player.speed-open = true; }
+        }
+        t := Body {
+            text: Player.speed-labels[Player.speed];
+            font-size: Theme.t-meta;
+            font-weight: 600;
+            color: Theme.text1;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+    }
+}
+
+// The speed popup: the Settings chips in a panel `s2` above the bar, centred on the pill.
+// A pick, Escape or a click outside closes it. app.slint draws it over everything, shown
+// while `Player.speed-open`.
+export component SpeedLayer inherits Rectangle {
+    // The bar's top edge, and the pill's centre (window coordinates).
+    in property <length> bottom;
+    in property <length> anchor;
+    callback closed();
+    property <bool> open: Player.speed-open;
+    changed open => {
+        if self.open {
+            keys.focus();
+        }
+    }
+    function close() {
+        Player.speed-open = false;
+        root.closed();
+    }
+    TouchArea {
+        pointer-event(e) => {
+            if e.kind == PointerEventKind.down {
+                root.close();
+            }
+        }
+        scroll-event(e) => {
+            root.close();
+            accept
+        }
+    }
+    Rectangle {
+        width: chips.preferred-width + 2 * Theme.s4;
+        height: 2 * Theme.s4 + 20px + Theme.s3 + chips.height;
+        x: max(8px, min(root.anchor - self.width / 2, root.width - self.width - 8px));
+        y: root.bottom - Theme.s2 - self.height;
+        border-radius: Theme.r-l;
+        background: Theme.panel;
+        border-width: 1px;
+        border-color: Theme.card-edge;
+        drop-shadow-blur: 24px;
+        drop-shadow-offset-y: 8px;
+        drop-shadow-color: Theme.cover-shadow;
+        accessible-role: list;
+        accessible-label: @tr("Playback speed");
+        // Swallows clicks on the panel's padding.
+        TouchArea { }
+        keys := FocusScope {
+            key-pressed(e) => {
+                if e.text == Key.Escape {
+                    root.close();
+                    return accept;
+                }
+                reject
+            }
+        }
+        Body {
+            x: Theme.s4;
+            y: Theme.s4;
+            height: 20px;
+            text: @tr("Playback speed");
+            font-weight: 600;
+            color: Theme.text1;
+            vertical-alignment: center;
+        }
+        chips := Chips {
+            x: Theme.s4;
+            y: Theme.s4 + 20px + Theme.s3;
+            labels: Player.speed-labels;
+            active: Player.speed;
+            selected(i) => {
+                Player.pick-speed(i);
+                root.close();
+            }
+        }
+    }
+}
+
 export component BottomBar inherits Rectangle {
     // The volume to go back to when unmuting.
     property <float> unmuted: 0.7;
@@ -419,7 +526,12 @@ export component BottomBar inherits Rectangle {
     }
     // The middle column (the transport, the time and the line), and what's left either side
     // for the title: it stays clear of the buttons on the right at the narrowest window.
-    property <length> center-w: max(320px, min(600px, self.width - 2 * (actions.preferred-width + 14px)));
+    // The speed pill, while it shows, sits just left of the right-hand group, which then
+    // takes its room too.
+    property <length> right-w: actions.preferred-width + (Player.speed != 2 ? speed-pill.width + 4px : 0px);
+    property <length> center-w: max(320px, min(600px, self.width - 2 * (root.right-w + 14px)));
+    // Where the speed popup centres (in the bar).
+    out property <length> speed-centre: speed-pill.x + speed-pill.width / 2;
     property <length> left-w: max(80px, (self.width - root.center-w) / 2 - 100px);
     // The transport row, and the time row under it.
     property <length> transport-y: 8px;
@@ -596,6 +708,12 @@ export component BottomBar inherits Rectangle {
             vertical-alignment: center;
             overflow: clip;
         }
+    }
+
+    speed-pill := SpeedPill {
+        x: actions.x - self.width - 4px;
+        y: actions.y;
+        visible: Player.speed != 2;
     }
 
     actions := HorizontalLayout {

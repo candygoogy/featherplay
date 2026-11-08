@@ -9,7 +9,7 @@ import { Player } from "player.slint";
 import { Probe, ProbeRegion } from "probe.slint";
 import { Sidebar } from "sidebar.slint";
 import { TopBar, TopBarData } from "top_bar.slint";
-import { BottomBar } from "bottom_bar.slint";
+import { BottomBar, SpeedLayer } from "bottom_bar.slint";
 import { QueuePanel } from "queue_panel.slint";
 import { HomePage, HomeData } from "pages/home.slint";
 import { LibraryPage } from "pages/library.slint";
@@ -469,6 +469,18 @@ export component AppWindow inherits Window {
         ToastView {
             x: root.no-top ? root.page-x + (root.page-width - self.width) / 2 : (root.width - self.width) / 2;
             y: root.bar-top - Theme.s4 - self.height;
+        }
+
+        // The bar's speed popup, from its speed pill.
+        SpeedLayer {
+            x: 0;
+            y: 0;
+            width: root.width;
+            height: root.height;
+            visible: Player.speed-open;
+            bottom: root.bar-top;
+            anchor: bottom-bar.x + bottom-bar.speed-centre;
+            closed => { keys.focus(); }
         }
 
         // The account menu, from the sidebar's account row.
