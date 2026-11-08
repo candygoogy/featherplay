@@ -512,7 +512,7 @@ component ItemRow inherits Rectangle {
 // the card's left edge. Beside the cover the song on short lines (no separators), Pause or
 // Resume and Go to album pinned right on the title's line (under the artist when that would
 // leave the title too little room), and at the cover's foot the progress line with its
-// times, the whole text column wide. Under a hairline, what's next as a strip of cells, the
+// times, at most 560 px wide. Under a hairline, what's next as a strip of cells, the
 // label in the cover's column: three cells from 1000 px of card, two below, so the queue
 // never drops out.
 component ResumeCard inherits Rectangle {
@@ -590,10 +590,12 @@ component ResumeCard inherits Rectangle {
             }
         }
         // The elapsed time is as wide as the length, so the line doesn't shift as it ticks.
+        // At most 560 px with its times (a line of ~480 px, about the player bar's), so on a
+        // wide window it doesn't run the whole card.
         if Player.duration-s > 0: HorizontalLayout {
             x: 0;
             y: parent.height - self.height - 6px;
-            width: parent.width;
+            width: min(parent.width, 560px);
             height: 16px;
             spacing: Theme.s3;
             Body {
