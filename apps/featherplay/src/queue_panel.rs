@@ -16,7 +16,7 @@ use crate::app::Ctx;
 use crate::controller::{Action, PlayerState, QueueAction};
 use crate::router::Page;
 use crate::ui::{Frame, NowPlayingData, QueueData, TrackRow};
-use crate::ui_bridge::{model, to_rows};
+use crate::ui_bridge::{model, shown, to_rows};
 
 /// Row covers, in logical pixels.
 const COVER: u32 = 40;
@@ -148,7 +148,7 @@ pub fn update(ctx: &Rc<Ctx>, state: &PlayerState) {
     let Some(ui) = ctx.window() else { return };
     let data = ui.global::<QueueData>();
     let from = &state.queue.playing_from;
-    data.set_playing_from(from.label.as_str().into());
+    data.set_playing_from(shown(&from.label));
     SOURCE.with(|s| s.borrow_mut().clone_from(&from.page));
     data.set_autoplay_at(
         state

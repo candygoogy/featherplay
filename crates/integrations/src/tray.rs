@@ -15,6 +15,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
+use featherplay_core::text::plain;
 use featherplay_core::tr;
 use tray_icon::menu::MenuEvent;
 use tray_icon::{Icon, MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
@@ -272,7 +273,9 @@ pub fn tooltip_text(np: Option<&NowPlaying>, at: Duration) -> String {
     let Some(np) = np else {
         return format!("featherplay\n{}", tr!("Nothing playing"));
     };
-    let one_line = |s: &str| s.replace(['\r', '\n'], " ").trim().to_string();
+    // Styled maths letters as plain ones, as the window shows them (the shell's font has
+    // none of them either).
+    let one_line = |s: &str| plain(s).replace(['\r', '\n'], " ").trim().to_string();
     let (title, artist) = (one_line(&np.title), one_line(&np.artist));
     let at = np.duration.map_or(at, |d| at.min(d));
     let time = match (np.playing, np.duration) {
@@ -425,6 +428,16 @@ Someone, 1:02:05"
             paused,
             "Title
 Paused at 0:00"
+        );
+    }
+
+    #[test]
+    fn tooltip_shows_styled_letters_plain() {
+        let text = tooltip_text(Some(&np("𝙡𝙪𝙪", "𝔅𝔩𝔬𝔬𝔡𝔪𝔬𝔬𝔫", true)), Duration::ZERO);
+        assert_eq!(
+            text,
+            "luu
+Bloodmoon, 0:00 of 2:31"
         );
     }
 

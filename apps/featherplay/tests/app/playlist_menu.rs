@@ -8,6 +8,8 @@
 use featherplay::offscreen;
 use featherplay::snapshot::Scene;
 use featherplay::ui::{PlaylistDialog, PlaylistKind, PlaylistMenu, SidebarData, Theme, Toast};
+use featherplay_core::model::PlaylistId;
+use featherplay_ytm::PlaylistSummary;
 use slint::platform::{Key, PointerEventButton, WindowEvent};
 use slint::{ComponentHandle, LogicalPosition, Model};
 
@@ -209,6 +211,32 @@ fn the_sidebar_playlist_menu() {
     assert_eq!(
         ui.global::<Toast>().get_text(),
         "Renamed to \u{201C}Road trip\u{201D}"
+    );
+
+    // A name in styled letters, shown plain: Rename starts from it as written, and saving
+    // it unchanged writes nothing.
+    let styled = "𝙍𝙤𝙖𝙙 𝙩𝙧𝙞𝙥";
+    featherplay::playlist_menu::remember(&[PlaylistSummary {
+        id: PlaylistId(own.id.to_string()),
+        title: styled.into(),
+        author: None,
+        count: None,
+        views: None,
+        avatar: None,
+        thumbnail: None,
+        owned: true,
+    }]);
+    right_click(&scene, FIRST_ROW);
+    click_row(&scene, "Rename…");
+    assert_eq!(menu.get_draft(), styled);
+    ui.global::<Toast>().set_text("".into());
+    menu.invoke_rename(own.id.clone(), menu.get_draft());
+    scene.settle();
+    assert_eq!(menu.get_dialog(), PlaylistDialog::None);
+    assert_eq!(
+        ui.global::<Toast>().get_text(),
+        "",
+        "an unchanged name was sent"
     );
 
     // Remove from library, on the saved one.

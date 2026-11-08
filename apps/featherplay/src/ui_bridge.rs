@@ -6,6 +6,7 @@ use std::rc::Rc;
 use std::time::Duration;
 
 use featherplay_core::model::{ArtistRef, LikeStatus, Track};
+use featherplay_core::text::plain;
 use featherplay_core::tr;
 use featherplay_ytm::{AlbumSummary, ArtistSummary, HomeItem, PlaylistSummary};
 use slint::{ModelRc, SharedString, VecModel};
@@ -23,6 +24,13 @@ pub fn format_duration(d: Duration) -> String {
     }
 }
 
+/// A title, artist or album name as the UI shows it: styled maths letters ("𝙡𝙪𝙪") as plain
+/// ones (`text::plain`). Only for what's drawn; what's scrobbled, searched or sent back keeps
+/// the name as written.
+pub fn shown(s: &str) -> SharedString {
+    plain(s).as_ref().into()
+}
+
 /// `"A, B"`.
 pub fn artist_names(artists: &[ArtistRef]) -> String {
     artists
@@ -32,8 +40,8 @@ pub fn artist_names(artists: &[ArtistRef]) -> String {
         .join(", ")
 }
 
-/// One row per track, numbered from 1, in order. Titles are passed through untouched;
-/// eliding long ones is Slint's job.
+/// One row per track, numbered from 1, in order. Titles are only `shown`; eliding long ones
+/// is Slint's job.
 pub fn to_rows(tracks: &[Track]) -> Vec<TrackRow> {
     tracks
         .iter()
@@ -41,8 +49,8 @@ pub fn to_rows(tracks: &[Track]) -> Vec<TrackRow> {
         .map(|(i, t)| TrackRow {
             id: t.id.0.as_str().into(),
             index: (i + 1).to_string().into(),
-            title: t.title.as_str().into(),
-            artist: artist_names(&t.artists).into(),
+            title: shown(&t.title),
+            artist: shown(&artist_names(&t.artists)),
             artist_id: t
                 .artists
                 .iter()
@@ -52,7 +60,7 @@ pub fn to_rows(tracks: &[Track]) -> Vec<TrackRow> {
             album: t
                 .album
                 .as_ref()
-                .map(|a| SharedString::from(a.title.as_str()))
+                .map(|a| shown(&a.title))
                 .unwrap_or_default(),
             album_id: t
                 .album
@@ -70,8 +78,8 @@ pub fn to_rows(tracks: &[Track]) -> Vec<TrackRow> {
         .collect()
 }
 
-/// "Daft Punk, 1996": an album card's subtitle, the artists, then the year.
-pub fn album_card(a: &AlbumSummary) -> CardItem {
+/// "Daft Punk, 1996": an album card's subtitle, the artists, then the year, as written.
+pub fn album_subtitle(a: &AlbumSummary) -> String {
     let mut subtitle = artist_names(&a.artists);
     if let Some(year) = &a.year {
         if !subtitle.is_empty() {
@@ -79,11 +87,15 @@ pub fn album_card(a: &AlbumSummary) -> CardItem {
         }
         subtitle.push_str(year);
     }
+    subtitle
+}
+
+pub fn album_card(a: &AlbumSummary) -> CardItem {
     CardItem {
         id: a.id.0.as_str().into(),
         kind: ItemKind::Album,
-        title: a.title.as_str().into(),
-        subtitle: subtitle.into(),
+        title: shown(&a.title),
+        subtitle: shown(&album_subtitle(a)),
         cover: Default::default(),
         round: false,
     }
@@ -93,15 +105,15 @@ pub fn artist_card(a: &ArtistSummary) -> CardItem {
     CardItem {
         id: a.id.0.as_str().into(),
         kind: ItemKind::Artist,
-        title: a.name.as_str().into(),
+        title: shown(&a.name),
         subtitle: tr!("Artist").into(),
         cover: Default::default(),
         round: true,
     }
 }
 
-/// The subtitle is the author, then the track count when known.
-pub fn playlist_card(p: &PlaylistSummary) -> CardItem {
+/// A playlist card's subtitle, as written: the author, then the track count when known.
+pub fn playlist_subtitle(p: &PlaylistSummary) -> String {
     let mut parts = Vec::new();
     if let Some(author) = &p.author {
         parts.push(author.clone());
@@ -116,11 +128,15 @@ pub fn playlist_card(p: &PlaylistSummary) -> CardItem {
             format!("{n} songs")
         });
     }
+    parts.join(", ")
+}
+
+pub fn playlist_card(p: &PlaylistSummary) -> CardItem {
     CardItem {
         id: p.id.0.as_str().into(),
         kind: ItemKind::Playlist,
-        title: p.title.as_str().into(),
-        subtitle: parts.join(", ").into(),
+        title: shown(&p.title),
+        subtitle: shown(&playlist_subtitle(p)),
         cover: Default::default(),
         round: false,
     }
@@ -136,8 +152,8 @@ pub fn home_card(item: &HomeItem) -> CardItem {
         HomeItem::Track(t) => CardItem {
             id: t.id.0.as_str().into(),
             kind: ItemKind::Song,
-            title: t.title.as_str().into(),
-            subtitle: artist_names(&t.artists).into(),
+            title: shown(&t.title),
+            subtitle: shown(&artist_names(&t.artists)),
             cover: Default::default(),
             round: false,
         },

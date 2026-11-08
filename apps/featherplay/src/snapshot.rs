@@ -40,6 +40,8 @@ pub const PAGES: &[&str] = &[
     "home",
     // Home on a fresh start: no session, so the hero features a pick.
     "home-fresh",
+    // Home playing titles in styled maths letters, shown plain on the card and in its queue.
+    "home-styled",
     "library",
     "library-playlists",
     "library-albums",
@@ -256,6 +258,15 @@ const SOUNDTRACK_ALBUM: &str = "Cyberpunk: Edgerunners 2 (Original Series Soundt
 const SETTLE: Duration = Duration::from_secs(60);
 /// The fixture track's position, the same in every snapshot.
 const POSITION: Duration = Duration::from_secs(161);
+
+/// Titles and artists in styled maths letters, shown as plain letters (`text::plain`):
+/// `home-styled` plays them, the rest in Home's queue strip.
+const STYLED_TITLES: &[(&str, &str)] = &[
+    ("𝙡𝙪𝙪 - 𝙚𝙭 𝙛𝙧𝙚𝙪𝙣𝙙𝙞𝙣 ( 𝙎𝙡𝙤𝙬𝙚𝙙 )", "𝓑𝓵𝓸𝓸𝓭𝓶𝓸𝓸𝓷"),
+    ("𝔅𝔩𝔬𝔬𝔡𝔪𝔬𝔬𝔫", "ℌ𝔞𝔩𝔣𝔪𝔬𝔬𝔫"),
+    ("𝕄𝕠𝕟𝕠 𝟚𝟘𝟚𝟜", "𝙼𝚘𝚗𝚘"),
+    ("Around the World", "Daft Punk"),
+];
 
 /// Titles and artists as users saw them in boxes (2026-11-01): Mathematical Alphanumeric
 /// Symbols (U+1D400–1D7FF, styled letters), Japanese with fullwidth brackets, then Cyrillic,
@@ -534,6 +545,8 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
     // As the controller does at startup, home-fresh too: nothing to play, the saved volume.
     if o.page == "now-playing-scripts" {
         scene.play_titled(SCRIPT_TITLES)?;
+    } else if o.page == "home-styled" {
+        scene.play_titled(STYLED_TITLES)?;
     } else if o.page == "settings-long" {
         scene.play_credited(o.track, LONG_TITLE, LONG_ARTISTS)?;
     } else if o.page == "settings-scripts" {
@@ -953,6 +966,7 @@ fn page(name: &str, f: &Fixtures) -> Result<Page, String> {
     Ok(match name {
         "home"
         | "home-fresh"
+        | "home-styled"
         | "account-menu"
         | "mini-player"
         | "mini-player-paused"

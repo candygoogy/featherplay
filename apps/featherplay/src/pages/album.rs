@@ -14,7 +14,7 @@ use crate::controller::PlayerState;
 use crate::follow;
 use crate::pages::content::{self, HEADER_COVER, TrackList};
 use crate::ui::AlbumData;
-use crate::ui_bridge::artist_names;
+use crate::ui_bridge::{artist_names, shown};
 
 thread_local! {
     static LIST: RefCell<Option<TrackList>> = const { RefCell::new(None) };
@@ -104,8 +104,8 @@ pub fn open(ctx: &Rc<Ctx>, id: &AlbumId) {
             };
             let s = &album.summary;
             crate::sidebar::opened(ctx, crate::sidebar::album_entry(s));
-            data.set_title(s.title.as_str().into());
-            data.set_artist(artist_names(&s.artists).into());
+            data.set_title(shown(&s.title));
+            data.set_artist(shown(&artist_names(&s.artists)));
             data.set_artist_id(
                 s.artists
                     .iter()

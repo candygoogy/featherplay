@@ -119,9 +119,10 @@ pub fn open(ctx: &Rc<Ctx>, id: &PlaylistId) {
             if liked {
                 data.set_meta(content::meta(&[n.as_str(), &length]).into());
             } else {
-                data.set_title(s.title.as_str().into());
-                let author = s.author.clone().unwrap_or_default();
-                data.set_byline(author.into());
+                data.set_title(crate::ui_bridge::shown(&s.title));
+                data.set_byline(crate::ui_bridge::shown(
+                    s.author.as_deref().unwrap_or_default(),
+                ));
                 data.set_meta(content::meta(&[&n, &length]).into());
                 // Liked songs shows its own heart instead of the service's artwork.
                 if let Some(url) = &s.thumbnail {

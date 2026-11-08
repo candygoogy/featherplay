@@ -145,8 +145,8 @@ pub fn rows(s: &SearchSuggestions) -> (Vec<Suggestion>, Vec<Option<String>>) {
         };
         let row = Suggestion {
             kind,
-            title: title.into(),
-            subtitle: r.subtitle.as_str().into(),
+            title: crate::ui_bridge::shown(title),
+            subtitle: crate::ui_bridge::shown(&r.subtitle),
             ..Suggestion::default()
         };
         (row, cover.clone())

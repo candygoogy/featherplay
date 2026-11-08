@@ -24,7 +24,9 @@ use crate::catalog::Source;
 use crate::library_list::{self, Entry, Kind};
 use crate::pages::{home, settings};
 use crate::ui::{CardItem, ItemKind, SidebarData};
-use crate::ui_bridge::{album_card, artist_card, model, playlist_card};
+use crate::ui_bridge::{
+    album_subtitle, artist_card, model, playlist_card, playlist_subtitle, shown,
+};
 use crate::{account_menu, playlist_menu};
 
 /// The sidebar's list covers, in logical pixels.
@@ -428,20 +430,19 @@ fn card(e: &Entry) -> CardItem {
             Kind::Album => ItemKind::Album,
             Kind::Artist => ItemKind::Artist,
         },
-        title: e.title.as_str().into(),
-        subtitle: e.subtitle.as_str().into(),
+        title: shown(&e.title),
+        subtitle: shown(&e.subtitle),
         cover: Image::default(),
         round: e.kind == Kind::Artist,
     }
 }
 
 pub fn playlist_entry(p: &PlaylistSummary) -> Entry {
-    let card = playlist_card(p);
     Entry {
         kind: Kind::Playlist,
         id: featherplay_ytm::convert::bare_playlist_id(&p.id.0).to_string(),
         title: p.title.clone(),
-        subtitle: card.subtitle.to_string(),
+        subtitle: playlist_subtitle(p),
         thumbnail: p.thumbnail.clone(),
     }
 }
@@ -451,7 +452,7 @@ pub fn album_entry(a: &AlbumSummary) -> Entry {
         kind: Kind::Album,
         id: a.id.0.clone(),
         title: a.title.clone(),
-        subtitle: album_card(a).subtitle.to_string(),
+        subtitle: album_subtitle(a),
         thumbnail: a.thumbnail.clone(),
     }
 }

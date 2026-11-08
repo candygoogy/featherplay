@@ -17,7 +17,7 @@ use crate::pages::content::{self, CARD_COVER, TrackList};
 /// photo is square, so the banner crops it from the top.
 const BANNER: u32 = 1200;
 use crate::ui::{ArtistData, CardItem, PageKind};
-use crate::ui_bridge::{album_card, model};
+use crate::ui_bridge::{album_card, model, shown};
 
 thread_local! {
     static TOP: RefCell<Option<TrackList>> = const { RefCell::new(None) };
@@ -90,7 +90,7 @@ pub fn open(ctx: &Rc<Ctx>, id: &ArtistId) {
                 }
             };
             crate::sidebar::opened(ctx, crate::sidebar::artist_entry(&artist.summary));
-            data.set_name(artist.summary.name.as_str().into());
+            data.set_name(shown(&artist.summary.name));
             data.set_meta(tr!("Artist").into());
             data.set_has_photo(artist.summary.thumbnail.is_some());
             if let Some(url) = &artist.summary.thumbnail {

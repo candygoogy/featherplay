@@ -19,7 +19,7 @@ use slint::{ComponentHandle, Model, ModelRc, Timer, TimerMode, VecModel};
 use crate::app::Ctx;
 use crate::controller::{Action, Mark, PlayerState, now_playing};
 use crate::ui::{Player, Repeat, SilenceSpan};
-use crate::ui_bridge::{artist_names, format_duration};
+use crate::ui_bridge::{artist_names, format_duration, shown};
 use crate::{mini, not_for_me, shell};
 
 /// The cover size in the bar, in logical pixels.
@@ -164,8 +164,8 @@ pub fn apply(ctx: &Rc<Ctx>, state: &PlayerState) {
     };
     p.set_has_track(true);
     p.set_track_id(track.id.0.as_str().into());
-    p.set_title(track.title.as_str().into());
-    p.set_artist(artist_names(&track.artists).into());
+    p.set_title(shown(&track.title));
+    p.set_artist(shown(&artist_names(&track.artists)));
     p.set_artist_id(
         track
             .artists
@@ -175,14 +175,13 @@ pub fn apply(ctx: &Rc<Ctx>, state: &PlayerState) {
             .unwrap_or_default()
             .into(),
     );
-    p.set_album(
+    p.set_album(shown(
         track
             .album
             .as_ref()
             .map(|a| a.title.as_str())
-            .unwrap_or_default()
-            .into(),
-    );
+            .unwrap_or_default(),
+    ));
     p.set_album_id(
         track
             .album

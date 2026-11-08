@@ -34,6 +34,9 @@ export global PlaylistMenu {
     // The open dialog, and the playlist it's for (the menu has closed by then).
     in-out property <PlaylistDialog> dialog;
     out property <CardItem> target;
+    // The entry's name as written, set on `opened`: Rename's field starts from it (`item`
+    // has it as shown, styled letters plain).
+    in property <string> written;
     // Rename's field.
     in-out property <string> draft;
     // Why Rename can't go ahead ("" when it can).
@@ -70,7 +73,7 @@ export global PlaylistMenu {
     // Closes the menu and opens `d` for its playlist.
     public function ask(d: PlaylistDialog) {
         self.target = self.item;
-        self.draft = self.item.title;
+        self.draft = self.written;
         self.dialog-error = "";
         self.open = false;
         self.dialog = d;

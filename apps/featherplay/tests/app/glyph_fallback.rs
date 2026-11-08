@@ -1,12 +1,14 @@
 //! Titles in other scripts and in styled Unicode find a font, on the offscreen platform (no
 //! window is shown): Now playing, the bar and Up next draw them without one `.notdef` box.
 //! The users' examples (2026-11-01) were Mathematical Alphanumeric Symbols, which no font in
-//! the text's family list has, and Japanese with fullwidth brackets.
+//! the text's family list has, and Japanese with fullwidth brackets. Since 2026-11-08 the
+//! styled letters are shown as plain ones (`text::plain`).
 
 use std::sync::atomic::Ordering;
 
 use featherplay::snapshot::{SCRIPT_TITLES, Scene};
-use featherplay::ui::{Frame, QueueData};
+use featherplay::ui::{Frame, Player, QueueData};
+use featherplay_core::text::plain;
 use i_slint_renderer_skia::NOTDEF_GLYPHS;
 use slint::{ComponentHandle, Model};
 
@@ -19,9 +21,15 @@ fn titles_in_other_scripts_draw_no_notdef_boxes() {
     scene.ui.global::<Frame>().set_queue_open(true);
     scene.settle();
 
-    // The titles are the ones on screen: the first plays, the rest are Up next.
+    // The titles are the ones on screen, styled letters plain: the first plays (the bar and
+    // Now playing), the rest are Up next.
+    let (styled, artist) = SCRIPT_TITLES[0];
+    let player = scene.ui.global::<Player>();
+    assert_ne!(player.get_title(), styled, "styled letters on screen");
+    assert_eq!(player.get_title(), plain(styled));
+    assert_eq!(player.get_artist(), plain(artist));
     let queue = scene.ui.global::<QueueData>();
-    assert_eq!(queue.get_current().title, SCRIPT_TITLES[0].0);
+    assert_eq!(queue.get_current().title, plain(styled));
     let upcoming: Vec<_> = queue.get_upcoming().iter().map(|r| r.title).collect();
     for (title, _) in &SCRIPT_TITLES[1..] {
         assert!(

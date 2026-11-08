@@ -9,7 +9,7 @@
 //! show a toast.
 
 use std::cell::RefCell;
-use std::collections::HashSet;
+use std::collections::HashMap;
 use std::rc::Rc;
 
 use featherplay_core::model::{AlbumId, ArtistId, PlaylistId, Track};
@@ -25,13 +25,15 @@ use crate::router::Page;
 use crate::sidebar;
 use crate::song_menu;
 use crate::ui::{ItemKind, PlaylistDialog, PlaylistKind, PlaylistMenu};
+use crate::ui_bridge::shown;
 
 /// Liked songs' playlist id.
 const LIKED: &str = "LM";
 
 thread_local! {
-    /// The library playlists that are the account's own, as the sidebar last loaded them.
-    static OWNED: RefCell<HashSet<String>> = RefCell::new(HashSet::new());
+    /// The library playlists that are the account's own, as the sidebar last loaded them,
+    /// with their names as written (the menu's items show them plain, `ui_bridge::shown`).
+    static OWNED: RefCell<HashMap<String, String>> = RefCell::new(HashMap::new());
 }
 
 /// Notes which of the sidebar's playlists are the account's own (`load_playlists`).
@@ -39,7 +41,7 @@ pub fn remember(playlists: &[PlaylistSummary]) {
     let owned = playlists
         .iter()
         .filter(|p| p.owned)
-        .map(|p| p.id.0.clone())
+        .map(|p| (p.id.0.clone(), p.title.clone()))
         .collect();
     OWNED.with_borrow_mut(|o| *o = owned);
 }
@@ -87,8 +89,14 @@ pub fn init(ctx: &Rc<Ctx>) {
     let c = ctx.clone();
     menu.on_opened(move |id| {
         let Some(ui) = c.window() else { return };
-        let owned = OWNED.with_borrow(|o| o.contains(id.as_str()));
+        let written = OWNED.with_borrow(|o| o.get(id.as_str()).cloned());
+        let owned = written.is_some();
         let menu = ui.global::<PlaylistMenu>();
+        menu.set_written(
+            written
+                .unwrap_or_else(|| menu.get_item().title.into())
+                .into(),
+        );
         let entry = entry_kind(menu.get_item().kind);
         menu.set_kind(match entry {
             Kind::Album => PlaylistKind::Album,
@@ -267,7 +275,10 @@ fn rename(ctx: &Rc<Ctx>, id: &str, name: &str) {
         menu.set_dialog_error(tr!("Enter a name for the playlist.").into());
         return;
     }
-    let old = title_of(ctx, id);
+    // As written: the field started from it (`written`), so an unchanged name sends nothing.
+    let old = OWNED
+        .with_borrow(|o| o.get(id).cloned())
+        .unwrap_or_else(|| title_of(ctx, id));
     menu.invoke_close_dialog();
     if name == old {
         return;
@@ -278,10 +289,13 @@ fn rename(ctx: &Rc<Ctx>, id: &str, name: &str) {
         move |source| async move { source.rename_playlist(&pid, &sent).await },
         move |ctx, _, result| match result {
             Ok(()) => {
-                ctx.toast(&tr!("Renamed to {}", quoted(&name)));
+                ctx.toast(&tr!("Renamed to {}", quoted(&shown(&name))));
                 changed(ctx, Change::Renamed);
             }
-            Err(e) => ctx.toast(&failure_text(&tr!("Couldn't rename {}.", quoted(&old)), &e)),
+            Err(e) => ctx.toast(&failure_text(
+                &tr!("Couldn't rename {}.", quoted(&shown(&old))),
+                &e,
+            )),
         },
     );
 }
