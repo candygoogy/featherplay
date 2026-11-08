@@ -779,6 +779,9 @@ export component BottomBar inherits Rectangle {
             // On Now playing it shows and hides the page's own side panel; elsewhere the
             // frame's Up next panel. Each keeps its own state.
             active: Frame.full-page ? Frame.side-open : Frame.queue-open;
+            // The open panel shows the state; a circle here, lit all the time on Now playing
+            // (its side panel is open by default), only looked stuck.
+            circle: false;
             clicked => {
                 if Frame.full-page {
                     Frame.side-open = !Frame.side-open;

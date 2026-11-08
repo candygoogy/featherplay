@@ -438,6 +438,9 @@ export component IconButton inherits Rectangle {
     // Toggles, lit: the accent glyph on the accent's tonal circle (as a selected chip), so
     // "on" shows by more than the glyph's colour, whatever the accent.
     in property <bool> active: false;
+    // Lit without the circle, only the accent glyph: for a button whose panel shows its state
+    // itself (the bar's Up next, lit whenever Now playing's side panel is open).
+    in property <bool> circle: true;
     in property <bool> enabled: true;
     // Below 1, the glyph snaps to this size and eases back to 1 (the like pop).
     in property <float> glyph-scale: 1.0;
@@ -472,7 +475,7 @@ export component IconButton inherits Rectangle {
         // The lit circle, over the hover overlay. It comes and goes at once, as the glyph's
         // colour does: a fade would repaint the bar's corner for its length, and as one region
         // with whatever else moves on screen (the lyrics view's toggle).
-        if root.active: Rectangle {
+        if root.active && root.circle: Rectangle {
             border-radius: root.border-radius;
             background: Theme.accent-tonal.transparentize(1 - root.alpha);
         }
