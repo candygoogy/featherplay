@@ -101,6 +101,9 @@ sys-locale = "=0.3.2"
 # See vendor/i-slint-renderer-skia/VENDORED.md.
 [patch.crates-io]
 i-slint-renderer-skia = { path = "vendor/i-slint-renderer-skia" }
+# Slint's winit backend, with its frame pacing asking for one paint per redraw, not two.
+# See vendor/i-slint-backend-winit/VENDORED.md.
+i-slint-backend-winit = { path = "vendor/i-slint-backend-winit" }
 # The pure-Rust Opus decoder with its naive DFT swapped for rustfft (4-5x realtime to ~325x).
 # See vendor/opus-decoder/VENDORED.md.
 opus-decoder = { path = "vendor/opus-decoder" }
