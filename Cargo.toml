@@ -114,7 +114,7 @@ debug = "line-tables-only"
 debug = false
 
 # The exe must stay at 32 MB or less (`release.yml` checks it). Fat LTO with one codegen unit and
-# size-optimised code gets it there; the audio path keeps full speed below.
+# size-optimised code gets it there; the audio path and the cover decoders keep full speed below.
 [profile.release]
 lto = "fat"
 codegen-units = 1
@@ -141,3 +141,26 @@ opt-level = 3
 opt-level = 3
 # The Opus path (symphonia-format-mkv, opus-decoder, rustfft) stays at "z": at opt-level 3 it
 # cost ~96 KB of the exe budget, and at "z" it still decodes at ~250x realtime (2026-11-06).
+
+# Covers are decoded, cropped and resized on tokio's blocking pool for every page shown, and
+# that was most of a page's CPU. At opt-level 3 they take ~45 % less time (a page's CPU 20-40 %
+# less, the start's 28 %) for ~160 KB (2026-11-08). Slint's runtime, renderer and text crates
+# at 3 cost ~950 KB and made a frame only 3-11 % cheaper, within the noise: they stay at "z".
+[profile.release.package.image]
+opt-level = 3
+[profile.release.package.image-webp]
+opt-level = 3
+[profile.release.package.zune-jpeg]
+opt-level = 3
+[profile.release.package.zune-core]
+opt-level = 3
+[profile.release.package.png]
+opt-level = 3
+[profile.release.package.fdeflate]
+opt-level = 3
+[profile.release.package.miniz_oxide]
+opt-level = 3
+[profile.release.package.simd-adler32]
+opt-level = 3
+[profile.release.package.crc32fast]
+opt-level = 3
