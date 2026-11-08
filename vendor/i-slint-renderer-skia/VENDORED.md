@@ -1,6 +1,6 @@
 # Vendored: i-slint-renderer-skia 1.18.1
 
-This is the crate as published on crates.io, with fifteen changes. The workspace `Cargo.toml`
+This is the crate as published on crates.io, with sixteen changes. The workspace `Cargo.toml`
 swaps it in with `[patch.crates-io]`.
 
 1. `Cargo.toml`: `wgpu-30` is out of the default features.
@@ -125,6 +125,17 @@ Change 15 makes a live resize follow the pointer (measured 2026-11-05):
     taller, against 17 and 12 ms before (`apps/featherplay/tests/app/resize_frames.rs`;
     `live_resize.rs` checks every frame of a drag shows the whole window).
 
+Change 16 makes the exe smaller (measured 2026-11-08):
+
+16. `lib.rs`: on Windows, the OpenGL surface (`opengl_surface.rs`) is compiled in only with
+    the crate's `opengl` feature, which nothing turns on. Without it `default_opengl` still
+    exists (`i-slint-backend-winit` calls it for the `skia-opengl` renderer name or an OpenGL
+    graphics-API request, with no feature gate) and builds a renderer whose surface creation
+    returns an error (`opengl_left_out_surface_factory`), as change 2 does for wgpu; marked
+    `featherplay patch`. featherplay asks for `skia-software`, so that path never runs. The
+    surface was the only thing reaching Skia's GPU backend (Ganesh over OpenGL, with its GL
+    interface and shader code): leaving it out took 496,640 bytes off the release exe.
+
 ## Why
 
 `i-slint-backend-winit` depends on this crate with its default features, and our crates
@@ -132,7 +143,8 @@ can't turn them off. `wgpu-30` pulls in wgpu, wgpu-core, wgpu-hal and naga (and 
 `i-slint-core/wgpu-30`), about 1 MB of the release exe, which took it over the 30 MB
 budget. featherplay only renders with the `skia-software` renderer (`apps/featherplay/src/app.rs`
 and `src/offscreen.rs`), so the wgpu surface was never used. Without the feature, the
-crate's own `#[cfg]`s leave out the wgpu surface and keep the software and OpenGL ones.
+crate's own `#[cfg]`s leave out the wgpu surface and keep the software and OpenGL ones;
+change 16 leaves out the OpenGL one too.
 
 Licence: unchanged, see `LICENSES/` (featherplay uses Slint under the Royalty-free 2.0
 licence, which allows modified copies).
@@ -146,7 +158,8 @@ licence, which allows modified copies).
    `[features] default`.
 3. Keep change 3 unless the new `free_graphics_resources` already frees `layer_cache`,
    change 4 (or an equivalent the frame log can read), change 5, changes 6–8 and 10–15 unless the
-   new renderer already does the same (then check `scroll_frames.rs` still passes optimised).
+   new renderer already does the same (then check `scroll_frames.rs` still passes optimised),
+   and change 16 (the exe's size shows whether Skia's GPU backend came back).
 4. Build. If `i-slint-backend-winit` still calls wgpu-only constructors, port the two
    wgpu `featherplay patch` blocks in `lib.rs` (the git history of this folder has the diff);
    if it now gates them itself, leave those two out.

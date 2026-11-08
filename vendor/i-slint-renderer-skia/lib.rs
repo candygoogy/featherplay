@@ -45,7 +45,13 @@ pub use font_cache::NOTDEF_GLYPHS;
 #[cfg(skia_backend_software)]
 pub mod software_surface;
 
-#[cfg(any(not(target_vendor = "apple"), target_os = "macos"))]
+// featherplay patch: on Windows the OpenGL surface is compiled in only with the `opengl`
+// feature. Without it `default_opengl` still exists and its surface creation returns an
+// error (`opengl_left_out_surface_factory`). See VENDORED.md.
+#[cfg(all(
+    any(not(target_vendor = "apple"), target_os = "macos"),
+    any(feature = "opengl", not(target_family = "windows"))
+))]
 pub mod opengl_surface;
 
 #[cfg(skia_wgpu_vulkan)]
@@ -105,6 +111,8 @@ impl TextureEncoding {
 /// An sRGB attachment applies the transfer function when storing, so Skia has to hand it linear
 /// values. A UNORM attachment stores what it is given, so Skia keeps working in gamma encoded
 /// sRGB and no conversion happens at all.
+// featherplay patch: unused on Windows without the OpenGL surface.
+#[allow(dead_code)]
 pub(crate) fn attachment_color_space(encoding: TextureEncoding) -> skia_safe::ColorSpace {
     match encoding {
         TextureEncoding::Srgb => linear_srgb_color_space(),
@@ -425,6 +433,19 @@ fn wgpu_left_out_surface_factory(
     Err("Skia's WGPU surface was left out of this build (no `wgpu-30` feature)".into())
 }
 
+/// featherplay patch: the surface factory behind `default_opengl` on Windows when the OpenGL
+/// surface isn't compiled in. See VENDORED.md.
+#[cfg(all(target_family = "windows", not(feature = "opengl")))]
+fn opengl_left_out_surface_factory(
+    _context: &SkiaSharedContext,
+    _window_handle: Arc<dyn raw_window_handle::HasWindowHandle + Send + Sync>,
+    _display_handle: Arc<dyn raw_window_handle::HasDisplayHandle + Send + Sync>,
+    _size: PhysicalWindowSize,
+    _requested_graphics_api: Option<RequestedGraphicsAPI>,
+) -> Result<Box<dyn Surface>, PlatformError> {
+    Err("Skia's OpenGL surface was left out of this build (no `opengl` feature)".into())
+}
+
 impl SkiaRenderer {
     fn new_with_surface_factory(
         context: &SkiaSharedContext,
@@ -476,7 +497,11 @@ impl SkiaRenderer {
     pub fn default_opengl(context: &SkiaSharedContext) -> Self {
         Self::new_with_surface_factory(
             context,
+            // featherplay patch: no OpenGL surface on Windows without the `opengl` feature.
+            #[cfg(any(feature = "opengl", not(target_family = "windows")))]
             surface_factory::<opengl_surface::OpenGLSurface>,
+            #[cfg(not(any(feature = "opengl", not(target_family = "windows"))))]
+            opengl_left_out_surface_factory,
             create_partial_renderer_state(None),
         )
     }
