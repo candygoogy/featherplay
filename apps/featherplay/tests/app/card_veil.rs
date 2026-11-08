@@ -11,9 +11,9 @@ use slint::{ComponentHandle, LogicalPosition, Rgba8Pixel, SharedPixelBuffer};
 
 /// The "Listen together" card's art at 1920×1360, scale 1, Up next open, light (tall enough
 /// for the card's text to clear the floating bar under the resume card).
-const ART: LogicalPosition = LogicalPosition::new(420.0, 1033.0);
+const ART: LogicalPosition = LogicalPosition::new(420.0, 960.0);
 /// Below the art, in the card's text: no veil there.
-const TEXT_GAP: LogicalPosition = LogicalPosition::new(560.0, 1153.0);
+const TEXT_GAP: LogicalPosition = LogicalPosition::new(560.0, 1080.0);
 
 fn luma(shot: &SharedPixelBuffer<Rgba8Pixel>, at: LogicalPosition) -> f64 {
     // The mean over a 9×9 patch: the art is noisy.

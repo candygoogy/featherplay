@@ -45,7 +45,7 @@ const FEED_TTL: Duration = Duration::from_secs(30 * 60);
 const HERO_COVER: u32 = 152;
 /// Rows in the fresh-start hero's right column (two rows of two).
 const HERO_ROWS: usize = 4;
-/// Cells in the resume card's queue strip, at most (`ResumeCard.cols`).
+/// Rows in the resume card's queue column, at most (`ResumeCard`).
 const HERO_NEXT: usize = 3;
 /// Pages of the feed per Home load, the first ones included.
 pub const MAX_PAGES: usize = 6;

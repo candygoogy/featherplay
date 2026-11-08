@@ -83,6 +83,7 @@ mod related_scroll;
 mod render_surface;
 mod render_timing;
 mod resize_frames;
+mod resume_card;
 mod row_menus;
 mod scroll_frames;
 mod search_link;

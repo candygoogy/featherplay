@@ -42,6 +42,8 @@ pub const PAGES: &[&str] = &[
     "home-fresh",
     // Home playing titles in styled maths letters, shown plain on the card and in its queue.
     "home-styled",
+    // Home resuming a title too long for the resume card's line, by many artists.
+    "home-long",
     "library",
     "library-playlists",
     "library-albums",
@@ -260,7 +262,7 @@ const SETTLE: Duration = Duration::from_secs(60);
 const POSITION: Duration = Duration::from_secs(161);
 
 /// Titles and artists in styled maths letters, shown as plain letters (`text::plain`):
-/// `home-styled` plays them, the rest in Home's queue strip.
+/// `home-styled` plays them, the rest in the resume card's queue.
 const STYLED_TITLES: &[(&str, &str)] = &[
     ("𝙡𝙪𝙪 - 𝙚𝙭 𝙛𝙧𝙚𝙪𝙣𝙙𝙞𝙣 ( 𝙎𝙡𝙤𝙬𝙚𝙙 )", "𝓑𝓵𝓸𝓸𝓭𝓶𝓸𝓸𝓷"),
     ("𝔅𝔩𝔬𝔬𝔡𝔪𝔬𝔬𝔫", "ℌ𝔞𝔩𝔣𝔪𝔬𝔬𝔫"),
@@ -551,7 +553,7 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
         scene.play_credited(o.track, LONG_TITLE, LONG_ARTISTS)?;
     } else if o.page == "settings-scripts" {
         scene.play_credited(o.track, SCRIPTS_LONG_TITLE, SCRIPTS_LONG_ARTISTS)?;
-    } else if o.page.starts_with("now-playing-long") {
+    } else if o.page.starts_with("now-playing-long") || o.page == "home-long" {
         scene.play_credited(o.track, NOW_PLAYING_LONG_TITLE, LONG_ARTISTS)?;
     } else if o.page.ends_with("-side-hidden") {
         scene.play_credited(o.track, SOUNDTRACK_TITLE, SOUNDTRACK_ARTISTS)?;
@@ -967,6 +969,7 @@ fn page(name: &str, f: &Fixtures) -> Result<Page, String> {
         "home"
         | "home-fresh"
         | "home-styled"
+        | "home-long"
         | "account-menu"
         | "mini-player"
         | "mini-player-paused"

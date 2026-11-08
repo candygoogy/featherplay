@@ -3,9 +3,10 @@
 // `src/pages/home.rs` through `HomeData`.
 //
 // The hero has two modes. With a session or a queue: "Pick up where you left off"
-// (`ResumeCard`), the current track (from `Player`) with Pause or Resume and Go to album, the
-// progress, and what's next in the queue as a strip of cells under it. On a fresh start with
-// an empty queue: a featured pick from the first shelf, with more from it (`FeaturedCard`).
+// (`ResumeCard`, as wide as the shelf row under it), the current track (from `Player`) with
+// the progress, Pause or Resume and Go to album, and beside it what's next in the queue as a
+// column of rows. On a fresh start with an empty queue: a featured pick from the first shelf,
+// with more from it (`FeaturedCard`).
 //
 // Every shelf takes the shape of what it holds (`home.rs::arrange`), so the eye tells the
 // shelves apart before reading them: your mixes as wide shortcuts right under the hero (what
@@ -126,6 +127,14 @@ export global Shapes {
     public pure function art-h(s: ShelfShape, w: length) -> length {
         return s == ShelfShape.videos ? round(Shapes.tile-w(s, w) * 9 / 16 / 1px) * 1px : Shapes.tile-w(s, w);
     }
+    // How far a row of `n` tiles reaches in `w`, from the first tile's left edge to the
+    // last's right: a shelf with fewer items than fit stops short of the content's edge.
+    public pure function row-w(s: ShelfShape, w: length, n: int) -> length {
+        return min(n, Shapes.per-row(s, w)) * (Shapes.tile-w(s, w) + Shapes.gap(s)) - Shapes.gap(s);
+    }
+    // The shortcuts Home counts on before the feed is in, or when it has no row of them: as
+    // many as the Shortcuts row holds (`home.rs::SHORTCUTS`).
+    out property <int> lead-tiles: 4;
     public pure function rows(n: int, w: length) -> int {
         return max(1, min(root.mix-rows, ceil(n / Shapes.per-row(ShelfShape.mixes, w))));
     }
@@ -508,30 +517,34 @@ component ItemRow inherits Rectangle {
     }
 }
 
-// "Pick up where you left off", stacked on one edge: everything hangs off the cover's top and
-// the card's left edge. Beside the cover the song on short lines (no separators), Pause or
-// Resume and Go to album pinned right on the title's line (under the artist when that would
-// leave the title too little room), and at the cover's foot the progress line with its
-// times, at most 560 px wide. Under a hairline, what's next as a strip of cells, the
-// label in the cover's column: three cells from 1000 px of card, two below, so the queue
-// never drops out.
+// "Pick up where you left off": one card as wide as the shelf row under it (`HomeTop`), so it
+// stops where Home's shelves stop instead of running the full width. The 152 px cover, then
+// the song on one column: the title and artist on short lines (no separators), the progress
+// line with its times across the column, and Pause or Resume and Go to album at the cover's
+// foot. A hairline, then what's next in the queue as a column of rows under a plain label.
+// The card ends with the shelf row, so the two columns can't drift apart as the window
+// grows. A card too narrow for both (the Up next panel open) drops the queue's: the song's
+// column keeps the room its buttons need.
 component ResumeCard inherits Rectangle {
     property <length> pad: Theme.hero-pad;
     property <length> cover: Theme.hero-cover;
     property <length> text-x: root.pad + root.cover + Theme.s5;
-    property <length> text-w: root.width - root.text-x - root.pad;
-    // The buttons sit on the title's line while that leaves the title 280 px.
-    property <bool> buttons-right: root.text-w - buttons.preferred-width - Theme.s4 >= 280px;
-    property <length> title-w: root.buttons-right ? root.text-w - buttons.preferred-width - Theme.s4 : root.text-w;
-    // The strip: its cells run from the text column to 8 px from the card's edge (a cell's
-    // own 8 px inset ends its text where the column ends).
-    property <length> rule-y: root.cover + 2 * root.pad;
-    property <length> strip-y: root.rule-y + 1px + Theme.s3;
-    property <length> cell-h: Theme.track-row-h;
-    property <int> cols: root.width >= 1000px ? 3 : 2;
-    property <length> cells-w: root.width - root.text-x - Theme.s2;
-    property <length> col-w: floor((root.cells-w - (root.cols - 1) * Theme.s2) / root.cols / 1px) * 1px;
-    height: root.strip-y + root.cell-h + Theme.s3;
+    // The room the song's column needs beside the queue: the buttons, and a title's worth.
+    property <length> song-min-w: max(260px, buttons.preferred-width);
+    // The narrowest card that keeps the queue's column (its rows at their narrowest), so a
+    // short row of shortcuts doesn't hide the queue (`HomeTop`).
+    out property <length> queue-min-w: root.text-x + root.song-min-w + 2 * Theme.s5 + 1px + 260px - 16px + root.pad;
+    // The queue's rows, their 8 px insets included: about a third of the card.
+    property <length> rows-w: clamp(floor(root.width * 0.3 / 1px) * 1px, 260px, 320px);
+    // The rows' hover tiles reach 8 px past the column on both sides, as Quick picks' do.
+    property <length> rows-x: root.width - root.pad + 8px - root.rows-w;
+    // The hairline, a gap left of the rows' covers.
+    property <length> rule-x: root.rows-x + 8px - Theme.s5 - 1px;
+    // The song's column beside the queue, while that leaves it its room.
+    property <length> with-queue-w: root.rule-x - Theme.s5 - root.text-x;
+    property <bool> has-queue: root.with-queue-w >= root.song-min-w;
+    property <length> text-w: root.has-queue ? root.with-queue-w : root.width - root.text-x - root.pad;
+    height: root.cover + 2 * root.pad;
     border-radius: Theme.r-l;
     background: Theme.card;
     border-width: 1px;
@@ -554,7 +567,7 @@ component ResumeCard inherits Rectangle {
         Display {
             x: 0;
             y: 0;
-            width: root.title-w;
+            width: parent.width;
             height: 36px;
             text: Player.title;
             font-size: Theme.t-display-m;
@@ -563,39 +576,19 @@ component ResumeCard inherits Rectangle {
         Body {
             x: 0;
             y: 38px;
-            width: root.title-w;
+            width: parent.width;
             height: 20px;
             text: Player.artist;
             font-size: Theme.t-body-l;
             color: Theme.text2;
             vertical-alignment: center;
         }
-        buttons := HorizontalLayout {
-            x: root.buttons-right ? parent.width - self.preferred-width : 0;
-            y: root.buttons-right ? 0 : 70px;
-            width: self.preferred-width;
-            height: 40px;
-            spacing: Theme.s2;
-            Pill {
-                label: Player.playing ? @tr("Pause") : @tr("Resume");
-                // As wide as the wider label, so Go to album doesn't shift as it toggles.
-                alt-label: Player.playing ? @tr("Resume") : @tr("Pause");
-                icon: Player.playing ? Icons.pause : Icons.play;
-                solid: true;
-                clicked => { HomeData.resume-clicked(); }
-            }
-            if Player.album-id != "": Pill {
-                label: @tr("Go to album");
-                clicked => { Nav.open-album(Player.album-id); }
-            }
-        }
-        // The elapsed time is as wide as the length, so the line doesn't shift as it ticks.
-        // At most 560 px with its times (a line of ~480 px, about the player bar's), so on a
-        // wide window it doesn't run the whole card.
+        // Across the column, a line's gap over the buttons. The elapsed time is as wide as the
+        // length, so the line doesn't shift as it ticks.
         if Player.duration-s > 0: HorizontalLayout {
             x: 0;
-            y: parent.height - self.height - 6px;
-            width: min(parent.width, 560px);
+            y: parent.height - 40px - Theme.s4 - self.height;
+            width: parent.width;
             height: 16px;
             spacing: Theme.s3;
             Body {
@@ -623,46 +616,72 @@ component ResumeCard inherits Rectangle {
                 vertical-alignment: center;
             }
         }
+        buttons := HorizontalLayout {
+            x: 0;
+            y: parent.height - self.height;
+            width: self.preferred-width;
+            height: 40px;
+            spacing: Theme.s2;
+            Pill {
+                label: Player.playing ? @tr("Pause") : @tr("Resume");
+                // As wide as the wider label, so Go to album doesn't shift as it toggles.
+                alt-label: Player.playing ? @tr("Resume") : @tr("Pause");
+                icon: Player.playing ? Icons.pause : Icons.play;
+                solid: true;
+                clicked => { HomeData.resume-clicked(); }
+            }
+            if Player.album-id != "": Pill {
+                label: @tr("Go to album");
+                clicked => { Nav.open-album(Player.album-id); }
+            }
+        }
     }
 
-    Rectangle {
-        x: root.pad;
-        y: root.rule-y;
-        width: root.width - 2 * root.pad;
-        height: 1px;
+    if root.has-queue: Rectangle {
+        x: root.rule-x;
+        y: root.pad;
+        width: 1px;
+        height: root.cover;
         background: Theme.hairline;
     }
-    Body {
-        x: root.pad;
-        y: root.strip-y;
-        width: root.text-x - root.pad - Theme.s2;
-        height: root.cell-h;
-        text: @tr("Next in queue");
-        font-weight: 600;
-        color: Theme.text2;
-        vertical-alignment: center;
-    }
-    if HomeData.next.length == 0: Body {
-        x: root.text-x;
-        y: root.strip-y;
-        width: root.text-w;
-        height: root.cell-h;
-        text: @tr("Nothing after this one");
-        color: Theme.text3;
-        vertical-alignment: center;
-    }
-    for t[i] in HomeData.next: SongRow {
-        x: root.text-x + i * (root.col-w + Theme.s2);
-        y: root.strip-y;
-        width: root.col-w;
-        height: root.cell-h;
-        track: t;
-        menu: true;
-        show-duration: false;
-        visible: i < root.cols;
-        double-clicked => { HomeData.play-next(i); }
-        play => { HomeData.play-next(i); }
-        menu-requested(x, y, top) => { SongMenu.show(t, x, y, top); }
+    // The label, then the rows from the top (`home.rs::HERO_NEXT`, three at most; two or one when
+    // the queue holds fewer), over the cover's height and 4 px past it at both ends.
+    if root.has-queue: Rectangle {
+        x: root.rows-x;
+        y: root.pad - 4px;
+        width: root.rows-w;
+        height: root.cover + 8px;
+        Body {
+            x: 8px;
+            y: -4px;
+            width: parent.width - 16px;
+            height: 20px;
+            text: @tr("Next in queue");
+            font-weight: 600;
+            color: Theme.text2;
+            vertical-alignment: center;
+        }
+        if HomeData.next.length == 0: Body {
+            x: 8px;
+            y: 24px;
+            width: parent.width - 16px;
+            height: 20px;
+            text: @tr("Nothing after this one");
+            color: Theme.text3;
+            vertical-alignment: center;
+        }
+        for t[i] in HomeData.next: SongRow {
+            x: 0;
+            y: parent.height - 3 * Theme.track-row-h + i * Theme.track-row-h;
+            width: parent.width;
+            height: Theme.track-row-h;
+            track: t;
+            menu: true;
+            show-duration: false;
+            double-clicked => { HomeData.play-next(i); }
+            play => { HomeData.play-next(i); }
+            menu-requested(x, y, top) => { SongMenu.show(t, x, y, top); }
+        }
     }
 }
 
@@ -789,7 +808,8 @@ component HomeSkeleton inherits Skeleton {
         sweep: root.sweep;
         fade: root.fade;
     }
-    for i in root.mix-cols: Rectangle {
+    // As many shortcuts as the resume card above counts on (`Shapes.lead-tiles`).
+    for i in min(root.mix-cols, Shapes.lead-tiles): Rectangle {
         x: i * (root.mix-w + Shapes.mix-gap);
         y: Shapes.head-h;
         width: root.mix-w;
@@ -909,7 +929,19 @@ component HomeTop inherits VerticalLayout {
         ShelfHead {
             title: HomeData.resume ? @tr("Pick up where you left off") : @tr("Start listening");
         }
-        if HomeData.resume: ResumeCard { }
+        // As wide as the shelf row under it: your mixes or the Shortcuts row, whose tiles
+        // stop short of the edge when there are fewer than fit (4 x 240 px of 1248 at a 1568 px
+        // window); a shelf of another shape, or none yet, counts as the Shortcuts row.
+        if HomeData.resume: Rectangle {
+            property <bool> lead-mixes: HomeData.shelves.length > 0 && HomeData.shelves[0].shape == ShelfShape.mixes;
+            height: card.height;
+            card := ResumeCard {
+                x: 0;
+                y: 0;
+                // Never so short a row that the queue's column would drop out.
+                width: min(parent.width, max(self.queue-min-w, Shapes.row-w(ShelfShape.mixes, parent.width, parent.lead-mixes ? HomeData.shelves[0].items.length : Shapes.lead-tiles)));
+            }
+        }
         if !HomeData.resume: FeaturedCard { }
     }
     if HomeData.loading && HomeData.shelves.length == 0: HomeSkeleton { }

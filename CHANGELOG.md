@@ -58,6 +58,9 @@ Notable changes to featherplay, newest first. The format follows
   song that plays, with its cover.
 - Search suggestions come while you type, from the third letter, instead of only after you
   stop: at most five requests a second, and an answer never replaces a newer one.
+- Home's "Pick up where you left off" card is shorter and stops where the shortcuts under
+  it stop, instead of running the window's width: the song, its progress and its buttons
+  in one column beside the cover, then the next three songs in the queue as a list.
 
 ### Fixed
 
