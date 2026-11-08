@@ -38,10 +38,23 @@ Notable changes to featherplay, newest first. The format follows
   that opens the same choices. Times stay in the song's minutes; Discord, the media card
   and scrobbling follow the speed (a scrobble counts the song's time heard).
 
+### Changed
+
+- Home no longer shows "Music videos for you": its cards are built around the picture, and
+  featherplay plays only the sound.
+- "Prefer song versions" now applies to music videos started from anywhere (Home, search,
+  artist pages, playlists, the queue), not only the radio's: featherplay finds the song
+  version ahead, while you point at a video or while the songs before it play. A start
+  never waits for it: a video clicked before its song version is ready plays as the video,
+  to its end. The player bar, the media card, lyrics, Discord and the scrobble name the
+  song that plays, with its cover.
+
 ### Fixed
 
 - Pausing, resuming and skipping no longer click: the sound ramps out and back in over
   30 ms.
+- A radio's music video that plays as its song version no longer skips parts of the song
+  with SponsorBlock's segments for the video (its intro, its skits).
 - An update's toast waits until the window is back from the tray or the taskbar, and stays
   10 seconds, so it's no longer missed; a failed check tries again an hour later, not the
   next day.
