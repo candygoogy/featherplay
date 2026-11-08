@@ -513,6 +513,7 @@ pub fn on_event(ev: UiEvent) {
         },
         UiEvent::Release(release) => pages::about::show_update(&ctx, Some(&release)),
         UiEvent::Toast(text) => toast::show(&ctx, text),
+        UiEvent::Silences(marks) => bar::show_silences(&ctx, &marks),
         UiEvent::LocalApi(notice) => pages::settings::local_api_changed(&ctx, notice),
     }
     // The first page is up once the session is known and its loads have landed.

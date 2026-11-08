@@ -19,6 +19,7 @@ mod local_api;
 mod notice;
 mod queue;
 mod reconnect;
+mod silences;
 mod streams;
 
 use std::collections::{HashMap, VecDeque};
@@ -52,6 +53,7 @@ pub use queue::{
     PlayingFrom, QueueAction, QueueInfo, add_input, back_to_inputs, playing_from, queue_edit,
     queue_info, with_likes,
 };
+pub use silences::Mark;
 
 use crate::catalog::{Catalog, Source};
 use crate::presence::Presence;
@@ -208,6 +210,9 @@ pub enum UiEvent {
     Release(updates::Release),
     /// A plain toast: a song waits for the helpers' first download.
     Toast(&'static str),
+    /// What Skip silence drops from the current track, for the seek bar (`silences.rs`);
+    /// empty while it's off, and from a track change until the new track is scanned.
+    Silences(Vec<Mark>),
 }
 
 /// The controller's side of the UI thread.
@@ -291,6 +296,12 @@ pub struct Controller {
     /// When the daily `yt-dlp -U` was last asked for: at startup, then when a song starts
     /// playing a day later (`update_daily`). No timer.
     daily_update: Instant,
+    /// The current track's silences, once scanned (`silences.rs`).
+    silences: Option<silences::TrackSilences>,
+    /// The songs scanned before, read on first use.
+    silence_cache: Option<featherplay_store::SilenceCache>,
+    /// The seek bar's marks last sent.
+    shown_marks: Option<Vec<Mark>>,
 }
 
 impl Controller {
@@ -461,6 +472,9 @@ impl Controller {
             lookup: Default::default(),
             local_api: Default::default(),
             daily_update: Instant::now(),
+            silences: None,
+            silence_cache: None,
+            shown_marks: None,
         })
     }
 
@@ -773,6 +787,7 @@ impl Controller {
                     return Some(Input::StreamExpired);
                 };
                 log!("load {} at {:.1}s", id.0, start.as_secs_f64());
+                self.track_loaded(&id, &src.url);
                 self.audio.load(src.clone(), start);
                 self.loaded(src);
             }
@@ -782,6 +797,7 @@ impl Controller {
                     return Some(Input::StreamExpired);
                 };
                 log!("crossfade to {} over {:.1}s", id.0, fade.as_secs_f64());
+                self.track_loaded(&id, &src.url);
                 self.audio.crossfade_to(src.clone(), fade);
                 self.loaded(src);
             }
@@ -789,6 +805,7 @@ impl Controller {
             Effect::Preload(id) => {
                 if let Some(src) = self.source(&id) {
                     log!("preload {} ({})", id.0, self.time_left());
+                    let _ = self.known_silences(&id, &src.url);
                     self.audio.preload(src);
                 }
             }
@@ -1076,6 +1093,10 @@ impl Controller {
                     self.preload_refused(&url);
                     return;
                 }
+                AudioEvent::Silences { url, silences } => {
+                    self.silences_found(&url, &silences);
+                    return;
+                }
                 AudioEvent::Error(msg) => {
                     log!("audio error: {msg}");
                     Input::AudioFailed(msg)
@@ -1236,6 +1257,8 @@ impl Controller {
             self.shown_state = Some(state.clone());
             (self.ui.events)(UiEvent::Player(Box::new(state)));
         }
+        // A new track's clear the last one's.
+        self.push_marks();
     }
 
     /// "at 180.2s of 200s" for the current track, for the log.

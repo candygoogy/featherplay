@@ -3,6 +3,9 @@
 
 export enum Repeat { off, all, one }
 
+// A stretch of the track that Skip silence drops, in fractions of `Player.duration-s`.
+export struct SilenceSpan { start: float, end: float }
+
 export global Player {
     in property <bool> has-track;
     in property <string> track-id;
@@ -29,6 +32,10 @@ export global Player {
     in property <float> duration-s;
     in property <string> elapsed;
     in property <string> total;
+    // While Skip silence is on, what it drops from the current track as it plays from the
+    // start, once the track has been scanned (or was before); empty otherwise. Set when it
+    // changes, never per frame. Nothing draws it yet.
+    in property <[SilenceSpan]> silences;
     // The 0..1 slider value; the audio engine applies the perceptual curve.
     in property <float> volume;
     // The Volume step setting, in percent: what a wheel notch and Up or Down move it.

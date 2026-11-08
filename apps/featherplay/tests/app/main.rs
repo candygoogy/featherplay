@@ -16,6 +16,7 @@ mod account_menu;
 mod account_picker;
 mod album_actions;
 mod animations;
+mod bar_silences;
 mod bar_speed;
 mod bar_total;
 mod card_hint;

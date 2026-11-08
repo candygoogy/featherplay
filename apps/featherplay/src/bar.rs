@@ -14,11 +14,11 @@ use std::time::{Duration, Instant};
 use featherplay_core::model::{LikeStatus, RepeatMode, TrackId};
 use featherplay_core::tr;
 use featherplay_integrations::NowPlaying;
-use slint::{ComponentHandle, Timer, TimerMode};
+use slint::{ComponentHandle, ModelRc, Timer, TimerMode, VecModel};
 
 use crate::app::Ctx;
-use crate::controller::{Action, PlayerState, now_playing};
-use crate::ui::{Player, Repeat};
+use crate::controller::{Action, Mark, PlayerState, now_playing};
+use crate::ui::{Player, Repeat, SilenceSpan};
 use crate::ui_bridge::{artist_names, format_duration};
 use crate::{mini, not_for_me, shell};
 
@@ -223,6 +223,18 @@ pub fn apply(ctx: &Rc<Ctx>, state: &PlayerState) {
     });
     shell::set_tray_menu(&p);
     mini::update(ctx);
+}
+
+/// What Skip silence drops from the current track, for the seek bar (`Player.silences`):
+/// (start, end) fractions of the duration. Sent only when they change.
+pub fn show_silences(ctx: &Ctx, marks: &[Mark]) {
+    let Some(ui) = ctx.window() else { return };
+    let spans: Vec<SilenceSpan> = marks
+        .iter()
+        .map(|&(start, end)| SilenceSpan { start, end })
+        .collect();
+    ui.global::<Player>()
+        .set_silences(ModelRc::new(VecModel::from(spans)));
 }
 
 /// Where the current track is now (it advances while sound plays), or `None` with nothing

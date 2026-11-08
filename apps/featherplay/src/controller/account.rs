@@ -631,7 +631,11 @@ impl Controller {
             Change::Equalizer(..) => self.audio.set_equalizer(equalizer_bands(&self.settings)),
             Change::Loudness(l) => self.audio.set_compressor(compressor(l)),
             // From the next silence the decoder reaches.
-            Change::SkipSilence(m) => self.audio.set_skip_silences(skip_silences(m)),
+            // The bar's marks follow at once.
+            Change::SkipSilence(m) => {
+                self.audio.set_skip_silences(skip_silences(m));
+                self.push_marks();
+            }
             Change::Sponsorblock(false) => self.segments = None,
             Change::OutputDevice(name) => self.audio.set_device(name.as_deref()),
             Change::Scrobbling(_) | Change::Scrobble(_) | Change::ListenBrainz(_) => {
