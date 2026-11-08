@@ -40,8 +40,9 @@ use slint::{ComponentHandle, LogicalPosition, LogicalSize, Model, ModelRc, Share
 use crate::app::Ctx;
 use crate::controller::PlayerState;
 use crate::ui::{
-    AlbumData, ArtistData, HistoryData, HomeData, ItemKind, LibraryData, Nav, NowPlayingData,
-    PageKind, Player, PlaylistData, QueueData, RowHover, SearchData, TopBarData, TrackRow,
+    AlbumData, ArtistData, Frame, HistoryData, HomeData, ItemKind, LibraryData, Nav,
+    NowPlayingData, PageKind, Player, PlaylistData, QueueData, RowHover, SearchData, TopBarData,
+    TrackRow,
 };
 
 /// A paint gap longer than this starts a new run of frames: the window was idle between.
@@ -247,7 +248,14 @@ impl<F: FnMut() -> bool + Unpin> Future for Until<F> {
         if now >= self.deadline {
             return Poll::Ready(false);
         }
-        SEEN.with_borrow_mut(|s| s.wakers.push(cx.waker().clone()));
+        // Once: each wake polls the script again, and each poll lands here. Queued on every
+        // poll, a copy was never dropped and every timer wake added one, so over a run every
+        // paint came to post hundreds of wakes to the UI thread (half its time in the tour).
+        SEEN.with_borrow_mut(|s| {
+            if !s.wakers.iter().any(|w| w.will_wake(cx.waker())) {
+                s.wakers.push(cx.waker().clone());
+            }
+        });
         // Slint's timers count whole milliseconds and may fire a little early: armed again
         // for what's left whenever it isn't running.
         if !self.timer.as_ref().is_some_and(slint::Timer::running) {
@@ -597,6 +605,16 @@ fn begin() -> (Instant, f64) {
         *d = (0, 0.0, 0.0, 0.0);
     }
     (Instant::now(), cpu_ms())
+}
+
+/// The threads that used the most CPU since `before`, taken as the step began at `t0` (as
+/// `idle` lists them; outside the step's `cpu_ms`).
+fn threads(record: &mut Map<String, Value>, before: &Sample, t0: Instant) {
+    let wall = t0.elapsed().as_secs_f64();
+    record.insert(
+        "busiest".into(),
+        Value::Array(before.busiest_until(&sample(), wall)),
+    );
 }
 
 fn decodes(record: &mut Map<String, Value>) {
@@ -1194,8 +1212,12 @@ impl Driver {
         let w = ui.window();
         let size = w.size().to_logical(w.scale_factor());
         let at = LogicalPosition::new(size.width * 0.55, size.height * 0.5);
+        let before = sample();
         let (t0, c0) = begin();
         w.dispatch_event(WindowEvent::PointerMoved { position: at });
+        // A wheel under a still pointer, as `wheel` sets it from winit's events: the rows
+        // passing under the pointer don't take the hover.
+        ui.global::<Frame>().set_scrolling(true);
         for _ in 0..events {
             crate::offscreen::wheel(w, at, notches);
             sleep(Duration::from_millis(every as u64)).await;
@@ -1203,9 +1225,11 @@ impl Driver {
         let mut m = Map::new();
         settle(&mut m, t0, &self.ctx.covers).await;
         m.insert("cpu_ms".into(), json!(round(cpu_ms() - c0)));
+        threads(&mut m, &before, t0);
         frames(&mut m, self.out.period);
         decodes(&mut m);
         self.record("scroll", words, m, None);
+        ui.global::<Frame>().set_scrolling(false);
         w.dispatch_event(WindowEvent::PointerExited);
         Ok(())
     }
@@ -1222,7 +1246,10 @@ impl Driver {
         let steps: u32 = words.get(2).and_then(|s| s.parse().ok()).unwrap_or(30);
         let w = ui.window();
         let from = w.size().to_logical(w.scale_factor());
+        let before = sample();
         let (t0, c0) = begin();
+        // As a drag of the window's edge sets it (`native::when_sizing`).
+        crate::live_resize::set(w, true);
         for (a, b) in [
             ((from.width, from.height), (tw, th)),
             ((tw, th), (from.width, from.height)),
@@ -1236,9 +1263,11 @@ impl Driver {
                 sleep(Duration::from_millis(16)).await;
             }
         }
+        crate::live_resize::set(w, false);
         let mut m = Map::new();
         settle(&mut m, t0, &self.ctx.covers).await;
         m.insert("cpu_ms".into(), json!(round(cpu_ms() - c0)));
+        threads(&mut m, &before, t0);
         frames(&mut m, self.out.period);
         decodes(&mut m);
         self.record("resize", words, m, None);
