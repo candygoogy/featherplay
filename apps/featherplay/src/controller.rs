@@ -246,6 +246,8 @@ enum Msg {
     Discord(crate::presence::Status),
     /// A reconnect with the stored session; `None`: there's no stored session any more.
     Reconnected(Option<Result<YtMusic, ApiError>>),
+    /// The sign-in behind a resumed start (`YtMusic::refresh`): the fresh client version.
+    Refreshed(Result<Option<String>, ApiError>),
     /// The link for the "may need an update" toast, and a newer release if one is out.
     Help(Option<updates::Help>, Option<updates::Release>),
     /// The Amuse endpoint started, or why not; the number is the start's (`start_amuse`).
@@ -294,6 +296,9 @@ pub struct Controller {
     account: account::AccountState,
     /// The stored session couldn't connect (network or parse failure): the reconnects.
     unreachable: Option<reconnect::Reconnect>,
+    /// `api` is the stored session resumed at startup, and its sign-in behind the start
+    /// hasn't answered yet (`reconnect::stored_session`, `refresh_session`).
+    resumed: bool,
     /// The link for the "may need an update" toast, looked up once a session (`notice.rs`).
     lookup: notice::Lookup,
     /// The local API's server, when it's on.
@@ -358,17 +363,25 @@ impl Controller {
 
         let mut initial = Vec::new();
         let mut unreachable = None;
+        let mut resumed = false;
         let api = match cookie_header() {
             None => {
                 log!("no cookies: signed out");
                 None
             }
             Some(cookies) => {
-                let result = YtMusic::connect(&cookies, &account::saved_identity(&settings)).await;
+                let identity = account::saved_identity(&settings);
+                let (result, at_once) =
+                    reconnect::stored_session(&cookies, &identity, &paths).await;
                 match reconnect::outcome(result) {
                     reconnect::Outcome::Live(api) => {
-                        log!("signed in");
-                        Some(api)
+                        resumed = at_once;
+                        if resumed {
+                            log!("signed in with the kept client version");
+                        } else {
+                            log!("signed in");
+                        }
+                        Some(*api)
                     }
                     reconnect::Outcome::Expired => {
                         initial.push(Input::AuthExpired);
@@ -482,6 +495,7 @@ impl Controller {
             playing_from,
             account: Default::default(),
             unreachable,
+            resumed,
             lookup: Default::default(),
             local_api: Default::default(),
             daily_update: Instant::now(),
@@ -511,6 +525,7 @@ impl Controller {
         let signed_in = signed_in || crate::perf::fixtures();
         (self.ui.events)(UiEvent::Account { signed_in });
         self.check_identity();
+        self.refresh_session();
         if self.presence.is_none() {
             (self.ui.events)(UiEvent::Discord(crate::presence::off_status()));
         }
@@ -1009,6 +1024,10 @@ impl Controller {
             }
             Msg::Reconnected(result) => {
                 self.reconnected(result);
+                return;
+            }
+            Msg::Refreshed(result) => {
+                self.refreshed(result);
                 return;
             }
             Msg::Amuse(start, result) => {

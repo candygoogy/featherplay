@@ -8,8 +8,8 @@ use featherplay_core::model::{
 use featherplay_store::settings::SCHEMA;
 use featherplay_store::{
     Accent, AccentColour, CloseAction, DiscordOptions, DiscordStatusText, DiscordTime, Equalizer,
-    Hotkeys, Loudness, Paths, Settings, SkipSilence, StreamingQuality, ThemeMode, load_session,
-    save_session,
+    Hotkeys, Loudness, Paths, Settings, SkipSilence, StreamingQuality, ThemeMode,
+    load_client_version, load_session, save_client_version, save_session,
 };
 
 use crate::home::{self, TestHome};
@@ -617,6 +617,19 @@ fn session_roundtrip() {
 
     fs::write(p.config.join("session.json"), "{\"queue\": [").unwrap();
     assert_eq!(load_session(&p), None);
+}
+
+#[test]
+fn the_client_version_is_kept_for_the_next_start() {
+    let Some(home) = TestHome::new("client-version") else {
+        return;
+    };
+    let p = home.paths();
+    assert_eq!(load_client_version(&p), None);
+    save_client_version(&p, "1.20261106.01.00").unwrap();
+    assert_eq!(load_client_version(&p).as_deref(), Some("1.20261106.01.00"));
+    save_client_version(&p, "1.20261107.01.00").unwrap();
+    assert_eq!(load_client_version(&p).as_deref(), Some("1.20261107.01.00"));
 }
 
 #[test]

@@ -10,7 +10,8 @@
 use std::time::{Duration, Instant};
 
 use featherplay_core::player::Input;
-use featherplay_ytm::{ApiError, YtMusic};
+use featherplay_store::{Paths, load_client_version, save_client_version};
+use featherplay_ytm::{ApiError, Identity, YtMusic};
 
 use super::{Controller, Msg, UiEvent, account, cookie_header};
 use crate::catalog::Source;
@@ -25,17 +26,51 @@ const BACKOFF: [Duration; 3] = [
 
 /// What a connect with the stored session leads to.
 pub(super) enum Outcome {
-    Live(YtMusic),
+    Live(Box<YtMusic>),
     /// The session was refused: "Session expired, sign in again".
     Expired,
     /// A network or parse failure: the session may well be fine.
     Unreachable,
 }
 
+/// Signs in with the stored session at startup: at once with the client version the last
+/// sign-in kept (`YtMusic::resume`, no request; `refresh_session` checks it behind), or with
+/// `YtMusic::connect`'s request when none is kept (a first start) or it can't be used.
+/// The bool: resumed.
+pub(super) async fn stored_session(
+    cookies: &str,
+    identity: &Identity,
+    paths: &Paths,
+) -> (Result<YtMusic, ApiError>, bool) {
+    if let Some(version) = load_client_version(paths) {
+        match YtMusic::resume(cookies, identity, &version) {
+            Ok(api) => return (Ok(api), true),
+            // Refused cookies are `connect`'s to say too.
+            Err(e) => log!("resuming with the kept client version failed: {e}"),
+        }
+    }
+    let result = YtMusic::connect(cookies, identity).await;
+    if let Ok(api) = &result {
+        keep_version(paths, api.client_version());
+    }
+    (result, false)
+}
+
+/// Keeps a sign-in's client version for the next start. A small file; blocks briefly.
+pub(super) fn keep_version(paths: &Paths, version: Option<String>) {
+    let Some(version) = version else { return };
+    if load_client_version(paths).as_deref() == Some(version.as_str()) {
+        return;
+    }
+    if let Err(e) = save_client_version(paths, &version) {
+        log!("keeping the client version failed: {}", e.kind());
+    }
+}
+
 /// Sorts a connect's result. The error goes to the log.
 pub(super) fn outcome(result: Result<YtMusic, ApiError>) -> Outcome {
     match result {
-        Ok(api) => Outcome::Live(api),
+        Ok(api) => Outcome::Live(Box::new(api)),
         Err(ApiError::AuthExpired) => Outcome::Expired,
         Err(e) => {
             log!("connecting with the stored session failed: {e}");
@@ -92,6 +127,43 @@ impl Reconnect {
 }
 
 impl Controller {
+    /// A session resumed at startup signs in behind the first pages (`YtMusic::refresh`,
+    /// the request `connect` would have waited for), once.
+    pub(super) fn refresh_session(&self) {
+        let Some(api) = self.api.clone().filter(|_| self.resumed) else {
+            return;
+        };
+        let tx = self.tx.clone();
+        tokio::spawn(async move {
+            let _ = tx.send(Msg::Refreshed(api.refresh().await));
+        });
+    }
+
+    /// The resumed session's sign-in: its fresh client version is kept for the next start.
+    /// Refused cookies or a failure lead where a startup `connect`'s would have: "Session
+    /// expired", or unreachable with its reconnects (the page and the API are one host, so
+    /// the pages' requests are failing too; a reconnect reloads them).
+    pub(super) fn refreshed(&mut self, result: Result<Option<String>, ApiError>) {
+        if !std::mem::take(&mut self.resumed) {
+            // Signed in, out or expired meanwhile: that state stands.
+            return;
+        }
+        match result {
+            Ok(version) => {
+                log!("signed in behind the start");
+                keep_version(&self.paths, version);
+            }
+            Err(ApiError::AuthExpired) => self.input(Input::AuthExpired),
+            Err(e) => {
+                log!("connecting with the stored session failed: {e}");
+                self.api = None;
+                self.unreachable = Some(Reconnect::after_failure(Instant::now()));
+                self.ui.catalog.set(Source::Unreachable);
+                (self.ui.events)(UiEvent::Unreachable);
+            }
+        }
+    }
+
     /// Connects with the stored session again, unless one is running already or the app
     /// isn't unreachable (connected or signed out meanwhile).
     pub(super) fn reconnect(&mut self) {
@@ -132,7 +204,9 @@ impl Controller {
                 (self.ui.events)(UiEvent::Unreachable);
             }
             Some(Outcome::Live(api)) => {
+                let api = *api;
                 log!("signed in");
+                keep_version(&self.paths, api.client_version());
                 self.unreachable = None;
                 self.api = Some(api.clone());
                 self.ui.catalog.set(Source::Live(api));

@@ -12,7 +12,7 @@ pub mod silence_cache;
 pub use library_cache::{LibraryCache, LibraryList};
 pub use paths::Paths;
 pub use secrets::{SecretKey, StoreError, delete_secret, get_secret, set_secret};
-pub use session::{load_session, save_session};
+pub use session::{load_client_version, load_session, save_client_version, save_session};
 pub use settings::{
     Accent, AccentColour, CloseAction, DiscordOptions, DiscordStatusText, DiscordTime, Equalizer,
     Hotkeys, Loudness, Settings, SkipSilence, StreamingQuality, ThemeMode,
