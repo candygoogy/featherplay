@@ -45,16 +45,16 @@ msgid "Unknown title"
 msgstr "[Unknown title]"
 
 #: ../../crates/integrations/src/taskbar.rs:176
-#: ../../crates/integrations/src/taskbar.rs:176 ui/bottom_bar.slint:400
-#: ../../crates/integrations/src/taskbar.rs:176 ui/bottom_bar.slint:400 ui/parts.slint:99
+#: ../../crates/integrations/src/taskbar.rs:176 ui/bottom_bar.slint:458
+#: ../../crates/integrations/src/taskbar.rs:176 ui/bottom_bar.slint:458 ui/parts.slint:99
 msgid "Pause"
 msgstr "[Pause]"
 
 #: ../../crates/integrations/src/taskbar.rs:178
 #: ../../crates/integrations/src/taskbar.rs:178
-#: ../../crates/integrations/src/taskbar.rs:178 ui/bottom_bar.slint:400
-#: ../../crates/integrations/src/taskbar.rs:178 ui/bottom_bar.slint:400 ui/pages/content.slint:841 ui/pages/home.slint:606
-#: ../../crates/integrations/src/taskbar.rs:178 ui/bottom_bar.slint:400 ui/pages/content.slint:841 ui/pages/home.slint:606 ui/playlist_menu_layer.slint:197
+#: ../../crates/integrations/src/taskbar.rs:178 ui/bottom_bar.slint:458
+#: ../../crates/integrations/src/taskbar.rs:178 ui/bottom_bar.slint:458 ui/pages/content.slint:841 ui/pages/home.slint:606
+#: ../../crates/integrations/src/taskbar.rs:178 ui/bottom_bar.slint:458 ui/pages/content.slint:841 ui/pages/home.slint:606 ui/playlist_menu_layer.slint:197
 msgid "Play"
 msgstr "[Play]"
 
@@ -73,10 +73,10 @@ msgid "Next"
 msgstr "[Next]"
 
 #: ../../crates/integrations/src/tray.rs:273
-#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:558
-#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:558 ui/mini_player.slint:131 ui/pages/lyrics.slint:97
-#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:558 ui/mini_player.slint:131 ui/pages/lyrics.slint:97 ui/pages/now_playing.slint:709
-#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:558 ui/mini_player.slint:131 ui/pages/lyrics.slint:97 ui/pages/now_playing.slint:709
+#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:616
+#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:616 ui/mini_player.slint:131 ui/pages/lyrics.slint:97
+#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:616 ui/mini_player.slint:131 ui/pages/lyrics.slint:97 ui/pages/now_playing.slint:709
+#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:616 ui/mini_player.slint:131 ui/pages/lyrics.slint:97 ui/pages/now_playing.slint:709
 msgid "Nothing playing"
 msgstr "[Nothing playing]"
 
@@ -253,7 +253,7 @@ msgstr "[the music service said no]"
 msgid "Sign in"
 msgstr "[Sign in]"
 
-#: src/bar.rs:99 src/song_menu.rs:139
+#: src/bar.rs:102 src/song_menu.rs:139
 msgid "Sign in to like songs"
 msgstr "[Sign in to like songs]"
 
@@ -976,92 +976,96 @@ msgstr "[Like all songs]"
 msgid "Dislike all songs"
 msgstr "[Dislike all songs]"
 
-#: ui/bottom_bar.slint:39
+#: ui/bottom_bar.slint:48
 msgid "Seek"
 msgstr "[Seek]"
 
-#: ui/bottom_bar.slint:149
+#: ui/bottom_bar.slint:182
+msgid "Silence"
+msgstr "[Silence]"
+
+#: ui/bottom_bar.slint:207
 msgid "Volume"
 msgstr "[Volume]"
 
-#: ui/bottom_bar.slint:267 ui/pages/settings.slint:1861
+#: ui/bottom_bar.slint:325 ui/pages/settings.slint:1861
 msgid "{} %"
 msgstr "[{} %]"
 
-#: ui/bottom_bar.slint:306 ui/bottom_bar.slint:338
-#: ui/bottom_bar.slint:306 ui/bottom_bar.slint:338 ui/pages/now_playing.slint:247
-#: ui/bottom_bar.slint:306 ui/bottom_bar.slint:338 ui/pages/now_playing.slint:247 ui/pages/settings.slint:2433
+#: ui/bottom_bar.slint:364 ui/bottom_bar.slint:396
+#: ui/bottom_bar.slint:364 ui/bottom_bar.slint:396 ui/pages/now_playing.slint:247
+#: ui/bottom_bar.slint:364 ui/bottom_bar.slint:396 ui/pages/now_playing.slint:247 ui/pages/settings.slint:2433
 msgid "Lyrics"
 msgstr "[Lyrics]"
 
-#: ui/bottom_bar.slint:307
+#: ui/bottom_bar.slint:365
 msgid "Hides the lyrics, back to the cover"
 msgstr "[Hides the lyrics, back to the cover]"
 
-#: ui/bottom_bar.slint:307
+#: ui/bottom_bar.slint:365
 msgid "Shows the lyrics on Now playing"
 msgstr "[Shows the lyrics on Now playing]"
 
-#: ui/bottom_bar.slint:338
+#: ui/bottom_bar.slint:396
 msgid "Hide lyrics"
 msgstr "[Hide lyrics]"
 
-#: ui/bottom_bar.slint:338 ui/pages/now_playing.slint:247
+#: ui/bottom_bar.slint:396 ui/pages/now_playing.slint:247
 msgid "No lyrics"
 msgstr "[No lyrics]"
 
-#: ui/bottom_bar.slint:338 ui/pages/now_playing.slint:247
+#: ui/bottom_bar.slint:396 ui/pages/now_playing.slint:247
 msgid "Retry lyrics"
 msgstr "[Retry lyrics]"
 
-#: ui/bottom_bar.slint:344
+#: ui/bottom_bar.slint:402
 msgid "Ctrl+L"
 msgstr "[Ctrl+L]"
 
 #. Its shortcut, in both windows.
-#: ui/bottom_bar.slint:406 ui/parts.slint:101
+#: ui/bottom_bar.slint:464 ui/parts.slint:101
 msgid "Space"
 msgstr "[Space]"
 
-#: ui/bottom_bar.slint:426
+#: ui/bottom_bar.slint:484
 msgid "Playback speed, {}"
 msgstr "[Playback speed, {}]"
 
-#: ui/bottom_bar.slint:486 ui/bottom_bar.slint:502
-#: ui/bottom_bar.slint:486 ui/bottom_bar.slint:502
+#: ui/bottom_bar.slint:544 ui/bottom_bar.slint:560
+#: ui/bottom_bar.slint:544 ui/bottom_bar.slint:560
 msgid "Playback speed"
 msgstr "[Playback speed]"
 
-#: ui/bottom_bar.slint:558
+#: ui/bottom_bar.slint:616
 msgid "Now playing: {}"
 msgstr "[Now playing: {}]"
 
-#: ui/bottom_bar.slint:636 ui/pages/content.slint:842
-#: ui/bottom_bar.slint:636 ui/pages/content.slint:842
+#: ui/bottom_bar.slint:694 ui/pages/content.slint:842
+#: ui/bottom_bar.slint:694 ui/pages/content.slint:842
 msgid "Shuffle"
 msgstr "[Shuffle]"
 
-#: ui/bottom_bar.slint:666
+#: ui/bottom_bar.slint:724
 msgid "Repeat one"
 msgstr "[Repeat one]"
 
-#: ui/bottom_bar.slint:666
+#: ui/bottom_bar.slint:724
 msgid "Repeat all"
 msgstr "[Repeat all]"
 
-#: ui/bottom_bar.slint:666
+#: ui/bottom_bar.slint:724
 msgid "Repeat off"
 msgstr "[Repeat off]"
 
-#: ui/bottom_bar.slint:736
+#: ui/bottom_bar.slint:794
 msgid "Mute"
 msgstr "[Mute]"
 
-#: ui/bottom_bar.slint:736
+#: ui/bottom_bar.slint:794
 msgid "Unmute"
 msgstr "[Unmute]"
 
-#: ui/bottom_bar.slint:752 ui/pages/now_playing.slint:114
+#: ui/bottom_bar.slint:810 ui/pages/now_playing.slint:114
 msgid "Up next"
 msgstr "[Up next]"
 
@@ -2582,27 +2586,27 @@ msgstr "[Playing]"
 msgid "Pause {}"
 msgstr "[Pause {}]"
 
-#: ui/player.slint:46
+#: ui/player.slint:50
 msgid "0.5×"
 msgstr "[0.5×]"
 
-#: ui/player.slint:46
+#: ui/player.slint:50
 msgid "0.75×"
 msgstr "[0.75×]"
 
-#: ui/player.slint:46
+#: ui/player.slint:50
 msgid "1×"
 msgstr "[1×]"
 
-#: ui/player.slint:46
+#: ui/player.slint:50
 msgid "1.25×"
 msgstr "[1.25×]"
 
-#: ui/player.slint:46
+#: ui/player.slint:50
 msgid "1.5×"
 msgstr "[1.5×]"
 
-#: ui/player.slint:46
+#: ui/player.slint:50
 msgid "2×"
 msgstr "[2×]"
 

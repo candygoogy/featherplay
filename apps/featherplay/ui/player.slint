@@ -34,8 +34,12 @@ export global Player {
     in property <string> total;
     // While Skip silence is on, what it drops from the current track as it plays from the
     // start, once the track has been scanned (or was before); empty otherwise. Set when it
-    // changes, never per frame. Nothing draws it yet.
+    // changes, never per frame. The seek line draws them as marks.
     in property <[SilenceSpan]> silences;
+    // The end of the mark drawn under `at` (0..1 along the line, marks at least `min` long
+    // there), or 0 off them: what the seek line's tip names and its click seeks to. Its
+    // callers pass `silences`, which Rust replaces whole, so they follow every change.
+    pure callback silence-end(spans: [SilenceSpan], at: float, min: float) -> float;
     // The 0..1 slider value; the audio engine applies the perceptual curve.
     in property <float> volume;
     // The Volume step setting, in percent: what a wheel notch and Up or Down move it.

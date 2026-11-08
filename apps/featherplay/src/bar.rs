@@ -14,7 +14,7 @@ use std::time::{Duration, Instant};
 use featherplay_core::model::{LikeStatus, RepeatMode, TrackId};
 use featherplay_core::tr;
 use featherplay_integrations::NowPlaying;
-use slint::{ComponentHandle, ModelRc, Timer, TimerMode, VecModel};
+use slint::{ComponentHandle, Model, ModelRc, Timer, TimerMode, VecModel};
 
 use crate::app::Ctx;
 use crate::controller::{Action, Mark, PlayerState, now_playing};
@@ -68,6 +68,9 @@ pub fn init(ctx: &Rc<Ctx>) {
     player.on_next(move || c.send(Action::Next));
     let c = ctx.clone();
     player.on_previous(move || c.send(Action::Previous));
+    player.on_silence_end(|spans, at, min| {
+        silence_end(spans.iter().map(|s| (s.start, s.end)), at, min).unwrap_or(0.0)
+    });
     let c = ctx.clone();
     player.on_seek(move |fraction| {
         let Some(d) = CLOCK.with(|k| k.duration.get()) else {
@@ -225,16 +228,51 @@ pub fn apply(ctx: &Rc<Ctx>, state: &PlayerState) {
     mini::update(ctx);
 }
 
+/// The most marks the seek line draws: a song with more gaps keeps its longest.
+const MAX_MARKS: usize = 32;
+
 /// What Skip silence drops from the current track, for the seek bar (`Player.silences`):
-/// (start, end) fractions of the duration. Sent only when they change.
+/// (start, end) fractions of the duration, in order, `MAX_MARKS` at most. Sent only when
+/// they change.
 pub fn show_silences(ctx: &Ctx, marks: &[Mark]) {
     let Some(ui) = ctx.window() else { return };
-    let spans: Vec<SilenceSpan> = marks
-        .iter()
-        .map(|&(start, end)| SilenceSpan { start, end })
+    let mut kept = marks.to_vec();
+    if kept.len() > MAX_MARKS {
+        kept.sort_by(|a, b| (b.1 - b.0).total_cmp(&(a.1 - a.0)));
+        kept.truncate(MAX_MARKS);
+        kept.sort_by(|a, b| a.0.total_cmp(&b.0));
+    }
+    let spans: Vec<SilenceSpan> = kept
+        .into_iter()
+        .map(|(start, end)| SilenceSpan { start, end })
         .collect();
     ui.global::<Player>()
         .set_silences(ModelRc::new(VecModel::from(spans)));
+}
+
+/// The end of the mark drawn under `at`, if any, for the seek line's tip and its click
+/// (`Player.silence-end`). All in fractions of the line; a mark shorter than `min` is drawn
+/// `min` long, from the line's start or to its end when it touches one, else centred on
+/// itself (within the line), as `SeekLine` draws it. Where two drawn marks overlap, the
+/// later one, drawn on top, wins.
+pub fn silence_end(spans: impl IntoIterator<Item = Mark>, at: f32, min: f32) -> Option<f32> {
+    spans
+        .into_iter()
+        .filter_map(|(start, end)| {
+            let (from, to) = if end - start >= min {
+                (start, end)
+            } else if start <= 0.0 {
+                (0.0, min)
+            } else if end >= 1.0 {
+                (1.0 - min, 1.0)
+            } else {
+                // Not `clamp`: it panics when the line is shorter than `min`.
+                let from = ((start + end - min) / 2.0).min(1.0 - min).max(0.0);
+                (from, from + min)
+            };
+            (from..=to).contains(&at).then_some(end)
+        })
+        .last()
 }
 
 /// Where the current track is now (it advances while sound plays), or `None` with nothing

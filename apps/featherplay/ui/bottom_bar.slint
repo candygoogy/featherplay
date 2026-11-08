@@ -16,6 +16,8 @@ import { Chips } from "pages/content.slint";
 // click or drag anywhere on it to seek. Hovered, a thumb sits at the fill's end and a tooltip
 // shows the time under the pointer. The fill follows a drag directly and stays
 // where it was dropped until the next position arrives. The tray's mini player has one too.
+// With Skip silence on, what it drops shows as dashed marks on the line; over one the tooltip
+// adds "Silence", and a click there seeks to the mark's end.
 export component SeekLine inherits Rectangle {
     // The time under the pointer stays between the line's ends (the mini player's line
     // runs close to its window's edges); by default it may reach half its width past them.
@@ -34,6 +36,13 @@ export component SeekLine inherits Rectangle {
     property <float> shown: self.dragging ? self.preview : (self.dropped >= 0 ? self.dropped : (Player.duration-s > 0 ? clamp(Player.position-s / Player.duration-s, 0, 1) : 0));
     property <length> thickness: root.active ? 6px : 4px;
     property <length> mid: self.height / 2;
+    // A mark is never drawn shorter than this.
+    property <length> min-mark: 8px;
+    // The end of the mark under the pointer, 0 off them. Kept as the pointer leaves, so the
+    // tooltip doesn't change while it fades out.
+    property <float> mark-end: Player.silences.length > 0 ? Player.silence-end(Player.silences, root.preview, root.min-mark / max(1px, root.width)) : 0;
+    // A mark's dashes ahead of the fill (behind it they're in the accent).
+    property <color> dash-ahead: Theme.dark ? #FFFFFF66 : #00000059;
     height: 16px;
     accessible-role: slider;
     accessible-label: @tr("Seek");
@@ -42,9 +51,11 @@ export component SeekLine inherits Rectangle {
         enabled: root.can-seek;
         mouse-cursor: pointer;
         pointer-event(e) => {
+            // Inside a mark: to its end, where Skip silence would take the song anyway.
             if e.kind == PointerEventKind.up && e.button == PointerEventButton.left {
-                root.dropped = root.preview;
-                Player.seek(root.preview);
+                let to = root.mark-end > 0 ? root.mark-end : root.preview;
+                root.dropped = to;
+                Player.seek(to);
             }
         }
     }
@@ -63,6 +74,41 @@ export component SeekLine inherits Rectangle {
         border-radius: self.height / 2;
         background: Theme.accent;
         animate height { duration: Theme.t-hover; }
+    }
+    // Skip silence's marks: each span it drops is cut out of the line, 2 px of the bar's colour
+    // at either end, and dashed inside: 3 px dashes every 6 px, the line's thickness, in the
+    // accent once played and a pale track colour ahead. A mark is `min-mark` long at least,
+    // from the line's start or to its end when the span touches one, else centred on it
+    // (`bar::silence_end` hits them the same way, to within a pixel). A song's marks fade in together when they
+    // arrive. Rectangles rather than a tiled image: a dozen or so per mark, drawn only
+    // while there are marks, with no asset or image shader.
+    Rectangle {
+        opacity: Player.silences.length > 0 ? 1 : 0;
+        visible: self.opacity > 0;
+        animate opacity { duration: Theme.fading ? 150ms : 0ms; easing: Curves.ease-out; }
+        for s in Player.silences: Rectangle {
+            // On whole pixels, so the line doesn't show a fringe at the cuts.
+            property <length> from: round(root.width * s.start / 1px) * 1px;
+            property <length> to: round(root.width * s.end / 1px) * 1px;
+            property <bool> short: self.to - self.from < root.min-mark;
+            x: !self.short ? self.from : (s.start <= 0 ? 0 : (s.end >= 1 ? self.to - root.min-mark : clamp(round((self.from + self.to - root.min-mark) / 2px) * 1px, 0, root.width - root.min-mark)));
+            y: root.mid - self.height / 2;
+            width: max(root.min-mark, self.to - self.from);
+            height: root.thickness + 2px;
+            border-radius: 1px;
+            background: Theme.bar;
+            animate height { duration: Theme.t-hover; }
+            // As many dashes as the inside holds (the last one may be cut short), within
+            // reason: the line is 600 px at most.
+            for i in min(120, ceil((self.width - 4px) / 6px)): Rectangle {
+                x: 2px + i * 6px;
+                y: 1px;
+                width: min(3px, parent.width - 2px - self.x);
+                height: parent.height - 2px;
+                border-radius: 1px;
+                background: parent.x + self.x + 1.5px < root.width * root.shown ? Theme.accent : root.dash-ahead;
+            }
+        }
     }
     // Until the first sound: a shimmer runs along the line (the only repeating animation,
     // and only while loading). Without motion, a quiet static line instead.
@@ -104,14 +150,14 @@ export component SeekLine inherits Rectangle {
             easing: root.active ? Curves.release : Curves.ease-out;
         }
     }
-    // The time under the pointer, 8 px above the line.
+    // The time under the pointer, 8 px above the line; over a mark, a muted "Silence" after it.
     Rectangle {
-        property <length> w: tip.preferred-width + 12px;
+        property <length> w: tip.preferred-width;
         property <length> reach: root.tip-within ? 0 : self.w / 2;
         x: clamp(ta.mouse-x - self.w / 2, -self.reach, root.width - self.w + self.reach);
         y: root.mid - 3px - Theme.s2 - self.height;
         width: self.w;
-        height: tip.preferred-height + 8px;
+        height: tip.preferred-height;
         border-radius: Theme.r-s;
         background: Theme.card;
         drop-shadow-blur: 8px;
@@ -119,13 +165,25 @@ export component SeekLine inherits Rectangle {
         opacity: root.active ? 1 : 0;
         visible: self.opacity > 0;
         animate opacity { duration: Theme.t-fast; easing: Curves.ease-out; }
-        tip := Body {
-            text: Player.clock(root.preview * Player.duration-s);
-            font-size: Theme.t-meta;
-            font-weight: 600;
-            color: Theme.text1;
-            horizontal-alignment: center;
-            vertical-alignment: center;
+        tip := HorizontalLayout {
+            padding-left: 6px;
+            padding-right: 6px;
+            padding-top: 4px;
+            padding-bottom: 4px;
+            spacing: Theme.s2;
+            Body {
+                text: Player.clock(root.preview * Player.duration-s);
+                font-size: Theme.t-meta;
+                font-weight: 600;
+                color: Theme.text1;
+                vertical-alignment: center;
+            }
+            if root.mark-end > 0: Body {
+                text: @tr("Silence");
+                font-size: Theme.t-meta;
+                color: Theme.text2;
+                vertical-alignment: center;
+            }
         }
     }
 }
