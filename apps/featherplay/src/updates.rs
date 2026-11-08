@@ -42,10 +42,14 @@ use slint::ComponentHandle;
 
 pub mod install;
 
-use install::{FetchError, Origin, Ready};
+use install::{FetchError, Keys, Origin, Ready};
 
 /// The project's pages on GitHub; every URL opened from a reply must start with it.
 const PAGES: &str = "https://github.com/candygoogy/featherplay/";
+/// The website, opened instead of the release page when a release couldn't be verified:
+/// the page users know to download from, deployed apart from GitHub's releases. Its
+/// download links still lead to GitHub's files, for the version it was last deployed with.
+pub const SITE: &str = "https://featherplay.candygoogy.dev/";
 const LATEST: &str = "https://api.github.com/repos/candygoogy/featherplay/releases/latest";
 const SEARCH: &str = "https://api.github.com/search/issues";
 /// The title of the issue the maintainer opens by hand once playback is confirmed broken for
@@ -247,7 +251,7 @@ pub fn may_request(last: u64, now: SystemTime, limited_until: Option<u64>) -> bo
 
 /// The download of a newer release's setup: which version, how many times it was tried and
 /// when last, and whether it's refused for good (a checksum that didn't match, no setup for
-/// this PC).
+/// this PC), because its checksums weren't signed for it with featherplay's keys or not.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Fetch {
@@ -256,6 +260,8 @@ pub struct Fetch {
     pub last: u64,
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub refused: bool,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub unverified: bool,
 }
 
 /// The last check, kept in the cache.
@@ -317,7 +323,7 @@ impl Stamp {
                 version,
                 attempts: FETCH_ATTEMPTS,
                 last: stamp.checked,
-                refused: false,
+                ..Fetch::default()
             });
         }
         if stamp.answered == 0 && stamp.error.is_none() {
@@ -397,23 +403,31 @@ impl Stamp {
     }
 
     /// The downloaded setup, if it installs the newer release (not an older one, nor the
-    /// version running now).
+    /// version running now), and its checksums were signed (`Ready::signed`).
     pub fn pending(&self, current: &str) -> Option<&Ready> {
         let newer = self.newer(current)?;
-        self.ready.as_ref().filter(|r| r.version == newer.version)
+        self.ready
+            .as_ref()
+            .filter(|r| r.version == newer.version && r.signed)
     }
 
     /// The newer release, if its setup is to be downloaded now: never tried; or tried and
     /// failed fewer than `FETCH_ATTEMPTS` times, the last over an hour ago; or, asked for by
-    /// a click (`manual`), failed any number of times. Never once it's refused.
+    /// a click (`manual`), failed any number of times. Never once it's refused, except one
+    /// refused as unverified: its signature is looked for again a day later, in case it was
+    /// uploaded late (and checked as ever).
     pub fn to_fetch(&self, current: &str, now: SystemTime, manual: bool) -> Option<&Release> {
         let newer = self.newer(current)?;
         let Some(f) = self.fetch.as_ref().filter(|f| f.version == newer.version) else {
             return Some(newer);
         };
         let now = unix(now);
-        let waited = now < f.last || now - f.last >= FETCH_RETRY;
-        let again = !f.refused && (manual || (f.attempts < FETCH_ATTEMPTS && waited));
+        let waited = |secs| now < f.last || now - f.last >= secs;
+        let again = if f.unverified {
+            waited(CHECK_EVERY)
+        } else {
+            !f.refused && (manual || (f.attempts < FETCH_ATTEMPTS && waited(FETCH_RETRY)))
+        };
         again.then_some(newer)
     }
 
@@ -430,7 +444,17 @@ impl Stamp {
             attempts: attempts + 1,
             last: unix(now),
             refused,
+            unverified: false,
         });
+    }
+
+    /// A download of `version`'s setup at `now` that its checksums' signature refused. It's
+    /// looked at again only a day later (`to_fetch`), and About says why.
+    pub fn fetch_unverified(&mut self, version: &str, now: SystemTime) {
+        self.fetch_tried(version, now, true);
+        if let Some(f) = &mut self.fetch {
+            f.unverified = true;
+        }
     }
 
     /// When a failed download of the newer release is to be tried again, if it is.
@@ -439,6 +463,16 @@ impl Stamp {
         let f = self.fetch.as_ref().filter(|f| f.version == newer.version)?;
         let again = !f.refused && f.attempts < FETCH_ATTEMPTS && self.pending(current).is_none();
         again.then_some(f.last + FETCH_RETRY)
+    }
+
+    /// Whether the newer release's setup was refused as unverified (`fetch_unverified`).
+    pub fn unverified(&self, current: &str) -> bool {
+        let Some(newer) = self.newer(current) else {
+            return false;
+        };
+        self.fetch
+            .as_ref()
+            .is_some_and(|f| f.version == newer.version && f.unverified)
     }
 
     /// The version "Restart to update" started whose update didn't install: the setup ran,
@@ -453,11 +487,13 @@ pub fn stamp_path(cache: &Path) -> PathBuf {
     cache.join(STAMP)
 }
 
-/// Where a run asks: GitHub, or in tests a server on 127.0.0.1; and whether this is the
-/// installed copy, which downloads setups.
+/// Where a run asks: GitHub, or in tests a server on 127.0.0.1; the keys a release's
+/// checksums must be signed with; and whether this is the installed copy, which downloads
+/// setups.
 pub struct Remote {
     latest: String,
     origin: Origin,
+    keys: Keys,
     installed: bool,
     /// Tests: the release files' URLs (`install::DOWNLOADS…`) are fetched from here instead.
     #[cfg(test)]
@@ -465,11 +501,13 @@ pub struct Remote {
 }
 
 impl Remote {
-    /// GitHub, for this copy (`installed`: it's the installed copy).
+    /// GitHub, with featherplay's own keys, for this copy (`installed`: it's the installed
+    /// copy).
     pub fn github(installed: bool) -> Remote {
         Remote {
             latest: LATEST.to_string(),
             origin: Origin::github(),
+            keys: Keys::release(),
             installed,
             #[cfg(test)]
             files: None,
@@ -481,6 +519,7 @@ impl Remote {
         Remote {
             latest: format!("{base}/latest"),
             origin: Origin::local(),
+            keys: install::tests::test_keys(),
             installed,
             files: Some(base.to_string()),
         }
@@ -491,7 +530,10 @@ impl Remote {
         #[cfg(test)]
         if let Some(base) = &self.files {
             let mut plan = plan;
-            for asset in [&mut plan.setup, &mut plan.sums] {
+            for asset in [&mut plan.setup, &mut plan.sums]
+                .into_iter()
+                .chain(plan.sig.as_mut())
+            {
                 asset.url = format!("{base}/{}", asset.name);
             }
             return plan;
@@ -651,6 +693,9 @@ pub enum Banner {
     Scoop,
     /// B8: "Restart to update" clicked, before featherplay quits.
     Starting,
+    /// B9: the release's checksums weren't signed for it with featherplay's keys: nothing
+    /// downloaded; "Get it" opens the website, not the release page.
+    Unverified,
 }
 
 impl Status {
@@ -686,6 +731,9 @@ impl Status {
         }
         if self.downloading {
             return Banner::Downloading;
+        }
+        if self.stamp.unverified(CURRENT) {
+            return Banner::Unverified;
         }
         match self.stamp.fetch.as_ref() {
             Some(f) if f.version == newer.version && f.refused => Banner::CannotInstall,
@@ -743,6 +791,8 @@ pub struct Found {
     pub ready: Option<Ready>,
     /// `ready` was downloaded by this run (not at an earlier one).
     pub downloaded: bool,
+    /// This run refused the newer release's setup: its checksums weren't signed for it.
+    pub unverified: bool,
     pub failed_install: Option<String>,
     /// Seconds since 1970; 0 for at once.
     pub next_due: u64,
@@ -817,6 +867,7 @@ pub async fn run(
     }
     let mut ready = None;
     let mut downloaded = false;
+    let mut unverified = false;
     if install_on && remote.installed && (check_on || trigger.clicked()) {
         if let Some(r) = stamp.pending(CURRENT).cloned() {
             if r.verified(&cache) {
@@ -847,7 +898,7 @@ pub async fn run(
                     changed_elsewhere();
                     let plan = remote.localise(plan);
                     let began = std::time::Instant::now();
-                    match install::fetch(&cache, &plan, &remote.origin).await {
+                    match install::fetch(&cache, &plan, &remote.origin, &remote.keys).await {
                         Ok(r) => {
                             log!(
                                 "update: {} downloaded and checked in {:.1} s",
@@ -858,6 +909,14 @@ pub async fn run(
                             stamp.ready = Some(r.clone());
                             ready = Some(r);
                             downloaded = true;
+                        }
+                        Err(FetchError::Unverified(e)) => {
+                            log!(
+                                "update: refusing {}, it couldn't be verified: {e}",
+                                release.version
+                            );
+                            stamp.fetch_unverified(&release.version, now);
+                            unverified = true;
                         }
                         Err(e) => {
                             log!("update download: {e}");
@@ -897,6 +956,7 @@ pub async fn run(
         announce,
         ready,
         downloaded,
+        unverified,
         failed_install,
         next_due,
     };
@@ -924,15 +984,21 @@ pub async fn help(cache: PathBuf, install_on: bool) -> (Option<Help>, Option<Rel
     let remote = Remote::github(install::installed());
     let found = run(running, cache, Trigger::Help, true, install_on, remote).await;
     if let Some(r) = found.newer {
-        // A setup downloaded and checked: the banner's "Restart to update".
+        // A setup downloaded and checked: the banner's "Restart to update". One that
+        // couldn't be verified: the website, not the release page.
         let restart = found.ready.is_some();
+        let unverified = status().stamp.unverified(CURRENT);
         let help = Help {
             label: if restart {
                 tr!("Restart to update")
             } else {
                 tr!("Get it")
             },
-            url: r.url.clone(),
+            url: if unverified {
+                SITE.into()
+            } else {
+                r.url.clone()
+            },
             restart,
         };
         return (Some(help), Some(r));
@@ -962,6 +1028,8 @@ pub enum Notice {
     Ready(String),
     /// "The update to 0.2.0 didn't install", with "Try again".
     InstallFailed(String),
+    /// "The update to 0.2.0 couldn't be verified", with "View": About says what to do.
+    Unverified(String),
 }
 
 impl Notice {
@@ -981,7 +1049,11 @@ impl Notice {
         if let Some(r) = &found.ready {
             return fresh.then(|| Notice::Ready(r.version.clone()));
         }
-        found.announce.clone().map(Notice::Out)
+        let announce = found.announce.clone();
+        if found.unverified {
+            return announce.map(|r| Notice::Unverified(r.version));
+        }
+        announce.map(Notice::Out)
     }
 }
 
@@ -1149,6 +1221,13 @@ fn show(ctx: &Ctx, notice: &Notice) {
             restart,
             TOAST_FOR,
         ),
+        Notice::Unverified(version) => toast::show_for(
+            ctx,
+            &tr!("The update to {} couldn't be verified", version),
+            tr!("View"),
+            |c| c.navigate(Page::About),
+            TOAST_FOR,
+        ),
     }
 }
 
@@ -1238,13 +1317,14 @@ pub fn ready_for_snapshot(ctx: &Ctx) {
             version: "0.2.0".into(),
             file: "featherplay-setup-0.2.0.exe".into(),
             sha256: String::new(),
+            signed: true,
         });
     });
     show(ctx, &Notice::Ready("0.2.0".into()));
 }
 
 /// `--snapshot about-…`: the version row and the banner in the state `page` names (the
-/// design board's S1-S4c and B1-B8; plain `about` is S0).
+/// design board's S1-S4c and B1-B9; plain `about` is S0).
 pub fn for_snapshot(ctx: &Ctx, page: &str) {
     if page == "about-update-ready" {
         ready_for_snapshot(ctx);
@@ -1255,6 +1335,7 @@ pub fn for_snapshot(ctx: &Ctx, page: &str) {
         version: "0.2.0".into(),
         file: "featherplay-setup-0.2.0.exe".into(),
         sha256: String::new(),
+        signed: true,
     };
     set_status(ctx, |s| {
         s.stamp.checked = now;
@@ -1263,6 +1344,7 @@ pub fn for_snapshot(ctx: &Ctx, page: &str) {
             attempts: 1,
             last: now,
             refused,
+            unverified: false,
         };
         match page.strip_prefix("about-") {
             Some("check-checking") => {
@@ -1282,6 +1364,12 @@ pub fn for_snapshot(ctx: &Ctx, page: &str) {
                     "update-downloading" => s.downloading = true,
                     "update-failed-download" => s.stamp.fetch = Some(tried(false)),
                     "update-cannot-install" => s.stamp.fetch = Some(tried(true)),
+                    "update-unverified" => {
+                        s.stamp.fetch = Some(Fetch {
+                            unverified: true,
+                            ..tried(true)
+                        });
+                    }
                     "update-failed-install" => {
                         s.stamp.ready = Some(setup.clone());
                         s.stamp.launched = Some("0.2.0".into());
@@ -1300,9 +1388,9 @@ pub fn for_snapshot(ctx: &Ctx, page: &str) {
     });
 }
 
-/// Opens one of the project's pages in the browser, off the UI thread.
+/// Opens one of the project's pages, or the website, in the browser, off the UI thread.
 pub fn open(ctx: &Ctx, url: &str) {
-    if !ours(url) {
+    if !ours(url) && url != SITE {
         return;
     }
     let url = url.to_string();
@@ -1315,37 +1403,44 @@ pub fn open(ctx: &Ctx, url: &str) {
 
 #[cfg(test)]
 mod tests {
-    use super::install::tests::{SETUP, serve, sums_for, test_cache};
+    use super::install::tests::{BY_MAIN, SETUP, SIGNED_SUMS, serve, test_cache};
     use super::*;
 
-    /// `releases/latest` for 9.0.0, its files on the project's releases, as GitHub gives.
-    fn reply() -> Vec<u8> {
+    /// `releases/latest` for 9.0.0, its files on the project's releases, as GitHub gives;
+    /// `signed`: with `SHA256SUMS.txt.minisig`.
+    fn reply(signed: bool) -> Vec<u8> {
         let file = |name: &str| {
             format!(
                 r#"{{"name":"{name}","browser_download_url":"{}v9.0.0/{name}"}}"#,
                 install::DOWNLOADS
             )
         };
+        let mut files = vec![file("featherplay-setup-9.0.0.exe"), file("SHA256SUMS.txt")];
+        if signed {
+            files.push(file("SHA256SUMS.txt.minisig"));
+        }
         format!(
-            r#"{{"tag_name":"v9.0.0","html_url":"{PAGES}releases/tag/v9.0.0","assets":[{},{}]}}"#,
-            file("featherplay-setup-9.0.0.exe"),
-            file("SHA256SUMS.txt")
+            r#"{{"tag_name":"v9.0.0","html_url":"{PAGES}releases/tag/v9.0.0","assets":[{}]}}"#,
+            files.join(",")
         )
         .into_bytes()
+    }
+
+    /// GitHub's reply (`signed` or not) and 9.0.0's files, signed with the test main key.
+    fn github(signed: bool) -> String {
+        serve(move |path| match path {
+            "/latest" => (200, reply(signed)),
+            "/SHA256SUMS.txt" => (200, SIGNED_SUMS.to_vec()),
+            "/SHA256SUMS.txt.minisig" => (200, BY_MAIN.to_vec()),
+            "/featherplay-setup-9.0.0.exe" => (200, SETUP.to_vec()),
+            _ => (404, Vec::new()),
+        })
     }
 
     #[tokio::test]
     async fn a_manual_check_on_the_installed_copy_downloads_the_setup() {
         let cache = test_cache("manual-run");
-        let sums = String::from_utf8(sums_for(SETUP))
-            .unwrap()
-            .replace("0.2.0", "9.0.0");
-        let base = serve(move |path| match path {
-            "/latest" => (200, reply()),
-            "/SHA256SUMS.txt" => (200, sums.clone().into_bytes()),
-            "/featherplay-setup-9.0.0.exe" => (200, SETUP.to_vec()),
-            _ => (404, Vec::new()),
-        });
+        let base = github(true);
 
         // "Check for updates" off: the click asks all the same.
         let running = Running::begin(true).expect("no run going");
@@ -1367,6 +1462,34 @@ mod tests {
             "nor toasted later"
         );
         assert!(!status().running);
+        std::fs::remove_dir_all(&cache).unwrap();
+    }
+
+    #[tokio::test]
+    async fn an_unsigned_release_is_refused_for_good_and_said() {
+        let cache = test_cache("unsigned-run");
+        let base = github(false);
+
+        let running = Running::begin(true).expect("no run going");
+        let remote = Remote::local(&base, true);
+        let found = run(running, cache.clone(), Trigger::Startup, true, true, remote).await;
+
+        assert_eq!(found.ready, None, "never installed unsigned");
+        assert!(found.unverified);
+        assert!(!cache.join("updates").exists(), "nothing downloaded");
+        let stamp = Stamp::load(&stamp_path(&cache));
+        assert!(stamp.unverified(CURRENT));
+        assert_eq!(stamp.to_fetch(CURRENT, SystemTime::now(), true), None);
+        let about = Status {
+            stamp,
+            kind: Kind::Installed,
+            ..Status::default()
+        };
+        assert_eq!(about.banner(true), Banner::Unverified);
+        assert_eq!(
+            Notice::of(&found, Trigger::Startup),
+            Some(Notice::Unverified("9.0.0".into()))
+        );
         std::fs::remove_dir_all(&cache).unwrap();
     }
 

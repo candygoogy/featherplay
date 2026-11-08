@@ -174,6 +174,7 @@ fn setup() -> Ready {
         version: "0.2.0".into(),
         file: "featherplay-setup-0.2.0.exe".into(),
         sha256: String::new(),
+        signed: true,
     }
 }
 
@@ -281,6 +282,38 @@ fn a_failed_install_says_so_in_the_banner() {
     assert_eq!(about.get_update_state(), UpdateState::Scoop);
     updates::set_status(&scene.ctx, |s| s.kind = Kind::Portable);
     assert_eq!(about.get_update_state(), UpdateState::Get);
+}
+
+#[test]
+fn an_update_that_could_not_be_verified_says_so() {
+    let scene = about_with(|s| {
+        s.kind = Kind::Installed;
+        s.stamp.latest = Some(release());
+        s.stamp
+            .fetch_unverified("0.2.0", std::time::SystemTime::now());
+    });
+    let about = scene.ui.global::<AboutData>();
+    assert_eq!(about.get_update_state(), UpdateState::Unverified);
+}
+
+#[test]
+fn an_unverified_update_toast_leads_to_about() {
+    let scene = home();
+    let toast = scene.ui.global::<Toast>();
+    let found = Found {
+        newer: Some(release()),
+        announce: Some(release()),
+        unverified: true,
+        ..Found::default()
+    };
+
+    updates::finished(&scene.ctx, Trigger::Startup, &found);
+
+    assert_eq!(
+        toast.get_text().as_str(),
+        "The update to 0.2.0 couldn't be verified"
+    );
+    assert_eq!(toast.get_action().as_str(), "View");
 }
 
 /// The window's Win32 side: minimised or not.

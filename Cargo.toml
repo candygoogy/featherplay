@@ -57,6 +57,9 @@ serde_json = "=1.0.154"
 toml = "=1.1.8"
 md-5 = "=0.11.0"
 sha2 = "=0.11.1"
+# Checks the minisign signature on a release's SHA256SUMS.txt before an update downloads.
+# Pure Rust, no dependencies (its own Ed25519 and BLAKE2b), MIT.
+minisign-verify = "=0.3.0"
 zip = { version = "=9.1.0", default-features = false }
 # Deflates embedded data at build time and inflates it at runtime; in the tree already (zip, png).
 flate2 = "=1.1.10"

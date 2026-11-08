@@ -1,2 +1,5 @@
 # Shell scripts keep LF on Windows checkouts too (core.autocrlf), or bash reads the CRs.
 *.sh text eol=lf
+# The signed update fixtures are checked byte for byte: a CRLF checkout would break their
+# signatures.
+apps/featherplay/tests/fixtures/signing/** -text

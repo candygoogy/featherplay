@@ -139,11 +139,12 @@ pub const PAGES: &[&str] = &[
     // the toast.
     "about-update-ready",
     // The banner while the setup downloads; after the download failed; when it can't be
-    // installed from here; after the update didn't install; on Scoop's copy; after Restart
-    // to update was clicked.
+    // installed from here; when it couldn't be verified; after the update didn't install;
+    // on Scoop's copy; after Restart to update was clicked.
     "about-update-downloading",
     "about-update-failed-download",
     "about-update-cannot-install",
+    "about-update-unverified",
     "about-update-failed-install",
     "about-update-scoop",
     "about-update-starting",

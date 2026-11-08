@@ -92,6 +92,7 @@ fn banner_state(banner: Banner) -> UpdateState {
         Banner::InstallFailed => UpdateState::InstallFailed,
         Banner::Scoop => UpdateState::Scoop,
         Banner::Starting => UpdateState::Starting,
+        Banner::Unverified => UpdateState::Unverified,
     }
 }
 
@@ -164,6 +165,8 @@ fn update_clicked(ctx: &Rc<Ctx>, primary: bool) {
         (Banner::Ready | Banner::InstallFailed, true) => updates::restart(ctx),
         (Banner::DownloadFailed, true) => updates::retry_download(ctx),
         (Banner::InstallFailed, false) => open_log_folder(),
+        // Not the release page: its files are what couldn't be verified.
+        (Banner::Unverified, true) => updates::open(ctx, updates::SITE),
         // "Get it", "What's new", "Get it on GitHub": the release's page.
         (Banner::Get | Banner::CannotInstall, true)
         | (

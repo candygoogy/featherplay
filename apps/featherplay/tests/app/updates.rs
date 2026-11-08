@@ -2,13 +2,16 @@
 //! fixtures in `tests/fixtures/github/`), the stamp (a day between checks, an hour after a
 //! failed one, the download's retries, the update that didn't install), the rate limit and
 //! the cooldown, and what the automatic update picks: the setup for this architecture, its
-//! line in `SHA256SUMS.txt`, and whether this is the installed copy, or Scoop's. No request
-//! is made.
+//! line in `SHA256SUMS.txt`, the minisign signature on that file (made with test keys,
+//! `tests/fixtures/signing/`), and whether this is the installed copy, or Scoop's. No
+//! request is made.
 
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use featherplay::updates::install::{self, Ready, is_installed, is_scoop, parse_sums, setup_name};
+use featherplay::updates::install::{
+    self, Keys, Ready, SignatureError, is_installed, is_scoop, parse_sums, setup_name, verify_sums,
+};
 use featherplay::updates::{
     Asset, CheckError, Release, Stamp, classify, is_newer, may_request, parse_issue, parse_release,
 };
@@ -394,6 +397,108 @@ fn a_malformed_or_contradictory_checksum_is_refused() {
     assert_eq!(parse_sums(&twice, "featherplay.exe"), None);
 }
 
+/// `SHA256SUMS.txt` for 9.0.0, and its signatures: by the test main key, the test backup
+/// key, a key featherplay doesn't know, and the main key for 8.0.0.
+const SIGNED_SUMS: &[u8] = include_bytes!("../fixtures/signing/SHA256SUMS.txt");
+const BY_MAIN: &str = include_str!("../fixtures/signing/main.minisig");
+const BY_BACKUP: &str = include_str!("../fixtures/signing/backup.minisig");
+const BY_UNKNOWN: &str = include_str!("../fixtures/signing/unknown.minisig");
+const FOR_8: &str = include_str!("../fixtures/signing/old-version.minisig");
+
+fn test_keys() -> Keys {
+    Keys::from_pub(&[
+        include_str!("../fixtures/signing/test-main.pub"),
+        include_str!("../fixtures/signing/test-backup.pub"),
+    ])
+}
+
+#[test]
+fn checksums_signed_with_the_main_key_are_trusted() {
+    assert_eq!(
+        verify_sums(SIGNED_SUMS, BY_MAIN, "9.0.0", &test_keys()),
+        Ok(())
+    );
+}
+
+#[test]
+fn checksums_signed_with_the_backup_key_are_trusted() {
+    assert_eq!(
+        verify_sums(SIGNED_SUMS, BY_BACKUP, "9.0.0", &test_keys()),
+        Ok(())
+    );
+}
+
+#[test]
+fn a_damaged_signature_is_refused() {
+    // One character of the signature itself, past the algorithm and the key id.
+    let mut lines: Vec<String> = BY_MAIN.lines().map(str::to_string).collect();
+    let mut sig: Vec<char> = lines[1].chars().collect();
+    sig[40] = if sig[40] == 'A' { 'B' } else { 'A' };
+    lines[1] = sig.into_iter().collect();
+    let damaged = lines.join("\n");
+    assert_eq!(
+        verify_sums(SIGNED_SUMS, &damaged, "9.0.0", &test_keys()),
+        Err(SignatureError::Invalid)
+    );
+    assert_eq!(
+        verify_sums(SIGNED_SUMS, "not a signature", "9.0.0", &test_keys()),
+        Err(SignatureError::Unreadable)
+    );
+}
+
+#[test]
+fn a_signature_from_an_unknown_key_is_refused() {
+    assert_eq!(
+        verify_sums(SIGNED_SUMS, BY_UNKNOWN, "9.0.0", &test_keys()),
+        Err(SignatureError::UnknownKey)
+    );
+}
+
+#[test]
+fn a_signature_for_another_version_is_refused() {
+    // 8.0.0's checksums, validly signed, uploaded again as 9.0.0's.
+    assert_eq!(
+        verify_sums(SIGNED_SUMS, FOR_8, "9.0.0", &test_keys()),
+        Err(SignatureError::WrongVersion("featherplay v8.0.0".into()))
+    );
+    assert_eq!(
+        verify_sums(SIGNED_SUMS, FOR_8, "8.0.0", &test_keys()),
+        Ok(())
+    );
+}
+
+#[test]
+fn a_trusted_comment_edited_for_another_version_is_refused() {
+    // The comment is signed as well: rewriting 8.0.0's to say 9.0.0 breaks the signature.
+    let forged = FOR_8.replace("featherplay v8.0.0", "featherplay v9.0.0");
+    assert_eq!(
+        verify_sums(SIGNED_SUMS, &forged, "9.0.0", &test_keys()),
+        Err(SignatureError::Invalid)
+    );
+}
+
+#[test]
+fn checksums_changed_after_signing_are_refused() {
+    let changed = String::from_utf8(SIGNED_SUMS.to_vec())
+        .unwrap()
+        .replacen('d', "e", 1);
+    assert_eq!(
+        verify_sums(changed.as_bytes(), BY_MAIN, "9.0.0", &test_keys()),
+        Err(SignatureError::Invalid)
+    );
+}
+
+#[test]
+fn the_test_keys_sign_nothing_for_the_release_keys() {
+    // The built-in keys are featherplay's own two, and neither is a test key.
+    let release = Keys::release();
+    assert_eq!(release.len(), 2, "the main key and the backup key");
+    assert_eq!(
+        verify_sums(SIGNED_SUMS, BY_MAIN, "9.0.0", &release),
+        Err(SignatureError::UnknownKey)
+    );
+}
+
 #[test]
 fn the_setup_is_picked_by_architecture() {
     assert_eq!(
@@ -448,6 +553,26 @@ fn a_release_without_checksums_is_only_announced() {
 }
 
 #[test]
+fn the_plan_carries_the_checksums_signature_if_the_release_has_one() {
+    let signed = with_assets(&[
+        "featherplay-setup-0.2.0.exe",
+        "SHA256SUMS.txt",
+        "SHA256SUMS.txt.minisig",
+    ]);
+    let plan = install::plan(&signed, "x86_64").expect("a plan");
+    assert_eq!(
+        plan.sig.map(|a| a.name).as_deref(),
+        Some("SHA256SUMS.txt.minisig")
+    );
+    // Unsigned: still a plan, which the download then refuses (`fetch`).
+    let unsigned = with_assets(&["featherplay-setup-0.2.0.exe", "SHA256SUMS.txt"]);
+    assert_eq!(
+        install::plan(&unsigned, "x86_64").expect("a plan").sig,
+        None
+    );
+}
+
+#[test]
 fn the_exe_in_the_install_folder_is_the_installed_copy() {
     let location = Path::new(r"C:\Users\Ann\AppData\Local\Programs\featherplay\");
     let exe = Path::new(r"C:\Users\Ann\AppData\Local\Programs\featherplay\featherplay.exe");
@@ -495,6 +620,7 @@ fn ready(version: &str) -> Ready {
         version: version.into(),
         file: format!("featherplay-setup-{version}.exe"),
         sha256: "ab".repeat(32),
+        signed: true,
     }
 }
 
@@ -533,6 +659,52 @@ fn a_checksum_mismatch_is_not_retried() {
         "nor on a click"
     );
     assert_eq!(s.fetch_due_at("0.1.0"), None, "nothing to wake for");
+}
+
+#[test]
+fn a_release_not_newer_than_the_running_one_is_never_downloaded() {
+    let mut s = Stamp::default();
+    s.record(Ok(Some(release("0.2.0"))), now());
+    s.ready = Some(ready("0.2.0"));
+    for running in ["0.2.0", "0.3.0"] {
+        assert_eq!(s.to_fetch(running, now(), true), None, "{running}");
+        assert_eq!(s.pending(running), None, "{running}");
+    }
+}
+
+#[test]
+fn an_unverified_update_is_checked_again_a_day_later() {
+    let mut s = Stamp::default();
+    s.record(Ok(Some(release("0.2.0"))), now());
+    s.fetch_unverified("0.2.0", now());
+    let fetch = s.fetch.clone().expect("tried");
+    assert!(fetch.refused && fetch.unverified);
+    assert_eq!(
+        s.to_fetch("0.1.0", now() + 2 * HOUR, true),
+        None,
+        "nor on a click"
+    );
+    // A signature uploaded late is found at the next day's check, and checked as ever.
+    assert_eq!(
+        s.to_fetch("0.1.0", now() + 25 * HOUR, false),
+        Some(&release("0.2.0"))
+    );
+}
+
+#[test]
+fn a_setup_downloaded_without_a_signature_check_is_not_offered() {
+    // 0.1.2 and before checked only the sha256: their downloaded setup isn't installed.
+    let mut s = Stamp::default();
+    s.record(Ok(Some(release("0.2.0"))), now());
+    s.ready = Some(Ready {
+        signed: false,
+        ..ready("0.2.0")
+    });
+    assert_eq!(s.pending("0.1.0"), None);
+    assert!(
+        s.to_fetch("0.1.0", now(), false).is_some(),
+        "downloaded again"
+    );
 }
 
 #[test]

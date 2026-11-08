@@ -14,7 +14,7 @@ export struct Credit {
     licence: string,
 }
 
-// The banner's state (the design board's B1-B8).
+// The banner's state (the design board's B1-B9).
 export enum UpdateState {
     // No newer release: no banner.
     none,
@@ -35,6 +35,9 @@ export enum UpdateState {
     scoop,
     // "Restart to update" was clicked, before featherplay quits: no button.
     starting,
+    // The release's checksums weren't signed for it with featherplay's keys: nothing was
+    // downloaded; "Get it" opens the website.
+    unverified,
 }
 
 export global AboutData {
@@ -85,8 +88,9 @@ component UpdateBanner inherits Rectangle {
         : root.state == UpdateState.cannot-install ? @tr("It can't be installed from here. You have {}.", AboutData.version)
         : root.state == UpdateState.install-failed ? @tr("You still have {}. The log folder has the details.", AboutData.version)
         : root.state == UpdateState.starting ? @tr("Starting the update…")
+        : root.state == UpdateState.unverified ? @tr("This update couldn't be verified. Download it from featherplay.candygoogy.dev.")
         : @tr("You have {}.", AboutData.version);
-    property <string> primary: root.state == UpdateState.get || root.state == UpdateState.cannot-install ? @tr("Get it")
+    property <string> primary: root.state == UpdateState.get || root.state == UpdateState.cannot-install || root.state == UpdateState.unverified ? @tr("Get it")
         : root.state == UpdateState.ready ? @tr("Restart to update")
         : root.state == UpdateState.download-failed || root.state == UpdateState.install-failed ? @tr("Try again")
         : root.state == UpdateState.scoop ? @tr("Copy command")
