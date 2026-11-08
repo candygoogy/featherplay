@@ -1,5 +1,5 @@
-//! The Home hero's "Next in queue" rows open the song menu, on the offscreen platform (no
-//! window is shown): right-click on a row, or its ⋯ on hover.
+//! The Home hero's "Next in queue" cells open the song menu, on the offscreen platform (no
+//! window is shown): right-click on a cell, or its ⋯ on hover.
 
 use std::rc::Rc;
 
@@ -49,17 +49,17 @@ fn right_click_and_more_open_the_song_menu() {
     let menu = ui.global::<SongMenu>();
     assert!(!menu.get_open());
 
-    // Direction A's hero: at 1280 px without the Up next panel it's 960 px wide, from x 280
-    // and y 144 (32 + the 48 px heading, below the 64 px top bar), 16 px in. Its right
-    // column is 428 px wide: a 2 x 2 grid of 210 px rows, 56 px tall, at its bottom.
-    let list_x = 280.0 + 960.0 - 428.0 - 16.0;
-    let col_x = |i: usize| list_x + (i % 2) as f32 * 218.0;
-    let row_y = |i: usize| 144.0 + 16.0 + 152.0 - 2.0 * 56.0 + (i / 2) as f32 * 56.0 + 28.0;
+    // The resume card: at 1280 px without the Up next panel it's 960 px wide, from x 280
+    // and y 144 (32 + the 48 px heading, below the 64 px top bar). Under the 152 px cover
+    // (16 px in), a hairline, then the queue strip: two 376 px cells, 48 px tall, from the
+    // text column (x 192 in the card), 12 px under the hairline.
+    let cell_x = |i: usize| 280.0 + 192.0 + i as f32 * 384.0;
+    let cell_y = 144.0 + 16.0 + 152.0 + 16.0 + 1.0 + 12.0 + 24.0;
 
-    // Right-click on the first row.
+    // Right-click on the first cell.
     click(
         w,
-        LogicalPosition::new(col_x(0) + 120.0, row_y(0)),
+        LogicalPosition::new(cell_x(0) + 120.0, cell_y),
         PointerEventButton::Right,
     );
     assert!(menu.get_open());
@@ -69,14 +69,14 @@ fn right_click_and_more_open_the_song_menu() {
     // A left click doesn't open it.
     click(
         w,
-        LogicalPosition::new(col_x(1) + 120.0, row_y(1)),
+        LogicalPosition::new(cell_x(1) + 120.0, cell_y),
         PointerEventButton::Left,
     );
     assert!(!menu.get_open());
 
-    // Hovering shows the ⋯ at the row's right end.
-    let more = LogicalPosition::new(col_x(2) + 210.0 - 4.0 - 18.0, row_y(2));
+    // Hovering shows the ⋯ at the cell's right end.
+    let more = LogicalPosition::new(cell_x(1) + 376.0 - 4.0 - 18.0, cell_y);
     click(w, more, PointerEventButton::Left);
     assert!(menu.get_open());
-    assert_eq!(menu.get_track().id, "c");
+    assert_eq!(menu.get_track().id, "b");
 }

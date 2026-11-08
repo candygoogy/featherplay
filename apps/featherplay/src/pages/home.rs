@@ -34,8 +34,10 @@ use crate::ui_bridge::{home_badge, home_card, home_thumbnail, model, to_rows};
 const FEED_TTL: Duration = Duration::from_secs(30 * 60);
 /// The hero's cover, in logical pixels (`Theme.hero-cover`).
 const HERO_COVER: u32 = 152;
-/// Rows in the hero's right column (two rows of two).
+/// Rows in the fresh-start hero's right column (two rows of two).
 const HERO_ROWS: usize = 4;
+/// Cells in the resume card's queue strip, at most (`ResumeCard.cols`).
+const HERO_NEXT: usize = 3;
 /// Pages of the feed per Home load, the first ones included.
 pub const MAX_PAGES: usize = 6;
 /// Pages `YtMusic::home` fetches: the first and the continuation fetched with it.
@@ -715,7 +717,7 @@ fn show_hero(ctx: &Rc<Ctx>) {
             let url = state.current.as_ref().and_then(|t| t.thumbnail.clone());
             set_hero_cover(ctx, url.clone());
             show_wash(ctx, url);
-            let next: Vec<Track> = state.upcoming.iter().take(HERO_ROWS).cloned().collect();
+            let next: Vec<Track> = state.upcoming.iter().take(HERO_NEXT).cloned().collect();
             let ids: Vec<TrackId> = next.iter().map(|t| t.id.clone()).collect();
             if changed || STATE.with(|s| s.borrow().next != ids) {
                 song_menu::remember(&next);

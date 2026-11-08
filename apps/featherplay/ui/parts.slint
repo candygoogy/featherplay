@@ -495,9 +495,12 @@ export component Pill inherits Rectangle {
     in property <bool> icon-filled: true;
     in property <bool> enabled: true;
     in property <bool> compact: false;
+    // A label it switches to (Pause, Resume): the pill is as wide as the wider of the two,
+    // so what sits beside it doesn't shift.
+    in property <string> alt-label;
     callback clicked();
     height: root.compact ? 32px : 40px;
-    width: lay.preferred-width;
+    width: lay.preferred-width + max(0px, alt.preferred-width - label.preferred-width);
     border-radius: self.height / 2;
     // Dimmed through each part's colour, not `opacity` (see IconButton.fade).
     property <float> alpha: root.enabled ? 1.0 : 0.4;
@@ -530,13 +533,20 @@ export component Pill inherits Rectangle {
             fill: (root.icon-filled ? (root.solid ? Theme.on-solid : Theme.text1) : transparent).transparentize(1 - root.alpha);
             stroke: (root.icon-filled ? transparent : (root.solid ? Theme.on-solid : Theme.text1)).transparentize(1 - root.alpha);
         }
-        Body {
+        label := Body {
             text: root.label;
             font-size: root.compact ? Theme.t-meta : Theme.t-body;
             font-weight: 600;
             color: (root.solid ? Theme.on-solid : Theme.text1).transparentize(1 - root.alpha);
             vertical-alignment: center;
         }
+    }
+    // Only measured.
+    alt := Body {
+        visible: false;
+        text: root.alt-label;
+        font-size: root.compact ? Theme.t-meta : Theme.t-body;
+        font-weight: 600;
     }
 }
 

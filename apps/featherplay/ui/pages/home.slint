@@ -2,11 +2,10 @@
 // the hero, titled like a shelf, then the Home feed. Data comes from
 // `src/pages/home.rs` through `HomeData`.
 //
-// The hero has two modes. With a session or a queue: "Pick up where you left off", the
-// current track (from `Player`) with Resume and Go to album, and what's next in the queue as a
-// 2 x 2 grid of rows. On a fresh start with an empty queue: a featured pick from the first
-// shelf, with more from it. A hero too narrow for its right column (the Up next panel open at
-// 1280) drops the rows.
+// The hero has two modes. With a session or a queue: "Pick up where you left off"
+// (`ResumeCard`), the current track (from `Player`) with Pause or Resume and Go to album, the
+// progress, and what's next in the queue as a strip of cells under it. On a fresh start with
+// an empty queue: a featured pick from the first shelf, with more from it (`FeaturedCard`).
 //
 // Every shelf takes the shape of what it holds (`home.rs::arrange`), so the eye tells the
 // shelves apart before reading them: your mixes as wide shortcuts right under the hero (what
@@ -61,7 +60,7 @@ export global HomeData {
     // bar's height): the frame clears the bar's ground and leaves out its fade below, so the
     // wash runs up behind the search field to the window's top.
     in-out property <bool> wash-behind-bar;
-    // Resume: the next 4 tracks of the queue.
+    // Resume: the next 3 tracks of the queue.
     in property <[TrackRow]> next;
     // Featured: the pick, the heading over the rest ("More from Quick picks"), and 4 more
     // from that shelf.
@@ -509,12 +508,168 @@ component ItemRow inherits Rectangle {
     }
 }
 
-// The hero: a 152 px cover, the track on short lines (no separators), progress and the two
-// actions; on the right, what's next as a 2 x 2 grid of rows under a plain column heading.
-// The track's column takes what it needs, up to 520 px, and the rows take the rest, so on a
-// wide window the two halves stay together instead of drifting to the card's ends.
-component Hero inherits Rectangle {
-    property <bool> resume: HomeData.resume;
+// "Pick up where you left off", stacked on one edge: everything hangs off the cover's top and
+// the card's left edge. Beside the cover the song on short lines (no separators), Pause or
+// Resume and Go to album pinned right on the title's line (under the artist when that would
+// leave the title too little room), and at the cover's foot the progress line with its
+// times, the whole text column wide. Under a hairline, what's next as a strip of cells, the
+// label in the cover's column: three cells from 1000 px of card, two below, so the queue
+// never drops out.
+component ResumeCard inherits Rectangle {
+    property <length> pad: Theme.hero-pad;
+    property <length> cover: Theme.hero-cover;
+    property <length> text-x: root.pad + root.cover + Theme.s5;
+    property <length> text-w: root.width - root.text-x - root.pad;
+    // The buttons sit on the title's line while that leaves the title 280 px.
+    property <bool> buttons-right: root.text-w - buttons.preferred-width - Theme.s4 >= 280px;
+    property <length> title-w: root.buttons-right ? root.text-w - buttons.preferred-width - Theme.s4 : root.text-w;
+    // The strip: its cells run from the text column to 8 px from the card's edge (a cell's
+    // own 8 px inset ends its text where the column ends).
+    property <length> rule-y: root.cover + 2 * root.pad;
+    property <length> strip-y: root.rule-y + 1px + Theme.s3;
+    property <length> cell-h: Theme.track-row-h;
+    property <int> cols: root.width >= 1000px ? 3 : 2;
+    property <length> cells-w: root.width - root.text-x - Theme.s2;
+    property <length> col-w: floor((root.cells-w - (root.cols - 1) * Theme.s2) / root.cols / 1px) * 1px;
+    height: root.strip-y + root.cell-h + Theme.s3;
+    border-radius: Theme.r-l;
+    background: Theme.card;
+    border-width: 1px;
+    border-color: Theme.card-edge;
+
+    Cover {
+        x: root.pad;
+        y: root.pad;
+        width: root.cover;
+        height: root.cover;
+        crossfade: true;
+        source: HomeData.hero-cover;
+    }
+
+    Rectangle {
+        x: root.text-x;
+        y: root.pad;
+        width: root.text-w;
+        height: root.cover;
+        Display {
+            x: 0;
+            y: 0;
+            width: root.title-w;
+            height: 36px;
+            text: Player.title;
+            font-size: Theme.t-display-m;
+            vertical-alignment: center;
+        }
+        Body {
+            x: 0;
+            y: 38px;
+            width: root.title-w;
+            height: 20px;
+            text: Player.artist;
+            font-size: Theme.t-body-l;
+            color: Theme.text2;
+            vertical-alignment: center;
+        }
+        buttons := HorizontalLayout {
+            x: root.buttons-right ? parent.width - self.preferred-width : 0;
+            y: root.buttons-right ? 0 : 70px;
+            width: self.preferred-width;
+            height: 40px;
+            spacing: Theme.s2;
+            Pill {
+                label: Player.playing ? @tr("Pause") : @tr("Resume");
+                // As wide as the wider label, so Go to album doesn't shift as it toggles.
+                alt-label: Player.playing ? @tr("Resume") : @tr("Pause");
+                icon: Player.playing ? Icons.pause : Icons.play;
+                solid: true;
+                clicked => { HomeData.resume-clicked(); }
+            }
+            if Player.album-id != "": Pill {
+                label: @tr("Go to album");
+                clicked => { Nav.open-album(Player.album-id); }
+            }
+        }
+        // The elapsed time is as wide as the length, so the line doesn't shift as it ticks.
+        if Player.duration-s > 0: HorizontalLayout {
+            x: 0;
+            y: parent.height - self.height - 6px;
+            width: parent.width;
+            height: 16px;
+            spacing: Theme.s3;
+            Body {
+                width: total.preferred-width;
+                text: Player.elapsed;
+                font-size: Theme.t-meta;
+                color: Theme.text2;
+                vertical-alignment: center;
+                overflow: clip;
+            }
+            Rectangle {
+                horizontal-stretch: 1;
+                accessible-role: progress-indicator;
+                accessible-label: @tr("{0} of {1}", Player.elapsed, Player.total);
+                ProgressRail {
+                    y: (parent.height - self.height) / 2;
+                    width: parent.width;
+                    progress: Player.position-s / Player.duration-s;
+                }
+            }
+            total := Body {
+                text: Player.total;
+                font-size: Theme.t-meta;
+                color: Theme.text2;
+                vertical-alignment: center;
+            }
+        }
+    }
+
+    Rectangle {
+        x: root.pad;
+        y: root.rule-y;
+        width: root.width - 2 * root.pad;
+        height: 1px;
+        background: Theme.hairline;
+    }
+    Body {
+        x: root.pad;
+        y: root.strip-y;
+        width: root.text-x - root.pad - Theme.s2;
+        height: root.cell-h;
+        text: @tr("Next in queue");
+        font-weight: 600;
+        color: Theme.text2;
+        vertical-alignment: center;
+    }
+    if HomeData.next.length == 0: Body {
+        x: root.text-x;
+        y: root.strip-y;
+        width: root.text-w;
+        height: root.cell-h;
+        text: @tr("Nothing after this one");
+        color: Theme.text3;
+        vertical-alignment: center;
+    }
+    for t[i] in HomeData.next: SongRow {
+        x: root.text-x + i * (root.col-w + Theme.s2);
+        y: root.strip-y;
+        width: root.col-w;
+        height: root.cell-h;
+        track: t;
+        menu: true;
+        show-duration: false;
+        visible: i < root.cols;
+        double-clicked => { HomeData.play-next(i); }
+        play => { HomeData.play-next(i); }
+        menu-requested(x, y, top) => { SongMenu.show(t, x, y, top); }
+    }
+}
+
+// "Start listening" on a fresh start: a 152 px cover, the pick on short lines, Play and Go to
+// it; on the right, more from its shelf as a 2 x 2 grid of rows under a plain column heading.
+// The pick's column takes what it needs, up to 520 px, and the rows take the rest, so on a
+// wide window the two halves stay together instead of drifting to the card's ends. A card
+// too narrow for the rows (the Up next panel open at 1280) drops them.
+component FeaturedCard inherits Rectangle {
     property <length> pad: Theme.hero-pad;
     property <length> cover: Theme.hero-cover;
     property <length> text-x: root.pad + root.cover + Theme.s5;
@@ -537,7 +692,7 @@ component Hero inherits Rectangle {
         width: root.cover;
         height: root.cover;
         crossfade: true;
-        round: !root.resume && HomeData.featured.round;
+        round: HomeData.featured.round;
         source: HomeData.hero-cover;
     }
 
@@ -551,7 +706,7 @@ component Hero inherits Rectangle {
             y: 0;
             width: parent.width;
             height: 36px;
-            text: root.resume ? Player.title : HomeData.featured.title;
+            text: HomeData.featured.title;
             font-size: Theme.t-display-m;
             vertical-alignment: center;
         }
@@ -560,31 +715,10 @@ component Hero inherits Rectangle {
             y: 38px;
             width: parent.width;
             height: 20px;
-            text: root.resume ? Player.artist : HomeData.featured.subtitle;
+            text: HomeData.featured.subtitle;
             font-size: Theme.t-body-l;
             color: Theme.text2;
             vertical-alignment: center;
-        }
-        if root.resume && Player.duration-s > 0: Rectangle {
-            x: 0;
-            y: 70px;
-            width: parent.width;
-            height: 20px;
-            ProgressRail {
-                x: 0;
-                y: 8px;
-                width: max(0px, min(200px, parent.width - 96px));
-                progress: Player.position-s / Player.duration-s;
-            }
-            Body {
-                x: max(0px, min(200px, parent.width - 96px)) + 12px;
-                width: 96px;
-                height: parent.height;
-                text: @tr("{0} of {1}", Player.elapsed, Player.total);
-                font-size: Theme.t-meta;
-                color: Theme.text3;
-                vertical-alignment: center;
-            }
         }
         HorizontalLayout {
             x: 0;
@@ -592,23 +726,13 @@ component Hero inherits Rectangle {
             height: 40px;
             alignment: start;
             spacing: Theme.s2;
-            if root.resume: Pill {
-                label: Player.playing ? @tr("Pause") : @tr("Resume");
-                icon: Player.playing ? Icons.pause : Icons.play;
-                solid: true;
-                clicked => { HomeData.resume-clicked(); }
-            }
-            if root.resume && Player.album-id != "": Pill {
-                label: @tr("Go to album");
-                clicked => { Nav.open-album(Player.album-id); }
-            }
-            if !root.resume: Pill {
+            Pill {
                 label: @tr("Play");
                 icon: Icons.play;
                 solid: true;
                 clicked => { HomeData.play-featured(); }
             }
-            if !root.resume && HomeData.featured.kind != ItemKind.song: Pill {
+            if HomeData.featured.kind != ItemKind.song: Pill {
                 label: HomeData.featured.kind == ItemKind.artist ? @tr("Go to artist") : (HomeData.featured.kind == ItemKind.album ? @tr("Go to album") : @tr("Open playlist"));
                 clicked => { HomeData.open-featured(-1); }
             }
@@ -625,42 +749,17 @@ component Hero inherits Rectangle {
             y: 0;
             width: parent.width - 16px;
             height: 24px;
-            text: root.resume ? @tr("Next in queue") : HomeData.featured-from;
+            text: HomeData.featured-from;
             font-weight: 600;
             vertical-alignment: center;
         }
-        if root.resume && HomeData.next.length == 0: Body {
-            x: 8px;
-            y: 32px;
-            height: 20px;
-            text: @tr("Nothing after this one");
-            color: Theme.text3;
-            vertical-alignment: center;
-        }
-        if root.resume: Rectangle {
-            for t[i] in HomeData.next: SongRow {
-                x: mod(i, root.cols) * (root.col-w + Theme.s2);
-                y: parent.height - 2 * Theme.row-h + floor(i / root.cols) * Theme.row-h;
-                width: root.col-w;
-                height: Theme.row-h;
-                track: t;
-                menu: true;
-                show-duration: false;
-                visible: i < 2 * root.cols;
-                double-clicked => { HomeData.play-next(i); }
-                play => { HomeData.play-next(i); }
-                menu-requested(x, y, top) => { SongMenu.show(t, x, y, top); }
-            }
-        }
-        if !root.resume: Rectangle {
-            for it[i] in HomeData.featured-more: ItemRow {
-                x: mod(i, root.cols) * (root.col-w + Theme.s2);
-                y: parent.height - 2 * Theme.row-h + floor(i / root.cols) * Theme.row-h;
-                width: root.col-w;
-                item: it;
-                visible: i < 2 * root.cols;
-                clicked => { HomeData.open-featured(i); }
-            }
+        for it[i] in HomeData.featured-more: ItemRow {
+            x: mod(i, root.cols) * (root.col-w + Theme.s2);
+            y: parent.height - 2 * Theme.row-h + floor(i / root.cols) * Theme.row-h;
+            width: root.col-w;
+            item: it;
+            visible: i < 2 * root.cols;
+            clicked => { HomeData.open-featured(i); }
         }
     }
 }
@@ -808,7 +907,8 @@ component HomeTop inherits VerticalLayout {
         ShelfHead {
             title: HomeData.resume ? @tr("Pick up where you left off") : @tr("Start listening");
         }
-        Hero { }
+        if HomeData.resume: ResumeCard { }
+        if !HomeData.resume: FeaturedCard { }
     }
     if HomeData.loading && HomeData.shelves.length == 0: HomeSkeleton { }
     if !HomeData.loading && HomeData.error != "": ErrorState {
