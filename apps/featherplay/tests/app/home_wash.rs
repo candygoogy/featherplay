@@ -1,6 +1,6 @@
 //! Home's header wash, on the offscreen platform with fixture data (no window is shown): the
 //! resumed song's cover tints the page from the window's top, behind the clear top bar; grey
-//! art takes the accent's colour instead; with nothing to resume the page stays plain; and
+//! art washes it grey; with nothing to resume the page stays plain; and
 //! once Home scrolls past it, the wash is gone and the top bar is back on the ground.
 
 use featherplay::fixtures::Fixtures;
@@ -83,13 +83,14 @@ fn home_washes_from_the_resumed_cover_and_scrolls_it_away() {
         "the warm cover's wash isn't warm: {warm:?}"
     );
 
-    // Grey art: the accent's red.
+    // Grey art: a grey wash, as Now playing's.
     scene.play_track(false, 16).expect("grey art");
     scene.settle();
     let grey = at(&scene, BAND);
+    assert_ne!(rgb(grey), GROUND, "grey art has no wash");
     assert!(
-        grey.r > grey.g + 8 && grey.r > grey.b + 8,
-        "grey art's wash isn't the accent's red: {grey:?}"
+        grey.r.abs_diff(grey.g) <= 3 && grey.r.abs_diff(grey.b) <= 3,
+        "grey art's wash isn't grey: {grey:?}"
     );
 
     // Scrolled well past the header: no wash, the band is the ground again.

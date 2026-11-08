@@ -27,7 +27,7 @@ use crate::pages::content::{self, CARD_COVER, ROW_COVER};
 use crate::router::Page;
 use crate::sidebar;
 use crate::song_menu;
-use crate::ui::{AppWindow, HomeData, HomeShelfRow, MoreState, PageKind, ShelfShape, Theme};
+use crate::ui::{AppWindow, HomeData, HomeShelfRow, MoreState, PageKind, ShelfShape};
 use crate::ui_bridge::{home_badge, home_card, home_thumbnail, model, to_rows};
 
 /// How long a fetched feed is shown before Home fetches it again.
@@ -782,8 +782,7 @@ fn set_hero_cover(ctx: &Ctx, url: Option<String>) {
 
 /// The header's wash from the resumed song's cover: its colour is worked out once per cover,
 /// off the UI thread. Until the new one is known the last one stays, so a track change
-/// crossfades colour to colour (`HomePage.wash`). Painted again on every call, as the accent
-/// that grey art takes may have changed in Settings since.
+/// crossfades colour to colour (`HomePage.wash`).
 fn show_wash(ctx: &Rc<Ctx>, url: Option<String>) {
     if STATE.with(|s| s.borrow().wash_url != url) {
         STATE.with(|s| s.borrow_mut().wash_url = url.clone());
@@ -815,33 +814,22 @@ fn show_wash(ctx: &Rc<Ctx>, url: Option<String>) {
     paint_wash(ctx);
 }
 
-/// Sets the wash for the known cover colour, with the theme's plain accent for grey art.
+/// Sets the wash for the known cover colour.
 fn paint_wash(ctx: &Ctx) {
     let Some(ui) = ctx.window() else { return };
     let Some(seed) = STATE.with(|s| s.borrow().wash_seed) else {
         return;
     };
-    let theme = ui.global::<Theme>();
-    let rgb = |c: slint::Color| [c.red(), c.green(), c.blue()].map(|v| f32::from(v) / 255.0);
-    let accent = (rgb(theme.get_preset_dark()), rgb(theme.get_preset_light()));
-    let washes = follow::washes_on_ground(hero_washes(seed, accent));
+    let washes = follow::washes_on_ground(hero_washes(seed));
     let data = ui.global::<HomeData>();
     data.set_wash_dark(washes.dark);
     data.set_wash_light(washes.light);
 }
 
-/// The header wash's two shades for the resumed song's cover: its own colour, or on grey
-/// art the accent's (`accent`, the theme's plain accent for dark and light), as the accent
-/// itself falls back.
-fn hero_washes(seed: Lch, accent: (Rgb, Rgb)) -> (Rgb, Rgb) {
-    if seed.c >= colour::NEUTRAL_CHROMA {
-        return colour::washes(seed);
-    }
-    let (dark, light) = accent;
-    (
-        colour::washes(colour::to_lch(dark)).0,
-        colour::washes(colour::to_lch(light)).1,
-    )
+/// The header wash's two shades for the resumed song's cover: its own colour, grey for
+/// grey art (below `NEUTRAL_CHROMA`), as Now playing's wash and the neutral accent.
+fn hero_washes(seed: Lch) -> (Rgb, Rgb) {
+    colour::washes(seed)
 }
 
 /// The controller's state changed (track, play/pause, queue).
@@ -1211,11 +1199,6 @@ mod tests {
         assert_eq!(paging.want().map(|(_, t)| t).as_deref(), Some("new"));
     }
 
-    fn accent_hexes(accent: featherplay_store::Accent) -> (Rgb, Rgb) {
-        let (dark, light) = crate::follow::preset(accent);
-        (colour::hex(dark), colour::hex(light))
-    }
-
     #[test]
     fn the_header_washes_in_a_colourful_covers_own_colour() {
         let seed = Lch {
@@ -1223,43 +1206,19 @@ mod tests {
             c: 0.14,
             h: 1.0,
         };
-        let red = accent_hexes(featherplay_store::Accent::Red);
-        assert_eq!(hero_washes(seed, red), colour::washes(seed));
+        assert_eq!(hero_washes(seed), colour::washes(seed));
     }
 
     #[test]
-    fn grey_art_washes_the_header_in_the_accent() {
+    fn grey_art_washes_the_header_grey() {
         let grey = Lch {
             l: 0.5,
-            c: 0.01,
+            c: 0.02,
             h: 0.3,
         };
-        let teal = accent_hexes(featherplay_store::Accent::Teal);
-        let (dark, light) = hero_washes(grey, teal);
-        assert_eq!(dark, colour::washes(colour::to_lch(teal.0)).0);
-        assert_eq!(light, colour::washes(colour::to_lch(teal.1)).1);
-        assert!(
-            colour::to_lch(dark).c > colour::NEUTRAL_CHROMA,
-            "a grey wash"
-        );
-    }
-
-    #[test]
-    fn text_stays_readable_on_every_accent_wash() {
-        let grey = Lch {
-            l: 0.2,
-            c: 0.0,
-            h: 0.0,
-        };
-        for accent in featherplay_store::Accent::ALL {
-            let (dark, light) = hero_washes(grey, accent_hexes(accent));
-            let d = colour::over(dark, colour::WASH_ALPHA_DARK, colour::DARK.ground);
-            let l = colour::over(light, colour::WASH_ALPHA_LIGHT, colour::LIGHT.ground);
-            assert!(colour::contrast(colour::DARK.text1, d) >= 7.0, "{accent:?}");
-            assert!(
-                colour::contrast(colour::LIGHT.text1, l) >= 7.0,
-                "{accent:?}"
-            );
+        let (dark, light) = hero_washes(grey);
+        for shade in [dark, light] {
+            assert!(colour::to_lch(shade).c < 0.005, "a tinted wash: {shade:?}");
         }
     }
 }
