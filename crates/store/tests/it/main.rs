@@ -9,4 +9,5 @@
 
 mod home;
 mod library_cache;
+mod silence_cache;
 mod store;
