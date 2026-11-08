@@ -12,6 +12,7 @@
 //! after a load or a seek to 0 (not after a seek elsewhere), is dropped whole in both modes.
 
 use std::collections::VecDeque;
+use std::ops::Range;
 use std::time::Duration;
 
 use rodio::{ChannelCount, Sample, SampleRate};
@@ -60,55 +61,148 @@ pub(crate) struct Skip {
     pub frames: u64,
 }
 
-pub(crate) struct Trimmer {
-    channels: usize,
-    /// Samples per block.
-    block_len: usize,
-    /// `KEEP` and `LONG` in frames.
+/// The sizes above at one sample rate, in frames.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Sizes {
+    pub block: u64,
     keep: u64,
     long: u64,
-    /// Most samples held back.
-    hold_max: usize,
-    /// The block being filled.
-    block: Vec<Sample>,
-    /// Silent blocks past the run's `KEEP`, not sent on yet.
-    hold: VecDeque<Sample>,
+    /// Most frames held back.
+    hold_max: u64,
+}
+
+impl Sizes {
+    pub fn new(rate: SampleRate) -> Self {
+        let frames = |d: Duration| (d.as_secs_f64() * f64::from(rate.get())).round() as u64;
+        Sizes {
+            block: frames(BLOCK).max(1),
+            keep: frames(KEEP),
+            long: frames(LONG),
+            hold_max: frames(LONG) - frames(KEEP),
+        }
+    }
+}
+
+/// What a block does (`Gate::block`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Act {
+    /// Sound: what's held goes on, then the block. `told` frames were dropped just before it.
+    Sound { told: u64 },
+    /// Silence that's heard.
+    Pass,
+    /// Silence that's dropped.
+    Drop,
+    /// Held back; then `release` frames from the front of the hold go on.
+    Hold { release: u64 },
+    /// Held back, then the whole hold, this block with it, is dropped.
+    DropHeld,
+}
+
+/// Skip silence's decisions, one block at a time, from the block's length and whether it's
+/// silent alone. The trimmer moves samples by them, and `Silences::drops` replays them over
+/// a track's silent runs, so the marks on the bar are what playback drops.
+#[derive(Clone, Debug)]
+struct Gate {
+    sizes: Sizes,
     /// Nothing but silence since the load: the track's start.
     at_start: bool,
     /// Frames of the current silent run.
     run: u64,
     /// Frames dropped in the drop under way, not told yet.
     dropped: u64,
+    /// Frames held back.
+    held: u64,
+}
+
+impl Gate {
+    fn new(sizes: Sizes) -> Self {
+        Gate {
+            sizes,
+            at_start: true,
+            run: 0,
+            dropped: 0,
+            held: 0,
+        }
+    }
+
+    fn block(&mut self, mode: SkipSilence, can_drop: bool, frames: u64, silent: bool) -> Act {
+        if mode == SkipSilence::Off || !silent {
+            let told = std::mem::take(&mut self.dropped);
+            self.held = 0;
+            self.at_start = false;
+            self.run = 0;
+            return Act::Sound { told };
+        }
+        self.run += frames;
+        if self.dropped > 0 || (self.at_start && can_drop) {
+            self.dropped += frames;
+            return Act::Drop;
+        }
+        if self.run <= self.sizes.keep {
+            return Act::Pass;
+        }
+        self.held += frames;
+        if mode == SkipSilence::Everywhere && self.run >= self.sizes.long && can_drop {
+            self.dropped = std::mem::take(&mut self.held);
+            return Act::DropHeld;
+        }
+        let mut release = 0;
+        while self.held > self.sizes.hold_max {
+            let r = self.sizes.block.min(self.held);
+            self.held -= r;
+            release += r;
+        }
+        Act::Hold { release }
+    }
+
+    /// The mode went off: what's held goes on. Returns the frames dropped not told yet.
+    fn off(&mut self) -> u64 {
+        self.held = 0;
+        self.at_start = false;
+        self.run = 0;
+        std::mem::take(&mut self.dropped)
+    }
+
+    /// The end of the stream: what's held, or being dropped, goes. Returns how much.
+    fn finish(&mut self) -> u64 {
+        std::mem::take(&mut self.held) + std::mem::take(&mut self.dropped)
+    }
+}
+
+pub(crate) struct Trimmer {
+    channels: usize,
+    /// Samples per block.
+    block_len: usize,
+    gate: Gate,
+    /// The block being filled.
+    block: Vec<Sample>,
+    /// Silent blocks past the run's `KEEP`, not sent on yet: `gate.held` frames.
+    hold: VecDeque<Sample>,
 }
 
 impl Trimmer {
     pub fn new(channels: ChannelCount, rate: SampleRate) -> Self {
         let channels = channels.get() as usize;
-        let frames = |d: Duration| (d.as_secs_f64() * rate.get() as f64).round() as u64;
-        let block_len = (frames(BLOCK).max(1) as usize) * channels;
+        let sizes = Sizes::new(rate);
+        let block_len = sizes.block as usize * channels;
         Self {
             channels,
             block_len,
-            keep: frames(KEEP),
-            long: frames(LONG),
-            hold_max: (frames(LONG) - frames(KEEP)) as usize * channels,
+            gate: Gate::new(sizes),
             block: Vec::with_capacity(block_len),
             hold: VecDeque::new(),
-            at_start: true,
-            run: 0,
-            dropped: 0,
         }
     }
 
     /// Nothing held back or part-filled: with the mode off, samples may skip the trimmer.
     pub fn is_idle(&self) -> bool {
-        self.block.is_empty() && self.hold.is_empty() && self.dropped == 0
+        self.block.is_empty() && self.hold.is_empty() && self.gate.dropped == 0
     }
 
     /// Samples went to the ring without the trimmer (the mode was off): the start is over.
     pub fn passed(&mut self) {
-        self.at_start = false;
-        self.run = 0;
+        self.gate.at_start = false;
+        self.gate.run = 0;
     }
 
     /// The decoder moved to `frame`: what's held is from before. The silence at the target
@@ -116,9 +210,10 @@ impl Trimmer {
     pub fn seeked(&mut self, frame: u64) {
         self.block.clear();
         self.hold.clear();
-        self.at_start = frame == 0;
-        self.run = 0;
-        self.dropped = 0;
+        self.gate = Gate {
+            at_start: frame == 0,
+            ..Gate::new(self.gate.sizes)
+        };
     }
 
     /// Appends to `out` what of `input` is heard. `can_drop` is false while the reader
@@ -138,17 +233,15 @@ impl Trimmer {
             if !self.block.is_empty() {
                 self.on_block(mode, can_drop, out, &mut skip);
             }
-            if self.dropped > 0 {
+            let told = self.gate.off();
+            if told > 0 {
                 skip = Some(Skip {
                     at: out.len(),
-                    frames: self.dropped,
+                    frames: told,
                 });
-                self.dropped = 0;
             }
             out.extend(self.hold.drain(..));
             out.extend_from_slice(input);
-            self.at_start = false;
-            self.run = 0;
             return skip;
         }
         let mut rest = input;
@@ -179,7 +272,7 @@ impl Trimmer {
             out.extend(self.hold.drain(..));
         }
         self.hold.clear();
-        self.dropped = 0;
+        self.gate.finish();
         skip
     }
 
@@ -192,39 +285,201 @@ impl Trimmer {
     ) {
         let block = std::mem::take(&mut self.block);
         let frames = (block.len() / self.channels) as u64;
-        let peak = block.iter().fold(0.0, |m: Sample, s| m.max(s.abs()));
-        if mode == SkipSilence::Off || peak >= THRESHOLD {
-            if self.dropped > 0 {
-                debug_assert!(skip.is_none(), "two drops in one call");
-                *skip = Some(Skip {
-                    at: out.len(),
-                    frames: self.dropped,
-                });
-                self.dropped = 0;
-            }
-            out.extend(self.hold.drain(..));
-            out.extend_from_slice(&block);
-            self.at_start = false;
-            self.run = 0;
-        } else {
-            self.run += frames;
-            if self.dropped > 0 || (self.at_start && can_drop) {
-                self.dropped += frames;
-            } else if self.run <= self.keep {
+        match self.gate.block(mode, can_drop, frames, is_silent(&block)) {
+            Act::Sound { told } => {
+                if told > 0 {
+                    debug_assert!(skip.is_none(), "two drops in one call");
+                    *skip = Some(Skip {
+                        at: out.len(),
+                        frames: told,
+                    });
+                }
+                out.extend(self.hold.drain(..));
                 out.extend_from_slice(&block);
-            } else {
-                self.hold.extend(&block);
-                if mode == SkipSilence::Everywhere && self.run >= self.long && can_drop {
-                    self.dropped = (self.hold.len() / self.channels) as u64;
-                    self.hold.clear();
-                }
-                while self.hold.len() > self.hold_max {
-                    out.extend(self.hold.drain(..self.block_len.min(self.hold.len())));
-                }
             }
+            Act::Pass => out.extend_from_slice(&block),
+            Act::Drop => {}
+            Act::Hold { release } => {
+                self.hold.extend(&block);
+                out.extend(self.hold.drain(..release as usize * self.channels));
+            }
+            Act::DropHeld => self.hold.clear(),
         }
         self.block = block;
         self.block.clear();
+    }
+}
+
+/// A block whose peak is under `THRESHOLD`.
+fn is_silent(block: &[Sample]) -> bool {
+    block.iter().fold(0.0, |m: Sample, s| m.max(s.abs())) < THRESHOLD
+}
+
+/// Where a track is silent, from a scan of all of it (`Scan`): its runs of silent blocks,
+/// whatever the mode. `spans` gives what a mode drops.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Silences {
+    /// The rate the frames count at.
+    pub rate: u32,
+    /// The track's length, in frames.
+    pub frames: u64,
+    /// The silent runs, as (first frame, frames): in order, apart, each a whole number of
+    /// blocks from the track's start (the last may end with a part-block).
+    pub runs: Vec<(u64, u64)>,
+}
+
+impl Silences {
+    /// What a scan could have found: a rate of 8 to 384 kHz, at most 12 hours, the runs in
+    /// order, apart and within the track. Anything else (a damaged cache) has no spans.
+    pub fn is_plausible(&self) -> bool {
+        const MOST: u64 = 12 * 3600;
+        if !(8_000..=384_000).contains(&self.rate) || self.frames > u64::from(self.rate) * MOST {
+            return false;
+        }
+        let mut pos = 0;
+        self.runs.iter().all(|&(start, len)| {
+            let ok = start >= pos && len > 0 && start.saturating_add(len) <= self.frames;
+            pos = start.saturating_add(len);
+            ok
+        })
+    }
+
+    /// What `mode` drops from the track played from its start, in track time. Playback
+    /// drops the same, give or take a few blocks after a seek or right after another drop
+    /// (the trimmer holds a new drop until the last one is heard).
+    pub fn spans(&self, mode: SkipSilence) -> Vec<Range<Duration>> {
+        let time = |f: u64| Duration::from_secs_f64(f as f64 / f64::from(self.rate));
+        self.drops(mode)
+            .into_iter()
+            .map(|r| time(r.start)..time(r.end))
+            .collect()
+    }
+
+    /// What `mode` drops from the track played from its start, in frames: the gate's
+    /// decisions replayed over the runs, a block at a time, with the sound between them
+    /// as one block (any sound block leaves the gate the same). Nothing unless
+    /// `is_plausible`.
+    pub(crate) fn drops(&self, mode: SkipSilence) -> Vec<Range<u64>> {
+        let mut drops = Vec::new();
+        let Some(rate) = SampleRate::new(self.rate) else {
+            return drops;
+        };
+        if mode == SkipSilence::Off || !self.is_plausible() {
+            return drops;
+        }
+        let sizes = Sizes::new(rate);
+        let mut gate = Gate::new(sizes);
+        // Frames gone through the gate, and where the drop under way began.
+        let mut pos = 0;
+        let mut open: Option<u64> = None;
+        let mut sound = |gate: &mut Gate, pos: &mut u64, to: u64, open: &mut Option<u64>| {
+            if to > *pos {
+                gate.block(mode, true, to - *pos, false);
+                if let Some(from) = open.take() {
+                    drops.push(from..*pos);
+                }
+                *pos = to;
+            }
+        };
+        for &(start, len) in &self.runs {
+            let start = start.clamp(pos, self.frames);
+            let end = start.saturating_add(len).min(self.frames);
+            sound(&mut gate, &mut pos, start, &mut open);
+            while pos < end {
+                let n = sizes.block.min(end - pos);
+                match gate.block(mode, true, n, true) {
+                    Act::Drop => {
+                        open.get_or_insert(pos);
+                    }
+                    Act::DropHeld => {
+                        open.get_or_insert((pos + n).saturating_sub(gate.dropped));
+                    }
+                    Act::Sound { .. } | Act::Pass | Act::Hold { .. } => {}
+                }
+                pos += n;
+            }
+        }
+        sound(&mut gate, &mut pos, self.frames, &mut open);
+        // The end of the stream drops what's held, or the drop under way.
+        let tail = gate.finish();
+        if tail > 0 {
+            let from = open.unwrap_or(self.frames.saturating_sub(tail));
+            drops.push(from..self.frames);
+        }
+        drops
+    }
+}
+
+/// Finds a track's silent runs, block by block as the trimmer sees them, from its decoded
+/// samples fed in order from the start. Holds no samples.
+pub(crate) struct Scan {
+    channels: usize,
+    rate: u32,
+    /// Samples per block.
+    block_len: usize,
+    /// Samples of the block being read, and its peak so far.
+    filled: usize,
+    peak: Sample,
+    /// Frames read in whole blocks.
+    pos: u64,
+    /// Where the silent run under way began.
+    run: Option<u64>,
+    runs: Vec<(u64, u64)>,
+}
+
+impl Scan {
+    pub fn new(channels: ChannelCount, rate: SampleRate) -> Self {
+        let channels = channels.get() as usize;
+        Scan {
+            channels,
+            rate: rate.get(),
+            block_len: Sizes::new(rate).block as usize * channels,
+            filled: 0,
+            peak: 0.0,
+            pos: 0,
+            run: None,
+            runs: Vec::new(),
+        }
+    }
+
+    pub fn feed(&mut self, samples: &[Sample]) {
+        let mut rest = samples;
+        while !rest.is_empty() {
+            let take = (self.block_len - self.filled).min(rest.len());
+            self.peak = rest[..take]
+                .iter()
+                .fold(self.peak, |m: Sample, s| m.max(s.abs()));
+            self.filled += take;
+            rest = &rest[take..];
+            if self.filled == self.block_len {
+                self.end_block();
+            }
+        }
+    }
+
+    pub fn finish(mut self) -> Silences {
+        if self.filled > 0 {
+            self.end_block();
+        }
+        if let Some(start) = self.run.take() {
+            self.runs.push((start, self.pos - start));
+        }
+        Silences {
+            rate: self.rate,
+            frames: self.pos,
+            runs: self.runs,
+        }
+    }
+
+    fn end_block(&mut self) {
+        if self.peak < THRESHOLD {
+            self.run.get_or_insert(self.pos);
+        } else if let Some(start) = self.run.take() {
+            self.runs.push((start, self.pos - start));
+        }
+        self.pos += (self.filled / self.channels) as u64;
+        self.filled = 0;
+        self.peak = 0.0;
     }
 }
 
@@ -441,6 +696,106 @@ mod tests {
             }]
         );
         same(&out, &silence(0.2));
+    }
+
+    /// What the trimmer drops from `input` played from its start, as frame ranges: the
+    /// skips it tells, and what the end of the stream drops untold.
+    fn trimmed(t: &mut Trimmer, mode: SkipSilence, input: &[Sample]) -> Vec<Range<u64>> {
+        let (out, skips) = run(t, mode, input);
+        let mut drops = Vec::new();
+        let mut dropped = 0;
+        for s in skips {
+            let from = (s.at / 2) as u64 + dropped;
+            drops.push(from..from + s.frames);
+            dropped += s.frames;
+        }
+        let total = (input.len() / 2) as u64;
+        let tail = total - (out.len() / 2) as u64 - dropped;
+        if tail > 0 {
+            drops.push(total - tail..total);
+        }
+        drops
+    }
+
+    fn scanned(input: &[Sample], rate: u32) -> Silences {
+        let mut scan = Scan::new(
+            ChannelCount::new(2).unwrap(),
+            SampleRate::new(rate).unwrap(),
+        );
+        for batch in input.chunks(4096) {
+            scan.feed(batch);
+        }
+        scan.finish()
+    }
+
+    /// `secs` of stereo at `level` at `rate`, a square wave as `signal` makes.
+    fn at_rate(rate: u32, secs: f64, level: Sample) -> Vec<Sample> {
+        let frames = (secs * f64::from(rate)).round() as usize;
+        (0..frames)
+            .flat_map(|i| {
+                let s = if i % 2 == 0 { level } else { -level };
+                [s, s]
+            })
+            .collect()
+    }
+
+    #[test]
+    fn the_scan_marks_what_the_trimmer_drops() {
+        // A part-block at the end, and 22.05 kHz, whose 10 ms block (221 frames) doesn't
+        // divide the kept 0.5 s: the hold lets a block go before a long run drops.
+        for rate in [48_000, 22_050] {
+            let (s, t) = (
+                |secs| at_rate(rate, secs, 0.0),
+                |secs| at_rate(rate, secs, 0.5),
+            );
+            let tracks = [
+                [s(1.0), t(1.0), s(3.0), t(1.0), s(2.0)].concat(),
+                [t(1.0), s(1.9), t(0.5), s(2.5), t(0.3), s(1.0)].concat(),
+                [t(0.5), s(5.003_7)].concat(),
+                [s(0.7)].concat(),
+                [t(0.2), s(2.0), t(0.004), s(0.9)].concat(),
+            ];
+            for mode in [SkipSilence::StartAndEnd, SkipSilence::Everywhere] {
+                for (i, track) in tracks.iter().enumerate() {
+                    let mut trimmer = Trimmer::new(
+                        ChannelCount::new(2).unwrap(),
+                        SampleRate::new(rate).unwrap(),
+                    );
+                    let want = trimmed(&mut trimmer, mode, track);
+                    assert!(!want.is_empty(), "track {i} drops nothing in {mode:?}");
+                    assert_eq!(
+                        scanned(track, rate).drops(mode),
+                        want,
+                        "track {i} at {rate} Hz in {mode:?}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn a_mode_change_derives_the_marks_again_without_a_rescan() {
+        let input = [
+            silence(1.0),
+            tone(1.0),
+            silence(3.0),
+            tone(1.0),
+            silence(2.0),
+        ]
+        .concat();
+        let found = scanned(&input, RATE as u32);
+        let secs = |a: f64, b: f64| Duration::from_secs_f64(a)..Duration::from_secs_f64(b);
+        // The start whole; the last 1.5 s of the end.
+        assert_eq!(
+            found.spans(SkipSilence::StartAndEnd),
+            [secs(0.0, 1.0), secs(6.5, 8.0)]
+        );
+        // And the inner gap past its first 0.5 s; all of the end past its first 0.5 s.
+        assert_eq!(
+            found.spans(SkipSilence::Everywhere),
+            [secs(0.0, 1.0), secs(2.5, 5.0), secs(6.5, 8.0)]
+        );
+        assert!(found.spans(SkipSilence::Off).is_empty());
     }
 
     /// The decoder thread's cost in `Everywhere`: 60 s of 48 kHz stereo noise with a 3 s
