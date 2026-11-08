@@ -96,7 +96,7 @@ pub fn is_hidden() -> bool {
 /// Hands the heaps' free pages back to Windows. What was just let go is mostly free blocks
 /// inside the heaps (a cover is under the heap's 512 KB threshold for a block of its own), and
 /// a heap keeps free pages committed, so they'd still count as private memory.
-fn compact_heaps() {
+pub(crate) fn compact_heaps() {
     #[link(name = "kernel32")]
     unsafe extern "system" {
         fn GetProcessHeaps(count: u32, heaps: *mut isize) -> u32;
@@ -113,7 +113,7 @@ fn compact_heaps() {
 
 /// The renderer lets go of its caches and the window's pixel buffer: a zero size, which the
 /// vendored skia renderer takes for that (VENDORED.md, change 5).
-fn release_drawing(window: &slint::Window) {
+pub(crate) fn release_drawing(window: &slint::Window) {
     let adapter = WindowInner::from_pub(window).window_adapter();
     if let Err(e) = adapter.renderer().resize(slint::PhysicalSize::new(0, 0)) {
         log!("memory: letting the renderer go: {e}");
@@ -122,7 +122,7 @@ fn release_drawing(window: &slint::Window) {
 
 /// The renderer draws again, the whole window: its size (a restore passes it too, but this
 /// doesn't depend on that), then a repaint of everything.
-fn resume_drawing(window: &slint::Window) {
+pub(crate) fn resume_drawing(window: &slint::Window) {
     let size = window.size();
     if size.width == 0 || size.height == 0 {
         return;

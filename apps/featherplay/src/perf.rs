@@ -18,6 +18,7 @@
 //! The runner script and the script language are documented with the measurements, which
 //! are kept outside the repo.
 
+use std::alloc::{GlobalAlloc, Layout, System};
 use std::cell::RefCell;
 use std::future::Future;
 use std::io::Write;
@@ -25,6 +26,7 @@ use std::ops::ControlFlow;
 use std::path::PathBuf;
 use std::pin::Pin;
 use std::rc::Rc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Mutex, OnceLock};
 use std::task::{Context, Poll, Waker};
 use std::time::{Duration, Instant};
@@ -526,6 +528,190 @@ fn logical_cpus() -> f64 {
     std::thread::available_parallelism().map_or(1.0, |n| n.get() as f64)
 }
 
+/// The Rust heap's live bytes: every allocation through the global allocator, counted.
+/// What the C and C++ libraries (skia, the system's DLLs) allocate isn't in it.
+struct Counting;
+
+static RUST_LIVE: AtomicUsize = AtomicUsize::new(0);
+
+// SAFETY: every call goes to `System` as it came; only a counter is kept beside it.
+unsafe impl GlobalAlloc for Counting {
+    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+        // SAFETY: the caller's layout, passed on.
+        let p = unsafe { System.alloc(layout) };
+        if !p.is_null() {
+            RUST_LIVE.fetch_add(layout.size(), Ordering::Relaxed);
+        }
+        p
+    }
+
+    unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 {
+        // SAFETY: as `alloc`.
+        let p = unsafe { System.alloc_zeroed(layout) };
+        if !p.is_null() {
+            RUST_LIVE.fetch_add(layout.size(), Ordering::Relaxed);
+        }
+        p
+    }
+
+    unsafe fn dealloc(&self, p: *mut u8, layout: Layout) {
+        // SAFETY: a block this allocator handed out, with its layout.
+        unsafe { System.dealloc(p, layout) };
+        RUST_LIVE.fetch_sub(layout.size(), Ordering::Relaxed);
+    }
+
+    unsafe fn realloc(&self, p: *mut u8, layout: Layout, size: usize) -> *mut u8 {
+        // SAFETY: as `dealloc`, with the new size the caller asked for.
+        let q = unsafe { System.realloc(p, layout, size) };
+        if !q.is_null() {
+            RUST_LIVE.fetch_add(size, Ordering::Relaxed);
+            RUST_LIVE.fetch_sub(layout.size(), Ordering::Relaxed);
+        }
+        q
+    }
+}
+
+#[global_allocator]
+static ALLOCATOR: Counting = Counting;
+
+/// What the process's heaps hold, in bytes.
+#[derive(Default)]
+struct Heaps {
+    /// Blocks in use, Rust's and C/C++'s alike (a low-fragmentation bucket counts whole).
+    busy: u64,
+    /// The heaps' segments, committed: blocks in use and free blocks alike.
+    committed: u64,
+    /// Blocks in use too big for a segment, each its own allocation.
+    large: u64,
+}
+
+/// The process's heaps walked.
+fn heap_walk() -> Heaps {
+    /// `PROCESS_HEAP_ENTRY` (x64); for a region, `rest[0]` holds its committed size in its
+    /// low half.
+    #[repr(C)]
+    struct Entry {
+        data: *mut u8,
+        size: u32,
+        overhead: u8,
+        region: u8,
+        flags: u16,
+        rest: [usize; 3],
+    }
+    #[link(name = "kernel32")]
+    unsafe extern "system" {
+        fn GetProcessHeaps(count: u32, heaps: *mut isize) -> u32;
+        fn HeapLock(heap: isize) -> i32;
+        fn HeapUnlock(heap: isize) -> i32;
+        fn HeapWalk(heap: isize, entry: *mut Entry) -> i32;
+    }
+    const REGION: u16 = 0x1;
+    const BUSY: u16 = 0x4;
+    /// A block this big is no segment's on x64: Windows allocates it on its own.
+    const LARGE: u32 = 1016 * 1024;
+    let mut heaps = [0isize; 64];
+    // SAFETY: a buffer of `heaps.len()` handles; the call fills at most that many.
+    let n = unsafe { GetProcessHeaps(heaps.len() as u32, heaps.as_mut_ptr()) } as usize;
+    let mut out = Heaps::default();
+    for &heap in &heaps[..n.min(heaps.len())] {
+        // SAFETY: a heap of this process, locked while it's walked; the walk starts from a
+        // null `data` and is handed back the entry it filled.
+        unsafe {
+            if HeapLock(heap) == 0 {
+                continue;
+            }
+            let mut e = Entry {
+                data: std::ptr::null_mut(),
+                size: 0,
+                overhead: 0,
+                region: 0,
+                flags: 0,
+                rest: [0; 3],
+            };
+            while HeapWalk(heap, &mut e) != 0 {
+                if e.flags & REGION != 0 {
+                    out.committed += (e.rest[0] & 0xFFFF_FFFF) as u64;
+                } else if e.flags & BUSY != 0 {
+                    out.busy += u64::from(e.size);
+                    if e.size >= LARGE {
+                        out.large += u64::from(e.size);
+                    }
+                }
+            }
+            HeapUnlock(heap);
+        }
+    }
+    out
+}
+
+/// The process's committed private memory, from its address space: all of it, and the
+/// part in regions of 1 MB or more.
+fn private_regions() -> (u64, u64) {
+    /// `MEMORY_BASIC_INFORMATION` (x64).
+    #[repr(C)]
+    #[derive(Default)]
+    struct Info {
+        base: usize,
+        allocation_base: usize,
+        allocation_protect: u32,
+        partition: u32,
+        size: usize,
+        state: u32,
+        protect: u32,
+        kind: u32,
+        pad: u32,
+    }
+    #[link(name = "kernel32")]
+    unsafe extern "system" {
+        fn VirtualQuery(at: usize, info: *mut Info, len: usize) -> usize;
+    }
+    const COMMIT: u32 = 0x1000;
+    const PRIVATE: u32 = 0x2_0000;
+    let (mut all, mut big) = (0u64, 0u64);
+    let mut at = 0usize;
+    loop {
+        let mut info = Info::default();
+        // SAFETY: an address of this process and a struct of the size given.
+        let got = unsafe { VirtualQuery(at, &mut info, std::mem::size_of::<Info>()) };
+        if got == 0 || info.size == 0 {
+            break;
+        }
+        if info.state == COMMIT && info.kind == PRIVATE {
+            all += info.size as u64;
+            if info.size >= 1 << 20 {
+                big += info.size as u64;
+            }
+        }
+        let Some(next) = info.base.checked_add(info.size) else {
+            break;
+        };
+        at = next;
+    }
+    (all, big)
+}
+
+/// Into `m`, each name after `prefix`: Rust's live bytes, the heaps' parts, the committed
+/// private regions and the decoded covers in the in-memory cache.
+fn heap_parts(m: &mut Map<String, Value>, prefix: &str, covers: &crate::covers::Covers) {
+    let h = heap_walk();
+    let (private, private_big) = private_regions();
+    let rust = RUST_LIVE.load(Ordering::Relaxed) as u64;
+    for (name, bytes) in [
+        ("rust", rust),
+        ("heap_busy", h.busy),
+        ("heap_committed", h.committed),
+        ("heap_large", h.large),
+        ("regions_private", private),
+        ("regions_private_1mb", private_big),
+        ("covers_cache", covers.cached_bytes() as u64),
+    ] {
+        m.insert(
+            format!("{prefix}{name}_mb"),
+            json!(round(bytes as f64 / 1e6)),
+        );
+    }
+}
+
 // ----- The report -----------------------------------------------------------------------
 
 struct Out {
@@ -1019,7 +1205,35 @@ impl Driver {
                 m.insert("private_mb".into(), json!(round(s.private_mb)));
                 m.insert("working_set_mb".into(), json!(round(s.working_set_mb)));
                 m.insert("threads".into(), json!(s.threads));
+                heap_parts(&mut m, "", &self.ctx.covers);
                 self.record("mem", words, m, None);
+                Ok(())
+            }
+            "mem-parts" => {
+                // What each holder lets go of, in turn: the renderer's caches and buffer,
+                // the covers, the heaps' free pages (`memory::hidden` lets go of the same),
+                // then everything back as a show brings it. Shown windows only.
+                let mut m = Map::new();
+                let covers = self.ctx.covers.clone();
+                let at = |m: &mut Map<String, Value>, part: &str| {
+                    m.insert(
+                        format!("{part}private_mb"),
+                        json!(round(sample().private_mb)),
+                    );
+                    heap_parts(m, part, &covers);
+                };
+                at(&mut m, "");
+                crate::memory::release_drawing(ui.window());
+                at(&mut m, "no_drawing_");
+                covers.show(None);
+                at(&mut m, "no_covers_");
+                crate::memory::compact_heaps();
+                at(&mut m, "compacted_");
+                let t0 = Instant::now();
+                covers.show(Some(self.ctx.current_page().kind()));
+                crate::memory::resume_drawing(ui.window());
+                settle(&mut m, t0, &covers).await;
+                self.record("mem-parts", words, m, None);
                 Ok(())
             }
             "minimize" | "restore" => {
