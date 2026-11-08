@@ -723,6 +723,7 @@ mod tests {
             available_at: None,
             video_title: None,
             first_tag: None,
+            loudness_db: None,
         }
     }
 

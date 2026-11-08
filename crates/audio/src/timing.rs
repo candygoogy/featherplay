@@ -142,6 +142,7 @@ fn source(s: &Resolved) -> StreamSource {
         mime: s.mime.clone(),
         content_length: s.clen,
         duration: None,
+        loudness_db: None,
     }
 }
 
@@ -457,6 +458,7 @@ fn timing_engine() {
             mime: s.mime.clone(),
             content_length: s.content_length,
             duration: None,
+            loudness_db: None,
         };
         let cold = play(&src, &|_| {});
         let cold_total = t.elapsed().as_secs_f64();

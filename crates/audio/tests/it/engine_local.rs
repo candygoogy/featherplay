@@ -21,6 +21,7 @@ fn tone() -> StreamSource {
         mime: "audio/mp4".into(),
         content_length: None,
         duration: None,
+        loudness_db: None,
     }
 }
 

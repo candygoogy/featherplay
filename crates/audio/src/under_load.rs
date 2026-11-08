@@ -43,6 +43,7 @@ fn scan_beside(stop: Arc<AtomicBool>) -> Option<JoinHandle<u32>> {
         mime: "audio/webm".into(),
         content_length: None,
         duration: None,
+        loudness_db: None,
     };
     Some(std::thread::spawn(move || {
         crate::priority::lower_scan();
@@ -90,6 +91,7 @@ fn fixture(name: &str) -> StreamSource {
         mime: "audio/mp4".into(),
         content_length: None,
         duration: Some(Duration::from_secs(10)),
+        loudness_db: None,
     }
 }
 

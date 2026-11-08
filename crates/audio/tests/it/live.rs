@@ -75,6 +75,7 @@ fn live_stream_starts_fast_and_seeks_cold() {
             mime: s.mime,
             content_length: s.content_length,
             duration: s.duration,
+            loudness_db: None,
         },
         Duration::ZERO,
     );

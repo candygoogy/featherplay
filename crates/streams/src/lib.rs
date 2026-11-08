@@ -41,6 +41,10 @@ pub struct ResolvedStream {
     /// "alternative titles" and "alternative artists" use. `None` when missing or blank.
     pub video_title: Option<String>,
     pub first_tag: Option<String>,
+    /// How many dB YouTube measured the song above its reference level (the player data's
+    /// `loudnessDb`), for "Match song volumes". The native resolver gives it; yt-dlp's
+    /// answer doesn't carry it, so `None` there.
+    pub loudness_db: Option<f32>,
 }
 
 /// Which audio format a resolve asks for (`YtDlpResolver::set_quality`).

@@ -130,6 +130,7 @@ pub(crate) struct Pending {
     pub duration: Option<Duration>,
     pub video_title: Option<String>,
     pub first_tag: Option<String>,
+    pub loudness_db: Option<f32>,
     /// How long the URL is refused for (HTTP 403) after the answer: the ads before the
     /// song, until each could be skipped.
     pub gate: Option<Duration>,
@@ -723,6 +724,11 @@ pub(crate) fn parse_player_response(
             .or_else(|| num(&f["approxDurationMs"]).map(Duration::from_millis)),
         video_title: text(&d["title"]),
         first_tag: text(&d["keywords"][0]),
+        // Per format, as the web player reads it; else the one for the whole video.
+        loudness_db: f["loudnessDb"]
+            .as_f64()
+            .or_else(|| v["playerConfig"]["audioConfig"]["loudnessDb"].as_f64())
+            .map(|db| db as f32),
         gate,
     })
 }
@@ -832,6 +838,7 @@ pub(crate) fn finish(
         available_at,
         video_title: p.video_title,
         first_tag: p.first_tag,
+        loudness_db: p.loudness_db,
     })
 }
 
@@ -1360,6 +1367,31 @@ _result.sig = (s) => s.slice(2).split("").reverse().join("");"#;
         );
         // An unanswered challenge is an error, not a URL that fails later.
         assert!(finish(p, &Answers::default(), now).is_err());
+    }
+
+    #[test]
+    fn the_answer_gives_the_songs_loudness() {
+        let p = parse_player_response(PLAYER, VIDEO, Quality::High.itags()).unwrap();
+        assert_eq!(p.loudness_db, Some(7.17));
+        let (_, s) = p.sig.clone().unwrap();
+        let answers = Answers {
+            n: HashMap::from([("tbgZJm7jUNULHGjSAEd".into(), "solved-n".into())]),
+            sig: HashMap::from([(s, "solved-sig".into())]),
+        };
+        let stream = finish(p, &answers, SystemTime::now()).unwrap();
+        assert_eq!(stream.loudness_db, Some(7.17));
+
+        // Without one per format, the player's own (`playerConfig.audioConfig`); else none.
+        let bare = PLAYER.replace("\"loudnessDb\": 7.17,", "");
+        let p = parse_player_response(&bare, VIDEO, Quality::High.itags()).unwrap();
+        assert_eq!(p.loudness_db, None);
+        let config = bare.replacen(
+            '{',
+            r#"{ "playerConfig": { "audioConfig": { "loudnessDb": -2.5 } },"#,
+            1,
+        );
+        let p = parse_player_response(&config, VIDEO, Quality::High.itags()).unwrap();
+        assert_eq!(p.loudness_db, Some(-2.5));
     }
 
     #[test]

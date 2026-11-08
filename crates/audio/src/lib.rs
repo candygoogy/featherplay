@@ -64,10 +64,10 @@ pub use dsp::Compressor;
 pub use engine::AudioEngine;
 pub use silence::{Silences, SkipSilence};
 pub use tmp::clear_stale_temp;
-pub use volume::perceptual_gain;
+pub use volume::{loudness_gain, perceptual_gain};
 
 /// What to play: an `https://` stream URL (from the resolver) or a `file://` URL.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct StreamSource {
     pub url: String,
     /// Picks the demuxer, e.g. `audio/mp4`.
@@ -77,6 +77,10 @@ pub struct StreamSource {
     /// The stream's length, when known. While crossfade is on, the decoder reads the last
     /// 20 s from here to find where the music ends (`AudioEngine::playhead`).
     pub duration: Option<Duration>,
+    /// How many dB YouTube measured the song above its reference level (`loudnessDb`), when
+    /// known. While "Match song volumes" is on, a louder song plays turned down by that much
+    /// (`loudness_gain`, `AudioEngine::set_match_volumes`).
+    pub loudness_db: Option<f32>,
 }
 
 /// Where playback stands in the current track.

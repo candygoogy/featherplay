@@ -330,6 +330,13 @@ impl AudioEngine {
         self.controls.crossfade.store(on, Ordering::Relaxed);
     }
 
+    /// "Match song volumes": each song louder than YouTube's reference level plays turned
+    /// down to it (`StreamSource::loudness_db`), quieter ones as they are; off, all play
+    /// unchanged. The playing songs move to their new level over ~150 ms.
+    pub fn set_match_volumes(&self, on: bool) {
+        self.controls.match_volumes.store(on, Ordering::Relaxed);
+    }
+
     /// The position in the current track, and where its music ends if known; read
     /// together, so both are the same track's.
     pub fn playhead(&self) -> Playhead {

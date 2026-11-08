@@ -173,6 +173,7 @@ impl Env {
             mime: "audio/mp4".into(),
             content_length: None,
             duration: None,
+            loudness_db: None,
         };
         let error = ErrorSlot::default();
         let Opened { media, len, .. } = Media::open(
@@ -578,6 +579,7 @@ fn src(url: &str) -> StreamSource {
         mime: "audio/mp4".into(),
         content_length: None,
         duration: None,
+        loudness_db: None,
     }
 }
 
@@ -1010,6 +1012,7 @@ fn the_tail_scan_of_a_song_that_sounds_to_its_end() {
 fn silent_outro() -> StreamSource {
     StreamSource {
         duration: Some(Duration::from_secs(6)),
+        loudness_db: None,
         ..local("silence-ends.m4a")
     }
 }
@@ -1046,6 +1049,7 @@ fn engine_scans_a_download_once_it_is_complete() {
     let events = engine.events();
     let stream = StreamSource {
         duration: Some(Duration::from_secs(10)),
+        loudness_db: None,
         ..src(&server.url)
     };
     engine.load(stream, Duration::ZERO);
@@ -1111,10 +1115,12 @@ fn crossfade_cpu() {
     let opus = StreamSource {
         mime: WEBM.into(),
         duration: Some(Duration::from_secs(10)),
+        loudness_db: None,
         ..local("tone-10s.webm")
     };
     let aac = StreamSource {
         duration: Some(Duration::from_secs(10)),
+        loudness_db: None,
         ..local("tone-10s.m4a")
     };
     let engine = crate::AudioEngine::new_null(engine_tmp());

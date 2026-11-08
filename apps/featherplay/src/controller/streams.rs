@@ -325,6 +325,7 @@ impl Streams {
                     "available_at": s.available_at.and_then(secs),
                     "title": s.video_title,
                     "tag": s.first_tag,
+                    "loudness_db": s.loudness_db,
                 })
             })
             .collect();
@@ -367,6 +368,7 @@ impl Streams {
                 available_at: at(&s["available_at"]),
                 video_title: text(&s["title"]),
                 first_tag: text(&s["tag"]),
+                loudness_db: s["loudness_db"].as_f64().map(|db| db as f32),
             };
             let id = TrackId(id);
             self.cache.retain(|(c, _)| *c != id);
@@ -577,6 +579,7 @@ mod tests {
             available_at: None,
             video_title: None,
             first_tag: None,
+            loudness_db: None,
         }
     }
 
@@ -849,6 +852,22 @@ mod tests {
             s.get(&id("old")).is_none(),
             "one about to expire isn't kept"
         );
+    }
+
+    #[test]
+    fn a_saved_stream_keeps_its_loudness() {
+        let now = SystemTime::now();
+        let mut before = Streams::default();
+        let loud = ResolvedStream {
+            loudness_db: Some(7.17),
+            ..from("1.2.3.4", HOURS)
+        };
+        before.done(&id("loud"), Some(&loud), &[]);
+        before.done(&id("ytdlp"), Some(&from("1.2.3.4", HOURS)), &[]);
+        let mut s = Streams::default();
+        s.restore(&before.saved(now), now);
+        let db = |t: &str| s.get(&id(t)).map(|x| x.loudness_db);
+        assert_eq!((db("loud"), db("ytdlp")), (Some(Some(7.17)), Some(None)));
     }
 
     #[test]

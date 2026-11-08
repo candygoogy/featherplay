@@ -76,6 +76,8 @@ pub fn parse_ytdlp_json(json: &str, now: SystemTime) -> Result<ResolvedStream, R
             .map(|s| UNIX_EPOCH + Duration::from_secs(s)),
         video_title: text(&v["title"]),
         first_tag: text(&v["tags"][0]),
+        // yt-dlp's formats don't carry YouTube's `loudnessDb`.
+        loudness_db: None,
     })
 }
 

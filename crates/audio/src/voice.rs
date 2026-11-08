@@ -55,6 +55,8 @@ const UNKNOWN: u64 = u64::MAX;
 /// How long a cut takes: a pause, a stop or a skip ramps the sound out over this instead of
 /// clicking, and a resume ramps it back in (`measurements/r74-crossfade-reference.md`).
 pub(crate) const DECLICK: Duration = Duration::from_millis(30);
+/// How long a voice takes to reach a new level when "Match song volumes" is switched.
+const LEVEL_RAMP: Duration = Duration::from_millis(150);
 /// The crossfade phase of a voice at full volume; its gain is `sin(phase)`.
 const FULL: f64 = std::f64::consts::FRAC_PI_2;
 
@@ -74,6 +76,9 @@ pub(crate) struct Controls {
     pub crossfade: AtomicBool,
     /// "Skip silence" (`SkipSilence::to_u8`), which decoder threads read once per batch.
     pub skip_silence: AtomicU8,
+    /// "Match song volumes": each voice plays at its song's level (`VoiceShared::set_level`),
+    /// which every source reads once per refill and ramps to over `LEVEL_RAMP`.
+    pub match_volumes: AtomicBool,
     /// The playback speed (`f32` bits), which every source reads once per refill: at 1.0 it
     /// copies from the ring, otherwise it plays the ring through its `Stretch`.
     speed: AtomicU32,
@@ -92,6 +97,7 @@ impl Controls {
             paused: AtomicBool::new(true),
             crossfade: AtomicBool::new(false),
             skip_silence: AtomicU8::new(0),
+            match_volumes: AtomicBool::new(true),
             speed: AtomicU32::new(1.0_f32.to_bits()),
             bus: BusControls::default(),
             glitches: Arc::default(),
@@ -192,6 +198,8 @@ pub(crate) struct VoiceShared {
     silences_told: AtomicBool,
     /// The first source ramps in (`ramp_in_first`).
     ramp_in: AtomicBool,
+    /// The song's level while "Match song volumes" is on (`f32` bits, 0..=1; `loudness_gain`).
+    level: AtomicU32,
     /// A seek for the decoder thread: target and the engine's sequence number. The engine
     /// and the decoder thread lock it; the audio thread never does.
     seek: Mutex<Option<(Duration, u64)>>,
@@ -234,6 +242,7 @@ impl VoiceShared {
             silences_known: AtomicBool::new(false),
             silences_told: AtomicBool::new(false),
             ramp_in: AtomicBool::new(false),
+            level: AtomicU32::new(1.0_f32.to_bits()),
             seek: Mutex::new(None),
             cv: Condvar::new(),
             stopped: AtomicBool::new(false),
@@ -295,6 +304,26 @@ impl VoiceShared {
         let ms = u32::try_from(over.as_millis()).unwrap_or(u32::MAX).max(1);
         if !self.fade_out.load(Ordering::Relaxed) || self.fade_ms.load(Ordering::Relaxed) > ms {
             self.fade(Fade::Out, over);
+        }
+    }
+
+    /// The song's level while "Match song volumes" is on: an amplitude gain, clamped to
+    /// 0..=1 (NaN is 1). Set before the first source, so it plays at that level from the start.
+    pub fn set_level(&self, gain: f32) {
+        let gain = if gain.is_nan() {
+            1.0
+        } else {
+            gain.clamp(0.0, 1.0)
+        };
+        self.level.store(gain.to_bits(), Ordering::Relaxed);
+    }
+
+    /// The level a source plays at now: the song's own while "Match song volumes" is on.
+    fn level_for(&self, controls: &Controls) -> f32 {
+        if controls.match_volumes.load(Ordering::Relaxed) {
+            f32::from_bits(self.level.load(Ordering::Relaxed))
+        } else {
+            1.0
         }
     }
 
@@ -361,6 +390,8 @@ impl VoiceShared {
         // A source for a voice already heard (another device, a seek after the end) comes
         // in mid-song, as does one loaded at a position: it ramps in.
         let mid_song = self.started.load(Ordering::Relaxed) || self.ramp_in.load(Ordering::Relaxed);
+        let level = self.level_for(&controls);
+        let level_frames = (LEVEL_RAMP.as_secs_f64() * f64::from(rate.get())).max(1.0) as f32;
         Some(RingSource {
             voice: self.clone(),
             controls,
@@ -379,6 +410,10 @@ impl VoiceShared {
             click: if mid_song { 0.0 } else { 1.0 },
             click_step: 0.0,
             declick,
+            level,
+            level_to: level,
+            level_step: 0.0,
+            level_frames,
             live: false,
             ending: false,
             faded_out: false,
@@ -484,6 +519,7 @@ pub(crate) fn spawn(
     if silences_known {
         shared.silences_known();
     }
+    shared.set_level(crate::loudness_gain(src.loudness_db));
     let v = shared.clone();
     let err_tx = tx.clone();
     let spawned = std::thread::Builder::new()
@@ -674,13 +710,17 @@ fn decode(
 /// The mixer side of a voice. Runs on the audio thread: no I/O, no locks, no allocation,
 /// and messages only on state changes.
 ///
-/// Two gains shape what it plays, per frame and only while one of them moves:
+/// Three gains shape what it plays, per frame and only while one of them moves or is below
+/// full:
+/// - the song's level, "Match song volumes" (`VoiceShared::set_level`), which ramps over
+///   `LEVEL_RAMP` when the switch changes; it comes before the master bus, so the
+///   compressor and the limiter see each song levelled;
 /// - the crossfade, `sin(phase)`, ramping between silence and full over seconds
 ///   (`VoiceShared::fade`);
 /// - the de-click, which ramps out over `DECLICK` on a pause or a stop, and back in on a
 ///   resume or after a dry ring, so none of them clicks.
 ///
-/// Neither moves while the source plays silence (paused or starved): a pause holds a fade.
+/// None of them moves while the source plays silence (paused or starved): a pause holds a fade.
 pub(crate) struct RingSource {
     voice: Arc<VoiceShared>,
     controls: Arc<Controls>,
@@ -705,6 +745,12 @@ pub(crate) struct RingSource {
     click_step: f32,
     /// `DECLICK` in frames.
     declick: u64,
+    /// The song's level ("Match song volumes"), where it's headed, how far it moves per
+    /// frame, and `LEVEL_RAMP` in frames.
+    level: f32,
+    level_to: f32,
+    level_step: f32,
+    level_frames: f32,
     /// The last chunk was sound, not silence: a pause or a stop ramps it out.
     live: bool,
     /// The next refill ends the source: a stop's tail has played, or a fade out reached
@@ -736,6 +782,7 @@ impl RingSource {
         self.local.clear();
         self.idx = 0;
         self.take_fade();
+        self.take_level();
         let stopped = self.voice.stopped.load(Ordering::Relaxed);
         let leaving = stopped || self.controls.paused.load(Ordering::Relaxed);
         let ch = u64::from(self.channels.get());
@@ -798,24 +845,49 @@ impl RingSource {
         };
     }
 
-    /// Applies the crossfade and the de-click to `local`, frame by frame, while either
-    /// moves or is below full.
+    /// Heads for the level "Match song volumes" wants now, if it changed.
+    fn take_level(&mut self) {
+        let to = self.voice.level_for(&self.controls);
+        if to != self.level_to {
+            self.level_to = to;
+            self.level_step = (to - self.level) / self.level_frames;
+        }
+    }
+
+    /// Applies the level, the crossfade and the de-click to `local`, frame by frame, while
+    /// any of them moves or is below full.
     fn apply_gains(&mut self) {
         if self.phase_step == 0.0
             && self.click_step == 0.0
+            && self.level_step == 0.0
             && self.phase >= FULL
             && self.click >= 1.0
+            && self.level >= 1.0
         {
             return;
         }
         let ch = self.channels.get() as usize;
         for frame in self.local.chunks_exact_mut(ch) {
-            let g = self.click * (self.phase as f32).sin();
+            let fade = if self.phase >= FULL {
+                1.0
+            } else {
+                (self.phase as f32).sin()
+            };
+            let g = self.level * self.click * fade;
             for s in frame {
                 *s *= g;
             }
             self.click = (self.click + self.click_step).clamp(0.0, 1.0);
             self.phase = (self.phase + self.phase_step).clamp(0.0, FULL);
+            if self.level_step != 0.0 {
+                // Snapped within a step, so a step too small for `f32` still ends.
+                if (self.level_to - self.level).abs() <= self.level_step.abs() {
+                    self.level = self.level_to;
+                    self.level_step = 0.0;
+                } else {
+                    self.level += self.level_step;
+                }
+            }
         }
         if self.click <= 0.0 || self.click >= 1.0 {
             self.click_step = 0.0;
@@ -1305,6 +1377,37 @@ mod tests {
         let g = gains(&mut src, 2048);
         assert!(g[0] < 0.01, "starts at {}", g[0]);
         assert_eq!(g[2047], 1.0);
+    }
+
+    #[test]
+    fn a_loud_song_plays_at_its_own_level_from_the_first_frame() {
+        let (tx, _rx) = mpsc::channel();
+        let v = steady(2.0);
+        v.set_level(0.25);
+        let mut src = v.source(playing(), tx).unwrap();
+        let g = gains(&mut src, 8192);
+        assert!(g.iter().all(|&x| x == 0.25), "{} .. {}", g[0], g[8191]);
+    }
+
+    #[test]
+    fn match_song_volumes_turned_off_ramps_the_song_back_up_without_a_step() {
+        let controls = playing();
+        let (tx, _rx) = mpsc::channel();
+        let v = steady(2.0);
+        v.set_level(0.25);
+        let mut src = v.source(controls.clone(), tx).unwrap();
+        let _ = gains(&mut src, 4096);
+        controls.match_volumes.store(false, Ordering::Relaxed);
+        let g = gains(&mut src, 8192);
+        let biggest = g
+            .windows(2)
+            .map(|w| (w[0] - w[1]).abs())
+            .fold(0.0, f32::max);
+        assert!(biggest < 0.01, "a step of {biggest} between frames");
+        assert_eq!(g[8191], 1.0);
+        controls.match_volumes.store(true, Ordering::Relaxed);
+        let back = gains(&mut src, 8192);
+        assert_eq!(back[8191], 0.25);
     }
 
     #[test]
