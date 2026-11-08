@@ -77,6 +77,13 @@ Notable changes to featherplay, newest first. The format follows
   isn't 127.0.0.1, localhost or [::1] with its port, so a page can't reach it through DNS
   rebinding. A home-made overlay that read it from a local file or another site, as Pear's
   plugin allows, is refused too.
+- Automatic updates are signed. Each release's `SHA256SUMS.txt` now carries a minisign
+  signature, made on the maintainer's PC, for that version. The installed copy checks it
+  with the keys built into featherplay before it downloads a setup, and refuses an update
+  with no signature, a bad one, or one for another release: About then says the update
+  couldn't be verified and links to featherplay.candygoogy.dev. Someone who could upload
+  files to a GitHub release can no longer make copies install them. Copies up to 0.1.2
+  update to this one with the SHA256 check only.
 
 ## [0.1.2] - 2026-11-07
 

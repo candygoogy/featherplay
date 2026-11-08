@@ -54,6 +54,8 @@ Inno Setup, and creates a **draft** release with:
 - `SHA256SUMS.txt`, covering all four and `THIRD_PARTY.md`
 - `THIRD_PARTY.md`
 
+Its signature, `SHA256SUMS.txt.minisig`, comes from your PC in step 4.
+
 The x64 names never change: 0.1.0's links, the site, the README, winget and Scoop use them.
 
 To try the workflow before tagging, run it on a branch:
@@ -89,6 +91,31 @@ with `featherplay-setup-X.Y.Z-arm64.exe` and `featherplay-arm64.exe`; Task Manag
 Details tab should show featherplay, yt-dlp and deno as ARM64, not x64. (Over an x64
 install, the yt-dlp and deno it downloaded stay, and keep running as x64.)
 
+Then sign the draft. Installed copies (0.1.3 and later) download an update only if the
+release's `SHA256SUMS.txt` carries a minisign signature by one of the two keys built into
+the app (`apps/featherplay/keys/`), made for that version; without it they only announce
+the release and say it couldn't be verified.
+
+The signature vouches for whatever the draft holds, so first compare the draft's
+`SHA256SUMS.txt` with the one the workflow printed in its `package` job's log: they must be
+the same. Then, on your own PC, with minisign 0.12 or later (`MINISIGN` names its exe if it
+isn't on PATH):
+
+```
+FEATHERPLAY_SIGN_KEY=<path to featherplay-update.key> packaging/sign-release.sh X.Y.Z <new empty folder>
+```
+
+It checks that `vX.Y.Z` is still a draft, downloads its files into the folder, checks them
+with `sha256sum -c SHA256SUMS.txt`, and signs `SHA256SUMS.txt` with that key and the trusted
+comment `featherplay vX.Y.Z`. minisign asks for the key's password; the script never sees
+it. It then verifies the signature with `apps/featherplay/keys/update.pub` and uploads
+`SHA256SUMS.txt.minisig` to the draft. If the main key is lost, sign with the backup key
+(`featherplay-update-backup.key`) and add
+`FEATHERPLAY_UPDATE_KEYS=apps/featherplay/keys/update-backup.pub`. `--dry-run` signs the
+files already in the folder and uploads nothing.
+
+If the draft's files change after signing (a re-run of the workflow), sign again.
+
 Then, in one commit that you push after publishing (step 5):
 
 - `README.md`: the version in the installer link
@@ -113,8 +140,14 @@ pnpm budget
 ## 5. Publish
 
 ```
-gh release edit vX.Y.Z --draft=false --latest
+packaging/check-signature.sh X.Y.Z && gh release edit vX.Y.Z --draft=false --latest
 ```
+
+`check-signature.sh` downloads the draft's `SHA256SUMS.txt` and `SHA256SUMS.txt.minisig`
+and checks them as the app does: a valid signature by either built-in key, for
+`featherplay vX.Y.Z`. If anything is missing or wrong it says NOT SIGNED and stops, and
+nothing is published: sign the draft (step 4) and run it again. Never publish an unsigned
+release: no installed copy would update to it.
 
 Now push the README and site commit from step 4.
 

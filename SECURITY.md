@@ -46,6 +46,17 @@ it.
 - The helpers. featherplay downloads yt-dlp and Deno on the first run and checks each file
   against a SHA256 hash pinned in its code (`crates/streams/src/sidecars.rs`), then lets
   yt-dlp update itself. A way to get featherplay to run a file that wasn't checked is in scope.
+- Automatic updates. The installed copy downloads a newer release's setup only from the
+  project's GitHub releases, over HTTPS, and only if the release's `SHA256SUMS.txt` carries
+  a minisign signature (`SHA256SUMS.txt.minisig`) by one of the two public keys built into
+  featherplay (`apps/featherplay/keys/`), with the trusted comment `featherplay vX.Y.Z` for
+  that release. Then the setup must match its SHA256 in that file, and the version must be
+  newer than the one running. The private keys never reach GitHub: the maintainer signs
+  each release by hand on their own PC. A missing, invalid or mismatched signature means no
+  download, and About says the update couldn't be verified; there's no fallback to an
+  unsigned file (`apps/featherplay/src/updates/install.rs`). A way to make featherplay
+  install a file that's unsigned, signed for another release, or doesn't match its
+  checksum, or an older version, is in scope. Versions up to 0.1.2 check only the SHA256.
 - The installer and uninstaller (`packaging/windows/`), including what the uninstaller
   deletes and which processes it closes.
 

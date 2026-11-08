@@ -28,7 +28,10 @@ name: Release
 #   <each of the four>.sha256                its `sha256sum` line (Scoop's autoupdate reads featherplay.exe.sha256)
 #   SHA256SUMS.txt                           all four, plus THIRD_PARTY.md: `sha256sum -c SHA256SUMS.txt`
 #   THIRD_PARTY.md                           the licence notices, which a portable exe needs beside it
-# The release notes list each file's SHA256 as well.
+# The release notes list each file's SHA256 as well. One more file is added by hand, never
+# here: SHA256SUMS.txt.minisig, the maintainer's signature on SHA256SUMS.txt, made on their
+# PC with a key GitHub never sees (packaging/sign-release.sh, RELEASING.md step 4). The
+# installed app's updater won't download a release without it.
 #
 # Build keys: three repository secrets, the same names as the variables in featherplay.env
 # (Settings > Secrets and variables > Actions > New repository secret):
