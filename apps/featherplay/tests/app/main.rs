@@ -30,6 +30,7 @@ mod first_frames;
 mod first_run_toast;
 mod frame;
 mod glyph_fallback;
+mod grid_cover;
 mod hero_menu;
 mod home_covers;
 mod home_more;

@@ -13,6 +13,7 @@ pub mod album;
 pub mod artist;
 pub mod content;
 pub mod explore;
+pub mod grid;
 pub mod history;
 pub mod home;
 pub mod library;
@@ -25,6 +26,7 @@ pub mod sign_in;
 pub fn init(ctx: &Rc<Ctx>) {
     home::init(ctx);
     explore::init(ctx);
+    grid::init(ctx);
     history::init(ctx);
     library::init(ctx);
     album::init(ctx);

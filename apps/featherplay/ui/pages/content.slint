@@ -18,6 +18,12 @@ export global Open {
     }
 }
 
+// One line of a card grid: its cards, and the index of its first in the page's model.
+export struct CardLine {
+    cards: [CardItem],
+    first: int,
+}
+
 // Cards per row for a content width: 5 from 900 px, else 4 (so 4 or 5 at a 1280 px window),
 // down to 3 or 2 where 4 would make cards narrower than 120 px (a page beside the Up next panel
 // in a narrow window).
@@ -28,6 +34,9 @@ export global Grid {
     public pure function card(width: length, per-row: int) -> length {
         return floor((width - (per-row - 1) * Theme.card-gap) / per-row / 1px) * 1px;
     }
+    // `cards` in lines of `per-row`, each line a model of its own (src/pages/grid.rs), so a
+    // card set (its cover in) reaches that card only.
+    pure callback lines(cards: [CardItem], per-row: int) -> [CardLine];
 }
 
 /// Glyphs only the page states use.
@@ -756,22 +765,24 @@ export component CardGrid inherits Rectangle {
     property <int> per-row: Grid.per-row(root.inner);
     property <length> card: Grid.card(root.inner, root.per-row);
     property <length> line-h: root.card + Theme.card-text-gap + 40px + Theme.s6;
+    // Each card is its line's own data, not read out of `items` by index: a model read by
+    // index is one dependency for all of it, so a cover handed to one card repainted them all.
+    property <[CardLine]> lines: Grid.lines(root.items, root.per-row);
     ListView {
-        for r in ceil(root.items.length / root.per-row): Rectangle {
+        for line[r] in root.lines: Rectangle {
             // The last line leaves room to scroll past the floating bar.
-            height: (r == 0 ? root.top : 0px) + root.line-h + (r == ceil(root.items.length / root.per-row) - 1 ? Theme.page-end - Theme.s6 : 0px);
-            for c in root.per-row: cell := Rectangle {
-                property <int> idx: r * root.per-row + c;
+            height: (r == 0 ? root.top : 0px) + root.line-h + (r == root.lines.length - 1 ? Theme.page-end - Theme.s6 : 0px);
+            for it[c] in line.cards: Rectangle {
                 x: root.pad + c * (root.card + Theme.card-gap);
                 y: r == 0 ? root.top : 0px;
                 width: root.card;
                 height: root.line-h - Theme.s6;
-                if cell.idx < root.items.length: Card {
+                Card {
                     size: root.card;
-                    item: root.items[cell.idx];
+                    item: it;
                     playable: root.playable;
-                    clicked => { root.open(root.items[cell.idx]); }
-                    play => { root.play(root.items[cell.idx]); }
+                    clicked => { root.open(it); }
+                    play => { root.play(it); }
                 }
             }
         }
