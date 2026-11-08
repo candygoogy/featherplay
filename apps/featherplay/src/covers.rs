@@ -12,6 +12,10 @@
 //! to 40 MB or more, and the models of the pages left behind kept them all for good
 //! (2026-10-31: 210 MB private while playing minimised). Showing a page again answers from
 //! the in-memory cache when its covers are still there, with nothing fetched or decoded again.
+//! While the window shows nothing, that cache keeps the covers of the page it showed and
+//! lets go of the rest: shown again, the page answers from memory, where emptying the cache
+//! had every cover on it decoded again (2026-11-08: 18 covers, 0.3-0.4 s of decode work, on
+//! each show from the tray).
 //!
 //! Cards get their covers a few a frame (`PACE_PER_TICK` every `PACE_TICK`), not all in the
 //! frame they're ready: each one's first draw makes its layer, the art resampled to the card's
@@ -20,7 +24,7 @@
 //! in over their empty tiles as covers from the disk do, top shelf first.
 
 use std::cell::{Cell, RefCell};
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::PathBuf;
 use std::rc::{Rc, Weak};
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -170,12 +174,13 @@ impl Covers {
     }
 
     /// The page now on screen, or `None` when the window shows nothing. Every other page's
-    /// covers are let go (and the in-memory cache emptied with `None`); this one's covers
-    /// that were let go are asked for again.
+    /// covers are let go (with `None`, the in-memory cache keeps only those of the page that
+    /// was shown); this one's covers that were let go are asked for again.
     pub fn show(&self, page: Option<PageKind>) {
         let before = self.0.shown.replace(page);
         if page.is_none() {
-            self.0.memory.borrow_mut().clear();
+            let keep = before.map(|p| self.keys_of(p)).unwrap_or_default();
+            self.0.memory.borrow_mut().retain(&keep);
         }
         if before == page {
             return;
@@ -196,6 +201,26 @@ impl Covers {
                 what.release();
             }
         }
+    }
+
+    /// The in-memory cache's keys of the covers `page` holds.
+    fn keys_of(&self, page: PageKind) -> HashSet<Key> {
+        let held = self.0.held.borrow();
+        let mut keys = HashSet::new();
+        for h in held.iter().filter(|h| h.page == page && h.what.alive()) {
+            match &h.what {
+                Holder::Cards {
+                    urls,
+                    width,
+                    height,
+                    ..
+                } => keys.extend(urls.values().map(|u| self.key(u, *width, *height))),
+                Holder::Single { url, px, .. } => {
+                    keys.insert(self.key(url, *px, *px));
+                }
+            }
+        }
+        keys
     }
 
     /// The covers of `model`'s cards (`urls[i]` for row `i`), square at `px`, held by `page`:
@@ -335,6 +360,12 @@ impl Covers {
         });
     }
 
+    /// The in-memory cache's key for `url` at `width`×`height` logical pixels.
+    fn key(&self, url: &str, width: u32, height: u32) -> Key {
+        let phys = |px: u32| ((px as f32) * self.0.scale.get()).round().max(1.0) as u32;
+        (url.to_string(), phys(width), phys(height))
+    }
+
     fn request(
         &self,
         url: &str,
@@ -346,8 +377,7 @@ impl Covers {
             done(None);
             return;
         }
-        let phys = |px: u32| ((px as f32) * self.0.scale.get()).round().max(1.0) as u32;
-        let key = (url.to_string(), phys(width), phys(height));
+        let key = self.key(url, width, height);
         let cached = self.0.memory.borrow_mut().get(&key);
         if let Some(img) = cached {
             done(Some(img));
@@ -667,9 +697,10 @@ struct Memory {
 }
 
 impl Memory {
-    fn clear(&mut self) {
-        self.items.clear();
-        self.bytes = 0;
+    /// Lets go of every cover but those `keep` names.
+    fn retain(&mut self, keep: &HashSet<Key>) {
+        self.items.retain(|key, _| keep.contains(key));
+        self.bytes = self.items.values().map(|(_, _, bytes)| bytes).sum();
     }
 
     fn get(&mut self, key: &Key) -> Option<Image> {
@@ -959,6 +990,20 @@ mod tests {
     fn decode_square_keeps_the_centred_square() {
         let out = decode(&letterboxed(640, 480, 60), 300, 300).expect("decode");
         assert_eq!((out.width(), out.height()), (300, 300));
+    }
+
+    /// What the window keeps while it shows nothing: the named covers, and their bytes.
+    #[test]
+    fn retain_keeps_only_the_named_covers() {
+        let mut memory = Memory::default();
+        let img = || Image::from_rgba8(SharedPixelBuffer::new(10, 10));
+        let key = |u: &str| (u.to_string(), 10, 10);
+        memory.put(key("a"), img());
+        memory.put(key("b"), img());
+        memory.retain(&HashSet::from([key("a")]));
+        assert!(memory.get(&key("a")).is_some());
+        assert!(memory.get(&key("b")).is_none());
+        assert_eq!(memory.bytes, 400);
     }
 
     #[test]

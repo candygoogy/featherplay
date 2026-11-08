@@ -2,10 +2,11 @@
 //! that lets a measurement see it.
 //!
 //! Minimised or hidden in the tray, the window shows nothing, so the pages' covers, the
-//! in-memory cover cache (`Covers::show(None)`), the renderer's layers, images and text, and
-//! the window's pixel buffer (32 MB at 4K; `vendor/i-slint-renderer-skia/VENDORED.md`,
-//! change 5) all go. Shown again, the page's covers come back from the disk cache and the
-//! first frame paints the window whole, as it does after a restore anyway (`repaint`).
+//! in-memory cover cache but for the shown page's covers (`Covers::show(None)`), the
+//! renderer's layers, images and text, and the window's pixel buffer (32 MB at 4K;
+//! `vendor/i-slint-renderer-skia/VENDORED.md`, change 5) all go. Shown again, the page's
+//! covers come back from that cache and the first frame paints the window whole, as it does
+//! after a restore anyway (`repaint`).
 //!
 //! While sound plays, the private bytes go to the log once a minute (`tick`, from the bar's
 //! clock, so nothing runs for it while paused).

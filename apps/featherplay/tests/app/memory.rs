@@ -294,8 +294,16 @@ fn a_pages_covers_go_while_it_is_not_shown_and_come_back() {
     scene.settle();
     assert_eq!(home_art(ui).1, shown, "Home's covers didn't all come back");
 
+    let home_bytes = home_art(ui).2 as usize;
     minimise(&scene, true);
     assert_eq!(home_art(ui).1, 0, "Home's covers stayed while minimised");
+    // The shown page's decoded covers stay in memory, for the restore (this Home fills the
+    // cache on its own, so nothing else is left in it to go).
+    let kept = scene.ctx.covers.cached_bytes();
+    assert!(
+        kept > 0 && kept <= home_bytes,
+        "{kept} bytes of covers kept while minimised, Home's are {home_bytes}"
+    );
     let drawn: u64 = frames(w, 10, |_| {}).iter().map(|f| f.damaged).sum();
     assert_eq!(drawn, 0, "frames were drawn while minimised");
 
