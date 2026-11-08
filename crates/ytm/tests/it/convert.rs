@@ -260,6 +260,36 @@ fn home_parses_shelves() {
     assert_eq!(album.artists[0].name, "Billie Eilish");
 }
 
+/// "Music videos for you" (in the fixture's continuation, two of its cards) is left out:
+/// featherplay plays only the sound. It's told by its cards, music videos on 16:9
+/// thumbnails, since its title follows the UI language. Its "Play all" goes with it.
+#[test]
+fn home_leaves_out_the_music_videos_shelf() {
+    let pages = home_pages();
+    assert!(pages[1].contains("Music videos for you"), "the fixture has it");
+    let shelves = home();
+    assert!(shelves.iter().all(|s| s.title != "Music videos for you"));
+    let ids = shelves.iter().flat_map(|s| &s.items).filter_map(|i| match i {
+        HomeItem::Track(t) => Some(t.id.0.as_str()),
+        _ => None,
+    });
+    assert!(ids.into_iter().all(|id| id != "roPiy2JydwA" && id != "bzPr09snprY"));
+}
+
+/// A shelf with a music video among other cards (a genre's) stays.
+#[test]
+fn home_keeps_a_shelf_with_other_cards_beside_music_videos() {
+    let mut second: Value = serde_json::from_str(&home_pages()[1]).unwrap();
+    let shelf = second
+        .pointer_mut("/continuationContents/sectionListContinuation/contents/1/musicCarouselShelfRenderer")
+        .unwrap();
+    shelf["contents"][1]["musicTwoRowItemRenderer"]["aspectRatio"] =
+        json!("MUSIC_TWO_ROW_ITEM_THUMBNAIL_ASPECT_RATIO_SQUARE");
+    let pages = [home_pages()[0].clone(), second.to_string()];
+    let shelves = convert::home(&pages).expect("parse");
+    assert!(shelves.iter().any(|s| s.title == "Music videos for you"));
+}
+
 #[test]
 fn home_strapline_is_scrubbed() {
     let account = std::env::var("FEATHERPLAY_ACCOUNT_NAME")

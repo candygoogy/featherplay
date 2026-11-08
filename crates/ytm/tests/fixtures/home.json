@@ -1580,6 +1580,266 @@
      },
      {
       "musicCarouselShelfRenderer": {
+       "header": {
+        "musicCarouselShelfBasicHeaderRenderer": {
+         "title": {
+          "runs": [
+           {
+            "text": "Music videos for you"
+           }
+          ]
+         },
+         "headerStyle": "MUSIC_CAROUSEL_SHELF_BASIC_HEADER_STYLE_DEFAULT",
+         "moreContentButton": {
+          "buttonRenderer": {
+           "style": "STYLE_TEXT",
+           "text": {
+            "runs": [
+             {
+              "text": "Play all"
+             }
+            ]
+           },
+           "navigationEndpoint": {
+            "watchEndpoint": {
+             "videoId": "roPiy2JydwA"
+            }
+           }
+          }
+         }
+        }
+       },
+       "contents": [
+        {
+         "musicTwoRowItemRenderer": {
+          "thumbnailRenderer": {
+           "musicThumbnailRenderer": {
+            "thumbnail": {
+             "thumbnails": [
+              {
+               "url": "https://i.ytimg.com/vi/roPiy2JydwA/hqdefault.jpg?sqp=-oaymwEWCJADEOEBIAQqCggAEOADGC0guwJIWg&rs=AMzJL3mqLUkJWTiPzyUkpeOkVc9Ph8MYXw",
+               "width": 400,
+               "height": 225
+              },
+              {
+               "url": "https://i.ytimg.com/vi/roPiy2JydwA/hq720.jpg?sqp=-oaymwEKCKAGEMIDIABIWg&rs=AMzJL3lzl-AgclAuGbJf_EnNeIxOhlDauQ",
+               "width": 800,
+               "height": 450
+              }
+             ]
+            },
+            "thumbnailCrop": "MUSIC_THUMBNAIL_CROP_UNSPECIFIED",
+            "thumbnailScale": "MUSIC_THUMBNAIL_SCALE_ASPECT_FILL"
+           }
+          },
+          "aspectRatio": "MUSIC_TWO_ROW_ITEM_THUMBNAIL_ASPECT_RATIO_RECTANGLE_16_9",
+          "title": {
+           "runs": [
+            {
+             "text": "Headlock (Official Video)"
+            }
+           ]
+          },
+          "subtitle": {
+           "runs": [
+            {
+             "text": "Imogen Heap",
+             "navigationEndpoint": {
+              "browseEndpoint": {
+               "browseId": "UCziNcw5vV4M6rdH5e3z_Vyg",
+               "browseEndpointContextSupportedConfigs": {
+                "browseEndpointContextMusicConfig": {
+                 "pageType": "MUSIC_PAGE_TYPE_ARTIST"
+                }
+               }
+              }
+             }
+            },
+            {
+             "text": " • "
+            },
+            {
+             "text": "45M views"
+            }
+           ]
+          },
+          "navigationEndpoint": {
+           "watchEndpoint": {
+            "videoId": "roPiy2JydwA",
+            "watchEndpointMusicSupportedConfigs": {
+             "watchEndpointMusicConfig": {
+              "musicVideoType": "MUSIC_VIDEO_TYPE_OMV"
+             }
+            }
+           }
+          },
+          "thumbnailOverlay": {
+           "musicItemThumbnailOverlayRenderer": {
+            "background": {
+             "verticalGradient": {
+              "gradientLayerColors": [
+               "2147483648",
+               "2147483648"
+              ]
+             }
+            },
+            "content": {
+             "musicPlayButtonRenderer": {
+              "playNavigationEndpoint": {
+               "watchEndpoint": {
+                "videoId": "roPiy2JydwA",
+                "watchEndpointMusicSupportedConfigs": {
+                 "watchEndpointMusicConfig": {
+                  "musicVideoType": "MUSIC_VIDEO_TYPE_OMV"
+                 }
+                }
+               }
+              },
+              "playIcon": {
+               "iconType": "PLAY_ARROW"
+              },
+              "pauseIcon": {
+               "iconType": "PAUSE"
+              },
+              "iconColor": 4294967295,
+              "backgroundColor": 0,
+              "activeBackgroundColor": 0,
+              "loadingIndicatorColor": 14745645,
+              "playingIcon": {
+               "iconType": "VOLUME_UP"
+              },
+              "iconLoadingColor": 0,
+              "activeScaleFactor": 1,
+              "buttonSize": "MUSIC_PLAY_BUTTON_SIZE_HUGE",
+              "rippleTarget": "MUSIC_PLAY_BUTTON_RIPPLE_TARGET_ANCESTOR",
+              "accessibilityPlayData": {},
+              "accessibilityPauseData": {}
+             }
+            },
+            "contentPosition": "MUSIC_ITEM_THUMBNAIL_OVERLAY_CONTENT_POSITION_CENTERED",
+            "displayStyle": "MUSIC_ITEM_THUMBNAIL_OVERLAY_DISPLAY_STYLE_PERSISTENT"
+           }
+          }
+         }
+        },
+        {
+         "musicTwoRowItemRenderer": {
+          "thumbnailRenderer": {
+           "musicThumbnailRenderer": {
+            "thumbnail": {
+             "thumbnails": [
+              {
+               "url": "https://i.ytimg.com/vi/bzPr09snprY/hqdefault.jpg?sqp=-oaymwEWCJADEOEBIAQqCggAEOADGC0guwJIWg&rs=AMzJL3mDR3kuGWW_B513wmvOjZ3VNyCOeQ",
+               "width": 400,
+               "height": 225
+              },
+              {
+               "url": "https://i.ytimg.com/vi/bzPr09snprY/hq720.jpg?sqp=-oaymwEKCKAGEMIDIABIWg&rs=AMzJL3n8Jk_tN218qXrMcrMSGkJKxSO69A",
+               "width": 800,
+               "height": 450
+              }
+             ]
+            },
+            "thumbnailCrop": "MUSIC_THUMBNAIL_CROP_UNSPECIFIED",
+            "thumbnailScale": "MUSIC_THUMBNAIL_SCALE_ASPECT_FILL"
+           }
+          },
+          "aspectRatio": "MUSIC_TWO_ROW_ITEM_THUMBNAIL_ASPECT_RATIO_RECTANGLE_16_9",
+          "title": {
+           "runs": [
+            {
+             "text": "older (Official Video)"
+            }
+           ]
+          },
+          "subtitle": {
+           "runs": [
+            {
+             "text": "Isabel LaRosa",
+             "navigationEndpoint": {
+              "browseEndpoint": {
+               "browseId": "UCtrY01QWo40b4Dsv2yA8Uyw",
+               "browseEndpointContextSupportedConfigs": {
+                "browseEndpointContextMusicConfig": {
+                 "pageType": "MUSIC_PAGE_TYPE_ARTIST"
+                }
+               }
+              }
+             }
+            },
+            {
+             "text": " • "
+            },
+            {
+             "text": "45M views"
+            }
+           ]
+          },
+          "navigationEndpoint": {
+           "watchEndpoint": {
+            "videoId": "bzPr09snprY",
+            "watchEndpointMusicSupportedConfigs": {
+             "watchEndpointMusicConfig": {
+              "musicVideoType": "MUSIC_VIDEO_TYPE_OMV"
+             }
+            }
+           }
+          },
+          "thumbnailOverlay": {
+           "musicItemThumbnailOverlayRenderer": {
+            "background": {
+             "verticalGradient": {
+              "gradientLayerColors": [
+               "2147483648",
+               "2147483648"
+              ]
+             }
+            },
+            "content": {
+             "musicPlayButtonRenderer": {
+              "playNavigationEndpoint": {
+               "watchEndpoint": {
+                "videoId": "bzPr09snprY",
+                "watchEndpointMusicSupportedConfigs": {
+                 "watchEndpointMusicConfig": {
+                  "musicVideoType": "MUSIC_VIDEO_TYPE_OMV"
+                 }
+                }
+               }
+              },
+              "playIcon": {
+               "iconType": "PLAY_ARROW"
+              },
+              "pauseIcon": {
+               "iconType": "PAUSE"
+              },
+              "iconColor": 4294967295,
+              "backgroundColor": 0,
+              "activeBackgroundColor": 0,
+              "loadingIndicatorColor": 14745645,
+              "playingIcon": {
+               "iconType": "VOLUME_UP"
+              },
+              "iconLoadingColor": 0,
+              "activeScaleFactor": 1,
+              "buttonSize": "MUSIC_PLAY_BUTTON_SIZE_HUGE",
+              "rippleTarget": "MUSIC_PLAY_BUTTON_RIPPLE_TARGET_ANCESTOR",
+              "accessibilityPlayData": {},
+              "accessibilityPauseData": {}
+             }
+            },
+            "contentPosition": "MUSIC_ITEM_THUMBNAIL_OVERLAY_CONTENT_POSITION_CENTERED",
+            "displayStyle": "MUSIC_ITEM_THUMBNAIL_OVERLAY_DISPLAY_STYLE_PERSISTENT"
+           }
+          }
+         }
+        }
+       ],
+       "itemSize": "COLLECTION_STYLE_ITEM_SIZE_MEDIUM"
+      }
+     },
+     {
+      "musicCarouselShelfRenderer": {
        "contents": [
         {
          "musicTwoRowItemRenderer": {

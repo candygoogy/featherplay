@@ -1435,7 +1435,8 @@ fn query_param(url: &str, name: &str) -> Option<String> {
 
 /// Shelves of the Home feed: the first page, then any continuation pages.
 /// Mood chips, unknown shelf kinds, shelves that don't read, items that map to nothing
-/// (podcast episodes, user channels) and shelves left empty are dropped.
+/// (podcast episodes, user channels) and shelves left empty are dropped, and so is "Music
+/// videos for you" (`music_videos_only`).
 ///
 /// Only the first page can fail, and only when it isn't a Home answer at all (not JSON,
 /// an API error, or a layout we don't know). A first page without shelves (an identity
@@ -1445,9 +1446,9 @@ pub fn home(pages: &[String]) -> Result<Vec<HomeShelf>, ApiError> {
     let Some((first, rest)) = pages.split_first() else {
         return Ok(Vec::new());
     };
-    let mut out = home_page(first)?;
+    let mut out = feed_page(first)?;
     for raw in rest {
-        if let Ok(more) = home_page(raw) {
+        if let Ok(more) = feed_page(raw) {
             out.extend(more);
         }
     }
@@ -1467,12 +1468,50 @@ pub fn home_feed(pages: &[String]) -> Result<HomeFeed, ApiError> {
 /// Home can offer to try it again.
 pub fn home_more(raw: &str) -> Result<HomeFeed, ApiError> {
     Ok(HomeFeed {
-        shelves: home_page(raw)?,
+        shelves: feed_page(raw)?,
         more: home_continuation(raw),
     })
 }
 
+/// A page of the Home feed: its shelves (`home_page`) but "Music videos for you".
+fn feed_page(raw: &str) -> Result<Vec<HomeShelf>, ApiError> {
+    shelves_page(raw, |shelf| !music_videos_only(shelf))
+}
+
+/// Home's "Music videos for you": every card a music video on a 16:9 thumbnail. It's built
+/// around the picture, and featherplay plays only the sound (intros, skits and effects
+/// included). Told by its cards, not its title, which follows the UI language; a genre's
+/// shelf with a music video among other cards stays.
+fn music_videos_only(shelf: &Value) -> bool {
+    let Some(cards) = shelf
+        .get("musicCarouselShelfRenderer")
+        .and_then(|r| r.get("contents"))
+        .and_then(Value::as_array)
+        .filter(|c| !c.is_empty())
+    else {
+        return false;
+    };
+    cards.iter().all(|card| {
+        let Some(r) = card.get("musicTwoRowItemRenderer") else {
+            return false;
+        };
+        let wide = r.get("aspectRatio").and_then(Value::as_str)
+            == Some("MUSIC_TWO_ROW_ITEM_THUMBNAIL_ASPECT_RATIO_RECTANGLE_16_9");
+        let kind = r
+            .pointer("/navigationEndpoint/watchEndpoint")
+            .and_then(|w| w.pointer(MUSIC_VIDEO_TYPE))
+            .and_then(Value::as_str)
+            .map(video_type);
+        wide && kind == Some(VideoType::MusicVideo)
+    })
+}
+
+/// A page of shelves as Home has them: Home, and Explore's pages shaped like it.
 fn home_page(raw: &str) -> Result<Vec<HomeShelf>, ApiError> {
+    shelves_page(raw, |_| true)
+}
+
+fn shelves_page(raw: &str, keep: impl Fn(&Value) -> bool) -> Result<Vec<HomeShelf>, ApiError> {
     let v = json(raw)?;
     check_error(&v)?;
     let Some(section) = home_section(&v) else {
@@ -1488,6 +1527,7 @@ fn home_page(raw: &str) -> Result<Vec<HomeShelf>, ApiError> {
     Ok(shelves
         .into_iter()
         .flatten()
+        .filter(|shelf| keep(shelf))
         .filter_map(home_shelf)
         .collect())
 }
