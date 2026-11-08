@@ -19,7 +19,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU32, AtomicU64, Ordering, fence};
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Condvar, Mutex, OnceLock};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use featherplay_core::sync::{CondvarExt, LockExt};
 use rodio::{ChannelCount, Sample, SampleRate, Source};
@@ -148,9 +148,22 @@ impl Slots {
     }
 }
 
+/// When a voice's start-up steps were done, for the first-sound log line (`engine.rs`).
+#[derive(Default)]
+pub(crate) struct Stages {
+    /// The stream's start is there to read, and whether it came without a request (a
+    /// local file, a head in memory).
+    pub opened: OnceLock<(Instant, bool)>,
+    /// The decoder has read the header and its first packet.
+    pub ready: OnceLock<Instant>,
+    /// The first samples went into the ring.
+    pub filled: OnceLock<Instant>,
+}
+
 pub(crate) struct VoiceShared {
     pub id: u64,
     pub url: String,
+    pub stages: Stages,
     /// Set once with `format`, before the first source exists.
     slots: OnceLock<Slots>,
     /// Samples written so far. Only the decoder thread stores it.
@@ -220,6 +233,7 @@ impl VoiceShared {
         Self {
             id,
             url,
+            stages: Stages::default(),
             slots: OnceLock::new(),
             write: AtomicU64::new(0),
             read: AtomicU64::new(0),
@@ -558,8 +572,13 @@ fn decode(
         tmp_dir,
         heads,
     } = fetch;
-    let Opened { media, len, cancel } =
-        Media::open(src, rt.handle(), client, tmp_dir, heads, error.clone())?;
+    let Opened {
+        media,
+        len,
+        cancel,
+        at_hand,
+    } = Media::open(src, rt.handle(), client, tmp_dir, heads, error.clone())?;
+    let _ = v.stages.opened.set((Instant::now(), at_hand));
     // For the tail scan, while crossfade is on; done once the stream is known not to have
     // one (no length) or after one try with the whole file there.
     let viewer = media.viewer();
@@ -577,6 +596,7 @@ fn decode(
     let Some(slots) = v.slots.get() else {
         return Err("decoder: no ring".into());
     };
+    let _ = v.stages.ready.set(Instant::now());
     let _ = tx.send(Msg::Ready { voice: v.id });
 
     let mut batch: Vec<Sample> = Vec::with_capacity(BATCH);
@@ -696,6 +716,9 @@ fn decode(
             skip = None;
         }
         v.push(slots, &out[sent..upto]);
+        if upto > sent && v.stages.filled.get().is_none() {
+            let _ = v.stages.filled.set(Instant::now());
+        }
         sent = upto;
         if at_end && sent == out.len() {
             let error = take_error();

@@ -156,7 +156,9 @@ fn decode(
 ) -> (f64, f64, f64, f64) {
     let client = reqwest::Client::new();
     let t = Instant::now();
-    let Opened { media, len, cancel } = Media::open(
+    let Opened {
+        media, len, cancel, ..
+    } = Media::open(
         &source(s),
         rt.handle(),
         &client,
@@ -395,6 +397,9 @@ fn timing_engine() {
     use featherplay_core::model::TrackId;
     use featherplay_streams::{Sidecars, StreamResolver, YtDlpResolver};
 
+    // The resolver's and the engine's log lines (ads before a song, the first sound).
+    let _ = log::set_logger(&NEW_CONNECTIONS);
+    log::set_max_level(log::LevelFilter::Debug);
     let home = std::path::PathBuf::from(env("FEATHERPLAY_HOME").expect("set FEATHERPLAY_HOME"));
     let out = std::path::PathBuf::from(env("TIMING_OUT").expect("set TIMING_OUT"));
     let label = env("TIMING_LABEL").unwrap_or_else(|| "engine".into());
@@ -487,5 +492,196 @@ fn timing_engine() {
         );
         println!("{row} ({via})");
         writeln!(csv, "{row}").unwrap();
+    }
+}
+
+/// Prints each new connection reqwest opens (without its host) and the engine's own log
+/// lines, so a request on a kept connection shows as one without a line before it.
+struct NewConnections;
+
+static NEW_CONNECTIONS: NewConnections = NewConnections;
+
+impl log::Log for NewConnections {
+    fn enabled(&self, m: &log::Metadata) -> bool {
+        m.target().starts_with("reqwest") || m.target().starts_with("featherplay")
+    }
+    fn log(&self, r: &log::Record) {
+        let msg = r.args().to_string();
+        if msg.starts_with("starting new connection") {
+            println!("  new connection");
+        } else if r.target().starts_with("featherplay") {
+            println!("  {msg}");
+        }
+    }
+    fn flush(&self) {}
+}
+
+/// The engine's own time from `load` to `Started`, step by step (`FirstSound`), on streams
+/// already resolved: no resolve. `TIMING_STREAMS` is a TSV of `url, mime, length` rows
+/// (e.g. from the app's `streams.json`). Per stream, a few `Range` requests: the first
+/// response's headers on a new connection and again on the same one, then the engine's
+/// cold load, the same stream again on that engine, a load after a prefetch, and one
+/// `TIMING_GAP` ms (default 100) after a prefetch, while its head is on its way.
+/// `TIMING_DEVICE=1` plays on the default device at volume 0 instead of the null output.
+/// `TIMING_IDLE=30,90` also times a request on a connection left idle that many seconds
+/// (first stream only). Rows go to `{TIMING_OUT}/start.csv`.
+#[test]
+#[ignore = "live: a few Range requests per TIMING_STREAMS row"]
+fn timing_start() {
+    use crate::engine::FirstSound;
+
+    let _ = log::set_logger(&NEW_CONNECTIONS);
+    log::set_max_level(log::LevelFilter::Debug);
+    let out = std::path::PathBuf::from(env("TIMING_OUT").expect("set TIMING_OUT"));
+    let tmp = out.join("tmp");
+    let label = env("TIMING_LABEL").unwrap_or_else(|| "start".into());
+    let device = env("TIMING_DEVICE").is_some();
+    let rows = std::fs::read_to_string(env("TIMING_STREAMS").expect("set TIMING_STREAMS"))
+        .expect("TIMING_STREAMS");
+    let streams: Vec<StreamSource> = rows
+        .lines()
+        .filter_map(|l| {
+            let f: Vec<&str> = l.split('\t').collect();
+            (f.len() >= 3).then(|| StreamSource {
+                url: f[0].into(),
+                mime: f[1].into(),
+                content_length: f[2].parse().ok(),
+                duration: None,
+                loudness_db: None,
+            })
+        })
+        .collect();
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(1)
+        .enable_all()
+        .build()
+        .unwrap();
+    // Seconds to the headers of a first-chunk request on `client`. The body is read to its
+    // end, so the connection goes back to the pool (a response dropped early closes it).
+    let headers = |client: &reqwest::Client, url: &str| -> f64 {
+        let t = Instant::now();
+        let r = rt
+            .block_on(crate::http::get_range(client, url, 0, crate::http::CHUNK))
+            .expect("range request");
+        let s = t.elapsed().as_secs_f64();
+        rt.block_on(r.bytes()).expect("body");
+        s
+    };
+    let engine = || {
+        if device {
+            let e = crate::AudioEngine::new(None, tmp.clone()).expect("engine");
+            e.set_volume(0.0);
+            e
+        } else {
+            crate::AudioEngine::new_null(tmp.clone())
+        }
+    };
+    let play = |e: &crate::AudioEngine, src: &StreamSource| -> FirstSound {
+        let events = e.events();
+        e.load(src.clone(), Duration::ZERO);
+        e.play();
+        loop {
+            match events.recv_timeout(Duration::from_secs(20)) {
+                Ok(crate::AudioEvent::Started) => break,
+                Ok(crate::AudioEvent::Error(err)) => panic!("{err}"),
+                Ok(other) => println!("  event {other:?}"),
+                Err(_) => panic!("no Started"),
+            }
+        }
+        e.first_sound().expect("first sound")
+    };
+    let ms = |s: f64| (s * 1000.0).round();
+    let fs = |f: &FirstSound| {
+        format!(
+            "{},{},{},{},{},{}",
+            f.total.as_millis(),
+            f.open.as_millis(),
+            f.at_hand,
+            f.decoder.as_millis(),
+            f.fill.as_millis(),
+            f.output.as_millis()
+        )
+    };
+    let mut csv = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(out.join("start.csv"))
+        .unwrap();
+    if csv.metadata().unwrap().len() == 0 {
+        writeln!(
+            csv,
+            "label,stream,mime,device,cold_headers_ms,warm_headers_ms,\
+             cold_total,cold_open,cold_at_hand,cold_decoder,cold_fill,cold_output,\
+             again_total,again_open,again_at_hand,again_decoder,again_fill,again_output,\
+             ahead_total,ahead_open,ahead_at_hand,ahead_decoder,ahead_fill,ahead_output,\
+             way_total,way_open,way_at_hand,way_decoder,way_fill,way_output"
+        )
+        .unwrap();
+    }
+    let gap = Duration::from_millis(env("TIMING_GAP").map_or(100, |g| g.parse().unwrap()));
+    for (i, src) in streams.iter().enumerate() {
+        let client = crate::http::stream_client(crate::http::READ_TIMEOUT).unwrap();
+        println!(" stream {i}: a request on a new client");
+        let cold = headers(&client, &src.url);
+        println!(" the same again");
+        let warm = headers(&client, &src.url);
+        // A cold click: a new engine, so a new connection.
+        println!(" a new engine's load");
+        let e = engine();
+        let c = play(&e, src);
+        // Time for the whole download, whose last connection then waits in the pool.
+        std::thread::sleep(Duration::from_secs(3));
+        // The same stream again on that engine, its connection warm (a jump back). The
+        // stopped voice's head isn't kept, so this opens with a request.
+        println!(" the same load again");
+        let again = play(&e, src);
+        drop(e);
+        // Resolved ahead: its head was fetched before the click.
+        println!(" a new engine's prefetch, then its load");
+        let e = engine();
+        e.prefetch(src);
+        std::thread::sleep(Duration::from_secs(2));
+        let a = play(&e, src);
+        drop(e);
+        // Clicked just after its resolve ahead: its head is on its way.
+        println!(" a new engine's prefetch, then its load {gap:?} later");
+        let e = engine();
+        e.prefetch(src);
+        std::thread::sleep(gap);
+        let on_its_way = play(&e, src);
+        drop(e);
+        let row = format!(
+            "{label},{i},{},{device},{},{},{},{},{},{}",
+            src.mime.split(';').next().unwrap_or_default(),
+            ms(cold),
+            ms(warm),
+            fs(&c),
+            fs(&again),
+            fs(&a),
+            fs(&on_its_way),
+        );
+        println!("{row}");
+        writeln!(csv, "{row}").unwrap();
+    }
+    if let (Some(idle), Some(src)) = (env("TIMING_IDLE"), streams.first()) {
+        // A pool that never drops idle connections itself: what the server keeps.
+        let client = reqwest::Client::builder()
+            .pool_idle_timeout(None)
+            .build()
+            .unwrap();
+        for secs in idle.split(',').filter_map(|s| s.trim().parse::<u64>().ok()) {
+            println!("  request, then idle {secs} s");
+            let first = headers(&client, &src.url);
+            std::thread::sleep(Duration::from_secs(secs));
+            println!("  request after idle {secs} s");
+            let after = headers(&client, &src.url);
+            let row = format!(
+                "idle {secs} s: first {} ms, after {} ms",
+                ms(first),
+                ms(after)
+            );
+            println!("{row}");
+            writeln!(csv, "# {label} {row}").unwrap();
+        }
     }
 }

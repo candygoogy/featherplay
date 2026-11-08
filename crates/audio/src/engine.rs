@@ -25,7 +25,7 @@ use tokio::runtime::Runtime;
 use crate::devices::{self, OpenError, Output, is_device_lost};
 use crate::glitches::Counts;
 use crate::head::{self, HeadCache};
-use crate::voice::{self, Controls, DECLICK, Fade, VoiceShared};
+use crate::voice::{self, Controls, DECLICK, Fade, Stages, VoiceShared};
 use crate::{AudioEvent, Compressor, Playhead, SkipSilence, StreamSource, perceptual_gain};
 
 /// How long the ring must stay empty before `Buffering(true)` goes out. Shorter gaps (a seek
@@ -117,6 +117,72 @@ struct Status {
     current: Option<Arc<VoiceShared>>,
     /// The target of a `load` or `seek` the engine hasn't finished, with its sequence number.
     pending: Option<(u64, Duration)>,
+    /// The latest track's way to its first sound. For tests.
+    #[cfg(test)]
+    first_sound: Option<FirstSound>,
+}
+
+/// How a track's first sound came after its load, step by step; logged once per load.
+/// It counts from the load, or from `play()` if that came later. Each step counts from the
+/// end of the one before, or from that start if it was done before it (a preload; a
+/// preloaded track loaded at a position counts its seek in `output`).
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub(crate) struct FirstSound {
+    pub total: Duration,
+    /// Until the stream's start was there to read: its first response's headers, or
+    /// without a request of its own (`at_hand`): a local file, a head in memory or the head
+    /// on its way.
+    pub open: Duration,
+    pub at_hand: bool,
+    /// The decoder reading the header and the first packet.
+    pub decoder: Duration,
+    /// Decoding (and a load at a position seeking) until the first samples are in the ring.
+    pub fill: Duration,
+    /// From there until the output took them.
+    pub output: Duration,
+}
+
+impl FirstSound {
+    /// The steps of a voice loaded at `loaded` whose first sound the output took at `now`.
+    fn of(stages: &Stages, loaded: Instant, now: Instant) -> FirstSound {
+        let mut last = loaded;
+        let mut step = |at: Option<Instant>| {
+            let at = at.unwrap_or(last).max(last);
+            let d = at - last;
+            last = at;
+            d
+        };
+        let opened = stages.opened.get();
+        FirstSound {
+            total: now.saturating_duration_since(loaded),
+            open: step(opened.map(|(t, _)| *t)),
+            at_hand: opened.is_some_and(|(_, h)| *h),
+            decoder: step(stages.ready.get().copied()),
+            fill: step(stages.filled.get().copied()),
+            output: step(Some(now)),
+        }
+    }
+}
+
+impl std::fmt::Display for FirstSound {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let ms = |d: Duration| d.as_millis();
+        write!(
+            f,
+            "first sound {} ms after the load: stream {} ms ({}), decoder {} ms, \
+             first samples {} ms, output {} ms",
+            ms(self.total),
+            ms(self.open),
+            if self.at_hand {
+                "no request"
+            } else {
+                "a request"
+            },
+            ms(self.decoder),
+            ms(self.fill),
+            ms(self.output),
+        )
+    }
 }
 
 /// Audio playback on a dedicated thread. See the crate docs for the event contract.
@@ -359,6 +425,12 @@ impl AudioEngine {
         self.playhead().position
     }
 
+    /// How the latest track's first sound came. For tests.
+    #[cfg(test)]
+    pub(crate) fn first_sound(&self) -> Option<FirstSound> {
+        self.status.lock_or_recover().first_sound
+    }
+
     /// The glitch counters so far. For tests.
     #[cfg(test)]
     pub(crate) fn glitches(&self) -> Counts {
@@ -412,6 +484,8 @@ struct Voice {
     /// Attach to the mixer only after this load seek finished, so no audio from before
     /// `start_at` is heard.
     attach_after: Option<u64>,
+    /// When it was loaded (or crossfaded to), until its first sound is logged.
+    loaded: Option<Instant>,
 }
 
 struct Engine {
@@ -439,6 +513,8 @@ struct Engine {
     buffering_shown: bool,
     /// When the output stream stops, set by `Msg::Paused` and cleared by `play()`.
     stop_at: Option<Instant>,
+    /// The latest `play()`: a track loaded while paused counts its first sound from there.
+    played: Option<Instant>,
     /// The glitch counters at the last report.
     reported: Counts,
     /// The URLs `silences_known` was told last, newest last; `KNOWN` at most.
@@ -486,6 +562,7 @@ impl Engine {
             starved_since: None,
             buffering_shown: false,
             stop_at: None,
+            played: None,
             reported: Counts::default(),
             known: VecDeque::new(),
             null,
@@ -626,6 +703,7 @@ impl Engine {
             }
             Msg::EnsureOutput => {
                 self.stop_at = None;
+                self.played = Some(Instant::now());
                 let started = self
                     .sink
                     .as_mut()
@@ -708,6 +786,7 @@ impl Engine {
             }
             Msg::Started { voice } => {
                 if self.is_current(voice) {
+                    self.log_first_sound();
                     self.emit(AudioEvent::Started);
                 }
             }
@@ -766,6 +845,7 @@ impl Engine {
                 self.spawn_voice(src)
             }
         };
+        voice.loaded = Some(Instant::now());
         if start_at.is_zero() {
             // A new or preloaded voice is already at the start.
             self.settle(seq);
@@ -810,13 +890,14 @@ impl Engine {
         {
             self.deferred_preload = None;
         }
-        let voice = match self.preloaded.take() {
+        let mut voice = match self.preloaded.take() {
             Some(p) if p.shared.url == src.url => p,
             other => {
                 self.preloaded = other;
                 self.spawn_voice(src)
             }
         };
+        voice.loaded = Some(Instant::now());
         // Not attached yet (a preloaded voice never is), so it starts from silence.
         voice.shared.start_silent();
         voice.shared.fade(Fade::In, fade);
@@ -912,6 +993,7 @@ impl Engine {
             shared,
             ready: false,
             attach_after: None,
+            loaded: None,
         }
     }
 
@@ -959,6 +1041,23 @@ impl Engine {
         }
     }
 
+    /// Logs how the current track's first sound came, once per load.
+    fn log_first_sound(&mut self) {
+        let Some(v) = self.current.as_mut() else {
+            return;
+        };
+        let Some(loaded) = v.loaded.take() else {
+            return;
+        };
+        let from = self.played.map_or(loaded, |p| p.max(loaded));
+        let steps = FirstSound::of(&v.shared.stages, from, Instant::now());
+        log::info!("audio: {steps}");
+        #[cfg(test)]
+        {
+            self.status.lock_or_recover().first_sound = Some(steps);
+        }
+    }
+
     fn is_current(&self, voice: u64) -> bool {
         self.current.as_ref().is_some_and(|v| v.shared.id == voice)
     }
@@ -997,5 +1096,59 @@ impl Engine {
 
     fn emit(&mut self, ev: AudioEvent) {
         self.subscribers.retain(|s| s.send(ev.clone()).is_ok());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const MS: Duration = Duration::from_millis(1);
+
+    /// Stages done `opened`, `ready` and `filled` after `t0`.
+    fn stages(t0: Instant, opened: u32, ready: u32, filled: u32) -> Stages {
+        let s = Stages::default();
+        let _ = s.opened.set((t0 + MS * opened, false));
+        let _ = s.ready.set(t0 + MS * ready);
+        let _ = s.filled.set(t0 + MS * filled);
+        s
+    }
+
+    #[test]
+    fn a_first_sound_splits_into_the_steps_after_the_load() {
+        let t0 = Instant::now();
+        let steps = FirstSound::of(&stages(t0, 150, 160, 162), t0, t0 + MS * 170);
+        let want = FirstSound {
+            total: MS * 170,
+            open: MS * 150,
+            at_hand: false,
+            decoder: MS * 10,
+            fill: MS * 2,
+            output: MS * 8,
+        };
+        assert_eq!(steps, want);
+    }
+
+    #[test]
+    fn a_preloaded_track_counts_only_what_came_after_its_load() {
+        let t0 = Instant::now();
+        let loaded = t0 + MS * 500;
+        let steps = FirstSound::of(&stages(t0, 150, 160, 162), loaded, loaded + MS * 4);
+        assert_eq!(
+            (
+                steps.total,
+                steps.open,
+                steps.decoder,
+                steps.fill,
+                steps.output
+            ),
+            (
+                MS * 4,
+                Duration::ZERO,
+                Duration::ZERO,
+                Duration::ZERO,
+                MS * 4
+            )
+        );
     }
 }

@@ -55,6 +55,8 @@ pub(crate) struct Opened {
     pub media: Media,
     pub len: u64,
     pub cancel: Option<Cancel>,
+    /// The start came without a request of its own: a local file, or a head.
+    pub at_hand: bool,
 }
 
 impl Media {
@@ -80,6 +82,7 @@ impl Media {
                 media: Media::new(Inner::File(f, path), error, len),
                 len,
                 cancel: None,
+                at_hand: true,
             });
         }
         if !(src.url.starts_with("https://") || src.url.starts_with("http://")) {
@@ -90,6 +93,7 @@ impl Media {
         }
         std::fs::create_dir_all(tmp_dir).map_err(|e| format!("{}: {e}", tmp_dir.display()))?;
         let cached = heads.lock_or_recover().get(&src.url);
+        let at_hand = cached.is_some();
         let (first, len) = match cached {
             Some(h) => (First::Head(h.bytes.clone()), h.len),
             None => {
@@ -114,6 +118,7 @@ impl Media {
             media: Media::new(Inner::Http(dl), error, len),
             len,
             cancel: Some(cancel),
+            at_hand,
         })
     }
 

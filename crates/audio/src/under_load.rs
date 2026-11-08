@@ -175,6 +175,9 @@ fn play(
             Err(_) => panic!("no Started within 5 s"),
         }
     }
+    if let Some(steps) = engine.first_sound() {
+        println!("{steps}");
+    }
     let before = engine.glitches();
     engine.reset_max_gap();
     let next = fixture("tone-10s-frag.m4a");
