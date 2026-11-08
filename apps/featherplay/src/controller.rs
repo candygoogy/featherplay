@@ -333,21 +333,28 @@ impl Controller {
         );
         resolver.set_quality(stream_quality(settings.streaming_quality));
         let helpers = resolver.clone();
-        tokio::spawn(async move {
-            // A first run downloads yt-dlp and deno now, so they're usually there by the first
-            // click; a resolve waits for this same download. It logs its own start and end, and
-            // a failure is tried again by the next resolve.
-            let installed = helpers.install_helpers().await.is_ok();
-            // After the startup's own work: the daily `yt-dlp -U` (skipped when the last one,
-            // or the download, is under a day old), then once, for the log and Copy
-            // diagnostics, the versions. Short processes, off this task.
-            tokio::time::sleep(TOOL_VERSIONS_AFTER).await;
-            if installed {
-                helpers.update_daily().await;
-            }
-            let (ytdlp, deno) = probe.versions().await;
-            crate::diagnostics::set_tool_versions(ytdlp, deno);
-        });
+        // The performance harness's fixtures play nothing: no helpers to fetch or start.
+        #[cfg(feature = "perf-harness")]
+        let helpers_wanted = !crate::perf::fixtures();
+        #[cfg(not(feature = "perf-harness"))]
+        let helpers_wanted = true;
+        if helpers_wanted {
+            tokio::spawn(async move {
+                // A first run downloads yt-dlp and deno now, so they're usually there by the first
+                // click; a resolve waits for this same download. It logs its own start and end, and
+                // a failure is tried again by the next resolve.
+                let installed = helpers.install_helpers().await.is_ok();
+                // After the startup's own work: the daily `yt-dlp -U` (skipped when the last one,
+                // or the download, is under a day old), then once, for the log and Copy
+                // diagnostics, the versions. Short processes, off this task.
+                tokio::time::sleep(TOOL_VERSIONS_AFTER).await;
+                if installed {
+                    helpers.update_daily().await;
+                }
+                let (ytdlp, deno) = probe.versions().await;
+                crate::diagnostics::set_tool_versions(ytdlp, deno);
+            });
+        }
 
         let mut initial = Vec::new();
         let mut unreachable = None;
@@ -498,9 +505,11 @@ impl Controller {
         self.restore_streams();
         // Unreachable keeps the signed-in look: the session is likely fine, and signed out
         // would send the window to Sign in.
-        (self.ui.events)(UiEvent::Account {
-            signed_in: self.api.is_some() || self.unreachable.is_some(),
-        });
+        let signed_in = self.api.is_some() || self.unreachable.is_some();
+        // The performance harness's fixtures stand for an account.
+        #[cfg(feature = "perf-harness")]
+        let signed_in = signed_in || crate::perf::fixtures();
+        (self.ui.events)(UiEvent::Account { signed_in });
         self.check_identity();
         if self.presence.is_none() {
             (self.ui.events)(UiEvent::Discord(crate::presence::off_status()));
@@ -1430,6 +1439,11 @@ const COOKIES_FILE_ALLOWED: bool = cfg!(any(debug_assertions, feature = "dev-coo
 /// The cookie header: from the credential store, or `FEATHERPLAY_COOKIES_FILE` in a dev
 /// build. Its contents are never logged.
 fn cookie_header() -> Option<String> {
+    // The performance harness's fixtures: no account is read.
+    #[cfg(feature = "perf-harness")]
+    if crate::perf::fixtures() {
+        return None;
+    }
     if let Some(path) = std::env::var_os(COOKIES_FILE_VAR).filter(|v| !v.is_empty()) {
         if !COOKIES_FILE_ALLOWED {
             log!("{COOKIES_FILE_VAR} is ignored: this is a release build");

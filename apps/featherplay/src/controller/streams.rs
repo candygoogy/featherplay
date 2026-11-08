@@ -520,6 +520,11 @@ impl Controller {
     }
 
     pub(super) fn start_hints(&mut self) {
+        // The performance harness's fixtures play nothing, so nothing is asked of YouTube.
+        #[cfg(feature = "perf-harness")]
+        if crate::perf::fixtures() {
+            return;
+        }
         for (id, urgent) in self.streams.start_hints() {
             log!("resolve {} ahead", id.0);
             let task = self.spawn_resolve(id.clone(), Some(urgent));
@@ -529,6 +534,14 @@ impl Controller {
 
     /// `Effect::Resolve`: a stream that's here answers at once.
     pub(super) fn resolve(&mut self, id: TrackId) -> Option<Input> {
+        #[cfg(feature = "perf-harness")]
+        if crate::perf::fixtures() {
+            log!(
+                "resolve {}: not with the performance harness's fixtures",
+                id.0
+            );
+            return None;
+        }
         let want = self.streams.want(&id, SystemTime::now());
         if !matches!(want, Want::Cached(_)) && !self.resolver.helpers_installed() {
             // A first run: the resolve waits for the helpers' download (the player shows

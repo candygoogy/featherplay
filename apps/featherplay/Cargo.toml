@@ -21,6 +21,9 @@ path = "src/main.rs"
 # This turns it on in a release build too, for measuring a release build on the dev
 # cookie file. Never on in a published build.
 dev-cookies-file = []
+# The performance harness's scripted run of the window (`src/perf.rs`), started by
+# `FEATHERPLAY_PERF_SCRIPT`. Never on in a published build.
+perf-harness = []
 
 [dependencies]
 featherplay-audio = { path = "../../crates/audio" }

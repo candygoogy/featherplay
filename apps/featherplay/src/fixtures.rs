@@ -197,7 +197,11 @@ impl Fixtures {
         if let Some(d) = &self.demo {
             return Ok(d.liked_songs());
         }
-        convert::playlist_tracks(&[self.raw("liked_songs")?])
+        #[allow(unused_mut, reason = "lengthened by the performance harness only")]
+        let mut tracks = convert::playlist_tracks(&[self.raw("liked_songs")?])?;
+        #[cfg(feature = "perf-harness")]
+        crate::perf::lengthen(&mut tracks);
+        Ok(tracks)
     }
 
     /// The recorded album, then the artist's albums and singles.
@@ -231,9 +235,13 @@ impl Fixtures {
             "playlist"
         };
         let raw = self.raw(name)?;
+        #[allow(unused_mut, reason = "lengthened by the performance harness only")]
+        let mut tracks = convert::playlist_tracks(std::slice::from_ref(&raw))?;
+        #[cfg(feature = "perf-harness")]
+        crate::perf::lengthen(&mut tracks);
         Ok(Playlist {
             summary: convert::playlist_summary(&raw, id)?,
-            tracks: convert::playlist_tracks(std::slice::from_ref(&raw))?,
+            tracks,
             pages: 1,
         })
     }

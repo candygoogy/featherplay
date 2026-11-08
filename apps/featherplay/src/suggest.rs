@@ -245,6 +245,8 @@ fn show(ctx: &Ctx, ui: &AppWindow, s: SearchSuggestions) {
     ctx.covers
         .fill(&model, covers, COVER_PX, |row, img| row.cover = img);
     STATE.with(|st| st.borrow_mut().shown = Some(s));
+    #[cfg(feature = "perf-harness")]
+    crate::perf::mark(crate::perf::Mark::Suggest);
 }
 
 fn hide(ui: &AppWindow) {

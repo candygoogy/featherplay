@@ -348,6 +348,8 @@ impl Ctx {
                     let current = visit.is_none_or(|v| v == ctx.visit());
                     if current && let Some(ui) = ctx.window() {
                         apply(&ctx, &ui, value);
+                        #[cfg(feature = "perf-harness")]
+                        crate::perf::mark(crate::perf::Mark::Load);
                     }
                 }
                 Err(e) => log!("load task: {e}"),
@@ -456,6 +458,8 @@ pub fn on_event(ev: UiEvent) {
                     .as_ref()
                     .is_some_and(|before| before.playing);
             *ctx.player.borrow_mut() = Some((*state).clone());
+            #[cfg(feature = "perf-harness")]
+            crate::perf::player(&state);
             bar::apply(&ctx, &state);
             queue_panel::update(&ctx, &state);
             pages::player_changed(&ctx, &state);
@@ -479,6 +483,8 @@ pub fn on_event(ev: UiEvent) {
             for run in parked {
                 run();
             }
+            #[cfg(feature = "perf-harness")]
+            crate::perf::mark(crate::perf::Mark::Account);
         }
         UiEvent::Unreachable => {
             // A Try again's reconnect failed: the page shows its error again. Reopening it
@@ -612,6 +618,17 @@ pub fn run(opts: Options, app: AppOptions) -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
+    // The performance harness's page tours: the fixtures, no account.
+    #[cfg(feature = "perf-harness")]
+    if crate::perf::fixtures() {
+        match crate::fixtures::Fixtures::load() {
+            Ok(f) => catalog.set(Source::Fixtures(std::sync::Arc::new(f))),
+            Err(e) => {
+                log!("perf fixtures: {e}");
+                return ExitCode::FAILURE;
+            }
+        }
+    }
 
     let (tx, commands) = mpsc::unbounded_channel::<UiCommand>();
     let (action_tx, actions) = mpsc::unbounded_channel::<Action>();
@@ -696,7 +713,11 @@ fn run_window(
     ui.global::<Theme>()
         .set_motion(native::animations_enabled());
     wheel::install(&ui);
-    let covers = Covers::new(catalog.runtime().clone(), paths.cache.clone(), None);
+    let covers = Covers::new(
+        catalog.runtime().clone(),
+        paths.cache.clone(),
+        catalog.fixtures(),
+    );
     let ctx = Ctx::new(&ui, catalog, covers, actions);
     wire(&ctx, &ui);
     queue_panel::restore(&ctx);
@@ -715,6 +736,8 @@ fn run_window(
     shell::start(find_hwnd, tx, hotkeys, move |hwnd| {
         c.hwnd.set(Some(hwnd));
         c.set_native(Rc::new(Win32(hwnd)));
+        #[cfg(feature = "perf-harness")]
+        crate::perf::start(&c, hwnd);
         if timing {
             // The skia software surface has no rendering notifier. The window exists now;
             // its first frame is painted before the event loop's next turn.

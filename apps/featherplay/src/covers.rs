@@ -141,6 +141,8 @@ impl Covers {
                         let next = inner.paced.borrow_mut().pop_front();
                         let Some(next) = next else { break };
                         next();
+                        #[cfg(feature = "perf-harness")]
+                        crate::perf::mark(crate::perf::Mark::CoverShown);
                     }
                     if inner.paced.borrow().is_empty() {
                         inner.pacer.stop();
@@ -148,6 +150,12 @@ impl Covers {
                 });
             }
         }
+    }
+
+    /// Whether the pacer still holds covers to hand over (the performance harness waits).
+    #[cfg(feature = "perf-harness")]
+    pub fn pacing(&self) -> bool {
+        !self.0.paced.borrow().is_empty()
     }
 
     /// Hands every card cover the pacer still holds over at once: `--snapshot` renders the
@@ -419,6 +427,8 @@ impl Covers {
                 for done in waiters {
                     done(Some(img.clone()));
                 }
+                #[cfg(feature = "perf-harness")]
+                crate::perf::mark(crate::perf::Mark::Cover);
             }
             Err(e) => {
                 // Fixtures: most video thumbnails were never downloaded; that's expected.
@@ -548,16 +558,27 @@ async fn fetch(
                 .await?
         }
     };
-    tokio::task::spawn_blocking(move || decode(&bytes, width, height))
-        .await
-        .map_err(|e| e.to_string())?
+    tokio::task::spawn_blocking(move || {
+        #[cfg(feature = "perf-harness")]
+        let started = std::time::Instant::now();
+        let decoded = decode(&bytes, width, height);
+        #[cfg(feature = "perf-harness")]
+        crate::perf::decoded(started.elapsed().as_secs_f64() * 1000.0);
+        decoded
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 /// Decodes, crops the centre to `width`:`height` and resizes to `width`×`height`.
 fn decode(bytes: &[u8], width: u32, height: u32) -> Result<SharedPixelBuffer<Rgba8Pixel>, String> {
+    #[cfg(feature = "perf-harness")]
+    let started = std::time::Instant::now();
     let img = image::load_from_memory(bytes)
         .map_err(|e| format!("decode: {e}"))?
         .to_rgba8();
+    #[cfg(feature = "perf-harness")]
+    crate::perf::decoded_alone(started.elapsed().as_secs_f64() * 1000.0);
     let (iw, ih) = (u64::from(img.width()), u64::from(img.height()));
     let (w, h) = (u64::from(width), u64::from(height));
     // The largest centred rectangle of the wanted shape.

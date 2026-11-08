@@ -125,6 +125,18 @@ unsafe extern "system" fn repaint_proc(
         if whole {
             invalidated();
         }
+        #[cfg(feature = "perf-harness")]
+        if crate::perf::on() {
+            let started = std::time::Instant::now();
+            let logged = frame_log::enabled().then(frame_log::Mark::now);
+            // SAFETY: the arguments this subclass was called with.
+            let result = unsafe { DefSubclassProc(hwnd, msg, wparam, lparam) };
+            if let Some(mark) = logged {
+                frame_log::painted(mark, whole);
+            }
+            crate::perf::painted(started);
+            return result;
+        }
         if frame_log::enabled() {
             // winit draws inside this WM_PAINT: Slint's render and softbuffer's BitBlt.
             let started = frame_log::Mark::now();

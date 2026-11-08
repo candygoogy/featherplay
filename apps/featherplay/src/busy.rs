@@ -17,7 +17,11 @@ impl Busy {
 
 impl Drop for Busy {
     fn drop(&mut self) {
-        PENDING.fetch_sub(1, Ordering::SeqCst);
+        let _was = PENDING.fetch_sub(1, Ordering::SeqCst);
+        #[cfg(feature = "perf-harness")]
+        if _was == 1 && crate::perf::on() {
+            crate::perf::idle();
+        }
     }
 }
 

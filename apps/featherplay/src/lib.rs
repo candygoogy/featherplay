@@ -53,6 +53,8 @@ pub mod native;
 pub mod not_for_me;
 pub mod offscreen;
 pub mod pages;
+#[cfg(feature = "perf-harness")]
+pub mod perf;
 pub mod playlist_menu;
 pub mod popup;
 pub mod presence;
