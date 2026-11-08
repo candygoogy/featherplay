@@ -48,7 +48,7 @@ pub(super) fn check(
 }
 
 /// The header's value when it's there once and is text.
-fn single<'h>(headers: &'h HeaderMap, name: &HeaderName) -> Option<&'h str> {
+pub(super) fn single<'h>(headers: &'h HeaderMap, name: &HeaderName) -> Option<&'h str> {
     let mut all = headers.get_all(name).iter();
     match (all.next(), all.next()) {
         (Some(v), None) => v.to_str().ok(),
@@ -57,7 +57,7 @@ fn single<'h>(headers: &'h HeaderMap, name: &HeaderName) -> Option<&'h str> {
 }
 
 /// `127.0.0.1:<port>`, `localhost:<port>` or `[::1]:<port>`.
-fn host_ok(host: &str, port: u16) -> bool {
+pub(super) fn host_ok(host: &str, port: u16) -> bool {
     let Some((name, p)) = host.rsplit_once(':') else {
         return false;
     };

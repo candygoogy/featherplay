@@ -48,6 +48,15 @@ Notable changes to featherplay, newest first. The format follows
 - A toast's button does what it says. "Restart to update", "Undo", "View", "Sign in" and
   "Get it" closed the toast and did nothing; Settings > About's update button worked.
 
+### Security
+
+- The Amuse endpoint answers only the Amuse widget's page (`https://6klabs.com`) and apps
+  on the PC. Any website open in a browser could read what was playing while Amuse was on;
+  now other pages get a 403 and no CORS headers. It also refuses requests whose `Host`
+  isn't 127.0.0.1, localhost or [::1] with its port, so a page can't reach it through DNS
+  rebinding. A home-made overlay that read it from a local file or another site, as Pear's
+  plugin allows, is refused too.
+
 ## [0.1.2] - 2026-11-07
 
 ### Added

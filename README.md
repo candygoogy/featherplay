@@ -355,9 +355,14 @@ Local API. featherplay then answers on `http://127.0.0.1:9863` as Pear's Amuse p
              "url": "https://music.youtube.com/watch?v=…", "id": "…", "isAdvertisement": false } }
 ```
 
-Times are whole seconds. Like Pear's plugin, it needs no token and answers web pages too, so
-while it's on, any app on this PC, and any website open in a browser on it, can see what's
-playing. It only reads: there are no controls.
+Times are whole seconds. Like Pear's plugin, it needs no token, so while it's on, any app on
+this PC can see what's playing. Unlike Pear's, it answers only one web page: the Amuse widget,
+which runs on `https://6klabs.com` and reads `http://localhost:9863/query` from your browser
+source. Other websites get a 403 with no CORS headers, so they can't read it, and requests
+whose `Host` isn't 127.0.0.1, localhost or [::1] with the port are refused too (DNS
+rebinding). That includes a home-made overlay in a local file or on another site, which
+Pear's plugin answers; it can use the [local API](#local-api) through a helper instead. It
+only reads: there are no controls.
 
 ## What it leaves out
 
@@ -416,8 +421,8 @@ featherplay sends no telemetry and has no server. It connects to:
 
 The [local API](#local-api), off by default, sends nothing anywhere: it listens on 127.0.0.1
 for apps on your PC that have its token. The [Amuse](#amuse) endpoint, off by default too,
-has no token: while it's on, any app on your PC, and any website open in a browser on it, can
-see what's playing.
+has no token: while it's on, any app on your PC, and the Amuse widget's page, can see what's
+playing. Other websites can't.
 
 Your YouTube Music session, your Last.fm session, your ListenBrainz token and the local API's
 token are kept in Windows Credential Manager. Settings, the play queue and the scrobbles waiting to be sent are

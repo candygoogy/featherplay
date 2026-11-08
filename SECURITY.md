@@ -37,9 +37,12 @@ it.
   answers only requests that carry its token, name the loopback address as their host, and
   don't come from a web page (`crates/integrations/src/local_api/gate.rs`). The Amuse
   endpoint (port 9863) has no token, as Pear Desktop's Amuse plugin has none: it only says
-  what's playing, and any app or web page on the PC can read that while it's on. Reaching
-  either from another PC, controlling playback through the Amuse endpoint, or using the local
-  API without its token is in scope.
+  what's playing, and any app on the PC can read that while it's on. It checks the `Host` the
+  same way, and of web pages it answers only the Amuse widget's origin, `https://6klabs.com`,
+  matched exactly; any other `Origin` gets a 403 with no CORS headers
+  (`crates/integrations/src/local_api/amuse.rs`). Reaching either from another PC, reading
+  the Amuse endpoint from any other web page, controlling playback through it, or using the
+  local API without its token is in scope.
 - The helpers. featherplay downloads yt-dlp and Deno on the first run and checks each file
   against a SHA256 hash pinned in its code (`crates/streams/src/sidecars.rs`), then lets
   yt-dlp update itself. A way to get featherplay to run a file that wasn't checked is in scope.

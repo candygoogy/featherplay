@@ -2259,15 +2259,15 @@ msgstr "[Amuse]"
 
 #: ui/pages/settings.slint:2249
 msgid ""
-"Lets Amuse show what's playing. It needs no token: any app or website on "
-"this PC can see it."
-msgstr "[Lets Amuse show what's playing. It needs no token: any app or website on this PC can see it.]"
+"Lets Amuse show what's playing. It needs no token: any app on this PC can "
+"see it, but no website other than Amuse's."
+msgstr "[Lets Amuse show what's playing. It needs no token: any app on this PC can see it, but no website other than Amuse's.]"
 
 #: ui/pages/settings.slint:2251
 msgid ""
-"On at http://127.0.0.1:9863. It needs no token: any app or website on this "
-"PC can see it."
-msgstr "[On at http://127.0.0.1:9863. It needs no token: any app or website on this PC can see it.]"
+"On at http://127.0.0.1:9863. It needs no token: any app on this PC can see "
+"it, but no website other than Amuse's."
+msgstr "[On at http://127.0.0.1:9863. It needs no token: any app on this PC can see it, but no website other than Amuse's.]"
 
 #: ui/pages/settings.slint:2260 ui/pages/settings.slint:2433
 msgid "Window"

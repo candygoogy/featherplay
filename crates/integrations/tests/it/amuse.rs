@@ -1,6 +1,7 @@
 //! The Amuse endpoint against an in-process server on an ephemeral port: Pear Desktop's
-//! Amuse plugin's routes and song info, CORS for any page, nothing else served, and a taken
-//! port. Raw HTTP over a `TcpStream`, as in `local_api`.
+//! Amuse plugin's routes and song info, read by the widget's page and by apps but by no other
+//! web page, the loopback names only, nothing else served, and a taken port. Raw HTTP over a
+//! `TcpStream`, as in `local_api`.
 
 use std::time::Duration;
 
@@ -14,11 +15,36 @@ async fn start(now: Snapshot) -> Amuse {
     Amuse::start(0, now).await.expect("the server starts")
 }
 
+/// The page Amuse's widget runs in: `https://6klabs.com/widget/amuse/<id>`.
+const WIDGET: &str = "https://6klabs.com";
+
 fn request(method: &str, path: &str, port: u16, extra: &str) -> Vec<u8> {
-    format!(
-        "{method} {path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\n{extra}Connection: close\r\n\r\n"
+    with_host(method, path, &format!("127.0.0.1:{port}"), extra)
+}
+
+fn with_host(method: &str, path: &str, host: &str, extra: &str) -> Vec<u8> {
+    format!("{method} {path} HTTP/1.1\r\nHost: {host}\r\n{extra}Connection: close\r\n\r\n")
+        .into_bytes()
+}
+
+/// The widget's poll as its page's `axios.get("http://localhost:9863/query")` leaves a
+/// Chromium browser source: a simple GET, so no preflight.
+fn widget_poll(port: u16) -> Vec<u8> {
+    with_host(
+        "GET",
+        "/query",
+        &format!("localhost:{port}"),
+        &format!(
+            "Accept: application/json, text/plain, */*\r\nOrigin: {WIDGET}\r\n\
+             Referer: {WIDGET}/\r\nSec-Fetch-Site: cross-site\r\nSec-Fetch-Mode: cors\r\n\
+             Sec-Fetch-Dest: empty\r\nUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) \
+             AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36\r\n"
+        ),
     )
-    .into_bytes()
+}
+
+fn has_cors(r: &Reply) -> bool {
+    r.head.contains("access-control-")
 }
 
 async fn get(a: &Amuse, path: &str) -> Reply {
@@ -121,32 +147,176 @@ async fn the_root_says_it_runs() {
 }
 
 #[tokio::test]
-async fn every_reply_lets_any_page_read_it() {
+async fn the_widgets_poll_reads_the_song() {
     let a = start(playing()).await;
-    for path in ["/", "/query", "/api", "/nothing"] {
+    let r = send(a.port(), &widget_poll(a.port())).await;
+    assert_eq!(r.status, 200, "{}", r.head);
+    assert!(
+        r.head
+            .contains("access-control-allow-origin: https://6klabs.com\r\n"),
+        "{}",
+        r.head
+    );
+    assert!(r.head.contains("vary: origin"), "{}", r.head);
+    let info = r.json();
+    assert_eq!(info["player"]["hasSong"], true);
+    assert_eq!(info["track"]["title"], "Song title");
+}
+
+#[tokio::test]
+async fn an_app_reads_without_cors_headers() {
+    let a = start(playing()).await;
+    for path in ["/", "/query", "/api"] {
         let r = get(&a, path).await;
-        assert!(
-            r.head.contains("access-control-allow-origin: *"),
-            "{path}: {}",
-            r.head
-        );
+        assert_eq!(r.status, 200, "{path}");
+        assert!(!has_cors(&r), "{path}: {}", r.head);
     }
+    // An app's OPTIONS is no preflight.
     let port = a.port();
-    let preflight = request(
-        "OPTIONS",
+    let r = send(port, &request("OPTIONS", "/query", port, "")).await;
+    assert_eq!(r.status, 204);
+    assert!(r.head.contains("allow: get, head, options"), "{}", r.head);
+    assert!(!has_cors(&r), "{}", r.head);
+}
+
+#[tokio::test]
+async fn other_pages_are_refused_without_cors_headers() {
+    let a = start(playing()).await;
+    let port = a.port();
+    for origin in [
+        "https://evil.example",
+        "null",
+        "file://",
+        "http://6klabs.com",
+        "https://www.6klabs.com",
+        "https://6klabs.com.evil.example",
+        "https://6klabs.com:8443",
+        "https://6klabs.com/",
+    ] {
+        let raw = request("GET", "/query", port, &format!("Origin: {origin}\r\n"));
+        let r = send(port, &raw).await;
+        assert_eq!(r.status, 403, "{origin}");
+        assert!(!has_cors(&r), "{origin}: {}", r.head);
+        assert!(!r.body.contains("Song title"), "{origin}: {}", r.body);
+    }
+    // Two origins, one of them the widget's, aren't one page's request.
+    let raw = request(
+        "GET",
         "/query",
         port,
-        "Origin: https://overlay.example\r\nAccess-Control-Request-Method: GET\r\n\
-         Access-Control-Request-Headers: x-overlay\r\n",
+        &format!("Origin: {WIDGET}\r\nOrigin: https://evil.example\r\n"),
+    );
+    assert_eq!(send(port, &raw).await.status, 403);
+}
+
+#[tokio::test]
+async fn only_the_loopback_names_are_hosts() {
+    let a = start(playing()).await;
+    let port = a.port();
+    for host in [
+        format!("127.0.0.1:{port}"),
+        format!("localhost:{port}"),
+        format!("[::1]:{port}"),
+    ] {
+        let r = send(port, &with_host("GET", "/query", &host, "")).await;
+        assert_eq!(r.status, 200, "{host}");
+    }
+    // A DNS-rebinding page reaches 127.0.0.1 through a name of its own.
+    for host in [
+        format!("rebind.evil.example:{port}"),
+        format!("127.0.0.1.evil.example:{port}"),
+        "127.0.0.1".to_string(),
+        "127.0.0.1:80".to_string(),
+    ] {
+        let r = send(port, &with_host("GET", "/query", &host, "")).await;
+        assert_eq!(r.status, 403, "{host}");
+        assert!(!r.body.contains("Song title"), "{host}: {}", r.body);
+    }
+    // Even with the widget's origin.
+    let raw = with_host(
+        "GET",
+        "/query",
+        &format!("rebind.evil.example:{port}"),
+        &format!("Origin: {WIDGET}\r\n"),
+    );
+    let r = send(port, &raw).await;
+    assert_eq!(r.status, 403);
+    assert!(!has_cors(&r), "{}", r.head);
+}
+
+#[tokio::test]
+async fn the_widgets_preflight_is_answered() {
+    let a = start(playing()).await;
+    let port = a.port();
+    let preflight = with_host(
+        "OPTIONS",
+        "/query",
+        &format!("localhost:{port}"),
+        &format!(
+            "Origin: {WIDGET}\r\nAccess-Control-Request-Method: GET\r\n\
+             Access-Control-Request-Headers: x-overlay\r\n\
+             Access-Control-Request-Private-Network: true\r\n"
+        ),
     );
     let r = send(port, &preflight).await;
     assert_eq!(r.status, 204);
     for header in [
-        "access-control-allow-origin: *",
-        "access-control-allow-methods: get",
+        "access-control-allow-origin: https://6klabs.com\r\n",
+        "access-control-allow-methods: get, head",
         "access-control-allow-headers: x-overlay",
+        "access-control-allow-private-network: true",
+        "vary: origin",
     ] {
         assert!(r.head.contains(header), "{header}: {}", r.head);
+    }
+    // Loopback access only when the browser asks for it.
+    let preflight = request(
+        "OPTIONS",
+        "/query",
+        port,
+        &format!("Origin: {WIDGET}\r\nAccess-Control-Request-Method: GET\r\n"),
+    );
+    let r = send(port, &preflight).await;
+    assert_eq!(r.status, 204);
+    assert!(
+        !r.head.contains("access-control-allow-private-network"),
+        "{}",
+        r.head
+    );
+}
+
+#[tokio::test]
+async fn the_widget_can_read_a_miss() {
+    let a = start(playing()).await;
+    let port = a.port();
+    let raw = request("GET", "/nothing", port, &format!("Origin: {WIDGET}\r\n"));
+    let r = send(port, &raw).await;
+    assert_eq!(r.status, 404);
+    assert!(
+        r.head
+            .contains("access-control-allow-origin: https://6klabs.com\r\n"),
+        "{}",
+        r.head
+    );
+}
+
+#[tokio::test]
+async fn other_pages_preflights_are_refused() {
+    let a = start(playing()).await;
+    let port = a.port();
+    for origin in ["https://evil.example", "null"] {
+        let preflight = request(
+            "OPTIONS",
+            "/query",
+            port,
+            &format!(
+                "Origin: {origin}\r\nAccess-Control-Request-Method: GET\r\n\
+                 Access-Control-Request-Private-Network: true\r\n"
+            ),
+        );
+        let r = send(port, &preflight).await;
+        assert_eq!(r.status, 403, "{origin}");
+        assert!(!has_cors(&r), "{origin}: {}", r.head);
     }
 }
 
