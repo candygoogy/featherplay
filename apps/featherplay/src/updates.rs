@@ -290,7 +290,7 @@ pub struct Stamp {
     /// than it afterwards means that update didn't install.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub launched: Option<String>,
-    /// Before 0.1.3: the version whose setup was downloaded, once, whatever came of it.
+    /// Before 0.2.0: the version whose setup was downloaded, once, whatever came of it.
     #[serde(skip_serializing, rename = "fetched")]
     old_fetched: Option<String>,
 }
@@ -310,7 +310,7 @@ pub fn now_unix() -> u64 {
 
 impl Stamp {
     /// The stamp at `path`; a missing or broken file is no check yet. A stamp from before
-    /// 0.1.3 reads as if its download was tried three times, and its last check answered.
+    /// 0.2.0 reads as if its download was tried three times, and its last check answered.
     pub fn load(path: &Path) -> Stamp {
         let mut stamp: Stamp = std::fs::read_to_string(path)
             .ok()

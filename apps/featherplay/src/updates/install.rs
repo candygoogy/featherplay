@@ -35,7 +35,7 @@ pub const DOWNLOADS: &str = "https://github.com/candygoogy/featherplay/releases/
 pub const SUMS: &str = "SHA256SUMS.txt";
 /// `SUMS`'s minisign signature, made and uploaded by hand (`packaging/sign-release.sh`).
 pub const SUMS_SIG: &str = "SHA256SUMS.txt.minisig";
-/// What the signature's trusted comment says, the version after it: `featherplay v0.1.3`.
+/// What the signature's trusted comment says, the version after it: `featherplay v0.2.0`.
 /// The comment is signed too, so an old release's files can't pass for a newer one's.
 const SIGNED_FOR: &str = "featherplay v";
 /// The public keys that sign releases: the main one, and the backup kept apart in case the

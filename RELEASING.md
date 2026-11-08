@@ -91,7 +91,7 @@ with `featherplay-setup-X.Y.Z-arm64.exe` and `featherplay-arm64.exe`; Task Manag
 Details tab should show featherplay, yt-dlp and deno as ARM64, not x64. (Over an x64
 install, the yt-dlp and deno it downloaded stay, and keep running as x64.)
 
-Then sign the draft. Installed copies (0.1.3 and later) download an update only if the
+Then sign the draft. Installed copies (0.2.0 and later) download an update only if the
 release's `SHA256SUMS.txt` carries a minisign signature by one of the two keys built into
 the app (`apps/featherplay/keys/`), made for that version; without it they only announce
 the release and say it couldn't be verified.
