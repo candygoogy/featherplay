@@ -68,6 +68,31 @@ pub fn fixtures() -> bool {
     *ON.get_or_init(|| on() && std::env::var_os("FEATHERPLAY_PERF_FIXTURES").is_some())
 }
 
+/// With the fixtures, every song plays the local file `FEATHERPLAY_PERF_AUDIO` names (an
+/// `.m4a` or `.webm`), so the window can be measured while sound plays and after, with no
+/// stream asked of YouTube. Unset, the fixtures play nothing.
+pub fn fixture_stream() -> Option<featherplay_streams::ResolvedStream> {
+    if !fixtures() {
+        return None;
+    }
+    let path = std::path::absolute(std::env::var_os("FEATHERPLAY_PERF_AUDIO")?).ok()?;
+    let len = std::fs::metadata(&path).ok()?.len();
+    let webm = path.extension().is_some_and(|e| e == "webm");
+    Some(featherplay_streams::ResolvedStream {
+        url: format!("file:///{}", path.display().to_string().replace('\\', "/")),
+        mime: if webm { "audio/webm" } else { "audio/mp4" }.into(),
+        itag: if webm { 251 } else { 140 },
+        bitrate_kbps: 128,
+        content_length: Some(len),
+        expires_at: std::time::SystemTime::now() + Duration::from_secs(6 * 3600),
+        duration: None,
+        available_at: None,
+        video_title: None,
+        first_tag: None,
+        loudness_db: None,
+    })
+}
+
 /// The rows a fixture playlist is lengthened to (`FEATHERPLAY_PERF_ROWS`), if set.
 pub fn rows() -> Option<usize> {
     if !fixtures() {
@@ -240,6 +265,10 @@ struct Until<F> {
     timer: Option<slint::Timer>,
     /// Checked again at least this often, for conditions that time alone makes true.
     tick: Option<Duration>,
+    /// Checked again whenever the app reports something. Off for a plain wait (`sleep`),
+    /// which time alone ends: woken by every paint, the script would cost an idle spell's
+    /// frames a posted message and a turn of the event loop each.
+    on_reports: bool,
 }
 
 impl<F: FnMut() -> bool + Unpin> Future for Until<F> {
@@ -256,7 +285,7 @@ impl<F: FnMut() -> bool + Unpin> Future for Until<F> {
         // poll, a copy was never dropped and every timer wake added one, so over a run every
         // paint came to post hundreds of wakes to the UI thread (half its time in the tour).
         SEEN.with_borrow_mut(|s| {
-            if !s.wakers.iter().any(|w| w.will_wake(cx.waker())) {
+            if self.on_reports && !s.wakers.iter().any(|w| w.will_wake(cx.waker())) {
                 s.wakers.push(cx.waker().clone());
             }
         });
@@ -284,6 +313,7 @@ fn until(
         deadline: Instant::now() + timeout,
         timer: None,
         tick: None,
+        on_reports: true,
     }
 }
 
@@ -300,7 +330,11 @@ fn ticking(
 }
 
 async fn sleep(d: Duration) {
-    until(d, || false).await;
+    Until {
+        on_reports: false,
+        ..until(d, || false)
+    }
+    .await;
 }
 
 /// Lets the event loop run once (input dispatched, a frame asked for).
@@ -1522,6 +1556,15 @@ impl Driver {
             json!(SEEN.with_borrow(|s| s.player.audible)),
         );
         frames(&mut m, self.out.period);
+        // When the spell's first paints began, in ms: what draws while nothing should.
+        let at: Vec<Value> = SEEN.with_borrow(|s| {
+            s.paints
+                .iter()
+                .take(64)
+                .map(|(start, _)| json!(round((*start - t0).as_secs_f64() * 1000.0)))
+                .collect()
+        });
+        m.insert("paints_at_ms".into(), Value::Array(at));
         self.record("idle", words, m, None);
         Ok(())
     }
@@ -1598,6 +1641,26 @@ mod tests {
             panic!("no repeat: {s:?}")
         };
         assert!(matches!(&body[1], Cmd::Repeat(3, inner) if inner.len() == 1));
+    }
+
+    #[test]
+    fn a_wait_keeps_one_waker_however_often_it_is_polled() {
+        struct Task;
+        #[expect(
+            clippy::manual_noop_waker,
+            reason = "Waker::noop() doesn't say its copies wake the same task"
+        )]
+        impl std::task::Wake for Task {
+            fn wake(self: std::sync::Arc<Self>) {}
+        }
+        // One task's waker, as the script's.
+        let waker = Waker::from(std::sync::Arc::new(Task));
+        let mut cx = Context::from_waker(&waker);
+        let mut wait = until(Duration::from_secs(60), || false);
+        for _ in 0..5 {
+            assert!(Pin::new(&mut wait).poll(&mut cx).is_pending());
+        }
+        assert_eq!(SEEN.with_borrow(|s| s.wakers.len()), 1);
     }
 
     #[test]

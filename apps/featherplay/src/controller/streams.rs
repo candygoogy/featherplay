@@ -541,10 +541,16 @@ impl Controller {
     pub(super) fn resolve(&mut self, id: TrackId) -> Option<Input> {
         #[cfg(feature = "perf-harness")]
         if crate::perf::fixtures() {
-            log!(
-                "resolve {}: not with the performance harness's fixtures",
-                id.0
-            );
+            match crate::perf::fixture_stream() {
+                Some(stream) => {
+                    log!("resolve {}: the performance harness's local file", id.0);
+                    let _ = self.tx.send(Msg::Resolved(id, Ok(stream)));
+                }
+                None => log!(
+                    "resolve {}: not with the performance harness's fixtures",
+                    id.0
+                ),
+            }
             return None;
         }
         let want = self.streams.want(&id, SystemTime::now());
