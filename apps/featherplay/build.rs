@@ -7,7 +7,7 @@
 //! The translations in `po/<lang>/LC_MESSAGES/featherplay.po` are bundled twice: Slint
 //! compiles them into the UI's `@tr` strings, and `catalog.rs` in `OUT_DIR` holds them for
 //! the strings Rust shows (`featherplay_core::i18n`, loaded by `src/language.rs`). Only a
-//! debug build's catalogue has the test language.
+//! debug build has the test language's strings, in both.
 #![allow(
     clippy::print_stdout,
     reason = "cargo reads a build script's instructions from its stdout"
@@ -33,26 +33,31 @@ const SIZES: [(u32, &str); 6] = [
 ];
 
 fn main() {
+    let out = std::env::var("OUT_DIR").expect("OUT_DIR");
+    let debug = std::env::var_os("CARGO_CFG_DEBUG_ASSERTIONS").is_some();
     // No default context: a string means one thing wherever it's used, unless its `@tr`
     // names a context (`"verb" => "Like"`); `po/update.sh` extracts them the same way.
-    // Slint gets every language, the test language too in a release build: with no bundle,
-    // each `@tr` compiles to a call that builds its strings at runtime, and the exe came out
-    // 188 KB larger than with the bundle's string table (2026-11-07).
+    // Slint always gets a bundle: with none, each `@tr` compiles to a call that builds its
+    // strings at runtime, and the exe came out 188 KB larger than with the bundle's string
+    // table (2026-11-07). A release build never selects the test language (its catalogue
+    // below leaves it out), so its bundle has every other language and the test language
+    // with no strings.
+    let po = if debug {
+        PathBuf::from("po")
+    } else {
+        stub_po(Path::new(&out))
+    };
     let config = slint_build::CompilerConfiguration::new()
         .with_style("fluent".into())
-        .with_bundled_translations("po")
+        .with_bundled_translations(po)
         .with_default_translation_context(slint_build::DefaultTranslationContext::None);
     slint_build::compile_with_config("ui/app.slint", config).expect("compile ui/app.slint");
 
     println!("cargo:rerun-if-changed=ui/logo");
-    let out = std::env::var("OUT_DIR").expect("OUT_DIR");
     println!("cargo:rerun-if-changed=po");
     // The catalogue is what `language` offers and picks from, so a release build leaves the
-    // test language out of it: the UI's bundle still has it, but nothing selects it there.
-    let languages = languages(
-        Path::new("po"),
-        std::env::var_os("CARGO_CFG_DEBUG_ASSERTIONS").is_some(),
-    );
+    // test language out of it.
+    let languages = languages(Path::new("po"), debug);
     std::fs::write(Path::new(&out).join("catalog.rs"), catalog(&languages))
         .expect("write catalog.rs");
     let ico = Path::new(&out).join("featherplay.ico");
@@ -84,6 +89,33 @@ fn main() {
 /// Per (context, id): the plural id ("" for none) and the forms in each language (`None`
 /// where it isn't translated).
 type Entries = BTreeMap<(String, String), (String, Vec<Option<Vec<String>>>)>;
+
+/// A `po` folder in `out` for a release build's UI: every language under `po` as it is, and
+/// the test language with no translations (so the folder never lacks the one language Slint
+/// needs to make a bundle).
+fn stub_po(out: &Path) -> PathBuf {
+    let po = out.join("po-release");
+    if po.exists() {
+        std::fs::remove_dir_all(&po).expect("clear po-release");
+    }
+    for lang in languages(Path::new("po"), false) {
+        let dir = po.join(lang.file_name().expect("name")).join("LC_MESSAGES");
+        std::fs::create_dir_all(&dir).expect("create po-release");
+        std::fs::copy(
+            lang.join("LC_MESSAGES/featherplay.po"),
+            dir.join("featherplay.po"),
+        )
+        .expect("copy a featherplay.po");
+    }
+    let dir = po.join(PSEUDO).join("LC_MESSAGES");
+    std::fs::create_dir_all(&dir).expect("create po-release");
+    let header = format!(
+        "msgid \"\"\nmsgstr \"\"\n\"Content-Type: text/plain; charset=UTF-8\\n\"\n\
+         \"Language: {PSEUDO}\\n\"\n\"Plural-Forms: nplurals=2; plural=(n != 1);\\n\"\n"
+    );
+    std::fs::write(dir.join("featherplay.po"), header).expect("write the stub featherplay.po");
+    po
+}
 
 /// The language folders under `po`, sorted by name as Slint orders them; the test
 /// language only `with_pseudo`.
