@@ -24,13 +24,14 @@ import { LyricsData } from "pages/lyrics.slint";
 import { SettingsPage, SettingsData, SettingsDialog, SettingsDialogLayer } from "pages/settings.slint";
 import { AboutPage } from "pages/about.slint";
 import { SignInPage } from "pages/sign_in.slint";
-import { SongMenuLayer } from "song_menu.slint";
+import { SongMenu, SongMenuLayer } from "song_menu.slint";
 import { PlaylistMenu, PlaylistDialog } from "playlist_menu.slint";
 import { PlaylistMenuLayer, PlaylistDialogLayer } from "playlist_menu_layer.slint";
 import { AlbumMenu, AlbumMenuLayer, AlbumDialogLayer } from "album_menu.slint";
-import { AccountMenuLayer, AccountPickerDialog, AccountPicker } from "account_menu.slint";
+import { AccountMenu, AccountMenuLayer, AccountPickerDialog, AccountPicker } from "account_menu.slint";
 import { ToastView } from "toast.slint";
 import { CloseDialog, CloseChoice } from "close_dialog.slint";
+import { Shortcuts, ShortcutKind } from "shortcuts.slint";
 
 // What Rust can reach. Shared pieces first, then one line per page: a page's owner adds its
 // own exported structs to its own line only (blank lines keep the merges clean).
@@ -43,6 +44,7 @@ export { SidebarData } from "sidebar.slint";
 export { TopBarData, Suggestion, SuggestionKind } from "top_bar.slint";
 export { QueueData } from "queue_panel.slint";
 export { Tooltips } from "bar_tip.slint";
+export { Shortcuts, ShortcutKind, ShortcutRow } from "shortcuts.slint";
 
 export { HomeData, HomeShelfRow, ShelfShape, MoreState } from "pages/home.slint";
 
@@ -208,9 +210,23 @@ export component AppWindow inherits Window {
         Frame.instant = true;
     }
 
+    // Settings' dialogs close: the keys come back to the window (the dialog had them).
+    property <SettingsDialog> settings-dialog: SettingsData.dialog;
+    changed settings-dialog => {
+        if root.settings-dialog == SettingsDialog.none {
+            keys.focus();
+        }
+    }
+
+    // A menu, a popup or a dialog is open over the window: the transport keys and Ctrl+/ wait.
+    property <bool> overlay-open: CloseChoice.open || SettingsData.dialog != SettingsDialog.none || AlbumMenu.open || AlbumMenu.dialog || SongMenu.open || PlaylistMenu.open || PlaylistMenu.dialog != PlaylistDialog.none || AccountMenu.open || AccountPicker.open || Player.speed-open;
+
+    // The shortcuts, listed for Settings' "Keyboard shortcuts" in shortcuts.slint: each one
+    // taken here is reported there (`Shortcuts.used`). A new one goes in both.
     keys := FocusScope {
         key-pressed(e) => {
             if e.modifiers.control && (e.text == "k" || e.text == "K") {
+                Shortcuts.used(ShortcutKind.search);
                 // Now playing hides the bar: leave it first. Sign in has none: search from
                 // Home, as "Continue without signing in" goes, but not from under the account
                 // picker, which keeps the keys.
@@ -230,6 +246,7 @@ export component AppWindow inherits Window {
             // Lyrics on or off, as the bar's microphone does (off any page, Now playing opens
             // on them). Nothing with lyrics off in Settings.
             if e.modifiers.control && (e.text == "l" || e.text == "L") {
+                Shortcuts.used(ShortcutKind.lyrics);
                 if LyricsData.on && (Player.has-track || LyricsData.showing) {
                     if !LyricsData.showing && Nav.page != PageKind.now-playing {
                         root.navigate-by-key();
@@ -240,18 +257,20 @@ export component AppWindow inherits Window {
             }
             // Previous, Next, Shuffle and Repeat, as the bar's buttons do: Ctrl+Left, Ctrl+Right,
             // Ctrl+S and Ctrl+R. Not while a text field has the keys (Ctrl+Left and Right move
-            // by word there, and some reach here at the field's ends); a held key acts once;
-            // with nothing loaded they do nothing.
+            // by word there, and some reach here at the field's ends), nor under a menu or a
+            // dialog; a held key acts once; with nothing loaded they do nothing.
             if e.modifiers.control && !e.modifiers.alt && !e.modifiers.shift && !e.modifiers.meta && (e.text == Key.LeftArrow || e.text == Key.RightArrow || e.text == "s" || e.text == "S" || e.text == "r" || e.text == "R") {
                 if TextInputInterface.text-input-focused {
                     return reject;
                 }
-                if Player.has-track && !e.repeat {
-                    if e.text == Key.LeftArrow {
+                let kind = e.text == Key.LeftArrow ? ShortcutKind.previous : (e.text == Key.RightArrow ? ShortcutKind.next : (e.text == "s" || e.text == "S" ? ShortcutKind.shuffle : ShortcutKind.repeat));
+                Shortcuts.used(kind);
+                if Player.has-track && !e.repeat && !root.overlay-open {
+                    if kind == ShortcutKind.previous {
                         Player.previous();
-                    } else if e.text == Key.RightArrow {
+                    } else if kind == ShortcutKind.next {
                         Player.next();
-                    } else if e.text == "s" || e.text == "S" {
+                    } else if kind == ShortcutKind.shuffle {
                         Player.toggle-shuffle();
                     } else {
                         Player.cycle-repeat();
@@ -259,12 +278,28 @@ export component AppWindow inherits Window {
                 }
                 return accept;
             }
+            // The keyboard shortcuts' list (Settings' dialog) over any page: Ctrl+/. With Ctrl
+            // held the key comes as the character Shift makes, so layouts where "/" needs Shift
+            // (Shift+7 in German) work too; Ctrl+? on a US layout opens it as well. Not from a
+            // text field, nor over a menu or another dialog.
+            if e.modifiers.control && !e.modifiers.alt && !e.modifiers.meta && (e.text == "/" || e.text == "?") {
+                if TextInputInterface.text-input-focused {
+                    return reject;
+                }
+                Shortcuts.used(ShortcutKind.shortcuts);
+                if !root.overlay-open {
+                    SettingsData.open-dialog(SettingsDialog.shortcuts);
+                }
+                return accept;
+            }
             if e.modifiers.alt && e.text == Key.LeftArrow {
+                Shortcuts.used(ShortcutKind.back);
                 root.navigate-by-key();
                 Nav.back();
                 return accept;
             }
             if e.modifiers.alt && e.text == Key.RightArrow {
+                Shortcuts.used(ShortcutKind.forward);
                 root.navigate-by-key();
                 Nav.forward();
                 return accept;
@@ -274,6 +309,7 @@ export component AppWindow inherits Window {
             // don't take the keys; Settings' switches leave it and flip on Enter. A held Space
             // flips once (auto-repeats are dropped); with nothing loaded it does nothing.
             if e.text == " " && !e.modifiers.control && !e.modifiers.alt && !e.modifiers.meta {
+                Shortcuts.used(ShortcutKind.play-pause);
                 if Player.has-track && !e.repeat {
                     Player.toggle();
                 }
@@ -284,12 +320,14 @@ export component AppWindow inherits Window {
             // the search suggestions, the account picker and the hue slider their own choice.
             // Not under a dialog.
             if (e.text == Key.UpArrow || e.text == Key.DownArrow) && !e.modifiers.control && !e.modifiers.alt && !e.modifiers.meta {
+                Shortcuts.used(ShortcutKind.volume);
                 if !CloseChoice.open && SettingsData.dialog == SettingsDialog.none && !AlbumMenu.dialog {
                     bottom-bar.step-volume(e.text == Key.UpArrow);
                 }
                 return accept;
             }
             if e.text == Key.Escape {
+                Shortcuts.used(ShortcutKind.escape);
                 // In the search field: the first Escape clears it, the next leaves it.
                 if top-bar.searching && TopBarData.query != "" {
                     TopBarData.query = "";
@@ -451,8 +489,9 @@ export component AppWindow inherits Window {
             width: root.width - 2 * Theme.bar-inset;
         }
 
-        // Settings' dialogs: their scrim covers the whole window and takes its clicks.
-        if Nav.page == PageKind.settings && SettingsData.dialog != SettingsDialog.none: SettingsDialogLayer {
+        // Settings' dialogs: their scrim covers the whole window and takes its clicks. The
+        // keyboard shortcuts' shows over any page (Ctrl+/).
+        if (Nav.page == PageKind.settings && SettingsData.dialog != SettingsDialog.none) || SettingsData.dialog == SettingsDialog.shortcuts: SettingsDialogLayer {
             x: 0;
             y: 0;
             width: root.width;

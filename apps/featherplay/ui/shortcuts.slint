@@ -1,0 +1,50 @@
+// The window's keyboard shortcuts, listed once: Settings' "Keyboard shortcuts" dialog shows
+// these rows, and app.slint's key handler reports each one it takes (`Shortcuts.used`), so a
+// test can press every listed key and check the handler takes it as listed.
+// Keys a menu, a dialog or the search suggestions take for themselves (arrows, Tab, Enter)
+// aren't listed: they work as everywhere in Windows.
+
+export enum ShortcutKind {
+    play-pause,
+    previous,
+    next,
+    shuffle,
+    repeat,
+    volume,
+    search,
+    lyrics,
+    back,
+    forward,
+    escape,
+    shortcuts,
+}
+
+export struct ShortcutRow {
+    kind: ShortcutKind,
+    // What it does.
+    label: string,
+    // One keycap each, pressed together; an empty one between two keys that each do it (the
+    // list writes "or" there).
+    keys: [string],
+}
+
+export global Shortcuts {
+    out property <[ShortcutRow]> playback: [
+        { kind: ShortcutKind.play-pause, label: @tr("Play or pause"), keys: [@tr("Space")] },
+        { kind: ShortcutKind.previous, label: @tr("Previous"), keys: [@tr("Ctrl"), "←"] },
+        { kind: ShortcutKind.next, label: @tr("Next"), keys: [@tr("Ctrl"), "→"] },
+        { kind: ShortcutKind.shuffle, label: @tr("Shuffle on or off"), keys: [@tr("Ctrl"), "S"] },
+        { kind: ShortcutKind.repeat, label: @tr("Repeat: off, all, one"), keys: [@tr("Ctrl"), "R"] },
+        { kind: ShortcutKind.volume, label: @tr("Volume up or down"), keys: ["↑", "", "↓"] },
+    ];
+    out property <[ShortcutRow]> moving: [
+        { kind: ShortcutKind.search, label: @tr("Search"), keys: [@tr("Ctrl"), "K"] },
+        { kind: ShortcutKind.lyrics, label: @tr("Lyrics on or off"), keys: [@tr("Ctrl"), "L"] },
+        { kind: ShortcutKind.back, label: @tr("Back"), keys: [@tr("Alt"), "←"] },
+        { kind: ShortcutKind.forward, label: @tr("Forward"), keys: [@tr("Alt"), "→"] },
+        { kind: ShortcutKind.escape, label: @tr("Clear the search, or leave Now playing"), keys: [@tr("Esc")] },
+        { kind: ShortcutKind.shortcuts, label: @tr("Keyboard shortcuts"), keys: [@tr("Ctrl"), "/"] },
+    ];
+    // The window's key handler took a shortcut (the tests listen).
+    callback used(ShortcutKind);
+}

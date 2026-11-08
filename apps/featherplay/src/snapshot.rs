@@ -122,6 +122,9 @@ pub const PAGES: &[&str] = &[
     // of the fill) and 22 s at the end; or with the inner one at 1:40, played past.
     "silences",
     "silences-played",
+    // The keyboard shortcuts' list over Home, with the global hotkeys off, then on.
+    "shortcuts",
+    "shortcuts-hotkeys",
     "about",
     // About's version row while a check runs; up to date (checked 2 hours ago); after a
     // check failed offline, rate limited, or with an HTTP error.
@@ -715,6 +718,10 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
         crate::pages::settings::show_dialog_for_snapshot(ctx, o.page == "settings-lastfm-keys");
         settle();
     }
+    if o.page == "shortcuts" || o.page == "shortcuts-hotkeys" {
+        crate::pages::settings::show_shortcuts_for_snapshot(ctx, o.page == "shortcuts-hotkeys");
+        settle();
+    }
     if o.page == "settings-local-api" {
         crate::pages::settings::show_local_api_for_snapshot(ctx);
         settle();
@@ -956,6 +963,8 @@ fn page(name: &str, f: &Fixtures) -> Result<Page, String> {
         | "speed-popup"
         | "silences"
         | "silences-played"
+        | "shortcuts"
+        | "shortcuts-hotkeys"
         | "home-more"
         | "home-more-loading"
         | "home-more-failed"

@@ -321,6 +321,8 @@ const NOT_TRANSLATED: &[&str] = &[
     "cookie: SID=…; HSID=…; SAPISID=…",
     "scoop update featherplay",
     "K",
+    // Keys on the shortcuts list.
+    "R",
 ];
 
 /// The string literals of a `.slint` line, with what precedes and follows each; a `//`

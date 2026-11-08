@@ -88,6 +88,7 @@ mod search_link;
 mod search_paste;
 mod search_suggestions;
 mod settings_index;
+mod shortcut_list;
 mod side_panel;
 mod sidebar_chips;
 mod sign_in_page;

@@ -1,7 +1,7 @@
 // Settings (a calm single column). Every field of `Settings`, grouped: Playback, Sound,
 // Lyrics, Scrobbling, Discord, Local API, Window, Account. The Last.fm API settings, the
 // ListenBrainz token and the equalizer's bands are set in a small dialog over the window
-// (`SettingsDialogLayer`). Filled and
+// (`SettingsDialogLayer`), which also lists the keyboard shortcuts (over any page). Filled and
 // applied by `src/pages/settings.rs`; changes apply at once and are saved by the controller.
 import { Theme, Curves, Icons, Appearance } from "../theme.slint";
 import { Body, Display, PageTitle, Pill, Icon, Cover, TextLink } from "../parts.slint";
@@ -10,6 +10,7 @@ import { Chips } from "content.slint";
 import { NowPlayingData } from "now_playing.slint";
 import { Nav, PageKind } from "../nav.slint";
 import { SidebarData } from "../sidebar.slint";
+import { Shortcuts, ShortcutRow } from "../shortcuts.slint";
 
 // The on/off settings, for `SettingsData.toggled`.
 export enum SettingKey {
@@ -130,6 +131,8 @@ export enum SettingsDialog {
     lastfm-keys,
     listenbrainz-token,
     equalizer,
+    // The keyboard shortcuts (over any page: Ctrl+/ opens it from anywhere).
+    shortcuts,
 }
 
 export global SettingsData {
@@ -244,6 +247,9 @@ export global SettingsData {
     in-out property <string> hotkey-next;
     in-out property <string> hotkey-previous;
     in property <string> hotkeys-error;
+    // The saved hotkeys (play or pause, next, previous), a keycap per key, for the shortcuts'
+    // list: filled as it opens.
+    in property <[[string]]> hotkey-keys;
     // Account.
     in property <bool> signed-in;
     // Lyrics: shown at all ("Show lyrics"), and looked up on LRCLIB.
@@ -1673,6 +1679,241 @@ component EqualizerDialog inherits Rectangle {
     }
 }
 
+// A key in the shortcuts' list, as a keycap like the search field's Ctrl K: 22 px, a 1 px
+// edge, 12/600 in `text2`. An empty key, between two keys that each do it, is the word "or".
+component Keycap inherits Rectangle {
+    in property <string> text;
+    property <bool> word: root.text == "";
+    height: 22px;
+    min-width: root.word ? 0 : self.height;
+    border-radius: Theme.r-s;
+    border-width: root.word ? 0 : 1px;
+    border-color: Theme.field-edge;
+    background: root.word ? transparent : (Theme.dark ? #FFFFFF08 : Theme.ground);
+    HorizontalLayout {
+        padding-left: root.word ? 2px : 6px;
+        padding-right: root.word ? 2px : 6px;
+        Text {
+            text: root.word ? @tr("or") : root.text;
+            font-family: Theme.body-font;
+            font-size: Theme.t-meta;
+            font-weight: root.word ? 400 : 600;
+            color: root.word ? Theme.text3 : Theme.text2;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+    }
+}
+
+// The shortcuts' list's measures: a row, a group's heading, a column.
+global Keys {
+    out property <length> row-h: 32px;
+    out property <length> head-h: 30px;
+    out property <length> column-w: 400px;
+    // A group of `n` rows under its heading.
+    public pure function group(n: int) -> length {
+        return self.head-h + n * self.row-h;
+    }
+}
+
+// A row of the list: what it does (with a quiet note, "Global hotkey"), then its keys, or a
+// line of text instead (`instead`). A hairline above all but a group's first.
+component KeyRow inherits Rectangle {
+    in property <string> label;
+    in property <string> note;
+    in property <[string]> keys;
+    in property <string> instead;
+    in property <bool> divider: true;
+    height: Keys.row-h;
+    if root.divider: Rectangle {
+        y: 0;
+        height: 1px;
+        background: Theme.hairline;
+    }
+    HorizontalLayout {
+        spacing: Theme.s2;
+        Body {
+            text: root.label;
+            vertical-alignment: center;
+        }
+        if root.note != "": Body {
+            text: root.note;
+            font-size: Theme.t-meta;
+            color: Theme.text3;
+            vertical-alignment: center;
+        }
+        Rectangle {
+            horizontal-stretch: 1;
+        }
+        if root.instead != "": Body {
+            text: root.instead;
+            font-size: Theme.t-meta;
+            color: Theme.text3;
+            vertical-alignment: center;
+        }
+        if root.keys.length > 0: HorizontalLayout {
+            spacing: Theme.s1;
+            padding-top: (Keys.row-h - 22px) / 2;
+            padding-bottom: (Keys.row-h - 22px) / 2;
+            for key in root.keys: Keycap {
+                text: key;
+            }
+        }
+    }
+}
+
+// A group's heading, 12/600 in `text2`, sitting on its first row.
+component KeyGroup inherits Body {
+    height: Keys.head-h;
+    font-size: Theme.t-meta;
+    font-weight: 600;
+    color: Theme.text2;
+    vertical-alignment: bottom;
+}
+
+component KeyList inherits VerticalLayout {
+    in property <string> title;
+    in property <[ShortcutRow]> rows;
+    KeyGroup {
+        text: root.title;
+    }
+    for row[i] in root.rows: KeyRow {
+        label: row.label;
+        keys: row.keys;
+        divider: i > 0;
+    }
+}
+
+// What works from any app: the media keys always, and the global hotkeys with the user's
+// keys while they're on (otherwise a line says where to turn them on).
+component FromAnyApp inherits VerticalLayout {
+    KeyGroup {
+        text: @tr("From any app");
+    }
+    KeyRow {
+        label: @tr("Your keyboard's media keys");
+        instead: @tr("play, pause, next, previous · always on");
+        divider: false;
+    }
+    if SettingsData.hotkey-keys.length > 0: VerticalLayout {
+        for label[i] in [@tr("Play or pause"), @tr("Next"), @tr("Previous")]: KeyRow {
+            label: label;
+            note: @tr("Global hotkey");
+            keys: SettingsData.hotkey-keys[i];
+        }
+    }
+    if SettingsData.hotkey-keys.length == 0: Body {
+        text: @tr("Global hotkeys are off. Turn them on in Settings › Window to play, pause and skip with your own keys.");
+        font-size: Theme.t-meta;
+        color: Rows.detail;
+        wrap: word-wrap;
+    }
+}
+
+// The keyboard shortcuts over the window, from Window's "Show shortcuts" or Ctrl+/ on any
+// page: `Dialog`'s scrim and card with Done alone, the rows from `Shortcuts` (the list the
+// window's key handler keeps to). One column, 460 px; on a window too short for it, the
+// groups sit in two columns of a wider card (Playback and From any app, then Finding and
+// moving), so it never scrolls, even at the window's smallest. Done, Escape and a click on
+// the scrim close it.
+component ShortcutsDialog inherits Rectangle {
+    // The one column's height (title, groups, Done, padding), and whether it fits.
+    property <length> chrome: 2 * Theme.s5 + 28px + 2 * Theme.s4 + Theme.s2 + 32px;
+    property <length> from-any-app: SettingsData.hotkey-keys.length > 0 ? Keys.group(4) : Keys.group(1) + 40px;
+    property <length> one-h: root.chrome + Keys.group(Shortcuts.playback.length) + Keys.group(Shortcuts.moving.length) + root.from-any-app;
+    property <bool> two: root.height < root.one-h + 2 * Theme.s5;
+    property <bool> shown: false;
+    background: Theme.scrim;
+    opacity: root.shown ? 1 : 0;
+    animate opacity { duration: Theme.t-menu; easing: Curves.ease-out; }
+    init => {
+        root.shown = true;
+        keys.focus();
+    }
+    // It keeps the keys: the window's shortcuts don't act under it. Escape and Ctrl+/ close it;
+    // Tab moves the focus as usual.
+    keys := FocusScope {
+        key-pressed(e) => {
+            if e.text == Key.Escape || (e.modifiers.control && (e.text == "/" || e.text == "?")) {
+                SettingsData.close-dialog();
+                return accept;
+            }
+            if e.text == Key.Tab || e.text == Key.Backtab {
+                return reject;
+            }
+            accept
+        }
+        TouchArea {
+            clicked => { SettingsData.close-dialog(); }
+            // The page under the scrim doesn't scroll.
+            scroll-event(e) => { accept }
+        }
+        // The groups are placed by hand rather than by two sets of layouts, one per
+        // arrangement: each layout costs the exe code (see `Eq`).
+        card := Rectangle {
+            property <length> pad: Theme.s5;
+            property <length> col-w: root.two ? (self.width - 2 * self.pad - Theme.s6) / 2 : self.width - 2 * self.pad;
+            property <length> top: self.pad + 28px + Theme.s4;
+            property <length> body-h: root.two ? max(playback.height + any-app.height, moving.height) : playback.height + moving.height + any-app.height;
+            width: min(root.two ? 2 * Keys.column-w + Theme.s6 + 2 * Theme.s5 : 460px, root.width - 2 * Theme.s5);
+            height: self.top + self.body-h + Theme.s4 + Theme.s2 + 32px + self.pad;
+            x: (root.width - self.width) / 2;
+            y: max(Theme.s5, (root.height - self.height) / 2 - (root.two ? 0 : Theme.s6));
+            border-radius: Theme.r-l;
+            background: Theme.panel;
+            border-width: 1px;
+            border-color: Theme.card-edge;
+            transform-scale: root.shown ? 1 : (Theme.moving ? 0.98 : 1);
+            animate transform-scale { duration: Theme.t-menu; easing: Curves.ease-out; }
+            drop-shadow-blur: 24px;
+            drop-shadow-offset-y: 8px;
+            drop-shadow-color: Theme.cover-shadow;
+            accessible-role: groupbox;
+            accessible-label: @tr("Keyboard shortcuts");
+            // Clicks on the card don't reach the scrim.
+            TouchArea { }
+            Display {
+                x: card.pad;
+                y: card.pad;
+                height: 28px;
+                text: @tr("Keyboard shortcuts");
+                font-size: 20px;
+            }
+            // One column: Playback, Finding and moving, From any app. Two: Playback over From
+            // any app, Finding and moving beside them.
+            playback := KeyList {
+                x: card.pad;
+                y: card.top;
+                width: card.col-w;
+                height: self.preferred-height;
+                title: @tr("Playback");
+                rows: Shortcuts.playback;
+            }
+            moving := KeyList {
+                x: root.two ? card.pad + card.col-w + Theme.s6 : card.pad;
+                y: root.two ? card.top : card.top + playback.height;
+                width: card.col-w;
+                height: self.preferred-height;
+                title: @tr("Finding and moving");
+                rows: Shortcuts.moving;
+            }
+            any-app := FromAnyApp {
+                x: card.pad;
+                y: card.top + playback.height + (root.two ? 0 : moving.height);
+                width: card.col-w;
+                height: self.preferred-height;
+            }
+            RowButton {
+                x: card.width - card.pad - self.width;
+                y: card.top + card.body-h + Theme.s4 + Theme.s2;
+                label: @tr("Done");
+                solid: true;
+                clicked => { SettingsData.close-dialog(); }
+            }
+        }
+    }
+}
+
 // An entry of Settings' section index: the section's name, marked while it's in view.
 // The marked entry wears the accent's tonal fill, as the selected chip and tab do.
 component SectionLink inherits Rectangle {
@@ -2336,6 +2577,14 @@ export component SettingsPage inherits Rectangle {
                         key: SettingKey.tooltips;
                         checked: SettingsData.tooltips;
                     }
+                    SettingRow {
+                        label: @tr("Keyboard shortcuts");
+                        detail: @tr("Play, skip, search and move around without the mouse.");
+                        RowButton {
+                            label: @tr("Show shortcuts");
+                            clicked => { SettingsData.open-dialog(SettingsDialog.shortcuts); }
+                        }
+                    }
                     ToggleRow {
                         label: @tr("Global hotkeys");
                         detail: @tr("Play, pause and skip from any app. Each key needs Ctrl, Alt, Shift or Win.");
@@ -2512,6 +2761,11 @@ export component SettingsDialogLayer inherits Rectangle {
     }
 
     if SettingsData.dialog == SettingsDialog.equalizer: EqualizerDialog {
+        width: root.width;
+        height: root.height;
+    }
+
+    if SettingsData.dialog == SettingsDialog.shortcuts: ShortcutsDialog {
         width: root.width;
         height: root.height;
     }

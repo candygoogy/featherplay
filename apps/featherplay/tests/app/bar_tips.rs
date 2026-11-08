@@ -10,7 +10,7 @@ use slint::{ComponentHandle, LogicalPosition, Rgba8Pixel};
 /// The transport's buttons at 1280 wide: 36, 36, the 48 px play button, 36, 36, 12 apart,
 /// centred on the bar.
 const PLAY_X: f32 = 640.0;
-const NEXT_X: f32 = 688.0;
+const NEXT_X: f32 = 694.0;
 
 /// The window at 1280 × 800 with the fixture radio playing. Still (as the snapshots are), a
 /// tooltip shows at once on hover.
@@ -34,7 +34,7 @@ fn strip(scene: &Scene, hover: Option<f32>, centre: f32) -> Vec<Rgba8Pixel> {
     w.dispatch_event(WindowEvent::PointerMoved { position: at });
     scene.settle_once();
     let shot = w.take_snapshot().expect("snapshot");
-    let y = (bar_top - 20.0) as u32;
+    let y = (bar_top - 12.0) as u32;
     (centre as u32 - 40..centre as u32 + 40)
         .map(|x| shot.as_slice()[(y * shot.width() + x) as usize])
         .collect()

@@ -68,7 +68,8 @@ export component NotForMeButton inherits Rectangle {
     tip := BarTip {
         over: btn.hovered;
         name: @tr("Not for me");
-        hint: "· " + @tr("Dislike and skip");
+        // What it does rather than a shortcut (it has none), set off by a dot.
+        hint: @tr("· Dislike and skip");
         above: root.above;
     }
 }
