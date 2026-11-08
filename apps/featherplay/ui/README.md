@@ -193,7 +193,7 @@ on each tab), mood (Chill's playlists), history, sidebar-albums, sidebar-artists
 (opens the Up next panel), `--hover X,Y` or `--press X,Y` (logical pixels: the pointer rests
 there, or also holds the left button, to show hover and pressed states), `--track N` (the
 radio fixture's Nth track plays, so its cover sets the accent; 3 is warm, 11 cool, 16 grey
-art). Data comes from `crates/ytm/tests/fixtures/*.json`, covers from
+art), `--shuffle` (Shuffle on, a lit toggle). Data comes from `crates/ytm/tests/fixtures/*.json`, covers from
 `$FEATHERPLAY_HOME/design-covers` (not every fixture image was downloaded; those stay empty).
 Motion is off in snapshots, and the render waits until every load and cover has arrived.
 
@@ -211,12 +211,15 @@ times, gaps, wheel messages and the UI thread's CPU time inside the paints (`src
 - Colours, sizes and durations come from `Theme`; no literal colours in pages.
 - Everything clickable shows hover and pressed: `Theme.state(pressed, hovered)` for overlays,
   `Theme.tonal(…)` and `Theme.solid-state(…)` for buttons, over `Theme.t-hover`.
-- The accent comes from the current cover by default (`src/follow.rs`; red without a cover
-  or on grey art, or a fixed colour from Settings > Accent). It fills and marks: progress and
-  the seek thumb, the play button, the playing mark, the selected chip and tab, switches,
-  focus rings. Never body text: text on an accent fill is `Theme.on-accent` (black on dark,
-  white on light), and accent fills hover and press with `Theme.accent-state(…)`. Playing
-  titles stay `text1`; the accent wave marks the row.
+- The accent comes from the current cover by default (`src/follow.rs`; on black-and-white,
+  missing or failed art the neutral accent, near-white on dark and graphite on light
+  (`Theme.neutral`); the logo's red with nothing playing; or a fixed colour from Settings >
+  Accent). It fills and marks: progress and the seek thumb, the play button, the playing
+  mark, the selected chip and tab, lit toggles (on its tonal circle), switches, focus rings.
+  Never body text: text on an accent fill is `Theme.on-accent` (black on dark, white on
+  light), and accent fills hover and press with `Theme.accent-state(…)` (the round play
+  button's overlay, `Theme.accent-overlay(…)`). Playing titles stay `text1`; the accent wave
+  marks the row.
 - Motion follows user actions only, with `Theme.t-*` durations and `Curves.*` easings. With
   Windows' animation effects off, movement and scale go and short fades stay; `Theme.still`
   (set by `--snapshot` and the offscreen tests) makes everything instant. Nothing animates

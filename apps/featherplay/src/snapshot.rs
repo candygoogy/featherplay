@@ -1,5 +1,5 @@
 //! `--snapshot <page> --fixtures [--theme dark|light] [--size WxH] [--queue]
-//! [--hover X,Y | --press X,Y] [--hold-loading | --hold-error] [--track N] [--language CODE] --out <png>`:
+//! [--hover X,Y | --press X,Y] [--hold-loading | --hold-error] [--track N] [--shuffle] [--language CODE] --out <png>`:
 //! renders the real window offscreen (no window is shown, nothing is captured from the
 //! screen) with fixture data, waits until every load and cover has arrived, and writes a PNG.
 //! No controller runs; the bar shows a fixture track paused at 2:41. `--hover` puts the
@@ -8,7 +8,7 @@
 //! skeleton, past `t-skeleton-delay`); `--hold-error` shows its "Try again" state.
 //! `--track N` plays the radio fixture's Nth track instead of its first, for another cover
 //! and so another accent; past the radio, its first track wears the cover of one of the
-//! artist fixture's albums and singles.
+//! artist fixture's albums and singles. `--shuffle` shows Shuffle on, a lit toggle.
 
 use std::cell::RefCell;
 use std::path::PathBuf;
@@ -31,8 +31,8 @@ use crate::fixtures::Fixtures;
 use crate::pages::content;
 use crate::router::{ExploreTab, LibraryTab, Page};
 use crate::ui::{
-    AlbumData, AppWindow, ArtistData, Frame, HomeData, LibraryData, NowPlayingData, PlaylistData,
-    Theme,
+    AlbumData, AppWindow, ArtistData, Frame, HomeData, LibraryData, NowPlayingData, Player,
+    PlaylistData, Theme,
 };
 use crate::{busy, offscreen};
 
@@ -289,6 +289,8 @@ pub struct SnapshotOptions {
     pub hold: Hold,
     /// Which of the radio fixture's tracks plays (its cover sets the accent).
     pub track: usize,
+    /// Shuffle is on (the bar's toggle lit).
+    pub shuffle: bool,
     /// The language to render in ("" or "en" for English), as Settings > Window picks it.
     pub language: String,
     pub out: PathBuf,
@@ -540,6 +542,9 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
             ),
             o.track,
         )?;
+    }
+    if o.shuffle {
+        ui.global::<Player>().set_shuffle(true);
     }
     if o.signed_out {
         app::on_event(UiEvent::Account { signed_in: false });

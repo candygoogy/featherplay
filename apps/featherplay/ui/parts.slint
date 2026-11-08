@@ -435,7 +435,9 @@ export component IconButton inherits Rectangle {
     in property <color> tint: Theme.text2;
     in property <bool> filled: false;      // filled glyphs (transport)
     in property <length> glyph: 20px;
-    in property <bool> active: false;      // toggles: accent glyph
+    // Toggles, lit: the accent glyph on the accent's tonal circle (as a selected chip), so
+    // "on" shows by more than the glyph's colour, whatever the accent.
+    in property <bool> active: false;
     in property <bool> enabled: true;
     // Below 1, the glyph snaps to this size and eases back to 1 (the like pop).
     in property <float> glyph-scale: 1.0;
@@ -460,6 +462,13 @@ export component IconButton inherits Rectangle {
     animate transform-scale {
         duration: ta.pressed ? Theme.t-press : Theme.t-release;
         easing: ta.pressed ? Curves.ease-out : Curves.release;
+    }
+    // The lit circle, over the hover overlay. It comes and goes at once, as the glyph's colour
+    // does: a fade would repaint the bar's corner for its length, and as one region with
+    // whatever else moves on screen (the lyrics view's toggle).
+    if root.active: Rectangle {
+        border-radius: root.border-radius;
+        background: Theme.accent-tonal.transparentize(1 - root.alpha);
     }
     ta := TouchArea {
         enabled: root.enabled;
