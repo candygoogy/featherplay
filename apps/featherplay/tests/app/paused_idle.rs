@@ -1,8 +1,8 @@
 //! Paused with the window on screen, nothing renders and no timer is armed (the paused CPU
 //! budget, 0.012 % of the machine), on the offscreen platform (no window is shown), with
 //! Windows' animation effects on: on each page once it has loaded, after pausing from the
-//! tray icon's menu, after opening and closing the mini player (open and unpinned, its
-//! foreground poll is the one timer), and with it pinned.
+//! tray icon's menu, on each page again once a song has played, after opening and closing the
+//! mini player (open and unpinned, its foreground poll is the one timer), and with it pinned.
 
 use std::time::{Duration, Instant};
 
@@ -65,6 +65,20 @@ fn assert_idle_but_the_poll(scene: &Scene, windows: &[&slint::Window], after: &s
     );
 }
 
+/// The pages checked, before a song has played and after.
+const PAGES: [&str; 10] = [
+    "home",
+    "library",
+    "album",
+    "playlist",
+    "liked",
+    "artist",
+    "search",
+    "now-playing",
+    "now-playing-lyrics",
+    "settings",
+];
+
 /// One test: the platform can be installed once per process.
 #[test]
 fn paused_nothing_renders_and_no_timer_is_armed() {
@@ -74,18 +88,7 @@ fn paused_nothing_renders_and_no_timer_is_armed() {
     scene.theme(true);
     scene.ui.show().expect("show");
     let main = scene.ui.window();
-    for page in [
-        "home",
-        "library",
-        "album",
-        "playlist",
-        "liked",
-        "artist",
-        "search",
-        "now-playing",
-        "now-playing-lyrics",
-        "settings",
-    ] {
+    for page in PAGES {
         scene.open(page).expect("page");
         scene.settle();
         assert_idle(&scene, &[main], &format!("opening {page}"));
@@ -108,6 +111,18 @@ fn paused_nothing_renders_and_no_timer_is_armed() {
     scene.settle();
     assert!(!scene.ui.global::<Player>().get_playing());
     assert_idle(&scene, &[main], "pausing from the tray menu");
+
+    // After a song has played, every page is as still as before it: the paused track's
+    // marks, its cover and the Settings card's live preview start nothing.
+    for page in PAGES {
+        scene.open(page).expect("page");
+        scene.settle();
+        assert_idle(
+            &scene,
+            &[main],
+            &format!("opening {page} paused, after playing"),
+        );
+    }
 
     // The mini player, opened and closed: open and unpinned, only its foreground poll runs.
     let player = mini::create(&scene.ctx).expect("mini player");
