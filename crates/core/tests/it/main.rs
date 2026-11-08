@@ -15,3 +15,4 @@ mod player;
 mod queue;
 mod scrobble;
 mod sync;
+mod text;

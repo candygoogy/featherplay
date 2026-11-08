@@ -8,3 +8,4 @@ pub mod player;
 pub mod queue;
 pub mod scrobble;
 pub mod sync;
+pub mod text;
