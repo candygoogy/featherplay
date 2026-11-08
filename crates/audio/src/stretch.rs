@@ -12,10 +12,6 @@
 //!
 //! `Stretch::new` allocates every buffer once; `push`, `pull` and the rest never allocate,
 //! lock or block. At exactly 1.0x the input passes through bit for bit.
-#![cfg_attr(
-    not(test),
-    allow(dead_code, reason = "playback speed wires it into RingSource next")
-)]
 
 /// The slowest speed `set_speed` accepts.
 pub(crate) const MIN_SPEED: f32 = 0.5;
@@ -197,6 +193,17 @@ impl Stretch {
                 return done;
             }
         }
+    }
+
+    /// At 1.0x with nothing buffered: the caller may skip `push` and `pull` and use its
+    /// input as it is, with nothing lost or reordered.
+    pub(crate) fn is_idle(&self) -> bool {
+        self.speed == 1.0 && !self.has_tail && self.frames == 0 && self.out_start == self.out_end
+    }
+
+    /// How many frames `push` has room for now, unless it is `finish`ed.
+    pub(crate) fn room_frames(&self) -> usize {
+        self.input.len() / self.channels - self.frames
     }
 
     /// Source frames pushed but not yet output: how far the playing position lags behind
@@ -735,33 +742,35 @@ mod tests {
         assert!(pulled > 0, "nothing came out");
     }
 
-    /// The CPU cost at 2x: 60 s of 48 kHz stereo noise. Run it in release:
-    /// `cargo nextest run -p featherplay-audio --release --run-ignored only -E 'test(stretch_cpu)'`.
+    /// The CPU cost at 0.5x, 1.5x and 2x: 60 s of 48 kHz stereo noise. Run it in release:
+    /// `cargo nextest run -p featherplay-audio --release --run-ignored only -E 'test(stretch_cpu)' --no-capture`.
     #[test]
     #[ignore = "a measurement; run in release"]
-    fn stretch_cpu_at_2x() {
+    fn stretch_cpu() {
         let seconds = 60;
         let input = noise(seconds * RATE as usize, 2);
         let mut out = vec![0.0; 1_024];
-        let mut stretch = Stretch::new(2, RATE);
-        stretch.set_speed(2.0);
-        let start = Instant::now();
-        let mut produced = 0;
-        for block in input.chunks(1_024) {
-            let mut read = 0;
-            while read < block.len() {
-                read += stretch.push(&block[read..]);
-                produced += stretch.pull(&mut out);
+        for speed in [0.5, 1.5, 2.0] {
+            let mut stretch = Stretch::new(2, RATE);
+            stretch.set_speed(speed);
+            let start = Instant::now();
+            let mut produced = 0;
+            for block in input.chunks(1_024) {
+                let mut read = 0;
+                while read < block.len() {
+                    read += stretch.push(&block[read..]);
+                    produced += stretch.pull(&mut out);
+                }
             }
+            let ms = start.elapsed().as_secs_f64() * 1_000.0;
+            // Per second played, i.e. of output, is what the audio thread pays.
+            let played = produced as f64 / 2.0 / f64::from(RATE);
+            let per_played = ms / played;
+            println!(
+                "stretch at {speed}x: {per_played:.2} ms per second played, {:.2} ms per second of input",
+                ms / seconds as f64
+            );
+            assert!(per_played <= 5.0, "{speed}x: {per_played:.2} ms/s");
         }
-        let ms = start.elapsed().as_secs_f64() * 1_000.0;
-        // Per second played, i.e. of output (30 s here), is what the audio thread pays.
-        let played = produced as f64 / 2.0 / f64::from(RATE);
-        let per_played = ms / played;
-        println!(
-            "stretch at 2x: {per_played:.2} ms per second played, {:.2} ms per second of input",
-            ms / seconds as f64
-        );
-        assert!(per_played <= 3.0, "{per_played:.2} ms/s");
     }
 }

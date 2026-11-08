@@ -14,6 +14,8 @@
 //! work: the equalizer on Bass and the compressor on Strong, and skip silence looks at every
 //! block (Everywhere). Crossfade is on: each track's tail is scanned, and from 2 s to 7 s
 //! the tone crossfades into a second one, so two voices decode and sound at once.
+//! `UNDER_LOAD_SPEED` sets the playback speed (default 1); above 1 the round's times shrink
+//! by it, so the 10 s tones last the round.
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -104,9 +106,18 @@ fn burner() {
     let _ = timer.join();
 }
 
-/// Plays the tone for `PLAY` from the start, polling the position every 250 ms as the app's
-/// controller does, and returns the counters it added.
-fn play(engine: &AudioEngine, events: &std::sync::mpsc::Receiver<AudioEvent>) -> Counts {
+/// Plays the tone for `PLAY` (divided by `faster`) from the start, polling the position
+/// every 250 ms as the app's controller does, and returns the counters it added.
+fn play(
+    engine: &AudioEngine,
+    events: &std::sync::mpsc::Receiver<AudioEvent>,
+    faster: f64,
+) -> Counts {
+    let (play_for, fade_at, fade) = (
+        PLAY.div_f64(faster),
+        FADE_AT.div_f64(faster),
+        FADE.div_f64(faster),
+    );
     engine.load(tone(), Duration::ZERO);
     engine.play();
     let t = Instant::now();
@@ -123,12 +134,12 @@ fn play(engine: &AudioEngine, events: &std::sync::mpsc::Receiver<AudioEvent>) ->
     let next = fixture("tone-10s-frag.m4a");
     engine.preload(next.clone());
     let mut faded = false;
-    while t.elapsed() < PLAY {
+    while t.elapsed() < play_for {
         std::thread::sleep(Duration::from_millis(250));
         let _ = engine.playhead();
-        if !faded && t.elapsed() >= FADE_AT {
+        if !faded && t.elapsed() >= fade_at {
             faded = true;
-            engine.crossfade_to(next.clone(), FADE);
+            engine.crossfade_to(next.clone(), fade);
         }
     }
     let after = engine.glitches();
@@ -152,6 +163,13 @@ fn playback_beside_a_full_cpu() {
     engine.set_compressor(Compressor::Strong);
     engine.set_skip_silences(SkipSilence::Everywhere);
     engine.set_crossfade(true);
+    let speed: f32 = std::env::var("UNDER_LOAD_SPEED")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(1.0);
+    engine.set_speed(speed);
+    println!("at {speed}x");
+    let faster = f64::from(speed).max(1.0);
     let events = engine.events();
     let show = |what: &str, c: Counts| {
         println!(
@@ -162,11 +180,11 @@ fn playback_beside_a_full_cpu() {
         );
     };
     for _ in 0..rounds {
-        show("quiet", play(&engine, &events));
-        let mut burner = burn(PLAY + Duration::from_millis(500));
+        show("quiet", play(&engine, &events, faster));
+        let mut burner = burn(PLAY.div_f64(faster) + Duration::from_millis(500));
         // Let every burning thread start.
         std::thread::sleep(Duration::from_millis(300));
-        let loaded = play(&engine, &events);
+        let loaded = play(&engine, &events, faster);
         let _ = burner.wait();
         show("all cores busy", loaded);
     }

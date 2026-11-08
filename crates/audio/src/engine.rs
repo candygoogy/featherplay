@@ -295,6 +295,13 @@ impl AudioEngine {
         self.controls.bus.set_compressor(c);
     }
 
+    /// The playback speed, with the pitch kept: 0.5 to 2.0 (clamped; NaN means 1.0). Heard
+    /// within ~30 ms, on every voice, a crossfade's two included. `position()` stays in the
+    /// track's time.
+    pub fn set_speed(&self, speed: f32) {
+        self.controls.set_speed(speed);
+    }
+
     /// Moves playback to the named device (`None` or unknown: the default device), keeping
     /// the current track and position.
     pub fn set_device(&self, name: Option<&str>) {

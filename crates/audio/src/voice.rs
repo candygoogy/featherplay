@@ -34,6 +34,7 @@ use crate::head::HeadCache;
 use crate::http::ErrorSlot;
 use crate::media::{Cancel, Media, Opened};
 use crate::silence::{Skip, SkipSilence, Trimmer};
+use crate::stretch::{MAX_SPEED, MIN_SPEED, Stretch};
 
 /// Samples the decoder thread decodes between ring updates.
 const BATCH: usize = 4096;
@@ -73,6 +74,9 @@ pub(crate) struct Controls {
     pub crossfade: AtomicBool,
     /// "Skip silence" (`SkipSilence::to_u8`), which decoder threads read once per batch.
     pub skip_silence: AtomicU8,
+    /// The playback speed (`f32` bits), which every source reads once per refill: at 1.0 it
+    /// copies from the ring, otherwise it plays the ring through its `Stretch`.
+    speed: AtomicU32,
     /// The volume, the equalizer and the compressor, which the output's bus applies to the
     /// mix (`dsp`).
     pub bus: BusControls,
@@ -88,11 +92,26 @@ impl Controls {
             paused: AtomicBool::new(true),
             crossfade: AtomicBool::new(false),
             skip_silence: AtomicU8::new(0),
+            speed: AtomicU32::new(1.0_f32.to_bits()),
             bus: BusControls::default(),
             glitches: Arc::default(),
             #[cfg(test)]
             sources: Default::default(),
         }
+    }
+
+    /// Sets the playback speed, clamped to `MIN_SPEED..=MAX_SPEED`; NaN means 1.0.
+    pub fn set_speed(&self, speed: f32) {
+        let speed = if speed.is_nan() {
+            1.0
+        } else {
+            speed.clamp(MIN_SPEED, MAX_SPEED)
+        };
+        self.speed.store(speed.to_bits(), Ordering::Relaxed);
+    }
+
+    pub fn speed(&self) -> f32 {
+        f32::from_bits(self.speed.load(Ordering::Relaxed))
     }
 }
 
@@ -322,6 +341,8 @@ impl VoiceShared {
             // Room for any refill, so the audio thread never allocates.
             local: Vec::with_capacity(TAKE.max(SILENCE_FRAMES * ch).max(declick as usize * ch)),
             idx: 0,
+            stretch: Stretch::new(channels.get(), rate.get()),
+            input: Vec::with_capacity(TAKE),
             phase: f64::from_bits(self.fade_phase.load(Ordering::Relaxed)),
             phase_step: 0.0,
             fade_seen: 0,
@@ -622,6 +643,11 @@ pub(crate) struct RingSource {
     rate: SampleRate,
     local: Vec<Sample>,
     idx: usize,
+    /// Plays the ring at the engine's speed with the pitch kept, from `input`, a chunk of the
+    /// ring. Bypassed at 1.0 once it holds nothing (`Stretch::is_idle`): then the ring is
+    /// copied into `local` directly.
+    stretch: Stretch,
+    input: Vec<Sample>,
     /// The crossfade phase, and how far it moves per frame (0 while it holds).
     phase: f64,
     phase_step: f64,
@@ -676,7 +702,13 @@ impl RingSource {
         } else {
             TAKE as u64 / ch
         };
-        match self.read(frames)? {
+        self.stretch.set_speed(self.controls.speed());
+        let read = if self.stretch.is_idle() {
+            self.read(frames, false)?
+        } else {
+            self.read_stretched(frames)?
+        };
+        match read {
             Read::Sound => {}
             Read::Silence if stopped => return None,
             Read::Silence => {
@@ -754,9 +786,59 @@ impl RingSource {
             .store(self.phase.to_bits(), Ordering::Relaxed);
     }
 
-    /// Takes up to `frames` from the ring into `local`, following seeks and skips. `None`
-    /// ends the source.
-    fn read(&mut self, frames: u64) -> Option<Read> {
+    /// Fills `local` with up to `frames` frames of the ring played through the stretcher,
+    /// reading as much of the ring as that takes, and sets the position from what the
+    /// stretcher still holds. `None` ends the source.
+    fn read_stretched(&mut self, frames: u64) -> Option<Read> {
+        let ch = usize::from(self.channels.get());
+        let want = frames as usize * ch;
+        let v = &*self.voice;
+        if v.seek_seq.load(Ordering::Acquire) != v.seek_seen.load(Ordering::Relaxed) {
+            // A seek: what the stretcher holds is from before it, so none of it plays.
+            self.stretch.reset();
+        }
+        let mut end = None;
+        loop {
+            self.local.resize(want, 0.0);
+            let got = self.stretch.pull(&mut self.local);
+            self.local.truncate(got);
+            if got > 0 {
+                // The frames read from the ring, less those the stretcher holds and those
+                // about to play: where the chunk playing now starts, in track time.
+                let speed = f64::from(self.stretch.speed());
+                let behind = self.stretch.latency_frames() as f64 + (got / ch) as f64 * speed;
+                let front = self.voice.front_frame.load(Ordering::Relaxed);
+                let played = front.saturating_sub(behind.round() as u64);
+                self.voice.played_frame.store(played, Ordering::Relaxed);
+                return Some(Read::Sound);
+            }
+            if let Some(seq) = end {
+                return Some(Read::End(seq));
+            }
+            let room = self.stretch.room_frames().min(TAKE / ch) as u64;
+            if room == 0 {
+                // Full yet nothing out: can't happen, but never read what wouldn't fit.
+                return Some(Read::Silence);
+            }
+            self.input.clear();
+            match self.read(room, true)? {
+                Read::Sound => {
+                    self.stretch.push(&self.input);
+                }
+                Read::Silence => return Some(Read::Silence),
+                Read::End(seq) => {
+                    // The stretcher plays out what it holds, then the source ends.
+                    self.stretch.finish();
+                    end = Some(seq);
+                }
+            }
+        }
+    }
+
+    /// Takes up to `frames` from the ring, following seeks and skips: into `local`, or for
+    /// the stretcher into `input`, leaving the position to `read_stretched`. `None` ends the
+    /// source.
+    fn read(&mut self, frames: u64, stretching: bool) -> Option<Read> {
         let v = &*self.voice;
         let slots = v.slots.get()?;
         let ch = self.channels.get() as u64;
@@ -777,6 +859,8 @@ impl RingSource {
             v.front_frame.store(frame, Ordering::Relaxed);
             v.played_frame.store(frame, Ordering::Relaxed);
             v.seek_seen.store(seq, Ordering::Release);
+            // What the stretcher holds is from before the seek.
+            self.stretch.reset();
             // The ring is free again from `start` on; the decoder may be waiting for room.
             v.cv.notify_one();
         }
@@ -803,12 +887,16 @@ impl RingSource {
             v.cv.notify_one();
             return Some(Read::Silence);
         }
-        self.local
-            .extend((read..read + n).map(|i| f32::from_bits(slots.at(i).load(Ordering::Relaxed))));
+        let to = if stretching {
+            &mut self.input
+        } else {
+            &mut self.local
+        };
+        to.extend((read..read + n).map(|i| f32::from_bits(slots.at(i).load(Ordering::Relaxed))));
         // A seek published while copying may have overwritten what was copied.
         fence(Ordering::Acquire);
         if v.seek_seq.load(Ordering::Relaxed) != seq {
-            self.local.clear();
+            to.clear();
             return Some(Read::Silence);
         }
         v.read.store(read + n, Ordering::Release);
@@ -825,7 +913,9 @@ impl RingSource {
                 skipped = true;
             }
         }
-        v.played_frame.store(front, Ordering::Relaxed);
+        if !stretching {
+            v.played_frame.store(front, Ordering::Relaxed);
+        }
         v.front_frame.store(front + n / ch, Ordering::Relaxed);
         if write - (read + n) < slots.len() / 2 {
             v.cv.notify_one();
@@ -1214,5 +1304,151 @@ mod tests {
         v.push(slots, &ramp(3000, 3000));
         v.publish_seek(0);
         assert!(v.can_skip());
+    }
+
+    /// Controls playing at `speed`.
+    fn playing_at(speed: f32) -> Arc<Controls> {
+        let c = playing();
+        c.set_speed(speed);
+        c
+    }
+
+    /// Plays `frames` frames from `src`, topping the ring up with a 440 Hz tone (peak 0.4)
+    /// as a decoder would; `next` counts the frames written so far.
+    fn play_fed(
+        v: &VoiceShared,
+        src: &mut RingSource,
+        next: &mut usize,
+        frames: usize,
+    ) -> Vec<Sample> {
+        let slots = v.slots.get().unwrap();
+        let mut heard = Vec::with_capacity(frames * 2);
+        while heard.len() < frames * 2 {
+            while v.room(slots) >= 2048 {
+                let tone: Vec<Sample> = (*next..*next + 1024)
+                    .flat_map(|i| {
+                        let x = 0.4 * (std::f32::consts::TAU * 440.0 * i as f32 / 44_100.0).sin();
+                        [x, x]
+                    })
+                    .collect();
+                v.push(slots, &tone);
+                *next += 1024;
+            }
+            heard.extend(src.by_ref().take(1024.min(frames * 2 - heard.len())));
+        }
+        heard
+    }
+
+    #[test]
+    fn at_2x_the_position_moves_two_seconds_per_second_played() {
+        let v = voice();
+        let (tx, _rx) = mpsc::channel();
+        let mut src = v.source(playing_at(2.0), tx).unwrap();
+        let mut next = 0;
+        let _ = play_fed(&v, &mut src, &mut next, 22_050);
+        let from = v.position();
+        let _ = play_fed(&v, &mut src, &mut next, 44_100);
+        let moved = v.position() - from;
+        assert!(
+            (moved.as_secs_f64() - 2.0).abs() < 0.06,
+            "{moved:?} in a second played"
+        );
+    }
+
+    #[test]
+    fn a_seek_while_stretching_lands_on_its_target() {
+        let v = voice();
+        let slots = v.slots.get().unwrap();
+        v.push(slots, &[-0.5; 44_100]);
+        let (tx, _rx) = mpsc::channel();
+        let mut src = v.source(playing_at(1.5), tx).unwrap();
+        // The stretcher holds some of the old place when the seek comes.
+        let _ = src.by_ref().take(4096).count();
+        v.publish_seek(441_000);
+        assert_eq!(v.position(), Duration::from_secs(10));
+        let mut next = 0;
+        let heard = play_fed(&v, &mut src, &mut next, 22_050);
+        // What was already taken before the seek may finish; nothing of it after that.
+        assert!(
+            heard[TAKE..].iter().all(|&s| s > -0.45),
+            "the old place played after the seek"
+        );
+        // Half a second played at 1.5x: 0.75 s of the track, less up to a chunk.
+        let at = v.position().as_secs_f64();
+        assert!((10.68..=10.76).contains(&at), "at {at} s");
+    }
+
+    #[test]
+    fn a_crossfade_at_2x_keeps_its_length_in_output_time() {
+        let controls = playing_at(2.0);
+        let (tx, _rx) = mpsc::channel();
+        let (old, new) = (steady(3.0), steady(3.0));
+        let mut out = old.source(controls.clone(), tx.clone()).unwrap();
+        let _ = gains(&mut out, 4096);
+        let fade = Duration::from_secs(1);
+        old.fade(Fade::Out, fade);
+        new.start_silent();
+        new.fade(Fade::In, fade);
+        let mut inc = new.source(controls, tx).unwrap();
+        let a = gains(&mut out, 46_000);
+        let b = gains(&mut inc, 46_000);
+        // Halfway through the second, not the half second the track's time would take.
+        let (mid, half) = (22_050, std::f32::consts::FRAC_1_SQRT_2);
+        assert!((a[mid] - half).abs() < 0.04, "the old voice at {}", a[mid]);
+        assert!((b[mid] - half).abs() < 0.04, "the new voice at {}", b[mid]);
+        assert!(a[45_999] < 0.01, "the old voice still at {}", a[45_999]);
+        assert!(b[45_999] > 0.99, "the new voice at {}", b[45_999]);
+        // And the track it fades into plays at 2x meanwhile.
+        let at = new.position().as_secs_f64();
+        assert!((1.95..=2.1).contains(&at), "the new track at {at} s");
+    }
+
+    #[test]
+    fn a_skip_while_stretching_moves_the_position() {
+        let v = voice();
+        let slots = v.slots.get().unwrap();
+        v.push(slots, &[0.5; 6000]);
+        v.mark_skip(44_100);
+        v.push(slots, &[0.5; 6000]);
+        let (tx, rx) = mpsc::channel();
+        let mut src = v.source(playing_at(2.0), tx).unwrap();
+        let _ = src.by_ref().take(4000).count();
+        let at = v.position().as_secs_f64();
+        assert!(at > 1.0, "at {at} s");
+        assert!(
+            rx.try_iter()
+                .any(|m| matches!(m, Msg::Skipped { voice: 1 }))
+        );
+    }
+
+    #[test]
+    fn a_ring_that_trickles_in_while_stretching_loses_nothing() {
+        let v = voice();
+        let slots = v.slots.get().unwrap();
+        let (tx, _rx) = mpsc::channel();
+        let mut src = v.source(playing_at(2.0), tx).unwrap();
+        // 2 s arriving 500 frames at a time, less than a stretch step needs: the ring runs
+        // dry between pieces, as with a slow download.
+        let mut heard = 0;
+        for _ in 0..176 {
+            v.push(slots, &[0.5; 1000]);
+            heard += src.by_ref().take(4000).filter(|&s| s > 0.0).count() / 2;
+        }
+        // 1 s of output at 2x, less what the stretcher still holds.
+        assert!(heard > 40_000, "{heard} frames heard of about 44100");
+    }
+
+    #[test]
+    fn back_at_1x_the_ring_is_read_directly_again() {
+        let v = voice();
+        let (tx, _rx) = mpsc::channel();
+        let controls = playing_at(2.0);
+        let mut src = v.source(controls.clone(), tx).unwrap();
+        let mut next = 0;
+        let _ = play_fed(&v, &mut src, &mut next, 22_050);
+        controls.set_speed(1.0);
+        // The stretcher crossfades back and drains within a chunk or two.
+        let _ = play_fed(&v, &mut src, &mut next, 4410);
+        assert!(src.stretch.is_idle(), "still stretching at 1x");
     }
 }
