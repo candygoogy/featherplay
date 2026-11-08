@@ -546,7 +546,10 @@ export component BottomBar inherits Rectangle {
     // The speed pill, while it shows, sits just left of the right-hand group, which then
     // takes its room too.
     property <length> right-w: actions.preferred-width + (Player.speed != 2 ? speed-pill.width + 4px : 0px);
-    property <length> center-w: max(320px, min(600px, self.width - 2 * (root.right-w + 14px)));
+    // The right-hand buttons sit as far in from the bar's right end as from its top and bottom,
+    // so the last one is centred in the rounded end, as the cover is at the left.
+    property <length> end-gap: (Theme.bar-h - 36px) / 2;
+    property <length> center-w: max(320px, min(600px, self.width - 2 * (root.right-w + root.end-gap + 2px)));
     // Where the speed popup centres (in the bar).
     out property <length> speed-centre: speed-pill.x + speed-pill.width / 2;
     property <length> left-w: max(80px, (self.width - root.center-w) / 2 - 100px);
@@ -743,7 +746,7 @@ export component BottomBar inherits Rectangle {
     }
 
     actions := HorizontalLayout {
-        x: parent.width - self.width - Theme.s3;
+        x: parent.width - self.width - root.end-gap;
         y: (parent.height - 36px) / 2;
         height: 36px;
         width: self.preferred-width;
