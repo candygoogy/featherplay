@@ -1,6 +1,6 @@
 # Vendored: i-slint-renderer-skia 1.18.1
 
-This is the crate as published on crates.io, with sixteen changes. The workspace `Cargo.toml`
+This is the crate as published on crates.io, with seventeen changes. The workspace `Cargo.toml`
 swaps it in with `[patch.crates-io]`.
 
 1. `Cargo.toml`: `wgpu-30` is out of the default features.
@@ -136,6 +136,22 @@ Change 16 makes the exe smaller (measured 2026-11-08):
     surface was the only thing reaching Skia's GPU backend (Ganesh over OpenGL, with its GL
     interface and shader code): leaving it out took 496,640 bytes off the release exe.
 
+Change 17 keeps a colour fade's shadows out of memory (measured 2026-11-08):
+
+17. `itemrenderer.rs`, `draw_box_shadow`, `render_drop_shadow_mask` (in place of
+    `render_drop_shadow_image`), `drop_shadow_mask`, `SHADOW_MASKS`: a drop shadow is drawn
+    from an alpha mask of its blurred shape, cached by its options with the colour left out
+    (at most 64, more than the ~27 shadows of the whole UI, the least recently drawn going
+    first, cleared with the other caches), in a
+    paint of its colour. Upstream rendered each shadow into an RGBA image in its colour and
+    kept it in the box shadow cache under all its options, the colour included. Now
+    playing's glow under the cover is a shadow in the accent, and the accent crossfades to
+    each new cover's colour a frame at a time, so each frame of the fade blurred a new
+    image and the cache kept the last 16: ~26 MB more private memory after a song change
+    at 1600x1000 at 150 %, more at 4K (`apps/featherplay/tests/app/memory.rs`, the glow
+    test). The mask is a quarter of the image's bytes, and is made once for the fade.
+    Inset shadows still go through the box shadow cache.
+
 ## Why
 
 `i-slint-backend-winit` depends on this crate with its default features, and our crates
@@ -159,7 +175,9 @@ licence, which allows modified copies).
 3. Keep change 3 unless the new `free_graphics_resources` already frees `layer_cache`,
    change 4 (or an equivalent the frame log can read), change 5, changes 6–8 and 10–15 unless the
    new renderer already does the same (then check `scroll_frames.rs` still passes optimised),
-   and change 16 (the exe's size shows whether Skia's GPU backend came back).
+   and change 16 (the exe's size shows whether Skia's GPU backend came back), and change
+   17 unless the new box shadow cache leaves the colour out of its key (`memory.rs`' glow
+   test shows it).
 4. Build. If `i-slint-backend-winit` still calls wgpu-only constructors, port the two
    wgpu `featherplay patch` blocks in `lib.rs` (the git history of this folder has the diff);
    if it now gates them itself, leave those two out.

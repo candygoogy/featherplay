@@ -8,7 +8,7 @@ use std::pin::Pin;
 use super::{PhysicalBorderRadius, PhysicalLength, PhysicalPoint, PhysicalRect, PhysicalSize};
 use i_slint_core::graphics::ApproxEq;
 use i_slint_core::graphics::ResolvedBrush;
-use i_slint_core::graphics::boxshadowcache::BoxShadowCache;
+use i_slint_core::graphics::boxshadowcache::{BoxShadowCache, BoxShadowOptions};
 use i_slint_core::graphics::euclid::num::Zero;
 use i_slint_core::graphics::euclid::{self, Vector2D};
 use i_slint_core::item_rendering::{
@@ -35,10 +35,44 @@ thread_local! {
         Default::default();
 }
 
+thread_local! {
+    /// featherplay patch (change 17): drop shadows' blurred shapes, as alpha masks, by
+    /// their options with the colour left out (`shadow_mask_key`), and when each was last
+    /// drawn. The colour is the paint's when a mask is drawn, so a shadow whose colour fades
+    /// (Now playing's glow, as the accent crossfades to a new cover's) keeps its one mask.
+    static SHADOW_MASKS: std::cell::RefCell<ShadowMasks> = Default::default();
+}
+
+/// featherplay patch (change 17): `SHADOW_MASKS`' entries and its clock.
+#[derive(Default)]
+struct ShadowMasks {
+    masks: std::collections::BTreeMap<
+        i_slint_core::graphics::boxshadowcache::BoxShadowOptions,
+        (Option<skia_safe::Image>, u64),
+    >,
+    clock: u64,
+}
+
+/// featherplay patch (change 17): the most masks `SHADOW_MASKS` keeps; the least recently
+/// drawn goes first. It's the only cache of drop shadows (they skip the per-item one), so
+/// it holds more than a frame draws (~27 shadows in the whole UI), or they would push each
+/// other out and be blurred again each frame; masks are one byte a pixel.
+const MAX_SHADOW_MASKS: usize = 64;
+
 /// featherplay patch (change 8): lets go of the cached borders (with the renderer's other
-/// caches, when the window is minimised).
+/// caches, when the window is minimised), and of the shadow masks (change 17).
 pub(crate) fn clear_ring_cache() {
     RINGS.with_borrow_mut(|rings| rings.clear());
+    SHADOW_MASKS.with_borrow_mut(|s| s.masks.clear());
+}
+
+/// featherplay patch (change 17): a drop shadow's options as `SHADOW_MASKS` keys them: its
+/// colour opaque black, whatever it is.
+fn shadow_mask_key(
+    mut options: i_slint_core::graphics::boxshadowcache::BoxShadowOptions,
+) -> i_slint_core::graphics::boxshadowcache::BoxShadowOptions {
+    options.color = Color::from_argb_u8(255, 0, 0, 0);
+    options
 }
 
 #[derive(Clone, Copy)]
@@ -106,7 +140,11 @@ impl<'a> SkiaItemRenderer<'a> {
         !self.canvas.local_to_device_as_3x3().preserves_axis_alignment()
     }
 
-    fn render_drop_shadow_image(
+    /// featherplay patch (change 17, in place of upstream's `render_drop_shadow_image`): a
+    /// drop shadow's blurred shape alone, as an alpha mask. Upstream drew the same shape in
+    /// the shadow's colour into an RGBA image; this mask drawn with a paint of that colour
+    /// gives its pixels, at a quarter of its bytes.
+    fn render_drop_shadow_mask(
         canvas: &skia_safe::Canvas,
         shadow_options: &i_slint_core::graphics::boxshadowcache::BoxShadowOptions,
     ) -> Option<skia_safe::Image> {
@@ -114,24 +152,16 @@ impl<'a> SkiaItemRenderer<'a> {
         if shape_size.is_empty() {
             return None;
         }
-
-        let canvas_size: skia_safe::Size = {
-            let size = shadow_options.drop_texture_size();
-            (size.width, size.height).into()
-        };
-
-        let image_info = crate::image_info(
-            canvas_size.to_ceil(),
-            skia_safe::ColorType::RGBA8888,
-            skia_safe::AlphaType::Premul,
+        let size = shadow_options.drop_texture_size();
+        let image_info = skia_safe::ImageInfo::new_a8(
+            skia_safe::Size::new(size.width, size.height).to_ceil(),
         );
-
         let rounded_rect = to_skia_rrect(
             &PhysicalRect::new(shadow_options.shape_origin(), shape_size),
             &shadow_options.outer_radius(),
         );
-
-        let mut paint = crate::solid_paint(&shadow_options.color);
+        let mut paint = skia_safe::Paint::default();
+        paint.set_color(skia_safe::Color::BLACK);
         paint.set_anti_alias(true);
         if shadow_options.blur.get() > 0. {
             paint.set_mask_filter(skia_safe::MaskFilter::blur(
@@ -140,12 +170,37 @@ impl<'a> SkiaItemRenderer<'a> {
                 None,
             ));
         }
-
         let mut surface = canvas.new_surface(&image_info, None)?;
         let surface_canvas = surface.canvas();
         surface_canvas.clear(skia_safe::Color::TRANSPARENT);
         surface_canvas.draw_rrect(rounded_rect, &paint);
         Some(surface.image_snapshot())
+    }
+
+    /// featherplay patch (change 17): the mask of the drop shadow `options` describes, from
+    /// `SHADOW_MASKS` or made now.
+    fn drop_shadow_mask(
+        canvas: &skia_safe::Canvas,
+        options: i_slint_core::graphics::boxshadowcache::BoxShadowOptions,
+    ) -> Option<skia_safe::Image> {
+        let key = shadow_mask_key(options);
+        SHADOW_MASKS.with_borrow_mut(|s| {
+            s.clock += 1;
+            let now = s.clock;
+            if let Some((mask, used)) = s.masks.get_mut(&key) {
+                *used = now;
+                return mask.clone();
+            }
+            if s.masks.len() >= MAX_SHADOW_MASKS
+                && let Some(oldest) =
+                    s.masks.iter().min_by_key(|(_, (_, used))| *used).map(|(k, _)| k.clone())
+            {
+                s.masks.remove(&oldest);
+            }
+            let mask = Self::render_drop_shadow_mask(canvas, &key);
+            s.masks.insert(key, (mask.clone(), now));
+            mask
+        })
     }
 
     fn render_inset_shadow_image(
@@ -863,19 +918,28 @@ impl ItemRenderer for SkiaItemRenderer<'_> {
             return;
         }
 
-        let cached_shadow_image = self.box_shadow_cache.get_box_shadow(
-            self_rc,
-            self.image_cache,
-            box_shadow,
-            self.scale_factor,
-            |shadow_options| {
-                if shadow_options.inset {
-                    Self::render_inset_shadow_image(self.canvas, shadow_options)
-                } else {
-                    Self::render_drop_shadow_image(self.canvas, shadow_options)
-                }
-            },
-        );
+        // featherplay patch (change 17): a drop shadow is its colourless mask (`SHADOW_MASKS`)
+        // drawn in its colour. Through the shared box shadow cache, which keys its images on
+        // the colour too, each frame of a colour fade made and blurred an image of its own,
+        // and kept the last 16: Now playing's glow fading to a new cover's accent left ~26 MB
+        // of them at 1600x1000 at 150 %.
+        let mut mask_paint = None;
+        let cached_shadow_image = if inset {
+            self.box_shadow_cache.get_box_shadow(
+                self_rc,
+                self.image_cache,
+                box_shadow,
+                self.scale_factor,
+                |shadow_options| Self::render_inset_shadow_image(self.canvas, shadow_options),
+            )
+        } else {
+            BoxShadowOptions::new(self_rc, box_shadow, self.scale_factor).and_then(|options| {
+                let mut paint = crate::solid_paint(&options.color);
+                paint.set_alpha_f(paint.alpha_f() * self.current_state.alpha);
+                mask_paint = Some(paint);
+                Self::drop_shadow_mask(self.canvas, options)
+            })
+        };
 
         let cached_shadow_image = match cached_shadow_image {
             Some(img) => img,
@@ -919,7 +983,7 @@ impl ItemRenderer for SkiaItemRenderer<'_> {
             self.canvas.draw_image(
                 cached_shadow_image,
                 to_skia_point(offset - PhysicalPoint::new(pad, pad).to_vector()),
-                self.default_paint().as_ref(),
+                mask_paint.as_ref(),
             );
             if saved {
                 self.canvas.restore();

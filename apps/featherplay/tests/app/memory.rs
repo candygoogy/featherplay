@@ -313,6 +313,32 @@ fn a_pages_covers_go_while_it_is_not_shown_and_come_back() {
     );
 }
 
+/// Now playing's glow is a shadow in the accent, which crossfades to each new cover's colour
+/// a frame at a time. The renderer kept a blurred image of the glow for every colour it was
+/// drawn in, the last 16 of them (~26 MB at 1600x1000 at 150 %, measured 2026-11-08); its
+/// colourless mask is kept once now, whatever the colour.
+#[test]
+fn the_glow_fading_through_colours_keeps_one_image_of_it() {
+    let scene = scene();
+    scene.open("now-playing").expect("now playing");
+    scene.settle();
+    let w = scene.ui.window();
+    let theme = scene.ui.global::<Theme>();
+    theme.set_follow(true);
+    theme.set_follow_neutral(false);
+    frames(w, 10, |_| {});
+    let before = private_mb();
+    for i in 0..24u8 {
+        theme.set_follow_accent(slint::Color::from_rgb_u8(60 + i * 7, 120, 220 - i * 6));
+        frames(w, 1, |_| {});
+    }
+    let grew = private_mb() - before;
+    assert!(
+        grew < 8.0,
+        "24 frames of the glow's colour fade took {grew:.1} MB more private memory"
+    );
+}
+
 #[test]
 #[ignore = "a measurement: prints private memory after each step"]
 fn steps() {
