@@ -45,16 +45,16 @@ msgid "Unknown title"
 msgstr ""
 
 #: ../../crates/integrations/src/taskbar.rs:176
-#: ../../crates/integrations/src/taskbar.rs:176 ui/bottom_bar.slint:458
-#: ../../crates/integrations/src/taskbar.rs:176 ui/bottom_bar.slint:458 ui/parts.slint:99
+#: ../../crates/integrations/src/taskbar.rs:176 ui/bottom_bar.slint:378
+#: ../../crates/integrations/src/taskbar.rs:176 ui/bottom_bar.slint:378 ui/parts.slint:99
 msgid "Pause"
 msgstr ""
 
 #: ../../crates/integrations/src/taskbar.rs:178
 #: ../../crates/integrations/src/taskbar.rs:178
-#: ../../crates/integrations/src/taskbar.rs:178 ui/bottom_bar.slint:458
-#: ../../crates/integrations/src/taskbar.rs:178 ui/bottom_bar.slint:458 ui/pages/content.slint:841 ui/pages/home.slint:606
-#: ../../crates/integrations/src/taskbar.rs:178 ui/bottom_bar.slint:458 ui/pages/content.slint:841 ui/pages/home.slint:606 ui/playlist_menu_layer.slint:197
+#: ../../crates/integrations/src/taskbar.rs:178 ui/bottom_bar.slint:378
+#: ../../crates/integrations/src/taskbar.rs:178 ui/bottom_bar.slint:378 ui/pages/content.slint:841 ui/pages/home.slint:606
+#: ../../crates/integrations/src/taskbar.rs:178 ui/bottom_bar.slint:378 ui/pages/content.slint:841 ui/pages/home.slint:606 ui/playlist_menu_layer.slint:197
 msgid "Play"
 msgstr ""
 
@@ -73,10 +73,10 @@ msgid "Next"
 msgstr ""
 
 #: ../../crates/integrations/src/tray.rs:273
-#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:616
-#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:616 ui/mini_player.slint:131 ui/pages/lyrics.slint:97
-#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:616 ui/mini_player.slint:131 ui/pages/lyrics.slint:97 ui/pages/now_playing.slint:709
-#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:616 ui/mini_player.slint:131 ui/pages/lyrics.slint:97 ui/pages/now_playing.slint:709
+#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:575
+#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:575 ui/mini_player.slint:131 ui/pages/lyrics.slint:97
+#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:575 ui/mini_player.slint:131 ui/pages/lyrics.slint:97 ui/pages/now_playing.slint:709
+#: ../../crates/integrations/src/tray.rs:273 ui/bottom_bar.slint:575 ui/mini_player.slint:131 ui/pages/lyrics.slint:97 ui/pages/now_playing.slint:709
 msgid "Nothing playing"
 msgstr ""
 
@@ -93,7 +93,7 @@ msgid "paused at {}"
 msgstr ""
 
 #: ../../crates/integrations/src/tray_menu.rs:49 ui/mini_player.slint:270
-#: ../../crates/integrations/src/tray_menu.rs:49 ui/mini_player.slint:270 ui/not_for_me.slint:106
+#: ../../crates/integrations/src/tray_menu.rs:49 ui/mini_player.slint:270 ui/not_for_me.slint:70
 msgid "Not for me"
 msgstr ""
 
@@ -269,7 +269,7 @@ msgstr ""
 msgid "Right-click the tray icon to show the window or quit."
 msgstr ""
 
-#: src/controller.rs:1281
+#: src/controller.rs:1315
 msgid "No sound output found. Connect speakers or headphones."
 msgstr ""
 
@@ -362,7 +362,7 @@ msgstr ""
 msgid "featherplay couldn't listen on port {} for Amuse."
 msgstr ""
 
-#: src/controller/queue.rs:249
+#: src/controller/queue.rs:255
 msgid "Autoplay"
 msgstr ""
 
@@ -374,7 +374,7 @@ msgstr ""
 msgid "Lyrics from LRCLIB"
 msgstr ""
 
-#: src/lyrics.rs:897
+#: src/lyrics.rs:898
 msgid "Source: LyricFind"
 msgstr ""
 
@@ -490,41 +490,41 @@ msgstr ""
 msgid "Artist"
 msgstr ""
 
-#: src/pages/content.rs:229
+#: src/pages/content.rs:248
 msgid "{n} song"
 msgid_plural "{n} songs"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/pages/content.rs:241
+#: src/pages/content.rs:260
 msgid "{n} hour"
 msgid_plural "{n} hours"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/pages/content.rs:242
+#: src/pages/content.rs:261
 msgid "{n} minute"
 msgid_plural "{n} minutes"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/pages/content.rs:299
+#: src/pages/content.rs:318
 msgid "Your session has ended. Sign in to see this."
 msgstr ""
 
-#: src/pages/content.rs:300
+#: src/pages/content.rs:319
 msgid "Sign in to see this."
 msgstr ""
 
-#: src/pages/content.rs:302
+#: src/pages/content.rs:321
 msgid "Can't reach the music service. Check the connection, then try again."
 msgstr ""
 
-#: src/pages/content.rs:304
+#: src/pages/content.rs:323
 msgid "This isn't available."
 msgstr ""
 
-#: src/pages/content.rs:305
+#: src/pages/content.rs:324
 msgid "The music service sent something unexpected."
 msgstr ""
 
@@ -701,7 +701,7 @@ msgstr ""
 msgid "Something went wrong inside it. Try again, or use another way below."
 msgstr ""
 
-#: src/pages/sign_in.rs:259 src/snapshot.rs:655
+#: src/pages/sign_in.rs:259 src/snapshot.rs:664
 msgid ""
 "Finish signing in in Microsoft Edge. featherplay closes it once you're in."
 msgstr ""
@@ -976,96 +976,115 @@ msgstr ""
 msgid "Dislike all songs"
 msgstr ""
 
-#: ui/bottom_bar.slint:48
+#: ui/bottom_bar.slint:50
 msgid "Seek"
 msgstr ""
 
-#: ui/bottom_bar.slint:182
+#: ui/bottom_bar.slint:184
 msgid "Silence"
 msgstr ""
 
-#: ui/bottom_bar.slint:207
+#: ui/bottom_bar.slint:209
 msgid "Volume"
 msgstr ""
 
-#: ui/bottom_bar.slint:325 ui/pages/settings.slint:1861
+#: ui/bottom_bar.slint:327 ui/pages/settings.slint:1861
 msgid "{} %"
 msgstr ""
 
-#: ui/bottom_bar.slint:364 ui/bottom_bar.slint:396
-#: ui/bottom_bar.slint:364 ui/bottom_bar.slint:396 ui/pages/now_playing.slint:247
-#: ui/bottom_bar.slint:364 ui/bottom_bar.slint:396 ui/pages/now_playing.slint:247 ui/pages/settings.slint:2433
+#: ui/bottom_bar.slint:349 ui/bottom_bar.slint:361
+#: ui/bottom_bar.slint:349 ui/bottom_bar.slint:361 ui/pages/now_playing.slint:247
+#: ui/bottom_bar.slint:349 ui/bottom_bar.slint:361 ui/pages/now_playing.slint:247 ui/pages/settings.slint:2433
 msgid "Lyrics"
 msgstr ""
 
-#: ui/bottom_bar.slint:365
+#: ui/bottom_bar.slint:350
 msgid "Hides the lyrics, back to the cover"
 msgstr ""
 
-#: ui/bottom_bar.slint:365
+#: ui/bottom_bar.slint:350
 msgid "Shows the lyrics on Now playing"
 msgstr ""
 
-#: ui/bottom_bar.slint:396
+#: ui/bottom_bar.slint:361
 msgid "Hide lyrics"
 msgstr ""
 
-#: ui/bottom_bar.slint:396 ui/pages/now_playing.slint:247
+#: ui/bottom_bar.slint:361 ui/pages/now_playing.slint:247
 msgid "No lyrics"
 msgstr ""
 
-#: ui/bottom_bar.slint:396 ui/pages/now_playing.slint:247
+#: ui/bottom_bar.slint:361 ui/pages/now_playing.slint:247
 msgid "Retry lyrics"
 msgstr ""
 
-#: ui/bottom_bar.slint:402
+#: ui/bottom_bar.slint:362
 msgid "Ctrl+L"
 msgstr ""
 
 #. Its shortcut, in both windows.
-#: ui/bottom_bar.slint:464 ui/parts.slint:101
+#: ui/bottom_bar.slint:379 ui/parts.slint:101
 msgid "Space"
 msgstr ""
 
-#: ui/bottom_bar.slint:484
+#: ui/bottom_bar.slint:435
 msgid "Playback speed, {}"
 msgstr ""
 
-#: ui/bottom_bar.slint:544 ui/bottom_bar.slint:560
-#: ui/bottom_bar.slint:544 ui/bottom_bar.slint:560
+#: ui/bottom_bar.slint:456 ui/bottom_bar.slint:503 ui/bottom_bar.slint:519
+#: ui/bottom_bar.slint:456 ui/bottom_bar.slint:503 ui/bottom_bar.slint:519
 msgid "Playback speed"
 msgstr ""
 
-#: ui/bottom_bar.slint:616
+#: ui/bottom_bar.slint:575
 msgid "Now playing: {}"
 msgstr ""
 
-#: ui/bottom_bar.slint:694 ui/pages/content.slint:842
-#: ui/bottom_bar.slint:694 ui/pages/content.slint:842
-msgid "Shuffle"
+#: ui/bottom_bar.slint:655
+msgid "Shuffle on"
 msgstr ""
 
-#: ui/bottom_bar.slint:724
+#: ui/bottom_bar.slint:655
+msgid "Shuffle off"
+msgstr ""
+
+#: ui/bottom_bar.slint:657
+msgid "Ctrl+S"
+msgstr ""
+
+#: ui/bottom_bar.slint:667
+msgid "Ctrl+←"
+msgstr ""
+
+#: ui/bottom_bar.slint:681
+msgid "Ctrl+→"
+msgstr ""
+
+#: ui/bottom_bar.slint:690
 msgid "Repeat one"
 msgstr ""
 
-#: ui/bottom_bar.slint:724
+#: ui/bottom_bar.slint:690
 msgid "Repeat all"
 msgstr ""
 
-#: ui/bottom_bar.slint:724
+#: ui/bottom_bar.slint:690
 msgid "Repeat off"
 msgstr ""
 
-#: ui/bottom_bar.slint:794
+#: ui/bottom_bar.slint:692
+msgid "Ctrl+R"
+msgstr ""
+
+#: ui/bottom_bar.slint:762
 msgid "Mute"
 msgstr ""
 
-#: ui/bottom_bar.slint:794
+#: ui/bottom_bar.slint:762
 msgid "Unmute"
 msgstr ""
 
-#: ui/bottom_bar.slint:810 ui/pages/now_playing.slint:114
+#: ui/bottom_bar.slint:778 ui/pages/now_playing.slint:114
 msgid "Up next"
 msgstr ""
 
@@ -1126,8 +1145,12 @@ msgstr ""
 msgid "Remove like"
 msgstr ""
 
-#: ui/mini_player.slint:271 ui/not_for_me.slint:75 ui/not_for_me.slint:112
+#: ui/mini_player.slint:271 ui/not_for_me.slint:59
 msgid "Skips the song and tells YouTube Music you dislike it"
+msgstr ""
+
+#: ui/not_for_me.slint:71
+msgid "Dislike and skip"
 msgstr ""
 
 #: ui/pages/about.slint:82
@@ -1277,8 +1300,12 @@ msgid "Go to Explore"
 msgstr ""
 
 #: ui/pages/content.slint:686 ui/pages/content.slint:1003
-#: ui/pages/content.slint:686 ui/pages/content.slint:1003 ui/parts.slint:743 ui/parts.slint:882
+#: ui/pages/content.slint:686 ui/pages/content.slint:1003 ui/parts.slint:752 ui/parts.slint:891
 msgid "More"
+msgstr ""
+
+#: ui/pages/content.slint:842 ui/playlist_menu_layer.slint:206
+msgid "Shuffle"
 msgstr ""
 
 #: ui/pages/explore.slint:188
@@ -1365,8 +1392,8 @@ msgstr ""
 msgid "Plays on your other devices count too."
 msgstr ""
 
-#: ui/pages/home.slint:363 ui/parts.slint:388 ui/parts.slint:647
-#: ui/pages/home.slint:363 ui/parts.slint:388 ui/parts.slint:647
+#: ui/pages/home.slint:363 ui/parts.slint:388 ui/parts.slint:656
+#: ui/pages/home.slint:363 ui/parts.slint:388 ui/parts.slint:656
 msgid "Play {}"
 msgstr ""
 
@@ -2582,7 +2609,7 @@ msgstr ""
 msgid "Playing"
 msgstr ""
 
-#: ui/parts.slint:388 ui/parts.slint:846
+#: ui/parts.slint:388 ui/parts.slint:855
 msgid "Pause {}"
 msgstr ""
 

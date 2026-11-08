@@ -3,12 +3,14 @@
 // middle the transport around the round play button, with the time, the seek line and the
 // length under it; Lyrics (the microphone), "Not for me" (a thumbs-down), like, volume and
 // the Up next button on the right. It reads and drives the `Player` global; `src/bar.rs`
-// connects that to the controller.
+// connects that to the controller. The transport, Lyrics, "Not for me" and the speed pill
+// share one tooltip (`BarTip`): the name, then the shortcut.
 import { Theme, Icons, Curves } from "theme.slint";
 import { Body, Cover, IconButton, Icon, PlayButton } from "parts.slint";
 import { Player, Repeat } from "player.slint";
 import { Nav, PageKind, Frame } from "nav.slint";
 import { NotForMeButton, LikeButton } from "not_for_me.slint";
+import { BarTip } from "bar_tip.slint";
 import { LyricsData, LyricsState } from "pages/lyrics.slint";
 import { Chips } from "pages/content.slint";
 
@@ -334,31 +336,14 @@ component VolumeSlider inherits Rectangle {
 
 // Lyrics, the microphone left of "Not for me": Now playing's full lyrics view on and off from
 // any page (`LyricsData.toggle-view`; elsewhere it opens Now playing on the lyrics), in the
-// accent while the view shows. Resting on it shows a tooltip like "Not for me"'s, with the
-// shortcut; the same delay keeps it from flashing as the pointer crosses the bar. For a song
-// with no lyrics it says so, and a press does what the stage's pill does: the stage stays and
-// the pill's note says why.
+// accent while the view shows. Its tooltip names what a click does, with the shortcut. For a
+// song with no lyrics it says so, and a press does what the stage's pill does: the stage stays
+// and the pill's note says why.
 component LyricsButton inherits Rectangle {
     // How far above the button the tooltip ends (the bar lifts it clear of itself).
     in property <length> above: Theme.s2;
-    property <bool> over: btn.hovered;
-    // The pointer has rested long enough (at once in snapshots), and hasn't clicked since.
-    property <bool> rested: false;
-    property <bool> dismissed: false;
-    property <bool> tip: root.over && !root.dismissed && (root.rested || Theme.still);
-    changed over => {
-        if !root.over {
-            root.rested = false;
-            root.dismissed = false;
-        }
-    }
     width: 36px;
     height: 36px;
-    Timer {
-        interval: 500ms;
-        running: root.over && !root.rested;
-        triggered => { root.rested = true; }
-    }
     btn := IconButton {
         icon: Icons.lyrics;
         label: @tr("Lyrics");
@@ -367,111 +352,77 @@ component LyricsButton inherits Rectangle {
         // Off is always possible; on needs a song.
         enabled: Player.has-track || LyricsData.showing;
         clicked => {
-            root.dismissed = true;
+            tip.dismiss();
             LyricsData.toggle-view();
         }
     }
-    // The tooltip, `above` the button, centred over it.
-    Rectangle {
-        x: (root.width - self.width) / 2;
-        y: btn.y - root.above - self.height;
-        width: lay.preferred-width;
-        height: lay.preferred-height;
-        border-radius: Theme.r-s;
-        background: Theme.card;
-        border-width: 1px;
-        border-color: Theme.card-edge;
-        drop-shadow-blur: 8px;
-        drop-shadow-color: Theme.cover-shadow;
-        opacity: root.tip ? 1 : 0;
-        visible: self.opacity > 0;
-        animate opacity { duration: Theme.t-fast; easing: Curves.ease-out; }
-        lay := HorizontalLayout {
-            padding-left: Theme.s3;
-            padding-right: Theme.s3;
-            padding-top: Theme.s2;
-            padding-bottom: Theme.s2;
-            spacing: Theme.s2;
-            Body {
-                text: LyricsData.showing ? @tr("Hide lyrics") : (LyricsData.state == LyricsState.none ? @tr("No lyrics") : (LyricsData.state == LyricsState.error ? @tr("Retry lyrics") : @tr("Lyrics")));
-                font-size: Theme.t-meta;
-                font-weight: 600;
-                color: Theme.text1;
-            }
-            Body {
-                text: @tr("Ctrl+L");
-                font-size: Theme.t-meta;
-                color: Theme.text2;
-            }
-        }
+    tip := BarTip {
+        over: btn.hovered;
+        name: LyricsData.showing ? @tr("Hide lyrics") : (LyricsData.state == LyricsState.none ? @tr("No lyrics") : (LyricsData.state == LyricsState.error ? @tr("Retry lyrics") : @tr("Lyrics")));
+        hint: @tr("Ctrl+L");
+        above: root.above;
     }
 }
 
-// The bar's play button, with a tooltip like the microphone's: Play or Pause, and its
-// shortcut, Space. The same delay; the timer runs only while the pointer is on it.
+// The bar's play button, with its tooltip: Play or Pause, and its shortcut, Space.
 component BarPlayButton inherits Rectangle {
     // How far above the button the tooltip ends (the bar lifts it clear of itself).
     in property <length> above: Theme.s2;
-    property <bool> over: btn.hovered;
-    // The pointer has rested long enough (at once in snapshots), and hasn't clicked since.
-    property <bool> rested: false;
-    property <bool> dismissed: false;
-    property <bool> tip: root.over && !root.dismissed && (root.rested || Theme.still);
-    changed over => {
-        if !root.over {
-            root.rested = false;
-            root.dismissed = false;
-        }
-    }
     width: btn.width;
     height: btn.height;
-    Timer {
-        interval: 500ms;
-        running: root.over && !root.rested;
-        triggered => { root.rested = true; }
-    }
     btn := PlayButton {
-        clicked => { root.dismissed = true; }
+        clicked => { tip.dismiss(); }
     }
-    // The tooltip, `above` the button, centred over it.
-    Rectangle {
-        x: (root.width - self.width) / 2;
-        y: btn.y - root.above - self.height;
-        width: lay.preferred-width;
-        height: lay.preferred-height;
-        border-radius: Theme.r-s;
-        background: Theme.card;
-        border-width: 1px;
-        border-color: Theme.card-edge;
-        drop-shadow-blur: 8px;
-        drop-shadow-color: Theme.cover-shadow;
-        opacity: root.tip ? 1 : 0;
-        visible: self.opacity > 0;
-        animate opacity { duration: Theme.t-fast; easing: Curves.ease-out; }
-        lay := HorizontalLayout {
-            padding-left: Theme.s3;
-            padding-right: Theme.s3;
-            padding-top: Theme.s2;
-            padding-bottom: Theme.s2;
-            spacing: Theme.s2;
-            Body {
-                text: Player.playing ? @tr("Pause") : @tr("Play");
-                font-size: Theme.t-meta;
-                font-weight: 600;
-                color: Theme.text1;
-            }
-            Body {
-                text: @tr("Space");
-                font-size: Theme.t-meta;
-                color: Theme.text2;
-            }
+    tip := BarTip {
+        over: btn.hovered;
+        name: Player.playing ? @tr("Pause") : @tr("Play");
+        hint: @tr("Space");
+        above: root.above;
+    }
+}
+
+// The transport's other buttons (Shuffle, Previous, Next, Repeat): an `IconButton` with the
+// bar's tooltip, `tip` and its `hint` (the shortcut). Children go on the button.
+component TransportButton inherits Rectangle {
+    in property <string> icon;
+    in property <string> label;
+    in property <bool> filled: false;
+    in property <color> tint: Theme.text2;
+    in property <bool> active: false;
+    in property <string> tip;
+    in property <string> hint;
+    // How far above the button the tooltip ends (the bar lifts it clear of itself).
+    in property <length> above: Theme.s2;
+    callback clicked();
+    width: btn.width;
+    height: btn.height;
+    btn := IconButton {
+        icon: root.icon;
+        label: root.label;
+        filled: root.filled;
+        tint: root.tint;
+        active: root.active;
+        enabled: Player.has-track;
+        clicked => {
+            bar-tip.dismiss();
+            root.clicked();
         }
+        @children
+    }
+    bar-tip := BarTip {
+        over: btn.hovered;
+        name: root.tip;
+        hint: root.hint;
+        above: root.above;
     }
 }
 
 // The speed while it isn't 1x, just before the bar's right-hand group: a 28 px pill on the
-// accent's tonal fill, as a selected chip. A click opens the speed popup over it.
+// accent's tonal fill, as a selected chip. A click opens the speed popup over it. Its tooltip
+// names it; the pill shows the value.
 component SpeedPill inherits Rectangle {
+    // How far above the pill's 36 px row the tooltip ends (the bar lifts it clear of itself).
+    in property <length> above: Theme.s2;
     width: pill.width;
     height: 36px;
     pill := Rectangle {
@@ -486,7 +437,10 @@ component SpeedPill inherits Rectangle {
         animate background { duration: Theme.t-hover; }
         ta := TouchArea {
             mouse-cursor: pointer;
-            clicked => { Player.speed-open = true; }
+            clicked => {
+                tip.dismiss();
+                Player.speed-open = true;
+            }
         }
         t := Body {
             text: Player.speed-labels[Player.speed];
@@ -496,6 +450,11 @@ component SpeedPill inherits Rectangle {
             horizontal-alignment: center;
             vertical-alignment: center;
         }
+    }
+    tip := BarTip {
+        over: ta.has-hover;
+        name: @tr("Playback speed");
+        above: root.above;
     }
 }
 
@@ -688,42 +647,50 @@ export component BottomBar inherits Rectangle {
         height: Theme.play-size;
         width: self.preferred-width;
         spacing: 12px;
-        IconButton {
+        // The tooltips end `s2` above the bar.
+        TransportButton {
             y: (Theme.play-size - self.height) / 2;
+            above: root.transport-y + self.y + Theme.s2;
             icon: Icons.shuffle;
-            label: @tr("Shuffle");
+            label: Player.shuffle ? @tr("Shuffle on") : @tr("Shuffle off");
+            tip: self.label;
+            hint: @tr("Ctrl+S");
             active: Player.shuffle;
-            enabled: Player.has-track;
             clicked => { Player.toggle-shuffle(); }
         }
-        IconButton {
+        TransportButton {
             y: (Theme.play-size - self.height) / 2;
+            above: root.transport-y + self.y + Theme.s2;
             icon: Icons.prev;
             label: @tr("Previous");
+            tip: self.label;
+            hint: @tr("Ctrl+←");
             filled: true;
             tint: Theme.text1;
-            enabled: Player.has-track;
             clicked => { Player.previous(); }
         }
-        // Its tooltip ends `s2` above the bar.
         BarPlayButton {
             above: root.transport-y + Theme.s2;
         }
-        IconButton {
+        TransportButton {
             y: (Theme.play-size - self.height) / 2;
+            above: root.transport-y + self.y + Theme.s2;
             icon: Icons.next;
             label: @tr("Next");
+            tip: self.label;
+            hint: @tr("Ctrl+→");
             filled: true;
             tint: Theme.text1;
-            enabled: Player.has-track;
             clicked => { Player.next(); }
         }
-        IconButton {
+        TransportButton {
             y: (Theme.play-size - self.height) / 2;
+            above: root.transport-y + self.y + Theme.s2;
             icon: Icons.repeat;
             label: Player.repeat == Repeat.one ? @tr("Repeat one") : (Player.repeat == Repeat.all ? @tr("Repeat all") : @tr("Repeat off"));
+            tip: self.label;
+            hint: @tr("Ctrl+R");
             active: Player.repeat != Repeat.off;
-            enabled: Player.has-track;
             clicked => { Player.cycle-repeat(); }
             if Player.repeat == Repeat.one: Text {
                 x: parent.width - 13px;
@@ -771,6 +738,7 @@ export component BottomBar inherits Rectangle {
     speed-pill := SpeedPill {
         x: actions.x - self.width - 4px;
         y: actions.y;
+        above: (Theme.bar-h - 36px) / 2 + Theme.s2;
         visible: Player.speed != 2;
     }
 

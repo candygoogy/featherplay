@@ -1,0 +1,79 @@
+// The player bar's tooltip, one style for every button that has one: the name in 600, then a
+// muted hint (the shortcut, or what the button does), on one line in a small card centred
+// `above` the button. It shows once the pointer has rested on the button for 500 ms (at once
+// in snapshots), so it doesn't flash as the pointer crosses the bar; a click hides it until
+// the pointer leaves. Its timer runs only while the pointer is on the button. Settings'
+// "Show tooltips" turns them all off (`Tooltips.on`).
+import { Theme, Curves } from "theme.slint";
+import { Body } from "parts.slint";
+
+// "Show tooltips" (Settings > Window), set by `src/pages/settings.rs`.
+export global Tooltips {
+    in property <bool> on: true;
+}
+
+// Placed after the button in the same parent, which it fills: the card hangs above it.
+export component BarTip inherits Rectangle {
+    // The pointer is on the button.
+    in property <bool> over;
+    in property <string> name;
+    in property <string> hint;
+    // How far above the button the card ends (the bar lifts it clear of itself).
+    in property <length> above: Theme.s2;
+    // The pointer has rested long enough, and hasn't clicked since.
+    property <bool> rested: false;
+    property <bool> dismissed: false;
+    property <bool> shown: Tooltips.on && root.over && !root.dismissed && (root.rested || Theme.still);
+    // A click on the button: hidden until the pointer leaves it.
+    public function dismiss() {
+        root.dismissed = true;
+    }
+    changed over => {
+        if !root.over {
+            root.rested = false;
+            root.dismissed = false;
+        }
+    }
+    Timer {
+        interval: 500ms;
+        running: Tooltips.on && root.over && !root.rested;
+        triggered => { root.rested = true; }
+    }
+    // Placed by hand, not by a layout: each layout costs the exe code, and the bar has seven
+    // of these.
+    Rectangle {
+        x: (root.width - self.width) / 2;
+        y: -root.above - self.height;
+        width: name.preferred-width + (root.hint != "" ? Theme.s2 + hint.preferred-width : 0) + 2 * Theme.s3;
+        height: name.preferred-height + 2 * Theme.s2;
+        border-radius: Theme.r-s;
+        background: Theme.card;
+        border-width: 1px;
+        border-color: Theme.card-edge;
+        drop-shadow-blur: 8px;
+        drop-shadow-offset-y: 2px;
+        drop-shadow-color: Theme.cover-shadow;
+        opacity: root.shown ? 1 : 0;
+        visible: self.opacity > 0;
+        animate opacity { duration: Theme.t-fast; easing: Curves.ease-out; }
+        name := Body {
+            x: Theme.s3;
+            y: Theme.s2;
+            width: self.preferred-width;
+            height: self.preferred-height;
+            text: root.name;
+            font-size: Theme.t-meta;
+            font-weight: 600;
+            color: Theme.text1;
+        }
+        hint := Body {
+            x: name.x + name.width + Theme.s2;
+            y: Theme.s2;
+            width: self.preferred-width;
+            height: self.preferred-height;
+            text: root.hint;
+            font-size: Theme.t-meta;
+            color: Theme.text2;
+        }
+    }
+}

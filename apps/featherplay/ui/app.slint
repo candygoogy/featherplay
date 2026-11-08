@@ -237,6 +237,27 @@ export component AppWindow inherits Window {
                 }
                 return accept;
             }
+            // Previous, Next, Shuffle and Repeat, as the bar's buttons do: Ctrl+Left, Ctrl+Right,
+            // Ctrl+S and Ctrl+R. Not while a text field has the keys (Ctrl+Left and Right move
+            // by word there, and some reach here at the field's ends); a held key acts once;
+            // with nothing loaded they do nothing.
+            if e.modifiers.control && !e.modifiers.alt && !e.modifiers.shift && !e.modifiers.meta && (e.text == Key.LeftArrow || e.text == Key.RightArrow || e.text == "s" || e.text == "S" || e.text == "r" || e.text == "R") {
+                if TextInputInterface.text-input-focused {
+                    return reject;
+                }
+                if Player.has-track && !e.repeat {
+                    if e.text == Key.LeftArrow {
+                        Player.previous();
+                    } else if e.text == Key.RightArrow {
+                        Player.next();
+                    } else if e.text == "s" || e.text == "S" {
+                        Player.toggle-shuffle();
+                    } else {
+                        Player.cycle-repeat();
+                    }
+                }
+                return accept;
+            }
             if e.modifiers.alt && e.text == Key.LeftArrow {
                 root.navigate-by-key();
                 Nav.back();

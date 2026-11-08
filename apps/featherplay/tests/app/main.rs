@@ -102,6 +102,7 @@ mod tab_pill;
 mod title_row;
 mod top_search;
 mod translations;
+mod transport_keys;
 mod tray_click;
 mod tray_hide;
 mod ui_bridge;

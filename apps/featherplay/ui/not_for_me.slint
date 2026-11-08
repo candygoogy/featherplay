@@ -4,13 +4,13 @@
 // press, and filled in `text1`
 // for a song already rated Dislike, as the heart fills for a liked one. A click rates the
 // song Dislike (unless it already is) and skips it (`src/not_for_me.rs`); the toast that
-// follows offers Undo. Resting on it for a moment shows a tooltip over its right end that
-// says what it does, so the skip never comes as a surprise. The delay keeps the tooltip from
-// flashing as the pointer crosses the bar; its timer runs only while the pointer is on the
-// button. `LikeButton`, the heart, is here too: the bar and Now playing show the pair.
-import { Theme, Curves, Icons } from "theme.slint";
-import { Body, IconButton } from "parts.slint";
+// follows offers Undo. Resting on it shows the bar's tooltip (`BarTip`) saying what it does,
+// so the skip never comes as a surprise. `LikeButton`, the heart, is here too: the bar and
+// Now playing show the pair.
+import { Theme, Icons } from "theme.slint";
+import { IconButton } from "parts.slint";
 import { Player } from "player.slint";
+import { BarTip } from "bar_tip.slint";
 
 // The current song's heart: filled in `text1` while it's liked, `text2` otherwise. A like
 // added here pops the glyph (it snaps smaller and eases back).
@@ -46,24 +46,8 @@ export component NotForMeButton inherits Rectangle {
     in property <float> fade: 1.0;
     // The target's side: the bar's 36 px, or Now playing's 40.
     in property <length> size: 36px;
-    property <bool> over: btn.hovered;
-    // The pointer has rested long enough (at once in snapshots), and hasn't clicked since.
-    property <bool> rested: false;
-    property <bool> dismissed: false;
-    property <bool> tip: root.over && !root.dismissed && (root.rested || Theme.still);
-    changed over => {
-        if !root.over {
-            root.rested = false;
-            root.dismissed = false;
-        }
-    }
     width: btn.width;
     height: btn.height;
-    Timer {
-        interval: 500ms;
-        running: root.over && !root.rested;
-        triggered => { root.rested = true; }
-    }
     btn := IconButton {
         x: 0;
         y: 0;
@@ -77,42 +61,14 @@ export component NotForMeButton inherits Rectangle {
         enabled: Player.has-track;
         fade: root.fade;
         clicked => {
-            root.dismissed = true;
+            tip.dismiss();
             Player.not-for-me();
         }
     }
-    // The tooltip, `above` the button, its right end over the button's.
-    Rectangle {
-        x: root.width - self.width;
-        y: btn.y - root.above - self.height;
-        width: lay.preferred-width;
-        height: lay.preferred-height;
-        border-radius: Theme.r-s;
-        background: Theme.card;
-        border-width: 1px;
-        border-color: Theme.card-edge;
-        drop-shadow-blur: 8px;
-        drop-shadow-color: Theme.cover-shadow;
-        opacity: root.tip ? 1 : 0;
-        visible: self.opacity > 0;
-        animate opacity { duration: Theme.t-fast; easing: Curves.ease-out; }
-        lay := VerticalLayout {
-            padding-left: Theme.s3;
-            padding-right: Theme.s3;
-            padding-top: Theme.s2;
-            padding-bottom: Theme.s2;
-            spacing: 2px;
-            Body {
-                text: @tr("Not for me");
-                font-size: Theme.t-meta;
-                font-weight: 600;
-                color: Theme.text1;
-            }
-            Body {
-                text: @tr("Skips the song and tells YouTube Music you dislike it");
-                font-size: Theme.t-meta;
-                color: Theme.text2;
-            }
-        }
+    tip := BarTip {
+        over: btn.hovered;
+        name: @tr("Not for me");
+        hint: "· " + @tr("Dislike and skip");
+        above: root.above;
     }
 }
