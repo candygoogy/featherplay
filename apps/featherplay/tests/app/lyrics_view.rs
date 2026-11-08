@@ -21,7 +21,9 @@ fn bar_lyrics(scene: &Scene) -> LogicalPosition {
     let t = scene.ui.global::<Theme>();
     let bar_w = W as f32 - 2.0 * t.get_bar_inset();
     let row_w = 36.0 + 32.0 + 36.0 + 36.0 + 88.0 + 8.0 + 36.0 + 6.0 * 4.0;
-    let x = t.get_bar_inset() + bar_w - t.get_s3() - row_w + 18.0;
+    // The right-hand group sits as far in from the bar's end as from its top and bottom.
+    let end_gap = (t.get_bar_h() - 36.0) / 2.0;
+    let x = t.get_bar_inset() + bar_w - end_gap - row_w + 18.0;
     let y = H as f32 - t.get_bar_clear() + t.get_bar_h() / 2.0;
     LogicalPosition::new(x, y)
 }
