@@ -174,8 +174,10 @@ component LyricLine inherits Rectangle {
     min-height: root.gap ? root.gap-h : lay.min-height;
     preferred-height: root.gap ? root.gap-h : lay.preferred-height;
     border-radius: Theme.r-m;
-    background: !root.live ? transparent : Theme.panel-state(ta.pressed, ta.has-hover && root.hot);
-    animate background { duration: Theme.t-hover; }
+    // Animated as a private property: a root animating a public one is copied into each use.
+    property <brush> ground: !root.live ? transparent : Theme.panel-state(ta.pressed, ta.has-hover && root.hot);
+    animate ground { duration: Theme.t-hover; }
+    background: root.ground;
     accessible-role: button;
     accessible-enabled: root.live;
     accessible-label: root.text;

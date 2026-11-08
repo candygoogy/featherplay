@@ -112,11 +112,13 @@ component NavItem inherits Rectangle {
     callback right-clicked(length, length);
     height: 40px;
     border-radius: Theme.r-m;
-    background: Theme.state-on(root.active, ta.pressed, ta.has-hover);
+    // Animated as a private property: a root animating a public one is copied into each use.
+    property <brush> ground: Theme.state-on(root.active, ta.pressed, ta.has-hover);
+    animate ground { duration: Theme.t-hover; }
+    background: root.ground;
     accessible-role: button;
     accessible-label: root.label;
     accessible-action-default => { root.clicked(); }
-    animate background { duration: Theme.t-hover; }
     ta := TouchArea {
         mouse-cursor: pointer;
         clicked => { root.clicked(); }

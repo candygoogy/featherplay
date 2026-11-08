@@ -393,7 +393,10 @@ component Swatch inherits Rectangle {
     width: 32px;
     height: 32px;
     border-radius: self.height / 2;
-    background: Theme.state(ta.pressed, ta.has-hover);
+    // Animated as a private property: a root animating a public one is copied into each use.
+    property <brush> ground: Theme.state(ta.pressed, ta.has-hover);
+    animate ground { duration: Theme.t-hover; }
+    background: root.ground;
     border-width: root.selected ? 2px : 0px;
     border-color: Theme.text1;
     accessible-role: radio-button;
@@ -401,7 +404,6 @@ component Swatch inherits Rectangle {
     accessible-checkable: true;
     accessible-checked: root.selected;
     accessible-action-default => { root.clicked(); }
-    animate background { duration: Theme.t-hover; }
     Rectangle {
         width: 22px;
         height: 22px;
@@ -671,9 +673,12 @@ component PreviewLine inherits Rectangle {
 component LitMark inherits Rectangle {
     in property <bool> lit;
     border-width: 1px;
-    background: root.lit ? Theme.accent-tonal : Theme.accent-tonal.transparentize(1);
-    border-color: root.lit ? Theme.accent : Theme.accent.transparentize(1);
-    animate background, border-color { duration: Theme.t-fast; easing: Curves.ease-hover; }
+    // Animated as private properties: a root animating public ones is copied into each use.
+    property <brush> ground: root.lit ? Theme.accent-tonal : Theme.accent-tonal.transparentize(1);
+    property <brush> edge: root.lit ? Theme.accent : Theme.accent.transparentize(1);
+    animate ground, edge { duration: Theme.t-fast; easing: Curves.ease-hover; }
+    background: root.ground;
+    border-color: root.edge;
 }
 
 // A part of the card an option changes (the time, the title and artist), marked round its
@@ -1389,13 +1394,15 @@ component DeviceRow inherits Rectangle {
     callback clicked();
     height: 40px;
     border-radius: Theme.r-m;
-    background: Theme.state(ta.pressed, ta.has-hover);
+    // Animated as a private property: a root animating a public one is copied into each use.
+    property <brush> ground: Theme.state(ta.pressed, ta.has-hover);
+    animate ground { duration: Theme.t-hover; }
+    background: root.ground;
     accessible-role: radio-button;
     accessible-label: root.name;
     accessible-checkable: true;
     accessible-checked: root.selected;
     accessible-action-default => { root.clicked(); }
-    animate background { duration: Theme.t-hover; }
     ta := TouchArea {
         mouse-cursor: pointer;
         clicked => { root.clicked(); }

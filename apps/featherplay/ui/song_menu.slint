@@ -65,11 +65,13 @@ export component MenuItem inherits Rectangle {
     callback clicked();
     height: 36px;
     border-radius: Theme.r-s;
-    background: Theme.state(ta.pressed, ta.has-hover);
+    // Animated as a private property: a root animating a public one is copied into each use.
+    property <brush> ground: Theme.state(ta.pressed, ta.has-hover);
+    animate ground { duration: Theme.t-hover; }
+    background: root.ground;
     accessible-role: button;
     accessible-label: root.label;
     accessible-action-default => { root.clicked(); }
-    animate background { duration: Theme.t-hover; }
     ta := TouchArea {
         enabled: root.enabled;
         mouse-cursor: pointer;

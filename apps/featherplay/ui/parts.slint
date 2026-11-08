@@ -451,38 +451,47 @@ export component IconButton inherits Rectangle {
     width: 36px;
     height: 36px;
     border-radius: self.width / 2;
-    background: (root.enabled ? Theme.state(ta.pressed, ta.has-hover) : transparent).transparentize(1 - root.alpha);
-    // Press: a small give, then a short spring back past rest on release.
-    transform-scale: ta.pressed ? Theme.press-scale : 1.0;
     accessible-role: button;
     accessible-label: root.label;
     accessible-description: root.description;
     accessible-action-default => { root.clicked(); }
-    animate background { duration: Theme.t-hover; }
-    animate transform-scale {
-        duration: ta.pressed ? Theme.t-press : Theme.t-release;
-        easing: ta.pressed ? Curves.ease-out : Curves.release;
-    }
-    // The lit circle, over the hover overlay. It comes and goes at once, as the glyph's colour
-    // does: a fade would repaint the bar's corner for its length, and as one region with
-    // whatever else moves on screen (the lyrics view's toggle).
-    if root.active: Rectangle {
+    // The button's face, the root's size: its ground and its press animate here rather than
+    // on the root. Slint copies a component whose root animates a public property into every
+    // place it's used, and ignores a `transform-scale` on the root of one it doesn't copy;
+    // this button is used in dozens of places.
+    Rectangle {
         border-radius: root.border-radius;
-        background: Theme.accent-tonal.transparentize(1 - root.alpha);
-    }
-    ta := TouchArea {
-        enabled: root.enabled;
-        mouse-cursor: pointer;
-        clicked => { root.clicked(); }
-    }
-    Icon {
-        width: root.glyph;
-        height: root.glyph;
-        commands: root.icon;
-        stroke: (root.filled ? transparent : (root.active ? Theme.accent : root.tint)).transparentize(1 - root.alpha);
-        fill: (root.filled ? (root.active ? Theme.accent : root.tint) : transparent).transparentize(1 - root.alpha);
-        transform-scale: root.glyph-scale;
-        animate transform-scale { duration: root.glyph-scale < 1 ? 0ms : Theme.t-fast; easing: Curves.ease-out; }
+        background: (root.enabled ? Theme.state(ta.pressed, ta.has-hover) : transparent).transparentize(1 - root.alpha);
+        // Press: a small give, then a short spring back past rest on release.
+        transform-scale: ta.pressed ? Theme.press-scale : 1.0;
+        animate background { duration: Theme.t-hover; }
+        animate transform-scale {
+            duration: ta.pressed ? Theme.t-press : Theme.t-release;
+            easing: ta.pressed ? Curves.ease-out : Curves.release;
+        }
+        // The lit circle, over the hover overlay. It comes and goes at once, as the glyph's
+        // colour does: a fade would repaint the bar's corner for its length, and as one region
+        // with whatever else moves on screen (the lyrics view's toggle).
+        if root.active: Rectangle {
+            border-radius: root.border-radius;
+            background: Theme.accent-tonal.transparentize(1 - root.alpha);
+        }
+        ta := TouchArea {
+            enabled: root.enabled;
+            mouse-cursor: pointer;
+            clicked => { root.clicked(); }
+        }
+        Icon {
+            width: root.glyph;
+            height: root.glyph;
+            commands: root.icon;
+            stroke: (root.filled ? transparent : (root.active ? Theme.accent : root.tint)).transparentize(1 - root.alpha);
+            fill: (root.filled ? (root.active ? Theme.accent : root.tint) : transparent).transparentize(1 - root.alpha);
+            transform-scale: root.glyph-scale;
+            animate transform-scale { duration: root.glyph-scale < 1 ? 0ms : Theme.t-fast; easing: Curves.ease-out; }
+        }
+        // What a use adds (the bar's Repeat one badge) presses with the button.
+        @children
     }
 }
 
@@ -504,49 +513,55 @@ export component Pill inherits Rectangle {
     border-radius: self.height / 2;
     // Dimmed through each part's colour, not `opacity` (see IconButton.fade).
     property <float> alpha: root.enabled ? 1.0 : 0.4;
-    background: (root.solid ? Theme.solid-state(ta.pressed, ta.has-hover) : Theme.tonal(ta.pressed, ta.has-hover)).transparentize(1 - root.alpha);
-    // Press: a small give under the pointer, then a spring back on release.
-    transform-scale: ta.pressed ? Theme.press-scale : 1.0;
     accessible-role: button;
     accessible-label: root.label;
     accessible-action-default => { root.clicked(); }
-    animate background { duration: Theme.t-hover; }
-    animate transform-scale {
-        duration: ta.pressed ? Theme.t-press : Theme.t-release;
-        easing: ta.pressed ? Curves.ease-out : Curves.release;
-    }
-    ta := TouchArea {
-        enabled: root.enabled;
-        mouse-cursor: pointer;
-        clicked => { root.clicked(); }
-    }
-    lay := HorizontalLayout {
-        padding-left: root.compact ? 14px : root.icon == "" ? 20px : 16px;
-        padding-right: root.compact ? 14px : 20px;
-        spacing: 8px;
-        alignment: center;
-        if root.icon != "": Icon {
-            y: (parent.height - self.height) / 2;
-            width: 18px;
-            height: 18px;
-            commands: root.icon;
-            fill: (root.icon-filled ? (root.solid ? Theme.on-solid : Theme.text1) : transparent).transparentize(1 - root.alpha);
-            stroke: (root.icon-filled ? transparent : (root.solid ? Theme.on-solid : Theme.text1)).transparentize(1 - root.alpha);
+    // The pill's face, the root's size, so it stays one shared component (see IconButton).
+    Rectangle {
+        border-radius: root.border-radius;
+        background: (root.solid ? Theme.solid-state(ta.pressed, ta.has-hover) : Theme.tonal(ta.pressed, ta.has-hover)).transparentize(1 - root.alpha);
+        // Press: a small give under the pointer, then a spring back on release.
+        transform-scale: ta.pressed ? Theme.press-scale : 1.0;
+        animate background { duration: Theme.t-hover; }
+        animate transform-scale {
+            duration: ta.pressed ? Theme.t-press : Theme.t-release;
+            easing: ta.pressed ? Curves.ease-out : Curves.release;
         }
-        label := Body {
-            text: root.label;
+        ta := TouchArea {
+            enabled: root.enabled;
+            mouse-cursor: pointer;
+            clicked => { root.clicked(); }
+        }
+        lay := HorizontalLayout {
+            padding-left: root.compact ? 14px : root.icon == "" ? 20px : 16px;
+            padding-right: root.compact ? 14px : 20px;
+            spacing: 8px;
+            alignment: center;
+            if root.icon != "": Icon {
+                y: (parent.height - self.height) / 2;
+                width: 18px;
+                height: 18px;
+                commands: root.icon;
+                fill: (root.icon-filled ? (root.solid ? Theme.on-solid : Theme.text1) : transparent).transparentize(1 - root.alpha);
+                stroke: (root.icon-filled ? transparent : (root.solid ? Theme.on-solid : Theme.text1)).transparentize(1 - root.alpha);
+            }
+            label := Body {
+                text: root.label;
+                font-size: root.compact ? Theme.t-meta : Theme.t-body;
+                font-weight: 600;
+                color: (root.solid ? Theme.on-solid : Theme.text1).transparentize(1 - root.alpha);
+                vertical-alignment: center;
+            }
+        }
+        // Only measured.
+        alt := Body {
+            visible: false;
+            text: root.alt-label;
             font-size: root.compact ? Theme.t-meta : Theme.t-body;
             font-weight: 600;
-            color: (root.solid ? Theme.on-solid : Theme.text1).transparentize(1 - root.alpha);
-            vertical-alignment: center;
         }
-    }
-    // Only measured.
-    alt := Body {
-        visible: false;
-        text: root.alt-label;
-        font-size: root.compact ? Theme.t-meta : Theme.t-body;
-        font-weight: 600;
+        // What a use adds (the close dialog's focus ring) presses with the pill.
+        @children
     }
 }
 

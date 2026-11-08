@@ -636,10 +636,12 @@ export component SongListRow inherits Rectangle {
         id: root.track.id;
     }
     // The playing row rests on a light tile; hover and press show over it.
-    background: root.track.playing && !ta.pressed && !root.hovered ? Theme.playing-row : Theme.state(ta.pressed, root.hovered);
+    // Animated as a private property: a root animating a public one is copied into each use.
+    property <brush> ground: root.track.playing && !ta.pressed && !root.hovered ? Theme.playing-row : Theme.state(ta.pressed, root.hovered);
+    animate ground { duration: Theme.t-hover; }
+    background: root.ground;
     accessible-role: list-item;
     accessible-label: root.track.title + ", " + root.track.artist;
-    animate background { duration: Theme.t-hover; }
     // Under the touch area, so the play button inside it draws over the art.
     Cover {
         x: 8px;
