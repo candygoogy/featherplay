@@ -194,8 +194,11 @@ into one program that opens at once and stays quiet while it plays.
   own menu. Closing the window asks whether to quit or keep playing there, until you tell it
   to remember.
 - **Keyboard and mouse.** `Space` plays and pauses (unless you're typing in a field),
-  `Ctrl+K` searches and `Ctrl+L` shows or hides lyrics. `Alt+Left` and `Alt+Right`, or the
-  mouse's back and forward buttons, move between pages.
+  `Ctrl+Left` and `Ctrl+Right` skip back and ahead, `Ctrl+S` and `Ctrl+R` turn Shuffle and
+  Repeat, `Ctrl+K` searches and `Ctrl+L` shows or hides lyrics. `Alt+Left` and `Alt+Right`,
+  or the mouse's back and forward buttons, move between pages. `Ctrl+/` lists them all
+  (Settings > Window > Keyboard shortcuts), and the player's buttons name their shortcut
+  when you rest the pointer on them.
 - **Optional extras,** off until you turn them on: notifications when the song changes, and
   global hotkeys you choose.
 

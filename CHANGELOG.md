@@ -37,6 +37,14 @@ Notable changes to featherplay, newest first. The format follows
   remembered across restarts. Away from 1× the player bar shows the speed as a small pill
   that opens the same choices. Times stay in the song's minutes; Discord, the media card
   and scrobbling follow the speed (a scrobble counts the song's time heard).
+- Keyboard shortcuts for the transport: `Ctrl+Left` Previous, `Ctrl+Right` Next, `Ctrl+S`
+  Shuffle and `Ctrl+R` Repeat (not while you're typing in a field).
+- Every button of the player's transport, and the speed pill, shows a tooltip after a
+  moment's rest: its name (Shuffle and Repeat say whether they're on) and its shortcut, in
+  one style with Play, Lyrics and Not for me, whose tooltip is now one line ("Dislike and
+  skip"). **Show tooltips** in Settings > Window turns them all off.
+- **Keyboard shortcuts** in Settings > Window lists every shortcut, the media keys and your
+  global hotkeys; `Ctrl+/` opens the list from anywhere.
 
 ### Changed
 
