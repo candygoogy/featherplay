@@ -19,6 +19,8 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 # One line per list item ytmapi-rs can't read (`convert`), into the app's log.
 log = { workspace = true }
+# `sync`: a resumed session signs in once, shared by its clones (`YtMusic::refresh`).
+tokio = { workspace = true, features = ["sync"] }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }

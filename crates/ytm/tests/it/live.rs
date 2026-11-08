@@ -62,6 +62,33 @@ async fn live_startup_timing() {
     );
 }
 
+/// A session resumed with a client version kept from an earlier sign-in, as the app starts
+/// a known session: no page request, straight to Home. An old version (2020) is still
+/// taken as it is (one read, checked 2026-11-08); a refused one ("0.1": Google answers it
+/// with an error) signs in once and Home goes again with the fresh version (three
+/// requests). Counts only.
+#[tokio::test]
+#[ignore = "live: needs FEATHERPLAY_COOKIES_FILE"]
+async fn live_resumed_session() {
+    let path =
+        std::env::var("FEATHERPLAY_COOKIES_FILE").expect("FEATHERPLAY_COOKIES_FILE is not set");
+    let cookies = std::fs::read_to_string(&path).expect("cookie file is not readable");
+    let id = featherplay_ytm::Identity::default();
+    let old = YtMusic::resume(cookies.trim(), &id, "1.20200101.01.00").expect("resume");
+    let home = old.home().await.expect("home with an old version");
+    assert_eq!(old.client_version().as_deref(), Some("1.20200101.01.00"));
+    println!("old version: {} shelves", home.shelves.len());
+
+    let refused = YtMusic::resume(cookies.trim(), &id, "0.1").expect("resume");
+    let home = refused.home().await.expect("home after the refresh");
+    let fresh = refused.client_version().expect("a version");
+    assert_ne!(fresh, "0.1", "not refreshed");
+    println!(
+        "refused version: {} shelves, now {fresh}",
+        home.shelves.len()
+    );
+}
+
 #[tokio::test]
 #[ignore = "live: needs FEATHERPLAY_COOKIES_FILE"]
 async fn live_reads() {

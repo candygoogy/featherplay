@@ -21,6 +21,7 @@
 
 use std::borrow::Cow;
 use std::fmt;
+use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
 use featherplay_core::model::{AlbumId, ArtistId, LikeStatus, PlaylistId, Track, TrackId};
@@ -65,6 +66,8 @@ const PAGE_ID: &str = "x-goog-pageid";
 pub struct YtMusic {
     session: Session,
     identity: Identity,
+    /// `session_number`.
+    number: u64,
     /// Without the session or the identity headers: the mobile lyrics request.
     public: reqwest::Client,
 }
@@ -75,9 +78,47 @@ enum Session {
         inner: ytmapi_rs::YtMusic<BrowserToken>,
         /// Kept to build the client for another identity without signing in again.
         token: BrowserToken,
+        /// Resumed with a kept client version (`resume`): its own sign-in, done once.
+        refresh: Option<Arc<Refresh>>,
     },
     /// No cookies.
     Guest(ytmapi_rs::YtMusic<GuestToken>),
+}
+
+/// A resumed session's sign-in, as `connect` does it: in the background (`refresh`), or
+/// when a request is refused before that's done. Shared by one identity's clones; once it's
+/// in, their requests go out with its version.
+struct Refresh {
+    cookies: String,
+    fresh: tokio::sync::OnceCell<Fresh>,
+}
+
+struct Fresh {
+    inner: ytmapi_rs::YtMusic<BrowserToken>,
+    token: BrowserToken,
+}
+
+impl Refresh {
+    fn new(cookies: String) -> Arc<Refresh> {
+        Arc::new(Refresh {
+            cookies,
+            fresh: tokio::sync::OnceCell::new(),
+        })
+    }
+}
+
+/// `YtMusic::session_number` for `token`: a hash of its `SAPISID` cookie, which the cookie
+/// jar's sign-in keeps (a reconnect with the same cookies has the same number). Never 0.
+/// Not kept anywhere: it only tells two clients of this run apart.
+fn session_of(token: &BrowserToken) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let sapisid = serde_json::to_value(token)
+        .ok()
+        .and_then(|v| v.get("sapisid")?.as_str().map(str::to_string))
+        .unwrap_or_default();
+    let mut h = std::hash::DefaultHasher::new();
+    sapisid.hash(&mut h);
+    h.finish().max(1)
 }
 
 impl fmt::Debug for YtMusic {
@@ -103,6 +144,74 @@ impl YtMusic {
         YtMusic::with_token(token, identity.clone())
     }
 
+    /// Signs in with `cookies` and the client version an earlier `connect` read
+    /// (`client_version`), and acts as `identity`. Sends nothing: the request `connect`
+    /// waits for is left out, so the first page's request can go at once. The cookies are
+    /// checked as `connect` checks them (a `SAPISID`, else `AuthExpired`); an odd version is
+    /// a `Parse` error, and the caller connects instead.
+    pub fn resume(
+        cookies: &str,
+        identity: &Identity,
+        client_version: &str,
+    ) -> Result<YtMusic, ApiError> {
+        if !plausible_version(client_version) {
+            return Err(ApiError::Parse("the kept client version isn't one".into()));
+        }
+        let cookies = cookies.trim();
+        // As ytmapi-rs's `BrowserToken::from_str` reads it.
+        let sapisid = cookies
+            .split_once("SAPISID=")
+            .and_then(|(_, rest)| rest.split_once(';'))
+            .map(|(value, _)| value)
+            .ok_or(ApiError::AuthExpired)?;
+        // ytmapi-rs 0.3.3 builds a `BrowserToken` only from the page's request; its
+        // fields are private, but the type is `Deserialize`.
+        let token: BrowserToken = serde_json::from_value(serde_json::json!({
+            "sapisid": sapisid,
+            "client_version": client_version,
+            "cookies": cookies,
+        }))
+        .map_err(|_| ApiError::Parse("building the session token".into()))?;
+        YtMusic::resumed(token, cookies.to_string(), identity.clone())
+    }
+
+    /// The client version a signed-in client sends (to keep for `resume`): a resumed one's
+    /// fresh version once `refresh` has it. `None` for a visitor's, which is worked out
+    /// from the date.
+    pub fn client_version(&self) -> Option<String> {
+        self.account()
+            .ok()
+            .map(|(_, token)| token.client_version().into_owned())
+    }
+
+    /// A resumed session (`resume`) signs in as `connect` does, once (one request for the
+    /// page), and its requests use the fresh version from then on. Returns that version;
+    /// `None` without a request when the client wasn't resumed. A failure is `connect`'s
+    /// (`AuthExpired` for refused cookies, `Network` otherwise), and a later call tries
+    /// again.
+    pub async fn refresh(&self) -> Result<Option<String>, ApiError> {
+        let Session::Account {
+            refresh: Some(refresh),
+            ..
+        } = &self.session
+        else {
+            return Ok(None);
+        };
+        let fresh = refresh
+            .fresh
+            .get_or_try_init(|| async {
+                let client =
+                    ytmapi_rs::Client::new_from_reqwest_client(http_client(&self.identity)?);
+                let token = BrowserToken::from_str(&refresh.cookies, &client)
+                    .await
+                    .map_err(map_error)?;
+                let inner = account_client(&token, &self.identity)?;
+                Ok::<_, ApiError>(Fresh { inner, token })
+            })
+            .await?;
+        Ok(Some(fresh.token.client_version().into_owned()))
+    }
+
     /// Signed out: the catalogue as a visitor, without cookies. Sends nothing.
     pub fn guest() -> Result<YtMusic, ApiError> {
         let client = ytmapi_rs::Client::new_from_reqwest_client(http_client(&Identity::default())?);
@@ -113,6 +222,7 @@ impl YtMusic {
         Ok(YtMusic {
             session: Session::Guest(inner),
             identity: Identity::default(),
+            number: 0,
             public: http_client(&Identity::default())?,
         })
     }
@@ -123,27 +233,61 @@ impl YtMusic {
         matches!(self.session, Session::Account { .. })
     }
 
-    /// The same session acting as `identity`. Sends nothing.
+    /// The same session acting as `identity`. Sends nothing. A resumed session not
+    /// refreshed yet stays resumed (with a `refresh` of its own: this identity's).
     pub fn as_identity(&self, identity: &Identity) -> Result<YtMusic, ApiError> {
-        match &self.session {
-            Session::Account { token, .. } => YtMusic::with_token(token.clone(), identity.clone()),
-            Session::Guest(_) => Err(ApiError::SignInRequired),
-        }
+        let Session::Account { token, refresh, .. } = &self.session else {
+            return Err(ApiError::SignInRequired);
+        };
+        let (token, refresh) = match refresh {
+            Some(r) => match r.fresh.get() {
+                Some(fresh) => (fresh.token.clone(), None),
+                None => (token.clone(), Some(Refresh::new(r.cookies.clone()))),
+            },
+            None => (token.clone(), None),
+        };
+        YtMusic::account_session(token, refresh, identity.clone(), self.number)
     }
 
     pub fn identity(&self) -> &Identity {
         &self.identity
     }
 
+    /// Which sign-in this client belongs to: the same for every client of one cookie
+    /// session (its identities, a reconnect), another for another sign-in; 0 for a visitor.
+    /// Two sign-ins' own identities (`Identity::default`) can be two Google accounts.
+    pub fn session_number(&self) -> u64 {
+        self.number
+    }
+
     fn with_token(token: BrowserToken, identity: Identity) -> Result<YtMusic, ApiError> {
-        let client = ytmapi_rs::Client::new_from_reqwest_client(http_client(&identity)?);
-        let inner = YtMusicBuilder::new_with_client(client)
-            .with_auth_token(token.clone())
-            .build()
-            .map_err(map_error)?;
+        let number = session_of(&token);
+        YtMusic::account_session(token, None, identity, number)
+    }
+
+    fn resumed(
+        token: BrowserToken,
+        cookies: String,
+        identity: Identity,
+    ) -> Result<YtMusic, ApiError> {
+        let number = session_of(&token);
+        YtMusic::account_session(token, Some(Refresh::new(cookies)), identity, number)
+    }
+
+    fn account_session(
+        token: BrowserToken,
+        refresh: Option<Arc<Refresh>>,
+        identity: Identity,
+        number: u64,
+    ) -> Result<YtMusic, ApiError> {
         Ok(YtMusic {
-            session: Session::Account { inner, token },
+            session: Session::Account {
+                inner: account_client(&token, &identity)?,
+                token,
+                refresh,
+            },
             identity,
+            number,
             public: http_client(&Identity::default())?,
         })
     }
@@ -322,7 +466,7 @@ impl YtMusic {
             LikeStatus::Indifferent => YtLike::Indifferent,
         };
         let query = RateSongQuery::new(VideoID::from_raw(id.0.as_str()), rating);
-        self.account()?.query(query).await.map_err(map_error)
+        self.account()?.0.query(query).await.map_err(map_error)
     }
 
     /// Fails if a track is already in the playlist (the API's default).
@@ -336,6 +480,7 @@ impl YtMusic {
             DuplicateHandlingMode::default(),
         );
         self.account()?
+            .0
             .query(query)
             .await
             .map(|_| ())
@@ -346,7 +491,7 @@ impl YtMusic {
     /// offer it yet; the live test makes its throwaway playlist with it.
     pub async fn create_playlist(&self, title: &str) -> Result<PlaylistId, ApiError> {
         let query = CreatePlaylistQuery::new(title, None, PrivacyStatus::Private);
-        let id = self.account()?.query(query).await.map_err(map_error)?;
+        let id = self.account()?.0.query(query).await.map_err(map_error)?;
         Ok(PlaylistId(id.get_raw().to_string()))
     }
 
@@ -356,7 +501,7 @@ impl YtMusic {
             PlaylistID::from_raw(convert::bare_playlist_id(&p.0)),
             title,
         );
-        match self.account()?.query(query).await.map_err(map_error)? {
+        match self.account()?.0.query(query).await.map_err(map_error)? {
             ApiOutcome::Success => Ok(()),
             ApiOutcome::Failure => Err(ApiError::Parse("the rename was refused".into())),
         }
@@ -365,7 +510,7 @@ impl YtMusic {
     /// Deletes one of the account's own playlists. One write; it can't be undone.
     pub async fn delete_playlist(&self, p: &PlaylistId) -> Result<(), ApiError> {
         let query = DeletePlaylistQuery::new(PlaylistID::from_raw(convert::bare_playlist_id(&p.0)));
-        self.account()?.query(query).await.map_err(map_error)
+        self.account()?.0.query(query).await.map_err(map_error)
     }
 
     /// Removes someone else's playlist from the library (YouTube Music's "Remove playlist
@@ -375,7 +520,7 @@ impl YtMusic {
             PlaylistID::from_raw(convert::bare_playlist_id(&p.0)),
             YtLike::Indifferent,
         );
-        self.account()?.query(query).await.map_err(map_error)
+        self.account()?.0.query(query).await.map_err(map_error)
     }
 
     /// The first batch of a playlist's radio: songs like the playlist's.
@@ -497,9 +642,7 @@ impl YtMusic {
         Q: Query<BrowserToken> + Query<GuestToken>,
     {
         match &self.session {
-            Session::Account { inner, .. } => {
-                inner.raw_json_query::<Q>(query).await.map_err(map_error)
-            }
+            Session::Account { .. } => self.raw_account(query).await,
             Session::Guest(inner) => inner
                 .raw_json_query::<Q>(query)
                 .await
@@ -508,18 +651,54 @@ impl YtMusic {
         }
     }
 
-    /// A request about the account: `SignInRequired` for a guest, sending nothing.
+    /// A request about the account: `SignInRequired` for a guest, sending nothing. A
+    /// resumed session's refused request (any error but 401/403: maybe an old client
+    /// version) refreshes, once per session, and goes once more if it went with another
+    /// version than the fresh one.
     async fn raw_account<Q: Query<BrowserToken>>(&self, query: &Q) -> Result<String, ApiError> {
-        self.account()?
-            .raw_json_query::<Q>(query)
-            .await
-            .map_err(map_error)
+        let (client, token) = self.account()?;
+        let raw = client.raw_json_query::<Q>(query).await.map_err(map_error)?;
+        if !self.is_resumed() || !refused(&raw) {
+            return Ok(raw);
+        }
+        // The version this request went with: a refresh may have landed meanwhile.
+        let sent = token.client_version().into_owned();
+        match self.refresh().await {
+            Ok(Some(fresh)) if fresh != sent => {
+                log::info!("the kept client version was refused; trying with the fresh one");
+                self.account()?
+                    .0
+                    .raw_json_query::<Q>(query)
+                    .await
+                    .map_err(map_error)
+            }
+            _ => Ok(raw),
+        }
     }
 
-    /// The signed-in client, or `SignInRequired`.
-    fn account(&self) -> Result<&ytmapi_rs::YtMusic<BrowserToken>, ApiError> {
+    /// A resumed session (`resume`), refreshed or not.
+    fn is_resumed(&self) -> bool {
+        matches!(
+            &self.session,
+            Session::Account {
+                refresh: Some(_),
+                ..
+            }
+        )
+    }
+
+    /// The signed-in client and its token (a resumed session's fresh ones once they're in),
+    /// or `SignInRequired`.
+    fn account(&self) -> Result<(&ytmapi_rs::YtMusic<BrowserToken>, &BrowserToken), ApiError> {
         match &self.session {
-            Session::Account { inner, .. } => Ok(inner),
+            Session::Account {
+                refresh,
+                inner,
+                token,
+            } => Ok(match refresh.as_ref().and_then(|r| r.fresh.get()) {
+                Some(fresh) => (&fresh.inner, &fresh.token),
+                None => (inner, token),
+            }),
             Session::Guest(_) => Err(ApiError::SignInRequired),
         }
     }
@@ -621,6 +800,13 @@ impl AuthToken for GuestToken {
     fn deserialize_response<Q>(raw: RawResult<Q, Self>) -> ytmapi_rs::Result<ProcessedResult<Q>> {
         ProcessedResult::try_from(raw)
     }
+}
+
+/// Whether `v` can be a web client version (`1.20261106.01.00`): digits and dots, short.
+fn plausible_version(v: &str) -> bool {
+    (1..=32).contains(&v.len())
+        && v.starts_with(|c: char| c.is_ascii_digit())
+        && v.chars().all(|c| c.is_ascii_digit() || c == '.')
 }
 
 /// The web client's version for `now`: `1.YYYYMMDD.01.00` (UTC).
@@ -945,6 +1131,14 @@ fn guest_error(e: ApiError) -> ApiError {
 /// body whatever the HTTP status, and the parsers would read its `error.code` 401/403 as an
 /// ended session.
 fn guest_reply(raw: String) -> Result<String, ApiError> {
+    match error_code(&raw) {
+        Some(401 | 403) => Err(ApiError::SignInRequired),
+        _ => Ok(raw),
+    }
+}
+
+/// The `error.code` of an answer, if it's an error.
+fn error_code(raw: &str) -> Option<u64> {
     #[derive(serde::Deserialize)]
     struct Reply {
         error: Option<Code>,
@@ -953,14 +1147,29 @@ fn guest_reply(raw: String) -> Result<String, ApiError> {
     struct Code {
         code: Option<u64>,
     }
-    let code = serde_json::from_str::<Reply>(&raw)
+    serde_json::from_str::<Reply>(raw)
         .ok()
         .and_then(|r| r.error)
-        .and_then(|e| e.code);
-    match code {
-        Some(401 | 403) => Err(ApiError::SignInRequired),
-        _ => Ok(raw),
-    }
+        .and_then(|e| e.code)
+}
+
+/// An error answer to a signed-in request that a fresh client version might fix: any but a
+/// refused session (401/403). Error answers are small; a page isn't parsed for it.
+fn refused(raw: &str) -> bool {
+    const MOST: usize = 4096;
+    raw.len() <= MOST && error_code(raw).is_some_and(|c| c != 401 && c != 403)
+}
+
+/// The ytmapi-rs client for a signed-in `identity` with `token`. Sends nothing.
+fn account_client(
+    token: &BrowserToken,
+    identity: &Identity,
+) -> Result<ytmapi_rs::YtMusic<BrowserToken>, ApiError> {
+    let client = ytmapi_rs::Client::new_from_reqwest_client(http_client(identity)?);
+    YtMusicBuilder::new_with_client(client)
+        .with_auth_token(token.clone())
+        .build()
+        .map_err(map_error)
 }
 
 fn empty() -> ApiError {
@@ -1112,6 +1321,81 @@ mod tests {
         assert_eq!(guest_reply(fine.into()).as_deref(), Ok(fine));
         let other = r#"{"error":{"code":500}}"#;
         assert_eq!(guest_reply(other.into()).as_deref(), Ok(other));
+    }
+
+    #[test]
+    fn a_resumed_session_sends_the_kept_client_version() {
+        // Not async: building it sends nothing.
+        let api = YtMusic::resume(
+            "A=1; SAPISID=abc/def; B=2",
+            &Identity::default(),
+            "1.20261101.01.00",
+        )
+        .expect("resume");
+        assert!(api.signed_in());
+        assert_eq!(api.client_version().as_deref(), Some("1.20261101.01.00"));
+        assert_eq!(YtMusic::guest().unwrap().client_version(), None);
+    }
+
+    #[test]
+    fn a_session_resumes_only_with_its_sapisid_and_a_version_that_looks_like_one() {
+        let id = Identity::default();
+        assert_eq!(
+            YtMusic::resume("A=1; B=2", &id, "1.20261101.01.00").map(drop),
+            Err(ApiError::AuthExpired)
+        );
+        for odd in ["", "1.2026\"x", "<html>", &"1".repeat(40)] {
+            assert!(YtMusic::resume("SAPISID=abc;", &id, odd).is_err(), "{odd}");
+        }
+    }
+
+    #[test]
+    fn another_identity_of_a_resumed_session_is_resumed_too() {
+        let api = YtMusic::resume("SAPISID=abc;", &Identity::default(), "1.20261101.01.00")
+            .expect("resume");
+        let other = api.as_identity(&Identity::new(2, None).unwrap()).unwrap();
+        assert!(other.is_resumed());
+        assert_eq!(other.client_version().as_deref(), Some("1.20261101.01.00"));
+        // The same sign-in, and so is the same cookie session again (a reconnect); another
+        // sign-in is another, whatever its identity.
+        assert_eq!(other.session_number(), api.session_number());
+        let again =
+            YtMusic::resume("A=1; SAPISID=abc; B=2", &Identity::default(), "1.2").expect("resume");
+        assert_eq!(again.session_number(), api.session_number());
+        let another = YtMusic::resume("SAPISID=xyz;", &Identity::default(), "1.20261101.01.00")
+            .expect("resume");
+        assert_ne!(another.session_number(), api.session_number());
+        assert_ne!(api.session_number(), 0);
+        assert_eq!(YtMusic::guest().unwrap().session_number(), 0);
+    }
+
+    #[tokio::test]
+    async fn only_a_resumed_session_refreshes() {
+        // Nothing listens anywhere here: a request would fail as a network error instead.
+        let token: BrowserToken = serde_json::from_value(serde_json::json!({
+            "sapisid": "abc", "client_version": "1.20261101.01.00", "cookies": "SAPISID=abc;"
+        }))
+        .unwrap();
+        let connected = YtMusic::with_token(token, Identity::default()).unwrap();
+        assert!(!connected.is_resumed());
+        assert_eq!(connected.refresh().await, Ok(None));
+        assert_eq!(YtMusic::guest().unwrap().refresh().await, Ok(None));
+    }
+
+    #[test]
+    fn an_error_answer_but_a_refused_session_may_be_the_client_version() {
+        assert!(refused(
+            r#"{"error":{"code":400,"message":"Precondition check failed."}}"#
+        ));
+        assert!(refused(r#"{"error":{"code":404}}"#));
+        assert!(!refused(r#"{"error":{"code":401}}"#), "the session ended");
+        assert!(!refused(r#"{"error":{"code":403}}"#), "the session ended");
+        assert!(!refused(r#"{"responseContext":{},"contents":{}}"#));
+        let page = format!(
+            r#"{{"contents":"{}","error":{{"code":400}}}}"#,
+            "x".repeat(5000)
+        );
+        assert!(!refused(&page), "a page isn't parsed for it");
     }
 
     #[tokio::test]
