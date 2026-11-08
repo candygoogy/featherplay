@@ -143,7 +143,7 @@ impl CacheKey {
 }
 
 /// The identity key of the session a result came from, to cache it under.
-fn source_key(source: &Source) -> Option<String> {
+pub(crate) fn source_key(source: &Source) -> Option<String> {
     match source {
         Source::Live(api) => Some(api.identity().key()),
         _ => None,

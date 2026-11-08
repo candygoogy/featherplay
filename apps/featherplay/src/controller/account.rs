@@ -383,7 +383,9 @@ impl Controller {
         match msg {
             AccountMsg::SignedIn(Ok(api)) => {
                 log!("signed in");
+                super::reconnect::keep_version(&self.paths, api.client_version());
                 self.unreachable = None;
+                self.resumed = false;
                 // A new session starts as its own identity, and may be another account:
                 // the Library's cached lists go before the window hears of it.
                 if self.settings.identity.take().is_some() {
@@ -520,7 +522,10 @@ impl Controller {
         log!("session expired, sign in again");
         self.api = None;
         self.unreachable = None;
+        self.resumed = false;
         self.ui.catalog.sign_out();
+        // Before the window hears of it, so it can't show the feed again.
+        forget_home(&self.paths);
         (self.ui.events)(UiEvent::AccountNotice(AccountEvent::SessionExpired));
         (self.ui.events)(UiEvent::Account { signed_in: false });
     }
@@ -586,6 +591,7 @@ impl Controller {
         log!("signing out");
         self.api = None;
         self.unreachable = None;
+        self.resumed = false;
         if self.settings.identity.take().is_some() {
             self.save_settings();
         }
@@ -865,6 +871,16 @@ fn forget_library(paths: &featherplay_store::Paths) {
     match featherplay_store::LibraryCache::new(paths).clear() {
         Ok(()) => log!("library cache removed"),
         Err(e) => log!("removing the library cache failed: {}", e.kind()),
+    }
+}
+
+/// Deletes Home's cached feed (every identity's), keeping the Library's lists: a session
+/// that ended. Blocks briefly, as `forget_library`.
+fn forget_home(paths: &featherplay_store::Paths) {
+    let cache = featherplay_store::LibraryCache::new(paths);
+    match cache.forget(featherplay_store::LibraryList::Home) {
+        Ok(()) => log!("home feed cache removed"),
+        Err(e) => log!("removing the home feed cache failed: {}", e.kind()),
     }
 }
 
@@ -1239,9 +1255,38 @@ mod tests {
         cache
             .save("2", LibraryList::Albums, &vec!["b".to_string()])
             .unwrap();
+        // Sign-out's and a new sign-in's: Home's feed goes with the lists.
+        cache
+            .save("", LibraryList::Home, &vec!["feed".to_string()])
+            .unwrap();
         forget_library(&paths);
         assert_eq!(cache.load::<Vec<String>>("", LibraryList::Liked), None);
         assert_eq!(cache.load::<Vec<String>>("2", LibraryList::Albums), None);
+        assert_eq!(cache.load::<Vec<String>>("", LibraryList::Home), None);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn an_expired_session_forgets_the_home_feed() {
+        use featherplay_store::{LibraryCache, LibraryList, Paths};
+        let home = std::env::var_os("FEATHERPLAY_HOME").expect("set FEATHERPLAY_HOME");
+        let dir =
+            std::path::PathBuf::from(home).join(format!("test-expired-{}", std::process::id()));
+        let paths = Paths::from_home(&dir);
+        let cache = LibraryCache::new(&paths);
+        for identity in ["", "2"] {
+            cache
+                .save(identity, LibraryList::Home, &vec!["feed".to_string()])
+                .unwrap();
+        }
+        cache
+            .save("", LibraryList::Liked, &vec!["a".to_string()])
+            .unwrap();
+        forget_home(&paths);
+        assert_eq!(cache.load::<Vec<String>>("", LibraryList::Home), None);
+        assert_eq!(cache.load::<Vec<String>>("2", LibraryList::Home), None);
+        // The Library's lists stay until a new sign-in, as before.
+        assert!(cache.load::<Vec<String>>("", LibraryList::Liked).is_some());
         let _ = std::fs::remove_dir_all(&dir);
     }
 

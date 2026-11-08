@@ -100,3 +100,32 @@ fn a_damaged_file_reads_as_nothing() {
     fs::write(&file, b"{ not json").expect("damage");
     assert_eq!(cache.load::<Vec<Track>>("", LibraryList::Liked), None);
 }
+
+#[test]
+fn forgetting_a_list_drops_it_for_every_identity_and_keeps_the_others() {
+    let Some(home) = TestHome::new("library-forget-list") else {
+        return;
+    };
+    let cache = home.cache();
+    for identity in ["", "2"] {
+        cache
+            .save(identity, LibraryList::Home, &vec![track("feed")])
+            .expect("save home");
+    }
+    cache
+        .save("", LibraryList::Liked, &vec![track("a")])
+        .expect("save liked");
+    cache.forget(LibraryList::Home).expect("forget");
+    assert_eq!(cache.load::<Vec<Track>>("", LibraryList::Home), None);
+    assert_eq!(cache.load::<Vec<Track>>("2", LibraryList::Home), None);
+    assert_eq!(
+        cache.load::<Vec<Track>>("", LibraryList::Liked),
+        Some(vec![track("a")])
+    );
+    // Nothing left to forget is fine too, and so is a cache never made.
+    cache.forget(LibraryList::Home).expect("forget again");
+    cache.clear().expect("clear");
+    cache
+        .forget(LibraryList::Home)
+        .expect("forget with no cache");
+}

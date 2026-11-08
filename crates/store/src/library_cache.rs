@@ -3,7 +3,8 @@
 //! "2" or "0/<page id>" for another), under `{cache}/library/<identity>/<list>.json`.
 //!
 //! It holds what the lists show (titles, ids, thumbnail URLs), never cookies or secrets.
-//! Sign-out and a new sign-in remove it all (`clear`).
+//! Sign-out and a new sign-in remove it all (`clear`); a session that ended, Home's feed
+//! (`forget`).
 
 use std::fs;
 use std::io;
@@ -24,6 +25,8 @@ pub enum LibraryList {
     /// The playlists, albums and artists opened or played lately, for the sidebar's order
     /// and Home's shortcuts. Kept on this device only.
     Recent,
+    /// Home's feed as last fetched, so Home shows at once at the next start.
+    Home,
 }
 
 impl LibraryList {
@@ -34,6 +37,7 @@ impl LibraryList {
             LibraryList::Albums => "albums.json",
             LibraryList::Artists => "artists.json",
             LibraryList::Recent => "recent.json",
+            LibraryList::Home => "home.json",
         }
     }
 }
@@ -74,6 +78,25 @@ impl LibraryCache {
             Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(()),
             other => other,
         }
+    }
+
+    /// Forgets `list` for every identity, keeping the other lists. One that can't be
+    /// removed doesn't stop the others; the first error is returned.
+    pub fn forget(&self, list: LibraryList) -> io::Result<()> {
+        let dirs = match fs::read_dir(&self.dir) {
+            Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(()),
+            other => other?,
+        };
+        let mut first = Ok(());
+        for dir in dirs {
+            let removed = dir.and_then(|d| fs::remove_file(d.path().join(list.file_name())));
+            match removed {
+                Err(e) if e.kind() == io::ErrorKind::NotFound => {}
+                Err(e) if first.is_ok() => first = Err(e),
+                _ => {}
+            }
+        }
+        first
     }
 
     fn file(&self, identity: &str, list: LibraryList) -> PathBuf {
