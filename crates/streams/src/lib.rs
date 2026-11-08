@@ -47,6 +47,16 @@ pub struct ResolvedStream {
     pub loudness_db: Option<f32>,
 }
 
+/// How soon the player may ask for a song resolved ahead (`YtDlpResolver::resolve_ahead`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Ahead {
+    /// A row or card under the pointer, a page's first row, Home's featured song, the
+    /// restored track, a refused preload: a click may come any moment.
+    Soon,
+    /// The queue's tracks after the next one: minutes away.
+    Later,
+}
+
 /// Which audio format a resolve asks for (`YtDlpResolver::set_quality`).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Quality {

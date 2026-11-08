@@ -12,7 +12,8 @@ use crate::expiry::query_param;
 use crate::native::{NativeError, NativeResolver};
 use crate::sidecars::{Installer, tail};
 use crate::{
-    Downloads, Quality, ResolveError, ResolvedStream, Sidecars, StreamResolver, expires_at_from_url,
+    Ahead, Downloads, Quality, ResolveError, ResolvedStream, Sidecars, StreamResolver,
+    expires_at_from_url,
 };
 
 const RESOLVE_TIMEOUT: Duration = Duration::from_secs(45);
@@ -281,13 +282,14 @@ impl YtDlpResolver {
 
     /// `resolve`, ahead of a click: its yt-dlp steps wait for those of other resolves
     /// ahead, so one yt-dlp runs ahead at a time. Notify `urgent` when the player asks for
-    /// `id` meanwhile: the resolve then stops waiting.
+    /// `id` meanwhile: the resolve then stops waiting. `ahead`: how soon that may be.
     pub async fn resolve_ahead(
         &self,
         id: &TrackId,
         urgent: &Notify,
+        ahead: Ahead,
     ) -> Result<ResolvedStream, ResolveError> {
-        self.run_chain(id, Some(urgent)).await
+        self.run_chain(id, Some((urgent, ahead))).await
     }
 
     /// One step of `resolve` on its own, without cookies: no fallback, no `yt-dlp -U`, no
@@ -392,7 +394,7 @@ impl YtDlpResolver {
     async fn run_chain(
         &self,
         id: &TrackId,
-        ahead: Option<&Notify>,
+        ahead: Option<(&Notify, Ahead)>,
     ) -> Result<ResolvedStream, ResolveError> {
         if id.0.is_empty()
             || !id
@@ -428,7 +430,7 @@ impl YtDlpResolver {
             quality,
         };
         match ahead {
-            Some(urgent) => self.chain.resolve_ahead(&steps, id, urgent).await,
+            Some((urgent, ahead)) => self.chain.resolve_ahead(&steps, id, urgent, ahead).await,
             None => self.chain.resolve(&steps, id).await,
         }
     }

@@ -11,7 +11,7 @@ use tokio::sync::{Notify, Semaphore, SemaphorePermit};
 
 use crate::expiry::query_param;
 use crate::native::NativeError;
-use crate::{ResolveError, ResolvedStream};
+use crate::{Ahead, ResolveError, ResolvedStream};
 
 /// The `c=` of the embedded client's stream URLs.
 const EMBEDDED_CLIENT: &str = "WEB_EMBEDDED_PLAYER";
@@ -205,14 +205,15 @@ impl Chain {
     }
 
     /// A resolve ahead of a click: see `run`. `urgent` is notified when the player asks
-    /// for `id` meanwhile.
+    /// for `id` meanwhile; `ahead` says how soon that may be.
     pub async fn resolve_ahead(
         &self,
         s: &impl Steps,
         id: &TrackId,
         urgent: &Notify,
+        ahead: Ahead,
     ) -> Result<ResolvedStream, ResolveError> {
-        self.run(s, id, Some(urgent)).await
+        self.run(s, id, Some((urgent, ahead))).await
     }
 
     /// In order:
@@ -231,7 +232,9 @@ impl Chain {
     /// first byte plays (`opened`). A resolve ahead just waits; a resolve the player waits
     /// for runs one fresh native answer (`gated_for_player`) and step 2 beside the wait and
     /// takes the first URL that opens (`race`), as their requests may have come without an
-    /// ad. A gate past `MAX_GATE_WAIT` sends an embedded URL on to the next step.
+    /// ad. A resolve ahead of a click that may come any moment (`Ahead::Soon`) asks for its
+    /// fresh answer at once (two requests, ~0.45 s), and step 2 only once the player asks.
+    /// A gate past `MAX_GATE_WAIT` sends an embedded URL on to the next step.
     ///
     /// For `DOUBT_FOR` after a refused embedded URL (`refused`), steps 1 and 2 check their
     /// URL's first byte (one request, ~0.2 s) before handing it over, so a refused one
@@ -246,8 +249,11 @@ impl Chain {
         &self,
         s: &impl Steps,
         id: &TrackId,
-        ahead: Option<&Notify>,
+        ahead: Option<(&Notify, Ahead)>,
     ) -> Result<ResolvedStream, ResolveError> {
+        let soon = matches!(ahead, Some((_, Ahead::Soon)));
+        // Told when the player asks for the song; `None` once it has.
+        let mut ahead = ahead.map(|(urgent, _)| urgent);
         // Left by a resolve of the same song that was cancelled.
         self.take_fallback_reason(id);
         let (mut embedded, doubt) = self.embedded();
@@ -258,7 +264,6 @@ impl Chain {
                 "its native URL was refused (HTTP 403) a moment ago".into(),
             );
         }
-        let mut ahead = ahead;
         let one = if !native {
             None
         } else if doubt && ahead.is_none() {
@@ -270,23 +275,43 @@ impl Chain {
             match self.native_answer(s, id).await {
                 Some(Answer::Gated(stream)) => {
                     let wait = self.native_ready(s, id, stream, doubt);
-                    tokio::pin!(wait);
-                    // Ahead, the wait is all; once the player asks, yt-dlp runs beside it.
-                    let waited = match ahead {
-                        Some(urgent) => tokio::select! {
-                            biased;
-                            one = &mut wait => Some(one),
-                            () = urgent.notified() => None,
-                        },
-                        None => None,
+                    // Ahead, the wait is all; once the player asks, the fresh answer and
+                    // yt-dlp run beside it. Ahead of a click that may come any moment, the
+                    // fresh answer is asked for at once, so it's in by the click. `Ok`: the
+                    // wait ended with nobody asking; `Err`: the player asked, the race's end.
+                    let raced = match ahead {
+                        Some(urgent) if soon => {
+                            let rest = self.gated_for_player(s, id, wait, doubt);
+                            tokio::pin!(rest);
+                            match until_asked(&mut rest, urgent).await {
+                                Some(one) => Ok(one),
+                                None => {
+                                    Err(self.race(s, id, async { Some(rest.await) }, doubt).await)
+                                }
+                            }
+                        }
+                        _ => {
+                            tokio::pin!(wait);
+                            let waited = match ahead {
+                                Some(urgent) => until_asked(&mut wait, urgent).await,
+                                None => None,
+                            };
+                            match waited {
+                                Some(one) => Ok(one),
+                                None => {
+                                    let rest = async {
+                                        Some(self.gated_for_player(s, id, wait, doubt).await)
+                                    };
+                                    Err(self.race(s, id, rest, doubt).await)
+                                }
+                            }
+                        }
                     };
-                    match waited {
-                        Some(one) => Some(one),
-                        None => {
+                    match raced {
+                        Ok(one) => Some(one),
+                        Err(r) => {
                             ahead = None;
-                            let rest =
-                                async { Some(self.gated_for_player(s, id, wait, doubt).await) };
-                            match self.race(s, id, rest, doubt).await {
+                            match r {
                                 Some(r) => return r,
                                 None => Some(One::NotEmbeddable),
                             }
@@ -401,8 +426,9 @@ impl Chain {
         })
     }
 
-    /// A gated native answer the player waits for: its gate's `wait`, beside one more
-    /// native answer from a fresh embed page, which plays at once if it came without ads.
+    /// A gated native answer the player waits for, or may soon: its gate's `wait`, beside
+    /// one more native answer from a fresh embed page, which plays at once if it came
+    /// without ads.
     /// On 2026-11-07 yt-dlp's runs (a fresh visitor each) came without the ads of the
     /// native answer just before them 5 times in 6, but in ~2.7 s; a native answer takes
     /// ~0.5 s with its embed page. A fresh answer with ads too is dropped: the first one's
@@ -612,6 +638,15 @@ enum Answer {
     /// A URL refused until its `available_at` (ads before the song).
     Gated(ResolvedStream),
     Done(One),
+}
+
+/// `f`'s output, or `None` once the player asks for the song (`urgent`); `f` goes on then.
+async fn until_asked<F: Future + Unpin>(f: &mut F, urgent: &Notify) -> Option<F::Output> {
+    tokio::select! {
+        biased;
+        out = f => Some(out),
+        () = urgent.notified() => None,
+    }
 }
 
 /// How long `stream`'s URL stays refused (`available_at`), if it does.
@@ -1160,7 +1195,7 @@ mod tests {
         chain.refused(&other(), NATIVE_URL);
         let s = Script::default().native_hangs();
         let (urgent, song) = (Notify::new(), id());
-        let ahead = chain.resolve_ahead(&s, &song, &urgent);
+        let ahead = chain.resolve_ahead(&s, &song, &urgent, Ahead::Later);
         assert!(timeout(Duration::from_millis(50), ahead).await.is_err());
         assert_eq!(s.calls(), ["native"]);
     }
@@ -1178,7 +1213,7 @@ mod tests {
             .embedded(Ok(EMBEDDED_URL));
         let (first_urgent, second_urgent) = (Notify::new(), Notify::new());
         let (first_song, second_song) = (id(), other());
-        let first = chain.resolve_ahead(&s, &first_song, &first_urgent);
+        let first = chain.resolve_ahead(&s, &first_song, &first_urgent, Ahead::Later);
         tokio::pin!(first);
         assert!(
             timeout(Duration::from_millis(20), &mut first)
@@ -1187,7 +1222,7 @@ mod tests {
         );
         assert_eq!(s.calls(), ["native", "embedded"]);
 
-        let second = chain.resolve_ahead(&s, &second_song, &second_urgent);
+        let second = chain.resolve_ahead(&s, &second_song, &second_urgent, Ahead::Later);
         tokio::pin!(second);
         assert!(
             timeout(Duration::from_millis(50), &mut second)
@@ -1303,7 +1338,7 @@ mod tests {
             .native_gated(NATIVE_URL, 5)
             .check(Check::Plays);
         let (urgent, song, t) = (Notify::new(), id(), tokio::time::Instant::now());
-        let ahead = chain.resolve_ahead(&s, &song, &urgent);
+        let ahead = chain.resolve_ahead(&s, &song, &urgent, Ahead::Later);
         assert_eq!(url(within_gates(ahead).await), NATIVE_URL);
         assert!(t.elapsed() >= Duration::from_secs(5), "{:?}", t.elapsed());
         assert_eq!(s.calls(), ["native", "check"]);
@@ -1322,7 +1357,7 @@ mod tests {
             .check(Check::Refused)
             .check(Check::Plays);
         let (urgent, song) = (Notify::new(), id());
-        let ahead = chain.resolve_ahead(&s, &song, &urgent);
+        let ahead = chain.resolve_ahead(&s, &song, &urgent, Ahead::Later);
         assert_eq!(url(within_gates(ahead).await), NATIVE_URL);
         assert_eq!(s.calls(), ["native", "check", "check"]);
         let at = s.checked_at.lock().unwrap().clone();
@@ -1339,7 +1374,7 @@ mod tests {
             .native_gated(NATIVE_URL, 30)
             .embedded(Ok(EMBEDDED_URL));
         let (urgent, song) = (Notify::new(), id());
-        let ahead = chain.resolve_ahead(&s, &song, &urgent);
+        let ahead = chain.resolve_ahead(&s, &song, &urgent, Ahead::Later);
         assert_eq!(url(within_gates(ahead).await), EMBEDDED_URL);
         assert_eq!(s.calls(), ["native", "embedded"]);
         let why = chain.take_fallback_reason(&song).expect("a reason");
@@ -1365,9 +1400,8 @@ mod tests {
         assert!(t.elapsed() >= Duration::from_secs(6), "{:?}", t.elapsed());
     }
 
-    /// A hovered row is clicked while its URL's gate runs (a hover comes 0.1-1 s before
-    /// the click): from then on a fresh native answer and yt-dlp run beside the rest of
-    /// the wait.
+    /// A queue track resolved ahead is jumped to while its URL's gate runs: from then on a
+    /// fresh native answer and yt-dlp run beside the rest of the wait.
     #[tokio::test(start_paused = true)]
     async fn a_resolve_ahead_the_player_asks_for_during_its_gate_runs_yt_dlp_beside_it() {
         let chain = Chain::default();
@@ -1375,7 +1409,7 @@ mod tests {
             .native_gated(NATIVE_URL, 5)
             .embedded(Ok(EMBEDDED_URL));
         let (urgent, song, t) = (Notify::new(), id(), tokio::time::Instant::now());
-        let ahead = chain.resolve_ahead(&s, &song, &urgent);
+        let ahead = chain.resolve_ahead(&s, &song, &urgent, Ahead::Later);
         tokio::pin!(ahead);
         assert!(
             timeout(Duration::from_secs(1), &mut ahead).await.is_err(),
@@ -1386,6 +1420,68 @@ mod tests {
         assert_eq!(url(within_gates(ahead).await), EMBEDDED_URL);
         assert!(t.elapsed() < Duration::from_secs(2), "{:?}", t.elapsed());
         assert_eq!(s.calls(), ["fresh", "embedded"]);
+    }
+
+    /// A hovered row's native answer has ads: its click may come any moment (0.2-2.5 s
+    /// after the hint in the 2026-11-08 log), so the fresh answer is asked for at once
+    /// instead of at the click (~0.45 s later), and one without ads is the answer.
+    #[tokio::test(start_paused = true)]
+    async fn a_soon_resolve_ahead_takes_a_fresh_answer_without_ads_before_any_click() {
+        let chain = Chain::default();
+        let s = Script::default()
+            .native_gated(NATIVE_URL, 5)
+            .fresh(Ok(stream(FRESH_URL)))
+            .check(Check::Plays);
+        let (urgent, song, t) = (Notify::new(), id(), tokio::time::Instant::now());
+        let ahead = chain.resolve_ahead(&s, &song, &urgent, Ahead::Soon);
+        assert_eq!(url(within_gates(ahead).await), FRESH_URL);
+        assert!(t.elapsed() < Duration::from_secs(1), "{:?}", t.elapsed());
+        assert_eq!(s.calls(), ["native", "fresh"]);
+    }
+
+    /// Its fresh answer had ads too: the click then runs yt-dlp beside the gate, and no
+    /// second fresh answer (one per resolve).
+    #[tokio::test(start_paused = true)]
+    async fn a_soon_resolve_ahead_clicked_after_its_fresh_answer_had_ads_races_only_yt_dlp() {
+        let chain = Chain::default();
+        let s = Script::default()
+            .native_gated(NATIVE_URL, 5)
+            .fresh(Ok(gated_stream(FRESH_URL, 5)))
+            .embedded(Ok(EMBEDDED_URL));
+        let (urgent, song, t) = (Notify::new(), id(), tokio::time::Instant::now());
+        let ahead = chain.resolve_ahead(&s, &song, &urgent, Ahead::Soon);
+        tokio::pin!(ahead);
+        assert!(
+            timeout(Duration::from_secs(1), &mut ahead).await.is_err(),
+            "waits the gate"
+        );
+        assert_eq!(s.calls(), ["native", "fresh"]);
+        urgent.notify_one();
+        assert_eq!(url(within_gates(ahead).await), EMBEDDED_URL);
+        assert!(t.elapsed() < Duration::from_secs(2), "{:?}", t.elapsed());
+        assert_eq!(s.calls(), ["embedded"]);
+    }
+
+    /// Clicked while its fresh answer is still on its way: that one goes on beside yt-dlp,
+    /// and no second fresh answer is asked for.
+    #[tokio::test(start_paused = true)]
+    async fn a_soon_resolve_ahead_clicked_before_its_fresh_answer_came_asks_for_no_other() {
+        let chain = Chain::default();
+        let s = Script::default()
+            .native_gated(NATIVE_URL, 5)
+            .embedded(Ok(EMBEDDED_URL));
+        let (urgent, song) = (Notify::new(), id());
+        let ahead = chain.resolve_ahead(&s, &song, &urgent, Ahead::Soon);
+        tokio::pin!(ahead);
+        assert!(
+            timeout(Duration::from_millis(100), &mut ahead)
+                .await
+                .is_err()
+        );
+        assert_eq!(s.calls(), ["native", "fresh"]);
+        urgent.notify_one();
+        assert_eq!(url(within_gates(ahead).await), EMBEDDED_URL);
+        assert_eq!(s.calls(), ["embedded"]);
     }
 
     /// The player waits: yt-dlp's request may have come without an ad (2.5 s instead of
@@ -1470,7 +1566,7 @@ mod tests {
             .native_gated(NATIVE_URL, 5)
             .check(Check::Plays);
         let (urgent, song, t) = (Notify::new(), id(), tokio::time::Instant::now());
-        let ahead = chain.resolve_ahead(&s, &song, &urgent);
+        let ahead = chain.resolve_ahead(&s, &song, &urgent, Ahead::Later);
         assert_eq!(url(within_gates(ahead).await), NATIVE_URL);
         assert_eq!(s.calls(), ["native", "check"]);
         let checked = s.checked_at.lock().unwrap()[0];
@@ -1495,8 +1591,20 @@ mod tests {
         let ended = |r: Result<ResolvedStream, ResolveError>| (url(r), t.elapsed());
         let (first, second) = within_gates(async {
             tokio::join!(
-                async { ended(chain.resolve_ahead(&s, &first_song, &first_urgent).await) },
-                async { ended(chain.resolve_ahead(&s, &second_song, &second_urgent).await) },
+                async {
+                    ended(
+                        chain
+                            .resolve_ahead(&s, &first_song, &first_urgent, Ahead::Later)
+                            .await,
+                    )
+                },
+                async {
+                    ended(
+                        chain
+                            .resolve_ahead(&s, &second_song, &second_urgent, Ahead::Later)
+                            .await,
+                    )
+                },
             )
         })
         .await;

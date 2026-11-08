@@ -14,7 +14,8 @@
 //!
 //! The player's own resolves start at once. Resolves ahead ("hints") take at most
 //! `HINT_SLOTS` at a time; the newest hints go first, and older row hints are dropped past
-//! `HINT_QUEUE`. Their yt-dlp runs take turns (`YtDlpResolver::resolve_ahead`). Nothing
+//! `HINT_QUEUE`. Their yt-dlp runs take turns (`YtDlpResolver::resolve_ahead`). A row's
+//! hint is for a click that may come any moment (`Ahead::Soon`), the queue's for later. Nothing
 //! resolves twice: a hint for a stream that's here, running or waiting does nothing. The
 //! queue's hints follow the queue: a track no longer ahead has its resolve stopped, and
 //! paused or stopped, none runs. No timers: hints start when they come in and when a
@@ -28,7 +29,7 @@ use featherplay_audio::StreamSource;
 use featherplay_core::failure::getting_ready;
 use featherplay_core::model::{Track, TrackId};
 use featherplay_core::player::Input;
-use featherplay_streams::ResolvedStream;
+use featherplay_streams::{Ahead, ResolvedStream};
 use serde_json::{Value, json};
 use tokio::sync::Notify;
 use tokio::task::AbortHandle;
@@ -239,8 +240,8 @@ impl Streams {
     }
 
     /// The hints that can start now, newest first, each with what tells it the player
-    /// asks for its track; they count as running.
-    pub fn start_hints(&mut self) -> Vec<(TrackId, Arc<Notify>)> {
+    /// asks for its track and how soon that may be; they count as running.
+    pub fn start_hints(&mut self) -> Vec<(TrackId, Arc<Notify>, Ahead)> {
         let mut out = Vec::new();
         while self.running.iter().filter(|r| r.hint.is_some()).count() < HINT_SLOTS {
             let Some((id, hint)) = self.waiting.pop_back() else {
@@ -254,7 +255,11 @@ impl Streams {
                 urgent: urgent.clone(),
                 task: None,
             });
-            out.push((id, urgent));
+            let ahead = match hint {
+                Hint::Row => Ahead::Soon,
+                Hint::Queue => Ahead::Later,
+            };
+            out.push((id, urgent, ahead));
         }
         out
     }
@@ -525,9 +530,9 @@ impl Controller {
         if crate::perf::fixtures() {
             return;
         }
-        for (id, urgent) in self.streams.start_hints() {
+        for (id, urgent, ahead) in self.streams.start_hints() {
             log!("resolve {} ahead", id.0);
-            let task = self.spawn_resolve(id.clone(), Some(urgent));
+            let task = self.spawn_resolve(id.clone(), Some((urgent, ahead)));
             self.streams.started(&id, task);
         }
     }
@@ -570,14 +575,14 @@ impl Controller {
     }
 
     /// A resolve, ahead of a click when `urgent` is given (told when the player asks for
-    /// `id` meanwhile).
-    fn spawn_resolve(&self, id: TrackId, urgent: Option<Arc<Notify>>) -> AbortHandle {
+    /// `id` meanwhile), with how soon that may be.
+    fn spawn_resolve(&self, id: TrackId, urgent: Option<(Arc<Notify>, Ahead)>) -> AbortHandle {
         let (resolver, tx) = (self.resolver.clone(), self.tx.clone());
         tokio::spawn(async move {
             use featherplay_streams::StreamResolver;
             let started = Instant::now();
             let result = match &urgent {
-                Some(urgent) => resolver.resolve_ahead(&id, urgent).await,
+                Some((urgent, ahead)) => resolver.resolve_ahead(&id, urgent, *ahead).await,
                 None => resolver.resolve(&id).await,
             };
             let took = started.elapsed();
@@ -626,8 +631,8 @@ mod tests {
         TrackId(s.into())
     }
 
-    fn ids(started: Vec<(TrackId, Arc<Notify>)>) -> Vec<TrackId> {
-        started.into_iter().map(|(id, _)| id).collect()
+    fn ids(started: Vec<(TrackId, Arc<Notify>, Ahead)>) -> Vec<TrackId> {
+        started.into_iter().map(|(id, _, _)| id).collect()
     }
 
     fn waiting(s: &Streams) -> Vec<TrackId> {
@@ -763,6 +768,25 @@ mod tests {
         assert!(ended.unwrap_err().is_cancelled(), "q1 stopped");
         assert_eq!(ids(s.start_hints()), [id("q3"), id("row")]);
         assert!(s.running.iter().all(|r| r.id != id("q1")));
+    }
+
+    /// A row's click may come any moment, the queue's tracks are minutes away: the
+    /// resolver is told which (a row's gated answer gets its fresh one at once).
+    #[test]
+    fn a_rows_hint_resolves_for_a_click_soon_and_the_queues_for_later() {
+        let mut s = Streams::default();
+        let now = SystemTime::now();
+        s.ahead(None, &[id("q1")], now);
+        s.hint(&id("row"), now);
+        let started: Vec<_> = s
+            .start_hints()
+            .into_iter()
+            .map(|(id, _, ahead)| (id, ahead))
+            .collect();
+        assert_eq!(
+            started,
+            [(id("row"), Ahead::Soon), (id("q1"), Ahead::Later)]
+        );
     }
 
     /// Paused or stopped: the queue's resolves ahead stop and none starts.
