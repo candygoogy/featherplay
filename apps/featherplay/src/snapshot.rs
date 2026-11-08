@@ -118,6 +118,10 @@ pub const PAGES: &[&str] = &[
     // pill's popup open.
     "settings-speed",
     "speed-popup",
+    // Home with Skip silence's marks on the seek line: 5 s at the start, 8 s at 4:12 (ahead
+    // of the fill) and 22 s at the end; or with the inner one at 1:40, played past.
+    "silences",
+    "silences-played",
     "about",
     // About's version row while a check runs; up to date (checked 2 hours ago); after a
     // check failed offline, rate limited, or with an HTTP error.
@@ -719,6 +723,23 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
         crate::pages::settings::show_speed_for_snapshot(ctx, 125, o.page == "speed-popup");
         settle();
     }
+    if o.page == "silences" || o.page == "silences-played" {
+        let d = ui.global::<crate::ui::Player>().get_duration_s();
+        if d < 60.0 {
+            return Err(format!("{}: the fixture track is {d} s long", o.page));
+        }
+        let at = |s: f32| (s / d).clamp(0.0, 1.0);
+        let inner = if o.page == "silences" { 252.0 } else { 100.0 };
+        crate::bar::show_silences(
+            ctx,
+            &[
+                (0.0, at(5.0)),
+                (at(inner), at(inner + 8.0)),
+                (at(d - 22.0), 1.0),
+            ],
+        );
+        settle();
+    }
     if o.page == "settings-sound" || o.page == "settings-equalizer" {
         crate::pages::settings::show_sound_for_snapshot(ctx, o.page == "settings-equalizer");
         settle();
@@ -933,6 +954,8 @@ fn page(name: &str, f: &Fixtures) -> Result<Page, String> {
         | "mini-player-pinned"
         | "close-dialog"
         | "speed-popup"
+        | "silences"
+        | "silences-played"
         | "home-more"
         | "home-more-loading"
         | "home-more-failed"
