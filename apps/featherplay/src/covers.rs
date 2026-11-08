@@ -54,7 +54,8 @@ const PACE_TICK: Duration = Duration::from_millis(4);
 
 /// URL, physical width and height.
 type Key = (String, u32, u32);
-type Waiter = Box<dyn FnOnce(Image)>;
+/// Called with the cover, or `None` when it couldn't be loaded.
+type Waiter = Box<dyn FnOnce(Option<Image>)>;
 
 /// The UI thread's handle. Cheap to clone.
 #[derive(Clone)]
@@ -313,14 +314,35 @@ impl Covers {
         self.load_sized(url, px, px, done);
     }
 
+    /// As `load`, but `done` also hears of a failure, with `None` (an empty `url` included).
+    pub fn try_load(&self, url: &str, px: u32, done: impl FnOnce(Option<Image>) + 'static) {
+        self.request(url, px, px, done);
+    }
+
     fn load_sized(&self, url: &str, width: u32, height: u32, done: impl FnOnce(Image) + 'static) {
+        self.request(url, width, height, move |img| {
+            if let Some(img) = img {
+                done(img);
+            }
+        });
+    }
+
+    fn request(
+        &self,
+        url: &str,
+        width: u32,
+        height: u32,
+        done: impl FnOnce(Option<Image>) + 'static,
+    ) {
         if url.is_empty() || width == 0 || height == 0 {
+            done(None);
             return;
         }
         let phys = |px: u32| ((px as f32) * self.0.scale.get()).round().max(1.0) as u32;
         let key = (url.to_string(), phys(width), phys(height));
-        if let Some(img) = self.0.memory.borrow_mut().get(&key) {
-            done(img);
+        let cached = self.0.memory.borrow_mut().get(&key);
+        if let Some(img) = cached {
+            done(Some(img));
             return;
         }
         {
@@ -340,6 +362,7 @@ impl Covers {
             key.2,
         ));
         let this = self.clone();
+        let stuck = key.clone();
         let spawned = slint::spawn_local(async move {
             let result = task.await.unwrap_or_else(|e| Err(format!("task: {e}")));
             this.finish(key, result);
@@ -347,6 +370,8 @@ impl Covers {
         });
         if let Err(e) = spawned {
             log!("covers: {e}");
+            // Nothing will finish it: its callers hear it failed.
+            self.finish(stuck, Err(e.to_string()));
         }
     }
 
@@ -392,12 +417,18 @@ impl Covers {
                 let img = Image::from_rgba8(buffer);
                 self.0.memory.borrow_mut().put(key, img.clone());
                 for done in waiters {
-                    done(img.clone());
+                    done(Some(img.clone()));
                 }
             }
-            // Fixtures: most video thumbnails were never downloaded; thats expected.
-            Err(_) if self.0.fixtures.is_some() => {}
-            Err(e) => log!("cover {}: {e}", short(&key.0)),
+            Err(e) => {
+                // Fixtures: most video thumbnails were never downloaded; that's expected.
+                if self.0.fixtures.is_none() {
+                    log!("cover {}: {e}", short(&key.0));
+                }
+                for done in waiters {
+                    done(None);
+                }
+            }
         }
     }
 }
