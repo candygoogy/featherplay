@@ -318,69 +318,72 @@ export component Switch inherits Rectangle {
     callback toggled(bool);
     width: 40px;
     height: 22px;
-    border-radius: self.height / 2;
-    background: root.checked ? Theme.accent : transparent;
-    border-width: root.checked ? 0px : 1.5px;
-    border-color: Theme.text2;
-    opacity: root.enabled ? 1.0 : 0.4;
     accessible-role: switch;
     accessible-label: root.label;
     accessible-checkable: true;
     accessible-checked: root.checked;
     accessible-action-default => { root.flip(); }
-    animate background { duration: Theme.t-hover; }
 
     function flip() {
         if root.enabled {
             root.toggled(!root.checked);
         }
     }
-    // Hover and press: a soft halo over and around the track.
+    // The track, the root's size, dimmed as a group here (see `Field`).
     Rectangle {
-        x: -4px;
-        y: -4px;
-        width: parent.width + 8px;
-        height: parent.height + 8px;
         border-radius: self.height / 2;
-        background: Theme.state(sta.pressed, sta.has-hover);
+        background: root.checked ? Theme.accent : transparent;
+        border-width: root.checked ? 0px : 1.5px;
+        border-color: Theme.text2;
+        opacity: root.enabled ? 1.0 : 0.4;
         animate background { duration: Theme.t-hover; }
-    }
-    focus := FocusScope {
-        enabled: root.enabled;
-        key-pressed(e) => {
-            if e.text == Key.Return {
-                root.flip();
-                return accept;
+        // Hover and press: a soft halo over and around the track.
+        Rectangle {
+            x: -4px;
+            y: -4px;
+            width: parent.width + 8px;
+            height: parent.height + 8px;
+            border-radius: self.height / 2;
+            background: Theme.state(sta.pressed, sta.has-hover);
+            animate background { duration: Theme.t-hover; }
+        }
+        focus := FocusScope {
+            enabled: root.enabled;
+            key-pressed(e) => {
+                if e.text == Key.Return {
+                    root.flip();
+                    return accept;
+                }
+                reject
             }
-            reject
         }
-    }
-    sta := TouchArea {
-        enabled: root.enabled;
-        mouse-cursor: pointer;
-        clicked => {
-            focus.focus();
-            root.flip();
+        sta := TouchArea {
+            enabled: root.enabled;
+            mouse-cursor: pointer;
+            clicked => {
+                focus.focus();
+                root.flip();
+            }
         }
-    }
-    // The focus ring, just outside the track.
-    if focus.has-focus: Rectangle {
-        x: -3px;
-        y: -3px;
-        width: parent.width + 6px;
-        height: parent.height + 6px;
-        border-radius: self.height / 2;
-        border-width: 2px;
-        border-color: Theme.accent;
-    }
-    Rectangle {
-        x: root.checked ? parent.width - self.width - 4px : 5px;
-        y: (parent.height - self.height) / 2;
-        width: root.checked ? 14px : 12px;
-        height: self.width;
-        border-radius: self.width / 2;
-        background: root.checked ? Theme.on-solid : Theme.text2;
-        animate x { duration: Theme.t-hover; easing: ease-out; }
+        // The focus ring, just outside the track.
+        if focus.has-focus: Rectangle {
+            x: -3px;
+            y: -3px;
+            width: parent.width + 6px;
+            height: parent.height + 6px;
+            border-radius: self.height / 2;
+            border-width: 2px;
+            border-color: Theme.accent;
+        }
+        Rectangle {
+            x: root.checked ? parent.width - self.width - 4px : 5px;
+            y: (parent.height - self.height) / 2;
+            width: root.checked ? 14px : 12px;
+            height: self.width;
+            border-radius: self.width / 2;
+            background: root.checked ? Theme.on-solid : Theme.text2;
+            animate x { duration: Theme.t-hover; easing: ease-out; }
+        }
     }
 }
 
@@ -522,47 +525,52 @@ export component Field inherits Rectangle {
         input.select-all();
     }
     height: 36px;
-    border-radius: Theme.r-m;
-    background: Theme.field;
-    border-width: input.has-focus ? 1px : (Theme.dark ? 0px : 1px);
-    border-color: input.has-focus ? Theme.accent : Theme.hairline;
-    opacity: root.enabled ? 1.0 : 0.4;
-    TouchArea {
-        enabled: root.enabled;
-        mouse-cursor: MouseCursor.text;
-        clicked => { input.focus(); }
-    }
-    if input.text == "": Body {
-        // Starts just past the text cursor, so the cursor never draws over its first letter.
-        x: 12px + input.text-cursor-width + 2px;
-        width: parent.width - self.x - 12px;
-        height: parent.height;
-        text: root.placeholder;
-        color: Theme.text3;
-        vertical-alignment: center;
-    }
-    input := TextInput {
-        x: 12px;
-        width: parent.width - 24px;
-        height: parent.height;
-        text <=> root.text;
-        enabled: root.enabled;
-        input-type: root.input-type;
-        single-line: true;
-        vertical-alignment: center;
-        font-family: Theme.body-font;
-        font-size: Theme.t-body;
-        color: Theme.text1;
-        selection-background-color: Theme.accent;
-        selection-foreground-color: Theme.on-solid;
-        accessible-label: root.label;
-        accepted => {
-            root.committed(self.text);
-            root.accepted();
+    // The field, the root's size, dimmed as a group here: Slint copies a component whose root
+    // has an opacity into every place it's used.
+    Rectangle {
+        border-radius: Theme.r-m;
+        background: Theme.field;
+        border-width: input.has-focus ? 1px : (Theme.dark ? 0px : 1px);
+        border-color: input.has-focus ? Theme.accent : Theme.hairline;
+        opacity: root.enabled ? 1.0 : 0.4;
+        TouchArea {
+            enabled: root.enabled;
+            mouse-cursor: MouseCursor.text;
+            clicked => { input.focus(); }
         }
-        changed has-focus => {
-            if !self.has-focus {
+        if input.text == "": Body {
+            // Starts just past the text cursor, so the cursor never draws over its first
+            // letter.
+            x: 12px + input.text-cursor-width + 2px;
+            width: parent.width - self.x - 12px;
+            height: parent.height;
+            text: root.placeholder;
+            color: Theme.text3;
+            vertical-alignment: center;
+        }
+        input := TextInput {
+            x: 12px;
+            width: parent.width - 24px;
+            height: parent.height;
+            text <=> root.text;
+            enabled: root.enabled;
+            input-type: root.input-type;
+            single-line: true;
+            vertical-alignment: center;
+            font-family: Theme.body-font;
+            font-size: Theme.t-body;
+            color: Theme.text1;
+            selection-background-color: Theme.accent;
+            selection-foreground-color: Theme.on-solid;
+            accessible-label: root.label;
+            accepted => {
                 root.committed(self.text);
+                root.accepted();
+            }
+            changed has-focus => {
+                if !self.has-focus {
+                    root.committed(self.text);
+                }
             }
         }
     }
@@ -1136,6 +1144,39 @@ component Group inherits VerticalLayout {
     }
 }
 
+// A setting row's hairline on top, and its label with the detail under it. Their own
+// components, so they're compiled once: `SettingRow` takes its controls as children, so
+// Slint copies it into every row.
+component RowDivider {
+    in property <bool> shown;
+    if root.shown: Rectangle {
+        y: 0;
+        height: 1px;
+        background: Theme.hairline;
+    }
+}
+
+component RowLabel inherits VerticalLayout {
+    in property <string> label;
+    in property <string> detail;
+    alignment: center;
+    spacing: Theme.s1;
+    Body {
+        text: root.label;
+        font-size: Theme.t-body-l;
+        font-weight: 500;
+        overflow: clip;
+        wrap: word-wrap;
+    }
+    if root.detail != "": Body {
+        text: root.detail;
+        font-size: Theme.t-meta;
+        color: Rows.detail;
+        overflow: clip;
+        wrap: word-wrap;
+    }
+}
+
 // One setting: its name and a line of detail on the left, the control on the right.
 component SettingRow inherits Rectangle {
     in property <string> label;
@@ -1143,33 +1184,17 @@ component SettingRow inherits Rectangle {
     in property <bool> divider: true;
     min-height: lay.min-height;
     preferred-height: lay.preferred-height;
-    if root.divider: Rectangle {
-        y: 0;
-        height: 1px;
-        background: Theme.hairline;
+    RowDivider {
+        shown: root.divider;
     }
     lay := HorizontalLayout {
         padding-top: Rows.pad-y;
         padding-bottom: Rows.pad-y;
         spacing: Theme.s6;
-        VerticalLayout {
-            alignment: center;
-            spacing: Theme.s1;
+        RowLabel {
             horizontal-stretch: 1;
-            Body {
-                text: root.label;
-                font-size: Theme.t-body-l;
-                font-weight: 500;
-                overflow: clip;
-                wrap: word-wrap;
-            }
-            if root.detail != "": Body {
-                text: root.detail;
-                font-size: Theme.t-meta;
-                color: Rows.detail;
-                overflow: clip;
-                wrap: word-wrap;
-            }
+            label: root.label;
+            detail: root.detail;
         }
         VerticalLayout {
             alignment: center;
@@ -1506,6 +1531,62 @@ export component DialogField inherits VerticalLayout {
     }
 }
 
+// A dialog's title and detail, and its error and buttons, around its fields: their own
+// components, compiled once (`Dialog` takes the fields as children, so Slint copies it into
+// every dialog). Their spacing is the card's, so the lines sit as they would in it.
+component DialogHead inherits VerticalLayout {
+    in property <string> title;
+    in property <string> detail;
+    spacing: Theme.s4;
+    Display {
+        text: root.title;
+        font-size: 20px;
+        // A long playlist name in "Delete “…”?" wraps rather than being cut.
+        wrap: word-wrap;
+    }
+    if root.detail != "": Body {
+        text: root.detail;
+        color: Theme.text2;
+        wrap: word-wrap;
+    }
+}
+
+component DialogFoot inherits VerticalLayout {
+    in property <string> error;
+    in property <string> extra;
+    in property <string> ok-label;
+    callback ok();
+    callback cancel();
+    callback extra-clicked();
+    spacing: Theme.s4;
+    if root.error != "": Body {
+        text: root.error;
+        font-size: Theme.t-meta;
+        color: Theme.text1;
+        wrap: word-wrap;
+    }
+    HorizontalLayout {
+        padding-top: Theme.s2;
+        spacing: Theme.s2;
+        if root.extra != "": RowButton {
+            label: root.extra;
+            clicked => { root.extra-clicked(); }
+        }
+        Rectangle {
+            horizontal-stretch: 1;
+        }
+        RowButton {
+            label: @tr("Cancel");
+            clicked => { root.cancel(); }
+        }
+        RowButton {
+            label: root.ok-label;
+            solid: true;
+            clicked => { root.ok(); }
+        }
+    }
+}
+
 // A dialog over the page: a scrim, and a card with a title, a line of detail, the fields
 // (children) and the buttons. Escape or a click on the scrim cancels. Settings' dialogs, and
 // the playlist menu's Rename and Delete.
@@ -1563,43 +1644,18 @@ export component Dialog inherits Rectangle {
             lay := VerticalLayout {
                 padding: Theme.s5;
                 spacing: Theme.s4;
-                Display {
-                    text: root.title;
-                    font-size: 20px;
-                    // A long playlist name in "Delete “…”?" wraps rather than being cut.
-                    wrap: word-wrap;
-                }
-                if root.detail != "": Body {
-                    text: root.detail;
-                    color: Theme.text2;
-                    wrap: word-wrap;
+                DialogHead {
+                    title: root.title;
+                    detail: root.detail;
                 }
                 @children
-                if root.error != "": Body {
-                    text: root.error;
-                    font-size: Theme.t-meta;
-                    color: Theme.text1;
-                    wrap: word-wrap;
-                }
-                HorizontalLayout {
-                    padding-top: Theme.s2;
-                    spacing: Theme.s2;
-                    if root.extra != "": RowButton {
-                        label: root.extra;
-                        clicked => { root.extra-clicked(); }
-                    }
-                    Rectangle {
-                        horizontal-stretch: 1;
-                    }
-                    RowButton {
-                        label: @tr("Cancel");
-                        clicked => { root.cancel(); }
-                    }
-                    RowButton {
-                        label: root.ok-label;
-                        solid: true;
-                        clicked => { root.ok(); }
-                    }
+                DialogFoot {
+                    error: root.error;
+                    extra: root.extra;
+                    ok-label: root.ok-label;
+                    ok => { root.ok(); }
+                    cancel => { root.cancel(); }
+                    extra-clicked => { root.extra-clicked(); }
                 }
             }
         }
