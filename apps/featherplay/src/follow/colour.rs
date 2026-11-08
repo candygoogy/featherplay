@@ -17,8 +17,8 @@ pub struct Lch {
     pub h: f32,
 }
 
-/// Below this chroma the art counts as neutral (grey, black and white) and the accent falls
-/// back to red.
+/// Below this chroma the art counts as neutral (grey, black and white) and takes the neutral
+/// accent (`neutral`), not a colour of its own.
 pub const NEUTRAL_CHROMA: f32 = 0.03;
 
 /// The theme's fixed colours (`ui/theme.slint`).
@@ -28,25 +28,34 @@ pub struct Ground {
     /// raised cards.
     pub surfaces: [Rgb; 2],
     pub text1: Rgb,
+    /// The plain secondary text (`Theme.plain-text2`).
+    pub text2: Rgb,
     /// Text and glyphs on an accent fill (`Theme.on-accent`).
     pub on_accent: Rgb,
-    /// The fallback accent, the logo's red.
+    /// The fallback accent with nothing playing, the logo's red.
     pub accent: Rgb,
+    /// The accent for neutral art (and a song with no art): near-white on dark, graphite on
+    /// light, so a black-and-white cover isn't lit in red.
+    pub neutral: Rgb,
 }
 
 pub const DARK: Ground = Ground {
     ground: hex(0x0F0F0F),
     surfaces: [hex(0x181818), hex(0x212121)],
     text1: hex(0xFFFFFF),
+    text2: hex(0xAAAAAA),
     on_accent: hex(0x0F0F0F),
     accent: hex(0xFF3B55),
+    neutral: hex(0xE6E6E6),
 };
 pub const LIGHT: Ground = Ground {
     ground: hex(0xFFFFFF),
     surfaces: [hex(0xF7F7F7), hex(0xF2F2F2)],
     text1: hex(0x0F0F0F),
+    text2: hex(0x606060),
     on_accent: hex(0xFFFFFF),
     accent: hex(0xCC1036),
+    neutral: hex(0x3A3A3A),
 };
 
 /// The accent's minimum contrast against what it sits on and what sits on it: AA for text,
@@ -199,6 +208,8 @@ pub struct Palette {
     /// The player bar's tint.
     pub bar: Rgb,
     pub text2: Rgb,
+    /// From neutral art: the neutral accent and the plain bar and text (`neutral`).
+    pub neutral: bool,
 }
 
 /// Moves lightness step by step until every pair passes `min` contrast. The steps reach
@@ -254,16 +265,27 @@ pub fn wash_on_ground(seed: Lch, dark: bool) -> Rgb {
     }
 }
 
-/// The palette for `seed` on the dark or light theme, or `None` for neutral art, which
-/// keeps the plain colours (the red accent, the grey bar).
+/// The palette for neutral art (grey, black and white) and for a song with no art: the
+/// neutral accent with the plain bar and secondary text, which grey art gives no tint.
+pub fn neutral(dark: bool) -> Palette {
+    let g = if dark { &DARK } else { &LIGHT };
+    Palette {
+        accent: g.neutral,
+        bar: g.surfaces[0],
+        text2: g.text2,
+        neutral: true,
+    }
+}
+
+/// The palette for `seed` on the dark or light theme; `neutral` for neutral art.
 ///
 /// The accent is bold: the cover's hue with its chroma lifted, so muted art still gives a
 /// clear colour, light on dark and deep on light, then clamped to `ACCENT_MIN` against
 /// every surface it marks (the ground, the tinted bar, panels, cards, the now-playing
 /// wash). Text on it is black on dark and white on light, which the same clamp keeps AA.
-pub fn palette(seed: Lch, dark: bool) -> Option<Palette> {
+pub fn palette(seed: Lch, dark: bool) -> Palette {
     if seed.c < NEUTRAL_CHROMA {
-        return None;
+        return neutral(dark);
     }
     let (h, c) = (seed.h, seed.c);
     let g = if dark { &DARK } else { &LIGHT };
@@ -289,7 +311,12 @@ pub fn palette(seed: Lch, dark: bool) -> Option<Palette> {
     } else {
         clamp(lch(0.50, chroma), -0.01, &surfaces, ACCENT_MIN)
     };
-    Some(Palette { accent, bar, text2 })
+    Palette {
+        accent,
+        bar,
+        text2,
+        neutral: false,
+    }
 }
 
 /// `c` with only its lightness moved, as little as needed to keep `ACCENT_MIN` against
@@ -321,14 +348,14 @@ pub fn against_all(c: Rgb, surfaces: &[Rgb], min: f32) -> bool {
     surfaces.iter().all(|&s| contrast(c, s) >= min)
 }
 
-/// Both themes' palettes for a cover; `None` for neutral art.
-pub fn palettes(cover: &RgbaImage) -> Option<(Palette, Palette)> {
+/// Both themes' palettes for a cover, dark then light.
+pub fn palettes(cover: &RgbaImage) -> (Palette, Palette) {
     palettes_for(dominant(cover))
 }
 
-/// Both themes' palettes for a cover's colour (`dominant`); `None` for neutral art.
-pub fn palettes_for(seed: Lch) -> Option<(Palette, Palette)> {
-    Some((palette(seed, true)?, palette(seed, false)?))
+/// Both themes' palettes for a cover's colour (`dominant`), dark then light.
+pub fn palettes_for(seed: Lch) -> (Palette, Palette) {
+    (palette(seed, true), palette(seed, false))
 }
 
 /// The lyrics' ground and their three levels of text: the line playing, the lines to come
@@ -360,20 +387,20 @@ const LYRIC_PANEL_WHITE: f32 = 8.0;
 /// app reads calmer muted.
 const LYRIC_LIGHT_CHROMA: f32 = 0.6;
 
-/// What the lyrics' panel takes its colour from: the cover, or for neutral art (and no
-/// cover) the accent the app falls back to, red or the user's fixed colour, as the accent
-/// itself does. A grey panel read as flat.
-pub fn lyric_seed(cover: Lch, accent: Rgb) -> Lch {
-    if cover.c < NEUTRAL_CHROMA {
-        to_lch(accent)
-    } else {
-        cover
+/// What the lyrics' panel takes its colour from: the cover. For neutral art (and no cover)
+/// with a fixed accent (`fixed`: red, a preset or the user's own colour), that accent; from
+/// the cover (`None`), the art's own grey, which makes a deep graphite panel, as the accent
+/// goes neutral rather than red.
+pub fn lyric_seed(cover: Lch, fixed: Option<Rgb>) -> Lch {
+    match fixed {
+        Some(accent) if cover.c < NEUTRAL_CHROMA => to_lch(accent),
+        _ => cover,
     }
 }
 
 /// A solid panel in the cover's colour with light text tinted from its hue, for the dark or
 /// light theme. Deep enough for white to keep `LYRIC_PANEL_WHITE`; a neutral seed would give
-/// a grey panel, which `lyric_seed` keeps grey art from. Sung lines are the dimmest tint that keeps `LYRIC_PAST`; the lines to come sit
+/// a deep graphite one (neutral art from the cover, `lyric_seed`). Sung lines are the dimmest tint that keeps `LYRIC_PAST`; the lines to come sit
 /// `LYRIC_STEP_PAST` lighter, and white marks the line playing.
 pub fn lyric_panel(seed: Lch, dark: bool) -> LyricInk {
     let white = hex(0xFFFFFF);
@@ -451,9 +478,7 @@ mod tests {
         for dark in [true, false] {
             let g = if dark { &DARK } else { &LIGHT };
             for seed in seeds() {
-                let Some(p) = palette(seed, dark) else {
-                    continue;
-                };
+                let p = palette(seed, dark);
                 let [panel, card] = g.surfaces;
                 for (name, surface) in [
                     ("ground", g.ground),
@@ -479,22 +504,42 @@ mod tests {
         // Muted art still gives a clear colour, not a grey.
         for dark in [true, false] {
             for seed in seeds().into_iter().filter(|s| s.c >= 0.06) {
-                let p = palette(seed, dark).expect("colourful");
-                let got = to_lch(p.accent);
+                let got = to_lch(palette(seed, dark).accent);
                 assert!(got.c >= 0.08, "{seed:?} dark={dark}: {got:?}");
             }
         }
     }
 
     #[test]
-    fn grey_art_falls_back_to_red() {
-        let grey = RgbaImage::from_pixel(64, 64, image::Rgba([128, 128, 128, 255]));
-        assert_eq!(palettes(&grey), None);
-        let black = RgbaImage::from_pixel(64, 64, image::Rgba([4, 4, 4, 255]));
-        assert_eq!(palettes(&black), None);
-        // Faintly warm paper counts as grey too.
-        let paper = RgbaImage::from_pixel(64, 64, image::Rgba([236, 232, 226, 255]));
-        assert_eq!(palettes(&paper), None);
+    fn grey_art_gets_the_neutral_accent_not_red() {
+        // Grey, black, and faintly warm paper, which counts as grey too.
+        for rgb in [[128, 128, 128], [4, 4, 4], [236, 232, 226]] {
+            let [r, g, b] = rgb;
+            let art = RgbaImage::from_pixel(64, 64, image::Rgba([r, g, b, 255]));
+            let (dark, light) = palettes(&art);
+            assert_eq!(dark, neutral(true), "{rgb:?} dark");
+            assert_eq!(light, neutral(false), "{rgb:?} light");
+        }
+    }
+
+    #[test]
+    fn the_neutral_accent_is_near_white_on_dark_and_graphite_on_light() {
+        let (dark, light) = (neutral(true), neutral(false));
+        assert!(dark.neutral && light.neutral);
+        assert_eq!(dark.accent, hex(0xE6E6E6));
+        assert_eq!(light.accent, hex(0x3A3A3A));
+        // Grey art gives the bar no tint and text2 no hue: the plain colours.
+        assert_eq!((dark.bar, dark.text2), (hex(0x181818), hex(0xAAAAAA)));
+        assert_eq!((light.bar, light.text2), (hex(0xF7F7F7), hex(0x606060)));
+    }
+
+    #[test]
+    fn colourful_art_is_not_neutral() {
+        for dark in [true, false] {
+            for seed in seeds().into_iter().filter(|s| s.c >= NEUTRAL_CHROMA) {
+                assert!(!palette(seed, dark).neutral, "{seed:?} dark={dark}");
+            }
+        }
     }
 
     #[test]
@@ -505,7 +550,7 @@ mod tests {
         // OKLCH red sits near 25 degrees.
         let deg = seed.h.to_degrees().rem_euclid(360.0);
         assert!((10.0..40.0).contains(&deg), "{deg}");
-        let (dark, light) = palettes(&red).expect("colourful");
+        let (dark, light) = palettes(&red);
         assert!(
             light.accent[0] > light.accent[2],
             "red over blue: {:?}",

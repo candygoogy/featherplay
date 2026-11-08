@@ -6,7 +6,7 @@ use std::rc::Rc;
 
 use featherplay::offscreen;
 use featherplay::snapshot::Scene;
-use featherplay::ui::{Frame, Player};
+use featherplay::ui::{Frame, Player, Theme};
 use slint::platform::WindowEvent;
 use slint::{ComponentHandle, LogicalPosition};
 
@@ -22,6 +22,13 @@ fn pixel(w: &slint::Window, p: LogicalPosition) -> [u8; 3] {
     let shot = w.take_snapshot().expect("snapshot");
     let px = shot.as_slice()[p.y as usize * shot.width() as usize + p.x as usize];
     [px.r, px.g, px.b]
+}
+
+/// Whether `px` is the accent (the hovered fill), not the resting fill's `text2`.
+fn is_accent(scene: &Scene, px: [u8; 3]) -> bool {
+    let a = scene.ui.global::<Theme>().get_accent();
+    let close = |x: u8, y: u8| x.abs_diff(y) <= 6;
+    close(px[0], a.red()) && close(px[1], a.green()) && close(px[2], a.blue())
 }
 
 #[test]
@@ -59,11 +66,10 @@ fn the_slider_stays_lit_while_the_wheel_holds_the_hover() {
 
     w.dispatch_event(WindowEvent::PointerMoved { position: fill });
     scene.settle();
-    let [r, g, _] = pixel(w, fill);
+    let px = pixel(w, fill);
     assert!(
-        r > g + 60,
-        "the hovered fill isn't the accent: {:?}",
-        [r, g]
+        is_accent(&scene, px),
+        "the hovered fill isn't the accent: {px:?}"
     );
 
     // What `wheel.rs` does on a notch: the hover-holding layer goes over the window, then
@@ -74,10 +80,9 @@ fn the_slider_stays_lit_while_the_wheel_holds_the_hover() {
         "the wheel no longer reaches the slider"
     );
     scene.settle();
-    let [r, g, _] = pixel(w, fill);
+    let px = pixel(w, fill);
     assert!(
-        r > g + 60,
-        "the slider went grey under the wheel: {:?}",
-        [r, g]
+        is_accent(&scene, px),
+        "the slider went grey under the wheel: {px:?}"
     );
 }

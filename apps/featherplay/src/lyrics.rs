@@ -240,12 +240,13 @@ pub fn set_cover(ui: &crate::ui::AppWindow, seed: Option<Lch>) {
     refresh_inks(ui);
 }
 
-/// Sets the lyrics' colours from the cover and, for grey art or no cover, the fixed accent
-/// (`Theme.preset-dark`: red, or the user's preset or custom colour). Called again when the
-/// Accent setting changes.
+/// Sets the lyrics' colours from the cover and, for grey art or no cover, a graphite panel
+/// from the cover, or with a fixed accent that accent (`Theme.preset-dark`: red, or the
+/// user's preset or custom colour). Called again when the Accent setting changes.
 pub fn refresh_inks(ui: &crate::ui::AppWindow) {
-    let accent = ui.global::<Theme>().get_preset_dark();
-    let inks = crate::follow::lyric_inks_for(COVER.with(Cell::get), accent);
+    let theme = ui.global::<Theme>();
+    let fixed = (!theme.get_follow()).then(|| theme.get_preset_dark());
+    let inks = crate::follow::lyric_inks_for(COVER.with(Cell::get), fixed);
     let data = ui.global::<LyricsData>();
     data.set_ink_dark(inks.dark);
     data.set_ink_light(inks.light);

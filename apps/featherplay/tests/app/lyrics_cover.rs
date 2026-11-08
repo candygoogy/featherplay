@@ -34,8 +34,9 @@ fn covers() {
 fn expected_ground(scene: &Scene, rgb: [u8; 3]) -> Color {
     let img = image::DynamicImage::ImageRgb8(solid(rgb)).to_rgba8();
     let seed = colour::dominant(&img);
-    let accent = scene.ui.global::<Theme>().get_preset_dark();
-    follow::lyric_inks_for(Some(seed), accent).dark.ground
+    let fixed = (!scene.ui.global::<Theme>().get_follow())
+        .then(|| scene.ui.global::<Theme>().get_preset_dark());
+    follow::lyric_inks_for(Some(seed), fixed).dark.ground
 }
 
 /// Within a few steps per channel: the cache stores the covers as JPEG.

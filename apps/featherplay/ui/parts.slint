@@ -107,10 +107,10 @@ export component PlayButton inherits Rectangle {
         duration: pta.pressed ? Theme.t-press : Theme.t-release;
         easing: pta.pressed ? Curves.ease-out : Curves.release;
     }
-    // Hover and press: the usual overlay, over the accent.
+    // Hover and press: the usual overlay, over the accent (`on-accent`'s over the neutral one).
     Rectangle {
         border-radius: parent.border-radius;
-        background: Theme.state(pta.pressed, pta.has-hover);
+        background: Theme.accent-overlay(pta.pressed, pta.has-hover);
         animate background { duration: Theme.t-hover; }
     }
     pta := TouchArea {

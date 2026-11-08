@@ -1,6 +1,8 @@
 //! The accent (the Accent setting): from the current cover by default ("From the cover"),
-//! one of a few fixed colours, or the user's own (`custom`). Red is the fallback: with no
-//! cover, with grey art, and as the first preset.
+//! one of a few fixed colours, or the user's own (`custom`). From the cover, black-and-white
+//! art, a song with no art and a cover that fails to load take the neutral accent
+//! (`colour::neutral`); red, the logo's, is left for when nothing plays, and is the first
+//! preset.
 //!
 //! From the cover: once per track, the bar's cover (already in the memory cache) is copied
 //! out and its colour is extracted on tokio's blocking pool (`colour`), with the accents for
@@ -99,19 +101,27 @@ pub fn hue(c: AccentColour) -> f32 {
 enum Colours {
     /// Being extracted.
     Pending,
-    /// No cover, or grey art: the plain colours, red.
+    /// Nothing playing: the plain colours, red.
     #[default]
     Plain,
-    /// Dark and light palettes.
+    /// Dark and light palettes: the cover's, or the neutral ones for grey, missing or failed
+    /// art.
     Cover(Palette, Palette),
+}
+
+impl Colours {
+    fn neutral() -> Colours {
+        Colours::Cover(colour::neutral(true), colour::neutral(false))
+    }
 }
 
 #[derive(Default)]
 struct State {
     /// The setting is "From the cover".
     enabled: bool,
-    /// The cover the colours belong to (or are being made for).
-    url: String,
+    /// The cover the colours belong to (or are being made for): `None` with nothing
+    /// playing, empty for a song with no art.
+    url: Option<String>,
     colours: Colours,
     /// Which theme's colours are shown, once some are.
     shown_dark: Option<bool>,
@@ -135,29 +145,30 @@ pub fn set_accent(ctx: &Rc<Ctx>, accent: Accent, custom_colour: AccentColour) {
     let (dark, light) = fixed(accent, custom_colour);
     theme.set_preset_dark(to_color(colour::hex(dark)));
     theme.set_preset_light(to_color(colour::hex(light)));
-    // Grey art's lyrics take the fixed accent.
-    crate::lyrics::refresh_inks(&ui);
 
     let on = accent == Accent::Cover;
     let was = STATE.with(|s| std::mem::replace(&mut s.borrow_mut().enabled, on));
-    if was == on {
+    if was != on {
+        STATE.with(|s| {
+            let mut s = s.borrow_mut();
+            s.fade = None;
+            s.shown_dark = None;
+        });
+        if on {
+            // Start from what the window shows, the plain colours, so the first fade is smooth.
+            set(
+                &theme,
+                [theme.get_accent(), theme.get_bar(), theme.get_text2()],
+            );
+            theme.set_follow_neutral(false);
+        }
+        theme.set_follow(on);
+    }
+    // Grey art's lyrics take the fixed accent, or from the cover a graphite panel.
+    crate::lyrics::refresh_inks(&ui);
+    if was == on || !on {
         return;
     }
-    STATE.with(|s| {
-        let mut s = s.borrow_mut();
-        s.fade = None;
-        s.shown_dark = None;
-    });
-    if !on {
-        theme.set_follow(false);
-        return;
-    }
-    // Start from what the window shows, the plain colours, so the first fade is smooth.
-    set(
-        &theme,
-        [theme.get_accent(), theme.get_bar(), theme.get_text2()],
-    );
-    theme.set_follow(true);
     match ctx.player() {
         Some(state) => player_changed(ctx, &state),
         None => refresh(ctx),
@@ -191,8 +202,7 @@ pub fn player_changed(ctx: &Rc<Ctx>, state: &PlayerState) {
     let url = state
         .current
         .as_ref()
-        .and_then(|t| t.thumbnail.clone())
-        .unwrap_or_default();
+        .map(|t| t.thumbnail.clone().unwrap_or_default());
     let extract_for = STATE.with(|s| {
         let mut s = s.borrow_mut();
         if s.url == url {
@@ -201,21 +211,22 @@ pub fn player_changed(ctx: &Rc<Ctx>, state: &PlayerState) {
         s.url = url.clone();
         s.generation += 1;
         s.shown_dark = None;
-        s.colours = if url.is_empty() {
-            Colours::Plain
-        } else {
-            Colours::Pending
+        s.colours = match url.as_deref() {
+            None => Colours::Plain,
+            Some("") => Colours::neutral(),
+            Some(_) => Colours::Pending,
         };
         Some(s.generation)
     });
-    match extract_for {
+    match (extract_for, url) {
         // Same cover: only the setting or the theme may have changed.
-        None => refresh(ctx),
-        Some(_) if url.is_empty() => {
+        (None, _) => refresh(ctx),
+        (Some(generation), Some(url)) if !url.is_empty() => extract(ctx, url, generation),
+        // Nothing playing, or a song with no art.
+        (Some(_), _) => {
             cover_colour(ctx, None);
             refresh(ctx);
         }
-        Some(generation) => extract(ctx, url, generation),
     }
 }
 
@@ -229,14 +240,16 @@ fn cover_colour(ctx: &Ctx, seed: Option<Lch>) {
 
 fn extract(ctx: &Rc<Ctx>, url: String, generation: u64) {
     let c = ctx.clone();
-    ctx.covers.load(&url, COVER_PX, move |img| {
-        let current = STATE.with(|s| s.borrow().generation == generation);
-        let Some(buffer) = img.to_rgba8().filter(|_| current) else {
+    ctx.covers.try_load(&url, COVER_PX, move |img| {
+        if STATE.with(|s| s.borrow().generation != generation) {
             return;
-        };
-        let Some(pixels) =
+        }
+        let pixels = img.and_then(|img| img.to_rgba8()).and_then(|buffer| {
             image::RgbaImage::from_raw(buffer.width(), buffer.height(), buffer.as_bytes().to_vec())
-        else {
+        });
+        let Some(pixels) = pixels else {
+            // The cover failed to load: neutral, as for a song with no art.
+            no_colour(&c);
             return;
         };
         c.load(
@@ -250,16 +263,18 @@ fn extract(ctx: &Rc<Ctx>, url: String, generation: u64) {
             },
             move |ctx, _, found| {
                 let Some((seed, palettes)) = found else {
+                    // The extraction failed: as a cover that failed to load.
+                    if STATE.with(|s| s.borrow().generation == generation) {
+                        no_colour(ctx);
+                    }
                     return;
                 };
                 let current = STATE.with(|s| {
                     let mut s = s.borrow_mut();
                     let current = s.generation == generation;
                     if current {
-                        s.colours = match palettes {
-                            Some((dark, light)) => Colours::Cover(dark, light),
-                            None => Colours::Plain,
-                        };
+                        let (dark, light) = palettes;
+                        s.colours = Colours::Cover(dark, light);
                     }
                     current
                 });
@@ -272,22 +287,39 @@ fn extract(ctx: &Rc<Ctx>, url: String, generation: u64) {
     });
 }
 
+/// The current song's cover gave no colour (it failed to load, or its colour couldn't be
+/// worked out): the neutral colours, as for a song with no art.
+fn no_colour(ctx: &Rc<Ctx>) {
+    STATE.with(|s| s.borrow_mut().colours = Colours::neutral());
+    cover_colour(ctx, None);
+    refresh(ctx);
+}
+
 /// Crossfades `Theme.follow-*` from what's on screen to `colours` for the theme.
 fn show(ctx: &Rc<Ctx>, colours: Colours, dark: bool) {
     let Some(ui) = ctx.window() else { return };
     let theme = ui.global::<Theme>();
     let from = [theme.get_accent(), theme.get_bar(), theme.get_text2()];
-    let to = match colours {
+    let (to, neutral) = match colours {
         Colours::Cover(d, l) => {
             let p = if dark { d } else { l };
-            [p.accent, p.bar, p.text2].map(to_color)
+            ([p.accent, p.bar, p.text2].map(to_color), p.neutral)
         }
-        Colours::Plain | Colours::Pending => [
-            theme.get_plain_accent(),
-            theme.get_plain_bar(),
-            theme.get_plain_text2(),
-        ],
+        Colours::Plain | Colours::Pending => (
+            [
+                theme.get_plain_accent(),
+                theme.get_plain_bar(),
+                theme.get_plain_text2(),
+            ],
+            false,
+        ),
     };
+    // The neutral glow and hover come at once, as the colours start towards the neutral
+    // accent; they go once the fade away from it ends, so the glow never lights up in a
+    // half-faded near-white.
+    if neutral {
+        theme.set_follow_neutral(true);
+    }
     let first = STATE.with(|s| {
         let mut s = s.borrow_mut();
         s.shown_dark = Some(dark);
@@ -302,6 +334,7 @@ fn show(ctx: &Rc<Ctx>, colours: Colours, dark: bool) {
     let duration = Duration::from_millis(theme.get_t_colour().max(0) as u64);
     if duration.is_zero() || !on_screen || first || from == to {
         set(&theme, to);
+        theme.set_follow_neutral(neutral);
         STATE.with(|s| s.borrow_mut().fade = None);
         return;
     }
@@ -322,6 +355,9 @@ fn show(ctx: &Rc<Ctx>, colours: Colours, dark: bool) {
             let eased = ease_out(t);
             let now = std::array::from_fn(|i| mix(from[i], to[i], eased));
             set(&theme, now);
+            if t >= 1.0 {
+                theme.set_follow_neutral(neutral);
+            }
         }
         if t >= 1.0
             && let Some(timer) = stop.upgrade()
@@ -436,9 +472,10 @@ pub struct LyricInks {
     pub light: crate::ui::LyricInk,
 }
 
-/// The inks for a cover's `seed` (`None`: no cover). Grey art and no cover take `accent`,
-/// the fixed accent the app falls back to (`Theme.preset-dark`), as `colour::lyric_seed`.
-pub fn lyric_inks_for(seed: Option<Lch>, accent: Color) -> LyricInks {
+/// The inks for a cover's `seed` (`None`: no cover). With a fixed accent (`fixed`,
+/// `Theme.preset-dark`) grey art and no cover take it; from the cover (`None`) they take a
+/// graphite panel, as `colour::lyric_seed`.
+pub fn lyric_inks_for(seed: Option<Lch>, fixed: Option<Color>) -> LyricInks {
     let ink = |i: colour::LyricInk| crate::ui::LyricInk {
         ground: to_color(i.ground),
         current: to_color(i.current),
@@ -450,7 +487,7 @@ pub fn lyric_inks_for(seed: Option<Lch>, accent: Color) -> LyricInks {
         c: 0.0,
         h: 0.0,
     };
-    let seed = colour::lyric_seed(seed.unwrap_or(grey), to_rgb(accent));
+    let seed = colour::lyric_seed(seed.unwrap_or(grey), fixed.map(to_rgb));
     LyricInks {
         dark: ink(colour::lyric_panel(seed, true)),
         light: ink(colour::lyric_panel(seed, false)),
@@ -649,8 +686,7 @@ mod tests {
                 // Brighter and darker art than `seeds` covers.
                 [0.02, 0.98].into_iter().map(|l| Lch { l, c: 0.2, h: 1.0 }),
             )
-            .filter_map(|seed| colour::palette(seed, dark))
-            .map(|p| p.accent);
+            .map(|seed| colour::palette(seed, dark).accent);
         presets.chain(covers).collect()
     }
 
@@ -671,6 +707,27 @@ mod tests {
                         "dark={dark} {accent:?} under a veil of {alpha}: {ratio}"
                     );
                 }
+            }
+        }
+    }
+
+    #[test]
+    fn the_neutral_accent_hovers_visibly_and_keeps_its_glyph_aa() {
+        // White veils on dark barely change a near-white fill: the neutral accent steps
+        // towards `on-accent` instead, as an overlay (the round play button, 10 % and 20 %)
+        // and as a mix (`accent-hover` and `accent-pressed`, 16 % and 30 %).
+        for dark in [true, false] {
+            let g = if dark { &DARK } else { &LIGHT };
+            let rest = colour::neutral(dark).accent;
+            for (amount, least) in [(0.1, 1.2), (0.16, 1.2), (0.2, 1.4), (0.3, 1.4)] {
+                let fill = colour::over(g.on_accent, amount, rest);
+                let step = contrast(rest, fill);
+                assert!(step >= least, "dark={dark} at {amount}: a step of {step}");
+                let glyph = contrast(g.on_accent, fill);
+                assert!(
+                    glyph >= 4.5,
+                    "dark={dark} at {amount}: the glyph at {glyph}"
+                );
             }
         }
     }
@@ -728,7 +785,7 @@ mod tests {
                 continue;
             }
             for dark in [true, false] {
-                let ink = colour::lyric_panel(colour::lyric_seed(grey, accent), dark);
+                let ink = colour::lyric_panel(colour::lyric_seed(grey, Some(accent)), dark);
                 let got = colour::to_lch(ink.ground);
                 assert!(
                     got.c >= 0.035,
@@ -741,6 +798,26 @@ mod tests {
     }
 
     #[test]
+    fn from_the_cover_grey_and_missing_art_give_a_graphite_lyrics_panel() {
+        let grey = Lch {
+            l: 0.3,
+            c: 0.01,
+            h: 1.0,
+        };
+        for seed in [Some(grey), None] {
+            let inks = lyric_inks_for(seed, None);
+            for ink in [inks.dark, inks.light] {
+                let g = ink.ground;
+                let spread =
+                    g.red().max(g.green()).max(g.blue()) - g.red().min(g.green()).min(g.blue());
+                assert!(spread <= 4, "{seed:?}: not a grey panel: {g:?}");
+                let white = contrast(to_rgb(ink.current), to_rgb(g));
+                assert!(white >= colour::LYRIC_CURRENT, "{seed:?}: white at {white}");
+            }
+        }
+    }
+
+    #[test]
     fn colourful_art_keeps_its_own_lyrics_panel_whatever_the_accent() {
         let blue = Lch {
             l: 0.5,
@@ -748,7 +825,7 @@ mod tests {
             h: 4.4,
         };
         for accent in fallbacks() {
-            assert_eq!(colour::lyric_seed(blue, accent), blue);
+            assert_eq!(colour::lyric_seed(blue, Some(accent)), blue);
         }
     }
 
@@ -761,7 +838,7 @@ mod tests {
         };
         for accent in fallbacks() {
             for dark in [true, false] {
-                let ink = colour::lyric_panel(colour::lyric_seed(grey, accent), dark);
+                let ink = colour::lyric_panel(colour::lyric_seed(grey, Some(accent)), dark);
                 let what = format!("{accent:?} dark={dark}");
                 let (c, n, p) = (
                     contrast(ink.current, ink.ground),

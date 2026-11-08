@@ -34,12 +34,18 @@ export global Theme {
 
     // The accent (the Accent setting, `src/follow.rs`). "From the cover", the default: Rust
     // extracts the current cover's colours, clamps them for AA and crossfades `follow-*` to
-    // them over `t-colour`; `follow` is on while the setting is. No cover or grey art fades
-    // them to the plain colours (red). A fixed choice turns `follow` off: `preset-*` shows.
+    // them over `t-colour`; `follow` is on while the setting is. Black-and-white art (and a
+    // song with no art, or whose art failed) takes the neutral accent, near-white on dark and
+    // graphite on light, and sets `follow-neutral`; with nothing playing they fade to the
+    // plain colours (red). A fixed choice turns `follow` off: `preset-*` shows.
     in-out property <bool> follow: false;
     in-out property <color> follow-accent: #FF3B55;
     in-out property <color> follow-bar: #181818;
     in-out property <color> follow-text2: #AAAAAA;
+    in-out property <bool> follow-neutral: false;
+    // The accent is the neutral one: a fainter glow under the cover (`cover-glow`), and its
+    // own hover (`accent-hover`, `accent-overlay`).
+    out property <bool> neutral: follow && follow-neutral;
     in-out property <color> preset-dark: #FF3B55;
     in-out property <color> preset-light: #CC1036;
 
@@ -56,9 +62,11 @@ export global Theme {
     // on light (the accent is deep). The accent's AA against the ground carries over.
     out property <color> on-accent: dark ? #0F0F0F : #FFFFFF;
     // An accent fill hovered and pressed: a step towards `text1`, away from `on-accent`, so
-    // the glyph only gains contrast.
-    out property <color> accent-hover: accent.mix(text1, 0.84);
-    out property <color> accent-pressed: accent.mix(text1, 0.7);
+    // the glyph only gains contrast. The neutral accent is already next to `text1`, where
+    // that step can't be seen: it steps towards `on-accent` instead (darker on dark, lighter
+    // on light), the glyph keeping AA (11.0:1 and 6.9:1 hovered, 7.9:1 and 4.6:1 pressed).
+    out property <color> accent-hover: accent.mix(neutral ? on-accent : text1, 0.84);
+    out property <color> accent-pressed: accent.mix(neutral ? on-accent : text1, 0.7);
     // The accent's tonal fill (the selected pill tab or chip) and its hover, under `text1`.
     out property <color> accent-tonal: accent.transparentize(dark ? 0.78 : 0.86);
     out property <color> accent-tonal-hover: accent.transparentize(dark ? 0.7 : 0.8);
@@ -91,7 +99,9 @@ export global Theme {
     out property <color> track: dark ? #FFFFFF26 : #0000001F;      // progress and volume rails
     out property <color> cover-shadow: dark ? #00000099 : #00000033;
     // Now playing's soft glow under the cover, in the accent (the cover's colour by default).
-    out property <color> cover-glow: accent.with-alpha(dark ? 0.33 : 0.22);
+    // The neutral accent's would read as a spotlight: a faint white on dark, and on light none,
+    // which leaves the cover's own shadow (`cover-shadow`).
+    out property <color> cover-glow: neutral ? (dark ? #FFFFFF1A : #00000000) : accent.with-alpha(dark ? 0.33 : 0.22);
     out property <color> avatar: dark ? #3A3A3A : #E0E0E0;
     out property <color> scrim: dark ? #00000080 : #0000002E;      // under overlays
     // The current song's row rests on a light tile (hover and press still apply on top).
@@ -163,6 +173,11 @@ export global Theme {
     // An accent fill's background (the play button, the selected chip).
     public pure function accent-state(down: bool, over: bool) -> color {
         return down ? accent-pressed : (over ? accent-hover : accent);
+    }
+    // The overlay for an accent fill's state (the round play button): the usual one, but
+    // `on-accent` over the neutral accent, which a white veil on dark wouldn't change.
+    public pure function accent-overlay(down: bool, over: bool) -> color {
+        return neutral ? (down ? on-accent.with-alpha(0.2) : (over ? on-accent.with-alpha(0.1) : on-accent.with-alpha(0))) : state(down, over);
     }
 
     // Text: three levels. Level 3 sits at ~55 % (not 40 %) so it keeps WCAG AA on every

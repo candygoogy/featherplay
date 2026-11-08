@@ -83,12 +83,15 @@ fn not_for_me_takes_the_covers_tint_like_the_heart() {
     scene.play(false).expect("player");
     scene.open("now-playing").expect("now playing");
     scene.theme(true);
-    let theme = scene.ui.global::<Theme>();
-    theme.set_follow_text2(Color::from_rgb_u8(TINT.0, TINT.1, TINT.2));
-    theme.set_follow(true);
     scene.ui.show().expect("show");
     scene.settle();
     offscreen::freeze_clock();
+    // Once the accent has settled on the fixture's cover (none here: the neutral colours),
+    // so its fade doesn't paint over the tint.
+    settle(&scene);
+    let theme = scene.ui.global::<Theme>();
+    theme.set_follow_text2(Color::from_rgb_u8(TINT.0, TINT.1, TINT.2));
+    theme.set_follow(true);
     settle(&scene);
 
     // In the bar and in the title row: one of each, unrated.
