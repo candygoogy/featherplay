@@ -302,7 +302,8 @@ impl AudioEngine {
     }
 
     /// Fetches the first 256 KB of `src` into memory, so a later `load()` or `preload()`
-    /// of the same URL starts without waiting for the network. Cheap to call again: a URL
+    /// of the same URL starts without waiting for the network; one that comes while the
+    /// fetch is on its way takes its request over. Cheap to call again: a URL
     /// already fetched or on its way is left alone. The 8 newest are kept. A refused URL
     /// is told (`AudioEvent::PreloadRefused`).
     pub fn prefetch(&self, src: &StreamSource) {

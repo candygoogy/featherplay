@@ -4,7 +4,8 @@
 //! HTTP streams are fetched in 1 MiB `Range` requests into a temp file (`download.rs`),
 //! because a plain GET is throttled to about 2x realtime. `file://` URLs play directly.
 //! Decoding starts on the first fragment, before the download is done (`decoder.rs`), and
-//! `prefetch` keeps the first 256 KB of streams that may play soon in memory (`head.rs`).
+//! `prefetch` keeps the first 256 KB of streams that may play soon in memory (`head.rs`); a
+//! stream loaded while that is on its way takes its request over.
 //! Each track gets a decoder thread that does all blocking I/O and decodes about 1.5 s ahead,
 //! so the audio callback never waits on the network.
 //!

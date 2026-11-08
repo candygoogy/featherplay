@@ -359,7 +359,7 @@ fn timing() {
             r.url.clone(),
             |_| {},
         );
-        while heads.lock().unwrap().get(&r.url).is_none() {
+        while heads.get(&r.url).is_none() {
             assert!(t.elapsed() < Duration::from_secs(10), "no head");
             std::thread::sleep(Duration::from_millis(5));
         }

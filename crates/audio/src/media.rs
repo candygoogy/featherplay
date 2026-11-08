@@ -3,14 +3,20 @@
 use std::fs::File;
 use std::io::{self, Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 use featherplay_core::sync::LockExt;
 use tokio::runtime::Handle;
 
 use crate::StreamSource;
 use crate::download::{Download, DownloadView, First};
-use crate::head::HeadCache;
+use crate::head::{Coming, HeadCache, Start, Taken};
 use crate::http::ErrorSlot;
+
+/// How long a stream waits for the answer to its head's request on its way (`head.rs`)
+/// before it also asks for its start itself. That answer comes within ~0.4 s of the
+/// head's request, even on a new connection; one that takes longer may be stuck.
+const HEAD_WAIT: Duration = Duration::from_millis(500);
 
 enum Inner {
     /// The file and its path, for a second reader.
@@ -60,10 +66,11 @@ pub(crate) struct Opened {
 }
 
 impl Media {
-    /// Opens `src`. For HTTP this returns once the first chunk's headers arrived, or at
-    /// once when `heads` holds the start of the file; the download carries on in the
-    /// background on `rt`, into a temp file in `tmp_dir`. Failures, now or later, are
-    /// recorded in `error`.
+    /// Opens `src`. For HTTP this returns once the first chunk's headers arrived, at once
+    /// when `heads` holds the start of the file, or with the request of the head on its way
+    /// there once that has its answer (`head_or_own`). The download carries on in the
+    /// background on `rt`, into a temp file in
+    /// `tmp_dir`. Failures, now or later, are recorded in `error`.
     pub fn open(
         src: &StreamSource,
         rt: &Handle,
@@ -92,15 +99,10 @@ impl Media {
             ));
         }
         std::fs::create_dir_all(tmp_dir).map_err(|e| format!("{}: {e}", tmp_dir.display()))?;
-        let cached = heads.lock_or_recover().get(&src.url);
-        let at_hand = cached.is_some();
-        let (first, len) = match cached {
-            Some(h) => (First::Head(h.bytes.clone()), h.len),
-            None => {
-                let (r, len) =
-                    rt.block_on(crate::http::open(client, &src.url, src.content_length))?;
-                (First::Response(r), len)
-            }
+        let (first, len, at_hand) = match heads.take(&src.url) {
+            Some(Start::Now(t)) => from_head(t),
+            Some(Start::Coming(c)) => rt.block_on(head_or_own(c, client, src))?,
+            None => rt.block_on(own(client, src))?,
         };
         let dl = Download::start(
             rt,
@@ -210,6 +212,41 @@ impl Seek for Media {
                 Err(e)
             }
         }
+    }
+}
+
+/// How a download begins, the stream's length, and whether that took no request of its own.
+type Begin = (First, u64, bool);
+
+fn from_head(t: Taken) -> Begin {
+    match t {
+        Taken::Whole(h) => (First::Head(h.bytes.clone()), h.len, true),
+        Taken::Partial { read, rest, len } => (First::Partial(read, rest), len, true),
+    }
+}
+
+/// The stream's first chunk, asked for with a request of its own.
+async fn own(client: &reqwest::Client, src: &StreamSource) -> Result<Begin, String> {
+    let (r, len) = crate::http::open(client, &src.url, src.content_length).await?;
+    Ok((First::Response(r), len, false))
+}
+
+/// The head on its way, if its answer comes within `HEAD_WAIT`; after that, the head or a
+/// request of its own, whichever answers first, so a late head never makes the start later
+/// than it would have been without it.
+async fn head_or_own(
+    mut head: Coming,
+    client: &reqwest::Client,
+    src: &StreamSource,
+) -> Result<Begin, String> {
+    match tokio::time::timeout(HEAD_WAIT, head.wait()).await {
+        Ok(Some(t)) => return Ok(from_head(t)),
+        Ok(None) => return own(client, src).await,
+        Err(_) => {}
+    }
+    tokio::select! {
+        Some(t) = head.wait() => Ok(from_head(t)),
+        own = own(client, src) => own,
     }
 }
 

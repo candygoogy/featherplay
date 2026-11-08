@@ -317,7 +317,7 @@ fn a_fetched_head_starts_without_the_network() {
         |_| {},
     );
     let deadline = Instant::now() + Duration::from_secs(10);
-    while env.heads.lock().unwrap().get(&server.url).is_none() {
+    while env.heads.get(&server.url).is_none() {
         assert!(Instant::now() < deadline, "the head never arrived");
         std::thread::sleep(Duration::from_millis(20));
     }
@@ -643,6 +643,79 @@ fn engine_starts_a_prefetched_stream_without_the_network() {
         server.log.starts.lock().unwrap().len(),
         1,
         "one request, the prefetch"
+    );
+}
+
+/// A click on a song resolved just before it: its head is on its way. The load waits for
+/// that response instead of sending a second request, which would start later and come
+/// later (on a second connection, over the network).
+#[test]
+fn engine_load_takes_the_head_that_is_on_its_way() {
+    let data = fixture("tone-10s-frag.m4a");
+    // Every request takes 600 ms to answer.
+    let server = serve(data, 1 << 20, Duration::from_millis(600));
+    let engine = crate::AudioEngine::new_null(engine_tmp());
+    let events = engine.events();
+    engine.prefetch(&src(&server.url));
+    std::thread::sleep(Duration::from_millis(250));
+    let t = Instant::now();
+    engine.load(src(&server.url), Duration::ZERO);
+    engine.play();
+    wait_event(&events, Duration::from_secs(3), crate::AudioEvent::Started);
+    let started = t.elapsed();
+    let starts = server.log.starts.lock().unwrap().clone();
+    assert_eq!(starts, [0], "one request for the start, the prefetch's");
+    // The head comes ~350 ms after the load; a request of its own would take 600 ms.
+    assert!(
+        started < Duration::from_millis(550),
+        "Started after {started:?}"
+    );
+}
+
+/// On a slow link the head takes seconds to come in whole: the load takes its request over
+/// and plays from its first bytes, as a request of its own would.
+#[test]
+fn engine_load_on_a_slow_link_takes_the_head_request_over() {
+    let data = fixture("tone-10s-frag.m4a");
+    // ~5 s for the whole file.
+    let server = serve(data, 16 << 10, Duration::ZERO);
+    let engine = crate::AudioEngine::new_null(engine_tmp());
+    let events = engine.events();
+    engine.prefetch(&src(&server.url));
+    std::thread::sleep(Duration::from_millis(250));
+    let t = Instant::now();
+    engine.load(src(&server.url), Duration::ZERO);
+    engine.play();
+    wait_event(&events, Duration::from_secs(3), crate::AudioEvent::Started);
+    let started = t.elapsed();
+    let starts = server.log.starts.lock().unwrap().clone();
+    assert_eq!(starts, [0], "one request for the start, the prefetch's");
+    assert!(
+        started < Duration::from_millis(500),
+        "Started after {started:?}"
+    );
+}
+
+/// A head's answer that comes late still wins if it beats the request the load then sends
+/// of its own: the load never comes later than it would have without the head.
+#[test]
+fn engine_load_takes_a_late_head_if_it_answers_first() {
+    let data = fixture("tone-10s-frag.m4a");
+    // Every request takes 1.3 s to answer: longer than a load waits for the head's.
+    let server = serve(data, 1 << 20, Duration::from_millis(1300));
+    let engine = crate::AudioEngine::new_null(engine_tmp());
+    let events = engine.events();
+    engine.prefetch(&src(&server.url));
+    std::thread::sleep(Duration::from_millis(100));
+    let t = Instant::now();
+    engine.load(src(&server.url), Duration::ZERO);
+    engine.play();
+    wait_event(&events, Duration::from_secs(4), crate::AudioEvent::Started);
+    let started = t.elapsed();
+    // The head answers ~1.2 s after the load; a request of its own would answer later.
+    assert!(
+        started < Duration::from_millis(1600),
+        "Started after {started:?}"
     );
 }
 

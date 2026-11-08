@@ -35,6 +35,9 @@ pub(crate) enum First {
     Response(reqwest::Response),
     /// The start of the file, from memory (`head.rs`).
     Head(Bytes),
+    /// The start of the file so far, and the response it came on, which goes on from there
+    /// (a head's request, taken over).
+    Partial(Bytes, reqwest::Response),
 }
 
 #[derive(Default)]
@@ -274,19 +277,20 @@ async fn run(
     };
     let len = shared.len;
     let mut cursor = 0u64;
-    let mut response = match first {
-        First::Response(r) => Some(r),
-        First::Head(b) => {
-            let n = (b.len() as u64).min(len);
-            if let Err(e) = write_all_at(file.as_file(), &b[..n as usize], 0) {
-                return fail(format!("writing the temp file: {e}"));
-            }
-            shared.state.lock_or_recover().add(0..n);
-            shared.arrived.notify_all();
-            cursor = n;
-            None
-        }
+    let (start, mut response) = match first {
+        First::Response(r) => (None, Some(r)),
+        First::Head(b) => (Some(b), None),
+        First::Partial(b, r) => (Some(b), Some(r)),
     };
+    if let Some(b) = start {
+        let n = (b.len() as u64).min(len);
+        if let Err(e) = write_all_at(file.as_file(), &b[..n as usize], 0) {
+            return fail(format!("writing the temp file: {e}"));
+        }
+        shared.state.lock_or_recover().add(0..n);
+        shared.arrived.notify_all();
+        cursor = n;
+    }
     let mut failures = 0;
     loop {
         // Where to go on from: the wanted byte if it's out of reach, else the next hole.
