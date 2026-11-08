@@ -10,6 +10,7 @@
 //! silence, so `STOP_AFTER` into a pause the engine stops the output stream; `play()` starts
 //! it again. The device stays open, so resuming is as quick as from a short pause.
 
+use std::collections::VecDeque;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
@@ -36,6 +37,8 @@ const STOP_AFTER: Duration = Duration::from_secs(1);
 /// Tracks fading out at once at most: a third (skips in a row, each fading) stops the
 /// oldest, which is the quietest.
 const MAX_FADING: usize = 2;
+/// URLs `silences_known` remembers: the current track, the next, and a skip or two.
+const KNOWN: usize = 4;
 
 pub(crate) enum Msg {
     Load {
@@ -77,6 +80,12 @@ pub(crate) enum Msg {
     },
     /// From a head prefetch (`head::prefetch`): its URL was refused.
     HeadRefused(String),
+    /// The app has this stream's silences: its voice doesn't scan for them.
+    SilencesKnown(String),
+    /// From a scan thread (`scan`): the voice's silences are there.
+    Silences {
+        voice: u64,
+    },
     // From the audio thread.
     Started {
         voice: u64,
@@ -290,6 +299,13 @@ impl AudioEngine {
             .store(mode.to_u8(), Ordering::Relaxed);
     }
 
+    /// The app keeps the silences of the stream at `url` (from an earlier
+    /// `AudioEvent::Silences`): a `load`, `preload` or `crossfade_to` of it after this
+    /// doesn't scan it again. Remembered for the few URLs told last.
+    pub fn silences_known(&self, url: &str) {
+        self.send(Msg::SilencesKnown(url.to_owned()));
+    }
+
     /// "Even out loudness". Heard within one device buffer (~50 ms).
     pub fn set_compressor(&self, c: Compressor) {
         self.controls.bus.set_compressor(c);
@@ -418,6 +434,8 @@ struct Engine {
     stop_at: Option<Instant>,
     /// The glitch counters at the last report.
     reported: Counts,
+    /// The URLs `silences_known` was told last, newest last; `KNOWN` at most.
+    known: VecDeque<String>,
     /// Tests: a null output instead of a device, there while the flag is set. `None` opens
     /// the real devices.
     #[cfg_attr(not(test), allow(dead_code))]
@@ -462,6 +480,7 @@ impl Engine {
             buffering_shown: false,
             stop_at: None,
             reported: Counts::default(),
+            known: VecDeque::new(),
             null,
         })
     }
@@ -557,6 +576,23 @@ impl Engine {
             }
             // Told like a refused preload: the app resolves the stream again.
             Msg::HeadRefused(url) => self.emit(AudioEvent::PreloadRefused(url)),
+            Msg::SilencesKnown(url) => {
+                for v in [&self.current, &self.preloaded].into_iter().flatten() {
+                    if v.shared.url == url {
+                        v.shared.silences_known();
+                    }
+                }
+                self.known.retain(|u| *u != url);
+                if self.known.len() >= KNOWN {
+                    self.known.pop_front();
+                }
+                self.known.push_back(url);
+            }
+            Msg::Silences { voice } => {
+                if self.is_current(voice) {
+                    self.tell_silences();
+                }
+            }
             Msg::Seek { to, seq } => {
                 if !self.fading.is_empty() {
                     // A seek ends the fade: the old track goes, the new one comes up.
@@ -734,6 +770,7 @@ impl Engine {
         self.status.lock_or_recover().current = Some(voice.shared.clone());
         self.current = Some(voice);
         self.attach_current();
+        self.tell_silences();
     }
 
     fn preload(&mut self, src: StreamSource) {
@@ -780,6 +817,20 @@ impl Engine {
         self.status.lock_or_recover().current = Some(voice.shared.clone());
         self.current = Some(voice);
         self.attach_current();
+        self.tell_silences();
+    }
+
+    /// The current voice's silences, once, when its scan has found them (a preloaded
+    /// voice's may have before it became current).
+    fn tell_silences(&mut self) {
+        let Some(v) = &self.current else { return };
+        if let Some(silences) = v.shared.take_silences() {
+            let ev = AudioEvent::Silences {
+                url: v.shared.url.clone(),
+                silences: silences.clone(),
+            };
+            self.emit(ev);
+        }
     }
 
     /// `v` is no longer current: it fades out over `fade` from where it is, or stops now if
@@ -836,6 +887,7 @@ impl Engine {
 
     fn spawn_voice(&mut self, src: StreamSource) -> Voice {
         self.next_voice += 1;
+        let known = self.known.contains(&src.url);
         let shared = voice::spawn(
             self.next_voice,
             src,
@@ -847,6 +899,7 @@ impl Engine {
             },
             self.controls.clone(),
             self.tx.clone(),
+            known,
         );
         Voice {
             shared,

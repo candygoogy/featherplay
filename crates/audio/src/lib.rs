@@ -14,6 +14,8 @@
 //!   seek past the downloaded data), then `Buffering(false)` when audio resumes.
 //! - `Skipped` each time playback reaches silence that skip silence dropped: the position
 //!   jumped ahead.
+//! - `Silences` while skip silence is on, once the scan of the whole downloaded track has
+//!   found where it's silent (`scan.rs`).
 //! - `Ended` when the track played to its end. A seek after that plays again.
 //! - `Error(msg)` when the stream can't be opened, decoded or downloaded; no `Ended` follows.
 //!   An expired URL shows up here as `HTTP 403`.
@@ -43,6 +45,7 @@ mod http;
 mod media;
 mod opus;
 mod priority;
+mod scan;
 mod silence;
 #[cfg(test)]
 mod stream_tests;
@@ -59,7 +62,7 @@ mod volume;
 pub use devices::output_devices;
 pub use dsp::Compressor;
 pub use engine::AudioEngine;
-pub use silence::SkipSilence;
+pub use silence::{Silences, SkipSilence};
 pub use tmp::clear_stale_temp;
 pub use volume::perceptual_gain;
 
@@ -100,4 +103,11 @@ pub enum AudioEvent {
     /// first request). Other preload failures stay quiet: a later `load` of the URL tries
     /// again and reports.
     PreloadRefused(String),
+    /// While skip silence is on, the current track's silent runs, found by a scan of the
+    /// whole stream once its download is complete (`Silences::spans` gives what a mode
+    /// drops). Once per track, unless `AudioEngine::silences_known` was told its URL.
+    Silences {
+        url: String,
+        silences: Silences,
+    },
 }

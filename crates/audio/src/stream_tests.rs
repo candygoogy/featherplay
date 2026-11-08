@@ -1171,3 +1171,125 @@ fn engine_fade_out_then_crossfade_brings_the_next_track_in() {
     std::thread::sleep(Duration::from_millis(1200));
     assert_eq!(engine.sources(), 1);
 }
+
+// Skip silence's scan of the whole track, for the seek bar's marks.
+
+/// The next `Silences` event within `timeout`.
+fn next_silences(
+    rx: &std::sync::mpsc::Receiver<crate::AudioEvent>,
+    timeout: Duration,
+) -> Option<(String, crate::Silences)> {
+    let t = Instant::now();
+    loop {
+        match rx.recv_timeout(timeout.saturating_sub(t.elapsed())) {
+            Ok(crate::AudioEvent::Silences { url, silences }) => return Some((url, silences)),
+            Ok(crate::AudioEvent::Error(e)) => panic!("engine error: {e}"),
+            Ok(_) => {}
+            Err(_) => return None,
+        }
+    }
+}
+
+#[test]
+fn engine_finds_every_silence_of_a_track_while_skip_silence_is_on() {
+    let engine = crate::AudioEngine::new_null(engine_tmp());
+    engine.set_skip_silences(crate::SkipSilence::StartAndEnd);
+    let events = engine.events();
+    let track = local("silence-ends.m4a");
+    // Paused: the scan needs no playback, only all of the bytes.
+    engine.load(track.clone(), Duration::ZERO);
+    let (url, found) = next_silences(&events, Duration::from_secs(5)).expect("silences");
+    assert_eq!(url, track.url);
+    let spans = found.spans(crate::SkipSilence::StartAndEnd);
+    // The 2 s intro whole, and the last 1.5 s of the 2 s outro.
+    assert_eq!(spans.len(), 2, "{spans:?}");
+    for (got, want) in [
+        (spans[0].start, 0.0),
+        (spans[0].end, 2.0),
+        (spans[1].start, 4.5),
+        (spans[1].end, 6.0),
+    ] {
+        near(Some(got), want);
+    }
+}
+
+#[test]
+fn engine_does_not_scan_a_track_whose_silences_the_app_has() {
+    let engine = crate::AudioEngine::new_null(engine_tmp());
+    engine.set_skip_silences(crate::SkipSilence::StartAndEnd);
+    let events = engine.events();
+    let track = local("silence-ends.m4a");
+    engine.silences_known(&track.url);
+    engine.load(track, Duration::ZERO);
+    engine.play();
+    assert_eq!(next_silences(&events, Duration::from_secs(1)), None);
+}
+
+/// The process's commit charge now and at its peak, in bytes.
+#[cfg(windows)]
+fn commit() -> (usize, usize) {
+    use windows::Win32::System::ProcessStatus::{GetProcessMemoryInfo, PROCESS_MEMORY_COUNTERS};
+    use windows::Win32::System::Threading::GetCurrentProcess;
+
+    let mut c = PROCESS_MEMORY_COUNTERS::default();
+    // SAFETY: the pseudo-handle of the current process is always valid, and `c` is a live
+    // local of the size passed.
+    let _ = unsafe {
+        GetProcessMemoryInfo(
+            GetCurrentProcess(),
+            &mut c,
+            std::mem::size_of::<PROCESS_MEMORY_COUNTERS>() as u32,
+        )
+    };
+    (c.PagefileUsage, c.PeakPagefileUsage)
+}
+
+#[cfg(not(windows))]
+fn commit() -> (usize, usize) {
+    (0, 0)
+}
+
+/// What skip silence's scan of a whole track costs: CPU, wall time at below-normal
+/// priority, and the most memory it added. `SCAN_FILE` names an Opus WebM file (default:
+/// the 10 s tone). A measurement, run by hand in release on an otherwise quiet machine:
+/// `RUSTFLAGS="--cfg ci" SCAN_FILE=<path> cargo nextest run -p featherplay-audio --lib --release -E 'test(silence_scan_cpu)' --run-ignored only --no-capture`
+#[test]
+#[ignore = "a measurement; run it in release"]
+fn silence_scan_cpu() {
+    let url = match std::env::var("SCAN_FILE") {
+        Ok(path) => format!(
+            "file:///{}",
+            path.replace('\\', "/").trim_start_matches('/')
+        ),
+        Err(_) => local("tone-10s.webm").url,
+    };
+    let env = env();
+    let (media, n, _) = env.open(&url);
+    let (before, _) = commit();
+    let cpu = process_cpu();
+    let wall = Instant::now();
+    let found = std::thread::spawn(move || {
+        crate::priority::lower_scan();
+        crate::scan::silences(media, n, WEBM, &AtomicBool::new(false))
+    })
+    .join()
+    .unwrap()
+    .expect("scanned");
+    let (cpu, wall) = (process_cpu() - cpu, wall.elapsed());
+    let (_, peak) = commit();
+    let secs = found.frames as f64 / f64::from(found.rate);
+    println!(
+        "scan of {secs:.1} s: {:.0} ms CPU ({:.0}x realtime), {:.0} ms wall, peak +{} KB, {} runs",
+        cpu.as_secs_f64() * 1000.0,
+        secs / cpu.as_secs_f64(),
+        wall.as_secs_f64() * 1000.0,
+        peak.saturating_sub(before) / 1024,
+        found.runs.len()
+    );
+    for mode in [
+        crate::SkipSilence::StartAndEnd,
+        crate::SkipSilence::Everywhere,
+    ] {
+        println!("{mode:?}: {:?}", found.spans(mode));
+    }
+}

@@ -33,7 +33,7 @@ use crate::glitches::Glitches;
 use crate::head::HeadCache;
 use crate::http::ErrorSlot;
 use crate::media::{Cancel, Media, Opened};
-use crate::silence::{Skip, SkipSilence, Trimmer};
+use crate::silence::{Silences, Skip, SkipSilence, Trimmer};
 use crate::stretch::{MAX_SPEED, MIN_SPEED, Stretch};
 
 /// Samples the decoder thread decodes between ring updates.
@@ -184,6 +184,12 @@ pub(crate) struct VoiceShared {
     /// Where the track's music ends, in ms (`tail`); `UNKNOWN` before the decoder thread
     /// has read the end of the stream.
     music_end_ms: AtomicU64,
+    /// Skip silence's scan of the whole track (`scan`), once it's done.
+    silences: OnceLock<Silences>,
+    /// The app has the track's silences already (`AudioEngine::silences_known`): no scan.
+    silences_known: AtomicBool,
+    /// The engine has told the scan (`take_silences`).
+    silences_told: AtomicBool,
     /// The first source ramps in (`ramp_in_first`).
     ramp_in: AtomicBool,
     /// A seek for the decoder thread: target and the engine's sequence number. The engine
@@ -224,6 +230,9 @@ impl VoiceShared {
             fade_ms: AtomicU32::new(0),
             fade_phase: AtomicU64::new(FULL.to_bits()),
             music_end_ms: AtomicU64::new(UNKNOWN),
+            silences: OnceLock::new(),
+            silences_known: AtomicBool::new(false),
+            silences_told: AtomicBool::new(false),
             ramp_in: AtomicBool::new(false),
             seek: Mutex::new(None),
             cv: Condvar::new(),
@@ -298,6 +307,27 @@ impl VoiceShared {
     pub fn music_end(&self) -> Option<Duration> {
         let ms = self.music_end_ms.load(Ordering::Relaxed);
         (ms != UNKNOWN).then(|| Duration::from_millis(ms))
+    }
+
+    /// The track's silent runs, the first time it's asked once the scan has found them.
+    pub fn take_silences(&self) -> Option<&Silences> {
+        let found = self.silences.get()?;
+        (!self.silences_told.swap(true, Ordering::Relaxed)).then_some(found)
+    }
+
+    /// From the scan thread.
+    pub fn found_silences(&self, found: Silences) {
+        let _ = self.silences.set(found);
+    }
+
+    /// The app has this track's silences: the decoder thread doesn't scan for them.
+    pub fn silences_known(&self) {
+        self.silences_known.store(true, Ordering::Relaxed);
+    }
+
+    /// Set once the voice stops; the scan thread ends on it.
+    pub fn stopped_flag(&self) -> &AtomicBool {
+        &self.stopped
     }
 
     /// The audio source ran to the end and left the mixer (not cleared).
@@ -440,15 +470,20 @@ pub(crate) struct Fetch {
 
 /// Starts a voice: its decoder thread opens `src`, then sends `Msg::Ready` and decodes ahead
 /// until the ring is full. The thread holds `fetch.rt` so a cancelled download can still
-/// wind down after the engine is gone.
+/// wind down after the engine is gone. `silences_known`: the app has the track's silences,
+/// so it isn't scanned for them.
 pub(crate) fn spawn(
     id: u64,
     src: StreamSource,
     fetch: Fetch,
     controls: Arc<Controls>,
     tx: Sender<Msg>,
+    silences_known: bool,
 ) -> Arc<VoiceShared> {
     let shared = Arc::new(VoiceShared::new(id, src.url.clone()));
+    if silences_known {
+        shared.silences_known();
+    }
     let v = shared.clone();
     let err_tx = tx.clone();
     let spawned = std::thread::Builder::new()
@@ -474,7 +509,7 @@ pub(crate) fn spawn(
 }
 
 fn decode(
-    v: &VoiceShared,
+    v: &Arc<VoiceShared>,
     src: &StreamSource,
     fetch: &Fetch,
     controls: &Controls,
@@ -493,6 +528,8 @@ fn decode(
     // one (no length) or after one try with the whole file there.
     let viewer = media.viewer();
     let mut scanned = src.duration.is_none();
+    // Skip silence's whole-track scan (`scan`): started once, while the mode is on.
+    let mut silences_started = false;
     *v.cancel.lock_or_recover() = cancel;
     if v.stopped.load(Ordering::SeqCst) {
         return Ok(());
@@ -533,6 +570,16 @@ fn decode(
                 let ms = u64::try_from(end.as_millis()).unwrap_or(UNKNOWN - 1);
                 v.music_end_ms.store(ms, Ordering::Relaxed);
             }
+        }
+        // Then skip silence's scan, on a thread of its own.
+        if !silences_started
+            && idle
+            && controls.skip_silence.load(Ordering::Relaxed) != SkipSilence::Off.to_u8()
+            && !v.silences_known.load(Ordering::Relaxed)
+            && let Some(scan_media) = viewer.open(len)
+        {
+            silences_started = true;
+            crate::scan::spawn(v.clone(), scan_media, len, src.mime.clone(), tx.clone());
         }
         // Wait for a seek, room in the ring, or stop.
         let seek = {

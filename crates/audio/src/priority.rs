@@ -61,6 +61,20 @@ pub(crate) fn raise_decoder() {
     }
 }
 
+/// Lowers the calling thread below normal priority: background work (skip silence's scan,
+/// `scan.rs`) that every ordinary thread, the UI's included, goes ahead of.
+pub(crate) fn lower_scan() {
+    #[cfg(windows)]
+    {
+        use windows::Win32::System::Threading::{
+            GetCurrentThread, SetThreadPriority, THREAD_PRIORITY_BELOW_NORMAL,
+        };
+        // SAFETY: `GetCurrentThread` is a pseudo-handle for the calling thread, valid for
+        // the call. A failure leaves the thread at normal priority.
+        let _ = unsafe { SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL) };
+    }
+}
+
 #[cfg(all(test, windows))]
 mod tests {
     use windows::Win32::System::Threading::{GetCurrentThread, GetThreadPriority};
@@ -90,6 +104,16 @@ mod tests {
         std::thread::spawn(|| {
             super::raise_decoder();
             assert_eq!(priority(), 2); // THREAD_PRIORITY_HIGHEST
+        })
+        .join()
+        .unwrap();
+    }
+
+    #[test]
+    fn a_scan_thread_runs_below_normal_threads() {
+        std::thread::spawn(|| {
+            super::lower_scan();
+            assert_eq!(priority(), -1); // THREAD_PRIORITY_BELOW_NORMAL
         })
         .join()
         .unwrap();

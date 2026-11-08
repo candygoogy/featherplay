@@ -131,6 +131,11 @@ impl Media {
         self.pos
     }
 
+    /// Where its read failures go.
+    pub fn error(&self) -> ErrorSlot {
+        self.error.clone()
+    }
+
     /// What opens a second reader over these bytes later.
     pub fn viewer(&self) -> Viewer {
         match &self.inner {

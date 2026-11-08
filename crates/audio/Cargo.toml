@@ -40,8 +40,9 @@ featherplay-streams = { path = "../streams" }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 
 [target.'cfg(windows)'.dev-dependencies]
-# The process's cycle count, for the crossfade's CPU measurement (`stream_tests.rs`).
-windows = { workspace = true, features = ["Win32_System_WindowsProgramming"] }
+# The process's cycle count, for the crossfade's CPU measurement, and its commit charge, for
+# the silence scan's (`stream_tests.rs`).
+windows = { workspace = true, features = ["Win32_System_WindowsProgramming", "Win32_System_ProcessStatus"] }
 
 [lints]
 workspace = true

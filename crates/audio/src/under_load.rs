@@ -15,15 +15,59 @@
 //! block (Everywhere). Crossfade is on: each track's tail is scanned, and from 2 s to 7 s
 //! the tone crossfades into a second one, so two voices decode and sound at once.
 //! `UNDER_LOAD_SPEED` sets the playback speed (default 1); above 1 the round's times shrink
-//! by it, so the 10 s tones last the round.
+//! by it, so the 10 s tones last the round. `UNDER_LOAD_SCAN_FILE` (an Opus WebM file) runs
+//! skip silence's whole-track scan of it over and over beside playback, at its below-normal
+//! priority, as a long song's scan would run.
 
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
 use crate::glitches::Counts;
+use crate::head::HeadCache;
+use crate::http::ErrorSlot;
+use crate::media::Media;
 use crate::{AudioEngine, AudioEvent, Compressor, SkipSilence, StreamSource};
+
+/// With `UNDER_LOAD_SCAN_FILE`, scans the file until `stop`; the thread returns the scans
+/// it finished.
+fn scan_beside(stop: Arc<AtomicBool>) -> Option<JoinHandle<u32>> {
+    let path = std::env::var("UNDER_LOAD_SCAN_FILE").ok()?;
+    let src = StreamSource {
+        url: format!(
+            "file:///{}",
+            path.replace('\\', "/").trim_start_matches('/')
+        ),
+        mime: "audio/webm".into(),
+        content_length: None,
+        duration: None,
+    };
+    Some(std::thread::spawn(move || {
+        crate::priority::lower_scan();
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .build()
+            .expect("runtime");
+        let client = crate::http::stream_client(crate::http::READ_TIMEOUT).expect("client");
+        let mut done = 0;
+        while !stop.load(Ordering::Relaxed) {
+            let opened = Media::open(
+                &src,
+                rt.handle(),
+                &client,
+                &tmp(),
+                &HeadCache::default(),
+                ErrorSlot::default(),
+            )
+            .expect("open");
+            if crate::scan::silences(opened.media, opened.len, &src.mime, &stop).is_some() {
+                done += 1;
+            }
+        }
+        done
+    }))
+}
 
 const PLAY: Duration = Duration::from_secs(8);
 /// When in each round the crossfade starts, and how long it takes.
@@ -179,6 +223,8 @@ fn playback_beside_a_full_cpu() {
             c.starved
         );
     };
+    let stop_scans = Arc::new(AtomicBool::new(false));
+    let scans = scan_beside(stop_scans.clone());
     for _ in 0..rounds {
         show("quiet", play(&engine, &events, faster));
         let mut burner = burn(PLAY.div_f64(faster) + Duration::from_millis(500));
@@ -187,5 +233,12 @@ fn playback_beside_a_full_cpu() {
         let loaded = play(&engine, &events, faster);
         let _ = burner.wait();
         show("all cores busy", loaded);
+    }
+    stop_scans.store(true, Ordering::Relaxed);
+    if let Some(scans) = scans {
+        println!(
+            "whole-track scans beside it: {}",
+            scans.join().expect("scans")
+        );
     }
 }
