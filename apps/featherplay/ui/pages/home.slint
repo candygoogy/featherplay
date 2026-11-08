@@ -98,31 +98,44 @@ export global HomeData {
     callback sync-rows(/* count */ int);
 }
 
-// The sizes each shape lays out with. `min-w` is the narrowest a tile may get, so it sets how
-// many fit a row (at 1280 px: 4 mixes, 3 videos, 6 playlists, 7 artists, 5 cards); covers are
-// fetched at about the widest a tile gets (`home.rs::cover_px`).
+// The sizes each shape lays out with. A tile has one steady width (`tile-max`, its width at a
+// 1568 px window) and a row holds as many as fit, the rest of the row left empty: so tiles
+// don't grow and shrink as the page widens and fits another column (opening or closing the side
+// panel resized every shelf). Only a page too narrow for two shrinks them. Shortcuts keep a row
+// of a few together instead (`mix-w`). Covers are fetched at about a tile's width
+// (`home.rs::cover_px`).
 export global Shapes {
     out property <length> head-h: 48px;
     out property <length> mix-h: 64px;
     out property <length> mix-gap: Theme.s3;
     // Mixes show two rows a page at most.
     out property <int> mix-rows: 2;
-    // Quick picks: columns of four rows, as many ~300 px columns as fit.
+    // Quick picks: columns of four rows, as many 380 px columns as fit.
     out property <int> grid-rows: 4;
-    out property <length> grid-col: 300px;
+    out property <length> grid-col: 380px;
     // A community playlist's avatar badge (`home.rs::BADGE`), its ring included.
     out property <length> badge: 32px;
-    public pure function min-w(s: ShelfShape) -> length {
-        return s == ShelfShape.mixes ? 220px : (s == ShelfShape.videos ? 280px : (s == ShelfShape.playlists ? 140px : (s == ShelfShape.artists ? 120px : 170px)));
+    // Mixes: the narrowest a shortcut may get, so a row of four holds together down to a
+    // 1280 px window (`mix-w`). The other shapes: their one width.
+    public pure function tile-max(s: ShelfShape) -> length {
+        return s == ShelfShape.mixes ? 220px : (s == ShelfShape.videos ? 300px : (s == ShelfShape.playlists ? 160px : (s == ShelfShape.artists ? 120px : 192px)));
     }
     public pure function gap(s: ShelfShape) -> length {
         return s == ShelfShape.mixes ? root.mix-gap : Theme.card-gap;
     }
     public pure function per-row(s: ShelfShape, w: length) -> int {
-        return max(2, floor((w + Shapes.gap(s)) / (Shapes.min-w(s) + Shapes.gap(s))));
+        return max(2, floor((w + Shapes.gap(s)) / (Shapes.tile-max(s) + Shapes.gap(s))));
     }
     public pure function tile-w(s: ShelfShape, w: length) -> length {
-        return floor((w - (Shapes.per-row(s, w) - 1) * Shapes.gap(s)) / Shapes.per-row(s, w) / 1px) * 1px;
+        return min(Shapes.tile-max(s), floor((w - (Shapes.per-row(s, w) - 1) * Shapes.gap(s)) / Shapes.per-row(s, w) / 1px) * 1px);
+    }
+    // A shortcut (a mix) in a row of `n`: the row's tiles share the width, up to `mix-max` each.
+    // So a row of a few keeps one length however wide the page is, rather than its tiles
+    // getting narrower as the page widens and fits another column (opening and closing the
+    // side panel moved its end), and the resume card above lines up with it.
+    out property <length> mix-max: 240px;
+    public pure function mix-w(w: length, n: int) -> length {
+        return min(root.mix-max, floor((w - (min(Shapes.per-row(ShelfShape.mixes, w), max(1, n)) - 1) * root.mix-gap) / min(Shapes.per-row(ShelfShape.mixes, w), max(1, n)) / 1px) * 1px);
     }
     public pure function art-h(s: ShelfShape, w: length) -> length {
         return s == ShelfShape.videos ? round(Shapes.tile-w(s, w) * 9 / 16 / 1px) * 1px : Shapes.tile-w(s, w);
@@ -130,7 +143,7 @@ export global Shapes {
     // How far a row of `n` tiles reaches in `w`, from the first tile's left edge to the
     // last's right: a shelf with fewer items than fit stops short of the content's edge.
     public pure function row-w(s: ShelfShape, w: length, n: int) -> length {
-        return min(n, Shapes.per-row(s, w)) * (Shapes.tile-w(s, w) + Shapes.gap(s)) - Shapes.gap(s);
+        return min(n, Shapes.per-row(s, w)) * ((s == ShelfShape.mixes ? Shapes.mix-w(w, n) : Shapes.tile-w(s, w)) + Shapes.gap(s)) - Shapes.gap(s);
     }
     // The shortcuts Home counts on before the feed is in, or when it has no row of them: as
     // many as the Shortcuts row holds (`home.rs::SHORTCUTS`).
@@ -392,7 +405,7 @@ component MixShelf inherits Rectangle {
     property <int> rows: Shapes.rows(root.shelf.items.length, root.width);
     property <int> per-page: root.cols * root.rows;
     property <int> pages: ceil(root.shelf.items.length / root.per-page);
-    property <length> tile-w: Shapes.tile-w(ShelfShape.mixes, root.width);
+    property <length> tile-w: Shapes.mix-w(root.width, root.shelf.items.length);
     property <int> page: 0;
     property <float> at: root.page;
     animate at { duration: Theme.moving ? Theme.t-panel + 40ms : 0ms; easing: Curves.ease-in-out; }
@@ -427,14 +440,14 @@ component MixShelf inherits Rectangle {
     }
 }
 
-// Quick picks as a dense grid: columns of four rows with small covers, as many ~300 px columns
+// Quick picks as a dense grid: columns of four rows with small covers, as many 380 px columns
 // as fit, paged a page of columns at a time. A click plays; right-click and ⋯ open the menu.
 component SongGrid inherits Rectangle {
     in property <HomeShelfRow> shelf;
     property <int> rows: Shapes.grid-rows;
     property <int> per-page: max(2, floor((root.width + Theme.card-gap) / (Shapes.grid-col + Theme.card-gap)));
     property <int> columns: ceil(root.shelf.songs.length / root.rows);
-    property <length> col-w: floor((root.width - (root.per-page - 1) * Theme.card-gap) / root.per-page / 1px) * 1px;
+    property <length> col-w: min(Shapes.grid-col, floor((root.width - (root.per-page - 1) * Theme.card-gap) / root.per-page / 1px) * 1px);
     property <int> first: 0;
     property <float> at: root.first;
     animate at { duration: Theme.moving ? Theme.t-panel + 40ms : 0ms; easing: Curves.ease-in-out; }
@@ -790,11 +803,11 @@ component FeaturedCard inherits Rectangle {
 // out, so nothing jumps when the data lands.
 component HomeSkeleton inherits Skeleton {
     property <int> mix-cols: Shapes.per-row(ShelfShape.mixes, root.width);
-    property <length> mix-w: Shapes.tile-w(ShelfShape.mixes, root.width);
+    property <length> mix-w: Shapes.mix-w(root.width, Shapes.lead-tiles);
     property <length> mixes-h: Shapes.height(ShelfShape.mixes, root.width, root.mix-cols);
     property <length> grid-y: root.mixes-h + Theme.section-gap;
     property <int> grid-cols: max(2, floor((root.width + Theme.card-gap) / (Shapes.grid-col + Theme.card-gap)));
-    property <length> col-w: floor((root.width - (root.grid-cols - 1) * Theme.card-gap) / root.grid-cols / 1px) * 1px;
+    property <length> col-w: min(Shapes.grid-col, floor((root.width - (root.grid-cols - 1) * Theme.card-gap) / root.grid-cols / 1px) * 1px);
     property <length> cards-y: root.grid-y + Shapes.height(ShelfShape.songs, root.width, 0) + Theme.section-gap;
     property <int> per-row: Shapes.per-row(ShelfShape.cards, root.width);
     property <length> card: Shapes.tile-w(ShelfShape.cards, root.width);
@@ -808,7 +821,7 @@ component HomeSkeleton inherits Skeleton {
         sweep: root.sweep;
         fade: root.fade;
     }
-    // As many shortcuts as the resume card above counts on (`Shapes.lead-tiles`).
+    // As many shortcuts as the Shortcuts row holds (`Shapes.lead-tiles`).
     for i in min(root.mix-cols, Shapes.lead-tiles): Rectangle {
         x: i * (root.mix-w + Shapes.mix-gap);
         y: Shapes.head-h;
@@ -929,17 +942,15 @@ component HomeTop inherits VerticalLayout {
         ShelfHead {
             title: HomeData.resume ? @tr("Pick up where you left off") : @tr("Start listening");
         }
-        // As wide as the shelf row under it: your mixes or the Shortcuts row, whose tiles
-        // stop short of the edge when there are fewer than fit (4 x 240 px of 1248 at a 1568 px
-        // window); a shelf of another shape, or none yet, counts as the Shortcuts row.
+        // As wide as a row of four shortcuts under it (996 px once they're at their full 240 px),
+        // which keeps one length however wide the page is (`Shapes.mix-max`): steady, and lined
+        // up with the Shortcuts row.
         if HomeData.resume: Rectangle {
-            property <bool> lead-mixes: HomeData.shelves.length > 0 && HomeData.shelves[0].shape == ShelfShape.mixes;
             height: card.height;
             card := ResumeCard {
                 x: 0;
                 y: 0;
-                // Never so short a row that the queue's column would drop out.
-                width: min(parent.width, max(self.queue-min-w, Shapes.row-w(ShelfShape.mixes, parent.width, parent.lead-mixes ? HomeData.shelves[0].items.length : Shapes.lead-tiles)));
+                width: min(parent.width, Shapes.row-w(ShelfShape.mixes, parent.width, Shapes.lead-tiles));
             }
         }
         if !HomeData.resume: FeaturedCard { }

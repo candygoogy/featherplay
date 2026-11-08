@@ -811,9 +811,9 @@ pub(crate) fn shelf_row(
     }
 }
 
-/// The size, in logical pixels, a shape's covers are fetched at: about the widest its tiles
-/// get (`Shapes.min-w` in home.slint sets how many fit a row, so a tile stays under twice
-/// it). Covers are square, except a video tile's: 16:9, this wide.
+/// The size, in logical pixels, a shape's covers are fetched at: about a tile's width
+/// (`Shapes.tile-max` in home.slint, which tiles don't grow past). Covers are square, except a
+/// video tile's: 16:9, this wide.
 fn cover_px(shape: ShelfShape) -> u32 {
     match shape {
         ShelfShape::Songs => ROW_COVER,
