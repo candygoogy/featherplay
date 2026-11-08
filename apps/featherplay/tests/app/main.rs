@@ -18,6 +18,7 @@ mod album_actions;
 mod animations;
 mod bar_silences;
 mod bar_speed;
+mod bar_tips;
 mod bar_total;
 mod card_hint;
 mod card_veil;

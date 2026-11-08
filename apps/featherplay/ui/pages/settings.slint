@@ -40,6 +40,7 @@ export enum SettingKey {
     tray-click-opens-window,
     fade-on-skip,
     match-volumes,
+    tooltips,
 }
 
 // The Discord connection, live from the presence worker.
@@ -219,6 +220,8 @@ export global SettingsData {
     in property <int> close-action;
     // "Turn off the mini player": a left click on the tray icon opens the main window instead.
     in property <bool> tray-click-opens-window;
+    // "Show tooltips": the bar's buttons name themselves and their shortcut on a rest.
+    in property <bool> tooltips: true;
     in property <Appearance> appearance;
     // The Language setting: Windows default, English, then the bundled languages by their
     // own names (Rust fills both lists); `language` is the picked one's index.
@@ -2326,6 +2329,12 @@ export component SettingsPage inherits Rectangle {
                         detail: @tr("Show a notification when the track changes.");
                         key: SettingKey.notifications;
                         checked: SettingsData.notifications;
+                    }
+                    ToggleRow {
+                        label: @tr("Show tooltips");
+                        detail: @tr("Names and shortcuts when you rest the pointer on a button.");
+                        key: SettingKey.tooltips;
+                        checked: SettingsData.tooltips;
                     }
                     ToggleRow {
                         label: @tr("Global hotkeys");

@@ -77,6 +77,7 @@ fn settings_defaults_when_missing() {
             crossfade: 0,
             fade_on_skip: false,
             playback_speed: 100,
+            tooltips: true,
         }
     );
     assert_eq!(s, Settings::default());
@@ -147,6 +148,7 @@ fn settings_roundtrip() {
         crossfade: 12,
         fade_on_skip: true,
         playback_speed: 125,
+        tooltips: false,
     };
     s.save(&p).unwrap();
     assert!(p.config.join("settings.toml").is_file());
@@ -960,6 +962,24 @@ volume = 0.5
     .unwrap();
     let s = Settings::load(&p);
     assert_eq!((s.playback_speed, s.volume), (100, 0.5));
+}
+
+#[test]
+fn tooltips_show_in_older_files_and_off_stays_off() {
+    let Some(home) = TestHome::new("settings-tooltips") else {
+        return;
+    };
+    let p = home.paths();
+    fs::create_dir_all(&p.config).unwrap();
+    let file = p.config.join("settings.toml");
+    fs::write(&file, "volume = 0.5\n").unwrap();
+    assert!(Settings::load(&p).tooltips);
+
+    fs::write(&file, "tooltips = false\n").unwrap();
+    let off = Settings::load(&p);
+    assert!(!off.tooltips);
+    off.save(&p).unwrap();
+    assert!(!Settings::load(&p).tooltips);
 }
 
 #[test]

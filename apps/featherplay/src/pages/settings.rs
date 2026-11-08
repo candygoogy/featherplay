@@ -33,6 +33,7 @@ use crate::scrobbler::build_keys;
 use crate::ui::{
     AccentSwatch, Appearance, DiscordPart, DiscordPreview, DiscordState, LastfmState,
     ListenBrainzState, LocalApiState, Player, SettingKey, SettingsData, SettingsDialog, Theme,
+    Tooltips,
 };
 use crate::{follow, language, lyrics, native, shell, toast, updates};
 
@@ -125,6 +126,11 @@ pub fn mark_tray_notice_shown(ctx: &Ctx) {
 /// ("Turn off the mini player").
 pub fn tray_click_opens_window() -> bool {
     SETTINGS.with(|s| s.borrow().tray_click_opens_window)
+}
+
+/// Whether the player bar's buttons show their tooltips ("Show tooltips").
+pub fn tooltips() -> bool {
+    SETTINGS.with(|s| s.borrow().tooltips)
 }
 
 /// Once at startup: load the settings, apply the theme and the accent, connect
@@ -760,6 +766,8 @@ fn show(ctx: &Ctx) {
     data.set_notifications(s.notifications);
     data.set_close_action(close_action_index(s.close_action));
     data.set_tray_click_opens_window(s.tray_click_opens_window);
+    data.set_tooltips(s.tooltips);
+    ui.global::<Tooltips>().set_on(s.tooltips);
     data.set_accent(accent_index(s.accent));
     data.set_appearance(appearance(s.theme));
     data.set_hotkeys(s.hotkeys.is_some());
@@ -1343,6 +1351,13 @@ fn toggled(ctx: &Rc<Ctx>, key: SettingKey, on: bool) {
         SettingKey::TrayClickOpensWindow => {
             data.set_tray_click_opens_window(on);
             Change::TrayClickOpensWindow(on)
+        }
+        SettingKey::Tooltips => {
+            data.set_tooltips(on);
+            if let Some(ui) = ctx.window() {
+                ui.global::<Tooltips>().set_on(on);
+            }
+            Change::Tooltips(on)
         }
         SettingKey::DiscordAutoReconnect => {
             discord_options(ctx, |o| o.auto_reconnect = on);
