@@ -739,6 +739,7 @@ fn show(ctx: &Ctx) {
     show_volume_step(ctx, s.volume_step);
     show_equalizer(&data, &s);
     data.set_loudness(loudness_index(s.loudness));
+    data.set_match_volumes(s.match_volumes);
     data.set_skip_silence(skip_silence_index(s.skip_silence));
     data.set_crossfade(crossfade_index(s.crossfade));
     data.set_fade_on_skip(s.fade_on_skip);
@@ -1277,6 +1278,10 @@ fn toggled(ctx: &Rc<Ctx>, key: SettingKey, on: bool) {
         SettingKey::FadeOnSkip => {
             data.set_fade_on_skip(on);
             Change::FadeOnSkip(on)
+        }
+        SettingKey::MatchVolumes => {
+            data.set_match_volumes(on);
+            Change::MatchVolumes(on)
         }
         SettingKey::Sponsorblock => {
             data.set_sponsorblock(on);

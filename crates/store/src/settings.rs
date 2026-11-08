@@ -133,6 +133,10 @@ pub struct Settings {
     /// Strong. A value this build doesn't know loads as Off.
     #[serde(deserialize_with = "lenient")]
     pub loudness: Loudness,
+    /// "Match song volumes" (Settings > Sound, on by default): a song YouTube measured as
+    /// louder than its reference level plays turned down to it, as YouTube's own player
+    /// does. Quieter songs, and songs without the value (yt-dlp's), play unchanged.
+    pub match_volumes: bool,
     /// "Skip silence" (Settings > Playback): Off (the default), the start and end of a song,
     /// or everywhere. A value this build doesn't know loads as Off.
     #[serde(deserialize_with = "lenient")]
@@ -374,6 +378,7 @@ impl Default for Settings {
             equalizer: Equalizer::Off,
             equalizer_bands: [0; 5],
             loudness: Loudness::Off,
+            match_volumes: true,
             skip_silence: SkipSilence::Off,
             crossfade: 0,
             fade_on_skip: false,

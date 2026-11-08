@@ -72,6 +72,7 @@ fn settings_defaults_when_missing() {
             equalizer: Equalizer::Off,
             equalizer_bands: [0; 5],
             loudness: Loudness::Off,
+            match_volumes: true,
             skip_silence: SkipSilence::Off,
             crossfade: 0,
             fade_on_skip: false,
@@ -141,6 +142,7 @@ fn settings_roundtrip() {
         equalizer: Equalizer::Custom,
         equalizer_bands: [6, -2, 0, 3, 12],
         loudness: Loudness::Light,
+        match_volumes: false,
         skip_silence: SkipSilence::Everywhere,
         crossfade: 12,
         fade_on_skip: true,
@@ -863,6 +865,26 @@ volume = 0.5
     .unwrap();
     let s = Settings::load(&p);
     assert_eq!((s.skip_silence, s.volume), (SkipSilence::Off, 0.5));
+}
+
+#[test]
+fn match_song_volumes_is_on_in_older_files_and_off_stays_off() {
+    let Some(home) = TestHome::new("settings-match-volumes") else {
+        return;
+    };
+    let p = home.paths();
+    let file = p.config.join("settings.toml");
+    fs::create_dir_all(&p.config).unwrap();
+    fs::write(&file, "volume = 0.5\n").unwrap();
+    assert!(Settings::load(&p).match_volumes);
+    let s = Settings {
+        match_volumes: false,
+        ..Settings::default()
+    };
+    s.save(&p).unwrap();
+    assert!(!Settings::load(&p).match_volumes);
+    let text = fs::read_to_string(&file).unwrap();
+    assert!(text.contains("match_volumes = false"), "{text}");
 }
 
 #[test]

@@ -19,6 +19,11 @@ Notable changes to featherplay, newest first. The format follows
   so nothing distorts. Even out loudness is a compressor, Light or Strong (Pear's Audio
   Compressor settings). Both apply while a song plays. Streaming quality and Output device
   moved to Sound too.
+- **Match song volumes**, on by default (Settings > Sound): songs YouTube measured as louder
+  than its reference level play turned down to it, as YouTube Music's own player does, so a
+  loud master doesn't jump out after a quiet one. Quieter songs play as they are. Each song
+  keeps its own level through a crossfade, and switching it applies to the playing song at
+  once, without a jump. Songs that play through yt-dlp have no value and play unchanged.
 - Skip silence, off by default (Settings > Playback): Start and end skips the silence before
   a song starts and after it ends, and Everywhere also shortens silences of 2 seconds or
   more inside a song to half a second. The player bar, Discord and Last.fm stay in step:

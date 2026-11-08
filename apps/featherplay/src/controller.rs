@@ -484,6 +484,7 @@ impl Controller {
         self.audio.set_equalizer(equalizer_bands(&self.settings));
         self.audio
             .set_compressor(compressor(self.settings.loudness));
+        self.audio.set_match_volumes(self.settings.match_volumes);
         self.audio
             .set_skip_silences(skip_silences(self.settings.skip_silence));
         self.audio.set_crossfade(self.settings.crossfade > 0);

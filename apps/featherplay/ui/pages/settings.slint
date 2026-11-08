@@ -39,6 +39,7 @@ export enum SettingKey {
     amuse,
     tray-click-opens-window,
     fade-on-skip,
+    match-volumes,
 }
 
 // The Discord connection, live from the presence worker.
@@ -148,6 +149,7 @@ export global SettingsData {
     in property <[int]> eq-bands: [0, 0, 0, 0, 0];
     // Even out loudness: 0 Off, 1 Light, 2 Strong.
     in property <int> loudness: 0;
+    in property <bool> match-volumes: true;
     // The Streaming quality: 0 High, 1 Standard.
     in property <int> streaming-quality: 0;
     in property <bool> skip-disliked: true;
@@ -1883,6 +1885,12 @@ export component SettingsPage inherits Rectangle {
                         active: SettingsData.loudness;
                         selected(i) => { SettingsData.pick-loudness(i); }
                     }
+                }
+                ToggleRow {
+                    label: @tr("Match song volumes");
+                    detail: @tr("Turns louder songs down to the same level, as YouTube Music's own player does.");
+                    key: SettingKey.match-volumes;
+                    checked: SettingsData.match-volumes;
                 }
                 SettingRow {
                     label: @tr("Streaming quality");

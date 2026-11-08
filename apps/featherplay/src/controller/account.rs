@@ -164,6 +164,8 @@ pub enum Change {
     Equalizer(Equalizer, [i8; 5]),
     /// "Even out loudness", the compressor.
     Loudness(Loudness),
+    /// "Match song volumes": louder songs play turned down to YouTube's reference level.
+    MatchVolumes(bool),
     SkipSilence(SkipSilence),
     /// Seconds the end of a song fades into the next (one of `Settings::CROSSFADES`); 0 off.
     Crossfade(u8),
@@ -223,6 +225,7 @@ impl Change {
                 s.equalizer_bands = bands;
             }
             Change::Loudness(v) => s.loudness = v,
+            Change::MatchVolumes(v) => s.match_volumes = v,
             Change::SkipSilence(v) => s.skip_silence = v,
             Change::Crossfade(v) => s.crossfade = v,
             Change::FadeOnSkip(v) => s.fade_on_skip = v,
@@ -630,6 +633,8 @@ impl Controller {
             // Heard within a device buffer, mid-song too.
             Change::Equalizer(..) => self.audio.set_equalizer(equalizer_bands(&self.settings)),
             Change::Loudness(l) => self.audio.set_compressor(compressor(l)),
+            // The playing songs move to their new level within ~150 ms.
+            Change::MatchVolumes(on) => self.audio.set_match_volumes(on),
             // From the next silence the decoder reaches.
             // The bar's marks follow at once.
             Change::SkipSilence(m) => {
@@ -1063,6 +1068,7 @@ mod tests {
             Change::TrayClickOpensWindow(true),
             Change::Equalizer(Equalizer::Custom, [4, 0, -3, 0, 2]),
             Change::Loudness(Loudness::Strong),
+            Change::MatchVolumes(false),
             Change::SkipSilence(SkipSilence::Everywhere),
             Change::Crossfade(8),
             Change::FadeOnSkip(true),
@@ -1098,6 +1104,7 @@ mod tests {
             (Equalizer::Custom, [4, 0, -3, 0, 2])
         );
         assert_eq!(s.loudness, Loudness::Strong);
+        assert!(!s.match_volumes);
         assert_eq!(s.skip_silence, SkipSilence::Everywhere);
         assert_eq!((s.crossfade, s.fade_on_skip), (8, true));
         assert_eq!(s.playback_speed, 150);
