@@ -28,9 +28,9 @@ it.
   (`CookieFile` in `crates/streams/src/ytdlp.rs`). If featherplay was killed in between, it
   deletes the leftover the next time it starts signed in. A way to make that file outlive
   the lookup, land somewhere else, or be read by another Windows user is in scope.
-- The Edge sign-in's temporary profile. "Use Microsoft Edge" runs Edge with a new profile in
-  `%LOCALAPPDATA%\featherplay\signin-*`, keeps only the YouTube Music session from it
-  and deletes the folder afterwards; a start deletes any that a crash left behind
+- The browser sign-in's temporary profile. "Use Microsoft Edge" (or Google Chrome, Brave or
+  Vivaldi) runs that browser with a new profile in `%LOCALAPPDATA%\featherplay\signin-*`,
+  keeps only the YouTube Music session from it and deletes the folder afterwards; a start deletes any that a crash left behind
   (`apps/featherplay/src/pages/sign_in/browser/profile.rs`). A way to make it keep more than
   that session, or outlive the sign-in, is in scope.
 - The local listeners, both off by default and on 127.0.0.1 only. The local API (port 26538)
