@@ -202,14 +202,18 @@ pub fn rows(s: &SearchSuggestions) -> (Vec<Suggestion>, Vec<Option<String>>) {
     });
     let results = s.results.iter().map(|r| {
         let (kind, title, cover) = match &r.item {
-            HomeItem::Track(t) => (SuggestionKind::Song, &t.title, &t.thumbnail),
-            HomeItem::Album(a) => (SuggestionKind::Album, &a.title, &a.thumbnail),
-            HomeItem::Artist(a) => (SuggestionKind::Artist, &a.name, &a.thumbnail),
-            HomeItem::Playlist(p) => (SuggestionKind::Playlist, &p.title, &p.thumbnail),
+            HomeItem::Track(t) => (SuggestionKind::Song, t.display_title(), &t.thumbnail),
+            HomeItem::Album(a) => (SuggestionKind::Album, a.title.as_str().into(), &a.thumbnail),
+            HomeItem::Artist(a) => (SuggestionKind::Artist, a.name.as_str().into(), &a.thumbnail),
+            HomeItem::Playlist(p) => (
+                SuggestionKind::Playlist,
+                p.title.as_str().into(),
+                &p.thumbnail,
+            ),
         };
         let row = Suggestion {
             kind,
-            title: crate::ui_bridge::shown(title),
+            title: crate::ui_bridge::shown(&title),
             subtitle: crate::ui_bridge::shown(&r.subtitle),
             ..Suggestion::default()
         };

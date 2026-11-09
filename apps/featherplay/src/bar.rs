@@ -164,7 +164,7 @@ pub fn apply(ctx: &Rc<Ctx>, state: &PlayerState) {
     };
     p.set_has_track(true);
     p.set_track_id(track.id.0.as_str().into());
-    p.set_title(shown(&track.title));
+    p.set_title(shown(&track.display_title()));
     p.set_artist(shown(&artist_names(&track.artists)));
     p.set_artist_id(
         track

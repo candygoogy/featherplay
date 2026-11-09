@@ -75,7 +75,7 @@ pub fn init(ctx: &Rc<Ctx>) {
                 tracks,
                 start,
                 radio: true,
-                from: PlayingFrom::named(format!("{} radio", seed.title)),
+                from: PlayingFrom::named(format!("{} radio", seed.display_title())),
             }));
         }
     });

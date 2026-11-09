@@ -85,7 +85,7 @@ pub fn init(ctx: &Rc<Ctx>) {
     let c = ctx.clone();
     menu.on_play_next(move |id| match find(&id) {
         Some(t) => {
-            c.toast(&tr!("Playing next: {}", t.title));
+            c.toast(&tr!("Playing next: {}", t.display_title()));
             c.send(Action::PlayNext(t));
         }
         None => log!("play next: unknown track {id}"),
@@ -93,7 +93,7 @@ pub fn init(ctx: &Rc<Ctx>) {
     let c = ctx.clone();
     menu.on_add_to_queue(move |id| match find(&id) {
         Some(t) => {
-            c.toast(&tr!("Added to queue: {}", t.title));
+            c.toast(&tr!("Added to queue: {}", t.display_title()));
             c.send(Action::AddToQueue(t));
         }
         None => log!("add to queue: unknown track {id}"),

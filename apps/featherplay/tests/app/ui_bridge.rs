@@ -2,6 +2,7 @@
 
 use std::time::Duration;
 
+use featherplay::controller::now_playing;
 use featherplay::ui::ItemKind;
 use featherplay::ui_bridge::{format_duration, home_badge, home_card, home_thumbnail, to_rows};
 use featherplay_core::model::{
@@ -43,6 +44,24 @@ fn to_rows_joins_artists() {
     assert_eq!(rows[0].artist.as_str(), "A, B");
     assert_eq!(rows[0].title.as_str(), "Song");
     assert_eq!(rows[0].duration.as_str(), "3:57");
+}
+
+#[test]
+fn a_music_video_shows_its_short_title() {
+    let raw = "Mirror ft. Bruno Mars (Official Music Video) (feat. Bruno Mars)";
+    let mv = Track {
+        video_type: VideoType::MusicVideo,
+        ..track(raw, &["Lil Wayne", "Bruno Mars"])
+    };
+    let short = "Mirror ft. Bruno Mars";
+    assert_eq!(to_rows(std::slice::from_ref(&mv))[0].title.as_str(), short);
+    // The media card, the tray's tooltip, Discord and the toasts start from `now_playing`.
+    assert_eq!(now_playing(&mv, true, Duration::ZERO).title, short);
+    assert_eq!(
+        home_card(&HomeItem::Track(mv.clone())).title.as_str(),
+        short
+    );
+    assert_eq!(mv.title, raw, "the track keeps its raw title");
 }
 
 #[test]

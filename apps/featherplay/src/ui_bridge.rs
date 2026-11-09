@@ -49,7 +49,7 @@ pub fn to_rows(tracks: &[Track]) -> Vec<TrackRow> {
         .map(|(i, t)| TrackRow {
             id: t.id.0.as_str().into(),
             index: (i + 1).to_string().into(),
-            title: shown(&t.title),
+            title: shown(&t.display_title()),
             artist: shown(&artist_names(&t.artists)),
             artist_id: t
                 .artists
@@ -152,7 +152,7 @@ pub fn home_card(item: &HomeItem) -> CardItem {
         HomeItem::Track(t) => CardItem {
             id: t.id.0.as_str().into(),
             kind: ItemKind::Song,
-            title: shown(&t.title),
+            title: shown(&t.display_title()),
             subtitle: shown(&artist_names(&t.artists)),
             cover: Default::default(),
             round: false,

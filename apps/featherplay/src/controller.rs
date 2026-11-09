@@ -1347,7 +1347,7 @@ pub fn no_sound_output() -> &'static str {
 pub fn now_playing(t: &Track, playing: bool, position: Duration) -> NowPlaying {
     NowPlaying {
         track_id: Some(t.id.0.clone()),
-        title: t.title.clone(),
+        title: t.display_title().into_owned(),
         artist_id: t
             .artists
             .first()

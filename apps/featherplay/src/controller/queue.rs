@@ -158,7 +158,7 @@ pub fn playing_from(tracks: &[Track], start: usize, radio: bool) -> PlayingFrom 
         return tracks
             .get(start)
             .or(tracks.first())
-            .map(|t| PlayingFrom::named(format!("{} radio", t.title)))
+            .map(|t| PlayingFrom::named(format!("{} radio", t.display_title())))
             .unwrap_or_default();
     }
     let mut albums = tracks.iter().map(|t| t.album.as_ref());
