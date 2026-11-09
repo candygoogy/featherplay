@@ -31,6 +31,15 @@ Notable changes to featherplay, newest first. The format follows
   preview is above the options, as before, and its note says it changes with them.
 - A song that wasn't ready ahead starts about 0.1 s sooner: while featherplay looks up its
   stream, it already opens the connection to the server the stream most likely comes from.
+- Songs start sooner, and a new install's first song no longer waits for a download.
+  featherplay now answers YouTube's player challenges with a JavaScript engine built into
+  the app (QuickJS-NG) instead of starting Deno for every song. Deno is still downloaded, in
+  the background, for yt-dlp, which only the songs featherplay can't find by itself need;
+  "Getting ready" shows only when a song really waits for it, and a background download
+  that fails is tried again later without a toast.
+- When YouTube moves to a new player, songs keep playing with the previous one while the
+  new one is prepared in the background, so no song waits the few seconds that takes.
+- Copy diagnostics names the built-in JavaScript engine and its version.
 
 ### Fixed
 

@@ -101,14 +101,21 @@ and compare the hash with the one on the release page, or
 
 ### The first run
 
-featherplay finds each song's audio with two helper programs,
-[yt-dlp](https://github.com/yt-dlp/yt-dlp) and [Deno](https://github.com/denoland/deno). On
-the first run it downloads them from their GitHub releases and checks each file against a
-SHA256 written into featherplay's code; a file that doesn't match is deleted, not run. When
-GitHub can't be reached, it gets yt-dlp from featherplay's site and Deno from Deno's own
-download server instead, checked the same way. After that, featherplay updates yt-dlp at most
-once a day, because YouTube changes often. The helpers live in
-`%LOCALAPPDATA%\featherplay\sidecars`.
+featherplay finds most songs' audio itself: it asks YouTube for the stream and answers the
+player's challenges with yt-dlp's solver scripts in the JavaScript engine built into the app
+([QuickJS-NG](https://github.com/quickjs-ng/quickjs)). On the first run it prepares YouTube's
+current player at startup, which takes a few seconds, so the first song you click plays
+without waiting for any download.
+
+For the songs that way can't give, it falls back to two helper programs,
+[yt-dlp](https://github.com/yt-dlp/yt-dlp) and [Deno](https://github.com/denoland/deno)
+(yt-dlp's JavaScript runtime). On the first run it downloads them in the background from
+their GitHub releases and checks each file against a SHA256 written into featherplay's code;
+a file that doesn't match is deleted, not run. When GitHub can't be reached, it gets yt-dlp
+from featherplay's site and Deno from Deno's own download server instead, checked the same
+way. A song waits for that download only if it needs the helpers before they're there.
+After that, featherplay updates yt-dlp at most once a day, because YouTube changes often.
+The helpers live in `%LOCALAPPDATA%\featherplay\sidecars`.
 
 Behind a proxy, featherplay and its helpers go through the one Windows is set to use
 (Settings > Network > Proxy): the one "Automatically detect settings" finds, else the
@@ -417,7 +424,8 @@ and neither names your account.
 featherplay sends no telemetry and has no server, only a static website. It connects to:
 
 - **YouTube Music and Google**, for your music, covers, streams and sign-in;
-- **GitHub**, to download yt-dlp and Deno on the first run and to update yt-dlp;
+- **GitHub**, to download yt-dlp and Deno in the background on the first run and to update
+  yt-dlp;
 - **featherplay's site and dl.deno.land**, only when GitHub can't be reached on the first run,
   for the same yt-dlp and Deno;
 - **GitHub, for featherplay's own updates**, with Check for updates on (the default): once a
@@ -476,8 +484,10 @@ tests, the installer and the rest of a developer's setup.
 - [ytmapi-rs](https://github.com/nick42d/youtui), a Rust port of
   [ytmusicapi](https://github.com/sigma67/ytmusicapi), talks to YouTube Music.
 - [yt-dlp](https://github.com/yt-dlp/yt-dlp) and its challenge solver scripts
-  ([yt-dlp-ejs](https://github.com/yt-dlp/ejs)), run by [Deno](https://deno.com), find the
-  audio streams.
+  ([yt-dlp-ejs](https://github.com/yt-dlp/ejs)) find the audio streams. featherplay runs the
+  scripts in [QuickJS-NG](https://github.com/quickjs-ng/quickjs), built in through
+  [rquickjs](https://github.com/DelSkayn/rquickjs); yt-dlp runs them in
+  [Deno](https://deno.com).
 - [Symphonia](https://github.com/pdeljanov/Symphonia) and
   [opus-decoder](https://github.com/TadeuszWolfGang/Rusopus) decode the audio, and
   [rodio](https://github.com/RustAudio/rodio) and [cpal](https://github.com/RustAudio/cpal)

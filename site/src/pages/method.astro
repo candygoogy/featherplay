@@ -110,9 +110,12 @@ const { startToSoundS: start, clickToSoundS: click, hovered, notHovered } = timi
           for a fresh one (1.2, 4.2 and 6.4 s).
         </li>
         <li>
-          These starts used the state featherplay had kept for finding songs' streams. A new install's very first song
-          takes longer, about 12 s once, while featherplay downloads the two helpers it uses (yt-dlp and Deno); the
-          starts after it took 0.5 to 0.9 s. About one fresh start in seven gets answers from YouTube without a stream,
+          These starts used the state featherplay had kept for finding songs' streams. In 0.2.0, a new install's very
+          first song took longer, about 12 s once, while featherplay downloaded the two helpers it used (yt-dlp and
+          Deno); the starts after it took 0.5 to 0.9 s. Since featherplay answers YouTube's player challenges with the
+          JavaScript engine built into it, the first song no longer waits for that download: a new install prepares
+          YouTube's player at startup, in about 5 s, and a first click after that is one request (0.2 to 0.6 s,
+          measured on 9 November 2026). About one fresh start in seven gets answers from YouTube without a stream,
           and then plays through yt-dlp instead (4 to 9 s) until the next song.
         </li>
       </ul>
