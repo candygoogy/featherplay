@@ -671,3 +671,38 @@ fn first_mood_params(v: &serde_json::Value) -> Option<String> {
         _ => None,
     }
 }
+
+/// The mixes made for the account on Home ("RDTMAK…"), the first two, opened as the app
+/// opens a playlist (the card and its play button ask for the same pages), timed: Home's
+/// two requests, then each mix's pages. Reads only; counts, no titles or ids.
+#[tokio::test]
+#[ignore = "live: needs FEATHERPLAY_COOKIES_FILE"]
+async fn live_mixes() {
+    let yt = connect().await;
+    let home = yt.home().await.expect("home");
+    let mixes: Vec<_> = home
+        .shelves
+        .iter()
+        .flat_map(|s| &s.items)
+        .filter_map(|item| match item {
+            featherplay_ytm::HomeItem::Playlist(p) if p.id.0.contains("RDTMAK") => Some(&p.id),
+            _ => None,
+        })
+        .take(2)
+        .collect();
+    assert!(!mixes.is_empty(), "no mix on Home");
+    for id in mixes {
+        let t = std::time::Instant::now();
+        let mix = yt.playlist(id).await.expect("the mix");
+        let ids: std::collections::HashSet<_> = mix.tracks.iter().map(|t| &t.id).collect();
+        println!(
+            "TIMING mix: {} songs ({} different) from {} pages in {} ms",
+            mix.tracks.len(),
+            ids.len(),
+            mix.pages,
+            t.elapsed().as_millis()
+        );
+        assert!(!mix.tracks.is_empty());
+        assert_eq!(ids.len(), mix.tracks.len(), "a song listed twice");
+    }
+}
