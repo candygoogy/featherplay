@@ -6,6 +6,8 @@ Notable changes to featherplay, newest first. The format follows
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-09
+
 ### Changed
 
 - Toasts are rounded pills that stand out from the page in the light theme too, and their
@@ -13,8 +15,18 @@ Notable changes to featherplay, newest first. The format follows
   toast stays open while it has the focus. A toast saying something went wrong starts with
   an alert sign and stays 5 seconds instead of 3. A new toast while one shows brings its
   line in, so the change is seen.
+- Music videos show by their short title: "Mirror ft. Bruno Mars" instead of "Mirror ft.
+  Bruno Mars (Official Music Video) (feat. Bruno Mars)", everywhere the title is shown and
+  in scrobbles. Only video tags such as "(Official Video)" or "(Visualizer)" go, and a
+  "(feat. …)" that repeats a featured artist already in the title; "(Live)" or "(Remix)"
+  stay. Plain songs are unchanged.
 
 ### Fixed
+
+- Songs could start slowly for half an hour: one bad answer from YouTube, met by a few
+  songs at once, turned the fast way of starting them off for 30 minutes, so each song took
+  3 to 10 seconds. Now featherplay asks again at once with a fresh session (about half a
+  second), counts that answer once, and is back to the fast way after 5 minutes at most.
 
 - The first run's helpers download works behind a proxy. featherplay, and yt-dlp with it,
   now go through the proxy set in Windows' settings (Network > Proxy, "Use a proxy server"),
@@ -287,7 +299,8 @@ as a per-user installer or a portable exe.
 - A Language setting. featherplay ships in English and is ready for translations
   (CONTRIBUTING.md says how to add one).
 
-[Unreleased]: https://github.com/candygoogy/featherplay/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/candygoogy/featherplay/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/candygoogy/featherplay/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/candygoogy/featherplay/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/candygoogy/featherplay/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/candygoogy/featherplay/compare/v0.1.0...v0.1.1
