@@ -6,6 +6,14 @@ Notable changes to featherplay, newest first. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- Toasts are rounded pills that stand out from the page in the light theme too, and their
+  button ("Undo", "View") now looks like a button, with a focus ring from the keyboard; the
+  toast stays open while it has the focus. A toast saying something went wrong starts with
+  an alert sign and stays 5 seconds instead of 3. A new toast while one shows brings its
+  line in, so the change is seen.
+
 ## [0.2.0] - 2026-11-09
 
 ### Added

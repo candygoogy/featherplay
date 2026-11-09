@@ -56,7 +56,7 @@ export { AlbumMenu, AlbumAction } from "album_menu.slint";
 
 export { AccountMenu, AccountItem, AccountPicker } from "account_menu.slint";
 
-export { Toast } from "toast.slint";
+export { Toast, ToastTone } from "toast.slint";
 
 export { LibraryData } from "pages/library.slint";
 
@@ -532,6 +532,7 @@ export component AppWindow inherits Window {
         ToastView {
             x: root.no-top ? root.page-x + (root.page-width - self.width) / 2 : (root.width - self.width) / 2;
             y: root.bar-top - Theme.s4 - self.height;
+            focus-released => { keys.focus(); }
         }
 
         // The bar's speed popup, from its speed pill.

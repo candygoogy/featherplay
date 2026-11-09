@@ -51,8 +51,12 @@ pub const PAGES: &[&str] = &[
     "album",
     // The album with the song menu open on its third track.
     "album-menu",
-    // The album with a toast above the bar.
+    // The album with a toast above the bar: with a button; a short confirmation; an error
+    // with a button; a line too long for the toast.
     "album-toast",
+    "album-toast-short",
+    "album-toast-error",
+    "album-toast-long",
     // The album with its ⋯ menu open, and with the confirmation of Like all songs.
     "album-actions",
     "album-actions-confirm",
@@ -708,6 +712,26 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
         crate::toast::show_with(ctx, "Saved to Homework", "View", |_| {});
         settle();
     }
+    if o.page == "album-toast-short" {
+        crate::toast::show(ctx, "Added to queue: Da Funk");
+        settle();
+    }
+    if o.page == "album-toast-error" {
+        crate::toast::show_error_with(
+            ctx,
+            "Couldn't download helpers. Check VPN or proxy.",
+            "Copy diagnostics",
+            |_| {},
+        );
+        settle();
+    }
+    if o.page == "album-toast-long" {
+        crate::toast::show(
+            ctx,
+            "Added to queue: Harder, Better, Faster, Stronger (Alive 2007, Live at the Bercy)",
+        );
+        settle();
+    }
     if o.page.starts_with("about-") {
         crate::updates::for_snapshot(ctx, &o.page);
         settle();
@@ -1012,6 +1036,9 @@ fn page(name: &str, f: &Fixtures) -> Result<Page, String> {
         "album"
         | "album-menu"
         | "album-toast"
+        | "album-toast-short"
+        | "album-toast-error"
+        | "album-toast-long"
         | "album-actions"
         | "album-actions-confirm"
         | "album-stopped"

@@ -1,42 +1,85 @@
-// Toasts: one short confirmation at a time, bottom centre, 16 px
-// above the bar ("Added to queue: Revolution 909", "Saved to Homework"). `src/toast.rs` shows
-// them and closes them after 3 s (5 s with an action); hovering the toast holds it open.
-import { Theme, Curves } from "theme.slint";
-import { Body } from "parts.slint";
+// Toasts: one short line at a time, bottom centre, 16 px above the bar ("Added to queue:
+// Revolution 909", "Saved to Homework"). `src/toast.rs` shows them and closes them after 3 s,
+// or 5 s with an action or for an error (unless `show_for` says); hovering the toast, or its
+// button holding the keyboard focus, holds it open.
+import { Theme, Curves, Icons } from "theme.slint";
+import { Body, Icon } from "parts.slint";
+
+// What a toast says: a confirmation or news (neutral), or that something went wrong (error:
+// the alert ring before the line, in `Theme.error`; the surface stays neutral).
+export enum ToastTone { neutral, error }
 
 export global Toast {
     in property <bool> open;
     in property <string> text;
     // A text button ("View"), or "" for none.
     in property <string> action;
+    in property <ToastTone> tone;
+    // Counts the toasts shown, so a new one while one shows is seen as new (`ToastView`).
+    in property <int> shown;
     callback action-clicked();
-    // The pointer entered (true) or left the toast.
+    // The pointer entered the toast or the keyboard focused its button (true), or neither.
     callback hover-changed(bool);
 }
 
+// A pill on the toast surface: rises `rise` as it fades in, sinks 4 px as it fades out. A
+// new toast while one shows keeps the card where it is and brings the new line up `nudge`
+// into it, so the change reads without the card jumping. Settled, nothing moves or ticks.
 export component ToastView inherits Rectangle {
-    // Rises `rise` as it fades in; sinks 4 px as it fades out. A new toast while one shows
-    // only replaces the text.
+    // The button had the keyboard focus and is going (the toast closed, or the next one has
+    // no button): the window gives it back to its key handler.
+    callback focus-released();
     property <bool> open: Toast.open;
-    property <bool> settled: true;
-    property <bool> over: hover.has-hover;
+    property <int> shown: Toast.shown;
+    // For one tick while a toast starts, the start values apply without animation; then
+    // they animate to rest. `refresh`: that start is a new line in a card already showing.
+    property <bool> fresh: true;
+    property <bool> refresh: false;
+    property <bool> error: Toast.tone == ToastTone.error;
+    property <bool> has-action: Toast.action != "";
+    // The button was focused from the keyboard: its ring shows (not after a click).
+    property <bool> ring;
+    property <bool> held: root.open && (hover.has-hover || fs.has-focus);
     changed open => {
         if root.open {
-            root.settled = false;
-            settle.running = true;
+            root.start();
+        } else {
+            root.release-focus();
         }
     }
-    changed over => { Toast.hover-changed(root.over); }
-    settle := Timer {
+    changed has-action => {
+        if !root.has-action {
+            root.release-focus();
+        }
+    }
+    changed shown => {
+        if root.open {
+            root.start();
+        }
+    }
+    changed held => { Toast.hover-changed(root.held); }
+    function start() {
+        // Still on screen (showing, or not yet faded out): refresh the line in place.
+        root.refresh = root.opacity > 0;
+        root.fresh = false;
+        kick.running = true;
+    }
+    function release-focus() {
+        if fs.has-focus {
+            fs.clear-focus();
+            root.focus-released();
+        }
+    }
+    kick := Timer {
         interval: 1ms;
         running: false;
         triggered => {
             self.running = false;
-            root.settled = true;
+            root.fresh = true;
         }
     }
     width: min(480px, lay.preferred-width);
-    height: 44px;
+    height: 48px;
     opacity: root.open ? 1 : 0;
     visible: self.opacity > 0;
     accessible-role: text;
@@ -44,51 +87,110 @@ export component ToastView inherits Rectangle {
     animate opacity { duration: root.open ? Theme.t-toast : Theme.t-fast; easing: Curves.ease-out; }
 
     card := Rectangle {
-        property <length> dy: !root.open ? (Theme.moving ? 4px : 0px) : (root.settled ? 0px : Theme.rise);
+        property <length> dy: !root.open ? (Theme.moving ? 4px : 0px) : (!root.fresh && !root.refresh ? Theme.rise : 0px);
         y: self.dy;
-        border-radius: Theme.r-m;
-        background: Theme.card;
+        border-radius: self.height / 2;
+        background: Theme.toast;
         border-width: 1px;
-        border-color: Theme.card-edge;
-        drop-shadow-blur: 16px;
-        drop-shadow-offset-y: 4px;
-        drop-shadow-color: Theme.cover-shadow;
+        border-color: Theme.toast-edge;
+        drop-shadow-blur: 24px;
+        drop-shadow-offset-y: 8px;
+        drop-shadow-color: Theme.toast-shadow;
         animate dy {
-            duration: !root.open ? Theme.t-fast : (root.settled ? Theme.t-toast : 0ms);
+            duration: !root.open ? Theme.t-fast : (!root.fresh && !root.refresh ? 0ms : Theme.t-toast);
             easing: Curves.ease-out;
         }
         hover := TouchArea {
             enabled: root.open;
         }
-        lay := HorizontalLayout {
-            padding-left: Theme.s4;
-            padding-right: Toast.action != "" ? Theme.s2 : Theme.s4;
-            spacing: Theme.s2;
-            Body {
-                text: Toast.text;
-                color: Theme.text1;
-                vertical-alignment: center;
+        // The line (icon and text) and the button, faded and lifted together on a refresh.
+        line := Rectangle {
+            property <bool> lowered: !root.fresh && root.refresh;
+            y: self.lowered ? Theme.nudge : 0px;
+            opacity: self.lowered ? 0 : 1;
+            animate y, opacity { duration: self.lowered ? 0ms : Theme.t-menu; easing: Curves.ease-out; }
+            // The text's inset matches a 40 px pill's; the icon (16 px, as Windows' info bars
+            // draw theirs) and the button sit concentric with the toast's rounded ends. Room
+            // for the line beside "Copy diagnostics": 307 px. The button keeps its place on
+            // the right (`padding-right`) rather than sitting in the layout, so it always
+            // exists and its focus can be handed back when it goes.
+            lay := HorizontalLayout {
+                padding-left: root.error ? Theme.s4 : 20px;
+                padding-right: root.has-action ? pill.width + 2 * Theme.s2 : 20px;
+                spacing: Theme.s2;
+                if root.error: Icon {
+                    y: (parent.height - self.height) / 2;
+                    width: 16px;
+                    height: 16px;
+                    commands: Icons.alert;
+                    stroke: Theme.error;
+                    accessible-role: none;
+                }
+                Body {
+                    text: Toast.text;
+                    color: Theme.text1;
+                    vertical-alignment: center;
+                    accessible-role: none;
+                }
             }
-            if Toast.action != "": Rectangle {
+            // A compact tonal pill (32 px, 12/600), as the app's secondary buttons in a row:
+            // it reads as a button at rest, a step deeper hovered, and gives a little under a
+            // press.
+            pill := Rectangle {
+                x: parent.width - Theme.s2 - self.width;
                 y: (parent.height - self.height) / 2;
-                width: label.preferred-width + 2 * Theme.s2;
+                width: label.preferred-width + 2 * Theme.s3;
                 height: 32px;
-                border-radius: Theme.r-s;
-                background: Theme.state(ata.pressed, ata.has-hover);
-                accessible-role: button;
-                accessible-label: Toast.action;
-                accessible-action-default => { Toast.action-clicked(); }
-                animate background { duration: Theme.t-hover; }
+                visible: root.has-action;
+                Rectangle {
+                    border-radius: self.height / 2;
+                    background: Theme.tonal(ata.pressed, ata.has-hover);
+                    transform-scale: ata.pressed ? Theme.press-scale : 1.0;
+                    animate background { duration: Theme.t-hover; }
+                    animate transform-scale {
+                        duration: ata.pressed ? Theme.t-press : Theme.t-release;
+                        easing: ata.pressed ? Curves.ease-out : Curves.release;
+                    }
+                    label := Body {
+                        text: Toast.action;
+                        font-size: Theme.t-meta;
+                        font-weight: 600;
+                        color: Theme.text1;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                        accessible-role: none;
+                    }
+                }
+                // Where the keyboard lands, so it carries the button's role and action.
+                fs := FocusScope {
+                    enabled: root.open && root.has-action;
+                    accessible-role: button;
+                    accessible-label: Toast.action;
+                    accessible-action-default => { Toast.action-clicked(); }
+                    focus-gained(reason) => { root.ring = reason == FocusReason.tab-navigation; }
+                    focus-lost => { root.ring = false; }
+                    key-pressed(e) => {
+                        if root.open && (e.text == Key.Return || e.text == Key.Space) {
+                            Toast.action-clicked();
+                            return accept;
+                        }
+                        reject
+                    }
+                }
+                // Above the focus scope, so a click is the touch area's.
                 ata := TouchArea {
-                    enabled: root.open;
+                    enabled: root.open && root.has-action;
                     mouse-cursor: pointer;
                     clicked => { Toast.action-clicked(); }
                 }
-                label := Body {
-                    text: Toast.action;
-                    font-weight: 600;
-                    color: Theme.text2;
-                    vertical-alignment: center;
+                if fs.has-focus && root.ring: Rectangle {
+                    x: -3px;
+                    y: -3px;
+                    width: parent.width + 6px;
+                    height: parent.height + 6px;
+                    border-radius: self.height / 2;
+                    border-width: 2px;
+                    border-color: Theme.accent;
                 }
             }
         }

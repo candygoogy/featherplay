@@ -173,6 +173,11 @@ impl Ctx {
         toast::show(self, text);
     }
 
+    /// Shows above the bar that something went wrong (the toast's error tone).
+    pub fn toast_error(&self, text: &str) {
+        toast::show_error(self, text);
+    }
+
     /// For a control that writes to the account (a like, a rating, a playlist): signed out,
     /// says `why` ("Sign in to like songs") in a toast with a Sign in button and returns
     /// `true`, so the control does nothing more.
@@ -506,19 +511,21 @@ pub fn on_event(ev: UiEvent) {
         UiEvent::ShowWindow => show_window(&ctx),
         UiEvent::AccountNotice(ev) => pages::sign_in::notice(&ctx, ev),
         UiEvent::Discord(status) => pages::settings::discord_changed(&ctx, status),
+        // Songs stopped playing: an error toast.
         UiEvent::Stopped { text, help } => match help {
             // A setup downloaded for the newer release: the banner's "Restart to update".
             Some(help) if help.restart => {
-                toast::show_with(&ctx, text, help.label, updates::restart);
+                toast::show_error_with(&ctx, text, help.label, updates::restart);
             }
             Some(help) => {
                 let url = help.url;
-                toast::show_with(&ctx, text, help.label, move |c| updates::open(c, &url));
+                toast::show_error_with(&ctx, text, help.label, move |c| updates::open(c, &url));
             }
-            None => toast::show(&ctx, text),
+            None => toast::show_error(&ctx, text),
         },
         UiEvent::Release(release) => pages::about::show_update(&ctx, Some(&release)),
         UiEvent::Toast(text) => toast::show(&ctx, text),
+        UiEvent::ToastError(text) => toast::show_error(&ctx, text),
         UiEvent::Silences(marks) => bar::show_silences(&ctx, &marks),
         UiEvent::LocalApi(notice) => pages::settings::local_api_changed(&ctx, notice),
     }

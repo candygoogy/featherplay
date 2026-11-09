@@ -150,7 +150,7 @@ fn problem(ctx: &Rc<Ctx>, title: &str, line: &str, retry: SignInWay) {
     data.set_error(line.into());
     data.set_retry(retry);
     if ctx.current_page() != Page::SignIn {
-        ctx.toast(title);
+        ctx.toast_error(title);
     }
 }
 

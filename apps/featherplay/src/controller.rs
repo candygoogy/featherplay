@@ -211,6 +211,8 @@ pub enum UiEvent {
     Release(updates::Release),
     /// A plain toast: a song waits for the helpers' first download.
     Toast(&'static str),
+    /// A toast saying something went wrong: no sound output.
+    ToastError(&'static str),
     /// What Skip silence drops from the current track, for the seek bar (`silences.rs`);
     /// empty while it's off, and from a track change until the new track is scanned.
     Silences(Vec<Mark>),
@@ -1133,7 +1135,7 @@ impl Controller {
                 AudioEvent::NoDevice => {
                     // The engine stayed paused; the player shows it, as for a lost device.
                     log!("play: no audio output device");
-                    (self.ui.events)(UiEvent::Toast(no_sound_output()));
+                    (self.ui.events)(UiEvent::ToastError(no_sound_output()));
                     Input::DeviceLost
                 }
                 AudioEvent::Error(msg) if msg.contains("HTTP 403") => {

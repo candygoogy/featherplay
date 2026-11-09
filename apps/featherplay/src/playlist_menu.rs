@@ -228,7 +228,7 @@ fn with_tracks(
                 then(ctx, from, tracks);
             }
             Ok(_) => ctx.toast(&tr!("{} has no songs yet", quoted(&name))),
-            Err(e) => ctx.toast(&failure_text(what, &e)),
+            Err(e) => ctx.toast_error(&failure_text(what, &e)),
         },
     );
 }
@@ -260,7 +260,7 @@ fn start_radio(ctx: &Rc<Ctx>, id: &str) {
                 }));
             }
             Ok(_) => ctx.toast(tr!("This playlist has no radio")),
-            Err(e) => ctx.toast(&failure_text(tr!("Couldn't start the radio."), &e)),
+            Err(e) => ctx.toast_error(&failure_text(tr!("Couldn't start the radio."), &e)),
         },
     );
 }
@@ -292,7 +292,7 @@ fn rename(ctx: &Rc<Ctx>, id: &str, name: &str) {
                 ctx.toast(&tr!("Renamed to {}", quoted(&shown(&name))));
                 changed(ctx, Change::Renamed);
             }
-            Err(e) => ctx.toast(&failure_text(
+            Err(e) => ctx.toast_error(&failure_text(
                 &tr!("Couldn't rename {}.", quoted(&shown(&old))),
                 &e,
             )),
@@ -317,7 +317,7 @@ fn delete(ctx: &Rc<Ctx>, id: &str) {
                 ctx.toast(&tr!("Deleted {}", quoted(&name)));
                 changed(ctx, Change::Gone(pid));
             }
-            Err(e) => ctx.toast(&failure_text(
+            Err(e) => ctx.toast_error(&failure_text(
                 &tr!("Couldn't delete {}.", quoted(&name)),
                 &e,
             )),
@@ -339,7 +339,7 @@ fn remove(ctx: &Rc<Ctx>, id: &str) {
                 ctx.toast(&tr!("Removed {} from your library", quoted(&name)));
                 changed(ctx, Change::Gone(pid));
             }
-            Err(e) => ctx.toast(&failure_text(
+            Err(e) => ctx.toast_error(&failure_text(
                 &tr!("Couldn't remove {}.", quoted(&name)),
                 &e,
             )),

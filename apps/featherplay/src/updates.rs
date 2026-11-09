@@ -36,7 +36,7 @@ use serde_json::Value;
 
 use crate::app::Ctx;
 use crate::router::Page;
-use crate::ui::Frame;
+use crate::ui::{Frame, ToastTone};
 use crate::{busy, pages, toast};
 use slint::ComponentHandle;
 
@@ -1188,10 +1188,12 @@ pub fn window_shown(ctx: &Rc<Ctx>) {
     maybe_run(ctx);
 }
 
+/// News is neutral; an update that didn't install or couldn't be verified is an error.
 fn show(ctx: &Ctx, notice: &Notice) {
     match notice {
         Notice::Out(release) if status().kind == Kind::Scoop => toast::show_for(
             ctx,
+            ToastTone::Neutral,
             &tr!("featherplay {} is out", release.version),
             tr!("View"),
             |c| c.navigate(Page::About),
@@ -1201,6 +1203,7 @@ fn show(ctx: &Ctx, notice: &Notice) {
             let url = release.url.clone();
             toast::show_for(
                 ctx,
+                ToastTone::Neutral,
                 &tr!("featherplay {} is out", release.version),
                 tr!("Get it"),
                 move |c| open(c, &url),
@@ -1209,6 +1212,7 @@ fn show(ctx: &Ctx, notice: &Notice) {
         }
         Notice::Ready(version) => toast::show_for(
             ctx,
+            ToastTone::Neutral,
             &tr!("featherplay {} is ready to install", version),
             tr!("Restart to update"),
             restart,
@@ -1216,6 +1220,7 @@ fn show(ctx: &Ctx, notice: &Notice) {
         ),
         Notice::InstallFailed(version) => toast::show_for(
             ctx,
+            ToastTone::Error,
             &tr!("The update to {} didn't install", version),
             tr!("Try again"),
             restart,
@@ -1223,6 +1228,7 @@ fn show(ctx: &Ctx, notice: &Notice) {
         ),
         Notice::Unverified(version) => toast::show_for(
             ctx,
+            ToastTone::Error,
             &tr!("The update to {} couldn't be verified", version),
             tr!("View"),
             |c| c.navigate(Page::About),
@@ -1286,7 +1292,7 @@ pub fn restart(ctx: &Rc<Ctx>) {
                     s.launch_failed = true;
                 }
                 pages::about::refresh_update(ctx);
-                ctx.toast(tr!("The update couldn't start"));
+                ctx.toast_error(tr!("The update couldn't start"));
             }
         },
     );

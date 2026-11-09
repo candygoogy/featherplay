@@ -5,7 +5,7 @@
 use featherplay::app;
 use featherplay::controller::UiEvent;
 use featherplay::snapshot::Scene;
-use featherplay::ui::Toast;
+use featherplay::ui::{Toast, ToastTone};
 use featherplay_core::failure::{Notice, getting_ready};
 use slint::ComponentHandle;
 
@@ -43,4 +43,5 @@ fn a_failed_helpers_download_says_so_in_plain_words() {
         toast.get_text().as_str(),
         "Couldn't download helpers. Check your connection."
     );
+    assert_eq!(toast.get_tone(), ToastTone::Error, "a stop is an error");
 }

@@ -580,7 +580,7 @@ fn copy_api_token() {
         Some(Ok(())) => toast::show(&ctx, tr!("Token copied")),
         Some(Err(e)) => {
             log!("copying the local API token: {e}");
-            toast::show(&ctx, tr!("Couldn't copy the token. Try again."));
+            toast::show_error(&ctx, tr!("Couldn't copy the token. Try again."));
         }
         None => {}
     }

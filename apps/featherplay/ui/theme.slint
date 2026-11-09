@@ -87,6 +87,16 @@ export global Theme {
     out property <color> card: dark ? #212121 : #F2F2F2;         // raised cards (Home hero)
     out property <color> card-edge: dark ? #FFFFFF0D : #00000014;
     out property <color> field: dark ? #FFFFFF14 : #F2F2F2;      // search field
+    // The toast, the topmost surface, floating over any page (a cover-tinted one too): a step
+    // above the cards on dark; white on light, where a grey card read as part of the page.
+    // Its edge and a deeper shadow hold it apart from the bar just under it.
+    out property <color> toast: dark ? #262626 : #FFFFFF;
+    out property <color> toast-edge: dark ? #FFFFFF17 : #0000001A;
+    out property <color> toast-shadow: dark ? #000000A6 : #00000029;
+    // Something went wrong (the toast's alert ring): Windows' own critical colours, soft on
+    // dark, so an error reads as one without an alarm-red slab. 7.4:1 on the dark toast,
+    // 5.7:1 on the light one.
+    out property <color> error: dark ? #FF99A4 : #C42B1C;
     // The top bar's search field: opaque, a step lighter than the cards on dark so it holds
     // its own on a page's wash; `text3` keeps 4.7:1 on it in both themes. Its 1 px edge, a
     // neutral step up on hover (the focus ring is the accent).
