@@ -207,6 +207,9 @@ pub enum UiEvent {
         text: &'static str,
         help: Option<updates::Help>,
     },
+    /// Playback stopped because the helpers couldn't be downloaded: what to say, with a Copy
+    /// diagnostics button.
+    HelpersFailed(&'static str),
     /// A fresh update check found a newer release (About's banner).
     Release(updates::Release),
     /// A plain toast: a song waits for the helpers' first download.
@@ -355,7 +358,15 @@ impl Controller {
                 // A first run downloads yt-dlp and deno now, so they're usually there by the first
                 // click; a resolve waits for this same download. It logs its own start and end, and
                 // a failure is tried again by the next resolve.
-                let installed = helpers.install_helpers().await.is_ok();
+                let installed = match helpers.install_helpers().await {
+                    Ok(()) => true,
+                    Err(e) => {
+                        if let ResolveError::Sidecar(s) = &e {
+                            crate::diagnostics::helpers_failed(s);
+                        }
+                        false
+                    }
+                };
                 // After the startup's own work: the daily `yt-dlp -U` (skipped when the last one,
                 // or the download, is under a day old), then once, for the log and Copy
                 // diagnostics, the versions. Short processes, off this task.
@@ -978,6 +989,9 @@ impl Controller {
                     Err(e) => {
                         let failure = notice::failure(&e);
                         crate::diagnostics::resolve_failed(&id.0, took, &failure.detail);
+                        if let ResolveError::Sidecar(s) = &e {
+                            crate::diagnostics::helpers_failed(s);
+                        }
                         Input::Resolved {
                             id,
                             result: Err(failure),

@@ -8,7 +8,9 @@ use featherplay_core::sync::LockExt;
 use sha2::{Digest, Sha256};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-use crate::ResolveError;
+use featherplay_core::failure::HelperFault;
+
+use crate::{ResolveError, SidecarError};
 
 // The releases a first run installs, pinned with their sha256. A checksum file fetched
 // from the same "latest" release would only catch a broken download, not a replaced
@@ -164,7 +166,7 @@ impl Downloads {
             return builder
                 .redirect(reqwest::redirect::Policy::none())
                 .build()
-                .map_err(|e| sidecar_err("http client", e));
+                .map_err(|e| sidecar_err(HelperFault::Unreachable, "http client", e));
         }
         builder
             .https_only(true)
@@ -176,13 +178,14 @@ impl Downloads {
                 }
             }))
             .build()
-            .map_err(|e| sidecar_err("http client", e))
+            .map_err(|e| sidecar_err(HelperFault::Unreachable, "http client", e))
     }
 }
 
 /// Downloads the missing sidecars one download at a time: a caller that comes while one
-/// runs waits for it and shares its outcome instead of starting another. A failed download
-/// is tried again by the next caller that comes after it, so there's no retry loop.
+/// runs waits for it and shares its outcome instead of starting another. Within a download,
+/// each file is tried a few times (`DOWNLOAD_WAITS`, `HELD_WAITS`); after a failed one, the
+/// next caller that comes tries again, so there's no retry loop.
 pub(crate) struct Installer {
     downloads: Downloads,
     running: tokio::sync::Mutex<()>,
@@ -215,11 +218,13 @@ impl Installer {
         }
         if self.tried.load(Ordering::SeqCst) != before {
             // The download this call waited for failed: its error, not another try at once.
-            return Err(self
-                .failed
-                .lock_or_recover()
-                .clone()
-                .unwrap_or_else(|| sidecar_err("downloading yt-dlp and deno", "failed")));
+            return Err(self.failed.lock_or_recover().clone().unwrap_or_else(|| {
+                sidecar_err(
+                    HelperFault::Unreachable,
+                    "downloading yt-dlp and deno",
+                    "failed",
+                )
+            }));
         }
         log::info!(
             "yt-dlp or deno is missing: downloading them into {}",
@@ -237,6 +242,11 @@ impl Installer {
             Ok(()) => log::info!(
                 "yt-dlp and deno downloaded in {:.1}s",
                 started.elapsed().as_secs_f64()
+            ),
+            Err(ResolveError::Sidecar(e)) => log::warn!(
+                "downloading yt-dlp and deno failed ({}): {}",
+                e.fault.name(),
+                e.message
             ),
             Err(e) => log::warn!("downloading yt-dlp and deno failed: {e}"),
         }
@@ -272,7 +282,7 @@ impl Sidecars {
     ) -> Result<(), ResolveError> {
         tokio::fs::create_dir_all(&self.dir)
             .await
-            .map_err(|e| sidecar_err("creating the sidecar dir", e))?;
+            .map_err(|e| io_err(HelperFault::NoSpace, "creating the sidecar dir", e))?;
         let http = from.client()?;
 
         if !self.ytdlp().is_file() {
@@ -298,7 +308,7 @@ impl Sidecars {
                 }
             })
             .await
-            .map_err(|e| sidecar_err("extracting deno.exe", e));
+            .map_err(|e| io_err(HelperFault::Blocked, "extracting deno.exe", e));
             let _ = tokio::fs::remove_file(&zip).await;
             if let Err(e) = extracted {
                 let _ = tokio::fs::remove_file(&exe_part).await;
@@ -453,8 +463,50 @@ fn is_recent(stamp: &Path) -> bool {
         .is_some_and(|age| age < UPDATE_EVERY)
 }
 
-fn sidecar_err(what: &str, e: impl std::fmt::Display) -> ResolveError {
-    ResolveError::Sidecar(format!("{what}: {e}"))
+fn failure(fault: HelperFault, what: &str, e: impl std::fmt::Display) -> SidecarError {
+    SidecarError {
+        fault,
+        message: format!("{what}: {e}"),
+        host: None,
+        status: None,
+        os_error: None,
+    }
+}
+
+fn sidecar_err(fault: HelperFault, what: &str, e: impl std::fmt::Display) -> ResolveError {
+    ResolveError::Sidecar(failure(fault, what, e))
+}
+
+/// A file step that failed: `fault` unless the error says better. A full disk is `NoSpace`,
+/// and a zip that can't be read (`InvalidData`) `Damaged`.
+fn io_err(fault: HelperFault, what: &str, e: std::io::Error) -> ResolveError {
+    // ERROR_HANDLE_DISK_FULL, ERROR_DISK_FULL.
+    let full = matches!(e.raw_os_error(), Some(39 | 112))
+        || e.kind() == std::io::ErrorKind::StorageFull
+        || e.kind() == std::io::ErrorKind::QuotaExceeded;
+    let fault = if full {
+        HelperFault::NoSpace
+    } else if e.kind() == std::io::ErrorKind::InvalidData {
+        HelperFault::Damaged
+    } else {
+        fault
+    };
+    ResolveError::Sidecar(SidecarError {
+        os_error: e.raw_os_error(),
+        ..failure(fault, what, e)
+    })
+}
+
+/// A failed request or body read from `url`: `Unreachable`, with its host and HTTP status.
+fn http_err(url: &str, e: reqwest::Error) -> ResolveError {
+    let host = reqwest::Url::parse(url)
+        .ok()
+        .and_then(|u| u.host_str().map(str::to_string));
+    ResolveError::Sidecar(SidecarError {
+        host,
+        status: e.status().map(|s| s.as_u16()),
+        ..failure(HelperFault::Unreachable, url, e)
+    })
 }
 
 /// HTTPS on github.com or GitHub's release download hosts. Nothing secret is sent; the
@@ -483,7 +535,7 @@ fn http_failed(url: &str, e: reqwest::Error) -> Failed {
         || e.is_decode()
         || e.status().is_some_and(|s| s.is_server_error());
     Failed {
-        error: sidecar_err(url, e),
+        error: http_err(url, e),
         transient,
     }
 }
@@ -491,7 +543,7 @@ fn http_failed(url: &str, e: reqwest::Error) -> Failed {
 /// A failed write: not one another try would mend.
 fn write_failed(what: &str, e: std::io::Error) -> Failed {
     Failed {
-        error: sidecar_err(what, e),
+        error: io_err(HelperFault::NoSpace, what, e),
         transient: false,
     }
 }
@@ -531,7 +583,7 @@ async fn download(
 ) -> Result<(), Failed> {
     if !reqwest::Url::parse(url).is_ok_and(|u| from.allows(&u)) {
         return Err(Failed {
-            error: sidecar_err(url, "not a GitHub download"),
+            error: sidecar_err(HelperFault::Unreachable, url, "not an allowed download"),
             transient: false,
         });
     }
@@ -594,9 +646,10 @@ async fn put_in_place(part: &Path, exe: &Path) -> Result<(), ResolveError> {
         .unwrap_or_default();
     patiently(|| tokio::fs::rename(part, exe))
         .await
-        .map_err(|e| sidecar_err(&format!("installing {name}"), e))?;
+        .map_err(|e| io_err(HelperFault::Blocked, &format!("installing {name}"), e))?;
     if !exe.is_file() {
         return Err(sidecar_err(
+            HelperFault::Blocked,
             &format!("installing {name}"),
             "it was removed right after it was saved",
         ));
@@ -613,10 +666,15 @@ async fn verify_or_delete(path: &Path, expected_hex: &str) -> Result<(), Resolve
     let result = match patiently(|| sha256_file(path)).await {
         Ok(actual) if actual.eq_ignore_ascii_case(expected_hex.trim()) => return Ok(()),
         Ok(actual) => sidecar_err(
+            HelperFault::Damaged,
             &format!("sha256 mismatch for {name}"),
             format!("expected {expected_hex}, got {actual}"),
         ),
-        Err(e) => sidecar_err(&format!("reading {name} for its sha256"), e),
+        Err(e) => io_err(
+            HelperFault::Blocked,
+            &format!("reading {name} for its sha256"),
+            e,
+        ),
     };
     let _ = tokio::fs::remove_file(path).await;
     Err(result)
@@ -863,6 +921,55 @@ mod tests {
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
+    /// What a failed file step is, from the system's error.
+    #[test]
+    fn a_file_error_says_what_kept_the_helpers_out() {
+        let fault = |os: i32| {
+            let e = io_err(
+                HelperFault::Blocked,
+                "installing yt-dlp.exe",
+                std::io::Error::from_raw_os_error(os),
+            );
+            match e {
+                ResolveError::Sidecar(e) => (e.fault, e.os_error),
+                e => panic!("{e:?}"),
+            }
+        };
+        // Still held after the retries.
+        assert_eq!(fault(32), (HelperFault::Blocked, Some(32)));
+        assert_eq!(fault(5), (HelperFault::Blocked, Some(5)));
+        // ERROR_DISK_FULL, ERROR_HANDLE_DISK_FULL.
+        assert_eq!(fault(112), (HelperFault::NoSpace, Some(112)));
+        assert_eq!(fault(39), (HelperFault::NoSpace, Some(39)));
+        let damaged = io_err(
+            HelperFault::Blocked,
+            "extracting deno.exe",
+            std::io::Error::new(std::io::ErrorKind::InvalidData, "the deno zip: bad"),
+        );
+        assert!(matches!(damaged, ResolveError::Sidecar(e) if e.fault == HelperFault::Damaged));
+    }
+
+    /// Copy diagnostics' line: what and where, never a path.
+    #[test]
+    fn a_helper_error_is_summed_up_without_paths() {
+        let e = SidecarError {
+            fault: HelperFault::Unreachable,
+            message: r"C:\Users\ada\x: boom".into(),
+            host: Some("github.com".into()),
+            status: Some(503),
+            os_error: None,
+        };
+        assert_eq!(e.summary(), "unreachable, github.com, HTTP 503");
+        let e = SidecarError {
+            fault: HelperFault::Blocked,
+            host: None,
+            status: None,
+            os_error: Some(32),
+            ..e
+        };
+        assert_eq!(e.summary(), "blocked, os error 32");
+    }
+
     /// The real waits: about six seconds for a held file, as long as antivirus usually
     /// holds one, and two more tries for a download.
     #[test]
@@ -891,7 +998,8 @@ mod tests {
         let expected = "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824";
         let err = verify_or_delete(&part, expected).await.unwrap_err();
         assert!(
-            matches!(&err, ResolveError::Sidecar(m) if m.contains("sha256")),
+            matches!(&err, ResolveError::Sidecar(e)
+                if e.message.contains("sha256") && e.fault == HelperFault::Damaged),
             "got {err:?}"
         );
         assert!(!part.exists(), "the corrupted download was not deleted");

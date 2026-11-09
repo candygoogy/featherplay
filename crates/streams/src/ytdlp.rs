@@ -792,6 +792,7 @@ mod tests {
         use std::io::Write;
         use std::sync::atomic::AtomicUsize;
 
+        use featherplay_core::failure::HelperFault;
         use sha2::{Digest, Sha256};
 
         use super::*;
@@ -929,6 +930,24 @@ mod tests {
             std::fs::remove_dir_all(&home).unwrap();
         }
 
+        /// A file that doesn't match its pin is deleted, and said to be damaged.
+        #[tokio::test]
+        async fn a_download_that_doesnt_match_its_pin_is_damaged() {
+            let home = test_home("first-run-damaged");
+            let (_, base, _) = helpers_server(0, Duration::ZERO);
+            let wrong = sha256(b"another file");
+            let r = resolver(&home, Downloads::local(&base, &wrong, &wrong));
+
+            let result = r.resolve(&TrackId("h46YpWrg55Q".into())).await;
+
+            let Err(ResolveError::Sidecar(e)) = &result else {
+                panic!("got {result:?}");
+            };
+            assert_eq!(e.fault, HelperFault::Damaged, "{e:?}");
+            assert!(!home.join("sidecars").join("yt-dlp.exe.part").exists());
+            std::fs::remove_dir_all(&home).unwrap();
+        }
+
         /// A missing file stays missing: no second try.
         #[tokio::test]
         async fn a_download_that_isnt_there_is_not_tried_again() {
@@ -954,10 +973,14 @@ mod tests {
             let id = TrackId("h46YpWrg55Q".into());
 
             let first = r.resolve(&id).await;
-            assert!(
-                matches!(&first, Err(ResolveError::Sidecar(m)) if m.contains("503")),
-                "got {first:?}"
+            let Err(ResolveError::Sidecar(e)) = &first else {
+                panic!("got {first:?}");
+            };
+            assert_eq!(
+                (e.fault, e.host.as_deref(), e.status),
+                (HelperFault::Unreachable, Some("127.0.0.1"), Some(503))
             );
+            assert!(e.message.contains("503"), "{e:?}");
             assert_eq!(requests(&log, "/yt-dlp.exe"), 3, "three tries, no loop");
 
             let second = r.resolve(&id).await;

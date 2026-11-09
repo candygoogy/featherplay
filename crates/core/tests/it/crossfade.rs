@@ -422,7 +422,9 @@ fn a_stop_after_a_faded_skip_leaves_no_fade_for_the_next_play() {
         Input::Resolved {
             id: id("c"),
             result: Err(featherplay_core::failure::Failure {
-                kind: featherplay_core::failure::FailKind::Setup,
+                kind: featherplay_core::failure::FailKind::Setup(
+                    featherplay_core::failure::HelperFault::Unreachable,
+                ),
                 detail: "no helpers".into(),
             }),
         },

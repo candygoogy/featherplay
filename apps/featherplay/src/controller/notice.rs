@@ -8,9 +8,13 @@
 //! the maintainer opens, if there is one. That lookup is a fresh update check plus at most
 //! one issue search, once a session, and only with "Check for updates" on.
 
+#[cfg(test)]
+use featherplay_core::failure::HelperFault;
 use featherplay_core::failure::{FailKind, Failure, Notice, notice};
 use featherplay_core::player::Stop;
 use featherplay_streams::ResolveError;
+#[cfg(test)]
+use featherplay_streams::SidecarError;
 
 use super::{Controller, Msg, UiEvent};
 use crate::updates::{self, Help, Release};
@@ -30,7 +34,7 @@ pub(super) fn failure(e: &ResolveError) -> Failure {
     let kind = match e {
         ResolveError::Unavailable(_) => FailKind::Unavailable,
         ResolveError::ToolFailed { .. } => FailKind::Broken,
-        ResolveError::Sidecar(_) => FailKind::Setup,
+        ResolveError::Sidecar(e) => FailKind::Setup(e.fault),
         ResolveError::ToolMissing => FailKind::Other,
     };
     Failure {
@@ -46,7 +50,7 @@ fn describe(e: &ResolveError) -> String {
         ResolveError::ToolFailed { code, stderr_tail } => {
             format!("yt-dlp failed ({code}): {stderr_tail}")
         }
-        ResolveError::Sidecar(m) => format!("sidecar: {m}"),
+        ResolveError::Sidecar(e) => format!("sidecar ({}): {}", e.fault.name(), e.message),
     }
 }
 
@@ -78,9 +82,10 @@ impl Controller {
                     });
                 }
             },
-            Notice::Unavailable | Notice::CouldNotPlay | Notice::HelpersFailed => {
-                self.tell(said, None);
-            }
+            Notice::Unavailable | Notice::CouldNotPlay => self.tell(said, None),
+            // With Copy diagnostics, for a report: the cause is on the user's side, and
+            // differs from one PC to the next.
+            Notice::HelpersFailed(_) => (self.ui.events)(UiEvent::HelpersFailed(said.text())),
         }
     }
 
@@ -122,12 +127,40 @@ mod tests {
 
     /// Offline on a first run, or a download that didn't match its pin: not something a
     /// `yt-dlp -U` could fix, and every song would fail the same way.
+    fn sidecar(fault: HelperFault, message: &str) -> ResolveError {
+        ResolveError::Sidecar(SidecarError {
+            fault,
+            message: message.into(),
+            host: None,
+            status: None,
+            os_error: None,
+        })
+    }
+
     #[test]
-    fn a_failed_helpers_download_is_setup() {
-        let offline = ResolveError::Sidecar("https://github.com/…: connection refused".into());
-        assert_eq!(failure(&offline).kind, FailKind::Setup);
-        let sidecar = ResolveError::Sidecar("sha256 mismatch".into());
-        assert_eq!(failure(&sidecar).kind, FailKind::Setup);
+    fn a_failed_helpers_download_is_setup_with_its_fault() {
+        let offline = sidecar(
+            HelperFault::Unreachable,
+            "https://github.com/…: connection refused",
+        );
+        assert_eq!(
+            failure(&offline).kind,
+            FailKind::Setup(HelperFault::Unreachable)
+        );
+        let damaged = sidecar(HelperFault::Damaged, "sha256 mismatch");
+        assert_eq!(
+            failure(&damaged).kind,
+            FailKind::Setup(HelperFault::Damaged)
+        );
+    }
+
+    #[test]
+    fn a_failed_helpers_download_logs_its_fault() {
+        let held = sidecar(HelperFault::Blocked, "installing deno.exe: in use");
+        assert_eq!(
+            failure(&held).detail,
+            "sidecar (blocked): installing deno.exe: in use"
+        );
     }
 
     #[test]

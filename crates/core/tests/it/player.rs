@@ -1,6 +1,6 @@
 use std::time::{Duration, SystemTime};
 
-use featherplay_core::failure::{FailKind, Failure, StopCause};
+use featherplay_core::failure::{FailKind, Failure, HelperFault, StopCause};
 use featherplay_core::model::{LikeStatus, RepeatMode, Session, Track, TrackId, VideoType};
 use featherplay_core::player::{Effect, Input, PlaybackPrefs, Player, Status, Stop, StreamInfo};
 
@@ -539,8 +539,11 @@ fn a_failed_helpers_download_stops_at_once_on_the_same_song() {
             radio: false,
         },
     );
-    let fx = run(&mut p, failed("a", FailKind::Setup));
-    assert_eq!(stop_of(&fx).map(|s| s.cause), Some(StopCause::Setup));
+    let fx = run(&mut p, failed("a", FailKind::Setup(HelperFault::Blocked)));
+    assert_eq!(
+        stop_of(&fx).map(|s| s.cause),
+        Some(StopCause::Setup(HelperFault::Blocked))
+    );
     assert_eq!(resolves(&fx), Vec::<String>::new(), "nothing skipped to");
     assert_eq!(p.queue().current().map(|t| t.id.0.as_str()), Some("a"));
     // Play asks for the same song again, so its resolve tries the download again.

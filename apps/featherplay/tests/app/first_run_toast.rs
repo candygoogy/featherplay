@@ -6,7 +6,7 @@ use featherplay::app;
 use featherplay::controller::UiEvent;
 use featherplay::snapshot::Scene;
 use featherplay::ui::{Toast, ToastTone};
-use featherplay_core::failure::{Notice, getting_ready};
+use featherplay_core::failure::{HelperFault, Notice, getting_ready};
 use slint::ComponentHandle;
 
 #[test]
@@ -26,22 +26,23 @@ fn the_helpers_download_shows_why_the_song_waits() {
     assert_eq!(toast.get_action().as_str(), "", "nothing to click");
 }
 
+/// The toast says why, in plain words, and offers what a bug report needs.
 #[test]
-fn a_failed_helpers_download_says_so_in_plain_words() {
+fn a_failed_helpers_download_says_why_with_copy_diagnostics() {
     let scene = Scene::new(1280, 800, true, false).expect("scene");
     scene.open("home").expect("home");
     scene.settle();
 
-    app::on_event(UiEvent::Stopped {
-        text: Notice::HelpersFailed.text(),
-        help: None,
-    });
+    app::on_event(UiEvent::HelpersFailed(
+        Notice::HelpersFailed(HelperFault::Blocked).text(),
+    ));
 
     let toast = scene.ui.global::<Toast>();
     assert!(toast.get_open());
     assert_eq!(
         toast.get_text().as_str(),
-        "Couldn't download helpers. Check your connection."
+        "Your antivirus may have blocked the helpers."
     );
     assert_eq!(toast.get_tone(), ToastTone::Error, "a stop is an error");
+    assert_eq!(toast.get_action().as_str(), "Copy diagnostics");
 }

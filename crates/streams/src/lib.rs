@@ -19,6 +19,7 @@ use std::fmt;
 use std::future::Future;
 use std::time::{Duration, SystemTime};
 
+use featherplay_core::failure::HelperFault;
 use featherplay_core::model::TrackId;
 
 pub use expiry::expires_at_from_url;
@@ -95,7 +96,33 @@ pub enum ResolveError {
     /// yt-dlp failed for another reason. Updating yt-dlp may fix it.
     ToolFailed { code: i32, stderr_tail: String },
     /// Downloading or verifying a sidecar failed (network, checksum mismatch, bad archive).
-    Sidecar(String),
+    Sidecar(SidecarError),
+}
+
+/// Why and where downloading the sidecars failed.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SidecarError {
+    pub fault: HelperFault,
+    /// For the log: the step and the error (`https://github.com/…: connection refused`).
+    pub message: String,
+    /// The server a download asked.
+    pub host: Option<String>,
+    /// The HTTP status it answered with, when it answered.
+    pub status: Option<u16>,
+    /// The system's error number for a file step (5: access denied, 32: in use, 112: disk full).
+    pub os_error: Option<i32>,
+}
+
+impl SidecarError {
+    /// One line for Copy diagnostics: the kind, the host, the HTTP status, the os error,
+    /// those known. No paths.
+    pub fn summary(&self) -> String {
+        let mut parts = vec![self.fault.name().to_string()];
+        parts.extend(self.host.clone());
+        parts.extend(self.status.map(|s| format!("HTTP {s}")));
+        parts.extend(self.os_error.map(|n| format!("os error {n}")));
+        parts.join(", ")
+    }
 }
 
 /// For the log: the exit code and stderr tail in full.
@@ -107,7 +134,7 @@ impl fmt::Display for ResolveError {
             ResolveError::ToolFailed { code, stderr_tail } => {
                 write!(f, "yt-dlp exited with code {code}: {stderr_tail}")
             }
-            ResolveError::Sidecar(m) => write!(f, "sidecar: {m}"),
+            ResolveError::Sidecar(e) => write!(f, "sidecar ({}): {}", e.fault.name(), e.message),
         }
     }
 }

@@ -28,9 +28,21 @@ msgstr "[This song isn't available.]"
 msgid "Couldn't play this song. Check your connection."
 msgstr "[Couldn't play this song. Check your connection.]"
 
-#: ../../crates/core/src/failure.rs:105
-msgid "Couldn't download helpers. Check your connection."
-msgstr "[Couldn't download helpers. Check your connection.]"
+#: ../../crates/core/src/failure.rs:137
+msgid "Couldn't download helpers. Check VPN or proxy."
+msgstr "[Couldn't download helpers. Check VPN or proxy.]"
+
+#: ../../crates/core/src/failure.rs:140
+msgid "Your antivirus may have blocked the helpers."
+msgstr "[Your antivirus may have blocked the helpers.]"
+
+#: ../../crates/core/src/failure.rs:143
+msgid "A helper download arrived damaged."
+msgstr "[A helper download arrived damaged.]"
+
+#: ../../crates/core/src/failure.rs:146
+msgid "Couldn't save helpers. Is the disk full?"
+msgstr "[Couldn't save helpers. Is the disk full?]"
 
 #: ../../crates/integrations/src/discord.rs:28
 msgid "Play song"

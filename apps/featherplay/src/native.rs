@@ -954,6 +954,16 @@ const PRIVATE_FORMATS: [&str; 3] = [
 /// Puts a secret (the local API's token) on the clipboard as text, kept out of the
 /// clipboard history and the cloud clipboard.
 pub fn copy_secret(text: &str) -> Result<(), String> {
+    copy(text, true)
+}
+
+/// Puts `text` on the clipboard, as Ctrl+C in a text field does.
+pub fn copy_text(text: &str) -> Result<(), String> {
+    copy(text, false)
+}
+
+/// `copy_secret` when `private`, else `copy_text`.
+fn copy(text: &str, private: bool) -> Result<(), String> {
     let utf16: Vec<u16> = text.encode_utf16().chain([0]).collect();
     let bytes: Vec<u8> = utf16.iter().flat_map(|u| u.to_ne_bytes()).collect();
     // SAFETY: the clipboard is opened, filled with memory this function allocates and
@@ -969,7 +979,8 @@ pub fn copy_secret(text: &str) -> Result<(), String> {
             Err("the clipboard couldn't be emptied".to_string())
         } else {
             set_clipboard(CF_UNICODETEXT, &bytes).and_then(|()| {
-                for name in PRIVATE_FORMATS {
+                let private_formats = if private { &PRIVATE_FORMATS[..] } else { &[] };
+                for name in private_formats {
                     let wide: Vec<u16> = name.encode_utf16().chain([0]).collect();
                     let format = RegisterClipboardFormatW(wide.as_ptr());
                     // A DWORD of 0: "no" for the two Can… formats; any data for the first.

@@ -1083,7 +1083,7 @@ impl Player {
         self.failures.push(failure.kind);
         self.phase = Phase::Empty;
         self.stream = None;
-        if failure.kind == FailKind::Setup {
+        if matches!(failure.kind, FailKind::Setup(_)) {
             // The next songs would fail the same way: stay on this one, so Play tries again.
             self.stop(failure.detail, out);
             return;

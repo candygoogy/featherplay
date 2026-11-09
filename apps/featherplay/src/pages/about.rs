@@ -223,6 +223,15 @@ pub fn init(ctx: &Rc<Ctx>) {
     data.on_copied(move || c.toast(tr!("Diagnostics copied")));
 }
 
+/// What the button below does, from elsewhere (the failed helpers download's toast): the
+/// same text on the clipboard, then the same "Diagnostics copied".
+pub fn copy_diagnostics(ctx: &Rc<Ctx>) {
+    match crate::native::copy_text(&diagnostics(ctx)) {
+        Ok(()) => ctx.toast(tr!("Diagnostics copied")),
+        Err(e) => log!("copy diagnostics: {e}"),
+    }
+}
+
 /// The diagnostics text: what's known now, with the account's state but never its name.
 fn diagnostics(ctx: &Ctx) -> String {
     let settings = Settings::load(&Paths::resolve());

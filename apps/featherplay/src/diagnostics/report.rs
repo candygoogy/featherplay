@@ -16,6 +16,10 @@ pub struct Report {
     pub lastfm: bool,
     pub listenbrainz: bool,
     pub discord: bool,
+    /// The proxy requests go through, without credentials; `None`: none.
+    pub proxy: Option<String>,
+    /// How the last helpers download failed (`SidecarError::summary`); `None`: it didn't.
+    pub helpers: Option<String>,
     /// The last resolver errors, oldest first, each with its time.
     pub errors: Vec<String>,
 }
@@ -34,7 +38,9 @@ impl Report {
              Signed in: {}\n\
              Last.fm: {}\n\
              ListenBrainz: {}\n\
-             Discord: {}\n",
+             Discord: {}\n\
+             Proxy: {}\n\
+             Last helpers download error: {}\n",
             self.version,
             self.windows,
             known(&self.ytdlp),
@@ -44,6 +50,8 @@ impl Report {
             on(self.lastfm),
             on(self.listenbrainz),
             on(self.discord),
+            self.proxy.as_deref().unwrap_or("none"),
+            self.helpers.as_deref().unwrap_or("none"),
         );
         if self.errors.is_empty() {
             out.push_str("Recent resolver errors: none\n");
@@ -75,6 +83,8 @@ mod tests {
             lastfm: true,
             listenbrainz: false,
             discord: true,
+            proxy: None,
+            helpers: None,
             errors: vec![
                 "14:03:11 abc: yt-dlp failed (1): ERROR: one\nsecond line".into(),
                 "14:05:00 def: unavailable: private video".into(),
@@ -122,6 +132,28 @@ mod tests {
         .text();
         assert!(text.contains("Output device: System default"), "{text}");
         assert!(text.contains("Recent resolver errors: none"), "{text}");
+    }
+
+    #[test]
+    fn the_proxy_and_the_last_helpers_error_have_their_lines() {
+        let text = Report {
+            proxy: Some("http://proxy.corp:3128".into()),
+            helpers: Some("blocked, os error 32".into()),
+            ..report()
+        }
+        .text();
+        for line in [
+            "Proxy: http://proxy.corp:3128",
+            "Last helpers download error: blocked, os error 32",
+        ] {
+            assert!(text.lines().any(|l| l == line), "no {line:?} in\n{text}");
+        }
+        let text = report().text();
+        assert!(text.contains("Proxy: none\n"), "{text}");
+        assert!(
+            text.contains("Last helpers download error: none\n"),
+            "{text}"
+        );
     }
 
     #[test]

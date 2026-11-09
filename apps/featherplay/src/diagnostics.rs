@@ -46,6 +46,8 @@ static LOG: OnceLock<Sender<Msg>> = OnceLock::new();
 /// The yt-dlp and Deno versions, once read.
 static TOOLS: Mutex<(Option<String>, Option<String>)> = Mutex::new((None, None));
 static RECENT: Mutex<VecDeque<String>> = Mutex::new(VecDeque::new());
+/// How the last helpers download failed (`SidecarError::summary`).
+static HELPERS: Mutex<Option<String>> = Mutex::new(None);
 
 /// `{cache}/logs`: the log, the one before it and the crash files.
 pub fn log_dir(paths: &Paths) -> PathBuf {
@@ -216,10 +218,17 @@ pub fn resolve_failed(id: &str, took_secs: f64, msg: &str) {
     recent.push_back(format!("{} {id}: {msg}", Stamp::now().time()));
 }
 
+/// The helpers download failed: Copy diagnostics names its kind, host, HTTP status and os
+/// error (the log has the rest, from `featherplay-streams`).
+pub fn helpers_failed(e: &featherplay_streams::SidecarError) {
+    *HELPERS.lock_or_recover() = Some(e.summary());
+}
+
 /// What Copy diagnostics says now. `signed_in` only: the account itself never reaches it.
 pub fn report(signed_in: bool, settings: &Settings) -> Report {
     let (ytdlp, deno) = TOOLS.lock_or_recover().clone();
     let errors = RECENT.lock_or_recover().iter().cloned().collect();
+    let helpers = HELPERS.lock_or_recover().clone();
     Report {
         version: env!("CARGO_PKG_VERSION").to_string(),
         windows: windows().to_string(),
@@ -230,6 +239,8 @@ pub fn report(signed_in: bool, settings: &Settings) -> Report {
         lastfm: settings.scrobbling && settings.lastfm_enabled,
         listenbrainz: settings.scrobbling && settings.listenbrainz_enabled,
         discord: settings.discord,
+        proxy: featherplay_streams::https_proxy().map(|p| p.to_string()),
+        helpers,
         errors,
     }
 }

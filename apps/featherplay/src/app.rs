@@ -523,6 +523,13 @@ pub fn on_event(ev: UiEvent) {
             }
             None => toast::show_error(&ctx, text),
         },
+        // Songs can't start until the helpers are there: an error toast, as for a stop.
+        UiEvent::HelpersFailed(text) => toast::show_error_with(
+            &ctx,
+            text,
+            tr!("Copy diagnostics"),
+            pages::about::copy_diagnostics,
+        ),
         UiEvent::Release(release) => pages::about::show_update(&ctx, Some(&release)),
         UiEvent::Toast(text) => toast::show(&ctx, text),
         UiEvent::ToastError(text) => toast::show_error(&ctx, text),

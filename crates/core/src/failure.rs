@@ -14,7 +14,34 @@ pub enum FailKind {
     Other,
     /// The helpers (yt-dlp and deno) couldn't be downloaded: every song would fail the same
     /// way until they are, so the player stops on this one instead of skipping on.
-    Setup,
+    Setup(HelperFault),
+}
+
+/// Why the helpers couldn't be downloaded, which picks the toast's words.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum HelperFault {
+    /// No connection, a name that didn't resolve, a timeout or an HTTP error, from every
+    /// source.
+    Unreachable,
+    /// A new file stayed locked ("access denied" or "in use") through the retries, or
+    /// vanished right after it was saved: antivirus, usually.
+    Blocked,
+    /// A download didn't match its pinned sha256.
+    Damaged,
+    /// The disk is full, or the helpers' folder can't be written to.
+    NoSpace,
+}
+
+impl HelperFault {
+    /// For the log and Copy diagnostics.
+    pub fn name(self) -> &'static str {
+        match self {
+            HelperFault::Unreachable => "unreachable",
+            HelperFault::Blocked => "blocked",
+            HelperFault::Damaged => "damaged",
+            HelperFault::NoSpace => "no space",
+        }
+    }
 }
 
 /// A track that failed: its kind, and the raw text for the log (never shown).
@@ -42,15 +69,20 @@ pub enum StopCause {
     Broken,
     Other,
     /// The helpers couldn't be downloaded.
-    Setup,
+    Setup(HelperFault),
 }
 
 /// The cause of a stop after the failures in `streak` (oldest first). One broken resolve
 /// is enough: the songs around it were likely caught by the same change. A failed helpers
 /// download decides over that: the songs before it may have failed for the same reason.
+/// The latest one says why.
 pub fn stop_cause(streak: &[FailKind]) -> StopCause {
-    if streak.contains(&FailKind::Setup) {
-        StopCause::Setup
+    let setup = streak.iter().rev().find_map(|k| match k {
+        FailKind::Setup(fault) => Some(*fault),
+        _ => None,
+    });
+    if let Some(fault) = setup {
+        StopCause::Setup(fault)
     } else if streak.contains(&FailKind::Broken) {
         StopCause::Broken
     } else if !streak.is_empty() && streak.iter().all(|k| *k == FailKind::Unavailable) {
@@ -70,8 +102,8 @@ pub enum Notice {
     /// The song is gone.
     Unavailable,
     CouldNotPlay,
-    /// The helpers couldn't be downloaded. The next song played tries again.
-    HelpersFailed,
+    /// The helpers couldn't be downloaded, and why. The next song played tries again.
+    HelpersFailed(HelperFault),
 }
 
 /// The toast while a first run downloads the helpers and a song waits for them.
@@ -87,7 +119,7 @@ pub fn notice(cause: StopCause, helpers_tried: bool) -> Notice {
         StopCause::Broken => Notice::Updating,
         StopCause::Unavailable => Notice::Unavailable,
         StopCause::Other => Notice::CouldNotPlay,
-        StopCause::Setup => Notice::HelpersFailed,
+        StopCause::Setup(fault) => Notice::HelpersFailed(fault),
     }
 }
 
@@ -101,8 +133,17 @@ impl Notice {
             Notice::UpdateNeeded => crate::tr!("Songs can't play. featherplay may need an update."),
             Notice::Unavailable => crate::tr!("This song isn't available."),
             Notice::CouldNotPlay => crate::tr!("Couldn't play this song. Check your connection."),
-            Notice::HelpersFailed => {
-                crate::tr!("Couldn't download helpers. Check your connection.")
+            Notice::HelpersFailed(HelperFault::Unreachable) => {
+                crate::tr!("Couldn't download helpers. Check VPN or proxy.")
+            }
+            Notice::HelpersFailed(HelperFault::Blocked) => {
+                crate::tr!("Your antivirus may have blocked the helpers.")
+            }
+            Notice::HelpersFailed(HelperFault::Damaged) => {
+                crate::tr!("A helper download arrived damaged.")
+            }
+            Notice::HelpersFailed(HelperFault::NoSpace) => {
+                crate::tr!("Couldn't save helpers. Is the disk full?")
             }
         }
     }

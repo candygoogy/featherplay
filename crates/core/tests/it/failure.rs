@@ -1,6 +1,9 @@
-use featherplay_core::failure::{FailKind, Notice, StopCause, getting_ready, notice, stop_cause};
+use featherplay_core::failure::{
+    FailKind, HelperFault, Notice, StopCause, getting_ready, notice, stop_cause,
+};
 
 use FailKind::{Broken, Other, Setup, Unavailable};
+use HelperFault::{Blocked, Damaged, NoSpace, Unreachable};
 
 #[test]
 fn a_broken_resolver_in_the_streak_makes_the_stop_broken() {
@@ -26,14 +29,33 @@ fn anything_else_stops_as_other() {
 
 #[test]
 fn a_failed_helpers_download_makes_the_stop_setup() {
-    assert_eq!(stop_cause(&[Setup]), StopCause::Setup);
-    assert_eq!(stop_cause(&[Unavailable, Broken, Setup]), StopCause::Setup);
+    assert_eq!(
+        stop_cause(&[Setup(Unreachable)]),
+        StopCause::Setup(Unreachable)
+    );
+    assert_eq!(
+        stop_cause(&[Unavailable, Broken, Setup(Blocked)]),
+        StopCause::Setup(Blocked)
+    );
 }
 
 #[test]
-fn a_setup_stop_says_the_helpers_didnt_download() {
-    for tried in [false, true] {
-        assert_eq!(notice(StopCause::Setup, tried), Notice::HelpersFailed);
+fn the_last_helpers_failure_says_why_they_didnt_download() {
+    assert_eq!(
+        stop_cause(&[Setup(Unreachable), Other, Setup(Damaged)]),
+        StopCause::Setup(Damaged)
+    );
+}
+
+#[test]
+fn a_setup_stop_says_why_the_helpers_didnt_download() {
+    for fault in [Unreachable, Blocked, Damaged, NoSpace] {
+        for tried in [false, true] {
+            assert_eq!(
+                notice(StopCause::Setup(fault), tried),
+                Notice::HelpersFailed(fault)
+            );
+        }
     }
 }
 
@@ -62,7 +84,10 @@ fn notices_are_plain_words_without_tool_names() {
         Notice::UpdateNeeded,
         Notice::Unavailable,
         Notice::CouldNotPlay,
-        Notice::HelpersFailed,
+        Notice::HelpersFailed(Unreachable),
+        Notice::HelpersFailed(Blocked),
+        Notice::HelpersFailed(Damaged),
+        Notice::HelpersFailed(NoSpace),
     ]
     .map(Notice::text)
     .into_iter()
@@ -93,8 +118,20 @@ fn the_wording_says_what_happened_and_what_happens_next() {
         "Couldn't play this song. Check your connection."
     );
     assert_eq!(
-        Notice::HelpersFailed.text(),
-        "Couldn't download helpers. Check your connection."
+        Notice::HelpersFailed(Unreachable).text(),
+        "Couldn't download helpers. Check VPN or proxy."
+    );
+    assert_eq!(
+        Notice::HelpersFailed(Blocked).text(),
+        "Your antivirus may have blocked the helpers."
+    );
+    assert_eq!(
+        Notice::HelpersFailed(Damaged).text(),
+        "A helper download arrived damaged."
+    );
+    assert_eq!(
+        Notice::HelpersFailed(NoSpace).text(),
+        "Couldn't save helpers. Is the disk full?"
     );
     assert_eq!(
         getting_ready(),
