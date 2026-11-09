@@ -20,6 +20,7 @@ use std::fs::OpenOptions;
 use std::io::{BufRead, BufReader, Write};
 use std::path::Path;
 use std::process::{Command, Stdio};
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use crate::StreamSource;
@@ -507,6 +508,9 @@ struct NewConnections;
 
 static NEW_CONNECTIONS: NewConnections = NewConnections;
 
+/// The connections opened to stream servers so far.
+static STREAM_CONNECTIONS: AtomicU32 = AtomicU32::new(0);
+
 impl log::Log for NewConnections {
     fn enabled(&self, m: &log::Metadata) -> bool {
         m.target().starts_with("reqwest") || m.target().starts_with("featherplay")
@@ -514,12 +518,211 @@ impl log::Log for NewConnections {
     fn log(&self, r: &log::Record) {
         let msg = r.args().to_string();
         if msg.starts_with("starting new connection") {
+            if msg.contains(".googlevideo.com") {
+                STREAM_CONNECTIONS.fetch_add(1, Ordering::Relaxed);
+            }
             println!("  new connection");
         } else if r.target().starts_with("featherplay") {
             println!("  {msg}");
         }
     }
     fn flush(&self) {}
+}
+
+/// The rows of a `TIMING_STREAMS` file: `url, mime, length` and, for `timing_click`, the
+/// track's id.
+fn read_streams(path: &str) -> Vec<(StreamSource, String)> {
+    std::fs::read_to_string(path)
+        .expect("TIMING_STREAMS")
+        .lines()
+        .filter_map(|l| {
+            let f: Vec<&str> = l.split('\t').collect();
+            (f.len() >= 3).then(|| {
+                let src = StreamSource {
+                    url: f[0].into(),
+                    mime: f[1].into(),
+                    content_length: f[2].parse().ok(),
+                    duration: None,
+                    loudness_db: None,
+                };
+                (src, f.get(3).copied().unwrap_or_default().to_string())
+            })
+        })
+        .collect()
+}
+
+/// `scheme://host` of a URL.
+fn server(url: &str) -> &str {
+    let host = url.find("://").map_or(0, |i| i + 3);
+    let end = url[host..].find(['/', '?']).map_or(url.len(), |i| host + i);
+    &url[..end]
+}
+
+/// Cold clicks as the app makes them, on a null output: an engine that's there already,
+/// the stream's resolve, then load + play until `Started`, with the engine's own steps
+/// (`FirstSound`) and the connections opened to stream servers on the way. The engine goes
+/// at `Started`, which stops the download: one `Range` request per click.
+///
+/// - `TIMING_STREAMS` (as for `timing_start`, with the track's id as a fourth column):
+///   streams resolved earlier. The first row is loaded once before the clicks and not
+///   counted, as a process's first request also pays for DNS and the TLS library's start.
+///   Each click says whether its stream is on the server most of these rows are on.
+/// - `TIMING_PREPARED=n`: the next `n` rows are clicked `TIMING_GAP` ms (default 100) and
+///   2 s after a prefetch, a hovered and a prepared start (two requests each).
+/// - `TIMING_SAVED=n`: the next `n` rows are clicked cold without a resolve: a wait of
+///   `TIMING_RESOLVE_MS` (default 400) stands in for it.
+/// - `TIMING_IDS`: cold clicks with the player's resolve (`YtDlpResolver::resolve`, signed
+///   out), one live resolve each.
+/// - `TIMING_CONNECT=1`: at each cold click the engine opens a connection to that server
+///   while the resolve runs (`AudioEngine::connect`), as the app does.
+///
+/// Rows go to `{TIMING_OUT}/click.csv`; a click that fails says why in its last column.
+#[test]
+#[ignore = "live: one Range request per click, and one resolve per TIMING_IDS entry"]
+fn timing_click() {
+    use featherplay_core::model::TrackId;
+    use featherplay_streams::{Sidecars, StreamResolver, YtDlpResolver};
+
+    let _ = log::set_logger(&NEW_CONNECTIONS);
+    log::set_max_level(log::LevelFilter::Debug);
+    let home = std::path::PathBuf::from(env("FEATHERPLAY_HOME").expect("set FEATHERPLAY_HOME"));
+    let out = std::path::PathBuf::from(env("TIMING_OUT").expect("set TIMING_OUT"));
+    std::fs::create_dir_all(&out).unwrap();
+    let label = env("TIMING_LABEL").unwrap_or_else(|| "click".into());
+    let count = |name: &str| env(name).map_or(0, |n| n.parse::<usize>().unwrap());
+    let millis =
+        |name: &str, or: u64| Duration::from_millis(env(name).map_or(or, |ms| ms.parse().unwrap()));
+    let gap = millis("TIMING_GAP", 100);
+    let stand_in = millis("TIMING_RESOLVE_MS", 400);
+    let connect = env("TIMING_CONNECT").is_some();
+    let streams = read_streams(&env("TIMING_STREAMS").expect("set TIMING_STREAMS"));
+    let servers: Vec<&str> = streams.iter().map(|(s, _)| server(&s.url)).collect();
+    let likely = servers
+        .iter()
+        .copied()
+        .max_by_key(|s| servers.iter().filter(|o| *o == s).count())
+        .expect("a row in TIMING_STREAMS");
+    let sidecars = Sidecars {
+        dir: home.join("sidecars"),
+    };
+    let resolver = YtDlpResolver::new(sidecars, None);
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(2)
+        .enable_all()
+        .build()
+        .unwrap();
+    let tmp = home.join("tmp");
+    let mut csv = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(out.join("click.csv"))
+        .unwrap();
+    if csv.metadata().unwrap().len() == 0 {
+        writeln!(
+            csv,
+            "label,kind,id,likely_server,resolve_ms,click_to_sound_ms,\
+             total,open,at_hand,decoder,fill,output,stream_connections,failed"
+        )
+        .unwrap();
+    }
+    // One click on a new engine, after `prep` ran on it: `stream` gives the stream (the
+    // resolve, or one at hand), then load and play until `Started`.
+    let mut click = |kind: &str,
+                     id: &str,
+                     prep: &dyn Fn(&crate::AudioEngine),
+                     stream: &dyn Fn() -> Result<StreamSource, String>| {
+        let engine = crate::AudioEngine::new_null(tmp.clone());
+        let events = engine.events();
+        prep(&engine);
+        let before = STREAM_CONNECTIONS.load(Ordering::Relaxed);
+        let t = Instant::now();
+        if connect && matches!(kind, "saved" | "cold") {
+            engine.connect(likely);
+        }
+        let started = stream().and_then(|src| {
+            let resolved = t.elapsed();
+            engine.load(src.clone(), Duration::ZERO);
+            engine.play();
+            loop {
+                match events.recv_timeout(Duration::from_secs(20)) {
+                    Ok(crate::AudioEvent::Started) => break,
+                    Ok(crate::AudioEvent::Error(e)) => return Err(e),
+                    Ok(_) => {}
+                    Err(_) => return Err("no Started".into()),
+                }
+            }
+            Ok((src, resolved, t.elapsed()))
+        });
+        let connections = STREAM_CONNECTIONS.load(Ordering::Relaxed) - before;
+        let row = match started {
+            Ok((src, resolved, sound)) => {
+                let f = engine.first_sound().expect("first sound");
+                format!(
+                    "{label},{kind},{id},{},{},{},{},{},{},{},{},{},{connections},",
+                    server(&src.url) == likely,
+                    resolved.as_millis(),
+                    sound.as_millis(),
+                    f.total.as_millis(),
+                    f.open.as_millis(),
+                    f.at_hand,
+                    f.decoder.as_millis(),
+                    f.fill.as_millis(),
+                    f.output.as_millis(),
+                )
+            }
+            Err(e) => {
+                // Without the URL an error may name.
+                let why = e.split("http").next().unwrap_or_default().replace(',', ";");
+                format!("{label},{kind},{id},,,,,,,,,,{connections},{}", why.trim())
+            }
+        };
+        drop(engine);
+        println!("{row}");
+        writeln!(csv, "{row}").unwrap();
+    };
+    let mut rows = streams.iter();
+    if let Some((src, id)) = rows.next() {
+        click("first", id, &|_| {}, &|| Ok(src.clone()));
+    }
+    for (src, id) in rows.by_ref().take(count("TIMING_PREPARED")) {
+        let ahead = |wait: Duration| {
+            move |e: &crate::AudioEngine| {
+                e.prefetch(src);
+                std::thread::sleep(wait);
+            }
+        };
+        click("hovered", id, &ahead(gap), &|| Ok(src.clone()));
+        click("prepared", id, &ahead(Duration::from_secs(2)), &|| {
+            Ok(src.clone())
+        });
+    }
+    for (src, id) in rows.by_ref().take(count("TIMING_SAVED")) {
+        click("saved", id, &|_| {}, &|| {
+            std::thread::sleep(stand_in);
+            Ok(src.clone())
+        });
+    }
+    let ids: Vec<String> = env("TIMING_IDS")
+        .map(|v| v.split(',').map(|s| s.trim().to_string()).collect())
+        .unwrap_or_default();
+    for (i, id) in ids.iter().enumerate() {
+        if i > 0 {
+            // Spread the live resolves out a little.
+            std::thread::sleep(Duration::from_secs(5));
+        }
+        click("cold", id, &|_| {}, &|| {
+            let s = rt
+                .block_on(resolver.resolve(&TrackId(id.clone())))
+                .map_err(|e| format!("resolve: {e:?}"))?;
+            Ok(StreamSource {
+                url: s.url,
+                mime: s.mime,
+                content_length: s.content_length,
+                duration: None,
+                loudness_db: None,
+            })
+        });
+    }
 }
 
 /// The engine's own time from `load` to `Started`, step by step (`FirstSound`), on streams
@@ -542,21 +745,11 @@ fn timing_start() {
     let tmp = out.join("tmp");
     let label = env("TIMING_LABEL").unwrap_or_else(|| "start".into());
     let device = env("TIMING_DEVICE").is_some();
-    let rows = std::fs::read_to_string(env("TIMING_STREAMS").expect("set TIMING_STREAMS"))
-        .expect("TIMING_STREAMS");
-    let streams: Vec<StreamSource> = rows
-        .lines()
-        .filter_map(|l| {
-            let f: Vec<&str> = l.split('\t').collect();
-            (f.len() >= 3).then(|| StreamSource {
-                url: f[0].into(),
-                mime: f[1].into(),
-                content_length: f[2].parse().ok(),
-                duration: None,
-                loudness_db: None,
-            })
-        })
-        .collect();
+    let streams: Vec<StreamSource> =
+        read_streams(&env("TIMING_STREAMS").expect("set TIMING_STREAMS"))
+            .into_iter()
+            .map(|(src, _)| src)
+            .collect();
     let rt = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(1)
         .enable_all()
