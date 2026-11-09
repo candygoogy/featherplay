@@ -103,10 +103,13 @@ featherplay finds each song's audio with two helper programs,
 the first run it downloads them from their GitHub releases and checks each file against a
 SHA256 written into featherplay's code; a file that doesn't match is deleted, not run. When
 GitHub can't be reached, it gets yt-dlp from featherplay's site and Deno from Deno's own
-download server instead, checked the same way. It goes through the proxy set in Windows'
-settings, if there is one. After that it updates yt-dlp at most once a day, because YouTube
-changes often. They live in
+download server instead, checked the same way. After that it updates yt-dlp at most once a
+day, because YouTube changes often. They live in
 `%LOCALAPPDATA%\featherplay\sidecars`.
+
+Behind a proxy, featherplay and its helpers go through the one Windows is set to use
+(Settings > Network > Proxy): the one "Automatically detect settings" finds, else the
+setup script's, else the proxy set by hand. `HTTPS_PROXY` comes before all three.
 
 ### Signing in
 

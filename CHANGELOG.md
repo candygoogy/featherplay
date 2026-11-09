@@ -6,6 +6,17 @@ Notable changes to featherplay, newest first. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- featherplay follows a proxy script (PAC) and "Automatically detect settings" from
+  Windows' settings (Network > Proxy), which work and school networks often use. The order
+  is Windows' own: auto-detect, then the script, then the proxy set by hand. `HTTPS_PROXY`
+  still comes before all three. The proxy is looked up in the background and used once
+  it's found, so featherplay starts and plays as fast as before on a network without one.
+  yt-dlp goes through the same proxy, and the log and **Copy diagnostics** say where the
+  proxy came from: the environment, Windows' manual setting, the script (its server's name
+  only) or auto-detect.
+
 ### Changed
 
 - Settings > Discord: the profile preview now sits beside the options from the window's

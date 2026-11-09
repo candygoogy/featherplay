@@ -28,6 +28,7 @@ A Cargo workspace. The app is `apps/featherplay`; the rest are libraries it uses
 | `crates/streams` | Stream URLs for tracks: one InnerTube request of its own, else the yt-dlp sidecar. Also downloads and checks the yt-dlp and Deno sidecars. |
 | `crates/audio` | The audio engine on its own thread: 1 MiB `Range` downloads into a temp file, AAC/MP4 decoding with Symphonia, output through rodio and cpal. |
 | `crates/store` | What's kept on disk and in the OS: paths, settings, the saved session, Credential Manager secrets and the Library's cache. |
+| `crates/proxy` | Which proxy a request goes through: the environment, else Windows' auto-detection, proxy script or manual proxy, looked up in the background. Every HTTP client is built from its `client()`. |
 | `crates/lyrics` | The LRC format and the LRCLIB lookup. No cache, no retries. |
 | `crates/lastfm` | The Last.fm client: request signing, the desktop auth flow, scrobbling and the offline queue. |
 | `crates/listenbrainz` | The ListenBrainz client: `submit-listens` (now playing, single listens, the offline queue) and `validate-token`. |

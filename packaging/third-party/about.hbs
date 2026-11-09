@@ -20,6 +20,9 @@ cargo about generate --offline -c packaging/third-party/about.toml --workspace -
 featherplay downloads both from their GitHub releases into `%LOCALAPPDATA%\featherplay\sidecars`
 (yt-dlp 2026.10.26 and Deno 2.9.8) and checks each file against a SHA256 hash pinned in
 featherplay's code (`crates/streams/src/sidecars.rs`); a file that doesn't match is deleted.
+When GitHub can't be reached, the same yt-dlp comes from featherplay's site (unchanged, under
+the same hash) and Deno from Deno's own download server, dl.deno.land, whose zip has its own
+pinned hash.
 After that, yt-dlp updates itself with its own updater (`yt-dlp -U`) at most once a day. They
 are separate programs that featherplay runs; they are not linked into it.
 
