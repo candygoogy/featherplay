@@ -85,6 +85,59 @@ fn hover(scene: &Scene, x: f32, y: f32) {
     scene.settle();
 }
 
+/// The top bar's height and the room the player bar takes at the bottom: the page shows
+/// between them.
+const TOP_BAR: f32 = 64.0;
+const BAR_CLEAR: f32 = 98.0;
+
+/// One step of the wheel over the page, `notches` of 60 px (down for negative), run to its
+/// end. The clock must be frozen (`offscreen::freeze_clock`).
+fn wheel(scene: &Scene, notches: f32) {
+    let w = scene.ui.window();
+    let size = w.size().to_logical(w.scale_factor());
+    // In the page's right padding: over no option, so nothing is hovered.
+    let at = LogicalPosition::new(size.width - 20.0, size.height / 2.0);
+    offscreen::wheel(w, at, notches);
+    offscreen::advance(Duration::from_millis(200));
+    scene.settle();
+}
+
+/// Wheels the page down `notches` at a time until `done`, `most` times at most. No further
+/// than asked: how far the options reach depends on the text's measures, which differ
+/// between PCs.
+fn wheel_down_until(scene: &Scene, notches: f32, most: usize, done: impl Fn() -> bool) -> bool {
+    for _ in 0..most {
+        if done() {
+            return true;
+        }
+        wheel(scene, -notches);
+    }
+    done()
+}
+
+/// Wheels down from the page's top until the Discord options come up from under the player
+/// bar.
+fn scroll_to_the_options(scene: &Scene) {
+    let up = || shown(scene, "Discord status").is_some();
+    assert!(
+        wheel_down_until(scene, 2.0, 60, up),
+        "the Discord options didn't come up"
+    );
+}
+
+/// Wheels on through the Discord options to the last one, whole above the player bar of a
+/// window `height` tall, and says where it is.
+fn scroll_on_to_the_last_option(scene: &Scene, height: u32) -> LogicalRect {
+    let last = "Listening to the song title";
+    let bar_top = height as f32 - BAR_CLEAR;
+    let whole = || shown(scene, last).is_some_and(|r| r.max_y() <= bar_top);
+    assert!(
+        wheel_down_until(scene, 0.25, 160, whole),
+        "the last option didn't come up"
+    );
+    find(scene, last)
+}
+
 #[test]
 fn hovering_an_option_lights_the_part_of_the_card_it_changes() {
     let scene = settings(1568, 3400);
@@ -155,7 +208,7 @@ fn the_card_shows_the_account_picture_while_signed_in() {
 #[test]
 fn the_discord_group_ends_with_its_rows() {
     // Tall enough for the Local API group under Discord.
-    let scene = settings(1568, 3600);
+    let scene = settings(1568, 4000);
     let discord = panel(&scene, "Discord");
     let local_api = panel(&scene, "Local API");
     assert!(
@@ -223,6 +276,110 @@ fn the_card_sits_above_the_options_in_a_narrow_window() {
     assert!(
         caption.max_x() < card.min_x() && (caption.min_x() - row.min_x()).abs() < 2.0,
         "the caption {caption:?} isn't left of the card {card:?}, under the options' edge"
+    );
+    // The options are under the card here, most of them a scroll away from it: the note
+    // doesn't send the pointer to them.
+    assert!(
+        shown(&scene, "The preview changes with the options below.").is_some()
+            && shown(&scene, "Hover an option to see what it changes.").is_none(),
+        "the note above the options isn't the one for this arrangement"
+    );
+}
+
+#[test]
+fn the_card_sits_beside_the_options_from_the_default_window_size_up() {
+    // 1280 wide is the size the window opens at: the page is 1040 px past the sidebar. And
+    // at every width from there up, the ones where the section index has come in and taken
+    // its room from the column too.
+    let height = 3800;
+    let scene = settings(1280, height);
+    let w = scene.ui.window();
+    for width in (1280..=1600).step_by(20) {
+        w.set_size(slint::PhysicalSize::new(width, height));
+        w.dispatch_event(WindowEvent::Resized {
+            size: slint::LogicalSize::new(width as f32, height as f32),
+        });
+        scene.settle();
+        let card = find(&scene, "Discord preview");
+        let row = find(&scene, "Discord status");
+        let switch =
+            shown_as(&scene, Some(AccessibleRole::Switch), "Discord status").expect("switch");
+        assert!(
+            card.min_x() > switch.max_x() && (card.min_y() - row.min_y()).abs() < 60.0,
+            "{width} px wide: the card {card:?} isn't beside the options, level with the \
+             first {row:?} and right of its switch {switch:?}"
+        );
+    }
+    // Beside the options, the note says what hovering them does.
+    assert!(
+        shown(&scene, "Hover an option to see what it changes.").is_some(),
+        "no note about hovering beside the options"
+    );
+}
+
+#[test]
+fn the_card_stays_in_view_at_the_default_window_size() {
+    let (width, height) = (1280, 800);
+    let scene = settings(width, height);
+    offscreen::freeze_clock();
+    let bar_top = height as f32 - BAR_CLEAR;
+    // Down until the first option has gone under the top bar: the card has stopped below it.
+    scroll_to_the_options(&scene);
+    let gone = || shown(&scene, "Discord status").is_none();
+    assert!(
+        wheel_down_until(&scene, 0.25, 160, gone),
+        "the first option hasn't scrolled away"
+    );
+    let (card, row) = (find(&scene, "Discord preview"), find(&scene, "Time"));
+    // It's held where it is, not carried along and brought back: the options scroll on and
+    // the card doesn't move at all.
+    for _ in 0..4 {
+        wheel(&scene, -0.25);
+    }
+    let (held, moved) = (find(&scene, "Discord preview"), find(&scene, "Time"));
+    assert!(
+        (row.min_y() - moved.min_y() - 60.0).abs() < 1.0,
+        "the options didn't scroll 60 px: {row:?} to {moved:?}"
+    );
+    assert!(
+        (held.min_y() - card.min_y()).abs() < 0.05,
+        "the card moved with the scroll: {card:?} to {held:?}"
+    );
+
+    // On to the last option, the furthest from where the card starts: the card is still
+    // beside it, whole between the bars.
+    let row = scroll_on_to_the_last_option(&scene, height);
+    let card = find(&scene, "Discord preview");
+    assert!(
+        card.min_x() > row.max_x(),
+        "the card {card:?} isn't right of the last option {row:?}"
+    );
+    assert!(
+        card.min_y() >= TOP_BAR && card.max_y() <= bar_top,
+        "the card {card:?} isn't whole on the page while the last option {row:?} is"
+    );
+}
+
+#[test]
+fn the_card_keeps_its_end_on_the_page_in_a_short_window() {
+    // 600 px, the least the window allows: the page shows 438 px between the bars, less
+    // than the card is tall.
+    let (width, height) = (1280, 600);
+    let scene = settings(width, height);
+    offscreen::freeze_clock();
+    let bar_top = height as f32 - BAR_CLEAR;
+    scroll_to_the_options(&scene);
+    let row = scroll_on_to_the_last_option(&scene, height);
+    let card = find(&scene, "Discord preview");
+    assert!(
+        card.min_x() > row.max_x(),
+        "the card {card:?} isn't right of the last option {row:?}"
+    );
+    // Its end, the activity the options change, stays above the player bar; the banner at
+    // its top is what goes under the top bar.
+    assert!(
+        card.max_y() <= bar_top && card.max_y() > bar_top - 80.0,
+        "the card {card:?} doesn't end just above the player bar, at {bar_top}"
     );
 }
 
