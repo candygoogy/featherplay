@@ -36,7 +36,7 @@
 //! # The job object
 //! The browser starts suspended, joins a job object with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`
 //! and only then runs, so it and every helper process it starts are in the job. When the
-//! app lets go of the job (`Edge` dropped), or the app crashes or is killed and Windows
+//! app lets go of the job (`Running` dropped), or the app crashes or is killed and Windows
 //! closes the handle, everything in the job ends.
 
 use std::ffi::{OsStr, OsString};
@@ -150,13 +150,13 @@ fn quote(arg: &OsStr) -> Vec<u16> {
 }
 
 /// The running browser. Dropping it closes the job, which ends whatever is still in it.
-pub struct Edge {
+pub struct Running {
     process: OwnedHandle,
     job: OwnedHandle,
     pub pid: u32,
 }
 
-impl Edge {
+impl Running {
     /// The browser's own process has exited (its helpers may linger a moment).
     pub fn exited(&self) -> bool {
         self.wait(Duration::ZERO)
@@ -188,7 +188,7 @@ pub struct Pipes {
 
 /// Starts `exe` with `args` and the pipe, suspended, in a kill-on-close job, then lets it
 /// run.
-pub fn launch(exe: &Path, args: &[OsString]) -> io::Result<(Edge, Pipes)> {
+pub fn launch(exe: &Path, args: &[OsString]) -> io::Result<(Running, Pipes)> {
     let (browser_read, to_browser) = pipe()?;
     let (from_browser, browser_write) = pipe()?;
     let plan = plan(
@@ -223,7 +223,7 @@ pub fn launch(exe: &Path, args: &[OsString]) -> io::Result<(Edge, Pipes)> {
         return Err(e);
     }
     Ok((
-        Edge { process, job, pid },
+        Running { process, job, pid },
         Pipes {
             to_browser: File::from(to_browser),
             from_browser: File::from(from_browser),

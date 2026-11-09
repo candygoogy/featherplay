@@ -31,7 +31,7 @@ it.
 - The Edge sign-in's temporary profile. "Use Microsoft Edge" runs Edge with a new profile in
   `%LOCALAPPDATA%\featherplay\cache\signin-*`, keeps only the YouTube Music session from it
   and deletes the folder afterwards; a start deletes any that a crash left behind
-  (`apps/featherplay/src/pages/sign_in/edge/profile.rs`). A way to make it keep more than
+  (`apps/featherplay/src/pages/sign_in/browser/profile.rs`). A way to make it keep more than
   that session, or outlive the sign-in, is in scope.
 - The local listeners, both off by default and on 127.0.0.1 only. The local API (port 26538)
   answers only requests that carry its token, name the loopback address as their host, and

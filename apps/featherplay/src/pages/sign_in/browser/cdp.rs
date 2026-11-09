@@ -156,7 +156,7 @@ pub fn cookies(result: serde_json::Value) -> Result<Vec<Cookie>, String> {
 pub fn read_replies(mut from: impl Read + Send + 'static) -> io::Result<Receiver<Reply>> {
     let (tx, rx) = mpsc::channel();
     std::thread::Builder::new()
-        .name("featherplay-edge-pipe".into())
+        .name("featherplay-browser-pipe".into())
         .spawn(move || {
             let mut frames = Frames::default();
             let mut buf = vec![0u8; 64 * 1024];

@@ -73,9 +73,9 @@ webview2-com = { workspace = true }
 # The title bar, an opaque surface repainted when Windows drops it, the window icon,
 # the animation setting; the sign-in window
 # (COM, HiDpi) and opening the Last.fm approval page (Shell); the Windows build for the
-# log and the diagnostics (Registry, already on for `featherplay-integrations`). The Edge
-# sign-in: its two pipes (Pipes) and the job object that ends Edge with the app
-# (JobObjects); finding Edge (Registry).
+# log and the diagnostics (Registry, already on for `featherplay-integrations`). The browser
+# sign-in: its two pipes (Pipes) and the job object that ends the browser with the app
+# (JobObjects); finding the browser (Registry).
 windows = { workspace = true, features = [
     "Win32_Foundation",
     "Win32_Graphics_Dwm",

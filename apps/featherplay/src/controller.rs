@@ -427,8 +427,8 @@ impl Controller {
         if cleared > 0 {
             log!("removed {cleared} stale temp file(s)");
         }
-        // And an Edge sign-in's temporary profile.
-        crate::pages::sign_in::sweep_edge_profiles(&paths.cache);
+        // And a browser sign-in's temporary profile.
+        crate::pages::sign_in::sweep_browser_profiles(&paths.cache);
         let audio = AudioEngine::new(settings.output_device.as_deref(), paths.cache.join("tmp"))?;
         let player = Player::new(prefs(&settings));
 

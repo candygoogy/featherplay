@@ -1,6 +1,6 @@
 //! What a signed-in YouTube Music session looks like, and the `cookie:` header made from a
-//! browser's cookies. Both sign-ins use it: the WebView2 window (`webview`) and Microsoft
-//! Edge (`edge`), so the controller gets the same header either way.
+//! browser's cookies. Both sign-ins use it: the WebView2 window (`webview`) and the
+//! user's own browser (`browser`), so the controller gets the same header either way.
 //!
 //! The header is what a browser would send to `https://music.youtube.com/`: every cookie
 //! that applies to that URL (RFC 6265 §5.4: the domain matches, or equals the host for a
