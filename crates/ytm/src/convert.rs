@@ -1486,14 +1486,26 @@ fn feed_page(raw: &str) -> Result<Vec<HomeShelf>, ApiError> {
     shelves_page(raw, |shelf| !music_videos_only(shelf))
 }
 
-/// Home's "Music videos for you": every card a music video on a 16:9 thumbnail. It's built
-/// around the picture, and featherplay plays only the sound (intros, skits and effects
-/// included). Told by its cards, not its title, which follows the UI language; a genre's
-/// shelf with a music video among other cards stays.
+/// Home's "Music videos for you": it offers Play all (a watch endpoint behind its header's
+/// button), and every card is a video on a 16:9 thumbnail, music videos and the odd user
+/// upload. It's built around the picture, and featherplay plays only the sound (intros,
+/// skits and effects included). Told by its shape, not its title, which follows the UI
+/// language. "Forgotten favorites", also all videos, offers no Play all (each card starts
+/// its own radio), and stays; so do Quick picks (rows, not cards), a daily discover's Play
+/// all over square song cards, and a genre's shelf
+/// (other cards beside its music videos, and More rather than Play all).
 fn music_videos_only(shelf: &Value) -> bool {
-    let Some(cards) = shelf
-        .get("musicCarouselShelfRenderer")
-        .and_then(|r| r.get("contents"))
+    let Some(r) = shelf.get("musicCarouselShelfRenderer") else {
+        return false;
+    };
+    let play_all = r
+        .pointer("/header/musicCarouselShelfBasicHeaderRenderer/moreContentButton/buttonRenderer/navigationEndpoint")
+        .is_some_and(|e| e.get("watchEndpoint").is_some());
+    if !play_all {
+        return false;
+    }
+    let Some(cards) = r
+        .get("contents")
         .and_then(Value::as_array)
         .filter(|c| !c.is_empty())
     else {
@@ -1510,7 +1522,7 @@ fn music_videos_only(shelf: &Value) -> bool {
             .and_then(|w| w.pointer(MUSIC_VIDEO_TYPE))
             .and_then(Value::as_str)
             .map(video_type);
-        wide && kind == Some(VideoType::MusicVideo)
+        wide && matches!(kind, Some(VideoType::MusicVideo | VideoType::UserVideo))
     })
 }
 

@@ -269,7 +269,7 @@ fn home_parses_shelves() {
 }
 
 /// "Music videos for you" (in the fixture's continuation, two of its cards) is left out:
-/// featherplay plays only the sound. It's told by its cards, music videos on 16:9
+/// featherplay plays only the sound. It's told by its shape, a Play all over videos on 16:9
 /// thumbnails, since its title follows the UI language. Its "Play all" goes with it.
 #[test]
 fn home_leaves_out_the_music_videos_shelf() {
@@ -307,6 +307,49 @@ fn home_keeps_a_shelf_with_other_cards_beside_music_videos() {
     let pages = [home_pages()[0].clone(), second.to_string()];
     let shelves = convert::home(&pages).expect("parse");
     assert!(shelves.iter().any(|s| s.title == "Music videos for you"));
+}
+
+/// "Forgotten favorites" on a first page and "Music videos for you" on its continuation,
+/// both every card a video on a 16:9 thumbnail, cut to a few cards. The last music video
+/// is a user upload, as in a feed where the shelf still showed.
+fn video_shelves_pages() -> Vec<Value> {
+    serde_json::from_str(&fixture("home_video_shelves")).expect("fixture")
+}
+
+fn video_shelves_titles(pages: &[Value]) -> Vec<String> {
+    let pages: Vec<String> = pages.iter().map(Value::to_string).collect();
+    let shelves = convert::home(&pages).expect("parse");
+    shelves.into_iter().map(|s| s.title).collect()
+}
+
+/// "Music videos for you" goes with a user upload among its music videos too: it's told by
+/// the Play all its header offers (a watch endpoint), which "Forgotten favorites" doesn't.
+#[test]
+fn home_leaves_out_the_music_videos_shelf_with_a_user_upload() {
+    let pages = video_shelves_pages();
+    let last_card = "/continuationContents/sectionListContinuation/contents/0/musicCarouselShelfRenderer/contents/3/musicTwoRowItemRenderer/navigationEndpoint/watchEndpoint/watchEndpointMusicSupportedConfigs/watchEndpointMusicConfig/musicVideoType";
+    assert_eq!(
+        pages[1].pointer(last_card),
+        Some(&json!("MUSIC_VIDEO_TYPE_UGC")),
+        "the fixture has a user upload in the shelf"
+    );
+    assert_eq!(video_shelves_titles(&pages), ["Forgotten favorites"]);
+}
+
+/// "Forgotten favorites" stays when every card is a music video on a 16:9 thumbnail: it
+/// offers no Play all.
+#[test]
+fn home_keeps_forgotten_favorites_of_music_videos_only() {
+    let mut pages = video_shelves_pages();
+    let cards = pages[0]
+        .pointer_mut("/contents/singleColumnBrowseResultsRenderer/tabs/0/tabRenderer/content/sectionListRenderer/contents/0/musicCarouselShelfRenderer/contents")
+        .and_then(Value::as_array_mut)
+        .expect("Forgotten favorites' cards");
+    for card in cards {
+        card["musicTwoRowItemRenderer"]["navigationEndpoint"]["watchEndpoint"]["watchEndpointMusicSupportedConfigs"]
+            ["watchEndpointMusicConfig"]["musicVideoType"] = json!("MUSIC_VIDEO_TYPE_OMV");
+    }
+    assert!(video_shelves_titles(&pages).contains(&"Forgotten favorites".to_string()));
 }
 
 #[test]

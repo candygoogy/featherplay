@@ -1,0 +1,681 @@
+[
+  {
+    "contents": {
+      "singleColumnBrowseResultsRenderer": {
+        "tabs": [
+          {
+            "tabRenderer": {
+              "content": {
+                "sectionListRenderer": {
+                  "contents": [
+                    {
+                      "musicCarouselShelfRenderer": {
+                        "header": {
+                          "musicCarouselShelfBasicHeaderRenderer": {
+                            "title": {
+                              "runs": [
+                                {
+                                  "text": "Forgotten favorites"
+                                }
+                              ]
+                            },
+                            "headerStyle": "MUSIC_CAROUSEL_SHELF_BASIC_HEADER_STYLE_DEFAULT"
+                          }
+                        },
+                        "contents": [
+                          {
+                            "musicTwoRowItemRenderer": {
+                              "thumbnailRenderer": {
+                                "musicThumbnailRenderer": {
+                                  "thumbnail": {
+                                    "thumbnails": [
+                                      {
+                                        "url": "https://i.ytimg.com/vi/WFfGf1-y1Bs/hqdefault.jpg?sqp=-oaymwEWCJADEOEBIAQqCggAEOADGC0guwJIWg&rs=AMzJL3k-GYrvF4TBsWlk5lO_s4fCzINIKg",
+                                        "width": 400,
+                                        "height": 225
+                                      },
+                                      {
+                                        "url": "https://i.ytimg.com/vi/WFfGf1-y1Bs/hq720.jpg?sqp=-oaymwEKCKAGEMIDIABIWg&rs=AMzJL3lPqh-xBsXuKU7hOkfhJSro8YqEOg",
+                                        "width": 800,
+                                        "height": 450
+                                      }
+                                    ]
+                                  },
+                                  "thumbnailCrop": "MUSIC_THUMBNAIL_CROP_UNSPECIFIED",
+                                  "thumbnailScale": "MUSIC_THUMBNAIL_SCALE_ASPECT_FILL"
+                                }
+                              },
+                              "aspectRatio": "MUSIC_TWO_ROW_ITEM_THUMBNAIL_ASPECT_RATIO_RECTANGLE_16_9",
+                              "title": {
+                                "runs": [
+                                  {
+                                    "text": "Where Is My Mind?"
+                                  }
+                                ]
+                              },
+                              "subtitle": {
+                                "runs": [
+                                  {
+                                    "text": "Tkay Maidza",
+                                    "navigationEndpoint": {
+                                      "browseEndpoint": {
+                                        "browseId": "UCFkVQfiDfhpTgXob8oqBRHg",
+                                        "browseEndpointContextSupportedConfigs": {
+                                          "browseEndpointContextMusicConfig": {
+                                            "pageType": "MUSIC_PAGE_TYPE_ARTIST"
+                                          }
+                                        }
+                                      }
+                                    }
+                                  },
+                                  {
+                                    "text": " • "
+                                  },
+                                  {
+                                    "text": "1.6M views"
+                                  }
+                                ]
+                              },
+                              "navigationEndpoint": {
+                                "watchEndpoint": {
+                                  "videoId": "WFfGf1-y1Bs",
+                                  "playlistId": "RDAMVMWFfGf1-y1Bs",
+                                  "params": "wAEB",
+                                  "watchEndpointMusicSupportedConfigs": {
+                                    "watchEndpointMusicConfig": {
+                                      "musicVideoType": "MUSIC_VIDEO_TYPE_OMV"
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          {
+                            "musicTwoRowItemRenderer": {
+                              "thumbnailRenderer": {
+                                "musicThumbnailRenderer": {
+                                  "thumbnail": {
+                                    "thumbnails": [
+                                      {
+                                        "url": "https://i.ytimg.com/vi/K17df81RL9Y/hqdefault.jpg?sqp=-oaymwEWCJADEOEBIAQqCggAEOADGC0guwJIWg&rs=AMzJL3k9VNaiKiigB9ZKP3zzYlJyQuz3nQ",
+                                        "width": 400,
+                                        "height": 225
+                                      },
+                                      {
+                                        "url": "https://i.ytimg.com/vi/K17df81RL9Y/hq720.jpg?sqp=-oaymwEKCKAGEMIDIABIWg&rs=AMzJL3nJWBdaIaCxuyACV0fcQ5K4--JMAw",
+                                        "width": 800,
+                                        "height": 450
+                                      }
+                                    ]
+                                  },
+                                  "thumbnailCrop": "MUSIC_THUMBNAIL_CROP_UNSPECIFIED",
+                                  "thumbnailScale": "MUSIC_THUMBNAIL_SCALE_ASPECT_FILL"
+                                }
+                              },
+                              "aspectRatio": "MUSIC_TWO_ROW_ITEM_THUMBNAIL_ASPECT_RATIO_RECTANGLE_16_9",
+                              "title": {
+                                "runs": [
+                                  {
+                                    "text": "Cure For Me"
+                                  }
+                                ]
+                              },
+                              "subtitle": {
+                                "runs": [
+                                  {
+                                    "text": "AURORA",
+                                    "navigationEndpoint": {
+                                      "browseEndpoint": {
+                                        "browseId": "UC4G-AJa7kn8oumI6TT2WXYw",
+                                        "browseEndpointContextSupportedConfigs": {
+                                          "browseEndpointContextMusicConfig": {
+                                            "pageType": "MUSIC_PAGE_TYPE_ARTIST"
+                                          }
+                                        }
+                                      }
+                                    }
+                                  },
+                                  {
+                                    "text": " • "
+                                  },
+                                  {
+                                    "text": "176M views"
+                                  }
+                                ]
+                              },
+                              "navigationEndpoint": {
+                                "watchEndpoint": {
+                                  "videoId": "K17df81RL9Y",
+                                  "playlistId": "RDAMVMK17df81RL9Y",
+                                  "params": "wAEB",
+                                  "watchEndpointMusicSupportedConfigs": {
+                                    "watchEndpointMusicConfig": {
+                                      "musicVideoType": "MUSIC_VIDEO_TYPE_OMV"
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          {
+                            "musicTwoRowItemRenderer": {
+                              "thumbnailRenderer": {
+                                "musicThumbnailRenderer": {
+                                  "thumbnail": {
+                                    "thumbnails": [
+                                      {
+                                        "url": "https://i.ytimg.com/vi/uks5ZvmHqes/hqdefault.jpg?sqp=-oaymwEWCJADEOEBIAQqCggAEOADGC0guwJIWg&rs=AMzJL3lgmGCOGsztGTZePeP0fS9rJIXe9w",
+                                        "width": 400,
+                                        "height": 225
+                                      },
+                                      {
+                                        "url": "https://i.ytimg.com/vi/uks5ZvmHqes/hq720.jpg?sqp=-oaymwEKCKAGEMIDIABIWg&rs=AMzJL3mBTTPe4XLohOJ_PAJgPz0WO8fMtw",
+                                        "width": 800,
+                                        "height": 450
+                                      }
+                                    ]
+                                  },
+                                  "thumbnailCrop": "MUSIC_THUMBNAIL_CROP_UNSPECIFIED",
+                                  "thumbnailScale": "MUSIC_THUMBNAIL_SCALE_ASPECT_FILL"
+                                }
+                              },
+                              "aspectRatio": "MUSIC_TWO_ROW_ITEM_THUMBNAIL_ASPECT_RATIO_RECTANGLE_16_9",
+                              "title": {
+                                "runs": [
+                                  {
+                                    "text": "The Kid LAROI - NIGHTS LIKE THIS [Slowed + Reverb + Looped to Perfection]"
+                                  }
+                                ]
+                              },
+                              "subtitle": {
+                                "runs": [
+                                  {
+                                    "text": "All Tunes",
+                                    "navigationEndpoint": {
+                                      "browseEndpoint": {
+                                        "browseId": "UCAhxB8Tx_sxknSKgOAtzvNg",
+                                        "params": "ggMEgAKKBA%3D%3D",
+                                        "browseEndpointContextSupportedConfigs": {
+                                          "browseEndpointContextMusicConfig": {
+                                            "pageType": "MUSIC_PAGE_TYPE_USER_CHANNEL"
+                                          }
+                                        }
+                                      }
+                                    }
+                                  },
+                                  {
+                                    "text": " • "
+                                  },
+                                  {
+                                    "text": "710K views"
+                                  }
+                                ]
+                              },
+                              "navigationEndpoint": {
+                                "watchEndpoint": {
+                                  "videoId": "uks5ZvmHqes",
+                                  "playlistId": "RDAMVMuks5ZvmHqes",
+                                  "params": "wAEB",
+                                  "watchEndpointMusicSupportedConfigs": {
+                                    "watchEndpointMusicConfig": {
+                                      "musicVideoType": "MUSIC_VIDEO_TYPE_UGC"
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          {
+                            "musicTwoRowItemRenderer": {
+                              "thumbnailRenderer": {
+                                "musicThumbnailRenderer": {
+                                  "thumbnail": {
+                                    "thumbnails": [
+                                      {
+                                        "url": "https://i.ytimg.com/vi/VBvDOy1jK7o/hqdefault.jpg?sqp=-oaymwEWCJADEOEBIAQqCggAEOADGC0guwJIWg&rs=AMzJL3lnuYcdRTjuLbw9WIcKkhyzsPbwAg",
+                                        "width": 400,
+                                        "height": 225
+                                      },
+                                      {
+                                        "url": "https://i.ytimg.com/vi/VBvDOy1jK7o/hq720.jpg?sqp=-oaymwEKCKAGEMIDIABIWg&rs=AMzJL3ncXGjtBU_rk6NzQhixQHpgf3QZdw",
+                                        "width": 800,
+                                        "height": 450
+                                      }
+                                    ]
+                                  },
+                                  "thumbnailCrop": "MUSIC_THUMBNAIL_CROP_UNSPECIFIED",
+                                  "thumbnailScale": "MUSIC_THUMBNAIL_SCALE_ASPECT_FILL"
+                                }
+                              },
+                              "aspectRatio": "MUSIC_TWO_ROW_ITEM_THUMBNAIL_ASPECT_RATIO_RECTANGLE_16_9",
+                              "title": {
+                                "runs": [
+                                  {
+                                    "text": "LXSTGARDEN - ROYALTY FUNK (ULTRA SLOWED + REVERB)"
+                                  }
+                                ]
+                              },
+                              "subtitle": {
+                                "runs": [
+                                  {
+                                    "text": "Baldwin Sounds",
+                                    "navigationEndpoint": {
+                                      "browseEndpoint": {
+                                        "browseId": "UCdTdHFi3k-VJycSTgpSyAgw",
+                                        "params": "ggMEgAKKBA%3D%3D",
+                                        "browseEndpointContextSupportedConfigs": {
+                                          "browseEndpointContextMusicConfig": {
+                                            "pageType": "MUSIC_PAGE_TYPE_USER_CHANNEL"
+                                          }
+                                        }
+                                      }
+                                    }
+                                  },
+                                  {
+                                    "text": " • "
+                                  },
+                                  {
+                                    "text": "69K views"
+                                  }
+                                ]
+                              },
+                              "navigationEndpoint": {
+                                "watchEndpoint": {
+                                  "videoId": "VBvDOy1jK7o",
+                                  "playlistId": "RDAMVMVBvDOy1jK7o",
+                                  "params": "wAEB",
+                                  "watchEndpointMusicSupportedConfigs": {
+                                    "watchEndpointMusicConfig": {
+                                      "musicVideoType": "MUSIC_VIDEO_TYPE_UGC"
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          {
+                            "musicTwoRowItemRenderer": {
+                              "thumbnailRenderer": {
+                                "musicThumbnailRenderer": {
+                                  "thumbnail": {
+                                    "thumbnails": [
+                                      {
+                                        "url": "https://i.ytimg.com/vi/-FFtLo-sQXQ/hqdefault.jpg?sqp=-oaymwEWCJADEOEBIAQqCggAEOADGC0guwJIWg&rs=AMzJL3mUVBGKCFIIH39wJeT6AWsG-Hk7lA",
+                                        "width": 400,
+                                        "height": 225
+                                      },
+                                      {
+                                        "url": "https://i.ytimg.com/vi/-FFtLo-sQXQ/hq720.jpg?sqp=-oaymwEKCKAGEMIDIABIWg&rs=AMzJL3mhJUWvexi0Cyfx6cmFVLoUYCGtpA",
+                                        "width": 800,
+                                        "height": 450
+                                      }
+                                    ]
+                                  },
+                                  "thumbnailCrop": "MUSIC_THUMBNAIL_CROP_UNSPECIFIED",
+                                  "thumbnailScale": "MUSIC_THUMBNAIL_SCALE_ASPECT_FILL"
+                                }
+                              },
+                              "aspectRatio": "MUSIC_TWO_ROW_ITEM_THUMBNAIL_ASPECT_RATIO_RECTANGLE_16_9",
+                              "title": {
+                                "runs": [
+                                  {
+                                    "text": "ANDROMEDA - NO FEAR [Slowed + Reverb + Looped to Perfection]"
+                                  }
+                                ]
+                              },
+                              "subtitle": {
+                                "runs": [
+                                  {
+                                    "text": "All Tunes",
+                                    "navigationEndpoint": {
+                                      "browseEndpoint": {
+                                        "browseId": "UCAhxB8Tx_sxknSKgOAtzvNg",
+                                        "params": "ggMEgAKKBA%3D%3D",
+                                        "browseEndpointContextSupportedConfigs": {
+                                          "browseEndpointContextMusicConfig": {
+                                            "pageType": "MUSIC_PAGE_TYPE_USER_CHANNEL"
+                                          }
+                                        }
+                                      }
+                                    }
+                                  },
+                                  {
+                                    "text": " • "
+                                  },
+                                  {
+                                    "text": "1.6M views"
+                                  }
+                                ]
+                              },
+                              "navigationEndpoint": {
+                                "watchEndpoint": {
+                                  "videoId": "-FFtLo-sQXQ",
+                                  "playlistId": "RDAMVM-FFtLo-sQXQ",
+                                  "params": "wAEB",
+                                  "watchEndpointMusicSupportedConfigs": {
+                                    "watchEndpointMusicConfig": {
+                                      "musicVideoType": "MUSIC_VIDEO_TYPE_UGC"
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        ],
+                        "itemSize": "COLLECTION_STYLE_ITEM_SIZE_MEDIUM"
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  {
+    "continuationContents": {
+      "sectionListContinuation": {
+        "contents": [
+          {
+            "musicCarouselShelfRenderer": {
+              "header": {
+                "musicCarouselShelfBasicHeaderRenderer": {
+                  "title": {
+                    "runs": [
+                      {
+                        "text": "Music videos for you"
+                      }
+                    ]
+                  },
+                  "headerStyle": "MUSIC_CAROUSEL_SHELF_BASIC_HEADER_STYLE_DEFAULT",
+                  "moreContentButton": {
+                    "buttonRenderer": {
+                      "style": "STYLE_TEXT",
+                      "text": {
+                        "runs": [
+                          {
+                            "text": "Play all"
+                          }
+                        ]
+                      },
+                      "navigationEndpoint": {
+                        "watchEndpoint": {
+                          "videoId": "yqDufHrvn9k"
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "contents": [
+                {
+                  "musicTwoRowItemRenderer": {
+                    "thumbnailRenderer": {
+                      "musicThumbnailRenderer": {
+                        "thumbnail": {
+                          "thumbnails": [
+                            {
+                              "url": "https://i.ytimg.com/vi/yqDufHrvn9k/hqdefault.jpg?sqp=-oaymwEWCJADEOEBIAQqCggAEOADGC0guwJIWg&rs=AMzJL3k-SsWDwDXc7_tUvrFh5n9vZYu4Qw",
+                              "width": 400,
+                              "height": 225
+                            },
+                            {
+                              "url": "https://i.ytimg.com/vi/yqDufHrvn9k/hq720.jpg?sqp=-oaymwEKCKAGEMIDIABIWg&rs=AMzJL3mEO4W_LLY5I7-adCNkMXpW4WJ54g",
+                              "width": 800,
+                              "height": 450
+                            }
+                          ]
+                        },
+                        "thumbnailCrop": "MUSIC_THUMBNAIL_CROP_UNSPECIFIED",
+                        "thumbnailScale": "MUSIC_THUMBNAIL_SCALE_ASPECT_FILL"
+                      }
+                    },
+                    "aspectRatio": "MUSIC_TWO_ROW_ITEM_THUMBNAIL_ASPECT_RATIO_RECTANGLE_16_9",
+                    "title": {
+                      "runs": [
+                        {
+                          "text": "Exitin"
+                        }
+                      ]
+                    },
+                    "subtitle": {
+                      "runs": [
+                        {
+                          "text": "Cece Natalie",
+                          "navigationEndpoint": {
+                            "browseEndpoint": {
+                              "browseId": "UCYm8ZroPrMIE-SvoYj97i8Q",
+                              "browseEndpointContextSupportedConfigs": {
+                                "browseEndpointContextMusicConfig": {
+                                  "pageType": "MUSIC_PAGE_TYPE_ARTIST"
+                                }
+                              }
+                            }
+                          }
+                        },
+                        {
+                          "text": " • "
+                        },
+                        {
+                          "text": "1.1M views"
+                        }
+                      ]
+                    },
+                    "navigationEndpoint": {
+                      "watchEndpoint": {
+                        "videoId": "yqDufHrvn9k",
+                        "watchEndpointMusicSupportedConfigs": {
+                          "watchEndpointMusicConfig": {
+                            "musicVideoType": "MUSIC_VIDEO_TYPE_OMV"
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                {
+                  "musicTwoRowItemRenderer": {
+                    "thumbnailRenderer": {
+                      "musicThumbnailRenderer": {
+                        "thumbnail": {
+                          "thumbnails": [
+                            {
+                              "url": "https://i.ytimg.com/vi/ZJXM4mCDL8I/hqdefault.jpg?sqp=-oaymwEWCJADEOEBIAQqCggAEOADGC0guwJIWg&rs=AMzJL3nCSP_ZIulDk-ZgRw7LBcWd3LEcSg",
+                              "width": 400,
+                              "height": 225
+                            },
+                            {
+                              "url": "https://i.ytimg.com/vi/ZJXM4mCDL8I/hq720.jpg?sqp=-oaymwEKCKAGEMIDIABIWg&rs=AMzJL3lH8-B13hsiyxdZJuctL_Lyy2yHOg",
+                              "width": 800,
+                              "height": 450
+                            }
+                          ]
+                        },
+                        "thumbnailCrop": "MUSIC_THUMBNAIL_CROP_UNSPECIFIED",
+                        "thumbnailScale": "MUSIC_THUMBNAIL_SCALE_ASPECT_FILL"
+                      }
+                    },
+                    "aspectRatio": "MUSIC_TWO_ROW_ITEM_THUMBNAIL_ASPECT_RATIO_RECTANGLE_16_9",
+                    "title": {
+                      "runs": [
+                        {
+                          "text": "I Don't Care"
+                        }
+                      ]
+                    },
+                    "subtitle": {
+                      "runs": [
+                        {
+                          "text": "VIOLENT VIRA",
+                          "navigationEndpoint": {
+                            "browseEndpoint": {
+                              "browseId": "UC_eXSMPZQmRaMmK99U7I-7g",
+                              "browseEndpointContextSupportedConfigs": {
+                                "browseEndpointContextMusicConfig": {
+                                  "pageType": "MUSIC_PAGE_TYPE_ARTIST"
+                                }
+                              }
+                            }
+                          }
+                        },
+                        {
+                          "text": " • "
+                        },
+                        {
+                          "text": "8.7M views"
+                        }
+                      ]
+                    },
+                    "navigationEndpoint": {
+                      "watchEndpoint": {
+                        "videoId": "ZJXM4mCDL8I",
+                        "watchEndpointMusicSupportedConfigs": {
+                          "watchEndpointMusicConfig": {
+                            "musicVideoType": "MUSIC_VIDEO_TYPE_OMV"
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                {
+                  "musicTwoRowItemRenderer": {
+                    "thumbnailRenderer": {
+                      "musicThumbnailRenderer": {
+                        "thumbnail": {
+                          "thumbnails": [
+                            {
+                              "url": "https://i.ytimg.com/vi/wxTRruWVcpI/hqdefault.jpg?sqp=-oaymwEWCJADEOEBIAQqCggAEOADGC0guwJIWg&rs=AMzJL3lDYDnKdMHK9WKOfGWEwukol0b4iA",
+                              "width": 400,
+                              "height": 225
+                            },
+                            {
+                              "url": "https://i.ytimg.com/vi/wxTRruWVcpI/hq720.jpg?sqp=-oaymwEKCKAGEMIDIABIWg&rs=AMzJL3mnL_IIqFTxGu1B1KAYLFanF_9OXQ",
+                              "width": 800,
+                              "height": 450
+                            }
+                          ]
+                        },
+                        "thumbnailCrop": "MUSIC_THUMBNAIL_CROP_UNSPECIFIED",
+                        "thumbnailScale": "MUSIC_THUMBNAIL_SCALE_ASPECT_FILL"
+                      }
+                    },
+                    "aspectRatio": "MUSIC_TWO_ROW_ITEM_THUMBNAIL_ASPECT_RATIO_RECTANGLE_16_9",
+                    "title": {
+                      "runs": [
+                        {
+                          "text": "Favorite (Official Video)"
+                        }
+                      ]
+                    },
+                    "subtitle": {
+                      "runs": [
+                        {
+                          "text": "Isabel LaRosa",
+                          "navigationEndpoint": {
+                            "browseEndpoint": {
+                              "browseId": "UCtrY01QWo40b4Dsv2yA8Uyw",
+                              "browseEndpointContextSupportedConfigs": {
+                                "browseEndpointContextMusicConfig": {
+                                  "pageType": "MUSIC_PAGE_TYPE_ARTIST"
+                                }
+                              }
+                            }
+                          }
+                        },
+                        {
+                          "text": " • "
+                        },
+                        {
+                          "text": "36M views"
+                        }
+                      ]
+                    },
+                    "navigationEndpoint": {
+                      "watchEndpoint": {
+                        "videoId": "wxTRruWVcpI",
+                        "watchEndpointMusicSupportedConfigs": {
+                          "watchEndpointMusicConfig": {
+                            "musicVideoType": "MUSIC_VIDEO_TYPE_OMV"
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                {
+                  "musicTwoRowItemRenderer": {
+                    "thumbnailRenderer": {
+                      "musicThumbnailRenderer": {
+                        "thumbnail": {
+                          "thumbnails": [
+                            {
+                              "url": "https://i.ytimg.com/vi/uqV1OdIm3HY/hqdefault.jpg?sqp=-oaymwEWCJADEOEBIAQqCggAEOADGC0guwJIWg&rs=AMzJL3kILNQZ5nLx0gXPmKSwfam-cagkCQ",
+                              "width": 400,
+                              "height": 225
+                            },
+                            {
+                              "url": "https://i.ytimg.com/vi/uqV1OdIm3HY/hq720.jpg?sqp=-oaymwEKCKAGEMIDIABIWg&rs=AMzJL3nqhZwhRYUlwXefS9az3o7v0jtERw",
+                              "width": 800,
+                              "height": 450
+                            }
+                          ]
+                        },
+                        "thumbnailCrop": "MUSIC_THUMBNAIL_CROP_UNSPECIFIED",
+                        "thumbnailScale": "MUSIC_THUMBNAIL_SCALE_ASPECT_FILL"
+                      }
+                    },
+                    "aspectRatio": "MUSIC_TWO_ROW_ITEM_THUMBNAIL_ASPECT_RATIO_RECTANGLE_16_9",
+                    "title": {
+                      "runs": [
+                        {
+                          "text": "Вирус - Попрошу тебя (hardstyle remix) (OUT ON ALL PLATFORMS)"
+                        }
+                      ]
+                    },
+                    "subtitle": {
+                      "runs": [
+                        {
+                          "text": "BRZ",
+                          "navigationEndpoint": {
+                            "browseEndpoint": {
+                              "browseId": "UCStbe8nowlzENZncQdpiq6w",
+                              "browseEndpointContextSupportedConfigs": {
+                                "browseEndpointContextMusicConfig": {
+                                  "pageType": "MUSIC_PAGE_TYPE_ARTIST"
+                                }
+                              }
+                            }
+                          }
+                        },
+                        {
+                          "text": " • "
+                        },
+                        {
+                          "text": "46M views"
+                        }
+                      ]
+                    },
+                    "navigationEndpoint": {
+                      "watchEndpoint": {
+                        "videoId": "uqV1OdIm3HY",
+                        "watchEndpointMusicSupportedConfigs": {
+                          "watchEndpointMusicConfig": {
+                            "musicVideoType": "MUSIC_VIDEO_TYPE_UGC"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              ],
+              "itemSize": "COLLECTION_STYLE_ITEM_SIZE_MEDIUM"
+            }
+          }
+        ]
+      }
+    }
+  }
+]
