@@ -14,6 +14,22 @@ Notable changes to featherplay, newest first. The format follows
   an alert sign and stays 5 seconds instead of 3. A new toast while one shows brings its
   line in, so the change is seen.
 
+### Fixed
+
+- The first run's helpers download works behind a proxy. featherplay, and yt-dlp with it,
+  now go through the proxy set in Windows' settings (Network > Proxy, "Use a proxy server"),
+  as they already did through `HTTPS_PROXY`. A proxy script or "Automatically detect
+  settings" isn't read yet.
+- The helpers download tries harder before it gives up. A download that can't connect,
+  times out, is cut off or meets a server error is tried twice more, and a new file that
+  antivirus is still scanning is waited for, up to about 6 seconds. When GitHub can't be
+  reached, yt-dlp comes from featherplay's site and Deno from Deno's own download server,
+  each checked against a SHA256 pinned in featherplay's code, as GitHub's are.
+- When the helpers still can't be downloaded, the toast says why: no connection ("Check VPN
+  or proxy"), antivirus, a damaged download or a full disk. Its **Copy diagnostics** button
+  copies what Settings > About's does, which now also names the proxy and how the last
+  helpers download failed.
+
 ## [0.2.0] - 2026-11-09
 
 ### Added
