@@ -9,6 +9,8 @@ description = "featherplay's Windows integrations: media controls, taskbar butto
 publish = false
 
 [dependencies]
+# The HTTP client follows the proxy settings (`featherplay_proxy::client`).
+featherplay-proxy = { path = "../proxy" }
 # Rich presence over Discord's local IPC pipe.
 discord-rich-presence = { workspace = true }
 featherplay-core = { path = "../core" }

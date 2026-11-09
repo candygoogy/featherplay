@@ -9,6 +9,8 @@ description = "featherplay's lyrics: the LRC format and the LRCLIB lookup"
 publish = false
 
 [dependencies]
+# The HTTP client follows the proxy settings (`featherplay_proxy::client`).
+featherplay-proxy = { path = "../proxy" }
 # The workspace's reqwest over the system TLS, like the other crates: no second TLS stack.
 reqwest = { workspace = true, features = ["native-tls"] }
 serde = { workspace = true }

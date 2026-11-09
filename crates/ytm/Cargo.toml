@@ -9,6 +9,8 @@ description = "featherplay's YouTube Music client: the catalogue and library ove
 publish = false
 
 [dependencies]
+# The HTTP client follows the proxy settings (`featherplay_proxy::client`).
+featherplay-proxy = { path = "../proxy" }
 featherplay-core = { path = "../core" }
 # native-tls, like the other crates: the default (rustls + aws-lc) is a second TLS stack.
 # `reqwest`: hands ytmapi-rs our own client, which carries the identity headers.

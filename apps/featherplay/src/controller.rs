@@ -332,11 +332,10 @@ impl Controller {
             paths.config.display(),
             paths.cache.display()
         );
-        // The proxy every HTTP client and yt-dlp go through, without its credentials.
-        match featherplay_streams::https_proxy() {
-            Some(p) => log!("proxy: {p}"),
-            None => log!("proxy: none"),
-        }
+        // The proxy the HTTP clients and yt-dlp go through, and where it came from. A proxy
+        // script or auto-detection is asked from here on, in the background, and logs its
+        // answer itself (`featherplay_proxy`).
+        log!("proxy: {}", featherplay_proxy::summary());
 
         // A dev build may point at helpers elsewhere.
         let sidecars = std::env::var_os("FEATHERPLAY_SIDECARS_DIR")

@@ -28,7 +28,7 @@ pub(crate) const READ_TIMEOUT: Duration = Duration::from_secs(15);
 /// link: a request fails when no byte comes for `read_timeout`, and the download goes on
 /// from the byte it reached (`download.rs`).
 pub(crate) fn stream_client(read_timeout: Duration) -> reqwest::Result<reqwest::Client> {
-    reqwest::Client::builder()
+    featherplay_proxy::client()
         .connect_timeout(CONNECT_TIMEOUT)
         .read_timeout(read_timeout)
         .build()

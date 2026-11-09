@@ -10,12 +10,12 @@ use tokio::sync::Notify;
 use crate::chain::{Chain, Check, Steps};
 use crate::expiry::query_param;
 use crate::native::{NativeError, NativeResolver};
-use crate::proxy::{Proxy, https_proxy};
 use crate::sidecars::{Installer, tail};
 use crate::{
     Ahead, Downloads, Quality, ResolveError, ResolvedStream, Sidecars, StreamResolver,
     expires_at_from_url,
 };
+use featherplay_proxy::Proxy;
 
 const RESOLVE_TIMEOUT: Duration = Duration::from_secs(45);
 
@@ -154,15 +154,16 @@ pub struct YtDlpResolver {
     checks: OnceLock<Option<reqwest::Client>>,
     /// The `Quality` resolves ask for (`set_quality`), as `quality_to_u8`.
     quality: AtomicU8,
-    /// yt-dlp's `--proxy`: the proxy the HTTP clients took when the resolver was made.
-    proxy: Option<Proxy>,
+    /// yt-dlp's `--proxy`: the proxy the HTTP clients take for YouTube Music, asked at each
+    /// run, as a proxy script's or auto-detection's answer comes after the start.
+    proxy: fn() -> Option<Proxy>,
 }
 
 impl YtDlpResolver {
     pub fn new(sidecars: Sidecars, cookie_header: Option<String>) -> Self {
         let native = NativeResolver::new(sidecars.dir.clone());
         Self {
-            proxy: https_proxy(),
+            proxy: || featherplay_proxy::for_url(featherplay_proxy::YOUTUBE),
             ..Self::with_native(sidecars, cookie_header, native)
         }
     }
@@ -186,7 +187,7 @@ impl YtDlpResolver {
             installer: None,
             checks: OnceLock::new(),
             quality: AtomicU8::new(quality_to_u8(Quality::default())),
-            proxy: None,
+            proxy: || None,
         }
     }
 
@@ -386,7 +387,9 @@ impl YtDlpResolver {
         if let Some(a) = extractor_args {
             cmd.arg("--extractor-args").arg(a);
         }
-        if let Some(p) = self.proxy.as_ref().and_then(Proxy::argument) {
+        if let Some(proxy) = (self.proxy)()
+            && let Some(p) = proxy.argument()
+        {
             cmd.arg("--proxy").arg(p);
         }
         cmd.arg(format!("https://music.youtube.com/watch?v={}", id.0));
@@ -503,7 +506,7 @@ const CHECK_TIMEOUT: Duration = Duration::from_secs(3);
 /// The client for `first_byte`: like the engine's (no User-Agent), and keeping no
 /// connection idle, so no reaper timer runs while paused.
 fn check_client() -> Option<reqwest::Client> {
-    reqwest::Client::builder()
+    featherplay_proxy::client()
         .connect_timeout(CHECK_TIMEOUT)
         .pool_max_idle_per_host(0)
         .build()
@@ -1091,8 +1094,8 @@ mod tests {
         }
     }
 
-    /// Behind a proxy (Windows' or `HTTPS_PROXY`), yt-dlp goes through the same one as the
-    /// HTTP clients.
+    /// Behind a proxy, yt-dlp goes through the one the HTTP clients take when its run
+    /// starts: a script's or auto-detection's answer may have come since the resolver was made.
     #[test]
     fn a_proxy_is_handed_to_yt_dlp() {
         let mut r = YtDlpResolver::with_native(
@@ -1106,7 +1109,7 @@ mod tests {
         let args = command_args(&r.command(&id, None, None, Quality::High));
         assert!(!args.iter().any(|a| a == "--proxy"), "{args:?}");
 
-        r.proxy = crate::proxy::parse("http://proxy.corp:3128");
+        r.proxy = || Proxy::parse("http://proxy.corp:3128");
         let args = command_args(&r.command(&id, None, None, Quality::High));
         assert!(
             args.windows(2)

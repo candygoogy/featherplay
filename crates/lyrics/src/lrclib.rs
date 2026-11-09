@@ -310,7 +310,7 @@ impl LrcLib {
     /// A client of an LRCLIB at `base` (`…/api/`): another instance, or a local stand-in
     /// in tests.
     pub fn with_base(base: &str) -> Result<LrcLib, Error> {
-        let client = reqwest::Client::builder()
+        let client = featherplay_proxy::client()
             .user_agent(USER_AGENT)
             .timeout(TIMEOUT)
             .redirect(redirect_policy())

@@ -251,7 +251,7 @@ pub fn report(signed_in: bool, settings: &Settings) -> Report {
         lastfm: settings.scrobbling && settings.lastfm_enabled,
         listenbrainz: settings.scrobbling && settings.listenbrainz_enabled,
         discord: settings.discord,
-        proxy: featherplay_streams::https_proxy().map(|p| p.to_string()),
+        proxy: Some(featherplay_proxy::summary()),
         helpers,
         sign_in_save: SIGN_IN_SAVE.lock_or_recover().clone(),
         errors,

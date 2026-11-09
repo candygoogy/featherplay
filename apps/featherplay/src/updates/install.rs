@@ -365,7 +365,7 @@ impl Origin {
     /// The client for GitHub's API (`releases/latest`, the issue search): HTTPS only, or
     /// plain HTTP to the test server.
     pub fn api_client(&self, timeout: Duration) -> Result<reqwest::Client, String> {
-        let builder = reqwest::Client::builder()
+        let builder = featherplay_proxy::client()
             .user_agent(concat!("featherplay/", env!("CARGO_PKG_VERSION")))
             .timeout(timeout);
         #[cfg(test)]
@@ -389,7 +389,7 @@ impl Origin {
     }
 
     fn client(&self) -> Result<reqwest::Client, String> {
-        let builder = reqwest::Client::builder()
+        let builder = featherplay_proxy::client()
             .user_agent(concat!("featherplay/", env!("CARGO_PKG_VERSION")))
             .connect_timeout(CONNECT_TIMEOUT)
             .read_timeout(READ_TIMEOUT);

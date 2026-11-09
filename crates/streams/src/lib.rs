@@ -11,7 +11,6 @@
 mod chain;
 mod expiry;
 mod native;
-mod proxy;
 mod sidecars;
 mod ytdlp;
 
@@ -23,7 +22,6 @@ use featherplay_core::failure::HelperFault;
 use featherplay_core::model::TrackId;
 
 pub use expiry::expires_at_from_url;
-pub use proxy::{Proxy, https_proxy};
 pub use sidecars::{Downloads, Sidecars};
 pub use ytdlp::{Probe, YtDlpResolver, classify_failure, parse_ytdlp_json};
 

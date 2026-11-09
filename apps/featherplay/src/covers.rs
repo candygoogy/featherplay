@@ -755,7 +755,7 @@ impl DiskCache {
     fn new(dir: PathBuf) -> DiskCache {
         DiskCache {
             dir,
-            client: reqwest::Client::builder()
+            client: featherplay_proxy::client()
                 .timeout(std::time::Duration::from_secs(20))
                 .build()
                 .unwrap_or_default(),

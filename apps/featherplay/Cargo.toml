@@ -32,6 +32,7 @@ featherplay-integrations = { path = "../../crates/integrations" }
 featherplay-lastfm = { path = "../../crates/lastfm" }
 featherplay-listenbrainz = { path = "../../crates/listenbrainz" }
 featherplay-lyrics = { path = "../../crates/lyrics" }
+featherplay-proxy = { path = "../../crates/proxy" }
 featherplay-store = { path = "../../crates/store" }
 featherplay-streams = { path = "../../crates/streams" }
 featherplay-ytm = { path = "../../crates/ytm" }

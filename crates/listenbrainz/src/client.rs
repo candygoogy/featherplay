@@ -100,7 +100,7 @@ impl ListenBrainz {
         root: &str,
         timeout: Duration,
     ) -> Result<ListenBrainz, ListenBrainzError> {
-        let http = reqwest::Client::builder()
+        let http = featherplay_proxy::client()
             .connect_timeout(CONNECT_TIMEOUT)
             .timeout(timeout)
             .user_agent(USER_AGENT)

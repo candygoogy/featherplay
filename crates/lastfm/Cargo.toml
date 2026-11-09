@@ -9,6 +9,8 @@ description = "featherplay's Last.fm client: request signing, desktop auth, scro
 publish = false
 
 [dependencies]
+# The HTTP client follows the proxy settings (`featherplay_proxy::client`).
+featherplay-proxy = { path = "../proxy" }
 featherplay-core = { path = "../core" }
 md-5 = { workspace = true }
 reqwest = { workspace = true, features = ["native-tls", "form"] }

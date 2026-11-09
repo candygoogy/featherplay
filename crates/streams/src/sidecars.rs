@@ -200,7 +200,7 @@ impl Downloads {
     /// fails the download instead of holding the resolves waiting on it. The client goes
     /// with the download, and its timers with it.
     fn client(&self) -> Result<reqwest::Client, ResolveError> {
-        let builder = reqwest::Client::builder()
+        let builder = featherplay_proxy::client()
             .user_agent(concat!("featherplay/", env!("CARGO_PKG_VERSION")))
             .connect_timeout(CONNECT_TIMEOUT)
             .read_timeout(READ_TIMEOUT);
@@ -422,9 +422,9 @@ impl Sidecars {
         }
         let mut cmd = self.command(&self.ytdlp());
         cmd.args(["--ignore-config", "-U"]);
-        if let Some(p) = crate::proxy::https_proxy()
-            .as_ref()
-            .and_then(crate::Proxy::argument)
+        // The update comes from GitHub.
+        if let Some(proxy) = featherplay_proxy::for_url("https://github.com/")
+            && let Some(p) = proxy.argument()
         {
             cmd.arg("--proxy").arg(p);
         }

@@ -16,7 +16,8 @@ pub struct Report {
     pub lastfm: bool,
     pub listenbrainz: bool,
     pub discord: bool,
-    /// The proxy requests go through, without credentials; `None`: none.
+    /// The proxy requests go through and where it came from, without credentials
+    /// (`featherplay_proxy::summary`); `None`: none.
     pub proxy: Option<String>,
     /// How the last helpers download failed (`SidecarError::summary`); `None`: it didn't.
     pub helpers: Option<String>,

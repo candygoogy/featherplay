@@ -1060,7 +1060,7 @@ const TIMEOUT: Duration = Duration::from_secs(20);
 
 /// `http_client` with another total timeout per request (tests use a short one).
 fn http_client_with(identity: &Identity, timeout: Duration) -> Result<reqwest::Client, ApiError> {
-    reqwest::Client::builder()
+    featherplay_proxy::client()
         .connect_timeout(CONNECT_TIMEOUT)
         .timeout(timeout)
         .http1_only()

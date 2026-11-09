@@ -234,7 +234,7 @@ const TIMEOUT: Duration = Duration::from_secs(20);
 
 /// `http_client` with another total timeout per request (tests use a short one).
 fn http_client_with(timeout: Duration) -> reqwest::Result<reqwest::Client> {
-    reqwest::Client::builder()
+    featherplay_proxy::client()
         .connect_timeout(CONNECT_TIMEOUT)
         .timeout(timeout)
         .user_agent(USER_AGENT)

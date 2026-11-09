@@ -9,6 +9,8 @@ description = "featherplay's audio engine: ranged HTTP downloads, AAC/MP4 and Op
 publish = false
 
 [dependencies]
+# The HTTP client follows the proxy settings (`featherplay_proxy::client`).
+featherplay-proxy = { path = "../proxy" }
 # Output (cpal 0.18.2 underneath). Decoding is ours (`decoder.rs`), not rodio's.
 rodio = { workspace = true, features = ["playback", "mp4"] }
 # AAC-in-MP4 (itag 140) and Opus-in-WebM (itag 251) demuxing, plus the AAC decoder, driven

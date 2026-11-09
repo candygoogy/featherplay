@@ -9,6 +9,8 @@ description = "featherplay's ListenBrainz client: now playing, listens and token
 publish = false
 
 [dependencies]
+# The HTTP client follows the proxy settings (`featherplay_proxy::client`).
+featherplay-proxy = { path = "../proxy" }
 reqwest = { workspace = true, features = ["native-tls"] }
 serde_json = { workspace = true }
 

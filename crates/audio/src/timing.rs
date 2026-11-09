@@ -73,7 +73,7 @@ fn resolve(home: &Path, out: &Path, id: &str, xargs: Option<&str>, label: &str) 
         cmd.arg("--extractor-args").arg(x);
     }
     // The app's resolves go through the same proxy (`YtDlpResolver::command`).
-    if let Some(p) = featherplay_streams::https_proxy()
+    if let Some(p) = featherplay_proxy::for_url(featherplay_proxy::YOUTUBE)
         && let Some(arg) = p.argument()
     {
         cmd.arg("--proxy").arg(arg);
@@ -161,7 +161,7 @@ fn decode(
     s: &Resolved,
     heads: &HeadCache,
 ) -> (f64, f64, f64, f64) {
-    let client = reqwest::Client::new();
+    let client = featherplay_proxy::client().build().unwrap();
     let t = Instant::now();
     let Opened {
         media, len, cancel, ..
@@ -195,7 +195,7 @@ fn decode(
 
 /// Seconds for the whole file in sequential 1 MiB `Range` requests, as the engine fetches it.
 async fn full_download(url: &str) -> (f64, u64) {
-    let client = reqwest::Client::new();
+    let client = featherplay_proxy::client().build().unwrap();
     let t = Instant::now();
     let mut pos = 0u64;
     let mut total = None;
@@ -226,7 +226,9 @@ async fn full_download(url: &str) -> (f64, u64) {
 }
 
 async fn status_now(url: &str) -> u16 {
-    reqwest::Client::new()
+    featherplay_proxy::client()
+        .build()
+        .unwrap()
         .get(url)
         .header("Range", "bytes=0-1023")
         .send()
@@ -362,7 +364,7 @@ fn timing() {
         head::prefetch(
             &heads,
             rt.handle(),
-            &reqwest::Client::new(),
+            &featherplay_proxy::client().build().unwrap(),
             r.url.clone(),
             |_| {},
         );
@@ -864,7 +866,7 @@ fn timing_start() {
     }
     if let (Some(idle), Some(src)) = (env("TIMING_IDLE"), streams.first()) {
         // A pool that never drops idle connections itself: what the server keeps.
-        let client = reqwest::Client::builder()
+        let client = featherplay_proxy::client()
             .pool_idle_timeout(None)
             .build()
             .unwrap();

@@ -64,7 +64,7 @@ pub async fn fetch_segments(id: &TrackId) -> Result<Vec<Segment>, String> {
     static CLIENT: OnceLock<Result<reqwest::Client, String>> = OnceLock::new();
     let client = CLIENT
         .get_or_init(|| {
-            reqwest::Client::builder()
+            featherplay_proxy::client()
                 .user_agent(concat!("featherplay/", env!("CARGO_PKG_VERSION")))
                 .timeout(Duration::from_secs(10))
                 .build()
