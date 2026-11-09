@@ -54,7 +54,7 @@ or as one portable exe.
 <!-- The installer's file name carries the version: update this link with each release. -->
 
 **Installer (recommended).**
-[`featherplay-setup-0.2.0.exe`](https://github.com/candygoogy/featherplay/releases/download/v0.2.0/featherplay-setup-0.2.0.exe)
+[`featherplay-setup-0.2.1.exe`](https://github.com/candygoogy/featherplay/releases/download/v0.2.1/featherplay-setup-0.2.1.exe)
 installs for your Windows user only, with no admin prompt, and adds featherplay to the Start
 menu and to Settings > Apps. A newer setup upgrades in place and keeps your settings and
 sign-in. Uninstalling from Settings > Apps removes everything featherplay keeps: settings,
@@ -92,7 +92,7 @@ scoop install featherplay
 
 featherplay isn't code-signed yet, so Windows SmartScreen may warn you the first time you run
 it. Choose **More info**, then **Run anyway**. To check the file first, run
-`Get-FileHash featherplay-setup-0.2.0.exe` (or `Get-FileHash featherplay.exe`) in PowerShell
+`Get-FileHash featherplay-setup-0.2.1.exe` (or `Get-FileHash featherplay.exe`) in PowerShell
 and compare the hash with the one on the release page, or
 [build it yourself](#build-from-source).
 
@@ -253,7 +253,7 @@ with its window minimised. Lower is better.
      repo. The website's site/src/data/numbers.ts holds the same figures, so keep the two in
      step. -->
 
-| | featherplay 0.2.0 | Pear Desktop 3.12.0 | YouTube Music in Edge 156 |
+| | featherplay 0.2.1 | Pear Desktop 3.12.0 | YouTube Music in Edge 156 |
 |---|---|---|---|
 | Memory while playing | **40 MB** | 798 MB | 988 MB |
 | Memory while paused | **38 MB** | 782 MB | 973 MB |
@@ -262,7 +262,7 @@ with its window minimised. Lower is better.
 | Processes | **1** | 6 to 7 | 9 to 11 |
 | Start to music playing | **1.0 s** (0.73 to 6.4 s) | — | — |
 | Click to sound | **0.3 s** (0.003 to 5.7 s); hovered first 0.004 s, not hovered 0.68 s | — | — |
-| Download | **10.68 MB** installer (28.99 MB portable exe) | 274 MB installer | nothing (Edge comes with Windows) |
+| Download | **10.70 MB** installer (29.05 MB portable exe) | 274 MB installer | nothing (Edge comes with Windows) |
 
 <sub>featherplay 0.2.0 was measured on 9 November 2026, Pear Desktop and Edge on 1 November: each app playing a song on repeat for 5 minutes, then paused for 3, window minimised. Memory is the private memory of all the app's processes (1 MB = 1,048,576 bytes); CPU is a share of the whole machine. Start to music playing runs from starting featherplay to the first sound of the song it resumes (median of 6 starts). Click to sound runs from clicking a song's play button to its first sound (median of 10 clicks); hovered first means the pointer rested on the song before the click, which lets featherplay get it ready. A dash (—) means not part of this measurement. [How these were measured](https://featherplay.candygoogy.dev/method).</sub>
 

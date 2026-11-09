@@ -1,7 +1,7 @@
-// The download: version 0.2.0, the files on the v0.2.0 release (built by release.yml on
+// The download: version 0.2.1, the files on the v0.2.1 release (built by release.yml on
 // 9 November 2026). Each file links straight to its download; the release page has the
 // checksums and notes. featherplay's memory and CPU figures (numbers.ts) were measured on
-// 9 November, on this release's own portable exe.
+// 9 November, on 0.2.0's portable exe (0.2.1 wasn't measured again).
 //
 // Two ways to get it: the per-user installer (recommended: no admin prompt, a Start menu
 // entry, an uninstaller that removes everything) and the portable exe. A file's bytes are
@@ -31,7 +31,7 @@ export type Release = {
 };
 
 const releases = links.releases;
-const version = "0.2.0";
+const version = "0.2.1";
 /** Bytes as MB the way Windows counts them (1,048,576 bytes), to two decimals. */
 export const toMB = (bytes: number): number => Math.round((bytes / 1_048_576) * 100) / 100;
 const file = (name: string, bytes: number | null): ReleaseFile => ({
@@ -40,8 +40,8 @@ const file = (name: string, bytes: number | null): ReleaseFile => ({
   sizeMB: bytes == null ? null : toMB(bytes),
   url: `${releases}/download/v${version}/${name}`,
 });
-const installer: ReleaseFile | null = file(`featherplay-setup-${version}.exe`, 11_199_216);
-const portable: ReleaseFile | null = file("featherplay.exe", 30_398_464);
+const installer: ReleaseFile | null = file(`featherplay-setup-${version}.exe`, 11_214_659);
+const portable: ReleaseFile | null = file("featherplay.exe", 30_456_832);
 
 export const release: Release = {
   version,
