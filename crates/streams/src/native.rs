@@ -201,7 +201,7 @@ impl NativeResolver {
 
     /// A URL this client gave was refused: the next resolve starts from a fresh embed page.
     pub(crate) fn refused(&self) {
-        self.inner.forget.store(true, Ordering::Relaxed);
+        self.inner.drop_page();
     }
 
     pub(crate) async fn resolve(
@@ -299,6 +299,14 @@ impl NativeResolver {
 }
 
 impl Inner {
+    /// The next resolve starts from a fresh embed page. The saved page goes at once: some
+    /// new visitors get answers without URLs every time (2026-11-09), and a session that
+    /// ends before its next resolve would load it again at the next start.
+    fn drop_page(&self) {
+        self.forget.store(true, Ordering::Relaxed);
+        let _ = std::fs::remove_file(self.dir.join("state.json"));
+    }
+
     async fn resolve(&self, video: &str, quality: Quality) -> Result<ResolvedStream, NativeError> {
         let ready = self.ready(video).await?;
         self.answer(video, quality, &ready, true).await
@@ -316,7 +324,7 @@ impl Inner {
         let player = ready.player.clone();
         let forget = || {
             if kept {
-                self.forget.store(true, Ordering::Relaxed);
+                self.drop_page();
             }
         };
         // Loads the player while the request runs.
@@ -1713,6 +1721,37 @@ _result.sig = (s) => s.slice(2).split("").reverse().join("");"#;
             log.lock().unwrap().len(),
             n,
             "off: no request after three failures"
+        );
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// Some new visitors get answers without URLs, every time, while the kept one and other
+    /// new ones get URLs for the same song (2026-11-09). An answer without a URL drops the
+    /// kept page from disk at once, so a start after a short session doesn't load it again.
+    #[tokio::test]
+    async fn an_answer_without_a_url_drops_the_kept_page_for_the_next_start() {
+        let Some(sidecars) = deno_sidecars() else {
+            eprintln!("skipped: no deno in FEATHERPLAY_SIDECARS_DIR");
+            return;
+        };
+        let mut answer: Value = serde_json::from_str(PLAYER).unwrap();
+        for f in answer["streamingData"]["adaptiveFormats"]
+            .as_array_mut()
+            .unwrap()
+        {
+            let f = f.as_object_mut().unwrap();
+            f.remove("url");
+            f.remove("signatureCipher");
+        }
+        let answer = answer.to_string();
+        let (base, _log) = test_server::serve(move |_, _, _| (200, answer.clone()));
+        let (r, dir) = seeded("no-url", sidecars.clone(), &base);
+        let e = r.resolve(VIDEO, Quality::High).await.unwrap_err();
+        assert!(matches!(e, NativeError::NoUrl(_)), "{e:?}");
+        let next_start = NativeResolver::with_dirs(sidecars, Some(dir.clone()), &base).unwrap();
+        assert!(
+            next_start.inner.load().is_none(),
+            "the next start fetches a fresh embed page"
         );
         std::fs::remove_dir_all(&dir).unwrap();
     }
