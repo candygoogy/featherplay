@@ -10,6 +10,7 @@ use tokio::sync::Notify;
 use crate::chain::{Chain, Check, Steps};
 use crate::expiry::query_param;
 use crate::native::{NativeError, NativeResolver};
+use crate::proxy::{Proxy, https_proxy};
 use crate::sidecars::{Installer, tail};
 use crate::{
     Ahead, Downloads, Quality, ResolveError, ResolvedStream, Sidecars, StreamResolver,
@@ -153,12 +154,17 @@ pub struct YtDlpResolver {
     checks: OnceLock<Option<reqwest::Client>>,
     /// The `Quality` resolves ask for (`set_quality`), as `quality_to_u8`.
     quality: AtomicU8,
+    /// yt-dlp's `--proxy`: the proxy the HTTP clients took when the resolver was made.
+    proxy: Option<Proxy>,
 }
 
 impl YtDlpResolver {
     pub fn new(sidecars: Sidecars, cookie_header: Option<String>) -> Self {
         let native = NativeResolver::new(sidecars.dir.clone());
-        Self::with_native(sidecars, cookie_header, native)
+        Self {
+            proxy: https_proxy(),
+            ..Self::with_native(sidecars, cookie_header, native)
+        }
     }
 
     fn with_native(
@@ -180,6 +186,7 @@ impl YtDlpResolver {
             installer: None,
             checks: OnceLock::new(),
             quality: AtomicU8::new(quality_to_u8(Quality::default())),
+            proxy: None,
         }
     }
 
@@ -378,6 +385,9 @@ impl YtDlpResolver {
         }
         if let Some(a) = extractor_args {
             cmd.arg("--extractor-args").arg(a);
+        }
+        if let Some(p) = self.proxy.as_ref().and_then(Proxy::argument) {
+            cmd.arg("--proxy").arg(p);
         }
         cmd.arg(format!("https://music.youtube.com/watch?v={}", id.0));
         cmd
@@ -960,6 +970,30 @@ mod tests {
             assert!(log.lock().unwrap().is_empty(), "{:?}", log.lock().unwrap());
             std::fs::remove_dir_all(&home).unwrap();
         }
+    }
+
+    /// Behind a proxy (Windows' or `HTTPS_PROXY`), yt-dlp goes through the same one as the
+    /// HTTP clients.
+    #[test]
+    fn a_proxy_is_handed_to_yt_dlp() {
+        let mut r = YtDlpResolver::with_native(
+            Sidecars {
+                dir: PathBuf::from("sidecars"),
+            },
+            None,
+            None,
+        );
+        let id = TrackId("kXbeLiZY6jc".into());
+        let args = command_args(&r.command(&id, None, None, Quality::High));
+        assert!(!args.iter().any(|a| a == "--proxy"), "{args:?}");
+
+        r.proxy = crate::proxy::parse("http://proxy.corp:3128");
+        let args = command_args(&r.command(&id, None, None, Quality::High));
+        assert!(
+            args.windows(2)
+                .any(|w| w == ["--proxy", "http://proxy.corp:3128/"]),
+            "{args:?}"
+        );
     }
 
     /// High asks yt-dlp for Opus (251), else AAC (140); Standard for AAC only.

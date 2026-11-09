@@ -71,6 +71,12 @@ fn resolve(home: &Path, out: &Path, id: &str, xargs: Option<&str>, label: &str) 
     if let Some(x) = xargs {
         cmd.arg("--extractor-args").arg(x);
     }
+    // The app's resolves go through the same proxy (`YtDlpResolver::command`).
+    if let Some(p) = featherplay_streams::https_proxy()
+        && let Some(arg) = p.argument()
+    {
+        cmd.arg("--proxy").arg(arg);
+    }
     cmd.arg(format!("https://music.youtube.com/watch?v={id}"))
         .stdin(Stdio::null())
         .stdout(Stdio::piped())

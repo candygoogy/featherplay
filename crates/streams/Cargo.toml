@@ -23,6 +23,10 @@ zip = { workspace = true, features = ["deflate-flate2"] }
 # Inflates the EJS library, which `build.rs` deflates; the same inflater zip uses.
 flate2 = { workspace = true }
 
+[target.'cfg(windows)'.dependencies]
+# Windows' proxy setting, for yt-dlp's `--proxy` (`proxy.rs`).
+windows-registry = { workspace = true }
+
 [build-dependencies]
 flate2 = { workspace = true }
 

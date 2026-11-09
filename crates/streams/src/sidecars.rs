@@ -348,6 +348,12 @@ impl Sidecars {
         }
         let mut cmd = self.command(&self.ytdlp());
         cmd.args(["--ignore-config", "-U"]);
+        if let Some(p) = crate::proxy::https_proxy()
+            .as_ref()
+            .and_then(crate::Proxy::argument)
+        {
+            cmd.arg("--proxy").arg(p);
+        }
         let out = match tokio::time::timeout(UPDATE_TIMEOUT, cmd.output()).await {
             Ok(Ok(out)) => out,
             Ok(Err(e)) => {
