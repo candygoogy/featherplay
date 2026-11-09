@@ -77,8 +77,10 @@ cd <empty folder>
 sha256sum -c SHA256SUMS.txt
 ```
 
-Then install and uninstall, on a clean VM if you have one. featherplay's data on your own
-PC makes the last check fail.
+### Install and uninstall
+
+Do this on a clean VM if you have one: featherplay's data on your own PC makes the last check
+fail.
 
 1. Run `featherplay-setup-X.Y.Z.exe`. featherplay should start from the Start menu, sign in
    and play.
@@ -91,7 +93,9 @@ with `featherplay-setup-X.Y.Z-arm64.exe` and `featherplay-arm64.exe`; Task Manag
 Details tab should show featherplay, yt-dlp and deno as ARM64, not x64. (Over an x64
 install, the yt-dlp and deno it downloaded stay, and keep running as x64.)
 
-Then sign the draft. Installed copies (0.2.0 and later) download an update only if the
+### Sign it
+
+Installed copies (0.2.0 and later) download an update only if the
 release's `SHA256SUMS.txt` carries a minisign signature by one of the two keys built into
 the app (`apps/featherplay/keys/`), made for that version; without it they only announce
 the release and say it couldn't be verified.
@@ -116,13 +120,16 @@ files already in the folder and uploads nothing.
 
 If the draft's files change after signing (a re-run of the workflow), sign again.
 
-Then, in one commit that you push after publishing (step 5):
+### Prepare the README and site commit
+
+Make one commit with these changes, and push it after publishing (step 5):
 
 - `README.md`: the version in the installer link
   (`releases/download/vX.Y.Z/featherplay-setup-X.Y.Z.exe`), in the `Get-FileHash` line below
   it, and in the "How light?" table's header; the table's Download row gets both files'
-  sizes in MB of 1,048,576 bytes, to two decimals. If you measured again, update the
-  table's figures and `site/src/data/numbers.ts` together; they must match.
+  sizes in MB of 1,048,576 bytes, to two decimals, and the note under the table says which
+  release the Download row is. If you measured again, update the table's figures, the note's
+  dates and `site/src/data/numbers.ts` together; they must match.
 - `site/src/data/release.ts`: `version`, and each file's size in bytes, from the draft.
 - The site tests that pin the version and sizes: `site/tests/unit/data.test.ts`,
   `site/tests/sections.spec.ts`, `site/tests/compare.spec.ts` and `site/tests/seo.spec.ts`.
@@ -207,8 +214,8 @@ within hours. A report counts when it is:
   `question`, `cant-reproduce`, `external-issue` and the like;
 - busy: labelled `high-priority`, or with 10 or more comments and reactions together.
 
-Reports that count open one issue here, "yt-dlp reports YouTube breakage", labelled
-`canary`. The workflow comments on it when the linked reports change, and closes it once
+When reports count, the workflow opens one issue here, "yt-dlp reports YouTube breakage",
+labelled `canary`. The workflow comments on it when the linked reports change, and closes it once
 they're all closed. That issue is for you only: the app never reads it.
 
 The app's notice is a step you take by hand:
@@ -226,6 +233,5 @@ The app's notice is a step you take by hand:
    says, with `ytdlp_mirror`). Move the old pins to `site/scripts/helpers-kept.json` in the
    same commit, so the site keeps the files released builds still fall back to, then deploy
    the site: its build puts the pinned yt-dlp files under `/helpers/`, the app's second
-   source. Installed copies get the fix with their daily
-   `yt-dlp -U`. Then close
+   source. Installed copies get the fix with their daily `yt-dlp -U`. Then close
    `Playback broken`.
