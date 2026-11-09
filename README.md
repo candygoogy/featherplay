@@ -107,7 +107,7 @@ player's challenges with yt-dlp's solver scripts in the JavaScript engine built 
 current player at startup, which takes a few seconds, so the first song you click plays
 without waiting for any download.
 
-For the songs that way can't give, it falls back to two helper programs,
+For a song it can't get that way, it falls back to two helper programs,
 [yt-dlp](https://github.com/yt-dlp/yt-dlp) and [Deno](https://github.com/denoland/deno)
 (yt-dlp's JavaScript runtime). On the first run it downloads them in the background from
 their GitHub releases and checks each file against a SHA256 written into featherplay's code;
