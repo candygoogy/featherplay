@@ -819,6 +819,15 @@ mod tests {
         /// Serves the two helpers, each after `delay`; the first `failures` requests for
         /// yt-dlp answer 503. The embed page and a player for the native request too.
         fn helpers_server(failures: usize, delay: Duration) -> (Downloads, String, Log) {
+            failing_server(failures, 503, delay)
+        }
+
+        /// `helpers_server`, with the failures answering `status`.
+        fn failing_server(
+            failures: usize,
+            status: u16,
+            delay: Duration,
+        ) -> (Downloads, String, Log) {
             let zip = deno_zip();
             let deno_sha = sha256(&zip);
             let failed = AtomicUsize::new(0);
@@ -828,7 +837,7 @@ mod tests {
                 }
                 match path {
                     "/yt-dlp.exe" if failed.fetch_add(1, Ordering::SeqCst) < failures => {
-                        (503, b"try later".to_vec())
+                        (status, b"try later".to_vec())
                     }
                     "/yt-dlp.exe" => (200, YTDLP.to_vec()),
                     "/deno.zip" => (200, zip.clone()),
@@ -906,10 +915,41 @@ mod tests {
             std::fs::remove_dir_all(&home).unwrap();
         }
 
+        /// A server error is tried twice more, after a pause, before the download fails.
+        #[tokio::test]
+        async fn a_download_that_fails_twice_is_tried_again() {
+            let home = test_home("first-run-again");
+            let (downloads, _, log) = helpers_server(2, Duration::ZERO);
+            let r = resolver(&home, downloads);
+
+            let result = r.resolve(&TrackId("h46YpWrg55Q".into())).await;
+
+            assert!(went_on(&result), "got {result:?}");
+            assert_eq!(requests(&log, "/yt-dlp.exe"), 3);
+            std::fs::remove_dir_all(&home).unwrap();
+        }
+
+        /// A missing file stays missing: no second try.
+        #[tokio::test]
+        async fn a_download_that_isnt_there_is_not_tried_again() {
+            let home = test_home("first-run-404");
+            let (downloads, _, log) = failing_server(1, 404, Duration::ZERO);
+            let r = resolver(&home, downloads);
+
+            let result = r.resolve(&TrackId("h46YpWrg55Q".into())).await;
+
+            assert!(
+                matches!(result, Err(ResolveError::Sidecar(_))),
+                "got {result:?}"
+            );
+            assert_eq!(requests(&log, "/yt-dlp.exe"), 1);
+            std::fs::remove_dir_all(&home).unwrap();
+        }
+
         #[tokio::test]
         async fn a_failed_download_fails_the_resolve_and_the_next_resolve_tries_again() {
             let home = test_home("first-run-retry");
-            let (downloads, _, log) = helpers_server(1, Duration::ZERO);
+            let (downloads, _, log) = helpers_server(3, Duration::ZERO);
             let r = resolver(&home, downloads);
             let id = TrackId("h46YpWrg55Q".into());
 
@@ -918,11 +958,11 @@ mod tests {
                 matches!(&first, Err(ResolveError::Sidecar(m)) if m.contains("503")),
                 "got {first:?}"
             );
-            assert_eq!(requests(&log, "/yt-dlp.exe"), 1, "no retry loop");
+            assert_eq!(requests(&log, "/yt-dlp.exe"), 3, "three tries, no loop");
 
             let second = r.resolve(&id).await;
             assert!(went_on(&second), "got {second:?}");
-            assert_eq!(requests(&log, "/yt-dlp.exe"), 2);
+            assert_eq!(requests(&log, "/yt-dlp.exe"), 4);
             std::fs::remove_dir_all(&home).unwrap();
         }
 
@@ -937,7 +977,11 @@ mod tests {
 
             assert!(matches!(a, Err(ResolveError::Sidecar(_))), "got {a:?}");
             assert_eq!(a, b);
-            assert_eq!(requests(&log, "/yt-dlp.exe"), 1);
+            assert_eq!(
+                requests(&log, "/yt-dlp.exe"),
+                3,
+                "one download, tried three times"
+            );
             std::fs::remove_dir_all(&home).unwrap();
         }
 

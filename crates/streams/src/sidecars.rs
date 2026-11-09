@@ -67,6 +67,28 @@ const VERSION_TIMEOUT: Duration = Duration::from_secs(30);
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
 const READ_TIMEOUT: Duration = Duration::from_secs(30);
 
+/// Antivirus often holds a new `.exe` for a few seconds after it's written, and the rename,
+/// the unzip or the hashing then fails with "access denied" (os error 5) or "in use" (32).
+/// Such a step waits these and tries again: five tries over about six seconds.
+const HELD_WAITS_LIVE: [Duration; 4] = [
+    Duration::from_millis(500),
+    Duration::from_millis(1000),
+    Duration::from_millis(1500),
+    Duration::from_millis(3000),
+];
+/// A download that couldn't connect, timed out or met a server error (5xx) is tried twice
+/// more, after these. A 404 or a file that doesn't match its pin isn't.
+const DOWNLOAD_WAITS_LIVE: [Duration; 2] = [Duration::from_secs(2), Duration::from_secs(5)];
+#[cfg(not(test))]
+const HELD_WAITS: [Duration; 4] = HELD_WAITS_LIVE;
+#[cfg(not(test))]
+const DOWNLOAD_WAITS: [Duration; 2] = DOWNLOAD_WAITS_LIVE;
+// Tests don't wait.
+#[cfg(test)]
+const HELD_WAITS: [Duration; 4] = [Duration::from_millis(1); 4];
+#[cfg(test)]
+const DOWNLOAD_WAITS: [Duration; 2] = [Duration::from_millis(1); 2];
+
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
@@ -255,33 +277,34 @@ impl Sidecars {
 
         if !self.ytdlp().is_file() {
             let part = self.dir.join("yt-dlp.exe.part");
-            download(&http, from, &from.ytdlp.url, &part, "yt-dlp", &progress).await?;
+            download_patiently(&http, from, &from.ytdlp.url, &part, "yt-dlp", &progress).await?;
             verify_or_delete(&part, &from.ytdlp.sha256).await?;
-            tokio::fs::rename(&part, self.ytdlp())
-                .await
-                .map_err(|e| sidecar_err("installing yt-dlp.exe", e))?;
+            put_in_place(&part, &self.ytdlp()).await?;
             // The pinned release counts as today's update: no `yt-dlp -U` right after it.
             touch(&self.dir.join(UPDATE_STAMP)).await;
         }
 
         if !self.deno().is_file() {
             let zip = self.dir.join(format!("{DENO_ZIP}.part"));
-            download(&http, from, &from.deno.url, &zip, "deno", &progress).await?;
+            download_patiently(&http, from, &from.deno.url, &zip, "deno", &progress).await?;
             verify_or_delete(&zip, &from.deno.sha256).await?;
             let exe_part = self.dir.join("deno.exe.part");
-            let (z, e) = (zip.clone(), exe_part.clone());
-            let extracted = tokio::task::spawn_blocking(move || extract_deno(&z, &e))
-                .await
-                .map_err(|e| sidecar_err("extracting deno", e))
-                .and_then(|r| r);
+            let extracted = patiently(|| {
+                let (z, e) = (zip.clone(), exe_part.clone());
+                async move {
+                    tokio::task::spawn_blocking(move || extract_deno(&z, &e))
+                        .await
+                        .map_err(std::io::Error::other)?
+                }
+            })
+            .await
+            .map_err(|e| sidecar_err("extracting deno.exe", e));
             let _ = tokio::fs::remove_file(&zip).await;
             if let Err(e) = extracted {
                 let _ = tokio::fs::remove_file(&exe_part).await;
                 return Err(e);
             }
-            tokio::fs::rename(&exe_part, self.deno())
-                .await
-                .map_err(|e| sidecar_err("installing deno.exe", e))?;
+            put_in_place(&exe_part, &self.deno()).await?;
         }
         Ok(())
     }
@@ -443,7 +466,38 @@ fn download_host(url: &reqwest::Url) -> bool {
             .is_some_and(|h| h == "github.com" || h.ends_with(ASSET_DOMAIN))
 }
 
-async fn download(
+/// A download that failed, and whether it's worth another try.
+struct Failed {
+    error: ResolveError,
+    /// It couldn't connect, timed out, was cut off mid-file or met a server error (5xx).
+    transient: bool,
+}
+
+/// A failed request or response body: transient when it couldn't connect, timed out, the
+/// connection dropped mid-file, or the server answered 5xx. A dropped connection comes as a
+/// body error, or as a decode error since the body goes through the gzip decoder.
+fn http_failed(url: &str, e: reqwest::Error) -> Failed {
+    let transient = e.is_connect()
+        || e.is_timeout()
+        || e.is_body()
+        || e.is_decode()
+        || e.status().is_some_and(|s| s.is_server_error());
+    Failed {
+        error: sidecar_err(url, e),
+        transient,
+    }
+}
+
+/// A failed write: not one another try would mend.
+fn write_failed(what: &str, e: std::io::Error) -> Failed {
+    Failed {
+        error: sidecar_err(what, e),
+        transient: false,
+    }
+}
+
+/// `download`, tried again after `DOWNLOAD_WAITS` while it fails transiently.
+async fn download_patiently(
     http: &reqwest::Client,
     from: &Downloads,
     url: &str,
@@ -451,8 +505,35 @@ async fn download(
     name: &str,
     progress: &impl Fn(&str, u64, u64),
 ) -> Result<(), ResolveError> {
+    let mut waits = DOWNLOAD_WAITS.iter();
+    loop {
+        let failed = match download(http, from, url, dest, name, progress).await {
+            Ok(()) => return Ok(()),
+            Err(failed) => failed,
+        };
+        match waits.next() {
+            Some(wait) if failed.transient => {
+                log::info!("downloading {name} failed ({}): trying again", failed.error);
+                tokio::time::sleep(*wait).await;
+            }
+            _ => return Err(failed.error),
+        }
+    }
+}
+
+async fn download(
+    http: &reqwest::Client,
+    from: &Downloads,
+    url: &str,
+    dest: &Path,
+    name: &str,
+    progress: &impl Fn(&str, u64, u64),
+) -> Result<(), Failed> {
     if !reqwest::Url::parse(url).is_ok_and(|u| from.allows(&u)) {
-        return Err(sidecar_err(url, "not a GitHub download"));
+        return Err(Failed {
+            error: sidecar_err(url, "not a GitHub download"),
+            transient: false,
+        });
     }
     let result = async {
         let mut resp = http
@@ -460,23 +541,23 @@ async fn download(
             .send()
             .await
             .and_then(|r| r.error_for_status())
-            .map_err(|e| sidecar_err(url, e))?;
+            .map_err(|e| http_failed(url, e))?;
         let total = resp.content_length().unwrap_or(0);
         let mut file = tokio::fs::File::create(dest)
             .await
-            .map_err(|e| sidecar_err("creating the download file", e))?;
+            .map_err(|e| write_failed("creating the download file", e))?;
         let mut done = 0u64;
         progress(name, 0, total);
-        while let Some(chunk) = resp.chunk().await.map_err(|e| sidecar_err(url, e))? {
+        while let Some(chunk) = resp.chunk().await.map_err(|e| http_failed(url, e))? {
             file.write_all(&chunk)
                 .await
-                .map_err(|e| sidecar_err("writing the download", e))?;
+                .map_err(|e| write_failed("writing the download", e))?;
             done += chunk.len() as u64;
             progress(name, done, total);
         }
         file.flush()
             .await
-            .map_err(|e| sidecar_err("writing the download", e))
+            .map_err(|e| write_failed("writing the download", e))
     }
     .await;
     if result.is_err() {
@@ -485,13 +566,51 @@ async fn download(
     result
 }
 
+/// Runs a file step on a new file, again after each of `HELD_WAITS` while antivirus holds
+/// the file (os error 5 or 32). Any other error, or the last one, is the step's.
+async fn patiently<T, F, Fut>(mut step: F) -> std::io::Result<T>
+where
+    F: FnMut() -> Fut,
+    Fut: Future<Output = std::io::Result<T>>,
+{
+    let mut waits = HELD_WAITS.iter();
+    loop {
+        match step().await {
+            Err(e) if matches!(e.raw_os_error(), Some(5 | 32)) => match waits.next() {
+                Some(wait) => tokio::time::sleep(*wait).await,
+                None => return Err(e),
+            },
+            done => return done,
+        }
+    }
+}
+
+/// Renames the checked `part` to `exe`, waiting out antivirus. An exe gone right after
+/// (quarantined) fails too.
+async fn put_in_place(part: &Path, exe: &Path) -> Result<(), ResolveError> {
+    let name = exe
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    patiently(|| tokio::fs::rename(part, exe))
+        .await
+        .map_err(|e| sidecar_err(&format!("installing {name}"), e))?;
+    if !exe.is_file() {
+        return Err(sidecar_err(
+            &format!("installing {name}"),
+            "it was removed right after it was saved",
+        ));
+    }
+    Ok(())
+}
+
 /// Checks `path`'s sha256 against `expected_hex` (any case). On a mismatch the file is deleted.
 async fn verify_or_delete(path: &Path, expected_hex: &str) -> Result<(), ResolveError> {
     let name = path
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_default();
-    let result = match sha256_file(path).await {
+    let result = match patiently(|| sha256_file(path)).await {
         Ok(actual) if actual.eq_ignore_ascii_case(expected_hex.trim()) => return Ok(()),
         Ok(actual) => sidecar_err(
             &format!("sha256 mismatch for {name}"),
@@ -521,16 +640,21 @@ async fn sha256_file(path: &Path) -> std::io::Result<String> {
         .collect())
 }
 
-fn extract_deno(zip_path: &Path, exe_dest: &Path) -> Result<(), ResolveError> {
-    let file = std::fs::File::open(zip_path).map_err(|e| sidecar_err("opening the deno zip", e))?;
-    let mut archive =
-        zip::ZipArchive::new(file).map_err(|e| sidecar_err("reading the deno zip", e))?;
-    let mut entry = archive
-        .by_name("deno.exe")
-        .map_err(|e| sidecar_err("deno.exe in the zip", e))?;
-    let mut out =
-        std::fs::File::create(exe_dest).map_err(|e| sidecar_err("creating deno.exe", e))?;
-    std::io::copy(&mut entry, &mut out).map_err(|e| sidecar_err("extracting deno.exe", e))?;
+/// Writes the zip's `deno.exe` to `exe_dest`. A zip that can't be read is `InvalidData`; the
+/// file errors are the system's, so `patiently` can tell a held file.
+fn extract_deno(zip_path: &Path, exe_dest: &Path) -> std::io::Result<()> {
+    let zip_err = |e: zip::result::ZipError| match e {
+        zip::result::ZipError::Io(e) => e,
+        e => std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            format!("the deno zip: {e}"),
+        ),
+    };
+    let file = std::fs::File::open(zip_path)?;
+    let mut archive = zip::ZipArchive::new(file).map_err(zip_err)?;
+    let mut entry = archive.by_name("deno.exe").map_err(zip_err)?;
+    let mut out = std::fs::File::create(exe_dest)?;
+    std::io::copy(&mut entry, &mut out)?;
     Ok(())
 }
 
@@ -653,6 +777,104 @@ mod tests {
         touch(&stamp).await;
         assert!(is_recent(&stamp));
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// What a file step does while antivirus scans the new file: "in use" (os error 32)
+    /// `held` times, then it goes through. Counts its calls.
+    fn held_step(
+        held: usize,
+        code: i32,
+    ) -> (
+        impl FnMut() -> std::future::Ready<std::io::Result<u8>>,
+        std::sync::Arc<AtomicU64>,
+    ) {
+        let calls = std::sync::Arc::new(AtomicU64::new(0));
+        let counted = calls.clone();
+        let step = move || {
+            let n = counted.fetch_add(1, Ordering::SeqCst);
+            std::future::ready(if (n as usize) < held {
+                Err(std::io::Error::from_raw_os_error(code))
+            } else {
+                Ok(7)
+            })
+        };
+        (step, calls)
+    }
+
+    #[tokio::test]
+    async fn a_file_step_waits_while_antivirus_holds_the_file() {
+        let (step, calls) = held_step(2, 32);
+        assert_eq!(patiently(step).await.unwrap(), 7);
+        assert_eq!(calls.load(Ordering::SeqCst), 3);
+    }
+
+    #[tokio::test]
+    async fn a_file_held_too_long_fails_after_five_tries() {
+        let (step, calls) = held_step(usize::MAX, 5);
+        let err = patiently(step).await.unwrap_err();
+        assert_eq!(err.raw_os_error(), Some(5));
+        assert_eq!(calls.load(Ordering::SeqCst), 5);
+    }
+
+    #[tokio::test]
+    async fn other_file_errors_fail_at_once() {
+        // ERROR_DISK_FULL
+        let (step, calls) = held_step(usize::MAX, 112);
+        assert_eq!(patiently(step).await.unwrap_err().raw_os_error(), Some(112));
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+    }
+
+    /// A connection that drops mid-file is tried again, like one that couldn't connect.
+    #[tokio::test]
+    async fn a_download_cut_off_mid_file_is_tried_again() {
+        use std::io::{Read, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let base = format!("http://{}", listener.local_addr().unwrap());
+        std::thread::spawn(move || {
+            for (n, stream) in listener.incoming().enumerate() {
+                let mut s = stream.unwrap();
+                let mut request = Vec::new();
+                let mut byte = [0u8; 1];
+                while !request.ends_with(b"\r\n\r\n") && s.read(&mut byte).unwrap_or(0) == 1 {
+                    request.push(byte[0]);
+                }
+                // The first answer promises 100 bytes and stops after 7.
+                let answer: &[u8] = if n == 0 {
+                    b"HTTP/1.1 200 OK\r\nContent-Length: 100\r\n\r\npartial"
+                } else {
+                    b"HTTP/1.1 200 OK\r\nContent-Length: 5\r\nConnection: close\r\n\r\nhello"
+                };
+                let _ = s.write_all(answer);
+            }
+        });
+        let dir = PathBuf::from(std::env::var("FEATHERPLAY_HOME").expect("FEATHERPLAY_HOME"))
+            .join("test-streams")
+            .join(format!("cut-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let dest = dir.join("yt-dlp.exe.part");
+        let from = Downloads::local(&base, "", "");
+        let http = from.client().unwrap();
+
+        let url = format!("{base}/yt-dlp.exe");
+        let got = download_patiently(&http, &from, &url, &dest, "yt-dlp", &|_, _, _| {}).await;
+
+        assert_eq!(got, Ok(()));
+        assert_eq!(std::fs::read(&dest).unwrap(), b"hello");
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// The real waits: about six seconds for a held file, as long as antivirus usually
+    /// holds one, and two more tries for a download.
+    #[test]
+    fn the_waits_are_few_and_short() {
+        let total: Duration = HELD_WAITS_LIVE.iter().sum();
+        assert!(
+            total >= Duration::from_secs(5) && total <= Duration::from_secs(7),
+            "{total:?}"
+        );
+        assert_eq!(HELD_WAITS_LIVE.len(), 4, "five tries");
+        assert_eq!(DOWNLOAD_WAITS_LIVE.len(), 2, "three tries");
+        assert!(DOWNLOAD_WAITS_LIVE.iter().sum::<Duration>() <= Duration::from_secs(10));
     }
 
     #[tokio::test]
