@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "dev": "astro dev",
-    "build": "astro build",
+    "build": "node scripts/helpers.mjs && astro build",
+    "helpers": "node scripts/helpers.mjs",
     "preview": "astro preview",
     "test": "playwright test",
     "unit": "vitest run",

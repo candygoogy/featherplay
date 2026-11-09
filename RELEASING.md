@@ -223,5 +223,9 @@ The app's notice is a step you take by hand:
    or a collaborator, counts.
 3. When a yt-dlp release fixes it, move the pin in `crates/streams/src/sidecars.rs` so new
    installs start on the fix (the URL and SHA256 together, as the "Sidecar pins" workflow
-   says). Installed copies get the fix with their daily `yt-dlp -U`. Then close
+   says, with `ytdlp_mirror`). Move the old pins to `site/scripts/helpers-kept.json` in the
+   same commit, so the site keeps the files released builds still fall back to, then deploy
+   the site: its build puts the pinned yt-dlp files under `/helpers/`, the app's second
+   source. Installed copies get the fix with their daily
+   `yt-dlp -U`. Then close
    `Playback broken`.

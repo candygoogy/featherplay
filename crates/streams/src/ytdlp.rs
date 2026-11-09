@@ -849,7 +849,7 @@ mod tests {
                     _ => (200, b"var x={signatureTimestamp:20752};".to_vec()),
                 }
             });
-            let downloads = Downloads::local(&base, &sha256(YTDLP), &deno_sha);
+            let downloads = Downloads::local(&[&base], &sha256(YTDLP), &deno_sha);
             (downloads, base, log)
         }
 
@@ -930,13 +930,65 @@ mod tests {
             std::fs::remove_dir_all(&home).unwrap();
         }
 
+        /// GitHub can't be reached for yt-dlp and sends a damaged Deno: both come from the
+        /// second source instead, after GitHub's own tries.
+        #[tokio::test]
+        async fn what_github_cant_give_comes_from_the_second_source() {
+            let home = test_home("first-run-second");
+            let (github, github_log) = test_server::serve_bytes(|path| match path {
+                "/yt-dlp.exe" => (503, b"down".to_vec()),
+                _ => (200, b"not the zip".to_vec()),
+            });
+            let (_, second, second_log) = helpers_server(0, Duration::ZERO);
+            let downloads =
+                Downloads::local(&[&github, &second], &sha256(YTDLP), &sha256(&deno_zip()));
+            let r = resolver(&home, downloads);
+
+            let result = r.resolve(&TrackId("h46YpWrg55Q".into())).await;
+
+            assert!(went_on(&result), "got {result:?}");
+            assert_eq!(
+                (
+                    requests(&github_log, "/yt-dlp.exe"),
+                    requests(&github_log, "/deno.zip")
+                ),
+                (3, 1),
+                "a server error is tried again, a damaged file isn't"
+            );
+            assert_eq!(
+                (
+                    requests(&second_log, "/yt-dlp.exe"),
+                    requests(&second_log, "/deno.zip")
+                ),
+                (1, 1)
+            );
+            std::fs::remove_dir_all(&home).unwrap();
+        }
+
+        /// Both sources failing: the toast says what GitHub's failure was.
+        #[tokio::test]
+        async fn a_file_neither_source_gives_fails_with_githubs_fault() {
+            let home = test_home("first-run-neither");
+            let (github, _) = test_server::serve_bytes(|_| (503, b"down".to_vec()));
+            let (second, _) = test_server::serve_bytes(|_| (404, b"gone".to_vec()));
+            let r = resolver(&home, Downloads::local(&[&github, &second], "00", "00"));
+
+            let result = r.resolve(&TrackId("h46YpWrg55Q".into())).await;
+
+            let Err(ResolveError::Sidecar(e)) = &result else {
+                panic!("got {result:?}");
+            };
+            assert_eq!((e.fault, e.status), (HelperFault::Unreachable, Some(503)));
+            std::fs::remove_dir_all(&home).unwrap();
+        }
+
         /// A file that doesn't match its pin is deleted, and said to be damaged.
         #[tokio::test]
         async fn a_download_that_doesnt_match_its_pin_is_damaged() {
             let home = test_home("first-run-damaged");
             let (_, base, _) = helpers_server(0, Duration::ZERO);
             let wrong = sha256(b"another file");
-            let r = resolver(&home, Downloads::local(&base, &wrong, &wrong));
+            let r = resolver(&home, Downloads::local(&[&base], &wrong, &wrong));
 
             let result = r.resolve(&TrackId("h46YpWrg55Q".into())).await;
 

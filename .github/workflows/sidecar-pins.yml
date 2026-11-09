@@ -7,6 +7,12 @@ name: Sidecar pins
 # one) when Deno is a minor version or more behind, or the yt-dlp pin is more than
 # YTDLP_MAX_DAYS older than the latest yt-dlp. Moving a pin means changing its URL and
 # SHA256 together, from that release's own checksum file.
+#
+# Each file has a second source, for when GitHub can't be reached: yt-dlp from the site
+# (`ytdlp_mirror`, the same file and pin, put there by the site's build, which reads the pins)
+# and Deno from dl.deno.land (`deno_cdn_url`, whose zips have their own `deno_cdn_sha256`).
+# This checks they're at the pinned releases and serve files that match their pins. After
+# moving a yt-dlp pin, deploy the site, or the mirror check fails until it's done.
 
 on:
   schedule:
@@ -44,13 +50,14 @@ jobs:
         run: |
           set -euo pipefail
           file=crates/streams/src/sidecars.rs
-          # One pin per architecture (x64 and ARM64), always at the same release: more than
-          # one version of either means a pin was moved without the other.
-          ytdlp_pins=$(grep -oP 'yt-dlp/releases/download/\K[0-9][0-9.]*(?=/)' "$file" | sort -u || true)
-          deno_pins=$(grep -oP 'denoland/deno/releases/download/v\K[0-9][0-9.]*(?=/)' "$file" | sort -u || true)
+          # One pin per architecture (x64 and ARM64) and source (GitHub and the second one),
+          # always at the same release: more than one version of either means a pin was
+          # moved without the others.
+          ytdlp_pins=$(grep -oP '(yt-dlp/releases/download|/helpers/yt-dlp)/\K[0-9][0-9.]*(?=/)' "$file" | sort -u || true)
+          deno_pins=$(grep -oP '(denoland/deno/releases/download|dl\.deno\.land/release)/v\K[0-9][0-9.]*(?=/)' "$file" | sort -u || true)
           for pins in "yt-dlp:$ytdlp_pins" "Deno:$deno_pins"; do
             if [ "$(printf '%s\n' "${pins#*:}" | grep -c .)" -gt 1 ]; then
-              echo "::error::the ${pins%%:*} pins in $file differ between architectures: $(echo ${pins#*:})"
+              echo "::error::the ${pins%%:*} pins in $file differ between architectures or sources: $(echo ${pins#*:})"
               exit 1
             fi
           done
@@ -94,10 +101,37 @@ jobs:
 
           title="Sidecar pins are behind"
           body=$(printf '%s\n' "The weekly sidecar check on $(date -u +%Y-%m-%d) found:" "" "${stale[@]}" "" \
-            "Update the URL and SHA256 together in \`crates/streams/src/sidecars.rs\` (and the versions in THIRD_PARTY.md). Run: $RUN_URL")
+            "Update the URL and SHA256 together in \`crates/streams/src/sidecars.rs\`, with the second sources (\`ytdlp_mirror\`, \`deno_cdn_url\` and \`deno_cdn_sha256\`, from dl.deno.land's zip), and the versions in THIRD_PARTY.md; then deploy the site. Run: $RUN_URL")
           existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "\"$title\" in:title" --json number --jq '.[0].number')
           if [ -n "$existing" ]; then
             gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body "$body"
           else
             gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "$body"
           fi
+
+      # The app falls back to these when GitHub can't be reached, and deletes a file that
+      # doesn't match its pin: a stale site or a changed CDN zip would make the fallback fail.
+      - name: Check the second sources serve the pinned files
+        shell: bash
+        run: |
+          set -euo pipefail
+          file=crates/streams/src/sidecars.rs
+          pairs=$(perl -0ne '
+            print "$2 $1\n" while /ytdlp_sha256:\s*"(\w+)",\s*ytdlp_mirror:\s*"([^"]+)"/g;
+            print "$1 $2\n" while /deno_cdn_url:\s*"([^"]+)",\s*deno_cdn_sha256:\s*"(\w+)"/g;
+          ' "$file")
+          if [ "$(printf '%s\n' "$pairs" | grep -c .)" -ne 4 ]; then
+            echo "::error::expected 4 second-source pins in $file, found: $pairs"
+            exit 1
+          fi
+          failed=0
+          while read -r url sha; do
+            got=$(curl -fsSL --retry 2 "$url" | sha256sum | cut -d' ' -f1) || got="(download failed)"
+            if [ "$got" = "$sha" ]; then
+              echo "$url matches its pin"
+            else
+              echo "::error::$url: SHA256 $got, the pin is $sha"
+              failed=1
+            fi
+          done <<< "$pairs"
+          exit $failed

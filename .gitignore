@@ -3,6 +3,8 @@ target/
 .env
 site/node_modules/
 site/dist/
+# The yt-dlp builds the site serves, downloaded by site/scripts/helpers.mjs at build time.
+site/public/helpers/
 site/.astro/
 site/test-results/
 site/playwright-report/

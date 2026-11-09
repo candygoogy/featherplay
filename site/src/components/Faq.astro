@@ -45,7 +45,7 @@ const faqs = [
     id: "connects",
     q: "What does it connect to?",
     a: [
-      "featherplay sends no telemetry and has no server of its own. It connects to YouTube Music and Google for your music, covers, streams and sign-in, and to GitHub to fetch yt-dlp and Deno on the first run and to update yt-dlp.",
+      "featherplay sends no telemetry and has no server of its own. It connects to YouTube Music and Google for your music, covers, streams and sign-in, and to GitHub to fetch yt-dlp and Deno on the first run and to update yt-dlp. Only when GitHub can't be reached, it fetches them from this site and from Deno's download server instead.",
       "LRCLIB gets the song's title, artist, album and length, only while lyrics are on screen. SponsorBlock, on by default, is asked only about music videos and uploads (songs have nothing to skip), by the first four characters of a hash of the video's ID, so it doesn't learn which video you play.",
       "Last.fm and ListenBrainz hear from it only if you connect them, and Discord only if you turn on the status, through the Discord app on your own PC.",
     ],
@@ -60,7 +60,7 @@ const faqs = [
   {
     q: "Does it download anything else?",
     a: [
-      "Yes, two helpers, on the first run: yt-dlp, which finds each song's audio stream, and Deno, which yt-dlp needs to do it. featherplay fetches both from their GitHub releases and checks each file against a SHA256 written into its own code; a file that doesn't match is deleted, not run.",
+      "Yes, two helpers, on the first run: yt-dlp, which finds each song's audio stream, and Deno, which yt-dlp needs to do it. featherplay fetches both from their GitHub releases, or from this site and Deno's download server when GitHub can't be reached, and checks each file against a SHA256 written into its own code; a file that doesn't match is deleted, not run.",
       "After that it updates yt-dlp at most once a day, because YouTube changes often. Nothing else is downloaded, and never the music itself.",
     ],
   },

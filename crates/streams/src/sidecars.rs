@@ -4,11 +4,10 @@ use std::sync::Mutex;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant, SystemTime};
 
+use featherplay_core::failure::HelperFault;
 use featherplay_core::sync::LockExt;
 use sha2::{Digest, Sha256};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-
-use featherplay_core::failure::HelperFault;
 
 use crate::{ResolveError, SidecarError};
 
@@ -18,34 +17,54 @@ use crate::{ResolveError, SidecarError};
 // `SHA2-256SUMS`, deno's `.sha256sum`), and matched the downloaded binaries on 2026-11-03.
 // yt-dlp then keeps itself current with `yt-dlp -U`, which fetches the build of its own
 // variant (`yt-dlp_arm64.exe` for the ARM64 one), whatever the file is called here.
-// Both architectures pin the same versions; `.github/workflows/sidecar-pins.yml` checks that.
+// Both architectures pin the same versions; `.github/workflows/sidecar-pins.yml` checks that,
+// and that the second sources below hold the same releases.
+//
+// Each file comes from GitHub first, then from a second source when GitHub can't be reached
+// or sent something else: yt-dlp from featherplay's site (the same file, put there by the
+// site's build, `site/scripts/helpers.mjs`, which reads the pins here), Deno from Deno's own
+// download server, whose zips aren't GitHub's bytes (measured 2026-11-09: same sizes, and a
+// `deno.exe` inside that differs from GitHub's too), so they have their own pins, measured
+// from dl.deno.land itself. Deno publishes no checksum there to check them against: moving
+// the Deno pin means downloading both zips once and pinning what came.
 
 /// The helpers one architecture's build downloads.
 struct Pins {
     ytdlp_url: &'static str,
     ytdlp_sha256: &'static str,
+    /// The same file on featherplay's site.
+    ytdlp_mirror: &'static str,
     /// The zip's file name; its download is kept as `{DENO_ZIP}.part`.
     deno_zip: &'static str,
     deno_url: &'static str,
     deno_sha256: &'static str,
+    /// The release's zip on dl.deno.land, and its own sha256.
+    deno_cdn_url: &'static str,
+    deno_cdn_sha256: &'static str,
 }
 
 #[cfg(any(test, not(target_arch = "aarch64")))]
 const X64: Pins = Pins {
     ytdlp_url: "https://github.com/yt-dlp/yt-dlp/releases/download/2026.10.26/yt-dlp.exe",
     ytdlp_sha256: "f5389d3698ecde4ef06f4e6b1ce0294fe9ac1396228c8990b8d3416d6d177a7d",
+    ytdlp_mirror: "https://featherplay.candygoogy.dev/helpers/yt-dlp/2026.10.26/yt-dlp.exe",
     deno_zip: "deno-x86_64-pc-windows-msvc.zip",
     deno_url: "https://github.com/denoland/deno/releases/download/v2.9.8/deno-x86_64-pc-windows-msvc.zip",
     deno_sha256: "cba84b26e0df5ae7f74fc66b86a95b866872a86292ebd84fa1e959927edd93bf",
+    deno_cdn_url: "https://dl.deno.land/release/v2.9.8/deno-x86_64-pc-windows-msvc.zip",
+    deno_cdn_sha256: "b0f654158ad3edaee34cf6aa8d39695f242d3b122753f6fb965261b9c7986f24",
 };
 
 #[cfg(any(test, target_arch = "aarch64"))]
 const ARM64: Pins = Pins {
     ytdlp_url: "https://github.com/yt-dlp/yt-dlp/releases/download/2026.10.26/yt-dlp_arm64.exe",
     ytdlp_sha256: "0066dbac3c124028e2dcae2a197fccee33cd91f456313d24f7af89fd54590e98",
+    ytdlp_mirror: "https://featherplay.candygoogy.dev/helpers/yt-dlp/2026.10.26/yt-dlp_arm64.exe",
     deno_zip: "deno-aarch64-pc-windows-msvc.zip",
     deno_url: "https://github.com/denoland/deno/releases/download/v2.9.8/deno-aarch64-pc-windows-msvc.zip",
     deno_sha256: "b413b92b735b50c198e8fe3b85af1aa50e29d5f72e229aab701d132286e14cef",
+    deno_cdn_url: "https://dl.deno.land/release/v2.9.8/deno-aarch64-pc-windows-msvc.zip",
+    deno_cdn_sha256: "ef6c1d9d946dd6d52774ec1adbd55abdaab9585ba9d7be269cfe41c022504b5b",
 };
 
 /// The native helpers of the architecture this exe is built for, so an ARM64 featherplay
@@ -58,6 +77,8 @@ const DENO_ZIP: &str = PINS.deno_zip;
 /// GitHub sends release downloads on to a host under this domain
 /// (`release-assets.githubusercontent.com` in Oct 2026).
 const ASSET_DOMAIN: &str = ".githubusercontent.com";
+/// The second sources' hosts. Neither redirected on 2026-11-09.
+const SECOND_HOSTS: [&str; 2] = ["featherplay.candygoogy.dev", "dl.deno.land"];
 
 /// Touched after every successful `yt-dlp -U`, and when yt-dlp is downloaded: the pinned
 /// release is new enough for its first day, then `update_if_stale` keeps it current.
@@ -68,6 +89,9 @@ const VERSION_TIMEOUT: Duration = Duration::from_secs(30);
 /// A download that can't connect, or stops sending, for this long fails.
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
 const READ_TIMEOUT: Duration = Duration::from_secs(30);
+/// A download stops here: the helpers are 20 to 45 MB, so more is no helper, and the disk
+/// stays out of a bad server's reach.
+const MAX_DOWNLOAD_BYTES: u64 = 200_000_000;
 
 /// Antivirus often holds a new `.exe` for a few seconds after it's written, and the rename,
 /// the unzip or the hashing then fails with "access denied" (os error 5) or "in use" (32).
@@ -94,19 +118,33 @@ const DOWNLOAD_WAITS: [Duration; 2] = [Duration::from_millis(1); 2];
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
-/// One file a first run downloads, and the sha256 it must have.
-struct Asset {
+/// One place a file can be downloaded from, and the sha256 it must have there.
+struct Source {
     url: String,
     sha256: String,
 }
 
-/// Where the sidecars are downloaded from: the pinned GitHub releases, over HTTPS, with
-/// redirects only to GitHub's download hosts. Tests use a local server instead.
+impl Source {
+    fn new(url: &str, sha256: &str) -> Source {
+        Source {
+            url: url.into(),
+            sha256: sha256.into(),
+        }
+    }
+}
+
+/// One file a first run downloads: its sources, in the order they're tried.
+struct Asset {
+    sources: Vec<Source>,
+}
+
+/// Where the sidecars are downloaded from: the pinned GitHub releases, then the second
+/// sources, over HTTPS, with redirects only to those hosts. Tests use local servers instead.
 pub struct Downloads {
     ytdlp: Asset,
     /// A zip with `deno.exe` in it.
     deno: Asset,
-    /// The test server on 127.0.0.1, over plain HTTP.
+    /// The test servers on 127.0.0.1, over plain HTTP.
     #[cfg(test)]
     local: bool,
 }
@@ -116,30 +154,35 @@ impl Downloads {
     pub fn pinned() -> Downloads {
         Downloads {
             ytdlp: Asset {
-                url: PINS.ytdlp_url.into(),
-                sha256: PINS.ytdlp_sha256.into(),
+                sources: vec![
+                    Source::new(PINS.ytdlp_url, PINS.ytdlp_sha256),
+                    Source::new(PINS.ytdlp_mirror, PINS.ytdlp_sha256),
+                ],
             },
             deno: Asset {
-                url: PINS.deno_url.into(),
-                sha256: PINS.deno_sha256.into(),
+                sources: vec![
+                    Source::new(PINS.deno_url, PINS.deno_sha256),
+                    Source::new(PINS.deno_cdn_url, PINS.deno_cdn_sha256),
+                ],
             },
             #[cfg(test)]
             local: false,
         }
     }
 
-    /// `{base}/yt-dlp.exe` and `{base}/deno.zip` from a test server on 127.0.0.1.
+    /// `{base}/yt-dlp.exe` and `{base}/deno.zip` from test servers on 127.0.0.1, tried in
+    /// the order of `bases`.
     #[cfg(test)]
-    pub(crate) fn local(base: &str, ytdlp_sha256: &str, deno_sha256: &str) -> Downloads {
+    pub(crate) fn local(bases: &[&str], ytdlp_sha256: &str, deno_sha256: &str) -> Downloads {
+        let from = |file: &str, sha256: &str| Asset {
+            sources: bases
+                .iter()
+                .map(|base| Source::new(&format!("{base}/{file}"), sha256))
+                .collect(),
+        };
         Downloads {
-            ytdlp: Asset {
-                url: format!("{base}/yt-dlp.exe"),
-                sha256: ytdlp_sha256.into(),
-            },
-            deno: Asset {
-                url: format!("{base}/deno.zip"),
-                sha256: deno_sha256.into(),
-            },
+            ytdlp: from("yt-dlp.exe", ytdlp_sha256),
+            deno: from("deno.zip", deno_sha256),
             local: true,
         }
     }
@@ -153,7 +196,7 @@ impl Downloads {
         download_host(url)
     }
 
-    /// HTTPS only, redirects only to GitHub's hosts, and timeouts so a dead connection
+    /// HTTPS only, redirects only to the download hosts, and timeouts so a dead connection
     /// fails the download instead of holding the resolves waiting on it. The client goes
     /// with the download, and its timers with it.
     fn client(&self) -> Result<reqwest::Client, ResolveError> {
@@ -174,7 +217,7 @@ impl Downloads {
                 if attempt.previous().len() < 5 && download_host(attempt.url()) {
                     attempt.follow()
                 } else {
-                    attempt.error("redirect away from GitHub refused")
+                    attempt.error("redirect away from the download hosts refused")
                 }
             }))
             .build()
@@ -287,8 +330,7 @@ impl Sidecars {
 
         if !self.ytdlp().is_file() {
             let part = self.dir.join("yt-dlp.exe.part");
-            download_patiently(&http, from, &from.ytdlp.url, &part, "yt-dlp", &progress).await?;
-            verify_or_delete(&part, &from.ytdlp.sha256).await?;
+            fetch(&http, from, &from.ytdlp, &part, "yt-dlp", &progress).await?;
             put_in_place(&part, &self.ytdlp()).await?;
             // The pinned release counts as today's update: no `yt-dlp -U` right after it.
             touch(&self.dir.join(UPDATE_STAMP)).await;
@@ -296,8 +338,7 @@ impl Sidecars {
 
         if !self.deno().is_file() {
             let zip = self.dir.join(format!("{DENO_ZIP}.part"));
-            download_patiently(&http, from, &from.deno.url, &zip, "deno", &progress).await?;
-            verify_or_delete(&zip, &from.deno.sha256).await?;
+            fetch(&http, from, &from.deno, &zip, "deno", &progress).await?;
             let exe_part = self.dir.join("deno.exe.part");
             let extracted = patiently(|| {
                 let (z, e) = (zip.clone(), exe_part.clone());
@@ -499,9 +540,7 @@ fn io_err(fault: HelperFault, what: &str, e: std::io::Error) -> ResolveError {
 
 /// A failed request or body read from `url`: `Unreachable`, with its host and HTTP status.
 fn http_err(url: &str, e: reqwest::Error) -> ResolveError {
-    let host = reqwest::Url::parse(url)
-        .ok()
-        .and_then(|u| u.host_str().map(str::to_string));
+    let host = Some(host_of(url)).filter(|h| !h.is_empty());
     ResolveError::Sidecar(SidecarError {
         host,
         status: e.status().map(|s| s.as_u16()),
@@ -509,13 +548,13 @@ fn http_err(url: &str, e: reqwest::Error) -> ResolveError {
     })
 }
 
-/// HTTPS on github.com or GitHub's release download hosts. Nothing secret is sent; the
-/// pinned sha256 is what vouches for the file.
+/// HTTPS on github.com, GitHub's release download hosts or a second source's host. Nothing
+/// secret is sent; the pinned sha256 is what vouches for the file.
 fn download_host(url: &reqwest::Url) -> bool {
     url.scheme() == "https"
-        && url
-            .host_str()
-            .is_some_and(|h| h == "github.com" || h.ends_with(ASSET_DOMAIN))
+        && url.host_str().is_some_and(|h| {
+            h == "github.com" || h.ends_with(ASSET_DOMAIN) || SECOND_HOSTS.contains(&h)
+        })
 }
 
 /// A download that failed, and whether it's worth another try.
@@ -546,6 +585,55 @@ fn write_failed(what: &str, e: std::io::Error) -> Failed {
         error: io_err(HelperFault::NoSpace, what, e),
         transient: false,
     }
+}
+
+/// Downloads `asset` to `dest` and checks it against the pin of the source it came from:
+/// from each source in turn while the last couldn't be reached or sent a damaged file. A
+/// failure on our side (a full disk, a held file) stops there. When every source fails, the
+/// first one's error is the one returned: GitHub's, what the user's network did to it.
+async fn fetch(
+    http: &reqwest::Client,
+    from: &Downloads,
+    asset: &Asset,
+    dest: &Path,
+    name: &str,
+    progress: &impl Fn(&str, u64, u64),
+) -> Result<(), ResolveError> {
+    let mut first = None;
+    for (i, source) in asset.sources.iter().enumerate() {
+        if i > 0 {
+            log::info!("downloading {name} from {} instead", host_of(&source.url));
+        }
+        let fetched = async {
+            download_patiently(http, from, &source.url, dest, name, progress).await?;
+            verify_or_delete(dest, &source.sha256).await
+        }
+        .await;
+        match fetched {
+            Ok(()) => return Ok(()),
+            Err(ResolveError::Sidecar(e))
+                if matches!(e.fault, HelperFault::Unreachable | HelperFault::Damaged) =>
+            {
+                log::warn!(
+                    "downloading {name} from {} failed ({}): {}",
+                    host_of(&source.url),
+                    e.fault.name(),
+                    e.message
+                );
+                first.get_or_insert(ResolveError::Sidecar(e));
+            }
+            Err(e) => return Err(e),
+        }
+    }
+    Err(first.unwrap_or_else(|| sidecar_err(HelperFault::Unreachable, name, "no source")))
+}
+
+/// `url`'s host, for the log.
+fn host_of(url: &str) -> String {
+    reqwest::Url::parse(url)
+        .ok()
+        .and_then(|u| u.host_str().map(str::to_string))
+        .unwrap_or_default()
 }
 
 /// `download`, tried again after `DOWNLOAD_WAITS` while it fails transiently.
@@ -605,6 +693,12 @@ async fn download(
                 .await
                 .map_err(|e| write_failed("writing the download", e))?;
             done += chunk.len() as u64;
+            if done > MAX_DOWNLOAD_BYTES {
+                return Err(Failed {
+                    error: sidecar_err(HelperFault::Damaged, url, "far bigger than the helper"),
+                    transient: false,
+                });
+            }
             progress(name, done, total);
         }
         file.flush()
@@ -721,11 +815,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn downloads_stay_on_github_over_https() {
+    fn downloads_stay_on_their_hosts_over_https() {
         let ok = |u: &str| download_host(&reqwest::Url::parse(u).unwrap());
         for pins in [&X64, &ARM64] {
             assert!(ok(pins.ytdlp_url) && ok(pins.deno_url));
+            assert!(ok(pins.ytdlp_mirror) && ok(pins.deno_cdn_url));
         }
+        assert!(!ok(
+            "http://featherplay.candygoogy.dev/helpers/yt-dlp/x/yt-dlp.exe"
+        ));
+        assert!(!ok("http://dl.deno.land/release/v2.9.8/deno.zip"));
+        assert!(!ok("https://dl.deno.land.example.net/"));
+        assert!(!ok("https://evil.featherplay.candygoogy.dev/"));
+        assert!(!ok("https://candygoogy.dev/"));
         assert!(ok(
             "https://release-assets.githubusercontent.com/github-production-release-asset/1"
         ));
@@ -756,7 +858,7 @@ mod tests {
     #[test]
     fn the_pins_are_sha256_hex() {
         for pins in [&X64, &ARM64] {
-            for h in [pins.ytdlp_sha256, pins.deno_sha256] {
+            for h in [pins.ytdlp_sha256, pins.deno_sha256, pins.deno_cdn_sha256] {
                 assert_eq!(h.len(), 64);
                 assert!(
                     h.bytes()
@@ -780,20 +882,49 @@ mod tests {
         assert!(X64.ytdlp_url.ends_with("/yt-dlp.exe"));
         assert_ne!(X64.ytdlp_sha256, ARM64.ytdlp_sha256);
         assert_ne!(X64.deno_sha256, ARM64.deno_sha256);
+        assert_ne!(X64.deno_cdn_sha256, ARM64.deno_cdn_sha256);
     }
 
+    /// The second sources hold the same releases, under the same file names: the site's
+    /// `helpers/yt-dlp/<version>/<file>`, and Deno's `release/v<version>/<zip>`.
+    #[test]
+    fn the_second_sources_hold_the_pinned_releases() {
+        for pins in [&X64, &ARM64] {
+            let (_, ytdlp) = pins.ytdlp_url.split_once("/releases/download/").unwrap();
+            assert_eq!(
+                pins.ytdlp_mirror,
+                format!("https://featherplay.candygoogy.dev/helpers/yt-dlp/{ytdlp}")
+            );
+            let (_, deno) = pins.deno_url.split_once("/releases/download/").unwrap();
+            assert_eq!(
+                pins.deno_cdn_url,
+                format!("https://dl.deno.land/release/{deno}")
+            );
+            assert_ne!(pins.deno_cdn_sha256, pins.deno_sha256, "not GitHub's bytes");
+        }
+    }
+
+    /// GitHub first, then the second source, each with its own pin.
     #[cfg(target_arch = "aarch64")]
     #[test]
     fn an_arm64_build_downloads_the_arm64_helpers() {
-        assert_eq!(Downloads::pinned().deno.url, ARM64.deno_url);
-        assert_eq!(Downloads::pinned().ytdlp.url, ARM64.ytdlp_url);
+        let urls = |a: &Asset| a.sources.iter().map(|s| s.url.clone()).collect::<Vec<_>>();
+        let d = Downloads::pinned();
+        assert_eq!(urls(&d.ytdlp), [ARM64.ytdlp_url, ARM64.ytdlp_mirror]);
+        assert_eq!(urls(&d.deno), [ARM64.deno_url, ARM64.deno_cdn_url]);
+        assert_eq!(d.deno.sources[1].sha256, ARM64.deno_cdn_sha256);
     }
 
+    /// GitHub first, then the second source, each with its own pin.
     #[cfg(target_arch = "x86_64")]
     #[test]
     fn an_x64_build_downloads_the_x64_helpers() {
-        assert_eq!(Downloads::pinned().deno.url, X64.deno_url);
-        assert_eq!(Downloads::pinned().ytdlp.url, X64.ytdlp_url);
+        let urls = |a: &Asset| a.sources.iter().map(|s| s.url.clone()).collect::<Vec<_>>();
+        let d = Downloads::pinned();
+        assert_eq!(urls(&d.ytdlp), [X64.ytdlp_url, X64.ytdlp_mirror]);
+        assert_eq!(urls(&d.deno), [X64.deno_url, X64.deno_cdn_url]);
+        assert_eq!(d.deno.sources[1].sha256, X64.deno_cdn_sha256);
+        assert_eq!(d.ytdlp.sources[1].sha256, X64.ytdlp_sha256, "the same file");
     }
 
     /// Downloads both pinned releases from GitHub (~60 MB) into a scratch dir.
@@ -910,7 +1041,7 @@ mod tests {
             .join(format!("cut-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let dest = dir.join("yt-dlp.exe.part");
-        let from = Downloads::local(&base, "", "");
+        let from = Downloads::local(&[&base], "", "");
         let http = from.client().unwrap();
 
         let url = format!("{base}/yt-dlp.exe");

@@ -101,8 +101,11 @@ and compare the hash with the one on the release page, or
 featherplay finds each song's audio with two helper programs,
 [yt-dlp](https://github.com/yt-dlp/yt-dlp) and [Deno](https://github.com/denoland/deno). On
 the first run it downloads them from their GitHub releases and checks each file against a
-SHA256 written into featherplay's code; a file that doesn't match is deleted, not run. After
-that it updates yt-dlp at most once a day, because YouTube changes often. They live in
+SHA256 written into featherplay's code; a file that doesn't match is deleted, not run. When
+GitHub can't be reached, it gets yt-dlp from featherplay's site and Deno from Deno's own
+download server instead, checked the same way. It goes through the proxy set in Windows'
+settings, if there is one. After that it updates yt-dlp at most once a day, because YouTube
+changes often. They live in
 `%LOCALAPPDATA%\featherplay\sidecars`.
 
 ### Signing in
@@ -414,13 +417,15 @@ neither names your account.
 
 ## Privacy
 
-featherplay sends no telemetry and has no server. It connects to:
+featherplay sends no telemetry and has no server, only a static website. It connects to:
 
 - **YouTube Music and Google**, for your music, covers, streams and sign-in;
 - **GitHub**, to download yt-dlp and Deno on the first run and to update yt-dlp. With "Check
   for updates" on (the default), also once a day at startup, to ask whether a newer
   featherplay is out, and when songs keep failing to play, to look for a newer release or a
   known problem. It's sent nothing but the app's version;
+- **featherplay's site and dl.deno.land**, only when GitHub can't be reached on the first run,
+  for the same yt-dlp and Deno;
 - **LRCLIB**, for lyrics, only while lyrics are on screen. It gets the song's title, artist,
   album and length;
 - **SponsorBlock**, on by default, only for music videos and uploads (songs have nothing to

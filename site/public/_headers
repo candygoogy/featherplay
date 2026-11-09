@@ -22,6 +22,11 @@
 /_astro/*
   Cache-Control: public, max-age=31536000, immutable
 
+# The yt-dlp builds the app falls back to (scripts/helpers.mjs): for the app, not for search
+# results. No long cache: a path not deployed yet answers 404, which mustn't stick.
+/helpers/*
+  X-Robots-Tag: noindex
+
 # The workers.dev address stays out of search results; the site lives at featherplay.candygoogy.dev.
 https://featherplay-site.candygoogy.workers.dev/*
   X-Robots-Tag: noindex
