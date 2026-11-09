@@ -166,11 +166,16 @@ fn a_watch_response_without_the_seed_gives_none() {
     assert_eq!(convert::seed_track("{}", &other).expect("parse"), None);
 }
 
+/// A recording that is a list of answers, in the order they came.
+fn fixture_pages(name: &str) -> Vec<String> {
+    let pages: Vec<Value> = serde_json::from_str(&fixture(name)).expect(name);
+    pages.iter().map(Value::to_string).collect()
+}
+
 /// The Home fixture holds three raw pages: the first page and one continuation, as `home`
 /// fetches them, then the page after them, as Home fetches it on scroll.
 fn home_fixture() -> Vec<String> {
-    let pages: Vec<Value> = serde_json::from_str(&fixture("home")).expect("home fixture");
-    pages.iter().map(Value::to_string).collect()
+    fixture_pages("home")
 }
 
 /// The first page and its continuation.
@@ -1114,6 +1119,96 @@ fn a_continuation_with_a_row_without_duration_reads() {
     let joined = &tracks[first_count];
     assert_eq!(joined.id, liked_first.id);
     assert_eq!(joined.duration, None);
+}
+
+fn ids(tracks: &[featherplay_core::model::Track]) -> Vec<&str> {
+    tracks.iter().map(|t| t.id.0.as_str()).collect()
+}
+
+/// A mix ("Archive Mix", recorded 2026-11-09 and scrubbed, its id too, as a mix is made for
+/// one listener; the first page is cut to five of its songs): a playlist page like any other, except that its last row always offers a
+/// next page, and the answer to the last one has nothing in it. The list ends there. It
+/// read as a page in an unknown layout, which failed the whole mix.
+#[test]
+fn a_mix_ends_at_the_empty_answer_to_its_last_continuation() {
+    let pages = fixture_pages("playlist_mix");
+    assert_eq!(
+        pages.len(),
+        3,
+        "the first page, a continuation, the empty one"
+    );
+    let id = PlaylistId("VLRDTMAK5uy_FIXTURE_MIX_100000000000000000000".into());
+    let s = convert::playlist_summary(&pages[0], &id).expect("header");
+    assert_eq!(s.title, "Archive Mix");
+    assert_eq!(s.author.as_deref(), Some("YouTube Music"));
+    // A mix's header doesn't say how many songs it has.
+    assert_eq!(s.count, None);
+    assert!(s.thumbnail.is_some());
+
+    let tracks = convert::playlist_tracks(&pages).expect("rows");
+    assert_eq!(
+        ids(&tracks),
+        [
+            "STsjU8qow-M",
+            "0q2MYILxzpE",
+            "XqJosdWocto",
+            "GwiNZNJxTN8",
+            "6ThfS7mQUqM",
+            "-V817A5o_NM",
+            "Vr68FBT8Jr0",
+            "Ez-6-5E5H6c"
+        ]
+    );
+    let first = &tracks[0];
+    assert_eq!(first.video_type, VideoType::Song);
+    assert!(first.duration.is_some() && !first.artists.is_empty() && first.album.is_some());
+}
+
+/// The end of another mix ("Discover Mix", recorded the same day, scrubbed): asked for
+/// what follows its last four rows, the service hands out the first three of them again,
+/// then the fourth, then the three again, with the same two tokens, round and round. Each
+/// song is listed once.
+#[test]
+fn a_mix_whose_continuations_go_round_lists_each_song_once() {
+    let pages = fixture_pages("playlist_mix_round");
+    let tracks = convert::playlist_tracks(&pages).expect("rows");
+    assert_eq!(
+        ids(&tracks),
+        ["-GEf9-TtU10", "zt6R4ejez5Q", "o2OZLe2j9so", "OnGf-JgMaSU"]
+    );
+}
+
+/// Following that circle is where a mix's long wait went: one request after another, up to
+/// the most pages a playlist may have. The page that lists nothing new is the last one
+/// asked for; the empty answer, and a page without a continuation item, end a list too.
+#[test]
+fn paging_stops_where_a_playlist_brings_nothing_new() {
+    let round = fixture_pages("playlist_mix_round");
+    let mut paging = convert::PlaylistPaging::default();
+    assert_eq!(
+        paging.next_token(&round[0]).as_deref(),
+        Some("CONTINUATION_1")
+    );
+    assert_eq!(paging.next_token(&round[1]), None, "the same rows again");
+
+    let mix = fixture_pages("playlist_mix");
+    let mut paging = convert::PlaylistPaging::default();
+    let tokens: Vec<Option<String>> = mix.iter().map(|page| paging.next_token(page)).collect();
+    assert_eq!(
+        tokens,
+        [
+            Some("CONTINUATION_1".into()),
+            Some("CONTINUATION_2".into()),
+            None
+        ]
+    );
+
+    let whole = fixture("playlist");
+    assert_eq!(
+        convert::PlaylistPaging::default().next_token(&whole),
+        None,
+        "a playlist that fits on its first page"
+    );
 }
 
 /// A library grid item, as the library's playlists page lists it, with `menu` as its

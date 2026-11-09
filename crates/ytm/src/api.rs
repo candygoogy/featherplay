@@ -729,7 +729,8 @@ impl YtMusic {
     /// Raw pages of a playlist: the first page, then its continuations one after another,
     /// at most `MAX_PAGES`. Our own paging: ytmapi-rs's stream finds the next token by
     /// parsing the page with its typed parser, so a page it can't read silently ends the
-    /// list there. With `signed_in`, a signed-out first page is `AuthExpired` and nothing
+    /// list there. A mix's pages never run out of tokens; `PlaylistPaging` tells where its
+    /// list ends. With `signed_in`, a signed-out first page is `AuthExpired` and nothing
     /// more is fetched.
     async fn playlist_pages<Q>(&self, base: &Q, signed_in: bool) -> Result<Vec<String>, ApiError>
     where
@@ -739,13 +740,14 @@ impl YtMusic {
         if signed_in && convert::logged_in(&first) == Some(false) {
             return Err(ApiError::AuthExpired);
         }
-        let mut token = convert::playlist_continuation(&first);
+        let mut paging = convert::PlaylistPaging::default();
+        let mut token = paging.next_token(&first);
         let mut pages = vec![first];
         while let Some(t) = token.take()
             && pages.len() < MAX_PAGES
         {
             let page = self.raw(&Continuation { base, token: t }).await?;
-            token = convert::playlist_continuation(&page);
+            token = paging.next_token(&page);
             pages.push(page);
         }
         Ok(pages)

@@ -11,7 +11,7 @@
 //! `process_lenient`, which takes such an item out of the page and parses the page again; a
 //! song row is then read from the raw JSON in its place, anything else left out.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 
 use featherplay_core::model::{
@@ -436,19 +436,23 @@ fn suggested_result(r: &Value) -> Option<SuggestedResult> {
 /// column. Unavailable (greyed out, deleted) rows and uploads are dropped; a row without
 /// a duration is kept without one.
 ///
-/// A first page without a track shelf is an empty playlist. A continuation page that
-/// isn't a list of rows is a parse error.
+/// A first page without a track shelf is an empty playlist. A continuation with nothing in
+/// it is the end of the list: a mix's last row always offers a next page, and the answer
+/// to the last one is empty. Any other continuation that isn't a list of rows is a parse
+/// error. A row the service hands out a second time (`Listed`) is left out.
 pub fn playlist_tracks(pages: &[String]) -> Result<Vec<Track>, ApiError> {
     if pages.first().is_some_and(|raw| unavailable(raw)) {
         return Err(ApiError::NotFound);
     }
     let mut out = Vec::new();
+    let mut listed = Listed::default();
     for (i, raw) in pages.iter().enumerate() {
         let v = json(raw)?;
         check_error(&v)?;
         let rows = match playlist_rows(&v) {
             Some(rows) => rows,
             None if i == 0 && v.pointer(PLAYLIST_COLUMNS).is_some() => &[],
+            None if i > 0 && no_contents(&v) => &[],
             None => {
                 return Err(ApiError::Parse(format!(
                     "playlist page has no rows ({})",
@@ -456,21 +460,81 @@ pub fn playlist_tracks(pages: &[String]) -> Result<Vec<Track>, ApiError> {
                 )));
             }
         };
-        out.extend(rows.iter().filter_map(playlist_row));
+        out.extend(
+            rows.iter()
+                .filter(|row| listed.add(row))
+                .filter_map(playlist_row),
+        );
     }
     Ok(out)
+}
+
+/// The rows a playlist's pages have listed so far, to tell the ones that come a second
+/// time. A mix's continuations go round at its end: asked for what follows its last rows,
+/// the service hands some of them out again, as entries it has already listed
+/// (`playlistSetVideoId` numbers a list's entries). A row is new when its entry or its
+/// video is: a playlist that has a song twice has it as two entries.
+#[derive(Default)]
+struct Listed {
+    entries: HashSet<String>,
+    videos: HashSet<String>,
+}
+
+impl Listed {
+    /// Notes `row` and says whether it's new. A row that doesn't name its entry and its
+    /// video (a collaborative playlist's, the continuation item) always is.
+    fn add(&mut self, row: &Value) -> bool {
+        let data = row.pointer("/musicResponsiveListItemRenderer/playlistItemData");
+        let id = |key: &str| data.and_then(|d| d.get(key)).and_then(Value::as_str);
+        let (Some(entry), Some(video)) = (id("playlistSetVideoId"), id("videoId")) else {
+            return true;
+        };
+        // Both are noted, whatever the first one says.
+        let new_entry = self.entries.insert(entry.to_string());
+        let new_video = self.videos.insert(video.to_string());
+        new_entry || new_video
+    }
 }
 
 /// The next-page token of a playlist page (first page or continuation): the last row's
 /// continuation item.
 pub fn playlist_continuation(raw: &str) -> Option<String> {
     let v: Value = serde_json::from_str(raw).ok()?;
-    playlist_rows(&v)?
-        .last()?
+    continuation_token(playlist_rows(&v)?)
+}
+
+fn continuation_token(rows: &[Value]) -> Option<String> {
+    rows.last()?
         .pointer(CONTINUATION_TOKEN)
         .and_then(Value::as_str)
         .filter(|t| !t.is_empty())
         .map(str::to_string)
+}
+
+/// Follows a playlist's pages to the end of its list: `next_token` for each page as it
+/// comes, the first one included.
+#[derive(Default)]
+pub struct PlaylistPaging {
+    listed: Listed,
+}
+
+impl PlaylistPaging {
+    /// The token of the page after `raw`, as `playlist_continuation` reads it, or `None`
+    /// at the end of the list. A mix has no last page: every one ends with a token. Its
+    /// list ends at an answer with no rows, or at a page whose rows were all listed before
+    /// (`Listed`), whose token would only bring them round again.
+    pub fn next_token(&mut self, raw: &str) -> Option<String> {
+        let v: Value = serde_json::from_str(raw).ok()?;
+        let rows = playlist_rows(&v)?;
+        let songs = rows
+            .iter()
+            .filter(|row| row.get("musicResponsiveListItemRenderer").is_some());
+        let (new, again): (Vec<_>, Vec<_>) = songs.partition(|row| self.listed.add(row));
+        if new.is_empty() && !again.is_empty() {
+            return None;
+        }
+        continuation_token(rows)
+    }
 }
 
 /// A first page's track shelf rows, or the rows a continuation page appends.
