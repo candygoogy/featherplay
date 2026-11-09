@@ -13,6 +13,8 @@ Notable changes to featherplay, newest first. The format follows
   Status text lights what it changes on the card. In a window too short for the whole
   card, its lower part (the activity) is what stays on screen. In a narrow window the
   preview is above the options, as before, and its note says it changes with them.
+- A song that wasn't ready ahead starts about 0.1 s sooner: while featherplay looks up its
+  stream, it already opens the connection to the server the stream most likely comes from.
 
 ### Fixed
 

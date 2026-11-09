@@ -28,7 +28,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use featherplay_audio::StreamSource;
 use featherplay_core::failure::getting_ready;
 use featherplay_core::model::{Track, TrackId};
-use featherplay_core::player::Input;
+use featherplay_core::player::{Input, Player, Status};
 use featherplay_streams::{Ahead, ResolvedStream};
 use serde_json::{Value, json};
 use tokio::sync::Notify;
@@ -413,6 +413,44 @@ impl Streams {
         let i = self.cache.iter().position(|(_, s)| s.url == url)?;
         self.cache.remove(i).map(|(id, _)| id)
     }
+
+    /// The server (`scheme://host`) the next stream most likely comes from: the one most
+    /// of the kept streams for this address are on, the newer of two with as many. A
+    /// stream's server repeats (4 servers over 32 streams kept, 2026-11-09), and this
+    /// guesses right about half the time, the last stream's server a third.
+    pub fn likely_server(&self) -> Option<&str> {
+        let servers: Vec<&str> = self
+            .cache
+            .iter()
+            .filter(|(_, s)| self.address.is_none() || address(&s.url) == self.address.as_deref())
+            .filter_map(|(_, s)| server(&s.url))
+            .collect();
+        // Oldest first: of equal counts `max_by_key` keeps the last, the newest.
+        servers
+            .iter()
+            .copied()
+            .max_by_key(|s| servers.iter().filter(|o| *o == s).count())
+    }
+}
+
+/// The `scheme://host` of an `http(s)` URL.
+fn server(url: &str) -> Option<&str> {
+    let rest = url
+        .strip_prefix("https://")
+        .or_else(|| url.strip_prefix("http://"))?;
+    let end = url.len() - rest.len() + rest.find(['/', '?']).unwrap_or(rest.len());
+    Some(&url[..end])
+}
+
+/// Whether the player waits for the stream of `id` to play it: a click on the current
+/// track, not the next one's preload nor a load while paused.
+fn waits_to_play(player: &Player, id: &TrackId) -> bool {
+    player.wants_play()
+        && *player.status() == Status::Loading
+        && player
+            .queue()
+            .current()
+            .is_some_and(|t| player.play_id(t) == *id)
 }
 
 impl Controller {
@@ -559,6 +597,13 @@ impl Controller {
             // Loading meanwhile). Said once per song asked for, never on a timer.
             log!("resolve {}: waiting for yt-dlp and deno to download", id.0);
             (self.ui.events)(super::UiEvent::Toast(getting_ready()));
+        } else if !matches!(want, Want::Cached(_))
+            && waits_to_play(&self.player, &id)
+            && let Some(server) = self.streams.likely_server()
+        {
+            // A click that waits for its resolve: the stream's request finds a connection
+            // open, ~100 ms sooner, when its server is the one guessed.
+            self.audio.connect(server);
         }
         match want {
             Want::Cached(s) => {
@@ -612,6 +657,8 @@ impl Controller {
 
 #[cfg(test)]
 mod tests {
+    use featherplay_core::player::{Effect, StreamInfo};
+
     use super::*;
 
     fn stream(expires_in: Duration) -> ResolvedStream {
@@ -946,5 +993,101 @@ mod tests {
         s.done(&id("b"), Some(&from("5.6.7.8", HOURS)), &[]);
         assert!(s.fresh(&id("a"), now).is_none());
         assert_eq!(s.want(&id("a"), now), Want::Start);
+    }
+
+    /// Streams resolved in this order, each on the server named, all for the address `ip`.
+    fn resolved_on(s: &mut Streams, servers: &[&str], ip: &str) {
+        for server in servers {
+            let stream = ResolvedStream {
+                url: format!("https://{server}.example.invalid/videoplayback?expire=1&ip={ip}"),
+                ..stream(HOURS)
+            };
+            let n = s.cache.len();
+            s.done(&id(&format!("{ip}-{n}")), Some(&stream), &[]);
+        }
+    }
+
+    /// The next stream comes from the server most of the kept ones are on more often than
+    /// from the last one's.
+    #[test]
+    fn the_likely_server_is_the_one_most_kept_streams_are_on() {
+        let mut s = Streams::default();
+        assert_eq!(s.likely_server(), None, "no stream kept, no guess");
+        resolved_on(&mut s, &["rr3", "rr1", "rr3", "rr5"], "1.2.3.4");
+        assert_eq!(s.likely_server(), Some("https://rr3.example.invalid"));
+    }
+
+    #[test]
+    fn the_newer_of_two_servers_with_as_many_streams_is_the_likely_one() {
+        let mut s = Streams::default();
+        resolved_on(&mut s, &["rr3", "rr1", "rr1", "rr3", "rr5"], "1.2.3.4");
+        assert_eq!(s.likely_server(), Some("https://rr3.example.invalid"));
+    }
+
+    /// The last session's streams stand in until a resolve shows this session's address;
+    /// from another address (another network, other servers) they no longer count.
+    #[test]
+    fn streams_for_another_address_do_not_make_a_server_likely() {
+        let now = SystemTime::now();
+        let mut before = Streams::default();
+        resolved_on(&mut before, &["home", "home", "home"], "1.2.3.4");
+        let mut s = Streams::default();
+        s.restore(&before.saved(now), now);
+        assert_eq!(s.likely_server(), Some("https://home.example.invalid"));
+        resolved_on(&mut s, &["away"], "5.6.7.8");
+        assert_eq!(s.likely_server(), Some("https://away.example.invalid"));
+    }
+
+    fn track(s: &str) -> Track {
+        Track {
+            id: id(s),
+            title: s.into(),
+            artists: Vec::new(),
+            album: None,
+            duration: None,
+            video_type: featherplay_core::model::VideoType::Song,
+            thumbnail: None,
+            like: featherplay_core::model::LikeStatus::Indifferent,
+            counterpart: None,
+        }
+    }
+
+    /// A player that was just told to play `a`, then `b`.
+    fn clicked() -> Player {
+        let prefs = super::super::prefs(&featherplay_store::Settings::default());
+        let mut player = Player::new(prefs);
+        let effects = player.handle(Input::PlayTracks {
+            tracks: vec![track("a"), track("b")],
+            start: 0,
+            radio: false,
+        });
+        assert!(effects.contains(&Effect::Resolve(id("a"))));
+        player
+    }
+
+    /// A connection opens ahead for the song the player waits to play, and not for the
+    /// next one, which it resolves while the current one plays.
+    #[test]
+    fn a_click_waits_for_its_stream_and_the_next_songs_preload_does_not() {
+        let mut player = clicked();
+        assert!(waits_to_play(&player, &id("a")), "the song clicked");
+        let info = StreamInfo {
+            expires_at: SystemTime::now() + HOURS,
+            duration: None,
+        };
+        player.handle(Input::Resolved {
+            id: id("a"),
+            result: Ok(info),
+        });
+        let effects = player.handle(Input::AudioStarted);
+        assert!(effects.contains(&Effect::Resolve(id("b"))));
+        assert!(!waits_to_play(&player, &id("b")), "the next song");
+    }
+
+    #[test]
+    fn a_song_paused_while_it_resolves_is_not_waited_for() {
+        let mut player = clicked();
+        player.handle(Input::Toggle);
+        assert!(!waits_to_play(&player, &id("a")));
     }
 }
