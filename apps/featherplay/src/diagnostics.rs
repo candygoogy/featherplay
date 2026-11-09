@@ -246,6 +246,7 @@ pub fn report(signed_in: bool, settings: &Settings) -> Report {
         windows: windows().to_string(),
         ytdlp,
         deno,
+        js_engine: featherplay_streams::js_engine(),
         output_device: settings.output_device.clone(),
         signed_in,
         lastfm: settings.scrobbling && settings.lastfm_enabled,

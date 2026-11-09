@@ -453,19 +453,26 @@ impl Sidecars {
         Ok(())
     }
 
-    /// A sidecar command with no console window, no stdin, killed if its future is dropped,
-    /// and deno's cache kept under `{cache}` instead of %LOCALAPPDATA%.
+    /// A sidecar command (`hidden_command`), with deno's cache kept under `{cache}` instead
+    /// of %LOCALAPPDATA%.
     pub(crate) fn command(&self, program: &Path) -> tokio::process::Command {
-        let mut cmd = tokio::process::Command::new(program);
-        cmd.env("DENO_DIR", self.home().join("deno-dir"))
-            .stdin(Stdio::null())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .kill_on_drop(true);
-        #[cfg(windows)]
-        cmd.creation_flags(CREATE_NO_WINDOW);
+        let mut cmd = hidden_command(program);
+        cmd.env("DENO_DIR", self.home().join("deno-dir"));
         cmd
     }
+}
+
+/// A command with no console window and no stdin, its output piped, killed if its future
+/// is dropped.
+pub(crate) fn hidden_command(program: &Path) -> tokio::process::Command {
+    let mut cmd = tokio::process::Command::new(program);
+    cmd.stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .kill_on_drop(true);
+    #[cfg(windows)]
+    cmd.creation_flags(CREATE_NO_WINDOW);
+    cmd
 }
 
 /// The version a sidecar's `--version` printed: yt-dlp prints `2026.10.26`, deno

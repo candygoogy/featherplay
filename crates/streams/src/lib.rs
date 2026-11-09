@@ -10,12 +10,15 @@
 
 mod chain;
 mod expiry;
+mod js;
 mod native;
 mod sidecars;
 mod ytdlp;
 
 use std::fmt;
 use std::future::Future;
+use std::io::{Read, Write};
+use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
 
 use featherplay_core::failure::HelperFault;
@@ -24,6 +27,58 @@ use featherplay_core::model::TrackId;
 pub use expiry::expires_at_from_url;
 pub use sidecars::{Downloads, Sidecars};
 pub use ytdlp::{Probe, YtDlpResolver, classify_failure, parse_ytdlp_json};
+
+/// The JavaScript engine built in for YouTube's player challenges, with its version:
+/// `QuickJS-NG 0.16.2`.
+pub fn js_engine() -> String {
+    js::engine()
+}
+
+/// Where the native resolver preprocesses a new player's JS: seconds of work and ~220 MB at
+/// its peak, once per player version (`YtDlpResolver::with_preprocessor`).
+#[derive(Clone)]
+pub enum Preprocessor {
+    /// In this process, on a thread of its own. For tests and tools.
+    InProcess,
+    /// In a short-lived child process, so the memory peak and a crash stay out of the app:
+    /// this program, started with [`PREPROCESS_ARG`] alone, which must then run
+    /// [`preprocess_stdio`] and nothing else (featherplay's own exe does).
+    Child(PathBuf),
+    /// Stands in for the work: the preprocessed player for a player's JS.
+    #[cfg(test)]
+    Stub(Stub),
+}
+
+/// Stands in for the preprocessing in tests.
+#[cfg(test)]
+pub(crate) type Stub = std::sync::Arc<dyn Fn(&str) -> Result<String, String> + Send + Sync>;
+
+/// The one argument of the process that preprocesses a player ([`Preprocessor::Child`]).
+pub const PREPROCESS_ARG: &str = "--preprocess-player";
+
+/// The whole run of the process started with [`PREPROCESS_ARG`]: reads a player's JS from
+/// stdin and writes the preprocessed player to stdout. False when it failed, with the
+/// reason on stderr. It reads no file and asks nothing of the network.
+pub fn preprocess_stdio() -> bool {
+    let mut js = String::new();
+    let done = std::io::stdin()
+        .read_to_string(&mut js)
+        .map_err(|e| format!("reading the player: {e}"))
+        .and_then(|_| js::preprocess(&js))
+        .and_then(|player| {
+            let mut out = std::io::stdout().lock();
+            out.write_all(player.as_bytes())
+                .and_then(|()| out.flush())
+                .map_err(|e| format!("writing the player: {e}"))
+        });
+    match done {
+        Ok(()) => true,
+        Err(e) => {
+            let _ = std::io::stderr().write_all(e.as_bytes());
+            false
+        }
+    }
+}
 
 /// A directly fetchable audio stream. Fetch it with 1 MiB `Range` requests: plain GETs are throttled.
 #[derive(Clone, Debug, PartialEq)]

@@ -100,3 +100,65 @@ async fn live_resolve_timing() {
         assert!(matches!(s.itag, 251 | 140), "{id}: itag {}", s.itag);
     }
 }
+
+/// A first run, on an empty home (`FEATHERPLAY_HOME`, with no `resolver` folder), as the
+/// app starts one: the helpers download in the background, and how long the start takes to
+/// have the native step ready (an embed page, the player's JS and its preprocessing; no
+/// helper is waited for), then the first song (`TIMING_IDS`).
+/// `MEASURE_PREPROCESSOR`: featherplay.exe, to preprocess in a child as the app does.
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "live: the helpers' download, an embed page, a player's JS, one player API request \
+            and one 64 KB fetch"]
+async fn live_first_run() {
+    let home = PathBuf::from(std::env::var("FEATHERPLAY_HOME").expect("set FEATHERPLAY_HOME"));
+    assert!(!home.join("resolver").exists(), "not a first run");
+    let t = Instant::now();
+    let mut r = YtDlpResolver::new(
+        Sidecars {
+            dir: home.join("sidecars"),
+        },
+        None,
+    )
+    .with_downloads(featherplay_streams::Downloads::pinned());
+    if let Ok(exe) = std::env::var("MEASURE_PREPROCESSOR") {
+        r = r.with_preprocessor(featherplay_streams::Preprocessor::Child(exe.into()));
+    }
+    let r = std::sync::Arc::new(r);
+    let helpers = r.clone();
+    let downloads = tokio::spawn(async move {
+        let done = helpers.install_helpers().await;
+        println!(
+            "helpers downloaded after {:.2} s: {done:?}",
+            t.elapsed().as_secs_f64()
+        );
+    });
+    r.prepare().await;
+    println!(
+        "the native step is ready after {:.2} s",
+        t.elapsed().as_secs_f64()
+    );
+    let id = std::env::var("TIMING_IDS").expect("set TIMING_IDS");
+    let t1 = Instant::now();
+    let s = r.resolve(&TrackId(id.clone())).await.unwrap();
+    let via = r
+        .take_fallback_reason(&TrackId(id.clone()))
+        .map_or("native".into(), |e| format!("yt-dlp ({e})"));
+    println!(
+        "first resolve {:.2} s via {via}; {:.2} s since the start",
+        t1.elapsed().as_secs_f64(),
+        t.elapsed().as_secs_f64()
+    );
+    let t2 = Instant::now();
+    let resp = reqwest::Client::new()
+        .get(&s.url)
+        .header("Range", "bytes=0-65535")
+        .send()
+        .await
+        .unwrap();
+    println!(
+        "64 KB fetch {} in {:.3} s",
+        resp.status().as_u16(),
+        t2.elapsed().as_secs_f64()
+    );
+    downloads.await.unwrap();
+}

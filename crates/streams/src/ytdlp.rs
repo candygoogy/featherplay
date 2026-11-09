@@ -1,9 +1,10 @@
 use std::path::{Path, PathBuf};
-use std::sync::OnceLock;
 use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU64, Ordering};
+use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use featherplay_core::model::TrackId;
+use featherplay_core::sync::LockExt;
 use serde_json::Value;
 use tokio::sync::Notify;
 
@@ -12,8 +13,8 @@ use crate::expiry::query_param;
 use crate::native::{NativeError, NativeResolver};
 use crate::sidecars::{Installer, tail};
 use crate::{
-    Ahead, Downloads, Quality, ResolveError, ResolvedStream, Sidecars, StreamResolver,
-    expires_at_from_url,
+    Ahead, Downloads, Preprocessor, Quality, ResolveError, ResolvedStream, Sidecars,
+    StreamResolver, expires_at_from_url,
 };
 use featherplay_proxy::Proxy;
 
@@ -121,6 +122,9 @@ pub fn classify_failure(code: i32, stderr: &str) -> ResolveError {
     }
 }
 
+/// What `YtDlpResolver::on_helpers_wait` is told.
+type Told = Box<dyn Fn(&TrackId) + Send + Sync>;
+
 /// The embedded player's client: no PO token, and its URL plays at once unless the answer
 /// had ads before the song (often since 2026-11-05: then 5 s later, which the chain waits
 /// out). Only for videos that allow embedding. The webpage and the `next` call are skipped
@@ -133,15 +137,23 @@ const EMBEDDED_ARGS: &str =
 /// order and with the rules of `Chain::resolve`:
 ///
 /// 1. The embedded player's client, asked from Rust (`native`: one request, ~0.3 s once
-///    the player is cached). Not with cookies.
+///    the player is cached). Not with cookies. It needs no helper: the player's challenges
+///    run in the QuickJS built in.
 /// 2. The same client through yt-dlp (`EMBEDDED_ARGS`, ~2.6 s).
 /// 3. yt-dlp's default clients (the TV clients, which gate their URLs behind a pre-roll ad
 ///    until `available_at`).
+///
+/// Steps 2 and 3 need the helpers (yt-dlp, and deno as its JavaScript runtime): a resolve
+/// waits for their download only when it gets to one of them (`helpers`).
 pub struct YtDlpResolver {
     sidecars: Sidecars,
     cookie_header: Option<String>,
     chain: Chain,
     native: Option<NativeResolver>,
+    /// The songs whose resolve waits for the helpers' download now.
+    waiting: Mutex<Vec<TrackId>>,
+    /// Told when a song's resolve starts to wait for it (`on_helpers_wait`).
+    on_wait: Option<Told>,
     /// yt-dlp was forced up to date after a failure this session (`update_helpers`).
     forced: AtomicBool,
     /// Held while an update runs, so resolves failing together run one `yt-dlp -U`.
@@ -161,7 +173,7 @@ pub struct YtDlpResolver {
 
 impl YtDlpResolver {
     pub fn new(sidecars: Sidecars, cookie_header: Option<String>) -> Self {
-        let native = NativeResolver::new(sidecars.dir.clone());
+        let native = NativeResolver::new(sidecars.home().join("resolver"));
         Self {
             proxy: || featherplay_proxy::for_url(featherplay_proxy::YOUTUBE),
             ..Self::with_native(sidecars, cookie_header, native)
@@ -181,6 +193,8 @@ impl YtDlpResolver {
             cookie_header,
             chain: Chain::default(),
             native,
+            waiting: Mutex::default(),
+            on_wait: None,
             forced: AtomicBool::new(false),
             updating: tokio::sync::Mutex::new(()),
             updates: AtomicU64::new(0),
@@ -203,16 +217,47 @@ impl YtDlpResolver {
         }
     }
 
-    /// Downloads yt-dlp and deno from `downloads` when they're missing: every resolve
-    /// (the native request needs deno too) waits for them first.
+    /// Downloads yt-dlp and deno from `downloads` when they're missing: a resolve that
+    /// gets to a yt-dlp step waits for them there (`helpers`).
     pub fn with_downloads(mut self, downloads: Downloads) -> Self {
         self.installer = Some(Installer::new(downloads));
         self
     }
 
+    /// Where the native step preprocesses a new player (in this process unless set).
+    pub fn with_preprocessor(mut self, preprocessor: Preprocessor) -> Self {
+        if let Some(native) = &mut self.native {
+            native.set_preprocessor(preprocessor);
+        }
+        self
+    }
+
+    /// `told(id)` runs when `id`'s resolve starts to wait for the helpers' download: its
+    /// native step didn't give a stream, and yt-dlp isn't there yet.
+    pub fn on_helpers_wait(mut self, told: impl Fn(&TrackId) + Send + Sync + 'static) -> Self {
+        self.on_wait = Some(Box::new(told));
+        self
+    }
+
+    /// `id`'s resolve is waiting for the helpers' download now.
+    pub fn waits_for_helpers(&self, id: &TrackId) -> bool {
+        self.waiting.lock_or_recover().contains(id)
+    }
+
+    /// For the app's start: has the native step ready for the first song (a first run
+    /// fetches and preprocesses its player now, `NativeResolver::prepare`). Nothing to do
+    /// with cookies, which the native step doesn't take.
+    pub async fn prepare(&self) {
+        if self.cookie_header.is_none()
+            && let Some(native) = &self.native
+        {
+            native.prepare().await;
+        }
+    }
+
     /// Downloads yt-dlp and deno if either is missing, or waits for the download running.
-    /// The app starts it at startup, so a first run has them by the first click. Without
-    /// `with_downloads`, a missing helper is `ToolMissing`.
+    /// The app starts it at startup, in the background: only the yt-dlp steps need them.
+    /// Without `with_downloads`, a missing helper is `ToolMissing`.
     pub async fn install_helpers(&self) -> Result<(), ResolveError> {
         match &self.installer {
             Some(installer) => installer.install(&self.sidecars).await,
@@ -421,10 +466,6 @@ impl YtDlpResolver {
             )));
         }
         let quality = self.quality();
-        // A first run: wait for the helpers (or the download already running for them).
-        if let Some(installer) = &self.installer {
-            installer.install(&self.sidecars).await?;
-        }
         // Lives for every step; dropping it deletes the file, on every return path.
         let cookies = match &self.cookie_header {
             Some(header) => Some(
@@ -445,6 +486,39 @@ impl YtDlpResolver {
         match ahead {
             Some((urgent, ahead)) => self.chain.resolve_ahead(&steps, id, urgent, ahead).await,
             None => self.chain.resolve(&steps, id).await,
+        }
+    }
+
+    /// Before a yt-dlp step of `id`'s resolve: waits for the helpers when they aren't
+    /// there (a first run whose native step gave no stream), or for the download already
+    /// running for them, and tells `on_wait` so. Without `with_downloads` nothing is
+    /// waited for: the step answers `ToolMissing` itself.
+    async fn helpers(&self, id: &TrackId) -> Result<(), ResolveError> {
+        let Some(installer) = &self.installer else {
+            return Ok(());
+        };
+        if self.sidecars.installed() {
+            return Ok(());
+        }
+        log::info!("resolve {}: waiting for yt-dlp and deno to download", id.0);
+        self.waiting.lock_or_recover().push(id.clone());
+        // Off the list on every way out, a cancelled resolve's too.
+        let _waiting = Waiting(&self.waiting, id);
+        if let Some(told) = &self.on_wait {
+            told(id);
+        }
+        installer.install(&self.sidecars).await
+    }
+}
+
+/// A song on `YtDlpResolver::waiting`, taken off when dropped.
+struct Waiting<'a>(&'a Mutex<Vec<TrackId>>, &'a TrackId);
+
+impl Drop for Waiting<'_> {
+    fn drop(&mut self) {
+        let mut waiting = self.0.lock_or_recover();
+        if let Some(i) = waiting.iter().position(|id| id == self.1) {
+            waiting.swap_remove(i);
         }
     }
 }
@@ -478,13 +552,26 @@ impl Steps for Live<'_> {
         )
     }
 
+    fn helpers_ready(&self) -> bool {
+        self.r.installer.is_none() || self.r.sidecars.installed()
+    }
+
+    async fn helpers_downloaded(&self) {
+        match &self.r.installer {
+            Some(installer) if installer.install(&self.r.sidecars).await.is_ok() => {}
+            _ => std::future::pending().await,
+        }
+    }
+
     async fn embedded(&self, id: &TrackId) -> Result<ResolvedStream, ResolveError> {
+        self.r.helpers(id).await?;
         self.r
             .run(id, self.cookies, Some(EMBEDDED_ARGS), self.quality)
             .await
     }
 
     async fn default_clients(&self, id: &TrackId) -> Result<ResolvedStream, ResolveError> {
+        self.r.helpers(id).await?;
         self.r.run(id, self.cookies, None, self.quality).await
     }
 
@@ -755,9 +842,8 @@ mod tests {
             .join(format!("fallback-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&home);
         std::fs::create_dir_all(home.join("sidecars")).unwrap();
-        // The embed page and a player whose preprocessing fails: this deno doesn't start.
+        // The embed page and a player whose preprocessing fails: EJS finds nothing in it.
         // No yt-dlp, so the fallback ends in `ToolMissing`.
-        std::fs::write(home.join("sidecars").join("deno.exe"), b"not a program").unwrap();
         let (url, log) = test_server::serve(|_, path, _| {
             if path.starts_with("/embed/") {
                 (200, r#"<script src="/s/player/abcd1234/base.js">"#.into())
@@ -765,7 +851,7 @@ mod tests {
                 (200, "var x={signatureTimestamp:20752};".into())
             }
         });
-        let native = NativeResolver::with_dirs(home.join("sidecars"), None, &url);
+        let native = NativeResolver::with_dirs(home.join("resolver"), &url);
         let r = YtDlpResolver::with_native(
             Sidecars {
                 dir: home.join("sidecars"),
@@ -777,7 +863,7 @@ mod tests {
         assert_eq!(err, ResolveError::ToolMissing, "yt-dlp was tried next");
         let id = TrackId("h46YpWrg55Q".into());
         let why = r.take_fallback_reason(&id).expect("a reason");
-        assert!(why.contains("deno"), "{why}");
+        assert!(why.contains("EJS"), "{why}");
         assert_eq!(
             *log.lock().unwrap(),
             [
@@ -871,32 +957,42 @@ mod tests {
             matches!(result, Err(ResolveError::ToolFailed { .. }))
         }
 
+        /// The native request needs no helper, so it goes first. The song waits for the
+        /// helpers only once that gave nothing and yt-dlp is next, and says so then.
         #[tokio::test]
-        async fn a_resolve_waits_for_the_helpers_then_goes_on() {
+        async fn a_resolve_waits_for_the_helpers_only_once_the_native_step_failed() {
             let home = test_home("first-run-wait");
             let (downloads, base, log) = helpers_server(0, Duration::ZERO);
             let dir = home.join("sidecars");
-            // The native request needs deno too: it waits as well.
-            let native = NativeResolver::with_dirs(dir.clone(), None, &base);
+            // Its player can't be preprocessed (EJS finds nothing in it), so it fails.
+            let native = NativeResolver::with_dirs(home.join("resolver"), &base);
+            let told = std::sync::Arc::new(Mutex::new(Vec::new()));
+            let waits = told.clone();
             let r = YtDlpResolver::with_native(Sidecars { dir: dir.clone() }, None, native)
-                .with_downloads(downloads);
+                .with_downloads(downloads)
+                .on_helpers_wait(move |id| waits.lock().unwrap().push(id.clone()));
+            let id = TrackId("h46YpWrg55Q".into());
 
-            let result = r.resolve(&TrackId("h46YpWrg55Q".into())).await;
+            let result = r.resolve(&id).await;
 
             assert!(went_on(&result), "got {result:?}");
             assert!(dir.join("yt-dlp.exe").is_file() && dir.join("deno.exe").is_file());
-            let log = log.lock().unwrap().clone();
             assert_eq!(
-                log.get(..3),
-                Some(
-                    &[
-                        "GET /yt-dlp.exe".to_string(),
-                        "GET /deno.zip".into(),
-                        "GET /embed/h46YpWrg55Q?html5=1".into(),
-                    ][..]
-                ),
-                "the downloads come before the native request: {log:?}"
+                *log.lock().unwrap(),
+                [
+                    "GET /embed/h46YpWrg55Q?html5=1",
+                    "GET /s/player/abcd1234/player_ias.vflset/en_US/base.js",
+                    "GET /yt-dlp.exe",
+                    "GET /deno.zip",
+                ],
+                "the native request comes before the downloads"
             );
+            assert_eq!(
+                *told.lock().unwrap(),
+                std::slice::from_ref(&id),
+                "told once"
+            );
+            assert!(!r.waits_for_helpers(&id), "the wait is over");
             std::fs::remove_dir_all(&home).unwrap();
         }
 

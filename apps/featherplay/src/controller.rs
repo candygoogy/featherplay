@@ -73,6 +73,33 @@ const TOOL_VERSIONS_AFTER: Duration = Duration::from_secs(10);
 /// How often a long session asks for the daily `yt-dlp -U`.
 const DAILY_UPDATE: Duration = Duration::from_secs(24 * 3600);
 
+/// How long after a failed helpers download a song's start tries it again in the background.
+const HELPERS_RETRY: Duration = Duration::from_secs(10 * 60);
+
+/// Where the resolver preprocesses a new player: in a short-lived child of this exe
+/// (`main` runs `featherplay_streams::preprocess_stdio` for it and nothing else), so its
+/// ~220 MB peak and a crash stay out of the app. Without the exe's own path, here.
+fn preprocessor() -> featherplay_streams::Preprocessor {
+    match std::env::current_exe() {
+        Ok(exe) => featherplay_streams::Preprocessor::Child(exe),
+        Err(_) => featherplay_streams::Preprocessor::InProcess,
+    }
+}
+
+/// Downloads the helpers if they're missing; true when they're there. A failure is logged
+/// by the download and kept for Copy diagnostics: no toast, as no song waits for it.
+async fn install_helpers(resolver: &YtDlpResolver) -> bool {
+    match resolver.install_helpers().await {
+        Ok(()) => true,
+        Err(e) => {
+            if let ResolveError::Sidecar(s) = &e {
+                crate::diagnostics::helpers_failed(s);
+            }
+            false
+        }
+    }
+}
+
 /// Time since the process started; the first call starts the clock.
 pub fn uptime() -> Duration {
     static START: OnceLock<Instant> = OnceLock::new();
@@ -241,6 +268,9 @@ pub struct UiLink {
 /// Results of background work.
 enum Msg {
     Resolved(TrackId, Result<ResolvedStream, ResolveError>),
+    /// This song's resolve started to wait for the helpers' download: its native request
+    /// gave no stream, and yt-dlp isn't there yet (a first run).
+    HelpersWait(TrackId),
     Continuation(TrackId, Result<Vec<Track>, ApiError>),
     Audio(AudioEvent),
     Scrobbled(Sent),
@@ -315,6 +345,9 @@ pub struct Controller {
     /// When the daily `yt-dlp -U` was last asked for: at startup, then when a song starts
     /// playing a day later (`update_daily`). No timer.
     daily_update: Instant,
+    /// When the helpers' download was last started in the background: at startup, then
+    /// when a song starts while they're still missing (`retry_helpers`). No timer.
+    helpers_tried: Instant,
     /// The current track's silences, once scanned (`silences.rs`).
     silences: Option<silences::TrackSilences>,
     /// The songs scanned before, read on first use.
@@ -345,31 +378,34 @@ impl Controller {
         let probe = Sidecars {
             dir: sidecars.clone(),
         };
+        let (tx, rx) = mpsc::unbounded_channel();
+        let waits = tx.clone();
         let resolver = Arc::new(
             YtDlpResolver::new(Sidecars { dir: sidecars }, None)
-                .with_downloads(Downloads::pinned()),
+                .with_downloads(Downloads::pinned())
+                .with_preprocessor(preprocessor())
+                .on_helpers_wait(move |id| {
+                    let _ = waits.send(Msg::HelpersWait(id.clone()));
+                }),
         );
         resolver.set_quality(stream_quality(settings.streaming_quality));
-        let helpers = resolver.clone();
+        log!("player challenges: {}", featherplay_streams::js_engine());
         // The performance harness's fixtures play nothing: no helpers to fetch or start.
         #[cfg(feature = "perf-harness")]
         let helpers_wanted = !crate::perf::fixtures();
         #[cfg(not(feature = "perf-harness"))]
         let helpers_wanted = true;
         if helpers_wanted {
+            // A first run fetches and preprocesses YouTube's player now (seconds), so the
+            // native request is ready for the first click, signed in or not.
+            let native = resolver.clone();
+            tokio::spawn(async move { native.prepare().await });
+            let helpers = resolver.clone();
             tokio::spawn(async move {
-                // A first run downloads yt-dlp and deno now, so they're usually there by the first
-                // click; a resolve waits for this same download. It logs its own start and end, and
-                // a failure is tried again by the next resolve.
-                let installed = match helpers.install_helpers().await {
-                    Ok(()) => true,
-                    Err(e) => {
-                        if let ResolveError::Sidecar(s) = &e {
-                            crate::diagnostics::helpers_failed(s);
-                        }
-                        false
-                    }
-                };
+                // A first run also downloads yt-dlp and deno now, in the background: only a
+                // song the native request can't give waits for them (`HelpersWait`). It logs
+                // its own start and end; a failure is tried again later (`retry_helpers`).
+                let installed = install_helpers(&helpers).await;
                 // After the startup's own work: the daily `yt-dlp -U` (skipped when the last one,
                 // or the download, is under a day old), then once, for the log and Copy
                 // diagnostics, the versions. Short processes, off this task.
@@ -464,7 +500,6 @@ impl Controller {
             initial.push(Input::SeekTo(at));
         }
 
-        let (tx, rx) = mpsc::unbounded_channel();
         let events = audio.events();
         let audio_tx = tx.clone();
         std::thread::Builder::new()
@@ -520,6 +555,7 @@ impl Controller {
             lookup: Default::default(),
             local_api: Default::default(),
             daily_update: Instant::now(),
+            helpers_tried: Instant::now(),
             silences: None,
             silence_cache: None,
             shown_marks: None,
@@ -959,8 +995,30 @@ impl Controller {
         });
     }
 
+    /// A song started while the helpers are still missing (their download at startup
+    /// failed): once more in the background, at most every `HELPERS_RETRY`. No toast, as
+    /// nothing waits for it; a song that needs them waits for this same download.
+    fn retry_helpers(&mut self) {
+        #[cfg(feature = "perf-harness")]
+        if crate::perf::fixtures() {
+            return;
+        }
+        if self.helpers_tried.elapsed() < HELPERS_RETRY || self.resolver.helpers_installed() {
+            return;
+        }
+        self.helpers_tried = Instant::now();
+        let resolver = self.resolver.clone();
+        tokio::spawn(async move {
+            install_helpers(&resolver).await;
+        });
+    }
+
     fn message(&mut self, msg: Msg) {
         let input = match msg {
+            Msg::HelpersWait(id) => {
+                self.helpers_wait(&id);
+                return;
+            }
             Msg::Resolved(id, result) => {
                 let keep = self.in_use();
                 let (took, ahead) = self.streams.done(&id, result.as_ref().ok(), &keep);
@@ -1125,6 +1183,7 @@ impl Controller {
             Msg::Audio(ev) => match ev {
                 AudioEvent::Started => {
                     self.update_daily();
+                    self.retry_helpers();
                     Input::AudioStarted
                 }
                 AudioEvent::Ended => {

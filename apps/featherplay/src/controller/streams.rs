@@ -575,6 +575,16 @@ impl Controller {
         }
     }
 
+    /// `id`'s resolve started to wait for the helpers' download: a first run, a song the
+    /// native request couldn't give, and yt-dlp not there yet. Said when the player waits
+    /// for that song (it shows Loading meanwhile); a resolve ahead of a click waits quietly,
+    /// until the player asks for it (`resolve`). Once per wait, never on a timer.
+    pub(super) fn helpers_wait(&mut self, id: &TrackId) {
+        if waits_to_play(&self.player, id) {
+            (self.ui.events)(super::UiEvent::Toast(getting_ready()));
+        }
+    }
+
     /// `Effect::Resolve`: a stream that's here answers at once.
     pub(super) fn resolve(&mut self, id: TrackId) -> Option<Input> {
         #[cfg(feature = "perf-harness")]
@@ -592,12 +602,7 @@ impl Controller {
             return None;
         }
         let want = self.streams.want(&id, SystemTime::now());
-        if !matches!(want, Want::Cached(_)) && !self.resolver.helpers_installed() {
-            // A first run: the resolve waits for the helpers' download (the player shows
-            // Loading meanwhile). Said once per song asked for, never on a timer.
-            log!("resolve {}: waiting for yt-dlp and deno to download", id.0);
-            (self.ui.events)(super::UiEvent::Toast(getting_ready()));
-        } else if !matches!(want, Want::Cached(_))
+        if !matches!(want, Want::Cached(_))
             && waits_to_play(&self.player, &id)
             && let Some(server) = self.streams.likely_server()
         {
@@ -615,6 +620,10 @@ impl Controller {
             }
             Want::Running => {
                 log!("resolve {}: already running ({})", id.0, self.time_left());
+                if self.resolver.waits_for_helpers(&id) {
+                    // Resolved ahead, it has been waiting for the helpers quietly.
+                    (self.ui.events)(super::UiEvent::Toast(getting_ready()));
+                }
                 None
             }
             Want::Start => {

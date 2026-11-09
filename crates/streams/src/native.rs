@@ -7,38 +7,30 @@
 //!   player's version. They're kept in `{home}/resolver/state.json` and fetched again after
 //!   `REFRESH_AFTER`, in the background, after a resolve that used the old ones.
 //! - Each player version is downloaded and preprocessed once, with yt-dlp's EJS solver
-//!   scripts (`ejs/`) in deno, into `{home}/resolver/players/{id}.js`: the cached transform.
-//!   The last `KEEP_PLAYERS` are kept.
-//! - A resolve then starts deno on that file (it loads in ~0.2 s) while the player API
-//!   request runs, and hands it the `n` and `sig` challenges once the answer is in.
+//!   scripts (`ejs/`) in QuickJS (`js`), into `{home}/resolver/players/{id}.js`: the cached
+//!   transform, with its bytecode beside it. The last `KEEP_PLAYERS` are kept.
+//!   Preprocessing takes seconds, so it never sits in front of a song: a page that names
+//!   a new player is answered with an older one while the new one is made in the
+//!   background, and a first run makes its player at startup (`prepare`).
+//! - A resolve then loads that player in QuickJS on a thread of its own (~20 ms from the
+//!   bytecode) while the player API request runs, and hands it the `n` and `sig`
+//!   challenges once the answer is in (~1 ms).
 //!
 //! `YtDlpResolver` falls back to yt-dlp on any error here.
 
 use std::collections::{HashMap, HashSet};
-use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use featherplay_core::sync::LockExt;
 use serde_json::{Value, json};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::AsyncWriteExt;
 
 use crate::expiry::{form_value, query_param};
-use crate::{Quality, ResolvedStream, Sidecars, expires_at_from_url};
-
-/// yt-dlp's EJS challenge solver, v0.8.0 (Unlicense; the lib bundles meriyah, ISC, and
-/// astring, MIT). Only preprocessing a new player needs them. The lib is deflated by
-/// `build.rs` ([`ejs_lib`]).
-const EJS_LIB_DEFLATED: &[u8] =
-    include_bytes!(concat!(env!("OUT_DIR"), "/yt.solver.lib.min.js.deflate"));
-const EJS_CORE: &str = include_str!("../ejs/yt.solver.core.min.js");
-/// Preprocessed players carry it; one made by other scripts is made again.
-const EJS_VERSION: &str = "0.8.0";
-/// Runs per resolve: loads a preprocessed player, answers the challenges from stdin.
-const SOLVE_JS: &str = include_str!("../ejs/solve.js");
+use crate::js::{self, EJS_VERSION, Solver};
+use crate::{Preprocessor, Quality, ResolvedStream, expires_at_from_url};
 
 const ORIGIN: &str = "https://www.youtube.com";
 const CLIENT_NAME: &str = "WEB_EMBEDDED_PLAYER";
@@ -52,9 +44,12 @@ const EMBED_URL: &str = "https://www.reddit.com/";
 const REFRESH_AFTER: Duration = Duration::from_secs(12 * 3600);
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
 const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(30);
-const SOLVE_TIMEOUT: Duration = Duration::from_secs(10);
-const PREPROCESS_TIMEOUT: Duration = Duration::from_secs(30);
+/// When the process preprocessing a player is killed. Its own limit (`js`, 30 s) ends it
+/// first and says why; this is for one that hangs.
+const PREPROCESS_TIMEOUT: Duration = Duration::from_secs(40);
 const KEEP_PLAYERS: usize = 3;
+/// A temporary file in the players' folder this old belongs to no save still running.
+const STRAY_AFTER: Duration = Duration::from_secs(600);
 /// After this many failures in a row, resolves go straight to yt-dlp for `OFF_FOR`, and
 /// then one failure turns it off again. Resolves at once from one page that fail count
 /// once: on 2026-11-09 a start's three resolves failed together on one bad visitor, and
@@ -112,7 +107,8 @@ pub(crate) struct Player {
 #[derive(Clone, Debug)]
 struct Ready {
     config: EmbedConfig,
-    /// Usually `config.player`; an older one when the new one couldn't be preprocessed.
+    /// Usually `config.player`; an older one while the new one is being preprocessed, or
+    /// when it couldn't be.
     player: Player,
     fetched: SystemTime,
     /// Which page this is in this run (`Inner::pages`): a newer one has a higher number.
@@ -147,10 +143,12 @@ pub(crate) struct NativeResolver {
 
 struct Inner {
     http: reqwest::Client,
-    sidecars: Sidecars,
     /// `{home}/resolver`
     dir: PathBuf,
     base: String,
+    preprocessor: Preprocessor,
+    /// The players being installed in the background, so each is installed once at a time.
+    installing: Mutex<HashSet<String>>,
     state: tokio::sync::Mutex<Option<Ready>>,
     /// The page to drop from `state` before the next resolve (a URL was refused, or the
     /// request failed).
@@ -183,19 +181,15 @@ struct Health {
 }
 
 impl NativeResolver {
-    /// `None` when no HTTP client can be built (then yt-dlp does every resolve).
-    pub(crate) fn new(sidecars_dir: PathBuf) -> Option<Self> {
-        Self::with_dirs(sidecars_dir, None, ORIGIN)
+    /// `dir`: where the state and the players go (`{home}/resolver`). `None` when no HTTP
+    /// client can be built (then yt-dlp does every resolve).
+    pub(crate) fn new(dir: PathBuf) -> Option<Self> {
+        Self::with_dirs(dir, ORIGIN)
     }
 
-    /// `dir`: where the state and the players go (`{home}/resolver` by default); `base`:
-    /// `https://www.youtube.com`, or a test server.
-    pub(crate) fn with_dirs(
-        sidecars_dir: PathBuf,
-        dir: Option<PathBuf>,
-        base: &str,
-    ) -> Option<Self> {
-        let http = reqwest::Client::builder()
+    /// `base`: `https://www.youtube.com`, or a test server.
+    pub(crate) fn with_dirs(dir: PathBuf, base: &str) -> Option<Self> {
+        let http = featherplay_proxy::client()
             .user_agent(USER_AGENT)
             .connect_timeout(Duration::from_secs(5))
             // No idle timeout, so no reaper timer runs while paused: an idle connection
@@ -204,14 +198,13 @@ impl NativeResolver {
             .pool_max_idle_per_host(2)
             .build()
             .ok()?;
-        let sidecars = Sidecars { dir: sidecars_dir };
-        let dir = dir.unwrap_or_else(|| sidecars.home().join("resolver"));
         Some(Self {
             inner: Arc::new(Inner {
                 http,
-                sidecars,
                 dir,
                 base: base.trim_end_matches('/').to_string(),
+                preprocessor: Preprocessor::InProcess,
+                installing: Mutex::default(),
                 state: tokio::sync::Mutex::new(None),
                 forget: Mutex::new(None),
                 pages: AtomicU64::new(0),
@@ -221,9 +214,55 @@ impl NativeResolver {
         })
     }
 
+    /// How new players are preprocessed, set before the first resolve.
+    pub(crate) fn set_preprocessor(&mut self, preprocessor: Preprocessor) {
+        if let Some(inner) = Arc::get_mut(&mut self.inner) {
+            inner.preprocessor = preprocessor;
+        }
+    }
+
     /// A URL this client gave was refused: the next resolve starts from a fresh embed page.
     pub(crate) fn refused(&self) {
         self.inner.drop_page(None);
+    }
+
+    /// For the app's start. With no player to answer with (a first run, or players made by
+    /// other EJS scripts), fetches an embed page and installs its player now, so the first
+    /// song doesn't wait the seconds that takes; a resolve that comes meanwhile waits for
+    /// this install instead of starting its own. With a player, nothing is asked: the first
+    /// resolve does what it did.
+    pub(crate) async fn prepare(&self) {
+        let inner = &self.inner;
+        // What deno ran until 0.2.1.
+        let _ = std::fs::remove_file(inner.dir.join("solve.js"));
+        let mut st = inner.state.lock().await;
+        if st.is_some() {
+            return;
+        }
+        if let Some(player) = newest(&inner.dir.join("players"), |_| true) {
+            drop(st);
+            // An update left its bytecode to another build: made again now, not in front
+            // of the first song (~0.2 s).
+            let path = player.path.clone();
+            let stale = tokio::task::spawn_blocking(move || !js::has_bytecode(&path));
+            if stale.await.unwrap_or(true) {
+                warm(&player).await;
+            }
+            return;
+        }
+        let started = Instant::now();
+        match inner.fetch_ready("", None).await {
+            Ok(ready) => {
+                log::info!(
+                    "player {} ready {:.1}s after the start",
+                    ready.player.id,
+                    started.elapsed().as_secs_f64()
+                );
+                inner.save(&ready);
+                *st = Some(ready);
+            }
+            Err(e) => log::warn!("no player yet, the first song's resolve tries again: {e}"),
+        }
     }
 
     pub(crate) async fn resolve(
@@ -232,11 +271,6 @@ impl NativeResolver {
         quality: Quality,
     ) -> Result<ResolvedStream, NativeError> {
         let inner = &self.inner;
-        if !inner.sidecars.deno().is_file() {
-            // Not installed yet (a first run): no request is worth it, and it's no failure
-            // of this path, so it doesn't count towards turning it off.
-            return Err(failed("deno is missing"));
-        }
         if inner
             .health
             .lock_or_recover()
@@ -253,7 +287,7 @@ impl NativeResolver {
                 h.failed_page = None;
             }
             Err(e @ (NativeError::Failed(_) | NativeError::NoUrl(_))) => {
-                // Other failures (deno, a player's challenges) count each time.
+                // Other failures (a request, a player's challenges) count each time.
                 let page = page.filter(|_| matches!(e, NativeError::NoUrl(_)));
                 if page.is_none() || page != h.failed_page {
                     h.failures += 1;
@@ -276,17 +310,15 @@ impl NativeResolver {
     /// `resolve` from a fresh embed page (a new visitor), for this answer only: the kept
     /// page, the failure count and the next resolves stay as they were. For a gated answer
     /// the player waits for (`Chain`): the page's player is the kept one unless YouTube
-    /// moved on, then it's installed as for a refresh. Its URL refused later drops the kept
-    /// page as any refused URL does (`refused`): rare, and a fresh page is cheap.
+    /// moved on, then the kept one answers and the new one is installed in the background.
+    /// Its URL refused later drops the kept page as any refused URL does (`refused`): rare,
+    /// and a fresh page is cheap.
     pub(crate) async fn resolve_fresh(
         &self,
         video: &str,
         quality: Quality,
     ) -> Result<ResolvedStream, NativeError> {
         let inner = &self.inner;
-        if !inner.sidecars.deno().is_file() {
-            return Err(failed("deno is missing"));
-        }
         if inner
             .health
             .lock_or_recover()
@@ -320,9 +352,14 @@ impl NativeResolver {
         let video = video.to_string();
         tokio::spawn(async move {
             let old = inner.state.lock().await.as_ref().map(|r| r.player.clone());
-            if let Ok(ready) = inner.fetch_ready(&video, old).await {
+            if let Ok(mut ready) = inner.fetch_ready(&video, old).await {
+                let mut st = inner.state.lock().await;
+                // Its page's player may have been installed meanwhile (`install_behind`).
+                if let Some(own) = installed(&inner.dir.join("players"), &ready.config.player) {
+                    ready.player = own;
+                }
                 inner.save(&ready);
-                *inner.state.lock().await = Some(ready);
+                *st = Some(ready);
             }
             inner.refreshing.store(false, Ordering::Release);
         });
@@ -351,7 +388,7 @@ impl Inner {
     /// while new ones do (2026-11-09). Resolves at once that get none share the first
     /// one's fresh page.
     async fn resolve(
-        &self,
+        self: &Arc<Self>,
         video: &str,
         quality: Quality,
     ) -> (Result<ResolvedStream, NativeError>, Option<u64>) {
@@ -392,8 +429,8 @@ impl Inner {
             }
         };
         // Loads the player while the request runs.
-        let solver = Solver::start(&self.sidecars, &self.solve_script()?, &player.path)
-            .map_err(|e| failed(format!("starting deno: {e}")))?;
+        let solver =
+            Solver::start(&player.path).map_err(|e| failed(format!("starting the solver: {e}")))?;
         let body = match self.player_request(video, ready).await {
             Ok(b) => b,
             Err(e) => {
@@ -426,7 +463,7 @@ impl Inner {
     }
 
     /// The config and player to use: in memory, else on disk, else fetched.
-    async fn ready(&self, video: &str) -> Result<Ready, NativeError> {
+    async fn ready(self: &Arc<Self>, video: &str) -> Result<Ready, NativeError> {
         let mut st = self.state.lock().await;
         // `drop_page` took it off the disk already.
         let stale = match self.forget.lock_or_recover().take() {
@@ -439,6 +476,10 @@ impl Inner {
         }
         if st.is_none() {
             *st = self.load();
+            // Saved while its page's player was still being installed: once more, once.
+            if let Some(r) = st.as_ref().filter(|r| r.player.id != r.config.player) {
+                self.install_behind(&r.config.player);
+            }
         }
         let ready = match &*st {
             Some(ready) => ready.clone(),
@@ -459,10 +500,13 @@ impl Inner {
         Ok(ready)
     }
 
-    /// A fresh embed page and its player. `fallback` is used if that player can't be
-    /// installed (YouTube accepts an older player's `sts` for a while).
+    /// A fresh embed page (`video`'s, or with `""` the one of no video, which names the
+    /// same things) and a player to answer with. When the page's player isn't installed,
+    /// an older one answers now (`fallback`, else the newest installed: YouTube accepts an
+    /// older player's `sts` for a while) and the page's is installed in the background,
+    /// which takes seconds. Only with no player at all is the install waited for.
     async fn fetch_ready(
-        &self,
+        self: &Arc<Self>,
         video: &str,
         fallback: Option<Player>,
     ) -> Result<Ready, NativeError> {
@@ -475,12 +519,22 @@ impl Inner {
             .await?;
         let config =
             parse_embed_page(&page).ok_or_else(|| failed("no player in the embed page"))?;
-        let player = match self.install_player(&config.player).await {
-            Ok(p) => p,
-            Err(e) => match fallback {
-                Some(old) if old.path.is_file() => old,
-                _ => return Err(e),
-            },
+        let players = self.dir.join("players");
+        let player = match installed(&players, &config.player) {
+            Some(player) => player,
+            None => {
+                let good = |id: &str| !self.health.lock_or_recover().bad.contains(id);
+                let older = fallback
+                    .filter(|old| old.path.is_file() && good(&old.id))
+                    .or_else(|| newest(&players, good));
+                match older {
+                    Some(old) => {
+                        self.install_behind(&config.player);
+                        old
+                    }
+                    None => self.install_player(&config.player).await?,
+                }
+            }
         };
         Ok(Ready {
             config,
@@ -488,6 +542,35 @@ impl Inner {
             fetched: SystemTime::now(),
             page: self.next_page(),
         })
+    }
+
+    /// Installs player `id` in the background, once at a time, and hands it to the kept
+    /// page that names it. A failure waits for the next page that names the player.
+    fn install_behind(self: &Arc<Self>, id: &str) {
+        if self.health.lock_or_recover().bad.contains(id)
+            || !self.installing.lock_or_recover().insert(id.to_string())
+        {
+            return;
+        }
+        let (inner, id) = (self.clone(), id.to_string());
+        tokio::spawn(async move {
+            let started = Instant::now();
+            match inner.install_player(&id).await {
+                Ok(player) => {
+                    log::info!(
+                        "player {id} installed in the background in {:.1}s",
+                        started.elapsed().as_secs_f64()
+                    );
+                    let mut st = inner.state.lock().await;
+                    if let Some(r) = st.as_mut().filter(|r| r.config.player == id) {
+                        r.player = player;
+                        inner.save(r);
+                    }
+                }
+                Err(e) => log::warn!("installing player {id} in the background failed: {e}"),
+            }
+            inner.installing.lock_or_recover().remove(&id);
+        });
     }
 
     async fn install_player(&self, id: &str) -> Result<Player, NativeError> {
@@ -509,7 +592,7 @@ impl Inner {
             )
             .await?;
         let sts = player_sts(&js).ok_or_else(|| failed(format!("player {id} has no sts")))?;
-        let pre = preprocess(&self.sidecars, &js).await.map_err(|e| match e {
+        let pre = self.preprocess(js).await.map_err(|e| match e {
             // Says nothing about the player: it's tried again next time.
             PreprocessError::NotStarted(e) => e,
             PreprocessError::Unsolved(e) => {
@@ -517,7 +600,35 @@ impl Inner {
                 e
             }
         })?;
-        install(&players, id, sts, &pre).map_err(|e| failed(format!("saving player {id}: {e}")))
+        let player = install(&players, id, sts, &pre)
+            .map_err(|e| failed(format!("saving player {id}: {e}")))?;
+        warm(&player).await;
+        Ok(player)
+    }
+
+    /// Runs EJS on a player's JS, as `self.preprocessor` says. A child that can't be
+    /// started (an antivirus may refuse it) leaves the work to this process.
+    async fn preprocess(&self, js: String) -> Result<String, PreprocessError> {
+        match &self.preprocessor {
+            Preprocessor::Child(program) => {
+                let mut cmd = crate::sidecars::hidden_command(program);
+                cmd.arg(crate::PREPROCESS_ARG)
+                    .stdin(std::process::Stdio::piped());
+                match run_with_stdin(cmd, js.as_bytes(), PREPROCESS_TIMEOUT).await {
+                    Err(PreprocessError::NotStarted(e)) => {
+                        log::warn!("{e}; preprocessing the player in this process instead");
+                        blocking(move || js::preprocess(&js)).await
+                    }
+                    result => result,
+                }
+            }
+            Preprocessor::InProcess => blocking(move || js::preprocess(&js)).await,
+            #[cfg(test)]
+            Preprocessor::Stub(stub) => {
+                let stub = stub.clone();
+                blocking(move || stub(&js)).await
+            }
+        }
     }
 
     async fn get_text(
@@ -566,17 +677,6 @@ impl Inner {
             return Err(failed(format!("player API answered {status}")));
         }
         Ok(body)
-    }
-
-    /// `{dir}/solve.js`, written when missing or out of date.
-    fn solve_script(&self) -> Result<PathBuf, NativeError> {
-        let path = self.dir.join("solve.js");
-        if std::fs::read_to_string(&path).ok().as_deref() != Some(SOLVE_JS) {
-            std::fs::create_dir_all(&self.dir)
-                .and_then(|()| write_atomic(&path, SOLVE_JS.as_bytes()))
-                .map_err(|e| failed(format!("writing solve.js: {e}")))?;
-        }
-        Ok(path)
     }
 
     /// The saved page's config, and the whole saved state.
@@ -985,7 +1085,33 @@ pub(crate) fn installed(players: &Path, id: &str) -> Option<Player> {
     })
 }
 
-/// Saves a preprocessed player and drops all but the newest `KEEP_PLAYERS`.
+/// The files in `players` with this extension, oldest first.
+fn files(players: &Path, extension: &str) -> Vec<(SystemTime, PathBuf)> {
+    let mut files: Vec<(SystemTime, PathBuf)> = std::fs::read_dir(players)
+        .into_iter()
+        .flatten()
+        .filter_map(|e| {
+            let p = e.ok()?.path();
+            let ok = p.extension().is_some_and(|x| x == extension);
+            ok.then(|| Some((p.metadata().ok()?.modified().ok()?, p)))?
+        })
+        .collect();
+    files.sort();
+    files
+}
+
+/// The newest installed player that `good` takes: what answers while a page's own player
+/// is being installed.
+fn newest(players: &Path, good: impl Fn(&str) -> bool) -> Option<Player> {
+    files(players, "js")
+        .into_iter()
+        .rev()
+        .filter_map(|(_, p)| installed(players, p.file_stem()?.to_str()?))
+        .find(|p| good(&p.id))
+}
+
+/// Saves a preprocessed player and drops all but the newest `KEEP_PLAYERS`, each with its
+/// bytecode (`js`).
 pub(crate) fn install(players: &Path, id: &str, sts: u64, pre: &str) -> std::io::Result<Player> {
     if !valid_player_id(id) {
         return Err(std::io::Error::other("bad player id"));
@@ -994,17 +1120,20 @@ pub(crate) fn install(players: &Path, id: &str, sts: u64, pre: &str) -> std::io:
     let path = players.join(format!("{id}.js"));
     let body = format!("// featherplay player {id} sts {sts} ejs {EJS_VERSION}\n{pre}");
     write_atomic(&path, body.as_bytes())?;
-    let mut others: Vec<(SystemTime, PathBuf)> = std::fs::read_dir(players)?
-        .filter_map(|e| {
-            let p = e.ok()?.path();
-            let ok = p != path && p.extension().is_some_and(|x| x == "js");
-            ok.then(|| Some((p.metadata().ok()?.modified().ok()?, p)))?
-        })
-        .collect();
-    others.sort();
+    // An earlier file's bytecode isn't this one's.
+    let _ = std::fs::remove_file(js::bytecode_path(&path));
+    let others = files(players, "js").into_iter().filter(|(_, p)| *p != path);
+    let others: Vec<_> = others.collect();
     let drop_n = (others.len() + 1).saturating_sub(KEEP_PLAYERS);
     for (_, p) in others.into_iter().take(drop_n) {
+        let _ = std::fs::remove_file(js::bytecode_path(&p));
         let _ = std::fs::remove_file(p);
+    }
+    // A save cut short (a crash, the power) left its temporary file.
+    for (written, part) in files(players, "part") {
+        if written.elapsed().is_ok_and(|age| age > STRAY_AFTER) {
+            let _ = std::fs::remove_file(part);
+        }
     }
     Ok(Player {
         id: id.to_string(),
@@ -1013,193 +1142,95 @@ pub(crate) fn install(players: &Path, id: &str, sts: u64, pre: &str) -> std::io:
     })
 }
 
+/// Numbers the temporary files of `write_atomic`, so two writes of one file at once (two
+/// installs of a player, or two saves of the state) each rename their own.
+static WRITES: AtomicU64 = AtomicU64::new(0);
+
 fn write_atomic(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
-    let part = path.with_extension("part");
-    std::fs::write(&part, bytes)?;
-    std::fs::rename(&part, path)
+    let part = path.with_extension(format!(
+        "{}-{}.part",
+        std::process::id(),
+        WRITES.fetch_add(1, Ordering::Relaxed)
+    ));
+    let written = std::fs::write(&part, bytes).and_then(|()| std::fs::rename(&part, path));
+    if written.is_err() {
+        let _ = std::fs::remove_file(&part);
+    }
+    written
 }
 
-/// deno with no network, no prompts and no project files.
-fn deno(sidecars: &Sidecars) -> tokio::process::Command {
-    let mut cmd = sidecars.command(&sidecars.deno());
-    cmd.args([
-        "run",
-        "--no-prompt",
-        "--no-remote",
-        "--no-lock",
-        "--no-config",
-        "--no-npm",
-        "--node-modules-dir=none",
-        "--cached-only",
-    ])
-    .stdin(Stdio::piped());
-    cmd
+/// Loads `player` once, which saves its bytecode: the first song it answers then loads it
+/// in ~15 ms instead of compiling 4 MB of JS (~190 ms).
+async fn warm(player: &Player) {
+    let path = player.path.clone();
+    let warmed = tokio::task::spawn_blocking(move || js::warm(&path)).await;
+    if let Err(e) = warmed.map_err(|e| e.to_string()).and_then(|w| w) {
+        log::warn!("player {} didn't answer once loaded: {e}", player.id);
+    }
 }
 
 /// Why a player couldn't be preprocessed.
 enum PreprocessError {
-    /// deno didn't start, so nothing is known about the player.
+    /// The work didn't start, so nothing is known about the player.
     NotStarted(NativeError),
     /// EJS ran on the player and failed, or took too long.
     Unsolved(NativeError),
 }
 
-/// The EJS library's source, inflated from what `build.rs` deflated.
-fn ejs_lib() -> String {
-    let mut js = String::new();
-    flate2::read::DeflateDecoder::new(EJS_LIB_DEFLATED)
-        .read_to_string(&mut js)
-        .expect("build.rs deflates the EJS library from a UTF-8 file");
-    js
+/// `work` on the blocking pool: it waits for a QuickJS thread, which an async thread
+/// never does.
+async fn blocking(
+    work: impl FnOnce() -> Result<String, String> + Send + 'static,
+) -> Result<String, PreprocessError> {
+    tokio::task::spawn_blocking(work)
+        .await
+        .map_err(|e| PreprocessError::NotStarted(failed(e)))?
+        .map_err(|e| PreprocessError::Unsolved(failed(e)))
 }
 
-/// Runs EJS on a player's JS once: the preprocessed player, which sets `_result.n` and
-/// `_result.sig` when run as `Function("_result", code)`. Checked on a test challenge each.
-async fn preprocess(sidecars: &Sidecars, js: &str) -> Result<String, PreprocessError> {
-    let sig_test: String = (0u8..100).map(|b| (b'0' + b % 75) as char).collect();
-    let input = json!({
-        "type": "player",
-        "player": js,
-        "requests": [
-            { "type": "n", "challenges": ["featherplayTest0"] },
-            { "type": "sig", "challenges": [sig_test] },
-        ],
-        "output_preprocessed": true,
-    });
-    let ejs = ejs_lib();
-    let script = format!(
-        "{ejs}\nObject.assign(globalThis, lib);\n{EJS_CORE}\nconsole.log(JSON.stringify(jsc({input})));\n"
-    );
-    let mut cmd = deno(sidecars);
-    cmd.args(["--ext=js", "--no-code-cache", "-"]);
-    let out = run_with_stdin(cmd, script.as_bytes(), PREPROCESS_TIMEOUT).await?;
-    let unsolved = |m: String| PreprocessError::Unsolved(failed(m));
-    let v: Value =
-        serde_json::from_str(out.trim()).map_err(|e| unsolved(format!("EJS output: {e}")))?;
-    for r in v["responses"].as_array().into_iter().flatten() {
-        if r["type"] != "result" {
-            return Err(unsolved(format!(
-                "EJS: {}",
-                r["error"].as_str().unwrap_or("error")
-            )));
-        }
-    }
-    v["preprocessed_player"]
-        .as_str()
-        .filter(|p| !p.is_empty())
-        .map(str::to_string)
-        .ok_or_else(|| unsolved("EJS gave no preprocessed player".into()))
-}
-
+/// Runs the process that preprocesses a player (`crate::preprocess_stdio`): the player's
+/// JS goes to its stdin, the preprocessed player comes from its stdout. Killed at
+/// `timeout`, or when the future is dropped.
 async fn run_with_stdin(
     mut cmd: tokio::process::Command,
     stdin: &[u8],
     timeout: Duration,
 ) -> Result<String, PreprocessError> {
-    let mut child = cmd
-        .spawn()
-        .map_err(|e| PreprocessError::NotStarted(failed(format!("starting deno: {e}"))))?;
+    let not_started =
+        |e: String| PreprocessError::NotStarted(failed(format!("starting the preprocessor: {e}")));
+    // Starting a process blocks for as long as an antivirus checks the exe, and a 30 MB one
+    // can take a few hundred ms: not on an async thread, where resolves run.
+    let mut child = tokio::task::spawn_blocking(move || cmd.spawn())
+        .await
+        .map_err(|e| not_started(e.to_string()))?
+        .map_err(|e| not_started(e.to_string()))?;
     let unsolved = |m: String| PreprocessError::Unsolved(failed(m));
     let mut pipe = child
         .stdin
         .take()
-        .expect("callers pass a `deno()` command, which pipes stdin");
+        .expect("the caller's command pipes stdin");
     let run = async {
+        // The child reads all of it before it writes, so nothing waits on a full pipe.
         pipe.write_all(stdin).await?;
         drop(pipe);
         child.wait_with_output().await
     };
     let out = tokio::time::timeout(timeout, run)
         .await
-        .map_err(|_| unsolved("deno timed out".into()))?
-        .map_err(|e| unsolved(format!("deno: {e}")))?;
+        .map_err(|_| unsolved("the preprocessor timed out".into()))?
+        .map_err(|e| unsolved(format!("the preprocessor: {e}")))?;
     if !out.status.success() {
         let err = String::from_utf8_lossy(&out.stderr);
         return Err(unsolved(format!(
-            "deno exited with {}: {}",
+            "the preprocessor exited with {}: {}",
             out.status.code().unwrap_or(-1),
             crate::sidecars::tail(&err, 300)
         )));
     }
-    String::from_utf8(out.stdout).map_err(|_| unsolved("deno printed non-UTF-8".into()))
-}
-
-/// A deno process loading a preprocessed player, waiting for its challenges on stdin.
-/// Killed if dropped before it answers.
-pub(crate) struct Solver {
-    child: tokio::process::Child,
-}
-
-impl Solver {
-    pub(crate) fn start(
-        sidecars: &Sidecars,
-        script: &Path,
-        player: &Path,
-    ) -> std::io::Result<Self> {
-        let mut cmd = deno(sidecars);
-        let dir = player.parent().unwrap_or(player);
-        cmd.arg(format!("--allow-read={}", dir.display()))
-            .arg(script)
-            .arg(player);
-        Ok(Self {
-            child: cmd.spawn()?,
-        })
-    }
-
-    pub(crate) async fn solve(mut self, n: &[String], sig: &[String]) -> Result<Answers, String> {
-        let input = json!({ "n": n, "sig": sig }).to_string();
-        let mut pipe = self
-            .child
-            .stdin
-            .take()
-            .expect("`deno()` pipes stdin, taken once here");
-        let mut stdout = self
-            .child
-            .stdout
-            .take()
-            .expect("`Sidecars::command` pipes stdout");
-        let mut stderr = self
-            .child
-            .stderr
-            .take()
-            .expect("`Sidecars::command` pipes stderr");
-        let run = async {
-            pipe.write_all(input.as_bytes()).await?;
-            drop(pipe);
-            let (mut out, mut err) = (String::new(), String::new());
-            let (a, b) = tokio::join!(
-                stdout.read_to_string(&mut out),
-                stderr.read_to_string(&mut err)
-            );
-            a?;
-            b?;
-            let status = self.child.wait().await?;
-            Ok::<_, std::io::Error>((status, out, err))
-        };
-        let (status, out, err) = tokio::time::timeout(SOLVE_TIMEOUT, run)
-            .await
-            .map_err(|_| "the solver timed out".to_string())?
-            .map_err(|e| format!("the solver: {e}"))?;
-        if !status.success() {
-            return Err(format!(
-                "the solver failed: {}",
-                crate::sidecars::tail(&err, 300)
-            ));
-        }
-        let v: Value =
-            serde_json::from_str(out.trim()).map_err(|e| format!("solver output: {e}"))?;
-        let map = |k: &str| -> HashMap<String, String> {
-            v[k].as_object()
-                .into_iter()
-                .flatten()
-                .filter_map(|(c, a)| Some((c.clone(), a.as_str()?.to_string())))
-                .collect()
-        };
-        Ok(Answers {
-            n: map("n"),
-            sig: map("sig"),
-        })
-    }
+    String::from_utf8(out.stdout)
+        .ok()
+        .filter(|player| !player.is_empty())
+        .ok_or_else(|| unsolved("the preprocessor gave no player".into()))
 }
 
 /// A one-thread HTTP/1.1 server for tests: answers each request with
@@ -1343,19 +1374,8 @@ _result.sig = (s) => s.slice(2).split("").reverse().join("");"#;
         dir
     }
 
-    /// The sidecar dir with deno in it (`FEATHERPLAY_SIDECARS_DIR`), if there is one.
-    fn deno_sidecars() -> Option<PathBuf> {
-        let dir = PathBuf::from(std::env::var("FEATHERPLAY_SIDECARS_DIR").ok()?);
-        dir.join("deno.exe").is_file().then_some(dir)
-    }
-
     fn config() -> EmbedConfig {
         parse_embed_page(EMBED).unwrap()
-    }
-
-    #[test]
-    fn the_ejs_library_inflates_to_its_source() {
-        assert_eq!(ejs_lib(), include_str!("../ejs/yt.solver.lib.min.js"));
     }
 
     #[test]
@@ -1648,11 +1668,15 @@ _result.sig = (s) => s.slice(2).split("").reverse().join("");"#;
         assert_eq!(p.sts, 20000);
         let text = std::fs::read_to_string(&p.path).unwrap();
         assert!(text.ends_with(FAKE_PLAYER), "the player follows the header");
+        let bytecode = js::bytecode_path(&p.path);
+        std::fs::write(&bytecode, b"its bytecode").unwrap();
         for (i, id) in ["aaaa0002", "aaaa0003", "aaaa0004"].iter().enumerate() {
             std::thread::sleep(Duration::from_millis(20));
             install(&dir, id, 20001 + i as u64, FAKE_PLAYER).unwrap();
         }
         assert_eq!(installed(&dir, "aaaa0001"), None, "the oldest went");
+        assert!(!bytecode.exists(), "and its bytecode with it");
+        assert_eq!(newest(&dir, |_| true).unwrap().id, "aaaa0004");
         for id in ["aaaa0002", "aaaa0003", "aaaa0004"] {
             assert!(installed(&dir, id).is_some(), "{id}");
         }
@@ -1666,10 +1690,12 @@ _result.sig = (s) => s.slice(2).split("").reverse().join("");"#;
     }
 
     /// A resolver over `base` whose state and player are already on disk.
-    fn seeded(name: &str, sidecars: PathBuf, base: &str) -> (NativeResolver, PathBuf) {
+    fn seeded(name: &str, base: &str) -> (NativeResolver, PathBuf) {
         let dir = home(name);
         let player = install(&dir.join("players"), "096efeec", 20752, FAKE_PLAYER).unwrap();
-        let r = NativeResolver::with_dirs(sidecars, Some(dir.clone()), base).unwrap();
+        // Its bytecode now, so no save runs beside the resolves and the folder can go.
+        js::warm(&player.path).unwrap();
+        let r = NativeResolver::with_dirs(dir.clone(), base).unwrap();
         r.inner.save(&Ready {
             config: config(),
             player,
@@ -1680,39 +1706,7 @@ _result.sig = (s) => s.slice(2).split("").reverse().join("");"#;
     }
 
     #[tokio::test]
-    async fn the_solver_answers_from_a_cached_player() {
-        let Some(sidecars) = deno_sidecars() else {
-            eprintln!("skipped: no deno in FEATHERPLAY_SIDECARS_DIR");
-            return;
-        };
-        let dir = home("solver");
-        let p = install(&dir.join("players"), "096efeec", 20752, FAKE_PLAYER).unwrap();
-        std::fs::write(dir.join("solve.js"), SOLVE_JS).unwrap();
-        let s = Sidecars { dir: sidecars };
-        let a = Solver::start(&s, &dir.join("solve.js"), &p.path)
-            .unwrap()
-            .solve(&["abc".into()], &["xy123".into()])
-            .await
-            .unwrap();
-        assert_eq!(a.n["abc"], "cba");
-        assert_eq!(a.sig["xy123"], "321");
-        // A player without the functions fails, and says so.
-        let bad = install(&dir.join("players"), "badd0001", 1, "_result.x = 1;").unwrap();
-        let e = Solver::start(&s, &dir.join("solve.js"), &bad.path)
-            .unwrap()
-            .solve(&["abc".into()], &[])
-            .await
-            .unwrap_err();
-        assert!(e.contains("no n function"), "{e}");
-        std::fs::remove_dir_all(&dir).unwrap();
-    }
-
-    #[tokio::test]
     async fn a_native_resolve_is_one_request() {
-        let Some(sidecars) = deno_sidecars() else {
-            eprintln!("skipped: no deno in FEATHERPLAY_SIDECARS_DIR");
-            return;
-        };
         let (base, log) = test_server::serve(|method, path, body| {
             match (method, path.split('?').next().unwrap()) {
                 ("POST", "/youtubei/v1/player") if body.contains(VIDEO) => {
@@ -1721,7 +1715,7 @@ _result.sig = (s) => s.slice(2).split("").reverse().join("");"#;
                 _ => (404, String::new()),
             }
         });
-        let (r, dir) = seeded("resolve", sidecars, &base);
+        let (r, dir) = seeded("resolve", &base);
         let s = r.resolve(VIDEO, Quality::High).await.unwrap();
         assert_eq!(
             *log.lock().unwrap(),
@@ -1747,10 +1741,6 @@ _result.sig = (s) => s.slice(2).split("").reverse().join("");"#;
     /// the resolves after it.
     #[tokio::test]
     async fn a_fresh_resolve_uses_a_new_embed_page_once() {
-        let Some(sidecars) = deno_sidecars() else {
-            eprintln!("skipped: no deno in FEATHERPLAY_SIDECARS_DIR");
-            return;
-        };
         let kept = config().visitor_data.unwrap();
         let page = EMBED.replace(&kept, "fresh-visitor");
         let bodies = Arc::new(Mutex::new(Vec::new()));
@@ -1765,7 +1755,7 @@ _result.sig = (s) => s.slice(2).split("").reverse().join("");"#;
                 _ => (404, String::new()),
             }
         });
-        let (r, dir) = seeded("fresh", sidecars, &base);
+        let (r, dir) = seeded("fresh", &base);
         r.resolve_fresh(VIDEO, Quality::High).await.unwrap();
         r.resolve(VIDEO, Quality::High).await.unwrap();
         assert_eq!(
@@ -1784,12 +1774,8 @@ _result.sig = (s) => s.slice(2).split("").reverse().join("");"#;
 
     #[tokio::test]
     async fn a_failed_request_forgets_the_config_and_three_turn_it_off() {
-        let Some(sidecars) = deno_sidecars() else {
-            eprintln!("skipped: no deno in FEATHERPLAY_SIDECARS_DIR");
-            return;
-        };
         let (base, log) = test_server::serve(|_, _, _| (500, String::new()));
-        let (r, dir) = seeded("fails", sidecars, &base);
+        let (r, dir) = seeded("fails", &base);
         let e = r.resolve(VIDEO, Quality::High).await.unwrap_err();
         assert!(matches!(e, NativeError::Failed(_)), "{e:?}");
         assert!(
@@ -1820,10 +1806,6 @@ _result.sig = (s) => s.slice(2).split("").reverse().join("");"#;
     /// kept page from disk at once, so a start after a short session doesn't load it again.
     #[tokio::test]
     async fn an_answer_without_a_url_drops_the_kept_page_for_the_next_start() {
-        let Some(sidecars) = deno_sidecars() else {
-            eprintln!("skipped: no deno in FEATHERPLAY_SIDECARS_DIR");
-            return;
-        };
         let answer = without_urls();
         let page = EMBED.replace(&config().visitor_data.unwrap(), "fresh-visitor");
         let (base, _log) = test_server::serve(move |_, path, _| {
@@ -1833,10 +1815,10 @@ _result.sig = (s) => s.slice(2).split("").reverse().join("");"#;
                 (200, answer.clone())
             }
         });
-        let (r, dir) = seeded("no-url", sidecars.clone(), &base);
+        let (r, dir) = seeded("no-url", &base);
         let e = r.resolve(VIDEO, Quality::High).await.unwrap_err();
         assert!(matches!(e, NativeError::NoUrl(_)), "{e:?}");
-        let next_start = NativeResolver::with_dirs(sidecars, Some(dir.clone()), &base).unwrap();
+        let next_start = NativeResolver::with_dirs(dir.clone(), &base).unwrap();
         assert!(
             next_start.inner.load().is_none(),
             "the next start fetches a fresh embed page"
@@ -1863,10 +1845,6 @@ _result.sig = (s) => s.slice(2).split("").reverse().join("");"#;
     /// yt-dlp's fresh visitors got URLs. Each asks once more, from one fresh page they share.
     #[tokio::test]
     async fn answers_without_urls_from_the_kept_page_ask_again_from_one_fresh_page() {
-        let Some(sidecars) = deno_sidecars() else {
-            eprintln!("skipped: no deno in FEATHERPLAY_SIDECARS_DIR");
-            return;
-        };
         let kept = config().visitor_data.unwrap();
         let page = EMBED.replace(&kept, "fresh-visitor");
         let bad = without_urls();
@@ -1878,7 +1856,7 @@ _result.sig = (s) => s.slice(2).split("").reverse().join("");"#;
                 _ => (404, String::new()),
             }
         });
-        let (r, dir) = seeded("no-url-again", sidecars, &base);
+        let (r, dir) = seeded("no-url-again", &base);
         let (a, b, c) = tokio::join!(
             r.resolve(VIDEO, Quality::High),
             r.resolve(VIDEO, Quality::High),
@@ -1902,10 +1880,6 @@ _result.sig = (s) => s.slice(2).split("").reverse().join("");"#;
     /// a start's three resolves at once don't turn the native step off.
     #[tokio::test]
     async fn the_failures_of_one_page_count_once() {
-        let Some(sidecars) = deno_sidecars() else {
-            eprintln!("skipped: no deno in FEATHERPLAY_SIDECARS_DIR");
-            return;
-        };
         let kept = config().visitor_data.unwrap();
         let fetched = std::sync::atomic::AtomicUsize::new(0);
         let bad = without_urls();
@@ -1917,7 +1891,7 @@ _result.sig = (s) => s.slice(2).split("").reverse().join("");"#;
                 (200, bad.clone())
             }
         });
-        let (r, dir) = seeded("no-url-once", sidecars, &base);
+        let (r, dir) = seeded("no-url-once", &base);
         let (a, b, c) = tokio::join!(
             r.resolve(VIDEO, Quality::High),
             r.resolve(VIDEO, Quality::High),
@@ -1935,59 +1909,217 @@ _result.sig = (s) => s.slice(2).split("").reverse().join("");"#;
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
-    /// The embed page with player `abcd1234`, and that player (which has an `sts`).
-    fn embed_and_player() -> (String, test_server::Log) {
-        test_server::serve(|_, path, _| {
+    /// An embed page that names player `abcd1234`, that player's JS (which has an `sts`),
+    /// and the player API's recorded answer.
+    fn new_player_server() -> (String, test_server::Log) {
+        test_server::serve(|method, path, _| {
             if path.starts_with("/embed/") {
-                (200, r#"<script src="/s/player/abcd1234/base.js">"#.into())
+                (200, EMBED.replace("096efeec", "abcd1234"))
+            } else if method == "POST" {
+                (200, PLAYER.to_string())
             } else {
-                (200, "var x={signatureTimestamp:20752};".into())
+                (200, "var x={signatureTimestamp:20760};".into())
             }
         })
     }
 
-    /// A first run resolves before deno is installed (v0.1.0, 2026-11-03): no request is
-    /// made, and it counts as no failure, so the native path is still on once deno is in.
+    /// Stands in for the preprocessing: gives `player` for any JS.
+    fn stub(player: &'static str) -> Preprocessor {
+        Preprocessor::Stub(Arc::new(move |_: &str| Ok(player.to_string())))
+    }
+
+    /// YouTube moves on to a new player a few times a week, and preprocessing one takes
+    /// seconds: the song is answered with the older player meanwhile, and the new one
+    /// takes over once it's installed.
     #[tokio::test]
-    async fn without_deno_nothing_is_asked_and_nothing_counts_as_a_failure() {
-        let dir = home("no-deno");
-        let sidecars = dir.join("sidecars");
-        std::fs::create_dir_all(&sidecars).unwrap();
-        let (base, log) = embed_and_player();
-        let r = NativeResolver::with_dirs(sidecars, Some(dir.join("resolver")), &base).unwrap();
-        for _ in 0..=MAX_FAILURES {
-            let e = r.resolve(VIDEO, Quality::High).await.unwrap_err();
-            assert_eq!(e, failed("deno is missing"));
+    async fn a_new_player_is_installed_behind_the_older_ones_answer() {
+        /// `n` in upper case: not what the older player answers.
+        const NEW_PLAYER: &str = "_result.n = (n) => n.toUpperCase(); _result.sig = (s) => s;";
+        let (base, log) = new_player_server();
+        let (mut r, dir) = seeded("new-player", &base);
+        // Preprocessing ends when the test lets it.
+        let (go, wait) = std::sync::mpsc::channel::<()>();
+        let wait = Mutex::new(wait);
+        r.set_preprocessor(Preprocessor::Stub(Arc::new(move |_: &str| {
+            let _ = wait.lock().unwrap().recv();
+            Ok(NEW_PLAYER.to_string())
+        })));
+        // The kept page goes: the next one names `abcd1234`.
+        r.refused();
+        let s = r.resolve(VIDEO, Quality::High).await.unwrap();
+        assert_eq!(
+            query_param(&s.url, "n").as_deref(),
+            Some("dEASjGHLUNUj7mJZgbt"),
+            "the older player's answer, while the new one is being made"
+        );
+        go.send(()).unwrap();
+        for _ in 0..500 {
+            let st = r.inner.state.lock().await;
+            if st.as_ref().is_some_and(|st| st.player.id == "abcd1234") {
+                break;
+            }
+            drop(st);
+            tokio::time::sleep(Duration::from_millis(10)).await;
         }
-        assert!(log.lock().unwrap().is_empty(), "{:?}", log.lock().unwrap());
+        let s = r.resolve(VIDEO, Quality::High).await.unwrap();
+        assert_eq!(
+            query_param(&s.url, "n").as_deref(),
+            Some("TBGZJM7JUNULHGJSAED")
+        );
+        let new = installed(&dir.join("players"), "abcd1234").unwrap();
+        assert!(
+            js::bytecode_path(&new.path).is_file(),
+            "the install saved its bytecode"
+        );
+        let log = log.lock().unwrap();
+        let fetched = log.iter().filter(|l| l.contains("/s/player/"));
+        assert_eq!(fetched.count(), 1);
+        drop(log);
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
-    /// deno that doesn't start says nothing about the player: it isn't marked as one that
-    /// can't be solved (which lasted the whole session in v0.1.0), and is tried again.
+    /// A first run has no player. The app's start fetches a page and installs its player
+    /// (`prepare`), so the first song is one request, as any other.
     #[tokio::test]
-    async fn a_player_is_not_marked_unsolvable_when_deno_did_not_start() {
-        let dir = home("deno-wont-start");
-        let sidecars = dir.join("sidecars");
-        std::fs::create_dir_all(&sidecars).unwrap();
-        std::fs::write(sidecars.join("deno.exe"), b"not a program").unwrap();
-        let (base, log) = embed_and_player();
-        let r = NativeResolver::with_dirs(sidecars, Some(dir.join("resolver")), &base).unwrap();
-        for _ in 0..2 {
-            let e = r
-                .resolve(VIDEO, Quality::High)
-                .await
-                .unwrap_err()
-                .to_string();
-            assert!(e.contains("starting deno"), "{e}");
+    async fn a_first_run_has_its_player_before_the_first_song() {
+        let (base, log) = new_player_server();
+        let dir = home("first-run");
+        let mut r = NativeResolver::with_dirs(dir.clone(), &base).unwrap();
+        r.set_preprocessor(stub(FAKE_PLAYER));
+        r.prepare().await;
+        assert_eq!(
+            *log.lock().unwrap(),
+            [
+                "GET /embed/?html5=1",
+                "GET /s/player/abcd1234/player_ias.vflset/en_US/base.js"
+            ]
+        );
+        r.resolve(VIDEO, Quality::High).await.unwrap();
+        assert_eq!(
+            log.lock().unwrap().len(),
+            3,
+            "the song asked the player API"
+        );
+        // With a player there, a start asks nothing.
+        let next_start = NativeResolver::with_dirs(dir.clone(), &base).unwrap();
+        next_start.prepare().await;
+        assert_eq!(log.lock().unwrap().len(), 3);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// A child that can't be started (an antivirus may refuse it) leaves the preprocessing
+    /// to this process: EJS itself answers, here that the stand-in player has nothing to
+    /// find.
+    #[tokio::test]
+    async fn a_preprocessor_that_cannot_start_leaves_the_work_to_this_process() {
+        let (base, _log) = new_player_server();
+        let dir = home("no-child");
+        let mut r = NativeResolver::with_dirs(dir.clone(), &base).unwrap();
+        r.set_preprocessor(Preprocessor::Child(dir.join("no-such-program.exe")));
+        let e = r.resolve(VIDEO, Quality::High).await.unwrap_err();
+        assert!(e.to_string().contains("EJS"), "{e}");
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// This process's private bytes, in MB.
+    fn private_mb() -> f64 {
+        let ask = format!(
+            "(Get-Process -Id {}).PrivateMemorySize64",
+            std::process::id()
+        );
+        let out = std::process::Command::new("powershell")
+            .args(["-NoProfile", "-Command", &ask])
+            .output()
+            .unwrap();
+        let bytes: f64 = String::from_utf8_lossy(&out.stdout).trim().parse().unwrap();
+        bytes / 1_048_576.0
+    }
+
+    /// A measurement on a real player, against a local server that answers at once, so a
+    /// resolve's time is the solver's: 50 resolves and the memory after them, then a page
+    /// that names a new player. `MEASURE_PLAYER`: a preprocessed player (a file of
+    /// `{home}/resolver/players`); `MEASURE_BASE`: a player's JS as YouTube serves it;
+    /// `MEASURE_PREPROCESSOR`: featherplay.exe, to preprocess in a child as the app does.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    #[ignore = "a measurement: set MEASURE_PLAYER and MEASURE_BASE"]
+    async fn measure_resolves_and_a_new_player() {
+        let pre = std::fs::read_to_string(std::env::var("MEASURE_PLAYER").unwrap()).unwrap();
+        let (head, body) = pre.split_once('\n').unwrap();
+        let sts: u64 = head.split(' ').nth(5).unwrap().parse().unwrap();
+        let base_js = std::fs::read_to_string(std::env::var("MEASURE_BASE").unwrap()).unwrap();
+        let page = EMBED.replace("096efeec", "abcd1234");
+        let (base, _log) = test_server::serve(move |method, path, _| {
+            match (method, path.split('?').next().unwrap()) {
+                ("POST", "/youtubei/v1/player") => (200, PLAYER.to_string()),
+                ("GET", p) if p.starts_with("/embed/") => (200, page.clone()),
+                ("GET", p) if p.starts_with("/s/player/abcd1234/") => (200, base_js.clone()),
+                _ => (404, String::new()),
+            }
+        });
+        let dir = home("measure");
+        let player = install(&dir.join("players"), "096efeec", sts, body).unwrap();
+        let mut r = NativeResolver::with_dirs(dir.clone(), &base).unwrap();
+        if let Ok(exe) = std::env::var("MEASURE_PREPROCESSOR") {
+            r.set_preprocessor(Preprocessor::Child(exe.into()));
         }
-        let players = log
-            .lock()
-            .unwrap()
-            .iter()
-            .filter(|l| l.contains("/s/player/abcd1234/"))
-            .count();
-        assert_eq!(players, 2, "the player was fetched and tried again");
+        r.inner.save(&Ready {
+            config: config(),
+            player,
+            fetched: SystemTime::now(),
+            page: 0,
+        });
+        println!("private at start: {:.1} MB", private_mb());
+        let mut times = Vec::new();
+        for i in 0..50 {
+            let t = Instant::now();
+            let s = r.resolve(VIDEO, Quality::High).await.unwrap();
+            times.push(t.elapsed().as_secs_f64() * 1000.0);
+            if i == 0 {
+                println!("n = {:?}", query_param(&s.url, "n"));
+            }
+            if i % 10 == 9 {
+                println!("private after {} resolves: {:.1} MB", i + 1, private_mb());
+            }
+        }
+        let (first, second) = (times[0], times[1]);
+        times.sort_by(f64::total_cmp);
+        println!(
+            "50 resolves: first {first:.1} ms (from the source), second {second:.1} ms, \
+             median {:.1} ms, min {:.1} ms, max {:.1} ms",
+            times[25], times[0], times[49]
+        );
+        tokio::time::sleep(Duration::from_secs(2)).await;
+        println!("private after 50 resolves: {:.1} MB", private_mb());
+        // A new player appears: the kept page is dropped, the next page names `abcd1234`.
+        r.refused();
+        let appeared = Instant::now();
+        let mut peak = private_mb();
+        for i in 0.. {
+            let t = Instant::now();
+            r.resolve(VIDEO, Quality::High).await.unwrap();
+            let took = t.elapsed().as_secs_f64() * 1000.0;
+            let player = r
+                .inner
+                .state
+                .lock()
+                .await
+                .as_ref()
+                .unwrap()
+                .player
+                .id
+                .clone();
+            peak = peak.max(private_mb());
+            println!(
+                "new player, resolve {i} at {:.1} s: {took:.1} ms (player {player}), private {peak:.1} MB at most",
+                appeared.elapsed().as_secs_f64()
+            );
+            if player == "abcd1234" || appeared.elapsed() > Duration::from_secs(60) {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(500)).await;
+        }
+        tokio::time::sleep(Duration::from_secs(2)).await;
+        println!("private at the end: {:.1} MB", private_mb());
         std::fs::remove_dir_all(&dir).unwrap();
     }
 }

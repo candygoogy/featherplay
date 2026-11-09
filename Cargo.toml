@@ -66,6 +66,11 @@ minisign-verify = "=0.3.0"
 zip = { version = "=9.1.0", default-features = false }
 # Deflates embedded data at build time and inflates it at runtime; in the tree already (zip, png).
 flate2 = "=1.1.10"
+# QuickJS-NG, the JavaScript engine that runs YouTube's player challenges inside the app
+# (crates/streams/src/js.rs). C, built by `cc` with the bindings the crate ships for both
+# Windows targets (no bindgen, no libclang). No default features beyond `std`: no module
+# loader, no macros. `allocator` gives each run a heap of its own (`js.rs`, `RunHeap`).
+rquickjs = { version = "=0.14.0", default-features = false, features = ["std", "allocator"] }
 # For the UI. Each one is already in the lock tree through slint or ytmapi-rs.
 # Cover decoding and resizing, and the PNGs that `--snapshot` writes.
 image = { version = "=0.25.10", default-features = false }
@@ -118,6 +123,10 @@ opus-decoder = { path = "vendor/opus-decoder" }
 debug = "line-tables-only"
 [profile.dev.package."*"]
 debug = false
+# QuickJS is C, built with its package's opt-level. Unoptimised, a debug build would take
+# several times longer to preprocess a new player and to load one for each song.
+[profile.dev.package.rquickjs-sys]
+opt-level = 3
 
 # The exe must stay at 32 MB or less (`release.yml` checks it). Fat LTO with one codegen unit and
 # size-optimised code gets it there; the audio path and the cover decoders keep full speed below.
@@ -147,6 +156,15 @@ opt-level = 3
 opt-level = 3
 # The Opus path (symphonia-format-mkv, opus-decoder, rustfft) stays at "z": at opt-level 3 it
 # cost ~96 KB of the exe budget, and at "z" it still decodes at ~250x realtime (2026-11-06).
+
+# QuickJS loads YouTube's player for every song (~15 ms from its bytecode) and preprocesses each
+# new player (~4 s). At "z" those took 15-100 % longer (a load 35 ms instead of 18, preprocessing
+# 6.0-6.4 s instead of 3.7-3.9). At 3, with its Rust side, the engine took the exe from
+# 30,456,320 to 31,681,536 B, ~0.3 MB more than at "z" (2026-11-09).
+[profile.release.package.rquickjs-sys]
+opt-level = 3
+[profile.release.package.rquickjs-core]
+opt-level = 3
 
 # Covers are decoded, cropped and resized on tokio's blocking pool for every page shown, and
 # that was most of a page's CPU. At opt-level 3 they take ~45 % less time (a page's CPU 20-40 %

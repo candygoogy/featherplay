@@ -23,7 +23,7 @@ const OFL: &str = include_str!("../../ui/fonts/manrope/OFL.txt");
 
 /// The main components and their licences; `THIRD_PARTY.md` has every crate.
 /// Licence names stay as their authors wrote them; the words around them are translated.
-fn credits() -> [(&'static str, &'static str); 11] {
+fn credits() -> [(&'static str, &'static str); 12] {
     [
         (
             "Slint",
@@ -33,6 +33,7 @@ fn credits() -> [(&'static str, &'static str); 11] {
         ("ytmapi-rs", "MIT License"),
         (tr!("rodio and cpal"), "MIT or Apache 2.0; Apache 2.0"),
         ("Symphonia", "Mozilla Public License 2.0"),
+        ("QuickJS-NG", "MIT License"),
         (tr!("tokio and reqwest"), "MIT License; MIT or Apache 2.0"),
         (
             "tray-icon, global-hotkey, keyring, windows-rs",

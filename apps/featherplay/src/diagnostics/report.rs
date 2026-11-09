@@ -10,6 +10,8 @@ pub struct Report {
     /// `None` until the version was read (or when the tool isn't installed).
     pub ytdlp: Option<String>,
     pub deno: Option<String>,
+    /// The JavaScript engine built in for YouTube's player challenges, with its version.
+    pub js_engine: String,
     /// `None`: the system's default device.
     pub output_device: Option<String>,
     pub signed_in: bool,
@@ -38,6 +40,7 @@ impl Report {
              Windows: {}\n\
              yt-dlp: {}\n\
              Deno: {}\n\
+             JavaScript: {} (built in)\n\
              Output device: {}\n\
              Signed in: {}\n\
              Last.fm: {}\n\
@@ -50,6 +53,7 @@ impl Report {
             self.windows,
             known(&self.ytdlp),
             known(&self.deno),
+            self.js_engine,
             self.output_device.as_deref().unwrap_or("System default"),
             if self.signed_in { "yes" } else { "no" },
             on(self.lastfm),
@@ -84,6 +88,7 @@ mod tests {
             windows: "Windows 11 25H2, build 26300.7171".into(),
             ytdlp: Some("2026.10.26".into()),
             deno: None,
+            js_engine: "QuickJS-NG 0.16.2".into(),
             output_device: Some("Speakers (Realtek(R) Audio)".into()),
             signed_in: true,
             lastfm: true,
@@ -107,6 +112,7 @@ mod tests {
             "Windows: Windows 11 25H2, build 26300.7171",
             "yt-dlp: 2026.10.26",
             "Deno: unknown",
+            "JavaScript: QuickJS-NG 0.16.2 (built in)",
             "Output device: Speakers (Realtek(R) Audio)",
             "Signed in: yes",
             "Last.fm: on",

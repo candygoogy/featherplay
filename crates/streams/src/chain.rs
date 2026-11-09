@@ -60,6 +60,13 @@ pub(crate) trait Steps {
     /// The native step once more, from a fresh embed page (a new visitor, as each yt-dlp
     /// run is), kept for this one answer. `None` as for `native`.
     async fn native_fresh(&self, id: &TrackId) -> Option<Result<ResolvedStream, NativeError>>;
+    /// Whether a yt-dlp step can run at once. False while the helpers aren't downloaded
+    /// yet (a first run): such a step waits for them first, so it runs only when the
+    /// native step gave nothing, never beside it.
+    fn helpers_ready(&self) -> bool;
+    /// Ends once the helpers are downloaded, waiting for their download quietly (no song is
+    /// told); never, if it fails.
+    async fn helpers_downloaded(&self);
     /// The embedded client through yt-dlp.
     async fn embedded(&self, id: &TrackId) -> Result<ResolvedStream, ResolveError>;
     /// yt-dlp's default clients.
@@ -384,11 +391,24 @@ impl Chain {
     ) -> Option<Result<ResolvedStream, ResolveError>> {
         let ytdlp = self.embedded_step(s, id, doubt);
         tokio::pin!(native, ytdlp);
-        // The native step first when both are ready: it has no process to wait for.
-        let first = tokio::select! {
-            biased;
-            one = &mut native => Ok(one),
-            two = &mut ytdlp => Err(two),
+        let first = if s.helpers_ready() {
+            // The native step first when both are ready: it has no process to wait for.
+            tokio::select! {
+                biased;
+                one = &mut native => Ok(one),
+                two = &mut ytdlp => Err(two),
+            }
+        } else {
+            // yt-dlp isn't downloaded yet: it runs beside once it is (a first run's click
+            // while the start still makes its player), else only if the native step fails.
+            tokio::select! {
+                biased;
+                one = &mut native => Ok(one),
+                two = async {
+                    s.helpers_downloaded().await;
+                    (&mut ytdlp).await
+                } => Err(two),
+            }
         };
         let (one, two) = match first {
             Ok(one) => (one, None),
@@ -609,8 +629,10 @@ impl Chain {
             }
             Two::Failed(e) => {
                 log::warn!("{}", stage_failed(id, Stage::Embedded, &e));
-                // Not embeddable, or the client broke: the default clients decide.
-                (e == ResolveError::ToolMissing).then_some(Err(e))
+                // Without the helpers (missing, or their download failed) the default
+                // clients have nothing to run either. Else not embeddable, or the client
+                // broke: the default clients decide.
+                matches!(e, ResolveError::ToolMissing | ResolveError::Sidecar(_)).then_some(Err(e))
             }
         }
     }
@@ -783,6 +805,8 @@ mod tests {
         /// When each check was made (tokio's clock, paused in the gate tests).
         checked_at: Mutex<Vec<tokio::time::Instant>>,
         no_native: bool,
+        /// The helpers aren't downloaded yet (`Steps::helpers_ready`).
+        no_helpers: bool,
         /// The next native step answers only once the other steps have had a turn.
         native_later: std::sync::atomic::AtomicBool,
     }
@@ -870,6 +894,12 @@ mod tests {
                 Some(r) => Some(r),
                 None => std::future::pending().await,
             }
+        }
+        fn helpers_ready(&self) -> bool {
+            !self.no_helpers
+        }
+        async fn helpers_downloaded(&self) {
+            std::future::pending().await
         }
         async fn embedded(&self, _: &TrackId) -> Result<ResolvedStream, ResolveError> {
             match self.next("embedded", &self.embedded) {
@@ -1502,6 +1532,38 @@ mod tests {
             s.calls(),
             ["native", "fresh", "embedded"],
             "no check outside doubt"
+        );
+    }
+
+    /// A first run, its helpers still downloading: yt-dlp doesn't run beside a gated native
+    /// answer (it would wait for the download, and say so), only once the native step
+    /// gave nothing.
+    #[tokio::test(start_paused = true)]
+    async fn without_the_helpers_yt_dlp_runs_only_after_the_native_step_failed() {
+        let chain = Chain::default();
+        let s = Script {
+            no_helpers: true,
+            ..Script::default()
+        }
+        .native_gated(NATIVE_URL, 5)
+        .check(Check::Plays);
+        assert_eq!(
+            url(within_gates(chain.resolve(&s, &id())).await),
+            NATIVE_URL
+        );
+        assert_eq!(s.calls(), ["native", "fresh", "check"], "no yt-dlp step");
+
+        let s = Script {
+            no_helpers: true,
+            ..Script::default()
+        }
+        .native_gated(NATIVE_URL, 5)
+        .check(Check::Refused)
+        .check(Check::Refused)
+        .embedded(Ok(EMBEDDED_URL));
+        assert_eq!(
+            url(within_gates(chain.resolve(&s, &id())).await),
+            EMBEDDED_URL
         );
     }
 

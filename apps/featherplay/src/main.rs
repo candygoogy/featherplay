@@ -12,6 +12,10 @@
 //! [--hover X,Y | --press X,Y] [--hold-loading | --hold-error] [--signed-out] [--track N] [--shuffle] [--language CODE] --out <png>`.
 //! `--unregister` removes the Start menu shortcut and registry entry that a normal start
 //! adds so the media card names the app (`identity`), then exits.
+//! `--preprocess-player`, alone, is how featherplay starts itself to preprocess a new
+//! YouTube player for the stream resolver (seconds of JavaScript in the QuickJS built in,
+//! ~220 MB at its peak): that run reads the player from stdin, writes the result to stdout
+//! and exits, with nothing of the app started.
 //! Dev overrides: `FEATHERPLAY_COOKIES_FILE` (the cookie header, read instead of the
 //! credential store; debug builds only, or a release build with the `dev-cookies-file`
 //! feature) and `FEATHERPLAY_SIDECARS_DIR` (instead of `{cache}/sidecars`).
@@ -182,6 +186,16 @@ fn parse_args() -> Result<Mode, String> {
 }
 
 fn main() -> ExitCode {
+    // The resolver's child: before the instance check, the log and any window, none of
+    // which it has. It reads no file and its JavaScript has no host functions.
+    let mut args = std::env::args().skip(1);
+    if args.next().as_deref() == Some(featherplay_streams::PREPROCESS_ARG) && args.next().is_none()
+    {
+        return match featherplay_streams::preprocess_stdio() {
+            true => ExitCode::SUCCESS,
+            false => ExitCode::FAILURE,
+        };
+    }
     controller::uptime();
     match parse_args() {
         Ok(Mode::App(opts, app)) => {

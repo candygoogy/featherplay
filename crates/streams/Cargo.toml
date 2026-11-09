@@ -12,6 +12,8 @@ publish = false
 featherplay-core = { path = "../core" }
 # The HTTP clients and yt-dlp follow the proxy settings.
 featherplay-proxy = { path = "../proxy" }
+# Runs YouTube's player challenges for the native request (`js.rs`).
+rquickjs = { workspace = true }
 # Each resolve step that fails logs a line (the app writes it to its log file).
 log = { workspace = true }
 reqwest = { workspace = true, features = ["native-tls", "gzip"] }
@@ -22,8 +24,13 @@ tokio = { workspace = true, features = ["fs", "io-util", "macros", "process", "r
 # decoders for bzip2, lzma, xz, zstd (C), ppmd, deflate64, AES and a zopfli encoder;
 # flate2's own backend (already in the tree through png) does the inflating.
 zip = { workspace = true, features = ["deflate-flate2"] }
-# Inflates the EJS library, which `build.rs` deflates; the same inflater zip uses.
+# Inflates the EJS library, which `build.rs` deflates; the same inflater zip uses. Its
+# CRC-32 checks a player's saved bytecode.
 flate2 = { workspace = true }
+
+[target.'cfg(windows)'.dependencies]
+# A heap for each QuickJS run (`js.rs`).
+windows = { workspace = true, features = ["Win32_Foundation", "Win32_System_Memory"] }
 
 [build-dependencies]
 flate2 = { workspace = true }
