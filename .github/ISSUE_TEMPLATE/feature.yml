@@ -11,7 +11,8 @@ body:
         - **No downloads.** It streams; it won't save songs or videos to disk.
         - **No telemetry.** No analytics, usage stats or crash uploads, and no server of its own.
 
-        The README's "Coming from Pear?" table lists which Pear plugins are planned.
+        The README's "Coming from Pear?" table lists which Pear plugins are built in already
+        and which may come later.
 
   - type: textarea
     id: problem

@@ -24,15 +24,15 @@ A Cargo workspace. The app is `apps/featherplay`; the rest are libraries it uses
 | Crate | What it does |
 |---|---|
 | `crates/core` | The pure logic: the track model, the play queue, the player state machine and the scrobble rules. No I/O. |
-| `crates/ytm` | The music catalogue and library over ytmapi-rs with cookie auth; `convert` turns raw responses into `core` types and is tested on recorded fixtures. |
+| `crates/ytm` | The music catalogue and library over ytmapi-rs, signed in with the session's cookies or signed out; `convert` turns raw responses into `core` types and is tested on recorded fixtures. |
 | `crates/streams` | Stream URLs for tracks: one InnerTube request of its own, else the yt-dlp sidecar. Also downloads and checks the yt-dlp and Deno sidecars. |
-| `crates/audio` | The audio engine on its own thread: 1 MiB `Range` downloads into a temp file, AAC/MP4 decoding with Symphonia, output through rodio and cpal. |
-| `crates/store` | What's kept on disk and in the OS: paths, settings, the saved session, Credential Manager secrets and the Library's cache. |
+| `crates/audio` | The audio engine on its own thread: 1 MiB `Range` downloads into a temp file, AAC/MP4 decoding with Symphonia and Opus/WebM with opus-decoder, the sound processing (`dsp/`: equalizer, compressor, limiter; crossfade, speed and silence skipping beside it), output through rodio and cpal. |
+| `crates/store` | What's kept on disk and in the OS: paths, settings, the saved session, Credential Manager secrets, the Library's cache and where songs are silent. |
 | `crates/proxy` | Which proxy a request goes through: the environment, else Windows' auto-detection, proxy script or manual proxy, looked up in the background. Every HTTP client is built from its `client()`. |
 | `crates/lyrics` | The LRC format and the LRCLIB lookup. No cache, no retries. |
 | `crates/lastfm` | The Last.fm client: request signing, the desktop auth flow, scrobbling and the offline queue. |
 | `crates/listenbrainz` | The ListenBrainz client: `submit-listens` (now playing, single listens, the offline queue) and `validate-token`. |
-| `crates/integrations` | Windows integrations: media controls, taskbar buttons, the tray icon, toasts and global hotkeys, plus SponsorBlock, Discord presence and the app's identity for the shell. |
+| `crates/integrations` | Windows integrations: media controls, taskbar buttons, the tray icon, toasts and global hotkeys, plus SponsorBlock, Discord presence, the local API and Amuse endpoint, and the app's identity for the shell. |
 | `apps/featherplay` | The app: the Slint UI (`ui/`), the controller that ties the crates together, and the offscreen snapshot mode. `apps/featherplay/ui/README.md` explains how the UI is laid out. |
 
 `vendor/` holds patched third-party crates and stays out of fmt and clippy. `site/` is the
@@ -56,7 +56,7 @@ featherplay is left alone.
 The build keys are optional. Official builds compile in a Last.fm API key and secret and a
 Discord application ID from `LASTFM_API_KEY`, `LASTFM_API_SECRET` and `DISCORD_CLIENT_ID`.
 Without them everything builds and the tests pass; Last.fm then needs your own API key
-(Settings, Scrobbling, API settings), and Discord status is unavailable.
+(Settings > Scrobbling > API settings), and Discord status is unavailable.
 
 The installer needs [Inno Setup](https://jrsoftware.org/isinfo.php) 6.7 or later.
 `packaging/windows/build-installer.sh` builds the release exe and then
@@ -73,10 +73,14 @@ cargo fmt --all --check
 ```
 
 CI runs the same four, plus `cargo deny check` against `deny.toml` (advisories, licences,
-crate sources). The tests need [cargo-nextest](https://nexte.st), because it runs
-each test in its own process: Slint allows one platform per process, and most app tests
-install the offscreen one, so plain `cargo test` fails them. nextest skips doctests, hence
-the second line. `--cfg ci` skips the tests that open an audio device. Some tests write
+crate sources). On pushes and pull requests it uses nextest's `ci` profile, which leaves out
+the slow frame-cost and CPU-time ceilings. The weekly run's and `release.yml`'s x64 tests
+run everything; their ARM64 jobs use the `ci` profile too.
+
+The tests need [cargo-nextest](https://nexte.st), because it runs each test in its own
+process: Slint allows one platform per process, and most app tests install the offscreen
+one, so plain `cargo test` fails them. nextest skips doctests, hence the second line.
+`--cfg ci` skips the tests that open an audio device. Some tests write
 files under `FEATHERPLAY_HOME` and skip, saying so, when it isn't set. The tests in
 `apps/featherplay/tests/app/` don't use yours: each starts in a fresh, empty home of its own
 under `target/tmp`, so the settings of a home you ran the app in can't fail them. That home
@@ -119,9 +123,10 @@ To see a UI change without opening the window, render a page offscreen to a PNG:
 ```
 
 `--fixtures` uses the recorded, scrubbed responses in `crates/ytm/tests/fixtures`;
-`FEATHERPLAY_FIXTURES=demo` uses the demo set the README's images come from. The pages and
-the other flags (`--size`, `--queue`, `--hover`, `--press`, `--hold-loading`, ...) are listed
-in `apps/featherplay/src/snapshot.rs`. For a UI change, attach a before and after in dark and
+`FEATHERPLAY_FIXTURES=demo` uses the demo set the README's images come from. The pages are
+listed in `PAGES` in `apps/featherplay/src/snapshot.rs`, and the other flags (`--size`,
+`--queue`, `--hover`, `--press`, `--hold-loading`, ...) in the usage line of
+`apps/featherplay/src/main.rs`; `apps/featherplay/ui/README.md` explains them. For a UI change, attach a before and after in dark and
 light to the pull request.
 
 Recorded fixtures must be scrubbed before they're committed: no account name, email, channel
