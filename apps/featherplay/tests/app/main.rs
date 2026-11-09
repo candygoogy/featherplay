@@ -3,7 +3,8 @@
 //! Run them with `cargo nextest run` (one process per test); see `.config/nextest.toml`.
 //! Most of them install Slint's offscreen platform, which a process can do only once, so
 //! `cargo test` runs them one at a time only: `cargo test -p featherplay --test app -- <name>`.
-//! `support` holds the helpers several modules share.
+//! `support` holds the helpers several modules share, and starts every test in a fresh home
+//! of its own (`FEATHERPLAY_HOME`).
 #![allow(
     clippy::print_stderr,
     clippy::print_stdout,
@@ -94,6 +95,7 @@ mod shortcut_list;
 mod side_panel;
 mod sidebar_chips;
 mod sign_in_page;
+mod sign_in_unsaved;
 mod signed_out;
 mod skeleton_frames;
 mod skeleton_sweep;

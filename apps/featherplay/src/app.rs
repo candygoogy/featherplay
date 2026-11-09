@@ -96,6 +96,9 @@ pub struct Ctx {
     /// A page's Try again asked the controller to reconnect the stored session; loads wait
     /// for its answer (`UiEvent::Account` or `UiEvent::Unreachable`).
     reconnecting: Cell<bool>,
+    /// The sign-in on its way in wasn't stored for the next start
+    /// (`UiEvent::SignInNotSaved`): a toast says so once it shows.
+    sign_in_unsaved: Cell<bool>,
     hwnd: Cell<Option<isize>>,
     /// The window's Win32 side, once the real window exists (`Win32`), or a test's.
     native: RefCell<Option<Rc<dyn NativeWindow>>>,
@@ -133,6 +136,7 @@ impl Ctx {
             account_known: Cell::new(false),
             parked: RefCell::new(Vec::new()),
             reconnecting: Cell::new(false),
+            sign_in_unsaved: Cell::new(false),
             hwnd: Cell::new(None),
             native: RefCell::new(None),
             shown: RefCell::new(None),
@@ -488,6 +492,15 @@ pub fn on_event(ev: UiEvent) {
             for run in parked {
                 run();
             }
+            // Now that the sign-in shows, past the account picker if it asked; a sign-out
+            // meanwhile drops it.
+            if ctx.sign_in_unsaved.take() && signed_in {
+                // One line of the toast's pill, with room to spare for a wider font.
+                toast::show_error(
+                    &ctx,
+                    tr!("Signed in, but Windows couldn't save it for next time."),
+                );
+            }
             #[cfg(feature = "perf-harness")]
             crate::perf::mark(crate::perf::Mark::Account);
         }
@@ -503,6 +516,7 @@ pub fn on_event(ev: UiEvent) {
             }
         }
         UiEvent::AskIdentity => account_picker::ask(&ctx),
+        UiEvent::SignInNotSaved => ctx.sign_in_unsaved.set(true),
         UiEvent::Identity(identity) => {
             if !account_picker::switched(&identity) {
                 account_menu::identity_changed(&ctx, &identity);

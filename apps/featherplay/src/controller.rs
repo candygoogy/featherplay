@@ -202,6 +202,10 @@ pub enum UiEvent {
     /// A new sign-in, just before its `Account { signed_in: true }`: the window asks which
     /// identity to act as when the session has several (`account_picker`).
     AskIdentity,
+    /// That new sign-in works for this run, but Windows wouldn't store it for the next
+    /// start; sent just before its `Account { signed_in: true }`. The window says so once
+    /// the sign-in shows.
+    SignInNotSaved,
     /// Playback stopped after failures: what to say, and a link to offer.
     Stopped {
         text: &'static str,

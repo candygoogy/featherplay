@@ -267,6 +267,10 @@ msgstr "[the music service said no]"
 msgid "Sign in"
 msgstr "[Sign in]"
 
+#: src/app.rs:501
+msgid "Signed in, but Windows couldn't save it for next time."
+msgstr "[Signed in, but Windows couldn't save it for next time.]"
+
 #: src/bar.rs:102 src/song_menu.rs:139
 msgid "Sign in to like songs"
 msgstr "[Sign in to like songs]"

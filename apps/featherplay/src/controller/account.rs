@@ -2,7 +2,9 @@
 //!
 //! - Sign-in: a cookie header from the sign-in window or the paste field is checked with
 //!   one read, stored with `set_secret(YtCookies)` once it works, and the app signs in
-//!   without a restart (`self.api`, `Source::Live`, `UiEvent::Account`).
+//!   without a restart (`self.api`, `Source::Live`, `UiEvent::Account`). When Windows won't
+//!   store it, the app signs in all the same and says it isn't saved for the next start
+//!   (`UiEvent::SignInNotSaved`).
 //! - Sign-out deletes the cookie secret, the sign-in window's browser profile and the
 //!   Library's cache (a new sign-in deletes that cache too).
 //! - Identities (the account menu): the session acts as one of the identities its cookie
@@ -277,7 +279,8 @@ pub enum AccountEvent {
 
 /// Results of the account's background work.
 pub(super) enum AccountMsg {
-    SignedIn(Result<YtMusic, String>),
+    /// The session, and whether it was stored for the next start (`keep_session`).
+    SignedIn(Result<(YtMusic, bool), String>),
     /// Whether the account switcher still lists the saved identity the session started as.
     IdentityChecked(Identity, Result<bool, ApiError>),
     /// What Credential Manager holds, for the Settings page.
@@ -381,7 +384,7 @@ impl Controller {
 
     pub(super) fn account_msg(&mut self, msg: AccountMsg) {
         match msg {
-            AccountMsg::SignedIn(Ok(api)) => {
+            AccountMsg::SignedIn(Ok((api, kept))) => {
                 log!("signed in");
                 super::reconnect::keep_version(&self.paths, api.client_version());
                 self.unreachable = None;
@@ -397,6 +400,9 @@ impl Controller {
                 // No identity is saved now: the window asks which one when there are several,
                 // holding the sign-in until it's chosen (`account_picker`).
                 (self.ui.events)(UiEvent::AskIdentity);
+                if !kept {
+                    (self.ui.events)(UiEvent::SignInNotSaved);
+                }
                 (self.ui.events)(UiEvent::Account { signed_in: true });
                 self.input(Input::SignedIn);
             }
@@ -934,23 +940,33 @@ pub(super) fn start_presence(
 }
 
 /// Signs in with `cookies` and checks the session with one read; stores the header once
-/// it works. The error text never contains the header.
-async fn check_session(cookies: Cookies) -> Result<YtMusic, String> {
+/// it works, and says whether that worked. The error text never contains the header.
+async fn check_session(cookies: Cookies) -> Result<(YtMusic, bool), String> {
     let api = YtMusic::from_cookie_header(&cookies.0)
         .await
         .map_err(|e| sign_in_error(&e))?;
     api.library_playlists()
         .await
         .map_err(|e| sign_in_error(&e))?;
-    let saved = tokio::task::spawn_blocking(move || set_secret(SecretKey::YtCookies, &cookies.0))
+    let kept = keep_session(cookies, |header| set_secret(SecretKey::YtCookies, header)).await;
+    Ok((api, kept))
+}
+
+/// Stores a session's cookie header for the next start with `store` (Credential Manager),
+/// off the async threads. `false` when it refuses: the session works for this run, and the
+/// next start asks again. Why goes to the log and Copy diagnostics: the store's error with
+/// Windows' code, never the header.
+async fn keep_session<E: fmt::Display + 'static>(
+    cookies: Cookies,
+    store: impl FnOnce(&str) -> Result<(), E> + Send + 'static,
+) -> bool {
+    let refused = tokio::task::spawn_blocking(move || store(&cookies.0).map_err(|e| e.to_string()))
         .await
-        .map_err(|e| e.to_string())
-        .and_then(|r| r.map_err(|e| e.to_string()));
-    if let Err(e) = saved {
-        // Signed in for this run; the next start asks again.
-        log!("saving the session failed: {e}");
-    }
-    Ok(api)
+        .unwrap_or_else(|e| Err(e.to_string()))
+        .err();
+    let kept = refused.is_none();
+    crate::diagnostics::sign_in_kept(refused);
+    kept
 }
 
 /// What the sign-in page says when a session doesn't work. The details go to the log.
@@ -1033,6 +1049,29 @@ mod tests {
         assert!(!text.contains("error sending request"), "{text}");
         assert!(!text.contains("https://"), "{text}");
         assert!(text.contains("try again"), "{text}");
+    }
+
+    #[tokio::test]
+    async fn a_session_the_store_refuses_isnt_kept_and_copy_diagnostics_says_why() {
+        let header = "SAPISID=secret-value";
+        let refusal = "credential store: Platform failure: Windows error code 1783";
+        let kept = keep_session(Cookies(header.into()), move |_| Err(refusal)).await;
+        assert!(!kept, "a refused session counted as kept");
+        let report = crate::diagnostics::report(true, &Settings::default());
+        assert_eq!(report.sign_in_save.as_deref(), Some(refusal));
+
+        // The next sign-in is stored, header and all: nothing is left to report.
+        let kept = keep_session(Cookies(header.into()), move |stored| {
+            if stored == header {
+                Ok(())
+            } else {
+                Err("not the header")
+            }
+        })
+        .await;
+        assert!(kept, "a stored session counted as refused");
+        let report = crate::diagnostics::report(true, &Settings::default());
+        assert_eq!(report.sign_in_save, None);
     }
 
     #[test]

@@ -76,7 +76,10 @@ crate sources). The tests need [cargo-nextest](https://nexte.st), because it run
 each test in its own process: Slint allows one platform per process, and most app tests
 install the offscreen one, so plain `cargo test` fails them. nextest skips doctests, hence
 the second line. `--cfg ci` skips the tests that open an audio device. Some tests write
-files under `FEATHERPLAY_HOME` and skip, saying so, when it isn't set.
+files under `FEATHERPLAY_HOME` and skip, saying so, when it isn't set. The tests in
+`apps/featherplay/tests/app/` don't use yours: each starts in a fresh, empty home of its own
+under `target/tmp`, so the settings of a home you ran the app in can't fail them. That home
+is removed when the test ends; a failed test's stays.
 
 Each crate's integration tests are one program: `apps/featherplay/tests/app/` and
 `crates/*/tests/it/`. Add a new test file as a module of that program. The timing tests

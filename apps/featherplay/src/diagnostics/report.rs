@@ -20,6 +20,9 @@ pub struct Report {
     pub proxy: Option<String>,
     /// How the last helpers download failed (`SidecarError::summary`); `None`: it didn't.
     pub helpers: Option<String>,
+    /// Why Windows wouldn't store the last sign-in (the credential store's error, with its
+    /// code); `None`: it did, or nobody signed in this run.
+    pub sign_in_save: Option<String>,
     /// The last resolver errors, oldest first, each with its time.
     pub errors: Vec<String>,
 }
@@ -40,7 +43,8 @@ impl Report {
              ListenBrainz: {}\n\
              Discord: {}\n\
              Proxy: {}\n\
-             Last helpers download error: {}\n",
+             Last helpers download error: {}\n\
+             Last sign-in save error: {}\n",
             self.version,
             self.windows,
             known(&self.ytdlp),
@@ -52,6 +56,7 @@ impl Report {
             on(self.discord),
             self.proxy.as_deref().unwrap_or("none"),
             self.helpers.as_deref().unwrap_or("none"),
+            self.sign_in_save.as_deref().unwrap_or("none"),
         );
         if self.errors.is_empty() {
             out.push_str("Recent resolver errors: none\n");
@@ -85,6 +90,7 @@ mod tests {
             discord: true,
             proxy: None,
             helpers: None,
+            sign_in_save: None,
             errors: vec![
                 "14:03:11 abc: yt-dlp failed (1): ERROR: one\nsecond line".into(),
                 "14:05:00 def: unavailable: private video".into(),
@@ -154,6 +160,22 @@ mod tests {
             text.contains("Last helpers download error: none\n"),
             "{text}"
         );
+    }
+
+    #[test]
+    fn a_sign_in_that_wasnt_saved_has_its_line() {
+        let text = Report {
+            sign_in_save: Some(
+                "credential store: Platform failure: Windows error code 1783".into(),
+            ),
+            ..report()
+        }
+        .text();
+        let line =
+            "Last sign-in save error: credential store: Platform failure: Windows error code 1783";
+        assert!(text.lines().any(|l| l == line), "no {line:?} in\n{text}");
+        let text = report().text();
+        assert!(text.contains("Last sign-in save error: none\n"), "{text}");
     }
 
     #[test]

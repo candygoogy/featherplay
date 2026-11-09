@@ -267,6 +267,10 @@ msgstr ""
 msgid "Sign in"
 msgstr ""
 
+#: src/app.rs:501
+msgid "Signed in, but Windows couldn't save it for next time."
+msgstr ""
+
 #: src/bar.rs:102 src/song_menu.rs:139
 msgid "Sign in to like songs"
 msgstr ""

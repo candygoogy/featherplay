@@ -48,6 +48,8 @@ static TOOLS: Mutex<(Option<String>, Option<String>)> = Mutex::new((None, None))
 static RECENT: Mutex<VecDeque<String>> = Mutex::new(VecDeque::new());
 /// How the last helpers download failed (`SidecarError::summary`).
 static HELPERS: Mutex<Option<String>> = Mutex::new(None);
+/// Why Windows wouldn't store the last sign-in (`sign_in_kept`).
+static SIGN_IN_SAVE: Mutex<Option<String>> = Mutex::new(None);
 
 /// `{cache}/logs`: the log, the one before it and the crash files.
 pub fn log_dir(paths: &Paths) -> PathBuf {
@@ -224,6 +226,16 @@ pub fn helpers_failed(e: &featherplay_streams::SidecarError) {
     *HELPERS.lock_or_recover() = Some(e.summary());
 }
 
+/// A new sign-in was stored for the next start, or `refused`: the credential store's error,
+/// with Windows' code and never the cookie header. Its log line, and Copy diagnostics names
+/// it until a sign-in is stored.
+pub fn sign_in_kept(refused: Option<String>) {
+    if let Some(why) = &refused {
+        write(format_args!("saving the sign-in failed: {why}"));
+    }
+    *SIGN_IN_SAVE.lock_or_recover() = refused;
+}
+
 /// What Copy diagnostics says now. `signed_in` only: the account itself never reaches it.
 pub fn report(signed_in: bool, settings: &Settings) -> Report {
     let (ytdlp, deno) = TOOLS.lock_or_recover().clone();
@@ -241,6 +253,7 @@ pub fn report(signed_in: bool, settings: &Settings) -> Report {
         discord: settings.discord,
         proxy: featherplay_streams::https_proxy().map(|p| p.to_string()),
         helpers,
+        sign_in_save: SIGN_IN_SAVE.lock_or_recover().clone(),
         errors,
     }
 }

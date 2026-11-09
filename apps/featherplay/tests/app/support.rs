@@ -30,7 +30,8 @@ const COVER_SIDE: u32 = 544;
 static FRESH_HOME: extern "C" fn() = fresh_home;
 
 /// The home is under the tests' temp folder, named after the process, and removed as the
-/// process ends.
+/// process ends. A failed test's stays, with what the test saved: libtest then exits without
+/// running the exit handlers.
 extern "C" fn fresh_home() {
     unsafe extern "C" {
         fn atexit(f: extern "C" fn()) -> i32;

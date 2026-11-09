@@ -13,6 +13,11 @@ Notable changes to featherplay, newest first. The format follows
   one more page of songs, and the last one is empty or brings back songs it has already
   listed. featherplay now stops there, lists each song once, and opens a mix in a few
   seconds.
+- A sign-in that Windows can't save is no longer silent. When Windows' Credential Manager
+  refuses to store the session, featherplay stays signed in until it closes, as before, and
+  now says so in a toast: "Signed in, but Windows couldn't save it for next time." Until now
+  it only asked you to sign in again at the next start. The log keeps Windows' error code,
+  and Copy diagnostics shows it ("Last sign-in save error").
 
 ## [0.2.1] - 2026-11-09
 
