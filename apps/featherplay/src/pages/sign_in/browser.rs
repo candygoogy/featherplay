@@ -1,6 +1,10 @@
-//! "Use Microsoft Edge": Google's sign-in in a real browser window (its own address bar,
-//! padlock, passkeys and Windows Hello), for people who'd rather not type their password
-//! into a window of the app. The WebView2 window (`webview`) stays the default.
+//! "Use Microsoft Edge" (or Google Chrome, Brave or Vivaldi: `known`): Google's sign-in in
+//! a real browser window (its own address bar, padlock, passkeys and Windows Hello), for
+//! people who'd rather not type their password into a window of the app. The WebView2
+//! window (`webview`) stays the default.
+//!
+//! Which browser: the page offers one of those found on this PC (`offers`) and starts the
+//! sign-in with it (`start`).
 //!
 //! How it goes, on its own thread:
 //! 1. Find the browser's exe (`known`: App Paths, then where its installer puts it).
@@ -46,7 +50,7 @@ use std::time::{Duration, Instant};
 
 use super::session::{self, Cookie};
 use cdp::{Client, Method, Reply};
-pub use known::{Browser, EDGE};
+pub use known::{Browser, EDGE, by_id};
 
 /// How a browser sign-in ended.
 #[derive(PartialEq)]
@@ -120,10 +124,33 @@ pub fn start(
         .map_err(|e| format!("browser sign-in thread: {e}"))
 }
 
-/// A policy on this PC turns off `browser`'s DevTools pipe, so the sign-in can't use it.
-/// Read from the registry each time (only read, never written).
-pub fn pipe_blocked(browser: &Browser) -> bool {
-    browser.pipe_blocked(&known::ThisPc)
+/// A known browser that's installed on this PC, as the sign-in page offers it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Offer {
+    pub browser: &'static Browser,
+    /// A policy on this PC turns off its DevTools pipe, so the sign-in can't use it.
+    pub blocked: bool,
+}
+
+/// The known browsers installed on this PC, in the order the page lists them, and which
+/// one it offers (`None` with none found): the one used last (`remembered`, its id), else
+/// Windows' default browser, else the first; a blocked one only when every one is blocked.
+/// Read from the registry and the disk each time (only read, never written).
+pub fn offers(remembered: Option<&str>) -> (Vec<Offer>, Option<usize>) {
+    use known::Lookup;
+    let pc = known::ThisPc;
+    let found = known::found(&pc);
+    // The default browser only matters between two or more.
+    let default = (found.len() > 1).then(|| pc.https_handler()).flatten();
+    let pick = known::pick(&found, remembered, default.as_deref());
+    let offers = found
+        .iter()
+        .map(|f| Offer {
+            browser: f.browser,
+            blocked: f.blocked,
+        })
+        .collect();
+    (offers, pick)
 }
 
 /// Deletes the temporary profiles that earlier runs left in `cache` (a crash, a kill).
@@ -630,6 +657,9 @@ mod tests {
         fn dword(&self, hive: known::Hive, _: &str, value: &str) -> Option<u32> {
             (hive == known::Hive::LocalMachine && value == "RemoteDebuggingAllowed").then_some(0)
         }
+        fn https_handler(&self) -> Option<PathBuf> {
+            None
+        }
     }
 
     #[test]
@@ -977,10 +1007,33 @@ mod tests {
         eprintln!("browser: {what}");
     }
 
-    /// A browser started on the pipe for a live check: Edge, or the Chromium-based exe in
-    /// `FEATHERPLAY_PIPE_TEST_BROWSER` (for a PC whose Edge policy turns DevTools off). On
-    /// about:blank, with a temporary profile under the test home. Dropping it ends the
-    /// browser and deletes the profile.
+    /// What a live check starts: every known browser installed on this PC whose policy
+    /// leaves the pipe on; or only the Chromium-based exe in `FEATHERPLAY_PIPE_TEST_BROWSER`
+    /// (for a PC whose policies turn DevTools off), started as Edge is.
+    fn live_browsers() -> Vec<(&'static Browser, PathBuf)> {
+        if let Some(exe) = std::env::var_os("FEATHERPLAY_PIPE_TEST_BROWSER") {
+            return vec![(&EDGE, PathBuf::from(exe))];
+        }
+        let mut usable = Vec::new();
+        for found in known::found(&known::ThisPc) {
+            if found.blocked {
+                report(&format!(
+                    "{}: skipped, its RemoteDebuggingAllowed policy is off",
+                    found.browser.name
+                ));
+            } else {
+                usable.push((found.browser, found.exe));
+            }
+        }
+        assert!(
+            !usable.is_empty(),
+            "no known browser is installed with its pipe on"
+        );
+        usable
+    }
+
+    /// A browser started on the pipe for a live check, on about:blank, with a temporary
+    /// profile under the test home. Dropping it ends the browser and deletes the profile.
     struct Live {
         process: Option<launch::Running>,
         client: Client<std::fs::File>,
@@ -989,17 +1042,13 @@ mod tests {
     }
 
     impl Live {
-        fn start() -> Self {
+        fn start(browser: &Browser, exe: &Path) -> Self {
             let home = std::env::var_os("FEATHERPLAY_HOME").expect("set FEATHERPLAY_HOME");
             let cache = featherplay_store::Paths::from_home(Path::new(&home)).cache;
-            let exe = std::env::var_os("FEATHERPLAY_PIPE_TEST_BROWSER")
-                .map(PathBuf::from)
-                .or_else(|| EDGE.find(&known::ThisPc))
-                .expect("Edge isn't installed");
-            report(&format!("starting {}", exe.display()));
+            report(&format!("{}: starting {}", browser.name, exe.display()));
             let profile = profile::create(&cache).unwrap();
             let (process, pipes) =
-                launch::launch(&exe, &args(&EDGE, &profile, "about:blank")).unwrap();
+                launch::launch(exe, &args(browser, &profile, "about:blank")).unwrap();
             Self {
                 process: Some(process),
                 client: Client::new(pipes.to_browser),
@@ -1039,37 +1088,56 @@ mod tests {
         }
     }
 
-    /// The real Edge on the pipe, on about:blank with a temporary profile under the test
-    /// home: no Google page, no account. Its window shows for a moment.
+    /// Every known browser installed here, for real, on the pipe: on about:blank with a
+    /// temporary profile under the test home, so no Google page and no account. Each one's
+    /// window shows for a moment.
     /// `FEATHERPLAY_HOME=<a test home> cargo nextest run -p featherplay --lib --run-ignored only
-    /// -E 'test(live_edge)' --no-capture`
+    /// -E 'test(live_browsers)' --no-capture`
     #[test]
-    #[ignore = "starts Microsoft Edge (about:blank, temporary profile)"]
-    fn live_edge_answers_on_the_pipe_and_closes() {
-        let mut live = Live::start();
-        let cookies = live
-            .cookies()
-            .expect("no reply on the pipe (is the RemoteDebuggingAllowed policy off?)")
-            .unwrap();
-        report(&format!("Storage.getCookies: {} cookies", cookies.len()));
-        assert!(
-            session::music_cookies(&cookies, wall_now()).is_empty(),
-            "a new profile has no YouTube cookies"
-        );
+    #[ignore = "starts every known browser that's installed (about:blank, temporary profile)"]
+    fn live_browsers_answer_on_the_pipe_and_close() {
+        for (browser, exe) in live_browsers() {
+            let name = browser.name;
+            let mut live = Live::start(browser, &exe);
+            let cookies = live
+                .cookies()
+                .unwrap_or_else(|| panic!("{name}: no reply on the pipe"))
+                .unwrap();
+            report(&format!(
+                "{name}: Storage.getCookies: {} cookies",
+                cookies.len()
+            ));
+            assert!(
+                session::music_cookies(&cookies, wall_now()).is_empty(),
+                "{name}: a new profile has no YouTube cookies"
+            );
 
-        live.client.send(Method::CloseBrowser).unwrap();
-        let exited = live.process().wait(Duration::from_secs(10));
-        report(&format!("exited within 10 s of Browser.close: {exited}"));
-        assert!(exited, "the browser didn't exit on Browser.close");
-        assert!(live.finish(), "the temporary profile is still there");
-        assert!(!live.profile.exists());
+            live.client.send(Method::CloseBrowser).unwrap();
+            let exited = live.process().wait(Duration::from_secs(10));
+            report(&format!(
+                "{name}: exited within 10 s of Browser.close: {exited}"
+            ));
+            assert!(exited, "{name} didn't exit on Browser.close");
+            assert!(
+                live.finish(),
+                "{name}: the temporary profile is still there"
+            );
+            assert!(!live.profile.exists());
+        }
     }
 
-    /// Review point: does Edge's process exit when its last window is closed (WM_CLOSE),
-    /// with the pipe open? About:blank, temporary profile, as above.
+    /// Does each browser's process exit when its last window is closed (WM_CLOSE), with the
+    /// pipe open? The sign-in takes that as "the user closed it". About:blank, temporary
+    /// profile, as above.
     #[test]
-    #[ignore = "starts Microsoft Edge (about:blank, temporary profile)"]
-    fn live_edge_exits_when_its_window_closes() {
+    #[ignore = "starts every known browser that's installed (about:blank, temporary profile)"]
+    fn live_browsers_exit_when_their_window_closes() {
+        for (browser, exe) in live_browsers() {
+            exits_when_its_window_closes(browser, &exe);
+        }
+    }
+
+    fn exits_when_its_window_closes(browser: &Browser, exe: &Path) {
         use windows::Win32::Foundation::{HWND, LPARAM, WPARAM};
         use windows::Win32::UI::WindowsAndMessaging::{
             EnumWindows, GetWindowThreadProcessId, IsWindowVisible, PostMessageW, WM_CLOSE,
@@ -1093,9 +1161,10 @@ mod tests {
             true.into()
         }
 
-        let mut live = Live::start();
+        let name = browser.name;
+        let mut live = Live::start(browser, exe);
         let answered = live.cookies().is_some();
-        report(&format!("answers on the pipe: {answered}"));
+        report(&format!("{name}: answers on the pipe: {answered}"));
         let mut find = Find {
             pid: live.process().pid,
             found: Vec::new(),
@@ -1112,9 +1181,9 @@ mod tests {
             }
             std::thread::sleep(Duration::from_millis(200));
         }
-        assert!(!find.found.is_empty(), "no visible window");
+        assert!(!find.found.is_empty(), "{name}: no visible window");
         report(&format!(
-            "{} visible window(s); sending WM_CLOSE",
+            "{name}: {} visible window(s); sending WM_CLOSE",
             find.found.len()
         ));
         for hwnd in &find.found {
@@ -1124,8 +1193,11 @@ mod tests {
             }
         }
         let exited = live.process().wait(Duration::from_secs(10));
-        report(&format!("exited within 10 s of WM_CLOSE: {exited}"));
-        assert!(live.finish(), "the temporary profile is still there");
-        assert!(exited, "the browser kept running after its window closed");
+        report(&format!("{name}: exited within 10 s of WM_CLOSE: {exited}"));
+        assert!(
+            live.finish(),
+            "{name}: the temporary profile is still there"
+        );
+        assert!(exited, "{name} kept running after its window closed");
     }
 }

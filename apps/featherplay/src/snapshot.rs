@@ -169,6 +169,14 @@ pub const PAGES: &[&str] = &[
     "sign-in-edge",
     "sign-in-edge-blocked",
     "sign-in-edge-why",
+    // Sign in on a PC with Microsoft Edge, Google Chrome and Brave, Chrome the default
+    // browser: the row offers Chrome, with Change; the list Change opens; the same with a
+    // policy turning off the connection to Edge, which says so in the list, with Why?; and
+    // with that Why? open.
+    "sign-in-browsers",
+    "sign-in-browsers-list",
+    "sign-in-browsers-blocked",
+    "sign-in-browsers-why",
     // Sign in with the paste field open.
     "sign-in-paste",
     // Sign in after the sign-in window didn't open: what happened, with Try again.
@@ -664,14 +672,29 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
         ui.global::<crate::ui::SignInData>().set_expired(true);
         settle();
     }
-    if o.page.starts_with("sign-in") {
-        // The same picture on every PC, whatever its Edge policy.
-        let data = ui.global::<crate::ui::SignInData>();
-        data.set_edge_blocked(matches!(
+    if o.page.starts_with("sign-in") || o.page == "account-picker" {
+        // The same picture on every PC, whatever browsers and policies it has: Microsoft
+        // Edge alone, or Edge, Chrome (the one offered) and Brave.
+        let edge_blocked = matches!(
             o.page.as_str(),
-            "sign-in-edge-blocked" | "sign-in-edge-why"
+            "sign-in-edge-blocked"
+                | "sign-in-edge-why"
+                | "sign-in-browsers-blocked"
+                | "sign-in-browsers-why"
+        );
+        if o.page.starts_with("sign-in-browsers") {
+            let found = [("edge", edge_blocked), ("chrome", false), ("brave", false)];
+            crate::pages::sign_in::offer_for_snapshot(ctx, &found, "chrome");
+        } else {
+            crate::pages::sign_in::offer_for_snapshot(ctx, &[("edge", edge_blocked)], "edge");
+        }
+        let data = ui.global::<crate::ui::SignInData>();
+        data.set_choosing(o.page.starts_with("sign-in-browsers-"));
+        data.set_why_browser("Edge".into());
+        data.set_why_open(matches!(
+            o.page.as_str(),
+            "sign-in-edge-why" | "sign-in-browsers-why"
         ));
-        data.set_why_open(o.page == "sign-in-edge-why");
         data.set_paste_open(o.page == "sign-in-paste");
         settle();
     }
@@ -680,15 +703,7 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
         settle();
     }
     if o.page == "sign-in-edge" {
-        let data = ui.global::<crate::ui::SignInData>();
-        data.set_busy(true);
-        data.set_edge(true);
-        data.set_status(
-            featherplay_core::tr!(
-                "Finish signing in in Microsoft Edge. featherplay closes it once you're in."
-            )
-            .into(),
-        );
+        crate::pages::sign_in::running_for_snapshot(ctx);
         settle();
     }
     if o.page == "home-more" {
@@ -1094,6 +1109,10 @@ fn page(name: &str, f: &Fixtures) -> Result<Page, String> {
         | "sign-in-edge"
         | "sign-in-edge-blocked"
         | "sign-in-edge-why"
+        | "sign-in-browsers"
+        | "sign-in-browsers-list"
+        | "sign-in-browsers-blocked"
+        | "sign-in-browsers-why"
         | "sign-in-paste"
         | "sign-in-error"
         | "sign-in-window"

@@ -112,6 +112,18 @@ pub fn set_pins(ctx: &Ctx, key: &str, pins: Vec<String>) {
     commit(ctx, Change::Pins(key.to_string(), pins));
 }
 
+/// The browser the sign-in page's browser row last opened or was switched to, by its id.
+pub fn sign_in_browser() -> Option<String> {
+    SETTINGS.with(|s| s.borrow().sign_in_browser.clone())
+}
+
+/// Remembers the browser the sign-in page's row opened or was switched to.
+pub fn set_sign_in_browser(ctx: &Ctx, id: &str) {
+    if sign_in_browser().as_deref() != Some(id) {
+        commit(ctx, Change::SignInBrowser(id.to_string()));
+    }
+}
+
 /// Whether the one-time "still playing in the tray" notice has been shown.
 pub fn tray_notice_shown() -> bool {
     SETTINGS.with(|s| s.borrow().tray_notice_shown)

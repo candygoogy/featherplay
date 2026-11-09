@@ -1,9 +1,11 @@
 //! The sign-in page, offscreen (no window is shown): the ways in are rows of one list.
-//! With Edge's connection turned off on this PC, its row says so calmly and "Why?" opens the
-//! policy detail; the details ease open and shut; "Continue without signing in" goes Home. A
-//! sign-in window that never gets its handle (the offscreen platform makes none) ends the
-//! sign-in in plain words, with Try again. No row that would open Edge is pressed here, and
-//! no sign-in window gets far enough to load a page.
+//! Its browser row names the browser it opens; with more than one found, "Change" lists them
+//! and a pick is offered from then on. With a browser's connection turned off on this PC, it
+//! says so calmly and "Why?" opens the policy detail; the details ease open and shut;
+//! "Continue without signing in" goes Home. A sign-in window that never gets its handle (the
+//! offscreen platform makes none) ends the sign-in in plain words, with Try again. No row
+//! that would open a browser is pressed here, and no sign-in window gets far enough to load a
+//! page.
 //!
 //! The page has no search bar. Its block, the error row in it, a toast and the account
 //! picker all centre on the room the page has: right of the sidebar, left of Up next while
@@ -14,6 +16,7 @@ use std::ops::ControlFlow;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
+use featherplay::controller::{AccountAction, Action, Change};
 use featherplay::offscreen;
 use featherplay::router::Page;
 use featherplay::snapshot::Scene;
@@ -66,17 +69,21 @@ fn line(scene: &Scene, row: &str) -> String {
         .to_string()
 }
 
-fn sign_in_page(edge_blocked: bool) -> Scene {
+/// The page as on a PC with these browsers installed (by id; `true`: a policy turns the
+/// connection to it off), its browser row offering `offered`: the same page on every PC,
+/// whatever browsers and policies it has.
+fn sign_in_page_with(installed: &[(&str, bool)], offered: &str) -> Scene {
     let scene = Scene::new(1280, 800, true, false).expect("scene");
     scene.open("sign-in").expect("sign in");
     scene.settle();
-    // The same page on every PC, whatever its Edge policy.
-    scene
-        .ui
-        .global::<SignInData>()
-        .set_edge_blocked(edge_blocked);
+    featherplay::pages::sign_in::offer_for_snapshot(&scene.ctx, installed, offered);
     scene.settle();
     scene
+}
+
+/// The page on a PC with Microsoft Edge alone.
+fn sign_in_page(edge_blocked: bool) -> Scene {
+    sign_in_page_with(&[("edge", edge_blocked)], "edge")
 }
 
 #[test]
@@ -96,6 +103,100 @@ fn the_ways_in_are_rows_of_one_list() {
         "Not available on this PC"
     );
     assert!(!shown(&scene, "Why?"));
+    assert!(!shown(&scene, "Change"), "one browser is no choice");
+}
+
+const BROWSERS: [&str; 3] = ["Microsoft Edge", "Google Chrome", "Brave"];
+
+/// Whether the list's entry for `browser` has the check.
+fn checked(scene: &Scene, browser: &str) -> bool {
+    find(scene, |l| l == browser)
+        .unwrap_or_else(|| panic!("{browser:?} isn't listed"))
+        .accessible_string_property(AccessibleStringProperty::Checked)
+        .is_some_and(|c| c == "true")
+}
+
+#[test]
+fn with_several_browsers_the_row_names_the_one_offered_and_change_lists_them() {
+    let found = [("edge", false), ("chrome", false), ("brave", false)];
+    let scene = sign_in_page_with(&found, "chrome");
+    assert!(enabled(&scene, "Use Google Chrome"));
+    assert!(!shown(&scene, "Use Microsoft Edge"));
+    for browser in BROWSERS {
+        assert!(!shown(&scene, browser), "{browser} shows before Change");
+    }
+
+    press(&scene, "Change");
+    for browser in BROWSERS {
+        assert!(shown(&scene, browser), "{browser} isn't listed");
+    }
+    let checks: Vec<bool> = BROWSERS.iter().map(|b| checked(&scene, b)).collect();
+    assert_eq!(checks, [false, true, false]);
+
+    // Another way in shuts the list, so it doesn't unfold again when that way ends.
+    press(&scene, "Sign in with Google");
+    assert!(!scene.ui.global::<SignInData>().get_choosing());
+}
+
+#[test]
+fn picking_a_browser_from_the_list_offers_it_and_remembers_it() {
+    let found = [("edge", false), ("chrome", false), ("brave", false)];
+    let scene = sign_in_page_with(&found, "chrome");
+    press(&scene, "Change");
+    scene.take_actions();
+
+    press(&scene, "Brave");
+    assert!(enabled(&scene, "Use Brave"));
+    assert!(!shown(&scene, "Google Chrome"), "the list stayed open");
+    let remembered = scene.take_actions().into_iter().any(|a| {
+        matches!(a, Action::Account(AccountAction::Set(Change::SignInBrowser(id))) if id == "brave")
+    });
+    assert!(remembered, "the choice wasn't saved");
+    // Opened again, the check has moved.
+    press(&scene, "Change");
+    assert!(checked(&scene, "Brave") && !checked(&scene, "Google Chrome"));
+}
+
+#[test]
+fn a_blocked_browser_in_the_list_says_so_with_why_and_cant_be_picked() {
+    let found = [("edge", true), ("chrome", false), ("brave", false)];
+    let scene = sign_in_page_with(&found, "chrome");
+    // The row offers one that works, so it isn't the one saying "Why?".
+    assert!(enabled(&scene, "Use Google Chrome"));
+    assert!(!shown(&scene, "Why?"));
+
+    press(&scene, "Change");
+    assert!(!enabled(&scene, "Microsoft Edge"));
+    assert_eq!(line(&scene, "Microsoft Edge"), "Not available on this PC");
+    let policy = |l: &str| l.starts_with("Edge on this PC");
+    assert!(
+        find(&scene, policy).is_none(),
+        "the policy shows before Why?"
+    );
+    press(&scene, "Why?");
+    assert!(find(&scene, policy).is_some(), "Why? didn't open the note");
+
+    press(&scene, "Microsoft Edge");
+    assert!(
+        shown(&scene, "Use Google Chrome"),
+        "a blocked one was taken"
+    );
+}
+
+#[test]
+fn with_every_browser_blocked_the_row_says_so_as_with_one() {
+    let scene = sign_in_page_with(&[("edge", true), ("chrome", true)], "chrome");
+    assert!(!enabled(&scene, "Use Google Chrome"));
+    assert_eq!(
+        line(&scene, "Use Google Chrome"),
+        "Not available on this PC"
+    );
+    assert!(!shown(&scene, "Change"));
+    press(&scene, "Why?");
+    assert!(
+        find(&scene, |l| l.starts_with("Chrome on this PC")).is_some(),
+        "Why? didn't name Chrome's policy"
+    );
 }
 
 #[test]
@@ -158,7 +259,7 @@ fn why_eases_open_and_shut_and_the_rows_below_follow() {
     scene.ui.global::<Theme>().set_motion(true);
     scene.open("sign-in").expect("sign in");
     scene.settle();
-    scene.ui.global::<SignInData>().set_edge_blocked(true);
+    featherplay::pages::sign_in::offer_for_snapshot(&scene.ctx, &[("edge", true)], "edge");
     scene.settle();
     offscreen::freeze_clock();
     offscreen::advance(Duration::from_secs(1));

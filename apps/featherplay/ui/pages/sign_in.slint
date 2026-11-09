@@ -1,25 +1,47 @@
 // Sign in: the ways in as rows of one card (house style rule 5), the block centred in the
 // page. Sign in with Google, the recommended way, opens the sign-in window (a separate window
-// with Google's page; the main window never hosts a webview); Use Microsoft Edge opens Edge
-// with a temporary profile, or says calmly that it can't work on this PC, with "Why?" for the
-// policy; Paste a cookie header opens the paste field under its row. The card ends with what
-// featherplay keeps; under it, "Continue without signing in" as a quiet pill. A way that
-// fails says so above the card in plain words, with Try again. Driven by
-// `src/pages/sign_in.rs`.
-import { Theme, Icons } from "../theme.slint";
-import { Body, ChoiceList, ChoiceRow, Display, Icon, Pill } from "../parts.slint";
+// with Google's page; the main window never hosts a webview); Use Microsoft Edge (or Google
+// Chrome, Brave, Vivaldi: the row names the browser it opens) opens that browser with a
+// temporary profile, or says calmly that it can't work on this PC, with "Why?" for the
+// policy; with more than one of them found, "Change" lists them under the row; Paste a
+// cookie header opens the paste field under its row. The card ends with what featherplay
+// keeps; under it, "Continue without signing in" as a quiet pill. A way that fails says so
+// above the card in plain words, with Try again. Driven by `src/pages/sign_in.rs`.
+import { Theme, Icons, Curves } from "../theme.slint";
+import { Body, ChoiceList, ChoiceRow, Display, Icon, Pill, TextLink } from "../parts.slint";
 import { Nav, PageKind } from "../nav.slint";
 
 // A way in, for Try again.
-export enum SignInWay { none, window, edge, paste }
+export enum SignInWay { none, window, browser, paste }
+
+// A browser the sign-in can open that's installed on this PC, in the list under "Change".
+export struct BrowserChoice {
+    // As the user knows it: "Google Chrome".
+    name: string,
+    // In a sentence about it: "Chrome".
+    short: string,
+    // A policy on this PC turns off the connection to it.
+    blocked: bool,
+}
 
 export global SignInData {
-    // The sign-in window or Edge is open, or a cookie header is being checked.
+    // The sign-in window or the browser is open, or a cookie header is being checked.
     in property <bool> busy;
-    // The Edge sign-in is running (Edge is open, or closing).
-    in property <bool> edge;
-    // A policy on this PC turns off the connection to Edge: the option can't work.
-    in property <bool> edge-blocked;
+    // The browser sign-in is running (the browser is open, or closing).
+    in property <bool> browser-running;
+    // The browser the row offers, as the user knows it and as a sentence about it names it
+    // (Rust sets Microsoft Edge at startup).
+    in property <string> browser-name;
+    in property <string> browser-short;
+    // A policy on this PC turns off the connection to it, and to every other browser found:
+    // the option can't work.
+    in property <bool> browser-blocked;
+    // The browsers found, when there are two or more: what "Change" lists. The row offers
+    // the one at `browser-current`.
+    in property <[BrowserChoice]> browsers;
+    in property <int> browser-current;
+    // "Change" was pressed: the list is open.
+    in-out property <bool> choosing;
     // What's happening, e.g. "Finish signing in in the other window."
     in property <string> status;
     // A way that failed: what happened (`error-title`), what to do (`error`), and the way
@@ -32,15 +54,154 @@ export global SignInData {
     // Shown after "Session expired, sign in again".
     in property <bool> expired;
     in-out property <bool> paste-open;
-    // "Why?" under a blocked Edge: the policy detail is open.
+    // "Why?" on a blocked browser: the policy detail is open. In the list, it's about
+    // `why-browser` (the browser as a sentence names it).
     in-out property <bool> why-open;
+    in-out property <string> why-browser;
     // The pasted header. Rust clears it once it has been taken.
     in-out property <string> cookies;
     callback open-window();
-    callback open-edge();
-    // Closes Edge and deletes its profile.
-    callback cancel-edge();
+    callback open-browser();
+    // Closes the browser and deletes its profile.
+    callback cancel-browser();
+    // "Change": offer the browser at this index of `browsers` from now on.
+    callback pick-browser(int);
     callback submit(string);
+}
+
+// A glyph only this page uses, on the same 24 px grid as `Icons`.
+global SignInIcons {
+    out property <string> check: "M5.5 12.5 L10 17 L18.5 7.5";
+}
+
+// Why a browser can't be used: what it means first; the policy's name for whoever looks it
+// up.
+component PolicyNote inherits Rectangle {
+    // The browser, as a sentence names it: "Edge".
+    in property <string> browser;
+    min-height: lay.min-height;
+    preferred-height: lay.preferred-height;
+    lay := VerticalLayout {
+        spacing: Theme.s3;
+        Body {
+            // {} is a browser's name: Edge, Chrome, Brave or Vivaldi.
+            text: @tr("{} on this PC is set to keep apps from reading its sign-in, so featherplay can't use it. Sign in with Google works without it.", root.browser);
+            font-size: Theme.t-meta + 1px;
+            color: Theme.text2;
+            overflow: clip;
+            wrap: word-wrap;
+        }
+        Body {
+            text: @tr("Set by an administrator or a tweaking tool: the RemoteDebuggingAllowed policy is off.");
+            font-size: Theme.t-meta;
+            color: Theme.text3;
+            overflow: clip;
+            wrap: word-wrap;
+        }
+    }
+}
+
+// One browser in the list under "Change": its name, and a check on the one the row offers. A
+// press offers it instead; Enter or Space does too, once tabbed to. One a policy blocks is dimmed,
+// says so under its name, and has "Why?" where the check goes.
+component BrowserEntry inherits Rectangle {
+    in property <string> name;
+    in property <bool> current;
+    in property <bool> blocked;
+    // Off while the list is shut, so Tab doesn't reach it; `showing` until it has shut.
+    in property <bool> enabled: true;
+    in property <bool> showing: true;
+    // "Why?" is open on this one.
+    in property <bool> why-open;
+    callback clicked();
+    callback why();
+    property <bool> can-pick: root.enabled && !root.blocked;
+    property <bool> ring;
+    // Animated as a private property: a root animating a public one is copied into each use.
+    property <brush> ground: root.can-pick ? Theme.state(ta.pressed, ta.has-hover) : transparent;
+    animate ground { duration: Theme.t-hover; }
+    height: root.blocked ? 52px : 40px;
+    // Inside the list's corner, on the same centre.
+    border-radius: Theme.r-m - Theme.s1;
+    background: root.ground;
+    accessible-role: button;
+    accessible-label: root.name;
+    accessible-description: root.blocked ? @tr("Not available on this PC") : "";
+    accessible-enabled: root.can-pick;
+    accessible-checkable: true;
+    accessible-checked: root.current;
+    accessible-action-default => {
+        if root.can-pick {
+            root.clicked();
+        }
+    }
+    fs := FocusScope {
+        enabled: root.can-pick;
+        focus-gained(reason) => { root.ring = reason == FocusReason.tab-navigation; }
+        focus-lost => { root.ring = false; }
+        key-pressed(e) => {
+            if e.text == Key.Return || e.text == Key.Space {
+                root.clicked();
+                return accept;
+            }
+            reject
+        }
+    }
+    // Above the focus scope, so a click is the touch area's.
+    ta := TouchArea {
+        enabled: root.can-pick;
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+    if fs.has-focus && root.ring: Rectangle {
+        border-radius: parent.border-radius;
+        border-width: 2px;
+        border-color: Theme.accent;
+    }
+    // Above the touch area, so a click on "Why?" is the link's.
+    HorizontalLayout {
+        padding-left: Theme.s3;
+        padding-right: Theme.s3;
+        spacing: Theme.s2;
+        VerticalLayout {
+            alignment: center;
+            spacing: 1px;
+            horizontal-stretch: 1;
+            // Read once, as the entry's label and description.
+            Body {
+                text: root.name;
+                color: Theme.text1.transparentize(root.blocked ? 0.55 : 0);
+                accessible-role: none;
+            }
+            if root.blocked: Body {
+                text: @tr("Not available on this PC");
+                font-size: Theme.t-meta + 1px;
+                color: Theme.text2;
+                accessible-role: none;
+            }
+        }
+        if root.current && !root.blocked: VerticalLayout {
+            alignment: center;
+            Icon {
+                width: 18px;
+                height: 18px;
+                commands: SignInIcons.check;
+                stroke: Theme.text1;
+            }
+        }
+        // Gone with the list, so Tab doesn't reach it while the list is shut.
+        if root.blocked && root.showing: VerticalLayout {
+            alignment: center;
+            TextLink {
+                text: @tr("Why?");
+                font-size: Theme.t-meta + 1px;
+                font-weight: 400;
+                expands: true;
+                expanded: root.why-open;
+                clicked => { root.why(); }
+            }
+        }
+    }
 }
 
 // The multi-line paste field. Its text is never logged.
@@ -171,11 +332,19 @@ component Problem inherits Rectangle {
 export component SignInPage inherits Rectangle {
     property <length> col-w: min(self.width - 2 * Theme.page-pad, 460px);
     // Which way is under way.
-    property <bool> paste-busy: SignInData.busy && SignInData.paste-open && !SignInData.edge;
-    property <bool> window-busy: SignInData.busy && !SignInData.paste-open && !SignInData.edge;
+    property <bool> paste-busy: SignInData.busy && SignInData.paste-open && !SignInData.browser-running;
+    property <bool> window-busy: SignInData.busy && !SignInData.paste-open && !SignInData.browser-running;
     // The block's height with its rows' details shut: the block is centred on it, so a
     // detail opens downwards and the row clicked stays where it was, while there's room.
-    property <length> rest-h: col.preferred-height - edge-row.detail-height - paste-row.detail-height;
+    property <length> rest-h: col.preferred-height - browser-row.detail-height - paste-row.detail-height;
+    // There's a choice of browsers: more than one found, and one of them works.
+    property <bool> listing: !SignInData.browser-blocked && SignInData.browsers.length > 1;
+    // How far the list's "Why?" note is unfolded under it, 0 to 1, eased.
+    property <float> why-shown: root.listing && SignInData.why-open ? 1 : 0;
+    animate why-shown {
+        duration: Theme.t-expand;
+        easing: Curves.ease-out;
+    }
     // The room the page shows: its full height (it has no search bar above it), less the
     // floating bar's. The page itself is the width beside the sidebar and Up next.
     property <length> room-h: flick.height - Theme.bar-clear;
@@ -243,8 +412,8 @@ export component SignInPage inherits Rectangle {
                     retry => {
                         if SignInData.retry == SignInWay.window {
                             SignInData.open-window();
-                        } else if SignInData.retry == SignInWay.edge {
-                            SignInData.open-edge();
+                        } else if SignInData.retry == SignInWay.browser {
+                            SignInData.open-browser();
                         } else if SignInData.retry == SignInWay.paste {
                             SignInData.submit(SignInData.cookies);
                         }
@@ -266,43 +435,83 @@ export component SignInPage inherits Rectangle {
                         bare: root.window-busy;
                         clicked => { SignInData.open-window(); }
                     }
-                    // Edge: Google's sign-in in the user's own browser, with a throwaway profile.
-                    edge-row := ChoiceRow {
+                    // The user's own browser: Google's sign-in there, with a throwaway profile.
+                    browser-row := ChoiceRow {
                         icon: Icons.browser;
-                        title: @tr("Use Microsoft Edge");
-                        line: SignInData.edge ? SignInData.status : (SignInData.edge-blocked ? @tr("Not available on this PC") : @tr("In your own browser, with a temporary profile"));
-                        enabled: !SignInData.busy && !SignInData.edge-blocked;
-                        dimmed: SignInData.edge-blocked || (SignInData.busy && !SignInData.edge);
-                        link: SignInData.edge ? @tr("Cancel") : (SignInData.edge-blocked ? @tr("Why?") : "");
-                        link-expands: SignInData.edge-blocked && !SignInData.edge;
-                        expands: SignInData.edge-blocked;
-                        open: SignInData.edge-blocked && SignInData.why-open;
-                        clicked => { SignInData.open-edge(); }
+                        // {} is the browser it opens: Microsoft Edge, Google Chrome, Brave or Vivaldi.
+                        title: @tr("Use {}", SignInData.browser-name);
+                        line: SignInData.browser-running ? SignInData.status : (SignInData.browser-blocked ? @tr("Not available on this PC") : @tr("In your own browser, with a temporary profile"));
+                        enabled: !SignInData.busy && !SignInData.browser-blocked;
+                        dimmed: SignInData.browser-blocked || (SignInData.busy && !SignInData.browser-running);
+                        // "Change" opens the list of browsers, to sign in with another one.
+                        link: SignInData.browser-running ? @tr("Cancel") : (SignInData.browser-blocked ? @tr("Why?") : (root.listing && !SignInData.busy ? @tr("Change") : ""));
+                        link-expands: !SignInData.browser-running;
+                        expands: SignInData.browser-blocked || root.listing;
+                        open: SignInData.browser-blocked ? SignInData.why-open : (root.listing && SignInData.choosing && !SignInData.busy);
+                        clicked => { SignInData.open-browser(); }
                         link-clicked => {
-                            if SignInData.edge {
-                                SignInData.cancel-edge();
-                            } else {
+                            if SignInData.browser-running {
+                                SignInData.cancel-browser();
+                            } else if SignInData.browser-blocked {
                                 SignInData.why-open = !SignInData.why-open;
+                            } else {
+                                // The list opens and shuts with its note folded.
+                                SignInData.why-open = false;
+                                SignInData.choosing = !SignInData.choosing;
                             }
                         }
-                        // What it means first; the policy's name for whoever looks it up.
-                        // The details are made once and hidden while shut (the row clips
-                        // them to nothing): an `if` would cost the exe a copy of each.
-                        Body {
-                            visible: edge-row.showing;
-                            text: @tr("Edge on this PC is set to keep apps from reading its sign-in, so featherplay can't use it. Sign in with Google works without it.");
-                            font-size: Theme.t-meta + 1px;
-                            color: Theme.text2;
-                            overflow: clip;
-                            wrap: word-wrap;
-                        }
-                        Body {
-                            visible: edge-row.showing;
-                            text: @tr("Set by an administrator or a tweaking tool: the RemoteDebuggingAllowed policy is off.");
-                            font-size: Theme.t-meta;
-                            color: Theme.text3;
-                            overflow: clip;
-                            wrap: word-wrap;
+                        // The row's two details, as one child (so the row's own spacing
+                        // stays out of it): the browsers found, under "Change", and why one
+                        // can't be used, under "Why?". With no browser that works, the note
+                        // is the whole detail; with a choice, it unfolds under the list,
+                        // about the blocked browser whose "Why?" was pressed. Made once and
+                        // hidden while shut (the row clips them to nothing).
+                        VerticalLayout {
+                            // The list: rows of one tile on the ground colour.
+                            Rectangle {
+                                height: root.listing ? entries.preferred-height : 0;
+                                visible: browser-row.showing && root.listing;
+                                Rectangle {
+                                    y: 0;
+                                    height: entries.preferred-height;
+                                    border-radius: Theme.r-m;
+                                    background: Theme.ground;
+                                    border-width: 1px;
+                                    border-color: Theme.card-edge;
+                                    entries := VerticalLayout {
+                                        padding: Theme.s1;
+                                        for choice[i] in SignInData.browsers: BrowserEntry {
+                                            name: choice.name;
+                                            blocked: choice.blocked;
+                                            current: i == SignInData.browser-current;
+                                            // Shut, or hidden behind a blocked row's note: Tab
+                                            // doesn't reach it.
+                                            enabled: browser-row.open && root.listing;
+                                            showing: browser-row.showing && root.listing;
+                                            why-open: SignInData.why-open && SignInData.why-browser == choice.short;
+                                            clicked => { SignInData.pick-browser(i); }
+                                            why => {
+                                                if self.why-open {
+                                                    SignInData.why-open = false;
+                                                } else {
+                                                    SignInData.why-browser = choice.short;
+                                                    SignInData.why-open = true;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            Rectangle {
+                                clip: true;
+                                height: SignInData.browser-blocked ? note.preferred-height : (Theme.s3 + note.preferred-height) * root.why-shown;
+                                note := PolicyNote {
+                                    y: SignInData.browser-blocked ? 0 : Theme.s3;
+                                    height: self.preferred-height;
+                                    visible: browser-row.showing && (SignInData.browser-blocked || root.why-shown > 0);
+                                    browser: SignInData.browser-blocked ? SignInData.browser-short : SignInData.why-browser;
+                                }
+                            }
                         }
                     }
                     paste-row := ChoiceRow {

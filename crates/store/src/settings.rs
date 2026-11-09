@@ -69,6 +69,12 @@ pub struct Settings {
     /// Not secret, and no names. `None` is the identity the cookies were signed in with.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub identity: Option<String>,
+    /// The browser the sign-in page's "Use Microsoft Edge" row last opened or was switched
+    /// to: "edge", "chrome", "brave" or "vivaldi". `None` (the default) is Windows' default
+    /// browser when it's one of them. A name this build doesn't know, or a browser that's
+    /// no longer installed, is passed over.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sign_in_browser: Option<String>,
     /// Lyrics show at all (on by default): the Lyrics toggles and tab, and their lookups.
     pub lyrics: bool,
     /// The lyrics view looks up synced lyrics on LRCLIB (on by default); off, it shows only
@@ -364,6 +370,7 @@ impl Default for Settings {
             theme: ThemeMode::Dark,
             discord_options: DiscordOptions::default(),
             identity: None,
+            sign_in_browser: None,
             lyrics: true,
             lyrics_lrclib: true,
             autoplay: true,

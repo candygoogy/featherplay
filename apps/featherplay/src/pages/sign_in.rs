@@ -6,10 +6,16 @@
 //!
 //! Three ways in: the sign-in window (the default: a slim browser frame, `frame`, round
 //! Google's page in WebView2 on a thread of its own, `webview`, its address from the
-//! webview's `Source`, `address`), Microsoft Edge with a temporary profile (`browser`), or a
-//! pasted cookie header, checked here for shape and by the controller with one read. The
-//! two windows build the same header (`session`). Every way, the controller stores the
-//! header and signs in without a restart. The header is never logged.
+//! webview's `Source`, `address`), the user's own browser with a temporary profile
+//! (`browser`: Microsoft Edge, Google Chrome, Brave or Vivaldi), or a pasted cookie header,
+//! checked here for shape and by the controller with one read. The two windows build the
+//! same header (`session`). Every way, the controller stores the header and signs in
+//! without a restart. The header is never logged.
+//!
+//! The browser row offers one browser, named in its title: the one used last (kept in the
+//! settings), else Windows' default browser when it's a known one, else the first found in
+//! the order Edge, Chrome, Brave, Vivaldi; one whose policy turns the connection off gives
+//! way to one that works. With more than one found, "Change" lists them.
 
 mod address;
 mod browser;
@@ -31,24 +37,30 @@ use crate::app::Ctx;
 use crate::controller::{AccountAction, AccountEvent, Action, Cookies, PlayerState};
 use crate::pages::settings;
 use crate::router::Page;
-use crate::ui::{SignInData, SignInWay};
+use crate::ui::{BrowserChoice, SignInData, SignInWay};
+use crate::ui_bridge;
+use browser::Browser;
 
-/// Once at startup: connect `SignInData`'s callbacks.
+/// Once at startup: connect `SignInData`'s callbacks. The browsers are looked for when the
+/// page is shown (`open`), not here.
 pub fn init(ctx: &Rc<Ctx>) {
     let Some(ui) = ctx.window() else { return };
     let data = ui.global::<SignInData>();
+    // Until the page looks: the row names Edge, as with none found.
+    offer(&data, Vec::new(), 0);
     let c = ctx.clone();
     data.on_open_window(move || open_window(&c, session::SIGN_IN_URL));
     let c = ctx.clone();
-    data.on_open_edge(move || open_edge(&c));
-    data.set_edge_blocked(browser::pipe_blocked(&browser::EDGE));
-    data.on_cancel_edge(cancel_edge);
+    data.on_open_browser(move || open_browser(&c));
+    data.on_cancel_browser(cancel_browser);
+    let c = ctx.clone();
+    data.on_pick_browser(move |index| pick_browser(&c, index));
     let c = ctx.clone();
     data.on_submit(move |text| submit(&c, &text));
 }
 
-/// At startup: deletes the temporary Edge profiles a crash or a kill left in `cache`, on a
-/// thread of its own (a profile can hold thousands of files).
+/// At startup: deletes the temporary browser profiles a crash or a kill left in `cache`, on
+/// a thread of its own (a profile can hold thousands of files).
 pub fn sweep_browser_profiles(cache: &Path) {
     let cache = cache.to_path_buf();
     let swept = std::thread::Builder::new()
@@ -72,8 +84,8 @@ pub fn open(ctx: &Rc<Ctx>) {
         data.set_status("".into());
         // A failure told on another page (a toast) is old news here.
         clear_problem(&data);
-        // The policy may have changed since the app started.
-        data.set_edge_blocked(browser::pipe_blocked(&browser::EDGE));
+        // What's installed, the default browser and the policies may have changed since.
+        look_for_browsers(&data);
     }
 }
 
@@ -88,7 +100,7 @@ pub fn account_changed(ctx: &Rc<Ctx>, signed_in: bool) {
     let data = ui.global::<SignInData>();
     if signed_in {
         data.set_busy(false);
-        data.set_edge(false);
+        data.set_browser_running(false);
         data.set_status("".into());
         clear_problem(&data);
         data.set_expired(false);
@@ -98,8 +110,8 @@ pub fn account_changed(ctx: &Rc<Ctx>, signed_in: bool) {
             ctx.navigate(Page::Home);
         }
     } else {
-        // An Edge sign-in still running keeps the page busy until it ends.
-        if RUNNING.with(|e| e.borrow().is_none()) && !frame::is_open() {
+        // A browser sign-in still running keeps the page busy until it ends.
+        if RUNNING.with(|r| r.borrow().is_none()) && !frame::is_open() {
             data.set_busy(false);
         }
         if data.get_expired() && ctx.current_page() != Page::SignIn {
@@ -183,6 +195,8 @@ fn open_window(ctx: &Rc<Ctx>, start: &'static str) {
     }
     LAST_WAY.set(SignInWay::Window);
     data.set_busy(true);
+    // The list of browsers would unfold again once this way ends.
+    data.set_choosing(false);
     clear_problem(&data);
     data.set_status(tr!("Finish signing in in the other window. It closes by itself.").into());
     if ctx.current_page() != Page::SignIn {
@@ -239,57 +253,185 @@ fn window_closed(outcome: webview::Outcome) {
     }
 }
 
-thread_local! {
-    /// The running Edge sign-in, for Cancel.
-    static RUNNING: RefCell<Option<browser::Cancel>> = const { RefCell::new(None) };
+/// The browser row's state: the known browsers found on this PC, and the one it offers.
+struct Offers {
+    found: Vec<browser::Offer>,
+    /// The one the row offers, an index into `found`.
+    current: usize,
 }
 
-/// "Use Microsoft Edge": Google's sign-in in Edge, with a temporary profile.
-fn open_edge(ctx: &Rc<Ctx>) {
+impl Offers {
+    /// The browser the row names. With none found that's Edge, which says it isn't on this
+    /// PC when it's tried.
+    fn browser(&self) -> &'static Browser {
+        self.found
+            .get(self.current)
+            .map_or(&browser::EDGE, |o| o.browser)
+    }
+}
+
+thread_local! {
+    static OFFERS: RefCell<Offers> = const {
+        RefCell::new(Offers { found: Vec::new(), current: 0 })
+    };
+    /// The running browser sign-in: its Cancel, and the browser it opened.
+    static RUNNING: RefCell<Option<(browser::Cancel, &'static Browser)>> =
+        const { RefCell::new(None) };
+}
+
+/// Looks for the known browsers on this PC and shows the one the row offers.
+fn look_for_browsers(data: &SignInData) {
+    let (found, pick) = browser::offers(settings::sign_in_browser().as_deref());
+    offer(data, found, pick.unwrap_or(0));
+}
+
+/// The row offers `found[current]`, and "Change" lists `found` when there's a choice.
+fn offer(data: &SignInData, found: Vec<browser::Offer>, current: usize) {
+    let offers = Offers { found, current };
+    let browser = offers.browser();
+    data.set_browser_name(browser.name.into());
+    data.set_browser_short(browser.short.into());
+    data.set_browser_blocked(offers.found.get(current).is_some_and(|o| o.blocked));
+    data.set_browser_current(i32::try_from(current).unwrap_or(0));
+    // One browser is no choice: the list is for two or more.
+    let choices: Vec<BrowserChoice> = offers
+        .found
+        .iter()
+        .filter(|_| offers.found.len() > 1)
+        .map(|o| BrowserChoice {
+            name: o.browser.name.into(),
+            short: o.browser.short.into(),
+            blocked: o.blocked,
+        })
+        .collect();
+    data.set_browsers(ui_bridge::model(choices).1);
+    data.set_choosing(false);
+    OFFERS.with(|o| *o.borrow_mut() = offers);
+}
+
+/// The browser row as on a PC with these known browsers installed (by id, in the page's
+/// order; `true` for one whose policy turns the connection off), offering `current`. For
+/// `--snapshot` and the tests, which mustn't show the PC they run on.
+pub fn offer_for_snapshot(ctx: &Rc<Ctx>, installed: &[(&str, bool)], current: &str) {
+    let Some(ui) = ctx.window() else { return };
+    let found: Vec<browser::Offer> = installed
+        .iter()
+        .filter_map(|&(id, blocked)| {
+            let browser = browser::by_id(id)?;
+            Some(browser::Offer { browser, blocked })
+        })
+        .collect();
+    let current = found.iter().position(|o| o.browser.id == current);
+    offer(&ui.global::<SignInData>(), found, current.unwrap_or(0));
+}
+
+/// "Change": the row offers the browser at `index` of the list from now on, and the next
+/// start does too.
+fn pick_browser(ctx: &Rc<Ctx>, index: i32) {
     let Some(ui) = ctx.window() else { return };
     let data = ui.global::<SignInData>();
-    if data.get_busy() || RUNNING.with(|e| e.borrow().is_some()) {
+    if data.get_busy() {
         return;
     }
-    LAST_WAY.set(SignInWay::Edge);
-    data.set_busy(true);
-    data.set_edge(true);
-    clear_problem(&data);
-    data.set_status(
-        tr!("Finish signing in in Microsoft Edge. featherplay closes it once you're in.").into(),
-    );
-    let started = browser::start(&browser::EDGE, Paths::resolve().cache, |outcome| {
-        let _ = slint::invoke_from_event_loop(move || edge_done(outcome));
+    let picked = OFFERS.with(|o| {
+        let o = o.borrow();
+        let index = usize::try_from(index).ok()?;
+        let offer = o.found.get(index).filter(|offer| !offer.blocked)?;
+        Some((o.found.clone(), index, offer.browser))
+    });
+    let Some((found, index, browser)) = picked else {
+        return;
+    };
+    settings::set_sign_in_browser(ctx, browser.id);
+    // A note on a blocked one shuts with the list, and Try again on the browser before
+    // would open this one.
+    data.set_why_open(false);
+    if data.get_retry() == SignInWay::Browser {
+        clear_problem(&data);
+    }
+    offer(&data, found, index);
+}
+
+/// "Use Microsoft Edge" (or the browser the row names): Google's sign-in in that browser,
+/// with a temporary profile.
+fn open_browser(ctx: &Rc<Ctx>) {
+    let Some(ui) = ctx.window() else { return };
+    let data = ui.global::<SignInData>();
+    if data.get_busy() || RUNNING.with(|r| r.borrow().is_some()) {
+        return;
+    }
+    let (browser, found) = OFFERS.with(|o| {
+        let o = o.borrow();
+        (o.browser(), !o.found.is_empty())
+    });
+    // The one used last is the one offered next time.
+    if found {
+        settings::set_sign_in_browser(ctx, browser.id);
+    }
+    LAST_WAY.set(SignInWay::Browser);
+    show_running(&data, browser);
+    let started = browser::start(browser, Paths::resolve().cache, move |outcome| {
+        let _ = slint::invoke_from_event_loop(move || browser_done(browser, outcome));
     });
     match started {
-        Ok(cancel) => RUNNING.with(|e| *e.borrow_mut() = Some(cancel)),
+        Ok(cancel) => RUNNING.with(|r| *r.borrow_mut() = Some((cancel, browser))),
         Err(e) => {
             log!("{e}");
-            edge_done(browser::Outcome::DidntStart(e));
+            browser_done(browser, browser::Outcome::DidntStart(e));
         }
     }
 }
 
-/// Cancel while Edge is open: Edge closes and its profile is deleted; `edge_done` follows.
-fn cancel_edge() {
-    let running = RUNNING.with(|e| e.borrow().as_ref().map(browser::Cancel::cancel).is_some());
-    if running
+/// The page while `browser` is open for the sign-in: its row waits, with Cancel.
+fn show_running(data: &SignInData, browser: &Browser) {
+    data.set_busy(true);
+    data.set_browser_running(true);
+    data.set_choosing(false);
+    clear_problem(data);
+    data.set_status(
+        tr!(
+            "Finish signing in in {}. featherplay closes it once you're in.",
+            browser.name
+        )
+        .into(),
+    );
+}
+
+/// The page as while the browser its row offers is open for the sign-in, without opening
+/// it: for `--snapshot`.
+pub fn running_for_snapshot(ctx: &Rc<Ctx>) {
+    let Some(ui) = ctx.window() else { return };
+    let browser = OFFERS.with(|o| o.borrow().browser());
+    show_running(&ui.global::<SignInData>(), browser);
+}
+
+/// Cancel while the browser is open: it closes and its profile is deleted; `browser_done`
+/// follows.
+fn cancel_browser() {
+    let running = RUNNING.with(|r| {
+        let r = r.borrow();
+        let (cancel, browser) = r.as_ref()?;
+        cancel.cancel();
+        Some(*browser)
+    });
+    if let Some(browser) = running
         && let Some(ctx) = Ctx::get()
         && let Some(ui) = ctx.window()
     {
         ui.global::<SignInData>()
-            .set_status(tr!("Closing Edge…").into());
+            .set_status(tr!("Closing {}…", browser.short).into());
     }
 }
 
-/// On the UI thread, once Edge is gone and its profile deleted.
-fn edge_done(outcome: browser::Outcome) {
+/// On the UI thread, once `browser` is gone and its profile deleted.
+fn browser_done(browser: &'static Browser, outcome: browser::Outcome) {
     use browser::Outcome;
-    RUNNING.with(|e| e.borrow_mut().take());
+    RUNNING.with(|r| r.borrow_mut().take());
     let Some(ctx) = Ctx::get() else { return };
     let Some(ui) = ctx.window() else { return };
     let data = ui.global::<SignInData>();
-    data.set_edge(false);
+    data.set_browser_running(false);
+    let (name, short) = (browser.name, browser.short);
     let not_yet = tr!("It closed before you finished signing in. Try again when you're ready.");
     let instead = tr!("Try again, or use Sign in with Google.");
     let (title, line, retry) = match outcome {
@@ -303,44 +445,50 @@ fn edge_done(outcome: browser::Outcome) {
             data.set_status("".into());
             return;
         }
+        // Its policy was turned off since the page looked: the row says so now, or offers
+        // another browser.
         Outcome::PolicyOff => {
-            data.set_edge_blocked(true);
             data.set_busy(false);
             data.set_status("".into());
+            look_for_browsers(&data);
             return;
         }
-        Outcome::Closed => (tr!("Edge closed"), not_yet, SignInWay::Edge),
+        Outcome::Closed => (tr!("{} closed", short), not_yet, SignInWay::Browser),
         Outcome::TimedOut => (
-            tr!("Edge closed after 10 minutes"),
+            tr!("{} closed after 10 minutes", short),
             tr!(
                 "featherplay closes it when the sign-in takes that long. Try again when you're ready."
             ),
-            SignInWay::Edge,
+            SignInWay::Browser,
         ),
-        Outcome::NotFound => (
-            tr!("Microsoft Edge isn't on this PC"),
-            tr!("Sign in with Google works without it."),
-            SignInWay::None,
-        ),
+        Outcome::NotFound => {
+            // It was removed since the page looked.
+            look_for_browsers(&data);
+            (
+                tr!("{} isn't on this PC", name),
+                tr!("Sign in with Google works without it."),
+                SignInWay::None,
+            )
+        }
         Outcome::DidntStart(e) => {
-            log!("browser sign-in: didn't start: {e}");
-            (tr!("Microsoft Edge didn't start"), instead, SignInWay::Edge)
+            log!("browser sign-in: {name} didn't start: {e}");
+            (tr!("{} didn't start", name), instead, SignInWay::Browser)
         }
         Outcome::Blocked => (
-            tr!("Edge didn't let featherplay in"),
+            tr!("{} didn't let featherplay in", short),
             tr!("A setting on this PC may block it. Sign in with Google works without it."),
             SignInWay::None,
         ),
         Outcome::Lost(e) => {
-            log!("browser sign-in: lost Edge: {e}");
+            log!("browser sign-in: lost {name}: {e}");
             (
-                tr!("featherplay lost touch with Edge"),
+                tr!("featherplay lost touch with {}", short),
                 instead,
-                SignInWay::Edge,
+                SignInWay::Browser,
             )
         }
     };
-    problem(&ctx, title, line, retry);
+    problem(&ctx, &title, line, retry);
 }
 
 fn submit(ctx: &Rc<Ctx>, text: &str) {
@@ -353,6 +501,7 @@ fn submit(ctx: &Rc<Ctx>, text: &str) {
         Ok(header) => {
             LAST_WAY.set(SignInWay::Paste);
             data.set_busy(true);
+            data.set_choosing(false);
             clear_problem(&data);
             data.set_status(tr!("Checking the session…").into());
             ctx.send(Action::Account(AccountAction::SignIn(Cookies(header))));

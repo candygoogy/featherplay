@@ -177,6 +177,8 @@ pub enum Change {
     FadeOnSkip(bool),
     /// The playback speed in percent, one of `Settings::SPEEDS` (100 is normal).
     PlaybackSpeed(u8),
+    /// The browser the sign-in page's browser row opened or was switched to, by its id.
+    SignInBrowser(String),
 }
 
 impl Change {
@@ -235,6 +237,7 @@ impl Change {
             Change::Crossfade(v) => s.crossfade = v,
             Change::FadeOnSkip(v) => s.fade_on_skip = v,
             Change::PlaybackSpeed(v) => s.playback_speed = v,
+            Change::SignInBrowser(v) => s.sign_in_browser = Some(v),
         }
     }
 }
@@ -1132,6 +1135,7 @@ mod tests {
             Change::Crossfade(8),
             Change::FadeOnSkip(true),
             Change::PlaybackSpeed(150),
+            Change::SignInBrowser("brave".into()),
         ];
         for c in &changes {
             c.apply(&mut s);
@@ -1168,6 +1172,7 @@ mod tests {
         assert_eq!(s.skip_silence, SkipSilence::Everywhere);
         assert_eq!((s.crossfade, s.fade_on_skip), (8, true));
         assert_eq!(s.playback_speed, 150);
+        assert_eq!(s.sign_in_browser.as_deref(), Some("brave"));
         assert!(!s.check_for_updates && !s.install_updates);
         assert_eq!(s.volume, d.volume, "the volume isn't a page setting");
     }
