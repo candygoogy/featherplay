@@ -238,6 +238,12 @@ fn run_on(
         Ok(p) => TempProfile(p),
         Err(e) => return Outcome::DidntStart(format!("temporary profile: {}", e.kind())),
     };
+    if let Some(prefs) = browser.preferences
+        && let Err(e) = profile::seed(&profile.0, prefs)
+    {
+        // The browser still works with its own defaults.
+        log!("browser sign-in: the profile's preferences: {}", e.kind());
+    }
     log!(
         "browser sign-in: temporary profile {}",
         display_name(&profile.0)
@@ -1047,6 +1053,9 @@ mod tests {
             let cache = featherplay_store::Paths::from_home(Path::new(&home)).cache;
             report(&format!("{}: starting {}", browser.name, exe.display()));
             let profile = profile::create(&cache).unwrap();
+            if let Some(prefs) = browser.preferences {
+                profile::seed(&profile, prefs).unwrap();
+            }
             let (process, pipes) =
                 launch::launch(exe, &args(browser, &profile, "about:blank")).unwrap();
             Self {

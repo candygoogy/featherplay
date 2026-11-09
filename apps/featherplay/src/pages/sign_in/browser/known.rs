@@ -64,6 +64,9 @@ pub struct Browser {
     /// Its policies' key, in HKLM and HKCU. Its `RemoteDebuggingAllowed` set to 0 turns
     /// the DevTools pipe off.
     pub policy_key: &'static str,
+    /// Written to the temporary profile's `Default/Preferences` before the browser starts,
+    /// for a browser whose own defaults get in the sign-in's way.
+    pub preferences: Option<&'static str>,
 }
 
 /// Chromium's own switches (`chrome/common/chrome_switches.h`), the same in all four.
@@ -78,6 +81,7 @@ pub const EDGE: Browser = Browser {
     per_user: false,
     switches: QUIET_START,
     policy_key: r"Software\Policies\Microsoft\Edge",
+    preferences: None,
 };
 
 pub const CHROME: Browser = Browser {
@@ -89,6 +93,7 @@ pub const CHROME: Browser = Browser {
     per_user: true,
     switches: QUIET_START,
     policy_key: r"Software\Policies\Google\Chrome",
+    preferences: None,
 };
 
 pub const BRAVE: Browser = Browser {
@@ -100,6 +105,7 @@ pub const BRAVE: Browser = Browser {
     per_user: true,
     switches: QUIET_START,
     policy_key: r"Software\Policies\BraveSoftware\Brave",
+    preferences: None,
 };
 
 pub const VIVALDI: Browser = Browser {
@@ -111,6 +117,10 @@ pub const VIVALDI: Browser = Browser {
     per_user: true,
     switches: QUIET_START,
     policy_key: r"Software\Policies\Vivaldi",
+    // Vivaldi asks "Confirm exit" when its window is closed, so closing it to cancel the
+    // sign-in left it running behind the dialog (checked on a GitHub Windows runner,
+    // Vivaldi 8.3, 2026-11-10). With the dialog off it exits within 2 s, as the others do.
+    preferences: Some(r#"{"vivaldi":{"system":{"show_exit_confirmation_dialog":false}}}"#),
 };
 
 /// Every browser the sign-in knows, in the order it offers them.

@@ -26,6 +26,14 @@ pub fn create(cache: &Path) -> io::Result<PathBuf> {
     Err(last.unwrap_or_else(|| io::Error::other("no free profile name")))
 }
 
+/// Writes `preferences` as the new `profile`'s `Default/Preferences`, which the browser reads
+/// as it starts (`Browser::preferences`).
+pub fn seed(profile: &Path, preferences: &str) -> io::Result<()> {
+    let default = profile.join("Default");
+    std::fs::create_dir_all(&default)?;
+    std::fs::write(default.join("Preferences"), preferences)
+}
+
 /// Deletes `profile`, retrying while the browser's processes still hold files in it. Says
 /// whether it's gone.
 pub fn remove(profile: &Path, tries: u32, pause: Duration) -> bool {
@@ -111,6 +119,23 @@ mod tests {
         assert!(!a.exists());
         // Already gone counts as removed.
         assert!(remove(&a, 1, Duration::ZERO));
+        std::fs::remove_dir_all(cache.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn a_browsers_preferences_go_in_before_it_starts() {
+        let cache = scratch("seed").join("cache");
+        let p = create(&cache).unwrap();
+        let prefs = crate::pages::sign_in::browser::known::VIVALDI
+            .preferences
+            .expect("Vivaldi's exit confirmation is turned off");
+        seed(&p, prefs).unwrap();
+        let written = std::fs::read_to_string(p.join("Default").join("Preferences")).unwrap();
+        let v: serde_json::Value = serde_json::from_str(&written).unwrap();
+        assert_eq!(
+            v["vivaldi"]["system"]["show_exit_confirmation_dialog"],
+            false
+        );
         std::fs::remove_dir_all(cache.parent().unwrap()).unwrap();
     }
 
