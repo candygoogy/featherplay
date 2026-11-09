@@ -1,14 +1,25 @@
 ---
-// Light, and it shows: featherplay next to Pear Desktop and YouTube Music in Edge, six
-// measures from the final measurement (1 November 2026), lower is better. Every value comes
-// from src/data/numbers.ts and is in the HTML; the "times less" lines are worked out from
-// the same figures. Then what featherplay leaves out.
-import { figures, installFolders, leftOutTotals, timesLess, valueOf, type FolderEntry, type LeftOut, type Metric } from "../data/numbers";
+// Light, and it shows: featherplay next to Pear Desktop and YouTube Music in Edge, eight
+// measures, lower is better: featherplay 0.2.0's from 9 November 2026, the others' from the
+// final measurement of 1 November. Every value comes from src/data/numbers.ts and is in the
+// HTML; the "times less" lines are worked out from the same figures. The two timings are
+// featherplay's alone, so they have no bars. Then what featherplay leaves out.
+import { figureFor, figures, installFolders, leftOutTotals, timesLess, timings, valueOf, type FolderEntry, type LeftOut, type Metric } from "../data/numbers";
 import { formatBytes, figureText } from "../data/format";
 import { release, sizeLabel } from "../data/release";
 
-const both = (m: "memoryMB" | "memoryPausedMB" | "cpuPlayingPct" | "cpuPausedPct") =>
-  `About ${timesLess(m, "Pear Desktop")} times less than Pear Desktop and ${timesLess(m, "YouTube Music in Edge")} times less than Edge.`;
+type Ratioed = "memoryMB" | "memoryPausedMB" | "cpuPlayingPct" | "cpuPausedPct";
+// "About 20 times less than Pear Desktop and 25 times less than Edge"; half reads as half,
+// and nothing at all as nothing.
+const both = (m: Ratioed) => {
+  if (figureFor("featherplay")[m] === 0) return "None at all in any of the three runs.";
+  const [pear, edge] = [timesLess(m, "Pear Desktop"), timesLess(m, "YouTube Music in Edge")];
+  if (pear === 2 && edge === 2) return "About half of what Pear Desktop and Edge use.";
+  return `About ${pear} times less than Pear Desktop and ${edge} times less than Edge.`;
+};
+const s = (v: number) => `${v.toLocaleString("en-GB", { maximumSignificantDigits: 2 })} s`;
+const span = (t: { min: number; max: number }) => `${s(t.min)} to ${s(t.max)}`;
+const ONLY_OURS = "Pear Desktop and Edge weren't part of this measurement.";
 const panels: { metric: Metric; title: string; note: string; ratio?: string }[] = [
   { metric: "memoryMB", title: "Memory while playing", note: "Private memory of all its processes, window minimised.", ratio: both("memoryMB") },
   { metric: "memoryPausedMB", title: "Memory while paused", note: "The same, with the song paused.", ratio: both("memoryPausedMB") },
@@ -16,16 +27,32 @@ const panels: { metric: Metric; title: string; note: string; ratio?: string }[] 
   { metric: "cpuPausedPct", title: "CPU while paused", note: "The same, with the song paused.", ratio: both("cpuPausedPct") },
   { metric: "processes", title: "Processes", note: "How many it runs at once, fewest to most seen. All are counted above." },
   {
+    metric: "startToSoundS",
+    title: "Start to music playing",
+    note: `From starting featherplay to the first sound of the song it resumes. ${ONLY_OURS}`,
+    ratio: `Median of ${timings.startToSoundS.n} starts, which took ${span(timings.startToSoundS)}.`,
+  },
+  {
+    metric: "clickToSoundS",
+    title: "Click to sound",
+    note: `From clicking a song's play button to its first sound. ${ONLY_OURS}`,
+    ratio: `Median of ${timings.clickToSoundS.n} clicks (${span(timings.clickToSoundS)}): ${s(timings.hovered.median)} with the pointer on the song first, ${s(timings.notHovered.median)} without.`,
+  },
+  {
     metric: "downloadMB",
     title: "Download",
     note: "What you download to install it. Edge comes with Windows.",
     ratio: `About ${timesLess("downloadMB", "Pear Desktop")} times smaller than Pear Desktop's installer.`,
   },
 ];
-const max = (m: Metric) => Math.max(...figures.map((f) => valueOf(f, m)));
+const known = (m: Metric) => figures.map((f) => valueOf(f, m)).filter((v): v is number => v != null);
+const max = (m: Metric) => Math.max(...known(m));
+// Bars only where there's something to compare: a measure only featherplay has shows its
+// figure alone.
+const compared = (m: Metric) => known(m).length > 1;
 // The figures that count up from zero: plain numbers above zero. A range of processes, or
 // nothing to download, simply shows.
-const counts = (m: Metric, v: number) => m !== "processes" && v > 0;
+const counts = (m: Metric, v: number | null): v is number => m !== "processes" && v != null && v > 0;
 
 // Explorer's own size column: kilobytes, rounded up, with thousands separators.
 const kb = (b: number) => `${Math.ceil(b / 1024).toLocaleString("en-GB")} KB`;
@@ -69,7 +96,8 @@ const kind = (e: FolderEntry) => (e.files ? "folder" : e.name.endsWith(".exe") ?
     <div class="head">
       <h2 id="light-title">Light, and it shows</h2>
       <p class="lede">
-        Measured on one Windows PC on 1 November 2026, the same song in all three. Lower is better on every bar.
+        Measured on one Windows PC: featherplay 0.2.0 on 9 November 2026, the other two on 1 November. Lower is better
+        on every bar.
       </p>
     </div>
 
@@ -84,7 +112,7 @@ const kind = (e: FolderEntry) => (e.files ? "folder" : e.name.endsWith(".exe") ?
             <ul>
               {figures.map((f) => {
                 const v = valueOf(f, p.metric);
-                const scale = v / max(p.metric);
+                const scale = (v ?? 0) / max(p.metric);
                 return (
                   <li
                     class:list={["row", { ours: f.app === "featherplay" }]}
@@ -97,9 +125,11 @@ const kind = (e: FolderEntry) => (e.files ? "folder" : e.name.endsWith(".exe") ?
                     <span class="value" data-value>
                       {figureText(f, p.metric)}
                     </span>
-                    <span class="track" aria-hidden="true">
-                      {v > 0 && <i data-bar style={`transform:scaleX(${scale.toFixed(4)})`} />}
-                    </span>
+                    {compared(p.metric) && (
+                      <span class="track" aria-hidden="true">
+                        {v != null && v > 0 && <i data-bar style={`transform:scaleX(${scale.toFixed(4)})`} />}
+                      </span>
+                    )}
                   </li>
                 );
               })}

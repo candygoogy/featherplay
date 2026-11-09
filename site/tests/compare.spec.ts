@@ -24,6 +24,17 @@ test.describe("without JavaScript", () => {
     );
     expect(text).toContain("Edge comes with Windows");
   });
+
+  test("the two timings are featherplay's alone: the others show a dash and say why, and no panel has bars", async ({ page }) => {
+    await page.goto("/");
+    for (const m of ["startToSoundS", "clickToSoundS"] as const) {
+      const panel = section(page).locator("figure.panel", { has: page.locator(`[data-figure="featherplay:${m}"]`) });
+      await expect(panel.locator(`[data-figure="Pear Desktop:${m}"] [data-value]`)).toHaveText("—");
+      await expect(panel.locator(`[data-figure="YouTube Music in Edge:${m}"] [data-value]`)).toHaveText("—");
+      await expect(panel).toContainText("Pear Desktop and Edge weren't part of this measurement.");
+      await expect(panel.locator(".track")).toHaveCount(0);
+    }
+  });
 });
 
 test("the count-up runs once", async ({ page }) => {
@@ -116,9 +127,9 @@ test("the sizes are weighed like with like: Pear installed against featherplay i
   await expect(weigh.locator("[data-weigh-row='pear']")).toContainText("Pear Desktop, installed");
   await expect(weigh.locator("[data-weigh-row='pear']")).toContainText("396 MB");
   await expect(weigh.locator("[data-weigh-row='installed']")).toContainText("featherplay, installed");
-  await expect(weigh.locator("[data-weigh-row='installed']")).toContainText("about 35 MB");
-  await expect(weigh.locator("[data-weigh-row='portable']")).toContainText("29.95 MB");
-  await expect(weigh).toContainText("11 times smaller");
+  await expect(weigh.locator("[data-weigh-row='installed']")).toContainText("about 34 MB");
+  await expect(weigh.locator("[data-weigh-row='portable']")).toContainText("28.99 MB");
+  await expect(weigh).toContainText("12 times smaller");
   await expect(weigh).toContainText("uninstaller");
   await expect(weigh).toContainText("Visual C++ runtime");
   await expect(weigh).not.toHaveAttribute("data-armed", /.*/);
@@ -140,7 +151,10 @@ test("the method link opens /method", async ({ page }) => {
   // It names the file behind every figure.
   const text = await page.locator("main").innerText();
   for (const f of figures) {
-    for (const m of metrics) expect(text, `${f.app} ${m}`).toContain(f.sources[m].split("/").pop()!);
+    for (const m of metrics) {
+      const src = f.sources[m];
+      if (src) expect(text, `${f.app} ${m}`).toContain(src.split("/").pop()!);
+    }
   }
 });
 
@@ -156,9 +170,15 @@ test.describe("/method without JavaScript", () => {
       "Pear Desktop 3.12.0",
       "Edge 156.0.4314.58",
       "1 November 2026",
+      "9 November",
+      "Start to music playing",
+      "Click to sound",
+      "Hovered first means",
+      "run-starts.ps1",
+      "run-clicks.ps1",
       "1,048,576 bytes",
       "16 logical",
-      "measure-pid-hwnd.ps1",
+      "measure-pass.ps1",
       "measure-pear.ps1",
       "measure-edge.ps1",
       "Left out",

@@ -1,11 +1,12 @@
 ---
-// How the comparison's figures were measured, and where each one comes from. The setup is
-// the final measurement's (its write-up, kept outside the repo); the figures and the sizes
-// come from numbers.ts and release.ts.
+// How the comparison's figures were measured, and where each one comes from. The setups are
+// the two measurements' (featherplay 0.2.0 on 9 November 2026, Pear Desktop and Edge on
+// 1 November; their write-ups are kept outside the repo); the figures and the sizes come from
+// numbers.ts and release.ts.
 import Base from "../layouts/Base.astro";
 import Header from "../components/Header.astro";
-import { figureFor, figures, installFolders, metrics, type Metric } from "../data/numbers";
-import { figureText, formatBytes } from "../data/format";
+import { figureFor, figures, installFolders, metrics, timings, withProcessing, type Metric } from "../data/numbers";
+import { figureText, formatBytes, formatFigure } from "../data/format";
 import { release, sizeLabel } from "../data/release";
 
 const names: Record<Metric, string> = {
@@ -14,25 +15,33 @@ const names: Record<Metric, string> = {
   cpuPlayingPct: "CPU while playing",
   cpuPausedPct: "CPU while paused",
   processes: "Processes",
+  startToSoundS: "Start to music playing",
+  clickToSoundS: "Click to sound",
   downloadMB: "Download",
 };
 const file = (path: string) => path.split("/").pop() ?? path;
+// A figure's source, by its path inside the measurements folder.
+const source = (path: string | null) => (path ? path.replace(/^measurements\//, "") : "Not part of this measurement");
 const fp = figureFor("featherplay");
 const pear = figureFor("Pear Desktop");
 const edge = figureFor("YouTube Music in Edge");
 const procs = (f: (typeof figures)[number]) => figureText(f, "processes");
+// Seconds as the page writes them: two significant figures (0.73 s, 6.4 s, 0.003 s).
+const s = (v: number) => `${v.toLocaleString("en-GB", { maximumSignificantDigits: 2 })} s`;
+const { startToSoundS: start, clickToSoundS: click, hovered, notHovered } = timings;
 ---
 
 <Base
   title="How featherplay's figures were measured"
-  description="The PC, the versions and the method behind the memory, CPU and download figures that compare featherplay with Pear Desktop and YouTube Music in Edge."
+  description="The PC, the versions and the method behind the memory, CPU, timing and download figures that compare featherplay with Pear Desktop and YouTube Music in Edge."
 >
   <Header />
   <main id="main" tabindex="-1" class="wrap method">
     <h1>How these were measured</h1>
     <p class="lede">
-      All three players were measured on one PC on the evening of 1 November 2026, one after the other, playing the
-      same song. Every figure on the home page comes from that evening, and each one names its file below.
+      All three players were measured on one PC: Pear Desktop and Edge on the evening of 1 November 2026, featherplay
+      {fp.version} early on 9 November. Every figure on the home page comes from those two measurements, and each one
+      names its files below.
     </p>
 
     <section aria-labelledby="setup">
@@ -43,9 +52,12 @@ const procs = (f: (typeof figures)[number]) => figureText(f, "processes");
           Workstations, build 26300.
         </li>
         <li>
-          featherplay {fp.version}, the release build that's offered for download: the exe is
-          {release.portable ? ` ${sizeLabel(release.portable)}` : ""}, the installer
-          {release.installer ? ` ${sizeLabel(release.installer)}` : ""}.
+          featherplay {fp.version}, the release's own portable exe, the one offered for download, checked against the
+          release's checksums: the exe is{release.portable ? ` ${sizeLabel(release.portable)}` : ""}, the installer
+          {release.installer ? ` ${sizeLabel(release.installer)}` : ""}. It ran on a copy of a long-used featherplay
+          folder (settings, cache, library and covers), with Streaming quality on High, so every song played as Opus.
+          The settings were its owner's (Last.fm on, lyrics on, a 2 s crossfade), and the new sound features were at
+          their defaults: the equalizer, Even out loudness and Skip silence off.
         </li>
         <li>Pear Desktop {pear.version}, installed, with its owner's settings left as they were.</li>
         <li>
@@ -58,13 +70,82 @@ const procs = (f: (typeof figures)[number]) => figureText(f, "processes");
     <section aria-labelledby="run">
       <h2 id="run">How each one ran</h2>
       <ul class="facts">
-        <li>The same song in all three, on repeat, at normal volume.</li>
         <li>
-          Each was the only player running. Pear Desktop stayed open but paused while Edge was measured, and wasn't
-          counted.
+          Pear Desktop and Edge, on 1 November: the same song in both, on repeat, at normal volume. Each was the only
+          player running. Pear Desktop stayed open but paused while Edge was measured, and wasn't counted.
+        </li>
+        <li>
+          featherplay, on 9 November: one song on repeat, at featherplay's volume of 2 % (Windows' own volume left as
+          it was), three runs. Each figure is the median of the three. Pear Desktop wasn't running at any point.
         </li>
         <li>The window was minimised to the taskbar, and the PC was otherwise lightly used, with no games running.</li>
         <li>Five minutes playing, then three minutes paused, with a sample every 5 seconds.</li>
+        <li>
+          With the equalizer, Even out loudness, Skip silence and a 5 s crossfade all on, one more run of featherplay
+          used {withProcessing.memoryMB} MB of memory and {formatFigure("cpuPlayingPct", withProcessing.cpuPlayingPct)}
+          CPU while playing. That run isn't in the comparison.
+        </li>
+      </ul>
+    </section>
+
+    <section aria-labelledby="start">
+      <h2 id="start">Start to music playing</h2>
+      <ul class="facts">
+        <li>
+          featherplay only: Pear Desktop and Edge weren't part of this measurement. Each start resumed the queue
+          featherplay had saved, which picks a song up at 0:29, so the song had to load and seek.
+        </li>
+        <li>
+          The clock starts when Windows creates featherplay's process and stops when its audio engine logs the first
+          sound: the moment Windows' audio output takes the song's first samples.
+        </li>
+        <li>
+          Play was pressed on the taskbar thumbnail as soon as the window would take it, 0.09 to 0.13 s after the start.
+          The window was shown, not minimised.
+        </li>
+        <li>
+          Warm starts, with featherplay and its folder already used: one start to warm up, not counted, then{" "}
+          {start.n}. The median is {formatFigure("startToSoundS", start.median)}, and they took {s(start.min)} to{" "}
+          {s(start.max)}. Three got a playable answer from YouTube straight away (0.73 to 0.87 s); the other three waited
+          for a fresh one (1.2, 4.2 and 6.4 s).
+        </li>
+        <li>
+          These starts used the state featherplay had kept for finding songs' streams. A new install's very first song
+          takes longer, about 12 s once, while featherplay downloads the two helpers it uses (yt-dlp and Deno); the
+          starts after it took 0.5 to 0.9 s. About one fresh start in seven gets answers from YouTube without a stream,
+          and then plays through yt-dlp instead (4 to 9 s) until the next song.
+        </li>
+      </ul>
+    </section>
+
+    <section aria-labelledby="click">
+      <h2 id="click">Click to sound</h2>
+      <ul class="facts">
+        <li>
+          featherplay only: Pear Desktop and Edge weren't part of this measurement. In Liked songs, the play button on a
+          song's cover was clicked through the window itself, with the messages Windows sends for a mouse click (move,
+          press, release). The real pointer didn't move.
+        </li>
+        <li>
+          The clock starts at the release, the moment a click counts, and stops at the same first sound as above.
+        </li>
+        <li>
+          Five songs, each clicked twice: once hovered first and once not. Hovered first means the pointer rests on the
+          song before the click; featherplay starts getting a song ready 120 ms into a hover, or at the press. The PC
+          was locked, and Windows ends a hover at once on a locked PC, so for these clicks the button was held down for
+          1 s before the release, which starts the same work. Not hovered means a quick click, released 90 ms after the
+          press.
+        </li>
+        <li>
+          Ten clicks in two sessions. Before each session the five songs' saved links were removed, so no click found a
+          song featherplay had kept from earlier listening.
+        </li>
+        <li>
+          All ten: median {formatFigure("clickToSoundS", click.median)}, {s(click.min)} to {s(click.max)}. Hovered first:
+          median {s(hovered.median)}; four of the five were ready by the click, the fifth took 5.2 s. Not hovered:
+          median {s(notHovered.median)} ({s(notHovered.min)} to {s(notHovered.max)}). The slow ones waited for a fresh answer
+          from YouTube, as the slow starts did.
+        </li>
       </ul>
     </section>
 
@@ -74,6 +155,7 @@ const procs = (f: (typeof figures)[number]) => figureText(f, "processes");
         <li>
           Every process each player runs: {procs(fp)} for featherplay, {procs(pear)} for Pear Desktop and{" "}
           {procs(edge)} for Edge. Edge's are picked out by the profile folder, so no other Edge window gets counted.
+          featherplay's would include any helper it starts to find a song's stream; none ran while it was measured.
         </li>
         <li>
           Memory is private memory, the memory those processes keep for themselves, averaged over the run. It's in MB
@@ -101,13 +183,23 @@ const procs = (f: (typeof figures)[number]) => figureText(f, "processes");
 
     <section aria-labelledby="dropped">
       <h2 id="dropped">Left out, and measured again</h2>
-      <p class="para">Three runs were thrown away and done again:</p>
+      <p class="para">On 1 November, two runs were thrown away and done again:</p>
       <ul class="facts">
-        <li>featherplay's first playing run, because the sound device changed partway through.</li>
         <li>Edge's first playing run, because playback had stalled.</li>
         <li>
           Edge's second playing run, because a rounding bug in the script's CPU column spoiled its CPU figure. The bug
           is fixed. That run's memory, 999 MB, agrees with the run that's used.
+        </li>
+      </ul>
+      <p class="para">On 9 November:</p>
+      <ul class="facts">
+        <li>
+          A short trial of the script, and featherplay's first launch, which downloaded its helpers, weren't counted.
+        </li>
+        <li>
+          Two of the three runs first had their CPU divided by 12 logical processors instead of 16, the number PowerShell
+          reported. Their CPU figures were rescaled to 16, which is exact, and the script fixed. Their CPU
+          seconds and memory were right all along.
         </li>
       </ul>
     </section>
@@ -115,9 +207,11 @@ const procs = (f: (typeof figures)[number]) => figureText(f, "processes");
     <section aria-labelledby="scripts">
       <h2 id="scripts">The scripts</h2>
       <p class="para">
-        Three PowerShell scripts took the samples and wrote them to CSV files: <code>measure-pid-hwnd.ps1</code> for
-        featherplay, <code>measure-pear.ps1</code> for Pear Desktop and <code>measure-edge.ps1</code> for Edge, which
-        reads each process's CPU time from Windows' own process list (Win32_Process).
+        PowerShell scripts took the samples and wrote them to CSV files. On 1 November, <code>measure-pear.ps1</code>{" "}
+        for Pear Desktop and <code>measure-edge.ps1</code> for Edge, which reads each process's CPU time from Windows'
+        own process list (Win32_Process). On 9 November, <code>measure-pass.ps1</code> for featherplay (the method of
+        the 1 November script, with more columns), and <code>run-starts.ps1</code> and <code>run-clicks.ps1</code> for
+        the two timings.
       </p>
     </section>
 
@@ -135,7 +229,7 @@ const procs = (f: (typeof figures)[number]) => figureText(f, "processes");
                   <dt>{names[m]}</dt>
                   <dd>
                     <span class="v">{figureText(f, m)}</span>
-                    <span class="src">{file(f.sources[m])}</span>
+                    <span class="src">{source(f.sources[m])}</span>
                   </dd>
                 </div>
               ))}

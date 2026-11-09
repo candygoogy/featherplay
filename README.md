@@ -22,7 +22,7 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: light)" srcset=".github/readme/header-light.png">
-    <img src=".github/readme/header-dark.png" alt="featherplay: a native Windows player for YouTube Music, light enough to forget it's running. While playing it uses 81 MB of memory, 1 process and 0.022 % CPU. Beside the name, a laptop shows featherplay's Now playing view with synced lyrics for California Lullabye, over a mauve glow, the colour the app takes from the song's cover." width="800">
+    <img src=".github/readme/header-dark.png" alt="featherplay: a native Windows player for YouTube Music, light enough to forget it's running. While playing it uses 40 MB of memory, 1 process and 0.070 % CPU. Beside the name, a laptop shows featherplay's Now playing view with synced lyrics for California Lullabye, over a mauve glow, the colour the app takes from the song's cover." width="800">
   </picture>
 </p>
 
@@ -39,7 +39,7 @@ featherplay plays your YouTube Music library, playlists, search results and radi
 native Windows program. It's written in Rust and drawn with Slint, so there's no web browser
 running behind the window and nothing plays but the audio. It keeps what people use most in
 Pear Desktop (scrobbling, media keys and taskbar buttons, SponsorBlock, Discord status) and
-uses about a tenth of its memory ([How light?](#how-light)).
+uses about a twentieth of its memory ([How light?](#how-light)).
 
 > **Unofficial.** featherplay is an independent project. It isn't made, endorsed or supported
 > by Google or YouTube, and it uses YouTube Music's private web interface, which can change
@@ -54,7 +54,7 @@ or as one portable exe.
 <!-- The installer's file name carries the version: update this link with each release. -->
 
 **Installer (recommended).**
-[`featherplay-setup-0.1.2.exe`](https://github.com/candygoogy/featherplay/releases/download/v0.1.2/featherplay-setup-0.1.2.exe)
+[`featherplay-setup-0.2.0.exe`](https://github.com/candygoogy/featherplay/releases/download/v0.2.0/featherplay-setup-0.2.0.exe)
 installs for your Windows user only, with no admin prompt, and adds featherplay to the Start
 menu and to Settings > Apps. A newer setup upgrades in place and keeps your settings and
 sign-in. Uninstalling from Settings > Apps removes everything featherplay keeps: settings,
@@ -92,7 +92,7 @@ scoop install featherplay
 
 featherplay isn't code-signed yet, so Windows SmartScreen may warn you the first time you run
 it. Choose **More info**, then **Run anyway**. To check the file first, run
-`Get-FileHash featherplay-setup-0.1.2.exe` (or `Get-FileHash featherplay.exe`) in PowerShell
+`Get-FileHash featherplay-setup-0.2.0.exe` (or `Get-FileHash featherplay.exe`) in PowerShell
 and compare the hash with the one on the release page, or
 [build it yourself](#build-from-source).
 
@@ -241,23 +241,30 @@ into one program that opens at once and stays quiet while it plays.
 
 ## How light?
 
-Measured on one Windows PC with 16 logical processors, each app playing the same song with
-its window minimised, on the same day. Lower is better.
+Measured on one Windows PC with 16 logical processors, each app playing a song on repeat
+with its window minimised. Lower is better.
 
-<!-- Figures: the final measurement of 1 November 2026, whose write-up is kept outside the
+<!-- Figures: featherplay's are the measurement of 0.2.0 on 9 November 2026 (the v0.2.0
+     release's own portable exe, three runs, the median), Pear Desktop's and Edge's the final
+     measurement of 1 November 2026, which wasn't repeated. Both write-ups are kept outside the
      repo. The website's site/src/data/numbers.ts holds the same figures, so keep the two in
      step. -->
 
-| | featherplay 0.1.2 | Pear Desktop 3.12.0 | YouTube Music in Edge 156 |
+| | featherplay 0.2.0 | Pear Desktop 3.12.0 | YouTube Music in Edge 156 |
 |---|---|---|---|
-| Memory while playing | **81 MB** | 798 MB | 988 MB |
-| Memory while paused | **80 MB** | 782 MB | 973 MB |
-| CPU while playing | **0.022 %** | 0.17 % | 0.14 % |
-| CPU while paused | **0.005 %** | 0.05 % | 0.018 % |
+| Memory while playing | **40 MB** | 798 MB | 988 MB |
+| Memory while paused | **38 MB** | 782 MB | 973 MB |
+| CPU while playing | **0.070 %** | 0.17 % | 0.14 % |
+| CPU while paused | **0.000 %** (none at all in 3 of 3 runs) | 0.05 % | 0.018 % |
 | Processes | **1** | 6 to 7 | 9 to 11 |
-| Download | **10.73 MB** installer (29.95 MB portable exe) | 274 MB installer | nothing (Edge comes with Windows) |
+| Start to music playing | **1.0 s** (0.73 to 6.4 s) | — | — |
+| Click to sound | **0.3 s** (0.003 to 5.7 s); hovered first 0.004 s, not hovered 0.68 s | — | — |
+| Download | **10.68 MB** installer (28.99 MB portable exe) | 274 MB installer | nothing (Edge comes with Windows) |
 
-<sub>Measured on 1 November 2026: each app playing the same song on repeat for 5 minutes, then paused for 3, window minimised. Memory is the private memory of all the app's processes (1 MB = 1,048,576 bytes); CPU is a share of the whole machine. [How these were measured](https://featherplay.candygoogy.dev/method).</sub>
+<sub>featherplay 0.2.0 was measured on 9 November 2026, Pear Desktop and Edge on 1 November: each app playing a song on repeat for 5 minutes, then paused for 3, window minimised. Memory is the private memory of all the app's processes (1 MB = 1,048,576 bytes); CPU is a share of the whole machine. Start to music playing runs from starting featherplay to the first sound of the song it resumes (median of 6 starts). Click to sound runs from clicking a song's play button to its first sound (median of 10 clicks); hovered first means the pointer rested on the song before the click, which lets featherplay get it ready. A dash (—) means not part of this measurement. [How these were measured](https://featherplay.candygoogy.dev/method).</sub>
+
+With the equalizer, Even out loudness, Skip silence and a 5 s crossfade all on, featherplay
+used 56 MB of memory and 0.087 % CPU while playing (one run).
 
 Pear does much more than featherplay, and [Coming from Pear?](#coming-from-pear) lists which
 of its plugins carry over. Its own tracker has several reports about resource use (titles as

@@ -1,15 +1,40 @@
-// The comparison's figures: the final measurement of 1 November 2026 (19:07 to 19:58), all
-// three apps on the same PC, the same song on repeat, window minimised, each the only player
-// running. Every process of each app is counted. Memory is private memory, averaged, in MB
-// of 1,048,576 bytes; CPU is the share of the whole machine (CPU seconds over wall seconds
-// over 16 logical cores). Every figure names the file it came from, by its path inside the
-// measurement write-up, which is kept outside the repo; the Method page shows the file names.
+// The comparison's figures, from two measurements on the same PC, each app playing a song on
+// repeat with its window minimised, the only player running. Every process of each app is
+// counted. Memory is private memory, averaged, in MB of 1,048,576 bytes; CPU is the share of
+// the whole machine (CPU seconds over wall seconds over 16 logical cores).
+// - featherplay: 0.2.0 on 9 November 2026 (04:43 to 05:30), the v0.2.0 release's own
+//   portable exe; three runs, the median. Its two timings too (start to music playing,
+//   click to sound), which only featherplay has: Pear Desktop and Edge weren't part of
+//   that measurement.
+// - Pear Desktop and Edge: the final measurement of 1 November 2026 (19:07 to 19:58), not
+//   repeated.
+// Every figure names the files it came from, by their path inside the measurement write-ups,
+// which are kept outside the repo; the Method page shows them.
 
-export type Metric = "memoryMB" | "memoryPausedMB" | "cpuPlayingPct" | "cpuPausedPct" | "processes" | "downloadMB";
+export type Metric =
+  | "memoryMB"
+  | "memoryPausedMB"
+  | "cpuPlayingPct"
+  | "cpuPausedPct"
+  | "processes"
+  | "startToSoundS"
+  | "clickToSoundS"
+  | "downloadMB";
 /** The measures that are a single number (processes are a range). */
 export type NumericMetric = Exclude<Metric, "processes">;
+/** The measures only featherplay has: null for the others. */
+export type Timing = "startToSoundS" | "clickToSoundS";
 
-export const metrics: Metric[] = ["memoryMB", "memoryPausedMB", "cpuPlayingPct", "cpuPausedPct", "processes", "downloadMB"];
+export const metrics: Metric[] = [
+  "memoryMB",
+  "memoryPausedMB",
+  "cpuPlayingPct",
+  "cpuPausedPct",
+  "processes",
+  "startToSoundS",
+  "clickToSoundS",
+  "downloadMB",
+];
 
 export type App = "featherplay" | "Pear Desktop" | "YouTube Music in Edge";
 
@@ -24,39 +49,77 @@ export type Figure = {
   cpuPausedPct: number;
   /** How many processes it ran, fewest and most seen. */
   processes: { min: number; max: number };
+  /** Seconds from the process starting to the first sound of the song it resumes (median);
+   *  null where it wasn't part of the measurement. */
+  startToSoundS: number | null;
+  /** Seconds from a click on a song's play button to its first sound (median); null where it
+   *  wasn't part of the measurement. */
+  clickToSoundS: number | null;
   /** What you download to install it; 0 for a browser that comes with Windows. */
   downloadMB: number;
   /** What the download is, in a few words. */
   download: string;
-  sources: Record<Metric, string>;
+  sources: Record<Metric, string | null>;
 };
 
 import { release } from "./release";
 
 const M = "measurements/";
 const FINAL = `${M}final-2026-11-01.md`;
-const runs = (playing: string, paused: string): Record<Metric, string> => ({
+const runs = (playing: string, paused: string): Record<Metric, string | null> => ({
   memoryMB: `${M}${playing}`,
   memoryPausedMB: `${M}${paused}`,
   cpuPlayingPct: `${M}${playing}`,
   cpuPausedPct: `${M}${paused}`,
   processes: `${M}${playing}`,
+  startToSoundS: null,
+  clickToSoundS: null,
   downloadMB: FINAL,
 });
+// 0.2.0's write-up: its samples in csv/, three runs of each (the median is used).
+const V020 = `${M}final-0.2.0/`;
+
+/** featherplay 0.2.0's two timings in detail: the median, the range, and how many. */
+export const timings = {
+  startToSoundS: { median: 1.048, min: 0.733, max: 6.435, n: 6 },
+  clickToSoundS: { median: 0.309, min: 0.003, max: 5.7, n: 10 },
+  /** Clicks on a song the pointer rested on first, and clicks straight away (5 each). */
+  hovered: { median: 0.004, min: 0.003, max: 5.22, n: 5 },
+  notHovered: { median: 0.68, min: 0.195, max: 5.7, n: 5 },
+};
+
+/** One extra run with the sound features on (Equalizer Bass, Even out loudness Light, Skip
+ *  silence Start and end, Crossfade 5 s): beside the table, not in it. */
+export const withProcessing = {
+  memoryMB: 56,
+  cpuPlayingPct: 0.087,
+  source: `${V020}csv/processing-1-playing.csv`,
+};
 
 export const figures: Figure[] = [
   {
     app: "featherplay",
     version: release.version,
-    memoryMB: 81,
-    memoryPausedMB: 80,
-    cpuPlayingPct: 0.022,
-    cpuPausedPct: 0.005,
+    memoryMB: 40,
+    memoryPausedMB: 38,
+    cpuPlayingPct: 0.07,
+    cpuPausedPct: 0,
     processes: { min: 1, max: 1 },
+    startToSoundS: timings.startToSoundS.median,
+    clickToSoundS: timings.clickToSoundS.median,
     // The installer (release.ts); the portable exe is the other option.
     downloadMB: release.installer!.sizeMB!,
     download: "the installer",
-    sources: runs("featherplay_final-playing2_2026-11-01_1907.csv", "featherplay_final-paused_2026-11-01_1913.csv"),
+    sources: {
+      memoryMB: `${V020}csv/default-{1,2,3}-playing.csv`,
+      memoryPausedMB: `${V020}csv/default-{1,2,3}-paused.csv`,
+      cpuPlayingPct: `${V020}csv/default-{1,2,3}-playing.csv`,
+      cpuPausedPct: `${V020}csv/default-{1,2,3}-paused.csv`,
+      processes: `${V020}csv/default-{1,2,3}-playing.csv`,
+      startToSoundS: `${V020}csv/start-to-sound.csv`,
+      clickToSoundS: `${V020}csv/click-to-sound-{A,B}.csv`,
+      downloadMB: `${V020}README.md`,
+    },
   },
   {
     app: "Pear Desktop",
@@ -66,6 +129,8 @@ export const figures: Figure[] = [
     cpuPlayingPct: 0.17,
     cpuPausedPct: 0.05,
     processes: { min: 6, max: 7 },
+    startToSoundS: null,
+    clickToSoundS: null,
     downloadMB: 274,
     download: "the installer",
     sources: runs("pear_final-playing-2026-11-01_2026-11-01_1918.csv", "pear_final-paused-2026-11-01_2026-11-01_1924.csv"),
@@ -78,6 +143,8 @@ export const figures: Figure[] = [
     cpuPlayingPct: 0.14,
     cpuPausedPct: 0.018,
     processes: { min: 9, max: 11 },
+    startToSoundS: null,
+    clickToSoundS: null,
     downloadMB: 0,
     download: "nothing, Edge comes with Windows",
     sources: runs("edge_final-playing3_2026-11-01_1946.csv", "edge_final-paused_2026-11-01_1952.csv"),
@@ -86,11 +153,12 @@ export const figures: Figure[] = [
 
 export const figureFor = (app: App) => figures.find((f) => f.app === app)!;
 
-/** A figure as one number: a range of processes by its upper end. */
-export const valueOf = (f: Figure, m: Metric): number => (m === "processes" ? f.processes.max : f[m]);
+/** A figure as one number: a range of processes by its upper end; null where it wasn't
+ *  part of the measurement. */
+export const valueOf = (f: Figure, m: Metric): number | null => (m === "processes" ? f.processes.max : f[m]);
 
 /** How many times less featherplay uses than `app`, to the nearest whole time. */
-export const timesLess = (m: NumericMetric, app: App): number =>
+export const timesLess = (m: Exclude<NumericMetric, Timing>, app: App): number =>
   Math.round(figureFor(app)[m] / figureFor("featherplay")[m]);
 
 /** What each group of Pear's entries adds up to: how many, and how many bytes. */
