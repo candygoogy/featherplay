@@ -8,6 +8,11 @@ Notable changes to featherplay, newest first. The format follows
 
 ### Added
 
+- The browser sign-in works with Google Chrome, Brave and Vivaldi as well as Microsoft Edge.
+  The option names the browser it opens ("Use Google Chrome"): the one used last, else your
+  default browser when it's one of the four, else the first one installed. With more than
+  one installed, "Change" picks another. A browser whose policy turns the connection off
+  says so, and one that works is offered first. With only Edge, the page is as before.
 - featherplay follows a proxy script (PAC) and "Automatically detect settings" from
   Windows' settings (Network > Proxy), which work and school networks often use. The order
   is Windows' own: auto-detect, then the script, then the proxy set by hand. `HTTPS_PROXY`

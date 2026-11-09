@@ -126,17 +126,23 @@ you can see you're on Google's own sign-in page (it says "Google's page" there).
 doesn't read your password; the code is open. Once you're in, it keeps the YouTube Music
 session from that window and closes it. The main window never contains a browser.
 
-If you'd rather sign in in a browser you know, choose **Use Microsoft Edge**. Edge
-opens with a temporary profile of its own, with Edge's address bar and padlock, and your
-passkeys and Windows Hello work as usual. featherplay never touches your own Edge profile. It
-talks to that Edge over a private pipe, not a network port, and the only things it can ask
-are the profile's cookies and for Edge to close. Once you're signed in, it keeps the YouTube
-Music session, drops every other cookie, closes Edge and deletes the temporary profile. If
-you close Edge or don't sign in within 10 minutes, nothing is kept. **Switch Google account**
-in the account menu still uses the small window, because it remembers the accounts you've
-signed in with. If an Edge policy on your PC turns that connection off
-(`RemoteDebuggingAllowed`), the Edge option says it isn't available on this PC, and **Why?**
-explains.
+If you'd rather sign in in a browser you know, choose **Use Microsoft Edge**, or **Use Google
+Chrome**, **Use Brave** or **Use Vivaldi**: the option names the browser it opens. That
+browser opens with a temporary profile of its own, with its own address bar and padlock, and
+your passkeys and Windows Hello work as usual. featherplay never touches your own browser
+profile. It talks to that browser over a private pipe, not a network port, and the only
+things it can ask are the profile's cookies and for the browser to close. Once you're signed
+in, it keeps the YouTube Music session, drops every other cookie, closes the browser and
+deletes the temporary profile. If you close the browser or don't sign in within 10 minutes,
+nothing is kept. **Switch Google account** in the account menu still uses the small window,
+because it remembers the accounts you've signed in with.
+
+The option offers the browser you used for it last; the first time, your default browser if
+it's one of these four, else the first one installed of Edge, Chrome, Brave and Vivaldi. With
+more than one installed, **Change** lists them. If a policy on your PC turns that connection
+off for a browser (`RemoteDebuggingAllowed`), that browser says it isn't available on this PC,
+**Why?** explains, and another one that works is offered instead. Opera and Firefox aren't
+offered: Opera starts through a launcher, and Firefox has no such pipe.
 
 The session is stored in Windows Credential Manager. yt-dlp takes cookies as a file, so
 while it looks up a song's audio, featherplay writes the session to a temporary file in
@@ -383,7 +389,7 @@ only reads: there are no controls.
 ## What it leaves out
 
 - **Chromium.** There's no browser engine in the window. Signing in uses Windows' own
-  WebView2 (or Microsoft Edge, if you choose it) once, then closes it.
+  WebView2 (or your own browser, if you choose it) once, then closes it.
 - **Electron.** featherplay is one native program, not a web app in a frame.
 - **Video.** It never plays video. A music video with a song version plays as the song.
 - **Telemetry.** No analytics and no tracking, and no server of its own.
@@ -395,9 +401,9 @@ code is public. It's still an unofficial client using YouTube Music in a way Goo
 support; if that worries you, sign in with a second account.
 
 **I don't want to type my Google password into an app's window.** Choose **Use Microsoft
-Edge** on the sign-in page. You sign in in Edge itself, with its own address bar,
-passkeys and Windows Hello, in a temporary profile that's deleted afterwards. featherplay
-doesn't read your password; the code is open.
+Edge** (or Google Chrome, Brave or Vivaldi) on the sign-in page. You sign in in the browser
+itself, with its own address bar, passkeys and Windows Hello, in a temporary profile that's
+deleted afterwards. featherplay doesn't read your password; the code is open.
 
 **Playback stopped working.** Update featherplay first. If the latest version fails too,
 [open an issue](https://github.com/candygoogy/featherplay/issues).
@@ -445,8 +451,8 @@ playing. Other websites can't.
 Your YouTube Music session, your Last.fm session, your ListenBrainz token and the local API's
 token are kept in Windows Credential Manager. Settings, the play queue and the scrobbles waiting to be sent are
 in `%APPDATA%\featherplay`; covers, the helpers and the sign-in window's data are in
-`%LOCALAPPDATA%\featherplay`. Signing in with Microsoft Edge uses a temporary Edge profile in
-that folder too, deleted as soon as the sign-in ends (or at the next start, if featherplay was
+`%LOCALAPPDATA%\featherplay`. Signing in with your own browser uses a temporary browser
+profile in that folder too, deleted as soon as the sign-in ends (or at the next start, if featherplay was
 killed meanwhile); featherplay keeps only its YouTube Music cookies. The song links looked up
 in the last session are kept there until they expire (a few hours), so songs start sooner
 after a restart; like every YouTube stream link, each one contains your public IP address.
