@@ -18,7 +18,7 @@ use std::collections::{HashMap, HashSet};
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
@@ -55,9 +55,12 @@ const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(30);
 const SOLVE_TIMEOUT: Duration = Duration::from_secs(10);
 const PREPROCESS_TIMEOUT: Duration = Duration::from_secs(30);
 const KEEP_PLAYERS: usize = 3;
-/// After this many failures in a row, resolves go straight to yt-dlp for `OFF_FOR`.
+/// After this many failures in a row, resolves go straight to yt-dlp for `OFF_FOR`, and
+/// then one failure turns it off again. Resolves at once from one page that fail count
+/// once: on 2026-11-09 a start's three resolves failed together on one bad visitor, and
+/// 30 min off cost every song 2.6-10.8 s, while each fresh visitor got URLs.
 const MAX_FAILURES: u32 = 3;
-const OFF_FOR: Duration = Duration::from_secs(30 * 60);
+const OFF_FOR: Duration = Duration::from_secs(5 * 60);
 
 /// Why a native resolve didn't give a stream.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -112,6 +115,8 @@ struct Ready {
     /// Usually `config.player`; an older one when the new one couldn't be preprocessed.
     player: Player,
     fetched: SystemTime,
+    /// Which page this is in this run (`Inner::pages`): a newer one has a higher number.
+    page: u64,
 }
 
 /// The `n`/`sig` resolve's fields before the challenges are answered.
@@ -147,15 +152,31 @@ struct Inner {
     dir: PathBuf,
     base: String,
     state: tokio::sync::Mutex<Option<Ready>>,
-    /// Drop `state` before the next resolve (a URL was refused, or the request failed).
-    forget: AtomicBool,
+    /// The page to drop from `state` before the next resolve (a URL was refused, or the
+    /// request failed).
+    forget: Mutex<Option<Forget>>,
+    /// The last page number given (`Ready::page`).
+    pages: AtomicU64,
     refreshing: AtomicBool,
     health: Mutex<Health>,
+}
+
+/// Which kept page the next resolve drops.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Forget {
+    /// Whichever is kept: a URL it gave was refused.
+    Any,
+    /// This page (`Ready::page`) or an older one: an answer from it failed. Resolves at
+    /// once from one page fail one after the other, and the first may have kept a fresh
+    /// page meanwhile.
+    Page(u64),
 }
 
 #[derive(Default)]
 struct Health {
     failures: u32,
+    /// The page of the last answer without a URL: another one from it doesn't count.
+    failed_page: Option<u64>,
     off_until: Option<Instant>,
     /// Players whose challenges couldn't be solved.
     bad: HashSet<String>,
@@ -192,7 +213,8 @@ impl NativeResolver {
                 dir,
                 base: base.trim_end_matches('/').to_string(),
                 state: tokio::sync::Mutex::new(None),
-                forget: AtomicBool::new(false),
+                forget: Mutex::new(None),
+                pages: AtomicU64::new(0),
                 refreshing: AtomicBool::new(false),
                 health: Mutex::new(Health::default()),
             }),
@@ -201,7 +223,7 @@ impl NativeResolver {
 
     /// A URL this client gave was refused: the next resolve starts from a fresh embed page.
     pub(crate) fn refused(&self) {
-        self.inner.drop_page();
+        self.inner.drop_page(None);
     }
 
     pub(crate) async fn resolve(
@@ -223,15 +245,24 @@ impl NativeResolver {
         {
             return Err(failed("off for a while after repeated failures"));
         }
-        let result = inner.resolve(video, quality).await;
+        let (result, page) = inner.resolve(video, quality).await;
         let mut h = inner.health.lock_or_recover();
         match &result {
-            Ok(_) | Err(NativeError::Skip(_)) => h.failures = 0,
-            Err(NativeError::Failed(_) | NativeError::NoUrl(_)) => {
-                h.failures += 1;
-                if h.failures >= MAX_FAILURES {
-                    h.failures = 0;
-                    h.off_until = Some(Instant::now() + OFF_FOR);
+            Ok(_) | Err(NativeError::Skip(_)) => {
+                h.failures = 0;
+                h.failed_page = None;
+            }
+            Err(e @ (NativeError::Failed(_) | NativeError::NoUrl(_))) => {
+                // Other failures (deno, a player's challenges) count each time.
+                let page = page.filter(|_| matches!(e, NativeError::NoUrl(_)));
+                if page.is_none() || page != h.failed_page {
+                    h.failures += 1;
+                    h.failed_page = page;
+                    if h.failures >= MAX_FAILURES {
+                        // The first resolve after the time off tries once.
+                        h.failures = MAX_FAILURES - 1;
+                        h.off_until = Some(Instant::now() + OFF_FOR);
+                    }
                 }
             }
         }
@@ -299,17 +330,50 @@ impl NativeResolver {
 }
 
 impl Inner {
-    /// The next resolve starts from a fresh embed page. The saved page goes at once: some
+    /// The next resolve starts from a fresh embed page, unless `page` (`None`: whichever is
+    /// kept) is one another resolve already replaced. The saved page goes at once: some
     /// new visitors get answers without URLs every time (2026-11-09), and a session that
     /// ends before its next resolve would load it again at the next start.
-    fn drop_page(&self) {
-        self.forget.store(true, Ordering::Relaxed);
-        let _ = std::fs::remove_file(self.dir.join("state.json"));
+    fn drop_page(&self, page: Option<&Ready>) {
+        if page.is_none_or(|r| self.saved().is_some_and(|(c, _)| c == r.config)) {
+            let _ = std::fs::remove_file(self.dir.join("state.json"));
+        }
+        let mut forget = self.forget.lock_or_recover();
+        *forget = Some(match (*forget, page) {
+            (Some(Forget::Any), _) | (_, None) => Forget::Any,
+            (Some(Forget::Page(old)), Some(r)) => Forget::Page(old.max(r.page)),
+            (None, Some(r)) => Forget::Page(r.page),
+        });
     }
 
-    async fn resolve(&self, video: &str, quality: Quality) -> Result<ResolvedStream, NativeError> {
-        let ready = self.ready(video).await?;
-        self.answer(video, quality, &ready, true).await
+    /// A resolve from the kept page, and that page (`Ready::page`). An answer without a
+    /// URL asks once more from a fresh page (~0.45 s): some visitors get none every time
+    /// while new ones do (2026-11-09). Resolves at once that get none share the first
+    /// one's fresh page.
+    async fn resolve(
+        &self,
+        video: &str,
+        quality: Quality,
+    ) -> (Result<ResolvedStream, NativeError>, Option<u64>) {
+        let ready = match self.ready(video).await {
+            Ok(r) => r,
+            Err(e) => return (Err(e), None),
+        };
+        match self.answer(video, quality, &ready, true).await {
+            // `answer` dropped the page.
+            Err(NativeError::NoUrl(_)) => match self.ready(video).await {
+                Ok(fresh) => (
+                    self.answer(video, quality, &fresh, true).await,
+                    Some(fresh.page),
+                ),
+                Err(e) => (Err(e), None),
+            },
+            result => (result, Some(ready.page)),
+        }
+    }
+
+    fn next_page(&self) -> u64 {
+        self.pages.fetch_add(1, Ordering::Relaxed) + 1
     }
 
     /// One resolve from `ready`. `kept`: `ready` is the state resolves share, which a
@@ -324,7 +388,7 @@ impl Inner {
         let player = ready.player.clone();
         let forget = || {
             if kept {
-                self.drop_page();
+                self.drop_page(Some(ready));
             }
         };
         // Loads the player while the request runs.
@@ -364,9 +428,14 @@ impl Inner {
     /// The config and player to use: in memory, else on disk, else fetched.
     async fn ready(&self, video: &str) -> Result<Ready, NativeError> {
         let mut st = self.state.lock().await;
-        if self.forget.swap(false, Ordering::Relaxed) {
+        // `drop_page` took it off the disk already.
+        let stale = match self.forget.lock_or_recover().take() {
+            Some(Forget::Any) => true,
+            Some(Forget::Page(page)) => st.as_ref().is_some_and(|r| r.page <= page),
+            None => false,
+        };
+        if stale {
             *st = None;
-            let _ = std::fs::remove_file(self.dir.join("state.json"));
         }
         if st.is_none() {
             *st = self.load();
@@ -417,6 +486,7 @@ impl Inner {
             config,
             player,
             fetched: SystemTime::now(),
+            page: self.next_page(),
         })
     }
 
@@ -509,7 +579,8 @@ impl Inner {
         Ok(path)
     }
 
-    fn load(&self) -> Option<Ready> {
+    /// The saved page's config, and the whole saved state.
+    fn saved(&self) -> Option<(EmbedConfig, Value)> {
         let v: Value =
             serde_json::from_str(&std::fs::read_to_string(self.dir.join("state.json")).ok()?)
                 .ok()?;
@@ -519,11 +590,17 @@ impl Inner {
             host_flags: v["host_flags"].as_str().map(str::to_string),
             player: v["player"].as_str()?.to_string(),
         };
+        Some((config, v))
+    }
+
+    fn load(&self) -> Option<Ready> {
+        let (config, v) = self.saved()?;
         let player = installed(&self.dir.join("players"), v["active"].as_str()?)?;
         Some(Ready {
             config,
             player,
             fetched: UNIX_EPOCH + Duration::from_secs(v["fetched"].as_u64()?),
+            page: self.next_page(),
         })
     }
 
@@ -1135,60 +1212,66 @@ pub(crate) mod test_server {
 
     pub(crate) type Log = Arc<Mutex<Vec<String>>>;
 
+    /// One thread per connection, so a client that keeps its connection open doesn't hold
+    /// up another (requests at once).
     pub(crate) fn serve(
-        route: impl Fn(&str, &str, &str) -> (u16, String) + Send + 'static,
+        route: impl Fn(&str, &str, &str) -> (u16, String) + Send + Sync + 'static,
     ) -> (String, Log) {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let base = format!("http://{}", listener.local_addr().unwrap());
         let log: Log = Arc::default();
         let log2 = log.clone();
+        let route = Arc::new(route);
         std::thread::spawn(move || {
             for stream in listener.incoming() {
                 let Ok(mut stream) = stream else { return };
-                let mut reader = BufReader::new(stream.try_clone().unwrap());
-                loop {
-                    let mut line = String::new();
-                    if reader.read_line(&mut line).unwrap_or(0) == 0 {
-                        break;
-                    }
-                    let mut parts = line.split_whitespace();
-                    let method = parts.next().unwrap_or("").to_string();
-                    let path = parts.next().unwrap_or("").to_string();
-                    let mut len = 0;
+                let (log, route) = (log2.clone(), route.clone());
+                std::thread::spawn(move || {
+                    let mut reader = BufReader::new(stream.try_clone().unwrap());
                     loop {
-                        let mut h = String::new();
-                        if reader.read_line(&mut h).unwrap_or(0) == 0 || h.trim().is_empty() {
+                        let mut line = String::new();
+                        if reader.read_line(&mut line).unwrap_or(0) == 0 {
                             break;
                         }
-                        if let Some((k, v)) = h.split_once(':')
-                            && k.eq_ignore_ascii_case("content-length")
+                        let mut parts = line.split_whitespace();
+                        let method = parts.next().unwrap_or("").to_string();
+                        let path = parts.next().unwrap_or("").to_string();
+                        let mut len = 0;
+                        loop {
+                            let mut h = String::new();
+                            if reader.read_line(&mut h).unwrap_or(0) == 0 || h.trim().is_empty() {
+                                break;
+                            }
+                            if let Some((k, v)) = h.split_once(':')
+                                && k.eq_ignore_ascii_case("content-length")
+                            {
+                                len = v.trim().parse().unwrap_or(0);
+                            }
+                        }
+                        let mut body = vec![0; len];
+                        if reader.read_exact(&mut body).is_err() {
+                            break;
+                        }
+                        log.lock().unwrap().push(format!("{method} {path}"));
+                        let (status, answer) =
+                            route(&method, &path, &String::from_utf8_lossy(&body));
+                        let head = format!(
+                            "HTTP/1.1 {status} X\r\nContent-Length: {}\r\nContent-Type: text/plain\r\n\r\n",
+                            answer.len()
+                        );
+                        if stream.write_all(head.as_bytes()).is_err()
+                            || stream.write_all(answer.as_bytes()).is_err()
                         {
-                            len = v.trim().parse().unwrap_or(0);
+                            break;
                         }
                     }
-                    let mut body = vec![0; len];
-                    if reader.read_exact(&mut body).is_err() {
-                        break;
-                    }
-                    log2.lock().unwrap().push(format!("{method} {path}"));
-                    let (status, answer) = route(&method, &path, &String::from_utf8_lossy(&body));
-                    let head = format!(
-                        "HTTP/1.1 {status} X\r\nContent-Length: {}\r\nContent-Type: text/plain\r\n\r\n",
-                        answer.len()
-                    );
-                    if stream.write_all(head.as_bytes()).is_err()
-                        || stream.write_all(answer.as_bytes()).is_err()
-                    {
-                        break;
-                    }
-                }
+                });
             }
         });
         (base, log)
     }
 
-    /// Like `serve`, with binary answers, one thread per connection (so a client that
-    /// keeps its connection open doesn't hold up another), and requests read as GETs.
+    /// Like `serve`, with binary answers, and requests read as GETs.
     pub(crate) fn serve_bytes(
         route: impl Fn(&str) -> (u16, Vec<u8>) + Send + Sync + 'static,
     ) -> (String, Log) {
@@ -1591,6 +1674,7 @@ _result.sig = (s) => s.slice(2).split("").reverse().join("");"#;
             config: config(),
             player,
             fetched: SystemTime::now(),
+            page: 0,
         });
         (r, dir)
     }
@@ -1709,7 +1793,7 @@ _result.sig = (s) => s.slice(2).split("").reverse().join("");"#;
         let e = r.resolve(VIDEO, Quality::High).await.unwrap_err();
         assert!(matches!(e, NativeError::Failed(_)), "{e:?}");
         assert!(
-            r.inner.forget.load(Ordering::Relaxed),
+            r.inner.forget.lock().unwrap().is_some(),
             "the next resolve fetches the embed page"
         );
         for _ in 0..2 {
@@ -1722,6 +1806,12 @@ _result.sig = (s) => s.slice(2).split("").reverse().join("");"#;
             n,
             "off: no request after three failures"
         );
+        // Once the time off is over, one resolve tries; failing, it turns it off again.
+        r.inner.health.lock().unwrap().off_until = Some(Instant::now());
+        assert!(r.resolve(VIDEO, Quality::High).await.is_err());
+        let n = log.lock().unwrap().len();
+        assert!(r.resolve(VIDEO, Quality::High).await.is_err());
+        assert_eq!(log.lock().unwrap().len(), n, "off again after one failure");
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
@@ -1734,6 +1824,28 @@ _result.sig = (s) => s.slice(2).split("").reverse().join("");"#;
             eprintln!("skipped: no deno in FEATHERPLAY_SIDECARS_DIR");
             return;
         };
+        let answer = without_urls();
+        let page = EMBED.replace(&config().visitor_data.unwrap(), "fresh-visitor");
+        let (base, _log) = test_server::serve(move |_, path, _| {
+            if path.starts_with("/embed/") {
+                (200, page.clone())
+            } else {
+                (200, answer.clone())
+            }
+        });
+        let (r, dir) = seeded("no-url", sidecars.clone(), &base);
+        let e = r.resolve(VIDEO, Quality::High).await.unwrap_err();
+        assert!(matches!(e, NativeError::NoUrl(_)), "{e:?}");
+        let next_start = NativeResolver::with_dirs(sidecars, Some(dir.clone()), &base).unwrap();
+        assert!(
+            next_start.inner.load().is_none(),
+            "the next start fetches a fresh embed page"
+        );
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// `PLAYER` with its formats' URLs taken out (a SABR-only answer).
+    fn without_urls() -> String {
         let mut answer: Value = serde_json::from_str(PLAYER).unwrap();
         for f in answer["streamingData"]["adaptiveFormats"]
             .as_array_mut()
@@ -1743,15 +1855,82 @@ _result.sig = (s) => s.slice(2).split("").reverse().join("");"#;
             f.remove("url");
             f.remove("signatureCipher");
         }
-        let answer = answer.to_string();
-        let (base, _log) = test_server::serve(move |_, _, _| (200, answer.clone()));
-        let (r, dir) = seeded("no-url", sidecars.clone(), &base);
-        let e = r.resolve(VIDEO, Quality::High).await.unwrap_err();
-        assert!(matches!(e, NativeError::NoUrl(_)), "{e:?}");
-        let next_start = NativeResolver::with_dirs(sidecars, Some(dir.clone()), &base).unwrap();
+        answer.to_string()
+    }
+
+    /// The three resolves a start fires at once all got answers without URLs from the kept
+    /// visitor, which turned the native step off for 30 min (2026-11-09 13:42), while
+    /// yt-dlp's fresh visitors got URLs. Each asks once more, from one fresh page they share.
+    #[tokio::test]
+    async fn answers_without_urls_from_the_kept_page_ask_again_from_one_fresh_page() {
+        let Some(sidecars) = deno_sidecars() else {
+            eprintln!("skipped: no deno in FEATHERPLAY_SIDECARS_DIR");
+            return;
+        };
+        let kept = config().visitor_data.unwrap();
+        let page = EMBED.replace(&kept, "fresh-visitor");
+        let bad = without_urls();
+        let (base, log) = test_server::serve(move |method, path, body| {
+            match (method, path.split('?').next().unwrap()) {
+                ("GET", p) if p.starts_with("/embed/") => (200, page.clone()),
+                ("POST", "/youtubei/v1/player") if body.contains(&kept) => (200, bad.clone()),
+                ("POST", "/youtubei/v1/player") => (200, PLAYER.to_string()),
+                _ => (404, String::new()),
+            }
+        });
+        let (r, dir) = seeded("no-url-again", sidecars, &base);
+        let (a, b, c) = tokio::join!(
+            r.resolve(VIDEO, Quality::High),
+            r.resolve(VIDEO, Quality::High),
+            r.resolve(VIDEO, Quality::High),
+        );
+        for s in [a, b, c] {
+            assert_eq!(s.unwrap().itag, 251);
+        }
+        let pages = log
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|l| l.starts_with("GET /embed/"))
+            .count();
+        assert_eq!(pages, 1, "one fresh page for the three");
+        assert_eq!(r.inner.health.lock().unwrap().failures, 0);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// Answers without URLs from fresh pages too: the failures of one page count once, so
+    /// a start's three resolves at once don't turn the native step off.
+    #[tokio::test]
+    async fn the_failures_of_one_page_count_once() {
+        let Some(sidecars) = deno_sidecars() else {
+            eprintln!("skipped: no deno in FEATHERPLAY_SIDECARS_DIR");
+            return;
+        };
+        let kept = config().visitor_data.unwrap();
+        let fetched = std::sync::atomic::AtomicUsize::new(0);
+        let bad = without_urls();
+        let (base, log) = test_server::serve(move |_, path, _| {
+            if path.starts_with("/embed/") {
+                let n = fetched.fetch_add(1, Ordering::Relaxed);
+                (200, EMBED.replace(&kept, &format!("visitor-{n}")))
+            } else {
+                (200, bad.clone())
+            }
+        });
+        let (r, dir) = seeded("no-url-once", sidecars, &base);
+        let (a, b, c) = tokio::join!(
+            r.resolve(VIDEO, Quality::High),
+            r.resolve(VIDEO, Quality::High),
+            r.resolve(VIDEO, Quality::High),
+        );
+        for e in [a, b, c] {
+            assert!(matches!(e, Err(NativeError::NoUrl(_))), "{e:?}");
+        }
+        let n = log.lock().unwrap().len();
+        let _ = r.resolve(VIDEO, Quality::High).await;
         assert!(
-            next_start.inner.load().is_none(),
-            "the next start fetches a fresh embed page"
+            log.lock().unwrap().len() > n,
+            "still on: the next resolve asks"
         );
         std::fs::remove_dir_all(&dir).unwrap();
     }
