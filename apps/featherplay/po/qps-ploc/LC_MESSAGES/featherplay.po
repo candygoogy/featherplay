@@ -2444,9 +2444,9 @@ msgstr "[Accent]"
 
 #: ui/pages/settings.slint:2635
 msgid ""
-"From the cover takes the colour of the song that's playing, and uses red "
-"when the art is grey."
-msgstr "[From the cover takes the colour of the song that's playing, and uses red when the art is grey.]"
+"From the cover takes the colour of the song that's playing, and a plain grey "
+"when the art has none."
+msgstr "[From the cover takes the colour of the song that's playing, and a plain grey when the art has none.]"
 
 #: ui/pages/settings.slint:2657
 msgid "Track notifications"

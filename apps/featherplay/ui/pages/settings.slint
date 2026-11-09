@@ -2632,7 +2632,7 @@ export component SettingsPage inherits Rectangle {
                     }
                     SettingRow {
                         label: @tr("Accent");
-                        detail: @tr("From the cover takes the colour of the song that's playing, and uses red when the art is grey.");
+                        detail: @tr("From the cover takes the colour of the song that's playing, and a plain grey when the art has none.");
                         Chips {
                             labels: [@tr("From the cover")];
                             active: SettingsData.accent == 0 ? 0 : -1;
