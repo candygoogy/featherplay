@@ -20,8 +20,8 @@ use slint::{ComponentHandle, Rgba8Pixel, SharedPixelBuffer};
 
 fn release() -> Release {
     Release {
-        version: "0.2.0".into(),
-        url: "https://github.com/candygoogy/featherplay/releases/tag/v0.2.0".into(),
+        version: "9.2.0".into(),
+        url: "https://github.com/candygoogy/featherplay/releases/tag/v9.2.0".into(),
         assets: Vec::new(),
     }
 }
@@ -80,7 +80,7 @@ fn a_newer_release_puts_a_banner_at_the_top_of_about() {
 
     app::on_event(UiEvent::Release(release()));
     scene.settle();
-    assert_eq!(about.get_update_version().as_str(), "0.2.0");
+    assert_eq!(about.get_update_version().as_str(), "9.2.0");
     let after = shot(&scene);
     // The banner sits above the logo, so the top of the page changes.
     let width = before.width() as usize;
@@ -135,10 +135,10 @@ fn a_downloaded_update_offers_restart_to_update() {
     assert!(toast.get_open());
     assert_eq!(
         toast.get_text().as_str(),
-        "featherplay 0.2.0 is ready to install"
+        "featherplay 9.2.0 is ready to install"
     );
     assert_eq!(toast.get_action().as_str(), "Restart to update");
-    assert_eq!(about.get_update_version().as_str(), "0.2.0");
+    assert_eq!(about.get_update_version().as_str(), "9.2.0");
     assert!(
         about.get_update_state() == UpdateState::Ready,
         "the banner offers Restart to update"
@@ -154,14 +154,14 @@ fn a_newer_release_than_the_downloaded_one_is_not_offered_as_ready() {
 
     updates::ready_for_snapshot(&scene.ctx);
     let mut newer = release();
-    newer.version = "0.3.0".into();
+    newer.version = "9.3.0".into();
     app::on_event(UiEvent::Release(newer));
     scene.settle();
 
-    assert_eq!(about.get_update_version().as_str(), "0.3.0");
+    assert_eq!(about.get_update_version().as_str(), "9.3.0");
     assert!(
         about.get_update_state() != UpdateState::Ready,
-        "0.2.0's setup doesn't install 0.3.0"
+        "9.2.0's setup doesn't install 9.3.0"
     );
 }
 
@@ -171,8 +171,8 @@ fn now() -> u64 {
 
 fn setup() -> Ready {
     Ready {
-        version: "0.2.0".into(),
-        file: "featherplay-setup-0.2.0.exe".into(),
+        version: "9.2.0".into(),
+        file: "featherplay-setup-9.2.0.exe".into(),
         sha256: String::new(),
         signed: true,
     }
@@ -211,7 +211,7 @@ fn the_version_row_says_when_it_last_checked() {
 
     // A newer release: the banner's button is the action, so the pill goes.
     pages::about::show_update(&scene.ctx, Some(&release()));
-    assert_eq!(about.get_check_line().as_str(), "featherplay 0.2.0 is out.");
+    assert_eq!(about.get_check_line().as_str(), "featherplay 9.2.0 is out.");
     assert_eq!(about.get_check_pill().as_str(), "");
 }
 
@@ -263,19 +263,19 @@ fn a_failed_install_says_so_in_the_banner() {
         s.kind = Kind::Installed;
         s.stamp.latest = Some(release());
         s.stamp.ready = Some(setup());
-        s.stamp.launched = Some("0.2.0".into());
+        s.stamp.launched = Some("9.2.0".into());
     });
     let about = scene.ui.global::<AboutData>();
     assert_eq!(about.get_update_state(), UpdateState::InstallFailed);
 
-    // It installed after all (0.2.0 runs): nothing to say. Here: launched an older one.
+    // It installed after all (9.2.0 runs): nothing to say. Here: launched an older one.
     updates::set_status(&scene.ctx, |s| s.stamp.launched = None);
     assert_eq!(about.get_update_state(), UpdateState::Ready);
     // The download failed; Scoop's copy; the portable copy.
     updates::set_status(&scene.ctx, |s| {
         s.stamp.ready = None;
         s.stamp
-            .fetch_tried("0.2.0", std::time::SystemTime::now(), false);
+            .fetch_tried("9.2.0", std::time::SystemTime::now(), false);
     });
     assert_eq!(about.get_update_state(), UpdateState::DownloadFailed);
     updates::set_status(&scene.ctx, |s| s.kind = Kind::Scoop);
@@ -290,7 +290,7 @@ fn an_update_that_could_not_be_verified_says_so() {
         s.kind = Kind::Installed;
         s.stamp.latest = Some(release());
         s.stamp
-            .fetch_unverified("0.2.0", std::time::SystemTime::now());
+            .fetch_unverified("9.2.0", std::time::SystemTime::now());
     });
     let about = scene.ui.global::<AboutData>();
     assert_eq!(about.get_update_state(), UpdateState::Unverified);
@@ -311,7 +311,7 @@ fn an_unverified_update_toast_leads_to_about() {
 
     assert_eq!(
         toast.get_text().as_str(),
-        "The update to 0.2.0 couldn't be verified"
+        "The update to 9.2.0 couldn't be verified"
     );
     assert_eq!(toast.get_action().as_str(), "View");
 }
@@ -355,7 +355,7 @@ fn an_update_toast_waits_while_the_window_is_in_the_tray() {
 
     app::show_window(&scene.ctx);
     assert!(toast.get_open(), "shown once the window is back");
-    assert_eq!(toast.get_text().as_str(), "featherplay 0.2.0 is out");
+    assert_eq!(toast.get_text().as_str(), "featherplay 9.2.0 is out");
     assert_eq!(toast.get_action().as_str(), "Get it");
 }
 
@@ -366,14 +366,14 @@ fn an_update_toast_waits_while_the_window_is_minimised() {
     let window = Rc::new(Minimised(Cell::new(true)));
     scene.ctx.set_native(window.clone());
 
-    updates::tell(&scene.ctx, Notice::Ready("0.2.0".into()));
+    updates::tell(&scene.ctx, Notice::Ready("9.2.0".into()));
     assert!(!toast.get_open());
 
     window.0.set(false);
     updates::window_shown(&scene.ctx);
     assert_eq!(
         toast.get_text().as_str(),
-        "featherplay 0.2.0 is ready to install"
+        "featherplay 9.2.0 is ready to install"
     );
     assert_eq!(toast.get_action().as_str(), "Restart to update");
 }
@@ -401,7 +401,7 @@ fn a_failed_install_toast_offers_try_again() {
     let found = Found {
         newer: Some(release()),
         ready: Some(setup()),
-        failed_install: Some("0.2.0".into()),
+        failed_install: Some("9.2.0".into()),
         ..Found::default()
     };
 
@@ -412,7 +412,7 @@ fn a_failed_install_toast_offers_try_again() {
 
     assert_eq!(
         toast.get_text().as_str(),
-        "The update to 0.2.0 didn't install"
+        "The update to 9.2.0 didn't install"
     );
     assert_eq!(toast.get_action().as_str(), "Try again");
 }

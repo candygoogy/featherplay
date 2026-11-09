@@ -1292,11 +1292,15 @@ pub fn restart(ctx: &Rc<Ctx>) {
     );
 }
 
-/// The release used by About's snapshots and tests: 0.2.0, with its page.
+/// The version About's snapshots and tests offer as the newer release: far ahead of any real
+/// one, so they keep working as featherplay's own version climbs.
+pub const SAMPLE_VERSION: &str = "9.2.0";
+
+/// The release used by About's snapshots and tests: `SAMPLE_VERSION`, with its page.
 pub fn sample_release() -> Release {
     Release {
-        version: "0.2.0".into(),
-        url: "https://github.com/candygoogy/featherplay/releases/tag/v0.2.0".into(),
+        version: SAMPLE_VERSION.into(),
+        url: format!("https://github.com/candygoogy/featherplay/releases/tag/v{SAMPLE_VERSION}"),
         assets: Vec::new(),
     }
 }
@@ -1308,19 +1312,19 @@ pub fn set_status(ctx: &Ctx, f: impl FnOnce(&mut Status)) {
     pages::about::refresh_update(ctx);
 }
 
-/// `--snapshot about-update-ready`: a setup for 0.2.0 waiting, with its toast.
+/// `--snapshot about-update-ready`: a setup for `SAMPLE_VERSION` waiting, with its toast.
 pub fn ready_for_snapshot(ctx: &Ctx) {
     set_status(ctx, |s| {
         s.kind = Kind::Installed;
         s.stamp.latest = Some(sample_release());
         s.stamp.ready = Some(Ready {
-            version: "0.2.0".into(),
-            file: "featherplay-setup-0.2.0.exe".into(),
+            version: SAMPLE_VERSION.into(),
+            file: format!("featherplay-setup-{SAMPLE_VERSION}.exe"),
             sha256: String::new(),
             signed: true,
         });
     });
-    show(ctx, &Notice::Ready("0.2.0".into()));
+    show(ctx, &Notice::Ready(SAMPLE_VERSION.into()));
 }
 
 /// `--snapshot about-…`: the version row and the banner in the state `page` names (the
@@ -1332,15 +1336,15 @@ pub fn for_snapshot(ctx: &Ctx, page: &str) {
     }
     let now = now_unix();
     let setup = Ready {
-        version: "0.2.0".into(),
-        file: "featherplay-setup-0.2.0.exe".into(),
+        version: SAMPLE_VERSION.into(),
+        file: format!("featherplay-setup-{SAMPLE_VERSION}.exe"),
         sha256: String::new(),
         signed: true,
     };
     set_status(ctx, |s| {
         s.stamp.checked = now;
         let tried = |refused| Fetch {
-            version: "0.2.0".into(),
+            version: SAMPLE_VERSION.into(),
             attempts: 1,
             last: now,
             refused,
@@ -1372,7 +1376,7 @@ pub fn for_snapshot(ctx: &Ctx, page: &str) {
                     }
                     "update-failed-install" => {
                         s.stamp.ready = Some(setup.clone());
-                        s.stamp.launched = Some("0.2.0".into());
+                        s.stamp.launched = Some(SAMPLE_VERSION.into());
                     }
                     "update-scoop" => s.kind = Kind::Scoop,
                     "update-starting" => {
