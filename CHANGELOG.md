@@ -6,6 +6,14 @@ Notable changes to featherplay, newest first. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- The mixes on Home ("Discover Mix", "My Supermix", "Archive Mix" and the like) open and
+  play. They loaded for up to a minute, then said "This didn't load": a mix always offers
+  one more page of songs, and the last one is empty or brings back songs it has already
+  listed. featherplay now stops there, lists each song once, and opens a mix in a few
+  seconds.
+
 ## [0.2.1] - 2026-11-09
 
 ### Changed
