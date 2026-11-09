@@ -1,0 +1,29 @@
+[package]
+name = "featherplay-proxy"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "featherplay's proxy choice for every HTTP client and yt-dlp: the environment, else Windows' auto-detection, proxy script or manual proxy"
+publish = false
+
+[dependencies]
+# What a lookup found, or how it failed, goes to the app's log file.
+log = { workspace = true }
+reqwest = { workspace = true }
+# The matcher reqwest's own clients pick a proxy with (the environment, then Windows' manual
+# proxy and its exceptions). A request still goes by it until a script or auto-detection
+# says otherwise. In the tree through reqwest, with these features.
+hyper-util = { workspace = true, features = ["client-proxy", "client-proxy-system"] }
+
+[target.'cfg(windows)'.dependencies]
+# WinHTTP's types, and the loader calls that bring winhttp.dll in when a lookup first runs
+# (`winhttp.rs`). The app builds `windows` with Foundation and LibraryLoader already.
+windows = { workspace = true, features = ["Win32_Foundation", "Win32_Networking_WinHttp", "Win32_System_LibraryLoader"] }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt", "time"] }
+
+[lints]
+workspace = true

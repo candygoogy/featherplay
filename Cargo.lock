@@ -1444,6 +1444,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "featherplay-proxy"
+version = "0.2.1"
+dependencies = [
+ "hyper-util",
+ "log",
+ "reqwest",
+ "tokio",
+ "windows 0.62.2",
+]
+
+[[package]]
 name = "featherplay-store"
 version = "0.2.1"
 dependencies = [
