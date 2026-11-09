@@ -1419,7 +1419,9 @@ mod tests {
                 install::DOWNLOADS
             )
         };
-        let mut files = vec![file("featherplay-setup-9.0.0.exe"), file("SHA256SUMS.txt")];
+        // The setup for the machine the tests run on (x64 or ARM64, as the updater picks it).
+        let setup = install::setup_name("9.0.0", std::env::consts::ARCH).expect("x64 or ARM64");
+        let mut files = vec![file(&setup), file("SHA256SUMS.txt")];
         if signed {
             files.push(file("SHA256SUMS.txt.minisig"));
         }
@@ -1432,11 +1434,15 @@ mod tests {
 
     /// GitHub's reply (`signed` or not) and 9.0.0's files, signed with the test main key.
     fn github(signed: bool) -> String {
+        let setup = format!(
+            "/{}",
+            install::setup_name("9.0.0", std::env::consts::ARCH).expect("x64 or ARM64")
+        );
         serve(move |path| match path {
             "/latest" => (200, reply(signed)),
             "/SHA256SUMS.txt" => (200, SIGNED_SUMS.to_vec()),
             "/SHA256SUMS.txt.minisig" => (200, BY_MAIN.to_vec()),
-            "/featherplay-setup-9.0.0.exe" => (200, SETUP.to_vec()),
+            p if p == setup => (200, SETUP.to_vec()),
             _ => (404, Vec::new()),
         })
     }

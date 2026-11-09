@@ -731,7 +731,7 @@ pub(super) mod tests {
         base
     }
 
-    /// 9.0.0's `SHA256SUMS.txt` (`SETUP`'s sha256 for its x64 setup), signed with the test
+    /// 9.0.0's `SHA256SUMS.txt` (`SETUP`'s sha256 for its x64 and ARM64 setups), signed with the test
     /// main key for `featherplay v9.0.0` (`tests/fixtures/signing/`).
     pub(crate) const SIGNED_SUMS: &[u8] =
         include_bytes!("../../tests/fixtures/signing/SHA256SUMS.txt");
@@ -864,11 +864,11 @@ pub(super) mod tests {
     async fn a_setup_missing_from_the_checksums_is_not_downloaded() {
         let cache = test_cache("unlisted");
         let base = release_files(BY_MAIN, SETUP);
-        // The signed checksums list no ARM64 setup.
-        let mut arm = plan(&base);
-        arm.setup.name = "featherplay-setup-9.0.0-arm64.exe".into();
+        // The signed checksums list the x64 and ARM64 setups, not this one.
+        let mut unlisted = plan(&base);
+        unlisted.setup.name = "featherplay-setup-9.0.1.exe".into();
 
-        let err = fetch(&cache, &arm, &Origin::local(), &test_keys())
+        let err = fetch(&cache, &unlisted, &Origin::local(), &test_keys())
             .await
             .unwrap_err();
 
