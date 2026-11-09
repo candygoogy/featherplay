@@ -1,22 +1,24 @@
-# featherplay UI: who owns what
+# featherplay UI: where things live
 
-The window is built so each page can be worked on in its own files. Touch only the files
-your task owns; the shared files below change only when a page truly needs something new.
+Each page has its own `.slint` file and its own Rust module, so work on one page rarely
+touches another. The shared files below change only when a page needs something new.
 
 ## Files
 
-| File | What it holds | Owner |
+| File | What it holds | Area |
 |---|---|---|
 | `app.slint` | `AppWindow`: the frame (sidebar, top bar, content, Up next panel, bottom bar), the page switch, keyboard shortcuts, the exports to Rust | frame (shared) |
 | `theme.slint` | `Theme` (colours, interaction states, type, spacing, sizes, durations; dark, light or Windows' mode per the Appearance setting) and `Icons` | frame (shared) |
-| `parts.slint` | Shared pieces: `TrackRow`, `CardItem`, `Icon`, `Display`, `Body`, `PageTitle`, `ShelfTitle`, `Cover`, `IconButton`, `Pill`, `ProgressRail`, `Card`, `Shelf`, `SongRow`, `TrackListRow`, `Tabs`, `PageStub`, `TextLink` (the underlined tertiary action), `ChoiceList` and `ChoiceRow` (several ways to do one thing as rows of one card: icon tile, title, one line, chevron or a "Why?"; the recommended one lit) | frame (shared) |
+| `parts.slint` | Shared pieces: `TrackRow`, `CardItem`, `Icon`, `Display`, `Body`, `PageTitle`, `ShelfTitle`, `Bands`, `Cover`, `CoverPlay`, `PlayButton`, `PlayingMark`, `HoverIntent`, `IconButton`, `Pill`, `ProgressRail`, `Card`, `Shelf`, `ShelfArrows`, `SongRow`, `TrackListRow`, `Tabs`, `PageStub`, `TextLink` (the underlined tertiary action), `ChoiceList` and `ChoiceRow` (several ways to do one thing as rows of one card: icon tile, title, one line, chevron or a "Why?"; the recommended one lit) | frame (shared) |
 | `nav.slint` | `PageKind`, `Nav` (the navigation callbacks) and `Frame` (`queue-open`, Now playing's `side-open`, …) | frame (shared) |
 | `player.slint` | `Player`: the current track and the transport, for the bar, Now playing and the Home hero | frame (shared) |
 | `sidebar.slint`, `bottom_bar.slint` | The frame's sidebar (`SidebarData`: Home, Library, Explore, History, Liked songs, then the library as a list under the Playlists, Albums and Artists chips, pinned entries first; `src/sidebar.rs`, its order in `src/library_list.rs`) and bottom bar | frame |
 | `top_bar.slint` | The top bar above every page but Now playing and Sign in: the search field (`TopBarData.query`, filled by `src/top_bar.rs` and cleared off search pages) with its right-click menu | frame |
+| `toast.slint` | Toasts: one short line at a time, bottom centre above the bar; `src/toast.rs` shows and closes them | frame (shared) |
 | `queue_panel.slint` | The Up next panel (`QueueData`) | now playing |
 | `mini_player.slint` | The tray's mini player (`MiniPlayer`, `MiniData`): its own small window, opened by a left click on the tray icon; `src/mini.rs` | tray |
 | `account_menu.slint` | The account menu from the sidebar's account row (`AccountMenu`, `AccountItem`): identities, Switch Google account, Sign out | account |
+| `song_menu.slint` | The song menu (`SongMenu`, drawn over everything by `SongMenuLayer` in `app.slint`): Play next, Add to queue, Like or Dislike, Add to playlist, Start radio; `src/song_menu.rs` | menus |
 | `playlist_menu.slint`, `playlist_menu_layer.slint` | The sidebar list's right-click menu (albums and artists get Play, Shuffle, Go to, Pin to top; playlists also Pin to top), in the song menu's style: the state (`PlaylistMenu`, `PlaylistKind`, `PlaylistDialog`), then the panel and its Rename and Delete dialogs (Settings' `Dialog`). Split so the sidebar can import the state without an import cycle; `src/playlist_menu.rs` | menus |
 | `album_menu.slint` | The album page's ⋯ menu (`AlbumMenu`, `AlbumAction`): Like all songs, Remove likes, Dislike all songs, Remove dislikes, each confirmed in Settings' `Dialog`, in the song menu's style; `src/album_actions.rs` rates only the songs that need it, one at a time | menus |
 | `close_dialog.slint` | The close dialog (`CloseDialog`, `CloseChoice`): what the close button does, asked on close until the user picks; `src/close.rs` | close |
@@ -25,17 +27,19 @@ your task owns; the shared files below change only when a page truly needs somet
 | `bar_tip.slint` | `BarTip`, the player bar's one tooltip (the name, then the shortcut, after a 500 ms rest; a click hides it until the pointer leaves), placed after its button; `Tooltips.on`, Settings' "Show tooltips" | frame (shared) |
 | `list_view.slint` | `ListView`, imported in place of std-widgets' one: the fluent style's ListView and scroll bars as they are, with the bars compiled once instead of into every list (`list_view/` holds the bars' arrows) | frame (shared) |
 | `shortcuts.slint` | `Shortcuts`, the window's keyboard shortcuts listed once: Settings' "Keyboard shortcuts" dialog (`ShortcutsDialog`, Ctrl+/) shows them, and `app.slint`'s key handler reports each one it takes (`Shortcuts.used`), so a test checks the two agree | frame (shared) |
+| `probe.slint` | `Probe`, a small animated region that only `tests/app/smoothness.rs` turns on, to price a continuously animated indicator | tests |
+| `pages/content.slint` | The page-level pieces the content pages share (Home, Library, album, playlist, artist, search): headers, skeletons, error and empty states, `TopScrim` | content pages |
 | `pages/home.slint` | `HomePage`, `HomeData`; `ShelfShape` and `Shapes`, how each shelf lays out from what it holds (`src/pages/home.rs::arrange`) | home |
 | `pages/{library,album,playlist,artist,search}.slint` | One page each, with its `…Data` global | content pages |
 | `pages/explore.slint` | `ExplorePage` (New releases, Charts with the country picker and the top artists, Moods & genres) and `MoodPage` (a mood's curated playlists), `ExploreData`, `MoodData`; `src/pages/explore.rs` | discovery |
 | `pages/history.slint` | `HistoryPage`, `HistoryData`: the songs played lately, under a heading per day; `src/pages/history.rs` | discovery |
-| `pages/now_playing.slint` | `NowPlayingPage`, `NowPlayingData`: "Playing from" centred in the stage's header (`QueueData.open-source`: the album or playlist page, or Up next for a radio; `src/queue_panel.rs`), then one block the cover's width: the cover with a glow in the accent, the title (two lines at most) with the song's buttons pinned at the cover's right edge, the artists, and "album · year"; in a short or narrow stage the title steps down a size and the cover gives way first | now playing |
-| `pages/lyrics.slint` | `LyricsView`, `LyricsData`: the lyrics on a panel in the cover's colour (the accent's for grey art; synced lines from LRCLIB or YouTube Music, or plain lyrics), in the Lyrics tab of `SideTabs` and in Now playing's full lyrics view. The full view is optional (`LyricsData.full`, off at every start, kept for the session) and toggled by the stage's Lyrics pill, the bar's microphone or Ctrl+L (`LyricsData.toggle-view`), the cover gliding to its column as the lines fade in (`Theme.t-lyrics`, one eased value); it opens only with lines to show (`LyricsData.showing`), staying open through a new song's lookup: with none found or a failed lookup the stage keeps the cover view, the pill says "Finding lyrics…", "No lyrics" or "Retry lyrics" (a press asks again), and a press on "No lyrics", or a lookup that ends so, shows a note under the pill for a few seconds saying where featherplay looked (`LyricsData.hint`); while it's open the side panel's Lyrics tab steps aside for Up next, and comes back when it closes; with nothing to show the tab keeps its place and shows an empty state (`NoLyrics`: the microphone's tile, what happened, where featherplay looked, Try again after a failure); nothing is looked up until a lyrics view is on screen; with Settings' "Show lyrics" off (`LyricsData.on`) the toggles and the tab are gone and nothing is looked up at all; `src/lyrics.rs` | lyrics |
+| `pages/now_playing.slint` | `NowPlayingPage`, `NowPlayingData`: "Playing from" centred in the stage's header (`QueueData.open-source`: the album or playlist page, or Up next for a radio; `src/queue_panel.rs`), then one block the cover's width: the cover with a glow in the accent, the title (two lines at most) with the song's buttons pinned at the cover's right edge, the artists, and "album · year"; in a short or narrow stage the title steps down a size and the cover gives way first. Also `SideTabs`, the side panel's Up next, Related and Lyrics tabs | now playing |
+| `pages/lyrics.slint` | `LyricsView`, `LyricsData`: the lyrics, in the Lyrics tab and in Now playing's full lyrics view (see [Lyrics](#lyrics)); `src/lyrics.rs` | lyrics |
 | `pages/{settings,about,sign_in}.slint` | One page each | account |
 
-Rust mirrors this in `src/`: one module per page in `src/pages/<page>.rs` (same owners),
-`src/queue_panel.rs` and `src/controller/queue.rs` (now playing), `src/controller/account.rs` and
-`src/account_menu.rs` (account).
+Rust mirrors this in `src/`: one module per page in `src/pages/<page>.rs`, with
+`src/queue_panel.rs` and `src/controller/queue.rs` for Now playing's side, and
+`src/controller/account.rs` and `src/account_menu.rs` for the account.
 `src/pages/mod.rs` only dispatches and doesn't need editing.
 
 Fonts and art: `fonts/manrope/` (Manrope, SIL OFL 1.1; `OFL.txt` goes into About) and
@@ -116,21 +120,32 @@ From Slint: `Nav.open-album(id)`, `Nav.open-playlist(id)` (`"LM"` is Liked songs
 `ctx.back()`, `ctx.forward()`. `src/router.rs` keeps the history; switching Library tabs
 replaces the entry instead of adding one.
 
-Keys: Space plays and pauses from any page, as the bar's play button does (`Player.toggle`;
-a held Space flips once; with nothing loaded it does nothing; in a text field it types a
-space; Settings' switches leave it to playback and flip on Enter; the mini player takes it
-too), Ctrl+K focuses the top bar's search field (Enter searches; a pasted link opens what it
-points at, `src/link.rs`: a song or video link shows that one song on Search, a playlist link
-the playlist, a music-site channel or `MPRE` album link the artist or album; Escape clears it,
-then leaves it; × clears it), Alt+Left and Alt+Right go back and forward, Escape leaves Now
-playing, Ctrl+L turns the full lyrics view on or off (from another page it opens Now playing
-on the lyrics). Pages start below the 64 px top bar (`Theme.top-bar-h`); Now playing and
-Sign in have none (Ctrl+K leaves Now playing first, and goes Home from Sign in). Sign in
-centres its block, its error row, its toasts, the account picker and the sign-in window
-itself in the page's room: right of the sidebar, left of Up next while it's open, above the
-bar.
-Album, playlist and artist pages run up under it instead, clear, so their wash or photo
-reaches the window's top: they start their content `Theme.top-bar-h` down and draw a
+The keys are handled in `app.slint`'s `keys` scope, and each one is also listed in
+`shortcuts.slint`:
+
+- Space plays and pauses from any page, as the bar's play button does (`Player.toggle`). A
+  held Space flips once; with nothing loaded it does nothing; in a text field it types a
+  space; Settings' switches leave it to playback and flip on Enter; the mini player takes it
+  too.
+- Up and Down move the volume one Volume step, from any page where nothing focused takes
+  them, and not under a dialog.
+- Ctrl+Left, Ctrl+Right, Ctrl+S and Ctrl+R are Previous, Next, Shuffle and Repeat, never
+  while a text field has the keys.
+- Ctrl+K focuses the top bar's search field. Enter searches; a pasted link opens what it
+  points at (`src/link.rs`: a song or video link shows that one song on Search, a playlist
+  link the playlist, a music-site channel or `MPRE` album link the artist or album). Escape
+  clears the field, then leaves it; × clears it.
+- Alt+Left and Alt+Right go back and forward; Escape leaves Now playing.
+- Ctrl+L turns the full lyrics view on or off (from another page it opens Now playing on the
+  lyrics), and Ctrl+/ opens the list of shortcuts.
+
+Pages start below the 64 px top bar (`Theme.top-bar-h`); Now playing and Sign in have none
+(Ctrl+K leaves Now playing first, and goes Home from Sign in). Sign in centres its block, its
+error row, its toasts, the account picker and the sign-in window itself in the page's room:
+right of the sidebar, left of Up next while it's open, above the bar.
+
+Album, playlist and artist pages run up under the top bar instead, clear, so their wash or
+photo reaches the window's top: they start their content `Theme.top-bar-h` down and draw a
 `TopScrim` (content.slint) that brings the ground back as content scrolls under the bar.
 Home's wash (the resumed song's cover; the accent's on grey art; none with nothing to resume)
 reaches the top differently: Home starts below the bar, and its wash, behind the `ListView`
@@ -158,47 +173,61 @@ use `tr!` and `trn!` from `featherplay_core`. After changing any, run `po/update
 `tests/app/translations.rs` fails on a string in `ui/` that isn't marked, and on a template
 that's out of date. `CONTRIBUTING.md` explains the files.
 
+## Lyrics
+
+`LyricsView` shows the lyrics on a panel in the cover's colour (the accent's for grey art):
+synced lines from LRCLIB or YouTube Music, or plain lyrics. It appears in the Lyrics tab of
+`SideTabs` and in Now playing's full lyrics view.
+
+- The full view is optional (`LyricsData.full`, off at every start, kept for the session).
+  The stage's Lyrics pill, the bar's microphone and Ctrl+L toggle it
+  (`LyricsData.toggle-view`), and the cover glides to its column as the lines fade in
+  (`Theme.t-lyrics`, one eased value).
+- It opens only with lines to show (`LyricsData.showing`), and stays open through a new
+  song's lookup. With none found, or a failed lookup, the stage keeps the cover view and the
+  pill says "Finding lyrics…", "No lyrics" or "Retry lyrics" (a press asks again). A press on
+  "No lyrics", or a lookup that ends that way, shows a note under the pill for a few seconds
+  saying where featherplay looked (`LyricsData.hint`).
+- While the full view is open, the side panel's Lyrics tab steps aside for Up next, and comes
+  back when it closes. With nothing to show, the tab keeps its place and shows an empty state
+  (`NoLyrics`: the microphone's tile, what happened, where featherplay looked, and Try again
+  after a failure).
+- Nothing is looked up until a lyrics view is on screen. With Settings' "Show lyrics" off
+  (`LyricsData.on`), the toggles and the tab are gone and nothing is looked up at all.
+
 ## Checking your work: offscreen snapshots
 
-Never capture the screen and don't open the window while the user's featherplay runs.
-Render offscreen instead (no window is shown):
+To see a change without opening a window, render the page offscreen to a PNG. Nothing is
+shown and nothing is captured from the screen:
 
 ```sh
 FEATHERPLAY_HOME=<your dev home> cargo run -p featherplay -- \
   --snapshot album --fixtures --theme dark --out <a scratch folder>/album-dark.png
 ```
 
-Pages: home, library, library-playlists, library-albums, library-artists, album, playlist,
-liked, artist, search, search-link and search-link-missing (a pasted song link: its one song,
-or a link to no song), now-playing, now-playing-side-hidden (the side panel hidden, a
-soundtrack's credits), now-playing-long and now-playing-long-side-hidden (a title too long
-for one line and long credits),
-now-playing-disliked (the song rated Dislike: the thumbs-down filled there and in the bar),
-now-playing-lyrics (also -plain and -none; with
-`--hold-loading`, still loading; with `--hold-error`, the lookup failed),
-now-playing-lyrics-full (lyrics on; also -full-plain, -full-none and -full-outage, the plain fallback of an LRCLIB outage), settings, settings-idle (Settings with nothing to play),
-settings-long (a long title by five artists, for the Discord preview; the preview shows only
-with `discord = true` in the home's `config/settings.toml`, and needs a tall `--size`, about
-1280x3600), settings-scripts (the same with a Cyrillic and Japanese title),
-about, sign-in (also -expired, -edge, -edge-blocked, -edge-why with the policy open, -paste with the paste field open), sign-in-window (the sign-in window's frame alone, 540 x 780 logical; also -lookalike, -http and -long, a host wider than the pill), account-menu (Home with the
-account menu open), mini-player, mini-player-paused, mini-player-long, mini-player-disliked and mini-player-idle (the tray's mini
-player alone, 340 x 170 logical), close-dialog (Home with the close dialog open), home-more (Home after a scroll loaded the next
-page, the community shelf; use a tall `--size` to see the end), home-more-loading and
-home-more-failed (its loading and Try again rows), not-for-me (Now playing with the toast after
-"Not for me"), playlist-menu, playlist-menu-saved and playlist-menu-liked (Home with the sidebar's
-playlist menu open on the account's own playlist, a saved one or Liked songs),
-playlist-rename and playlist-delete (its dialogs), explore, explore-charts and explore-moods (Explore
-on each tab), mood (Chill's playlists), history, sidebar-albums, sidebar-artists and sidebar-pinned
-(Home with the sidebar's list on that chip, or with the third playlist pinned), home-shortcuts
-(Home for a feed without mixes: the Shortcuts row). Options: `--theme dark|light`,
-`--size WxH` (physical pixels; default 1280x800; below 1100 px wide the sidebar becomes a rail),
-`--scale F` (the display scale, e.g. 2 for a 4K screen at 200 %), `--queue`
-(opens the Up next panel), `--hover X,Y` or `--press X,Y` (logical pixels: the pointer rests
-there, or also holds the left button, to show hover and pressed states), `--track N` (the
-radio fixture's Nth track plays, so its cover sets the accent; 3 is warm, 11 cool, 16 grey
-art), `--shuffle` (Shuffle on, a lit toggle). Data comes from `crates/ytm/tests/fixtures/*.json`, covers from
-`$FEATHERPLAY_HOME/design-covers` (not every fixture image was downloaded; those stay empty).
-Motion is off in snapshots, and the render waits until every load and cover has arrived.
+The pages are listed in `PAGES` in `src/snapshot.rs`, most with a line on what they show:
+every page (`home`, `album`, `now-playing`, `settings`, `sign-in`, …) and variants of them
+such as `now-playing-lyrics-full`, `settings-sound`, `mini-player-paused` or
+`playlist-menu`. The options:
+
+- `--theme dark|light`;
+- `--size WxH`, in physical pixels (default 1280x800; below 1100 px wide the sidebar becomes
+  a rail), and `--scale F`, the display scale (e.g. 2 for a 4K screen at 200 %);
+- `--queue` opens the Up next panel;
+- `--hover X,Y` or `--press X,Y`, in logical pixels: the pointer rests there, or also holds
+  the left button, to show hover and pressed states;
+- `--hold-loading` shows the page still loading, and `--hold-error` its "Try again" state;
+- `--track N` plays the radio fixture's Nth track, so its cover sets the accent (3 is warm,
+  11 cool, 16 grey art);
+- `--shuffle` shows Shuffle on, a lit toggle;
+- `--signed-out` renders the page signed out, and `--language CODE` in another language.
+
+Data comes from `crates/ytm/tests/fixtures/*.json`, covers from
+`$FEATHERPLAY_HOME/design-covers` (not every fixture image was downloaded; those stay
+empty). Motion is off in snapshots, and the render waits until every load and cover has
+arrived. A few pages need more: `settings-long` shows the Discord preview only with
+`discord = true` in the home's `config/settings.toml`, and needs a tall `--size`, about
+1280x3600.
 
 To check frames as the window presents them (partial rendering, motion on, a frozen clock
 stepped 16 ms at a time), use `snapshot::Scene` with `offscreen::install_presenting`, as
