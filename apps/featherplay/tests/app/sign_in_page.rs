@@ -225,6 +225,46 @@ fn a_sign_in_window_with_no_handle_says_so_plainly_with_try_again() {
     assert!(tried.get(), "Try again didn't open the window");
 }
 
+/// The log says how much memory the app holds as the sign-in window opens, and again a
+/// minute after it closed: what a hand test reads to see that the window gave its memory
+/// back.
+#[test]
+fn the_log_says_what_the_app_holds_a_minute_after_the_sign_in_window_closed() {
+    let dir = std::path::Path::new(env!("CARGO_TARGET_TMPDIR"))
+        .join(format!("sign-in-memory-log-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    featherplay::diagnostics::init(&dir).expect("log");
+    let log = || {
+        featherplay::diagnostics::flush();
+        std::fs::read_to_string(dir.join("featherplay.log")).unwrap_or_default()
+    };
+    let scene = sign_in_page(false);
+    let data = scene.ui.global::<SignInData>();
+    press(&scene, "Sign in with Google");
+    assert!(
+        log().contains("sign-in window opening: private "),
+        "no memory line as the window opened"
+    );
+
+    // The offscreen platform never makes the window: its frame closes once the wait is over.
+    let end = Instant::now() + Duration::from_secs(5);
+    while data.get_busy() && Instant::now() < end {
+        slint::platform::update_timers_and_animations();
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert!(!data.get_busy(), "still waiting after 5 s");
+    let after = "sign-in window closed a minute ago: private ";
+    offscreen::freeze_clock();
+    offscreen::advance(Duration::from_secs(59));
+    assert!(!log().contains(after), "the memory line came early");
+    offscreen::advance(Duration::from_secs(1));
+    assert!(
+        log().contains(after),
+        "no memory line a minute after it closed"
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 #[test]
 fn a_paste_that_cant_be_used_says_why_under_the_field() {
     let scene = sign_in_page(false);

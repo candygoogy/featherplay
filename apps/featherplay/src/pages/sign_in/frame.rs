@@ -8,8 +8,9 @@ use std::cell::RefCell;
 use std::ffi::c_void;
 use std::path::PathBuf;
 use std::rc::Rc;
+use std::time::Duration;
 
-use slint::{CloseRequestResponse, ComponentHandle, LogicalSize, PhysicalPosition};
+use slint::{CloseRequestResponse, ComponentHandle, LogicalSize, PhysicalPosition, Timer};
 use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::UI::Shell::{DefSubclassProc, RemoveWindowSubclass, SetWindowSubclass};
 use windows::Win32::UI::WindowsAndMessaging::{
@@ -26,6 +27,10 @@ use crate::ui::{AppWindow, SettingsData, SignInWindow, Theme};
 
 /// Logical size the window opens at.
 pub const SIZE: (f32, f32) = (540.0, 780.0);
+
+/// How long after the frame goes the log says what the app holds: by then WebView2's
+/// processes and the page thread have ended.
+const SETTLED: Duration = Duration::from_secs(60);
 
 thread_local! {
     /// The frame while a sign-in runs.
@@ -70,6 +75,7 @@ pub fn open(
     if is_open() {
         return Err("the sign-in window is already open".into());
     }
+    log!("sign-in window opening: private {:.0} MB", private_mb());
     let ui = create(ctx)?;
     if let Some(main) = ctx.window() {
         place_over_page(&main, &ui);
@@ -211,7 +217,21 @@ pub fn is_open() -> bool {
 pub fn closed() {
     if let Some(ui) = FRAME.with_borrow_mut(Option::take) {
         let _ = ui.hide();
+        // For a hand test: what the app holds once the window has had time to let go (not
+        // if it has opened again meanwhile).
+        Timer::single_shot(SETTLED, || {
+            if !is_open() {
+                log!(
+                    "sign-in window closed a minute ago: private {:.0} MB",
+                    private_mb()
+                );
+            }
+        });
     }
+}
+
+fn private_mb() -> f64 {
+    crate::memory::private_bytes() as f64 / 1024.0 / 1024.0
 }
 
 /// The title bar in the frame's colours, an opaque client area, the app's icon.
