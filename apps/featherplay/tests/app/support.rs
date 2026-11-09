@@ -20,6 +20,39 @@ pub const FRAME_240: Duration = Duration::from_millis(4);
 const COVERS: usize = 40;
 const COVER_SIDE: u32 = 544;
 
+/// Every test starts in a fresh, empty home of its own, whatever `FEATHERPLAY_HOME` the run
+/// was given: the settings a hand-tested home had saved (tooltips off) failed three tests.
+/// This is the one place: nextest runs each test in its own process, and the C runtime
+/// calls `fresh_home` as the process starts, before `main`. A test that wants something in
+/// its home sets its own after that (`home_with_covers`, `mini_player`, `startup_session`).
+#[used]
+#[unsafe(link_section = ".CRT$XCU")]
+static FRESH_HOME: extern "C" fn() = fresh_home;
+
+/// The home is under the tests' temp folder, named after the process, and removed as the
+/// process ends.
+extern "C" fn fresh_home() {
+    unsafe extern "C" {
+        fn atexit(f: extern "C" fn()) -> i32;
+    }
+    extern "C" fn remove() {
+        let _ = std::fs::remove_dir_all(own_home());
+    }
+    let home = own_home();
+    // Windows hands a process ID out again: one that died may have left its home behind.
+    let _ = std::fs::remove_dir_all(&home);
+    std::fs::create_dir_all(&home).expect("test home");
+    // SAFETY: before `main`, on the process's only thread; `remove` is a plain function.
+    unsafe {
+        std::env::set_var("FEATHERPLAY_HOME", &home);
+        atexit(remove);
+    }
+}
+
+fn own_home() -> PathBuf {
+    Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("home-{}", std::process::id()))
+}
+
 /// This thread's CPU time, from Windows' per-thread cycle counter.
 pub mod cpu {
     use std::sync::OnceLock;
