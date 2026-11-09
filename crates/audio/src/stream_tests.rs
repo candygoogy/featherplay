@@ -719,6 +719,146 @@ fn engine_load_takes_a_late_head_if_it_answers_first() {
     );
 }
 
+/// A server that keeps its connections open between requests, as the stream servers do,
+/// and counts them.
+struct KeepAlive {
+    url: String,
+    connections: Arc<AtomicU32>,
+    /// The paths asked for, in the order they were answered.
+    answered: Arc<Mutex<Vec<String>>>,
+}
+
+impl KeepAlive {
+    /// Waits until `n` requests are answered, and a moment more for the client to take
+    /// the last answer in.
+    fn wait_answered(&self, n: usize) {
+        let t = Instant::now();
+        while self.answered.lock().unwrap().len() < n {
+            assert!(
+                t.elapsed() < Duration::from_secs(5),
+                "answer {n} never came"
+            );
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+}
+
+/// Serves `data` to `Range` requests and an empty 204 to any other, as the stream servers'
+/// `/generate_204`, each after `delay`.
+fn serve_keep_alive(data: Vec<u8>, delay: Duration) -> KeepAlive {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let url = format!("http://{}/track.m4a", listener.local_addr().unwrap());
+    let connections = Arc::new(AtomicU32::new(0));
+    let answered = Arc::new(Mutex::new(Vec::new()));
+    let data = Arc::new(data);
+    let (count, log) = (connections.clone(), answered.clone());
+    std::thread::spawn(move || {
+        for conn in listener.incoming() {
+            let Ok(conn) = conn else { return };
+            count.fetch_add(1, Ordering::SeqCst);
+            let (data, log) = (data.clone(), log.clone());
+            std::thread::spawn(move || keep_answering(conn, &data, &log, delay));
+        }
+    });
+    KeepAlive {
+        url,
+        connections,
+        answered,
+    }
+}
+
+fn keep_answering(mut conn: TcpStream, data: &[u8], log: &Mutex<Vec<String>>, delay: Duration) {
+    let mut reader = BufReader::new(conn.try_clone().unwrap());
+    loop {
+        let mut path = None;
+        let mut range = None;
+        loop {
+            let mut line = String::new();
+            if reader.read_line(&mut line).unwrap_or(0) == 0 {
+                // The client closed the connection.
+                return;
+            }
+            let line = line.trim_end();
+            if line.is_empty() {
+                break;
+            }
+            if path.is_none() {
+                // `GET /track.m4a HTTP/1.1`
+                path = line.split(' ').nth(1).map(str::to_owned);
+            } else if let Some(v) = line.to_ascii_lowercase().strip_prefix("range: bytes=") {
+                let (a, b) = v.split_once('-').unwrap();
+                range = Some((a.parse::<usize>().unwrap(), b.parse::<usize>().unwrap()));
+            }
+        }
+        std::thread::sleep(delay);
+        log.lock().unwrap().push(path.unwrap_or_default());
+        let sent = match range {
+            Some((a, b)) => {
+                let b = b.min(data.len() - 1);
+                let head = format!(
+                    "HTTP/1.1 206 Partial Content\r\nContent-Type: audio/mp4\r\n\
+                     Content-Length: {}\r\nContent-Range: bytes {a}-{b}/{}\r\n\r\n",
+                    b - a + 1,
+                    data.len()
+                );
+                conn.write_all(head.as_bytes())
+                    .and_then(|()| conn.write_all(&data[a..=b]))
+            }
+            None => conn.write_all(b"HTTP/1.1 204 No Content\r\nContent-Length: 0\r\n\r\n"),
+        };
+        if sent.is_err() {
+            return;
+        }
+    }
+}
+
+/// A click on a song that isn't resolved yet: while its resolve runs, the app has the
+/// engine open a connection to the server the stream will likely come from. The stream's
+/// first request then goes over it instead of opening its own (~100 ms over TLS).
+#[test]
+fn engine_load_uses_the_connection_opened_ahead() {
+    let server = serve_keep_alive(fixture("tone-10s-frag.m4a"), Duration::ZERO);
+    let engine = crate::AudioEngine::new_null(engine_tmp());
+    let events = engine.events();
+    // The server alone, as the app names it.
+    engine.connect(server.url.trim_end_matches("/track.m4a"));
+    server.wait_answered(1);
+    engine.load(src(&server.url), Duration::ZERO);
+    engine.play();
+    wait_event(&events, Duration::from_secs(3), crate::AudioEvent::Started);
+    assert_eq!(
+        *server.answered.lock().unwrap(),
+        ["/generate_204", "/track.m4a"]
+    );
+    assert_eq!(
+        server.connections.load(Ordering::SeqCst),
+        1,
+        "the stream's request opened no connection"
+    );
+}
+
+/// Clicks in a row each ask for a connection: the one on its way or waiting in the pool
+/// serves them all, and no second one opens.
+#[test]
+fn engine_opens_no_second_connection_ahead() {
+    // Each answer takes 300 ms, so the second call comes while the first is on its way.
+    let server = serve_keep_alive(Vec::new(), Duration::from_millis(300));
+    let engine = crate::AudioEngine::new_null(engine_tmp());
+    engine.connect(&server.url);
+    engine.connect(&server.url);
+    server.wait_answered(1);
+    // The connection waits in the pool now: the next call's request goes over it.
+    engine.connect(&server.url);
+    server.wait_answered(2);
+    assert_eq!(
+        server.answered.lock().unwrap().len(),
+        2,
+        "the second call sent nothing"
+    );
+    assert_eq!(server.connections.load(Ordering::SeqCst), 1);
+}
+
 #[test]
 fn engine_starts_a_preloaded_stream_at_once() {
     let data = fixture("tone-10s-frag.m4a");

@@ -34,6 +34,33 @@ pub(crate) fn stream_client(read_timeout: Duration) -> reqwest::Result<reqwest::
         .build()
 }
 
+/// The path the stream servers answer with an empty 204: one round trip, and the
+/// connection stays open (checked 2026-11-09).
+const NO_CONTENT: &str = "/generate_204";
+/// A connection ahead that isn't open and answered by then is given up, so it can't hold
+/// up the next click's (`connect` runs one at a time).
+const CONNECT_AHEAD_TIMEOUT: Duration = Duration::from_secs(3);
+
+/// Opens a connection to the server of `url` and leaves it in `client`'s pool, where the
+/// next request to that server finds it. The client opens a connection only for a request,
+/// so this sends the smallest there is. With a connection to the server waiting in the
+/// pool already, the request goes over that one and none is opened.
+pub(crate) async fn connect(client: &reqwest::Client, url: &str) -> Result<(), String> {
+    let mut server = reqwest::Url::parse(url).map_err(|e| e.to_string())?;
+    server.set_path(NO_CONTENT);
+    server.set_query(None);
+    let failed = |e: reqwest::Error| e.without_url().to_string();
+    let answer = client
+        .get(server)
+        .timeout(CONNECT_AHEAD_TIMEOUT)
+        .send()
+        .await
+        .map_err(failed)?;
+    // Read to its end (a 204 has no body), a response gives its connection back.
+    answer.bytes().await.map_err(failed)?;
+    Ok(())
+}
+
 /// The first failure that ended the download, shared with the reader so the engine can
 /// report it instead of a generic I/O error.
 pub(crate) type ErrorSlot = Arc<Mutex<Option<String>>>;

@@ -5,7 +5,8 @@
 //! because a plain GET is throttled to about 2x realtime. `file://` URLs play directly.
 //! Decoding starts on the first fragment, before the download is done (`decoder.rs`), and
 //! `prefetch` keeps the first 256 KB of streams that may play soon in memory (`head.rs`); a
-//! stream loaded while that is on its way takes its request over.
+//! stream loaded while that is on its way takes its request over. For a stream that isn't
+//! resolved yet, `connect` opens the connection its first request will go over.
 //! Each track gets a decoder thread that does all blocking I/O and decodes about 1.5 s ahead,
 //! so the audio callback never waits on the network.
 //!

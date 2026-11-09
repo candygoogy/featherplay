@@ -54,6 +54,7 @@ pub(crate) enum Msg {
     },
     FadeOut(Duration),
     Prefetch(String),
+    Connect(String),
     Seek {
         to: Duration,
         seq: u64,
@@ -312,6 +313,18 @@ impl AudioEngine {
         }
     }
 
+    /// Opens a connection to the server of `url` (`https://host` is enough), ahead of a
+    /// stream that will be loaded in a moment and likely comes from there: its first request
+    /// finds the connection open, and its answer comes ~100 ms sooner. Nothing is fetched.
+    /// With a connection to that server waiting already none is opened, and a call while
+    /// another is on its way does nothing. Left unused, the connection closes like any
+    /// other, 90 s later.
+    pub fn connect(&self, url: &str) {
+        if url.starts_with("https://") || url.starts_with("http://") {
+            self.send(Msg::Connect(url.to_owned()));
+        }
+    }
+
     /// Makes `src` the current track from its start without pausing, and plays: the track
     /// playing now fades out over `fade` while `src` fades in (equal power), and stops once
     /// silent. A preloaded `src` sounds at once; another fades in once it has loaded. A
@@ -497,6 +510,8 @@ struct Engine {
     client: reqwest::Client,
     tmp_dir: PathBuf,
     heads: HeadCache,
+    /// The connection being opened ahead of a stream (`AudioEngine::connect`), if any.
+    connecting: Option<tokio::task::JoinHandle<()>>,
     sink: Option<Output>,
     sink_gen: u64,
     device: Option<String>,
@@ -551,6 +566,7 @@ impl Engine {
             client,
             tmp_dir,
             heads: HeadCache::default(),
+            connecting: None,
             sink: None,
             sink_gen: 0,
             device: None,
@@ -658,6 +674,23 @@ impl Engine {
                     };
                     head::prefetch(&self.heads, self.rt.handle(), &self.client, url, refused);
                 }
+            }
+            Msg::Connect(url) => {
+                // One at a time: a second one beside it would open a second connection.
+                if self.connecting.as_ref().is_some_and(|c| !c.is_finished()) {
+                    return;
+                }
+                let client = self.client.clone();
+                self.connecting = Some(self.rt.spawn(async move {
+                    let t = Instant::now();
+                    match crate::http::connect(&client, &url).await {
+                        Ok(()) => log::info!(
+                            "audio: connected ahead of the stream in {} ms",
+                            t.elapsed().as_millis()
+                        ),
+                        Err(e) => log::info!("audio: no connection ahead of the stream: {e}"),
+                    }
+                }));
             }
             // Told like a refused preload: the app resolves the stream again.
             Msg::HeadRefused(url) => self.emit(AudioEvent::PreloadRefused(url)),
