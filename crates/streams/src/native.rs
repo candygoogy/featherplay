@@ -1204,6 +1204,15 @@ async fn run_with_stdin(
         .await
         .map_err(|e| not_started(e.to_string()))?
         .map_err(|e| not_started(e.to_string()))?;
+    // Held for the run: if the app exits or crashes, the job's handle closes and the child
+    // (~205 MB) ends with it instead of running out its own time limit.
+    #[cfg(windows)]
+    let _job = match child.raw_handle() {
+        Some(process) => kill_on_close_job(process)
+            .inspect_err(|e| log::warn!("the preprocessor isn't tied to the app: {e}"))
+            .ok(),
+        None => None,
+    };
     let unsolved = |m: String| PreprocessError::Unsolved(failed(m));
     let mut pipe = child
         .stdin
@@ -1231,6 +1240,40 @@ async fn run_with_stdin(
         .ok()
         .filter(|player| !player.is_empty())
         .ok_or_else(|| unsolved("the preprocessor gave no player".into()))
+}
+
+/// A job that ends `process` when its last handle closes: when it's dropped, or when this
+/// process ends, however it ends.
+#[cfg(windows)]
+fn kill_on_close_job(
+    process: std::os::windows::io::RawHandle,
+) -> std::io::Result<std::os::windows::io::OwnedHandle> {
+    use std::os::windows::io::{AsRawHandle, FromRawHandle, OwnedHandle};
+    use windows::Win32::Foundation::HANDLE;
+    use windows::Win32::System::JobObjects::{
+        AssignProcessToJobObject, CreateJobObjectW, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+        JOBOBJECT_EXTENDED_LIMIT_INFORMATION, JobObjectExtendedLimitInformation,
+        SetInformationJobObject,
+    };
+    use windows::core::PCWSTR;
+    // SAFETY: no security attributes (not inheritable) and no name.
+    let job = unsafe { CreateJobObjectW(None, PCWSTR::null()) }?;
+    // SAFETY: CreateJobObjectW succeeded; the handle is ours alone.
+    let job = unsafe { OwnedHandle::from_raw_handle(job.0) };
+    let mut info = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
+    info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+    // SAFETY: `info` is the structure JobObjectExtendedLimitInformation expects, with its
+    // size; `job` is ours, and `process` is the live child's handle, owned by its `Child`.
+    unsafe {
+        SetInformationJobObject(
+            HANDLE(job.as_raw_handle()),
+            JobObjectExtendedLimitInformation,
+            (&raw const info).cast(),
+            size_of_val(&info) as u32,
+        )?;
+        AssignProcessToJobObject(HANDLE(job.as_raw_handle()), HANDLE(process))?;
+    }
+    Ok(job)
 }
 
 /// A one-thread HTTP/1.1 server for tests: answers each request with
@@ -2019,6 +2062,30 @@ _result.sig = (s) => s.slice(2).split("").reverse().join("");"#;
         let e = r.resolve(VIDEO, Quality::High).await.unwrap_err();
         assert!(e.to_string().contains("EJS"), "{e}");
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// The preprocessing child's job ends it when the job's handle closes, as it does when
+    /// the app exits or crashes.
+    #[cfg(windows)]
+    #[test]
+    fn the_preprocessor_ends_when_its_job_closes() {
+        use std::os::windows::io::AsRawHandle;
+        let mut child = std::process::Command::new("ping")
+            .args(["-n", "30", "127.0.0.1"])
+            .stdout(std::process::Stdio::null())
+            .spawn()
+            .unwrap();
+        let job = kill_on_close_job(child.as_raw_handle()).unwrap();
+        assert!(child.try_wait().unwrap().is_none(), "running in its job");
+        drop(job);
+        for _ in 0..250 {
+            if child.try_wait().unwrap().is_some() {
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        let _ = child.kill();
+        panic!("the child outlived its job");
     }
 
     /// This process's private bytes, in MB.
