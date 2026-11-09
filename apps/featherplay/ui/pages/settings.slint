@@ -1010,10 +1010,14 @@ component ProfileCard inherits Rectangle {
 // window), the caption, the card and the note are a column `card-w` wide, so the note wraps
 // at the card's width. With `text-beside`, the pane is a row like the options': the caption as
 // its label and the note as its detail on the left, the card on the right, at the switches'
-// edge.
+// edge. The note points at the hover only with the options `beside` the card, in view with
+// it; above them, most are a scroll away from it.
 component DiscordPane inherits Rectangle {
     in property <length> card-w;
     in property <bool> text-beside;
+    in property <bool> beside;
+    // Where the card ends, from the pane's top.
+    out property <length> card-end: card.y + card.height;
     property <bool> on: SettingsData.discord-live;
     property <string> caption: root.on ? @tr("Preview · how friends see you")
         : SettingsData.discord-state == DiscordState.unavailable ? @tr("Preview · This build has no Discord app ID")
@@ -1021,8 +1025,10 @@ component DiscordPane inherits Rectangle {
         : SettingsData.discord-state == DiscordState.connecting ? @tr("Preview · Connecting to Discord…")
         : @tr("Preview · Not connected to Discord");
     property <string> note: SettingsData.discord-preview.sample
-        ? @tr("Nothing is playing, so a sample song stands in. Hover an option to see what it changes.")
-        : @tr("Hover an option to see what it changes.");
+        ? (root.beside ? @tr("Nothing is playing, so a sample song stands in. Hover an option to see what it changes.")
+            : @tr("Nothing is playing, so a sample song stands in. The preview changes with the options below."))
+        : (root.beside ? @tr("Hover an option to see what it changes.")
+            : @tr("The preview changes with the options below."));
     // Placed by hand rather than in layouts, so the two arrangements share their three parts.
     property <length> text-w: root.text-beside ? root.width - root.card-w - Theme.s6 : root.card-w;
     preferred-height: root.text-beside ? max(card.y + card.height, note.y + note.height) : note.y + note.height;
@@ -2011,31 +2017,43 @@ component SectionLink inherits Rectangle {
 export component SettingsPage inherits Rectangle {
     // The content column: wide enough that the descriptions run one or two lines.
     property <length> col-max: 920px;
-    // At wide windows a section index sits left of the column, when the column keeps at
-    // least 760 px beside it. The block starts at the page's padding, as every page's content
-    // does (level with the search field), whether the side panel is open or not; the column
-    // takes the rest, up to `col-max`, so the switches stay near their labels.
+    // At wide windows a section index sits left of the column, when the column keeps
+    // `beside-min` beside it: what the Discord group needs for its two columns, so the index
+    // coming in doesn't send the Discord card back above its options. The block starts at the
+    // page's padding, as every page's content does (level with the search field), whether the
+    // side panel is open or not; the column takes the rest, up to `col-max`, so the switches
+    // stay near their labels.
     property <length> index-w: 184px;
     property <length> index-gap: Theme.s7;
-    property <bool> indexed: self.width >= 2 * Theme.page-pad + root.index-w + root.index-gap + 760px;
+    property <bool> indexed: self.width >= 2 * Theme.page-pad + root.index-w + root.index-gap + root.beside-min;
     property <length> index-room: root.indexed ? root.index-w + root.index-gap : 0px;
     property <length> col-w: min(self.width - 2 * Theme.page-pad - root.index-room, root.col-max);
     property <length> block-x: Theme.page-pad;
     property <length> col-x: root.block-x + root.index-room;
     // The Discord profile card sits beside the Discord options when the Discord panel can
-    // hold both: the options at `options-min` or more, the gap, the card. The panel then
-    // reaches past the column on the right, by the card and its gap at most, as far as the
-    // page's padding. Otherwise the card sits above the options.
+    // hold both: the options at `options-min` or more, the gap, the card at `card-min` or
+    // more. Otherwise the card sits above the options. Where the card and its gap fit whole
+    // right of the column, before the page's padding, the panel reaches past the column by
+    // them, so the options keep the column's width and their switches line up with the other
+    // groups'; with less room there, the panel keeps the column's edge rather than jutting
+    // past it by a sliver, and the options and the card share it. Beside them the card is
+    // `card-w` wide, its own measure, where that leaves the options `options-ease`, enough
+    // for a row's line beside its controls; in less room the card gives way first, down to
+    // `card-min` (as wide as Discord draws its own), and then the options do.
     property <length> card-w: 400px;
-    property <length> card-gap: Theme.s7;
-    property <length> options-min: 520px;
-    property <length> wide-panel: min(self.width - Theme.page-pad - root.col-x, root.col-w + root.card-gap + root.card-w);
-    property <bool> card-beside: root.wide-panel - 2 * Rows.inset >= root.options-min + root.card-gap + root.card-w;
-    // Where the Discord rows start in the scrolled content, and how far the card stays below
-    // the page's top while the options scroll past it (its caption level with the section
-    // index's first entry).
+    property <length> card-min: 340px;
+    property <length> card-gap: Theme.s6;
+    property <length> options-min: 400px;
+    property <length> options-ease: 480px;
+    property <length> beside-min: 2 * Rows.inset + root.options-min + root.card-gap + root.card-min;
+    property <length> margin-room: self.width - Theme.page-pad - root.col-x - root.col-w;
+    property <length> wide-panel: root.col-w + (root.margin-room >= root.card-gap + root.card-w ? root.card-gap + root.card-w : 0px);
+    property <bool> card-beside: root.wide-panel >= root.beside-min;
+    property <length> beside-card-w: max(root.card-min, min(root.card-w, root.wide-panel - 2 * Rows.inset - root.card-gap - root.options-ease));
+    // Where the Discord rows start in the scrolled content, and how much of the page shows
+    // above the player bar and the fade over its top (`bar-fade` in app.slint).
     property <length> discord-top: col.y + discord-section.y + Rows.title-h + Theme.s3 + Rows.pad-top;
-    property <length> card-stick: Theme.page-top - Rows.pad-y;
+    property <length> view-h: flick.height - Theme.bar-clear - Theme.s5;
     property <bool> confirm-sign-out: false;
     // How many of the sections below the fold (Discord, Window, Account) are made: one
     // more each tick after the page's first frame, not all with it. Making and laying out
@@ -2344,7 +2362,7 @@ export component SettingsPage inherits Rectangle {
                 // the room kept for it there. One card either way, placed over the layout.
                 if root.made >= 1: block := Rectangle {
                     property <length> inner-w: root.col-w - 2 * Rows.inset;
-                    property <length> card-w: root.card-beside ? root.card-w : min(root.card-w, block.inner-w);
+                    property <length> card-w: root.card-beside ? root.beside-card-w : min(root.card-w, block.inner-w);
                     // Above the options, the caption and the note go left of the card while
                     // they keep a column of their own, so the card doesn't hang off the left
                     // of an empty panel.
@@ -2487,19 +2505,26 @@ export component SettingsPage inherits Rectangle {
                             }
                         }
                         lane := Rectangle {
-                            width: root.card-beside ? root.card-w : 0px;
+                            width: root.card-beside ? block.card-w : 0px;
                             min-height: root.card-beside ? block.pane-h : 0px;
                         }
                     }
-                    // Beside the options, the card keeps in view while they scroll past it,
-                    // within their rows.
+                    // Beside the options, the pane keeps in view while they scroll past it,
+                    // within their rows. It stops with its caption level with the section
+                    // index's first entry, `page-top` below the page's top; in a window too
+                    // short to show the card whole from there, where the card's end meets
+                    // the page's, so the activity the options change stays in view and the
+                    // banner is what goes under the top bar. Its place comes straight from
+                    // the scroll position: nothing eases after it.
+                    property <length> stick: min(Theme.page-top, root.view-h - pane.card-end) - Rows.pad-y;
                     pane := DiscordPane {
                         x: root.card-beside ? lane.x : 0px;
-                        y: Rows.pad-y + (root.card-beside ? max(0px, min(root.scrolled + root.card-stick - root.discord-top, discord-rows.height - block.pane-h)) : 0px);
+                        y: Rows.pad-y + (root.card-beside ? max(0px, min(root.scrolled + block.stick - root.discord-top, discord-rows.height - block.pane-h)) : 0px);
                         width: block.pane-w;
                         height: self.preferred-height;
                         card-w: block.card-w;
                         text-beside: block.text-beside;
+                        beside: root.card-beside;
                     }
                 }
             }

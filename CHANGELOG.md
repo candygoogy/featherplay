@@ -6,6 +6,14 @@ Notable changes to featherplay, newest first. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- Settings > Discord: the profile preview now sits beside the options from the window's
+  default size up, and stays in view while you scroll through them, so hovering Time or
+  Status text lights what it changes on the card. In a window too short for the whole
+  card, its lower part (the activity) is what stays on screen. In a narrow window the
+  preview is above the options, as before, and its note says it changes with them.
+
 ### Fixed
 
 - The mixes on Home ("Discover Mix", "My Supermix", "Archive Mix" and the like) open and

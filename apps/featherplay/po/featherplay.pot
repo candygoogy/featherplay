@@ -1715,14 +1715,24 @@ msgstr ""
 msgid "Preview · Not connected to Discord"
 msgstr ""
 
-#: ui/pages/settings.slint:1011
+#: ui/pages/settings.slint:1028
 msgid ""
 "Nothing is playing, so a sample song stands in. Hover an option to see what "
 "it changes."
 msgstr ""
 
-#: ui/pages/settings.slint:1012
+#: ui/pages/settings.slint:1029
+msgid ""
+"Nothing is playing, so a sample song stands in. The preview changes with the "
+"options below."
+msgstr ""
+
+#: ui/pages/settings.slint:1030
 msgid "Hover an option to see what it changes."
+msgstr ""
+
+#: ui/pages/settings.slint:1031
+msgid "The preview changes with the options below."
 msgstr ""
 
 #: ui/pages/settings.slint:1257
