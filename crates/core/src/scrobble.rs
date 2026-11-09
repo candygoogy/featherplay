@@ -1,6 +1,8 @@
 //! Scrobble rules: when a track counts as played, which tracks count,
 //! and the title cleanup sent to Last.fm. No I/O.
 
+use std::borrow::Cow;
+use std::ops::Range;
 use std::time::{Duration, SystemTime};
 
 use crate::model::{Track, VideoType};
@@ -10,15 +12,9 @@ const MIN_DURATION: Duration = Duration::from_secs(30);
 /// A track is scrobbled after half its duration or this much play time, whichever is less.
 const MAX_THRESHOLD: Duration = Duration::from_secs(240);
 
-/// Trailing video-title suffixes stripped for music and user videos, matched case-insensitively.
-const TITLE_SUFFIXES: [&str; 6] = [
-    " (Official Video)",
-    " (Official Music Video)",
-    " (Official Audio)",
-    " (Lyrics)",
-    " [Official Video]",
-    " (Visualizer)",
-];
+/// What a scrobbled video title loses at its end on top of its `display_title` tags,
+/// matched case-insensitively. On screen it stays.
+const LYRICS_SUFFIX: &str = " (Lyrics)";
 
 /// The play time after which a track of `duration` is scrobbled:
 /// `None` if it is 30 s or shorter, else `min(duration / 2, 240 s)`.
@@ -26,30 +22,157 @@ pub fn threshold(duration: Duration) -> Option<Duration> {
     (duration > MIN_DURATION).then(|| (duration / 2).min(MAX_THRESHOLD))
 }
 
-/// The title sent to Last.fm. For music and user videos, trailing suffixes
-/// such as " (Official Video)" are removed; other titles are returned unchanged.
-pub fn clean_title(title: &str, t: VideoType) -> String {
-    if !matches!(t, VideoType::MusicVideo | VideoType::UserVideo) {
-        return title.to_string();
+/// Bracketed tags in video titles that name the video, not the music, matched whole and
+/// case-insensitively. Version tags such as "(Live)" or "(Lyrics)" aren't among them.
+const VIDEO_TAGS: [&str; 13] = [
+    "official music video",
+    "official video",
+    "official audio",
+    "official lyric video",
+    "official lyrics video",
+    "official visualizer",
+    "official visualiser",
+    "visualizer",
+    "visualiser",
+    "official hd video",
+    "official 4k video",
+    "music video",
+    "lyric video",
+];
+
+/// How a title credits a guest artist, lowercase.
+const FEAT: [&str; 2] = ["feat. ", "ft. "];
+
+/// The title shown for a track: for music and user videos, YouTube's video title without
+/// the bracketed video tags ("(Official Music Video)", "[Official Video]"…) and without a
+/// "(feat. X)" whose X is already credited as "ft. X" or "feat. X". Other titles, titles
+/// with nothing to remove and titles that would be left empty are returned as they are.
+pub fn display_title(title: &str, t: VideoType) -> Cow<'_, str> {
+    if !is_video(t) || !title.contains(['(', '[']) {
+        return Cow::Borrowed(title);
     }
-    let mut rest = title.trim_end();
-    while let Some(stripped) = strip_one_suffix(rest) {
+    // Lowercased in ASCII only, so its byte offsets are the title's.
+    let lower = title.to_ascii_lowercase();
+    let mut dropped: Vec<Range<usize>> = Vec::new();
+    for g in bracket_groups(&lower) {
+        let inner = lower[g.start + 1..g.end - 1].trim();
+        if VIDEO_TAGS.contains(&inner)
+            || guest(inner).is_some_and(|x| credited_elsewhere(&lower, x, &g, &dropped))
+        {
+            dropped.push(g);
+        }
+    }
+    if dropped.is_empty() {
+        return Cow::Borrowed(title);
+    }
+    // What's left between the cuts, joined by one space, or none inside a bracket.
+    let starts = std::iter::once(0).chain(dropped.iter().map(|g| g.end));
+    let ends = dropped.iter().map(|g| g.start).chain([title.len()]);
+    let mut kept = String::with_capacity(title.len());
+    for piece in starts.zip(ends).map(|(s, e)| title[s..e].trim()) {
+        if piece.is_empty() {
+            continue;
+        }
+        let tight = kept.ends_with(['(', '[']) || piece.starts_with([')', ']']);
+        if !kept.is_empty() && !tight {
+            kept.push(' ');
+        }
+        kept.push_str(piece);
+    }
+    if kept.is_empty() {
+        Cow::Borrowed(title)
+    } else {
+        Cow::Owned(kept)
+    }
+}
+
+/// The byte ranges of "(…)" and "[…]" groups, brackets included, in order. A group closes
+/// with its own bracket; one interrupted by another bracket isn't a group.
+fn bracket_groups(s: &str) -> Vec<Range<usize>> {
+    let bytes = s.as_bytes();
+    let mut groups = Vec::new();
+    let mut i = 0;
+    while i < bytes.len() {
+        let close = match bytes[i] {
+            b'(' => b')',
+            b'[' => b']',
+            _ => {
+                i += 1;
+                continue;
+            }
+        };
+        let Some(off) = bytes[i + 1..]
+            .iter()
+            .position(|b| matches!(b, b'(' | b')' | b'[' | b']'))
+        else {
+            break;
+        };
+        let j = i + 1 + off;
+        if bytes[j] == close {
+            groups.push(i..j + 1);
+            i = j + 1;
+        } else {
+            i = j;
+        }
+    }
+    groups
+}
+
+/// The guest a "(feat. x)" group credits: "x". YouTube Music adds such a group to
+/// video titles that may already say "ft. x".
+fn guest(inner: &str) -> Option<&str> {
+    inner
+        .strip_prefix("feat. ")
+        .map(str::trim)
+        .filter(|x| !x.is_empty())
+}
+
+/// `x` is credited as "ft. x" or "feat. x", as whole words, somewhere in `lower` outside
+/// the group `own` and the groups already dropped.
+fn credited_elsewhere(lower: &str, x: &str, own: &Range<usize>, dropped: &[Range<usize>]) -> bool {
+    let word = |c: Option<char>| c.is_some_and(char::is_alphanumeric);
+    FEAT.iter().any(|f| {
+        let credit = format!("{f}{x}");
+        lower.match_indices(&credit).any(|(at, _)| {
+            // Both ends are char boundaries: the match starts with ASCII and ends with `x`.
+            let end = at + credit.len();
+            let outside = |r: &Range<usize>| !r.contains(&at);
+            outside(own)
+                && dropped.iter().all(outside)
+                && !word(lower[..at].chars().next_back())
+                && !word(lower[end..].chars().next())
+        })
+    })
+}
+
+/// The title sent to Last.fm. For music and user videos, the `display_title` without a
+/// trailing " (Lyrics)"; other titles are returned unchanged.
+pub fn clean_title(title: &str, t: VideoType) -> String {
+    let shown = display_title(title, t);
+    if !is_video(t) {
+        return shown.into_owned();
+    }
+    let mut rest = shown.trim_end();
+    while let Some(stripped) = strip_lyrics(rest) {
         rest = stripped;
     }
     rest.to_string()
 }
 
-fn strip_one_suffix(title: &str) -> Option<&str> {
-    TITLE_SUFFIXES.iter().find_map(|suffix| {
-        let cut = title.len().checked_sub(suffix.len())?;
-        // The suffixes are ASCII, so a byte match also means `cut` is a char boundary.
-        if !title.as_bytes()[cut..].eq_ignore_ascii_case(suffix.as_bytes()) {
-            return None;
-        }
-        // Never reduce a title to nothing.
-        let stripped = title[..cut].trim_end();
-        (!stripped.is_empty()).then_some(stripped)
-    })
+fn strip_lyrics(title: &str) -> Option<&str> {
+    let cut = title.len().checked_sub(LYRICS_SUFFIX.len())?;
+    // The suffix is ASCII, so a byte match also means `cut` is a char boundary.
+    if !title.as_bytes()[cut..].eq_ignore_ascii_case(LYRICS_SUFFIX.as_bytes()) {
+        return None;
+    }
+    // Never reduce a title to nothing.
+    let stripped = title[..cut].trim_end();
+    (!stripped.is_empty()).then_some(stripped)
+}
+
+/// Music and user videos: the tracks whose titles are YouTube's video titles.
+fn is_video(t: VideoType) -> bool {
+    matches!(t, VideoType::MusicVideo | VideoType::UserVideo)
 }
 
 /// The video's own metadata, as YouTube has it beside YouTube Music's: Pear's

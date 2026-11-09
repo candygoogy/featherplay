@@ -1,5 +1,6 @@
 //! Track and session types shared by every crate.
 
+use std::borrow::Cow;
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
@@ -104,6 +105,12 @@ impl Track {
         };
         video.counterpart = Some(Box::new(self));
         *video
+    }
+
+    /// The title as it's shown and scrobbled: a video's without its video tags
+    /// (`scrobble::display_title`). `title` stays as YouTube Music has it, for lookups.
+    pub fn display_title(&self) -> Cow<'_, str> {
+        crate::scrobble::display_title(&self.title, self.video_type)
     }
 
     /// The ids this entry stands for: its own, and its counterpart's.

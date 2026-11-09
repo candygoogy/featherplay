@@ -1,7 +1,9 @@
 use std::time::{Duration, SystemTime};
 
 use featherplay_core::model::{LikeStatus, Track, TrackId, VideoType};
-use featherplay_core::scrobble::{ScrobbleTracker, clean_title, eligible, threshold};
+use featherplay_core::scrobble::{
+    ScrobbleTracker, clean_title, display_title, eligible, threshold,
+};
 
 fn track(secs: u64) -> Track {
     Track {
@@ -49,6 +51,105 @@ fn clean_title_strips_only_videos() {
         "Song (Official Video)"
     );
     assert_eq!(clean_title("Song (LYRICS)", VideoType::MusicVideo), "Song");
+}
+
+#[test]
+fn display_title_shortens_only_video_titles() {
+    use VideoType::{Episode, MusicVideo, Song, UserVideo};
+    let cases = [
+        // The video tags removed, in either bracket, anywhere, in any case.
+        ("Song (Official Music Video)", MusicVideo, "Song"),
+        ("Song (Official Video)", MusicVideo, "Song"),
+        ("Song (Official Audio)", MusicVideo, "Song"),
+        ("Song (Official Lyric Video)", MusicVideo, "Song"),
+        ("Song (Official Lyrics Video)", MusicVideo, "Song"),
+        ("Song (Official Visualizer)", MusicVideo, "Song"),
+        ("Song (Official Visualiser)", MusicVideo, "Song"),
+        ("Song (Visualizer)", MusicVideo, "Song"),
+        ("Song (Visualiser)", MusicVideo, "Song"),
+        ("Song (Official HD Video)", MusicVideo, "Song"),
+        ("Song (Official 4K Video)", MusicVideo, "Song"),
+        ("Song (Music Video)", MusicVideo, "Song"),
+        ("Song (Lyric Video)", MusicVideo, "Song"),
+        ("Song [Official Music Video]", MusicVideo, "Song"),
+        ("Song [Official Video]", MusicVideo, "Song"),
+        ("Song [official audio]", MusicVideo, "Song"),
+        ("Song [Visualizer]", MusicVideo, "Song"),
+        ("Song (OFFICIAL VIDEO)", MusicVideo, "Song"),
+        ("Song ( Official Video )", MusicVideo, "Song"),
+        ("Song (Official Video) (Live)", MusicVideo, "Song (Live)"),
+        ("Song(Official Video)", MusicVideo, "Song"),
+        // Only the spaces where a tag was cut are tidied.
+        (
+            "夜に駆ける\u{3000}2 (Official Video)",
+            MusicVideo,
+            "夜に駆ける\u{3000}2",
+        ),
+        ("A  B (Official Video)", MusicVideo, "A  B"),
+        ("Song (Live [Official Video])", MusicVideo, "Song (Live)"),
+        ("[Official Video] Song", MusicVideo, "Song"),
+        ("Song [Official Video]", UserVideo, "Song"),
+        // A "(feat. X)" goes only when X is already credited as "ft. X" or "feat. X".
+        (
+            "Mirror ft. Bruno Mars (Official Music Video) (feat. Bruno Mars)",
+            MusicVideo,
+            "Mirror ft. Bruno Mars",
+        ),
+        (
+            "Song feat. B (Official Video) [feat. B]",
+            MusicVideo,
+            "Song feat. B",
+        ),
+        ("Song (ft. B) (Feat. B)", MusicVideo, "Song (ft. B)"),
+        ("Song (feat. B) (feat. B)", MusicVideo, "Song (feat. B)"),
+        (
+            "Song ft. A (feat. A & B)",
+            MusicVideo,
+            "Song ft. A (feat. A & B)",
+        ),
+        ("Song ft. Bo (feat. B)", MusicVideo, "Song ft. Bo (feat. B)"),
+        (
+            "Song ft. Björk (feat. Bj)",
+            MusicVideo,
+            "Song ft. Björk (feat. Bj)",
+        ),
+        (
+            "Song (feat. B) (Official Video)",
+            MusicVideo,
+            "Song (feat. B)",
+        ),
+        // Version tags are the music's: kept.
+        ("Song (Lyrics)", MusicVideo, "Song (Lyrics)"),
+        ("Song (Live)", MusicVideo, "Song (Live)"),
+        ("Song (Acoustic)", MusicVideo, "Song (Acoustic)"),
+        ("Song (Remix)", MusicVideo, "Song (Remix)"),
+        ("Song (Extended Mix)", MusicVideo, "Song (Extended Mix)"),
+        (
+            "Song (Official Video Edit)",
+            MusicVideo,
+            "Song (Official Video Edit)",
+        ),
+        ("Song - Official Video", MusicVideo, "Song - Official Video"),
+        // Untouched: songs and other media, titles without tags, and a title that's all tag.
+        ("Song (Official Video)", Song, "Song (Official Video)"),
+        ("Song (Official Video)", Episode, "Song (Official Video)"),
+        ("Song  (Live)", MusicVideo, "Song  (Live)"),
+        ("(Official Video)", MusicVideo, "(Official Video)"),
+        (
+            "(Official Video) [Official Audio]",
+            MusicVideo,
+            "(Official Video) [Official Audio]",
+        ),
+        ("Song (Official Video]", MusicVideo, "Song (Official Video]"),
+        (
+            "夜に駆ける (Official Music Video)",
+            MusicVideo,
+            "夜に駆ける",
+        ),
+    ];
+    for (raw, t, want) in cases {
+        assert_eq!(display_title(raw, t), want, "{raw:?} as {t:?}");
+    }
 }
 
 #[test]
@@ -177,5 +278,31 @@ mod alternates {
         let f = scrobble_fields(&mv, &alt, opts(true, true)).unwrap();
         assert_eq!(f.track, "Get Lucky");
         assert_eq!(f.artist, "YOASOBI");
+    }
+
+    #[test]
+    fn a_music_video_scrobbles_its_short_title() {
+        let mv = Track {
+            title: "Mirror ft. Bruno Mars (Official Music Video) (feat. Bruno Mars)".into(),
+            video_type: VideoType::MusicVideo,
+            ..song()
+        };
+        let f = scrobble_fields(&mv, &Alternates::default(), opts(false, false)).unwrap();
+        assert_eq!(f.track, "Mirror ft. Bruno Mars");
+        // As before, a trailing "(Lyrics)" is cut from what a video scrobbles, not a song's.
+        let lyrics = |video_type| Track {
+            title: "Song (Lyrics)".into(),
+            video_type,
+            ..song()
+        };
+        let scrobbled = |t: &Track| scrobble_fields(t, &Alternates::default(), opts(false, false));
+        assert_eq!(
+            scrobbled(&lyrics(VideoType::MusicVideo)).unwrap().track,
+            "Song"
+        );
+        assert_eq!(
+            scrobbled(&lyrics(VideoType::Song)).unwrap().track,
+            "Song (Lyrics)"
+        );
     }
 }
