@@ -514,16 +514,16 @@ https://datatracker.ietf.org/ipr/1526/
 | euclid | 0.22.14 | MIT OR Apache-2.0 |
 | fastrand | 2.5.0 | Apache-2.0 OR MIT |
 | fdeflate | 0.3.7 | MIT OR Apache-2.0 |
-| featherplay | 0.1.2 | MIT |
-| featherplay-audio | 0.1.2 | MIT |
-| featherplay-core | 0.1.2 | MIT |
-| featherplay-integrations | 0.1.2 | MIT |
-| featherplay-lastfm | 0.1.2 | MIT |
-| featherplay-listenbrainz | 0.1.2 | MIT |
-| featherplay-lyrics | 0.1.2 | MIT |
-| featherplay-store | 0.1.2 | MIT |
-| featherplay-streams | 0.1.2 | MIT |
-| featherplay-ytm | 0.1.2 | MIT |
+| featherplay | 0.2.0 | MIT |
+| featherplay-audio | 0.2.0 | MIT |
+| featherplay-core | 0.2.0 | MIT |
+| featherplay-integrations | 0.2.0 | MIT |
+| featherplay-lastfm | 0.2.0 | MIT |
+| featherplay-listenbrainz | 0.2.0 | MIT |
+| featherplay-lyrics | 0.2.0 | MIT |
+| featherplay-store | 0.2.0 | MIT |
+| featherplay-streams | 0.2.0 | MIT |
+| featherplay-ytm | 0.2.0 | MIT |
 | field-offset | 0.3.6 | MIT OR Apache-2.0 |
 | fixed_decimal | 0.7.3 | Unicode-3.0 |
 | flate2 | 1.1.10 | MIT OR Apache-2.0 |
@@ -5172,7 +5172,7 @@ SOFTWARE.
 
 ### MIT License
 
-Used by: featherplay 0.1.2, featherplay-audio 0.1.2, featherplay-core 0.1.2, featherplay-integrations 0.1.2, featherplay-lastfm 0.1.2, featherplay-listenbrainz 0.1.2, featherplay-lyrics 0.1.2, featherplay-store 0.1.2, featherplay-streams 0.1.2, featherplay-ytm 0.1.2, opus-decoder 0.1.1, chrono 0.4.45, dasp_sample 0.11.0, dpi 0.1.2, json-crawler 0.1.0, libm 0.2.16, lyon_algorithms 1.0.22, lyon_extra 1.1.0, lyon_geom 1.0.20, lyon_path 1.0.19, minisign-verify 0.3.0, skia-bindings 0.153.3, skia-safe 0.153.3, taffy 0.10.1, tauri-winrt-notification 0.8.1, webview2-com-macros 0.8.1, webview2-com-sys 0.39.1, webview2-com 0.39.1, windows-collections 0.3.2, windows-core 0.62.2, windows-future 0.3.2, windows-implement 0.60.2, windows-interface 0.59.3, windows-link 0.2.1, windows-numerics 0.3.1, windows-result 0.4.1, windows-strings 0.5.1, windows-sys 0.52.0, windows-sys 0.59.0, windows-sys 0.61.2, windows-targets 0.42.2, windows-targets 0.52.6, windows-threading 0.2.1, windows-version 0.1.7, windows 0.44.0, windows 0.62.2, windows_aarch64_msvc 0.42.2, windows_aarch64_msvc 0.52.6, windows_x86_64_msvc 0.42.2, windows_x86_64_msvc 0.52.6, ytmapi-rs 0.3.3
+Used by: featherplay 0.2.0, featherplay-audio 0.2.0, featherplay-core 0.2.0, featherplay-integrations 0.2.0, featherplay-lastfm 0.2.0, featherplay-listenbrainz 0.2.0, featherplay-lyrics 0.2.0, featherplay-store 0.2.0, featherplay-streams 0.2.0, featherplay-ytm 0.2.0, opus-decoder 0.1.1, chrono 0.4.45, dasp_sample 0.11.0, dpi 0.1.2, json-crawler 0.1.0, libm 0.2.16, lyon_algorithms 1.0.22, lyon_extra 1.1.0, lyon_geom 1.0.20, lyon_path 1.0.19, minisign-verify 0.3.0, skia-bindings 0.153.3, skia-safe 0.153.3, taffy 0.10.1, tauri-winrt-notification 0.8.1, webview2-com-macros 0.8.1, webview2-com-sys 0.39.1, webview2-com 0.39.1, windows-collections 0.3.2, windows-core 0.62.2, windows-future 0.3.2, windows-implement 0.60.2, windows-interface 0.59.3, windows-link 0.2.1, windows-numerics 0.3.1, windows-result 0.4.1, windows-strings 0.5.1, windows-sys 0.52.0, windows-sys 0.59.0, windows-sys 0.61.2, windows-targets 0.42.2, windows-targets 0.52.6, windows-threading 0.2.1, windows-version 0.1.7, windows 0.44.0, windows 0.62.2, windows_aarch64_msvc 0.42.2, windows_aarch64_msvc 0.52.6, windows_x86_64_msvc 0.42.2, windows_x86_64_msvc 0.52.6, ytmapi-rs 0.3.3
 
 ```
 MIT License

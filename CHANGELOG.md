@@ -6,6 +6,8 @@ Notable changes to featherplay, newest first. The format follows
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-09
+
 ### Added
 
 - **Check for updates** in Settings > About, beside the version, with when it last checked
@@ -72,7 +74,9 @@ Notable changes to featherplay, newest first. The format follows
   10 seconds, so it's no longer missed; a failed check tries again an hour later, not the
   next day.
 - A toast's button does what it says. "Restart to update", "Undo", "View", "Sign in" and
-  "Get it" closed the toast and did nothing; Settings > About's update button worked.
+  "Get it" closed the toast and did nothing; Settings > About's update button worked. On
+  0.1.2 the toast's "Restart to update" still does nothing, so update to 0.2.0 from Settings >
+  About.
 
 ### Security
 
@@ -259,7 +263,8 @@ as a per-user installer or a portable exe.
 - A Language setting. featherplay ships in English and is ready for translations
   (CONTRIBUTING.md says how to add one).
 
-[Unreleased]: https://github.com/candygoogy/featherplay/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/candygoogy/featherplay/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/candygoogy/featherplay/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/candygoogy/featherplay/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/candygoogy/featherplay/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/candygoogy/featherplay/releases/tag/v0.1.0
