@@ -51,6 +51,16 @@ pub fn find(id: &str) -> Option<Track> {
     KNOWN.with(|k| k.borrow().get(id).cloned())
 }
 
+/// A rating made here, for the remembered track: its rows and the pages shown again from
+/// what they showed (`pages::ahead`) read it.
+pub fn remember_rating(id: &TrackId, status: LikeStatus) {
+    KNOWN.with(|k| {
+        if let Some(t) = k.borrow_mut().get_mut(&id.0) {
+            t.like = status;
+        }
+    });
+}
+
 /// A remembered track's rating, with the likes made since it was loaded.
 pub fn like_of(id: &TrackId) -> Option<LikeStatus> {
     KNOWN.with(|k| k.borrow().get(&id.0).map(|t| t.like))
@@ -121,6 +131,7 @@ pub fn init(ctx: &Rc<Ctx>) {
                 .map(|p| p.title.to_string())
         });
         let id = PlaylistId(playlist.to_string());
+        crate::pages::ahead::forget_playlist(&id);
         c.send(Action::AddToPlaylist {
             playlist: id.clone(),
             tracks: vec![TrackId(track.into())],
@@ -164,11 +175,7 @@ pub fn rate(ctx: &Ctx, id: &TrackId, status: LikeStatus) {
 /// and the remembered track. `rate` sends the write first; the album menu's job, after its
 /// own write went through.
 pub fn show_rating(ctx: &Ctx, id: &TrackId, status: LikeStatus) {
-    KNOWN.with(|k| {
-        if let Some(t) = k.borrow_mut().get_mut(&id.0) {
-            t.like = status;
-        }
-    });
+    remember_rating(id, status);
     let Some(ui) = ctx.window() else { return };
     let liked = status == LikeStatus::Like;
     let models: [ModelRc<TrackRow>; 6] = [

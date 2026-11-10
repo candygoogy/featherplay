@@ -11,14 +11,19 @@
 //!   account drops everything kept.
 //! - What's still in flight when another page opens is dropped: its card is gone.
 //!
+//! The pages shown are kept too (`showing`): Back or Forward to one within `RECENT` shows it
+//! as it was left, with no request, and with the likes made since. A playlist is kept once
+//! it was read to its end, and dropped when it's changed here (`forget_playlist`).
+//!
 //! Nothing runs here but on a rest of the pointer: no timer, nothing while paused or idle.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::future::Future;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
-use featherplay_core::model::{AlbumId, ArtistId, PlaylistId};
+use featherplay_core::model::{AlbumId, ArtistId, PlaylistId, Track};
+use featherplay_ytm::convert::bare_playlist_id;
 use featherplay_ytm::{Album, ApiError, Artist, Playlist, PlaylistRest};
 use slint::ComponentHandle;
 use tokio::task::JoinHandle;
@@ -28,6 +33,7 @@ use crate::catalog::Source;
 use crate::memory;
 use crate::pages::playlist;
 use crate::router::Page;
+use crate::song_menu;
 use crate::ui::{ItemKind, PageHover};
 
 /// How long an answer read ahead is used.
@@ -36,6 +42,10 @@ const KEEP: Duration = Duration::from_secs(60);
 const KEPT: usize = 4;
 /// How many requests are in flight at once.
 const IN_FLIGHT: usize = 2;
+/// How long a page left behind shows again as it was, on Back or Forward.
+const RECENT: Duration = Duration::from_secs(5 * 60);
+/// How many pages left behind are kept.
+const RECENT_KEPT: usize = 6;
 
 /// A request read ahead: in flight, or its answer in.
 pub type Ahead = JoinHandle<Answer>;
@@ -72,6 +82,34 @@ impl Answer {
             _ => None,
         }
     }
+
+    /// A copy to show again, with the likes made since: a good answer, a playlist only as
+    /// a whole list.
+    fn again(&self) -> Option<Answer> {
+        let mut again = match self {
+            Answer::Album(Ok(a)) => Answer::Album(Ok(a.clone())),
+            Answer::Artist(Ok(a)) => Answer::Artist(Ok(a.clone())),
+            Answer::Playlist(Ok((p, None))) => Answer::Playlist(Ok((p.clone(), None))),
+            _ => return None,
+        };
+        let tracks = match &mut again {
+            Answer::Album(Ok(a)) => &mut a.tracks,
+            Answer::Artist(Ok(a)) => &mut a.top_songs,
+            Answer::Playlist(Ok((p, _))) => &mut p.tracks,
+            _ => return None,
+        };
+        with_likes(tracks);
+        Some(again)
+    }
+}
+
+/// The ratings made since `tracks` were read, as the song menu remembers them.
+fn with_likes(tracks: &mut [Track]) {
+    for t in tracks {
+        if let Some(like) = song_menu::like_of(&t.id) {
+            t.like = like;
+        }
+    }
 }
 
 /// The page a card opens.
@@ -104,6 +142,18 @@ impl Key {
             Key::Album(id) => Page::Album { id: id.clone() },
             Key::Artist(id) => Page::Artist { id: id.clone() },
             Key::Playlist(id) => Page::Playlist { id: id.clone() },
+        }
+    }
+
+    /// The key of `page`, if it's one kept.
+    fn of_page(page: &Page) -> Option<Key> {
+        match page {
+            Page::Album { id } => Some(Key::Album(id.clone())),
+            Page::Artist { id } => Some(Key::Artist(id.clone())),
+            Page::Playlist { id } if !playlist::is_liked_songs(id) => {
+                Some(Key::Playlist(id.clone()))
+            }
+            _ => None,
         }
     }
 
@@ -227,8 +277,49 @@ impl<R: Request> Kept<R> {
     }
 }
 
+/// The pages shown, newest last: what each showed, and when.
+#[derive(Default)]
+struct Shown {
+    pages: Vec<(Key, Instant, Answer)>,
+}
+
+impl Shown {
+    fn expire(&mut self, now: Instant) {
+        self.pages
+            .retain(|(_, at, _)| now.saturating_duration_since(*at) < RECENT);
+    }
+
+    /// Keeps `answer` for `key`'s page, shown at `now`. A page shown again keeps the time
+    /// it was first kept, so going back and forth doesn't keep it for good.
+    fn insert(&mut self, key: Key, answer: Answer, now: Instant) {
+        self.expire(now);
+        let mut since = now;
+        self.pages.retain(|(k, at, _)| {
+            if *k == key {
+                since = *at;
+            }
+            *k != key
+        });
+        if self.pages.len() >= RECENT_KEPT {
+            self.pages.remove(0);
+        }
+        self.pages.push((key, since, answer));
+    }
+
+    /// What `key`'s page showed, to show again.
+    fn again(&mut self, key: &Key, now: Instant) -> Option<Answer> {
+        self.expire(now);
+        self.pages
+            .iter()
+            .find(|(k, ..)| k == key)
+            .and_then(|(.., answer)| answer.again())
+    }
+}
+
 thread_local! {
     static KEPT_AHEAD: RefCell<Kept<Ahead>> = const { RefCell::new(Kept::new()) };
+    static SHOWN: RefCell<Shown> = RefCell::default();
+    static CHANGES: Cell<u64> = const { Cell::new(0) };
 }
 
 /// Once at startup: connect `PageHover`.
@@ -258,23 +349,62 @@ fn rested(ctx: &Rc<Ctx>, kind: ItemKind, id: &str) {
     KEPT_AHEAD.with(|k| k.borrow_mut().insert(key, request, now));
 }
 
-fn take(key: Key) -> Option<Ahead> {
-    KEPT_AHEAD.with(|k| k.borrow_mut().take(&key, Instant::now()))
+/// The request read ahead for `key`, or on Back or Forward what its page showed when it
+/// was left (as an answer already in).
+fn take(ctx: &Ctx, key: Key) -> Option<Ahead> {
+    let now = Instant::now();
+    // Back or Forward: what the page showed, rather than a read ahead still on its way.
+    if ctx.revisiting()
+        && let Some(answer) = SHOWN.with(|s| s.borrow_mut().again(&key, now))
+    {
+        log!("{}: as it was left", key.what());
+        return Some(ctx.catalog.runtime().spawn(async move { answer }));
+    }
+    KEPT_AHEAD.with(|k| k.borrow_mut().take(&key, now))
 }
 
 /// The album read ahead, if it is: for `or_fetch` with `Answer::album`.
-pub fn album(id: &AlbumId) -> Option<Ahead> {
-    take(Key::Album(id.clone()))
+pub fn album(ctx: &Ctx, id: &AlbumId) -> Option<Ahead> {
+    take(ctx, Key::Album(id.clone()))
 }
 
 /// The artist read ahead, if it is: for `or_fetch` with `Answer::artist`.
-pub fn artist(id: &ArtistId) -> Option<Ahead> {
-    take(Key::Artist(id.clone()))
+pub fn artist(ctx: &Ctx, id: &ArtistId) -> Option<Ahead> {
+    take(ctx, Key::Artist(id.clone()))
 }
 
 /// The playlist's first page read ahead, if it is: for `or_fetch` with `Answer::playlist`.
-pub fn playlist(id: &PlaylistId) -> Option<Ahead> {
-    take(Key::Playlist(id.clone()))
+pub fn playlist(ctx: &Ctx, id: &PlaylistId) -> Option<Ahead> {
+    take(ctx, Key::Playlist(id.clone()))
+}
+
+/// How many times a playlist was changed here (`forget_playlist`), for `showing`.
+pub fn changes() -> u64 {
+    CHANGES.with(Cell::get)
+}
+
+/// `page` shows `answer`, a good one (a playlist whole, without a rest), asked for when
+/// `changes` said `asked`: Back or Forward to it within `RECENT` shows it again as it is
+/// now, unless a playlist was changed here since it was asked for.
+pub fn showing(page: &Page, answer: Answer, asked: u64) {
+    if asked != changes() {
+        return;
+    }
+    if let Some(key) = Key::of_page(page) {
+        SHOWN.with(|s| s.borrow_mut().insert(key, answer, Instant::now()));
+    }
+}
+
+/// Playlist `id` changed here (songs added, renamed, deleted): it's read again next time.
+pub fn forget_playlist(id: &PlaylistId) {
+    CHANGES.with(|c| c.set(c.get() + 1));
+    let bare = |id: &PlaylistId| bare_playlist_id(&id.0).to_string();
+    let gone = bare(id);
+    SHOWN.with(|s| {
+        s.borrow_mut()
+            .pages
+            .retain(|(k, ..)| !matches!(k, Key::Playlist(p) if bare(p) == gone));
+    });
 }
 
 /// The answer read `ahead` (as `pick` takes it out), or else `fetch`'s. Only a request read
@@ -300,12 +430,16 @@ pub async fn or_fetch<T>(
 /// `page` is shown: what's still in flight for other pages is dropped, and so is what's
 /// expired.
 pub fn shown(page: &Page) {
-    KEPT_AHEAD.with(|k| k.borrow_mut().keep_only(page, Instant::now()));
+    let now = Instant::now();
+    KEPT_AHEAD.with(|k| k.borrow_mut().keep_only(page, now));
+    SHOWN.with(|s| s.borrow_mut().expire(now));
 }
 
-/// Drops everything read ahead: the account changed, or the window shows nothing.
+/// Drops everything read ahead, and the pages left: the account changed, or the window
+/// shows nothing.
 pub fn clear() {
     KEPT_AHEAD.with(|k| k.borrow_mut().clear());
+    SHOWN.with(|s| s.borrow_mut().pages.clear());
 }
 
 #[cfg(test)]

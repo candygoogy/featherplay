@@ -433,7 +433,7 @@ pub fn play_card(ctx: &Rc<Ctx>, item: &CardItem) {
 
 /// Plays a whole album, from the start (one call, or its answer read ahead).
 pub fn play_album(ctx: &Rc<Ctx>, id: AlbumId) {
-    let ahead = ahead::album(&id);
+    let ahead = ahead::album(ctx, &id);
     ctx.load(
         move |source| async move {
             ahead::or_fetch(ahead, ahead::Answer::album, source.album(&id)).await
@@ -454,7 +454,7 @@ pub fn play_playlist(ctx: &Rc<Ctx>, id: PlaylistId) {
     let arriving = Arriving::default();
     let mut from = None;
     let wanted = id.clone();
-    let ahead = ahead::playlist(&id);
+    let ahead = ahead::playlist(ctx, &id);
     ctx.stream(
         move |source, parts| playlist::fetch(source, wanted, ahead, parts),
         move |ctx, _, part| match part {
@@ -516,7 +516,7 @@ fn start_or_join(
 
 /// Plays an artist's top songs (one call, or its answer read ahead).
 pub fn play_artist(ctx: &Rc<Ctx>, id: featherplay_core::model::ArtistId) {
-    let ahead = ahead::artist(&id);
+    let ahead = ahead::artist(ctx, &id);
     ctx.load(
         move |source| async move {
             ahead::or_fetch(ahead, ahead::Answer::artist, source.artist(&id)).await

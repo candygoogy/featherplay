@@ -107,6 +107,8 @@ pub struct Ctx {
     native: RefCell<Option<Rc<dyn NativeWindow>>>,
     /// The page last shown, so showing it again (a rename, a Try again) isn't a navigation.
     shown: RefCell<Option<Page>>,
+    /// Back or Forward is opening the page it moved to (`revisiting`).
+    revisit: Cell<bool>,
 }
 
 thread_local! {
@@ -143,6 +145,7 @@ impl Ctx {
             hwnd: Cell::new(None),
             native: RefCell::new(None),
             shown: RefCell::new(None),
+            revisit: Cell::new(false),
         });
         CTX.with(|c| *c.borrow_mut() = Some(ctx.clone()));
         ctx
@@ -268,15 +271,28 @@ impl Ctx {
     pub fn back(self: &Rc<Self>) {
         let moved = self.history.borrow_mut().back();
         if moved {
-            self.show_current();
+            self.show_again();
         }
     }
 
     pub fn forward(self: &Rc<Self>) {
         let moved = self.history.borrow_mut().forward();
         if moved {
-            self.show_current();
+            self.show_again();
         }
+    }
+
+    /// Whether the page opening is one Back or Forward moved to: it may show what it showed
+    /// when it was left (`pages::ahead`).
+    pub fn revisiting(&self) -> bool {
+        self.revisit.get()
+    }
+
+    /// `show_current` for a move through the history.
+    fn show_again(self: &Rc<Self>) {
+        self.revisit.set(true);
+        self.show_current();
+        self.revisit.set(false);
     }
 
     /// Shows the history's current page and asks its module to fill it.

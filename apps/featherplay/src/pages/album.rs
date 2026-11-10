@@ -15,6 +15,7 @@ use crate::controller::PlayerState;
 use crate::follow;
 use crate::pages::ahead;
 use crate::pages::content::{self, HEADER_COVER, TrackList};
+use crate::router::Page;
 use crate::ui::AlbumData;
 use crate::ui_bridge::{artist_names, shown};
 
@@ -80,8 +81,9 @@ pub fn open(ctx: &Rc<Ctx>, id: &AlbumId) {
     data.set_tracks(Default::default());
     LIST.with(|l| *l.borrow_mut() = None);
 
-    let ahead = ahead::album(id);
+    let ahead = ahead::album(ctx, id);
     let read_ahead = if ahead.is_some() { " (read ahead)" } else { "" };
+    let (page, asked) = (Page::Album { id: id.clone() }, ahead::changes());
     let id = id.clone();
     ctx.load_for_page(
         move |source| async move {
@@ -100,6 +102,7 @@ pub fn open(ctx: &Rc<Ctx>, id: &AlbumId) {
                         album.tracks.len(),
                         took.as_millis()
                     );
+                    ahead::showing(&page, ahead::Answer::Album(Ok(album.clone())), asked);
                     album
                 }
                 Err(e) => {

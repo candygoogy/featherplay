@@ -143,8 +143,12 @@ pub fn open(ctx: &Rc<Ctx>, id: &PlaylistId) {
     let arriving = Arriving::default();
     let mut tracks = 0;
     let wanted = id.clone();
-    let ahead = ahead::playlist(id);
+    let ahead = ahead::playlist(ctx, id);
     let read_ahead = if ahead.is_some() { " (read ahead)" } else { "" };
+    // Its header, kept with the whole list once it's in, for Back and Forward (`ahead`),
+    // unless it's changed here meanwhile.
+    let mut summary = None;
+    let asked = ahead::changes();
     ctx.stream(
         // Liked songs loads like any playlist; the header shown for it is ours.
         move |source, parts| fetch(source, wanted, ahead, parts),
@@ -156,6 +160,7 @@ pub fn open(ctx: &Rc<Ctx>, id: &PlaylistId) {
                         return ControlFlow::Break(());
                     }
                     tracks = p.tracks.len();
+                    summary = Some(p.summary.clone());
                     log!(
                         "playlist: first page, {tracks} tracks in {} ms{read_ahead}",
                         took.as_millis()
@@ -181,11 +186,27 @@ pub fn open(ctx: &Rc<Ctx>, id: &PlaylistId) {
                 Part::End(result, took) => {
                     match result {
                         // The page count includes the first: continuations are the rest.
-                        Ok(pages) => log!(
-                            "playlist: {tracks} tracks fetched in {} ms ({} continuation(s))",
-                            took.as_millis(),
-                            pages.saturating_sub(1)
-                        ),
+                        Ok(pages) => {
+                            log!(
+                                "playlist: {tracks} tracks fetched in {} ms ({} continuation(s))",
+                                took.as_millis(),
+                                pages.saturating_sub(1)
+                            );
+                            if here && let Some(summary) = summary.take() {
+                                with_list(|l| {
+                                    let whole = Playlist {
+                                        summary,
+                                        tracks: l.tracks.clone(),
+                                        pages,
+                                    };
+                                    ahead::showing(
+                                        &page,
+                                        ahead::Answer::Playlist(Ok((whole, None))),
+                                        asked,
+                                    );
+                                });
+                            }
+                        }
                         Err(e) if here && ui.global::<PlaylistData>().get_loading() => {
                             let data = ui.global::<PlaylistData>();
                             data.set_loading(false);

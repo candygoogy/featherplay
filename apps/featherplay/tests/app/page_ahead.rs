@@ -9,10 +9,12 @@ use std::time::{Duration, Instant};
 use crate::support::home_at;
 use featherplay::fixtures::Fixtures;
 use featherplay::offscreen;
+use featherplay::pages::ahead;
 use featherplay::router::Page;
 use featherplay::snapshot::Scene;
+use featherplay::song_menu;
 use featherplay::ui::{AlbumData, ItemKind, PageHover, PlaylistData};
-use featherplay_core::model::{AlbumId, PlaylistId};
+use featherplay_core::model::{AlbumId, LikeStatus, PlaylistId, TrackId};
 use slint::platform::WindowEvent;
 use slint::{ComponentHandle, LogicalPosition, Model};
 
@@ -160,4 +162,109 @@ fn sweeping_across_cards_reads_nothing_and_resting_reads_ahead() {
         wait_for(|| page_reads(&f) > before),
         "no rest on a card read its page ahead"
     );
+}
+
+#[test]
+fn back_shows_an_album_again_without_a_request_and_a_click_asks_again() {
+    let scene = Scene::new(1280, 800, true, false).expect("scene");
+    scene.settle();
+    let f = fixtures(&scene);
+    let before = f.reads("album");
+    let album = || Page::Album {
+        id: AlbumId("MPREb_left".into()),
+    };
+    scene.ctx.navigate(album());
+    scene.settle();
+    scene.ctx.navigate(Page::Playlist {
+        id: PlaylistId("PLnext".into()),
+    });
+    scene.settle();
+
+    scene.ctx.back();
+    scene.settle();
+
+    let data = scene.ui.global::<AlbumData>();
+    assert_eq!(data.get_id(), "MPREb_left");
+    assert!(!data.get_loading());
+    assert_ne!(data.get_title(), "", "the album didn't show");
+    assert_eq!(f.reads("album") - before, 1, "Back asked again");
+
+    // A click on it is a new visit.
+    scene.ctx.navigate(Page::Home);
+    scene.settle();
+    scene.ctx.navigate(album());
+    scene.settle();
+    assert_eq!(f.reads("album") - before, 2);
+}
+
+/// The mix recording has two pages: Back shows the songs of both from what was read.
+#[test]
+fn back_shows_a_playlist_read_to_its_end_whole_without_a_request() {
+    let scene = Scene::new(1280, 800, true, false).expect("scene");
+    scene.settle();
+    let f = fixtures(&scene);
+    let mix = "RDTMAK5uy_FIXTURE_MIX_100000000000000000000";
+    let before = f.reads("playlist_mix");
+    scene.ctx.navigate(Page::Playlist {
+        id: PlaylistId(mix.into()),
+    });
+    scene.settle();
+    scene.ctx.navigate(Page::Album {
+        id: AlbumId("MPREb_next".into()),
+    });
+    scene.settle();
+
+    scene.ctx.back();
+    scene.settle();
+
+    let rows = scene.ui.global::<PlaylistData>().get_tracks().row_count();
+    assert_eq!(rows, 8, "the songs of both pages");
+    assert_eq!(f.reads("playlist_mix") - before, 2, "Back asked again");
+}
+
+#[test]
+fn back_shows_the_likes_made_since_and_reads_a_playlist_changed_since_again() {
+    let scene = Scene::new(1280, 800, true, false).expect("scene");
+    scene.settle();
+    let f = fixtures(&scene);
+    let changed = PlaylistId("PLchanged".into());
+    scene.ctx.navigate(Page::Playlist {
+        id: changed.clone(),
+    });
+    scene.settle();
+    scene.ctx.navigate(Page::Album {
+        id: AlbumId("MPREb_liked".into()),
+    });
+    scene.settle();
+    let first = || {
+        scene
+            .ui
+            .global::<AlbumData>()
+            .get_tracks()
+            .row_data(0)
+            .expect("a row")
+    };
+    let row = first();
+    scene.ctx.navigate(Page::Home);
+    scene.settle();
+    // As the bar's heart does it, for the song's remembered track.
+    let liked = !row.liked;
+    let status = if liked {
+        LikeStatus::Like
+    } else {
+        LikeStatus::Indifferent
+    };
+    song_menu::remember_rating(&TrackId(row.id.to_string()), status);
+    let (albums, playlists) = (f.reads("album"), f.reads("playlist"));
+
+    scene.ctx.back();
+    scene.settle();
+    assert_eq!(first().liked, liked, "the like made since");
+    assert_eq!(f.reads("album"), albums);
+
+    // Songs added to it here: Back reads it again.
+    ahead::forget_playlist(&changed);
+    scene.ctx.back();
+    scene.settle();
+    assert_eq!(f.reads("playlist") - playlists, 1);
 }

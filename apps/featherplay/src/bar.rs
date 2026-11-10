@@ -112,7 +112,10 @@ pub fn init(ctx: &Rc<Ctx>) {
         } else {
             LikeStatus::Indifferent
         };
-        c.send(Action::Rate(TrackId(p.get_track_id().into()), status));
+        let id = TrackId(p.get_track_id().into());
+        c.send(Action::Rate(id.clone(), status));
+        // A page shown again by Back reads its likes from there (`pages::ahead`).
+        crate::song_menu::remember_rating(&id, status);
     });
     let c = ctx.clone();
     player.on_not_for_me(move || not_for_me::start(&c));

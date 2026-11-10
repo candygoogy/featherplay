@@ -284,6 +284,7 @@ fn rename(ctx: &Rc<Ctx>, id: &str, name: &str) {
         return;
     }
     let pid = PlaylistId(id.to_string());
+    crate::pages::ahead::forget_playlist(&pid);
     let sent = name.clone();
     ctx.load(
         move |source| async move { source.rename_playlist(&pid, &sent).await },
@@ -307,6 +308,7 @@ fn delete(ctx: &Rc<Ctx>, id: &str) {
         ui.global::<PlaylistMenu>().invoke_close_dialog();
     }
     let pid = PlaylistId(id.to_string());
+    crate::pages::ahead::forget_playlist(&pid);
     ctx.load(
         {
             let pid = pid.clone();
@@ -329,6 +331,7 @@ fn delete(ctx: &Rc<Ctx>, id: &str) {
 fn remove(ctx: &Rc<Ctx>, id: &str) {
     let name = title_of(ctx, id);
     let pid = PlaylistId(id.to_string());
+    crate::pages::ahead::forget_playlist(&pid);
     ctx.load(
         {
             let pid = pid.clone();

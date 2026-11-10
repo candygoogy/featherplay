@@ -14,6 +14,7 @@ use crate::app::Ctx;
 use crate::controller::{Action, PlayerState};
 use crate::pages::ahead;
 use crate::pages::content::{self, CARD_COVER, TrackList};
+use crate::router::Page;
 
 /// The banner photo's width, in logical pixels: the content width of a large window. The
 /// photo is square, so the banner crops it from the top.
@@ -78,8 +79,9 @@ pub fn open(ctx: &Rc<Ctx>, id: &ArtistId) {
     data.set_singles(Default::default());
     TOP.with(|l| *l.borrow_mut() = None);
 
-    let ahead = ahead::artist(id);
+    let ahead = ahead::artist(ctx, id);
     let read_ahead = if ahead.is_some() { " (read ahead)" } else { "" };
+    let (page, asked) = (Page::Artist { id: id.clone() }, ahead::changes());
     let id = id.clone();
     ctx.load_for_page(
         move |source| async move {
@@ -93,6 +95,7 @@ pub fn open(ctx: &Rc<Ctx>, id: &ArtistId) {
             let artist = match result {
                 Ok(a) => {
                     log!("artist: fetched in {} ms{read_ahead}", took.as_millis());
+                    ahead::showing(&page, ahead::Answer::Artist(Ok(a.clone())), asked);
                     a
                 }
                 Err(e) => {
