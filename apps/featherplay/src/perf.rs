@@ -360,11 +360,55 @@ unsafe extern "system" {
     fn GetThreadDescription(thread: isize, description: *mut *mut u16) -> i32;
     fn LocalFree(memory: *mut core::ffi::c_void) -> *mut core::ffi::c_void;
     fn CloseHandle(handle: isize) -> i32;
+    fn QueryThreadCycleTime(thread: isize, cycles: *mut u64) -> i32;
+    fn QueryProcessCycleTime(process: isize, cycles: *mut u64) -> i32;
+}
+
+const THREAD_QUERY_LIMITED_INFORMATION: u32 = 0x0800;
+
+// Windows charges a thread's time (GetProcessTimes, the system's process list, Task Manager)
+// a whole clock tick (15.6 ms) at a time, to the thread running when the tick comes. A
+// thread that wakes 100 times a second for 40 µs, as the audio output's does, then reads 0
+// for a while, then a tick per wake while its wakes line up with the tick: up to 4 % of a
+// core for 10-20 s, every minute or two, as the sound device's clock drifts against the
+// system's, though its real cost stays ~0.4 %. Cycles are counted at every switch, so the
+// spells also report them, at the TSC's rate (QueryThreadCycleTime counts in it).
+
+/// A thread's cycles so far, or 0.
+fn thread_cycles(tid: u64) -> u64 {
+    // SAFETY: a thread id of this process; a null handle is checked before use.
+    let h = unsafe { OpenThread(THREAD_QUERY_LIMITED_INFORMATION, 0, tid as u32) };
+    if h == 0 {
+        return 0;
+    }
+    let mut c = 0u64;
+    // SAFETY: a live thread handle and a valid out pointer.
+    unsafe { QueryThreadCycleTime(h, &mut c) };
+    // SAFETY: the handle opened above.
+    unsafe { CloseHandle(h) };
+    c
+}
+
+/// This process's cycles so far, its ended threads' included.
+fn process_cycles() -> u64 {
+    let mut c = 0u64;
+    // SAFETY: the process pseudo-handle and a valid out pointer.
+    unsafe { QueryProcessCycleTime(GetCurrentProcess(), &mut c) };
+    c
+}
+
+/// The time-stamp counter, the clock the cycle counts are in on x86-64. Elsewhere (ARM64
+/// counts cycles in other units) 0, and the spells report no cycles.
+fn tsc() -> u64 {
+    #[cfg(target_arch = "x86_64")]
+    // SAFETY: rdtsc has no preconditions on x86-64.
+    return unsafe { core::arch::x86_64::_rdtsc() };
+    #[cfg(not(target_arch = "x86_64"))]
+    return 0;
 }
 
 /// A thread's name (`GetThreadDescription`: Rust's thread names, tokio's workers), or "".
 fn thread_name(tid: u64) -> String {
-    const THREAD_QUERY_LIMITED_INFORMATION: u32 = 0x0800;
     // SAFETY: a thread id of this process; a null handle is checked before use.
     let h = unsafe { OpenThread(THREAD_QUERY_LIMITED_INFORMATION, 0, tid as u32) };
     if h == 0 {
@@ -436,6 +480,10 @@ struct Sample {
     /// CPU time so far (100 ns units).
     switches: Vec<(u64, u64, u64)>,
     threads: u32,
+    /// Each thread's id and cycles so far; the process's cycles; the TSC.
+    cycles: Vec<(u64, u64)>,
+    proc_cycles: u64,
+    tsc: u64,
 }
 
 impl Sample {
@@ -456,30 +504,54 @@ impl Sample {
             .sum()
     }
 
-    /// The threads that used the most CPU from `self` to `later`: name (or id), CPU ms and
-    /// wakeups per second over `secs`.
+    /// The threads that used the most cycles from `self` to `later`: name (or id), CPU ms
+    /// as Windows charges it, CPU ms from the cycles, and wakeups per second over `secs`.
     fn busiest_until(&self, later: &Sample, secs: f64) -> Vec<Value> {
-        let mut rows: Vec<(u64, u64, u64)> = later
+        // No rate without both TSC readings (a failed sample, an ARM64 build): no cycles.
+        let tsc_per_ms = if self.tsc > 0 {
+            later.tsc.saturating_sub(self.tsc) as f64 / (secs * 1000.0)
+        } else {
+            0.0
+        };
+        let cycles = |s: &Sample, tid: u64| {
+            s.cycles
+                .iter()
+                .find(|(t, _)| *t == tid)
+                .map_or(0, |(_, c)| *c)
+        };
+        let mut rows: Vec<(u64, u64, u64, f64)> = later
             .switches
             .iter()
-            .map(|(tid, n, cpu)| {
+            .map(|&(tid, n, cpu)| {
                 let (n0, cpu0) = self
                     .switches
                     .iter()
-                    .find(|(t, _, _)| t == tid)
+                    .find(|(t, _, _)| *t == tid)
                     .map_or((0, 0), |(_, n, c)| (*n, *c));
-                (*tid, cpu.saturating_sub(cpu0), n.saturating_sub(n0))
+                let ran = cycles(later, tid).saturating_sub(cycles(self, tid)) as f64;
+                let cycle_ms = if tsc_per_ms > 0.0 {
+                    ran / tsc_per_ms
+                } else {
+                    0.0
+                };
+                (
+                    tid,
+                    cpu.saturating_sub(cpu0),
+                    n.saturating_sub(n0),
+                    cycle_ms,
+                )
             })
             .collect();
-        rows.sort_by(|a, b| b.1.cmp(&a.1).then(b.2.cmp(&a.2)));
+        rows.sort_by(|a, b| b.3.total_cmp(&a.3).then(b.1.cmp(&a.1)));
         rows.into_iter()
-            .take(4)
-            .filter(|(_, cpu, n)| *cpu > 0 || *n > 0)
-            .map(|(tid, cpu, n)| {
+            .take(5)
+            .filter(|(_, cpu, n, cycle_ms)| *cpu > 0 || *n > 0 || *cycle_ms > 0.0)
+            .map(|(tid, cpu, n, cycle_ms)| {
                 let name = thread_name(tid);
                 json!({
                     "thread": if name.is_empty() { tid.to_string() } else { name },
                     "cpu_ms": round(cpu as f64 / 1e4),
+                    "cycle_ms": round(cycle_ms),
                     "wakeups_per_s": round(n as f64 / secs),
                 })
             })
@@ -532,7 +604,7 @@ fn sample() -> Sample {
         let entry = &buf[at..];
         if u64_at(entry, SPI_PID) == me {
             let threads = u32_at(entry, SPI_THREADS);
-            let switches = (0..threads as usize)
+            let switches: Vec<(u64, u64, u64)> = (0..threads as usize)
                 .map(|i| {
                     let t = SPI_SIZE + i * STI_SIZE;
                     (
@@ -542,12 +614,19 @@ fn sample() -> Sample {
                     )
                 })
                 .collect();
+            let cycles = switches
+                .iter()
+                .map(|&(tid, _, _)| (tid, thread_cycles(tid)))
+                .collect();
             return Sample {
                 cpu_ms: (u64_at(entry, SPI_USER) + u64_at(entry, SPI_KERNEL)) as f64 / 1e4,
                 private_mb: u64_at(entry, SPI_PAGEFILE) as f64 / 1e6,
                 working_set_mb: u64_at(entry, SPI_WORKING_SET) as f64 / 1e6,
                 switches,
                 threads,
+                cycles,
+                proc_cycles: process_cycles(),
+                tsc: tsc(),
             };
         }
         let next = u32_at(entry, 0) as usize;
@@ -1533,7 +1612,8 @@ impl Driver {
         Ok(())
     }
 
-    /// `idle <seconds> <name>`: nothing done; the process's CPU, wakeups and memory over it.
+    /// `idle <seconds> <name>`: nothing done; the process's CPU (as Windows charges it, and
+    /// from its cycles), wakeups and memory over it.
     async fn idle(&mut self, words: &[String]) -> Result<(), String> {
         let secs: f64 = words
             .get(1)
@@ -1557,6 +1637,20 @@ impl Driver {
             json!(round(a.switches_until(&b) as f64 / wall)),
         );
         m.insert("busiest".into(), Value::Array(a.busiest_until(&b, wall)));
+        // The same from the cycles: what the process ran, not the clock ticks it was charged.
+        let ticked = b.tsc.saturating_sub(a.tsc) as f64;
+        // A failed sample has no TSC (0), nor has an ARM64 build.
+        if a.tsc > 0 && ticked > 0.0 {
+            let ran = b.proc_cycles.saturating_sub(a.proc_cycles) as f64;
+            m.insert(
+                "cycle_ms".into(),
+                json!(round(ran / ticked * wall * 1000.0)),
+            );
+            m.insert(
+                "cycle_pct_machine".into(),
+                json!((ran / (ticked * logical_cpus()) * 1e5).round() / 1e3),
+            );
+        }
         m.insert("private_mb".into(), json!(round(b.private_mb)));
         m.insert("working_set_mb".into(), json!(round(b.working_set_mb)));
         m.insert("threads".into(), json!(b.threads));
