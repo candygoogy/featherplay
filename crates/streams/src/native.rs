@@ -15,6 +15,11 @@
 //! - A resolve then loads that player in QuickJS on a thread of its own (~20 ms from the
 //!   bytecode) while the player API request runs, and hands it the `n` and `sig`
 //!   challenges once the answer is in (~1 ms).
+//! - Before that, each resolve asks as the visionOS app (`VISIONOS`, yt-dlp's `visionos`),
+//!   with the kept page's visitor. Its answers come without ads before the song, and its
+//!   URLs need no challenges, so it needs the page but not its player (it still waits for
+//!   a resolve's page and player, as the embedded client does). Any answer it gives no
+//!   stream with goes on to the embedded client.
 //!
 //! `YtDlpResolver` falls back to yt-dlp on any error here.
 
@@ -41,6 +46,28 @@ const CLIENT_VERSION: &str = "2.20260708.00.00";
 const USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.5 Safari/605.1.15,gzip(gfe)";
 /// The page the player is "embedded" in: any page outside YouTube (yt-dlp's choice).
 const EMBED_URL: &str = "https://www.reddit.com/";
+/// The client asked first: yt-dlp's `visionos` (one of its default clients since
+/// 2026.08.19) and NewPipe's only one. On 2026-11-10 none of its 43 answers had ads before
+/// the song (the embedded client's: 12 of 22), and its URLs played to the end from their
+/// first byte, with no PO token. It wants a visitor: without one it asks for a sign-in
+/// ("confirm you're not a bot"). ANDROID_VR and TVHTML5_SIMPLY answered without ads too,
+/// but without a PO token their URLs were refused after the first MiB.
+pub(crate) const VISIONOS: &str = "VISIONOS";
+const VISIONOS_ID: &str = "101";
+/// yt-dlp's (2026.10.26).
+const VISIONOS_VERSION: &str = "1.02";
+const VISIONOS_USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 15_7_3) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15";
+/// After this many visionOS answers in a row without a stream, resolves ask the embedded
+/// client alone for `OFF_FOR`, and then one more failure turns it off again, so a client
+/// YouTube changed (or a kept visitor it won't answer) costs no request per song. Songs it
+/// can't give (made for kids, no such format) don't count.
+const VISIONOS_MAX_FAILURES: u32 = 3;
+/// Its answers took 91-154 ms (2026-11-10): one that takes longer goes on to the embedded
+/// client rather than hold the song up to `REQUEST_TIMEOUT`.
+const VISIONOS_TIMEOUT: Duration = Duration::from_secs(3);
+/// How long resolves ask the embedded client alone after a visionOS URL was refused: the
+/// way YouTube refused the other clients' URLs without a PO token (after the first MiB).
+const VISIONOS_REFUSED_FOR: Duration = Duration::from_secs(30 * 60);
 const REFRESH_AFTER: Duration = Duration::from_secs(12 * 3600);
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
 const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(30);
@@ -178,6 +205,39 @@ struct Health {
     off_until: Option<Instant>,
     /// Players whose challenges couldn't be solved.
     bad: HashSet<String>,
+    /// visionOS answers in a row without a stream.
+    visionos_failures: u32,
+    visionos_off_until: Option<Instant>,
+}
+
+impl Health {
+    fn visionos_on(&self) -> bool {
+        self.visionos_off_until
+            .is_none_or(|until| Instant::now() >= until)
+    }
+
+    /// Counts a visionOS answer; enough in a row without a stream turn the client off.
+    fn visionos_answered(&mut self, answer: &Result<ResolvedStream, NativeError>) {
+        match answer {
+            Ok(_) => self.visionos_failures = 0,
+            // The song, not the client: made for kids, no such format, DRM.
+            Err(NativeError::Skip(m)) if !m.starts_with("LOGIN_REQUIRED") => {}
+            Err(_) => {
+                self.visionos_failures += 1;
+                if self.visionos_failures >= VISIONOS_MAX_FAILURES {
+                    // The first resolve after the time off tries once.
+                    self.visionos_failures = VISIONOS_MAX_FAILURES - 1;
+                    self.visionos_off(OFF_FOR);
+                }
+            }
+        }
+    }
+
+    /// visionOS off for `time`, or for longer if it's off for longer already.
+    fn visionos_off(&mut self, time: Duration) {
+        let until = Instant::now() + time;
+        self.visionos_off_until = Some(self.visionos_off_until.map_or(until, |t| t.max(until)));
+    }
 }
 
 impl NativeResolver {
@@ -224,6 +284,18 @@ impl NativeResolver {
     /// A URL this client gave was refused: the next resolve starts from a fresh embed page.
     pub(crate) fn refused(&self) {
         self.inner.drop_page(None);
+    }
+
+    /// A visionOS URL was refused: resolves ask the embedded client alone for
+    /// `VISIONOS_REFUSED_FOR`.
+    pub(crate) fn visionos_refused(&self) {
+        log::info!(
+            "a visionOS URL was refused: the embedded client alone for {} min",
+            VISIONOS_REFUSED_FOR.as_secs() / 60
+        );
+        let mut h = self.inner.health.lock_or_recover();
+        h.visionos_failures = VISIONOS_MAX_FAILURES - 1;
+        h.visionos_off(VISIONOS_REFUSED_FOR);
     }
 
     /// For the app's start. With no player to answer with (a first run, or players made by
@@ -404,10 +476,10 @@ impl Inner {
         });
     }
 
-    /// A resolve from the kept page, and that page (`Ready::page`). An answer without a
-    /// URL asks once more from a fresh page (~0.45 s): some visitors get none every time
-    /// while new ones do (2026-11-09). Resolves at once that get none share the first
-    /// one's fresh page.
+    /// A resolve from the kept page, and that page (`Ready::page`): the visionOS client's
+    /// answer, else the embedded client's. An embedded answer without a URL asks once more
+    /// from a fresh page (~0.45 s): some visitors get none every time while new ones do
+    /// (2026-11-09). Resolves at once that get none share the first one's fresh page.
     async fn resolve(
         self: &Arc<Self>,
         video: &str,
@@ -417,6 +489,16 @@ impl Inner {
             Ok(r) => r,
             Err(e) => return (Err(e), None),
         };
+        if self.health.lock_or_recover().visionos_on() {
+            let answer = self.visionos(video, quality, &ready).await;
+            self.health.lock_or_recover().visionos_answered(&answer);
+            match answer {
+                Ok(stream) => return (Ok(stream), Some(ready.page)),
+                Err(NativeError::Skip(m) | NativeError::Failed(m) | NativeError::NoUrl(m)) => {
+                    log::info!("resolve {video}: no visionOS stream ({m}), asking as the embed")
+                }
+            }
+        }
         match self.answer(video, quality, &ready, true).await {
             // `answer` dropped the page.
             Err(NativeError::NoUrl(_)) => match self.ready(video).await {
@@ -481,6 +563,40 @@ impl Inner {
             }
         };
         finish(pending, &answers, answered)
+    }
+
+    /// One resolve as the visionOS app, with `ready`'s visitor. An answer with ads before
+    /// the song is no stream here: the embedded client's may come without.
+    async fn visionos(
+        &self,
+        video: &str,
+        quality: Quality,
+        ready: &Ready,
+    ) -> Result<ResolvedStream, NativeError> {
+        let visitor = ready
+            .config
+            .visitor_data
+            .as_deref()
+            .ok_or_else(|| failed("no visitor"))?;
+        let body = self
+            .post_player(
+                &visionos_request_body(video, visitor),
+                &visionos_headers(visitor),
+                VISIONOS_TIMEOUT,
+            )
+            .await?;
+        let answered = SystemTime::now();
+        let pending = parse_player_response(&body, video, quality.itags())?;
+        if pending.n.is_some() || pending.sig.is_some() {
+            return Err(failed("its URL has a challenge"));
+        }
+        if let Some(gate) = pending.gate {
+            return Err(failed(format!(
+                "ads before the song, {:.1}s",
+                gate.as_secs_f64()
+            )));
+        }
+        finish(pending, &Answers::default(), answered)
     }
 
     /// The config and player to use: in memory, else on disk, else fetched.
@@ -672,20 +788,35 @@ impl Inner {
     }
 
     async fn player_request(&self, video: &str, ready: &Ready) -> Result<String, NativeError> {
+        self.post_player(
+            &player_request_body(video, &ready.config, ready.player.sts),
+            &player_headers(&ready.config),
+            REQUEST_TIMEOUT,
+        )
+        .await
+    }
+
+    /// The player API's answer to `body`, sent with the client's `headers`.
+    async fn post_player(
+        &self,
+        body: &Value,
+        headers: &[(&'static str, String)],
+        timeout: Duration,
+    ) -> Result<String, NativeError> {
         let mut req = self
             .http
             .post(format!(
                 "{}/youtubei/v1/player?prettyPrint=false",
                 self.base
             ))
-            .timeout(REQUEST_TIMEOUT)
+            .timeout(timeout)
             .header("Content-Type", "application/json")
             .header("Origin", ORIGIN);
-        for (k, v) in player_headers(&ready.config) {
-            req = req.header(k, v);
+        for (k, v) in headers {
+            req = req.header(*k, v);
         }
         let resp = req
-            .body(player_request_body(video, &ready.config, ready.player.sts).to_string())
+            .body(body.to_string())
             .send()
             .await
             .map_err(|e| failed(format!("player API: {e}")))?;
@@ -832,6 +963,44 @@ pub(crate) fn player_headers(c: &EmbedConfig) -> Vec<(&'static str, String)> {
         h.push(("X-Goog-Visitor-Id", v.clone()));
     }
     h
+}
+
+/// The player API request's body as yt-dlp's `visionos` client sends it: no player, so no
+/// `signatureTimestamp`.
+pub(crate) fn visionos_request_body(video: &str, visitor: &str) -> Value {
+    json!({
+        "context": {
+            "client": {
+                "clientName": VISIONOS,
+                "clientVersion": VISIONOS_VERSION,
+                "deviceMake": "Apple",
+                "deviceModel": "RealityDevice17,1",
+                "osName": "visionOS",
+                "osVersion": "26.5.23O471",
+                "userAgent": VISIONOS_USER_AGENT,
+                "hl": "en",
+                "timeZone": "UTC",
+                "utcOffsetMinutes": 0,
+                "visitorData": visitor,
+            },
+        },
+        "videoId": video,
+        "playbackContext": {
+            "contentPlaybackContext": { "html5Preference": "HTML5_PREF_WANTS" },
+        },
+        "contentCheckOk": true,
+        "racyCheckOk": true,
+    })
+}
+
+/// The visionOS client's headers of the player API request (the body and origin aside).
+pub(crate) fn visionos_headers(visitor: &str) -> Vec<(&'static str, String)> {
+    vec![
+        ("User-Agent", VISIONOS_USER_AGENT.to_string()),
+        ("X-YouTube-Client-Name", VISIONOS_ID.to_string()),
+        ("X-YouTube-Client-Version", VISIONOS_VERSION.to_string()),
+        ("X-Goog-Visitor-Id", visitor.to_string()),
+    ]
 }
 
 /// Reads a player API answer: the URL and challenges of the first format in `wanted` that
@@ -1420,6 +1589,9 @@ mod tests {
     /// A recorded `player` answer for `h46YpWrg55Q` without cookies (2026-10-28), cut to
     /// formats 140 and 251, with the CDN host, request ids and signatures scrubbed.
     const PLAYER: &str = include_str!("../tests/fixtures/native/player-embedded.json");
+    /// The visionOS client's answer for the same song (2026-11-10), cut and scrubbed the
+    /// same way: its URLs have no `n` and no cipher.
+    const VISIONOS_PLAYER: &str = include_str!("../tests/fixtures/native/player-visionos.json");
     const VIDEO: &str = "h46YpWrg55Q";
     /// Stands in for a preprocessed player: `n` reversed, `sig` without its first two
     /// characters and reversed.
@@ -1504,6 +1676,34 @@ _result.sig = (s) => s.slice(2).split("").reverse().join("");"#;
         let pb = &body["playbackContext"]["contentPlaybackContext"];
         assert!(pb.get("encryptedHostFlags").is_none());
         assert_eq!(player_headers(&bare).len(), 2);
+    }
+
+    #[test]
+    fn the_visionos_request_is_yt_dlps() {
+        let body = visionos_request_body(VIDEO, "visitor");
+        let client = &body["context"]["client"];
+        assert_eq!(client["clientName"], "VISIONOS");
+        assert_eq!(client["clientVersion"], "1.02");
+        assert_eq!(client["deviceModel"], "RealityDevice17,1");
+        assert_eq!(client["visitorData"], "visitor");
+        assert!(body["context"].get("thirdParty").is_none());
+        let pb = &body["playbackContext"]["contentPlaybackContext"];
+        assert!(pb.get("signatureTimestamp").is_none(), "no player");
+        assert_eq!(body["videoId"], VIDEO);
+        let h = visionos_headers("visitor");
+        assert!(h.contains(&("X-YouTube-Client-Name", "101".into())));
+        assert!(h.contains(&("X-Goog-Visitor-Id", "visitor".into())));
+        assert!(h.contains(&("User-Agent", VISIONOS_USER_AGENT.into())));
+    }
+
+    #[test]
+    fn a_recorded_visionos_answer_has_a_url_without_challenges() {
+        let p = parse_player_response(VISIONOS_PLAYER, VIDEO, Quality::High.itags()).unwrap();
+        assert_eq!((p.itag, p.mime.as_str()), (251, "audio/webm"));
+        assert_eq!(query_param(&p.url, "c").as_deref(), Some("VISIONOS"));
+        assert_eq!((p.n, p.sig, p.gate), (None, None, None));
+        assert_eq!(p.loudness_db, Some(7.17));
+        assert_eq!(p.video_title.as_deref(), Some("affection"));
     }
 
     #[test]
@@ -1753,8 +1953,22 @@ _result.sig = (s) => s.slice(2).split("").reverse().join("");"#;
         std::fs::remove_dir_all(&root).unwrap();
     }
 
-    /// A resolver over `base` whose state and player are already on disk.
+    /// A resolver over `base` whose state and player are already on disk, asking as the
+    /// embed alone: these tests are about that client.
     fn seeded(name: &str, base: &str) -> (NativeResolver, PathBuf) {
+        let (r, dir) = seeded_with_visionos(name, base);
+        embedded_only(&r);
+        (r, dir)
+    }
+
+    /// Resolves ask the embedded client alone, as after repeated visionOS failures.
+    fn embedded_only(r: &NativeResolver) {
+        r.inner.health.lock().unwrap().visionos_off_until =
+            Some(Instant::now() + Duration::from_secs(3600));
+    }
+
+    /// A resolver over `base` whose state and player are already on disk.
+    fn seeded_with_visionos(name: &str, base: &str) -> (NativeResolver, PathBuf) {
         let dir = home(name);
         let player = install(&dir.join("players"), "096efeec", 20752, FAKE_PLAYER).unwrap();
         // Its bytecode now, so no save runs beside the resolves and the folder can go.
@@ -1798,6 +2012,96 @@ _result.sig = (s) => s.slice(2).split("").reverse().join("");"#;
         assert_eq!(query_param(&s.url, "sig"), Some(want));
         assert_eq!((s.itag, s.mime.as_str()), (251, "audio/webm"));
         assert_eq!(s.video_title.as_deref(), Some("affection"));
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// A server for both clients: `visionos` answers the visionOS client's requests that
+    /// come with the kept visitor, the recorded embedded answer the others.
+    fn two_clients(visionos: String) -> (String, test_server::Log) {
+        let kept = config().visitor_data.unwrap();
+        test_server::serve(move |method, path, body| {
+            match (method, path.split('?').next().unwrap()) {
+                ("POST", "/youtubei/v1/player") if body.contains(r#""VISIONOS""#) => {
+                    if body.contains(&kept) {
+                        (200, visionos.clone())
+                    } else {
+                        (400, String::new())
+                    }
+                }
+                ("POST", "/youtubei/v1/player") => (200, PLAYER.to_string()),
+                _ => (404, String::new()),
+            }
+        })
+    }
+
+    fn client(s: &ResolvedStream) -> String {
+        query_param(&s.url, "c").unwrap_or_default()
+    }
+
+    /// The visionOS client is asked first, with the kept visitor: one request, and its URL
+    /// as it came.
+    #[tokio::test]
+    async fn a_resolve_asks_as_visionos_first() {
+        let (base, log) = two_clients(VISIONOS_PLAYER.to_string());
+        let (r, dir) = seeded_with_visionos("visionos", &base);
+        let s = r.resolve(VIDEO, Quality::High).await.unwrap();
+        assert_eq!(log.lock().unwrap().len(), 1, "one request");
+        assert_eq!((client(&s).as_str(), s.itag), ("VISIONOS", 251));
+        let want = parse_player_response(VISIONOS_PLAYER, VIDEO, Quality::High.itags());
+        assert_eq!(s.url, want.unwrap().url);
+        assert_eq!(s.available_at, None);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// No stream from the visionOS client (here a sign-in it asks for): the embedded one
+    /// answers. Three in a row leave resolves to the embedded client alone for a while,
+    /// then one resolve tries it, and one more failure turns it off again.
+    #[tokio::test]
+    async fn without_a_visionos_stream_the_embedded_client_answers() {
+        let bot = r#"{"playabilityStatus":{"status":"LOGIN_REQUIRED","reason":"Sign in to confirm you're not a bot"}}"#;
+        let (base, log) = two_clients(bot.to_string());
+        let (r, dir) = seeded_with_visionos("no-visionos", &base);
+        for asked in [2, 4, 6] {
+            let s = r.resolve(VIDEO, Quality::High).await.unwrap();
+            assert_eq!(client(&s), "WEB_EMBEDDED_PLAYER");
+            assert_eq!(log.lock().unwrap().len(), asked, "visionOS, then the embed");
+        }
+        r.resolve(VIDEO, Quality::High).await.unwrap();
+        assert_eq!(log.lock().unwrap().len(), 7, "the embed alone after three");
+        r.inner.health.lock().unwrap().visionos_off_until = Some(Instant::now());
+        r.resolve(VIDEO, Quality::High).await.unwrap();
+        assert_eq!(
+            log.lock().unwrap().len(),
+            9,
+            "tried once after the time off"
+        );
+        r.resolve(VIDEO, Quality::High).await.unwrap();
+        assert_eq!(log.lock().unwrap().len(), 10, "off again after one failure");
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// A visionOS answer with ads before the song would wait as long as an embedded one,
+    /// which may come without: the embedded client answers.
+    #[tokio::test]
+    async fn a_visionos_answer_with_ads_goes_to_the_embedded_client() {
+        let gated = VISIONOS_PLAYER.replacen('{', &format!("{{{AD_SLOT},"), 1);
+        let (base, log) = two_clients(gated);
+        let (r, dir) = seeded_with_visionos("visionos-ads", &base);
+        let s = r.resolve(VIDEO, Quality::High).await.unwrap();
+        assert_eq!(client(&s), "WEB_EMBEDDED_PLAYER");
+        assert_eq!(log.lock().unwrap().len(), 2);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// A refused visionOS URL leaves resolves to the embedded client for a while, at once.
+    #[tokio::test]
+    async fn a_refused_visionos_url_leaves_resolves_to_the_embedded_client() {
+        let (base, log) = two_clients(VISIONOS_PLAYER.to_string());
+        let (r, dir) = seeded_with_visionos("visionos-refused", &base);
+        r.visionos_refused();
+        let s = r.resolve(VIDEO, Quality::High).await.unwrap();
+        assert_eq!(client(&s), "WEB_EMBEDDED_PLAYER");
+        assert_eq!(log.lock().unwrap().len(), 1, "no visionOS request");
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
@@ -2064,6 +2368,7 @@ _result.sig = (s) => s.slice(2).split("").reverse().join("");"#;
         let (base, log) = new_player_server();
         let dir = home("first-run");
         let mut r = NativeResolver::with_dirs(dir.clone(), &base).unwrap();
+        embedded_only(&r);
         r.set_preprocessor(stub(FAKE_PLAYER));
         r.prepare().await;
         assert_eq!(
@@ -2162,6 +2467,7 @@ _result.sig = (s) => s.slice(2).split("").reverse().join("");"#;
         let dir = home("measure");
         let player = install(&dir.join("players"), "096efeec", sts, body).unwrap();
         let mut r = NativeResolver::with_dirs(dir.clone(), &base).unwrap();
+        embedded_only(&r);
         if let Ok(exe) = std::env::var("MEASURE_PREPROCESSOR") {
             r.set_preprocessor(Preprocessor::Child(exe.into()));
         }

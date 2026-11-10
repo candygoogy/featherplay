@@ -91,16 +91,17 @@ const GATE_RETRIES: [Duration; 3] = [
     Duration::from_millis(1000),
 ];
 
-/// The `c=` of the embedded player's URLs: a 403 there is final. The resolver hands one
-/// over at once, or, when it had an ad gate, once a check found it open.
-const UNGATED_CLIENT: &str = "c=WEB_EMBEDDED_PLAYER";
+/// The `c=` of the embedded player's and the visionOS app's URLs: a 403 there is final.
+/// The resolver hands one over at once, or, when it had an ad gate, once a check found it
+/// open (a visionOS one with a gate isn't handed over at all).
+const UNGATED_CLIENTS: [&str; 2] = ["c=WEB_EMBEDDED_PLAYER", "c=VISIONOS"];
 
 /// The first chunk of a stream. A 403 is tried again a few times (see `GATE_RETRIES`)
 /// before it counts as an expired URL, except on a URL without an ad gate.
 async fn first_range(client: &reqwest::Client, url: &str) -> Result<reqwest::Response, String> {
     let gated = !url
         .split_once('?')
-        .is_some_and(|(_, q)| q.split('&').any(|p| p == UNGATED_CLIENT));
+        .is_some_and(|(_, q)| q.split('&').any(|p| UNGATED_CLIENTS.contains(&p)));
     let retries: &[Duration] = if gated { &GATE_RETRIES } else { &[] };
     let mut tries = retries.iter();
     loop {

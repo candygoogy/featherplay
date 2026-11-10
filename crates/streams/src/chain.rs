@@ -10,7 +10,7 @@ use featherplay_core::sync::LockExt;
 use tokio::sync::{Notify, Semaphore, SemaphorePermit};
 
 use crate::expiry::query_param;
-use crate::native::NativeError;
+use crate::native::{NativeError, VISIONOS};
 use crate::{Ahead, ResolveError, ResolvedStream};
 
 /// The `c=` of the embedded client's stream URLs.
@@ -579,7 +579,9 @@ impl Chain {
 
     /// Step 1's URL once its gate has passed and, if it had one or URLs are in doubt, its
     /// first byte plays. A refusal starts the doubt over; the native step's embed page is
-    /// kept then (URLs from one page were refused and played in turn).
+    /// kept then (URLs from one page were refused and played in turn). A refused visionOS
+    /// URL says nothing of the embedded client's: no doubt, and the song keeps its native
+    /// step (`Steps::check` turned visionOS off).
     async fn native_ready(
         &self,
         s: &impl Steps,
@@ -594,8 +596,10 @@ impl Chain {
         match Self::opened(s, &stream.url, gated).await {
             Check::Plays | Check::Unknown => One::Plays(stream),
             Check::Refused => {
-                self.doubt();
-                self.native_refused(id);
+                if query_param(&stream.url, "c").as_deref() != Some(VISIONOS) {
+                    self.doubt();
+                    self.native_refused(id);
+                }
                 self.fall_back(id, "its URL was refused (HTTP 403) at its check".into());
                 One::Next
             }
@@ -822,6 +826,7 @@ mod tests {
     const EMBEDDED_URL: &str = "https://r2.example/videoplayback?c=WEB_EMBEDDED_PLAYER&n=2";
     const TV_URL: &str = "https://r3.example/videoplayback?c=TVHTML5&n=3";
     const FRESH_URL: &str = "https://r4.example/videoplayback?c=WEB_EMBEDDED_PLAYER&n=4";
+    const VISIONOS_URL: &str = "https://r5.example/videoplayback?c=VISIONOS";
 
     fn stream(url: &str) -> ResolvedStream {
         ResolvedStream {
@@ -1150,6 +1155,27 @@ mod tests {
 
         // The client works: another song's native step comes first again, checked.
         assert_eq!(url(within(chain.resolve(&s, &third())).await), NATIVE_URL);
+        assert_eq!(s.calls(), ["native", "check"]);
+    }
+
+    /// A visionOS URL refused at its check says nothing of the embedded client's: the
+    /// doubt isn't started over, and the song keeps its native step.
+    #[tokio::test]
+    async fn a_visionos_url_refused_at_its_check_leaves_the_song_its_native_step() {
+        let chain = Chain::default();
+        chain.refused(&other(), NATIVE_URL);
+        let doubt = chain.embedded.lock().unwrap().doubt_until;
+        let s = Script::default()
+            .native(Ok(VISIONOS_URL))
+            .check(Check::Refused)
+            .embedded(Ok(EMBEDDED_URL))
+            .check(Check::Plays)
+            .native(Ok(NATIVE_URL))
+            .check(Check::Plays);
+        assert_eq!(url(within(chain.resolve(&s, &id())).await), EMBEDDED_URL);
+        assert_eq!(s.calls(), ["native", "check", "embedded", "check"]);
+        assert_eq!(chain.embedded.lock().unwrap().doubt_until, doubt);
+        assert_eq!(url(within(chain.resolve(&s, &id())).await), NATIVE_URL);
         assert_eq!(s.calls(), ["native", "check"]);
     }
 

@@ -1,0 +1,83 @@
+{
+ "playabilityStatus": {
+  "status": "OK",
+  "playableInEmbed": true
+ },
+ "streamingData": {
+  "expiresInSeconds": "21540",
+  "adaptiveFormats": [
+   {
+    "itag": 140,
+    "url": "https://rr1---sn-scrubbed.googlevideo.com/videoplayback?expire=1794306923&id=o-SCRUBBED&itag=140&source=youtube&requiressl=yes&mime=audio%2Fmp4&gir=yes&clen=3809688&dur=235.225&lmt=1764547564819928&c=VISIONOS&sparams=expire%2Cei%2Cip%2Cid%2Citag%2Csource%2Crequiressl%2Cxpc%2Cpcm2%2Cgcr%2Cbui%2Cspc%2Cvprv%2Csvpuc%2Cmime%2Crqh%2Cgir%2Cclen%2Cdur%2Clmt&lsparams=cps%2Cmet%2Cmh%2Cmm%2Cmn%2Cms%2Cmv%2Cmvi%2Cpcm2cms%2Cpl%2Crms%2Cinitcwndbps&lsig=SCRUBBED&sig=SCRUBBED",
+    "mimeType": "audio/mp4; codecs=\"mp4a.40.2\"",
+    "bitrate": 131116,
+    "initRange": {
+     "start": "0",
+     "end": "758"
+    },
+    "indexRange": {
+     "start": "759",
+     "end": "1078"
+    },
+    "lastModified": "1764547564819928",
+    "contentLength": "3809688",
+    "quality": "tiny",
+    "projectionType": "RECTANGULAR",
+    "averageBitrate": 129567,
+    "highReplication": true,
+    "audioQuality": "AUDIO_QUALITY_MEDIUM",
+    "approxDurationMs": "235225",
+    "audioSampleRate": "44100",
+    "audioChannels": 2,
+    "loudnessDb": 7.17,
+    "trackAbsoluteLoudnessLkfs": -6.83,
+    "qualityOrdinal": "QUALITY_ORDINAL_UNKNOWN"
+   },
+   {
+    "itag": 251,
+    "url": "https://rr1---sn-scrubbed.googlevideo.com/videoplayback?expire=1794306923&id=o-SCRUBBED&itag=251&source=youtube&requiressl=yes&mime=audio%2Fwebm&gir=yes&clen=3856919&dur=235.241&lmt=1764547617657260&c=VISIONOS&sparams=expire%2Cei%2Cip%2Cid%2Citag%2Csource%2Crequiressl%2Cxpc%2Cpcm2%2Cgcr%2Cbui%2Cspc%2Cvprv%2Csvpuc%2Cmime%2Crqh%2Cgir%2Cclen%2Cdur%2Clmt&lsparams=cps%2Cmet%2Cmh%2Cmm%2Cmn%2Cms%2Cmv%2Cmvi%2Cpcm2cms%2Cpl%2Crms%2Cinitcwndbps&lsig=SCRUBBED&sig=SCRUBBED",
+    "mimeType": "audio/webm; codecs=\"opus\"",
+    "bitrate": 139795,
+    "initRange": {
+     "start": "0",
+     "end": "258"
+    },
+    "indexRange": {
+     "start": "259",
+     "end": "663"
+    },
+    "lastModified": "1764547617657260",
+    "contentLength": "3856919",
+    "quality": "tiny",
+    "projectionType": "RECTANGULAR",
+    "averageBitrate": 131164,
+    "audioQuality": "AUDIO_QUALITY_MEDIUM",
+    "approxDurationMs": "235241",
+    "audioSampleRate": "48000",
+    "audioChannels": 2,
+    "loudnessDb": 7.17,
+    "trackAbsoluteLoudnessLkfs": -6.83,
+    "qualityOrdinal": "QUALITY_ORDINAL_UNKNOWN"
+   }
+  ]
+ },
+ "videoDetails": {
+  "videoId": "h46YpWrg55Q",
+  "title": "affection",
+  "lengthSeconds": "235",
+  "keywords": [
+   "BETWEEN FRIENDS",
+   "we just need some time together",
+   "affection"
+  ],
+  "author": "BETWEEN FRIENDS - Topic"
+ },
+ "playerConfig": {
+  "audioConfig": {
+   "perceptualLoudnessDb": -6.83,
+   "enablePerFormatLoudness": true,
+   "trackAbsoluteLoudnessLkfs": -6.83,
+   "loudnessTargetLkfs": -14
+  }
+ }
+}

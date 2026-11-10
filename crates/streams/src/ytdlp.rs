@@ -10,7 +10,7 @@ use tokio::sync::Notify;
 
 use crate::chain::{Chain, Check, Steps};
 use crate::expiry::query_param;
-use crate::native::{NativeError, NativeResolver};
+use crate::native::{NativeError, NativeResolver, VISIONOS};
 use crate::sidecars::{Installer, tail};
 use crate::{
     Ahead, Downloads, Preprocessor, Quality, ResolveError, ResolvedStream, Sidecars,
@@ -334,9 +334,16 @@ impl YtDlpResolver {
 
     /// The stream URL this resolver gave for `id` was refused (HTTP 403) before it
     /// expired: see `Chain::refused`. The native step starts from a fresh embed page next
-    /// time, checked; refused twice, `id` skips it for a while.
+    /// time, checked; refused twice, `id` skips it for a while. A refused visionOS URL
+    /// leaves the native step to the embedded client for a while
+    /// (`NativeResolver::visionos_refused`), whichever step gave it (yt-dlp's default
+    /// clients include visionOS).
     pub fn refused(&self, id: &TrackId, url: &str) {
-        if self.chain.refused(id, url)
+        if query_param(url, "c").as_deref() == Some(VISIONOS) {
+            if let Some(n) = &self.native {
+                n.visionos_refused();
+            }
+        } else if self.chain.refused(id, url)
             && let Some(n) = &self.native
         {
             n.refused();
@@ -599,10 +606,17 @@ impl Steps for Live<'_> {
     }
 
     async fn check(&self, url: &str) -> Check {
-        match self.r.checks.get_or_init(check_client) {
+        let check = match self.r.checks.get_or_init(check_client) {
             Some(http) => first_byte(http, url).await,
             None => Check::Unknown,
+        };
+        if check == Check::Refused
+            && query_param(url, "c").as_deref() == Some(VISIONOS)
+            && let Some(n) = &self.r.native
+        {
+            n.visionos_refused();
         }
+        check
     }
 
     fn waits_at_gate(&self, id: &TrackId) {
