@@ -324,7 +324,7 @@ impl YtDlpResolver {
 
     /// The stream URL this resolver gave for `id` was refused (HTTP 403) before it
     /// expired: see `Chain::refused`. The native step starts from a fresh embed page next
-    /// time, and `id` skips it for a while.
+    /// time, checked; refused twice, `id` skips it for a while.
     pub fn refused(&self, id: &TrackId, url: &str) {
         if self.chain.refused(id, url)
             && let Some(n) = &self.native
