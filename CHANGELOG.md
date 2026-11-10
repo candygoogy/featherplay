@@ -45,6 +45,17 @@ Notable changes to featherplay, newest first. The format follows
   a second. Moving across a shelf loads nothing, at most two pages load at once, an answer
   is kept for a minute, and a playlist reads only its first page before the click. Nothing
   loads while the window is minimised or in the tray.
+- Back and Forward show an album, artist or playlist you left in the last five minutes at
+  once, as you left it, without loading it again: a long playlist no longer reads all its
+  pages a second time. Likes made since show on it. A click on a card still loads the page
+  fresh, and a playlist you add songs to, rename or delete is loaded again.
+- A song you point at for a moment starts sooner when you click it:
+  - featherplay fetches the start of its stream when it already has the stream from
+    earlier (the last session, or a lookup ahead), as it did for one it had just looked
+    up. Such a click waited 50-150 ms for that start.
+  - While playback is paused, the sound output starts (silently) if Windows may have let
+    the audio device go idle, which it does after about 10 s with nothing playing. Waking
+    it took 80-90 ms after the click. It stops again a second later if nothing plays.
 - Settings > Discord: the profile preview now sits beside the options from the window's
   default size up, and stays in view while you scroll through them, so hovering Time or
   Status text lights what it changes on the card. In a window too short for the whole
