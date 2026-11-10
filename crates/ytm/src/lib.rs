@@ -13,6 +13,7 @@ pub mod api;
 pub mod convert;
 
 pub use api::YtMusic;
+pub use convert::PlaylistRest;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SearchFilter {

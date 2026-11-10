@@ -47,7 +47,7 @@ use ytmapi_rs::query::{
     RatePlaylistQuery, RateSongQuery, SearchQuery,
 };
 
-use crate::convert::{self, map_error};
+use crate::convert::{self, PlaylistRest, map_error};
 use crate::{
     AccountIdentity, AccountInfo, Album, AlbumSummary, ApiError, Artist, ArtistSummary, Charts,
     HistoryDay, HomeFeed, HomeShelf, Identity, MoodPage, MoodSection, Playlist, PlaylistPart,
@@ -412,21 +412,43 @@ impl YtMusic {
         id: &PlaylistId,
         mut each: impl FnMut(PlaylistPart) -> ControlFlow<()> + Send,
     ) -> Result<usize, ApiError> {
-        let query =
-            GetPlaylistTracksQuery::new(PlaylistID::from_raw(convert::browse_playlist_id(&id.0)));
+        let (first, rest) = self.playlist_first(id).await?;
+        let query = playlist_query(id);
+        let base = &query;
+        let fetch =
+            move |token: String| async move { self.raw(&Continuation { base, token }).await };
+        follow_playlist(first, rest, fetch, &mut each).await
+    }
+
+    /// A playlist's first page, one request: its header and songs, and where the list goes
+    /// on (`playlist_rest`), if it does. Liked songs as in `playlist`.
+    pub async fn playlist_first(
+        &self,
+        id: &PlaylistId,
+    ) -> Result<(Playlist, Option<PlaylistRest>), ApiError> {
         let signed_in = convert::bare_playlist_id(&id.0) == "LM";
         if signed_in {
             self.account()?;
         }
-        let first = self.raw(&query).await?;
+        let first = self.raw(&playlist_query(id)).await?;
         if signed_in && convert::logged_in(&first) == Some(false) {
             return Err(ApiError::AuthExpired);
         }
-        let summary = convert::playlist_summary(&first, id)?;
+        convert::playlist_first(&first, id)
+    }
+
+    /// The rest of a playlist from where `playlist_first` stopped, a page at a time as
+    /// `playlist_by_page` reads them. Returns how many pages were read, the first included.
+    pub async fn playlist_rest(
+        &self,
+        rest: PlaylistRest,
+        mut each: impl FnMut(PlaylistPart) -> ControlFlow<()> + Send,
+    ) -> Result<usize, ApiError> {
+        let query = playlist_query(rest.id());
         let base = &query;
         let fetch =
             move |token: String| async move { self.raw(&Continuation { base, token }).await };
-        follow_playlist(first, summary, fetch, &mut each).await
+        follow_rest(rest, fetch, &mut each).await
     }
 
     pub async fn album(&self, id: &AlbumId) -> Result<Album, ApiError> {
@@ -810,12 +832,38 @@ impl YtMusic {
     }
 }
 
-/// Follows a playlist from its `first` page (read with `summary`, its header): hands each
-/// page's songs to `each`, then asks `fetch` for the next page by its token, to the end of
-/// the list, `MAX_PAGES`, or until `each` breaks. Returns how many pages were read.
+/// The request for a playlist's first page; its continuations are asked with the same.
+fn playlist_query(id: &PlaylistId) -> GetPlaylistTracksQuery<'static> {
+    GetPlaylistTracksQuery::new(PlaylistID::from_raw(convert::browse_playlist_id(&id.0)))
+}
+
+/// Follows a playlist from its `first` page and where the list goes on after it (`rest`):
+/// hands `first` to `each`, then the pages after as `follow_rest` does. Returns how many
+/// pages were read.
 async fn follow_playlist<F, Fut>(
-    first: String,
-    summary: PlaylistSummary,
+    first: Playlist,
+    rest: Option<PlaylistRest>,
+    fetch: F,
+    each: &mut impl FnMut(PlaylistPart) -> ControlFlow<()>,
+) -> Result<usize, ApiError>
+where
+    F: FnMut(String) -> Fut,
+    Fut: Future<Output = Result<String, ApiError>>,
+{
+    if each(PlaylistPart::First(first)).is_break() {
+        return Ok(1);
+    }
+    match rest {
+        Some(rest) => follow_rest(rest, fetch, each).await,
+        None => Ok(1),
+    }
+}
+
+/// Asks `fetch` for each page after `rest` by its token and hands its songs to `each`, to
+/// the end of the list, `MAX_PAGES`, or until `each` breaks. Returns how many pages were
+/// read, the first included.
+async fn follow_rest<F, Fut>(
+    mut rest: PlaylistRest,
     mut fetch: F,
     each: &mut impl FnMut(PlaylistPart) -> ControlFlow<()>,
 ) -> Result<usize, ApiError>
@@ -823,31 +871,19 @@ where
     F: FnMut(String) -> Fut,
     Fut: Future<Output = Result<String, ApiError>>,
 {
-    let mut paging = convert::PlaylistPaging::default();
-    let (tracks, mut token) = paging.read(&first)?;
-    // The raw page isn't kept while the next ones are fetched.
-    drop(first);
-    let mut pages = 1;
-    let part = PlaylistPart::First(Playlist {
-        summary,
-        tracks,
-        pages,
-    });
-    if each(part).is_break() {
-        return Ok(pages);
-    }
-    while let Some(t) = token.take()
-        && pages < MAX_PAGES
-    {
-        let page = fetch(t).await?;
-        pages += 1;
-        let (tracks, next) = paging.read(&page)?;
-        token = next;
+    while rest.pages() < MAX_PAGES {
+        let page = fetch(rest.token().to_string()).await?;
+        let pages = rest.pages() + 1;
+        let (tracks, next) = rest.read(&page)?;
         if each(PlaylistPart::More(tracks)).is_break() {
-            break;
+            return Ok(pages);
+        }
+        match next {
+            Some(next) => rest = next,
+            None => return Ok(pages),
         }
     }
-    Ok(pages)
+    Ok(rest.pages())
 }
 
 /// A visitor's requests: no cookies and no visitor id, and the web client's version from
@@ -1545,7 +1581,7 @@ mod tests {
     async fn follow_mix(stop: bool) -> Vec<String> {
         let pages = mix_pages();
         let id = PlaylistId("VLRDTMAK5uy_FIXTURE_MIX_100000000000000000000".into());
-        let summary = convert::playlist_summary(&pages[0], &id).expect("header");
+        let (first, rest) = convert::playlist_first(&pages[0], &id).expect("first page");
         let log = std::sync::Mutex::new(Vec::new());
         let note = |s: String| log.lock().unwrap().push(s);
         let mut asked = 0;
@@ -1567,7 +1603,7 @@ mod tests {
                 ControlFlow::Continue(())
             }
         };
-        let read = follow_playlist(pages[0].clone(), summary, fetch, &mut each)
+        let read = follow_playlist(first, rest, fetch, &mut each)
             .await
             .expect("follow");
         note(format!("{read} pages"));

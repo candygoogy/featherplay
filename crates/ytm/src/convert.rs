@@ -38,8 +38,8 @@ use ytmapi_rs::query::{
 use crate::{
     AccountIdentity, AccountInfo, Album, AlbumSummary, ApiError, Artist, ArtistSummary,
     ChartArtist, Charts, Country, HistoryDay, HomeFeed, HomeItem, HomeShelf, Mood, MoodPage,
-    MoodSection, PlainLyrics, PlaylistSummary, QuerySuggestion, SearchSuggestions, SuggestedResult,
-    TimedLine, TimedLyrics, Trend,
+    MoodSection, PlainLyrics, Playlist, PlaylistSummary, QuerySuggestion, SearchSuggestions,
+    SuggestedResult, TimedLine, TimedLyrics, Trend,
 };
 
 const WATCH_PANEL: &str = "/contents/singleColumnMusicWatchNextResultsRenderer/tabbedRenderer/watchNextTabbedResultsRenderer/tabs/0/tabRenderer/content/musicQueueRenderer/content/playlistPanelRenderer/contents";
@@ -541,6 +541,69 @@ impl PlaylistPaging {
     /// read, too.
     pub fn next_token(&mut self, raw: &str) -> Option<String> {
         self.read(raw).ok()?.1
+    }
+}
+
+/// A playlist's first page, `raw`, read: the header and its songs, and where the list goes
+/// on (`PlaylistRest`), if it does.
+pub fn playlist_first(
+    raw: &str,
+    id: &PlaylistId,
+) -> Result<(Playlist, Option<PlaylistRest>), ApiError> {
+    let summary = playlist_summary(raw, id)?;
+    let mut paging = PlaylistPaging::default();
+    let (tracks, token) = paging.read(raw)?;
+    let rest = token.map(|token| PlaylistRest {
+        id: id.clone(),
+        paging,
+        token,
+    });
+    let first = Playlist {
+        summary,
+        tracks,
+        pages: 1,
+    };
+    Ok((first, rest))
+}
+
+/// Where a playlist read so far goes on (`playlist_first`): the next page's token, and the
+/// rows listed so far, so the pages after leave out the ones they hand out again. Read on
+/// with `YtMusic::playlist_rest`, or a page at a time with `read`.
+pub struct PlaylistRest {
+    id: PlaylistId,
+    paging: PlaylistPaging,
+    token: String,
+}
+
+impl PlaylistRest {
+    pub fn id(&self) -> &PlaylistId {
+        &self.id
+    }
+
+    /// The pages read so far, the first included.
+    pub fn pages(&self) -> usize {
+        self.paging.pages
+    }
+
+    /// What the next page is asked for with.
+    pub fn token(&self) -> &str {
+        &self.token
+    }
+
+    /// Reads `raw`, the answer to `token`: its new songs, and where the list goes on after
+    /// it, if it does (`PlaylistPaging::read`).
+    pub fn read(mut self, raw: &str) -> Result<(Vec<Track>, Option<PlaylistRest>), ApiError> {
+        let (tracks, next) = self.paging.read(raw)?;
+        Ok((tracks, next.map(|token| PlaylistRest { token, ..self })))
+    }
+}
+
+impl std::fmt::Debug for PlaylistRest {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PlaylistRest")
+            .field("id", &self.id)
+            .field("pages", &self.pages())
+            .finish_non_exhaustive()
     }
 }
 
