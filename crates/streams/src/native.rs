@@ -851,7 +851,7 @@ impl Inner {
         Some(Ready {
             config,
             player,
-            fetched: UNIX_EPOCH + Duration::from_secs(v["fetched"].as_u64()?),
+            fetched: crate::expiry::unix_secs(v["fetched"].as_u64()?)?,
             page: self.next_page(),
         })
     }
@@ -1197,10 +1197,11 @@ pub(crate) fn finish(
         url = with_param(&url, sp, answer);
     }
     // Counted from the next whole second, as yt-dlp does (its URLs played so, 2026-11-07).
-    let available_at = p.gate.map(|gate| {
+    // A gate past what the clock can hold (a damaged answer) is left out.
+    let available_at = p.gate.and_then(|gate| {
         let since = now.duration_since(UNIX_EPOCH).unwrap_or_default();
         let whole = since.as_secs() + u64::from(since.subsec_nanos() > 0);
-        UNIX_EPOCH + Duration::from_secs(whole) + gate
+        crate::expiry::unix_secs(whole)?.checked_add(gate)
     });
     Ok(ResolvedStream {
         expires_at: expires_at_from_url(&url, now),
@@ -1879,6 +1880,21 @@ _result.sig = (s) => s.slice(2).split("").reverse().join("");"#;
         );
     }
 
+    /// A gate past what the clock can hold (a damaged answer) is left out, without a panic.
+    #[test]
+    fn a_gate_too_far_ahead_is_left_out() {
+        let mut p =
+            parse_player_response(&with_ads(AD_SLOT), VIDEO, Quality::High.itags()).unwrap();
+        p.gate = Some(Duration::MAX);
+        let (_, s) = p.sig.clone().unwrap();
+        let answers = Answers {
+            n: HashMap::from([("tbgZJm7jUNULHGjSAEd".into(), "solved-n".into())]),
+            sig: HashMap::from([(s, "solved-sig".into())]),
+        };
+        let stream = finish(p, &answers, SystemTime::now()).unwrap();
+        assert_eq!(stream.available_at, None);
+    }
+
     #[test]
     fn an_ad_that_cant_be_skipped_gates_the_url_for_its_length() {
         let ads = AD_SLOT.replace(r#""skipOffsetMilliseconds":5000,"#, "");
@@ -2206,6 +2222,20 @@ _result.sig = (s) => s.slice(2).split("").reverse().join("");"#;
             next_start.inner.load().is_none(),
             "the next start fetches a fresh embed page"
         );
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// A kept state whose time is past what the clock can hold (damaged) is read as none,
+    /// without a panic: the next start fetches the page again.
+    #[test]
+    fn a_kept_state_fetched_too_far_ahead_is_not_loaded() {
+        let (_r, dir) = seeded("far-fetched", "http://127.0.0.1:9");
+        let path = dir.join("state.json");
+        let mut v: Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        v["fetched"] = u64::MAX.into();
+        std::fs::write(&path, v.to_string()).unwrap();
+        let next_start = NativeResolver::with_dirs(dir.clone(), "http://127.0.0.1:9").unwrap();
+        assert!(next_start.inner.load().is_none());
         std::fs::remove_dir_all(&dir).unwrap();
     }
 

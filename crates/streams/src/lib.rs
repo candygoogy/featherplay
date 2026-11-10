@@ -24,7 +24,7 @@ use std::time::{Duration, SystemTime};
 use featherplay_core::failure::HelperFault;
 use featherplay_core::model::TrackId;
 
-pub use expiry::expires_at_from_url;
+pub use expiry::{expires_at_from_url, unix_secs};
 pub use sidecars::{Downloads, Sidecars};
 pub use ytdlp::{Probe, YtDlpResolver, classify_failure, parse_ytdlp_json};
 

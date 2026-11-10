@@ -7,8 +7,14 @@ const FALLBACK_LIFETIME: Duration = Duration::from_secs(5 * 3600);
 pub fn expires_at_from_url(url: &str, fallback_now: SystemTime) -> SystemTime {
     query_param(url, "expire")
         .and_then(|v| v.parse::<u64>().ok())
-        .map(|secs| UNIX_EPOCH + Duration::from_secs(secs))
+        .and_then(unix_secs)
         .unwrap_or(fallback_now + FALLBACK_LIFETIME)
+}
+
+/// `secs` after the Unix epoch, or `None` past what `SystemTime` holds (adding would panic):
+/// for times read from a file or an answer.
+pub fn unix_secs(secs: u64) -> Option<SystemTime> {
+    UNIX_EPOCH.checked_add(Duration::from_secs(secs))
 }
 
 /// The percent-decoded value of the first `key=` parameter in `url`'s query string.

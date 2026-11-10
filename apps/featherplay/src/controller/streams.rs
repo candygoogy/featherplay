@@ -635,7 +635,7 @@ impl Streams {
         let Ok(v) = serde_json::from_str::<Value>(text) else {
             return;
         };
-        let at = |v: &Value| v.as_u64().map(|s| UNIX_EPOCH + Duration::from_secs(s));
+        let at = |v: &Value| v.as_u64().and_then(featherplay_streams::unix_secs);
         let text = |v: &Value| v.as_str().map(str::to_string);
         for s in v["streams"].as_array().into_iter().flatten() {
             let (Some(id), Some(url), Some(expires_at)) =
@@ -1564,6 +1564,24 @@ mod tests {
         s.restore(&before.saved(now), now);
         let db = |t: &str| s.get(&id(t)).map(|x| x.loudness_db);
         assert_eq!((db("loud"), db("ytdlp")), (Some(Some(7.17)), Some(None)));
+    }
+
+    /// A saved file with times past what the clock can hold (written by hand, or damaged)
+    /// is read without a panic: such a stream isn't kept, and such a gate is left out.
+    #[test]
+    fn a_saved_time_too_far_ahead_is_read_without_a_panic() {
+        let now = SystemTime::now();
+        let url = "https://rr1.example.invalid/videoplayback?ip=1.2.3.4";
+        let soon = (now + HOURS).duration_since(UNIX_EPOCH).unwrap().as_secs();
+        let text = serde_json::json!({ "streams": [
+            { "id": "far", "url": url, "expires": u64::MAX },
+            { "id": "gate", "url": url, "expires": soon, "available_at": u64::MAX },
+        ] })
+        .to_string();
+        let mut s = Streams::default();
+        s.restore(&text, now);
+        assert!(s.get(&id("far")).is_none());
+        assert_eq!(s.get(&id("gate")).map(|x| x.available_at), Some(None));
     }
 
     /// Once a resolve shows another address, the last session's streams no longer answer,

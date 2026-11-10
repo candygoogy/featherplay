@@ -76,7 +76,7 @@ pub fn parse_ytdlp_json(json: &str, now: SystemTime) -> Result<ResolvedStream, R
             .map(Duration::from_secs_f64),
         available_at: v["available_at"]
             .as_u64()
-            .map(|s| UNIX_EPOCH + Duration::from_secs(s)),
+            .and_then(crate::expiry::unix_secs),
         video_title: text(&v["title"]),
         first_tag: text(&v["tags"][0]),
         // yt-dlp's formats don't carry YouTube's `loudnessDb`.

@@ -35,6 +35,16 @@ fn parse_picks_requested_format() {
     );
 }
 
+/// An `available_at` past what the clock can hold is left out, without a panic.
+#[test]
+fn parse_leaves_out_a_gate_too_far_ahead() {
+    let mut v: serde_json::Value = serde_json::from_str(FIXTURE_140).unwrap();
+    v["available_at"] = u64::MAX.into();
+    let now = UNIX_EPOCH + Duration::from_secs(1_793_021_330);
+    let s = parse_ytdlp_json(&v.to_string(), now).expect("parses");
+    assert_eq!(s.available_at, None);
+}
+
 #[test]
 fn parse_unavailable_maps_error() {
     // yt-dlp -J prints `null` and exits 1 for an unavailable video.
