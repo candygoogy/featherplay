@@ -43,8 +43,8 @@ use crate::app::Ctx;
 use crate::controller::PlayerState;
 use crate::ui::{
     AlbumData, ArtistData, Frame, HistoryData, HomeData, ItemKind, LibraryData, Nav,
-    NowPlayingData, PageKind, Player, PlaylistData, QueueData, RowHover, SearchData, TopBarData,
-    TrackRow,
+    NowPlayingData, PageHover, PageKind, Player, PlaylistData, QueueData, RowHover, SearchData,
+    TopBarData, TrackRow,
 };
 
 /// A paint gap longer than this starts a new run of frames: the window was idle between.
@@ -1222,6 +1222,12 @@ impl Driver {
                 self.record("pause", words, m, None);
                 Ok(())
             }
+            "rest-card" => {
+                // `PageIntent`'s report once the pointer has stood still over the card.
+                let card = self.card(num(1)? as usize)?;
+                ui.global::<PageHover>().invoke_rested(card.kind, card.id);
+                Ok(())
+            }
             "rest" => {
                 let (rows, _) = self.page_rows()?;
                 let row = rows.row_data(num(1)? as usize).ok_or("no such row")?;
@@ -1354,6 +1360,8 @@ impl Driver {
     /// A navigation or any step whose result is a page: runs `act`, then waits for it to
     /// settle.
     async fn nav(&mut self, words: &[String], act: impl FnOnce()) -> Result<(), String> {
+        // Taken before the step's clock starts, so it isn't in the step's times.
+        let before = sample();
         let (t0, c0) = begin();
         act();
         let mut m = Map::new();
@@ -1361,6 +1369,7 @@ impl Driver {
         m.insert("cpu_ms".into(), json!(round(cpu_ms() - c0)));
         frames(&mut m, self.out.period);
         decodes(&mut m);
+        threads(&mut m, &before, t0);
         self.record(&words[0], words, m, None);
         Ok(())
     }
@@ -1569,10 +1578,20 @@ impl Driver {
         Ok(())
     }
 
-    /// Card `i` of the page shown (Library's tabs, search results).
+    /// Card `i` of the page shown (Library's tabs, search results, an artist's albums, and
+    /// Home's cards that open a page, counted across its shelves, top first).
     fn card(&self, i: usize) -> Result<crate::ui::CardItem, String> {
         let ui = self.ui()?;
         let cards = match self.ctx.current_page().kind() {
+            PageKind::Home => {
+                let shelves = ui.global::<HomeData>().get_shelves();
+                return shelves
+                    .iter()
+                    .flat_map(|shelf| shelf.items.iter().collect::<Vec<_>>())
+                    .filter(|card| card.kind != ItemKind::Song)
+                    .nth(i)
+                    .ok_or_else(|| format!("open-card: no card {i} on Home"));
+            }
             PageKind::Library => ui.global::<LibraryData>().get_cards(),
             PageKind::Search => ui.global::<SearchData>().get_cards(),
             PageKind::Artist => ui.global::<ArtistData>().get_albums(),
