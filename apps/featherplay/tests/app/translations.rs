@@ -323,6 +323,10 @@ const NOT_TRANSLATED: &[&str] = &[
     "K",
     // Keys on the shortcuts list.
     "R",
+    // Slint's `AboutSlint`, which shows them untranslated (`made_with_slint.slint`).
+    "#MadeWithSlint",
+    "Version 1.18.1\nhttps://slint.dev/",
+    "https://slint.dev",
 ];
 
 /// The string literals of a `.slint` line, with what precedes and follows each; a `//`

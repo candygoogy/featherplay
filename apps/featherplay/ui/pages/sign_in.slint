@@ -9,6 +9,7 @@
 // above the card in plain words, with Try again. Driven by `src/pages/sign_in.rs`.
 import { Theme, Icons, Curves } from "../theme.slint";
 import { Body, ChoiceList, ChoiceRow, Display, Icon, Pill, TextLink } from "../parts.slint";
+import { Logo } from "../logo.slint";
 import { Nav, PageKind } from "../nav.slint";
 
 // A way in, for Try again.
@@ -364,11 +365,9 @@ export component SignInPage inherits Rectangle {
 
             HorizontalLayout {
                 alignment: center;
-                Image {
+                Logo {
                     width: 56px;
                     height: 56px;
-                    source: Theme.logo;
-                    accessible-role: none;
                 }
             }
             VerticalLayout {

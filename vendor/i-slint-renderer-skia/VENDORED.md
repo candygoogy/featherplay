@@ -1,6 +1,6 @@
 # Vendored: i-slint-renderer-skia 1.18.1
 
-This is the crate as published on crates.io, with seventeen changes. The workspace `Cargo.toml`
+This is the crate as published on crates.io, with eighteen changes. The workspace `Cargo.toml`
 swaps it in with `[patch.crates-io]`.
 
 1. `Cargo.toml`: `wgpu-30` is out of the default features.
@@ -152,6 +152,19 @@ Change 17 keeps a colour fade's shadows out of memory (measured 2026-11-08):
     test). The mask is a quarter of the image's bytes, and is made once for the fade.
     Inset shadows still go through the box shadow cache.
 
+Change 18 leaves the SVG renderer out (measured 2026-11-10):
+
+18. `Cargo.toml`: `svg` is out of the `i-slint-core` features (as in the vendored
+    `i-slint-backend-winit`, the only other crate that asked for it), and `cached_image.rs`,
+    `as_skia_image`, has no `ImageInner::Svg` arm (`#[cfg(any())]`, marked `featherplay
+    patch`). featherplay draws its vector images (the Tri-vane, the Made with Slint badge in
+    place of std-widgets' `AboutSlint`, the scroll bars' arrows) as `Path`s, so nothing
+    needs resvg at runtime; without it, usvg, resvg, their text shaping and font database,
+    tiny-skia, roxmltree and svgtypes leave the exe: about 1.5 MB. An `@image-url` of an
+    `.svg` now draws nothing: the one left in the UI is std-widgets' sub-menu arrow in
+    Slint's own popup menu, which featherplay's one menu (the search field's Cut, Copy,
+    Paste) never shows, having no sub-menu, and which Windows draws natively anyway.
+
 ## Why
 
 `i-slint-backend-winit` depends on this crate with its default features, and our crates
@@ -177,7 +190,7 @@ licence, which allows modified copies).
    new renderer already does the same (then check `scroll_frames.rs` still passes optimised),
    and change 16 (the exe's size shows whether Skia's GPU backend came back), and change
    17 unless the new box shadow cache leaves the colour out of its key (`memory.rs`' glow
-   test shows it).
+   test shows it), and change 18 (the exe's size shows whether resvg came back).
 4. Build. If `i-slint-backend-winit` still calls wgpu-only constructors, port the two
    wgpu `featherplay patch` blocks in `lib.rs` (the git history of this folder has the diff);
    if it now gates them itself, leave those two out.

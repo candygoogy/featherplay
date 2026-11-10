@@ -45,6 +45,7 @@ mod installer;
 mod instance;
 mod library_refresh;
 mod live_resize;
+mod logo;
 mod lyrics_arrive;
 mod lyrics_button;
 mod lyrics_cover;

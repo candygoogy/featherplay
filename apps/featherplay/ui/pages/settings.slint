@@ -5,6 +5,7 @@
 // applied by `src/pages/settings.rs`; changes apply at once and are saved by the controller.
 import { Theme, Curves, Icons, Appearance } from "../theme.slint";
 import { Body, Display, PageTitle, Pill, Icon, Cover, TextLink } from "../parts.slint";
+import { SmallLogo } from "../logo.slint";
 import { Player } from "../player.slint";
 import { Chips } from "content.slint";
 import { NowPlayingData } from "now_playing.slint";
@@ -897,10 +898,9 @@ component ProfileCard inherits Rectangle {
                                     background: Theme.ground;
                                     border-width: 3px;
                                     border-color: Theme.panel;
-                                    Image {
+                                    SmallLogo {
                                         width: 14px;
                                         height: 14px;
-                                        source: Theme.dark ? @image-url("../logo/tri-vane-16.svg") : @image-url("../logo/tri-vane-light-16.svg");
                                     }
                                 }
                             }

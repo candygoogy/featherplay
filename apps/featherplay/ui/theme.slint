@@ -71,10 +71,6 @@ export global Theme {
     out property <color> accent-tonal: accent.transparentize(dark ? 0.78 : 0.86);
     out property <color> accent-tonal-hover: accent.transparentize(dark ? 0.7 : 0.8);
 
-    // The Tri-vane logo for the ground: on light, the play sits on a deep-crimson ring, so
-    // the white play doesn't read as a hole on white (the master drawing, 32 px and up).
-    out property <image> logo: dark ? @image-url("logo/tri-vane.svg") : @image-url("logo/tri-vane-light.svg");
-
     // Grounds and surfaces, neutral greys. Dark is near-black, the sidebar a step darker,
     // the bar and panels a step lighter, raised cards lighter again; light is white, with
     // the sidebar, bar and cards in light greys.

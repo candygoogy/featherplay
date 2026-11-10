@@ -1,12 +1,14 @@
 // About (a calm single column): the logo, the tagline, the version row with "Check for
 // updates" and what the last check found, the not-affiliated disclaimer, the log folder and
 // the diagnostics for a bug report, the licences and the Made with Slint badge that Slint's
-// royalty-free licence asks for (its `AboutSlint` widget). Filled by `src/pages/about.rs`.
+// royalty-free licence asks for (its `AboutSlint` widget, drawn as paths: `MadeWithSlint`).
+// Filled by `src/pages/about.rs`.
 // When a newer release is out (`src/updates.rs`), a banner above the logo says so, in one of
 // the states of `UpdateState`, and the row's pill goes: the banner's button is the action.
-import { AboutSlint } from "std-widgets.slint";
+import { MadeWithSlint } from "../made_with_slint.slint";
 import { Theme } from "../theme.slint";
 import { Body, Display, Pill, TextLink } from "../parts.slint";
+import { Logo } from "../logo.slint";
 
 // A third-party component and its licence.
 export struct Credit {
@@ -347,11 +349,9 @@ export component AboutPage inherits Rectangle {
 
             VerticalLayout {
                 spacing: Theme.s3;
-                Image {
+                Logo {
                     width: 72px;
                     height: 72px;
-                    source: Theme.logo;
-                    accessible-role: none;
                 }
                 Display {
                     text: "featherplay";
@@ -431,7 +431,7 @@ export component AboutPage inherits Rectangle {
 
             HorizontalLayout {
                 alignment: start;
-                AboutSlint {
+                MadeWithSlint {
                     width: 200px;
                 }
             }

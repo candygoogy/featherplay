@@ -283,7 +283,6 @@ default-features = false
 version = "=1.18.1"
 features = [
     "image-decoders",
-    "svg",
 ]
 default-features = false
 

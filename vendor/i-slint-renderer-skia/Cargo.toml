@@ -105,7 +105,6 @@ features = [
     "box-shadow-cache",
     "shared-parley",
     "image-decoders",
-    "svg",
 ]
 default-features = false
 

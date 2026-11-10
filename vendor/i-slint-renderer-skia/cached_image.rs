@@ -35,6 +35,8 @@ pub(crate) fn as_skia_image(
     canvas: &skia_safe::Canvas,
     surface: Option<&dyn crate::Surface>,
 ) -> Option<skia_safe::Image> {
+    // featherplay patch (change 18): only the SVG arm read it.
+    let _ = image_fit;
     let image_inner: &ImageInner = (&image).into();
     match image_inner {
         ImageInner::None => None,
@@ -50,6 +52,9 @@ pub(crate) fn as_skia_image(
             }
             result
         }
+        // featherplay patch (change 18): i-slint-core is built without `svg`, so there's no
+        // `ImageInner::Svg` to draw.
+        #[cfg(any())]
         ImageInner::Svg(svg) => {
             // Query target_width/height here again to ensure that changes will invalidate the item rendering cache.
             let target_size = i_slint_core::graphics::scalable_render_size(

@@ -25,7 +25,9 @@ touches another. The shared files below change only when a page needs something 
 | `sign_in_window.slint` | `SignInWindow`, the sign-in window's slim browser frame: back, reload, the read-only address (padlock for https, the host in full weight, the path dimmed, "Google's page" for Google's sign-in hosts) and the status strip, round the room where the WebView2 page sits as a child window of another thread; `src/pages/sign_in/frame.rs`, the page in `webview.rs`, the address from the webview's `Source` in `address.rs` | account |
 | `not_for_me.slint` | `NotForMeButton`, the thumbs-down beside the heart (styled as it) in the bar and on Now playing, with its tooltip: rates Dislike and skips, the toast offers Undo; `src/not_for_me.rs` | frame (shared) |
 | `bar_tip.slint` | `BarTip`, the player bar's one tooltip (the name, then the shortcut, after a 500 ms rest; a click hides it until the pointer leaves), placed after its button; `Tooltips.on`, Settings' "Show tooltips" | frame (shared) |
-| `list_view.slint` | `ListView`, imported in place of std-widgets' one: the fluent style's ListView and scroll bars as they are, with the bars compiled once instead of into every list (`list_view/` holds the bars' arrows) | frame (shared) |
+| `list_view.slint` | `ListView`, imported in place of std-widgets' one: the fluent style's ListView and scroll bars as they are, with the bars compiled once instead of into every list (their arrows drawn as paths) | frame (shared) |
+| `logo.slint` | `Logo` and `SmallLogo`, the Tri-vane in About, Sign in and the Discord preview, drawn with the paths of `logo/tri-vane*.svg`, so a release build has no SVG renderer; `tests/app/logo.rs` checks they match the drawings | frame (shared) |
+| `made_with_slint.slint` | `MadeWithSlint`, std-widgets' `AboutSlint` (the badge Slint's royalty-free licence asks for, at the end of About) with its badge drawn as paths, for the same reason | account |
 | `shortcuts.slint` | `Shortcuts`, the window's keyboard shortcuts listed once: Settings' "Keyboard shortcuts" dialog (`ShortcutsDialog`, Ctrl+/) shows them, and `app.slint`'s key handler reports each one it takes (`Shortcuts.used`), so a test checks the two agree | frame (shared) |
 | `probe.slint` | `Probe`, a small animated region that only `tests/app/smoothness.rs` turns on, to price a continuously animated indicator | tests |
 | `pages/content.slint` | The page-level pieces the content pages share (Home, Library, album, playlist, artist, search): headers, skeletons, error and empty states, `TopScrim` | content pages |
@@ -45,7 +47,7 @@ Rust mirrors this in `src/`: one module per page in `src/pages/<page>.rs`, with
 Fonts and art: `fonts/manrope/` (Manrope, SIL OFL 1.1; `OFL.txt` goes into About) and
 `logo/` (Tri-vane: `tri-vane*.svg` for the window, taskbar, exe and in-app logo, with
 16 and 24 px drawings; `tri-vane-light*.svg`, the play on a deep-crimson ring, for light
-grounds: `Theme.logo` in the light theme, and the window and taskbar icon under a light
+grounds: `logo.slint`'s ring in the light theme, and the window and taskbar icon under a light
 taskbar, and the tray icon on a dark or light taskbar; `tri-vane-tray-{white,black}.svg`, the
 one-colour glyph the tray used to show, are kept but unused).
 `build.rs` renders the drawings into `featherplay.ico` (the exe's icon, and the window's
