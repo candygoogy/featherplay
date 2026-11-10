@@ -40,6 +40,9 @@ pub struct Queue {
     original: Vec<u64>,
     /// Keys of the entries a radio continuation appended; may hold stale keys.
     continued: HashSet<u64>,
+    /// Keys of the entries Add to queue put at the end (`enqueue`), which a list's later
+    /// tracks go before (`extend_list`); may hold stale keys.
+    added: HashSet<u64>,
     /// Up next was cleared since the list was played: more of it (`extend_list`) is let go.
     list_cleared: bool,
     rng: u64,
@@ -59,6 +62,7 @@ impl Queue {
         self.radio = radio;
         self.original.clear();
         self.continued.clear();
+        self.added.clear();
         self.list_cleared = false;
         if self.shuffle {
             self.original = self.keys.clone();
@@ -193,21 +197,28 @@ impl Queue {
     /// Appends `tracks` to the end. On an empty queue the first one becomes current.
     pub fn enqueue(&mut self, tracks: Vec<Track>) {
         for track in tracks {
-            self.push(track);
+            let key = self.push(track);
+            self.added.insert(key);
         }
     }
 
     /// More of the list that's playing, arrived after it started (a long playlist's later
-    /// pages): after the list's upcoming tracks, before any a continuation appended. With
-    /// `mix_seed` (the list was shuffled), or with shuffle on, each goes to a random place
-    /// among the list's upcoming tracks instead. On an empty queue the first one becomes
-    /// current. Nothing once Up next was cleared since the list was played.
+    /// pages): after the list's upcoming tracks, before any Add to queue put after them
+    /// (where those would be had the whole list been read) and any a continuation appended.
+    /// With `mix_seed` (the list was shuffled), or with shuffle on, each goes to a random
+    /// place among the list's upcoming tracks instead. On an empty queue the first one
+    /// becomes current. Nothing once Up next was cleared since the list was played.
     pub fn extend_list(&mut self, tracks: Vec<Track>, mix_seed: Option<u64>) {
         if self.list_cleared {
             return;
         }
+        let after_list = |k: &u64| self.continued.contains(k) || self.added.contains(k);
         let base = (self.index + 1).min(self.tracks.len());
-        let list_end = base + self.autoplay_start().unwrap_or(self.tracks.len() - base);
+        let list_end = base
+            + self.keys[base..]
+                .iter()
+                .position(after_list)
+                .unwrap_or(self.tracks.len() - base);
         if let Some(seed) = mix_seed {
             self.rng = seed ^ GOLDEN;
         }
@@ -219,7 +230,7 @@ impl Queue {
         let mut queued_at = self
             .original
             .iter()
-            .position(|k| self.continued.contains(k))
+            .position(after_list)
             .unwrap_or(self.original.len());
         // Where the list's own tracks end, as each one goes in.
         for (end, track) in (list_end..).zip(tracks) {

@@ -164,6 +164,34 @@ fn a_list_extended_after_it_started_goes_on_before_autoplay() {
     assert_eq!(q.autoplay_start(), Some(2));
 }
 
+/// Songs added to the queue while a long playlist's later pages still arrive go after the
+/// whole list, as they would had it all been read: the pages go in before them. Play next
+/// stays right after the current song, and autoplay after all of it.
+#[test]
+fn a_list_extended_after_songs_were_added_goes_on_before_them() {
+    let mut q = Queue::new();
+    q.replace(tracks(&["a", "b"]), 0, false);
+    q.enqueue(tracks(&["x"]));
+    q.play_next(track("n"));
+    q.append_continuation(tracks(&["auto"]));
+    q.extend_list(tracks(&["c", "d"]), None);
+    assert_eq!(ids(q.upcoming()), ["n", "b", "c", "d", "x", "auto"]);
+}
+
+/// The same with shuffle on: the pages are mixed in among the list's own songs, never
+/// after a song added to the queue; turned off, the queued order has them before it too.
+#[test]
+fn a_shuffled_list_extended_after_songs_were_added_keeps_them_last() {
+    let mut q = Queue::new();
+    q.set_shuffle(true, 7);
+    q.replace(tracks(&["a", "b", "c"]), 0, false);
+    q.enqueue(tracks(&["x"]));
+    q.extend_list(tracks(&["d", "e"]), None);
+    assert_eq!(ids(q.upcoming()).last(), Some(&"x"));
+    q.set_shuffle(false, 0);
+    assert_eq!(ids(q.upcoming()).last(), Some(&"x"));
+}
+
 /// Up next cleared while a long playlist's later pages still arrive: they don't fill it
 /// again. A new play from a list takes them once more.
 #[test]
