@@ -587,7 +587,7 @@ impl Solver {
                     Err(e) => Err(e.clone()),
                 };
                 let result = result.map_err(|e| match timer.timed_out() {
-                    true => "the solver timed out".to_string(),
+                    true => OVER_LIMIT.to_string(),
                     false => e,
                 });
                 let _ = tell.send(result);
@@ -603,7 +603,7 @@ impl Solver {
     }
 
     pub(crate) async fn solve(mut self, n: &[String], sig: &[String]) -> Result<Answers, String> {
-        let stopped = || "the solver stopped".to_string();
+        let stopped = || STOPPED.to_string();
         self.ask
             .send((n.to_vec(), sig.to_vec()))
             .map_err(|_| stopped())?;
@@ -612,10 +612,19 @@ impl Solver {
         match tokio::time::timeout(limit, &mut self.answer).await {
             Ok(Ok(result)) => result,
             Ok(Err(_)) => Err(stopped()),
-            Err(_) => Err("the solver timed out".into()),
+            Err(_) => Err(TIMED_OUT.into()),
         }
     }
 }
+
+/// The player's challenges ran past the solver's own time limit (`SOLVE`): the player's
+/// doing, as one that never ends.
+pub(crate) const OVER_LIMIT: &str = "the player's challenges timed out in the solver";
+/// The solver's thread didn't answer by its limit and then some (`Solver::solve`'s watchdog):
+/// a busy machine may be why.
+pub(crate) const TIMED_OUT: &str = "the solver didn't answer in time";
+/// A solver whose thread ended, or never started, before it answered.
+pub(crate) const STOPPED: &str = "the solver stopped";
 
 impl Drop for Solver {
     fn drop(&mut self) {
@@ -862,7 +871,7 @@ _result.sig = (s) => s.slice(2).split("").reverse().join("");"#;
             ..SOLVE
         };
         for (code, said) in [
-            ("_result.n = () => { for (;;) {} };", "timed out"),
+            ("_result.n = () => { for (;;) {} };", OVER_LIMIT),
             ("_result.n = function f(x) { return f(x) + 1; };", "stack"),
             (
                 "_result.n = () => { const all = []; for (;;) all.push(new Array(1e5).fill(1)); };",

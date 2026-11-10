@@ -83,6 +83,9 @@ const STRAY_AFTER: Duration = Duration::from_secs(600);
 /// 30 min off cost every song 2.6-10.8 s, while each fresh visitor got URLs.
 const MAX_FAILURES: u32 = 3;
 const OFF_FOR: Duration = Duration::from_secs(5 * 60);
+/// How often the solver may not answer for one player before it counts as one that can't
+/// be solved: each time holds a resolve up to its watchdog (`Solver::solve`, ~30 s).
+const SOLVER_TIMEOUTS: u32 = 2;
 
 /// Why a native resolve didn't give a stream.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -205,6 +208,8 @@ struct Health {
     off_until: Option<Instant>,
     /// Players whose challenges couldn't be solved.
     bad: HashSet<String>,
+    /// How often the solver didn't answer for each player (`solve_failed`).
+    solver_timeouts: HashMap<String, u32>,
     /// visionOS answers in a row without a stream.
     visionos_failures: u32,
     visionos_off_until: Option<Instant>,
@@ -279,6 +284,25 @@ fn song_not_client(e: &NativeError) -> bool {
 }
 
 impl Health {
+    /// `player`'s solve failed with `e`: it can't be solved (`bad`) when its challenges
+    /// threw or ran past the solver's own limit, or when the solver didn't answer for it
+    /// `SOLVER_TIMEOUTS` times (once may be a busy machine). A solver that stopped (its
+    /// thread couldn't start) says nothing of the player.
+    fn solve_failed(&mut self, player: &str, e: &str) {
+        let bad = match e {
+            js::STOPPED => false,
+            js::TIMED_OUT => {
+                let n = self.solver_timeouts.entry(player.to_string()).or_default();
+                *n += 1;
+                *n >= SOLVER_TIMEOUTS
+            }
+            _ => true,
+        };
+        if bad {
+            self.bad.insert(player.to_string());
+        }
+    }
+
     /// visionOS off for `time`, or for longer if it's off for longer already.
     fn visionos_off(&mut self, time: Duration) {
         let until = Instant::now() + time;
@@ -606,7 +630,7 @@ impl Inner {
             match solver.solve(&n, &sig).await {
                 Ok(a) => a,
                 Err(e) => {
-                    self.health.lock_or_recover().bad.insert(player.id.clone());
+                    self.health.lock_or_recover().solve_failed(&player.id, &e);
                     forget();
                     return Err(failed(format!("player {}: {e}", player.id)));
                 }
@@ -668,6 +692,17 @@ impl Inner {
                 self.install_behind(&r.config.player);
             }
         }
+        // A player whose challenges couldn't be solved gives way: the state that names it
+        // goes, from the disk too, and a fresh page's player answers (an older good one
+        // while it's installed), so a new player YouTube moved on to is found.
+        if let Some(r) = st
+            .as_ref()
+            .filter(|r| self.health.lock_or_recover().bad.contains(&r.player.id))
+        {
+            log::info!("player {} couldn't be solved: a fresh page", r.player.id);
+            let _ = std::fs::remove_file(self.dir.join("state.json"));
+            *st = None;
+        }
         let ready = match &*st {
             Some(ready) => ready.clone(),
             None => {
@@ -677,13 +712,6 @@ impl Inner {
                 ready
             }
         };
-        if self.health.lock_or_recover().bad.contains(&ready.player.id) {
-            *st = None;
-            return Err(failed(format!(
-                "player {} couldn't be solved",
-                ready.player.id
-            )));
-        }
         Ok(ready)
     }
 
@@ -707,10 +735,10 @@ impl Inner {
         let config =
             parse_embed_page(&page).ok_or_else(|| failed("no player in the embed page"))?;
         let players = self.dir.join("players");
-        let player = match installed(&players, &config.player) {
+        let good = |id: &str| !self.health.lock_or_recover().bad.contains(id);
+        let player = match installed(&players, &config.player).filter(|p| good(&p.id)) {
             Some(player) => player,
             None => {
-                let good = |id: &str| !self.health.lock_or_recover().bad.contains(id);
                 let older = fallback
                     .filter(|old| old.path.is_file() && good(&old.id))
                     .or_else(|| newest(&players, good));
@@ -762,11 +790,12 @@ impl Inner {
 
     async fn install_player(&self, id: &str) -> Result<Player, NativeError> {
         let players = self.dir.join("players");
-        if let Some(p) = installed(&players, id) {
-            return Ok(p);
-        }
+        // Installed or not, a player that couldn't be solved doesn't answer.
         if self.health.lock_or_recover().bad.contains(id) {
             return Err(failed(format!("player {id} couldn't be solved")));
+        }
+        if let Some(p) = installed(&players, id) {
+            return Ok(p);
         }
         let js = self
             .get_text(
@@ -781,7 +810,7 @@ impl Inner {
         let sts = player_sts(&js).ok_or_else(|| failed(format!("player {id} has no sts")))?;
         let pre = self.preprocess(js).await.map_err(|e| match e {
             // Says nothing about the player: it's tried again next time.
-            PreprocessError::NotStarted(e) => e,
+            PreprocessError::NotStarted(e) | PreprocessError::Interrupted(e) => e,
             PreprocessError::Unsolved(e) => {
                 self.health.lock_or_recover().bad.insert(id.to_string());
                 e
@@ -1414,8 +1443,11 @@ async fn warm(player: &Player) {
 enum PreprocessError {
     /// The work didn't start, so nothing is known about the player.
     NotStarted(NativeError),
-    /// EJS ran on the player and failed, or took too long.
+    /// EJS ran on the player and failed, or ran past its own time limit, and said so.
     Unsolved(NativeError),
+    /// The child preprocessing it ended before it said how it went (killed, crashed, hung
+    /// past its own limit): nothing is known about the player, and it's tried again later.
+    Interrupted(NativeError),
 }
 
 /// `work` on the blocking pool: it waits for a QuickJS thread, which an async thread
@@ -1465,22 +1497,39 @@ async fn run_with_stdin(
         drop(pipe);
         child.wait_with_output().await
     };
+    // A child that hangs past its own limit, or whose pipes broke, says nothing of the
+    // player either.
+    let interrupted = |m: String| PreprocessError::Interrupted(failed(m));
     let out = tokio::time::timeout(timeout, run)
         .await
-        .map_err(|_| unsolved("the preprocessor timed out".into()))?
-        .map_err(|e| unsolved(format!("the preprocessor: {e}")))?;
+        .map_err(|_| interrupted("the preprocessor timed out".into()))?
+        .map_err(|e| interrupted(format!("the preprocessor: {e}")))?;
     if !out.status.success() {
-        let err = String::from_utf8_lossy(&out.stderr);
-        return Err(unsolved(format!(
-            "the preprocessor exited with {}: {}",
-            out.status.code().unwrap_or(-1),
-            crate::sidecars::tail(&err, 300)
-        )));
+        return Err(child_failed(
+            out.status.code(),
+            &String::from_utf8_lossy(&out.stderr),
+        ));
     }
     String::from_utf8(out.stdout)
         .ok()
         .filter(|player| !player.is_empty())
         .ok_or_else(|| unsolved("the preprocessor gave no player".into()))
+}
+
+/// Why a preprocessing child that exited with `code` and `stderr` failed: EJS failed when
+/// it exits with 1 and says why (`preprocess_stdio`); one that ended without a reason was
+/// killed or crashed, which says nothing of the player.
+fn child_failed(code: Option<i32>, stderr: &str) -> PreprocessError {
+    let e = failed(format!(
+        "the preprocessor exited with {}: {}",
+        code.unwrap_or(-1),
+        crate::sidecars::tail(stderr, 300)
+    ));
+    if code == Some(1) && !stderr.trim().is_empty() {
+        PreprocessError::Unsolved(e)
+    } else {
+        PreprocessError::Interrupted(e)
+    }
 }
 
 /// A job that ends `process` when its last handle closes: when it's dropped, or when this
@@ -2490,6 +2539,58 @@ _result.sig = (s) => s.slice(2).split("").reverse().join("");"#;
         assert_eq!(fetched.count(), 1);
         drop(log);
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// A player whose challenges couldn't be solved isn't the one answering from then on,
+    /// though the kept state names it: the next resolve fetches a page and answers with the
+    /// player that page names, installed now.
+    #[tokio::test]
+    async fn a_player_that_couldnt_be_solved_gives_way_to_the_next_one() {
+        let (base, log) = new_player_server();
+        let (mut r, dir) = seeded("bad-player", &base);
+        r.set_preprocessor(stub(FAKE_PLAYER));
+        r.inner.health.lock().unwrap().bad.insert("096efeec".into());
+        r.resolve(VIDEO, Quality::High).await.unwrap();
+        assert!(
+            log.lock()
+                .unwrap()
+                .iter()
+                .any(|l| l.contains("/s/player/abcd1234/")),
+            "the page's player wasn't installed: {:?}",
+            log.lock().unwrap()
+        );
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// A player whose challenges throw or run past the solver's limit can't be solved; one
+    /// the solver once didn't answer for (a busy machine) or that stopped (a thread that
+    /// couldn't start) is tried again, but not after it didn't answer again.
+    #[test]
+    fn a_player_is_set_aside_for_its_own_failures_and_repeated_timeouts() {
+        let bad = |errors: &[&str]| {
+            let mut h = Health::default();
+            for e in errors {
+                h.solve_failed("p", e);
+            }
+            h.bad.contains("p")
+        };
+        assert!(bad(&["n: TypeError: not a function"]));
+        assert!(bad(&[js::OVER_LIMIT]), "a run past the limit");
+        assert!(!bad(&[js::STOPPED, js::STOPPED, js::STOPPED]));
+        assert!(!bad(&[js::TIMED_OUT]), "one timeout");
+        assert!(bad(&[js::TIMED_OUT, js::TIMED_OUT]), "timed out again");
+    }
+
+    /// A preprocessing child that ended without a reason (killed, crashed) says nothing of
+    /// the player; one that failed says why on stderr.
+    #[test]
+    fn a_preprocessor_that_ends_without_a_reason_leaves_the_player_good() {
+        let unsolved =
+            |code, err: &str| matches!(child_failed(code, err), PreprocessError::Unsolved(_));
+        assert!(unsolved(Some(1), "EJS: no n function"));
+        assert!(!unsolved(Some(1), ""), "killed (TerminateProcess's code 1)");
+        assert!(!unsolved(Some(-1_073_741_819), ""), "crashed");
+        assert!(!unsolved(None, ""));
     }
 
     /// A first run has no player. The app's start fetches a page and installs its player
