@@ -208,6 +208,9 @@ struct Health {
     /// visionOS answers in a row without a stream.
     visionos_failures: u32,
     visionos_off_until: Option<Instant>,
+    /// The songs visionOS said were unavailable since its last stream, the last
+    /// `VISIONOS_MAX_FAILURES` at most.
+    visionos_unavailable: Vec<String>,
 }
 
 impl Health {
@@ -216,12 +219,37 @@ impl Health {
             .is_none_or(|until| Instant::now() >= until)
     }
 
-    /// Counts a visionOS answer; enough in a row without a stream turn the client off.
-    fn visionos_answered(&mut self, answer: &Result<ResolvedStream, NativeError>) {
+    /// Counts visionOS's answer for `video`; enough in a row without a stream turn the
+    /// client off. "This video is unavailable" counts once it's said of different songs
+    /// in a row: for one song it's the song's, for several it's what a client config
+    /// YouTube no longer takes gets. `counts`: not for a song prepared aside
+    /// (`resolve_aside`), so a page of them can't turn it off for the clicks.
+    fn visionos_answered(
+        &mut self,
+        video: &str,
+        answer: &Result<ResolvedStream, NativeError>,
+        counts: bool,
+    ) {
         match answer {
-            Ok(_) => self.visionos_failures = 0,
-            // The song, not the client: made for kids, no such format, DRM.
-            Err(NativeError::Skip(m)) if !m.starts_with("LOGIN_REQUIRED") => {}
+            Ok(_) => {
+                self.visionos_failures = 0;
+                self.visionos_unavailable.clear();
+            }
+            Err(_) if !counts => {}
+            Err(NativeError::Failed(m)) if m.starts_with("ERROR:") => {
+                let songs = &mut self.visionos_unavailable;
+                if !songs.iter().any(|v| v == video) {
+                    songs.push(video.to_string());
+                    if songs.len() > VISIONOS_MAX_FAILURES as usize {
+                        songs.remove(0);
+                    }
+                }
+                if songs.len() >= VISIONOS_MAX_FAILURES as usize {
+                    self.visionos_failures = VISIONOS_MAX_FAILURES - 1;
+                    self.visionos_off(OFF_FOR);
+                }
+            }
+            Err(e) if song_not_client(e) => {}
             Err(_) => {
                 self.visionos_failures += 1;
                 if self.visionos_failures >= VISIONOS_MAX_FAILURES {
@@ -232,7 +260,25 @@ impl Health {
             }
         }
     }
+}
 
+/// Whether a visionOS answer without a stream is the song's doing rather than the client's:
+/// made for kids, no such format, DRM, an age check, or "This video is unavailable" (for
+/// one song: `Health::visionos_answered`). A sign-in it asks for otherwise ("confirm you're
+/// not a bot") is the client's.
+fn song_not_client(e: &NativeError) -> bool {
+    match e {
+        NativeError::Skip(m) => {
+            !m.starts_with("LOGIN_REQUIRED")
+                || m.contains("your age")
+                || m.contains("inappropriate")
+        }
+        NativeError::Failed(m) => m.starts_with("ERROR:"),
+        NativeError::NoUrl(_) => false,
+    }
+}
+
+impl Health {
     /// visionOS off for `time`, or for longer if it's off for longer already.
     fn visionos_off(&mut self, time: Duration) {
         let until = Instant::now() + time;
@@ -371,7 +417,7 @@ impl NativeResolver {
         {
             return Err(failed("off for a while after repeated failures"));
         }
-        let (result, page) = inner.resolve(video, quality).await;
+        let (result, page) = inner.resolve(video, quality, counts).await;
         let mut h = inner.health.lock_or_recover();
         match &result {
             Ok(_) | Err(NativeError::Skip(_)) => {
@@ -480,10 +526,12 @@ impl Inner {
     /// answer, else the embedded client's. An embedded answer without a URL asks once more
     /// from a fresh page (~0.45 s): some visitors get none every time while new ones do
     /// (2026-11-09). Resolves at once that get none share the first one's fresh page.
+    /// `counts`: a visionOS failure counts towards turning it off (`Health::visionos_answered`).
     async fn resolve(
         self: &Arc<Self>,
         video: &str,
         quality: Quality,
+        counts: bool,
     ) -> (Result<ResolvedStream, NativeError>, Option<u64>) {
         let ready = match self.ready(video).await {
             Ok(r) => r,
@@ -491,7 +539,9 @@ impl Inner {
         };
         if self.health.lock_or_recover().visionos_on() {
             let answer = self.visionos(video, quality, &ready).await;
-            self.health.lock_or_recover().visionos_answered(&answer);
+            self.health
+                .lock_or_recover()
+                .visionos_answered(video, &answer, counts);
             match answer {
                 Ok(stream) => return (Ok(stream), Some(ready.page)),
                 Err(NativeError::Skip(m) | NativeError::Failed(m) | NativeError::NoUrl(m)) => {
@@ -2107,6 +2157,57 @@ _result.sig = (s) => s.slice(2).split("").reverse().join("");"#;
         assert_eq!(client(&s), "WEB_EMBEDDED_PLAYER");
         assert_eq!(log.lock().unwrap().len(), 2);
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// What the visionOS client won't give for the song's sake (an age check, a song that's
+    /// unavailable) doesn't turn it off, nor do songs prepared aside: after as many as would
+    /// turn it off, the next click still asks it first.
+    #[tokio::test]
+    async fn song_refusals_and_resolves_aside_leave_visionos_on() {
+        let age = r#"{"playabilityStatus":{"status":"LOGIN_REQUIRED","reason":"Sign in to confirm your age"}}"#;
+        let gone =
+            r#"{"playabilityStatus":{"status":"ERROR","reason":"This video is unavailable"}}"#;
+        let bot = r#"{"playabilityStatus":{"status":"LOGIN_REQUIRED","reason":"Sign in to confirm you're not a bot"}}"#;
+        for (name, answer, aside) in [
+            ("age", age, false),
+            ("gone", gone, false),
+            ("aside", bot, true),
+        ] {
+            let (base, log) = two_clients(answer.to_string());
+            let (r, dir) = seeded_with_visionos(&format!("visionos-{name}"), &base);
+            for _ in 0..VISIONOS_MAX_FAILURES {
+                let s = if aside {
+                    r.resolve_aside(VIDEO, Quality::High).await
+                } else {
+                    r.resolve(VIDEO, Quality::High).await
+                };
+                assert_eq!(client(&s.unwrap()), "WEB_EMBEDDED_PLAYER", "{name}");
+            }
+            let n = log.lock().unwrap().len();
+            r.resolve(VIDEO, Quality::High).await.unwrap();
+            assert_eq!(
+                log.lock().unwrap().len(),
+                n + 2,
+                "{name}: visionOS wasn't asked"
+            );
+            std::fs::remove_dir_all(&dir).unwrap();
+        }
+    }
+
+    /// "This video is unavailable" for one song is the song's, but for different songs in a
+    /// row it's how YouTube answers a client config it no longer takes: that turns it off.
+    #[test]
+    fn unavailable_for_different_songs_in_a_row_turns_visionos_off() {
+        let gone = Err(failed("ERROR: This video is unavailable"));
+        let mut h = Health::default();
+        for _ in 0..VISIONOS_MAX_FAILURES {
+            h.visionos_answered("aaaaaaaaaaa", &gone, true);
+        }
+        assert!(h.visionos_on(), "off for one song");
+        h.visionos_answered("bbbbbbbbbbb", &gone, true);
+        assert!(h.visionos_on(), "off for two songs");
+        h.visionos_answered("ccccccccccc", &gone, true);
+        assert!(!h.visionos_on(), "still on after three songs");
     }
 
     /// A refused visionOS URL leaves resolves to the embedded client for a while, at once.
