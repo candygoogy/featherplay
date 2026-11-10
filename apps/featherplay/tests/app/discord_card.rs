@@ -1,6 +1,6 @@
 //! Settings' Discord profile card, offscreen with fixture data (no window is shown): hovering
 //! an option lights the part of the card it changes; the card sits beside the options at
-//! wide windows, staying in view while they scroll, and above them at narrow ones.
+//! wide windows, staying in view while they scroll, and is left out at narrow ones.
 
 use std::ops::ControlFlow;
 use std::time::Duration;
@@ -257,32 +257,27 @@ fn the_card_sits_beside_the_options_in_a_wide_window() {
 }
 
 #[test]
-fn the_card_sits_above_the_options_in_a_narrow_window() {
+fn a_narrow_window_has_the_options_without_the_card() {
     // 1100 wide: the page is 860 px, too narrow for both side by side.
     let scene = settings(1100, 3800);
-    let card = find(&scene, "Discord preview");
+    assert!(
+        shown(&scene, "Discord preview").is_none()
+            && shown(&scene, "Preview · how friends see you").is_none(),
+        "the card shows in a window too narrow for it beside the options"
+    );
+    // The options start at the top of their panel, with no room kept for it.
     let row = find(&scene, "Discord status");
+    let group = panel(&scene, "Discord");
     assert!(
-        card.max_y() < row.min_y(),
-        "the card {card:?} isn't above the options {row:?}"
+        row.min_y() - group.min_y() < 60.0,
+        "the first option {row:?} isn't at the top of its panel {group:?}"
     );
-    // On the right, at the switches' edge, its caption and note on its left as a row's text.
-    let switch = shown_as(&scene, Some(AccessibleRole::Switch), "Discord status").expect("switch");
-    assert!(
-        (card.max_x() - switch.max_x()).abs() < 2.0,
-        "the card {card:?} doesn't end at the switches' edge {switch:?}"
-    );
-    let caption = find(&scene, "Preview · how friends see you");
-    assert!(
-        caption.max_x() < card.min_x() && (caption.min_x() - row.min_x()).abs() < 2.0,
-        "the caption {caption:?} isn't left of the card {card:?}, under the options' edge"
-    );
-    // The options are under the card here, most of them a scroll away from it: the note
-    // doesn't send the pointer to them.
-    assert!(
-        shown(&scene, "The preview changes with the options below.").is_some()
-            && shown(&scene, "Hover an option to see what it changes.").is_none(),
-        "the note above the options isn't the one for this arrangement"
+    // Hovering an option lights nothing.
+    hover(&scene, row.center().x, row.center().y);
+    assert_eq!(
+        scene.ui.global::<SettingsData>().get_discord_lit(),
+        DiscordPart::None,
+        "an option lit a card that isn't there"
     );
 }
 

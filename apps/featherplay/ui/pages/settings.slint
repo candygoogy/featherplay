@@ -1004,18 +1004,12 @@ component ProfileCard inherits Rectangle {
     }
 }
 
-// The Discord options' preview: a caption saying whose view it is (or why it's dimmed), the
-// profile card, and a note on how it follows the options. Dimmed, with nothing lit, while
-// Discord status is off or not connected. Beside the options (or above them in a narrow
-// window), the caption, the card and the note are a column `card-w` wide, so the note wraps
-// at the card's width. With `text-beside`, the pane is a row like the options': the caption as
-// its label and the note as its detail on the left, the card on the right, at the switches'
-// edge. The note points at the hover only with the options `beside` the card, in view with
-// it; above them, most are a scroll away from it.
+// The Discord options' preview, beside them: a caption saying whose view it is (or why it's
+// dimmed), the profile card, and a note on how it follows the options, in a column `card-w`
+// wide, so the note wraps at the card's width. Dimmed, with nothing lit, while Discord status
+// is off or not connected.
 component DiscordPane inherits Rectangle {
     in property <length> card-w;
-    in property <bool> text-beside;
-    in property <bool> beside;
     // Where the card ends, from the pane's top.
     out property <length> card-end: card.y + card.height;
     property <bool> on: SettingsData.discord-live;
@@ -1025,27 +1019,22 @@ component DiscordPane inherits Rectangle {
         : SettingsData.discord-state == DiscordState.connecting ? @tr("Preview · Connecting to Discord…")
         : @tr("Preview · Not connected to Discord");
     property <string> note: SettingsData.discord-preview.sample
-        ? (root.beside ? @tr("Nothing is playing, so a sample song stands in. Hover an option to see what it changes.")
-            : @tr("Nothing is playing, so a sample song stands in. The preview changes with the options below."))
-        : (root.beside ? @tr("Hover an option to see what it changes.")
-            : @tr("The preview changes with the options below."));
-    // Placed by hand rather than in layouts, so the two arrangements share their three parts.
-    property <length> text-w: root.text-beside ? root.width - root.card-w - Theme.s6 : root.card-w;
-    preferred-height: root.text-beside ? max(card.y + card.height, note.y + note.height) : note.y + note.height;
+        ? @tr("Nothing is playing, so a sample song stands in. Hover an option to see what it changes.")
+        : @tr("Hover an option to see what it changes.");
+    preferred-height: note.y + note.height;
     caption := Body {
         x: 0;
         y: 0;
-        width: root.text-w;
+        width: root.card-w;
         height: self.preferred-height;
         text: root.caption;
-        font-size: root.text-beside ? Theme.t-body-l : Theme.t-meta;
-        font-weight: root.text-beside ? 500 : 400;
-        color: root.text-beside ? Theme.text1 : Theme.text3;
+        font-size: Theme.t-meta;
+        color: Theme.text3;
         wrap: word-wrap;
     }
     card := ProfileCard {
-        x: root.text-beside ? root.width - root.card-w : 0;
-        y: root.text-beside ? 0 : caption.height + Theme.s3;
+        x: 0;
+        y: caption.height + Theme.s3;
         width: root.card-w;
         height: self.preferred-height;
         lit: SettingsData.discord-card-lit;
@@ -1053,34 +1042,36 @@ component DiscordPane inherits Rectangle {
     }
     note := Body {
         x: 0;
-        y: root.text-beside ? caption.height + Theme.s1 : card.y + card.height + Theme.s3;
-        width: root.text-w;
+        y: card.y + card.height + Theme.s3;
+        width: root.card-w;
         height: self.preferred-height;
         text: root.note;
         font-size: Theme.t-meta;
-        color: root.text-beside ? Rows.detail : Theme.text3;
+        color: Theme.text3;
         wrap: word-wrap;
     }
 }
 
 // A Discord option's rows: hovering them lights the part of the profile card the option
-// changes (`SettingsData.discord-lit`), and tints the rows a shade.
+// changes (`SettingsData.discord-lit`), and tints the rows a shade, while the card is
+// `shown` beside them.
 component DiscordOption inherits Rectangle {
     in property <DiscordPart> part;
     // Unique among the options.
     in property <int> option;
+    in property <bool> shown;
     min-height: lay.min-height;
     preferred-height: lay.preferred-height;
     Rectangle {
         x: -Theme.s3;
         width: parent.width + 2 * Theme.s3;
         border-radius: Theme.r-m;
-        background: ta.has-hover ? Theme.choice-lit : Theme.choice-lit.transparentize(1);
+        background: ta.has-hover && root.shown ? Theme.choice-lit : Theme.choice-lit.transparentize(1);
         animate background { duration: Theme.t-hover; easing: Curves.ease-hover; }
     }
     ta := TouchArea {
         changed has-hover => {
-            if self.has-hover {
+            if self.has-hover && root.shown {
                 SettingsData.discord-lit = root.part;
                 SettingsData.discord-lit-option = root.option;
             } else if SettingsData.discord-lit-option == root.option {
@@ -2032,7 +2023,8 @@ export component SettingsPage inherits Rectangle {
     property <length> col-x: root.block-x + root.index-room;
     // The Discord profile card sits beside the Discord options when the Discord panel can
     // hold both: the options at `options-min` or more, the gap, the card at `card-min` or
-    // more. Otherwise the card sits above the options. Where the card and its gap fit whole
+    // more. Otherwise there's no card: above the options it pushed them a screen down, and
+    // the options say what they do without it. Where the card and its gap fit whole
     // right of the column, before the page's padding, the panel reaches past the column by
     // them, so the options keep the column's width and their switches line up with the other
     // groups'; with less room there, the panel keeps the column's edge rather than jutting
@@ -2358,16 +2350,10 @@ export component SettingsPage inherits Rectangle {
                 title: @tr("Discord");
                 extend: root.card-beside ? root.wide-panel - root.col-w : 0px;
                 // Two columns while the card fits beside the options: the rows on the left,
-                // the card's lane on the right. Otherwise the card sits above the options, in
-                // the room kept for it there. One card either way, placed over the layout.
+                // the card's lane on the right, the card placed over the layout. Otherwise
+                // the rows alone.
                 if root.made >= 1: block := Rectangle {
-                    property <length> inner-w: root.col-w - 2 * Rows.inset;
-                    property <length> card-w: root.card-beside ? root.beside-card-w : min(root.card-w, block.inner-w);
-                    // Above the options, the caption and the note go left of the card while
-                    // they keep a column of their own, so the card doesn't hang off the left
-                    // of an empty panel.
-                    property <bool> text-beside: !root.card-beside && block.inner-w - root.card-w - Theme.s6 >= 220px;
-                    property <length> pane-w: block.text-beside ? block.inner-w : block.card-w;
+                    property <length> card-w: root.beside-card-w;
                     property <length> pane-h: pane.preferred-height + 2 * Rows.pad-y;
                     min-width: columns.min-width;
                     min-height: columns.min-height;
@@ -2378,15 +2364,13 @@ export component SettingsPage inherits Rectangle {
                             horizontal-stretch: 1;
                             // At the top, when the card beside them is the taller.
                             alignment: start;
-                            Rectangle {
-                                height: root.card-beside ? 0px : block.pane-h;
-                            }
                             discord-rows := VerticalLayout {
                                 DiscordOption {
+                                    shown: root.card-beside;
                                     part: DiscordPart.card;
                                     option: 1;
                                     SettingRow {
-                                        divider: !root.card-beside;
+                                        divider: false;
                                         label: @tr("Discord status");
                                         detail: SettingsData.discord-state == DiscordState.unavailable ? @tr("This build has no Discord app ID.")
                                             : !SettingsData.discord ? @tr("Show \"Listening to\" with the track on your Discord profile.")
@@ -2417,6 +2401,7 @@ export component SettingsPage inherits Rectangle {
                                         checked: SettingsData.discord-auto-reconnect;
                                     }
                                     DiscordOption {
+                                        shown: root.card-beside;
                                         part: DiscordPart.activity;
                                         option: 2;
                                         SettingRow {
@@ -2430,6 +2415,7 @@ export component SettingsPage inherits Rectangle {
                                         }
                                     }
                                     DiscordOption {
+                                        shown: root.card-beside;
                                         part: DiscordPart.activity;
                                         option: 3;
                                         SettingRow {
@@ -2450,6 +2436,7 @@ export component SettingsPage inherits Rectangle {
                                         }
                                     }
                                     DiscordOption {
+                                        shown: root.card-beside;
                                         part: DiscordPart.button;
                                         option: 4;
                                         ToggleRow {
@@ -2460,6 +2447,7 @@ export component SettingsPage inherits Rectangle {
                                         }
                                     }
                                     DiscordOption {
+                                        shown: root.card-beside;
                                         part: DiscordPart.links;
                                         option: 5;
                                         ToggleRow {
@@ -2470,6 +2458,7 @@ export component SettingsPage inherits Rectangle {
                                         }
                                     }
                                     DiscordOption {
+                                        shown: root.card-beside;
                                         part: DiscordPart.time;
                                         option: 6;
                                         SettingRow {
@@ -2486,6 +2475,7 @@ export component SettingsPage inherits Rectangle {
                                         }
                                     }
                                     DiscordOption {
+                                        shown: root.card-beside;
                                         part: DiscordPart.status;
                                         option: 7;
                                         SettingRow {
@@ -2518,13 +2508,12 @@ export component SettingsPage inherits Rectangle {
                     // the scroll position: nothing eases after it.
                     property <length> stick: min(Theme.page-top, root.view-h - pane.card-end) - Rows.pad-y;
                     pane := DiscordPane {
-                        x: root.card-beside ? lane.x : 0px;
-                        y: Rows.pad-y + (root.card-beside ? max(0px, min(root.scrolled + block.stick - root.discord-top, discord-rows.height - block.pane-h)) : 0px);
-                        width: block.pane-w;
+                        visible: root.card-beside;
+                        x: lane.x;
+                        y: Rows.pad-y + max(0px, min(root.scrolled + block.stick - root.discord-top, discord-rows.height - block.pane-h));
+                        width: block.card-w;
                         height: self.preferred-height;
                         card-w: block.card-w;
-                        text-beside: block.text-beside;
-                        beside: root.card-beside;
                     }
                 }
             }

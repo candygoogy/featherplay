@@ -27,8 +27,8 @@ Notable changes to featherplay, newest first. The format follows
 - Settings > Discord: the profile preview now sits beside the options from the window's
   default size up, and stays in view while you scroll through them, so hovering Time or
   Status text lights what it changes on the card. In a window too short for the whole
-  card, its lower part (the activity) is what stays on screen. In a narrow window the
-  preview is above the options, as before, and its note says it changes with them.
+  card, its lower part (the activity) is what stays on screen. A window too narrow for the
+  preview beside the options leaves it out, rather than pushing them a screen down.
 - A song that wasn't ready ahead starts about 0.1 s sooner: while featherplay looks up its
   stream, it already opens the connection to the server the stream most likely comes from.
 - Songs start sooner, and a new install's first song no longer waits for a download.
