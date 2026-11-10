@@ -127,8 +127,8 @@ test("the sizes are weighed like with like: Pear installed against featherplay i
   await expect(weigh.locator("[data-weigh-row='pear']")).toContainText("Pear Desktop, installed");
   await expect(weigh.locator("[data-weigh-row='pear']")).toContainText("396 MB");
   await expect(weigh.locator("[data-weigh-row='installed']")).toContainText("featherplay, installed");
-  await expect(weigh.locator("[data-weigh-row='installed']")).toContainText("about 34 MB");
-  await expect(weigh.locator("[data-weigh-row='portable']")).toContainText("29.05 MB");
+  await expect(weigh.locator("[data-weigh-row='installed']")).toContainText("about 33 MB");
+  await expect(weigh.locator("[data-weigh-row='portable']")).toContainText("28.25 MB");
   await expect(weigh).toContainText("12 times smaller");
   await expect(weigh).toContainText("uninstaller");
   await expect(weigh).toContainText("Visual C++ runtime");
@@ -170,7 +170,7 @@ test.describe("/method without JavaScript", () => {
       "Pear Desktop 3.12.0",
       "Edge 156.0.4314.58",
       "1 November 2026",
-      "9 November",
+      "10 November",
       "Start to music playing",
       "Click to sound",
       "Hovered first means",

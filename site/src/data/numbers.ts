@@ -2,10 +2,11 @@
 // repeat with its window minimised, the only player running. Every process of each app is
 // counted. Memory is private memory, averaged, in MB of 1,048,576 bytes; CPU is the share of
 // the whole machine (CPU seconds over wall seconds over 16 logical cores).
-// - featherplay: 0.2.0 on 9 November 2026 (04:43 to 05:30), the v0.2.0 release's own
+// - featherplay: 0.2.2 on 10 November 2026 (21:30 to 22:34), the v0.2.2 release's own
 //   portable exe; three runs, the median. Its two timings too (start to music playing,
 //   click to sound), which only featherplay has: Pear Desktop and Edge weren't part of
-//   that measurement.
+//   that measurement. The one run with the sound features on (withProcessing) is 0.2.0's,
+//   of 9 November, and wasn't repeated.
 // - Pear Desktop and Edge: the final measurement of 1 November 2026 (19:07 to 19:58), not
 //   repeated.
 // Every figure names the files it came from, by their path inside the measurement write-ups,
@@ -76,20 +77,28 @@ const runs = (playing: string, paused: string): Record<Metric, string | null> =>
   clickToSoundS: null,
   downloadMB: FINAL,
 });
-// 0.2.0's write-up: its samples in csv/, three runs of each (the median is used).
+// The write-ups: their samples in csv/, three runs of each (the median is used). 0.2.2's
+// holds the figures; 0.2.0's the one run with the sound features on.
+const V022 = `${M}final-0.2.2/`;
 const V020 = `${M}final-0.2.0/`;
 
-/** featherplay 0.2.0's two timings in detail: the median, the range, and how many. */
+/** featherplay 0.2.2's two timings in detail: the median, the range, and how many. */
 export const timings = {
-  startToSoundS: { median: 1.048, min: 0.733, max: 6.435, n: 6 },
-  clickToSoundS: { median: 0.309, min: 0.003, max: 5.7, n: 10 },
-  /** Clicks on a song the pointer rested on first, and clicks straight away (5 each). */
-  hovered: { median: 0.004, min: 0.003, max: 5.22, n: 5 },
-  notHovered: { median: 0.68, min: 0.195, max: 5.7, n: 5 },
+  startToSoundS: { median: 0.48, min: 0.443, max: 1.264, n: 6 },
+  clickToSoundS: { median: 0.009, min: 0.003, max: 0.49, n: 12 },
+  /** Clicks on a song the pointer rested on first, and clicks straight away (6 each). */
+  hovered: { median: 0.006, min: 0.003, max: 0.01, n: 6 },
+  notHovered: { median: 0.084, min: 0.005, max: 0.49, n: 6 },
+  /** The same 12 clicks by what was ready before them: the song prepared ahead while another
+   *  played, only the hover's own work, or nothing (cold). */
+  preparedAhead: { median: 0.009, min: 0.003, max: 0.237, n: 10 },
+  hoveredOnly: { median: 0.004, min: 0.004, max: 0.004, n: 1 },
+  cold: { median: 0.49, min: 0.49, max: 0.49, n: 1 },
 };
 
-/** One extra run with the sound features on (Equalizer Bass, Even out loudness Light, Skip
- *  silence Start and end, Crossfade 5 s): beside the table, not in it. */
+/** One extra run of 0.2.0 with the sound features on (Equalizer Bass, Even out loudness Light,
+ *  Skip silence Start and end, Crossfade 5 s): beside the table, not in it, and not repeated
+ *  for 0.2.2. */
 export const withProcessing = {
   memoryMB: 56,
   cpuPlayingPct: 0.087,
@@ -100,10 +109,10 @@ export const figures: Figure[] = [
   {
     app: "featherplay",
     version: release.version,
-    memoryMB: 40,
-    memoryPausedMB: 38,
-    cpuPlayingPct: 0.07,
-    cpuPausedPct: 0,
+    memoryMB: 42,
+    memoryPausedMB: 42,
+    cpuPlayingPct: 0.062,
+    cpuPausedPct: 0.002,
     processes: { min: 1, max: 1 },
     startToSoundS: timings.startToSoundS.median,
     clickToSoundS: timings.clickToSoundS.median,
@@ -111,14 +120,14 @@ export const figures: Figure[] = [
     downloadMB: release.installer!.sizeMB!,
     download: "the installer",
     sources: {
-      memoryMB: `${V020}csv/default-{1,2,3}-playing.csv`,
-      memoryPausedMB: `${V020}csv/default-{1,2,3}-paused.csv`,
-      cpuPlayingPct: `${V020}csv/default-{1,2,3}-playing.csv`,
-      cpuPausedPct: `${V020}csv/default-{1,2,3}-paused.csv`,
-      processes: `${V020}csv/default-{1,2,3}-playing.csv`,
-      startToSoundS: `${V020}csv/start-to-sound.csv`,
-      clickToSoundS: `${V020}csv/click-to-sound-{A,B}.csv`,
-      downloadMB: `${V020}README.md`,
+      memoryMB: `${V022}csv/default-{1,2,3}-playing.csv`,
+      memoryPausedMB: `${V022}csv/default-{1,2,3}-paused.csv`,
+      cpuPlayingPct: `${V022}csv/default-{1,2,3}-playing.csv`,
+      cpuPausedPct: `${V022}csv/default-{1,2,3}-paused.csv`,
+      processes: `${V022}csv/default-{1,2,3}-playing.csv`,
+      startToSoundS: `${V022}csv/start-to-sound.csv`,
+      clickToSoundS: `${V022}csv/click-to-sound-{A,B}.csv`,
+      downloadMB: `${V022}README.md`,
     },
   },
   {

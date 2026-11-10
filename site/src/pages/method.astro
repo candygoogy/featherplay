@@ -1,8 +1,8 @@
 ---
 // How the comparison's figures were measured, and where each one comes from. The setups are
-// the two measurements' (featherplay 0.2.0 on 9 November 2026, Pear Desktop and Edge on
-// 1 November; their write-ups are kept outside the repo); the figures and the sizes come from
-// numbers.ts and release.ts.
+// the two measurements' (featherplay 0.2.2 on 10 November 2026, Pear Desktop and Edge on
+// 1 November; their write-ups are kept outside the repo), plus 0.2.0's one run with the sound
+// features on (9 November); the figures and the sizes come from numbers.ts and release.ts.
 import Base from "../layouts/Base.astro";
 import Header from "../components/Header.astro";
 import { figureFor, figures, installFolders, metrics, timings, withProcessing, type Metric } from "../data/numbers";
@@ -28,7 +28,7 @@ const edge = figureFor("YouTube Music in Edge");
 const procs = (f: (typeof figures)[number]) => figureText(f, "processes");
 // Seconds as the page writes them: two significant figures (0.73 s, 6.4 s, 0.003 s).
 const s = (v: number) => `${v.toLocaleString("en-GB", { maximumSignificantDigits: 2 })} s`;
-const { startToSoundS: start, clickToSoundS: click, hovered, notHovered } = timings;
+const { startToSoundS: start, clickToSoundS: click, hovered, notHovered, preparedAhead, hoveredOnly, cold } = timings;
 ---
 
 <Base
@@ -40,8 +40,8 @@ const { startToSoundS: start, clickToSoundS: click, hovered, notHovered } = timi
     <h1>How these were measured</h1>
     <p class="lede">
       All three players were measured on one PC: Pear Desktop and Edge on the evening of 1 November 2026, featherplay
-      {fp.version} early on 9 November. Every figure on the home page comes from those two measurements, and each one
-      names its files below.
+      {fp.version} on the evening of 10 November. Every figure on the home page comes from those two measurements, and
+      each one names its files below.
     </p>
 
     <section aria-labelledby="setup">
@@ -55,9 +55,9 @@ const { startToSoundS: start, clickToSoundS: click, hovered, notHovered } = timi
           featherplay {fp.version}, the release's own portable exe, the one offered for download, checked against the
           release's checksums: the exe is{release.portable ? ` ${sizeLabel(release.portable)}` : ""}, the installer
           {release.installer ? ` ${sizeLabel(release.installer)}` : ""}. It ran on a copy of a long-used featherplay
-          folder (settings, cache, library and covers), with Streaming quality on High, so every song played as Opus.
-          The settings were its owner's (Last.fm on, lyrics on, a 2 s crossfade), and the new sound features were at
-          their defaults: the equalizer, Even out loudness and Skip silence off.
+          folder (settings, saved queue, kept streams, library and covers), with Streaming quality on High, so every
+          song played as Opus. The settings were its owner's (Last.fm on, lyrics on, a 2 s crossfade, the equalizer,
+          Even out loudness and Skip silence off), with Discord status off.
         </li>
         <li>Pear Desktop {pear.version}, installed, with its owner's settings left as they were.</li>
         <li>
@@ -75,15 +75,18 @@ const { startToSoundS: start, clickToSoundS: click, hovered, notHovered } = timi
           player running. Pear Desktop stayed open but paused while Edge was measured, and wasn't counted.
         </li>
         <li>
-          featherplay, on 9 November: one song on repeat, at featherplay's volume of 2 % (Windows' own volume left as
+          featherplay, on 10 November: one song on repeat, at featherplay's volume of 2 % (Windows' own volume left as
           it was), three runs. Each figure is the median of the three. Pear Desktop wasn't running at any point.
+          featherplay ran on a Windows desktop of its own, so its window never showed while the PC was in use; the
+          whole machine averaged 11 to 20 % CPU over each part of a run.
         </li>
-        <li>The window was minimised to the taskbar, and the PC was otherwise lightly used, with no games running.</li>
+        <li>The window was minimised, and no games were running.</li>
         <li>Five minutes playing, then three minutes paused, with a sample every 5 seconds.</li>
         <li>
-          With the equalizer, Even out loudness, Skip silence and a 5 s crossfade all on, one more run of featherplay
-          used {withProcessing.memoryMB} MB of memory and {formatFigure("cpuPlayingPct", withProcessing.cpuPlayingPct)}
-          CPU while playing. That run isn't in the comparison.
+          With the equalizer, Even out loudness, Skip silence and a 5 s crossfade all on, one more run, of featherplay
+          0.2.0 on 9 November, used {withProcessing.memoryMB} MB of memory and{" "}
+          {formatFigure("cpuPlayingPct", withProcessing.cpuPlayingPct)} CPU while playing. That run is 0.2.0's, wasn't
+          repeated for {fp.version}, and isn't in the comparison.
         </li>
       </ul>
     </section>
@@ -93,24 +96,25 @@ const { startToSoundS: start, clickToSoundS: click, hovered, notHovered } = timi
       <ul class="facts">
         <li>
           featherplay only: Pear Desktop and Edge weren't part of this measurement. Each start resumed the queue
-          featherplay had saved, which picks a song up at 0:29, so the song had to load and seek.
+          featherplay had saved, which picks a song up at 0:49, so the song had to load and seek.
         </li>
         <li>
           The clock starts when Windows creates featherplay's process and stops when its audio engine logs the first
           sound: the moment Windows' audio output takes the song's first samples.
         </li>
         <li>
-          Play was pressed on the taskbar thumbnail as soon as the window would take it, 0.09 to 0.13 s after the start.
-          The window was shown, not minimised.
+          Play was sent the way the taskbar thumbnail's Play button sends it, as soon as the window would take it, 0.07
+          to 0.25 s after the start. The window was shown, not minimised.
         </li>
         <li>
           Warm starts, with featherplay and its folder already used: one start to warm up, not counted, then{" "}
           {start.n}. The median is {formatFigure("startToSoundS", start.median)}, and they took {s(start.min)} to{" "}
-          {s(start.max)}. Three got a playable answer from YouTube straight away (0.73 to 0.87 s); the other three waited
-          for a fresh one (1.2, 4.2 and 6.4 s).
+          {s(start.max)}. All {start.n} played the stream featherplay had kept from the last session, with no lookup, so
+          from Play to the first sound was the stream's first request and the seek. The slow one waited 0.97 s for that
+          first request.
         </li>
         <li>
-          These starts used the state featherplay had kept for finding songs' streams. In 0.2.0, a new install's very
+          A new install has nothing kept yet. In 0.2.0, a new install's very
           first song took longer, about 12 s once, while featherplay downloaded the two helpers it used (yt-dlp and
           Deno); the starts after it took 0.5 to 0.9 s. Since featherplay answers YouTube's player challenges with the
           JavaScript engine built into it, the first song no longer waits for that download: a new install prepares
@@ -130,24 +134,35 @@ const { startToSoundS: start, clickToSoundS: click, hovered, notHovered } = timi
           press, release). The real pointer didn't move.
         </li>
         <li>
+          On featherplay's own desktop the first press and release after a move never counted (0.2.0 behaves the same
+          there), so each click was a move, then two presses and releases 40 ms apart. The second release plays the
+          song. The first press lets featherplay start on the song about 45 ms early, as a real click's press does.
+        </li>
+        <li>
           The clock starts at the release, the moment a click counts, and stops at the same first sound as above.
         </li>
         <li>
-          Five songs, each clicked twice: once hovered first and once not. Hovered first means the pointer rests on the
-          song before the click; featherplay starts getting a song ready 120 ms into a hover, or at the press. The PC
-          was locked, and Windows ends a hover at once on a locked PC, so for these clicks the button was held down for
-          1 s before the release, which starts the same work. Not hovered means a quick click, released 90 ms after the
-          press.
+          Hovered first means the pointer rests on the song before the click; featherplay starts getting a song ready
+          120 ms into a hover, or at a press. For these clicks a press and release 1 s before the click stood in for a
+          1 s hover, which starts the same work. Not hovered means the click alone.
         </li>
         <li>
-          Ten clicks in two sessions. Before each session the five songs' saved links were removed, so no click found a
-          song featherplay had kept from earlier listening.
+          Two sessions of six clicks, {click.n} in all, alternating hovered and not. featherplay started paused, so each
+          session's first click came while nothing played; each next one came about 12 s into the song the last click
+          started. While a song plays, featherplay prepares the songs on screen, as it does in everyday use. Before each
+          session the songs' kept streams were removed, so only that session's work made a song ready.
         </li>
         <li>
-          All ten: median {formatFigure("clickToSoundS", click.median)}, {s(click.min)} to {s(click.max)}. Hovered first:
-          median {s(hovered.median)}; four of the five were ready by the click, the fifth took 5.2 s. Not hovered:
-          median {s(notHovered.median)} ({s(notHovered.min)} to {s(notHovered.max)}). The slow ones waited for a fresh answer
-          from YouTube, as the slow starts did.
+          All {click.n}: median {formatFigure("clickToSoundS", click.median)}, {s(click.min)} to {s(click.max)}. Hovered
+          first: median {s(hovered.median)} ({s(hovered.min)} to {s(hovered.max)}). Not hovered: median{" "}
+          {s(notHovered.median)} ({s(notHovered.min)} to {s(notHovered.max)}).
+        </li>
+        <li>
+          By what was ready: {preparedAhead.n} of the {click.n} songs had been prepared while another played (median{" "}
+          {s(preparedAhead.median)}, {s(preparedAhead.min)} to {s(preparedAhead.max)}). A prepared song's stream isn't
+          fetched ahead, so a click on one waits for the stream's first request; a hovered one plays from memory. One
+          session's first click was ready from its hover alone ({s(hoveredOnly.median)}). The other session's first was
+          cold: it waited for its lookup and its stream's first request ({s(cold.median)}).
         </li>
       </ul>
     </section>
@@ -166,7 +181,9 @@ const { startToSoundS: start, clickToSoundS: click, hovered, notHovered } = timi
         </li>
         <li>
           CPU is a share of the whole processor: the CPU seconds the processes used, divided by the seconds measured,
-          divided by the 16 logical processors.
+          divided by the 16 logical processors. Windows charges CPU time in 15.6 ms ticks, which can miss very short
+          wakes; 0.2.0's paused figure of 0% came from that. For {fp.version} the processor cycles were counted too, and
+          they agree with the CPU seconds.
         </li>
         <li>
           Download is what you download to install it: featherplay's installer (or the{" "}
@@ -194,15 +211,18 @@ const { startToSoundS: start, clickToSoundS: click, hovered, notHovered } = timi
           is fixed. That run's memory, 999 MB, agrees with the run that's used.
         </li>
       </ul>
-      <p class="para">On 9 November:</p>
+      <p class="para">On 10 November:</p>
       <ul class="facts">
         <li>
-          A short trial of the script, and featherplay's first launch, which downloaded its helpers, weren't counted.
+          Five tries of the first click session played nothing. Short trials found why: on its own desktop featherplay
+          lays its window out at 100 % scale, which moves the click points, and it needs the two presses described
+          above. A trial run, a trial launch, and one run's first start, which failed before featherplay started,
+          weren't counted either.
         </li>
         <li>
-          Two of the three runs first had their CPU divided by 12 logical processors instead of 16, the number PowerShell
-          reported. Their CPU figures were rescaled to 16, which is exact, and the script fixed. Their CPU
-          seconds and memory were right all along.
+          One of the three runs sat at 57 MB of memory from the start, the other two at 40 and 42 MB, with the same song
+          and otherwise the same log. 0.2.0's own exe, run the same way, sat at 57 to 59 MB, so this isn't new in{" "}
+          {fp.version}; what puts a run there wasn't found. The median of the three is the figure used.
         </li>
       </ul>
     </section>
@@ -212,9 +232,9 @@ const { startToSoundS: start, clickToSoundS: click, hovered, notHovered } = timi
       <p class="para">
         PowerShell scripts took the samples and wrote them to CSV files. On 1 November, <code>measure-pear.ps1</code>{" "}
         for Pear Desktop and <code>measure-edge.ps1</code> for Edge, which reads each process's CPU time from Windows'
-        own process list (Win32_Process). On 9 November, <code>measure-pass.ps1</code> for featherplay (the method of
-        the 1 November script, with more columns), and <code>run-starts.ps1</code> and <code>run-clicks.ps1</code> for
-        the two timings.
+        own process list (Win32_Process). On 10 November, <code>measure-pass.ps1</code> for featherplay (the method of
+        the 1 November script, with more columns, the processor cycles among them), and <code>run-starts.ps1</code> and{" "}
+        <code>run-clicks.ps1</code> for the two timings.
       </p>
     </section>
 

@@ -1,6 +1,6 @@
 ---
 // Light, and it shows: featherplay next to Pear Desktop and YouTube Music in Edge, eight
-// measures, lower is better: featherplay 0.2.0's from 9 November 2026, the others' from the
+// measures, lower is better: featherplay 0.2.2's from 10 November 2026, the others' from the
 // final measurement of 1 November. Every value comes from src/data/numbers.ts and is in the
 // HTML; the "times less" lines are worked out from the same figures. The two timings are
 // featherplay's alone, so they have no bars. Then what featherplay leaves out.
@@ -9,12 +9,14 @@ import { formatBytes, figureText } from "../data/format";
 import { release, sizeLabel } from "../data/release";
 
 type Ratioed = "memoryMB" | "memoryPausedMB" | "cpuPlayingPct" | "cpuPausedPct";
-// "About 20 times less than Pear Desktop and 25 times less than Edge"; half reads as half,
-// and nothing at all as nothing.
+// "About 19 times less than Pear Desktop and 24 times less than Edge"; two or three times
+// less reads as half or a third, and nothing at all as nothing.
+const parts: Record<number, string> = { 2: "half", 3: "a third" };
 const both = (m: Ratioed) => {
   if (figureFor("featherplay")[m] === 0) return "None at all in any of the three runs.";
   const [pear, edge] = [timesLess(m, "Pear Desktop"), timesLess(m, "YouTube Music in Edge")];
   if (pear === 2 && edge === 2) return "About half of what Pear Desktop and Edge use.";
+  if (parts[pear] && parts[edge]) return `About ${parts[pear]} of what Pear Desktop uses and ${parts[edge]} of what Edge uses.`;
   return `About ${pear} times less than Pear Desktop and ${edge} times less than Edge.`;
 };
 const s = (v: number) => `${v.toLocaleString("en-GB", { maximumSignificantDigits: 2 })} s`;
@@ -36,7 +38,7 @@ const panels: { metric: Metric; title: string; note: string; ratio?: string }[] 
     metric: "clickToSoundS",
     title: "Click to sound",
     note: `From clicking a song's play button to its first sound. ${ONLY_OURS}`,
-    ratio: `Median of ${timings.clickToSoundS.n} clicks (${span(timings.clickToSoundS)}): ${s(timings.hovered.median)} with the pointer on the song first, ${s(timings.notHovered.median)} without.`,
+    ratio: `Median of ${timings.clickToSoundS.n} clicks (${span(timings.clickToSoundS)}): ${s(timings.hovered.median)} with the pointer on the song first, ${s(timings.notHovered.median)} without. ${timings.preparedAhead.n} of them were on songs featherplay had got ready while another played.`,
   },
   {
     metric: "downloadMB",
@@ -96,7 +98,7 @@ const kind = (e: FolderEntry) => (e.files ? "folder" : e.name.endsWith(".exe") ?
     <div class="head">
       <h2 id="light-title">Light, and it shows</h2>
       <p class="lede">
-        Measured on one Windows PC: featherplay 0.2.0 on 9 November 2026, the other two on 1 November. Lower is better
+        Measured on one Windows PC: featherplay 0.2.2 on 10 November 2026, the other two on 1 November. Lower is better
         on every bar.
       </p>
     </div>

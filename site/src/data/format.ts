@@ -6,8 +6,9 @@ export const decimals: Record<NumericMetric, number> = {
   memoryPausedMB: 0,
   cpuPlayingPct: 3,
   cpuPausedPct: 3,
-  startToSoundS: 1,
-  clickToSoundS: 1,
+  // Start to music playing in hundredths (0.48 s), click to sound in thousandths (0.009 s).
+  startToSoundS: 2,
+  clickToSoundS: 3,
   downloadMB: 2,
 };
 
@@ -26,7 +27,7 @@ export function formatFigure(metric: NumericMetric, value: number): string {
   return isTime(metric) ? `${n} s` : `${n} MB`;
 }
 
-/** A figure as the page shows it: "40 MB", "0.07%", "6 to 7" processes, "1.0 s", "None" to
+/** A figure as the page shows it: "42 MB", "0.062%", "6 to 7" processes, "0.48 s", "None" to
  *  download, and a dash for one that wasn't part of the measurement. */
 export function figureText(f: Figure, metric: Metric): string {
   if (metric === "processes") {

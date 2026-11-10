@@ -29,7 +29,7 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: light)" srcset=".github/readme/header-light.png">
-    <img src=".github/readme/header-dark.png" alt="featherplay: a native Windows player for YouTube Music, light enough to forget it's running. While playing it uses 40 MB of memory, 1 process and 0.070 % CPU. Beside the name, a laptop shows featherplay's Now playing view with synced lyrics for California Lullabye, over a mauve glow, the colour the app takes from the song's cover." width="100%">
+    <img src=".github/readme/header-dark.png" alt="featherplay: a native Windows player for YouTube Music, light enough to forget it's running. While playing it uses 42 MB of memory, 1 process and 0.062 % CPU. Beside the name, a laptop shows featherplay's Now playing view with synced lyrics for California Lullabye, over a mauve glow, the colour the app takes from the song's cover." width="100%">
   </picture>
 </p>
 
@@ -68,7 +68,7 @@ SHA256.
 
 | | The installer, the one to choose | The portable exe |
 |---|---|---|
-| Download | [`featherplay-setup-0.2.1.exe`](https://github.com/candygoogy/featherplay/releases/download/v0.2.1/featherplay-setup-0.2.1.exe) | [`featherplay.exe`](https://github.com/candygoogy/featherplay/releases/latest/download/featherplay.exe) |
+| Download | [`featherplay-setup-0.2.2.exe`](https://github.com/candygoogy/featherplay/releases/download/v0.2.2/featherplay-setup-0.2.2.exe) | [`featherplay.exe`](https://github.com/candygoogy/featherplay/releases/latest/download/featherplay.exe) |
 | Where it goes | Your Windows user only, with no admin prompt. It adds featherplay to the Start menu and to Settings > Apps. | Any folder. Settings go in `%APPDATA%\featherplay`, the cache in `%LOCALAPPDATA%\featherplay`. |
 | Updates | Downloads a new version in the background and installs it when you click **Restart to update**. | Tells you when a new version is out, but doesn't install it. |
 | Visual C++ runtime | Brings its own copy. | Needs the [Visual C++ Redistributable](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist) (x64, or ARM64 for `featherplay-arm64.exe`), which most PCs already have. |
@@ -101,7 +101,7 @@ scoop install featherplay
 
 featherplay isn't code-signed yet, so Windows SmartScreen may warn you the first time you run
 it. Choose **More info**, then **Run anyway**. To check the file first, run
-`Get-FileHash featherplay-setup-0.2.1.exe` (or `Get-FileHash featherplay.exe`) in PowerShell
+`Get-FileHash featherplay-setup-0.2.2.exe` (or `Get-FileHash featherplay.exe`) in PowerShell
 and compare the hash with the one on the release page, or
 [build it yourself](#build-from-source).
 
@@ -356,27 +356,28 @@ These are off until you turn them on, except Match song volumes.
 Measured on one Windows PC with 16 logical processors, each app playing a song on repeat for
 5 minutes and then paused for 3, with its window minimised. Lower is better.
 
-<!-- Figures: featherplay's are the measurement of 0.2.0 on 9 November 2026 (the v0.2.0
+<!-- Figures: featherplay's are the measurement of 0.2.2 on 10 November 2026 (the v0.2.2
      release's own portable exe, three runs, the median), Pear Desktop's and Edge's the final
-     measurement of 1 November 2026, which wasn't repeated. Both write-ups are kept outside the
-     repo. The website's site/src/data/numbers.ts holds the same figures, so keep the two in
-     step. -->
+     measurement of 1 November 2026, which wasn't repeated. The run with the sound features on,
+     below the table, is 0.2.0's of 9 November, not repeated either. The write-ups are kept
+     outside the repo. The website's site/src/data/numbers.ts holds the same figures, so keep
+     the two in step. -->
 
-| | featherplay 0.2.1 | Pear Desktop 3.12.0 | YouTube Music in Edge 156 |
+| | featherplay 0.2.2 | Pear Desktop 3.12.0 | YouTube Music in Edge 156 |
 |---|---|---|---|
-| Memory while playing | **40 MB** | 798 MB | 988 MB |
-| Memory while paused | **38 MB** | 782 MB | 973 MB |
-| CPU while playing | **0.070 %** | 0.17 % | 0.14 % |
-| CPU while paused | **0.000 %** (none at all in 3 of 3 runs) | 0.05 % | 0.018 % |
+| Memory while playing | **42 MB** | 798 MB | 988 MB |
+| Memory while paused | **42 MB** | 782 MB | 973 MB |
+| CPU while playing | **0.062 %** | 0.17 % | 0.14 % |
+| CPU while paused | **0.002 %** | 0.05 % | 0.018 % |
 | Processes | **1** | 6 to 7 | 9 to 11 |
-| Start to music playing | **1.0 s** (0.73 to 6.4 s) | — | — |
-| Click to sound | **0.3 s** (0.003 to 5.7 s); hovered first 0.004 s, not hovered 0.68 s | — | — |
-| Download | **10.70 MB** installer (29.05 MB portable exe) | 274 MB installer | nothing (Edge comes with Windows) |
+| Start to music playing | **0.48 s** (0.44 to 1.26 s) | — | — |
+| Click to sound | **0.009 s** (0.003 to 0.49 s); hovered first 0.006 s, not hovered 0.084 s | — | — |
+| Download | **10.68 MB** installer (28.25 MB portable exe) | 274 MB installer | nothing (Edge comes with Windows) |
 
-<sub>featherplay's figures are 0.2.0's, measured on 9 November 2026 (three runs, the median); the Download row is 0.2.1's files. Pear Desktop and Edge were measured on 1 November. Memory is the private memory of all the app's processes (1 MB = 1,048,576 bytes); CPU is a share of the whole machine. Start to music playing runs from starting featherplay to the first sound of the song it resumes (median of 6 starts). Click to sound runs from clicking a song's play button to its first sound (median of 10 clicks); hovered first means the pointer rested on the song before the click, which lets featherplay get it ready. A dash (—) means not part of this measurement. [How these were measured](https://featherplay.candygoogy.dev/method).</sub>
+<sub>featherplay's figures are 0.2.2's, measured on 10 November 2026 (three runs, the median), and the Download row is 0.2.2's files. Pear Desktop and Edge were measured on 1 November. Memory is the private memory of all the app's processes (1 MB = 1,048,576 bytes); CPU is a share of the whole machine. Start to music playing runs from starting featherplay to the first sound of the song it resumes (median of 6 starts). Click to sound runs from clicking a song's play button to its first sound (median of 12 clicks, most of them while a song played, when featherplay had already got the songs on screen ready); hovered first means the pointer rested on the song before the click, which lets featherplay get it ready. A dash (—) means not part of this measurement. [How these were measured](https://featherplay.candygoogy.dev/method).</sub>
 
 With the equalizer, Even out loudness, Skip silence and a 5 s crossfade all on, featherplay
-used 56 MB of memory and 0.087 % CPU while playing (one run).
+0.2.0 used 56 MB of memory and 0.087 % CPU while playing (one run, 9 November).
 
 Pear does much more than featherplay, and [Coming from Pear?](#coming-from-pear) lists which
 of its plugins carry over. Its own tracker has several reports about resource use (titles as

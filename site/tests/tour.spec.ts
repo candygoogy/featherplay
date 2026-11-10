@@ -102,9 +102,9 @@ test("the tray step shows featherplay's measured memory figure", async ({ page }
   await replica(page).getByRole("button", { name: "Minimise featherplay" }).click();
   const meter = page.locator("[data-meter]");
   await expect(meter).toBeVisible();
-  // Minimised and playing: featherplay 0.2.0 on 9 November, 40 MB; Pear and Edge on 1 November, 798 and 988 MB.
+  // Minimised and playing: featherplay 0.2.2 on 10 November, 42 MB; Pear and Edge on 1 November, 798 and 988 MB.
   for (const [app, mb] of [
-    ["featherplay", 40],
+    ["featherplay", 42],
     ["Pear Desktop", 798],
     ["YouTube Music in Edge", 988],
   ] as const) {
@@ -112,7 +112,7 @@ test("the tray step shows featherplay's measured memory figure", async ({ page }
     await expect(meter.locator(`[data-meter-app="${app}"] [data-meter-value]`)).toHaveText(`${mb} MB`);
   }
   await expect(meter).not.toContainText(/drops|not measured/);
-  await expect(meter).toContainText("9 November 2026");
+  await expect(meter).toContainText("10 November 2026");
 });
 
 test("Take the tour, from the top of the page, wakes the laptop and starts the tour", async ({ page }) => {
