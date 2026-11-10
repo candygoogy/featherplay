@@ -9,6 +9,7 @@ use crate::controller::PlayerState;
 use crate::router::Page;
 
 pub mod about;
+pub mod ahead;
 pub mod album;
 pub mod artist;
 pub mod content;
@@ -24,6 +25,7 @@ pub mod settings;
 pub mod sign_in;
 
 pub fn init(ctx: &Rc<Ctx>) {
+    ahead::init(ctx);
     home::init(ctx);
     explore::init(ctx);
     grid::init(ctx);
@@ -40,6 +42,8 @@ pub fn init(ctx: &Rc<Ctx>) {
 }
 
 pub fn open(ctx: &Rc<Ctx>, page: &Page) {
+    // Its card is gone: what's read ahead for another page needn't come.
+    ahead::shown(page);
     match page {
         Page::Home => home::open(ctx),
         Page::Explore { tab } => explore::open(ctx, *tab),
@@ -73,6 +77,7 @@ pub fn player_changed(ctx: &Rc<Ctx>, state: &PlayerState) {
 }
 
 pub fn account_changed(ctx: &Rc<Ctx>, signed_in: bool) {
+    ahead::clear();
     home::account_changed(ctx, signed_in);
     explore::account_changed(ctx, signed_in);
     history::account_changed(ctx, signed_in);
@@ -91,6 +96,7 @@ pub fn account_changed(ctx: &Rc<Ctx>, signed_in: bool) {
 /// app goes to Home, as YouTube Music does; the page that was showing may belong to the
 /// previous identity (a private playlist).
 pub fn identity_changed(ctx: &Rc<Ctx>) {
+    ahead::clear();
     // Drops the feed; reopens Home when it's showing.
     home::account_changed(ctx, true);
     library::forget(ctx);

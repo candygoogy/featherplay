@@ -20,7 +20,7 @@
 // shelf while a page loads, a quiet Try again if it fails; Home itself never errors for it.
 import { ListView } from "../list_view.slint";
 import { Theme, Curves, Icons } from "../theme.slint";
-import { TrackRow, CardItem, ItemKind, Body, Display, Cover, Card, Icon, Pill, ProgressRail, SongRow, ShelfArrows, Bands, RowsShown, SongList } from "../parts.slint";
+import { TrackRow, CardItem, ItemKind, Body, Display, Cover, Card, Icon, Pill, ProgressRail, SongRow, ShelfArrows, Bands, RowsShown, SongList, PageIntent } from "../parts.slint";
 import { Nav } from "../nav.slint";
 import { Player } from "../player.slint";
 import { Skeleton, SkeletonBlock, SkeletonBar, SkeletonRow, SkeletonCard, ErrorState, EmptyState, Open } from "content.slint";
@@ -364,6 +364,14 @@ component Shortcut inherits Rectangle {
         font-weight: 600;
         vertical-alignment: center;
     }
+    PageIntent {
+        hovered: ta.has-hover;
+        pressed: ta.pressed;
+        pointer-x: ta.mouse-x;
+        pointer-y: ta.mouse-y;
+        kind: root.item.kind;
+        id: root.item.id;
+    }
     ta := TouchArea {
         mouse-cursor: pointer;
         clicked => { root.clicked(); }
@@ -501,6 +509,14 @@ component ItemRow inherits Rectangle {
     accessible-label: root.item.title;
     accessible-action-default => { root.clicked(); }
     animate background { duration: Theme.t-hover; easing: Curves.ease-hover; }
+    PageIntent {
+        hovered: ta.has-hover;
+        pressed: ta.pressed;
+        pointer-x: ta.mouse-x;
+        pointer-y: ta.mouse-y;
+        kind: root.item.kind;
+        id: root.item.id;
+    }
     ta := TouchArea {
         mouse-cursor: pointer;
         clicked => { root.clicked(); }

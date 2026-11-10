@@ -1,8 +1,9 @@
 //! Artist page (ui/pages/artist.slint): the profile header, top songs, albums and singles.
-//! One call per visit.
+//! One call per visit, started early when the pointer rested on its card (`ahead`).
 
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::time::Instant;
 
 use featherplay_core::model::ArtistId;
 use featherplay_core::tr;
@@ -11,6 +12,7 @@ use slint::ComponentHandle;
 
 use crate::app::Ctx;
 use crate::controller::{Action, PlayerState};
+use crate::pages::ahead;
 use crate::pages::content::{self, CARD_COVER, TrackList};
 
 /// The banner photo's width, in logical pixels: the content width of a large window. The
@@ -76,14 +78,23 @@ pub fn open(ctx: &Rc<Ctx>, id: &ArtistId) {
     data.set_singles(Default::default());
     TOP.with(|l| *l.borrow_mut() = None);
 
+    let ahead = ahead::artist(id);
+    let read_ahead = if ahead.is_some() { " (read ahead)" } else { "" };
     let id = id.clone();
     ctx.load_for_page(
-        move |source| async move { source.artist(&id).await },
-        |ctx, ui, result| {
+        move |source| async move {
+            let started = Instant::now();
+            let artist = ahead::or_fetch(ahead, ahead::Answer::artist, source.artist(&id)).await;
+            (artist, started.elapsed())
+        },
+        move |ctx, ui, (result, took)| {
             let data = ui.global::<ArtistData>();
             data.set_loading(false);
             let artist = match result {
-                Ok(a) => a,
+                Ok(a) => {
+                    log!("artist: fetched in {} ms{read_ahead}", took.as_millis());
+                    a
+                }
                 Err(e) => {
                     data.set_error(content::error_text("artist", &e).into());
                     return;

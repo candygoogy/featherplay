@@ -13,7 +13,7 @@
 // moves at rest.
 import { ListView } from "../list_view.slint";
 import { Theme, Curves, Icons } from "../theme.slint";
-import { CardItem, ItemKind, Body, Display, Card, Cover, Icon, PageTitle, ShelfArrows } from "../parts.slint";
+import { CardItem, ItemKind, Body, Display, Card, Cover, Icon, PageTitle, ShelfArrows, PageIntent } from "../parts.slint";
 import { Nav } from "../nav.slint";
 import { HomeShelfRow, ShelfShape, Shapes } from "home.slint";
 import { Chips, SkeletonShelves, SkeletonList, SkeletonGrid, ErrorState, EmptyState, FadeIn, Open } from "content.slint";
@@ -299,6 +299,14 @@ component ChartArtistItem inherits Rectangle {
         : root.entry.rank + ". " + root.entry.item.title;
     accessible-action-default => { Open.item(root.entry.item); }
     animate background { duration: Theme.t-hover; easing: Curves.ease-hover; }
+    PageIntent {
+        hovered: ta.has-hover;
+        pressed: ta.pressed;
+        pointer-x: ta.mouse-x;
+        pointer-y: ta.mouse-y;
+        kind: root.entry.item.kind;
+        id: root.entry.item.id;
+    }
     ta := TouchArea {
         mouse-cursor: pointer;
         clicked => { Open.item(root.entry.item); }

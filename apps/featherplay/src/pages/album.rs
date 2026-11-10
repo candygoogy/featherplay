@@ -1,5 +1,6 @@
 //! Album page (ui/pages/album.slint): the header, then the numbered track list. One call
-//! per visit; the tracks stay here for Play, Shuffle and the song menu.
+//! per visit, started early when the pointer rested on its card (`ahead`); the tracks stay
+//! here for Play, Shuffle and the song menu.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -12,6 +13,7 @@ use slint::{ComponentHandle, Model};
 use crate::app::Ctx;
 use crate::controller::PlayerState;
 use crate::follow;
+use crate::pages::ahead;
 use crate::pages::content::{self, HEADER_COVER, TrackList};
 use crate::ui::AlbumData;
 use crate::ui_bridge::{artist_names, shown};
@@ -78,20 +80,23 @@ pub fn open(ctx: &Rc<Ctx>, id: &AlbumId) {
     data.set_tracks(Default::default());
     LIST.with(|l| *l.borrow_mut() = None);
 
+    let ahead = ahead::album(id);
+    let read_ahead = if ahead.is_some() { " (read ahead)" } else { "" };
     let id = id.clone();
     ctx.load_for_page(
         move |source| async move {
             let started = Instant::now();
-            (source.album(&id).await, started.elapsed())
+            let album = ahead::or_fetch(ahead, ahead::Answer::album, source.album(&id)).await;
+            (album, started.elapsed())
         },
-        |ctx, ui, (result, took)| {
+        move |ctx, ui, (result, took)| {
             let data = ui.global::<AlbumData>();
             data.set_loading(false);
             let album = match result {
                 Ok(album) => {
                     // One request: album pages have no continuations.
                     log!(
-                        "album: {} tracks fetched in {} ms",
+                        "album: {} tracks fetched in {} ms{read_ahead}",
                         album.tracks.len(),
                         took.as_millis()
                     );

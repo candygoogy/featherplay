@@ -98,6 +98,67 @@ export component RowsShown {
     changed last => { root.tell(); }
 }
 
+// An album, playlist or artist card or row the pointer has rested on for a moment, or pressed
+// (`PageIntent`): the app starts loading its page then, so a click shows it at once
+// (`pages/ahead.rs`).
+export global PageHover {
+    callback rested(ItemKind, string /* id */);
+}
+
+// Reports `kind` and `id` to `PageHover` once the pointer has stood still over the card for
+// 150 ms, so a sweep across a shelf reports nothing, or at once when it's pressed; once per
+// hover. Songs aren't reported. The timer runs only while hovered. The wheel scrolling under a
+// still pointer hovers nothing (`Frame.scrolling`), so nothing is reported for it either.
+export component PageIntent {
+    in property <bool> hovered;
+    in property <bool> pressed;
+    // Where the pointer is over the card: each move starts the wait again.
+    in property <length> pointer-x;
+    in property <length> pointer-y;
+    in property <ItemKind> kind;
+    in property <string> id;
+    width: 0;
+    height: 0;
+    property <bool> sent;
+    property <bool> wanted: root.kind != ItemKind.song && root.id != "";
+    changed hovered => {
+        if !self.hovered {
+            self.sent = false;
+        }
+    }
+    changed pressed => {
+        if self.pressed && self.hovered && !self.sent && self.wanted {
+            self.sent = true;
+            PageHover.rested(self.kind, self.id);
+        }
+    }
+    changed pointer-x => {
+        if wait.running {
+            wait.restart();
+        }
+    }
+    changed pointer-y => {
+        if wait.running {
+            wait.restart();
+        }
+    }
+    // A list's row shows another card (its rows are reused as it scrolls).
+    changed id => {
+        self.sent = false;
+        if wait.running {
+            wait.restart();
+        }
+    }
+    wait := Timer {
+        interval: 150ms;
+        running: root.hovered && !root.sent && root.wanted;
+        triggered => {
+            root.sent = true;
+            PageHover.rested(root.kind, root.id);
+        }
+    }
+}
+
 // One card on a shelf or grid, or a playlist in the sidebar.
 export struct CardItem {
     id: string,
@@ -650,6 +711,15 @@ export component Card inherits Rectangle {
         hovered: ta.has-hover && root.playable && root.item.kind == ItemKind.song;
         pressed: ta.pressed;
         id: root.item.kind == ItemKind.song ? root.item.id : "";
+    }
+    // An album, playlist or artist card starts loading its page: its click opens it.
+    PageIntent {
+        hovered: ta.has-hover;
+        pressed: ta.pressed;
+        pointer-x: ta.mouse-x;
+        pointer-y: ta.mouse-y;
+        kind: root.item.kind;
+        id: root.item.id;
     }
     // The art and its hover veil, pressed together.
     Rectangle {

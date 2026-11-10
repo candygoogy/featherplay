@@ -14,12 +14,14 @@ use std::collections::HashMap;
 use std::fmt;
 use std::ops::ControlFlow;
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 
 use featherplay_core::model::{AlbumId, PlaylistId, Track, TrackId};
+use featherplay_core::sync::LockExt;
 use featherplay_ytm::{
     AccountIdentity, AccountInfo, Album, AlbumSummary, ApiError, Artist, ArtistSummary, Charts,
     HistoryDay, HomeFeed, HomeShelf, Identity, MoodPage, MoodSection, Playlist, PlaylistPart,
-    PlaylistSummary, SearchFilter, SearchResults, SearchSuggestions, convert,
+    PlaylistRest, PlaylistSummary, SearchFilter, SearchResults, SearchSuggestions, convert,
 };
 use serde_json::Value;
 use sha1::{Digest, Sha1};
@@ -67,6 +69,9 @@ pub struct Fixtures {
     covers: HashMap<String, PathBuf>,
     /// `FEATHERPLAY_FIXTURE_COVERS`: images for every other URL.
     fallback: Vec<PathBuf>,
+    /// How often each recording was read: each read stands for a request a live source
+    /// would send (`reads`).
+    reads: Mutex<HashMap<String, usize>>,
 }
 
 impl fmt::Debug for Fixtures {
@@ -122,7 +127,14 @@ impl Fixtures {
             demo,
             covers,
             fallback,
+            reads: Mutex::default(),
         })
+    }
+
+    /// How often recording `name` ("album", "playlist_mix"…) has been read, for tests that
+    /// count requests.
+    pub fn reads(&self, name: &str) -> usize {
+        self.reads.lock_or_recover().get(name).copied().unwrap_or(0)
     }
 
     /// The cached design cover for a thumbnail URL from the fixtures, or else one of the
@@ -144,6 +156,7 @@ impl Fixtures {
     }
 
     fn raw(&self, name: &str) -> Result<String, ApiError> {
+        *self.reads.lock_or_recover().entry(name.into()).or_default() += 1;
         std::fs::read_to_string(self.dir.join(format!("{name}.json")))
             .map_err(|e| ApiError::Parse(format!("fixture {name}: {e}")))
     }
@@ -248,38 +261,40 @@ impl Fixtures {
         })
     }
 
-    /// `playlist` a page at a time. A mix ("RD…") is the mix recording, whose three pages
-    /// are handed on one at a time as live ones are, to the end of its list; anything else
-    /// comes as one page.
-    pub fn playlist_by_page(
+    /// `playlist`'s first page, and where the list goes on. A mix ("RD…") is the mix
+    /// recording, whose three pages are read one at a time as live ones are (`playlist_rest`);
+    /// anything else is one page.
+    pub fn playlist_first(
         &self,
         id: &PlaylistId,
-        mut each: impl FnMut(PlaylistPart) -> ControlFlow<()>,
-    ) -> Result<usize, ApiError> {
+    ) -> Result<(Playlist, Option<PlaylistRest>), ApiError> {
         if self.demo.is_some() || !convert::bare_playlist_id(&id.0).starts_with("RD") {
-            let _ = each(PlaylistPart::First(self.playlist(id)?));
-            return Ok(1);
+            return Ok((self.playlist(id)?, None));
         }
         let pages = self.pages("playlist_mix")?;
-        let mut paging = convert::PlaylistPaging::default();
-        let mut read = 0;
-        for page in &pages {
-            let (tracks, token) = paging.read(page)?;
-            read += 1;
-            let part = if read == 1 {
-                PlaylistPart::First(Playlist {
-                    summary: convert::playlist_summary(page, id)?,
-                    tracks,
-                    pages: 1,
-                })
-            } else {
-                PlaylistPart::More(tracks)
-            };
-            if each(part).is_break() || token.is_none() {
-                break;
+        let first = pages
+            .first()
+            .ok_or_else(|| ApiError::Parse("fixture playlist_mix: no pages".into()))?;
+        convert::playlist_first(first, id)
+    }
+
+    /// The mix recording's pages after `rest`, each handed to `each`, to the end of its list.
+    pub fn playlist_rest(
+        &self,
+        mut rest: PlaylistRest,
+        mut each: impl FnMut(PlaylistPart) -> ControlFlow<()>,
+    ) -> Result<usize, ApiError> {
+        let pages = self.pages("playlist_mix")?;
+        while let Some(page) = pages.get(rest.pages()) {
+            let read = rest.pages() + 1;
+            let (tracks, next) = rest.read(page)?;
+            let wanted = each(PlaylistPart::More(tracks)).is_continue();
+            match next {
+                Some(next) if wanted => rest = next,
+                _ => return Ok(read),
             }
         }
-        Ok(read)
+        Ok(rest.pages())
     }
 
     pub fn album(&self, id: &AlbumId) -> Result<Album, ApiError> {

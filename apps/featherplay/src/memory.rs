@@ -74,6 +74,7 @@ pub fn hidden(ctx: &Ctx, hidden: bool) {
     if hidden {
         let before = private_bytes();
         ctx.covers.show(None);
+        crate::pages::ahead::clear();
         if let Some(ui) = ctx.window() {
             release_drawing(ui.window());
         }

@@ -38,6 +38,13 @@ Notable changes to featherplay, newest first. The format follows
   Related and Up next. It takes the top first, a few at a time and at most 24 a minute, with
   one request each. It stops when you move to another page or scroll the rows away, and
   does nothing while playback is paused or the window is minimised or in the tray.
+- Albums, playlists and artists open sooner. When the pointer rests on a card or a sidebar
+  entry for a moment, featherplay starts loading its page, so a click shows it from that
+  answer, or from the request already under way, instead of waiting for a new one: a page
+  that took 0.2-0.5 s to fill shows at once when the pointer rested on its card for about
+  a second. Moving across a shelf loads nothing, at most two pages load at once, an answer
+  is kept for a minute, and a playlist reads only its first page before the click. Nothing
+  loads while the window is minimised or in the tray.
 - Settings > Discord: the profile preview now sits beside the options from the window's
   default size up, and stays in view while you scroll through them, so hovering Time or
   Status text lights what it changes on the card. In a window too short for the whole

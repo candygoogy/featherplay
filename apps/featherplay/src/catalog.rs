@@ -11,7 +11,7 @@ use featherplay_core::model::{AlbumId, ArtistId, LikeStatus, PlaylistId, Track, 
 use featherplay_core::sync::RwLockExt;
 use featherplay_ytm::{
     AccountIdentity, AccountInfo, Album, AlbumSummary, ApiError, Artist, ArtistSummary, Charts,
-    HistoryDay, HomeFeed, HomeShelf, MoodPage, MoodSection, Playlist, PlaylistPart,
+    HistoryDay, HomeFeed, HomeShelf, MoodPage, MoodSection, Playlist, PlaylistPart, PlaylistRest,
     PlaylistSummary, SearchFilter, SearchResults, SearchSuggestions, SongLyrics, YtMusic,
 };
 use tokio::runtime::Handle;
@@ -165,17 +165,30 @@ impl Source {
         }
     }
 
-    /// `playlist` a page at a time, each handed to `each` as it's read
-    /// (`YtMusic::playlist_by_page`). Returns how many pages were read.
-    pub async fn playlist_by_page(
+    /// `playlist`'s first page, and where the list goes on, if it does
+    /// (`YtMusic::playlist_first`). One request.
+    pub async fn playlist_first(
         &self,
         id: &PlaylistId,
+    ) -> Result<(Playlist, Option<PlaylistRest>), ApiError> {
+        match self {
+            Source::Unreachable => Err(unreachable()),
+            Source::Live(api) | Source::SignedOut(api) => api.playlist_first(id).await,
+            Source::Fixtures(f) => f.playlist_first(id),
+        }
+    }
+
+    /// The rest of a playlist after `playlist_first`, each page handed to `each` as it's
+    /// read (`YtMusic::playlist_rest`). Returns how many pages were read, the first included.
+    pub async fn playlist_rest(
+        &self,
+        rest: PlaylistRest,
         each: impl FnMut(PlaylistPart) -> ControlFlow<()> + Send,
     ) -> Result<usize, ApiError> {
         match self {
             Source::Unreachable => Err(unreachable()),
-            Source::Live(api) | Source::SignedOut(api) => api.playlist_by_page(id, each).await,
-            Source::Fixtures(f) => f.playlist_by_page(id, each),
+            Source::Live(api) | Source::SignedOut(api) => api.playlist_rest(rest, each).await,
+            Source::Fixtures(f) => f.playlist_rest(rest, each),
         }
     }
 

@@ -16,7 +16,7 @@ use slint::{Image, Model, ModelRc, VecModel};
 use crate::app::Ctx;
 use crate::controller::{Action, PlayerState, PlayingFrom, QueueAction};
 use crate::covers::Covers;
-use crate::pages::playlist;
+use crate::pages::{ahead, playlist};
 use crate::router::Page;
 use crate::song_menu;
 use crate::ui::{CardItem, ItemKind, TrackRow};
@@ -431,10 +431,13 @@ pub fn play_card(ctx: &Rc<Ctx>, item: &CardItem) {
     }
 }
 
-/// Plays a whole album, from the start (one call).
+/// Plays a whole album, from the start (one call, or its answer read ahead).
 pub fn play_album(ctx: &Rc<Ctx>, id: AlbumId) {
+    let ahead = ahead::album(&id);
     ctx.load(
-        move |source| async move { source.album(&id).await },
+        move |source| async move {
+            ahead::or_fetch(ahead, ahead::Answer::album, source.album(&id)).await
+        },
         |ctx, _, result| match result {
             Ok(album) => {
                 crate::sidebar::opened(ctx, crate::sidebar::album_entry(&album.summary));
@@ -451,8 +454,9 @@ pub fn play_playlist(ctx: &Rc<Ctx>, id: PlaylistId) {
     let arriving = Arriving::default();
     let mut from = None;
     let wanted = id.clone();
+    let ahead = ahead::playlist(&id);
     ctx.stream(
-        move |source, parts| playlist::fetch(source, wanted, parts),
+        move |source, parts| playlist::fetch(source, wanted, ahead, parts),
         move |ctx, _, part| match part {
             playlist::Part::Page(PlaylistPart::First(p), _) => {
                 crate::sidebar::opened(ctx, crate::sidebar::playlist_entry(&p.summary));
@@ -510,10 +514,13 @@ fn start_or_join(
     ControlFlow::Continue(())
 }
 
-/// Plays an artist's top songs (one call).
+/// Plays an artist's top songs (one call, or its answer read ahead).
 pub fn play_artist(ctx: &Rc<Ctx>, id: featherplay_core::model::ArtistId) {
+    let ahead = ahead::artist(&id);
     ctx.load(
-        move |source| async move { source.artist(&id).await },
+        move |source| async move {
+            ahead::or_fetch(ahead, ahead::Answer::artist, source.artist(&id)).await
+        },
         |ctx, _, result| match result {
             Ok(artist) => play_tracks(ctx, artist.top_songs),
             Err(e) => log!("play artist: {e}"),

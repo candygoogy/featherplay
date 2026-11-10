@@ -5,7 +5,7 @@
 // `src/sidebar.rs`. Search is the top bar's (top_bar.slint).
 import { ListView } from "list_view.slint";
 import { Theme, Icons, Curves } from "theme.slint";
-import { CardItem, ItemKind, Icon, Body, Cover, IconButton, Pill } from "parts.slint";
+import { CardItem, ItemKind, Icon, Body, Cover, IconButton, Pill, PageIntent } from "parts.slint";
 import { Nav, PageKind } from "nav.slint";
 import { AccountMenu } from "account_menu.slint";
 import { PlaylistMenu } from "playlist_menu.slint";
@@ -274,6 +274,15 @@ export component Sidebar inherits Rectangle {
                 accessible-label: self.pinned ? @tr("{}, pinned", p.title) : p.title;
                 accessible-action-default => { SideOpen.item(p); }
                 animate background { duration: Theme.t-hover; }
+                // Starts loading its page, unless it's the one shown.
+                PageIntent {
+                    hovered: pta.has-hover && !entry.active;
+                    pressed: pta.pressed;
+                    pointer-x: pta.mouse-x;
+                    pointer-y: pta.mouse-y;
+                    kind: p.kind;
+                    id: p.id;
+                }
                 pta := TouchArea {
                     mouse-cursor: pointer;
                     clicked => { SideOpen.item(p); }

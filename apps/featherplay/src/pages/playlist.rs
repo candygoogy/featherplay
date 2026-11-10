@@ -1,7 +1,8 @@
 //! Playlist page (ui/pages/playlist.slint), also Liked songs (`"LM"`): the header, then song
 //! rows whose covers load as they scroll into view. One load per visit, a page at a time:
 //! the header and the first songs show as soon as the first page is read, and the songs of
-//! each later page follow them as it comes, with the count and length in the header.
+//! each later page follow them as it comes, with the count and length in the header. The
+//! first page may have been read already, when the pointer rested on its card (`ahead`).
 
 use std::cell::{Cell, RefCell};
 use std::ops::ControlFlow;
@@ -18,6 +19,7 @@ use crate::app::Ctx;
 use crate::catalog::Source;
 use crate::controller::{PlayerState, PlayingFrom};
 use crate::follow;
+use crate::pages::ahead;
 use crate::pages::content::{self, Arriving, HEADER_COVER, TrackList};
 use crate::router::Page;
 use crate::ui::{AppWindow, PlaylistData};
@@ -37,18 +39,30 @@ pub enum Part {
     End(Result<usize, ApiError>, Duration),
 }
 
-/// Reads playlist `id` a page at a time onto `parts`, and asks for no more pages once
-/// they're no longer wanted (`parts` is closed).
-pub async fn fetch(source: Source, id: PlaylistId, parts: UnboundedSender<Part>) {
+/// Reads playlist `id` a page at a time onto `parts`, the first one from `ahead` when it was
+/// read ahead, and asks for no more pages once they're no longer wanted (`parts` is closed).
+pub async fn fetch(
+    source: Source,
+    id: PlaylistId,
+    ahead: Option<ahead::Ahead>,
+    parts: UnboundedSender<Part>,
+) {
     let started = Instant::now();
-    let result = source
-        .playlist_by_page(&id, |part| {
-            match parts.send(Part::Page(part, started.elapsed())) {
-                Ok(()) => ControlFlow::Continue(()),
-                Err(_) => ControlFlow::Break(()),
+    let send = |part| match parts.send(Part::Page(part, started.elapsed())) {
+        Ok(()) => ControlFlow::Continue(()),
+        Err(_) => ControlFlow::Break(()),
+    };
+    let result =
+        match ahead::or_fetch(ahead, ahead::Answer::playlist, source.playlist_first(&id)).await {
+            Ok((first, rest)) => {
+                let wanted = send(PlaylistPart::First(first)).is_continue();
+                match rest {
+                    Some(rest) if wanted => source.playlist_rest(rest, send).await,
+                    _ => Ok(1),
+                }
             }
-        })
-        .await;
+            Err(e) => Err(e),
+        };
     // Nobody may be listening any more.
     let _ = parts.send(Part::End(result, started.elapsed()));
 }
@@ -129,9 +143,11 @@ pub fn open(ctx: &Rc<Ctx>, id: &PlaylistId) {
     let arriving = Arriving::default();
     let mut tracks = 0;
     let wanted = id.clone();
+    let ahead = ahead::playlist(id);
+    let read_ahead = if ahead.is_some() { " (read ahead)" } else { "" };
     ctx.stream(
         // Liked songs loads like any playlist; the header shown for it is ours.
-        move |source, parts| fetch(source, wanted, parts),
+        move |source, parts| fetch(source, wanted, ahead, parts),
         move |ctx, ui, part| {
             let here = ctx.visit() == visit && OPENED.with(Cell::get) == opened;
             match part {
@@ -141,7 +157,7 @@ pub fn open(ctx: &Rc<Ctx>, id: &PlaylistId) {
                     }
                     tracks = p.tracks.len();
                     log!(
-                        "playlist: first page, {tracks} tracks in {} ms",
+                        "playlist: first page, {tracks} tracks in {} ms{read_ahead}",
                         took.as_millis()
                     );
                     show(ctx, ui, p, page.clone(), &arriving);
