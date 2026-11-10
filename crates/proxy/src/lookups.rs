@@ -20,6 +20,9 @@ const RETRY_AFTER: Duration = Duration::from_secs(5 * 60);
 
 /// Windows' error for "auto-detection found no script on this network".
 const NOTHING_DETECTED: u32 = 12180;
+/// Windows' error for a script that ran but failed (`ERROR_WINHTTP_BAD_AUTO_PROXY_SCRIPT`),
+/// which may be for the host asked about alone.
+const SCRIPT_ERROR: u32 = 12166;
 
 /// What Windows' proxy settings say to ask.
 #[derive(Clone, Default, PartialEq, Eq)]
@@ -128,9 +131,10 @@ struct Failure {
     code: u32,
 }
 
-/// A host's answer, and when it came.
+/// A host's answer, and when it came. `None`: the script threw for this host
+/// (`SCRIPT_ERROR`), which goes as without a script until it's asked again.
 struct Answer {
-    found: Found,
+    found: Option<Found>,
     at: Instant,
 }
 
@@ -206,7 +210,7 @@ impl Lookups {
             if answer.at.elapsed() >= self.retry_after {
                 self.ask_about(&mut state, url);
             }
-            return Some(found);
+            return found;
         }
         let worth_asking = match &state.sources {
             // Settings read a while ago are read again: they may name a source now.
@@ -250,7 +254,9 @@ impl Lookups {
         // The answers of a setting turned off since (a VPN's script, disconnected) go:
         // asking nothing, nothing would replace them.
         let before = state.answers.len();
-        state.answers.retain(|_, a| sources.has(a.found.source));
+        state
+            .answers
+            .retain(|_, a| a.found.as_ref().is_none_or(|f| sources.has(f.source)));
         if state
             .latest
             .as_ref()
@@ -271,17 +277,21 @@ impl Lookups {
             };
             let ask = state.askable(&sources, self.retry_after);
             drop(state);
-            let found = self.ask(&url, &sources, ask);
-            self.answered(&url, found.is_some(), ask.contains(&true));
+            let (answered, failed) = self.ask(&url, &sources, ask);
+            self.answered(&url, answered, failed);
         }
     }
 
     /// Asks the sources in `ask` about `url`, and keeps what they say. Auto-detection's
     /// answer wins, as in Windows, but the script is asked first: it's on a server the
     /// network names and answers in moments, while auto-detection can take seconds to find
-    /// nothing. Its answer serves until auto-detection's comes.
-    fn ask(&self, url: &Url, sources: &Sources, ask: [bool; 2]) -> Option<Found> {
-        let mut found = None;
+    /// nothing. Its answer serves until auto-detection's comes. Says whether a source
+    /// answered, a script that threw for this host alone (`SCRIPT_ERROR`) included, and
+    /// whether one failed otherwise.
+    fn ask(&self, url: &Url, sources: &Sources, ask: [bool; 2]) -> (bool, bool) {
+        let mut found = false;
+        let mut threw = None;
+        let mut failed = false;
         for source in [Source::Script, Source::AutoDetect] {
             if !ask[source as usize] {
                 continue;
@@ -293,14 +303,38 @@ impl Lookups {
             match self.system.ask(url.as_str(), script) {
                 Ok(proxies) => {
                     let proxy = proxies.and_then(|list| first(&list, url.scheme()));
-                    let answer = Found { proxy, source };
-                    self.keep(url, answer.clone(), sources);
-                    found = Some(answer);
+                    self.keep(url, Found { proxy, source }, sources);
+                    found = true;
                 }
-                Err(code) => self.failed(source, code, sources),
+                Err(SCRIPT_ERROR) => {
+                    // Auto-detection's script is set aside a while, as for any failure.
+                    if source == Source::AutoDetect {
+                        self.failed(source, SCRIPT_ERROR, sources);
+                    }
+                    threw = Some(source);
+                }
+                Err(code) => {
+                    self.failed(source, code, sources);
+                    failed = true;
+                }
             }
         }
-        found
+        // As WinHTTP's guidance has it, this host goes as without a script (the proxy set
+        // by hand, if any) until it's asked again; the others keep their answers, as the
+        // script did run.
+        if let Some(source) = threw.filter(|_| !found) {
+            let host = url.host_str().unwrap_or_default();
+            log::info!(
+                "proxy for {host}: {}; as without a script",
+                sources.failure(source, SCRIPT_ERROR)
+            );
+            let answer = Answer {
+                found: None,
+                at: Instant::now(),
+            };
+            self.lock().answers.insert(host.to_string(), answer);
+        }
+        (found || threw.is_some(), failed)
     }
 
     /// `source` gave no answer. The log says so the first time, and when the error changes.
@@ -322,7 +356,7 @@ impl Lookups {
         state.failed[found.source as usize] = None;
         let news = (state.latest.as_ref() != Some(&found)).then(|| found.describe(sources));
         let answer = Answer {
-            found: found.clone(),
+            found: Some(found.clone()),
             at: Instant::now(),
         };
         state.answers.insert(host.to_string(), answer);
@@ -335,13 +369,14 @@ impl Lookups {
 
     /// The lookup for `url`'s host is over. When every source asked failed, the answers so
     /// far go: they were for a network the PC has left (an office's proxy, seen from home),
-    /// and requests go as they would without a script until one answers again.
-    fn answered(&self, url: &Url, found: bool, asked: bool) {
+    /// and requests go as they would without a script until one answers again. `failed`: a
+    /// source asked failed (`ask`).
+    fn answered(&self, url: &Url, found: bool, failed: bool) {
         let host = url.host_str().unwrap_or_default();
         let mut state = self.lock();
         state.asking.remove(host);
         let had_answers = state.latest.is_some() || !state.answers.is_empty();
-        if !found && asked && had_answers {
+        if !found && failed && had_answers {
             state.answers.clear();
             state.latest = None;
             drop(state);
@@ -357,7 +392,7 @@ impl Lookups {
             found: url
                 .host_str()
                 .and_then(|h| state.answers.get(h))
-                .map(|answer| answer.found.clone()),
+                .and_then(|answer| answer.found.clone()),
             errors: SOURCES.map(|s| state.failed[s as usize].as_ref().map(|f| f.code)),
         }
     }
@@ -625,6 +660,32 @@ mod tests {
         assert_eq!(lookups.found(&url(MUSIC)), None);
         assert_eq!(lookups.found(&url("https://lrclib.net/")), None);
         lookups.settle();
+    }
+
+    /// A script that throws for one host (Windows' error 12166) says nothing of the others:
+    /// their answers stay, and the script isn't set aside for the next hosts. The host it
+    /// threw for goes as without a script (the proxy set by hand, if any), and isn't asked
+    /// about again at each request.
+    #[test]
+    fn a_script_error_for_one_host_keeps_the_others_answers() {
+        let windows = Windows::both(nothing, |u| match u.contains("odd.example") {
+            true => Err(12166),
+            false => Ok(Some("proxy.corp:8080".into())),
+        });
+        let asked = windows.asked.clone();
+        let lookups = Lookups::new(windows);
+        let office = Some((Source::Script, "http://proxy.corp:8080".to_string()));
+        assert_eq!(shown(answer(&lookups, MUSIC)), office);
+
+        let odd = url("https://odd.example/");
+        assert_eq!(answer(&lookups, odd.as_str()), None, "as without a script");
+        assert_eq!(
+            asked.lock().unwrap().len(),
+            3,
+            "asked about at each request"
+        );
+        assert_eq!(shown(lookups.status(&url(MUSIC)).found), office);
+        assert_eq!(lookups.status(&odd).errors[Source::Script as usize], None);
     }
 
     #[test]
