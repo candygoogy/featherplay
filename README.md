@@ -1,15 +1,22 @@
 <!--
   Images in .github/readme/: rendered offscreen by featherplay's own `--snapshot` mode with the
   demo fixtures (FEATHERPLAY_FIXTURES=demo: six free-licence songs, our own cover art, a plain
-  "Listener" account), not screen captures (except tray.png, below). Window 1600 x 1000 at 125 %. The script that
-  renders them and composes the header is kept outside the repo.
+  "Listener" account), not screen captures (except tray.png, below). The window is at its
+  default size, 1280 x 800, at 125 %. The script that renders them, cuts the details and
+  composes the header is kept outside the repo.
 
   header-dark.png, header-light.png  The header: icon, wordmark, line, measured figures, and a laptop
                                      showing Now playing with lyrics over the cover's glow (1600 x 900).
   hero-dark.png, hero-light.png      Home with a song playing, the bar visible.
   now-playing-lyrics.png             Now playing with the full lyrics view, the current line lit.
   theme-dark.png, theme-light.png    The same playlist, same song, in each theme.
+  settings-discord.png               Settings at the Discord group (`--snapshot settings-discord`):
+                                     the profile card beside its options.
+  search.png                         Search results.
   mini-player.png                    The tray's mini player (200 %).
+  feature-*.png                      The pictures beside Features, cut from the same renders: search,
+                                     Up next, the Equalizer, the Discord card, and the mini player
+                                     with three covers, each giving its accent.
   tray.png                           The one real capture: the tray's tooltip and menu are Windows'
                                      own, so the snapshot mode can't draw them. A free-licence song
                                      playing (muted), the window on Settings behind; other apps'
@@ -22,18 +29,13 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: light)" srcset=".github/readme/header-light.png">
-    <img src=".github/readme/header-dark.png" alt="featherplay: a native Windows player for YouTube Music, light enough to forget it's running. While playing it uses 40 MB of memory, 1 process and 0.070 % CPU. Beside the name, a laptop shows featherplay's Now playing view with synced lyrics for California Lullabye, over a mauve glow, the colour the app takes from the song's cover." width="800">
+    <img src=".github/readme/header-dark.png" alt="featherplay: a native Windows player for YouTube Music, light enough to forget it's running. While playing it uses 40 MB of memory, 1 process and 0.070 % CPU. Beside the name, a laptop shows featherplay's Now playing view with synced lyrics for California Lullabye, over a mauve glow, the colour the app takes from the song's cover." width="100%">
   </picture>
 </p>
 
 <p align="center">
-  <a href="#install">Install</a> &nbsp;
-  <a href="#features">Features</a> &nbsp;
-  <a href="#screenshots">Screenshots</a> &nbsp;
-  <a href="#how-light">How light?</a> &nbsp;
-  <a href="#coming-from-pear">Coming from Pear?</a> &nbsp;
-  <a href="#privacy">Privacy</a> &nbsp;
-  <a href="#build-from-source">Build</a>
+  <a href="https://github.com/candygoogy/featherplay/releases/latest"><b>Download for Windows</b></a>
+  &nbsp;·&nbsp; Windows 10 and 11, x64 and ARM64 &nbsp;·&nbsp; free and open source
 </p>
 
 featherplay plays your YouTube Music library, playlists, search results and radio from one
@@ -42,9 +44,18 @@ behind the window and nothing plays but the audio. It keeps what people use most
 Desktop (scrobbling, media keys and taskbar buttons, SponsorBlock, Discord status) and uses
 about a twentieth of its memory ([How light?](#how-light)).
 
+> [!NOTE]
 > **Unofficial.** featherplay is an independent project. It isn't made, endorsed or supported
 > by Google or YouTube, and it uses YouTube Music's private web interface, which can change
 > without notice. **If playback breaks, update; YouTube changes things.**
+
+**Start:** [Install](#install) · [Windows protected your PC](#windows-protected-your-pc) ·
+[The first run](#the-first-run) · [Signing in](#signing-in)<br>
+**What it is:** [Why](#why) · [What it leaves out](#what-it-leaves-out) ·
+[Features](#features) · [Screenshots](#screenshots) · [How light?](#how-light)<br>
+**Reference:** [Coming from Pear?](#coming-from-pear) · [Questions](#questions) ·
+[Privacy](#privacy) · [Local API](#local-api) · [Build from source](#build-from-source) ·
+[Credits](#credits) · [Licence](#licence)
 
 ## Install
 
@@ -55,25 +66,20 @@ SHA256.
 
 <!-- The installer's file name carries the version: update this link with each release. -->
 
-The installer,
-[`featherplay-setup-0.2.1.exe`](https://github.com/candygoogy/featherplay/releases/download/v0.2.1/featherplay-setup-0.2.1.exe),
-is the one to choose. It installs for your Windows user only, with no admin prompt, and adds
-featherplay to the Start menu and to Settings > Apps. A newer setup upgrades it in place and
-keeps your settings and sign-in, and featherplay fetches one by itself: it downloads in the
-background and installs when you click **Restart to update** (Install updates automatically,
-in Settings > Account, turns this off). Uninstalling from Settings >
-Apps removes everything featherplay keeps: settings, cache, helpers, the sign-in window's
-data, and its entries in Credential Manager.
+| | The installer, the one to choose | The portable exe |
+|---|---|---|
+| Download | [`featherplay-setup-0.2.1.exe`](https://github.com/candygoogy/featherplay/releases/download/v0.2.1/featherplay-setup-0.2.1.exe) | [`featherplay.exe`](https://github.com/candygoogy/featherplay/releases/latest/download/featherplay.exe) |
+| Where it goes | Your Windows user only, with no admin prompt. It adds featherplay to the Start menu and to Settings > Apps. | Any folder. Settings go in `%APPDATA%\featherplay`, the cache in `%LOCALAPPDATA%\featherplay`. |
+| Updates | Downloads a new version in the background and installs it when you click **Restart to update**. | Tells you when a new version is out, but doesn't install it. |
+| Visual C++ runtime | Brings its own copy. | Needs the [Visual C++ Redistributable](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist) (x64, or ARM64 for `featherplay-arm64.exe`), which most PCs already have. |
 
-The portable
-[`featherplay.exe`](https://github.com/candygoogy/featherplay/releases/latest/download/featherplay.exe)
-runs from any folder. It keeps its settings in `%APPDATA%\featherplay` and its cache in
-`%LOCALAPPDATA%\featherplay`, and it tells you when a new version is out but doesn't install
-it. To remove it, delete the exe and those two folders, then open Credential Manager and
-remove the Windows Credentials whose names end in `.featherplay`. It needs the
-[Visual C++ Redistributable](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist)
-(x64, or ARM64 for `featherplay-arm64.exe`), which most PCs already have; the installer brings
-its own copy.
+A newer setup upgrades the installed copy in place and keeps your settings and sign-in.
+**Install updates automatically**, in Settings > Account, turns the automatic install off.
+Uninstalling from Settings > Apps removes everything featherplay keeps: settings, cache,
+helpers, the sign-in window's data, and its entries in Credential Manager.
+
+To remove the portable exe, delete it and its two folders, then open Credential Manager and
+remove the Windows Credentials whose names end in `.featherplay`.
 
 <!-- TODO(release): show these once the manifests in packaging/ are accepted.
 
@@ -107,35 +113,60 @@ player's challenges with yt-dlp's solver scripts in the JavaScript engine built 
 current player at startup, which takes a few seconds, so the first song you click plays
 without waiting for any download.
 
-For a song it can't get that way, it falls back to two helper programs,
-[yt-dlp](https://github.com/yt-dlp/yt-dlp) and [Deno](https://github.com/denoland/deno)
-(yt-dlp's JavaScript runtime). On the first run it downloads them in the background from
-their GitHub releases and checks each file against a SHA256 written into featherplay's code;
-a file that doesn't match is deleted, not run. When GitHub can't be reached, it gets yt-dlp
-from featherplay's site and Deno from Deno's own download server instead, checked the same
-way. A song waits for that download only if it needs the helpers before they're there.
-After that, featherplay updates yt-dlp at most once a day, because YouTube changes often.
-The helpers live in `%LOCALAPPDATA%\featherplay\sidecars`.
+For a song it can't get that way, it falls back to two helper programs, yt-dlp and Deno,
+which it downloads in the background on the first run and checks against a SHA256 written
+into its code.
+
+<details>
+<summary>The helpers, and proxies</summary>
+<br>
+
+The helpers are [yt-dlp](https://github.com/yt-dlp/yt-dlp) and
+[Deno](https://github.com/denoland/deno) (yt-dlp's JavaScript runtime). On the first run
+featherplay downloads them in the background from their GitHub releases and checks each file
+against a SHA256 written into featherplay's code; a file that doesn't match is deleted, not
+run. When GitHub can't be reached, it gets yt-dlp from featherplay's site and Deno from Deno's
+own download server instead, checked the same way. A song waits for that download only if it
+needs the helpers before they're there. After that, featherplay updates yt-dlp at most once a
+day, because YouTube changes often. The helpers live in `%LOCALAPPDATA%\featherplay\sidecars`.
 
 Behind a proxy, featherplay and its helpers go through the one Windows is set to use
 (Settings > Network > Proxy): the one "Automatically detect settings" finds, else the
 setup script's, else the proxy set by hand. `HTTPS_PROXY` comes before all three.
+
+</details>
 
 ### Signing in
 
 You don't need an account to listen. Signed out, featherplay searches, opens artists, albums
 and public playlists, shows Home and Explore, and plays songs with their radio and lyrics.
 Your library, liked songs, history, likes and playlists need your account; their pages and
-buttons ask you to sign in.
+buttons ask you to sign in. There are three ways in:
 
-**Sign in with Google**, the default, opens a small window, Microsoft Edge WebView2, on
-Google's own sign-in page. Windows 11 includes WebView2, and most Windows 10 PCs have it with
-Edge. You sign in there as you would in a browser. The window has a slim browser frame: back,
-reload, and the page's address with a padlock. The address comes from WebView2 itself, not
-from the page, and on Google's sign-in pages it reads "Google's page", so you can see where
-you are. featherplay doesn't read your password, and the code is open for anyone to check.
-Once you're in, it keeps the YouTube Music session from that window and closes it. The main
-window never contains a browser.
+- **Sign in with Google**, the default, opens a small Microsoft Edge WebView2 window on
+  Google's own sign-in page.
+- **Use Microsoft Edge**, **Use Google Chrome**, **Use Brave** or **Use Vivaldi** opens that
+  browser itself, in a temporary profile that's deleted afterwards. Your passkeys and Windows
+  Hello work there as usual.
+- **Paste a cookie header**, for advanced users, takes a `Cookie` header copied from a
+  signed-in browser.
+
+featherplay keeps the YouTube Music session in Windows Credential Manager. The session gives the
+same access to your account as a signed-in browser, so treat it like a password. **Sign out**, in
+Settings > Account or the account menu, removes it.
+
+<details>
+<summary>How each way works, and what featherplay keeps</summary>
+<br>
+
+**Sign in with Google** opens Google's sign-in page in a small window, Microsoft Edge
+WebView2. Windows 11 includes WebView2, and most Windows 10 PCs have it with Edge. You sign in
+there as you would in a browser. The window has a slim browser frame: back, reload, and the
+page's address with a padlock. The address comes from WebView2 itself, not from the page, and
+on Google's sign-in pages it reads "Google's page", so you can see where you are. featherplay
+doesn't read your password, and the code is open for anyone to check. Once you're in, it
+keeps the YouTube Music session from that window and closes it. The main window never
+contains a browser.
 
 If you'd rather sign in in a browser you know, choose **Use Microsoft Edge**, **Use Google
 Chrome**, **Use Brave** or **Use Vivaldi**: the option names the browser it opens. That
@@ -156,16 +187,16 @@ isn't available on this PC, **Why?** explains, and another one that works is off
 instead. Opera and Firefox aren't offered: Opera starts through a launcher, and Firefox has
 no such pipe.
 
-**Paste a cookie header**, for advanced users, takes a `Cookie` header copied from a
-signed-in browser. A session copied that way can stop working after a while, because the
-browser keeps renewing its own copy.
+**Paste a cookie header** takes a `Cookie` header copied from a signed-in browser. A session
+copied that way can stop working after a while, because the browser keeps renewing its own
+copy.
 
-The session is kept in Windows Credential Manager. yt-dlp takes cookies as a file, so while
-it looks up a song's audio, featherplay writes the session to a temporary file in
-`%LOCALAPPDATA%\featherplay\tmp` and deletes it as soon as yt-dlp is done. If featherplay is
-killed before it can, it deletes the leftover file the next time it starts signed in. The
-session gives the same access to your account as a signed-in browser, so treat it like a
-password. **Sign out**, in Settings > Account or the account menu, removes it.
+yt-dlp takes cookies as a file, so while it looks up a song's audio, featherplay writes the
+session to a temporary file in `%LOCALAPPDATA%\featherplay\tmp` and deletes it as soon as
+yt-dlp is done. If featherplay is killed before it can, it deletes the leftover file the next
+time it starts signed in.
+
+</details>
 
 ## Why
 
@@ -174,9 +205,19 @@ plugin for everything, but underneath it's the YouTube Music website running in 
 it can get heavy and glitchy. featherplay is the handful of things I used every day, built
 into one program that opens at once and stays quiet while it plays.
 
+## What it leaves out
+
+- **Chromium.** There's no browser engine in the window. Signing in uses Windows' own
+  WebView2 (or your own browser, if you choose it) once, then closes it.
+- **Electron.** featherplay is one native program, not a web app in a frame.
+- **Video.** It never plays video. A music video with a song version plays as the song.
+- **Telemetry.** No analytics and no tracking, and no server of its own.
+
 ## Features
 
 ### Find your music
+
+<img align="right" width="340" src=".github/readme/feature-search.png" alt="Search results for creative commons: the Songs, Albums, Artists and Playlists filters over six songs with their covers">
 
 - Search, artists, albums, public playlists, Home, Explore, radio and lyrics work without an
   account. Sign in for your library, likes and history.
@@ -192,7 +233,11 @@ into one program that opens at once and stays quiet while it plays.
   sidebar to play or shuffle it, queue it, start a radio, or rename or delete it if it's
   yours. An album's ⋯ menu likes or dislikes all its songs at once.
 
+<br clear="right">
+
 ### Listen
+
+<img align="right" width="300" src=".github/readme/feature-queue.png" alt="Up next, playing from Invisible Light radio: the song playing and the five after it, beside the Related and Lyrics tabs">
 
 - A click usually plays at once: the song under the pointer, the next one in the queue and the
   one you left off on are fetched ahead.
@@ -217,9 +262,13 @@ into one program that opens at once and stays quiet while it plays.
   the default one. The volume slider follows a curve that matches how loudness sounds, and
   Volume step sets how far the mouse wheel and the Up and Down keys move it.
 
+<br clear="right">
+
 ### Shape the sound
 
 These are off until you turn them on, except Match song volumes.
+
+<img align="right" width="300" src=".github/readme/feature-equalizer.png" alt="The Equalizer dialog: five bands from 60 Hz to 12 kHz, set to +6, +2, 0, +3 and +5 dB">
 
 - The equalizer has Bass, Treble and Vocal presets, or five bands you set yourself. Even out
   loudness is a compressor, Light or Strong (both in Settings > Sound).
@@ -232,7 +281,11 @@ These are off until you turn them on, except Match song volumes.
 - Playback speed goes from 0.5× to 2×, at the same pitch (Settings > Playback, and the player
   bar).
 
+<br clear="right">
+
 ### Fits into Windows
+
+<img align="right" width="340" src=".github/readme/tray.png" alt="The notification-area icon with its tooltip, the song and its position, and its right-click menu: Pause, Previous, Next, Like, Not for me, Show featherplay and Quit">
 
 - Media keys and the Windows media overlay work, with the cover, title and artist.
 - The taskbar thumbnail has Previous, Play and Next.
@@ -248,7 +301,11 @@ These are off until you turn them on, except Match song volumes.
 - You can also turn on a notification when the song changes, and global hotkeys of your own
   (Settings > Window).
 
+<br clear="right">
+
 ### Keep track and share
+
+<img align="right" width="250" src=".github/readme/feature-discord.png" alt="The Discord preview in Settings: a profile card listening to featherplay, with California Lullabye's cover, title, artist, a progress bar and a Play song button">
 
 - Scrobbling goes to Last.fm, ListenBrainz or both, with clean titles and artists. Plays that
   couldn't be sent wait and go later.
@@ -258,27 +315,37 @@ These are off until you turn them on, except Match song volumes.
   [Amuse](#amuse) support serves the Amuse widget; both are off until you turn them on.
 - The account menu switches between your Google accounts and their brand channels.
 
+<br clear="right">
+
 ### Make it yours
 
 - Choose dark, light, or System to follow Windows.
 - The accent comes from the cover that's playing, or pick a fixed colour.
 
+<img src=".github/readme/feature-accents.png" alt="The mini player three times, playing California Lullabye in pink, Invisible Light in blue and Watching Seabirds Soar in teal: each cover gives the accent" width="100%">
+
 ## Screenshots
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: light)" srcset=".github/readme/hero-light.png">
+    <img src=".github/readme/hero-dark.png" alt="Home with a song playing: where you left off, your mixes and quick picks" width="100%">
+  </picture>
+  <br><sub>Home</sub>
+</p>
 
 <table>
   <tr>
-    <td align="center" colspan="2"><picture><source media="(prefers-color-scheme: light)" srcset=".github/readme/hero-light.png"><img src=".github/readme/hero-dark.png" alt="Home with a song playing: where you left off, your mixes and quick picks" width="720"></picture><br><sub>Home</sub></td>
+    <td align="center"><a href=".github/readme/now-playing-lyrics.png"><img src=".github/readme/now-playing-lyrics.png" alt="Now playing with the full lyrics view, the current line lit, and Up next beside it" width="410"></a><br><sub>Now playing, with lyrics</sub></td>
+    <td align="center"><a href=".github/readme/settings-discord.png"><img src=".github/readme/settings-discord.png" alt="Settings at the Discord group: the options on the left, the preview of what friends see on the right" width="410"></a><br><sub>Settings, with the Discord preview</sub></td>
   </tr>
   <tr>
-    <td align="center" colspan="2"><a href=".github/readme/now-playing-lyrics.png"><img src=".github/readme/now-playing-lyrics.png" alt="Now playing with the full lyrics view, the current line lit" width="720"></a><br><sub>Now playing, with lyrics</sub></td>
+    <td align="center"><a href=".github/readme/theme-dark.png"><img src=".github/readme/theme-dark.png" alt="A playlist in the dark theme" width="410"></a><br><sub>A playlist, dark</sub></td>
+    <td align="center"><a href=".github/readme/theme-light.png"><img src=".github/readme/theme-light.png" alt="The same playlist in the light theme" width="410"></a><br><sub>The same playlist, light</sub></td>
   </tr>
   <tr>
-    <td align="center"><a href=".github/readme/theme-dark.png"><img src=".github/readme/theme-dark.png" alt="A playlist in the dark theme" width="360"></a><br><sub>Dark</sub></td>
-    <td align="center"><a href=".github/readme/theme-light.png"><img src=".github/readme/theme-light.png" alt="The same playlist in the light theme" width="360"></a><br><sub>Light</sub></td>
-  </tr>
-  <tr>
-    <td align="center"><a href=".github/readme/tray.png"><img src=".github/readme/tray.png" alt="The notification-area icon with its tooltip and menu" width="360"></a><br><sub>The tray</sub></td>
-    <td align="center"><a href=".github/readme/mini-player.png"><img src=".github/readme/mini-player.png" alt="The mini player that a click on the tray icon opens" width="360"></a><br><sub>Mini player</sub></td>
+    <td align="center"><a href=".github/readme/search.png"><img src=".github/readme/search.png" alt="Search results with the Songs filter" width="410"></a><br><sub>Search</sub></td>
+    <td align="center"><a href=".github/readme/mini-player.png"><img src=".github/readme/mini-player.png" alt="The mini player that a click on the tray icon opens" width="300"></a><br><sub>The mini player</sub></td>
   </tr>
 </table>
 
@@ -357,67 +424,70 @@ Most of Pear's plugins are settings in featherplay. Plugin by plugin, as of toda
 | Picture-in-picture, Ambient Mode, Transparent Player, Clock, Visualizer | Later. |
 | Music Together | No. |
 
-## Local API
-
-For stream overlays, Stream Deck plugins and scripts on your PC: what's playing, and the
-controls. It's off by default; turn on **API server** in Settings > Local API. featherplay
-then listens on `http://127.0.0.1:26538`, the port of Pear Desktop's API Server, with Pear's
-routes under `/api/v1/` and its WebSocket events. Every request needs the token shown in
-Settings:
-
-```sh
-curl -H "Authorization: Bearer $TOKEN" http://127.0.0.1:26538/api/v1/song
-curl -X POST -H "Authorization: Bearer $TOKEN" http://127.0.0.1:26538/api/v1/toggle-play
-```
-
-It answers only apps on this PC; other PCs and web pages can't reach it.
-[docs/local-api.md](docs/local-api.md) lists the routes and events, and how they differ from
-Pear's.
-
-### Amuse
-
-For 6K Labs' Amuse now-playing widget, turn on **Amuse** in Settings > Local API. featherplay
-then answers on `http://127.0.0.1:9863` as Pear's Amuse plugin does. Like Pear's plugin, it
-needs no token, so while it's on, any app on this PC can see what's playing. Of web pages, it
-answers only the Amuse widget's own. It only reads: there are no controls.
-[docs/local-api.md](docs/local-api.md#amuse) has the details.
-
-## What it leaves out
-
-- **Chromium.** There's no browser engine in the window. Signing in uses Windows' own
-  WebView2 (or your own browser, if you choose it) once, then closes it.
-- **Electron.** featherplay is one native program, not a web app in a frame.
-- **Video.** It never plays video. A music video with a song version plays as the song.
-- **Telemetry.** No analytics and no tracking, and no server of its own.
-
 ## Questions
 
-**Is my account safe with it?** The session stays on your PC, in Credential Manager, and the
-code is public. It's still an unofficial client using YouTube Music in a way Google doesn't
-support; if that worries you, sign in with a second account.
+<details>
+<summary><b>Is my account safe with it?</b></summary>
+<br>
 
-**I don't want to type my Google password into an app's window.** Choose **Use Microsoft
-Edge** (or Google Chrome, Brave or Vivaldi) on the sign-in page. You sign in in the browser
-itself, with its own address bar, passkeys and Windows Hello, in a temporary profile that's
-deleted afterwards. featherplay doesn't read your password; the code is open.
+The session stays on your PC, in Credential Manager, and the code is public. It's still an
+unofficial client using YouTube Music in a way Google doesn't support; if that worries you,
+sign in with a second account.
 
-**Playback stopped working.** Update featherplay first. If the latest version fails too,
+</details>
+
+<details>
+<summary><b>I don't want to type my Google password into an app's window.</b></summary>
+<br>
+
+Choose **Use Microsoft Edge** (or Google Chrome, Brave or Vivaldi) on the sign-in page. You
+sign in in the browser itself, with its own address bar, passkeys and Windows Hello, in a
+temporary profile that's deleted afterwards. featherplay doesn't read your password; the code
+is open.
+
+</details>
+
+<details>
+<summary><b>Playback stopped working.</b></summary>
+<br>
+
+Update featherplay first. If the latest version fails too,
 [open an issue](https://github.com/candygoogy/featherplay/issues).
 
-**Why only Windows?** featherplay is built on Windows' own parts: the media overlay, the
-taskbar buttons, the notification area and Credential Manager. That's a lot of what keeps it
-light. There's no macOS or Linux version.
+</details>
 
-**Is it free?** Yes. It's open source under the MIT licence, and there's no paid tier and no
-featherplay account to make.
+<details>
+<summary><b>Why only Windows?</b></summary>
+<br>
 
-**How do I report a bug?** [Open an issue](https://github.com/candygoogy/featherplay/issues)
-with what you did, what you expected and what happened, and the version from Settings >
-About. **Copy diagnostics**, on the About page, copies the versions, which services are on
-and the last playback errors as plain text to paste into the issue. featherplay also keeps a
-log in `%LOCALAPPDATA%\featherplay\logs`, with a `crash-….txt` file for each crash; **Open
-log folder**, beside Copy diagnostics, opens it. Cookies, tokens and keys are masked in both,
-and neither names your account.
+featherplay is built on Windows' own parts: the media overlay, the taskbar buttons, the
+notification area and Credential Manager. That's a lot of what keeps it light. There's no
+macOS or Linux version.
+
+</details>
+
+<details>
+<summary><b>Is it free?</b></summary>
+<br>
+
+Yes. It's open source under the MIT licence, and there's no paid tier and no featherplay
+account to make.
+
+</details>
+
+<details>
+<summary><b>How do I report a bug?</b></summary>
+<br>
+
+[Open an issue](https://github.com/candygoogy/featherplay/issues) with what you did, what you
+expected and what happened, and the version from Settings > About. **Copy diagnostics**, on
+the About page, copies the versions, which services are on and the last playback errors as
+plain text to paste into the issue. featherplay also keeps a log in
+`%LOCALAPPDATA%\featherplay\logs`, with a `crash-….txt` file for each crash; **Open log
+folder**, beside Copy diagnostics, opens it. Cookies, tokens and keys are masked in both, and
+neither names your account.
+
+</details>
 
 ## Privacy
 
@@ -454,6 +524,31 @@ sign-in ends (or at the next start, if featherplay was killed meanwhile); feathe
 only its YouTube Music cookies. The song links looked up in the last session are kept there
 until they expire (a few hours), so songs start sooner after a restart; like every YouTube
 stream link, each one contains your public IP address.
+
+## Local API
+
+For stream overlays, Stream Deck plugins and scripts on your PC: what's playing, and the
+controls. It's off by default; turn on **API server** in Settings > Local API. featherplay
+then listens on `http://127.0.0.1:26538`, the port of Pear Desktop's API Server, with Pear's
+routes under `/api/v1/` and its WebSocket events. Every request needs the token shown in
+Settings:
+
+```sh
+curl -H "Authorization: Bearer $TOKEN" http://127.0.0.1:26538/api/v1/song
+curl -X POST -H "Authorization: Bearer $TOKEN" http://127.0.0.1:26538/api/v1/toggle-play
+```
+
+It answers only apps on this PC; other PCs and web pages can't reach it.
+[docs/local-api.md](docs/local-api.md) lists the routes and events, and how they differ from
+Pear's.
+
+### Amuse
+
+For 6K Labs' Amuse now-playing widget, turn on **Amuse** in Settings > Local API. featherplay
+then answers on `http://127.0.0.1:9863` as Pear's Amuse plugin does. Like Pear's plugin, it
+needs no token, so while it's on, any app on this PC can see what's playing. Of web pages, it
+answers only the Amuse widget's own. It only reads: there are no controls.
+[docs/local-api.md](docs/local-api.md#amuse) has the details.
 
 ## Build from source
 
