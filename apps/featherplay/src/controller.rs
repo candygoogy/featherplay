@@ -591,7 +591,7 @@ impl Controller {
         }
         // The restored track, so Play starts it at once.
         if let Some(t) = self.player.queue().current().cloned() {
-            self.hint(std::slice::from_ref(&t));
+            self.prepare_restored(&t);
         }
         // The volume, even with nothing to play.
         self.push_state();
@@ -668,7 +668,7 @@ impl Controller {
         }
         self.audio.pause();
         self.persist();
-        self.save_streams();
+        self.save_streams(true);
         if let Some(presence) = self.presence.take() {
             presence.quit();
         }
@@ -967,7 +967,10 @@ impl Controller {
             }
             Effect::ShowError(stop) => self.stopped(stop),
             Effect::ShowReauth => self.session_expired(),
-            Effect::PersistSession => self.persist(),
+            Effect::PersistSession => {
+                self.persist();
+                self.save_streams(false);
+            }
             Effect::StateChanged => {
                 self.log_state();
                 self.push_now_playing();
@@ -1305,16 +1308,6 @@ impl Controller {
         let path = self.paths.cache.join(streams::SAVED_STREAMS);
         if let Ok(text) = std::fs::read_to_string(&path) {
             self.streams.restore(&text, SystemTime::now());
-        }
-    }
-
-    /// At quit: the streams resolved this session, for the next one (`Streams::saved`).
-    fn save_streams(&self) {
-        let path = self.paths.cache.join(streams::SAVED_STREAMS);
-        let saved = std::fs::create_dir_all(&self.paths.cache)
-            .and_then(|()| std::fs::write(&path, self.streams.saved(SystemTime::now())));
-        if let Err(e) = saved {
-            log!("saving the streams failed: {e}");
         }
     }
 

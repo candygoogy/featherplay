@@ -9,6 +9,7 @@ pub mod session;
 pub mod settings;
 pub mod silence_cache;
 
+pub use atomic::write as write_atomic;
 pub use library_cache::{LibraryCache, LibraryList};
 pub use paths::Paths;
 pub use secrets::{SecretKey, StoreError, delete_secret, get_secret, set_secret};

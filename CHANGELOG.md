@@ -36,6 +36,12 @@ Notable changes to featherplay, newest first. The format follows
   Status text lights what it changes on the card. In a window too short for the whole
   card, its lower part (the activity) is what stays on screen. A window too narrow for the
   preview beside the options leaves it out, rather than pushing them a screen down.
+- After a restart, the streams featherplay found in the last session are used from the
+  start, without looking any up again first. The song you resume is ready to play right
+  away, even one with ads before it, which used to wait 5-6 s for its lookup. Up to 200
+  streams are kept, until shortly before they expire. They're now saved during the session
+  as well as at quit, so they survive a crash too, and they're removed when you sign out.
+  They hold no cookies or account data.
 - A song whose stream YouTube refused is looked up again by featherplay itself before it
   goes to yt-dlp: about 0.5 s without ads, instead of yt-dlp's 3 s or more plus any ads.
   The song goes to yt-dlp if that stream is refused too.

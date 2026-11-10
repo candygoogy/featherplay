@@ -606,6 +606,7 @@ impl Controller {
         }
         self.ui.catalog.sign_out();
         forget_library(&self.paths);
+        self.forget_saved_streams();
         // The sign-in window's profile too, so the next sign-in can pick another account.
         let profile = self.paths.cache.join("webview2");
         tokio::task::spawn_blocking(move || {

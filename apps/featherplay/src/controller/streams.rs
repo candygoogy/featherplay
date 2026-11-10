@@ -9,8 +9,10 @@
 //! The track played before the current one gets its first 256 KB fetched again when it's
 //! left (its download went with it), so Previous starts from memory too.
 //!
-//! The streams outlive a restart (`SAVED_STREAMS`, written at quit): the next session uses
-//! one until it nears its expiry, once a resolve has shown the same address.
+//! The streams outlive a restart (`SAVED_STREAMS`, written when the session is saved and
+//! they changed, and at quit): the next session uses one until it nears its expiry, unless
+//! a resolve shows another address. The restored track's is buffered at the start, so Play
+//! starts it with no resolve. Signing out removes the file.
 //!
 //! The player's own resolves start at once. Resolves ahead ("hints") take at most
 //! `HINT_SLOTS` at a time; the newest hints go first, and older row hints are dropped past
@@ -22,13 +24,16 @@
 //! resolve ends.
 
 use std::collections::VecDeque;
-use std::sync::Arc;
+use std::io;
+use std::path::Path;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use featherplay_audio::StreamSource;
 use featherplay_core::failure::getting_ready;
 use featherplay_core::model::{Track, TrackId};
 use featherplay_core::player::{Input, Player, Status};
+use featherplay_core::sync::LockExt;
 use featherplay_streams::{Ahead, ResolvedStream};
 use serde_json::{Value, json};
 use tokio::sync::Notify;
@@ -36,8 +41,11 @@ use tokio::task::AbortHandle;
 
 use super::{Controller, Msg};
 
-/// Resolved streams kept, oldest dropped first (but never the ones `done` is told to keep).
-const KEEP: usize = 32;
+/// Resolved streams kept, oldest dropped first (but never the ones `done` is told to keep),
+/// and saved for the next session: ~1.5 KB each.
+const KEEP: usize = 200;
+/// The newest streams `likely_server` counts.
+const SERVER_SAMPLE: usize = 32;
 /// Resolves ahead running at once (the player's own come on top): the queue's two and a
 /// hovered row.
 const HINT_SLOTS: usize = 3;
@@ -101,9 +109,39 @@ pub(super) struct Streams {
     refused_preloads: VecDeque<TrackId>,
     /// Streams of the last session (`restore`) not resolved again since.
     restored: Vec<TrackId>,
-    /// The `ip=` of the last stream resolved this session: a restored one answers only for
-    /// the same address.
+    /// The `ip=` of the last stream resolved this session: once known, a restored one
+    /// answers only for the same address.
     address: Option<String>,
+    /// A stream came or went since `take_changed`.
+    changed: bool,
+    /// The writes of `SAVED_STREAMS`, and the number of the last one asked for.
+    file: SavedFile,
+    writes: u64,
+}
+
+/// Writes `SAVED_STREAMS` one at a time (in the background, and at quit on the controller's
+/// thread); an older write that comes after a newer one does nothing. Holds the number of
+/// the last one done.
+#[derive(Clone, Default)]
+pub(super) struct SavedFile(Arc<Mutex<u64>>);
+
+impl SavedFile {
+    /// Writes `text` to `path`, or removes the file for `None`, unless a write numbered
+    /// `n` or later was done already.
+    pub fn write(&self, path: &Path, n: u64, text: Option<&str>) -> io::Result<()> {
+        let mut done = self.0.lock_or_recover();
+        if n <= *done {
+            return Ok(());
+        }
+        *done = n;
+        match text {
+            Some(text) => featherplay_store::write_atomic(path, text.as_bytes()),
+            None => match std::fs::remove_file(path) {
+                Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(()),
+                gone => gone,
+            },
+        }
+    }
 }
 
 /// How far a track's stream is from playing (`Streams::readiness`), least ready first.
@@ -131,12 +169,17 @@ impl Streams {
     }
 
     /// The stream resolved for `id`, if it stays valid for `FRESH_FOR` from `now`.
-    /// One from the last session, only if a resolve showed that it's for this address.
+    /// One from the last session unless a resolve showed another address (a URL is for
+    /// one): the network seldom changes between two sessions, and a URL refused anyway is
+    /// resolved again (`is_from_last_session`).
     fn fresh(&self, id: &TrackId, now: SystemTime) -> Option<&ResolvedStream> {
         self.get(id).filter(|s| {
             s.expires_at > now + FRESH_FOR
                 && (!self.restored.contains(id)
-                    || self.address.is_some() && address(&s.url) == self.address.as_deref())
+                    || self
+                        .address
+                        .as_deref()
+                        .is_none_or(|ip| address(&s.url) == Some(ip)))
         })
     }
 
@@ -300,6 +343,7 @@ impl Streams {
                 {
                     self.cache.remove(i);
                 }
+                self.changed = true;
             }
             None if hint == Some(Hint::Queue) => self.give_up(id),
             None => {}
@@ -310,7 +354,28 @@ impl Streams {
     /// Drops the stream of `id` (its URL was refused); returns it.
     pub fn forget(&mut self, id: &TrackId) -> Option<ResolvedStream> {
         let i = self.cache.iter().position(|(c, _)| c == id)?;
+        self.changed = true;
         self.cache.remove(i).map(|(_, s)| s)
+    }
+
+    /// Whether a stream came or went since the last call.
+    pub fn take_changed(&mut self) -> bool {
+        std::mem::take(&mut self.changed)
+    }
+
+    /// The writer of `SAVED_STREAMS` and the number of a new write, for the streams as
+    /// they are now.
+    pub fn next_write(&mut self) -> (SavedFile, u64) {
+        self.writes += 1;
+        (self.file.clone(), self.writes)
+    }
+
+    /// Signing out: drops every stream kept; returns the write that removes the file.
+    pub fn forget_all(&mut self) -> (SavedFile, u64) {
+        self.cache.clear();
+        self.restored.clear();
+        self.changed = false;
+        self.next_write()
     }
 
     /// Whether a refused preload of `id` is resolved again ahead: not when it was one of
@@ -329,14 +394,20 @@ impl Streams {
     }
 
     /// The streams that stay valid for `FRESH_FOR` from `now`, for `restore` in the next
-    /// session (`SAVED_STREAMS`).
+    /// session (`SAVED_STREAMS`). Not those for another address than this session's.
     pub fn saved(&self, now: SystemTime) -> String {
         let secs = |t: SystemTime| t.duration_since(UNIX_EPOCH).ok().map(|d| d.as_secs());
         let ms = |d: Duration| u64::try_from(d.as_millis()).ok();
         let streams: Vec<Value> = self
             .cache
             .iter()
-            .filter(|(_, s)| s.expires_at > now + FRESH_FOR)
+            .filter(|(_, s)| {
+                s.expires_at > now + FRESH_FOR
+                    && self
+                        .address
+                        .as_deref()
+                        .is_none_or(|ip| address(&s.url) == Some(ip))
+            })
             .map(|(id, s)| {
                 json!({
                     "id": id.0,
@@ -358,8 +429,8 @@ impl Streams {
     }
 
     /// Keeps the streams `saved` gave in the last session that stay valid for `FRESH_FOR`
-    /// from `now`. Each answers once a resolve shows that its URL is for this address (its
-    /// `ip=`): the network may have changed since.
+    /// from `now`, up to `KEEP`. They answer until a resolve shows that this session's URLs
+    /// are for another address (their `ip=`): the network may have changed since.
     pub fn restore(&mut self, text: &str, now: SystemTime) {
         let Ok(v) = serde_json::from_str::<Value>(text) else {
             return;
@@ -411,13 +482,14 @@ impl Streams {
     /// Drops the stream whose URL is `url` (refused while preloaded); returns its id.
     pub fn forget_url(&mut self, url: &str) -> Option<TrackId> {
         let i = self.cache.iter().position(|(_, s)| s.url == url)?;
+        self.changed = true;
         self.cache.remove(i).map(|(id, _)| id)
     }
 
     /// The server (`scheme://host`) the next stream most likely comes from: the one most
-    /// of the kept streams for this address are on, the newer of two with as many. A
-    /// stream's server repeats (4 servers over 32 streams kept, 2026-11-09), and this
-    /// guesses right about half the time, the last stream's server a third.
+    /// of the newest `SERVER_SAMPLE` streams for this address are on, the newer of two with
+    /// as many. A stream's server repeats (4 servers over 32 streams kept, 2026-11-09), and
+    /// this guesses right about half the time, the last stream's server a third.
     pub fn likely_server(&self) -> Option<&str> {
         let servers: Vec<&str> = self
             .cache
@@ -425,6 +497,7 @@ impl Streams {
             .filter(|(_, s)| self.address.is_none() || address(&s.url) == self.address.as_deref())
             .filter_map(|(_, s)| server(&s.url))
             .collect();
+        let servers = &servers[servers.len().saturating_sub(SERVER_SAMPLE)..];
         // Oldest first: of equal counts `max_by_key` keeps the last, the newest.
         servers
             .iter()
@@ -478,6 +551,62 @@ impl Controller {
             .map(|t| self.player.play_id(t));
         self.streams.hint(&known.unwrap_or(id), SystemTime::now());
         self.start_hints();
+    }
+
+    /// At the start, the restored track, so Play starts it at once: buffered from the last
+    /// session's stream when that's here (no resolve, nor its ads' wait), else resolved
+    /// ahead and buffered then (`Msg::Resolved`). A saved URL refused anyway is resolved
+    /// again (`preload_refused`).
+    pub(super) fn prepare_restored(&mut self, track: &Track) {
+        // The performance harness's fixtures play nothing, so nothing is asked of YouTube.
+        #[cfg(feature = "perf-harness")]
+        if crate::perf::fixtures() {
+            return;
+        }
+        let mut t = track.clone();
+        self.song_versions.fill(&mut t);
+        let id = self.player.play_id(&t);
+        if *self.player.status() == Status::Paused
+            && let Some(s) = self.streams.fresh(&id, SystemTime::now())
+        {
+            log!("resolve {}: kept from the last session", id.0);
+            self.audio.preload(super::source(s));
+            return;
+        }
+        self.hint(std::slice::from_ref(track));
+    }
+
+    /// Writes the streams kept for the next session (`Streams::saved`): when the session is
+    /// saved and they changed, in the background; at quit (`at_quit`), at once.
+    pub(super) fn save_streams(&mut self, at_quit: bool) {
+        if !self.streams.take_changed() && !at_quit {
+            return;
+        }
+        // None kept (signed out, say): no file.
+        let text = (!self.streams.cache.is_empty()).then(|| self.streams.saved(SystemTime::now()));
+        let (file, n) = self.streams.next_write();
+        let path = self.paths.cache.join(SAVED_STREAMS);
+        let write = move || {
+            if let Err(e) = file.write(&path, n, text.as_deref()) {
+                log!("saving the streams failed: {e}");
+            }
+        };
+        if at_quit {
+            write();
+        } else {
+            tokio::task::spawn_blocking(write);
+        }
+    }
+
+    /// Signing out: the kept streams go, and their file with them.
+    pub(super) fn forget_saved_streams(&mut self) {
+        let (file, n) = self.streams.forget_all();
+        let path = self.paths.cache.join(SAVED_STREAMS);
+        tokio::task::spawn_blocking(move || {
+            if let Err(e) = file.write(&path, n, None) {
+                log!("removing the saved streams failed: {e}");
+            }
+        });
     }
 
     /// The play ids of the current and the next track, whose streams the player may load
@@ -950,30 +1079,64 @@ mod tests {
         }
     }
 
-    /// The streams of the last session answer once a resolve of this one shows the same
-    /// address in its URL (YouTube's URLs are for one address); until then, none does.
+    /// The streams of the last session answer at once after a restart, before any resolve
+    /// of this one: the restored track is the first song asked for, and a resolve of it
+    /// waits out its ads again (5-6 s).
     #[test]
-    fn saved_streams_answer_after_a_restart_from_the_same_address() {
+    fn saved_streams_answer_at_once_after_a_restart() {
         let now = SystemTime::now();
         let mut before = Streams::default();
         before.done(&id("a"), Some(&from("1.2.3.4", HOURS)), &[]);
         before.done(&id("old"), Some(&from("1.2.3.4", FRESH_FOR / 2)), &[]);
         let mut s = Streams::default();
         s.restore(&before.saved(now), now);
-        assert!(
-            s.fresh(&id("a"), now).is_none(),
-            "the address isn't known yet"
-        );
-        s.done(&id("b"), Some(&from("1.2.3.4", HOURS)), &[]);
         let parts = |x: &ResolvedStream| (x.url.clone(), x.video_title.clone(), x.duration);
         assert_eq!(
             s.fresh(&id("a"), now).map(parts),
             before.get(&id("a")).map(parts)
         );
+        s.done(&id("b"), Some(&from("1.2.3.4", HOURS)), &[]);
+        assert!(s.fresh(&id("a"), now).is_some(), "the same address");
         assert!(
             s.get(&id("old")).is_none(),
             "one about to expire isn't kept"
         );
+    }
+
+    /// The saved file is written again only when the kept streams changed.
+    #[test]
+    fn the_kept_streams_count_as_changed_when_one_comes_or_goes() {
+        let mut s = Streams::default();
+        assert!(!s.take_changed());
+        s.done(&id("a"), Some(&stream(HOURS)), &[]);
+        assert!(s.take_changed());
+        assert!(!s.take_changed(), "taken");
+        s.done(&id("b"), None, &[]);
+        assert!(!s.take_changed(), "a failed resolve keeps nothing");
+        s.forget(&id("a"));
+        assert!(s.take_changed());
+    }
+
+    /// Signing out drops the file and the streams with it; a write that was on its way
+    /// doesn't bring the file back.
+    #[test]
+    fn signing_out_removes_the_saved_streams() {
+        let home = std::env::var_os("FEATHERPLAY_HOME").expect("set FEATHERPLAY_HOME");
+        let dir = std::path::PathBuf::from(home)
+            .join(format!("test-saved-streams-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join(SAVED_STREAMS);
+        let mut s = Streams::default();
+        s.done(&id("a"), Some(&stream(HOURS)), &[]);
+        let (file, older) = s.next_write();
+        let text = s.saved(SystemTime::now());
+        file.write(&path, older, Some(&text)).unwrap();
+        let (file, signed_out) = s.forget_all();
+        file.write(&path, signed_out, None).unwrap();
+        file.write(&path, older, Some(&text)).unwrap();
+        assert!(!path.exists());
+        assert!(s.get(&id("a")).is_none());
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]
@@ -992,6 +1155,8 @@ mod tests {
         assert_eq!((db("loud"), db("ytdlp")), (Some(Some(7.17)), Some(None)));
     }
 
+    /// Once a resolve shows another address, the last session's streams no longer answer,
+    /// nor are they saved again for the next one.
     #[test]
     fn saved_streams_from_another_address_are_not_used() {
         let now = SystemTime::now();
@@ -1002,6 +1167,10 @@ mod tests {
         s.done(&id("b"), Some(&from("5.6.7.8", HOURS)), &[]);
         assert!(s.fresh(&id("a"), now).is_none());
         assert_eq!(s.want(&id("a"), now), Want::Start);
+        let mut next = Streams::default();
+        next.restore(&s.saved(now), now);
+        assert!(next.get(&id("a")).is_none(), "not saved again");
+        assert!(next.get(&id("b")).is_some());
     }
 
     /// Streams resolved in this order, each on the server named, all for the address `ip`.

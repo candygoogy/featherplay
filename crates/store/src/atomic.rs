@@ -4,7 +4,7 @@ use std::path::Path;
 
 /// Writes `bytes` to `path` atomically: a temp file in the same directory, then a rename
 /// over the target. Creates the parent directory if needed.
-pub(crate) fn write(path: &Path, bytes: &[u8]) -> io::Result<()> {
+pub fn write(path: &Path, bytes: &[u8]) -> io::Result<()> {
     let dir = path
         .parent()
         .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "path has no parent"))?;
