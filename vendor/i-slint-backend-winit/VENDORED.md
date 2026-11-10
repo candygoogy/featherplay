@@ -40,8 +40,9 @@ licence, which allows modified copies).
    the SVG renderer may come back (about 1.5 MB).
 2. Otherwise copy the new `i-slint-backend-winit-<version>/` from the cargo registry
    (`$CARGO_HOME/registry/src/index.crates.io-*/`) over this folder, keeping this file,
-   delete `.cargo-ok`, port the `featherplay patch` blocks of `frame_throttle.rs`, and take
-   `svg` out of the `i-slint-core` features again (change 3).
+   delete `.cargo-ok` and `Cargo.lock` (a path dependency's lock file is never read), port
+   the `featherplay patch` blocks of `frame_throttle.rs`, and take `svg` out of the
+   `i-slint-core` features again (change 3).
 3. Bump the `=x.y.z` pins in the workspace `Cargo.toml`, build with the `perf-harness`
    feature and check with the harness's `playing-fixtures.txt` that a song list while playing
    paints about 30 frames a second (one per step of the playing mark), not 60.

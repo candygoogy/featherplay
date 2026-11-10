@@ -182,7 +182,7 @@ licence, which allows modified copies).
 
 1. Copy the new `i-slint-renderer-skia-<version>/` from the cargo registry
    (`$CARGO_HOME/registry/src/index.crates.io-*/`) over this folder, keeping this file.
-   Delete `.cargo-ok`.
+   Delete `.cargo-ok` and `Cargo.lock` (a path dependency's lock file is never read).
 2. In its `Cargo.toml`, remove `wgpu-30` (or whichever `wgpu-*` is the new default) from
    `[features] default`.
 3. Keep change 3 unless the new `free_graphics_resources` already frees `layer_cache`,

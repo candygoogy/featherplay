@@ -69,7 +69,7 @@ licence files). It's a port of libopus, BSD 3-Clause (see `README.md`).
 
 1. Copy the new `opus-decoder-<version>/` from the cargo registry
    (`$CARGO_HOME/registry/src/index.crates.io-*/`) over this folder, keeping this file.
-   Delete `.cargo-ok`.
+   Delete `.cargo-ok` and `Cargo.lock` (a path dependency's lock file is never read).
 2. If `flat_fft_forward` (or whatever the inverse MDCT calls) is still a naive DFT, port the
    `featherplay patch` block in `src/celt/kiss_fft.rs` and the `rustfft` dependency (the git
    history of this folder has the diff). If the inverse MDCT's sizes changed, extend `plan`
