@@ -524,17 +524,17 @@ https://datatracker.ietf.org/ipr/1526/
 | euclid | 0.22.14 | MIT OR Apache-2.0 |
 | fastrand | 2.5.0 | Apache-2.0 OR MIT |
 | fdeflate | 0.3.7 | MIT OR Apache-2.0 |
-| featherplay | 0.2.1 | MIT |
-| featherplay-audio | 0.2.1 | MIT |
-| featherplay-core | 0.2.1 | MIT |
-| featherplay-integrations | 0.2.1 | MIT |
-| featherplay-lastfm | 0.2.1 | MIT |
-| featherplay-listenbrainz | 0.2.1 | MIT |
-| featherplay-lyrics | 0.2.1 | MIT |
-| featherplay-proxy | 0.2.1 | MIT |
-| featherplay-store | 0.2.1 | MIT |
-| featherplay-streams | 0.2.1 | MIT |
-| featherplay-ytm | 0.2.1 | MIT |
+| featherplay | 0.2.2 | MIT |
+| featherplay-audio | 0.2.2 | MIT |
+| featherplay-core | 0.2.2 | MIT |
+| featherplay-integrations | 0.2.2 | MIT |
+| featherplay-lastfm | 0.2.2 | MIT |
+| featherplay-listenbrainz | 0.2.2 | MIT |
+| featherplay-lyrics | 0.2.2 | MIT |
+| featherplay-proxy | 0.2.2 | MIT |
+| featherplay-store | 0.2.2 | MIT |
+| featherplay-streams | 0.2.2 | MIT |
+| featherplay-ytm | 0.2.2 | MIT |
 | field-offset | 0.3.6 | MIT OR Apache-2.0 |
 | fixed_decimal | 0.7.3 | Unicode-3.0 |
 | flate2 | 1.1.10 | MIT OR Apache-2.0 |
