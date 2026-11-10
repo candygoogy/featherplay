@@ -967,7 +967,9 @@ impl Controller {
                 if self.settings.notifications {
                     let np = now_playing(&t, true, Duration::ZERO);
                     // A few ms of WinRT calls; kept off this loop and the UI thread.
-                    tokio::task::spawn_blocking(move || notify_track(&np));
+                    crate::app::blocking_detached(&tokio::runtime::Handle::current(), move || {
+                        notify_track(&np)
+                    });
                 }
                 self.fetch_segments(&t);
                 let alt = self.alternates(&t.id);

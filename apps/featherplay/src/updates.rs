@@ -1404,7 +1404,7 @@ pub fn open(ctx: &Ctx, url: &str) {
         return;
     }
     let url = url.to_string();
-    ctx.catalog.runtime().spawn_blocking(move || {
+    crate::app::blocking_detached(ctx.catalog.runtime(), move || {
         if let Err(e) = crate::controller::open_url(&url) {
             log!("opening the release page: {e}");
         }

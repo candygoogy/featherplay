@@ -323,7 +323,7 @@ impl Controller {
                     self.lastfm_event(LastfmStatus::Waiting, None);
                 }
                 let tx = self.tx.clone();
-                tokio::task::spawn_blocking(move || {
+                crate::app::blocking_detached(&tokio::runtime::Handle::current(), move || {
                     let checked = AccountMsg::Checked {
                         lastfm_session: get_secret(SecretKey::LastfmSession).is_some(),
                         custom_keys: get_secret(SecretKey::LastfmApiKey).is_some(),
@@ -360,7 +360,7 @@ impl Controller {
                 self.settings.lastfm_enabled = false;
                 self.save_settings();
                 self.restart_scrobbler();
-                tokio::task::spawn_blocking(|| {
+                crate::app::blocking_detached(&tokio::runtime::Handle::current(), || {
                     if let Err(e) = delete_secret(SecretKey::LastfmSession) {
                         log!("Last.fm: deleting the session failed: {e}");
                     }
@@ -375,7 +375,7 @@ impl Controller {
                 self.settings.listenbrainz_enabled = false;
                 self.save_settings();
                 self.restart_scrobbler();
-                tokio::task::spawn_blocking(|| {
+                crate::app::blocking_detached(&tokio::runtime::Handle::current(), || {
                     if let Err(e) = delete_secret(SecretKey::ListenbrainzToken) {
                         log!("ListenBrainz: deleting the token failed: {e}");
                     }
@@ -609,7 +609,7 @@ impl Controller {
         self.forget_saved_streams();
         // The sign-in window's profile too, so the next sign-in can pick another account.
         let profile = self.paths.cache.join("webview2");
-        tokio::task::spawn_blocking(move || {
+        crate::app::blocking_detached(&tokio::runtime::Handle::current(), move || {
             if let Err(e) = delete_secret(SecretKey::YtCookies) {
                 log!("deleting the session failed: {e}");
             }
@@ -682,7 +682,9 @@ impl Controller {
             Change::Discord(false) => {
                 if let Some(p) = self.presence.take() {
                     // Clears the activity; waits up to a second for Discord.
-                    tokio::task::spawn_blocking(move || p.quit());
+                    crate::app::blocking_detached(&tokio::runtime::Handle::current(), move || {
+                        p.quit()
+                    });
                 }
                 (self.ui.events)(UiEvent::Discord(presence::off_status()));
             }
@@ -817,7 +819,7 @@ impl Controller {
         self.save_settings();
         self.restart_scrobbler();
         let tx = self.tx.clone();
-        tokio::task::spawn_blocking(move || {
+        crate::app::blocking_detached(&tokio::runtime::Handle::current(), move || {
             let result = store_keys(keys.as_ref())
                 .and_then(|()| delete_secret(SecretKey::LastfmSession))
                 .map(|()| keys.is_some())

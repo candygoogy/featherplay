@@ -141,7 +141,7 @@ impl Controller {
         let cache = self.silence_cache();
         cache.insert(&id.0, to_song(found));
         let cache = cache.clone();
-        tokio::task::spawn_blocking(move || {
+        crate::app::blocking_detached(&tokio::runtime::Handle::current(), move || {
             if let Err(e) = cache.save() {
                 log!("saving the silences failed: {e}");
             }

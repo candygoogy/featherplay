@@ -186,7 +186,7 @@ fn hide(ctx: &Ctx) {
             tr!("featherplay is still running in the tray")
         };
         // A few milliseconds of WinRT calls: off the UI thread.
-        ctx.catalog.runtime().spawn_blocking(move || {
+        crate::app::blocking_detached(ctx.catalog.runtime(), move || {
             featherplay_integrations::notify(
                 title,
                 tr!("Right-click the tray icon to show the window or quit."),

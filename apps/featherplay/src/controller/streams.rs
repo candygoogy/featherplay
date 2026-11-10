@@ -877,7 +877,7 @@ impl Controller {
         if at_quit {
             write();
         } else {
-            tokio::task::spawn_blocking(write);
+            crate::app::blocking_detached(&tokio::runtime::Handle::current(), write);
         }
     }
 
@@ -885,7 +885,7 @@ impl Controller {
     pub(super) fn forget_saved_streams(&mut self) {
         let (file, n) = self.streams.forget_all();
         let path = self.paths.cache.join(SAVED_STREAMS);
-        tokio::task::spawn_blocking(move || {
+        crate::app::blocking_detached(&tokio::runtime::Handle::current(), move || {
             if let Err(e) = file.write(&path, n, None) {
                 log!("removing the saved streams failed: {e}");
             }
