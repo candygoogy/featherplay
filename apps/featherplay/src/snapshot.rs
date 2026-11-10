@@ -11,6 +11,7 @@
 //! artist fixture's albums and singles. `--shuffle` shows Shuffle on, a lit toggle.
 
 use std::cell::RefCell;
+use std::ops::ControlFlow;
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::rc::Rc;
@@ -19,6 +20,10 @@ use std::time::{Duration, Instant};
 
 use featherplay_core::model::{AlbumRef, ArtistRef, PlaylistId, Track};
 use featherplay_store::{Paths, ThemeMode};
+use i_slint_core::accessibility::AccessibleStringProperty;
+use i_slint_core::item_tree::ItemRc;
+use i_slint_core::items::AccessibleRole;
+use i_slint_core::window::WindowInner;
 use slint::ComponentHandle;
 use slint::platform::{PointerEventButton, WindowEvent};
 use tokio::sync::mpsc;
@@ -118,6 +123,9 @@ pub const PAGES: &[&str] = &[
     "settings-scripts",
     // Settings with the local API on and running, its port and masked token.
     "settings-local-api",
+    // Settings scrolled to the Discord group, with Discord status on: the profile card
+    // beside its options.
+    "settings-discord",
     // Settings with the new sound rows on (Skip silence at Start and end, Crossfade at 5 s
     // with Fade on skip, Bass, Light), and with the Equalizer's bands open.
     "settings-sound",
@@ -781,6 +789,10 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
         crate::pages::settings::show_local_api_for_snapshot(ctx);
         settle();
     }
+    if o.page == "settings-discord" {
+        ui.global::<crate::ui::SettingsData>().set_discord(true);
+        settle();
+    }
     if o.page == "settings-speed" || o.page == "speed-popup" {
         crate::pages::settings::show_speed_for_snapshot(ctx, 125, o.page == "speed-popup");
         settle();
@@ -912,15 +924,21 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
         Hold::Error if o.page.starts_with("now-playing-lyrics") => {}
         Hold::Error => hold_error(ctx, ui)?,
     }
-    if let Some((x, y)) = o.pointer {
-        let position = slint::LogicalPosition::new(x, y);
-        let w = window;
-        // Laid out at the snapshot's size first, so the pointer lands on what the picture
-        // shows there.
-        w.dispatch_event(WindowEvent::Resized {
+    if o.page == "settings-discord" || o.pointer.is_some() {
+        // Laid out at the snapshot's size first, so the scroll and the pointer land on what
+        // the picture shows there.
+        window.dispatch_event(WindowEvent::Resized {
             size: slint::LogicalSize::new(width as f32 / o.scale, height as f32 / o.scale),
         });
         settle();
+    }
+    if o.page == "settings-discord" {
+        scroll_to_group(window, "Discord")?;
+        settle();
+    }
+    if let Some((x, y)) = o.pointer {
+        let position = slint::LogicalPosition::new(x, y);
+        let w = window;
         w.dispatch_event(WindowEvent::PointerMoved { position });
         if o.press {
             w.dispatch_event(WindowEvent::PointerPressed {
@@ -938,6 +956,40 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
         height,
         started.elapsed().as_millis()
     );
+    Ok(())
+}
+
+/// Scrolls the page so the settings group titled `title` has its title just under the top
+/// bar. The group is found by its panel, as a screen reader finds it, because where it sits
+/// depends on how the text above it measures.
+fn scroll_to_group(window: &slint::Window, title: &str) -> Result<(), String> {
+    // The panel's top, in logical pixels from the window's: below the top bar (64 px,
+    // `TOP_BAR` in tests/app/discord_card.rs) and the group's title row.
+    const PANEL_TOP: f32 = 136.0;
+    let root = ItemRc::new_root(WindowInner::from_pub(window).component());
+    let mut top = None;
+    // Below the fold the group is clipped by the page, so not `is_visible`: any group of
+    // that title will do, and Settings has one.
+    root.visit_descendants(|item| {
+        if item.accessible_role() == AccessibleRole::Groupbox
+            && item
+                .accessible_string_property(AccessibleStringProperty::Label)
+                .is_some_and(|v| v == title)
+        {
+            top = Some(item.map_to_window(item.geometry().origin).y);
+            return ControlFlow::Break(());
+        }
+        ControlFlow::Continue(())
+    });
+    let top = top.ok_or_else(|| format!("no {title:?} group on the page"))?;
+    let size = window.size().to_logical(window.scale_factor());
+    // In the page's right padding, over no option.
+    let position = slint::LogicalPosition::new(size.width - 20.0, size.height / 2.0);
+    window.dispatch_event(WindowEvent::PointerScrolled {
+        position,
+        delta_x: 0.0,
+        delta_y: PANEL_TOP - top,
+    });
     Ok(())
 }
 
@@ -1069,8 +1121,14 @@ fn page(name: &str, f: &Fixtures) -> Result<Page, String> {
         "artist" => Page::Artist {
             id: f.artist().map_err(e)?.summary.id,
         },
+        // The demo set answers any query with its free-licence songs, so it asks for those.
         "search" => Page::Search {
-            query: "daft punk".into(),
+            query: if f.is_demo() {
+                "creative commons"
+            } else {
+                "daft punk"
+            }
+            .into(),
         },
         // A pasted song link: its one song (a track of the radio recording).
         "search-link" => crate::link::search_page("https://youtu.be/Jb6gcoR266U?si=snapshot"),
@@ -1100,6 +1158,7 @@ fn page(name: &str, f: &Fixtures) -> Result<Page, String> {
         | "settings-long"
         | "settings-scripts"
         | "settings-local-api"
+        | "settings-discord"
         | "settings-sound"
         | "settings-equalizer"
         | "settings-speed" => Page::Settings,
