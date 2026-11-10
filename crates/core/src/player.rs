@@ -95,6 +95,13 @@ pub enum Input {
     PlayNextAll(Vec<Track>),
     /// At the end of the queue. On an empty queue the first one plays.
     Enqueue(Vec<Track>),
+    /// More of the list that's playing, arrived after it started (`Queue::extend_list`):
+    /// after its own upcoming tracks, or with `mix` (the list was shuffled) mixed in among
+    /// them.
+    ExtendList {
+        tracks: Vec<Track>,
+        mix: bool,
+    },
     /// Play the upcoming track at this index now; the ones before it go to history.
     SkipTo(usize),
     /// The account took a rating: every queue entry of the track gets it, so one disliked
@@ -486,6 +493,14 @@ impl Player {
                     self.added(empty, &mut out);
                 }
             }
+            Input::ExtendList { tracks, mix } => {
+                if !tracks.is_empty() {
+                    let empty = self.queue.current().is_none();
+                    let seed = mix.then(|| self.shuffle_seed());
+                    self.queue.extend_list(tracks, seed);
+                    self.added(empty, &mut out);
+                }
+            }
             Input::SkipTo(index) => self.skip_to(index, &mut out),
             Input::SetLike(id, like) => {
                 if self.queue.set_like(&id, like) {
@@ -539,6 +554,10 @@ impl Player {
             Input::PlayNext(t) => Input::PlayNext(t.into_song_version()),
             Input::PlayNextAll(tracks) => Input::PlayNextAll(songs(tracks)),
             Input::Enqueue(tracks) => Input::Enqueue(songs(tracks)),
+            Input::ExtendList { tracks, mix } => Input::ExtendList {
+                tracks: songs(tracks),
+                mix,
+            },
             other => other,
         }
     }

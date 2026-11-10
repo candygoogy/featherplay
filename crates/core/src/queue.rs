@@ -194,6 +194,42 @@ impl Queue {
         }
     }
 
+    /// More of the list that's playing, arrived after it started (a long playlist's later
+    /// pages): after the list's upcoming tracks, before any a continuation appended. With
+    /// `mix_seed` (the list was shuffled), or with shuffle on, each goes to a random place
+    /// among the list's upcoming tracks instead. On an empty queue the first one becomes
+    /// current.
+    pub fn extend_list(&mut self, tracks: Vec<Track>, mix_seed: Option<u64>) {
+        let base = (self.index + 1).min(self.tracks.len());
+        let list_end = base + self.autoplay_start().unwrap_or(self.tracks.len() - base);
+        if let Some(seed) = mix_seed {
+            self.rng = seed ^ GOLDEN;
+        }
+        if self.rng == 0 {
+            self.rng = GOLDEN;
+        }
+        let mix = mix_seed.is_some() || self.shuffle;
+        // In queued order they go where the list's own tracks end, too.
+        let mut queued_at = self
+            .original
+            .iter()
+            .position(|k| self.continued.contains(k))
+            .unwrap_or(self.original.len());
+        // Where the list's own tracks end, as each one goes in.
+        for (end, track) in (list_end..).zip(tracks) {
+            let at = if mix {
+                base + (self.next_random() % (end - base + 1) as u64) as usize
+            } else {
+                end
+            };
+            let key = self.insert(at, track);
+            if self.shuffle {
+                self.original.insert(queued_at, key);
+                queued_at += 1;
+            }
+        }
+    }
+
     /// Moves an upcoming track. Indices are into `upcoming()`; out-of-range is ignored.
     pub fn move_item(&mut self, from: usize, to: usize) {
         let len = self.upcoming().len();

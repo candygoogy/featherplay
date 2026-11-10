@@ -146,7 +146,9 @@ pub(super) fn with_song_versions(
 ) -> Input {
     let (tracks, start): (&mut [Track], Option<usize>) = match &mut input {
         Input::PlayTracks { tracks, start, .. } => (tracks, Some(*start)),
-        Input::PlayNextAll(tracks) | Input::Enqueue(tracks) => (tracks, queue_empty.then_some(0)),
+        Input::PlayNextAll(tracks) | Input::Enqueue(tracks) | Input::ExtendList { tracks, .. } => {
+            (tracks, queue_empty.then_some(0))
+        }
         Input::PlayNext(t) => (std::slice::from_mut(t), queue_empty.then_some(0)),
         Input::ContinuationLoaded(_, tracks) => (tracks, None),
         _ => return input,

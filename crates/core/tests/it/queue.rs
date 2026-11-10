@@ -152,6 +152,47 @@ fn append_continuation_skips_duplicates() {
     assert_eq!(ids(q.upcoming()), ["c", "d", "e"]);
 }
 
+/// A long playlist's later pages, arriving after a play from it started: they follow the
+/// list's own upcoming tracks, before what autoplay added once the list ran short.
+#[test]
+fn a_list_extended_after_it_started_goes_on_before_autoplay() {
+    let mut q = Queue::new();
+    q.replace(tracks(&["a", "b"]), 1, false);
+    q.append_continuation(tracks(&["x", "y"]));
+    q.extend_list(tracks(&["c", "d"]), None);
+    assert_eq!(ids(q.upcoming()), ["c", "d", "x", "y"]);
+    assert_eq!(q.autoplay_start(), Some(2));
+}
+
+/// After Shuffle, the songs still to come are mixed in among the upcoming ones, never
+/// before the current track nor after autoplay's.
+#[test]
+fn a_shuffled_list_extended_after_it_started_mixes_the_new_tracks_in() {
+    let names = |prefix: &str| (0..20).map(|i| format!("{prefix}{i}")).collect::<Vec<_>>();
+    let (first, more) = (names("a"), names("b"));
+    let first: Vec<&str> = first.iter().map(String::as_str).collect();
+    let more: Vec<&str> = more.iter().map(String::as_str).collect();
+    let mut q = Queue::new();
+    q.replace(tracks(&first), 0, false);
+    q.append_continuation(tracks(&["x"]));
+    q.extend_list(tracks(&more), Some(7));
+
+    assert_eq!(current_id(&q), Some("a0"));
+    let upcoming = ids(q.upcoming());
+    assert_eq!(upcoming.last(), Some(&"x"), "autoplay stays last");
+    let list = &upcoming[..upcoming.len() - 1];
+    let mut got = list.to_vec();
+    got.sort_unstable();
+    let mut want: Vec<&str> = first[1..].iter().chain(&more).copied().collect();
+    want.sort_unstable();
+    assert_eq!(got, want);
+    let old = |id: &&str| id.starts_with('a');
+    assert!(
+        !list[..19].iter().all(old),
+        "the new tracks all went after the old ones: {list:?}"
+    );
+}
+
 #[test]
 fn autoplay_starts_at_the_first_continued_track() {
     let mut q = Queue::new();

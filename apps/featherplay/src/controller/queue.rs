@@ -35,6 +35,14 @@ pub enum QueueAction {
         radio: bool,
         from: PlayingFrom,
     },
+    /// More of a list that was still arriving when a play from it started (a long
+    /// playlist's later pages): into that queue, after its own tracks, or with `mix` (it
+    /// was shuffled) mixed in among them. Dropped once the queue is from somewhere else.
+    Extend {
+        tracks: Vec<Track>,
+        mix: bool,
+        from: PlayingFrom,
+    },
     /// The panel was opened or closed; remembered for the next run.
     PanelOpen(bool),
     /// Now playing's side panel shown or hidden (the bar's Up next button there): kept in the
@@ -108,6 +116,7 @@ pub fn with_likes(mut input: Input, likes: &HashMap<TrackId, LikeStatus>) -> Inp
         Input::PlayTracks { tracks, .. }
         | Input::PlayNextAll(tracks)
         | Input::Enqueue(tracks)
+        | Input::ExtendList { tracks, .. }
         | Input::ContinuationLoaded(_, tracks) => tracks,
         Input::PlayNext(track) => std::slice::from_mut(track),
         _ => &mut [],
@@ -220,6 +229,17 @@ impl Controller {
                     start,
                     radio,
                 });
+            }
+            QueueAction::Extend { tracks, mix, from } => {
+                if from != self.playing_from || self.player.queue().current().is_none() {
+                    log!(
+                        "{} more tracks of {}: the queue is from elsewhere now",
+                        tracks.len(),
+                        from.label
+                    );
+                    return;
+                }
+                self.input(Input::ExtendList { tracks, mix });
             }
             QueueAction::PanelOpen(open) => {
                 if self.settings.queue_open != open {
