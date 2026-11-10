@@ -21,6 +21,8 @@
 
 use std::borrow::Cow;
 use std::fmt;
+use std::future::Future;
+use std::ops::ControlFlow;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
@@ -48,8 +50,8 @@ use ytmapi_rs::query::{
 use crate::convert::{self, map_error};
 use crate::{
     AccountIdentity, AccountInfo, Album, AlbumSummary, ApiError, Artist, ArtistSummary, Charts,
-    HistoryDay, HomeFeed, HomeShelf, Identity, MoodPage, MoodSection, Playlist, PlaylistSummary,
-    SearchFilter, SearchResults, SearchSuggestions, SongLyrics,
+    HistoryDay, HomeFeed, HomeShelf, Identity, MoodPage, MoodSection, Playlist, PlaylistPart,
+    PlaylistSummary, SearchFilter, SearchResults, SearchSuggestions, SongLyrics,
 };
 
 /// Upper bound on continuation pages for one list (about 100 rows per page).
@@ -383,19 +385,48 @@ impl YtMusic {
     /// (`LM`) is the account's own, so a signed-out page is `AuthExpired`,
     /// as in `liked_songs`, and a guest's is `SignInRequired`.
     pub async fn playlist(&self, id: &PlaylistId) -> Result<Playlist, ApiError> {
+        let mut whole: Option<Playlist> = None;
+        let pages = self
+            .playlist_by_page(id, |part| {
+                match (part, &mut whole) {
+                    (PlaylistPart::First(p), _) => whole = Some(p),
+                    (PlaylistPart::More(tracks), Some(p)) => p.tracks.extend(tracks),
+                    (PlaylistPart::More(_), None) => {}
+                }
+                ControlFlow::Continue(())
+            })
+            .await?;
+        let mut playlist = whole.ok_or_else(empty)?;
+        playlist.pages = pages;
+        Ok(playlist)
+    }
+
+    /// `playlist` a page at a time: each is handed to `each` as soon as it's read, before
+    /// the next is asked for, so a long list (a mix of 500 songs is 19 pages, ~10 s) shows
+    /// its first songs after one request. Pages are fetched one after another, at most
+    /// `MAX_PAGES`, to the end of the list (`PlaylistPaging`), or until `each` breaks.
+    /// Returns how many pages were read. A page that fails after the first ends it with
+    /// that error; the pages handed on stay handed on.
+    pub async fn playlist_by_page(
+        &self,
+        id: &PlaylistId,
+        mut each: impl FnMut(PlaylistPart) -> ControlFlow<()> + Send,
+    ) -> Result<usize, ApiError> {
         let query =
             GetPlaylistTracksQuery::new(PlaylistID::from_raw(convert::browse_playlist_id(&id.0)));
         let signed_in = convert::bare_playlist_id(&id.0) == "LM";
         if signed_in {
             self.account()?;
         }
-        let pages = self.playlist_pages(&query, signed_in).await?;
-        let first = pages.first().ok_or_else(empty)?;
-        Ok(Playlist {
-            summary: convert::playlist_summary(first, id)?,
-            tracks: convert::playlist_tracks(&pages)?,
-            pages: pages.len(),
-        })
+        let first = self.raw(&query).await?;
+        if signed_in && convert::logged_in(&first) == Some(false) {
+            return Err(ApiError::AuthExpired);
+        }
+        let summary = convert::playlist_summary(&first, id)?;
+        let base = &query;
+        let fetch =
+            move |token: String| async move { self.raw(&Continuation { base, token }).await };
+        follow_playlist(first, summary, fetch, &mut each).await
     }
 
     pub async fn album(&self, id: &AlbumId) -> Result<Album, ApiError> {
@@ -777,6 +808,46 @@ impl YtMusic {
         }
         Ok(pages)
     }
+}
+
+/// Follows a playlist from its `first` page (read with `summary`, its header): hands each
+/// page's songs to `each`, then asks `fetch` for the next page by its token, to the end of
+/// the list, `MAX_PAGES`, or until `each` breaks. Returns how many pages were read.
+async fn follow_playlist<F, Fut>(
+    first: String,
+    summary: PlaylistSummary,
+    mut fetch: F,
+    each: &mut impl FnMut(PlaylistPart) -> ControlFlow<()>,
+) -> Result<usize, ApiError>
+where
+    F: FnMut(String) -> Fut,
+    Fut: Future<Output = Result<String, ApiError>>,
+{
+    let mut paging = convert::PlaylistPaging::default();
+    let (tracks, mut token) = paging.read(&first)?;
+    // The raw page isn't kept while the next ones are fetched.
+    drop(first);
+    let mut pages = 1;
+    let part = PlaylistPart::First(Playlist {
+        summary,
+        tracks,
+        pages,
+    });
+    if each(part).is_break() {
+        return Ok(pages);
+    }
+    while let Some(t) = token.take()
+        && pages < MAX_PAGES
+    {
+        let page = fetch(t).await?;
+        pages += 1;
+        let (tracks, next) = paging.read(&page)?;
+        token = next;
+        if each(PlaylistPart::More(tracks)).is_break() {
+            break;
+        }
+    }
+    Ok(pages)
 }
 
 /// A visitor's requests: no cookies and no visitor id, and the web client's version from
@@ -1456,5 +1527,65 @@ mod tests {
             !elsewhere.is_finished(),
             "the redirect target was contacted"
         );
+    }
+
+    /// The recorded mix's three pages (`tests/fixtures/playlist_mix.json`).
+    fn mix_pages() -> Vec<String> {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/playlist_mix.json"
+        );
+        let raw = std::fs::read_to_string(path).expect("fixture");
+        let pages: Vec<serde_json::Value> = serde_json::from_str(&raw).expect("pages");
+        pages.iter().map(serde_json::Value::to_string).collect()
+    }
+
+    /// Follows the mix with the recording answering, and notes in order each page handed
+    /// on (its song count) and each page asked for. `stop` says when to stop reading.
+    async fn follow_mix(stop: bool) -> Vec<String> {
+        let pages = mix_pages();
+        let id = PlaylistId("VLRDTMAK5uy_FIXTURE_MIX_100000000000000000000".into());
+        let summary = convert::playlist_summary(&pages[0], &id).expect("header");
+        let log = std::sync::Mutex::new(Vec::new());
+        let note = |s: String| log.lock().unwrap().push(s);
+        let mut asked = 0;
+        let fetch = |_token: String| {
+            asked += 1;
+            note(format!("fetch {asked}"));
+            let page = pages[asked].clone();
+            async move { Ok(page) }
+        };
+        let mut each = |part: PlaylistPart| {
+            let n = match &part {
+                PlaylistPart::First(p) => p.tracks.len(),
+                PlaylistPart::More(t) => t.len(),
+            };
+            note(format!("page {n}"));
+            if stop {
+                ControlFlow::Break(())
+            } else {
+                ControlFlow::Continue(())
+            }
+        };
+        let read = follow_playlist(pages[0].clone(), summary, fetch, &mut each)
+            .await
+            .expect("follow");
+        note(format!("{read} pages"));
+        log.into_inner().unwrap()
+    }
+
+    #[tokio::test]
+    async fn a_playlists_first_page_is_handed_on_before_the_next_is_asked_for() {
+        assert_eq!(
+            follow_mix(false).await,
+            [
+                "page 5", "fetch 1", "page 3", "fetch 2", "page 0", "3 pages"
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn no_page_is_asked_for_once_the_reader_has_stopped() {
+        assert_eq!(follow_mix(true).await, ["page 5", "1 pages"]);
     }
 }

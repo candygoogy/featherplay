@@ -441,30 +441,10 @@ fn suggested_result(r: &Value) -> Option<SuggestedResult> {
 /// to the last one is empty. Any other continuation that isn't a list of rows is a parse
 /// error. A row the service hands out a second time (`Listed`) is left out.
 pub fn playlist_tracks(pages: &[String]) -> Result<Vec<Track>, ApiError> {
-    if pages.first().is_some_and(|raw| unavailable(raw)) {
-        return Err(ApiError::NotFound);
-    }
+    let mut paging = PlaylistPaging::default();
     let mut out = Vec::new();
-    let mut listed = Listed::default();
-    for (i, raw) in pages.iter().enumerate() {
-        let v = json(raw)?;
-        check_error(&v)?;
-        let rows = match playlist_rows(&v) {
-            Some(rows) => rows,
-            None if i == 0 && v.pointer(PLAYLIST_COLUMNS).is_some() => &[],
-            None if i > 0 && no_contents(&v) => &[],
-            None => {
-                return Err(ApiError::Parse(format!(
-                    "playlist page has no rows ({})",
-                    layout(&v)
-                )));
-            }
-        };
-        out.extend(
-            rows.iter()
-                .filter(|row| listed.add(row))
-                .filter_map(playlist_row),
-        );
+    for raw in pages {
+        out.extend(paging.read(raw)?.0);
     }
     Ok(out)
 }
@@ -511,29 +491,56 @@ fn continuation_token(rows: &[Value]) -> Option<String> {
         .map(str::to_string)
 }
 
-/// Follows a playlist's pages to the end of its list: `next_token` for each page as it
-/// comes, the first one included.
+/// Follows a playlist's pages to the end of its list, a page at a time as they come, the
+/// first one included: `read` for its new songs and the next page's token, or `next_token`
+/// for the token alone.
 #[derive(Default)]
 pub struct PlaylistPaging {
     listed: Listed,
+    /// The pages read so far.
+    pages: usize,
 }
 
 impl PlaylistPaging {
-    /// The token of the page after `raw`, as `playlist_continuation` reads it, or `None`
-    /// at the end of the list. A mix has no last page: every one ends with a token. Its
-    /// list ends at an answer with no rows, or at a page whose rows were all listed before
-    /// (`Listed`), whose token would only bring them round again.
-    pub fn next_token(&mut self, raw: &str) -> Option<String> {
-        let v: Value = serde_json::from_str(raw).ok()?;
-        let rows = playlist_rows(&v)?;
-        let songs = rows
-            .iter()
-            .filter(|row| row.get("musicResponsiveListItemRenderer").is_some());
-        let (new, again): (Vec<_>, Vec<_>) = songs.partition(|row| self.listed.add(row));
-        if new.is_empty() && !again.is_empty() {
-            return None;
+    /// The songs on `raw` not listed before, as `playlist_tracks` reads them, and the token
+    /// of the page after it, or `None` at the end of the list. A mix has no last page: every
+    /// one ends with a token. Its list ends at an answer with no rows, or at a page whose
+    /// rows were all listed before (`Listed`), whose token would only bring them round again.
+    pub fn read(&mut self, raw: &str) -> Result<(Vec<Track>, Option<String>), ApiError> {
+        let first = self.pages == 0;
+        self.pages += 1;
+        if first && unavailable(raw) {
+            return Err(ApiError::NotFound);
         }
-        continuation_token(rows)
+        let v = json(raw)?;
+        check_error(&v)?;
+        let rows = match playlist_rows(&v) {
+            Some(rows) => rows,
+            None if first && v.pointer(PLAYLIST_COLUMNS).is_some() => return Ok((vec![], None)),
+            None if !first && no_contents(&v) => return Ok((vec![], None)),
+            None => {
+                return Err(ApiError::Parse(format!(
+                    "playlist page has no rows ({})",
+                    layout(&v)
+                )));
+            }
+        };
+        let (new, again): (Vec<_>, Vec<_>) = rows
+            .iter()
+            .filter(|row| row.get("musicResponsiveListItemRenderer").is_some())
+            .partition(|row| self.listed.add(row));
+        let token = if new.is_empty() && !again.is_empty() {
+            None
+        } else {
+            continuation_token(rows)
+        };
+        Ok((new.into_iter().filter_map(playlist_row).collect(), token))
+    }
+
+    /// The token of the page after `raw`, as `read` gives it; `None` for a page it can't
+    /// read, too.
+    pub fn next_token(&mut self, raw: &str) -> Option<String> {
+        self.read(raw).ok()?.1
     }
 }
 

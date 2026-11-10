@@ -1211,6 +1211,33 @@ fn paging_stops_where_a_playlist_brings_nothing_new() {
     );
 }
 
+/// Read a page at a time, as they arrive, a playlist gives each page's new songs and the
+/// next page's token: the same songs, in the same order, as read whole.
+#[test]
+fn a_playlist_read_a_page_at_a_time_gives_each_pages_new_songs() {
+    for name in ["playlist_mix", "playlist_mix_round"] {
+        let pages = fixture_pages(name);
+        let mut paging = convert::PlaylistPaging::default();
+        let mut read = Vec::new();
+        let mut tokens = Vec::new();
+        for page in &pages {
+            let (tracks, token) = paging.read(page).expect("page");
+            read.push(tracks);
+            tokens.push(token);
+        }
+        let whole = convert::playlist_tracks(&pages).expect("rows");
+        assert_eq!(read[0], whole[..read[0].len()], "{name}'s first page");
+        assert_eq!(read.concat(), whole, "{name}");
+        let mut by_token = convert::PlaylistPaging::default();
+        let want: Vec<Option<String>> = pages.iter().map(|p| by_token.next_token(p)).collect();
+        assert_eq!(tokens, want, "{name}'s tokens");
+    }
+    assert_eq!(
+        convert::PlaylistPaging::default().read(&fixture("playlist_unavailable")),
+        Err(ApiError::NotFound)
+    );
+}
+
 /// A library grid item, as the library's playlists page lists it, with `menu` as its
 /// menu's items.
 fn library_item(id: &str, title: &str, menu: Value) -> Value {

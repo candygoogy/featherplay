@@ -706,3 +706,36 @@ async fn live_mixes() {
         assert_eq!(ids.len(), mix.tracks.len(), "a song listed twice");
     }
 }
+
+/// The New Release Mix, a long one (~500 songs, ~19 pages), read a page at a time as the
+/// playlist page reads it, timed: to its first songs, and to its end. Reads only; counts.
+#[tokio::test]
+#[ignore = "live: needs FEATHERPLAY_COOKIES_FILE"]
+async fn live_long_mix_by_page() {
+    let id =
+        featherplay_core::model::PlaylistId("RDTMAK5uy_lr0LWzGrq6FU9GIxWvFHTRPQD2LHMqlFA".into());
+    let yt = connect().await;
+    let t = std::time::Instant::now();
+    let mut first = None;
+    let mut songs = 0;
+    let pages = yt
+        .playlist_by_page(&id, |part| {
+            match part {
+                featherplay_ytm::PlaylistPart::First(p) => {
+                    first = Some((t.elapsed(), p.tracks.len()));
+                    songs += p.tracks.len();
+                }
+                featherplay_ytm::PlaylistPart::More(tracks) => songs += tracks.len(),
+            }
+            std::ops::ControlFlow::Continue(())
+        })
+        .await
+        .expect("the mix");
+    let (to_first, first_songs) = first.expect("a first page");
+    println!(
+        "TIMING long mix: first {first_songs} songs in {} ms | {songs} songs from {pages} pages in {} ms",
+        to_first.as_millis(),
+        t.elapsed().as_millis()
+    );
+    assert!(first_songs > 0);
+}

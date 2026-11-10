@@ -108,6 +108,15 @@ pub struct Playlist {
     pub pages: usize,
 }
 
+/// A playlist's page as it arrives (`YtMusic::playlist_by_page`).
+#[derive(Clone, Debug, PartialEq)]
+pub enum PlaylistPart {
+    /// The first page: the header and its songs (`pages` is 1).
+    First(Playlist),
+    /// A continuation's songs, the ones not listed before.
+    More(Vec<Track>),
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Artist {
     pub summary: ArtistSummary,
