@@ -154,6 +154,8 @@ pub struct YtDlpResolver {
     waiting: Mutex<Vec<TrackId>>,
     /// Told when a song's resolve starts to wait for it (`on_helpers_wait`).
     on_wait: Option<Told>,
+    /// Told when a resolve ahead starts to wait out an ad gate (`on_gate_wait`).
+    on_gate: Option<Told>,
     /// yt-dlp was forced up to date after a failure this session (`update_helpers`).
     forced: AtomicBool,
     /// Held while an update runs, so resolves failing together run one `yt-dlp -U`.
@@ -195,6 +197,7 @@ impl YtDlpResolver {
             native,
             waiting: Mutex::default(),
             on_wait: None,
+            on_gate: None,
             forced: AtomicBool::new(false),
             updating: tokio::sync::Mutex::new(()),
             updates: AtomicU64::new(0),
@@ -236,6 +239,13 @@ impl YtDlpResolver {
     /// native step didn't give a stream, and yt-dlp isn't there yet.
     pub fn on_helpers_wait(mut self, told: impl Fn(&TrackId) + Send + Sync + 'static) -> Self {
         self.on_wait = Some(Box::new(told));
+        self
+    }
+
+    /// `told(id)` runs when a resolve ahead of a click for `id` gets a native URL with ads
+    /// before the song and starts to wait them out (~5-6 s, no request meanwhile).
+    pub fn on_gate_wait(mut self, told: impl Fn(&TrackId) + Send + Sync + 'static) -> Self {
+        self.on_gate = Some(Box::new(told));
         self
     }
 
@@ -482,6 +492,7 @@ impl YtDlpResolver {
             r: self,
             cookies: cookies.as_ref(),
             quality,
+            aside: matches!(ahead, Some((_, Ahead::Maybe))),
         };
         match ahead {
             Some((urgent, ahead)) => self.chain.resolve_ahead(&steps, id, urgent, ahead).await,
@@ -529,6 +540,9 @@ struct Live<'a> {
     cookies: Option<&'a CookieFile>,
     /// Read once when the resolve starts.
     quality: Quality,
+    /// A song prepared in case it's clicked (`Ahead::Maybe`): its native failure doesn't
+    /// count towards turning the native step off.
+    aside: bool,
 }
 
 impl Steps for Live<'_> {
@@ -536,7 +550,12 @@ impl Steps for Live<'_> {
         if self.cookies.is_some() {
             return None;
         }
-        Some(self.r.native.as_ref()?.resolve(&id.0, self.quality).await)
+        let native = self.r.native.as_ref()?;
+        Some(if self.aside {
+            native.resolve_aside(&id.0, self.quality).await
+        } else {
+            native.resolve(&id.0, self.quality).await
+        })
     }
 
     async fn native_fresh(&self, id: &TrackId) -> Option<Result<ResolvedStream, NativeError>> {
@@ -583,6 +602,12 @@ impl Steps for Live<'_> {
         match self.r.checks.get_or_init(check_client) {
             Some(http) => first_byte(http, url).await,
             None => Check::Unknown,
+        }
+    }
+
+    fn waits_at_gate(&self, id: &TrackId) {
+        if let Some(told) = &self.r.on_gate {
+            told(id);
         }
     }
 }

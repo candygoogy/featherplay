@@ -35,7 +35,8 @@ pub(super) fn failure(e: &ResolveError) -> Failure {
         ResolveError::Unavailable(_) => FailKind::Unavailable,
         ResolveError::ToolFailed { .. } => FailKind::Broken,
         ResolveError::Sidecar(e) => FailKind::Setup(e.fault),
-        ResolveError::ToolMissing => FailKind::Other,
+        // Only a resolve ahead of a click ends so, and the player never gets it (`streams.rs`).
+        ResolveError::ToolMissing | ResolveError::Deferred => FailKind::Other,
     };
     Failure {
         kind,
@@ -51,6 +52,7 @@ fn describe(e: &ResolveError) -> String {
             format!("yt-dlp failed ({code}): {stderr_tail}")
         }
         ResolveError::Sidecar(e) => format!("sidecar ({}): {}", e.fault.name(), e.message),
+        ResolveError::Deferred => "not natively, left for a click".into(),
     }
 }
 

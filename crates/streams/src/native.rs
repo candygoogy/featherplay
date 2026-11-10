@@ -270,6 +270,26 @@ impl NativeResolver {
         video: &str,
         quality: Quality,
     ) -> Result<ResolvedStream, NativeError> {
+        self.resolve_counting(video, quality, true).await
+    }
+
+    /// `resolve` for a song prepared in case it's clicked (`Ahead::Maybe`): its failure
+    /// doesn't count towards turning the step off, so a page of rows prepared ahead can't
+    /// turn it off for the clicks.
+    pub(crate) async fn resolve_aside(
+        &self,
+        video: &str,
+        quality: Quality,
+    ) -> Result<ResolvedStream, NativeError> {
+        self.resolve_counting(video, quality, false).await
+    }
+
+    async fn resolve_counting(
+        &self,
+        video: &str,
+        quality: Quality,
+        counts: bool,
+    ) -> Result<ResolvedStream, NativeError> {
         let inner = &self.inner;
         if inner
             .health
@@ -286,6 +306,7 @@ impl NativeResolver {
                 h.failures = 0;
                 h.failed_page = None;
             }
+            Err(_) if !counts => {}
             Err(e @ (NativeError::Failed(_) | NativeError::NoUrl(_))) => {
                 // Other failures (a request, a player's challenges) count each time.
                 let page = page.filter(|_| matches!(e, NativeError::NoUrl(_)));
@@ -1841,6 +1862,21 @@ _result.sig = (s) => s.slice(2).split("").reverse().join("");"#;
         let n = log.lock().unwrap().len();
         assert!(r.resolve(VIDEO, Quality::High).await.is_err());
         assert_eq!(log.lock().unwrap().len(), n, "off again after one failure");
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// Songs prepared in case they're clicked fail without counting: a page of them can't
+    /// turn the step off for the clicks.
+    #[tokio::test]
+    async fn failures_of_songs_prepared_aside_do_not_turn_it_off() {
+        let (base, log) = test_server::serve(|_, _, _| (500, String::new()));
+        let (r, dir) = seeded("aside", &base);
+        for _ in 0..MAX_FAILURES {
+            assert!(r.resolve_aside(VIDEO, Quality::High).await.is_err());
+        }
+        let n = log.lock().unwrap().len();
+        assert!(r.resolve(VIDEO, Quality::High).await.is_err());
+        assert!(log.lock().unwrap().len() > n, "still on: the click asks");
         std::fs::remove_dir_all(&dir).unwrap();
     }
 

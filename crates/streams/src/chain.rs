@@ -76,6 +76,8 @@ pub(crate) trait Steps {
     async fn update(&self) -> bool;
     /// Asks for the first byte of `url`.
     async fn check(&self, url: &str) -> Check;
+    /// A resolve ahead of a click for `id` starts to wait out its native URL's ad gate.
+    fn waits_at_gate(&self, _id: &TrackId) {}
 }
 
 /// What the chain remembers between resolves.
@@ -276,7 +278,8 @@ impl Chain {
     /// waits for runs steps 1 and 2 at once (`race`).
     ///
     /// A resolve ahead (`ahead`) runs its yt-dlp steps one resolve ahead at a time, unless
-    /// the player asks for its song meanwhile; a gate's wait isn't part of its turn.
+    /// the player asks for its song meanwhile; a gate's wait isn't part of its turn. One for
+    /// a row that may not be clicked (`Ahead::Maybe`) runs none: it ends after step 1.
     async fn run(
         &self,
         s: &impl Steps,
@@ -284,6 +287,7 @@ impl Chain {
         ahead: Option<(&Notify, Ahead)>,
     ) -> Result<ResolvedStream, ResolveError> {
         let soon = matches!(ahead, Some((_, Ahead::Soon)));
+        let maybe = matches!(ahead, Some((_, Ahead::Maybe)));
         // Told when the player asks for the song; `None` once it has.
         let mut ahead = ahead.map(|(urgent, _)| urgent);
         // Left by a resolve of the same song that was cancelled.
@@ -311,6 +315,9 @@ impl Chain {
         } else {
             match self.native_answer(s, id).await {
                 Some(Answer::Gated(stream)) => {
+                    if ahead.is_some() {
+                        s.waits_at_gate(id);
+                    }
                     let wait = self.native_ready(s, id, stream, doubt);
                     // Ahead, the wait is all; once the player asks, the fresh answer and
                     // yt-dlp run beside it. Ahead of a click that may come any moment, the
@@ -365,6 +372,19 @@ impl Chain {
             Some(One::Ends(e)) => return Err(e),
             Some(One::NotEmbeddable) => embedded = false,
             Some(One::Next) | None => {}
+        }
+        if maybe && let Some(urgent) = ahead {
+            // Unless the player asked meanwhile: then it goes on as the player's.
+            let asked = tokio::select! {
+                biased;
+                () = urgent.notified() => true,
+                () = std::future::ready(()) => false,
+            };
+            if !asked {
+                log::info!("resolve {}: not natively, left for a click", id.0);
+                return Err(ResolveError::Deferred);
+            }
+            ahead = None;
         }
         // yt-dlp from here on.
         if embedded {
@@ -1316,6 +1336,33 @@ mod tests {
         let ahead = chain.resolve_ahead(&s, &song, &urgent, Ahead::Later);
         assert!(timeout(Duration::from_millis(50), ahead).await.is_err());
         assert_eq!(s.calls(), ["native"]);
+    }
+
+    /// A song prepared in case it's clicked gets the native step only: one that needs
+    /// yt-dlp is left for the click, so a page of rows costs no yt-dlp runs.
+    #[tokio::test]
+    async fn a_song_that_may_be_clicked_is_left_for_the_click_past_the_native_step() {
+        let chain = Chain::default();
+        let s =
+            Script::default().native(Err(NativeError::Failed("player API answered 500".into())));
+        let urgent = Notify::new();
+        let r = within(chain.resolve_ahead(&s, &id(), &urgent, Ahead::Maybe)).await;
+        assert!(matches!(r, Err(ResolveError::Deferred)), "{r:?}");
+        assert_eq!(s.calls(), ["native"]);
+    }
+
+    /// Clicked while its native step ran, it goes on as the player's own resolve.
+    #[tokio::test]
+    async fn a_song_that_may_be_clicked_goes_on_once_the_player_asks() {
+        let chain = Chain::default();
+        let s = Script::default()
+            .native(Err(NativeError::Failed("player API answered 500".into())))
+            .embedded(Ok(EMBEDDED_URL));
+        let urgent = Notify::new();
+        urgent.notify_one();
+        let r = within(chain.resolve_ahead(&s, &id(), &urgent, Ahead::Maybe)).await;
+        assert_eq!(url(r), EMBEDDED_URL);
+        assert_eq!(s.calls(), ["native", "embedded"]);
     }
 
     /// At most one yt-dlp run for resolves ahead at a time; the player asking for a song

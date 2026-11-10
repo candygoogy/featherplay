@@ -111,6 +111,11 @@ pub enum Ahead {
     Soon,
     /// The queue's tracks after the next one: minutes away.
     Later,
+    /// A song row on screen: it may be clicked, or not. Only the native step runs for it
+    /// (`ResolveError::Deferred` past it), its failures don't count towards turning that
+    /// step off, and an ad gate is waited out as for `Later`. Once the player asks, it goes
+    /// on as any resolve does.
+    Maybe,
 }
 
 /// Which audio format a resolve asks for (`YtDlpResolver::set_quality`).
@@ -150,6 +155,9 @@ pub enum ResolveError {
     ToolFailed { code: i32, stderr_tail: String },
     /// Downloading or verifying a sidecar failed (network, checksum mismatch, bad archive).
     Sidecar(SidecarError),
+    /// A resolve ahead of a click that may not come (`Ahead::Maybe`) stopped where it
+    /// would have needed yt-dlp: the click resolves the song.
+    Deferred,
 }
 
 /// Why and where downloading the sidecars failed.
@@ -188,6 +196,7 @@ impl fmt::Display for ResolveError {
                 write!(f, "yt-dlp exited with code {code}: {stderr_tail}")
             }
             ResolveError::Sidecar(e) => write!(f, "sidecar ({}): {}", e.fault.name(), e.message),
+            ResolveError::Deferred => f.write_str("not natively, left for a click"),
         }
     }
 }
