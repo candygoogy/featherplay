@@ -8,7 +8,8 @@
 //!
 //! A running output wakes its device thread every few milliseconds even when it only plays
 //! silence, so `STOP_AFTER` into a pause the engine stops the output stream; `play()` starts
-//! it again. The device stays open, so resuming is as quick as from a short pause.
+//! it again. The device stays open, so resuming is as quick as from a short pause, unless
+//! Windows has let the device go idle meanwhile: then `wake()` starts it ahead of a play.
 
 use std::collections::VecDeque;
 use std::path::PathBuf;
@@ -34,6 +35,13 @@ const BUFFERING_DELAY: Duration = Duration::from_millis(150);
 /// How long a paused output keeps running before its stream stops: enough to play out the
 /// device buffer as silence, so a resume never replays audio from before the pause.
 const STOP_AFTER: Duration = Duration::from_secs(1);
+/// An output stopped this long may have let its device go idle (it did after 8-15 s,
+/// 2026-11-10), so `wake()` starts it ahead of a play. Stopped for less, a play starts it
+/// at once anyway.
+#[cfg(not(test))]
+const WAKE_AFTER: Duration = Duration::from_secs(5);
+#[cfg(test)]
+const WAKE_AFTER: Duration = Duration::from_millis(300);
 /// Tracks fading out at once at most: a third (skips in a row, each fading) stops the
 /// oldest, which is the quietest.
 const MAX_FADING: usize = 2;
@@ -64,6 +72,8 @@ pub(crate) enum Msg {
     EnsureOutput,
     /// Sent by `pause()` and `load()`: stop the output stream after `STOP_AFTER`.
     Paused,
+    /// Sent by `wake()`.
+    Wake,
     Subscribe(Sender<AudioEvent>),
     Shutdown,
     // From decoder threads.
@@ -341,6 +351,14 @@ impl AudioEngine {
         self.send(Msg::FadeOut(fade));
     }
 
+    /// A play may come in a moment (the pointer rests on a song): while paused, an output
+    /// stopped `WAKE_AFTER` or more starts now, playing silence, so the play doesn't wait
+    /// ~85 ms for the device to wake. It stops again `STOP_AFTER` later unless something
+    /// plays. Paused or stopped a short while, it does nothing.
+    pub fn wake(&self) {
+        self.send(Msg::Wake);
+    }
+
     pub fn play(&self) {
         self.controls.paused.store(false, Ordering::SeqCst);
         self.send(Msg::EnsureOutput);
@@ -449,6 +467,12 @@ impl AudioEngine {
     #[cfg(test)]
     pub(crate) fn glitches(&self) -> Counts {
         self.controls.glitches.snapshot()
+    }
+
+    /// How many times the output started. For tests.
+    #[cfg(test)]
+    pub(crate) fn output_starts(&self) -> u32 {
+        self.controls.glitches.starts()
     }
 
     /// Sources in the mixer now. For tests.
@@ -759,6 +783,20 @@ impl Engine {
                 self.report_glitches();
                 self.stop_at
                     .get_or_insert_with(|| Instant::now() + STOP_AFTER);
+            }
+            Msg::Wake => {
+                let idle = self
+                    .sink
+                    .as_ref()
+                    .and_then(Output::stopped_for)
+                    .is_some_and(|d| d >= WAKE_AFTER);
+                if idle
+                    && self.controls.paused.load(Ordering::SeqCst)
+                    && let Some(sink) = &mut self.sink
+                    && sink.set_playing(true).is_ok()
+                {
+                    self.stop_at = Some(Instant::now() + STOP_AFTER);
+                }
             }
             Msg::Subscribe(tx) => self.subscribers.push(tx),
             Msg::Shutdown => {}

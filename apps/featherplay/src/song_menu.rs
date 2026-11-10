@@ -71,6 +71,7 @@ pub fn init(ctx: &Rc<Ctx>) {
     let c = ctx.clone();
     ui.global::<RowHover>().on_rested(move |id| {
         let track = find(&id);
+        c.send(Action::WakeOutput);
         c.send(Action::Prefetch {
             id: TrackId(id.into()),
             track,

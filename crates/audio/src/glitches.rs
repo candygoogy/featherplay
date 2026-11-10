@@ -36,6 +36,12 @@ impl Glitches {
         self.epoch.fetch_add(1, Ordering::Relaxed);
     }
 
+    /// How many times the output started. For tests.
+    #[cfg(test)]
+    pub fn starts(&self) -> u32 {
+        self.epoch.load(Ordering::Relaxed)
+    }
+
     pub fn snapshot(&self) -> Counts {
         Counts {
             late: self.late.load(Ordering::Relaxed),

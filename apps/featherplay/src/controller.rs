@@ -171,6 +171,9 @@ pub enum Action {
         id: TrackId,
         track: Option<Track>,
     },
+    /// The pointer rests on a song: while paused, the audio output starts if Windows may have
+    /// let its device go idle, so a click then plays at once (`AudioEngine::wake`).
+    WakeOutput,
     /// The song rows on screen, the likeliest click first, each with its track when the
     /// window has it: resolved ahead while a song plays (`streams.rs`). Replaces the last;
     /// empty when none shows (a page without songs, the window minimised or hidden).
@@ -771,6 +774,7 @@ impl Controller {
                 None => self.hint_id(id),
             },
             Action::Prepare(rows) => self.prepare(rows),
+            Action::WakeOutput => self.audio.wake(),
             // `run` stops for it before it gets here.
             Action::Quit => {}
         }

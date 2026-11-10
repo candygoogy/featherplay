@@ -2,7 +2,7 @@
 
 use std::num::NonZero;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use rodio::cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use rodio::cpal::{self, BufferSize, Device, FromSample, SampleFormat, SizedSample, StreamConfig};
@@ -40,6 +40,8 @@ pub(crate) struct Output {
     mixer: Mixer,
     stream: Stream,
     playing: bool,
+    /// When it last started or stopped (opened, for a new one).
+    since: Instant,
     glitches: Arc<Glitches>,
 }
 
@@ -55,8 +57,15 @@ impl Output {
         &self.mixer
     }
 
+    /// How long it's been stopped, or `None` while it plays.
+    pub fn stopped_for(&self) -> Option<Duration> {
+        (!self.playing).then(|| self.since.elapsed())
+    }
+
     /// Starts or stops the device callback. While stopped, the mixer and its sources don't
-    /// advance, and the device keeps its buffer, so starting again is near-instant.
+    /// advance, and the device keeps its buffer. Starting again is near-instant within a
+    /// few seconds; once Windows has let the device go idle (8-15 s with nothing playing on
+    /// it, 2026-11-10), the first callback comes ~80-90 ms after the start.
     pub fn set_playing(&mut self, on: bool) -> Result<(), String> {
         if on != self.playing {
             if on {
@@ -69,6 +78,7 @@ impl Output {
                 Stream::Null(n) => n.set_playing(on),
             }
             self.playing = on;
+            self.since = Instant::now();
         }
         Ok(())
     }
@@ -188,6 +198,7 @@ where
         mixer,
         stream: Stream::Device(stream),
         playing: false,
+        since: Instant::now(),
         glitches: controls.glitches.clone(),
     })
 }
@@ -267,6 +278,7 @@ pub(crate) fn open_null(controls: &Arc<Controls>) -> Output {
             controls.glitches.clone(),
         )),
         playing: false,
+        since: Instant::now(),
         glitches: controls.glitches.clone(),
     }
 }
