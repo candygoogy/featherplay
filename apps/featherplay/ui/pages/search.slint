@@ -4,7 +4,7 @@
 // song, without the chips.
 import { ListView } from "../list_view.slint";
 import { Theme, Icons } from "../theme.slint";
-import { TrackRow, CardItem, Body, PageTitle } from "../parts.slint";
+import { TrackRow, CardItem, Body, PageTitle, RowsShown, ShownRows, SongList } from "../parts.slint";
 import { SongMenu } from "../song_menu.slint";
 import { SongListRow, CardGrid, SkeletonList, SkeletonGrid, ErrorState, EmptyState, FadeIn, Chips, Open } from "content.slint";
 
@@ -92,7 +92,12 @@ export component SearchPage inherits Rectangle {
             }
         }
         if !SearchData.loading && SearchData.filter == 0 && SearchData.songs.length > 0: FadeIn {
-            ListView {
+            RowsShown {
+                list: SongList.search;
+                first: ShownRows.first(-songs.content-y, Theme.s2, Theme.row-h);
+                last: ShownRows.last(-songs.content-y, Theme.s2, Theme.row-h, songs.visible-height - Theme.bar-clear, SearchData.songs.length);
+            }
+            songs := ListView {
                 for t[i] in SearchData.songs: Rectangle {
                     height: Theme.row-h + (i == 0 ? Theme.s2 : 0px) + (i == SearchData.songs.length - 1 ? Theme.page-end : 0px);
                     SongListRow {

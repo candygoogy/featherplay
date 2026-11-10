@@ -6,7 +6,7 @@
 // Covers are asked for as rows appear (`cover-needed`), so long playlists load only what's seen.
 import { ListView } from "../list_view.slint";
 import { Theme, Icons } from "../theme.slint";
-import { TrackRow } from "../parts.slint";
+import { TrackRow, RowsShown, ShownRows, SongList } from "../parts.slint";
 import { SongMenu } from "../song_menu.slint";
 import { Nav, PageKind } from "../nav.slint";
 import { SidebarData } from "../sidebar.slint";
@@ -133,6 +133,11 @@ export component PlaylistPage inherits Rectangle {
         }
         TopScrim {
             scrolled: -list.content-y;
+        }
+        RowsShown {
+            list: SongList.playlist;
+            first: ShownRows.first(-list.content-y, root.header-h, Theme.row-h);
+            last: ShownRows.last(-list.content-y, root.header-h, Theme.row-h, list.visible-height - Theme.bar-clear, PlaylistData.tracks.length);
         }
     }
 }

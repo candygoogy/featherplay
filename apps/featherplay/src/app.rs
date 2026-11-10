@@ -27,8 +27,8 @@ use crate::router::{ExploreTab, History, LibraryTab, Page};
 use crate::ui::{AppWindow, Frame, Nav, PageKind, Theme};
 use crate::{
     account_menu, account_picker, album_actions, bar, close, endsession, instance, language, link,
-    memory, mini, native, pages, playlist_menu, popup, queue_panel, repaint, shell, sidebar,
-    song_menu, suggest, toast, top_bar, updates, wheel,
+    memory, mini, native, pages, playlist_menu, popup, prepare, queue_panel, repaint, shell,
+    sidebar, song_menu, suggest, toast, top_bar, updates, wheel,
 };
 
 /// Set once featherplay starts to quit. A second launch asking to show the window is told
@@ -300,6 +300,8 @@ impl Ctx {
         if !memory::is_hidden() {
             self.covers.show(Some(page.kind()));
         }
+        // The rows the last page showed are no longer resolved ahead.
+        prepare::page_changed(self);
         pages::open(self, &page);
     }
 
@@ -482,6 +484,7 @@ pub fn wire(ctx: &Rc<Ctx>, ui: &AppWindow) {
     bar::init(ctx);
     queue_panel::init(ctx);
     song_menu::init(ctx);
+    prepare::init(ctx);
     playlist_menu::init(ctx);
     album_actions::init(ctx);
     account_menu::init(ctx);

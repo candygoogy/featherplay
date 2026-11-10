@@ -4,7 +4,7 @@
 // short (the API gives a handful of top songs and one shelf each), so the page is one
 // Flickable.
 import { Theme, Curves, Icons } from "../theme.slint";
-import { TrackRow, CardItem, ShelfTitle, Shelf, Display, Body, Pill } from "../parts.slint";
+import { TrackRow, CardItem, ShelfTitle, Shelf, Display, Body, Pill, RowsShown, SongList } from "../parts.slint";
 import { SongMenu } from "../song_menu.slint";
 import { CollectionHeader, SongListRow, Skeleton, SkeletonBlock, SkeletonBar, SkeletonRow, ErrorState, FadeIn, Grid, Open, TopScrim } from "content.slint";
 
@@ -197,6 +197,12 @@ export component ArtistPage inherits Rectangle {
                 y: root.songs-y;
                 width: root.inner;
                 text: @tr("Top songs");
+            }
+            // A handful of rows, all at the page's top.
+            RowsShown {
+                list: SongList.artist;
+                first: 0;
+                last: ArtistData.top-songs.length - 1;
             }
             for t[i] in ArtistData.top-songs: SongListRow {
                 x: root.pad - 8px;

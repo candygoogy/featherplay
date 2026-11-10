@@ -73,6 +73,9 @@ const TOOL_VERSIONS_AFTER: Duration = Duration::from_secs(10);
 /// How often a long session asks for the daily `yt-dlp -U`.
 const DAILY_UPDATE: Duration = Duration::from_secs(24 * 3600);
 
+/// The rows on screen resolved ahead of a click at most (`Action::Prepare`), the top first.
+pub const PREPARE_ROWS: usize = 12;
+
 /// How long after a failed helpers download a song's start tries it again in the background.
 const HELPERS_RETRY: Duration = Duration::from_secs(10 * 60);
 
@@ -168,6 +171,10 @@ pub enum Action {
         id: TrackId,
         track: Option<Track>,
     },
+    /// The song rows on screen, the likeliest click first, each with its track when the
+    /// window has it: resolved ahead while a song plays (`streams.rs`). Replaces the last;
+    /// empty when none shows (a page without songs, the window minimised or hidden).
+    Prepare(Vec<(TrackId, Option<Track>)>),
     /// A page's Try again while the stored session can't connect (`Source::Unreachable`):
     /// connect with it again (`reconnect.rs`).
     Reconnect,
@@ -271,6 +278,8 @@ enum Msg {
     /// This song's resolve started to wait for the helpers' download: its native request
     /// gave no stream, and yt-dlp isn't there yet (a first run).
     HelpersWait(TrackId),
+    /// This song's resolve ahead got a URL with ads before the song and waits them out.
+    GateWait(TrackId),
     Continuation(TrackId, Result<Vec<Track>, ApiError>),
     Audio(AudioEvent),
     Scrobbled(Sent),
@@ -379,13 +388,16 @@ impl Controller {
             dir: sidecars.clone(),
         };
         let (tx, rx) = mpsc::unbounded_channel();
-        let waits = tx.clone();
+        let (waits, gates) = (tx.clone(), tx.clone());
         let resolver = Arc::new(
             YtDlpResolver::new(Sidecars { dir: sidecars }, None)
                 .with_downloads(Downloads::pinned())
                 .with_preprocessor(preprocessor())
                 .on_helpers_wait(move |id| {
                     let _ = waits.send(Msg::HelpersWait(id.clone()));
+                })
+                .on_gate_wait(move |id| {
+                    let _ = gates.send(Msg::GateWait(id.clone()));
                 }),
         );
         resolver.set_quality(stream_quality(settings.streaming_quality));
@@ -758,6 +770,7 @@ impl Controller {
                 }
                 None => self.hint_id(id),
             },
+            Action::Prepare(rows) => self.prepare(rows),
             // `run` stops for it before it gets here.
             Action::Quit => {}
         }
@@ -1022,6 +1035,16 @@ impl Controller {
                 self.helpers_wait(&id);
                 return;
             }
+            Msg::GateWait(id) => {
+                // A row on screen waiting out its gate needs no slot meanwhile.
+                self.streams.at_gate(&id);
+                self.start_hints();
+                return;
+            }
+            Msg::Resolved(id, Err(ResolveError::Deferred)) => {
+                self.deferred(id);
+                return;
+            }
             Msg::Resolved(id, result) => {
                 let keep = self.in_use();
                 let (took, ahead) = self.streams.done(&id, result.as_ref().ok(), &keep);
@@ -1037,18 +1060,31 @@ impl Controller {
                             stream.bitrate_kbps,
                             client(&stream.url)
                         );
-                        if ahead && keep.first() == Some(&id) {
-                            // The restored track, not loaded yet: buffer all of it, so Play
-                            // starts at once at the saved position too.
-                            self.audio.preload(source(&stream));
-                        } else if ahead {
-                            // Not asked for yet: fetch its start, so a click plays from memory.
-                            self.audio.prefetch(&source(&stream));
+                        match ahead {
+                            // A row on screen: its start is fetched once the pointer rests
+                            // on it (`streams.rs`).
+                            Some(streams::Hint::Page) => {}
+                            Some(_) if keep.first() == Some(&id) => {
+                                // The restored track, not loaded yet: buffer all of it, so
+                                // Play starts at once at the saved position too.
+                                self.audio.preload(source(&stream));
+                            }
+                            Some(_) => {
+                                // Not asked for yet: fetch its start, so a click plays from
+                                // memory.
+                                self.audio.prefetch(&source(&stream));
+                            }
+                            None => {}
                         }
                         Input::Resolved {
                             id,
                             result: Ok(stream_info(&stream)),
                         }
+                    }
+                    Err(e) if ahead == Some(streams::Hint::Page) => {
+                        // Nobody waits for it: no failure to count or show.
+                        log!("prepare {} in {took:.1}s: {e}", id.0);
+                        return;
                     }
                     Err(e) => {
                         let failure = notice::failure(&e);

@@ -4,7 +4,7 @@
 // Filled by `src/queue_panel.rs`.
 import { ListView } from "list_view.slint";
 import { Theme, Icons, Curves } from "theme.slint";
-import { TrackRow, Body, SongRow, Cover, IconButton } from "parts.slint";
+import { TrackRow, Body, SongRow, Cover, IconButton, RowsShown, ShownRows, SongList } from "parts.slint";
 
 export global QueueData {
     in property <TrackRow> current;
@@ -189,6 +189,9 @@ component QueueRow inherits Rectangle {
 
 // "Playing from" and Clear, the current track, then the queue.
 export component UpNext inherits Rectangle {
+    // On screen, and which panel it's in, for `RowsShown` (`SideTabs.place`).
+    in property <bool> shown;
+    in property <int> place;
     // Drag to reorder: the row picked up, the row under the pointer, the pointer.
     property <int> drag-from: -1;
     property <int> drag-to: -1;
@@ -277,6 +280,13 @@ export component UpNext inherits Rectangle {
         vertical-alignment: center;
     }
 
+    // The divider before the autoplay rows is left out: a row more or less.
+    RowsShown {
+        list: SongList.up-next;
+        part: root.place;
+        first: ShownRows.first(-list.content-y, 0, Theme.row-h);
+        last: root.shown ? ShownRows.last(-list.content-y, 0, Theme.row-h, list.visible-height, root.count) : -1;
+    }
     list := ListView {
         x: Theme.s4;
         y: root.list-y;

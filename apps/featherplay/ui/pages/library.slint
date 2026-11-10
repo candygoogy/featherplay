@@ -4,7 +4,7 @@
 // the library is the account's: the page asks to sign in instead.
 import { ListView } from "../list_view.slint";
 import { Theme, Icons } from "../theme.slint";
-import { TrackRow, CardItem, PageTitle } from "../parts.slint";
+import { TrackRow, CardItem, PageTitle, RowsShown, ShownRows, SongList } from "../parts.slint";
 import { Nav, PageKind } from "../nav.slint";
 import { SongMenu } from "../song_menu.slint";
 import { SidebarData } from "../sidebar.slint";
@@ -94,7 +94,12 @@ export component LibraryPage inherits Rectangle {
             }
         }
         if root.account && LibraryData.tab == 0 && LibraryData.liked.length > 0: FadeIn {
-            ListView {
+            RowsShown {
+                list: SongList.liked;
+                first: ShownRows.first(-liked.content-y, Theme.s4, Theme.row-h);
+                last: ShownRows.last(-liked.content-y, Theme.s4, Theme.row-h, liked.visible-height - Theme.bar-clear, LibraryData.liked.length);
+            }
+            liked := ListView {
                 for t[i] in LibraryData.liked: Rectangle {
                     height: Theme.row-h + (i == 0 ? Theme.s4 : 0px) + (i == LibraryData.liked.length - 1 ? Theme.page-end : 0px);
                     init => { LibraryData.cover-needed(i); }

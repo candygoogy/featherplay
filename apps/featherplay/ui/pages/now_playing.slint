@@ -14,7 +14,7 @@
 // rest comes from `src/pages/now_playing.rs` through `NowPlayingData`.
 import { ListView } from "../list_view.slint";
 import { Theme, Curves, Icons } from "../theme.slint";
-import { TrackRow, Body, Display, Cover, IconButton, SongRow, Tabs, Icon } from "../parts.slint";
+import { TrackRow, Body, Display, Cover, IconButton, SongRow, Tabs, Icon, RowsShown, ShownRows, SongList } from "../parts.slint";
 import { Nav, PageKind, Frame } from "../nav.slint";
 import { Player } from "../player.slint";
 import { QueueData, UpNext } from "../queue_panel.slint";
@@ -92,6 +92,8 @@ component LinkText inherits Rectangle {
 // Related picked it asks Rust for the current track's (cached per track).
 export component SideTabs inherits Rectangle {
     in property <bool> shown: true;
+    // Which panel it is, for `RowsShown`: 0 the frame's, 1 Now playing's.
+    in property <int> place;
     changed shown => {
         if root.shown && NowPlayingData.tab == 1 {
             NowPlayingData.tab-selected(1);
@@ -127,6 +129,8 @@ export component SideTabs inherits Rectangle {
         width: parent.width;
         height: parent.height - self.y;
         visible: root.tab == 0;
+        shown: root.shown && root.tab == 0;
+        place: root.place;
     }
     Rectangle {
         x: 0;
@@ -163,7 +167,13 @@ export component SideTabs inherits Rectangle {
             vertical-alignment: center;
         }
         if NowPlayingData.related.length > 0: FadeIn {
-            ListView {
+            RowsShown {
+                list: SongList.related;
+                part: root.place;
+                first: ShownRows.first(-related.content-y, 0, Theme.row-h);
+                last: root.shown && root.tab == 1 ? ShownRows.last(-related.content-y, 0, Theme.row-h, related.visible-height, NowPlayingData.related.length) : -1;
+            }
+            related := ListView {
                 x: Theme.s4;
                 y: 32px;
                 width: parent.width - 2 * Theme.s4;
@@ -802,6 +812,7 @@ export component NowPlayingPage inherits Rectangle {
         }
         SideTabs {
             shown: Frame.side-open;
+            place: 1;
         }
     }
 }

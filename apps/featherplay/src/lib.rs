@@ -57,6 +57,7 @@ pub mod pages;
 pub mod perf;
 pub mod playlist_menu;
 pub mod popup;
+pub mod prepare;
 pub mod presence;
 pub mod queue_panel;
 pub mod repaint;

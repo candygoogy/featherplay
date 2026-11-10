@@ -31,6 +31,13 @@ Notable changes to featherplay, newest first. The format follows
   starts with the songs already there, and the rest join the queue as they arrive: in
   order after Play, mixed in after Shuffle. A playlist card's play button on Home starts
   the same way, and Up next names the playlist.
+- Songs in a list start faster when you click them, also the ones YouTube holds back for
+  about 5-6 s before they can play. While a song plays, featherplay looks up the songs on
+  screen ahead of the click: the first rows of a playlist, an album, Liked songs or search
+  results once the list opens or a scroll stops, Home's song shelves, an artist's top songs,
+  Related and Up next. It takes the top first, a few at a time and at most 24 a minute, with
+  one request each. It stops when you move to another page or scroll the rows away, and
+  does nothing while playback is paused or the window is minimised or in the tray.
 - Settings > Discord: the profile preview now sits beside the options from the window's
   default size up, and stays in view while you scroll through them, so hovering Time or
   Status text lights what it changes on the card. In a window too short for the whole

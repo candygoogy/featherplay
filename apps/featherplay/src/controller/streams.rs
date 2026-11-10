@@ -22,6 +22,17 @@
 //! queue's hints follow the queue: a track no longer ahead has its resolve stopped, and
 //! paused or stopped, none runs. No timers: hints start when they come in and when a
 //! resolve ends.
+//!
+//! The song rows on screen (`Action::Prepare`: a list's rows once it opens or settles after
+//! a scroll, Home's song shelves, Related, Up next) are resolved too while a song plays, so
+//! a click on one needn't wait for its ad gate (~5-6 s): the top first, `PAGE_SLOTS` at a
+//! time on top of the hints, at most `PAGE_ROWS` a screen and `PAGE_PER_MINUTE` a minute.
+//! These are `Ahead::Maybe`: the native request only, its failure left for the click, and
+//! no fetch of the stream's start until the pointer rests on the row. One waiting out an
+//! ad gate leaves its slot to the next row. Rows that leave the screen (another page, a
+//! scroll, the window minimised or hidden) have their resolves stopped; paused or stopped,
+//! none runs. A row hovered or a track the queue wants takes its resolve over, so it keeps
+//! running, and is resolved again in full if it stops short (`deferred`).
 
 use std::collections::VecDeque;
 use std::io;
@@ -53,8 +64,18 @@ const HINT_SLOTS: usize = 3;
 const HINT_QUEUE: usize = 4;
 /// The queue's tracks resolved ahead, the next one (the player's own preload) included.
 const AHEAD: usize = 3;
+/// Resolves of rows on screen asking at once, on top of `HINT_SLOTS`. One waiting out an ad
+/// gate (~5-6 s, no request meanwhile, `at_gate`) leaves its slot to the next.
+const PAGE_SLOTS: usize = 3;
+/// The rows of a screen resolved, the top first.
+const PAGE_ROWS: usize = super::PREPARE_ROWS;
+/// Resolves of rows on screen started in a minute, at most, so a fast scroller can't send
+/// dozens: two screens' worth.
+const PAGE_PER_MINUTE: usize = 2 * PAGE_ROWS;
+const MINUTE: Duration = Duration::from_secs(60);
 /// Tracks the queue doesn't resolve ahead again for `FAILED_FOR` (their resolve failed, or
-/// their stream was refused twice), and refused preloads remembered.
+/// their stream was refused twice), and refused preloads remembered. The rows on screen
+/// keep their own, `2 * PAGE_ROWS`.
 const FAILED_KEPT: usize = 8;
 const FAILED_FOR: Duration = Duration::from_secs(10 * 60);
 /// A stream that expires sooner than this is resolved again (the player re-resolves at
@@ -81,6 +102,8 @@ pub(super) enum Hint {
     Row,
     /// One of the queue's tracks after the next one.
     Queue,
+    /// A row on screen (`Streams::on_screen`).
+    Page,
 }
 
 struct Running {
@@ -92,6 +115,20 @@ struct Running {
     urgent: Arc<Notify>,
     /// Stops a queue hint whose track is no longer ahead.
     task: Option<AbortHandle>,
+    /// A row on screen's resolve waiting out an ad gate (`at_gate`).
+    at_gate: bool,
+}
+
+/// What a resolve ahead that stopped short of yt-dlp (`ResolveError::Deferred`) leaves
+/// (`Streams::deferred`).
+#[derive(Debug, PartialEq, Eq)]
+pub(super) enum Deferred {
+    /// The player asked for the song as it stopped: its own resolve starts now.
+    Player,
+    /// A hover's or the queue's now: it's resolved ahead again as theirs.
+    Again,
+    /// A row on screen's, given up on for a while, or one no longer tracked.
+    Done,
 }
 
 #[derive(Default)]
@@ -101,8 +138,10 @@ pub(super) struct Streams {
     running: Vec<Running>,
     /// Newest last.
     waiting: VecDeque<(TrackId, Hint)>,
-    /// Tracks given up on ahead, and when (`give_up`), newest last.
+    /// Tracks given up on ahead, and when (`give_up`), newest last: the queue's, the rows
+    /// on screen's.
     failed: VecDeque<(TrackId, Instant)>,
+    page_failed: VecDeque<(TrackId, Instant)>,
     /// The stream loaded last.
     loaded: Option<StreamSource>,
     /// The tracks whose refused preload was resolved again lately (`again_after_refusal`).
@@ -117,6 +156,16 @@ pub(super) struct Streams {
     /// The writes of `SAVED_STREAMS`, and the number of the last one asked for.
     file: SavedFile,
     writes: u64,
+    /// The rows on screen, the likeliest click first (`on_screen`).
+    page: Vec<TrackId>,
+    /// Those still to resolve, next first.
+    page_waiting: VecDeque<TrackId>,
+    /// When the resolves of rows on screen started, in the last `MINUTE`.
+    page_starts: VecDeque<Instant>,
+    /// Rows are resolved: a song plays.
+    playing: bool,
+    /// Rows resolved whose stream's start isn't fetched yet (`head_wanted`).
+    headless: VecDeque<TrackId>,
 }
 
 /// Writes `SAVED_STREAMS` one at a time (in the background, and at quit on the controller's
@@ -186,6 +235,8 @@ impl Streams {
     /// The player asks for `id`.
     pub fn want(&mut self, id: &TrackId, now: SystemTime) -> Want {
         self.waiting.retain(|(w, _)| w != id);
+        self.page_waiting.retain(|w| w != id);
+        self.headless.retain(|h| h != id);
         if let Some(s) = self.fresh(id, now) {
             return Want::Cached(Box::new(s.clone()));
         }
@@ -201,6 +252,7 @@ impl Streams {
             hint: None,
             urgent: Arc::default(),
             task: None,
+            at_gate: false,
         });
         Want::Start
     }
@@ -221,10 +273,14 @@ impl Streams {
         self.fresh(id, now).is_some()
             || self.running.iter().any(|r| r.id == *id)
             || self.waiting.iter().any(|(w, _)| w == id)
+            || self.page_waiting.contains(id)
     }
 
-    /// Queues a resolve ahead for `id` (a row) unless it's covered already.
+    /// Queues a resolve ahead for `id` (a row) unless it's covered already. A row on screen
+    /// becomes a hovered one: its resolve no longer stops when it leaves the screen.
     pub fn hint(&mut self, id: &TrackId, now: SystemTime) {
+        self.page_waiting.retain(|w| w != id);
+        self.take_over(id, Hint::Row);
         if self.covered(id, now) {
             return;
         }
@@ -250,6 +306,10 @@ impl Streams {
         let wanted = |id: &TrackId| ids.contains(id) || next == Some(id);
         self.waiting
             .retain(|(w, h)| *h == Hint::Row || ids.contains(w));
+        self.page_waiting.retain(|w| !wanted(w));
+        for id in ids.iter().chain(next) {
+            self.take_over(id, Hint::Queue);
+        }
         let mut stopped = Vec::new();
         self.running.retain(|r| {
             let stale = r.hint == Some(Hint::Queue) && !wanted(&r.id);
@@ -261,50 +321,180 @@ impl Streams {
             }
             !stale
         });
-        let since = Instant::now().checked_sub(FAILED_FOR);
-        self.failed
-            .retain(|(_, at)| since.is_none_or(|since| *at > since));
+        self.forget_failures();
         // The nearest last, so it starts first.
         for id in ids.iter().rev() {
-            if !self.covered(id, now) && !self.failed.iter().any(|(f, _)| f == id) {
+            if !self.covered(id, now) && !self.has_failed(id) {
                 self.waiting.push_back((id.clone(), Hint::Queue));
             }
         }
         stopped
     }
 
-    /// `id` isn't resolved ahead again for `FAILED_FOR`.
-    fn give_up(&mut self, id: &TrackId) {
-        self.failed.retain(|(f, _)| f != id);
-        self.failed.push_back((id.clone(), Instant::now()));
-        if self.failed.len() > FAILED_KEPT {
-            self.failed.pop_front();
+    /// A hint for `id` that runs for a row on screen is `hint`'s from now on: a row hovered,
+    /// or a track the queue wants, so it no longer stops when the row leaves the screen.
+    fn take_over(&mut self, id: &TrackId, hint: Hint) {
+        if let Some(r) = self
+            .running
+            .iter_mut()
+            .find(|r| r.id == *id && r.hint == Some(Hint::Page))
+        {
+            r.hint = Some(hint);
         }
     }
 
-    /// The hints that can start now, newest first, each with what tells it the player
-    /// asks for its track and how soon that may be; they count as running.
+    /// The song rows on screen are now `ids`, the likeliest click first (none on another
+    /// page, or with the window minimised or hidden). Resolves for rows no longer there
+    /// stop, running or waiting; returns the running ones stopped.
+    pub fn on_screen(&mut self, mut ids: Vec<TrackId>, now: SystemTime) -> Vec<TrackId> {
+        ids.truncate(PAGE_ROWS);
+        self.page = ids;
+        self.sync_page(now)
+    }
+
+    /// Whether the rows on screen are resolved: while a song plays. Paused or stopped, their
+    /// resolves stop; returns the running ones stopped.
+    pub fn prepare_while(&mut self, playing: bool, now: SystemTime) -> Vec<TrackId> {
+        self.playing = playing;
+        self.sync_page(now)
+    }
+
+    /// The rows on screen waiting for a slot again, from `page`: the top first, none that's
+    /// here, running, waiting as a hint, or failed lately.
+    fn sync_page(&mut self, now: SystemTime) -> Vec<TrackId> {
+        let (playing, page) = (self.playing, &self.page);
+        let mut stopped = Vec::new();
+        self.running.retain(|r| {
+            let stale = r.hint == Some(Hint::Page) && !(playing && page.contains(&r.id));
+            if stale {
+                if let Some(task) = &r.task {
+                    task.abort();
+                }
+                stopped.push(r.id.clone());
+            }
+            !stale
+        });
+        self.page_waiting.clear();
+        if playing {
+            self.forget_failures();
+            for id in self.page.clone() {
+                if !self.covered(&id, now) && !self.has_failed(&id) {
+                    self.page_waiting.push_back(id);
+                }
+            }
+        }
+        stopped
+    }
+
+    /// The stream of `id`, a row resolved while on screen, if its start isn't fetched yet:
+    /// the pointer rests on it, so a click may come.
+    pub fn head_wanted(&mut self, id: &TrackId, now: SystemTime) -> Option<ResolvedStream> {
+        let i = self.headless.iter().position(|h| h == id)?;
+        self.headless.remove(i);
+        self.fresh(id, now).cloned()
+    }
+
+    fn forget_failures(&mut self) {
+        let since = Instant::now().checked_sub(FAILED_FOR);
+        let recent = |(_, at): &(TrackId, Instant)| since.is_none_or(|since| *at > since);
+        self.failed.retain(recent);
+        self.page_failed.retain(recent);
+    }
+
+    fn has_failed(&self, id: &TrackId) -> bool {
+        self.failed
+            .iter()
+            .chain(&self.page_failed)
+            .any(|(f, _)| f == id)
+    }
+
+    /// `id` isn't resolved ahead again for `FAILED_FOR`, as `hint`'s (a row on screen's is
+    /// kept apart, so a page of them can't push the queue's out).
+    fn give_up(&mut self, id: &TrackId, hint: Hint) {
+        let (failed, kept) = match hint {
+            Hint::Page => (&mut self.page_failed, 2 * PAGE_ROWS),
+            Hint::Row | Hint::Queue => (&mut self.failed, FAILED_KEPT),
+        };
+        failed.retain(|(f, _)| f != id);
+        failed.push_back((id.clone(), Instant::now()));
+        if failed.len() > kept {
+            failed.pop_front();
+        }
+    }
+
+    /// `id`'s resolve ahead of a click told its gate wait (`Msg::GateWait`): a row on
+    /// screen's no longer takes a slot.
+    pub fn at_gate(&mut self, id: &TrackId) {
+        if let Some(r) = self.running.iter_mut().find(|r| r.id == *id) {
+            r.at_gate = true;
+        }
+    }
+
+    /// `id`'s resolve ahead stopped where it would have needed yt-dlp (`Ahead::Maybe`).
+    pub fn deferred(&mut self, id: &TrackId) -> Deferred {
+        let Some(i) = self.running.iter().position(|r| r.id == *id) else {
+            return Deferred::Done;
+        };
+        match self.running.swap_remove(i).hint {
+            None => Deferred::Player,
+            Some(Hint::Page) => {
+                self.give_up(id, Hint::Page);
+                Deferred::Done
+            }
+            Some(hint @ (Hint::Row | Hint::Queue)) => {
+                self.waiting.push_back((id.clone(), hint));
+                Deferred::Again
+            }
+        }
+    }
+
+    /// The hints that can start now, newest first, then the rows on screen, top first, each
+    /// with what tells it the player asks for its track and how soon that may be; they
+    /// count as running.
     pub fn start_hints(&mut self) -> Vec<(TrackId, Arc<Notify>, Ahead)> {
         let mut out = Vec::new();
-        while self.running.iter().filter(|r| r.hint.is_some()).count() < HINT_SLOTS {
+        let running = |s: &Self, page: bool| {
+            s.running
+                .iter()
+                .filter(|r| r.hint.is_some_and(|h| (h == Hint::Page) == page))
+                .filter(|r| !(page && r.at_gate))
+                .count()
+        };
+        while running(self, false) < HINT_SLOTS {
             let Some((id, hint)) = self.waiting.pop_back() else {
                 break;
             };
-            let urgent = Arc::new(Notify::new());
-            self.running.push(Running {
-                id: id.clone(),
-                since: Instant::now(),
-                hint: Some(hint),
-                urgent: urgent.clone(),
-                task: None,
-            });
             let ahead = match hint {
                 Hint::Row => Ahead::Soon,
                 Hint::Queue => Ahead::Later,
+                Hint::Page => Ahead::Maybe,
             };
-            out.push((id, urgent, ahead));
+            out.push(self.run_hint(id, hint, ahead));
+        }
+        let now = Instant::now();
+        self.page_starts
+            .retain(|at| now.duration_since(*at) < MINUTE);
+        while running(self, true) < PAGE_SLOTS && self.page_starts.len() < PAGE_PER_MINUTE {
+            let Some(id) = self.page_waiting.pop_front() else {
+                break;
+            };
+            self.page_starts.push_back(now);
+            out.push(self.run_hint(id, Hint::Page, Ahead::Maybe));
         }
         out
+    }
+
+    fn run_hint(&mut self, id: TrackId, hint: Hint, ahead: Ahead) -> (TrackId, Arc<Notify>, Ahead) {
+        let urgent = Arc::new(Notify::new());
+        self.running.push(Running {
+            id: id.clone(),
+            since: Instant::now(),
+            hint: Some(hint),
+            urgent: urgent.clone(),
+            task: None,
+            at_gate: false,
+        });
+        (id, urgent, ahead)
     }
 
     /// The hint for `id` runs as `task`, which `ahead` may stop.
@@ -314,15 +504,15 @@ impl Streams {
         }
     }
 
-    /// A resolve ended: returns how long it took and whether it was a hint the player
-    /// still hasn't asked for. A stream is kept; when that makes too many, the oldest
-    /// not in `keep` (the player's current and next tracks) goes.
+    /// A resolve ended: returns how long it took and the hint it was, if the player still
+    /// hasn't asked for it. A stream is kept; when that makes too many, the oldest not in
+    /// `keep` (the player's current and next tracks) goes.
     pub fn done(
         &mut self,
         id: &TrackId,
         stream: Option<&ResolvedStream>,
         keep: &[TrackId],
-    ) -> (Duration, bool) {
+    ) -> (Duration, Option<Hint>) {
         let (took, hint) = match self.running.iter().position(|r| r.id == *id) {
             Some(i) => {
                 let r = self.running.swap_remove(i);
@@ -344,11 +534,21 @@ impl Streams {
                     self.cache.remove(i);
                 }
                 self.changed = true;
+                if hint == Some(Hint::Page) {
+                    self.headless.retain(|h| h != id);
+                    self.headless.push_back(id.clone());
+                    if self.headless.len() > KEEP {
+                        self.headless.pop_front();
+                    }
+                }
             }
-            None if hint == Some(Hint::Queue) => self.give_up(id),
-            None => {}
+            None => {
+                if let Some(hint @ (Hint::Queue | Hint::Page)) = hint {
+                    self.give_up(id, hint);
+                }
+            }
         }
-        (took, hint.is_some())
+        (took, hint)
     }
 
     /// Drops the stream of `id` (its URL was refused); returns it.
@@ -383,7 +583,7 @@ impl Streams {
     /// it resolved ahead for the queue again for a while then: the player resolves it.
     pub fn again_after_refusal(&mut self, id: &TrackId) -> bool {
         if self.refused_preloads.contains(id) {
-            self.give_up(id);
+            self.give_up(id, Hint::Queue);
             return false;
         }
         self.refused_preloads.push_back(id.clone());
@@ -529,27 +729,79 @@ fn waits_to_play(player: &Player, id: &TrackId) -> bool {
 impl Controller {
     /// Resolves `tracks` ahead of a click (see the module docs).
     pub(super) fn hint(&mut self, tracks: &[Track]) {
-        let now = SystemTime::now();
         for t in tracks {
-            let mut t = t.clone();
-            self.song_versions.fill(&mut t);
-            let id = self.player.play_id(&t);
-            self.streams.hint(&id, now);
+            let id = self.play_id_of(t.id.clone(), Some(t.clone()));
+            self.hint_play_id(&id);
         }
         self.start_hints();
     }
 
-    /// A hint by video id alone (a row the window has no `Track` for): the queue's track
-    /// with that id gives its play id.
+    /// A hint by video id alone (a row the window has no `Track` for).
     pub(super) fn hint_id(&mut self, id: TrackId) {
+        let id = self.play_id_of(id, None);
+        self.hint_play_id(&id);
+        self.start_hints();
+    }
+
+    /// A row the pointer rests on: resolved ahead, or, resolved while on screen, its
+    /// stream's start fetched.
+    fn hint_play_id(&mut self, id: &TrackId) {
+        let now = SystemTime::now();
+        if let Some(stream) = self.streams.head_wanted(id, now) {
+            self.audio.prefetch(&super::source(&stream));
+        }
+        self.streams.hint(id, now);
+    }
+
+    /// The id the player would play for row `id`: its song version (`track` when the
+    /// window has it), else the queue's track with that id.
+    fn play_id_of(&mut self, id: TrackId, track: Option<Track>) -> TrackId {
+        if let Some(mut t) = track {
+            self.song_versions.fill(&mut t);
+            return self.player.play_id(&t);
+        }
         let q = self.player.queue();
-        let known = q
-            .current()
+        q.current()
             .into_iter()
             .chain(q.upcoming())
             .find(|t| t.id == id)
-            .map(|t| self.player.play_id(t));
-        self.streams.hint(&known.unwrap_or(id), SystemTime::now());
+            .map(|t| self.player.play_id(t))
+            .unwrap_or(id)
+    }
+
+    /// A resolve ahead stopped short of yt-dlp (`ResolveError::Deferred`).
+    pub(super) fn deferred(&mut self, id: TrackId) {
+        match self.streams.deferred(&id) {
+            Deferred::Player => {
+                log!("resolve {}: asked for as its resolve ahead stopped", id.0);
+                if let Some(input) = self.resolve(id) {
+                    self.input(input);
+                }
+            }
+            Deferred::Again => {
+                log!(
+                    "resolve {} ahead: hovered or up next, so again in full",
+                    id.0
+                );
+                self.start_hints();
+            }
+            Deferred::Done => {
+                log!("prepare {}: not natively, left for a click", id.0);
+                self.start_hints();
+            }
+        }
+    }
+
+    /// `Action::Prepare`: the song rows on screen, the likeliest click first, resolved
+    /// ahead while a song plays (see the module docs).
+    pub(super) fn prepare(&mut self, rows: Vec<(TrackId, Option<Track>)>) {
+        let ids = rows
+            .into_iter()
+            .map(|(id, track)| self.play_id_of(id, track))
+            .collect();
+        for id in self.streams.on_screen(ids, SystemTime::now()) {
+            log!("prepare {}: stopped, no longer on screen", id.0);
+        }
         self.start_hints();
     }
 
@@ -636,18 +888,22 @@ impl Controller {
             Some((next, after)) => (Some(next), after),
             None => (None, &[][..]),
         };
-        self.resolve_ahead(next, after);
+        self.resolve_ahead(next, after, true);
         self.look_up_ahead(AHEAD);
     }
 
-    /// Paused or stopped: the queue's resolves ahead stop.
+    /// Paused or stopped: the queue's resolves ahead stop, and the rows on screen's.
     pub(super) fn stop_ahead(&mut self) {
-        self.resolve_ahead(None, &[]);
+        self.resolve_ahead(None, &[], false);
     }
 
-    fn resolve_ahead(&mut self, next: Option<&TrackId>, after: &[TrackId]) {
-        for id in self.streams.ahead(next, after, SystemTime::now()) {
+    fn resolve_ahead(&mut self, next: Option<&TrackId>, after: &[TrackId], playing: bool) {
+        let now = SystemTime::now();
+        for id in self.streams.ahead(next, after, now) {
             log!("resolve {} ahead: stopped, no longer up next", id.0);
+        }
+        for id in self.streams.prepare_while(playing, now) {
+            log!("prepare {}: stopped, nothing plays", id.0);
         }
         self.start_hints();
     }
@@ -698,7 +954,11 @@ impl Controller {
             return;
         }
         for (id, urgent, ahead) in self.streams.start_hints() {
-            log!("resolve {} ahead", id.0);
+            if ahead == Ahead::Maybe {
+                log!("prepare {}: on screen", id.0);
+            } else {
+                log!("resolve {} ahead", id.0);
+            }
             let task = self.spawn_resolve(id.clone(), Some((urgent, ahead)));
             self.streams.started(&id, task);
         }
@@ -867,7 +1127,7 @@ mod tests {
         s.hint(&id("f"), now);
         assert_eq!(s.waiting.len(), 1);
         let (_, hint) = s.done(&id("f"), Some(&stream(HOURS)), &[]);
-        assert!(hint);
+        assert_eq!(hint, Some(Hint::Row));
         s.hint(&id("f"), now);
         assert_eq!(ids(s.start_hints()), [id("c")]);
     }
@@ -881,7 +1141,7 @@ mod tests {
         s.start_hints();
         assert_eq!(s.want(&id("a"), now), Want::Running);
         let (_, hint) = s.done(&id("a"), Some(&stream(HOURS)), &[]);
-        assert!(!hint, "asked for by the player while it ran");
+        assert_eq!(hint, None, "asked for by the player while it ran");
         // A waiting hint the player asks for starts as the player's own.
         s.hint(&id("c"), now);
         s.hint(&id("d"), now);
@@ -1051,6 +1311,157 @@ mod tests {
         assert!(!s.again_after_refusal(&id("q1")));
         s.ahead(None, &[id("q1")], now);
         assert!(s.start_hints().is_empty());
+    }
+
+    fn page(started: &[(TrackId, Arc<Notify>, Ahead)]) -> Vec<TrackId> {
+        started
+            .iter()
+            .filter(|(_, _, ahead)| *ahead == Ahead::Maybe)
+            .map(|(id, _, _)| id.clone())
+            .collect()
+    }
+
+    /// The rows on screen resolve top first, a few at a time, beside the queue's and a
+    /// hovered row's resolves, and never a second time for a song one of those has.
+    #[test]
+    fn rows_on_screen_resolve_top_first_without_repeating_the_queue_or_a_hover() {
+        let mut s = Streams::default();
+        let now = SystemTime::now();
+        s.prepare_while(true, now);
+        s.ahead(None, &[id("q1")], now);
+        s.hint(&id("hovered"), now);
+        s.want(&id("playing"), now);
+        let rows = ["playing", "q1", "hovered", "a", "b", "c", "d"].map(id);
+        s.on_screen(rows.to_vec(), now);
+        let started = s.start_hints();
+        assert_eq!(started.len(), 2 + PAGE_SLOTS, "{started:?}");
+        assert_eq!(page(&started), [id("a"), id("b"), id("c")]);
+        s.done(&id("a"), Some(&stream(HOURS)), &[]);
+        assert_eq!(page(&s.start_hints()), [id("d")]);
+        // Resolved: on screen again, it isn't asked again.
+        s.on_screen(rows.to_vec(), now);
+        assert!(s.start_hints().is_empty());
+    }
+
+    /// Another page, or the rows scrolled away: their resolves stop, running or waiting.
+    #[test]
+    fn rows_that_leave_the_screen_stop_resolving() {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_time()
+            .build()
+            .unwrap();
+        let task = rt.spawn(std::future::pending::<()>());
+        let mut s = Streams::default();
+        let now = SystemTime::now();
+        s.prepare_while(true, now);
+        s.on_screen(["a", "b", "c", "d"].map(id).to_vec(), now);
+        s.start_hints();
+        s.started(&id("a"), task.abort_handle());
+        let stopped = s.on_screen(vec![id("x")], now);
+        assert_eq!(stopped, [id("a"), id("b"), id("c")]);
+        let ended = rt.block_on(async { tokio::time::timeout(TEST_WAIT, task).await });
+        assert!(
+            ended
+                .expect("a's task wasn't stopped")
+                .unwrap_err()
+                .is_cancelled()
+        );
+        assert_eq!(page(&s.start_hints()), [id("x")], "d went with its page");
+    }
+
+    /// Paused or stopped, nothing on screen is resolved; playing again, it is.
+    #[test]
+    fn rows_on_screen_wait_while_paused() {
+        let mut s = Streams::default();
+        let now = SystemTime::now();
+        s.on_screen(["a", "b"].map(id).to_vec(), now);
+        assert!(s.start_hints().is_empty(), "nothing plays yet");
+        s.prepare_while(true, now);
+        assert_eq!(page(&s.start_hints()), [id("a"), id("b")]);
+        assert_eq!(s.prepare_while(false, now), [id("a"), id("b")]);
+        assert!(s.start_hints().is_empty());
+        s.prepare_while(true, now);
+        assert_eq!(page(&s.start_hints()), [id("a"), id("b")]);
+    }
+
+    /// A fast scroller sends a new screen of rows every moment: the lookups stop at
+    /// `PAGE_PER_MINUTE` in the last minute.
+    #[test]
+    fn rows_on_screen_are_looked_up_at_most_so_often_a_minute() {
+        let mut s = Streams::default();
+        let now = SystemTime::now();
+        s.prepare_while(true, now);
+        let mut looked_up = 0;
+        for screen in 0..10 {
+            let rows: Vec<TrackId> = (0..12).map(|i| id(&format!("{screen}-{i}"))).collect();
+            s.on_screen(rows, now);
+            for id in page(&s.start_hints()) {
+                looked_up += 1;
+                s.done(&id, Some(&stream(HOURS)), &[]);
+            }
+            looked_up += s.start_hints().len();
+        }
+        assert_eq!(looked_up, PAGE_PER_MINUTE);
+        // A minute on, they go on.
+        for at in &mut s.page_starts {
+            *at = Instant::now().checked_sub(MINUTE).unwrap();
+        }
+        assert!(!s.start_hints().is_empty());
+    }
+
+    /// A row on screen the pointer rests on: its resolve is a hover's from then on, and
+    /// one already resolved gets its start fetched for the click.
+    #[test]
+    fn a_hovered_row_on_screen_is_a_hovers_resolve() {
+        let mut s = Streams::default();
+        let now = SystemTime::now();
+        s.prepare_while(true, now);
+        s.on_screen(["a", "b"].map(id).to_vec(), now);
+        s.start_hints();
+        s.done(&id("a"), Some(&stream(HOURS)), &[]);
+        assert!(s.head_wanted(&id("a"), now).is_some());
+        assert!(s.head_wanted(&id("a"), now).is_none(), "once");
+        s.hint(&id("b"), now);
+        assert!(
+            s.on_screen(Vec::new(), now).is_empty(),
+            "b stays, as a hover's"
+        );
+        // Stopped short of yt-dlp, it's resolved again as a hover's.
+        assert_eq!(s.deferred(&id("b")), Deferred::Again);
+        assert_eq!(ids(s.start_hints()), [id("b")]);
+    }
+
+    /// A row on screen stopped short of yt-dlp is left for the click; clicked as it
+    /// stopped, the player resolves it; one no longer tracked (stopped, its answer late)
+    /// starts nothing.
+    #[test]
+    fn a_row_resolve_that_stops_short_is_left_for_the_click() {
+        let mut s = Streams::default();
+        let now = SystemTime::now();
+        s.prepare_while(true, now);
+        s.on_screen(["a", "b"].map(id).to_vec(), now);
+        s.start_hints();
+        assert_eq!(s.deferred(&id("a")), Deferred::Done);
+        s.on_screen(["a", "b"].map(id).to_vec(), now);
+        assert!(
+            s.start_hints().is_empty(),
+            "a isn't asked again for a while"
+        );
+        assert_eq!(s.want(&id("b"), now), Want::Running);
+        assert_eq!(s.deferred(&id("b")), Deferred::Player);
+        assert_eq!(s.deferred(&id("b")), Deferred::Done, "no longer tracked");
+    }
+
+    /// A row waiting out its ad gate makes no request: the next row takes its slot.
+    #[test]
+    fn a_row_waiting_out_its_gate_leaves_its_slot() {
+        let mut s = Streams::default();
+        let now = SystemTime::now();
+        s.prepare_while(true, now);
+        s.on_screen(["a", "b", "c", "d"].map(id).to_vec(), now);
+        assert_eq!(page(&s.start_hints()), [id("a"), id("b"), id("c")]);
+        s.at_gate(&id("b"));
+        assert_eq!(page(&s.start_hints()), [id("d")]);
     }
 
     #[test]

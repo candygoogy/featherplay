@@ -20,7 +20,7 @@
 // shelf while a page loads, a quiet Try again if it fails; Home itself never errors for it.
 import { ListView } from "../list_view.slint";
 import { Theme, Curves, Icons } from "../theme.slint";
-import { TrackRow, CardItem, ItemKind, Body, Display, Cover, Card, Icon, Pill, ProgressRail, SongRow, ShelfArrows, Bands } from "../parts.slint";
+import { TrackRow, CardItem, ItemKind, Body, Display, Cover, Card, Icon, Pill, ProgressRail, SongRow, ShelfArrows, Bands, RowsShown, SongList } from "../parts.slint";
 import { Nav } from "../nav.slint";
 import { Player } from "../player.slint";
 import { Skeleton, SkeletonBlock, SkeletonBar, SkeletonRow, SkeletonCard, ErrorState, EmptyState, Open } from "content.slint";
@@ -448,7 +448,8 @@ component SongGrid inherits Rectangle {
     property <int> per-page: max(2, floor((root.width + Theme.card-gap) / (Shapes.grid-col + Theme.card-gap)));
     property <int> columns: ceil(root.shelf.songs.length / root.rows);
     property <length> col-w: min(Shapes.grid-col, floor((root.width - (root.per-page - 1) * Theme.card-gap) / root.per-page / 1px) * 1px);
-    property <int> first: 0;
+    // The first column shown (`FeedShelf` reads it).
+    in-out property <int> first: 0;
     property <float> at: root.first;
     animate at { duration: Theme.moving ? Theme.t-panel + 40ms : 0ms; easing: Curves.ease-in-out; }
     property <int> last-first: max(0, root.columns - root.per-page);
@@ -915,10 +916,13 @@ component FeedShelf inherits Rectangle {
     in property <HomeShelfRow> shelf;
     // Some of it shows: its covers may start taking layers (`TileShelf.warm`).
     in property <bool> in-sight: true;
+    // A song grid's first column shown (the feed's row reports its songs, `RowsShown`).
+    in-out property <int> grid-first;
     height: Shapes.height(root.shelf.shape, root.width, root.shelf.shape == ShelfShape.songs ? root.shelf.songs.length : root.shelf.items.length);
     if root.shelf.shape == ShelfShape.songs: SongGrid {
         width: parent.width;
         shelf: root.shelf;
+        first <=> root.grid-first;
     }
     if root.shelf.shape == ShelfShape.mixes: MixShelf {
         width: parent.width;
@@ -1044,7 +1048,18 @@ export component HomePage inherits Rectangle {
         for slot[i] in HomeData.rows: feed-row := Rectangle {
             // The row's top is above the floating bar's.
             property <bool> in-sight: self.y + list.content-y < root.height - Theme.bar-clear;
+            // A song shelf's songs on screen, its grid's page (`FeedShelf.grid-first`), are
+            // resolved ahead of a click. Told from the row, which lives as long as its
+            // instance, so a row reused for another shelf, or for none, says so.
+            property <int> grid-first;
+            property <bool> songs: i > 0 && i <= root.count && HomeData.shelves[i - 1].shape == ShelfShape.songs;
             height: row.preferred-height;
+            RowsShown {
+                list: SongList.home;
+                part: i - 1;
+                first: feed-row.grid-first * Shapes.grid-rows;
+                last: feed-row.songs && feed-row.in-sight && feed-row.y + list.content-y + feed-row.height > 0 ? min(HomeData.shelves[i - 1].songs.length, (feed-row.grid-first + max(2, floor((root.inner + Theme.card-gap) / (Shapes.grid-col + Theme.card-gap)))) * Shapes.grid-rows) - 1 : -1;
+            }
             row := VerticalLayout {
                 width: parent.width;
                 padding-left: root.pad;
@@ -1058,6 +1073,7 @@ export component HomePage inherits Rectangle {
                 if i > 0 && i <= root.count: FeedShelf {
                     shelf: HomeData.shelves[i - 1];
                     in-sight: feed-row.in-sight;
+                    grid-first <=> feed-row.grid-first;
                 }
                 if i > root.count && HomeData.more == MoreState.loading: MoreSkeleton { }
                 if i > root.count && HomeData.more == MoreState.failed: MoreFailed { }

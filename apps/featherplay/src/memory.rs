@@ -69,6 +69,8 @@ pub fn hidden(ctx: &Ctx, hidden: bool) {
     if HIDDEN.replace(hidden) == hidden {
         return;
     }
+    // Nothing on screen to resolve ahead of a click, until it shows again.
+    crate::prepare::hidden(ctx, hidden);
     if hidden {
         let before = private_bytes();
         ctx.covers.show(None);

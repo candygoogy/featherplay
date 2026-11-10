@@ -55,6 +55,49 @@ export component HoverIntent {
     }
 }
 
+// The song lists whose rows on screen are resolved ahead of a click (`src/prepare.rs`).
+export enum SongList { playlist, album, liked, search, artist, home, related, up-next }
+
+// Which song rows show, from `RowsShown`: once a list settles, `src/prepare.rs` resolves
+// them ahead of a click while a song plays.
+export global ShownRows {
+    // Rows `first` to `last` of `list` show (none when `last < first`). `part`: a Home shelf's
+    // index, the side panel's place (0 the frame's, 1 Now playing's), else 0.
+    callback shown(SongList, /* part */ int, /* first */ int, /* last */ int);
+    // The first and the last row on screen of a list of `count` rows `row-h` tall, from `top`
+    // in its content, scrolled by `scrolled`, in a view `view-h` tall.
+    public pure function first(scrolled: length, top: length, row-h: length) -> int {
+        return max(0, floor((scrolled - top) / row-h));
+    }
+    public pure function last(scrolled: length, top: length, row-h: length, view-h: length, count: int) -> int {
+        return min(count - 1, floor((scrolled + view-h - top) / row-h));
+    }
+}
+
+// Tells `ShownRows` which rows of a song list show, as the list opens and whenever that
+// changes: a scroll, a resize, a Home shelf paged, or a row reused for another shelf (the
+// one it showed is said to be gone first). Nothing runs on a timer.
+export component RowsShown {
+    in property <SongList> list;
+    in property <int> part;
+    in property <int> first;
+    in property <int> last;
+    width: 0;
+    height: 0;
+    property <int> told-part: -1;
+    function tell() {
+        if root.told-part >= 0 && root.told-part != root.part {
+            ShownRows.shown(root.list, root.told-part, 0, -1);
+        }
+        root.told-part = root.part;
+        ShownRows.shown(root.list, root.part, root.first, root.last);
+    }
+    init => { root.tell(); }
+    changed part => { root.tell(); }
+    changed first => { root.tell(); }
+    changed last => { root.tell(); }
+}
+
 // One card on a shelf or grid, or a playlist in the sidebar.
 export struct CardItem {
     id: string,

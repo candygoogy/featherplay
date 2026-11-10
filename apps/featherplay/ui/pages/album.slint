@@ -6,7 +6,7 @@
 // The list is a ListView; the header rides in its first row so it scrolls away with it.
 import { ListView } from "../list_view.slint";
 import { Theme, Icons } from "../theme.slint";
-import { TrackRow, TrackListRow } from "../parts.slint";
+import { TrackRow, TrackListRow, RowsShown, ShownRows, SongList } from "../parts.slint";
 import { Nav } from "../nav.slint";
 import { SongMenu } from "../song_menu.slint";
 import { AlbumMenu } from "../album_menu.slint";
@@ -117,6 +117,11 @@ export component AlbumPage inherits Rectangle {
         }
         TopScrim {
             scrolled: -list.content-y;
+        }
+        RowsShown {
+            list: SongList.album;
+            first: ShownRows.first(-list.content-y, root.header-h, Theme.track-row-h);
+            last: ShownRows.last(-list.content-y, root.header-h, Theme.track-row-h, list.visible-height - Theme.bar-clear, AlbumData.tracks.length);
         }
     }
 }

@@ -78,6 +78,7 @@ mod playing_from;
 mod playing_mark;
 mod playlist_menu;
 mod playlist_pages;
+mod prepare_rows;
 mod present_damage;
 mod press_feedback;
 mod queue_panel;

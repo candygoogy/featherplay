@@ -46,7 +46,8 @@ pub fn remember(tracks: &[Track]) {
     });
 }
 
-fn find(id: &str) -> Option<Track> {
+/// A remembered track, by id.
+pub fn find(id: &str) -> Option<Track> {
     KNOWN.with(|k| k.borrow().get(id).cloned())
 }
 
