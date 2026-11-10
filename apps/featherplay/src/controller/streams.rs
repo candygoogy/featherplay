@@ -72,6 +72,9 @@ const PAGE_ROWS: usize = super::PREPARE_ROWS;
 /// Resolves of rows on screen started in a minute, at most, so a fast scroller can't send
 /// dozens: two screens' worth.
 const PAGE_PER_MINUTE: usize = 2 * PAGE_ROWS;
+/// The streams whose start a rest on a row fetched that are remembered, so it isn't fetched
+/// again: a few screens of rows.
+const HEADS_ASKED: usize = 64;
 const MINUTE: Duration = Duration::from_secs(60);
 /// Tracks the queue doesn't resolve ahead again for `FAILED_FOR` (their resolve failed, or
 /// their stream was refused twice), and refused preloads remembered. The rows on screen
@@ -166,8 +169,8 @@ pub(super) struct Streams {
     page_starts: VecDeque<Instant>,
     /// Rows are resolved: a song plays.
     playing: bool,
-    /// Rows resolved whose stream's start isn't fetched yet (`head_wanted`).
-    headless: VecDeque<TrackId>,
+    /// The URLs whose start a rest on their row asked for, newest last (`head_wanted`).
+    heads_asked: VecDeque<String>,
     /// Sign-outs so far (`forget_all`): a resolve started before the last one plays, but
     /// isn't saved (`unsaved`), so the removed file doesn't come back with it.
     signed_out: u64,
@@ -243,7 +246,6 @@ impl Streams {
     pub fn want(&mut self, id: &TrackId, now: SystemTime) -> Want {
         self.waiting.retain(|(w, _)| w != id);
         self.page_waiting.retain(|w| w != id);
-        self.headless.retain(|h| h != id);
         if let Some(s) = self.fresh(id, now) {
             return Want::Cached(Box::new(s.clone()));
         }
@@ -394,12 +396,22 @@ impl Streams {
         stopped
     }
 
-    /// The stream of `id`, a row resolved while on screen, if its start isn't fetched yet:
-    /// the pointer rests on it, so a click may come.
+    /// The stream of `id` if it's here and its start wasn't asked for yet, for that start to
+    /// be fetched: the pointer rests on its row, so a click may come. A row resolved while on
+    /// screen has no start fetched yet, and one kept from earlier (the last session, an hour
+    /// ago) may have none in memory. Once per URL, of the last `HEADS_ASKED`, so resting on
+    /// rows again and again fetches nothing more.
     pub fn head_wanted(&mut self, id: &TrackId, now: SystemTime) -> Option<ResolvedStream> {
-        let i = self.headless.iter().position(|h| h == id)?;
-        self.headless.remove(i);
-        self.fresh(id, now).cloned()
+        let stream = self.fresh(id, now)?;
+        if self.heads_asked.contains(&stream.url) {
+            return None;
+        }
+        let stream = stream.clone();
+        self.heads_asked.push_back(stream.url.clone());
+        if self.heads_asked.len() > HEADS_ASKED {
+            self.heads_asked.pop_front();
+        }
+        Some(stream)
     }
 
     fn forget_failures(&mut self) {
@@ -552,13 +564,6 @@ impl Streams {
                     self.changed = true;
                 } else {
                     self.unsaved.push(id.clone());
-                }
-                if hint == Some(Hint::Page) {
-                    self.headless.retain(|h| h != id);
-                    self.headless.push_back(id.clone());
-                    if self.headless.len() > KEEP {
-                        self.headless.pop_front();
-                    }
                 }
             }
             None => {
@@ -771,8 +776,9 @@ impl Controller {
         self.start_hints();
     }
 
-    /// A row the pointer rests on: resolved ahead, or, resolved while on screen, its
-    /// stream's start fetched.
+    /// A row the pointer rests on: resolved ahead, or, with its stream here (resolved while
+    /// on screen, or kept from earlier), its stream's start fetched, as for a stream the
+    /// hint resolves.
     fn hint_play_id(&mut self, id: &TrackId) {
         let now = SystemTime::now();
         if let Some(stream) = self.streams.head_wanted(id, now) {
@@ -1519,6 +1525,19 @@ mod tests {
             duration: Some(Duration::from_secs(200)),
             ..stream(expires_in)
         }
+    }
+
+    /// A stream kept from the last session may have no start in memory: a rest on its row
+    /// fetches it, as for a stream resolved while on screen.
+    #[test]
+    fn a_stream_from_the_last_session_has_its_start_fetched_when_its_row_is_rested_on() {
+        let now = SystemTime::now();
+        let mut before = Streams::default();
+        before.done(&id("a"), Some(&from("1.2.3.4", HOURS)), &[]);
+        let mut s = Streams::default();
+        s.restore(&before.saved(now), now);
+        assert!(s.head_wanted(&id("a"), now).is_some());
+        assert!(s.head_wanted(&id("b"), now).is_none(), "none here");
     }
 
     /// The streams of the last session answer at once after a restart, before any resolve
