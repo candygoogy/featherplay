@@ -75,6 +75,10 @@ Notable changes to featherplay, newest first. The format follows
 - When YouTube moves to a new player, songs keep playing with the previous one while the
   new one is prepared in the background, so no song waits the few seconds that takes.
 - Copy diagnostics names the built-in JavaScript engine and its version.
+- featherplay.exe is about 2.4 MB smaller. The logo, the Made with Slint badge in About and
+  the scroll bars' arrows are drawn as shapes, so the app no longer carries an SVG
+  renderer, and the code that sends requests and runs background work is shared rather
+  than repeated for each use.
 
 ### Fixed
 
