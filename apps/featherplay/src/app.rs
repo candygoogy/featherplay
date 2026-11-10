@@ -5,9 +5,11 @@
 //! a shared tokio runtime. Background work comes back to the UI thread through
 //! `Ctx::load` (data) and `Covers::load` (images), never by blocking.
 
+use std::any::Any;
 use std::cell::{Cell, RefCell};
 use std::future::Future;
 use std::ops::ControlFlow;
+use std::pin::Pin;
 use std::process::ExitCode;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -365,6 +367,9 @@ impl Ctx {
         }
     }
 
+    /// `load` and the like: `work` and `apply` boxed, their result as `Any`, so that only
+    /// this shim is compiled for each of the ~40 loads and `spawn_boxed` (the parking, the
+    /// tokio task, the hand-back to the UI thread) once.
     fn spawn<T, Fut>(
         self: &Rc<Self>,
         work: impl FnOnce(Source) -> Fut + 'static,
@@ -374,12 +379,28 @@ impl Ctx {
         T: Send + 'static,
         Fut: Future<Output = T> + Send + 'static,
     {
+        self.spawn_boxed(
+            Box::new(move |source| {
+                let fut = work(source);
+                Box::pin(async move { Box::new(fut.await) as Box<dyn Any + Send> })
+            }),
+            visit,
+            Box::new(move |ctx, ui, value| {
+                // Always a `T`: `work`'s result above.
+                if let Ok(value) = value.downcast::<T>() {
+                    apply(ctx, ui, *value);
+                }
+            }),
+        );
+    }
+
+    fn spawn_boxed(self: &Rc<Self>, work: BoxedWork, visit: Option<u64>, apply: BoxedApply) {
         if self.session_pending() {
             let ctx = self.clone();
             self.parked.borrow_mut().push(Box::new(move || {
                 // A page's load is dropped, call and all, if the user has moved on.
                 if visit.is_none_or(|v| v == ctx.visit()) {
-                    ctx.spawn(work, visit, apply);
+                    ctx.spawn_boxed(work, visit, apply);
                 }
             }));
             return;
@@ -408,6 +429,12 @@ impl Ctx {
         }
     }
 }
+
+/// A load's work, started on the UI thread with the data source; its future runs on tokio.
+type BoxedWork =
+    Box<dyn FnOnce(Source) -> Pin<Box<dyn Future<Output = Box<dyn Any + Send>> + Send>>>;
+/// A load's `apply`, on the UI thread with the work's result.
+type BoxedApply = Box<dyn FnOnce(&Rc<Ctx>, &AppWindow, Box<dyn Any + Send>)>;
 
 /// Connects the frame to `ctx`: navigation, the sidebar, the bar, the panel, the pages.
 pub fn wire(ctx: &Rc<Ctx>, ui: &AppWindow) {
