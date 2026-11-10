@@ -52,6 +52,11 @@ Notable changes to featherplay, newest first. The format follows
 - A song whose stream YouTube refused is looked up again by featherplay itself before it
   goes to yt-dlp: about 0.5 s without ads, instead of yt-dlp's 3 s or more plus any ads.
   The song goes to yt-dlp if that stream is refused too.
+- Songs that sometimes waited 5-7 seconds to start now start in well under a second.
+  About half of them used to get a stream that YouTube held back for 5-6 seconds.
+  featherplay now first asks for a song's stream the way YouTube's visionOS app does, and
+  YouTube hands that one over at once. When that way gives nothing, featherplay asks as
+  before.
 - A song that wasn't ready ahead starts about 0.1 s sooner: while featherplay looks up its
   stream, it already opens the connection to the server the stream most likely comes from.
 - Songs start sooner, and a new install's first song no longer waits for a download.
