@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 
 use featherplay::controller::Action;
 use featherplay::snapshot::Scene;
-use featherplay::ui::{AlbumData, HomeData, LibraryData, ShelfShape, TrackRow};
+use featherplay::ui::{AlbumData, Frame, HomeData, LibraryData, QueueData, ShelfShape, TrackRow};
 use slint::{ComponentHandle, LogicalPosition, Model, ModelRc};
 
 /// Runs timers for `ms`, rendering as the window would.
@@ -90,4 +90,32 @@ fn the_rows_on_screen_are_sent_once_a_list_settles_and_none_off_it() {
         !rows.is_empty() && rows.iter().all(|id| grids.contains(id)),
         "{rows:?}"
     );
+}
+
+/// Up next shows other songs in the same rows as the queue moves on (a long queue): those
+/// are sent once it settles, though the rows on screen are the same ones.
+#[test]
+fn up_next_is_sent_again_when_its_rows_show_other_songs() {
+    let scene = Scene::new(1280, 800, true, false).expect("scene");
+    scene.open("album").expect("album");
+    scene.ui.global::<Frame>().set_queue_open(true);
+    scene.play_track(false, 0).expect("play");
+    scene.settle();
+    run_for(&scene, 500);
+    let upcoming = || ids(scene.ui.global::<QueueData>().get_upcoming());
+    let before = upcoming();
+    let sent = prepared(&scene);
+    let first = sent.last().expect("nothing sent");
+    assert!(first.contains(&before[0]), "{first:?}");
+
+    // The next song plays: as many songs to come, each a row up.
+    scene.play_track(false, 1).expect("next");
+    scene.settle();
+    run_for(&scene, 500);
+    let after = upcoming();
+    assert_eq!(after.len(), before.len());
+    assert_ne!(after[0], before[0]);
+    let sent = prepared(&scene);
+    let rows = sent.last().expect("Up next's new rows weren't sent");
+    assert!(rows.contains(&after[0]), "{rows:?}");
 }

@@ -318,6 +318,7 @@ fn fill_related(ctx: &Rc<Ctx>, tracks: &[Track]) {
     let urls = tracks.iter().map(|t| t.thumbnail.clone()).collect();
     let (rows, model) = model(to_rows(tracks));
     ui.global::<NowPlayingData>().set_related(model);
+    crate::prepare::rows_changed(crate::ui::SongList::Related);
     ctx.covers
         .fill(&rows, urls, ROW_COVER, |row, img| row.cover = img);
 }

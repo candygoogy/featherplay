@@ -215,6 +215,7 @@ pub fn update(ctx: &Rc<Ctx>, state: &PlayerState) {
     }
     let (rows, rows_model) = model(new_rows);
     data.set_upcoming(rows_model);
+    crate::prepare::rows_changed(crate::ui::SongList::UpNext);
     SHOWN.with(|s| {
         *s.borrow_mut() = Shown {
             ids,

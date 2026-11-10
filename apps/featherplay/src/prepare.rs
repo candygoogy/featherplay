@@ -108,11 +108,27 @@ fn shown(list: SongList, part: i32, first: i32, last: i32) {
         if was == s.lists.get(&key).copied() || s.hidden {
             return;
         }
-        s.settle.start(TimerMode::SingleShot, SETTLE, || {
-            if let Some(ctx) = Ctx::get() {
-                send(&ctx);
-            }
-        });
+        settle_then_send(&s);
+    });
+}
+
+/// `list` shows other songs in the rows it showed (Up next as the queue moves on, Related
+/// for another song): sent once it settles, as after a scroll, when it's on screen.
+pub fn rows_changed(list: SongList) {
+    STATE.with(|s| {
+        let s = s.borrow();
+        if !s.hidden && s.lists.values().any(|(l, ..)| *l == list) {
+            settle_then_send(&s);
+        }
+    });
+}
+
+/// (Re)starts the wait for the lists to settle, then sends what they show.
+fn settle_then_send(s: &State) {
+    s.settle.start(TimerMode::SingleShot, SETTLE, || {
+        if let Some(ctx) = Ctx::get() {
+            send(&ctx);
+        }
     });
 }
 
