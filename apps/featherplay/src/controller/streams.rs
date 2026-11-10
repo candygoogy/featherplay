@@ -117,6 +117,8 @@ struct Running {
     task: Option<AbortHandle>,
     /// A row on screen's resolve waiting out an ad gate (`at_gate`).
     at_gate: bool,
+    /// `Streams::signed_out` when it started: one from before a sign-out isn't kept.
+    since_sign_out: u64,
 }
 
 /// What a resolve ahead that stopped short of yt-dlp (`ResolveError::Deferred`) leaves
@@ -166,6 +168,11 @@ pub(super) struct Streams {
     playing: bool,
     /// Rows resolved whose stream's start isn't fetched yet (`head_wanted`).
     headless: VecDeque<TrackId>,
+    /// Sign-outs so far (`forget_all`): a resolve started before the last one plays, but
+    /// isn't saved (`unsaved`), so the removed file doesn't come back with it.
+    signed_out: u64,
+    /// Kept streams of resolves started before the last sign-out.
+    unsaved: Vec<TrackId>,
 }
 
 /// Writes `SAVED_STREAMS` one at a time (in the background, and at quit on the controller's
@@ -253,6 +260,7 @@ impl Streams {
             urgent: Arc::default(),
             task: None,
             at_gate: false,
+            since_sign_out: self.signed_out,
         });
         Want::Start
     }
@@ -493,6 +501,7 @@ impl Streams {
             urgent: urgent.clone(),
             task: None,
             at_gate: false,
+            since_sign_out: self.signed_out,
         });
         (id, urgent, ahead)
     }
@@ -513,12 +522,16 @@ impl Streams {
         stream: Option<&ResolvedStream>,
         keep: &[TrackId],
     ) -> (Duration, Option<Hint>) {
-        let (took, hint) = match self.running.iter().position(|r| r.id == *id) {
+        let (took, hint, kept) = match self.running.iter().position(|r| r.id == *id) {
             Some(i) => {
                 let r = self.running.swap_remove(i);
-                (r.since.elapsed(), r.hint)
+                (
+                    r.since.elapsed(),
+                    r.hint,
+                    r.since_sign_out == self.signed_out,
+                )
             }
-            None => (Duration::ZERO, None),
+            None => (Duration::ZERO, None, true),
         };
         match stream {
             Some(s) => {
@@ -533,7 +546,13 @@ impl Streams {
                 {
                     self.cache.remove(i);
                 }
-                self.changed = true;
+                // Started before the sign-out: it plays, but isn't saved.
+                self.unsaved.retain(|u| u != id);
+                if kept {
+                    self.changed = true;
+                } else {
+                    self.unsaved.push(id.clone());
+                }
                 if hint == Some(Hint::Page) {
                     self.headless.retain(|h| h != id);
                     self.headless.push_back(id.clone());
@@ -572,10 +591,17 @@ impl Streams {
 
     /// Signing out: drops every stream kept; returns the write that removes the file.
     pub fn forget_all(&mut self) -> (SavedFile, u64) {
+        self.signed_out += 1;
         self.cache.clear();
         self.restored.clear();
+        self.unsaved.clear();
         self.changed = false;
         self.next_write()
+    }
+
+    /// Whether any stream kept is one to save (`saved`).
+    pub fn keeps_any(&self) -> bool {
+        self.cache.iter().any(|(id, _)| !self.unsaved.contains(id))
     }
 
     /// Whether a refused preload of `id` is resolved again ahead: not when it was one of
@@ -594,15 +620,17 @@ impl Streams {
     }
 
     /// The streams that stay valid for `FRESH_FOR` from `now`, for `restore` in the next
-    /// session (`SAVED_STREAMS`). Not those for another address than this session's.
+    /// session (`SAVED_STREAMS`). Not those for another address than this session's, nor
+    /// those resolved from before a sign-out (`unsaved`).
     pub fn saved(&self, now: SystemTime) -> String {
         let secs = |t: SystemTime| t.duration_since(UNIX_EPOCH).ok().map(|d| d.as_secs());
         let ms = |d: Duration| u64::try_from(d.as_millis()).ok();
         let streams: Vec<Value> = self
             .cache
             .iter()
-            .filter(|(_, s)| {
-                s.expires_at > now + FRESH_FOR
+            .filter(|(id, s)| {
+                !self.unsaved.contains(id)
+                    && s.expires_at > now + FRESH_FOR
                     && self
                         .address
                         .as_deref()
@@ -835,7 +863,10 @@ impl Controller {
             return;
         }
         // None kept (signed out, say): no file.
-        let text = (!self.streams.cache.is_empty()).then(|| self.streams.saved(SystemTime::now()));
+        let text = self
+            .streams
+            .keeps_any()
+            .then(|| self.streams.saved(SystemTime::now()));
         let (file, n) = self.streams.next_write();
         let path = self.paths.cache.join(SAVED_STREAMS);
         let write = move || {
@@ -1548,6 +1579,32 @@ mod tests {
         assert!(!path.exists());
         assert!(s.get(&id("a")).is_none());
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// A resolve started before the sign-out that answers after it plays, but isn't saved,
+    /// so the removed file doesn't come back with it; one started after it is.
+    #[test]
+    fn a_resolve_from_before_the_sign_out_is_not_saved() {
+        let now = SystemTime::now();
+        let url = |n: &str| format!("https://rr1.example.invalid/videoplayback?ip=1.2.3.4&n={n}");
+        let at = |n: &str| ResolvedStream {
+            url: url(n),
+            ..stream(HOURS)
+        };
+        let mut s = Streams::default();
+        assert_eq!(s.want(&id("before"), now), Want::Start);
+        let _ = s.forget_all();
+        s.done(&id("before"), Some(&at("before")), &[]);
+        assert!(s.get(&id("before")).is_some(), "it plays");
+        assert!(!s.take_changed(), "nothing to save");
+        assert!(!s.keeps_any());
+
+        assert_eq!(s.want(&id("after"), now), Want::Start);
+        s.done(&id("after"), Some(&at("after")), &[]);
+        assert!(s.take_changed());
+        let saved = s.saved(now);
+        assert!(saved.contains(&url("after")), "{saved}");
+        assert!(!saved.contains(&url("before")), "{saved}");
     }
 
     #[test]
