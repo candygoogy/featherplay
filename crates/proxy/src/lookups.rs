@@ -245,7 +245,24 @@ impl Lookups {
     /// The lookup thread: Windows' settings first, then one waiting URL after the other.
     fn work(&self) {
         let sources = self.system.sources();
-        self.lock().sources = Some((sources.clone(), Instant::now()));
+        let mut state = self.lock();
+        state.sources = Some((sources.clone(), Instant::now()));
+        // The answers of a setting turned off since (a VPN's script, disconnected) go:
+        // asking nothing, nothing would replace them.
+        let before = state.answers.len();
+        state.answers.retain(|_, a| sources.has(a.found.source));
+        if state
+            .latest
+            .as_ref()
+            .is_some_and(|f| !sources.has(f.source))
+        {
+            state.latest = None;
+        }
+        let dropped = state.answers.len() < before;
+        drop(state);
+        if dropped {
+            log::info!("proxy: a setting is off now; its answers go");
+        }
         loop {
             let mut state = self.lock();
             let Some(url) = state.waiting.pop_front() else {
@@ -576,6 +593,36 @@ mod tests {
         assert_eq!(shown(lookups.found(&url(MUSIC))), office);
         lookups.settle();
         assert_eq!(lookups.status(&url(MUSIC)).found, None);
+        assert_eq!(lookups.found(&url("https://lrclib.net/")), None);
+        lookups.settle();
+    }
+
+    /// A setup script whose setting the test turns off (a VPN that sets it, disconnected).
+    struct Switched(Arc<Mutex<Sources>>);
+
+    impl System for Switched {
+        fn sources(&self) -> Sources {
+            self.0.lock().unwrap().clone()
+        }
+
+        fn ask(&self, _: &str, _: Option<&str>) -> Reply {
+            Ok(Some("proxy.corp:8080".into()))
+        }
+    }
+
+    #[test]
+    fn an_answer_goes_once_the_setting_that_gave_it_is_off() {
+        let sources = Arc::new(Mutex::new(Sources {
+            auto_detect: false,
+            script: Some("http://pac.corp/proxy.pac".into()),
+        }));
+        let lookups = Lookups::with_retry(Switched(sources.clone()), Duration::ZERO);
+        assert!(answer(&lookups, MUSIC).is_some_and(|f| f.proxy.is_some()));
+
+        *sources.lock().unwrap() = Sources::default();
+        lookups.found(&url(MUSIC));
+        lookups.settle();
+        assert_eq!(lookups.found(&url(MUSIC)), None);
         assert_eq!(lookups.found(&url("https://lrclib.net/")), None);
         lookups.settle();
     }
