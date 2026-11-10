@@ -181,7 +181,7 @@ impl Controller {
         self.song_versions.started(&t.id);
         let source = self.ui.catalog.source();
         let (id, tx) = (t.id.clone(), self.tx.clone());
-        tokio::spawn(async move {
+        crate::app::spawn_detached(async move {
             let result = source.radio(&id).await;
             let _ = tx.send(Msg::SongVersion(id, result));
         });

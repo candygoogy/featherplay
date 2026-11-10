@@ -411,9 +411,9 @@ impl Controller {
             // A first run fetches and preprocesses YouTube's player now (seconds), so the
             // native request is ready for the first click, signed in or not.
             let native = resolver.clone();
-            tokio::spawn(async move { native.prepare().await });
+            crate::app::spawn_detached(async move { native.prepare().await });
             let helpers = resolver.clone();
-            tokio::spawn(async move {
+            crate::app::spawn_detached(async move {
                 // A first run also downloads yt-dlp and deno now, in the background: only a
                 // song the native request can't give waits for them (`HelpersWait`). It logs
                 // its own start and end; a failure is tried again later (`retry_helpers`).
@@ -709,7 +709,7 @@ impl Controller {
                 // The catalog's source: the account's, or signed out the visitor's.
                 let source = self.ui.catalog.source();
                 let tx = self.tx.clone();
-                tokio::spawn(async move {
+                crate::app::spawn_detached(async move {
                     let result = source.radio(&seed).await;
                     let _ = tx.send(Msg::Radio(seed, result));
                 });
@@ -728,7 +728,7 @@ impl Controller {
                 };
                 log!("rate {} {status:?}", id.0);
                 let tx = self.tx.clone();
-                tokio::spawn(async move {
+                crate::app::spawn_detached(async move {
                     let result = api.rate(&id, status).await;
                     let _ = tx.send(Msg::Rated(id, status, result));
                 });
@@ -751,7 +751,7 @@ impl Controller {
                     return;
                 };
                 log!("add {} track(s) to playlist {}", tracks.len(), playlist.0);
-                tokio::spawn(async move {
+                crate::app::spawn_detached(async move {
                     match api.add_to_playlist(&playlist, &tracks).await {
                         Ok(()) => log!("added to playlist {}", playlist.0),
                         Err(e) => log!("add to playlist {} failed: {e}", playlist.0),
@@ -948,7 +948,7 @@ impl Controller {
                 // Signed out too: the radio is the catalogue's.
                 let source = self.ui.catalog.source();
                 let tx = self.tx.clone();
-                tokio::spawn(async move {
+                crate::app::spawn_detached(async move {
                     let result = source.radio(&last).await;
                     let _ = tx.send(Msg::Continuation(last, result));
                 });
@@ -1006,7 +1006,7 @@ impl Controller {
         }
         self.daily_update = Instant::now();
         let resolver = self.resolver.clone();
-        tokio::spawn(async move {
+        crate::app::spawn_detached(async move {
             resolver.update_daily().await;
         });
     }
@@ -1024,7 +1024,7 @@ impl Controller {
         }
         self.helpers_tried = Instant::now();
         let resolver = self.resolver.clone();
-        tokio::spawn(async move {
+        crate::app::spawn_detached(async move {
             install_helpers(&resolver).await;
         });
     }
@@ -1298,7 +1298,7 @@ impl Controller {
             return;
         }
         let (id, tx) = (t.id.clone(), self.tx.clone());
-        tokio::spawn(async move {
+        crate::app::spawn_detached(async move {
             let result = sponsorblock::fetch_segments(&id).await;
             let _ = tx.send(Msg::Segments(id, result));
         });

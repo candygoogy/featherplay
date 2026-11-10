@@ -542,7 +542,7 @@ impl Controller {
     fn sign_in(&mut self, cookies: Cookies) {
         log!("signing in ({} byte cookie header)", cookies.0.len());
         let tx = self.tx.clone();
-        tokio::spawn(async move {
+        crate::app::spawn_detached(async move {
             let result = check_session(cookies).await;
             let _ = tx.send(Msg::Account(AccountMsg::SignedIn(result)));
         });
@@ -586,7 +586,7 @@ impl Controller {
             return;
         }
         let tx = self.tx.clone();
-        tokio::spawn(async move {
+        crate::app::spawn_detached(async move {
             let identity = api.identity().clone();
             let listed = api
                 .accounts()
@@ -727,7 +727,7 @@ impl Controller {
         log!("Last.fm: asking for a token");
         self.lastfm_event(LastfmStatus::Opening, None);
         let tx = self.tx.clone();
-        tokio::spawn(async move {
+        crate::app::spawn_detached(async move {
             let keys = tokio::task::spawn_blocking(lastfm_keys)
                 .await
                 .ok()
@@ -769,7 +769,7 @@ impl Controller {
         log!("Last.fm: asking for the session");
         self.lastfm_event(LastfmStatus::Finishing, None);
         let tx = self.tx.clone();
-        tokio::spawn(async move {
+        crate::app::spawn_detached(async move {
             let session = async {
                 let client = LastFm::new(&keys.key, &keys.secret, None)?;
                 client.get_session(&token).await
@@ -830,7 +830,7 @@ impl Controller {
         log!("ListenBrainz: checking a token ({} bytes)", token.0.len());
         self.listenbrainz_event(ListenBrainzStatus::Checking, None);
         let tx = self.tx.clone();
-        tokio::spawn(async move {
+        crate::app::spawn_detached(async move {
             let token = token.0.trim().to_string();
             let checked = async { ListenBrainz::new(&token)?.validate_token().await }.await;
             let result = match checked {

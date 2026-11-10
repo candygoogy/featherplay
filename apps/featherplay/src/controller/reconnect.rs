@@ -134,7 +134,7 @@ impl Controller {
             return;
         };
         let tx = self.tx.clone();
-        tokio::spawn(async move {
+        crate::app::spawn_detached(async move {
             let _ = tx.send(Msg::Refreshed(api.refresh().await));
         });
     }
@@ -176,7 +176,7 @@ impl Controller {
         log!("reconnecting with the stored session");
         let identity = account::saved_identity(&self.settings);
         let tx = self.tx.clone();
-        tokio::spawn(async move {
+        crate::app::spawn_detached(async move {
             let result = match cookie_header() {
                 Some(cookies) => Some(YtMusic::connect(&cookies, &identity).await),
                 None => None,

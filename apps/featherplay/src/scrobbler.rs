@@ -186,7 +186,7 @@ impl Sender {
     /// A failure is only logged: now playing isn't queued.
     fn now_playing(&self, s: PendingScrobble) {
         let (client, name) = (self.client.clone(), self.service.name());
-        tokio::spawn(async move {
+        crate::app::spawn_detached(async move {
             if let Err((_, e)) = client.now_playing(&s).await {
                 log!("{name} now playing failed: {e}");
             }
@@ -251,7 +251,7 @@ impl Sender {
 
     fn send(&self, batch: Vec<PendingScrobble>, flush: bool) {
         let (client, reply, service) = (self.client.clone(), self.reply.clone(), self.service);
-        tokio::spawn(async move {
+        crate::app::spawn_detached(async move {
             let result = client.submit(&batch).await;
             reply(Sent {
                 service,

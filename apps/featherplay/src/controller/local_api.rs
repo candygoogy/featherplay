@@ -110,7 +110,7 @@ impl Controller {
         let start = self.local_api.amuse_starts;
         let now = self.api_snapshot();
         let tx = self.tx.clone();
-        tokio::spawn(async move {
+        crate::app::spawn_detached(async move {
             let result = Amuse::start(AMUSE_PORT, now).await;
             // The controller is gone when this fails: the app is closing.
             let _ = tx.send(Msg::Amuse(start, result));

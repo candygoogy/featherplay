@@ -430,6 +430,12 @@ impl Ctx {
     }
 }
 
+/// `tokio::spawn` for a task nobody waits for, on the current runtime. Boxed, so tokio's
+/// task code is compiled once for all of them rather than once for each (~2 KB apiece).
+pub fn spawn_detached(task: impl Future<Output = ()> + Send + 'static) {
+    tokio::spawn(Box::pin(task) as Pin<Box<dyn Future<Output = ()> + Send>>);
+}
+
 /// A load's work, started on the UI thread with the data source; its future runs on tokio.
 type BoxedWork =
     Box<dyn FnOnce(Source) -> Pin<Box<dyn Future<Output = Box<dyn Any + Send>> + Send>>>;

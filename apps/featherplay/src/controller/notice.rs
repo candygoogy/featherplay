@@ -65,7 +65,7 @@ impl Controller {
             Notice::Updating => {
                 self.tell(said, None);
                 let resolver = self.resolver.clone();
-                tokio::spawn(async move {
+                crate::app::spawn_detached(async move {
                     resolver.update_helpers().await;
                     log!("helpers updated after the stop");
                 });
@@ -78,7 +78,7 @@ impl Controller {
                     self.lookup = Lookup::Running;
                     let (cache, tx) = (self.paths.cache.clone(), self.tx.clone());
                     let install = self.settings.install_updates;
-                    tokio::spawn(async move {
+                    crate::app::spawn_detached(async move {
                         let (help, release) = updates::help(cache, install).await;
                         let _ = tx.send(Msg::Help(help, release));
                     });
