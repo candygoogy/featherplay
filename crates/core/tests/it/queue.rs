@@ -164,6 +164,21 @@ fn a_list_extended_after_it_started_goes_on_before_autoplay() {
     assert_eq!(q.autoplay_start(), Some(2));
 }
 
+/// Up next cleared while a long playlist's later pages still arrive: they don't fill it
+/// again. A new play from a list takes them once more.
+#[test]
+fn a_list_cleared_after_it_started_takes_no_more_of_its_tracks() {
+    let mut q = Queue::new();
+    q.replace(tracks(&["a", "b", "c"]), 0, false);
+    q.clear_upcoming();
+    q.extend_list(tracks(&["d", "e"]), None);
+    assert!(q.upcoming().is_empty(), "{:?}", ids(q.upcoming()));
+
+    q.replace(tracks(&["a", "b"]), 0, false);
+    q.extend_list(tracks(&["c"]), None);
+    assert_eq!(ids(q.upcoming()), ["b", "c"]);
+}
+
 /// After Shuffle, the songs still to come are mixed in among the upcoming ones, never
 /// before the current track nor after autoplay's.
 #[test]

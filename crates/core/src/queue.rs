@@ -40,6 +40,8 @@ pub struct Queue {
     original: Vec<u64>,
     /// Keys of the entries a radio continuation appended; may hold stale keys.
     continued: HashSet<u64>,
+    /// Up next was cleared since the list was played: more of it (`extend_list`) is let go.
+    list_cleared: bool,
     rng: u64,
 }
 
@@ -57,6 +59,7 @@ impl Queue {
         self.radio = radio;
         self.original.clear();
         self.continued.clear();
+        self.list_cleared = false;
         if self.shuffle {
             self.original = self.keys.clone();
             self.shuffle_upcoming();
@@ -198,8 +201,11 @@ impl Queue {
     /// pages): after the list's upcoming tracks, before any a continuation appended. With
     /// `mix_seed` (the list was shuffled), or with shuffle on, each goes to a random place
     /// among the list's upcoming tracks instead. On an empty queue the first one becomes
-    /// current.
+    /// current. Nothing once Up next was cleared since the list was played.
     pub fn extend_list(&mut self, tracks: Vec<Track>, mix_seed: Option<u64>) {
+        if self.list_cleared {
+            return;
+        }
         let base = (self.index + 1).min(self.tracks.len());
         let list_end = base + self.autoplay_start().unwrap_or(self.tracks.len() - base);
         if let Some(seed) = mix_seed {
@@ -255,6 +261,7 @@ impl Queue {
 
     /// Drops every upcoming track. History and the current track stay.
     pub fn clear_upcoming(&mut self) {
+        self.list_cleared = true;
         let keep = (self.index + 1).min(self.tracks.len());
         self.tracks.truncate(keep);
         self.keys.truncate(keep);
