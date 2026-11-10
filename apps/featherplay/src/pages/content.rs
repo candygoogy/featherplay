@@ -2,18 +2,22 @@
 //! mark and lazy covers; meta lines; error texts; playing a whole album, playlist or artist.
 //! The formatting helpers are pure and tested below.
 
+use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
+use std::ops::ControlFlow;
 use std::rc::Rc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use featherplay_core::model::{AlbumId, ArtistRef, PlaylistId, Track, TrackId};
 use featherplay_core::{tr, trn};
-use featherplay_ytm::ApiError;
+use featherplay_ytm::{ApiError, PlaylistPart};
 use slint::{Image, Model, ModelRc, VecModel};
 
 use crate::app::Ctx;
 use crate::controller::{Action, PlayerState, PlayingFrom, QueueAction};
 use crate::covers::Covers;
+use crate::pages::playlist;
+use crate::router::Page;
 use crate::song_menu;
 use crate::ui::{CardItem, ItemKind, TrackRow};
 use crate::ui_bridge::{model, to_rows};
@@ -35,6 +39,65 @@ pub struct TrackList {
     pub from: PlayingFrom,
     asked: Vec<bool>,
     playing: Option<Playing>,
+    /// While the list's songs are still arriving (a long playlist's later pages): where a
+    /// play from it is noted, so the songs to come join its queue.
+    pub arriving: Option<Arriving>,
+}
+
+thread_local! {
+    /// Plays started from a list or a card, counted: the songs still arriving for a list
+    /// join only the queue of the last one (`Arriving`).
+    static PLAYS: Cell<u64> = const { Cell::new(0) };
+}
+
+/// Notes a play starting from a list or a card; returns its number.
+fn started_play() -> u64 {
+    PLAYS.with(|p| {
+        p.set(p.get() + 1);
+        p.get()
+    })
+}
+
+/// A list whose songs are still arriving (a long playlist's later pages), shared by what
+/// shows it and what fetches it: the play from it, once one starts, that the songs to come
+/// join. A play from it while they arrive plays the songs there; the rest follow in the
+/// queue as they come, in order after a Play, mixed in after a Shuffle.
+#[derive(Clone, Debug, Default)]
+pub struct Arriving(Rc<RefCell<Option<Joined>>>);
+
+#[derive(Debug)]
+struct Joined {
+    /// Its number (`started_play`).
+    play: u64,
+    /// Shuffled: the songs to come are mixed in.
+    mix: bool,
+    from: PlayingFrom,
+}
+
+impl Arriving {
+    /// Play `play` started from the list.
+    pub fn played(&self, play: u64, mix: bool, from: PlayingFrom) {
+        *self.0.borrow_mut() = Some(Joined { play, mix, from });
+    }
+
+    /// Hands `tracks` to the queue the play from this list started, while that's the last
+    /// play started (the controller drops them too if the queue is from somewhere else
+    /// now). Returns whether there's such a play.
+    pub fn join(&self, ctx: &Ctx, tracks: &[Track]) -> bool {
+        let joined = self.0.borrow();
+        let Some(j) = joined.as_ref().filter(|j| j.play == PLAYS.with(Cell::get)) else {
+            return false;
+        };
+        if !tracks.is_empty() {
+            song_menu::remember(tracks);
+            ctx.send(Action::Queue(QueueAction::Extend {
+                tracks: tracks.to_vec(),
+                mix: j.mix,
+                from: j.from.clone(),
+            }));
+        }
+        true
+    }
 }
 
 /// What a list marks as playing: the current track, and the music video it plays in the
@@ -64,6 +127,7 @@ impl TrackList {
             rows,
             from: PlayingFrom::default(),
             playing: None,
+            arriving: None,
         };
         list.mark_playing(playing(ctx.player().as_ref()).as_ref());
         (list, model)
@@ -105,6 +169,30 @@ impl TrackList {
         self.asked = asked;
         self.playing = None;
         self.mark_playing(playing);
+    }
+
+    /// Adds `tracks` after the rows shown (a playlist's next page), numbered on from them.
+    /// The rows shown stay as they are, so the list keeps its scroll position.
+    pub fn append(&mut self, tracks: Vec<Track>) {
+        if tracks.is_empty() {
+            return;
+        }
+        song_menu::remember(&tracks);
+        let base = self.tracks.len();
+        let playing = self.playing.as_ref();
+        let rows: Vec<TrackRow> = to_rows(&tracks)
+            .into_iter()
+            .zip(&tracks)
+            .enumerate()
+            .map(|(k, (mut row, t))| {
+                row.index = (base + k + 1).to_string().into();
+                row.playing = playing.is_some_and(|p| p.is(&t.id));
+                row
+            })
+            .collect();
+        self.rows.extend(rows);
+        self.asked.resize(base + tracks.len(), false);
+        self.tracks.extend(tracks);
     }
 
     /// Resolves the first row's stream ahead: when a list opens, it's the likeliest click
@@ -172,13 +260,14 @@ impl TrackList {
     /// Plays the list from `start`.
     pub fn play(&self, ctx: &Ctx, start: usize, radio: bool) {
         if start < self.tracks.len() {
-            self.send_play(ctx, self.tracks.clone(), start, radio);
+            self.send_play(ctx, self.tracks.clone(), start, radio, false);
         }
     }
 
     /// Plays track `i` alone, with its radio after it (search results, Home cards).
     pub fn play_one(&self, ctx: &Ctx, i: usize) {
         if let Some(t) = self.tracks.get(i) {
+            started_play();
             ctx.send(Action::Play {
                 tracks: vec![t.clone()],
                 start: 0,
@@ -190,12 +279,17 @@ impl TrackList {
     /// Plays the list in a random order.
     pub fn shuffle(&self, ctx: &Ctx) {
         if !self.tracks.is_empty() {
-            self.send_play(ctx, shuffled(&self.tracks, seed()), 0, false);
+            self.send_play(ctx, shuffled(&self.tracks, seed()), 0, false, true);
         }
     }
 
-    /// Plays `tracks`, labelled with `from` when the list has one.
-    fn send_play(&self, ctx: &Ctx, tracks: Vec<Track>, start: usize, radio: bool) {
+    /// Plays `tracks`, labelled with `from` when the list has one. While the list's songs
+    /// are still arriving, the ones to come join this queue (`mix`: mixed in).
+    fn send_play(&self, ctx: &Ctx, tracks: Vec<Track>, start: usize, radio: bool, mix: bool) {
+        let play = started_play();
+        if let Some(arriving) = &self.arriving {
+            arriving.played(play, mix, self.from.clone());
+        }
         ctx.send(if self.from.label.is_empty() {
             Action::Play {
                 tracks,
@@ -351,18 +445,69 @@ pub fn play_album(ctx: &Rc<Ctx>, id: AlbumId) {
     );
 }
 
-/// Plays a whole playlist, from the start (one call).
+/// Plays a whole playlist from the start: its first page as soon as it's read, the rest
+/// joining the queue as it comes (`Arriving`).
 pub fn play_playlist(ctx: &Rc<Ctx>, id: PlaylistId) {
-    ctx.load(
-        move |source| async move { source.playlist(&id).await },
-        |ctx, _, result| match result {
-            Ok(playlist) => {
-                crate::sidebar::opened(ctx, crate::sidebar::playlist_entry(&playlist.summary));
-                play_tracks(ctx, playlist.tracks)
+    let arriving = Arriving::default();
+    let mut from = None;
+    let wanted = id.clone();
+    ctx.stream(
+        move |source, parts| playlist::fetch(source, wanted, parts),
+        move |ctx, _, part| match part {
+            playlist::Part::Page(PlaylistPart::First(p), _) => {
+                crate::sidebar::opened(ctx, crate::sidebar::playlist_entry(&p.summary));
+                let label = if playlist::is_liked_songs(&id) {
+                    playlist::liked_songs().into()
+                } else {
+                    p.summary.title.clone()
+                };
+                let page = Page::Playlist { id: id.clone() };
+                from = Some(PlayingFrom::on_page(label, page));
+                start_or_join(ctx, &arriving, from.as_ref(), p.tracks)
             }
-            Err(e) => log!("play playlist: {e}"),
+            playlist::Part::Page(PlaylistPart::More(tracks), _) => {
+                start_or_join(ctx, &arriving, from.as_ref(), tracks)
+            }
+            playlist::Part::End(result, _) => {
+                if let Err(e) = result {
+                    log!("play playlist: {e}");
+                }
+                ControlFlow::Break(())
+            }
         },
     );
+}
+
+/// A card's playlist page: the first songs that arrive start the queue, the later ones
+/// join it. Stops once the queue is from elsewhere.
+fn start_or_join(
+    ctx: &Ctx,
+    arriving: &Arriving,
+    from: Option<&PlayingFrom>,
+    tracks: Vec<Track>,
+) -> ControlFlow<()> {
+    let started = arriving.0.borrow().is_some();
+    if started {
+        return if arriving.join(ctx, &tracks) {
+            ControlFlow::Continue(())
+        } else {
+            ControlFlow::Break(())
+        };
+    }
+    let Some(from) = from else {
+        return ControlFlow::Break(());
+    };
+    if !tracks.is_empty() {
+        arriving.played(started_play(), false, from.clone());
+        song_menu::remember(&tracks);
+        ctx.send(Action::Queue(QueueAction::PlayFrom {
+            tracks,
+            start: 0,
+            radio: false,
+            from: from.clone(),
+        }));
+    }
+    ControlFlow::Continue(())
 }
 
 /// Plays an artist's top songs (one call).
@@ -378,6 +523,7 @@ pub fn play_artist(ctx: &Rc<Ctx>, id: featherplay_core::model::ArtistId) {
 
 fn play_tracks(ctx: &Ctx, tracks: Vec<Track>) {
     if !tracks.is_empty() {
+        started_play();
         song_menu::remember(&tracks);
         ctx.send(Action::Play {
             tracks,
@@ -465,6 +611,7 @@ mod tests {
             rows,
             from: PlayingFrom::default(),
             playing: None,
+            arriving: None,
         };
         let cover = slint::Image::from_rgba8(slint::SharedPixelBuffer::new(2, 2));
         for i in 0..2 {
@@ -493,6 +640,46 @@ mod tests {
         list.replace(vec![track("a", &[], 1)], None);
         assert_eq!(model.row_count(), 1);
         assert_eq!(size(0).width, 2);
+    }
+
+    /// A playlist's next page: its songs go after the rows shown, numbered on from them,
+    /// and the rows shown stay as they were (their covers too), so nothing on screen moves.
+    #[test]
+    fn appended_tracks_follow_the_rows_shown_numbered_on() {
+        let old = vec![track("a", &[], 1), track("b", &[], 1)];
+        let (rows, model) = model(to_rows(&old));
+        let mut list = TrackList {
+            asked: vec![true, false],
+            tracks: old,
+            rows,
+            from: PlayingFrom::default(),
+            playing: None,
+            arriving: None,
+        };
+        let cover = slint::Image::from_rgba8(slint::SharedPixelBuffer::new(2, 2));
+        let mut row = list.rows.row_data(0).unwrap();
+        row.cover = cover;
+        list.rows.set_row_data(0, row);
+        list.mark_playing(Some(&Playing {
+            id: TrackId("c".into()),
+            video: None,
+        }));
+
+        list.append(vec![track("c", &[], 1), track("d", &[], 1)]);
+
+        let row = |i: usize| model.row_data(i).unwrap();
+        let shown: Vec<(String, String)> = (0..model.row_count())
+            .map(|i| (row(i).id.to_string(), row(i).index.to_string()))
+            .collect();
+        assert_eq!(
+            shown,
+            [("a", "1"), ("b", "2"), ("c", "3"), ("d", "4")].map(|(a, b)| (a.into(), b.into()))
+        );
+        assert_eq!(row(0).cover.size().width, 2, "a row shown was made again");
+        assert!(row(2).playing, "the playing song arrived unmarked");
+        assert!(!row(3).playing);
+        assert_eq!(list.asked, [true, false, false, false]);
+        assert_eq!(list.tracks.len(), 4);
     }
 
     #[test]

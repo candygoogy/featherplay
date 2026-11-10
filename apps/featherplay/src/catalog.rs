@@ -4,14 +4,15 @@
 //!
 //! Every call goes out once; nothing here retries or loops.
 
+use std::ops::ControlFlow;
 use std::sync::{Arc, RwLock};
 
 use featherplay_core::model::{AlbumId, ArtistId, LikeStatus, PlaylistId, Track, TrackId};
 use featherplay_core::sync::RwLockExt;
 use featherplay_ytm::{
     AccountIdentity, AccountInfo, Album, AlbumSummary, ApiError, Artist, ArtistSummary, Charts,
-    HistoryDay, HomeFeed, HomeShelf, MoodPage, MoodSection, Playlist, PlaylistSummary,
-    SearchFilter, SearchResults, SearchSuggestions, SongLyrics, YtMusic,
+    HistoryDay, HomeFeed, HomeShelf, MoodPage, MoodSection, Playlist, PlaylistPart,
+    PlaylistSummary, SearchFilter, SearchResults, SearchSuggestions, SongLyrics, YtMusic,
 };
 use tokio::runtime::Handle;
 
@@ -161,6 +162,20 @@ impl Source {
             Source::Unreachable => Err(unreachable()),
             Source::Live(api) | Source::SignedOut(api) => api.playlist(id).await,
             Source::Fixtures(f) => f.playlist(id),
+        }
+    }
+
+    /// `playlist` a page at a time, each handed to `each` as it's read
+    /// (`YtMusic::playlist_by_page`). Returns how many pages were read.
+    pub async fn playlist_by_page(
+        &self,
+        id: &PlaylistId,
+        each: impl FnMut(PlaylistPart) -> ControlFlow<()> + Send,
+    ) -> Result<usize, ApiError> {
+        match self {
+            Source::Unreachable => Err(unreachable()),
+            Source::Live(api) | Source::SignedOut(api) => api.playlist_by_page(id, each).await,
+            Source::Fixtures(f) => f.playlist_by_page(id, each),
         }
     }
 

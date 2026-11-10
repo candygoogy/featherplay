@@ -7,6 +7,7 @@
 
 use std::cell::{Cell, RefCell};
 use std::future::Future;
+use std::ops::ControlFlow;
 use std::process::ExitCode;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -326,6 +327,40 @@ impl Ctx {
         Fut: Future<Output = T> + Send + 'static,
     {
         self.spawn(work, Some(self.visit()), apply);
+    }
+
+    /// Like `load`, for work that hands its result over in parts as they come (a
+    /// playlist's pages): `work` sends each part on its sender, and `apply` takes them in
+    /// order on the UI thread until it breaks. Then the parts still to come are dropped,
+    /// and `work` finds its sender closed at its next send, so it can stop there. Whether
+    /// the user is still on the page is for `apply` to check (`visit`).
+    pub fn stream<T, Fut>(
+        self: &Rc<Self>,
+        work: impl FnOnce(Source, mpsc::UnboundedSender<T>) -> Fut + 'static,
+        mut apply: impl FnMut(&Rc<Ctx>, &AppWindow, T) -> ControlFlow<()> + 'static,
+    ) where
+        T: Send + 'static,
+        Fut: Future<Output = ()> + Send + 'static,
+    {
+        let (parts, mut arrived) = mpsc::unbounded_channel();
+        // Until the last part is applied, which may be after `work` has ended.
+        let busy = Busy::start();
+        self.spawn(move |source| work(source, parts), None, |_, _, ()| {});
+        let ctx = self.clone();
+        let spawned = slint::spawn_local(async move {
+            while let Some(part) = arrived.recv().await {
+                let Some(ui) = ctx.window() else { break };
+                if apply(&ctx, &ui, part).is_break() {
+                    break;
+                }
+            }
+            drop(arrived);
+            drop(busy);
+            updates::page_settled(&ctx);
+        });
+        if let Err(e) = spawned {
+            log!("stream: {e}");
+        }
     }
 
     fn spawn<T, Fut>(

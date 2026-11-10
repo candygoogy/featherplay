@@ -12,13 +12,14 @@
 
 use std::collections::HashMap;
 use std::fmt;
+use std::ops::ControlFlow;
 use std::path::{Path, PathBuf};
 
 use featherplay_core::model::{AlbumId, PlaylistId, Track, TrackId};
 use featherplay_ytm::{
     AccountIdentity, AccountInfo, Album, AlbumSummary, ApiError, Artist, ArtistSummary, Charts,
-    HistoryDay, HomeFeed, HomeShelf, Identity, MoodPage, MoodSection, Playlist, PlaylistSummary,
-    SearchFilter, SearchResults, SearchSuggestions, convert,
+    HistoryDay, HomeFeed, HomeShelf, Identity, MoodPage, MoodSection, Playlist, PlaylistPart,
+    PlaylistSummary, SearchFilter, SearchResults, SearchSuggestions, convert,
 };
 use serde_json::Value;
 use sha1::{Digest, Sha1};
@@ -153,7 +154,7 @@ impl Fixtures {
         if let Some(d) = &self.demo {
             return Ok(d.home());
         }
-        let pages = self.home_pages()?;
+        let pages = self.pages("home")?;
         convert::home_feed(pages.get(..2).unwrap_or(&pages))
     }
 
@@ -163,16 +164,17 @@ impl Fixtures {
         if self.demo.is_some() {
             return Ok(HomeFeed::default());
         }
-        let pages = self.home_pages()?;
+        let pages = self.pages("home")?;
         let page = pages
             .get(2)
             .ok_or_else(|| ApiError::Parse("fixture home: no third page".into()))?;
         convert::home_more(page)
     }
 
-    fn home_pages(&self) -> Result<Vec<String>, ApiError> {
-        let pages: Vec<Value> = serde_json::from_str(&self.raw("home")?)
-            .map_err(|e| ApiError::Parse(format!("fixture home: {e}")))?;
+    /// A recording that holds several raw pages, as an array.
+    fn pages(&self, name: &str) -> Result<Vec<String>, ApiError> {
+        let pages: Vec<Value> = serde_json::from_str(&self.raw(name)?)
+            .map_err(|e| ApiError::Parse(format!("fixture {name}: {e}")))?;
         Ok(pages.iter().map(Value::to_string).collect())
     }
 
@@ -244,6 +246,40 @@ impl Fixtures {
             tracks,
             pages: 1,
         })
+    }
+
+    /// `playlist` a page at a time. A mix ("RD…") is the mix recording, whose three pages
+    /// are handed on one at a time as live ones are, to the end of its list; anything else
+    /// comes as one page.
+    pub fn playlist_by_page(
+        &self,
+        id: &PlaylistId,
+        mut each: impl FnMut(PlaylistPart) -> ControlFlow<()>,
+    ) -> Result<usize, ApiError> {
+        if self.demo.is_some() || !convert::bare_playlist_id(&id.0).starts_with("RD") {
+            let _ = each(PlaylistPart::First(self.playlist(id)?));
+            return Ok(1);
+        }
+        let pages = self.pages("playlist_mix")?;
+        let mut paging = convert::PlaylistPaging::default();
+        let mut read = 0;
+        for page in &pages {
+            let (tracks, token) = paging.read(page)?;
+            read += 1;
+            let part = if read == 1 {
+                PlaylistPart::First(Playlist {
+                    summary: convert::playlist_summary(page, id)?,
+                    tracks,
+                    pages: 1,
+                })
+            } else {
+                PlaylistPart::More(tracks)
+            };
+            if each(part).is_break() || token.is_none() {
+                break;
+            }
+        }
+        Ok(read)
     }
 
     pub fn album(&self, id: &AlbumId) -> Result<Album, ApiError> {

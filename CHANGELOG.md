@@ -24,6 +24,13 @@ Notable changes to featherplay, newest first. The format follows
 
 ### Changed
 
+- A long playlist or mix shows its first songs after one request, in about a second,
+  instead of after all its pages: the New Release Mix's ~500 songs took over 10 s. The
+  other songs join the list as they arrive, without moving what's on screen, and the song
+  count and length in the header grow with them. Play, Shuffle or a song clicked meanwhile
+  starts with the songs already there, and the rest join the queue as they arrive: in
+  order after Play, mixed in after Shuffle. A playlist card's play button on Home starts
+  the same way, and Up next names the playlist.
 - Settings > Discord: the profile preview now sits beside the options from the window's
   default size up, and stays in view while you scroll through them, so hovering Time or
   Status text lights what it changes on the card. In a window too short for the whole
