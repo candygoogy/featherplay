@@ -359,25 +359,31 @@ impl YtMusic {
     pub async fn liked_songs(&self) -> Result<Vec<Track>, ApiError> {
         self.account()?;
         let query = GetPlaylistTracksQuery::new(PlaylistID::from_raw("VLLM"));
-        let pages = self.playlist_pages(&query, true).await?;
+        let pages = self.playlist_pages(Post::of(&query), true).await?;
         convert::playlist_tracks(&pages)
     }
 
     /// Parsed from raw JSON with our own paging: ytmapi-rs 0.3.3 fails on
     /// library playlists whose subtitle has no track count.
     pub async fn library_playlists(&self) -> Result<Vec<PlaylistSummary>, ApiError> {
-        convert::library_playlists(&self.grid_pages(&GetLibraryPlaylistsQuery).await?)
+        convert::library_playlists(&self.grid_pages(Post::of(&GetLibraryPlaylistsQuery)).await?)
     }
 
     /// Parsed from raw JSON with our own paging: ytmapi-rs 0.3.3 fails on an
     /// empty album library.
     pub async fn library_albums(&self) -> Result<Vec<AlbumSummary>, ApiError> {
-        convert::library_albums(&self.grid_pages(&GetLibraryAlbumsQuery::default()).await?)
+        convert::library_albums(
+            &self
+                .grid_pages(Post::of(&GetLibraryAlbumsQuery::default()))
+                .await?,
+        )
     }
 
     /// Paged from raw JSON (`shelf_pages`); ytmapi-rs 0.3.3 parses each page.
     pub async fn library_artists(&self) -> Result<Vec<ArtistSummary>, ApiError> {
-        let pages = self.shelf_pages(&GetLibraryArtistsQuery::default()).await?;
+        let pages = self
+            .shelf_pages(Post::of(&GetLibraryArtistsQuery::default()))
+            .await?;
         convert::library_artists(&pages)
     }
 
@@ -414,9 +420,9 @@ impl YtMusic {
     ) -> Result<usize, ApiError> {
         let (first, rest) = self.playlist_first(id).await?;
         let query = playlist_query(id);
-        let base = &query;
-        let fetch =
-            move |token: String| async move { self.raw(&Continuation { base, token }).await };
+        let base = Post::of(&query);
+        let base = &base;
+        let fetch = move |token: String| self.raw_post(base.next(token));
         follow_playlist(first, rest, fetch, &mut each).await
     }
 
@@ -445,9 +451,9 @@ impl YtMusic {
         mut each: impl FnMut(PlaylistPart) -> ControlFlow<()> + Send,
     ) -> Result<usize, ApiError> {
         let query = playlist_query(rest.id());
-        let base = &query;
-        let fetch =
-            move |token: String| async move { self.raw(&Continuation { base, token }).await };
+        let base = Post::of(&query);
+        let base = &base;
+        let fetch = move |token: String| self.raw_post(base.next(token));
         follow_rest(rest, fetch, &mut each).await
     }
 
@@ -594,11 +600,10 @@ impl YtMusic {
         }
         let token = convert::home_continuation(&first);
         let mut pages = vec![first];
-        if let Some(token) = token {
-            let base = &HomeQuery;
-            if let Ok(page) = self.raw(&Continuation { base, token }).await {
-                pages.push(page);
-            }
+        if let Some(token) = token
+            && let Ok(page) = self.raw_post(Post::of(&HomeQuery).next(token)).await
+        {
+            pages.push(page);
         }
         convert::home_feed(&pages)
     }
@@ -606,11 +611,8 @@ impl YtMusic {
     /// The next page of the Home feed, from `HomeFeed::more`: one request. Home asks for it
     /// as the user scrolls near the end.
     pub async fn home_more(&self, token: &str) -> Result<HomeFeed, ApiError> {
-        let query = Continuation {
-            base: &HomeQuery,
-            token: token.to_string(),
-        };
-        convert::home_more(&self.raw(&query).await?)
+        let query = Post::of(&HomeQuery).next(token.to_string());
+        convert::home_more(&self.raw_post(query).await?)
     }
 
     /// Explore's new releases: albums and singles, then music videos. One request.
@@ -668,7 +670,7 @@ impl YtMusic {
     /// The account menu's raw JSON, for recording the fixture. It holds the
     /// account's personal data: scrub it before it's stored anywhere.
     pub async fn account_menu_raw(&self) -> Result<String, ApiError> {
-        self.raw_account(&AccountMenuQuery).await
+        self.raw_account(&Post::of(&AccountMenuQuery)).await
     }
 
     /// One `browse` page as raw JSON: `id` (`FEmusic_charts`, …), with the page's `params`
@@ -688,16 +690,25 @@ impl YtMusic {
         .await
     }
 
+    /// A catalogue request, signed in or not: `query` as a `Post`, sent by `raw_post`.
+    /// The bounds keep account-only queries out.
+    fn raw<'a, Q>(
+        &'a self,
+        query: &'a Q,
+    ) -> impl Future<Output = Result<String, ApiError>> + Send + 'a
+    where
+        Q: Query<BrowserToken> + Query<GuestToken> + PostQuery,
+    {
+        self.raw_post(Post::of(query))
+    }
+
     /// A catalogue request, signed in or not. A guest is never told its session ended: a
     /// 401/403 to a visitor asks for an account.
-    async fn raw<Q>(&self, query: &Q) -> Result<String, ApiError>
-    where
-        Q: Query<BrowserToken> + Query<GuestToken>,
-    {
+    async fn raw_post(&self, query: Post<'_>) -> Result<String, ApiError> {
         match &self.session {
-            Session::Account { .. } => self.raw_account(query).await,
+            Session::Account { .. } => self.raw_account(&query).await,
             Session::Guest(inner) => inner
-                .raw_json_query::<Q>(query)
+                .raw_json_query::<Post>(&query)
                 .await
                 .map_err(|e| guest_error(map_error(e)))
                 .and_then(guest_reply),
@@ -759,11 +770,8 @@ impl YtMusic {
     /// Raw pages of a library grid: the first page, then grid continuations
     /// one after another, at most `MAX_PAGES`. A signed-out first page is
     /// `AuthExpired` and nothing more is fetched.
-    async fn grid_pages<Q>(&self, base: &Q) -> Result<Vec<String>, ApiError>
-    where
-        Q: Query<BrowserToken> + PostQuery,
-    {
-        let first = self.raw_account(base).await?;
+    async fn grid_pages(&self, base: Post<'_>) -> Result<Vec<String>, ApiError> {
+        let first = self.raw_account(&base).await?;
         if convert::logged_in(&first) == Some(false) {
             return Err(ApiError::AuthExpired);
         }
@@ -772,7 +780,7 @@ impl YtMusic {
         while let Some(t) = token.take()
             && pages.len() < MAX_PAGES
         {
-            let page = self.raw_account(&Continuation { base, token: t }).await?;
+            let page = self.raw_account(&base.next(t)).await?;
             token = convert::grid_continuation(&page);
             pages.push(page);
         }
@@ -785,11 +793,12 @@ impl YtMusic {
     /// list there. A mix's pages never run out of tokens; `PlaylistPaging` tells where its
     /// list ends. With `signed_in`, a signed-out first page is `AuthExpired` and nothing
     /// more is fetched.
-    async fn playlist_pages<Q>(&self, base: &Q, signed_in: bool) -> Result<Vec<String>, ApiError>
-    where
-        Q: Query<BrowserToken> + Query<GuestToken> + PostQuery,
-    {
-        let first = self.raw(base).await?;
+    async fn playlist_pages(
+        &self,
+        base: Post<'_>,
+        signed_in: bool,
+    ) -> Result<Vec<String>, ApiError> {
+        let first = self.raw_post(base.clone()).await?;
         if signed_in && convert::logged_in(&first) == Some(false) {
             return Err(ApiError::AuthExpired);
         }
@@ -799,7 +808,7 @@ impl YtMusic {
         while let Some(t) = token.take()
             && pages.len() < MAX_PAGES
         {
-            let page = self.raw(&Continuation { base, token: t }).await?;
+            let page = self.raw_post(base.next(t)).await?;
             token = paging.next_token(&page);
             pages.push(page);
         }
@@ -811,11 +820,8 @@ impl YtMusic {
     /// stream finds the next token with its typed parser, so a row it can't read silently
     /// ended the list there. A signed-out first page is `AuthExpired` and nothing more is
     /// fetched.
-    async fn shelf_pages<Q>(&self, base: &Q) -> Result<Vec<String>, ApiError>
-    where
-        Q: Query<BrowserToken> + PostQuery,
-    {
-        let first = self.raw_account(base).await?;
+    async fn shelf_pages(&self, base: Post<'_>) -> Result<Vec<String>, ApiError> {
+        let first = self.raw_account(&base).await?;
         if convert::logged_in(&first) == Some(false) {
             return Err(ApiError::AuthExpired);
         }
@@ -824,7 +830,7 @@ impl YtMusic {
         while let Some(t) = token.take()
             && pages.len() < MAX_PAGES
         {
-            let page = self.raw_account(&Continuation { base, token: t }).await?;
+            let page = self.raw_account(&base.next(t)).await?;
             token = convert::shelf_continuation(&page);
             pages.push(page);
         }
@@ -1065,11 +1071,6 @@ async fn mobile_browse(public: &reqwest::Client, url: &str, id: &str) -> Result<
 /// The account menu (`account/account_menu`), fetched as raw JSON.
 struct AccountMenuQuery;
 
-impl Query<BrowserToken> for AccountMenuQuery {
-    type Output = Unparsed;
-    type Method = PostMethod;
-}
-
 impl PostQuery for AccountMenuQuery {
     fn header(&self) -> serde_json::Map<String, serde_json::Value> {
         serde_json::Map::new()
@@ -1079,12 +1080,6 @@ impl PostQuery for AccountMenuQuery {
     }
     fn path(&self) -> &str {
         "account/account_menu"
-    }
-}
-
-impl ParseFrom<AccountMenuQuery> for Unparsed {
-    fn parse_from(_: ProcessedResult<AccountMenuQuery>) -> ytmapi_rs::Result<Self> {
-        Ok(Unparsed)
     }
 }
 
@@ -1113,38 +1108,66 @@ impl ParseFrom<AccountSwitcherQuery> for Unparsed {
     }
 }
 
-/// The next page of `base`, fetched as raw JSON. Same request shape as
-/// ytmapi-rs's own continuation query, for lists its typed parser can't read.
-struct Continuation<'a, Q> {
-    base: &'a Q,
-    token: String,
+/// A POST query as it goes out: its path, body and URL parameters, read from a typed query
+/// once (`of`). Every raw request is sent as one, so the request code (both tokens, the
+/// resumed session's retry) is compiled once, not once for each query type. It answers for
+/// either token: `raw`'s bounds keep an account-only query off the guest path, and the
+/// callers of `raw_post` pass catalogue queries only (`raw_account` refuses a guest).
+#[derive(Clone)]
+struct Post<'q> {
+    path: &'q str,
+    header: serde_json::Map<String, serde_json::Value>,
+    params: Vec<(&'q str, Cow<'q, str>)>,
+}
+
+impl<'q> Post<'q> {
+    fn of(query: &'q impl PostQuery) -> Post<'q> {
+        Post {
+            path: query.path(),
+            header: query.header(),
+            params: query.params(),
+        }
+    }
+
+    /// The next page of this list, by its continuation `token`: the same request shape as
+    /// ytmapi-rs's own continuation query, for lists its typed parser can't read.
+    fn next(&self, token: String) -> Post<'q> {
+        Post {
+            path: self.path,
+            header: self.header.clone(),
+            params: vec![
+                ("ctoken", token.clone().into()),
+                ("continuation", token.into()),
+            ],
+        }
+    }
 }
 
 #[derive(Debug)]
 struct Unparsed;
 
-impl<Q: PostQuery, A: AuthToken> Query<A> for Continuation<'_, Q> {
+impl<A: AuthToken> Query<A> for Post<'_> {
     type Output = Unparsed;
     type Method = PostMethod;
 }
 
-impl<Q: PostQuery> PostQuery for Continuation<'_, Q> {
+impl PostQuery for Post<'_> {
     fn header(&self) -> serde_json::Map<String, serde_json::Value> {
-        self.base.header()
+        self.header.clone()
     }
-    fn params(&self) -> Vec<(&str, std::borrow::Cow<'_, str>)> {
-        vec![
-            ("ctoken", self.token.as_str().into()),
-            ("continuation", self.token.as_str().into()),
-        ]
+    fn params(&self) -> Vec<(&str, Cow<'_, str>)> {
+        self.params
+            .iter()
+            .map(|(name, value)| (*name, Cow::Borrowed(value.as_ref())))
+            .collect()
     }
     fn path(&self) -> &str {
-        self.base.path()
+        self.path
     }
 }
 
-impl<Q> ParseFrom<Continuation<'_, Q>> for Unparsed {
-    fn parse_from(_: ProcessedResult<Continuation<'_, Q>>) -> ytmapi_rs::Result<Self> {
+impl ParseFrom<Post<'_>> for Unparsed {
+    fn parse_from(_: ProcessedResult<Post<'_>>) -> ytmapi_rs::Result<Self> {
         Ok(Unparsed)
     }
 }
@@ -1412,6 +1435,30 @@ mod tests {
         assert_eq!(body["browseId"], "MPLYt_x");
         assert_eq!(body["context"]["client"]["clientName"], "ANDROID_MUSIC");
         assert_eq!(body["context"]["client"]["clientVersion"], "7.21.50");
+    }
+
+    #[test]
+    fn a_continuation_asks_for_the_same_page_with_its_token() {
+        let browse = Browse {
+            id: "FEmusic_charts",
+            params: None,
+            country: Some("ZZ"),
+        };
+        let first = Post::of(&browse);
+        let next = first.next("tok".into());
+        assert_eq!(PostQuery::path(&next), "browse");
+        assert_eq!(PostQuery::header(&next), browse.header());
+        let params: Vec<_> = PostQuery::params(&next)
+            .into_iter()
+            .map(|(k, v)| (k, v.into_owned()))
+            .collect();
+        assert_eq!(
+            params,
+            [
+                ("ctoken", "tok".to_string()),
+                ("continuation", "tok".to_string())
+            ]
+        );
     }
 
     #[test]
