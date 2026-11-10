@@ -90,6 +90,8 @@ Notable changes to featherplay, newest first. The format follows
   the scroll bars' arrows are drawn as shapes, so the app no longer carries an SVG
   renderer, and the code that sends requests and runs background work is shared rather
   than repeated for each use.
+- The window uses a little less CPU while a song plays: each step of the playing mark no
+  longer draws the hidden hover buttons, tooltips and menus.
 
 ### Fixed
 

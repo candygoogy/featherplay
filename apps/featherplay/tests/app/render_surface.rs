@@ -159,3 +159,60 @@ fn the_window_never_shows_through() {
         enter_and_scroll(&scene, page, list, "1440p at 150 %");
     }
 }
+
+/// While the playing mark steps (Up next's playing row), frames repaint small spots, and the
+/// renderer leaves out the opacity layers at opacity 0 (its change 19): the rows' hover
+/// buttons, tooltips and menus waiting to fade in. After each run of such frames (Up next's
+/// contents fading in and out, a row's buttons fading in, out and in again) the window shows
+/// what a full render does. Nothing renders the whole window in between, as nothing does in
+/// the app.
+#[test]
+fn frames_while_the_playing_mark_steps_match_a_full_render() {
+    let scene = Scene::new(1280, 800, false, true).expect("scene");
+    scene.ui.global::<Theme>().set_motion(true);
+    scene.play(false).expect("player");
+    scene.open("playlist").expect("playlist");
+    scene.theme(true);
+    scene.ui.show().expect("show");
+    scene.settle();
+    offscreen::freeze_clock();
+    let w = scene.ui.window();
+    // The pixels the frames copied to the window.
+    let frames = |n: u32| (0..n).map(|_| frame(w).damaged).sum::<u64>();
+    let queue = |open: bool| scene.ui.global::<Frame>().set_queue_open(open);
+    let point = |y: f32| {
+        w.dispatch_event(WindowEvent::PointerMoved {
+            position: LogicalPosition::new(600.0, y),
+        })
+    };
+    point(20.0);
+    queue(true);
+    frames(30);
+    matches_full_render(w, "Up next opened");
+    let marked = frames(16);
+    assert!(
+        marked > 0,
+        "the playing mark didn't step: the test lost its point"
+    );
+    for (y, what) in [(420.0, "a row hovered"), (470.0, "the next row hovered")] {
+        point(y);
+        let hovered = frames(16);
+        assert!(
+            hovered > marked,
+            "{what}: nothing faded, the test lost its point"
+        );
+        matches_full_render(w, what);
+    }
+    point(20.0);
+    frames(16);
+    matches_full_render(w, "the rows left");
+    // The first row's buttons have waited at opacity 0 through those frames.
+    frames(16);
+    point(420.0);
+    frames(16);
+    matches_full_render(w, "the row hovered again");
+    point(20.0);
+    queue(false);
+    frames(30);
+    matches_full_render(w, "Up next closed");
+}

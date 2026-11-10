@@ -1141,6 +1141,18 @@ impl ItemRenderer for SkiaItemRenderer<'_> {
     ) -> RenderingResult {
         let opacity = opacity_item.opacity();
         if Opacity::need_layer(item_rc, opacity) && !over_kept_layer(item_rc) {
+            // featherplay patch (change 19, VENDORED.md): a layer that would be blended at
+            // alpha 0 shows nothing, so it isn't made and its children aren't visited.
+            // Upstream made it, drew the children into it wherever they reached the clip,
+            // and blended it away. Hover buttons, tooltips and menus wait at opacity 0, most
+            // of them layers, so every frame of the playing mark went through them all: a
+            // tenth of a Liked songs frame. The opacity is read first, so its change to
+            // something visible still repaints the whole subtree. Its children are drawn
+            // through this renderer, not the partial one, so they have no change trackers of
+            // their own to be left dirty.
+            if (opacity * 255.) as u32 == 0 {
+                return RenderingResult::ContinueRenderingWithoutChildren;
+            }
             let window_adapter = WindowInner::from_pub(self.window).window_adapter();
             // featherplay patch (change 11, VENDORED.md): the layer only as large as what
             // the children draw (their shadows included), a pixel to spare; skia rounds it out

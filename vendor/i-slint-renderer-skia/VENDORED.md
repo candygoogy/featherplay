@@ -1,6 +1,6 @@
 # Vendored: i-slint-renderer-skia 1.18.1
 
-This is the crate as published on crates.io, with eighteen changes. The workspace `Cargo.toml`
+This is the crate as published on crates.io, with nineteen changes. The workspace `Cargo.toml`
 swaps it in with `[patch.crates-io]`.
 
 1. `Cargo.toml`: `wgpu-30` is out of the default features.
@@ -165,6 +165,17 @@ Change 18 leaves the SVG renderer out (measured 2026-11-10):
     Slint's own popup menu, which featherplay's one menu (the search field's Cut, Copy,
     Paste) never shows, having no sub-menu, and which Windows draws natively anyway.
 
+Change 19 makes a frame of the playing mark cheaper (measured 2026-11-10):
+
+19. `itemrenderer.rs`, `visit_opacity`: an `opacity` that needs a layer and would blend it at
+    alpha 0 gets no layer, and its children aren't visited. Upstream made the layer, drew
+    the children into it wherever they reached the clip, and blended it away. Hover
+    buttons, tooltips and menus wait at opacity 0, most of them layers, so each 30 fps step
+    of the playing mark went through them all: about a tenth of a Liked songs frame
+    offscreen at 150 %. The opacity is still read, so a fade in repaints the whole subtree;
+    the children of a layer are drawn through the Skia renderer, not the partial one, so
+    they have no change trackers left dirty by the skip.
+
 ## Why
 
 `i-slint-backend-winit` depends on this crate with its default features, and our crates
@@ -190,7 +201,9 @@ licence, which allows modified copies).
    new renderer already does the same (then check `scroll_frames.rs` still passes optimised),
    and change 16 (the exe's size shows whether Skia's GPU backend came back), and change
    17 unless the new box shadow cache leaves the colour out of its key (`memory.rs`' glow
-   test shows it), and change 18 (the exe's size shows whether resvg came back).
+   test shows it), change 18 (the exe's size shows whether resvg came back), and change
+   19 unless the new `visit_opacity` already skips a layer at alpha 0 (`render_surface.rs`
+   checks the frames).
 4. Build. If `i-slint-backend-winit` still calls wgpu-only constructors, port the two
    wgpu `featherplay patch` blocks in `lib.rs` (the git history of this folder has the diff);
    if it now gates them itself, leave those two out.
