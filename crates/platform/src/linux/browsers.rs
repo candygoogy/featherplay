@@ -54,6 +54,14 @@ impl Running {
     }
 }
 
+/// Dropping a running browser ends it, as on Windows (whose job ends with its handle): callers
+/// drop it on purpose.
+impl Drop for Running {
+    fn drop(&mut self) {
+        match self.never {}
+    }
+}
+
 /// The app's ends of the two pipes.
 pub struct Pipes {
     pub to_browser: File,
