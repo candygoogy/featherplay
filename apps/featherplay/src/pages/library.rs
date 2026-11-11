@@ -217,7 +217,7 @@ impl Lists {
                 Box::new(move |c, k, list| c.save(k, list, &l))
             }
         };
-        crate::app::blocking_detached(ctx.catalog.runtime(), move || {
+        crate::task::blocking_detached(ctx.catalog.runtime(), move || {
             let cache = LibraryCache::new(&Paths::resolve());
             if let Err(e) = save(&cache, &key, list_of(tab)) {
                 log!("library cache: saving {tab:?} failed: {}", e.kind());

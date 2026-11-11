@@ -73,3 +73,6 @@ pub mod top_bar;
 pub mod ui_bridge;
 pub mod updates;
 pub mod wheel;
+
+/// The detached task helpers (`spawn_detached`, `blocking_detached`), from the controller crate.
+pub use featherplay_controller::task;

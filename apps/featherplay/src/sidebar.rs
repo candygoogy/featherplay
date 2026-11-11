@@ -476,7 +476,7 @@ pub fn opened(ctx: &Ctx, e: Entry) {
         l.key.clone().map(|k| (k, l.recent.clone()))
     });
     if let Some((key, recent)) = saved {
-        crate::app::blocking_detached(ctx.catalog.runtime(), move || {
+        crate::task::blocking_detached(ctx.catalog.runtime(), move || {
             let cache = LibraryCache::new(&Paths::resolve());
             if let Err(e) = cache.save(&key, LibraryList::Recent, &recent) {
                 log!("sidebar recent: saving failed: {}", e.kind());

@@ -564,7 +564,7 @@ fn session_ended(ctx: &Ctx, ui: &AppWindow) {
         s.from_cache = false;
     });
     ui.global::<HomeData>().set_shelves(Default::default());
-    crate::app::blocking_detached(ctx.catalog.runtime(), || {
+    crate::task::blocking_detached(ctx.catalog.runtime(), || {
         if let Err(e) = LibraryCache::new(&Paths::resolve()).forget(LibraryList::Home) {
             log!("home cache: removing failed: {}", e.kind());
         }
@@ -607,7 +607,7 @@ fn hold(s: &mut State, feed: HomeFeed, owner: Option<Owner>, on_screen: bool) ->
 fn save_feed(ctx: &Ctx, owner: Owner, shelves: &[HomeShelf]) {
     let cached = CachedFeed::new(shelves, SystemTime::now());
     let catalog = ctx.catalog.clone();
-    crate::app::blocking_detached(ctx.catalog.runtime(), move || {
+    crate::task::blocking_detached(ctx.catalog.runtime(), move || {
         // Signed out, ended or another sign-in meanwhile: its cache was just deleted, and
         // this feed isn't the new one's.
         if owner_of(&catalog.source()).as_ref() != Some(&owner) {

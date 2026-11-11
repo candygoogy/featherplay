@@ -1330,6 +1330,7 @@ version = "0.2.2"
 dependencies = [
  "embed-resource",
  "featherplay-audio",
+ "featherplay-controller",
  "featherplay-core",
  "featherplay-integrations",
  "featherplay-lastfm",
@@ -1374,6 +1375,13 @@ dependencies = [
  "rodio",
  "symphonia",
  "tempfile",
+ "tokio",
+]
+
+[[package]]
+name = "featherplay-controller"
+version = "0.2.2"
+dependencies = [
  "tokio",
 ]
 

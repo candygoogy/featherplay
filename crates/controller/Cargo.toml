@@ -1,0 +1,17 @@
+[package]
+name = "featherplay-controller"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "featherplay's logic without a window: the controller and what it runs on"
+publish = false
+
+# No Slint, winit or `windows` here (ARCHITECTURE.md, "Phase 3"): the OS is reached through
+# `featherplay-platform`, the window through the app.
+[dependencies]
+tokio = { workspace = true, features = ["rt"] }
+
+[lints]
+workspace = true

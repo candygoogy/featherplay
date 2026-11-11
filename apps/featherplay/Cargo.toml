@@ -27,6 +27,8 @@ perf-harness = ["featherplay-platform/perf"]
 
 [dependencies]
 featherplay-audio = { path = "../../crates/audio" }
+# The logic that needs no window (ARCHITECTURE.md, "Phase 3"); it moves in area by area.
+featherplay-controller = { path = "../../crates/controller" }
 featherplay-core = { path = "../../crates/core" }
 featherplay-integrations = { path = "../../crates/integrations" }
 featherplay-lastfm = { path = "../../crates/lastfm" }

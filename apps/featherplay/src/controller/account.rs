@@ -323,7 +323,7 @@ impl Controller {
                     self.lastfm_event(LastfmStatus::Waiting, None);
                 }
                 let tx = self.tx.clone();
-                crate::app::blocking_detached(&tokio::runtime::Handle::current(), move || {
+                crate::task::blocking_detached(&tokio::runtime::Handle::current(), move || {
                     let checked = AccountMsg::Checked {
                         lastfm_session: get_secret(SecretKey::LastfmSession).is_some(),
                         custom_keys: get_secret(SecretKey::LastfmApiKey).is_some(),
@@ -360,7 +360,7 @@ impl Controller {
                 self.settings.lastfm_enabled = false;
                 self.save_settings();
                 self.restart_scrobbler();
-                crate::app::blocking_detached(&tokio::runtime::Handle::current(), || {
+                crate::task::blocking_detached(&tokio::runtime::Handle::current(), || {
                     if let Err(e) = delete_secret(SecretKey::LastfmSession) {
                         log!("Last.fm: deleting the session failed: {e}");
                     }
@@ -375,7 +375,7 @@ impl Controller {
                 self.settings.listenbrainz_enabled = false;
                 self.save_settings();
                 self.restart_scrobbler();
-                crate::app::blocking_detached(&tokio::runtime::Handle::current(), || {
+                crate::task::blocking_detached(&tokio::runtime::Handle::current(), || {
                     if let Err(e) = delete_secret(SecretKey::ListenbrainzToken) {
                         log!("ListenBrainz: deleting the token failed: {e}");
                     }
@@ -542,7 +542,7 @@ impl Controller {
     fn sign_in(&mut self, cookies: Cookies) {
         log!("signing in ({} byte cookie header)", cookies.0.len());
         let tx = self.tx.clone();
-        crate::app::spawn_detached(async move {
+        crate::task::spawn_detached(async move {
             let result = check_session(cookies).await;
             let _ = tx.send(Msg::Account(AccountMsg::SignedIn(result)));
         });
@@ -586,7 +586,7 @@ impl Controller {
             return;
         }
         let tx = self.tx.clone();
-        crate::app::spawn_detached(async move {
+        crate::task::spawn_detached(async move {
             let identity = api.identity().clone();
             let listed = api
                 .accounts()
@@ -609,7 +609,7 @@ impl Controller {
         self.forget_saved_streams();
         // The sign-in window's profile too, so the next sign-in can pick another account.
         let profile = self.paths.cache.join("webview2");
-        crate::app::blocking_detached(&tokio::runtime::Handle::current(), move || {
+        crate::task::blocking_detached(&tokio::runtime::Handle::current(), move || {
             if let Err(e) = delete_secret(SecretKey::YtCookies) {
                 log!("deleting the session failed: {e}");
             }
@@ -682,7 +682,7 @@ impl Controller {
             Change::Discord(false) => {
                 if let Some(p) = self.presence.take() {
                     // Clears the activity; waits up to a second for Discord.
-                    crate::app::blocking_detached(&tokio::runtime::Handle::current(), move || {
+                    crate::task::blocking_detached(&tokio::runtime::Handle::current(), move || {
                         p.quit()
                     });
                 }
@@ -729,7 +729,7 @@ impl Controller {
         log!("Last.fm: asking for a token");
         self.lastfm_event(LastfmStatus::Opening, None);
         let tx = self.tx.clone();
-        crate::app::spawn_detached(async move {
+        crate::task::spawn_detached(async move {
             let keys = tokio::task::spawn_blocking(lastfm_keys)
                 .await
                 .ok()
@@ -772,7 +772,7 @@ impl Controller {
         log!("Last.fm: asking for the session");
         self.lastfm_event(LastfmStatus::Finishing, None);
         let tx = self.tx.clone();
-        crate::app::spawn_detached(async move {
+        crate::task::spawn_detached(async move {
             let session = async {
                 let client = LastFm::new(&keys.key, &keys.secret, None)?;
                 client.get_session(&token).await
@@ -820,7 +820,7 @@ impl Controller {
         self.save_settings();
         self.restart_scrobbler();
         let tx = self.tx.clone();
-        crate::app::blocking_detached(&tokio::runtime::Handle::current(), move || {
+        crate::task::blocking_detached(&tokio::runtime::Handle::current(), move || {
             let result = store_keys(keys.as_ref())
                 .and_then(|()| delete_secret(SecretKey::LastfmSession))
                 .map(|()| keys.is_some())
@@ -833,7 +833,7 @@ impl Controller {
         log!("ListenBrainz: checking a token ({} bytes)", token.0.len());
         self.listenbrainz_event(ListenBrainzStatus::Checking, None);
         let tx = self.tx.clone();
-        crate::app::spawn_detached(async move {
+        crate::task::spawn_detached(async move {
             let token = token.0.trim().to_string();
             let checked = async { ListenBrainz::new(&token)?.validate_token().await }.await;
             let result = match checked {
