@@ -1,33 +1,27 @@
-//! Secrets in the OS credential store (Windows Credential Manager), service `featherplay`.
+//! Secrets in the OS credential store (Windows Credential Manager, through
+//! `featherplay_platform::credentials`), service `featherplay`.
 //!
 //! A Windows credential holds at most 2560 bytes, and a YouTube Music cookie header is
 //! often longer. So a value is stored as UTF-8 bytes split into chunks: the first chunk
 //! under the entry `<key>`, later ones under `<key>#1`, `<key>#2`, and so on. A value that
 //! fits in one chunk is a single entry named `<key>`.
-//!
-//! Credential Manager encrypts each entry with the user's DPAPI key, so other Windows
-//! users can't read it, but any program running as this user can. Entries are written
-//! with `Local` persistence (this computer only) rather than the Windows store's default,
-//! `Enterprise`, which copies them to other computers along with a roaming profile.
 
 use std::collections::HashMap;
 use std::fmt;
 use std::sync::LazyLock;
 
+use featherplay_platform::credentials;
 use keyring_core::{Entry, Error};
 
-/// Makes Credential Manager the default store, once, on first use: what the `keyring`
-/// crate's `Entry::store_status` does on Windows.
+/// Makes the OS's store the default, once, on first use: what the `keyring` crate's
+/// `Entry::store_status` does on Windows.
 static STORE: LazyLock<Result<(), Error>> = LazyLock::new(|| {
-    keyring_core::set_default_store(windows_native_keyring_store::Store::new()?);
+    keyring_core::set_default_store(credentials::store()?);
     Ok(())
 });
 
 const SERVICE: &str = "featherplay";
-/// The Windows store's `persistence` modifier: `CRED_PERSIST_LOCAL_MACHINE`.
-const PERSISTENCE: &str = "Local";
-/// `CRED_MAX_CREDENTIAL_BLOB_SIZE`.
-const CHUNK: usize = 2560;
+const CHUNK: usize = credentials::MAX_SECRET_BYTES;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SecretKey {
@@ -103,7 +97,7 @@ fn entry(name: &str, chunk: usize) -> Result<Entry, Error> {
     if STORE.is_err() {
         return Err(Error::NoDefaultStore);
     }
-    let modifiers = HashMap::from([("persistence", PERSISTENCE)]);
+    let modifiers: HashMap<&str, &str> = credentials::MODIFIERS.iter().copied().collect();
     if chunk == 0 {
         Entry::new_with_modifiers(SERVICE, name, &modifiers)
     } else {
@@ -229,7 +223,9 @@ mod tests {
         assert_eq!(read(NAME).as_deref(), Some(long.as_str()));
         for chunk in 0..3 {
             let attrs = entry(NAME, chunk).unwrap().get_attributes().unwrap();
-            assert_eq!(attrs["persistence"], PERSISTENCE, "chunk {chunk}");
+            for &(name, value) in credentials::MODIFIERS {
+                assert_eq!(attrs[name], value, "chunk {chunk}");
+            }
         }
 
         write(NAME, "short").unwrap();

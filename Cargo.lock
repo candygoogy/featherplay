@@ -1456,6 +1456,7 @@ name = "featherplay-platform"
 version = "0.2.2"
 dependencies = [
  "featherplay-core",
+ "keyring-core",
  "raw-window-handle",
  "souvlaki",
  "tauri-winrt-notification",
@@ -1486,7 +1487,6 @@ dependencies = [
  "serde",
  "serde_json",
  "toml 1.1.8+spec-1.1.0",
- "windows-native-keyring-store",
 ]
 
 [[package]]
