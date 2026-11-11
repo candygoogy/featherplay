@@ -227,7 +227,7 @@ pub fn init(ctx: &Rc<Ctx>) {
 /// What the button below does, from elsewhere (the failed helpers download's toast): the
 /// same text on the clipboard, then the same "Diagnostics copied".
 pub fn copy_diagnostics(ctx: &Rc<Ctx>) {
-    match crate::native::copy_text(&diagnostics(ctx)) {
+    match featherplay_platform::clipboard::copy_text(&diagnostics(ctx)) {
         Ok(()) => ctx.toast(tr!("Diagnostics copied")),
         Err(e) => log!("copy diagnostics: {e}"),
     }

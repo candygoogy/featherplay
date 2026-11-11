@@ -587,7 +587,11 @@ pub fn mask(token: &Token) -> String {
 
 fn copy_api_token() {
     let Some(ctx) = Ctx::get() else { return };
-    let copied = API_TOKEN.with(|t| t.borrow().as_ref().map(|t| native::copy_secret(t.as_str())));
+    let copied = API_TOKEN.with(|t| {
+        t.borrow()
+            .as_ref()
+            .map(|t| featherplay_platform::clipboard::copy_secret(t.as_str()))
+    });
     match copied {
         Some(Ok(())) => toast::show(&ctx, tr!("Token copied")),
         Some(Err(e)) => {

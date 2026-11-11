@@ -36,7 +36,7 @@ pub fn init(ui: &AppWindow) {
 /// did nothing was reported on 2026-10-31; this tells a clipboard Windows wouldn't open
 /// from a field that dropped what it got.
 fn pasting(weak: &slint::Weak<AppWindow>) {
-    let state = crate::native::clipboard_state();
+    let state = featherplay_platform::clipboard::state();
     let before = query_chars(weak);
     let weak = weak.clone();
     slint::Timer::single_shot(std::time::Duration::ZERO, move || {
