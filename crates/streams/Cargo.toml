@@ -31,14 +31,10 @@ zip = { workspace = true, features = ["deflate-flate2"] }
 flate2 = { workspace = true }
 
 [target.'cfg(windows)'.dependencies]
-# A heap for each QuickJS run (`js.rs`), and a job that ends the preprocessing child with
-# the app (`native.rs`). The app enables these features already.
+# A heap for each QuickJS run (`js.rs`). The app enables these features already.
 windows = { workspace = true, features = [
   "Win32_Foundation",
-  "Win32_Security",
-  "Win32_System_JobObjects",
   "Win32_System_Memory",
-  "Win32_System_Threading",
 ] }
 
 [build-dependencies]

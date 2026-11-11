@@ -115,9 +115,6 @@ const HELD_WAITS: [Duration; 4] = [Duration::from_millis(1); 4];
 #[cfg(test)]
 const DOWNLOAD_WAITS: [Duration; 2] = [Duration::from_millis(1); 2];
 
-#[cfg(windows)]
-const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-
 /// One place a file can be downloaded from, and the sha256 it must have there.
 struct Source {
     url: String,
@@ -470,8 +467,7 @@ pub(crate) fn hidden_command(program: &Path) -> tokio::process::Command {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .kill_on_drop(true);
-    #[cfg(windows)]
-    cmd.creation_flags(CREATE_NO_WINDOW);
+    featherplay_platform::process::no_console_window(cmd.as_std_mut());
     cmd
 }
 
