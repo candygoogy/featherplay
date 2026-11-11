@@ -26,8 +26,10 @@
 //! which re-exports this one); About's banner and row are redrawn through the callback it
 //! gives (`on_change`).
 
+use std::future::Future;
 use std::io;
 use std::path::{Path, PathBuf};
+use std::pin::Pin;
 use std::sync::{LazyLock, Mutex, MutexGuard, OnceLock, PoisonError};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -819,7 +821,23 @@ fn changed_elsewhere() {
 /// release's if that's due (`Stamp::to_fetch`). Setups no longer pending are deleted. A
 /// release is marked announced; it's returned to announce only at startup or on resume, as
 /// a click is answered in About and `help` makes its own toast.
-pub async fn run(
+///
+/// Boxed here, as the app polls it too: a future is compiled in each crate that polls it.
+#[inline(never)]
+pub fn run(
+    running: Running,
+    cache: PathBuf,
+    trigger: Trigger,
+    check_on: bool,
+    install_on: bool,
+    remote: Remote,
+) -> Pin<Box<dyn Future<Output = Found> + Send>> {
+    Box::pin(run_here(
+        running, cache, trigger, check_on, install_on, remote,
+    ))
+}
+
+async fn run_here(
     running: Running,
     cache: PathBuf,
     trigger: Trigger,
@@ -988,7 +1006,7 @@ pub async fn help(cache: PathBuf, install_on: bool) -> (Option<Help>, Option<Rel
         tokio::time::sleep(Duration::from_millis(250)).await;
     };
     let remote = Remote::github(install::installed());
-    let found = run(running, cache, Trigger::Help, true, install_on, remote).await;
+    let found = run_here(running, cache, Trigger::Help, true, install_on, remote).await;
     if let Some(r) = found.newer {
         // A setup downloaded and checked: the banner's "Restart to update". One that
         // couldn't be verified: the website, not the release page.

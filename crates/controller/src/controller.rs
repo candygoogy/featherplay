@@ -24,7 +24,9 @@ mod song_versions;
 mod streams;
 
 use std::collections::{HashMap, VecDeque};
+use std::future::Future;
 use std::path::PathBuf;
+use std::pin::Pin;
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
 
@@ -370,8 +372,19 @@ pub struct Controller {
     shown_marks: Option<Vec<Mark>>,
 }
 
+/// A future boxed in this crate.
+type Boxed<T> = Pin<Box<dyn Future<Output = T>>>;
+
 impl Controller {
-    pub async fn start(opts: Options, ui: UiLink) -> Result<Controller, String> {
+    /// Loads the settings and the session; `run` then plays. Both are boxed here so the
+    /// loop's code is compiled once, in this crate: a future is compiled in each crate that
+    /// polls it, and the app's copies of the loop and its tasks cost ~150 KB of the exe.
+    #[inline(never)]
+    pub fn start(opts: Options, ui: UiLink) -> Boxed<Result<Controller, String>> {
+        Box::pin(Self::start_here(opts, ui))
+    }
+
+    async fn start_here(opts: Options, ui: UiLink) -> Result<Controller, String> {
         let paths = Paths::resolve();
         let settings = Settings::load(&paths);
         log!(
@@ -574,8 +587,13 @@ impl Controller {
         })
     }
 
-    /// Runs until Ctrl+C or `UiCommand::Quit`, then saves the session.
-    pub async fn run(mut self) {
+    /// Runs until Ctrl+C or `UiCommand::Quit`, then saves the session. Boxed as `start` is.
+    #[inline(never)]
+    pub fn run(self) -> Boxed<()> {
+        Box::pin(self.run_here())
+    }
+
+    async fn run_here(mut self) {
         self.audio.set_volume(self.slider_volume());
         self.audio.set_equalizer(equalizer_bands(&self.settings));
         self.audio
