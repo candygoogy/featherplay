@@ -19,11 +19,6 @@ reqwest = { workspace = true }
 # says otherwise. In the tree through reqwest, with these features.
 hyper-util = { workspace = true, features = ["client-proxy", "client-proxy-system"] }
 
-[target.'cfg(windows)'.dependencies]
-# WinHTTP's types, and the loader calls that bring winhttp.dll in when a lookup first runs
-# (`winhttp.rs`). The app builds `windows` with Foundation and LibraryLoader already.
-windows = { workspace = true, features = ["Win32_Foundation", "Win32_Networking_WinHttp", "Win32_System_LibraryLoader"] }
-
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt", "time"] }
 

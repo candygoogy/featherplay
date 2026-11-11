@@ -1474,7 +1474,6 @@ dependencies = [
  "log",
  "reqwest",
  "tokio",
- "windows 0.62.2",
 ]
 
 [[package]]
