@@ -13,7 +13,6 @@ mod crash;
 mod logfile;
 mod redact;
 mod report;
-mod system;
 
 use std::collections::VecDeque;
 use std::fmt;
@@ -196,7 +195,7 @@ impl log::Log for Facade {
 /// `Windows 11 25H2, build 26200.7171`, read once.
 pub fn windows() -> &'static str {
     static WINDOWS: OnceLock<String> = OnceLock::new();
-    WINDOWS.get_or_init(system::windows)
+    WINDOWS.get_or_init(featherplay_platform::system::os_version)
 }
 
 /// The yt-dlp and Deno versions, once the controller has read them (`None`: not installed,

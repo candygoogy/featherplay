@@ -12,30 +12,9 @@ pub struct Stamp {
     pub millis: u16,
 }
 
-#[repr(C)]
-#[derive(Default)]
-struct SystemTime {
-    year: u16,
-    month: u16,
-    day_of_week: u16,
-    day: u16,
-    hour: u16,
-    minute: u16,
-    second: u16,
-    millis: u16,
-}
-
-// Declared here rather than turning on another `windows` feature.
-#[link(name = "kernel32")]
-unsafe extern "system" {
-    fn GetLocalTime(time: *mut SystemTime);
-}
-
 impl Stamp {
     pub fn now() -> Stamp {
-        let mut t = SystemTime::default();
-        // SAFETY: a valid out pointer to a SYSTEMTIME-shaped struct.
-        unsafe { GetLocalTime(&mut t) };
+        let t = featherplay_platform::system::local_time();
         Stamp {
             year: t.year,
             month: t.month,
