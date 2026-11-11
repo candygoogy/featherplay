@@ -1408,7 +1408,6 @@ dependencies = [
  "serde_json",
  "sha1",
  "sha2",
- "souvlaki",
  "tauri-winrt-notification",
  "tokio",
  "windows 0.62.2",

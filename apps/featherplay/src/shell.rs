@@ -8,7 +8,8 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
-use featherplay_integrations::{Hotkeys, NowPlaying, Sender, Smtc, UiCommand, tooltip_text};
+use featherplay_integrations::{Hotkeys, NowPlaying, Sender, UiCommand, tooltip_text};
+use featherplay_platform::media_controls::{MediaControls, MediaState};
 use featherplay_platform::taskbar::TaskbarButtons;
 use featherplay_platform::tray::{MenuState, Tray, TrayChoice, TrayEvent};
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
@@ -23,7 +24,7 @@ const HWND_POLL: Duration = Duration::from_millis(10);
 
 #[derive(Default)]
 struct Integrations {
-    smtc: Option<Smtc>,
+    smtc: Option<MediaControls>,
     taskbar: Option<TaskbarButtons>,
     tray: Option<Tray>,
     hotkeys: Option<Hotkeys>,
@@ -254,7 +255,11 @@ pub fn hwnd(window: &slint::Window) -> Option<isize> {
 fn attach(hwnd: isize, tx: Sender<UiCommand>) {
     log!("window ready, HWND {hwnd:#x}");
     let t = Instant::now();
-    let smtc = match Smtc::attach(hwnd, tx.clone()) {
+    let card = tx.clone();
+    let on_media = move |event| {
+        let _ = card.send(UiCommand::from(event));
+    };
+    let smtc = match MediaControls::attach(hwnd, on_media) {
         Ok(s) => {
             log!("media controls attached ({})", ms(t));
             Some(s)
@@ -302,7 +307,7 @@ pub fn apply(np: NowPlaying) {
         it.idle = false;
         let t = Instant::now();
         if let Some(smtc) = &mut it.smtc {
-            smtc.update(&np);
+            smtc.update(MediaState::from(&np));
         }
         if let Some(taskbar) = &it.taskbar {
             taskbar.set_playing(np.playing);

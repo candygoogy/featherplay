@@ -17,6 +17,7 @@
 
 use std::time::Duration;
 
+use featherplay_platform::media_controls::{MediaEvent, MediaState};
 use featherplay_platform::taskbar::ThumbButton;
 
 pub mod discord;
@@ -24,14 +25,12 @@ mod hotkeys;
 pub mod identity;
 pub mod local_api;
 mod notify;
-mod smtc;
 pub mod sponsorblock;
 mod tooltip;
 
 pub use discord::Discord;
 pub use hotkeys::{Hotkeys, parse_hotkey};
 pub use notify::{notify, notify_track};
-pub use smtc::Smtc;
 pub use tooltip::tooltip_text;
 
 /// The channel commands travel on. Unbounded, so sending from a window procedure or a
@@ -59,6 +58,17 @@ pub enum UiCommand {
     ToggleShuffle,
     /// Press the repeat button this many times: Off, All, One, then Off again.
     CycleRepeat(u8),
+}
+
+impl From<MediaEvent> for UiCommand {
+    fn from(event: MediaEvent) -> Self {
+        match event {
+            MediaEvent::PlayPause => UiCommand::PlayPause,
+            MediaEvent::Next => UiCommand::Next,
+            MediaEvent::Previous => UiCommand::Previous,
+            MediaEvent::Show => UiCommand::Show,
+        }
+    }
 }
 
 impl From<ThumbButton> for UiCommand {
@@ -106,6 +116,21 @@ impl Default for NowPlaying {
             position: Duration::ZERO,
             duration: None,
             speed: 1.0,
+        }
+    }
+}
+
+impl From<&NowPlaying> for MediaState {
+    fn from(np: &NowPlaying) -> Self {
+        MediaState {
+            title: np.title.clone(),
+            artist: np.artist.clone(),
+            album: np.album.clone(),
+            art_url: np.art_url.clone(),
+            duration: np.duration,
+            playing: np.playing,
+            position: np.position,
+            speed: np.speed,
         }
     }
 }

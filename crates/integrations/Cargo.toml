@@ -40,8 +40,6 @@ getrandom = { workspace = true }
 # Windows only. `tray-icon` and `souvlaki` work elsewhere too, but on Linux they bring in GTK
 # and D-Bus; the Linux tray and media controls are chosen in phase 5 (ARCHITECTURE.md).
 [target.'cfg(windows)'.dependencies]
-# The media card (SMTC).
-souvlaki = { workspace = true }
 # Toasts.
 tauri-winrt-notification = { workspace = true }
 # `identity`: the AppUserModelID, the Start menu shortcut (IShellLink and its property
