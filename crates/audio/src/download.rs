@@ -8,7 +8,6 @@
 //! task drops its request and goes on from that byte: a seek into the undownloaded part
 //! costs one request. Once the end is reached, the holes left behind are filled.
 
-use std::fs::File;
 use std::io;
 use std::ops::Range;
 use std::path::Path;
@@ -17,6 +16,7 @@ use std::sync::{Arc, Condvar, Mutex};
 
 use bytes::Bytes;
 use featherplay_core::sync::{CondvarExt, LockExt};
+use featherplay_platform::files::{read_exact_at, write_all_at};
 use reqwest::StatusCode;
 use tempfile::NamedTempFile;
 use tokio::runtime::Handle;
@@ -367,44 +367,6 @@ async fn run(
             }
         }
     }
-}
-
-#[cfg(windows)]
-fn write_all_at(f: &File, mut buf: &[u8], mut pos: u64) -> io::Result<()> {
-    use std::os::windows::fs::FileExt;
-    while !buf.is_empty() {
-        let n = f.seek_write(buf, pos)?;
-        if n == 0 {
-            return Err(io::ErrorKind::WriteZero.into());
-        }
-        buf = &buf[n..];
-        pos += n as u64;
-    }
-    Ok(())
-}
-
-#[cfg(windows)]
-fn read_exact_at(f: &File, mut buf: &mut [u8], mut pos: u64) -> io::Result<()> {
-    use std::os::windows::fs::FileExt;
-    while !buf.is_empty() {
-        let n = f.seek_read(buf, pos)?;
-        if n == 0 {
-            return Err(io::ErrorKind::UnexpectedEof.into());
-        }
-        buf = &mut buf[n..];
-        pos += n as u64;
-    }
-    Ok(())
-}
-
-#[cfg(unix)]
-fn write_all_at(f: &File, buf: &[u8], pos: u64) -> io::Result<()> {
-    std::os::unix::fs::FileExt::write_all_at(f, buf, pos)
-}
-
-#[cfg(unix)]
-fn read_exact_at(f: &File, buf: &mut [u8], pos: u64) -> io::Result<()> {
-    std::os::unix::fs::FileExt::read_exact_at(f, buf, pos)
 }
 
 #[cfg(test)]
