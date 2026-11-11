@@ -2,16 +2,15 @@
 //! souvlaki, bound to the app window's HWND. The playback rate, which souvlaki leaves out,
 //! is set on the same controls directly.
 
-use std::ffi::c_void;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use souvlaki::{MediaControlEvent, MediaMetadata, MediaPlayback, MediaPosition, PlatformConfig};
 use windows::Media::SystemMediaTransportControls;
-use windows::Win32::Foundation::HWND;
 use windows::Win32::System::WinRT::ISystemMediaTransportControlsInterop;
 
 pub use crate::common::media_controls::*;
+use crate::window::Handle;
 
 pub struct MediaControls {
     controls: souvlaki::MediaControls,
@@ -26,16 +25,16 @@ pub struct MediaControls {
 }
 
 impl MediaControls {
-    /// Binds the media controls to `hwnd`. Call on the window's thread. `on_event` is called
+    /// Binds the media controls to `window`. Call on the window's thread. `on_event` is called
     /// on a WinRT thread-pool thread.
     pub fn attach(
-        hwnd: isize,
+        window: Handle,
         on_event: impl Fn(MediaEvent) + Send + 'static,
     ) -> Result<MediaControls, String> {
         let mut controls = souvlaki::MediaControls::new(PlatformConfig {
             display_name: "featherplay",
             dbus_name: "featherplay",
-            hwnd: Some(hwnd as *mut c_void),
+            hwnd: Some(window.hwnd().0),
         })
         .map_err(|e| format!("media controls: {e:?}"))?;
         let playing = Arc::new(AtomicBool::new(false));
@@ -64,7 +63,7 @@ impl MediaControls {
             controls,
             playing,
             shown: None,
-            rate: window_controls(hwnd),
+            rate: window_controls(window),
             speed: 1.0,
         })
     }
@@ -112,15 +111,15 @@ impl MediaControls {
     }
 }
 
-/// The media controls of `hwnd`: the same object souvlaki was given.
-fn window_controls(hwnd: isize) -> Option<SystemMediaTransportControls> {
+/// The media controls of `window`: the same object souvlaki was given.
+fn window_controls(window: Handle) -> Option<SystemMediaTransportControls> {
     let interop = windows::core::factory::<
         SystemMediaTransportControls,
         ISystemMediaTransportControlsInterop,
     >()
     .ok()?;
-    // SAFETY: `hwnd` is the live window souvlaki just attached to, on its thread.
-    unsafe { interop.GetForWindow(HWND(hwnd as *mut c_void)) }.ok()
+    // SAFETY: `window` is the live window souvlaki just attached to, on its thread.
+    unsafe { interop.GetForWindow(window.hwnd()) }.ok()
 }
 
 impl Drop for MediaControls {

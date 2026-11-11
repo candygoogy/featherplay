@@ -45,7 +45,7 @@ fn open(scene: &Scene) -> MiniPlayer {
     let mini = mini::create(&scene.ctx).expect("mini player");
     mini.show().expect("show");
     // The offscreen platform has no window handles: a stand-in, as Windows gives one later.
-    mini::own_window_for_tests(0x1);
+    mini::own_window_for_tests(featherplay::shell::stand_in_handle(0x1));
     mini.window()
         .dispatch_event(WindowEvent::WindowActiveChanged(true));
     scene.settle();
@@ -71,10 +71,10 @@ thread_local! {
     static FRONT: RefCell<Option<Foreground>> = const { RefCell::new(None) };
 }
 
-/// Puts window `hwnd`, of `class`, in front, as the mini player's poll reads it.
-fn in_front((hwnd, class): (isize, &str)) {
+/// Puts window `n`, of `class`, in front, as the mini player's poll reads it.
+fn in_front((n, class): (u32, &str)) {
     FRONT.set(Some(Foreground {
-        hwnd,
+        window: featherplay::shell::stand_in_handle(n),
         class: class.into(),
     }));
 }
@@ -84,10 +84,10 @@ fn read_front() -> Option<Foreground> {
 }
 
 /// The hidden icons' flyout (^) on Windows 11, the taskbar, the desktop and another app.
-const FLYOUT: (isize, &str) = (0x10, "TopLevelWindowForOverflowXamlIsland");
-const TASKBAR: (isize, &str) = (0x20, "Shell_TrayWnd");
-const DESKTOP: (isize, &str) = (0x30, "Progman");
-const OTHER_APP: (isize, &str) = (0x40, "Chrome_WidgetWin_1");
+const FLYOUT: (u32, &str) = (0x10, "TopLevelWindowForOverflowXamlIsland");
+const TASKBAR: (u32, &str) = (0x20, "Shell_TrayWnd");
+const DESKTOP: (u32, &str) = (0x30, "Progman");
+const OTHER_APP: (u32, &str) = (0x40, "Chrome_WidgetWin_1");
 
 /// Lets one round of the foreground poll run.
 fn poll(scene: &Scene) {
@@ -527,7 +527,7 @@ fn waiting_for_a_window_handle_gives_up_and_stays_quiet_once_the_window_is_gone(
     let mini = mini::create(&scene.ctx).expect("mini player");
     let said = Rc::new(RefCell::new(Vec::new()));
     let (r, g) = (said.clone(), said.clone());
-    featherplay::shell::when_hwnd(
+    featherplay::shell::when_handle(
         &mini,
         move |_, _| r.borrow_mut().push("ready"),
         move |_| g.borrow_mut().push("gave up"),
@@ -540,7 +540,7 @@ fn waiting_for_a_window_handle_gives_up_and_stays_quiet_once_the_window_is_gone(
     // A window dropped while its handle is awaited: neither runs.
     let gone = Rc::new(RefCell::new(0));
     let (r, g) = (gone.clone(), gone.clone());
-    featherplay::shell::when_hwnd(
+    featherplay::shell::when_handle(
         &mini,
         move |_, _| *r.borrow_mut() += 1,
         move |_| *g.borrow_mut() += 1,

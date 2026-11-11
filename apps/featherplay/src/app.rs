@@ -17,7 +17,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use featherplay_core::model::{AlbumId, ArtistId, PlaylistId};
 use featherplay_core::tr;
 use featherplay_integrations::UiCommand;
-use featherplay_platform::{session_end, window};
+use featherplay_platform::session_end;
+use featherplay_platform::window::{self, Handle};
 use featherplay_store::{Paths, Settings};
 use slint::ComponentHandle;
 use tokio::sync::mpsc;
@@ -63,7 +64,7 @@ pub trait NativeWindow {
 }
 
 /// The real window, by its handle.
-struct Win32(isize);
+struct Win32(Handle);
 
 impl NativeWindow for Win32 {
     fn minimise(&self) {
@@ -104,7 +105,7 @@ pub struct Ctx {
     /// The sign-in on its way in wasn't stored for the next start
     /// (`UiEvent::SignInNotSaved`): a toast says so once it shows.
     sign_in_unsaved: Cell<bool>,
-    hwnd: Cell<Option<isize>>,
+    handle: Cell<Option<Handle>>,
     /// The window's Win32 side, once the real window exists (`Win32`), or a test's.
     native: RefCell<Option<Rc<dyn NativeWindow>>>,
     /// The page last shown, so showing it again (a rename, a Try again) isn't a navigation.
@@ -144,7 +145,7 @@ impl Ctx {
             parked: RefCell::new(Vec::new()),
             reconnecting: Cell::new(false),
             sign_in_unsaved: Cell::new(false),
-            hwnd: Cell::new(None),
+            handle: Cell::new(None),
             native: RefCell::new(None),
             shown: RefCell::new(None),
             revisit: Cell::new(false),
@@ -163,8 +164,8 @@ impl Ctx {
     }
 
     /// The main window's handle, once the real window exists (never offscreen).
-    pub fn hwnd(&self) -> Option<isize> {
-        self.hwnd.get()
+    pub fn handle(&self) -> Option<Handle> {
+        self.handle.get()
     }
 
     /// The window's Win32 side, once the real window exists (never offscreen, unless a test
@@ -853,13 +854,13 @@ fn run_window(
     let weak = ui.as_weak();
     let c = ctx.clone();
     let find = ui.as_weak();
-    let find_hwnd = move || find.upgrade().and_then(|ui| shell::hwnd(ui.window()));
+    let find_handle = move || find.upgrade().and_then(|ui| shell::handle(ui.window()));
     let timing = app.timing;
-    shell::start(find_hwnd, tx, hotkeys, move |hwnd| {
-        c.hwnd.set(Some(hwnd));
-        c.set_native(Rc::new(Win32(hwnd)));
+    shell::start(find_handle, tx, hotkeys, move |handle| {
+        c.handle.set(Some(handle));
+        c.set_native(Rc::new(Win32(handle)));
         #[cfg(feature = "perf-harness")]
-        crate::perf::start(&c, hwnd);
+        crate::perf::start(&c, handle);
         if timing {
             // The skia software surface has no rendering notifier. The window exists now;
             // its first frame is painted before the event loop's next turn.
@@ -871,7 +872,7 @@ fn run_window(
                 eprintln!("first_frame_ms={}", crate::controller::uptime().as_millis());
             });
         }
-        if let Err(e) = window::opaque(hwnd) {
+        if let Err(e) = window::opaque(handle) {
             log!("opaque window: {e}");
         }
         // Minimised, the window shows nothing: what it drew with goes (`memory`). After the
@@ -879,7 +880,7 @@ fn run_window(
         let parked = Rc::downgrade(&c);
         // Every size change says "not minimised"; only the first after a minimise is a return.
         let was_minimised = Rc::new(Cell::new(false));
-        let watched = window::when_minimised(hwnd, move |minimised| {
+        let watched = window::when_minimised(handle, move |minimised| {
             let parked = parked.clone();
             let restored = !minimised && was_minimised.replace(minimised);
             slint::Timer::single_shot(std::time::Duration::ZERO, move || {
@@ -902,7 +903,7 @@ fn run_window(
         }
         // Dragging the window's edge: the renderer keeps its buffer until the drag ends.
         let sizing = weak.clone();
-        let watched = window::when_sizing(hwnd, move |live| {
+        let watched = window::when_sizing(handle, move |live| {
             if let Some(ui) = sizing.upgrade() {
                 crate::live_resize::set(ui.window(), live);
             }
@@ -912,7 +913,7 @@ fn run_window(
         }
         let repaint = weak.clone();
         let watched = window::repaint_when_invalidated(
-            hwnd,
+            handle,
             move || {
                 if let Some(ui) = repaint.upgrade() {
                     repaint::all(ui.window());
@@ -926,9 +927,9 @@ fn run_window(
         }
         // The window icon has a dark and a light drawing, picked by the taskbar's theme.
         let recolour = weak.clone();
-        let watched = window::when_colours_change(hwnd, move || {
+        let watched = window::when_colours_change(handle, move || {
             if let Some(ui) = recolour.upgrade()
-                && let Err(e) = chrome::set_icon(hwnd, ui.window().scale_factor())
+                && let Err(e) = chrome::set_icon(handle, ui.window().scale_factor())
             {
                 log!("window icon: {e}");
             }
@@ -937,14 +938,14 @@ fn run_window(
             log!("icon on theme change: {e}");
         }
         // The tray icon follows the taskbar's theme and the primary display's scale.
-        if let Err(e) = window::when_displays_change(hwnd, shell::refresh_tray_icon) {
+        if let Err(e) = window::when_displays_change(handle, shell::refresh_tray_icon) {
             log!("tray icon on display change: {e}");
         }
         // A window back from the tray restores once its taskbar button is there
         // (`show_window`); out of the message Explorer sent, on the event loop's next turn.
-        let watched = window::when_taskbar_button(hwnd, move || {
+        let watched = window::when_taskbar_button(handle, move || {
             slint::Timer::single_shot(std::time::Duration::ZERO, move || {
-                restore_pending(&Win32(hwnd));
+                restore_pending(&Win32(handle));
             });
         });
         if let Err(e) = watched {
@@ -952,11 +953,11 @@ fn run_window(
         }
         if let Some(ui) = weak.upgrade() {
             let t = ui.global::<Theme>();
-            if let Err(e) = chrome::title_bar(hwnd, t.get_dark(), t.get_ground(), t.get_text1()) {
+            if let Err(e) = chrome::title_bar(handle, t.get_dark(), t.get_ground(), t.get_text1()) {
                 log!("title bar: {e}");
             }
             c.covers.set_scale(ui.window().scale_factor());
-            if let Err(e) = chrome::set_icon(hwnd, ui.window().scale_factor()) {
+            if let Err(e) = chrome::set_icon(handle, ui.window().scale_factor()) {
                 log!("window icon: {e}");
             }
         }

@@ -31,6 +31,7 @@ use windows::core::w;
 pub use crate::common::taskbar::*;
 
 use super::icons::{self, Glyph};
+use crate::window::Handle;
 
 const ID_PREVIOUS: u32 = 1001;
 const ID_PLAY_PAUSE: u32 = 1002;
@@ -57,11 +58,14 @@ struct State {
 }
 
 impl TaskbarButtons {
-    /// Subclasses `hwnd`; the buttons are added when "TaskbarButtonCreated" arrives (or
+    /// Subclasses `window`; the buttons are added when "TaskbarButtonCreated" arrives (or
     /// on the first `set_playing` if it came too early). Call on the window's thread;
     /// `on_click` is called from the window's procedure.
-    pub fn attach(hwnd: isize, on_click: impl Fn(ThumbButton) + 'static) -> Result<Self, String> {
-        let hwnd = HWND(hwnd as *mut c_void);
+    pub fn attach(
+        window: Handle,
+        on_click: impl Fn(ThumbButton) + 'static,
+    ) -> Result<Self, String> {
+        let hwnd = window.hwnd();
         // S_FALSE or RPC_E_CHANGED_MODE when winit already set up COM on this thread;
         // either way the thread has an apartment, which is all ITaskbarList3 needs.
         // SAFETY: the reserved argument is None, as the API requires. The apartment is never

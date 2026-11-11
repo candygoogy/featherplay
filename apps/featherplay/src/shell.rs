@@ -12,6 +12,7 @@ use featherplay_integrations::{Hotkeys, NowPlaying, Sender, UiCommand, tooltip_t
 use featherplay_platform::media_controls::{MediaControls, MediaState};
 use featherplay_platform::taskbar::TaskbarButtons;
 use featherplay_platform::tray::{MenuState, Tray, TrayChoice, TrayEvent};
+use featherplay_platform::window::Handle;
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use slint::{ComponentHandle, Timer, TimerMode};
 
@@ -43,13 +44,13 @@ thread_local! {
 }
 
 /// Adds the tray icon and hotkeys now, and attaches the media controls and thumb buttons
-/// to the window once `find_hwnd` returns its handle; then calls `on_hwnd` with it.
+/// to the window once `find_handle` returns its handle; then calls `on_handle` with it.
 /// (The winit window is created after the event loop starts, so it is polled for.)
 pub fn start(
-    find_hwnd: impl Fn() -> Option<isize> + 'static,
+    find_handle: impl Fn() -> Option<Handle> + 'static,
     tx: Sender<UiCommand>,
     hotkeys: Option<featherplay_store::Hotkeys>,
-    on_hwnd: impl FnOnce(isize) + 'static,
+    on_handle: impl FnOnce(Handle) + 'static,
 ) {
     let mut it = Integrations {
         tx: Some(tx.clone()),
@@ -90,17 +91,17 @@ pub fn start(
 
     let poll = Rc::new(Timer::default());
     let weak_poll = Rc::downgrade(&poll);
-    let mut on_hwnd = Some(on_hwnd);
+    let mut on_handle = Some(on_handle);
     poll.start(TimerMode::Repeated, HANDLE_POLL, move || {
-        let Some(hwnd) = find_hwnd() else {
+        let Some(window) = find_handle() else {
             return;
         };
         if let Some(p) = weak_poll.upgrade() {
             p.stop();
         }
-        attach(hwnd, tx.clone());
-        if let Some(f) = on_hwnd.take() {
-            f(hwnd);
+        attach(window, tx.clone());
+        if let Some(f) = on_handle.take() {
+            f(window);
         }
     });
     it.poll = Some(poll);
@@ -200,8 +201,7 @@ pub fn quit() {
     });
 }
 
-/// The window's handle, once it exists.
-/// How long `when_hwnd` waits for a window to be made.
+/// How long `when_handle` waits for a window to be made.
 const HANDLE_WAIT: Duration = Duration::from_secs(2);
 
 /// Calls `ready` with `ui`'s window handle once Windows has made its window. Winit makes a
@@ -209,12 +209,12 @@ const HANDLE_WAIT: Duration = Duration::from_secs(2);
 /// returns, so the handle usually isn't there yet (the main window waits for its own the
 /// same way, `HANDLE_POLL`). Tries at once, then every `HANDLE_POLL` for up to
 /// `HANDLE_WAIT`, then calls `gave_up`. Neither runs once `ui` is gone.
-pub fn when_hwnd<C: ComponentHandle + 'static>(
+pub fn when_handle<C: ComponentHandle + 'static>(
     ui: &C,
-    ready: impl FnOnce(&C, isize) + 'static,
+    ready: impl FnOnce(&C, Handle) + 'static,
     gave_up: impl FnOnce(&C) + 'static,
 ) {
-    try_hwnd(
+    try_handle(
         ui.as_weak(),
         Box::new(ready),
         Box::new(gave_up),
@@ -222,10 +222,10 @@ pub fn when_hwnd<C: ComponentHandle + 'static>(
     );
 }
 
-type Ready<C> = Box<dyn FnOnce(&C, isize)>;
+type Ready<C> = Box<dyn FnOnce(&C, Handle)>;
 type GaveUp<C> = Box<dyn FnOnce(&C)>;
 
-fn try_hwnd<C: ComponentHandle + 'static>(
+fn try_handle<C: ComponentHandle + 'static>(
     weak: slint::Weak<C>,
     ready: Ready<C>,
     gave_up: GaveUp<C>,
@@ -234,32 +234,45 @@ fn try_hwnd<C: ComponentHandle + 'static>(
     let Some(ui) = weak.upgrade() else {
         return;
     };
-    if let Some(h) = hwnd(ui.window()) {
+    if let Some(h) = handle(ui.window()) {
         ready(&ui, h);
     } else if Instant::now() >= deadline {
         gave_up(&ui);
     } else {
         Timer::single_shot(HANDLE_POLL, move || {
-            try_hwnd(weak, ready, gave_up, deadline);
+            try_handle(weak, ready, gave_up, deadline);
         });
     }
 }
 
-pub fn hwnd(window: &slint::Window) -> Option<isize> {
-    match window.window_handle().window_handle().ok()?.as_raw() {
-        RawWindowHandle::Win32(h) => Some(h.hwnd.get()),
-        _ => None,
-    }
+/// The window's handle, once it exists: the one place the app reads it from the windowing
+/// library's raw handle. `None` before that (always on the offscreen platform), and for a
+/// kind of window the platform crate doesn't take.
+pub fn handle(window: &slint::Window) -> Option<Handle> {
+    Handle::from_raw(window.window_handle().window_handle().ok()?.as_raw())
 }
 
-fn attach(hwnd: isize, tx: Sender<UiCommand>) {
-    log!("window ready, HWND {hwnd:#x}");
+/// A made-up handle for window number `n` (not zero), for tests: the offscreen platform
+/// makes no handles, and the mini player's tests tell windows apart with these.
+#[doc(hidden)]
+pub fn stand_in_handle(n: u32) -> Handle {
+    #[cfg(windows)]
+    let raw = RawWindowHandle::Win32(raw_window_handle::Win32WindowHandle::new(
+        std::num::NonZeroIsize::new(n as isize).expect("not zero"),
+    ));
+    #[cfg(not(windows))]
+    let raw = RawWindowHandle::Xlib(raw_window_handle::XlibWindowHandle::new(n.into()));
+    Handle::from_raw(raw).expect("a window the platform takes")
+}
+
+fn attach(window: Handle, tx: Sender<UiCommand>) {
+    log!("window ready, HWND {window:?}");
     let t = Instant::now();
     let card = tx.clone();
     let on_media = move |event| {
         let _ = card.send(UiCommand::from(event));
     };
-    let smtc = match MediaControls::attach(hwnd, on_media) {
+    let smtc = match MediaControls::attach(window, on_media) {
         Ok(s) => {
             log!("media controls attached ({})", ms(t));
             Some(s)
@@ -273,7 +286,7 @@ fn attach(hwnd: isize, tx: Sender<UiCommand>) {
     let on_click = move |button| {
         let _ = tx.send(UiCommand::from(button));
     };
-    let taskbar = match TaskbarButtons::attach(hwnd, on_click) {
+    let taskbar = match TaskbarButtons::attach(window, on_click) {
         Ok(b) => {
             log!("taskbar subclassed ({})", ms(t));
             Some(b)

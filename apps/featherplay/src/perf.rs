@@ -33,6 +33,7 @@ use std::task::{Context, Poll, Waker};
 use std::time::{Duration, Instant};
 
 use featherplay_platform::perf::{cpu_ms, since_creation, thread_cycles, thread_name};
+use featherplay_platform::window::Handle;
 use i_slint_core::accessibility::{AccessibilityAction, AccessibleStringProperty};
 use i_slint_core::item_tree::ItemRc;
 use i_slint_core::window::WindowInner;
@@ -775,13 +776,13 @@ type PlayRow = Box<dyn Fn(i32)>;
 
 struct Driver {
     ctx: Rc<Ctx>,
-    hwnd: isize,
+    handle: Handle,
     out: Out,
     reps: Vec<u32>,
 }
 
 /// Starts the script, once the window exists (`app::run_window`).
-pub fn start(ctx: &Rc<Ctx>, hwnd: isize) {
+pub fn start(ctx: &Rc<Ctx>, handle: Handle) {
     if !on() {
         return;
     }
@@ -816,7 +817,7 @@ pub fn start(ctx: &Rc<Ctx>, hwnd: isize) {
         .map_or(1000.0 / 60.0, |mhz| 1e6 / f64::from(mhz));
     let mut driver = Driver {
         ctx: ctx.clone(),
-        hwnd,
+        handle,
         out: Out {
             file,
             epoch,
@@ -1084,9 +1085,9 @@ impl Driver {
             }
             "minimize" | "restore" => {
                 let minimise = words[0] == "minimize";
-                let hwnd = self.hwnd;
+                let handle = self.handle;
                 self.nav(words, || {
-                    featherplay_platform::perf::show_minimised(hwnd, minimise);
+                    featherplay_platform::perf::show_minimised(handle, minimise);
                 })
                 .await
             }

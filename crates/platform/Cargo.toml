@@ -18,6 +18,9 @@ perf = ["windows/Win32_System_ProcessStatus", "windows/Win32_System_WindowsProgr
 [dependencies]
 # Translations (`tr!`) for the strings the platform code shows, such as the tray menu's.
 featherplay-core = { path = "../core" }
+# `window::Handle::from_raw`: the window handle the window functions take, read from the
+# windowing library's raw handle: an HWND on Windows, an X11 window or Wayland surface on Linux.
+raw-window-handle = { workspace = true }
 # `credentials`: the store API the OS's credential store sits behind.
 keyring-core = { workspace = true }
 # Warnings from the OS calls, which reach the app's log file.

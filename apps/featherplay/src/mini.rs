@@ -22,7 +22,7 @@ use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
-use featherplay_platform::window;
+use featherplay_platform::window::{self, Handle};
 use slint::ComponentHandle;
 use slint::winit_030::{EventResult, WinitWindowAccessor, winit};
 
@@ -73,11 +73,11 @@ struct Mini {
     /// The last press on it is what brought it to the front (`pressed`).
     pressed_from_behind: Cell<bool>,
     /// Its window's handle, once it shows on screen (none on the offscreen platform).
-    hwnd: Cell<Option<isize>>,
+    handle: Cell<Option<Handle>>,
     /// Looks at the window in front every `POLL`, while it's unpinned (`watch`).
     poll: slint::Timer,
     /// The window in front when the poll last looked.
-    front: Cell<Option<isize>>,
+    front: Cell<Option<Handle>>,
     /// Hears every press on screen while it shows unpinned (`listen`).
     presses: RefCell<Option<window::PressWatch>>,
 }
@@ -148,7 +148,7 @@ pub fn create(ctx: &Rc<Ctx>) -> Result<MiniPlayer, String> {
         ui: ui.clone_strong(),
         cover_url: RefCell::new(String::new()),
         pressed_from_behind: Cell::new(false),
-        hwnd: Cell::new(None),
+        handle: Cell::new(None),
         poll: slint::Timer::default(),
         front: Cell::new(None),
         presses: RefCell::new(None),
@@ -168,12 +168,12 @@ pub fn open(ctx: &Rc<Ctx>, x: i32, y: i32) -> Result<(), String> {
     let border = popup::border(&ui.global::<Theme>());
     let (left, top) = popup::show_at(ui.window(), (x, y), SIZE)?;
     // Winit makes the window on a later turn of the loop: what needs its handle waits for it.
-    shell::when_hwnd(
+    shell::when_handle(
         &ui,
-        move |_, hwnd| {
-            popup::dress(hwnd, border);
-            window_ready(hwnd);
-            if let Err(e) = window::when_pressed(hwnd, pressed) {
+        move |_, handle| {
+            popup::dress(handle, border);
+            window_ready(handle);
+            if let Err(e) = window::when_pressed(handle, pressed) {
                 log!("mini player: presses: {e}");
             }
         },
@@ -186,12 +186,12 @@ pub fn open(ctx: &Rc<Ctx>, x: i32, y: i32) -> Result<(), String> {
     Ok(())
 }
 
-/// The open mini player's window exists now, with handle `hwnd`: the poll can tell it from
+/// The open mini player's window exists now, with handle `handle`: the poll can tell it from
 /// other windows, and unpinned, it hears presses on screen.
-fn window_ready(hwnd: isize) {
+fn window_ready(handle: Handle) {
     MINI.with_borrow(|m| {
         if let Some(mini) = m {
-            mini.hwnd.set(Some(hwnd));
+            mini.handle.set(Some(handle));
             if !mini.ui.global::<MiniData>().get_pinned() {
                 listen(mini);
             }
@@ -199,13 +199,13 @@ fn window_ready(hwnd: isize) {
     });
 }
 
-/// Gives the open mini player window handle `hwnd` without listening for presses: the
+/// Gives the open mini player window handle `handle` without listening for presses: the
 /// offscreen platform has no handles, and the poll judges nothing without one.
 #[doc(hidden)]
-pub fn own_window_for_tests(hwnd: isize) {
+pub fn own_window_for_tests(handle: Handle) {
     MINI.with_borrow(|m| {
         if let Some(mini) = m {
-            mini.hwnd.set(Some(hwnd));
+            mini.handle.set(Some(handle));
         }
     });
 }
@@ -331,7 +331,7 @@ fn toggle_pin() {
 /// unpinned, the mini player closes once another app comes to the front (`moved_away`) or
 /// the taskbar is pressed (`closes_on_press`).
 fn watch(mini: &Mini) {
-    mini.front.set(READ_FOREGROUND.get()().map(|f| f.hwnd));
+    mini.front.set(READ_FOREGROUND.get()().map(|f| f.window));
     mini.poll
         .start(slint::TimerMode::Repeated, POLL, look_at_the_front);
     listen(mini);
@@ -340,7 +340,7 @@ fn watch(mini: &Mini) {
 /// Hears every press on screen from now on, once the mini player shows on screen (the
 /// offscreen platform has no screen to press). Pinning or closing it stops that.
 fn listen(mini: &Mini) {
-    if mini.hwnd.get().is_none() || mini.presses.borrow().is_some() {
+    if mini.handle.get().is_none() || mini.presses.borrow().is_some() {
         return;
     }
     match window::watch_presses(pressed_on) {
@@ -379,7 +379,7 @@ fn look_at_the_front() {
     };
     let front = READ_FOREGROUND.get()();
     let mut last = mini.front.get();
-    let away = moved_away(front.as_ref(), mini.hwnd.get(), &mut last);
+    let away = moved_away(front.as_ref(), mini.handle.get(), &mut last);
     mini.front.set(last);
     if away {
         mini.poll.stop();
@@ -396,17 +396,17 @@ fn look_at_the_front() {
 /// handing the foreground to the taskbar as it closes, a second click on the tray icon,
 /// which then toggles it) or to no window at all (Windows between two) leaves it open too.
 /// Any other window, an app or the desktop (`Progman`, `WorkerW`), closes it.
-fn moved_away(front: Option<&Foreground>, own: Option<isize>, last: &mut Option<isize>) -> bool {
+fn moved_away(front: Option<&Foreground>, own: Option<Handle>, last: &mut Option<Handle>) -> bool {
     // Until its own window is known (winit makes it after `show` returns), the mini player
     // coming to the front can't be told from another app: nothing is judged, or taken as seen.
     let (Some(front), Some(own)) = (front, own) else {
         return false;
     };
-    if *last == Some(front.hwnd) {
+    if *last == Some(front.window) {
         return false;
     }
-    *last = Some(front.hwnd);
-    front.hwnd != own && !NEUTRAL.contains(&front.class.as_str())
+    *last = Some(front.window);
+    front.window != own && !NEUTRAL.contains(&front.class.as_str())
 }
 
 /// A mouse button, finger or pen went down on the open mini player; `from_behind` when that
@@ -467,57 +467,65 @@ fn sync(ctx: &Rc<Ctx>, mini: &Mini, main: &AppWindow) {
 mod tests {
     use super::*;
 
-    const OWN: isize = 0x1;
-    const APP: isize = 0x40;
+    const OWN: u32 = 0x1;
+    const APP: u32 = 0x40;
 
-    fn front(hwnd: isize, class: &str) -> Foreground {
+    /// Window `n` (`OWN`, `APP`, another), as the poll tells them apart.
+    fn w(n: u32) -> Handle {
+        crate::shell::stand_in_handle(n)
+    }
+
+    fn front(n: u32, class: &str) -> Foreground {
         Foreground {
-            hwnd,
+            window: w(n),
             class: class.into(),
         }
     }
 
     #[test]
     fn the_window_in_front_at_the_start_leaves_it_open() {
-        let mut last = Some(APP);
+        let mut last = Some(w(APP));
         let app = front(APP, "Chrome_WidgetWin_1");
-        assert!(!moved_away(Some(&app), Some(OWN), &mut last));
+        assert!(!moved_away(Some(&app), Some(w(OWN)), &mut last));
     }
 
     #[test]
     fn another_app_coming_to_the_front_closes_it() {
-        let mut last = Some(0x10);
+        let mut last = Some(w(0x10));
         let app = front(APP, "Chrome_WidgetWin_1");
-        assert!(moved_away(Some(&app), Some(OWN), &mut last));
+        assert!(moved_away(Some(&app), Some(w(OWN)), &mut last));
     }
 
     #[test]
     fn the_desktop_coming_to_the_front_closes_it() {
         for class in ["Progman", "WorkerW"] {
-            let mut last = Some(0x10);
+            let mut last = Some(w(0x10));
             let desktop = front(0x30, class);
-            assert!(moved_away(Some(&desktop), Some(OWN), &mut last), "{class}");
+            assert!(
+                moved_away(Some(&desktop), Some(w(OWN)), &mut last),
+                "{class}"
+            );
         }
     }
 
     #[test]
     fn the_mini_player_itself_coming_to_the_front_leaves_it_open() {
-        let mut last = Some(0x10);
+        let mut last = Some(w(0x10));
         let own = front(OWN, "Window Class");
-        assert!(!moved_away(Some(&own), Some(OWN), &mut last));
-        assert_eq!(last, Some(OWN));
+        assert!(!moved_away(Some(&own), Some(w(OWN)), &mut last));
+        assert_eq!(last, Some(w(OWN)));
     }
 
     #[test]
     fn nothing_closes_it_before_its_own_window_is_known() {
         // Winit makes the window after `show` returns: until its handle is known, the mini
         // player coming to the front (a press on its play button) looks like any other window.
-        let mut last = Some(0x20);
+        let mut last = Some(w(0x20));
         let itself = front(OWN, "Window Class");
         assert!(!moved_away(Some(&itself), None, &mut last));
         assert_eq!(
             last,
-            Some(0x20),
+            Some(w(0x20)),
             "a window it couldn't judge was taken as seen"
         );
     }
@@ -525,26 +533,29 @@ mod tests {
     #[test]
     fn the_shell_and_the_tray_menu_coming_to_the_front_leave_it_open() {
         for class in NEUTRAL {
-            let mut last = Some(APP);
+            let mut last = Some(w(APP));
             let shell = front(0x20, class);
-            assert!(!moved_away(Some(&shell), Some(OWN), &mut last), "{class}");
+            assert!(
+                !moved_away(Some(&shell), Some(w(OWN)), &mut last),
+                "{class}"
+            );
         }
     }
 
     #[test]
     fn no_window_in_front_leaves_it_open_and_the_last_one_kept() {
-        let mut last = Some(0x10);
-        assert!(!moved_away(None, Some(OWN), &mut last));
-        assert_eq!(last, Some(0x10));
+        let mut last = Some(w(0x10));
+        assert!(!moved_away(None, Some(w(OWN)), &mut last));
+        assert_eq!(last, Some(w(0x10)));
     }
 
     #[test]
     fn the_first_app_coming_back_after_the_taskbar_closes_it() {
-        let mut last = Some(APP);
+        let mut last = Some(w(APP));
         let taskbar = front(0x20, "Shell_TrayWnd");
         let app = front(APP, "Chrome_WidgetWin_1");
-        assert!(!moved_away(Some(&taskbar), Some(OWN), &mut last));
-        assert!(moved_away(Some(&app), Some(OWN), &mut last));
+        assert!(!moved_away(Some(&taskbar), Some(w(OWN)), &mut last));
+        assert!(moved_away(Some(&app), Some(w(OWN)), &mut last));
     }
 
     #[test]

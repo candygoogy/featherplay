@@ -11,10 +11,11 @@
 
 use std::time::Duration;
 
-use windows::Win32::Foundation::HWND;
 use windows::Win32::UI::WindowsAndMessaging::{
     GetSystemMetrics, SM_CXSCREEN, SM_CYSCREEN, SW_MINIMIZE, SW_RESTORE, ShowWindow,
 };
+
+use crate::window::Handle;
 
 // Declared here as the harness always had them, rather than turning on more `windows`
 // features for a build that's never published.
@@ -329,10 +330,10 @@ pub fn private_regions() -> (u64, u64) {
 
 /// Minimises the window (`minimise`) or restores it, directly (ShowWindow), not as its
 /// title bar's buttons do. `h` is a live window of the calling thread.
-pub fn show_minimised(h: isize, minimise: bool) {
+pub fn show_minimised(h: Handle, minimise: bool) {
     let how = if minimise { SW_MINIMIZE } else { SW_RESTORE };
     // SAFETY: the window's live handle, on its own thread.
-    let _ = unsafe { ShowWindow(HWND(h as *mut core::ffi::c_void), how) };
+    let _ = unsafe { ShowWindow(h.hwnd(), how) };
 }
 
 /// The primary screen's size, in physical pixels.

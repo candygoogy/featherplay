@@ -163,7 +163,7 @@ pub fn init(ctx: &Rc<Ctx>) {
     ui.global::<Theme>().on_dark_changed(move |dark| {
         follow::theme_changed(&c);
         if let Some(ui) = c.window()
-            && let Some(h) = shell::hwnd(ui.window())
+            && let Some(h) = shell::handle(ui.window())
             && let Err(e) = chrome::title_bar(
                 h,
                 dark,

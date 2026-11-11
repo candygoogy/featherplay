@@ -2,6 +2,7 @@
 
 pub use crate::common::media_controls::*;
 
+use crate::window::Handle;
 use crate::{Feature, Unsupported};
 
 /// The system's media controls, which this OS doesn't have yet.
@@ -12,7 +13,7 @@ pub struct MediaControls {
 impl MediaControls {
     /// Always an error: `Feature::MediaControls` isn't supported here.
     pub fn attach(
-        _hwnd: isize,
+        _window: Handle,
         _on_event: impl Fn(MediaEvent) + Send + 'static,
     ) -> Result<MediaControls, String> {
         Err(Unsupported(Feature::MediaControls).to_string())

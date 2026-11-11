@@ -5,7 +5,7 @@
 
 use std::cell::Cell;
 
-use featherplay_platform::window::{self, ScreenRect};
+use featherplay_platform::window::{self, Handle, ScreenRect};
 #[cfg(windows)]
 use slint::winit_030::winit::platform::windows::{CornerPreference, WindowAttributesExtWindows};
 use slint::winit_030::winit::window::WindowAttributes;
@@ -50,7 +50,7 @@ pub fn window_attributes(attrs: WindowAttributes) -> WindowAttributes {
 
 /// Shows `window`, `size` logical pixels, for a click on the tray icon at `(x, y)` (physical
 /// screen pixels). Returns where its top-left corner went. Once its window exists
-/// (`shell::when_hwnd`), `dress` it.
+/// (`shell::when_handle`), `dress` it.
 pub fn show_at(
     window: &slint::Window,
     (x, y): (i32, i32),
@@ -76,14 +76,14 @@ pub fn show_at(
     Ok((left, top))
 }
 
-/// Makes the shown popup's window `hwnd` opaque, with a hairline `border`, and gives it the
+/// Makes the shown popup's window `handle` opaque, with a hairline `border`, and gives it the
 /// activation.
-pub fn dress(hwnd: isize, border: slint::Color) {
-    if let Err(e) = window::opaque(hwnd) {
+pub fn dress(handle: Handle, border: slint::Color) {
+    if let Err(e) = window::opaque(handle) {
         log!("popup: opaque: {e}");
     }
-    let _ = chrome::popup_border(hwnd, border);
-    window::bring_forward(hwnd);
+    let _ = chrome::popup_border(handle, border);
+    window::bring_forward(handle);
 }
 
 /// Where a popup's top-left corner goes for a click at `point`, everything in physical

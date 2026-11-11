@@ -29,7 +29,6 @@
 //! values with the user's DPAPI key. Sign out deletes the whole profile.
 
 use std::cell::RefCell;
-use std::ffi::c_void;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::SyncSender;
 use std::time::Duration;
@@ -49,6 +48,9 @@ use windows::Win32::UI::HiDpi::GetDpiForWindow;
 use windows::Win32::UI::Shell::{DefSubclassProc, RemoveWindowSubclass, SetWindowSubclass};
 use windows::Win32::UI::WindowsAndMessaging::*;
 use windows::core::{BOOL, HSTRING, Interface, PCWSTR, PWSTR, w};
+
+use crate::window::Handle;
+
 /// What the profile drops when the window closes: all but the cookies.
 const FORGET: COREWEBVIEW2_BROWSING_DATA_KINDS = COREWEBVIEW2_BROWSING_DATA_KINDS(
     COREWEBVIEW2_BROWSING_DATA_KINDS_ALL_DOM_STORAGE.0
@@ -223,12 +225,12 @@ thread_local! {
     static EVENTS: RefCell<Option<Events>> = const { RefCell::new(None) };
 }
 
-/// Opens `page` in the frame `parent` (an HWND of the UI thread), on a new thread; `events`
+/// Opens `page` in the frame `parent` (a window of the UI thread), on a new thread; `events`
 /// and `done` run on that thread, `done` once the page has closed. `profile` is the WebView2
 /// user data folder (`{cache}/webview2`). Returns once the thread takes messages; an error
 /// then means `done` never runs.
 pub fn open(
-    parent: isize,
+    parent: Handle,
     room: Room,
     profile: PathBuf,
     page: Page,
@@ -240,7 +242,7 @@ pub fn open(
         .name("featherplay-signin".into())
         .spawn(move || {
             EVENTS.with(|e| *e.borrow_mut() = Some(Box::new(events)));
-            if let Some(outcome) = run(HWND(parent as *mut _), room, &profile, page, &ready) {
+            if let Some(outcome) = run(parent.hwnd(), room, &profile, page, &ready) {
                 done(outcome);
             }
         })
@@ -908,15 +910,15 @@ extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
 /// The subclass that passes the frame's size and position on to the page.
 const FOLLOW_SUBCLASS: usize = 0xfea7_0020;
 
-/// Tells the page thread when the frame `frame` (an HWND of the calling thread, the UI
+/// Tells the page thread when the frame `frame` (a window of the calling thread, the UI
 /// thread) is resized (a drag, a maximize, another screen's scale), moved, or brought back
 /// from the keyboard: a subclass of the frame that lasts as long as its window.
-pub fn follow(frame: isize, remote: Remote) -> Result<(), String> {
+pub fn follow(frame: Handle, remote: Remote) -> Result<(), String> {
     let data = Box::into_raw(Box::new(remote));
     // SAFETY: a live HWND of this thread; `data` stays valid until WM_NCDESTROY frees it.
     let ok = unsafe {
         SetWindowSubclass(
-            HWND(frame as *mut c_void),
+            frame.hwnd(),
             Some(follow_proc),
             FOLLOW_SUBCLASS,
             data as usize,
@@ -1192,7 +1194,7 @@ mod tests {
     fn open_in(ui: &UiThread, profile: &Path) -> (Remote, std::sync::mpsc::Receiver<bool>) {
         let (tx, rx) = std::sync::mpsc::channel();
         let remote = open(
-            ui.parent.0 as isize,
+            Handle::from_hwnd(ui.parent),
             ROOM,
             profile.to_path_buf(),
             BLANK,

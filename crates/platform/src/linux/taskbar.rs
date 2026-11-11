@@ -2,6 +2,7 @@
 
 pub use crate::common::taskbar::*;
 
+use crate::window::Handle;
 use crate::{Feature, Unsupported};
 
 /// Thumb buttons, which this OS doesn't have yet.
@@ -11,7 +12,10 @@ pub struct TaskbarButtons {
 
 impl TaskbarButtons {
     /// Always an error: `Feature::TaskbarButtons` isn't supported here.
-    pub fn attach(_hwnd: isize, _on_click: impl Fn(ThumbButton) + 'static) -> Result<Self, String> {
+    pub fn attach(
+        _window: Handle,
+        _on_click: impl Fn(ThumbButton) + 'static,
+    ) -> Result<Self, String> {
         Err(Unsupported(Feature::TaskbarButtons).to_string())
     }
 

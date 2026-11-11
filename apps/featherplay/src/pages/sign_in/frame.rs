@@ -11,7 +11,7 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use std::time::Duration;
 
-use featherplay_platform::window::{self, ScreenRect};
+use featherplay_platform::window::{self, Handle, ScreenRect};
 use slint::{CloseRequestResponse, ComponentHandle, LogicalSize, PhysicalPosition, Timer};
 
 use super::address::Address;
@@ -64,7 +64,7 @@ pub fn show_address(ui: &SignInWindow, address: &Address) {
 /// thread through `closed`).
 ///
 /// Winit makes the frame's window on a later turn of the event loop than `show`, so the
-/// page goes in once its handle exists (`shell::when_hwnd`). An error returned here, or one
+/// page goes in once its handle exists (`shell::when_handle`). An error returned here, or one
 /// told to `super::didnt_open` later, means the window didn't open and `done` never runs.
 pub fn open(
     ctx: &Rc<Ctx>,
@@ -81,7 +81,7 @@ pub fn open(
         place_over_page(&main, &ui);
     }
     ui.show().map_err(|e| format!("show: {e}"))?;
-    // Kept here while the window is made: `when_hwnd` holds it weakly.
+    // Kept here while the window is made: `when_handle` holds it weakly.
     FRAME.with_borrow_mut(|f| *f = Some(ui.clone_strong()));
     // Closed before the page went in (`embed` replaces this): nothing to wait for, and
     // dropping the frame stops the wait.
@@ -89,10 +89,10 @@ pub fn open(
         let _ = slint::invoke_from_event_loop(|| super::window_closed(Outcome::Cancelled));
         CloseRequestResponse::HideWindow
     });
-    shell::when_hwnd(
+    shell::when_handle(
         &ui,
-        move |ui, hwnd| {
-            if let Err(e) = embed(ui, hwnd, profile, start, done) {
+        move |ui, handle| {
+            if let Err(e) = embed(ui, handle, profile, start, done) {
                 closed();
                 super::didnt_open(&e);
             }
@@ -109,17 +109,17 @@ pub fn open(
 #[cfg(windows)]
 fn embed(
     ui: &SignInWindow,
-    hwnd: isize,
+    handle: Handle,
     profile: PathBuf,
     start: &'static str,
     done: impl FnOnce(Outcome) + Send + 'static,
 ) -> Result<(), String> {
-    dress(ui, hwnd);
+    dress(ui, handle);
     let room = Room {
         top: ui.get_page_top(),
         bottom: ui.get_page_bottom(),
     };
-    let remote = webview::open(hwnd, room, profile, start, tell, done)?;
+    let remote = webview::open(handle, room, profile, start, tell, done)?;
     ui.on_back(move || remote.back());
     ui.on_reload(move || remote.reload());
     ui.window().on_close_requested(move || {
@@ -135,7 +135,7 @@ fn embed(
         });
         CloseRequestResponse::HideWindow
     });
-    if let Err(e) = featherplay_platform::webview::follow(hwnd, remote) {
+    if let Err(e) = featherplay_platform::webview::follow(handle, remote) {
         log!("sign-in window: can't follow its size: {e}");
     }
     Ok(())
@@ -145,7 +145,7 @@ fn embed(
 #[cfg(not(windows))]
 fn embed(
     _ui: &SignInWindow,
-    _hwnd: isize,
+    _handle: Handle,
     _profile: PathBuf,
     _start: &'static str,
     _done: impl FnOnce(Outcome) + Send + 'static,
@@ -164,7 +164,9 @@ const LEAST_H: f32 = 480.0;
 /// places it.
 fn place_over_page(main: &AppWindow, ui: &SignInWindow) {
     let window = main.window();
-    let Some(h) = shell::hwnd(window) else { return };
+    let Some(h) = shell::handle(window) else {
+        return;
+    };
     if window::is_minimised(h) {
         return;
     }
@@ -250,16 +252,20 @@ fn private_mb() -> f64 {
 
 /// The title bar in the frame's colours, an opaque client area, the app's icon.
 #[cfg(windows)]
-fn dress(ui: &SignInWindow, hwnd: isize) {
+fn dress(ui: &SignInWindow, handle: Handle) {
     let theme = ui.global::<Theme>();
-    if let Err(e) = window::opaque(hwnd) {
+    if let Err(e) = window::opaque(handle) {
         log!("sign-in window: opaque: {e}");
     }
-    if let Err(e) = chrome::title_bar(hwnd, theme.get_dark(), theme.get_panel(), theme.get_text1())
-    {
+    if let Err(e) = chrome::title_bar(
+        handle,
+        theme.get_dark(),
+        theme.get_panel(),
+        theme.get_text1(),
+    ) {
         log!("sign-in window: title bar: {e}");
     }
-    let _ = chrome::set_icon(hwnd, ui.window().scale_factor());
+    let _ = chrome::set_icon(handle, ui.window().scale_factor());
 }
 
 /// From the sign-in thread: shown on the UI thread.

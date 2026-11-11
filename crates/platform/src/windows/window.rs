@@ -1,4 +1,4 @@
-//! Window operations on a plain handle (an HWND as `isize`): a title bar in the app's
+//! Window operations on a window's `Handle` (its HWND here): a title bar in the app's
 //! colours, an opaque surface that's repainted whole when Windows drops it, the window icon,
 //! minimising it and bringing it forward, and watching its theme, displays, size, presses and
 //! taskbar button; Windows' animation setting. For the tray's mini player: the work area and
@@ -9,6 +9,7 @@
 use std::cell::{Cell, RefCell};
 use std::ffi::c_void;
 
+use raw_window_handle::RawWindowHandle;
 use windows::Win32::Foundation::{COLORREF, HWND, LPARAM, LRESULT, POINT, RECT, WPARAM};
 use windows::Win32::Graphics::Dwm::{
     DWM_BB_ENABLE, DWM_BLURBEHIND, DWMWA_BORDER_COLOR, DWMWA_CAPTION_COLOR, DWMWA_TEXT_COLOR,
@@ -42,8 +43,33 @@ thread_local! {
     static MADE: RefCell<Vec<isize>> = const { RefCell::new(Vec::new()) };
 }
 
-fn hwnd(h: isize) -> HWND {
-    HWND(h as *mut c_void)
+/// A window, as the window functions take it: here its HWND. Made from the windowing
+/// library's raw handle (`from_raw`); its `Debug` prints the HWND in hex.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct Handle(isize);
+
+impl Handle {
+    /// The window `raw` names, if it's a Win32 window.
+    pub fn from_raw(raw: RawWindowHandle) -> Option<Handle> {
+        match raw {
+            RawWindowHandle::Win32(h) => Some(Handle(h.hwnd.get())),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn from_hwnd(h: HWND) -> Handle {
+        Handle(h.0 as isize)
+    }
+
+    pub(crate) fn hwnd(self) -> HWND {
+        HWND(self.0 as *mut c_void)
+    }
+}
+
+impl std::fmt::Debug for Handle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:#x}", self.0)
+    }
 }
 
 /// The title bar in the app's own colours: dark or light caption buttons, the window's
@@ -51,7 +77,7 @@ fn hwnd(h: isize) -> HWND {
 /// app even when Windows' app mode differs. No Mica: its wallpaper tint didn't match the
 /// opaque client area below it. Caption and text colours need Windows 11; older versions
 /// keep the plain dark or light title bar.
-pub fn title_bar(h: isize, dark: bool, caption: Rgb, text: Rgb) -> Result<(), String> {
+pub fn title_bar(h: Handle, dark: bool, caption: Rgb, text: Rgb) -> Result<(), String> {
     set(
         h,
         DWMWA_USE_IMMERSIVE_DARK_MODE,
@@ -64,14 +90,14 @@ pub fn title_bar(h: isize, dark: bool, caption: Rgb, text: Rgb) -> Result<(), St
 /// Makes DWM ignore the client area's alpha. Slint asks winit for a transparent window,
 /// which on Windows turns on blur-behind with an empty region: every pixel the renderer
 /// hasn't painted (alpha 0) then shows the windows behind. The app is opaque throughout.
-pub fn opaque(h: isize) -> Result<(), String> {
+pub fn opaque(h: Handle) -> Result<(), String> {
     let off = DWM_BLURBEHIND {
         dwFlags: DWM_BB_ENABLE,
         fEnable: false.into(),
         ..Default::default()
     };
     // SAFETY: a live HWND and a filled-in DWM_BLURBEHIND.
-    unsafe { DwmEnableBlurBehindWindow(hwnd(h), &off) }.map_err(|e| e.message())
+    unsafe { DwmEnableBlurBehindWindow(h.hwnd(), &off) }.map_err(|e| e.message())
 }
 
 /// The subclass that watches paints (`repaint_when_invalidated`).
@@ -97,7 +123,7 @@ struct Paints {
 /// `whole` is whether that paint had an update region. `wheel` gets each WM_MOUSEWHEEL's
 /// delta, in 120ths of a notch.
 pub fn repaint_when_invalidated(
-    h: isize,
+    h: Handle,
     invalidated: impl Fn() + 'static,
     around_paint: impl Fn(bool, &mut dyn FnMut()) + 'static,
     wheel: impl Fn(i16) + 'static,
@@ -108,8 +134,14 @@ pub fn repaint_when_invalidated(
         wheel: Box::new(wheel),
     }));
     // SAFETY: a live HWND on this thread; `data` stays valid until WM_NCDESTROY frees it.
-    let ok =
-        unsafe { SetWindowSubclass(hwnd(h), Some(repaint_proc), REPAINT_SUBCLASS, data as usize) };
+    let ok = unsafe {
+        SetWindowSubclass(
+            h.hwnd(),
+            Some(repaint_proc),
+            REPAINT_SUBCLASS,
+            data as usize,
+        )
+    };
     if !ok.as_bool() {
         // SAFETY: never shared, the subclass wasn't installed.
         drop(unsafe { Box::from_raw(data) });
@@ -160,11 +192,11 @@ unsafe extern "system" fn repaint_proc(
 }
 
 /// One DWM window attribute.
-fn set<T>(h: isize, attr: DWMWINDOWATTRIBUTE, value: &T) -> Result<(), String> {
+fn set<T>(h: Handle, attr: DWMWINDOWATTRIBUTE, value: &T) -> Result<(), String> {
     // SAFETY: a live HWND and a pointer to a value of the size given.
     unsafe {
         DwmSetWindowAttribute(
-            hwnd(h),
+            h.hwnd(),
             attr,
             value as *const T as *const c_void,
             size_of::<T>() as u32,
@@ -181,7 +213,7 @@ fn colorref(c: Rgb) -> COLORREF {
 /// Sets the title bar (small) and taskbar (big) icons, sized for `scale`, from the PNG
 /// entries of `ico` (an `.ico` file's bytes). Call it again with the other drawing when the
 /// taskbar's theme changes (`when_colours_change`).
-pub fn set_icon(h: isize, scale: f32, ico: &[u8]) -> Result<(), String> {
+pub fn set_icon(h: Handle, scale: f32, ico: &[u8]) -> Result<(), String> {
     for (which, base) in [(ICON_SMALL, 16.0), (ICON_BIG, 32.0)] {
         let px = (base * scale).round() as i32;
         let png = ico_entry(ico, px as u32).ok_or("no icon entry")?;
@@ -193,7 +225,7 @@ pub fn set_icon(h: isize, scale: f32, ico: &[u8]) -> Result<(), String> {
         // one it replaces.
         let old = unsafe {
             SendMessageW(
-                hwnd(h),
+                h.hwnd(),
                 WM_SETICON,
                 Some(WPARAM(which as usize)),
                 Some(LPARAM(icon.0 as isize)),
@@ -221,11 +253,17 @@ type Changed = Box<dyn Fn()>;
 
 /// Calls `changed` when Windows' light/dark settings change (a WM_SETTINGCHANGE for
 /// "ImmersiveColorSet"), so the window icon can follow the taskbar's theme.
-pub fn when_colours_change(h: isize, changed: impl Fn() + 'static) -> Result<(), String> {
+pub fn when_colours_change(h: Handle, changed: impl Fn() + 'static) -> Result<(), String> {
     let data = Box::into_raw(Box::new(Box::new(changed) as Changed));
     // SAFETY: a live HWND on this thread; `data` stays valid until WM_NCDESTROY frees it.
-    let ok =
-        unsafe { SetWindowSubclass(hwnd(h), Some(colours_proc), COLOURS_SUBCLASS, data as usize) };
+    let ok = unsafe {
+        SetWindowSubclass(
+            h.hwnd(),
+            Some(colours_proc),
+            COLOURS_SUBCLASS,
+            data as usize,
+        )
+    };
     if !ok.as_bool() {
         // SAFETY: never shared, the subclass wasn't installed.
         drop(unsafe { Box::from_raw(data) });
@@ -268,12 +306,12 @@ type Minimised = Box<dyn Fn(bool)>;
 /// Calls `changed(true)` when the window is minimised and `changed(false)` when it's restored
 /// or maximised (WM_SIZE), after the window has handled the message. It may be called again
 /// for the same state (each restore or resize sends one).
-pub fn when_minimised(h: isize, changed: impl Fn(bool) + 'static) -> Result<(), String> {
+pub fn when_minimised(h: Handle, changed: impl Fn(bool) + 'static) -> Result<(), String> {
     let data = Box::into_raw(Box::new(Box::new(changed) as Minimised));
     // SAFETY: a live HWND on this thread; `data` stays valid until WM_NCDESTROY frees it.
     let ok = unsafe {
         SetWindowSubclass(
-            hwnd(h),
+            h.hwnd(),
             Some(minimised_proc),
             MINIMISED_SUBCLASS,
             data as usize,
@@ -325,12 +363,12 @@ const DISPLAYS_SUBCLASS: usize = 0xfea7_0004;
 /// scale (WM_DPICHANGED), a display added, removed or resized (WM_DISPLAYCHANGE), or a
 /// setting (WM_SETTINGCHANGE, which a new scale on the primary display sends), so the tray
 /// icon can be drawn for its new size. `changed` should be cheap when nothing changed.
-pub fn when_displays_change(h: isize, changed: impl Fn() + 'static) -> Result<(), String> {
+pub fn when_displays_change(h: Handle, changed: impl Fn() + 'static) -> Result<(), String> {
     let data = Box::into_raw(Box::new(Box::new(changed) as Changed));
     // SAFETY: a live HWND on this thread; `data` stays valid until WM_NCDESTROY frees it.
     let ok = unsafe {
         SetWindowSubclass(
-            hwnd(h),
+            h.hwnd(),
             Some(displays_proc),
             DISPLAYS_SUBCLASS,
             data as usize,
@@ -382,11 +420,11 @@ type Sizing = Box<dyn Fn(bool)>;
 /// title bar (WM_ENTERSIZEMOVE, before the window handles it) and `changed(false)` when they
 /// let go (WM_EXITSIZEMOVE, after). Windows runs its own loop in between, applying the
 /// drag's next step once the window has painted the last one.
-pub fn when_sizing(h: isize, changed: impl Fn(bool) + 'static) -> Result<(), String> {
+pub fn when_sizing(h: Handle, changed: impl Fn(bool) + 'static) -> Result<(), String> {
     let data = Box::into_raw(Box::new(Box::new(changed) as Sizing));
     // SAFETY: a live HWND on this thread; `data` stays valid until WM_NCDESTROY frees it.
     let ok =
-        unsafe { SetWindowSubclass(hwnd(h), Some(sizing_proc), SIZING_SUBCLASS, data as usize) };
+        unsafe { SetWindowSubclass(h.hwnd(), Some(sizing_proc), SIZING_SUBCLASS, data as usize) };
     if !ok.as_bool() {
         // SAFETY: never shared, the subclass wasn't installed.
         drop(unsafe { Box::from_raw(data) });
@@ -444,28 +482,28 @@ unsafe fn is_colour_set(lparam: LPARAM) -> bool {
 /// way the title bar's and taskbar's do (WM_SYSCOMMAND), so winit's own minimised state
 /// follows and Windows plays its restore animation where it plays one; a window minimised
 /// from maximised comes back maximised.
-pub fn bring_forward(h: isize) {
+pub fn bring_forward(h: Handle) {
     // SAFETY: handle-only calls; a stale handle makes them fail, nothing is dereferenced.
     unsafe {
-        if IsIconic(hwnd(h)).as_bool() {
+        if IsIconic(h.hwnd()).as_bool() {
             SendMessageW(
-                hwnd(h),
+                h.hwnd(),
                 WM_SYSCOMMAND,
                 Some(WPARAM(SC_RESTORE as usize)),
                 None,
             );
         }
-        let _ = SetForegroundWindow(hwnd(h));
+        let _ = SetForegroundWindow(h.hwnd());
     }
 }
 
 /// Minimises the window as its title bar button does (WM_SYSCOMMAND, so winit's state
 /// follows), with Windows' minimise animation where it plays one.
-pub fn minimise(h: isize) {
+pub fn minimise(h: Handle) {
     // SAFETY: a handle-only message; a stale handle makes it fail.
     unsafe {
         SendMessageW(
-            hwnd(h),
+            h.hwnd(),
             WM_SYSCOMMAND,
             Some(WPARAM(SC_MINIMIZE as usize)),
             None,
@@ -484,14 +522,20 @@ type Pressed = (Cell<bool>, Box<dyn Fn(bool)>);
 /// window: `from_behind` when that press is what activates it (Windows sends an inactive
 /// window WM_MOUSEACTIVATE, or WM_POINTERACTIVATE for touch and pen, just before the press
 /// reaches it). By the time the press arrives, the window is already in front either way.
-pub fn when_pressed(h: isize, pressed: impl Fn(bool) + 'static) -> Result<(), String> {
+pub fn when_pressed(h: Handle, pressed: impl Fn(bool) + 'static) -> Result<(), String> {
     let data = Box::into_raw(Box::new((
         Cell::new(false),
         Box::new(pressed) as Box<dyn Fn(bool)>,
     )));
     // SAFETY: a live HWND on this thread; `data` stays valid until WM_NCDESTROY frees it.
-    let ok =
-        unsafe { SetWindowSubclass(hwnd(h), Some(pressed_proc), PRESSED_SUBCLASS, data as usize) };
+    let ok = unsafe {
+        SetWindowSubclass(
+            h.hwnd(),
+            Some(pressed_proc),
+            PRESSED_SUBCLASS,
+            data as usize,
+        )
+    };
     if !ok.as_bool() {
         // SAFETY: never shared, the subclass wasn't installed.
         drop(unsafe { Box::from_raw(data) });
@@ -539,7 +583,7 @@ pub fn foreground() -> Option<Foreground> {
         return None;
     }
     Some(Foreground {
-        hwnd: h.0 as isize,
+        window: Handle::from_hwnd(h),
         class: class_of(h),
     })
 }
@@ -601,16 +645,16 @@ unsafe extern "system" fn press_hook(code: i32, wparam: WPARAM, lparam: LPARAM) 
 }
 
 /// Whether the window is minimised (hidden or not).
-pub fn is_minimised(h: isize) -> bool {
+pub fn is_minimised(h: Handle) -> bool {
     // SAFETY: a handle-only call; a stale handle reads as not minimised.
-    unsafe { IsIconic(hwnd(h)) }.as_bool()
+    unsafe { IsIconic(h.hwnd()) }.as_bool()
 }
 
 /// Where the window's client area starts on screen, in physical pixels.
-pub fn client_origin(h: isize) -> Option<(i32, i32)> {
+pub fn client_origin(h: Handle) -> Option<(i32, i32)> {
     let mut p = POINT::default();
     // SAFETY: a handle and an out-parameter; a stale handle fails.
-    unsafe { ClientToScreen(hwnd(h), &mut p) }
+    unsafe { ClientToScreen(h.hwnd(), &mut p) }
         .as_bool()
         .then_some((p.x, p.y))
 }
@@ -640,7 +684,7 @@ type Button = (u32, Box<dyn Fn()>);
 
 /// Calls `created` each time the taskbar has made the window's button ("TaskbarButtonCreated":
 /// when the window shows, and again after Explorer restarts), after the window has handled it.
-pub fn when_taskbar_button(h: isize, created: impl Fn() + 'static) -> Result<(), String> {
+pub fn when_taskbar_button(h: Handle, created: impl Fn() + 'static) -> Result<(), String> {
     // SAFETY: a NUL-terminated static name.
     let msg = unsafe { RegisterWindowMessageW(windows::core::w!("TaskbarButtonCreated")) };
     if msg == 0 {
@@ -649,7 +693,7 @@ pub fn when_taskbar_button(h: isize, created: impl Fn() + 'static) -> Result<(),
     let data = Box::into_raw(Box::new((msg, Box::new(created) as Box<dyn Fn()>)));
     // SAFETY: a live HWND on this thread; `data` stays valid until WM_NCDESTROY frees it.
     let ok =
-        unsafe { SetWindowSubclass(hwnd(h), Some(button_proc), BUTTON_SUBCLASS, data as usize) };
+        unsafe { SetWindowSubclass(h.hwnd(), Some(button_proc), BUTTON_SUBCLASS, data as usize) };
     if !ok.as_bool() {
         // SAFETY: never shared, the subclass wasn't installed.
         drop(unsafe { Box::from_raw(data) });
@@ -711,7 +755,7 @@ pub fn work_area_at(x: i32, y: i32) -> Option<(ScreenRect, f32)> {
 
 /// The border Windows 11 draws around a rounded popup, in the app's hairline colour rather
 /// than the system's accent-or-grey one. Older versions have no such border.
-pub fn popup_border(h: isize, colour: Rgb) -> Result<(), String> {
+pub fn popup_border(h: Handle, colour: Rgb) -> Result<(), String> {
     set(h, DWMWA_BORDER_COLOR, &colorref(colour))
 }
 
@@ -776,7 +820,7 @@ mod tests {
         .expect("window");
         let seen = Rc::new(RefCell::new(Vec::new()));
         let s = seen.clone();
-        when_pressed(h.0 as isize, move |from_behind| {
+        when_pressed(Handle::from_hwnd(h), move |from_behind| {
             s.borrow_mut().push(from_behind);
         })
         .expect("subclass");

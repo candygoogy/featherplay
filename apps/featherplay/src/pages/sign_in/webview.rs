@@ -16,6 +16,8 @@ use std::path::PathBuf;
 use featherplay_platform::webview as page;
 #[cfg(windows)]
 pub use featherplay_platform::webview::{Remote, Room};
+#[cfg(windows)]
+use featherplay_platform::window::Handle;
 
 use super::address::Address;
 #[cfg(windows)]
@@ -67,7 +69,7 @@ pub enum Event {
 /// takes messages; an error then means `done` never runs.
 #[cfg(windows)]
 pub fn open(
-    parent: isize,
+    parent: Handle,
     room: Room,
     profile: PathBuf,
     start: &'static str,

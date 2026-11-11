@@ -10,6 +10,8 @@ use std::path::{Path, PathBuf};
 pub use crate::common::browsers::*;
 pub use launch::{Pipes, Running, launch};
 
+use crate::window::Handle;
+
 /// This PC: the registry, the environment, the disk.
 pub struct ThisPc;
 
@@ -135,9 +137,9 @@ fn https_handler() -> Option<PathBuf> {
     exe.is_absolute().then_some(exe)
 }
 
-/// The visible top-level windows of the process `pid`, as plain handles. For the app's live
+/// The visible top-level windows of the process `pid`. For the app's live
 /// check that a browser exits when its window is closed.
-pub fn visible_windows(pid: u32) -> Vec<isize> {
+pub fn visible_windows(pid: u32) -> Vec<Handle> {
     use windows::Win32::Foundation::{HWND, LPARAM};
     use windows::Win32::UI::WindowsAndMessaging::{
         EnumWindows, GetWindowThreadProcessId, IsWindowVisible,
@@ -146,7 +148,7 @@ pub fn visible_windows(pid: u32) -> Vec<isize> {
 
     struct Find {
         pid: u32,
-        found: Vec<isize>,
+        found: Vec<Handle>,
     }
     unsafe extern "system" fn each(hwnd: HWND, lparam: LPARAM) -> BOOL {
         // SAFETY: `lparam` is the `Find` passed to EnumWindows below, alive for the call.
@@ -156,7 +158,7 @@ pub fn visible_windows(pid: u32) -> Vec<isize> {
         unsafe { GetWindowThreadProcessId(hwnd, Some(&mut pid)) };
         // SAFETY: handle-only query.
         if pid == find.pid && unsafe { IsWindowVisible(hwnd) }.as_bool() {
-            find.found.push(hwnd.0 as isize);
+            find.found.push(Handle::from_hwnd(hwnd));
         }
         true.into()
     }
@@ -173,13 +175,13 @@ pub fn visible_windows(pid: u32) -> Vec<isize> {
 }
 
 /// Asks `window` (one of [`visible_windows`]) to close, as its close button would.
-pub fn close_window(window: isize) {
-    use windows::Win32::Foundation::{HWND, LPARAM, WPARAM};
+pub fn close_window(window: Handle) {
+    use windows::Win32::Foundation::{LPARAM, WPARAM};
     use windows::Win32::UI::WindowsAndMessaging::{PostMessageW, WM_CLOSE};
 
     // SAFETY: only queues a message for a window of the browser we started.
     unsafe {
-        let _ = PostMessageW(Some(HWND(window as *mut _)), WM_CLOSE, WPARAM(0), LPARAM(0));
+        let _ = PostMessageW(Some(window.hwnd()), WM_CLOSE, WPARAM(0), LPARAM(0));
     }
 }
 

@@ -8,6 +8,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 pub use crate::common::browsers::*;
+use crate::window::Handle;
 
 /// This PC, where no browser is looked for yet: every lookup comes back empty.
 pub struct ThisPc;
@@ -74,9 +75,9 @@ pub fn launch(_exe: &Path, _args: &[OsString]) -> io::Result<(Running, Pipes)> {
 }
 
 /// The visible top-level windows of the process `pid`: none, as no browser is started.
-pub fn visible_windows(_pid: u32) -> Vec<isize> {
+pub fn visible_windows(_pid: u32) -> Vec<Handle> {
     Vec::new()
 }
 
 /// Would ask `window` to close; there is none.
-pub fn close_window(_window: isize) {}
+pub fn close_window(_window: Handle) {}

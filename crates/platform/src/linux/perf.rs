@@ -3,6 +3,8 @@
 
 use std::time::Duration;
 
+use crate::window::Handle;
+
 /// A thread's cycles so far. 0: not counted on Linux.
 pub fn thread_cycles(_tid: u64) -> u64 {
     0
@@ -73,7 +75,7 @@ pub fn private_regions() -> (u64, u64) {
 }
 
 /// Would minimise or restore the window. Does nothing yet.
-pub fn show_minimised(_h: isize, _minimise: bool) {}
+pub fn show_minimised(_h: Handle, _minimise: bool) {}
 
 /// The primary screen's size, in physical pixels. Unknown for now: (0, 0).
 pub fn screen_size() -> (i32, i32) {

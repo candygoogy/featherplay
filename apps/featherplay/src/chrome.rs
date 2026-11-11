@@ -2,7 +2,7 @@
 //! bar and taskbar, which the build script makes, and the theme's colours for the title bar
 //! and a popup's border, handed to `featherplay_platform::window` as plain RGB.
 
-use featherplay_platform::window::{self, Rgb};
+use featherplay_platform::window::{self, Handle, Rgb};
 use slint::Color;
 
 /// The Tri-vane logo, 16 to 256 px, from `build.rs`, drawn for dark grounds: the play sits
@@ -33,20 +33,20 @@ fn rgb(c: Color) -> Rgb {
 /// app even when Windows' app mode differs. No Mica: its wallpaper tint didn't match the
 /// opaque client area below it. Caption and text colours need Windows 11; older versions
 /// keep the plain dark or light title bar.
-pub fn title_bar(h: isize, dark: bool, caption: Color, text: Color) -> Result<(), String> {
+pub fn title_bar(h: Handle, dark: bool, caption: Color, text: Color) -> Result<(), String> {
     window::title_bar(h, dark, rgb(caption), rgb(text))
 }
 
 /// Sets the title bar (small) and taskbar (big) icons, sized for `scale`, in the drawing for
 /// the taskbar's theme. Call it again when that theme changes (`window::when_colours_change`).
-pub fn set_icon(h: isize, scale: f32) -> Result<(), String> {
+pub fn set_icon(h: Handle, scale: f32) -> Result<(), String> {
     let ico = icon_for(featherplay_platform::taskbar::light_taskbar());
     window::set_icon(h, scale, ico)
 }
 
 /// The border Windows 11 draws around a rounded popup, in the app's hairline colour rather
 /// than the system's accent-or-grey one. Older versions have no such border.
-pub fn popup_border(h: isize, colour: Color) -> Result<(), String> {
+pub fn popup_border(h: Handle, colour: Color) -> Result<(), String> {
     window::popup_border(h, rgb(colour))
 }
 

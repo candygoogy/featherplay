@@ -1,5 +1,8 @@
 //! What the window functions take and give on every OS: a plain colour, a screen
-//! rectangle, the window in front, and the entry of an `.ico` for a size.
+//! rectangle, the window in front, and the entry of an `.ico` for a size. The window
+//! itself, `Handle`, is each OS's own.
+
+use crate::window::Handle;
 
 /// A colour as the window functions take it: red, green and blue, no alpha.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -15,7 +18,7 @@ pub type ScreenRect = (i32, i32, i32, i32);
 /// The window in front: what `foreground` reads.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Foreground {
-    pub hwnd: isize,
+    pub window: Handle,
     /// Its window class, as `GetClassNameW` gives it (`Shell_TrayWnd`).
     pub class: String,
 }
