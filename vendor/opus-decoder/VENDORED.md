@@ -62,6 +62,16 @@ dropping the pre-skip (alignment offset 0):
 `decode_float` goes through i16 internally, so the output has 16-bit precision; that's fine
 for playback.
 
+## Platforms
+
+Both changes are plain Rust with no OS code, so neither is gated (2026-11-11); the crate
+compiles on Linux as is.
+
+| Change | Neutral or Windows | Gated? | Why |
+|---|---|---|---|
+| 1 rustfft FFT | Neutral | No | Pure Rust, scalar (no SIMD back ends). |
+| 2 32-bit collapse mask | Neutral | No | A bug fix in the decoder. |
+
 Licence: unchanged, MIT OR Apache-2.0 (see `Cargo.toml`; the published crate ships no
 licence files). It's a port of libopus, BSD 3-Clause (see `README.md`).
 

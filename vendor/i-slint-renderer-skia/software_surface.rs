@@ -126,8 +126,10 @@ impl RenderBuffer for SoftbufferRenderBuffer {
         let mut surface = self.surface.borrow_mut();
 
         // featherplay patch (change 15): during a live resize the buffer may be larger than
-        // the window; the frame paints its top left, the buffer's rows as the stride.
-        let live = LIVE_RESIZE.load(std::sync::atomic::Ordering::Relaxed);
+        // the window; the frame paints its top left, the buffer's rows as the stride. Windows
+        // only: elsewhere the buffer is always the window's size, as upstream (a Wayland
+        // surface takes its size from the buffer, so a larger one would grow the window).
+        let live = cfg!(windows) && LIVE_RESIZE.load(std::sync::atomic::Ordering::Relaxed);
         let (buffer_width, buffer_height) =
             buffer_size(self.buffer.get(), (width.get(), height.get()), live);
         let (Some(buffer_width), Some(buffer_height)) =

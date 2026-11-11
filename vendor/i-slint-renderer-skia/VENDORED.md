@@ -18,6 +18,12 @@ swaps it in with `[patch.crates-io]`.
    for the `skia-wgpu` renderer name or a Direct3D graphics-API request; featherplay asks
    for `skia-software`, so neither path runs.
 
+   On Linux and the other non-Apple unixes, `SkiaRenderer::default_vulkan` gets the same
+   stub (2026-11-11, marked `featherplay patch`): there `i-slint-backend-winit` calls it for a
+   Vulkan request, also with no feature gate, and Skia's Vulkan surface is wgpu's, so without
+   wgpu it was missing and the backend didn't compile on Linux. It's compiled only where
+   upstream's own `default_vulkan` isn't (`not(skia_wgpu_vulkan)`), never on Windows.
+
 3. `lib.rs`: `free_graphics_resources` also frees the destroyed component's layers
    (`self.layer_cache.component_destroyed(component)`, marked `featherplay patch`). 1.18.1
    frees its images, paths and text but leaves its `cache-rendering-hint` layers in the cache
@@ -123,7 +129,11 @@ Change 15 makes a live resize follow the pointer (measured 2026-11-05):
     the drag's next step only after the window has painted, so the window trailed the
     pointer. With the buffer kept, a 4K step on Home takes 11 ms widening and 5 ms growing
     taller, against 17 and 12 ms before (`apps/featherplay/tests/app/resize_frames.rs`;
-    `live_resize.rs` checks every frame of a drag shows the whole window).
+    `live_resize.rs` checks every frame of a drag shows the whole window). The kept buffer is
+    Windows only (`cfg!(windows)` where the surface reads `LIVE_RESIZE`): a Wayland surface
+    takes its size from its buffer, so a larger one would grow the window. Elsewhere the
+    buffer is always the window's size; `LIVE_RESIZE` and `buffer_size` stay on every target,
+    for `src/offscreen.rs`.
 
 Change 16 makes the exe smaller (measured 2026-11-08):
 
@@ -176,6 +186,35 @@ Change 19 makes a frame of the playing mark cheaper (measured 2026-11-10):
     the children of a layer are drawn through the Skia renderer, not the partial one, so
     they have no change trackers left dirty by the skip.
 
+## Platforms
+
+Which changes are Windows-specific (2026-11-11). Only code that is Win32's or would behave
+wrongly elsewhere is gated; renderer logic that is the same on every target stays on. The
+crate compiles on Linux (x11 and wayland softbuffer, Skia software) with the features
+featherplay uses.
+
+| Change | Neutral or Windows | Gated? | Why |
+|---|---|---|---|
+| 1 wgpu out of the defaults | Neutral | No | A Cargo feature; wgpu is unused on every target. |
+| 2 wgpu stub constructors | `default_wgpu_30` neutral; `default_direct3d` Windows; `default_vulkan` Linux | Yes, the last two | Each exists only where `i-slint-backend-winit` calls it: Direct3D on Windows, Vulkan on non-Apple unixes (upstream's cfgs). |
+| 3 destroyed component's layers freed | Neutral | No | Cache bookkeeping. |
+| 4 `PRESENTED_PIXELS` | Neutral | No | One relaxed atomic add per present; only Windows code reads it, but counting is right everywhere. |
+| 5 zero-size `resize` lets go | Neutral | No | Clearing the caches is the same everywhere; the buffer's release is a softbuffer resize to 1×1, which frees Win32's DIB at once and elsewhere at most what softbuffer frees on a resize. Only featherplay calls it. |
+| 6 whole-pixel upright clips | Neutral | No | Skia rasterising. |
+| 7 layers in the canvas's format, opaque ones copied | Neutral | No | The window's canvas is BGRA on every target (upstream's softbuffer surface). |
+| 8 small borders as cached images | Neutral | No | Skia rasterising. |
+| 9 `NOTDEF_GLYPHS` | Neutral | No | Counts boxes whatever the font manager. |
+| 10 `coalesce_damage` | Neutral | No | Measured on Win32 (one BitBlt a rectangle), but a merge never covers more pixels, so it is never worse on X11 or Wayland; `src/offscreen.rs` uses it too. |
+| 11 opacity layer at its children's bounds | Neutral | No | Skia rasterising. |
+| 12 kept layer drawn with the opacity's alpha | Neutral | No | Skia rasterising. |
+| 13 shadow under an opaque background skipped | Neutral | No | Skia rasterising. |
+| 14 variations from the base typeface | Neutral | No | Measured with DirectWrite; `clone_with_arguments` works on FreeType typefaces too. |
+| 15 buffer kept through a live resize | Windows | Yes, `cfg!(windows)` in `SoftbufferRenderBuffer` | Win32's DIB per size and WM_ENTERSIZEMOVE; on Wayland a buffer larger than the window would grow it. `LIVE_RESIZE` and `buffer_size` stay for the offscreen surface. |
+| 16 no OpenGL surface | Windows | Yes (already `target_family = "windows"`) | Elsewhere the OpenGL surface stays as upstream. |
+| 17 shadows from colourless masks | Neutral | No | Skia rasterising and a cache. |
+| 18 no SVG renderer | Neutral | No | A Cargo feature and a `cfg(any())` arm. |
+| 19 no layer at alpha 0 | Neutral | No | Skia rasterising. |
+
 ## Why
 
 `i-slint-backend-winit` depends on this crate with its default features, and our crates
@@ -204,9 +243,9 @@ licence, which allows modified copies).
    test shows it), change 18 (the exe's size shows whether resvg came back), and change
    19 unless the new `visit_opacity` already skips a layer at alpha 0 (`render_surface.rs`
    checks the frames).
-4. Build. If `i-slint-backend-winit` still calls wgpu-only constructors, port the two
+4. Build. If `i-slint-backend-winit` still calls wgpu-only constructors, port the three
    wgpu `featherplay patch` blocks in `lib.rs` (the git history of this folder has the diff);
-   if it now gates them itself, leave those two out.
+   if it now gates them itself, leave those out. Check the Linux build too (see Platforms).
 5. Bump the `=x.y.z` pins in the workspace `Cargo.toml`, check `cargo tree -i wgpu-core`
    prints nothing, then build and measure the release exe.
 

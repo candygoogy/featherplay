@@ -29,6 +29,18 @@ don't go through the throttle and are unchanged.
 3. **No SVG renderer** (2026-11-10): `Cargo.toml` leaves `svg` out of the `i-slint-core`
    features, as the vendored `i-slint-renderer-skia` does (its change 18 says why).
 
+## Platforms
+
+None of the changes is Windows-specific, so none is gated (2026-11-11). The crate compiles
+on Linux (x11 and wayland, Skia software) with the features featherplay uses; for that the
+vendored `i-slint-renderer-skia` stubs `default_vulkan` (its change 2).
+
+| Change | Neutral or Windows | Gated? | Why |
+|---|---|---|---|
+| 1 one paint per redraw | Neutral | No | `TimerBasedFrameThrottle` is the throttle on Windows and X11 alike; Wayland windows use `WinitBasedFrameThrottle`, untouched. |
+| 2 refresh rate read once a second | Neutral | No | Measured on Win32's monitor calls, but caching winit's `refresh_rate_millihertz` is right on every target. |
+| 3 no SVG renderer | Neutral | No | A Cargo feature. |
+
 Licence: unchanged, see `LICENSES/` (featherplay uses Slint under the Royalty-free 2.0
 licence, which allows modified copies).
 
