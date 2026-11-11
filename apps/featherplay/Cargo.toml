@@ -67,6 +67,8 @@ slint = { workspace = true, features = ["std", "compat-1-2", "backend-winit", "r
 # `signal` for Ctrl+C, so the session is saved on exit. `fs` and `io-util` write a
 # downloaded update (`updates::install`); the streams crate has them on already.
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "signal", "sync", "time", "fs", "io-util"] }
+
+[target.'cfg(windows)'.dependencies]
 # The sign-in window: WebView2 on its own thread, a child window of the sign-in frame, never
 # in the main window.
 webview2-com = { workspace = true }

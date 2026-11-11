@@ -11,10 +11,13 @@ publish = false
 [dependencies]
 featherplay-core = { path = "../core" }
 keyring-core = { workspace = true }
-windows-native-keyring-store = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 toml = { workspace = true }
+
+[target.'cfg(windows)'.dependencies]
+# The Credential Manager store behind `keyring-core` (`secrets.rs`).
+windows-native-keyring-store = { workspace = true }
 
 [lints]
 workspace = true

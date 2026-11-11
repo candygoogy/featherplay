@@ -23,8 +23,6 @@ reqwest = { workspace = true, features = ["native-tls"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
-souvlaki = { workspace = true }
-tauri-winrt-notification = { workspace = true }
 # Commands go to the controller over an unbounded tokio channel; the local API listens and
 # serves on the app's runtime (`net`, `io-util`, `rt`), with hyper's header timeout (`time`).
 tokio = { workspace = true, features = ["sync", "net", "io-util", "rt", "macros", "time"] }
@@ -36,9 +34,18 @@ bytes = { workspace = true }
 base64 = { workspace = true, features = ["std"] }
 sha1 = { workspace = true }
 getrandom = { workspace = true }
-tray-icon = { workspace = true }
 # Inflates the tray icons, which `build.rs` deflates.
 flate2 = { workspace = true }
+
+# Windows only. `tray-icon` and `souvlaki` work elsewhere too, but on Linux they bring in GTK
+# and D-Bus; the Linux tray and media controls are chosen in phase 5 (ARCHITECTURE.md).
+[target.'cfg(windows)'.dependencies]
+# The media card (SMTC).
+souvlaki = { workspace = true }
+# Toasts.
+tauri-winrt-notification = { workspace = true }
+# The tray icon and its menu.
+tray-icon = { workspace = true }
 # `identity`: the AppUserModelID, the Start menu shortcut (IShellLink and its property
 # store) and the HKCU registration, so the media card names the app.
 windows = { workspace = true, features = [
