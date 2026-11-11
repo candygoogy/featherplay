@@ -2,8 +2,9 @@
 
 This is a map of the code for whoever maintains it. It says how the parts fit, which thread
 does what, and where things are kept on disk. The last part, [Target structure](#target-structure),
-is the plan for making the code easier to own and for adding Linux. Phase 2 of it is built;
-the rest is a plan, not a description of today's code. Its decisions are listed at its end.
+is the plan for making the code easier to own and for adding Linux. Phase 2 of it is built,
+and the first step of phase 3; the rest is a plan, not a description of today's code. Its
+decisions are listed at its end.
 
 Paths are relative to the repository root. Each module's own doc comment says more than
 this file does; when the two disagree, the code is right and this file needs fixing.
@@ -13,7 +14,7 @@ this file does; when the two disagree, the code is right and this file needs fix
 | Folder | What's in it |
 |---|---|
 | `apps/featherplay` | The app: startup, the window and its pages (Rust in `src/`, Slint in `ui/`), the controller, and the app's own tests (`tests/app/`). |
-| `crates/*` | Eleven library crates: the music logic, the network clients, the audio engine, the stream resolver, saved state, the integrations and the platform layer. None of them uses Slint. |
+| `crates/*` | Twelve library crates: the music logic, the network clients, the audio engine, the stream resolver, saved state, the integrations, the platform layer and the app's logic that needs no window (the controller crate). None of them uses Slint. |
 | `vendor/` | Three patched third-party crates, swapped in through `[patch.crates-io]` in `Cargo.toml`. Each has a `VENDORED.md` that lists its changes. |
 | `packaging/` | The Inno Setup installer, the winget and Scoop manifests, the third-party licence list, and the release signing scripts. |
 | `site/` | The website. |
@@ -161,7 +162,7 @@ controls and the tray (`apps/featherplay/src/shell.rs`).
 | `player-js` | One QuickJS run (a challenge or a load) | `crates/streams/src/js.rs` |
 | `featherplay-discord` | Discord's blocking IPC | `apps/featherplay/src/presence.rs` |
 | `featherplay-proxy` | Asks WinHTTP for a proxy script or auto-detection | `crates/proxy/src/lookups.rs` |
-| `featherplay-log` | Appends log lines to the file | `apps/featherplay/src/diagnostics.rs` |
+| `featherplay-log` | Appends log lines to the file | `crates/controller/src/diagnostics.rs` |
 | `featherplay-endsession` | A hidden window that hears Windows' end-of-session messages and second launches | `crates/platform/src/windows/session_end.rs` |
 | `featherplay-signin`, `featherplay-browser-signin`, `featherplay-browser-pipe` | The WebView2 sign-in, with its own COM apartment and message loop; the browser sign-in and its DevTools pipe | `crates/platform/src/windows/webview.rs`, `apps/featherplay/src/pages/sign_in/browser.rs`, `apps/featherplay/src/pages/sign_in/browser/cdp.rs` |
 
@@ -202,14 +203,17 @@ They talk like this:
 | `crates/listenbrainz` | `featherplay-listenbrainz` | ListenBrainz: now playing, listens, token checks | proxy |
 | `crates/lyrics` | `featherplay-lyrics` | LRC parsing and LRCLIB lookups | proxy |
 | `crates/integrations` | `featherplay-integrations` | Hotkeys, SponsorBlock, Discord and the local API; `UiCommand` and `NowPlaying`, which the platform's tray, media controls and thumb buttons map to and from; the tray's hover text and the track's toast | core, proxy, store, platform |
-| `apps/featherplay` | `featherplay` | Everything else: startup, the window, pages, the controller, scrobbling, presence, updates, sign-in, diagnostics | all of the above, Slint |
+| `crates/controller` | `featherplay-controller` | The app's logic that needs no window: diagnostics (the log, `log!`, crash files, Copy diagnostics), link parsing, the search suggestions' pacing, the update check and download, the detached task helpers, and `Place` (where a pick leads), which the app maps to its pages. Phase 3 moves the controller itself in ([Target structure](#phase-3-a-controller-crate)). | core, platform, proxy, store, streams, ytm |
+| `apps/featherplay` | `featherplay` | Everything else: startup, the window, pages, the controller, scrobbling, presence, the update check's triggers and toasts, sign-in | all of the above, Slint |
 
-The rules: library crates never depend on Slint or on the app. `core` depends on nothing of
+The rules: library crates never depend on Slint or on the app; the controller crate not on
+winit or `windows` either (only `platform` reaches the OS). `core` depends on nothing of
 ours, and `platform` on `core` only (no winit either). Every crate uses the workspace's
 exact pins and lints (`Cargo.toml`).
 
 ```
-featherplay (app) ─┬─ integrations ─┬─ store ── platform, core
+featherplay (app) ─┬─ controller ─── streams, ytm, store, proxy, platform, core
+                   ├─ integrations ─┬─ store ── platform, core
                    │                ├─ proxy
                    │                ├─ platform
                    │                └─ core
@@ -242,7 +246,7 @@ software surface) and `vendor/opus-decoder` (rustfft in place of a naive DFT).
 | `{config}/settings.toml` | Settings | `crates/store/src/settings.rs` |
 | `{config}/session.json` | The queue and position, restored paused | `crates/store/src/session.rs` |
 | `{config}/scrobble-queue.json`, `{config}/listenbrainz-queue.json` | Scrobbles waiting to be sent | `apps/featherplay/src/scrobbler.rs` |
-| `{cache}/logs/` | `featherplay.log` and `featherplay.1.log` (about 1 MB each), crash files | `apps/featherplay/src/diagnostics/logfile.rs`, `apps/featherplay/src/diagnostics/crash.rs` |
+| `{cache}/logs/` | `featherplay.log` and `featherplay.1.log` (about 1 MB each), crash files | `crates/controller/src/diagnostics/logfile.rs`, `crates/controller/src/diagnostics/crash.rs` |
 | `{cache}/covers/` | Cover art, an LRU disk cache | `apps/featherplay/src/covers.rs` |
 | `{cache}/library/` | Library lists and the Home feed, per identity | `crates/store/src/library_cache.rs` |
 | `{cache}/streams.json` | Resolved streams kept for the next start | `apps/featherplay/src/controller/streams.rs` |
@@ -252,7 +256,7 @@ software surface) and `vendor/opus-decoder` (rustfft in place of a naive DFT).
 | `{cache}/resolver/` | The native resolver's `state.json` and preprocessed players (`players/`) | `crates/streams/src/native.rs` |
 | `{cache}/yt-dlp-cache/`, `{cache}/deno-dir/` | The helpers' own caches | `crates/streams/src/ytdlp.rs`, `crates/streams/src/sidecars.rs` |
 | `{cache}/tmp/` | Audio being downloaded; stale files cleared at start | `crates/audio/src/tmp.rs` |
-| `{cache}/updates/`, `{cache}/update-check.json` | A downloaded setup and the last update check | `apps/featherplay/src/updates.rs`, `apps/featherplay/src/updates/install.rs` |
+| `{cache}/updates/`, `{cache}/update-check.json` | A downloaded setup and the last update check | `crates/controller/src/updates.rs`, `crates/controller/src/updates/install.rs` |
 | `{cache}/webview2/`, `{cache}/signin-*` | The WebView2 sign-in profile; a browser sign-in's temporary profile | `apps/featherplay/src/pages/sign_in.rs`, `apps/featherplay/src/pages/sign_in/browser/profile.rs` |
 
 ### Credentials
@@ -275,8 +279,8 @@ services.
 
 Every `log!` line, and every `log` record from the crates, is redacted and written to
 `{cache}/logs/featherplay.log` by the `featherplay-log` thread
-(`apps/featherplay/src/diagnostics.rs`). A panic leaves a crash file beside it. Settings >
-About's "Copy diagnostics" builds a short report (`apps/featherplay/src/diagnostics/report.rs`):
+(`crates/controller/src/diagnostics.rs`). A panic leaves a crash file beside it. Settings >
+About's "Copy diagnostics" builds a short report (`crates/controller/src/diagnostics/report.rs`):
 versions, the output device, which services are on, the proxy, the last helper download and
 sign-in save errors, and the last few resolver errors. It says whether you're signed in,
 never as whom.
@@ -305,13 +309,14 @@ object (`crates/streams/src/native.rs`), so it ends if the app dies.
 
 ## Updates and signing
 
-`apps/featherplay/src/updates.rs` asks GitHub for the latest release. It does this at
+`crates/controller/src/updates.rs` asks GitHub for the latest release (the app's
+`apps/featherplay/src/updates.rs` starts the runs and shows the toasts). It does this at
 most once a day, at startup, when playback resumes after a check is due, or when you click
 "Check for updates". It keeps the answer in `{cache}/update-check.json`. It also looks for
 an open "Playback broken" issue from a maintainer, to link from the failure toast.
 
 For the per-user install (told apart from a portable exe by the installer's uninstall key),
-`apps/featherplay/src/updates/install.rs` downloads the new setup into `{cache}/updates/`.
+`crates/controller/src/updates/install.rs` downloads the new setup into `{cache}/updates/`.
 It checks it against the release's `SHA256SUMS.txt`, and that file must carry a minisign
 signature (`SHA256SUMS.txt.minisig`) by one of the two public keys built into the app
 (`apps/featherplay/keys/update.pub`, `apps/featherplay/keys/update-backup.pub`). The
@@ -343,8 +348,8 @@ the controller's state.
 
 ## Target structure
 
-This part is the plan for phases 2 to 4. Phase 2 is built; phases 3 and 4 aren't yet. The
-goals are:
+This part is the plan for phases 2 to 4. Phase 2 is built, and phase 3's first step (3a,
+below); the rest of phase 3 and phase 4 aren't yet. The goals are:
 
 - Linux becomes "write one module", not "touch 30 files".
 - The app crate holds the UI and nothing else.
@@ -482,6 +487,23 @@ Files in this table are under `apps/featherplay/src/`.
 | `windows::` in `open_url` | `controller/account.rs` | Gone after phase 2 (`platform::open`) |
 | `slint::invoke_from_event_loop` | `updates.rs` (`changed_elsewhere`) | A callback the app gives the update runner |
 | The `log!` macro | everywhere | The `log` crate's macros, which already reach the log file through `Facade`, or a `log!` exported by the controller crate |
+
+**Built: step 3a, the lower layer.** `crates/controller` exists, with no Slint, winit or
+`windows` in its tree (`windows` comes only through `featherplay-platform`'s Windows
+dependencies). In it so far: `task` (`spawn_detached`, `blocking_detached`; the app reaches
+them as `crate::task`), `diagnostics` with `uptime` and the `log!` macro (the app takes it in
+with `#[macro_use]` and re-exports `diagnostics`), `link` (`search_page` stays in the app's
+`link.rs`), `suggest` (the Slint rows and the timer stay in the app's `suggest.rs`), and
+`updates` with `install` (the app's `updates.rs` keeps the triggers, toasts, "Restart to
+update" and the snapshot states, re-exports the check, and gives the runs their redraw of
+About through `updates::on_change`). The plain enum is `place::Place` (`Album`, `Playlist`,
+`Artist`, `History`), which the app turns into its `Page` (`From<Place> for Page`); search
+suggestions' picks use it now, and `PlayingFrom::page` can take it when the queue moves. The
+offline update tests and their fixtures are in `crates/controller/tests/`; the release keys
+stay in `apps/featherplay/keys/`, where the signing scripts read them. Step 3b moves the
+controller itself, the scrobbler, presence, the catalog and the fixtures on top: the app
+re-exports `diagnostics` and `updates` under their own names, so their `crate::` paths keep
+working once those files are in the crate.
 
 **The interface.** It mostly exists already as `UiLink` (`apps/featherplay/src/controller.rs`):
 
