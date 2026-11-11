@@ -13,7 +13,7 @@ this file does; when the two disagree, the code is right and this file needs fix
 | Folder | What's in it |
 |---|---|
 | `apps/featherplay` | The app: startup, the window and its pages (Rust in `src/`, Slint in `ui/`), the controller, and the app's own tests (`tests/app/`). |
-| `crates/*` | Ten library crates: the music logic, the network clients, the audio engine, the stream resolver, saved state and the Windows integrations. None of them uses Slint. |
+| `crates/*` | Eleven library crates: the music logic, the network clients, the audio engine, the stream resolver, saved state, the Windows integrations and the platform layer. None of them uses Slint. |
 | `vendor/` | Three patched third-party crates, swapped in through `[patch.crates-io]` in `Cargo.toml`. Each has a `VENDORED.md` that lists its changes. |
 | `packaging/` | The Inno Setup installer, the winget and Scoop manifests, the third-party licence list, and the release signing scripts. |
 | `site/` | The website. |
@@ -192,32 +192,36 @@ They talk like this:
 | Crate | Package | What it does | May depend on |
 |---|---|---|---|
 | `crates/core` | `featherplay-core` | Pure logic: the track model, the queue, the player state machine, scrobble rules, translations (`tr!`). No I/O. | serde only |
-| `crates/proxy` | `featherplay-proxy` | The proxy every HTTP client and yt-dlp go through: the environment, else Windows' settings | none of ours |
-| `crates/store` | `featherplay-store` | Paths, settings, the saved session, secrets in Credential Manager, the library and silence caches | core |
+| `crates/platform` | `featherplay-platform` | Everything that talks to the OS, one module per OS (`windows`, `linux`), and which features an OS lacks (`supports`). Phase 2 moves the OS code into it ([Target structure](#phase-2-a-platform-crate)). | core |
+| `crates/proxy` | `featherplay-proxy` | The proxy every HTTP client and yt-dlp go through: the environment, else Windows' settings | platform |
+| `crates/store` | `featherplay-store` | Paths, settings, the saved session, secrets in Credential Manager, the library and silence caches | core, platform |
 | `crates/ytm` | `featherplay-ytm` | The YouTube Music client over ytmapi-rs: requests (`crates/ytm/src/api.rs`) and parsing (`crates/ytm/src/convert.rs`) | core, proxy |
-| `crates/streams` | `featherplay-streams` | The stream resolver: native step, QuickJS, yt-dlp, the helper downloads | core, proxy |
-| `crates/audio` | `featherplay-audio` | The audio engine: download, decode, sound chain, output | core, proxy (tests also use streams) |
+| `crates/streams` | `featherplay-streams` | The stream resolver: native step, QuickJS, yt-dlp, the helper downloads | core, proxy, platform |
+| `crates/audio` | `featherplay-audio` | The audio engine: download, decode, sound chain, output | core, proxy, platform (tests also use streams) |
 | `crates/lastfm` | `featherplay-lastfm` | Last.fm: signing, auth, scrobbles, the offline queue | core, proxy |
 | `crates/listenbrainz` | `featherplay-listenbrainz` | ListenBrainz: now playing, listens, token checks | proxy |
 | `crates/lyrics` | `featherplay-lyrics` | LRC parsing and LRCLIB lookups | proxy |
-| `crates/integrations` | `featherplay-integrations` | Media controls (SMTC), taskbar buttons, tray and tray menu, toasts, hotkeys, app identity, plus SponsorBlock, Discord and the local API | core, proxy, store |
+| `crates/integrations` | `featherplay-integrations` | Media controls (SMTC), taskbar buttons, tray and tray menu, toasts, hotkeys, app identity, plus SponsorBlock, Discord and the local API | core, proxy, store, platform |
 | `apps/featherplay` | `featherplay` | Everything else: startup, the window, pages, the controller, scrobbling, presence, updates, sign-in, diagnostics | all of the above, Slint |
 
 The rules: library crates never depend on Slint or on the app. `core` depends on nothing of
-ours. Every crate uses the workspace's exact pins and lints (`Cargo.toml`).
+ours, and `platform` on `core` only (no winit either). Every crate uses the workspace's
+exact pins and lints (`Cargo.toml`).
 
 ```
-featherplay (app) ─┬─ integrations ─┬─ store ── core
+featherplay (app) ─┬─ integrations ─┬─ store ── platform, core
                    │                ├─ proxy
+                   │                ├─ platform
                    │                └─ core
-                   ├─ audio ─────── proxy, core
-                   ├─ streams ───── proxy, core
+                   ├─ audio ─────── proxy, platform, core
+                   ├─ streams ───── proxy, platform, core
                    ├─ ytm ───────── proxy, core
                    ├─ lastfm ────── proxy, core
                    ├─ listenbrainz ─ proxy
                    ├─ lyrics ────── proxy
-                   ├─ store ─────── core
-                   ├─ proxy
+                   ├─ store ─────── platform, core
+                   ├─ proxy ─────── platform
+                   ├─ platform ──── core
                    └─ core
 ```
 
