@@ -131,6 +131,8 @@ struct State {
     /// Bumped per cover, so a late extraction for an old track is dropped.
     generation: u64,
     fade: Option<Rc<Timer>>,
+    /// Ends `Theme.switching` once the theme switch is on screen.
+    switched: Timer,
 }
 
 thread_local! {
@@ -175,8 +177,23 @@ pub fn set_accent(ctx: &Rc<Ctx>, accent: Accent, custom_colour: AccentColour) {
     }
 }
 
-/// The theme flipped: crossfade to the current colours for the new theme.
+/// The theme flipped: the current colours for the new theme, at once, in the frame that
+/// shows the rest of the window in it. `Theme.switching` zeroes `t-colour` for that frame,
+/// so neither `show` nor the bar's own crossfade fades the switch.
 pub fn theme_changed(ctx: &Rc<Ctx>) {
+    if let Some(ui) = ctx.window() {
+        ui.global::<Theme>().set_switching(true);
+        let weak = ui.as_weak();
+        STATE.with(|s| {
+            s.borrow()
+                .switched
+                .start(TimerMode::SingleShot, FRAME, move || {
+                    if let Some(ui) = weak.upgrade() {
+                        ui.global::<Theme>().set_switching(false);
+                    }
+                });
+        });
+    }
     STATE.with(|s| s.borrow_mut().shown_dark = None);
     refresh(ctx);
 }

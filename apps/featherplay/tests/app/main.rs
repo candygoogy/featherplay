@@ -114,6 +114,7 @@ mod song_menu_queue;
 mod space_play;
 mod startup_session;
 mod tab_pill;
+mod theme_switch;
 mod title_row;
 mod top_search;
 mod translations;
