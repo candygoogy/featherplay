@@ -5,8 +5,8 @@
 #   scripts/linux-check.sh
 #
 # It needs the target's standard library (`rustup target add x86_64-unknown-linux-gnu`, which
-# a Linux toolchain has already). Until phase 5 the Linux side of crates/platform is stubs,
-# and code outside it that isn't gated yet fails here (ARCHITECTURE.md, "Target structure").
+# a Linux toolchain has already). Until phase 5 the Linux side of crates/platform is stubs
+# (ARCHITECTURE.md, "Target structure"). CI runs it on every push (the `linux` job).
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
