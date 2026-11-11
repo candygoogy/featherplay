@@ -509,6 +509,25 @@ fn mini_player_mirrors_the_player_and_closes_on_escape_or_lost_activation() {
     );
 }
 
+#[test]
+fn a_theme_switch_recolours_the_open_mini_player_at_once() {
+    let scene = playing_scene();
+    scene.theme(true);
+    scene.settle();
+    let mini = open(&scene);
+    let (main, own) = (scene.ui.global::<Theme>(), mini.global::<Theme>());
+    assert!(own.get_dark());
+
+    // No change of the player follows: the switch alone recolours it.
+    scene.theme(false);
+    slint::platform::update_timers_and_animations();
+    assert!(!main.get_dark());
+    assert!(!own.get_dark(), "the mini player stayed dark");
+    let shot = mini.window().take_snapshot().expect("snapshot");
+    assert_eq!(pixel(&shot, 6, 140), rgba(main.get_bar()));
+    assert_eq!(own.get_accent(), main.get_accent());
+}
+
 /// Runs the event loop's timers for `ms`.
 fn run_timers_for(ms: u64) {
     let end = std::time::Instant::now() + Duration::from_millis(ms);

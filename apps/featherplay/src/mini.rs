@@ -29,7 +29,7 @@ use slint::winit_030::{EventResult, WinitWindowAccessor, winit};
 use crate::app::{self, Ctx};
 use crate::ui::{AppWindow, MiniData, MiniPlayer, Player, SettingsData, Theme};
 use crate::ui_bridge::format_duration;
-use crate::{popup, shell};
+use crate::{chrome, popup, shell};
 
 /// The window's size in logical pixels.
 pub const SIZE: (f32, f32) = (340.0, 170.0);
@@ -430,14 +430,32 @@ fn dismiss(why: &str) {
     let _ = slint::invoke_from_event_loop(close);
 }
 
-/// Copies the main window's theme and player into the mini player's own globals, and loads
-/// its cover when the track's changed.
-fn sync(ctx: &Rc<Ctx>, mini: &Mini, main: &AppWindow) {
+/// The theme flipped (`follow::theme_changed`, once the main window has the new colours):
+/// the open mini player takes them at once, its border too, rather than at the player's
+/// next change.
+pub fn theme_changed(ctx: &Rc<Ctx>) {
+    let Some(mini) = MINI.with_borrow(Clone::clone) else {
+        return;
+    };
+    let Some(main) = ctx.window() else { return };
+    sync_theme(&mini, &main);
+    if let Some(handle) = mini.handle.get() {
+        let _ = chrome::popup_border(handle, popup::border(&mini.ui.global::<Theme>()));
+    }
+}
+
+fn sync_theme(mini: &Mini, main: &AppWindow) {
     popup::sync_theme(
         &main.global::<Theme>(),
         &mini.ui.global::<Theme>(),
         main.global::<SettingsData>().get_appearance(),
     );
+}
+
+/// Copies the main window's theme and player into the mini player's own globals, and loads
+/// its cover when the track's changed.
+fn sync(ctx: &Rc<Ctx>, mini: &Mini, main: &AppWindow) {
+    sync_theme(mini, main);
     let (from, to) = (main.global::<Player>(), mini.ui.global::<Player>());
     popup::sync_player(&from, &to);
 

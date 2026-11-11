@@ -179,7 +179,8 @@ pub fn set_accent(ctx: &Rc<Ctx>, accent: Accent, custom_colour: AccentColour) {
 
 /// The theme flipped: the current colours for the new theme, at once, in the frame that
 /// shows the rest of the window in it. `Theme.switching` zeroes `t-colour` for that frame,
-/// so neither `show` nor the bar's own crossfade fades the switch.
+/// so neither `show` nor the bar's own crossfade fades the switch. The open mini player
+/// takes them in the same turn.
 pub fn theme_changed(ctx: &Rc<Ctx>) {
     if let Some(ui) = ctx.window() {
         ui.global::<Theme>().set_switching(true);
@@ -196,6 +197,7 @@ pub fn theme_changed(ctx: &Rc<Ctx>) {
     }
     STATE.with(|s| s.borrow_mut().shown_dark = None);
     refresh(ctx);
+    crate::mini::theme_changed(ctx);
 }
 
 /// Shows the known colours for the current theme, unless they're already on screen.
