@@ -44,6 +44,9 @@ mod hover_play;
 // The Windows installer's script (Inno Setup) and the Windows names it repeats.
 #[cfg(windows)]
 mod installer;
+// Windows' guard: the named mutex, its `Local\` names and the window message that asks the
+// first copy to show itself. Linux has none until phase 5.
+#[cfg(windows)]
 mod instance;
 mod library_refresh;
 mod live_resize;
