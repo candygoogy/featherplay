@@ -420,8 +420,8 @@ fn surface_factory<S: Surface + 'static>(
         .map(|r| Box::new(r) as Box<dyn Surface>)
 }
 
-/// featherplay patch: the surface factory behind `default_wgpu_30` and `default_direct3d`
-/// when the WGPU 30 surface isn't compiled in. See VENDORED.md.
+/// featherplay patch: the surface factory behind `default_wgpu_30`, `default_direct3d` and
+/// `default_vulkan` when the WGPU 30 surface isn't compiled in. See VENDORED.md.
 #[cfg(not(feature = "wgpu-30"))]
 fn wgpu_left_out_surface_factory(
     _context: &SkiaSharedContext,
@@ -572,6 +572,19 @@ impl SkiaRenderer {
     #[cfg(not(feature = "wgpu-30"))]
     /// Without WGPU 30: creates a SkiaRenderer whose surface creation always fails.
     pub fn default_wgpu_30(context: &SkiaSharedContext) -> Self {
+        Self::new_with_surface_factory(
+            context,
+            wgpu_left_out_surface_factory,
+            create_partial_renderer_state(None),
+        )
+    }
+
+    // featherplay patch: on Linux and the other non-Apple unixes, i-slint-backend-winit
+    // 1.18.1 calls this one too (for a Vulkan request), and Skia's Vulkan goes through
+    // wgpu. Without wgpu it builds a renderer whose surface creation fails. See VENDORED.md.
+    #[cfg(all(target_family = "unix", not(target_vendor = "apple"), not(skia_wgpu_vulkan)))]
+    /// Without WGPU: creates a SkiaRenderer whose surface creation always fails.
+    pub fn default_vulkan(context: &SkiaSharedContext) -> Self {
         Self::new_with_surface_factory(
             context,
             wgpu_left_out_surface_factory,
