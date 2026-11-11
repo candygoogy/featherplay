@@ -33,6 +33,10 @@ pub const CHOOSER_URL: &str =
 const COOKIE_URL: &str = "https://music.youtube.com";
 
 /// How the sign-in window ended.
+#[cfg_attr(
+    not(windows),
+    allow(dead_code, reason = "the sign-in window is Windows only")
+)]
 pub enum Outcome {
     /// The `cookie:` header for music.youtube.com, with a session cookie in it.
     SignedIn(String),
@@ -44,6 +48,10 @@ pub enum Outcome {
 }
 
 /// What the frame shows, from the page's thread.
+#[cfg_attr(
+    not(windows),
+    allow(dead_code, reason = "the sign-in window is Windows only")
+)]
 pub enum Event {
     /// The page moved: its address, from the webview's `Source`.
     Address(Address),

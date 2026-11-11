@@ -19,6 +19,7 @@ use super::webview::Outcome;
 #[cfg(windows)]
 use super::webview::{self, Event, Room};
 use crate::app::Ctx;
+#[cfg(windows)]
 use crate::chrome;
 use crate::popup;
 use crate::shell;
