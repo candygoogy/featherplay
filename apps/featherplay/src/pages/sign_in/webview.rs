@@ -53,7 +53,7 @@ pub enum Event {
     Closing,
 }
 
-/// Opens Google's page at `start` in the frame `parent` (an HWND of the UI thread), on a new
+/// Opens Google's page at `start` in the frame `parent` (a window of the UI thread), on a new
 /// thread; `events` and `done` run on that thread, `done` once the page has closed.
 /// `profile` is the WebView2 user data folder (`{cache}/webview2`). Returns once the thread
 /// takes messages; an error then means `done` never runs.
