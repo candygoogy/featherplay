@@ -10,6 +10,7 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use std::time::Duration;
 
+use featherplay_platform::window::{self, ScreenRect};
 use slint::{CloseRequestResponse, ComponentHandle, LogicalSize, PhysicalPosition, Timer};
 use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::UI::Shell::{DefSubclassProc, RemoveWindowSubclass, SetWindowSubclass};
@@ -20,7 +21,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
 use super::address::Address;
 use super::webview::{self, Event, Outcome, Remote, Room};
 use crate::app::Ctx;
-use crate::native::{self, ScreenRect};
+use crate::chrome;
 use crate::popup;
 use crate::shell;
 use crate::ui::{AppWindow, SettingsData, SignInWindow, Theme};
@@ -151,10 +152,10 @@ const LEAST_H: f32 = 480.0;
 fn place_over_page(main: &AppWindow, ui: &SignInWindow) {
     let window = main.window();
     let Some(h) = shell::hwnd(window) else { return };
-    if native::is_minimised(h) {
+    if window::is_minimised(h) {
         return;
     }
-    let Some((left, top)) = native::client_origin(h) else {
+    let Some((left, top)) = window::client_origin(h) else {
         return;
     };
     let main_scale = window.scale_factor();
@@ -166,7 +167,7 @@ fn place_over_page(main: &AppWindow, ui: &SignInWindow) {
         top + (y * main_scale).round() as i32,
     );
     // The frame opens on that screen, at its scale.
-    let Some((work, scale)) = native::work_area_at(centre.0, centre.1) else {
+    let Some((work, scale)) = window::work_area_at(centre.0, centre.1) else {
         return;
     };
     let px = |v: f32| (v * scale).round() as i32;
@@ -175,7 +176,7 @@ fn place_over_page(main: &AppWindow, ui: &SignInWindow) {
         centre,
         client,
         px(LEAST_H),
-        native::frame_insets(scale),
+        window::frame_insets(scale),
         work,
     );
     if client_h != client.1 {
@@ -237,14 +238,14 @@ fn private_mb() -> f64 {
 /// The title bar in the frame's colours, an opaque client area, the app's icon.
 fn dress(ui: &SignInWindow, hwnd: isize) {
     let theme = ui.global::<Theme>();
-    if let Err(e) = native::opaque(hwnd) {
+    if let Err(e) = window::opaque(hwnd) {
         log!("sign-in window: opaque: {e}");
     }
-    if let Err(e) = native::title_bar(hwnd, theme.get_dark(), theme.get_panel(), theme.get_text1())
+    if let Err(e) = chrome::title_bar(hwnd, theme.get_dark(), theme.get_panel(), theme.get_text1())
     {
         log!("sign-in window: title bar: {e}");
     }
-    let _ = native::set_icon(hwnd, ui.window().scale_factor());
+    let _ = chrome::set_icon(hwnd, ui.window().scale_factor());
 }
 
 /// From the sign-in thread: shown on the UI thread.

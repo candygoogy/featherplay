@@ -5,14 +5,15 @@
 
 use std::cell::Cell;
 
+use featherplay_platform::window::{self, ScreenRect};
+#[cfg(windows)]
 use slint::winit_030::winit::platform::windows::{CornerPreference, WindowAttributesExtWindows};
 use slint::winit_030::winit::window::WindowAttributes;
 use slint::{ComponentHandle, PhysicalPosition};
 
-use crate::bar;
-use crate::native::{self, ScreenRect};
 use crate::ui::{AppWindow, Appearance, Player, Theme};
 use crate::ui_bridge::format_duration;
+use crate::{bar, chrome};
 
 /// From the taskbar and the screen's edges, in logical pixels (Windows 11's flyouts keep 12).
 const GAP: f32 = 12.0;
@@ -38,12 +39,13 @@ pub fn window_attributes(attrs: WindowAttributes) -> WindowAttributes {
     if !CREATING.get() {
         return attrs;
     }
-    attrs
-        .with_decorations(false)
-        .with_resizable(false)
+    let attrs = attrs.with_decorations(false).with_resizable(false);
+    #[cfg(windows)]
+    let attrs = attrs
         .with_skip_taskbar(true)
         .with_undecorated_shadow(true)
-        .with_corner_preference(CornerPreference::Round)
+        .with_corner_preference(CornerPreference::Round);
+    attrs
 }
 
 /// Shows `window`, `size` logical pixels, for a click on the tray icon at `(x, y)` (physical
@@ -54,7 +56,7 @@ pub fn show_at(
     (x, y): (i32, i32),
     size: (f32, f32),
 ) -> Result<(i32, i32), String> {
-    let (work, scale) = native::work_area_at(x, y).ok_or("no monitor at the click")?;
+    let (work, scale) = window::work_area_at(x, y).ok_or("no monitor at the click")?;
     let physical = (
         (size.0 * scale).round() as i32,
         (size.1 * scale).round() as i32,
@@ -77,11 +79,11 @@ pub fn show_at(
 /// Makes the shown popup's window `hwnd` opaque, with a hairline `border`, and gives it the
 /// activation.
 pub fn dress(hwnd: isize, border: slint::Color) {
-    if let Err(e) = native::opaque(hwnd) {
+    if let Err(e) = window::opaque(hwnd) {
         log!("popup: opaque: {e}");
     }
-    let _ = native::popup_border(hwnd, border);
-    native::bring_forward(hwnd);
+    let _ = chrome::popup_border(hwnd, border);
+    window::bring_forward(hwnd);
 }
 
 /// Where a popup's top-left corner goes for a click at `point`, everything in physical

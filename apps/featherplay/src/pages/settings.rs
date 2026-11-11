@@ -35,7 +35,7 @@ use crate::ui::{
     ListenBrainzState, LocalApiState, Player, SettingKey, SettingsData, SettingsDialog, Theme,
     Tooltips,
 };
-use crate::{follow, language, lyrics, native, shell, toast, updates};
+use crate::{chrome, follow, language, lyrics, shell, toast, updates};
 
 /// Offered when the hotkeys are first switched on.
 const DEFAULT_HOTKEYS: [&str; 3] = ["Ctrl+Alt+Space", "Ctrl+Alt+Right", "Ctrl+Alt+Left"];
@@ -164,7 +164,7 @@ pub fn init(ctx: &Rc<Ctx>) {
         follow::theme_changed(&c);
         if let Some(ui) = c.window()
             && let Some(h) = shell::hwnd(ui.window())
-            && let Err(e) = native::title_bar(
+            && let Err(e) = chrome::title_bar(
                 h,
                 dark,
                 ui.global::<Theme>().get_ground(),

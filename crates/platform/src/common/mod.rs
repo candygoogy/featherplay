@@ -8,3 +8,4 @@ pub mod identity;
 pub mod media_controls;
 pub mod taskbar;
 pub mod tray;
+pub mod window;

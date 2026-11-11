@@ -6,7 +6,7 @@
 //! minimized window reallocates the window's surface at the same size, and Slint ignores the
 //! 0×0 size in between, so it sees nothing to redraw. Only the parts that happen to change
 //! (the progress bar, a hovered row) would be painted, and the rest stayed see-through.
-//! `native::repaint_when_invalidated` calls `all` when that happens.
+//! `featherplay_platform::window::repaint_when_invalidated` calls `all` when that happens.
 
 use i_slint_core::lengths::{LogicalRect, LogicalSize};
 use i_slint_core::window::WindowInner;

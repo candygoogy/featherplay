@@ -30,7 +30,7 @@ pub fn startup() {
 /// Registers, and on success lets toasts use the app's AUMID (`identity::mark_registered`).
 /// A toast sent before this finishes, or after it failed, borrows PowerShell's instead.
 fn register_now() {
-    let result = registration().and_then(|r| identity::register(&r, crate::native::ICON));
+    let result = registration().and_then(|r| identity::register(&r, crate::chrome::ICON));
     if result.is_ok() {
         identity::mark_registered();
     }

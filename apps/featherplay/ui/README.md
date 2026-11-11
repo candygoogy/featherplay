@@ -238,7 +238,7 @@ only small spots) and `tests/app/render_timing.rs` (frame times, ignored) do. `t
 (ignored) measures frames at 4K.
 
 In the real window, `FEATHERPLAY_FRAME_LOG=1` logs the frames once a second to stderr: paint
-times, gaps, wheel messages and the UI thread's CPU time inside the paints (`src/native.rs`).
+times, gaps, wheel messages and the UI thread's CPU time inside the paints (`src/frame_log.rs`).
 
 ## Rules the design sets
 

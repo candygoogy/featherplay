@@ -1,5 +1,5 @@
 //! A live resize: the user dragging the window's edge, between WM_ENTERSIZEMOVE and
-//! WM_EXITSIZEMOVE (`native::when_sizing`).
+//! WM_EXITSIZEMOVE (`featherplay_platform::window::when_sizing`).
 //!
 //! Windows applies the next step of the drag only once the window has painted the last
 //! one, so the window follows the pointer as fast as it paints. softbuffer's Win32 surface

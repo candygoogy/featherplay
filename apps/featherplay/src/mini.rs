@@ -22,13 +22,14 @@ use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
+use featherplay_platform::window;
 use slint::ComponentHandle;
 use slint::winit_030::{EventResult, WinitWindowAccessor, winit};
 
 use crate::app::{self, Ctx};
 use crate::ui::{AppWindow, MiniData, MiniPlayer, Player, SettingsData, Theme};
 use crate::ui_bridge::format_duration;
-use crate::{native, popup, shell};
+use crate::{popup, shell};
 
 /// The window's size in logical pixels.
 pub const SIZE: (f32, f32) = (340.0, 170.0);
@@ -40,7 +41,7 @@ const REOPEN_GUARD: Duration = Duration::from_millis(400);
 /// How often the open, unpinned mini player looks at the window in front.
 pub const POLL: Duration = Duration::from_millis(250);
 
-pub use crate::native::Foreground;
+pub use featherplay_platform::window::Foreground;
 
 /// The window classes whose coming to the front doesn't close the mini player: the shell's
 /// own, which take the foreground on the way to it, and the tray icon's menu. Seen on
@@ -78,7 +79,7 @@ struct Mini {
     /// The window in front when the poll last looked.
     front: Cell<Option<isize>>,
     /// Hears every press on screen while it shows unpinned (`listen`).
-    presses: RefCell<Option<native::PressWatch>>,
+    presses: RefCell<Option<window::PressWatch>>,
 }
 
 thread_local! {
@@ -87,7 +88,7 @@ thread_local! {
     static DISMISSED: Cell<Option<Instant>> = const { Cell::new(None) };
     /// What the poll reads the window in front with: Windows', or a test's.
     static READ_FOREGROUND: Cell<fn() -> Option<Foreground>> =
-        const { Cell::new(native::foreground) };
+        const { Cell::new(window::foreground) };
 }
 
 /// Has the foreground poll read the window in front with `read` from now on: the offscreen
@@ -172,7 +173,7 @@ pub fn open(ctx: &Rc<Ctx>, x: i32, y: i32) -> Result<(), String> {
         move |_, hwnd| {
             popup::dress(hwnd, border);
             window_ready(hwnd);
-            if let Err(e) = native::when_pressed(hwnd, pressed) {
+            if let Err(e) = window::when_pressed(hwnd, pressed) {
                 log!("mini player: presses: {e}");
             }
         },
@@ -342,7 +343,7 @@ fn listen(mini: &Mini) {
     if mini.hwnd.get().is_none() || mini.presses.borrow().is_some() {
         return;
     }
-    match native::watch_presses(pressed_on) {
+    match window::watch_presses(pressed_on) {
         Ok(watch) => {
             log!("mini player: listening for presses");
             *mini.presses.borrow_mut() = Some(watch);
@@ -409,7 +410,7 @@ fn moved_away(front: Option<&Foreground>, own: Option<isize>, last: &mut Option<
 }
 
 /// A mouse button, finger or pen went down on the open mini player; `from_behind` when that
-/// press is what brought it to the front (`native::when_pressed`). The window is in front by
+/// press is what brought it to the front (`window::when_pressed`). The window is in front by
 /// the time a click's callback runs either way, so this is how the pin tells the two apart.
 pub fn pressed(from_behind: bool) {
     MINI.with_borrow(|m| {

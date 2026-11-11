@@ -17,6 +17,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use featherplay_core::model::{AlbumId, ArtistId, PlaylistId};
 use featherplay_core::tr;
 use featherplay_integrations::UiCommand;
+use featherplay_platform::window;
 use featherplay_store::{Paths, Settings};
 use slint::ComponentHandle;
 use tokio::sync::mpsc;
@@ -28,9 +29,9 @@ use crate::covers::Covers;
 use crate::router::{ExploreTab, History, LibraryTab, Page};
 use crate::ui::{AppWindow, Frame, Nav, PageKind, Theme};
 use crate::{
-    account_menu, account_picker, album_actions, bar, close, endsession, instance, language, link,
-    memory, mini, native, pages, playlist_menu, popup, prepare, queue_panel, repaint, shell,
-    sidebar, song_menu, suggest, toast, top_bar, updates, wheel,
+    account_menu, account_picker, album_actions, bar, chrome, close, endsession, frame_log,
+    instance, language, link, memory, mini, pages, playlist_menu, popup, prepare, queue_panel,
+    repaint, shell, sidebar, song_menu, suggest, toast, top_bar, updates, wheel,
 };
 
 /// Set once featherplay starts to quit. A second launch asking to show the window is told
@@ -48,7 +49,8 @@ pub fn is_closing() -> bool {
 }
 
 /// The main window's Win32 side that going to the tray and back uses: `Win32` on the real
-/// window's HWND. The offscreen tests have no HWND and set a stand-in (`Ctx::set_native`).
+/// window's handle. The offscreen tests have no window handle and set a stand-in
+/// (`Ctx::set_native`).
 pub trait NativeWindow {
     /// Minimises it as its title bar button does, with Windows' animation where it plays one.
     fn minimise(&self);
@@ -60,24 +62,24 @@ pub trait NativeWindow {
     fn animations_enabled(&self) -> bool;
 }
 
-/// The real window, by its HWND.
+/// The real window, by its handle.
 struct Win32(isize);
 
 impl NativeWindow for Win32 {
     fn minimise(&self) {
-        native::minimise(self.0);
+        window::minimise(self.0);
     }
 
     fn is_minimised(&self) -> bool {
-        native::is_minimised(self.0)
+        window::is_minimised(self.0)
     }
 
     fn bring_forward(&self) {
-        native::bring_forward(self.0);
+        window::bring_forward(self.0);
     }
 
     fn animations_enabled(&self) -> bool {
-        native::animations_enabled()
+        window::animations_enabled()
     }
 }
 
@@ -160,7 +162,7 @@ impl Ctx {
         self.ui.upgrade()
     }
 
-    /// The main window's HWND, once the real window exists (never offscreen).
+    /// The main window's handle, once the real window exists (never offscreen).
     pub fn hwnd(&self) -> Option<isize> {
         self.hwnd.get()
     }
@@ -831,7 +833,7 @@ fn run_window(
 ) -> Result<(), String> {
     let ui = AppWindow::new().map_err(|e| format!("window: {e}"))?;
     ui.global::<Theme>()
-        .set_motion(native::animations_enabled());
+        .set_motion(window::animations_enabled());
     wheel::install(&ui);
     let covers = Covers::new(
         catalog.runtime().clone(),
@@ -869,7 +871,7 @@ fn run_window(
                 eprintln!("first_frame_ms={}", crate::controller::uptime().as_millis());
             });
         }
-        if let Err(e) = native::opaque(hwnd) {
+        if let Err(e) = window::opaque(hwnd) {
             log!("opaque window: {e}");
         }
         // Minimised, the window shows nothing: what it drew with goes (`memory`). After the
@@ -877,7 +879,7 @@ fn run_window(
         let parked = Rc::downgrade(&c);
         // Every size change says "not minimised"; only the first after a minimise is a return.
         let was_minimised = Rc::new(Cell::new(false));
-        let watched = native::when_minimised(hwnd, move |minimised| {
+        let watched = window::when_minimised(hwnd, move |minimised| {
             let parked = parked.clone();
             let restored = !minimised && was_minimised.replace(minimised);
             slint::Timer::single_shot(std::time::Duration::ZERO, move || {
@@ -900,7 +902,7 @@ fn run_window(
         }
         // Dragging the window's edge: the renderer keeps its buffer until the drag ends.
         let sizing = weak.clone();
-        let watched = native::when_sizing(hwnd, move |live| {
+        let watched = window::when_sizing(hwnd, move |live| {
             if let Some(ui) = sizing.upgrade() {
                 crate::live_resize::set(ui.window(), live);
             }
@@ -909,19 +911,24 @@ fn run_window(
             log!("live resize: {e}");
         }
         let repaint = weak.clone();
-        let watched = native::repaint_when_invalidated(hwnd, move || {
-            if let Some(ui) = repaint.upgrade() {
-                repaint::all(ui.window());
-            }
-        });
+        let watched = window::repaint_when_invalidated(
+            hwnd,
+            move || {
+                if let Some(ui) = repaint.upgrade() {
+                    repaint::all(ui.window());
+                }
+            },
+            frame_log::around_paint,
+            frame_log::wheel,
+        );
         if let Err(e) = watched {
             log!("repaint on invalidate: {e}");
         }
         // The window icon has a dark and a light drawing, picked by the taskbar's theme.
         let recolour = weak.clone();
-        let watched = native::when_colours_change(hwnd, move || {
+        let watched = window::when_colours_change(hwnd, move || {
             if let Some(ui) = recolour.upgrade()
-                && let Err(e) = native::set_icon(hwnd, ui.window().scale_factor())
+                && let Err(e) = chrome::set_icon(hwnd, ui.window().scale_factor())
             {
                 log!("window icon: {e}");
             }
@@ -930,12 +937,12 @@ fn run_window(
             log!("icon on theme change: {e}");
         }
         // The tray icon follows the taskbar's theme and the primary display's scale.
-        if let Err(e) = native::when_displays_change(hwnd, shell::refresh_tray_icon) {
+        if let Err(e) = window::when_displays_change(hwnd, shell::refresh_tray_icon) {
             log!("tray icon on display change: {e}");
         }
         // A window back from the tray restores once its taskbar button is there
         // (`show_window`); out of the message Explorer sent, on the event loop's next turn.
-        let watched = native::when_taskbar_button(hwnd, move || {
+        let watched = window::when_taskbar_button(hwnd, move || {
             slint::Timer::single_shot(std::time::Duration::ZERO, move || {
                 restore_pending(&Win32(hwnd));
             });
@@ -945,11 +952,11 @@ fn run_window(
         }
         if let Some(ui) = weak.upgrade() {
             let t = ui.global::<Theme>();
-            if let Err(e) = native::title_bar(hwnd, t.get_dark(), t.get_ground(), t.get_text1()) {
+            if let Err(e) = chrome::title_bar(hwnd, t.get_dark(), t.get_ground(), t.get_text1()) {
                 log!("title bar: {e}");
             }
             c.covers.set_scale(ui.window().scale_factor());
-            if let Err(e) = native::set_icon(hwnd, ui.window().scale_factor()) {
+            if let Err(e) = chrome::set_icon(hwnd, ui.window().scale_factor()) {
                 log!("window icon: {e}");
             }
         }

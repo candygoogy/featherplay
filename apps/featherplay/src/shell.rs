@@ -1,5 +1,5 @@
 //! The Windows integrations on the UI thread: media controls (SMTC) and taskbar thumb
-//! buttons on the main window's HWND, plus the tray icon and the global hotkeys.
+//! buttons on the main window's handle, plus the tray icon and the global hotkeys.
 //!
 //! Everything here runs on the main thread inside Slint's event loop. Other threads reach
 //! it only through `slint::invoke_from_event_loop` (see `quit`).
@@ -19,8 +19,8 @@ use crate::app::{self, Ctx};
 use crate::pages::settings;
 use crate::ui::Player;
 
-/// How often to look for the HWND, which exists once the event loop has started.
-const HWND_POLL: Duration = Duration::from_millis(10);
+/// How often to look for the window handle, which exists once the event loop has started.
+const HANDLE_POLL: Duration = Duration::from_millis(10);
 
 #[derive(Default)]
 struct Integrations {
@@ -30,7 +30,7 @@ struct Integrations {
     hotkeys: Option<Hotkeys>,
     /// For re-registering the hotkeys from Settings (`set_hotkeys`).
     tx: Option<Sender<UiCommand>>,
-    /// The latest state, kept for the window-bound parts if it arrives before the HWND,
+    /// The latest state, kept for the window-bound parts if it arrives before the handle,
     /// and to skip updates that change nothing.
     last: Option<NowPlaying>,
     /// Nothing to play (`idle`): the tray's hover text is the app's name.
@@ -43,7 +43,7 @@ thread_local! {
 }
 
 /// Adds the tray icon and hotkeys now, and attaches the media controls and thumb buttons
-/// to the window once `find_hwnd` returns its HWND; then calls `on_hwnd` with it.
+/// to the window once `find_hwnd` returns its handle; then calls `on_hwnd` with it.
 /// (The winit window is created after the event loop starts, so it is polled for.)
 pub fn start(
     find_hwnd: impl Fn() -> Option<isize> + 'static,
@@ -91,7 +91,7 @@ pub fn start(
     let poll = Rc::new(Timer::default());
     let weak_poll = Rc::downgrade(&poll);
     let mut on_hwnd = Some(on_hwnd);
-    poll.start(TimerMode::Repeated, HWND_POLL, move || {
+    poll.start(TimerMode::Repeated, HANDLE_POLL, move || {
         let Some(hwnd) = find_hwnd() else {
             return;
         };
@@ -200,15 +200,15 @@ pub fn quit() {
     });
 }
 
-/// The window's HWND, once it exists.
+/// The window's handle, once it exists.
 /// How long `when_hwnd` waits for a window to be made.
-const HWND_WAIT: Duration = Duration::from_secs(2);
+const HANDLE_WAIT: Duration = Duration::from_secs(2);
 
 /// Calls `ready` with `ui`'s window handle once Windows has made its window. Winit makes a
 /// window shown from inside the running event loop on a later turn of the loop, after `show`
 /// returns, so the handle usually isn't there yet (the main window waits for its own the
-/// same way, `HWND_POLL`). Tries at once, then every `HWND_POLL` for up to `HWND_WAIT`, then
-/// calls `gave_up`. Neither runs once `ui` is gone.
+/// same way, `HANDLE_POLL`). Tries at once, then every `HANDLE_POLL` for up to
+/// `HANDLE_WAIT`, then calls `gave_up`. Neither runs once `ui` is gone.
 pub fn when_hwnd<C: ComponentHandle + 'static>(
     ui: &C,
     ready: impl FnOnce(&C, isize) + 'static,
@@ -218,7 +218,7 @@ pub fn when_hwnd<C: ComponentHandle + 'static>(
         ui.as_weak(),
         Box::new(ready),
         Box::new(gave_up),
-        Instant::now() + HWND_WAIT,
+        Instant::now() + HANDLE_WAIT,
     );
 }
 
@@ -239,7 +239,7 @@ fn try_hwnd<C: ComponentHandle + 'static>(
     } else if Instant::now() >= deadline {
         gave_up(&ui);
     } else {
-        Timer::single_shot(HWND_POLL, move || {
+        Timer::single_shot(HANDLE_POLL, move || {
             try_hwnd(weak, ready, gave_up, deadline);
         });
     }

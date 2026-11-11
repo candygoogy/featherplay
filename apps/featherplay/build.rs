@@ -1,5 +1,5 @@
 //! Compiles the Slint UI, renders the Tri-vane logo into `featherplay.ico` and its light
-//! variant into `featherplay-light.ico` in `OUT_DIR` (`native::set_icon` picks one at runtime
+//! variant into `featherplay-light.ico` in `OUT_DIR` (`chrome::set_icon` picks one at runtime
 //! by the taskbar's theme) and embeds the dark `.ico` into the exe as its icon resource,
 //! which Explorer shows. Both logos also go to `installer-small{,-light}.png` and
 //! `installer-panel{,-light}.png`, the installer's wizard images.

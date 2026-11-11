@@ -57,6 +57,33 @@ pub fn lower_priority() {
     let _ = unsafe { SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL) };
 }
 
+/// This thread's user and kernel CPU time so far, in the 15.6 ms steps Windows charges it
+/// in. `None` if Windows didn't say. For the frame log (`FEATHERPLAY_FRAME_LOG`).
+pub fn user_and_kernel_time() -> Option<(std::time::Duration, std::time::Duration)> {
+    use windows::Win32::Foundation::FILETIME;
+    use windows::Win32::System::Threading::GetThreadTimes;
+
+    let (mut created, mut exited, mut kernel, mut user) = Default::default();
+    // SAFETY: the pseudo-handle of the current thread is always valid, and the four
+    // pointers are to live locals.
+    let ok = unsafe {
+        GetThreadTimes(
+            GetCurrentThread(),
+            &mut created,
+            &mut exited,
+            &mut kernel,
+            &mut user,
+        )
+    };
+    ok.ok()?;
+    // 100 ns ticks.
+    let time = |t: FILETIME| {
+        let ticks = (u64::from(t.dwHighDateTime) << 32) | u64::from(t.dwLowDateTime);
+        std::time::Duration::from_nanos(ticks * 100)
+    };
+    Some((time(user), time(kernel)))
+}
+
 /// This thread's CPU time so far, in the 15.6 ms steps Windows charges it in. `None` if
 /// Windows didn't say.
 #[cfg(feature = "perf")]

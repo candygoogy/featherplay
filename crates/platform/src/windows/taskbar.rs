@@ -286,7 +286,7 @@ fn make_icons() -> Result<[HICON; 4], String> {
 }
 
 /// `SystemUsesLightTheme` (the taskbar's theme); dark when it can't be read. The app's
-/// window icon follows it too (`featherplay::native::set_icon`).
+/// window icon follows it too (`featherplay::chrome::set_icon`).
 pub fn light_taskbar() -> bool {
     let mut value = 0u32;
     let mut len = size_of::<u32>() as u32;

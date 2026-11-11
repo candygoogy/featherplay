@@ -15,6 +15,11 @@ pub fn raise_priority() {}
 /// Would lower the calling thread below ordinary threads. Leaves it as it is.
 pub fn lower_priority() {}
 
+/// This thread's user and kernel CPU time so far. `None`: not read here yet (phase 5).
+pub fn user_and_kernel_time() -> Option<(std::time::Duration, std::time::Duration)> {
+    None
+}
+
 /// This thread's CPU time so far, from the scheduler's count (`/proc/thread-self/schedstat`,
 /// in nanoseconds). `None` where the kernel doesn't keep it.
 #[cfg(feature = "perf")]
