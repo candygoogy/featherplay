@@ -19,6 +19,8 @@ featherplay-proxy = { path = "../proxy" }
 featherplay-store = { path = "../store" }
 # The helpers' failures and the JavaScript engine, for Copy diagnostics.
 featherplay-streams = { path = "../streams" }
+# The search suggestions' answers (`suggest`).
+featherplay-ytm = { path = "../ytm" }
 # A link pasted into the search field is read as a URL (`link`). Over the system TLS, like
 # the other crates.
 reqwest = { workspace = true, features = ["native-tls"] }

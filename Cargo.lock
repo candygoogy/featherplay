@@ -1386,6 +1386,7 @@ dependencies = [
  "featherplay-proxy",
  "featherplay-store",
  "featherplay-streams",
+ "featherplay-ytm",
  "log",
  "reqwest",
  "tokio",

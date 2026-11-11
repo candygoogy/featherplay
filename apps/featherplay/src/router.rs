@@ -1,6 +1,7 @@
 //! Pages and the back/forward history. Pure; `app::Ctx::navigate` applies a page to the
 //! window (sets `Nav`, calls the page's `open`).
 
+use featherplay_controller::place::Place;
 use featherplay_core::model::{AlbumId, ArtistId, PlaylistId};
 
 use crate::ui::PageKind;
@@ -153,6 +154,18 @@ impl Page {
             (Page::Library { .. }, Page::Library { .. })
                 | (Page::Explore { .. }, Page::Explore { .. })
         )
+    }
+}
+
+/// The page that shows a place the controller crate names.
+impl From<Place> for Page {
+    fn from(place: Place) -> Page {
+        match place {
+            Place::Album(id) => Page::Album { id },
+            Place::Playlist(id) => Page::Playlist { id },
+            Place::Artist(id) => Page::Artist { id },
+            Place::History => Page::History,
+        }
     }
 }
 
