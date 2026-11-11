@@ -176,8 +176,9 @@ impl Controller {
         log!("reconnecting with the stored session");
         let identity = account::saved_identity(&self.settings);
         let tx = self.tx.clone();
+        let fixtures = self.fixture_stream.is_some();
         crate::task::spawn_detached(async move {
-            let result = match cookie_header() {
+            let result = match cookie_header(fixtures) {
                 Some(cookies) => Some(YtMusic::connect(&cookies, &identity).await),
                 None => None,
             };

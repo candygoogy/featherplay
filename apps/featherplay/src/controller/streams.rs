@@ -846,8 +846,7 @@ impl Controller {
     /// again (`preload_refused`).
     pub(super) fn prepare_restored(&mut self, track: &Track) {
         // The performance harness's fixtures play nothing, so nothing is asked of YouTube.
-        #[cfg(feature = "perf-harness")]
-        if crate::perf::fixtures() {
+        if self.fixture_stream.is_some() {
             return;
         }
         let mut t = track.clone();
@@ -987,8 +986,7 @@ impl Controller {
 
     pub(super) fn start_hints(&mut self) {
         // The performance harness's fixtures play nothing, so nothing is asked of YouTube.
-        #[cfg(feature = "perf-harness")]
-        if crate::perf::fixtures() {
+        if self.fixture_stream.is_some() {
             return;
         }
         for (id, urgent, ahead) in self.streams.start_hints() {
@@ -1014,9 +1012,8 @@ impl Controller {
 
     /// `Effect::Resolve`: a stream that's here answers at once.
     pub(super) fn resolve(&mut self, id: TrackId) -> Option<Input> {
-        #[cfg(feature = "perf-harness")]
-        if crate::perf::fixtures() {
-            match crate::perf::fixture_stream() {
+        if let Some(fixture_stream) = self.fixture_stream {
+            match fixture_stream() {
                 Some(stream) => {
                     log!("resolve {}: the performance harness's local file", id.0);
                     let _ = self.tx.send(Msg::Resolved(id, Ok(stream)));

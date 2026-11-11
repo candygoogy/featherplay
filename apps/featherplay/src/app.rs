@@ -744,6 +744,13 @@ pub fn run(opts: Options, app: AppOptions) -> ExitCode {
             }
         }
     }
+    // The controller reads no account then, and every song plays the harness's local file
+    // (or nothing).
+    #[cfg(feature = "perf-harness")]
+    let opts = Options {
+        fixture_stream: crate::perf::fixtures().then_some(crate::perf::fixture_stream),
+        ..opts
+    };
 
     let (tx, commands) = mpsc::unbounded_channel::<UiCommand>();
     let (action_tx, actions) = mpsc::unbounded_channel::<Action>();
@@ -756,6 +763,9 @@ pub fn run(opts: Options, app: AppOptions) -> ExitCode {
         }),
         catalog: catalog.clone(),
     };
+    // A browser sign-in's temporary profile a crash or a kill left behind, in the
+    // background.
+    crate::pages::sign_in::sweep_browser_profiles(&paths.cache);
     let handle = runtime.handle().clone();
     let controller = match std::thread::Builder::new()
         .name("featherplay-controller".into())

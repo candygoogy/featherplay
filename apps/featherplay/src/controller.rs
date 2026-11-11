@@ -113,6 +113,10 @@ pub struct Options {
     pub volume: Option<f32>,
     /// Start the first track here.
     pub start_at: Option<Duration>,
+    /// Stand-in data instead of an account, set by the app's performance harness: no
+    /// account is read and nothing is asked of YouTube (no helpers, no resolves); a song
+    /// plays the stream this gives (a local file), or nothing.
+    pub fixture_stream: Option<fn() -> Option<ResolvedStream>>,
 }
 
 /// What the window asks for (pages, the bar). The integrations still send `UiCommand`s.
@@ -318,6 +322,8 @@ pub struct Controller {
     settings: Settings,
     paths: Paths,
     volume: Option<f32>,
+    /// The performance harness's stand-in stream (`Options::fixture_stream`).
+    fixture_stream: Option<fn() -> Option<ResolvedStream>>,
     /// Inputs to feed once the loop runs: the restored session or the `--play` radio.
     initial: Vec<Input>,
     /// Resolved streams and the resolves running (`streams.rs`).
@@ -402,11 +408,7 @@ impl Controller {
         resolver.set_quality(stream_quality(settings.streaming_quality));
         log!("player challenges: {}", featherplay_streams::js_engine());
         // The performance harness's fixtures play nothing: no helpers to fetch or start.
-        #[cfg(feature = "perf-harness")]
-        let helpers_wanted = !crate::perf::fixtures();
-        #[cfg(not(feature = "perf-harness"))]
-        let helpers_wanted = true;
-        if helpers_wanted {
+        if opts.fixture_stream.is_none() {
             // A first run fetches and preprocesses YouTube's player now (seconds), so the
             // native request is ready for the first click, signed in or not.
             let native = resolver.clone();
@@ -432,7 +434,7 @@ impl Controller {
         let mut initial = Vec::new();
         let mut unreachable = None;
         let mut resumed = false;
-        let api = match cookie_header() {
+        let api = match cookie_header(opts.fixture_stream.is_some()) {
             None => {
                 log!("no cookies: signed out");
                 None
@@ -474,8 +476,6 @@ impl Controller {
         if cleared > 0 {
             log!("removed {cleared} stale temp file(s)");
         }
-        // And a browser sign-in's temporary profile.
-        crate::pages::sign_in::sweep_browser_profiles(&paths.cache);
         let audio = AudioEngine::new(settings.output_device.as_deref(), paths.cache.join("tmp"))?;
         let player = Player::new(prefs(&settings));
 
@@ -548,6 +548,7 @@ impl Controller {
             settings,
             paths,
             volume: opts.volume,
+            fixture_stream: opts.fixture_stream,
             initial,
             streams: Default::default(),
             song_versions: Default::default(),
@@ -589,8 +590,7 @@ impl Controller {
         // would send the window to Sign in.
         let signed_in = self.api.is_some() || self.unreachable.is_some();
         // The performance harness's fixtures stand for an account.
-        #[cfg(feature = "perf-harness")]
-        let signed_in = signed_in || crate::perf::fixtures();
+        let signed_in = signed_in || self.fixture_stream.is_some();
         (self.ui.events)(UiEvent::Account { signed_in });
         self.check_identity();
         self.refresh_session();
@@ -1023,8 +1023,7 @@ impl Controller {
     /// failed): once more in the background, at most every `HELPERS_RETRY`. No toast, as
     /// nothing waits for it; a song that needs them waits for this same download.
     fn retry_helpers(&mut self) {
-        #[cfg(feature = "perf-harness")]
-        if crate::perf::fixtures() {
+        if self.fixture_stream.is_some() {
             return;
         }
         if self.helpers_tried.elapsed() < HELPERS_RETRY || self.resolver.helpers_installed() {
@@ -1577,11 +1576,10 @@ const COOKIES_FILE_VAR: &str = "FEATHERPLAY_COOKIES_FILE";
 const COOKIES_FILE_ALLOWED: bool = cfg!(any(debug_assertions, feature = "dev-cookies-file"));
 
 /// The cookie header: from the credential store, or `FEATHERPLAY_COOKIES_FILE` in a dev
-/// build. Its contents are never logged.
-fn cookie_header() -> Option<String> {
-    // The performance harness's fixtures: no account is read.
-    #[cfg(feature = "perf-harness")]
-    if crate::perf::fixtures() {
+/// build. Its contents are never logged. None with the performance harness's fixtures
+/// (`fixtures`): no account is read.
+fn cookie_header(fixtures: bool) -> Option<String> {
+    if fixtures {
         return None;
     }
     if let Some(path) = std::env::var_os(COOKIES_FILE_VAR).filter(|v| !v.is_empty()) {
