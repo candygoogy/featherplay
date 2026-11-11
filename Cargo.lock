@@ -1387,6 +1387,7 @@ dependencies = [
  "featherplay-store",
  "featherplay-streams",
  "log",
+ "reqwest",
  "tokio",
 ]
 

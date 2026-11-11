@@ -2,8 +2,8 @@
 //! keeps the pages, the UI bridge, the windows and startup, and calls in here.
 //!
 //! `diagnostics` has the log file, the crash files and the Copy diagnostics text; `log!`
-//! writes to the log, here and in the app. `task` has the detached task helpers everything
-//! here spawns with.
+//! writes to the log, here and in the app. `link` parses a link pasted into the search
+//! field. `task` has the detached task helpers everything here spawns with.
 
 /// Writes a line to the log file (`diagnostics`), prefixed with the time and the seconds
 /// since start; debug builds print it to stderr too.
@@ -15,4 +15,5 @@ macro_rules! log {
 }
 
 pub mod diagnostics;
+pub mod link;
 pub mod task;
