@@ -1377,7 +1377,6 @@ dependencies = [
  "symphonia",
  "tempfile",
  "tokio",
- "windows 0.62.2",
 ]
 
 [[package]]

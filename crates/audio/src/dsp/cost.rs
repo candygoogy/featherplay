@@ -19,32 +19,8 @@ const PASSES: usize = 10;
 const CALLBACK_FRAMES: usize = 480;
 
 /// This thread's CPU time so far.
-#[cfg(windows)]
 fn cpu_time() -> Duration {
-    use windows::Win32::Foundation::FILETIME;
-    use windows::Win32::System::Threading::{GetCurrentThread, GetThreadTimes};
-
-    let (mut created, mut exited, mut kernel, mut user) = Default::default();
-    // SAFETY: the pseudo-handle of the current thread is always valid, and the four
-    // pointers are to live locals.
-    let ok = unsafe {
-        GetThreadTimes(
-            GetCurrentThread(),
-            &mut created,
-            &mut exited,
-            &mut kernel,
-            &mut user,
-        )
-    };
-    assert!(ok.is_ok(), "GetThreadTimes");
-    let ticks = |t: FILETIME| (u64::from(t.dwHighDateTime) << 32) | u64::from(t.dwLowDateTime);
-    // 100 ns ticks.
-    Duration::from_nanos((ticks(kernel) + ticks(user)) * 100)
-}
-
-#[cfg(not(windows))]
-fn cpu_time() -> Duration {
-    Duration::ZERO
+    featherplay_platform::thread::cpu_time().expect("this thread's CPU time")
 }
 
 #[test]

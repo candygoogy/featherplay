@@ -57,6 +57,57 @@ pub fn lower_priority() {
     let _ = unsafe { SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL) };
 }
 
+/// This thread's CPU time so far, in the 15.6 ms steps Windows charges it in. `None` if
+/// Windows didn't say.
+#[cfg(feature = "perf")]
+pub fn cpu_time() -> Option<std::time::Duration> {
+    use windows::Win32::Foundation::FILETIME;
+    use windows::Win32::System::Threading::GetThreadTimes;
+
+    let (mut created, mut exited, mut kernel, mut user) = Default::default();
+    // SAFETY: the pseudo-handle of the current thread is always valid, and the four
+    // pointers are to live locals.
+    let ok = unsafe {
+        GetThreadTimes(
+            GetCurrentThread(),
+            &mut created,
+            &mut exited,
+            &mut kernel,
+            &mut user,
+        )
+    };
+    ok.ok()?;
+    let ticks = |t: FILETIME| (u64::from(t.dwHighDateTime) << 32) | u64::from(t.dwLowDateTime);
+    // 100 ns ticks.
+    Some(std::time::Duration::from_nanos(
+        (ticks(kernel) + ticks(user)) * 100,
+    ))
+}
+
+/// The cycles this thread has run so far. `None` if Windows didn't say.
+#[cfg(feature = "perf")]
+pub fn cycles() -> Option<u64> {
+    use windows::Win32::System::WindowsProgramming::QueryThreadCycleTime;
+    let mut c = 0u64;
+    // SAFETY: the pseudo-handle of the current thread is always valid, and the pointer
+    // is to a live local.
+    unsafe { QueryThreadCycleTime(GetCurrentThread(), &mut c) }.ok()?;
+    Some(c)
+}
+
+/// The cycles this process has run so far, its ended threads' included. `None` if Windows
+/// didn't say.
+#[cfg(feature = "perf")]
+pub fn process_cycles() -> Option<u64> {
+    use windows::Win32::System::Threading::GetCurrentProcess;
+    use windows::Win32::System::WindowsProgramming::QueryProcessCycleTime;
+    let mut c = 0u64;
+    // SAFETY: the pseudo-handle of the current process is always valid, and the pointer is
+    // to a live local.
+    unsafe { QueryProcessCycleTime(GetCurrentProcess(), &mut c) }.ok()?;
+    Some(c)
+}
+
 #[cfg(test)]
 mod tests {
     use windows::Win32::System::Threading::{GetCurrentThread, GetThreadPriority};

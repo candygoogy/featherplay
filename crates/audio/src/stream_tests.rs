@@ -1321,20 +1321,16 @@ fn engine_scans_a_download_once_it_is_complete() {
 /// This process's CPU time so far, from its cycle count: `GetProcessTimes` moves in 15.6 ms
 /// steps, too coarse for a few ms per second. The cycles are converted at the rate a busy
 /// thread counts them, measured once.
-#[cfg(windows)]
 fn process_cpu() -> Duration {
     use std::sync::OnceLock;
 
-    use windows::Win32::System::Threading::{GetCurrentProcess, GetCurrentThread};
-    use windows::Win32::System::WindowsProgramming::{QueryProcessCycleTime, QueryThreadCycleTime};
+    use featherplay_platform::thread::{cycles, process_cycles};
 
-    let thread = || {
-        let mut c = 0u64;
-        // SAFETY: the pseudo-handle of the current thread is always valid, and the pointer
-        // is to a live local.
-        let _ = unsafe { QueryThreadCycleTime(GetCurrentThread(), &mut c) };
-        c
-    };
+    // Linux counts no cycles: the cost reads as zero there.
+    if process_cycles().is_none() {
+        return Duration::ZERO;
+    }
+    let thread = || cycles().unwrap_or(0);
     static PER_SECOND: OnceLock<f64> = OnceLock::new();
     let per_second = *PER_SECOND.get_or_init(|| {
         let (c0, t) = (thread(), Instant::now());
@@ -1343,16 +1339,8 @@ fn process_cpu() -> Duration {
         }
         (thread() - c0) as f64 / t.elapsed().as_secs_f64()
     });
-    let mut cycles = 0u64;
-    // SAFETY: the pseudo-handle of the current process is always valid, and the pointer is
-    // to a live local.
-    let _ = unsafe { QueryProcessCycleTime(GetCurrentProcess(), &mut cycles) };
-    Duration::from_secs_f64(cycles as f64 / per_second)
-}
-
-#[cfg(not(windows))]
-fn process_cpu() -> Duration {
-    Duration::ZERO
+    let process = process_cycles().unwrap_or(0);
+    Duration::from_secs_f64(process as f64 / per_second)
 }
 
 /// What a crossfade costs, on the null output with crossfade on: the process's CPU per
@@ -1483,27 +1471,8 @@ fn engine_does_not_scan_a_track_whose_silences_the_app_has() {
 }
 
 /// The process's commit charge now and at its peak, in bytes.
-#[cfg(windows)]
 fn commit() -> (usize, usize) {
-    use windows::Win32::System::ProcessStatus::{GetProcessMemoryInfo, PROCESS_MEMORY_COUNTERS};
-    use windows::Win32::System::Threading::GetCurrentProcess;
-
-    let mut c = PROCESS_MEMORY_COUNTERS::default();
-    // SAFETY: the pseudo-handle of the current process is always valid, and `c` is a live
-    // local of the size passed.
-    let _ = unsafe {
-        GetProcessMemoryInfo(
-            GetCurrentProcess(),
-            &mut c,
-            std::mem::size_of::<PROCESS_MEMORY_COUNTERS>() as u32,
-        )
-    };
-    (c.PagefileUsage, c.PeakPagefileUsage)
-}
-
-#[cfg(not(windows))]
-fn commit() -> (usize, usize) {
-    (0, 0)
+    featherplay_platform::memory::commit_charge().unwrap_or((0, 0))
 }
 
 /// What skip silence's scan of a whole track costs: CPU, wall time at below-normal

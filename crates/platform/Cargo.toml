@@ -9,9 +9,11 @@ description = "featherplay's platform layer: everything that talks to the operat
 publish = false
 
 [features]
-# The performance harness's process, heap and window queries (`perf`). The app's
-# `perf-harness` feature turns it on; never on in a published build.
-perf = []
+# The performance harness's process, heap and window queries (`perf`), and the CPU-time,
+# cycle and commit-charge queries the measurements take (`thread`, `memory`). The app's
+# `perf-harness` feature and the audio crate's tests turn it on; never on in a published
+# build. The cycle counts and the commit charge need two more `windows` features.
+perf = ["windows/Win32_System_ProcessStatus", "windows/Win32_System_WindowsProgramming"]
 
 [dependencies]
 # Translations (`tr!`) for the strings the platform code shows, such as the tray menu's.

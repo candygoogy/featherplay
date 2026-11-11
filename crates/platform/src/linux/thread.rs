@@ -14,3 +14,24 @@ pub fn raise_priority() {}
 
 /// Would lower the calling thread below ordinary threads. Leaves it as it is.
 pub fn lower_priority() {}
+
+/// This thread's CPU time so far, from the scheduler's count (`/proc/thread-self/schedstat`,
+/// in nanoseconds). `None` where the kernel doesn't keep it.
+#[cfg(feature = "perf")]
+pub fn cpu_time() -> Option<std::time::Duration> {
+    let stat = std::fs::read_to_string("/proc/thread-self/schedstat").ok()?;
+    let nanos = stat.split_whitespace().next()?.parse().ok()?;
+    Some(std::time::Duration::from_nanos(nanos))
+}
+
+/// The cycles this thread has run so far. `None`: not read on Linux.
+#[cfg(feature = "perf")]
+pub fn cycles() -> Option<u64> {
+    None
+}
+
+/// The cycles this process has run so far. `None`: not read on Linux.
+#[cfg(feature = "perf")]
+pub fn process_cycles() -> Option<u64> {
+    None
+}
