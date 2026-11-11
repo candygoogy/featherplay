@@ -52,9 +52,6 @@ pub const SETUP_ARGS: [&str; 4] = [
     "/NORESTART",
     "/RELAUNCH",
 ];
-/// The installer's uninstall key under HKCU: Inno Setup names it after the AppId in
-/// `featherplay.iss`, plus `_is1`.
-const UNINSTALL_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Uninstall\{F2D85B2D-D1BB-4404-AA87-B6D35D0F5283}_is1";
 /// The folder in the cache that holds the downloaded setup and the setup's log.
 const DIR: &str = "updates";
 const SETUP_PREFIX: &str = "featherplay-setup-";
@@ -69,9 +66,6 @@ const READ_TIMEOUT: Duration = Duration::from_secs(30);
 /// GitHub sends release downloads on to a host under this domain
 /// (`release-assets.githubusercontent.com` in Nov 2026).
 const ASSET_DOMAIN: &str = ".githubusercontent.com";
-/// `CREATE_BREAKAWAY_FROM_JOB`: the setup must outlive featherplay even if a job object
-/// (a terminal, a launcher) would end featherplay's children with it.
-const CREATE_BREAKAWAY_FROM_JOB: u32 = 0x0100_0000;
 
 /// The setup's file name for this `version` on `arch` (`std::env::consts::ARCH`):
 /// `featherplay-setup-0.2.0.exe` on x64, `featherplay-setup-0.2.0-arm64.exe` on ARM64. No
@@ -128,7 +122,7 @@ pub fn is_installed(exe: &Path, install_location: &Path) -> bool {
 
 /// Whether this process is the installed copy (`is_installed`, read from the registry).
 pub fn installed() -> bool {
-    let Some(location) = install_location() else {
+    let Some(location) = featherplay_platform::installer::install_location() else {
         return false;
     };
     let Ok(exe) = std::env::current_exe() else {
@@ -151,40 +145,6 @@ pub fn is_scoop(exe: &Path) -> bool {
 /// Whether this process is the copy Scoop installed (`is_scoop`).
 pub fn scoop() -> bool {
     std::env::current_exe().is_ok_and(|exe| is_scoop(&exe))
-}
-
-/// The installer's `InstallLocation`, if featherplay is installed for this user.
-fn install_location() -> Option<PathBuf> {
-    use windows::Win32::Foundation::ERROR_SUCCESS;
-    use windows::Win32::System::Registry::{HKEY_CURRENT_USER, RRF_RT_REG_SZ, RegGetValueW};
-    use windows::core::HSTRING;
-
-    let (key, name) = (
-        HSTRING::from(UNINSTALL_KEY),
-        HSTRING::from("InstallLocation"),
-    );
-    let mut buf = vec![0u16; 1024];
-    let mut len = (buf.len() * 2) as u32;
-    // SAFETY: the buffer and its size in bytes are passed together; RRF_RT_REG_SZ makes the
-    // result NUL-terminated.
-    let status = unsafe {
-        RegGetValueW(
-            HKEY_CURRENT_USER,
-            &key,
-            &name,
-            RRF_RT_REG_SZ,
-            None,
-            Some(buf.as_mut_ptr().cast()),
-            Some(&mut len),
-        )
-    };
-    if status != ERROR_SUCCESS {
-        return None;
-    }
-    let chars = (len as usize / 2).min(buf.len());
-    let end = buf[..chars].iter().position(|&c| c == 0).unwrap_or(chars);
-    let s = String::from_utf16_lossy(&buf[..end]).trim().to_string();
-    (!s.is_empty()).then(|| PathBuf::from(s))
 }
 
 /// The public keys a release's checksums must be signed with: `Keys::release` in the app,
@@ -647,7 +607,6 @@ pub fn install_log_tail(cache: &Path, n: usize) -> Vec<String> {
 /// Starts the downloaded setup (checked again first) with `SETUP_ARGS`, logging to
 /// `{cache}/updates/install.log`. featherplay quits right after.
 pub fn launch(cache: &Path, ready: &Ready) -> Result<(), String> {
-    use std::os::windows::process::CommandExt;
     use std::process::Command;
 
     let path = ready
@@ -665,12 +624,8 @@ pub fn launch(cache: &Path, ready: &Ready) -> Result<(), String> {
             .arg(format!("/LOG={}", dir(cache).join("install.log").display()));
         c
     };
-    // A job that doesn't allow breaking away refuses the flag: then start it plainly.
-    command()
-        .creation_flags(CREATE_BREAKAWAY_FROM_JOB)
-        .spawn()
-        .or_else(|_| command().spawn())
-        .map(drop)
+    // Out of featherplay's job, so it outlives featherplay.
+    featherplay_platform::installer::start_setup(command)
         .map_err(|e| format!("starting {}: {}", ready.file, e.kind()))
 }
 
