@@ -749,9 +749,10 @@ impl Controller {
             .await;
             let result = match asked {
                 Ok((url, token)) => {
-                    let opened = tokio::task::spawn_blocking(move || open_url(&url))
-                        .await
-                        .unwrap_or_else(|e| Err(e.to_string()));
+                    let opened =
+                        tokio::task::spawn_blocking(move || featherplay_platform::open::url(&url))
+                            .await
+                            .unwrap_or_else(|e| Err(e.to_string()));
                     match opened {
                         Ok(()) => Ok((token, keys)),
                         Err(e) => Err(tr!("The browser didn't open: {}", e)),
@@ -1011,33 +1012,6 @@ fn describe(c: &Change) -> String {
             format!("hotkeys {} / {} / {}", h.play_pause, h.next, h.previous)
         }
         other => format!("{other:?}"),
-    }
-}
-
-/// Opens `url` in the default browser.
-pub(crate) fn open_url(url: &str) -> Result<(), String> {
-    use windows::Win32::System::Com::{
-        COINIT_APARTMENTTHREADED, COINIT_DISABLE_OLE1DDE, CoInitializeEx, CoUninitialize,
-    };
-    use windows::Win32::UI::Shell::ShellExecuteW;
-    use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
-    use windows::core::{HSTRING, w};
-
-    let url = HSTRING::from(url);
-    // SAFETY: COM is initialised on this (blocking pool) thread for the shell call and
-    // released after; the strings outlive the call.
-    unsafe {
-        let com = CoInitializeEx(None, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
-        let done = ShellExecuteW(None, w!("open"), &url, None, None, SW_SHOWNORMAL);
-        if com.is_ok() {
-            CoUninitialize();
-        }
-        // Values above 32 mean success.
-        if done.0 as isize > 32 {
-            Ok(())
-        } else {
-            Err(format!("ShellExecute returned {}", done.0 as isize))
-        }
     }
 }
 

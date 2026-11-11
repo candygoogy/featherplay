@@ -1405,7 +1405,7 @@ pub fn open(ctx: &Ctx, url: &str) {
     }
     let url = url.to_string();
     crate::app::blocking_detached(ctx.catalog.runtime(), move || {
-        if let Err(e) = crate::controller::open_url(&url) {
+        if let Err(e) = featherplay_platform::open::url(&url) {
             log!("opening the release page: {e}");
         }
     });

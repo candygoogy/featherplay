@@ -3,7 +3,6 @@
 //! list of third-party components, and a banner when a newer release is out (`updates`). The tagline, the disclaimer and the Made with Slint badge are in the
 //! Slint file.
 
-use std::path::Path;
 use std::rc::Rc;
 
 use featherplay_core::{tr, trn};
@@ -247,40 +246,13 @@ fn open_log_folder() {
         .spawn(move || {
             if let Err(e) = std::fs::create_dir_all(&dir)
                 .map_err(|e| e.to_string())
-                .and_then(|()| shell_open(&dir))
+                .and_then(|()| featherplay_platform::open::path(&dir))
             {
                 log!("open the log folder {}: {e}", dir.display());
             }
         });
     if let Err(e) = opened {
         log!("open the log folder: {e}");
-    }
-}
-
-/// Opens `path` as Explorer would (a folder opens in a window of its own).
-fn shell_open(path: &Path) -> Result<(), String> {
-    use windows::Win32::System::Com::{
-        COINIT_APARTMENTTHREADED, COINIT_DISABLE_OLE1DDE, CoInitializeEx, CoUninitialize,
-    };
-    use windows::Win32::UI::Shell::ShellExecuteW;
-    use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
-    use windows::core::{HSTRING, w};
-
-    let path = HSTRING::from(path.as_os_str());
-    // SAFETY: COM is initialised on this thread for the shell call and released after; the
-    // strings outlive the call.
-    unsafe {
-        let com = CoInitializeEx(None, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
-        let done = ShellExecuteW(None, w!("open"), &path, None, None, SW_SHOWNORMAL);
-        if com.is_ok() {
-            CoUninitialize();
-        }
-        // Values above 32 mean success.
-        if done.0 as isize > 32 {
-            Ok(())
-        } else {
-            Err(format!("ShellExecute returned {}", done.0 as isize))
-        }
     }
 }
 

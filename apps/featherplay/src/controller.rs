@@ -45,7 +45,6 @@ use featherplay_streams::{
 use featherplay_ytm::{ApiError, YtMusic};
 use tokio::sync::mpsc;
 
-pub(crate) use account::open_url;
 pub use account::{
     AccountAction, AccountEvent, ApiKeys, Change, Cookies, LastfmStatus, ListenBrainzStatus, Token,
 };
