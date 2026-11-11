@@ -40,8 +40,8 @@ touches another. The shared files below change only when a page needs something 
 | `pages/{settings,about,sign_in}.slint` | One page each | account |
 
 Rust mirrors this in `src/`: one module per page in `src/pages/<page>.rs`, with
-`src/queue_panel.rs` and `src/controller/queue.rs` for Now playing's side, and
-`src/controller/account.rs` and `src/account_menu.rs` for the account.
+`src/queue_panel.rs` and `crates/controller/src/controller/queue.rs` for Now playing's side, and
+`crates/controller/src/controller/account.rs` and `src/account_menu.rs` for the account.
 `src/pages/mod.rs` only dispatches and doesn't need editing.
 
 Fonts and art: `fonts/manrope/` (Manrope, SIL OFL 1.1; `OFL.txt` goes into About) and
@@ -111,7 +111,7 @@ pub fn open(ctx: &Rc<Ctx>, id: &AlbumId) {
 - Covers: `ctx.covers.load(url, px, |img| …)` or `ctx.covers.fill(model, urls, px, set)`.
   `px` is the displayed size in logical pixels; decoding happens off the UI thread.
 - Playing: `ctx.send(Action::Play { tracks, start, radio })`, `Action::Radio(id)`, etc.
-  (`src/controller.rs`). The player's state: `ctx.player()` and the `Player` global.
+  (`crates/controller/src/controller.rs`). The player's state: `ctx.player()` and the `Player` global.
 - Never block the UI thread; never call `block_on` there.
 
 ## Navigation

@@ -1,6 +1,11 @@
 //! featherplay's logic that needs no window (ARCHITECTURE.md, "Phase 3"). The app crate
 //! keeps the pages, the UI bridge, the windows and startup, and calls in here.
 //!
+//! `controller` is the loop that plays: the window's `Action`s and the integrations'
+//! `UiCommand`s come in on channels, with `Options` at the start, and every `UiEvent` goes
+//! out through one callback (`UiLink`). Beside it run `scrobbler` (Last.fm, ListenBrainz)
+//! and `presence` (Discord, on a thread of its own).
+//!
 //! `diagnostics` has the log file, the crash files and the Copy diagnostics text; `log!`
 //! writes to the log, here and in the app. `link` parses a link pasted into the search
 //! field, and `suggest` paces the suggestions under it. `place` is where a pick leads or a

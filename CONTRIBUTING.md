@@ -33,7 +33,8 @@ A Cargo workspace. The app is `apps/featherplay`; the rest are libraries it uses
 | `crates/lastfm` | The Last.fm client: request signing, the desktop auth flow, scrobbling and the offline queue. |
 | `crates/listenbrainz` | The ListenBrainz client: `submit-listens` (now playing, single listens, the offline queue) and `validate-token`. |
 | `crates/integrations` | Windows integrations: media controls, taskbar buttons, the tray icon, toasts and global hotkeys, plus SponsorBlock, Discord presence, the local API and Amuse endpoint, and the app's identity for the shell. |
-| `apps/featherplay` | The app: the Slint UI (`ui/`), the controller that ties the crates together, and the offscreen snapshot mode. `apps/featherplay/ui/README.md` explains how the UI is laid out. |
+| `crates/controller` | Everything the app does without a window: the controller that ties the crates together, scrobbling, Discord presence, the data source the pages share (and its `--fixtures`), the log and Copy diagnostics, the update check. Its tests need no window: `cargo nextest run -p featherplay-controller`. |
+| `apps/featherplay` | The app: the Slint UI (`ui/`), the pages and the window, startup, and the offscreen snapshot mode. `apps/featherplay/ui/README.md` explains how the UI is laid out. |
 
 `vendor/` holds patched third-party crates and stays out of fmt and clippy. `site/` is the
 website, and `packaging/` holds the installer script and the winget and Scoop manifests.

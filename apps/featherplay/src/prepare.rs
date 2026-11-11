@@ -1,6 +1,7 @@
 //! The song rows on screen, sent to the controller to resolve ahead of a click
-//! (`Action::Prepare`, `controller/streams.rs`): a playlist's, an album's or Liked songs'
-//! rows, search results, Home's song shelves, an artist's top songs, Related and Up next.
+//! (`Action::Prepare`; the controller crate's `controller/streams.rs`): a playlist's, an
+//! album's or Liked songs' rows, search results, Home's song shelves, an artist's top songs,
+//! Related and Up next.
 //!
 //! The lists tell which rows show through `ShownRows` (`RowsShown`, ui/parts.slint), as they
 //! open and whenever that changes. Once nothing has changed for `SETTLE` (a list opened, a

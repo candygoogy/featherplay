@@ -33,18 +33,18 @@ Here is what happens when you click a song row, from the page to the speakers.
 A page's Slint callback runs Rust on the UI thread. Home's, for example, is in
 `apps/featherplay/src/pages/home.rs`. It calls `Ctx::send` (`apps/featherplay/src/app.rs`)
 with `Action::Play { tracks, start, radio }`. `Action` is defined in
-`apps/featherplay/src/controller.rs`. The send goes into an unbounded tokio channel, so the
+`crates/controller/src/controller.rs`. The send goes into an unbounded tokio channel, so the
 UI never waits.
 
 Before the click there's often a head start. A row the pointer rests on sends
 `Action::Prefetch`, and the rows on screen go as `Action::Prepare`
 (`apps/featherplay/src/prepare.rs`). The controller then resolves those songs ahead
-(`apps/featherplay/src/controller/streams.rs`), so a click often finds its stream already
+(`crates/controller/src/controller/streams.rs`), so a click often finds its stream already
 there and its first 256 KB already in memory.
 
 ### 2. The controller turns it into player inputs
 
-The controller (`apps/featherplay/src/controller.rs`) runs one loop (`Controller::run`). It
+The controller (`crates/controller/src/controller.rs`) runs one loop (`Controller::run`). It
 waits on a timer tick, the background results (`Msg`), the integrations' commands
 (`UiCommand`) and the window's actions (`Action`). `Action::Play` becomes
 `Input::PlayTracks` for the player state machine in `crates/core/src/player.rs`.
@@ -57,7 +57,7 @@ only the controller loop ever touches the player.
 ### 3. The resolver chain finds a stream URL
 
 `Effect::Resolve(id)` starts a resolve on tokio (`spawn_resolve` in
-`apps/featherplay/src/controller/streams.rs`). It calls `YtDlpResolver`
+`crates/controller/src/controller/streams.rs`). It calls `YtDlpResolver`
 (`crates/streams/src/ytdlp.rs`), whose order of steps is in `crates/streams/src/chain.rs`
 (`Chain::run`):
 
@@ -158,9 +158,9 @@ controls and the tray (`apps/featherplay/src/shell.rs`).
 | `featherplay-audio-net` | A one-worker tokio runtime of the engine's own, for stream downloads | `crates/audio/src/engine.rs` |
 | `featherplay-decode-<n>`, `featherplay-scan-<n>` | One decoder per loaded track; one silence scan per track | `crates/audio/src/voice.rs`, `crates/audio/src/scan.rs` |
 | cpal's output thread | The audio callback: ring to mixer to bus to device | `crates/audio/src/devices.rs` |
-| `featherplay-audio-events` | Forwards `AudioEvent`s from the engine's std channel into the controller's tokio channel | `apps/featherplay/src/controller.rs` |
+| `featherplay-audio-events` | Forwards `AudioEvent`s from the engine's std channel into the controller's tokio channel | `crates/controller/src/controller.rs` |
 | `player-js` | One QuickJS run (a challenge or a load) | `crates/streams/src/js.rs` |
-| `featherplay-discord` | Discord's blocking IPC | `apps/featherplay/src/presence.rs` |
+| `featherplay-discord` | Discord's blocking IPC | `crates/controller/src/presence.rs` |
 | `featherplay-proxy` | Asks WinHTTP for a proxy script or auto-detection | `crates/proxy/src/lookups.rs` |
 | `featherplay-log` | Appends log lines to the file | `crates/controller/src/diagnostics.rs` |
 | `featherplay-endsession` | A hidden window that hears Windows' end-of-session messages and second launches | `crates/platform/src/windows/session_end.rs` |
@@ -185,7 +185,7 @@ They talk like this:
 - **Engine to controller:** `AudioEvent`s, forwarded by `featherplay-audio-events`.
 - **UI loads:** `Ctx::load` runs work on tokio and applies the result back on the UI thread.
   Nothing on the UI thread blocks on the network.
-- **Shared data:** the `Catalog` (`apps/featherplay/src/catalog.rs`) is the current data
+- **Shared data:** the `Catalog` (`crates/controller/src/catalog.rs`) is the current data
   source (signed-in API, visitor, or fixtures). The UI and the controller both hold it.
 
 ## The crates
@@ -203,8 +203,8 @@ They talk like this:
 | `crates/listenbrainz` | `featherplay-listenbrainz` | ListenBrainz: now playing, listens, token checks | proxy |
 | `crates/lyrics` | `featherplay-lyrics` | LRC parsing and LRCLIB lookups | proxy |
 | `crates/integrations` | `featherplay-integrations` | Hotkeys, SponsorBlock, Discord and the local API; `UiCommand` and `NowPlaying`, which the platform's tray, media controls and thumb buttons map to and from; the tray's hover text and the track's toast | core, proxy, store, platform |
-| `crates/controller` | `featherplay-controller` | The app's logic that needs no window: diagnostics (the log, `log!`, crash files, Copy diagnostics), link parsing, the search suggestions' pacing, the update check and download, the detached task helpers, and `Place` (where a pick leads), which the app maps to its pages. Phase 3 moves the controller itself in ([Target structure](#phase-3-a-controller-crate)). | core, platform, proxy, store, streams, ytm |
-| `apps/featherplay` | `featherplay` | Everything else: startup, the window, pages, the controller, scrobbling, presence, the update check's triggers and toasts, sign-in | all of the above, Slint |
+| `crates/controller` | `featherplay-controller` | The app's logic that needs no window ([Target structure](#phase-3-a-controller-crate)): the controller loop (`controller`), scrobbling (`scrobbler`), Discord presence (`presence`), the data source the pages share (`catalog`) and the recorded `fixtures`, diagnostics (the log, `log!`, crash files, Copy diagnostics), link parsing, the search suggestions' pacing, the update check and download, the detached task helpers, and `Place` (where a pick leads or a queue came from), which the app maps to its pages | core, platform, proxy, store, streams, ytm, audio, integrations, lastfm, listenbrainz, lyrics |
+| `apps/featherplay` | `featherplay` | Everything else: startup, the window, pages, the UI bridge, the update check's triggers and toasts, sign-in, the perf harness | all of the above, Slint |
 
 The rules: library crates never depend on Slint or on the app; the controller crate not on
 winit or `windows` either (only `platform` reaches the OS). `core` depends on nothing of
@@ -212,7 +212,10 @@ ours, and `platform` on `core` only (no winit either). Every crate uses the work
 exact pins and lints (`Cargo.toml`).
 
 ```
-featherplay (app) ─┬─ controller ─── streams, ytm, store, proxy, platform, core
+featherplay (app) ─┬─ controller ─┬─ lastfm ────── proxy, core
+                   │              ├─ listenbrainz ─ proxy
+                   │              └─ audio, integrations, lyrics, streams, ytm, store, proxy,
+                   │                 platform, core
                    ├─ integrations ─┬─ store ── platform, core
                    │                ├─ proxy
                    │                ├─ platform
@@ -220,8 +223,6 @@ featherplay (app) ─┬─ controller ─── streams, ytm, store, proxy, pla
                    ├─ audio ─────── proxy, platform, core
                    ├─ streams ───── proxy, platform, core
                    ├─ ytm ───────── proxy, core
-                   ├─ lastfm ────── proxy, core
-                   ├─ listenbrainz ─ proxy
                    ├─ lyrics ────── proxy
                    ├─ store ─────── platform, core
                    ├─ proxy ─────── platform
@@ -245,11 +246,11 @@ software surface) and `vendor/opus-decoder` (rustfft in place of a naive DFT).
 |---|---|---|
 | `{config}/settings.toml` | Settings | `crates/store/src/settings.rs` |
 | `{config}/session.json` | The queue and position, restored paused | `crates/store/src/session.rs` |
-| `{config}/scrobble-queue.json`, `{config}/listenbrainz-queue.json` | Scrobbles waiting to be sent | `apps/featherplay/src/scrobbler.rs` |
+| `{config}/scrobble-queue.json`, `{config}/listenbrainz-queue.json` | Scrobbles waiting to be sent | `crates/controller/src/scrobbler.rs` |
 | `{cache}/logs/` | `featherplay.log` and `featherplay.1.log` (about 1 MB each), crash files | `crates/controller/src/diagnostics/logfile.rs`, `crates/controller/src/diagnostics/crash.rs` |
 | `{cache}/covers/` | Cover art, an LRU disk cache | `apps/featherplay/src/covers.rs` |
 | `{cache}/library/` | Library lists and the Home feed, per identity | `crates/store/src/library_cache.rs` |
-| `{cache}/streams.json` | Resolved streams kept for the next start | `apps/featherplay/src/controller/streams.rs` |
+| `{cache}/streams.json` | Resolved streams kept for the next start | `crates/controller/src/controller/streams.rs` |
 | `{cache}/silences.json` | Silences found by skip silence | `crates/store/src/silence_cache.rs` |
 | `{cache}/client-version.txt` | The client version of the last session | `crates/store/src/session.rs` |
 | `{cache}/sidecars/` | yt-dlp and Deno (`FEATHERPLAY_SIDECARS_DIR` overrides this in dev builds) | `crates/streams/src/sidecars.rs` |
@@ -271,8 +272,8 @@ Dev builds can read the cookie header from a file named by `FEATHERPLAY_COOKIES_
 (see `apps/featherplay/src/main.rs`).
 
 The Last.fm API key and the Discord client ID for official builds are compiled in from
-environment variables (`option_env!` in `apps/featherplay/src/scrobbler.rs` and
-`apps/featherplay/src/presence.rs`). A build without them still works, without those
+environment variables (`option_env!` in `crates/controller/src/scrobbler.rs` and
+`crates/controller/src/presence.rs`). A build without them still works, without those
 services.
 
 ### Logs and Copy diagnostics
@@ -288,7 +289,7 @@ never as whom.
 ## The helpers: yt-dlp and Deno
 
 On a first run the controller downloads yt-dlp and Deno into `{cache}/sidecars` in the
-background (`install_helpers` in `apps/featherplay/src/controller.rs`). Only a song the
+background (`install_helpers` in `crates/controller/src/controller.rs`). Only a song the
 native step can't resolve waits for them.
 
 The versions are pinned in `crates/streams/src/sidecars.rs`, each with its SHA-256, for x64
@@ -342,14 +343,14 @@ Both are off by default and listen on this PC only. `docs/local-api.md` is the u
   Amuse plugin serves, on port 9863. It needs no token, and it answers only the Amuse
   widget's own web page.
 
-The controller drives both (`apps/featherplay/src/controller/local_api.rs`). The API's
+The controller drives both (`crates/controller/src/controller/local_api.rs`). The API's
 controls come in as `UiCommand`s, like the media keys, and what's playing goes out from
 the controller's state.
 
 ## Target structure
 
-This part is the plan for phases 2 to 4. Phase 2 is built, and phase 3's first step (3a,
-below); the rest of phase 3 and phase 4 aren't yet. The goals are:
+This part is the plan for phases 2 to 4. Phases 2 and 3 are built; phase 4 isn't yet. The
+goals are:
 
 - Linux becomes "write one module", not "touch 30 files".
 - The app crate holds the UI and nothing else.
@@ -455,6 +456,8 @@ app maps those to `UiCommand`, as `shell.rs` already does for the tray's events.
 
 ### Phase 3: a controller crate
 
+**Done**, in two steps (3a and 3b, at the end of this section). The plan as it was:
+
 A new crate, `crates/controller` (`featherplay-controller`), holds the app's logic that
 doesn't need a window. It must not depend on Slint, winit or `windows`. The app crate keeps
 pages, the UI bridge, windows and startup.
@@ -500,12 +503,34 @@ About through `updates::on_change`). The plain enum is `place::Place` (`Album`, 
 `Artist`, `History`), which the app turns into its `Page` (`From<Place> for Page`); search
 suggestions' picks use it now, and `PlayingFrom::page` can take it when the queue moves. The
 offline update tests and their fixtures are in `crates/controller/tests/`; the release keys
-stay in `apps/featherplay/keys/`, where the signing scripts read them. Step 3b moves the
-controller itself, the scrobbler, presence, the catalog and the fixtures on top: the app
-re-exports `diagnostics` and `updates` under their own names, so their `crate::` paths keep
-working once those files are in the crate.
+stay in `apps/featherplay/keys/`, where the signing scripts read them.
 
-**The interface.** It mostly exists already as `UiLink` (`apps/featherplay/src/controller.rs`):
+**Built: step 3b, the controller.** On top of 3a: `controller` (the loop and all of
+`controller/`), `scrobbler`, `presence`, `catalog` and `fixtures`, with the demo set's files
+(`crates/controller/fixtures/demo`). The ties were cut this way:
+
+- `PlayingFrom::page` is a `Place`; the Up next panel maps it to a `Page` to open it.
+- The app sweeps the browser sign-in's leftover profiles (`sweep_browser_profiles`) just
+  before it starts the controller's thread, instead of the controller during its start.
+- The performance harness sets `Options::fixture_stream` (its local file for every song;
+  set, the controller reads no account, fetches no helpers and resolves nothing) and
+  lengthens the fixtures' lists through `Fixtures::lengthened_by`. The controller crate has
+  no harness feature; a build without the harness leaves both unset.
+- The `dev-cookies-file` feature is the controller crate's too; the app's turns it on.
+- The Last.fm keys and the Discord client ID are still `option_env!` at compile time, now
+  in the controller crate: cargo gives every crate the same environment.
+
+The app keeps the name `crate::controller` for the interface (a re-export, as every page
+imports from it) and reaches the rest of the crate by its own name
+(`featherplay_controller::catalog`, `::diagnostics`, `::task` and so on). Scrobbling's and
+presence's internals are the crate's own; only `build_keys` and Discord's `Status` are
+public. The controller's tests, and the queue tests that need no window (`playing_from`,
+`song_menu_queue`), run in `cargo nextest run -p featherplay-controller`.
+
+The numbers: the app crate's `src/` went from 39,841 lines before phase 3 to 26,218 (35,525
+after 3a); the controller crate has 13,857 lines in `src/` and 15,035 with its tests.
+
+**The interface.** `UiLink` (`crates/controller/src/controller.rs`):
 
 - **In:** `Action` (the window) and `UiCommand` (integrations and the local API), each on an
   unbounded channel; `Options` at start.
@@ -534,16 +559,16 @@ tests start late, the code part is smaller than the total.
 | `crates/streams/src/chain.rs` | 1,910 (817) | The code is under 1,000. Move the tests to `chain/tests.rs`. |
 | `apps/featherplay/src/pages/settings.rs` | 1,818 (1,595) | One module per section, matching the Slint split |
 | `apps/featherplay/src/perf.rs` | 1,784 | Moves too (decision 3) |
-| `apps/featherplay/src/controller/streams.rs` | 1,776 (1,093) | The resolve-ahead queue (hints, page slots) apart from the saved streams; tests beside each |
+| `crates/controller/src/controller/streams.rs` | 1,776 (1,093) | The resolve-ahead queue (hints, page slots) apart from the saved streams; tests beside each |
 | `apps/featherplay/src/pages/home.rs` | 1,693 (1,155) | The feed and its paging and disk cache; the hero and its wash; the shelf layout (`arrange`) |
 | `crates/ytm/src/api.rs` | 1,674 (1,311) | The `YtMusic` methods apart from the raw query types and the guest token |
 | `crates/audio/src/voice.rs` | 1,627 (1,144) | The ring and its seqlock; the decoder thread; `RingSource` and its gains |
-| `apps/featherplay/src/controller.rs` | 1,596 | The interface types (`Action`, `UiEvent`, `PlayerState`, `UiLink`); startup; effects; messages |
+| `crates/controller/src/controller.rs` | 1,596 | The interface types (`Action`, `UiEvent`, `PlayerState`, `UiLink`); startup; effects; messages |
 | `crates/audio/src/stream_tests.rs` | 1,552 (all tests) | By area: start, seek, crossfade, devices |
 | `apps/featherplay/src/updates.rs` | 1,521 (1,414) | Splits in phase 3 (check versus UI) |
 | `apps/featherplay/ui/parts.slint` | 1,517 | Rows, cards, covers, buttons and text styles in separate files |
 | `crates/core/src/player.rs` | 1,386 | Stays (decision 9) |
-| `apps/featherplay/src/controller/account.rs` | 1,354 (1,044) | Sign-in and identity apart from settings changes |
+| `crates/controller/src/controller/account.rs` | 1,354 (1,044) | Sign-in and identity apart from settings changes |
 | `apps/featherplay/src/snapshot.rs` | 1,297 | The page table apart from the offscreen run |
 | `crates/streams/src/ytdlp.rs` | 1,285 (747) | Under 1,000 without its tests: tests to their own file |
 | `apps/featherplay/src/lyrics.rs` | 1,285 (1,006) | Fetching and caching apart from the view |
