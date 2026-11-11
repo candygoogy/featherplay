@@ -3,7 +3,7 @@
 
 use std::time::Duration;
 
-use featherplay::controller::{PlayingFrom, playing_from, queue_info};
+use featherplay_controller::controller::{PlayingFrom, playing_from, queue_info};
 use featherplay_controller::place::Place;
 use featherplay_core::model::{AlbumId, AlbumRef, LikeStatus, ListEnd, Track, TrackId, VideoType};
 use featherplay_core::queue::Queue;

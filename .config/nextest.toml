@@ -58,7 +58,7 @@ threads-required = 'num-test-threads'
 # never comes is ended after a minute, so a hang fails the run instead of holding the
 # machine-wide build lock (a hung test held it for 47 minutes on 2026-11-06).
 [[profile.default.overrides]]
-filter = 'package(featherplay-streams) | (package(featherplay) & test(/^controller::/))'
+filter = 'package(featherplay-streams) | (package(featherplay-controller) & test(/^controller::/))'
 slow-timeout = { period = "30s", terminate-after = 2 }
 
 # Settings' Discord card, settled offscreen in a few seconds, the activity sent to Discord,

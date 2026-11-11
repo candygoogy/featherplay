@@ -2,7 +2,7 @@
 
 use std::time::Duration;
 
-use featherplay::controller::{Action, QueueAction, add_input, queue_edit};
+use featherplay_controller::controller::{Action, QueueAction, add_input, queue_edit};
 use featherplay_core::model::{LikeStatus, Track, TrackId, VideoType};
 use featherplay_core::player::{Input, PlaybackPrefs, Player};
 
