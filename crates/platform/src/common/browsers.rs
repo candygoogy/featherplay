@@ -228,7 +228,9 @@ fn same_path(a: &Path, b: &Path) -> bool {
     a.as_os_str().eq_ignore_ascii_case(b.as_os_str())
 }
 
-#[cfg(test)]
+// The PCs these tests stand in are Windows ones, with Windows' paths (`C:\…` is absolute
+// only there), as is the search they check.
+#[cfg(all(test, windows))]
 mod tests {
     use super::*;
     use std::collections::HashMap;
