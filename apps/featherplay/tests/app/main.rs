@@ -41,6 +41,8 @@ mod home_shelves_dropped;
 mod home_video_covers;
 mod home_wash;
 mod hover_play;
+// The Windows installer's script (Inno Setup) and the Windows names it repeats.
+#[cfg(windows)]
 mod installer;
 mod instance;
 mod library_refresh;
