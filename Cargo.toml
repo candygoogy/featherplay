@@ -55,6 +55,8 @@ webview2-com = "=0.39.1"
 keyring-core = "=1.0.1"
 windows-native-keyring-store = { version = "=1.1.0", default-features = false }
 windows = "=0.62.2"
+# The window handle `featherplay-platform` takes, and that the app reads out of Slint's window.
+raw-window-handle = "=0.6.2"
 serde = { version = "=1.0.229", features = ["derive"] }
 serde_json = "=1.0.154"
 toml = "=1.1.8"

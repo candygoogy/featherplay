@@ -1,0 +1,63 @@
+[package]
+name = "featherplay-platform"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "featherplay's platform layer: everything that talks to the operating system, one module per OS"
+publish = false
+
+[features]
+# The performance harness's process, heap and window queries (`perf`). The app's
+# `perf-harness` feature turns it on; never on in a published build.
+perf = []
+
+[dependencies]
+# Translations (`tr!`) for the strings the platform code shows, such as the tray menu's.
+featherplay-core = { path = "../core" }
+# The window handle the window functions take: an HWND today, X11 or Wayland later.
+raw-window-handle = { workspace = true }
+
+# The OS crates the Windows code moving in from the other crates uses, with the union of the
+# `windows` features those crates turn on today, so moving an area doesn't edit this list.
+# The Windows build has all of them on already. Any still unused go at the end of phase 2.
+[target.'cfg(windows)'.dependencies]
+# `media_controls`: the media card (SMTC).
+souvlaki = { workspace = true }
+# `notify`: toasts.
+tauri-winrt-notification = { workspace = true }
+# `tray`: the tray icon and its menu.
+tray-icon = { workspace = true }
+# `webview`: WebView2 for the sign-in window.
+webview2-com = { workspace = true }
+# `credentials`: the Credential Manager store.
+windows-native-keyring-store = { workspace = true }
+windows = { workspace = true, features = [
+    "Media",
+    "Win32_Foundation",
+    "Win32_Graphics_Dwm",
+    "Win32_Graphics_Gdi",
+    "Win32_Networking_WinHttp",
+    "Win32_Security",
+    "Win32_Storage_EnhancedStorage",
+    "Win32_Storage_FileSystem",
+    "Win32_System_Com",
+    "Win32_System_Com_StructuredStorage",
+    "Win32_System_JobObjects",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Memory",
+    "Win32_System_Pipes",
+    "Win32_System_Registry",
+    "Win32_System_Threading",
+    "Win32_System_Variant",
+    "Win32_System_WinRT",
+    "Win32_UI_Accessibility",
+    "Win32_UI_HiDpi",
+    "Win32_UI_Shell",
+    "Win32_UI_Shell_PropertiesSystem",
+    "Win32_UI_WindowsAndMessaging",
+] }
+
+[lints]
+workspace = true

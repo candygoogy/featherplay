@@ -23,7 +23,7 @@ path = "src/main.rs"
 dev-cookies-file = []
 # The performance harness's scripted run of the window (`src/perf.rs`), started by
 # `FEATHERPLAY_PERF_SCRIPT`. Never on in a published build.
-perf-harness = []
+perf-harness = ["featherplay-platform/perf"]
 
 [dependencies]
 featherplay-audio = { path = "../../crates/audio" }
@@ -32,6 +32,8 @@ featherplay-integrations = { path = "../../crates/integrations" }
 featherplay-lastfm = { path = "../../crates/lastfm" }
 featherplay-listenbrainz = { path = "../../crates/listenbrainz" }
 featherplay-lyrics = { path = "../../crates/lyrics" }
+# What talks to the OS (ARCHITECTURE.md, "Phase 2"); its code moves in area by area.
+featherplay-platform = { path = "../../crates/platform" }
 featherplay-proxy = { path = "../../crates/proxy" }
 featherplay-store = { path = "../../crates/store" }
 featherplay-streams = { path = "../../crates/streams" }
@@ -46,7 +48,7 @@ image = { workspace = true, features = ["jpeg", "png", "webp"] }
 # the lock tree through reqwest, symphonia and resvg.
 log = { workspace = true, features = ["std"] }
 # Reads the HWND out of `slint::WindowHandle`; slint doesn't re-export the trait.
-raw-window-handle = "=0.6.2"
+raw-window-handle = { workspace = true }
 # Covers are fetched over the system TLS, like the other crates.
 reqwest = { workspace = true, features = ["native-tls"] }
 # The signature on a release's SHA256SUMS.txt, checked before an update is downloaded

@@ -9,6 +9,8 @@ description = "featherplay's proxy choice for every HTTP client and yt-dlp: the 
 publish = false
 
 [dependencies]
+# What talks to the OS (ARCHITECTURE.md, "Phase 2"); its code moves in area by area.
+featherplay-platform = { path = "../platform" }
 # What a lookup found, or how it failed, goes to the app's log file.
 log = { workspace = true }
 reqwest = { workspace = true }

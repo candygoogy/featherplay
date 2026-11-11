@@ -12,6 +12,8 @@ publish = false
 featherplay-core = { path = "../core" }
 # The HTTP clients and yt-dlp follow the proxy settings.
 featherplay-proxy = { path = "../proxy" }
+# What talks to the OS (ARCHITECTURE.md, "Phase 2"); its code moves in area by area.
+featherplay-platform = { path = "../platform" }
 # Runs YouTube's player challenges for the native request (`js.rs`).
 rquickjs = { workspace = true }
 # Each resolve step that fails logs a line (the app writes it to its log file).

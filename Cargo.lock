@@ -1335,6 +1335,7 @@ dependencies = [
  "featherplay-lastfm",
  "featherplay-listenbrainz",
  "featherplay-lyrics",
+ "featherplay-platform",
  "featherplay-proxy",
  "featherplay-store",
  "featherplay-streams",
@@ -1366,6 +1367,7 @@ version = "0.2.2"
 dependencies = [
  "bytes",
  "featherplay-core",
+ "featherplay-platform",
  "featherplay-proxy",
  "featherplay-streams",
  "log",
@@ -1393,6 +1395,7 @@ dependencies = [
  "bytes",
  "discord-rich-presence",
  "featherplay-core",
+ "featherplay-platform",
  "featherplay-proxy",
  "featherplay-store",
  "flate2",
@@ -1450,9 +1453,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "featherplay-platform"
+version = "0.2.2"
+dependencies = [
+ "featherplay-core",
+ "raw-window-handle",
+ "souvlaki",
+ "tauri-winrt-notification",
+ "tray-icon",
+ "webview2-com",
+ "windows 0.62.2",
+ "windows-native-keyring-store",
+]
+
+[[package]]
 name = "featherplay-proxy"
 version = "0.2.2"
 dependencies = [
+ "featherplay-platform",
  "hyper-util",
  "log",
  "reqwest",
@@ -1465,6 +1483,7 @@ name = "featherplay-store"
 version = "0.2.2"
 dependencies = [
  "featherplay-core",
+ "featherplay-platform",
  "keyring-core",
  "serde",
  "serde_json",
@@ -1477,6 +1496,7 @@ name = "featherplay-streams"
 version = "0.2.2"
 dependencies = [
  "featherplay-core",
+ "featherplay-platform",
  "featherplay-proxy",
  "flate2",
  "log",

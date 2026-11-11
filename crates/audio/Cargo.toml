@@ -21,6 +21,8 @@ symphonia = { version = "=0.5.5", default-features = false, features = ["aac", "
 # symphonia 0.5 has no Opus decoder: this pure-Rust one sits behind its `Decoder` trait
 # (`opus.rs`). Patched in from vendor/opus-decoder for a fast FFT (see its VENDORED.md).
 opus-decoder = "=0.1.1"
+# What talks to the OS (ARCHITECTURE.md, "Phase 2"); its code moves in area by area.
+featherplay-platform = { path = "../platform" }
 reqwest = { workspace = true, features = ["native-tls"] }
 tokio = { workspace = true, features = ["rt-multi-thread", "sync", "time", "macros"] }
 # The in-memory heads, and the temp file a stream downloads into under {cache}/tmp
