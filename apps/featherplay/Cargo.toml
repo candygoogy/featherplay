@@ -71,9 +71,6 @@ slint = { workspace = true, features = ["std", "compat-1-2", "backend-winit", "r
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "signal", "sync", "time", "fs", "io-util"] }
 
 [target.'cfg(windows)'.dependencies]
-# The sign-in window: WebView2 on its own thread, a child window of the sign-in frame, never
-# in the main window.
-webview2-com = { workspace = true }
 # The title bar, an opaque surface repainted when Windows drops it, the window icon,
 # the animation setting; the sign-in window
 # (COM, HiDpi) and opening the Last.fm approval page (Shell); the Windows build for the
