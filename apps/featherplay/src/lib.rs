@@ -2,7 +2,7 @@
 //!
 //! Threads: Slint owns the main thread (`app`, the window, the integrations in `shell`).
 //! The controller runs on `featherplay-controller` and shares one tokio runtime with the
-//! UI's background loads (`catalog`, `covers`).
+//! UI's background loads (the controller crate's `catalog`, `covers`).
 //!
 //! The window: `app` (context, startup), `router` (pages and history), `pages` (one module
 //! per page), `sidebar`, `top_bar` (search), `bar`, `queue_panel`, `ui_bridge` (model to Slint
@@ -29,12 +29,10 @@ pub mod album_actions;
 pub mod app;
 pub mod bar;
 pub mod busy;
-pub mod catalog;
 pub mod chrome;
 pub mod close;
 pub mod controller;
 pub mod covers;
-pub mod fixtures;
 pub mod follow;
 pub mod fonts;
 pub mod frame_log;

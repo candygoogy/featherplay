@@ -1381,6 +1381,7 @@ name = "featherplay-controller"
 version = "0.2.2"
 dependencies = [
  "featherplay-core",
+ "featherplay-lyrics",
  "featherplay-platform",
  "featherplay-proxy",
  "featherplay-store",
@@ -1391,6 +1392,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "sha1",
  "sha2",
  "tokio",
 ]

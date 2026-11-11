@@ -26,6 +26,8 @@ use std::rc::Rc;
 use std::sync::OnceLock;
 use std::time::Duration;
 
+use featherplay_controller::catalog::Source;
+use featherplay_controller::fixtures::Fixtures;
 use featherplay_core::model::{Track, TrackId};
 use featherplay_core::tr;
 use featherplay_lyrics::lrclib::{self, Lookup, LrcLib, Query};
@@ -35,8 +37,6 @@ use slint::{ComponentHandle, ModelRc, SharedString, Timer, TimerMode, VecModel};
 
 use crate::app::Ctx;
 use crate::bar;
-use crate::catalog::Source;
-use crate::fixtures::Fixtures;
 use crate::follow::colour::Lch;
 use crate::pages::settings;
 use crate::ui::{LyricsData, LyricsState, Player, Theme};
@@ -1032,7 +1032,8 @@ mod tests {
 
     #[test]
     fn the_demo_set_should_show_a_songs_own_timed_lines_with_their_credit() {
-        let f = Fixtures::load_set(crate::fixtures::FixtureSet::Demo).expect("demo fixtures");
+        let f = Fixtures::load_set(featherplay_controller::fixtures::FixtureSet::Demo)
+            .expect("demo fixtures");
         let found = fixture_for(&f, &TrackId("demo-invisible-light".into()), true).expect("found");
         let Some(Lyrics::Synced(lines)) = &found.lyrics else {
             panic!("not synced: {found:?}");

@@ -3,10 +3,10 @@
 //! art washes it grey; with nothing to resume the page stays plain; and
 //! once Home scrolls past it, the wash is gone and the top bar is back on the ground.
 
-use featherplay::fixtures::Fixtures;
 use featherplay::offscreen;
 use featherplay::snapshot::Scene;
 use featherplay::ui::HomeData;
+use featherplay_controller::fixtures::Fixtures;
 use slint::{ComponentHandle, LogicalPosition, Rgba8Pixel};
 
 use crate::support;

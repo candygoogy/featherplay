@@ -18,6 +18,8 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use featherplay_controller::catalog::{Catalog, Source};
+use featherplay_controller::fixtures::Fixtures;
 use featherplay_core::model::{AlbumRef, ArtistRef, PlaylistId, Track};
 use featherplay_store::{Paths, ThemeMode};
 use i_slint_core::accessibility::AccessibleStringProperty;
@@ -29,10 +31,8 @@ use slint::platform::{PointerEventButton, WindowEvent};
 use tokio::sync::mpsc;
 
 use crate::app::{self, Ctx};
-use crate::catalog::{Catalog, Source};
 use crate::controller::{Action, PlayerState, PlayingFrom, QueueInfo, UiEvent, playing_from};
 use crate::covers::Covers;
-use crate::fixtures::Fixtures;
 use crate::pages::content;
 use crate::router::{ExploreTab, LibraryTab, Page};
 use crate::ui::{

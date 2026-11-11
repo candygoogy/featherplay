@@ -6,7 +6,8 @@
 //! field, and `suggest` paces the suggestions under it. `place` is where a pick leads or a
 //! queue came from, which the app maps to its pages. `updates` checks for a newer release
 //! and downloads its setup. `task` has the detached task helpers everything here spawns
-//! with.
+//! with. `catalog` is the data source the pages and the controller share: the music API, or
+//! the recorded `fixtures`.
 
 /// Writes a line to the log file (`diagnostics`), prefixed with the time and the seconds
 /// since start; debug builds print it to stderr too.
@@ -17,7 +18,9 @@ macro_rules! log {
     };
 }
 
+pub mod catalog;
 pub mod diagnostics;
+pub mod fixtures;
 pub mod link;
 pub mod place;
 pub mod suggest;

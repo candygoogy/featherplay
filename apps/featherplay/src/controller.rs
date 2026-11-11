@@ -29,6 +29,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
 
 use featherplay_audio::{AudioEngine, AudioEvent, Compressor, StreamSource};
+use featherplay_controller::catalog::{Catalog, Source};
 use featherplay_core::model::{LikeStatus, PlaylistId, RepeatMode, Track, TrackId};
 use featherplay_core::player::{Effect, Input, ListEnd, PlaybackPrefs, Player, Status, StreamInfo};
 use featherplay_core::scrobble::Alternates;
@@ -55,7 +56,6 @@ pub use queue::{
 };
 pub use silences::Mark;
 
-use crate::catalog::{Catalog, Source};
 use crate::presence::Presence;
 use crate::scrobbler::{Scrobblers, Sent};
 use crate::updates;

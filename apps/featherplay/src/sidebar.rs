@@ -14,13 +14,13 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use featherplay_controller::catalog::Source;
 use featherplay_core::tr;
 use featherplay_store::{LibraryCache, LibraryList, Paths};
 use featherplay_ytm::{AccountInfo, AlbumSummary, ArtistSummary, HomeItem, PlaylistSummary};
 use slint::{ComponentHandle, Image, ModelRc, VecModel};
 
 use crate::app::Ctx;
-use crate::catalog::Source;
 use crate::library_list::{self, Entry, Kind};
 use crate::pages::{home, settings};
 use crate::ui::{CardItem, ItemKind, SidebarData};

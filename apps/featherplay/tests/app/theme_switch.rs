@@ -3,10 +3,10 @@
 //! song's colour still crossfades into it. On the offscreen platform with the fixtures; no
 //! window is shown.
 
-use featherplay::fixtures::Fixtures;
 use featherplay::offscreen;
 use featherplay::snapshot::Scene;
 use featherplay::ui::Theme;
+use featherplay_controller::fixtures::Fixtures;
 use slint::ComponentHandle;
 
 use crate::support::{self, frames};

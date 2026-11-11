@@ -1,7 +1,7 @@
 //! The demo fixture set (`FEATHERPLAY_FIXTURES=demo`): six free-licence songs (Josh Woodward,
 //! DoKashiteru feat. Snowflake, Scott Buckley; CC BY), the same ones the website plays, with
 //! our own cover art and the three Josh Woodward songs' timed lyrics, from
-//! `apps/featherplay/fixtures/demo`. Nothing in it was recorded from an account: the account
+//! `crates/controller/fixtures/demo`. Nothing in it was recorded from an account: the account
 //! is a plain "Listener" with no photo, and the playlists and shelves are made up from the six
 //! songs. What gets published (the README's screenshots) is rendered from this set, never from
 //! the recordings, whose covers are commercial releases.
@@ -481,6 +481,17 @@ mod tests {
         TrackId(format!("{TRACK_PREFIX}{slug}"))
     }
 
+    /// The cover URL of a Home feed item, as the app's Home cards show it
+    /// (`ui_bridge::home_thumbnail`).
+    fn home_thumbnail(item: &HomeItem) -> Option<String> {
+        match item {
+            HomeItem::Album(a) => a.thumbnail.clone(),
+            HomeItem::Playlist(p) => p.thumbnail.clone(),
+            HomeItem::Artist(a) => a.thumbnail.clone(),
+            HomeItem::Track(t) => t.thumbnail.clone(),
+        }
+    }
+
     #[test]
     fn featherplay_fixtures_demo_should_pick_the_demo_set() {
         assert_eq!(FixtureSet::parse(Some("demo")), Ok(FixtureSet::Demo));
@@ -523,7 +534,7 @@ mod tests {
             .shelves
             .iter()
             .flat_map(|s| &s.items)
-            .filter_map(crate::ui_bridge::home_thumbnail)
+            .filter_map(home_thumbnail)
             .chain(
                 f.radio()
                     .expect("radio")

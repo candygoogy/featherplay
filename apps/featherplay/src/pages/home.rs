@@ -17,6 +17,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::{Duration, Instant, SystemTime};
 
+use featherplay_controller::catalog::Source;
 use featherplay_core::model::{PlaylistId, Track, TrackId, VideoType};
 use featherplay_core::tr;
 use featherplay_store::{LibraryCache, LibraryList, Paths};
@@ -26,7 +27,6 @@ use slint::{ComponentHandle, Model, ModelRc, VecModel};
 
 use crate::app::Ctx;
 use crate::busy::Busy;
-use crate::catalog::Source;
 use crate::controller::{Action, PlayerState};
 use crate::follow::{
     self,

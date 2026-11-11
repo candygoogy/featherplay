@@ -7,13 +7,13 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use crate::support::home_at;
-use featherplay::fixtures::Fixtures;
 use featherplay::offscreen;
 use featherplay::pages::ahead;
 use featherplay::router::Page;
 use featherplay::snapshot::Scene;
 use featherplay::song_menu;
 use featherplay::ui::{AlbumData, ItemKind, PageHover, PlaylistData};
+use featherplay_controller::fixtures::Fixtures;
 use featherplay_core::model::{AlbumId, LikeStatus, PlaylistId, TrackId};
 use slint::platform::WindowEvent;
 use slint::{ComponentHandle, LogicalPosition, Model};

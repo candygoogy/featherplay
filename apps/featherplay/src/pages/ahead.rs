@@ -22,6 +22,7 @@ use std::future::Future;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
+use featherplay_controller::catalog::Source;
 use featherplay_core::model::{AlbumId, ArtistId, PlaylistId, Track};
 use featherplay_ytm::convert::bare_playlist_id;
 use featherplay_ytm::{Album, ApiError, Artist, Playlist, PlaylistRest};
@@ -29,7 +30,6 @@ use slint::ComponentHandle;
 use tokio::task::JoinHandle;
 
 use crate::app::Ctx;
-use crate::catalog::Source;
 use crate::memory;
 use crate::pages::playlist;
 use crate::router::Page;

@@ -14,6 +14,7 @@ use std::process::ExitCode;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
+use featherplay_controller::catalog::{Catalog, Source};
 use featherplay_core::model::{AlbumId, ArtistId, PlaylistId};
 use featherplay_core::tr;
 use featherplay_integrations::UiCommand;
@@ -24,7 +25,6 @@ use slint::ComponentHandle;
 use tokio::sync::mpsc;
 
 use crate::busy::Busy;
-use crate::catalog::{Catalog, Source};
 use crate::controller::{Action, Controller, Options, PlayerState, UiEvent, UiLink};
 use crate::covers::Covers;
 use crate::router::{ExploreTab, History, LibraryTab, Page};
@@ -731,11 +731,13 @@ pub fn run(opts: Options, app: AppOptions) -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    // The performance harness's page tours: the fixtures, no account.
+    // The performance harness's page tours: the fixtures, with its long lists, no account.
     #[cfg(feature = "perf-harness")]
     if crate::perf::fixtures() {
-        match crate::fixtures::Fixtures::load() {
-            Ok(f) => catalog.set(Source::Fixtures(std::sync::Arc::new(f))),
+        match featherplay_controller::fixtures::Fixtures::load() {
+            Ok(f) => catalog.set(Source::Fixtures(std::sync::Arc::new(
+                f.lengthened_by(crate::perf::lengthen),
+            ))),
             Err(e) => {
                 log!("perf fixtures: {e}");
                 return ExitCode::FAILURE;

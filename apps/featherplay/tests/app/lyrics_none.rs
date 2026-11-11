@@ -10,11 +10,11 @@ use std::cell::Cell;
 use std::ops::ControlFlow;
 use std::rc::Rc;
 
-use featherplay::fixtures::Fixtures;
 use featherplay::lyrics::{self, SnapshotLyrics};
 use featherplay::offscreen;
 use featherplay::snapshot::Scene;
 use featherplay::ui::{LyricsData, LyricsState, Nav, NowPlayingData, PageKind, Theme};
+use featherplay_controller::fixtures::Fixtures;
 use i_slint_core::accessibility::{AccessibilityAction, AccessibleStringProperty};
 use i_slint_core::item_tree::ItemRc;
 use i_slint_core::window::WindowInner;

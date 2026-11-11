@@ -1,8 +1,8 @@
 //! Copy diagnostics: the text with the fixture account signed in says so without naming it.
 
-use featherplay::fixtures::Fixtures;
 use featherplay::snapshot::Scene;
 use featherplay::ui::AboutData;
+use featherplay_controller::fixtures::Fixtures;
 use slint::ComponentHandle;
 
 #[test]

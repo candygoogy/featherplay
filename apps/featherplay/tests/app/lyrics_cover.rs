@@ -2,10 +2,10 @@
 //! that changes while another page is open repaints the Lyrics tab's panel too, not only the
 //! accent. On the offscreen platform with the fixtures; no window is shown.
 
-use featherplay::fixtures::Fixtures;
 use featherplay::follow::{self, colour};
 use featherplay::snapshot::Scene;
 use featherplay::ui::{LyricsData, Theme};
+use featherplay_controller::fixtures::Fixtures;
 use slint::{Color, ComponentHandle};
 
 use crate::support;

@@ -17,11 +17,11 @@ use featherplay_core::model::Track;
 use featherplay_store::{LibraryCache, LibraryList, Paths, Settings};
 use featherplay_ytm::{AlbumSummary, ApiError, ArtistSummary, PlaylistSummary};
 
+use featherplay_controller::catalog::Source;
 use slint::{ComponentHandle, Model, VecModel};
 
 use crate::app::Ctx;
 use crate::busy::Busy;
-use crate::catalog::Source;
 use crate::controller::PlayerState;
 use crate::pages::content::{self, CARD_COVER, TrackList};
 use crate::router::LibraryTab;

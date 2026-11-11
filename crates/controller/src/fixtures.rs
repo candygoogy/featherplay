@@ -39,7 +39,7 @@ pub enum FixtureSet {
     /// The recorded, scrubbed API responses.
     #[default]
     Recorded,
-    /// The free-licence demo songs (`apps/featherplay/fixtures/demo`).
+    /// The free-licence demo songs (`crates/controller/fixtures/demo`).
     Demo,
 }
 
@@ -72,6 +72,8 @@ pub struct Fixtures {
     /// How often each recording was read: each read stands for a request a live source
     /// would send (`reads`).
     reads: Mutex<HashMap<String, usize>>,
+    /// Stretches the liked songs and a playlist's songs as they're read (`lengthened_by`).
+    lengthen: Option<fn(&mut Vec<Track>)>,
 }
 
 impl fmt::Debug for Fixtures {
@@ -128,7 +130,21 @@ impl Fixtures {
             covers,
             fallback,
             reads: Mutex::default(),
+            lengthen: None,
         })
+    }
+
+    /// Has `lengthen` stretch the liked songs and every playlist's songs as they're read:
+    /// the app's performance harness makes its long lists this way.
+    pub fn lengthened_by(mut self, lengthen: fn(&mut Vec<Track>)) -> Fixtures {
+        self.lengthen = Some(lengthen);
+        self
+    }
+
+    fn lengthen(&self, tracks: &mut Vec<Track>) {
+        if let Some(lengthen) = self.lengthen {
+            lengthen(tracks);
+        }
     }
 
     /// How often recording `name` ("album", "playlist_mix"…) has been read, for tests that
@@ -212,10 +228,8 @@ impl Fixtures {
         if let Some(d) = &self.demo {
             return Ok(d.liked_songs());
         }
-        #[allow(unused_mut, reason = "lengthened by the performance harness only")]
         let mut tracks = convert::playlist_tracks(&[self.raw("liked_songs")?])?;
-        #[cfg(feature = "perf-harness")]
-        crate::perf::lengthen(&mut tracks);
+        self.lengthen(&mut tracks);
         Ok(tracks)
     }
 
@@ -250,10 +264,8 @@ impl Fixtures {
             "playlist"
         };
         let raw = self.raw(name)?;
-        #[allow(unused_mut, reason = "lengthened by the performance harness only")]
         let mut tracks = convert::playlist_tracks(std::slice::from_ref(&raw))?;
-        #[cfg(feature = "perf-harness")]
-        crate::perf::lengthen(&mut tracks);
+        self.lengthen(&mut tracks);
         Ok(Playlist {
             summary: convert::playlist_summary(&raw, id)?,
             tracks,

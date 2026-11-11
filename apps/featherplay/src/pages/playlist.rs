@@ -9,6 +9,7 @@ use std::ops::ControlFlow;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
+use featherplay_controller::catalog::Source;
 use featherplay_core::model::{PlaylistId, Track};
 use featherplay_core::tr;
 use featherplay_ytm::{ApiError, Playlist, PlaylistPart};
@@ -16,7 +17,6 @@ use slint::ComponentHandle;
 use tokio::sync::mpsc::UnboundedSender;
 
 use crate::app::Ctx;
-use crate::catalog::Source;
 use crate::controller::{PlayerState, PlayingFrom};
 use crate::follow;
 use crate::pages::ahead;

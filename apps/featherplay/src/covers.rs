@@ -30,6 +30,7 @@ use std::rc::{Rc, Weak};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, SystemTime};
 
+use featherplay_controller::fixtures::Fixtures;
 use image::imageops::FilterType;
 use sha2::{Digest, Sha256};
 use slint::{
@@ -39,7 +40,6 @@ use tokio::runtime::Handle;
 use tokio::sync::Semaphore;
 
 use crate::busy::Busy;
-use crate::fixtures::Fixtures;
 use crate::ui::{CardItem, PageKind};
 
 /// The disk cache's size limit; the least recently used files go first.

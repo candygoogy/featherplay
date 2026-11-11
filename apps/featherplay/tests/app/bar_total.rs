@@ -7,11 +7,11 @@ use std::time::{Duration, SystemTime};
 
 use featherplay::app::Ctx;
 use featherplay::bar;
-use featherplay::catalog::Catalog;
 use featherplay::controller::{PlayerState, QueueInfo};
 use featherplay::covers::Covers;
 use featherplay::offscreen;
 use featherplay::ui::{AppWindow, Player as Bar};
+use featherplay_controller::catalog::Catalog;
 use featherplay_core::model::{LikeStatus, Track, TrackId, VideoType};
 use featherplay_core::player::{Input, PlaybackPrefs, Player, Status, StreamInfo};
 use slint::ComponentHandle;

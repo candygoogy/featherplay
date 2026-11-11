@@ -12,6 +12,8 @@ publish = false
 # `featherplay-platform`, the window through the app.
 [dependencies]
 featherplay-core = { path = "../core" }
+# The demo fixtures' timed lyrics (`fixtures`).
+featherplay-lyrics = { path = "../lyrics" }
 # What talks to the OS: the Windows version and the local time for the log.
 featherplay-platform = { path = "../platform" }
 # The proxy in use, for Copy diagnostics.
@@ -19,7 +21,9 @@ featherplay-proxy = { path = "../proxy" }
 featherplay-store = { path = "../store" }
 # The helpers' failures and the JavaScript engine, for Copy diagnostics.
 featherplay-streams = { path = "../streams" }
-# The search suggestions' answers (`suggest`).
+# The music API: the catalogue the pages and the controller share (`catalog`), the
+# fixtures' recordings parsed as live answers (`fixtures`), the search suggestions' answers
+# (`suggest`).
 featherplay-ytm = { path = "../ytm" }
 # A link pasted into the search field is read as a URL (`link`); the update check asks
 # GitHub (`updates`). Over the system TLS, like the other crates.
@@ -29,6 +33,8 @@ reqwest = { workspace = true, features = ["native-tls"] }
 minisign-verify = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+# `--fixtures` finds the design covers by the SHA-1 of their URL (`fixtures`).
+sha1 = { workspace = true }
 # Checks a downloaded update's setup.
 sha2 = { workspace = true }
 # The crates' log records reach the log file through it (`diagnostics`).

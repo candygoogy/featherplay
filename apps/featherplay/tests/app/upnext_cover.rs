@@ -9,14 +9,14 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use featherplay::app::Ctx;
-use featherplay::catalog::{Catalog, Source};
 use featherplay::controller::{Action, PlayerState, QueueAction, QueueInfo};
 use featherplay::covers::Covers;
-use featherplay::fixtures::Fixtures;
 use featherplay::offscreen;
 use featherplay::pages::playlist;
 use featherplay::queue_panel;
 use featherplay::ui::{AppWindow, PlaylistData, QueueData, Theme};
+use featherplay_controller::catalog::{Catalog, Source};
+use featherplay_controller::fixtures::Fixtures;
 use featherplay_core::model::{PlaylistId, Track};
 use featherplay_store::Paths;
 use sha1::{Digest, Sha1};

@@ -8,12 +8,12 @@ use std::path::PathBuf;
 
 use featherplay::app::Ctx;
 use featherplay::bar;
-use featherplay::catalog::Catalog;
 use featherplay::controller::Action;
 use featherplay::covers::Covers;
 use featherplay::offscreen;
 use featherplay::snapshot::Scene;
 use featherplay::ui::{AppWindow, Player};
+use featherplay_controller::catalog::Catalog;
 use i_slint_core::accessibility::AccessibleStringProperty;
 use i_slint_core::item_tree::ItemRc;
 use i_slint_core::items::AccessibleRole;

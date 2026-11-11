@@ -8,13 +8,13 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use featherplay::app::{self, Ctx};
-use featherplay::catalog::{Catalog, Source};
 use featherplay::controller::UiEvent;
 use featherplay::covers::Covers;
-use featherplay::fixtures::Fixtures;
 use featherplay::offscreen;
 use featherplay::router::{LibraryTab, Page};
 use featherplay::ui::{AppWindow, HomeData, LibraryData, Theme};
+use featherplay_controller::catalog::{Catalog, Source};
+use featherplay_controller::fixtures::Fixtures;
 use slint::{ComponentHandle, Model};
 use tokio::sync::mpsc;
 
