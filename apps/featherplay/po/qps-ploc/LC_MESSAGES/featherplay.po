@@ -8,6 +8,117 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "X-Language-Name: Test language [qps-ploc]\n"
 
+#: ../../crates/controller/src/controller.rs:1461
+msgid "No sound output found. Connect speakers or headphones."
+msgstr "[No sound output found. Connect speakers or headphones.]"
+
+#: ../../crates/controller/src/controller/account.rs:462
+msgid "Your API key is saved. Connect to sign in to Last.fm with it."
+msgstr "[Your API key is saved. Connect to sign in to Last.fm with it.]"
+
+#: ../../crates/controller/src/controller/account.rs:464
+msgid "Using featherplay's API key again. Connect to sign in."
+msgstr "[Using featherplay's API key again. Connect to sign in.]"
+
+#: ../../crates/controller/src/controller/account.rs:465
+msgid "Your API key is removed. Last.fm needs one to connect."
+msgstr "[Your API key is removed. Last.fm needs one to connect.]"
+
+#: ../../crates/controller/src/controller/account.rs:473
+msgid "Saving the API key failed: {}"
+msgstr "[Saving the API key failed: {}]"
+
+#: ../../crates/controller/src/controller/account.rs:484
+msgid "Connected as {}. Listens go to your ListenBrainz profile."
+msgstr "[Connected as {}. Listens go to your ListenBrainz profile.]"
+
+#: ../../crates/controller/src/controller/account.rs:758
+msgid "The browser didn't open: {}"
+msgstr "[The browser didn't open: {}]"
+
+#: ../../crates/controller/src/controller/account.rs:784
+msgid "Saving the session failed: {}"
+msgstr "[Saving the session failed: {}]"
+
+#: ../../crates/controller/src/controller/account.rs:790
+msgid ""
+"Last.fm hasn't been approved yet. Approve featherplay in the browser, then "
+"try again."
+msgstr "[Last.fm hasn't been approved yet. Approve featherplay in the browser, then try again.]"
+
+#: ../../crates/controller/src/controller/account.rs:795
+msgid "That approval expired. Connect again."
+msgstr "[That approval expired. Connect again.]"
+
+#: ../../crates/controller/src/controller/account.rs:843
+msgid "Saving the token failed: {}"
+msgstr "[Saving the token failed: {}]"
+
+#: ../../crates/controller/src/controller/account.rs:916
+msgid ""
+"ListenBrainz didn't accept that token. Copy it again from listenbrainz.org/"
+"settings."
+msgstr "[ListenBrainz didn't accept that token. Copy it again from listenbrainz.org/settings.]"
+
+#: ../../crates/controller/src/controller/account.rs:921
+msgid "Couldn't reach ListenBrainz. Check the connection and try again."
+msgstr "[Couldn't reach ListenBrainz. Check the connection and try again.]"
+
+#: ../../crates/controller/src/controller/account.rs:984
+msgid ""
+"That session isn't signed in. Sign in again, or copy a fresh cookie header."
+msgstr "[That session isn't signed in. Sign in again, or copy a fresh cookie header.]"
+
+#: ../../crates/controller/src/controller/account.rs:988
+msgid "Couldn't reach YouTube Music. Check the connection, then try again."
+msgstr "[Couldn't reach YouTube Music. Check the connection, then try again.]"
+
+#: ../../crates/controller/src/controller/account.rs:991
+msgid ""
+"YouTube Music answered in a way featherplay doesn't understand. Try again "
+"later."
+msgstr "[YouTube Music answered in a way featherplay doesn't understand. Try again later.]"
+
+#: ../../crates/controller/src/controller/account.rs:1000
+msgid "Couldn't reach Last.fm. Check the connection and try again."
+msgstr "[Couldn't reach Last.fm. Check the connection and try again.]"
+
+#: ../../crates/controller/src/controller/account.rs:1002
+msgid "Last.fm said: {0} ({1})"
+msgstr "[Last.fm said: {0} ({1})]"
+
+#: ../../crates/controller/src/controller/local_api.rs:255
+msgid ""
+"Port {} is in use, perhaps by Pear Desktop's Amuse plugin. Close that app, "
+"then turn Amuse off and on again."
+msgstr "[Port {} is in use, perhaps by Pear Desktop's Amuse plugin. Close that app, then turn Amuse off and on again.]"
+
+#: ../../crates/controller/src/controller/local_api.rs:259
+msgid "Windows keeps port {} for itself, so Amuse can't reach featherplay."
+msgstr "[Windows keeps port {} for itself, so Amuse can't reach featherplay.]"
+
+#: ../../crates/controller/src/controller/local_api.rs:263
+msgid "featherplay couldn't listen on port {} for Amuse."
+msgstr "[featherplay couldn't listen on port {} for Amuse.]"
+
+#: ../../crates/controller/src/controller/queue.rs:273
+msgid "Autoplay"
+msgstr "[Autoplay]"
+
+#: ../../crates/controller/src/updates.rs:999 src/updates.rs:199
+#: ../../crates/controller/src/updates.rs:999 src/updates.rs:199
+msgid "Restart to update"
+msgstr "[Restart to update]"
+
+#: ../../crates/controller/src/updates.rs:1001 src/updates.rs:190
+#: ../../crates/controller/src/updates.rs:1001 src/updates.rs:190
+msgid "Get it"
+msgstr "[Get it]"
+
+#: ../../crates/controller/src/updates.rs:1015
+msgid "Details"
+msgstr "[Details]"
+
 #: ../../crates/core/src/failure.rs:111
 msgid "Getting ready to play: downloading helpers (one time)…"
 msgstr "[Getting ready to play: downloading helpers (one time)…]"
@@ -102,19 +213,19 @@ msgstr "[Pause]"
 msgid "Liked"
 msgstr "[Liked]"
 
-#: ../../crates/platform/src/windows/taskbar.rs:187
-#: ../../crates/platform/src/windows/taskbar.rs:187 src/pages/settings.rs:1545
-#: ../../crates/platform/src/windows/taskbar.rs:187 src/pages/settings.rs:1545 ui/mini_player.slint:244
-#: ../../crates/platform/src/windows/taskbar.rs:187 src/pages/settings.rs:1545 ui/mini_player.slint:244 ui/pages/settings.slint:2686
-#: ../../crates/platform/src/windows/taskbar.rs:187 src/pages/settings.rs:1545 ui/mini_player.slint:244 ui/pages/settings.slint:2686
+#: ../../crates/platform/src/windows/taskbar.rs:191
+#: ../../crates/platform/src/windows/taskbar.rs:191 src/pages/settings.rs:1549
+#: ../../crates/platform/src/windows/taskbar.rs:191 src/pages/settings.rs:1549 ui/mini_player.slint:244
+#: ../../crates/platform/src/windows/taskbar.rs:191 src/pages/settings.rs:1549 ui/mini_player.slint:244 ui/pages/settings.slint:2686
+#: ../../crates/platform/src/windows/taskbar.rs:191 src/pages/settings.rs:1549 ui/mini_player.slint:244 ui/pages/settings.slint:2686
 msgid "Previous"
 msgstr "[Previous]"
 
-#: ../../crates/platform/src/windows/taskbar.rs:189
-#: ../../crates/platform/src/windows/taskbar.rs:189 src/pages/settings.rs:1544
-#: ../../crates/platform/src/windows/taskbar.rs:189 src/pages/settings.rs:1544 ui/mini_player.slint:259
-#: ../../crates/platform/src/windows/taskbar.rs:189 src/pages/settings.rs:1544 ui/mini_player.slint:259 ui/pages/settings.slint:2680
-#: ../../crates/platform/src/windows/taskbar.rs:189 src/pages/settings.rs:1544 ui/mini_player.slint:259 ui/pages/settings.slint:2680
+#: ../../crates/platform/src/windows/taskbar.rs:193
+#: ../../crates/platform/src/windows/taskbar.rs:193 src/pages/settings.rs:1548
+#: ../../crates/platform/src/windows/taskbar.rs:193 src/pages/settings.rs:1548 ui/mini_player.slint:259
+#: ../../crates/platform/src/windows/taskbar.rs:193 src/pages/settings.rs:1548 ui/mini_player.slint:259 ui/pages/settings.slint:2680
+#: ../../crates/platform/src/windows/taskbar.rs:193 src/pages/settings.rs:1548 ui/mini_player.slint:259 ui/pages/settings.slint:2680
 msgid "Next"
 msgstr "[Next]"
 
@@ -131,7 +242,7 @@ msgstr "[Show featherplay]"
 msgid "Quit"
 msgstr "[Quit]"
 
-#: ../../crates/platform/src/windows/webview.rs:460
+#: ../../crates/platform/src/windows/webview.rs:462
 msgid "WebView2 isn't available ({}). Paste a cookie header instead."
 msgstr "[WebView2 isn't available ({}). Paste a cookie header instead.]"
 
@@ -267,16 +378,16 @@ msgstr "[a song wasn't found]"
 msgid "the music service said no"
 msgstr "[the music service said no]"
 
-#: src/app.rs:198 ui/pages/content.slint:601 ui/pages/settings.slint:2712
-#: src/app.rs:198 ui/pages/content.slint:601 ui/pages/settings.slint:2712 ui/sidebar.slint:416 ui/sidebar.slint:466
+#: src/app.rs:202 ui/pages/content.slint:601 ui/pages/settings.slint:2712
+#: src/app.rs:202 ui/pages/content.slint:601 ui/pages/settings.slint:2712 ui/sidebar.slint:416 ui/sidebar.slint:466
 msgid "Sign in"
 msgstr "[Sign in]"
 
-#: src/app.rs:593
+#: src/app.rs:586
 msgid "Signed in, but Windows couldn't save it for next time."
 msgstr "[Signed in, but Windows couldn't save it for next time.]"
 
-#: src/app.rs:636 ui/pages/about.slint:399
+#: src/app.rs:629 ui/pages/about.slint:399
 msgid "Copy diagnostics"
 msgstr "[Copy diagnostics]"
 
@@ -295,103 +406,6 @@ msgstr "[featherplay is still running in the tray]"
 #: src/close.rs:192
 msgid "Right-click the tray icon to show the window or quit."
 msgstr "[Right-click the tray icon to show the window or quit.]"
-
-#: src/controller.rs:1466
-msgid "No sound output found. Connect speakers or headphones."
-msgstr "[No sound output found. Connect speakers or headphones.]"
-
-#: src/controller/account.rs:462
-msgid "Your API key is saved. Connect to sign in to Last.fm with it."
-msgstr "[Your API key is saved. Connect to sign in to Last.fm with it.]"
-
-#: src/controller/account.rs:464
-msgid "Using featherplay's API key again. Connect to sign in."
-msgstr "[Using featherplay's API key again. Connect to sign in.]"
-
-#: src/controller/account.rs:465
-msgid "Your API key is removed. Last.fm needs one to connect."
-msgstr "[Your API key is removed. Last.fm needs one to connect.]"
-
-#: src/controller/account.rs:473
-msgid "Saving the API key failed: {}"
-msgstr "[Saving the API key failed: {}]"
-
-#: src/controller/account.rs:484
-msgid "Connected as {}. Listens go to your ListenBrainz profile."
-msgstr "[Connected as {}. Listens go to your ListenBrainz profile.]"
-
-#: src/controller/account.rs:757
-msgid "The browser didn't open: {}"
-msgstr "[The browser didn't open: {}]"
-
-#: src/controller/account.rs:783
-msgid "Saving the session failed: {}"
-msgstr "[Saving the session failed: {}]"
-
-#: src/controller/account.rs:789
-msgid ""
-"Last.fm hasn't been approved yet. Approve featherplay in the browser, then "
-"try again."
-msgstr "[Last.fm hasn't been approved yet. Approve featherplay in the browser, then try again.]"
-
-#: src/controller/account.rs:794
-msgid "That approval expired. Connect again."
-msgstr "[That approval expired. Connect again.]"
-
-#: src/controller/account.rs:842
-msgid "Saving the token failed: {}"
-msgstr "[Saving the token failed: {}]"
-
-#: src/controller/account.rs:915
-msgid ""
-"ListenBrainz didn't accept that token. Copy it again from listenbrainz.org/"
-"settings."
-msgstr "[ListenBrainz didn't accept that token. Copy it again from listenbrainz.org/settings.]"
-
-#: src/controller/account.rs:920
-msgid "Couldn't reach ListenBrainz. Check the connection and try again."
-msgstr "[Couldn't reach ListenBrainz. Check the connection and try again.]"
-
-#: src/controller/account.rs:983
-msgid ""
-"That session isn't signed in. Sign in again, or copy a fresh cookie header."
-msgstr "[That session isn't signed in. Sign in again, or copy a fresh cookie header.]"
-
-#: src/controller/account.rs:987
-msgid "Couldn't reach YouTube Music. Check the connection, then try again."
-msgstr "[Couldn't reach YouTube Music. Check the connection, then try again.]"
-
-#: src/controller/account.rs:990
-msgid ""
-"YouTube Music answered in a way featherplay doesn't understand. Try again "
-"later."
-msgstr "[YouTube Music answered in a way featherplay doesn't understand. Try again later.]"
-
-#: src/controller/account.rs:999
-msgid "Couldn't reach Last.fm. Check the connection and try again."
-msgstr "[Couldn't reach Last.fm. Check the connection and try again.]"
-
-#: src/controller/account.rs:1001
-msgid "Last.fm said: {0} ({1})"
-msgstr "[Last.fm said: {0} ({1})]"
-
-#: src/controller/local_api.rs:255
-msgid ""
-"Port {} is in use, perhaps by Pear Desktop's Amuse plugin. Close that app, "
-"then turn Amuse off and on again."
-msgstr "[Port {} is in use, perhaps by Pear Desktop's Amuse plugin. Close that app, then turn Amuse off and on again.]"
-
-#: src/controller/local_api.rs:259
-msgid "Windows keeps port {} for itself, so Amuse can't reach featherplay."
-msgstr "[Windows keeps port {} for itself, so Amuse can't reach featherplay.]"
-
-#: src/controller/local_api.rs:263
-msgid "featherplay couldn't listen on port {} for Amuse."
-msgstr "[featherplay couldn't listen on port {} for Amuse.]"
-
-#: src/controller/queue.rs:275
-msgid "Autoplay"
-msgstr "[Autoplay]"
 
 #: src/language.rs:41
 msgid "Windows default"
@@ -413,107 +427,107 @@ msgstr "[Marked as not for me]"
 msgid "Undo"
 msgstr "[Undo]"
 
-#: src/pages/about.rs:32
+#: src/pages/about.rs:31
 msgid "Skia, Slint's renderer"
 msgstr "[Skia, Slint's renderer]"
 
-#: src/pages/about.rs:34
+#: src/pages/about.rs:33
 msgid "rodio and cpal"
 msgstr "[rodio and cpal]"
 
-#: src/pages/about.rs:37
+#: src/pages/about.rs:36
 msgid "tokio and reqwest"
 msgstr "[tokio and reqwest]"
 
-#: src/pages/about.rs:48
+#: src/pages/about.rs:47
 msgid "The Unlicense. Downloaded on first run, not bundled."
 msgstr "[The Unlicense. Downloaded on first run, not bundled.]"
 
-#: src/pages/about.rs:52
+#: src/pages/about.rs:51
 msgid "MIT License. Downloaded on first run, not bundled."
 msgstr "[MIT License. Downloaded on first run, not bundled.]"
 
-#: src/pages/about.rs:55
+#: src/pages/about.rs:54
 msgid "Every other component"
 msgstr "[Every other component]"
 
-#: src/pages/about.rs:56
+#: src/pages/about.rs:55
 msgid "Listed with its licence in THIRD_PARTY.md in the source repository."
 msgstr "[Listed with its licence in THIRD_PARTY.md in the source repository.]"
 
-#: src/pages/about.rs:103 ui/pages/settings.slint:2733
+#: src/pages/about.rs:102 ui/pages/settings.slint:2733
 msgid "Check for updates"
 msgstr "[Check for updates]"
 
-#: src/pages/about.rs:104 src/updates.rs:1225 ui/pages/about.slint:97
-#: src/pages/about.rs:104 src/updates.rs:1225 ui/pages/about.slint:97 ui/pages/home.slint:924 ui/pages/lyrics.slint:269
-#: src/pages/about.rs:104 src/updates.rs:1225 ui/pages/about.slint:97 ui/pages/home.slint:924 ui/pages/lyrics.slint:269
+#: src/pages/about.rs:103 src/updates.rs:207 ui/pages/about.slint:97
+#: src/pages/about.rs:103 src/updates.rs:207 ui/pages/about.slint:97 ui/pages/home.slint:924 ui/pages/lyrics.slint:269
+#: src/pages/about.rs:103 src/updates.rs:207 ui/pages/about.slint:97 ui/pages/home.slint:924 ui/pages/lyrics.slint:269
 msgid "Try again"
 msgstr "[Try again]"
 
-#: src/pages/about.rs:107
+#: src/pages/about.rs:106
 msgid "featherplay {} is out."
 msgstr "[featherplay {} is out.]"
 
-#: src/pages/about.rs:110
+#: src/pages/about.rs:109
 msgid "Checking for updates…"
 msgstr "[Checking for updates…]"
 
-#: src/pages/about.rs:110 ui/pages/sign_in.slint:561
+#: src/pages/about.rs:109 ui/pages/sign_in.slint:561
 msgid "Checking…"
 msgstr "[Checking…]"
 
-#: src/pages/about.rs:115
+#: src/pages/about.rs:114
 msgid "GitHub is busy. Try again after {}."
 msgstr "[GitHub is busy. Try again after {}.]"
 
-#: src/pages/about.rs:121
+#: src/pages/about.rs:120
 msgid "Couldn't check: no connection."
 msgstr "[Couldn't check: no connection.]"
 
-#: src/pages/about.rs:122
+#: src/pages/about.rs:121
 msgid "Couldn't check: GitHub answered {}."
 msgstr "[Couldn't check: GitHub answered {}.]"
 
-#: src/pages/about.rs:124
+#: src/pages/about.rs:123
 msgid "Couldn't check: the answer wasn't readable."
 msgstr "[Couldn't check: the answer wasn't readable.]"
 
-#: src/pages/about.rs:137
+#: src/pages/about.rs:136
 msgid "Up to date. Checked just now."
 msgstr "[Up to date. Checked just now.]"
 
-#: src/pages/about.rs:139
+#: src/pages/about.rs:138
 msgid "Up to date. Checked {n} minute ago."
 msgid_plural "Up to date. Checked {n} minutes ago."
 msgstr[0] "[Up to date. Checked {n} minute ago.]"
 msgstr[1] "[Up to date. Checked {n} minutes ago.]"
 
-#: src/pages/about.rs:144
+#: src/pages/about.rs:143
 msgid "Up to date. Checked {n} hour ago."
 msgid_plural "Up to date. Checked {n} hours ago."
 msgstr[0] "[Up to date. Checked {n} hour ago.]"
 msgstr[1] "[Up to date. Checked {n} hours ago.]"
 
-#: src/pages/about.rs:146
+#: src/pages/about.rs:145
 msgid "Up to date. Checked {n} day ago."
 msgid_plural "Up to date. Checked {n} days ago."
 msgstr[0] "[Up to date. Checked {n} day ago.]"
 msgstr[1] "[Up to date. Checked {n} days ago.]"
 
-#: src/pages/about.rs:208
+#: src/pages/about.rs:207
 msgid "Command copied"
 msgstr "[Command copied]"
 
-#: src/pages/about.rs:224 src/pages/about.rs:231
+#: src/pages/about.rs:223 src/pages/about.rs:230
 msgid "Diagnostics copied"
 msgstr "[Diagnostics copied]"
 
-#: src/pages/album.rs:128 src/pages/settings.rs:747
+#: src/pages/album.rs:128 src/pages/settings.rs:751
 msgid "Album"
 msgstr "[Album]"
 
-#: src/pages/artist.rs:108 src/pages/settings.rs:744 src/ui_bridge.rs:109
+#: src/pages/artist.rs:108 src/pages/settings.rs:748 src/ui_bridge.rs:109
 msgid "Artist"
 msgstr "[Artist]"
 
@@ -559,8 +573,8 @@ msgstr "[The music service sent something unexpected.]"
 msgid "History"
 msgstr "[History]"
 
-#: src/pages/home.rs:893 src/pages/playlist.rs:72 ui/sidebar.slint:229
-#: src/pages/home.rs:893 src/pages/playlist.rs:72 ui/sidebar.slint:229
+#: src/pages/home.rs:893 src/pages/playlist.rs:73 ui/sidebar.slint:229
+#: src/pages/home.rs:893 src/pages/playlist.rs:73 ui/sidebar.slint:229
 msgid "Liked songs"
 msgstr "[Liked songs]"
 
@@ -580,7 +594,7 @@ msgstr "[More from {}]"
 msgid "Couldn't load related tracks"
 msgstr "[Couldn't load related tracks]"
 
-#: src/pages/playlist.rs:121
+#: src/pages/playlist.rs:122
 msgid "Playlist"
 msgstr "[Playlist]"
 
@@ -598,94 +612,94 @@ msgstr "[A Last.fm API key and its shared secret are 32 letters and digits each.
 msgid "Paste your user token first."
 msgstr "[Paste your user token first.]"
 
-#: src/pages/settings.rs:592
+#: src/pages/settings.rs:596
 msgid "Token copied"
 msgstr "[Token copied]"
 
-#: src/pages/settings.rs:595
+#: src/pages/settings.rs:599
 msgid "Couldn't copy the token. Try again."
 msgstr "[Couldn't copy the token. Try again.]"
 
-#: src/pages/settings.rs:609
+#: src/pages/settings.rs:613
 msgid "Pick a port from 1024 to 65535."
 msgstr "[Pick a port from 1024 to 65535.]"
 
-#: src/pages/settings.rs:611
+#: src/pages/settings.rs:615
 msgid "9863 is the Amuse switch's port. Pick another one."
 msgstr "[9863 is the Amuse switch's port. Pick another one.]"
 
-#: src/pages/settings.rs:743
+#: src/pages/settings.rs:747
 msgid "Song title"
 msgstr "[Song title]"
 
-#: src/pages/settings.rs:775
+#: src/pages/settings.rs:779
 msgid "Listening to {}"
 msgstr "[Listening to {}]"
 
-#: src/pages/settings.rs:940 ui/pages/settings.slint:2626
+#: src/pages/settings.rs:944 ui/pages/settings.slint:2626
 msgid "From the cover"
 msgstr "[From the cover]"
 
-#: src/pages/settings.rs:941
+#: src/pages/settings.rs:945
 msgid "Red"
 msgstr "[Red]"
 
-#: src/pages/settings.rs:942
+#: src/pages/settings.rs:946
 msgid "Rose"
 msgstr "[Rose]"
 
-#: src/pages/settings.rs:943
+#: src/pages/settings.rs:947
 msgid "Amber"
 msgstr "[Amber]"
 
-#: src/pages/settings.rs:944
+#: src/pages/settings.rs:948
 msgid "Teal"
 msgstr "[Teal]"
 
-#: src/pages/settings.rs:945
+#: src/pages/settings.rs:949
 msgid "Violet"
 msgstr "[Violet]"
 
-#: src/pages/settings.rs:946 ui/pages/settings.slint:2638
+#: src/pages/settings.rs:950 ui/pages/settings.slint:2638
 msgid "Custom colour"
 msgstr "[Custom colour]"
 
-#: src/pages/settings.rs:1259
+#: src/pages/settings.rs:1263
 msgid "On the dark theme it shows as {}, so it stays easy to see."
 msgstr "[On the dark theme it shows as {}, so it stays easy to see.]"
 
-#: src/pages/settings.rs:1264
+#: src/pages/settings.rs:1268
 msgid "On the light theme it shows as {}, so it stays easy to see."
 msgstr "[On the light theme it shows as {}, so it stays easy to see.]"
 
-#: src/pages/settings.rs:1294
+#: src/pages/settings.rs:1298
 msgid "Type a colour as # and 6 letters or digits, like #4390EE."
 msgstr "[Type a colour as # and 6 letters or digits, like #4390EE.]"
 
-#: src/pages/settings.rs:1534
+#: src/pages/settings.rs:1538
 msgid "Another app already uses one of these keys. Pick other keys."
 msgstr "[Another app already uses one of these keys. Pick other keys.]"
 
-#: src/pages/settings.rs:1543 ui/pages/settings.slint:1859
-#: src/pages/settings.rs:1543 ui/pages/settings.slint:1859 ui/shortcuts.slint:33
+#: src/pages/settings.rs:1547 ui/pages/settings.slint:1859
+#: src/pages/settings.rs:1547 ui/pages/settings.slint:1859 ui/shortcuts.slint:33
 msgid "Play or pause"
 msgstr "[Play or pause]"
 
-#: src/pages/settings.rs:1548
+#: src/pages/settings.rs:1552
 msgid ""
 "{0}: \"{1}\" isn't a key featherplay can use. Write it like Ctrl+Alt+Space; "
 "it needs Ctrl, Alt, Shift or Win."
 msgstr "[{0}: \"{1}\" isn't a key featherplay can use. Write it like Ctrl+Alt+Space; it needs Ctrl, Alt, Shift or Win.]"
 
-#: src/pages/settings.rs:1551
+#: src/pages/settings.rs:1555
 msgid "{} uses the same key as another action."
 msgstr "[{} uses the same key as another action.]"
 
-#: src/pages/settings.rs:1564
+#: src/pages/settings.rs:1568
 msgid "System default"
 msgstr "[System default]"
 
-#: src/pages/settings.rs:1572
+#: src/pages/settings.rs:1576
 msgid "{} (not connected)"
 msgstr "[{} (not connected)]"
 
@@ -795,91 +809,91 @@ msgid ""
 "that is signed in."
 msgstr "[That cookie header has no SAPISID, so it isn't signed in. Copy it from a tab that is signed in.]"
 
-#: src/playlist_menu.rs:72
+#: src/playlist_menu.rs:73
 msgid "{} Sign in again, then try once more."
 msgstr "[{} Sign in again, then try once more.]"
 
-#: src/playlist_menu.rs:74
+#: src/playlist_menu.rs:75
 msgid "{} Check the connection, then try again."
 msgstr "[{} Check the connection, then try again.]"
 
-#: src/playlist_menu.rs:75
+#: src/playlist_menu.rs:76
 msgid "{} The playlist is gone."
 msgstr "[{} The playlist is gone.]"
 
-#: src/playlist_menu.rs:76
+#: src/playlist_menu.rs:77
 msgid "{} The music service said no."
 msgstr "[{} The music service said no.]"
 
-#: src/playlist_menu.rs:121
+#: src/playlist_menu.rs:122
 msgid "Pinned {} to the top"
 msgstr "[Pinned {} to the top]"
 
-#: src/playlist_menu.rs:123
+#: src/playlist_menu.rs:124
 msgid "Unpinned {}"
 msgstr "[Unpinned {}]"
 
-#: src/playlist_menu.rs:142 src/song_menu.rs:100
+#: src/playlist_menu.rs:143 src/song_menu.rs:100
 msgid "Playing next: {}"
 msgstr "[Playing next: {}]"
 
-#: src/playlist_menu.rs:149 src/song_menu.rs:108
+#: src/playlist_menu.rs:150 src/song_menu.rs:108
 msgid "Added to queue: {}"
 msgstr "[Added to queue: {}]"
 
-#: src/playlist_menu.rs:156
+#: src/playlist_menu.rs:157
 msgid "Link copied"
 msgstr "[Link copied]"
 
-#: src/playlist_menu.rs:213
+#: src/playlist_menu.rs:214
 msgid "Couldn't load the playlist."
 msgstr "[Couldn't load the playlist.]"
 
-#: src/playlist_menu.rs:214
+#: src/playlist_menu.rs:215
 msgid "Couldn't load the album."
 msgstr "[Couldn't load the album.]"
 
-#: src/playlist_menu.rs:215
+#: src/playlist_menu.rs:216
 msgid "Couldn't load the artist."
 msgstr "[Couldn't load the artist.]"
 
-#: src/playlist_menu.rs:230
+#: src/playlist_menu.rs:231
 msgid "{} has no songs yet"
 msgstr "[{} has no songs yet]"
 
-#: src/playlist_menu.rs:262
+#: src/playlist_menu.rs:263
 msgid "This playlist has no radio"
 msgstr "[This playlist has no radio]"
 
-#: src/playlist_menu.rs:263
+#: src/playlist_menu.rs:264
 msgid "Couldn't start the radio."
 msgstr "[Couldn't start the radio.]"
 
-#: src/playlist_menu.rs:275
+#: src/playlist_menu.rs:276
 msgid "Enter a name for the playlist."
 msgstr "[Enter a name for the playlist.]"
 
-#: src/playlist_menu.rs:293
+#: src/playlist_menu.rs:294
 msgid "Renamed to {}"
 msgstr "[Renamed to {}]"
 
-#: src/playlist_menu.rs:297
+#: src/playlist_menu.rs:298
 msgid "Couldn't rename {}."
 msgstr "[Couldn't rename {}.]"
 
-#: src/playlist_menu.rs:319
+#: src/playlist_menu.rs:320
 msgid "Deleted {}"
 msgstr "[Deleted {}]"
 
-#: src/playlist_menu.rs:323
+#: src/playlist_menu.rs:324
 msgid "Couldn't delete {}."
 msgstr "[Couldn't delete {}.]"
 
-#: src/playlist_menu.rs:342
+#: src/playlist_menu.rs:343
 msgid "Removed {} from your library"
 msgstr "[Removed {} from your library]"
 
-#: src/playlist_menu.rs:346
+#: src/playlist_menu.rs:347
 msgid "Couldn't remove {}."
 msgstr "[Couldn't remove {}.]"
 
@@ -903,7 +917,7 @@ msgstr "[Sign in to add songs to your playlists]"
 msgid "Saved to {}"
 msgstr "[Saved to {}]"
 
-#: src/song_menu.rs:141 src/updates.rs:1198 src/updates.rs:1233
+#: src/song_menu.rs:141 src/updates.rs:180 src/updates.rs:215
 msgid "View"
 msgstr "[View]"
 
@@ -915,35 +929,23 @@ msgstr "[Added to Liked songs]"
 msgid "Removed from Liked songs"
 msgstr "[Removed from Liked songs]"
 
-#: src/updates.rs:993 src/updates.rs:1217 ui/pages/about.slint:96
-msgid "Restart to update"
-msgstr "[Restart to update]"
-
-#: src/updates.rs:995 src/updates.rs:1208 ui/pages/about.slint:95
-msgid "Get it"
-msgstr "[Get it]"
-
-#: src/updates.rs:1009
-msgid "Details"
-msgstr "[Details]"
-
-#: src/updates.rs:1197 src/updates.rs:1207 ui/pages/about.slint:86
+#: src/updates.rs:179 src/updates.rs:189 ui/pages/about.slint:86
 msgid "featherplay {} is out"
 msgstr "[featherplay {} is out]"
 
-#: src/updates.rs:1216
+#: src/updates.rs:198
 msgid "featherplay {} is ready to install"
 msgstr "[featherplay {} is ready to install]"
 
-#: src/updates.rs:1224 ui/pages/about.slint:85
+#: src/updates.rs:206 ui/pages/about.slint:85
 msgid "The update to {} didn't install"
 msgstr "[The update to {} didn't install]"
 
-#: src/updates.rs:1232
+#: src/updates.rs:214
 msgid "The update to {} couldn't be verified"
 msgstr "[The update to {} couldn't be verified]"
 
-#: src/updates.rs:1295
+#: src/updates.rs:276
 msgid "The update couldn't start"
 msgstr "[The update couldn't start]"
 
