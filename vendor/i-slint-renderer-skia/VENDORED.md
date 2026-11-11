@@ -35,7 +35,8 @@ swaps it in with `[patch.crates-io]`.
 4. `software_surface.rs`: `PRESENTED_PIXELS`, a process-wide count of the physical pixels the
    softbuffer surfaces have copied to their windows (each present's damage rectangles, or the
    whole buffer without a damage region; marked `featherplay patch`). featherplay's
-   `FEATHERPLAY_FRAME_LOG` (`apps/featherplay/src/native.rs`) reads it around each WM_PAINT, so
+   `FEATHERPLAY_FRAME_LOG` (`apps/featherplay/src/frame_log.rs`, called from the paint
+   subclass in `crates/platform/src/windows/window.rs`) reads it around each WM_PAINT, so
    a real-window log shows how much of the window each frame repainted: offscreen runs can't
    see what the real window merges into one repaint (2026-10-31). It's one
    relaxed atomic add per present.

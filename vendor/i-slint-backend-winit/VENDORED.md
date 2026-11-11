@@ -23,7 +23,8 @@ Why (2026-11-08): while sound plays, the playing mark steps 30 times a second, s
 on screen painted 60 frames a second, half of them empty, and the throttle's own timer ticks,
 monitor queries and loop turns were most of the UI thread's time outside painting
 (measured with the app's perf harness). Paints Windows asks for
-itself (a restore, a display change, `apps/featherplay/src/native.rs` `repaint_when_invalidated`)
+itself (a restore, a display change, `crates/platform/src/windows/window.rs`
+`repaint_when_invalidated`)
 don't go through the throttle and are unchanged.
 
 3. **No SVG renderer** (2026-11-10): `Cargo.toml` leaves `svg` out of the `i-slint-core`
