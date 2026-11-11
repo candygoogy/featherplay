@@ -133,7 +133,7 @@ I/O.
 
 `crates/audio/src/devices.rs` opens the device through cpal (WASAPI on Windows), with a
 buffer of about 50 ms. The output thread joins Windows' "Pro Audio" scheduling class
-(`crates/audio/src/priority.rs`). When the output starts, the engine sends
+(`featherplay_platform::thread`). When the output starts, the engine sends
 `AudioEvent::Started`. The controller turns it into an input, the player emits
 `TrackStarted`, and the log gets a "first sound … ms after the load" line that breaks the
 wait down step by step.

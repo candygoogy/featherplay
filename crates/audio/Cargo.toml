@@ -35,8 +35,7 @@ featherplay-core = { path = "../core" }
 log = { workspace = true }
 
 [target.'cfg(windows)'.dependencies]
-# MMCSS for the output thread and a raised priority for the decoders (`priority.rs`). The
-# app builds `windows` with these features already.
+# This thread's CPU time, for the bus's cost measurement (`dsp/cost.rs`).
 windows = { workspace = true, features = ["Win32_Foundation", "Win32_System_Threading"] }
 
 [dev-dependencies]

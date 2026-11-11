@@ -46,7 +46,6 @@ mod head;
 mod http;
 mod media;
 mod opus;
-mod priority;
 mod scan;
 mod silence;
 #[cfg(test)]

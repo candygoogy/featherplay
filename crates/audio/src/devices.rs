@@ -226,13 +226,13 @@ where
     T: SizedSample + FromSample<rodio::Sample>,
     E: FnMut(cpal::Error) + Send + 'static,
 {
-    let mut task: Option<Option<crate::priority::ProAudio>> = None;
+    let mut task: Option<Option<featherplay_platform::thread::ProAudio>> = None;
     device.build_output_stream::<T, _, _>(
         config,
         move |data: &mut [T], _| {
             // On the first callback: this is cpal's thread for the stream's whole life.
             if task.is_none() {
-                task = Some(crate::priority::pro_audio());
+                task = Some(featherplay_platform::thread::pro_audio());
             }
             clock.tick(&glitches);
             bus.fill(&mut source, data);
@@ -320,7 +320,7 @@ mod null {
             let (p, s) = (playing.clone(), stop.clone());
             let thread = std::thread::spawn(move || {
                 // As a device's thread: see `stream`.
-                let _task = crate::priority::pro_audio();
+                let _task = featherplay_platform::thread::pro_audio();
                 let mut out = vec![0f32; 2 * STEP_FRAMES];
                 let mut last = Instant::now();
                 // Frames due but not consumed yet (a fraction of one, between steps).

@@ -3,10 +3,11 @@
 //! from the ring, so a slow network never stalls the audio callback.
 //!
 //! The ring has one writer (the decoder thread) and one reader (the audio thread) and no
-//! lock between them: the audio thread runs in the real-time range (`priority.rs`), and a
-//! lock it shared with a normal thread would let that thread, preempted while holding it,
-//! hold up the output as long as the scheduler keeps it waiting. Indices count samples
-//! from the voice's start and never wrap; a slot is `index % capacity`.
+//! lock between them: the audio thread runs in the real-time range
+//! (`featherplay_platform::thread`), and a lock it shared with a normal thread would let
+//! that thread, preempted while holding it, hold up the output as long as the scheduler
+//! keeps it waiting. Indices count samples from the voice's start and never wrap; a slot is
+//! `index % capacity`.
 //!
 //! A seek can't empty the ring from the decoder's side, since the reader owns the read
 //! index. The decoder publishes where the new position's samples start instead (a seqlock:
@@ -539,7 +540,7 @@ pub(crate) fn spawn(
     let spawned = std::thread::Builder::new()
         .name(format!("featherplay-decode-{id}"))
         .spawn(move || {
-            crate::priority::raise_decoder();
+            featherplay_platform::thread::raise_priority();
             if let Err(e) = decode(&v, &src, &fetch, &controls, &tx) {
                 v.failed.store(true, Ordering::Relaxed);
                 let _ = tx.send(Msg::VoiceError {

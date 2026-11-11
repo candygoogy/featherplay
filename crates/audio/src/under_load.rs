@@ -46,7 +46,7 @@ fn scan_beside(stop: Arc<AtomicBool>) -> Option<JoinHandle<u32>> {
         loudness_db: None,
     };
     Some(std::thread::spawn(move || {
-        crate::priority::lower_scan();
+        featherplay_platform::thread::lower_priority();
         let rt = tokio::runtime::Builder::new_current_thread()
             .build()
             .expect("runtime");

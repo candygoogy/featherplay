@@ -1526,7 +1526,7 @@ fn silence_scan_cpu() {
     let cpu = process_cpu();
     let wall = Instant::now();
     let found = std::thread::spawn(move || {
-        crate::priority::lower_scan();
+        featherplay_platform::thread::lower_priority();
         crate::scan::silences(media, n, WEBM, &AtomicBool::new(false))
     })
     .join()

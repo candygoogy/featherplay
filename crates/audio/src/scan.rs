@@ -27,7 +27,7 @@ pub(crate) fn spawn(v: Arc<VoiceShared>, media: Media, len: u64, mime: String, t
     let spawned = std::thread::Builder::new()
         .name(format!("featherplay-scan-{}", v.id))
         .spawn(move || {
-            crate::priority::lower_scan();
+            featherplay_platform::thread::lower_priority();
             if let Some(found) = silences(media, len, &mime, v.stopped_flag()) {
                 v.found_silences(found);
                 let _ = tx.send(Msg::Silences { voice: v.id });
