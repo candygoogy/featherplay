@@ -58,7 +58,6 @@ pub mod presence;
 pub mod queue_panel;
 pub mod repaint;
 pub mod router;
-pub mod scrobbler;
 pub mod shell;
 pub mod sidebar;
 pub mod snapshot;

@@ -12,6 +12,9 @@ publish = false
 # `featherplay-platform`, the window through the app.
 [dependencies]
 featherplay-core = { path = "../core" }
+# Scrobbling (`scrobbler`).
+featherplay-lastfm = { path = "../lastfm" }
+featherplay-listenbrainz = { path = "../listenbrainz" }
 # The demo fixtures' timed lyrics (`fixtures`).
 featherplay-lyrics = { path = "../lyrics" }
 # What talks to the OS: the Windows version and the local time for the log.

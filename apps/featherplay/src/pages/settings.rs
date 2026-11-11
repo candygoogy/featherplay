@@ -14,6 +14,7 @@ use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::time::{Duration, SystemTime};
 
+use featherplay_controller::scrobbler::build_keys;
 use featherplay_core::tr;
 use featherplay_integrations::local_api::{AMUSE_PORT, Token};
 use featherplay_integrations::{NowPlaying, discord, parse_hotkey};
@@ -29,7 +30,6 @@ use crate::controller::{
     LocalApiStatus, PlayerState, Token as ListenBrainzToken,
 };
 use crate::presence::Status as DiscordStatus;
-use crate::scrobbler::build_keys;
 use crate::ui::{
     AccentSwatch, Appearance, DiscordPart, DiscordPreview, DiscordState, LastfmState,
     ListenBrainzState, LocalApiState, Player, SettingKey, SettingsData, SettingsDialog, Theme,
