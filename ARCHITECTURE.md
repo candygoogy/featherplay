@@ -2,8 +2,8 @@
 
 This is a map of the code for whoever maintains it. It says how the parts fit, which thread
 does what, and where things are kept on disk. The last part, [Target structure](#target-structure),
-is the plan for making the code easier to own and for adding Linux. It's a plan, not a
-description of today's code, and its decisions are listed at its end.
+is the plan for making the code easier to own and for adding Linux. Phase 2 of it is built;
+the rest is a plan, not a description of today's code. Its decisions are listed at its end.
 
 Paths are relative to the repository root. Each module's own doc comment says more than
 this file does; when the two disagree, the code is right and this file needs fixing.
@@ -163,7 +163,7 @@ controls and the tray (`apps/featherplay/src/shell.rs`).
 | `featherplay-proxy` | Asks WinHTTP for a proxy script or auto-detection | `crates/proxy/src/lookups.rs` |
 | `featherplay-log` | Appends log lines to the file | `apps/featherplay/src/diagnostics.rs` |
 | `featherplay-endsession` | A hidden window that hears Windows' end-of-session messages and second launches | `crates/platform/src/windows/session_end.rs` |
-| `featherplay-signin`, `featherplay-browser-signin`, `featherplay-browser-pipe` | The WebView2 sign-in, with its own COM apartment and message loop; the browser sign-in and its DevTools pipe | `apps/featherplay/src/pages/sign_in/webview.rs`, `apps/featherplay/src/pages/sign_in/browser.rs`, `apps/featherplay/src/pages/sign_in/browser/cdp.rs` |
+| `featherplay-signin`, `featherplay-browser-signin`, `featherplay-browser-pipe` | The WebView2 sign-in, with its own COM apartment and message loop; the browser sign-in and its DevTools pipe | `crates/platform/src/windows/webview.rs`, `apps/featherplay/src/pages/sign_in/browser.rs`, `apps/featherplay/src/pages/sign_in/browser/cdp.rs` |
 
 There are also short-lived threads, such as opening the log folder and registering the app's
 identity. And there are child processes: yt-dlp, Deno, and featherplay itself with
@@ -192,7 +192,7 @@ They talk like this:
 | Crate | Package | What it does | May depend on |
 |---|---|---|---|
 | `crates/core` | `featherplay-core` | Pure logic: the track model, the queue, the player state machine, scrobble rules, translations (`tr!`). No I/O. | serde only |
-| `crates/platform` | `featherplay-platform` | Everything that talks to the OS, one module per OS (`windows`, `linux`), and which features an OS lacks (`supports`). Phase 2 moves the OS code into it ([Target structure](#phase-2-a-platform-crate)). | core |
+| `crates/platform` | `featherplay-platform` | Everything that talks to the OS, one module per OS (`windows`, `linux`), and which features an OS lacks (`supports`). Phase 2 moved the OS code into it; the `linux` module is stubs until phase 5 ([Target structure](#phase-2-a-platform-crate)). | core |
 | `crates/proxy` | `featherplay-proxy` | The proxy every HTTP client and yt-dlp go through: the environment, else Windows' settings | platform |
 | `crates/store` | `featherplay-store` | Paths, settings, the saved session, secrets in Credential Manager, the library and silence caches | core, platform |
 | `crates/ytm` | `featherplay-ytm` | The YouTube Music client over ytmapi-rs: requests (`crates/ytm/src/api.rs`) and parsing (`crates/ytm/src/convert.rs`) | core, proxy |
@@ -343,7 +343,8 @@ the controller's state.
 
 ## Target structure
 
-This part is the plan for the next three phases. It isn't built yet. The goals are:
+This part is the plan for phases 2 to 4. Phase 2 is built; phases 3 and 4 aren't yet. The
+goals are:
 
 - Linux becomes "write one module", not "touch 30 files".
 - The app crate holds the UI and nothing else.
@@ -357,6 +358,12 @@ The [decisions](#decisions-for-these-phases) at the end settle the choices these
 
 ### Phase 2: a platform crate
 
+**Done.** The Windows code is in `crates/platform/src/windows/`, and the workspace builds for
+Linux with `linux/` as stubs (CI's `linux` job). Left for phase 5: the `linux` module itself,
+one area file at a time, with `supports` turning each feature on as it lands, and tests
+that run on Linux (today the check only builds; the app's single-instance tests run on
+Windows only).
+
 A new crate, `crates/platform` (`featherplay-platform`), holds everything that talks to the
 operating system. It sits low in the graph. It may depend on OS crates and on
 `featherplay-core`, but not on Slint, winit or any other featherplay crate.
@@ -364,15 +371,16 @@ operating system. It sits low in the graph. It may depend on OS crates and on
 ```
 crates/platform/src/
   lib.rs          picks the module with cfg, re-exports its functions and types
+  common/         what an area's versions share: plain types, events, logic with no OS calls
   windows/        today's code, moved here
   linux/          stubs in phase 2, real code in phase 5
 ```
 
 The rules:
 
-- It exposes plain functions and types. Window functions take a plain handle type (`isize`
-  for an HWND today, or a `raw-window-handle` handle). The Slint side, finding the handle
-  and calling back into the UI, stays in the app's `shell.rs`.
+- It exposes plain functions and types. Window functions take the window as a plain
+  `isize`, an HWND on Windows (decision 2). The Slint side, finding the handle and calling
+  back into the UI, stays in the app's `shell.rs`.
 - A trait only where a test needs a fake. Two such seams exist already and stay where they
   are: `NativeWindow` in `apps/featherplay/src/app.rs` (the offscreen tests set a stand-in)
   and `System` in `crates/proxy/src/lookups.rs` (the proxy tests).
@@ -383,7 +391,8 @@ The rules:
   everything it does today.
 - `windows`, `webview2-com`, `tauri-winrt-notification` and `windows-native-keyring-store`
   move under `[target.'cfg(windows)'.dependencies]` in every crate.
-- CI gets a job that runs `cargo check` and `clippy` for `x86_64-unknown-linux-gnu`.
+- CI's `linux` job runs `cargo check` and `clippy` for `x86_64-unknown-linux-gnu`
+  (`scripts/linux-check.sh`) on every push.
 
 **What moves.** This list comes from a `git grep` for `windows::`, `webview2_com`,
 `HWND`, `extern "system"`, `creation_flags`, `CREATE_NO_WINDOW`,
@@ -546,8 +555,10 @@ These were open questions in the first draft. Each has a default now; say so if 
 
 1. **Translations in the platform crate.** It depends on `featherplay-core` and uses `tr!`.
    Core is pure logic with serde only, so this keeps the plumbing small.
-2. **The window handle type.** `raw-window-handle`, which is already a dependency and has no
-   Slint in it. It carries Win32, X11 and Wayland handles alike.
+2. **The window handle type.** A plain `isize`: the HWND's value on Windows. The app's
+   `shell::hwnd` reads it out of Slint's `raw-window-handle` and passes the number, so the
+   platform crate doesn't depend on `raw-window-handle`. The Linux stubs take the same
+   `isize`; phase 5 settles what an X11 or Wayland window passes.
 3. **The perf harness's Win32 calls** (and the hand-declared kernel32 calls in
    `apps/featherplay/tests/app/`) move to the platform crate, behind a `perf` feature where
    only the harness needs them. No named exceptions to "nothing outside platform names Win32".
