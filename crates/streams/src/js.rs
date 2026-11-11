@@ -145,13 +145,14 @@ fn spawn<T: Send + 'static>(
         .stack_size(limits.thread_stack)
         .spawn(move || {
             let failed = |e: rquickjs::Error| format!("starting QuickJS: {e}");
-            #[cfg(windows)]
-            let runtime = {
-                let heap = heap::RunHeap::new().map_err(|e| format!("starting QuickJS: {e}"))?;
-                Runtime::new_with_alloc(heap).map_err(failed)?
+            let runtime = match heap::RunHeap::new() {
+                Ok(heap) => Runtime::new_with_alloc(heap).map_err(failed)?,
+                // No private heap on this OS: the system allocator's.
+                Err(e) if e.kind() == std::io::ErrorKind::Unsupported => {
+                    Runtime::new().map_err(failed)?
+                }
+                Err(e) => return Err(format!("starting QuickJS: {e}")),
             };
-            #[cfg(not(windows))]
-            let runtime = Runtime::new().map_err(failed)?;
             runtime.set_memory_limit(limits.memory);
             runtime.set_max_stack_size(limits.stack);
             runtime.set_interrupt_handler(Some(Box::new(move || watch.over())));
@@ -161,40 +162,31 @@ fn spawn<T: Send + 'static>(
         })
 }
 
-/// Each run's memory in a Windows heap of its own, destroyed with its runtime. In the process
-/// heap, what a run frees mostly stays committed: 50 resolves (a loaded player each) left the
-/// process 9.4 MB larger (8.2 to 17.6 MB private) and still growing ~30 KB a resolve; in a
-/// heap of their own, 0.5 MB (8.3 to 8.8 MB), flat after the first 20 (2026-11-09).
-#[cfg(windows)]
+/// Each run's memory in a heap of its own (`featherplay_platform::heap`, a Windows heap),
+/// destroyed with its runtime. In the process heap, what a run frees mostly stays committed:
+/// 50 resolves (a loaded player each) left the process 9.4 MB larger (8.2 to 17.6 MB
+/// private) and still growing ~30 KB a resolve; in a heap of their own, 0.5 MB (8.3 to
+/// 8.8 MB), flat after the first 20 (2026-11-09).
 mod heap {
     use std::cell::Cell;
-    use std::ffi::c_void;
     use std::ptr;
 
+    use featherplay_platform::heap::{self, Heap};
     use rquickjs::allocator::Allocator;
-    use windows::Win32::Foundation::HANDLE;
-    use windows::Win32::System::Memory::{
-        HEAP_FLAGS, HEAP_ZERO_MEMORY, HeapAlloc, HeapCreate, HeapDestroy, HeapFree, HeapReAlloc,
-        HeapSize,
-    };
 
     thread_local! {
         /// This thread's run heap: `usable_size` gets no `self`, and a runtime lives and
         /// dies on one thread (`spawn`).
-        static HEAP: Cell<HANDLE> = const { Cell::new(HANDLE(ptr::null_mut())) };
+        static HEAP: Cell<Option<Heap>> = const { Cell::new(None) };
     }
 
-    /// Only this thread allocates from it, but a heap without its lock gets no low-fragmentation
-    /// front end either, and was slower.
-    const FLAGS: HEAP_FLAGS = HEAP_FLAGS(0);
-
-    pub(super) struct RunHeap(HANDLE);
+    pub(super) struct RunHeap(Heap);
 
     impl RunHeap {
-        pub(super) fn new() -> windows::core::Result<Self> {
-            // SAFETY: a growable heap with no initial size; destroyed in `drop`.
-            let heap = unsafe { HeapCreate(FLAGS, 0, 0)? };
-            HEAP.set(heap);
+        /// `Unsupported` where the OS gives no private heap.
+        pub(super) fn new() -> std::io::Result<Self> {
+            let heap = heap::create()?;
+            HEAP.set(Some(heap));
             Ok(Self(heap))
         }
     }
@@ -203,18 +195,19 @@ mod heap {
         fn drop(&mut self) {
             // The runtime drops its allocator after `JS_FreeRuntime`: nothing in the heap is
             // used any more.
-            HEAP.set(HANDLE(ptr::null_mut()));
-            // SAFETY: the heap is this value's own, and destroyed once.
-            let _ = unsafe { HeapDestroy(self.0) };
+            HEAP.set(None);
+            // SAFETY: the heap is this value's own, nothing uses it now, and it's destroyed
+            // once.
+            unsafe { self.0.destroy() };
         }
     }
 
-    // SAFETY: `HeapAlloc` aligns to 16 bytes on x64 and ARM64, more than QuickJS needs (8),
-    // and `HeapSize` gives each block's usable size.
+    // SAFETY: the platform's heap aligns blocks to 16 bytes on x64 and ARM64, more than
+    // QuickJS needs (8), and gives each block's usable size.
     unsafe impl Allocator for RunHeap {
         fn alloc(&mut self, size: usize) -> *mut u8 {
             // SAFETY: the heap is alive while the runtime is.
-            unsafe { HeapAlloc(self.0, FLAGS, size).cast() }
+            unsafe { self.0.alloc(size) }
         }
 
         fn calloc(&mut self, count: usize, size: usize) -> *mut u8 {
@@ -222,12 +215,12 @@ mod heap {
                 return ptr::null_mut();
             };
             // SAFETY: as for `alloc`.
-            unsafe { HeapAlloc(self.0, FLAGS | HEAP_ZERO_MEMORY, size).cast() }
+            unsafe { self.0.alloc_zeroed(size) }
         }
 
         unsafe fn dealloc(&mut self, block: *mut u8) {
             // SAFETY: `block` is this heap's, as the trait asks of the caller.
-            let _ = unsafe { HeapFree(self.0, FLAGS, Some(block as *const c_void)) };
+            unsafe { self.0.free(block) }
         }
 
         unsafe fn realloc(&mut self, block: *mut u8, new_size: usize) -> *mut u8 {
@@ -235,13 +228,15 @@ mod heap {
                 return self.alloc(new_size);
             }
             // SAFETY: as for `dealloc`.
-            unsafe { HeapReAlloc(self.0, FLAGS, Some(block as *const c_void), new_size).cast() }
+            unsafe { self.0.realloc(block, new_size) }
         }
 
         unsafe fn usable_size(block: *mut u8) -> usize {
+            let Some(heap) = HEAP.get() else {
+                return 0;
+            };
             // SAFETY: `block` is this thread's run heap's, as the trait asks of the caller.
-            let size = unsafe { HeapSize(HEAP.get(), FLAGS, block as *const c_void) };
-            if size == usize::MAX { 0 } else { size }
+            unsafe { heap.usable_size(block) }
         }
     }
 }

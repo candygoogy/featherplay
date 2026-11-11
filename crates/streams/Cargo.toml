@@ -30,13 +30,6 @@ zip = { workspace = true, features = ["deflate-flate2"] }
 # CRC-32 checks a player's saved bytecode.
 flate2 = { workspace = true }
 
-[target.'cfg(windows)'.dependencies]
-# A heap for each QuickJS run (`js.rs`). The app enables these features already.
-windows = { workspace = true, features = [
-  "Win32_Foundation",
-  "Win32_System_Memory",
-] }
-
 [build-dependencies]
 flate2 = { workspace = true }
 
