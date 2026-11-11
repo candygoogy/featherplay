@@ -4,13 +4,13 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
-use featherplay_controller::place::Place;
 use featherplay_core::model::{LikeStatus, Track, TrackId};
 use featherplay_core::player::Input;
 use featherplay_core::queue::Queue;
 use featherplay_core::tr;
 
 use super::{Action, Controller};
+use crate::place::Place;
 
 #[derive(Debug)]
 pub enum QueueAction {

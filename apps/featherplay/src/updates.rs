@@ -385,7 +385,7 @@ pub fn open(ctx: &Ctx, url: &str) {
         return;
     }
     let url = url.to_string();
-    crate::task::blocking_detached(ctx.catalog.runtime(), move || {
+    featherplay_controller::task::blocking_detached(ctx.catalog.runtime(), move || {
         if let Err(e) = featherplay_platform::open::url(&url) {
             log!("opening the release page: {e}");
         }

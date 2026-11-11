@@ -21,7 +21,7 @@ use featherplay_store::{Paths, SecretKey, Settings, get_secret};
 
 /// Where the Last.fm API key in use comes from.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum KeySource {
+pub(crate) enum KeySource {
     /// Entered by the user in Settings; stored in Credential Manager.
     User,
     /// Compiled into this build.
@@ -30,7 +30,7 @@ pub enum KeySource {
 
 /// A Last.fm API key and secret. `Debug` never shows them.
 #[derive(Clone, PartialEq, Eq)]
-pub struct LastfmKeys {
+pub(crate) struct LastfmKeys {
     pub key: String,
     pub secret: String,
     pub source: KeySource,
@@ -51,7 +51,7 @@ pub fn build_keys() -> Option<(&'static str, &'static str)> {
 
 /// Which keys to use: the user's when both their key and secret are set (blank counts as
 /// unset), else the build's, else none.
-pub fn pick_keys(
+pub(crate) fn pick_keys(
     user_key: Option<String>,
     user_secret: Option<String>,
     build: Option<(&str, &str)>,
@@ -72,7 +72,7 @@ pub fn pick_keys(
 }
 
 /// The keys in use now. Reads Credential Manager, so it blocks briefly.
-pub fn lastfm_keys() -> Option<LastfmKeys> {
+pub(crate) fn lastfm_keys() -> Option<LastfmKeys> {
     pick_keys(
         get_secret(SecretKey::LastfmApiKey),
         get_secret(SecretKey::LastfmApiSecret),
@@ -81,7 +81,7 @@ pub fn lastfm_keys() -> Option<LastfmKeys> {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Service {
+pub(crate) enum Service {
     Lastfm,
     ListenBrainz,
 }
@@ -143,7 +143,7 @@ fn listen(s: &PendingScrobble) -> Listen {
 }
 
 /// The outcome of one scrobble request.
-pub struct Sent {
+pub(crate) struct Sent {
     service: Service,
     batch: Vec<PendingScrobble>,
     result: Outcome,
@@ -152,7 +152,7 @@ pub struct Sent {
 }
 
 /// Hands a `Sent` back to the controller's loop.
-pub type Reply = Arc<dyn Fn(Sent) + Send + Sync>;
+pub(crate) type Reply = Arc<dyn Fn(Sent) + Send + Sync>;
 
 /// One service: its client and its offline queue.
 struct Sender {
@@ -271,7 +271,7 @@ impl Sender {
 
 /// Every scrobbling service that is on, and the rules they share.
 #[derive(Default)]
-pub struct Scrobblers {
+pub(crate) struct Scrobblers {
     lastfm: Option<Sender>,
     listenbrainz: Option<Sender>,
     meta: Option<MetaOptions>,

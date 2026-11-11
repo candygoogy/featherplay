@@ -10,9 +10,17 @@ publish = false
 
 # No Slint, winit or `windows` here (ARCHITECTURE.md, "Phase 3"): the OS is reached through
 # `featherplay-platform`, the window through the app.
+[features]
+# `FEATHERPLAY_COOKIES_FILE` (a plaintext cookie header) is read by debug builds only.
+# This turns it on in a release build too (the app's feature of the same name).
+dev-cookies-file = []
+
 [dependencies]
+# The controller's sound (`controller`).
+featherplay-audio = { path = "../audio" }
 featherplay-core = { path = "../core" }
-# Discord's connection and card (`presence`).
+# Discord's connection and card (`presence`); SponsorBlock, the local API and the media
+# commands the controller takes (`UiCommand`).
 featherplay-integrations = { path = "../integrations" }
 # Scrobbling (`scrobbler`).
 featherplay-lastfm = { path = "../lastfm" }
@@ -24,7 +32,8 @@ featherplay-platform = { path = "../platform" }
 # The proxy in use, for Copy diagnostics.
 featherplay-proxy = { path = "../proxy" }
 featherplay-store = { path = "../store" }
-# The helpers' failures and the JavaScript engine, for Copy diagnostics.
+# The stream resolver (`controller`), and the helpers' failures and the JavaScript engine
+# for Copy diagnostics.
 featherplay-streams = { path = "../streams" }
 # The music API: the catalogue the pages and the controller share (`catalog`), the
 # fixtures' recordings parsed as live answers (`fixtures`), the search suggestions' answers
@@ -45,8 +54,9 @@ sha2 = { workspace = true }
 # The crates' log records reach the log file through it (`diagnostics`).
 log = { workspace = true, features = ["std"] }
 # `fs` and `io-util` write a downloaded update (`updates::install`); `time` paces a run that
-# waits for another.
-tokio = { workspace = true, features = ["rt", "time", "fs", "io-util"] }
+# waits for another, and the controller's ticks. `sync`, `macros` and `signal`: the
+# controller's channels and its loop, which ends on Ctrl+C too.
+tokio = { workspace = true, features = ["rt", "time", "fs", "io-util", "sync", "macros", "signal"] }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt"] }

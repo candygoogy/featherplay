@@ -9,12 +9,12 @@
 
 use std::time::{Duration, Instant};
 
-use featherplay_controller::catalog::Source;
 use featherplay_core::player::Input;
 use featherplay_store::{Paths, load_client_version, save_client_version};
 use featherplay_ytm::{ApiError, Identity, YtMusic};
 
 use super::{Controller, Msg, UiEvent, account, cookie_header};
+use crate::catalog::Source;
 
 /// The pauses before the automatic reconnects, one per failure; after the last one, only
 /// Try again reconnects.

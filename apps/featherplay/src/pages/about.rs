@@ -5,13 +5,13 @@
 
 use std::rc::Rc;
 
+use featherplay_controller::diagnostics;
 use featherplay_core::{tr, trn};
 use featherplay_store::{Paths, Settings};
 use slint::{ComponentHandle, ModelRc, VecModel};
 
 use crate::app::Ctx;
 use crate::controller::PlayerState;
-use crate::diagnostics;
 use crate::language;
 use crate::pages;
 use crate::ui::{AboutData, Credit, UpdateState};
@@ -149,7 +149,7 @@ fn checked_ago(now: u64, answered: u64) -> String {
 /// The local clock time `until` (seconds since 1970) falls at, "14:32", rounded up to the
 /// minute, from the local time now.
 fn clock_after(until: u64, now: u64) -> String {
-    let local = crate::diagnostics::clock::Stamp::now();
+    let local = diagnostics::clock::Stamp::now();
     let wait = until.saturating_sub(now).div_ceil(60);
     let minutes = (u64::from(local.hour) * 60 + u64::from(local.minute) + wait) % (24 * 60);
     format!("{:02}:{:02}", minutes / 60, minutes % 60)

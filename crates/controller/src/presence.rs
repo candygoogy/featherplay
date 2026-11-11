@@ -52,7 +52,7 @@ fn client_id() -> Option<&'static str> {
 }
 
 /// What the Settings page shows while presence is off.
-pub fn off_status() -> Status {
+pub(crate) fn off_status() -> Status {
     if client_id().is_some() {
         Status::Off
     } else {
@@ -72,7 +72,7 @@ enum Msg {
     Quit,
 }
 
-pub struct Presence {
+pub(crate) struct Presence {
     tx: Sender<Msg>,
     thread: Option<JoinHandle<()>>,
 }

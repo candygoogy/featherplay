@@ -40,7 +40,7 @@ fn pasting(weak: &slint::Weak<AppWindow>) {
     let before = query_chars(weak);
     let weak = weak.clone();
     slint::Timer::single_shot(std::time::Duration::ZERO, move || {
-        crate::log!(
+        log!(
             "search paste: clipboard {state:?}, field {before:?} -> {:?} chars",
             query_chars(&weak)
         );

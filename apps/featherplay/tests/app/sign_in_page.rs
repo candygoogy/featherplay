@@ -334,9 +334,9 @@ fn the_log_says_what_the_app_holds_a_minute_after_the_sign_in_window_closed() {
     let dir = std::path::Path::new(env!("CARGO_TARGET_TMPDIR"))
         .join(format!("sign-in-memory-log-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
-    featherplay::diagnostics::init(&dir).expect("log");
+    featherplay_controller::diagnostics::init(&dir).expect("log");
     let log = || {
-        featherplay::diagnostics::flush();
+        featherplay_controller::diagnostics::flush();
         std::fs::read_to_string(dir.join("featherplay.log")).unwrap_or_default()
     };
     let scene = sign_in_page(false);

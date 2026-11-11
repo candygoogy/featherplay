@@ -19,6 +19,7 @@ macro_rules! log {
 }
 
 pub mod catalog;
+pub mod controller;
 pub mod diagnostics;
 pub mod fixtures;
 pub mod link;

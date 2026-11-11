@@ -35,7 +35,8 @@ use featherplay::app::{self, AppOptions};
 use featherplay::controller::{self, Options};
 use featherplay::instance::{self, Start};
 use featherplay::snapshot::{self, Hold, PAGES, SnapshotOptions};
-use featherplay::{diagnostics, identity, language};
+use featherplay::{identity, language};
+use featherplay_controller::diagnostics;
 use featherplay_core::model::TrackId;
 use featherplay_store::Paths;
 

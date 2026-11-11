@@ -20,19 +20,18 @@ path = "src/main.rs"
 # `FEATHERPLAY_COOKIES_FILE` (a plaintext cookie header) is read by debug builds only.
 # This turns it on in a release build too, for measuring a release build on the dev
 # cookie file. Never on in a published build.
-dev-cookies-file = []
+dev-cookies-file = ["featherplay-controller/dev-cookies-file"]
 # The performance harness's scripted run of the window (`src/perf.rs`), started by
 # `FEATHERPLAY_PERF_SCRIPT`. Never on in a published build.
 perf-harness = ["featherplay-platform/perf"]
 
 [dependencies]
 featherplay-audio = { path = "../../crates/audio" }
-# The logic that needs no window (ARCHITECTURE.md, "Phase 3"); it moves in area by area.
+# The logic that needs no window: the controller, the catalog, scrobbling, presence, the
+# update check, diagnostics (ARCHITECTURE.md, "Phase 3").
 featherplay-controller = { path = "../../crates/controller" }
 featherplay-core = { path = "../../crates/core" }
 featherplay-integrations = { path = "../../crates/integrations" }
-featherplay-lastfm = { path = "../../crates/lastfm" }
-featherplay-listenbrainz = { path = "../../crates/listenbrainz" }
 featherplay-lyrics = { path = "../../crates/lyrics" }
 # What talks to the OS (ARCHITECTURE.md, "Phase 2"); its code moves in area by area.
 featherplay-platform = { path = "../../crates/platform" }

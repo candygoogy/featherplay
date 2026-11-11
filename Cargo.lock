@@ -1333,8 +1333,6 @@ dependencies = [
  "featherplay-controller",
  "featherplay-core",
  "featherplay-integrations",
- "featherplay-lastfm",
- "featherplay-listenbrainz",
  "featherplay-lyrics",
  "featherplay-platform",
  "featherplay-proxy",
@@ -1380,6 +1378,7 @@ dependencies = [
 name = "featherplay-controller"
 version = "0.2.2"
 dependencies = [
+ "featherplay-audio",
  "featherplay-core",
  "featherplay-integrations",
  "featherplay-lastfm",
