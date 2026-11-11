@@ -1357,7 +1357,6 @@ dependencies = [
  "slint-build",
  "sys-locale",
  "tokio",
- "windows 0.62.2",
 ]
 
 [[package]]
@@ -1452,7 +1451,6 @@ dependencies = [
  "flate2",
  "keyring-core",
  "log",
- "raw-window-handle",
  "resvg",
  "souvlaki",
  "tauri-winrt-notification",
