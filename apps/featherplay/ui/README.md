@@ -51,7 +51,7 @@ grounds: `logo.slint`'s ring in the light theme, and the window and taskbar icon
 taskbar, and the tray icon on a dark or light taskbar; `tri-vane-tray-{white,black}.svg`, the
 one-colour glyph the tray used to show, are kept but unused).
 `build.rs` renders the drawings into `featherplay.ico` (the exe's icon, and the window's
-under a dark taskbar) and `featherplay-light.ico`; `crates/integrations/build.rs` renders
+under a dark taskbar) and `featherplay-light.ico`; `crates/platform/build.rs` renders
 them as raw RGBA at the tray's sizes.
 
 ## How a page works

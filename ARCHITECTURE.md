@@ -13,7 +13,7 @@ this file does; when the two disagree, the code is right and this file needs fix
 | Folder | What's in it |
 |---|---|
 | `apps/featherplay` | The app: startup, the window and its pages (Rust in `src/`, Slint in `ui/`), the controller, and the app's own tests (`tests/app/`). |
-| `crates/*` | Eleven library crates: the music logic, the network clients, the audio engine, the stream resolver, saved state, the Windows integrations and the platform layer. None of them uses Slint. |
+| `crates/*` | Eleven library crates: the music logic, the network clients, the audio engine, the stream resolver, saved state, the integrations and the platform layer. None of them uses Slint. |
 | `vendor/` | Three patched third-party crates, swapped in through `[patch.crates-io]` in `Cargo.toml`. Each has a `VENDORED.md` that lists its changes. |
 | `packaging/` | The Inno Setup installer, the winget and Scoop manifests, the third-party licence list, and the release signing scripts. |
 | `site/` | The website. |
@@ -201,7 +201,7 @@ They talk like this:
 | `crates/lastfm` | `featherplay-lastfm` | Last.fm: signing, auth, scrobbles, the offline queue | core, proxy |
 | `crates/listenbrainz` | `featherplay-listenbrainz` | ListenBrainz: now playing, listens, token checks | proxy |
 | `crates/lyrics` | `featherplay-lyrics` | LRC parsing and LRCLIB lookups | proxy |
-| `crates/integrations` | `featherplay-integrations` | Media controls (SMTC), taskbar buttons, tray and tray menu, toasts, hotkeys, app identity, plus SponsorBlock, Discord and the local API | core, proxy, store, platform |
+| `crates/integrations` | `featherplay-integrations` | Hotkeys, SponsorBlock, Discord and the local API; `UiCommand` and `NowPlaying`, which the platform's tray, media controls and thumb buttons map to and from; the tray's hover text and the track's toast | core, proxy, store, platform |
 | `apps/featherplay` | `featherplay` | Everything else: startup, the window, pages, the controller, scrobbling, presence, updates, sign-in, diagnostics | all of the above, Slint |
 
 The rules: library crates never depend on Slint or on the app. `core` depends on nothing of

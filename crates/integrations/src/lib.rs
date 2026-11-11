@@ -1,11 +1,13 @@
-//! Windows integrations: media controls (SMTC), taskbar thumb buttons, the tray icon,
-//! toasts and global hotkeys, plus SponsorBlock lookups, Discord presence and the local API,
-//! and the app's identity for the shell (`identity`: the name and icon the media card shows).
+//! The services and the commands: global hotkeys, SponsorBlock lookups, Discord presence
+//! and the local API, plus `UiCommand`, what the user asked for, and `NowPlaying`, what the
+//! integrations show. The OS parts (the tray, the media controls, the thumb buttons, toasts
+//! and the app's identity) are `featherplay_platform`'s. Their events become `UiCommand`s
+//! here (`From`), and a `NowPlaying` becomes what they show: the media card's `MediaState`,
+//! the tray's hover text (`tooltip_text`), the track's toast (`notify_track`).
 //!
-//! Everything here except `notify`, `notify_track`, `parse_hotkey` and `local_api` lives on
-//! the UI thread, the one that owns the window and pumps its messages. Events go to the
-//! controller as `UiCommand`s over a `Sender`, which never blocks. `sponsorblock`, `discord`
-//! and `local_api` are driven by the controller, off the UI thread.
+//! `Hotkeys` lives on the UI thread, the one that owns the window and pumps its messages.
+//! Events go to the controller as `UiCommand`s over a `Sender`, which never blocks.
+//! `sponsorblock`, `discord` and `local_api` are driven by the controller, off the UI thread.
 #![cfg_attr(
     test,
     allow(

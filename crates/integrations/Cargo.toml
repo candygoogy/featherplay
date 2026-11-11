@@ -5,7 +5,7 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 homepage.workspace = true
-description = "featherplay's Windows integrations: media controls, taskbar buttons, tray, toasts, hotkeys, SponsorBlock and Discord"
+description = "featherplay's integrations: hotkeys, SponsorBlock, Discord, the local API, and the commands the OS integrations send"
 publish = false
 
 [dependencies]
