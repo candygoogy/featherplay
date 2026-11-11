@@ -101,6 +101,40 @@ pub struct ResolvedStream {
     /// `loudnessDb`), for "Match song volumes". The native resolver gives it; yt-dlp's
     /// answer doesn't carry it, so `None` there.
     pub loudness_db: Option<f32>,
+    /// Which step of the resolve gave the URL, for the log and Copy diagnostics. Not kept
+    /// in the streams saved for the next session: those come back as `Via::Saved`.
+    pub via: Via,
+}
+
+/// Where a stream came from (`ResolvedStream::via`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Via {
+    /// The native request as the visionOS app (a URL without challenges).
+    NativeVisionOs,
+    /// The native request as the embedded client, its challenges solved in QuickJS.
+    NativeEmbedded,
+    /// yt-dlp with the embedded client (step 2).
+    YtDlpEmbedded,
+    /// yt-dlp's default clients (step 3).
+    YtDlpDefault,
+    /// A stream kept from the last session (`{cache}/streams.json`).
+    Saved,
+    /// A local file standing in for one (the performance harness's fixtures).
+    Fixture,
+}
+
+impl Via {
+    /// A short, stable name for the log and Copy diagnostics.
+    pub fn label(self) -> &'static str {
+        match self {
+            Via::NativeVisionOs => "native visionOS",
+            Via::NativeEmbedded => "native embedded (QuickJS)",
+            Via::YtDlpEmbedded => "yt-dlp embedded",
+            Via::YtDlpDefault => "yt-dlp default",
+            Via::Saved => "saved",
+            Via::Fixture => "local file",
+        }
+    }
 }
 
 /// How soon the player may ask for a song resolved ahead (`YtDlpResolver::resolve_ahead`).

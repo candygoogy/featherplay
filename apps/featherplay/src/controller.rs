@@ -975,6 +975,10 @@ impl Controller {
                         notify_track(&np)
                     });
                 }
+                let id = self.player.play_id(&t);
+                if let Some(s) = self.streams.get(&id) {
+                    crate::diagnostics::song_started(&id.0, s.via.label());
+                }
                 self.fetch_segments(&t);
                 let alt = self.alternates(&t.id);
                 self.scrobblers.now_playing(&t, alt);
@@ -1060,11 +1064,12 @@ impl Controller {
                 match result {
                     Ok(stream) => {
                         log!(
-                            "resolved {} in {took:.1}s: itag {}, {} kbps, {}",
+                            "resolved {} in {took:.1}s: itag {}, {} kbps, {}, via {}",
                             id.0,
                             stream.itag,
                             stream.bitrate_kbps,
-                            client(&stream.url)
+                            client(&stream.url),
+                            stream.via.label()
                         );
                         match ahead {
                             // A row on screen: its start is fetched once the pointer rests

@@ -14,7 +14,7 @@ use crate::native::{NativeError, NativeResolver, VISIONOS};
 use crate::sidecars::{Installer, tail};
 use crate::{
     Ahead, Downloads, Preprocessor, Quality, ResolveError, ResolvedStream, Sidecars,
-    StreamResolver, expires_at_from_url,
+    StreamResolver, Via, expires_at_from_url,
 };
 use featherplay_proxy::Proxy;
 
@@ -81,6 +81,8 @@ pub fn parse_ytdlp_json(json: &str, now: SystemTime) -> Result<ResolvedStream, R
         first_tag: text(&v["tags"][0]),
         // yt-dlp's formats don't carry YouTube's `loudnessDb`.
         loudness_db: None,
+        // The chain names the embedded client's runs (`Chain::embedded_answer`).
+        via: Via::YtDlpDefault,
     })
 }
 

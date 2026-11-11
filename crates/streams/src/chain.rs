@@ -11,7 +11,7 @@ use tokio::sync::{Notify, Semaphore, SemaphorePermit};
 
 use crate::expiry::query_param;
 use crate::native::{NativeError, VISIONOS};
-use crate::{Ahead, ResolveError, ResolvedStream};
+use crate::{Ahead, ResolveError, ResolvedStream, Via};
 
 /// The `c=` of the embedded client's stream URLs.
 const EMBEDDED_CLIENT: &str = "WEB_EMBEDDED_PLAYER";
@@ -398,14 +398,14 @@ impl Chain {
         }
         let turn = self.turn(&mut ahead).await;
         let mut t = Instant::now();
-        let mut result = s.default_clients(id).await;
+        let mut result = s.default_clients(id).await.map(by(Via::YtDlpDefault));
         if let Err(e) = &result {
             log::warn!("{}", stage_failed(id, Stage::Default, e));
         }
         if matches!(result, Err(ResolveError::ToolFailed { .. })) && s.update().await {
             // The retry is worth it even if the update fails (a transient error).
             t = Instant::now();
-            result = s.default_clients(id).await;
+            result = s.default_clients(id).await.map(by(Via::YtDlpDefault));
             if let Err(e) = &result {
                 log::warn!("{} (after yt-dlp -U)", stage_failed(id, Stage::Default, e));
             }
@@ -619,7 +619,7 @@ impl Chain {
         id: &TrackId,
     ) -> Result<ResolvedStream, ResolveError> {
         let t = Instant::now();
-        let answer = s.embedded(id).await;
+        let answer = s.embedded(id).await.map(by(Via::YtDlpEmbedded));
         if let Ok(stream) = &answer {
             // Its time varies (2.5-8 s on 2026-11-07, the gate apart); the log tells which
             // part was slow.
@@ -728,6 +728,11 @@ async fn until_asked<F: Future + Unpin>(f: &mut F, urgent: &Notify) -> Option<F:
         out = f => Some(out),
         () = urgent.notified() => None,
     }
+}
+
+/// Names the step that gave a stream (`ResolvedStream::via`).
+fn by(via: Via) -> impl Fn(ResolvedStream) -> ResolvedStream {
+    move |stream| ResolvedStream { via, ..stream }
 }
 
 /// How long `stream`'s URL stays refused (`available_at`), if it does.
@@ -841,6 +846,8 @@ mod tests {
             video_title: None,
             first_tag: None,
             loudness_db: None,
+            // What the native step names; the chain names its yt-dlp steps' own.
+            via: Via::NativeEmbedded,
         }
     }
 
@@ -1040,6 +1047,27 @@ mod tests {
         assert_eq!(s.calls(), ["native", "embedded"]);
         let why = chain.take_fallback_reason(&id()).expect("a reason");
         assert!(why.contains("deno timed out"), "{why}");
+    }
+
+    #[tokio::test]
+    async fn the_stream_names_the_step_that_gave_it() {
+        let via = |s: Script| async move {
+            within(Chain::default().resolve(&s, &id()))
+                .await
+                .expect("a stream")
+                .via
+        };
+        let native = Script::default().native(Ok(NATIVE_URL));
+        assert_eq!(via(native).await, Via::NativeEmbedded);
+        let embedded = Script::default()
+            .native(Err(NativeError::Failed("deno timed out".into())))
+            .embedded(Ok(EMBEDDED_URL));
+        assert_eq!(via(embedded).await, Via::YtDlpEmbedded);
+        let default = Script::default()
+            .native(Err(NativeError::Failed("deno timed out".into())))
+            .embedded(Err(failed("ERROR: Requested format is not available")))
+            .default_clients(Ok(TV_URL));
+        assert_eq!(via(default).await, Via::YtDlpDefault);
     }
 
     #[tokio::test]

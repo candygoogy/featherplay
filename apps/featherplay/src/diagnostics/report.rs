@@ -1,6 +1,6 @@
 //! The plain text that Settings > About's "Copy diagnostics" puts on the clipboard: versions,
-//! the output device, which services are on, and the last resolver errors. Whether an account
-//! is signed in, never which one.
+//! the output device, which services are on, the last resolver errors, and which step gave the
+//! last songs played their stream. Whether an account is signed in, never which one.
 
 /// What the text says. Built by `diagnostics::report`; tests build their own.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -28,10 +28,13 @@ pub struct Report {
     pub sign_in_save: Option<String>,
     /// The last resolver errors, oldest first, each with its time.
     pub errors: Vec<String>,
+    /// The last song starts, oldest first, each with its time and the step that gave its
+    /// stream (`featherplay_streams::Via::label`).
+    pub played: Vec<String>,
 }
 
 impl Report {
-    /// One fact per line, then the errors (redacted, each on one line).
+    /// One fact per line, then the errors and the song starts (redacted, each on one line).
     pub fn text(&self) -> String {
         let on = |b: bool| if b { "on" } else { "off" };
         let known = |v: &Option<String>| v.clone().unwrap_or_else(|| "unknown".into());
@@ -63,18 +66,25 @@ impl Report {
             self.helpers.as_deref().unwrap_or("none"),
             self.sign_in_save.as_deref().unwrap_or("none"),
         );
-        if self.errors.is_empty() {
-            out.push_str("Recent resolver errors: none\n");
-        } else {
-            out.push_str("Recent resolver errors:\n");
-            for e in &self.errors {
-                let one_line = e.lines().map(str::trim).collect::<Vec<_>>().join(" / ");
-                out.push_str("  ");
-                out.push_str(&super::redact(&one_line));
-                out.push('\n');
-            }
-        }
+        list(&mut out, "Recent resolver errors", &self.errors);
+        list(&mut out, "Recent songs played via", &self.played);
         out
+    }
+}
+
+/// `title: none`, or `title:` and an indented line for each entry.
+fn list(out: &mut String, title: &str, entries: &[String]) {
+    out.push_str(title);
+    if entries.is_empty() {
+        out.push_str(": none\n");
+        return;
+    }
+    out.push_str(":\n");
+    for e in entries {
+        let one_line = e.lines().map(str::trim).collect::<Vec<_>>().join(" / ");
+        out.push_str("  ");
+        out.push_str(&super::redact(&one_line));
+        out.push('\n');
     }
 }
 
@@ -101,6 +111,7 @@ mod tests {
                 "14:03:11 abc: yt-dlp failed (1): ERROR: one\nsecond line".into(),
                 "14:05:00 def: unavailable: private video".into(),
             ],
+            played: Vec::new(),
         }
     }
 
@@ -123,6 +134,24 @@ mod tests {
         ] {
             assert!(text.lines().any(|l| l == line), "no {line:?} in\n{text}");
         }
+    }
+
+    #[test]
+    fn the_last_songs_name_the_step_that_gave_their_stream() {
+        let text = Report {
+            played: vec![
+                "14:06:02 abc: native embedded (QuickJS)".into(),
+                "14:09:40 def: yt-dlp default".into(),
+            ],
+            ..report()
+        }
+        .text();
+        let section = "Recent songs played via:\n  \
+                       14:06:02 abc: native embedded (QuickJS)\n  \
+                       14:09:40 def: yt-dlp default\n";
+        assert!(text.ends_with(section), "{text}");
+        let text = report().text();
+        assert!(text.ends_with("Recent songs played via: none\n"), "{text}");
     }
 
     #[test]

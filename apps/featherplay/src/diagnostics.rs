@@ -33,6 +33,8 @@ pub use report::Report;
 
 /// How many resolver errors Copy diagnostics lists.
 const RECENT_ERRORS: usize = 5;
+/// How many song starts Copy diagnostics lists, with the step that gave each its stream.
+const RECENT_SONGS: usize = 5;
 /// How long `flush` waits for the log thread.
 const FLUSH_WAIT: Duration = Duration::from_secs(1);
 
@@ -46,6 +48,8 @@ static LOG: OnceLock<Sender<Msg>> = OnceLock::new();
 /// The yt-dlp and Deno versions, once read.
 static TOOLS: Mutex<(Option<String>, Option<String>)> = Mutex::new((None, None));
 static RECENT: Mutex<VecDeque<String>> = Mutex::new(VecDeque::new());
+/// The last song starts (`song_started`), oldest first.
+static PLAYED: Mutex<VecDeque<String>> = Mutex::new(VecDeque::new());
 /// How the last helpers download failed (`SidecarError::summary`).
 static HELPERS: Mutex<Option<String>> = Mutex::new(None);
 /// Why Windows wouldn't store the last sign-in (`sign_in_kept`).
@@ -220,6 +224,16 @@ pub fn resolve_failed(id: &str, took_secs: f64, msg: &str) {
     recent.push_back(format!("{} {id}: {msg}", Stamp::now().time()));
 }
 
+/// A song started playing from a stream `via` gave (`featherplay_streams::Via::label`):
+/// one of the song starts Copy diagnostics lists.
+pub fn song_started(id: &str, via: &str) {
+    let mut played = PLAYED.lock_or_recover();
+    if played.len() == RECENT_SONGS {
+        played.pop_front();
+    }
+    played.push_back(format!("{} {id}: {via}", Stamp::now().time()));
+}
+
 /// The helpers download failed: Copy diagnostics names its kind, host, HTTP status and os
 /// error (the log has the rest, from `featherplay-streams`).
 pub fn helpers_failed(e: &featherplay_streams::SidecarError) {
@@ -240,6 +254,7 @@ pub fn sign_in_kept(refused: Option<String>) {
 pub fn report(signed_in: bool, settings: &Settings) -> Report {
     let (ytdlp, deno) = TOOLS.lock_or_recover().clone();
     let errors = RECENT.lock_or_recover().iter().cloned().collect();
+    let played = PLAYED.lock_or_recover().iter().cloned().collect();
     let helpers = HELPERS.lock_or_recover().clone();
     Report {
         version: env!("CARGO_PKG_VERSION").to_string(),
@@ -256,6 +271,7 @@ pub fn report(signed_in: bool, settings: &Settings) -> Report {
         helpers,
         sign_in_save: SIGN_IN_SAVE.lock_or_recover().clone(),
         errors,
+        played,
     }
 }
 

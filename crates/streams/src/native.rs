@@ -35,7 +35,7 @@ use tokio::io::AsyncWriteExt;
 
 use crate::expiry::{form_value, query_param};
 use crate::js::{self, EJS_VERSION, Solver};
-use crate::{Preprocessor, Quality, ResolvedStream, expires_at_from_url};
+use crate::{Preprocessor, Quality, ResolvedStream, Via, expires_at_from_url};
 
 const ORIGIN: &str = "https://www.youtube.com";
 const CLIENT_NAME: &str = "WEB_EMBEDDED_PLAYER";
@@ -670,7 +670,11 @@ impl Inner {
                 gate.as_secs_f64()
             )));
         }
-        finish(pending, &Answers::default(), answered)
+        let stream = finish(pending, &Answers::default(), answered)?;
+        Ok(ResolvedStream {
+            via: Via::NativeVisionOs,
+            ..stream
+        })
     }
 
     /// The config and player to use: in memory, else on disk, else fetched.
@@ -1294,6 +1298,7 @@ pub(crate) fn finish(
         video_title: p.video_title,
         first_tag: p.first_tag,
         loudness_db: p.loudness_db,
+        via: Via::NativeEmbedded,
     })
 }
 

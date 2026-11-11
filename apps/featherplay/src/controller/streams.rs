@@ -45,7 +45,7 @@ use featherplay_core::failure::getting_ready;
 use featherplay_core::model::{Track, TrackId};
 use featherplay_core::player::{Input, Player, Status};
 use featherplay_core::sync::LockExt;
-use featherplay_streams::{Ahead, ResolvedStream};
+use featherplay_streams::{Ahead, ResolvedStream, Via};
 use serde_json::{Value, json};
 use tokio::sync::Notify;
 use tokio::task::AbortHandle;
@@ -698,6 +698,7 @@ impl Streams {
                 video_title: text(&s["title"]),
                 first_tag: text(&s["tag"]),
                 loudness_db: s["loudness_db"].as_f64().map(|db| db as f32),
+                via: Via::Saved,
             };
             let id = TrackId(id);
             self.cache.retain(|(c, _)| *c != id);
@@ -1038,7 +1039,7 @@ impl Controller {
         }
         match want {
             Want::Cached(s) => {
-                log!("resolve {}: resolved ahead", id.0);
+                log!("resolve {}: resolved ahead, via {}", id.0, s.via.label());
                 Some(Input::Resolved {
                     id,
                     result: Ok(super::stream_info(&s)),
@@ -1109,6 +1110,7 @@ mod tests {
             video_title: None,
             first_tag: None,
             loudness_db: None,
+            via: Via::YtDlpDefault,
         }
     }
 

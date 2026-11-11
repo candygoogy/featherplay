@@ -90,6 +90,7 @@ pub fn fixture_stream() -> Option<featherplay_streams::ResolvedStream> {
         video_title: None,
         first_tag: None,
         loudness_db: None,
+        via: featherplay_streams::Via::Fixture,
     })
 }
 
