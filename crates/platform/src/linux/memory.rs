@@ -14,3 +14,15 @@ pub fn compact_heaps() {}
 pub fn commit_charge() -> Option<(usize, usize)> {
     None
 }
+
+/// The heaps' allocated and committed bytes. Nothing counted until phase 5.
+#[cfg(feature = "perf")]
+pub fn heap_summary() -> (usize, usize) {
+    (0, 0)
+}
+
+/// The committed private bytes of each allocation. None listed until phase 5.
+#[cfg(feature = "perf")]
+pub fn private_allocations() -> Vec<usize> {
+    Vec::new()
+}

@@ -357,83 +357,15 @@ fn steps() {
 /// For `steps`: the Windows heaps' allocated and committed bytes, and the committed private
 /// allocations of 1 MB or more.
 mod diag {
-    #[repr(C)]
-    struct Mbi {
-        base: usize,
-        alloc_base: usize,
-        alloc_protect: u32,
-        partition: u16,
-        size: usize,
-        state: u32,
-        protect: u32,
-        kind: u32,
-    }
-    #[repr(C)]
-    struct HeapSummary {
-        cb: u32,
-        allocated: usize,
-        committed: usize,
-        reserved: usize,
-        max_reserve: usize,
-    }
-    #[link(name = "kernel32")]
-    unsafe extern "system" {
-        fn VirtualQuery(addr: usize, info: *mut Mbi, len: usize) -> usize;
-        fn GetProcessHeaps(n: u32, heaps: *mut isize) -> u32;
-        fn HeapSummary(heap: isize, flags: u32, s: *mut HeapSummary) -> i32;
-    }
-
-    const MEM_COMMIT: u32 = 0x1000;
-    const MEM_PRIVATE: u32 = 0x2_0000;
+    use featherplay_platform::memory::{heap_summary, private_allocations};
 
     pub fn report(label: &str) {
         let mb = |b: usize| b as f64 / 1048576.0;
-        let mut heaps = [0isize; 64];
-        // SAFETY: a buffer of 64 handles.
-        let n = unsafe { GetProcessHeaps(64, heaps.as_mut_ptr()) } as usize;
-        let (mut allocated, mut committed) = (0, 0);
-        for &h in &heaps[..n.min(64)] {
-            let mut s = HeapSummary {
-                cb: std::mem::size_of::<HeapSummary>() as u32,
-                allocated: 0,
-                committed: 0,
-                reserved: 0,
-                max_reserve: 0,
-            };
-            // SAFETY: a heap handle from GetProcessHeaps and a sized summary.
-            if unsafe { HeapSummary(h, 0, &mut s) } != 0 {
-                allocated += s.allocated;
-                committed += s.committed;
-            }
-        }
-        let mut by_base: std::collections::BTreeMap<usize, usize> = Default::default();
-        let mut addr = 0usize;
-        loop {
-            let mut m = Mbi {
-                base: 0,
-                alloc_base: 0,
-                alloc_protect: 0,
-                partition: 0,
-                size: 0,
-                state: 0,
-                protect: 0,
-                kind: 0,
-            };
-            // SAFETY: querying our own address space into a sized struct.
-            if unsafe { VirtualQuery(addr, &mut m, std::mem::size_of::<Mbi>()) } == 0 {
-                break;
-            }
-            if m.state == MEM_COMMIT && m.kind == MEM_PRIVATE {
-                *by_base.entry(m.alloc_base).or_default() += m.size;
-            }
-            if m.size == 0 {
-                break;
-            }
-            addr = m.base + m.size;
-        }
-        let total: usize = by_base.values().sum();
-        let mut big: Vec<usize> = by_base
-            .values()
+        let (allocated, committed) = heap_summary();
+        let allocations = private_allocations();
+        let total: usize = allocations.iter().sum();
+        let mut big: Vec<usize> = allocations
+            .iter()
             .copied()
             .filter(|&s| s >= 1 << 20)
             .collect();

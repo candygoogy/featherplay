@@ -56,22 +56,9 @@ mod cpu {
     use std::sync::OnceLock;
     use std::time::{Duration, Instant};
 
-    #[link(name = "kernel32")]
-    unsafe extern "system" {
-        fn GetCurrentThread() -> isize;
-        fn GetCurrentProcess() -> isize;
-        fn QueryThreadCycleTime(thread: isize, cycles: *mut u64) -> i32;
-        fn SetPriorityClass(process: isize, class: u32) -> i32;
-    }
-
-    const HIGH_PRIORITY_CLASS: u32 = 0x80;
-
     /// Cycles this thread has run.
     pub fn cycles() -> u64 {
-        let mut c = 0;
-        // SAFETY: the pseudo-handle of the calling thread and a valid out pointer.
-        unsafe { QueryThreadCycleTime(GetCurrentThread(), &mut c) };
-        c
+        featherplay_platform::thread::cycles().unwrap_or(0)
     }
 
     /// Cycles per millisecond: the most a 100 ms spin got (a preempted spin gets fewer).
@@ -96,8 +83,7 @@ mod cpu {
 
     /// High priority, and the rate calibrated now.
     pub fn prepare() -> f64 {
-        // SAFETY: the pseudo-handle of this process.
-        unsafe { SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS) };
+        featherplay_platform::thread::raise_process_priority();
         rate()
     }
 }

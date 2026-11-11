@@ -59,18 +59,9 @@ pub mod cpu {
     use std::sync::OnceLock;
     use std::time::{Duration, Instant};
 
-    #[link(name = "kernel32")]
-    unsafe extern "system" {
-        fn GetCurrentThread() -> isize;
-        fn QueryThreadCycleTime(thread: isize, cycles: *mut u64) -> i32;
-    }
-
     /// Cycles this thread has run.
     pub fn cycles() -> u64 {
-        let mut c = 0;
-        // SAFETY: the pseudo-handle of the calling thread and a valid out pointer.
-        unsafe { QueryThreadCycleTime(GetCurrentThread(), &mut c) };
-        c
+        featherplay_platform::thread::cycles().unwrap_or(0)
     }
 
     /// Cycles per millisecond: the most a 100 ms spin got (a preempted spin gets fewer).
@@ -96,33 +87,7 @@ pub mod cpu {
 
 /// This process's private bytes, in MB.
 pub fn private_mb() -> f64 {
-    #[repr(C)]
-    #[derive(Default)]
-    struct Counters {
-        cb: u32,
-        page_faults: u32,
-        peak_working_set: usize,
-        working_set: usize,
-        quota_peak_paged: usize,
-        quota_paged: usize,
-        quota_peak_nonpaged: usize,
-        quota_nonpaged: usize,
-        pagefile: usize,
-        peak_pagefile: usize,
-        private: usize,
-    }
-    #[link(name = "kernel32")]
-    unsafe extern "system" {
-        fn GetCurrentProcess() -> isize;
-        fn K32GetProcessMemoryInfo(process: isize, counters: *mut Counters, cb: u32) -> i32;
-    }
-    let mut c = Counters {
-        cb: std::mem::size_of::<Counters>() as u32,
-        ..Default::default()
-    };
-    // SAFETY: this process's pseudo-handle and a counters struct of the size it says.
-    unsafe { K32GetProcessMemoryInfo(GetCurrentProcess(), &mut c, c.cb) };
-    c.private as f64 / 1024.0 / 1024.0
+    featherplay_platform::memory::private_bytes() as f64 / 1024.0 / 1024.0
 }
 
 pub fn quantile(v: &[f64], q: f64) -> f64 {

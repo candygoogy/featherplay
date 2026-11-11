@@ -40,3 +40,7 @@ pub fn cycles() -> Option<u64> {
 pub fn process_cycles() -> Option<u64> {
     None
 }
+
+/// Would raise this whole process's priority. Leaves it as it is for now.
+#[cfg(feature = "perf")]
+pub fn raise_process_priority() {}

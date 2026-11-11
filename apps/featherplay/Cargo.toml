@@ -93,6 +93,11 @@ windows = { workspace = true, features = [
     "Win32_UI_WindowsAndMessaging",
 ] }
 
+[dev-dependencies]
+# This thread's cycles, the process's priority, its private bytes, heaps and allocations,
+# for the measurements in `tests/app/`.
+featherplay-platform = { path = "../../crates/platform", features = ["perf"] }
+
 [build-dependencies]
 embed-resource = { workspace = true }
 resvg = { workspace = true }

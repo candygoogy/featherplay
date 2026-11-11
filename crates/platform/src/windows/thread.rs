@@ -135,6 +135,17 @@ pub fn process_cycles() -> Option<u64> {
     Some(c)
 }
 
+/// Raises this whole process to high priority, so a measured thread is preempted less.
+/// A failure leaves it as it was.
+#[cfg(feature = "perf")]
+pub fn raise_process_priority() {
+    use windows::Win32::System::Threading::{
+        GetCurrentProcess, HIGH_PRIORITY_CLASS, SetPriorityClass,
+    };
+    // SAFETY: the pseudo-handle of this process.
+    let _ = unsafe { SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS) };
+}
+
 #[cfg(test)]
 mod tests {
     use windows::Win32::System::Threading::{GetCurrentThread, GetThreadPriority};
