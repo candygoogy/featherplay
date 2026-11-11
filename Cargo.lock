@@ -1397,7 +1397,6 @@ dependencies = [
  "featherplay-platform",
  "featherplay-proxy",
  "featherplay-store",
- "flate2",
  "getrandom 0.4.3",
  "global-hotkey",
  "http-body-util",
@@ -1405,7 +1404,6 @@ dependencies = [
  "hyper-util",
  "log",
  "reqwest",
- "resvg",
  "serde",
  "serde_json",
  "sha1",
@@ -1413,7 +1411,6 @@ dependencies = [
  "souvlaki",
  "tauri-winrt-notification",
  "tokio",
- "tray-icon",
  "windows 0.62.2",
 ]
 
@@ -1456,9 +1453,11 @@ name = "featherplay-platform"
 version = "0.2.2"
 dependencies = [
  "featherplay-core",
+ "flate2",
  "keyring-core",
  "log",
  "raw-window-handle",
+ "resvg",
  "souvlaki",
  "tauri-winrt-notification",
  "tray-icon",

@@ -21,21 +21,18 @@ use featherplay_platform::taskbar::ThumbButton;
 
 pub mod discord;
 mod hotkeys;
-mod icons;
 pub mod identity;
 pub mod local_api;
 mod notify;
 mod smtc;
 pub mod sponsorblock;
-mod tray;
-mod tray_menu;
+mod tooltip;
 
 pub use discord::Discord;
 pub use hotkeys::{Hotkeys, parse_hotkey};
 pub use notify::{notify, notify_track};
 pub use smtc::Smtc;
-pub use tray::{TOOLTIP_LINE_UTF16, TOOLTIP_MAX_UTF16, Tray, tooltip_text};
-pub use tray_menu::{MenuState, TrayChoice};
+pub use tooltip::tooltip_text;
 
 /// The channel commands travel on. Unbounded, so sending from a window procedure or a
 /// WinRT callback never blocks.
@@ -72,20 +69,6 @@ impl From<ThumbButton> for UiCommand {
             ThumbButton::Next => UiCommand::Next,
         }
     }
-}
-
-/// What the tray icon reports to the UI thread itself (the window procedure calls the
-/// handler; it should only post the event on).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum TrayEvent {
-    /// A left click, released at this point of the screen (physical pixels).
-    Click { x: i32, y: i32 },
-    /// A right click: Windows' menu opens.
-    Menu,
-    /// The pointer came onto the icon or moved over it: the hover text may show.
-    Hover,
-    /// An entry of the right-click menu was chosen.
-    Chose(TrayChoice),
 }
 
 /// The current track and playback state, as the integrations show it.

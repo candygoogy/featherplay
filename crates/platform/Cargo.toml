@@ -35,6 +35,8 @@ souvlaki = { workspace = true }
 tauri-winrt-notification = { workspace = true }
 # `tray`: the tray icon and its menu.
 tray-icon = { workspace = true }
+# `tray`: inflates the tray icons, which `build.rs` deflates.
+flate2 = { workspace = true }
 # `webview`: WebView2 for the sign-in window.
 webview2-com = { workspace = true }
 # `credentials`: the Credential Manager store.
@@ -64,6 +66,11 @@ windows = { workspace = true, features = [
     "Win32_UI_Shell_PropertiesSystem",
     "Win32_UI_WindowsAndMessaging",
 ] }
+
+[build-dependencies]
+# Renders the colour Tri-vane (apps/featherplay/ui/logo/tri-vane{,-light}{,-16,-24}.svg) for the tray.
+resvg = { workspace = true }
+flate2 = { workspace = true }
 
 [lints]
 workspace = true

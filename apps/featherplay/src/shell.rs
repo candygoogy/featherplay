@@ -8,11 +8,9 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
-use featherplay_integrations::{
-    Hotkeys, MenuState, NowPlaying, Sender, Smtc, Tray, TrayChoice, TrayEvent, UiCommand,
-    tooltip_text,
-};
+use featherplay_integrations::{Hotkeys, NowPlaying, Sender, Smtc, UiCommand, tooltip_text};
 use featherplay_platform::taskbar::TaskbarButtons;
+use featherplay_platform::tray::{MenuState, Tray, TrayChoice, TrayEvent};
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use slint::{ComponentHandle, Timer, TimerMode};
 
@@ -58,11 +56,17 @@ pub fn start(
     };
     let t = Instant::now();
     // The tray's window procedure calls this on this thread; the event is handled on the
-    // event loop's next turn, outside that procedure.
-    let on_tray = |ev: TrayEvent| {
+    // event loop's next turn, outside that procedure. A double click goes straight to the
+    // controller, which brings back a window hidden to the tray.
+    let show = tx.clone();
+    let on_tray = move |ev: TrayEvent| {
+        if ev == TrayEvent::DoubleClick {
+            let _ = show.send(UiCommand::Show);
+            return;
+        }
         let _ = slint::invoke_from_event_loop(move || tray_event(ev));
     };
-    match Tray::new(tx.clone(), on_tray) {
+    match Tray::new(&tooltip_text(None, Duration::ZERO), on_tray) {
         Ok(tray) => {
             log!("tray icon created ({})", ms(t));
             it.tray = Some(tray);
@@ -115,6 +119,8 @@ fn tray_event(ev: TrayEvent) {
         TrayEvent::Click { x, y } => tray_click(x, y),
         TrayEvent::Menu => crate::mini::close_unpinned(),
         TrayEvent::Chose(choice) => tray_choice(choice),
+        // Sent on as `UiCommand::Show` by `start`'s handler.
+        TrayEvent::DoubleClick => {}
     }
 }
 

@@ -36,8 +36,6 @@ bytes = { workspace = true }
 base64 = { workspace = true, features = ["std"] }
 sha1 = { workspace = true }
 getrandom = { workspace = true }
-# Inflates the tray icons, which `build.rs` deflates.
-flate2 = { workspace = true }
 
 # Windows only. `tray-icon` and `souvlaki` work elsewhere too, but on Linux they bring in GTK
 # and D-Bus; the Linux tray and media controls are chosen in phase 5 (ARCHITECTURE.md).
@@ -46,8 +44,6 @@ flate2 = { workspace = true }
 souvlaki = { workspace = true }
 # Toasts.
 tauri-winrt-notification = { workspace = true }
-# The tray icon and its menu.
-tray-icon = { workspace = true }
 # `identity`: the AppUserModelID, the Start menu shortcut (IShellLink and its property
 # store) and the HKCU registration, so the media card names the app.
 windows = { workspace = true, features = [
@@ -70,11 +66,6 @@ windows = { workspace = true, features = [
     "Win32_UI_Shell_PropertiesSystem",
     "Win32_UI_WindowsAndMessaging",
 ] }
-
-[build-dependencies]
-# Renders the colour Tri-vane (apps/featherplay/ui/logo/tri-vane{,-light}{,-16,-24}.svg) for the tray.
-resvg = { workspace = true }
-flate2 = { workspace = true }
 
 [lints]
 workspace = true

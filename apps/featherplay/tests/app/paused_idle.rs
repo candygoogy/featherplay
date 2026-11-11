@@ -9,7 +9,7 @@ use std::time::{Duration, Instant};
 use featherplay::snapshot::Scene;
 use featherplay::ui::{Frame, MiniData, Player, Theme};
 use featherplay::{mini, offscreen, shell};
-use featherplay_integrations::TrayChoice;
+use featherplay_platform::tray::TrayChoice;
 use slint::ComponentHandle;
 use slint::platform::WindowEvent;
 
