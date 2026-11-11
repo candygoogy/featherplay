@@ -4,7 +4,7 @@
 use std::time::Duration;
 
 use featherplay::controller::{PlayingFrom, playing_from, queue_info};
-use featherplay::router::Page;
+use featherplay_controller::place::Place;
 use featherplay_core::model::{AlbumId, AlbumRef, LikeStatus, ListEnd, Track, TrackId, VideoType};
 use featherplay_core::queue::Queue;
 
@@ -26,12 +26,7 @@ fn track(id: &str, album: Option<(&str, &str)>) -> Track {
 }
 
 fn homework() -> PlayingFrom {
-    PlayingFrom::on_page(
-        "Homework",
-        Page::Album {
-            id: AlbumId("MPREb_hw".into()),
-        },
-    )
+    PlayingFrom::on_page("Homework", Place::Album(AlbumId("MPREb_hw".into())))
 }
 
 #[test]

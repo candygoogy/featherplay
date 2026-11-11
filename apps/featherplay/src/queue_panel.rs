@@ -149,7 +149,7 @@ pub fn update(ctx: &Rc<Ctx>, state: &PlayerState) {
     let data = ui.global::<QueueData>();
     let from = &state.queue.playing_from;
     data.set_playing_from(shown(&from.label));
-    SOURCE.with(|s| s.borrow_mut().clone_from(&from.page));
+    SOURCE.with(|s| *s.borrow_mut() = from.page.clone().map(Page::from));
     data.set_autoplay_at(
         state
             .queue

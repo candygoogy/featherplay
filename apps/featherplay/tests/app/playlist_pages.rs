@@ -6,17 +6,17 @@ use std::time::Duration;
 
 use featherplay::controller::{Action, PlayingFrom, QueueAction};
 use featherplay::pages::content::{Arriving, TrackList};
-use featherplay::router::Page;
 use featherplay::snapshot::Scene;
 use featherplay::ui::PlaylistData;
+use featherplay_controller::place::Place;
 use featherplay_core::model::{LikeStatus, PlaylistId, Track, TrackId, VideoType};
 use slint::{ComponentHandle, Model};
 
 /// The recorded mix, by the id any mix ("RD…") opens it with.
-fn mix() -> Page {
-    Page::Playlist {
-        id: PlaylistId("RDTMAK5uy_FIXTURE_MIX_100000000000000000000".into()),
-    }
+fn mix() -> Place {
+    Place::Playlist(PlaylistId(
+        "RDTMAK5uy_FIXTURE_MIX_100000000000000000000".into(),
+    ))
 }
 
 /// The ids and numbers of the rows on the playlist page.
@@ -31,7 +31,7 @@ fn rows(scene: &Scene) -> Vec<(String, String)> {
 #[test]
 fn a_mixs_later_pages_follow_its_first_songs_numbered_on() {
     let scene = Scene::new(1280, 800, true, false).expect("scene");
-    scene.ctx.navigate(mix());
+    scene.ctx.navigate(mix().into());
     scene.settle();
 
     let data = scene.ui.global::<PlaylistData>();
@@ -52,7 +52,7 @@ fn a_mixs_later_pages_follow_its_first_songs_numbered_on() {
 fn a_playlist_left_while_it_loads_takes_none_of_its_pages() {
     let scene = Scene::new(1280, 800, true, false).expect("scene");
     // The mix's pages all arrive after the page has moved on.
-    scene.ctx.navigate(mix());
+    scene.ctx.navigate(mix().into());
     scene.open("home").expect("home");
     scene.settle();
 

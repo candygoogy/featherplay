@@ -12,6 +12,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
+use featherplay_controller::place::Place;
 use featherplay_core::model::{AlbumId, ArtistId, PlaylistId, Track};
 use featherplay_core::tr;
 use featherplay_ytm::{ApiError, PlaylistSummary};
@@ -110,7 +111,7 @@ pub fn init(ctx: &Rc<Ctx>) {
     menu.on_open_item(move |id| {
         let Some(ui) = c.window() else { return };
         let kind = entry_kind(ui.global::<PlaylistMenu>().get_item().kind);
-        c.navigate(page_of(kind, &id));
+        c.navigate(place_of(kind, &id).into());
     });
     let c = ctx.clone();
     menu.on_pin(move |id| {
@@ -185,13 +186,13 @@ fn entry_kind(kind: ItemKind) -> Kind {
     }
 }
 
-/// The entry's page.
-fn page_of(kind: Kind, id: &str) -> Page {
+/// Where the entry is: its page.
+fn place_of(kind: Kind, id: &str) -> Place {
     let id = id.to_string();
     match kind {
-        Kind::Album => Page::Album { id: AlbumId(id) },
-        Kind::Artist => Page::Artist { id: ArtistId(id) },
-        Kind::Playlist => Page::Playlist { id: PlaylistId(id) },
+        Kind::Album => Place::Album(AlbumId(id)),
+        Kind::Artist => Place::Artist(ArtistId(id)),
+        Kind::Playlist => Place::Playlist(PlaylistId(id)),
     }
 }
 
@@ -207,7 +208,7 @@ fn with_tracks(
         .window()
         .map(|ui| entry_kind(ui.global::<PlaylistMenu>().get_item().kind))
         .unwrap_or(Kind::Playlist);
-    let from = PlayingFrom::on_page(name.clone(), page_of(kind, id));
+    let from = PlayingFrom::on_page(name.clone(), place_of(kind, id));
     let id = id.to_string();
     let what = match kind {
         Kind::Playlist => tr!("Couldn't load the playlist."),

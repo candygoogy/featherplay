@@ -8,6 +8,7 @@ use std::ops::ControlFlow;
 use std::rc::Rc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use featherplay_controller::place::Place;
 use featherplay_core::model::{AlbumId, ArtistRef, PlaylistId, Track, TrackId};
 use featherplay_core::{tr, trn};
 use featherplay_ytm::{ApiError, PlaylistPart};
@@ -17,7 +18,6 @@ use crate::app::Ctx;
 use crate::controller::{Action, PlayerState, PlayingFrom, QueueAction};
 use crate::covers::Covers;
 use crate::pages::{ahead, playlist};
-use crate::router::Page;
 use crate::song_menu;
 use crate::ui::{CardItem, ItemKind, TrackRow};
 use crate::ui_bridge::{model, to_rows};
@@ -465,7 +465,7 @@ pub fn play_playlist(ctx: &Rc<Ctx>, id: PlaylistId) {
                 } else {
                     p.summary.title.clone()
                 };
-                let page = Page::Playlist { id: id.clone() };
+                let page = Place::Playlist(id.clone());
                 from = Some(PlayingFrom::on_page(label, page));
                 start_or_join(ctx, &arriving, from.as_ref(), p.tracks)
             }

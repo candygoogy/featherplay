@@ -11,6 +11,7 @@ use featherplay::lyrics::{self, SnapshotLyrics};
 use featherplay::router::Page;
 use featherplay::snapshot::Scene;
 use featherplay::ui::{Frame, LyricsData, NowPlayingData, Player, QueueData, Theme};
+use featherplay_controller::place::Place;
 use featherplay_core::model::AlbumId;
 use i_slint_core::accessibility::AccessibleStringProperty;
 use i_slint_core::item_tree::ItemRc;
@@ -139,15 +140,13 @@ fn the_header_opens_the_source_or_up_next() {
     assert_eq!(scene.ctx.current_page(), Page::NowPlaying);
 
     // An album: its page.
-    let album = Page::Album {
-        id: AlbumId("MPREb_hw".into()),
-    };
+    let album = Place::Album(AlbumId("MPREb_hw".into()));
     scene
         .play_from(PlayingFrom::on_page("Homework", album.clone()))
         .expect("album");
     scene.settle();
     click(&scene, header(&scene).expect("the header"));
-    assert_eq!(scene.ctx.current_page(), album);
+    assert_eq!(scene.ctx.current_page(), Page::from(album));
 }
 
 #[test]

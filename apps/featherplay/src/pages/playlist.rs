@@ -10,6 +10,7 @@ use std::rc::Rc;
 use std::time::{Duration, Instant};
 
 use featherplay_controller::catalog::Source;
+use featherplay_controller::place::Place;
 use featherplay_core::model::{PlaylistId, Track};
 use featherplay_core::tr;
 use featherplay_ytm::{ApiError, Playlist, PlaylistPart};
@@ -137,6 +138,7 @@ pub fn open(ctx: &Rc<Ctx>, id: &PlaylistId) {
     }
 
     let page = Page::Playlist { id: id.clone() };
+    let place = Place::Playlist(id.clone());
     let visit = ctx.visit();
     // A play from the list while its pages arrive: the ones to come join its queue, even
     // once the page is left.
@@ -165,7 +167,7 @@ pub fn open(ctx: &Rc<Ctx>, id: &PlaylistId) {
                         "playlist: first page, {tracks} tracks in {} ms{read_ahead}",
                         took.as_millis()
                     );
-                    show(ctx, ui, p, page.clone(), &arriving);
+                    show(ctx, ui, p, place.clone(), &arriving);
                     ControlFlow::Continue(())
                 }
                 Part::Page(PlaylistPart::More(more), _) => {
@@ -226,7 +228,7 @@ pub fn open(ctx: &Rc<Ctx>, id: &PlaylistId) {
 }
 
 /// The first page has arrived: the header, the songs so far, and the list that plays them.
-fn show(ctx: &Rc<Ctx>, ui: &AppWindow, playlist: Playlist, page: Page, arriving: &Arriving) {
+fn show(ctx: &Rc<Ctx>, ui: &AppWindow, playlist: Playlist, place: Place, arriving: &Arriving) {
     let data = ui.global::<PlaylistData>();
     data.set_loading(false);
     let liked = data.get_liked_songs();
@@ -270,7 +272,7 @@ fn show(ctx: &Rc<Ctx>, ui: &AppWindow, playlist: Playlist, page: Page, arriving:
         s.title.clone()
     };
     let (mut list, model) = TrackList::new(playlist.tracks, ctx);
-    list.from = PlayingFrom::on_page(label, page);
+    list.from = PlayingFrom::on_page(label, place);
     list.arriving = Some(arriving.clone());
     list.hint_first(ctx);
     data.set_tracks(model);

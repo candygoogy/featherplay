@@ -4,13 +4,13 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
+use featherplay_controller::place::Place;
 use featherplay_core::model::{LikeStatus, Track, TrackId};
 use featherplay_core::player::Input;
 use featherplay_core::queue::Queue;
 use featherplay_core::tr;
 
 use super::{Action, Controller};
-use crate::router::Page;
 
 #[derive(Debug)]
 pub enum QueueAction {
@@ -56,7 +56,7 @@ pub enum QueueAction {
 pub struct PlayingFrom {
     /// "Homework", "Around the World radio", "Liked songs"; empty when unknown.
     pub label: String,
-    pub page: Option<Page>,
+    pub page: Option<Place>,
 }
 
 impl PlayingFrom {
@@ -69,7 +69,7 @@ impl PlayingFrom {
     }
 
     /// A source `page` shows.
-    pub fn on_page(label: impl Into<String>, page: Page) -> Self {
+    pub fn on_page(label: impl Into<String>, page: Place) -> Self {
         Self {
             label: label.into(),
             page: Some(page),
@@ -173,9 +173,7 @@ pub fn playing_from(tracks: &[Track], start: usize, radio: bool) -> PlayingFrom 
     let mut albums = tracks.iter().map(|t| t.album.as_ref());
     match albums.next() {
         Some(Some(first)) if albums.all(|a| a.is_some_and(|a| a.id == first.id)) => {
-            let page = Page::Album {
-                id: first.id.clone(),
-            };
+            let page = Place::Album(first.id.clone());
             PlayingFrom::on_page(first.title.clone(), page)
         }
         _ => PlayingFrom::default(),
