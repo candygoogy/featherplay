@@ -29,7 +29,7 @@ mod tooltip;
 
 pub use discord::Discord;
 pub use hotkeys::{Hotkeys, parse_hotkey};
-pub use notify::{notify, notify_track};
+pub use notify::notify_track;
 pub use tooltip::tooltip_text;
 
 /// The channel commands travel on. Unbounded, so sending from a window procedure or a

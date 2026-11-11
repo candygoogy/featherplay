@@ -37,33 +37,5 @@ base64 = { workspace = true, features = ["std"] }
 sha1 = { workspace = true }
 getrandom = { workspace = true }
 
-# Windows only. `tray-icon` and `souvlaki` work elsewhere too, but on Linux they bring in GTK
-# and D-Bus; the Linux tray and media controls are chosen in phase 5 (ARCHITECTURE.md).
-[target.'cfg(windows)'.dependencies]
-# Toasts.
-tauri-winrt-notification = { workspace = true }
-# `identity`: the AppUserModelID, the Start menu shortcut (IShellLink and its property
-# store) and the HKCU registration, so the media card names the app.
-windows = { workspace = true, features = [
-    # `smtc`: the media card's playback rate, which souvlaki doesn't set.
-    "Media",
-    "Win32_Foundation",
-    "Win32_Graphics_Gdi",
-    "Win32_Security",
-    "Win32_Storage_EnhancedStorage",
-    "Win32_Storage_FileSystem",
-    "Win32_System_Com",
-    "Win32_System_Com_StructuredStorage",
-    "Win32_System_LibraryLoader",
-    "Win32_System_Registry",
-    "Win32_System_Variant",
-    "Win32_System_WinRT",
-    "Win32_UI_Accessibility",
-    "Win32_UI_HiDpi",
-    "Win32_UI_Shell",
-    "Win32_UI_Shell_PropertiesSystem",
-    "Win32_UI_WindowsAndMessaging",
-] }
-
 [lints]
 workspace = true

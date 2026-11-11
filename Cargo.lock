@@ -1408,9 +1408,7 @@ dependencies = [
  "serde_json",
  "sha1",
  "sha2",
- "tauri-winrt-notification",
  "tokio",
- "windows 0.62.2",
 ]
 
 [[package]]
