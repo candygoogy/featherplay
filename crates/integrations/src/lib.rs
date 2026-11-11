@@ -22,7 +22,6 @@ use featherplay_platform::taskbar::ThumbButton;
 
 pub mod discord;
 mod hotkeys;
-pub mod identity;
 pub mod local_api;
 mod notify;
 pub mod sponsorblock;

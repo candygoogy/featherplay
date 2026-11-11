@@ -9,6 +9,7 @@
 //!
 //! What an area's versions share (its plain types and events, logic with no OS calls) is in
 //! `common`, which each OS's area file re-exports.
+#![cfg_attr(test, allow(clippy::print_stderr, reason = "tests report skips"))]
 
 mod common;
 mod feature;

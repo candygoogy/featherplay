@@ -22,7 +22,7 @@ use std::marker::PhantomData;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
-use featherplay_integrations::identity::AUMID;
+use featherplay_platform::identity::AUMID;
 use windows::Win32::Foundation::{
     CloseHandle, ERROR_ALREADY_EXISTS, GetLastError, HANDLE, HWND, LPARAM, SetLastError,
     WAIT_ABANDONED, WAIT_OBJECT_0, WIN32_ERROR, WPARAM,

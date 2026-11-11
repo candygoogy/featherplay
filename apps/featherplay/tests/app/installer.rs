@@ -4,7 +4,7 @@
 //! uninstaller closes the app through. These keep the two in step.
 
 use featherplay::endsession;
-use featherplay_integrations::identity;
+use featherplay_platform::identity;
 
 fn script() -> String {
     let path = concat!(

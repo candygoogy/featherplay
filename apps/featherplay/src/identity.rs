@@ -1,10 +1,10 @@
 //! The app's identity for the shell, so the media card shows "featherplay" and the
-//! Tri-vane icon. The work is in `featherplay_integrations::identity`; this wires it to
+//! Tri-vane icon. The work is in `featherplay_platform::identity`; this wires it to
 //! startup and `--unregister`.
 
 use std::process::ExitCode;
 
-use featherplay_integrations::identity::{self, Registration};
+use featherplay_platform::identity::{self, Registration};
 use featherplay_store::Paths;
 
 /// Call first thing in a windowed run, before any window or media session: names the

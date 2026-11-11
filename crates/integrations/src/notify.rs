@@ -3,7 +3,9 @@
 
 use tauri_winrt_notification::{Duration, Sound, Toast};
 
-use crate::{NowPlaying, identity};
+use featherplay_platform::identity;
+
+use crate::NowPlaying;
 
 /// Shows the title over "artist, album". Blocks for a few milliseconds of WinRT calls, so call
 /// it off the UI thread. Errors are logged, not returned: a missing toast is not worth

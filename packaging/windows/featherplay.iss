@@ -6,7 +6,7 @@
 ;   (same AppId) and keeps the settings and sign-in.
 ; - The Start menu shortcut carries the app's AppUserModelID, so the media overlay, the
 ;   taskbar and notifications name featherplay. The app checks the same shortcut at every
-;   start (crates/integrations/src/identity.rs: AUMID, SHORTCUT_FILE); keep the two equal.
+;   start (crates/platform/src/common/identity.rs: AUMID, SHORTCUT_FILE); keep the two equal.
 ; - Uninstalling removes everything featherplay keeps: the program folder, its settings
 ;   (%APPDATA%\featherplay), its cache, sidecars and sign-in browser profile
 ;   (%LOCALAPPDATA%\featherplay), its secrets in Windows Credential Manager, the registry
@@ -56,7 +56,7 @@
 #endif
 
 #define AppName "featherplay"
-; crates/integrations/src/identity.rs: AUMID.
+; crates/platform/src/common/identity.rs: AUMID.
 #define AppUserModelId "featherplay.featherplay"
 ; apps/featherplay/src/endsession.rs: CLASS and TITLE.
 #define EndSessionClass "featherplay-endsession"
