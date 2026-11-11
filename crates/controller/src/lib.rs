@@ -23,6 +23,7 @@ pub mod diagnostics;
 pub mod fixtures;
 pub mod link;
 pub mod place;
+pub mod presence;
 pub mod scrobbler;
 pub mod suggest;
 pub mod task;

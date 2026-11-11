@@ -26,6 +26,7 @@
 use std::fmt;
 
 use featherplay_controller::catalog::Source;
+use featherplay_controller::presence::{self, Presence};
 use featherplay_controller::scrobbler::{LastfmKeys, Scrobblers, build_keys, lastfm_keys};
 use featherplay_core::player::Input;
 use featherplay_core::tr;
@@ -40,7 +41,6 @@ use featherplay_ytm::{ApiError, Identity, YtMusic};
 use super::{
     Controller, Msg, UiEvent, compressor, equalizer_bands, prefs, skip_silences, stream_quality,
 };
-use crate::presence::{self, Presence};
 
 /// A cookie header. Its `Debug` never shows the value.
 pub struct Cookies(pub String);

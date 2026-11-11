@@ -1381,6 +1381,7 @@ name = "featherplay-controller"
 version = "0.2.2"
 dependencies = [
  "featherplay-core",
+ "featherplay-integrations",
  "featherplay-lastfm",
  "featherplay-listenbrainz",
  "featherplay-lyrics",

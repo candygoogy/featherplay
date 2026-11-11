@@ -12,6 +12,8 @@ publish = false
 # `featherplay-platform`, the window through the app.
 [dependencies]
 featherplay-core = { path = "../core" }
+# Discord's connection and card (`presence`).
+featherplay-integrations = { path = "../integrations" }
 # Scrobbling (`scrobbler`).
 featherplay-lastfm = { path = "../lastfm" }
 featherplay-listenbrainz = { path = "../listenbrainz" }

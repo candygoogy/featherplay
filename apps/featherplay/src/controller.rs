@@ -30,6 +30,7 @@ use std::time::{Duration, Instant, SystemTime};
 
 use featherplay_audio::{AudioEngine, AudioEvent, Compressor, StreamSource};
 use featherplay_controller::catalog::{Catalog, Source};
+use featherplay_controller::presence::Presence;
 use featherplay_controller::scrobbler::{Scrobblers, Sent};
 use featherplay_core::model::{LikeStatus, PlaylistId, RepeatMode, Track, TrackId};
 use featherplay_core::player::{Effect, Input, ListEnd, PlaybackPrefs, Player, Status, StreamInfo};
@@ -57,7 +58,6 @@ pub use queue::{
 };
 pub use silences::Mark;
 
-use crate::presence::Presence;
 use crate::updates;
 
 /// How often the player gets the engine's position and the time, while it
@@ -225,7 +225,7 @@ pub enum UiEvent {
     /// Sign-in, session and Last.fm news for the account pages.
     AccountNotice(account::AccountEvent),
     /// The Discord connection, for Settings.
-    Discord(crate::presence::Status),
+    Discord(featherplay_controller::presence::Status),
     /// The local API's state and token, for Settings.
     LocalApi(LocalApiNotice),
     /// The app acts as another identity of the session (the account menu, the first
@@ -290,7 +290,7 @@ enum Msg {
     /// Sign-in, sign-out and Last.fm results.
     Account(account::AccountMsg),
     /// The Discord worker's connection changed.
-    Discord(crate::presence::Status),
+    Discord(featherplay_controller::presence::Status),
     /// A reconnect with the stored session; `None`: there's no stored session any more.
     Reconnected(Option<Result<YtMusic, ApiError>>),
     /// The sign-in behind a resumed start (`YtMusic::refresh`): the fresh client version.
@@ -595,7 +595,9 @@ impl Controller {
         self.check_identity();
         self.refresh_session();
         if self.presence.is_none() {
-            (self.ui.events)(UiEvent::Discord(crate::presence::off_status()));
+            (self.ui.events)(UiEvent::Discord(
+                featherplay_controller::presence::off_status(),
+            ));
         }
         for input in std::mem::take(&mut self.initial) {
             self.input(input);
