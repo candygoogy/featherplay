@@ -25,7 +25,7 @@ mod streams;
 
 use std::collections::{HashMap, VecDeque};
 use std::path::PathBuf;
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
 
 use featherplay_audio::{AudioEngine, AudioEvent, Compressor, StreamSource};
@@ -103,10 +103,7 @@ async fn install_helpers(resolver: &YtDlpResolver) -> bool {
 }
 
 /// Time since the process started; the first call starts the clock.
-pub fn uptime() -> Duration {
-    static START: OnceLock<Instant> = OnceLock::new();
-    START.get_or_init(Instant::now).elapsed()
-}
+pub use crate::diagnostics::uptime;
 
 #[derive(Debug, Default)]
 pub struct Options {

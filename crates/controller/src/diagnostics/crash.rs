@@ -74,7 +74,7 @@ pub fn report(message: &str, location: &str, thread: &str, backtrace: &Backtrace
          Backtrace:\n{backtrace}\n",
         env!("CARGO_PKG_VERSION"),
         Stamp::now().line(),
-        crate::controller::uptime().as_secs_f64(),
+        super::uptime().as_secs_f64(),
         super::windows(),
     )
 }

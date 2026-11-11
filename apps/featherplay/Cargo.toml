@@ -46,9 +46,6 @@ i-slint-renderer-skia = { workspace = true }
 i-slint-core = { workspace = true }
 # Covers: decoded and resized off the UI thread; `--snapshot` writes PNGs.
 image = { workspace = true, features = ["jpeg", "png", "webp"] }
-# The crates' log records reach the app's log file through it (`diagnostics`). Already in
-# the lock tree through reqwest, symphonia and resvg.
-log = { workspace = true, features = ["std"] }
 # Reads the HWND out of `slint::WindowHandle`; slint doesn't re-export the trait.
 raw-window-handle = { workspace = true }
 # Covers are fetched over the system TLS, like the other crates.

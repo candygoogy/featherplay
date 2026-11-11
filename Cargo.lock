@@ -1344,7 +1344,6 @@ dependencies = [
  "i-slint-core",
  "i-slint-renderer-skia",
  "image",
- "log",
  "minisign-verify",
  "raw-window-handle",
  "reqwest",
@@ -1382,6 +1381,12 @@ dependencies = [
 name = "featherplay-controller"
 version = "0.2.2"
 dependencies = [
+ "featherplay-core",
+ "featherplay-platform",
+ "featherplay-proxy",
+ "featherplay-store",
+ "featherplay-streams",
+ "log",
  "tokio",
 ]
 

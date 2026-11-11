@@ -10,14 +10,13 @@
 //! icon's hover text and right-click menu are Windows' own (`shell`). The Slint side is in `ui/`;
 //! `ui/README.md` says which file owns what.
 
-/// Writes a line to the log file (`diagnostics`), prefixed with the time and the seconds
-/// since start; debug builds print it to stderr too.
-#[macro_export]
-macro_rules! log {
-    ($($arg:tt)*) => {
-        $crate::diagnostics::write(format_args!($($arg)*))
-    };
-}
+/// `log!` writes a line to the log file (`diagnostics`), in every module here.
+#[macro_use]
+extern crate featherplay_controller;
+
+/// The log file, the crash files and Copy diagnostics live in the controller crate; `log!`
+/// is its macro.
+pub use featherplay_controller::{diagnostics, log};
 
 /// The Slint components, globals and structs (`ui/app.slint`).
 pub mod ui {
@@ -35,7 +34,6 @@ pub mod chrome;
 pub mod close;
 pub mod controller;
 pub mod covers;
-pub mod diagnostics;
 pub mod fixtures;
 pub mod follow;
 pub mod fonts;

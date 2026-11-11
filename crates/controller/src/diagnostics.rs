@@ -8,7 +8,7 @@
 //! Debug builds print every line to stderr too, as does a process that never called `init`
 //! (the tests, `--snapshot`).
 
-pub(crate) mod clock;
+pub mod clock;
 mod crash;
 mod logfile;
 mod redact;
@@ -19,7 +19,7 @@ use std::fmt;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Mutex, OnceLock};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use featherplay_core::sync::LockExt;
 use featherplay_store::{Paths, Settings};
@@ -53,6 +53,12 @@ static PLAYED: Mutex<VecDeque<String>> = Mutex::new(VecDeque::new());
 static HELPERS: Mutex<Option<String>> = Mutex::new(None);
 /// Why Windows wouldn't store the last sign-in (`sign_in_kept`).
 static SIGN_IN_SAVE: Mutex<Option<String>> = Mutex::new(None);
+
+/// Time since the process started; the first call starts the clock.
+pub fn uptime() -> Duration {
+    static START: OnceLock<Instant> = OnceLock::new();
+    START.get_or_init(Instant::now).elapsed()
+}
 
 /// `{cache}/logs`: the log, the one before it and the crash files.
 pub fn log_dir(paths: &Paths) -> PathBuf {
@@ -136,7 +142,7 @@ pub fn write(args: fmt::Arguments<'_>) {
 )]
 fn line(msg: &str) {
     let msg = redact(msg);
-    let up = crate::controller::uptime().as_secs_f64();
+    let up = uptime().as_secs_f64();
     let tagged = format!("[{up:>8.3}] {msg}");
     let log = LOG.get();
     if cfg!(debug_assertions) || log.is_none() {

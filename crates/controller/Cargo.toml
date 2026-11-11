@@ -11,6 +11,16 @@ publish = false
 # No Slint, winit or `windows` here (ARCHITECTURE.md, "Phase 3"): the OS is reached through
 # `featherplay-platform`, the window through the app.
 [dependencies]
+featherplay-core = { path = "../core" }
+# What talks to the OS: the Windows version and the local time for the log.
+featherplay-platform = { path = "../platform" }
+# The proxy in use, for Copy diagnostics.
+featherplay-proxy = { path = "../proxy" }
+featherplay-store = { path = "../store" }
+# The helpers' failures and the JavaScript engine, for Copy diagnostics.
+featherplay-streams = { path = "../streams" }
+# The crates' log records reach the log file through it (`diagnostics`).
+log = { workspace = true, features = ["std"] }
 tokio = { workspace = true, features = ["rt"] }
 
 [lints]
