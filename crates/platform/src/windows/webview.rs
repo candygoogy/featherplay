@@ -1019,25 +1019,39 @@ mod tests {
     }
 
     /// The page the live checks open: about:blank, its cookies those of the music site, the
-    /// header built from them while a session cookie is there (the app builds it with its
-    /// session rules).
+    /// header built from them by the session rules the app's sign-in uses.
     const BLANK: Page = Page {
         start: "about:blank",
         close_cancels: false,
         cookie_url: "https://music.youtube.com",
         ends_at: |_| false,
         opens_here: |_| false,
-        header: |cookies| {
-            let header: Vec<String> = cookies
-                .iter()
-                .map(|c| format!("{}={}", c.name, c.value))
-                .collect();
-            cookies
-                .iter()
-                .any(|c| c.name == "SAPISID")
-                .then(|| header.join("; "))
-        },
+        header: session_header,
     };
+
+    /// The header from the cookies WebView2 gave, as the app's sign-in builds it
+    /// (`featherplay_core::session`); `None` without a session.
+    fn session_header(cookies: Vec<Cookie>) -> Option<String> {
+        use featherplay_core::session;
+        let cookies: Vec<session::Cookie> = cookies
+            .into_iter()
+            .map(|c| session::Cookie {
+                name: c.name,
+                value: c.value,
+                domain: c.domain,
+                path: c.path,
+                secure: c.secure,
+                expires: c.expires,
+                partitioned: false,
+            })
+            .collect();
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs_f64();
+        let music = session::music_cookies(&cookies, now);
+        session::signed_in(&music).then(|| session::header(&music))
+    }
 
     /// A hidden window standing in for the frame, on the calling thread.
     fn hidden_parent() -> Result<HWND, String> {
