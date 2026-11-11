@@ -36,7 +36,6 @@ pub mod close;
 pub mod controller;
 pub mod covers;
 pub mod diagnostics;
-pub mod endsession;
 pub mod fixtures;
 pub mod follow;
 pub mod fonts;

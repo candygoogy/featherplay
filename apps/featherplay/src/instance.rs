@@ -9,10 +9,10 @@
 //! user's app.
 //!
 //! How the second finds the first: every featherplay keeps the hidden end-session window
-//! (`endsession`), on a thread that is always pumping messages, even while the main window
+//! (`session_end`), on a thread that is always pumping messages, even while the main window
 //! is hidden in the tray. The second looks those windows up by class and sends each one a
 //! window message registered under the guard's key. Only a featherplay of the same home
-//! registered that message, so only it answers `endsession::SHOWN`, after posting the tray's
+//! registered that message, so only it answers `session_end::SHOWN`, after posting the tray's
 //! Show to its event loop. Windows lets only the foreground app bring a window to the
 //! front; the launch the user just made may, so it hands that right to each candidate
 //! (`AllowSetForegroundWindow`) before asking.
@@ -34,7 +34,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
 };
 use windows::core::HSTRING;
 
-use crate::endsession;
+use featherplay_platform::session_end;
 
 /// How long a second launch keeps trying: the first may still be starting (its end-session
 /// window not made yet) or closing (saving its session).
@@ -186,8 +186,8 @@ pub fn ask_to_show(key: &str) -> bool {
             return false;
         }
     };
-    let class = HSTRING::from(endsession::CLASS);
-    let title = HSTRING::from(endsession::TITLE);
+    let class = HSTRING::from(session_end::CLASS);
+    let title = HSTRING::from(session_end::TITLE);
     let mut after: Option<HWND> = None;
     // SAFETY: NUL-terminated strings; `after` is a window found before, or None.
     while let Ok(hwnd) = unsafe { FindWindowExW(None, after, &class, &title) } {
@@ -213,7 +213,7 @@ pub fn ask_to_show(key: &str) -> bool {
                 Some(&mut answer),
             )
         };
-        if sent.0 != 0 && answer == endsession::SHOWN {
+        if sent.0 != 0 && answer == session_end::SHOWN {
             return true;
         }
     }

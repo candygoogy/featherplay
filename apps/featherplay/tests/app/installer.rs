@@ -3,8 +3,7 @@
 //! AppUserModelID, which the app checks at every start, and the end-session window the
 //! uninstaller closes the app through. These keep the two in step.
 
-use featherplay::endsession;
-use featherplay_platform::identity;
+use featherplay_platform::{identity, session_end};
 
 fn script() -> String {
     let path = concat!(
@@ -37,18 +36,18 @@ fn the_uninstaller_finds_the_end_session_window() {
     assert!(
         iss.contains(&format!(
             "#define EndSessionClass \"{}\"",
-            endsession::CLASS
+            session_end::CLASS
         )),
         "the installer's EndSessionClass isn't {}",
-        endsession::CLASS
+        session_end::CLASS
     );
     assert!(
         iss.contains(&format!(
             "#define EndSessionTitle \"{}\"",
-            endsession::TITLE
+            session_end::TITLE
         )),
         "the installer's EndSessionTitle isn't {}",
-        endsession::TITLE
+        session_end::TITLE
     );
 }
 

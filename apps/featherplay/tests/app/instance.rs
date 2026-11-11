@@ -8,8 +8,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, mpsc};
 use std::time::Duration;
 
-use featherplay::endsession;
 use featherplay::instance::{self, Claim};
+use featherplay_platform::session_end;
 
 /// A home no featherplay runs with, so the test's mutex and message are its own.
 fn test_key(test: &str) -> String {
@@ -116,9 +116,9 @@ fn asking_to_show_reaches_the_window_of_the_same_home() {
     let key = test_key("show");
     let shown = Arc::new(AtomicUsize::new(0));
     let count = shown.clone();
-    endsession::listen(
+    session_end::listen(
         || {},
-        Some(endsession::Show {
+        Some(session_end::Show {
             message: instance::show_message(&key).expect("register the message"),
             on_show: Box::new(move || {
                 count.fetch_add(1, Ordering::SeqCst);
@@ -136,9 +136,9 @@ fn asking_to_show_reaches_the_window_of_the_same_home() {
 fn asking_to_show_passes_over_the_window_of_another_home() {
     let shown = Arc::new(AtomicUsize::new(0));
     let count = shown.clone();
-    endsession::listen(
+    session_end::listen(
         || {},
-        Some(endsession::Show {
+        Some(session_end::Show {
             message: instance::show_message(&test_key("mine")).expect("register the message"),
             on_show: Box::new(move || {
                 count.fetch_add(1, Ordering::SeqCst);
@@ -155,9 +155,9 @@ fn asking_to_show_passes_over_the_window_of_another_home() {
 #[test]
 fn a_closing_instance_does_not_count_as_shown() {
     let key = test_key("closing");
-    endsession::listen(
+    session_end::listen(
         || {},
-        Some(endsession::Show {
+        Some(session_end::Show {
             message: instance::show_message(&key).expect("register the message"),
             on_show: Box::new(|| false),
         }),

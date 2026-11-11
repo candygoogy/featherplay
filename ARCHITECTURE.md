@@ -162,7 +162,7 @@ controls and the tray (`apps/featherplay/src/shell.rs`).
 | `featherplay-discord` | Discord's blocking IPC | `apps/featherplay/src/presence.rs` |
 | `featherplay-proxy` | Asks WinHTTP for a proxy script or auto-detection | `crates/proxy/src/lookups.rs` |
 | `featherplay-log` | Appends log lines to the file | `apps/featherplay/src/diagnostics.rs` |
-| `featherplay-endsession` | A hidden window that hears Windows' end-of-session messages and second launches | `apps/featherplay/src/endsession.rs` |
+| `featherplay-endsession` | A hidden window that hears Windows' end-of-session messages and second launches | `crates/platform/src/windows/session_end.rs` |
 | `featherplay-signin`, `featherplay-browser-signin`, `featherplay-browser-pipe` | The WebView2 sign-in, with its own COM apartment and message loop; the browser sign-in and its DevTools pipe | `apps/featherplay/src/pages/sign_in/webview.rs`, `apps/featherplay/src/pages/sign_in/browser.rs`, `apps/featherplay/src/pages/sign_in/browser/cdp.rs` |
 
 There are also short-lived threads, such as opening the log folder and registering the app's

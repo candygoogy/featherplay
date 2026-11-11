@@ -58,7 +58,7 @@
 #define AppName "featherplay"
 ; crates/platform/src/common/identity.rs: AUMID.
 #define AppUserModelId "featherplay.featherplay"
-; apps/featherplay/src/endsession.rs: CLASS and TITLE.
+; crates/platform/src/windows/session_end.rs: CLASS and TITLE.
 #define EndSessionClass "featherplay-endsession"
 #define EndSessionTitle "featherplay"
 
@@ -100,7 +100,7 @@ WizardImageFileDynamicDark={#ArtDir}\installer-panel.png
 WizardImageStretch=no
 
 ; A running featherplay is closed by the Restart Manager, which sends the end-session
-; messages endsession.rs answers by saving and quitting. It isn't restarted that way; the
+; messages session_end.rs answers by saving and quitting. It isn't restarted that way; the
 ; finish page's "Launch featherplay" does it, or, for an update featherplay started itself
 ; (/RELAUNCH), the second [Run] entry.
 CloseApplications=yes

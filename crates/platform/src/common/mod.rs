@@ -6,6 +6,7 @@
 pub mod clipboard;
 pub mod identity;
 pub mod media_controls;
+pub mod session_end;
 pub mod taskbar;
 pub mod tray;
 pub mod window;

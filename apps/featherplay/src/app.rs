@@ -17,7 +17,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use featherplay_core::model::{AlbumId, ArtistId, PlaylistId};
 use featherplay_core::tr;
 use featherplay_integrations::UiCommand;
-use featherplay_platform::window;
+use featherplay_platform::{session_end, window};
 use featherplay_store::{Paths, Settings};
 use slint::ComponentHandle;
 use tokio::sync::mpsc;
@@ -29,9 +29,9 @@ use crate::covers::Covers;
 use crate::router::{ExploreTab, History, LibraryTab, Page};
 use crate::ui::{AppWindow, Frame, Nav, PageKind, Theme};
 use crate::{
-    account_menu, account_picker, album_actions, bar, chrome, close, endsession, frame_log,
-    instance, language, link, memory, mini, pages, playlist_menu, popup, prepare, queue_panel,
-    repaint, shell, sidebar, song_menu, suggest, toast, top_bar, updates, wheel,
+    account_menu, account_picker, album_actions, bar, chrome, close, frame_log, instance, language,
+    link, memory, mini, pages, playlist_menu, popup, prepare, queue_panel, repaint, shell, sidebar,
+    song_menu, suggest, toast, top_bar, updates, wheel,
 };
 
 /// Set once featherplay starts to quit. A second launch asking to show the window is told
@@ -781,7 +781,7 @@ pub fn run(opts: Options, app: AppOptions) -> ExitCode {
     };
     // Another launch of this home: show the window, as the tray's Show does.
     let show = match instance::show_message(&instance::key_here()) {
-        Ok(message) => Some(endsession::Show {
+        Ok(message) => Some(session_end::Show {
             message,
             on_show: Box::new(|| {
                 !CLOSING.load(Ordering::Acquire)
@@ -794,7 +794,7 @@ pub fn run(opts: Options, app: AppOptions) -> ExitCode {
         }
     };
     // Sign-out, shutdown, an upgrade or the uninstaller: quit as the tray's Quit does.
-    if let Err(e) = endsession::listen(
+    if let Err(e) = session_end::listen(
         || {
             log!("Windows asked featherplay to close");
             closing();
@@ -818,7 +818,7 @@ pub fn run(opts: Options, app: AppOptions) -> ExitCode {
         log!("the controller thread panicked");
         ExitCode::FAILURE
     });
-    endsession::saved();
+    session_end::saved();
     runtime.shutdown_timeout(std::time::Duration::from_secs(2));
     if ui.is_err() { ExitCode::FAILURE } else { code }
 }
