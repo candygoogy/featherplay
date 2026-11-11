@@ -23,6 +23,7 @@ use std::borrow::Cow;
 use std::fmt;
 use std::future::Future;
 use std::ops::ControlFlow;
+use std::pin::Pin;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
@@ -61,6 +62,9 @@ const MAX_PAGES: usize = 50;
 const AUTH_USER: &str = "x-goog-authuser";
 /// The brand account header (the delegated session's page id).
 const PAGE_ID: &str = "x-goog-pageid";
+
+/// A request's future, boxed in this crate (`raw_post`).
+type Boxed<'a, T> = Pin<Box<dyn Future<Output = Result<T, ApiError>> + Send + 'a>>;
 
 /// A client for YouTube Music: signed in and acting as one identity, or signed out
 /// (`guest`). Cheap to clone.
@@ -190,28 +194,31 @@ impl YtMusic {
     /// page), and its requests use the fresh version from then on. Returns that version;
     /// `None` without a request when the client wasn't resumed. A failure is `connect`'s
     /// (`AuthExpired` for refused cookies, `Network` otherwise), and a later call tries
-    /// again.
-    pub async fn refresh(&self) -> Result<Option<String>, ApiError> {
-        let Session::Account {
-            refresh: Some(refresh),
-            ..
-        } = &self.session
-        else {
-            return Ok(None);
-        };
-        let fresh = refresh
-            .fresh
-            .get_or_try_init(|| async {
-                let client =
-                    ytmapi_rs::Client::new_from_reqwest_client(http_client(&self.identity)?);
-                let token = BrowserToken::from_str(&refresh.cookies, &client)
-                    .await
-                    .map_err(map_error)?;
-                let inner = account_client(&token, &self.identity)?;
-                Ok::<_, ApiError>(Fresh { inner, token })
-            })
-            .await?;
-        Ok(Some(fresh.token.client_version().into_owned()))
+    /// again. Boxed (`raw_post`).
+    #[inline(never)]
+    pub fn refresh(&self) -> Boxed<'_, Option<String>> {
+        Box::pin(async move {
+            let Session::Account {
+                refresh: Some(refresh),
+                ..
+            } = &self.session
+            else {
+                return Ok(None);
+            };
+            let fresh = refresh
+                .fresh
+                .get_or_try_init(|| async {
+                    let client =
+                        ytmapi_rs::Client::new_from_reqwest_client(http_client(&self.identity)?);
+                    let token = BrowserToken::from_str(&refresh.cookies, &client)
+                        .await
+                        .map_err(map_error)?;
+                    let inner = account_client(&token, &self.identity)?;
+                    Ok::<_, ApiError>(Fresh { inner, token })
+                })
+                .await?;
+            Ok(Some(fresh.token.client_version().into_owned()))
+        })
     }
 
     /// Signed out: the catalogue as a visitor, without cookies. Sends nothing.
@@ -659,18 +666,22 @@ impl YtMusic {
 
     /// Every identity the account switcher lists (the Google accounts signed in to the
     /// cookie jar and their brand accounts), with the one this client acts as marked
-    /// `active`. The request YouTube Music's own "Switch account" sends. Read-only.
-    pub async fn accounts(&self) -> Result<Vec<AccountIdentity>, ApiError> {
-        convert::accounts(
-            &self.raw_account(&AccountSwitcherQuery).await?,
-            &self.identity,
-        )
+    /// `active`. The request YouTube Music's own "Switch account" sends. Read-only. Boxed
+    /// (`raw_post`).
+    #[inline(never)]
+    pub fn accounts(&self) -> Boxed<'_, Vec<AccountIdentity>> {
+        Box::pin(async move {
+            convert::accounts(
+                &self.raw_account(&AccountSwitcherQuery).await?,
+                &self.identity,
+            )
+        })
     }
 
     /// The account menu's raw JSON, for recording the fixture. It holds the
     /// account's personal data: scrub it before it's stored anywhere.
     pub async fn account_menu_raw(&self) -> Result<String, ApiError> {
-        self.raw_account(&Post::of(&AccountMenuQuery)).await
+        self.account_post(&Post::of(&AccountMenuQuery)).await
     }
 
     /// One `browse` page as raw JSON: `id` (`FEmusic_charts`, …), with the page's `params`
@@ -704,15 +715,21 @@ impl YtMusic {
 
     /// A catalogue request, signed in or not. A guest is never told its session ended: a
     /// 401/403 to a visitor asks for an account.
-    async fn raw_post(&self, query: Post<'_>) -> Result<String, ApiError> {
-        match &self.session {
-            Session::Account { .. } => self.raw_account(&query).await,
-            Session::Guest(inner) => inner
-                .raw_json_query::<Post>(&query)
-                .await
-                .map_err(|e| guest_error(map_error(e)))
-                .and_then(guest_reply),
-        }
+    ///
+    /// Boxed here, as `account_post`, `refresh` and `accounts` are: a future is compiled
+    /// in each crate that polls it, and the app and the controller crate both reach these.
+    #[inline(never)]
+    fn raw_post<'a>(&'a self, query: Post<'a>) -> Boxed<'a, String> {
+        Box::pin(async move {
+            match &self.session {
+                Session::Account { .. } => self.account_post(&query).await,
+                Session::Guest(inner) => inner
+                    .raw_json_query::<Post>(&query)
+                    .await
+                    .map_err(|e| guest_error(map_error(e)))
+                    .and_then(guest_reply),
+            }
+        })
     }
 
     /// A request about the account: `SignInRequired` for a guest, sending nothing. A
@@ -738,6 +755,12 @@ impl YtMusic {
             }
             _ => Ok(raw),
         }
+    }
+
+    /// `raw_account` for a `Post`, which most account requests are. Boxed (`raw_post`).
+    #[inline(never)]
+    fn account_post<'a>(&'a self, query: &'a Post<'_>) -> Boxed<'a, String> {
+        Box::pin(self.raw_account(query))
     }
 
     /// A resumed session (`resume`), refreshed or not.
@@ -771,7 +794,7 @@ impl YtMusic {
     /// one after another, at most `MAX_PAGES`. A signed-out first page is
     /// `AuthExpired` and nothing more is fetched.
     async fn grid_pages(&self, base: Post<'_>) -> Result<Vec<String>, ApiError> {
-        let first = self.raw_account(&base).await?;
+        let first = self.account_post(&base).await?;
         if convert::logged_in(&first) == Some(false) {
             return Err(ApiError::AuthExpired);
         }
@@ -780,7 +803,7 @@ impl YtMusic {
         while let Some(t) = token.take()
             && pages.len() < MAX_PAGES
         {
-            let page = self.raw_account(&base.next(t)).await?;
+            let page = self.account_post(&base.next(t)).await?;
             token = convert::grid_continuation(&page);
             pages.push(page);
         }
@@ -821,7 +844,7 @@ impl YtMusic {
     /// ended the list there. A signed-out first page is `AuthExpired` and nothing more is
     /// fetched.
     async fn shelf_pages(&self, base: Post<'_>) -> Result<Vec<String>, ApiError> {
-        let first = self.raw_account(&base).await?;
+        let first = self.account_post(&base).await?;
         if convert::logged_in(&first) == Some(false) {
             return Err(ApiError::AuthExpired);
         }
@@ -830,7 +853,7 @@ impl YtMusic {
         while let Some(t) = token.take()
             && pages.len() < MAX_PAGES
         {
-            let page = self.raw_account(&base.next(t)).await?;
+            let page = self.account_post(&base.next(t)).await?;
             token = convert::shelf_continuation(&page);
             pages.push(page);
         }
