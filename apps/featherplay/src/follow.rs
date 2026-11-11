@@ -125,6 +125,9 @@ struct State {
     colours: Colours,
     /// Which theme's colours are shown, once some are.
     shown_dark: Option<bool>,
+    /// The colours `follow-*` show or fade to (never `Pending`): while a new cover's are
+    /// worked out, a theme switch shows these for the new theme.
+    on_screen: Colours,
     /// A cover's colours have been shown since launch. The first ones appear at once, so
     /// the window doesn't open on red and then fade.
     cover_shown: bool,
@@ -155,6 +158,7 @@ pub fn set_accent(ctx: &Rc<Ctx>, accent: Accent, custom_colour: AccentColour) {
             let mut s = s.borrow_mut();
             s.fade = None;
             s.shown_dark = None;
+            s.on_screen = Colours::Plain;
         });
         if on {
             // Start from what the window shows, the plain colours, so the first fade is smooth.
@@ -195,8 +199,18 @@ pub fn theme_changed(ctx: &Rc<Ctx>) {
                 });
         });
     }
-    STATE.with(|s| s.borrow_mut().shown_dark = None);
-    refresh(ctx);
+    // While a new cover's colours are worked out, the ones on screen, for the new theme
+    // (each cover keeps both themes' palettes); the new cover's crossfade in once known, as
+    // for any new song.
+    let waiting = STATE.with(|s| {
+        let mut s = s.borrow_mut();
+        s.shown_dark = None;
+        (s.enabled && matches!(s.colours, Colours::Pending)).then_some(s.on_screen)
+    });
+    match (waiting, ctx.window()) {
+        (Some(shown), Some(ui)) => show(ctx, shown, ui.global::<Theme>().get_dark()),
+        _ => refresh(ctx),
+    }
     crate::mini::theme_changed(ctx);
 }
 
@@ -294,6 +308,8 @@ fn extract(ctx: &Rc<Ctx>, url: String, generation: u64) {
                     if current {
                         let (dark, light) = palettes;
                         s.colours = Colours::Cover(dark, light);
+                        // A theme switch meanwhile showed the last cover's colours.
+                        s.shown_dark = None;
                     }
                     current
                 });
@@ -309,7 +325,11 @@ fn extract(ctx: &Rc<Ctx>, url: String, generation: u64) {
 /// The current song's cover gave no colour (it failed to load, or its colour couldn't be
 /// worked out): the neutral colours, as for a song with no art.
 fn no_colour(ctx: &Rc<Ctx>) {
-    STATE.with(|s| s.borrow_mut().colours = Colours::neutral());
+    STATE.with(|s| {
+        let mut s = s.borrow_mut();
+        s.colours = Colours::neutral();
+        s.shown_dark = None;
+    });
     cover_colour(ctx, None);
     refresh(ctx);
 }
@@ -342,6 +362,9 @@ fn show(ctx: &Rc<Ctx>, colours: Colours, dark: bool) {
     let first = STATE.with(|s| {
         let mut s = s.borrow_mut();
         s.shown_dark = Some(dark);
+        if !matches!(colours, Colours::Pending) {
+            s.on_screen = colours;
+        }
         let cover = matches!(colours, Colours::Cover(..));
         let first = cover && !s.cover_shown;
         s.cover_shown |= cover;
