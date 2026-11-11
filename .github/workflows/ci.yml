@@ -102,6 +102,41 @@ jobs:
           cargo nextest run --workspace --profile "$profile"
           cargo test --workspace --doc
 
+  # The workspace builds for Linux: cargo check and clippy for x86_64-unknown-linux-gnu
+  # (scripts/linux-check.sh). Until phase 5 the Linux side of crates/platform is stubs, so this
+  # only keeps code outside it from naming Windows again; nothing runs.
+  linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The headers the native crates build against: fontconfig and freetype (fonts),
+      # xkbcommon, Wayland and X11 (winit), ALSA (cpal), D-Bus, OpenSSL (native-tls), and clang
+      # for the bindings. skia-bindings downloads its prebuilt library.
+      - name: System packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            pkg-config clang libfontconfig1-dev libfreetype-dev libxkbcommon-dev \
+            libxkbcommon-x11-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev \
+            libxi-dev libasound2-dev libdbus-1-dev libssl-dev
+
+      # Installs the toolchain and components named in rust-toolchain.toml.
+      - name: Rust toolchain
+        shell: bash
+        run: |
+          rustup toolchain install
+          rustup show active-toolchain
+          cargo --version
+
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+
+      - name: Check and clippy for Linux
+        run: scripts/linux-check.sh
+
   # The ARM64 build, natively on windows-11-arm: weekly and when run by hand, so an ARM64
   # break shows before a release (release.yml tests ARM64 too). Not on every push, where it
   # would be a second full build. The `ci` profile: the frame-cost and CPU-time ceilings were
