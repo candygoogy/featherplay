@@ -378,9 +378,9 @@ crates/platform/src/
 
 The rules:
 
-- It exposes plain functions and types. Window functions take the window as a plain
-  `isize`, an HWND on Windows (decision 2). The Slint side, finding the handle and calling
-  back into the UI, stays in the app's `shell.rs`.
+- It exposes plain functions and types. Window functions take the window as a
+  `platform::window::Handle`, an HWND on Windows (decision 2). The Slint side, finding the
+  handle and calling back into the UI, stays in the app's `shell.rs`.
 - A trait only where a test needs a fake. Two such seams exist already and stay where they
   are: `NativeWindow` in `apps/featherplay/src/app.rs` (the offscreen tests set a stand-in)
   and `System` in `crates/proxy/src/lookups.rs` (the proxy tests).
@@ -403,7 +403,7 @@ The rules:
 |---|---|---|---|
 | `apps/featherplay/src/native.rs` | Title bar colour, opaque surface, repaint on invalidate, window icon, theme change, minimise and is-minimised, display change, live resize, bring forward, press activation, foreground window, global press hook, client origin, frame insets, taskbar button created, work area, popup border, animation setting, clipboard | `platform::window`, `platform::clipboard` | `chrome.rs`: the theme's `slint::Color`s become the plain `Rgb`, and the icon bytes from the app's build script are passed in. `frame_log.rs`: `FEATHERPLAY_FRAME_LOG`, which the paint watch calls around each paint. |
 | `apps/featherplay/src/app.rs` | `Win32` impl of `NativeWindow`; `run_window` wires the window hooks | Calls `platform::window` | The trait, and the wiring (it's Slint glue) |
-| `apps/featherplay/src/shell.rs` | Finds the HWND through `raw-window-handle`; attaches SMTC, thumb buttons, tray and hotkeys | | All of it, as the Slint side. It hands the platform crate a plain handle. |
+| `apps/featherplay/src/shell.rs` | Finds the HWND through `raw-window-handle`; attaches SMTC, thumb buttons, tray and hotkeys | | All of it, as the Slint side. It hands the platform crate a `window::Handle`. |
 | `apps/featherplay/src/popup.rs`, `apps/featherplay/src/mini.rs` | Mini player window attributes (`winit::platform::windows`), placement by the tray, closing on a press elsewhere | Placement and press watching: `platform::window` | The winit attributes hook, under `cfg(windows)`. It names winit types, not Win32 ones. |
 | `apps/featherplay/src/instance.rs` | One instance per home: named mutex, finding the running copy's window | `platform::instance` | The key for this run's `FEATHERPLAY_HOME`, the log lines and the start sequence |
 | `apps/featherplay/src/endsession.rs` | Hidden window for the end of the session and second launches | `platform::session_end` | |
@@ -555,10 +555,15 @@ These were open questions in the first draft. Each has a default now; say so if 
 
 1. **Translations in the platform crate.** It depends on `featherplay-core` and uses `tr!`.
    Core is pure logic with serde only, so this keeps the plumbing small.
-2. **The window handle type.** A plain `isize`: the HWND's value on Windows. The app's
-   `shell::hwnd` reads it out of Slint's `raw-window-handle` and passes the number, so the
-   platform crate doesn't depend on `raw-window-handle`. The Linux stubs take the same
-   `isize`; phase 5 settles what an X11 or Wayland window passes.
+2. **The window handle type.** `platform::window::Handle`, a small `Copy` type each OS
+   module defines: on Windows it holds the HWND, on Linux the X11 window id or the Wayland
+   surface. It's built in one place, `Handle::from_raw` from Slint's `raw-window-handle`,
+   which the app's `shell::handle` (and `shell::when_handle`, for windows made later) calls;
+   a raw handle of another kind gives none. Outside the platform crate it's opaque but for
+   `Debug`, which prints the HWND in hex as the log has always shown it. Every window
+   function, the media controls, the thumb buttons, the sign-in page's frame and the window
+   in front (`window::Foreground`) take or give it; the Windows module unwraps it to an
+   `HWND` inside.
 3. **The perf harness's Win32 calls** (and the hand-declared kernel32 calls in
    `apps/featherplay/tests/app/`) move to the platform crate, behind a `perf` feature where
    only the harness needs them. No named exceptions to "nothing outside platform names Win32".
