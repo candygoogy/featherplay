@@ -50,13 +50,10 @@ image = { workspace = true, features = ["jpeg", "png", "webp"] }
 raw-window-handle = { workspace = true }
 # Covers are fetched over the system TLS, like the other crates.
 reqwest = { workspace = true, features = ["native-tls"] }
-# The signature on a release's SHA256SUMS.txt, checked before an update is downloaded
-# (`updates::install::verify_sums`).
-minisign-verify = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha1 = { workspace = true }
-# Names the files of the cover cache; checks a downloaded update's setup.
+# Names the files of the cover cache.
 sha2 = { workspace = true }
 # The user's Windows display languages, for the "Windows default" language.
 sys-locale = { workspace = true }
@@ -65,9 +62,8 @@ sys-locale = { workspace = true }
 # `unstable-winit-030` reaches winit's window: the wheel filter, and the tray's mini player
 # (a borderless popup with no taskbar button, closed when it loses the activation).
 slint = { workspace = true, features = ["std", "compat-1-2", "backend-winit", "renderer-skia", "raw-window-handle-06", "unstable-winit-030"] }
-# `signal` for Ctrl+C, so the session is saved on exit. `fs` and `io-util` write a
-# downloaded update (`updates::install`); the streams crate has them on already.
-tokio = { workspace = true, features = ["rt-multi-thread", "macros", "signal", "sync", "time", "fs", "io-util"] }
+# `signal` for Ctrl+C, so the session is saved on exit.
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "signal", "sync", "time"] }
 
 [dev-dependencies]
 # This thread's cycles, the process's priority, its private bytes, heaps and allocations,

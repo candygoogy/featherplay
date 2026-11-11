@@ -2,7 +2,7 @@
 # Checks that a release's SHA256SUMS.txt carries a valid minisign signature
 # (SHA256SUMS.txt.minisig) by one of the keys built into featherplay, made for that version
 # (trusted comment `featherplay vX.Y.Z`). That's what installed copies check before they
-# download an update (apps/featherplay/src/updates/install.rs, `verify_sums`): a release
+# download an update (crates/controller/src/updates/install.rs, `verify_sums`): a release
 # published without it updates nobody. RELEASING.md runs it before publishing.
 #
 # Usage: packaging/check-signature.sh X.Y.Z [folder]

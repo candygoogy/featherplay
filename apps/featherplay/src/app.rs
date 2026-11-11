@@ -151,6 +151,7 @@ impl Ctx {
             revisit: Cell::new(false),
         });
         CTX.with(|c| *c.borrow_mut() = Some(ctx.clone()));
+        updates::connect();
         ctx
     }
 

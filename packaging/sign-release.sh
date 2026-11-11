@@ -2,7 +2,7 @@
 # Signs a draft release's SHA256SUMS.txt with the update key, on the maintainer's PC
 # (RELEASING.md, step 4). Installed copies download an update only if SHA256SUMS.txt
 # carries a valid signature by one of the keys built into featherplay, made for that
-# version (apps/featherplay/src/updates/install.rs, `verify_sums`).
+# version (crates/controller/src/updates/install.rs, `verify_sums`).
 #
 # Usage: packaging/sign-release.sh [--dry-run] X.Y.Z <folder>
 #   1. checks that vX.Y.Z is still a draft, and downloads its files into <folder> (new, or

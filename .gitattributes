@@ -2,4 +2,4 @@
 *.sh text eol=lf
 # The signed update fixtures are checked byte for byte: a CRLF checkout would break their
 # signatures.
-apps/featherplay/tests/fixtures/signing/** -text
+crates/controller/tests/fixtures/signing/** -text

@@ -1344,7 +1344,6 @@ dependencies = [
  "i-slint-core",
  "i-slint-renderer-skia",
  "image",
- "minisign-verify",
  "raw-window-handle",
  "reqwest",
  "resvg",
@@ -1388,7 +1387,11 @@ dependencies = [
  "featherplay-streams",
  "featherplay-ytm",
  "log",
+ "minisign-verify",
  "reqwest",
+ "serde",
+ "serde_json",
+ "sha2",
  "tokio",
 ]
 

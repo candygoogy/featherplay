@@ -142,7 +142,7 @@ Name: "{userdesktop}\{#AppName}"; Filename: "{app}\featherplay.exe"; WorkingDir:
 [Run]
 Filename: "{app}\featherplay.exe"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: nowait postinstall skipifsilent
 ; An update featherplay downloaded and started itself, silently, with /RELAUNCH
-; (apps/featherplay/src/updates/install.rs: SETUP_ARGS): the new version starts once its
+; (crates/controller/src/updates/install.rs: SETUP_ARGS): the new version starts once its
 ; files are in place. A plain silent install (/VERYSILENT alone) still starts nothing.
 Filename: "{app}\featherplay.exe"; Flags: nowait; Check: Relaunch
 
@@ -391,7 +391,7 @@ begin
 end;
 
 // featherplay started this setup to update itself: silent, with /RELAUNCH on the command
-// line (apps/featherplay/src/updates/install.rs: SETUP_ARGS).
+// line (crates/controller/src/updates/install.rs: SETUP_ARGS).
 function Relaunch(): Boolean;
 var
   I: Integer;

@@ -21,12 +21,24 @@ featherplay-store = { path = "../store" }
 featherplay-streams = { path = "../streams" }
 # The search suggestions' answers (`suggest`).
 featherplay-ytm = { path = "../ytm" }
-# A link pasted into the search field is read as a URL (`link`). Over the system TLS, like
-# the other crates.
+# A link pasted into the search field is read as a URL (`link`); the update check asks
+# GitHub (`updates`). Over the system TLS, like the other crates.
 reqwest = { workspace = true, features = ["native-tls"] }
+# The signature on a release's SHA256SUMS.txt, checked before an update is downloaded
+# (`updates::install::verify_sums`).
+minisign-verify = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+# Checks a downloaded update's setup.
+sha2 = { workspace = true }
 # The crates' log records reach the log file through it (`diagnostics`).
 log = { workspace = true, features = ["std"] }
-tokio = { workspace = true, features = ["rt"] }
+# `fs` and `io-util` write a downloaded update (`updates::install`); `time` paces a run that
+# waits for another.
+tokio = { workspace = true, features = ["rt", "time", "fs", "io-util"] }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt"] }
 
 [lints]
 workspace = true

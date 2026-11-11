@@ -39,10 +39,11 @@ pub const SUMS_SIG: &str = "SHA256SUMS.txt.minisig";
 /// The comment is signed too, so an old release's files can't pass for a newer one's.
 const SIGNED_FOR: &str = "featherplay v";
 /// The public keys that sign releases: the main one, and the backup kept apart in case the
-/// main one is lost. Either one's signature is enough.
+/// main one is lost. Either one's signature is enough. They stay in the app's folder
+/// (`apps/featherplay/keys/`), where the signing scripts and RELEASING.md look for them.
 const RELEASE_KEYS: [&str; 2] = [
-    include_str!("../../keys/update.pub"),
-    include_str!("../../keys/update-backup.pub"),
+    include_str!("../../../../apps/featherplay/keys/update.pub"),
+    include_str!("../../../../apps/featherplay/keys/update-backup.pub"),
 ];
 /// How the setup is started: no wizard, no message boxes, no reboot, and `/RELAUNCH`, which
 /// the setup script reads to close featherplay first and start it again afterwards.

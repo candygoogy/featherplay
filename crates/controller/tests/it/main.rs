@@ -2,3 +2,4 @@
 //! Run them with `cargo nextest run` (one process per test); see `.config/nextest.toml`.
 
 mod diagnostics;
+mod updates;

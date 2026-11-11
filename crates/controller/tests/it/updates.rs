@@ -9,10 +9,10 @@
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use featherplay::updates::install::{
+use featherplay_controller::updates::install::{
     self, Keys, Ready, SignatureError, is_installed, is_scoop, parse_sums, setup_name, verify_sums,
 };
-use featherplay::updates::{
+use featherplay_controller::updates::{
     Asset, CheckError, Release, Stamp, classify, is_newer, may_request, parse_issue, parse_release,
 };
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};

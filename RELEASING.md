@@ -223,7 +223,7 @@ The app's notice is a step you take by hand:
 1. When the canary opens, or users report songs that won't play, play a few songs on a
    home connection. After a failure the app brings yt-dlp up to date by itself first.
 2. If playback is broken for everyone, open an issue titled exactly `Playback broken`
-   (`ISSUE_TITLE` in `apps/featherplay/src/updates.rs`). Say what fails and that a fix is
+   (`ISSUE_TITLE` in `crates/controller/src/updates.rs`). Say what fails and that a fix is
    on the way. When a user's songs keep failing after the yt-dlp update, and no newer
    featherplay is out, the "may need an update" toast links to that issue under
    "Details". Only an open issue with exactly that title, opened by the owner, a member

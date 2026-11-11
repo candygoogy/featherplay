@@ -54,7 +54,7 @@ it.
   newer than the one running. The private keys never reach GitHub: the maintainer signs
   each release by hand on their own PC. A missing, invalid or mismatched signature means no
   download, and About says the update couldn't be verified; there's no fallback to an
-  unsigned file (`apps/featherplay/src/updates/install.rs`). A way to make featherplay
+  unsigned file (`crates/controller/src/updates/install.rs`). A way to make featherplay
   install a file that's unsigned, signed for another release, or doesn't match its
   checksum, or an older version, is in scope. Versions up to 0.1.2 check only the SHA256.
 - The installer and uninstaller (`packaging/windows/`), including what the uninstaller

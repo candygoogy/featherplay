@@ -123,7 +123,6 @@ mod tray_click;
 mod tray_hide;
 mod ui_bridge;
 mod update_notice;
-mod updates;
 mod upnext_cover;
 mod upnext_hover;
 mod upnext_slide;
