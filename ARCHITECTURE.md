@@ -392,11 +392,11 @@ The rules:
 
 | Today | What it does there | Goes to | Stays behind |
 |---|---|---|---|
-| `apps/featherplay/src/native.rs` | Title bar colour, opaque surface, repaint on invalidate, window icon, theme change, minimise and is-minimised, display change, live resize, bring forward, press activation, foreground window, global press hook, client origin, frame insets, taskbar button created, work area, popup border, animation setting, clipboard | `platform::window`, `platform::clipboard` | Nothing. `slint::Color` arguments become a plain RGB type. The icon bytes come from the app's build script and are passed in. |
+| `apps/featherplay/src/native.rs` | Title bar colour, opaque surface, repaint on invalidate, window icon, theme change, minimise and is-minimised, display change, live resize, bring forward, press activation, foreground window, global press hook, client origin, frame insets, taskbar button created, work area, popup border, animation setting, clipboard | `platform::window`, `platform::clipboard` | `chrome.rs`: the theme's `slint::Color`s become the plain `Rgb`, and the icon bytes from the app's build script are passed in. `frame_log.rs`: `FEATHERPLAY_FRAME_LOG`, which the paint watch calls around each paint. |
 | `apps/featherplay/src/app.rs` | `Win32` impl of `NativeWindow`; `run_window` wires the window hooks | Calls `platform::window` | The trait, and the wiring (it's Slint glue) |
 | `apps/featherplay/src/shell.rs` | Finds the HWND through `raw-window-handle`; attaches SMTC, thumb buttons, tray and hotkeys | | All of it, as the Slint side. It hands the platform crate a plain handle. |
 | `apps/featherplay/src/popup.rs`, `apps/featherplay/src/mini.rs` | Mini player window attributes (`winit::platform::windows`), placement by the tray, closing on a press elsewhere | Placement and press watching: `platform::window` | The winit attributes hook, under `cfg(windows)`. It names winit types, not Win32 ones. |
-| `apps/featherplay/src/instance.rs` | One instance per home: named mutex, finding the running copy's window | `platform::instance` | |
+| `apps/featherplay/src/instance.rs` | One instance per home: named mutex, finding the running copy's window | `platform::instance` | The key for this run's `FEATHERPLAY_HOME`, the log lines and the start sequence |
 | `apps/featherplay/src/endsession.rs` | Hidden window for the end of the session and second launches | `platform::session_end` | |
 | `apps/featherplay/src/identity.rs`, `crates/integrations/src/identity.rs` | AUMID, Start menu shortcut, registry entry, `--unregister` | `platform::identity` | The app's startup call |
 | `apps/featherplay/src/memory.rs` | Private bytes, heap compaction | `platform::memory` | Releasing the renderer's buffers (Slint) |
