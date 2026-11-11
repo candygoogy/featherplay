@@ -131,6 +131,10 @@ msgstr ""
 msgid "Quit"
 msgstr ""
 
+#: ../../crates/platform/src/windows/webview.rs:460
+msgid "WebView2 isn't available ({}). Paste a cookie header instead."
+msgstr ""
+
 #: src/account_menu.rs:117
 msgid "Switched to {}"
 msgstr ""
@@ -789,10 +793,6 @@ msgstr ""
 msgid ""
 "That cookie header has no SAPISID, so it isn't signed in. Copy it from a tab "
 "that is signed in."
-msgstr ""
-
-#: src/pages/sign_in/webview.rs:417
-msgid "WebView2 isn't available ({}). Paste a cookie header instead."
 msgstr ""
 
 #: src/playlist_menu.rs:72

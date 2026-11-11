@@ -131,6 +131,10 @@ msgstr "[Show featherplay]"
 msgid "Quit"
 msgstr "[Quit]"
 
+#: ../../crates/platform/src/windows/webview.rs:460
+msgid "WebView2 isn't available ({}). Paste a cookie header instead."
+msgstr "[WebView2 isn't available ({}). Paste a cookie header instead.]"
+
 #: src/account_menu.rs:117
 msgid "Switched to {}"
 msgstr "[Switched to {}]"
@@ -790,10 +794,6 @@ msgid ""
 "That cookie header has no SAPISID, so it isn't signed in. Copy it from a tab "
 "that is signed in."
 msgstr "[That cookie header has no SAPISID, so it isn't signed in. Copy it from a tab that is signed in.]"
-
-#: src/pages/sign_in/webview.rs:417
-msgid "WebView2 isn't available ({}). Paste a cookie header instead."
-msgstr "[WebView2 isn't available ({}). Paste a cookie header instead.]"
 
 #: src/playlist_menu.rs:72
 msgid "{} Sign in again, then try once more."
