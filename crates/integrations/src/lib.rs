@@ -17,6 +17,8 @@
 
 use std::time::Duration;
 
+use featherplay_platform::taskbar::ThumbButton;
+
 pub mod discord;
 mod hotkeys;
 mod icons;
@@ -25,7 +27,6 @@ pub mod local_api;
 mod notify;
 mod smtc;
 pub mod sponsorblock;
-mod taskbar;
 mod tray;
 mod tray_menu;
 
@@ -33,7 +34,6 @@ pub use discord::Discord;
 pub use hotkeys::{Hotkeys, parse_hotkey};
 pub use notify::{notify, notify_track};
 pub use smtc::Smtc;
-pub use taskbar::{TaskbarButtons, light_taskbar};
 pub use tray::{TOOLTIP_LINE_UTF16, TOOLTIP_MAX_UTF16, Tray, tooltip_text};
 pub use tray_menu::{MenuState, TrayChoice};
 
@@ -62,6 +62,16 @@ pub enum UiCommand {
     ToggleShuffle,
     /// Press the repeat button this many times: Off, All, One, then Off again.
     CycleRepeat(u8),
+}
+
+impl From<ThumbButton> for UiCommand {
+    fn from(button: ThumbButton) -> Self {
+        match button {
+            ThumbButton::Previous => UiCommand::Previous,
+            ThumbButton::PlayPause => UiCommand::PlayPause,
+            ThumbButton::Next => UiCommand::Next,
+        }
+    }
 }
 
 /// What the tray icon reports to the UI thread itself (the window procedure calls the

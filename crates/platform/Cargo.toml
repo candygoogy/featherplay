@@ -22,6 +22,8 @@ featherplay-core = { path = "../core" }
 raw-window-handle = { workspace = true }
 # `credentials`: the store API the OS's credential store sits behind.
 keyring-core = { workspace = true }
+# Warnings from the OS calls, which reach the app's log file.
+log = { workspace = true }
 
 # The OS crates the Windows code moving in from the other crates uses, with the union of the
 # `windows` features those crates turn on today, so moving an area doesn't edit this list.

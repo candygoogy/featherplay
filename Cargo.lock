@@ -1457,6 +1457,7 @@ version = "0.2.2"
 dependencies = [
  "featherplay-core",
  "keyring-core",
+ "log",
  "raw-window-handle",
  "souvlaki",
  "tauri-winrt-notification",

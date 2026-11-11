@@ -9,9 +9,10 @@ use std::rc::Rc;
 use std::time::{Duration, Instant};
 
 use featherplay_integrations::{
-    Hotkeys, MenuState, NowPlaying, Sender, Smtc, TaskbarButtons, Tray, TrayChoice, TrayEvent,
-    UiCommand, tooltip_text,
+    Hotkeys, MenuState, NowPlaying, Sender, Smtc, Tray, TrayChoice, TrayEvent, UiCommand,
+    tooltip_text,
 };
+use featherplay_platform::taskbar::TaskbarButtons;
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use slint::{ComponentHandle, Timer, TimerMode};
 
@@ -258,7 +259,10 @@ fn attach(hwnd: isize, tx: Sender<UiCommand>) {
         }
     };
     let t = Instant::now();
-    let taskbar = match TaskbarButtons::attach(hwnd, tx) {
+    let on_click = move |button| {
+        let _ = tx.send(UiCommand::from(button));
+    };
+    let taskbar = match TaskbarButtons::attach(hwnd, on_click) {
         Ok(b) => {
             log!("taskbar subclassed ({})", ms(t));
             Some(b)

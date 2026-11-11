@@ -6,7 +6,11 @@
 //!
 //! A feature an OS lacks says so: [`supports`] returns false for it, and its functions
 //! return [`Unsupported`] rather than doing nothing.
+//!
+//! What an area's versions share (its plain types and events, logic with no OS calls) is in
+//! `common`, which each OS's area file re-exports.
 
+mod common;
 mod feature;
 
 pub use crate::feature::{Feature, Unsupported, supports};

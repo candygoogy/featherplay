@@ -17,8 +17,8 @@ use windows::Win32::UI::WindowsAndMessaging::{
 };
 use windows::core::{PCSTR, w};
 
-use crate::taskbar::light_taskbar;
 use crate::tray::{ellipsize, utf16_len};
+use featherplay_platform::taskbar::light_taskbar;
 
 /// The menu and the entries whose labels follow the player.
 pub struct TrayMenu {

@@ -28,9 +28,9 @@ use windows::Win32::UI::WindowsAndMessaging::{
     SM_CXSMICON, WM_MOUSEMOVE, WM_NCDESTROY, WM_RBUTTONUP,
 };
 
-use crate::taskbar::light_taskbar;
 use crate::tray_menu::{MenuState, TrayChoice, TrayMenu, in_taskbar_mode};
 use crate::{NowPlaying, Sender, TrayEvent, UiCommand, icons};
+use featherplay_platform::taskbar::light_taskbar;
 
 /// Windows keeps 128 UTF-16 units of tooltip, including the terminator.
 pub const TOOLTIP_MAX_UTF16: usize = 127;

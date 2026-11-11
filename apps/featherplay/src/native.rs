@@ -340,7 +340,7 @@ fn colorref(c: Color) -> COLORREF {
 /// Sets the title bar (small) and taskbar (big) icons, sized for `scale`, in the drawing for
 /// the taskbar's theme. Call it again when that theme changes (`when_colours_change`).
 pub fn set_icon(h: isize, scale: f32) -> Result<(), String> {
-    let ico = icon_for(featherplay_integrations::light_taskbar());
+    let ico = icon_for(featherplay_platform::taskbar::light_taskbar());
     for (which, base) in [(ICON_SMALL, 16.0), (ICON_BIG, 32.0)] {
         let px = (base * scale).round() as i32;
         let png = entry(ico, px as u32).ok_or("no icon entry")?;

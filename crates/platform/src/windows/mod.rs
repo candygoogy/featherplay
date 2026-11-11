@@ -7,6 +7,8 @@ pub mod credentials;
 pub mod files;
 pub mod fonts;
 pub mod heap;
+// The thumb button glyphs and the tray icon's drawings, for `taskbar` and `tray`.
+mod icons;
 pub mod identity;
 pub mod installer;
 pub mod instance;
