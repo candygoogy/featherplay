@@ -2,24 +2,22 @@
 //! own with back, reload, the read-only address and the status strip, round the room where
 //! the sign-in thread's WebView2 page sits as a child window (`webview`). The frame shows
 //! what the page thread tells it (`webview::Event`) and passes back, reload, close, resizes
-//! and moves on to it (`webview::Remote`). Once the page thread has ended, the frame goes.
+//! and moves on to it (`webview::Remote`; `featherplay_platform::webview::follow` passes the
+//! resizes and moves). Once the page thread has ended, the frame goes. The page is Windows
+//! only (`Feature::WebViewSignIn`): elsewhere the window says it didn't open.
 
 use std::cell::RefCell;
-use std::ffi::c_void;
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::time::Duration;
 
 use featherplay_platform::window::{self, ScreenRect};
 use slint::{CloseRequestResponse, ComponentHandle, LogicalSize, PhysicalPosition, Timer};
-use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
-use windows::Win32::UI::Shell::{DefSubclassProc, RemoveWindowSubclass, SetWindowSubclass};
-use windows::Win32::UI::WindowsAndMessaging::{
-    WA_ACTIVE, WM_ACTIVATE, WM_MOVE, WM_NCDESTROY, WM_SIZE,
-};
 
 use super::address::Address;
-use super::webview::{self, Event, Outcome, Remote, Room};
+use super::webview::Outcome;
+#[cfg(windows)]
+use super::webview::{self, Event, Room};
 use crate::app::Ctx;
 use crate::chrome;
 use crate::popup;
@@ -107,6 +105,7 @@ pub fn open(
 }
 
 /// Once the frame's window exists: its colours, then Google's page in it.
+#[cfg(windows)]
 fn embed(
     ui: &SignInWindow,
     hwnd: isize,
@@ -135,10 +134,23 @@ fn embed(
         });
         CloseRequestResponse::HideWindow
     });
-    if let Err(e) = follow(hwnd, remote) {
+    if let Err(e) = featherplay_platform::webview::follow(hwnd, remote) {
         log!("sign-in window: can't follow its size: {e}");
     }
     Ok(())
+}
+
+/// The page is Windows only: here the window didn't open.
+#[cfg(not(windows))]
+fn embed(
+    _ui: &SignInWindow,
+    _hwnd: isize,
+    _profile: PathBuf,
+    _start: &'static str,
+    _done: impl FnOnce(Outcome) + Send + 'static,
+) -> Result<(), String> {
+    use featherplay_platform::{Feature, Unsupported};
+    Err(Unsupported(Feature::WebViewSignIn).to_string())
 }
 
 /// The frame's least height, logical pixels (`min-height` in `ui/sign_in_window.slint`).
@@ -236,6 +248,7 @@ fn private_mb() -> f64 {
 }
 
 /// The title bar in the frame's colours, an opaque client area, the app's icon.
+#[cfg(windows)]
 fn dress(ui: &SignInWindow, hwnd: isize) {
     let theme = ui.global::<Theme>();
     if let Err(e) = window::opaque(hwnd) {
@@ -249,6 +262,7 @@ fn dress(ui: &SignInWindow, hwnd: isize) {
 }
 
 /// From the sign-in thread: shown on the UI thread.
+#[cfg(windows)]
 fn tell(event: Event) {
     let _ = slint::invoke_from_event_loop(move || {
         FRAME.with_borrow(|f| {
@@ -263,62 +277,6 @@ fn tell(event: Event) {
             }
         });
     });
-}
-
-/// The subclass that passes the frame's size and position on to the page.
-const FOLLOW_SUBCLASS: usize = 0xfea7_0020;
-
-/// Tells the page thread when the frame is resized (a drag, a maximize, another screen's
-/// scale), moved, or brought back from the keyboard.
-fn follow(h: isize, remote: Remote) -> Result<(), String> {
-    let data = Box::into_raw(Box::new(remote));
-    // SAFETY: a live HWND of this thread; `data` stays valid until WM_NCDESTROY frees it.
-    let ok = unsafe {
-        SetWindowSubclass(
-            HWND(h as *mut c_void),
-            Some(follow_proc),
-            FOLLOW_SUBCLASS,
-            data as usize,
-        )
-    };
-    if !ok.as_bool() {
-        // SAFETY: never shared, the subclass wasn't installed.
-        drop(unsafe { Box::from_raw(data) });
-        return Err("SetWindowSubclass failed".into());
-    }
-    Ok(())
-}
-
-unsafe extern "system" fn follow_proc(
-    hwnd: HWND,
-    msg: u32,
-    wparam: WPARAM,
-    lparam: LPARAM,
-    _id: usize,
-    data: usize,
-) -> LRESULT {
-    if msg == WM_NCDESTROY {
-        // SAFETY: the window is going; nothing calls this subclass with `data` again.
-        unsafe {
-            let _ = RemoveWindowSubclass(hwnd, Some(follow_proc), FOLLOW_SUBCLASS);
-            drop(Box::from_raw(data as *mut Remote));
-        }
-        // SAFETY: the arguments this subclass was called with.
-        return unsafe { DefSubclassProc(hwnd, msg, wparam, lparam) };
-    }
-    // SAFETY: the arguments this subclass was called with; winit lays the frame out first.
-    let result = unsafe { DefSubclassProc(hwnd, msg, wparam, lparam) };
-    // SAFETY: `data` is the box from `follow`, alive until WM_NCDESTROY.
-    let remote = unsafe { *(data as *const Remote) };
-    match msg {
-        WM_SIZE => remote.relayout(),
-        WM_MOVE => remote.moved(),
-        // Back from Alt+Tab (not a click, which goes where it lands): the page takes the
-        // keyboard again, as it did when the window opened.
-        WM_ACTIVATE if (wparam.0 & 0xffff) as u32 == WA_ACTIVE => remote.focus_page(),
-        _ => {}
-    }
-    result
 }
 
 #[cfg(test)]
