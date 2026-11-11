@@ -1,18 +1,18 @@
-//! "Use Microsoft Edge" (or Google Chrome, Brave or Vivaldi: `known`): Google's sign-in in
-//! a real browser window (its own address bar, padlock, passkeys and Windows Hello), for
-//! people who'd rather not type their password into a window of the app. The WebView2
+//! "Use Microsoft Edge" (or Google Chrome, Brave or Vivaldi: `featherplay_platform::browsers`):
+//! Google's sign-in in a real browser window (its own address bar, padlock, passkeys and
+//! Windows Hello), for people who'd rather not type their password into a window of the app. The WebView2
 //! window (`webview`) stays the default.
 //!
 //! Which browser: the page offers one of those found on this PC (`offers`) and starts the
 //! sign-in with it (`start`).
 //!
 //! How it goes, on its own thread:
-//! 1. Find the browser's exe (`known`: App Paths, then where its installer puts it).
+//! 1. Find the browser's exe (`browsers`: App Paths, then where its installer puts it).
 //! 2. Make a temporary profile, `{cache}/signin-{pid}-{random}` (`profile`). The user's own
 //!    browser profile is never touched, and no browser's cookie files are read.
 //! 3. Start the browser on it with `--remote-debugging-pipe`, on Google's sign-in page,
-//!    inside a kill-on-close job object (`launch`, which documents how the pipe reaches
-//!    Chromium). A pipe only: never `--remote-debugging-port`, so no other program can
+//!    inside a kill-on-close job object (`browsers::launch`, which documents how the pipe
+//!    reaches Chromium). A pipe only: never `--remote-debugging-port`, so no other program can
 //!    connect. No switch that marks the browser as automated.
 //! 4. About once a second, ask for the profile's cookies (`cdp`: the app can send only
 //!    `Storage.getCookies` and `Browser.close`).
@@ -35,8 +35,6 @@
 //! Cookie values are never logged, printed or written here.
 
 mod cdp;
-mod known;
-mod launch;
 mod profile;
 
 use std::ffi::OsString;
@@ -50,7 +48,8 @@ use std::time::{Duration, Instant};
 
 use super::session::{self, Cookie};
 use cdp::{Client, Method, Reply};
-pub use known::{Browser, EDGE, by_id};
+use featherplay_platform::browsers;
+pub use featherplay_platform::browsers::{Browser, EDGE, by_id};
 
 /// How a browser sign-in ended.
 #[derive(PartialEq)]
@@ -115,7 +114,7 @@ pub fn start(
     std::thread::Builder::new()
         .name("featherplay-browser-signin".into())
         .spawn(move || {
-            let run = AssertUnwindSafe(|| run_on(&known::ThisPc, browser, &cache, &flag));
+            let run = AssertUnwindSafe(|| run_on(&browsers::ThisPc, browser, &cache, &flag));
             let outcome = std::panic::catch_unwind(run)
                 .unwrap_or_else(|_| Outcome::Lost("the sign-in thread panicked".into()));
             done(outcome)
@@ -137,12 +136,12 @@ pub struct Offer {
 /// Windows' default browser, else the first; a blocked one only when every one is blocked.
 /// Read from the registry and the disk each time (only read, never written).
 pub fn offers(remembered: Option<&str>) -> (Vec<Offer>, Option<usize>) {
-    use known::Lookup;
-    let pc = known::ThisPc;
-    let found = known::found(&pc);
+    use browsers::Lookup;
+    let pc = browsers::ThisPc;
+    let found = browsers::found(&pc);
     // The default browser only matters between two or more.
     let default = (found.len() > 1).then(|| pc.https_handler()).flatten();
-    let pick = known::pick(&found, remembered, default.as_deref());
+    let pick = browsers::pick(&found, remembered, default.as_deref());
     let offers = found
         .iter()
         .map(|f| Offer {
@@ -203,21 +202,21 @@ trait Process {
     fn kill(&self);
 }
 
-impl Process for launch::Running {
+impl Process for browsers::Running {
     fn exited(&self) -> bool {
-        launch::Running::exited(self)
+        browsers::Running::exited(self)
     }
     fn wait(&self, limit: Duration) -> bool {
-        launch::Running::wait(self, limit)
+        browsers::Running::wait(self, limit)
     }
     fn kill(&self) {
-        launch::Running::kill(self)
+        browsers::Running::kill(self)
     }
 }
 
 /// One sign-in in `browser`, with what it reads of the PC given.
 fn run_on(
-    pc: &impl known::Lookup,
+    pc: &impl browsers::Lookup,
     browser: &Browser,
     cache: &Path,
     cancel: &AtomicBool,
@@ -273,7 +272,7 @@ fn display_name(p: &Path) -> String {
 
 fn launch_and_watch(browser: &Browser, exe: &Path, profile: &Path, cancel: &AtomicBool) -> Outcome {
     let args = args(browser, profile, session::SIGN_IN_URL);
-    let (process, pipes) = match launch::launch(exe, &args) {
+    let (process, pipes) = match browsers::launch(exe, &args) {
         Ok(started) => started,
         Err(e) => {
             log!("browser sign-in: {} didn't start: {e}", browser.name);
@@ -650,8 +649,8 @@ mod tests {
     /// Edge installed, with its pipe turned off by the machine's policy.
     struct PolicyOffPc;
 
-    impl known::Lookup for PolicyOffPc {
-        fn app_path(&self, _: known::Hive, _: &str) -> Option<String> {
+    impl browsers::Lookup for PolicyOffPc {
+        fn app_path(&self, _: browsers::Hive, _: &str) -> Option<String> {
             Some(r"C:\Edge\msedge.exe".into())
         }
         fn env(&self, _: &str) -> Option<OsString> {
@@ -660,8 +659,8 @@ mod tests {
         fn is_file(&self, _: &Path) -> bool {
             true
         }
-        fn dword(&self, hive: known::Hive, _: &str, value: &str) -> Option<u32> {
-            (hive == known::Hive::LocalMachine && value == "RemoteDebuggingAllowed").then_some(0)
+        fn dword(&self, hive: browsers::Hive, _: &str, value: &str) -> Option<u32> {
+            (hive == browsers::Hive::LocalMachine && value == "RemoteDebuggingAllowed").then_some(0)
         }
         fn https_handler(&self) -> Option<PathBuf> {
             None
@@ -1021,7 +1020,7 @@ mod tests {
             return vec![(&EDGE, PathBuf::from(exe))];
         }
         let mut usable = Vec::new();
-        for found in known::found(&known::ThisPc) {
+        for found in browsers::found(&browsers::ThisPc) {
             if found.blocked {
                 report(&format!(
                     "{}: skipped, its RemoteDebuggingAllowed policy is off",
@@ -1041,7 +1040,7 @@ mod tests {
     /// A browser started on the pipe for a live check, on about:blank, with a temporary
     /// profile under the test home. Dropping it ends the browser and deletes the profile.
     struct Live {
-        process: Option<launch::Running>,
+        process: Option<browsers::Running>,
         client: Client<std::fs::File>,
         replies: Receiver<Reply>,
         profile: PathBuf,
@@ -1057,7 +1056,7 @@ mod tests {
                 profile::seed(&profile, prefs).unwrap();
             }
             let (process, pipes) =
-                launch::launch(exe, &args(browser, &profile, "about:blank")).unwrap();
+                browsers::launch(exe, &args(browser, &profile, "about:blank")).unwrap();
             Self {
                 process: Some(process),
                 client: Client::new(pipes.to_browser),
@@ -1066,7 +1065,7 @@ mod tests {
             }
         }
 
-        fn process(&self) -> &launch::Running {
+        fn process(&self) -> &browsers::Running {
             self.process.as_ref().unwrap()
         }
 
@@ -1147,59 +1146,26 @@ mod tests {
     }
 
     fn exits_when_its_window_closes(browser: &Browser, exe: &Path) {
-        use windows::Win32::Foundation::{HWND, LPARAM, WPARAM};
-        use windows::Win32::UI::WindowsAndMessaging::{
-            EnumWindows, GetWindowThreadProcessId, IsWindowVisible, PostMessageW, WM_CLOSE,
-        };
-        use windows::core::BOOL;
-
-        struct Find {
-            pid: u32,
-            found: Vec<HWND>,
-        }
-        unsafe extern "system" fn each(hwnd: HWND, lparam: LPARAM) -> BOOL {
-            // SAFETY: `lparam` is the `Find` passed to EnumWindows below, alive for the call.
-            let find = unsafe { &mut *(lparam.0 as *mut Find) };
-            let mut pid = 0u32;
-            // SAFETY: a window handle Windows gave us and a live out pointer.
-            unsafe { GetWindowThreadProcessId(hwnd, Some(&mut pid)) };
-            // SAFETY: handle-only query.
-            if pid == find.pid && unsafe { IsWindowVisible(hwnd) }.as_bool() {
-                find.found.push(hwnd);
-            }
-            true.into()
-        }
-
         let name = browser.name;
         let mut live = Live::start(browser, exe);
         let answered = live.cookies().is_some();
         report(&format!("{name}: answers on the pipe: {answered}"));
-        let mut find = Find {
-            pid: live.process().pid,
-            found: Vec::new(),
-        };
+        let mut found = Vec::new();
         // Its window may take a moment.
         for _ in 0..50 {
-            find.found.clear();
-            // SAFETY: `each` matches WNDENUMPROC and `find` outlives the call.
-            unsafe {
-                let _ = EnumWindows(Some(each), LPARAM((&raw mut find) as isize));
-            }
-            if !find.found.is_empty() {
+            found = browsers::visible_windows(live.process().pid);
+            if !found.is_empty() {
                 break;
             }
             std::thread::sleep(Duration::from_millis(200));
         }
-        assert!(!find.found.is_empty(), "{name}: no visible window");
+        assert!(!found.is_empty(), "{name}: no visible window");
         report(&format!(
             "{name}: {} visible window(s); sending WM_CLOSE",
-            find.found.len()
+            found.len()
         ));
-        for hwnd in &find.found {
-            // SAFETY: only queues a message for a window of the browser we started.
-            unsafe {
-                let _ = PostMessageW(Some(*hwnd), WM_CLOSE, WPARAM(0), LPARAM(0));
-            }
+        for &window in &found {
+            browsers::close_window(window);
         }
         let exited = live.process().wait(Duration::from_secs(10));
         report(&format!("{name}: exited within 10 s of WM_CLOSE: {exited}"));

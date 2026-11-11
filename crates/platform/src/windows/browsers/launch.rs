@@ -35,9 +35,9 @@
 //!
 //! # The job object
 //! The browser starts suspended, joins a job object with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`
-//! and only then runs, so it and every helper process it starts are in the job. When the
-//! app lets go of the job (`Running` dropped), or the app crashes or is killed and Windows
-//! closes the handle, everything in the job ends.
+//! (`process::kill_on_close`) and only then runs, so it and every helper process it starts
+//! are in the job. When the app lets go of the job (`Running` dropped), or the app crashes
+//! or is killed and Windows closes the handle, everything in the job ends.
 
 use std::ffi::{OsStr, OsString};
 use std::fs::File;
@@ -50,11 +50,6 @@ use std::time::Duration;
 use windows::Win32::Foundation::{
     HANDLE, HANDLE_FLAG_INHERIT, HANDLE_FLAGS, SetHandleInformation, WAIT_OBJECT_0,
 };
-use windows::Win32::System::JobObjects::{
-    AssignProcessToJobObject, CreateJobObjectW, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
-    JOBOBJECT_EXTENDED_LIMIT_INFORMATION, JobObjectExtendedLimitInformation,
-    SetInformationJobObject, TerminateJobObject,
-};
 use windows::Win32::System::Pipes::CreatePipe;
 use windows::Win32::System::Threading::{
     CREATE_SUSPENDED, CreateProcessW, DeleteProcThreadAttributeList, EXTENDED_STARTUPINFO_PRESENT,
@@ -63,6 +58,8 @@ use windows::Win32::System::Threading::{
     STARTUPINFOEXW, TerminateProcess, UpdateProcThreadAttribute, WaitForSingleObject,
 };
 use windows::core::{HSTRING, PCWSTR, PWSTR};
+
+use crate::process::{Job, kill_on_close};
 
 /// The C runtime's descriptor flags (UCRT `lowio`): open, and a pipe.
 const FOPEN: u8 = 0x01;
@@ -152,7 +149,7 @@ fn quote(arg: &OsStr) -> Vec<u16> {
 /// The running browser. Dropping it closes the job, which ends whatever is still in it.
 pub struct Running {
     process: OwnedHandle,
-    job: OwnedHandle,
+    job: Job,
     pub pid: u32,
 }
 
@@ -171,10 +168,7 @@ impl Running {
 
     /// Ends the browser and every process in its job.
     pub fn kill(&self) {
-        // SAFETY: `job` is a live job handle we own.
-        unsafe {
-            let _ = TerminateJobObject(handle(&self.job), 1);
-        }
+        self.job.end();
     }
 }
 
@@ -203,7 +197,7 @@ pub fn launch(exe: &Path, args: &[OsString]) -> io::Result<(Running, Pipes)> {
     drop(browser_write);
     let (process, thread, pid) = started?;
 
-    let job = match kill_on_close_job(&process) {
+    let job = match kill_on_close(process.as_raw_handle()) {
         Ok(job) => job,
         Err(e) => {
             // SAFETY: our live, suspended child; it never ran.
@@ -216,10 +210,8 @@ pub fn launch(exe: &Path, args: &[OsString]) -> io::Result<(Running, Pipes)> {
     // SAFETY: the live, suspended main thread of our child.
     if unsafe { ResumeThread(handle(&thread)) } == u32::MAX {
         let e = io::Error::last_os_error();
-        // SAFETY: our live job handle; this ends the child that never ran.
-        unsafe {
-            let _ = TerminateJobObject(handle(&job), 1);
-        }
+        // This ends the child that never ran.
+        job.end();
         return Err(e);
     }
     Ok((
@@ -359,28 +351,6 @@ impl Drop for HandleList {
         // is still owned by `self`.
         unsafe { DeleteProcThreadAttributeList(self.list) };
     }
-}
-
-/// A job that ends everything in it when its last handle closes, with `process` in it.
-fn kill_on_close_job(process: &OwnedHandle) -> io::Result<OwnedHandle> {
-    // SAFETY: no security attributes (not inheritable) and no name.
-    let job = unsafe { CreateJobObjectW(None, PCWSTR::null()) }?;
-    // SAFETY: CreateJobObjectW succeeded; the handle is ours alone.
-    let job = unsafe { OwnedHandle::from_raw_handle(job.0) };
-    let mut info = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
-    info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
-    // SAFETY: `info` is the structure JobObjectExtendedLimitInformation expects, with its
-    // size; `job` and `process` are live handles we own.
-    unsafe {
-        SetInformationJobObject(
-            handle(&job),
-            JobObjectExtendedLimitInformation,
-            (&raw const info).cast(),
-            size_of_val(&info) as u32,
-        )?;
-        AssignProcessToJobObject(handle(&job), handle(process))?;
-    }
-    Ok(job)
 }
 
 #[cfg(test)]

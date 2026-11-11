@@ -126,7 +126,7 @@ mod tests {
     fn a_browsers_preferences_go_in_before_it_starts() {
         let cache = scratch("seed").join("cache");
         let p = create(&cache).unwrap();
-        let prefs = crate::pages::sign_in::browser::known::VIVALDI
+        let prefs = featherplay_platform::browsers::VIVALDI
             .preferences
             .expect("Vivaldi's exit confirmation is turned off");
         seed(&p, prefs).unwrap();

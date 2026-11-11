@@ -9,7 +9,7 @@ use windows::Win32::Foundation::HANDLE;
 use windows::Win32::System::JobObjects::{
     AssignProcessToJobObject, CreateJobObjectW, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
     JOBOBJECT_EXTENDED_LIMIT_INFORMATION, JobObjectExtendedLimitInformation,
-    SetInformationJobObject,
+    SetInformationJobObject, TerminateJobObject,
 };
 use windows::core::PCWSTR;
 
@@ -27,7 +27,17 @@ pub type ChildHandle = RawHandle;
 
 /// A job that ends the process in it when the job's last handle closes.
 pub struct Job {
-    _handle: OwnedHandle,
+    handle: OwnedHandle,
+}
+
+impl Job {
+    /// Ends every process in the job now, as closing it would.
+    pub(crate) fn end(&self) {
+        // SAFETY: `handle` is a live job handle we own.
+        unsafe {
+            let _ = TerminateJobObject(HANDLE(self.handle.as_raw_handle()), 1);
+        }
+    }
 }
 
 /// A job that ends `process` when its last handle closes: when it's dropped, or when this
@@ -50,7 +60,7 @@ pub fn kill_on_close(process: ChildHandle) -> io::Result<Job> {
         )?;
         AssignProcessToJobObject(HANDLE(job.as_raw_handle()), HANDLE(process))?;
     }
-    Ok(Job { _handle: job })
+    Ok(Job { handle: job })
 }
 
 #[cfg(test)]
