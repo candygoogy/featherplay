@@ -3,7 +3,6 @@
 
 use std::time::{Duration, Instant};
 
-use featherplay_core::failure::songs_refused;
 use featherplay_core::player::{Effect, Input, Status};
 use featherplay_integrations::notify_track;
 
@@ -104,7 +103,11 @@ impl Controller {
                 self.scrobblers.scrobble(&t, started);
             }
             Effect::ShowError(stop) => self.stopped(stop),
-            Effect::SongsRefused => (self.ui.events)(super::UiEvent::Toast(songs_refused())),
+            Effect::SongsRefused => {
+                let redirected = featherplay_proxy::dns::found().is_some_and(|d| d.redirected());
+                let event = super::notice::refused_toast(redirected, &mut self.network_told);
+                (self.ui.events)(event);
+            }
             Effect::ShowReauth => self.session_expired(),
             Effect::PersistSession => {
                 self.persist();

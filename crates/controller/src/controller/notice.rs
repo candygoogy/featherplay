@@ -10,7 +10,9 @@
 
 #[cfg(test)]
 use featherplay_core::failure::HelperFault;
-use featherplay_core::failure::{FailKind, Failure, Notice, notice};
+use featherplay_core::failure::{
+    FailKind, Failure, Notice, notice, songs_refused, songs_refused_by_network,
+};
 use featherplay_core::player::Stop;
 use featherplay_streams::ResolveError;
 #[cfg(test)]
@@ -42,6 +44,17 @@ pub(super) fn failure(e: &ResolveError) -> Failure {
     Failure {
         kind,
         detail: describe(e),
+    }
+}
+
+/// The toast for songs passed over as refused. `redirected`: the DNS sends YouTube's hosts
+/// away from Google (`featherplay_proxy::dns`), which the first such toast of the session
+/// says, as an error; `told` keeps that it did.
+pub(super) fn refused_toast(redirected: bool, told: &mut bool) -> UiEvent {
+    if redirected && !std::mem::replace(told, true) {
+        UiEvent::ToastError(songs_refused_by_network())
+    } else {
+        UiEvent::Toast(songs_refused())
     }
 }
 
@@ -133,6 +146,29 @@ mod tests {
         let gone = "[youtube] abc: Video unavailable. This video has been removed by the uploader";
         let f = failure(&ResolveError::Unavailable(gone.into()));
         assert_eq!(f.kind, FailKind::Unavailable);
+    }
+
+    #[test]
+    fn the_refused_songs_toast_names_a_dns_redirect_once() {
+        let text = |e: UiEvent| match e {
+            UiEvent::Toast(t) => ("plain", t),
+            UiEvent::ToastError(t) => ("error", t),
+            _ => unreachable!(),
+        };
+        let mut told = false;
+        assert_eq!(
+            text(refused_toast(false, &mut told)),
+            ("plain", songs_refused())
+        );
+        assert!(!told);
+        assert_eq!(
+            text(refused_toast(true, &mut told)),
+            ("error", songs_refused_by_network())
+        );
+        assert_eq!(
+            text(refused_toast(true, &mut told)),
+            ("plain", songs_refused())
+        );
     }
 
     #[test]

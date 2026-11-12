@@ -124,6 +124,13 @@ pub fn songs_refused() -> &'static str {
     crate::tr!("Some songs here can't play right now. featherplay skips them.")
 }
 
+/// `songs_refused` when the DNS sends YouTube's hosts away from Google
+/// (`featherplay_proxy::dns`), once a session: YouTube answers as if from another country,
+/// as when a DNS service or filter routes it through its own servers.
+pub fn songs_refused_by_network() -> &'static str {
+    crate::tr!("Some songs can't play: a DNS service routes YouTube abroad.")
+}
+
 /// The notice for a stop. `helpers_tried`: yt-dlp was already brought up to date after a
 /// failure this session, so another update of the helpers won't help.
 pub fn notice(cause: StopCause, helpers_tried: bool) -> Notice {

@@ -271,6 +271,7 @@ impl Controller {
             silences: None,
             silence_cache: None,
             shown_marks: None,
+            network_told: false,
         })
     }
 

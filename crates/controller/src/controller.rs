@@ -136,6 +136,8 @@ pub struct Controller {
     silence_cache: Option<featherplay_store::SilenceCache>,
     /// The seek bar's marks last sent.
     shown_marks: Option<Vec<Mark>>,
+    /// The refused songs' toast has said the network's DNS is why (`refused_toast`).
+    network_told: bool,
 }
 
 /// A future boxed in this crate.
