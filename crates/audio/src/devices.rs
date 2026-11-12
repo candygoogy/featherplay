@@ -183,7 +183,11 @@ where
         return Err("audio device: empty format".into());
     };
     let (mixer, source) = mixer(channels, rate);
+    #[cfg(not(target_os = "linux"))]
     let clock = CallbackClock::new(buffer_duration(&config));
+    // ALSA's buffer is two periods or more, and measured as it plays (`glitches::Alsa`).
+    #[cfg(target_os = "linux")]
+    let clock = CallbackClock::alsa(channels.get(), rate.get());
     let bus = Bus::new(controls.clone(), channels.get(), rate.get());
     let g = controls.glitches.clone();
     let stream = match format {
@@ -205,6 +209,7 @@ where
 
 /// How long the device plays from one full buffer. A format without a fixed size (a
 /// fallback) gets WASAPI's shared-mode default, about the same ~50 ms.
+#[cfg(not(target_os = "linux"))]
 fn buffer_duration(config: &StreamConfig) -> Duration {
     let frames = match config.buffer_size {
         BufferSize::Fixed(n) => n,
@@ -234,7 +239,7 @@ where
             if task.is_none() {
                 task = Some(featherplay_platform::thread::pro_audio());
             }
-            clock.tick(&glitches);
+            clock.tick(&glitches, data.len());
             bus.fill(&mut source, data);
         },
         on_error,
@@ -328,7 +333,8 @@ mod null {
                 while !s.load(Ordering::Relaxed) {
                     let now = Instant::now();
                     if p.load(Ordering::Relaxed) {
-                        clock.tick(&glitches);
+                        // A fixed buffer's rule, which doesn't look at the period.
+                        clock.tick(&glitches, 0);
                         owed += (now - last).as_secs_f64() * f64::from(frames_per_s);
                         while owed >= 1.0 {
                             let n = (owed as usize).min(STEP_FRAMES);
