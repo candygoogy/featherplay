@@ -147,9 +147,29 @@ esac
 
 say "$mode: the app, on the tour"
 in_home "$h" env "${app_env[@]}" "$APP" >"$out/stderr.log" 2>&1 &
+# $! is the subshell `in_home` runs in, which waits for the app and ends with its code:
+# `wait` and `kill -0` use that. The checks over D-Bus need the app's own pid (its MPRIS
+# name, the tray item's process), a child of that subshell, or deeper.
 app=$!
 pids+=($app)
-echo "app pid $app"
+own_pid() {
+  local exe p kids="$app"
+  exe=$(readlink -f "$APP")
+  while [ -n "$kids" ]; do
+    for p in $kids; do
+      if [ "$(readlink -f "/proc/$p/exe" 2>/dev/null)" = "$exe" ]; then
+        echo "$p"
+        return 0
+      fi
+    done
+    kids=$(for p in $kids; do pgrep -P "$p"; done)
+  done
+  return 1
+}
+wait_for 15 own_pid || die "$mode: no featherplay process under pid $app (stderr.log)"
+app_pid=$(own_pid)
+pids+=($app_pid)
+echo "app pid $app_pid (shell $app)"
 
 failed=0
 check() {
@@ -185,9 +205,9 @@ check "Now playing" step go now-playing 05-now-playing
 
 if [ "$mode" = x11 ]; then
   say "x11: tray, MPRIS, notifications"
-  check "the tray item and its menu" python3 "$here/checks.py" tray "$app" "$OUT/standins.jsonl"
+  check "the tray item and its menu" python3 "$here/checks.py" tray "$app_pid" "$OUT/standins.jsonl"
   check "MPRIS: metadata, Pause, Play, Next; one notification per song" \
-    python3 "$here/checks.py" mpris "$app" "$OUT/standins.jsonl"
+    python3 "$here/checks.py" mpris "$app_pid" "$OUT/standins.jsonl"
   shot 06-after-next
 
   say "x11: single instance"
@@ -205,7 +225,7 @@ if [ "$mode" = x11 ]; then
   kill -0 "$app" 2>/dev/null || die "x11: the first app ended after the second launch"
 
   say "x11: quit from the tray menu"
-  check "the tray menu's Quit" python3 "$here/checks.py" tray-quit "$app" "$OUT/standins.jsonl"
+  check "the tray menu's Quit" python3 "$here/checks.py" tray-quit "$app_pid" "$OUT/standins.jsonl"
 else
   if [ "$mode" = wayland ]; then
     swaymsg -t get_tree >"$out/sway-tree.json"
@@ -224,7 +244,7 @@ EOF
     }
     check "the window is a native Wayland one (xdg_shell)" native
   fi
-  check "MPRIS Quit" python3 "$here/checks.py" mpris-quit "$app"
+  check "MPRIS Quit" python3 "$here/checks.py" mpris-quit "$app_pid"
 fi
 
 say "$mode: the app ends"
