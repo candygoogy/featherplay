@@ -1,0 +1,170 @@
+// The song and card items, and the reports that load ahead of a click: a song row or card
+// rested on (`HoverIntent`), the song rows on screen (`RowsShown`), and an album, playlist
+// or artist rested on (`PageIntent`).
+
+// One song in a list. Built by `ui_bridge::to_rows`; covers arrive later from `covers.rs`.
+export struct TrackRow {
+    id: string,         // videoId
+    index: string,      // "1", "2"... for album and playlist lists
+    title: string,
+    artist: string,     // "A, B"
+    artist-id: string,  // the first artist's channel id, or ""
+    album: string,
+    album-id: string,
+    duration: string,   // "3:57", or "" when unknown
+    cover: image,
+    liked: bool,
+    playing: bool,      // the current track
+}
+
+export enum ItemKind { album, artist, playlist, song }
+
+// A song row or card the pointer has rested on for a moment, or pressed (`HoverIntent`): the app
+// resolves its stream then, so a click plays at once (`song_menu.rs`).
+export global RowHover {
+    callback rested(string /* videoId */);
+}
+
+// Reports `id` to `RowHover` once the row has been hovered for 120 ms, or at once when it's
+// pressed (the click comes on release), once per hover. The timer runs only while hovered.
+export component HoverIntent {
+    in property <bool> hovered;
+    in property <bool> pressed;
+    in property <string> id;
+    width: 0;
+    height: 0;
+    property <bool> sent;
+    changed hovered => {
+        if !self.hovered {
+            self.sent = false;
+        }
+    }
+    changed pressed => {
+        if self.pressed && self.hovered && !self.sent && self.id != "" {
+            self.sent = true;
+            RowHover.rested(self.id);
+        }
+    }
+    Timer {
+        interval: 120ms;
+        running: root.hovered && !root.sent && root.id != "";
+        triggered => {
+            root.sent = true;
+            RowHover.rested(root.id);
+        }
+    }
+}
+
+// The song lists whose rows on screen are resolved ahead of a click (`src/prepare.rs`).
+export enum SongList { playlist, album, liked, search, artist, home, related, up-next }
+
+// Which song rows show, from `RowsShown`: once a list settles, `src/prepare.rs` resolves
+// them ahead of a click while a song plays.
+export global ShownRows {
+    // Rows `first` to `last` of `list` show (none when `last < first`). `part`: a Home shelf's
+    // index, the side panel's place (0 the frame's, 1 Now playing's), else 0.
+    callback shown(SongList, /* part */ int, /* first */ int, /* last */ int);
+    // The first and the last row on screen of a list of `count` rows `row-h` tall, from `top`
+    // in its content, scrolled by `scrolled`, in a view `view-h` tall.
+    public pure function first(scrolled: length, top: length, row-h: length) -> int {
+        return max(0, floor((scrolled - top) / row-h));
+    }
+    public pure function last(scrolled: length, top: length, row-h: length, view-h: length, count: int) -> int {
+        return min(count - 1, floor((scrolled + view-h - top) / row-h));
+    }
+}
+
+// Tells `ShownRows` which rows of a song list show, as the list opens and whenever that
+// changes: a scroll, a resize, a Home shelf paged, or a row reused for another shelf (the
+// one it showed is said to be gone first). Nothing runs on a timer.
+export component RowsShown {
+    in property <SongList> list;
+    in property <int> part;
+    in property <int> first;
+    in property <int> last;
+    width: 0;
+    height: 0;
+    property <int> told-part: -1;
+    function tell() {
+        if root.told-part >= 0 && root.told-part != root.part {
+            ShownRows.shown(root.list, root.told-part, 0, -1);
+        }
+        root.told-part = root.part;
+        ShownRows.shown(root.list, root.part, root.first, root.last);
+    }
+    init => { root.tell(); }
+    changed part => { root.tell(); }
+    changed first => { root.tell(); }
+    changed last => { root.tell(); }
+}
+
+// An album, playlist or artist card or row the pointer has rested on for a moment, or pressed
+// (`PageIntent`): the app starts loading its page then, so a click shows it at once
+// (`pages/ahead.rs`).
+export global PageHover {
+    callback rested(ItemKind, string /* id */);
+}
+
+// Reports `kind` and `id` to `PageHover` once the pointer has stood still over the card for
+// 150 ms, so a sweep across a shelf reports nothing, or at once when it's pressed; once per
+// hover. Songs aren't reported. The timer runs only while hovered. The wheel scrolling under a
+// still pointer hovers nothing (`Frame.scrolling`), so nothing is reported for it either.
+export component PageIntent {
+    in property <bool> hovered;
+    in property <bool> pressed;
+    // Where the pointer is over the card: each move starts the wait again.
+    in property <length> pointer-x;
+    in property <length> pointer-y;
+    in property <ItemKind> kind;
+    in property <string> id;
+    width: 0;
+    height: 0;
+    property <bool> sent;
+    property <bool> wanted: root.kind != ItemKind.song && root.id != "";
+    changed hovered => {
+        if !self.hovered {
+            self.sent = false;
+        }
+    }
+    changed pressed => {
+        if self.pressed && self.hovered && !self.sent && self.wanted {
+            self.sent = true;
+            PageHover.rested(self.kind, self.id);
+        }
+    }
+    changed pointer-x => {
+        if wait.running {
+            wait.restart();
+        }
+    }
+    changed pointer-y => {
+        if wait.running {
+            wait.restart();
+        }
+    }
+    // A list's row shows another card (its rows are reused as it scrolls).
+    changed id => {
+        self.sent = false;
+        if wait.running {
+            wait.restart();
+        }
+    }
+    wait := Timer {
+        interval: 150ms;
+        running: root.hovered && !root.sent && root.wanted;
+        triggered => {
+            root.sent = true;
+            PageHover.rested(root.kind, root.id);
+        }
+    }
+}
+
+// One card on a shelf or grid, or a playlist in the sidebar.
+export struct CardItem {
+    id: string,
+    kind: ItemKind,
+    title: string,
+    subtitle: string,
+    cover: image,
+    round: bool,        // artists
+}

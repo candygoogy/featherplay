@@ -1,0 +1,472 @@
+// Rows: the song row with a cover, the numbered track row, and the rows of a choice list.
+import { Theme, Icons, Curves } from "../theme.slint";
+import { Player } from "../player.slint";
+import { TrackRow, HoverIntent } from "items.slint";
+import { Icon, Body, TextLink } from "text.slint";
+import { Cover, CoverPlay, PlayingMark } from "covers.slint";
+import { IconButton } from "buttons.slint";
+
+// Song row with a cover: queue, quick picks, search results.
+export component SongRow inherits Rectangle {
+    in property <TrackRow> track;
+    in property <bool> show-duration: true;
+    in property <length> cover-size: Theme.row-cover;
+    in property <bool> selected: false;
+    // Right-click and a menu button on hover ask for the song menu.
+    in property <bool> menu: false;
+    callback clicked();
+    callback double-clicked();
+    // The play button on the cover (as the row's click or double-click does). On the current
+    // track the button pauses and resumes instead.
+    callback play();
+    // Window coordinates for the menu: where it opens down from, and where it ends upward.
+    callback menu-requested(length, length, length);
+    property <bool> menu-shown: root.menu && ta.has-hover;
+    height: Theme.row-h;
+    border-radius: Theme.r-m;
+    HoverIntent {
+        hovered: ta.has-hover && !root.selected && !root.track.playing;
+        pressed: ta.pressed || cover-play.pressed;
+        id: root.track.id;
+    }
+    // The selected row (the current track in Up next) isn't a button; the playing row rests
+    // on a light tile, hover and press over it.
+    background: root.selected ? Theme.selected : (root.track.playing ? Theme.playing-row : transparent);
+    accessible-role: list-item;
+    accessible-label: root.track.title + ", " + root.track.artist;
+    Rectangle {
+        border-radius: parent.border-radius;
+        background: root.selected ? transparent : Theme.state(ta.pressed, ta.has-hover);
+        animate background { duration: Theme.t-hover; easing: Curves.ease-hover; }
+    }
+    // Under the touch area, so the play button inside it draws over the art.
+    Cover {
+        x: 8px;
+        y: (parent.height - self.height) / 2;
+        width: root.cover-size;
+        height: root.cover-size;
+        radius: Theme.r-s;
+        source: root.track.cover;
+    }
+    ta := TouchArea {
+        mouse-cursor: root.selected ? MouseCursor.default : MouseCursor.pointer;
+        clicked => { root.clicked(); }
+        double-clicked => { root.double-clicked(); }
+        pointer-event(e) => {
+            if root.menu && e.button == PointerEventButton.right && e.kind == PointerEventKind.up {
+                root.menu-requested(root.absolute-position.x + self.mouse-x, root.absolute-position.y + self.mouse-y, root.absolute-position.y + self.mouse-y);
+            }
+        }
+        // Inside the touch area, so hovering the buttons keeps the row hovered.
+        cover-play := CoverPlay {
+            x: 8px;
+            y: (parent.height - self.height) / 2;
+            width: root.cover-size;
+            height: root.cover-size;
+            current: root.track.playing;
+            mark: false;
+            title: root.track.title;
+            play => { root.play(); }
+            right-clicked(x, y) => {
+                if root.menu {
+                    root.menu-requested(x, y, y);
+                }
+            }
+        }
+        // It fades in and out with the hover.
+        if root.menu: IconButton {
+            x: parent.width - self.width - 4px;
+            y: (parent.height - self.height) / 2;
+            icon: Icons.more;
+            label: @tr("More");
+            filled: true;
+            enabled: root.menu-shown;
+            fade: root.menu-shown ? 1 : 0;
+            visible: self.fade > 0;
+            animate fade { duration: Theme.t-hover; easing: Curves.ease-hover; }
+            clicked => {
+                root.menu-requested(self.absolute-position.x + self.width - 4px, self.absolute-position.y + self.height, root.absolute-position.y);
+            }
+        }
+    }
+    VerticalLayout {
+        x: 8px + root.cover-size + 12px;
+        width: parent.width - self.x - (root.show-duration ? 64px : 8px);
+        alignment: center;
+        spacing: 1px;
+        Body {
+            text: root.track.title;
+            font-weight: 600;
+            color: Theme.text1;
+        }
+        Body {
+            text: root.track.artist;
+            font-size: Theme.t-meta;
+            color: Theme.text2;
+        }
+    }
+    // Under the menu button: they fade out as it fades in.
+    if root.show-duration && !root.track.playing: Body {
+        x: parent.width - self.width - 12px;
+        height: parent.height;
+        text: root.track.duration;
+        font-size: Theme.t-meta;
+        color: Theme.text3;
+        vertical-alignment: center;
+        opacity: root.menu-shown ? 0 : 1;
+        animate opacity { duration: Theme.t-hover; easing: Curves.ease-hover; }
+    }
+    if root.track.playing: PlayingMark {
+        x: parent.width - self.width - 12px;
+        width: 18px;
+        height: 18px;
+        fade: root.menu-shown ? 0 : 1;
+        animate fade { duration: Theme.t-hover; easing: Curves.ease-hover; }
+    }
+}
+
+// Numbered track row (album, playlist): number, title, artist (compilations only), like and
+// menu on hover, duration.
+export component TrackListRow inherits Rectangle {
+    in property <TrackRow> track;
+    in property <bool> compilation: false;
+    callback clicked();
+    callback double-clicked();
+    callback like-clicked();
+    callback menu-clicked();
+    // Right-click, at this point of the row (the song menu).
+    callback context-menu(length, length);
+    property <length> artist-w: root.compilation ? 240px : 0px;
+    property <bool> hovered: ta.has-hover;
+    // Album rows have no cover: 48 px.
+    height: Theme.track-row-h;
+    border-radius: Theme.r-m;
+    property <bool> cell-hovered: cell.has-hover;
+    function play-cell() {
+        if root.track.playing {
+            Player.toggle();
+        } else {
+            root.double-clicked();
+        }
+    }
+    HoverIntent {
+        hovered: root.hovered && !root.track.playing;
+        pressed: ta.pressed || cell.pressed;
+        id: root.track.id;
+    }
+    // The playing row rests on a light tile; hover and press go over it.
+    background: root.track.playing ? Theme.playing-row : transparent;
+    accessible-role: list-item;
+    accessible-label: root.track.title;
+    Rectangle {
+        border-radius: parent.border-radius;
+        background: Theme.state(ta.pressed || cell.pressed, root.hovered);
+        animate background { duration: Theme.t-hover; easing: Curves.ease-hover; }
+    }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+        double-clicked => { root.double-clicked(); }
+        pointer-event(e) => {
+            if e.button == PointerEventButton.right && e.kind == PointerEventKind.up {
+                root.context-menu(self.mouse-x, self.mouse-y);
+            }
+        }
+        // Inside the touch area, so hovering the buttons keeps the row hovered.
+        // The number cell: hovering it swaps the number (or the mark) for play, and clicking
+        // plays the row as a double-click does; on the current track, pause or play toggles.
+        // Centred where the mark sits.
+        cell := TouchArea {
+            x: 12px;
+            width: 48px;
+            mouse-cursor: pointer;
+            accessible-role: button;
+            accessible-label: root.track.playing && Player.playing ? @tr("Pause {}", root.track.title) : @tr("Play {}", root.track.title);
+            accessible-action-default => { root.play-cell(); }
+            clicked => { root.play-cell(); }
+            // The row's right-click, which this cell would otherwise swallow.
+            pointer-event(e) => {
+                if e.button == PointerEventButton.right && e.kind == PointerEventKind.up {
+                    root.context-menu(self.x + self.mouse-x, self.mouse-y);
+                }
+            }
+            if self.has-hover: Icon {
+                width: 18px;
+                height: 18px;
+                commands: root.track.playing && Player.playing ? Icons.pause : Icons.play;
+                fill: Theme.text1;
+                stroke: transparent;
+            }
+        }
+        // They stay instantiated and fade with the hover.
+        IconButton {
+            property <bool> shown: root.hovered || root.track.liked;
+            x: parent.width - 140px;
+            y: (parent.height - self.height) / 2;
+            icon: Icons.heart;
+            label: root.track.liked ? @tr("Remove like") : @tr("Like");
+            filled: root.track.liked;
+            tint: root.track.liked ? Theme.text1 : Theme.text2;
+            enabled: self.shown;
+            fade: self.shown ? 1 : 0;
+            visible: self.fade > 0;
+            animate fade { duration: Theme.t-hover; easing: Curves.ease-hover; }
+            clicked => { root.like-clicked(); }
+        }
+        IconButton {
+            x: parent.width - 44px;
+            y: (parent.height - self.height) / 2;
+            icon: Icons.more;
+            label: @tr("More");
+            filled: true;
+            enabled: root.hovered;
+            fade: root.hovered ? 1 : 0;
+            visible: self.fade > 0;
+            animate fade { duration: Theme.t-hover; easing: Curves.ease-hover; }
+            clicked => { root.menu-clicked(); }
+        }
+    }
+    if !root.track.playing && !root.cell-hovered: Body {
+        x: 8px;
+        width: 32px;
+        height: parent.height;
+        text: root.track.index;
+        color: Theme.text3;
+        horizontal-alignment: right;
+        vertical-alignment: center;
+    }
+    // Centred where a one-digit number sits (right-aligned at 40 px, about 8 px wide).
+    if root.track.playing && !root.cell-hovered: PlayingMark {
+        x: 27px;
+        width: 18px;
+        height: 18px;
+    }
+    Body {
+        x: 64px;
+        width: parent.width - 64px - 156px - root.artist-w;
+        height: parent.height;
+        text: root.track.title;
+        font-weight: 600;
+        color: Theme.text1;
+        vertical-alignment: center;
+    }
+    if root.compilation: Body {
+        x: parent.width - 148px - root.artist-w;
+        width: root.artist-w - 24px;
+        height: parent.height;
+        text: root.track.artist;
+        color: Theme.text2;
+        vertical-alignment: center;
+    }
+    Body {
+        x: parent.width - 92px;
+        width: 44px;
+        height: parent.height;
+        text: root.track.duration;
+        color: Theme.text2;
+        horizontal-alignment: right;
+        vertical-alignment: center;
+    }
+}
+
+// Several ways to do one thing, as rows of one panel card (house style rule 5): the rows go
+// in as children, each a `ChoiceRow`, the first with `divider: false`.
+export component ChoiceList inherits Rectangle {
+    min-height: lay.min-height;
+    preferred-height: lay.preferred-height;
+    border-radius: Theme.r-l;
+    background: Theme.panel;
+    border-width: 1px;
+    border-color: Theme.card-edge;
+    clip: true;
+    lay := VerticalLayout {
+        @children
+    }
+}
+
+// One way in a `ChoiceList`: a 36 px icon tile, a title and one line, then a chevron, or a
+// text link in its place ("Why?", "Cancel"). The whole row is the target, with hover and
+// press, and Enter presses it once tabbed to. `lit` marks the recommended way (a lifted row,
+// a solid tile); `dimmed` greys one that can't work here while its line says so. Children
+// show under the line, at the title's edge, while `open` (an expander's detail): it eases
+// open and shut (height, with a fade), the chevron turning with it; with motion off it fades
+// in place. Children show while `row.showing` (their `visible`), so they stay as it shuts.
+export component ChoiceRow inherits Rectangle {
+    in property <string> icon;
+    in property <string> title;
+    in property <string> line;
+    in property <bool> lit;
+    in property <bool> enabled: true;
+    in property <bool> dimmed;
+    in property <bool> divider: true;
+    // The row opens a detail under it: the chevron points down while it's open.
+    in property <bool> expands;
+    in property <bool> open;
+    // A text link in place of the chevron; `link-expands` when it opens the detail.
+    in property <string> link;
+    in property <bool> link-expands;
+    // Neither chevron nor link (a way that's under way).
+    in property <bool> bare;
+    // How far open the detail is, 0 to 1, eased.
+    property <float> opened: root.open ? 1 : 0;
+    animate opened {
+        duration: Theme.t-expand;
+        easing: Curves.ease-out;
+    }
+    // The detail is open or still shutting: what the children's `visible` reads.
+    out property <bool> showing: root.open || root.opened > 0;
+    // The room the detail takes now, as it eases.
+    out property <length> detail-height: detail.height;
+    callback clicked();
+    callback link-clicked();
+    property <length> pad-x: Theme.s4;
+    property <length> tile: 36px;
+    property <length> gap: 14px;
+    property <bool> ring;
+    property <float> alpha: root.dimmed ? 0.45 : 1.0;
+    min-height: lay.min-height;
+    preferred-height: lay.preferred-height;
+    background: root.lit ? Theme.choice-lit : transparent;
+
+    if root.divider: Rectangle {
+        y: 0;
+        height: 1px;
+        background: Theme.hairline;
+    }
+    lay := VerticalLayout {
+        // The row's button for screen readers: an ancestor of the focus scope, so a row
+        // reached with Tab is announced as itself.
+        Rectangle {
+            min-height: max(68px, head.min-height);
+            preferred-height: max(68px, head.preferred-height);
+            accessible-role: button;
+            accessible-label: root.title;
+            accessible-description: root.line;
+            accessible-enabled: root.enabled;
+            accessible-expandable: root.expands;
+            accessible-expanded: root.open;
+            accessible-action-default => {
+                if root.enabled {
+                    root.clicked();
+                }
+            }
+            Rectangle {
+                background: root.enabled ? Theme.state(ta.pressed, ta.has-hover) : transparent;
+                animate background { duration: Theme.t-hover; }
+            }
+            fs := FocusScope {
+                enabled: root.enabled;
+                focus-gained(reason) => { root.ring = reason == FocusReason.tab-navigation; }
+                focus-lost => { root.ring = false; }
+                key-pressed(e) => {
+                    if e.text == Key.Return {
+                        root.clicked();
+                        return accept;
+                    }
+                    reject
+                }
+            }
+            // Above the focus scope, so a click is the touch area's.
+            ta := TouchArea {
+                enabled: root.enabled;
+                mouse-cursor: pointer;
+                clicked => { root.clicked(); }
+            }
+            if fs.has-focus && root.ring: Rectangle {
+                x: 2px;
+                y: 2px;
+                width: parent.width - 4px;
+                height: parent.height - 4px;
+                border-radius: Theme.r-m;
+                border-width: 2px;
+                border-color: Theme.accent;
+            }
+            head := HorizontalLayout {
+                padding-left: root.pad-x;
+                padding-right: root.pad-x;
+                padding-top: Theme.s3;
+                padding-bottom: Theme.s3;
+                spacing: root.gap;
+                Rectangle {
+                    y: (parent.height - self.height) / 2;
+                    width: root.tile;
+                    height: root.tile;
+                    border-radius: Theme.r-m;
+                    background: (root.lit ? Theme.solid : Theme.card).transparentize(1 - root.alpha);
+                    Icon {
+                        commands: root.icon;
+                        stroke: (root.lit ? Theme.on-solid : Theme.text1).transparentize(1 - root.alpha);
+                    }
+                }
+                VerticalLayout {
+                    alignment: center;
+                    spacing: 2px;
+                    horizontal-stretch: 1;
+                    // Read once, as the row's label and description.
+                    Body {
+                        text: root.title;
+                        font-weight: 600;
+                        color: Theme.text1.transparentize(1 - root.alpha);
+                        overflow: clip;
+                        wrap: word-wrap;
+                        accessible-role: none;
+                    }
+                    if root.line != "": Body {
+                        text: root.line;
+                        font-size: Theme.t-meta + 1px;
+                        color: Theme.text2;
+                        overflow: clip;
+                        wrap: word-wrap;
+                        accessible-role: none;
+                    }
+                }
+                if root.link != "": VerticalLayout {
+                    alignment: center;
+                    TextLink {
+                        text: root.link;
+                        font-size: Theme.t-meta + 1px;
+                        font-weight: 400;
+                        expands: root.link-expands;
+                        expanded: root.open;
+                        clicked => { root.link-clicked(); }
+                    }
+                }
+                if root.link == "" && !root.bare: VerticalLayout {
+                    alignment: center;
+                    Icon {
+                        commands: Icons.chevron-right;
+                        stroke: Theme.text3.transparentize(1 - root.alpha);
+                        // Turns to point down while the detail is open.
+                        transform-rotation: root.expands && root.open ? 90deg : 0deg;
+                        animate transform-rotation {
+                            duration: Theme.t-expand;
+                            easing: Curves.ease-out;
+                        }
+                    }
+                }
+            }
+        }
+        // The detail: at the title's left edge, under the line. Its height eases between
+        // shut and the content's, the content fading with it, clipped as it goes.
+        detail := Rectangle {
+            clip: true;
+            height: body.preferred-height * root.opened;
+            Rectangle {
+                y: 0;
+                height: body.preferred-height;
+                opacity: root.open ? 1 : 0;
+                animate opacity {
+                    duration: root.open ? Theme.t-menu : Theme.t-fast;
+                    easing: Curves.ease-out;
+                }
+                body := VerticalLayout {
+                    padding-left: root.pad-x + root.tile + root.gap;
+                    padding-right: root.pad-x;
+                    padding-bottom: Theme.s4;
+                    spacing: Theme.s3;
+                    @children
+                }
+            }
+        }
+    }
+}

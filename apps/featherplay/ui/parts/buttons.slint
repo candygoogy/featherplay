@@ -1,0 +1,320 @@
+// Buttons: the play button, the round icon button, the pill, the shelf arrows and the tabs.
+import { Theme, Icons, Curves } from "../theme.slint";
+import { Player } from "../player.slint";
+import { Icon, Body } from "text.slint";
+
+// The play button (the bar, and the tray's mini player): a solid accent disc that morphs
+// with the player (an M3 Expressive shape morph, on a spring): paused, it's round and shows
+// play; playing, it eases into a rounded square and shows pause. A press squashes it a
+// little, and it springs back on release. With nothing to play it's a neutral grey disc with
+// a grey glyph (`selected` under `text3`, over 3:1 on the bar in both themes), not a faded
+// accent. The bar is shared by every page, so it's the same size everywhere.
+export component PlayButton inherits Rectangle {
+    in property <length> size: Theme.play-size;
+    in property <length> glyph: 24px;
+    // For the bar's tooltip.
+    out property <bool> hovered: pta.has-hover;
+    // After the toggle, on a click.
+    callback clicked();
+    property <bool> on: Player.has-track;
+    width: root.size;
+    height: root.size;
+    border-radius: Player.playing ? self.height * 0.3 : self.height / 2;
+    background: root.on ? Theme.accent : Theme.selected;
+    transform-scale: pta.pressed ? Theme.press-scale - (Theme.moving ? 0.02 : 0) : 1.0;
+    accessible-role: button;
+    accessible-label: Player.playing ? @tr("Pause") : @tr("Play");
+    // Its shortcut, in both windows.
+    accessible-description: @tr("Space");
+    accessible-enabled: root.on;
+    accessible-action-default => { Player.toggle(); }
+    animate border-radius { duration: Theme.t-morph; easing: Curves.morph; }
+    animate background { duration: Theme.t-hover; }
+    animate transform-scale {
+        duration: pta.pressed ? Theme.t-press : Theme.t-release;
+        easing: pta.pressed ? Curves.ease-out : Curves.release;
+    }
+    // Hover and press: the usual overlay, over the accent (`on-accent`'s over the neutral one).
+    Rectangle {
+        border-radius: parent.border-radius;
+        background: Theme.accent-overlay(pta.pressed, pta.has-hover);
+        animate background { duration: Theme.t-hover; }
+    }
+    pta := TouchArea {
+        enabled: root.on;
+        mouse-cursor: pointer;
+        clicked => {
+            Player.toggle();
+            root.clicked();
+        }
+    }
+    // Play turns into pause as the shape changes: both glyphs stay, one shrinking and
+    // turning away as the other turns in.
+    Icon {
+        width: root.glyph;
+        height: root.glyph;
+        commands: Icons.play;
+        fill: root.on ? Theme.on-accent : Theme.text3;
+        stroke: transparent;
+        opacity: Player.playing ? 0 : 1;
+        transform-scale: Player.playing && Theme.moving ? 0.6 : 1.0;
+        transform-rotation: Player.playing && Theme.moving ? 90deg : 0deg;
+        animate opacity { duration: Theme.t-fast; easing: Curves.ease-out; }
+        animate transform-scale, transform-rotation { duration: Theme.t-morph; easing: Curves.morph; }
+    }
+    Icon {
+        width: root.glyph;
+        height: root.glyph;
+        commands: Icons.pause;
+        fill: root.on ? Theme.on-accent : Theme.text3;
+        stroke: transparent;
+        opacity: Player.playing ? 1 : 0;
+        transform-scale: Player.playing || !Theme.moving ? 1.0 : 0.6;
+        transform-rotation: Player.playing || !Theme.moving ? 0deg : -90deg;
+        animate opacity { duration: Theme.t-fast; easing: Curves.ease-out; }
+        animate transform-scale, transform-rotation { duration: Theme.t-morph; easing: Curves.morph; }
+    }
+}
+
+// Round icon button with a 36 px target.
+export component IconButton inherits Rectangle {
+    in property <string> icon;
+    in property <string> label;            // for screen readers
+    // What it does, for screen readers, when the label alone doesn't say.
+    in property <string> description;
+    in property <color> tint: Theme.text2;
+    in property <bool> filled: false;      // filled glyphs (transport)
+    in property <length> glyph: 20px;
+    // Toggles, lit: the accent glyph on the accent's tonal circle (as a selected chip), so
+    // "on" shows by more than the glyph's colour, whatever the accent.
+    in property <bool> active: false;
+    // Lit without the circle, only the accent glyph: for a button whose panel shows its state
+    // itself (the bar's Up next, lit whenever Now playing's side panel is open).
+    in property <bool> circle: true;
+    in property <bool> enabled: true;
+    // Below 1, the glyph snaps to this size and eases back to 1 (the like pop).
+    in property <float> glyph-scale: 1.0;
+    // Shows the button from 0 (gone) to 1; rows fade it with their hover. Set this, never
+    // `opacity`: a group opacity on anything with children renders it through a layer as
+    // large as the window's repainted area (skia), every frame of a scroll.
+    in property <float> fade: 1.0;
+    property <float> alpha: (root.enabled ? 1.0 : 0.4) * root.fade;
+    out property <bool> hovered: ta.has-hover;
+    callback clicked();
+    width: 36px;
+    height: 36px;
+    border-radius: self.width / 2;
+    accessible-role: button;
+    accessible-label: root.label;
+    accessible-description: root.description;
+    accessible-action-default => { root.clicked(); }
+    // The button's face, the root's size: its ground and its press animate here rather than
+    // on the root. Slint copies a component whose root animates a public property into every
+    // place it's used, and ignores a `transform-scale` on the root of one it doesn't copy;
+    // this button is used in dozens of places.
+    Rectangle {
+        border-radius: root.border-radius;
+        background: (root.enabled ? Theme.state(ta.pressed, ta.has-hover) : transparent).transparentize(1 - root.alpha);
+        // Press: a small give, then a short spring back past rest on release.
+        transform-scale: ta.pressed ? Theme.press-scale : 1.0;
+        animate background { duration: Theme.t-hover; }
+        animate transform-scale {
+            duration: ta.pressed ? Theme.t-press : Theme.t-release;
+            easing: ta.pressed ? Curves.ease-out : Curves.release;
+        }
+        // The lit circle, over the hover overlay. It comes and goes at once, as the glyph's
+        // colour does: a fade would repaint the bar's corner for its length, and as one region
+        // with whatever else moves on screen (the lyrics view's toggle).
+        if root.active && root.circle: Rectangle {
+            border-radius: root.border-radius;
+            background: Theme.accent-tonal.transparentize(1 - root.alpha);
+        }
+        ta := TouchArea {
+            enabled: root.enabled;
+            mouse-cursor: pointer;
+            clicked => { root.clicked(); }
+        }
+        Icon {
+            width: root.glyph;
+            height: root.glyph;
+            commands: root.icon;
+            stroke: (root.filled ? transparent : (root.active ? Theme.accent : root.tint)).transparentize(1 - root.alpha);
+            fill: (root.filled ? (root.active ? Theme.accent : root.tint) : transparent).transparentize(1 - root.alpha);
+            transform-scale: root.glyph-scale;
+            animate transform-scale { duration: root.glyph-scale < 1 ? 0ms : Theme.t-fast; easing: Curves.ease-out; }
+        }
+        // What a use adds (the bar's Repeat one badge) presses with the button.
+        @children
+    }
+}
+
+// Pill button: solid (primary, neutral) or tonal (secondary). 40 px high; `compact`, 32 px in
+// the sidebar's smaller type.
+export component Pill inherits Rectangle {
+    in property <string> label;
+    in property <string> icon;
+    in property <bool> solid: false;
+    in property <bool> icon-filled: true;
+    in property <bool> enabled: true;
+    in property <bool> compact: false;
+    // A label it switches to (Pause, Resume): the pill is as wide as the wider of the two,
+    // so what sits beside it doesn't shift.
+    in property <string> alt-label;
+    callback clicked();
+    height: root.compact ? 32px : 40px;
+    width: lay.preferred-width + max(0px, alt.preferred-width - label.preferred-width);
+    border-radius: self.height / 2;
+    // Dimmed through each part's colour, not `opacity` (see IconButton.fade).
+    property <float> alpha: root.enabled ? 1.0 : 0.4;
+    accessible-role: button;
+    accessible-label: root.label;
+    accessible-action-default => { root.clicked(); }
+    // The pill's face, the root's size, so it stays one shared component (see IconButton).
+    Rectangle {
+        border-radius: root.border-radius;
+        background: (root.solid ? Theme.solid-state(ta.pressed, ta.has-hover) : Theme.tonal(ta.pressed, ta.has-hover)).transparentize(1 - root.alpha);
+        // Press: a small give under the pointer, then a spring back on release.
+        transform-scale: ta.pressed ? Theme.press-scale : 1.0;
+        animate background { duration: Theme.t-hover; }
+        animate transform-scale {
+            duration: ta.pressed ? Theme.t-press : Theme.t-release;
+            easing: ta.pressed ? Curves.ease-out : Curves.release;
+        }
+        ta := TouchArea {
+            enabled: root.enabled;
+            mouse-cursor: pointer;
+            clicked => { root.clicked(); }
+        }
+        lay := HorizontalLayout {
+            padding-left: root.compact ? 14px : root.icon == "" ? 20px : 16px;
+            padding-right: root.compact ? 14px : 20px;
+            spacing: 8px;
+            alignment: center;
+            if root.icon != "": Icon {
+                y: (parent.height - self.height) / 2;
+                width: 18px;
+                height: 18px;
+                commands: root.icon;
+                fill: (root.icon-filled ? (root.solid ? Theme.on-solid : Theme.text1) : transparent).transparentize(1 - root.alpha);
+                stroke: (root.icon-filled ? transparent : (root.solid ? Theme.on-solid : Theme.text1)).transparentize(1 - root.alpha);
+            }
+            label := Body {
+                text: root.label;
+                font-size: root.compact ? Theme.t-meta : Theme.t-body;
+                font-weight: 600;
+                color: (root.solid ? Theme.on-solid : Theme.text1).transparentize(1 - root.alpha);
+                vertical-alignment: center;
+            }
+        }
+        // Only measured.
+        alt := Body {
+            visible: false;
+            text: root.alt-label;
+            font-size: root.compact ? Theme.t-meta : Theme.t-body;
+            font-weight: 600;
+        }
+        // What a use adds (the close dialog's focus ring) presses with the pill.
+        @children
+    }
+}
+
+// Shelf scroll arrows.
+export component ShelfArrows inherits Rectangle {
+    in property <bool> can-back: false;
+    in property <bool> can-forward: true;
+    callback back();
+    callback forward();
+    width: 72px;
+    height: 32px;
+    for icon[i] in [Icons.chevron-left, Icons.chevron-right]: Rectangle {
+        property <bool> on: i == 0 ? root.can-back : root.can-forward;
+        x: i * 40px;
+        width: 32px;
+        height: 32px;
+        border-radius: 16px;
+        // Dimmed through each part's colour, not `opacity` (see IconButton.fade).
+        property <float> alpha: self.on ? 1.0 : 0.45;
+        background: (self.on ? Theme.tonal(arrow.pressed, arrow.has-hover) : Theme.selected).transparentize(1 - self.alpha);
+        animate background { duration: Theme.t-hover; }
+        arrow := TouchArea {
+            enabled: parent.on;
+            mouse-cursor: pointer;
+            clicked => {
+                if i == 0 { root.back(); } else { root.forward(); }
+            }
+        }
+        Icon {
+            width: 18px;
+            height: 18px;
+            commands: icon;
+            stroke: Theme.text1.transparentize(1 - parent.alpha);
+        }
+    }
+}
+
+// Pill tabs, a segmented control: equal segments across the width, the active one on the
+// accent's tonal fill. The pill glides to a newly picked tab (`Curves.glide` over `t-morph`):
+// one eased value, `at`, the pill's place counted in tabs (an index, not `x`, so a resize moves
+// it at once). Everything that moves follows from it: the pill's `x`, its slight stretch on the
+// way, and how lit each label is, so the labels light up as the pill reaches them rather than
+// on a timer of their own. It repaints only the tab row, and nothing runs once it's there
+// (`tests/tab_pill.rs`).
+export component Tabs inherits Rectangle {
+    in property <[string]> labels;
+    in property <int> active;
+    callback selected(int);
+    property <length> seg-w: self.width / max(1, root.labels.length);
+    property <float> at: root.active;
+    animate at { duration: Theme.t-morph; easing: Curves.glide; }
+    // How far the pill is between two tabs: 0 on one, 1 halfway. It stretches by up to 8 %
+    // of a segment there, both edges at once, and is its own width again on arrival.
+    property <float> part: root.at - floor(root.at);
+    property <length> stretch: 4 * root.part * (1 - root.part) * 0.08 * root.seg-w;
+    height: 40px;
+    border-radius: self.height / 2;
+    background: Theme.hover;
+    // The active pill, under the labels.
+    Rectangle {
+        x: root.at * root.seg-w + 4px - root.stretch / 2;
+        y: 4px;
+        width: root.seg-w - 8px + root.stretch;
+        height: parent.height - 8px;
+        border-radius: self.height / 2;
+        background: Theme.accent-tonal;
+    }
+    for label[i] in root.labels: Rectangle {
+        property <bool> on: i == root.active;
+        x: i * root.seg-w + 4px;
+        y: 4px;
+        width: root.seg-w - 8px;
+        height: parent.height - 8px;
+        border-radius: self.height / 2;
+        // Hover and press over the segment; the active one only darkens its pill.
+        background: self.on ? (tta.pressed ? Theme.hover : transparent) : Theme.state(tta.pressed, tta.has-hover);
+        transform-scale: tta.pressed ? Theme.press-scale : 1.0;
+        accessible-role: tab;
+        accessible-label: label;
+        accessible-action-default => { root.selected(i); }
+        animate background { duration: Theme.t-hover; }
+        animate transform-scale {
+            duration: tta.pressed ? Theme.t-press : Theme.t-release;
+            easing: tta.pressed ? Curves.ease-out : Curves.release;
+        }
+        tta := TouchArea {
+            mouse-cursor: pointer;
+            clicked => { root.selected(i); }
+        }
+        // Lit by the pill as much as it covers this segment, or by the hover (which eases
+        // on its own, over `t-hover`).
+        property <float> hovered: tta.has-hover ? 1 : 0;
+        animate hovered { duration: Theme.t-hover; easing: Curves.ease-hover; }
+        Body {
+            text: label;
+            font-weight: 600;
+            color: Theme.text1.mix(Theme.text2, max(parent.hovered, 1 - min(1, abs(root.at - i))));
+            horizontal-alignment: center;
+            vertical-alignment: center;
+            overflow: clip;
+        }
+    }
+}

@@ -1,0 +1,236 @@
+// Covers and the playing mark: a cover with its edge and fade, the mark's clock and wave,
+// and the play veil over a song row's cover.
+import { Theme, Icons, Curves } from "../theme.slint";
+import { Player } from "../player.slint";
+import { Icon } from "text.slint";
+
+// A cover with a hairline edge, so pale art keeps its shape on light and black art on dark.
+// Empty (no art, or not loaded yet): a quiet note glyph (a person when `round`) on the empty
+// tile; art fades in over it. `crossfade` (bar, menu header, Now playing, Home hero): a
+// new source dissolves over the old one instead of replacing it.
+// Art whose pixels aren't the cover's physical pixels (cards and tiles are fluid, their art is
+// decoded at a fixed size) draws through a cached layer at the cover's size, rounded corners and
+// all: a frame copies the layer instead of resampling the art through a rounded clip, which cost
+// a 4K Home scroll frame 10 ms. The layer lives as long as the cover, so long lists of such
+// covers belong in a `ListView` (Home, `CardGrid`), which drops what's scrolled away.
+// The fade in is the layer's own opacity, outside it, so the layer is drawn once and blended
+// as it fades (the renderer's change 12); a fade inside it drew it again in every frame, and a
+// page of cards fading in at once cost ~15 ms a 4K frame (`tests/app/content_fade.rs`).
+export component Cover inherits Rectangle {
+    in property <image> source;
+    in property <length> radius: Theme.r-m;
+    in property <bool> round: false;
+    in property <bool> crossfade: false;
+    // Off where the cover draws its own glyph (the Liked songs tile).
+    in property <bool> placeholder: true;
+    // May take a layer. Off for a cover out of sight in a clipped row (a shelf's other
+    // pages): Slint draws a layer even where it's clipped away, so each one off the page
+    // would still cost its whole draw when its row enters.
+    in property <bool> layered: true;
+    // The art underneath while a crossfade runs, the art last shown, and whether the top
+    // layer has settled.
+    property <image> under;
+    property <image> last;
+    property <bool> settled: true;
+    border-radius: root.round ? self.width / 2 : root.radius;
+    // The empty tile, until the art covers it: opaque art over it would only cost a rounded
+    // fill per cover per frame.
+    background: root.source.width > 0 && root.settled && art.opacity >= 1 && top.opacity >= 1 ? transparent : Theme.cover-empty;
+    // Only a crossfade needs the art last shown: kept in any other cover, it would hold its
+    // first image for as long as the cover lives, after the app has let it go.
+    init => {
+        if root.crossfade {
+            root.last = root.source;
+        }
+    }
+    changed source => {
+        if root.crossfade {
+            // The art that was showing stays below; the new one starts clear and fades in.
+            root.under = root.last;
+            root.last = root.source;
+            root.settled = false;
+            settle.running = true;
+        }
+    }
+    // One tick later, so the snap to clear lands before the fade starts.
+    settle := Timer {
+        interval: 1ms;
+        running: false;
+        triggered => {
+            self.running = false;
+            root.settled = true;
+        }
+    }
+    if root.placeholder && root.source.width == 0 && root.under.width == 0: Icon {
+        width: Math.round(root.width * 0.4 / 1px) * 1px;
+        height: self.width;
+        commands: root.round ? Icons.person : Icons.note;
+        stroke: Theme.text3;
+        stroke-width: max(1.2px, self.width / 24 * 1.6);
+        opacity: 0.6;
+    }
+    // The empty tile's edge, until the art's own covers it.
+    Rectangle {
+        visible: art.opacity < 1;
+        border-radius: parent.border-radius;
+        border-width: 1px;
+        border-color: Theme.cover-edge;
+    }
+    art := Rectangle {
+        width: parent.width;
+        height: parent.height;
+        border-radius: parent.border-radius;
+        clip: true;
+        // `layered` last: a cover without art never depends on it, so a change to it repaints nothing.
+        cache-rendering-hint: root.source.width > 0 && abs(root.source.width * 1phx - root.width) > 0.01px && root.layered;
+        // A plain cover fades its art in as a whole; a crossfade fades `top` over `under` in it.
+        opacity: root.crossfade || root.source.width > 0 ? 1 : 0;
+        animate opacity { duration: Theme.t-fast; easing: Curves.ease-hover; }
+        if root.crossfade && root.under.width > 0 && root.source.width > 0: Image {
+            width: parent.width;
+            height: parent.height;
+            source: root.under;
+            image-fit: cover;
+        }
+        top := Image {
+            width: parent.width;
+            height: parent.height;
+            source: root.source;
+            image-fit: cover;
+            opacity: !root.crossfade || (root.source.width > 0 && root.settled) ? 1 : 0;
+            animate opacity {
+                duration: root.settled ? Theme.t-cover : 0ms;
+                easing: Curves.ease-hover;
+            }
+        }
+        Rectangle {
+            border-radius: parent.border-radius;
+            border-width: 1px;
+            border-color: Theme.cover-edge;
+        }
+    }
+}
+
+// The playing mark's clock (the wave, chosen 2026-10-30). One `Timer` in `AppWindow`
+// steps `frame` 30 times a second while sound plays and the window shows, and nothing is
+// armed when paused, stopped, loading, minimized, hidden in the tray or with reduced motion.
+// Only a live `PlayingMark` reads `frame`, so only the current track's marks repaint, each one
+// small rectangle (one `Path`), and only where they're on screen.
+export global Mark {
+    in-out property <int> frame;
+    out property <int> fps: 30;
+    out property <duration> step: floor(1000 / root.fps) * 1ms;
+    // One cycle of the wave's travel and of its swell, in seconds.
+    out property <float> period: 1.6;
+    // Points along the wave, past its first.
+    out property <int> segments: 12;
+    // The wave's swell at `t` seconds: its amplitude, of the most it may take. At rest
+    // (`t` < 0) a still, middling wave.
+    public pure function swell(t: float) -> float {
+        return t < 0 ? 0.6 : 0.62 + 0.38 * Math.sin(t / root.period * 360deg);
+    }
+    // Point `i`'s height, -1 to 1: one and a half wavelengths travelling right, pinned at both
+    // ends (the sine envelope), swelling and settling.
+    public pure function wave(i: int, t: float) -> float {
+        return Mark.swell(t) * Math.sin(i / root.segments * 180deg) * Math.sin((i / root.segments * 1.5 - (t < 0 ? 0.15 : t) / (root.period / 2)) * 360deg);
+    }
+    // " L x y" for point `i` in a `w` x `h` viewbox: the wave spans the middle 76 % of the
+    // width and swings up to 32 % of the height either side of the middle.
+    pure function at(i: int, w: float, h: float, t: float) -> string {
+        return " L \{w * 0.12 + i * w * 0.76 / root.segments} \{h / 2 - h * 0.32 * Mark.wave(i, t)}";
+    }
+    // The wave's path in a `w` x `h` viewbox at `t` seconds (no loops in Slint functions).
+    public pure function path(w: float, h: float, t: float) -> string {
+        return "M \{w * 0.12} \{h / 2}" + Mark.at(1, w, h, t) + Mark.at(2, w, h, t) + Mark.at(3, w, h, t) + Mark.at(4, w, h, t) + Mark.at(5, w, h, t) + Mark.at(6, w, h, t) + Mark.at(7, w, h, t) + Mark.at(8, w, h, t) + Mark.at(9, w, h, t) + Mark.at(10, w, h, t) + Mark.at(11, w, h, t) + Mark.at(12, w, h, t);
+    }
+}
+
+// The playing mark: one accent stroke, a short wave travelling through the mark while the
+// current track is audible and motion is on. Paused, loading, or with Windows' animation
+// effects off, it rests as a still wave, which still says "this one". The viewbox is the
+// mark's own pixels, so the stroke stays 2 px at any size.
+export component PlayingMark inherits Rectangle {
+    // From 0 (gone) to 1, through the stroke's colour (see IconButton.fade).
+    in property <float> fade: 1.0;
+    width: 20px;
+    height: 20px;
+    property <bool> live: Player.playing && !Player.loading && Theme.moving;
+    // Seconds into the wave, or -1 at rest. Read only while live, so a resting mark doesn't
+    // depend on the clock at all.
+    property <float> t: root.live ? Mark.frame / Mark.fps : -1;
+    accessible-role: image;
+    accessible-label: Player.playing ? @tr("Playing") : @tr("Paused");
+    Path {
+        width: root.width;
+        height: root.height;
+        viewbox-x: 0;
+        viewbox-y: 0;
+        viewbox-width: root.width / 1px;
+        viewbox-height: root.height / 1px;
+        stroke: Theme.accent.transparentize(1 - root.fade);
+        stroke-width: 2px;
+        stroke-line-cap: round;
+        stroke-line-join: round;
+        fill: transparent;
+        commands: Mark.path(root.width / 1px, root.height / 1px, root.t);
+    }
+}
+
+// Over a song row's cover: hovering shows play, and clicking plays the row (`play`); on the
+// current track's row it shows pause or play and toggles the player. `mark`: the current
+// track's cover also rests under a deep veil with the playing mark (the lists; `SongRow` marks
+// its row at the right instead). Put it inside the row's TouchArea, over the cover, so
+// hovering it keeps the row hovered.
+export component CoverPlay inherits TouchArea {
+    in property <bool> current;
+    in property <bool> mark: true;
+    in property <length> radius: Theme.r-s;
+    // For screen readers.
+    in property <string> title;
+    callback play();
+    // A right-click here, in window coordinates: the row's song menu.
+    callback right-clicked(length, length);
+    property <bool> resting: root.current && root.mark;
+    property <bool> pause: root.current && Player.playing;
+    mouse-cursor: pointer;
+    accessible-role: button;
+    accessible-label: root.pause ? @tr("Pause {}", root.title) : @tr("Play {}", root.title);
+    accessible-action-default => { root.activate(); }
+    clicked => { root.activate(); }
+    pointer-event(e) => {
+        if e.button == PointerEventButton.right && e.kind == PointerEventKind.up {
+            root.right-clicked(self.absolute-position.x + self.mouse-x, self.absolute-position.y + self.mouse-y);
+        }
+    }
+    function activate() {
+        if root.current {
+            Player.toggle();
+        } else {
+            root.play();
+        }
+    }
+    // The veil fades in with the hover, as the row's own hover does.
+    Rectangle {
+        border-radius: root.radius;
+        background: root.pressed ? Theme.cover-button-pressed : (root.resting ? Theme.cover-playing : Theme.cover-button);
+        opacity: root.resting || root.has-hover ? 1 : 0;
+        visible: self.opacity > 0;
+        animate opacity { duration: Theme.t-hover; easing: Curves.ease-hover; }
+        animate background { duration: Theme.t-hover; easing: Curves.ease-hover; }
+    }
+    if root.resting && !root.has-hover: PlayingMark {
+        width: 20px;
+        height: 20px;
+    }
+    // White on the dark veil, over any art in either theme (as the cards' play button).
+    Icon {
+        width: min(20px, round(root.width / 2 / 1px) * 1px);
+        height: self.width;
+        commands: root.pause ? Icons.pause : Icons.play;
+        fill: #FFFFFF;
+        stroke: transparent;
+        opacity: root.has-hover ? 1 : 0;
+        visible: self.opacity > 0;
+        animate opacity { duration: Theme.t-hover; easing: Curves.ease-hover; }
+    }
+}

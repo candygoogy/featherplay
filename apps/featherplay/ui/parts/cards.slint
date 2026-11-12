@@ -1,0 +1,187 @@
+// Cards: one card on a shelf or grid, and the shelf that pages a row of them.
+import { Theme, Icons, Curves } from "../theme.slint";
+import { CardItem, ItemKind, HoverIntent, PageIntent } from "items.slint";
+import { Icon, Body, ShelfTitle } from "text.slint";
+import { Cover } from "covers.slint";
+import { ShelfArrows } from "buttons.slint";
+
+// Album, artist, playlist or song card on a shelf or grid. `playable`: hovering shows a round
+// play button on the cover that plays without opening (`play`). `art-h`: the art's height
+// when it isn't square (Home's 16:9 video tiles); `subtitle: false` leaves only the title (Home's
+// artist faces).
+export component Card inherits Rectangle {
+    in property <CardItem> item;
+    in property <length> size;
+    in property <length> art-h: root.size;
+    in property <bool> subtitle: true;
+    in property <bool> playable: false;
+    // On its row's visible page: off, the cover takes no layer (see `Cover.layered`).
+    in property <bool> on-page: true;
+    callback clicked();
+    callback play();
+    property <bool> button-shown: root.playable && ta.has-hover;
+    width: root.size;
+    height: root.art-h + Theme.card-text-gap + (root.subtitle ? 40px : 24px);
+    accessible-role: button;
+    accessible-label: root.item.title;
+    accessible-action-default => { root.clicked(); }
+    // A song card resolves ahead as a song row does: its click plays it.
+    HoverIntent {
+        hovered: ta.has-hover && root.playable && root.item.kind == ItemKind.song;
+        pressed: ta.pressed;
+        id: root.item.kind == ItemKind.song ? root.item.id : "";
+    }
+    // An album, playlist or artist card starts loading its page: its click opens it.
+    PageIntent {
+        hovered: ta.has-hover;
+        pressed: ta.pressed;
+        pointer-x: ta.mouse-x;
+        pointer-y: ta.mouse-y;
+        kind: root.item.kind;
+        id: root.item.id;
+    }
+    // The art and its hover veil, pressed together.
+    Rectangle {
+        x: 0;
+        y: 0;
+        width: root.size;
+        height: root.art-h;
+        transform-scale: ta.pressed ? Theme.press-scale : 1.0;
+        animate transform-scale {
+            duration: ta.pressed ? Theme.t-press : Theme.t-release;
+            easing: ta.pressed ? Curves.ease-out : Curves.release;
+        }
+        Cover {
+            width: parent.width;
+            height: parent.height;
+            source: root.item.cover;
+            round: root.item.round;
+            layered: root.on-page;
+        }
+        // Over the cover, not in it: inside, every frame of the veil's fade drew the cover's
+        // layer again (about 1 ms a frame per card at 4K, while the pointer crossed a shelf).
+        Rectangle {
+            width: parent.width;
+            height: parent.height;
+            border-radius: root.item.round ? self.width / 2 : Theme.r-m;
+            background: ta.pressed ? Theme.cover-pressed : (ta.has-hover ? Theme.cover-hover : transparent);
+            animate background { duration: Theme.t-hover; }
+        }
+    }
+    title := Body {
+        y: root.art-h + Theme.card-text-gap;
+        width: root.size;
+        text: root.item.title;
+        font-weight: 600;
+        horizontal-alignment: root.item.round ? center : left;
+    }
+    // The veil can vanish on very dark or pale art; the underlined title shows on any cover.
+    if ta.has-hover: Rectangle {
+        property <length> w: min(root.size, title.preferred-width);
+        x: root.item.round ? (root.size - self.w) / 2 : 0px;
+        y: root.art-h + Theme.card-text-gap + 18px;
+        width: self.w;
+        height: 1px;
+        background: Theme.text1;
+    }
+    if root.subtitle: Body {
+        y: root.art-h + Theme.card-text-gap + 20px;
+        width: root.size;
+        text: root.item.subtitle;
+        font-size: Theme.t-meta;
+        color: Theme.text2;
+        horizontal-alignment: root.item.round ? center : left;
+    }
+    // Last, so the play button draws over the cover.
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+        // Inside the touch area, so hovering the button keeps the card hovered.
+        if root.playable: play-button := Rectangle {
+            // 8 px from the cover's corner; on a round cover, inside the circle.
+            property <length> inset: root.item.round ? root.size * 0.146 : Theme.s2;
+            // Fades through each part's colour, not `opacity` (see IconButton.fade).
+            property <float> fade: root.button-shown ? 1 : 0;
+            x: root.size - self.width - self.inset;
+            y: root.art-h - self.height - self.inset;
+            width: 40px;
+            height: 40px;
+            border-radius: self.width / 2;
+            background: (pa.pressed ? Theme.cover-button-pressed : (pa.has-hover ? Theme.cover-button-hover : Theme.cover-button)).transparentize(1 - self.fade);
+            drop-shadow-blur: 8px;
+            drop-shadow-color: #00000040.transparentize(1 - self.fade);
+            visible: self.fade > 0;
+            transform-scale: !root.button-shown && Theme.moving ? 0.9 : (pa.pressed ? Theme.press-scale : 1.0);
+            accessible-role: button;
+            accessible-label: @tr("Play {}", root.item.title);
+            accessible-action-default => { root.play(); }
+            animate fade { duration: Theme.t-fast; easing: Curves.ease-out; }
+            animate transform-scale {
+                duration: pa.pressed ? Theme.t-press : Theme.t-release;
+                easing: pa.pressed ? Curves.ease-out : Curves.release;
+            }
+            animate background { duration: Theme.t-hover; }
+            pa := TouchArea {
+                enabled: root.button-shown;
+                mouse-cursor: pointer;
+                clicked => { root.play(); }
+            }
+            Icon {
+                width: 20px;
+                height: 20px;
+                commands: Icons.play;
+                fill: #FFFFFF.transparentize(1 - play-button.fade);
+                stroke: transparent;
+            }
+        }
+    }
+}
+
+// A titled row of cards that pages by a full row; arrows appear only while hovered.
+export component Shelf inherits Rectangle {
+    in property <string> title;
+    in property <[CardItem]> items;
+    in property <int> per-row: Theme.cards-per-row;
+    // Cards show a play button on hover (`play`); pages wire it per kind.
+    in property <bool> playable: false;
+    callback open(CardItem);
+    callback play(CardItem);
+    property <length> card: floor((self.width - (root.per-row - 1) * Theme.card-gap) / root.per-row / 1px) * 1px;
+    property <int> first: 0;
+    // The card at the left edge. Paging is an on-screen move, so it eases in-out over
+    // 280 ms; the cards follow it, so a resize moves them at once.
+    property <float> at: root.first;
+    animate at { duration: Theme.moving ? Theme.t-panel + 40ms : 0ms; easing: Curves.ease-in-out; }
+    property <int> last-first: max(0, root.items.length - root.per-row);
+    height: 48px + root.card + Theme.card-text-gap + 40px;
+    hover := TouchArea {
+        ShelfTitle {
+            x: 0;
+            y: 0;
+            width: parent.width - 88px;
+            text: root.title;
+        }
+        if hover.has-hover && root.items.length > root.per-row: ShelfArrows {
+            x: parent.width - self.width;
+            y: 0;
+            can-back: root.first > 0;
+            can-forward: root.first < root.last-first;
+            back => { root.first = max(0, root.first - root.per-row); }
+            forward => { root.first = min(root.last-first, root.first + root.per-row); }
+        }
+        Rectangle {
+            y: 48px;
+            height: parent.height - 48px;
+            clip: true;
+            for it[i] in root.items: Card {
+                x: (i - root.at) * (root.card + Theme.card-gap);
+                y: 0;
+                size: root.card;
+                item: it;
+                playable: root.playable;
+                clicked => { root.open(it); }
+                play => { root.play(it); }
+            }
+        }
+    }
+}

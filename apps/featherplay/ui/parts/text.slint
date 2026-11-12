@@ -1,0 +1,157 @@
+// The text styles and the plainest shapes: the icon, the display and body faces and the
+// titles, the banded gradient, the progress rail, a page's placeholder and the text link.
+import { Theme } from "../theme.slint";
+
+export component Icon inherits Path {
+    width: 20px;
+    height: 20px;
+    viewbox-width: 24;
+    viewbox-height: 24;
+    stroke: Theme.text2;
+    stroke-width: 1.6px;
+    stroke-line-cap: round;
+    fill: transparent;
+}
+
+export component Display inherits Text {
+    font-family: Theme.display-font;
+    font-weight: 700;
+    color: Theme.text1;
+    letter-spacing: self.font-size * Theme.display-tracking;
+    overflow: elide;
+}
+
+export component Body inherits Text {
+    font-family: Theme.body-font;
+    font-size: Theme.t-body;
+    color: Theme.text1;
+    overflow: elide;
+}
+
+// A page title in the display face (40 px).
+export component PageTitle inherits Display {
+    height: 48px;
+    font-size: Theme.t-display-l;
+    vertical-alignment: center;
+}
+
+export component ShelfTitle inherits Display {
+    font-size: Theme.t-display-s;
+    height: 32px;
+    vertical-alignment: center;
+}
+
+// A vertical gradient from `top` to `bottom` as `count` solid bands, in whole physical pixels
+// so neighbours meet without a seam. Skia fills a gradient pixel by pixel, at several times
+// the cost of a solid fill, and a strip that content scrolls under is filled again every
+// frame: the scrims and fades over scrolling pages cost a 4K frame up to ~1.3 ms as
+// gradients (measured 2026-10-31). Use it for anything a list scrolls under; enough
+// bands for a level or so between neighbours look the same as the gradient.
+export component Bands inherits Rectangle {
+    in property <color> top;
+    in property <color> bottom;
+    in property <int> count: 24;
+    for i in root.count: Rectangle {
+        y: Math.round(root.height * i / root.count / 1phx) * 1phx;
+        height: Math.round(root.height * (i + 1) / root.count / 1phx) * 1phx - self.y;
+        // At the band's middle: `top` at 0, `bottom` at 1.
+        background: root.bottom.mix(root.top, (i + 0.5) / root.count);
+    }
+}
+
+// A thin rail with a fill, for progress shown inside pages (the bar has its own seek line).
+export component ProgressRail inherits Rectangle {
+    in property <float> progress;
+    height: 4px;
+    border-radius: 2px;
+    background: Theme.track;
+    Rectangle {
+        x: 0;
+        width: parent.width * clamp(root.progress, 0, 1);
+        border-radius: 2px;
+        background: Theme.accent;
+    }
+}
+
+// Placeholder body for pages still to be built: the title, plus what was asked for.
+export component PageStub inherits Rectangle {
+    in property <string> title;
+    in property <string> detail;
+    PageTitle {
+        x: Theme.page-pad;
+        y: Theme.page-top;
+        width: parent.width - 2 * Theme.page-pad;
+        text: root.title;
+    }
+    if root.detail != "": Body {
+        x: Theme.page-pad;
+        y: Theme.page-top + 56px;
+        width: parent.width - 2 * Theme.page-pad;
+        height: 20px;
+        text: root.detail;
+        color: Theme.text3;
+        vertical-alignment: center;
+    }
+}
+
+// Underlined text, the tertiary action ("Continue without signing in", "Why?"): text1, the
+// underline brightening on hover; Enter presses it once tabbed to.
+export component TextLink inherits Rectangle {
+    in property <string> text;
+    in property <length> font-size: Theme.t-body;
+    in property <int> font-weight: 600;
+    // For screen readers, when the link opens or closes a detail.
+    in property <bool> expands;
+    in property <bool> expanded;
+    callback clicked();
+    width: t.preferred-width;
+    height: max(24px, t.preferred-height + 8px);
+    accessible-role: button;
+    accessible-label: root.text;
+    accessible-expandable: root.expands;
+    accessible-expanded: root.expanded;
+    accessible-action-default => { root.clicked(); }
+    // Focused from the keyboard: the ring shows (not after a click).
+    property <bool> ring;
+    fs := FocusScope {
+        focus-gained(reason) => { root.ring = reason == FocusReason.tab-navigation; }
+        focus-lost => { root.ring = false; }
+        key-pressed(e) => {
+            if e.text == Key.Return {
+                root.clicked();
+                return accept;
+            }
+            reject
+        }
+    }
+    // Above the focus scope, so a click is the touch area's.
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+    t := Text {
+        y: (parent.height - self.height) / 2 - 1px;
+        text: root.text;
+        font-family: Theme.body-font;
+        font-size: root.font-size;
+        font-weight: root.font-weight;
+        color: ta.pressed ? Theme.text2 : Theme.text1;
+        accessible-role: none;
+        animate color { duration: Theme.t-hover; }
+    }
+    Rectangle {
+        x: t.x;
+        y: t.y + t.height + 1px;
+        width: t.width;
+        height: 1px;
+        background: ta.has-hover ? Theme.text1 : Theme.text2;
+        animate background { duration: Theme.t-hover; }
+    }
+    if fs.has-focus && root.ring: Rectangle {
+        x: -4px;
+        width: parent.width + 8px;
+        border-radius: Theme.r-s;
+        border-width: 2px;
+        border-color: Theme.accent;
+    }
+}
