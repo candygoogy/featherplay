@@ -9,6 +9,8 @@
 //! script is ever waited for. A client starts as reqwest's own would (direct, or through the
 //! manual proxy), the answer is looked up in the background (`lookups`), and requests take it
 //! once it's there.
+//!
+//! `dns` tells whether this network's DNS sends YouTube's hosts somewhere that isn't Google.
 #![cfg_attr(
     test,
     allow(
@@ -18,6 +20,7 @@
     )
 )]
 
+pub mod dns;
 mod lookups;
 mod winhttp;
 

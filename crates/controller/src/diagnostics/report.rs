@@ -22,6 +22,12 @@ pub struct Report {
     /// The proxy requests go through and where it came from, without credentials
     /// (`featherplay_proxy::summary`); `None`: none.
     pub proxy: Option<String>,
+    /// Whether the DNS sends YouTube's hosts away from Google (`featherplay_proxy::dns::Dns`);
+    /// `None`: not checked yet.
+    pub dns: Option<String>,
+    /// The country YouTube last tied a stream to (`diagnostics::stream_region`), `IT`;
+    /// `None`: no stream said.
+    pub region: Option<String>,
     /// How the last helpers download failed (`SidecarError::summary`); `None`: it didn't.
     pub helpers: Option<String>,
     /// Why the system's credential store wouldn't keep the last sign-in (its error, with its
@@ -51,6 +57,8 @@ impl Report {
              ListenBrainz: {}\n\
              Discord: {}\n\
              Proxy: {}\n\
+             DNS: {}\n\
+             YouTube's region: {}\n\
              Last helpers download error: {}\n\
              Last sign-in save error: {}\n",
             self.version,
@@ -65,6 +73,8 @@ impl Report {
             on(self.listenbrainz),
             on(self.discord),
             self.proxy.as_deref().unwrap_or("none"),
+            self.dns.as_deref().unwrap_or("not checked yet"),
+            self.region.as_deref().unwrap_or("unknown"),
             self.helpers.as_deref().unwrap_or("none"),
             self.sign_in_save.as_deref().unwrap_or("none"),
         );
@@ -107,6 +117,8 @@ mod tests {
             listenbrainz: false,
             discord: true,
             proxy: None,
+            dns: None,
+            region: None,
             helpers: None,
             sign_in_save: None,
             errors: vec![
@@ -204,6 +216,31 @@ mod tests {
             text.contains("Last helpers download error: none\n"),
             "{text}"
         );
+    }
+
+    #[test]
+    fn a_dns_redirect_has_its_line() {
+        let found = "www.youtube.com resolves to 203.0.113.7, outside Google's own ranges \
+                     and unlike music.youtube.com (142.250.180.14)";
+        let text = Report {
+            dns: Some(found.into()),
+            ..report()
+        }
+        .text();
+        let with_region = Report {
+            region: Some("IT".into()),
+            ..report()
+        }
+        .text();
+        assert!(
+            with_region.contains("\nYouTube's region: IT\n"),
+            "{with_region}"
+        );
+        assert!(text.contains("\nYouTube's region: unknown\n"), "{text}");
+        let line = format!("DNS: {found}");
+        assert!(text.lines().any(|l| l == line), "no {line:?} in\n{text}");
+        let text = report().text();
+        assert!(text.contains("DNS: not checked yet\n"), "{text}");
     }
 
     #[test]

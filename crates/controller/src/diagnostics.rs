@@ -53,6 +53,8 @@ static PLAYED: Mutex<VecDeque<String>> = Mutex::new(VecDeque::new());
 static HELPERS: Mutex<Option<String>> = Mutex::new(None);
 /// Why the system's credential store wouldn't keep the last sign-in (`sign_in_kept`).
 static SIGN_IN_SAVE: Mutex<Option<String>> = Mutex::new(None);
+/// The country YouTube last put in a stream URL (`stream_region`).
+static REGION: Mutex<Option<String>> = Mutex::new(None);
 
 /// Time since the process started; the first call starts the clock.
 pub fn uptime() -> Duration {
@@ -255,6 +257,25 @@ pub fn helpers_failed(e: &featherplay_streams::SidecarError) {
     *HELPERS.lock_or_recover() = Some(e.summary());
 }
 
+/// A stream URL resolved: the country YouTube tied it to (its `gcr=`, there for songs only
+/// some countries may play) is kept for Copy diagnostics, and logged when it's new.
+pub fn stream_region(url: &str) {
+    let Some(region) = region_of(url) else { return };
+    let mut last = REGION.lock_or_recover();
+    if last.as_deref() != Some(region.as_str()) {
+        write(format_args!("youtube's region: {region}"));
+        *last = Some(region);
+    }
+}
+
+/// `IT` for a URL with `gcr=it`; `None` without one, or with anything but two letters.
+fn region_of(url: &str) -> Option<String> {
+    let query = url.split_once('?')?.1;
+    let code = query.split('&').find_map(|p| p.strip_prefix("gcr="))?;
+    (code.len() == 2 && code.bytes().all(|b| b.is_ascii_alphabetic()))
+        .then(|| code.to_ascii_uppercase())
+}
+
 /// A new sign-in was stored for the next start, or `refused`: the credential store's error,
 /// with the system's code and never the cookie header. Its log line, and Copy diagnostics names
 /// it until a sign-in is stored.
@@ -283,6 +304,8 @@ pub fn report(signed_in: bool, settings: &Settings) -> Report {
         listenbrainz: settings.scrobbling && settings.listenbrainz_enabled,
         discord: settings.discord,
         proxy: Some(featherplay_proxy::summary()),
+        dns: featherplay_proxy::dns::found().map(ToString::to_string),
+        region: REGION.lock_or_recover().clone(),
         helpers,
         sign_in_save: SIGN_IN_SAVE.lock_or_recover().clone(),
         errors,
@@ -322,6 +345,22 @@ mod tests {
         assert_eq!(r.ytdlp.as_deref(), Some("2026.10.26"));
         assert_eq!(r.deno, None);
         assert_eq!(r.version, env!("CARGO_PKG_VERSION"));
+    }
+
+    #[test]
+    fn the_region_is_read_from_a_stream_urls_gcr() {
+        let url = "https://rr1---sn-x.googlevideo.com/videoplayback?expire=1&gcr=it&c=WEB";
+        assert_eq!(region_of(url).as_deref(), Some("IT"));
+        let other = "https://x.googlevideo.com/videoplayback?gcr=al";
+        assert_eq!(region_of(other).as_deref(), Some("AL"));
+        assert_eq!(
+            region_of("https://x.googlevideo.com/videoplayback?c=WEB"),
+            None
+        );
+        assert_eq!(
+            region_of("https://x.googlevideo.com/videoplayback?gcr=x1y"),
+            None
+        );
     }
 
     #[test]

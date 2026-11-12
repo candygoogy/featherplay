@@ -19,6 +19,10 @@ use crate::scrobbler::Scrobblers;
 /// When the yt-dlp and Deno versions are read, after the start.
 const TOOL_VERSIONS_AFTER: Duration = Duration::from_secs(10);
 
+/// When the DNS is checked for a redirect of YouTube's hosts, after the start
+/// (`featherplay_proxy::dns`): after the first requests, never in their way.
+const DNS_CHECK_AFTER: Duration = Duration::from_secs(5);
+
 /// How often a long session asks for the daily `yt-dlp -U`.
 const DAILY_UPDATE: Duration = Duration::from_secs(24 * 3600);
 
@@ -71,6 +75,14 @@ impl Controller {
         // script or auto-detection is asked from here on, in the background, and logs its
         // answer itself (`featherplay_proxy`).
         log!("proxy: {}", featherplay_proxy::summary());
+        // Once, in the background: does the DNS send YouTube's hosts away from Google? It logs
+        // what it finds; Copy diagnostics and the refused songs' toast read it.
+        if opts.fixture_stream.is_none() {
+            crate::task::spawn_detached(async {
+                tokio::time::sleep(DNS_CHECK_AFTER).await;
+                let _ = tokio::task::spawn_blocking(featherplay_proxy::dns::check).await;
+            });
+        }
 
         // A dev build may point at helpers elsewhere.
         let sidecars = std::env::var_os("FEATHERPLAY_SIDECARS_DIR")

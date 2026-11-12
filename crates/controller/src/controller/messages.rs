@@ -85,6 +85,7 @@ impl Controller {
                 self.start_hints();
                 match result {
                     Ok(stream) => {
+                        crate::diagnostics::stream_region(&stream.url);
                         log!(
                             "resolved {} in {took:.1}s: itag {}, {} kbps, {}, via {}",
                             id.0,
