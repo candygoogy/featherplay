@@ -218,7 +218,8 @@ export global SettingsData {
     // "Turn off the mini player": a left click on the tray icon opens the main window instead.
     in property <bool> tray-click-opens-window;
     // Whether the desktop has a tray for the icon, and whether hotkeys can work from other
-    // apps (not on Wayland): without, their settings hide. Windows has both.
+    // apps (not on Wayland): without, their settings hide (and without a tray, the bar shows
+    // a mini player button, with Ctrl+M). Windows has both.
     in property <bool> has-tray: true;
     in property <bool> has-hotkeys: true;
     // Windows names itself in the texts about the system (its theme, its language, its

@@ -4,7 +4,9 @@
 //! window leave it open: it stays on top (the window always is), its × closes it and a press
 //! off its controls drags it. The pin lasts for that opening: every mini player opens
 //! unpinned, at the tray. Unpinned with a click that brought it from behind another window,
-//! it closes, as it would have had it been unpinned all along.
+//! it closes, as it would have had it been unpinned all along. Where the desktop has no tray
+//! (Linux without one), the bar's mini player button and Ctrl+M open and close it the same
+//! way, above the button (`toggle_from_bar`).
 //!
 //! Unpinned, it also watches which window is in front, four times a second: opened from the
 //! hidden icons' flyout (^), it never gets the activation, so it can't lose it either. And
@@ -136,6 +138,26 @@ pub fn toggle(x: i32, y: i32) {
         log!("mini player: {e}");
         close();
     }
+}
+
+/// The bar's mini player button (or Ctrl+M), shown where the desktop has no tray: toggles
+/// the mini player as a click on the tray icon does, above the button, whose top centre is
+/// at `(x, y)` in `window` (logical pixels).
+pub fn toggle_from_bar(window: &slint::Window, x: f32, y: f32) {
+    let scale = window.scale_factor();
+    // The window's content on screen: winit's inner position (the frame's title bar is
+    // above it), else Slint's.
+    let (left, top) = window
+        .with_winit_window(|w| w.inner_position().ok().map(|p| (p.x, p.y)))
+        .flatten()
+        .unwrap_or_else(|| {
+            let p = window.position();
+            (p.x, p.y)
+        });
+    toggle(
+        left + (x * scale).round() as i32,
+        top + (y * scale).round() as i32,
+    );
 }
 
 /// Builds the mini player with the main window's state, without showing it: `open` places

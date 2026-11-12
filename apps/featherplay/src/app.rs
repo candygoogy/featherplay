@@ -524,6 +524,12 @@ pub fn wire(ctx: &Rc<Ctx>, ui: &AppWindow) {
     });
     ui.global::<Frame>()
         .on_queue_toggled(|open| log!("queue panel {open}"));
+    let c = ctx.clone();
+    ui.global::<Frame>().on_toggle_mini(move |x, y| {
+        if let Some(ui) = c.window() {
+            mini::toggle_from_bar(ui.window(), x, y);
+        }
+    });
 
     sidebar::init(ctx);
     top_bar::init(ui);
@@ -975,6 +981,9 @@ fn run_window(
             }
         }
     });
+    // Whether the desktop shows the tray icon, now that `start` has put it there (Linux):
+    // Settings' tray options and the bar's mini player button, before the first frame.
+    pages::settings::tray_changed(&ctx);
 
     // Keeps running while the window is hidden in the tray, until Quit.
     let res = slint::run_event_loop_until_quit().map_err(|e| format!("event loop: {e}"));

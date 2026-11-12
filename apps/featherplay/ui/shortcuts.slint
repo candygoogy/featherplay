@@ -4,6 +4,8 @@
 // Keys a menu, a dialog or the search suggestions take for themselves (arrows, Tab, Enter)
 // aren't listed: they work as everywhere in Windows.
 
+import { SettingsData } from "pages/settings/data.slint";
+
 export enum ShortcutKind {
     play-pause,
     previous,
@@ -13,6 +15,7 @@ export enum ShortcutKind {
     volume,
     search,
     lyrics,
+    mini-player,
     back,
     forward,
     escape,
@@ -37,9 +40,19 @@ export global Shortcuts {
         { kind: ShortcutKind.repeat, label: @tr("Repeat: off, all, one"), keys: [@tr("Ctrl"), "R"] },
         { kind: ShortcutKind.volume, label: @tr("Volume up or down"), keys: ["↑", "", "↓"] },
     ];
-    out property <[ShortcutRow]> moving: [
+    // Ctrl+M only where the desktop has no tray, as the bar's mini player button (Windows
+    // always has one).
+    out property <[ShortcutRow]> moving: SettingsData.has-tray ? [
         { kind: ShortcutKind.search, label: @tr("Search"), keys: [@tr("Ctrl"), "K"] },
         { kind: ShortcutKind.lyrics, label: @tr("Lyrics on or off"), keys: [@tr("Ctrl"), "L"] },
+        { kind: ShortcutKind.back, label: @tr("Back"), keys: [@tr("Alt"), "←"] },
+        { kind: ShortcutKind.forward, label: @tr("Forward"), keys: [@tr("Alt"), "→"] },
+        { kind: ShortcutKind.escape, label: @tr("Clear the search, or leave Now playing"), keys: [@tr("Esc")] },
+        { kind: ShortcutKind.shortcuts, label: @tr("Keyboard shortcuts"), keys: [@tr("Ctrl"), "/"] },
+    ] : [
+        { kind: ShortcutKind.search, label: @tr("Search"), keys: [@tr("Ctrl"), "K"] },
+        { kind: ShortcutKind.lyrics, label: @tr("Lyrics on or off"), keys: [@tr("Ctrl"), "L"] },
+        { kind: ShortcutKind.mini-player, label: @tr("Mini player on or off"), keys: [@tr("Ctrl"), "M"] },
         { kind: ShortcutKind.back, label: @tr("Back"), keys: [@tr("Alt"), "←"] },
         { kind: ShortcutKind.forward, label: @tr("Forward"), keys: [@tr("Alt"), "→"] },
         { kind: ShortcutKind.escape, label: @tr("Clear the search, or leave Now playing"), keys: [@tr("Esc")] },

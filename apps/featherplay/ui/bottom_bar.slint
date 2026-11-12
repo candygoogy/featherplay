@@ -2,8 +2,9 @@
 // `Theme.bar-inset` in from its edges (app.slint places it). The track on the left; in the
 // middle the transport around the round play button, with the time, the seek line and the
 // length under it; Lyrics (the microphone), "Not for me" (a thumbs-down), like, volume and
-// the Up next button on the right. It reads and drives the `Player` global; `src/bar.rs`
-// connects that to the controller. The transport, Lyrics, "Not for me" and the speed pill
+// the Up next button on the right, and where the desktop has no tray, the mini player's
+// button before them. It reads and drives the `Player` global; `src/bar.rs` connects that to
+// the controller. The transport, the mini player, Lyrics, "Not for me" and the speed pill
 // share one tooltip (`BarTip`): the name, then the shortcut.
 import { Theme, Icons, Curves } from "theme.slint";
 import { Body, Cover, IconButton, Icon, PlayButton } from "parts.slint";
@@ -13,6 +14,7 @@ import { NotForMeButton, LikeButton } from "not_for_me.slint";
 import { BarTip } from "bar_tip.slint";
 import { LyricsData, LyricsState } from "pages/lyrics.slint";
 import { Chips } from "pages/content.slint";
+import { SettingsData } from "pages/settings/data.slint";
 
 // The seek line, between the time and the length: 4 px, 6 px while hovered, with round ends;
 // click or drag anywhere on it to seek. Hovered, a thumb sits at the fill's end and a tooltip
@@ -364,6 +366,33 @@ component LyricsButton inherits Rectangle {
     }
 }
 
+// The mini player, first in the right-hand group, only where the desktop has no tray
+// (`SettingsData.has-tray`; Windows always has one): elsewhere a click on the tray icon opens
+// it, and without the icon nothing would. A click opens it above the button or closes it, as
+// the icon's click does (`BottomBar.toggle-mini`).
+component MiniPlayerButton inherits Rectangle {
+    // How far above the button the tooltip ends (the bar lifts it clear of itself).
+    in property <length> above: Theme.s2;
+    callback clicked();
+    width: 36px;
+    height: 36px;
+    btn := IconButton {
+        icon: Icons.mini-player;
+        label: @tr("Mini player");
+        description: @tr("Opens or closes the mini player");
+        clicked => {
+            tip.dismiss();
+            root.clicked();
+        }
+    }
+    tip := BarTip {
+        over: btn.hovered;
+        name: @tr("Mini player");
+        hint: @tr("Ctrl+M");
+        above: root.above;
+    }
+}
+
 // The bar's play button, with its tooltip: Play or Pause, and its shortcut, Space.
 component BarPlayButton inherits Rectangle {
     // How far above the button the tooltip ends (the bar lifts it clear of itself).
@@ -540,6 +569,11 @@ export component BottomBar inherits Rectangle {
     // Up or Down from the window's keys: the volume one step up or down.
     public function step-volume(up: bool) {
         volume.step(up);
+    }
+    // The mini player's button, or Ctrl+M: the mini player opens above the button (first in
+    // the right-hand group, so at its start), or closes.
+    public function toggle-mini() {
+        Frame.toggle-mini(root.absolute-position.x + actions.x + 18px, root.absolute-position.y + actions.y);
     }
     // The middle column (the transport, the time and the line), and what's left either side
     // for the title: it stays clear of the buttons on the right at the narrowest window.
@@ -752,7 +786,12 @@ export component BottomBar inherits Rectangle {
         width: self.preferred-width;
         spacing: 4px;
         // The tooltips end `s2` above the bar (the buttons sit centred in it).
-        // Not there with lyrics off in Settings (`if`: a hidden element keeps its room).
+        // Only without a tray (`if`: a hidden element keeps its room).
+        if !SettingsData.has-tray: MiniPlayerButton {
+            above: (Theme.bar-h - 36px) / 2 + Theme.s2;
+            clicked => { root.toggle-mini(); }
+        }
+        // Not there with lyrics off in Settings.
         if LyricsData.on: LyricsButton {
             above: (Theme.bar-h - 36px) / 2 + Theme.s2;
         }

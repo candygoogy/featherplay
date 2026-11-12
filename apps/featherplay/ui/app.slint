@@ -257,6 +257,15 @@ export component AppWindow inherits Window {
                 }
                 return accept;
             }
+            // The mini player on or off, as the bar's button does: only where the desktop has
+            // no tray, as the button. Not under a menu or a dialog.
+            if !SettingsData.has-tray && e.modifiers.control && !e.modifiers.alt && !e.modifiers.meta && (e.text == "m" || e.text == "M") {
+                Shortcuts.used(ShortcutKind.mini-player);
+                if !root.overlay-open && !e.repeat {
+                    bottom-bar.toggle-mini();
+                }
+                return accept;
+            }
             // Previous, Next, Shuffle and Repeat, as the bar's buttons do: Ctrl+Left, Ctrl+Right,
             // Ctrl+S and Ctrl+R. Not while a text field has the keys (Ctrl+Left and Right move
             // by word there, and some reach here at the field's ends), nor under a menu or a

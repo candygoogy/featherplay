@@ -354,7 +354,8 @@ pub fn player_changed(ctx: &Rc<Ctx>, state: &PlayerState) {
     show_preview(ctx, &options, Some(state));
 }
 
-/// The desktop's tray came or went (`shell::tray_shown`): the tray's options show or hide.
+/// The desktop's tray came or went (`shell::tray_shown`), or the tray icon was just put
+/// there: the tray's options show or hide, and the bar's mini player button the other way.
 pub fn tray_changed(ctx: &Ctx) {
     let Some(ui) = ctx.window() else { return };
     ui.global::<SettingsData>()

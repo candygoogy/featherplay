@@ -39,6 +39,10 @@ export global Frame {
     // queue button there. Its own state: the frame's panel keeps `queue-open`.
     in-out property <bool> side-open: true;
     callback side-toggled(bool);
+    // The bar's mini player button, shown where the desktop has no tray: opens the mini
+    // player above the point given (the button's top centre, logical pixels in the window),
+    // or closes it, as a click on the tray icon does.
+    callback toggle-mini(length, length);
     // Set by keyboard actions (Alt+Left/Right, Enter in search) just before they navigate, so
     // the page appears without its enter fade: keyboard actions don't animate. Cleared once
     // the page changed.
