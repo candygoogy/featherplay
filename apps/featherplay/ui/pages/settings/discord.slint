@@ -2,8 +2,8 @@
 // them where the page has room (`discord_card.slint`).
 import { Theme, Curves } from "../../theme.slint";
 import { Body } from "../../parts.slint";
-import { DiscordPart, DiscordState, SettingId, SettingKey, SettingsData, SettingsSearch } from "data.slint";
-import { DeviceRow, Group, RowButton, Rows, SettingRow, Switch, ToggleRow } from "rows.slint";
+import { DiscordPart, DiscordState, SettingId, SettingKey, SettingsData } from "data.slint";
+import { DeviceRow, Group, RowButton, RowChoices, Rows, SettingRow, Switch, ToggleRow } from "rows.slint";
 import { DiscordPane } from "discord_card.slint";
 
 // A Discord option's rows: hovering them lights the part of the profile card the option
@@ -203,8 +203,8 @@ export component DiscordSection inherits Group {
                                 search: SettingId.discord-time;
                                 detail: @tr("What your profile shows of the track's time while it plays.");
                             }
-                            if !SettingsSearch.hit(SettingId.discord-time).hidden: VerticalLayout {
-                                padding-bottom: Theme.s2;
+                            RowChoices {
+                                search: SettingId.discord-time;
                                 for t[i] in [@tr("Progress bar"), @tr("Time elapsed only"), @tr("No time")]: DeviceRow {
                                     name: t;
                                     selected: i == SettingsData.discord-time;
@@ -221,8 +221,8 @@ export component DiscordSection inherits Group {
                                 search: SettingId.discord-status-text;
                                 detail: @tr("What your status says in member lists and DMs.");
                             }
-                            if !SettingsSearch.hit(SettingId.discord-status-text).hidden: VerticalLayout {
-                                padding-bottom: Theme.s2;
+                            RowChoices {
+                                search: SettingId.discord-status-text;
                                 for t[i] in [@tr("Listening to featherplay"), @tr("Listening to the artist"), @tr("Listening to the song title")]: DeviceRow {
                                     name: t;
                                     selected: i == SettingsData.discord-status-text;

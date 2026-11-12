@@ -280,22 +280,66 @@ export component MarkedText inherits Body {
     }
 }
 
-// A setting row's hairline on top, and its label with the detail under it. Their own
-// components, so they're compiled once: `SettingRow` takes its controls as children, so
-// Slint copies it into every row.
+// What a setting row is besides its controls, in components of their own so they're
+// compiled once: `SettingRow` takes its controls as children, so Slint copies it into
+// every row, and whatever it holds itself is code in each of them.
+
+// The fill over a row a search suggestion opened: it holds while `lit-on`, then fades.
+component LitFill inherits Rectangle {
+    border-radius: Theme.r-m;
+    background: Theme.accent-tonal-faint;
+    opacity: SettingsSearch.lit-on ? 1 : 0;
+    animate opacity {
+        duration: SettingsSearch.lit-on ? 0ms : (Theme.moving ? 600ms : 0ms);
+        easing: ease-out;
+    }
+}
+
+// The row's hairline on top, none on the first row its group shows while filtering.
 component RowDivider {
-    in property <bool> shown;
-    if root.shown: Rectangle {
+    in property <SettingId> search;
+    in property <bool> divider;
+    if root.divider && !SettingsSearch.hit(root.search).first: Rectangle {
         y: 0;
         height: 1px;
         background: Theme.hairline;
     }
 }
 
+// Behind the row, across it: the fill while a search suggestion has it lit, and the
+// hairline. Lit, it says where the row is when the page asks, for the page to bring it
+// into view.
+component RowBack inherits Rectangle {
+    in property <SettingId> search;
+    in property <bool> divider;
+    property <bool> lit: root.search != SettingId.none && SettingsSearch.lit == root.search;
+    property <int> measure: root.lit ? SettingsSearch.lit-measure : 0;
+    changed measure => {
+        SettingsSearch.lit-y = self.absolute-position.y;
+        SettingsSearch.lit-measured = self.measure;
+    }
+    // Across the row, 12 px in from the panel's edges.
+    if root.lit: LitFill {
+        x: -Theme.s3;
+        width: parent.width + 2 * Theme.s3;
+        height: parent.height;
+    }
+    RowDivider {
+        search: root.search;
+        divider: root.divider;
+    }
+}
+
+// The row's name and the detail under it, the search's words marked. `hidden` is the
+// search's word on the whole row.
 component RowLabel inherits VerticalLayout {
     in property <string> label;
     in property <string> detail;
-    in property <RowHit> hit;
+    in property <SettingId> search;
+    property <RowHit> hit: SettingsSearch.hit(root.search);
+    // Read from the callback, not `hit`: Slint would copy `root.hit.hidden` into each
+    // place that reads it, the whole `RowHit` and all, in every row.
+    out property <bool> hidden: SettingsSearch.hit(root.search).hidden;
     property <[TextMark]> none;
     alignment: center;
     spacing: Theme.s1;
@@ -327,17 +371,6 @@ component RowLabel inherits VerticalLayout {
     }
 }
 
-// The fill over a row a search suggestion opened: it holds while `lit-on`, then fades.
-component LitFill inherits Rectangle {
-    border-radius: Theme.r-m;
-    background: Theme.accent-tonal-faint;
-    opacity: SettingsSearch.lit-on ? 1 : 0;
-    animate opacity {
-        duration: SettingsSearch.lit-on ? 0ms : (Theme.moving ? 600ms : 0ms);
-        easing: ease-out;
-    }
-}
-
 // One setting: its name and a line of detail on the left, the control on the right. While
 // the search hides it, it takes no room.
 export component SettingRow inherits Rectangle {
@@ -346,44 +379,34 @@ export component SettingRow inherits Rectangle {
     in property <bool> divider: true;
     // Its row in the search's table (none: never hidden, nothing marked).
     in property <SettingId> search: SettingId.none;
-    property <RowHit> hit: SettingsSearch.hit(root.search);
-    property <bool> lit: root.search != SettingId.none && SettingsSearch.lit == root.search;
-    min-height: root.hit.hidden ? 0px : lay.min-height;
-    preferred-height: root.hit.hidden ? 0px : lay.preferred-height;
-    visible: !root.hit.hidden;
-    // Picked from the suggestions: when the page asks, where it is, for the page to bring
-    // it into view.
-    property <int> measure: root.lit ? SettingsSearch.lit-measure : 0;
-    changed measure => {
-        SettingsSearch.lit-y = self.absolute-position.y;
-        SettingsSearch.lit-measured = self.measure;
-    }
-    // Across the row, 12 px in from the panel's edges.
-    if root.lit: LitFill {
-        x: -Theme.s3;
-        width: parent.width + 2 * Theme.s3;
-        height: parent.height;
-    }
-    RowDivider {
-        shown: root.divider && !root.hit.first;
-    }
-    lay := HorizontalLayout {
-        padding-top: Rows.pad-y;
-        padding-bottom: Rows.pad-y;
-        spacing: Theme.s6;
-        RowLabel {
-            horizontal-stretch: 1;
-            label: root.label;
-            detail: root.detail;
-            hit: root.hit;
+    min-height: text.hidden ? 0px : lay.min-height;
+    preferred-height: text.hidden ? 0px : lay.preferred-height;
+    // Hidden on an element inside it, not on the row itself: `visible` on a component's
+    // root has Slint copy the component into every place it's used, ToggleRow's 28 too.
+    Rectangle {
+        visible: !text.hidden;
+        RowBack {
+            search: root.search;
+            divider: root.divider;
         }
-        VerticalLayout {
-            alignment: center;
-            horizontal-stretch: 0;
-            HorizontalLayout {
-                alignment: end;
-                spacing: Theme.s2;
-                @children
+        lay := HorizontalLayout {
+            padding-top: Rows.pad-y;
+            padding-bottom: Rows.pad-y;
+            spacing: Theme.s6;
+            text := RowLabel {
+                horizontal-stretch: 1;
+                label: root.label;
+                detail: root.detail;
+                search: root.search;
+            }
+            VerticalLayout {
+                alignment: center;
+                horizontal-stretch: 0;
+                HorizontalLayout {
+                    alignment: end;
+                    spacing: Theme.s2;
+                    @children
+                }
             }
         }
     }
@@ -411,6 +434,20 @@ export component RowButton inherits Pill {
 // Chips in a row, as small as its buttons.
 export component RowChips inherits Chips {
     height: 32px;
+}
+
+// The radio rows under a setting's row (`DeviceRow`s), hidden with the row while the search
+// hides it. By `visible`, as the rows are, not by an `if`: each `if` is code of its own.
+export component RowChoices inherits Rectangle {
+    // The row they're the choices of.
+    in property <SettingId> search;
+    property <bool> shown: !SettingsSearch.hit(root.search).hidden;
+    height: root.shown ? list.preferred-height : 0px;
+    visible: root.shown;
+    list := VerticalLayout {
+        padding-bottom: Theme.s2;
+        @children
+    }
 }
 
 // One output device: a radio mark and the name.

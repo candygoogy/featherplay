@@ -1,7 +1,6 @@
 // Settings' Sound section. Its Custom… chip opens the Equalizer dialog (`equalizer.slint`).
-import { Theme } from "../../theme.slint";
-import { SettingId, SettingKey, SettingsData, SettingsSearch } from "data.slint";
-import { DeviceRow, Group, RowChips, SettingRow, ToggleRow } from "rows.slint";
+import { SettingId, SettingKey, SettingsData } from "data.slint";
+import { DeviceRow, Group, RowChips, RowChoices, SettingRow, ToggleRow } from "rows.slint";
 
 export component SoundSection inherits Group {
     title: @tr("Sound");
@@ -49,8 +48,8 @@ export component SoundSection inherits Group {
         search: SettingId.output-device;
         detail: @tr("If the device goes away, playback pauses and moves to the system default.");
     }
-    if !SettingsSearch.hit(SettingId.output-device).hidden: VerticalLayout {
-        padding-bottom: Theme.s2;
+    RowChoices {
+        search: SettingId.output-device;
         for d[i] in SettingsData.devices: DeviceRow {
             name: d;
             selected: i == SettingsData.device-index;

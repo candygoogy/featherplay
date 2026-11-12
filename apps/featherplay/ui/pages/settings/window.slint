@@ -5,7 +5,7 @@ import { Theme, Appearance } from "../../theme.slint";
 import { Body } from "../../parts.slint";
 import { Chips } from "../content.slint";
 import { SettingId, SettingKey, SettingsData, SettingsDialog, SettingsSearch } from "data.slint";
-import { DeviceRow, Field, Group, RowButton, SettingRow, ToggleRow } from "rows.slint";
+import { DeviceRow, Field, Group, RowButton, RowChoices, SettingRow, ToggleRow } from "rows.slint";
 
 // An accent: a dot of its colour, ringed in `text1` when it's the one picked.
 component Swatch inherits Rectangle {
@@ -213,8 +213,8 @@ export component WindowSection inherits Group {
                 search: SettingId.close-action;
                 detail: @tr("In the tray, the music keeps going; quit from the tray icon's menu.");
             }
-            if !SettingsSearch.hit(SettingId.close-action).hidden: VerticalLayout {
-                padding-bottom: Theme.s2;
+            RowChoices {
+                search: SettingId.close-action;
                 for t[i] in [@tr("Ask"), @tr("Close featherplay"), @tr("Keep playing in the tray")]: DeviceRow {
                     name: t;
                     selected: i == SettingsData.close-action;
