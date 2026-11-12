@@ -42,7 +42,9 @@ cpal = "=0.18.2"
 # auto-detection are `crates/proxy`'s, whose builder every client starts from.
 reqwest = { version = "=0.13.5", default-features = false, features = ["system-proxy"] }
 tokio = "=1.54.1"
-souvlaki = "=0.8.3"
+# Windows only: the media card (SMTC). Neither of its D-Bus backends: Linux's MPRIS is
+# `platform::media_controls`' own, over zbus.
+souvlaki = { version = "=0.9.3", default-features = false }
 tray-icon = "=0.26.1"
 global-hotkey = "=0.9.0"
 tauri-winrt-notification = "=0.8.1"

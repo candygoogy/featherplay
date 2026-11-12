@@ -581,7 +581,7 @@ alone:
 
 | Older copy | Pulled in by | To remove it |
 |---|---|---|
-| `windows` 0.44 | souvlaki 0.8.3 | souvlaki 0.9 (changes the media-controls code) |
+| `windows` 0.44 | souvlaki 0.8.3 | Gone in phase 5: souvlaki 0.9.3, on `windows` 0.62 like the rest |
 | `windows-sys` 0.59 | global-hotkey 0.9 | global-hotkey 0.10 (changes the hotkey code) |
 | `windows-sys` 0.52 | winit 0.30, glutin | upstream |
 | `muda` 0.19, `keyboard-types` 0.7 | Slint's winit backend (vendored) | patching the vendored backend; tray-icon uses muda 0.21 |
@@ -591,8 +591,9 @@ alone:
 | `hashbrown` 0.14, 0.16 | rowan, clru (Slint) | upstream |
 | `smol_str` 0.2, `syn` 2 | winit; proc macros (build time) | upstream |
 
-The two upgrades change Windows behaviour, so they wait for a decision (phase 5 looks at
-souvlaki again for MPRIS).
+The two upgrades change Windows behaviour, so they wait for a decision. Phase 5 took
+souvlaki 0.9.3 for the Windows media card: the same SMTC calls on `windows` 0.62, so `windows`
+0.44 left the tree.
 
 The plan as it was:
 
