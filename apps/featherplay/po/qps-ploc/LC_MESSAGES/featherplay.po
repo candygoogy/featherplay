@@ -98,6 +98,10 @@ msgid "Windows keeps port {} for itself, so Amuse can't reach featherplay."
 msgstr "[Windows keeps port {} for itself, so Amuse can't reach featherplay.]"
 
 #: ../../crates/controller/src/controller/local_api.rs:263
+msgid "The system won't let featherplay use port {}, so Amuse can't reach it."
+msgstr "[The system won't let featherplay use port {}, so Amuse can't reach it.]"
+
+#: ../../crates/controller/src/controller/local_api.rs:267
 msgid "featherplay couldn't listen on port {} for Amuse."
 msgstr "[featherplay couldn't listen on port {} for Amuse.]"
 
@@ -418,9 +422,13 @@ msgstr "[featherplay is still running in the tray]"
 msgid "Right-click the tray icon to show the window or quit."
 msgstr "[Right-click the tray icon to show the window or quit.]"
 
-#: src/language.rs:41
+#: src/language.rs:42
 msgid "Windows default"
 msgstr "[Windows default]"
+
+#: src/language.rs:44 src/pages/settings/sound.rs:173
+msgid "System default"
+msgstr "[System default]"
 
 #: src/lyrics/lookup.rs:24
 msgid "Lyrics from LRCLIB"
@@ -526,11 +534,15 @@ msgid_plural "Up to date. Checked {n} days ago."
 msgstr[0] "[Up to date. Checked {n} day ago.]"
 msgstr[1] "[Up to date. Checked {n} days ago.]"
 
-#: src/pages/about.rs:207
+#: src/pages/about.rs:202
+msgid "SIL Open Font License 1.1. The body face, embedded."
+msgstr "[SIL Open Font License 1.1. The body face, embedded.]"
+
+#: src/pages/about.rs:221
 msgid "Command copied"
 msgstr "[Command copied]"
 
-#: src/pages/about.rs:223 src/pages/about.rs:230
+#: src/pages/about.rs:237 src/pages/about.rs:244
 msgid "Diagnostics copied"
 msgstr "[Diagnostics copied]"
 
@@ -647,10 +659,6 @@ msgstr "[A Last.fm API key and its shared secret are 32 letters and digits each.
 #: src/pages/settings/scrobbling.rs:108
 msgid "Paste your user token first."
 msgstr "[Paste your user token first.]"
-
-#: src/pages/settings/sound.rs:173
-msgid "System default"
-msgstr "[System default]"
 
 #: src/pages/settings/sound.rs:181
 msgid "{} (not connected)"
@@ -1682,110 +1690,117 @@ msgstr "[It may be private or removed. Try searching for its title.]"
 msgid "Check the spelling or try another filter."
 msgstr "[Check the spelling or try another filter.]"
 
-#: ui/pages/settings.slint:154 ui/sidebar.slint:396
+#: ui/pages/settings.slint:155 ui/sidebar.slint:396
 msgid "Settings"
 msgstr "[Settings]"
 
-#: ui/pages/settings.slint:197
+#: ui/pages/settings.slint:198
 msgid "Settings sections"
 msgstr "[Settings sections]"
 
-#: ui/pages/settings.slint:198 ui/pages/settings/playback.slint:7
-#: ui/pages/settings.slint:198 ui/pages/settings/playback.slint:7
+#: ui/pages/settings.slint:199 ui/pages/settings/playback.slint:7
+#: ui/pages/settings.slint:199 ui/pages/settings/playback.slint:7
 msgid "Playback"
 msgstr "[Playback]"
 
-#: ui/pages/settings.slint:198 ui/pages/settings/sound.slint:7
+#: ui/pages/settings.slint:199 ui/pages/settings/sound.slint:7
 msgid "Sound"
 msgstr "[Sound]"
 
-#: ui/pages/settings.slint:198 ui/pages/settings/scrobbling.slint:6
+#: ui/pages/settings.slint:199 ui/pages/settings/scrobbling.slint:6
 msgid "Scrobbling"
 msgstr "[Scrobbling]"
 
-#: ui/pages/settings.slint:198 ui/pages/settings/discord.slint:79
+#: ui/pages/settings.slint:199 ui/pages/settings/discord.slint:79
 msgid "Discord"
 msgstr "[Discord]"
 
-#: ui/pages/settings.slint:198 ui/pages/settings/local_api.slint:7
+#: ui/pages/settings.slint:199 ui/pages/settings/local_api.slint:7
 msgid "Local API"
 msgstr "[Local API]"
 
-#: ui/pages/settings.slint:198 ui/pages/settings/window.slint:204
+#: ui/pages/settings.slint:199 ui/pages/settings/window.slint:204
 msgid "Window"
 msgstr "[Window]"
 
-#: ui/pages/settings.slint:198 ui/pages/settings/account.slint:11
-#: ui/pages/settings.slint:198 ui/pages/settings/account.slint:11
+#: ui/pages/settings.slint:199 ui/pages/settings/account.slint:11
+#: ui/pages/settings.slint:199 ui/pages/settings/account.slint:11
 msgid "Account"
 msgstr "[Account]"
 
-#: ui/pages/settings.slint:225
+#: ui/pages/settings.slint:226
 msgid "Last.fm API settings"
 msgstr "[Last.fm API settings]"
 
 #. Two sentences: whose API account is in use, then how to make one.
-#: ui/pages/settings.slint:227
+#: ui/pages/settings.slint:228
 msgid "Your own API account is in use."
 msgstr "[Your own API account is in use.]"
 
-#: ui/pages/settings.slint:228
+#: ui/pages/settings.slint:229
 msgid "featherplay's own API account is in use; you can use yours instead."
 msgstr "[featherplay's own API account is in use; you can use yours instead.]"
 
-#: ui/pages/settings.slint:229
+#: ui/pages/settings.slint:230
 msgid "This build has no API account of its own, so Last.fm needs yours."
 msgstr "[This build has no API account of its own, so Last.fm needs yours.]"
 
-#: ui/pages/settings.slint:230
+#: ui/pages/settings.slint:231
 msgid ""
 "Create one at last.fm/api/account/create, leaving the callback URL empty. "
 "Saving signs you out of Last.fm."
 msgstr "[Create one at last.fm/api/account/create, leaving the callback URL empty. Saving signs you out of Last.fm.]"
 
-#: ui/pages/settings.slint:232
+#: ui/pages/settings.slint:233
 msgid "Remove your key"
 msgstr "[Remove your key]"
 
-#: ui/pages/settings.slint:238
+#: ui/pages/settings.slint:239
 msgid "API key"
 msgstr "[API key]"
 
-#: ui/pages/settings.slint:239
+#: ui/pages/settings.slint:240
 msgid "Enter a new key to replace yours"
 msgstr "[Enter a new key to replace yours]"
 
-#: ui/pages/settings.slint:239
+#: ui/pages/settings.slint:240
 msgid "32 letters and digits"
 msgstr "[32 letters and digits]"
 
-#: ui/pages/settings.slint:244
+#: ui/pages/settings.slint:245
 msgid "Shared secret"
 msgstr "[Shared secret]"
 
-#: ui/pages/settings.slint:245
+#: ui/pages/settings.slint:246
 msgid "Shown below the key on Last.fm"
 msgstr "[Shown below the key on Last.fm]"
 
-#: ui/pages/settings.slint:255
+#: ui/pages/settings.slint:256
 msgid "ListenBrainz token"
 msgstr "[ListenBrainz token]"
 
-#: ui/pages/settings.slint:256
+#. Where the token is kept: the same store as the session (`SignInData`).
+#: ui/pages/settings.slint:258
 msgid ""
 "Paste the user token from listenbrainz.org/settings. featherplay checks it "
 "with ListenBrainz, then keeps it in Windows Credential Manager."
 msgstr "[Paste the user token from listenbrainz.org/settings. featherplay checks it with ListenBrainz, then keeps it in Windows Credential Manager.]"
 
-#: ui/pages/settings.slint:262
+#: ui/pages/settings.slint:259
+msgid ""
+"Paste the user token from listenbrainz.org/settings. featherplay checks it "
+"with ListenBrainz, then keeps it in your keyring."
+msgstr "[Paste the user token from listenbrainz.org/settings. featherplay checks it with ListenBrainz, then keeps it in your keyring.]"
+
+#: ui/pages/settings.slint:265
 msgid "User token"
 msgstr "[User token]"
 
-#: ui/pages/settings.slint:263
+#: ui/pages/settings.slint:266
 msgid "Paste a new token to replace yours"
 msgstr "[Paste a new token to replace yours]"
 
-#: ui/pages/settings.slint:263
+#: ui/pages/settings.slint:266
 msgid "Paste your user token"
 msgstr "[Paste your user token]"
 
