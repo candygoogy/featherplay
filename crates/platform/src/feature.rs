@@ -63,19 +63,20 @@ pub fn supports(feature: Feature) -> bool {
     }
 }
 
-/// Whether this build's OS has `feature`. Linux is stubs until phase 5, so none yet but the
-/// secret store, which is there when a Secret Service answers on the session bus (asked once,
-/// on first use). The sign-in has no window of the app's own on Linux: there's no WebView2.
+/// Whether this build's OS has `feature`. On Linux some depend on the session bus, asked once
+/// on first use: the secret store when a Secret Service answers there, notifications when a
+/// notification server does, the media controls (MPRIS) when there's a session bus at all.
+/// The sign-in has no window of the app's own on Linux: there's no WebView2.
 #[cfg(target_os = "linux")]
 pub fn supports(feature: Feature) -> bool {
     match feature {
         Feature::SecretStorage => crate::credentials::available(),
+        Feature::Notifications => crate::notify::available(),
+        Feature::MediaControls => crate::linux::bus::session().is_some(),
         Feature::TaskbarButtons
         | Feature::Tray
         | Feature::MiniPlayerPlacement
         | Feature::GlobalHotkeys
-        | Feature::Notifications
-        | Feature::MediaControls
         | Feature::WebViewSignIn
         | Feature::InPlaceUpdate
         | Feature::TitleBarColour => false,
@@ -101,8 +102,13 @@ mod tests {
     #[test]
     fn each_platform_answers_for_every_feature() {
         for feature in Feature::ALL {
-            // On Linux it depends on the session's Secret Service (the credentials tests).
-            if cfg!(target_os = "linux") && feature == Feature::SecretStorage {
+            // On Linux these depend on the session bus (their own modules' tests).
+            let on_the_bus = [
+                Feature::SecretStorage,
+                Feature::Notifications,
+                Feature::MediaControls,
+            ];
+            if cfg!(target_os = "linux") && on_the_bus.contains(&feature) {
                 continue;
             }
             assert_eq!(supports(feature), cfg!(windows), "{feature:?}");

@@ -11,6 +11,15 @@ pub enum MediaEvent {
     Previous,
     /// Bring the app's window forward.
     Show,
+    /// Jump to this point of the song. Only Linux's MPRIS sends the seek and quit events: the
+    /// Windows media card has no seek bar of featherplay's, and no Quit.
+    SeekTo(Duration),
+    /// Jump this far back.
+    SeekBack(Duration),
+    /// Jump this far ahead.
+    SeekForward(Duration),
+    /// Quit the app, as the tray's Quit does.
+    Quit,
 }
 
 /// The current track and playback state, as the media controls show them.

@@ -1507,6 +1507,7 @@ dependencies = [
  "windows",
  "windows-native-keyring-store",
  "yeslogic-fontconfig-sys",
+ "zbus",
  "zbus-secret-service-keyring-store",
 ]
 

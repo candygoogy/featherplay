@@ -69,6 +69,9 @@ windows = "=0.62.2"
 yeslogic-fontconfig-sys = "=6.0.1"
 # The clipboard for `platform::clipboard` (Slint's winit backend uses it for its own).
 arboard = { version = "=3.7.0", default-features = false }
+# Linux only, in the lock tree already (Slint, the Secret Service store): the session bus that
+# `platform::media_controls` serves MPRIS on and `platform::notify` sends notifications over.
+zbus = "=5.19.0"
 # The window handle `featherplay-platform` takes, and that the app reads out of Slint's window.
 raw-window-handle = "=0.6.2"
 serde = { version = "=1.0.229", features = ["derive"] }

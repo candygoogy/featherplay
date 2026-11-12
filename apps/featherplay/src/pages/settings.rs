@@ -421,6 +421,9 @@ fn show(ctx: &Ctx) {
     show_preview(ctx, &s.discord_options, ctx.player().as_ref());
     show_custom(&data, s.custom_accent);
     data.set_notifications(s.notifications);
+    data.set_has_notifications(featherplay_platform::supports(
+        featherplay_platform::Feature::Notifications,
+    ));
     data.set_close_action(close_action_index(s.close_action));
     data.set_tray_click_opens_window(s.tray_click_opens_window);
     data.set_tooltips(s.tooltips);

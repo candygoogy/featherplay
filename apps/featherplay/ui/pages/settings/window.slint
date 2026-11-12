@@ -265,7 +265,7 @@ export component WindowSection inherits Group {
             }
         }
         if SettingsData.accent == SettingsData.accents.length + 1: CustomPicker { }
-        ToggleRow {
+        if SettingsData.has-notifications: ToggleRow {
             label: @tr("Track notifications");
             detail: @tr("Show a notification when the track changes.");
             key: SettingKey.notifications;

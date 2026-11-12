@@ -593,7 +593,8 @@ alone:
 
 The two upgrades change Windows behaviour, so they wait for a decision. Phase 5 took
 souvlaki 0.9.3 for the Windows media card: the same SMTC calls on `windows` 0.62, so `windows`
-0.44 left the tree.
+0.44 left the tree. It stays Windows only: its MPRIS backends poll every 10 ms, so Linux serves
+MPRIS itself over zbus (`platform::media_controls`).
 
 The plan as it was:
 

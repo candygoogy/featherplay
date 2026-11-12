@@ -210,6 +210,9 @@ export global SettingsData {
     in property <string> amuse-message;
     // Window.
     in property <bool> notifications;
+    // The system shows notifications (Linux: a notification server is running); else the
+    // "Track notifications" switch is hidden.
+    in property <bool> has-notifications: true;
     // What the close button does: 0 ask, 1 close featherplay, 2 keep playing in the tray.
     in property <int> close-action;
     // "Turn off the mini player": a left click on the tray icon opens the main window instead.

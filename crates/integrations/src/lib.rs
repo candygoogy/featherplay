@@ -68,6 +68,10 @@ impl From<MediaEvent> for UiCommand {
             MediaEvent::Next => UiCommand::Next,
             MediaEvent::Previous => UiCommand::Previous,
             MediaEvent::Show => UiCommand::Show,
+            MediaEvent::SeekTo(at) => UiCommand::SeekTo(at),
+            MediaEvent::SeekBack(by) => UiCommand::SeekBack(by),
+            MediaEvent::SeekForward(by) => UiCommand::SeekForward(by),
+            MediaEvent::Quit => UiCommand::Quit,
         }
     }
 }
