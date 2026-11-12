@@ -19,6 +19,9 @@
 //! <https://github.com/linebender/parley/issues/597>). They're only reached for a character
 //! every earlier family lacks, and fontique opens a family's font file the first time it's
 //! reached, so nothing loads up front. Fonts missing from a system are skipped.
+//!
+//! On Linux fontique asks fontconfig instead of DirectWrite, and the same two gaps are
+//! there; `featherplay_platform::fonts` finds the families for them through fontconfig.
 
 use i_slint_core::context::with_global_context;
 use i_slint_core::platform::PlatformError;

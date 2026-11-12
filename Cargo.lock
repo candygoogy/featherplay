@@ -1530,6 +1530,7 @@ dependencies = [
 name = "featherplay-platform"
 version = "0.2.2"
 dependencies = [
+ "arboard",
  "featherplay-core",
  "flate2",
  "keyring-core",
@@ -1544,6 +1545,7 @@ dependencies = [
  "webview2-com",
  "windows 0.62.2",
  "windows-native-keyring-store",
+ "yeslogic-fontconfig-sys",
  "zbus-secret-service-keyring-store",
 ]
 

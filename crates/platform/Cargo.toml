@@ -71,10 +71,15 @@ windows = { workspace = true, features = [
 [target.'cfg(target_os = "linux")'.dependencies]
 # `credentials`: the Secret Service store.
 zbus-secret-service-keyring-store = { workspace = true }
-# `browsers::launch`: the DevTools pipe on descriptors 3 and 4, the browser's process group.
+# `browsers::launch`: the DevTools pipe on descriptors 3 and 4, the browser's process group;
+# `thread`, `system`, `memory` and `session_end`: scheduler, time, allocator and signal calls.
 libc = { workspace = true }
 # `browsers`: the browsers' JSON policy files.
 serde_json = { workspace = true }
+# `fonts`: asks fontconfig for the fallback families.
+yeslogic-fontconfig-sys = { workspace = true }
+# `clipboard`: the X11 or Wayland clipboard, as Slint's winit backend reaches it.
+arboard = { workspace = true, features = ["wayland-data-control"] }
 
 [build-dependencies]
 # Renders the colour Tri-vane (apps/featherplay/ui/logo/tri-vane{,-light}{,-16,-24}.svg) for the tray.

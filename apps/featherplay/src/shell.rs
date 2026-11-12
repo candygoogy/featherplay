@@ -266,7 +266,11 @@ pub fn stand_in_handle(n: u32) -> Handle {
 }
 
 fn attach(window: Handle, tx: Sender<UiCommand>) {
+    // The handle's `Debug` names its kind elsewhere (`X11 0x…`, `Wayland 0x…`).
+    #[cfg(windows)]
     log!("window ready, HWND {window:?}");
+    #[cfg(not(windows))]
+    log!("window ready, {window:?}");
     let t = Instant::now();
     let card = tx.clone();
     let on_media = move |event| {

@@ -805,7 +805,10 @@ pub fn run(opts: Options, app: AppOptions) -> ExitCode {
     // Sign-out, shutdown, an upgrade or the uninstaller: quit as the tray's Quit does.
     if let Err(e) = session_end::listen(
         || {
+            #[cfg(windows)]
             log!("Windows asked featherplay to close");
+            #[cfg(not(windows))]
+            log!("the system asked featherplay to close (SIGTERM or SIGHUP)");
             closing();
             shell::quit();
         },

@@ -58,9 +58,15 @@ windows-native-keyring-store = { version = "=1.1.0", default-features = false }
 # works from any thread with no runtime around; the session with the service is encrypted
 # with Rust's crypto crates (aes, cbc, hkdf, sha2), no OpenSSL.
 zbus-secret-service-keyring-store = { version = "=1.0.1", features = ["rt-async-io-crypto-rust"] }
-# Linux: the descriptors and process group the browser sign-in starts its browser with.
+# Linux: the descriptors and process group the browser sign-in starts its browser with;
+# thread priority, CPU times, the local time and signals in `platform`'s Linux module.
 libc = "=0.2.191"
 windows = "=0.62.2"
+# Linux only, all in the lock tree already through Slint. fontconfig's C API, linked as
+# fontique links it: `platform::fonts` asks it for the fallback families.
+yeslogic-fontconfig-sys = "=6.0.1"
+# The clipboard for `platform::clipboard` (Slint's winit backend uses it for its own).
+arboard = { version = "=3.7.0", default-features = false }
 # The window handle `featherplay-platform` takes, and that the app reads out of Slint's window.
 raw-window-handle = "=0.6.2"
 serde = { version = "=1.0.229", features = ["derive"] }
