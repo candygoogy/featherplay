@@ -68,10 +68,11 @@ env:
   # Opus decoder, from 30 MB on 2026-10-31).
   # The helpers (yt-dlp, Deno) are downloaded at run time and don't count.
   MAX_EXE_BYTES: "32000000"
-  # The Linux binary (stripped; the same one in both Linux files) must stay at 31 MB or
-  # less: 29.3 MB at the first measurement (2026-11-12), before the tray and the media
-  # controls came.
-  MAX_LINUX_BIN_BYTES: "31000000"
+  # The Linux binary (stripped; the same one in both Linux files) must stay at 33 MB or
+  # less: 29.3 MB at the first measurement (2026-11-12), 30.3 MB with the tray and the media
+  # controls, 32.1 MB with rustls compiled in instead of the system's OpenSSL (raised from
+  # 31 MB on 2026-11-12, so no distro needs a particular OpenSSL).
+  MAX_LINUX_BIN_BYTES: "33000000"
   # The newest glibc the Linux binary may need: that of ubuntu-22.04, where it's built. It
   # then runs on Ubuntu 22.04, Debian 12, Fedora 36 and anything newer.
   LINUX_MAX_GLIBC: "2.35"
