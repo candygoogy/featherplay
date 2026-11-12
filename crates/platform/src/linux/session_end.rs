@@ -3,7 +3,8 @@
 //! Windows' end-of-session messages do, so the session is saved first. A second signal
 //! ends the process at once. Ctrl+C (`SIGINT`) is the controller's own.
 //!
-//! Second launches aren't heard here yet: `listen` drops its `Show`.
+//! A second launch's request to show the window comes through the single-instance socket,
+//! which `listen` opens (`instance::serve`), as Windows answers it from its end-session window.
 
 use std::sync::atomic::{AtomicI32, Ordering};
 
@@ -25,8 +26,8 @@ extern "C" fn on_signal(_signal: libc::c_int) {
 }
 
 /// Calls `on_end` (once, on a thread of its own) when the process gets `SIGTERM` or
-/// `SIGHUP`. `show` isn't used yet.
-pub fn listen(on_end: impl FnOnce() + Send + 'static, _show: Option<Show>) -> Result<(), String> {
+/// `SIGHUP`, and answers a second launch's request to show the window with `show`.
+pub fn listen(on_end: impl FnOnce() + Send + 'static, show: Option<Show>) -> Result<(), String> {
     let mut fds = [0 as libc::c_int; 2];
     // SAFETY: a valid out array of two descriptors.
     if unsafe { libc::pipe2(fds.as_mut_ptr(), libc::O_CLOEXEC) } != 0 {
@@ -64,8 +65,8 @@ pub fn listen(on_end: impl FnOnce() + Send + 'static, _show: Option<Show>) -> Re
             }
             on_end();
         })
-        .map(|_| ())
-        .map_err(|e| format!("session end: thread: {e}"))
+        .map_err(|e| format!("session end: thread: {e}"))?;
+    show.map_or(Ok(()), crate::instance::serve)
 }
 
 fn set_handler(signal: libc::c_int, handler: libc::sighandler_t) -> std::io::Result<()> {
