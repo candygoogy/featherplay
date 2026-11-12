@@ -28,5 +28,6 @@ updates itself.
 What it needs: glibc 2.35 or newer (Ubuntu 22.04, Debian 12, Fedora 36 or newer), OpenSSL 3,
 fontconfig, FreeType and ALSA (with PipeWire or PulseAudio behind it, as desktops have), and
 a Wayland or X11 session (libwayland-client, libxkbcommon, or libX11 and libxcb). A desktop
-distribution has all of these. Settings go in ~/.config/featherplay, the cache in
-~/.cache/featherplay.
+distribution has all of these, but for one: Fedora 45 and newer ship OpenSSL 4, so there
+OpenSSL 3 is a package of its own (sudo dnf install openssl3-libs). Settings go in
+~/.config/featherplay, the cache in ~/.cache/featherplay.

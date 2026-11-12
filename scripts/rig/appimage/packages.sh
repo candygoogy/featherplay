@@ -38,7 +38,13 @@ ubuntu:sound | debian:sound)
     pkgs="pulseaudio pulseaudio-utils libasound2-plugins"
     ;;
 fedora:runtime)
-    pkgs="fontconfig freetype alsa-lib openssl-libs libX11 libX11-xcb libXcursor libXi libxcb
+    # Fedora 45 moved openssl-libs to OpenSSL 4 (libssl.so.4); OpenSSL 3, which the binary
+    # links, is openssl3-libs there.
+    ssl=openssl-libs
+    if dnf -q repoquery --qf '%{name}\n' openssl3-libs 2>/dev/null | grep -q .; then
+        ssl=openssl3-libs
+    fi
+    pkgs="fontconfig freetype alsa-lib $ssl libX11 libX11-xcb libXcursor libXi libxcb
           libxkbcommon libxkbcommon-x11 libwayland-client dejavu-sans-fonts"
     ;;
 fedora:rig)
