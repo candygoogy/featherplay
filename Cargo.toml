@@ -36,7 +36,6 @@ slint = { version = "=1.18.1", default-features = false }
 slint-build = "=1.18.1"
 ytmapi-rs = { version = "=0.3.3", default-features = false }
 rodio = { version = "=0.23.0", default-features = false }
-cpal = "=0.18.2"
 # `system-proxy`: every client goes through Windows' manual proxy when one is set, as it does
 # through `HTTPS_PROXY`/`HTTP_PROXY` (hyper-util reads both). A proxy script and
 # auto-detection are `crates/proxy`'s, whose builder every client starts from.

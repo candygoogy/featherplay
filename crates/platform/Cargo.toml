@@ -90,10 +90,6 @@ ksni = { workspace = true }
 # placed with.
 x11rb = { workspace = true, features = ["randr", "resource_manager"] }
 
-[target.'cfg(target_os = "linux")'.dev-dependencies]
-# The tray test's stand-in StatusNotifierWatcher and its calls to the item.
-zbus = { workspace = true }
-
 [build-dependencies]
 # Renders the colour Tri-vane (apps/featherplay/ui/logo/tri-vane{,-light}{,-16,-24}.svg) for the tray.
 resvg = { workspace = true }
