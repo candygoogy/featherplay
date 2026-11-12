@@ -63,10 +63,13 @@ pub fn supports(feature: Feature) -> bool {
     }
 }
 
-/// Whether this build's OS has `feature`. Linux is stubs until phase 5, so none yet.
+/// Whether this build's OS has `feature`. Linux is stubs until phase 5, so none yet but the
+/// secret store, which is there when a Secret Service answers on the session bus (asked once,
+/// on first use). The sign-in has no window of the app's own on Linux: there's no WebView2.
 #[cfg(target_os = "linux")]
 pub fn supports(feature: Feature) -> bool {
     match feature {
+        Feature::SecretStorage => crate::credentials::available(),
         Feature::TaskbarButtons
         | Feature::Tray
         | Feature::MiniPlayerPlacement
@@ -75,8 +78,7 @@ pub fn supports(feature: Feature) -> bool {
         | Feature::MediaControls
         | Feature::WebViewSignIn
         | Feature::InPlaceUpdate
-        | Feature::TitleBarColour
-        | Feature::SecretStorage => false,
+        | Feature::TitleBarColour => false,
     }
 }
 
@@ -99,6 +101,10 @@ mod tests {
     #[test]
     fn each_platform_answers_for_every_feature() {
         for feature in Feature::ALL {
+            // On Linux it depends on the session's Secret Service (the credentials tests).
+            if cfg!(target_os = "linux") && feature == Feature::SecretStorage {
+                continue;
+            }
             assert_eq!(supports(feature), cfg!(windows), "{feature:?}");
         }
         assert_eq!(

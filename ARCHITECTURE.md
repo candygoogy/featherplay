@@ -268,6 +268,13 @@ own Last.fm API key and secret if you set them, the ListenBrainz token and the l
 token. A credential holds at most 2,560 bytes, so long values are split across entries
 (`key`, `key#1`, …). Entries use `Local` persistence, so they never roam to other PCs.
 
+On Linux they're kept by the Secret Service (GNOME Keyring, KWallet) in the default
+collection, split the same way (`crates/platform/src/linux/credentials.rs`,
+`zbus-secret-service-keyring-store`). The service is asked once per run; with none on the
+session bus, `supports(Feature::SecretStorage)` is false, every secret is refused, and a
+sign-in lasts for that run only: the sign-in page and Settings say so, and so does a toast
+after a sign-in. Nothing is ever written to a plain file instead.
+
 Dev builds can read the cookie header from a file named by `FEATHERPLAY_COOKIES_FILE` instead
 (see `apps/featherplay/src/main.rs`).
 

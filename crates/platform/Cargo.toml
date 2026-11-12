@@ -68,6 +68,14 @@ windows = { workspace = true, features = [
     "Win32_UI_WindowsAndMessaging",
 ] }
 
+[target.'cfg(target_os = "linux")'.dependencies]
+# `credentials`: the Secret Service store.
+zbus-secret-service-keyring-store = { workspace = true }
+# `browsers::launch`: the DevTools pipe on descriptors 3 and 4, the browser's process group.
+libc = { workspace = true }
+# `browsers`: the browsers' JSON policy files.
+serde_json = { workspace = true }
+
 [build-dependencies]
 # Renders the colour Tri-vane (apps/featherplay/ui/logo/tri-vane{,-light}{,-16,-24}.svg) for the tray.
 resvg = { workspace = true }

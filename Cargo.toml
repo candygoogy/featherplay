@@ -53,6 +53,13 @@ webview2-com = "=0.39.1"
 # whose regex we never call.
 keyring-core = "=1.0.1"
 windows-native-keyring-store = { version = "=1.1.0", default-features = false }
+# The Secret Service store (GNOME Keyring, KWallet) for keyring-core on Linux. Pure Rust over
+# zbus, which Slint's winit backend brings in already, on zbus's own async-io thread, so it
+# works from any thread with no runtime around; the session with the service is encrypted
+# with Rust's crypto crates (aes, cbc, hkdf, sha2), no OpenSSL.
+zbus-secret-service-keyring-store = { version = "=1.0.1", features = ["rt-async-io-crypto-rust"] }
+# Linux: the descriptors and process group the browser sign-in starts its browser with.
+libc = "=0.2.191"
 windows = "=0.62.2"
 # The window handle `featherplay-platform` takes, and that the app reads out of Slint's window.
 raw-window-handle = "=0.6.2"

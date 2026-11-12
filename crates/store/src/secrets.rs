@@ -1,10 +1,15 @@
-//! Secrets in the OS credential store (Windows Credential Manager, through
-//! `featherplay_platform::credentials`), service `featherplay`.
+//! Secrets in the OS credential store (Windows Credential Manager; on Linux the Secret
+//! Service, GNOME Keyring or KWallet; through `featherplay_platform::credentials`), service
+//! `featherplay`.
 //!
 //! A Windows credential holds at most 2560 bytes, and a YouTube Music cookie header is
 //! often longer. So a value is stored as UTF-8 bytes split into chunks: the first chunk
 //! under the entry `<key>`, later ones under `<key>#1`, `<key>#2`, and so on. A value that
-//! fits in one chunk is a single entry named `<key>`.
+//! fits in one chunk is a single entry named `<key>`. Linux splits the same way.
+//!
+//! With no store (Linux with no Secret Service running), every write is refused with the
+//! reason and every read is `None`: nothing is written anywhere else. The app then keeps a
+//! sign-in for the run only, and says so.
 
 use std::collections::HashMap;
 use std::fmt;
@@ -14,9 +19,9 @@ use featherplay_platform::credentials;
 use keyring_core::{Entry, Error};
 
 /// Makes the OS's store the default, once, on first use: what the `keyring` crate's
-/// `Entry::store_status` does on Windows.
-static STORE: LazyLock<Result<(), Error>> = LazyLock::new(|| {
-    keyring_core::set_default_store(credentials::store()?);
+/// `Entry::store_status` does on Windows. Without one, why (for the errors that follow).
+static STORE: LazyLock<Result<(), String>> = LazyLock::new(|| {
+    keyring_core::set_default_store(credentials::store().map_err(|e| e.to_string())?);
     Ok(())
 });
 
@@ -94,8 +99,8 @@ pub fn delete_secret(k: SecretKey) -> Result<(), StoreError> {
 }
 
 fn entry(name: &str, chunk: usize) -> Result<Entry, Error> {
-    if STORE.is_err() {
-        return Err(Error::NoDefaultStore);
+    if let Err(why) = &*STORE {
+        return Err(Error::NoStorageAccess(why.clone().into()));
     }
     let modifiers: HashMap<&str, &str> = credentials::MODIFIERS.iter().copied().collect();
     if chunk == 0 {
@@ -211,7 +216,8 @@ mod tests {
         );
     }
 
-    /// Touches the real Credential Manager, under a test-only name. Run with `--ignored`.
+    /// Touches the real store (Credential Manager; the Secret Service on Linux), under a
+    /// test-only name. Run with `--ignored`.
     #[test]
     #[ignore = "writes to the OS credential store"]
     fn live_set_get_delete() {
