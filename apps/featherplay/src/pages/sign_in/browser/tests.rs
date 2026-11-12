@@ -205,6 +205,7 @@ fn quick() -> Limits {
     Limits {
         poll: Duration::from_millis(10),
         settle: Duration::from_millis(30),
+        first_reply: Duration::from_millis(1000),
         reply: Duration::from_millis(300),
         timeout: Duration::from_secs(5),
         close: Duration::from_secs(2),
@@ -215,6 +216,8 @@ fn quick() -> Limits {
 enum Answer {
     Cookies(Vec<Cookie>),
     Silence,
+    /// No cookies, after this long.
+    Late(Duration),
     Hang,
     ExitProcess,
     ClosePipe,
@@ -289,6 +292,12 @@ fn serve(
                 }
             }
             Answer::Silence => {}
+            Answer::Late(after) => {
+                std::thread::sleep(after);
+                if write_reply(&mut to, id, serde_json::json!({ "cookies": [] })).is_err() {
+                    return;
+                }
+            }
             Answer::Hang => std::thread::sleep(Duration::from_secs(60)),
             Answer::ExitProcess => process.exited.store(true, Ordering::Relaxed),
             Answer::ClosePipe => return,
@@ -429,6 +438,26 @@ fn no_first_answer_means_blocked() {
     assert!(fb.process.killed.load(Ordering::Relaxed));
 }
 
+/// A browser that starts slowly answers its first command late: the first reply gets
+/// longer than the others.
+#[test]
+fn a_slow_first_answer_is_waited_for() {
+    let mut fb = fake_browser(|n| match n {
+        1 => Answer::Late(Duration::from_millis(600)),
+        _ => Answer::Cookies(signed_in_cookies()),
+    });
+    let out = run_fake(&mut fb, &AtomicBool::new(false), &quick());
+    assert!(matches!(out, Outcome::SignedIn(_)), "{out:?}");
+}
+
+#[test]
+fn the_first_answer_waits_longer_on_linux_only() {
+    let l = Limits::real();
+    let first = if cfg!(target_os = "linux") { 60 } else { 15 };
+    assert_eq!(l.first_reply, Duration::from_secs(first));
+    assert_eq!(l.reply, Duration::from_secs(15));
+}
+
 #[test]
 fn no_later_answer_means_lost() {
     let mut fb = fake_browser(|n| match n {
@@ -544,17 +573,13 @@ impl Live {
         self.process.as_ref().unwrap()
     }
 
-    /// Asks for the cookies; the reply, if one comes within 30 s.
+    /// Asks for the cookies; the reply, if one comes within 30 s, or the sign-in's wait for a
+    /// first reply if longer (Linux: a browser's first start on a fresh CI runner is slow).
     fn cookies(&mut self) -> Option<Result<Vec<Cookie>, String>> {
         let id = self.client.send(Method::GetCookies).ok()?;
         let never = AtomicBool::new(false);
-        let r = await_reply(
-            id,
-            &self.replies,
-            self.process(),
-            &never,
-            Duration::from_secs(30),
-        );
+        let within = Limits::real().first_reply.max(Duration::from_secs(30));
+        let r = await_reply(id, &self.replies, self.process(), &never, within);
         r.ok().map(|r| r.and_then(cdp::cookies))
     }
 

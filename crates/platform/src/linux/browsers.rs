@@ -19,7 +19,7 @@
 //!   (Chromium's docs/enterprise/linux.md, and Chrome Enterprise help); Edge from /etc/opt/edge/policies/managed (Microsoft's "Microsoft
 //!   Edge for Linux" policy docs); Brave from /etc/brave/policies/managed (Brave's Group Policy
 //!   help). **Not in its documentation**: Vivaldi's /etc/opt/vivaldi/policies/managed. A wrong
-//!   folder only means a block is found late: the sign-in then ends after 15 s without an
+//!   folder only means a block is found late: the sign-in then ends after 60 s without an
 //!   answer, as for any browser.
 //! - **Snap**: a Snap's command is a link to /usr/bin/snap in /snap/bin, and Ubuntu's
 //!   `chromium-browser` package is a script that runs /snap/bin/chromium. Snap confinement

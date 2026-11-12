@@ -28,8 +28,9 @@
 //!
 //! It ends early, ending the job and deleting the profile, when the browser's process exits
 //! (the user closed it), after 10 minutes without a sign-in, when the pipe breaks, when the
-//! browser doesn't answer within 15 s (a policy may block DevTools), or on Cancel. Profiles
-//! a crash left behind are deleted at the next start (`sweep`).
+//! browser doesn't answer within 15 s (a policy may block DevTools; on Linux its first answer
+//! gets 60 s, see `first_reply`), or on Cancel. Profiles a crash left behind are deleted at
+//! the next start (`sweep`).
 //!
 //! "Switch Google account" stays on the WebView2 window: it relies on that window's
 //! profile remembering earlier logins for Google's account chooser, and this profile is
@@ -170,7 +171,10 @@ struct Limits {
     poll: Duration,
     /// After the session cookies appear, before the last read.
     settle: Duration,
-    /// For any reply; the first one missing means the browser doesn't allow the pipe.
+    /// For the first reply, which comes once the browser has started; none means it doesn't
+    /// allow the pipe.
+    first_reply: Duration,
+    /// For any later reply.
     reply: Duration,
     /// For the whole sign-in.
     timeout: Duration,
@@ -183,11 +187,22 @@ impl Limits {
         Self {
             poll: Duration::from_secs(1),
             settle: Duration::from_secs(3),
+            first_reply: first_reply(),
             reply: Duration::from_secs(15),
             timeout: timeout(),
             close: Duration::from_secs(5),
         }
     }
+}
+
+/// 15 s on Windows. 60 s on Linux, where a browser's first start after boot, with none of it
+/// in the page cache yet, can take longer than 15 s; the commands it gets before it's up wait
+/// in the pipe. On a fresh GitHub runner (2026-11-12) Edge 157's first start gave no answer
+/// within 30 s, and the next one answered after 11 s (1 s in WSL). Linux reads the
+/// `RemoteDebuggingAllowed` policy before the start (`Browser::blocked`), so a missing
+/// answer there is rarely a block.
+fn first_reply() -> Duration {
+    Duration::from_secs(if cfg!(target_os = "linux") { 60 } else { 15 })
 }
 
 /// 10 minutes. A debug build takes `FEATHERPLAY_BROWSER_TIMEOUT_SECS` instead, to try the
@@ -388,7 +403,14 @@ fn poll<W: Write>(
         let reply = client
             .send(Method::GetCookies)
             .map_err(|_| Stop::PipeClosed)
-            .and_then(|id| await_reply(id, replies, process, cancel, limits.reply));
+            .and_then(|id| {
+                let within = if answered {
+                    limits.reply
+                } else {
+                    limits.first_reply
+                };
+                await_reply(id, replies, process, cancel, within)
+            });
         let result = match reply {
             Ok(r) => r,
             Err(stop) => return settle.or(stopped(stop, answered, started.elapsed(), process)),
