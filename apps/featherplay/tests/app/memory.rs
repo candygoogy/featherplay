@@ -7,6 +7,11 @@
 //! screen shows, 31.6 MB each at 4K) where the app's has one (softbuffer's DIB section, which
 //! counts as private memory too), so the ceilings take one buffer off.
 //!
+//! On Linux private memory is the resident anonymous memory (`platform::memory`), and the
+//! budget is the same. There the app's window buffer is shared with the display server
+//! (Wayland's shared memory, or X11's MIT-SHM where it has it), which doesn't count, so the
+//! app's own figure is a buffer lower than this one.
+//!
 //! `steps` (ignored) prints the private bytes after each step.
 
 use std::path::{Path, PathBuf};
@@ -354,8 +359,8 @@ fn steps() {
     assert!(!s.is_empty());
 }
 
-/// For `steps`: the Windows heaps' allocated and committed bytes, and the committed private
-/// allocations of 1 MB or more.
+/// For `steps`: the heaps' allocated and committed bytes (Windows' heaps, or glibc's arenas),
+/// and the private allocations of 1 MB or more (committed on Windows, resident on Linux).
 mod diag {
     use featherplay_platform::memory::{heap_summary, private_allocations};
 

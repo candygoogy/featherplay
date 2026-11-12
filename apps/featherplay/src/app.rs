@@ -698,6 +698,8 @@ pub struct AppOptions {
 
 /// The app with its window: runs until the window closes, Quit, or Ctrl+C.
 pub fn run(opts: Options, app: AppOptions) -> ExitCode {
+    // Before any other thread starts.
+    featherplay_platform::memory::tune_allocator();
     // Before anything posts to the event loop. The software renderer keeps idle memory
     // near 32 MB (the GPU path idles near 290 MB; measured 2026-10-26).
     if let Err(e) = slint::BackendSelector::new()

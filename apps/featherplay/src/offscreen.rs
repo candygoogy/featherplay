@@ -310,6 +310,8 @@ pub fn install_presenting() -> Result<Pump, String> {
 
 fn install_with(presenting: bool) -> Result<Pump, String> {
     STARTED.get_or_init(Instant::now);
+    // As the app's `run` does, so memory measured here is what the app's would be.
+    featherplay_platform::memory::tune_allocator();
     let (jobs, rx) = channel();
     slint::platform::set_platform(Box::new(OffscreenPlatform {
         context: SkiaSharedContext::default(),

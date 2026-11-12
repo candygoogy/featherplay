@@ -32,6 +32,11 @@ pub fn private_bytes() -> u64 {
     if ok == 0 { 0 } else { c.private as u64 }
 }
 
+/// Nothing to tune on Windows: the heap gives its big blocks back as they're freed (Linux's
+/// version keeps glibc doing the same).
+#[inline]
+pub fn tune_allocator() {}
+
 /// Hands the heaps' free pages back to Windows. What was just let go is mostly free blocks
 /// inside the heaps (a cover is under the heap's 512 KB threshold for a block of its own), and
 /// a heap keeps free pages committed, so they'd still count as private memory.
