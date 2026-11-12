@@ -4,8 +4,9 @@
 #   target/linux/featherplay-<arch>.AppImage   updates itself (crates/controller/src/updates/install.rs)
 #   target/linux/featherplay-<arch>.tar.gz     the same files as a plain archive; only told of updates
 # Both hold the binary, the desktop entry, the icons (the hicolor PNGs build.rs renders, and
-# the SVG) and the AppStream metadata. Nothing else is bundled: the libraries the binary
-# needs are a desktop's own (README.txt in this folder lists them).
+# the SVG), the AppStream metadata, LICENSE and THIRD_PARTY.md (the AppImage under
+# usr/share/doc/featherplay/, the archive at its top, with README.txt). Nothing else is
+# bundled: the libraries the binary needs are a desktop's own (README.txt lists them).
 #
 # Usage: packaging/linux/build-linux.sh [--skip-build]
 #   --skip-build  package the binary already at target/release/featherplay
@@ -171,6 +172,9 @@ appdir=$out/featherplay.AppDir
 rm -rf "$appdir"
 mkdir -p "$appdir/usr/bin"
 cp -r "$stage/share" "$appdir/usr/"
+# The licences, where a distribution puts a package's (not in $stage/share: the archive's
+# README has its users copy that folder into ~/.local/share).
+install -Dm 644 -t "$appdir/usr/share/doc/featherplay" LICENSE THIRD_PARTY.md
 install -m 755 "$bin" "$appdir/usr/bin/featherplay"
 ln -s usr/bin/featherplay "$appdir/AppRun"
 cp "$stage/share/applications/$app_id.desktop" "$appdir/"
