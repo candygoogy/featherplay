@@ -305,6 +305,7 @@ pub fn report(signed_in: bool, settings: &Settings) -> Report {
         discord: settings.discord,
         proxy: Some(featherplay_proxy::summary()),
         dns: featherplay_proxy::dns::found().map(ToString::to_string),
+        dns_over_https: settings.dns_over_https,
         region: REGION.lock_or_recover().clone(),
         helpers,
         sign_in_save: SIGN_IN_SAVE.lock_or_recover().clone(),

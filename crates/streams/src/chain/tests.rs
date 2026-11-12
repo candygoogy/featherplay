@@ -248,6 +248,24 @@ async fn the_stream_names_the_step_that_gave_it() {
 }
 
 #[tokio::test]
+async fn a_yt_dlp_streams_host_is_looked_up_by_the_system() {
+    use featherplay_proxy::doh::from_yt_dlp;
+    let embedded = Script::default()
+        .native(Err(NativeError::Failed("deno timed out".into())))
+        .embedded(Ok(EMBEDDED_URL));
+    within(Chain::default().resolve(&embedded, &id()))
+        .await
+        .expect("a stream");
+    assert!(from_yt_dlp("r2.example"));
+    // A native stream from the same server: the setting decides again.
+    let native = Script::default().native(Ok("https://r2.example/videoplayback?c=WEB&n=5"));
+    within(Chain::default().resolve(&native, &id()))
+        .await
+        .expect("a stream");
+    assert!(!from_yt_dlp("r2.example"));
+}
+
+#[tokio::test]
 async fn a_video_the_embedded_client_refuses_goes_to_the_default_clients() {
     let chain = Chain::default();
     let s = Script::default()

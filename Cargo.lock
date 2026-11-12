@@ -1540,6 +1540,7 @@ dependencies = [
  "hyper-util",
  "log",
  "reqwest",
+ "serde_json",
  "tokio",
 ]
 

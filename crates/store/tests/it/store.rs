@@ -79,6 +79,7 @@ fn settings_defaults_when_missing() {
             fade_on_skip: false,
             playback_speed: 100,
             tooltips: true,
+            dns_over_https: false,
         }
     );
     assert_eq!(s, Settings::default());
@@ -151,6 +152,7 @@ fn settings_roundtrip() {
         fade_on_skip: true,
         playback_speed: 125,
         tooltips: false,
+        dns_over_https: true,
     };
     s.save(&p).unwrap();
     assert!(p.config.join("settings.toml").is_file());
@@ -703,6 +705,26 @@ fn update_checks_are_on_in_older_files_and_off_stays_off() {
     assert!(!off.check_for_updates);
     off.save(&p).unwrap();
     assert!(!Settings::load(&p).check_for_updates);
+}
+
+#[test]
+fn dns_over_https_is_off_in_older_files_and_on_stays_on() {
+    let Some(home) = TestHome::new("settings-dns-over-https") else {
+        return;
+    };
+    let p = home.paths();
+    fs::create_dir_all(&p.config).unwrap();
+    let file = p.config.join("settings.toml");
+
+    // A file written before the setting existed.
+    fs::write(&file, "notifications = true\n").unwrap();
+    assert!(!Settings::load(&p).dns_over_https);
+
+    fs::write(&file, "dns_over_https = true\n").unwrap();
+    let on = Settings::load(&p);
+    assert!(on.dns_over_https);
+    on.save(&p).unwrap();
+    assert!(Settings::load(&p).dns_over_https);
 }
 
 #[test]

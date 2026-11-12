@@ -645,6 +645,12 @@ pub fn on_event(ev: UiEvent) {
         UiEvent::Release(release) => pages::about::show_update(&ctx, Some(&release)),
         UiEvent::Toast(text) => toast::show(&ctx, text),
         UiEvent::ToastError(text) => toast::show_error(&ctx, text),
+        UiEvent::RefusedByDns(text) => toast::show_error_with(
+            &ctx,
+            text,
+            featherplay_core::failure::look_up_directly(),
+            pages::settings::look_up_directly,
+        ),
         UiEvent::Silences(marks) => bar::show_silences(&ctx, &marks),
         UiEvent::Refused(ids) => refused::show(&ctx, &ids),
         UiEvent::LocalApi(notice) => pages::settings::local_api_changed(&ctx, notice),

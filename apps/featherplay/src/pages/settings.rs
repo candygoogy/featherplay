@@ -125,6 +125,22 @@ pub fn install_updates() -> bool {
     SETTINGS.with(|s| s.borrow().install_updates)
 }
 
+/// Whether YouTube's hosts are looked up over DNS over HTTPS ("Look up YouTube directly").
+pub fn dns_over_https() -> bool {
+    SETTINGS.with(|s| s.borrow().dns_over_https)
+}
+
+/// The refused songs' toast's button: turns "Look up YouTube directly" on. The controller
+/// then drops the old route's streams and refusals, so the queue tries those songs again.
+pub fn look_up_directly(ctx: &Rc<Ctx>) {
+    if let Some(ui) = ctx.window() {
+        ui.global::<SettingsData>().set_dns_over_https(true);
+    }
+    if !dns_over_https() {
+        commit(ctx, Change::DnsOverHttps(true));
+    }
+}
+
 /// What identity `key` pinned to the top of the sidebar's list, newest first.
 pub fn pins(key: &str) -> Vec<String> {
     SETTINGS.with(|s| s.borrow().pins.get(key).cloned().unwrap_or_default())
@@ -444,6 +460,9 @@ fn show(ctx: &Ctx) {
     data.set_lyrics_lrclib(s.lyrics_lrclib);
     data.set_check_for_updates(s.check_for_updates);
     data.set_install_updates(s.install_updates);
+    data.set_dns_over_https(s.dns_over_https);
+    // A proxy looks the names up itself: the setting does nothing then.
+    data.set_youtube_proxied(featherplay_proxy::for_url(featherplay_proxy::YOUTUBE).is_some());
     data.set_local_api(s.local_api);
     data.set_local_api_port(s.local_api_port.to_string().into());
     data.set_local_api_port_error("".into());
@@ -534,6 +553,10 @@ fn toggled(ctx: &Rc<Ctx>, key: SettingKey, on: bool) {
         SettingKey::InstallUpdates => {
             data.set_install_updates(on);
             Change::InstallUpdates(on)
+        }
+        SettingKey::DnsOverHttps => {
+            data.set_dns_over_https(on);
+            Change::DnsOverHttps(on)
         }
         SettingKey::LocalApi => {
             data.set_local_api(on);

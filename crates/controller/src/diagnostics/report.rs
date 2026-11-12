@@ -25,6 +25,9 @@ pub struct Report {
     /// Whether the DNS sends YouTube's hosts away from Google (`featherplay_proxy::dns::Dns`);
     /// `None`: not checked yet.
     pub dns: Option<String>,
+    /// "Look up YouTube directly": YouTube's hosts over DNS over HTTPS
+    /// (`featherplay_proxy::doh`).
+    pub dns_over_https: bool,
     /// The country YouTube last tied a stream to (`diagnostics::stream_region`), `IT`;
     /// `None`: no stream said.
     pub region: Option<String>,
@@ -58,6 +61,7 @@ impl Report {
              Discord: {}\n\
              Proxy: {}\n\
              DNS: {}\n\
+             Look up YouTube directly: {}\n\
              YouTube's region: {}\n\
              Last helpers download error: {}\n\
              Last sign-in save error: {}\n",
@@ -74,6 +78,7 @@ impl Report {
             on(self.discord),
             self.proxy.as_deref().unwrap_or("none"),
             self.dns.as_deref().unwrap_or("not checked yet"),
+            on(self.dns_over_https),
             self.region.as_deref().unwrap_or("unknown"),
             self.helpers.as_deref().unwrap_or("none"),
             self.sign_in_save.as_deref().unwrap_or("none"),
@@ -118,6 +123,7 @@ mod tests {
             discord: true,
             proxy: None,
             dns: None,
+            dns_over_https: false,
             region: None,
             helpers: None,
             sign_in_save: None,
@@ -241,6 +247,7 @@ mod tests {
         assert!(text.lines().any(|l| l == line), "no {line:?} in\n{text}");
         let text = report().text();
         assert!(text.contains("DNS: not checked yet\n"), "{text}");
+        assert!(text.contains("\nLook up YouTube directly: off\n"), "{text}");
     }
 
     #[test]

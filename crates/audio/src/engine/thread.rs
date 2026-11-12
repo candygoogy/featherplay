@@ -58,7 +58,9 @@ pub(super) struct Engine {
     controls: Arc<Controls>,
     status: Arc<Mutex<Status>>,
     rt: Arc<Runtime>,
-    client: reqwest::Client,
+    /// Made again when "Look up YouTube directly" changes, so no connection kept from the
+    /// old route is taken again (`featherplay_proxy::Fresh`).
+    http: featherplay_proxy::Fresh,
     tmp_dir: PathBuf,
     heads: HeadCache,
     /// The connection being opened ahead of a stream (`AudioEngine::connect`), if any.
@@ -107,14 +109,14 @@ impl Engine {
             .enable_all()
             .build()
             .map_err(|e| format!("audio runtime: {e}"))?;
-        let client =
-            crate::http::stream_client(read_timeout).map_err(|e| format!("http client: {e}"))?;
+        let http = featherplay_proxy::Fresh::new(move || crate::http::stream_client(read_timeout))
+            .map_err(|e| format!("http client: {e}"))?;
         Ok(Engine {
             tx,
             controls,
             status,
             rt: Arc::new(rt),
-            client,
+            http,
             tmp_dir,
             heads: HeadCache::default(),
             connecting: None,
@@ -223,7 +225,13 @@ impl Engine {
                         // Fails only if the engine thread is gone.
                         let _ = tx.send(Msg::HeadRefused(url));
                     };
-                    head::prefetch(&self.heads, self.rt.handle(), &self.client, url, refused);
+                    head::prefetch(
+                        &self.heads,
+                        self.rt.handle(),
+                        &self.http.client(),
+                        url,
+                        refused,
+                    );
                 }
             }
             Msg::Connect(url) => {
@@ -231,7 +239,7 @@ impl Engine {
                 if self.connecting.as_ref().is_some_and(|c| !c.is_finished()) {
                     return;
                 }
-                let client = self.client.clone();
+                let client = self.http.client();
                 self.connecting = Some(self.rt.spawn(async move {
                     let t = Instant::now();
                     match crate::http::connect(&client, &url).await {
@@ -594,7 +602,7 @@ impl Engine {
             src,
             voice::Fetch {
                 rt: self.rt.clone(),
-                client: self.client.clone(),
+                client: self.http.client(),
                 tmp_dir: self.tmp_dir.clone(),
                 heads: self.heads.clone(),
             },

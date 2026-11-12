@@ -192,7 +192,9 @@ pub(crate) struct NativeResolver {
 }
 
 struct Inner {
-    http: reqwest::Client,
+    /// Made again when "Look up YouTube directly" changes: it keeps its connections open
+    /// with no idle timeout, and one to the old route would go on being used.
+    http: featherplay_proxy::Fresh,
     /// `{home}/resolver`
     dir: PathBuf,
     base: String,
@@ -357,15 +359,17 @@ impl NativeResolver {
 
     /// `base`: `https://www.youtube.com`, or a test server.
     pub(crate) fn with_dirs(dir: PathBuf, base: &str) -> Option<Self> {
-        let http = featherplay_proxy::client()
-            .user_agent(USER_AGENT)
-            .connect_timeout(Duration::from_secs(5))
-            // No idle timeout, so no reaper timer runs while paused: an idle connection
-            // stays until the server closes it, and a click minutes later may reuse it.
-            .pool_idle_timeout(None::<Duration>)
-            .pool_max_idle_per_host(2)
-            .build()
-            .ok()?;
+        let http = featherplay_proxy::Fresh::new(|| {
+            featherplay_proxy::client()
+                .user_agent(USER_AGENT)
+                .connect_timeout(Duration::from_secs(5))
+                // No idle timeout, so no reaper timer runs while paused: an idle connection
+                // stays until the server closes it, and a click minutes later may reuse it.
+                .pool_idle_timeout(None::<Duration>)
+                .pool_max_idle_per_host(2)
+                .build()
+        })
+        .ok()?;
         Some(Self {
             inner: Arc::new(Inner {
                 http,
@@ -884,7 +888,7 @@ impl Inner {
         referer: Option<&str>,
         timeout: Duration,
     ) -> Result<String, NativeError> {
-        let mut req = self.http.get(url).timeout(timeout);
+        let mut req = self.http.client().get(url).timeout(timeout);
         if let Some(r) = referer {
             req = req.header("Referer", r);
         }
@@ -915,6 +919,7 @@ impl Inner {
     ) -> Result<String, NativeError> {
         let mut req = self
             .http
+            .client()
             .post(format!(
                 "{}/youtubei/v1/player?prettyPrint=false",
                 self.base

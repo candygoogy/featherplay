@@ -165,6 +165,9 @@ pub enum UiEvent {
     Toast(&'static str),
     /// A toast saying something went wrong: no sound output.
     ToastError(&'static str),
+    /// YouTube refuses songs while the DNS sends its hosts abroad: an error toast whose
+    /// button turns on "Look up YouTube directly" (`Change::DnsOverHttps`).
+    RefusedByDns(&'static str),
     /// What Skip silence drops from the current track, for the seek bar (`silences.rs`);
     /// empty while it's off, and from a track change until the new track is scanned.
     Silences(Vec<Mark>),

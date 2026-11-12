@@ -335,6 +335,22 @@ impl Streams {
         self.refused.iter().map(|(id, ..)| id.clone()).collect()
     }
 
+    /// The route to YouTube changed ("Look up YouTube directly"): what YouTube answered on
+    /// the old one goes. Its streams, tied to the address that asked for them; its refusals
+    /// and "unavailable" answers, which may have been for the country it showed; the songs
+    /// given up on ahead. Returns the songs that were refused.
+    pub fn route_changed(&mut self) -> Vec<TrackId> {
+        self.cache.clear();
+        self.restored.clear();
+        self.address = None;
+        self.unavailable.clear();
+        self.failed.clear();
+        self.page_failed.clear();
+        self.refused_preloads.clear();
+        self.changed = true;
+        self.refused.drain(..).map(|(id, ..)| id).collect()
+    }
+
     /// The answer to the player's resolve of `id` without asking YouTube: its "unavailable"
     /// of a moment ago, for a preload or a load while paused, rather than ~4 s of yt-dlp.
     /// The player waiting to play the song (a click on it, Next, the queue reaching it) asks
@@ -504,6 +520,24 @@ impl Controller {
         self.show_refused();
     }
 
+    /// "Look up YouTube directly" changed: the streams and refusals of the old route go
+    /// (`Streams::route_changed`), so the queue tries the refused songs again.
+    pub(super) fn route_changed(&mut self) {
+        let ids = self.streams.route_changed();
+        log!(
+            "route to YouTube changed: streams dropped, {} refused songs tried again",
+            ids.len()
+        );
+        if !ids.is_empty() {
+            self.inputs(
+                ids.into_iter()
+                    .map(|id| Input::SetRefused(id, false))
+                    .collect(),
+            );
+            self.show_refused();
+        }
+    }
+
     fn show_refused(&self) {
         (self.ui.events)(super::UiEvent::Refused(self.streams.refused()));
     }
@@ -663,6 +697,23 @@ mod tests {
         s.want(&id("a"), now);
         s.done(&id("a"), Some(&stream(HOURS)), &[]);
         assert!(s.forget(&id("a")).is_some());
+        assert_eq!(s.want(&id("a"), now), Want::Start);
+    }
+
+    /// "Look up YouTube directly" changed: the old route's streams and refusals go, so the
+    /// refused songs are tried again and every song is resolved anew.
+    #[test]
+    fn a_new_route_drops_the_old_ones_streams_and_refusals() {
+        let mut s = Streams::default();
+        let now = SystemTime::now();
+        s.want(&id("a"), now);
+        s.done(&id("a"), Some(&stream(HOURS)), &[]);
+        s.refuse(&id("b"), now, "This video is not available");
+        s.unavailable(&id("c"), "Video unavailable");
+        assert_eq!(s.route_changed(), [id("b")]);
+        assert!(s.refused().is_empty());
+        assert_eq!(s.known_unavailable(&id("b")), None);
+        assert_eq!(s.known_unavailable(&id("c")), None);
         assert_eq!(s.want(&id("a"), now), Want::Start);
     }
 

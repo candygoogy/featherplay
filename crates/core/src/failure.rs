@@ -126,9 +126,16 @@ pub fn songs_refused() -> &'static str {
 
 /// `songs_refused` when the DNS sends YouTube's hosts away from Google
 /// (`featherplay_proxy::dns`), once a session: YouTube answers as if from another country,
-/// as when a DNS service or filter routes it through its own servers.
+/// as when a DNS service or filter routes it through its own servers. Short enough to share
+/// the toast with its button, `look_up_directly`.
 pub fn songs_refused_by_network() -> &'static str {
-    crate::tr!("Some songs can't play: a DNS service routes YouTube abroad.")
+    crate::tr!("Songs can't play: DNS routes YouTube abroad.")
+}
+
+/// The button of `songs_refused_by_network`'s toast, which turns on "Look up YouTube
+/// directly" (Settings > Playback).
+pub fn look_up_directly() -> &'static str {
+    crate::tr!("Look up directly")
 }
 
 /// The notice for a stop. `helpers_tried`: yt-dlp was already brought up to date after a

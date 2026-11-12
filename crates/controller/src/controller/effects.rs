@@ -104,7 +104,9 @@ impl Controller {
             }
             Effect::ShowError(stop) => self.stopped(stop),
             Effect::SongsRefused => {
-                let redirected = featherplay_proxy::dns::found().is_some_and(|d| d.redirected());
+                // Looked up directly already, the DNS isn't why.
+                let redirected = featherplay_proxy::dns::found().is_some_and(|d| d.redirected())
+                    && !self.settings.dns_over_https;
                 let event = super::notice::refused_toast(redirected, &mut self.network_told);
                 (self.ui.events)(event);
             }

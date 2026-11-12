@@ -5,7 +5,7 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 homepage.workspace = true
-description = "featherplay's proxy choice for every HTTP client and yt-dlp: the environment, else Windows' auto-detection, proxy script or manual proxy"
+description = "featherplay's proxy choice for every HTTP client and yt-dlp: the environment, else Windows' auto-detection, proxy script or manual proxy; DNS over HTTPS for YouTube's hosts on request"
 publish = false
 
 [dependencies]
@@ -13,7 +13,12 @@ publish = false
 featherplay-platform = { path = "../platform" }
 # What a lookup found, or how it failed, goes to the app's log file.
 log = { workspace = true }
-reqwest = { workspace = true }
+# Over the system TLS, like the other crates: `doh` asks its services over HTTPS.
+reqwest = { workspace = true, features = ["native-tls"] }
+# `doh`: the services' JSON answers, and the system's lookups on tokio's blocking pool, as
+# reqwest's own resolver runs them. Both in the tree already.
+serde_json = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt"] }
 # The matcher reqwest's own clients pick a proxy with (the environment, then Windows' manual
 # proxy and its exceptions). A request still goes by it until a script or auto-detection
 # says otherwise. In the tree through reqwest, with these features.

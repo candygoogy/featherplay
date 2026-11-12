@@ -32,6 +32,7 @@ export enum SettingKey {
     fade-on-skip,
     match-volumes,
     tooltips,
+    dns-over-https,
 }
 
 // The Discord connection, live from the presence worker.
@@ -261,6 +262,10 @@ export global SettingsData {
     in property <bool> check-for-updates: true;
     // Download a newer release's setup and offer "Restart to update" (the installed copy).
     in property <bool> install-updates: true;
+    // "Look up YouTube directly": YouTube's hosts over DNS over HTTPS. Does nothing while a
+    // proxy is set for YouTube (`youtube-proxied`), which looks the names up itself.
+    in property <bool> dns-over-https;
+    in property <bool> youtube-proxied;
 
     callback toggled(SettingKey, bool);
     callback pick-device(int);

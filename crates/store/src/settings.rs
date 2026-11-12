@@ -161,6 +161,10 @@ pub struct Settings {
     /// "Show tooltips" (Settings > Window): the player bar's buttons name themselves and
     /// their shortcut when the pointer rests on them (on by default).
     pub tooltips: bool,
+    /// "Look up YouTube directly" (Settings > Playback, off by default): YouTube's hosts are
+    /// looked up over DNS over HTTPS instead of the system's DNS (`featherplay_proxy::doh`),
+    /// for networks whose DNS sends YouTube abroad. Does nothing through a proxy.
+    pub dns_over_https: bool,
 }
 
 /// The Equalizer setting: off, one of three presets, or the user's own bands.
@@ -394,6 +398,7 @@ impl Default for Settings {
             fade_on_skip: false,
             playback_speed: Settings::NORMAL_SPEED,
             tooltips: true,
+            dns_over_https: false,
         }
     }
 }

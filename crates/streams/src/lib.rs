@@ -135,6 +135,12 @@ impl Via {
             Via::Fixture => "local file",
         }
     }
+
+    /// yt-dlp gave the URL: a process of its own, on the system's DNS whatever "Look up
+    /// YouTube directly" says.
+    pub fn by_yt_dlp(self) -> bool {
+        matches!(self, Via::YtDlpEmbedded | Via::YtDlpDefault)
+    }
 }
 
 /// How soon the player may ask for a song resolved ahead (`YtDlpResolver::resolve_ahead`).

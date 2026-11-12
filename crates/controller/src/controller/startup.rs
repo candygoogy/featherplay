@@ -75,6 +75,8 @@ impl Controller {
         // script or auto-detection is asked from here on, in the background, and logs its
         // answer itself (`featherplay_proxy`).
         log!("proxy: {}", featherplay_proxy::summary());
+        // "Look up YouTube directly", before the first request (it logs itself when on).
+        featherplay_proxy::doh::set(settings.dns_over_https);
         // Once, in the background: does the DNS send YouTube's hosts away from Google? It logs
         // what it finds; Copy diagnostics and the refused songs' toast read it.
         if opts.fixture_stream.is_none() {

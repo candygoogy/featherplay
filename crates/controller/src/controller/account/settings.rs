@@ -87,6 +87,8 @@ pub enum Change {
     PlaybackSpeed(u8),
     /// The browser the sign-in page's browser row opened or was switched to, by its id.
     SignInBrowser(String),
+    /// "Look up YouTube directly": YouTube's hosts over DNS over HTTPS.
+    DnsOverHttps(bool),
 }
 
 impl Change {
@@ -146,6 +148,7 @@ impl Change {
             Change::FadeOnSkip(v) => s.fade_on_skip = v,
             Change::PlaybackSpeed(v) => s.playback_speed = v,
             Change::SignInBrowser(v) => s.sign_in_browser = Some(v),
+            Change::DnsOverHttps(v) => s.dns_over_https = v,
         }
     }
 }
@@ -231,6 +234,11 @@ impl Controller {
             Change::LocalApiPort(_) => self.local_api_port_changed(),
             Change::Amuse(true) => self.start_amuse(),
             Change::Amuse(false) => self.stop_amuse(),
+            // From the next lookup; the streams and refusals of the old route go.
+            Change::DnsOverHttps(on) => {
+                featherplay_proxy::doh::set(on);
+                self.route_changed();
+            }
             // Read when needed (notifications, SponsorBlock on) or applied by the window
             // (the close button, the accent, the theme, hotkeys).
             _ => {}
@@ -315,6 +323,7 @@ mod tests {
             Change::FadeOnSkip(true),
             Change::PlaybackSpeed(150),
             Change::SignInBrowser("brave".into()),
+            Change::DnsOverHttps(true),
         ];
         for c in &changes {
             c.apply(&mut s);
@@ -353,6 +362,7 @@ mod tests {
         assert_eq!(s.playback_speed, 150);
         assert_eq!(s.sign_in_browser.as_deref(), Some("brave"));
         assert!(!s.check_for_updates && !s.install_updates);
+        assert!(s.dns_over_https);
         assert_eq!(s.volume, d.volume, "the volume isn't a page setting");
     }
 

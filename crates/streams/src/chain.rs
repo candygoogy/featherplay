@@ -235,7 +235,7 @@ impl Chain {
         s: &impl Steps,
         id: &TrackId,
     ) -> Result<ResolvedStream, ResolveError> {
-        self.run(s, id, None).await
+        routed(self.run(s, id, None).await)
     }
 
     /// A resolve ahead of a click: see `run`. `urgent` is notified when the player asks
@@ -247,7 +247,7 @@ impl Chain {
         urgent: &Notify,
         ahead: Ahead,
     ) -> Result<ResolvedStream, ResolveError> {
-        self.run(s, id, Some((urgent, ahead))).await
+        routed(self.run(s, id, Some((urgent, ahead))).await)
     }
 
     /// In order:
@@ -743,9 +743,23 @@ async fn until_asked<F: Future + Unpin>(f: &mut F, urgent: &Notify) -> Option<F:
     }
 }
 
-/// Names the step that gave a stream (`ResolvedStream::via`).
+/// Names the step that gave a stream (`ResolvedStream::via`). yt-dlp's stream URL is tied to the address yt-dlp asked
+/// from, through the system's DNS: its host is looked up by the system too from here on, its
+/// check included (`featherplay_proxy::doh::stream_route`).
 fn by(via: Via) -> impl Fn(ResolvedStream) -> ResolvedStream {
-    move |stream| ResolvedStream { via, ..stream }
+    move |stream| {
+        featherplay_proxy::doh::stream_route(&stream.url, via.by_yt_dlp());
+        ResolvedStream { via, ..stream }
+    }
+}
+
+/// The resolve's answer, its route recorded: a native stream's host follows "Look up
+/// YouTube directly" again (`featherplay_proxy::doh::stream_route`).
+fn routed(result: Result<ResolvedStream, ResolveError>) -> Result<ResolvedStream, ResolveError> {
+    if let Ok(stream) = &result {
+        featherplay_proxy::doh::stream_route(&stream.url, stream.via.by_yt_dlp());
+    }
+    result
 }
 
 /// How long `stream`'s URL stays refused (`available_at`), if it does.

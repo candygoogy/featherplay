@@ -48,11 +48,12 @@ pub(super) fn failure(e: &ResolveError) -> Failure {
 }
 
 /// The toast for songs passed over as refused. `redirected`: the DNS sends YouTube's hosts
-/// away from Google (`featherplay_proxy::dns`), which the first such toast of the session
-/// says, as an error; `told` keeps that it did.
+/// away from Google (`featherplay_proxy::dns`) and "Look up YouTube directly" is off, which
+/// the first such toast of the session says, as an error with a button that turns it on;
+/// `told` keeps that it did.
 pub(super) fn refused_toast(redirected: bool, told: &mut bool) -> UiEvent {
     if redirected && !std::mem::replace(told, true) {
-        UiEvent::ToastError(songs_refused_by_network())
+        UiEvent::RefusedByDns(songs_refused_by_network())
     } else {
         UiEvent::Toast(songs_refused())
     }
@@ -152,7 +153,7 @@ mod tests {
     fn the_refused_songs_toast_names_a_dns_redirect_once() {
         let text = |e: UiEvent| match e {
             UiEvent::Toast(t) => ("plain", t),
-            UiEvent::ToastError(t) => ("error", t),
+            UiEvent::RefusedByDns(t) => ("error", t),
             _ => unreachable!(),
         };
         let mut told = false;

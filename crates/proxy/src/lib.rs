@@ -10,7 +10,8 @@
 //! manual proxy), the answer is looked up in the background (`lookups`), and requests take it
 //! once it's there.
 //!
-//! `dns` tells whether this network's DNS sends YouTube's hosts somewhere that isn't Google.
+//! `dns` tells whether this network's DNS sends YouTube's hosts somewhere that isn't Google,
+//! and `doh` looks them up over DNS over HTTPS instead when the user asks.
 #![cfg_attr(
     test,
     allow(
@@ -21,11 +22,12 @@
 )]
 
 pub mod dns;
+pub mod doh;
 mod lookups;
 mod winhttp;
 
 use std::fmt;
-use std::sync::{Arc, LazyLock};
+use std::sync::{Arc, LazyLock, Mutex, PoisonError};
 
 use hyper_util::client::proxy::matcher::{Intercept, Matcher};
 use reqwest::Url;
@@ -116,9 +118,11 @@ impl fmt::Display for Origin {
 static LOOKUPS: LazyLock<Arc<Lookups>> = LazyLock::new(|| Lookups::new(winhttp::WinHttp));
 
 /// A client builder that follows the proxy settings; every HTTP client starts from it.
-/// It costs what `reqwest::Client::builder()` costs: nothing is looked up here.
+/// It costs what `reqwest::Client::builder()` costs: nothing is looked up here. Its names
+/// are looked up by `doh`'s resolver, which asks the system as reqwest's own does unless
+/// "Look up YouTube directly" is on.
 pub fn client() -> reqwest::ClientBuilder {
-    let builder = reqwest::Client::builder();
+    let builder = reqwest::Client::builder().dns_resolver(doh::resolver());
     if environment_names_a_proxy() {
         // reqwest's own matcher reads it, credentials and `NO_PROXY` included.
         return builder;
@@ -128,6 +132,42 @@ pub fn client() -> reqwest::ClientBuilder {
         return builder;
     }
     following(builder, LOOKUPS.clone(), fixed)
+}
+
+/// A client of `client` that's made again once "Look up YouTube directly" changes
+/// (`doh::set`): the connections a client keeps open went the old route, and an idle one
+/// would be taken again for the next request. Until the setting changes, `client` hands out
+/// the same client.
+pub struct Fresh {
+    make: Box<dyn Fn() -> reqwest::Result<reqwest::Client> + Send + Sync>,
+    made: Mutex<(u64, reqwest::Client)>,
+}
+
+impl Fresh {
+    /// `make` builds the client, from `client()`.
+    pub fn new(
+        make: impl Fn() -> reqwest::Result<reqwest::Client> + Send + Sync + 'static,
+    ) -> reqwest::Result<Fresh> {
+        let client = make()?;
+        Ok(Fresh {
+            make: Box::new(make),
+            made: Mutex::new((doh::route(), client)),
+        })
+    }
+
+    /// The client for the route in use. If it can't be made again, the old one goes on.
+    pub fn client(&self) -> reqwest::Client {
+        let mut made = self.made.lock().unwrap_or_else(PoisonError::into_inner);
+        let route = doh::route();
+        if made.0 != route {
+            match (self.make)() {
+                Ok(client) => made.1 = client,
+                Err(e) => log::warn!("dns: the client wasn't made again: {e}"),
+            }
+            made.0 = route;
+        }
+        made.1.clone()
+    }
 }
 
 /// `builder` with every request asking `choose` for its proxy.
