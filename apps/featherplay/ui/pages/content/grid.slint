@@ -1,0 +1,65 @@
+// The card grid: its lines from `src/pages/grid.rs`, the cards a row holds, and the
+// virtualised grid itself.
+import { ListView } from "../../list_view.slint";
+import { Theme } from "../../theme.slint";
+import { CardItem, Card } from "../../parts.slint";
+
+// One line of a card grid: its cards, and the index of its first in the page's model.
+export struct CardLine {
+    cards: [CardItem],
+    first: int,
+}
+
+// Cards per row for a content width: 5 from 900 px, else 4 (so 4 or 5 at a 1280 px window),
+// down to 3 or 2 where 4 would make cards narrower than 120 px (a page beside the Up next panel
+// in a narrow window).
+export global Grid {
+    public pure function per-row(width: length) -> int {
+        return width >= 900px ? Theme.cards-per-row : max(2, min(Theme.cards-per-row - 1, floor((width + Theme.card-gap) / (120px + Theme.card-gap))));
+    }
+    public pure function card(width: length, per-row: int) -> length {
+        return floor((width - (per-row - 1) * Theme.card-gap) / per-row / 1px) * 1px;
+    }
+    // `cards` in lines of `per-row`, each line a model of its own (src/pages/grid.rs), so a
+    // card set (its cover in) reaches that card only.
+    pure callback lines(cards: [CardItem], per-row: int) -> [CardLine];
+}
+
+// A virtualised grid of cards: one ListView row per line of cards. Fills its parent.
+export component CardGrid inherits Rectangle {
+    in property <[CardItem]> items;
+    // Left and right inset of the cards inside the list.
+    in property <length> pad: Theme.page-pad;
+    // Space above the first line (scrolls with the grid).
+    in property <length> top: 0px;
+    // Cards show a play button on hover (`play`).
+    in property <bool> playable: false;
+    callback open(CardItem);
+    callback play(CardItem);
+    property <length> inner: root.width - 2 * root.pad;
+    property <int> per-row: Grid.per-row(root.inner);
+    property <length> card: Grid.card(root.inner, root.per-row);
+    property <length> line-h: root.card + Theme.card-text-gap + 40px + Theme.s6;
+    // Each card is its line's own data, not read out of `items` by index: a model read by
+    // index is one dependency for all of it, so a cover handed to one card repainted them all.
+    property <[CardLine]> lines: Grid.lines(root.items, root.per-row);
+    ListView {
+        for line[r] in root.lines: Rectangle {
+            // The last line leaves room to scroll past the floating bar.
+            height: (r == 0 ? root.top : 0px) + root.line-h + (r == root.lines.length - 1 ? Theme.page-end - Theme.s6 : 0px);
+            for it[c] in line.cards: Rectangle {
+                x: root.pad + c * (root.card + Theme.card-gap);
+                y: r == 0 ? root.top : 0px;
+                width: root.card;
+                height: root.line-h - Theme.s6;
+                Card {
+                    size: root.card;
+                    item: it;
+                    playable: root.playable;
+                    clicked => { root.open(it); }
+                    play => { root.play(it); }
+                }
+            }
+        }
+    }
+}
