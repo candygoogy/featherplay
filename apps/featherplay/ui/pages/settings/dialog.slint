@@ -1,0 +1,164 @@
+// A dialog over the window and its labelled field: Settings' dialogs, and the playlist
+// and album menus'.
+import { Theme, Curves } from "../../theme.slint";
+import { Body, Display } from "../../parts.slint";
+import { Field, RowButton } from "rows.slint";
+
+// A labelled field in a dialog (Settings', and the playlist menu's Rename).
+export component DialogField inherits VerticalLayout {
+    in property <string> label;
+    in property <string> placeholder;
+    in property <InputType> input-type: InputType.text;
+    in-out property <string> text;
+    callback accepted();
+    public function grab-focus() {
+        field.grab-focus();
+    }
+    public function select-all() {
+        field.select-all();
+    }
+    spacing: Theme.s1;
+    Body {
+        text: root.label;
+        font-size: Theme.t-meta;
+        color: Theme.text2;
+    }
+    field := Field {
+        text <=> root.text;
+        label: root.label;
+        placeholder: root.placeholder;
+        input-type: root.input-type;
+        accepted => { root.accepted(); }
+    }
+}
+
+// A dialog's title and detail, and its error and buttons, around its fields: their own
+// components, compiled once (`Dialog` takes the fields as children, so Slint copies it into
+// every dialog). Their spacing is the card's, so the lines sit as they would in it.
+component DialogHead inherits VerticalLayout {
+    in property <string> title;
+    in property <string> detail;
+    spacing: Theme.s4;
+    Display {
+        text: root.title;
+        font-size: 20px;
+        // A long playlist name in "Delete “…”?" wraps rather than being cut.
+        wrap: word-wrap;
+    }
+    if root.detail != "": Body {
+        text: root.detail;
+        color: Theme.text2;
+        wrap: word-wrap;
+    }
+}
+
+component DialogFoot inherits VerticalLayout {
+    in property <string> error;
+    in property <string> extra;
+    in property <string> ok-label;
+    callback ok();
+    callback cancel();
+    callback extra-clicked();
+    spacing: Theme.s4;
+    if root.error != "": Body {
+        text: root.error;
+        font-size: Theme.t-meta;
+        color: Theme.text1;
+        wrap: word-wrap;
+    }
+    HorizontalLayout {
+        padding-top: Theme.s2;
+        spacing: Theme.s2;
+        if root.extra != "": RowButton {
+            label: root.extra;
+            clicked => { root.extra-clicked(); }
+        }
+        Rectangle {
+            horizontal-stretch: 1;
+        }
+        RowButton {
+            label: @tr("Cancel");
+            clicked => { root.cancel(); }
+        }
+        RowButton {
+            label: root.ok-label;
+            solid: true;
+            clicked => { root.ok(); }
+        }
+    }
+}
+
+// A dialog over the page: a scrim, and a card with a title, a line of detail, the fields
+// (children) and the buttons. Escape or a click on the scrim cancels. Settings' dialogs, and
+// the playlist menu's Rename and Delete.
+export component Dialog inherits Rectangle {
+    in property <string> title;
+    in property <string> detail;
+    in property <string> error;
+    // A quiet button on the left ("Remove …"), shown when not empty.
+    in property <string> extra;
+    // The confirming button names its action ("Rename", "Delete").
+    in property <string> ok-label: @tr("OK");
+    callback ok();
+    callback cancel();
+    callback extra-clicked();
+    // For a dialog without a field: Escape reaches it at once.
+    public function focus-keys() {
+        keys.focus();
+    }
+    property <bool> shown: false;
+    background: Theme.scrim;
+    opacity: root.shown ? 1 : 0;
+    animate opacity { duration: Theme.t-menu; easing: Curves.ease-out; }
+    init => { root.shown = true; }
+    keys := FocusScope {
+        key-pressed(e) => {
+            if e.text == Key.Escape {
+                root.cancel();
+                return accept;
+            }
+            reject
+        }
+        TouchArea {
+            clicked => { root.cancel(); }
+            // The page under the scrim doesn't scroll.
+            scroll-event(e) => { accept }
+        }
+        card := Rectangle {
+            width: min(460px, root.width - 2 * Theme.s5);
+            height: lay.preferred-height;
+            x: (root.width - self.width) / 2;
+            y: max(Theme.s5, (root.height - self.height) / 2 - Theme.s6);
+            border-radius: Theme.r-l;
+            background: Theme.panel;
+            border-width: 1px;
+            border-color: Theme.card-edge;
+            transform-scale: root.shown ? 1 : (Theme.moving ? 0.98 : 1);
+            animate transform-scale { duration: Theme.t-menu; easing: Curves.ease-out; }
+            drop-shadow-blur: 24px;
+            drop-shadow-offset-y: 8px;
+            drop-shadow-color: Theme.cover-shadow;
+            accessible-role: groupbox;
+            accessible-label: root.title;
+            // Clicks on the card don't reach the scrim.
+            TouchArea { }
+            lay := VerticalLayout {
+                padding: Theme.s5;
+                spacing: Theme.s4;
+                DialogHead {
+                    title: root.title;
+                    detail: root.detail;
+                }
+                @children
+                DialogFoot {
+                    error: root.error;
+                    extra: root.extra;
+                    ok-label: root.ok-label;
+                    ok => { root.ok(); }
+                    cancel => { root.cancel(); }
+                    extra-clicked => { root.extra-clicked(); }
+                }
+            }
+        }
+    }
+}

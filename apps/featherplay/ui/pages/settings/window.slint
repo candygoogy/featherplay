@@ -1,0 +1,323 @@
+// Settings' Window section: closing, the tray, the appearance, the language, the accent
+// and its custom colour, notifications, tooltips, the shortcuts and the global hotkeys.
+import { Theme, Appearance } from "../../theme.slint";
+import { Body } from "../../parts.slint";
+import { Chips } from "../content.slint";
+import { SettingKey, SettingsData, SettingsDialog } from "data.slint";
+import { DeviceRow, Field, Group, RowButton, SettingRow, ToggleRow } from "rows.slint";
+
+// An accent: a dot of its colour, ringed in `text1` when it's the one picked.
+component Swatch inherits Rectangle {
+    in property <brush> colour;
+    in property <string> name;
+    in property <bool> selected;
+    callback clicked();
+    width: 32px;
+    height: 32px;
+    border-radius: self.height / 2;
+    // Animated as a private property: a root animating a public one is copied into each use.
+    property <brush> ground: Theme.state(ta.pressed, ta.has-hover);
+    animate ground { duration: Theme.t-hover; }
+    background: root.ground;
+    border-width: root.selected ? 2px : 0px;
+    border-color: Theme.text1;
+    accessible-role: radio-button;
+    accessible-label: root.name;
+    accessible-checkable: true;
+    accessible-checked: root.selected;
+    accessible-action-default => { root.clicked(); }
+    Rectangle {
+        width: 22px;
+        height: 22px;
+        border-radius: self.height / 2;
+        background: root.colour;
+    }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+}
+
+// The custom colour's hue: a strip of every hue at the slider's lightness and chroma
+// (`follow::hue_colour`), and a thumb. Dragging shows the colour live and saves it on
+// release; the arrow keys step 5 degrees and save.
+component HueSlider inherits Rectangle {
+    in property <float> hue;
+    property <length> knob: 20px;
+    height: 24px;
+    accessible-role: slider;
+    accessible-label: @tr("Hue");
+    accessible-value: @tr("{n} degree" | "{n} degrees" % Math.round(root.hue));
+    accessible-value-minimum: 0;
+    accessible-value-maximum: 360;
+    accessible-value-step: 5;
+    accessible-action-increment => { root.step(5); }
+    accessible-action-decrement => { root.step(-5); }
+
+    function step(by: float) {
+        SettingsData.custom-hue-moved(mod(root.hue + by + 360, 360), true);
+    }
+    function at(x: length, done: bool) {
+        let usable = root.width - root.knob;
+        SettingsData.custom-hue-moved(((x - root.knob / 2) / usable).clamp(0, 1) * 359.9, done);
+    }
+
+    Rectangle {
+        x: root.knob / 2 - 6px;
+        y: (parent.height - self.height) / 2;
+        width: parent.width - root.knob + 12px;
+        height: 12px;
+        border-radius: self.height / 2;
+        background: @linear-gradient(90deg,
+            oklch(0.65, 0.16, 0) 0%, oklch(0.65, 0.16, 30) 8.33%, oklch(0.65, 0.16, 60) 16.67%,
+            oklch(0.65, 0.16, 90) 25%, oklch(0.65, 0.16, 120) 33.33%, oklch(0.65, 0.16, 150) 41.67%,
+            oklch(0.65, 0.16, 180) 50%, oklch(0.65, 0.16, 210) 58.33%, oklch(0.65, 0.16, 240) 66.67%,
+            oklch(0.65, 0.16, 270) 75%, oklch(0.65, 0.16, 300) 83.33%, oklch(0.65, 0.16, 330) 91.67%,
+            oklch(0.65, 0.16, 360) 100%);
+    }
+    focus := FocusScope {
+        key-pressed(e) => {
+            if e.text == Key.RightArrow || e.text == Key.UpArrow {
+                root.step(5);
+                return accept;
+            }
+            if e.text == Key.LeftArrow || e.text == Key.DownArrow {
+                root.step(-5);
+                return accept;
+            }
+            reject
+        }
+    }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        pointer-event(e) => {
+            if e.button == PointerEventButton.left && e.kind == PointerEventKind.down {
+                focus.focus();
+                root.at(self.mouse-x, false);
+            }
+            if e.button == PointerEventButton.left && e.kind == PointerEventKind.up {
+                root.at(self.mouse-x, true);
+            }
+        }
+        moved => {
+            if self.pressed {
+                root.at(self.mouse-x, false);
+            }
+        }
+    }
+    // The thumb, in the slider's colour at this hue, ringed so it reads on any hue.
+    Rectangle {
+        x: root.hue / 360 * (parent.width - root.knob);
+        y: (parent.height - self.height) / 2;
+        width: root.knob;
+        height: root.knob;
+        border-radius: self.height / 2;
+        background: oklch(0.65, 0.16, root.hue);
+        border-width: 2px;
+        border-color: Theme.text1;
+    }
+    if focus.has-focus: Rectangle {
+        x: root.hue / 360 * (parent.width - root.knob) - 4px;
+        y: (parent.height - self.height) / 2;
+        width: root.knob + 8px;
+        height: root.knob + 8px;
+        border-radius: self.height / 2;
+        border-width: 2px;
+        border-color: Theme.accent;
+    }
+}
+
+// The custom colour, under the Accent row while it's picked: the colour as this theme
+// shows it, the hue slider and the hex field. A line below says when the theme adjusts the
+// colour to keep it visible, or why a typed code was refused.
+component CustomPicker inherits VerticalLayout {
+    property <string> note: Theme.dark ? SettingsData.custom-note-dark : SettingsData.custom-note-light;
+    padding-bottom: Theme.s4;
+    spacing: Theme.s2;
+    HorizontalLayout {
+        spacing: Theme.s4;
+        Rectangle {
+            width: 36px;
+            height: 36px;
+            border-radius: self.height / 2;
+            background: Theme.accent;
+            accessible-role: image;
+            accessible-label: @tr("Custom colour as shown");
+        }
+        VerticalLayout {
+            alignment: center;
+            horizontal-stretch: 1;
+            HueSlider {
+                hue: SettingsData.custom-hue;
+            }
+        }
+        Field {
+            width: 112px;
+            text <=> SettingsData.custom-hex;
+            label: @tr("Colour code");
+            placeholder: "#4390EE";
+            committed(t) => { SettingsData.custom-hex-entered(t); }
+        }
+    }
+    if SettingsData.custom-error != "": Body {
+        text: SettingsData.custom-error;
+        font-size: Theme.t-meta;
+        color: Theme.text1;
+        wrap: word-wrap;
+    }
+    if SettingsData.custom-error == "" && root.note != "": Body {
+        text: root.note;
+        font-size: Theme.t-meta;
+        color: Theme.text2;
+        wrap: word-wrap;
+    }
+}
+
+component HotkeyRow inherits Rectangle {
+    in property <string> label;
+    in property <int> index;
+    in-out property <string> text;
+    in property <string> placeholder;
+    height: 44px;
+    Body {
+        x: 0;
+        width: parent.width - 220px;
+        height: parent.height;
+        text: root.label;
+        color: Theme.text2;
+        vertical-alignment: center;
+    }
+    Field {
+        x: parent.width - self.width;
+        y: (parent.height - self.height) / 2;
+        width: 200px;
+        text <=> root.text;
+        placeholder: root.placeholder;
+        label: @tr("{} hotkey", root.label);
+        committed(t) => { SettingsData.hotkey-edited(root.index, t); }
+    }
+}
+
+export component WindowSection inherits Group {
+    // How many of the sections below the fold the page has made (`SettingsPage.made`).
+    in property <int> made;
+    title: @tr("Window");
+    if root.made >= 2: VerticalLayout {
+        SettingRow {
+            divider: false;
+            label: @tr("When I close the window");
+            detail: @tr("In the tray, the music keeps going; quit from the tray icon's menu.");
+        }
+        VerticalLayout {
+            padding-bottom: Theme.s2;
+            for t[i] in [@tr("Ask"), @tr("Close featherplay"), @tr("Keep playing in the tray")]: DeviceRow {
+                name: t;
+                selected: i == SettingsData.close-action;
+                clicked => { SettingsData.pick-close-action(i); }
+            }
+        }
+        ToggleRow {
+            label: @tr("Turn off the mini player");
+            detail: @tr("Clicking the tray icon opens the main window instead. Right-click always shows the menu.");
+            key: SettingKey.tray-click-opens-window;
+            checked: SettingsData.tray-click-opens-window;
+        }
+        SettingRow {
+            label: @tr("Appearance");
+            detail: @tr("System follows Windows' light or dark mode.");
+            Chips {
+                labels: [@tr("appearance" => "Dark"), @tr("appearance" => "Light"), @tr("appearance" => "System")];
+                active: SettingsData.appearance == Appearance.dark ? 0 : (SettingsData.appearance == Appearance.light ? 1 : 2);
+                selected(i) => {
+                    SettingsData.pick-appearance(i == 0 ? Appearance.dark : (i == 1 ? Appearance.light : Appearance.system));
+                }
+            }
+        }
+        SettingRow {
+            label: @tr("Language");
+            detail: @tr("Windows default follows Windows' display language when featherplay has it, and English otherwise.");
+            Chips {
+                labels: SettingsData.language-names;
+                active: SettingsData.language;
+                selected(i) => { SettingsData.pick-language(i); }
+            }
+        }
+        SettingRow {
+            label: @tr("Accent");
+            detail: @tr("From the cover takes the colour of the song that's playing, and a plain grey when the art has none.");
+            Chips {
+                labels: [@tr("From the cover")];
+                active: SettingsData.accent == 0 ? 0 : -1;
+                selected => { SettingsData.pick-accent(0); }
+            }
+            for swatch[i] in SettingsData.accents: Swatch {
+                name: swatch.name;
+                colour: Theme.dark ? swatch.dark : swatch.light;
+                selected: SettingsData.accent == i + 1;
+                clicked => { SettingsData.pick-accent(i + 1); }
+            }
+            // The custom colour: a hue wheel, the usual sign for "any colour".
+            Swatch {
+                name: @tr("Custom colour");
+                colour: @conic-gradient(#E5484D 0deg, #E58A3C 45deg, #D9C23A 90deg, #5CB85C 135deg, #3BB5C9 180deg, #4C7EE5 225deg, #9061E0 270deg, #D9509E 315deg, #E5484D 360deg);
+                selected: SettingsData.accent == SettingsData.accents.length + 1;
+                clicked => { SettingsData.pick-accent(SettingsData.accents.length + 1); }
+            }
+        }
+        if SettingsData.accent == SettingsData.accents.length + 1: CustomPicker { }
+        ToggleRow {
+            label: @tr("Track notifications");
+            detail: @tr("Show a notification when the track changes.");
+            key: SettingKey.notifications;
+            checked: SettingsData.notifications;
+        }
+        ToggleRow {
+            label: @tr("Show tooltips");
+            detail: @tr("Names and shortcuts when you rest the pointer on a button.");
+            key: SettingKey.tooltips;
+            checked: SettingsData.tooltips;
+        }
+        SettingRow {
+            label: @tr("Keyboard shortcuts");
+            detail: @tr("Play, skip, search and move around without the mouse.");
+            RowButton {
+                label: @tr("Show shortcuts");
+                clicked => { SettingsData.open-dialog(SettingsDialog.shortcuts); }
+            }
+        }
+        ToggleRow {
+            label: @tr("Global hotkeys");
+            detail: @tr("Play, pause and skip from any app. Each key needs Ctrl, Alt, Shift or Win.");
+            key: SettingKey.hotkeys;
+            checked: SettingsData.hotkeys;
+        }
+        if SettingsData.hotkeys: VerticalLayout {
+            padding-bottom: Theme.s3;
+            HotkeyRow {
+                label: @tr("Play or pause");
+                index: 0;
+                text <=> SettingsData.hotkey-play-pause;
+                placeholder: @tr("Ctrl+Alt+Space");
+            }
+            HotkeyRow {
+                label: @tr("Next");
+                index: 1;
+                text <=> SettingsData.hotkey-next;
+                placeholder: @tr("Ctrl+Alt+Right");
+            }
+            HotkeyRow {
+                label: @tr("Previous");
+                index: 2;
+                text <=> SettingsData.hotkey-previous;
+                placeholder: @tr("Ctrl+Alt+Left");
+            }
+            if SettingsData.hotkeys-error != "": Body {
+                text: SettingsData.hotkeys-error;
+                font-size: Theme.t-meta;
+                color: Theme.text1;
+                overflow: clip;
+                wrap: word-wrap;
+            }
+        }
+    }
+}

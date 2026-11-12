@@ -1,0 +1,21 @@
+// Settings' Lyrics section.
+import { SettingKey, SettingsData } from "data.slint";
+import { Group, ToggleRow } from "rows.slint";
+
+export component LyricsSection inherits Group {
+    title: @tr("Lyrics");
+    ToggleRow {
+        divider: false;
+        label: @tr("Show lyrics");
+        detail: @tr("The Lyrics button in the bar and on Now playing, and the Lyrics tab beside Up next. Off: they're hidden, and no lyrics are looked up.");
+        key: SettingKey.lyrics;
+        checked: SettingsData.lyrics;
+    }
+    ToggleRow {
+        label: @tr("Look up synced lyrics on LRCLIB");
+        detail: @tr("Lines follow the song. While lyrics are on screen, LRCLIB gets the song's title, artist, album and length. Off: only the lyrics that come with the song, synced for some songs.");
+        key: SettingKey.lyrics-lrclib;
+        checked: SettingsData.lyrics-lrclib;
+        enabled: SettingsData.lyrics;
+    }
+}

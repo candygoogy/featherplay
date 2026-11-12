@@ -1,0 +1,99 @@
+// Settings' Scrobbling section: Last.fm and ListenBrainz.
+import { LastfmState, ListenBrainzState, SettingKey, SettingsData, SettingsDialog } from "data.slint";
+import { Group, RowButton, SettingRow, ToggleRow } from "rows.slint";
+
+export component ScrobblingSection inherits Group {
+    title: @tr("Scrobbling");
+    ToggleRow {
+        divider: false;
+        label: @tr("Scrobble");
+        detail: @tr("Send what you play to Last.fm and ListenBrainz, once you've played half a track or 4 minutes of it.");
+        key: SettingKey.scrobbling;
+        checked: SettingsData.scrobbling;
+    }
+    ToggleRow {
+        label: @tr("Scrobble other media");
+        detail: @tr("Also scrobble user uploads and podcasts, not only songs and official music videos.");
+        key: SettingKey.scrobble-other-media;
+        checked: SettingsData.scrobble-other-media;
+        enabled: SettingsData.scrobbling;
+    }
+    ToggleRow {
+        label: @tr("Use alternative titles");
+        detail: @tr("Send the video's original title rather than the translated or romanised one shown here.");
+        key: SettingKey.alternative-titles;
+        checked: SettingsData.alternative-titles;
+        enabled: SettingsData.scrobbling;
+    }
+    ToggleRow {
+        label: @tr("Use alternative artists");
+        detail: @tr("Send the artist from the video's tags, spelled as the label has it, rather than the first artist shown.");
+        key: SettingKey.alternative-artists;
+        checked: SettingsData.alternative-artists;
+        enabled: SettingsData.scrobbling;
+    }
+    SettingRow {
+        label: "Last.fm";
+        detail: SettingsData.lastfm-message != "" ? SettingsData.lastfm-message
+            : SettingsData.lastfm-state == LastfmState.signed-in ? @tr("Connected. Scrobbles go to your Last.fm profile.")
+            : SettingsData.lastfm-state == LastfmState.opening ? @tr("Opening Last.fm in your browser…")
+            : SettingsData.lastfm-state == LastfmState.waiting ? @tr("Approve featherplay on the Last.fm page in your browser, then come back here.")
+            : SettingsData.lastfm-state == LastfmState.finishing ? @tr("Connecting…")
+            : !SettingsData.lastfm-builtin-key && !SettingsData.lastfm-custom-key ? @tr("Scrobble to your Last.fm profile. Enter an API key under API settings first.")
+            : @tr("Scrobble what you play to your Last.fm profile.");
+        if SettingsData.lastfm-state == LastfmState.signed-out || SettingsData.lastfm-state == LastfmState.signed-in: RowButton {
+            label: @tr("API settings…");
+            clicked => { SettingsData.open-dialog(SettingsDialog.lastfm-keys); }
+        }
+        if SettingsData.lastfm-state == LastfmState.signed-out: RowButton {
+            label: @tr("Connect");
+            clicked => { SettingsData.lastfm-connect(); }
+        }
+        if SettingsData.lastfm-state == LastfmState.waiting: RowButton {
+            label: @tr("Cancel");
+            clicked => { SettingsData.lastfm-cancel(); }
+        }
+        if SettingsData.lastfm-state == LastfmState.waiting: RowButton {
+            label: @tr("I've approved it");
+            solid: true;
+            clicked => { SettingsData.lastfm-approved(); }
+        }
+        if SettingsData.lastfm-state == LastfmState.signed-in: RowButton {
+            label: @tr("Disconnect");
+            clicked => { SettingsData.lastfm-sign-out(); }
+        }
+    }
+    if SettingsData.lastfm-state == LastfmState.signed-in: ToggleRow {
+        label: @tr("Scrobble to Last.fm");
+        detail: @tr("Off keeps the connection.");
+        key: SettingKey.scrobble;
+        checked: SettingsData.scrobble;
+        enabled: SettingsData.scrobbling;
+    }
+    SettingRow {
+        label: "ListenBrainz";
+        detail: SettingsData.listenbrainz-message != "" ? SettingsData.listenbrainz-message
+            : SettingsData.listenbrainz-state == ListenBrainzState.checking ? @tr("Checking the token with ListenBrainz…")
+            : SettingsData.listenbrainz-state == ListenBrainzState.signed-in ? @tr("Connected. Listens go to your ListenBrainz profile.")
+            : @tr("Send listens to your ListenBrainz profile with your user token.");
+        if SettingsData.listenbrainz-state == ListenBrainzState.signed-out: RowButton {
+            label: @tr("Add token…");
+            clicked => { SettingsData.open-dialog(SettingsDialog.listenbrainz-token); }
+        }
+        if SettingsData.listenbrainz-state == ListenBrainzState.signed-in: RowButton {
+            label: @tr("Change token…");
+            clicked => { SettingsData.open-dialog(SettingsDialog.listenbrainz-token); }
+        }
+        if SettingsData.listenbrainz-state == ListenBrainzState.signed-in: RowButton {
+            label: @tr("Remove");
+            clicked => { SettingsData.listenbrainz-remove(); }
+        }
+    }
+    if SettingsData.listenbrainz-state == ListenBrainzState.signed-in: ToggleRow {
+        label: @tr("Scrobble to ListenBrainz");
+        detail: @tr("Off keeps the token.");
+        key: SettingKey.listenbrainz;
+        checked: SettingsData.listenbrainz;
+        enabled: SettingsData.scrobbling;
+    }
+}

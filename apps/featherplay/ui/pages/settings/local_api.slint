@@ -1,0 +1,63 @@
+// Settings' Local API section: the API server, with its port and token, and Amuse.
+import { Body } from "../../parts.slint";
+import { LocalApiState, SettingKey, SettingsData } from "data.slint";
+import { Field, Group, RowButton, Rows, SettingRow, ToggleRow } from "rows.slint";
+
+export component LocalApiSection inherits Group {
+    title: @tr("Local API");
+    // Made with the page: off, as it mostly is, it's two rows.
+    VerticalLayout {
+        ToggleRow {
+            divider: false;
+            label: @tr("API server");
+            detail: !SettingsData.local-api ? @tr("Let stream overlays, Stream Deck and scripts on this PC show what's playing and control playback. Tools made for Pear's API Server work too.")
+                : SettingsData.local-api-state == LocalApiState.failed ? SettingsData.local-api-message
+                : SettingsData.local-api-state == LocalApiState.running ? @tr("On at http://127.0.0.1:{}. Only apps on this PC that have the token can use it.", SettingsData.local-api-port)
+                : @tr("Starting…");
+            key: SettingKey.local-api;
+            checked: SettingsData.local-api;
+        }
+        if SettingsData.local-api: VerticalLayout {
+            SettingRow {
+                label: @tr("Port");
+                detail: SettingsData.local-api-port-error != "" ? SettingsData.local-api-port-error
+                    : @tr("26538 is the one Pear Desktop uses, so its tools find featherplay.");
+                Field {
+                    width: 96px;
+                    text <=> SettingsData.local-api-port;
+                    label: @tr("Local API port");
+                    placeholder: "26538";
+                    committed(t) => { SettingsData.local-api-port-entered(t); }
+                }
+            }
+            SettingRow {
+                label: @tr("Access token");
+                detail: @tr("Apps send it as \"Authorization: Bearer\" and the token. It stays hidden here, so it doesn't show on stream. Regenerate disconnects the apps using the old one.");
+                Body {
+                    text: SettingsData.local-api-token;
+                    color: Rows.detail;
+                    vertical-alignment: center;
+                    accessible-label: @tr("Token, hidden");
+                }
+                RowButton {
+                    label: @tr("Copy");
+                    enabled: SettingsData.local-api-token != "";
+                    clicked => { SettingsData.local-api-copy(); }
+                }
+                RowButton {
+                    label: @tr("Regenerate");
+                    clicked => { SettingsData.local-api-regenerate(); }
+                }
+            }
+        }
+        ToggleRow {
+            label: @tr("Amuse");
+            detail: !SettingsData.amuse ? @tr("Lets Amuse show what's playing. It needs no token: any app on this PC can see it, but no website other than Amuse's.")
+                : SettingsData.amuse-state == LocalApiState.failed ? SettingsData.amuse-message
+                : SettingsData.amuse-state == LocalApiState.running ? @tr("On at http://127.0.0.1:9863. It needs no token: any app on this PC can see it, but no website other than Amuse's.")
+                : @tr("Starting…");
+            key: SettingKey.amuse;
+            checked: SettingsData.amuse;
+        }
+    }
+}

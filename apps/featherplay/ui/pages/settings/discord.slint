@@ -1,0 +1,247 @@
+// Settings' Discord section: the status and its options, with the profile card beside
+// them where the page has room (`discord_card.slint`).
+import { Theme, Curves } from "../../theme.slint";
+import { Body } from "../../parts.slint";
+import { DiscordPart, DiscordState, SettingKey, SettingsData } from "data.slint";
+import { DeviceRow, Group, RowButton, Rows, SettingRow, Switch, ToggleRow } from "rows.slint";
+import { DiscordPane } from "discord_card.slint";
+
+// A Discord option's rows: hovering them lights the part of the profile card the option
+// changes (`SettingsData.discord-lit`), and tints the rows a shade, while the card is
+// `shown` beside them.
+component DiscordOption inherits Rectangle {
+    in property <DiscordPart> part;
+    // Unique among the options.
+    in property <int> option;
+    in property <bool> shown;
+    min-height: lay.min-height;
+    preferred-height: lay.preferred-height;
+    Rectangle {
+        x: -Theme.s3;
+        width: parent.width + 2 * Theme.s3;
+        border-radius: Theme.r-m;
+        background: ta.has-hover && root.shown ? Theme.choice-lit : Theme.choice-lit.transparentize(1);
+        animate background { duration: Theme.t-hover; easing: Curves.ease-hover; }
+    }
+    ta := TouchArea {
+        changed has-hover => {
+            if self.has-hover && root.shown {
+                SettingsData.discord-lit = root.part;
+                SettingsData.discord-lit-option = root.option;
+            } else if SettingsData.discord-lit-option == root.option {
+                SettingsData.discord-lit = DiscordPart.none;
+                SettingsData.discord-lit-option = -1;
+            }
+        }
+        lay := VerticalLayout {
+            @children
+        }
+    }
+}
+
+// The pause timeout: shorter, the minutes, longer.
+component MinutesStepper inherits HorizontalLayout {
+    in property <int> minutes;
+    in property <bool> enabled: true;
+    spacing: Theme.s2;
+    RowButton {
+        label: "−";
+        accessible-label: @tr("Shorter");
+        enabled: root.enabled;
+        clicked => { SettingsData.discord-step-minutes(-1); }
+    }
+    Body {
+        min-width: 56px;
+        text: @tr("{n} min" | "{n} min" % root.minutes);
+        color: root.enabled ? Theme.text1 : Theme.text3;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+    RowButton {
+        label: "+";
+        accessible-label: @tr("Longer");
+        enabled: root.enabled;
+        clicked => { SettingsData.discord-step-minutes(1); }
+    }
+}
+
+export component DiscordSection inherits Group {
+    // From the page (`SettingsPage`): how many sections below the fold it has made, whether
+    // the card fits beside the options and how wide it is, and where the rows are on the
+    // scrolled page, for the card to keep in view.
+    in property <int> made;
+    in property <bool> card-beside;
+    in property <length> beside-card-w;
+    in property <length> card-gap;
+    in property <length> view-h;
+    in property <length> scrolled;
+    in property <length> discord-top;
+    title: @tr("Discord");
+    // Two columns while the card fits beside the options: the rows on the left,
+    // the card's lane on the right, the card placed over the layout. Otherwise
+    // the rows alone.
+    if root.made >= 1: block := Rectangle {
+        property <length> card-w: root.beside-card-w;
+        property <length> pane-h: pane.preferred-height + 2 * Rows.pad-y;
+        min-width: columns.min-width;
+        min-height: columns.min-height;
+        preferred-height: columns.preferred-height;
+        columns := HorizontalLayout {
+            spacing: root.card-beside ? root.card-gap : 0px;
+            VerticalLayout {
+                horizontal-stretch: 1;
+                // At the top, when the card beside them is the taller.
+                alignment: start;
+                discord-rows := VerticalLayout {
+                    DiscordOption {
+                        shown: root.card-beside;
+                        part: DiscordPart.card;
+                        option: 1;
+                        SettingRow {
+                            divider: false;
+                            label: @tr("Discord status");
+                            detail: SettingsData.discord-state == DiscordState.unavailable ? @tr("This build has no Discord app ID.")
+                                : !SettingsData.discord ? @tr("Show \"Listening to\" with the track on your Discord profile.")
+                                : SettingsData.discord-state == DiscordState.connected ? @tr("Connected to Discord.")
+                                : SettingsData.discord-state == DiscordState.connecting ? @tr("Connecting to Discord…")
+                                : SettingsData.discord-auto-reconnect ? @tr("Not connected. Discord isn't running; featherplay tries again while music plays.")
+                                : @tr("Not connected. Discord isn't running, or it closed.");
+                            if SettingsData.discord && SettingsData.discord-state == DiscordState.not-connected: RowButton {
+                                label: @tr("Connect");
+                                clicked => { SettingsData.discord-connect(); }
+                            }
+                            VerticalLayout {
+                                alignment: center;
+                                Switch {
+                                    checked: SettingsData.discord;
+                                    label: @tr("Discord status");
+                                    enabled: SettingsData.discord-state != DiscordState.unavailable;
+                                    toggled(on) => { SettingsData.toggled(SettingKey.discord, on); }
+                                }
+                            }
+                        }
+                    }
+                    if SettingsData.discord: VerticalLayout {
+                        ToggleRow {
+                            label: @tr("Reconnect automatically");
+                            detail: @tr("When Discord isn't running or restarts, try again while music plays.");
+                            key: SettingKey.discord-auto-reconnect;
+                            checked: SettingsData.discord-auto-reconnect;
+                        }
+                        DiscordOption {
+                            shown: root.card-beside;
+                            part: DiscordPart.activity;
+                            option: 2;
+                            SettingRow {
+                                label: @tr("Clear activity");
+                                detail: @tr("Remove the track from your profile until the next one starts or you resume.");
+                                RowButton {
+                                    label: @tr("Clear");
+                                    enabled: SettingsData.discord-state == DiscordState.connected;
+                                    clicked => { SettingsData.discord-clear(); }
+                                }
+                            }
+                        }
+                        DiscordOption {
+                            shown: root.card-beside;
+                            part: DiscordPart.activity;
+                            option: 3;
+                            SettingRow {
+                                label: @tr("Clear after a pause");
+                                detail: @tr("Remove the track when paused this long.");
+                                MinutesStepper {
+                                    minutes: SettingsData.discord-clear-minutes;
+                                    enabled: SettingsData.discord-clear-on-pause;
+                                }
+                                VerticalLayout {
+                                    alignment: center;
+                                    Switch {
+                                        checked: SettingsData.discord-clear-on-pause;
+                                        label: @tr("Clear after a pause");
+                                        toggled(on) => { SettingsData.toggled(SettingKey.discord-clear-on-pause, on); }
+                                    }
+                                }
+                            }
+                        }
+                        DiscordOption {
+                            shown: root.card-beside;
+                            part: DiscordPart.button;
+                            option: 4;
+                            ToggleRow {
+                                label: @tr("Play song button");
+                                detail: @tr("A button under the activity that opens the song in a browser.");
+                                key: SettingKey.discord-play-button;
+                                checked: SettingsData.discord-play-button;
+                            }
+                        }
+                        DiscordOption {
+                            shown: root.card-beside;
+                            part: DiscordPart.links;
+                            option: 5;
+                            ToggleRow {
+                                label: @tr("Links");
+                                detail: @tr("The title opens the song, the artist their page and the cover the album.");
+                                key: SettingKey.discord-links;
+                                checked: SettingsData.discord-links;
+                            }
+                        }
+                        DiscordOption {
+                            shown: root.card-beside;
+                            part: DiscordPart.time;
+                            option: 6;
+                            SettingRow {
+                                label: @tr("Time");
+                                detail: @tr("What your profile shows of the track's time while it plays.");
+                            }
+                            VerticalLayout {
+                                padding-bottom: Theme.s2;
+                                for t[i] in [@tr("Progress bar"), @tr("Time elapsed only"), @tr("No time")]: DeviceRow {
+                                    name: t;
+                                    selected: i == SettingsData.discord-time;
+                                    clicked => { SettingsData.discord-pick-time(i); }
+                                }
+                            }
+                        }
+                        DiscordOption {
+                            shown: root.card-beside;
+                            part: DiscordPart.status;
+                            option: 7;
+                            SettingRow {
+                                label: @tr("Status text");
+                                detail: @tr("What your status says in member lists and DMs.");
+                            }
+                            VerticalLayout {
+                                padding-bottom: Theme.s2;
+                                for t[i] in [@tr("Listening to featherplay"), @tr("Listening to the artist"), @tr("Listening to the song title")]: DeviceRow {
+                                    name: t;
+                                    selected: i == SettingsData.discord-status-text;
+                                    clicked => { SettingsData.discord-pick-status-text(i); }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            lane := Rectangle {
+                width: root.card-beside ? block.card-w : 0px;
+                min-height: root.card-beside ? block.pane-h : 0px;
+            }
+        }
+        // Beside the options, the pane keeps in view while they scroll past it,
+        // within their rows. It stops with its caption level with the section
+        // index's first entry, `page-top` below the page's top; in a window too
+        // short to show the card whole from there, where the card's end meets
+        // the page's, so the activity the options change stays in view and the
+        // banner is what goes under the top bar. Its place comes straight from
+        // the scroll position: nothing eases after it.
+        property <length> stick: min(Theme.page-top, root.view-h - pane.card-end) - Rows.pad-y;
+        pane := DiscordPane {
+            visible: root.card-beside;
+            x: lane.x;
+            y: Rows.pad-y + max(0px, min(root.scrolled + block.stick - root.discord-top, discord-rows.height - block.pane-h));
+            width: block.card-w;
+            height: self.preferred-height;
+            card-w: block.card-w;
+        }
+    }
+}

@@ -1,0 +1,265 @@
+// The Equalizer dialog, from Sound's Custom… chip.
+import { Theme, Curves } from "../../theme.slint";
+import { Body, Display, TextLink } from "../../parts.slint";
+import { SettingsData } from "data.slint";
+import { RowButton } from "rows.slint";
+
+// The Equalizer dialog's measures. Everything in it has a fixed size, so it's placed by
+// these rather than by layouts (each layout costs the exe code).
+global Eq {
+    // A band's value line, then its rail between two 12 px margins, then its frequency.
+    out property <length> value-h: 20px;
+    out property <length> rail-h: 176px;
+    out property <length> rail-top: self.value-h + Theme.s3;
+    out property <length> label-y: self.rail-top + self.rail-h + Theme.s3;
+    out property <length> height: self.label-y + 16px;
+    out property <length> zero-y: self.rail-top + self.rail-h / 2;
+    // The +12 / 0 / −12 scale left of the bands.
+    out property <length> scale-w: 34px;
+}
+
+// One band of the Equalizer dialog: its value, an upright slider, and its frequency. The
+// rail is the volume slider's turned upright, filled in the accent from the 0 dB line to the
+// thumb. A press or a drag sets it in 1 dB steps, live; a double click puts it back at 0 dB.
+// Keys: Up and Down 1 dB, Page Up and Page Down 3 dB, Home 0 dB (Tab moves between bands).
+component EqBand inherits Rectangle {
+    in property <string> label;
+    in property <int> value;
+    callback moved(int);
+    property <length> knob: 18px;
+    // The thumb's centre.
+    property <length> thumb-y: Eq.rail-top + (1 - (root.value + 12) / 24) * Eq.rail-h;
+    property <string> signed: root.value > 0 ? "+" + root.value : root.value < 0 ? "−" + (-root.value) : "0";
+    height: Eq.height;
+
+    function set(v: int) {
+        let c = clamp(v, -12, 12);
+        if c != root.value {
+            root.moved(c);
+        }
+    }
+    // A press or a drag at `y` from the band's top.
+    function at(y: length) {
+        root.set(round(12 - (y - Eq.rail-top) / Eq.rail-h * 24));
+    }
+
+    Body {
+        y: 0;
+        height: Eq.value-h;
+        text: root.signed;
+        font-size: Theme.t-meta;
+        font-weight: root.value == 0 ? 400 : 600;
+        color: root.value == 0 ? Theme.text3 : Theme.text1;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+    // The slider for screen readers is the element that takes the focus: "60 Hz, +6 dB".
+    focus := FocusScope {
+        accessible-role: slider;
+        accessible-label: root.label;
+        accessible-value: @tr("{} dB", root.signed);
+        accessible-value-minimum: -12;
+        accessible-value-maximum: 12;
+        accessible-value-step: 1;
+        accessible-action-increment => { root.set(root.value + 1); }
+        accessible-action-decrement => { root.set(root.value - 1); }
+        key-pressed(e) => {
+            if e.text == Key.UpArrow || e.text == Key.RightArrow {
+                root.set(root.value + 1);
+                return accept;
+            }
+            if e.text == Key.DownArrow || e.text == Key.LeftArrow {
+                root.set(root.value - 1);
+                return accept;
+            }
+            if e.text == Key.PageUp {
+                root.set(root.value + 3);
+                return accept;
+            }
+            if e.text == Key.PageDown {
+                root.set(root.value - 3);
+                return accept;
+            }
+            if e.text == Key.Home {
+                root.set(0);
+                return accept;
+            }
+            reject
+        }
+    }
+    TouchArea {
+        y: Eq.value-h;
+        height: Eq.rail-h + 2 * Theme.s3;
+        mouse-cursor: pointer;
+        pointer-event(e) => {
+            if e.button == PointerEventButton.left && e.kind == PointerEventKind.down {
+                focus.focus();
+                root.at(self.y + self.mouse-y);
+            }
+        }
+        moved => {
+            if self.pressed {
+                root.at(self.y + self.mouse-y);
+            }
+        }
+        double-clicked => { root.set(0); }
+    }
+    Rectangle {
+        x: (parent.width - self.width) / 2;
+        y: Eq.rail-top;
+        width: 4px;
+        height: Eq.rail-h;
+        border-radius: 2px;
+        background: Theme.track;
+    }
+    // The fill, from the 0 dB line to the thumb.
+    Rectangle {
+        x: (parent.width - self.width) / 2;
+        y: min(root.thumb-y, Eq.zero-y);
+        width: 4px;
+        height: abs(root.thumb-y - Eq.zero-y);
+        border-radius: 2px;
+        background: Theme.accent;
+    }
+    // The focus ring, 3 px out from the thumb.
+    Rectangle {
+        x: (parent.width - self.width) / 2;
+        y: root.thumb-y - self.height / 2;
+        width: root.knob + 10px;
+        height: self.width;
+        border-radius: self.height / 2;
+        border-width: 2px;
+        border-color: focus.has-focus ? Theme.accent : transparent;
+    }
+    Rectangle {
+        x: (parent.width - self.width) / 2;
+        y: root.thumb-y - self.height / 2;
+        width: root.knob;
+        height: root.knob;
+        border-radius: self.height / 2;
+        // White in both themes, edged on the light panel.
+        background: Theme.dark ? Theme.text1 : #FFFFFF;
+        border-width: Theme.dark ? 0px : 1px;
+        border-color: #0000002A;
+        drop-shadow-blur: 4px;
+        drop-shadow-offset-y: 1px;
+        drop-shadow-color: Theme.dark ? #0006 : #0003;
+    }
+    Body {
+        y: Eq.label-y;
+        text: root.label;
+        font-size: Theme.t-meta;
+        color: Theme.text2;
+        horizontal-alignment: center;
+    }
+}
+
+// The Equalizer dialog's five bands, beside a +12 / 0 / −12 scale, over the 0 dB line.
+component EqBands inherits Rectangle {
+    property <length> band-w: (self.width - Eq.scale-w) / 5;
+    height: Eq.height;
+    Rectangle {
+        x: Eq.scale-w;
+        y: Eq.zero-y;
+        width: parent.width - Eq.scale-w;
+        height: 1px;
+        background: Theme.hairline;
+    }
+    for mark[i] in ["+12", "0", "−12"]: Body {
+        x: 0;
+        y: Eq.zero-y + (i - 1) * Eq.rail-h / 2 - self.height / 2;
+        width: Eq.scale-w - Theme.s2;
+        text: mark;
+        font-size: 11px;
+        color: Theme.text3;
+        horizontal-alignment: right;
+    }
+    for v[i] in SettingsData.eq-bands: EqBand {
+        x: Eq.scale-w + i * root.band-w;
+        y: 0;
+        width: root.band-w;
+        label: [@tr("60 Hz"), @tr("250 Hz"), @tr("1 kHz"), @tr("4 kHz"), @tr("12 kHz")][i];
+        value: v;
+        moved(to) => { SettingsData.eq-band-moved(i, to); }
+    }
+}
+
+// The Equalizer's bands over the window, from its Custom… chip: `Dialog`'s scrim and card,
+// with Reset (underlined) and Done instead of Cancel and OK, as the bands apply as they move.
+// Done, Escape and a click on the scrim close it; Reset puts every band at 0 dB and the
+// equalizer off. Its own component rather than options on `Dialog`, which is inlined into
+// every dialog of the app.
+export component EqualizerDialog inherits Rectangle {
+    property <bool> shown: false;
+    background: Theme.scrim;
+    opacity: root.shown ? 1 : 0;
+    animate opacity { duration: Theme.t-menu; easing: Curves.ease-out; }
+    init => {
+        root.shown = true;
+        keys.focus();
+    }
+    keys := FocusScope {
+        key-pressed(e) => {
+            if e.text == Key.Escape {
+                SettingsData.close-dialog();
+                return accept;
+            }
+            reject
+        }
+        TouchArea {
+            clicked => { SettingsData.close-dialog(); }
+            // The page under the scrim doesn't scroll.
+            scroll-event(e) => { accept }
+        }
+        Rectangle {
+            width: min(460px, root.width - 2 * Theme.s5);
+            height: lay.preferred-height;
+            x: (root.width - self.width) / 2;
+            y: max(Theme.s5, (root.height - self.height) / 2 - Theme.s6);
+            border-radius: Theme.r-l;
+            background: Theme.panel;
+            border-width: 1px;
+            border-color: Theme.card-edge;
+            transform-scale: root.shown ? 1 : (Theme.moving ? 0.98 : 1);
+            animate transform-scale { duration: Theme.t-menu; easing: Curves.ease-out; }
+            drop-shadow-blur: 24px;
+            drop-shadow-offset-y: 8px;
+            drop-shadow-color: Theme.cover-shadow;
+            accessible-role: groupbox;
+            accessible-label: @tr("Equalizer");
+            // Clicks on the card don't reach the scrim.
+            TouchArea { }
+            lay := VerticalLayout {
+                padding: Theme.s5;
+                spacing: Theme.s4;
+                Display {
+                    text: @tr("Equalizer");
+                    font-size: 20px;
+                }
+                Body {
+                    text: @tr("Drag a band to change it. Boosts turn the overall level down a little, so nothing distorts.");
+                    color: Theme.text2;
+                    wrap: word-wrap;
+                }
+                EqBands { }
+                // Reset on the left, Done on the right, as `Dialog`'s buttons sit.
+                Rectangle {
+                    height: Theme.s2 + 32px;
+                    TextLink {
+                        x: 0;
+                        y: Theme.s2 + (32px - self.height) / 2;
+                        text: @tr("Reset");
+                        clicked => { SettingsData.eq-reset(); }
+                    }
+                    RowButton {
+                        x: parent.width - self.width;
+                        y: Theme.s2;
+                        label: @tr("Done");
+                        solid: true;
+                        clicked => { SettingsData.close-dialog(); }
+                    }
+                }
+            }
+        }
+    }
+}

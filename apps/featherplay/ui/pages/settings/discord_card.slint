@@ -1,0 +1,438 @@
+// The Discord section's preview: the profile card as friends see it, and the pane that
+// captions it.
+import { Theme, Curves, Icons } from "../../theme.slint";
+import { Body, Display, Icon, Cover } from "../../parts.slint";
+import { SmallLogo } from "../../logo.slint";
+import { Player } from "../../player.slint";
+import { NowPlayingData } from "../now_playing.slint";
+import { SidebarData } from "../../sidebar.slint";
+import { DiscordPart, DiscordPreview, DiscordState, SettingsData } from "data.slint";
+
+// The preview's type: the main lines (the name, the title) and the lines under them (the
+// status, the artist, the time).
+global PreviewType {
+    out property <length> main-size: Theme.t-body;
+    out property <int> main-weight: 600;
+    out property <color> main-color: Theme.text1;
+    out property <length> sub-size: Theme.t-meta;
+    out property <color> sub-color: Theme.text2;
+}
+
+component PreviewSub inherits Body {
+    font-size: PreviewType.sub-size;
+    color: PreviewType.sub-color;
+}
+
+// "Listening to featherplay", over the activity as Discord heads it: small and bold, in the
+// plain text colour (not the cover's tint, which made it read as a link).
+component PreviewHeading inherits Body {
+    font-size: PreviewType.sub-size;
+    font-weight: 600;
+    color: Theme.text1;
+}
+
+// The title (a main line) or the artist (a line under): one line, elided. With the Links
+// option on, Discord underlines it under the pointer (it's plain otherwise), and so does the
+// preview.
+component PreviewLine inherits Rectangle {
+    in property <string> text;
+    in property <bool> link;
+    in property <bool> main;
+    min-height: t.min-height;
+    preferred-height: t.preferred-height;
+    min-width: 0px;
+    horizontal-stretch: 1;
+    t := Body {
+        width: parent.width;
+        height: parent.height;
+        text: root.text;
+        font-size: root.main ? PreviewType.main-size : PreviewType.sub-size;
+        font-weight: root.main ? PreviewType.main-weight : 400;
+        color: root.main ? PreviewType.main-color : PreviewType.sub-color;
+    }
+    if root.link: hover := TouchArea {
+        x: 0;
+        width: min(t.preferred-width, root.width);
+        if hover.has-hover: Rectangle {
+            x: 0;
+            y: parent.height - 2px;
+            height: 1px;
+            background: t.color;
+        }
+    }
+}
+
+// A lit part's mark: the accent's tonal fill and a thin outline in the accent, eased in and
+// out over `t-fast`; clear while the part isn't lit.
+component LitMark inherits Rectangle {
+    in property <bool> lit;
+    border-width: 1px;
+    // Animated as private properties: a root animating public ones is copied into each use.
+    property <brush> ground: root.lit ? Theme.accent-tonal : Theme.accent-tonal.transparentize(1);
+    property <brush> edge: root.lit ? Theme.accent : Theme.accent.transparentize(1);
+    animate ground, edge { duration: Theme.t-fast; easing: Curves.ease-hover; }
+    background: root.ground;
+    border-color: root.edge;
+}
+
+// A part of the card an option changes (the time, the title and artist), marked round its
+// edge while the option is hovered.
+component LitPart inherits Rectangle {
+    in property <bool> lit;
+    // How far the mark reaches past the part, across and up and down.
+    property <length> reach: 8px;
+    property <length> rise: 4px;
+    min-width: lay.min-width;
+    preferred-width: lay.preferred-width;
+    min-height: lay.min-height;
+    preferred-height: lay.preferred-height;
+    horizontal-stretch: 1;
+    LitMark {
+        x: -root.reach;
+        y: -root.rise;
+        width: parent.width + 2 * root.reach;
+        height: parent.height + 2 * root.rise;
+        border-radius: Theme.r-s + root.rise;
+        lit: root.lit;
+    }
+    lay := VerticalLayout {
+        @children
+    }
+}
+
+// The profile card: how friends see you on Discord with these options, drawn in the app's
+// own style (no Discord marks or colours) at about the size of Discord's profile card. A
+// banner in the playing cover's colours (the accent's for the sample), the avatar over its
+// edge with the online dot, "You" and the status line; then the activity as the profile
+// shows it. `lit` marks the part an option changes. The time follows the player's
+// once-a-second position; nothing else moves.
+component ProfileCard inherits Rectangle {
+    in property <DiscordPart> lit;
+    property <DiscordPreview> p: SettingsData.discord-preview;
+    property <bool> live: !root.p.sample && Player.has-track;
+    property <float> at: root.live ? Player.position-s : 72;
+    property <float> total: root.live ? Player.duration-s : 210;
+    // The stage's wash from the cover (`NowPlayingData`); clear until it's known.
+    property <color> wash: Theme.dark ? NowPlayingData.wash-dark : NowPlayingData.wash-light;
+    property <bool> tinted: root.live && root.wash.alpha > 0;
+    // The banner's two ends: the cover's wash into its accent while the accent follows the
+    // cover, else into a lighter step of the wash; the sample's (and grey art's) go from a
+    // deep step of the accent into the accent, so they read as a banner, not a placeholder.
+    property <color> from: root.tinted ? root.wash.with-alpha(1) : Theme.accent.darker(0.6);
+    property <color> to: !root.tinted || Theme.follow ? Theme.accent : root.wash.with-alpha(1).brighter(0.4);
+    animate from, to { duration: Theme.t-colour; easing: Curves.ease-hover; }
+    property <length> pad: Theme.s4;
+    // About Discord's own proportions (a 340 px card, a 120 px banner, an 80 px avatar), a
+    // little flatter so the activity stays the card's subject.
+    property <length> banner-h: 112px;
+    // The photo inside the ring is 76 px, the size `src/sidebar.rs` decodes it at.
+    property <length> avatar: 88px;
+    property <length> ring: 6px;
+    property <length> cover: 80px;
+    property <length> badge: 26px;
+    property <bool> photo: SidebarData.signed-in && SidebarData.has-avatar;
+    min-height: lay.min-height;
+    preferred-height: lay.preferred-height;
+    min-width: lay.min-width;
+    border-radius: Theme.r-l;
+    background: Theme.ground;
+    border-width: 1px;
+    border-color: Theme.card-edge;
+    drop-shadow-blur: 24px;
+    drop-shadow-offset-y: 8px;
+    drop-shadow-color: Theme.cover-shadow;
+    accessible-role: groupbox;
+    accessible-label: @tr("Discord preview");
+
+    Rectangle {
+        x: 1px;
+        y: 1px;
+        width: parent.width - 2px;
+        height: root.banner-h;
+        border-top-left-radius: Theme.r-l - 1px;
+        border-top-right-radius: Theme.r-l - 1px;
+        background: @linear-gradient(120deg, root.from 0%, root.to 100%);
+    }
+    // The avatar: the signed-in account's photo, as the sidebar shows it (most people use the
+    // same face on Discord), or a neutral person signed out, without a photo or until it
+    // loads. Ringed in the card's ground where it overhangs the banner, the online dot on its
+    // edge.
+    Rectangle {
+        x: root.pad;
+        y: root.banner-h - root.avatar / 2;
+        width: root.avatar;
+        height: root.avatar;
+        border-radius: self.width / 2;
+        background: Theme.avatar;
+        border-width: root.ring;
+        border-color: Theme.ground;
+        Icon {
+            width: 36px;
+            height: 36px;
+            commands: Icons.person;
+            stroke: Theme.text1;
+        }
+        // Over the person, once it's there: a plain clipped image, as it never fades or
+        // crossfades and needs none of `Cover`'s machinery.
+        Rectangle {
+            x: root.ring;
+            y: root.ring;
+            width: parent.width - 2 * root.ring;
+            height: self.width;
+            border-radius: self.width / 2;
+            clip: true;
+            visible: root.photo;
+            accessible-role: image;
+            accessible-label: @tr("Your profile picture");
+            Image {
+                width: parent.width;
+                height: parent.height;
+                source: SidebarData.avatar;
+                image-fit: ImageFit.cover;
+            }
+        }
+        Rectangle {
+            x: parent.width - self.width - 2px;
+            y: parent.height - self.height - 2px;
+            width: 24px;
+            height: 24px;
+            border-radius: self.width / 2;
+            background: Theme.verified;
+            border-width: 5px;
+            border-color: Theme.ground;
+        }
+    }
+
+    lay := VerticalLayout {
+        padding-top: root.banner-h + root.avatar / 2 + Theme.s2;
+        padding-bottom: root.pad;
+        spacing: Theme.s4;
+        VerticalLayout {
+            padding-left: root.pad;
+            padding-right: root.pad;
+            spacing: Theme.s1;
+            Display {
+                text: @tr("You");
+                font-size: Theme.t-display-xs;
+            }
+            // The status line, as a pill under the name.
+            HorizontalLayout {
+                alignment: start;
+                Rectangle {
+                    border-radius: Theme.r-s + 2px;
+                    background: Theme.hover;
+                    min-width: 0px;
+                    preferred-width: status.preferred-width + 2 * Theme.s2;
+                    LitMark {
+                        border-radius: parent.border-radius;
+                        lit: root.lit == DiscordPart.status;
+                    }
+                    HorizontalLayout {
+                        padding-left: Theme.s2;
+                        padding-right: Theme.s2;
+                        padding-top: 3px;
+                        padding-bottom: 3px;
+                        status := PreviewSub {
+                            text: root.p.status;
+                            color: root.lit == DiscordPart.status ? Theme.text1 : PreviewType.sub-color;
+                        }
+                    }
+                }
+            }
+        }
+        // The activity: its heading, the cover with the app's badge on its corner and beside
+        // it the title, the artist and the album (and the time elapsed); then the progress
+        // bar and the button across the block, as Discord lays them out.
+        HorizontalLayout {
+            padding-left: root.pad;
+            padding-right: root.pad;
+            Rectangle {
+                border-radius: Theme.r-m + 2px;
+                background: Theme.panel;
+                LitMark {
+                    border-radius: parent.border-radius;
+                    lit: root.lit == DiscordPart.activity;
+                }
+                VerticalLayout {
+                    padding: Theme.s3 + 2px;
+                    spacing: Theme.s3;
+                    PreviewHeading {
+                        text: @tr("Listening to featherplay");
+                    }
+                    HorizontalLayout {
+                        spacing: Theme.s3 + 2px;
+                        VerticalLayout {
+                            alignment: start;
+                            Rectangle {
+                                width: root.cover;
+                                height: root.cover;
+                                Cover {
+                                    width: parent.width;
+                                    height: parent.height;
+                                    radius: Theme.r-m;
+                                    source: root.live ? Player.cover : @image-url("");
+                                }
+                                // A small badge, so the art stays whole, ringed in the block's
+                                // colour where it overhangs the corner.
+                                Rectangle {
+                                    x: parent.width - self.width + Theme.s1 + 2px;
+                                    y: parent.height - self.height + Theme.s1 + 2px;
+                                    width: root.badge;
+                                    height: root.badge;
+                                    border-radius: self.width / 2;
+                                    background: Theme.ground;
+                                    border-width: 3px;
+                                    border-color: Theme.panel;
+                                    SmallLogo {
+                                        width: 14px;
+                                        height: 14px;
+                                    }
+                                }
+                            }
+                        }
+                        // Centred on the cover, however many lines the options leave.
+                        VerticalLayout {
+                            alignment: center;
+                            spacing: 2px;
+                            LitPart {
+                                lit: root.lit == DiscordPart.links;
+                                PreviewLine {
+                                    text: root.p.title;
+                                    link: root.p.title-link;
+                                    main: true;
+                                }
+                                PreviewLine {
+                                    text: root.p.artist;
+                                    link: root.p.artist-link;
+                                }
+                            }
+                            if root.p.album != "": PreviewSub {
+                                text: root.p.album;
+                            }
+                            if root.p.time == 1: LitPart {
+                                lit: root.lit == DiscordPart.time;
+                                PreviewSub {
+                                    text: @tr("{} elapsed", Player.clock(root.at));
+                                }
+                            }
+                        }
+                    }
+                    if root.p.time == 0: LitPart {
+                        lit: root.lit == DiscordPart.time;
+                        HorizontalLayout {
+                            spacing: Theme.s2 + 2px;
+                            PreviewSub {
+                                text: Player.clock(root.at);
+                            }
+                            Rectangle {
+                                horizontal-stretch: 1;
+                                Rectangle {
+                                    y: (parent.height - self.height) / 2;
+                                    height: 4px;
+                                    border-radius: 2px;
+                                    background: Theme.track;
+                                }
+                                Rectangle {
+                                    x: 0;
+                                    y: (parent.height - self.height) / 2;
+                                    width: parent.width * (root.at / max(root.total, 1)).clamp(0, 1);
+                                    height: 4px;
+                                    border-radius: 2px;
+                                    background: Theme.text1;
+                                }
+                            }
+                            PreviewSub {
+                                text: Player.clock(root.total);
+                            }
+                        }
+                    }
+                    // The button, only when the option is on: across the block as Discord
+                    // draws it. A picture of the button, so it has no hover, and a fill a step
+                    // quieter than the app's own buttons. Under it, why you won't find it on
+                    // your own profile: Discord hides an activity's buttons from its user.
+                    if root.p.button != "": VerticalLayout {
+                        spacing: Theme.s2;
+                        Rectangle {
+                            height: 34px;
+                            border-radius: Theme.r-s + 2px;
+                            background: Theme.hover;
+                            LitMark {
+                                border-radius: parent.border-radius;
+                                lit: root.lit == DiscordPart.button;
+                            }
+                            Body {
+                                text: root.p.button;
+                                font-size: Theme.t-meta;
+                                font-weight: 600;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+                        }
+                        Body {
+                            text: @tr("Discord shows this button to others, not to you.");
+                            font-size: Theme.t-meta;
+                            color: Theme.text3;
+                            horizontal-alignment: center;
+                            wrap: word-wrap;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    // Discord status, which shows the card at all: a ring round the whole card.
+    Rectangle {
+        border-radius: root.border-radius;
+        border-width: 2px;
+        border-color: root.lit == DiscordPart.card ? Theme.accent : Theme.accent.transparentize(1);
+        animate border-color { duration: Theme.t-fast; easing: Curves.ease-hover; }
+    }
+}
+
+// The Discord options' preview, beside them: a caption saying whose view it is (or why it's
+// dimmed), the profile card, and a note on how it follows the options, in a column `card-w`
+// wide, so the note wraps at the card's width. Dimmed, with nothing lit, while Discord status
+// is off or not connected.
+export component DiscordPane inherits Rectangle {
+    in property <length> card-w;
+    // Where the card ends, from the pane's top.
+    out property <length> card-end: card.y + card.height;
+    property <bool> on: SettingsData.discord-live;
+    property <string> caption: root.on ? @tr("Preview · how friends see you")
+        : SettingsData.discord-state == DiscordState.unavailable ? @tr("Preview · This build has no Discord app ID")
+        : !SettingsData.discord ? @tr("Preview · Discord status is off")
+        : SettingsData.discord-state == DiscordState.connecting ? @tr("Preview · Connecting to Discord…")
+        : @tr("Preview · Not connected to Discord");
+    property <string> note: SettingsData.discord-preview.sample
+        ? @tr("Nothing is playing, so a sample song stands in. Hover an option to see what it changes.")
+        : @tr("Hover an option to see what it changes.");
+    preferred-height: note.y + note.height;
+    caption := Body {
+        x: 0;
+        y: 0;
+        width: root.card-w;
+        height: self.preferred-height;
+        text: root.caption;
+        font-size: Theme.t-meta;
+        color: Theme.text3;
+        wrap: word-wrap;
+    }
+    card := ProfileCard {
+        x: 0;
+        y: caption.height + Theme.s3;
+        width: root.card-w;
+        height: self.preferred-height;
+        lit: SettingsData.discord-card-lit;
+        opacity: root.on ? 1 : 0.5;
+    }
+    note := Body {
+        x: 0;
+        y: card.y + card.height + Theme.s3;
+        width: root.card-w;
+        height: self.preferred-height;
+        text: root.note;
+        font-size: Theme.t-meta;
+        color: Theme.text3;
+        wrap: word-wrap;
+    }
+}

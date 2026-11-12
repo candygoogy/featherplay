@@ -1,0 +1,336 @@
+// Settings' shared controls and rows: the switch, the text field, a group of rows on its
+// panel, a setting's row, and the radio rows (the output devices, and the lists of choices).
+import { Theme } from "../../theme.slint";
+import { Body, Display, Pill } from "../../parts.slint";
+import { Chips } from "../content.slint";
+import { SettingKey, SettingsData } from "data.slint";
+
+// An on/off switch: filled with the accent when on, outlined when off (Windows' toggle
+// shape). Enter toggles it when focused. Space doesn't: a click leaves the keys on it, and
+// Space plays and pauses from anywhere (app.slint), as on YouTube Music.
+export component Switch inherits Rectangle {
+    in property <bool> checked;
+    in property <string> label;
+    in property <bool> enabled: true;
+    callback toggled(bool);
+    width: 40px;
+    height: 22px;
+    accessible-role: switch;
+    accessible-label: root.label;
+    accessible-checkable: true;
+    accessible-checked: root.checked;
+    accessible-action-default => { root.flip(); }
+
+    function flip() {
+        if root.enabled {
+            root.toggled(!root.checked);
+        }
+    }
+    // The track, the root's size, dimmed as a group here (see `Field`).
+    Rectangle {
+        border-radius: self.height / 2;
+        background: root.checked ? Theme.accent : transparent;
+        border-width: root.checked ? 0px : 1.5px;
+        border-color: Theme.text2;
+        opacity: root.enabled ? 1.0 : 0.4;
+        animate background { duration: Theme.t-hover; }
+        // Hover and press: a soft halo over and around the track.
+        Rectangle {
+            x: -4px;
+            y: -4px;
+            width: parent.width + 8px;
+            height: parent.height + 8px;
+            border-radius: self.height / 2;
+            background: Theme.state(sta.pressed, sta.has-hover);
+            animate background { duration: Theme.t-hover; }
+        }
+        focus := FocusScope {
+            enabled: root.enabled;
+            key-pressed(e) => {
+                if e.text == Key.Return {
+                    root.flip();
+                    return accept;
+                }
+                reject
+            }
+        }
+        sta := TouchArea {
+            enabled: root.enabled;
+            mouse-cursor: pointer;
+            clicked => {
+                focus.focus();
+                root.flip();
+            }
+        }
+        // The focus ring, just outside the track.
+        if focus.has-focus: Rectangle {
+            x: -3px;
+            y: -3px;
+            width: parent.width + 6px;
+            height: parent.height + 6px;
+            border-radius: self.height / 2;
+            border-width: 2px;
+            border-color: Theme.accent;
+        }
+        Rectangle {
+            x: root.checked ? parent.width - self.width - 4px : 5px;
+            y: (parent.height - self.height) / 2;
+            width: root.checked ? 14px : 12px;
+            height: self.width;
+            border-radius: self.width / 2;
+            background: root.checked ? Theme.on-solid : Theme.text2;
+            animate x { duration: Theme.t-hover; easing: ease-out; }
+        }
+    }
+}
+
+// A one-line text field (hotkeys).
+export component Field inherits Rectangle {
+    in-out property <string> text;
+    in property <string> placeholder;
+    in property <string> label;
+    in property <bool> enabled: true;
+    in property <InputType> input-type: InputType.text;
+    callback committed(string);
+    // Enter in the field.
+    callback accepted();
+    public function grab-focus() {
+        input.focus();
+    }
+    public function select-all() {
+        input.select-all();
+    }
+    height: 36px;
+    // The field, the root's size, dimmed as a group here: Slint copies a component whose root
+    // has an opacity into every place it's used.
+    Rectangle {
+        border-radius: Theme.r-m;
+        background: Theme.field;
+        border-width: input.has-focus ? 1px : (Theme.dark ? 0px : 1px);
+        border-color: input.has-focus ? Theme.accent : Theme.hairline;
+        opacity: root.enabled ? 1.0 : 0.4;
+        TouchArea {
+            enabled: root.enabled;
+            mouse-cursor: MouseCursor.text;
+            clicked => { input.focus(); }
+        }
+        if input.text == "": Body {
+            // Starts just past the text cursor, so the cursor never draws over its first
+            // letter.
+            x: 12px + input.text-cursor-width + 2px;
+            width: parent.width - self.x - 12px;
+            height: parent.height;
+            text: root.placeholder;
+            color: Theme.text3;
+            vertical-alignment: center;
+        }
+        input := TextInput {
+            x: 12px;
+            width: parent.width - 24px;
+            height: parent.height;
+            text <=> root.text;
+            enabled: root.enabled;
+            input-type: root.input-type;
+            single-line: true;
+            vertical-alignment: center;
+            font-family: Theme.body-font;
+            font-size: Theme.t-body;
+            color: Theme.text1;
+            selection-background-color: Theme.accent;
+            selection-foreground-color: Theme.on-solid;
+            accessible-label: root.label;
+            accepted => {
+                root.committed(self.text);
+                root.accepted();
+            }
+            changed has-focus => {
+                if !self.has-focus {
+                    root.committed(self.text);
+                }
+            }
+        }
+    }
+}
+
+// The rows' measures, shared by the groups and the section index (which lines its first
+// entry up with the first group's title).
+export global Rows {
+    out property <length> title-h: 32px;
+    out property <length> link-h: 36px;
+    // Inside a group's panel, left and right: the labels' indent and the controls' inset.
+    out property <length> inset: Theme.s5;
+    // Above a panel's first row.
+    out property <length> pad-top: 4px;
+    out property <length> pad-y: 18px;
+    // The detail under a label: a step brighter than `text2`, still from it (so it keeps the
+    // cover's tint while the accent follows it), for a clearer read on the panel.
+    out property <color> detail: Theme.text2.mix(Theme.text1, 0.75);
+}
+
+// A group heading above its rows.
+component GroupTitle inherits Display {
+    font-size: 20px;
+    height: Rows.title-h;
+    vertical-alignment: center;
+}
+
+// A group of settings: its title, then its rows on a rounded panel. The panel can reach
+// `extend` past the column on the right (Discord, with its card beside the options).
+export component Group inherits VerticalLayout {
+    in property <string> title;
+    in property <length> extend: 0px;
+    spacing: Theme.s3;
+    GroupTitle {
+        text: root.title;
+    }
+    Rectangle {
+        min-width: max(0px, rows.min-width - root.extend);
+        min-height: rows.min-height;
+        preferred-height: rows.preferred-height;
+        Rectangle {
+            x: 0;
+            width: parent.width + root.extend;
+            height: parent.height;
+            accessible-role: groupbox;
+            accessible-label: root.title;
+            border-radius: Theme.r-l;
+            background: Theme.panel;
+            border-width: 1px;
+            border-color: Theme.card-edge;
+            rows := VerticalLayout {
+                padding-top: Rows.pad-top;
+                padding-bottom: 4px;
+                padding-left: Rows.inset;
+                padding-right: Rows.inset;
+                @children
+            }
+        }
+    }
+}
+
+// A setting row's hairline on top, and its label with the detail under it. Their own
+// components, so they're compiled once: `SettingRow` takes its controls as children, so
+// Slint copies it into every row.
+component RowDivider {
+    in property <bool> shown;
+    if root.shown: Rectangle {
+        y: 0;
+        height: 1px;
+        background: Theme.hairline;
+    }
+}
+
+component RowLabel inherits VerticalLayout {
+    in property <string> label;
+    in property <string> detail;
+    alignment: center;
+    spacing: Theme.s1;
+    Body {
+        text: root.label;
+        font-size: Theme.t-body-l;
+        font-weight: 500;
+        overflow: clip;
+        wrap: word-wrap;
+    }
+    if root.detail != "": Body {
+        text: root.detail;
+        font-size: Theme.t-meta;
+        color: Rows.detail;
+        overflow: clip;
+        wrap: word-wrap;
+    }
+}
+
+// One setting: its name and a line of detail on the left, the control on the right.
+export component SettingRow inherits Rectangle {
+    in property <string> label;
+    in property <string> detail;
+    in property <bool> divider: true;
+    min-height: lay.min-height;
+    preferred-height: lay.preferred-height;
+    RowDivider {
+        shown: root.divider;
+    }
+    lay := HorizontalLayout {
+        padding-top: Rows.pad-y;
+        padding-bottom: Rows.pad-y;
+        spacing: Theme.s6;
+        RowLabel {
+            horizontal-stretch: 1;
+            label: root.label;
+            detail: root.detail;
+        }
+        VerticalLayout {
+            alignment: center;
+            horizontal-stretch: 0;
+            HorizontalLayout {
+                alignment: end;
+                spacing: Theme.s2;
+                @children
+            }
+        }
+    }
+}
+
+// A row with a switch.
+export component ToggleRow inherits SettingRow {
+    in property <SettingKey> key;
+    in property <bool> checked;
+    in property <bool> enabled: true;
+    Switch {
+        checked: root.checked;
+        label: root.label;
+        enabled: root.enabled;
+        toggled(on) => { SettingsData.toggled(root.key, on); }
+    }
+}
+
+// A small pill for row controls.
+export component RowButton inherits Pill {
+    height: 32px;
+}
+
+// Chips in a row, as small as its buttons.
+export component RowChips inherits Chips {
+    height: 32px;
+}
+
+// One output device: a radio mark and the name.
+export component DeviceRow inherits Rectangle {
+    in property <string> name;
+    in property <bool> selected;
+    callback clicked();
+    height: 40px;
+    border-radius: Theme.r-m;
+    // Animated as a private property: a root animating a public one is copied into each use.
+    property <brush> ground: Theme.state(ta.pressed, ta.has-hover);
+    animate ground { duration: Theme.t-hover; }
+    background: root.ground;
+    accessible-role: radio-button;
+    accessible-label: root.name;
+    accessible-checkable: true;
+    accessible-checked: root.selected;
+    accessible-action-default => { root.clicked(); }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+    Rectangle {
+        x: 10px;
+        y: (parent.height - self.height) / 2;
+        width: 18px;
+        height: 18px;
+        border-radius: 9px;
+        border-width: root.selected ? 5px : 1.5px;
+        border-color: root.selected ? Theme.accent : Theme.text3;
+        animate border-width, border-color { duration: Theme.t-hover; }
+    }
+    Body {
+        x: 40px;
+        width: parent.width - 48px;
+        height: parent.height;
+        text: root.name;
+        color: root.selected ? Theme.text1 : Theme.text2;
+        vertical-alignment: center;
+    }
+}

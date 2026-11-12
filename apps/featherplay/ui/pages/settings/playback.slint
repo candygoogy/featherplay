@@ -1,0 +1,81 @@
+// Settings' Playback section.
+import { Player } from "../../player.slint";
+import { SettingKey, SettingsData } from "data.slint";
+import { Group, RowChips, SettingRow, ToggleRow } from "rows.slint";
+
+export component PlaybackSection inherits Group {
+    title: @tr("Playback");
+    ToggleRow {
+        divider: false;
+        label: @tr("Prefer song versions");
+        detail: @tr("Some uploads are music videos with intros or skits in the audio. Play the song version instead when there is one.");
+        key: SettingKey.prefer-song-versions;
+        checked: SettingsData.prefer-song-versions;
+    }
+    ToggleRow {
+        label: @tr("Autoplay similar songs when a list ends");
+        detail: @tr("When a playlist, album or other list ends, play on with songs like its last one. Off, the list starts again from the top. Repeat all always starts it again.");
+        key: SettingKey.autoplay;
+        checked: SettingsData.autoplay;
+    }
+    ToggleRow {
+        label: @tr("Skip non-music in radio");
+        detail: @tr("Radio and autoplay leave out user uploads and podcast episodes. Tracks you pick always play.");
+        key: SettingKey.skip-non-music;
+        checked: SettingsData.skip-non-music;
+    }
+    ToggleRow {
+        label: @tr("Skip non-music parts");
+        detail: @tr("Skips the intros and outros SponsorBlock users marked in music videos.");
+        key: SettingKey.sponsorblock;
+        checked: SettingsData.sponsorblock;
+    }
+    ToggleRow {
+        label: @tr("Skip songs I've disliked");
+        detail: @tr("Playlists, albums and radio move past songs you've disliked. A song you pick yourself still plays.");
+        key: SettingKey.skip-disliked;
+        checked: SettingsData.skip-disliked;
+    }
+    SettingRow {
+        label: @tr("Skip silence");
+        detail: @tr("Skips the silence before a song starts and after it ends. Everywhere also shortens silences of 2 seconds or more inside a song.");
+        RowChips {
+            labels: [@tr("Off"), @tr("Start and end"), @tr("Everywhere")];
+            active: SettingsData.skip-silence;
+            selected(i) => { SettingsData.pick-skip-silence(i); }
+        }
+    }
+    SettingRow {
+        label: @tr("Crossfade");
+        detail: @tr("The end of a song fades into the next. Songs from the same album play without a fade, and Next and Previous cut.");
+        RowChips {
+            labels: [@tr("Off"), @tr("{} s", 2), @tr("{} s", 5), @tr("{} s", 8), @tr("{} s", 12)];
+            active: SettingsData.crossfade;
+            selected(i) => { SettingsData.pick-crossfade(i); }
+        }
+    }
+    if SettingsData.crossfade != 0: ToggleRow {
+        label: @tr("Fade on skip");
+        detail: @tr("Next, Previous and a click on another song fade over 2 seconds instead of cutting.");
+        key: SettingKey.fade-on-skip;
+        checked: SettingsData.fade-on-skip;
+    }
+    SettingRow {
+        label: @tr("Playback speed");
+        detail: @tr("Faster or slower, at the same pitch. While it isn't 1×, the player bar shows it.");
+        RowChips {
+            labels: Player.speed-labels;
+            active: Player.speed;
+            selected(i) => { Player.pick-speed(i); }
+        }
+    }
+    SettingRow {
+        label: @tr("Volume step");
+        detail: @tr("How much the mouse wheel and the Up and Down keys change the volume.");
+        RowChips {
+            labels: [@tr("{} %", 1), @tr("{} %", 2), @tr("{} %", 5), @tr("{} %", 10)];
+            active: SettingsData.volume-step;
+            selected(i) => { SettingsData.pick-volume-step(i); }
+        }
+    }
+}

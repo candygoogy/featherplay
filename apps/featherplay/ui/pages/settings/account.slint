@@ -1,0 +1,61 @@
+// Settings' Account section: the music account, updates, and About.
+import { Nav, PageKind } from "../../nav.slint";
+import { SettingKey, SettingsData } from "data.slint";
+import { Group, RowButton, SettingRow, ToggleRow } from "rows.slint";
+
+export component AccountSection inherits Group {
+    // How many of the sections below the fold the page has made (`SettingsPage.made`).
+    in property <int> made;
+    property <bool> confirm-sign-out: false;
+    title: @tr("Account");
+    if root.made >= 3: VerticalLayout {
+        SettingRow {
+            divider: false;
+            label: @tr("Music account");
+            detail: !SettingsData.signed-in ? @tr("Not signed in.")
+                : root.confirm-sign-out ? @tr("Sign out? The saved session is deleted; the music keeps playing.")
+                : @tr("Signed in. The session is kept in Windows Credential Manager.");
+            if !SettingsData.signed-in: RowButton {
+                label: @tr("Sign in");
+                clicked => { Nav.go(PageKind.sign-in); }
+            }
+            if SettingsData.signed-in && !root.confirm-sign-out: RowButton {
+                label: @tr("Sign out");
+                clicked => { root.confirm-sign-out = true; }
+            }
+            if SettingsData.signed-in && root.confirm-sign-out: RowButton {
+                label: @tr("Cancel");
+                clicked => { root.confirm-sign-out = false; }
+            }
+            if SettingsData.signed-in && root.confirm-sign-out: RowButton {
+                label: @tr("Sign out");
+                solid: true;
+                clicked => {
+                    root.confirm-sign-out = false;
+                    SettingsData.sign-out();
+                }
+            }
+        }
+        ToggleRow {
+            label: @tr("Check for updates");
+            detail: @tr("Once a day, and when songs keep failing to play, ask GitHub whether a newer featherplay is out. Off, featherplay only checks when you click Check for updates in About.");
+            key: SettingKey.check-for-updates;
+            checked: SettingsData.check-for-updates;
+        }
+        ToggleRow {
+            label: @tr("Install updates automatically");
+            detail: @tr("Download a newer version in the background, check it, and install it when you click Restart to update. Only for the installed featherplay, not the portable exe.");
+            key: SettingKey.install-updates;
+            checked: SettingsData.install-updates;
+            enabled: SettingsData.check-for-updates;
+        }
+        SettingRow {
+            label: @tr("About featherplay");
+            detail: @tr("Version, licences and credits.");
+            RowButton {
+                label: @tr("About");
+                clicked => { Nav.go(PageKind.about); }
+            }
+        }
+    }
+}

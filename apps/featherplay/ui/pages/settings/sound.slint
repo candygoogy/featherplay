@@ -1,0 +1,54 @@
+// Settings' Sound section. Its Custom… chip opens the Equalizer dialog (`equalizer.slint`).
+import { Theme } from "../../theme.slint";
+import { SettingKey, SettingsData } from "data.slint";
+import { DeviceRow, Group, RowChips, SettingRow, ToggleRow } from "rows.slint";
+
+export component SoundSection inherits Group {
+    title: @tr("Sound");
+    SettingRow {
+        divider: false;
+        label: @tr("Equalizer");
+        detail: @tr("Shapes the sound of every song. Custom… lets you set each band.");
+        RowChips {
+            labels: [@tr("Off"), @tr("Bass"), @tr("Treble"), @tr("Vocal"), @tr("Custom…")];
+            active: SettingsData.equalizer;
+            selected(i) => { SettingsData.pick-equalizer(i); }
+        }
+    }
+    SettingRow {
+        label: @tr("Even out loudness");
+        detail: @tr("Brings quiet parts up and loud parts down, for low volume or a noisy room. Strong flattens a lot.");
+        RowChips {
+            labels: [@tr("Off"), @tr("Light"), @tr("Strong")];
+            active: SettingsData.loudness;
+            selected(i) => { SettingsData.pick-loudness(i); }
+        }
+    }
+    ToggleRow {
+        label: @tr("Match song volumes");
+        detail: @tr("Turns louder songs down to the same level, as YouTube Music's own player does.");
+        key: SettingKey.match-volumes;
+        checked: SettingsData.match-volumes;
+    }
+    SettingRow {
+        label: @tr("Streaming quality");
+        detail: @tr("High plays Opus, which sounds better than AAC at about the same data use. Standard always plays AAC at 128 kbps. Songs already loaded keep their quality.");
+        RowChips {
+            labels: [@tr("High"), @tr("Standard")];
+            active: SettingsData.streaming-quality;
+            selected(i) => { SettingsData.pick-streaming-quality(i); }
+        }
+    }
+    SettingRow {
+        label: @tr("Output device");
+        detail: @tr("If the device goes away, playback pauses and moves to the system default.");
+    }
+    VerticalLayout {
+        padding-bottom: Theme.s2;
+        for d[i] in SettingsData.devices: DeviceRow {
+            name: d;
+            selected: i == SettingsData.device-index;
+            clicked => { SettingsData.pick-device(i); }
+        }
+    }
+}

@@ -1,0 +1,300 @@
+// Settings' data: the on/off keys, the connections' states, the dialogs, and
+// `SettingsData`, which `src/pages/settings.rs` fills and listens to.
+import { Appearance } from "../../theme.slint";
+
+// The on/off settings, for `SettingsData.toggled`.
+export enum SettingKey {
+    prefer-song-versions,
+    skip-non-music,
+    skip-disliked,
+    sponsorblock,
+    scrobbling,
+    scrobble,
+    listenbrainz,
+    scrobble-other-media,
+    alternative-titles,
+    alternative-artists,
+    discord,
+    discord-auto-reconnect,
+    discord-clear-on-pause,
+    discord-play-button,
+    discord-links,
+    notifications,
+    hotkeys,
+    lyrics,
+    lyrics-lrclib,
+    autoplay,
+    check-for-updates,
+    install-updates,
+    local-api,
+    amuse,
+    tray-click-opens-window,
+    fade-on-skip,
+    match-volumes,
+    tooltips,
+}
+
+// The Discord connection, live from the presence worker.
+export enum DiscordState {
+    off,
+    // This build has no Discord app ID.
+    unavailable,
+    connecting,
+    connected,
+    not-connected,
+}
+
+// The local API's server, and the Amuse endpoint.
+export enum LocalApiState {
+    off,
+    running,
+    // It couldn't listen; `local-api-message` says why.
+    failed,
+}
+
+// The Last.fm desktop sign-in, step by step.
+export enum LastfmState {
+    signed-out,
+    // Asking Last.fm for a token, then opening the browser.
+    opening,
+    // The approval page is open in the browser.
+    waiting,
+    // Exchanging the approved token for a session.
+    finishing,
+    signed-in,
+}
+
+// ListenBrainz, by its user token.
+export enum ListenBrainzState {
+    signed-out,
+    // Checking a new token with ListenBrainz.
+    checking,
+    signed-in,
+}
+
+// A fixed accent on the page: its name and its colour in each theme.
+export struct AccentSwatch {
+    name: string,
+    dark: color,
+    light: color,
+}
+
+// The Discord preview (`src/pages/settings/discord.rs`, from the same card the presence
+// sends): the status line and the activity, for the current track or a sample when nothing
+// plays.
+export struct DiscordPreview {
+    sample: bool,
+    // "Listening to …".
+    status: string,
+    title: string,
+    artist: string,
+    // 0 the progress bar, 1 time elapsed only, 2 no time.
+    time: int,
+    // The button's label, or empty when it's off.
+    button: string,
+    // The Links option: the title opens the song, the artist their page.
+    title-link: bool,
+    artist-link: bool,
+    // The cover's hover text, which Discord shows as a line under the artist; empty if none.
+    album: string,
+}
+
+// The part of the Discord profile card an option changes, lit while the option is hovered.
+export enum DiscordPart {
+    none,
+    // The status line under the name (Status text).
+    status,
+    // The progress bar, or the time elapsed (Time).
+    time,
+    // The Play song button.
+    button,
+    // The title and the artist (Links).
+    links,
+    // The whole activity: the options that clear it.
+    activity,
+    // The whole card: Discord status, which shows it at all.
+    card,
+}
+
+// The dialog open over the page, if any.
+export enum SettingsDialog {
+    none,
+    lastfm-keys,
+    listenbrainz-token,
+    equalizer,
+    // The keyboard shortcuts (over any page: Ctrl+/ opens it from anywhere).
+    shortcuts,
+}
+
+export global SettingsData {
+    // Playback.
+    in property <bool> prefer-song-versions;
+    in property <bool> skip-non-music;
+    in property <bool> autoplay: true;
+    // Skip silence: 0 Off, 1 Start and end, 2 Everywhere.
+    in property <int> skip-silence: 0;
+    // Crossfade: 0 Off, 1 2 s, 2 5 s, 3 8 s, 4 12 s. Fade on skip shows only while it's on.
+    in property <int> crossfade: 0;
+    in property <bool> fade-on-skip;
+    // The Volume step: 0 1 %, 1 2 %, 2 5 %, 3 10 %.
+    in property <int> volume-step: 2;
+    // Sound. The Equalizer: 0 Off, 1 Bass, 2 Treble, 3 Vocal, 4 Custom; the bands it plays
+    // (60 Hz, 250 Hz, 1 kHz, 4 kHz, 12 kHz) in dB, all 0 when off.
+    in property <int> equalizer: 0;
+    in property <[int]> eq-bands: [0, 0, 0, 0, 0];
+    // Even out loudness: 0 Off, 1 Light, 2 Strong.
+    in property <int> loudness: 0;
+    in property <bool> match-volumes: true;
+    // The Streaming quality: 0 High, 1 Standard.
+    in property <int> streaming-quality: 0;
+    in property <bool> skip-disliked: true;
+    in property <bool> sponsorblock;
+    // "System default" first, then the output devices by name.
+    in property <[string]> devices;
+    in property <int> device-index;
+    // Scrobbling. `scrobbling` turns every service on or off; `scrobble` is Last.fm's own
+    // switch and `listenbrainz` ListenBrainz's.
+    in property <bool> scrobbling;
+    in property <bool> scrobble-other-media;
+    in property <bool> alternative-titles;
+    in property <bool> alternative-artists;
+    // This build has a Last.fm API key of its own; the user has entered theirs.
+    in property <bool> lastfm-builtin-key;
+    in property <bool> lastfm-custom-key;
+    in property <LastfmState> lastfm-state;
+    in property <string> lastfm-message;
+    in property <bool> scrobble;
+    in property <ListenBrainzState> listenbrainz-state;
+    in property <string> listenbrainz-message;
+    in property <bool> listenbrainz;
+    // The dialog and its fields (cleared by Rust when it opens or closes).
+    in-out property <SettingsDialog> dialog;
+    in-out property <string> dialog-key;
+    in-out property <string> dialog-secret;
+    in-out property <string> dialog-token;
+    in property <string> dialog-error;
+    // Discord and the local API.
+    in property <bool> discord;
+    in property <DiscordState> discord-state;
+    in property <bool> discord-auto-reconnect;
+    in property <bool> discord-clear-on-pause;
+    in property <int> discord-clear-minutes: 10;
+    // 0 the progress bar, 1 time elapsed only, 2 no time.
+    in property <int> discord-time;
+    // "Listening to …": 0 featherplay, 1 the artist, 2 the song title.
+    in property <int> discord-status-text: 2;
+    in property <bool> discord-play-button;
+    in property <bool> discord-links;
+    in property <DiscordPreview> discord-preview;
+    // The card's part for the option under the pointer, and which option lit it
+    // (`DiscordOption.option`, -1 for none), so an option the pointer leaves clears only its
+    // own (neighbours light the same part). Set by the page; Rust clears them when the page
+    // opens and when Discord status is turned off, as the rows go away under the pointer.
+    in-out property <DiscordPart> discord-lit;
+    in-out property <int> discord-lit-option: -1;
+    // What the card shows lit: nothing while Discord status is off or not connected, when
+    // the card is dimmed.
+    out property <bool> discord-live: discord && discord-state == DiscordState.connected;
+    out property <DiscordPart> discord-card-lit: discord-live ? discord-lit : DiscordPart.none;
+    // The local API: the switch, the server's state, the port as typed (and why it was
+    // refused), and the token masked (Rust keeps the token itself for Copy).
+    in property <bool> local-api;
+    in property <LocalApiState> local-api-state;
+    in property <string> local-api-message;
+    in-out property <string> local-api-port: "26538";
+    in property <string> local-api-port-error;
+    in property <string> local-api-token;
+    // The Amuse endpoint: the switch and its server's state (`amuse-message` says why it failed).
+    in property <bool> amuse;
+    in property <LocalApiState> amuse-state;
+    in property <string> amuse-message;
+    // Window.
+    in property <bool> notifications;
+    // What the close button does: 0 ask, 1 close featherplay, 2 keep playing in the tray.
+    in property <int> close-action;
+    // "Turn off the mini player": a left click on the tray icon opens the main window instead.
+    in property <bool> tray-click-opens-window;
+    // "Show tooltips": the bar's buttons name themselves and their shortcut on a rest.
+    in property <bool> tooltips: true;
+    in property <Appearance> appearance;
+    // The Language setting: Windows default, English, then the bundled languages by their
+    // own names (Rust fills both lists); `language` is the picked one's index.
+    in property <[string]> language-names;
+    in property <[string]> language-codes;
+    in property <int> language;
+    // The Accent setting: 0 from the cover, then `accents` (Red first), then the custom
+    // colour (`accents.length + 1`).
+    in property <int> accent;
+    in property <[AccentSwatch]> accents;
+    // The custom colour: as typed ("#4390EE"), its place on the hue slider (degrees), and
+    // what each theme makes of it (empty when it shows as typed). Rust fills them.
+    in-out property <string> custom-hex;
+    in property <float> custom-hue;
+    in property <string> custom-note-dark;
+    in property <string> custom-note-light;
+    in property <string> custom-error;
+    in property <bool> hotkeys;
+    in-out property <string> hotkey-play-pause;
+    in-out property <string> hotkey-next;
+    in-out property <string> hotkey-previous;
+    in property <string> hotkeys-error;
+    // The saved hotkeys (play or pause, next, previous), a keycap per key, for the shortcuts'
+    // list: filled as it opens.
+    in property <[[string]]> hotkey-keys;
+    // Account.
+    in property <bool> signed-in;
+    // Lyrics: shown at all ("Show lyrics"), and looked up on LRCLIB.
+    in property <bool> lyrics: true;
+    in property <bool> lyrics-lrclib: true;
+    // Ask GitHub once a day whether a newer featherplay is out.
+    in property <bool> check-for-updates: true;
+    // Download a newer release's setup and offer "Restart to update" (the installed copy).
+    in property <bool> install-updates: true;
+
+    callback toggled(SettingKey, bool);
+    callback pick-device(int);
+    callback pick-appearance(Appearance);
+    callback pick-language(int);
+    callback pick-accent(int);
+    // The hue slider moved (degrees); `done` when the button is let go or a key stepped it,
+    // which saves it.
+    callback custom-hue-moved(float, bool);
+    // Enter in the hex field, or leaving it, with the text as typed.
+    callback custom-hex-entered(string);
+    callback pick-close-action(int);
+    callback pick-volume-step(int);
+    // An Equalizer chip; Custom… (4) opens the bands.
+    callback pick-equalizer(int);
+    // A band in the Equalizer dialog moved: its index and its value in dB.
+    callback eq-band-moved(int, int);
+    // Reset in the Equalizer dialog: every band at 0 dB, and the equalizer off.
+    callback eq-reset();
+    callback pick-loudness(int);
+    callback pick-skip-silence(int);
+    callback pick-crossfade(int);
+    callback pick-streaming-quality(int);
+    // 0 play/pause, 1 next, 2 previous; the text as typed.
+    callback hotkey-edited(int, string);
+    callback lastfm-connect();
+    callback lastfm-approved();
+    callback lastfm-cancel();
+    callback lastfm-sign-out();
+    callback open-dialog(SettingsDialog);
+    // OK in the Last.fm API settings, with the fields as typed.
+    callback lastfm-keys-save(string, string);
+    callback lastfm-keys-remove();
+    callback listenbrainz-save(string);
+    callback listenbrainz-remove();
+    callback close-dialog();
+    callback sign-out();
+    callback discord-connect();
+    callback discord-clear();
+    // -1 shorter, +1 longer.
+    callback discord-step-minutes(int);
+    callback discord-pick-time(int);
+    callback discord-pick-status-text(int);
+    // Enter in the port field, or leaving it, with the text as typed.
+    callback local-api-port-entered(string);
+    callback local-api-copy();
+    callback local-api-regenerate();
+}
