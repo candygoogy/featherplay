@@ -73,27 +73,6 @@ export component ProgressRail inherits Rectangle {
     }
 }
 
-// Placeholder body for pages still to be built: the title, plus what was asked for.
-export component PageStub inherits Rectangle {
-    in property <string> title;
-    in property <string> detail;
-    PageTitle {
-        x: Theme.page-pad;
-        y: Theme.page-top;
-        width: parent.width - 2 * Theme.page-pad;
-        text: root.title;
-    }
-    if root.detail != "": Body {
-        x: Theme.page-pad;
-        y: Theme.page-top + 56px;
-        width: parent.width - 2 * Theme.page-pad;
-        height: 20px;
-        text: root.detail;
-        color: Theme.text3;
-        vertical-alignment: center;
-    }
-}
-
 // Underlined text, the tertiary action ("Continue without signing in", "Why?"): text1, the
 // underline brightening on hover; Enter presses it once tabbed to.
 export component TextLink inherits Rectangle {
