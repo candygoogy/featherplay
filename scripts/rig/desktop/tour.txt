@@ -1,0 +1,23 @@
+# The desktop rig's tour of the real window (scripts/rig/desktop/app.sh), for the
+# performance harness (FEATHERPLAY_PERF_SCRIPT) on the demo fixtures: no network, no account.
+# Each step but `wait` writes a line to FEATHERPLAY_PERF_OUT once it has settled; app.sh
+# takes a screenshot during the `wait` after it.
+startup
+wait 2500
+# Home's cards that open a page, counted across its shelves: 0-2 are "Mixed for you"'s
+# playlists, 3 the first of "Singles for you" (an album page).
+open-card 3
+wait 2500
+back
+# "Daily mix" (six songs), from its first: Next has somewhere to go.
+open-card 0
+play-row 0
+wait 2500
+# Japanese, Korean, Chinese, Arabic and emoji, in the search field and the results' heading.
+search 米津玄師 봄날 月亮代表我的心 أنا لحبيبي 🔥🎵✨
+wait 2500
+go now-playing
+# The checks over D-Bus run here; app.sh ends the app (the tray's Quit, or MPRIS's) before
+# this runs out.
+wait 150000
+quit
