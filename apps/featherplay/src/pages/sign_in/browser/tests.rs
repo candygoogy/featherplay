@@ -153,11 +153,14 @@ fn the_arguments_are_the_profile_the_pipe_and_the_sign_in_page() {
     let quiet: &[&str] = if cfg!(windows) {
         &["--no-first-run", "--no-default-browser-check"]
     } else {
-        // Linux keeps the throwaway profile's cookies out of the desktop's keyring.
+        // Linux keeps the throwaway profile's cookies out of the desktop's keyring, and
+        // `navigator.webdriver` false, without a bar about the switch.
         &[
             "--no-first-run",
             "--no-default-browser-check",
             "--password-store=basic",
+            "--disable-blink-features=AutomationControlled",
+            "--test-type",
         ]
     };
     let expected: Vec<&str> = [

@@ -299,6 +299,30 @@ fn a_missing_exe_is_an_error() {
     assert!(launch(Path::new("/definitely/not/here/chrome"), &[]).is_err());
 }
 
+/// The pipe makes pages see `navigator.webdriver` true, and Google's sign-in refuses such a
+/// browser: every browser starts with that Blink feature off and nothing that would add an
+/// automation mark back.
+#[test]
+fn every_browser_starts_unmarked_as_automated() {
+    for b in ALL {
+        let s = b.switches;
+        assert!(
+            s.contains(&"--disable-blink-features=AutomationControlled"),
+            "{}",
+            b.name
+        );
+        // Without it, a bar warns about the switch above.
+        assert!(s.contains(&"--test-type"), "{}", b.name);
+        assert!(
+            !s.iter().any(|s| s.contains("enable-automation")
+                || s.contains("headless")
+                || s.contains("remote-debugging")),
+            "{}",
+            b.name
+        );
+    }
+}
+
 /// What this PC really has: the known browsers found, the default browser, and the one
 /// offered. Nothing is started.
 /// `cargo nextest run -p featherplay-platform --lib --run-ignored only -E 'test(this_pc)' --no-capture`
@@ -323,7 +347,8 @@ fn this_pc_lists_its_browsers_and_its_default() {
 }
 
 /// A web server on 127.0.0.1 whose one page sets two test cookies named like Google's
-/// session cookies (for 127.0.0.1 only, with test values). Serves until the test ends.
+/// session cookies (for 127.0.0.1 only, with test values), and a third, from the page's
+/// script, with what `navigator.webdriver` says. Serves until the test ends.
 fn cookie_page() -> String {
     let server = TcpListener::bind("127.0.0.1:0").unwrap();
     let url = format!("http://{}/signin", server.local_addr().unwrap());
@@ -332,7 +357,8 @@ fn cookie_page() -> String {
             let Ok(mut stream) = stream else { continue };
             let mut request = [0u8; 4096];
             let _ = stream.read(&mut request);
-            let body = "<!doctype html><title>featherplay test page</title><p>Test cookies set.";
+            let body = "<!doctype html><title>featherplay test page</title><p>Test cookies set.\
+                        <script>document.cookie = 'webdriver=' + navigator.webdriver</script>";
             let reply = format!(
                 "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\
                  Set-Cookie: SAPISID=test-sapisid; Path=/\r\n\
@@ -431,13 +457,17 @@ fn live_browser_answers_on_the_pipe_with_a_local_pages_cookies() {
             .filter_map(|c| Some(format!("{}={}", c["name"].as_str()?, c["value"].as_str()?)))
             .collect();
         seen.sort();
-        if seen.len() == 2 {
+        if seen.len() == 3 {
             break;
         }
         std::thread::sleep(Duration::from_millis(500));
     }
     eprintln!("cookies for the local page: {seen:?}");
-    assert_eq!(seen, ["SAPISID=test-sapisid", "SID=test-sid"]);
+    // The page doesn't see an automated browser, as Google's sign-in would.
+    assert_eq!(
+        seen,
+        ["SAPISID=test-sapisid", "SID=test-sid", "webdriver=false"]
+    );
 
     assert!(ask(&mut to, &replies, 100, "Browser.close").is_some());
     let exited = running.wait(Duration::from_secs(10));
