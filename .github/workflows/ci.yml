@@ -102,12 +102,18 @@ jobs:
           cargo nextest run --workspace --profile "$profile"
           cargo test --workspace --doc
 
-  # The workspace builds for Linux: cargo check and clippy for x86_64-unknown-linux-gnu
-  # (scripts/linux-check.sh). Until phase 5 the Linux side of crates/platform is stubs, so this
-  # only keeps code outside it from naming Windows again; nothing runs.
+  # Linux: clippy and the tests, as the `check` job runs them on Windows, on the offscreen
+  # platform (no display). Two differences, both in the Test step: the `ci` profile always
+  # (the frame-cost, CPU-time and memory ceilings were set on Windows), and pixel checks that
+  # depend on the body font only save their images (an artifact). The runner is a matrix
+  # entry, so the ARM64 runner can join as a second one.
   linux:
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-latest]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -115,14 +121,17 @@ jobs:
 
       # The headers the native crates build against: fontconfig and freetype (fonts),
       # xkbcommon, Wayland and X11 (winit), ALSA (cpal), D-Bus, OpenSSL (native-tls), and clang
-      # for the bindings. skia-bindings downloads its prebuilt library.
+      # for the bindings. skia-bindings downloads its prebuilt library. For the tests: a
+      # session bus (dbus-run-session), and the Noto fonts, so the titles in other scripts
+      # and the emoji find a fallback font (`glyph_fallback`).
       - name: System packages
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             pkg-config clang libfontconfig1-dev libfreetype-dev libxkbcommon-dev \
             libxkbcommon-x11-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev \
-            libxi-dev libasound2-dev libdbus-1-dev libssl-dev
+            libxi-dev libasound2-dev libdbus-1-dev libssl-dev \
+            dbus fonts-noto-core fonts-noto-cjk fonts-noto-color-emoji
 
       # Installs the toolchain and components named in rust-toolchain.toml.
       - name: Rust toolchain
@@ -134,8 +143,36 @@ jobs:
 
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
 
-      - name: Check and clippy for Linux
-        run: scripts/linux-check.sh
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - uses: taiki-e/install-action@1919c4a95903d2c33e4a221102edca87309fc14b # v2.89.0
+        with:
+          tool: nextest
+
+      # FEATHERPLAY_PIXELS=unchecked: the app tests whose pixel checks measure text in the body
+      # font (Segoe UI Variable, which Linux lacks) render, save the image to
+      # FEATHERPLAY_TEST_SHOTS and skip those checks; Windows ignores it
+      # (apps/featherplay/tests/app/support.rs). The tests get their own session bus, as a
+      # desktop has one.
+      - name: Test
+        shell: bash
+        run: |
+          export FEATHERPLAY_HOME="$RUNNER_TEMP/featherplay-home"
+          export FEATHERPLAY_TEST_SHOTS="$RUNNER_TEMP/test-shots"
+          export FEATHERPLAY_PIXELS=unchecked
+          mkdir -p "$FEATHERPLAY_HOME" "$FEATHERPLAY_TEST_SHOTS"
+          dbus-run-session -- cargo nextest run --workspace --profile ci
+          dbus-run-session -- cargo test --workspace --doc
+
+      - name: Test images
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-shots-${{ matrix.runner }}
+          path: ${{ runner.temp }}/test-shots
+          if-no-files-found: warn
+          retention-days: 14
 
   # The ARM64 build, natively on windows-11-arm: weekly and when run by hand, so an ARM64
   # break shows before a release (release.yml tests ARM64 too). Not on every push, where it

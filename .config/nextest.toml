@@ -27,6 +27,8 @@ threads-required = 'num-test-threads'
 # CPU-time ceilings above, which draw 4K frames in software one at a time and take most of a
 # full run (20 to 90 s each on a 2-core runner). The full suite, those included, runs weekly
 # and before every release (`cargo nextest run --workspace`, the default profile).
+# CI's Linux job always runs this profile: the ceilings were set on Windows, and the CPU-time
+# ones count thread cycles, which only Windows reports.
 [profile.ci]
 default-filter = 'not (package(featherplay) & binary(app) & test(/^(smoothness|first_frames|home_scroll_bump|home_covers|lyrics_frames|related_scroll|scroll_frames|side_panel|render_timing|resize_frames|lyrics_gate|lyrics_toggle|lyrics_arrive|lyrics_button|skeleton_frames|content_fade|memory)::/))'
 
