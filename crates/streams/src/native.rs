@@ -600,7 +600,7 @@ impl Inner {
         quality: Quality,
         counts: bool,
     ) -> (Result<ResolvedStream, NativeError>, Option<u64>) {
-        let ready = match self.ready(video).await {
+        let ready = match self.ready(video, None).await {
             Ok(r) => r,
             Err(e) => return (Err(e), None),
         };
@@ -627,7 +627,7 @@ impl Inner {
         }
         match self.answer(video, quality, &ready, true).await {
             // `answer` dropped the page.
-            Err(NativeError::NoUrl(_)) => match self.ready(video).await {
+            Err(NativeError::NoUrl(_)) => match self.ready(video, Some(ready.page)).await {
                 Ok(fresh) => (
                     self.answer(video, quality, &fresh, true).await,
                     Some(fresh.page),
@@ -733,15 +733,25 @@ impl Inner {
         })
     }
 
-    /// The config and player to use: in memory, else on disk, else fetched.
-    async fn ready(self: &Arc<Self>, video: &str) -> Result<Ready, NativeError> {
+    /// The config and player to use: in memory, else on disk, else fetched. `after`: the
+    /// page an answer without a URL came from; a newer one kept meanwhile answers, even
+    /// one whose own answer failed since, so resolves at once share one fresh page (and its
+    /// failures count once) however late each one's first answer came. What to drop stays
+    /// for the next resolve.
+    async fn ready(
+        self: &Arc<Self>,
+        video: &str,
+        after: Option<u64>,
+    ) -> Result<Ready, NativeError> {
         let mut st = self.state.lock().await;
+        let newer = after.is_some_and(|p| st.as_ref().is_some_and(|r| r.page > p));
         // `drop_page` took it off the disk already.
-        let stale = match self.forget.lock_or_recover().take() {
-            Some(Forget::Any) => true,
-            Some(Forget::Page(page)) => st.as_ref().is_some_and(|r| r.page <= page),
-            None => false,
-        };
+        let stale = !newer
+            && match self.forget.lock_or_recover().take() {
+                Some(Forget::Any) => true,
+                Some(Forget::Page(page)) => st.as_ref().is_some_and(|r| r.page <= page),
+                None => false,
+            };
         if stale {
             *st = None;
         }

@@ -444,29 +444,46 @@ async fn answers_without_urls_from_the_kept_page_ask_again_from_one_fresh_page()
 }
 
 /// Answers without URLs from fresh pages too: the failures of one page count once, so
-/// a start's three resolves at once don't turn the native step off.
+/// a start's three resolves at once don't turn the native step off. The kept page's
+/// answers come one after each resolve's end (as on a busy machine, or behind visionOS
+/// answers that took longer): the later two still share the first one's fresh page,
+/// though its answer failed meanwhile.
 #[tokio::test]
 async fn the_failures_of_one_page_count_once() {
     let kept = config().visitor_data.unwrap();
     let fetched = std::sync::atomic::AtomicUsize::new(0);
+    let asked = std::sync::atomic::AtomicUsize::new(0);
+    let (done, held) = std::sync::mpsc::channel::<()>();
+    let held = Mutex::new(held);
     let bad = without_urls();
-    let (base, log) = test_server::serve(move |_, path, _| {
+    let (base, log) = test_server::serve(move |_, path, body| {
         if path.starts_with("/embed/") {
             let n = fetched.fetch_add(1, Ordering::Relaxed);
             (200, EMBED.replace(&kept, &format!("visitor-{n}")))
         } else {
+            if body.contains(&kept) && asked.fetch_add(1, Ordering::Relaxed) > 0 {
+                let _ = held.lock().unwrap().recv();
+            }
             (200, bad.clone())
         }
     });
     let (r, dir) = seeded("no-url-once", &base);
-    let (a, b, c) = tokio::join!(
-        r.resolve(VIDEO, Quality::High),
-        r.resolve(VIDEO, Quality::High),
-        r.resolve(VIDEO, Quality::High),
-    );
+    let resolve = || async {
+        let e = r.resolve(VIDEO, Quality::High).await;
+        let _ = done.send(());
+        e
+    };
+    let (a, b, c) = tokio::join!(resolve(), resolve(), resolve());
     for e in [a, b, c] {
         assert!(matches!(e, Err(NativeError::NoUrl(_))), "{e:?}");
     }
+    let pages = log
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|l| l.starts_with("GET /embed/"))
+        .count();
+    assert_eq!(pages, 1, "one fresh page for the three");
     let n = log.lock().unwrap().len();
     let _ = r.resolve(VIDEO, Quality::High).await;
     assert!(
