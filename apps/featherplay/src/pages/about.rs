@@ -22,8 +22,8 @@ const OFL: &str = include_str!("../../ui/fonts/manrope/OFL.txt");
 
 /// The main components and their licences; `THIRD_PARTY.md` has every crate.
 /// Licence names stay as their authors wrote them; the words around them are translated.
-fn credits() -> [(&'static str, &'static str); 12] {
-    [
+fn credits() -> Vec<(&'static str, &'static str)> {
+    let mut credits = vec![
         (
             "Slint",
             "Royalty-free Desktop, Mobile, and Web Applications License 2.0",
@@ -34,14 +34,9 @@ fn credits() -> [(&'static str, &'static str); 12] {
         ("Symphonia", "Mozilla Public License 2.0"),
         ("QuickJS-NG", "MIT License"),
         (tr!("tokio and reqwest"), "MIT License; MIT or Apache 2.0"),
-        (
-            "tray-icon, global-hotkey, keyring, windows-rs",
-            "MIT or Apache 2.0",
-        ),
-        (
-            "webview2-com, souvlaki, discord-rich-presence",
-            "MIT License",
-        ),
+    ];
+    credits.extend_from_slice(PLATFORM_CREDITS);
+    credits.extend([
         (
             "yt-dlp",
             tr!("The Unlicense. Downloaded on first run, not bundled."),
@@ -54,8 +49,36 @@ fn credits() -> [(&'static str, &'static str); 12] {
             tr!("Every other component"),
             tr!("Listed with its licence in THIRD_PARTY.md in the source repository."),
         ),
-    ]
+    ]);
+    credits
 }
+
+/// What the platform's integrations are built on (tray, hotkeys, keyring, media controls,
+/// Discord) and, on Linux, the TLS; each build lists its own.
+#[cfg(windows)]
+const PLATFORM_CREDITS: &[(&str, &str)] = &[
+    (
+        "tray-icon, global-hotkey, keyring, windows-rs",
+        "MIT or Apache 2.0",
+    ),
+    (
+        "webview2-com, souvlaki, discord-rich-presence",
+        "MIT License",
+    ),
+];
+#[cfg(not(windows))]
+const PLATFORM_CREDITS: &[(&str, &str)] = &[
+    (
+        "global-hotkey, keyring, x11rb, arboard",
+        "MIT or Apache 2.0",
+    ),
+    ("zbus, discord-rich-presence", "MIT License"),
+    ("ksni", "The Unlicense"),
+    (
+        "rustls, AWS-LC",
+        "Apache 2.0, ISC or MIT; ISC, Apache 2.0, MIT and BSD 3-Clause",
+    ),
+];
 
 /// The latest release a check found elsewhere ("can't play"), or none: the banner and the
 /// version row follow.
@@ -188,10 +211,11 @@ fn show_credits(data: &AboutData) {
         .map(|(name, licence)| Credit {
             name: (*name).into(),
             licence: (*licence).into(),
+            full_text: Default::default(),
         })
         .collect();
-    // Only the Linux build embeds Inter, for its body text (`fonts.rs`); the font holds its
-    // copyright and licence lines too.
+    // Only the Linux build embeds Inter, for its body text (`fonts.rs`); its OFL.txt opens
+    // under the row, as Manrope's does.
     #[cfg(target_os = "linux")]
     let credits = {
         let mut credits = credits;
@@ -200,6 +224,7 @@ fn show_credits(data: &AboutData) {
             Credit {
                 name: "Inter".into(),
                 licence: tr!("SIL Open Font License 1.1. The body face, embedded.").into(),
+                full_text: text(include_str!("../../ui/fonts/inter/OFL.txt")).into(),
             },
         );
         credits

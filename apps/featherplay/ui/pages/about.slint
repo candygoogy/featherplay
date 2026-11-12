@@ -10,10 +10,11 @@ import { Theme } from "../theme.slint";
 import { Body, Display, Pill, TextLink } from "../parts.slint";
 import { Logo } from "../logo.slint";
 
-// A third-party component and its licence.
+// A third-party component and its licence; `full-text`, when set, opens under the row.
 export struct Credit {
     name: string,
     licence: string,
+    full-text: string,
 }
 
 // The banner's state (the design board's B1-B9).
@@ -426,6 +427,7 @@ export component AboutPage inherits Rectangle {
                 for c in AboutData.credits: LicenceRow {
                     name: c.name;
                     licence: c.licence;
+                    full-text: c.full-text;
                 }
             }
 
