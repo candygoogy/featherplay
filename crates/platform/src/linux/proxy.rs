@@ -1,4 +1,4 @@
-//! The system proxy lookup. A stub until phase 5: no settings are read and no script is
+//! The system proxy lookup. A stub on Linux: no settings are read and no script is
 //! asked, so requests go by the environment's proxy alone.
 
 /// What the system's proxy settings say to ask. No `Debug`: the script's address may name

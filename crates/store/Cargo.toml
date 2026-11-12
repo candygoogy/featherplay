@@ -10,7 +10,7 @@ publish = false
 
 [dependencies]
 featherplay-core = { path = "../core" }
-# What talks to the OS (ARCHITECTURE.md, "Phase 2"); its code moves in area by area.
+# What talks to the OS (ARCHITECTURE.md, "Phase 2").
 featherplay-platform = { path = "../platform" }
 keyring-core = { workspace = true }
 serde = { workspace = true }

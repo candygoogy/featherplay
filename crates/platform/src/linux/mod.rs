@@ -1,9 +1,12 @@
 //! Linux. What the app needs to start, play and sign in is here (fonts, clipboard, files,
 //! opening links, thread priority, memory, the local time, the end of the session, the
-//! Secret Service, the sign-in browsers), and so are MPRIS, notifications, the single-instance
-//! guard and helpers that end with the app; the rest is still stubs, whose features `supports`
-//! reports as missing and whose functions return `Unsupported`. One file per area, as for
-//! Windows; there's no `webview` (WebView2 sign-in is Windows only).
+//! Secret Service, the sign-in browsers), and so are MPRIS, notifications, the tray, the
+//! single-instance guard, helpers that end with the app, the X11 window calls and the
+//! AppImage's update. What Linux lacks (thumb buttons, the title bar colour, an app
+//! registration) or this module doesn't do (the system's proxy settings, private heaps) are
+//! stubs, whose features `supports` reports as missing and whose functions return
+//! `Unsupported` or nothing. One file per area, as for Windows; there's no `webview`
+//! (WebView2 sign-in is Windows only).
 
 pub mod browsers;
 pub(crate) mod bus;

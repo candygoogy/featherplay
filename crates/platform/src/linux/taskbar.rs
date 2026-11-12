@@ -1,4 +1,4 @@
-//! Taskbar buttons: none yet (phase 5), so `attach` reports `Unsupported`.
+//! Taskbar buttons: none on Linux, so `attach` reports `Unsupported`.
 
 pub use crate::common::taskbar::*;
 

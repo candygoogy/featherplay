@@ -1,5 +1,5 @@
-//! The app's identity: its desktop entry, written in phase 5. Until then nothing is
-//! registered: `register` and `unregister` say so.
+//! The app's identity. On Linux the desktop entry comes with the AppImage and the .tar.gz
+//! (`packaging/linux/`), so the app registers nothing: `register` and `unregister` say so.
 
 use std::path::{Path, PathBuf};
 

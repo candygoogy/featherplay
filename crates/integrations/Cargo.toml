@@ -15,7 +15,7 @@ featherplay-proxy = { path = "../proxy" }
 discord-rich-presence = { workspace = true }
 featherplay-core = { path = "../core" }
 featherplay-store = { path = "../store" }
-# What talks to the OS (ARCHITECTURE.md, "Phase 2"); its code moves in area by area.
+# What talks to the OS (ARCHITECTURE.md, "Phase 2").
 featherplay-platform = { path = "../platform" }
 global-hotkey = { workspace = true }
 # Its warnings reach the app's log file.

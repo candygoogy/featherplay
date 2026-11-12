@@ -49,7 +49,7 @@ mod hover_play;
 #[cfg(windows)]
 mod installer;
 // Windows' guard: the named mutex, its `Local\` names and the window message that asks the
-// first copy to show itself. Linux has none until phase 5.
+// first copy to show itself. Linux's guard is tested in the platform crate.
 #[cfg(windows)]
 mod instance;
 mod library_refresh;
