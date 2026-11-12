@@ -23,7 +23,9 @@
 #
 # Layout under $RIG (default /rig): release/featherplay-<arch>.AppImage,
 # test/{old,new}/featherplay-<arch>.AppImage, test/versions.txt ("<old> <new>"),
-# server/ and keys/ (release.sh), scripts/ (this folder), tone-10s.m4a.
+# server/ and keys/ (release.sh), scripts/ (this folder), tone-10s.m4a, and fixtures/ (the
+# recorded API responses, crates/ytm/tests/fixtures: the test build looks for them in the
+# source tree it was built from unless FEATHERPLAY_FIXTURES_DIR names them).
 # Set RIG_TESTS to run only some ("start play update"); container.sh sets RIG_OFFLINE=1.
 set -uo pipefail
 
@@ -130,7 +132,8 @@ start() {
     [ -n "$APP" ] || APP=$RT
 }
 
-# first_frame <test>: waits up to 60 s for `first_frame_ms=`; prints it.
+# first_frame <test>: waits up to 60 s for `first_frame_ms=`; prints it. Returns 1 if the
+# program exited first, 2 if it's still running without one.
 first_frame() {
     local f=$out/$1.stderr
     for _ in $(seq 600); do
@@ -141,7 +144,16 @@ first_frame() {
         kill -0 "$RT" 2>/dev/null || return 1
         sleep 0.1
     done
-    return 1
+    return 2
+}
+
+# no_frame <first_frame's status> <stop's code>: why there was no first frame.
+no_frame() {
+    if [ "$1" = 2 ]; then
+        echo "no first frame within 60 s"
+    else
+        echo "exited with $2 before its first frame"
+    fi
 }
 
 # stop: SIGTERM to the program, then the runtime's exit code (124 if it took over 30 s).
@@ -171,14 +183,17 @@ closed='the system asked featherplay to close'
 # ----- start ---------------------------------------------------------------------------
 
 test_start() {
-    local img=$rig/release/$name h ms code
+    local img=$rig/release/$name h ms ff code
     [ -f "$img" ] || { result FAIL start "no $img"; return; }
     h=$(fresh_home start)
     start start "$h" "$img"
-    if ! ms=$(first_frame start); then
+    ms=$(first_frame start)
+    ff=$?
+    if [ "$ff" != 0 ]; then
         stop
+        code=$?
         keep start "$h"
-        result FAIL start "no first frame within 60 s (start.stderr, start.log)"
+        result FAIL start "$(no_frame "$ff" "$code") (start.stderr, start.log)"
         return
     fi
     sleep 2
@@ -197,17 +212,20 @@ test_start() {
 # ----- play ----------------------------------------------------------------------------
 
 test_play() {
-    local img=$rig/test/old/$name h ms code line inputs
+    local img=$rig/test/old/$name h ms ff code line inputs
     [ -n "$sound" ] || { result SKIP play "no sound server could run here"; return; }
     [ -f "$img" ] || { result FAIL play "no $img"; return; }
     h=$(fresh_home play)
     start play "$h" "$img" FEATHERPLAY_PERF_SCRIPT="$rig/scripts/play.txt" \
-        FEATHERPLAY_PERF_FIXTURES=1 FEATHERPLAY_PERF_AUDIO="$rig/tone-10s.m4a" \
-        FEATHERPLAY_PERF_OUT="$out/play-perf.jsonl"
-    if ! ms=$(first_frame play); then
+        FEATHERPLAY_PERF_FIXTURES=1 FEATHERPLAY_FIXTURES_DIR="$rig/fixtures" \
+        FEATHERPLAY_PERF_AUDIO="$rig/tone-10s.m4a" FEATHERPLAY_PERF_OUT="$out/play-perf.jsonl"
+    ms=$(first_frame play)
+    ff=$?
+    if [ "$ff" != 0 ]; then
         stop
+        code=$?
         keep play "$h"
-        result FAIL play "no first frame within 60 s"
+        result FAIL play "$(no_frame "$ff" "$code") (play.stderr, play.log)"
         return
     fi
     # The harness's play-row line: written once the song is audible, or after its timeout.
@@ -242,9 +260,9 @@ test_play() {
 # ----- update --------------------------------------------------------------------------
 
 test_update() {
-    local old=$rig/test/old/$name new=$rig/test/new/$name h target mode_before code
+    local old=$rig/test/old/$name new=$rig/test/new/$name h target mode_before code ff
     local versions new_version log want got mode_after newpid
-    for f in "$old" "$new" "$rig/server/latest" "$rig/keys/test.pub"; do
+    for f in "$old" "$new" "$rig/server/latest" "$rig/keys/test.pub" "$rig/fixtures/album.json"; do
         [ -f "$f" ] || { result FAIL update "no $f"; return; }
     done
     versions=$(cat "$rig/test/versions.txt")
@@ -265,12 +283,15 @@ test_update() {
     start update "$h" "$target" FEATHERPLAY_UPDATE_SERVER="http://127.0.0.1:$port" \
         FEATHERPLAY_UPDATE_KEY="$rig/keys/test.pub" \
         FEATHERPLAY_PERF_SCRIPT="$rig/scripts/update.txt" FEATHERPLAY_PERF_FIXTURES=1 \
-        FEATHERPLAY_PERF_OUT="$out/update-perf.jsonl"
+        FEATHERPLAY_FIXTURES_DIR="$rig/fixtures" FEATHERPLAY_PERF_OUT="$out/update-perf.jsonl"
     local oldapp=$APP
-    if ! first_frame update >/dev/null; then
+    first_frame update >/dev/null
+    ff=$?
+    if [ "$ff" != 0 ]; then
         stop
+        code=$?
         keep update "$h"
-        result FAIL update "no first frame within 60 s"
+        result FAIL update "$(no_frame "$ff" "$code") (update.stderr, update.log)"
         return
     fi
     # It quits by itself once "Restart to update" is pressed.

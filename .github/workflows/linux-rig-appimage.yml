@@ -216,7 +216,8 @@ jobs:
           echo "MINISIGN=$RUNNER_TEMP/minisign-linux/$(uname -m)/minisign" >> "$GITHUB_ENV"
 
       # run.sh's layout: the AppImages (artifacts lose the executable bit), the scripts, the
-      # bundled tone, and the newer release with its signed checksums.
+      # bundled tone, the recorded fixtures (the test build would look for them in the build
+      # runner's checkout), and the newer release with its signed checksums.
       - name: Lay out the rig
         shell: bash
         run: |
@@ -224,6 +225,7 @@ jobs:
           mkdir -p rig/scripts
           cp scripts/rig/appimage/* rig/scripts/
           cp crates/audio/tests/fixtures/tone-10s.m4a rig/
+          cp -r crates/ytm/tests/fixtures rig/fixtures
           new=$(cut -d' ' -f2 rig/test/versions.txt)
           scripts/rig/appimage/release.sh "rig/test/new/featherplay-$(uname -m).AppImage" \
             "$new" rig/server rig/keys
