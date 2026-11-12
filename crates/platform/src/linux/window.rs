@@ -6,6 +6,8 @@
 //! `work_area_at` ask the X server (`x11`). Wayland lets an app neither place its windows
 //! nor learn where anything is on screen, so there `work_area_at` finds nothing and the mini
 //! player opens as an ordinary window (`supports(Feature::MiniPlayerPlacement)` is false).
+//! `bring_forward` asks the X11 window manager to bring a window back; Wayland's compositor
+//! decides that alone.
 
 use std::sync::OnceLock;
 
@@ -134,8 +136,19 @@ pub fn when_sizing(_h: Handle, _changed: impl Fn(bool) + 'static) -> Result<(), 
     Ok(())
 }
 
-/// Does nothing yet.
-pub fn bring_forward(_h: Handle) {}
+/// Restores the window if it's minimised, raises it and gives it the focus, for an X11
+/// window (XWayland's too: `x11::activate`). On Wayland the compositor alone decides: an app
+/// can't un-minimise a window, and activating one takes a token from the user's action,
+/// which a second launch would have to hand over; so there it does nothing.
+pub fn bring_forward(h: Handle) {
+    if let Window::X11(w) = h.0
+        && let Err(e) = u32::try_from(w)
+            .map_err(|_| "not an X11 window id".to_string())
+            .and_then(x11::activate)
+    {
+        log::warn!("bring forward: {e}");
+    }
+}
 
 /// Does nothing yet.
 pub fn minimise(_h: Handle) {}

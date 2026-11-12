@@ -1,11 +1,14 @@
 //! What the mini player's placement asks the X server, over a connection of its own made for
 //! each question (a click on the tray icon is rare): the pointer, the monitors (RandR), the
 //! work area the window manager leaves beside its panels (`_NET_WORKAREA`), and the scale
-//! winit gives windows (`WINIT_X11_SCALE_FACTOR`, else `Xft.dpi`).
+//! winit gives windows (`WINIT_X11_SCALE_FACTOR`, else `Xft.dpi`). And bringing a window back
+//! (`activate`).
 
 use x11rb::connection::Connection;
 use x11rb::protocol::randr::ConnectionExt as _;
-use x11rb::protocol::xproto::{AtomEnum, ConnectionExt as _, Window};
+use x11rb::protocol::xproto::{
+    AtomEnum, ClientMessageEvent, ConnectionExt as _, EventMask, Window,
+};
 use x11rb::rust_connection::RustConnection;
 
 use crate::common::window::ScreenRect;
@@ -30,6 +33,33 @@ pub fn pointer() -> Result<(i32, i32), String> {
         .reply()
         .map_err(|e| e.to_string())?;
     Ok((p.root_x.into(), p.root_y.into()))
+}
+
+/// Asks the window manager to restore `window` if it's minimised, raise it and give it the
+/// focus (`_NET_ACTIVE_WINDOW`). The request says it comes from a pager (source 2), as the
+/// user's own action: the app asks only when the user did something to bring it back (a
+/// second launch, the tray's Show), and as an app (source 1) with no timestamp of a user
+/// event, GNOME and KDE would only mark it as wanting attention. It's mapped first, which
+/// restores a minimised window under a window manager without EWMH.
+pub fn activate(window: Window) -> Result<(), String> {
+    let (conn, root) = connect()?;
+    let active = conn
+        .intern_atom(false, b"_NET_ACTIVE_WINDOW")
+        .map_err(|e| e.to_string())?
+        .reply()
+        .map_err(|e| e.to_string())?
+        .atom;
+    let pager = 2;
+    let event = ClientMessageEvent::new(32, window, active, [pager, x11rb::CURRENT_TIME, 0, 0, 0]);
+    conn.map_window(window).map_err(|e| e.to_string())?;
+    conn.send_event(
+        false,
+        root,
+        EventMask::SUBSTRUCTURE_REDIRECT | EventMask::SUBSTRUCTURE_NOTIFY,
+        event,
+    )
+    .map_err(|e| e.to_string())?;
+    conn.flush().map_err(|e| e.to_string())
 }
 
 /// The work area of the monitor at `(x, y)` (the nearest one if none holds it), and the
