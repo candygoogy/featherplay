@@ -319,8 +319,8 @@ pub struct Catalog {
 }
 
 impl Catalog {
-    /// Signed out until the controller sets the session. Fails only if the HTTP client
-    /// can't be built.
+    /// Signed out until the controller sets the session. An HTTP client that can't be
+    /// built doesn't fail it: the app is offline then (`YtMusic::guest`).
     pub fn new(rt: Handle) -> Result<Catalog, ApiError> {
         let guest = YtMusic::guest()?;
         Ok(Catalog {

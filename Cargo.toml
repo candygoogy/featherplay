@@ -45,6 +45,10 @@ cpal = "=0.18.2"
 # the binary, so it links no libssl (Fedora 45 moved to OpenSSL 4, and a binary linked to
 # OpenSSL 3 doesn't start there).
 reqwest = { version = "=0.13.5", default-features = false, features = ["system-proxy"] }
+# Not Windows: whether the system has any CA certificates, as rustls-platform-verifier reads
+# them, and Mozilla's roots for when it has none (`crates/proxy`'s `roots`).
+rustls-native-certs = "=0.8.5"
+webpki-root-certs = "=1.0.11"
 tokio = "=1.54.1"
 # Windows only: the media card (SMTC). Neither of its D-Bus backends: Linux's MPRIS is
 # `platform::media_controls`' own, over zbus.

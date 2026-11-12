@@ -24,6 +24,7 @@
 pub mod dns;
 pub mod doh;
 mod lookups;
+mod roots;
 mod winhttp;
 
 use std::fmt;
@@ -33,6 +34,7 @@ use hyper_util::client::proxy::matcher::{Intercept, Matcher};
 use reqwest::Url;
 
 use lookups::{Lookups, Sources, Status};
+pub use roots::offline;
 
 /// YouTube Music's address. yt-dlp's `--proxy` and the proxy named in the log and in Copy
 /// diagnostics are the ones for this host.
@@ -118,11 +120,12 @@ impl fmt::Display for Origin {
 static LOOKUPS: LazyLock<Arc<Lookups>> = LazyLock::new(|| Lookups::new(winhttp::WinHttp));
 
 /// A client builder that follows the proxy settings; every HTTP client starts from it.
-/// It costs what `reqwest::Client::builder()` costs: nothing is looked up here. Its names
-/// are looked up by `doh`'s resolver, which asks the system as reqwest's own does unless
-/// "Look up YouTube directly" is on.
+/// It costs what `reqwest::Client::builder()` costs: nothing is looked up here (but for
+/// the first one off Windows, which reads whether the system has certificates: `roots`).
+/// Its names are looked up by `doh`'s resolver, which asks the system as reqwest's own does
+/// unless "Look up YouTube directly" is on.
 pub fn client() -> reqwest::ClientBuilder {
-    let builder = reqwest::Client::builder().dns_resolver(doh::resolver());
+    let builder = roots::builder().dns_resolver(doh::resolver());
     if environment_names_a_proxy() {
         // reqwest's own matcher reads it, credentials and `NO_PROXY` included.
         return builder;
@@ -153,6 +156,21 @@ impl Fresh {
             make: Box::new(make),
             made: Mutex::new((doh::route(), client)),
         })
+    }
+
+    /// `new`, or, when `make` fails, `offline()` until the route changes and `make` is
+    /// tried again. Logs why.
+    pub fn or_offline(
+        make: impl Fn() -> reqwest::Result<reqwest::Client> + Send + Sync + 'static,
+    ) -> Fresh {
+        let client = make().unwrap_or_else(|e| {
+            log::warn!("no HTTP client ({e}); offline");
+            offline()
+        });
+        Fresh {
+            make: Box::new(make),
+            made: Mutex::new((doh::route(), client)),
+        }
     }
 
     /// The client for the route in use. If it can't be made again, the old one goes on.

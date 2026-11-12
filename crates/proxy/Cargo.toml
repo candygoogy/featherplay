@@ -31,8 +31,13 @@ reqwest = { workspace = true, features = ["native-tls"] }
 # (rustls-platform-verifier: SSL_CERT_FILE/SSL_CERT_DIR, else the distribution's bundle).
 # Its crypto is aws-lc, reqwest's own choice: ring would need ytmapi-rs patched, whose TLS
 # features are native-tls or reqwest's `rustls` (aws-lc), one of them required.
+# With no system store at all (a container without `ca-certificates`), Mozilla's roots built
+# into the binary (`roots`): rustls-native-certs tells, as the platform verifier reads the
+# store, and webpki-root-certs holds them. Both in the lockfile already.
 [target.'cfg(not(windows))'.dependencies]
 reqwest = { workspace = true, features = ["rustls"] }
+rustls-native-certs = { workspace = true }
+webpki-root-certs = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt", "time"] }

@@ -109,8 +109,10 @@ impl Engine {
             .enable_all()
             .build()
             .map_err(|e| format!("audio runtime: {e}"))?;
-        let http = featherplay_proxy::Fresh::new(move || crate::http::stream_client(read_timeout))
-            .map_err(|e| format!("http client: {e}"))?;
+        // With no client to be had, the engine still starts: a stream fails as with no
+        // network, and local files play.
+        let http =
+            featherplay_proxy::Fresh::or_offline(move || crate::http::stream_client(read_timeout));
         Ok(Engine {
             tx,
             controls,

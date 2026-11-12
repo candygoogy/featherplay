@@ -1578,8 +1578,10 @@ dependencies = [
  "hyper-util",
  "log",
  "reqwest",
+ "rustls-native-certs",
  "serde_json",
  "tokio",
+ "webpki-root-certs",
 ]
 
 [[package]]

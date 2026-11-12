@@ -229,9 +229,15 @@ impl YtMusic {
         })
     }
 
-    /// Signed out: the catalogue as a visitor, without cookies. Sends nothing.
+    /// Signed out: the catalogue as a visitor, without cookies. Sends nothing. With no HTTP
+    /// client to be had, every request fails as a network error, as with no network (logged).
     pub fn guest() -> Result<YtMusic, ApiError> {
-        let client = ytmapi_rs::Client::new_from_reqwest_client(http_client(&Identity::default())?);
+        // Both of a visitor's clients are the default identity's: one client, one pool.
+        let http = http_client(&Identity::default()).unwrap_or_else(|e| {
+            log::warn!("{e}; offline");
+            featherplay_proxy::offline()
+        });
+        let client = ytmapi_rs::Client::new_from_reqwest_client(http.clone());
         let inner = YtMusicBuilder::new_with_client(client)
             .with_auth_token(GuestToken)
             .build()
@@ -240,7 +246,7 @@ impl YtMusic {
             session: Session::Guest(inner),
             identity: Identity::default(),
             number: 0,
-            public: http_client(&Identity::default())?,
+            public: http,
         })
     }
 

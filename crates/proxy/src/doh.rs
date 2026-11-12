@@ -119,7 +119,7 @@ impl Service {
     fn client(&self) -> Option<&reqwest::Client> {
         self.client
             .get_or_init(|| {
-                let mut builder = reqwest::Client::builder()
+                let mut builder = crate::roots::builder()
                     .no_proxy()
                     .connect_timeout(TIMEOUT)
                     .timeout(TIMEOUT);

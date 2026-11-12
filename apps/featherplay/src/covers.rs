@@ -758,7 +758,10 @@ impl DiskCache {
             client: featherplay_proxy::client()
                 .timeout(std::time::Duration::from_secs(20))
                 .build()
-                .unwrap_or_default(),
+                .unwrap_or_else(|e| {
+                    log!("covers: no HTTP client ({e}); covers come from the disk only");
+                    featherplay_proxy::offline()
+                }),
             permits: Semaphore::new(PARALLEL_FETCHES),
             index: Mutex::new(None),
         }
