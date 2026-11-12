@@ -1,0 +1,254 @@
+name: Linux rig (AppImage)
+
+# The Linux AppImage in the distributions people run, headless. ci.yml calls this workflow
+# (a reusable one: its own env and permissions, nothing of ci.yml's); it can also be run on
+# its own: Actions > Linux rig (AppImage) > Run workflow, or
+#   gh workflow run linux-rig-appimage.yml --ref <branch>
+#
+# Jobs, each for x86_64 and aarch64 (GitHub's ARM64 runners):
+#   build-release  the release AppImage, as release.yml's build-linux makes it (ubuntu-22.04,
+#                  so glibc 2.35 at most), but without the build keys
+#   build-test     the test AppImage twice, the crate's version and that version bumped (patch
+#                  + 1, in Cargo.toml only), with the `perf-harness` feature (the scripted
+#                  window and the recorded fixtures) and `update-test-server` (updates from
+#                  127.0.0.1 with a key given at run time); without LTO, to build faster.
+#                  Neither feature is ever on in a published build.
+#   distros        each AppImage in Ubuntu 22.04, Ubuntu 24.04, Debian stable, Fedora and Arch
+#                  containers (Arch has no arm64 image: x86_64 only), as
+#                  scripts/rig/appimage/container.sh runs them: the runtime packages a desktop
+#                  has, checked to be enough (libs.txt), then offline and as a plain user the
+#                  tests of run.sh: start (first frame, SIGTERM, exit 0), play (to a
+#                  PulseAudio null sink), update (from release.sh's local release, signed
+#                  with a key made for the run: downloaded, verified, replaced in place,
+#                  restarted into the newer version).
+# Each distribution's results and packages are in the run's summary; its logs are the
+# `rig-appimage-<arch>-<distribution>` artifacts.
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  # The newest glibc the binary may need, as in release.yml.
+  LINUX_MAX_GLIBC: "2.35"
+  # minisign for release.sh, pinned: the release's Linux archive, whose signature by its
+  # author's key (RWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3) was checked when
+  # this SHA256 was taken.
+  MINISIGN_URL: https://github.com/jedisct1/minisign/releases/download/0.12/minisign-0.12-linux.tar.gz
+  MINISIGN_SHA256: 9a599b48ba6eb7b1e80f12f36b94ceca7c00b7a5173c95c3efc88d9822957e73
+
+jobs:
+  build-release:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-22.04
+          - arch: aarch64
+            runner: ubuntu-22.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # As release.yml's build-linux.
+      - name: System packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            pkg-config clang libfontconfig1-dev libfreetype-dev libxkbcommon-dev \
+            libxkbcommon-x11-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev \
+            libxi-dev libasound2-dev libdbus-1-dev libssl-dev \
+            desktop-file-utils appstream
+
+      - name: Rust toolchain
+        shell: bash
+        run: |
+          rustup toolchain install
+          rustup show active-toolchain
+          host=$(rustc -vV | sed -n 's/^host: //p')
+          if [ "$host" != "$(uname -m)-unknown-linux-gnu" ]; then
+            echo "::error::rustc's host is '$host' on a $(uname -m) runner"
+            exit 1
+          fi
+
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          key: release-${{ matrix.arch }}
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
+      - name: Build
+        run: cargo build --release --locked -p featherplay
+
+      - name: Package
+        shell: bash
+        run: |
+          MAX_GLIBC="$LINUX_MAX_GLIBC" TOOLS_DIR="$RUNNER_TEMP/linux-tools" \
+            packaging/linux/build-linux.sh --skip-build
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rig-appimage-release-${{ matrix.arch }}
+          path: target/linux/featherplay-${{ matrix.arch }}.AppImage
+          if-no-files-found: error
+          retention-days: 3
+
+  build-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-22.04
+          - arch: aarch64
+            runner: ubuntu-22.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    env:
+      CARGO_PROFILE_RELEASE_LTO: "false"
+      CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "16"
+      FEATURES: perf-harness,update-test-server
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: System packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            pkg-config clang libfontconfig1-dev libfreetype-dev libxkbcommon-dev \
+            libxkbcommon-x11-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev \
+            libxi-dev libasound2-dev libdbus-1-dev libssl-dev
+
+      - name: Rust toolchain
+        shell: bash
+        run: |
+          rustup toolchain install
+          rustup show active-toolchain
+
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          key: test-${{ matrix.arch }}
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
+      # The older copy, at the crate's version.
+      - name: Build the older copy
+        shell: bash
+        run: |
+          cargo build --release --locked -p featherplay --features "$FEATURES"
+          TOOLS_DIR="$RUNNER_TEMP/linux-tools" packaging/linux/build-linux.sh --skip-build
+          mkdir -p rig-test/old rig-test/new
+          cp "target/linux/featherplay-${{ matrix.arch }}.AppImage" rig-test/old/
+          pkgid=$(cargo pkgid -p featherplay)
+          echo "OLD=${pkgid##*[@#]}" >> "$GITHUB_ENV"
+
+      # The newer one: the workspace's version bumped (Cargo.lock follows, so no --locked).
+      - name: Build the newer copy
+        shell: bash
+        run: |
+          IFS=. read -r major minor patch <<<"$OLD"
+          new="$major.$minor.$((patch + 1))"
+          sed -i "0,/^version = \"$OLD\"/s//version = \"$new\"/" Cargo.toml
+          cargo build --release -p featherplay --features "$FEATURES"
+          TOOLS_DIR="$RUNNER_TEMP/linux-tools" packaging/linux/build-linux.sh --skip-build
+          cp "target/linux/featherplay-${{ matrix.arch }}.AppImage" rig-test/new/
+          echo "$OLD $new" > rig-test/versions.txt
+          cat rig-test/versions.txt
+          git checkout -- Cargo.toml Cargo.lock
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rig-appimage-test-${{ matrix.arch }}
+          path: rig-test
+          if-no-files-found: error
+          retention-days: 3
+
+  distros:
+    needs: [build-release, build-test]
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x86_64, aarch64]
+        image: ["ubuntu:22.04", "ubuntu:24.04", "debian:stable", "fedora:latest", "archlinux:latest"]
+        exclude:
+          # The official Arch image is x86_64 only.
+          - arch: aarch64
+            image: "archlinux:latest"
+    name: ${{ matrix.image }} (${{ matrix.arch }})
+    runs-on: ${{ matrix.arch == 'aarch64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
+    timeout-minutes: 30
+    env:
+      IMAGE: ${{ matrix.image }}
+    steps:
+      # The image's name as an artifact may have it (no ':').
+      - name: Name
+        shell: bash
+        run: echo "SLUG=$(tr ':/' '--' <<<"$IMAGE")" >> "$GITHUB_ENV"
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: rig-appimage-release-${{ matrix.arch }}
+          path: rig/release
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: rig-appimage-test-${{ matrix.arch }}
+          path: rig/test
+
+      - name: minisign
+        shell: bash
+        run: |
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/minisign.tar.gz" "$MINISIGN_URL"
+          echo "$MINISIGN_SHA256  $RUNNER_TEMP/minisign.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/minisign.tar.gz" -C "$RUNNER_TEMP" 2>/dev/null
+          echo "MINISIGN=$RUNNER_TEMP/minisign-linux/$(uname -m)/minisign" >> "$GITHUB_ENV"
+
+      # run.sh's layout: the AppImages (artifacts lose the executable bit), the scripts, the
+      # bundled tone, and the newer release with its signed checksums.
+      - name: Lay out the rig
+        shell: bash
+        run: |
+          chmod 755 rig/release/*.AppImage rig/test/*/*.AppImage
+          mkdir -p rig/scripts
+          cp scripts/rig/appimage/* rig/scripts/
+          cp crates/audio/tests/fixtures/tone-10s.m4a rig/
+          new=$(cut -d' ' -f2 rig/test/versions.txt)
+          scripts/rig/appimage/release.sh "rig/test/new/featherplay-$(uname -m).AppImage" \
+            "$new" rig/server rig/keys
+
+      - name: Run in ${{ matrix.image }}
+        shell: bash
+        run: scripts/rig/appimage/container.sh "$IMAGE" rig
+
+      - name: Summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "### $IMAGE ($(uname -m))"
+            echo '```'
+            cat rig/out/results.txt 2>/dev/null || echo "no results"
+            echo
+            cat rig/out/packages-*.txt 2>/dev/null
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: rig-appimage-${{ matrix.arch }}-${{ env.SLUG }}
+          path: rig/out
+          if-no-files-found: warn
+          retention-days: 14

@@ -1,0 +1,13 @@
+# run.sh's update test (the performance harness's script language, apps/featherplay/src/perf):
+# once the window is up, About and its "Check for updates" (on the fixtures, the startup check
+# can wait for a load that never comes: the covers' work ends without one); its banner offers
+# "Restart to update" once the newer AppImage is downloaded and checked, pressed as soon as
+# it shows. The restarted copy runs this again, finds nothing to press (no second request
+# within a minute of the last); run.sh ends it with SIGTERM.
+startup
+go about
+press Check for updates
+repeat 120
+  wait 1000
+  press Restart to update
+end

@@ -1,0 +1,7 @@
+# run.sh's playback test (the performance harness's script language, apps/featherplay/src/perf):
+# the fixtures' library, its first song (every song plays FEATHERPLAY_PERF_AUDIO), then a few
+# seconds of it. run.sh ends the run with SIGTERM.
+startup
+library 0
+play-row 0
+wait 4000
