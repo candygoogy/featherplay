@@ -18,7 +18,8 @@
 //!    (`browsers::launch`, which documents how the pipe reaches Chromium). A pipe only: never `--remote-debugging-port`, so no other program can
 //!    connect. No switch that marks the browser as automated.
 //! 4. About once a second, ask for the profile's cookies (`cdp`: the app can send only
-//!    `Storage.getCookies` and `Browser.close`).
+//!    `Storage.getCookies` and `Browser.close`). Until the browser first answers, the
+//!    question goes again every 5 s, in case one sent before it was up is lost (`ask`).
 //! 5. Signed in = the YouTube session cookies (`session::signed_in`, the rule the WebView2
 //!    path and the controller use). Then wait 3 s so music.youtube.com can set its own
 //!    cookies, read once more, and build the header both sign-ins build
@@ -174,6 +175,8 @@ struct Limits {
     /// For the first reply, which comes once the browser has started; none means it doesn't
     /// allow the pipe.
     first_reply: Duration,
+    /// Until the first reply, how often the cookies are asked for again (`ask`).
+    resend: Duration,
     /// For any later reply.
     reply: Duration,
     /// For the whole sign-in.
@@ -188,6 +191,7 @@ impl Limits {
             poll: Duration::from_secs(1),
             settle: Duration::from_secs(3),
             first_reply: first_reply(),
+            resend: Duration::from_secs(5),
             reply: Duration::from_secs(15),
             timeout: timeout(),
             close: Duration::from_secs(5),
@@ -196,11 +200,13 @@ impl Limits {
 }
 
 /// 15 s on Windows. 60 s on Linux, where a browser's first start after boot, with none of it
-/// in the page cache yet, can take longer than 15 s; the commands it gets before it's up wait
-/// in the pipe. On a fresh GitHub runner (2026-11-12) Edge 157's first start gave no answer
-/// within 30 s, and the next one answered after 11 s (1 s in WSL). Linux reads the
-/// `RemoteDebuggingAllowed` policy before the start (`Browser::blocked`), so a missing
-/// answer there is rarely a block.
+/// in the page cache yet, can take longer than 15 s; the commands it gets before it's up
+/// usually wait in the pipe (Chrome 156 started cold in WSL answered all of them at once,
+/// after 3 to 7 s), and the cookies are asked for again meanwhile in case one is lost (`ask`).
+/// On a fresh GitHub runner (2026-11-12) Edge 157's first start gave no answer within 30 s,
+/// and the next one answered after 11 s (1 s in WSL); Chromium 156 gave none in 60 s, and
+/// answered in 0.4 s when started again. Linux reads the `RemoteDebuggingAllowed` policy
+/// before the start (`Browser::blocked`), so a missing answer there is rarely a block.
 fn first_reply() -> Duration {
     Duration::from_secs(if cfg!(target_os = "linux") { 60 } else { 15 })
 }
@@ -400,17 +406,12 @@ fn poll<W: Write>(
     let mut settle = Settle::new(limits.settle);
     let mut answered = false;
     loop {
-        let reply = client
-            .send(Method::GetCookies)
-            .map_err(|_| Stop::PipeClosed)
-            .and_then(|id| {
-                let within = if answered {
-                    limits.reply
-                } else {
-                    limits.first_reply
-                };
-                await_reply(id, replies, process, cancel, within)
-            });
+        let reply = if answered {
+            ask(client, replies, process, cancel, limits.reply, None)
+        } else {
+            let resend = Some(limits.resend);
+            ask(client, replies, process, cancel, limits.first_reply, resend)
+        };
         let result = match reply {
             Ok(r) => r,
             Err(stop) => return settle.or(stopped(stop, answered, started.elapsed(), process)),
@@ -485,24 +486,42 @@ fn stopped(stop: Stop, answered: bool, ran: Duration, process: &impl Process) ->
 /// How often waits look at Cancel and the browser's process.
 const SLICE: Duration = Duration::from_millis(100);
 
-/// Waits for the reply to `id`, at most `within`.
-fn await_reply(
-    id: u64,
+/// Sends `Storage.getCookies` and waits for its reply, at most `within`. With `resend`, sends
+/// it again each time that long passes without a reply, in case a browser that isn't up yet
+/// lost it (it's only read, so asking twice changes nothing): a reply to any of this wait's
+/// commands counts, and one to an earlier wait's is skipped.
+fn ask<W: Write>(
+    client: &mut Client<W>,
     replies: &Receiver<Reply>,
     process: &impl Process,
     cancel: &AtomicBool,
     within: Duration,
+    resend: Option<Duration>,
 ) -> Result<Result<serde_json::Value, String>, Stop> {
+    let mut send = || {
+        client
+            .send(Method::GetCookies)
+            .map_err(|_| Stop::PipeClosed)
+    };
+    let first = send()?;
     let deadline = Instant::now() + within;
+    let mut again = Instant::now() + resend.unwrap_or_default();
     loop {
         check(process, cancel)?;
-        let left = deadline.saturating_duration_since(Instant::now());
-        if left.is_zero() {
+        let now = Instant::now();
+        if now >= deadline {
             return Err(Stop::NoReply);
         }
-        match replies.recv_timeout(left.min(SLICE)) {
-            Ok(r) if r.id == id => return Ok(r.result),
-            // A late reply to an earlier command.
+        if let Some(every) = resend
+            && now >= again
+        {
+            let id = send()?;
+            log!("browser sign-in: no answer yet; asked again (#{id})");
+            again = now + every;
+        }
+        match replies.recv_timeout(deadline.saturating_duration_since(now).min(SLICE)) {
+            Ok(r) if r.id >= first => return Ok(r.result),
+            // A late reply to an earlier wait's command.
             Ok(_) | Err(RecvTimeoutError::Timeout) => {}
             Err(RecvTimeoutError::Disconnected) => return Err(Stop::PipeClosed),
         }

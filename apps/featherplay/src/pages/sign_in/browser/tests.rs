@@ -206,6 +206,7 @@ fn quick() -> Limits {
         poll: Duration::from_millis(10),
         settle: Duration::from_millis(30),
         first_reply: Duration::from_millis(1000),
+        resend: Duration::from_millis(100),
         reply: Duration::from_millis(300),
         timeout: Duration::from_secs(5),
         close: Duration::from_secs(2),
@@ -450,11 +451,38 @@ fn a_slow_first_answer_is_waited_for() {
     assert!(matches!(out, Outcome::SignedIn(_)), "{out:?}");
 }
 
+/// A browser that isn't up yet may lose the first command: until the first answer, the
+/// cookies are asked for again.
+#[test]
+fn a_lost_first_question_is_asked_again() {
+    let mut fb = fake_browser(|n| match n {
+        1 | 2 => Answer::Silence,
+        _ => Answer::Cookies(signed_in_cookies()),
+    });
+    let out = run_fake(&mut fb, &AtomicBool::new(false), &quick());
+    assert!(matches!(out, Outcome::SignedIn(_)), "{out:?}");
+    let methods = fb.methods.lock().unwrap().clone();
+    assert!(methods.len() >= 4, "{methods:?}");
+}
+
+/// Once the browser has answered, a missing reply isn't asked again: it stopped answering.
+#[test]
+fn after_the_first_answer_nothing_is_asked_again() {
+    let mut fb = fake_browser(|n| match n {
+        1 => Answer::Cookies(vec![]),
+        _ => Answer::Silence,
+    });
+    let out = run_fake(&mut fb, &AtomicBool::new(false), &quick());
+    assert!(matches!(out, Outcome::Lost(_)), "{out:?}");
+    assert_eq!(fb.methods.lock().unwrap().len(), 2);
+}
+
 #[test]
 fn the_first_answer_waits_longer_on_linux_only() {
     let l = Limits::real();
     let first = if cfg!(target_os = "linux") { 60 } else { 15 };
     assert_eq!(l.first_reply, Duration::from_secs(first));
+    assert_eq!(l.resend, Duration::from_secs(5));
     assert_eq!(l.reply, Duration::from_secs(15));
 }
 
@@ -573,13 +601,23 @@ impl Live {
         self.process.as_ref().unwrap()
     }
 
-    /// Asks for the cookies; the reply, if one comes within 30 s, or the sign-in's wait for a
-    /// first reply if longer (Linux: a browser's first start on a fresh CI runner is slow).
+    /// Asks for the cookies, again every 5 s as the sign-in does before a first reply; the
+    /// reply, if one comes within 30 s, or the sign-in's wait for a first reply if longer
+    /// (Linux: a browser's first start on a fresh CI runner is slow).
     fn cookies(&mut self) -> Option<Result<Vec<Cookie>, String>> {
-        let id = self.client.send(Method::GetCookies).ok()?;
         let never = AtomicBool::new(false);
-        let within = Limits::real().first_reply.max(Duration::from_secs(30));
-        let r = await_reply(id, &self.replies, self.process(), &never, within);
+        let limits = Limits::real();
+        let within = limits.first_reply.max(Duration::from_secs(30));
+        let process = self.process.as_ref().unwrap();
+        let resend = Some(limits.resend);
+        let r = ask(
+            &mut self.client,
+            &self.replies,
+            process,
+            &never,
+            within,
+            resend,
+        );
         r.ok().map(|r| r.and_then(cdp::cookies))
     }
 
