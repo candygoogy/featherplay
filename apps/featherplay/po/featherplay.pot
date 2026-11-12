@@ -109,17 +109,17 @@ msgstr ""
 msgid "Autoplay"
 msgstr ""
 
-#: ../../crates/controller/src/updates.rs:791 src/updates.rs:199
-#: ../../crates/controller/src/updates.rs:791 src/updates.rs:199
+#: ../../crates/controller/src/updates.rs:795 src/updates.rs:199
+#: ../../crates/controller/src/updates.rs:795 src/updates.rs:199
 msgid "Restart to update"
 msgstr ""
 
-#: ../../crates/controller/src/updates.rs:793 src/updates.rs:190
-#: ../../crates/controller/src/updates.rs:793 src/updates.rs:190
+#: ../../crates/controller/src/updates.rs:797 src/updates.rs:190
+#: ../../crates/controller/src/updates.rs:797 src/updates.rs:190
 msgid "Get it"
 msgstr ""
 
-#: ../../crates/controller/src/updates.rs:807
+#: ../../crates/controller/src/updates.rs:811
 msgid "Details"
 msgstr ""
 
@@ -173,10 +173,10 @@ msgstr ""
 
 #: ../../crates/integrations/src/tooltip.rs:21
 #: ../../crates/integrations/src/tooltip.rs:21
-#: ../../crates/integrations/src/tooltip.rs:21 ui/bottom_bar.slint:578
-#: ../../crates/integrations/src/tooltip.rs:21 ui/bottom_bar.slint:578 ui/mini_player.slint:134 ui/pages/lyrics.slint:97
-#: ../../crates/integrations/src/tooltip.rs:21 ui/bottom_bar.slint:578 ui/mini_player.slint:134 ui/pages/lyrics.slint:97 ui/pages/now_playing.slint:719
-#: ../../crates/integrations/src/tooltip.rs:21 ui/bottom_bar.slint:578 ui/mini_player.slint:134 ui/pages/lyrics.slint:97 ui/pages/now_playing.slint:719
+#: ../../crates/integrations/src/tooltip.rs:21 ui/bottom_bar.slint:612
+#: ../../crates/integrations/src/tooltip.rs:21 ui/bottom_bar.slint:612 ui/mini_player.slint:134 ui/pages/lyrics.slint:97
+#: ../../crates/integrations/src/tooltip.rs:21 ui/bottom_bar.slint:612 ui/mini_player.slint:134 ui/pages/lyrics.slint:97 ui/pages/now_playing.slint:719
+#: ../../crates/integrations/src/tooltip.rs:21 ui/bottom_bar.slint:612 ui/mini_player.slint:134 ui/pages/lyrics.slint:97 ui/pages/now_playing.slint:719
 msgid "Nothing playing"
 msgstr ""
 
@@ -194,10 +194,10 @@ msgstr ""
 
 #: ../../crates/platform/src/common/tray.rs:109
 #: ../../crates/platform/src/common/tray.rs:109
-#: ../../crates/platform/src/common/tray.rs:109 ui/bottom_bar.slint:378
-#: ../../crates/platform/src/common/tray.rs:109 ui/bottom_bar.slint:378 ui/pages/content.slint:444
-#: ../../crates/platform/src/common/tray.rs:109 ui/bottom_bar.slint:378 ui/pages/content.slint:444 ui/parts/buttons.slint:26
-#: ../../crates/platform/src/common/tray.rs:109 ui/bottom_bar.slint:378 ui/pages/content.slint:444 ui/parts/buttons.slint:26
+#: ../../crates/platform/src/common/tray.rs:109 ui/bottom_bar.slint:407
+#: ../../crates/platform/src/common/tray.rs:109 ui/bottom_bar.slint:407 ui/pages/content.slint:444
+#: ../../crates/platform/src/common/tray.rs:109 ui/bottom_bar.slint:407 ui/pages/content.slint:444 ui/parts/buttons.slint:26
+#: ../../crates/platform/src/common/tray.rs:109 ui/bottom_bar.slint:407 ui/pages/content.slint:444 ui/parts/buttons.slint:26
 msgid "Play"
 msgstr ""
 
@@ -210,9 +210,9 @@ msgstr ""
 
 #. As wide as the wider label, so Go to album doesn't shift as it toggles.
 #: ../../crates/platform/src/common/tray.rs:117
-#: ../../crates/platform/src/common/tray.rs:117 ui/bottom_bar.slint:378
-#: ../../crates/platform/src/common/tray.rs:117 ui/bottom_bar.slint:378 ui/pages/home/hero.slint:167
-#: ../../crates/platform/src/common/tray.rs:117 ui/bottom_bar.slint:378 ui/pages/home/hero.slint:167
+#: ../../crates/platform/src/common/tray.rs:117 ui/bottom_bar.slint:407
+#: ../../crates/platform/src/common/tray.rs:117 ui/bottom_bar.slint:407 ui/pages/home/hero.slint:167
+#: ../../crates/platform/src/common/tray.rs:117 ui/bottom_bar.slint:407 ui/pages/home/hero.slint:167
 msgid "Pause"
 msgstr ""
 
@@ -223,18 +223,18 @@ msgstr ""
 #: ../../crates/platform/src/linux/tray.rs:171
 #: ../../crates/platform/src/linux/tray.rs:171
 #: ../../crates/platform/src/linux/tray.rs:171
-#: ../../crates/platform/src/linux/tray.rs:171 ui/bottom_bar.slint:668
-#: ../../crates/platform/src/linux/tray.rs:171 ui/bottom_bar.slint:668 ui/pages/settings/shortcuts.slint:126
-#: ../../crates/platform/src/linux/tray.rs:171 ui/bottom_bar.slint:668 ui/pages/settings/shortcuts.slint:126 ui/shortcuts.slint:34
+#: ../../crates/platform/src/linux/tray.rs:171 ui/bottom_bar.slint:702
+#: ../../crates/platform/src/linux/tray.rs:171 ui/bottom_bar.slint:702 ui/pages/settings/shortcuts.slint:126
+#: ../../crates/platform/src/linux/tray.rs:171 ui/bottom_bar.slint:702 ui/pages/settings/shortcuts.slint:126 ui/shortcuts.slint:37
 msgid "Previous"
 msgstr ""
 
 #: ../../crates/platform/src/linux/tray.rs:172
 #: ../../crates/platform/src/linux/tray.rs:172
 #: ../../crates/platform/src/linux/tray.rs:172
-#: ../../crates/platform/src/linux/tray.rs:172 ui/bottom_bar.slint:682
-#: ../../crates/platform/src/linux/tray.rs:172 ui/bottom_bar.slint:682 ui/pages/settings/shortcuts.slint:126
-#: ../../crates/platform/src/linux/tray.rs:172 ui/bottom_bar.slint:682 ui/pages/settings/shortcuts.slint:126 ui/shortcuts.slint:35
+#: ../../crates/platform/src/linux/tray.rs:172 ui/bottom_bar.slint:716
+#: ../../crates/platform/src/linux/tray.rs:172 ui/bottom_bar.slint:716 ui/pages/settings/shortcuts.slint:126
+#: ../../crates/platform/src/linux/tray.rs:172 ui/bottom_bar.slint:716 ui/pages/settings/shortcuts.slint:126 ui/shortcuts.slint:38
 msgid "Next"
 msgstr ""
 
@@ -396,19 +396,19 @@ msgstr ""
 msgid "Sign in"
 msgstr ""
 
-#: src/app.rs:587
+#: src/app.rs:593
 msgid "Signed in, but Windows couldn't save it for next time."
 msgstr ""
 
-#: src/app.rs:589
+#: src/app.rs:595
 msgid "Signed in, but the keyring didn't save it for next time."
 msgstr ""
 
-#: src/app.rs:591
+#: src/app.rs:597
 msgid "Signed in for now: no keyring is running to save it."
 msgstr ""
 
-#: src/app.rs:635 ui/pages/about.slint:399
+#: src/app.rs:641 ui/pages/about.slint:399
 msgid "Copy diagnostics"
 msgstr ""
 
@@ -715,7 +715,7 @@ msgid "Another app already uses one of these keys. Pick other keys."
 msgstr ""
 
 #: src/pages/settings/window.rs:273 ui/pages/settings/shortcuts.slint:126
-#: src/pages/settings/window.rs:273 ui/pages/settings/shortcuts.slint:126 ui/shortcuts.slint:33
+#: src/pages/settings/window.rs:273 ui/pages/settings/shortcuts.slint:126 ui/shortcuts.slint:36
 msgid "Play or pause"
 msgstr ""
 
@@ -1050,115 +1050,127 @@ msgstr ""
 msgid "Dislike all songs"
 msgstr ""
 
-#: ui/bottom_bar.slint:50
+#: ui/bottom_bar.slint:52
 msgid "Seek"
 msgstr ""
 
-#: ui/bottom_bar.slint:184
+#: ui/bottom_bar.slint:186
 msgid "Silence"
 msgstr ""
 
-#: ui/bottom_bar.slint:209
+#: ui/bottom_bar.slint:211
 msgid "Volume"
 msgstr ""
 
-#: ui/bottom_bar.slint:327 ui/pages/settings/playback.slint:76
+#: ui/bottom_bar.slint:329 ui/pages/settings/playback.slint:76
 msgid "{} %"
 msgstr ""
 
-#: ui/bottom_bar.slint:349 ui/bottom_bar.slint:361
-#: ui/bottom_bar.slint:349 ui/bottom_bar.slint:361 ui/pages/now_playing.slint:257
-#: ui/bottom_bar.slint:349 ui/bottom_bar.slint:361 ui/pages/now_playing.slint:257 ui/pages/settings/lyrics.slint:6
+#: ui/bottom_bar.slint:351 ui/bottom_bar.slint:363
+#: ui/bottom_bar.slint:351 ui/bottom_bar.slint:363 ui/pages/now_playing.slint:257
+#: ui/bottom_bar.slint:351 ui/bottom_bar.slint:363 ui/pages/now_playing.slint:257 ui/pages/settings/lyrics.slint:6
 msgid "Lyrics"
 msgstr ""
 
-#: ui/bottom_bar.slint:350
+#: ui/bottom_bar.slint:352
 msgid "Hides the lyrics, back to the cover"
 msgstr ""
 
-#: ui/bottom_bar.slint:350
+#: ui/bottom_bar.slint:352
 msgid "Shows the lyrics on Now playing"
 msgstr ""
 
-#: ui/bottom_bar.slint:361
+#: ui/bottom_bar.slint:363
 msgid "Hide lyrics"
 msgstr ""
 
-#: ui/bottom_bar.slint:361 ui/pages/now_playing.slint:257
+#: ui/bottom_bar.slint:363 ui/pages/now_playing.slint:257
 msgid "No lyrics"
 msgstr ""
 
-#: ui/bottom_bar.slint:361 ui/pages/now_playing.slint:257
+#: ui/bottom_bar.slint:363 ui/pages/now_playing.slint:257
 msgid "Retry lyrics"
 msgstr ""
 
-#: ui/bottom_bar.slint:362
+#: ui/bottom_bar.slint:364
 msgid "Ctrl+L"
 msgstr ""
 
+#: ui/bottom_bar.slint:381 ui/bottom_bar.slint:390
+msgid "Mini player"
+msgstr ""
+
+#: ui/bottom_bar.slint:382
+msgid "Opens or closes the mini player"
+msgstr ""
+
+#: ui/bottom_bar.slint:391
+msgid "Ctrl+M"
+msgstr ""
+
 #. Its shortcut, in both windows.
-#: ui/bottom_bar.slint:379 ui/parts/buttons.slint:28 ui/shortcuts.slint:33
+#: ui/bottom_bar.slint:408 ui/parts/buttons.slint:28 ui/shortcuts.slint:36
 msgid "Space"
 msgstr ""
 
-#: ui/bottom_bar.slint:435
+#: ui/bottom_bar.slint:464
 msgid "Playback speed, {}"
 msgstr ""
 
-#: ui/bottom_bar.slint:456 ui/bottom_bar.slint:503 ui/bottom_bar.slint:519
-#: ui/bottom_bar.slint:456 ui/bottom_bar.slint:503 ui/bottom_bar.slint:519
+#: ui/bottom_bar.slint:485 ui/bottom_bar.slint:532 ui/bottom_bar.slint:548
+#: ui/bottom_bar.slint:485 ui/bottom_bar.slint:532 ui/bottom_bar.slint:548
 msgid "Playback speed"
 msgstr ""
 
-#: ui/bottom_bar.slint:578
+#: ui/bottom_bar.slint:612
 msgid "Now playing: {}"
 msgstr ""
 
-#: ui/bottom_bar.slint:658
+#: ui/bottom_bar.slint:692
 msgid "Shuffle on"
 msgstr ""
 
-#: ui/bottom_bar.slint:658
+#: ui/bottom_bar.slint:692
 msgid "Shuffle off"
 msgstr ""
 
-#: ui/bottom_bar.slint:660
+#: ui/bottom_bar.slint:694
 msgid "Ctrl+S"
 msgstr ""
 
-#: ui/bottom_bar.slint:670
+#: ui/bottom_bar.slint:704
 msgid "Ctrl+←"
 msgstr ""
 
-#: ui/bottom_bar.slint:684
+#: ui/bottom_bar.slint:718
 msgid "Ctrl+→"
 msgstr ""
 
-#: ui/bottom_bar.slint:693
+#: ui/bottom_bar.slint:727
 msgid "Repeat one"
 msgstr ""
 
-#: ui/bottom_bar.slint:693
+#: ui/bottom_bar.slint:727
 msgid "Repeat all"
 msgstr ""
 
-#: ui/bottom_bar.slint:693
+#: ui/bottom_bar.slint:727
 msgid "Repeat off"
 msgstr ""
 
-#: ui/bottom_bar.slint:695
+#: ui/bottom_bar.slint:729
 msgid "Ctrl+R"
 msgstr ""
 
-#: ui/bottom_bar.slint:765
+#: ui/bottom_bar.slint:804
 msgid "Mute"
 msgstr ""
 
-#: ui/bottom_bar.slint:765
+#: ui/bottom_bar.slint:804
 msgid "Unmute"
 msgstr ""
 
-#: ui/bottom_bar.slint:781 ui/pages/now_playing.slint:116
+#: ui/bottom_bar.slint:820 ui/pages/now_playing.slint:116
 msgid "Up next"
 msgstr ""
 
@@ -1643,8 +1655,8 @@ msgstr ""
 msgid "Playing from"
 msgstr ""
 
-#: ui/pages/now_playing.slint:575 ui/shortcuts.slint:43
-#: ui/pages/now_playing.slint:575 ui/shortcuts.slint:43
+#: ui/pages/now_playing.slint:575 ui/shortcuts.slint:48 ui/shortcuts.slint:56
+#: ui/pages/now_playing.slint:575 ui/shortcuts.slint:48 ui/shortcuts.slint:56
 msgid "Back"
 msgstr ""
 
@@ -1665,7 +1677,8 @@ msgid "Songs added to it show up here."
 msgstr ""
 
 #. A link isn't repeated as the title: the field above shows it.
-#: ui/pages/search.slint:44 ui/shortcuts.slint:41 ui/top_bar.slint:333
+#: ui/pages/search.slint:44 ui/shortcuts.slint:46 ui/shortcuts.slint:53
+#: ui/pages/search.slint:44 ui/shortcuts.slint:46 ui/shortcuts.slint:53
 msgid "Search"
 msgstr ""
 
@@ -2455,7 +2468,8 @@ msgid ""
 msgstr ""
 
 #: ui/pages/settings/shortcuts.slint:200 ui/pages/settings/shortcuts.slint:207
-#: ui/pages/settings/shortcuts.slint:200 ui/pages/settings/shortcuts.slint:207 ui/shortcuts.slint:46
+#: ui/pages/settings/shortcuts.slint:200 ui/pages/settings/shortcuts.slint:207 ui/shortcuts.slint:51
+#: ui/pages/settings/shortcuts.slint:200 ui/pages/settings/shortcuts.slint:207 ui/shortcuts.slint:51
 msgid "Keyboard shortcuts"
 msgstr ""
 
@@ -2926,42 +2940,48 @@ msgstr ""
 msgid "Nothing up next"
 msgstr ""
 
-#: ui/shortcuts.slint:34 ui/shortcuts.slint:35 ui/shortcuts.slint:36
-#: ui/shortcuts.slint:34 ui/shortcuts.slint:35 ui/shortcuts.slint:36 ui/shortcuts.slint:41 ui/shortcuts.slint:42
-#: ui/shortcuts.slint:34 ui/shortcuts.slint:35 ui/shortcuts.slint:36 ui/shortcuts.slint:41 ui/shortcuts.slint:42 ui/top_bar.slint:392
+#: ui/shortcuts.slint:37 ui/shortcuts.slint:38 ui/shortcuts.slint:39
+#: ui/shortcuts.slint:37 ui/shortcuts.slint:38 ui/shortcuts.slint:39 ui/shortcuts.slint:46 ui/shortcuts.slint:47
+#: ui/shortcuts.slint:37 ui/shortcuts.slint:38 ui/shortcuts.slint:39 ui/shortcuts.slint:46 ui/shortcuts.slint:47 ui/shortcuts.slint:53 ui/shortcuts.slint:54
+#: ui/shortcuts.slint:37 ui/shortcuts.slint:38 ui/shortcuts.slint:39 ui/shortcuts.slint:46 ui/shortcuts.slint:47 ui/shortcuts.slint:53 ui/shortcuts.slint:54 ui/shortcuts.slint:59 ui/top_bar.slint:392
 msgid "Ctrl"
 msgstr ""
 
-#: ui/shortcuts.slint:36
+#: ui/shortcuts.slint:39
 msgid "Shuffle on or off"
 msgstr ""
 
-#: ui/shortcuts.slint:37
+#: ui/shortcuts.slint:40
 msgid "Repeat: off, all, one"
 msgstr ""
 
-#: ui/shortcuts.slint:38
+#: ui/shortcuts.slint:41
 msgid "Volume up or down"
 msgstr ""
 
-#: ui/shortcuts.slint:42
+#: ui/shortcuts.slint:47 ui/shortcuts.slint:54
 msgid "Lyrics on or off"
 msgstr ""
 
-#: ui/shortcuts.slint:43 ui/shortcuts.slint:44
+#: ui/shortcuts.slint:48 ui/shortcuts.slint:49 ui/shortcuts.slint:56
+#: ui/shortcuts.slint:48 ui/shortcuts.slint:49 ui/shortcuts.slint:56
 msgid "Alt"
 msgstr ""
 
-#: ui/shortcuts.slint:44
+#: ui/shortcuts.slint:49 ui/shortcuts.slint:57
 msgid "Forward"
 msgstr ""
 
-#: ui/shortcuts.slint:45
+#: ui/shortcuts.slint:50 ui/shortcuts.slint:58
 msgid "Clear the search, or leave Now playing"
 msgstr ""
 
-#: ui/shortcuts.slint:45
+#: ui/shortcuts.slint:50 ui/shortcuts.slint:58
 msgid "Esc"
+msgstr ""
+
+#: ui/shortcuts.slint:55
+msgid "Mini player on or off"
 msgstr ""
 
 #: ui/sidebar.slint:179
