@@ -229,3 +229,5 @@ jobs:
   # run. Their reports and recordings are the runs' artifacts.
   rig-sound:
     uses: ./.github/workflows/linux-rig-sound.yml
+  rig-desktop:
+    uses: ./.github/workflows/linux-rig.yml
