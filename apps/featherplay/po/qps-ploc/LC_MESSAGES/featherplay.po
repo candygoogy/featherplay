@@ -8,7 +8,7 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "X-Language-Name: Test language [qps-ploc]\n"
 
-#: ../../crates/controller/src/controller.rs:637
+#: ../../crates/controller/src/controller.rs:639
 msgid "No sound output found. Connect speakers or headphones."
 msgstr "[No sound output found. Connect speakers or headphones.]"
 
@@ -131,35 +131,39 @@ msgstr "[Getting ready to play: downloading helpers (one time)…]"
 msgid "Some songs here can't play right now. featherplay skips them."
 msgstr "[Some songs here can't play right now. featherplay skips them.]"
 
-#: ../../crates/core/src/failure.rs:144
+#: ../../crates/core/src/failure.rs:131
+msgid "Some songs can't play: a DNS service routes YouTube abroad."
+msgstr "[Some songs can't play: a DNS service routes YouTube abroad.]"
+
+#: ../../crates/core/src/failure.rs:151
 msgid "Songs can't play. featherplay is updating its helpers."
 msgstr "[Songs can't play. featherplay is updating its helpers.]"
 
-#: ../../crates/core/src/failure.rs:146
+#: ../../crates/core/src/failure.rs:153
 msgid "Songs can't play. featherplay may need an update."
 msgstr "[Songs can't play. featherplay may need an update.]"
 
-#: ../../crates/core/src/failure.rs:147
+#: ../../crates/core/src/failure.rs:154
 msgid "This song isn't available."
 msgstr "[This song isn't available.]"
 
-#: ../../crates/core/src/failure.rs:148
+#: ../../crates/core/src/failure.rs:155
 msgid "Couldn't play this song. Check your connection."
 msgstr "[Couldn't play this song. Check your connection.]"
 
-#: ../../crates/core/src/failure.rs:150
+#: ../../crates/core/src/failure.rs:157
 msgid "Couldn't download helpers. Check VPN or proxy."
 msgstr "[Couldn't download helpers. Check VPN or proxy.]"
 
-#: ../../crates/core/src/failure.rs:153
+#: ../../crates/core/src/failure.rs:160
 msgid "Your antivirus may have blocked the helpers."
 msgstr "[Your antivirus may have blocked the helpers.]"
 
-#: ../../crates/core/src/failure.rs:156
+#: ../../crates/core/src/failure.rs:163
 msgid "A helper download arrived damaged."
 msgstr "[A helper download arrived damaged.]"
 
-#: ../../crates/core/src/failure.rs:159
+#: ../../crates/core/src/failure.rs:166
 msgid "Couldn't save helpers. Is the disk full?"
 msgstr "[Couldn't save helpers. Is the disk full?]"
 

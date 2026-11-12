@@ -8,7 +8,7 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#: ../../crates/controller/src/controller.rs:637
+#: ../../crates/controller/src/controller.rs:639
 msgid "No sound output found. Connect speakers or headphones."
 msgstr ""
 
@@ -131,35 +131,39 @@ msgstr ""
 msgid "Some songs here can't play right now. featherplay skips them."
 msgstr ""
 
-#: ../../crates/core/src/failure.rs:144
+#: ../../crates/core/src/failure.rs:131
+msgid "Some songs can't play: a DNS service routes YouTube abroad."
+msgstr ""
+
+#: ../../crates/core/src/failure.rs:151
 msgid "Songs can't play. featherplay is updating its helpers."
 msgstr ""
 
-#: ../../crates/core/src/failure.rs:146
+#: ../../crates/core/src/failure.rs:153
 msgid "Songs can't play. featherplay may need an update."
 msgstr ""
 
-#: ../../crates/core/src/failure.rs:147
+#: ../../crates/core/src/failure.rs:154
 msgid "This song isn't available."
 msgstr ""
 
-#: ../../crates/core/src/failure.rs:148
+#: ../../crates/core/src/failure.rs:155
 msgid "Couldn't play this song. Check your connection."
 msgstr ""
 
-#: ../../crates/core/src/failure.rs:150
+#: ../../crates/core/src/failure.rs:157
 msgid "Couldn't download helpers. Check VPN or proxy."
 msgstr ""
 
-#: ../../crates/core/src/failure.rs:153
+#: ../../crates/core/src/failure.rs:160
 msgid "Your antivirus may have blocked the helpers."
 msgstr ""
 
-#: ../../crates/core/src/failure.rs:156
+#: ../../crates/core/src/failure.rs:163
 msgid "A helper download arrived damaged."
 msgstr ""
 
-#: ../../crates/core/src/failure.rs:159
+#: ../../crates/core/src/failure.rs:166
 msgid "Couldn't save helpers. Is the disk full?"
 msgstr ""
 
