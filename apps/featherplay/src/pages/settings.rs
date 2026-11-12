@@ -12,7 +12,8 @@
 //!
 //! Each section's code is in its own module in `settings/`, as the page's Slint is; the
 //! shared state, `init`, `show`, the dialogs' opening and closing, and the switches
-//! (`toggled`) stay here.
+//! (`toggled`) stay here. The page's search, and the settings among the top bar's
+//! suggestions, are `settings/search.rs`.
 
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
@@ -35,6 +36,7 @@ mod discord;
 mod local_api;
 mod playback;
 mod scrobbling;
+pub mod search;
 mod shortcuts;
 mod sound;
 mod window;
@@ -219,6 +221,7 @@ pub fn init(ctx: &Rc<Ctx>) {
     });
     language::install();
     language::apply(&language::for_setting(&language_setting));
+    search::init(ctx);
     show(ctx);
 
     let c = ctx.clone();
@@ -330,6 +333,8 @@ pub fn open(ctx: &Rc<Ctx>) {
     if let Some(ui) = ctx.window() {
         // No option is under the pointer yet (one hovered as the page was left is gone).
         unlight(&ui.global::<SettingsData>());
+        // A search left behind is gone: the page opens whole.
+        search::reset(&ui);
     }
     if ctx.catalog.fixtures().is_some() {
         let names = FIXTURE_DEVICES.iter().map(|d| d.to_string()).collect();
@@ -364,6 +369,7 @@ pub fn tray_changed(ctx: &Ctx) {
     let Some(ui) = ctx.window() else { return };
     ui.global::<SettingsData>()
         .set_has_tray(supports(Feature::Tray));
+    search::refresh(&ui);
 }
 
 /// Signed in or out.
@@ -447,6 +453,7 @@ fn show(ctx: &Ctx) {
     data.set_on_windows(cfg!(windows));
     data.set_tooltips(s.tooltips);
     ui.global::<Tooltips>().set_on(s.tooltips);
+    data.set_settings_in_suggestions(s.settings_in_suggestions);
     data.set_accent(accent_index(s.accent));
     data.set_appearance(appearance(s.theme));
     data.set_hotkeys(s.hotkeys.is_some());
@@ -471,10 +478,14 @@ fn show(ctx: &Ctx) {
     data.set_listenbrainz_state(listenbrainz_state(LISTENBRAINZ.with(Cell::get)));
 }
 
-/// Applies `change` to the window's copy and sends it to the controller.
+/// Applies `change` to the window's copy and sends it to the controller. A search shown
+/// runs again: the change may bring rows in or take them away (Crossfade's Fade on skip).
 fn commit(ctx: &Ctx, change: Change) {
     SETTINGS.with(|s| change.apply(&mut s.borrow_mut()));
     ctx.send(Action::Account(AccountAction::Set(change)));
+    if let Some(ui) = ctx.window() {
+        search::refresh(&ui);
+    }
 }
 
 fn toggled(ctx: &Rc<Ctx>, key: SettingKey, on: bool) {
@@ -576,6 +587,10 @@ fn toggled(ctx: &Rc<Ctx>, key: SettingKey, on: bool) {
                 ui.global::<Tooltips>().set_on(on);
             }
             Change::Tooltips(on)
+        }
+        SettingKey::SettingsInSuggestions => {
+            data.set_settings_in_suggestions(on);
+            Change::SettingsInSuggestions(on)
         }
         SettingKey::DiscordAutoReconnect => {
             discord_options(ctx, |o| o.auto_reconnect = on);

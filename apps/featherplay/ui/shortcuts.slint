@@ -14,6 +14,7 @@ export enum ShortcutKind {
     repeat,
     volume,
     search,
+    search-settings,
     lyrics,
     mini-player,
     back,
@@ -44,6 +45,7 @@ export global Shortcuts {
     // always has one).
     out property <[ShortcutRow]> moving: SettingsData.has-tray ? [
         { kind: ShortcutKind.search, label: @tr("Search"), keys: [@tr("Ctrl"), "K"] },
+        { kind: ShortcutKind.search-settings, label: @tr("Search settings (on Settings)"), keys: [@tr("Ctrl"), "F"] },
         { kind: ShortcutKind.lyrics, label: @tr("Lyrics on or off"), keys: [@tr("Ctrl"), "L"] },
         { kind: ShortcutKind.back, label: @tr("Back"), keys: [@tr("Alt"), "←"] },
         { kind: ShortcutKind.forward, label: @tr("Forward"), keys: [@tr("Alt"), "→"] },
@@ -51,6 +53,7 @@ export global Shortcuts {
         { kind: ShortcutKind.shortcuts, label: @tr("Keyboard shortcuts"), keys: [@tr("Ctrl"), "/"] },
     ] : [
         { kind: ShortcutKind.search, label: @tr("Search"), keys: [@tr("Ctrl"), "K"] },
+        { kind: ShortcutKind.search-settings, label: @tr("Search settings (on Settings)"), keys: [@tr("Ctrl"), "F"] },
         { kind: ShortcutKind.lyrics, label: @tr("Lyrics on or off"), keys: [@tr("Ctrl"), "L"] },
         { kind: ShortcutKind.mini-player, label: @tr("Mini player on or off"), keys: [@tr("Ctrl"), "M"] },
         { kind: ShortcutKind.back, label: @tr("Back"), keys: [@tr("Alt"), "←"] },

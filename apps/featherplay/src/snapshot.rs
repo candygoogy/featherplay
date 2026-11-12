@@ -408,6 +408,14 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
     scene.theme(o.dark);
     let settle = || scene.settle();
     settle();
+    if o.page.starts_with("settings-search")
+        || o.page == "settings-picked"
+        || o.page == "search-suggestions-settings"
+    {
+        // The sound rows on, as `settings-sound` has them: Crossfade at 5 s with Fade on skip.
+        crate::pages::settings::show_sound_for_snapshot(ctx, false);
+        settle();
+    }
     if o.page.starts_with("settings") {
         // The sections below the fold are made one per timer tick after the page's first
         // frame (`made` in settings.slint), and a frame is what makes the page itself: a few
@@ -462,11 +470,34 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
             settle();
         }
     }
-    if o.page.starts_with("search-suggestions") {
-        crate::suggest::show_for_snapshot(ctx);
+    if let Some(text) = o.page.strip_prefix("settings-search-") {
+        let text = match text {
+            "none" => "sleep timer",
+            other => other,
+        };
+        crate::pages::settings::search::show_for_snapshot(ctx, text);
         settle();
-        if o.page == "search-suggestions-key" {
-            for _ in 0..8 {
+        for _ in 0..2 {
+            ui.window()
+                .take_snapshot()
+                .map_err(|e| format!("take_snapshot: {e}"))?;
+            scene.settle_once();
+        }
+    }
+    if o.page.starts_with("search-suggestions") {
+        let settings = o.page == "search-suggestions-settings";
+        crate::suggest::show_for_snapshot(ctx, if settings { "crossf" } else { "daft pu" });
+        settle();
+        // The first setting highlighted, as Down reaches it.
+        let downs = if settings {
+            ui.global::<crate::ui::TopBarData>().get_settings_from() + 1
+        } else if o.page == "search-suggestions-key" {
+            8
+        } else {
+            0
+        };
+        if downs > 0 {
+            for _ in 0..downs {
                 let down = slint::SharedString::from(slint::platform::Key::DownArrow);
                 ui.window()
                     .dispatch_event(WindowEvent::KeyPressed { text: down.clone() });
@@ -728,7 +759,7 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
         Hold::Error if o.page.starts_with("now-playing-lyrics") => {}
         Hold::Error => hold_error(ctx, ui)?,
     }
-    if o.page == "settings-discord" || o.pointer.is_some() {
+    if o.page == "settings-discord" || o.page == "settings-picked" || o.pointer.is_some() {
         // Laid out at the snapshot's size first, so the scroll and the pointer land on what
         // the picture shows there.
         window.dispatch_event(WindowEvent::Resized {
@@ -739,6 +770,18 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
     if o.page == "settings-discord" {
         scroll_to_group(window, "Discord")?;
         settle();
+    }
+    if o.page == "settings-picked" {
+        // At the snapshot's size, as the reading line the row comes to depends on it: the
+        // page asks the row where it is, then scrolls, a tick each.
+        crate::pages::settings::search::open_at(ctx, crate::ui::SettingId::Crossfade, false);
+        for _ in 0..4 {
+            window
+                .take_snapshot()
+                .map_err(|e| format!("take_snapshot: {e}"))?;
+            std::thread::sleep(Duration::from_millis(2));
+            scene.settle_once();
+        }
     }
     if let Some((x, y)) = o.pointer {
         let position = slint::LogicalPosition::new(x, y);

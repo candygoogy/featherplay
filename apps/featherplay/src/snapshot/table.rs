@@ -40,6 +40,9 @@ pub const PAGES: &[&str] = &[
     // same after Down eight times, the first song highlighted.
     "search-suggestions",
     "search-suggestions-key",
+    // Home with "crossf" typed in the top bar: the recorded music suggestions, then the
+    // settings that match, the first one highlighted.
+    "search-suggestions-settings",
     "now-playing",
     // Now playing with its side panel hidden (the bar's Up next button), the stage the whole
     // width, playing a soundtrack's long credits; and its full lyrics view the same way.
@@ -98,6 +101,14 @@ pub const PAGES: &[&str] = &[
     // pill's popup open.
     "settings-speed",
     "speed-popup",
+    // Settings' search with the sound rows on (as `settings-sound`), Ctrl+F and a word in
+    // the field: "cross", "volume", "dark", or "sleep timer", which finds nothing.
+    "settings-search-cross",
+    "settings-search-volume",
+    "settings-search-dark",
+    "settings-search-none",
+    // Settings as a suggestion opens it at Crossfade: the row on the reading line, lit.
+    "settings-picked",
     // Home with Skip silence's marks on the seek line: 5 s at the start, 8 s at 4:12 (ahead
     // of the fill) and 22 s at the end; or with the inner one at 1:40, played past.
     "silences",
@@ -239,7 +250,8 @@ pub(super) fn page(name: &str, f: &Fixtures) -> Result<Page, String> {
         | "sidebar-pinned"
         | "home-shortcuts"
         | "search-suggestions"
-        | "search-suggestions-key" => Page::Home,
+        | "search-suggestions-key"
+        | "search-suggestions-settings" => Page::Home,
         "library" => Page::Library {
             tab: LibraryTab::Liked,
         },
@@ -313,7 +325,12 @@ pub(super) fn page(name: &str, f: &Fixtures) -> Result<Page, String> {
         | "settings-discord"
         | "settings-sound"
         | "settings-equalizer"
-        | "settings-speed" => Page::Settings,
+        | "settings-speed"
+        | "settings-search-cross"
+        | "settings-search-volume"
+        | "settings-search-dark"
+        | "settings-search-none"
+        | "settings-picked" => Page::Settings,
         p if p == "about" || p.starts_with("about-") => Page::About,
         "sign-in"
         | "sign-in-expired"

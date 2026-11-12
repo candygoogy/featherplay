@@ -88,6 +88,8 @@ export global Theme {
     // The accent's tonal fill (the selected pill tab or chip) and its hover, under `text1`.
     out property <color> accent-tonal: accent.transparentize(between(0.78, 0.86));
     out property <color> accent-tonal-hover: accent.transparentize(between(0.7, 0.8));
+    // A setting a search suggestion opened, lit for a moment: about half the tonal fill.
+    out property <color> accent-tonal-faint: accent.transparentize(between(0.88, 0.92));
 
     // Grounds and surfaces, neutral greys. Dark is near-black, the sidebar a step darker,
     // the bar and panels a step lighter, raised cards lighter again; light is white, with

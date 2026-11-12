@@ -21,7 +21,7 @@ import { ArtistPage } from "pages/artist.slint";
 import { SearchPage } from "pages/search.slint";
 import { NowPlayingPage, SideTabs, LyricsWatch } from "pages/now_playing.slint";
 import { LyricsData } from "pages/lyrics.slint";
-import { SettingsPage, SettingsData, SettingsDialog, SettingsDialogLayer } from "pages/settings.slint";
+import { SettingsPage, SettingsData, SettingsDialog, SettingsDialogLayer, SettingsSearch } from "pages/settings.slint";
 import { AboutPage } from "pages/about.slint";
 import { SignInPage } from "pages/sign_in.slint";
 import { SongMenu, SongMenuLayer } from "song_menu.slint";
@@ -78,7 +78,7 @@ export { NowPlayingData } from "pages/now_playing.slint";
 
 export { LyricsData, LyricsState, LyricInk } from "pages/lyrics.slint";
 
-export { SettingsData, SettingKey, LastfmState, DiscordState, ListenBrainzState, SettingsDialog, AccentSwatch, DiscordPreview, DiscordPart } from "pages/settings.slint";
+export { SettingsData, SettingKey, LastfmState, DiscordState, ListenBrainzState, SettingsDialog, AccentSwatch, DiscordPreview, DiscordPart, SettingId, SettingsSearch, TextMark, RowHit } from "pages/settings.slint";
 
 export { AboutData, Credit, UpdateState } from "pages/about.slint";
 
@@ -243,6 +243,15 @@ export component AppWindow inherits Window {
                     Nav.go(PageKind.home);
                 }
                 top-bar.focus-search();
+                return accept;
+            }
+            // Settings' own search (on Settings only, not under a menu or a dialog): the page
+            // scrolls to its top and the field there takes the keys, its text selected.
+            if e.modifiers.control && !e.modifiers.alt && !e.modifiers.meta && (e.text == "f" || e.text == "F") {
+                Shortcuts.used(ShortcutKind.search-settings);
+                if Nav.page == PageKind.settings && !root.overlay-open {
+                    SettingsSearch.focus-asks += 1;
+                }
                 return accept;
             }
             // Lyrics on or off, as the bar's microphone does (off any page, Now playing opens
@@ -469,6 +478,7 @@ export component AppWindow inherits Window {
                     if by-key {
                         root.navigate-by-key();
                     }
+                    TopBarData.picked-by-key = by-key;
                     TopBarData.pick(i);
                     keys.focus();
                 }

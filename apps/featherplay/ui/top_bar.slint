@@ -2,12 +2,13 @@
 // the search field. Ctrl+K focuses it, Enter searches, Escape clears it then leaves it (the
 // window's key handler), × clears it. The query is filled by `src/top_bar.rs` on every page shown.
 // While the user types, suggestions drop down under the field (`src/suggest.rs`): Down and
-// Up move through them, Enter picks the one highlighted, Escape closes them first.
+// Up move through them, Enter picks the one highlighted, Escape closes them first. After the
+// music, after a divider, come up to three settings that match (`settings/search.rs`).
 import { Theme, Icons, Curves } from "theme.slint";
 import { Icon, Body, Cover } from "parts.slint";
 
 // What a suggestion row is.
-export enum SuggestionKind { query, history, song, album, artist, playlist }
+export enum SuggestionKind { query, history, song, album, artist, playlist, setting }
 
 export struct Suggestion {
     kind: SuggestionKind,
@@ -15,7 +16,8 @@ export struct Suggestion {
     // `rest`; the query is the two together. A result: its title, `rest` empty.
     title: string,
     rest: string,
-    // A result's line under the title, as YouTube Music writes it: `Song • Daft Punk • 111M plays`.
+    // A result's line under the title, as YouTube Music writes it: `Song • Daft Punk • 111M plays`;
+    // a setting's, `Setting • Playback`.
     subtitle: string,
     cover: image,
 }
@@ -35,6 +37,10 @@ export global TopBarData {
     // first, then the direct results.
     in property <[Suggestion]> suggestions;
     in property <int> completions;
+    // Where the settings start among the rows, after a divider; -1 for none.
+    in property <int> settings-from: -1;
+    // The pick `pick` is called for was made with the keyboard.
+    in-out property <bool> picked-by-key;
     // The rows are wanted. Set by Rust when an answer for the field's text lands; cleared by
     // Escape, Enter, a pick, a click outside them and a page change.
     in-out property <bool> suggesting;
@@ -102,7 +108,7 @@ component SuggestionRow inherits Rectangle {
             horizontal-stretch: 1;
         }
     }
-    if !root.completion: Cover {
+    if !root.completion && root.item.kind != SuggestionKind.setting: Cover {
         x: Theme.s2;
         y: (parent.height - self.height) / 2;
         width: 40px;
@@ -110,6 +116,22 @@ component SuggestionRow inherits Rectangle {
         radius: Theme.r-s;
         round: root.item.kind == SuggestionKind.artist;
         source: root.item.cover;
+    }
+    // A setting: Settings' own gear from the sidebar, on a tile in the cover's place.
+    if root.item.kind == SuggestionKind.setting: Rectangle {
+        x: Theme.s2;
+        y: (parent.height - self.height) / 2;
+        width: 40px;
+        height: 40px;
+        border-radius: Theme.r-m;
+        background: Theme.selected;
+        Icon {
+            width: 20px;
+            height: 20px;
+            commands: Icons.gear;
+            stroke: Theme.text2;
+            stroke-width: 1.5px;
+        }
     }
     if !root.completion: VerticalLayout {
         x: 60px;
@@ -193,7 +215,7 @@ component SuggestionsPanel inherits Rectangle {
         y: root.nudge;
         padding: Theme.s2;
         for item[i] in TopBarData.suggestions: VerticalLayout {
-            if i == TopBarData.completions && i > 0: Divider { }
+            if (i == TopBarData.completions || i == TopBarData.settings-from) && i > 0: Divider { }
             SuggestionRow {
                 item: item;
                 enabled: root.open;
@@ -212,7 +234,7 @@ component SuggestionsPanel inherits Rectangle {
 }
 
 // A key of a shortcut hint: its label in a small rounded cap with a hairline edge.
-component Keycap inherits Rectangle {
+export component Keycap inherits Rectangle {
     in property <string> text;
     height: 20px;
     min-width: self.height;

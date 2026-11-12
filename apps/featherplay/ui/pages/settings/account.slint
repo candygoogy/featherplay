@@ -1,6 +1,6 @@
 // Settings' Account section: the music account, updates, and About.
 import { Nav, PageKind } from "../../nav.slint";
-import { SettingKey, SettingsData } from "data.slint";
+import { SettingId, SettingKey, SettingsData } from "data.slint";
 import { Group, RowButton, SettingRow, ToggleRow } from "rows.slint";
 import { SessionStore, SignInData } from "../sign_in.slint";
 
@@ -9,10 +9,12 @@ export component AccountSection inherits Group {
     in property <int> made;
     property <bool> confirm-sign-out: false;
     title: @tr("Account");
+    section: 7;
     if root.made >= 3: VerticalLayout {
         SettingRow {
             divider: false;
             label: @tr("Music account");
+            search: SettingId.account;
             detail: !SettingsData.signed-in ? @tr("Not signed in.")
                 : root.confirm-sign-out ? @tr("Sign out? The saved session is deleted; the music keeps playing.")
                 : SignInData.session-store == SessionStore.credential-manager ? @tr("Signed in. The session is kept in Windows Credential Manager.")
@@ -41,12 +43,14 @@ export component AccountSection inherits Group {
         }
         ToggleRow {
             label: @tr("Check for updates");
+            search: SettingId.check-for-updates;
             detail: @tr("Once a day, and when songs keep failing to play, ask GitHub whether a newer featherplay is out. Off, featherplay only checks when you click Check for updates in About.");
             key: SettingKey.check-for-updates;
             checked: SettingsData.check-for-updates;
         }
         ToggleRow {
             label: @tr("Install updates automatically");
+            search: SettingId.install-updates;
             detail: @tr("Download a newer version in the background, check it, and install it when you click Restart to update. Only for the installed featherplay, not the portable exe.");
             key: SettingKey.install-updates;
             checked: SettingsData.install-updates;
@@ -54,6 +58,7 @@ export component AccountSection inherits Group {
         }
         SettingRow {
             label: @tr("About featherplay");
+            search: SettingId.about;
             detail: @tr("Version, licences and credits.");
             RowButton {
                 label: @tr("About");

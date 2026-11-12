@@ -1,18 +1,21 @@
 // Settings' Scrobbling section: Last.fm and ListenBrainz.
-import { LastfmState, ListenBrainzState, SettingKey, SettingsData, SettingsDialog } from "data.slint";
+import { LastfmState, ListenBrainzState, SettingId, SettingKey, SettingsData, SettingsDialog } from "data.slint";
 import { Group, RowButton, SettingRow, ToggleRow } from "rows.slint";
 
 export component ScrobblingSection inherits Group {
     title: @tr("Scrobbling");
+    section: 3;
     ToggleRow {
         divider: false;
         label: @tr("Scrobble");
+        search: SettingId.scrobbling;
         detail: @tr("Send what you play to Last.fm and ListenBrainz, once you've played half a track or 4 minutes of it.");
         key: SettingKey.scrobbling;
         checked: SettingsData.scrobbling;
     }
     ToggleRow {
         label: @tr("Scrobble other media");
+        search: SettingId.scrobble-other-media;
         detail: @tr("Also scrobble user uploads and podcasts, not only songs and official music videos.");
         key: SettingKey.scrobble-other-media;
         checked: SettingsData.scrobble-other-media;
@@ -20,6 +23,7 @@ export component ScrobblingSection inherits Group {
     }
     ToggleRow {
         label: @tr("Use alternative titles");
+        search: SettingId.alternative-titles;
         detail: @tr("Send the video's original title rather than the translated or romanised one shown here.");
         key: SettingKey.alternative-titles;
         checked: SettingsData.alternative-titles;
@@ -27,6 +31,7 @@ export component ScrobblingSection inherits Group {
     }
     ToggleRow {
         label: @tr("Use alternative artists");
+        search: SettingId.alternative-artists;
         detail: @tr("Send the artist from the video's tags, spelled as the label has it, rather than the first artist shown.");
         key: SettingKey.alternative-artists;
         checked: SettingsData.alternative-artists;
@@ -34,6 +39,7 @@ export component ScrobblingSection inherits Group {
     }
     SettingRow {
         label: "Last.fm";
+        search: SettingId.lastfm;
         detail: SettingsData.lastfm-message != "" ? SettingsData.lastfm-message
             : SettingsData.lastfm-state == LastfmState.signed-in ? @tr("Connected. Scrobbles go to your Last.fm profile.")
             : SettingsData.lastfm-state == LastfmState.opening ? @tr("Opening Last.fm in your browser…")
@@ -65,6 +71,7 @@ export component ScrobblingSection inherits Group {
     }
     if SettingsData.lastfm-state == LastfmState.signed-in: ToggleRow {
         label: @tr("Scrobble to Last.fm");
+        search: SettingId.scrobble-lastfm;
         detail: @tr("Off keeps the connection.");
         key: SettingKey.scrobble;
         checked: SettingsData.scrobble;
@@ -72,6 +79,7 @@ export component ScrobblingSection inherits Group {
     }
     SettingRow {
         label: "ListenBrainz";
+        search: SettingId.listenbrainz;
         detail: SettingsData.listenbrainz-message != "" ? SettingsData.listenbrainz-message
             : SettingsData.listenbrainz-state == ListenBrainzState.checking ? @tr("Checking the token with ListenBrainz…")
             : SettingsData.listenbrainz-state == ListenBrainzState.signed-in ? @tr("Connected. Listens go to your ListenBrainz profile.")
@@ -91,6 +99,7 @@ export component ScrobblingSection inherits Group {
     }
     if SettingsData.listenbrainz-state == ListenBrainzState.signed-in: ToggleRow {
         label: @tr("Scrobble to ListenBrainz");
+        search: SettingId.scrobble-listenbrainz;
         detail: @tr("Off keeps the token.");
         key: SettingKey.listenbrainz;
         checked: SettingsData.listenbrainz;

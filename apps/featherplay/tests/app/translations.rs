@@ -323,8 +323,9 @@ const NOT_TRANSLATED: &[&str] = &[
     "cookie: SID=…; HSID=…; SAPISID=…",
     "scoop update featherplay",
     "K",
-    // Keys on the shortcuts list.
+    // Keys on the shortcuts list (F also on Settings' search field).
     "R",
+    "F",
     // Slint's `AboutSlint`, which shows them untranslated (`made_with_slint.slint`).
     "#MadeWithSlint",
     "Version 1.18.1\nhttps://slint.dev/",

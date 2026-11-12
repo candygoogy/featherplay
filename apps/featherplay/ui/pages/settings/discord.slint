@@ -2,7 +2,7 @@
 // them where the page has room (`discord_card.slint`).
 import { Theme, Curves } from "../../theme.slint";
 import { Body } from "../../parts.slint";
-import { DiscordPart, DiscordState, SettingKey, SettingsData } from "data.slint";
+import { DiscordPart, DiscordState, SettingId, SettingKey, SettingsData, SettingsSearch } from "data.slint";
 import { DeviceRow, Group, RowButton, Rows, SettingRow, Switch, ToggleRow } from "rows.slint";
 import { DiscordPane } from "discord_card.slint";
 
@@ -77,6 +77,7 @@ export component DiscordSection inherits Group {
     in property <length> scrolled;
     in property <length> discord-top;
     title: @tr("Discord");
+    section: 4;
     // Two columns while the card fits beside the options: the rows on the left,
     // the card's lane on the right, the card placed over the layout. Otherwise
     // the rows alone.
@@ -100,6 +101,7 @@ export component DiscordSection inherits Group {
                         SettingRow {
                             divider: false;
                             label: @tr("Discord status");
+                            search: SettingId.discord;
                             detail: SettingsData.discord-state == DiscordState.unavailable ? @tr("This build has no Discord app ID.")
                                 : !SettingsData.discord ? @tr("Show \"Listening to\" with the track on your Discord profile.")
                                 : SettingsData.discord-state == DiscordState.connected ? @tr("Connected to Discord.")
@@ -115,6 +117,7 @@ export component DiscordSection inherits Group {
                                 Switch {
                                     checked: SettingsData.discord;
                                     label: @tr("Discord status");
+                                    setting: SettingId.discord;
                                     enabled: SettingsData.discord-state != DiscordState.unavailable;
                                     toggled(on) => { SettingsData.toggled(SettingKey.discord, on); }
                                 }
@@ -124,6 +127,7 @@ export component DiscordSection inherits Group {
                     if SettingsData.discord: VerticalLayout {
                         ToggleRow {
                             label: @tr("Reconnect automatically");
+                            search: SettingId.discord-auto-reconnect;
                             detail: @tr("When Discord isn't running or restarts, try again while music plays.");
                             key: SettingKey.discord-auto-reconnect;
                             checked: SettingsData.discord-auto-reconnect;
@@ -134,6 +138,7 @@ export component DiscordSection inherits Group {
                             option: 2;
                             SettingRow {
                                 label: @tr("Clear activity");
+                                search: SettingId.discord-clear;
                                 detail: @tr("Remove the track from your profile until the next one starts or you resume.");
                                 RowButton {
                                     label: @tr("Clear");
@@ -148,6 +153,7 @@ export component DiscordSection inherits Group {
                             option: 3;
                             SettingRow {
                                 label: @tr("Clear after a pause");
+                                search: SettingId.discord-clear-on-pause;
                                 detail: @tr("Remove the track when paused this long.");
                                 MinutesStepper {
                                     minutes: SettingsData.discord-clear-minutes;
@@ -158,6 +164,7 @@ export component DiscordSection inherits Group {
                                     Switch {
                                         checked: SettingsData.discord-clear-on-pause;
                                         label: @tr("Clear after a pause");
+                                        setting: SettingId.discord-clear-on-pause;
                                         toggled(on) => { SettingsData.toggled(SettingKey.discord-clear-on-pause, on); }
                                     }
                                 }
@@ -169,6 +176,7 @@ export component DiscordSection inherits Group {
                             option: 4;
                             ToggleRow {
                                 label: @tr("Play song button");
+                                search: SettingId.discord-play-button;
                                 detail: @tr("A button under the activity that opens the song in a browser.");
                                 key: SettingKey.discord-play-button;
                                 checked: SettingsData.discord-play-button;
@@ -180,6 +188,7 @@ export component DiscordSection inherits Group {
                             option: 5;
                             ToggleRow {
                                 label: @tr("Links");
+                                search: SettingId.discord-links;
                                 detail: @tr("The title opens the song, the artist their page and the cover the album.");
                                 key: SettingKey.discord-links;
                                 checked: SettingsData.discord-links;
@@ -191,9 +200,10 @@ export component DiscordSection inherits Group {
                             option: 6;
                             SettingRow {
                                 label: @tr("Time");
+                                search: SettingId.discord-time;
                                 detail: @tr("What your profile shows of the track's time while it plays.");
                             }
-                            VerticalLayout {
+                            if !SettingsSearch.hit(SettingId.discord-time).hidden: VerticalLayout {
                                 padding-bottom: Theme.s2;
                                 for t[i] in [@tr("Progress bar"), @tr("Time elapsed only"), @tr("No time")]: DeviceRow {
                                     name: t;
@@ -208,9 +218,10 @@ export component DiscordSection inherits Group {
                             option: 7;
                             SettingRow {
                                 label: @tr("Status text");
+                                search: SettingId.discord-status-text;
                                 detail: @tr("What your status says in member lists and DMs.");
                             }
-                            VerticalLayout {
+                            if !SettingsSearch.hit(SettingId.discord-status-text).hidden: VerticalLayout {
                                 padding-bottom: Theme.s2;
                                 for t[i] in [@tr("Listening to featherplay"), @tr("Listening to the artist"), @tr("Listening to the song title")]: DeviceRow {
                                     name: t;

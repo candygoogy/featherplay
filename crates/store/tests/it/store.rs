@@ -80,6 +80,7 @@ fn settings_defaults_when_missing() {
             playback_speed: 100,
             tooltips: true,
             dns_over_https: false,
+            settings_in_suggestions: true,
         }
     );
     assert_eq!(s, Settings::default());
@@ -153,6 +154,7 @@ fn settings_roundtrip() {
         playback_speed: 125,
         tooltips: false,
         dns_over_https: true,
+        settings_in_suggestions: false,
     };
     s.save(&p).unwrap();
     assert!(p.config.join("settings.toml").is_file());

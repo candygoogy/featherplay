@@ -106,6 +106,7 @@ mod search_link;
 mod search_paste;
 mod search_suggestions;
 mod settings_index;
+mod settings_search;
 mod shortcut_list;
 mod side_panel;
 mod sidebar_chips;

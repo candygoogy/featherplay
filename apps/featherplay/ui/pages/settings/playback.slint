@@ -1,43 +1,50 @@
 // Settings' Playback section.
 import { Player } from "../../player.slint";
-import { SettingKey, SettingsData } from "data.slint";
+import { SettingId, SettingKey, SettingsData } from "data.slint";
 import { Group, RowChips, SettingRow, ToggleRow } from "rows.slint";
 
 export component PlaybackSection inherits Group {
     title: @tr("Playback");
+    section: 0;
     ToggleRow {
         divider: false;
         label: @tr("Prefer song versions");
+        search: SettingId.prefer-song-versions;
         detail: @tr("Some uploads are music videos with intros or skits in the audio. Play the song version instead when there is one.");
         key: SettingKey.prefer-song-versions;
         checked: SettingsData.prefer-song-versions;
     }
     ToggleRow {
         label: @tr("Autoplay similar songs when a list ends");
+        search: SettingId.autoplay;
         detail: @tr("When a playlist, album or other list ends, play on with songs like its last one. Off, the list starts again from the top. Repeat all always starts it again.");
         key: SettingKey.autoplay;
         checked: SettingsData.autoplay;
     }
     ToggleRow {
         label: @tr("Skip non-music in radio");
+        search: SettingId.skip-non-music;
         detail: @tr("Radio and autoplay leave out user uploads and podcast episodes. Tracks you pick always play.");
         key: SettingKey.skip-non-music;
         checked: SettingsData.skip-non-music;
     }
     ToggleRow {
         label: @tr("Skip non-music parts");
+        search: SettingId.sponsorblock;
         detail: @tr("Skips the intros and outros SponsorBlock users marked in music videos.");
         key: SettingKey.sponsorblock;
         checked: SettingsData.sponsorblock;
     }
     ToggleRow {
         label: @tr("Skip songs I've disliked");
+        search: SettingId.skip-disliked;
         detail: @tr("Playlists, albums and radio move past songs you've disliked. A song you pick yourself still plays.");
         key: SettingKey.skip-disliked;
         checked: SettingsData.skip-disliked;
     }
     SettingRow {
         label: @tr("Skip silence");
+        search: SettingId.skip-silence;
         detail: @tr("Skips the silence before a song starts and after it ends. Everywhere also shortens silences of 2 seconds or more inside a song.");
         RowChips {
             labels: [@tr("Off"), @tr("Start and end"), @tr("Everywhere")];
@@ -47,6 +54,7 @@ export component PlaybackSection inherits Group {
     }
     SettingRow {
         label: @tr("Crossfade");
+        search: SettingId.crossfade;
         detail: @tr("The end of a song fades into the next. Songs from the same album play without a fade, and Next and Previous cut.");
         RowChips {
             labels: [@tr("Off"), @tr("{} s", 2), @tr("{} s", 5), @tr("{} s", 8), @tr("{} s", 12)];
@@ -56,12 +64,14 @@ export component PlaybackSection inherits Group {
     }
     if SettingsData.crossfade != 0: ToggleRow {
         label: @tr("Fade on skip");
+        search: SettingId.fade-on-skip;
         detail: @tr("Next, Previous and a click on another song fade over 2 seconds instead of cutting.");
         key: SettingKey.fade-on-skip;
         checked: SettingsData.fade-on-skip;
     }
     SettingRow {
         label: @tr("Playback speed");
+        search: SettingId.playback-speed;
         detail: @tr("Faster or slower, at the same pitch. While it isn't 1×, the player bar shows it.");
         RowChips {
             labels: Player.speed-labels;
@@ -71,6 +81,7 @@ export component PlaybackSection inherits Group {
     }
     SettingRow {
         label: @tr("Volume step");
+        search: SettingId.volume-step;
         detail: @tr("How much the mouse wheel and the Up and Down keys change the volume.");
         RowChips {
             labels: [@tr("{} %", 1), @tr("{} %", 2), @tr("{} %", 5), @tr("{} %", 10)];
@@ -80,6 +91,7 @@ export component PlaybackSection inherits Group {
     }
     ToggleRow {
         label: @tr("Look up YouTube directly");
+        search: SettingId.dns-over-https;
         detail: SettingsData.youtube-proxied ? @tr("A proxy is set, and it finds YouTube's servers itself, so this has no effect.")
             : @tr("Asks a secure DNS service (Google's, or else Cloudflare's) where YouTube's servers are, instead of your network's DNS. Turn on if songs can't play because a DNS service routes YouTube abroad.");
         key: SettingKey.dns-over-https;

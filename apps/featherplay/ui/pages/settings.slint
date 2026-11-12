@@ -4,11 +4,15 @@
 // (`SettingsDialogLayer`), which also lists the keyboard shortcuts (over any page). Filled and
 // applied by `src/pages/settings.rs`; changes apply at once and are saved by the controller.
 // The sections, their shared rows and the dialogs are in `settings/`; this file lays out the
-// page around them.
-import { Theme } from "../theme.slint";
+// page around them. The search field in the header filters the rows (`SettingsSearch`):
+// only the sections with rows found stay, the index lists them with their counts, and with
+// none found the page says so.
+import { Theme, Icons } from "../theme.slint";
 import { Body, PageTitle } from "../parts.slint";
-import { ListenBrainzState, SettingsData, SettingsDialog } from "settings/data.slint";
+import { EmptyState } from "content.slint";
+import { ListenBrainzState, SettingId, SettingsData, SettingsDialog, SettingsSearch } from "settings/data.slint";
 import { Rows } from "settings/rows.slint";
+import { SettingsSearchField } from "settings/search_field.slint";
 import { Dialog, DialogField } from "settings/dialog.slint";
 import { EqualizerDialog } from "settings/equalizer.slint";
 import { ShortcutsDialog } from "settings/shortcuts.slint";
@@ -22,14 +26,17 @@ import { WindowSection } from "settings/window.slint";
 import { AccountSection } from "settings/account.slint";
 import { SessionStore, SignInData } from "sign_in.slint";
 
-export { SettingKey, DiscordState, LocalApiState, LastfmState, ListenBrainzState, AccentSwatch, DiscordPreview, DiscordPart, SettingsDialog, SettingsData } from "settings/data.slint";
+export { SettingKey, DiscordState, LocalApiState, LastfmState, ListenBrainzState, AccentSwatch, DiscordPreview, DiscordPart, SettingsDialog, SettingsData, SettingId, SettingsSearch, TextMark, RowHit } from "settings/data.slint";
 export { Dialog, DialogField } from "settings/dialog.slint";
 
 // An entry of Settings' section index: the section's name, marked while it's in view.
-// The marked entry wears the accent's tonal fill, as the selected chip and tab do.
+// The marked entry wears the accent's tonal fill, as the selected chip and tab do. While
+// the search filters the page, the rows it found in the section are counted on the right.
 component SectionLink inherits Rectangle {
     in property <string> text;
     in property <bool> active;
+    // 0 for none shown.
+    in property <int> count;
     callback clicked();
     height: Rows.link-h;
     border-radius: Theme.r-m;
@@ -47,12 +54,23 @@ component SectionLink inherits Rectangle {
     }
     Body {
         x: Theme.s3;
-        width: parent.width - 2 * Theme.s3;
+        width: parent.width - 2 * Theme.s3 - (root.count > 0 ? 24px : 0px);
         height: parent.height;
         text: root.text;
         color: root.active ? Theme.text1 : Theme.text2;
         font-weight: root.active ? 600 : 400;
         vertical-alignment: center;
+    }
+    if root.count > 0: Body {
+        x: parent.width - Theme.s3 - self.width;
+        width: 24px;
+        height: parent.height;
+        text: root.count;
+        font-size: Theme.t-meta;
+        color: root.active ? Theme.text2 : Theme.text3;
+        horizontal-alignment: right;
+        vertical-alignment: center;
+        accessible-role: none;
     }
 }
 
@@ -95,7 +113,7 @@ export component SettingsPage inherits Rectangle {
     property <length> beside-card-w: max(root.card-min, min(root.card-w, root.wide-panel - 2 * Rows.inset - root.card-gap - root.options-ease));
     // Where the Discord rows start in the scrolled content, and how much of the page shows
     // above the player bar and the fade over its top (`bar-fade` in app.slint).
-    property <length> discord-top: col.y + discord-section.y + Rows.title-h + Theme.s3 + Rows.pad-top;
+    property <length> discord-top: col.y + discord-section.y + Rows.gap + Rows.title-h + Theme.s3 + Rows.pad-top;
     property <length> view-h: flick.height - Theme.bar-clear - Theme.s5;
     // How many of the sections below the fold (Discord, Window, Account) are made: one
     // more each tick after the page's first frame, not all with it. Making and laying out
@@ -109,34 +127,93 @@ export component SettingsPage inherits Rectangle {
         triggered => { root.made += 1; }
     }
 
-    // Where each section starts in the scrolled content, in the index's order.
+    // Where each section's title is in the scrolled content, in the index's order (a
+    // section the search hides is where the next one shown starts).
     property <[length]> tops: [
-        col.y + playback-section.y,
-        col.y + sound-section.y,
-        col.y + lyrics-section.y,
-        col.y + scrobbling-section.y,
-        col.y + discord-section.y,
-        col.y + local-api-section.y,
-        col.y + window-section.y,
-        col.y + account-section.y,
+        col.y + playback-section.y + Rows.gap,
+        col.y + sound-section.y + Rows.gap,
+        col.y + lyrics-section.y + Rows.gap,
+        col.y + scrobbling-section.y + Rows.gap,
+        col.y + discord-section.y + Rows.gap,
+        col.y + local-api-section.y + Rows.gap,
+        col.y + window-section.y + Rows.gap,
+        col.y + account-section.y + Rows.gap,
     ];
+    // Whether section `i` shows: all of them, unless the search found none of its rows.
+    pure function shown(i: int) -> bool {
+        return !SettingsSearch.active || SettingsSearch.counts[i] > 0;
+    }
+    // The first and the last section shown.
+    property <int> first-shown: root.shown(0) ? 0 : root.shown(1) ? 1 : root.shown(2) ? 2
+        : root.shown(3) ? 3 : root.shown(4) ? 4 : root.shown(5) ? 5 : root.shown(6) ? 6 : 7;
+    property <int> last-shown: root.shown(7) ? 7 : root.shown(6) ? 6 : root.shown(5) ? 5
+        : root.shown(4) ? 4 : root.shown(3) ? 3 : root.shown(2) ? 2 : root.shown(1) ? 1 : 0;
     // The section in view, derived from the scroll position (nothing is timed): the last one
-    // whose top has passed a third of the way down the visible page, or the last section once
-    // the page is scrolled to its end.
+    // shown whose top has passed a third of the way down the visible page, or the last one
+    // shown once the page is scrolled to its end.
     property <length> scrolled: -flick.content-y;
     property <length> max-scroll: max(0px, flick.content-height - flick.height);
-    property <length> reading-line: root.scrolled + (flick.height - Theme.bar-clear) / 3;
-    property <int> in-view: root.max-scroll > 0 && root.scrolled >= root.max-scroll - 1px ? 7
-        : root.reading-line >= root.tops[7] ? 7
-        : root.reading-line >= root.tops[6] ? 6
-        : root.reading-line >= root.tops[5] ? 5
-        : root.reading-line >= root.tops[4] ? 4
-        : root.reading-line >= root.tops[3] ? 3
-        : root.reading-line >= root.tops[2] ? 2
-        : root.reading-line >= root.tops[1] ? 1 : 0;
+    property <length> reading-offset: (flick.height - Theme.bar-clear) / 3;
+    property <length> reading-line: root.scrolled + root.reading-offset;
+    pure function passed(i: int) -> bool {
+        return root.shown(i) && root.reading-line >= root.tops[i];
+    }
+    property <int> in-view: root.max-scroll > 0 && root.scrolled >= root.max-scroll - 1px ? root.last-shown
+        : root.passed(7) ? 7
+        : root.passed(6) ? 6
+        : root.passed(5) ? 5
+        : root.passed(4) ? 4
+        : root.passed(3) ? 3
+        : root.passed(2) ? 2
+        : root.passed(1) ? 1 : root.first-shown;
     // Brings section `i`'s title near the top (as far as the page scrolls).
     function go-to(i: int) {
         flick.content-y = -min(max(0px, root.tops[i] - Theme.s5), root.max-scroll);
+    }
+
+    // Ctrl+F (the window's key handler): the page's top, where the field is, and the keys in it.
+    property <int> focus-asks: SettingsSearch.focus-asks;
+    changed focus-asks => {
+        flick.content-y = 0;
+        field.focus-input();
+    }
+
+    // A search suggestion picked: once every section is made and laid out, the page asks
+    // the row where it is, and the next tick brings it to the reading line (a third of the
+    // way down, where the index reads which section is in view), as far as the page
+    // scrolls. It's lit a moment (`LitFill` in rows.slint), then fades. A page opened
+    // otherwise has nothing to bring into view.
+    property <int> revealed;
+    property <int> scrolled-for;
+    init => {
+        if !SettingsSearch.lit-on {
+            root.revealed = SettingsSearch.lit-asks;
+        }
+        root.scrolled-for = SettingsSearch.lit-measure;
+    }
+    Timer {
+        interval: 1ms;
+        running: root.made >= 3 && root.revealed != SettingsSearch.lit-asks;
+        triggered => {
+            root.revealed = SettingsSearch.lit-asks;
+            SettingsSearch.lit-measure += 1;
+        }
+    }
+    Timer {
+        interval: 1ms;
+        running: SettingsSearch.lit-measured == SettingsSearch.lit-measure && root.scrolled-for != SettingsSearch.lit-measure;
+        triggered => {
+            root.scrolled-for = SettingsSearch.lit-measure;
+            // The row's top in the scrolled content, against the column it's in.
+            let top = SettingsSearch.lit-y - col.absolute-position.y + col.y;
+            flick.content-y = -min(max(0px, top - root.reading-offset), root.max-scroll);
+            SettingsSearch.lit-shown = true;
+        }
+    }
+    Timer {
+        interval: 1200ms;
+        running: SettingsSearch.lit-on;
+        triggered => { SettingsSearch.lit-on = false; }
     }
 
     flick := Flickable {
@@ -149,10 +226,35 @@ export component SettingsPage inherits Rectangle {
             y: Theme.page-top;
             width: root.col-w;
             height: self.preferred-height;
-            spacing: Theme.s7;
+            // Each group keeps its own gap above it (`Rows.gap`), so one the search hides
+            // leaves none.
+            spacing: 0;
 
-            PageTitle {
-                text: @tr("Settings");
+            // The title, and the search field right-aligned to the column's edge, centred
+            // on the title's line.
+            Rectangle {
+                height: title.height;
+                title := PageTitle {
+                    x: 0;
+                    width: parent.width - field.width - Theme.s4;
+                    text: @tr("Settings");
+                }
+                field := SettingsSearchField {
+                    x: parent.width - self.width;
+                    y: (parent.height - self.height) / 2;
+                    // Typing puts the page back at its top.
+                    edited => { flick.content-y = 0; }
+                }
+            }
+
+            // Nothing found: the app's empty state, where the first section's title would be.
+            if SettingsSearch.active && SettingsSearch.total == 0: VerticalLayout {
+                padding-top: Rows.gap;
+                EmptyState {
+                    glyph: Icons.search;
+                    title: @tr("No settings match “{}”", SettingsSearch.query);
+                    line: @tr("Check the spelling, or try a word for what the setting does.");
+                }
             }
 
             playback-section := PlaybackSection { }
@@ -189,17 +291,26 @@ export component SettingsPage inherits Rectangle {
     // The section index, at wide windows. It rises with the first section until it reaches
     // the page's top, then stays there while the sections scroll past.
     // Its first entry's label is level with the first group's title.
+    // While the search filters the page, only the sections shown, each with its count.
     if root.indexed: VerticalLayout {
         x: root.block-x;
         y: max(Theme.page-top, root.tops[0] + flick.content-y + (Rows.title-h - Rows.link-h) / 2);
         width: root.index-w;
-        spacing: 2px;
         accessible-role: list;
         accessible-label: @tr("Settings sections");
-        for name[i] in [@tr("Playback"), @tr("Sound"), @tr("Lyrics"), @tr("Scrobbling"), @tr("Discord"), @tr("Local API"), @tr("Window"), @tr("Account")]: SectionLink {
-            text: name;
-            active: i == root.in-view;
-            clicked => { root.go-to(i); }
+        for name[i] in [@tr("Playback"), @tr("Sound"), @tr("Lyrics"), @tr("Scrobbling"), @tr("Discord"), @tr("Local API"), @tr("Window"), @tr("Account")]: Rectangle {
+            property <bool> shown: root.shown(i);
+            // The 2 px between the entries is below each one.
+            height: self.shown ? Rows.link-h + 2px : 0px;
+            visible: self.shown;
+            SectionLink {
+                y: 0;
+                height: Rows.link-h;
+                text: name;
+                count: SettingsSearch.active ? SettingsSearch.counts[i] : 0;
+                active: i == root.in-view;
+                clicked => { root.go-to(i); }
+            }
         }
     }
 

@@ -1,13 +1,15 @@
 // Settings' Sound section. Its Custom… chip opens the Equalizer dialog (`equalizer.slint`).
 import { Theme } from "../../theme.slint";
-import { SettingKey, SettingsData } from "data.slint";
+import { SettingId, SettingKey, SettingsData, SettingsSearch } from "data.slint";
 import { DeviceRow, Group, RowChips, SettingRow, ToggleRow } from "rows.slint";
 
 export component SoundSection inherits Group {
     title: @tr("Sound");
+    section: 1;
     SettingRow {
         divider: false;
         label: @tr("Equalizer");
+        search: SettingId.equalizer;
         detail: @tr("Shapes the sound of every song. Custom… lets you set each band.");
         RowChips {
             labels: [@tr("Off"), @tr("Bass"), @tr("Treble"), @tr("Vocal"), @tr("Custom…")];
@@ -17,6 +19,7 @@ export component SoundSection inherits Group {
     }
     SettingRow {
         label: @tr("Even out loudness");
+        search: SettingId.loudness;
         detail: @tr("Brings quiet parts up and loud parts down, for low volume or a noisy room. Strong flattens a lot.");
         RowChips {
             labels: [@tr("Off"), @tr("Light"), @tr("Strong")];
@@ -26,12 +29,14 @@ export component SoundSection inherits Group {
     }
     ToggleRow {
         label: @tr("Match song volumes");
+        search: SettingId.match-volumes;
         detail: @tr("Turns louder songs down to the same level, as YouTube Music's own player does.");
         key: SettingKey.match-volumes;
         checked: SettingsData.match-volumes;
     }
     SettingRow {
         label: @tr("Streaming quality");
+        search: SettingId.streaming-quality;
         detail: @tr("High plays Opus, which sounds better than AAC at about the same data use. Standard always plays AAC at 128 kbps. Songs already loaded keep their quality.");
         RowChips {
             labels: [@tr("High"), @tr("Standard")];
@@ -41,9 +46,10 @@ export component SoundSection inherits Group {
     }
     SettingRow {
         label: @tr("Output device");
+        search: SettingId.output-device;
         detail: @tr("If the device goes away, playback pauses and moves to the system default.");
     }
-    VerticalLayout {
+    if !SettingsSearch.hit(SettingId.output-device).hidden: VerticalLayout {
         padding-bottom: Theme.s2;
         for d[i] in SettingsData.devices: DeviceRow {
             name: d;

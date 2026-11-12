@@ -1,15 +1,17 @@
 // Settings' Local API section: the API server, with its port and token, and Amuse.
 import { Body } from "../../parts.slint";
-import { LocalApiState, SettingKey, SettingsData } from "data.slint";
+import { LocalApiState, SettingId, SettingKey, SettingsData } from "data.slint";
 import { Field, Group, RowButton, Rows, SettingRow, ToggleRow } from "rows.slint";
 
 export component LocalApiSection inherits Group {
     title: @tr("Local API");
+    section: 5;
     // Made with the page: off, as it mostly is, it's two rows.
     VerticalLayout {
         ToggleRow {
             divider: false;
             label: @tr("API server");
+            search: SettingId.local-api;
             detail: !SettingsData.local-api ? @tr("Let stream overlays, Stream Deck and scripts on this PC show what's playing and control playback. Tools made for Pear's API Server work too.")
                 : SettingsData.local-api-state == LocalApiState.failed ? SettingsData.local-api-message
                 : SettingsData.local-api-state == LocalApiState.running ? @tr("On at http://127.0.0.1:{}. Only apps on this PC that have the token can use it.", SettingsData.local-api-port)
@@ -20,6 +22,7 @@ export component LocalApiSection inherits Group {
         if SettingsData.local-api: VerticalLayout {
             SettingRow {
                 label: @tr("Port");
+                search: SettingId.local-api-port;
                 detail: SettingsData.local-api-port-error != "" ? SettingsData.local-api-port-error
                     : @tr("26538 is the one Pear Desktop uses, so its tools find featherplay.");
                 Field {
@@ -32,6 +35,7 @@ export component LocalApiSection inherits Group {
             }
             SettingRow {
                 label: @tr("Access token");
+                search: SettingId.local-api-token;
                 detail: @tr("Apps send it as \"Authorization: Bearer\" and the token. It stays hidden here, so it doesn't show on stream. Regenerate disconnects the apps using the old one.");
                 Body {
                     text: SettingsData.local-api-token;
@@ -52,6 +56,7 @@ export component LocalApiSection inherits Group {
         }
         ToggleRow {
             label: @tr("Amuse");
+            search: SettingId.amuse;
             detail: !SettingsData.amuse ? @tr("Lets Amuse show what's playing. It needs no token: any app on this PC can see it, but no website other than Amuse's.")
                 : SettingsData.amuse-state == LocalApiState.failed ? SettingsData.amuse-message
                 : SettingsData.amuse-state == LocalApiState.running ? @tr("On at http://127.0.0.1:9863. It needs no token: any app on this PC can see it, but no website other than Amuse's.")

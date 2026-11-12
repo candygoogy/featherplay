@@ -165,6 +165,9 @@ pub struct Settings {
     /// looked up over DNS over HTTPS instead of the system's DNS (`featherplay_proxy::doh`),
     /// for networks whose DNS sends YouTube abroad. Does nothing through a proxy.
     pub dns_over_https: bool,
+    /// "Show settings in search suggestions" (Settings > Window): the top bar's suggestions
+    /// end with the settings that match (on by default).
+    pub settings_in_suggestions: bool,
 }
 
 /// The Equalizer setting: off, one of three presets, or the user's own bands.
@@ -399,6 +402,7 @@ impl Default for Settings {
             playback_speed: Settings::NORMAL_SPEED,
             tooltips: true,
             dns_over_https: false,
+            settings_in_suggestions: true,
         }
     }
 }

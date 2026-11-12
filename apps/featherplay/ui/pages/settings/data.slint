@@ -33,6 +33,7 @@ export enum SettingKey {
     match-volumes,
     tooltips,
     dns-over-https,
+    settings-in-suggestions,
 }
 
 // The Discord connection, live from the presence worker.
@@ -125,6 +126,126 @@ export enum SettingsDialog {
     equalizer,
     // The keyboard shortcuts (over any page: Ctrl+/ opens it from anywhere).
     shortcuts,
+}
+
+// The rows Settings' search finds, in the page's order: each row names itself with its id,
+// and `src/pages/settings/search.rs` keeps the table of what each one is found by.
+export enum SettingId {
+    none,
+    // Playback.
+    prefer-song-versions,
+    autoplay,
+    skip-non-music,
+    sponsorblock,
+    skip-disliked,
+    skip-silence,
+    crossfade,
+    fade-on-skip,
+    playback-speed,
+    volume-step,
+    dns-over-https,
+    // Sound.
+    equalizer,
+    loudness,
+    match-volumes,
+    streaming-quality,
+    output-device,
+    // Lyrics.
+    lyrics,
+    lyrics-lrclib,
+    // Scrobbling.
+    scrobbling,
+    scrobble-other-media,
+    alternative-titles,
+    alternative-artists,
+    lastfm,
+    scrobble-lastfm,
+    listenbrainz,
+    scrobble-listenbrainz,
+    // Discord.
+    discord,
+    discord-auto-reconnect,
+    discord-clear,
+    discord-clear-on-pause,
+    discord-play-button,
+    discord-links,
+    discord-time,
+    discord-status-text,
+    // Local API.
+    local-api,
+    local-api-port,
+    local-api-token,
+    amuse,
+    // Window.
+    close-action,
+    tray-click-opens-window,
+    appearance,
+    language,
+    accent,
+    notifications,
+    tooltips,
+    settings-in-suggestions,
+    shortcuts,
+    hotkeys,
+    // Account.
+    account,
+    check-for-updates,
+    install-updates,
+    about,
+}
+
+// A matched word's place in a text, in bytes, for its mark.
+export struct TextMark {
+    start: int,
+    end: int,
+}
+
+// What the search makes of one row (`SettingsSearch.hit`). The default is the row as it
+// always shows: the field empty, or the row found with nothing to mark.
+export struct RowHit {
+    // Not found: the row takes no room.
+    hidden: bool,
+    // The first row its group shows while filtering: no hairline above it.
+    first: bool,
+    title-marks: [TextMark],
+    // The line the marks are for: they show only while the row's line reads the same.
+    line: string,
+    line-marks: [TextMark],
+    // Found by a hidden keyword alone: `Matches “…”` under the row's text, and its marks.
+    hint: string,
+    hint-marks: [TextMark],
+}
+
+// Settings' search: the field in the page's header, and the row a top bar suggestion opens.
+// Filled by `src/pages/settings/search.rs`.
+export global SettingsSearch {
+    // The field's text.
+    in-out property <string> query;
+    // The page is filtered (two letters or more).
+    in property <bool> active;
+    // Each section's rows found, in the index's order.
+    in property <[int]> counts: [0, 0, 0, 0, 0, 0, 0, 0];
+    in property <int> total;
+    // Ctrl+F on Settings: the page scrolls to its top and the field takes the keys. Counts up.
+    in-out property <int> focus-asks;
+    // The row a suggestion opened, lit for a moment (`lit-on`, then fading), and whether it
+    // was picked with the keyboard (then its switch takes the keys with its ring).
+    in property <SettingId> lit;
+    in-out property <bool> lit-on;
+    // The page has brought the lit row into view (its switch takes the keys then).
+    in-out property <bool> lit-shown;
+    in property <bool> lit-by-key;
+    // Counts up with each pick: the page brings the row to its reading line once.
+    in property <int> lit-asks;
+    // Bringing the lit row into view: the page asks (`lit-measure` counts up), the row writes
+    // where its top is in the window and answers with the same count (`lit-measured`).
+    in-out property <int> lit-measure;
+    in-out property <int> lit-measured;
+    in-out property <length> lit-y;
+    // The user changed the field's text.
+    callback edited(string);
+    // Row `id` as the search has it.
+    pure callback hit(SettingId) -> RowHit;
 }
 
 export global SettingsData {
@@ -228,6 +349,8 @@ export global SettingsData {
     in property <bool> on-windows: true;
     // "Show tooltips": the bar's buttons name themselves and their shortcut on a rest.
     in property <bool> tooltips: true;
+    // "Show settings in search suggestions": the top bar's suggestions end with settings.
+    in property <bool> settings-in-suggestions: true;
     in property <Appearance> appearance;
     // The Language setting: Windows default, English, then the bundled languages by their
     // own names (Rust fills both lists); `language` is the picked one's index.

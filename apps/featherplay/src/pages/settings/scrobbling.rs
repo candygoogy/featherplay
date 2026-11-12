@@ -31,6 +31,8 @@ pub fn lastfm_changed(ctx: &Rc<Ctx>, status: LastfmStatus, message: Option<Strin
         SETTINGS.with(|s| s.borrow_mut().lastfm_enabled = on);
         data.set_scrobble(on);
     }
+    // Signed in, the page has Scrobble to Last.fm.
+    super::search::refresh(&ui);
 }
 
 /// Whether the user's own Last.fm API key is stored.
@@ -56,6 +58,7 @@ pub fn listenbrainz_changed(ctx: &Rc<Ctx>, status: ListenBrainzStatus, message: 
         SETTINGS.with(|s| s.borrow_mut().listenbrainz_enabled = on);
         data.set_listenbrainz(on);
     }
+    super::search::refresh(&ui);
 }
 
 /// `--snapshot settings-lastfm-keys` and `settings-listenbrainz`: the page with a dialog open.

@@ -72,6 +72,8 @@ pub enum Change {
     TrayClickOpensWindow(bool),
     /// "Show tooltips": the player bar's buttons name themselves when the pointer rests.
     Tooltips(bool),
+    /// "Show settings in search suggestions": the top bar's suggestions end with settings.
+    SettingsInSuggestions(bool),
     /// The equalizer's choice and the Custom bands (kept while another choice is picked).
     Equalizer(Equalizer, [i8; 5]),
     /// "Even out loudness", the compressor.
@@ -137,6 +139,7 @@ impl Change {
             Change::StreamingQuality(v) => s.streaming_quality = v,
             Change::TrayClickOpensWindow(v) => s.tray_click_opens_window = v,
             Change::Tooltips(v) => s.tooltips = v,
+            Change::SettingsInSuggestions(v) => s.settings_in_suggestions = v,
             Change::Equalizer(v, bands) => {
                 s.equalizer = v;
                 s.equalizer_bands = bands;
@@ -315,6 +318,7 @@ mod tests {
             Change::StreamingQuality(StreamingQuality::Standard),
             Change::TrayClickOpensWindow(true),
             Change::Tooltips(false),
+            Change::SettingsInSuggestions(false),
             Change::Equalizer(Equalizer::Custom, [4, 0, -3, 0, 2]),
             Change::Loudness(Loudness::Strong),
             Change::MatchVolumes(false),
@@ -351,6 +355,7 @@ mod tests {
         assert_eq!(s.streaming_quality, StreamingQuality::Standard);
         assert!(s.tray_click_opens_window);
         assert!(!s.tooltips);
+        assert!(!s.settings_in_suggestions);
         assert_eq!(
             (s.equalizer, s.equalizer_bands),
             (Equalizer::Custom, [4, 0, -3, 0, 2])

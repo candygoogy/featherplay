@@ -1,9 +1,11 @@
 // Settings' shared controls and rows: the switch, the text field, a group of rows on its
 // panel, a setting's row, and the radio rows (the output devices, and the lists of choices).
+// A row names itself to the search (`SettingsSearch`, `settings/search.rs`) by its
+// `SettingId`: it takes no room while the search hides it, and marks the words found.
 import { Theme } from "../../theme.slint";
 import { Body, Display, Pill } from "../../parts.slint";
 import { Chips } from "../content.slint";
-import { SettingKey, SettingsData } from "data.slint";
+import { TextMark, RowHit, SettingId, SettingKey, SettingsData, SettingsSearch } from "data.slint";
 
 // An on/off switch: filled with the accent when on, outlined when off (Windows' toggle
 // shape). Enter toggles it when focused. Space doesn't: a click leaves the keys on it, and
@@ -12,7 +14,31 @@ export component Switch inherits Rectangle {
     in property <bool> checked;
     in property <string> label;
     in property <bool> enabled: true;
+    // The row it's the control of: picked from the search suggestions, the switch takes the
+    // keys, ringed only when the pick was made with the keyboard.
+    in property <SettingId> setting: SettingId.none;
     callback toggled(bool);
+    // Once the page has brought its row into view.
+    property <bool> picked: root.setting != SettingId.none && SettingsSearch.lit == root.setting && SettingsSearch.lit-shown;
+    // Has the keys without its ring, until a key is pressed in it.
+    property <bool> quiet;
+    property <bool> focused: focus.has-focus;
+    changed focused => {
+        if !self.focused {
+            root.quiet = false;
+        }
+    }
+    changed picked => {
+        if root.picked {
+            root.take-keys();
+        }
+    }
+    function take-keys() {
+        if root.enabled {
+            focus.focus();
+            root.quiet = !SettingsSearch.lit-by-key;
+        }
+    }
     width: 40px;
     height: 22px;
     accessible-role: switch;
@@ -47,6 +73,7 @@ export component Switch inherits Rectangle {
         focus := FocusScope {
             enabled: root.enabled;
             key-pressed(e) => {
+                root.quiet = false;
                 if e.text == Key.Return {
                     root.flip();
                     return accept;
@@ -63,7 +90,7 @@ export component Switch inherits Rectangle {
             }
         }
         // The focus ring, just outside the track.
-        if focus.has-focus: Rectangle {
+        if focus.has-focus && !root.quiet: Rectangle {
             x: -3px;
             y: -3px;
             width: parent.width + 6px;
@@ -165,6 +192,8 @@ export global Rows {
     // The detail under a label: a step brighter than `text2`, still from it (so it keeps the
     // cover's tint while the accent follows it), for a clearer read on the panel.
     out property <color> detail: Theme.text2.mix(Theme.text1, 0.75);
+    // Above each group's title (and between the page's title and the first group).
+    out property <length> gap: Theme.s7;
 }
 
 // A group heading above its rows.
@@ -174,37 +203,80 @@ component GroupTitle inherits Display {
     vertical-alignment: center;
 }
 
-// A group of settings: its title, then its rows on a rounded panel. The panel can reach
-// `extend` past the column on the right (Discord, with its card beside the options).
-export component Group inherits VerticalLayout {
+// A group of settings: the gap above it, its title, then its rows on a rounded panel. The
+// panel can reach `extend` past the column on the right (Discord, with its card beside the
+// options). While the search finds none of its rows, the group takes no room, gap and all.
+export component Group inherits Rectangle {
     in property <string> title;
     in property <length> extend: 0px;
-    spacing: Theme.s3;
-    GroupTitle {
-        text: root.title;
-    }
-    Rectangle {
-        min-width: max(0px, rows.min-width - root.extend);
-        min-height: rows.min-height;
-        preferred-height: rows.preferred-height;
+    // Its place in the section index (0 Playback … 7 Account).
+    in property <int> section;
+    property <bool> hidden: SettingsSearch.active && SettingsSearch.counts[root.section] == 0;
+    min-width: lay.min-width;
+    min-height: root.hidden ? 0px : lay.min-height;
+    preferred-height: root.hidden ? 0px : lay.preferred-height;
+    vertical-stretch: 0;
+    visible: !root.hidden;
+    lay := VerticalLayout {
+        padding-top: Rows.gap;
+        spacing: Theme.s3;
+        GroupTitle {
+            text: root.title;
+        }
         Rectangle {
-            x: 0;
-            width: parent.width + root.extend;
-            height: parent.height;
-            accessible-role: groupbox;
-            accessible-label: root.title;
-            border-radius: Theme.r-l;
-            background: Theme.panel;
-            border-width: 1px;
-            border-color: Theme.card-edge;
-            rows := VerticalLayout {
-                padding-top: Rows.pad-top;
-                padding-bottom: 4px;
-                padding-left: Rows.inset;
-                padding-right: Rows.inset;
-                @children
+            min-width: max(0px, rows.min-width - root.extend);
+            min-height: rows.min-height;
+            preferred-height: rows.preferred-height;
+            Rectangle {
+                x: 0;
+                width: parent.width + root.extend;
+                height: parent.height;
+                accessible-role: groupbox;
+                accessible-label: root.title;
+                border-radius: Theme.r-l;
+                background: Theme.panel;
+                border-width: 1px;
+                border-color: Theme.card-edge;
+                rows := VerticalLayout {
+                    padding-top: Rows.pad-top;
+                    padding-bottom: 4px;
+                    padding-left: Rows.inset;
+                    padding-right: Rows.inset;
+                    @children
+                }
             }
         }
+    }
+}
+
+// Text with the search's words marked. Slint draws no fill behind part of a Text, so each
+// mark is a read-only TextInput laid over the text with the same font and width, its own
+// letters invisible and the mark its selection: the renderer places a selection on the
+// same glyphs, across wrapped lines, as when text is selected. Only text with marks has
+// any: a row as it always shows is its plain Text.
+export component MarkedText inherits Body {
+    in property <[TextMark]> marks;
+    for mark in root.marks: TextInput {
+        width: parent.width;
+        height: parent.height;
+        text: root.text;
+        font-family: root.font-family;
+        font-size: root.font-size;
+        font-weight: root.font-weight;
+        wrap: root.wrap;
+        horizontal-alignment: root.horizontal-alignment;
+        vertical-alignment: root.vertical-alignment;
+        read-only: true;
+        enabled: false;
+        // As good as transparent: a fully transparent one isn't drawn at all, selection and
+        // all (`draw_text_input` in Slint's renderers).
+        color: #00000001;
+        selection-background-color: Theme.accent-tonal-hover;
+        selection-foreground-color: Theme.text1;
+        accessible-role: none;
+        property <TextMark> at: mark;
+        init => { self.set-selection-offsets(mark.start, mark.end); }
+        changed at => { self.set-selection-offsets(self.at.start, self.at.end); }
     }
 }
 
@@ -223,33 +295,77 @@ component RowDivider {
 component RowLabel inherits VerticalLayout {
     in property <string> label;
     in property <string> detail;
+    in property <RowHit> hit;
+    property <[TextMark]> none;
     alignment: center;
     spacing: Theme.s1;
-    Body {
+    MarkedText {
         text: root.label;
+        marks: root.hit.title-marks;
         font-size: Theme.t-body-l;
         font-weight: 500;
         overflow: clip;
         wrap: word-wrap;
     }
-    if root.detail != "": Body {
+    if root.detail != "": MarkedText {
         text: root.detail;
+        // The line the search marked, unless the row has since changed it.
+        marks: root.hit.line == root.detail ? root.hit.line-marks : root.none;
         font-size: Theme.t-meta;
         color: Rows.detail;
         overflow: clip;
         wrap: word-wrap;
     }
+    // Found by a hidden keyword alone: which one, quietly.
+    if root.hit.hint != "": MarkedText {
+        text: root.hit.hint;
+        marks: root.hit.hint-marks;
+        font-size: Theme.t-meta;
+        color: Theme.text3;
+        overflow: clip;
+        wrap: word-wrap;
+    }
 }
 
-// One setting: its name and a line of detail on the left, the control on the right.
+// The fill over a row a search suggestion opened: it holds while `lit-on`, then fades.
+component LitFill inherits Rectangle {
+    border-radius: Theme.r-m;
+    background: Theme.accent-tonal-faint;
+    opacity: SettingsSearch.lit-on ? 1 : 0;
+    animate opacity {
+        duration: SettingsSearch.lit-on ? 0ms : (Theme.moving ? 600ms : 0ms);
+        easing: ease-out;
+    }
+}
+
+// One setting: its name and a line of detail on the left, the control on the right. While
+// the search hides it, it takes no room.
 export component SettingRow inherits Rectangle {
     in property <string> label;
     in property <string> detail;
     in property <bool> divider: true;
-    min-height: lay.min-height;
-    preferred-height: lay.preferred-height;
+    // Its row in the search's table (none: never hidden, nothing marked).
+    in property <SettingId> search: SettingId.none;
+    property <RowHit> hit: SettingsSearch.hit(root.search);
+    property <bool> lit: root.search != SettingId.none && SettingsSearch.lit == root.search;
+    min-height: root.hit.hidden ? 0px : lay.min-height;
+    preferred-height: root.hit.hidden ? 0px : lay.preferred-height;
+    visible: !root.hit.hidden;
+    // Picked from the suggestions: when the page asks, where it is, for the page to bring
+    // it into view.
+    property <int> measure: root.lit ? SettingsSearch.lit-measure : 0;
+    changed measure => {
+        SettingsSearch.lit-y = self.absolute-position.y;
+        SettingsSearch.lit-measured = self.measure;
+    }
+    // Across the row, 12 px in from the panel's edges.
+    if root.lit: LitFill {
+        x: -Theme.s3;
+        width: parent.width + 2 * Theme.s3;
+        height: parent.height;
+    }
     RowDivider {
-        shown: root.divider;
+        shown: root.divider && !root.hit.first;
     }
     lay := HorizontalLayout {
         padding-top: Rows.pad-y;
@@ -259,6 +375,7 @@ export component SettingRow inherits Rectangle {
             horizontal-stretch: 1;
             label: root.label;
             detail: root.detail;
+            hit: root.hit;
         }
         VerticalLayout {
             alignment: center;
@@ -281,6 +398,7 @@ export component ToggleRow inherits SettingRow {
         checked: root.checked;
         label: root.label;
         enabled: root.enabled;
+        setting: root.search;
         toggled(on) => { SettingsData.toggled(root.key, on); }
     }
 }

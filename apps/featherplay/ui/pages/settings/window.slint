@@ -1,9 +1,10 @@
 // Settings' Window section: closing, the tray, the appearance, the language, the accent
-// and its custom colour, notifications, tooltips, the shortcuts and the global hotkeys.
+// and its custom colour, notifications, tooltips, the search's suggestions, the shortcuts
+// and the global hotkeys.
 import { Theme, Appearance } from "../../theme.slint";
 import { Body } from "../../parts.slint";
 import { Chips } from "../content.slint";
-import { SettingKey, SettingsData, SettingsDialog } from "data.slint";
+import { SettingId, SettingKey, SettingsData, SettingsDialog, SettingsSearch } from "data.slint";
 import { DeviceRow, Field, Group, RowButton, SettingRow, ToggleRow } from "rows.slint";
 
 // An accent: a dot of its colour, ringed in `text1` when it's the one picked.
@@ -202,15 +203,17 @@ export component WindowSection inherits Group {
     // How many of the sections below the fold the page has made (`SettingsPage.made`).
     in property <int> made;
     title: @tr("Window");
+    section: 6;
     if root.made >= 2: VerticalLayout {
         // Without a tray, closing the window quits: nothing to choose.
         if SettingsData.has-tray: VerticalLayout {
             SettingRow {
                 divider: false;
                 label: @tr("When I close the window");
+                search: SettingId.close-action;
                 detail: @tr("In the tray, the music keeps going; quit from the tray icon's menu.");
             }
-            VerticalLayout {
+            if !SettingsSearch.hit(SettingId.close-action).hidden: VerticalLayout {
                 padding-bottom: Theme.s2;
                 for t[i] in [@tr("Ask"), @tr("Close featherplay"), @tr("Keep playing in the tray")]: DeviceRow {
                     name: t;
@@ -220,6 +223,7 @@ export component WindowSection inherits Group {
             }
             ToggleRow {
                 label: @tr("Turn off the mini player");
+                search: SettingId.tray-click-opens-window;
                 detail: @tr("Clicking the tray icon opens the main window instead. Right-click always shows the menu.");
                 key: SettingKey.tray-click-opens-window;
                 checked: SettingsData.tray-click-opens-window;
@@ -229,6 +233,7 @@ export component WindowSection inherits Group {
             // The first row has no line above it.
             divider: SettingsData.has-tray;
             label: @tr("Appearance");
+            search: SettingId.appearance;
             detail: SettingsData.on-windows ? @tr("System follows Windows' light or dark mode.") : @tr("System follows your desktop's light or dark mode.");
             Chips {
                 labels: [@tr("appearance" => "Dark"), @tr("appearance" => "Light"), @tr("appearance" => "System")];
@@ -240,6 +245,7 @@ export component WindowSection inherits Group {
         }
         SettingRow {
             label: @tr("Language");
+            search: SettingId.language;
             detail: SettingsData.on-windows ? @tr("Windows default follows Windows' display language when featherplay has it, and English otherwise.")
                 : @tr("System default follows the system's language when featherplay has it, and English otherwise.");
             Chips {
@@ -250,6 +256,7 @@ export component WindowSection inherits Group {
         }
         SettingRow {
             label: @tr("Accent");
+            search: SettingId.accent;
             detail: @tr("From the cover takes the colour of the song that's playing, and a plain grey when the art has none.");
             Chips {
                 labels: [@tr("From the cover")];
@@ -270,21 +277,31 @@ export component WindowSection inherits Group {
                 clicked => { SettingsData.pick-accent(SettingsData.accents.length + 1); }
             }
         }
-        if SettingsData.accent == SettingsData.accents.length + 1: CustomPicker { }
+        if SettingsData.accent == SettingsData.accents.length + 1 && !SettingsSearch.hit(SettingId.accent).hidden: CustomPicker { }
         if SettingsData.has-notifications: ToggleRow {
             label: @tr("Track notifications");
+            search: SettingId.notifications;
             detail: @tr("Show a notification when the track changes.");
             key: SettingKey.notifications;
             checked: SettingsData.notifications;
         }
         ToggleRow {
             label: @tr("Show tooltips");
+            search: SettingId.tooltips;
             detail: @tr("Names and shortcuts when you rest the pointer on a button.");
             key: SettingKey.tooltips;
             checked: SettingsData.tooltips;
         }
+        ToggleRow {
+            label: @tr("Show settings in search suggestions");
+            search: SettingId.settings-in-suggestions;
+            detail: @tr("Matching settings appear below the music results in the search bar.");
+            key: SettingKey.settings-in-suggestions;
+            checked: SettingsData.settings-in-suggestions;
+        }
         SettingRow {
             label: @tr("Keyboard shortcuts");
+            search: SettingId.shortcuts;
             detail: @tr("Play, skip, search and move around without the mouse.");
             RowButton {
                 label: @tr("Show shortcuts");
@@ -294,12 +311,13 @@ export component WindowSection inherits Group {
         // Wayland lets no app hear keys pressed in another.
         if SettingsData.has-hotkeys: ToggleRow {
             label: @tr("Global hotkeys");
+            search: SettingId.hotkeys;
             detail: SettingsData.on-windows ? @tr("Play, pause and skip from any app. Each key needs Ctrl, Alt, Shift or Win.")
                 : @tr("Play, pause and skip from any app. Each key needs Ctrl, Alt, Shift or Super.");
             key: SettingKey.hotkeys;
             checked: SettingsData.hotkeys;
         }
-        if SettingsData.has-hotkeys && SettingsData.hotkeys: VerticalLayout {
+        if SettingsData.has-hotkeys && SettingsData.hotkeys && !SettingsSearch.hit(SettingId.hotkeys).hidden: VerticalLayout {
             padding-bottom: Theme.s3;
             HotkeyRow {
                 label: @tr("Play or pause");
