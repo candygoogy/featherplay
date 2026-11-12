@@ -140,7 +140,9 @@ fn scroll_on_to_the_last_option(scene: &Scene, height: u32) -> LogicalRect {
 
 #[test]
 fn hovering_an_option_lights_the_part_of_the_card_it_changes() {
-    let scene = settings(1568, 3400);
+    // Tall enough for every option above the player bar whatever the body font: in Noto Sans
+    // (Linux without Segoe UI) "Status text" sat under the bar at 3400.
+    let scene = settings(1568, 4000);
     let data = scene.ui.global::<SettingsData>();
     assert_eq!(data.get_discord_lit(), DiscordPart::None);
 
