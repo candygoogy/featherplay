@@ -20,8 +20,9 @@ use crate::router::Page;
 use crate::sidebar;
 use crate::ui::{AppWindow, HomeData, MoreState};
 
-/// Pages of the feed per Home load, the first ones included.
-pub const MAX_PAGES: usize = 6;
+/// Pages of the feed per Home load, the first ones included. A cap against a token loop,
+/// not a design limit: a signed-in feed ran to 6 pages on 2026-11-12, so 10 leaves room.
+pub const MAX_PAGES: usize = 10;
 /// Pages `YtMusic::home` fetches: the first and the continuation fetched with it.
 const FIRST_PAGES: usize = 2;
 
