@@ -3,8 +3,9 @@ name: Release
 # On a `v*` tag: build featherplay.exe for x64 and for ARM64 with the release profile from
 # Cargo.toml (fat LTO, one codegen unit, strip, opt-level "z", the audio crates at 3), check
 # their size budget, package a per-user installer for each with Inno Setup, build the Linux
-# AppImage and .tar.gz (x86_64, experimental), and attach them all to a draft GitHub Release
-# with their SHA256 checksums. Publishing the draft stays a manual step.
+# AppImage and .tar.gz (experimental; x86_64, and aarch64 tested automatically only), and
+# attach them all to a draft GitHub Release with their SHA256 checksums. Publishing the
+# draft stays a manual step.
 #
 # Dry run, from any branch: Actions > Release > Run workflow, or
 #   gh workflow run release.yml --ref <branch>
@@ -16,8 +17,10 @@ name: Release
 #   test         the whole x64 suite, on windows-2025
 #   test-arm64   the `ci` profile, on windows-11-arm
 #   build-arm64  the ARM64 exe, built natively on windows-11-arm after test-arm64
-#   test-linux   the Linux suite, on ubuntu-24.04 (the `ci` profile, as CI's `linux` job)
-#   build-linux  the AppImage and the .tar.gz, on ubuntu-22.04 after test-linux
+#   test-linux   the Linux suite, on ubuntu-24.04 and ubuntu-24.04-arm (the `ci` profile, as
+#                CI's `linux` job)
+#   build-linux  the AppImage and the .tar.gz, on ubuntu-22.04 and ubuntu-22.04-arm after
+#                test-linux
 #   package      the x64 exe, both installers (Inno runs on x64 only), the checksums
 #   publish      the draft release, from package's artifact (tags only)
 #
@@ -30,6 +33,8 @@ name: Release
 #   featherplay-x86_64.AppImage              Linux, x86_64 (experimental); it updates itself in
 #                                            place, so its name carries no version
 #   featherplay-x86_64.tar.gz                the same program as a plain archive
+#   featherplay-aarch64.AppImage             Linux, aarch64 (experimental, tested automatically
+#   featherplay-aarch64.tar.gz               only: CI's ARM64 runner, never by hand)
 #   <each of the above>.sha256               its `sha256sum` line (Scoop's autoupdate reads featherplay.exe.sha256)
 #   SHA256SUMS.txt                           all of them, plus THIRD_PARTY.md: `sha256sum -c SHA256SUMS.txt`
 #   THIRD_PARTY.md                           the licence notices, which a portable exe needs beside it
@@ -215,14 +220,18 @@ jobs:
 
   # The Linux suite, as CI's `linux` job runs it: the `ci` profile (the frame-cost, CPU-time
   # and memory ceilings were set on Windows), the pixel checks that measure the body font
-  # only saving their images, and a session bus of their own. An architecture is a matrix
-  # entry (aarch64: `{ arch: aarch64, runner: ubuntu-24.04-arm }`).
+  # only saving their images, and a session bus of their own. One entry per architecture,
+  # each on its own native runner (aarch64 on GitHub's ARM64 one: the same packages, from
+  # Ubuntu's ports mirror).
   test-linux:
     strategy:
+      fail-fast: false
       matrix:
         include:
           - arch: x86_64
             runner: ubuntu-24.04
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
     permissions:
@@ -245,11 +254,17 @@ jobs:
             libxi-dev libasound2-dev libdbus-1-dev libssl-dev \
             dbus fonts-noto-core fonts-noto-cjk fonts-noto-color-emoji
 
+      # Native to the runner: fails if rustc's host isn't the machine's architecture.
       - name: Rust toolchain
         shell: bash
         run: |
           rustup toolchain install
           rustup show active-toolchain
+          host=$(rustc -vV | sed -n 's/^host: //p')
+          if [ "$host" != "$(uname -m)-unknown-linux-gnu" ]; then
+            echo "::error::rustc's host is '$host' on a $(uname -m) runner"
+            exit 1
+          fi
 
       - uses: taiki-e/install-action@1919c4a95903d2c33e4a221102edca87309fc14b # v2.89.0
         with:
@@ -266,18 +281,22 @@ jobs:
           dbus-run-session -- cargo test --workspace --doc --locked
 
   # The Linux files, made by packaging/linux/build-linux.sh on the oldest Ubuntu image GitHub
-  # has, so the binary needs no newer glibc than that image's (LINUX_MAX_GLIBC). The script
-  # downloads appimagetool and the AppImage runtime, pinned by version and SHA256, checks the
-  # binary's size and glibc, and validates the desktop entry and the AppStream metadata. An
-  # architecture is a matrix entry (aarch64: `{ arch: aarch64, runner: ubuntu-22.04-arm }`);
-  # package takes every `featherplay-linux-*` artifact.
+  # has, for each architecture natively (ubuntu-22.04, and ubuntu-22.04-arm for aarch64), so
+  # the binary needs no newer glibc than that image's (LINUX_MAX_GLIBC, the same on both). The
+  # script downloads appimagetool and the AppImage runtime for the machine's architecture,
+  # pinned by version and SHA256, checks the binary's architecture, size (one budget for both)
+  # and glibc, and validates the desktop entry and the AppStream metadata. package takes every
+  # `featherplay-linux-*` artifact.
   build-linux:
     needs: test-linux
     strategy:
+      fail-fast: false
       matrix:
         include:
           - arch: x86_64
             runner: ubuntu-22.04
+          - arch: aarch64
+            runner: ubuntu-22.04-arm
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
     permissions:
@@ -298,11 +317,17 @@ jobs:
             libxi-dev libasound2-dev libdbus-1-dev libssl-dev \
             desktop-file-utils appstream
 
+      # Native to the runner, as in test-linux.
       - name: Rust toolchain
         shell: bash
         run: |
           rustup toolchain install
           rustup show active-toolchain
+          host=$(rustc -vV | sed -n 's/^host: //p')
+          if [ "$host" != "$(uname -m)-unknown-linux-gnu" ]; then
+            echo "::error::rustc's host is '$host' on a $(uname -m) runner"
+            exit 1
+          fi
 
       # The same secrets as the Windows builds; package warns if they're missing.
       - name: Build
@@ -476,11 +501,16 @@ jobs:
           cp target/linux/featherplay-*.AppImage target/linux/featherplay-*.tar.gz dist/
           cp THIRD_PARTY.md dist/
           cd dist
-          if [ ! -f featherplay-x86_64.AppImage ] || [ ! -f featherplay-x86_64.tar.gz ]; then
-            echo "::error::build-linux's files are missing"
-            exit 1
-          fi
-          linux=(featherplay-*.AppImage featherplay-*.tar.gz)
+          linux=()
+          for arch in x86_64 aarch64; do
+            for f in "featherplay-$arch.AppImage" "featherplay-$arch.tar.gz"; do
+              if [ ! -f "$f" ]; then
+                echo "::error::build-linux's $f is missing"
+                exit 1
+              fi
+              linux+=("$f")
+            done
+          done
           files=(featherplay.exe "$setup" featherplay-arm64.exe "$setup_arm64" "${linux[@]}")
           for f in "${files[@]}"; do
             sha256sum "$f" > "$f.sha256"
@@ -500,10 +530,11 @@ jobs:
             echo "- \`$setup_arm64\`: the installer for ARM64 PCs, such as Snapdragon laptops."
             echo "- \`featherplay.exe\` (x64) and \`featherplay-arm64.exe\` (ARM64): the portable exes. Keep \`THIRD_PARTY.md\` with them; it holds the licence notices."
             echo
-            echo "Linux (experimental), x86_64, for Ubuntu 22.04, Debian 12, Fedora 36 or newer:"
+            echo "Linux (experimental), for Ubuntu 22.04, Debian 12, Fedora 36 or newer:"
             echo
-            echo "- \`featherplay-x86_64.AppImage\`: make it executable and run it. It updates itself."
+            echo "- \`featherplay-x86_64.AppImage\`: for x86_64 PCs. Make it executable and run it. It updates itself."
             echo "- \`featherplay-x86_64.tar.gz\`: the same program as plain files, with a README on installing it. It tells you about updates but doesn't install them."
+            echo "- \`featherplay-aarch64.AppImage\` and \`featherplay-aarch64.tar.gz\`: the same two for 64-bit ARM (aarch64). Experimental, tested automatically only."
             echo
             echo "SHA256:"
             echo
