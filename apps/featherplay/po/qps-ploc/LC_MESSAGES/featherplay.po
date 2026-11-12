@@ -132,8 +132,8 @@ msgid "Some songs here can't play right now. featherplay skips them."
 msgstr "[Some songs here can't play right now. featherplay skips them.]"
 
 #: ../../crates/core/src/failure.rs:132
-msgid "Songs can't play: DNS routes YouTube abroad."
-msgstr "[Songs can't play: DNS routes YouTube abroad.]"
+msgid "Songs can't play: DNS reroutes YouTube."
+msgstr "[Songs can't play: DNS reroutes YouTube.]"
 
 #: ../../crates/core/src/failure.rs:138
 msgid "Look up directly"
