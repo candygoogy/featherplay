@@ -129,7 +129,7 @@ pub fn songs_refused() -> &'static str {
 /// as when a DNS service or filter routes it through its own servers. Short enough to share
 /// the toast with its button, `look_up_directly`.
 pub fn songs_refused_by_network() -> &'static str {
-    crate::tr!("Songs can't play: DNS routes YouTube abroad.")
+    crate::tr!("Songs can't play: DNS reroutes YouTube.")
 }
 
 /// The button of `songs_refused_by_network`'s toast, which turns on "Look up YouTube
