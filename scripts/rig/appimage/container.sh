@@ -22,27 +22,27 @@ chmod 777 "$rig/out"
 trap 'docker rm -f "$name" >/dev/null 2>&1' EXIT
 docker pull -q "$image" >/dev/null
 docker run -d --name "$name" -v "$rig:/rig" -e OUT=/rig/out "$image" sleep infinity >/dev/null
-in() { docker exec "$name" "$@"; }
+in_box() { docker exec "$name" "$@"; }
 
 status=0
-if ! in bash /rig/scripts/packages.sh runtime; then
+if ! in_box bash /rig/scripts/packages.sh runtime; then
     echo "::error::$image: the runtime packages didn't install"
     exit 1
 fi
-if ! in bash /rig/scripts/libs.sh "/rig/release/featherplay-$arch.AppImage"; then
+if ! in_box bash /rig/scripts/libs.sh "/rig/release/featherplay-$arch.AppImage"; then
     echo "::error::$image: the AppImage misses libraries with the runtime packages alone (libs.txt)"
     status=1
 fi
-if ! in bash /rig/scripts/packages.sh rig; then
+if ! in_box bash /rig/scripts/packages.sh rig; then
     echo "::error::$image: the rig's packages didn't install"
     exit 1
 fi
 # Without a sound server run.sh skips the playback test, and says so.
-if ! in bash /rig/scripts/packages.sh sound; then
+if ! in_box bash /rig/scripts/packages.sh sound; then
     echo "::warning::$image: no sound server installed; the playback test is skipped"
 fi
-in sh -c 'mkdir -p /tmp/.X11-unix && chmod 1777 /tmp/.X11-unix'
-in useradd -m tester
+in_box sh -c 'mkdir -p /tmp/.X11-unix && chmod 1777 /tmp/.X11-unix'
+in_box useradd -m tester
 # Offline from here: the app starts signed out with no network, and the update server is
 # on 127.0.0.1 inside the container.
 docker network disconnect bridge "$name"
