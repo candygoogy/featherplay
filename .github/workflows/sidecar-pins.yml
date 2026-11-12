@@ -6,8 +6,8 @@ name: Sidecar pins
 # compares the pins with the latest releases and opens an issue (or comments on the open
 # one) when Deno is a minor version or more behind, or the yt-dlp pin is more than
 # YTDLP_MAX_DAYS older than the latest yt-dlp. Moving a pin means changing its URL and
-# SHA256 together, from that release's own checksum file. There are pins for Windows (x64,
-# ARM64) and Linux (x86_64, aarch64).
+# SHA256 together, from that release's own checksum file; this checks each GitHub pin
+# against that file. There are pins for Windows (x64, ARM64) and Linux (x86_64, aarch64).
 #
 # Each file has a second source, for when GitHub can't be reached: yt-dlp from the site
 # (`ytdlp_mirror`, the same file and pin, put there by the site's build, which reads the pins)
@@ -22,7 +22,7 @@ on:
     - cron: "0 7 * * 1"
   workflow_dispatch:
 
-# contents: read only to check out sidecars.rs (the repository is private).
+# contents: read to check out sidecars.rs; issues: write to open or comment on the issue.
 permissions:
   contents: read
   issues: write
@@ -111,6 +111,42 @@ jobs:
           else
             gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "$body"
           fi
+
+      # A typo in a pin fails every first run on that system: each GitHub pin must be the
+      # hash in its release's checksum file (yt-dlp's SHA2-256SUMS, Deno's `<zip>.sha256sum`).
+      - name: Check the GitHub pins against their releases' checksum files
+        shell: bash
+        run: |
+          set -euo pipefail
+          file=crates/streams/src/sidecars.rs
+          pairs=$(perl -0ne '
+            print "$1 $2\n" while /ytdlp_url:\s*"([^"]+)",\s*ytdlp_sha256:\s*"(\w+)"/g;
+            print "$1 $2\n" while /deno_url:\s*"([^"]+)",\s*deno_sha256:\s*"(\w+)"/g;
+          ' "$file")
+          if [ "$(printf '%s\n' "$pairs" | grep -c .)" -ne 8 ]; then
+            echo "::error::expected 8 GitHub pins in $file, found: $pairs"
+            exit 1
+          fi
+          failed=0
+          while read -r url sha; do
+            want=""
+            case $url in
+              */yt-dlp/yt-dlp/releases/download/*)
+                sums=$(curl -fsSL --retry 2 "${url%/*}/SHA2-256SUMS") || sums=""
+                want=$(awk -v f="${url##*/}" '$2 == f { print $1 }' <<< "$sums") ;;
+              *)
+                # Deno's Windows checksum files are PowerShell's, in capitals.
+                sums=$(curl -fsSL --retry 2 "$url.sha256sum") || sums=""
+                want=$(grep -oiE '[0-9a-f]{64}' <<< "$sums" | head -n 1 | tr 'A-F' 'a-f') || want="" ;;
+            esac
+            if [ -n "$want" ] && [ "$want" = "$sha" ]; then
+              echo "$url matches its release's checksum"
+            else
+              echo "::error::$url: the release's checksum is '${want:-(not found)}', the pin is $sha"
+              failed=1
+            fi
+          done <<< "$pairs"
+          exit $failed
 
       # The app falls back to these when GitHub can't be reached, and deletes a file that
       # doesn't match its pin: a stale site or a changed CDN zip would make the fallback fail.
