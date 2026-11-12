@@ -131,39 +131,43 @@ msgstr ""
 msgid "Some songs here can't play right now. featherplay skips them."
 msgstr ""
 
-#: ../../crates/core/src/failure.rs:131
-msgid "Some songs can't play: a DNS service routes YouTube abroad."
+#: ../../crates/core/src/failure.rs:132
+msgid "Songs can't play: DNS routes YouTube abroad."
 msgstr ""
 
-#: ../../crates/core/src/failure.rs:151
+#: ../../crates/core/src/failure.rs:138
+msgid "Look up directly"
+msgstr ""
+
+#: ../../crates/core/src/failure.rs:158
 msgid "Songs can't play. featherplay is updating its helpers."
 msgstr ""
 
-#: ../../crates/core/src/failure.rs:153
+#: ../../crates/core/src/failure.rs:160
 msgid "Songs can't play. featherplay may need an update."
 msgstr ""
 
-#: ../../crates/core/src/failure.rs:154
+#: ../../crates/core/src/failure.rs:161
 msgid "This song isn't available."
 msgstr ""
 
-#: ../../crates/core/src/failure.rs:155
+#: ../../crates/core/src/failure.rs:162
 msgid "Couldn't play this song. Check your connection."
 msgstr ""
 
-#: ../../crates/core/src/failure.rs:157
+#: ../../crates/core/src/failure.rs:164
 msgid "Couldn't download helpers. Check VPN or proxy."
 msgstr ""
 
-#: ../../crates/core/src/failure.rs:160
+#: ../../crates/core/src/failure.rs:167
 msgid "Your antivirus may have blocked the helpers."
 msgstr ""
 
-#: ../../crates/core/src/failure.rs:163
+#: ../../crates/core/src/failure.rs:170
 msgid "A helper download arrived damaged."
 msgstr ""
 
-#: ../../crates/core/src/failure.rs:166
+#: ../../crates/core/src/failure.rs:173
 msgid "Couldn't save helpers. Is the disk full?"
 msgstr ""
 
@@ -2349,6 +2353,22 @@ msgstr ""
 
 #: ui/pages/settings/playback.slint:74
 msgid "How much the mouse wheel and the Up and Down keys change the volume."
+msgstr ""
+
+#: ui/pages/settings/playback.slint:82
+msgid "Look up YouTube directly"
+msgstr ""
+
+#: ui/pages/settings/playback.slint:83
+msgid ""
+"A proxy is set, and it finds YouTube's servers itself, so this has no effect."
+msgstr ""
+
+#: ui/pages/settings/playback.slint:84
+msgid ""
+"Asks a secure DNS service (Google's, or else Cloudflare's) where YouTube's "
+"servers are, instead of your network's DNS. Turn on if songs can't play "
+"because a DNS service routes YouTube abroad."
 msgstr ""
 
 #: ui/pages/settings/scrobbling.slint:9
