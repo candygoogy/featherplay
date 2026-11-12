@@ -66,6 +66,30 @@ fn log_lines_reach_the_file_without_their_secrets() {
 }
 
 #[test]
+#[cfg(not(windows))]
+fn log_lines_name_no_home_folder() {
+    let dir = scratch("home");
+    diagnostics::init(&dir).expect("init");
+    // This machine's own home, so no path is written into the test.
+    let home = std::env::var("HOME").expect("HOME");
+    featherplay_controller::log!("cache {home}/.cache/featherplay, logs {home}/.local/state");
+    diagnostics::flush();
+
+    let text = read_log(&dir);
+    let user = home.rsplit('/').next().expect("a user folder");
+    assert!(
+        !text.contains(&format!("/{user}/")),
+        "the home folder is in\n{text}"
+    );
+    assert!(
+        text.contains("cache %HOME%/.cache/featherplay, logs %HOME%/.local/state"),
+        "{text}"
+    );
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+#[cfg(windows)]
 fn log_lines_name_no_users_folder() {
     let dir = scratch("profile");
     diagnostics::init(&dir).expect("init");

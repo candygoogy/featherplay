@@ -177,6 +177,10 @@ impl log::Log for Facade {
     fn enabled(&self, m: &log::Metadata<'_>) -> bool {
         let most = if ours(m.target()) {
             log::Level::Info
+        } else if cfg!(target_os = "linux") && m.target().starts_with("arboard") {
+            // Slint's clipboard warns at every start on a compositor without the Wayland
+            // data-control protocol (GNOME's, WSLg's), then uses the X11 one as it should.
+            log::Level::Error
         } else {
             log::Level::Warn
         };

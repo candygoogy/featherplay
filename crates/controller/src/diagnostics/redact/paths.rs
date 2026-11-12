@@ -6,11 +6,19 @@
 //! `X:\Users\<name>` (another account's, a build machine's) becomes `%USERPROFILE%` too. A
 //! match ignores case, takes `\` and `/` (single or doubled, as `{:?}` prints them) alike, and
 //! swallows a `\\?\` prefix.
+//!
+//! On Linux the folder is `HOME`'s: `/home/ada/.cache/featherplay` becomes
+//! `%HOME%/.cache/featherplay`.
 
 use std::sync::OnceLock;
 
 /// The variables, in the order a tie in length is broken.
-const VARS: [&str; 3] = ["LOCALAPPDATA", "APPDATA", "USERPROFILE"];
+#[cfg(windows)]
+const VARS: &[&str] = &["LOCALAPPDATA", "APPDATA", "USERPROFILE"];
+/// Elsewhere the home folder holds the others (`~/.config`, `~/.cache`, `~/.local/state`):
+/// `/home/ada/.cache/featherplay` becomes `%HOME%/.cache/featherplay`.
+#[cfg(not(windows))]
+const VARS: &[&str] = &["HOME"];
 /// What any `X:\Users\<name>` becomes.
 const ANY_PROFILE: &str = "USERPROFILE";
 /// A folder with fewer names (`C:\`) would mask paths that name no one.
@@ -232,6 +240,20 @@ mod tests {
 
     fn masked(text: &str) -> String {
         mask(text, &ada())
+    }
+
+    #[test]
+    fn a_linux_home_is_masked() {
+        let home = Profile::new(&[("HOME", "/home/ada")]);
+        assert_eq!(
+            mask(
+                "config /home/ada/.config/featherplay, logs /home/ada/.local/state/featherplay, \
+                 not /home/adam/x",
+                &home
+            ),
+            "config %HOME%/.config/featherplay, logs %HOME%/.local/state/featherplay, \
+             not /home/adam/x"
+        );
     }
 
     #[test]
