@@ -315,8 +315,11 @@ reports, and compares yt-dlp's latest release with the pin. Both read `sidecars.
 directly, and so does `site/scripts/helpers.mjs`. Keep that in mind before moving the pins.
 
 Helper processes start with no console window and are killed with their future
-(`hidden_command` in `sidecars.rs`). The preprocessing child is tied to a kill-on-close job
-object (`crates/streams/src/native.rs`), so it ends if the app dies.
+(`hidden_command` in `sidecars.rs`). On Windows the preprocessing child is tied to a
+kill-on-close job object (`crates/streams/src/native/players.rs`), so it ends if the app dies.
+On Linux every helper is tied as it starts (`platform::process::end_with_app`: the kernel
+sends it `SIGTERM` when the app ends, however it ends), and starts on a thread that lives as
+long as the app (`spawn_tied`), because the kernel ties a child to the thread that started it.
 
 ## Updates and signing
 

@@ -425,7 +425,7 @@ impl Sidecars {
         }
         let mut cmd = self.command(exe);
         cmd.arg("--version");
-        let out = tokio::time::timeout(VERSION_TIMEOUT, cmd.output())
+        let out = tokio::time::timeout(VERSION_TIMEOUT, output(cmd))
             .await
             .ok()?
             .ok()?;
@@ -473,7 +473,7 @@ impl Sidecars {
         {
             cmd.arg("--proxy").arg(p);
         }
-        let out = match tokio::time::timeout(UPDATE_TIMEOUT, cmd.output()).await {
+        let out = match tokio::time::timeout(UPDATE_TIMEOUT, output(cmd)).await {
             Ok(Ok(out)) => out,
             Ok(Err(e)) => {
                 return Err(ResolveError::ToolFailed {
@@ -508,7 +508,8 @@ impl Sidecars {
 }
 
 /// A command with no console window and no stdin, its output piped, killed if its future
-/// is dropped.
+/// is dropped. On Linux it also ends with the app (`process::end_with_app`); start it with
+/// [`spawn`] or [`output`].
 pub(crate) fn hidden_command(program: &Path) -> tokio::process::Command {
     let mut cmd = tokio::process::Command::new(program);
     cmd.stdin(Stdio::null())
@@ -516,7 +517,24 @@ pub(crate) fn hidden_command(program: &Path) -> tokio::process::Command {
         .stderr(Stdio::piped())
         .kill_on_drop(true);
     featherplay_platform::process::no_console_window(cmd.as_std_mut());
+    featherplay_platform::process::end_with_app(cmd.as_std_mut());
     cmd
+}
+
+/// Starts a [`hidden_command`]. On Linux it starts on the thread that lives as long as the
+/// app (`process::spawn_tied`), which the child's tie to the app needs; elsewhere, here.
+/// Call inside the runtime.
+pub(crate) fn spawn(mut cmd: tokio::process::Command) -> std::io::Result<tokio::process::Child> {
+    let runtime = tokio::runtime::Handle::current();
+    featherplay_platform::process::spawn_tied(move || {
+        let _inside = runtime.enter();
+        cmd.spawn()
+    })
+}
+
+/// Runs a [`hidden_command`] to its end and collects its output, as `Command::output` does.
+pub(crate) async fn output(cmd: tokio::process::Command) -> std::io::Result<std::process::Output> {
+    spawn(cmd)?.wait_with_output().await
 }
 
 /// The version a sidecar's `--version` printed: yt-dlp prints `2026.10.26`, deno

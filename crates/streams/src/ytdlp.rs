@@ -400,8 +400,8 @@ impl YtDlpResolver {
         if !self.sidecars.ytdlp().is_file() || !self.sidecars.deno().is_file() {
             return Err(ResolveError::ToolMissing);
         }
-        let mut cmd = self.command(id, cookies, extractor_args, quality);
-        let out = match tokio::time::timeout(RESOLVE_TIMEOUT, cmd.output()).await {
+        let cmd = self.command(id, cookies, extractor_args, quality);
+        let out = match tokio::time::timeout(RESOLVE_TIMEOUT, crate::sidecars::output(cmd)).await {
             Ok(Ok(out)) => out,
             Ok(Err(e)) if e.kind() == std::io::ErrorKind::NotFound => {
                 return Err(ResolveError::ToolMissing);

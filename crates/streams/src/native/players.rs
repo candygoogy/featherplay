@@ -159,7 +159,7 @@ async fn blocking(
 /// JS goes to its stdin, the preprocessed player comes from its stdout. Killed at
 /// `timeout`, or when the future is dropped.
 async fn run_with_stdin(
-    mut cmd: tokio::process::Command,
+    cmd: tokio::process::Command,
     stdin: &[u8],
     timeout: Duration,
 ) -> Result<String, PreprocessError> {
@@ -167,7 +167,7 @@ async fn run_with_stdin(
         |e: String| PreprocessError::NotStarted(failed(format!("starting the preprocessor: {e}")));
     // Starting a process blocks for as long as an antivirus checks the exe, and a 30 MB one
     // can take a few hundred ms: not on an async thread, where resolves run.
-    let mut child = tokio::task::spawn_blocking(move || cmd.spawn())
+    let mut child = tokio::task::spawn_blocking(move || crate::sidecars::spawn(cmd))
         .await
         .map_err(|e| not_started(e.to_string()))?
         .map_err(|e| not_started(e.to_string()))?;

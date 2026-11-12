@@ -21,6 +21,16 @@ pub fn no_console_window(cmd: &mut Command) {
     cmd.creation_flags(CREATE_NO_WINDOW);
 }
 
+/// Nothing to do on Windows, where a child is tied to the app after it starts, by
+/// [`kill_on_close`]. (Linux ties it as it starts.)
+pub fn end_with_app(_cmd: &mut Command) {}
+
+/// Runs `spawn` here and returns what it returned. (Linux starts tied children on a thread
+/// of their own.)
+pub fn spawn_tied<T: Send + 'static>(spawn: impl FnOnce() -> T + Send + 'static) -> T {
+    spawn()
+}
+
 /// What names a started child to [`kill_on_close`]: its process handle, as
 /// `tokio::process::Child::raw_handle` gives it.
 pub type ChildHandle = RawHandle;
