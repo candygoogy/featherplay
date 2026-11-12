@@ -38,7 +38,12 @@ pub fn choices(with_pseudo: bool) -> Vec<Choice> {
     let mut out = vec![
         Choice {
             code: "",
-            name: tr!("Windows default").into(),
+            name: if cfg!(windows) {
+                tr!("Windows default")
+            } else {
+                tr!("System default")
+            }
+            .into(),
         },
         Choice {
             code: "en",

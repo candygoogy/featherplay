@@ -84,10 +84,12 @@ fn texts_rust_filled_in_follow_a_language_change() {
     scene.settle();
     language::apply(language::PSEUDO);
     let names = scene.ui.global::<SettingsData>().get_language_names();
-    assert_eq!(
-        names.row_data(0).unwrap_or_default().as_str(),
+    let first = if cfg!(windows) {
         "[Windows default]"
-    );
+    } else {
+        "[System default]"
+    };
+    assert_eq!(names.row_data(0).unwrap_or_default().as_str(), first);
 }
 
 #[test]

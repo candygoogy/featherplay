@@ -20,6 +20,7 @@ import { DiscordSection } from "settings/discord.slint";
 import { LocalApiSection } from "settings/local_api.slint";
 import { WindowSection } from "settings/window.slint";
 import { AccountSection } from "settings/account.slint";
+import { SessionStore, SignInData } from "sign_in.slint";
 
 export { SettingKey, DiscordState, LocalApiState, LastfmState, ListenBrainzState, AccentSwatch, DiscordPreview, DiscordPart, SettingsDialog, SettingsData } from "settings/data.slint";
 export { Dialog, DialogField } from "settings/dialog.slint";
@@ -253,7 +254,9 @@ export component SettingsDialogLayer inherits Rectangle {
         width: root.width;
         height: root.height;
         title: @tr("ListenBrainz token");
-        detail: @tr("Paste the user token from listenbrainz.org/settings. featherplay checks it with ListenBrainz, then keeps it in Windows Credential Manager.");
+        // Where the token is kept: the same store as the session (`SignInData`).
+        detail: SignInData.session-store == SessionStore.credential-manager ? @tr("Paste the user token from listenbrainz.org/settings. featherplay checks it with ListenBrainz, then keeps it in Windows Credential Manager.")
+            : @tr("Paste the user token from listenbrainz.org/settings. featherplay checks it with ListenBrainz, then keeps it in your keyring.");
         error: SettingsData.dialog-error;
         ok => { SettingsData.listenbrainz-save(SettingsData.dialog-token); }
         cancel => { SettingsData.close-dialog(); }

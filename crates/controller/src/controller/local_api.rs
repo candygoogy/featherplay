@@ -256,8 +256,12 @@ pub fn amuse_start_error(kind: std::io::ErrorKind) -> String {
             "Port {} is in use, perhaps by Pear Desktop's Amuse plugin. Close that app, then turn Amuse off and on again.",
             AMUSE_PORT
         ),
-        std::io::ErrorKind::PermissionDenied => tr!(
+        std::io::ErrorKind::PermissionDenied if cfg!(windows) => tr!(
             "Windows keeps port {} for itself, so Amuse can't reach featherplay.",
+            AMUSE_PORT
+        ),
+        std::io::ErrorKind::PermissionDenied => tr!(
+            "The system won't let featherplay use port {}, so Amuse can't reach it.",
             AMUSE_PORT
         ),
         _ => tr!(
@@ -274,8 +278,11 @@ pub fn start_error(port: u16, kind: std::io::ErrorKind) -> String {
             "Port {port} is in use by another app (Pear Desktop's API Server uses 26538 too). \
              Close it or pick another port."
         ),
-        std::io::ErrorKind::PermissionDenied => {
+        std::io::ErrorKind::PermissionDenied if cfg!(windows) => {
             format!("Windows keeps port {port} for itself. Pick another port.")
+        }
+        std::io::ErrorKind::PermissionDenied => {
+            format!("The system won't let featherplay use port {port}. Pick another port.")
         }
         _ => format!("The local API couldn't listen on port {port}. Pick another port."),
     }
@@ -384,7 +391,14 @@ mod tests {
         let text = start_error(26538, std::io::ErrorKind::AddrInUse);
         assert!(text.starts_with("Port 26538 is in use"), "{text}");
         let text = start_error(5000, std::io::ErrorKind::PermissionDenied);
-        assert!(text.contains("Windows keeps port 5000"), "{text}");
+        if cfg!(windows) {
+            assert!(text.contains("Windows keeps port 5000"), "{text}");
+        } else {
+            assert!(
+                text.contains("port 5000") && !text.contains("Windows"),
+                "{text}"
+            );
+        }
     }
 
     #[test]
