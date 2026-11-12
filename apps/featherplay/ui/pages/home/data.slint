@@ -1,0 +1,74 @@
+// Home's data from `src/pages/home.rs`: the shelves' shapes and rows, and `HomeData`.
+import { TrackRow, CardItem } from "../../parts.slint";
+
+// How a shelf shows, from what it holds (`home.rs::shape`).
+export enum ShelfShape { cards, songs, mixes, videos, playlists, artists }
+
+// The row after the last shelf: nothing, the next page loading, or its quiet Try again.
+export enum MoreState { idle, loading, failed }
+
+// One shelf of the Home feed, its items as cards; a song grid also has them as rows in `songs`.
+export struct HomeShelfRow {
+    title: string,
+    // Words before the title, in sentence case ("Similar to" Ari Abdul), or "".
+    lead: string,
+    items: [CardItem],
+    songs: [TrackRow],
+    // A round badge for each item, by index (a community playlist's creator), or empty.
+    badges: [image],
+    shape: ShelfShape,
+}
+
+export global HomeData {
+    in property <bool> loading;
+    in property <string> error;
+    // The feed loaded and has no shelves (an identity with no history yet).
+    in property <bool> empty;
+    // The hero: true resumes the session, false features a pick (when there is one).
+    in property <bool> resume;
+    in property <image> hero-cover;
+    // The header's wash from the resumed song's cover, per theme (`home.rs::show_wash`; the
+    // accent's on grey art), already over the ground, opaque; transparent until it's worked
+    // out. Shown only while resuming.
+    in property <color> wash-dark;
+    in property <color> wash-light;
+    // The wash shows behind the top bar (set by `HomePage`, until the page has scrolled the
+    // bar's height): the frame clears the bar's ground and leaves out its fade below, so the
+    // wash runs up behind the search field to the window's top.
+    in-out property <bool> wash-behind-bar;
+    // Resume: the next 3 tracks of the queue.
+    in property <[TrackRow]> next;
+    // Featured: the pick, the heading over the rest ("More from Quick picks"), and 4 more
+    // from that shelf.
+    in property <bool> has-featured;
+    in property <CardItem> featured;
+    in property <string> featured-from;
+    in property <[CardItem]> featured-more;
+    in property <[HomeShelfRow]> shelves;
+    in property <MoreState> more;
+    // How many rows the page has: the top, the shelves, then the next page's row while it
+    // loads or failed.
+    out property <int> row-count: root.shelves.length + 1 + (root.more != MoreState.idle ? 1 : 0);
+    // One entry per row, kept by `home.rs` (`bind_rows`) as one model that only grows or
+    // shrinks at its end, to `row-count`, on `sync-rows`.
+    in property <[int]> rows;
+
+    callback resume-clicked();
+    // Plays the queue from row `i` of `next`.
+    callback play-next(int);
+    callback play-featured();
+    // The featured pick (-1) or one of `featured-more`.
+    callback open-featured(int);
+    // A song card on a shelf: plays it, with radio after it.
+    callback play-song(string);
+    // Fetches the feed again after an error.
+    callback retry();
+    // A card's play button: plays the album, playlist or artist without opening it.
+    callback play-card(CardItem);
+    // The user scrolled near the end: the next page, if one may load now.
+    callback near-end();
+    // Try again after the next page failed.
+    callback retry-more();
+    // The page needs `count` rows: `rows` grows or shrinks to that many at its end.
+    callback sync-rows(/* count */ int);
+}
