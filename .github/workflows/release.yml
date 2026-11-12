@@ -2,20 +2,22 @@ name: Release
 
 # On a `v*` tag: build featherplay.exe for x64 and for ARM64 with the release profile from
 # Cargo.toml (fat LTO, one codegen unit, strip, opt-level "z", the audio crates at 3), check
-# their size budget, package a per-user installer for each with Inno Setup, and attach them
-# to a draft GitHub Release with their SHA256 checksums. Publishing the draft stays a manual
-# step.
+# their size budget, package a per-user installer for each with Inno Setup, build the Linux
+# AppImage and .tar.gz (x86_64, experimental), and attach them all to a draft GitHub Release
+# with their SHA256 checksums. Publishing the draft stays a manual step.
 #
 # Dry run, from any branch: Actions > Release > Run workflow, or
 #   gh workflow run release.yml --ref <branch>
-# It runs every job but the last: tests, both builds, both installers, the checksums and the
-# notes, all uploaded as the run's `release-assets` artifact. It creates no release and no
+# It runs every job but the last: tests, both builds, both installers, the Linux files, the
+# checksums and the notes, all uploaded as the run's `release-assets` artifact. It creates no release and no
 # tag, whatever the branch. Only a pushed `v*` tag runs `publish`.
 #
 # Jobs:
 #   test         the whole x64 suite, on windows-2025
 #   test-arm64   the `ci` profile, on windows-11-arm
 #   build-arm64  the ARM64 exe, built natively on windows-11-arm after test-arm64
+#   test-linux   the Linux suite, on ubuntu-24.04 (the `ci` profile, as CI's `linux` job)
+#   build-linux  the AppImage and the .tar.gz, on ubuntu-22.04 after test-linux
 #   package      the x64 exe, both installers (Inno runs on x64 only), the checksums
 #   publish      the draft release, from package's artifact (tags only)
 #
@@ -25,8 +27,11 @@ name: Release
 #   featherplay-setup-<version>.exe          the installer, x64 (packaging/windows/featherplay.iss)
 #   featherplay-arm64.exe                    the portable exe, ARM64
 #   featherplay-setup-<version>-arm64.exe    the installer, ARM64
-#   <each of the four>.sha256                its `sha256sum` line (Scoop's autoupdate reads featherplay.exe.sha256)
-#   SHA256SUMS.txt                           all four, plus THIRD_PARTY.md: `sha256sum -c SHA256SUMS.txt`
+#   featherplay-x86_64.AppImage              Linux, x86_64 (experimental); it updates itself in
+#                                            place, so its name carries no version
+#   featherplay-x86_64.tar.gz                the same program as a plain archive
+#   <each of the above>.sha256               its `sha256sum` line (Scoop's autoupdate reads featherplay.exe.sha256)
+#   SHA256SUMS.txt                           all of them, plus THIRD_PARTY.md: `sha256sum -c SHA256SUMS.txt`
 #   THIRD_PARTY.md                           the licence notices, which a portable exe needs beside it
 # The release notes list each file's SHA256 as well. One more file is added by hand, never
 # here: SHA256SUMS.txt.minisig, the maintainer's signature on SHA256SUMS.txt, made on their
@@ -58,6 +63,13 @@ env:
   # Opus decoder, from 30 MB on 2026-10-31).
   # The helpers (yt-dlp, Deno) are downloaded at run time and don't count.
   MAX_EXE_BYTES: "32000000"
+  # The Linux binary (stripped; the same one in both Linux files) must stay at 31 MB or
+  # less: 29.3 MB at the first measurement (2026-11-12), before the tray and the media
+  # controls came.
+  MAX_LINUX_BIN_BYTES: "31000000"
+  # The newest glibc the Linux binary may need: that of ubuntu-22.04, where it's built. It
+  # then runs on Ubuntu 22.04, Debian 12, Fedora 36 and anything newer.
+  LINUX_MAX_GLIBC: "2.35"
   # Inno Setup, pinned: the official installer from jrsoftware/issrc's GitHub release, checked
   # against this SHA256 (the release's own asset digest) before it runs.
   INNO_VERSION: "6.7.4"
@@ -201,8 +213,123 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  # The Linux suite, as CI's `linux` job runs it: the `ci` profile (the frame-cost, CPU-time
+  # and memory ceilings were set on Windows), the pixel checks that measure the body font
+  # only saving their images, and a session bus of their own. An architecture is a matrix
+  # entry (aarch64: `{ arch: aarch64, runner: ubuntu-24.04-arm }`).
+  test-linux:
+    strategy:
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-24.04
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    env:
+      RUSTFLAGS: --cfg ci
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The headers the build needs (as in ci.yml), and for the tests a session bus and the
+      # Noto fonts.
+      - name: System packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            pkg-config clang libfontconfig1-dev libfreetype-dev libxkbcommon-dev \
+            libxkbcommon-x11-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev \
+            libxi-dev libasound2-dev libdbus-1-dev libssl-dev \
+            dbus fonts-noto-core fonts-noto-cjk fonts-noto-color-emoji
+
+      - name: Rust toolchain
+        shell: bash
+        run: |
+          rustup toolchain install
+          rustup show active-toolchain
+
+      - uses: taiki-e/install-action@1919c4a95903d2c33e4a221102edca87309fc14b # v2.89.0
+        with:
+          tool: nextest
+
+      - name: Test
+        shell: bash
+        run: |
+          export FEATHERPLAY_HOME="$RUNNER_TEMP/featherplay-home"
+          export FEATHERPLAY_TEST_SHOTS="$RUNNER_TEMP/test-shots"
+          export FEATHERPLAY_PIXELS=unchecked
+          mkdir -p "$FEATHERPLAY_HOME" "$FEATHERPLAY_TEST_SHOTS"
+          dbus-run-session -- cargo nextest run --workspace --locked --profile ci
+          dbus-run-session -- cargo test --workspace --doc --locked
+
+  # The Linux files, made by packaging/linux/build-linux.sh on the oldest Ubuntu image GitHub
+  # has, so the binary needs no newer glibc than that image's (LINUX_MAX_GLIBC). The script
+  # downloads appimagetool and the AppImage runtime, pinned by version and SHA256, checks the
+  # binary's size and glibc, and validates the desktop entry and the AppStream metadata. An
+  # architecture is a matrix entry (aarch64: `{ arch: aarch64, runner: ubuntu-22.04-arm }`);
+  # package takes every `featherplay-linux-*` artifact.
+  build-linux:
+    needs: test-linux
+    strategy:
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-22.04
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The headers the build needs (as in ci.yml), and the checkers for the desktop entry
+      # and the metadata.
+      - name: System packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            pkg-config clang libfontconfig1-dev libfreetype-dev libxkbcommon-dev \
+            libxkbcommon-x11-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev \
+            libxi-dev libasound2-dev libdbus-1-dev libssl-dev \
+            desktop-file-utils appstream
+
+      - name: Rust toolchain
+        shell: bash
+        run: |
+          rustup toolchain install
+          rustup show active-toolchain
+
+      # The same secrets as the Windows builds; package warns if they're missing.
+      - name: Build
+        shell: bash
+        env:
+          LASTFM_API_KEY: ${{ secrets.LASTFM_API_KEY }}
+          LASTFM_API_SECRET: ${{ secrets.LASTFM_API_SECRET }}
+          DISCORD_CLIENT_ID: ${{ secrets.DISCORD_CLIENT_ID }}
+        run: cargo build --release --locked -p featherplay
+
+      - name: Package
+        shell: bash
+        run: |
+          MAX_BIN_BYTES="$MAX_LINUX_BIN_BYTES" MAX_GLIBC="$LINUX_MAX_GLIBC" \
+            TOOLS_DIR="$RUNNER_TEMP/linux-tools" packaging/linux/build-linux.sh --skip-build
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: featherplay-linux-${{ matrix.arch }}
+          path: |
+            target/linux/featherplay-${{ matrix.arch }}.AppImage
+            target/linux/featherplay-${{ matrix.arch }}.tar.gz
+          if-no-files-found: error
+          retention-days: 7
+
   package:
-    needs: [test, build-arm64]
+    needs: [test, build-arm64, build-linux]
     # Pinned rather than windows-latest, so an image change can't move the build under us.
     # (The image ships Inno Setup 6.7.1 too; we install 6.7.4, the version the installer was
     # tested with, so the result doesn't depend on the image.)
@@ -304,6 +431,13 @@ jobs:
           name: featherplay-arm64-exe
           path: target/aarch64-pc-windows-msvc/release
 
+      # Every architecture's AppImage and .tar.gz, from build-linux.
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: featherplay-linux-*
+          path: target/linux
+          merge-multiple: true
+
       # Each exe is the architecture its name says: the PE header's machine field.
       - name: Check the exes' architectures
         shell: bash
@@ -339,9 +473,15 @@ jobs:
           cp target/release/featherplay.exe dist/
           cp "$ARM64_EXE" dist/featherplay-arm64.exe
           cp "target/installer/$setup" "target/installer/$setup_arm64" dist/
+          cp target/linux/featherplay-*.AppImage target/linux/featherplay-*.tar.gz dist/
           cp THIRD_PARTY.md dist/
           cd dist
-          files=(featherplay.exe "$setup" featherplay-arm64.exe "$setup_arm64")
+          if [ ! -f featherplay-x86_64.AppImage ] || [ ! -f featherplay-x86_64.tar.gz ]; then
+            echo "::error::build-linux's files are missing"
+            exit 1
+          fi
+          linux=(featherplay-*.AppImage featherplay-*.tar.gz)
+          files=(featherplay.exe "$setup" featherplay-arm64.exe "$setup_arm64" "${linux[@]}")
           for f in "${files[@]}"; do
             sha256sum "$f" > "$f.sha256"
           done
@@ -359,6 +499,11 @@ jobs:
             echo "- \`$setup\`: the installer for x64 PCs (per user, no admin prompt). It also runs on ARM64 Windows 11, under emulation."
             echo "- \`$setup_arm64\`: the installer for ARM64 PCs, such as Snapdragon laptops."
             echo "- \`featherplay.exe\` (x64) and \`featherplay-arm64.exe\` (ARM64): the portable exes. Keep \`THIRD_PARTY.md\` with them; it holds the licence notices."
+            echo
+            echo "Linux (experimental), x86_64, for Ubuntu 22.04, Debian 12, Fedora 36 or newer:"
+            echo
+            echo "- \`featherplay-x86_64.AppImage\`: make it executable and run it. It updates itself."
+            echo "- \`featherplay-x86_64.tar.gz\`: the same program as plain files, with a README on installing it. It tells you about updates but doesn't install them."
             echo
             echo "SHA256:"
             echo
@@ -403,11 +548,16 @@ jobs:
           version=${GITHUB_REF_NAME#v}
           setup="featherplay-setup-$version.exe"
           setup_arm64="featherplay-setup-$version-arm64.exe"
+          linux=()
+          for f in dist/featherplay-*.AppImage dist/featherplay-*.tar.gz; do
+            linux+=("$f" "$f.sha256")
+          done
           gh release create "$GITHUB_REF_NAME" \
             "dist/featherplay.exe" "dist/featherplay.exe.sha256" \
             "dist/$setup" "dist/$setup.sha256" \
             "dist/featherplay-arm64.exe" "dist/featherplay-arm64.exe.sha256" \
             "dist/$setup_arm64" "dist/$setup_arm64.sha256" \
+            "${linux[@]}" \
             "dist/SHA256SUMS.txt" "dist/THIRD_PARTY.md" \
             --repo "$GITHUB_REPOSITORY" \
             --draft \

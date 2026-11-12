@@ -45,13 +45,17 @@ git push origin vX.Y.Z
 `release.yml` runs the tests on x64 and on ARM64 (a `windows-11-arm` runner), checks that
 the tag matches the crate version, builds `featherplay.exe` for each with the build keys
 from the repository secrets, fails if either exe is over 32 MB, builds both installers with
-Inno Setup, and creates a **draft** release with:
+Inno Setup, runs the Linux tests on Ubuntu 24.04 and builds the Linux files on Ubuntu 22.04
+(`packaging/linux/build-linux.sh`, which fails if the binary is over 31 MB or needs a glibc
+newer than 2.35), and creates a **draft** release with:
 
 - `featherplay.exe` and `featherplay.exe.sha256` (x64)
 - `featherplay-setup-X.Y.Z.exe` and `featherplay-setup-X.Y.Z.exe.sha256` (x64)
 - `featherplay-arm64.exe` and `featherplay-arm64.exe.sha256`
 - `featherplay-setup-X.Y.Z-arm64.exe` and `featherplay-setup-X.Y.Z-arm64.exe.sha256`
-- `SHA256SUMS.txt`, covering all four and `THIRD_PARTY.md`
+- `featherplay-x86_64.AppImage` and `featherplay-x86_64.AppImage.sha256` (Linux)
+- `featherplay-x86_64.tar.gz` and `featherplay-x86_64.tar.gz.sha256` (Linux)
+- `SHA256SUMS.txt`, covering all six and `THIRD_PARTY.md`
 - `THIRD_PARTY.md`
 
 Its signature, `SHA256SUMS.txt.minisig`, comes from your PC in step 4.
@@ -92,6 +96,10 @@ Run the portable `featherplay.exe` once too. On an ARM64 PC, if you have one, do
 with `featherplay-setup-X.Y.Z-arm64.exe` and `featherplay-arm64.exe`; Task Manager's
 Details tab should show featherplay, yt-dlp and deno as ARM64, not x64. (Over an x64
 install, the yt-dlp and deno it downloaded stay, and keep running as x64.)
+
+On Linux (WSL will do), run the AppImage once: `chmod +x featherplay-x86_64.AppImage`, then
+`./featherplay-x86_64.AppImage` (add `--appimage-extract-and-run` where there's no FUSE). It
+should start, play, and quit from its window.
 
 ### Sign it
 
