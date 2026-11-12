@@ -1,4 +1,5 @@
 use super::*;
+use featherplay_platform::browsers::EDGE;
 use std::io::{BufRead, BufReader, PipeReader, PipeWriter};
 use std::sync::Mutex;
 
@@ -73,8 +74,10 @@ fn a_google_session_without_youtube_isnt_signed_in() {
 }
 
 /// Edge installed, with its pipe turned off by the machine's policy.
+#[cfg(windows)]
 struct PolicyOffPc;
 
+#[cfg(windows)]
 impl browsers::Lookup for PolicyOffPc {
     fn app_path(&self, _: browsers::Hive, _: &str) -> Option<String> {
         Some(r"C:\Edge\msedge.exe".into())
@@ -93,6 +96,36 @@ impl browsers::Lookup for PolicyOffPc {
     }
 }
 
+/// Edge installed, with its pipe turned off by a policy file.
+#[cfg(target_os = "linux")]
+struct PolicyOffPc;
+
+#[cfg(target_os = "linux")]
+impl browsers::Lookup for PolicyOffPc {
+    fn env(&self, _: &str) -> Option<OsString> {
+        None
+    }
+    fn is_file(&self, path: &Path) -> bool {
+        path == Path::new("/usr/bin/microsoft-edge-stable")
+    }
+    fn resolve(&self, path: &Path) -> Option<PathBuf> {
+        Some(path.into())
+    }
+    fn head(&self, _: &Path) -> Option<Vec<u8>> {
+        None
+    }
+    fn read(&self, _: &Path) -> Option<String> {
+        None
+    }
+    fn json_files(&self, dir: &Path) -> Vec<String> {
+        if dir == Path::new("/etc/opt/edge/policies/managed") {
+            vec![r#"{"RemoteDebuggingAllowed": false}"#.into()]
+        } else {
+            Vec::new()
+        }
+    }
+}
+
 #[test]
 fn with_the_policy_off_the_browser_isnt_started() {
     let home = std::env::var_os("FEATHERPLAY_HOME")
@@ -100,7 +133,7 @@ fn with_the_policy_off_the_browser_isnt_started() {
         .unwrap_or_else(std::env::temp_dir);
     let cache = home.join(format!("test-policy-{}", std::process::id()));
     let out = run_on(&PolicyOffPc, &EDGE, &cache, &AtomicBool::new(false));
-    assert_eq!(out, Outcome::PolicyOff);
+    assert_eq!(out, Outcome::Unusable(Block::Policy));
     // No profile was made, so nothing was launched.
     assert!(!cache.exists());
 }
@@ -113,16 +146,25 @@ fn the_arguments_are_the_profile_the_pipe_and_the_sign_in_page() {
         session::SIGN_IN_URL,
     );
     let a: Vec<&str> = a.iter().map(|s| s.to_str().unwrap()).collect();
-    assert_eq!(
-        a,
-        [
-            r"--user-data-dir=C:\cache\signin-1-ab",
-            "--remote-debugging-pipe",
+    let quiet: &[&str] = if cfg!(windows) {
+        &["--no-first-run", "--no-default-browser-check"]
+    } else {
+        // Linux keeps the throwaway profile's cookies out of the desktop's keyring.
+        &[
             "--no-first-run",
             "--no-default-browser-check",
-            session::SIGN_IN_URL,
+            "--password-store=basic",
         ]
-    );
+    };
+    let expected: Vec<&str> = [
+        r"--user-data-dir=C:\cache\signin-1-ab",
+        "--remote-debugging-pipe",
+    ]
+    .into_iter()
+    .chain(quiet.iter().copied())
+    .chain([session::SIGN_IN_URL])
+    .collect();
+    assert_eq!(a, expected);
     assert!(!a.iter().any(|s| s.contains("remote-debugging-port")));
 }
 
@@ -447,9 +489,9 @@ fn live_browsers() -> Vec<(&'static Browser, PathBuf)> {
     }
     let mut usable = Vec::new();
     for found in browsers::found(&browsers::ThisPc) {
-        if found.blocked {
+        if let Some(why) = found.blocked {
             report(&format!(
-                "{}: skipped, its RemoteDebuggingAllowed policy is off",
+                "{}: skipped, the sign-in can't use it ({why:?})",
                 found.browser.name
             ));
         } else {
@@ -562,7 +604,8 @@ fn live_browsers_answer_on_the_pipe_and_close() {
 
 /// Does each browser's process exit when its last window is closed (WM_CLOSE), with the
 /// pipe open? The sign-in takes that as "the user closed it". About:blank, temporary
-/// profile, as above.
+/// profile, as above. Windows only: Linux has no `visible_windows` to close.
+#[cfg(windows)]
 #[test]
 #[ignore = "starts every known browser that's installed (about:blank, temporary profile)"]
 fn live_browsers_exit_when_their_window_closes() {
@@ -571,6 +614,7 @@ fn live_browsers_exit_when_their_window_closes() {
     }
 }
 
+#[cfg(windows)]
 fn exits_when_its_window_closes(browser: &Browser, exe: &Path) {
     let name = browser.name;
     let mut live = Live::start(browser, exe);

@@ -1,18 +1,21 @@
-//! "Use Microsoft Edge" (or Google Chrome, Brave or Vivaldi: `featherplay_platform::browsers`):
-//! Google's sign-in in a real browser window (its own address bar, padlock, passkeys and
-//! Windows Hello), for people who'd rather not type their password into a window of the app. The WebView2
-//! window (`webview`) stays the default.
+//! "Use Microsoft Edge" (or Google Chrome, Brave or Vivaldi, and Chromium on Linux:
+//! `featherplay_platform::browsers`): Google's sign-in in a real browser window (its own
+//! address bar, padlock, passkeys and Windows Hello), for people who'd rather not type their
+//! password into a window of the app. On Windows the WebView2 window (`webview`) stays the
+//! default; Linux has no such window, so this is its way in, with the pasted cookie header.
 //!
 //! Which browser: the page offers one of those found on this PC (`offers`) and starts the
 //! sign-in with it (`start`).
 //!
 //! How it goes, on its own thread:
-//! 1. Find the browser's exe (`browsers`: App Paths, then where its installer puts it).
+//! 1. Find the browser's exe (`browsers`: on Windows App Paths, then where its installer puts
+//!    it; on Linux `PATH`, then where its package puts it). A Snap or a Flatpak, or a policy
+//!    that turns the pipe off, means it isn't started (`Outcome::Unusable`).
 //! 2. Make a temporary profile, `{cache}/signin-{pid}-{random}` (`profile`). The user's own
 //!    browser profile is never touched, and no browser's cookie files are read.
 //! 3. Start the browser on it with `--remote-debugging-pipe`, on Google's sign-in page,
-//!    inside a kill-on-close job object (`browsers::launch`, which documents how the pipe
-//!    reaches Chromium). A pipe only: never `--remote-debugging-port`, so no other program can
+//!    inside a kill-on-close job object on Windows, a process group of its own on Linux
+//!    (`browsers::launch`, which documents how the pipe reaches Chromium). A pipe only: never `--remote-debugging-port`, so no other program can
 //!    connect. No switch that marks the browser as automated.
 //! 4. About once a second, ask for the profile's cookies (`cdp`: the app can send only
 //!    `Storage.getCookies` and `Browser.close`).
@@ -20,7 +23,7 @@
 //!    path and the controller use). Then wait 3 s so music.youtube.com can set its own
 //!    cookies, read once more, and build the header both sign-ins build
 //!    (`session::music_cookies`); every other site's cookies are dropped.
-//! 6. `Browser.close`, wait up to 5 s for the browser to exit (then end the job), delete
+//! 6. `Browser.close`, wait up to 5 s for the browser to exit (then end it), delete
 //!    the profile, and hand the header over, as the WebView2 window does.
 //!
 //! It ends early, ending the job and deleting the profile, when the browser's process exits
@@ -30,7 +33,7 @@
 //!
 //! "Switch Google account" stays on the WebView2 window: it relies on that window's
 //! profile remembering earlier logins for Google's account chooser, and this profile is
-//! thrown away after every sign-in.
+//! thrown away after every sign-in. On Linux it opens the Sign in page instead.
 //!
 //! Cookie values are never logged, printed or written here.
 
@@ -49,7 +52,7 @@ use std::time::{Duration, Instant};
 use super::session::{self, Cookie};
 use cdp::{Client, Method, Reply};
 use featherplay_platform::browsers;
-pub use featherplay_platform::browsers::{Browser, EDGE, by_id};
+pub use featherplay_platform::browsers::{ALL, Block, Browser, by_id};
 
 /// How a browser sign-in ended.
 #[derive(PartialEq)]
@@ -62,8 +65,9 @@ pub enum Outcome {
     DidntStart(String),
     /// The browser never answered: a policy may block DevTools.
     Blocked,
-    /// The browser's `RemoteDebuggingAllowed` policy is off, so the browser wasn't started.
-    PolicyOff,
+    /// The browser can't be used (its `RemoteDebuggingAllowed` policy is off; on Linux, it's
+    /// a Snap or a Flatpak), so it wasn't started.
+    Unusable(Block),
     /// The user closed the browser before signing in.
     Closed,
     /// No sign-in within the time limit.
@@ -82,7 +86,7 @@ impl std::fmt::Debug for Outcome {
             Outcome::NotFound => f.write_str("NotFound"),
             Outcome::DidntStart(e) => write!(f, "DidntStart({e:?})"),
             Outcome::Blocked => f.write_str("Blocked"),
-            Outcome::PolicyOff => f.write_str("PolicyOff"),
+            Outcome::Unusable(why) => write!(f, "Unusable({why:?})"),
             Outcome::Closed => f.write_str("Closed"),
             Outcome::TimedOut => f.write_str("TimedOut"),
             Outcome::Lost(e) => write!(f, "Lost({e:?})"),
@@ -127,14 +131,16 @@ pub fn start(
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Offer {
     pub browser: &'static Browser,
-    /// A policy on this PC turns off its DevTools pipe, so the sign-in can't use it.
-    pub blocked: bool,
+    /// Why the sign-in can't use it (a policy on this PC turns off its DevTools pipe; on
+    /// Linux, a Snap's or a Flatpak's sandbox), if it can't.
+    pub blocked: Option<Block>,
 }
 
 /// The known browsers installed on this PC, in the order the page lists them, and which
 /// one it offers (`None` with none found): the one used last (`remembered`, its id), else
-/// Windows' default browser, else the first; a blocked one only when every one is blocked.
-/// Read from the registry and the disk each time (only read, never written).
+/// the system's default browser, else the first; a blocked one only when every one is
+/// blocked. Read from the registry (Linux: the policy files) and the disk each time (only
+/// read, never written).
 pub fn offers(remembered: Option<&str>) -> (Vec<Offer>, Option<usize>) {
     use browsers::Lookup;
     let pc = browsers::ThisPc;
@@ -226,12 +232,18 @@ fn run_on(
         return Outcome::NotFound;
     };
     // The browser would open and never answer: don't start it at all.
-    if browser.pipe_blocked(pc) {
-        log!(
-            "browser sign-in: {}'s RemoteDebuggingAllowed policy is off",
-            browser.name
-        );
-        return Outcome::PolicyOff;
+    if let Some(why) = browser.blocked(pc) {
+        match why {
+            Block::Policy => log!(
+                "browser sign-in: {}'s RemoteDebuggingAllowed policy is off",
+                browser.name
+            ),
+            Block::Snap | Block::Flatpak => log!(
+                "browser sign-in: {} is a {why:?}, whose sandbox keeps the sign-in out",
+                browser.name
+            ),
+        }
+        return Outcome::Unusable(why);
     }
     let profile = match profile::create(cache) {
         Ok(p) => TempProfile(p),
@@ -301,7 +313,7 @@ fn launch_and_watch(browser: &Browser, exe: &Path, profile: &Path, cancel: &Atom
         wall_now,
     );
     drop(client);
-    // Closing the job ends whatever helper is still running.
+    // Closing the job (Linux: ending the process group) ends whatever helper is still running.
     drop(process);
     outcome
 }

@@ -20,7 +20,7 @@ use featherplay::controller::{AccountAction, Action, Change};
 use featherplay::offscreen;
 use featherplay::router::Page;
 use featherplay::snapshot::Scene;
-use featherplay::ui::{Frame, SignInData, Theme, TopBarData};
+use featherplay::ui::{BrowserBlock, Frame, SessionStore, SignInData, Theme, TopBarData};
 use i_slint_core::accessibility::{AccessibilityAction, AccessibleStringProperty};
 use i_slint_core::item_tree::ItemRc;
 use i_slint_core::window::WindowInner;
@@ -90,14 +90,13 @@ fn sign_in_page(edge_blocked: bool) -> Scene {
 fn the_ways_in_are_rows_of_one_list() {
     let scene = sign_in_page(false);
     assert!(shown(&scene, "Sign in to featherplay"));
-    for row in [
-        "Sign in with Google",
-        "Use Microsoft Edge",
-        "Paste a cookie header",
-    ] {
+    for row in ["Use Microsoft Edge", "Paste a cookie header"] {
         assert!(shown(&scene, row), "no {row:?} row");
         assert!(enabled(&scene, row), "{row:?} is off");
     }
+    // The sign-in window is Windows' alone.
+    let window = featherplay_platform::supports(featherplay_platform::Feature::WebViewSignIn);
+    assert_eq!(shown(&scene, "Sign in with Google"), window);
     assert_ne!(
         line(&scene, "Use Microsoft Edge"),
         "Not available on this PC"
@@ -134,8 +133,10 @@ fn with_several_browsers_the_row_names_the_one_offered_and_change_lists_them() {
     assert_eq!(checks, [false, true, false]);
 
     // Another way in shuts the list, so it doesn't unfold again when that way ends.
-    press(&scene, "Sign in with Google");
-    assert!(!scene.ui.global::<SignInData>().get_choosing());
+    if featherplay_platform::supports(featherplay_platform::Feature::WebViewSignIn) {
+        press(&scene, "Sign in with Google");
+        assert!(!scene.ui.global::<SignInData>().get_choosing());
+    }
 }
 
 #[test]
@@ -220,6 +221,28 @@ fn edge_blocked_says_so_in_its_row_and_why_opens_the_detail() {
     );
 }
 
+/// The page as Linux shows it, on any OS: no sign-in window, so its row is gone and the
+/// browser row leads; a browser that's a Snap says why it can't be used; and with no keyring
+/// running, the card says the session lasts for this run only.
+#[test]
+fn without_a_sign_in_window_the_browser_row_leads_and_a_snap_says_why() {
+    let scene = sign_in_page(false);
+    let data = scene.ui.global::<SignInData>();
+    data.set_window_way(false);
+    data.set_session_store(SessionStore::None);
+    scene.settle();
+    assert!(!shown(&scene, "Sign in with Google"));
+    assert!(enabled(&scene, "Use Microsoft Edge"));
+    assert!(find(&scene, |l| l.contains("lasts until featherplay closes")).is_some());
+
+    data.set_browser_blocked(true);
+    data.set_browser_block(BrowserBlock::Snap);
+    scene.settle();
+    press(&scene, "Why?");
+    assert!(find(&scene, |l| l.starts_with("This Edge is a Snap")).is_some());
+    assert!(find(&scene, |l| l.contains("RemoteDebuggingAllowed")).is_none());
+}
+
 /// A left click with the pointer in the middle of what says `label`.
 fn click(scene: &Scene, label: &str) {
     let item = find(scene, |l| l == label).unwrap_or_else(|| panic!("nothing says {label:?}"));
@@ -295,6 +318,7 @@ fn why_eases_open_and_shut_and_the_rows_below_follow() {
 }
 
 #[test]
+#[cfg_attr(not(windows), ignore = "the sign-in window is Windows only")]
 fn a_sign_in_window_with_no_handle_says_so_plainly_with_try_again() {
     let scene = sign_in_page(false);
     let data = scene.ui.global::<SignInData>();
@@ -330,6 +354,7 @@ fn a_sign_in_window_with_no_handle_says_so_plainly_with_try_again() {
 /// minute after it closed: what a hand test reads to see that the window gave its memory
 /// back.
 #[test]
+#[cfg_attr(not(windows), ignore = "the sign-in window is Windows only")]
 fn the_log_says_what_the_app_holds_a_minute_after_the_sign_in_window_closed() {
     let dir = std::path::Path::new(env!("CARGO_TARGET_TMPDIR"))
         .join(format!("sign-in-memory-log-{}", std::process::id()));
@@ -477,6 +502,10 @@ fn the_page_has_no_search_bar_and_ctrl_k_searches_from_home() {
 }
 
 #[test]
+#[cfg_attr(
+    not(windows),
+    ignore = "its error row is the sign-in window's, Windows only"
+)]
 fn the_block_centres_in_the_room_beside_up_next_and_the_error_row_stays_with_it() {
     let scene = sign_in_page(false);
     featherplay::pages::sign_in::didnt_open("for a test");

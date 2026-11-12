@@ -80,10 +80,15 @@ fn a_sign_in_windows_wouldnt_save_says_so_once_it_shows() {
         "no toast for the sign-in that wasn't saved"
     );
     assert_eq!(toast.get_tone(), ToastTone::Error);
-    assert_eq!(
-        toast.get_text().as_str(),
+    // On Linux, the keyring refused it, or there's none in this session.
+    let said = if cfg!(windows) {
         "Signed in, but Windows couldn't save it for next time."
-    );
+    } else if featherplay_platform::supports(featherplay_platform::Feature::SecretStorage) {
+        "Signed in, but the keyring didn't save it for next time."
+    } else {
+        "Signed in for now: no keyring is running to save it."
+    };
+    assert_eq!(toast.get_text().as_str(), said);
     assert_eq!(toast.get_action().as_str(), "", "nothing to click");
     let width = pill_width(&scene);
     assert!(width < 480.0, "the line is cut short in a {width} px pill");

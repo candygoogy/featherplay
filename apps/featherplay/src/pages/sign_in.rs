@@ -13,9 +13,15 @@
 //! without a restart. The header is never logged.
 //!
 //! The browser row offers one browser, named in its title: the one used last (kept in the
-//! settings), else Windows' default browser when it's a known one, else the first found in
-//! the order Edge, Chrome, Brave, Vivaldi; one whose policy turns the connection off gives
-//! way to one that works. With more than one found, "Change" lists them.
+//! settings), else the system's default browser when it's a known one, else the first found
+//! in the order Edge, Chrome, Brave, Vivaldi (Linux: Chrome, Chromium, Edge, Brave, Vivaldi);
+//! one whose policy turns the connection off (or, on Linux, a Snap or a Flatpak) gives way to
+//! one that works. With more than one found, "Change" lists them.
+//!
+//! Linux has no sign-in window (`Feature::WebViewSignIn`): the page hides that row, the
+//! browser row leads, and "Switch Google account" opens this page. The card's last line says
+//! where the session is kept: in Credential Manager, in the desktop's keyring, or, with no
+//! keyring running (`Feature::SecretStorage`), for this run only.
 
 mod address;
 mod browser;
@@ -30,6 +36,7 @@ use std::path::Path;
 use std::rc::Rc;
 
 use featherplay_core::tr;
+use featherplay_platform::{Feature, supports};
 use featherplay_store::Paths;
 use slint::ComponentHandle;
 
@@ -37,16 +44,19 @@ use crate::app::Ctx;
 use crate::controller::{AccountAction, AccountEvent, Action, Cookies, PlayerState};
 use crate::pages::settings;
 use crate::router::Page;
-use crate::ui::{BrowserChoice, SignInData, SignInWay};
+use crate::ui::{BrowserBlock, BrowserChoice, SessionStore, SignInData, SignInWay};
 use crate::ui_bridge;
-use browser::Browser;
+use browser::{Block, Browser};
 
 /// Once at startup: connect `SignInData`'s callbacks. The browsers are looked for when the
 /// page is shown (`open`), not here.
 pub fn init(ctx: &Rc<Ctx>) {
     let Some(ui) = ctx.window() else { return };
     let data = ui.global::<SignInData>();
-    // Until the page looks: the row names Edge, as with none found.
+    data.set_window_way(supports(Feature::WebViewSignIn));
+    show_session_store(&ui);
+    // Until the page looks: the row names the first browser (Edge; Linux: Chrome), as with
+    // none found.
     offer(&data, Vec::new(), 0);
     let c = ctx.clone();
     data.on_open_window(move || open_window(&c, session::SIGN_IN_URL));
@@ -57,6 +67,48 @@ pub fn init(ctx: &Rc<Ctx>) {
     data.on_pick_browser(move |index| pick_browser(&c, index));
     let c = ctx.clone();
     data.on_submit(move |text| submit(&c, &text));
+}
+
+/// The card's last line: where the session is kept. Windows always has Credential Manager;
+/// on Linux, whether a Secret Service answers is asked off the UI thread (a D-Bus round
+/// trip, longer while one starts up), and the line says the keyring until it's known.
+fn show_session_store(ui: &crate::ui::AppWindow) {
+    let data = ui.global::<SignInData>();
+    if cfg!(windows) {
+        data.set_session_store(SessionStore::CredentialManager);
+        return;
+    }
+    data.set_session_store(SessionStore::Keyring);
+    let weak = ui.as_weak();
+    let asked = std::thread::Builder::new()
+        .name("featherplay-keyring-check".into())
+        .spawn(move || {
+            if !supports(Feature::SecretStorage) {
+                let _ = weak.upgrade_in_event_loop(|ui| {
+                    ui.global::<SignInData>()
+                        .set_session_store(SessionStore::None);
+                });
+            }
+        });
+    if let Err(e) = asked {
+        log!("keyring check: {e}");
+    }
+}
+
+/// The sentences that point to another way in when one fails: the sign-in window where
+/// there is one, else a pasted cookie header.
+fn other_way() -> (&'static str, &'static str) {
+    if supports(Feature::WebViewSignIn) {
+        (
+            tr!("Try again, or use Sign in with Google."),
+            tr!("Sign in with Google works without it."),
+        )
+    } else {
+        (
+            tr!("Try again, or paste a cookie header."),
+            tr!("Pasting a cookie header works without it."),
+        )
+    }
 }
 
 /// At startup: deletes the temporary browser profiles a crash or a kill left in `cache`, on
@@ -140,9 +192,15 @@ pub fn notice(ctx: &Rc<Ctx>, ev: AccountEvent) {
 
 /// The account menu's "Switch Google account": the sign-in window on Google's account
 /// chooser, to add a login or pick another one. Once it closes, the app signs in with the
-/// new cookies (the session's own identity), as after a first sign-in.
+/// new cookies (the session's own identity), as after a first sign-in. With no sign-in
+/// window (Linux), this page, where a browser sign-in (whose profile is new each time) or a
+/// pasted header brings in the other account.
 pub fn switch_account(ctx: &Rc<Ctx>) {
-    open_window(ctx, webview::CHOOSER_URL);
+    if supports(Feature::WebViewSignIn) {
+        open_window(ctx, webview::CHOOSER_URL);
+    } else {
+        ctx.navigate(Page::SignIn);
+    }
 }
 
 thread_local! {
@@ -261,12 +319,21 @@ struct Offers {
 }
 
 impl Offers {
-    /// The browser the row names. With none found that's Edge, which says it isn't on this
-    /// PC when it's tried.
+    /// The browser the row names. With none found that's the first known one (Edge; on
+    /// Linux, Chrome), which says it isn't on this PC when it's tried.
     fn browser(&self) -> &'static Browser {
         self.found
             .get(self.current)
-            .map_or(&browser::EDGE, |o| o.browser)
+            .map_or(browser::ALL[0], |o| o.browser)
+    }
+}
+
+/// How the page tells why a browser can't be used.
+fn block_kind(why: Block) -> BrowserBlock {
+    match why {
+        Block::Policy => BrowserBlock::Policy,
+        Block::Snap => BrowserBlock::Snap,
+        Block::Flatpak => BrowserBlock::Flatpak,
     }
 }
 
@@ -291,7 +358,9 @@ fn offer(data: &SignInData, found: Vec<browser::Offer>, current: usize) {
     let browser = offers.browser();
     data.set_browser_name(browser.name.into());
     data.set_browser_short(browser.short.into());
-    data.set_browser_blocked(offers.found.get(current).is_some_and(|o| o.blocked));
+    let blocked = offers.found.get(current).and_then(|o| o.blocked);
+    data.set_browser_blocked(blocked.is_some());
+    data.set_browser_block(blocked.map_or(BrowserBlock::Policy, block_kind));
     data.set_browser_current(i32::try_from(current).unwrap_or(0));
     // One browser is no choice: the list is for two or more.
     let choices: Vec<BrowserChoice> = offers
@@ -301,7 +370,8 @@ fn offer(data: &SignInData, found: Vec<browser::Offer>, current: usize) {
         .map(|o| BrowserChoice {
             name: o.browser.name.into(),
             short: o.browser.short.into(),
-            blocked: o.blocked,
+            blocked: o.blocked.is_some(),
+            block: o.blocked.map_or(BrowserBlock::Policy, block_kind),
         })
         .collect();
     data.set_browsers(ui_bridge::model(choices).1);
@@ -318,6 +388,7 @@ pub fn offer_for_snapshot(ctx: &Rc<Ctx>, installed: &[(&str, bool)], current: &s
         .iter()
         .filter_map(|&(id, blocked)| {
             let browser = browser::by_id(id)?;
+            let blocked = blocked.then_some(Block::Policy);
             Some(browser::Offer { browser, blocked })
         })
         .collect();
@@ -336,7 +407,7 @@ fn pick_browser(ctx: &Rc<Ctx>, index: i32) {
     let picked = OFFERS.with(|o| {
         let o = o.borrow();
         let index = usize::try_from(index).ok()?;
-        let offer = o.found.get(index).filter(|offer| !offer.blocked)?;
+        let offer = o.found.get(index).filter(|offer| offer.blocked.is_none())?;
         Some((o.found.clone(), index, offer.browser))
     });
     let Some((found, index, browser)) = picked else {
@@ -433,7 +504,7 @@ fn browser_done(browser: &'static Browser, outcome: browser::Outcome) {
     data.set_browser_running(false);
     let (name, short) = (browser.name, browser.short);
     let not_yet = tr!("It closed before you finished signing in. Try again when you're ready.");
-    let instead = tr!("Try again, or use Sign in with Google.");
+    let (instead, without_it) = other_way();
     let (title, line, retry) = match outcome {
         Outcome::SignedIn(header) => {
             data.set_status(tr!("Checking the session…").into());
@@ -445,9 +516,9 @@ fn browser_done(browser: &'static Browser, outcome: browser::Outcome) {
             data.set_status("".into());
             return;
         }
-        // Its policy was turned off since the page looked: the row says so now, or offers
-        // another browser.
-        Outcome::PolicyOff => {
+        // Its policy was turned off since the page looked (or it's a Snap or a Flatpak now):
+        // the row says so now, or offers another browser.
+        Outcome::Unusable(_) => {
             data.set_busy(false);
             data.set_status("".into());
             look_for_browsers(&data);
@@ -466,7 +537,7 @@ fn browser_done(browser: &'static Browser, outcome: browser::Outcome) {
             look_for_browsers(&data);
             (
                 tr!("{} isn't on this PC", name),
-                tr!("Sign in with Google works without it."),
+                without_it,
                 SignInWay::None,
             )
         }
@@ -476,7 +547,11 @@ fn browser_done(browser: &'static Browser, outcome: browser::Outcome) {
         }
         Outcome::Blocked => (
             tr!("{} didn't let featherplay in", short),
-            tr!("A setting on this PC may block it. Sign in with Google works without it."),
+            if supports(Feature::WebViewSignIn) {
+                tr!("A setting on this PC may block it. Sign in with Google works without it.")
+            } else {
+                tr!("A setting on this PC may block it. Pasting a cookie header works without it.")
+            },
             SignInWay::None,
         ),
         Outcome::Lost(e) => {

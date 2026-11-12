@@ -6,7 +6,9 @@
 // policy; with more than one of them found, "Change" lists them under the row; Paste a
 // cookie header opens the paste field under its row. The card ends with what featherplay
 // keeps; under it, "Continue without signing in" as a quiet pill. A way that fails says so
-// above the card in plain words, with Try again. Driven by `src/pages/sign_in.rs`.
+// above the card in plain words, with Try again. Linux has no sign-in window: its row is
+// hidden and the browser row leads, and "Why?" also tells of a Snap or Flatpak browser.
+// Driven by `src/pages/sign_in.rs`.
 import { Theme, Icons, Curves } from "../theme.slint";
 import { Body, ChoiceList, ChoiceRow, Display, Icon, Pill, TextLink } from "../parts.slint";
 import { Logo } from "../logo.slint";
@@ -15,17 +17,30 @@ import { Nav, PageKind } from "../nav.slint";
 // A way in, for Try again.
 export enum SignInWay { none, window, browser, paste }
 
+// Why a browser that's installed can't be used: a policy turns off the connection to it, or
+// (Linux) it's a Snap or a Flatpak, whose sandbox keeps the sign-in out.
+export enum BrowserBlock { policy, snap, flatpak }
+
+// Where the session is kept: Windows' Credential Manager, the desktop's keyring (Linux's
+// Secret Service), or nowhere, for this run only (Linux with no keyring running).
+export enum SessionStore { credential-manager, keyring, none }
+
 // A browser the sign-in can open that's installed on this PC, in the list under "Change".
 export struct BrowserChoice {
     // As the user knows it: "Google Chrome".
     name: string,
     // In a sentence about it: "Chrome".
     short: string,
-    // A policy on this PC turns off the connection to it.
+    // The sign-in can't use it, because of `block`.
     blocked: bool,
+    block: BrowserBlock,
 }
 
 export global SignInData {
+    // There's a sign-in window (WebView2, Windows only); without it the browser row leads.
+    in property <bool> window-way: true;
+    // Where the session is kept, for the card's last line.
+    in property <SessionStore> session-store;
     // The sign-in window or the browser is open, or a cookie header is being checked.
     in property <bool> busy;
     // The browser sign-in is running (the browser is open, or closing).
@@ -34,9 +49,11 @@ export global SignInData {
     // (Rust sets Microsoft Edge at startup).
     in property <string> browser-name;
     in property <string> browser-short;
-    // A policy on this PC turns off the connection to it, and to every other browser found:
-    // the option can't work.
+    // A policy on this PC turns off the connection to it, and to every other browser found
+    // (or on Linux they're Snaps or Flatpaks): the option can't work, because of
+    // `browser-block`.
     in property <bool> browser-blocked;
+    in property <BrowserBlock> browser-block;
     // The browsers found, when there are two or more: what "Change" lists. The row offers
     // the one at `browser-current`.
     in property <[BrowserChoice]> browsers;
@@ -56,9 +73,10 @@ export global SignInData {
     in property <bool> expired;
     in-out property <bool> paste-open;
     // "Why?" on a blocked browser: the policy detail is open. In the list, it's about
-    // `why-browser` (the browser as a sentence names it).
+    // `why-browser` (the browser as a sentence names it), which `why-block` keeps out.
     in-out property <bool> why-open;
     in-out property <string> why-browser;
+    in-out property <BrowserBlock> why-block;
     // The pasted header. Rust clears it once it has been taken.
     in-out property <string> cookies;
     callback open-window();
@@ -75,25 +93,30 @@ global SignInIcons {
     out property <string> check: "M5.5 12.5 L10 17 L18.5 7.5";
 }
 
-// Why a browser can't be used: what it means first; the policy's name for whoever looks it
-// up.
+// Why a browser can't be used: what it means first; then the policy's name for whoever looks
+// it up, or (a Snap or a Flatpak, on Linux) what works instead.
 component PolicyNote inherits Rectangle {
     // The browser, as a sentence names it: "Edge".
     in property <string> browser;
+    in property <BrowserBlock> block;
     min-height: lay.min-height;
     preferred-height: lay.preferred-height;
     lay := VerticalLayout {
         spacing: Theme.s3;
         Body {
-            // {} is a browser's name: Edge, Chrome, Brave or Vivaldi.
-            text: @tr("{} on this PC is set to keep apps from reading its sign-in, so featherplay can't use it. Sign in with Google works without it.", root.browser);
+            // {} is a browser's name: Edge, Chrome, Chromium, Brave or Vivaldi.
+            text: root.block == BrowserBlock.snap ? @tr("This {} is a Snap, whose sandbox keeps out the temporary profile featherplay opens it with, so featherplay can't use it.", root.browser)
+                : root.block == BrowserBlock.flatpak ? @tr("This {} is a Flatpak, whose sandbox keeps out the temporary profile and the connection featherplay opens it with, so featherplay can't use it.", root.browser)
+                : SignInData.window-way ? @tr("{} on this PC is set to keep apps from reading its sign-in, so featherplay can't use it. Sign in with Google works without it.", root.browser)
+                : @tr("{} on this PC is set to keep apps from reading its sign-in, so featherplay can't use it. Pasting a cookie header works without it.", root.browser);
             font-size: Theme.t-meta + 1px;
             color: Theme.text2;
             overflow: clip;
             wrap: word-wrap;
         }
         Body {
-            text: @tr("Set by an administrator or a tweaking tool: the RemoteDebuggingAllowed policy is off.");
+            text: root.block == BrowserBlock.policy ? @tr("Set by an administrator or a tweaking tool: the RemoteDebuggingAllowed policy is off.")
+                : @tr("One installed from a .deb or .rpm package works, as does pasting a cookie header.");
             font-size: Theme.t-meta;
             color: Theme.text3;
             overflow: clip;
@@ -423,21 +446,27 @@ export component SignInPage inherits Rectangle {
             VerticalLayout {
                 padding-top: SignInData.expired || SignInData.error-title != "" ? Theme.s2 : Theme.s6;
                 ChoiceList {
+                    // Folded away where there's no sign-in window (Linux), as the notes above.
                     ChoiceRow {
+                        height: SignInData.window-way ? self.preferred-height : 0;
+                        visible: SignInData.window-way;
                         divider: false;
                         lit: true;
                         icon: Icons.person;
                         title: @tr("Sign in with Google");
                         line: root.window-busy && SignInData.status != "" ? SignInData.status : @tr("On Google's own page, in a featherplay window");
-                        enabled: !SignInData.busy;
+                        enabled: SignInData.window-way && !SignInData.busy;
                         dimmed: SignInData.busy && !root.window-busy;
                         bare: root.window-busy;
                         clicked => { SignInData.open-window(); }
                     }
                     // The user's own browser: Google's sign-in there, with a throwaway profile.
+                    // Without the sign-in window it's the first way, and the one recommended.
                     browser-row := ChoiceRow {
+                        divider: SignInData.window-way;
+                        lit: !SignInData.window-way;
                         icon: Icons.browser;
-                        // {} is the browser it opens: Microsoft Edge, Google Chrome, Brave or Vivaldi.
+                        // {} is the browser it opens: Google Chrome, Chromium, Edge, Brave or Vivaldi.
                         title: @tr("Use {}", SignInData.browser-name);
                         line: SignInData.browser-running ? SignInData.status : (SignInData.browser-blocked ? @tr("Not available on this PC") : @tr("In your own browser, with a temporary profile"));
                         enabled: !SignInData.busy && !SignInData.browser-blocked;
@@ -494,6 +523,7 @@ export component SignInPage inherits Rectangle {
                                                     SignInData.why-open = false;
                                                 } else {
                                                     SignInData.why-browser = choice.short;
+                                                    SignInData.why-block = choice.block;
                                                     SignInData.why-open = true;
                                                 }
                                             }
@@ -509,6 +539,7 @@ export component SignInPage inherits Rectangle {
                                     height: self.preferred-height;
                                     visible: browser-row.showing && (SignInData.browser-blocked || root.why-shown > 0);
                                     browser: SignInData.browser-blocked ? SignInData.browser-short : SignInData.why-browser;
+                                    block: SignInData.browser-blocked ? SignInData.browser-block : SignInData.why-block;
                                 }
                             }
                         }
@@ -592,7 +623,9 @@ export component SignInPage inherits Rectangle {
                                 }
                             }
                             Body {
-                                text: @tr("featherplay never sees your password. It keeps only the session, in Windows Credential Manager, and you can sign out any time.");
+                                text: SignInData.session-store == SessionStore.credential-manager ? @tr("featherplay never sees your password. It keeps only the session, in Windows Credential Manager, and you can sign out any time.")
+                                    : SignInData.session-store == SessionStore.keyring ? @tr("featherplay never sees your password. It keeps only the session, in your keyring, and you can sign out any time.")
+                                    : @tr("featherplay never sees your password. No keyring is running to keep the session, so it lasts until featherplay closes.");
                                 font-size: Theme.t-meta;
                                 color: Theme.text3;
                                 overflow: clip;

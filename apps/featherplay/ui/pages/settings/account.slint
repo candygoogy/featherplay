@@ -2,6 +2,7 @@
 import { Nav, PageKind } from "../../nav.slint";
 import { SettingKey, SettingsData } from "data.slint";
 import { Group, RowButton, SettingRow, ToggleRow } from "rows.slint";
+import { SessionStore, SignInData } from "../sign_in.slint";
 
 export component AccountSection inherits Group {
     // How many of the sections below the fold the page has made (`SettingsPage.made`).
@@ -14,7 +15,9 @@ export component AccountSection inherits Group {
             label: @tr("Music account");
             detail: !SettingsData.signed-in ? @tr("Not signed in.")
                 : root.confirm-sign-out ? @tr("Sign out? The saved session is deleted; the music keeps playing.")
-                : @tr("Signed in. The session is kept in Windows Credential Manager.");
+                : SignInData.session-store == SessionStore.credential-manager ? @tr("Signed in. The session is kept in Windows Credential Manager.")
+                : SignInData.session-store == SessionStore.keyring ? @tr("Signed in. The session is kept in your keyring.")
+                : @tr("Signed in for this run only: no keyring is running to keep the session.");
             if !SettingsData.signed-in: RowButton {
                 label: @tr("Sign in");
                 clicked => { Nav.go(PageKind.sign-in); }

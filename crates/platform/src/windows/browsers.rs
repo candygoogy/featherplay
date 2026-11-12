@@ -1,13 +1,16 @@
 //! Finding Edge, Chrome, Brave and Vivaldi on this PC (the registry, the https association,
 //! the disk: `ThisPc`), and starting one with the DevTools pipe in a kill-on-close job
-//! (`launch`). The browsers, and the order they're looked for in, are in `common`.
+//! (`launch`). The browsers, and the order they're looked for in, are in `common`; how
+//! they're found is in `find`.
 
+mod find;
 mod launch;
 
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
 pub use crate::common::browsers::*;
+pub use find::{Hive, Lookup, found};
 pub use launch::{Pipes, Running, launch};
 
 use crate::window::Handle;
@@ -199,7 +202,7 @@ mod tests {
         let found = found(&ThisPc);
         for f in &found {
             eprintln!(
-                "found {}: {} (blocked: {})",
+                "found {}: {} (blocked: {:?})",
                 f.browser.name,
                 f.exe.display(),
                 f.blocked

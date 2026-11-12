@@ -580,11 +580,17 @@ pub fn on_event(ev: UiEvent) {
             // Now that the sign-in shows, past the account picker if it asked; a sign-out
             // meanwhile drops it.
             if ctx.sign_in_unsaved.take() && signed_in {
-                // One line of the toast's pill, with room to spare for a wider font.
-                toast::show_error(
-                    &ctx,
-                    tr!("Signed in, but Windows couldn't save it for next time."),
-                );
+                // One line of the toast's pill, with room to spare for a wider font. On Linux
+                // the keyring refused it, or there's none running.
+                use featherplay_platform::{Feature, supports};
+                let why = if cfg!(windows) {
+                    tr!("Signed in, but Windows couldn't save it for next time.")
+                } else if supports(Feature::SecretStorage) {
+                    tr!("Signed in, but the keyring didn't save it for next time.")
+                } else {
+                    tr!("Signed in for now: no keyring is running to save it.")
+                };
+                toast::show_error(&ctx, why);
             }
             #[cfg(feature = "perf-harness")]
             crate::perf::mark(crate::perf::Mark::Account);
