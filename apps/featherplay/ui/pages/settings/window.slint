@@ -229,7 +229,7 @@ export component WindowSection inherits Group {
             // The first row has no line above it.
             divider: SettingsData.has-tray;
             label: @tr("Appearance");
-            detail: @tr("System follows Windows' light or dark mode.");
+            detail: SettingsData.on-windows ? @tr("System follows Windows' light or dark mode.") : @tr("System follows your desktop's light or dark mode.");
             Chips {
                 labels: [@tr("appearance" => "Dark"), @tr("appearance" => "Light"), @tr("appearance" => "System")];
                 active: SettingsData.appearance == Appearance.dark ? 0 : (SettingsData.appearance == Appearance.light ? 1 : 2);
@@ -240,7 +240,8 @@ export component WindowSection inherits Group {
         }
         SettingRow {
             label: @tr("Language");
-            detail: @tr("Windows default follows Windows' display language when featherplay has it, and English otherwise.");
+            detail: SettingsData.on-windows ? @tr("Windows default follows Windows' display language when featherplay has it, and English otherwise.")
+                : @tr("System default follows the system's language when featherplay has it, and English otherwise.");
             Chips {
                 labels: SettingsData.language-names;
                 active: SettingsData.language;
@@ -293,7 +294,8 @@ export component WindowSection inherits Group {
         // Wayland lets no app hear keys pressed in another.
         if SettingsData.has-hotkeys: ToggleRow {
             label: @tr("Global hotkeys");
-            detail: @tr("Play, pause and skip from any app. Each key needs Ctrl, Alt, Shift or Win.");
+            detail: SettingsData.on-windows ? @tr("Play, pause and skip from any app. Each key needs Ctrl, Alt, Shift or Win.")
+                : @tr("Play, pause and skip from any app. Each key needs Ctrl, Alt, Shift or Super.");
             key: SettingKey.hotkeys;
             checked: SettingsData.hotkeys;
         }

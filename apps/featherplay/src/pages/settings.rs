@@ -439,6 +439,7 @@ fn show(ctx: &Ctx) {
     data.set_tray_click_opens_window(s.tray_click_opens_window);
     data.set_has_tray(supports(Feature::Tray));
     data.set_has_hotkeys(supports(Feature::GlobalHotkeys));
+    data.set_on_windows(cfg!(windows));
     data.set_tooltips(s.tooltips);
     ui.global::<Tooltips>().set_on(s.tooltips);
     data.set_accent(accent_index(s.accent));

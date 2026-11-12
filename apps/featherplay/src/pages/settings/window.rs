@@ -274,8 +274,13 @@ pub fn check_hotkeys(h: &Hotkeys) -> Result<(), String> {
         (tr!("Next"), &h.next),
         (tr!("Previous"), &h.previous),
     ] {
+        // The fourth modifier is the Windows key; elsewhere it's called Super.
         let key = parse_hotkey(text).map_err(|_| {
-            tr!("{0}: \"{1}\" isn't a key featherplay can use. Write it like Ctrl+Alt+Space; it needs Ctrl, Alt, Shift or Win.", label, text)
+            if cfg!(windows) {
+                tr!("{0}: \"{1}\" isn't a key featherplay can use. Write it like Ctrl+Alt+Space; it needs Ctrl, Alt, Shift or Win.", label, text)
+            } else {
+                tr!("{0}: \"{1}\" isn't a key featherplay can use. Write it like Ctrl+Alt+Space; it needs Ctrl, Alt, Shift or Super.", label, text)
+            }
         })?;
         if ids.contains(&key.id()) {
             return Err(tr!("{} uses the same key as another action.", label));
