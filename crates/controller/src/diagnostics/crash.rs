@@ -66,7 +66,7 @@ pub fn report(message: &str, location: &str, thread: &str, backtrace: &Backtrace
     format!(
         "featherplay {} crashed.\n\
          Time: {} (after {:.3} s)\n\
-         Windows: {}\n\
+         {}: {}\n\
          Thread: {thread}\n\
          Where: {location}\n\
          Message: {message}\n\
@@ -75,7 +75,8 @@ pub fn report(message: &str, location: &str, thread: &str, backtrace: &Backtrace
         env!("CARGO_PKG_VERSION"),
         Stamp::now().line(),
         super::uptime().as_secs_f64(),
-        super::windows(),
+        super::OS_LABEL,
+        super::os(),
     )
 }
 

@@ -6,7 +6,8 @@
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Report {
     pub version: String,
-    pub windows: String,
+    /// Which system this is (`diagnostics::os`), on the line `OS_LABEL` names.
+    pub os: String,
     /// `None` until the version was read (or when the tool isn't installed).
     pub ytdlp: Option<String>,
     pub deno: Option<String>,
@@ -23,7 +24,7 @@ pub struct Report {
     pub proxy: Option<String>,
     /// How the last helpers download failed (`SidecarError::summary`); `None`: it didn't.
     pub helpers: Option<String>,
-    /// Why Windows wouldn't store the last sign-in (the credential store's error, with its
+    /// Why the system's credential store wouldn't keep the last sign-in (its error, with its
     /// code); `None`: it did, or nobody signed in this run.
     pub sign_in_save: Option<String>,
     /// The last resolver errors, oldest first, each with its time.
@@ -40,7 +41,7 @@ impl Report {
         let known = |v: &Option<String>| v.clone().unwrap_or_else(|| "unknown".into());
         let mut out = format!(
             "featherplay {}\n\
-             Windows: {}\n\
+             {}: {}\n\
              yt-dlp: {}\n\
              Deno: {}\n\
              JavaScript: {} (built in)\n\
@@ -53,7 +54,8 @@ impl Report {
              Last helpers download error: {}\n\
              Last sign-in save error: {}\n",
             self.version,
-            self.windows,
+            super::OS_LABEL,
+            self.os,
             known(&self.ytdlp),
             known(&self.deno),
             self.js_engine,
@@ -95,7 +97,7 @@ mod tests {
     fn report() -> Report {
         Report {
             version: "0.1.0".into(),
-            windows: "Windows 11 25H2, build 26300.7171".into(),
+            os: "Windows 11 25H2, build 26300.7171".into(),
             ytdlp: Some("2026.10.26".into()),
             deno: None,
             js_engine: "QuickJS-NG 0.16.2".into(),
@@ -118,9 +120,15 @@ mod tests {
     #[test]
     fn every_fact_has_its_line() {
         let text = report().text();
+        // Windows names itself; elsewhere the line holds the distribution's name.
+        let os = if cfg!(windows) {
+            "Windows: Windows 11 25H2, build 26300.7171"
+        } else {
+            "System: Windows 11 25H2, build 26300.7171"
+        };
         for line in [
             "featherplay 0.1.0",
-            "Windows: Windows 11 25H2, build 26300.7171",
+            os,
             "yt-dlp: 2026.10.26",
             "Deno: unknown",
             "JavaScript: QuickJS-NG 0.16.2 (built in)",

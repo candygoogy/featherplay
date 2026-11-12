@@ -1,6 +1,6 @@
 //! Masks secrets in a log line before it's written anywhere: cookie values, the `Cookie`
 //! and `Authorization` headers, tokens, keys and session keys, email addresses, and the
-//! Windows user's folders (see `paths`).
+//! user's folders (see `paths`).
 
 mod paths;
 

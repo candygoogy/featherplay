@@ -51,7 +51,7 @@ static RECENT: Mutex<VecDeque<String>> = Mutex::new(VecDeque::new());
 static PLAYED: Mutex<VecDeque<String>> = Mutex::new(VecDeque::new());
 /// How the last helpers download failed (`SidecarError::summary`).
 static HELPERS: Mutex<Option<String>> = Mutex::new(None);
-/// Why Windows wouldn't store the last sign-in (`sign_in_kept`).
+/// Why the system's credential store wouldn't keep the last sign-in (`sign_in_kept`).
 static SIGN_IN_SAVE: Mutex<Option<String>> = Mutex::new(None);
 
 /// Time since the process started; the first call starts the clock.
@@ -67,7 +67,7 @@ pub fn log_dir(paths: &Paths) -> PathBuf {
 }
 
 /// At startup: the log file, the panic hook, and a first line saying which featherplay and
-/// which Windows this is. A log folder that can't be written leaves only stderr.
+/// which system this is (`os`). A log folder that can't be written leaves only stderr.
 pub fn start(paths: &Paths) {
     let dir = log_dir(paths);
     if let Err(e) = init(&dir) {
@@ -77,7 +77,7 @@ pub fn start(paths: &Paths) {
     write(format_args!(
         "featherplay {} on {}",
         env!("CARGO_PKG_VERSION"),
-        windows()
+        os()
     ));
 }
 
@@ -203,11 +203,16 @@ impl log::Log for Facade {
     }
 }
 
-/// `Windows 11 25H2, build 26200.7171`, read once.
-pub fn windows() -> &'static str {
-    static WINDOWS: OnceLock<String> = OnceLock::new();
-    WINDOWS.get_or_init(featherplay_platform::system::os_version)
+/// Which system this is, read once: `Windows 11 25H2, build 26200.7171`; on Linux the
+/// distribution's name (`Ubuntu 24.04.3 LTS`).
+pub fn os() -> &'static str {
+    static OS: OnceLock<String> = OnceLock::new();
+    OS.get_or_init(featherplay_platform::system::os_version)
 }
+
+/// What Copy diagnostics and a crash file call the `os` line: `Windows` there, as before,
+/// and `System` elsewhere, whose line is the distribution's name.
+pub(crate) const OS_LABEL: &str = if cfg!(windows) { "Windows" } else { "System" };
 
 /// The yt-dlp and Deno versions, once the controller has read them (`None`: not installed,
 /// or it failed). Logged once.
@@ -251,7 +256,7 @@ pub fn helpers_failed(e: &featherplay_streams::SidecarError) {
 }
 
 /// A new sign-in was stored for the next start, or `refused`: the credential store's error,
-/// with Windows' code and never the cookie header. Its log line, and Copy diagnostics names
+/// with the system's code and never the cookie header. Its log line, and Copy diagnostics names
 /// it until a sign-in is stored.
 pub fn sign_in_kept(refused: Option<String>) {
     if let Some(why) = &refused {
@@ -268,7 +273,7 @@ pub fn report(signed_in: bool, settings: &Settings) -> Report {
     let helpers = HELPERS.lock_or_recover().clone();
     Report {
         version: env!("CARGO_PKG_VERSION").to_string(),
-        windows: windows().to_string(),
+        os: os().to_string(),
         ytdlp,
         deno,
         js_engine: featherplay_streams::js_engine(),
