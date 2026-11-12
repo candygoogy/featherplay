@@ -86,11 +86,13 @@ fn parse_reports_webm_for_format_251() {
     assert_eq!(s.mime, "audio/webm");
 }
 
-/// A fresh dir under FEATHERPLAY_HOME, laid out like the app's: `{home}/sidecars`, `{home}/tmp`.
+/// A fresh dir under `FEATHERPLAY_HOME`, else the temp folder, laid out like the app's:
+/// `{home}/sidecars`, `{home}/tmp`.
 fn test_home(name: &str) -> PathBuf {
-    let base =
-        std::env::var("FEATHERPLAY_HOME").expect("set FEATHERPLAY_HOME to a D: dir for tests");
-    let home = PathBuf::from(base)
+    let base = std::env::var("FEATHERPLAY_HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| std::env::temp_dir().join("featherplay-tests"));
+    let home = base
         .join("test-streams")
         .join(format!("{name}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&home);

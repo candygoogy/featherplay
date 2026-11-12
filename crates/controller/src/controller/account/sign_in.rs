@@ -209,6 +209,13 @@ pub fn sign_in_error(e: &ApiError) -> String {
 mod tests {
     use super::*;
 
+    /// Where a test makes its folder: `FEATHERPLAY_HOME`, else the temp folder.
+    fn scratch_base() -> std::path::PathBuf {
+        std::env::var("FEATHERPLAY_HOME")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|_| std::env::temp_dir().join("featherplay-tests"))
+    }
+
     #[test]
     fn a_network_failure_reads_plainly_on_the_sign_in_page() {
         let raw = "error sending request for url (https://music.youtube.com/)";
@@ -255,8 +262,7 @@ mod tests {
 
     #[test]
     fn sign_out_removes_the_whole_profile() {
-        let home = std::env::var_os("FEATHERPLAY_HOME").expect("set FEATHERPLAY_HOME");
-        let profile = std::path::PathBuf::from(home)
+        let profile = scratch_base()
             .join(format!("test-profile-{}", std::process::id()))
             .join("webview2");
         let cookies = profile.join("EBWebView/Default/Network");
@@ -272,9 +278,7 @@ mod tests {
     #[test]
     fn ending_a_session_forgets_the_library_cache() {
         use featherplay_store::{LibraryCache, LibraryList, Paths};
-        let home = std::env::var_os("FEATHERPLAY_HOME").expect("set FEATHERPLAY_HOME");
-        let dir =
-            std::path::PathBuf::from(home).join(format!("test-forget-{}", std::process::id()));
+        let dir = scratch_base().join(format!("test-forget-{}", std::process::id()));
         let paths = Paths::from_home(&dir);
         let cache = LibraryCache::new(&paths);
         cache
@@ -297,9 +301,7 @@ mod tests {
     #[test]
     fn an_expired_session_forgets_the_home_feed() {
         use featherplay_store::{LibraryCache, LibraryList, Paths};
-        let home = std::env::var_os("FEATHERPLAY_HOME").expect("set FEATHERPLAY_HOME");
-        let dir =
-            std::path::PathBuf::from(home).join(format!("test-expired-{}", std::process::id()));
+        let dir = scratch_base().join(format!("test-expired-{}", std::process::id()));
         let paths = Paths::from_home(&dir);
         let cache = LibraryCache::new(&paths);
         for identity in ["", "2"] {

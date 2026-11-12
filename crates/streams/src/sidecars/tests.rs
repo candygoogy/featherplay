@@ -1,5 +1,15 @@
 use super::*;
 
+/// A folder of this test's own (not created), under `FEATHERPLAY_HOME`, else the temp
+/// folder.
+fn scratch(name: &str) -> PathBuf {
+    std::env::var("FEATHERPLAY_HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| std::env::temp_dir().join("featherplay-tests"))
+        .join("test-streams")
+        .join(format!("{name}-{}", std::process::id()))
+}
+
 /// Every system's pins: Windows x64 and ARM64, Linux x86_64 and aarch64.
 const ALL: [&Pins; 4] = [&X64, &ARM64, &LINUX_X64, &LINUX_ARM64];
 
@@ -164,10 +174,7 @@ fn a_linux_build_downloads_the_linux_helpers() {
 #[tokio::test]
 async fn an_installed_helper_is_executable() {
     use std::os::unix::fs::PermissionsExt;
-    let base = std::env::var("FEATHERPLAY_HOME").expect("set FEATHERPLAY_HOME to a dir for tests");
-    let dir = PathBuf::from(base)
-        .join("test-streams")
-        .join(format!("mode-{}", std::process::id()));
+    let dir = scratch("mode");
     std::fs::create_dir_all(&dir).unwrap();
     let (part, exe) = (dir.join("yt-dlp.part"), dir.join("yt-dlp"));
     std::fs::write(&part, b"#!/bin/sh\n").unwrap();
@@ -204,11 +211,7 @@ async fn live_the_pinned_releases_install() {
 /// `yt-dlp -U` (~10 s, beside the first resolves).
 #[tokio::test]
 async fn an_old_update_stamp_is_made_recent() {
-    let base =
-        std::env::var("FEATHERPLAY_HOME").expect("set FEATHERPLAY_HOME to a D: dir for tests");
-    let dir = PathBuf::from(base)
-        .join("test-streams")
-        .join(format!("stamp-{}", std::process::id()));
+    let dir = scratch("stamp");
     std::fs::create_dir_all(&dir).unwrap();
     let stamp = dir.join(UPDATE_STAMP);
     std::fs::write(&stamp, b"").unwrap();
@@ -293,9 +296,7 @@ async fn a_download_cut_off_mid_file_is_tried_again() {
             let _ = s.write_all(answer);
         }
     });
-    let dir = PathBuf::from(std::env::var("FEATHERPLAY_HOME").expect("FEATHERPLAY_HOME"))
-        .join("test-streams")
-        .join(format!("cut-{}", std::process::id()));
+    let dir = scratch("cut");
     std::fs::create_dir_all(&dir).unwrap();
     let dest = dir.join("yt-dlp.exe.part");
     let from = Downloads::local(&[&base], "", "");
@@ -374,11 +375,7 @@ fn the_waits_are_few_and_short() {
 
 #[tokio::test]
 async fn sha256_mismatch_rejected() {
-    let base =
-        std::env::var("FEATHERPLAY_HOME").expect("set FEATHERPLAY_HOME to a D: dir for tests");
-    let dir = PathBuf::from(base)
-        .join("test-streams")
-        .join(format!("sha-{}", std::process::id()));
+    let dir = scratch("sha");
     std::fs::create_dir_all(&dir).unwrap();
     let part = dir.join("yt-dlp.exe.part");
     std::fs::write(&part, b"corrupted download").unwrap();

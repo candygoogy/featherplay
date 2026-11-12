@@ -4,9 +4,12 @@ use featherplay_lastfm::{OfflineQueue, PendingScrobble};
 
 const DAY: i64 = 86_400;
 
+/// A folder of this test's own, under `FEATHERPLAY_HOME`, else the temp folder.
 fn test_dir() -> PathBuf {
-    let home = std::env::var("FEATHERPLAY_HOME").expect("set FEATHERPLAY_HOME for tests");
-    PathBuf::from(home).join(format!("test-lastfm-offline-{}", std::process::id()))
+    let base = std::env::var("FEATHERPLAY_HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| std::env::temp_dir().join("featherplay-tests"));
+    base.join(format!("test-lastfm-offline-{}", std::process::id()))
 }
 
 fn pending(i: i64, timestamp: i64) -> PendingScrobble {
