@@ -13,7 +13,7 @@ made:
 - Audio only. No video playback, video quality or captions.
 - No downloads. It streams; it doesn't save songs or videos.
 - No telemetry: no analytics, usage stats or crash uploads, and no server of its own.
-- Windows only, for now.
+- Windows and Linux, for now.
 - The name, the icon and the window title never carry the YouTube or YouTube Music name or
   Google's logos.
 

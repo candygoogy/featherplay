@@ -2,9 +2,9 @@
 
 This is a map of the code for whoever maintains it. It says how the parts fit, which thread
 does what, and where things are kept on disk. The last part, [Target structure](#target-structure),
-is the plan for making the code easier to own and for adding Linux. Phases 2 to 4 of it are
-built; phase 5 (Linux) is a plan, not a description of today's code. Its decisions are
-listed at its end.
+was the plan for making the code easier to own and for adding Linux, and all of it is built:
+phases 2 to 4 reshaped the code, phase 5 wrote the platform crate's `linux` module, and
+phase 6 added the Linux test rigs. Its decisions are listed at its end.
 
 Paths are relative to the repository root. Each module's own doc comment says more than
 this file does; when the two disagree, the code is right and this file needs fixing.
@@ -195,9 +195,9 @@ They talk like this:
 | Crate | Package | What it does | May depend on |
 |---|---|---|---|
 | `crates/core` | `featherplay-core` | Pure logic: the track model, the queue, the player state machine, scrobble rules, the session cookie rules and `cookie:` header both sign-ins use (`session`), translations (`tr!`). No I/O. | serde only |
-| `crates/platform` | `featherplay-platform` | Everything that talks to the OS, one module per OS (`windows`, `linux`), and which features an OS lacks (`supports`). Phase 2 moved the OS code into it; the `linux` module is stubs until phase 5 ([Target structure](#phase-2-a-platform-crate)). | core |
+| `crates/platform` | `featherplay-platform` | Everything that talks to the OS, one module per OS (`windows`, `linux`), and which features an OS lacks (`supports`). Phase 2 moved the OS code into it and phase 5 wrote the `linux` module ([Target structure](#phase-2-a-platform-crate)); what Linux lacks, `supports` reports. | core |
 | `crates/proxy` | `featherplay-proxy` | The proxy every HTTP client and yt-dlp go through: the environment, else Windows' settings | platform |
-| `crates/store` | `featherplay-store` | Paths, settings, the saved session, secrets in Credential Manager, the library and silence caches | core, platform |
+| `crates/store` | `featherplay-store` | Paths, settings, the saved session, secrets in Credential Manager or the Secret Service, the library and silence caches | core, platform |
 | `crates/ytm` | `featherplay-ytm` | The YouTube Music client over ytmapi-rs: requests (`crates/ytm/src/api.rs`) and parsing (`crates/ytm/src/convert.rs`) | core, proxy |
 | `crates/streams` | `featherplay-streams` | The stream resolver: native step, QuickJS, yt-dlp, the helper downloads | core, proxy, platform |
 | `crates/audio` | `featherplay-audio` | The audio engine: download, decode, sound chain, output | core, proxy, platform (tests also use streams) |
@@ -372,7 +372,8 @@ the controller's state.
 
 ## Target structure
 
-This part is the plan for phases 2 to 4, and all three are built. The goals are:
+This part is the plan for phases 2 to 4, and all three are built; phase 5 (the `linux`
+module) and phase 6 (the Linux rigs) came after them (see phase 2's status). The goals are:
 
 - Linux becomes "write one module", not "touch 30 files".
 - The app crate holds the UI and nothing else.
@@ -387,10 +388,14 @@ The [decisions](#decisions-for-these-phases) at the end settle the choices these
 ### Phase 2: a platform crate
 
 **Done.** The Windows code is in `crates/platform/src/windows/`, and the workspace builds for
-Linux with `linux/` as stubs (CI's `linux` job). Left for phase 5: the `linux` module itself,
-one area file at a time, with `supports` turning each feature on as it lands, and tests
-that run on Linux (today the check only builds; the app's single-instance tests run on
-Windows only).
+Linux with `linux/` as stubs (CI's `linux` job). Phase 5 then wrote the `linux` module, one
+area file at a time, with `supports` turning each feature on as it landed; the stubs left are
+for what Linux doesn't have (thumb buttons, the title bar colour, an app registration) or
+doesn't do yet (the system's proxy settings, a private heap per QuickJS run). CI's `linux`
+job runs clippy and the tests on Ubuntu, on x86_64 and aarch64. Phase 6 added the rigs that
+need a desktop session, a sound server or other distributions:
+`.github/workflows/linux-rig.yml`, `linux-rig-sound.yml` and `linux-rig-appimage.yml`, each
+called from `ci.yml`, with their scripts in `scripts/rig/`.
 
 A new crate, `crates/platform` (`featherplay-platform`), holds everything that talks to the
 operating system. It sits low in the graph. It may depend on OS crates and on
@@ -401,7 +406,7 @@ crates/platform/src/
   lib.rs          picks the module with cfg, re-exports its functions and types
   common/         what an area's versions share: plain types, events, logic with no OS calls
   windows/        today's code, moved here
-  linux/          stubs in phase 2, real code in phase 5
+  linux/          stubs in phase 2, the Linux code since phase 5
 ```
 
 The rules:
@@ -419,8 +424,9 @@ The rules:
   everything it does today.
 - `windows`, `webview2-com`, `tauri-winrt-notification` and `windows-native-keyring-store`
   move under `[target.'cfg(windows)'.dependencies]` in every crate.
-- CI's `linux` job runs `cargo check` and `clippy` for `x86_64-unknown-linux-gnu`
-  (`scripts/linux-check.sh`) on every push.
+- CI's `linux` job builds for Linux on every push (since phase 5, clippy and the tests);
+  `scripts/linux-check.sh` runs `cargo check` and clippy for `x86_64-unknown-linux-gnu`
+  before a push.
 
 **What moves.** This list comes from a `git grep` for `windows::`, `webview2_com`,
 `HWND`, `extern "system"`, `creation_flags`, `CREATE_NO_WINDOW`,
