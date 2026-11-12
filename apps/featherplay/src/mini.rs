@@ -14,7 +14,8 @@
 //! The window exists only while it shows: `open` creates it (a few milliseconds) and `close`
 //! drops it, so a closed mini player costs nothing, no window and no timer. While open it
 //! mirrors the main window's `Player` and `Theme` globals (each window has its own) on every
-//! state change and on the bar's once-a-second tick, and its buttons go through the main
+//! state change and on the bar's once-a-second tick, the cover colours on every step of a
+//! song change's crossfade (`follow_changed`), and its buttons go through the main
 //! window's `Player` callbacks, the same path as the bar's (`popup`). It never touches the
 //! main window's visibility, page or size; only "Open featherplay" shows it.
 
@@ -441,6 +442,20 @@ pub fn theme_changed(ctx: &Rc<Ctx>) {
     sync_theme(&mini, &main);
     if let Some(handle) = mini.handle.get() {
         let _ = chrome::popup_border(handle, popup::border(&mini.ui.global::<Theme>()));
+    }
+}
+
+/// The main window's cover colours moved (`follow::show`: a step of a song change's
+/// crossfade, or the new colours at once): the open mini player shows them in the same turn.
+/// Once they've `settled`, its border follows too.
+pub fn follow_changed(main: &Theme, settled: bool) {
+    let Some(mini) = MINI.with_borrow(Clone::clone) else {
+        return;
+    };
+    let own = mini.ui.global::<Theme>();
+    popup::sync_follow(main, &own);
+    if settled && let Some(handle) = mini.handle.get() {
+        let _ = chrome::popup_border(handle, popup::border(&own));
     }
 }
 

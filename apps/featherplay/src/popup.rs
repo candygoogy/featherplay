@@ -126,9 +126,15 @@ pub fn sync_theme(from: &Theme, to: &Theme, appearance: Appearance) {
     to.set_motion(from.get_motion());
     to.set_still(from.get_still());
     to.invoke_apply(appearance);
-    to.set_follow_accent(from.get_follow_accent());
     to.set_preset_dark(from.get_preset_dark());
     to.set_preset_light(from.get_preset_light());
+    sync_follow(from, to);
+}
+
+/// Copies the main window's cover colours into a popup's: the accent, the bar's tint and
+/// the secondary text.
+pub fn sync_follow(from: &Theme, to: &Theme) {
+    to.set_follow_accent(from.get_follow_accent());
     to.set_follow_bar(from.get_follow_bar());
     to.set_follow_text2(from.get_follow_text2());
     to.set_follow(from.get_follow());

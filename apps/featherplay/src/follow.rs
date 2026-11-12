@@ -12,8 +12,9 @@
 //! too, and no cover is worked out twice.
 //! Back on the UI thread the accents go into `Theme.follow-*`, crossfading over `Theme.t-colour`
 //! (300 ms; instant when Windows' animation effects are off, or while the window is
-//! minimized or hidden). Nothing else animates; nothing runs while the track stays the same,
-//! so a paused or idle player costs nothing.
+//! minimized or hidden and the mini player isn't open). The open mini player takes every
+//! step of it into its own `Theme` (`mini::follow_changed`). Nothing else animates; nothing
+//! runs while the track stays the same, so a paused or idle player costs nothing.
 
 pub mod colour;
 
@@ -371,15 +372,18 @@ fn show(ctx: &Rc<Ctx>, colours: Colours, dark: bool) {
         first
     });
 
+    // The mini player shows the same fade, so it runs while only the mini player is open.
     let window = ui.window();
-    let on_screen = window.is_visible() && !window.is_minimized();
+    let on_screen = (window.is_visible() && !window.is_minimized()) || crate::mini::is_open();
     let duration = Duration::from_millis(theme.get_t_colour().max(0) as u64);
     if duration.is_zero() || !on_screen || first || from == to {
         set(&theme, to);
         theme.set_follow_neutral(neutral);
+        crate::mini::follow_changed(&theme, true);
         STATE.with(|s| s.borrow_mut().fade = None);
         return;
     }
+    crate::mini::follow_changed(&theme, false);
     let timer = Rc::new(Timer::default());
     let started = Instant::now();
     let weak = ui.as_weak();
@@ -400,6 +404,7 @@ fn show(ctx: &Rc<Ctx>, colours: Colours, dark: bool) {
             if t >= 1.0 {
                 theme.set_follow_neutral(neutral);
             }
+            crate::mini::follow_changed(&theme, t >= 1.0);
         }
         if t >= 1.0
             && let Some(timer) = stop.upgrade()
