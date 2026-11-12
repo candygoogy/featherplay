@@ -2,7 +2,8 @@
 //! `HINT_SLOTS` at a time; the newest hints go first, and older row hints are dropped past
 //! `HINT_QUEUE`. Their yt-dlp runs take turns (`YtDlpResolver::resolve_ahead`). A row's
 //! hint is for a click that may come any moment (`Ahead::Soon`), the queue's for later. Nothing
-//! resolves twice: a hint for a stream that's here, running or waiting does nothing. The
+//! resolves twice: a hint for a stream that's here, running or waiting does nothing, nor
+//! one for a song YouTube said lately is unavailable (`Streams::unavailable`). The
 //! queue's hints follow the queue: a track no longer ahead has its resolve stopped, and
 //! paused or stopped, none runs. No timers: hints start when they come in and when a
 //! resolve ends.
@@ -74,7 +75,7 @@ impl Streams {
     pub fn hint(&mut self, id: &TrackId, now: SystemTime) {
         self.page_waiting.retain(|w| w != id);
         self.take_over(id, Hint::Row);
-        if self.covered(id, now) {
+        if self.covered(id, now) || self.known_unavailable(id).is_some() {
             return;
         }
         self.waiting.push_back((id.clone(), Hint::Row));
@@ -209,6 +210,7 @@ impl Streams {
             .iter()
             .chain(&self.page_failed)
             .any(|(f, _)| f == id)
+            || self.known_unavailable(id).is_some()
     }
 
     /// `id` isn't resolved ahead again for `FAILED_FOR`, as `hint`'s (a row on screen's is
@@ -577,6 +579,31 @@ mod tests {
         assert!(s.start_hints().is_empty());
         // The player still resolves it when it gets there.
         assert_eq!(s.want(&id("q1"), now), Want::Start);
+    }
+
+    /// YouTube said a song is unavailable: no hover, queue or row on screen resolves it
+    /// again for `UNAVAILABLE_FOR`; after that they do.
+    #[test]
+    fn an_unavailable_song_is_not_resolved_ahead_for_a_while() {
+        let mut s = Streams::default();
+        let now = SystemTime::now();
+        s.hint(&id("a"), now);
+        s.start_hints();
+        s.done(&id("a"), None, &[]);
+        s.unavailable(&id("a"), "This video is not available");
+        s.hint(&id("a"), now);
+        s.ahead(None, &[id("a")], now);
+        s.prepare_while(true, now);
+        s.on_screen(vec![id("a")], now);
+        assert!(s.start_hints().is_empty());
+
+        for (_, at, _) in &mut s.unavailable {
+            *at = Instant::now()
+                .checked_sub(super::super::UNAVAILABLE_FOR)
+                .unwrap();
+        }
+        s.hint(&id("a"), now);
+        assert_eq!(ids(s.start_hints()), [id("a")]);
     }
 
     /// The player asking for a song whose resolve ahead runs tells that resolve, so it

@@ -66,6 +66,10 @@ impl Controller {
                 return;
             }
             Msg::Resolved(id, result) => {
+                if let Err(ResolveError::Unavailable(why)) = &result {
+                    // Not asked again for a while (`streams.rs`).
+                    self.streams.unavailable(&id, why);
+                }
                 let keep = self.in_use();
                 let (took, ahead) = self.streams.done(&id, result.as_ref().ok(), &keep);
                 let took = took.as_secs_f64();

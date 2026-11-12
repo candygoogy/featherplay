@@ -6,6 +6,10 @@
 //! first 256 KB fetched into memory (`AudioEngine::prefetch`) without a request; a fetch
 //! that's refused (HTTP 403) is told, and the track resolved again ahead, once.
 //!
+//! A song YouTube answers is unavailable isn't asked again for `UNAVAILABLE_FOR`: not ahead,
+//! and not for the player's preload, which gets the same answer at once. Only the player
+//! waiting to play the song (a click on it, Next, the queue reaching it) asks again.
+//!
 //! The track played before the current one gets its first 256 KB fetched again when it's
 //! left (its download went with it), so Previous starts from memory too.
 //!
@@ -23,7 +27,7 @@ use featherplay_audio::StreamSource;
 use featherplay_core::failure::getting_ready;
 use featherplay_core::model::TrackId;
 use featherplay_core::player::{Input, Player, Status};
-use featherplay_streams::{Ahead, ResolvedStream};
+use featherplay_streams::{Ahead, ResolveError, ResolvedStream};
 use tokio::sync::Notify;
 use tokio::task::AbortHandle;
 
@@ -42,6 +46,13 @@ const SERVER_SAMPLE: usize = 32;
 /// keep their own, `2 * PAGE_ROWS`.
 const FAILED_KEPT: usize = 8;
 const FAILED_FOR: Duration = Duration::from_secs(10 * 60);
+/// How long YouTube's "unavailable" for a song stands (`Streams::unavailable`). On
+/// 2026-11-11 it answered so for many songs on every route for a few minutes, then recovered
+/// by itself; meanwhile the next song's preload asked again for the same one on every song
+/// change, ~4 s of yt-dlp each.
+const UNAVAILABLE_FOR: Duration = Duration::from_secs(5 * 60);
+/// Songs remembered as unavailable, oldest dropped first.
+const UNAVAILABLE_KEPT: usize = 32;
 /// A stream that expires sooner than this is resolved again (the player re-resolves at
 /// 30 s before expiry, so a stream handed to it must outlive that comfortably).
 const FRESH_FOR: Duration = Duration::from_secs(10 * 60);
@@ -94,6 +105,9 @@ pub(super) struct Streams {
     /// on screen's.
     failed: VecDeque<(TrackId, Instant)>,
     page_failed: VecDeque<(TrackId, Instant)>,
+    /// Songs YouTube answered are unavailable, when, and what it said, newest last
+    /// (`unavailable`).
+    unavailable: VecDeque<(TrackId, Instant, String)>,
     /// The stream loaded last.
     loaded: Option<StreamSource>,
     /// The tracks whose refused preload was resolved again lately (`again_after_refusal`).
@@ -226,6 +240,7 @@ impl Streams {
                     self.address = Some(ip.to_string());
                 }
                 self.restored.retain(|r| r != id);
+                self.unavailable.retain(|(u, ..)| u != id);
                 self.cache.retain(|(c, _)| c != id);
                 self.cache.push_back((id.clone(), s.clone()));
                 if self.cache.len() > KEEP
@@ -248,6 +263,37 @@ impl Streams {
             }
         }
         (took, hint)
+    }
+
+    /// YouTube answered `why` for `id`: it isn't available. Believed for `UNAVAILABLE_FOR`.
+    pub fn unavailable(&mut self, id: &TrackId, why: &str) {
+        self.unavailable.retain(|(u, ..)| u != id);
+        self.unavailable
+            .push_back((id.clone(), Instant::now(), why.to_string()));
+        if self.unavailable.len() > UNAVAILABLE_KEPT {
+            self.unavailable.pop_front();
+        }
+    }
+
+    /// What YouTube said when it answered `id` was unavailable, if that was within
+    /// `UNAVAILABLE_FOR`.
+    pub fn known_unavailable(&self, id: &TrackId) -> Option<&str> {
+        self.unavailable
+            .iter()
+            .find(|(u, at, _)| u == id && at.elapsed() < UNAVAILABLE_FOR)
+            .map(|(_, _, why)| why.as_str())
+    }
+
+    /// The answer to the player's resolve of `id` without asking YouTube: its "unavailable"
+    /// of a moment ago, for a preload or a load while paused, rather than ~4 s of yt-dlp.
+    /// The player waiting to play the song (a click on it, Next, the queue reaching it) asks
+    /// again.
+    fn unavailable_for(&self, player: &Player, id: &TrackId) -> Option<ResolveError> {
+        if waits_to_play(player, id) {
+            return None;
+        }
+        let why = self.known_unavailable(id)?;
+        Some(ResolveError::Unavailable(why.to_string()))
     }
 
     /// Drops the stream of `id` (its URL was refused); returns it.
@@ -394,6 +440,16 @@ impl Controller {
                 ),
             }
             return None;
+        }
+        if let Some(e) = self.streams.unavailable_for(&self.player, &id) {
+            log!(
+                "resolve {}: unavailable lately, not asked again before it plays",
+                id.0
+            );
+            return Some(Input::Resolved {
+                id,
+                result: Err(super::notice::failure(&e)),
+            });
         }
         let want = self.streams.want(&id, SystemTime::now());
         if !matches!(want, Want::Cached(_))
@@ -647,6 +703,41 @@ mod tests {
         let effects = player.handle(Input::AudioStarted);
         assert!(effects.contains(&Effect::Resolve(id("b"))));
         assert!(!waits_to_play(&player, &id("b")), "the next song");
+    }
+
+    /// YouTube said the next song is unavailable: its preload gets that answer again for a
+    /// while, without a resolve, but a click on it asks again.
+    #[test]
+    fn an_unavailable_songs_preload_is_answered_at_once_and_a_click_asks_again() {
+        let mut player = clicked();
+        let mut s = Streams::default();
+        for x in ["a", "b"] {
+            s.unavailable(&id(x), "This video is not available");
+        }
+        assert_eq!(
+            s.unavailable_for(&player, &id("a")),
+            None,
+            "the song clicked"
+        );
+        let info = StreamInfo {
+            expires_at: SystemTime::now() + HOURS,
+            duration: None,
+        };
+        player.handle(Input::Resolved {
+            id: id("a"),
+            result: Ok(info),
+        });
+        player.handle(Input::AudioStarted);
+        assert_eq!(
+            s.unavailable_for(&player, &id("b")),
+            Some(ResolveError::Unavailable(
+                "This video is not available".into()
+            )),
+            "the next song's preload"
+        );
+        // Resolved after all (YouTube came back): no longer taken as unavailable.
+        s.done(&id("b"), Some(&stream(HOURS)), &[]);
+        assert_eq!(s.unavailable_for(&player, &id("b")), None);
     }
 
     #[test]
