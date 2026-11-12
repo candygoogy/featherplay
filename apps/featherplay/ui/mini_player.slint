@@ -270,8 +270,8 @@ export component MiniPlayer inherits Window {
             y: 4px;
             icon: Player.disliked ? Icons.dislike-filled : Icons.dislike;
             filled: Player.disliked;
-            label: @tr("Not for me");
-            description: @tr("Skips the song and tells YouTube Music you dislike it");
+            label: Player.disliked ? @tr("Remove dislike") : @tr("Not for me");
+            description: Player.disliked ? @tr("Tells YouTube Music you no longer dislike the song") : @tr("Skips the song and tells YouTube Music you dislike it");
             tint: Player.disliked ? Theme.text1 : Theme.text2;
             enabled: Player.has-track;
             clicked => { Player.not-for-me(); }

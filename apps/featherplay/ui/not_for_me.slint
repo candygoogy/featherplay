@@ -1,12 +1,12 @@
 // "Not for me" (the bar and Now playing): a thumbs-down beside the heart, styled as the
 // heart is so the two read as a pair: the same button (36 px, 40 on Now playing) and 20 px
 // glyph in `text2` (the cover's tint while the colours follow it), the same hover and
-// press, and filled in `text1`
-// for a song already rated Dislike, as the heart fills for a liked one. A click rates the
-// song Dislike (unless it already is) and skips it (`src/not_for_me.rs`); the toast that
-// follows offers Undo. Resting on it shows the bar's tooltip (`BarTip`) saying what it does,
-// so the skip never comes as a surprise. `LikeButton`, the heart, is here too: the bar and
-// Now playing show the pair.
+// press, and filled in `text1` for a song already rated Dislike, as the heart fills for a
+// liked one. A click rates the song Dislike and skips it (`src/not_for_me.rs`); the toast
+// that follows offers Undo. On a song it shows filled it's a toggle, as the heart is: the
+// click takes the dislike off ("Remove dislike") and the song plays on. Resting on it shows
+// the bar's tooltip (`BarTip`) saying what it does, so the skip never comes as a surprise.
+// `LikeButton`, the heart, is here too: the bar and Now playing show the pair.
 import { Theme, Icons } from "theme.slint";
 import { IconButton } from "parts.slint";
 import { Player } from "player.slint";
@@ -55,8 +55,8 @@ export component NotForMeButton inherits Rectangle {
         height: root.size;
         icon: Player.disliked ? Icons.dislike-filled : Icons.dislike;
         filled: Player.disliked;
-        label: @tr("Not for me");
-        description: @tr("Skips the song and tells YouTube Music you dislike it");
+        label: Player.disliked ? @tr("Remove dislike") : @tr("Not for me");
+        description: Player.disliked ? @tr("Tells YouTube Music you no longer dislike the song") : @tr("Skips the song and tells YouTube Music you dislike it");
         tint: Player.disliked ? Theme.text1 : Theme.text2;
         enabled: Player.has-track;
         fade: root.fade;
@@ -67,9 +67,9 @@ export component NotForMeButton inherits Rectangle {
     }
     tip := BarTip {
         over: btn.hovered;
-        name: @tr("Not for me");
+        name: btn.label;
         // What it does rather than a shortcut (it has none), set off by a dot.
-        hint: @tr("· Dislike and skip");
+        hint: Player.disliked ? @tr("· Back to no rating") : @tr("· Dislike and skip");
         above: root.above;
     }
 }

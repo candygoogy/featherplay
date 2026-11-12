@@ -168,6 +168,9 @@ fn a_dislike_fills_the_thumbs_down_and_a_like_clears_it() {
     let id = TrackId(player.get_track_id().as_str().into());
     song_menu::show_rating(&scene.ctx, &id, LikeStatus::Dislike);
     assert!(player.get_disliked() && !player.get_liked());
+    // Pressed again it takes the dislike off, and says so.
+    scene.settle();
+    assert!(!rects(&scene, "Remove dislike", f32::MAX).is_empty());
 
     player.invoke_toggle_like();
     assert!(player.get_liked() && !player.get_disliked());

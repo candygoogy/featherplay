@@ -305,10 +305,10 @@ fn wire(ui: &MiniPlayer, main: &AppWindow) {
         }
     });
     // Not for me as the tray icon menu's: toast and Undo when the window is on screen, else
-    // just rated and skipped.
+    // just rated and skipped; on a song it shows disliked, it takes the dislike off.
     player.on_not_for_me(|| {
         if let Some(ctx) = Ctx::get() {
-            crate::not_for_me::from_tray(&ctx);
+            crate::not_for_me::from_mini(&ctx);
         }
     });
 

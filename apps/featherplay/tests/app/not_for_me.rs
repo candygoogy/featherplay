@@ -1,6 +1,7 @@
 //! "Not for me" (the thumbs-down beside the heart): it rates the song Dislike and skips it;
-//! Undo puts the rating back and returns to the song where it was. The actions run on a real
-//! player, as the controller runs them.
+//! Undo puts the rating back and returns to the song where it was; on a song shown disliked
+//! the button only takes the dislike off. The actions run on a real player, as the
+//! controller runs them.
 
 use std::collections::HashMap;
 use std::time::{Duration, SystemTime};
@@ -90,6 +91,7 @@ fn not_for_me_dislikes_the_song_then_skips_it() {
     assert_eq!(current(&player), Some("b"));
 }
 
+/// The tray's item, which doesn't show the rating.
 #[test]
 fn a_song_already_disliked_is_only_skipped_and_undo_writes_no_rating() {
     let mut player = player_with(&["a", "b", "c"]);
@@ -211,4 +213,47 @@ fn a_song_set_aside_still_plays_when_picked_on_its_page() {
         player.queue().current().map(|t| t.like),
         Some(LikeStatus::Dislike)
     );
+}
+
+#[test]
+fn a_press_on_a_song_shown_disliked_only_takes_the_dislike_off() {
+    let mut player = player_with(&["a", "b", "c"]);
+    player.handle(Input::SeekTo(AT));
+    let mut disliked = track("a");
+    disliked.like = LikeStatus::Dislike;
+    let not_for_me::Press::Unmark(action) = not_for_me::press(&disliked, AT) else {
+        panic!("a press on a song shown disliked marked it again");
+    };
+    assert!(
+        matches!(&action, Action::Rate(id, LikeStatus::Indifferent) if id.0 == "a"),
+        "{action:?}"
+    );
+    let mut likes = HashMap::new();
+    run_rated(&mut player, &mut likes, vec![action]);
+    // No skip, and nothing moves back: the song plays on where it was.
+    assert_eq!(current(&player), Some("a"));
+    assert_eq!(player.position(), AT);
+    assert_eq!(upcoming(&player), ["b", "c"]);
+    assert_eq!(
+        player.queue().current().map(|t| t.like),
+        Some(LikeStatus::Indifferent)
+    );
+}
+
+#[test]
+fn a_first_press_marks_and_skips_as_before() {
+    for like in [LikeStatus::Indifferent, LikeStatus::Like] {
+        let mut song = track("a");
+        song.like = like;
+        let not_for_me::Press::Mark(now, _) = not_for_me::press(&song, AT) else {
+            panic!("a first press on a song rated {like:?} took a dislike off");
+        };
+        assert!(
+            matches!(
+                &now[..],
+                [Action::Rate(_, LikeStatus::Dislike), Action::Next]
+            ),
+            "{now:?}"
+        );
+    }
 }
