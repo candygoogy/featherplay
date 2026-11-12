@@ -6,6 +6,8 @@
 //! video's song version when "prefer song versions" is on, so `Resolved` answers with that
 //! id too.
 
+use std::cell::Cell;
+use std::collections::HashSet;
 use std::time::{Duration, SystemTime};
 
 use crate::failure::{FailKind, Failure, StopCause, stop_cause};
@@ -14,8 +16,13 @@ use crate::model::{LikeStatus, RepeatMode, Session, Track, TrackId, VideoType};
 use crate::queue::{BackAction, Queue};
 use crate::scrobble::{ScrobbleTracker, eligible};
 
-/// Playback stops after this many tracks in a row fail to resolve or play.
+/// Playback stops after this many tracks in a row fail to resolve or play. Songs YouTube
+/// refuses (`FailKind::Refused`) don't count: the player passes over them and plays on.
 const MAX_FAILURES: usize = 3;
+/// It stops after this many refused songs in a row, though: then YouTube likely refuses
+/// every song for a while (as for a few minutes on 2026-11-11), and a radio would otherwise
+/// fetch continuation after continuation of songs refused too.
+const MAX_REFUSED: usize = 10;
 /// A URL this close to its expiry is resolved again before it's loaded or resumed.
 const EXPIRY_MARGIN: Duration = Duration::from_secs(30);
 /// While playing or loading, a changed session is saved this often (from `Tick`). Paused
@@ -114,6 +121,10 @@ pub enum Input {
         video: TrackId,
         song: Track,
     },
+    /// YouTube refuses to play this id (`true`, a `FailKind::Refused` the controller
+    /// remembers), or played it after all (`false`). Moving on passes over the tracks it
+    /// refuses, as over disliked ones: one the user starts directly is still tried.
+    SetRefused(TrackId, bool),
 }
 
 /// What core needs from a resolved stream.
@@ -156,6 +167,8 @@ pub enum Effect {
     /// Playback stopped after failures; the window says why in plain words.
     ShowError(Stop),
     ShowReauth,
+    /// Moving on passed over songs YouTube refuses: the window says so, once a queue.
+    SongsRefused,
     /// Save `Player::session()`.
     PersistSession,
     /// Status, current track or queue changed. Not sent for position updates.
@@ -264,6 +277,12 @@ pub struct Player {
     announced: bool,
     /// The failures in a row since a track last started, oldest first.
     failures: Vec<FailKind>,
+    /// The play ids YouTube refuses (`Input::SetRefused`).
+    refused: HashSet<TrackId>,
+    /// Moving on passed over a refused song, or one failed so (`Effect::SongsRefused`);
+    /// `told_refused`: the window was told this queue.
+    passed_refused: bool,
+    told_refused: bool,
     expired_retries: u32,
     preload: Preload,
     /// A preloaded stream whose track stopped being next after a queue edit, kept in case
@@ -304,6 +323,9 @@ impl Player {
             fade_in: None,
             announced: false,
             failures: Vec::new(),
+            refused: HashSet::new(),
+            passed_refused: false,
+            told_refused: false,
             expired_retries: 0,
             preload: Preload::Idle,
             parked: None,
@@ -507,6 +529,17 @@ impl Player {
                     self.queue_edited(&mut out);
                 }
             }
+            Input::SetRefused(id, refused) => {
+                let changed = if refused {
+                    self.refused.insert(id)
+                } else {
+                    self.refused.remove(&id)
+                };
+                if changed {
+                    // The next track may be another one now.
+                    self.replan_preload(&mut out);
+                }
+            }
             Input::SongVersion { video, song } => {
                 // The video's stream is already on its way as the next track's: the song
                 // would make that start wait for another resolve, so the video plays.
@@ -521,6 +554,14 @@ impl Player {
                     self.queue_edited(&mut out);
                 }
             }
+        }
+        if std::mem::take(&mut self.passed_refused)
+            && !self.told_refused
+            && !out.iter().any(|e| matches!(e, Effect::ShowError(_)))
+        {
+            // Said once a queue, and not over a stop's own words.
+            self.told_refused = true;
+            out.push(Effect::SongsRefused);
         }
         if self.position != position || (may_change && !out.is_empty()) {
             self.unsaved = true;
@@ -582,6 +623,7 @@ impl Player {
     fn added(&mut self, was_empty: bool, out: &mut Vec<Effect>) {
         if was_empty && self.queue.current().is_some() {
             self.failures.clear();
+            self.told_refused = false;
             self.play_intent = true;
             self.enter_track(Duration::ZERO, out);
             out.push(Effect::PersistSession);
@@ -677,6 +719,7 @@ impl Player {
         }
         self.queue.replace(tracks, start, radio);
         self.failures.clear();
+        self.told_refused = false;
         self.preload = Preload::Idle;
         self.parked = None;
         self.continuation_pending = false;
@@ -1097,7 +1140,8 @@ impl Player {
     }
 
     /// A track failed to resolve or play: skip it, or stop after `MAX_FAILURES` in a row (at
-    /// once when the helpers couldn't be downloaded).
+    /// once when the helpers couldn't be downloaded). A song YouTube refuses is passed over
+    /// from now on, and doesn't count, up to `MAX_REFUSED` in a row.
     fn fail(&mut self, failure: Failure, out: &mut Vec<Effect>) {
         self.failures.push(failure.kind);
         self.phase = Phase::Empty;
@@ -1107,11 +1151,28 @@ impl Player {
             self.stop(failure.detail, out);
             return;
         }
-        if self.failures.len() >= MAX_FAILURES {
+        let refused = self
+            .failures
+            .iter()
+            .filter(|k| **k == FailKind::Refused)
+            .count();
+        if failure.kind == FailKind::Refused {
+            if let Some(t) = self.queue.current() {
+                let id = self.play_id(t);
+                self.refused.insert(id);
+            }
+            self.passed_refused = true;
+        }
+        if self.failures.len() - refused >= MAX_FAILURES {
             let detail = format!(
                 "{MAX_FAILURES} tracks in a row couldn't play: {}",
                 failure.detail
             );
+            self.stop(detail, out);
+            return;
+        }
+        if refused >= MAX_REFUSED {
+            let detail = format!("{MAX_REFUSED} songs in a row refused: {}", failure.detail);
             self.stop(detail, out);
             return;
         }
@@ -1333,8 +1394,22 @@ impl Player {
     /// Moves on to the next track (the end of one, Next, a failure, a continuation), past
     /// the ones `passed_over` picks. Returns whether it moved.
     fn move_on(&mut self) -> bool {
-        let prefs = self.prefs;
-        self.queue.advance_past(|t| passed_over(prefs, t)).is_some()
+        let (prefs, refused) = (self.prefs, &self.refused);
+        let passed = Cell::new(false);
+        let moved = self
+            .queue
+            .advance_past(|t| {
+                let over = passed_over(prefs, refused, t);
+                if over && refused.contains(&play_id(prefs, t)) {
+                    passed.set(true);
+                }
+                over
+            })
+            .is_some();
+        if moved && passed.get() {
+            self.passed_refused = true;
+        }
+        moved
     }
 
     /// The play ids of the next `n` tracks, in the order they'll play (shuffled, repeated,
@@ -1342,7 +1417,7 @@ impl Player {
     pub fn ahead(&self, n: usize) -> Vec<TrackId> {
         let prefs = self.prefs;
         self.queue
-            .peek_ahead_past(n, |t| passed_over(prefs, t))
+            .peek_ahead_past(n, |t| passed_over(prefs, &self.refused, t))
             .into_iter()
             .map(|t| play_id(prefs, t))
             .collect()
@@ -1351,7 +1426,8 @@ impl Player {
     /// The track `move_on` would go to.
     fn next_track(&self) -> Option<&Track> {
         let prefs = self.prefs;
-        self.queue.peek_next_past(|t| passed_over(prefs, t))
+        self.queue
+            .peek_next_past(|t| passed_over(prefs, &self.refused, t))
     }
 
     fn set_status(&mut self, status: Status, out: &mut Vec<Effect>) {
@@ -1375,9 +1451,10 @@ fn same_album(a: &Track, b: &Track) -> bool {
     matches!((&a.album, &b.album), (Some(x), Some(y)) if x.id == y.id)
 }
 
-/// Moving on passes over `t`: the user disliked it, and "Skip songs I've disliked" is on.
-fn passed_over(prefs: PlaybackPrefs, t: &Track) -> bool {
-    prefs.skip_disliked && t.like == LikeStatus::Dislike
+/// Moving on passes over `t`: the user disliked it, and "Skip songs I've disliked" is on;
+/// or YouTube refuses to play it (`refused`: play ids).
+fn passed_over(prefs: PlaybackPrefs, refused: &HashSet<TrackId>, t: &Track) -> bool {
+    (prefs.skip_disliked && t.like == LikeStatus::Dislike) || refused.contains(&play_id(prefs, t))
 }
 
 /// Radio and continuations drop user uploads and podcast episodes.

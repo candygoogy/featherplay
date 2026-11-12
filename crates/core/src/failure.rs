@@ -7,6 +7,10 @@
 pub enum FailKind {
     /// The song itself can't be played (deleted, private, region-locked): one song is gone.
     Unavailable,
+    /// YouTube said the song isn't available to featherplay's clients: since 2026-11-11 it
+    /// answers so for some songs to every client but its own music web player. The player
+    /// passes over the song from then on and plays on (`Player::fail`).
+    Refused,
     /// Every way to the stream failed on our side (yt-dlp failed after the direct request):
     /// YouTube has likely changed something.
     Broken,
@@ -85,7 +89,11 @@ pub fn stop_cause(streak: &[FailKind]) -> StopCause {
         StopCause::Setup(fault)
     } else if streak.contains(&FailKind::Broken) {
         StopCause::Broken
-    } else if !streak.is_empty() && streak.iter().all(|k| *k == FailKind::Unavailable) {
+    } else if !streak.is_empty()
+        && streak
+            .iter()
+            .all(|k| matches!(k, FailKind::Unavailable | FailKind::Refused))
+    {
         StopCause::Unavailable
     } else {
         StopCause::Other
@@ -109,6 +117,11 @@ pub enum Notice {
 /// The toast while a first run downloads the helpers and a song waits for them.
 pub fn getting_ready() -> &'static str {
     crate::tr!("Getting ready to play: downloading helpers (one time)…")
+}
+
+/// The toast when songs YouTube won't play were passed over, once a queue.
+pub fn songs_refused() -> &'static str {
+    crate::tr!("Some songs here can't play right now. featherplay skips them.")
 }
 
 /// The notice for a stop. `helpers_tried`: yt-dlp was already brought up to date after a

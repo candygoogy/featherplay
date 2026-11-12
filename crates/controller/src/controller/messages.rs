@@ -70,6 +70,14 @@ impl Controller {
                     // Not asked again for a while (`streams.rs`).
                     self.streams.unavailable(&id, why);
                 }
+                match &result {
+                    // Ahead or not: the queue passes it over, the lists grey it.
+                    Err(e @ ResolveError::Unavailable(why)) if e.is_refusal() => {
+                        self.refused(&id, why);
+                    }
+                    Ok(_) => self.not_refused(&id),
+                    Err(_) => {}
+                }
                 let keep = self.in_use();
                 let (took, ahead) = self.streams.done(&id, result.as_ref().ok(), &keep);
                 let took = took.as_secs_f64();

@@ -13,6 +13,7 @@ mod failure;
 mod i18n;
 mod player;
 mod queue;
+mod refused;
 mod scrobble;
 mod sync;
 mod text;

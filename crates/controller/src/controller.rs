@@ -526,6 +526,7 @@ impl Controller {
         if let Ok(text) = std::fs::read_to_string(&path) {
             self.streams.restore(&text, SystemTime::now());
         }
+        self.restore_refused();
     }
 
     fn persist(&self) {

@@ -10,6 +10,12 @@
 //! and not for the player's preload, which gets the same answer at once. Only the player
 //! waiting to play the song (a click on it, Next, the queue reaching it) asks again.
 //!
+//! A song YouTube refuses ("This video is not available", `ResolveError::is_refusal`) is
+//! marked for the rest of the session instead (`refuse`): never resolved ahead, passed over
+//! by the queue (`Input::SetRefused`) and shown greyed in the lists. A click on it still
+//! asks, and a stream for it lifts the mark. The marks are saved with the streams and
+//! restored for `REFUSED_KEPT_FOR` after each.
+//!
 //! The track played before the current one gets its first 256 KB fetched again when it's
 //! left (its download went with it), so Previous starts from memory too.
 //!
@@ -53,6 +59,13 @@ const FAILED_FOR: Duration = Duration::from_secs(10 * 60);
 const UNAVAILABLE_FOR: Duration = Duration::from_secs(5 * 60);
 /// Songs remembered as unavailable, oldest dropped first.
 const UNAVAILABLE_KEPT: usize = 32;
+/// Songs marked as refused (`Streams::refuse`), oldest dropped first: a few long playlists'
+/// worth (one had 93 songs, many of them refused, on 2026-11-12).
+const REFUSED_KEPT: usize = 300;
+/// How long a refusal saved for the next session stands there. Since 2026-11-11 YouTube has
+/// refused the same songs every time, but its answers have flipped before: a restart the
+/// next day tries them again.
+const REFUSED_KEPT_FOR: Duration = Duration::from_secs(6 * 3600);
 /// A stream that expires sooner than this is resolved again (the player re-resolves at
 /// 30 s before expiry, so a stream handed to it must outlive that comfortably).
 const FRESH_FOR: Duration = Duration::from_secs(10 * 60);
@@ -108,6 +121,8 @@ pub(super) struct Streams {
     /// Songs YouTube answered are unavailable, when, and what it said, newest last
     /// (`unavailable`).
     unavailable: VecDeque<(TrackId, Instant, String)>,
+    /// Songs YouTube refuses, when, and what it said, newest last (`refuse`).
+    refused: VecDeque<(TrackId, SystemTime, String)>,
     /// The stream loaded last.
     loaded: Option<StreamSource>,
     /// The tracks whose refused preload was resolved again lately (`again_after_refusal`).
@@ -276,12 +291,48 @@ impl Streams {
     }
 
     /// What YouTube said when it answered `id` was unavailable, if that was within
-    /// `UNAVAILABLE_FOR`.
+    /// `UNAVAILABLE_FOR`, or when it refused `id` (`refuse`).
     pub fn known_unavailable(&self, id: &TrackId) -> Option<&str> {
         self.unavailable
             .iter()
             .find(|(u, at, _)| u == id && at.elapsed() < UNAVAILABLE_FOR)
             .map(|(_, _, why)| why.as_str())
+            .or_else(|| self.refusal(id))
+    }
+
+    /// YouTube refused `id` at `at`, saying `why` (`ResolveError::is_refusal`): it stays
+    /// marked for the session. Returns whether it's newly marked.
+    pub fn refuse(&mut self, id: &TrackId, at: SystemTime, why: &str) -> bool {
+        let new = self.refusal(id).is_none();
+        self.refused.retain(|(r, ..)| r != id);
+        self.refused.push_back((id.clone(), at, why.to_string()));
+        if self.refused.len() > REFUSED_KEPT {
+            self.refused.pop_front();
+        }
+        self.changed = true;
+        new
+    }
+
+    /// `id` played after all: its mark goes. Returns whether it had one.
+    pub fn unrefuse(&mut self, id: &TrackId) -> bool {
+        let before = self.refused.len();
+        self.refused.retain(|(r, ..)| r != id);
+        let had = self.refused.len() != before;
+        self.changed |= had;
+        had
+    }
+
+    /// What YouTube said when it refused `id`, if it did.
+    fn refusal(&self, id: &TrackId) -> Option<&str> {
+        self.refused
+            .iter()
+            .find(|(r, ..)| r == id)
+            .map(|(_, _, why)| why.as_str())
+    }
+
+    /// The songs YouTube refuses, oldest first.
+    pub fn refused(&self) -> Vec<TrackId> {
+        self.refused.iter().map(|(id, ..)| id.clone()).collect()
     }
 
     /// The answer to the player's resolve of `id` without asking YouTube: its "unavailable"
@@ -414,6 +465,40 @@ impl Controller {
         );
         self.streams.hint(&id, SystemTime::now());
         self.start_hints();
+    }
+
+    /// YouTube refused `id`, saying `why` (`ResolveError::is_refusal`): marked for the
+    /// session, so the queue passes it over and the lists show it greyed.
+    pub(super) fn refused(&mut self, id: &TrackId, why: &str) {
+        if self.streams.refuse(id, SystemTime::now(), why) {
+            log!("refused {}: passed over and greyed from now on", id.0);
+            self.input(Input::SetRefused(id.clone(), true));
+        }
+    }
+
+    /// `id` resolved: if YouTube refused it before, its mark goes.
+    pub(super) fn not_refused(&mut self, id: &TrackId) {
+        if self.streams.unrefuse(id) {
+            log!(
+                "refused {} before, but it resolved: no longer passed over",
+                id.0
+            );
+            self.input(Input::SetRefused(id.clone(), false));
+        }
+    }
+
+    /// At the start: the refusals restored with the streams go to the player and the lists.
+    pub(super) fn restore_refused(&mut self) {
+        let ids = self.streams.refused();
+        if ids.is_empty() {
+            return;
+        }
+        log!("{} songs refused lately, passed over", ids.len());
+        self.inputs(
+            ids.into_iter()
+                .map(|id| Input::SetRefused(id, true))
+                .collect(),
+        );
     }
 
     /// `id`'s resolve started to wait for the helpers' download: a first run, a song the

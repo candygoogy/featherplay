@@ -1,7 +1,10 @@
 //! The streams outlive a restart (`SAVED_STREAMS`, written when the session is saved and
 //! they changed, and at quit): the next session uses one until it nears its expiry, unless
 //! a resolve shows another address. The restored track's is buffered at the start, so Play
-//! starts it with no resolve. Signing out removes the file.
+//! starts it with no resolve. The songs YouTube refuses (`Streams::refuse`) are saved with
+//! them, and restored for `REFUSED_KEPT_FOR` after each refusal. Signing out removes the
+//! file; the marks stay for the session (they aren't the account's: YouTube refuses those
+//! songs to anonymous requests too).
 
 use std::io;
 use std::path::Path;
@@ -14,7 +17,7 @@ use featherplay_core::sync::LockExt;
 use featherplay_streams::{ResolvedStream, Via};
 use serde_json::{Value, json};
 
-use super::{Controller, FRESH_FOR, KEEP, Streams, address};
+use super::{Controller, FRESH_FOR, KEEP, REFUSED_KEPT, REFUSED_KEPT_FOR, Streams, address};
 
 /// The streams kept for the next session, in the cache dir (`Streams::saved`).
 pub(crate) const SAVED_STREAMS: &str = "streams.json";
@@ -67,9 +70,9 @@ impl Streams {
         self.next_write()
     }
 
-    /// Whether any stream kept is one to save (`saved`).
+    /// Whether any stream kept is one to save (`saved`), or a refusal.
     pub fn keeps_any(&self) -> bool {
-        self.cache.iter().any(|(id, _)| !self.unsaved.contains(id))
+        self.cache.iter().any(|(id, _)| !self.unsaved.contains(id)) || !self.refused.is_empty()
     }
 
     /// The streams that stay valid for `FRESH_FOR` from `now`, for `restore` in the next
@@ -106,7 +109,13 @@ impl Streams {
                 })
             })
             .collect();
-        json!({ "streams": streams }).to_string()
+        let refused: Vec<Value> = self
+            .refused
+            .iter()
+            .filter(|(_, at, _)| !too_old(*at, now))
+            .map(|(id, at, why)| json!({ "id": id.0, "at": secs(*at), "why": why }))
+            .collect();
+        json!({ "streams": streams, "refused": refused }).to_string()
     }
 
     /// Keeps the streams `saved` gave in the last session that stay valid for `FRESH_FOR`
@@ -153,6 +162,18 @@ impl Streams {
             self.cache.push_back((id.clone(), stream));
             self.restored.push(id);
         }
+        for r in v["refused"].as_array().into_iter().flatten() {
+            let (Some(id), Some(when)) = (text(&r["id"]), at(&r["at"])) else {
+                continue;
+            };
+            if too_old(when, now) || self.refused.len() >= REFUSED_KEPT {
+                continue;
+            }
+            let id = TrackId(id);
+            self.refused.retain(|(r, ..)| *r != id);
+            self.refused
+                .push_back((id, when, text(&r["why"]).unwrap_or_default()));
+        }
     }
 
     /// Whether `id`'s stream (or the one just dropped) came from the last session: its
@@ -160,6 +181,12 @@ impl Streams {
     pub fn is_from_last_session(&self, id: &TrackId) -> bool {
         self.restored.contains(id)
     }
+}
+
+/// Whether a refusal made at `at` is too old to restore at `now` (`REFUSED_KEPT_FOR`).
+fn too_old(at: SystemTime, now: SystemTime) -> bool {
+    now.duration_since(at)
+        .is_ok_and(|age| age >= REFUSED_KEPT_FOR)
 }
 
 impl Controller {
@@ -336,6 +363,30 @@ mod tests {
         let saved = s.saved(now);
         assert!(saved.contains(&url("after")), "{saved}");
         assert!(!saved.contains(&url("before")), "{saved}");
+    }
+
+    /// The songs YouTube refused come back after a restart, without a stream kept, for
+    /// `REFUSED_KEPT_FOR` after each refusal.
+    #[test]
+    fn refusals_are_saved_for_a_few_hours() {
+        let now = SystemTime::now();
+        let why = "UNPLAYABLE: This video is not available";
+        let mut before = Streams::default();
+        assert!(before.refuse(&id("new"), now, why));
+        assert!(!before.refuse(&id("new"), now, why), "marked already");
+        before.refuse(&id("old"), now - REFUSED_KEPT_FOR, why);
+        assert!(before.take_changed() && before.keeps_any());
+        let mut s = Streams::default();
+        s.restore(&before.saved(now), now);
+        assert_eq!(s.refused(), [id("new")]);
+        assert_eq!(s.known_unavailable(&id("new")), Some(why));
+        // Later the same day, the restored mark keeps its own time.
+        let mut later = Streams::default();
+        later.restore(&s.saved(now), now + REFUSED_KEPT_FOR / 2);
+        assert_eq!(later.refused(), [id("new")]);
+        let mut next_day = Streams::default();
+        next_day.restore(&s.saved(now), now + REFUSED_KEPT_FOR);
+        assert!(next_day.refused().is_empty());
     }
 
     #[test]

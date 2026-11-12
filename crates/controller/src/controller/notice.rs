@@ -32,6 +32,7 @@ pub(super) enum Lookup {
 /// A failed resolve as the player counts it, with the raw text for the log.
 pub(super) fn failure(e: &ResolveError) -> Failure {
     let kind = match e {
+        e @ ResolveError::Unavailable(_) if e.is_refusal() => FailKind::Refused,
         ResolveError::Unavailable(_) => FailKind::Unavailable,
         ResolveError::ToolFailed { .. } => FailKind::Broken,
         ResolveError::Sidecar(e) => FailKind::Setup(e.fault),
@@ -115,6 +116,22 @@ mod tests {
     #[test]
     fn a_song_that_is_gone_is_unavailable() {
         let f = failure(&ResolveError::Unavailable("Video unavailable".into()));
+        assert_eq!(f.kind, FailKind::Unavailable);
+    }
+
+    /// YouTube's "This video is not available" (since 2026-11-11, for some songs on every
+    /// route but its music web player): the player passes over the song and plays on.
+    #[test]
+    fn a_song_youtube_refuses_is_refused() {
+        for m in [
+            "UNPLAYABLE: This video is not available",
+            "[youtube] mCkBsSEG440: Video unavailable. This video is not available",
+        ] {
+            let f = failure(&ResolveError::Unavailable(m.into()));
+            assert_eq!(f.kind, FailKind::Refused, "{m}");
+        }
+        let gone = "[youtube] abc: Video unavailable. This video has been removed by the uploader";
+        let f = failure(&ResolveError::Unavailable(gone.into()));
         assert_eq!(f.kind, FailKind::Unavailable);
     }
 

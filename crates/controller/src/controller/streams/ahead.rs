@@ -606,6 +606,25 @@ mod tests {
         assert_eq!(ids(s.start_hints()), [id("a")]);
     }
 
+    /// A song YouTube refuses isn't resolved ahead for the session, whatever asks, until a
+    /// stream for it (a click that played it) lifts the mark.
+    #[test]
+    fn a_refused_song_is_not_resolved_ahead_until_it_plays() {
+        let mut s = Streams::default();
+        let now = SystemTime::now();
+        s.refuse(&id("a"), now, "UNPLAYABLE: This video is not available");
+        s.hint(&id("a"), now);
+        s.ahead(None, &[id("a")], now);
+        s.prepare_while(true, now);
+        s.on_screen(vec![id("a")], now);
+        assert!(s.start_hints().is_empty());
+
+        assert!(s.unrefuse(&id("a")));
+        assert!(!s.unrefuse(&id("a")), "no mark left");
+        s.hint(&id("a"), now);
+        assert_eq!(ids(s.start_hints()), [id("a")]);
+    }
+
     /// The player asking for a song whose resolve ahead runs tells that resolve, so it
     /// stops waiting for its turn at yt-dlp.
     #[test]
