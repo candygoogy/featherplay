@@ -26,9 +26,10 @@
 //! The body text's family (`Theme.body-font`) is Segoe UI Variable, which Linux hasn't got,
 //! so there the stack's next family, the generic sans-serif, draws it: whatever fontconfig
 //! picks (DejaVu Sans, often). On Linux [`add`] also registers Inter (`ui/fonts/inter/`, a
-//! Latin subset) and puts it first in the generic sans-serif and system-ui families, so the
-//! body text is Inter there. Characters Inter lacks go on to the families fontconfig picked,
-//! then to the fallbacks. Windows keeps Segoe UI Variable and the build has no Inter.
+//! Latin subset with Segoe UI Variable's line metrics, so lines lay out as on Windows) and
+//! puts it first in the generic sans-serif and system-ui families, so the body text is Inter
+//! there. Characters Inter lacks go on to the families fontconfig picked, then to the
+//! fallbacks. Windows keeps Segoe UI Variable and the build has no Inter.
 
 use i_slint_core::context::with_global_context;
 use i_slint_core::platform::PlatformError;

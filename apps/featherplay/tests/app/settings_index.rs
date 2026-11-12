@@ -149,13 +149,8 @@ fn settings_widen_and_index_their_sections_at_wide_windows() {
         .filter(|&y| (INDEX_LEFT + 12..INDEX_LEFT + 100).any(|x| px(&s, x, y) != fill))
         .collect();
     let label_mid = (label[0] + label[label.len() - 1]) / 2;
-    // Both are centred in boxes with the same middle, so where their ink sits depends on the
-    // fonts' metrics. Segoe UI Variable's label lands level (0 px apart, 2026-11-12). On
-    // Linux the label is Inter, which sits higher in its line (its ascent is 0.97 em to
-    // Segoe's 1.08): 2.5 px above the heading.
-    let level = if cfg!(windows) { 2 } else { 3 };
     assert!(
-        heading_mid.abs_diff(label_mid) <= level,
+        heading_mid.abs_diff(label_mid) <= 2,
         "the index's first label sits at {label_mid}, the first heading at {heading_mid}"
     );
 
