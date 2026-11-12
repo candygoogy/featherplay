@@ -5,7 +5,9 @@ use std::time::Duration;
 
 use featherplay_core::text::plain;
 use featherplay_core::tr;
-use featherplay_platform::tray::{TOOLTIP_LINE_UTF16, TOOLTIP_MAX_UTF16, ellipsize, utf16_len};
+use featherplay_platform::tray::{
+    TIMED_TOOLTIP, TOOLTIP_LINE_UTF16, TOOLTIP_MAX_UTF16, ellipsize, utf16_len,
+};
 
 use crate::NowPlaying;
 
@@ -38,6 +40,28 @@ pub fn tooltip_text(np: Option<&NowPlaying>, at: Duration) -> String {
     };
     let room = TOOLTIP_LINE_UTF16.min(TOOLTIP_MAX_UTF16.saturating_sub(1 + utf16_len(&second)));
     format!("{}\n{second}", ellipsize(&title, room))
+}
+
+/// The tray icon's hover text: `tooltip_text` where the tray brings it up to date as it
+/// shows (`TIMED_TOOLTIP`, Windows); elsewhere (Linux) the title, then the artist, with no
+/// time to go stale.
+pub fn tray_tooltip(np: Option<&NowPlaying>, at: Duration) -> String {
+    match np {
+        Some(np) if !TIMED_TOOLTIP => untimed(np),
+        _ => tooltip_text(np, at),
+    }
+}
+
+/// The title, then the artist (if any), each on one line within `TOOLTIP_LINE_UTF16`.
+fn untimed(np: &NowPlaying) -> String {
+    let one_line = |s: &str| plain(s).replace(['\r', '\n'], " ").trim().to_string();
+    let (title, artist) = (one_line(&np.title), one_line(&np.artist));
+    let title = ellipsize(&title, TOOLTIP_LINE_UTF16);
+    if artist.is_empty() {
+        title
+    } else {
+        format!("{title}\n{}", ellipsize(&artist, TOOLTIP_LINE_UTF16))
+    }
 }
 
 /// "2:41", or "1:02:41" from an hour.
@@ -197,5 +221,15 @@ LØLØ, paused at 0:00"
         assert_eq!(lines.len(), 2, "{text}");
         assert!(lines[0].ends_with('…'), "{}", lines[0]);
         assert!(lines[1].ends_with("…, 1:03 of 2:31"), "{}", lines[1]);
+    }
+
+    #[test]
+    fn the_untimed_text_is_the_title_then_the_artist() {
+        assert_eq!(untimed(&np("faceplant", "LØLØ", true)), "faceplant\nLØLØ");
+        assert_eq!(untimed(&np("Title", "", false)), "Title");
+        let at = Duration::from_secs(63);
+        let shown = tray_tooltip(Some(&np("faceplant", "LØLØ", true)), at);
+        assert_eq!(shown.ends_with("1:03 of 2:31"), TIMED_TOOLTIP, "{shown}");
+        assert_eq!(tray_tooltip(None, at), tooltip_text(None, at));
     }
 }

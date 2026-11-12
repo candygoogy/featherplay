@@ -217,6 +217,9 @@ export global SettingsData {
     in property <int> close-action;
     // "Turn off the mini player": a left click on the tray icon opens the main window instead.
     in property <bool> tray-click-opens-window;
+    // Whether the desktop has a tray for the icon: without one, the tray's settings hide.
+    // Windows always has one.
+    in property <bool> has-tray: true;
     // "Show tooltips": the bar's buttons name themselves and their shortcut on a rest.
     in property <bool> tooltips: true;
     in property <Appearance> appearance;

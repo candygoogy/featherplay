@@ -20,6 +20,7 @@ use std::rc::Rc;
 use featherplay_controller::presence::Status as DiscordStatus;
 use featherplay_controller::scrobbler::build_keys;
 use featherplay_integrations::local_api::Token;
+use featherplay_platform::{Feature, supports};
 use featherplay_store::{CloseAction, Equalizer, Paths, Settings};
 use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
 
@@ -353,6 +354,13 @@ pub fn player_changed(ctx: &Rc<Ctx>, state: &PlayerState) {
     show_preview(ctx, &options, Some(state));
 }
 
+/// The desktop's tray came or went (`shell::tray_shown`): the tray's options show or hide.
+pub fn tray_changed(ctx: &Ctx) {
+    let Some(ui) = ctx.window() else { return };
+    ui.global::<SettingsData>()
+        .set_has_tray(supports(Feature::Tray));
+}
+
 /// Signed in or out.
 pub fn account_changed(ctx: &Rc<Ctx>, signed_in: bool) {
     let Some(ui) = ctx.window() else { return };
@@ -426,6 +434,7 @@ fn show(ctx: &Ctx) {
     ));
     data.set_close_action(close_action_index(s.close_action));
     data.set_tray_click_opens_window(s.tray_click_opens_window);
+    data.set_has_tray(supports(Feature::Tray));
     data.set_tooltips(s.tooltips);
     ui.global::<Tooltips>().set_on(s.tooltips);
     data.set_accent(accent_index(s.accent));

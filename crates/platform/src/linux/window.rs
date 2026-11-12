@@ -1,12 +1,57 @@
-//! Window operations on a window's `Handle` (its X11 window or Wayland surface here): stubs
-//! until phase 5. The watches are made but never fire, the queries find nothing, and the
+//! Window operations on a window's `Handle` (its X11 window or Wayland surface here). Most
+//! are stubs still: the watches are made but never fire, the queries find nothing, and the
 //! title bar keeps the desktop's colours (`supports(Feature::TitleBarColour)` is false).
+//!
+//! On an X11 desktop the mini player is placed by the tray icon as on Windows: `pointer` and
+//! `work_area_at` ask the X server (`x11`). Wayland lets an app neither place its windows
+//! nor learn where anything is on screen, so there `work_area_at` finds nothing and the mini
+//! player opens as an ordinary window (`supports(Feature::MiniPlayerPlacement)` is false).
+
+use std::sync::OnceLock;
 
 use raw_window_handle::RawWindowHandle;
 
 pub use crate::common::window::*;
 
 use crate::{Feature, Unsupported};
+
+mod x11;
+
+/// Whether the desktop session is X11: `XDG_SESSION_TYPE` says so, or (it's unset or says
+/// something else, as in WSL) there's an X display and no Wayland one. A Wayland session's
+/// X server (XWayland) serves only the apps that use it: what it says of the pointer, the
+/// screen or the keys pressed elsewhere is not the desktop's. Read once.
+pub(crate) fn x11_session() -> bool {
+    static X11: OnceLock<bool> = OnceLock::new();
+    *X11.get_or_init(|| {
+        let var = |name| std::env::var_os(name).filter(|v| !v.is_empty());
+        let session = std::env::var("XDG_SESSION_TYPE").unwrap_or_default();
+        is_x11(
+            &session,
+            var("WAYLAND_DISPLAY").is_some() || var("WAYLAND_SOCKET").is_some(),
+            var("DISPLAY").is_some(),
+        )
+    })
+}
+
+/// `x11_session` for a session type and the displays there are.
+fn is_x11(session: &str, wayland: bool, x_display: bool) -> bool {
+    match session {
+        "x11" => true,
+        "wayland" => false,
+        _ => x_display && !wayland,
+    }
+}
+
+/// Where the pointer is on screen (physical pixels), on an X11 desktop; `None` elsewhere.
+pub fn pointer() -> Option<(i32, i32)> {
+    if !x11_session() {
+        return None;
+    }
+    x11::pointer()
+        .inspect_err(|e| log::warn!("pointer: {e}"))
+        .ok()
+}
 
 /// A window, as the window functions take it: here its X11 window or its Wayland surface.
 /// Made from the windowing library's raw handle (`from_raw`); its `Debug` prints it in hex.
@@ -105,15 +150,16 @@ pub fn foreground() -> Option<Foreground> {
     None
 }
 
-/// A watch on presses anywhere on screen, which this OS doesn't have yet.
+/// A watch on presses anywhere on screen, which never fires here: there's no taskbar of the
+/// app's to press, and a press on another window takes the focus from the mini player, which
+/// closes it (winit's `Focused(false)`).
 pub struct PressWatch {
     _none: (),
 }
 
-/// Always an error: `Feature::MiniPlayerPlacement` (which closes the mini player on a press
-/// elsewhere) isn't supported here.
+/// A watch that never fires (`PressWatch`).
 pub fn watch_presses(_on_press: fn(&str)) -> Result<PressWatch, String> {
-    Err(Unsupported(Feature::MiniPlayerPlacement).to_string())
+    Ok(PressWatch { _none: () })
 }
 
 /// Not known yet: never minimised.
@@ -136,9 +182,16 @@ pub fn when_taskbar_button(_h: Handle, _created: impl Fn() + 'static) -> Result<
     Ok(())
 }
 
-/// Not known yet.
-pub fn work_area_at(_x: i32, _y: i32) -> Option<(ScreenRect, f32)> {
-    None
+/// On an X11 desktop, the work area (the monitor's, less the panels) of the monitor at
+/// `(x, y)` (physical pixels), and the scale winit gives windows there; `None` on Wayland,
+/// where nothing is known of the screen.
+pub fn work_area_at(x: i32, y: i32) -> Option<(ScreenRect, f32)> {
+    if !x11_session() {
+        return None;
+    }
+    x11::work_area_at(x, y)
+        .inspect_err(|e| log::warn!("work area: {e}"))
+        .ok()
 }
 
 /// Nothing to do: the desktop draws its own border, if any.
@@ -149,4 +202,22 @@ pub fn popup_border(_h: Handle, _colour: Rgb) -> Result<(), String> {
 /// Animations on, as on Windows when the setting can't be read.
 pub fn animations_enabled() -> bool {
     true
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_session_type_decides_and_else_the_displays_there_are() {
+        assert!(is_x11("x11", true, true));
+        assert!(!is_x11("wayland", true, true));
+        // WSL, and a desktop started by hand: no session type.
+        assert!(
+            !is_x11("", true, true),
+            "a Wayland display makes it Wayland"
+        );
+        assert!(is_x11("", false, true));
+        assert!(!is_x11("tty", false, false));
+    }
 }

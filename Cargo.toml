@@ -46,6 +46,13 @@ tokio = "=1.54.1"
 # `platform::media_controls`' own, over zbus.
 souvlaki = { version = "=0.9.3", default-features = false }
 tray-icon = "=0.26.1"
+# Linux's tray: a StatusNotifierItem and its menu over D-Bus, no GTK. On zbus 5 with async-io
+# (Slint's and the Secret Service store's), its blocking API on a thread of its own; adds four
+# small crates (arc-swap, crossbeam-queue, pastey, task-local).
+ksni = { version = "=0.3.7", default-features = false, features = ["async-io", "blocking"] }
+# Linux, X11: where the mini player goes (the pointer, the monitors, the work area). In the
+# tree already through winit.
+x11rb = { version = "=0.13.2", default-features = false }
 global-hotkey = "=0.9.0"
 tauri-winrt-notification = "=0.8.1"
 discord-rich-presence = "=1.1.0"
@@ -70,7 +77,8 @@ yeslogic-fontconfig-sys = "=6.0.1"
 # The clipboard for `platform::clipboard` (Slint's winit backend uses it for its own).
 arboard = { version = "=3.7.0", default-features = false }
 # Linux only, in the lock tree already (Slint, the Secret Service store): the session bus that
-# `platform::media_controls` serves MPRIS on and `platform::notify` sends notifications over.
+# `platform::media_controls` serves MPRIS on and `platform::notify` sends notifications over,
+# and the tray test's stand-in StatusNotifierWatcher.
 zbus = "=5.19.0"
 # The window handle `featherplay-platform` takes, and that the app reads out of Slint's window.
 raw-window-handle = "=0.6.2"

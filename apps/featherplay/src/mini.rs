@@ -11,6 +11,11 @@
 //! it hears every press on screen: one on the taskbar closes it, even with the taskbar
 //! already in front, where the window in front doesn't change.
 //!
+//! On Linux neither watch sees anything: unpinned, the mini player closes when the focus
+//! goes elsewhere. On X11 it opens by the tray icon as on Windows; Wayland lets no app place
+//! its windows or learn where the icon is, so there it's an ordinary window in the desktop's
+//! frame, wherever the desktop puts it (`popup::placed`).
+//!
 //! The window exists only while it shows: `open` creates it (a few milliseconds) and `close`
 //! drops it, so a closed mini player costs nothing, no window and no timer. While open it
 //! mirrors the main window's `Player` and `Theme` globals (each window has its own) on every
@@ -139,6 +144,7 @@ pub fn create(ctx: &Rc<Ctx>) -> Result<MiniPlayer, String> {
     let main = ctx.window().ok_or("no main window")?;
     let ui = popup::creating(|| {
         MiniPlayer::new().inspect(|ui| {
+            ui.global::<MiniData>().set_framed(!popup::placed());
             ui.window()
                 .set_size(slint::LogicalSize::new(SIZE.0, SIZE.1));
         })
@@ -162,17 +168,29 @@ pub fn create(ctx: &Rc<Ctx>) -> Result<MiniPlayer, String> {
 }
 
 /// Opens the mini player for a click at `(x, y)` (physical screen pixels): above the
-/// taskbar's notification area, or beside a taskbar on the left or right.
+/// taskbar's notification area, or beside a taskbar on the left or right. On Wayland, as an
+/// ordinary window wherever the desktop puts it (`popup::placed`).
 pub fn open(ctx: &Rc<Ctx>, x: i32, y: i32) -> Result<(), String> {
     let started = Instant::now();
     let ui = create(ctx)?;
     let border = popup::border(&ui.global::<Theme>());
-    let (left, top) = popup::show_at(ui.window(), (x, y), SIZE)?;
+    let at = if popup::placed() {
+        let (left, top) = popup::show_at(ui.window(), (x, y), SIZE)?;
+        format!("at {left},{top}")
+    } else {
+        popup::show_unplaced(ui.window())?;
+        "where the desktop put it".to_string()
+    };
     // Winit makes the window on a later turn of the loop: what needs its handle waits for it.
     shell::when_handle(
         &ui,
-        move |_, handle| {
+        move |ui, handle| {
             popup::dress(handle, border);
+            // `dress` gives it the activation on Windows; elsewhere winit asks the window
+            // manager for it (on X11; Wayland lets only the desktop decide).
+            if cfg!(not(windows)) {
+                ui.window().with_winit_window(|w| w.focus_window());
+            }
             window_ready(handle);
             if let Err(e) = window::when_pressed(handle, pressed) {
                 log!("mini player: presses: {e}");
@@ -181,7 +199,7 @@ pub fn open(ctx: &Rc<Ctx>, x: i32, y: i32) -> Result<(), String> {
         |_| log!("mini player: its window never came"),
     );
     log!(
-        "mini player opened at {left},{top} ({:.1} ms)",
+        "mini player opened {at} ({:.1} ms)",
         started.elapsed().as_secs_f64() * 1000.0
     );
     Ok(())
@@ -292,10 +310,15 @@ fn wire(ui: &MiniPlayer, main: &AppWindow) {
             log!("mini player: drag: {e}");
         }
     });
-    // Winit's word on the activation, should the focus have left the key scope.
-    ui.window().on_winit_window_event(|_, ev| {
-        if matches!(ev, winit::event::WindowEvent::Focused(false)) {
-            activation_lost();
+    // Winit's word on the activation, should the focus have left the key scope. Only a focus
+    // it had can be lost: on X11, winit reports a new window unfocused before the window
+    // manager has given it anything (seen in WSLg), which would close it as it opens.
+    let had_focus = Cell::new(false);
+    ui.window().on_winit_window_event(move |_, ev| {
+        match ev {
+            winit::event::WindowEvent::Focused(true) => had_focus.set(true),
+            winit::event::WindowEvent::Focused(false) if had_focus.get() => activation_lost(),
+            _ => {}
         }
         EventResult::Propagate
     });

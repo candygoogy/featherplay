@@ -33,6 +33,10 @@ use menu::{TrayMenu, in_taskbar_mode};
 
 mod menu;
 
+/// Whether the hover text may say where the song is: yes, it's brought up to date as the
+/// pointer comes onto the icon (`TrayEvent::Hover`).
+pub const TIMED_TOOLTIP: bool = true;
+
 pub struct Tray {
     icon: TrayIcon,
     /// The right-click menu tray-icon shows.

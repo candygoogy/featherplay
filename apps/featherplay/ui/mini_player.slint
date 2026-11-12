@@ -1,5 +1,6 @@
 // The tray's mini player: a small borderless window that opens over the notification area on
-// a left click of the tray icon (`src/mini.rs` creates it, places it and drops it on close).
+// a left click of the tray icon (`src/mini.rs` creates it, places it and drops it on close);
+// on Wayland, which places windows itself, an ordinary one in the desktop's frame.
 // Top: the cover, then the title (up to two lines) and the artist, with the pin and the button
 // that opens the main window in the top-right corner, level with the cover's top. Pinned, it
 // stays open and on top until closed, the corner holds its × and a press off the controls
@@ -30,6 +31,8 @@ export global MiniData {
     callback toggle-pin();
     // A left press off the controls while pinned: move the window with the pointer.
     callback drag();
+    // An ordinary window in the desktop's frame, where the tray can't place it (Wayland).
+    in property <bool> framed;
 }
 
 // A time under an end of the progress line.
@@ -58,7 +61,7 @@ export component MiniPlayer inherits Window {
     // `mini::SIZE`: 340 x 170.
     width: 340px;
     height: root.controls-y + 44px + root.pad;
-    no-frame: true;
+    no-frame: !MiniData.framed;
     always-on-top: true;
     background: Theme.bar;
     default-font-family: Theme.body-font;

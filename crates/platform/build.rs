@@ -3,8 +3,8 @@
 //! `tri-vane-light*.svg` (the play on a crimson ring) for a light one, the same drawings as
 //! the window and taskbar icon. Every size is drawn from a vector at that size, never scaled
 //! from another: 16 px from the 16 px drawing, 20 and 24 px from the 24 px one, 32 px and up
-//! from the master. They're stored deflated; `icons::tray_icon` inflates them and picks one
-//! at runtime.
+//! from the master. They're stored deflated; `tray::drawings` inflates them, and Windows picks
+//! one at runtime (`icons::tray_icon`) while Linux hands the desktop them all.
 #![allow(
     clippy::print_stdout,
     reason = "cargo reads a build script's instructions from its stdout"
@@ -16,7 +16,7 @@ use std::path::Path;
 use flate2::Compression;
 use flate2::write::DeflateEncoder;
 
-/// Must match `icons::TRAY_SIZES`; each with the drawing it's rendered from.
+/// Must match `tray::ICON_SIZES`; each with the drawing it's rendered from.
 const SIZES: [(u32, &str); 7] = [
     (16, "-16"),
     (20, "-24"),

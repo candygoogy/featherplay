@@ -1,7 +1,10 @@
-//! What every OS's tray shares: the icon's events, the menu's entries and labels, and the
-//! hover text's limits.
+//! What every OS's tray shares: the icon's events, the menu's entries and labels, the hover
+//! text's limits, and the icon's drawings.
+
+use std::io::Read;
 
 use featherplay_core::tr;
+use flate2::read::DeflateDecoder;
 
 /// Windows keeps 128 UTF-16 units of tooltip, including the terminator.
 pub const TOOLTIP_MAX_UTF16: usize = 127;
@@ -10,19 +13,25 @@ pub const TOOLTIP_MAX_UTF16: usize = 127;
 pub const TOOLTIP_LINE_UTF16: usize = 64;
 
 /// What the tray icon reports to the UI thread itself (the window procedure calls the
-/// handler; it should only post the event on).
+/// handler on Windows, the D-Bus thread on Linux; it should only post the event on).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TrayEvent {
-    /// A left click, released at this point of the screen (physical pixels).
+    /// A left click, released at this point of the screen (physical pixels). On Linux, the
+    /// desktop's activation of the icon, at the point it gives, else at the pointer.
     Click { x: i32, y: i32 },
-    /// A double click with the left button: the app brings back a window hidden to the tray.
+    /// A double click with the left button (on Linux, a middle click: the desktop's secondary
+    /// activation): the app brings back a window hidden to the tray.
     DoubleClick,
-    /// A right click: Windows' menu opens.
+    /// A right click: the menu opens.
     Menu,
-    /// The pointer came onto the icon or moved over it: the hover text may show.
+    /// The pointer came onto the icon or moved over it: the hover text may show. Windows
+    /// only.
     Hover,
     /// An entry of the right-click menu was chosen.
     Chose(TrayChoice),
+    /// The desktop's tray took the icon again (`true`) or let it go (`false`): on Linux, the
+    /// StatusNotifierWatcher came back or went away. Never on Windows.
+    Shown(bool),
 }
 
 /// What the menu shows: the player's state.
@@ -112,13 +121,28 @@ pub fn labels(s: &MenuState) -> Labels {
     }
 }
 
-/// "title (artist)" on one line within `HEADER_UTF16`, each cut with "…" as needed (the
-/// artist keeps two fifths of the room), and "&" doubled so Windows shows it rather than
-/// underlining the next letter.
+/// The menu's first line as plain text, for a menu that shows "&" as it is: `labels`'s
+/// header without the "&" doubled.
+pub fn header_text(s: &MenuState) -> String {
+    if s.has_track {
+        one_line_header(&s.title, &s.artist)
+    } else {
+        tr!("Nothing playing").into()
+    }
+}
+
+/// "title (artist)" on one line within `HEADER_UTF16` (`one_line_header`), and "&" doubled
+/// so Windows shows it rather than underlining the next letter.
 fn header(title: &str, artist: &str) -> String {
+    one_line_header(title, artist).replace('&', "&&")
+}
+
+/// "title (artist)" on one line within `HEADER_UTF16`, each cut with "…" as needed (the
+/// artist keeps two fifths of the room).
+fn one_line_header(title: &str, artist: &str) -> String {
     let one_line = |s: &str| s.replace(['\r', '\n', '\t'], " ").trim().to_string();
     let (title, artist) = (one_line(title), one_line(artist));
-    let text = if artist.is_empty() {
+    if artist.is_empty() {
         ellipsize(&title, HEADER_UTF16)
     } else {
         // " (" and ")".
@@ -134,8 +158,32 @@ fn header(title: &str, artist: &str) -> String {
             ellipsize(&title, room - artist_room),
             ellipsize(&artist, artist_room)
         )
-    };
-    text.replace('&', "&&")
+    }
+}
+
+/// The sizes `build.rs` renders the tray icon at, in order.
+const ICON_SIZES: [u32; 7] = [16, 20, 24, 32, 40, 48, 64];
+/// The colour Tri-vane, for a dark taskbar and (the play on a crimson ring) a light one:
+/// every size's RGBA in turn, deflated by `build.rs` (41 KB each raw, mostly transparent).
+const ICON_DARK: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/tray-dark.rgba.deflate"));
+const ICON_LIGHT: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/tray-light.rgba.deflate"));
+
+/// The tray icon's drawings for a dark taskbar, or a `light` one: each size of `ICON_SIZES`
+/// with its straight-alpha RGBA, smallest first.
+pub(crate) fn drawings(light: bool) -> Vec<(u32, Vec<u8>)> {
+    let mut all = Vec::new();
+    DeflateDecoder::new(if light { ICON_LIGHT } else { ICON_DARK })
+        .read_to_end(&mut all)
+        .expect("build.rs deflates the tray icons");
+    let mut rest = all.as_slice();
+    ICON_SIZES
+        .iter()
+        .map(|&px| {
+            let (one, more) = rest.split_at((px * px * 4) as usize);
+            rest = more;
+            (px, one.to_vec())
+        })
+        .collect()
 }
 
 /// The length of `s` in UTF-16 units, as Windows counts it.

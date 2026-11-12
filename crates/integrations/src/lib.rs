@@ -3,7 +3,7 @@
 //! integrations show. The OS parts (the tray, the media controls, the thumb buttons, toasts
 //! and the app's identity) are `featherplay_platform`'s. Their events become `UiCommand`s
 //! here (`From`), and a `NowPlaying` becomes what they show: the media card's `MediaState`,
-//! the tray's hover text (`tooltip_text`), the track's toast (`notify_track`).
+//! the tray's hover text (`tooltip_text`, `tray_tooltip`), the track's toast (`notify_track`).
 //!
 //! `Hotkeys` lives on the UI thread, the one that owns the window and pumps its messages.
 //! Events go to the controller as `UiCommand`s over a `Sender`, which never blocks.
@@ -32,7 +32,7 @@ mod tooltip;
 pub use discord::Discord;
 pub use hotkeys::{Hotkeys, parse_hotkey};
 pub use notify::notify_track;
-pub use tooltip::tooltip_text;
+pub use tooltip::{tooltip_text, tray_tooltip};
 
 /// The channel commands travel on. Unbounded, so sending from a window procedure or a
 /// WinRT callback never blocks.

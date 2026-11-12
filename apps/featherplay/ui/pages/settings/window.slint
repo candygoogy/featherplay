@@ -203,26 +203,31 @@ export component WindowSection inherits Group {
     in property <int> made;
     title: @tr("Window");
     if root.made >= 2: VerticalLayout {
-        SettingRow {
-            divider: false;
-            label: @tr("When I close the window");
-            detail: @tr("In the tray, the music keeps going; quit from the tray icon's menu.");
-        }
-        VerticalLayout {
-            padding-bottom: Theme.s2;
-            for t[i] in [@tr("Ask"), @tr("Close featherplay"), @tr("Keep playing in the tray")]: DeviceRow {
-                name: t;
-                selected: i == SettingsData.close-action;
-                clicked => { SettingsData.pick-close-action(i); }
+        // Without a tray, closing the window quits: nothing to choose.
+        if SettingsData.has-tray: VerticalLayout {
+            SettingRow {
+                divider: false;
+                label: @tr("When I close the window");
+                detail: @tr("In the tray, the music keeps going; quit from the tray icon's menu.");
+            }
+            VerticalLayout {
+                padding-bottom: Theme.s2;
+                for t[i] in [@tr("Ask"), @tr("Close featherplay"), @tr("Keep playing in the tray")]: DeviceRow {
+                    name: t;
+                    selected: i == SettingsData.close-action;
+                    clicked => { SettingsData.pick-close-action(i); }
+                }
+            }
+            ToggleRow {
+                label: @tr("Turn off the mini player");
+                detail: @tr("Clicking the tray icon opens the main window instead. Right-click always shows the menu.");
+                key: SettingKey.tray-click-opens-window;
+                checked: SettingsData.tray-click-opens-window;
             }
         }
-        ToggleRow {
-            label: @tr("Turn off the mini player");
-            detail: @tr("Clicking the tray icon opens the main window instead. Right-click always shows the menu.");
-            key: SettingKey.tray-click-opens-window;
-            checked: SettingsData.tray-click-opens-window;
-        }
         SettingRow {
+            // The first row has no line above it.
+            divider: SettingsData.has-tray;
             label: @tr("Appearance");
             detail: @tr("System follows Windows' light or dark mode.");
             Chips {

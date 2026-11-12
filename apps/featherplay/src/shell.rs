@@ -8,11 +8,12 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
-use featherplay_integrations::{Hotkeys, NowPlaying, Sender, UiCommand, tooltip_text};
+use featherplay_integrations::{Hotkeys, NowPlaying, Sender, UiCommand, tray_tooltip};
 use featherplay_platform::media_controls::{MediaControls, MediaState};
 use featherplay_platform::taskbar::TaskbarButtons;
 use featherplay_platform::tray::{MenuState, Tray, TrayChoice, TrayEvent};
 use featherplay_platform::window::Handle;
+use featherplay_platform::{Feature, supports};
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use slint::{ComponentHandle, Timer, TimerMode};
 
@@ -68,7 +69,7 @@ pub fn start(
         }
         let _ = slint::invoke_from_event_loop(move || tray_event(ev));
     };
-    match Tray::new(&tooltip_text(None, Duration::ZERO), on_tray) {
+    match Tray::new(&tray_tooltip(None, Duration::ZERO), on_tray) {
         Ok(tray) => {
             log!("tray icon created ({})", ms(t));
             it.tray = Some(tray);
@@ -109,8 +110,9 @@ pub fn start(
 }
 
 /// The tray icon's events, on the UI thread: a left click goes to `tray_click`; a right click
-/// opens Windows' menu, so the mini player closes; the pointer over the icon brings the
-/// hover text's time up to date, as the shell is about to show it.
+/// opens the menu, so the mini player closes; the pointer over the icon brings the hover
+/// text's time up to date, as the shell is about to show it; the desktop's tray coming or
+/// going goes to `tray_shown`.
 fn tray_event(ev: TrayEvent) {
     match ev {
         TrayEvent::Hover => {
@@ -121,8 +123,22 @@ fn tray_event(ev: TrayEvent) {
         TrayEvent::Click { x, y } => tray_click(x, y),
         TrayEvent::Menu => crate::mini::close_unpinned(),
         TrayEvent::Chose(choice) => tray_choice(choice),
+        TrayEvent::Shown(shown) => tray_shown(shown),
         // Sent on as `UiCommand::Show` by `start`'s handler.
         TrayEvent::DoubleClick => {}
+    }
+}
+
+/// The desktop's tray took the icon again, or let it go (Linux: its StatusNotifierWatcher
+/// came or went). Settings shows or hides the tray's options; a window hidden to a tray
+/// that's gone comes back, as nothing else could bring it.
+fn tray_shown(shown: bool) {
+    log!("tray: {}", if shown { "shown again" } else { "gone" });
+    let Some(ctx) = Ctx::get() else { return };
+    settings::tray_changed(&ctx);
+    let hidden = ctx.window().is_some_and(|ui| !ui.window().is_visible());
+    if !shown && hidden && !app::is_closing() {
+        app::show_window(&ctx);
     }
 }
 
@@ -330,7 +346,7 @@ pub fn apply(np: NowPlaying) {
             taskbar.set_playing(np.playing);
         }
         if let Some(tray) = &it.tray {
-            tray.set_tooltip(&tooltip_text(Some(&np), np.position));
+            tray.set_tooltip(&tray_tooltip(Some(&np), np.position));
         }
         let took = t.elapsed();
         let over = if took > Duration::from_millis(16) {
@@ -356,7 +372,7 @@ pub fn idle() {
         let Some(it) = i.as_mut() else { return };
         it.idle = true;
         if let Some(tray) = &it.tray {
-            tray.set_tooltip(&tooltip_text(None, Duration::ZERO));
+            tray.set_tooltip(&tray_tooltip(None, Duration::ZERO));
         }
     });
 }
@@ -372,7 +388,7 @@ pub fn refresh_tooltip(at: Duration) {
             return;
         }
         if let (Some(tray), Some(np)) = (&it.tray, &it.last) {
-            tray.set_tooltip(&tooltip_text(Some(np), at));
+            tray.set_tooltip(&tray_tooltip(Some(np), at));
         }
     });
 }
@@ -421,7 +437,9 @@ pub fn set_hotkeys(
     })
 }
 
-/// Whether the tray icon exists (hiding to the tray needs a way back).
+/// Whether the tray icon exists and the desktop shows it (hiding to the tray needs a way
+/// back).
 pub fn has_tray() -> bool {
     INTEGRATIONS.with(|i| i.borrow().as_ref().is_some_and(|it| it.tray.is_some()))
+        && supports(Feature::Tray)
 }

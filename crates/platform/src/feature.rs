@@ -63,19 +63,22 @@ pub fn supports(feature: Feature) -> bool {
     }
 }
 
-/// Whether this build's OS has `feature`. On Linux some depend on the session bus, asked once
-/// on first use: the secret store when a Secret Service answers there, notifications when a
-/// notification server does, the media controls (MPRIS) when there's a session bus at all.
-/// The sign-in has no window of the app's own on Linux: there's no WebView2.
+/// Whether this build's OS has `feature`. On Linux some depend on the desktop, asked on first
+/// use: the secret store when a Secret Service answers on the session bus, notifications when
+/// a notification server does, the media controls (MPRIS) when there's a session bus at all;
+/// the tray while the desktop's tray (a StatusNotifierWatcher) shows the app's icon, so it's
+/// false until `tray::Tray::new` has put one there, and false again if the watcher goes;
+/// placing the mini player only in an X11 session (Wayland doesn't allow it). The sign-in has
+/// no window of the app's own on Linux: there's no WebView2.
 #[cfg(target_os = "linux")]
 pub fn supports(feature: Feature) -> bool {
     match feature {
         Feature::SecretStorage => crate::credentials::available(),
         Feature::Notifications => crate::notify::available(),
         Feature::MediaControls => crate::linux::bus::session().is_some(),
+        Feature::Tray => crate::tray::available(),
+        Feature::MiniPlayerPlacement => crate::window::x11_session(),
         Feature::TaskbarButtons
-        | Feature::Tray
-        | Feature::MiniPlayerPlacement
         | Feature::GlobalHotkeys
         | Feature::WebViewSignIn
         | Feature::InPlaceUpdate
@@ -102,13 +105,17 @@ mod tests {
     #[test]
     fn each_platform_answers_for_every_feature() {
         for feature in Feature::ALL {
-            // On Linux these depend on the session bus (their own modules' tests).
-            let on_the_bus = [
+            // On Linux these depend on the session: its bus (the credentials, notify and
+            // media controls tests), its tray (the tray's test), X11 or Wayland (`window`'s
+            // tests).
+            let on_the_session = [
                 Feature::SecretStorage,
                 Feature::Notifications,
                 Feature::MediaControls,
+                Feature::Tray,
+                Feature::MiniPlayerPlacement,
             ];
-            if cfg!(target_os = "linux") && on_the_bus.contains(&feature) {
+            if cfg!(target_os = "linux") && on_the_session.contains(&feature) {
                 continue;
             }
             assert_eq!(supports(feature), cfg!(windows), "{feature:?}");

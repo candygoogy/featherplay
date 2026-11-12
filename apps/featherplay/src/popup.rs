@@ -1,11 +1,13 @@
 //! The window code of the tray's mini player (`mini`): a borderless window with no taskbar
 //! button, placed by the tray icon like Windows 11's flyouts, opaque, with a hairline border,
-//! that takes the activation; and the main window's `Theme` and `Player` copied into its own
-//! globals, its buttons going through the main window's `Player` callbacks.
+//! that takes the activation (on Wayland, an ordinary window the desktop places: `placed`);
+//! and the main window's `Theme` and `Player` copied into its own globals, its buttons going
+//! through the main window's `Player` callbacks.
 
 use std::cell::Cell;
 
 use featherplay_platform::window::{self, Handle, ScreenRect};
+use featherplay_platform::{Feature, supports};
 #[cfg(windows)]
 use slint::winit_030::winit::platform::windows::{CornerPreference, WindowAttributesExtWindows};
 use slint::winit_030::winit::window::WindowAttributes;
@@ -33,19 +35,30 @@ pub fn creating<T>(f: impl FnOnce() -> T) -> T {
 }
 
 /// The winit attributes of a window about to be created: for a popup, borderless with no
-/// taskbar button, rounded with a shadow where Windows draws them (11). Other windows keep
-/// theirs.
+/// taskbar button, rounded with a shadow where Windows draws them (11); where the tray can't
+/// place it (Wayland), in the desktop's frame (`placed`). Other windows keep theirs.
 pub fn window_attributes(attrs: WindowAttributes) -> WindowAttributes {
     if !CREATING.get() {
         return attrs;
     }
-    let attrs = attrs.with_decorations(false).with_resizable(false);
+    let attrs = attrs.with_decorations(!placed()).with_resizable(false);
     #[cfg(windows)]
     let attrs = attrs
         .with_skip_taskbar(true)
         .with_undecorated_shadow(true)
         .with_corner_preference(CornerPreference::Round);
     attrs
+}
+
+/// Whether popups are placed by the tray icon, borderless: everywhere but Wayland, which
+/// lets no app place its windows or learn where the icon is.
+pub fn placed() -> bool {
+    supports(Feature::MiniPlayerPlacement)
+}
+
+/// Shows `window` where the desktop puts it, in its frame (Wayland: `placed` is false).
+pub fn show_unplaced(window: &slint::Window) -> Result<(), String> {
+    creating(|| window.show()).map_err(|e| format!("show: {e}"))
 }
 
 /// Shows `window`, `size` logical pixels, for a click on the tray icon at `(x, y)` (physical
