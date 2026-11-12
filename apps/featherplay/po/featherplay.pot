@@ -8,7 +8,7 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#: ../../crates/controller/src/controller.rs:636
+#: ../../crates/controller/src/controller.rs:637
 msgid "No sound output found. Connect speakers or headphones."
 msgstr ""
 
@@ -123,39 +123,43 @@ msgstr ""
 msgid "Details"
 msgstr ""
 
-#: ../../crates/core/src/failure.rs:111
+#: ../../crates/core/src/failure.rs:119
 msgid "Getting ready to play: downloading helpers (one time)…"
 msgstr ""
 
-#: ../../crates/core/src/failure.rs:131
+#: ../../crates/core/src/failure.rs:124
+msgid "Some songs here can't play right now. featherplay skips them."
+msgstr ""
+
+#: ../../crates/core/src/failure.rs:144
 msgid "Songs can't play. featherplay is updating its helpers."
 msgstr ""
 
-#: ../../crates/core/src/failure.rs:133
+#: ../../crates/core/src/failure.rs:146
 msgid "Songs can't play. featherplay may need an update."
 msgstr ""
 
-#: ../../crates/core/src/failure.rs:134
+#: ../../crates/core/src/failure.rs:147
 msgid "This song isn't available."
 msgstr ""
 
-#: ../../crates/core/src/failure.rs:135
+#: ../../crates/core/src/failure.rs:148
 msgid "Couldn't play this song. Check your connection."
 msgstr ""
 
-#: ../../crates/core/src/failure.rs:137
+#: ../../crates/core/src/failure.rs:150
 msgid "Couldn't download helpers. Check VPN or proxy."
 msgstr ""
 
-#: ../../crates/core/src/failure.rs:140
+#: ../../crates/core/src/failure.rs:153
 msgid "Your antivirus may have blocked the helpers."
 msgstr ""
 
-#: ../../crates/core/src/failure.rs:143
+#: ../../crates/core/src/failure.rs:156
 msgid "A helper download arrived damaged."
 msgstr ""
 
-#: ../../crates/core/src/failure.rs:146
+#: ../../crates/core/src/failure.rs:159
 msgid "Couldn't save helpers. Is the disk full?"
 msgstr ""
 
@@ -195,16 +199,16 @@ msgstr ""
 #: ../../crates/platform/src/common/tray.rs:109
 #: ../../crates/platform/src/common/tray.rs:109
 #: ../../crates/platform/src/common/tray.rs:109 ui/bottom_bar.slint:407
-#: ../../crates/platform/src/common/tray.rs:109 ui/bottom_bar.slint:407 ui/pages/content.slint:444
-#: ../../crates/platform/src/common/tray.rs:109 ui/bottom_bar.slint:407 ui/pages/content.slint:444 ui/parts/buttons.slint:26
-#: ../../crates/platform/src/common/tray.rs:109 ui/bottom_bar.slint:407 ui/pages/content.slint:444 ui/parts/buttons.slint:26
+#: ../../crates/platform/src/common/tray.rs:109 ui/bottom_bar.slint:407 ui/pages/content.slint:450
+#: ../../crates/platform/src/common/tray.rs:109 ui/bottom_bar.slint:407 ui/pages/content.slint:450 ui/parts/buttons.slint:26
+#: ../../crates/platform/src/common/tray.rs:109 ui/bottom_bar.slint:407 ui/pages/content.slint:450 ui/parts/buttons.slint:26
 msgid "Play"
 msgstr ""
 
 #: ../../crates/platform/src/common/tray.rs:110
 #: ../../crates/platform/src/common/tray.rs:110 src/album_actions.rs:275
-#: ../../crates/platform/src/common/tray.rs:110 src/album_actions.rs:275 ui/not_for_me.slint:20 ui/pages/content.slint:317
-#: ../../crates/platform/src/common/tray.rs:110 src/album_actions.rs:275 ui/not_for_me.slint:20 ui/pages/content.slint:317 ui/song_menu.slint:282
+#: ../../crates/platform/src/common/tray.rs:110 src/album_actions.rs:275 ui/not_for_me.slint:20 ui/pages/content.slint:322
+#: ../../crates/platform/src/common/tray.rs:110 src/album_actions.rs:275 ui/not_for_me.slint:20 ui/pages/content.slint:322 ui/song_menu.slint:282
 msgid "Like"
 msgstr ""
 
@@ -397,19 +401,19 @@ msgstr ""
 msgid "Sign in"
 msgstr ""
 
-#: src/app.rs:593
+#: src/app.rs:594
 msgid "Signed in, but Windows couldn't save it for next time."
 msgstr ""
 
-#: src/app.rs:595
+#: src/app.rs:596
 msgid "Signed in, but the keyring didn't save it for next time."
 msgstr ""
 
-#: src/app.rs:597
+#: src/app.rs:598
 msgid "Signed in for now: no keyring is running to save it."
 msgstr ""
 
-#: src/app.rs:641 ui/pages/about.slint:399
+#: src/app.rs:642 ui/pages/about.slint:399
 msgid "Copy diagnostics"
 msgstr ""
 
@@ -1227,8 +1231,8 @@ msgstr ""
 msgid "Close"
 msgstr ""
 
-#: ui/mini_player.slint:230 ui/not_for_me.slint:20 ui/pages/content.slint:317
-#: ui/mini_player.slint:230 ui/not_for_me.slint:20 ui/pages/content.slint:317 ui/song_menu.slint:282
+#: ui/mini_player.slint:230 ui/not_for_me.slint:20 ui/pages/content.slint:322
+#: ui/mini_player.slint:230 ui/not_for_me.slint:20 ui/pages/content.slint:322 ui/song_menu.slint:282
 msgid "Remove like"
 msgstr ""
 
@@ -1398,13 +1402,19 @@ msgstr ""
 msgid "Go to Explore"
 msgstr ""
 
-#: ui/pages/content.slint:326 ui/pages/content.slint:606
-#: ui/pages/content.slint:326 ui/pages/content.slint:606 ui/parts/rows.slint:81
-#: ui/pages/content.slint:326 ui/pages/content.slint:606 ui/parts/rows.slint:81
+#: ui/pages/content.slint:287 ui/pages/content.slint:350
+#: ui/pages/content.slint:287 ui/pages/content.slint:350 ui/parts/rows.slint:109 ui/parts/rows.slint:173
+#: ui/pages/content.slint:287 ui/pages/content.slint:350 ui/parts/rows.slint:109 ui/parts/rows.slint:173
+msgid "YouTube won't play this song in featherplay right now"
+msgstr ""
+
+#: ui/pages/content.slint:331 ui/pages/content.slint:612
+#: ui/pages/content.slint:331 ui/pages/content.slint:612 ui/parts/rows.slint:86
+#: ui/pages/content.slint:331 ui/pages/content.slint:612 ui/parts/rows.slint:86
 msgid "More"
 msgstr ""
 
-#: ui/pages/content.slint:445 ui/playlist_menu_layer.slint:206
+#: ui/pages/content.slint:451 ui/playlist_menu_layer.slint:206
 msgid "Shuffle"
 msgstr ""
 
@@ -2846,7 +2856,7 @@ msgstr ""
 msgid "Playing"
 msgstr ""
 
-#: ui/parts/covers.slint:197 ui/parts/rows.slint:184
+#: ui/parts/covers.slint:197 ui/parts/rows.slint:197
 msgid "Pause {}"
 msgstr ""
 
