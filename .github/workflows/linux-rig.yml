@@ -80,13 +80,18 @@ jobs:
         with:
           tool: nextest
 
-      # A dev build with the performance harness, which drives the window; and the test
-      # programs live.sh runs.
+      # The test programs live.sh runs, and a dev build with the performance harness, which
+      # drives the window. The app's integration tests build the app without the harness
+      # into the same target/debug/featherplay (and live.sh runs them again), so the
+      # harness build goes last and app.sh runs a copy of it (FEATHERPLAY_BIN).
       - name: Build
         run: |
-          cargo build -p featherplay --features perf-harness
           cargo nextest run --no-run -p featherplay-platform -p featherplay-streams --lib
           cargo nextest run --no-run -p featherplay --lib --test app
+          cargo build -p featherplay --features perf-harness
+          mkdir -p "$RUNNER_TEMP/rig/bin"
+          cp target/debug/featherplay "$RUNNER_TEMP/rig/bin/featherplay"
+          echo "FEATHERPLAY_BIN=$RUNNER_TEMP/rig/bin/featherplay" >>"$GITHUB_ENV"
 
       - name: Session
         run: scripts/rig/desktop/session.sh start

@@ -30,6 +30,10 @@ case "$mode" in
     ;;
 esac
 [ -x "$APP" ] || die "no app at $APP (cargo build -p featherplay --features perf-harness)"
+# Only a build with the harness reads its variables. A test build of the app (its
+# integration tests, live.sh's glyph test) puts one without it at the same path.
+grep -qa FEATHERPLAY_PERF_SCRIPT "$APP" ||
+  die "$APP has no performance harness: build it last with --features perf-harness, or name a copy in FEATHERPLAY_BIN"
 [ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ] || die "no session: run session.sh start first"
 
 out="$OUT/$mode"
