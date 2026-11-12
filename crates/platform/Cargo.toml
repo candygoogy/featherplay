@@ -71,6 +71,8 @@ windows = { workspace = true, features = [
 [target.'cfg(target_os = "linux")'.dependencies]
 # `media_controls`, `notify` and `bus`: MPRIS, notifications and the session bus checks.
 zbus = { workspace = true }
+# `bus::call`: the arguments' bound.
+serde = { workspace = true }
 # `credentials`: the Secret Service store.
 zbus-secret-service-keyring-store = { workspace = true }
 # `browsers::launch`: the DevTools pipe on descriptors 3 and 4, the browser's process group;

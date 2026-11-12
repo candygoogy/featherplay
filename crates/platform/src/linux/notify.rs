@@ -44,8 +44,7 @@ fn server() -> Option<&'static Server> {
                 log::warn!("no notification server ({SERVICE}) on the session bus");
                 return None;
             }
-            let caps: Vec<String> = bus
-                .call_method(Some(SERVICE), PATH, Some(SERVICE), "GetCapabilities", &())
+            let caps: Vec<String> = bus::call(bus, SERVICE, PATH, SERVICE, "GetCapabilities", &())
                 .and_then(|reply| reply.body().deserialize())
                 .inspect_err(|e| log::warn!("notifications: capabilities: {e}"))
                 .unwrap_or_default();
@@ -92,8 +91,7 @@ pub fn notify(title: &str, text: &str) {
         hints,
         expire_default,
     );
-    let shown = bus
-        .call_method(Some(SERVICE), PATH, Some(SERVICE), "Notify", &args)
+    let shown = bus::call(bus, SERVICE, PATH, SERVICE, "Notify", &args)
         .and_then(|reply| reply.body().deserialize::<u32>());
     match shown {
         Ok(id) => LAST.store(id, Ordering::Relaxed),

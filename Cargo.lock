@@ -1518,6 +1518,7 @@ dependencies = [
  "log",
  "raw-window-handle",
  "resvg",
+ "serde",
  "serde_json",
  "souvlaki",
  "tauri-winrt-notification",

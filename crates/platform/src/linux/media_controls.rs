@@ -409,21 +409,18 @@ impl MediaControls {
             std::process::id()
         );
         let served = (|| {
-            let server = bus.object_server();
-            server.at(
-                PATH,
-                Root {
-                    events: events.clone(),
-                },
-            )?;
-            server.at(
-                PATH,
-                Player {
-                    state: state.clone(),
-                    events,
-                },
-            )?;
-            bus.request_name(name.as_str())
+            let conn = bus.inner();
+            let server = conn.object_server();
+            let root = Root {
+                events: events.clone(),
+            };
+            bus::wait(Box::pin(server.at(PATH, root)))?;
+            let player = Player {
+                state: state.clone(),
+                events,
+            };
+            bus::wait(Box::pin(server.at(PATH, player)))?;
+            bus::wait(Box::pin(conn.request_name(name.as_str())))
         })();
         let controls = MediaControls { bus, name, state };
         served.map_err(|e| format!("media controls: {e}"))?;
@@ -445,21 +442,25 @@ impl MediaControls {
         };
         if !values.is_empty() {
             let no_invalidated: &[&str] = &[];
-            let sent = self.bus.emit_signal(
+            let sent = bus::wait(Box::pin(self.bus.inner().emit_signal(
                 None::<BusName<'_>>,
                 PATH,
                 "org.freedesktop.DBus.Properties",
                 "PropertiesChanged",
                 &(PLAYER, values, no_invalidated),
-            );
+            )));
             if let Err(e) = sent {
                 log::warn!("mpris: PropertiesChanged: {e}");
             }
         }
         if let Some(at) = changes.seeked {
-            let sent =
-                self.bus
-                    .emit_signal(None::<BusName<'_>>, PATH, PLAYER, "Seeked", &(micros(at),));
+            let sent = bus::wait(Box::pin(self.bus.inner().emit_signal(
+                None::<BusName<'_>>,
+                PATH,
+                PLAYER,
+                "Seeked",
+                &(micros(at),),
+            )));
             if let Err(e) = sent {
                 log::warn!("mpris: Seeked: {e}");
             }
@@ -481,10 +482,11 @@ fn value(state: &State, name: &str) -> Value<'static> {
 
 impl Drop for MediaControls {
     fn drop(&mut self) {
-        let _ = self.bus.release_name(self.name.as_str());
-        let server = self.bus.object_server();
-        let _ = server.remove::<Player, _>(PATH);
-        let _ = server.remove::<Root, _>(PATH);
+        let conn = self.bus.inner();
+        let _ = bus::wait(Box::pin(conn.release_name(self.name.as_str())));
+        let server = conn.object_server();
+        let _ = bus::wait(Box::pin(server.remove::<Player, _>(PATH)));
+        let _ = bus::wait(Box::pin(server.remove::<Root, _>(PATH)));
     }
 }
 
