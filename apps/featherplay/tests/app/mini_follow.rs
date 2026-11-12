@@ -1,7 +1,8 @@
 //! The open mini player takes a song change's cover colours with the main window's bar,
 //! step by step through the same crossfade: opened halfway through one, and with the main
-//! window hidden, where the fade runs for the mini player alone. On the offscreen platform
-//! with the fixtures; no window is shown.
+//! window hidden, where the fade runs for the mini player alone. Grey art's neutral accent,
+//! with its own hover and glow, is the mini player's too. On the offscreen platform with the
+//! fixtures; no window is shown.
 
 use featherplay::mini;
 use featherplay::offscreen;
@@ -92,4 +93,43 @@ fn the_mini_player_crossfades_with_the_bar_opened_midway_and_with_the_window_hid
         midway != blue && midway != green,
         "with the window hidden the mini player crossfades: {blue:?} to {green:?}, {midway:?} midway"
     );
+}
+
+#[test]
+fn grey_art_gives_the_mini_player_the_neutral_accent_too() {
+    // The radio's track 3 (from 0) wears a grey cover, track 0 a red one.
+    let f = Fixtures::load().expect("fixtures");
+    let radio = f.radio().expect("radio");
+    let cover = |i: usize| radio[i].thumbnail.clone().expect("a cover");
+    let solid = |rgb| image::RgbImage::from_pixel(96, 96, image::Rgb(rgb));
+    support::home_with_covers(
+        "mini-neutral",
+        &[
+            (&cover(0), solid([200, 40, 40])),
+            (&cover(3), solid([128, 128, 128])),
+        ],
+    );
+
+    let scene = Scene::new(1280, 800, true, false).expect("scene");
+    let main = scene.ui.global::<Theme>();
+    scene.theme(true);
+    scene.play_track(false, 3).expect("grey");
+    scene.settle();
+    assert!(main.get_neutral());
+
+    // Opened on grey art.
+    let mini = open(&scene);
+    let own = mini.global::<Theme>();
+    assert!(own.get_neutral(), "opened on grey art");
+    assert_eq!(own.get_accent_hover(), main.get_accent_hover());
+
+    // Songs change while it's open.
+    scene.play_track(false, 0).expect("red");
+    scene.settle();
+    assert!(!main.get_neutral() && !own.get_neutral());
+    scene.play_track(false, 3).expect("grey");
+    scene.settle();
+    assert!(own.get_neutral(), "grey art while open");
+    assert_eq!(own.get_accent(), main.get_accent());
+    assert_eq!(own.get_cover_glow(), main.get_cover_glow());
 }

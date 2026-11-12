@@ -131,12 +131,13 @@ pub fn sync_theme(from: &Theme, to: &Theme, appearance: Appearance) {
     sync_follow(from, to);
 }
 
-/// Copies the main window's cover colours into a popup's: the accent, the bar's tint and
-/// the secondary text.
+/// Copies the main window's cover colours into a popup's: the accent, the bar's tint, the
+/// secondary text, and whether the accent is the neutral one (its glow and hover).
 pub fn sync_follow(from: &Theme, to: &Theme) {
     to.set_follow_accent(from.get_follow_accent());
     to.set_follow_bar(from.get_follow_bar());
     to.set_follow_text2(from.get_follow_text2());
+    to.set_follow_neutral(from.get_follow_neutral());
     to.set_follow(from.get_follow());
 }
 
