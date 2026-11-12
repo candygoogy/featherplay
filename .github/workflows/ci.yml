@@ -231,3 +231,5 @@ jobs:
     uses: ./.github/workflows/linux-rig-sound.yml
   rig-desktop:
     uses: ./.github/workflows/linux-rig.yml
+  rig-appimage:
+    uses: ./.github/workflows/linux-rig-appimage.yml
