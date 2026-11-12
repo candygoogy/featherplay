@@ -105,13 +105,15 @@ jobs:
   # Linux: clippy and the tests, as the `check` job runs them on Windows, on the offscreen
   # platform (no display). Two differences, both in the Test step: the `ci` profile always
   # (the frame-cost, CPU-time and memory ceilings were set on Windows), and pixel checks that
-  # depend on the body font only save their images (an artifact). The runner is a matrix
-  # entry, so the ARM64 runner can join as a second one.
+  # depend on the body font only save their images (an artifact). One run per architecture,
+  # each native: x86_64, and aarch64 on GitHub's ARM64 runner (the same Ubuntu packages, from
+  # its ports mirror; skia-bindings has prebuilt aarch64 libraries too). aarch64 is tested
+  # here and in release.yml only, never by hand.
   linux:
     strategy:
       fail-fast: false
       matrix:
-        runner: [ubuntu-latest]
+        runner: [ubuntu-latest, ubuntu-24.04-arm]
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
     steps:
@@ -133,13 +135,19 @@ jobs:
             libxi-dev libasound2-dev libdbus-1-dev libssl-dev \
             dbus fonts-noto-core fonts-noto-cjk fonts-noto-color-emoji
 
-      # Installs the toolchain and components named in rust-toolchain.toml.
+      # Installs the toolchain and components named in rust-toolchain.toml, native to the
+      # runner: fails if rustc's host isn't the machine's architecture.
       - name: Rust toolchain
         shell: bash
         run: |
           rustup toolchain install
           rustup show active-toolchain
           cargo --version
+          host=$(rustc -vV | sed -n 's/^host: //p')
+          if [ "$host" != "$(uname -m)-unknown-linux-gnu" ]; then
+            echo "::error::rustc's host is '$host' on a $(uname -m) runner"
+            exit 1
+          fi
 
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
 
