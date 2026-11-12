@@ -86,7 +86,8 @@ impl Controller {
             });
         }
 
-        // A dev build may point at helpers elsewhere.
+        // `FEATHERPLAY_SIDECARS_DIR` points at helpers elsewhere, in every build: for testers'
+        // launchers and for packagers who provide their own yt-dlp and Deno.
         let sidecars = std::env::var_os("FEATHERPLAY_SIDECARS_DIR")
             .filter(|v| !v.is_empty())
             .map(PathBuf::from)

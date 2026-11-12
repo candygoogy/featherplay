@@ -18,7 +18,8 @@
 //! and exits, with nothing of the app started.
 //! Dev overrides: `FEATHERPLAY_COOKIES_FILE` (the cookie header, read instead of the
 //! credential store; debug builds only, or a release build with the `dev-cookies-file`
-//! feature) and `FEATHERPLAY_SIDECARS_DIR` (instead of `{cache}/sidecars`).
+//! feature). `FEATHERPLAY_SIDECARS_DIR` (instead of `{cache}/sidecars`) is honoured in every
+//! build: testers' launchers and packagers use it for helpers kept elsewhere.
 //!
 //! A release build is a GUI program, so starting it from the Start menu opens no console
 //! window; its log goes to `featherplay.log` in the log folder (`diagnostics::log_dir`), and a panic
