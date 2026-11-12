@@ -11,8 +11,9 @@ On `main`, with everything for the release merged:
 1. Set `version` under `[workspace.package]` in the root `Cargo.toml`. Every crate inherits
    it. Run `cargo build -p featherplay` once so `Cargo.lock` follows, and commit both:
    `release.yml` builds with `--locked` and fails on a stale lock file. `THIRD_PARTY.md`
-   lists the workspace's own crates with that version too: update those rows in the same
-   commit.
+   lists the workspace's own crates with that version too: regenerate it
+   (`python3 packaging/third-party/generate.py`, with cargo-about installed) and commit it
+   in the same commit.
 2. In `CHANGELOG.md`, rename `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD`, put a fresh,
    empty `## [Unreleased]` above it, and update the links at the bottom:
 

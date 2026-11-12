@@ -1,8 +1,7 @@
-# cargo-about config for THIRD_PARTY.md. Regenerate from the repo root with:
-#   cargo about generate --offline -c packaging/third-party/about.toml --workspace \
-#     -o THIRD_PARTY.md packaging/third-party/about.hbs
-# Only what ships in featherplay.exe: the Windows x64 and ARM64 targets, no build or dev
-# dependencies.
+# cargo-about config for THIRD_PARTY.md. Regenerate it from the repo root with
+#   python3 packaging/third-party/generate.py
+# which runs cargo-about with this config once per target below and merges the runs (it says
+# why). Only what ships in the binaries: no build or dev dependencies.
 accepted = [
   "MIT",
   "Apache-2.0",
@@ -19,9 +18,51 @@ accepted = [
   "CC0-1.0",
   "MIT-0",
   "bzip2-1.0.6",
-  # Slint ships no file for its licence; THIRD_PARTY.md links it (see about.hbs).
+  # Slint ships no file for its licence; THIRD_PARTY.md links it (see notices.md).
   "LicenseRef-Slint-Royalty-free-2.0",
 ]
-targets = ["x86_64-pc-windows-msvc", "aarch64-pc-windows-msvc"]
+targets = [
+  "x86_64-pc-windows-msvc",
+  "aarch64-pc-windows-msvc",
+  "x86_64-unknown-linux-gnu",
+  "aarch64-unknown-linux-gnu",
+]
 ignore-build-dependencies = true
 ignore-dev-dependencies = true
+
+# AWS-LC (Linux only): its LICENSE holds the notices of everything compiled in (BoringSSL,
+# OpenSSL, Fiat Cryptography, s2n-bignum, Jitter Entropy...), but cargo-about would fill the
+# ISC and MIT texts from generic templates. This gives them the real files. The expression is
+# aws-lc-sys 0.47.0's own: check it when the crate changes version. When a file changes,
+# generate.py stops on cargo-about's checksum warning: check it, then update the checksum.
+# (On the Windows targets cargo-about warns that the crate isn't in the graph; it isn't.)
+[aws-lc-sys.clarify]
+license = "ISC AND (Apache-2.0 OR ISC) AND Apache-2.0 AND MIT AND BSD-3-Clause AND (Apache-2.0 OR ISC OR MIT) AND (Apache-2.0 OR ISC OR MIT-0)"
+
+[[aws-lc-sys.clarify.files]]
+path = "LICENSE"
+license = "ISC"
+checksum = "728536b4160e051f86d7c9c388f704866b3d512cd7df97ac3516c65279523c4e"
+
+[[aws-lc-sys.clarify.files]]
+path = "aws-lc/third_party/fiat/LICENSE"
+license = "MIT"
+checksum = "43e358d7b6eb109d0f51f7b3a090fd82607965767c25fadee39e922475de2061"
+
+# The Rust side of AWS-LC (Linux only): its LICENSE has the Apache-2.0 text and the ISC one
+# with Amazon's copyright, which cargo-about otherwise fills from a template.
+[aws-lc-rs.clarify]
+license = "ISC AND (Apache-2.0 OR ISC)"
+
+[[aws-lc-rs.clarify.files]]
+path = "LICENSE"
+license = "ISC"
+checksum = "b50b376e7d24a0598488b730c3034ffcd0b58dd36c0913a24b9903a3cfd04bf7"
+
+# Linux only: cargo-about doesn't recognise its LICENSE.txt (MIT, with the author's copyright).
+[wayland-protocols-plasma.clarify]
+license = "MIT"
+
+[[wayland-protocols-plasma.clarify.files]]
+path = "LICENSE.txt"
+checksum = "1cb6f4dee8c649f175736380495f0af0c753c87f22d50931692968bb24bf2161"
