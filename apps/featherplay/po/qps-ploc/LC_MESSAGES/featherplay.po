@@ -171,80 +171,86 @@ msgstr "[Paused]"
 msgid "Unknown title"
 msgstr "[Unknown title]"
 
-#: ../../crates/integrations/src/tooltip.rs:19
-#: ../../crates/integrations/src/tooltip.rs:19 ui/bottom_bar.slint:578
-#: ../../crates/integrations/src/tooltip.rs:19 ui/bottom_bar.slint:578 ui/mini_player.slint:131 ui/pages/lyrics.slint:97
-#: ../../crates/integrations/src/tooltip.rs:19 ui/bottom_bar.slint:578 ui/mini_player.slint:131 ui/pages/lyrics.slint:97 ui/pages/now_playing.slint:719
-#: ../../crates/integrations/src/tooltip.rs:19 ui/bottom_bar.slint:578 ui/mini_player.slint:131 ui/pages/lyrics.slint:97 ui/pages/now_playing.slint:719
+#: ../../crates/integrations/src/tooltip.rs:21
+#: ../../crates/integrations/src/tooltip.rs:21
+#: ../../crates/integrations/src/tooltip.rs:21 ui/bottom_bar.slint:578
+#: ../../crates/integrations/src/tooltip.rs:21 ui/bottom_bar.slint:578 ui/mini_player.slint:134 ui/pages/lyrics.slint:97
+#: ../../crates/integrations/src/tooltip.rs:21 ui/bottom_bar.slint:578 ui/mini_player.slint:134 ui/pages/lyrics.slint:97 ui/pages/now_playing.slint:719
+#: ../../crates/integrations/src/tooltip.rs:21 ui/bottom_bar.slint:578 ui/mini_player.slint:134 ui/pages/lyrics.slint:97 ui/pages/now_playing.slint:719
 msgid "Nothing playing"
 msgstr "[Nothing playing]"
 
-#: ../../crates/integrations/src/tooltip.rs:27 ui/pages/home/hero.slint:144
+#: ../../crates/integrations/src/tooltip.rs:29 ui/pages/home/hero.slint:144
 msgid "{0} of {1}"
 msgstr "[{0} of {1}]"
 
-#: ../../crates/integrations/src/tooltip.rs:29
+#: ../../crates/integrations/src/tooltip.rs:31
 msgid "Paused at {}"
 msgstr "[Paused at {}]"
 
-#: ../../crates/integrations/src/tooltip.rs:30
+#: ../../crates/integrations/src/tooltip.rs:32
 msgid "paused at {}"
 msgstr "[paused at {}]"
 
-#: ../../crates/platform/src/common/tray.rs:100
-#: ../../crates/platform/src/common/tray.rs:100
-#: ../../crates/platform/src/common/tray.rs:100 ui/bottom_bar.slint:378
-#: ../../crates/platform/src/common/tray.rs:100 ui/bottom_bar.slint:378 ui/pages/content.slint:444
-#: ../../crates/platform/src/common/tray.rs:100 ui/bottom_bar.slint:378 ui/pages/content.slint:444 ui/parts/buttons.slint:26
-#: ../../crates/platform/src/common/tray.rs:100 ui/bottom_bar.slint:378 ui/pages/content.slint:444 ui/parts/buttons.slint:26
+#: ../../crates/platform/src/common/tray.rs:109
+#: ../../crates/platform/src/common/tray.rs:109
+#: ../../crates/platform/src/common/tray.rs:109 ui/bottom_bar.slint:378
+#: ../../crates/platform/src/common/tray.rs:109 ui/bottom_bar.slint:378 ui/pages/content.slint:444
+#: ../../crates/platform/src/common/tray.rs:109 ui/bottom_bar.slint:378 ui/pages/content.slint:444 ui/parts/buttons.slint:26
+#: ../../crates/platform/src/common/tray.rs:109 ui/bottom_bar.slint:378 ui/pages/content.slint:444 ui/parts/buttons.slint:26
 msgid "Play"
 msgstr "[Play]"
 
-#: ../../crates/platform/src/common/tray.rs:101
-#: ../../crates/platform/src/common/tray.rs:101 src/album_actions.rs:275
-#: ../../crates/platform/src/common/tray.rs:101 src/album_actions.rs:275 ui/not_for_me.slint:20 ui/pages/content.slint:317
-#: ../../crates/platform/src/common/tray.rs:101 src/album_actions.rs:275 ui/not_for_me.slint:20 ui/pages/content.slint:317 ui/song_menu.slint:282
+#: ../../crates/platform/src/common/tray.rs:110
+#: ../../crates/platform/src/common/tray.rs:110 src/album_actions.rs:275
+#: ../../crates/platform/src/common/tray.rs:110 src/album_actions.rs:275 ui/not_for_me.slint:20 ui/pages/content.slint:317
+#: ../../crates/platform/src/common/tray.rs:110 src/album_actions.rs:275 ui/not_for_me.slint:20 ui/pages/content.slint:317 ui/song_menu.slint:282
 msgid "Like"
 msgstr "[Like]"
 
 #. As wide as the wider label, so Go to album doesn't shift as it toggles.
-#: ../../crates/platform/src/common/tray.rs:108
-#: ../../crates/platform/src/common/tray.rs:108 ui/bottom_bar.slint:378
-#: ../../crates/platform/src/common/tray.rs:108 ui/bottom_bar.slint:378 ui/pages/home/hero.slint:167
-#: ../../crates/platform/src/common/tray.rs:108 ui/bottom_bar.slint:378 ui/pages/home/hero.slint:167
+#: ../../crates/platform/src/common/tray.rs:117
+#: ../../crates/platform/src/common/tray.rs:117 ui/bottom_bar.slint:378
+#: ../../crates/platform/src/common/tray.rs:117 ui/bottom_bar.slint:378 ui/pages/home/hero.slint:167
+#: ../../crates/platform/src/common/tray.rs:117 ui/bottom_bar.slint:378 ui/pages/home/hero.slint:167
 msgid "Pause"
 msgstr "[Pause]"
 
-#: ../../crates/platform/src/common/tray.rs:109 ui/pages/library.slint:48
+#: ../../crates/platform/src/common/tray.rs:118 ui/pages/library.slint:48
 msgid "Liked"
 msgstr "[Liked]"
 
-#: ../../crates/platform/src/windows/taskbar.rs:191
-#: ../../crates/platform/src/windows/taskbar.rs:191
-#: ../../crates/platform/src/windows/taskbar.rs:191 ui/bottom_bar.slint:668
-#: ../../crates/platform/src/windows/taskbar.rs:191 ui/bottom_bar.slint:668 ui/pages/settings/shortcuts.slint:125
-#: ../../crates/platform/src/windows/taskbar.rs:191 ui/bottom_bar.slint:668 ui/pages/settings/shortcuts.slint:125 ui/shortcuts.slint:34
+#: ../../crates/platform/src/linux/tray.rs:171
+#: ../../crates/platform/src/linux/tray.rs:171
+#: ../../crates/platform/src/linux/tray.rs:171
+#: ../../crates/platform/src/linux/tray.rs:171 ui/bottom_bar.slint:668
+#: ../../crates/platform/src/linux/tray.rs:171 ui/bottom_bar.slint:668 ui/pages/settings/shortcuts.slint:126
+#: ../../crates/platform/src/linux/tray.rs:171 ui/bottom_bar.slint:668 ui/pages/settings/shortcuts.slint:126 ui/shortcuts.slint:34
 msgid "Previous"
 msgstr "[Previous]"
 
-#: ../../crates/platform/src/windows/taskbar.rs:193
-#: ../../crates/platform/src/windows/taskbar.rs:193
-#: ../../crates/platform/src/windows/taskbar.rs:193 ui/bottom_bar.slint:682
-#: ../../crates/platform/src/windows/taskbar.rs:193 ui/bottom_bar.slint:682 ui/pages/settings/shortcuts.slint:125
-#: ../../crates/platform/src/windows/taskbar.rs:193 ui/bottom_bar.slint:682 ui/pages/settings/shortcuts.slint:125 ui/shortcuts.slint:35
+#: ../../crates/platform/src/linux/tray.rs:172
+#: ../../crates/platform/src/linux/tray.rs:172
+#: ../../crates/platform/src/linux/tray.rs:172
+#: ../../crates/platform/src/linux/tray.rs:172 ui/bottom_bar.slint:682
+#: ../../crates/platform/src/linux/tray.rs:172 ui/bottom_bar.slint:682 ui/pages/settings/shortcuts.slint:126
+#: ../../crates/platform/src/linux/tray.rs:172 ui/bottom_bar.slint:682 ui/pages/settings/shortcuts.slint:126 ui/shortcuts.slint:35
 msgid "Next"
 msgstr "[Next]"
 
-#: ../../crates/platform/src/windows/tray/menu.rs:49 ui/mini_player.slint:270
-#: ../../crates/platform/src/windows/tray/menu.rs:49 ui/mini_player.slint:270 ui/not_for_me.slint:70
+#: ../../crates/platform/src/linux/tray.rs:182
+#: ../../crates/platform/src/linux/tray.rs:182 ui/mini_player.slint:273
+#: ../../crates/platform/src/linux/tray.rs:182 ui/mini_player.slint:273 ui/not_for_me.slint:70
 msgid "Not for me"
 msgstr "[Not for me]"
 
-#: ../../crates/platform/src/windows/tray/menu.rs:52
+#: ../../crates/platform/src/linux/tray.rs:184
+#: ../../crates/platform/src/linux/tray.rs:184
 msgid "Show featherplay"
 msgstr "[Show featherplay]"
 
-#: ../../crates/platform/src/windows/tray/menu.rs:53
+#: ../../crates/platform/src/linux/tray.rs:185
+#: ../../crates/platform/src/linux/tray.rs:185
 msgid "Quit"
 msgstr "[Quit]"
 
@@ -664,7 +670,7 @@ msgstr "[Paste your user token first.]"
 msgid "{} (not connected)"
 msgstr "[{} (not connected)]"
 
-#: src/pages/settings/window.rs:92 ui/pages/settings/window.slint:249
+#: src/pages/settings/window.rs:92 ui/pages/settings/window.slint:255
 msgid "From the cover"
 msgstr "[From the cover]"
 
@@ -688,7 +694,7 @@ msgstr "[Teal]"
 msgid "Violet"
 msgstr "[Violet]"
 
-#: src/pages/settings/window.rs:98 ui/pages/settings/window.slint:261
+#: src/pages/settings/window.rs:98 ui/pages/settings/window.slint:267
 msgid "Custom colour"
 msgstr "[Custom colour]"
 
@@ -708,18 +714,24 @@ msgstr "[Type a colour as # and 6 letters or digits, like #4390EE.]"
 msgid "Another app already uses one of these keys. Pick other keys."
 msgstr "[Another app already uses one of these keys. Pick other keys.]"
 
-#: src/pages/settings/window.rs:273 ui/pages/settings/shortcuts.slint:125
-#: src/pages/settings/window.rs:273 ui/pages/settings/shortcuts.slint:125 ui/shortcuts.slint:33
+#: src/pages/settings/window.rs:273 ui/pages/settings/shortcuts.slint:126
+#: src/pages/settings/window.rs:273 ui/pages/settings/shortcuts.slint:126 ui/shortcuts.slint:33
 msgid "Play or pause"
 msgstr "[Play or pause]"
 
-#: src/pages/settings/window.rs:278
+#: src/pages/settings/window.rs:280
 msgid ""
 "{0}: \"{1}\" isn't a key featherplay can use. Write it like Ctrl+Alt+Space; "
 "it needs Ctrl, Alt, Shift or Win."
 msgstr "[{0}: \"{1}\" isn't a key featherplay can use. Write it like Ctrl+Alt+Space; it needs Ctrl, Alt, Shift or Win.]"
 
-#: src/pages/settings/window.rs:281
+#: src/pages/settings/window.rs:282
+msgid ""
+"{0}: \"{1}\" isn't a key featherplay can use. Write it like Ctrl+Alt+Space; "
+"it needs Ctrl, Alt, Shift or Super."
+msgstr "[{0}: \"{1}\" isn't a key featherplay can use. Write it like Ctrl+Alt+Space; it needs Ctrl, Alt, Shift or Super.]"
+
+#: src/pages/settings/window.rs:286
 msgid "{} uses the same key as another action."
 msgstr "[{} uses the same key as another action.]"
 
@@ -1170,44 +1182,44 @@ msgstr "[Choose what the close button does this time. featherplay will ask again
 msgid "Remember my choice"
 msgstr "[Remember my choice]"
 
-#: ui/close_dialog.slint:204 ui/pages/settings/window.slint:213
+#: ui/close_dialog.slint:204 ui/pages/settings/window.slint:215
 msgid "Keep playing in the tray"
 msgstr "[Keep playing in the tray]"
 
-#: ui/close_dialog.slint:209 ui/pages/settings/window.slint:213
+#: ui/close_dialog.slint:209 ui/pages/settings/window.slint:215
 msgid "Close featherplay"
 msgstr "[Close featherplay]"
 
-#: ui/mini_player.slint:57
+#: ui/mini_player.slint:60
 msgid "featherplay mini player"
 msgstr "[featherplay mini player]"
 
-#: ui/mini_player.slint:157 ui/playlist_menu_layer.slint:259
+#: ui/mini_player.slint:160 ui/playlist_menu_layer.slint:259
 msgid "Unpin"
 msgstr "[Unpin]"
 
-#: ui/mini_player.slint:157
+#: ui/mini_player.slint:160
 msgid "Keep on top"
 msgstr "[Keep on top]"
 
-#: ui/mini_player.slint:158
+#: ui/mini_player.slint:161
 msgid "Keeps the mini player open and above other windows"
 msgstr "[Keeps the mini player open and above other windows]"
 
-#: ui/mini_player.slint:174
+#: ui/mini_player.slint:177
 msgid "Open featherplay"
 msgstr "[Open featherplay]"
 
-#: ui/mini_player.slint:187
+#: ui/mini_player.slint:190
 msgid "Close"
 msgstr "[Close]"
 
-#: ui/mini_player.slint:227 ui/not_for_me.slint:20 ui/pages/content.slint:317
-#: ui/mini_player.slint:227 ui/not_for_me.slint:20 ui/pages/content.slint:317 ui/song_menu.slint:282
+#: ui/mini_player.slint:230 ui/not_for_me.slint:20 ui/pages/content.slint:317
+#: ui/mini_player.slint:230 ui/not_for_me.slint:20 ui/pages/content.slint:317 ui/song_menu.slint:282
 msgid "Remove like"
 msgstr "[Remove like]"
 
-#: ui/mini_player.slint:271 ui/not_for_me.slint:59
+#: ui/mini_player.slint:274 ui/not_for_me.slint:59
 msgid "Skips the song and tells YouTube Music you dislike it"
 msgstr "[Skips the song and tells YouTube Music you dislike it]"
 
@@ -2092,7 +2104,7 @@ msgstr "[Drag a band to change it. Boosts turn the overall level down a little, 
 msgid "Reset"
 msgstr "[Reset]"
 
-#: ui/pages/settings/equalizer.slint:257 ui/pages/settings/shortcuts.slint:235
+#: ui/pages/settings/equalizer.slint:257 ui/pages/settings/shortcuts.slint:237
 msgid "Done"
 msgstr "[Done]"
 
@@ -2420,34 +2432,34 @@ msgstr "[Off keeps the token.]"
 msgid "or"
 msgstr "[or]"
 
-#: ui/pages/settings/shortcuts.slint:117
+#: ui/pages/settings/shortcuts.slint:118
 msgid "From any app"
 msgstr "[From any app]"
 
-#: ui/pages/settings/shortcuts.slint:120
+#: ui/pages/settings/shortcuts.slint:121
 msgid "Your keyboard's media keys"
 msgstr "[Your keyboard's media keys]"
 
-#: ui/pages/settings/shortcuts.slint:121
+#: ui/pages/settings/shortcuts.slint:122
 msgid "play, pause, next, previous · always on"
 msgstr "[play, pause, next, previous · always on]"
 
-#: ui/pages/settings/shortcuts.slint:127
+#: ui/pages/settings/shortcuts.slint:128
 msgid "Global hotkey"
 msgstr "[Global hotkey]"
 
-#: ui/pages/settings/shortcuts.slint:132
+#: ui/pages/settings/shortcuts.slint:134
 msgid ""
 "Global hotkeys are off. Turn them on in Settings › Window to play, pause "
 "and skip with your own keys."
 msgstr "[Global hotkeys are off. Turn them on in Settings › Window to play, pause and skip with your own keys.]"
 
-#: ui/pages/settings/shortcuts.slint:198 ui/pages/settings/shortcuts.slint:205
-#: ui/pages/settings/shortcuts.slint:198 ui/pages/settings/shortcuts.slint:205 ui/shortcuts.slint:46
+#: ui/pages/settings/shortcuts.slint:200 ui/pages/settings/shortcuts.slint:207
+#: ui/pages/settings/shortcuts.slint:200 ui/pages/settings/shortcuts.slint:207 ui/shortcuts.slint:46
 msgid "Keyboard shortcuts"
 msgstr "[Keyboard shortcuts]"
 
-#: ui/pages/settings/shortcuts.slint:223
+#: ui/pages/settings/shortcuts.slint:225
 msgid "Finding and moving"
 msgstr "[Finding and moving]"
 
@@ -2549,113 +2561,128 @@ msgstr "[Colour code]"
 msgid "{} hotkey"
 msgstr "[{} hotkey]"
 
-#: ui/pages/settings/window.slint:208
+#: ui/pages/settings/window.slint:210
 msgid "When I close the window"
 msgstr "[When I close the window]"
 
-#: ui/pages/settings/window.slint:209
+#: ui/pages/settings/window.slint:211
 msgid "In the tray, the music keeps going; quit from the tray icon's menu."
 msgstr "[In the tray, the music keeps going; quit from the tray icon's menu.]"
 
-#: ui/pages/settings/window.slint:213
+#: ui/pages/settings/window.slint:215
 msgid "Ask"
 msgstr "[Ask]"
 
-#: ui/pages/settings/window.slint:220
+#: ui/pages/settings/window.slint:222
 msgid "Turn off the mini player"
 msgstr "[Turn off the mini player]"
 
-#: ui/pages/settings/window.slint:221
+#: ui/pages/settings/window.slint:223
 msgid ""
 "Clicking the tray icon opens the main window instead. Right-click always "
 "shows the menu."
 msgstr "[Clicking the tray icon opens the main window instead. Right-click always shows the menu.]"
 
-#: ui/pages/settings/window.slint:226
+#: ui/pages/settings/window.slint:231
 msgid "Appearance"
 msgstr "[Appearance]"
 
-#: ui/pages/settings/window.slint:227
+#: ui/pages/settings/window.slint:232
 msgid "System follows Windows' light or dark mode."
 msgstr "[System follows Windows' light or dark mode.]"
 
-#: ui/pages/settings/window.slint:229
+#: ui/pages/settings/window.slint:232
+msgid "System follows your desktop's light or dark mode."
+msgstr "[System follows your desktop's light or dark mode.]"
+
+#: ui/pages/settings/window.slint:234
 msgctxt "appearance"
 msgid "Dark"
 msgstr "[Dark]"
 
-#: ui/pages/settings/window.slint:229
+#: ui/pages/settings/window.slint:234
 msgctxt "appearance"
 msgid "Light"
 msgstr "[Light]"
 
-#: ui/pages/settings/window.slint:229
+#: ui/pages/settings/window.slint:234
 msgctxt "appearance"
 msgid "System"
 msgstr "[System]"
 
-#: ui/pages/settings/window.slint:237
+#: ui/pages/settings/window.slint:242
 msgid "Language"
 msgstr "[Language]"
 
-#: ui/pages/settings/window.slint:238
+#: ui/pages/settings/window.slint:243
 msgid ""
 "Windows default follows Windows' display language when featherplay has it, "
 "and English otherwise."
 msgstr "[Windows default follows Windows' display language when featherplay has it, and English otherwise.]"
 
-#: ui/pages/settings/window.slint:246
+#: ui/pages/settings/window.slint:244
+msgid ""
+"System default follows the system's language when featherplay has it, and "
+"English otherwise."
+msgstr "[System default follows the system's language when featherplay has it, and English otherwise.]"
+
+#: ui/pages/settings/window.slint:252
 msgid "Accent"
 msgstr "[Accent]"
 
-#: ui/pages/settings/window.slint:247
+#: ui/pages/settings/window.slint:253
 msgid ""
 "From the cover takes the colour of the song that's playing, and a plain grey "
 "when the art has none."
 msgstr "[From the cover takes the colour of the song that's playing, and a plain grey when the art has none.]"
 
-#: ui/pages/settings/window.slint:269
+#: ui/pages/settings/window.slint:275
 msgid "Track notifications"
 msgstr "[Track notifications]"
 
-#: ui/pages/settings/window.slint:270
+#: ui/pages/settings/window.slint:276
 msgid "Show a notification when the track changes."
 msgstr "[Show a notification when the track changes.]"
 
-#: ui/pages/settings/window.slint:275
+#: ui/pages/settings/window.slint:281
 msgid "Show tooltips"
 msgstr "[Show tooltips]"
 
-#: ui/pages/settings/window.slint:276
+#: ui/pages/settings/window.slint:282
 msgid "Names and shortcuts when you rest the pointer on a button."
 msgstr "[Names and shortcuts when you rest the pointer on a button.]"
 
-#: ui/pages/settings/window.slint:282
+#: ui/pages/settings/window.slint:288
 msgid "Play, skip, search and move around without the mouse."
 msgstr "[Play, skip, search and move around without the mouse.]"
 
-#: ui/pages/settings/window.slint:284
+#: ui/pages/settings/window.slint:290
 msgid "Show shortcuts"
 msgstr "[Show shortcuts]"
 
-#: ui/pages/settings/window.slint:289
+#: ui/pages/settings/window.slint:296
 msgid "Global hotkeys"
 msgstr "[Global hotkeys]"
 
-#: ui/pages/settings/window.slint:290
+#: ui/pages/settings/window.slint:297
 msgid ""
 "Play, pause and skip from any app. Each key needs Ctrl, Alt, Shift or Win."
 msgstr "[Play, pause and skip from any app. Each key needs Ctrl, Alt, Shift or Win.]"
 
-#: ui/pages/settings/window.slint:300
+#: ui/pages/settings/window.slint:298
+msgid ""
+"Play, pause and skip from any app. Each key needs Ctrl, Alt, Shift or Super."
+msgstr "[Play, pause and skip from any app. Each key needs Ctrl, Alt, Shift or Super.]"
+
+#: ui/pages/settings/window.slint:308
 msgid "Ctrl+Alt+Space"
 msgstr "[Ctrl+Alt+Space]"
 
-#: ui/pages/settings/window.slint:306
+#: ui/pages/settings/window.slint:314
 msgid "Ctrl+Alt+Right"
 msgstr "[Ctrl+Alt+Right]"
 
-#: ui/pages/settings/window.slint:312
+#: ui/pages/settings/window.slint:320
 msgid "Ctrl+Alt+Left"
 msgstr "[Ctrl+Alt+Left]"
 
