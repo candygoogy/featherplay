@@ -48,7 +48,7 @@ jobs:
         with:
           persist-credentials: false
 
-      # The audio crate's build needs ALSA's and OpenSSL's headers (cpal, native-tls), and clang
+      # The audio crate's build needs ALSA's headers (cpal), and clang
       # for the bindings of its dev-dependencies (the example links them). Then the sound server:
       # PipeWire with WirePlumber, its PulseAudio server and its ALSA plugin, or PulseAudio with
       # ALSA's pulse plugin; parec and pactl from pulseaudio-utils either way; a session bus for
@@ -62,7 +62,7 @@ jobs:
           sudo apt-get update
           # shellcheck disable=SC2086 # $server is a list of packages
           sudo apt-get install -y --no-install-recommends \
-            pkg-config clang libasound2-dev libssl-dev libfontconfig1-dev libfreetype-dev alsa-utils pulseaudio-utils dbus \
+            pkg-config clang libasound2-dev libfontconfig1-dev libfreetype-dev alsa-utils pulseaudio-utils dbus \
             $server
 
       - name: Rust toolchain

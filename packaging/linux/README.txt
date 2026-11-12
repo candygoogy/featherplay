@@ -25,9 +25,9 @@ dev.candygoogy.featherplay.* under ~/.local/share.
 Updates: this copy tells you when a new version is out, but doesn't install it. The AppImage
 updates itself.
 
-What it needs: glibc 2.35 or newer (Ubuntu 22.04, Debian 12, Fedora 36 or newer), OpenSSL 3,
+What it needs: glibc 2.35 or newer (Ubuntu 22.04, Debian 12, Fedora 36 or newer),
 fontconfig, FreeType and ALSA (with PipeWire or PulseAudio behind it, as desktops have), and
 a Wayland or X11 session (libwayland-client, libxkbcommon, or libX11 and libxcb). A desktop
-distribution has all of these, but for one: Fedora 45 and newer ship OpenSSL 4, so there
-OpenSSL 3 is a package of its own (sudo dnf install openssl3-libs). Settings go in
-~/.config/featherplay, the cache in ~/.cache/featherplay.
+distribution has all of these. Its TLS is built in (no OpenSSL needed); it trusts the
+certificates your system trusts. Settings go in ~/.config/featherplay, the cache in
+~/.cache/featherplay.

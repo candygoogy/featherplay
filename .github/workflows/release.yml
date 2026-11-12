@@ -251,7 +251,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             pkg-config clang libfontconfig1-dev libfreetype-dev libxkbcommon-dev \
             libxkbcommon-x11-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev \
-            libxi-dev libasound2-dev libdbus-1-dev libssl-dev \
+            libxi-dev libasound2-dev libdbus-1-dev \
             dbus fonts-noto-core fonts-noto-cjk fonts-noto-color-emoji
 
       # Native to the runner: fails if rustc's host isn't the machine's architecture.
@@ -314,7 +314,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             pkg-config clang libfontconfig1-dev libfreetype-dev libxkbcommon-dev \
             libxkbcommon-x11-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev \
-            libxi-dev libasound2-dev libdbus-1-dev libssl-dev \
+            libxi-dev libasound2-dev libdbus-1-dev \
             desktop-file-utils appstream
 
       # Native to the runner, as in test-linux.

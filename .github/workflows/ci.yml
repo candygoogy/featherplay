@@ -122,7 +122,7 @@ jobs:
           persist-credentials: false
 
       # The headers the native crates build against: fontconfig and freetype (fonts),
-      # xkbcommon, Wayland and X11 (winit), ALSA (cpal), D-Bus, OpenSSL (native-tls), and clang
+      # xkbcommon, Wayland and X11 (winit), ALSA (cpal), D-Bus (no OpenSSL: rustls), and clang
       # for the bindings. skia-bindings downloads its prebuilt library. For the tests: a
       # session bus (dbus-run-session), and the Noto fonts, so the titles in other scripts
       # and the emoji find a fallback font (`glyph_fallback`).
@@ -132,7 +132,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             pkg-config clang libfontconfig1-dev libfreetype-dev libxkbcommon-dev \
             libxkbcommon-x11-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev \
-            libxi-dev libasound2-dev libdbus-1-dev libssl-dev \
+            libxi-dev libasound2-dev libdbus-1-dev \
             dbus fonts-noto-core fonts-noto-cjk fonts-noto-color-emoji
 
       # Installs the toolchain and components named in rust-toolchain.toml, native to the

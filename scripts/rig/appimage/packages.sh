@@ -2,8 +2,8 @@
 # Installs, as root inside a distribution's container, one of three package sets, and lists
 # what it installed in $OUT/packages-<set>.txt:
 #   runtime  what featherplay's AppImage needs and a desktop install already has: the
-#            libraries the binary links (fontconfig, FreeType, ALSA, OpenSSL 3) and those it
-#            loads at run time for an X11 or Wayland window (libX11, libX11-xcb, libXcursor,
+#            libraries the binary links (fontconfig, FreeType, ALSA; no OpenSSL, its TLS is
+#            built in) and those it loads at run time for an X11 or Wayland window (libX11, libX11-xcb, libXcursor,
 #            libXi, libxcb, libxkbcommon, libxkbcommon-x11, libwayland-client), and one font.
 #            libs.sh then checks that these are enough, before anything else is installed.
 #   rig      what the rig itself needs: an X server (Xvfb), and for the tests python3 (the
@@ -23,11 +23,11 @@ mkdir -p "$out"
 
 case "$ID:$set_name" in
 ubuntu:runtime | debian:runtime)
-    # 24.04 and Debian 13 renamed ALSA's and OpenSSL's libraries for the 64-bit time_t move.
+    # 24.04 and Debian 13 renamed ALSA's library for the 64-bit time_t move.
     apt-get update -qq
     t64=
     if apt-cache show libasound2t64 >/dev/null 2>&1; then t64=t64; fi
-    pkgs="libfontconfig1 libfreetype6 libasound2$t64 libssl3$t64 libx11-6 libx11-xcb1
+    pkgs="libfontconfig1 libfreetype6 libasound2$t64 libx11-6 libx11-xcb1
           libxcursor1 libxi6 libxcb1 libxkbcommon0 libxkbcommon-x11-0 libwayland-client0
           fonts-dejavu-core"
     ;;
@@ -38,13 +38,7 @@ ubuntu:sound | debian:sound)
     pkgs="pulseaudio pulseaudio-utils libasound2-plugins"
     ;;
 fedora:runtime)
-    # Fedora 45 moved openssl-libs to OpenSSL 4 (libssl.so.4); OpenSSL 3, which the binary
-    # links, is openssl3-libs there.
-    ssl=openssl-libs
-    if dnf -q repoquery --qf '%{name}\n' openssl3-libs 2>/dev/null | grep -q .; then
-        ssl=openssl3-libs
-    fi
-    pkgs="fontconfig freetype alsa-lib $ssl libX11 libX11-xcb libXcursor libXi libxcb
+    pkgs="fontconfig freetype alsa-lib libX11 libX11-xcb libXcursor libXi libxcb
           libxkbcommon libxkbcommon-x11 libwayland-client dejavu-sans-fonts"
     ;;
 fedora:rig)
@@ -55,7 +49,7 @@ fedora:sound)
     ;;
 arch:runtime)
     # libX11-xcb is part of libx11 here.
-    pkgs="fontconfig freetype2 alsa-lib openssl libx11 libxcursor libxi libxcb libxkbcommon
+    pkgs="fontconfig freetype2 alsa-lib libx11 libxcursor libxi libxcb libxkbcommon
           libxkbcommon-x11 wayland ttf-dejavu"
     ;;
 arch:rig)
