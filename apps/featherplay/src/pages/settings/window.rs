@@ -23,6 +23,8 @@ pub(super) const CLOSE_ACTIONS: [CloseAction; 3] =
 /// Shows `mode` (live, without saving): `--snapshot --theme` forces Dark or Light this way.
 pub fn apply_theme(ctx: &Ctx, mode: ThemeMode) {
     let Some(ui) = ctx.window() else { return };
+    // Until the flip's crossfade starts (`follow::theme_changed`).
+    follow::hold(&ui);
     ui.global::<Theme>().invoke_apply(appearance(mode));
     ui.global::<SettingsData>().set_appearance(appearance(mode));
 }

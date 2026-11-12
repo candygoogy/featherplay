@@ -944,12 +944,14 @@ fn run_window(
         if let Err(e) = watched {
             log!("repaint on invalidate: {e}");
         }
-        // The window icon has a dark and a light drawing, picked by the taskbar's theme.
+        // The window icon has a dark and a light drawing, picked by the taskbar's theme. The
+        // colours hold until the app mode's flip, if this is one, starts its crossfade
+        // (`follow::hold`): this runs before the window hears of it.
         let recolour = weak.clone();
         let watched = window::when_colours_change(handle, move || {
-            if let Some(ui) = recolour.upgrade()
-                && let Err(e) = chrome::set_icon(handle, ui.window().scale_factor())
-            {
+            let Some(ui) = recolour.upgrade() else { return };
+            crate::follow::hold(&ui);
+            if let Err(e) = chrome::set_icon(handle, ui.window().scale_factor()) {
                 log!("window icon: {e}");
             }
         });

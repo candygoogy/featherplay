@@ -13,8 +13,10 @@
 //! Back on the UI thread the accents go into `Theme.follow-*`, crossfading over `Theme.t-colour`
 //! (300 ms; instant when Windows' animation effects are off, or while the window is
 //! minimized or hidden and the mini player isn't open). The open mini player takes every
-//! step of it into its own `Theme` (`mini::follow_changed`). Nothing else animates; nothing
-//! runs while the track stays the same, so a paused or idle player costs nothing.
+//! step of it into its own `Theme` (`mini::follow_changed`). A theme switch crossfades
+//! everything, these colours included, with one timer of its own (`theme_changed`). Nothing
+//! else animates; nothing runs while the track and the theme stay the same, so a paused or
+//! idle player costs nothing.
 
 pub mod colour;
 
@@ -135,8 +137,22 @@ struct State {
     /// Bumped per cover, so a late extraction for an old track is dropped.
     generation: u64,
     fade: Option<Rc<Timer>>,
-    /// Ends `Theme.switching` once the theme switch is on screen.
-    switched: Timer,
+    /// A theme switch's crossfade, while it runs (`theme_changed`), and the timer that steps
+    /// it, kept from one switch to the next (it stops itself, from its own callback).
+    switch: Option<Switch>,
+    switch_timer: Rc<Timer>,
+}
+
+/// A theme switch on its way: `Theme.switch-shade` from `from` to `to` (1 dark, 0 light),
+/// and the cover colours by the same amount while the accent follows the cover.
+struct Switch {
+    from: f32,
+    to: f32,
+    /// `follow-*`'s colours at the start and at the end, and whether the end's accent is the
+    /// neutral one. A new cover's colours known meanwhile move the end (`show`).
+    follow: Option<([Color; 3], [Color; 3], bool)>,
+    /// The end is on screen: the next step ends the switch.
+    landed: bool,
 }
 
 thread_local! {
@@ -182,37 +198,220 @@ pub fn set_accent(ctx: &Rc<Ctx>, accent: Accent, custom_colour: AccentColour) {
     }
 }
 
-/// The theme flipped: the current colours for the new theme, at once, in the frame that
-/// shows the rest of the window in it. `Theme.switching` zeroes `t-colour` for that frame,
-/// so neither `show` nor the bar's own crossfade fades the switch. The open mini player
-/// takes them in the same turn.
+/// The theme flipped (the setting, or Windows' app mode under System): every colour
+/// crossfades to the new theme's together, over `Theme.t-switch` with an ease-out; at once
+/// without motion, or with nothing on screen to see it. One timer steps
+/// `Theme.switch-shade`, which every theme colour is mixed by (`Theme.pick`), the cover
+/// colours (`follow-*`) by the same eased amount, the title bar, and the open mini player's
+/// copies of them, so the window, its bar and the mini player are at one blend in every
+/// frame. Meanwhile `Theme.switching` zeroes the colour transitions, so neither the bar's
+/// own crossfade nor a hover's fades on behind the switch. It stops once the new theme is
+/// on screen: nothing runs after.
 pub fn theme_changed(ctx: &Rc<Ctx>) {
-    if let Some(ui) = ctx.window() {
-        ui.global::<Theme>().set_switching(true);
-        let weak = ui.as_weak();
-        STATE.with(|s| {
-            s.borrow()
-                .switched
-                .start(TimerMode::SingleShot, FRAME, move || {
-                    if let Some(ui) = weak.upgrade() {
-                        ui.global::<Theme>().set_switching(false);
-                    }
-                });
-        });
-    }
-    // While a new cover's colours are worked out, the ones on screen, for the new theme
-    // (each cover keeps both themes' palettes); the new cover's crossfade in once known, as
-    // for any new song.
-    let waiting = STATE.with(|s| {
+    let Some(ui) = ctx.window() else { return };
+    let theme = ui.global::<Theme>();
+    let dark = theme.get_dark();
+    let to = if dark { 1.0 } else { 0.0 };
+    // From the old theme, or from where a switch still running has got to.
+    let from = if theme.get_switching() {
+        theme.get_switch_shade()
+    } else {
+        1.0 - to
+    };
+    // The cover colours go to the known ones for the new theme; while a new cover's are
+    // worked out, to the ones on screen (each cover keeps both themes' palettes), and the new
+    // cover's crossfade in once known, as for any new song. A song's crossfade still running
+    // gives way: the switch ends on its colours.
+    let colours = STATE.with(|s| {
         let mut s = s.borrow_mut();
-        s.shown_dark = None;
-        (s.enabled && matches!(s.colours, Colours::Pending)).then_some(s.on_screen)
+        s.fade = None;
+        s.switch = None;
+        let colours = match s.colours {
+            Colours::Pending => s.on_screen,
+            known => known,
+        };
+        s.enabled.then_some(colours)
     });
-    match (waiting, ctx.window()) {
-        (Some(shown), Some(ui)) => show(ctx, shown, ui.global::<Theme>().get_dark()),
-        _ => refresh(ctx),
-    }
+    // The new theme's plain colours, read with `shade` at rest.
+    theme.set_switching(false);
+    let follow = colours.map(|colours| {
+        let (end, neutral) = target(&theme, colours, dark);
+        STATE.with(|s| {
+            let mut s = s.borrow_mut();
+            s.shown_dark = Some(dark);
+            s.on_screen = colours;
+            s.cover_shown |= matches!(colours, Colours::Cover(..));
+        });
+        if neutral {
+            theme.set_follow_neutral(true);
+        }
+        (follow_colours(&theme), end, neutral)
+    });
+
+    let window = ui.window();
+    let on_screen = (window.is_visible() && !window.is_minimized()) || crate::mini::is_open();
+    let duration = Duration::from_millis(theme.get_t_switch().max(0) as u64);
+    // At once: the new theme in the next frame, `switching` on for that one frame only.
+    let (start, duration) = if duration.is_zero() || !on_screen || from == to {
+        (to, Duration::ZERO)
+    } else {
+        (from, duration)
+    };
+    let timer = STATE.with(|s| {
+        let mut s = s.borrow_mut();
+        s.switch = Some(Switch {
+            from: start,
+            to,
+            follow,
+            landed: false,
+        });
+        s.switch_timer.clone()
+    });
+    theme.set_switching(true);
+    // The start on screen (the old theme, until the first step), or the end at once.
+    step(&ui, if duration.is_zero() { 1.0 } else { 0.0 });
     crate::mini::theme_changed(ctx);
+
+    let began = i_slint_core::animations::current_tick();
+    let weak = ui.as_weak();
+    timer.start(TimerMode::Repeated, FRAME, move || {
+        let Some(ui) = weak.upgrade() else { return };
+        // The animation clock, which the offscreen tests step as they draw frames.
+        let elapsed = i_slint_core::animations::current_tick() - began;
+        let t = if duration.is_zero() {
+            1.0
+        } else {
+            (elapsed.as_secs_f32() / duration.as_secs_f32()).min(1.0)
+        };
+        step(&ui, ease_out(t));
+    });
+}
+
+/// Keeps the colours as they are until the event loop's next turn, just before the theme
+/// may flip (the setting picked, Windows' colours changing): the flip's first frame can be
+/// drawn before `theme_changed` hears of it, and would show the new theme for that frame,
+/// then fade from the old. The next turn's timers run before its change handlers, so this
+/// lets go just before `theme_changed` starts the crossfade from the same colours; when
+/// nothing flips, it only lets go.
+pub fn hold(ui: &crate::ui::AppWindow) {
+    let theme = ui.global::<Theme>();
+    if theme.get_switching() {
+        return;
+    }
+    theme.set_switch_shade(theme.get_shade());
+    theme.set_switching(true);
+    crate::mini::follow_changed(&theme, false);
+    let weak = ui.as_weak();
+    Timer::single_shot(Duration::ZERO, move || {
+        if let Some(ui) = weak.upgrade()
+            && STATE.with(|s| s.borrow().switch.is_none())
+        {
+            let theme = ui.global::<Theme>();
+            theme.set_switching(false);
+            crate::mini::follow_changed(&theme, false);
+        }
+    });
+}
+
+/// A step of the theme switch at `eased` (0 to 1): the shade and the cover colours, the
+/// title bar and the mini player. The first step at 1 shows the new theme; the next ends
+/// the switch, so `switching` goes off with nothing left to change (no transition starts).
+fn step(ui: &crate::ui::AppWindow, eased: f32) {
+    /// What a step shows.
+    enum Step {
+        At {
+            shade: f32,
+            follow: Option<[Color; 3]>,
+            /// The end's neutral flag, on the step that lands.
+            neutral: Option<bool>,
+        },
+        End,
+    }
+    let theme = ui.global::<Theme>();
+    let next = STATE.with(|s| {
+        let mut s = s.borrow_mut();
+        let switch = s.switch.as_mut()?;
+        if switch.landed {
+            s.switch = None;
+            s.switch_timer.stop();
+            return Some(Step::End);
+        }
+        switch.landed = eased >= 1.0;
+        let follow = switch
+            .follow
+            .map(|(from, to, _)| std::array::from_fn(|i| mix(from[i], to[i], eased)));
+        Some(Step::At {
+            shade: switch.from + (switch.to - switch.from) * eased,
+            follow,
+            neutral: switch
+                .follow
+                .filter(|_| switch.landed)
+                .map(|(.., neutral)| neutral),
+        })
+    });
+    match next {
+        None => return,
+        Some(Step::End) => theme.set_switching(false),
+        Some(Step::At {
+            shade,
+            follow,
+            neutral,
+        }) => {
+            theme.set_switch_shade(shade);
+            if let Some(now) = follow {
+                set(&theme, now);
+            }
+            if let Some(neutral) = neutral {
+                theme.set_follow_neutral(neutral);
+            }
+            title_bar(ui);
+        }
+    }
+    crate::mini::follow_changed(&theme, true);
+}
+
+/// The title bar in the window's colours as they are (`chrome::title_bar`): its caption
+/// buttons turn dark or light halfway through a switch.
+fn title_bar(ui: &crate::ui::AppWindow) {
+    let theme = ui.global::<Theme>();
+    if let Some(h) = crate::shell::handle(ui.window())
+        && let Err(e) = crate::chrome::title_bar(
+            h,
+            theme.get_shade() >= 0.5,
+            theme.get_ground(),
+            theme.get_text1(),
+        )
+    {
+        log!("title bar: {e}");
+    }
+}
+
+/// The colours `follow-*` show now.
+fn follow_colours(theme: &Theme) -> [Color; 3] {
+    [
+        theme.get_follow_accent(),
+        theme.get_follow_bar(),
+        theme.get_follow_text2(),
+    ]
+}
+
+/// What `follow-*` show for `colours` in the theme (`dark`), and whether that's the neutral
+/// accent. The plain colours are the theme's own, as `Theme` has them now.
+fn target(theme: &Theme, colours: Colours, dark: bool) -> ([Color; 3], bool) {
+    match colours {
+        Colours::Cover(d, l) => {
+            let p = if dark { d } else { l };
+            ([p.accent, p.bar, p.text2].map(to_color), p.neutral)
+        }
+        Colours::Plain | Colours::Pending => (
+            [
+                theme.get_plain_accent(),
+                theme.get_plain_bar(),
+                theme.get_plain_text2(),
+            ],
+            false,
+        ),
+    }
 }
 
 /// Shows the known colours for the current theme, unless they're already on screen.
@@ -340,20 +539,30 @@ fn show(ctx: &Rc<Ctx>, colours: Colours, dark: bool) {
     let Some(ui) = ctx.window() else { return };
     let theme = ui.global::<Theme>();
     let from = [theme.get_accent(), theme.get_bar(), theme.get_text2()];
-    let (to, neutral) = match colours {
-        Colours::Cover(d, l) => {
-            let p = if dark { d } else { l };
-            ([p.accent, p.bar, p.text2].map(to_color), p.neutral)
+    // During a theme switch the plain colours are read for its end, the new theme.
+    let switching = theme.get_switching();
+    theme.set_switching(false);
+    let (to, neutral) = target(&theme, colours, dark);
+    theme.set_switching(switching);
+    // A theme switch running fades the cover colours too: it takes these as its end.
+    let retargeted = STATE.with(|s| {
+        let mut s = s.borrow_mut();
+        let follow = s.switch.as_mut().and_then(|w| w.follow.as_mut())?;
+        follow.1 = to;
+        follow.2 = neutral;
+        s.shown_dark = Some(dark);
+        if !matches!(colours, Colours::Pending) {
+            s.on_screen = colours;
         }
-        Colours::Plain | Colours::Pending => (
-            [
-                theme.get_plain_accent(),
-                theme.get_plain_bar(),
-                theme.get_plain_text2(),
-            ],
-            false,
-        ),
-    };
+        s.cover_shown |= matches!(colours, Colours::Cover(..));
+        Some(())
+    });
+    if retargeted.is_some() {
+        if neutral {
+            theme.set_follow_neutral(true);
+        }
+        return;
+    }
     // The neutral glow and hover come at once, as the colours start towards the neutral
     // accent; they go once the fade away from it ends, so the glow never lights up in a
     // half-faded near-white.
@@ -800,8 +1009,8 @@ mod tests {
     #[test]
     fn the_tonal_alphas_match_the_theme() {
         let theme = include_str!("../ui/theme.slint");
-        assert!(theme.contains("accent-tonal: accent.transparentize(dark ? 0.78 : 0.86);"));
-        assert!(theme.contains("accent-tonal-hover: accent.transparentize(dark ? 0.7 : 0.8);"));
+        assert!(theme.contains("accent-tonal: accent.transparentize(between(0.78, 0.86));"));
+        assert!(theme.contains("accent-tonal-hover: accent.transparentize(between(0.7, 0.8));"));
     }
 
     /// The fixed accents a grey cover falls back to: red (the "From the cover" setting), each

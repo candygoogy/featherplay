@@ -161,6 +161,13 @@ pub fn sync_follow(from: &Theme, to: &Theme) {
     to.set_follow(from.get_follow());
 }
 
+/// Copies where the main window's theme switch is (`follow::theme_changed`) into a popup
+/// that follows each of its steps, the mini player.
+pub fn sync_switch(from: &Theme, to: &Theme) {
+    to.set_switch_shade(from.get_switch_shade());
+    to.set_switching(from.get_switching());
+}
+
 /// Copies the main window's player into a popup's.
 pub fn sync_player(from: &Player, to: &Player) {
     to.set_has_track(from.get_has_track());

@@ -258,7 +258,7 @@ export component WindowSection inherits Group {
             }
             for swatch[i] in SettingsData.accents: Swatch {
                 name: swatch.name;
-                colour: Theme.dark ? swatch.dark : swatch.light;
+                colour: Theme.pick(swatch.dark, swatch.light);
                 selected: SettingsData.accent == i + 1;
                 clicked => { SettingsData.pick-accent(i + 1); }
             }

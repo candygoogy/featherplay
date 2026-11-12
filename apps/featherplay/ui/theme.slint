@@ -18,6 +18,24 @@ export global Theme {
     callback dark-changed(bool);
     changed dark => { dark-changed(dark); }
 
+    // A theme switch crossfades every colour together (`follow::theme_changed`, ~200 ms; at
+    // once without motion): Rust turns `switching` on and steps `switch-shade` from the old
+    // theme to the new, in the same turn for the main window and the open mini player. The
+    // colours are made with `pick` from `shade`: 1 is dark, 0 light, in between only while
+    // switching. `switching` also zeroes the colour transitions (`t-colour`, `t-hover`,
+    // `t-fast`, `t-line`), so no part fades on its own schedule behind the switch.
+    in-out property <bool> switching: false;
+    in-out property <float> switch-shade: 1;
+    out property <float> shade: switching ? switch-shade : (dark ? 1 : 0);
+    // The colour for dark `d` and light `l`, as far as `shade` is.
+    public pure function pick(d: color, l: color) -> color {
+        return shade >= 1 ? d : (shade <= 0 ? l : d.mix(l, shade));
+    }
+    // The same for a number.
+    public pure function between(d: float, l: float) -> float {
+        return l + (d - l) * shade;
+    }
+
     // Sets the theme, and Slint's own widgets (scroll bars, the About badge) to match it.
     public function apply(mode: Appearance) {
         follow-system = mode == Appearance.system;
@@ -51,16 +69,16 @@ export global Theme {
 
     // The logo's red, the two ends of its gradient (a bright red on dark, a deeper one on
     // light): the Liked songs tile, and the accent's fallback.
-    out property <color> brand-accent: dark ? #FF3B55 : #CC1036;
+    out property <color> brand-accent: pick(#FF3B55, #CC1036);
     // The accent, used boldly but only for fills and marks, never for body text: progress
     // and the seek thumb, the play button, the playing mark, the selected chip and tab,
     // switches, focus rings. AA (4.5:1) against the ground, the bar, panels and cards, so it
     // also reads as a mark on every surface. Text on it is `on-accent`, black or white.
-    out property <color> plain-accent: dark ? preset-dark : preset-light;
+    out property <color> plain-accent: pick(preset-dark, preset-light);
     out property <color> accent: follow ? follow-accent : plain-accent;
     // On an accent fill: the ground's near-black on dark (the accent is light there), white
     // on light (the accent is deep). The accent's AA against the ground carries over.
-    out property <color> on-accent: dark ? #0F0F0F : #FFFFFF;
+    out property <color> on-accent: pick(#0F0F0F, #FFFFFF);
     // An accent fill hovered and pressed: a step towards `text1`, away from `on-accent`, so
     // the glyph only gains contrast. The neutral accent is already next to `text1`, where
     // that step can't be seen: it steps towards `on-accent` instead (darker on dark, lighter
@@ -68,77 +86,77 @@ export global Theme {
     out property <color> accent-hover: accent.mix(neutral ? on-accent : text1, 0.84);
     out property <color> accent-pressed: accent.mix(neutral ? on-accent : text1, 0.7);
     // The accent's tonal fill (the selected pill tab or chip) and its hover, under `text1`.
-    out property <color> accent-tonal: accent.transparentize(dark ? 0.78 : 0.86);
-    out property <color> accent-tonal-hover: accent.transparentize(dark ? 0.7 : 0.8);
+    out property <color> accent-tonal: accent.transparentize(between(0.78, 0.86));
+    out property <color> accent-tonal-hover: accent.transparentize(between(0.7, 0.8));
 
     // Grounds and surfaces, neutral greys. Dark is near-black, the sidebar a step darker,
     // the bar and panels a step lighter, raised cards lighter again; light is white, with
     // the sidebar, bar and cards in light greys.
-    out property <color> ground: dark ? #0F0F0F : #FFFFFF;
-    out property <color> surface: dark ? #030303 : #F7F7F7;      // sidebar
+    out property <color> ground: pick(#0F0F0F, #FFFFFF);
+    out property <color> surface: pick(#030303, #F7F7F7);      // sidebar
     // The player bar: tinted, subtly, with the cover's hue while the accent follows it.
-    out property <color> plain-bar: dark ? #181818 : #F7F7F7;
+    out property <color> plain-bar: pick(#181818, #F7F7F7);
     out property <color> bar: follow ? follow-bar : plain-bar;
-    out property <color> panel: dark ? #181818 : #F7F7F7;        // Up next panel, settings cards
-    out property <color> card: dark ? #212121 : #F2F2F2;         // raised cards (Home hero)
-    out property <color> card-edge: dark ? #FFFFFF0D : #00000014;
-    out property <color> field: dark ? #FFFFFF14 : #F2F2F2;      // search field
+    out property <color> panel: pick(#181818, #F7F7F7);        // Up next panel, settings cards
+    out property <color> card: pick(#212121, #F2F2F2);         // raised cards (Home hero)
+    out property <color> card-edge: pick(#FFFFFF0D, #00000014);
+    out property <color> field: pick(#FFFFFF14, #F2F2F2);      // search field
     // The toast, the topmost surface, floating over any page (a cover-tinted one too): a step
     // above the cards on dark; white on light, where a grey card read as part of the page.
     // Its edge and a deeper shadow hold it apart from the bar just under it.
-    out property <color> toast: dark ? #262626 : #FFFFFF;
-    out property <color> toast-edge: dark ? #FFFFFF17 : #0000001A;
-    out property <color> toast-shadow: dark ? #000000A6 : #00000029;
+    out property <color> toast: pick(#262626, #FFFFFF);
+    out property <color> toast-edge: pick(#FFFFFF17, #0000001A);
+    out property <color> toast-shadow: pick(#000000A6, #00000029);
     // Something went wrong (the toast's alert ring): Windows' own critical colours, soft on
     // dark, so an error reads as one without an alarm-red slab. 7.4:1 on the dark toast,
     // 5.7:1 on the light one.
-    out property <color> error: dark ? #FF99A4 : #C42B1C;
+    out property <color> error: pick(#FF99A4, #C42B1C);
     // The top bar's search field: opaque, a step lighter than the cards on dark so it holds
     // its own on a page's wash; `text3` keeps 4.7:1 on it in both themes. Its 1 px edge, a
     // neutral step up on hover (the focus ring is the accent).
-    out property <color> field-solid: dark ? #262626 : #F2F2F2;
-    out property <color> field-edge: dark ? #FFFFFF1F : #0000001A;
-    out property <color> field-edge-hover: dark ? #FFFFFF40 : #00000038;
-    out property <color> hairline: dark ? #FFFFFF1A : #0000001A;
-    out property <color> cover-edge: dark ? #FFFFFF14 : #0000001A; // keeps pale and black art from dissolving
-    out property <color> cover-empty: dark ? #272727 : #E5E5E5;
-    out property <color> track: dark ? #FFFFFF26 : #0000001F;      // progress and volume rails
-    out property <color> cover-shadow: dark ? #00000099 : #00000033;
+    out property <color> field-solid: pick(#262626, #F2F2F2);
+    out property <color> field-edge: pick(#FFFFFF1F, #0000001A);
+    out property <color> field-edge-hover: pick(#FFFFFF40, #00000038);
+    out property <color> hairline: pick(#FFFFFF1A, #0000001A);
+    out property <color> cover-edge: pick(#FFFFFF14, #0000001A); // keeps pale and black art from dissolving
+    out property <color> cover-empty: pick(#272727, #E5E5E5);
+    out property <color> track: pick(#FFFFFF26, #0000001F);      // progress and volume rails
+    out property <color> cover-shadow: pick(#00000099, #00000033);
     // Now playing's soft glow under the cover, in the accent (the cover's colour by default).
     // The neutral accent's would read as a spotlight: a faint white on dark, and on light none,
     // which leaves the cover's own shadow (`cover-shadow`).
-    out property <color> cover-glow: neutral ? (dark ? #FFFFFF1A : #00000000) : accent.with-alpha(dark ? 0.33 : 0.22);
-    out property <color> avatar: dark ? #3A3A3A : #E0E0E0;
-    out property <color> scrim: dark ? #00000080 : #0000002E;      // under overlays
+    out property <color> cover-glow: neutral ? pick(#FFFFFF1A, #00000000) : accent.with-alpha(between(0.33, 0.22));
+    out property <color> avatar: pick(#3A3A3A, #E0E0E0);
+    out property <color> scrim: pick(#00000080, #0000002E);      // under overlays
     // The current song's row rests on a light tile (hover and press still apply on top).
-    out property <color> playing-row: dark ? #FFFFFF0F : #0000000A;
+    out property <color> playing-row: pick(#FFFFFF0F, #0000000A);
     // The recommended row of a list of choices (`ChoiceRow.lit`), a shade over the panel.
-    out property <color> choice-lit: dark ? #FFFFFF0A : #00000008;
+    out property <color> choice-lit: pick(#FFFFFF0A, #00000008);
     // A checked fact, as text and its dot: the sign-in window's "Google's page". AA on the
     // address field (9:1 on dark, 5.2:1 on light).
-    out property <color> verified: dark ? #9FD5A6 : #1A7431;
+    out property <color> verified: pick(#9FD5A6, #1A7431);
     // Loading skeletons: the blocks, and the soft highlight that sweeps across them (only
     // inside the blocks, `SkeletonBlock`), `skeleton-band` wide.
-    out property <color> skeleton: dark ? #FFFFFF0F : #0000000D;
-    out property <color> skeleton-hi: dark ? #FFFFFF17 : #00000016;
+    out property <color> skeleton: pick(#FFFFFF0F, #0000000D);
+    out property <color> skeleton-hi: pick(#FFFFFF17, #00000016);
     out property <length> skeleton-band: 320px;
 
     // Interaction states: neutral overlays (white on dark, black on light) over whatever
     // the item sits on, changing over `t-hover`. Hover is ~1.2:1 against every surface,
     // pressed ~1.5-1.9:1, so both read everywhere, the near-black sidebar included;
     // `selected` (the current page) sits between.
-    out property <color> hover: dark ? #FFFFFF17 : #00000012;
-    out property <color> selected: dark ? #FFFFFF21 : #0000001A;
-    out property <color> pressed: dark ? #FFFFFF33 : #0000002B;
+    out property <color> hover: pick(#FFFFFF17, #00000012);
+    out property <color> selected: pick(#FFFFFF21, #0000001A);
+    out property <color> pressed: pick(#FFFFFF33, #0000002B);
     // Tonal buttons (pills, chips, shelf arrows) rest on `selected`, then go a step deeper.
-    out property <color> tonal-hover: dark ? #FFFFFF2E : #00000026;
-    out property <color> tonal-pressed: dark ? #FFFFFF45 : #00000038;
+    out property <color> tonal-hover: pick(#FFFFFF2E, #00000026);
+    out property <color> tonal-pressed: pick(#FFFFFF45, #00000038);
     // The filled button (`solid`) hovered and pressed.
-    out property <color> solid-hover: dark ? #E0E0E0 : #2E2E2E;
-    out property <color> solid-pressed: dark ? #C8C8C8 : #474747;
+    out property <color> solid-hover: pick(#E0E0E0, #2E2E2E);
+    out property <color> solid-pressed: pick(#C8C8C8, #474747);
     // Over artwork (cards): a darkening veil, since art can be any colour.
     out property <color> cover-hover: #0000002E;
-    out property <color> cover-pressed: dark ? #00000057 : #0000004D;
+    out property <color> cover-pressed: pick(#00000057, #0000004D);
     // The round play button on a card's cover (any art, either theme): dark glass, white glyph.
     out property <color> cover-button: #000000A6;
     // The playing mark over a row's cover (any art, either theme): a deep veil, so the
@@ -188,14 +206,14 @@ export global Theme {
 
     // Text: three levels. Level 3 sits at ~55 % (not 40 %) so it keeps WCAG AA on every
     // surface, the raised cards and the search field included.
-    out property <color> text1: dark ? #FFFFFF : #0F0F0F;
-    out property <color> plain-text2: dark ? #AAAAAA : #606060;
+    out property <color> text1: pick(#FFFFFF, #0F0F0F);
+    out property <color> plain-text2: pick(#AAAAAA, #606060);
     out property <color> text2: follow ? follow-text2 : plain-text2;
-    out property <color> text3: dark ? #909090 : #6B6B6B;
+    out property <color> text3: pick(#909090, #6B6B6B);
     // The filled button (Play, the current chip): a white pill with black text on dark,
     // a black pill with white text on light.
-    out property <color> solid: dark ? #FFFFFF : #0F0F0F;
-    out property <color> on-solid: dark ? #0F0F0F : #FFFFFF;
+    out property <color> solid: pick(#FFFFFF, #0F0F0F);
+    out property <color> on-solid: pick(#0F0F0F, #FFFFFF);
 
     // Type: Manrope (embedded) for page and shelf titles, Segoe UI Variable for the rest.
     // Linux hasn't got Segoe UI Variable, so the rest goes to sans-serif there, which
@@ -287,11 +305,11 @@ export global Theme {
     out property <length> hero-pad: s4;
 
     // Motion follows user actions only, then stops. Durations:
-    out property <duration> t-hover: fading ? 100ms : 0ms;                    // hover/press colour
+    out property <duration> t-hover: fading && !switching ? 100ms : 0ms;      // hover/press colour
     out property <duration> t-press: moving ? 100ms : 0ms;                    // press scale
     out property <duration> t-release: moving ? 320ms : 0ms;                  // the spring back
     out property <duration> t-morph: moving ? 240ms : 0ms;                    // play/pause shape, tab pill
-    out property <duration> t-fast: fading ? (motion ? 140ms : 100ms) : 0ms;  // exits, thumb, tooltips
+    out property <duration> t-fast: fading && !switching ? (motion ? 140ms : 100ms) : 0ms; // exits, thumb, tooltips
     out property <duration> t-menu: fading ? (motion ? 180ms : 120ms) : 0ms;  // menus, popovers in
     out property <duration> t-page: fading ? (motion ? 200ms : 120ms) : 0ms;  // page enter
     out property <duration> t-panel: moving ? 240ms : 0ms;                    // Up next slide
@@ -299,9 +317,8 @@ export global Theme {
     out property <duration> t-cover: fading ? 240ms : 0ms;                    // cover crossfade
     out property <duration> t-toast: fading ? (motion ? 220ms : 120ms) : 0ms;
     out property <duration> t-colour: fading && !switching ? 300ms : 0ms;     // the cover accent's crossfade
-    // A theme switch recolours at once: on for the frame that shows it (`follow::theme_changed`),
-    // it zeroes `t-colour`, so the bar's and the accent's crossfades don't fade the switch.
-    in-out property <bool> switching: false;
+    // How long a theme switch crossfades (`switching`, above): Rust runs it, at this length.
+    out property <duration> t-switch: moving ? 200ms : 0ms;
     out property <duration> t-linger: fading ? (motion ? 250ms : 120ms) : 0ms; // a passing value's fade-out once read (the volume)
     out property <duration> t-step: moving ? 120ms : 0ms;                     // a value's label following a wheel or key step
     out property <duration> t-shimmer: 1200ms;                                // one sweep (period)
@@ -309,7 +326,7 @@ export global Theme {
     out property <duration> t-skeleton-sweep: 2200ms;                         // one skeleton sweep and its rest
     out property <duration> t-lyrics: moving ? 300ms : 0ms;                   // the lyrics toggle: the cover glides to its column, the lines fade in
     out property <duration> t-follow: moving ? 400ms : 0ms;                   // lyrics glide to the next line (ambient, so calmer than a UI move)
-    out property <duration> t-line: fading ? 400ms : 0ms;                    // a line's colour as it becomes current or sung (stays without motion)
+    out property <duration> t-line: fading && !switching ? 400ms : 0ms;       // a line's colour as it becomes current or sung (stays without motion)
 
     // Distances: zero when motion is off, so the same code fades in place.
     out property <length> rise: moving ? 8px : 0px;          // page and toast enter offset

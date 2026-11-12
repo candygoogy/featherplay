@@ -46,7 +46,7 @@ export component SeekLine inherits Rectangle {
     // tooltip doesn't change while it fades out.
     property <float> mark-end: Player.silences.length > 0 ? Player.silence-end(Player.silences, root.preview, root.min-mark / max(1px, root.width)) : 0;
     // A mark's dashes ahead of the fill (behind it they're in the accent).
-    property <color> dash-ahead: Theme.dark ? #FFFFFF66 : #00000059;
+    property <color> dash-ahead: Theme.pick(#FFFFFF66, #00000059);
     height: 16px;
     accessible-role: slider;
     accessible-label: @tr("Seek");

@@ -113,7 +113,7 @@ component ProfileCard inherits Rectangle {
     property <float> at: root.live ? Player.position-s : 72;
     property <float> total: root.live ? Player.duration-s : 210;
     // The stage's wash from the cover (`NowPlayingData`); clear until it's known.
-    property <color> wash: Theme.dark ? NowPlayingData.wash-dark : NowPlayingData.wash-light;
+    property <color> wash: Theme.pick(NowPlayingData.wash-dark, NowPlayingData.wash-light);
     property <bool> tinted: root.live && root.wash.alpha > 0;
     // The banner's two ends: the cover's wash into its accent while the accent follows the
     // cover, else into a lighter step of the wash; the sample's (and grey art's) go from a

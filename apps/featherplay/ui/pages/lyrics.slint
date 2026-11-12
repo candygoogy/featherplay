@@ -80,7 +80,12 @@ export global LyricsData {
     // The cover's panel and lines, per theme.
     in property <LyricInk> ink-dark;
     in property <LyricInk> ink-light;
-    out property <LyricInk> ink: Theme.dark ? self.ink-dark : self.ink-light;
+    out property <LyricInk> ink: {
+        ground: Theme.pick(self.ink-dark.ground, self.ink-light.ground),
+        current: Theme.pick(self.ink-dark.current, self.ink-light.current),
+        next: Theme.pick(self.ink-dark.next, self.ink-light.next),
+        past: Theme.pick(self.ink-dark.past, self.ink-light.past),
+    };
     // The lyrics are on screen (`LyricsWatch`, now_playing.slint): Rust asks for lyrics and
     // times the lines only then.
     callback live-changed(bool);

@@ -36,7 +36,7 @@ fn check(slint: &str, component: &str, light: &str) {
     let mut at = 0;
     for (id, fill, d) in paths(&read(&format!("logo/{light}"))) {
         let fill = if id == "ring" {
-            format!("Theme.dark ? transparent : {fill}")
+            format!("Theme.pick(transparent, {fill})")
         } else {
             fill
         };

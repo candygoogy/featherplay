@@ -476,29 +476,33 @@ fn dismiss(why: &str) {
     let _ = slint::invoke_from_event_loop(close);
 }
 
-/// The theme flipped (`follow::theme_changed`, once the main window has the new colours):
-/// the open mini player takes them at once, its border too, rather than at the player's
-/// next change.
+/// The theme flipped (`follow::theme_changed`, once the main window's switch has started):
+/// the open mini player takes the new theme with the switch where the main window has it,
+/// its border too, rather than at the player's next change.
 pub fn theme_changed(ctx: &Rc<Ctx>) {
     let Some(mini) = MINI.with_borrow(Clone::clone) else {
         return;
     };
     let Some(main) = ctx.window() else { return };
     sync_theme(&mini, &main);
+    let own = mini.ui.global::<Theme>();
+    popup::sync_switch(&main.global::<Theme>(), &own);
     if let Some(handle) = mini.handle.get() {
-        let _ = chrome::popup_border(handle, popup::border(&mini.ui.global::<Theme>()));
+        let _ = chrome::popup_border(handle, popup::border(&own));
     }
 }
 
 /// The main window's cover colours moved (`follow::show`: a step of a song change's
-/// crossfade, or the new colours at once): the open mini player shows them in the same turn.
-/// Once they've `settled`, its border follows too.
+/// crossfade, or the new colours at once), or a theme switch took a step: the open mini
+/// player shows them in the same turn. Once they've `settled` (and at each step of a
+/// switch), its border follows too.
 pub fn follow_changed(main: &Theme, settled: bool) {
     let Some(mini) = MINI.with_borrow(Clone::clone) else {
         return;
     };
     let own = mini.ui.global::<Theme>();
     popup::sync_follow(main, &own);
+    popup::sync_switch(main, &own);
     if settled && let Some(handle) = mini.handle.get() {
         let _ = chrome::popup_border(handle, popup::border(&own));
     }

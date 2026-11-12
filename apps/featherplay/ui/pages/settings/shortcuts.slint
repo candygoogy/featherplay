@@ -15,7 +15,7 @@ component Keycap inherits Rectangle {
     border-radius: Theme.r-s;
     border-width: root.word ? 0 : 1px;
     border-color: Theme.field-edge;
-    background: root.word ? transparent : (Theme.dark ? #FFFFFF08 : Theme.ground);
+    background: root.word ? transparent : Theme.pick(#FFFFFF08, Theme.ground);
     HorizontalLayout {
         padding-left: root.word ? 2px : 6px;
         padding-right: root.word ? 2px : 6px;

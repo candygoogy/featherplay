@@ -138,12 +138,12 @@ component EqBand inherits Rectangle {
         height: root.knob;
         border-radius: self.height / 2;
         // White in both themes, edged on the light panel.
-        background: Theme.dark ? Theme.text1 : #FFFFFF;
+        background: Theme.pick(Theme.text1, #FFFFFF);
         border-width: Theme.dark ? 0px : 1px;
         border-color: #0000002A;
         drop-shadow-blur: 4px;
         drop-shadow-offset-y: 1px;
-        drop-shadow-color: Theme.dark ? #0006 : #0003;
+        drop-shadow-color: Theme.pick(#0006, #0003);
     }
     Body {
         y: Eq.label-y;

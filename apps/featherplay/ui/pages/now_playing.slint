@@ -452,7 +452,7 @@ export component NowPlayingPage inherits Rectangle {
     property <length> cover-x: (root.stage-w - root.cover-size) / 2;
     property <length> cover-y: root.room-top + max(0px, (root.room-h - root.cover-size - root.text-h) / 2);
     property <bool> shown: false;
-    property <color> wash: Theme.dark ? NowPlayingData.wash-dark : NowPlayingData.wash-light;
+    property <color> wash: Theme.pick(NowPlayingData.wash-dark, NowPlayingData.wash-light);
     animate wash { duration: Theme.t-colour; easing: Curves.ease-hover; }
     // No ground of its own: the window's is under it, and the stage and the side panel are
     // opaque, so a ground here would only be one more 4K fill under them in every frame.

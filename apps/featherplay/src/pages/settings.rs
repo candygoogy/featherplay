@@ -29,7 +29,7 @@ use crate::controller::{
     AccountAction, Action, Change, LastfmStatus, ListenBrainzStatus, PlayerState,
 };
 use crate::ui::{Player, SettingKey, SettingsData, SettingsDialog, Theme, Tooltips};
-use crate::{chrome, follow, language, lyrics, shell, updates};
+use crate::{follow, language, lyrics, shell, updates};
 
 mod discord;
 mod local_api;
@@ -180,23 +180,11 @@ pub fn init(ctx: &Rc<Ctx>) {
     lyrics::on_changed(ctx, show_lyrics);
 
     let Some(ui) = ctx.window() else { return };
-    // The theme flips (the setting, or Windows under System): the cover's colours and the
-    // title bar follow.
+    // The theme flips (the setting, or Windows under System): the window crossfades to it,
+    // the cover's colours and the title bar with it.
     let c = ctx.clone();
-    ui.global::<Theme>().on_dark_changed(move |dark| {
-        follow::theme_changed(&c);
-        if let Some(ui) = c.window()
-            && let Some(h) = shell::handle(ui.window())
-            && let Err(e) = chrome::title_bar(
-                h,
-                dark,
-                ui.global::<Theme>().get_ground(),
-                ui.global::<Theme>().get_text1(),
-            )
-        {
-            log!("title bar: {e}");
-        }
-    });
+    ui.global::<Theme>()
+        .on_dark_changed(move |_| follow::theme_changed(&c));
     apply_theme(ctx, theme);
     follow::set_accent(ctx, accent, custom);
 

@@ -479,7 +479,7 @@ export component CollectionHeader inherits Rectangle {
     property <bool> wrapped: root.two-lines && title.preferred-height > 1.5 * root.line-h;
     property <length> title-h: root.wrapped ? 2 * root.line-h : 56px;
     property <length> title-y: root.byline-y - root.title-h + 4px;
-    property <color> wash: Theme.dark ? root.wash-dark : root.wash-light;
+    property <color> wash: Theme.pick(root.wash-dark, root.wash-light);
     animate wash { duration: Theme.t-colour; easing: Curves.ease-hover; }
     height: root.top + root.cover-size + Theme.s6;
 
