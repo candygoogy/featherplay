@@ -68,6 +68,7 @@ fn scroll_down(scene: &Scene, at: LogicalPosition) -> Vec<Timed> {
 }
 
 #[test]
+#[cfg_attr(not(windows), ignore = "Windows only: it counts the thread's cycles")]
 fn scrolling_down_a_4k_home_has_no_bump() {
     let scene = home_at(3840, 2160, 1.5);
     let w = scene.ui.window();

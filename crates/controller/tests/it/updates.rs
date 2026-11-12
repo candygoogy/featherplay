@@ -573,6 +573,10 @@ fn the_plan_carries_the_checksums_signature_if_the_release_has_one() {
 }
 
 #[test]
+#[cfg_attr(
+    not(windows),
+    ignore = "Windows only: install folders compare without case"
+)]
 fn the_exe_in_the_install_folder_is_the_installed_copy() {
     let location = Path::new(r"C:\Users\Ann\AppData\Local\Programs\featherplay\");
     let exe = Path::new(r"C:\Users\Ann\AppData\Local\Programs\featherplay\featherplay.exe");

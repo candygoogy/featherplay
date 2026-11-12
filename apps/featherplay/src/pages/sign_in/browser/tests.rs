@@ -127,6 +127,10 @@ impl browsers::Lookup for PolicyOffPc {
 }
 
 #[test]
+#[cfg_attr(
+    not(windows),
+    ignore = "Windows only: the policy is read from the registry"
+)]
 fn with_the_policy_off_the_browser_isnt_started() {
     let home = std::env::var_os("FEATHERPLAY_HOME")
         .map(PathBuf::from)

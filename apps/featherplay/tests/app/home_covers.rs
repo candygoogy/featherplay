@@ -58,6 +58,7 @@ fn set_covers(ui: &featherplay::ui::AppWindow, mut f: impl FnMut(&Image) -> Imag
 }
 
 #[test]
+#[cfg_attr(not(windows), ignore = "Windows only: it counts the thread's cycles")]
 fn art_adds_little_to_a_4k_home_scroll_frame() {
     let scene = home_at(3840, 2160, 1.5);
     let ui = &scene.ui;

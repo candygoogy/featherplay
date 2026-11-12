@@ -46,6 +46,10 @@ fn the_switch_sets_the_setting() {
 }
 
 #[test]
+#[cfg_attr(
+    not(windows),
+    ignore = "Windows only: the mini player is placed by the tray (MiniPlayerPlacement)"
+)]
 fn off_a_tray_click_toggles_the_mini_player() {
     let scene = scene(false);
     hide_to_tray(&scene);

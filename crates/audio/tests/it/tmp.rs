@@ -32,6 +32,10 @@ impl Drop for TestDir {
 }
 
 #[test]
+#[cfg_attr(
+    not(windows),
+    ignore = "Windows only: elsewhere a file another process holds open still counts as unused"
+)]
 fn removes_only_our_unused_temp_files() {
     let Some(dir) = TestDir::new("tmp-cleanup") else {
         return;
