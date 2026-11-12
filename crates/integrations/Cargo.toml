@@ -20,8 +20,8 @@ featherplay-platform = { path = "../platform" }
 global-hotkey = { workspace = true }
 # Its warnings reach the app's log file.
 log = { workspace = true }
-# SponsorBlock: one GET per music video, over the system TLS like the Last.fm client.
-reqwest = { workspace = true, features = ["native-tls"] }
+# SponsorBlock: one GET per music video. Its TLS is `featherplay-proxy`'s, as for every crate.
+reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }

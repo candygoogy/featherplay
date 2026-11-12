@@ -11,7 +11,7 @@ publish = false
 [dependencies]
 # The HTTP client follows the proxy settings (`featherplay_proxy::client`).
 featherplay-proxy = { path = "../proxy" }
-reqwest = { workspace = true, features = ["native-tls"] }
+reqwest = { workspace = true }
 serde_json = { workspace = true }
 
 [dev-dependencies]

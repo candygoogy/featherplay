@@ -13,8 +13,6 @@ publish = false
 featherplay-platform = { path = "../platform" }
 # What a lookup found, or how it failed, goes to the app's log file.
 log = { workspace = true }
-# Over the system TLS, like the other crates: `doh` asks its services over HTTPS.
-reqwest = { workspace = true, features = ["native-tls"] }
 # `doh`: the services' JSON answers, and the system's lookups on tokio's blocking pool, as
 # reqwest's own resolver runs them. Both in the tree already.
 serde_json = { workspace = true }
@@ -23,6 +21,18 @@ tokio = { workspace = true, features = ["macros", "rt"] }
 # proxy and its exceptions). A request still goes by it until a script or auto-detection
 # says otherwise. In the tree through reqwest, with these features.
 hyper-util = { workspace = true, features = ["client-proxy", "client-proxy-system"] }
+
+# The TLS of every client in the app, since every crate with one depends on this crate
+# (the workspace's `reqwest` says why). Windows: SChannel, through native-tls.
+[target.'cfg(windows)'.dependencies]
+reqwest = { workspace = true, features = ["native-tls"] }
+
+# Elsewhere: rustls, checking certificates against the system's store as OpenSSL did
+# (rustls-platform-verifier: SSL_CERT_FILE/SSL_CERT_DIR, else the distribution's bundle).
+# Its crypto is aws-lc, reqwest's own choice: ring would need ytmapi-rs patched, whose TLS
+# features are native-tls or reqwest's `rustls` (aws-lc), one of them required.
+[target.'cfg(not(windows))'.dependencies]
+reqwest = { workspace = true, features = ["rustls"] }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt", "time"] }

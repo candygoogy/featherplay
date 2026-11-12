@@ -50,8 +50,8 @@ i-slint-core = { workspace = true }
 image = { workspace = true, features = ["jpeg", "png", "webp"] }
 # Reads the HWND out of `slint::WindowHandle`; slint doesn't re-export the trait.
 raw-window-handle = { workspace = true }
-# Covers are fetched over the system TLS, like the other crates.
-reqwest = { workspace = true, features = ["native-tls"] }
+# Covers are fetched with it. Its TLS is `featherplay-proxy`'s, as for every crate.
+reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 # Names the files of the cover cache.

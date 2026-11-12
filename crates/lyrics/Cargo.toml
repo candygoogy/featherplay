@@ -11,8 +11,8 @@ publish = false
 [dependencies]
 # The HTTP client follows the proxy settings (`featherplay_proxy::client`).
 featherplay-proxy = { path = "../proxy" }
-# The workspace's reqwest over the system TLS, like the other crates: no second TLS stack.
-reqwest = { workspace = true, features = ["native-tls"] }
+# Its TLS is `featherplay-proxy`'s, as for every crate.
+reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 

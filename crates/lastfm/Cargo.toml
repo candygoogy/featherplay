@@ -13,7 +13,7 @@ publish = false
 featherplay-proxy = { path = "../proxy" }
 featherplay-core = { path = "../core" }
 md-5 = { workspace = true }
-reqwest = { workspace = true, features = ["native-tls", "form"] }
+reqwest = { workspace = true, features = ["form"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 

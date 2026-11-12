@@ -18,7 +18,7 @@ featherplay-platform = { path = "../platform" }
 rquickjs = { workspace = true }
 # Each resolve step that fails logs a line (the app writes it to its log file).
 log = { workspace = true }
-reqwest = { workspace = true, features = ["native-tls", "gzip"] }
+reqwest = { workspace = true, features = ["gzip"] }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
 tokio = { workspace = true, features = ["fs", "io-util", "macros", "process", "rt", "sync", "time"] }

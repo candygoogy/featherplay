@@ -45,8 +45,8 @@ featherplay-streams = { path = "../streams" }
 # (`suggest`).
 featherplay-ytm = { path = "../ytm" }
 # A link pasted into the search field is read as a URL (`link`); the update check asks
-# GitHub (`updates`). Over the system TLS, like the other crates.
-reqwest = { workspace = true, features = ["native-tls"] }
+# GitHub (`updates`). Its TLS is `featherplay-proxy`'s, as for every crate.
+reqwest = { workspace = true }
 # The signature on a release's SHA256SUMS.txt, checked before an update is downloaded
 # (`updates::install::verify_sums`).
 minisign-verify = { workspace = true }

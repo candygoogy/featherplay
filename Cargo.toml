@@ -40,6 +40,10 @@ cpal = "=0.18.2"
 # `system-proxy`: every client goes through Windows' manual proxy when one is set, as it does
 # through `HTTPS_PROXY`/`HTTP_PROXY` (hyper-util reads both). A proxy script and
 # auto-detection are `crates/proxy`'s, whose builder every client starts from.
+# The TLS is `crates/proxy`'s too (every crate with a client depends on it, so the feature
+# reaches them all): native-tls on Windows, which is SChannel; elsewhere rustls, built into
+# the binary, so it links no libssl (Fedora 45 moved to OpenSSL 4, and a binary linked to
+# OpenSSL 3 doesn't start there).
 reqwest = { version = "=0.13.5", default-features = false, features = ["system-proxy"] }
 tokio = "=1.54.1"
 # Windows only: the media card (SMTC). Neither of its D-Bus backends: Linux's MPRIS is

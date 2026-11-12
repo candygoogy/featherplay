@@ -12,17 +12,26 @@ publish = false
 # The HTTP client follows the proxy settings (`featherplay_proxy::client`).
 featherplay-proxy = { path = "../proxy" }
 featherplay-core = { path = "../core" }
-# native-tls, like the other crates: the default (rustls + aws-lc) is a second TLS stack.
-# `reqwest`: hands ytmapi-rs our own client, which carries the identity headers.
-ytmapi-rs = { workspace = true, features = ["native-tls", "simplified-queries", "reqwest"] }
+# `reqwest`: hands ytmapi-rs our own client, which carries the identity headers, over
+# `featherplay-proxy`'s TLS.
+ytmapi-rs = { workspace = true, features = ["simplified-queries", "reqwest"] }
 # `json` and `gzip` (already on through ytmapi-rs): the mobile lyrics request we send ourselves.
-reqwest = { workspace = true, features = ["native-tls", "json", "gzip"] }
+reqwest = { workspace = true, features = ["json", "gzip"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 # One line per list item ytmapi-rs can't read (`convert`), into the app's log.
 log = { workspace = true }
 # `sync`: a resumed session signs in once, shared by its clones (`YtMusic::refresh`).
 tokio = { workspace = true, features = ["sync"] }
+
+# ytmapi-rs won't build without a TLS feature, though it only uses our client. Each one adds
+# its constructors over that TLS, which we don't call, and turns on reqwest's, which
+# `featherplay-proxy` has on already: native-tls on Windows, as before; `rustls` elsewhere.
+[target.'cfg(windows)'.dependencies]
+ytmapi-rs = { workspace = true, features = ["native-tls"] }
+
+[target.'cfg(not(windows))'.dependencies]
+ytmapi-rs = { workspace = true, features = ["rustls"] }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }
