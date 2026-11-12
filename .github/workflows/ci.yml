@@ -224,3 +224,8 @@ jobs:
           mkdir -p "$FEATHERPLAY_HOME"
           cargo nextest run --workspace --profile ci
           cargo test --workspace --doc
+
+  # The Linux test rigs (phase 6 of 0.3.0), each in its own workflow file, run with every CI
+  # run. Their reports and recordings are the runs' artifacts.
+  rig-sound:
+    uses: ./.github/workflows/linux-rig-sound.yml

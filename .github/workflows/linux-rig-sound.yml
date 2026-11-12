@@ -12,10 +12,10 @@ name: Linux rig (sound)
 # PulseAudio with ALSA's pulse plugin (what WSL and older desktops have) on x86_64. Opus/WebM
 # on one x86_64 run, AAC/MP4 on the others.
 
+# Called by ci.yml (every push to main, every pull request, and its manual runs), and runs on
+# its own by hand once it's on main.
 on:
-  push:
-    branches: [main]
-  pull_request:
+  workflow_call:
   workflow_dispatch:
 
 permissions:
