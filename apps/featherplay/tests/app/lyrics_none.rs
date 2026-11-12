@@ -158,10 +158,13 @@ fn no_lyrics_keep_the_cover_view_and_the_pill_says_so() {
     scene.open("home").expect("home");
     data.set_hint(false);
     data.invoke_toggle_view();
+    // Read before `settle`: the note shows for 4 s of real time, and on a loaded machine
+    // settling the page change can take longer than that.
+    let hint = data.get_hint();
     scene.settle();
     assert_eq!(scene.ui.global::<Nav>().get_page(), PageKind::NowPlaying);
     assert!(!data.get_showing(), "the microphone opened the full view");
-    assert!(data.get_hint(), "the microphone didn't show the note");
+    assert!(hint, "the microphone didn't show the note");
 }
 
 #[test]

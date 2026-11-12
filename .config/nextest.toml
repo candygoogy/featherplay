@@ -36,7 +36,7 @@ default-filter = 'not (package(featherplay) & binary(app) & test(/^(smoothness|f
 # run (or not) in that time. Beside a full machine a frame can take longer than a fade, and
 # `motion_idle` failed so ("the page appeared without its enter fade").
 [[profile.default.overrides]]
-filter = 'package(featherplay) & binary(app) & test(/^(motion_idle|playing_mark|paused_idle|library_refresh)::/)'
+filter = 'package(featherplay) & binary(app) & test(/^(motion_idle|playing_mark|paused_idle|library_refresh|lyrics_none|prepare_rows)::/)'
 test-group = 'serial-perf'
 threads-required = 'num-test-threads'
 
