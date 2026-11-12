@@ -1,16 +1,17 @@
 //! The update check, offline: the version comparison, GitHub's replies (hand-written
 //! fixtures in `tests/fixtures/github/`), the stamp (a day between checks, an hour after a
 //! failed one, the download's retries, the update that didn't install), the rate limit and
-//! the cooldown, and what the automatic update picks: the setup for this architecture, its
-//! line in `SHA256SUMS.txt`, the minisign signature on that file (made with test keys,
-//! `tests/fixtures/signing/`), and whether this is the installed copy, or Scoop's. No
-//! request is made.
+//! the cooldown, and what the automatic update picks: the setup (or the AppImage) for this OS
+//! and architecture, its line in `SHA256SUMS.txt`, the minisign signature on that file (made
+//! with test keys, `tests/fixtures/signing/`), and whether this is the installed copy, or
+//! Scoop's. No request is made.
 
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use featherplay_controller::updates::install::{
-    self, Keys, Ready, SignatureError, is_installed, is_scoop, parse_sums, setup_name, verify_sums,
+    self, Keys, Ready, SignatureError, is_installed, is_scoop, parse_sums, setup_name, update_name,
+    verify_sums,
 };
 use featherplay_controller::updates::{
     Asset, CheckError, Release, Stamp, classify, is_newer, may_request, parse_issue, parse_release,
@@ -532,24 +533,53 @@ fn with_assets(names: &[&str]) -> Release {
 #[test]
 fn a_release_without_this_architectures_setup_is_only_announced() {
     let x64_only = with_assets(&["featherplay-setup-0.2.0.exe", "SHA256SUMS.txt"]);
-    let plan = install::plan(&x64_only, "x86_64").expect("x64 has its setup");
+    let plan = install::plan(&x64_only, "windows", "x86_64").expect("x64 has its setup");
     assert_eq!(plan.setup.name, "featherplay-setup-0.2.0.exe");
     assert_eq!(plan.sums.name, "SHA256SUMS.txt");
-    assert_eq!(install::plan(&x64_only, "aarch64"), None);
+    assert_eq!(install::plan(&x64_only, "windows", "aarch64"), None);
 
     let both = with_assets(&[
         "featherplay-setup-0.2.0.exe",
         "featherplay-setup-0.2.0-arm64.exe",
         "SHA256SUMS.txt",
     ]);
-    let arm = install::plan(&both, "aarch64").expect("arm64 has its setup");
+    let arm = install::plan(&both, "windows", "aarch64").expect("arm64 has its setup");
     assert_eq!(arm.setup.name, "featherplay-setup-0.2.0-arm64.exe");
+}
+
+#[test]
+fn linux_takes_the_appimage_for_its_architecture() {
+    assert_eq!(
+        update_name("linux", "0.2.0", "x86_64").as_deref(),
+        Some("featherplay-x86_64.AppImage")
+    );
+    assert_eq!(
+        update_name("linux", "0.2.0", "aarch64").as_deref(),
+        Some("featherplay-aarch64.AppImage")
+    );
+    assert_eq!(update_name("linux", "0.2.0", "riscv64"), None);
+    assert_eq!(update_name("linux", "0.2.0/..", "x86_64"), None);
+    assert_eq!(
+        update_name("windows", "0.2.0", "x86_64").as_deref(),
+        Some("featherplay-setup-0.2.0.exe")
+    );
+    assert_eq!(update_name("macos", "0.2.0", "aarch64"), None);
+
+    let r = with_assets(&[
+        "featherplay-setup-0.2.0.exe",
+        "featherplay-x86_64.AppImage",
+        "featherplay-x86_64.tar.gz",
+        "SHA256SUMS.txt",
+    ]);
+    let plan = install::plan(&r, "linux", "x86_64").expect("x86_64 has its AppImage");
+    assert_eq!(plan.setup.name, "featherplay-x86_64.AppImage");
+    assert_eq!(install::plan(&r, "linux", "aarch64"), None);
 }
 
 #[test]
 fn a_release_without_checksums_is_only_announced() {
     let r = with_assets(&["featherplay-setup-0.2.0.exe"]);
-    assert_eq!(install::plan(&r, "x86_64"), None);
+    assert_eq!(install::plan(&r, "windows", "x86_64"), None);
 }
 
 #[test]
@@ -559,7 +589,7 @@ fn the_plan_carries_the_checksums_signature_if_the_release_has_one() {
         "SHA256SUMS.txt",
         "SHA256SUMS.txt.minisig",
     ]);
-    let plan = install::plan(&signed, "x86_64").expect("a plan");
+    let plan = install::plan(&signed, "windows", "x86_64").expect("a plan");
     assert_eq!(
         plan.sig.map(|a| a.name).as_deref(),
         Some("SHA256SUMS.txt.minisig")
@@ -567,7 +597,9 @@ fn the_plan_carries_the_checksums_signature_if_the_release_has_one() {
     // Unsigned: still a plan, which the download then refuses (`fetch`).
     let unsigned = with_assets(&["featherplay-setup-0.2.0.exe", "SHA256SUMS.txt"]);
     assert_eq!(
-        install::plan(&unsigned, "x86_64").expect("a plan").sig,
+        install::plan(&unsigned, "windows", "x86_64")
+            .expect("a plan")
+            .sig,
         None
     );
 }

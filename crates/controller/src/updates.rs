@@ -20,7 +20,8 @@
 //! at most, a setup that doesn't match its checksum never. It then offers "Restart to
 //! update" in the toast and the banner, at every start until it's clicked. If the update
 //! doesn't install (the setup fails silently), the next start says so. A copy Scoop
-//! installed is told the Scoop command instead; Scoop updates it.
+//! installed is told the Scoop command instead; Scoop updates it. On Linux a copy that runs
+//! from an AppImage is the installed copy, and the release's AppImage its setup.
 //!
 //! The triggers, the toasts and "Restart to update" are the app's (its `updates` module,
 //! which re-exports this one); About's banner and row are redrawn through the callback it
@@ -400,17 +401,20 @@ impl Trigger {
 /// How this copy is updated.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Kind {
-    /// A portable exe or a dev build: told about a newer release, with its page.
+    /// A portable exe, a dev build, or on Linux the .tar.gz's copy or a package's: told
+    /// about a newer release, with its page.
     #[default]
     Portable,
-    /// The installer's copy (winget's too): downloads the setup, restarts into it.
+    /// The installer's copy (winget's too), or on Linux an AppImage: downloads the setup
+    /// (the AppImage), restarts into it.
     Installed,
     /// Scoop's copy: told the Scoop command.
     Scoop,
 }
 
 impl Kind {
-    /// This process's: the installer's uninstall key, or Scoop's folder.
+    /// This process's: the installer's uninstall key (on Linux, the AppImage it runs from),
+    /// or Scoop's folder.
     pub fn detect() -> Kind {
         if install::installed() {
             Kind::Installed
@@ -682,7 +686,7 @@ async fn run_here(
         let due = stamp.to_fetch(CURRENT, now, trigger.clicked()).cloned();
         if let (None, Some(release)) = (&ready, due) {
             changed = true;
-            match install::plan(&release, std::env::consts::ARCH) {
+            match install::plan(&release, std::env::consts::OS, std::env::consts::ARCH) {
                 None => {
                     log!(
                         "update: {} has no setup for {}; announcing it only",

@@ -10,8 +10,9 @@ fn reply(signed: bool) -> Vec<u8> {
             install::DOWNLOADS
         )
     };
-    // The setup for the machine the tests run on (x64 or ARM64, as the updater picks it).
-    let setup = install::setup_name("9.0.0", std::env::consts::ARCH).expect("x64 or ARM64");
+    // The setup or AppImage for the OS and machine the tests run on, as the updater picks it.
+    let setup = install::update_name(std::env::consts::OS, "9.0.0", std::env::consts::ARCH)
+        .expect("x64 or ARM64");
     let mut files = vec![file(&setup), file("SHA256SUMS.txt")];
     if signed {
         files.push(file("SHA256SUMS.txt.minisig"));
@@ -27,7 +28,8 @@ fn reply(signed: bool) -> Vec<u8> {
 fn github(signed: bool) -> String {
     let setup = format!(
         "/{}",
-        install::setup_name("9.0.0", std::env::consts::ARCH).expect("x64 or ARM64")
+        install::update_name(std::env::consts::OS, "9.0.0", std::env::consts::ARCH)
+            .expect("x64 or ARM64")
     );
     serve(move |path| match path {
         "/latest" => (200, reply(signed)),
@@ -63,6 +65,52 @@ async fn a_manual_check_on_the_installed_copy_downloads_the_setup() {
         "nor toasted later"
     );
     assert!(!status().running);
+    std::fs::remove_dir_all(&cache).unwrap();
+}
+
+/// The AppImage's update, from the check to the file in place: the release's AppImage is
+/// downloaded and checked against the signed checksums, then put in place of the one this
+/// copy "runs from", keeping its name and its executable bit. Starting it is
+/// `installer::start_setup`'s (the platform crate's tests).
+#[cfg(target_os = "linux")]
+#[tokio::test]
+async fn an_appimage_is_replaced_by_the_signed_release() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let cache = test_cache("appimage-run");
+    let base = github(true);
+    let image = cache.join("Apps").join("featherplay.AppImage");
+    std::fs::create_dir_all(image.parent().unwrap()).unwrap();
+    std::fs::write(&image, b"the running version").unwrap();
+    std::fs::set_permissions(&image, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+    let running = Running::begin(true).expect("no run going");
+    let remote = Remote::local(&base, true);
+    let found = run(running, cache.clone(), Trigger::Manual, false, true, remote).await;
+    let ready = found.ready.expect("the AppImage downloaded and checked");
+    assert_eq!(
+        ready.file,
+        format!("featherplay-{}.AppImage", std::env::consts::ARCH)
+    );
+
+    install::replace_appimage(&cache, &ready, &image).unwrap();
+
+    assert_eq!(std::fs::read(&image).unwrap(), SETUP);
+    let mode = std::fs::metadata(&image).unwrap().permissions().mode();
+    assert_eq!(mode & 0o777, 0o755);
+    let left: Vec<_> = std::fs::read_dir(image.parent().unwrap())
+        .unwrap()
+        .flatten()
+        .map(|e| e.file_name())
+        .collect();
+    assert_eq!(left, ["featherplay.AppImage"], "nothing beside it");
+
+    // A download changed since it was checked replaces nothing.
+    std::fs::write(ready.path(&cache).unwrap(), b"tampered").unwrap();
+    std::fs::write(&image, b"the running version").unwrap();
+    let err = install::replace_appimage(&cache, &ready, &image).unwrap_err();
+    assert!(err.contains("no longer matches"), "{err}");
+    assert_eq!(std::fs::read(&image).unwrap(), b"the running version");
     std::fs::remove_dir_all(&cache).unwrap();
 }
 

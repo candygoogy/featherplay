@@ -9,6 +9,13 @@
 //! folder that key's `InstallLocation` names. A portable copy, or a dev build, is only told
 //! about a newer release, as before.
 //!
+//! On Linux the AppImage takes the setup's place: the release's
+//! `featherplay-<arch>.AppImage` is downloaded and checked the same way, and "Restart to
+//! update" puts it in place of the AppImage this copy runs from (a new file beside it,
+//! flushed, renamed over it) and starts it once featherplay has quit. Only a copy that runs
+//! from an AppImage it may replace does this; one from the .tar.gz, or a distribution's
+//! package, is only told about a newer release.
+//!
 //! Downloads come only from the project's release files on GitHub (`DOWNLOADS`), over
 //! HTTPS, following redirects only to GitHub's asset hosts. `SHA256SUMS.txt` must carry a
 //! minisign signature (`SHA256SUMS.txt.minisig`) by one of the two keys built into
@@ -31,7 +38,7 @@ use super::{Asset, Release};
 /// Where every update download starts: the project's own release files.
 pub const DOWNLOADS: &str = "https://github.com/candygoogy/featherplay/releases/download/";
 /// The checksum file each release carries (`.github/workflows/release.yml`): `sha256sum`
-/// lines for the exe, the setup and THIRD_PARTY.md.
+/// lines for the exes, the setups, the AppImages, the Linux archives and THIRD_PARTY.md.
 pub const SUMS: &str = "SHA256SUMS.txt";
 /// `SUMS`'s minisign signature, made and uploaded by hand (`packaging/sign-release.sh`).
 pub const SUMS_SIG: &str = "SHA256SUMS.txt.minisig";
@@ -68,6 +75,11 @@ const READ_TIMEOUT: Duration = Duration::from_secs(30);
 /// (`release-assets.githubusercontent.com` in Nov 2026).
 const ASSET_DOMAIN: &str = ".githubusercontent.com";
 
+/// The AppImage's file name on `arch`, the same for every release: the file a user keeps is
+/// replaced in place, under its own name.
+const APPIMAGE_PREFIX: &str = "featherplay-";
+const APPIMAGE_SUFFIX: &str = ".AppImage";
+
 /// The setup's file name for this `version` on `arch` (`std::env::consts::ARCH`):
 /// `featherplay-setup-0.2.0.exe` on x64, `featherplay-setup-0.2.0-arm64.exe` on ARM64. No
 /// setup for other architectures, or for a version that isn't digits and dots.
@@ -77,11 +89,44 @@ pub fn setup_name(version: &str, arch: &str) -> Option<String> {
         "aarch64" => "-arm64",
         _ => return None,
     };
-    let plain = !version.is_empty()
+    plain_version(version).then(|| format!("{SETUP_PREFIX}{version}{suffix}.exe"))
+}
+
+/// The AppImage's file name on `arch`: `featherplay-x86_64.AppImage`,
+/// `featherplay-aarch64.AppImage` (packaging/linux/build-linux.sh). None for other
+/// architectures, or for a version that isn't digits and dots.
+pub fn appimage_name(version: &str, arch: &str) -> Option<String> {
+    let known = matches!(arch, "x86_64" | "aarch64");
+    (known && plain_version(version)).then(|| format!("{APPIMAGE_PREFIX}{arch}{APPIMAGE_SUFFIX}"))
+}
+
+/// The file that updates this copy, for `version` on `os` and `arch`
+/// (`std::env::consts::OS` and `ARCH`): Windows' setup, or Linux's AppImage.
+pub fn update_name(os: &str, version: &str, arch: &str) -> Option<String> {
+    match os {
+        "windows" => setup_name(version, arch),
+        "linux" => appimage_name(version, arch),
+        _ => None,
+    }
+}
+
+fn plain_version(version: &str) -> bool {
+    !version.is_empty()
         && version.bytes().all(|b| b.is_ascii_digit() || b == b'.')
         && !version.starts_with('.')
-        && !version.contains("..");
-    plain.then(|| format!("{SETUP_PREFIX}{version}{suffix}.exe"))
+        && !version.contains("..")
+}
+
+/// Whether `file` is named like a setup or an AppImage (`update_name`), and nothing else: no
+/// path, no other characters.
+fn update_file(file: &str) -> bool {
+    let named = (file.starts_with(SETUP_PREFIX) && file.ends_with(".exe"))
+        || (file.starts_with(APPIMAGE_PREFIX) && file.ends_with(APPIMAGE_SUFFIX));
+    named
+        && !file.contains("..")
+        && file
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'.' || b == b'-' || b == b'_')
 }
 
 /// The sha256 (lower-case hex) `SHA256SUMS.txt` gives for `file`. Lines are `sha256sum`'s:
@@ -122,6 +167,7 @@ pub fn is_installed(exe: &Path, install_location: &Path) -> bool {
 }
 
 /// Whether this process is the installed copy (`is_installed`, read from the registry).
+#[cfg(windows)]
 pub fn installed() -> bool {
     let Some(location) = featherplay_platform::installer::install_location() else {
         return false;
@@ -132,6 +178,13 @@ pub fn installed() -> bool {
     // The same form for both (`\\?\`, long names), when the paths exist.
     let canonical = |p: &Path| std::fs::canonicalize(p).unwrap_or_else(|_| p.to_path_buf());
     is_installed(&canonical(&exe), &canonical(&location))
+}
+
+/// Whether this process updates in place: it runs from an AppImage it may replace
+/// (`installer::appimage`). A copy from the .tar.gz or a distribution's package doesn't.
+#[cfg(target_os = "linux")]
+pub fn installed() -> bool {
+    featherplay_platform::installer::appimage().is_some()
 }
 
 /// Whether `exe` is the copy Scoop installed (`packaging/scoop/featherplay.json`): Scoop
@@ -242,8 +295,8 @@ pub fn verify_sums(
     })
 }
 
-/// What to download for a release: its setup for this architecture, its checksums, and
-/// their signature, if it has one.
+/// What to download for a release: its setup (or AppImage) for this OS and architecture,
+/// its checksums, and their signature, if it has one.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Plan {
     pub version: String,
@@ -252,10 +305,10 @@ pub struct Plan {
     pub sig: Option<Asset>,
 }
 
-/// The release's setup for `arch` and its `SHA256SUMS.txt`, if it has both. A missing
-/// signature is still a plan: `fetch` refuses it, and says so.
-pub fn plan(release: &Release, arch: &str) -> Option<Plan> {
-    let name = setup_name(&release.version, arch)?;
+/// The release's file for `os` and `arch` (`update_name`) and its `SHA256SUMS.txt`, if it
+/// has both. A missing signature is still a plan: `fetch` refuses it, and says so.
+pub fn plan(release: &Release, os: &str, arch: &str) -> Option<Plan> {
+    let name = update_name(os, &release.version, arch)?;
     let find = |name: &str| release.assets.iter().find(|a| a.name == name).cloned();
     Some(Plan {
         version: release.version.clone(),
@@ -281,14 +334,7 @@ pub struct Ready {
 impl Ready {
     /// The setup's path; none if the stamp names anything but a setup in that folder.
     pub fn path(&self, cache: &Path) -> Option<PathBuf> {
-        let file = &self.file;
-        let safe = file.starts_with(SETUP_PREFIX)
-            && file.ends_with(".exe")
-            && !file.contains("..")
-            && file
-                .bytes()
-                .all(|b| b.is_ascii_alphanumeric() || b == b'.' || b == b'-');
-        safe.then(|| dir(cache).join(file))
+        update_file(&self.file).then(|| dir(cache).join(&self.file))
     }
 
     /// The setup is still there, with the sha256 it was checked with.
@@ -571,8 +617,8 @@ fn sha256_file(path: &Path) -> io::Result<String> {
     Ok(hex(&hasher.finalize()))
 }
 
-/// Deletes the setups (and partial downloads) in `{cache}/updates/` other than `keep`'s:
-/// an older one, or the one just installed. Only plain files named like a setup.
+/// Deletes the setups or AppImages (and partial downloads) in `{cache}/updates/` other than
+/// `keep`'s: an older one, or the one just installed. Only plain files named like one.
 pub fn clean(cache: &Path, keep: Option<&Ready>) {
     let Ok(entries) = std::fs::read_dir(dir(cache)) else {
         return;
@@ -581,7 +627,8 @@ pub fn clean(cache: &Path, keep: Option<&Ready>) {
         let name = entry.file_name();
         let name = name.to_string_lossy();
         let is_file = entry.file_type().is_ok_and(|t| t.is_file());
-        if !is_file || !name.starts_with(SETUP_PREFIX) || keep.is_some_and(|r| r.file == name) {
+        let ours = update_file(name.strip_suffix(".part").unwrap_or(&name));
+        if !is_file || !ours || keep.is_some_and(|r| r.file == name) {
             continue;
         }
         if let Err(e) = std::fs::remove_file(entry.path()) {
@@ -605,11 +652,8 @@ pub fn install_log_tail(cache: &Path, n: usize) -> Vec<String> {
         .collect()
 }
 
-/// Starts the downloaded setup (checked again first) with `SETUP_ARGS`, logging to
-/// `{cache}/updates/install.log`. featherplay quits right after.
-pub fn launch(cache: &Path, ready: &Ready) -> Result<(), String> {
-    use std::process::Command;
-
+/// The downloaded file's path, once it's checked again.
+fn checked(cache: &Path, ready: &Ready) -> Result<PathBuf, String> {
     let path = ready
         .path(cache)
         .ok_or_else(|| format!("not a setup's name: {}", ready.file))?;
@@ -619,6 +663,16 @@ pub fn launch(cache: &Path, ready: &Ready) -> Result<(), String> {
             ready.file
         ));
     }
+    Ok(path)
+}
+
+/// Starts the downloaded setup (checked again first) with `SETUP_ARGS`, logging to
+/// `{cache}/updates/install.log`. featherplay quits right after.
+#[cfg(windows)]
+pub fn launch(cache: &Path, ready: &Ready) -> Result<(), String> {
+    use std::process::Command;
+
+    let path = checked(cache, ready)?;
     let command = || {
         let mut c = Command::new(&path);
         c.args(SETUP_ARGS)
@@ -628,6 +682,48 @@ pub fn launch(cache: &Path, ready: &Ready) -> Result<(), String> {
     // Out of featherplay's job, so it outlives featherplay.
     featherplay_platform::installer::start_setup(command)
         .map_err(|e| format!("starting {}: {}", ready.file, e.kind()))
+}
+
+/// Replaces the AppImage this copy runs from with the downloaded one (`replace_appimage`),
+/// then starts it once featherplay has quit, which it does right after.
+#[cfg(target_os = "linux")]
+pub fn launch(cache: &Path, ready: &Ready) -> Result<(), String> {
+    use featherplay_platform::installer;
+
+    let image = installer::appimage().ok_or("this copy doesn't run from an AppImage")?;
+    replace_appimage(cache, ready, &image)?;
+    installer::start_setup(|| installer::appimage_command(&image))
+        .map_err(|e| format!("starting {}: {}", image.display(), e.kind()))
+}
+
+/// Puts the downloaded AppImage (checked again first) in place of `image`, all at once
+/// (`installer::replace_file`): the copy's sha256 must be the one the signed checksums
+/// gave, or `image` stays as it was.
+#[cfg(target_os = "linux")]
+pub fn replace_appimage(cache: &Path, ready: &Ready, image: &Path) -> Result<(), String> {
+    let path = checked(cache, ready)?;
+    featherplay_platform::installer::replace_file(image, |out| {
+        let mut file = std::fs::File::open(&path)?;
+        let mut hasher = Sha256::new();
+        let mut buf = vec![0u8; 1 << 16];
+        loop {
+            let n = file.read(&mut buf)?;
+            if n == 0 {
+                break;
+            }
+            hasher.update(&buf[..n]);
+            io::Write::write_all(out, &buf[..n])?;
+        }
+        if hex(&hasher.finalize()) == ready.sha256 {
+            Ok(())
+        } else {
+            Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "the copy doesn't match its sha256",
+            ))
+        }
+    })
+    .map_err(|e| format!("replacing {}: {e}", image.display()))
 }
 
 #[cfg(test)]
@@ -887,6 +983,7 @@ pub(super) mod tests {
             "featherplay-setup-0.1.5.exe",
             "featherplay-setup-0.2.0.exe",
             "featherplay-setup-0.2.0.exe.part",
+            "featherplay-x86_64.AppImage.part",
             "install.log",
         ] {
             std::fs::write(dir.join(f), b"x").unwrap();
@@ -918,6 +1015,10 @@ pub(super) mod tests {
             "featherplay-setup-0.2.0.exe\\..\\..\\x.exe",
             "featherplay-setup-0.2.0.bat",
             "other.exe",
+            "featherplay-x/../../x.AppImage",
+            "featherplay-x86_64 .AppImage",
+            "../featherplay-x86_64.AppImage",
+            "other.AppImage",
         ] {
             let r = Ready {
                 version: "0.2.0".into(),

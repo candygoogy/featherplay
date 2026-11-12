@@ -69,7 +69,9 @@ pub fn supports(feature: Feature) -> bool {
 /// the tray while the desktop's tray (a StatusNotifierWatcher) shows the app's icon, so it's
 /// false until `tray::Tray::new` has put one there, and false again if the watcher goes;
 /// placing the mini player and global hotkeys only in an X11 session (Wayland allows
-/// neither). The sign-in has no window of the app's own on Linux: there's no WebView2.
+/// neither); the update in place only in a copy that runs from an AppImage
+/// (`installer::appimage`). The sign-in has no window of the app's own on Linux: there's no
+/// WebView2.
 #[cfg(target_os = "linux")]
 pub fn supports(feature: Feature) -> bool {
     match feature {
@@ -78,9 +80,9 @@ pub fn supports(feature: Feature) -> bool {
         Feature::MediaControls => crate::linux::bus::session().is_some(),
         Feature::Tray => crate::tray::available(),
         Feature::MiniPlayerPlacement | Feature::GlobalHotkeys => crate::window::x11_session(),
+        Feature::InPlaceUpdate => crate::installer::appimage().is_some(),
         Feature::TaskbarButtons
         | Feature::WebViewSignIn
-        | Feature::InPlaceUpdate
         | Feature::TitleBarColour => false,
     }
 }
@@ -106,7 +108,7 @@ mod tests {
         for feature in Feature::ALL {
             // On Linux these depend on the session: its bus (the credentials, notify and
             // media controls tests), its tray (the tray's test), X11 or Wayland (`window`'s
-            // tests).
+            // tests), and on running from an AppImage (the installer tests).
             let on_the_session = [
                 Feature::SecretStorage,
                 Feature::Notifications,
@@ -114,6 +116,7 @@ mod tests {
                 Feature::Tray,
                 Feature::MiniPlayerPlacement,
                 Feature::GlobalHotkeys,
+                Feature::InPlaceUpdate,
             ];
             if cfg!(target_os = "linux") && on_the_session.contains(&feature) {
                 continue;
