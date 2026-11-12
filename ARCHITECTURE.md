@@ -16,7 +16,7 @@ this file does; when the two disagree, the code is right and this file needs fix
 | `apps/featherplay` | The app: startup, the window and its pages (Rust in `src/`, Slint in `ui/`), the controller, and the app's own tests (`tests/app/`). |
 | `crates/*` | Twelve library crates: the music logic, the network clients, the audio engine, the stream resolver, saved state, the integrations, the platform layer and the app's logic that needs no window (the controller crate). None of them uses Slint. |
 | `vendor/` | Three patched third-party crates, swapped in through `[patch.crates-io]` in `Cargo.toml`. Each has a `VENDORED.md` that lists its changes. |
-| `packaging/` | The Inno Setup installer, the winget and Scoop manifests, the third-party licence list, and the release signing scripts. |
+| `packaging/` | The Inno Setup installer, the Linux AppImage and archive (`packaging/linux/`), the winget and Scoop manifests, the third-party licence list, and the release signing scripts. |
 | `site/` | The website. |
 | `spikes/` | Early experiments, kept for reference. Not part of the build. |
 | `docs/` | User-facing docs, such as `docs/local-api.md`. |
@@ -340,6 +340,14 @@ signature's trusted comment must name that version. If anything is missing or wr
 release is only announced, never installed. "Restart to update" runs the setup silently
 with `/RELAUNCH`. The setup closes featherplay and starts the new version
 (`packaging/windows/featherplay.iss`). A Scoop install is told the Scoop command instead.
+
+On Linux, a copy that runs from an AppImage (the runtime's `APPIMAGE`, in a folder the user
+may write: `platform::installer::appimage`) takes the installed copy's place. It downloads
+the release's `featherplay-<arch>.AppImage` and checks it the same way. "Restart to update"
+writes it beside the running AppImage, flushes it, gives it the old file's permissions and
+renames it over the old one (`platform::installer::replace_file`), then starts it once
+featherplay has quit. A copy from the `.tar.gz` or a distribution's package only announces
+a new version. `packaging/linux/build-linux.sh` makes both Linux files.
 
 The release itself is in `RELEASING.md`. `.github/workflows/release.yml` builds both
 architectures and the installers, writes `SHA256SUMS.txt` and makes a draft. The maintainer

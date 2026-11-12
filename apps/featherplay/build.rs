@@ -2,7 +2,8 @@
 //! variant into `featherplay-light.ico` in `OUT_DIR` (`chrome::set_icon` picks one at runtime
 //! by the taskbar's theme) and embeds the dark `.ico` into the exe as its icon resource,
 //! which Explorer shows. Both logos also go to `installer-small{,-light}.png` and
-//! `installer-panel{,-light}.png`, the installer's wizard images.
+//! `installer-panel{,-light}.png`, the installer's wizard images. For Linux the dark logo
+//! goes to `hicolor/<size>.png` as well, the icons the Linux packages install.
 //!
 //! The translations in `po/<lang>/LC_MESSAGES/featherplay.po` are bundled twice: Slint
 //! compiles them into the UI's `@tr` strings, and `catalog.rs` in `OUT_DIR` holds them for
@@ -30,6 +31,20 @@ const SIZES: [(u32, &str); 6] = [
     (32, ""),
     (48, ""),
     (256, ""),
+];
+
+/// The Linux icon's sizes (the hicolor theme's usual ones), drawn the same way: 22 px from
+/// the 24 px drawing.
+const LINUX_SIZES: [(u32, &str); 9] = [
+    (16, "-16"),
+    (22, "-24"),
+    (24, "-24"),
+    (32, ""),
+    (48, ""),
+    (64, ""),
+    (128, ""),
+    (256, ""),
+    (512, ""),
 ];
 
 fn main() {
@@ -75,6 +90,21 @@ fn main() {
         let panel = Path::new(&out).join(format!("installer-panel{name}.png"));
         std::fs::write(&panel, render_on(&master, (430, 824), 192))
             .expect("write installer-panel.png");
+    }
+
+    // Linux: the icon at the freedesktop sizes, `hicolor/<size>.png`, which
+    // packaging/linux/build-linux.sh installs into share/icons/hicolor beside the SVG.
+    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("linux") {
+        let dir = Path::new(&out).join("hicolor");
+        std::fs::create_dir_all(&dir).expect("create hicolor");
+        for (size, drawing) in LINUX_SIZES {
+            let svg = format!("ui/logo/tri-vane{drawing}.svg");
+            std::fs::write(
+                dir.join(format!("{size}.png")),
+                render(Path::new(&svg), size),
+            )
+            .expect("write a hicolor icon");
+        }
     }
 
     // Resource ID 1 is the first icon group, the one Explorer and the shell pick.

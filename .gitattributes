@@ -1,5 +1,8 @@
 # Shell scripts keep LF on Windows checkouts too (core.autocrlf), or bash reads the CRs.
 *.sh text eol=lf
+# The Linux packages' desktop entry, metadata and notes go into the AppImage and the
+# archive as they are checked out: LF, as Linux reads them.
+packaging/linux/** text eol=lf
 # The signed update fixtures are checked byte for byte: a CRLF checkout would break their
 # signatures.
 crates/controller/tests/fixtures/signing/** -text
