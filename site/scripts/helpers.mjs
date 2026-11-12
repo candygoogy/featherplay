@@ -9,7 +9,8 @@
 // be. A file already there with the right SHA256 is kept. Released builds keep their own
 // pins, so after a pin moves the old files stay too: helpers-kept.json lists them (move the
 // old entries there in the same commit); any other version is removed. The app checks the
-// same pin after its download, so a file here can't change what runs.
+// same pin after its download, so a file here can't change what runs. A pin whose mirror is
+// `None` (the Linux builds, at 41 MB over the asset limit) has no copy here.
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -19,10 +20,13 @@ export const SITE = "https://featherplay.candygoogy.dev";
 /** Workers static assets serve files up to 25 MiB. */
 export const MAX_BYTES = 25 * 1024 * 1024;
 
-/** The yt-dlp pins in sidecars.rs: `{ url, sha256, path }`, `path` under the site's root. */
+/**
+ * The yt-dlp pins in sidecars.rs with a mirror (`ytdlp_mirror: Some("…")`): `{ url, sha256, path }`,
+ * `path` under the site's root.
+ */
 export function readPins(source) {
   const re =
-    /ytdlp_url:\s*"([^"]+)",\s*ytdlp_sha256:\s*"([0-9a-f]{64})",\s*ytdlp_mirror:\s*"([^"]+)"/g;
+    /ytdlp_url:\s*"([^"]+)",\s*ytdlp_sha256:\s*"([0-9a-f]{64})",\s*ytdlp_mirror:\s*Some\(\s*"([^"]+)",?\s*\)/g;
   const pins = [...source.matchAll(re)].map(([, url, sha256, mirror]) => {
     if (!url.startsWith("https://github.com/yt-dlp/yt-dlp/releases/download/")) {
       throw new Error(`not a yt-dlp release on GitHub: ${url}`);
@@ -41,7 +45,7 @@ export function readPins(source) {
 /** The earlier pins the site keeps serving: `[{ url, sha256, path }]`, checked as `readPins` checks. */
 export function readKept(json) {
   return JSON.parse(json).map(({ url, sha256, path }) =>
-    readPins(`ytdlp_url: "${url}", ytdlp_sha256: "${sha256}", ytdlp_mirror: "${SITE}/${path}"`)[0],
+    readPins(`ytdlp_url: "${url}", ytdlp_sha256: "${sha256}", ytdlp_mirror: Some("${SITE}/${path}")`)[0],
   );
 }
 

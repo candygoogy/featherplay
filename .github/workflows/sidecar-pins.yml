@@ -6,13 +6,16 @@ name: Sidecar pins
 # compares the pins with the latest releases and opens an issue (or comments on the open
 # one) when Deno is a minor version or more behind, or the yt-dlp pin is more than
 # YTDLP_MAX_DAYS older than the latest yt-dlp. Moving a pin means changing its URL and
-# SHA256 together, from that release's own checksum file.
+# SHA256 together, from that release's own checksum file. There are pins for Windows (x64,
+# ARM64) and Linux (x86_64, aarch64).
 #
 # Each file has a second source, for when GitHub can't be reached: yt-dlp from the site
 # (`ytdlp_mirror`, the same file and pin, put there by the site's build, which reads the pins)
 # and Deno from dl.deno.land (`deno_cdn_url`, whose zips have their own `deno_cdn_sha256`).
-# This checks they're at the pinned releases and serve files that match their pins. After
-# moving a yt-dlp pin, deploy the site, or the mirror check fails until it's done.
+# yt-dlp's Linux builds have none (`ytdlp_mirror: None`): they're over the site's 25 MiB a
+# file. This checks the second sources are at the pinned releases and serve files that match
+# their pins. After moving a yt-dlp pin, deploy the site, or the mirror check fails until
+# it's done.
 
 on:
   schedule:
@@ -50,9 +53,9 @@ jobs:
         run: |
           set -euo pipefail
           file=crates/streams/src/sidecars.rs
-          # One pin per architecture (x64 and ARM64) and source (GitHub and the second one),
-          # always at the same release: more than one version of either means a pin was
-          # moved without the others.
+          # One pin per system and architecture (Windows x64 and ARM64, Linux x86_64 and
+          # aarch64) and source (GitHub and the second one), always at the same release: more
+          # than one version of either means a pin was moved without the others.
           ytdlp_pins=$(grep -oP '(yt-dlp/releases/download|/helpers/yt-dlp)/\K[0-9][0-9.]*(?=/)' "$file" | sort -u || true)
           deno_pins=$(grep -oP '(denoland/deno/releases/download|dl\.deno\.land/release)/v\K[0-9][0-9.]*(?=/)' "$file" | sort -u || true)
           for pins in "yt-dlp:$ytdlp_pins" "Deno:$deno_pins"; do
@@ -116,12 +119,13 @@ jobs:
         run: |
           set -euo pipefail
           file=crates/streams/src/sidecars.rs
+          # Windows' two yt-dlp mirrors and the four Deno zips on dl.deno.land.
           pairs=$(perl -0ne '
-            print "$2 $1\n" while /ytdlp_sha256:\s*"(\w+)",\s*ytdlp_mirror:\s*"([^"]+)"/g;
+            print "$2 $1\n" while /ytdlp_sha256:\s*"(\w+)",\s*ytdlp_mirror:\s*Some\(\s*"([^"]+)"/g;
             print "$1 $2\n" while /deno_cdn_url:\s*"([^"]+)",\s*deno_cdn_sha256:\s*"(\w+)"/g;
           ' "$file")
-          if [ "$(printf '%s\n' "$pairs" | grep -c .)" -ne 4 ]; then
-            echo "::error::expected 4 second-source pins in $file, found: $pairs"
+          if [ "$(printf '%s\n' "$pairs" | grep -c .)" -ne 6 ]; then
+            echo "::error::expected 6 second-source pins in $file, found: $pairs"
             exit 1
           fi
           failed=0

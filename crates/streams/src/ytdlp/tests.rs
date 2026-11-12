@@ -1,5 +1,6 @@
 use super::*;
 use crate::native::test_server;
+use crate::sidecars::{DENO_EXE, YTDLP_EXE};
 
 fn test_home(name: &str) -> PathBuf {
     let base = std::env::var("FEATHERPLAY_HOME")
@@ -23,8 +24,8 @@ async fn the_daily_update_runs_when_the_last_one_is_a_day_old() {
     assert!(!r.update_daily().await, "no helpers, nothing to update");
 
     // Not programs: an update fails at once, which still counts as one that ran.
-    std::fs::write(dir.join("yt-dlp.exe"), b"not a program").unwrap();
-    std::fs::write(dir.join("deno.exe"), b"not a program").unwrap();
+    std::fs::write(dir.join(YTDLP_EXE), b"not a program").unwrap();
+    std::fs::write(dir.join(DENO_EXE), b"not a program").unwrap();
     assert!(r.update_daily().await, "never updated");
 
     let stamp = dir.join("yt-dlp.updated");
@@ -53,7 +54,7 @@ async fn the_helpers_are_forced_up_to_date_once_a_session() {
     let home = test_home("update-once");
     let dir = home.join("sidecars");
     // Not a program: the update fails at once, which still counts as an update tried.
-    std::fs::write(dir.join("yt-dlp.exe"), b"not a program").unwrap();
+    std::fs::write(dir.join(YTDLP_EXE), b"not a program").unwrap();
     let stamp = dir.join("yt-dlp.updated");
     std::fs::write(&stamp, b"").unwrap();
     let r = YtDlpResolver::with_native(Sidecars { dir: dir.clone() }, None, None);
@@ -187,12 +188,12 @@ mod first_run {
             .collect()
     }
 
-    /// deno's release zip, with a stand-in `deno.exe`.
+    /// deno's release zip, with a stand-in `deno.exe` (`deno`).
     fn deno_zip() -> Vec<u8> {
         let mut zip = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
         let stored = zip::write::SimpleFileOptions::default()
             .compression_method(zip::CompressionMethod::Stored);
-        zip.start_file("deno.exe", stored).unwrap();
+        zip.start_file(DENO_EXE, stored).unwrap();
         zip.write_all(b"not really deno").unwrap();
         zip.finish().unwrap().into_inner()
     }
@@ -263,7 +264,7 @@ mod first_run {
         let result = r.resolve(&id).await;
 
         assert!(went_on(&result), "got {result:?}");
-        assert!(dir.join("yt-dlp.exe").is_file() && dir.join("deno.exe").is_file());
+        assert!(dir.join(YTDLP_EXE).is_file() && dir.join(DENO_EXE).is_file());
         assert_eq!(
             *log.lock().unwrap(),
             [
@@ -380,7 +381,12 @@ mod first_run {
             panic!("got {result:?}");
         };
         assert_eq!(e.fault, HelperFault::Damaged, "{e:?}");
-        assert!(!home.join("sidecars").join("yt-dlp.exe.part").exists());
+        assert!(
+            !home
+                .join("sidecars")
+                .join(format!("{YTDLP_EXE}.part"))
+                .exists()
+        );
         std::fs::remove_dir_all(&home).unwrap();
     }
 
@@ -461,8 +467,8 @@ mod first_run {
     async fn nothing_downloads_when_the_helpers_are_there() {
         let home = test_home("first-run-present");
         let dir = home.join("sidecars");
-        std::fs::write(dir.join("yt-dlp.exe"), YTDLP).unwrap();
-        std::fs::write(dir.join("deno.exe"), b"not really deno").unwrap();
+        std::fs::write(dir.join(YTDLP_EXE), YTDLP).unwrap();
+        std::fs::write(dir.join(DENO_EXE), b"not really deno").unwrap();
         let (downloads, _, log) = helpers_server(0, Duration::ZERO);
         let r = resolver(&home, downloads);
 

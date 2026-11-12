@@ -8,6 +8,8 @@ const sidecars = readFileSync(new URL("../../../crates/streams/src/sidecars.rs",
 
 describe("helpers", () => {
   it("reads both architectures' yt-dlp pins from the app's code", () => {
+    // The Linux builds have no mirror (`ytdlp_mirror: None`): over the asset limit.
+    expect(sidecars).toMatch(/yt-dlp_linux",\s*ytdlp_sha256:\s*"\w+",\s*ytdlp_mirror:\s*None/);
     const pins = readPins(sidecars);
     expect(pins.map((p: { path: string }) => p.path.split("/").pop())).toEqual([
       "yt-dlp.exe",
@@ -43,8 +45,8 @@ describe("helpers", () => {
 
   it("refuses a pin that would write outside the helpers folder", () => {
     const evil = sidecars.replace(
-      /ytdlp_mirror: "[^"]+yt-dlp\.exe"/,
-      'ytdlp_mirror: "https://featherplay.candygoogy.dev/helpers/yt-dlp/../../../x.exe"',
+      /ytdlp_mirror: Some\("[^"]+yt-dlp\.exe"\)/,
+      'ytdlp_mirror: Some("https://featherplay.candygoogy.dev/helpers/yt-dlp/../../../x.exe")',
     );
     expect(() => readPins(evil)).toThrow(/helpers path/);
   });

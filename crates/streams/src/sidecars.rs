@@ -17,8 +17,9 @@ use crate::{ResolveError, SidecarError};
 // `SHA2-256SUMS`, deno's `.sha256sum`), and matched the downloaded binaries on 2026-11-03.
 // yt-dlp then keeps itself current with `yt-dlp -U`, which fetches the build of its own
 // variant (`yt-dlp_arm64.exe` for the ARM64 one), whatever the file is called here.
-// Both architectures pin the same versions; `.github/workflows/sidecar-pins.yml` checks that,
-// and that the second sources below hold the same releases.
+// Every system and architecture pins the same versions; `.github/workflows/sidecar-pins.yml`
+// checks that, and that the second sources below hold the same releases. On Linux, `yt-dlp -U`
+// fetches `yt-dlp_linux` or `yt-dlp_linux_aarch64` the same way.
 //
 // Each file comes from GitHub first, then from a second source when GitHub can't be reached
 // or sent something else: yt-dlp from featherplay's site (the same file, put there by the
@@ -32,8 +33,8 @@ use crate::{ResolveError, SidecarError};
 struct Pins {
     ytdlp_url: &'static str,
     ytdlp_sha256: &'static str,
-    /// The same file on featherplay's site.
-    ytdlp_mirror: &'static str,
+    /// The same file on featherplay's site, where there is one.
+    ytdlp_mirror: Option<&'static str>,
     /// The zip's file name; its download is kept as `{DENO_ZIP}.part`.
     deno_zip: &'static str,
     deno_url: &'static str,
@@ -43,11 +44,11 @@ struct Pins {
     deno_cdn_sha256: &'static str,
 }
 
-#[cfg(any(test, not(target_arch = "aarch64")))]
+#[cfg(any(test, all(windows, not(target_arch = "aarch64"))))]
 const X64: Pins = Pins {
     ytdlp_url: "https://github.com/yt-dlp/yt-dlp/releases/download/2026.10.26/yt-dlp.exe",
     ytdlp_sha256: "f5389d3698ecde4ef06f4e6b1ce0294fe9ac1396228c8990b8d3416d6d177a7d",
-    ytdlp_mirror: "https://featherplay.candygoogy.dev/helpers/yt-dlp/2026.10.26/yt-dlp.exe",
+    ytdlp_mirror: Some("https://featherplay.candygoogy.dev/helpers/yt-dlp/2026.10.26/yt-dlp.exe"),
     deno_zip: "deno-x86_64-pc-windows-msvc.zip",
     deno_url: "https://github.com/denoland/deno/releases/download/v2.9.8/deno-x86_64-pc-windows-msvc.zip",
     deno_sha256: "cba84b26e0df5ae7f74fc66b86a95b866872a86292ebd84fa1e959927edd93bf",
@@ -55,11 +56,13 @@ const X64: Pins = Pins {
     deno_cdn_sha256: "b0f654158ad3edaee34cf6aa8d39695f242d3b122753f6fb965261b9c7986f24",
 };
 
-#[cfg(any(test, target_arch = "aarch64"))]
+#[cfg(any(test, all(windows, target_arch = "aarch64")))]
 const ARM64: Pins = Pins {
     ytdlp_url: "https://github.com/yt-dlp/yt-dlp/releases/download/2026.10.26/yt-dlp_arm64.exe",
     ytdlp_sha256: "0066dbac3c124028e2dcae2a197fccee33cd91f456313d24f7af89fd54590e98",
-    ytdlp_mirror: "https://featherplay.candygoogy.dev/helpers/yt-dlp/2026.10.26/yt-dlp_arm64.exe",
+    ytdlp_mirror: Some(
+        "https://featherplay.candygoogy.dev/helpers/yt-dlp/2026.10.26/yt-dlp_arm64.exe",
+    ),
     deno_zip: "deno-aarch64-pc-windows-msvc.zip",
     deno_url: "https://github.com/denoland/deno/releases/download/v2.9.8/deno-aarch64-pc-windows-msvc.zip",
     deno_sha256: "b413b92b735b50c198e8fe3b85af1aa50e29d5f72e229aab701d132286e14cef",
@@ -67,13 +70,58 @@ const ARM64: Pins = Pins {
     deno_cdn_sha256: "ef6c1d9d946dd6d52774ec1adbd55abdaab9585ba9d7be269cfe41c022504b5b",
 };
 
-/// The native helpers of the architecture this exe is built for, so an ARM64 featherplay
-/// doesn't run them under x64 emulation.
-#[cfg(target_arch = "aarch64")]
+// Linux: the glibc builds of the same releases, each hash again the one in its release's
+// checksum file (they matched the downloads on 2026-11-12). They need glibc 2.17 or later
+// (yt-dlp, by its README; its loader asks for 2.14, and for libz.so.1) and 2.27 or later
+// (Deno, by its symbols). yt-dlp's Linux builds have no second source: at 41 MB they're over
+// the 25 MiB a file the site may serve, so they come from GitHub only.
+#[cfg(any(test, all(target_os = "linux", not(target_arch = "aarch64"))))]
+const LINUX_X64: Pins = Pins {
+    ytdlp_url: "https://github.com/yt-dlp/yt-dlp/releases/download/2026.10.26/yt-dlp_linux",
+    ytdlp_sha256: "767ba9dce7052aa196f8b12652f433d76de128ba168966fa84b6394d5e6c6795",
+    ytdlp_mirror: None,
+    deno_zip: "deno-x86_64-unknown-linux-gnu.zip",
+    deno_url: "https://github.com/denoland/deno/releases/download/v2.9.8/deno-x86_64-unknown-linux-gnu.zip",
+    deno_sha256: "e890975bc2549807bbcc0b584ffafda72cc7c93349dd99c80483dd784f6c4609",
+    deno_cdn_url: "https://dl.deno.land/release/v2.9.8/deno-x86_64-unknown-linux-gnu.zip",
+    deno_cdn_sha256: "a39762429792913fe762ef0b59c9cba41dbd38195984da99221a193b13d97b40",
+};
+
+#[cfg(any(test, all(target_os = "linux", target_arch = "aarch64")))]
+const LINUX_ARM64: Pins = Pins {
+    ytdlp_url: "https://github.com/yt-dlp/yt-dlp/releases/download/2026.10.26/yt-dlp_linux_aarch64",
+    ytdlp_sha256: "e87e9533e89fe5889abaa21f5114dfe7756d6aa6219b83551add04d48b18e483",
+    ytdlp_mirror: None,
+    deno_zip: "deno-aarch64-unknown-linux-gnu.zip",
+    deno_url: "https://github.com/denoland/deno/releases/download/v2.9.8/deno-aarch64-unknown-linux-gnu.zip",
+    deno_sha256: "d49596c20b9788cf8f5d8ddf644103d4bde56ed239753f0bdb92ba9361d51905",
+    deno_cdn_url: "https://dl.deno.land/release/v2.9.8/deno-aarch64-unknown-linux-gnu.zip",
+    deno_cdn_sha256: "2664fcd6a58a37676449e5750ef2140cd46c18f2bbc08be0e03cbcb26ca4de22",
+};
+
+/// The native helpers of the system and architecture this exe is built for, so an ARM64
+/// featherplay doesn't run them under x64 emulation.
+#[cfg(all(windows, target_arch = "aarch64"))]
 const PINS: Pins = ARM64;
-#[cfg(not(target_arch = "aarch64"))]
+#[cfg(all(windows, not(target_arch = "aarch64")))]
 const PINS: Pins = X64;
+#[cfg(all(target_os = "linux", target_arch = "aarch64"))]
+const PINS: Pins = LINUX_ARM64;
+#[cfg(all(target_os = "linux", not(target_arch = "aarch64")))]
+const PINS: Pins = LINUX_X64;
+#[cfg(not(any(windows, target_os = "linux")))]
+compile_error!("no yt-dlp and Deno builds are pinned for this system");
 const DENO_ZIP: &str = PINS.deno_zip;
+
+/// The helpers' file names in the sidecar dir; Deno's is its name in the zip too.
+#[cfg(windows)]
+pub(crate) const YTDLP_EXE: &str = "yt-dlp.exe";
+#[cfg(windows)]
+pub(crate) const DENO_EXE: &str = "deno.exe";
+#[cfg(not(windows))]
+pub(crate) const YTDLP_EXE: &str = "yt-dlp";
+#[cfg(not(windows))]
+pub(crate) const DENO_EXE: &str = "deno";
 /// GitHub sends release downloads on to a host under this domain
 /// (`release-assets.githubusercontent.com` in Oct 2026).
 const ASSET_DOMAIN: &str = ".githubusercontent.com";
@@ -139,7 +187,7 @@ struct Asset {
 /// sources, over HTTPS, with redirects only to those hosts. Tests use local servers instead.
 pub struct Downloads {
     ytdlp: Asset,
-    /// A zip with `deno.exe` in it.
+    /// A zip with `deno.exe` (`deno` on Linux) in it.
     deno: Asset,
     /// The test servers on 127.0.0.1, over plain HTTP.
     #[cfg(test)]
@@ -151,10 +199,10 @@ impl Downloads {
     pub fn pinned() -> Downloads {
         Downloads {
             ytdlp: Asset {
-                sources: vec![
-                    Source::new(PINS.ytdlp_url, PINS.ytdlp_sha256),
-                    Source::new(PINS.ytdlp_mirror, PINS.ytdlp_sha256),
-                ],
+                sources: std::iter::once(PINS.ytdlp_url)
+                    .chain(PINS.ytdlp_mirror)
+                    .map(|url| Source::new(url, PINS.ytdlp_sha256))
+                    .collect(),
             },
             deno: Asset {
                 sources: vec![
@@ -326,7 +374,7 @@ impl Sidecars {
         let http = from.client()?;
 
         if !self.ytdlp().is_file() {
-            let part = self.dir.join("yt-dlp.exe.part");
+            let part = self.dir.join(format!("{YTDLP_EXE}.part"));
             fetch(&http, from, &from.ytdlp, &part, "yt-dlp", &progress).await?;
             put_in_place(&part, &self.ytdlp()).await?;
             // The pinned release counts as today's update: no `yt-dlp -U` right after it.
@@ -336,7 +384,7 @@ impl Sidecars {
         if !self.deno().is_file() {
             let zip = self.dir.join(format!("{DENO_ZIP}.part"));
             fetch(&http, from, &from.deno, &zip, "deno", &progress).await?;
-            let exe_part = self.dir.join("deno.exe.part");
+            let exe_part = self.dir.join(format!("{DENO_EXE}.part"));
             let extracted = patiently(|| {
                 let (z, e) = (zip.clone(), exe_part.clone());
                 async move {
@@ -346,7 +394,7 @@ impl Sidecars {
                 }
             })
             .await
-            .map_err(|e| io_err(HelperFault::Blocked, "extracting deno.exe", e));
+            .map_err(|e| io_err(HelperFault::Blocked, &format!("extracting {DENO_EXE}"), e));
             let _ = tokio::fs::remove_file(&zip).await;
             if let Err(e) = extracted {
                 let _ = tokio::fs::remove_file(&exe_part).await;
@@ -388,11 +436,11 @@ impl Sidecars {
     }
 
     pub fn ytdlp(&self) -> PathBuf {
-        self.dir.join("yt-dlp.exe")
+        self.dir.join(YTDLP_EXE)
     }
 
     pub fn deno(&self) -> PathBuf {
-        self.dir.join("deno.exe")
+        self.dir.join(DENO_EXE)
     }
 
     /// `{cache}`, the parent of the sidecar dir. yt-dlp's cache, deno's cache and `tmp/` live there.
@@ -735,12 +783,20 @@ where
 }
 
 /// Renames the checked `part` to `exe`, waiting out antivirus. An exe gone right after
-/// (quarantined) fails too.
+/// (quarantined) fails too. On Unix the part is made executable (0o755) first, so the
+/// installed file always is.
 async fn put_in_place(part: &Path, exe: &Path) -> Result<(), ResolveError> {
     let name = exe
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_default();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        tokio::fs::set_permissions(part, std::fs::Permissions::from_mode(0o755))
+            .await
+            .map_err(|e| io_err(HelperFault::Blocked, &format!("installing {name}"), e))?;
+    }
     patiently(|| tokio::fs::rename(part, exe))
         .await
         .map_err(|e| io_err(HelperFault::Blocked, &format!("installing {name}"), e))?;
@@ -795,7 +851,7 @@ async fn sha256_file(path: &Path) -> std::io::Result<String> {
         .collect())
 }
 
-/// Writes the zip's `deno.exe` to `exe_dest`. A zip that can't be read is `InvalidData`; the
+/// Writes the zip's `deno.exe` (`deno`) to `exe_dest`. A zip that can't be read is `InvalidData`; the
 /// file errors are the system's, so `patiently` can tell a held file.
 fn extract_deno(zip_path: &Path, exe_dest: &Path) -> std::io::Result<()> {
     let zip_err = |e: zip::result::ZipError| match e {
@@ -807,7 +863,7 @@ fn extract_deno(zip_path: &Path, exe_dest: &Path) -> std::io::Result<()> {
     };
     let file = std::fs::File::open(zip_path)?;
     let mut archive = zip::ZipArchive::new(file).map_err(zip_err)?;
-    let mut entry = archive.by_name("deno.exe").map_err(zip_err)?;
+    let mut entry = archive.by_name(DENO_EXE).map_err(zip_err)?;
     let mut out = std::fs::File::create(exe_dest)?;
     std::io::copy(&mut entry, &mut out)?;
     Ok(())

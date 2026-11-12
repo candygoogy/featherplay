@@ -1,11 +1,14 @@
 use super::*;
 
+/// Every system's pins: Windows x64 and ARM64, Linux x86_64 and aarch64.
+const ALL: [&Pins; 4] = [&X64, &ARM64, &LINUX_X64, &LINUX_ARM64];
+
 #[test]
 fn downloads_stay_on_their_hosts_over_https() {
     let ok = |u: &str| download_host(&reqwest::Url::parse(u).unwrap());
-    for pins in [&X64, &ARM64] {
+    for pins in ALL {
         assert!(ok(pins.ytdlp_url) && ok(pins.deno_url));
-        assert!(ok(pins.ytdlp_mirror) && ok(pins.deno_cdn_url));
+        assert!(pins.ytdlp_mirror.is_none_or(ok) && ok(pins.deno_cdn_url));
     }
     assert!(!ok(
         "http://featherplay.candygoogy.dev/helpers/yt-dlp/x/yt-dlp.exe"
@@ -43,7 +46,7 @@ fn versions_are_read_from_either_tool() {
 
 #[test]
 fn the_pins_are_sha256_hex() {
-    for pins in [&X64, &ARM64] {
+    for pins in ALL {
         for h in [pins.ytdlp_sha256, pins.deno_sha256, pins.deno_cdn_sha256] {
             assert_eq!(h.len(), 64);
             assert!(
@@ -71,16 +74,36 @@ fn the_architectures_pin_the_same_releases_of_their_own_builds() {
     assert_ne!(X64.deno_cdn_sha256, ARM64.deno_cdn_sha256);
 }
 
+/// Linux pins the same releases as Windows, of its glibc builds, named without `.exe`.
+#[test]
+fn linux_pins_the_same_releases_of_its_own_builds() {
+    let release = |url: &'static str| url.rsplit_once('/').map(|(dir, _)| dir);
+    for linux in [&LINUX_X64, &LINUX_ARM64] {
+        assert_eq!(release(linux.ytdlp_url), release(X64.ytdlp_url));
+        assert_eq!(release(linux.deno_url), release(X64.deno_url));
+        assert!(linux.deno_zip.ends_with("-unknown-linux-gnu.zip"));
+        assert_eq!(linux.ytdlp_mirror, None, "over the site's 25 MiB a file");
+    }
+    assert!(LINUX_X64.ytdlp_url.ends_with("/yt-dlp_linux"));
+    assert!(LINUX_ARM64.ytdlp_url.ends_with("/yt-dlp_linux_aarch64"));
+    assert!(LINUX_X64.deno_zip.contains("x86_64") && LINUX_ARM64.deno_zip.contains("aarch64"));
+    assert_ne!(LINUX_X64.ytdlp_sha256, LINUX_ARM64.ytdlp_sha256);
+    assert_ne!(LINUX_X64.deno_sha256, LINUX_ARM64.deno_sha256);
+}
+
 /// The second sources hold the same releases, under the same file names: the site's
 /// `helpers/yt-dlp/<version>/<file>`, and Deno's `release/v<version>/<zip>`.
 #[test]
 fn the_second_sources_hold_the_pinned_releases() {
-    for pins in [&X64, &ARM64] {
+    assert!(X64.ytdlp_mirror.is_some() && ARM64.ytdlp_mirror.is_some());
+    for pins in ALL {
         let (_, ytdlp) = pins.ytdlp_url.split_once("/releases/download/").unwrap();
-        assert_eq!(
-            pins.ytdlp_mirror,
-            format!("https://featherplay.candygoogy.dev/helpers/yt-dlp/{ytdlp}")
-        );
+        if let Some(mirror) = pins.ytdlp_mirror {
+            assert_eq!(
+                mirror,
+                format!("https://featherplay.candygoogy.dev/helpers/yt-dlp/{ytdlp}")
+            );
+        }
         let (_, deno) = pins.deno_url.split_once("/releases/download/").unwrap();
         assert_eq!(
             pins.deno_cdn_url,
@@ -91,29 +114,74 @@ fn the_second_sources_hold_the_pinned_releases() {
 }
 
 /// GitHub first, then the second source, each with its own pin.
-#[cfg(target_arch = "aarch64")]
+#[cfg(all(windows, target_arch = "aarch64"))]
 #[test]
 fn an_arm64_build_downloads_the_arm64_helpers() {
     let urls = |a: &Asset| a.sources.iter().map(|s| s.url.clone()).collect::<Vec<_>>();
     let d = Downloads::pinned();
-    assert_eq!(urls(&d.ytdlp), [ARM64.ytdlp_url, ARM64.ytdlp_mirror]);
+    assert_eq!(
+        urls(&d.ytdlp),
+        [ARM64.ytdlp_url, ARM64.ytdlp_mirror.unwrap()]
+    );
     assert_eq!(urls(&d.deno), [ARM64.deno_url, ARM64.deno_cdn_url]);
     assert_eq!(d.deno.sources[1].sha256, ARM64.deno_cdn_sha256);
 }
 
 /// GitHub first, then the second source, each with its own pin.
-#[cfg(target_arch = "x86_64")]
+#[cfg(all(windows, target_arch = "x86_64"))]
 #[test]
 fn an_x64_build_downloads_the_x64_helpers() {
     let urls = |a: &Asset| a.sources.iter().map(|s| s.url.clone()).collect::<Vec<_>>();
     let d = Downloads::pinned();
-    assert_eq!(urls(&d.ytdlp), [X64.ytdlp_url, X64.ytdlp_mirror]);
+    assert_eq!(urls(&d.ytdlp), [X64.ytdlp_url, X64.ytdlp_mirror.unwrap()]);
     assert_eq!(urls(&d.deno), [X64.deno_url, X64.deno_cdn_url]);
     assert_eq!(d.deno.sources[1].sha256, X64.deno_cdn_sha256);
     assert_eq!(d.ytdlp.sources[1].sha256, X64.ytdlp_sha256, "the same file");
 }
 
-/// Downloads both pinned releases from GitHub (~60 MB) into a scratch dir.
+/// A Linux build downloads its own system's and architecture's helpers: yt-dlp from GitHub
+/// only, Deno from GitHub then dl.deno.land. Their files have no `.exe`.
+#[cfg(target_os = "linux")]
+#[test]
+fn a_linux_build_downloads_the_linux_helpers() {
+    let pins = if cfg!(target_arch = "aarch64") {
+        &LINUX_ARM64
+    } else {
+        &LINUX_X64
+    };
+    let urls = |a: &Asset| a.sources.iter().map(|s| s.url.clone()).collect::<Vec<_>>();
+    let d = Downloads::pinned();
+    assert_eq!(urls(&d.ytdlp), [pins.ytdlp_url]);
+    assert_eq!(urls(&d.deno), [pins.deno_url, pins.deno_cdn_url]);
+    assert_eq!(d.deno.sources[1].sha256, pins.deno_cdn_sha256);
+    let sidecars = Sidecars { dir: "s".into() };
+    assert_eq!(sidecars.ytdlp(), Path::new("s/yt-dlp"));
+    assert_eq!(sidecars.deno(), Path::new("s/deno"));
+}
+
+/// An installed helper is executable, whatever mode its download was written with.
+#[cfg(unix)]
+#[tokio::test]
+async fn an_installed_helper_is_executable() {
+    use std::os::unix::fs::PermissionsExt;
+    let base = std::env::var("FEATHERPLAY_HOME").expect("set FEATHERPLAY_HOME to a dir for tests");
+    let dir = PathBuf::from(base)
+        .join("test-streams")
+        .join(format!("mode-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let (part, exe) = (dir.join("yt-dlp.part"), dir.join("yt-dlp"));
+    std::fs::write(&part, b"#!/bin/sh\n").unwrap();
+    std::fs::set_permissions(&part, std::fs::Permissions::from_mode(0o600)).unwrap();
+
+    put_in_place(&part, &exe).await.unwrap();
+
+    let mode = std::fs::metadata(&exe).unwrap().permissions().mode();
+    assert_eq!(mode & 0o777, 0o755, "{mode:o}");
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+/// Downloads both pinned releases from GitHub (~60 MB, ~85 MB on Linux) into a scratch dir,
+/// checks them against their pins, and runs their `--version`.
 #[tokio::test]
 #[ignore = "live: downloads yt-dlp and deno from GitHub"]
 async fn live_the_pinned_releases_install() {
@@ -125,6 +193,9 @@ async fn live_the_pinned_releases_install() {
     let sidecars = Sidecars { dir: dir.clone() };
     sidecars.ensure(|_, _, _| {}).await.unwrap();
     assert!(sidecars.ytdlp().is_file() && sidecars.deno().is_file());
+    let (ytdlp, deno) = sidecars.versions().await;
+    assert_eq!(ytdlp.as_deref(), Some("2026.10.26"));
+    assert_eq!(deno.as_deref(), Some("2.9.8"));
     std::fs::remove_dir_all(&dir).unwrap();
 }
 
