@@ -574,6 +574,17 @@ fn linux_takes_the_appimage_for_its_architecture() {
     let plan = install::plan(&r, "linux", "x86_64").expect("x86_64 has its AppImage");
     assert_eq!(plan.setup.name, "featherplay-x86_64.AppImage");
     assert_eq!(install::plan(&r, "linux", "aarch64"), None);
+
+    let both = with_assets(&[
+        "featherplay-x86_64.AppImage",
+        "featherplay-aarch64.AppImage",
+        "featherplay-aarch64.tar.gz",
+        "SHA256SUMS.txt",
+    ]);
+    let arm = install::plan(&both, "linux", "aarch64").expect("aarch64 has its AppImage");
+    assert_eq!(arm.setup.name, "featherplay-aarch64.AppImage");
+    let x64 = install::plan(&both, "linux", "x86_64").expect("x86_64 has its AppImage");
+    assert_eq!(x64.setup.name, "featherplay-x86_64.AppImage");
 }
 
 #[test]
