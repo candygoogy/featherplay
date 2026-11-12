@@ -1,0 +1,129 @@
+name: Linux rig
+
+# The Linux desktop checks that need a session and a display, which the CI workflow's
+# offscreen tests can't show: the real window on X11 (Xvfb) and Wayland (sway and weston,
+# headless), with screenshots; the tray, MPRIS and notifications over a session D-Bus with
+# stand-ins for the desktop's services; the Secret Service; single instance, the XDG
+# folders and the proxy variables; the helpers' download; the browser sign-in's pipe. No
+# account and no Google page anywhere: the app runs on its demo fixtures. The scripts and
+# what each checks: scripts/rig/desktop/.
+
+# ci.yml calls this workflow (a job that `uses:` it), so it runs on CI's pushes and pull
+# requests; it can also be run by hand. A called workflow gets none of the caller's `env`,
+# so everything it needs is set here. No `concurrency`: the caller's group covers it.
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  # As in ci.yml: the engine tests that open an audio device are left out.
+  RUSTFLAGS: --cfg ci
+
+jobs:
+  # The desktop session. One run per architecture, each native, as ci.yml's `linux` job.
+  # aarch64 has no Google Chrome build and Ubuntu's Chromium is a snap, so the browser
+  # tests are skipped there (live.sh says so).
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Build: the headers ci.yml's `linux` job lists. The session: D-Bus, gnome-keyring and
+      # secret-tool, gdbus, python3-dbus and GLib for the stand-ins and the checks, PulseAudio and
+      # ALSA's pulse plugin for a null sink. The displays: Xvfb (with xdpyinfo, xdotool and
+      # ImageMagick's import), sway and grim, weston. Fonts: Noto for the scripts and emoji,
+      # DejaVu for the check without them.
+      - name: System packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            pkg-config clang libfontconfig1-dev libfreetype-dev libxkbcommon-dev \
+            libxkbcommon-x11-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev \
+            libxi-dev libasound2-dev libdbus-1-dev libssl-dev \
+            dbus libglib2.0-bin gnome-keyring libsecret-tools python3-dbus python3-gi \
+            pulseaudio pulseaudio-utils libasound2-plugins \
+            xvfb x11-utils xdotool imagemagick sway grim weston \
+            fonts-noto-core fonts-noto-cjk fonts-noto-color-emoji fonts-dejavu-core
+
+      # Ubuntu 24.04 keeps unprivileged user namespaces from programs without an AppArmor
+      # profile, which Chrome's sandbox needs.
+      - name: Browser sandbox
+        run: |
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+          for b in google-chrome chromium; do command -v "$b" && "$b" --version || true; done
+
+      - name: Rust toolchain
+        shell: bash
+        run: |
+          rustup toolchain install
+          rustup show active-toolchain
+          host=$(rustc -vV | sed -n 's/^host: //p')
+          if [ "$host" != "$(uname -m)-unknown-linux-gnu" ]; then
+            echo "::error::rustc's host is '$host' on a $(uname -m) runner"
+            exit 1
+          fi
+
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+
+      - uses: taiki-e/install-action@1919c4a95903d2c33e4a221102edca87309fc14b # v2.89.0
+        with:
+          tool: nextest
+
+      # A dev build with the performance harness, which drives the window; and the test
+      # programs live.sh runs.
+      - name: Build
+        run: |
+          cargo build -p featherplay --features perf-harness
+          cargo nextest run --no-run -p featherplay-platform -p featherplay-streams --lib
+          cargo nextest run --no-run -p featherplay --lib --test app
+
+      - name: Session
+        run: scripts/rig/desktop/session.sh start
+
+      - name: Live tests (Secret Service, notifications, MPRIS, browser, helpers, glyphs)
+        if: ${{ !cancelled() }}
+        run: scripts/rig/desktop/live.sh
+
+      - name: X11 (Xvfb)
+        if: ${{ !cancelled() }}
+        run: scripts/rig/desktop/app.sh x11
+
+      - name: Wayland (sway)
+        if: ${{ !cancelled() }}
+        run: scripts/rig/desktop/app.sh wayland
+
+      # winit's own title bar, as GNOME shows it. Its screenshot tool is the least proven
+      # part of the rig, so a failure here doesn't fail the job.
+      - name: Wayland (weston, client-side title bar)
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        run: scripts/rig/desktop/app.sh weston
+
+      - name: Summary
+        if: ${{ always() }}
+        run: |
+          out="$RUNNER_TEMP/rig/out"
+          { echo "### Desktop rig, ${{ matrix.runner }}"; echo '```';
+            cat "$out/summary.txt" 2>/dev/null || echo "no summary"; echo '```'; } \
+            >>"$GITHUB_STEP_SUMMARY"
+          scripts/rig/desktop/session.sh stop || true
+
+      - name: Screenshots and logs
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: linux-rig-desktop-${{ matrix.runner }}
+          path: ${{ runner.temp }}/rig/out
+          if-no-files-found: warn
+          retention-days: 14
