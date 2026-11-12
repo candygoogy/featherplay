@@ -613,7 +613,7 @@ export component HomePage inherits Rectangle {
     // so nothing scrolls under it: as the page scrolls the bar's height, the ground comes back
     // behind the bar (`TopScrim`, as on album pages), and from there the wash is clipped to
     // the page, so the bar isn't repainted with every scroll frame.
-    property <color> wash: Theme.dark ? HomeData.wash-dark : HomeData.wash-light;
+    property <color> wash: Theme.pick(HomeData.wash-dark, HomeData.wash-light);
     animate wash { duration: Theme.t-colour; easing: Curves.ease-hover; }
     // From the window's top (and `rise` above it, for the page's enter offset).
     property <length> wash-top: Theme.top-bar-h + Theme.rise;
