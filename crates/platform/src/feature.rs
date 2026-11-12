@@ -68,8 +68,8 @@ pub fn supports(feature: Feature) -> bool {
 /// a notification server does, the media controls (MPRIS) when there's a session bus at all;
 /// the tray while the desktop's tray (a StatusNotifierWatcher) shows the app's icon, so it's
 /// false until `tray::Tray::new` has put one there, and false again if the watcher goes;
-/// placing the mini player only in an X11 session (Wayland doesn't allow it). The sign-in has
-/// no window of the app's own on Linux: there's no WebView2.
+/// placing the mini player and global hotkeys only in an X11 session (Wayland allows
+/// neither). The sign-in has no window of the app's own on Linux: there's no WebView2.
 #[cfg(target_os = "linux")]
 pub fn supports(feature: Feature) -> bool {
     match feature {
@@ -77,9 +77,8 @@ pub fn supports(feature: Feature) -> bool {
         Feature::Notifications => crate::notify::available(),
         Feature::MediaControls => crate::linux::bus::session().is_some(),
         Feature::Tray => crate::tray::available(),
-        Feature::MiniPlayerPlacement => crate::window::x11_session(),
+        Feature::MiniPlayerPlacement | Feature::GlobalHotkeys => crate::window::x11_session(),
         Feature::TaskbarButtons
-        | Feature::GlobalHotkeys
         | Feature::WebViewSignIn
         | Feature::InPlaceUpdate
         | Feature::TitleBarColour => false,
@@ -114,6 +113,7 @@ mod tests {
                 Feature::MediaControls,
                 Feature::Tray,
                 Feature::MiniPlayerPlacement,
+                Feature::GlobalHotkeys,
             ];
             if cfg!(target_os = "linux") && on_the_session.contains(&feature) {
                 continue;

@@ -290,13 +290,14 @@ export component WindowSection inherits Group {
                 clicked => { SettingsData.open-dialog(SettingsDialog.shortcuts); }
             }
         }
-        ToggleRow {
+        // Wayland lets no app hear keys pressed in another.
+        if SettingsData.has-hotkeys: ToggleRow {
             label: @tr("Global hotkeys");
             detail: @tr("Play, pause and skip from any app. Each key needs Ctrl, Alt, Shift or Win.");
             key: SettingKey.hotkeys;
             checked: SettingsData.hotkeys;
         }
-        if SettingsData.hotkeys: VerticalLayout {
+        if SettingsData.has-hotkeys && SettingsData.hotkeys: VerticalLayout {
             padding-bottom: Theme.s3;
             HotkeyRow {
                 label: @tr("Play or pause");

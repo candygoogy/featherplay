@@ -373,7 +373,10 @@ fn open_dialog(ctx: &Ctx, which: SettingsDialog) {
     let data = ui.global::<SettingsData>();
     clear_fields(&data);
     if which == SettingsDialog::Shortcuts {
-        let hotkeys = SETTINGS.with(|s| s.borrow().hotkeys.clone());
+        // Where the desktop has none, they're not registered: not listed either.
+        let hotkeys = SETTINGS
+            .with(|s| s.borrow().hotkeys.clone())
+            .filter(|_| supports(Feature::GlobalHotkeys));
         let keys: Vec<ModelRc<SharedString>> = hotkeys
             .iter()
             .flat_map(|h| [&h.play_pause, &h.next, &h.previous])
@@ -435,6 +438,7 @@ fn show(ctx: &Ctx) {
     data.set_close_action(close_action_index(s.close_action));
     data.set_tray_click_opens_window(s.tray_click_opens_window);
     data.set_has_tray(supports(Feature::Tray));
+    data.set_has_hotkeys(supports(Feature::GlobalHotkeys));
     data.set_tooltips(s.tooltips);
     ui.global::<Tooltips>().set_on(s.tooltips);
     data.set_accent(accent_index(s.accent));

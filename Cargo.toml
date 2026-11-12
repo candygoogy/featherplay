@@ -53,7 +53,9 @@ ksni = { version = "=0.3.7", default-features = false, features = ["async-io", "
 # Linux, X11: where the mini player goes (the pointer, the monitors, the work area). In the
 # tree already through winit.
 x11rb = { version = "=0.13.2", default-features = false }
-global-hotkey = "=0.9.0"
+# 0.10: on X11, the Quote, NumpadEnter and NumpadEqual keys register (Windows' code is
+# unchanged from 0.9).
+global-hotkey = "=0.10.0"
 tauri-winrt-notification = "=0.8.1"
 discord-rich-presence = "=1.1.0"
 webview2-com = "=0.39.1"

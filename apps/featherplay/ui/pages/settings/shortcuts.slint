@@ -111,7 +111,8 @@ component KeyList inherits VerticalLayout {
 }
 
 // What works from any app: the media keys always, and the global hotkeys with the user's
-// keys while they're on (otherwise a line says where to turn them on).
+// keys while they're on (otherwise a line says where to turn them on, where the desktop
+// has them).
 component FromAnyApp inherits VerticalLayout {
     KeyGroup {
         text: @tr("From any app");
@@ -128,7 +129,8 @@ component FromAnyApp inherits VerticalLayout {
             keys: SettingsData.hotkey-keys[i];
         }
     }
-    if SettingsData.hotkey-keys.length == 0: Body {
+    // Where the desktop has none (Wayland), there's nothing to turn on.
+    if SettingsData.hotkey-keys.length == 0 && SettingsData.has-hotkeys: Body {
         text: @tr("Global hotkeys are off. Turn them on in Settings › Window to play, pause and skip with your own keys.");
         font-size: Theme.t-meta;
         color: Rows.detail;

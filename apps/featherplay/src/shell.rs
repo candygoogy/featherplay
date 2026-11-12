@@ -78,6 +78,8 @@ pub fn start(
     }
     match &hotkeys {
         None => log!("hotkeys: none set"),
+        // Wayland: an app can't hear keys pressed in other apps.
+        Some(_) if !supports(Feature::GlobalHotkeys) => log!("hotkeys: not on this desktop"),
         Some(cfg) => {
             let t = Instant::now();
             match Hotkeys::register(cfg, tx.clone()) {

@@ -165,6 +165,7 @@ controls and the tray (`apps/featherplay/src/shell.rs`).
 | `featherplay-log` | Appends log lines to the file | `crates/controller/src/diagnostics.rs` |
 | `featherplay-endsession` | A hidden window that hears Windows' end-of-session messages and second launches | `crates/platform/src/windows/session_end.rs` |
 | ksni's thread (Linux) | The tray icon's StatusNotifierItem and menu on the session bus; their events go to the main thread with `slint::invoke_from_event_loop` | `crates/platform/src/linux/tray.rs` |
+| global-hotkey's thread (Linux, X11) | The hotkeys' key grabs; a press is a `UiCommand` | `crates/integrations/src/hotkeys.rs` |
 | `featherplay-signin`, `featherplay-browser-signin`, `featherplay-browser-pipe` | The WebView2 sign-in, with its own COM apartment and message loop; the browser sign-in and its DevTools pipe | `crates/platform/src/windows/webview.rs`, `apps/featherplay/src/pages/sign_in/browser.rs`, `apps/featherplay/src/pages/sign_in/browser/cdp.rs` |
 
 There are also short-lived threads, such as opening the log folder and registering the app's
@@ -586,7 +587,7 @@ alone:
 | Older copy | Pulled in by | To remove it |
 |---|---|---|
 | `windows` 0.44 | souvlaki 0.8.3 | Gone in phase 5: souvlaki 0.9.3, on `windows` 0.62 like the rest |
-| `windows-sys` 0.59 | global-hotkey 0.9 | global-hotkey 0.10 (changes the hotkey code) |
+| `windows-sys` 0.59 | global-hotkey 0.10 (the latest, as 0.9 was) | upstream |
 | `windows-sys` 0.52 | winit 0.30, glutin | upstream |
 | `muda` 0.19, `keyboard-types` 0.7 | Slint's winit backend (vendored) | patching the vendored backend; tray-icon uses muda 0.21 |
 | `getrandom` 0.2 | uuid 0.8 in discord-rich-presence 1.1.0 (the latest) | upstream |
@@ -595,10 +596,10 @@ alone:
 | `hashbrown` 0.14, 0.16 | rowan, clru (Slint) | upstream |
 | `smol_str` 0.2, `syn` 2 | winit; proc macros (build time) | upstream |
 
-The two upgrades change Windows behaviour, so they wait for a decision. Phase 5 took
-souvlaki 0.9.3 for the Windows media card: the same SMTC calls on `windows` 0.62, so `windows`
-0.44 left the tree. It stays Windows only: its MPRIS backends poll every 10 ms, so Linux serves
-MPRIS itself over zbus (`platform::media_controls`).
+Phase 5 took souvlaki 0.9.3 for the Windows media card: the same SMTC calls on `windows`
+0.62, so `windows` 0.44 left the tree. It stays Windows only: its MPRIS backends poll every
+10 ms, so Linux serves MPRIS itself over zbus (`platform::media_controls`). global-hotkey went
+to 0.10 in phase 5 for its X11 key fixes; 0.10 still pulls `windows-sys` 0.59.
 
 The plan as it was:
 
