@@ -1,0 +1,109 @@
+name: Linux rig (sound)
+
+# The Linux sound path, headless: the audio engine plays the bundled test track to a null sink
+# on a private PipeWire or PulseAudio server, the sink's monitor is recorded, and the recording
+# and the logs are checked: not silent, the track's length, no dropouts or underruns
+# (scripts/rig/sound/, thresholds in analyze.py). The player is the audio crate's `play_file`
+# example, which drives `AudioEngine` as the app does, through cpal and ALSA's default device,
+# without building the window. Each run uploads its report, a 10 s excerpt of the recording
+# and the servers' logs.
+#
+# The runs: PipeWire with pipewire-alsa (what Ubuntu's desktop has) on x86_64 and aarch64, and
+# PulseAudio with ALSA's pulse plugin (what WSL and older desktops have) on x86_64. Opus/WebM
+# on one x86_64 run, AAC/MP4 on the others.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: linux-rig-sound-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  sound:
+    name: sound (${{ matrix.server }}, ${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: ubuntu-24.04, arch: x86_64, server: pipewire, track: invisible-light.webm }
+          - { runner: ubuntu-24.04, arch: x86_64, server: pulseaudio, track: invisible-light.m4a }
+          - { runner: ubuntu-24.04-arm, arch: aarch64, server: pipewire, track: invisible-light.m4a }
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    env:
+      SERVER: ${{ matrix.server }}
+      TRACK: site/public/music/${{ matrix.track }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The audio crate's build needs ALSA's and OpenSSL's headers (cpal, native-tls), and clang
+      # for the bindings of its dev-dependencies (the example links them). Then the sound server:
+      # PipeWire with WirePlumber, its PulseAudio server and its ALSA plugin, or PulseAudio with
+      # ALSA's pulse plugin; parec and pactl from pulseaudio-utils either way; a session bus for
+      # WirePlumber.
+      - name: System packages
+        run: |
+          case "$SERVER" in
+            pipewire) server="pipewire pipewire-pulse pipewire-alsa wireplumber" ;;
+            pulseaudio) server="pulseaudio libasound2-plugins" ;;
+          esac
+          sudo apt-get update
+          # shellcheck disable=SC2086 # $server is a list of packages
+          sudo apt-get install -y --no-install-recommends \
+            pkg-config clang libasound2-dev libssl-dev alsa-utils pulseaudio-utils dbus \
+            $server
+
+      - name: Rust toolchain
+        shell: bash
+        run: |
+          rustup toolchain install
+          rustup show active-toolchain
+          cargo --version
+
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: linux-rig-sound
+
+      # The release profile, as the app ships: the engine, rodio, cpal and the AAC decoder at
+      # opt-level 3. Without fat LTO, which only makes the exe smaller and the link minutes long.
+      - name: Build the player
+        env:
+          CARGO_PROFILE_RELEASE_LTO: "false"
+          CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "16"
+        run: cargo build --release --locked -p featherplay-audio --example play_file
+
+      - name: Play and record
+        run: |
+          # The track's length, from the demo fixtures.
+          seconds=$(python3 -c 'import json; t = json.load(open("crates/controller/fixtures/demo/demo.json"))["tracks"]; print(next(x["duration_ms"] for x in t if x["slug"] == "invisible-light") / 1000)')
+          dbus-run-session -- bash scripts/rig/sound/run.sh "$SERVER" \
+            target/release/examples/play_file "$TRACK" "$RUNNER_TEMP/rig-sound" "$seconds"
+
+      - name: Summary
+        if: ${{ !cancelled() }}
+        run: |
+          report="$RUNNER_TEMP/rig-sound/report.txt"
+          if [ -f "$report" ]; then
+            { echo '```'; cat "$report"; echo '```'; } >>"$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload the report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rig-sound-${{ matrix.server }}-${{ matrix.arch }}
+          path: ${{ runner.temp }}/rig-sound
+          if-no-files-found: warn
+          retention-days: 14
