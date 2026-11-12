@@ -257,7 +257,8 @@ impl Chain {
     /// 2. The embedded client through yt-dlp, when step 1 failed on our side. Skipped when
     ///    the client said no to the video itself (not embeddable).
     /// 3. yt-dlp's default clients (7-9 s with their ad gate). Not for a video step 1
-    ///    refused for its age check: without cookies these ask for a sign-in too. A failure
+    ///    refused for its age check: without cookies these ask for a sign-in too; nor for
+    ///    one both of its clients said isn't available (`NativeError::NotAvailable`). A failure
     ///    there that a newer yt-dlp may fix runs `yt-dlp -U` (`Steps::update`), then step 3
     ///    again.
     ///
@@ -560,6 +561,18 @@ impl Chain {
             Err(e) => {
                 if let Some(m) = age_check(&e) {
                     let e = ResolveError::Unavailable(m.to_string());
+                    log::info!("{}", stage_failed(id, Stage::Native, &e));
+                    return Some(Answer::Done(One::Ends(e)));
+                }
+                if let NativeError::NotAvailable(m) = &e {
+                    // Both native clients refused the song. Since 2026-11-11 yt-dlp's default
+                    // clients have given the same answer every time, ~4 s later ("Video
+                    // unavailable. This video is not available"), so they aren't asked.
+                    // YouTube's answers have flipped before (on 2026-11-11 a few minutes of
+                    // such answers for many songs ended by themselves): should the default
+                    // clients play such songs again, answer `One::NotEmbeddable` here, and
+                    // step 3 decides as it did.
+                    let e = ResolveError::Unavailable(m.clone());
                     log::info!("{}", stage_failed(id, Stage::Native, &e));
                     return Some(Answer::Done(One::Ends(e)));
                 }

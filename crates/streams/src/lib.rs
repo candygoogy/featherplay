@@ -220,6 +220,20 @@ impl SidecarError {
     }
 }
 
+impl ResolveError {
+    /// Whether YouTube said "This video is not available" (visionOS, then yt-dlp's default
+    /// clients: "Video unavailable. This video is not available"): since 2026-11-11 its
+    /// answer for some songs to every client but its music web player. Not a song that's
+    /// gone ("Video unavailable" alone, "has been removed"), a format or an age check.
+    pub fn is_refusal(&self) -> bool {
+        let ResolveError::Unavailable(m) = self else {
+            return false;
+        };
+        m.to_ascii_lowercase()
+            .contains("this video is not available")
+    }
+}
+
 /// For the log: the exit code and stderr tail in full.
 impl fmt::Display for ResolveError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

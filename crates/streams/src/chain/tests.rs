@@ -259,6 +259,26 @@ async fn a_video_the_embedded_client_refuses_goes_to_the_default_clients() {
     assert_eq!(s.calls(), ["native", "default"]);
 }
 
+/// Both native clients refused the song: yt-dlp's clients would say the same ~4 s later,
+/// so the resolve ends there, ahead of a click too (rows on screen learn it this way).
+#[tokio::test]
+async fn a_song_both_native_clients_refuse_skips_yt_dlp() {
+    let refused = || NativeError::NotAvailable("UNPLAYABLE: This video is not available".into());
+    let chain = Chain::default();
+    let s = Script::default().native(Err(refused()));
+    let e = within(chain.resolve(&s, &id())).await.unwrap_err();
+    assert!(e.is_refusal(), "{e:?}");
+    assert_eq!(s.calls(), ["native"]);
+
+    let s = Script::default().native(Err(refused()));
+    let urgent = Notify::new();
+    let e = within(chain.resolve_ahead(&s, &id(), &urgent, Ahead::Maybe))
+        .await
+        .unwrap_err();
+    assert!(e.is_refusal(), "not deferred: {e:?}");
+    assert_eq!(s.calls(), ["native"]);
+}
+
 #[tokio::test]
 async fn an_age_check_ends_the_resolve() {
     let chain = Chain::default();

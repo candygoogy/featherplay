@@ -210,6 +210,43 @@ async fn song_refusals_and_resolves_aside_leave_visionos_on() {
     }
 }
 
+/// YouTube's refusal of a song since 2026-11-11: visionOS says it isn't available and the
+/// embed that it's unavailable, which ends the native step as `NotAvailable`. The embed
+/// alone saying so (a song visionOS didn't refuse, or with visionOS off) stays a `Skip`, for
+/// yt-dlp's default clients to decide.
+#[tokio::test]
+async fn both_clients_refusing_a_song_is_not_available() {
+    let refused =
+        r#"{"playabilityStatus":{"status":"UNPLAYABLE","reason":"This video is not available"}}"#;
+    let embed = r#"{"playabilityStatus":{"status":"UNPLAYABLE","reason":"Video unavailable"}}"#;
+    let route = |visionos: &'static str| {
+        test_server::serve(move |method, path, body| {
+            match (method, path.split('?').next().unwrap()) {
+                ("POST", "/youtubei/v1/player") if body.contains(r#""VISIONOS""#) => {
+                    (200, visionos.to_string())
+                }
+                ("POST", "/youtubei/v1/player") => (200, embed.to_string()),
+                _ => (404, String::new()),
+            }
+        })
+    };
+    let (base, log) = route(refused);
+    let (r, dir) = seeded_with_visionos("not-available", &base);
+    let e = r.resolve(VIDEO, Quality::High).await.unwrap_err();
+    assert_eq!(
+        e,
+        NativeError::NotAvailable("UNPLAYABLE: This video is not available".into())
+    );
+    assert_eq!(log.lock().unwrap().len(), 2, "visionOS, then the embed");
+    std::fs::remove_dir_all(&dir).unwrap();
+
+    let (base, _) = route(refused);
+    let (r, dir) = seeded("not-available-embed", &base);
+    let e = r.resolve(VIDEO, Quality::High).await.unwrap_err();
+    assert_eq!(e, NativeError::Skip("UNPLAYABLE: Video unavailable".into()));
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
 /// "This video is unavailable" for one song is the song's, but for different songs in a
 /// row it's how YouTube answers a client config it no longer takes: that turns it off.
 #[test]

@@ -114,6 +114,10 @@ pub(crate) enum NativeError {
     /// The format wanted came without a URL (a SABR-only answer). yt-dlp gets the whole
     /// resolve, as for `Failed`; the same song tends to get such answers again.
     NoUrl(String),
+    /// visionOS and the embedded client both said the song isn't available (`VISIONOS_REFUSAL`):
+    /// YouTube won't give it to any client but its own music web player now. visionOS's
+    /// words.
+    NotAvailable(String),
 }
 
 impl std::fmt::Display for NativeError {
@@ -121,6 +125,7 @@ impl std::fmt::Display for NativeError {
         match self {
             Self::Skip(m) => write!(f, "not with the embedded client: {m}"),
             Self::Failed(m) | Self::NoUrl(m) => write!(f, "native resolve failed: {m}"),
+            Self::NotAvailable(m) => write!(f, "not available to visionOS nor the embed: {m}"),
         }
     }
 }
@@ -295,7 +300,25 @@ fn song_not_client(e: &NativeError) -> bool {
         }
         NativeError::Failed(m) => m.starts_with("ERROR:"),
         NativeError::NoUrl(_) => false,
+        NativeError::NotAvailable(_) => true,
     }
+}
+
+/// How visionOS refuses a song itself, in its `UNPLAYABLE` reason: "This video is not
+/// available". Since 2026-11-11 YouTube answers so for some songs to every client but its
+/// music web player, which needs PO tokens (`NativeError::NotAvailable`).
+const VISIONOS_REFUSAL: &[&str] = &["this video is not available"];
+/// How the embedded client refuses the same songs: "Video unavailable". It says so of a
+/// video that can't be embedded too, so it counts only after visionOS's refusal.
+const EMBED_REFUSAL: &[&str] = &["not available", "unavailable"];
+
+/// Whether `e` is an `UNPLAYABLE` answer whose reason has one of `words` (lower case).
+fn unplayable(e: &NativeError, words: &[&str]) -> bool {
+    let NativeError::Skip(m) = e else {
+        return false;
+    };
+    let low = m.to_ascii_lowercase();
+    low.starts_with("unplayable") && words.iter().any(|w| low.contains(w))
 }
 
 impl Health {
@@ -459,7 +482,7 @@ impl NativeResolver {
         let (result, page) = inner.resolve(video, quality, counts).await;
         let mut h = inner.health.lock_or_recover();
         match &result {
-            Ok(_) | Err(NativeError::Skip(_)) => {
+            Ok(_) | Err(NativeError::Skip(_) | NativeError::NotAvailable(_)) => {
                 h.failures = 0;
                 h.failed_page = None;
             }
@@ -562,7 +585,8 @@ impl Inner {
     }
 
     /// A resolve from the kept page, and that page (`Ready::page`): the visionOS client's
-    /// answer, else the embedded client's. An embedded answer without a URL asks once more
+    /// answer, else the embedded client's; both refusing the song (`VISIONOS_REFUSAL`) is
+    /// `NotAvailable`. An embedded answer without a URL asks once more
     /// from a fresh page (~0.45 s): some visitors get none every time while new ones do
     /// (2026-11-09). Resolves at once that get none share the first one's fresh page.
     /// `counts`: a visionOS failure counts towards turning it off (`Health::visionos_answered`).
@@ -576,6 +600,8 @@ impl Inner {
             Ok(r) => r,
             Err(e) => return (Err(e), None),
         };
+        // What visionOS said, when it refused the song.
+        let mut refused: Option<String> = None;
         if self.health.lock_or_recover().visionos_on() {
             let answer = self.visionos(video, quality, &ready).await;
             self.health
@@ -583,8 +609,15 @@ impl Inner {
                 .visionos_answered(video, &answer, counts);
             match answer {
                 Ok(stream) => return (Ok(stream), Some(ready.page)),
-                Err(NativeError::Skip(m) | NativeError::Failed(m) | NativeError::NoUrl(m)) => {
-                    log::info!("resolve {video}: no visionOS stream ({m}), asking as the embed")
+                Err(e) => {
+                    let (NativeError::Skip(m)
+                    | NativeError::Failed(m)
+                    | NativeError::NoUrl(m)
+                    | NativeError::NotAvailable(m)) = &e;
+                    log::info!("resolve {video}: no visionOS stream ({m}), asking as the embed");
+                    if unplayable(&e, VISIONOS_REFUSAL) {
+                        refused = Some(m.clone());
+                    }
                 }
             }
         }
@@ -597,6 +630,10 @@ impl Inner {
                 ),
                 Err(e) => (Err(e), None),
             },
+            Err(e) if unplayable(&e, EMBED_REFUSAL) && refused.is_some() => {
+                let m = refused.unwrap_or_default();
+                (Err(NativeError::NotAvailable(m)), Some(ready.page))
+            }
             result => (result, Some(ready.page)),
         }
     }
