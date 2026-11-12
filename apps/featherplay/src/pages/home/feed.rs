@@ -362,23 +362,31 @@ pub(super) fn show_feed(ctx: &Ctx, feed: HomeFeed) {
 }
 
 /// A fresh feed of `owner`'s: the one to show now, if any (`show_feed`). While the cached
-/// feed of the same owner is on screen (`on_screen`: Home is the page) it stays: with the
-/// same shelves, only the next page's token is taken; otherwise the fresh feed waits for
-/// Home's next open (`pending`), as swapped now the rows the user is looking at would change
-/// under them.
+/// feed of the same owner is on screen (`on_screen`: Home is the page) it stays, and takes
+/// the fresh feed's next-page token, so scrolling goes on under it (the cache keeps none).
+/// With the same shelves the fresh feed is that one; otherwise it waits for Home's next open
+/// (`pending`), as swapped now the rows the user is looking at would change under them.
 fn hold(s: &mut State, feed: HomeFeed, owner: Option<Owner>, on_screen: bool) -> Option<HomeFeed> {
     if !(s.from_cache && on_screen && s.owner == owner) {
         s.owner = owner;
         return Some(feed);
     }
+    s.paging.start(feed.more.clone(), FIRST_PAGES);
     if s.shelves == feed.shelves {
-        s.paging.start(feed.more, FIRST_PAGES);
         s.from_cache = false;
     } else {
         log!("home: the fresh feed shows the next time Home opens");
         s.pending = Some(feed);
     }
     None
+}
+
+/// A later page's shelves but those whose title already shows: under a cached feed the
+/// pages are the fresh feed's, which can repeat a shelf of the cached first pages.
+fn unseen(shown: &[HomeShelf], page: Vec<HomeShelf>) -> Vec<HomeShelf> {
+    page.into_iter()
+        .filter(|p| !shown.iter().any(|s| s.title == p.title))
+        .collect()
 }
 
 /// Replaces the identity's cached feed, off the UI thread.
@@ -426,8 +434,9 @@ pub(super) fn more(ctx: &Rc<Ctx>, retry: bool) {
             }
             match result {
                 Ok(feed) => {
-                    add_shelves(ctx, &feed.shelves);
-                    STATE.with(|s| s.borrow_mut().shelves.extend(feed.shelves));
+                    let shelves = STATE.with(|s| unseen(&s.borrow().shelves, feed.shelves));
+                    add_shelves(ctx, &shelves);
+                    STATE.with(|s| s.borrow_mut().shelves.extend(shelves));
                 }
                 Err(e) => log!("home: the next page failed: {e}"),
             }
@@ -645,6 +654,22 @@ mod tests {
         let mut s = cached_on_screen(&own("a"));
         assert_eq!(hold(&mut s, fresh_feed(), Some(own("a")), true), None);
         assert_eq!(s.shelves[0].items, vec![song("cached")]);
+        // Scrolling goes on under the cached shelves, with the fresh feed's later pages
+        // (the cache keeps no token), but none that shows already.
+        assert_eq!(
+            s.paging.want().map(|(_, t)| t).as_deref(),
+            Some("next"),
+            "the cached feed pages on"
+        );
+        let page = vec![
+            shelf("Quick picks", vec![song("again")]),
+            shelf("Albums for you", vec![song("b")]),
+        ];
+        let added: Vec<String> = unseen(&s.shelves, page)
+            .into_iter()
+            .map(|s| s.title)
+            .collect();
+        assert_eq!(added, ["Albums for you"]);
         // The same shelves: nothing to swap, the next page may load.
         let mut s = cached_on_screen(&own("a"));
         let same = HomeFeed {

@@ -10,7 +10,8 @@
 //!
 //! Signed in, the first pages' shelves are kept on disk for the identity (`CachedFeed`), so
 //! the next start shows Home at once from them while the feed is fetched behind. A fresh feed
-//! that differs doesn't replace the cached one under the user: it waits for Home's next open.
+//! that differs doesn't replace the cached one under the user: it waits for Home's next open,
+//! and its later pages go on under the cached shelves as the user scrolls.
 //! Another identity's feed is never shown, nor any signed out; a day-old one isn't either.
 
 use std::cell::RefCell;
