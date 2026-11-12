@@ -240,7 +240,7 @@ msgstr ""
 
 #: ../../crates/platform/src/linux/tray.rs:182
 #: ../../crates/platform/src/linux/tray.rs:182 ui/mini_player.slint:273
-#: ../../crates/platform/src/linux/tray.rs:182 ui/mini_player.slint:273 ui/not_for_me.slint:70
+#: ../../crates/platform/src/linux/tray.rs:182 ui/mini_player.slint:273
 msgid "Not for me"
 msgstr ""
 
@@ -270,7 +270,8 @@ msgstr ""
 msgid "No channel"
 msgstr ""
 
-#: src/album_actions.rs:125 src/not_for_me.rs:57 src/song_menu.rs:117
+#: src/album_actions.rs:125 src/not_for_me.rs:81 src/not_for_me.rs:131
+#: src/album_actions.rs:125 src/not_for_me.rs:81 src/not_for_me.rs:131
 msgid "Sign in to rate songs"
 msgstr ""
 
@@ -444,11 +445,11 @@ msgstr ""
 msgid "Source: LyricFind"
 msgstr ""
 
-#: src/not_for_me.rs:65
+#: src/not_for_me.rs:153
 msgid "Marked as not for me"
 msgstr ""
 
-#: src/not_for_me.rs:65
+#: src/not_for_me.rs:153
 msgid "Undo"
 msgstr ""
 
@@ -1231,8 +1232,21 @@ msgstr ""
 msgid "Remove like"
 msgstr ""
 
+#: ui/mini_player.slint:273 ui/not_for_me.slint:58
+msgid "Remove dislike"
+msgstr ""
+
+#: ui/mini_player.slint:274 ui/not_for_me.slint:59
+msgid "Tells YouTube Music you no longer dislike the song"
+msgstr ""
+
 #: ui/mini_player.slint:274 ui/not_for_me.slint:59
 msgid "Skips the song and tells YouTube Music you dislike it"
+msgstr ""
+
+#. What it does rather than a shortcut (it has none), set off by a dot.
+#: ui/not_for_me.slint:72
+msgid "· Back to no rating"
 msgstr ""
 
 #. What it does rather than a shortcut (it has none), set off by a dot.
