@@ -109,17 +109,17 @@ msgstr "[featherplay couldn't listen on port {} for Amuse.]"
 msgid "Autoplay"
 msgstr "[Autoplay]"
 
-#: ../../crates/controller/src/updates.rs:795 src/updates.rs:199
-#: ../../crates/controller/src/updates.rs:795 src/updates.rs:199
+#: ../../crates/controller/src/updates.rs:830 src/updates.rs:199
+#: ../../crates/controller/src/updates.rs:830 src/updates.rs:199
 msgid "Restart to update"
 msgstr "[Restart to update]"
 
-#: ../../crates/controller/src/updates.rs:797 src/updates.rs:190
-#: ../../crates/controller/src/updates.rs:797 src/updates.rs:190
+#: ../../crates/controller/src/updates.rs:832 src/updates.rs:190
+#: ../../crates/controller/src/updates.rs:832 src/updates.rs:190
 msgid "Get it"
 msgstr "[Get it]"
 
-#: ../../crates/controller/src/updates.rs:811
+#: ../../crates/controller/src/updates.rs:846
 msgid "Details"
 msgstr "[Details]"
 
