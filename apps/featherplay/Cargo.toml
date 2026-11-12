@@ -24,6 +24,9 @@ dev-cookies-file = ["featherplay-controller/dev-cookies-file"]
 # The performance harness's scripted run of the window (`src/perf.rs`), started by
 # `FEATHERPLAY_PERF_SCRIPT`. Never on in a published build.
 perf-harness = ["featherplay-platform/perf"]
+# Updates from a test server on 127.0.0.1 with a test key (the controller's feature of the
+# same name), for the AppImage update test. Never on in a published build.
+update-test-server = ["featherplay-controller/update-test-server"]
 
 [dependencies]
 featherplay-audio = { path = "../../crates/audio" }

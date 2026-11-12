@@ -350,21 +350,21 @@ fn dir(cache: &Path) -> PathBuf {
 }
 
 /// Where downloads may come from: the project's release files (with GitHub's redirects), or
-/// in tests a server on 127.0.0.1.
+/// in tests (and the `update-test-server` feature's test server) a server on 127.0.0.1.
 pub struct Origin {
-    #[cfg(test)]
+    #[cfg(any(test, feature = "update-test-server"))]
     local: bool,
 }
 
 impl Origin {
     pub fn github() -> Origin {
         Origin {
-            #[cfg(test)]
+            #[cfg(any(test, feature = "update-test-server"))]
             local: false,
         }
     }
 
-    #[cfg(test)]
+    #[cfg(any(test, feature = "update-test-server"))]
     pub(crate) fn local() -> Origin {
         Origin { local: true }
     }
@@ -375,16 +375,16 @@ impl Origin {
         let builder = featherplay_proxy::client()
             .user_agent(concat!("featherplay/", env!("CARGO_PKG_VERSION")))
             .timeout(timeout);
-        #[cfg(test)]
+        #[cfg(any(test, feature = "update-test-server"))]
         let builder = builder.https_only(!self.local);
-        #[cfg(not(test))]
+        #[cfg(not(any(test, feature = "update-test-server")))]
         let builder = builder.https_only(true);
         builder.build().map_err(|e| format!("http client: {e}"))
     }
 
     /// A URL a download may start from.
     fn allows(&self, url: &str) -> bool {
-        #[cfg(test)]
+        #[cfg(any(test, feature = "update-test-server"))]
         if self.local {
             return url.starts_with("http://127.0.0.1:");
         }
@@ -400,7 +400,7 @@ impl Origin {
             .user_agent(concat!("featherplay/", env!("CARGO_PKG_VERSION")))
             .connect_timeout(CONNECT_TIMEOUT)
             .read_timeout(READ_TIMEOUT);
-        #[cfg(test)]
+        #[cfg(any(test, feature = "update-test-server"))]
         if self.local {
             return builder
                 .redirect(reqwest::redirect::Policy::none())

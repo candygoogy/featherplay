@@ -14,6 +14,11 @@ publish = false
 # `FEATHERPLAY_COOKIES_FILE` (a plaintext cookie header) is read by debug builds only.
 # This turns it on in a release build too (the app's feature of the same name).
 dev-cookies-file = []
+# The update check asks a server on 127.0.0.1 that `FEATHERPLAY_UPDATE_SERVER` names,
+# trusting the key `FEATHERPLAY_UPDATE_KEY` names (`updates::Remote::github`), for the
+# AppImage update test (`scripts/rig/appimage/`). The app's feature of the same name. Never
+# on in a published build.
+update-test-server = []
 
 [dependencies]
 # The controller's sound (`controller`).

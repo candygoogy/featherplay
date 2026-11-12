@@ -266,22 +266,57 @@ pub struct Remote {
     keys: Keys,
     installed: bool,
     /// Tests: the release files' URLs (`install::DOWNLOADS…`) are fetched from here instead.
-    #[cfg(test)]
+    #[cfg(any(test, feature = "update-test-server"))]
     files: Option<String>,
 }
 
 impl Remote {
     /// GitHub, with featherplay's own keys, for this copy (`installed`: it's the installed
-    /// copy).
+    /// copy). A build with the `update-test-server` feature asks the test server instead,
+    /// when one is named (`test_server`).
     pub fn github(installed: bool) -> Remote {
+        #[cfg(feature = "update-test-server")]
+        if let Some(remote) = Remote::test_server(installed) {
+            return remote;
+        }
         Remote {
             latest: LATEST.to_string(),
             origin: Origin::github(),
             keys: Keys::release(),
             installed,
-            #[cfg(test)]
+            #[cfg(any(test, feature = "update-test-server"))]
             files: None,
         }
+    }
+
+    /// The AppImage update test's server (`scripts/rig/appimage/`), in a build with the
+    /// `update-test-server` feature, which is never published. `FEATHERPLAY_UPDATE_SERVER`
+    /// (`http://127.0.0.1:<port>`) answers for GitHub: `{base}/latest`, and the release's
+    /// files at `{base}/<name>`. `FEATHERPLAY_UPDATE_KEY` names the minisign `.pub` file
+    /// whose key alone may sign its checksums. Both, or GitHub as usual; 127.0.0.1 only.
+    #[cfg(feature = "update-test-server")]
+    fn test_server(installed: bool) -> Option<Remote> {
+        let base = std::env::var("FEATHERPLAY_UPDATE_SERVER").ok()?;
+        let key = std::env::var_os("FEATHERPLAY_UPDATE_KEY")?;
+        let base = base.trim_end_matches('/');
+        let port = base.strip_prefix("http://127.0.0.1:");
+        if !port.is_some_and(|p| !p.is_empty() && p.bytes().all(|b| b.is_ascii_digit())) {
+            log!("update check: FEATHERPLAY_UPDATE_SERVER isn't http://127.0.0.1:<port>");
+            return None;
+        }
+        let keys = Keys::from_pub(&[&std::fs::read_to_string(key).unwrap_or_default()]);
+        if keys.is_empty() {
+            log!("update check: FEATHERPLAY_UPDATE_KEY isn't a minisign public key file");
+            return None;
+        }
+        log!("update check: asking the test server at {base}");
+        Some(Remote {
+            latest: format!("{base}/latest"),
+            origin: Origin::local(),
+            keys,
+            installed,
+            files: Some(base.to_string()),
+        })
     }
 
     #[cfg(test)]
@@ -297,7 +332,7 @@ impl Remote {
 
     /// The download plan for this remote: GitHub's URLs as they are, or the test server's.
     fn localise(&self, plan: install::Plan) -> install::Plan {
-        #[cfg(test)]
+        #[cfg(any(test, feature = "update-test-server"))]
         if let Some(base) = &self.files {
             let mut plan = plan;
             for asset in [&mut plan.setup, &mut plan.sums]
