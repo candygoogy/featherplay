@@ -190,6 +190,20 @@ fn show_credits(data: &AboutData) {
             licence: (*licence).into(),
         })
         .collect();
+    // Only the Linux build embeds Inter, for its body text (`fonts.rs`); the font holds its
+    // copyright and licence lines too.
+    #[cfg(target_os = "linux")]
+    let credits = {
+        let mut credits = credits;
+        credits.insert(
+            0,
+            Credit {
+                name: "Inter".into(),
+                licence: tr!("SIL Open Font License 1.1. The body face, embedded.").into(),
+            },
+        );
+        credits
+    };
     data.set_credits(ModelRc::new(VecModel::from(credits)));
 }
 

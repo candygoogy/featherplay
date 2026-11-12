@@ -44,7 +44,9 @@ Rust mirrors this in `src/`: one module per page in `src/pages/<page>.rs`, with
 `crates/controller/src/controller/account.rs` and `src/account_menu.rs` for the account.
 `src/pages/mod.rs` only dispatches and doesn't need editing.
 
-Fonts and art: `fonts/manrope/` (Manrope, SIL OFL 1.1; `OFL.txt` goes into About) and
+Fonts and art: `fonts/manrope/` (Manrope, SIL OFL 1.1; `OFL.txt` goes into About),
+`fonts/inter/` (Inter, the body face on Linux only, registered by `src/fonts.rs`; its
+`README.md` says how the subset is made) and
 `logo/` (Tri-vane: `tri-vane*.svg` for the window, taskbar, exe and in-app logo, with
 16 and 24 px drawings; `tri-vane-light*.svg`, the play on a deep-crimson ring, for light
 grounds: `logo.slint`'s ring in the light theme, and the window and taskbar icon under a light

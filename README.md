@@ -591,7 +591,8 @@ tests, the installer and the rest of a developer's setup.
 - [LRCLIB](https://lrclib.net) for synced lyrics, [SponsorBlock](https://sponsor.ajay.app)
   for the segments it skips, and [Last.fm](https://www.last.fm) and
   [ListenBrainz](https://listenbrainz.org) for scrobbling.
-- [Manrope](https://github.com/googlefonts/manrope) is the typeface.
+- [Manrope](https://github.com/googlefonts/manrope) is the typeface, with
+  [Inter](https://github.com/rsms/inter) for the body text on Linux.
 - [Pear Desktop](https://github.com/pear-devs/pear-desktop), whose plugins set the list of
   what featherplay had to do.
 

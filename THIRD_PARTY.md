@@ -47,13 +47,16 @@ to prepare each new YouTube player once and to answer each song's challenges. `y
 QuickJS-NG is C, compiled into `featherplay.exe` by the `rquickjs-sys` crate (listed below
 with `rquickjs` and `rquickjs-core`, MIT), whose package carries its `quickjs/LICENSE`.
 
-## Embedded font
+## Embedded fonts
 
 | Font | Licence | Source |
 |---|---|---|
 | Manrope | SIL Open Font License 1.1 | https://github.com/googlefonts/manrope |
+| Inter 4.1, a Latin subset (Linux build only) | SIL Open Font License 1.1 | https://github.com/rsms/inter |
 
-The full licence is in `apps/featherplay/ui/fonts/manrope/OFL.txt` and on the About page.
+Manrope's full licence is in `apps/featherplay/ui/fonts/manrope/OFL.txt` and on the About page;
+Inter's is in `apps/featherplay/ui/fonts/inter/OFL.txt` and in the font's own name table, and the
+Linux build's About page lists it.
 
 ## Slint
 

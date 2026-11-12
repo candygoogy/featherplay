@@ -198,6 +198,8 @@ export global Theme {
     out property <color> on-solid: dark ? #0F0F0F : #FFFFFF;
 
     // Type: Manrope (embedded) for page and shelf titles, Segoe UI Variable for the rest.
+    // Linux hasn't got Segoe UI Variable, so the rest goes to sans-serif there, which
+    // `src/fonts.rs` makes the Inter the Linux build embeds.
     out property <string> display-font: "Manrope";
     out property <string> body-font: "Segoe UI Variable Text";
     out property <length> t-display-xxl: 56px;  // the artist banner

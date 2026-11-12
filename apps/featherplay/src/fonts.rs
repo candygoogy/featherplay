@@ -22,18 +22,95 @@
 //!
 //! On Linux fontique asks fontconfig instead of DirectWrite, and the same two gaps are
 //! there; `featherplay_platform::fonts` finds the families for them through fontconfig.
+//!
+//! The body text's family (`Theme.body-font`) is Segoe UI Variable, which Linux hasn't got,
+//! so there the stack's next family, the generic sans-serif, draws it: whatever fontconfig
+//! picks (DejaVu Sans, often). On Linux [`add`] also registers Inter (`ui/fonts/inter/`, a
+//! Latin subset) and puts it first in the generic sans-serif and system-ui families, so the
+//! body text is Inter there. Characters Inter lacks go on to the families fontconfig picked,
+//! then to the fallbacks. Windows keeps Segoe UI Variable and the build has no Inter.
 
 use i_slint_core::context::with_global_context;
 use i_slint_core::platform::PlatformError;
 use i_slint_core::textlayout::sharedparley::fontique::{self, FallbackKey, Script};
 
 /// Adds the fallback families to the font collection of this thread's Slint platform, which must
-/// be set. Call it once, on the UI thread, before the first text is laid out.
+/// be set, and on Linux Inter for the body text (`body`). Call it once, on the UI thread,
+/// before the first text is laid out.
 pub fn add() -> Result<(), PlatformError> {
     with_global_context(
         || Err(PlatformError::NoPlatform),
-        |ctx| append(&mut ctx.font_context().borrow_mut().collection),
+        |ctx| {
+            let mut fonts = ctx.font_context().borrow_mut();
+            #[cfg(target_os = "linux")]
+            {
+                body(&mut fonts.collection);
+                log!(
+                    "fonts: body text in {}",
+                    resolve(&mut fonts.collection, BODY_FAMILY).unwrap_or_default()
+                );
+            }
+            append(&mut fonts.collection);
+        },
     )
+}
+
+/// `Theme.body-font`, which Linux hasn't got.
+#[cfg(target_os = "linux")]
+pub const BODY_FAMILY: &str = "Segoe UI Variable Text";
+
+/// Inter 4.1, variable in weight, Latin only (`ui/fonts/inter/README.md` makes it).
+#[cfg(target_os = "linux")]
+const INTER: &[u8] = include_bytes!("../ui/fonts/inter/Inter-Latin.ttf");
+
+/// Registers Inter in `collection` and puts it first in the generic sans-serif, system-ui and
+/// ui-sans-serif families, before the ones fontconfig gave them.
+#[cfg(target_os = "linux")]
+pub fn body(collection: &mut fontique::Collection) {
+    use fontique::GenericFamily;
+    use std::sync::Arc;
+
+    let fonts = collection.register_fonts(fontique::Blob::new(Arc::new(INTER)), None);
+    let inter: Vec<_> = fonts.iter().map(|(id, _)| *id).collect();
+    for generic in [
+        GenericFamily::SansSerif,
+        GenericFamily::SystemUi,
+        GenericFamily::UiSansSerif,
+    ] {
+        let mut families = inter.clone();
+        families.extend(
+            collection
+                .generic_families(generic)
+                .filter(|id| !inter.contains(id)),
+        );
+        collection.set_generic_families(generic, families.into_iter());
+    }
+}
+
+/// The family text with `font-family: family` is drawn in: that family if `collection` has
+/// it, else the first of the generic sans-serif, then system-ui, families (Slint's stack).
+#[cfg(target_os = "linux")]
+pub fn resolve(collection: &mut fontique::Collection, family: &str) -> Option<String> {
+    use fontique::GenericFamily;
+
+    let id = collection.family_id(family).or_else(|| {
+        [GenericFamily::SansSerif, GenericFamily::SystemUi]
+            .into_iter()
+            .find_map(|g| collection.generic_families(g).next())
+    })?;
+    collection.family_name(id).map(str::to_owned)
+}
+
+/// The family text with `font-family: family` is drawn in, in the font collection of this
+/// thread's Slint platform ([`resolve`]).
+#[cfg(target_os = "linux")]
+pub fn resolved(family: &str) -> Option<String> {
+    with_global_context(
+        || Err(PlatformError::NoPlatform),
+        |ctx| resolve(&mut ctx.font_context().borrow_mut().collection, family),
+    )
+    .ok()
+    .flatten()
 }
 
 /// Appends the fallback families (`featherplay_platform::fonts::fallback_families`) to
