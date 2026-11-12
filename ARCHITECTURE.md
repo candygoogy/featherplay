@@ -238,16 +238,19 @@ software surface) and `vendor/opus-decoder` (rustfft in place of a naive DFT).
 
 ### Files
 
-`crates/store/src/paths.rs` decides the two folders. With `FEATHERPLAY_HOME` set, they are
+`crates/store/src/paths.rs` decides the folders. With `FEATHERPLAY_HOME` set, they are
 `{home}/config` and `{home}/cache`. Otherwise they are `%APPDATA%\featherplay` (config) and
-`%LOCALAPPDATA%\featherplay` (cache). Nothing is created until something is saved.
+`%LOCALAPPDATA%\featherplay` (cache) on Windows, and on Linux the XDG folders
+`$XDG_CONFIG_HOME/featherplay` and `$XDG_CACHE_HOME/featherplay` (`~/.config`, `~/.cache`).
+`{state}` below, the logs' folder, is `$XDG_STATE_HOME/featherplay` (`~/.local/state`) on
+Linux and the cache folder everywhere else. Nothing is created until something is saved.
 
 | Where | What | Written by |
 |---|---|---|
 | `{config}/settings.toml` | Settings | `crates/store/src/settings.rs` |
 | `{config}/session.json` | The queue and position, restored paused | `crates/store/src/session.rs` |
 | `{config}/scrobble-queue.json`, `{config}/listenbrainz-queue.json` | Scrobbles waiting to be sent | `crates/controller/src/scrobbler.rs` |
-| `{cache}/logs/` | `featherplay.log` and `featherplay.1.log` (about 1 MB each), crash files | `crates/controller/src/diagnostics/logfile.rs`, `crates/controller/src/diagnostics/crash.rs` |
+| `{state}/logs/` | `featherplay.log` and `featherplay.1.log` (about 1 MB each), crash files | `crates/controller/src/diagnostics/logfile.rs`, `crates/controller/src/diagnostics/crash.rs` |
 | `{cache}/covers/` | Cover art, an LRU disk cache | `apps/featherplay/src/covers.rs` |
 | `{cache}/library/` | Library lists and the Home feed, per identity | `crates/store/src/library_cache.rs` |
 | `{cache}/streams.json` | Resolved streams kept for the next start | `crates/controller/src/controller/streams.rs` |

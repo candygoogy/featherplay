@@ -4,7 +4,7 @@
 //!
 //! Every line (`log!`, and the crates' `log` macros through `Facade`) is redacted, then
 //! handed to the `featherplay-log` thread, which appends it to `featherplay.log` in
-//! `{cache}/logs`. The thread sleeps on its channel, so an idle app never wakes for the log.
+//! `log_dir`. The thread sleeps on its channel, so an idle app never wakes for the log.
 //! Debug builds print every line to stderr too, as does a process that never called `init`
 //! (the tests, `--snapshot`).
 
@@ -60,9 +60,10 @@ pub fn uptime() -> Duration {
     START.get_or_init(Instant::now).elapsed()
 }
 
-/// `{cache}/logs`: the log, the one before it and the crash files.
+/// `{state}/logs` (the cache folder but on Linux): the log, the one before it and the crash
+/// files.
 pub fn log_dir(paths: &Paths) -> PathBuf {
-    paths.cache.join("logs")
+    paths.state.join("logs")
 }
 
 /// At startup: the log file, the panic hook, and a first line saying which featherplay and

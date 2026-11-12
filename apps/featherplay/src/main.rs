@@ -21,7 +21,7 @@
 //! feature) and `FEATHERPLAY_SIDECARS_DIR` (instead of `{cache}/sidecars`).
 //!
 //! A release build is a GUI program, so starting it from the Start menu opens no console
-//! window; its log goes to `{cache}/logs/featherplay.log` (`diagnostics`), and a panic
+//! window; its log goes to `featherplay.log` in the log folder (`diagnostics::log_dir`), and a panic
 //! leaves a crash file beside it. Debug builds stay console programs, for `cargo run`, and
 //! print the log to stderr too.
 

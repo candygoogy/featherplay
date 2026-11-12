@@ -53,11 +53,20 @@ impl Controller {
     pub(super) async fn start_here(opts: Options, ui: UiLink) -> Result<Controller, String> {
         let paths = Paths::resolve();
         let settings = Settings::load(&paths);
-        log!(
-            "config {}, cache {}",
-            paths.config.display(),
-            paths.cache.display()
-        );
+        if paths.state == paths.cache {
+            log!(
+                "config {}, cache {}",
+                paths.config.display(),
+                paths.cache.display()
+            );
+        } else {
+            log!(
+                "config {}, cache {}, logs {}",
+                paths.config.display(),
+                paths.cache.display(),
+                paths.state.display()
+            );
+        }
         // The proxy the HTTP clients and yt-dlp go through, and where it came from. A proxy
         // script or auto-detection is asked from here on, in the background, and logs its
         // answer itself (`featherplay_proxy`).

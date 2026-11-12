@@ -9,7 +9,7 @@
 //! `crates/platform/src/windows/window.rs`, through `frame_log`), page loads applied (`app`),
 //! covers decoded (`covers`), suggestions shown (`suggest`), the background work still
 //! pending (`busy`) and the player's state (`app::on_event`). Each step writes one JSON line
-//! to `FEATHERPLAY_PERF_OUT` (or `{cache}/logs/perf.jsonl`). Nothing moves the real pointer
+//! to `FEATHERPLAY_PERF_OUT` (or `perf.jsonl` in the log folder). Nothing moves the real pointer
 //! or takes the keyboard.
 //!
 //! `FEATHERPLAY_PERF_FIXTURES=1` shows the recorded fixtures (`fixtures`) instead of the

@@ -100,9 +100,8 @@ pub fn start(ctx: &Rc<Ctx>, handle: Handle) {
     let out_path = std::env::var_os("FEATHERPLAY_PERF_OUT")
         .map(PathBuf::from)
         .unwrap_or_else(|| {
-            featherplay_store::Paths::resolve()
-                .cache
-                .join("logs/perf.jsonl")
+            featherplay_controller::diagnostics::log_dir(&featherplay_store::Paths::resolve())
+                .join("perf.jsonl")
         });
     let file = std::fs::OpenOptions::new()
         .create(true)

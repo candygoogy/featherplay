@@ -656,6 +656,7 @@ fn paths_honour_featherplay_home() {
 
     assert_eq!(p.config, home.join("config"));
     assert_eq!(p.cache, home.join("cache"));
+    assert_eq!(p.state, home.join("cache"));
     assert_eq!(p, Paths::from_home(&home));
     // Resolving paths does not create anything.
     assert!(!home.exists());
