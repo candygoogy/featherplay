@@ -13,20 +13,25 @@ threshold here:
   repeated. The time from the engine's `Started` to its `Ended` is the track's length within
   PLAYED_TOLERANCE_S, which is wider: with PulseAudio's null sink the output stalls for
   ~0.9 s right after it starts (0.84-0.89 s in WSL), sometimes after `Started`, and no sound
-  is lost to it. With `--seconds` (play that long, then pause) the span is checked against
-  the position the engine reached, and that position against the seconds asked for.
+  is lost to it. That is the null sink's clock, not the engine: with only the recorder on its
+  monitor it renders ahead in blocks of up to 2 s, and a new stream waits for the block to
+  end, so the stall is ~1.9 s less the time the recorder started before the player (0.2 s
+  before: 1.7 s; 1.6 s before: 0.3 s). Either way the engine has filled the ALSA buffer
+  within 4 ms of the play. With `--seconds` (play that long, then pause) the span is
+  checked against the position the engine reached, and that position against the seconds
+  asked for.
 - dropouts: no run of near-zero samples (every sample within DROPOUT_LEVEL of zero) of
   DROPOUT_MIN_MS or more inside the sounding span. That is what an underrun puts on the sink:
   the server fills a period the client didn't deliver with silence. The music itself never
   goes digitally silent for that long between its first and last notes.
 - engine: the engine's own glitch report (crates/audio/src/glitches.rs) says its ring never
-  ran dry, and it sent no `Buffering(true)`. Its other counter, "late output callback(s)" with
-  the longest gap between two callbacks, is reported but not checked. On ALSA a callback
-  fills one period of a two-period buffer and the engine calls it late once the gap passes
-  one period, so scheduling jitter counts. And the longest gap includes the stream's start:
-  through the pulse plugin it was 864 ms in a run whose recording had no gap at all (the
-  server was still prebuffering). The dropout check above is what hears a gap. The engine's
-  first-sound line must be in the log, so a logger that prints nothing can't pass.
+  ran dry, it sent no `Buffering(true)`, and at most MAX_LATE_CALLBACKS output callbacks came
+  late. On ALSA a callback is late once the gap since the one before nears the whole device
+  buffer (within a quarter period), measured from the first callback the device paced, so the
+  start above doesn't count. A good run has none (PipeWire and PulseAudio in WSL: 0 in a
+  whole track; traced, the longest gaps were 43 and 40 ms against buffers of 85 ms); the
+  player frozen for 200 ms gave one, and a dropout. The engine's first-sound line must be in
+  the log, so a logger that prints nothing can't pass.
 - PipeWire: the xrun counts (pw-top's ERR column) of the nodes in the graph while the track
   played are at most MAX_PW_XRUNS in total. PulseAudio's stream underrun lines are counted
   but not checked (it logs them at a stream's start and drain too).
@@ -51,6 +56,7 @@ PLAYED_TOLERANCE_S = 2.0
 DROPOUT_LEVEL = 2  # in s16 steps (of 32768)
 DROPOUT_MIN_MS = 10
 MAX_PW_XRUNS = 0
+MAX_LATE_CALLBACKS = 0
 EXCERPT_S = 10
 
 
@@ -191,6 +197,7 @@ def main():
             "dropout_level": DROPOUT_LEVEL,
             "dropout_min_ms": DROPOUT_MIN_MS,
             "max_pw_xruns": MAX_PW_XRUNS,
+            "max_late_callbacks": MAX_LATE_CALLBACKS,
         },
     }
 
@@ -268,9 +275,11 @@ def main():
         )
     check("logger", p["first_sound_logged"], "the engine's first-sound line is in the player's log")
     check("ring", p["ring_ran_dry"] == 0, f"ring ran dry {p['ring_ran_dry']} time(s)")
-    report["late_callbacks_info"] = (
-        f"{p['late_callbacks']} callback(s) past one period, longest gap "
-        f"{p['longest_callback_gap_ms']} ms, in {p['glitch_reports']} report(s); not checked"
+    check(
+        "late",
+        p["late_callbacks"] <= MAX_LATE_CALLBACKS,
+        f"{p['late_callbacks']} late output callback(s) (max {MAX_LATE_CALLBACKS}), longest gap "
+        f"{p['longest_callback_gap_ms']} ms, in {p['glitch_reports']} report(s)",
     )
     buffering = p["facts"].get("buffering")
     check("buffering", buffering == "0", f"Buffering(true) events: {buffering}")
@@ -295,7 +304,6 @@ def main():
             lines.append(f"  {k}: {report[k]}")
     for c in checks:
         lines.append(f"  [{'ok' if c['ok'] else 'FAIL'}] {c['check']}: {c['detail']}")
-    lines.append(f"  (info) engine: {report['late_callbacks_info']}")
     if "pulseaudio_underrun_lines" in report:
         lines.append(f"  (info) PulseAudio log lines mentioning underruns: {report['pulseaudio_underrun_lines']}")
     text = "\n".join(lines) + "\n"
