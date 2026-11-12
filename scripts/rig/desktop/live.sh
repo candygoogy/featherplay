@@ -45,6 +45,7 @@ run() {
     echo "::error::live: $name failed ($name.log)"
     echo "FAIL: live: $name" >>"$OUT/summary.txt"
     failed=1
+    return 1
   fi
 }
 
@@ -83,7 +84,21 @@ if [ -z "$browser" ]; then
   echo "skipped: live: browser sign-in (no browser on $(uname -m))" >>"$OUT/summary.txt"
 else
   run browser-pipe "${platform[@]}" -E 'test(live_browser)'
-  run browser-app-client -p featherplay --lib --run-ignored only -E 'test(live_browsers)'
+  if ! run browser-app-client -p featherplay --lib --run-ignored only -E 'test(live_browsers)'; then
+    # The test stops at the first browser that fails, and starts each with no output: that
+    # one again, its log kept, given longer (pipe_probe.py), and the policies it may read.
+    exe=$(grep -o 'starting /[^ ]*' "$out/browser-app-client.log" | tail -n 1 | cut -d' ' -f2)
+    if [ -n "$exe" ]; then
+      say "probe: $exe ($("$exe" --version 2>/dev/null))"
+      probe="$out/probe-$(basename "$exe")"
+      mkdir -p "$probe"
+      python3 "$here/pipe_probe.py" "$exe" "$probe" 60
+      grep -v '^$' "$probe/stderr.log" | tail -n 25
+      for d in /etc/opt/edge/policies /etc/opt/chrome/policies /etc/chromium/policies; do
+        find "$d" -type f 2>/dev/null | while read -r f; do echo "policy $f:"; cat "$f"; done
+      done
+    fi
+  fi
   left=$(find "$FEATHERPLAY_HOME" -maxdepth 3 -iname '*signin*' 2>/dev/null)
   if [ -z "$left" ]; then
     pass "live: no sign-in profile left in the test home"
