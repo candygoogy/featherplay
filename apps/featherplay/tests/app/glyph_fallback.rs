@@ -39,7 +39,9 @@ fn titles_in_other_scripts_draw_no_notdef_boxes() {
     }
 
     let before = NOTDEF_GLYPHS.load(Ordering::Relaxed);
-    scene.ui.window().take_snapshot().expect("render");
+    let shot = scene.ui.window().take_snapshot().expect("render");
     let boxes = NOTDEF_GLYPHS.load(Ordering::Relaxed) - before;
+    // To look at: which fallback font drew each script (CI's Linux job keeps it).
+    crate::support::pixels::save("scripts", &shot);
     assert_eq!(boxes, 0, "{boxes} glyphs drew as .notdef boxes");
 }

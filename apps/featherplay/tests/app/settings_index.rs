@@ -9,6 +9,8 @@ use featherplay::snapshot::Scene;
 use slint::platform::{PointerEventButton, WindowEvent};
 use slint::{ComponentHandle, LogicalPosition, Rgba8Pixel, SharedPixelBuffer};
 
+use crate::support::pixels;
+
 /// At 1920 wide the page is 1680 px past the 240 px sidebar; the index (184), its gap (40)
 /// and the column (920) start at the page's 40 px padding.
 const PAGE_LEFT: usize = 240;
@@ -86,6 +88,15 @@ fn settings_widen_and_index_their_sections_at_wide_windows() {
 
     // Wide: eight entries, the first one (Playback) marked.
     let s = shot(&scene);
+    pixels::save("wide", &s);
+    // The rows and the ink measured below are the body font's (`pixels`): the two layouts
+    // only saved.
+    if !pixels::checked() {
+        resize(&scene, 1280, 800);
+        scene.settle();
+        pixels::save("narrow", &shot(&scene));
+        return;
+    }
     let entries = runs(&busy_rows(&s, 64, 700));
     assert_eq!(entries.len(), 8, "index entries: {entries:?}");
     let (first, last) = (entries[0], entries[7]);

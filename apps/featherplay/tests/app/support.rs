@@ -56,6 +56,36 @@ fn own_home() -> PathBuf {
     Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("home-{}", std::process::id()))
 }
 
+/// Pixel checks whose numbers come from text drawn in the body font: Segoe UI Variable on
+/// Windows, another font on Linux, where a row's height or a label's ink lands a few pixels
+/// elsewhere.
+/// With `FEATHERPLAY_PIXELS=unchecked` (CI's Linux job) a test that measures text still
+/// renders every state and saves it (`save`), and skips those checks. Windows always checks.
+pub mod pixels {
+    use slint::{Rgba8Pixel, SharedPixelBuffer};
+
+    pub fn checked() -> bool {
+        cfg!(windows) || std::env::var_os("FEATHERPLAY_PIXELS").is_none_or(|v| v != "unchecked")
+    }
+
+    /// With `FEATHERPLAY_TEST_SHOTS=<dir>`, writes `shot` there as `<test>-<name>.png`, the
+    /// test named after its module.
+    pub fn save(name: &str, shot: &SharedPixelBuffer<Rgba8Pixel>) {
+        let Some(dir) = std::env::var_os("FEATHERPLAY_TEST_SHOTS") else {
+            return;
+        };
+        let test = std::thread::current()
+            .name()
+            .and_then(|n| n.split("::").next())
+            .unwrap_or("test")
+            .to_owned();
+        let img = image::RgbaImage::from_raw(shot.width(), shot.height(), shot.as_bytes().to_vec())
+            .expect("a whole image");
+        let path = std::path::Path::new(&dir).join(format!("{test}-{name}.png"));
+        img.save(&path).expect("test shot");
+    }
+}
+
 /// This thread's CPU time, from Windows' per-thread cycle counter.
 pub mod cpu {
     use std::sync::OnceLock;
