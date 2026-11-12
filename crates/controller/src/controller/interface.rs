@@ -168,6 +168,9 @@ pub enum UiEvent {
     /// What Skip silence drops from the current track, for the seek bar (`silences.rs`);
     /// empty while it's off, and from a track change until the new track is scanned.
     Silences(Vec<Mark>),
+    /// The songs YouTube refuses to play now, all of them, each time one comes or goes:
+    /// their rows show greyed (`streams.rs`).
+    Refused(Vec<TrackId>),
 }
 
 /// The controller's side of the UI thread.

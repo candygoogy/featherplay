@@ -51,6 +51,7 @@ pub mod playlist_menu;
 pub mod popup;
 pub mod prepare;
 pub mod queue_panel;
+pub mod refused;
 pub mod repaint;
 pub mod router;
 pub mod shell;

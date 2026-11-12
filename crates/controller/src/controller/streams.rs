@@ -473,6 +473,7 @@ impl Controller {
         if self.streams.refuse(id, SystemTime::now(), why) {
             log!("refused {}: passed over and greyed from now on", id.0);
             self.input(Input::SetRefused(id.clone(), true));
+            self.show_refused();
         }
     }
 
@@ -484,6 +485,7 @@ impl Controller {
                 id.0
             );
             self.input(Input::SetRefused(id.clone(), false));
+            self.show_refused();
         }
     }
 
@@ -499,6 +501,11 @@ impl Controller {
                 .map(|id| Input::SetRefused(id, true))
                 .collect(),
         );
+        self.show_refused();
+    }
+
+    fn show_refused(&self) {
+        (self.ui.events)(super::UiEvent::Refused(self.streams.refused()));
     }
 
     /// `id`'s resolve started to wait for the helpers' download: a first run, a song the

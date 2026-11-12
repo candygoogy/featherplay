@@ -2,7 +2,7 @@
 // Generic building blocks stay in parts.slint; these are the page-level ones.
 // The skeletons are in `content/skeletons.slint` and the card grid in `content/grid.slint`.
 import { Theme, Curves, Icons } from "../theme.slint";
-import { TrackRow, CardItem, ItemKind, Icon, Display, Body, Cover, CoverPlay, IconButton, Pill, HoverIntent, Bands } from "../parts.slint";
+import { TrackRow, CardItem, ItemKind, Icon, Display, Body, Cover, CoverPlay, IconButton, Pill, HoverIntent, Bands, Refused } from "../parts.slint";
 import { Nav, PageKind } from "../nav.slint";
 
 export { CardLine, Grid, CardGrid } from "content/grid.slint";
@@ -266,6 +266,10 @@ export component SongListRow inherits Rectangle {
     property <length> album-col: root.show-album && root.width >= 640px ? floor((root.width - root.text-x - root.right-w) * 0.38 / 1px) * 1px : 0px;
     property <length> album-x: root.width - root.right-w - root.album-col;
     property <length> album-w: root.album-col > 0 ? root.album-col + root.duration-w : 0px;
+    // YouTube refuses the song now (`Refused`): greyed as in `SongRow`, the second line
+    // saying why while hovered. A double-click still tries it.
+    property <bool> refused: Refused.changes >= 0 && Refused.has(root.track.id);
+    property <float> alpha: root.refused ? 0.45 : 1.0;
     height: Theme.row-h;
     border-radius: Theme.r-m;
     HoverIntent {
@@ -280,6 +284,7 @@ export component SongListRow inherits Rectangle {
     background: root.ground;
     accessible-role: list-item;
     accessible-label: root.track.title + ", " + root.track.artist;
+    accessible-description: root.refused ? @tr("YouTube won't play this song in featherplay right now") : "";
     // Under the touch area, so the play button inside it draws over the art.
     Cover {
         x: 8px;
@@ -338,12 +343,13 @@ export component SongListRow inherits Rectangle {
         Body {
             text: root.track.title;
             font-weight: 600;
-            color: Theme.text1;
+            color: Theme.text1.transparentize(1 - root.alpha);
         }
         Body {
-            text: root.track.artist;
+            property <bool> why: root.refused && root.hovered;
+            text: self.why ? @tr("YouTube won't play this song in featherplay right now") : root.track.artist;
             font-size: Theme.t-meta;
-            color: Theme.text2;
+            color: self.why ? Theme.text2 : Theme.text2.transparentize(1 - root.alpha);
         }
     }
     if root.album-w > 0: Rectangle {
@@ -355,7 +361,7 @@ export component SongListRow inherits Rectangle {
             width: parent.width;
             height: parent.height;
             text: root.track.album;
-            color: album-ta.has-hover ? Theme.text1 : Theme.text2;
+            color: (album-ta.has-hover ? Theme.text1 : Theme.text2).transparentize(1 - root.alpha);
             vertical-alignment: center;
         }
         // Only the text itself is a link.
@@ -373,7 +379,7 @@ export component SongListRow inherits Rectangle {
         width: 44px;
         height: parent.height;
         text: root.track.duration;
-        color: Theme.text2;
+        color: Theme.text2.transparentize(1 - root.alpha);
         horizontal-alignment: right;
         vertical-alignment: center;
     }

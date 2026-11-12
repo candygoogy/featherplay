@@ -1,7 +1,7 @@
 // Rows: the song row with a cover, the numbered track row, and the rows of a choice list.
 import { Theme, Icons, Curves } from "../theme.slint";
 import { Player } from "../player.slint";
-import { TrackRow, HoverIntent } from "items.slint";
+import { TrackRow, HoverIntent, Refused } from "items.slint";
 import { Icon, Body, TextLink } from "text.slint";
 import { Cover, CoverPlay, PlayingMark } from "covers.slint";
 import { IconButton } from "buttons.slint";
@@ -22,6 +22,10 @@ export component SongRow inherits Rectangle {
     // Window coordinates for the menu: where it opens down from, and where it ends upward.
     callback menu-requested(length, length, length);
     property <bool> menu-shown: root.menu && ta.has-hover;
+    // YouTube refuses the song now (`Refused`): greyed as `ChoiceRow.dimmed` is, and the
+    // second line says why while hovered. A click still tries it.
+    property <bool> refused: Refused.changes >= 0 && Refused.has(root.track.id);
+    property <float> alpha: root.refused ? 0.45 : 1.0;
     height: Theme.row-h;
     border-radius: Theme.r-m;
     HoverIntent {
@@ -34,6 +38,7 @@ export component SongRow inherits Rectangle {
     background: root.selected ? Theme.selected : (root.track.playing ? Theme.playing-row : transparent);
     accessible-role: list-item;
     accessible-label: root.track.title + ", " + root.track.artist;
+    accessible-description: root.refused ? @tr("YouTube won't play this song in featherplay right now") : "";
     Rectangle {
         border-radius: parent.border-radius;
         background: root.selected ? transparent : Theme.state(ta.pressed, ta.has-hover);
@@ -97,12 +102,13 @@ export component SongRow inherits Rectangle {
         Body {
             text: root.track.title;
             font-weight: 600;
-            color: Theme.text1;
+            color: Theme.text1.transparentize(1 - root.alpha);
         }
         Body {
-            text: root.track.artist;
+            property <bool> why: root.refused && ta.has-hover;
+            text: self.why ? @tr("YouTube won't play this song in featherplay right now") : root.track.artist;
             font-size: Theme.t-meta;
-            color: Theme.text2;
+            color: self.why ? Theme.text2 : Theme.text2.transparentize(1 - root.alpha);
         }
     }
     // Under the menu button: they fade out as it fades in.
@@ -111,7 +117,7 @@ export component SongRow inherits Rectangle {
         height: parent.height;
         text: root.track.duration;
         font-size: Theme.t-meta;
-        color: Theme.text3;
+        color: Theme.text3.transparentize(1 - root.alpha);
         vertical-alignment: center;
         opacity: root.menu-shown ? 0 : 1;
         animate opacity { duration: Theme.t-hover; easing: Curves.ease-hover; }
@@ -138,6 +144,12 @@ export component TrackListRow inherits Rectangle {
     callback context-menu(length, length);
     property <length> artist-w: root.compilation ? 240px : 0px;
     property <bool> hovered: ta.has-hover;
+    // YouTube refuses the song now (`Refused`): greyed as `ChoiceRow.dimmed` is, and why
+    // shows after the title while hovered. A click still tries it.
+    property <bool> refused: Refused.changes >= 0 && Refused.has(root.track.id);
+    property <float> alpha: root.refused ? 0.45 : 1.0;
+    property <bool> why-shown: root.refused && root.hovered;
+    property <length> title-room: root.width - 64px - 156px - root.artist-w;
     // Album rows have no cover: 48 px.
     height: Theme.track-row-h;
     border-radius: Theme.r-m;
@@ -158,6 +170,7 @@ export component TrackListRow inherits Rectangle {
     background: root.track.playing ? Theme.playing-row : transparent;
     accessible-role: list-item;
     accessible-label: root.track.title;
+    accessible-description: root.refused ? @tr("YouTube won't play this song in featherplay right now") : "";
     Rectangle {
         border-radius: parent.border-radius;
         background: Theme.state(ta.pressed || cell.pressed, root.hovered);
@@ -231,7 +244,7 @@ export component TrackListRow inherits Rectangle {
         width: 32px;
         height: parent.height;
         text: root.track.index;
-        color: Theme.text3;
+        color: Theme.text3.transparentize(1 - root.alpha);
         horizontal-alignment: right;
         vertical-alignment: center;
     }
@@ -241,21 +254,32 @@ export component TrackListRow inherits Rectangle {
         width: 18px;
         height: 18px;
     }
-    Body {
+    title := Body {
         x: 64px;
-        width: parent.width - 64px - 156px - root.artist-w;
+        width: root.why-shown ? min(self.preferred-width, root.title-room - why.width - Theme.s3) : root.title-room;
         height: parent.height;
         text: root.track.title;
         font-weight: 600;
-        color: Theme.text1;
+        color: Theme.text1.transparentize(1 - root.alpha);
         vertical-alignment: center;
+    }
+    why := Body {
+        x: title.x + title.width + Theme.s3;
+        width: root.why-shown ? min(self.preferred-width, root.title-room * 0.6) : 0px;
+        height: parent.height;
+        visible: root.why-shown;
+        text: @tr("YouTube won't play this song in featherplay right now");
+        font-size: Theme.t-meta;
+        color: Theme.text2;
+        vertical-alignment: center;
+        accessible-role: none;
     }
     if root.compilation: Body {
         x: parent.width - 148px - root.artist-w;
         width: root.artist-w - 24px;
         height: parent.height;
         text: root.track.artist;
-        color: Theme.text2;
+        color: Theme.text2.transparentize(1 - root.alpha);
         vertical-alignment: center;
     }
     Body {
@@ -263,7 +287,7 @@ export component TrackListRow inherits Rectangle {
         width: 44px;
         height: parent.height;
         text: root.track.duration;
-        color: Theme.text2;
+        color: Theme.text2.transparentize(1 - root.alpha);
         horizontal-alignment: right;
         vertical-alignment: center;
     }

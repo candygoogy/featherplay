@@ -31,8 +31,8 @@ use crate::router::{ExploreTab, History, LibraryTab, Page};
 use crate::ui::{AppWindow, Frame, Nav, PageKind, Theme};
 use crate::{
     account_menu, account_picker, album_actions, bar, chrome, close, frame_log, instance, language,
-    link, memory, mini, pages, playlist_menu, popup, prepare, queue_panel, repaint, shell, sidebar,
-    song_menu, suggest, toast, top_bar, updates, wheel,
+    link, memory, mini, pages, playlist_menu, popup, prepare, queue_panel, refused, repaint, shell,
+    sidebar, song_menu, suggest, toast, top_bar, updates, wheel,
 };
 
 /// Set once featherplay starts to quit. A second launch asking to show the window is told
@@ -543,6 +543,7 @@ pub fn wire(ctx: &Rc<Ctx>, ui: &AppWindow) {
     account_menu::init(ctx);
     account_picker::init(ctx);
     toast::init(ctx);
+    refused::init(ctx);
     pages::init(ctx);
 }
 
@@ -645,6 +646,7 @@ pub fn on_event(ev: UiEvent) {
         UiEvent::Toast(text) => toast::show(&ctx, text),
         UiEvent::ToastError(text) => toast::show_error(&ctx, text),
         UiEvent::Silences(marks) => bar::show_silences(&ctx, &marks),
+        UiEvent::Refused(ids) => refused::show(&ctx, &ids),
         UiEvent::LocalApi(notice) => pages::settings::local_api_changed(&ctx, notice),
     }
     // The first page is up once the session is known and its loads have landed.

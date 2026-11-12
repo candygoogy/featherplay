@@ -25,6 +25,13 @@ export global RowHover {
     callback rested(string /* videoId */);
 }
 
+// The songs YouTube refuses to play now (`src/refused.rs`): the song rows show them greyed,
+// saying why on hover. `has` is asked again each time `changes` moves.
+export global Refused {
+    in property <int> changes;
+    pure callback has(string /* videoId */) -> bool;
+}
+
 // Reports `id` to `RowHover` once the row has been hovered for 120 ms, or at once when it's
 // pressed (the click comes on release), once per hover. The timer runs only while hovered.
 export component HoverIntent {
