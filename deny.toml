@@ -50,6 +50,9 @@ allow = [
   "BSL-1.0",
   "Unlicense",
   "0BSD",
+  # Linux only: webpki-root-certs, Mozilla's root certificates as data, for a system with no
+  # CA certificates of its own.
+  "CDLA-Permissive-2.0",
   # Slint (`slint`, `i-slint-*`) offers GPL-3.0-only OR this OR its Software License 3.0;
   # featherplay takes the Royalty-free License 2.0, so only that one is allowed.
   "LicenseRef-Slint-Royalty-free-2.0",

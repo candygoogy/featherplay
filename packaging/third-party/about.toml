@@ -18,6 +18,7 @@ accepted = [
   "CC0-1.0",
   "MIT-0",
   "bzip2-1.0.6",
+  "CDLA-Permissive-2.0",
   # Slint ships no file for its licence; THIRD_PARTY.md links it (see notices.md).
   "LicenseRef-Slint-Royalty-free-2.0",
 ]

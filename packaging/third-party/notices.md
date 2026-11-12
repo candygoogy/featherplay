@@ -482,12 +482,13 @@ https://datatracker.ietf.org/ipr/1526/
 ## TLS and cryptography on Linux
 
 On Windows, HTTPS goes through the system's SChannel (native-tls). The Linux builds use rustls,
-with the system's certificates (rustls-platform-verifier) and AWS-LC for the cryptography: the
-`aws-lc-sys` crate compiles AWS-LC's C code (a fork of BoringSSL, itself a fork of OpenSSL)
-into the binary. AWS-LC's notice, which names the code from BoringSSL, OpenSSL, Fiat
-Cryptography, s2n-bignum, the Jitter Entropy library and its other sources with their
-licences, is the ISC License text listed for aws-lc-sys under [Licence texts](#licence-texts)
-below; its MIT License text is Fiat Cryptography's.
+with the system's certificates (rustls-platform-verifier), or, on a system that has none,
+Mozilla's root certificates built in (webpki-root-certs, CDLA Permissive 2.0), and AWS-LC for
+the cryptography: the `aws-lc-sys` crate compiles AWS-LC's C code (a fork of BoringSSL, itself
+a fork of OpenSSL) into the binary. AWS-LC's notice, which names the code from BoringSSL,
+OpenSSL, Fiat Cryptography, s2n-bignum, the Jitter Entropy library and its other sources with
+their licences, is the ISC License text listed for aws-lc-sys under
+[Licence texts](#licence-texts) below; its MIT License text is Fiat Cryptography's.
 
 ## Linux system libraries
 
