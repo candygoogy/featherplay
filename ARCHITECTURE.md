@@ -2,9 +2,9 @@
 
 This is a map of the code for whoever maintains it. It says how the parts fit, which thread
 does what, and where things are kept on disk. The last part, [Target structure](#target-structure),
-is the plan for making the code easier to own and for adding Linux. Phase 2 of it is built,
-and the first step of phase 3; the rest is a plan, not a description of today's code. Its
-decisions are listed at its end.
+is the plan for making the code easier to own and for adding Linux. Phases 2 to 4 of it are
+built; phase 5 (Linux) is a plan, not a description of today's code. Its decisions are
+listed at its end.
 
 Paths are relative to the repository root. Each module's own doc comment says more than
 this file does; when the two disagree, the code is right and this file needs fixing.
@@ -349,8 +349,7 @@ the controller's state.
 
 ## Target structure
 
-This part is the plan for phases 2 to 4. Phases 2 and 3 are built; phase 4 isn't yet. The
-goals are:
+This part is the plan for phases 2 to 4, and all three are built. The goals are:
 
 - Linux becomes "write one module", not "touch 30 files".
 - The app crate holds the UI and nothing else.
@@ -547,7 +546,47 @@ after 3a); the controller crate has 13,857 lines in `src/` and 15,035 with its t
 
 ### Phase 4: smaller files
 
-These source files are over 1,000 lines today. The count leaves out `vendor/`, `spikes/`,
+**Done.** Each file in the table below is now a parent file plus a folder of the same name
+(`native.rs` and `native/`), split along the lines proposed, with its tests beside the code
+they test or in a `tests.rs` of their own. Code moved verbatim; public paths stay the same
+through re-exports, so no caller changed. Where the split went further than proposed:
+`ytm/src/api/http.rs` (the HTTP client) and `controller/src/updates/stamp.rs` (the check's
+stamp), each to bring its parent under 1,000 lines. `parts.slint`, `settings.slint`,
+`home.slint` and `content.slint` re-export what moved out of them, so no `import` changed.
+
+**Left over 1,000 lines**, on purpose:
+
+| File | Lines | Why |
+|---|---|---|
+| `crates/core/src/player.rs` | 1,386 | One state machine reads best in one place (decision 9) |
+| `crates/core/tests/it/player.rs` | 1,535 | Test file (decision 8) |
+| `crates/ytm/tests/it/convert.rs` | 1,469 | Test file (decision 8) |
+| `crates/store/tests/it/store.rs` | 1,135 | Test file (decision 8) |
+| `crates/streams/src/chain/tests.rs` | 1,113 | Test file (decision 8): `chain.rs`'s tests, moved out whole |
+
+**Duplicates** (`cargo tree -d`, normal dependencies, Windows x64). The workspace's unused
+`symphonia = "=0.6.1"` entry is gone (the audio crate pins 0.5.5, rodio's version). Every
+other duplicate comes from a crate we don't own, and none can go with a lock-file change
+alone:
+
+| Older copy | Pulled in by | To remove it |
+|---|---|---|
+| `windows` 0.44 | souvlaki 0.8.3 | souvlaki 0.9 (changes the media-controls code) |
+| `windows-sys` 0.59 | global-hotkey 0.9 | global-hotkey 0.10 (changes the hotkey code) |
+| `windows-sys` 0.52 | winit 0.30, glutin | upstream |
+| `muda` 0.19, `keyboard-types` 0.7 | Slint's winit backend (vendored) | patching the vendored backend; tray-icon uses muda 0.21 |
+| `getrandom` 0.2 | uuid 0.8 in discord-rich-presence 1.1.0 (the latest) | upstream |
+| `bitflags` 1 | symphonia-core 0.5 | upstream |
+| `itertools` 0.14 | ytmapi-rs 0.3.3 | upstream |
+| `hashbrown` 0.14, 0.16 | rowan, clru (Slint) | upstream |
+| `smol_str` 0.2, `syn` 2 | winit; proc macros (build time) | upstream |
+
+The two upgrades change Windows behaviour, so they wait for a decision (phase 5 looks at
+souvlaki again for MPRIS).
+
+The plan as it was:
+
+These source files were over 1,000 lines. The count leaves out `vendor/`, `spikes/`,
 `target/` and the test folders, and includes the tests inside `src/` files. Where a file's
 tests start late, the code part is smaller than the total.
 
