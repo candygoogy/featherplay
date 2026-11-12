@@ -110,7 +110,7 @@ fn live_mpris_shows_the_track_and_takes_commands() {
     let player = proxy(bus, PLAYER);
     assert_eq!(
         root.get_property::<String>("DesktopEntry").unwrap(),
-        "featherplay"
+        "dev.candygoogy.featherplay"
     );
     assert_eq!(
         player.get_property::<String>("PlaybackStatus").unwrap(),

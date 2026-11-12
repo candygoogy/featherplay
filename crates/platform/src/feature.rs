@@ -81,9 +81,7 @@ pub fn supports(feature: Feature) -> bool {
         Feature::Tray => crate::tray::available(),
         Feature::MiniPlayerPlacement | Feature::GlobalHotkeys => crate::window::x11_session(),
         Feature::InPlaceUpdate => crate::installer::appimage().is_some(),
-        Feature::TaskbarButtons
-        | Feature::WebViewSignIn
-        | Feature::TitleBarColour => false,
+        Feature::TaskbarButtons | Feature::WebViewSignIn | Feature::TitleBarColour => false,
     }
 }
 

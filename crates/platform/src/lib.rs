@@ -16,6 +16,12 @@ mod feature;
 
 pub use crate::feature::{Feature, Unsupported, supports};
 
+/// The app's id on the Linux desktop: its desktop entry's name
+/// (`dev.candygoogy.featherplay.desktop`), the window's Wayland app id and X11 class, and
+/// what MPRIS and notifications name as theirs, so the desktop matches them to the entry's
+/// name and icon.
+pub const APP_ID: &str = "dev.candygoogy.featherplay";
+
 // `crate::` paths, because a bare `windows` here would also name the `windows` crate.
 #[cfg(windows)]
 mod windows;

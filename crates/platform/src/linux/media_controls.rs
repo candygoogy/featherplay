@@ -31,8 +31,8 @@ use crate::window::Handle;
 
 const PATH: &str = "/org/mpris/MediaPlayer2";
 const PLAYER: &str = "org.mpris.MediaPlayer2.Player";
-/// The desktop entry (`featherplay.desktop`) the widget takes the icon and name from.
-const DESKTOP_ENTRY: &str = "featherplay";
+/// The desktop entry the widget takes the icon and name from.
+const DESKTOP_ENTRY: &str = crate::APP_ID;
 /// The track ID MPRIS gives "no track".
 const NO_TRACK: &str = "/org/mpris/MediaPlayer2/TrackList/NoTrack";
 /// The slowest and fastest playback speeds (the store's `Settings::SPEEDS`).

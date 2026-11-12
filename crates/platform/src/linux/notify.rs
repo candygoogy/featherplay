@@ -23,7 +23,7 @@ const PATH: &str = "/org/freedesktop/Notifications";
 
 /// The desktop entry the notifications name as theirs (the `desktop-entry` hint), so the
 /// desktop can show the app's icon and per-app settings for them.
-const DESKTOP_ENTRY: &str = "featherplay";
+const DESKTOP_ENTRY: &str = crate::APP_ID;
 
 /// The server's ID of the last notification shown, which the next one replaces; 0 for none.
 static LAST: AtomicU32 = AtomicU32::new(0);

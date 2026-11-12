@@ -38,6 +38,13 @@ pub fn creating<T>(f: impl FnOnce() -> T) -> T {
 /// taskbar button, rounded with a shadow where Windows draws them (11); where the tray can't
 /// place it (Wayland), in the desktop's frame (`placed`). Other windows keep theirs.
 pub fn window_attributes(attrs: WindowAttributes) -> WindowAttributes {
+    // Every window: the Wayland app id and X11 class the desktop matches to the desktop
+    // entry (its name, icon and dock pin).
+    #[cfg(target_os = "linux")]
+    let attrs = {
+        use slint::winit_030::winit::platform::x11::WindowAttributesExtX11;
+        WindowAttributesExtX11::with_name(attrs, featherplay_platform::APP_ID, "featherplay")
+    };
     if !CREATING.get() {
         return attrs;
     }

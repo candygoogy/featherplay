@@ -9,4 +9,4 @@ Terminal=false
 Categories=AudioVideo;Audio;Player;
 Keywords=music;player;scrobble;lyrics;
 StartupNotify=true
-StartupWMClass=featherplay
+StartupWMClass=dev.candygoogy.featherplay
