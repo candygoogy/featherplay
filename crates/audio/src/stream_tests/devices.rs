@@ -45,6 +45,10 @@ fn engine_plays_on_a_device_that_appears_after_start() {
 }
 
 #[test]
+#[cfg_attr(
+    target_os = "linux",
+    ignore = "Linux opens a new output instead (`REOPEN_IDLE`), which it doesn't start"
+)]
 fn engine_wake_starts_an_output_stopped_a_while_and_it_stops_again() {
     let engine = crate::AudioEngine::new_null(engine_tmp());
     let starts = |n: u32| {

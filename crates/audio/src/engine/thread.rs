@@ -32,6 +32,10 @@ const STOP_AFTER: Duration = Duration::from_secs(1);
 const WAKE_AFTER: Duration = Duration::from_secs(5);
 #[cfg(test)]
 const WAKE_AFTER: Duration = Duration::from_millis(300);
+/// Whether an output stopped for `WAKE_AFTER` or more is opened afresh rather than started
+/// again. On Linux, ALSA's stream through PulseAudio, paused that long, took 5-11 s to give
+/// its first callback when resumed (WSLg, 2026-11-12), where a new one starts in ~30 ms.
+const REOPEN_IDLE: bool = cfg!(target_os = "linux");
 /// Tracks fading out at once at most: a third (skips in a row, each fading) stops the
 /// oldest, which is the quietest.
 const MAX_FADING: usize = 2;
@@ -285,10 +289,12 @@ impl Engine {
             Msg::EnsureOutput => {
                 self.stop_at = None;
                 self.played = Some(Instant::now());
-                let started = self
-                    .sink
-                    .as_mut()
-                    .is_some_and(|s| s.set_playing(true).is_ok());
+                let reopen = REOPEN_IDLE && self.stopped_long();
+                let started = !reopen
+                    && self
+                        .sink
+                        .as_mut()
+                        .is_some_and(|s| s.set_playing(true).is_ok());
                 if started {
                     return;
                 }
@@ -299,7 +305,17 @@ impl Engine {
                         self.controls.paused.store(true, Ordering::SeqCst);
                         self.emit(AudioEvent::NoDevice);
                     }
-                    Err(e) => self.emit(AudioEvent::Error(e.to_string())),
+                    Err(e) => {
+                        // A new one wouldn't open: the old one, late, is better than none.
+                        let resumed = reopen
+                            && self
+                                .sink
+                                .as_mut()
+                                .is_some_and(|s| s.set_playing(true).is_ok());
+                        if !resumed {
+                            self.emit(AudioEvent::Error(e.to_string()));
+                        }
+                    }
                 }
             }
             Msg::Paused => {
@@ -308,13 +324,15 @@ impl Engine {
                     .get_or_insert_with(|| Instant::now() + STOP_AFTER);
             }
             Msg::Wake => {
-                let idle = self
-                    .sink
-                    .as_ref()
-                    .and_then(Output::stopped_for)
-                    .is_some_and(|d| d >= WAKE_AFTER);
-                if idle
-                    && self.controls.paused.load(Ordering::SeqCst)
+                let idle = self.stopped_long();
+                let paused = self.controls.paused.load(Ordering::SeqCst);
+                if REOPEN_IDLE {
+                    // A new stream, stopped while paused, starts at once on the play.
+                    if idle && paused {
+                        let _ = self.open_output(self.device.clone());
+                    }
+                } else if idle
+                    && paused
                     && let Some(sink) = &mut self.sink
                     && sink.set_playing(true).is_ok()
                 {
@@ -590,6 +608,14 @@ impl Engine {
             attach_after: None,
             loaded: None,
         }
+    }
+
+    /// The output has been stopped for `WAKE_AFTER` or more.
+    fn stopped_long(&self) -> bool {
+        self.sink
+            .as_ref()
+            .and_then(Output::stopped_for)
+            .is_some_and(|d| d >= WAKE_AFTER)
     }
 
     /// Opens the output (see `devices::open_output`), started unless paused, and moves the

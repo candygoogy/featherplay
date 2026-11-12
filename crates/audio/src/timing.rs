@@ -61,8 +61,8 @@ fn resolve(home: &Path, out: &Path, id: &str, xargs: Option<&str>, label: &str) 
     let sidecars = env("FEATHERPLAY_SIDECARS_DIR")
         .map(Into::into)
         .unwrap_or_else(|| home.join("sidecars"));
-    let deno = sidecars.join("deno.exe");
-    let mut cmd = Command::new(sidecars.join("yt-dlp.exe"));
+    let deno = sidecars.join(format!("deno{}", std::env::consts::EXE_SUFFIX));
+    let mut cmd = Command::new(sidecars.join(format!("yt-dlp{}", std::env::consts::EXE_SUFFIX)));
     cmd.env("DENO_DIR", home.join("deno-dir"))
         .args(["--ignore-config", "--no-playlist", "-v", "-J", "-f", "140"])
         .arg("--cache-dir")
