@@ -23,7 +23,8 @@ impl TaskbarButtons {
     pub fn set_playing(&self, _playing: bool) {}
 }
 
-/// Whether the taskbar (the panel) is light. Dark until phase 5 reads the desktop's theme.
+/// Whether the taskbar (the panel) is light. Desktops share no way to ask, so the window icon
+/// is always the one drawn for a dark panel.
 pub fn light_taskbar() -> bool {
     false
 }

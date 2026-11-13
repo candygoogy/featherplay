@@ -1,8 +1,8 @@
 //! Everything in featherplay that talks to the operating system, behind plain functions and
 //! types. One module per OS, picked at compile time and re-exported here, so callers write
-//! `featherplay_platform::tray::…` on every OS. `windows` holds the Windows code; `linux` is
-//! stubs until phase 5 (ARCHITECTURE.md, "Target structure"). A `macos` module would go
-//! beside them, picked the same way.
+//! `featherplay_platform::tray::…` on every OS. `windows` holds the Windows code, `linux` the
+//! Linux code (ARCHITECTURE.md, "Target structure"). A `macos` module would go beside them,
+//! picked the same way.
 //!
 //! A feature an OS lacks says so: [`supports`] returns false for it, and its functions
 //! return [`Unsupported`] rather than doing nothing.
