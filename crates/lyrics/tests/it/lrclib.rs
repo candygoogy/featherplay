@@ -157,7 +157,7 @@ async fn a_failed_exact_lookup_should_still_search() {
     let base = stand_in(503, SEARCH_DONT_STOP, 2);
     let lrclib = LrcLib::with_base(&base).expect("client");
     let found = lrclib.find(&dont_stop()).await.expect("the search answers");
-    let Lookup::Found { lyrics, via } = found else {
+    let Lookup::Found { lyrics, via, .. } = found else {
         panic!("lyrics expected, got {found:?}");
     };
     assert!(matches!(lyrics, Lyrics::Synced(_)));
@@ -178,4 +178,25 @@ async fn a_failed_exact_lookup_and_an_empty_search_should_be_an_error() {
     let base = stand_in(503, "[]", 2);
     let lrclib = LrcLib::with_base(&base).expect("client");
     assert!(lrclib.find(&dont_stop()).await.is_err());
+}
+
+#[tokio::test]
+async fn a_text_search_should_list_every_record_with_words_and_its_first_line() {
+    let base = stand_in(404, SEARCH_DONT_STOP, 1);
+    let lrclib = LrcLib::with_base(&base).expect("client");
+    let records = lrclib
+        .search_text("Don't Stop The Music Rihanna")
+        .await
+        .expect("the search answers");
+    assert_eq!(records.len(), 20);
+    assert!(
+        records
+            .iter()
+            .all(|r| r.id.is_some() && r.lyrics().is_some())
+    );
+    assert_eq!(records[0].album_name.as_deref(), Some("Greatest Hits"));
+    assert_eq!(
+        records[0].first_line().as_deref(),
+        Some("Placeholder line 1")
+    );
 }

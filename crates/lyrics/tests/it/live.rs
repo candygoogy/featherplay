@@ -23,6 +23,7 @@ async fn live_lrclib_finds_synced_lyrics() {
         Lookup::Found {
             lyrics: Lyrics::Synced(lines),
             via,
+            ..
         } => println!("synced: {} lines ({via:?})", lines.len()),
         other => panic!("synced lyrics expected, got {other:?}"),
     }

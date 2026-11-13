@@ -193,6 +193,25 @@ pub struct Settings {
     /// "Show settings in search suggestions" (Settings > Window): the top bar's suggestions
     /// end with the settings that match (on by default).
     pub settings_in_suggestions: bool,
+    /// The lyrics' text size (Settings > Lyrics and the lyrics menu): Small, Medium (the
+    /// default) or Large. A value this build doesn't know loads as Medium.
+    #[serde(deserialize_with = "lenient")]
+    pub lyrics_size: LyricsSize,
+}
+
+/// The lyrics' text size, on Now playing and in the Lyrics tab.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum LyricsSize {
+    Small,
+    #[default]
+    Medium,
+    Large,
+}
+
+impl LyricsSize {
+    /// Every size, smallest first, as Settings and the menu show them.
+    pub const ALL: [LyricsSize; 3] = [LyricsSize::Small, LyricsSize::Medium, LyricsSize::Large];
 }
 
 /// The Equalizer setting: off, one of three presets, or the user's own bands.
@@ -434,6 +453,7 @@ impl Default for Settings {
             tooltips: true,
             dns_over_https: false,
             settings_in_suggestions: true,
+            lyrics_size: LyricsSize::Medium,
         }
     }
 }

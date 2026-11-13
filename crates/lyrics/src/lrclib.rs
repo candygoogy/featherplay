@@ -29,9 +29,12 @@ const LENGTH_SLACK_S: f64 = 3.0;
 #[derive(Clone, Debug, Default, PartialEq, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Record {
+    /// LRCLIB's id for the record.
+    pub id: Option<u64>,
     pub track_name: Option<String>,
     /// May join or repeat names: "A, B", "A/A".
     pub artist_name: Option<String>,
+    pub album_name: Option<String>,
     /// Seconds.
     pub duration: Option<f64>,
     /// `null` in some records.
@@ -57,7 +60,21 @@ impl Record {
             .map(|t| Lyrics::Plain(t.to_string()))
     }
 
-    fn synced(&self) -> bool {
+    /// The first line of its words, for telling records apart: the first timed line with
+    /// text, or the plain text's first line. `None` for a record without words.
+    pub fn first_line(&self) -> Option<String> {
+        match self.lyrics()? {
+            Lyrics::Synced(lines) => lines.into_iter().map(|l| l.text).find(|t| !t.is_empty()),
+            Lyrics::Plain(text) => text
+                .lines()
+                .map(str::trim)
+                .find(|l| !l.is_empty())
+                .map(str::to_string),
+        }
+    }
+
+    /// Whether its lyrics are synced, as `lyrics` would give them.
+    pub fn synced(&self) -> bool {
         self.synced_lyrics
             .as_deref()
             .is_some_and(|s| !s.trim().is_empty())
@@ -251,12 +268,12 @@ pub enum Lookup {
     Found {
         lyrics: Lyrics,
         via: Via,
+        /// The record's LRCLIB id, when it has one.
+        id: Option<u64>,
     },
     /// LRCLIB has nothing for the track: no exact record, and none of the search's
     /// `results` matched it.
-    Missed {
-        results: usize,
-    },
+    Missed { results: usize },
 }
 
 impl fmt::Display for Lookup {
@@ -269,10 +286,12 @@ impl fmt::Display for Lookup {
             Lookup::Found {
                 lyrics,
                 via: Via::Exact,
+                ..
             } => write!(f, "{} (exact match)", kind(lyrics)),
             Lookup::Found {
                 lyrics,
                 via: Via::Search { results },
+                ..
             } => write!(f, "{} (search, {results} results)", kind(lyrics)),
             Lookup::Missed { results } => write!(f, "no match (search, {results} results)"),
         }
@@ -342,11 +361,12 @@ impl LrcLib {
                 Ok(body) => body.map(|b| parse_record(&b)).transpose(),
                 Err(e) => Err(e),
             };
-            match record.map(|r| r.and_then(|r| r.lyrics())) {
-                Ok(Some(lyrics @ Lyrics::Synced(_))) => {
+            match record.map(|r| r.and_then(|r| r.lyrics().map(|l| (l, r.id)))) {
+                Ok(Some((lyrics @ Lyrics::Synced(_), id))) => {
                     return Ok(Lookup::Found {
                         lyrics,
                         via: Via::Exact,
+                        id,
                     });
                 }
                 Ok(plain) => exact = plain,
@@ -354,9 +374,10 @@ impl LrcLib {
             }
         }
         let searched = self.search(q).await;
-        let exact = exact.map(|lyrics| Lookup::Found {
+        let exact = exact.map(|(lyrics, id)| Lookup::Found {
             lyrics,
             via: Via::Exact,
+            id,
         });
         match (searched, exact, failed) {
             (
@@ -386,13 +407,27 @@ impl LrcLib {
         };
         let records = parse_search(&body)?;
         let results = records.len();
-        Ok(match best_match(records, q).and_then(|r| r.lyrics()) {
-            Some(lyrics) => Lookup::Found {
-                lyrics,
-                via: Via::Search { results },
+        Ok(
+            match best_match(records, q).and_then(|r| r.lyrics().map(|l| (l, r.id))) {
+                Some((lyrics, id)) => Lookup::Found {
+                    lyrics,
+                    via: Via::Search { results },
+                    id,
+                },
+                None => Lookup::Missed { results },
             },
-            None => Lookup::Missed { results },
-        })
+        )
+    }
+
+    /// `/api/search` for `text` (any of title, artist and album, as typed): every record
+    /// with words, in LRCLIB's order. One request; what "Choose other lyrics" lists.
+    pub async fn search_text(&self, text: &str) -> Result<Vec<Record>, Error> {
+        let Some(body) = self.fetch("search", &[("q", text)]).await? else {
+            return Ok(Vec::new());
+        };
+        let mut records = parse_search(&body)?;
+        records.retain(|r| r.lyrics().is_some());
+        Ok(records)
     }
 
     /// The body of `GET {base}{path}?{params}`, or `None` on a 404.

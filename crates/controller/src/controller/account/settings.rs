@@ -4,7 +4,7 @@
 use featherplay_core::player::Input;
 use featherplay_store::{
     Accent, AccentColour, CloseAction, DesktopLyrics, DiscordOptions, Equalizer, Hotkeys, Loudness,
-    Settings, SkipSilence, StreamingQuality, ThemeMode,
+    LyricsSize, Settings, SkipSilence, StreamingQuality, ThemeMode,
 };
 
 use super::start_presence;
@@ -104,6 +104,8 @@ pub enum Change {
     SignInBrowser(String),
     /// "Look up YouTube directly": YouTube's hosts over DNS over HTTPS.
     DnsOverHttps(bool),
+    /// The lyrics' text size (the window applies it).
+    LyricsSize(LyricsSize),
 }
 
 impl Change {
@@ -171,6 +173,7 @@ impl Change {
             Change::SleepFade(v) => s.sleep_fade = v,
             Change::SignInBrowser(v) => s.sign_in_browser = Some(v),
             Change::DnsOverHttps(v) => s.dns_over_https = v,
+            Change::LyricsSize(v) => s.lyrics_size = v,
         }
     }
 }

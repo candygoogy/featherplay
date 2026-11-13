@@ -9,5 +9,6 @@
 
 mod home;
 mod library_cache;
+mod lyrics_choices;
 mod silence_cache;
 mod store;

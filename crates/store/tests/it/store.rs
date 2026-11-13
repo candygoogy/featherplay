@@ -8,9 +8,9 @@ use featherplay_core::model::{
 use featherplay_store::settings::SCHEMA;
 use featherplay_store::{
     Accent, AccentColour, CloseAction, DesktopLyrics, DiscordOptions, DiscordStatusText,
-    DiscordTime, Equalizer, Hotkeys, Loudness, Paths, Settings, SkipSilence, StreamingQuality,
-    StripPlace, StripSize, ThemeMode, load_client_version, load_session, save_client_version,
-    save_session,
+    DiscordTime, Equalizer, Hotkeys, Loudness, LyricsSize, Paths, Settings, SkipSilence,
+    StreamingQuality, StripPlace, StripSize, ThemeMode, load_client_version, load_session,
+    save_client_version, save_session,
 };
 
 use crate::home::{self, TestHome};
@@ -88,6 +88,7 @@ fn settings_defaults_when_missing() {
             tooltips: true,
             dns_over_https: false,
             settings_in_suggestions: true,
+            lyrics_size: LyricsSize::Medium,
         }
     );
     assert_eq!(s, Settings::default());
@@ -178,6 +179,7 @@ fn settings_roundtrip() {
         tooltips: false,
         dns_over_https: true,
         settings_in_suggestions: false,
+        lyrics_size: LyricsSize::Large,
     };
     s.save(&p).unwrap();
     assert!(p.config.join("settings.toml").is_file());
@@ -1233,4 +1235,27 @@ fn saving_over_a_newer_file_keeps_its_schema_and_unknown_keys() {
         Some(1)
     );
     assert_eq!(file["discord_options"]["links"].as_bool(), Some(false));
+}
+
+#[test]
+fn a_lyrics_size_this_build_doesnt_know_loads_as_medium() {
+    let Some(home) = TestHome::new("lyrics-size-unknown") else {
+        return;
+    };
+    let p = home.paths();
+    fs::create_dir_all(&p.config).unwrap();
+    for value in ["\"huge\"", "7", "true"] {
+        fs::write(
+            p.config.join("settings.toml"),
+            format!("lyrics_size = {value}"),
+        )
+        .unwrap();
+        assert_eq!(
+            Settings::load(&p).lyrics_size,
+            LyricsSize::Medium,
+            "{value}"
+        );
+    }
+    fs::write(p.config.join("settings.toml"), "lyrics_size = \"large\"").unwrap();
+    assert_eq!(Settings::load(&p).lyrics_size, LyricsSize::Large);
 }
