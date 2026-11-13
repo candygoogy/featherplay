@@ -1,6 +1,6 @@
 # Vendored: i-slint-renderer-skia 1.18.1
 
-This is the crate as published on crates.io, with twenty changes. The workspace `Cargo.toml`
+This is the crate as published on crates.io, with twenty-one changes. The workspace `Cargo.toml`
 swaps it in with `[patch.crates-io]`.
 
 1. `Cargo.toml`: `wgpu-30` is out of the default features.
@@ -198,6 +198,20 @@ Change 19 makes a frame of the playing mark cheaper (measured 2026-11-10):
     scripts grew private memory 109 MB with the copies and 12 MB without
     (`apps/featherplay/tests/app/glyph_fallback.rs`).
 
+Change 21 makes a changed text always repaint (2026-11-13):
+
+21. `itemrenderer.rs`, `draw_text`: the item's text is read before `sharedparley::draw_text`
+    (marked `featherplay patch`), so the partial renderer's tracker for that item depends on
+    it directly. Upstream reads it only inside the text layout cache's entry, whose tracker
+    the item's tracker depends on; but the cache replaces entries without telling anyone
+    that depended on them (a wrapping, eliding `Text` is shaped once without wrapping for
+    its width and once with it for its height, each one dropping the other's entry; a
+    sweep or a scale change drops them too). After such a swap the item no longer repaints
+    when only its text changes. That fits what a hand test saw (2026-11-13): the desktop
+    lyrics' first line (wrapping, eliding) kept one line of the song while the second line
+    under it moved on; the offscreen frames didn't reproduce it. It's one property read per
+    drawn text.
+
 ## Platforms
 
 Which changes are Windows-specific (2026-11-11). Only code that is Win32's or would behave
@@ -227,6 +241,7 @@ featherplay uses.
 | 18 no SVG renderer | Neutral | No | A Cargo feature and a `cfg(any())` arm. |
 | 19 no layer at alpha 0 | Neutral | No | Skia rasterising. |
 | 20 fonts read in place | Neutral | No | DirectWrite and FreeType both read an `SkData` in place; fontique maps the files on every target. |
+| 21 a text read where it's drawn | Neutral | No | Property tracking, the same everywhere. |
 
 ## Why
 
@@ -256,7 +271,9 @@ licence, which allows modified copies).
    test shows it), change 18 (the exe's size shows whether resvg came back), change
    19 unless the new `visit_opacity` already skips a layer at alpha 0 (`render_surface.rs`
    checks the frames), and change 20 unless the new font cache already reads fonts without
-   a copy (`glyph_fallback.rs` checks the memory).
+   a copy (`glyph_fallback.rs` checks the memory), and change 21 unless the new `draw_text` or
+   the text layout cache already makes a text change repaint the item after its entry was
+   replaced.
 4. Build. If `i-slint-backend-winit` still calls wgpu-only constructors, port the three
    wgpu `featherplay patch` blocks in `lib.rs` (the git history of this folder has the diff);
    if it now gates them itself, leave those out. Check the Linux build too (see Platforms).

@@ -760,6 +760,12 @@ impl ItemRenderer for SkiaItemRenderer<'_> {
         size: LogicalSize,
         _cache: &CachedRenderingData,
     ) {
+        // featherplay patch (change 21): the text is read here, in the partial renderer's
+        // tracker for this item, so a new text always repaints it. Otherwise only the layout
+        // cache's entry reads it, and that entry is replaced without a word to whoever
+        // depended on it (a wrapping, eliding text is shaped once without wrapping for its
+        // width and again with it for its height, each swap dropping the other's entry).
+        let _ = text.text();
         let restore = self.save_canvas_and_pixel_align_origin();
         sharedparley::draw_text(self, text, Some(self_rc), size, Some(self.text_layout_cache));
         if restore {
