@@ -586,7 +586,12 @@ export component BottomBar inherits Rectangle {
     property <length> center-w: max(320px, min(600px, self.width - 2 * (root.right-w + root.end-gap + 2px)));
     // Where the speed popup centres (in the bar).
     out property <length> speed-centre: speed-pill.x + speed-pill.width / 2;
-    property <length> left-w: max(80px, (self.width - root.center-w) / 2 - 100px);
+    // The middle column's left edge: centred on the bar, unless that would run it into the
+    // right-hand group (the narrowest windows with the speed pill, or Linux's mini player
+    // button), then shifted left to stay 12 px clear of it.
+    property <length> middle-w: max(root.center-w, transport.preferred-width);
+    property <length> middle-x: min((self.width - root.middle-w) / 2, (Player.speed != 2 ? speed-pill.x : actions.x) - 12px - root.middle-w);
+    property <length> left-w: max(80px, root.middle-x + (root.middle-w - root.center-w) / 2 - 100px);
     // The transport row, and the time row under it.
     property <length> transport-y: 8px;
     property <length> time-y: 60px;
@@ -677,9 +682,9 @@ export component BottomBar inherits Rectangle {
         }
     }
 
-    // The transport, centred on the bar.
-    HorizontalLayout {
-        x: (parent.width - self.width) / 2;
+    // The transport, centred over the time row.
+    transport := HorizontalLayout {
+        x: root.middle-x + (root.middle-w - self.width) / 2;
         y: root.transport-y;
         height: Theme.play-size;
         width: self.preferred-width;
@@ -744,7 +749,7 @@ export component BottomBar inherits Rectangle {
     // Under the transport: the time, the seek line and the length. Fixed widths for the
     // times, so the line doesn't shift as they tick.
     HorizontalLayout {
-        x: (parent.width - root.center-w) / 2;
+        x: root.middle-x + (root.middle-w - root.center-w) / 2;
         y: root.time-y;
         width: root.center-w;
         height: 16px;
