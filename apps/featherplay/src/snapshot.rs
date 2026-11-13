@@ -895,7 +895,10 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
     if o.page.starts_with("settings-lyrics") {
         let data = ui.global::<crate::ui::SettingsData>();
         data.set_desktop_lyrics(true);
-        ui.global::<crate::ui::LyricsData>().set_size(2);
+        let lyrics = ui.global::<crate::ui::LyricsData>();
+        lyrics.set_size(2);
+        lyrics.set_resettable(true);
+        lyrics.set_reset_asked(o.page == "settings-lyrics-reset");
         if o.page == "settings-lyrics-wayland" {
             data.set_desktop_lyrics_here(false);
             data.set_desktop_lyrics_why(true);

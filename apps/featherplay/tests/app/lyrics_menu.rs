@@ -307,3 +307,56 @@ fn large_text_fits_the_narrowest_window_in_the_full_view_and_the_side_tab() {
         "the side tab",
     );
 }
+
+#[test]
+fn reset_puts_the_lyrics_back_to_their_defaults_and_keeps_what_is_on() {
+    use featherplay::pages::settings;
+    use featherplay_store::{DesktopLyrics, StripPlace, StripSize};
+
+    let scene = scene();
+    let data = scene.ui.global::<LyricsData>();
+    assert!(!data.get_resettable(), "nothing to reset at the defaults");
+
+    // Large, the lines a second later for this song, the strip moved, larger and locked.
+    data.invoke_pick_size(2);
+    data.invoke_move_timing(1);
+    data.invoke_move_timing(1);
+    let moved = DesktopLyrics {
+        on: true,
+        locked: true,
+        size: StripSize::Large,
+        place: Some(StripPlace {
+            x: 400,
+            bottom: 700,
+            screen: [0, 0, 1280, 760],
+        }),
+        hinted: true,
+    };
+    settings::set_desktop_lyrics(&scene.ctx, moved);
+    scene.settle();
+    assert!(data.get_resettable());
+    assert!(saved(&scene, |c| c.nudge_ms == 1_000));
+
+    data.invoke_reset();
+    scene.settle();
+    assert_eq!(data.get_size(), 1, "Medium again");
+    assert_eq!(data.get_timing(), "On time");
+    assert_eq!(
+        settings::desktop_lyrics(),
+        DesktopLyrics {
+            on: true,
+            hinted: true,
+            ..DesktopLyrics::default()
+        },
+        "the strip's size, place and lock back, desktop lyrics still on"
+    );
+    assert!(saved(&scene, |c| c.nudge_ms == 0));
+    assert!(
+        scene
+            .ui
+            .global::<featherplay::ui::SettingsData>()
+            .get_lyrics(),
+        "Show lyrics stays on"
+    );
+    assert!(!data.get_resettable(), "the link goes once all is back");
+}

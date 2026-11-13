@@ -8,7 +8,10 @@
 // closes it. `src/lyrics.rs` and `src/lyrics/choose.rs` do the work.
 import { Theme, Icons, Curves } from "theme.slint";
 import { Body, Display, Icon, Pill, TextLink } from "parts.slint";
-import { Divider } from "song_menu.slint";
+import { Divider, MenuItem } from "song_menu.slint";
+import { SettingKey, SettingsData } from "pages/settings/data.slint";
+import { Switch } from "pages/settings/rows.slint";
+import { Dialog } from "pages/settings/dialog.slint";
 import { LyricsData, LyricsState } from "pages/lyrics.slint";
 import { Skeleton, SkeletonBar } from "pages/content.slint";
 
@@ -40,6 +43,8 @@ global LyricsIcons {
     out property <string> plus: "M7 12 H17 M12 7 V17";
     out property <string> search: "M10.5 4.5 a6 6 0 1 0 0.01 0 Z M15 15 L19.5 19.5";
     out property <string> check: "M5 12.5 L10 17 L19 7.5";
+    out property <string> strip: "M3.5 6.5 H20.5 V17.5 H3.5 Z M7 10.5 H17 M9 13.5 H15";
+    out property <string> unlock: "M7 10.5 H17 A1.5 1.5 0 0 1 18.5 12 V18 A1.5 1.5 0 0 1 17 19.5 H7 A1.5 1.5 0 0 1 5.5 18 V12 A1.5 1.5 0 0 1 7 10.5 Z M8.5 10.5 V8 A3.5 3.5 0 0 1 15.2 6.6";
 }
 
 // A text size: an A at that size, the chosen one on the accent's tonal fill.
@@ -139,6 +144,7 @@ export component LyricsMenuLayer inherits Rectangle {
     property <length> pad: 6px;
     property <bool> timing: LyricsData.state == LyricsState.synced;
     property <bool> choose: LyricsData.lrclib;
+    property <bool> desktop: SettingsData.desktop-lyrics-here;
 
     // Motion, as the song menu: the panel stays instantiated so it can fade out. It opens
     // downward, growing from its top right corner, under the ⋯.
@@ -307,8 +313,41 @@ export component LyricsMenuLayer inherits Rectangle {
                     }
                 }
             }
-            // The desktop lyrics' row (its switch) and its divider go here, between Timing
-            // and Choose other lyrics.
+            // Desktop lyrics on and off, as Settings' row does (not where the desktop can't
+            // show the strip); while it shows locked, a way to unlock it.
+            if root.desktop: Divider { }
+            if root.desktop: HorizontalLayout {
+                padding: 6px;
+                padding-left: 10px;
+                spacing: Theme.s3;
+                min-height: 56px;
+                RowGlyph { icon: LyricsIcons.strip; }
+                RowText {
+                    horizontal-stretch: 1;
+                    label: @tr("Desktop lyrics");
+                    detail: @tr("The line being sung, over other apps");
+                }
+                VerticalLayout {
+                    alignment: center;
+                    Switch {
+                        checked: SettingsData.desktop-lyrics;
+                        label: @tr("Desktop lyrics");
+                        toggled(on) => {
+                            root.close();
+                            SettingsData.toggled(SettingKey.desktop-lyrics, on);
+                        }
+                    }
+                }
+            }
+            if root.desktop && SettingsData.desktop-lyrics && LyricsData.desktop-locked: MenuItem {
+                enabled: root.open;
+                icon: LyricsIcons.unlock;
+                label: @tr("Unlock desktop lyrics");
+                clicked => {
+                    root.close();
+                    LyricsData.unlock-desktop();
+                }
+            }
             if root.choose: Divider { }
             if root.choose: Rectangle {
                 min-height: 56px;
@@ -716,5 +755,28 @@ export component LyricsMoreButton inherits Rectangle {
         commands: Icons.more;
         stroke: transparent;
         fill: #FFFFFF;
+    }
+}
+
+// "Reset lyrics settings" (Settings > Lyrics) asks first, over the whole window like
+// Settings' dialogs.
+export component LyricsResetLayer inherits Rectangle {
+    callback closed();
+    Dialog {
+        init => { self.focus-keys(); }
+        width: root.width;
+        height: root.height;
+        title: @tr("Reset lyrics settings?");
+        detail: @tr("Text size, the desktop lyrics' size and place, and the timing and lyrics you chose for songs go back to how they were.");
+        ok-label: @tr("Reset");
+        ok => {
+            LyricsData.reset-asked = false;
+            LyricsData.reset();
+            root.closed();
+        }
+        cancel => {
+            LyricsData.reset-asked = false;
+            root.closed();
+        }
     }
 }

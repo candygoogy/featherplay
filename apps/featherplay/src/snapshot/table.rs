@@ -111,6 +111,8 @@ pub const PAGES: &[&str] = &[
     // and as on Wayland, where the row says it isn't available, its "Why?" open.
     "settings-lyrics",
     "settings-lyrics-wayland",
+    // The same, asking whether to reset the lyrics settings.
+    "settings-lyrics-reset",
     // Settings with the new sound rows on (Skip silence at Start and end, Crossfade at 5 s
     // with Fade on skip, Bass, Light), and with the Equalizer's bands open.
     "settings-sound",
@@ -420,6 +422,7 @@ pub(super) fn page(name: &str, f: &Fixtures) -> Result<Page, String> {
         | "settings-window-no-tray"
         | "settings-lyrics"
         | "settings-lyrics-wayland"
+        | "settings-lyrics-reset"
         | "settings-sound"
         | "settings-equalizer"
         | "settings-speed"

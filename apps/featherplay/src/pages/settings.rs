@@ -46,7 +46,7 @@ mod window;
 
 pub use discord::{Preview, PreviewTime, discord_changed, discord_preview, step_minutes};
 pub use local_api::{local_api_changed, mask, parse_port, show_local_api_for_snapshot};
-pub use lyrics_size::pick_lyrics_size;
+pub use lyrics_size::{pick_lyrics_size, reset_lyrics, show_lyrics_resettable};
 pub use playback::{show_sleep_timer_for_snapshot, show_speed_for_snapshot};
 pub use quick_key::{capture_text, show_for_snapshot as show_quick_key_for_snapshot};
 pub use scrobbling::{
@@ -126,6 +126,7 @@ pub fn desktop_lyrics() -> DesktopLyrics {
 pub fn set_desktop_lyrics(ctx: &Ctx, value: DesktopLyrics) {
     if desktop_lyrics() != value {
         commit(ctx, Change::DesktopLyrics(value));
+        show_lyrics_resettable(ctx);
     }
 }
 
@@ -501,6 +502,7 @@ fn show(ctx: &Ctx) {
     data.set_desktop_lyrics(s.desktop_lyrics.on);
     data.set_desktop_lyrics_here(desktop_lyrics::available());
     show_lyrics_size(ctx, s.lyrics_size);
+    show_lyrics_resettable(ctx);
     data.set_check_for_updates(s.check_for_updates);
     data.set_install_updates(s.install_updates);
     data.set_dns_over_https(s.dns_over_https);

@@ -33,7 +33,7 @@ import { AccountMenu, AccountMenuLayer, AccountPickerDialog, AccountPicker } fro
 import { ToastView } from "toast.slint";
 import { CloseDialog, CloseChoice } from "close_dialog.slint";
 import { Shortcuts, ShortcutKind } from "shortcuts.slint";
-import { LyricsMenu, LyricsMenuLayer, LyricsChoose, LyricsChooseLayer } from "lyrics_menu.slint";
+import { LyricsMenu, LyricsMenuLayer, LyricsChoose, LyricsChooseLayer, LyricsResetLayer } from "lyrics_menu.slint";
 
 // What Rust can reach. Shared pieces first, then one line per page: a page's owner adds its
 // own exported structs to its own line only (blank lines keep the merges clean).
@@ -230,7 +230,7 @@ export component AppWindow inherits Window {
     }
 
     // A menu, a popup or a dialog is open over the window: the transport keys and Ctrl+/ wait.
-    property <bool> overlay-open: CloseChoice.open || SettingsData.dialog != SettingsDialog.none || AlbumMenu.open || AlbumMenu.dialog || SongMenu.open || PlaylistMenu.open || PlaylistMenu.dialog != PlaylistDialog.none || AccountMenu.open || AccountPicker.open || Player.speed-open || Sleep.open || LyricsMenu.open || LyricsChoose.open;
+    property <bool> overlay-open: CloseChoice.open || SettingsData.dialog != SettingsDialog.none || AlbumMenu.open || AlbumMenu.dialog || SongMenu.open || PlaylistMenu.open || PlaylistMenu.dialog != PlaylistDialog.none || AccountMenu.open || AccountPicker.open || Player.speed-open || Sleep.open || LyricsMenu.open || LyricsChoose.open || LyricsData.reset-asked;
 
     // The shortcuts, listed for Settings' "Keyboard shortcuts" in shortcuts.slint: each one
     // taken here is reported there (`Shortcuts.used`). A new one goes in both.
@@ -639,6 +639,13 @@ export component AppWindow inherits Window {
             width: root.width;
             height: root.height;
             room-w: Nav.page == PageKind.now-playing && Frame.side-open ? root.width - (root.width >= Theme.wide-min ? Theme.nowplaying-side-w : Theme.panel-w) : root.width;
+            closed => { keys.focus(); }
+        }
+        if LyricsData.reset-asked: LyricsResetLayer {
+            x: 0;
+            y: 0;
+            width: root.width;
+            height: root.height;
             closed => { keys.focus(); }
         }
 

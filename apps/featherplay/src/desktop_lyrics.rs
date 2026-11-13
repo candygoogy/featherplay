@@ -146,9 +146,29 @@ pub fn apply(ctx: &Rc<Ctx>) {
     menus_changed(ctx);
 }
 
-/// Settings' row and the tray menu show the strip's state.
+/// "Reset lyrics settings": the strip's size, place and lock back to their defaults, whether
+/// it's on kept; a strip that shows opens again as it first did.
+pub fn reset(ctx: &Rc<Ctx>) {
+    let s = settings::desktop_lyrics();
+    settings::set_desktop_lyrics(
+        ctx,
+        Setting {
+            on: s.on,
+            hinted: s.hinted,
+            ..Setting::default()
+        },
+    );
+    if is_open() {
+        close(ctx);
+    }
+    apply(ctx);
+}
+
+/// Settings' row, the tray menu and the lyrics menu show the strip's state.
 fn menus_changed(ctx: &Ctx) {
     let Some(main) = ctx.window() else { return };
+    main.global::<LyricsData>()
+        .set_desktop_locked(is_open() && settings::desktop_lyrics().locked);
     let data = main.global::<SettingsData>();
     data.set_desktop_lyrics(settings::desktop_lyrics().on);
     data.set_desktop_lyrics_here(available());

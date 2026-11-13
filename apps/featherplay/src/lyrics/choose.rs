@@ -72,7 +72,25 @@ pub(super) fn set_nudge(id: &TrackId, nudge_ms: i32) {
     update(id, |c| c.nudge_ms = nudge_ms);
 }
 
-/// Changes `id`'s choices and saves them off the UI thread (not for a snapshot).
+/// Whether any song has choices kept: those in memory once read, else whether the file is
+/// there (it goes once it holds none).
+pub(super) fn any() -> bool {
+    CHOICES.with(|c| match &*c.borrow() {
+        Some(choices) => !choices.is_empty(),
+        None => LyricsChoices::saved(&Paths::resolve()),
+    })
+}
+
+/// Forgets every song's choices, on disk too.
+pub(super) fn forget() {
+    let copy = with_choices(|c| {
+        c.clear();
+        c.clone()
+    });
+    save(copy);
+}
+
+/// Changes `id`'s choices and saves them.
 fn update(id: &TrackId, change: impl FnOnce(&mut LyricsChoice)) {
     let copy = with_choices(|c| {
         let mut choice = c.get(&id.0);
@@ -80,6 +98,14 @@ fn update(id: &TrackId, change: impl FnOnce(&mut LyricsChoice)) {
         c.set(&id.0, choice);
         c.clone()
     });
+    save(copy);
+}
+
+/// Saves `copy` off the UI thread (not for a snapshot); Settings' reset link follows.
+fn save(copy: LyricsChoices) {
+    if let Some(ctx) = Ctx::get() {
+        settings::show_lyrics_resettable(&ctx);
+    }
     if SNAPSHOT.with(Cell::get) {
         return;
     }

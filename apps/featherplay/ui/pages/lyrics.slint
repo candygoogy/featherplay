@@ -115,6 +115,15 @@ export global LyricsData {
     callback reset-timing();
     // "Choose other lyrics…": the dialog opens on LRCLIB's matches for the song.
     callback choose();
+    // The desktop lyrics' strip shows, locked: the lyrics menu offers to unlock it.
+    in property <bool> desktop-locked;
+    callback unlock-desktop();
+    // Something of the lyrics differs from the defaults (the text size, the desktop lyrics'
+    // size, place or lock, a song's timing or pick): Settings offers "Reset lyrics settings".
+    in property <bool> resettable;
+    // Its confirmation shows; `reset` resets them.
+    in-out property <bool> reset-asked;
+    callback reset();
     // A click on line `i`: play from its start.
     callback seek-line(int);
     // Try again after a failed lookup.

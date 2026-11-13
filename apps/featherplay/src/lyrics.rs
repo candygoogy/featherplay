@@ -151,6 +151,10 @@ pub fn init(ctx: &Rc<Ctx>) {
     data.on_move_timing(move |dir| move_timing(&c, dir));
     let c = ctx.clone();
     data.on_reset_timing(move || set_nudge(&c, 0));
+    let c = ctx.clone();
+    data.on_unlock_desktop(move || crate::desktop_lyrics::toggle_lock(&c));
+    let c = ctx.clone();
+    data.on_reset(move || settings::reset_lyrics(&c));
     choose::init(ctx, &ui);
     let c = ctx.clone();
     data.on_retry(move || {
@@ -610,6 +614,18 @@ fn set_nudge(ctx: &Rc<Ctx>, nudge_ms: i32) {
         data.set_credit(credit_line(&found.credit, if synced { nudge_ms } else { 0 }).into());
     }
     sync(ctx);
+}
+
+/// Whether any song has a timing or a pick kept (without reading them all).
+pub fn songs_chosen() -> bool {
+    choose::any()
+}
+
+/// "Reset lyrics settings": every song's timing and pick are forgotten, and what shows now
+/// is looked up again as it would be without them.
+pub fn forget_choices(ctx: &Rc<Ctx>) {
+    choose::forget();
+    setting_changed(ctx);
 }
 
 /// `--snapshot`: the full view's lyrics menu open, at the defaults, or (`moved`) set to

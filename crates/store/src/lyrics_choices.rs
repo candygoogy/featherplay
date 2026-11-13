@@ -146,8 +146,30 @@ impl LyricsChoices {
         self.songs.drain(..over);
     }
 
-    /// Writes the choices (atomically, so a crash leaves the old file).
+    /// Whether a file of choices is there (without reading it): `save` removes it once it
+    /// holds none.
+    pub fn saved(paths: &Paths) -> bool {
+        paths.config.join("lyrics.json").is_file()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.songs.is_empty()
+    }
+
+    /// Forgets every song's choices.
+    pub fn clear(&mut self) {
+        self.songs.clear();
+    }
+
+    /// Writes the choices (atomically, so a crash leaves the old file), or removes the file
+    /// when there are none.
     pub fn save(&self) -> io::Result<()> {
+        if self.songs.is_empty() {
+            return match fs::remove_file(&self.path) {
+                Err(e) if e.kind() != io::ErrorKind::NotFound => Err(e),
+                _ => Ok(()),
+            };
+        }
         let file = File {
             songs: self.songs.clone(),
         };

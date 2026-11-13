@@ -1,7 +1,7 @@
 // Settings' Lyrics section.
 import { Theme } from "../../theme.slint";
 import { Body, TextLink } from "../../parts.slint";
-import { SettingId, SettingKey, SettingsData } from "data.slint";
+import { SettingId, SettingKey, SettingsData, SettingsSearch } from "data.slint";
 import { Group, RowChips, SettingRow, ToggleRow } from "rows.slint";
 import { LyricsData } from "../lyrics.slint";
 
@@ -83,6 +83,16 @@ export component LyricsSection inherits Group {
                     overflow: clip;
                 }
             }
+        }
+    }
+    // Back to the defaults: shown only when something differs from them, and asked first.
+    if SettingsData.lyrics && LyricsData.resettable && !SettingsSearch.active: HorizontalLayout {
+        padding-top: Theme.s3;
+        padding-bottom: Theme.s4;
+        alignment: start;
+        TextLink {
+            text: @tr("Reset lyrics settings");
+            clicked => { LyricsData.reset-asked = true; }
         }
     }
 }
