@@ -101,7 +101,8 @@ fn update(id: &TrackId, change: impl FnOnce(&mut LyricsChoice)) {
     save(copy);
 }
 
-/// Saves `copy` off the UI thread (not for a snapshot); Settings' reset link follows.
+/// Saves `copy` off the UI thread, after the saves before it, so quick changes (Timing +
+/// twice) land newest last (not for a snapshot); Settings' reset link follows.
 fn save(copy: LyricsChoices) {
     if let Some(ctx) = Ctx::get() {
         settings::show_lyrics_resettable(&ctx);
@@ -109,7 +110,7 @@ fn save(copy: LyricsChoices) {
     if SNAPSHOT.with(Cell::get) {
         return;
     }
-    std::thread::spawn(move || {
+    featherplay_controller::task::write_in_order(move || {
         if let Err(e) = copy.save() {
             log!("lyrics choices: {e}");
         }

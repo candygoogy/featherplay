@@ -10,7 +10,7 @@ use featherplay_store::{
     Accent, AccentColour, CloseAction, DesktopLyrics, DiscordOptions, DiscordStatusText,
     DiscordTime, Equalizer, Hotkeys, Loudness, LyricsSize, Paths, Settings, SkipSilence,
     StreamingQuality, StripPlace, StripSize, ThemeMode, load_client_version, load_session,
-    save_client_version, save_session,
+    save_client_version, save_session, write_atomic,
 };
 
 use crate::home::{self, TestHome};
@@ -1404,4 +1404,38 @@ fn a_start_in_tray_that_isnt_a_bool_loads_as_off_and_keeps_the_rest() {
     }
     fs::write(&file, "start_in_tray = true\n").unwrap();
     assert!(Settings::load(&p).start_in_tray);
+}
+
+/// Many writes of one file at once (saves from several threads) all succeed, each whole, and
+/// the file ends with the last value written; no temp file is left behind.
+#[test]
+fn writes_of_one_file_at_once_all_succeed() {
+    let Some(home) = TestHome::new("atomic-at-once") else {
+        return;
+    };
+    let p = home.paths();
+    let file = p.config.join("lyrics.json");
+    let values: Vec<String> = (0..16)
+        .map(|t| format!("thread {t}: {}", "x".repeat(4096)))
+        .collect();
+    std::thread::scope(|s| {
+        for value in &values {
+            let file = &file;
+            s.spawn(move || {
+                for _ in 0..25 {
+                    write_atomic(file, value.as_bytes()).expect("a write at once with others");
+                }
+            });
+        }
+    });
+    let text = fs::read_to_string(&file).unwrap();
+    assert!(values.contains(&text), "a write landed mixed with another");
+
+    write_atomic(&file, b"last").unwrap();
+    assert_eq!(fs::read_to_string(&file).unwrap(), "last");
+    let names: Vec<_> = fs::read_dir(&p.config)
+        .unwrap()
+        .map(|e| e.unwrap().file_name())
+        .collect();
+    assert_eq!(names, ["lyrics.json"]);
 }

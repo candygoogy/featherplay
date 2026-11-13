@@ -468,15 +468,16 @@ pub fn artist_entry(a: &ArtistSummary) -> Entry {
 }
 
 /// A playlist, album or artist was opened or played: it goes to the front of the recent
-/// record (saved off the UI thread). The sidebar's order follows the next time a list is
-/// shown; Home's shortcuts follow now.
+/// record (saved off the UI thread, in order, so two quick opens save the newer record
+/// last). The sidebar's order follows the next time a list is shown; Home's shortcuts follow
+/// now.
 pub fn opened(ctx: &Ctx, e: Entry) {
     let saved = LIBRARY.with_borrow_mut(|l| {
         library_list::note(&mut l.recent, e);
         l.key.clone().map(|k| (k, l.recent.clone()))
     });
     if let Some((key, recent)) = saved {
-        featherplay_controller::task::blocking_detached(ctx.catalog.runtime(), move || {
+        featherplay_controller::task::write_in_order(move || {
             let cache = LibraryCache::new(&Paths::resolve());
             if let Err(e) = cache.save(&key, LibraryList::Recent, &recent) {
                 log!("sidebar recent: saving failed: {}", e.kind());
