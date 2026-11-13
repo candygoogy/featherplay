@@ -59,8 +59,6 @@ component LinkText inherits Rectangle {
     in property <length> size: Theme.t-body-l;
     in property <bool> enabled: true;
     in property <length> room: 100000px;
-    // The text's own width, uncut.
-    out property <length> natural: t.preferred-width;
     callback clicked();
     width: min(t.preferred-width, max(0px, root.room));
     accessible-role: button;

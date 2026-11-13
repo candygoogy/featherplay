@@ -70,9 +70,6 @@ export component ResumeCard inherits Rectangle {
     property <length> text-x: root.pad + root.cover + Theme.s5;
     // The room the song's column needs beside the queue: the buttons, and a title's worth.
     property <length> song-min-w: max(260px, buttons.preferred-width);
-    // The narrowest card that keeps the queue's column (its rows at their narrowest), so a
-    // short row of shortcuts doesn't hide the queue (`HomeTop`).
-    out property <length> queue-min-w: root.text-x + root.song-min-w + 2 * Theme.s5 + 1px + 260px - 16px + root.pad;
     // The queue's rows, their 8 px insets included: about a third of the card.
     property <length> rows-w: clamp(floor(root.width * 0.3 / 1px) * 1px, 260px, 320px);
     // The rows' hover tiles reach 8 px past the column on both sides, as Quick picks' do.

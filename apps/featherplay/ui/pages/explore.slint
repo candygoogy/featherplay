@@ -358,7 +358,6 @@ component ChartArtistItem inherits Rectangle {
 // The charts' top: the country, the video charts, the "Top artists" heading.
 component ChartsHead inherits Rectangle {
     in property <length> pad;
-    out property <length> button-y: Theme.s4;
     callback country-clicked(length, length);
     in property <bool> list-open;
     property <length> shelf-h: ExploreData.shelves.length > 0 ? Shapes.height(ExploreData.shelves[0].shape, root.width - 2 * root.pad, ExploreData.shelves[0].items.length) + Theme.section-gap : 0px;
