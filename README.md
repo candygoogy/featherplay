@@ -6,6 +6,7 @@
   and mini-player stay for the site and release notes, but aren't shown here.
 -->
 
+<!-- TODO 0.4.0 figures -->
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: light)" srcset=".github/readme/header-light.png">
@@ -26,6 +27,7 @@ memory. It's written in Rust and drawn with Slint, and it keeps what people use 
 Desktop: scrobbling, media keys and taskbar buttons, SponsorBlock and Discord status.
 
 <!-- Figures: featherplay 0.3.0 on Windows, the same as in How light? Update both at release. -->
+<!-- TODO 0.4.0 figures -->
 
 | **42 MB** | **1** | **0.061 %** | **10.78 MB** |
 |---|---|---|---|
@@ -61,10 +63,12 @@ and a portable exe for each, and lists every file's SHA256.
 A newer setup upgrades the installed copy in place and keeps your settings and sign-in;
 **Install updates automatically**, in Settings > Account, turns the automatic install off.
 Uninstalling from Settings > Apps removes everything featherplay keeps: settings, cache,
-helpers, the sign-in window's data, and its entries in Credential Manager. To remove the
-portable exe, delete it and its two folders, then remove the Windows Credentials whose names
-end in `.featherplay` in Credential Manager. featherplay isn't code-signed yet, so Windows may
-say it [protected your PC](#windows-protected-your-pc) the first time.
+helpers, the sign-in window's data, its entries in Credential Manager, and its entry for
+starting when you sign in. To remove the portable exe, turn off **Start when you sign in to
+Windows** (Settings > Window) if it's on, delete the exe and its two folders, then remove the
+Windows Credentials whose names end in `.featherplay` in Credential Manager. featherplay
+isn't code-signed yet, so Windows may say it [protected your PC](#windows-protected-your-pc)
+the first time.
 
 <!-- TODO(release): once the manifests in packaging/ are accepted, show
      `winget install candygoogy.featherplay` and `scoop bucket add extras` +
@@ -175,6 +179,10 @@ into one program that opens at once and stays quiet while it plays. It leaves ou
   first. Pin any of them to the top.
 - Search (`Ctrl+K`) filters by songs, albums, artists and playlists, and opens any YouTube or
   YouTube Music link you paste.
+- Quick search from anywhere (off until you turn it on in Settings > Window): a shortcut,
+  `Ctrl+Alt+K` unless you pick another, opens a small search box over whatever app you're
+  in. `Enter` plays what you pick, `Shift+Enter` plays it next, `Ctrl+Enter` opens it in
+  featherplay, and the empty box lists your last five picks.
 - Right-click a song or a playlist to play it next, queue it, shuffle it or start a radio, or
   to rename or delete a playlist of your own. An album's ⋯ menu likes or dislikes all its songs.
 
@@ -190,6 +198,15 @@ into one program that opens at once and stays quiet while it plays. It leaves ou
   reorders, removes and clears; Related shows songs like the one playing.
 - Synced lyrics, from LRCLIB or YouTube Music, follow the song in its cover's colour; click a
   line to jump there. They're looked up only while on screen, and never with Show lyrics off.
+- The ⋯ beside the Lyrics pill sets the lyrics' text size (also `Ctrl+=` and `Ctrl+-`), moves
+  the lines half a second sooner or later for a song whose timing is off, and finds other
+  lyrics on LRCLIB when the match is wrong. What you choose for a song is kept for it.
+- Desktop lyrics (Settings > Lyrics, the tray menu or `Ctrl+Shift+L`; off by default) show
+  the line being sung, and the next, in a small strip above other apps. Drag it where you
+  want it, then lock it to let clicks through.
+- A sleep timer (off until you turn it on in Settings > Playback) adds a button to the player
+  bar and the tray menu: pause in 15, 30 or 45 minutes or an hour, or at the end of the song,
+  album or playlist, with the music fading out first.
 - Songs play YouTube Music's Opus stream, which sounds better than AAC at about the same data
   use (Settings > Sound > Streaming quality switches to AAC).
 - A music video with a song version plays as the song, so there are no skits or intros; radio
@@ -234,9 +251,13 @@ All off until you turn them on, except Match song volumes.
   the window asks whether to quit or keep playing there, until you tell it to remember.
 - `Space` plays and pauses (outside text fields), `Ctrl+Left` and `Ctrl+Right` change song,
   `Ctrl+S` shuffles, `Ctrl+R` steps through Repeat, `Up` and `Down` set the volume, `Ctrl+K`
-  searches, `Ctrl+L` shows or hides lyrics, and `Alt+Left` and `Alt+Right` (or the mouse's side
-  buttons) move between pages. `Ctrl+/` lists them all, and the player's buttons name theirs
-  when you point at them.
+  searches, `Ctrl+L` shows or hides lyrics, `Ctrl+=` and `Ctrl+-` make them larger or smaller,
+  `Ctrl+Shift+L` turns desktop lyrics on or off, and `Alt+Left` and `Alt+Right` (or the
+  mouse's side buttons) move between pages. `Ctrl+/` lists them all, and the player's buttons
+  name theirs when you point at them.
+- **Start when you sign in to Windows**, in Settings > Window, off by default, opens
+  featherplay when you sign in, without taking the focus and paused until you press play;
+  with **Start in the tray** it shows only the tray icon.
 - Song-change notifications and global hotkeys of your own are in Settings > Window. On
   Linux, media keys go through MPRIS, and the tray works where the desktop has one.
 
@@ -283,6 +304,7 @@ Measured on one Windows PC with 16 logical processors, each app playing a song o
 <!-- Figures: featherplay 0.3.0's of 13 November 2026 (its release exe, three runs, the
      median); Pear's and Edge's of 1 November, and the sound-features run (0.2.0, 9 November),
      not repeated. Write-ups outside the repo; site/src/data/numbers.ts holds the same figures. -->
+<!-- TODO 0.4.0 figures -->
 
 | | featherplay 0.3.0 | Pear Desktop 3.12.0 | YouTube Music in Edge 156 |
 |---|---|---|---|
@@ -300,6 +322,7 @@ Measured on one Windows PC with 16 logical processors, each app playing a song o
 With the equalizer, Even out loudness, Skip silence and a 5 s crossfade all on, featherplay
 0.2.0 used 56 MB of memory and 0.087 % CPU while playing (one run, 9 November).
 
+<!-- TODO 0.4.0 figures -->
 **On Linux**, measured in WSL on the same PC (not a real desktop), featherplay 0.3.0's AppImage
 used 85 MB of memory both playing and paused, 0.26 % CPU while playing and 0.001 % while paused,
 as a share of the 12 processors WSL had (three runs, the median; the queue played on rather than
@@ -323,10 +346,10 @@ Most of Pear's plugins are settings in featherplay. Plugin by plugin, as of toda
 |---|---|
 | Scrobbler | **Built in.** Last.fm and ListenBrainz, "Scrobble other media", alternative titles and artists, and your own Last.fm API key if you want one. |
 | Taskbar Media Control | **Built in** on Windows: Previous, Play/Pause and Next on the taskbar thumbnail. |
-| Shortcuts | **Built in.** Media keys and the system's media controls always; your own global hotkeys in Settings > Window (off by default; not on Wayland). |
+| Shortcuts | **Built in.** Media keys and the system's media controls always; your own global hotkeys in Settings > Window (off by default; not on Wayland), and a shortcut for quick search from any app. |
 | SponsorBlock | **Built in**, on by default: skips non-music segments in music videos. |
 | Discord Rich Presence | **Built in**, off by default, with Pear's options: status text, time display, links, the Play song button, clear after a pause, reconnect automatically. |
-| Synced Lyrics | **Built in.** LRCLIB and YouTube Music's own timed lyrics, with plain lyrics as the fallback; click a line to jump to it. A setting turns lyrics off completely. |
+| Synced Lyrics | **Built in.** LRCLIB and YouTube Music's own timed lyrics, with plain lyrics as the fallback; click a line to jump to it. Three text sizes, the timing moved per song, other lyrics chosen from LRCLIB, and desktop lyrics in a strip above other apps. A setting turns lyrics off completely. |
 | Notifications | **Built in.** Track-change notifications, off by default (Settings > Window). |
 | Custom Output Device | **Built in.** Pick the device in Settings > Sound; if it disappears, playback pauses and moves to the default one. |
 | Exponential Volume | **Built in.** The volume slider follows a perceptual curve. |
@@ -452,8 +475,9 @@ featherplay sends no telemetry and has no server, only a static website. It conn
   day, and when songs keep failing to play, it asks whether a newer featherplay is out or a
   known playback problem is open, and sends nothing but the app's version. The installed copy
   and the AppImage then download the new version from the release;
-- **LRCLIB**, for lyrics, only while lyrics are on screen. It gets the song's title, artist,
-  album and length;
+- **LRCLIB**, for lyrics, only while lyrics are on screen (desktop lyrics count). It gets the
+  song's title, artist, album and length, and in **Choose other lyrics** the words you search
+  for;
 - **SponsorBlock**, on by default, only for music videos and uploads (songs have nothing to
   skip). It asks by the first four characters of a hash of the video's ID, so the server
   doesn't learn which video you play;
@@ -473,8 +497,8 @@ token are kept in Windows Credential Manager, or on Linux in your keyring.
 
 | | Windows | Linux |
 |---|---|---|
-| Settings, the play queue, scrobbles waiting to be sent | `%APPDATA%\featherplay` | `~/.config/featherplay` |
-| Covers, the library's pages, the helpers (on Windows, the sign-in window's data too) | `%LOCALAPPDATA%\featherplay` | `~/.cache/featherplay` |
+| Settings, the play queue, scrobbles waiting to be sent, the lyrics' timing and picks per song | `%APPDATA%\featherplay` | `~/.config/featherplay` |
+| Covers, the library's pages, the helpers, quick search's last picks (on Windows, the sign-in window's data too) | `%LOCALAPPDATA%\featherplay` | `~/.cache/featherplay` |
 | Logs | `%LOCALAPPDATA%\featherplay\logs` | `~/.local/state/featherplay/logs` |
 
 Signing in with your own browser uses a temporary profile in the cache folder, deleted as soon
@@ -482,6 +506,10 @@ as the sign-in ends (or at the next start, if featherplay was killed meanwhile);
 keeps only its YouTube Music cookies. The song links looked up in the last session are kept
 there until they expire (a few hours), so songs start sooner after a restart; like every
 YouTube stream link, each one contains your public IP address.
+
+**Start when you sign in** adds the entry your system runs at sign-in: a `featherplay` value
+under `HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run` on Windows, or
+`~/.config/autostart/dev.candygoogy.featherplay.desktop` on Linux. Turning it off removes it.
 
 ## Linux (experimental)
 
@@ -492,7 +520,8 @@ desktop yet, so reports help, good or bad
 ([open an issue](https://github.com/candygoogy/featherplay/issues)). It's the same app as on
 Windows, except that there's no sign-in window (you sign in in your browser and close it
 when you're done) and no taskbar buttons, the session goes in your keyring, media keys work
-through MPRIS, and the body text is in Inter.
+through MPRIS, and the body text is in Inter. Under Wayland there are no global hotkeys, no
+quick search shortcut and no desktop lyrics (see [Known limits](#known-limits)).
 
 **The AppImage.** Download `featherplay-x86_64.AppImage` (or `featherplay-aarch64.AppImage`)
 from the [latest release](https://github.com/candygoogy/featherplay/releases/latest), then:
@@ -503,10 +532,11 @@ chmod +x featherplay-x86_64.AppImage
 ```
 
 It needs FUSE's `fusermount`, which most desktops have; without it, start it with
-`--appimage-extract-and-run`. In a folder you can write to, it updates itself as the Windows
-installer does. To remove it, delete the file and the three folders listed under
-[Privacy](#privacy), then remove the items whose names end in `@featherplay` from your keyring
-(in Seahorse, for example).
+`--appimage-extract-and-run`. It carries the keyboard and X11 libraries a minimal system may
+lack, so it starts there too. In a folder you can write to, it updates itself as the Windows
+installer does. To remove it, turn off **Start when you log in** (Settings > Window) if it's
+on, delete the file and the three folders listed under [Privacy](#privacy), then remove the
+items whose names end in `@featherplay` from your keyring (in Seahorse, for example).
 
 **The .tar.gz.** Unpack it and run `./featherplay` in the `featherplay` folder, or install it
 for your user, so it shows in your desktop's app list:
@@ -525,7 +555,9 @@ delete `~/.local/bin/featherplay` and the `dev.candygoogy.featherplay.*` files u
 
 A desktop install has everything already. A minimal one needs glibc 2.35 or newer, a Wayland
 or X11 session, PipeWire or PulseAudio behind ALSA, and these packages, plus the Noto fonts
-for song titles in other scripts and for emoji:
+for song titles in other scripts and for emoji. The AppImage brings its own libxkbcommon,
+libxkbcommon-x11, libXcursor and libXi (and the few libraries they use), so it doesn't need
+those four; the `.tar.gz` needs all of them:
 
 | | Packages | Fonts for other scripts and emoji |
 |---|---|---|
@@ -541,9 +573,14 @@ uses the Mozilla roots it carries.
 ### Known limits
 
 - **No tray on stock GNOME**, which shows no tray icons without an extension. Closing the
-  window quits, and a mini player button (`Ctrl+M`) shows in the player bar instead.
+  window quits, a mini player button (`Ctrl+M`) shows in the player bar instead, and **Start
+  in the tray** is **Start minimised** there.
 - **No global hotkeys on Wayland**, which doesn't let an app take keys for the whole desktop;
-  the setting is hidden there. Media keys still work through MPRIS.
+  the setting is hidden there. Media keys still work through MPRIS. Quick search's row says
+  it isn't available and gives the command `featherplay --quick-search`: add it as a shortcut
+  in your desktop's keyboard settings, and it opens the box in the running featherplay.
+- **No desktop lyrics on Wayland**, which leaves where windows sit and what stays on top to
+  the desktop; Settings says so. In an X11 session they work.
 - **The mini player on Wayland** opens as an ordinary window, where the desktop puts it.
 - **Snap and Flatpak browsers can't be used to sign in.** Use one from a `.deb` or `.rpm`, or
   paste a cookie header.
@@ -554,8 +591,9 @@ uses the Mozilla roots it carries.
 
 **Not yet checked on a real desktop**, only in automatic tests: the tray on KDE and on GNOME
 with the AppIndicator extension; notifications; media keys and the desktop's media widgets
-(MPRIS); global hotkeys on X11; title bars and scaling on GNOME under Wayland; signing in with
-the desktop's own browser; the AppImage updating itself. If you try one, say how it went.
+(MPRIS); global hotkeys, quick search and desktop lyrics on X11; starting at login; title bars
+and scaling on GNOME under Wayland; signing in with the desktop's own browser; the AppImage
+updating itself. If you try one, say how it went.
 
 ## Local API
 
