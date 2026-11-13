@@ -141,7 +141,8 @@ component RowText inherits VerticalLayout {
 export component LyricsMenuLayer inherits Rectangle {
     callback closed();
     property <length> w: 356px;
-    property <length> pad: 6px;
+    // The rows' inset from the card's edge, as the song and account menus have it.
+    property <length> pad: Theme.s2;
     property <bool> timing: LyricsData.state == LyricsState.synced;
     property <bool> choose: LyricsData.lrclib;
     property <bool> desktop: SettingsData.desktop-lyrics-here;
@@ -192,6 +193,8 @@ export component LyricsMenuLayer inherits Rectangle {
         x: max(8px, LyricsMenu.anchor-right - root.w);
         y: LyricsMenu.anchor-y + self.nudge;
         width: root.w;
+        // The rows and the padding under them: the layout's own height is set too, or it
+        // takes the card's and its last row hangs below the card's bottom edge.
         height: lay.preferred-height + 2 * root.pad;
         opacity: root.open ? 1 : 0;
         visible: self.opacity > 0;
@@ -230,6 +233,7 @@ export component LyricsMenuLayer inherits Rectangle {
             x: root.pad;
             y: root.pad;
             width: parent.width - 2 * root.pad;
+            height: self.preferred-height;
             // Text size: one setting for the app (Settings > Lyrics too).
             HorizontalLayout {
                 padding: 6px;
@@ -351,7 +355,7 @@ export component LyricsMenuLayer inherits Rectangle {
             if root.choose: Divider { }
             if root.choose: Rectangle {
                 min-height: 56px;
-                border-radius: Theme.r-m;
+                border-radius: Theme.r-s;
                 background: Theme.state(choose-ta.pressed, choose-ta.has-hover);
                 animate background { duration: Theme.t-hover; }
                 accessible-role: button;
