@@ -18,14 +18,32 @@ body:
     validations:
       required: true
 
+  - type: dropdown
+    id: system
+    attributes:
+      label: System
+      options:
+        - "Windows"
+        - "Linux"
+    validations:
+      required: true
+
   - type: input
     id: windows
     attributes:
       label: Windows version
-      description: Press Win+R and run `winver`.
+      description: On Windows, press Win+R and run `winver`.
       placeholder: "Windows 11 24H2 (build 26100)"
-    validations:
-      required: true
+
+  - type: textarea
+    id: linux
+    attributes:
+      label: Linux details
+      description: |
+        On Linux: the distribution and its version, the desktop, X11 or Wayland, and whether
+        you run the AppImage or the .tar.gz.
+      placeholder: |
+        Ubuntu 24.04, GNOME 46, Wayland, AppImage
 
   - type: dropdown
     id: signed-in
@@ -33,6 +51,7 @@ body:
       label: Signed in?
       options:
         - "Yes, through the sign-in window"
+        - "Yes, through a browser"
         - "Yes, with a pasted Cookie header"
         - "No"
     validations:
@@ -83,6 +102,7 @@ body:
     attributes:
       label: Log
       description: |
-        Attach `%LOCALAPPDATA%\featherplay\logs\featherplay.log` (Settings > About > Open log
-        folder), or paste the lines from around the problem. featherplay leaves cookies,
+        Attach `featherplay.log` (Settings > About > Open log folder): on Windows it's in
+        `%LOCALAPPDATA%\featherplay\logs`, on Linux in `~/.local/state/featherplay/logs`. Or
+        paste the lines from around the problem. featherplay leaves cookies,
         tokens and keys out of its log, but read it before you post it anyway.
