@@ -73,6 +73,10 @@ pub const PAGES: &[&str] = &[
     "now-playing-lyrics-full",
     "now-playing-lyrics-full-plain",
     "now-playing-lyrics-full-none",
+    // A song the user chose no lyrics for ("None of these"): the side tab and the full view
+    // say so, with the ways back.
+    "now-playing-lyrics-chose-none",
+    "now-playing-lyrics-full-chose-none",
     // The full view during an LRCLIB outage: the song's plain lyrics, the note saying synced
     // lyrics are unavailable for now.
     "now-playing-lyrics-full-outage",
@@ -396,6 +400,8 @@ pub(super) fn page(name: &str, f: &Fixtures) -> Result<Page, String> {
         | "now-playing-lyrics-full"
         | "now-playing-lyrics-full-plain"
         | "now-playing-lyrics-full-none"
+        | "now-playing-lyrics-chose-none"
+        | "now-playing-lyrics-full-chose-none"
         | "now-playing-lyrics-full-outage"
         | "now-playing-lyrics-full-unavailable"
         | "sleep-running"

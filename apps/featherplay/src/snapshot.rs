@@ -734,6 +734,9 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
                 SnapshotLyrics::Plain
             }
             ("now-playing-lyrics-none" | "now-playing-lyrics-full-none", _) => SnapshotLyrics::None,
+            ("now-playing-lyrics-chose-none" | "now-playing-lyrics-full-chose-none", _) => {
+                SnapshotLyrics::ChoseNone
+            }
             ("now-playing-lyrics-full-outage", _) => SnapshotLyrics::Outage,
             ("now-playing-lyrics-full-unavailable", _) => SnapshotLyrics::Unavailable,
             _ => SnapshotLyrics::Synced,
@@ -745,10 +748,14 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
         let full = o.page.starts_with("now-playing-lyrics-full");
         lyrics.set_full(full);
         // The full view shows the lyrics in the stage; the side panel keeps Up next. With
-        // none to show the stage keeps the cover, and the side panel shows the Lyrics tab.
+        // none to show the stage keeps the cover, and the side panel shows the Lyrics tab;
+        // no lyrics by choice show in the stage.
         let lines = matches!(
             kind,
-            SnapshotLyrics::Synced | SnapshotLyrics::Plain | SnapshotLyrics::Outage
+            SnapshotLyrics::Synced
+                | SnapshotLyrics::Plain
+                | SnapshotLyrics::Outage
+                | SnapshotLyrics::ChoseNone
         );
         ui.global::<NowPlayingData>()
             .set_tab(if full && lines { 0 } else { 2 });

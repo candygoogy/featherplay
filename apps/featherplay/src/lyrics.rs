@@ -657,6 +657,8 @@ pub enum SnapshotLyrics {
     Synced,
     Plain,
     None,
+    /// The user chose no lyrics for the song ("None of these").
+    ChoseNone,
     Loading,
     /// LRCLIB failed: the song's plain lyrics instead, LRCLIB asked again a minute later.
     Outage,
@@ -683,6 +685,11 @@ pub fn show_for_snapshot(ctx: &Rc<Ctx>, kind: SnapshotLyrics) {
         SnapshotLyrics::Outage => lookup(false).map(|f| Found { keep: false, ..f }),
         SnapshotLyrics::None => Ok(Found {
             keep: true,
+            ..Found::default()
+        }),
+        SnapshotLyrics::ChoseNone => Ok(Found {
+            keep: true,
+            picked: true,
             ..Found::default()
         }),
         SnapshotLyrics::Loading => {

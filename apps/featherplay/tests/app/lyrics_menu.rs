@@ -2,7 +2,8 @@
 //! other lyrics": the text size for the app (saved as a setting, Ctrl+= and Ctrl+- too), the
 //! lines half a second sooner or later for this song (kept on this PC, noted in the credit,
 //! Reset), and LRCLIB's matches for the song, a pick used at once and kept for the song;
-//! Large lays out in the narrowest window. On the offscreen platform with the demo
+//! "None of these" says so in the view, with the ways back; Large lays out in the narrowest
+//! window. On the offscreen platform with the demo
 //! fixtures; no window is shown.
 
 use std::ops::ControlFlow;
@@ -13,7 +14,7 @@ use featherplay::ui::{
     ChooseState, Frame, LyricsChoose, LyricsData, LyricsMenu, LyricsState, NowPlayingData, Theme,
 };
 use featherplay_store::{LyricsChoices, LyricsPick, Paths};
-use i_slint_core::accessibility::AccessibleStringProperty;
+use i_slint_core::accessibility::{AccessibilityAction, AccessibleStringProperty};
 use i_slint_core::item_tree::ItemRc;
 use i_slint_core::items::AccessibleRole;
 use i_slint_core::lengths::LogicalRect;
@@ -54,6 +55,31 @@ fn saved(scene: &Scene, ok: impl Fn(&featherplay_store::LyricsChoice) -> bool) -
         std::thread::sleep(Duration::from_millis(20));
     }
     false
+}
+
+/// The visible buttons whose accessible label is `label`.
+fn find(scene: &Scene, label: &str) -> Vec<ItemRc> {
+    let root = ItemRc::new_root(WindowInner::from_pub(scene.ui.window()).component());
+    let mut found = Vec::new();
+    root.visit_descendants(|item| {
+        if item.is_visible()
+            && item.accessible_role() == AccessibleRole::Button
+            && item
+                .accessible_string_property(AccessibleStringProperty::Label)
+                .is_some_and(|l| l == label)
+        {
+            found.push(item.clone());
+        }
+        ControlFlow::<()>::Continue(())
+    });
+    found
+}
+
+fn press(scene: &Scene, label: &str) {
+    let found = find(scene, label);
+    assert_eq!(found.len(), 1, "{} visible say {label:?}", found.len());
+    found[0].accessible_action(&AccessibilityAction::Default);
+    scene.settle();
 }
 
 fn ctrl(scene: &Scene, key: &str) {
@@ -203,6 +229,61 @@ fn another_match_picked_is_used_at_once_and_kept_for_the_song() {
     scene.settle();
     assert_eq!(data.get_state(), LyricsState::None);
     assert_eq!(data.get_why(), "You chose no lyrics for this song.");
+}
+
+#[test]
+fn none_of_these_says_so_with_the_ways_back_in_the_view_its_menu_and_the_side_tab() {
+    let scene = scene();
+    let data = scene.ui.global::<LyricsData>();
+    let choose = scene.ui.global::<LyricsChoose>();
+    let menu = scene.ui.global::<LyricsMenu>();
+    choose.invoke_pick_none();
+    choose.set_open(false);
+    scene.settle();
+    assert!(data.get_chose_none());
+    assert!(
+        data.get_showing(),
+        "the view closed, and its ⋯ menu with it"
+    );
+    assert!(saved(&scene, |c| matches!(c.pick, Some(LyricsPick::None))));
+
+    // The ⋯ menu stays, Choose other lyrics… in it as in the view.
+    scene.ui.window().take_snapshot().expect("frame");
+    menu.set_open_asked(menu.get_open_asked() + 1);
+    scene.settle();
+    assert!(menu.get_open(), "no ⋯ to open the menu");
+    assert_eq!(find(&scene, "Choose other lyrics…").len(), 2);
+    menu.invoke_close();
+    scene.settle();
+
+    // The view's ways back: the dialog, and the automatic match.
+    press(&scene, "Choose other lyrics…");
+    assert!(
+        choose.get_open(),
+        "Choose other lyrics… didn't open the dialog"
+    );
+    choose.set_open(false);
+    scene.settle();
+    press(&scene, "Use the automatic match");
+    assert_eq!(data.get_state(), LyricsState::Synced);
+    assert!(!data.get_picked());
+    assert!(saved(&scene, |c| c.pick.is_none()));
+
+    // The side tab offers them too, and the toggle opens the view again on the song.
+    choose.invoke_pick_none();
+    scene.settle();
+    data.invoke_toggle_view();
+    scene.ui.global::<Frame>().set_side_open(true);
+    let np = scene.ui.global::<NowPlayingData>();
+    np.set_tab(2);
+    np.invoke_tab_selected(2);
+    scene.settle();
+    assert!(!data.get_showing());
+    assert_eq!(find(&scene, "Choose other lyrics…").len(), 1);
+    assert_eq!(find(&scene, "Use the automatic match").len(), 1);
+    data.invoke_toggle_view();
+    scene.settle();
+    assert!(data.get_showing(), "the toggle didn't open the view");
 }
 
 /// Where every lyric line of a lyrics view lies, in window coordinates, top to bottom: the

@@ -62,10 +62,13 @@ export global LyricsData {
     // opened on it: it shows through the lookup (its skeleton), rather than opening once the
     // lines are in. Kept by `LyricsWatch` and Now playing's `init`.
     in-out property <bool> held: false;
+    // The user chose no lyrics for the playing song ("None of these"): the view says so,
+    // with the ways back, and the ⋯ menu stays.
+    out property <bool> chose-none: self.state == LyricsState.none && self.picked && Player.has-track;
     // The full view is on screen: what the toggles show as active. Only with lines to show,
-    // or a lookup it holds through: a song with none keeps the cover view, and the Lyrics
-    // pill says why.
-    out property <bool> showing: self.wanted && (self.has-lines || (self.looking && self.held));
+    // a lookup it holds through, or no lyrics by the user's choice: a song with none found
+    // keeps the cover view, and the Lyrics pill says why.
+    out property <bool> showing: self.wanted && (self.has-lines || self.chose-none || (self.looking && self.held));
     // The Lyrics pill's note under it, for a few seconds after a press on the toggles: on a
     // song with no lyrics, or one whose lookup the press waited on (`asked`) and that found
     // nothing to show. Never on its own when a later song has none. `LyricsWatch` hides it
@@ -103,6 +106,8 @@ export global LyricsData {
     in property <bool> timing-moved;
     // The lyrics shown were picked in "Choose other lyrics" (or none were).
     in property <bool> picked;
+    // "Use the automatic match": the song's pick is forgotten (`LyricsChoose.automatic`).
+    callback automatic();
     // The lyrics are on screen (`LyricsWatch`): the size keys work only then.
     in-out property <bool> on-screen;
     // The lyrics are on screen (`LyricsWatch`, now_playing.slint): Rust asks for lyrics and
@@ -160,19 +165,19 @@ export global LyricsData {
             return;
         }
         if Nav.page != PageKind.now-playing {
-            if self.state == LyricsState.none {
+            if self.state == LyricsState.none && !self.chose-none {
                 self.nudge();
             } else {
                 self.full = true;
                 self.held = !self.missing;
-                self.asked = !self.has-lines;
+                self.asked = !self.has-lines && !self.chose-none;
             }
             Nav.go(PageKind.now-playing);
         } else if self.state == LyricsState.error {
             self.full = true;
             self.asked = true;
             self.retry();
-        } else if self.state == LyricsState.none {
+        } else if self.state == LyricsState.none && !self.chose-none {
             self.nudge();
         } else {
             // Asked for, or called off while its lookup still runs.
@@ -265,10 +270,51 @@ component LyricsNote inherits HorizontalLayout {
     }
 }
 
-// No lines to show, in the side tab: the house's empty state on the panel's own ground (the
-// cover's colour is for lyrics), a tile with the microphone, what happened, where featherplay
-// looked or what to do, and after a failed lookup Try again.
+// A pill on the lyrics' panel (deep in either theme), as the stage's Lyrics pill and ⋯ are:
+// `solid`, white with the panel's colour for its ink; otherwise a white tonal one.
+component PanelPill inherits Rectangle {
+    in property <string> label;
+    in property <bool> solid;
+    callback clicked();
+    height: 40px;
+    width: lay.preferred-width;
+    border-radius: self.height / 2;
+    property <brush> ground: root.solid
+        ? (ta.pressed ? Theme.panel-solid-pressed : (ta.has-hover ? Theme.panel-solid-hover : Theme.panel-solid))
+        : (ta.pressed ? #FFFFFF40 : (ta.has-hover ? #FFFFFF33 : #FFFFFF26));
+    animate ground { duration: Theme.t-hover; }
+    background: root.ground;
+    transform-scale: ta.pressed ? Theme.press-scale : 1.0;
+    animate transform-scale {
+        duration: ta.pressed ? Theme.t-press : Theme.t-release;
+        easing: ta.pressed ? Curves.ease-out : Curves.release;
+    }
+    accessible-role: button;
+    accessible-label: root.label;
+    accessible-action-default => { root.clicked(); }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+    lay := HorizontalLayout {
+        padding-left: 20px;
+        padding-right: 20px;
+        Body {
+            text: root.label;
+            font-weight: 600;
+            color: root.solid ? LyricsData.ink.ground : LyricsData.ink.current;
+            vertical-alignment: center;
+        }
+    }
+}
+
+// No lines to show: the house's empty state, a tile with the microphone, what happened, where
+// featherplay looked or what to do, and after a failed lookup Try again. In the side tab it's
+// on the panel's own ground (the cover's colour is for lyrics); `on-panel`, in the full view,
+// it's on the lyrics' panel, in its inks. A song the user chose no lyrics for gets the ways
+// back: Choose other lyrics… (with LRCLIB on) and the automatic match.
 component NoLyrics inherits Rectangle {
+    in property <bool> on-panel;
     height: lay.preferred-height;
     accessible-role: text;
     accessible-label: LyricsData.message + ". " + LyricsData.why;
@@ -280,14 +326,14 @@ component NoLyrics inherits Rectangle {
                 width: 56px;
                 height: 56px;
                 border-radius: Theme.r-l;
-                background: Theme.card;
-                border-width: 1px;
+                background: root.on-panel ? #FFFFFF1A : Theme.card;
+                border-width: root.on-panel ? 0px : 1px;
                 border-color: Theme.card-edge;
                 Icon {
                     width: 26px;
                     height: 26px;
                     commands: Icons.lyrics;
-                    stroke: Theme.text2;
+                    stroke: root.on-panel ? LyricsData.ink.next : Theme.text2;
                 }
             }
         }
@@ -295,16 +341,51 @@ component NoLyrics inherits Rectangle {
         Display {
             text: LyricsData.message;
             font-size: Theme.t-display-xs;
+            color: root.on-panel ? LyricsData.ink.current : Theme.text1;
             wrap: word-wrap;
         }
         Rectangle { height: Theme.s2; }
         Body {
             text: LyricsData.why;
-            color: Theme.text2;
+            color: root.on-panel ? LyricsData.ink.next : Theme.text2;
             wrap: word-wrap;
         }
+        // Chosen: the ways back. Side by side on the panel; stacked in the narrow side tab.
+        if LyricsData.chose-none && root.on-panel: HorizontalLayout {
+            padding-top: Theme.s5;
+            alignment: start;
+            spacing: Theme.s3;
+            if LyricsData.lrclib: PanelPill {
+                solid: true;
+                label: @tr("Choose other lyrics…");
+                clicked => { LyricsData.choose(); }
+            }
+            PanelPill {
+                solid: !LyricsData.lrclib;
+                label: @tr("Use the automatic match");
+                clicked => { LyricsData.automatic(); }
+            }
+        }
+        if LyricsData.chose-none && !root.on-panel: VerticalLayout {
+            padding-top: Theme.s5;
+            spacing: Theme.s3;
+            if LyricsData.lrclib: HorizontalLayout {
+                alignment: start;
+                Pill {
+                    label: @tr("Choose other lyrics…");
+                    clicked => { LyricsData.choose(); }
+                }
+            }
+            HorizontalLayout {
+                alignment: start;
+                TextLink {
+                    text: @tr("Use the automatic match");
+                    clicked => { LyricsData.automatic(); }
+                }
+            }
+        }
         // A song LRCLIB matched wrongly or not at all: the user can look for it.
-        if LyricsData.state == LyricsState.none && LyricsData.lrclib && Player.has-track: VerticalLayout {
+        if LyricsData.state == LyricsState.none && !LyricsData.chose-none && LyricsData.lrclib && Player.has-track: VerticalLayout {
             padding-top: Theme.s3;
             HorizontalLayout {
                 alignment: start;
@@ -487,7 +568,8 @@ export component LyricsView inherits Rectangle {
     property <length> box-h: root.card ? root.list-h - Theme.s2 : root.list-h;
     property <bool> moving: LyricsData.has-lines;
     // No lines to show (none found, a failed lookup, nothing playing): the side tab says why
-    // (`NoLyrics`); the full view never shows then (`LyricsData.showing`).
+    // (`NoLyrics`); the full view shows then only for a song the user chose no lyrics for
+    // (`LyricsData.showing`), saying so on its panel.
     property <bool> empty: LyricsData.missing || (LyricsData.state == LyricsState.idle && !Player.has-track);
 
     // The panel, as a card in the side tab, for lyrics only.
@@ -588,5 +670,13 @@ export component LyricsView inherits Rectangle {
         x: Theme.s5;
         y: Theme.s5;
         width: min(root.width - 2 * Theme.s5, 460px);
+    }
+    // The full view, where the lines would start.
+    if !root.card && LyricsData.chose-none && root.reveal > 0: NoLyrics {
+        x: root.pad-x;
+        y: Theme.s5;
+        width: min(root.width - 2 * root.pad-x, 520px);
+        on-panel: true;
+        opacity: root.reveal;
     }
 }

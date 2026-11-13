@@ -4,7 +4,8 @@
 //! with the song's title and artist, and one more per Enter, never as the user types. The
 //! lyrics shown are marked "In use"; when they came with the song from YouTube Music they're
 //! the first row. A click uses a match at once; "None of these" turns lyrics off for the
-//! song; "Back to the automatic match" forgets the pick.
+//! song; "Back to the automatic match" forgets the pick. A song with no lyrics by choice
+//! offers both ways back in the lyrics view itself (`LyricsData.automatic`).
 //!
 //! What the user chose (a pick, and the timing nudge) is kept on this PC by video id
 //! (`featherplay_store::LyricsChoices`, read the first time lyrics show), the picked
@@ -45,6 +46,10 @@ thread_local! {
 pub(super) fn init(ctx: &Rc<Ctx>, ui: &AppWindow) {
     let c = ctx.clone();
     ui.global::<LyricsData>().on_choose(move || open(&c));
+    // The view's "Use the automatic match", for a song the user chose no lyrics for.
+    let c = ctx.clone();
+    ui.global::<LyricsData>()
+        .on_automatic(move || set_pick(&c, None));
     let choose = ui.global::<LyricsChoose>();
     let c = ctx.clone();
     choose.on_search(move |text| search(&c, text.trim()));

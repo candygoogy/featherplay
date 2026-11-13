@@ -101,7 +101,7 @@ export component SideTabs inherits Rectangle {
     // While the full lyrics view is open the lyrics show there, so the Lyrics tab steps aside
     // and its place goes to Up next. The user's tab stays in `NowPlayingData.tab` and comes
     // back when the full view closes. With lyrics off in Settings there's no Lyrics tab. A
-    // song with no lyrics never opens the full view, so the tab stays and says why.
+    // song with no lyrics found never opens the full view, so the tab stays and says why.
     property <bool> lyrics-away: LyricsData.showing || !LyricsData.on;
     // The tab shown. `lyrics-away` is read only with the Lyrics tab picked: read first, every
     // tab's `visible` was marked dirty whenever the lyrics view opened or closed, though the
@@ -471,7 +471,8 @@ export component NowPlayingPage inherits Rectangle {
     }
 
     // The full lyrics view: the cover small in a column on the left, the lyrics beside it.
-    // Only with lines to show (`LyricsData.showing`): a song with none keeps the cover view.
+    // Only with lines to show, or none by the user's choice (`LyricsData.showing`): a song
+    // with none found keeps the cover view.
     property <bool> full: LyricsData.showing;
     property <length> fl-pad: Theme.page-pad;
     property <length> fl-top: 72px;
