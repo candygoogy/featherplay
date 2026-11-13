@@ -14,6 +14,10 @@
 //! synced lyrics are unavailable for now, and while the view stays open on it LRCLIB is asked
 //! once more a minute later (`RESYNC_AFTER`); synced lyrics found then take its place.
 //!
+//! The lyrics menu (ui/lyrics_menu.slint) sets the text size (Settings' too) and moves the lines
+//! half a second sooner or later for the song (`nudge`), kept per song on this PC with what
+//! "Choose other lyrics" picked (`choose`), on top of any `[offset:]` the LRC carries.
+//!
 //! Timing: nothing ticks. While sound plays and lyrics are on screen, one single-shot timer
 //! waits for the next line's start, read from the bar's clock (`bar::position`); a pause, a
 //! seek or any new player state aims it again. Paused, with no lyrics on screen, minimized
@@ -25,7 +29,8 @@ use std::rc::Rc;
 use std::time::Duration;
 
 use featherplay_core::model::TrackId;
-use featherplay_lyrics::{Line, Lyrics, lrc};
+use featherplay_core::tr;
+use featherplay_lyrics::{Line, Lyrics};
 use slint::{ComponentHandle, ModelRc, SharedString, Timer, TimerMode, VecModel};
 
 use crate::app::Ctx;
@@ -34,6 +39,7 @@ use crate::follow::colour::Lch;
 use crate::pages::settings;
 use crate::ui::{LyricsData, LyricsState, Player, Theme};
 
+mod choose;
 mod lookup;
 
 pub use lookup::Found;
@@ -63,6 +69,8 @@ struct State {
     shown: Option<TrackId>,
     /// Its synced lines; empty for plain lyrics, none, or while loading.
     lines: Rc<[Line]>,
+    /// How much later (positive) the shown track's lines show, in milliseconds.
+    nudge_ms: i32,
     /// Bumped when the setting changes, so an answer to the old setting is dropped.
     generation: u64,
     retry: Retry,
@@ -137,6 +145,13 @@ pub fn init(ctx: &Rc<Ctx>) {
     data.on_live_changed(move |live| live_changed(&c, live));
     let c = ctx.clone();
     data.on_seek_line(move |i| seek_line(&c, i));
+    let c = ctx.clone();
+    data.on_pick_size(move |i| settings::pick_lyrics_size(&c, i));
+    let c = ctx.clone();
+    data.on_move_timing(move |dir| move_timing(&c, dir));
+    let c = ctx.clone();
+    data.on_reset_timing(move || set_nudge(&c, 0));
+    choose::init(ctx, &ui);
     let c = ctx.clone();
     data.on_retry(move || {
         let ask = STATE.with(|s| {
@@ -299,11 +314,14 @@ fn show(ctx: &Rc<Ctx>, wait: bool) {
         RESYNC.with(Timer::stop);
         stop_wait();
         stop_feed();
+        let nudge_ms = id.as_ref().map_or(0, choose::nudge);
         STATE.with(|s| {
             let mut s = s.borrow_mut();
             s.shown = id;
             s.lines = Rc::from([]);
+            s.nudge_ms = nudge_ms;
         });
+        show_timing(&data, nudge_ms);
         match track {
             None => data.set_state(LyricsState::Idle),
             Some(track) => {
@@ -338,7 +356,10 @@ fn show(ctx: &Rc<Ctx>, wait: bool) {
 
 /// Puts `found` on the tab.
 fn fill(data: &LyricsData, found: &Found) {
-    data.set_credit(found.credit.as_str().into());
+    let nudge_ms = STATE.with(|s| s.borrow().nudge_ms);
+    let synced = matches!(found.lyrics, Some(Lyrics::Synced(_)));
+    data.set_credit(credit_line(&found.credit, if synced { nudge_ms } else { 0 }).into());
+    data.set_picked(found.picked);
     data.set_synced_unavailable(found.synced_unavailable());
     match &found.lyrics {
         Some(Lyrics::Synced(lines)) => {
@@ -427,9 +448,9 @@ pub fn synced_lines() -> Rc<[Line]> {
 /// Marks the line playing now and arms the timer for the next one, while sound plays and
 /// the tab is on screen.
 fn time_lines(ctx: &Rc<Ctx>) {
-    let (lines, live) = STATE.with(|s| {
+    let (lines, live, nudge_ms) = STATE.with(|s| {
         let s = s.borrow();
-        (s.lines.clone(), s.live)
+        (s.lines.clone(), s.live, s.nudge_ms)
     });
     let Some(ui) = ctx.window() else { return };
     let (Some(at), false) = (bar::position(), lines.is_empty()) else {
@@ -437,12 +458,13 @@ fn time_lines(ctx: &Rc<Ctx>) {
         return;
     };
     let data = ui.global::<LyricsData>();
-    let current = lrc::line_at(&lines, at).map_or(-1, |i| i32::try_from(i).unwrap_or(-1));
+    let (line, next) = nudged_line_at(&lines, at, nudge_ms);
+    let current = line.map_or(-1, |i| i32::try_from(i).unwrap_or(-1));
     if data.get_current() != current {
         data.set_current(current);
     }
     let (audible, speed) = ctx.player().map_or((false, 1.0), |s| (s.audible, s.speed));
-    match lrc::next_start(&lines, at) {
+    match next {
         Some(next) if live && audible && !SNAPSHOT.with(Cell::get) => {
             let weak = Rc::downgrade(ctx);
             TIMER.with(|t| {
@@ -462,7 +484,10 @@ fn time_lines(ctx: &Rc<Ctx>) {
 /// A click on line `i`: plays from its start.
 fn seek_line(ctx: &Rc<Ctx>, i: i32) {
     let Some(ui) = ctx.window() else { return };
-    let lines = STATE.with(|s| s.borrow().lines.clone());
+    let (lines, nudge_ms) = STATE.with(|s| {
+        let s = s.borrow();
+        (s.lines.clone(), s.nudge_ms)
+    });
     let Some(line) = usize::try_from(i).ok().and_then(|i| lines.get(i)) else {
         return;
     };
@@ -474,7 +499,7 @@ fn seek_line(ctx: &Rc<Ctx>, i: i32) {
     else {
         return;
     };
-    let to = (line.start + LATE).min(duration);
+    let to = (nudged(line.start, nudge_ms) + LATE).min(duration);
     // The bar's seek: it moves the clock at once and tells the controller.
     let fraction = to.as_secs_f64() / duration.as_secs_f64();
     ui.global::<Player>().invoke_seek(fraction as f32);
@@ -490,6 +515,124 @@ fn show_failure(ctx: &Rc<Ctx>, data: &LyricsData, id: &TrackId, failure: &Failur
     if unavailable {
         resync_later(ctx, id, Again::Any);
     }
+}
+
+/// The most the lines move either way: past this, the lyrics are for another recording.
+const MAX_NUDGE_MS: i32 = 10_000;
+/// One press of − or +.
+const NUDGE_STEP_MS: i32 = 500;
+
+/// When a line starting at `start` in the song shows, moved `nudge_ms` later (sooner when
+/// negative); never before the song starts.
+fn nudged(start: Duration, nudge_ms: i32) -> Duration {
+    let ms = i64::try_from(start.as_millis()).unwrap_or(i64::MAX) + i64::from(nudge_ms);
+    Duration::from_millis(u64::try_from(ms).unwrap_or(0))
+}
+
+/// The line showing at `at` with the lines moved `nudge_ms`, and when the next one shows.
+fn nudged_line_at(
+    lines: &[Line],
+    at: Duration,
+    nudge_ms: i32,
+) -> (Option<usize>, Option<Duration>) {
+    let shown = lines.partition_point(|l| nudged(l.start, nudge_ms) <= at);
+    let next = lines.get(shown).map(|l| nudged(l.start, nudge_ms));
+    (shown.checked_sub(1), next)
+}
+
+/// The timing as the menu says it: "On time", "0.5 s later", "1 s sooner".
+fn timing_label(nudge_ms: i32) -> String {
+    let secs = seconds(nudge_ms);
+    match nudge_ms.signum() {
+        0 => tr!("On time").to_string(),
+        1 => tr!("{} s later", secs),
+        _ => tr!("{} s sooner", secs),
+    }
+}
+
+/// Half seconds as "0.5", whole ones as "1".
+fn seconds(nudge_ms: i32) -> String {
+    let ms = nudge_ms.unsigned_abs();
+    if ms.is_multiple_of(1000) {
+        (ms / 1000).to_string()
+    } else {
+        format!("{}.{}", ms / 1000, ms % 1000 / 100)
+    }
+}
+
+/// The credit under the lines, with the timing note once they were moved: "Lyrics from
+/// LRCLIB · 0.5 s later for this song".
+fn credit_line(credit: &str, nudge_ms: i32) -> String {
+    let note = match nudge_ms.signum() {
+        0 => return credit.to_string(),
+        1 => tr!("{} s later for this song", seconds(nudge_ms)),
+        _ => tr!("{} s sooner for this song", seconds(nudge_ms)),
+    };
+    if credit.is_empty() {
+        note
+    } else {
+        format!("{credit} · {note}")
+    }
+}
+
+/// The menu's timing line for `nudge_ms`.
+fn show_timing(data: &LyricsData, nudge_ms: i32) {
+    data.set_timing(timing_label(nudge_ms).into());
+    data.set_timing_moved(nudge_ms != 0);
+}
+
+/// − (-1) or + (1) in the menu: the lines half a second sooner or later for this song.
+fn move_timing(ctx: &Rc<Ctx>, dir: i32) {
+    let now = STATE.with(|s| s.borrow().nudge_ms);
+    let to = (now + dir.signum() * NUDGE_STEP_MS).clamp(-MAX_NUDGE_MS, MAX_NUDGE_MS);
+    set_nudge(ctx, to);
+}
+
+/// Moves the shown song's lines to `nudge_ms`, kept for the song; the current line and the
+/// credit follow at once.
+fn set_nudge(ctx: &Rc<Ctx>, nudge_ms: i32) {
+    let Some(ui) = ctx.window() else { return };
+    let (shown, found) = STATE.with(|s| {
+        let mut s = s.borrow_mut();
+        s.nudge_ms = nudge_ms;
+        let found = s.shown.as_ref().and_then(|id| match s.cache.get(id) {
+            Some(Entry::Ready(f)) => Some(f.clone()),
+            _ => None,
+        });
+        (s.shown.clone(), found)
+    });
+    let Some(id) = shown else { return };
+    choose::set_nudge(&id, nudge_ms);
+    let data = ui.global::<LyricsData>();
+    show_timing(&data, nudge_ms);
+    if let Some(found) = found {
+        let synced = matches!(found.lyrics, Some(Lyrics::Synced(_)));
+        data.set_credit(credit_line(&found.credit, if synced { nudge_ms } else { 0 }).into());
+    }
+    sync(ctx);
+}
+
+/// `--snapshot`: the full view's lyrics menu open, at the defaults, or (`moved`) set to
+/// Large with the lines half a second later, as board A draws it. Nothing is saved.
+pub fn menu_for_snapshot(ctx: &Rc<Ctx>, moved: bool) {
+    SNAPSHOT.with(|s| s.set(true));
+    let Some(ui) = ctx.window() else { return };
+    if moved {
+        ui.global::<LyricsData>().set_size(2);
+        set_nudge(ctx, NUDGE_STEP_MS);
+    }
+    // The ⋯ is made as a frame is: one first, so it's there to open its menu.
+    if let Err(e) = ui.window().take_snapshot() {
+        log!("lyrics menu: snapshot: {e}");
+    }
+    let menu = ui.global::<crate::ui::LyricsMenu>();
+    menu.set_open_asked(menu.get_open_asked() + 1);
+}
+
+/// `--snapshot`: "Choose other lyrics" open on the playing song, its matches listed.
+pub fn choose_for_snapshot(ctx: &Rc<Ctx>) {
+    SNAPSHOT.with(|s| s.set(true));
+    choose::open_for_snapshot(ctx);
 }
 
 /// What a snapshot shows on the tab.
@@ -523,9 +666,8 @@ pub fn show_for_snapshot(ctx: &Rc<Ctx>, kind: SnapshotLyrics) {
         SnapshotLyrics::Plain => lookup(false),
         SnapshotLyrics::Outage => lookup(false).map(|f| Found { keep: false, ..f }),
         SnapshotLyrics::None => Ok(Found {
-            lyrics: None,
-            credit: String::new(),
             keep: true,
+            ..Found::default()
         }),
         SnapshotLyrics::Loading => {
             STATE.with(|s| s.borrow_mut().cache.insert(id, Entry::Loading));
@@ -572,6 +714,46 @@ mod tests {
 
     fn id(s: &str) -> TrackId {
         TrackId(s.into())
+    }
+
+    #[test]
+    fn nudged_lines_should_show_later_or_sooner_and_never_before_the_song() {
+        let ms = Duration::from_millis;
+        let line = |start: u64| Line {
+            start: ms(start),
+            text: "x".into(),
+        };
+        let lines = [line(1_000), line(4_000), line(9_000)];
+        // On time, as `lrc` has it.
+        assert_eq!(
+            nudged_line_at(&lines, ms(4_200), 0),
+            (Some(1), Some(ms(9_000)))
+        );
+        // Half a second later: the second line isn't up yet at 4.2 s.
+        assert_eq!(
+            nudged_line_at(&lines, ms(4_200), 500),
+            (Some(0), Some(ms(4_500)))
+        );
+        // A second sooner: the first line shows from the start.
+        assert_eq!(
+            nudged_line_at(&lines, ms(0), -1_000),
+            (Some(0), Some(ms(3_000)))
+        );
+        assert_eq!(nudged(ms(300), -500), ms(0));
+    }
+
+    #[test]
+    fn the_timing_should_read_in_half_seconds_and_note_itself_in_the_credit() {
+        assert_eq!(timing_label(0), "On time");
+        assert_eq!(timing_label(500), "0.5 s later");
+        assert_eq!(timing_label(-1_000), "1 s sooner");
+        assert_eq!(timing_label(1_500), "1.5 s later");
+        assert_eq!(credit_line("Lyrics from LRCLIB", 0), "Lyrics from LRCLIB");
+        assert_eq!(
+            credit_line("Lyrics from LRCLIB", 500),
+            "Lyrics from LRCLIB · 0.5 s later for this song"
+        );
+        assert_eq!(credit_line("", -500), "0.5 s sooner for this song");
     }
 
     #[test]

@@ -34,6 +34,7 @@ use crate::{desktop_lyrics, follow, language, lyrics, shell, updates};
 
 mod discord;
 mod local_api;
+mod lyrics_size;
 mod playback;
 mod quick_key;
 mod scrobbling;
@@ -45,6 +46,7 @@ mod window;
 
 pub use discord::{Preview, PreviewTime, discord_changed, discord_preview, step_minutes};
 pub use local_api::{local_api_changed, mask, parse_port, show_local_api_for_snapshot};
+pub use lyrics_size::pick_lyrics_size;
 pub use playback::{show_sleep_timer_for_snapshot, show_speed_for_snapshot};
 pub use quick_key::{capture_text, show_for_snapshot as show_quick_key_for_snapshot};
 pub use scrobbling::{
@@ -59,6 +61,7 @@ use discord::{
     discord_options, show_discord, show_preview, status_text_choice, time_choice, unlight,
 };
 use local_api::{copy_api_token, local_api_port_entered};
+use lyrics_size::show_lyrics_size;
 use playback::{
     crossfade_index, pick_crossfade, pick_skip_silence, pick_sleep_fade, pick_speed,
     pick_volume_step, show_speed, show_volume_step, skip_silence_index, sleep_fade_index,
@@ -497,6 +500,7 @@ fn show(ctx: &Ctx) {
     data.set_lyrics_lrclib(s.lyrics_lrclib);
     data.set_desktop_lyrics(s.desktop_lyrics.on);
     data.set_desktop_lyrics_here(desktop_lyrics::available());
+    show_lyrics_size(ctx, s.lyrics_size);
     data.set_check_for_updates(s.check_for_updates);
     data.set_install_updates(s.install_updates);
     data.set_dns_over_https(s.dns_over_https);

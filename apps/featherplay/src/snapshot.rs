@@ -739,6 +739,9 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
             _ => SnapshotLyrics::Synced,
         };
         let lyrics = ui.global::<crate::ui::LyricsData>();
+        if o.page.ends_with("-large") {
+            lyrics.set_size(2);
+        }
         let full = o.page.starts_with("now-playing-lyrics-full");
         lyrics.set_full(full);
         // The full view shows the lyrics in the stage; the side panel keeps Up next. With
@@ -754,6 +757,19 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
             settle();
         }
         crate::lyrics::show_for_snapshot(ctx, kind);
+        settle();
+    }
+    if o.page.starts_with("now-playing-lyrics-full-menu") {
+        // At the snapshot's size first: the menu opens under the ⋯ where it is then.
+        ui.window().dispatch_event(WindowEvent::Resized {
+            size: slint::LogicalSize::new(o.width as f32 / o.scale, o.height as f32 / o.scale),
+        });
+        settle();
+        crate::lyrics::menu_for_snapshot(ctx, o.page.ends_with("-moved"));
+        settle();
+    }
+    if o.page == "now-playing-lyrics-full-choose" {
+        crate::lyrics::choose_for_snapshot(ctx);
         settle();
     }
     // The mini player: a paused song, or one with a title too long for its room.
@@ -879,6 +895,7 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
     if o.page.starts_with("settings-lyrics") {
         let data = ui.global::<crate::ui::SettingsData>();
         data.set_desktop_lyrics(true);
+        ui.global::<crate::ui::LyricsData>().set_size(2);
         if o.page == "settings-lyrics-wayland" {
             data.set_desktop_lyrics_here(false);
             data.set_desktop_lyrics_why(true);

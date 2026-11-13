@@ -210,6 +210,13 @@ fn table() -> Vec<Row> {
             tr!("search keywords" => "karaoke, timed"),
         ),
         row(
+            SettingId::LyricsSize,
+            2,
+            tr!("Text size"),
+            &[tr!("Small"), tr!("Medium"), tr!("Large")],
+            tr!("search keywords" => "font, bigger, smaller, lyrics"),
+        ),
+        row(
             SettingId::DesktopLyrics,
             2,
             tr!("Desktop lyrics"),
@@ -585,6 +592,7 @@ impl View {
         match id {
             S::FadeOnSkip => self.crossfade,
             S::SleepFade => self.sleep_timer,
+            S::LyricsSize => self.lyrics,
             S::ScrobbleLastfm => self.lastfm == LastfmState::SignedIn,
             S::ScrobbleListenbrainz => self.listenbrainz == ListenBrainzState::SignedIn,
             S::DiscordAutoReconnect
@@ -677,6 +685,7 @@ impl View {
             S::LyricsLrclib => tr!(
                 "Lines follow the song. While lyrics are on screen, LRCLIB gets the song's title, artist, album and length. Off: only the lyrics that come with the song, synced for some songs."
             ),
+            S::LyricsSize => tr!("The lines on Now playing and in the Lyrics tab."),
             S::DesktopLyrics if !self.desktop_lyrics_here => tr!("Not available on Wayland."),
             S::DesktopLyrics => tr!(
                 "The line being sung, in a small strip that stays on top of other apps. Drag it where you like; lock it to let clicks through."
@@ -1377,6 +1386,7 @@ mod tests {
             SettingId::StartInTray,
             SettingId::StartMinimised,
             SettingId::SleepFade,
+            SettingId::LyricsSize,
             SettingId::CloseAction,
             SettingId::TrayClickOpensWindow,
             SettingId::Hotkeys,

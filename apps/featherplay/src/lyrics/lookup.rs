@@ -20,7 +20,7 @@ use crate::pages::settings;
 use crate::ui::LyricsData;
 
 /// The credit under lyrics from LRCLIB.
-fn lrclib_credit() -> &'static str {
+pub(super) fn lrclib_credit() -> &'static str {
     tr!("Lyrics from LRCLIB")
 }
 /// Tracks whose lyrics are kept; past this the map starts over.
@@ -33,7 +33,7 @@ const RESYNC_AFTER: Duration = Duration::from_secs(60);
 const SKIP_WAIT: Duration = Duration::from_secs(1);
 
 /// What a lookup found for one track.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Found {
     pub(super) lyrics: Option<Lyrics>,
     /// Where they come from, shown under them ("" when unknown).
@@ -41,6 +41,12 @@ pub struct Found {
     /// Kept for the session. Not when LRCLIB failed and these are the fallback: the tab
     /// asks again the next time it opens on the track.
     pub(super) keep: bool,
+    /// The LRCLIB record they are, when they're LRCLIB's: "Choose other lyrics" marks it.
+    pub(super) lrclib_id: Option<u64>,
+    /// They came with the song from YouTube Music.
+    pub(super) from_song: bool,
+    /// The user picked them (or none) in "Choose other lyrics".
+    pub(super) picked: bool,
 }
 
 impl Found {
@@ -74,20 +80,22 @@ async fn ask_lrclib_again(lrclib: &LrcLib, track: &Track, again: Again) -> Optio
         (
             Lookup::Found {
                 lyrics: lyrics @ Lyrics::Synced(_),
+                id,
                 ..
             },
             _,
         )
-        | (Lookup::Found { lyrics, .. }, Again::Any) => Some(Found {
+        | (Lookup::Found { lyrics, id, .. }, Again::Any) => Some(Found {
             lyrics: Some(lyrics),
             credit: lrclib_credit().into(),
             keep: true,
+            lrclib_id: id,
+            ..Found::default()
         }),
         (_, Again::Synced) => None,
         (_, Again::Any) => Some(Found {
-            lyrics: None,
-            credit: String::new(),
             keep: true,
+            ..Found::default()
         }),
     }
 }
@@ -189,6 +197,21 @@ pub(super) fn fetch(ctx: &Rc<Ctx>, track: Track) {
     if !settings::lyrics_shown() {
         return;
     }
+    // Picked in "Choose other lyrics" and kept on this PC: shown without asking anyone.
+    if let Some(found) = super::choose::picked(&track.id) {
+        let found = Rc::new(found);
+        let shown = STATE.with(|s| {
+            let mut s = s.borrow_mut();
+            s.cache
+                .insert(track.id.clone(), Entry::Ready(found.clone()));
+            s.shown.as_ref() == Some(&track.id)
+        });
+        if shown && let Some(ui) = ctx.window() {
+            fill(&ui.global::<LyricsData>(), &found);
+            sync(ctx);
+        }
+        return;
+    }
     let use_lrclib = settings::lyrics_lrclib();
     LOOKUPS.with(|n| n.set(n.get() + 1));
     let id = track.id.clone();
@@ -278,18 +301,22 @@ async fn look_up(source: Source, use_lrclib: bool, track: Track) -> Result<Found
                     match lookup {
                         Lookup::Found {
                             lyrics: lyrics @ Lyrics::Synced(_),
+                            id,
                             ..
                         } => {
                             return Ok(Found {
                                 lyrics: Some(lyrics),
                                 credit: lrclib_credit().into(),
                                 keep: true,
+                                lrclib_id: id,
+                                ..Found::default()
                             });
                         }
                         Lookup::Found {
                             lyrics: Lyrics::Plain(text),
+                            id,
                             ..
-                        } => lrclib = FromLrclib::Plain(text),
+                        } => lrclib = FromLrclib::Plain(text, id),
                         _ => {}
                     }
                 }
@@ -321,8 +348,8 @@ async fn look_up(source: Source, use_lrclib: bool, track: Track) -> Result<Found
 enum FromLrclib {
     /// Nothing, or not asked (Settings).
     Missed,
-    /// Plain lyrics only.
-    Plain(String),
+    /// Plain lyrics only, and the record's id.
+    Plain(String, Option<u64>),
     /// It couldn't tell: an error or an outage.
     Failed(String),
 }
@@ -346,6 +373,8 @@ fn settle(lrclib: FromLrclib, own: Result<Option<SongLyrics>, String>) -> Result
                 lyrics: Some(Lyrics::Synced(lines)),
                 credit: timed.source.unwrap_or_default(),
                 keep: true,
+                from_song: true,
+                ..Found::default()
             });
         }
         Ok(Some(SongLyrics::Plain(plain))) => Ok(Some(plain)),
@@ -353,11 +382,13 @@ fn settle(lrclib: FromLrclib, own: Result<Option<SongLyrics>, String>) -> Result
         Err(e) => Err(e),
     };
     let lrclib_failed = match lrclib {
-        FromLrclib::Plain(text) => {
+        FromLrclib::Plain(text, id) => {
             return Ok(Found {
                 lyrics: Some(Lyrics::Plain(text)),
                 credit: lrclib_credit().into(),
                 keep: true,
+                lrclib_id: id,
+                ..Found::default()
             });
         }
         FromLrclib::Missed => None,
@@ -369,13 +400,14 @@ fn settle(lrclib: FromLrclib, own: Result<Option<SongLyrics>, String>) -> Result
             lyrics: Some(Lyrics::Plain(plain.text)),
             credit: plain.source.unwrap_or_default(),
             keep,
+            from_song: true,
+            ..Found::default()
         }),
         Ok(None) => match lrclib_failed {
             Some(e) => Err(Failure::Unavailable(e)),
             None => Ok(Found {
-                lyrics: None,
-                credit: String::new(),
                 keep,
+                ..Found::default()
             }),
         },
         Err(e) => Err(Failure::Failed(match lrclib_failed {
@@ -386,7 +418,7 @@ fn settle(lrclib: FromLrclib, own: Result<Option<SongLyrics>, String>) -> Result
 }
 
 /// One LRCLIB client for the session.
-fn client() -> Option<LrcLib> {
+pub(super) fn client() -> Option<LrcLib> {
     static CLIENT: OnceLock<Option<LrcLib>> = OnceLock::new();
     CLIENT
         .get_or_init(|| match LrcLib::new() {
@@ -400,7 +432,7 @@ fn client() -> Option<LrcLib> {
 }
 
 /// What LRCLIB is asked: the title, the first artist, the album and the length.
-fn query(track: &Track) -> Query {
+pub(super) fn query(track: &Track) -> Query {
     Query {
         title: track.title.clone(),
         artist: track
@@ -417,6 +449,27 @@ fn query(track: &Track) -> Query {
 /// `FEATHERPLAY_FIXTURE_LYRICS` names another record in LRCLIB's format instead, for
 /// measuring with lyrics as long as a real song's (`tests/lyrics_frames.rs`).
 pub(super) fn fixture(synced: bool) -> Result<Found, String> {
+    let record = read_fixture_record()?;
+    if synced {
+        return Ok(Found {
+            lyrics: record.lyrics(),
+            credit: lrclib_credit().into(),
+            keep: true,
+            lrclib_id: record.id,
+            ..Found::default()
+        });
+    }
+    Ok(Found {
+        lyrics: record.plain_lyrics.map(Lyrics::Plain),
+        credit: tr!("Source: LyricFind").into(),
+        keep: true,
+        from_song: true,
+        ..Found::default()
+    })
+}
+
+/// The recorded LRCLIB record, or `FEATHERPLAY_FIXTURE_LYRICS`'s.
+fn read_fixture_record() -> Result<lrclib::Record, String> {
     const RECORDED: &str = concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/../../crates/lyrics/tests/fixtures/lrclib_get.json"
@@ -424,19 +477,12 @@ pub(super) fn fixture(synced: bool) -> Result<Found, String> {
     let path = std::env::var_os("FEATHERPLAY_FIXTURE_LYRICS")
         .map_or_else(|| RECORDED.into(), std::path::PathBuf::from);
     let text = std::fs::read_to_string(path).map_err(|e| format!("lyrics fixture: {e}"))?;
-    let record = lrclib::parse_record(&text).map_err(|e| e.to_string())?;
-    if synced {
-        return Ok(Found {
-            lyrics: record.lyrics(),
-            credit: lrclib_credit().into(),
-            keep: true,
-        });
-    }
-    Ok(Found {
-        lyrics: record.plain_lyrics.map(Lyrics::Plain),
-        credit: tr!("Source: LyricFind").into(),
-        keep: true,
-    })
+    lrclib::parse_record(&text).map_err(|e| e.to_string())
+}
+
+/// `--fixtures` outside the demo set: the recorded record, as "Choose other lyrics" lists it.
+pub(super) fn fixture_record() -> Option<lrclib::Record> {
+    read_fixture_record().ok()
 }
 
 /// `--fixtures`: in the demo set, the song's own lines (or none), as LRCLIB would have them
@@ -447,9 +493,8 @@ pub(super) fn fixture_for(f: &Fixtures, id: &TrackId, synced: bool) -> Result<Fo
     }
     let Some((lines, credit)) = f.demo_lyrics(id).map_err(|e| e.to_string())? else {
         return Ok(Found {
-            lyrics: None,
-            credit: String::new(),
             keep: true,
+            ..Found::default()
         });
     };
     let lyrics = if synced {
@@ -465,8 +510,16 @@ pub(super) fn fixture_for(f: &Fixtures, id: &TrackId, synced: bool) -> Result<Fo
         lyrics: Some(lyrics),
         credit,
         keep: true,
+        // As LRCLIB's record would be, or as the song's own plain lyrics.
+        lrclib_id: synced.then_some(DEMO_RECORD),
+        from_song: !synced,
+        ..Found::default()
     })
 }
+
+/// `--fixtures`: the demo song's own lines stand for this LRCLIB record ("Choose other
+/// lyrics" marks it in use).
+pub(super) const DEMO_RECORD: u64 = 1;
 
 #[cfg(test)]
 mod tests {
@@ -552,7 +605,7 @@ mod tests {
 
     #[test]
     fn youtube_musics_timed_lyrics_should_come_before_lrclibs_plain_ones() {
-        let lrclib_plain = || FromLrclib::Plain("LRCLIB's words".into());
+        let lrclib_plain = || FromLrclib::Plain("LRCLIB's words".into(), None);
         let found = settle(lrclib_plain(), timed()).expect("timed lyrics");
         assert!(matches!(found.lyrics, Some(Lyrics::Synced(_))));
         // No timed lines: LRCLIB's plain lyrics, as before, even if the song's own failed.

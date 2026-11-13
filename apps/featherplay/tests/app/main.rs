@@ -64,6 +64,7 @@ mod lyrics_follow;
 mod lyrics_frames;
 mod lyrics_gate;
 mod lyrics_lines;
+mod lyrics_menu;
 mod lyrics_no_duplicate;
 mod lyrics_none;
 mod lyrics_off;

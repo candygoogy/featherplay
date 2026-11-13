@@ -21,6 +21,7 @@ import { QueueData, UpNext } from "../queue_panel.slint";
 import { SkeletonList, FadeIn } from "content.slint";
 import { LyricsData, LyricsState, LyricsView } from "lyrics.slint";
 import { NotForMeButton, LikeButton } from "../not_for_me.slint";
+import { LyricsMenu, LyricsMoreButton } from "../lyrics_menu.slint";
 
 export global NowPlayingData {
     // Related: loading and its error.
@@ -188,7 +189,7 @@ export component SideTabs inherits Rectangle {
         }
     }
     LyricsView {
-        size: Theme.t-lyric-side;
+        size: LyricsData.side-size;
         x: 0;
         y: 64px;
         width: parent.width;
@@ -208,7 +209,10 @@ export component SideTabs inherits Rectangle {
 export component LyricsWatch {
     in property <bool> minimized;
     property <bool> live: LyricsData.on && ((((NowPlayingData.tab == 2 && (Nav.page == PageKind.now-playing ? Frame.side-open : Frame.queue-open)) || LyricsData.wanted) && !Frame.hidden && !root.minimized) || LyricsData.desktop);
-    changed live => { LyricsData.live-changed(self.live); }
+    changed live => {
+        LyricsData.on-screen = self.live;
+        LyricsData.live-changed(self.live);
+    }
     property <bool> showing: LyricsData.showing;
     changed showing => { LyricsData.held = self.showing; }
     // A lookup a press waited on found nothing to show: the pill's note says why. A new
@@ -776,7 +780,7 @@ export component NowPlayingPage inherits Rectangle {
             y: root.fl-top;
             width: root.fl-lyrics-w + 2 * Theme.s3;
             height: root.stage-h - root.fl-top;
-            size: root.stage-w >= Theme.lyric-wide-min ? Theme.t-lyric-wide : Theme.t-lyric-full;
+            size: LyricsData.full-size(root.stage-w >= Theme.lyric-wide-min);
             pad-x: Theme.s3;
             bottom: 0;
             card: false;
@@ -792,6 +796,17 @@ export component NowPlayingPage inherits Rectangle {
             on: root.full;
             clicked => { LyricsData.toggle-view(); }
         }
+        // The lyrics menu's ⋯, left of the pill, while the lyrics show.
+        if root.full: LyricsMoreButton {
+            x: lyrics-pill.x - Theme.s3 - self.width;
+            y: Theme.s4;
+            asked: LyricsMenu.open-asked;
+            clicked => { root.open-lyrics-menu(); }
+        }
+    }
+    // The lyrics menu opens under the ⋯, ending at the pill's right edge.
+    function open-lyrics-menu() {
+        LyricsMenu.show(lyrics-pill.absolute-position.x + lyrics-pill.width, lyrics-pill.absolute-position.y + lyrics-pill.height + Theme.s2);
     }
 
     // Up next / Related: on the page's entry it comes in 24 px behind the stage. That offset

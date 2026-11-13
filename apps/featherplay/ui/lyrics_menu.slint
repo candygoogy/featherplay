@@ -1,0 +1,720 @@
+// The lyrics menu (board 2026-11-13, A and G): the ⋯ beside the Lyrics pill opens it while
+// the full lyrics view shows, in the song menu's style (song_menu.slint: the same panel,
+// motion and dismissal), anchored under the ⋯ and ending at the pill's right edge. Text size
+// (three A's), Timing (half a second sooner or later, for this song, with Reset once moved;
+// for synced lines only) and "Choose other lyrics…" (with LRCLIB on in Settings), which opens
+// `LyricsChooseLayer`: LRCLIB's matches for the song, the one in use marked; a click uses
+// another. Size and timing keep the menu open so the lines can be watched moving; Choose
+// closes it. `src/lyrics.rs` and `src/lyrics/choose.rs` do the work.
+import { Theme, Icons, Curves } from "theme.slint";
+import { Body, Display, Icon, Pill, TextLink } from "parts.slint";
+import { Divider } from "song_menu.slint";
+import { LyricsData, LyricsState } from "pages/lyrics.slint";
+import { Skeleton, SkeletonBar } from "pages/content.slint";
+
+export global LyricsMenu {
+    out property <bool> open;
+    // The menu's right edge and top (window coordinates).
+    out property <length> anchor-right;
+    out property <length> anchor-y;
+    // Bumped by Rust to open the menu as a click on the ⋯ does (`--snapshot`, tests): only
+    // the stage knows where its ⋯ is.
+    in-out property <int> open-asked;
+
+    public function show(right: length, y: length) {
+        self.anchor-right = right;
+        self.anchor-y = y;
+        self.open = true;
+    }
+    public function close() {
+        self.open = false;
+    }
+}
+
+// The menu's glyphs, on the 24 px grid of `Icons`.
+global LyricsIcons {
+    out property <string> text-size: "M3.5 18 L8 6 L12.5 18 M5.2 13.8 H10.8 M14 18 L17 10.5 L20 18 M15 15.6 H19";
+    out property <string> clock: "M12 4 a8 8 0 1 0 0.01 0 Z M12 8 V12 L15 14";
+    out property <string> list: "M4 6.5 H20 M4 11.5 H20 M4 16.5 H13 M15.5 16 l2 2 l3.5 -4";
+    out property <string> minus: "M7 12 H17";
+    out property <string> plus: "M7 12 H17 M12 7 V17";
+    out property <string> search: "M10.5 4.5 a6 6 0 1 0 0.01 0 Z M15 15 L19.5 19.5";
+    out property <string> check: "M5 12.5 L10 17 L19 7.5";
+}
+
+// A text size: an A at that size, the chosen one on the accent's tonal fill.
+component SizeChip inherits Rectangle {
+    in property <bool> on;
+    in property <length> glyph;
+    in property <string> label;
+    callback clicked();
+    width: 36px;
+    height: 32px;
+    border-radius: self.height / 2;
+    border-width: root.on ? 0px : 1px;
+    border-color: Theme.hairline;
+    // Animated as a private property: a root animating a public one is copied into each use.
+    property <brush> ground: root.on ? (ta.has-hover || ta.pressed ? Theme.accent-tonal-hover : Theme.accent-tonal) : Theme.state(ta.pressed, ta.has-hover);
+    animate ground { duration: Theme.t-hover; }
+    background: root.ground;
+    accessible-role: button;
+    accessible-label: root.label;
+    accessible-checked: root.on;
+    accessible-action-default => { root.clicked(); }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+    Display {
+        text: "A";
+        font-size: root.glyph;
+        font-weight: 700;
+        color: root.on ? Theme.text1 : Theme.text2;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+}
+
+// − or + beside the timing: a small round tonal button.
+component StepButton inherits Rectangle {
+    in property <string> icon;
+    in property <string> label;
+    callback clicked();
+    width: 32px;
+    height: 32px;
+    border-radius: self.height / 2;
+    property <brush> ground: Theme.tonal(ta.pressed, ta.has-hover);
+    animate ground { duration: Theme.t-hover; }
+    background: root.ground;
+    accessible-role: button;
+    accessible-label: root.label;
+    accessible-action-default => { root.clicked(); }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+    Icon {
+        width: 18px;
+        height: 18px;
+        commands: root.icon;
+        stroke: Theme.text1;
+    }
+}
+
+// The glyph column of a row: 20 px wide, 10 px in.
+component RowGlyph inherits Rectangle {
+    in property <string> icon;
+    width: 20px;
+    Icon {
+        width: 18px;
+        height: 18px;
+        commands: root.icon;
+        stroke: Theme.text2;
+    }
+}
+
+// A row's name, and its quiet line under it.
+component RowText inherits VerticalLayout {
+    in property <string> label;
+    in property <string> detail;
+    alignment: center;
+    spacing: 1px;
+    Body {
+        text: root.label;
+        wrap: no-wrap;
+        overflow: elide;
+    }
+    if root.detail != "": Body {
+        text: root.detail;
+        font-size: Theme.t-meta;
+        color: Theme.text3;
+        overflow: elide;
+    }
+}
+
+// Covers the window while the menu is open: a click outside closes it, Escape too.
+export component LyricsMenuLayer inherits Rectangle {
+    callback closed();
+    property <length> w: 356px;
+    property <length> pad: 6px;
+    property <bool> timing: LyricsData.state == LyricsState.synced;
+    property <bool> choose: LyricsData.lrclib;
+
+    // Motion, as the song menu: the panel stays instantiated so it can fade out. It opens
+    // downward, growing from its top right corner, under the ⋯.
+    property <bool> open: LyricsMenu.open;
+    property <bool> settled: true;
+    // Closed by Escape: keyboard actions don't animate.
+    property <bool> snap: false;
+    changed open => {
+        if root.open {
+            root.snap = false;
+            root.settled = false;
+            settle.running = true;
+            keys.focus();
+        }
+    }
+    settle := Timer {
+        interval: 1ms;
+        running: false;
+        triggered => {
+            self.running = false;
+            root.settled = true;
+        }
+    }
+
+    function close() {
+        LyricsMenu.close();
+        root.closed();
+    }
+
+    if LyricsMenu.open: TouchArea {
+        width: root.width;
+        height: root.height;
+        pointer-event(e) => {
+            if e.kind == PointerEventKind.down {
+                root.close();
+            }
+        }
+        scroll-event(e) => {
+            root.close();
+            accept
+        }
+    }
+    panel := Rectangle {
+        property <length> nudge: root.open && !root.settled ? -Theme.nudge : 0px;
+        x: max(8px, LyricsMenu.anchor-right - root.w);
+        y: LyricsMenu.anchor-y + self.nudge;
+        width: root.w;
+        height: lay.preferred-height + 2 * root.pad;
+        opacity: root.open ? 1 : 0;
+        visible: self.opacity > 0;
+        transform-origin: { x: self.width, y: 0px };
+        transform-scale: !root.open ? (Theme.moving ? 0.98 : 1.0) : (root.settled ? 1.0 : Theme.pop-from);
+        animate opacity { duration: root.open ? Theme.t-menu : (root.snap ? 0ms : Theme.t-fast); easing: Curves.ease-out; }
+        animate transform-scale, nudge {
+            duration: !root.open ? Theme.t-fast : (root.settled ? Theme.t-menu : 0ms);
+            easing: Curves.ease-out;
+        }
+        border-radius: Theme.r-l;
+        background: Theme.panel;
+        border-width: 1px;
+        border-color: Theme.card-edge;
+        drop-shadow-blur: 24px;
+        drop-shadow-offset-y: 8px;
+        drop-shadow-color: Theme.cover-shadow;
+        accessible-role: list;
+        accessible-label: @tr("Lyrics menu");
+
+        // Swallows clicks on the panel's padding.
+        TouchArea { enabled: root.open; }
+        keys := FocusScope {
+            enabled: root.open;
+            key-pressed(e) => {
+                if e.text == Key.Escape {
+                    root.snap = true;
+                    root.close();
+                    return accept;
+                }
+                reject
+            }
+        }
+
+        lay := VerticalLayout {
+            x: root.pad;
+            y: root.pad;
+            width: parent.width - 2 * root.pad;
+            // Text size: one setting for the app (Settings > Lyrics too).
+            HorizontalLayout {
+                padding: 6px;
+                padding-left: 10px;
+                spacing: Theme.s3;
+                min-height: 44px;
+                RowGlyph { icon: LyricsIcons.text-size; }
+                RowText {
+                    horizontal-stretch: 1;
+                    label: @tr("Text size");
+                }
+                HorizontalLayout {
+                    alignment: end;
+                    spacing: 6px;
+                    for glyph[i] in [12px, 15px, 19px]: SizeChip {
+                        y: (parent.height - self.height) / 2;
+                        on: LyricsData.size == i;
+                        glyph: glyph;
+                        label: [@tr("Small"), @tr("Medium"), @tr("Large")][i];
+                        clicked => { LyricsData.pick-size(i); }
+                    }
+                }
+            }
+            // Timing: synced lines only (plain ones don't follow the song).
+            if root.timing: HorizontalLayout {
+                padding: 6px;
+                padding-left: 10px;
+                spacing: Theme.s3;
+                min-height: 56px;
+                RowGlyph { icon: LyricsIcons.clock; }
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    alignment: center;
+                    spacing: 1px;
+                    Body {
+                        text: @tr("Timing");
+                    }
+                    if !LyricsData.timing-moved: Body {
+                        text: @tr("Lines early or late? Move them.");
+                        font-size: Theme.t-meta;
+                        color: Theme.text3;
+                        wrap: word-wrap;
+                    }
+                    if LyricsData.timing-moved: HorizontalLayout {
+                        alignment: start;
+                        spacing: 4px;
+                        Body {
+                            text: @tr("For this song ·");
+                            font-size: Theme.t-meta;
+                            color: Theme.text3;
+                            vertical-alignment: center;
+                        }
+                        TextLink {
+                            text: @tr("Reset");
+                            font-size: Theme.t-meta;
+                            clicked => { LyricsData.reset-timing(); }
+                        }
+                    }
+                }
+                HorizontalLayout {
+                    alignment: end;
+                    spacing: 4px;
+                    StepButton {
+                        y: (parent.height - self.height) / 2;
+                        icon: LyricsIcons.minus;
+                        label: @tr("Lines half a second sooner");
+                        clicked => { LyricsData.move-timing(-1); }
+                    }
+                    Body {
+                        min-width: 92px;
+                        text: LyricsData.timing;
+                        font-weight: 600;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                    StepButton {
+                        y: (parent.height - self.height) / 2;
+                        icon: LyricsIcons.plus;
+                        label: @tr("Lines half a second later");
+                        clicked => { LyricsData.move-timing(1); }
+                    }
+                }
+            }
+            // The desktop lyrics' row (its switch) and its divider go here, between Timing
+            // and Choose other lyrics.
+            if root.choose: Divider { }
+            if root.choose: Rectangle {
+                min-height: 56px;
+                border-radius: Theme.r-m;
+                background: Theme.state(choose-ta.pressed, choose-ta.has-hover);
+                animate background { duration: Theme.t-hover; }
+                accessible-role: button;
+                accessible-label: @tr("Choose other lyrics…");
+                accessible-action-default => { root.pick-other(); }
+                choose-ta := TouchArea {
+                    enabled: root.open;
+                    mouse-cursor: pointer;
+                    clicked => { root.pick-other(); }
+                }
+                HorizontalLayout {
+                    padding: 6px;
+                    padding-left: 10px;
+                    padding-right: 10px;
+                    spacing: Theme.s3;
+                    RowGlyph { icon: LyricsIcons.list; }
+                    RowText {
+                        horizontal-stretch: 1;
+                        label: @tr("Choose other lyrics…");
+                        detail: @tr("If these are for another song");
+                    }
+                    Rectangle {
+                        width: 18px;
+                        Icon {
+                            width: 16px;
+                            height: 16px;
+                            commands: Icons.chevron-right;
+                            stroke: Theme.text3;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Choose closes the menu; the dialog takes the keys.
+    function pick-other() {
+        LyricsMenu.close();
+        LyricsData.choose();
+    }
+}
+
+// One LRCLIB match in the dialog's list.
+export struct LyricsMatch {
+    title: string,
+    // "artist · album".
+    byline: string,
+    // Its first line, the quickest way to tell a wrong match.
+    first-line: string,
+    synced: bool,
+    // Its length ("3:12"), or "" when unknown.
+    length: string,
+    // The lyrics shown now.
+    in-use: bool,
+}
+
+export enum ChooseState { loading, list, empty, error }
+
+export global LyricsChoose {
+    in-out property <bool> open;
+    // The search: the song's title and artist at first; Enter asks LRCLIB again.
+    in-out property <string> query;
+    in property <ChooseState> state: ChooseState.loading;
+    in property <[LyricsMatch]> matches;
+    // The song's length ("0:54"), or "" when unknown.
+    in property <string> length;
+    // A pick is in use (or none was picked): the foot offers the automatic match back.
+    in property <bool> picked;
+    callback search(string);
+    // Match `i` is used for the song.
+    callback pick(int);
+    // "None of these": no lyrics for this song.
+    callback pick-none();
+    // "Back to the automatic match".
+    callback automatic();
+}
+
+// One match: its title, "artist · album" and first line, Synced or Plain, its length, and
+// "In use" in the accent for the lyrics shown now.
+component MatchRow inherits Rectangle {
+    in property <LyricsMatch> m;
+    in property <bool> first;
+    callback clicked();
+    // One height for every row, so the list knows its height before it lays them out.
+    height: 74px;
+    border-radius: Theme.r-m;
+    property <brush> ground: Theme.state(ta.pressed, ta.has-hover);
+    animate ground { duration: Theme.t-hover; }
+    background: root.ground;
+    accessible-role: button;
+    accessible-label: root.m.title + ", " + root.m.byline;
+    accessible-description: root.m.in-use ? @tr("In use") : "";
+    accessible-action-default => { root.clicked(); }
+    // The hairline between rows, hidden under a hover.
+    if !root.first && !ta.has-hover: Rectangle {
+        x: 12px;
+        y: 0;
+        width: parent.width - 24px;
+        height: 1px;
+        background: Theme.hairline;
+    }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+    lay := HorizontalLayout {
+        padding-left: 12px;
+        padding-right: 12px;
+        padding-top: 10px;
+        padding-bottom: 10px;
+        spacing: 14px;
+        VerticalLayout {
+            horizontal-stretch: 1;
+            alignment: center;
+            Body {
+                text: root.m.title;
+                font-weight: 600;
+                overflow: elide;
+            }
+            Body {
+                text: root.m.byline;
+                font-size: Theme.t-meta;
+                color: Theme.text2;
+                overflow: elide;
+            }
+            if root.m.first-line != "": Body {
+                text: "“" + root.m.first-line + "”";
+                font-size: Theme.t-meta;
+                color: Theme.text3;
+                overflow: elide;
+            }
+        }
+        VerticalLayout {
+            alignment: center;
+            Rectangle {
+                width: 64px;
+                height: 20px;
+                border-radius: 10px;
+                border-width: 1px;
+                border-color: Theme.hairline;
+                Body {
+                    text: root.m.synced ? @tr("Synced") : @tr("Plain");
+                    font-size: Theme.t-meta;
+                    font-weight: 600;
+                    color: Theme.text2;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+        }
+        Body {
+            width: 40px;
+            text: root.m.length;
+            color: Theme.text2;
+            horizontal-alignment: right;
+            vertical-alignment: center;
+        }
+        HorizontalLayout {
+            width: 72px;
+            spacing: 4px;
+            alignment: start;
+            if root.m.in-use: Icon {
+                y: (parent.height - self.height) / 2;
+                width: 16px;
+                height: 16px;
+                commands: LyricsIcons.check;
+                stroke: Theme.accent;
+                stroke-width: 2px;
+            }
+            if root.m.in-use: Body {
+                text: @tr("In use");
+                font-size: Theme.t-meta;
+                font-weight: 600;
+                color: Theme.accent;
+                vertical-alignment: center;
+            }
+        }
+    }
+}
+
+// The search field: the top bar's pill, the dialog's width.
+component ChooseField inherits Rectangle {
+    in-out property <string> text;
+    callback accepted();
+    public function focus-input() {
+        input.focus();
+    }
+    height: 40px;
+    border-radius: self.height / 2;
+    background: Theme.field-solid;
+    border-width: input.has-focus ? 2px : 1px;
+    property <brush> edge: input.has-focus ? Theme.accent : (ta.has-hover ? Theme.field-edge-hover : Theme.field-edge);
+    animate edge { duration: Theme.t-hover; easing: Curves.ease-hover; }
+    border-color: root.edge;
+    ta := TouchArea {
+        mouse-cursor: MouseCursor.text;
+        clicked => { input.focus(); }
+    }
+    Icon {
+        x: 14px;
+        width: 18px;
+        height: 18px;
+        commands: LyricsIcons.search;
+        stroke: Theme.text3;
+    }
+    input := TextInput {
+        x: 14px + 18px + 10px;
+        width: parent.width - self.x - 14px;
+        height: parent.height;
+        text <=> root.text;
+        single-line: true;
+        vertical-alignment: center;
+        font-family: Theme.body-font;
+        font-size: Theme.t-body;
+        color: Theme.text1;
+        selection-background-color: Theme.accent;
+        selection-foreground-color: Theme.on-solid;
+        accessible-label: @tr("Search LRCLIB");
+        accepted => { root.accepted(); }
+    }
+}
+
+// "Choose other lyrics" (board B): a Settings dialog, wider (640), centred in the room it's
+// given (Now playing's stage). The matches are one list on the ground colour inside the card.
+// Esc, Close or a click on the scrim shuts it.
+export component LyricsChooseLayer inherits Rectangle {
+    // The room the card centres in (the stage, left of Now playing's side panel).
+    in property <length> room-w: root.width;
+    callback closed();
+    property <bool> shown: false;
+    // About five matches show; more scroll.
+    property <length> row-h: 74px;
+    property <length> list-max: max(root.row-h * 2, min(root.row-h * 5, root.height - 340px));
+    function close() {
+        LyricsChoose.open = false;
+        root.closed();
+    }
+    background: Theme.scrim;
+    opacity: root.shown ? 1 : 0;
+    animate opacity { duration: Theme.t-menu; easing: Curves.ease-out; }
+    init => {
+        root.shown = true;
+        field.focus-input();
+    }
+    keys := FocusScope {
+        key-pressed(e) => {
+            if e.text == Key.Escape {
+                root.close();
+                return accept;
+            }
+            reject
+        }
+        TouchArea {
+            clicked => { root.close(); }
+            // The page under the scrim doesn't scroll.
+            scroll-event(e) => { accept }
+        }
+        card := Rectangle {
+            width: min(640px, root.room-w - 2 * Theme.s5);
+            height: lay.preferred-height;
+            x: (root.room-w - self.width) / 2;
+            y: max(Theme.s5, (root.height - self.height) / 2 - Theme.s6);
+            border-radius: Theme.r-l;
+            background: Theme.panel;
+            border-width: 1px;
+            border-color: Theme.card-edge;
+            transform-scale: root.shown ? 1 : (Theme.moving ? 0.98 : 1);
+            animate transform-scale { duration: Theme.t-menu; easing: Curves.ease-out; }
+            drop-shadow-blur: 24px;
+            drop-shadow-offset-y: 8px;
+            drop-shadow-color: Theme.cover-shadow;
+            accessible-role: groupbox;
+            accessible-label: @tr("Choose other lyrics");
+            // Clicks on the card don't reach the scrim.
+            TouchArea { }
+            lay := VerticalLayout {
+                padding: Theme.s5;
+                spacing: Theme.s2;
+                Display {
+                    text: @tr("Choose other lyrics");
+                    font-size: 20px;
+                }
+                Body {
+                    text: LyricsChoose.length != ""
+                        ? @tr("Matches from LRCLIB. This song is {} long. What you pick is kept for this song.", LyricsChoose.length)
+                        : @tr("Matches from LRCLIB. What you pick is kept for this song.");
+                    color: Theme.text2;
+                    wrap: word-wrap;
+                }
+                Rectangle { height: Theme.s1; }
+                field := ChooseField {
+                    text <=> LyricsChoose.query;
+                    accepted => { LyricsChoose.search(LyricsChoose.query); }
+                }
+                Rectangle {
+                    height: LyricsChoose.state == ChooseState.list ? min(LyricsChoose.matches.length * root.row-h + 8px, root.list-max) : root.row-h * (LyricsChoose.state == ChooseState.loading ? 3 : 1);
+                    border-radius: 12px;
+                    background: Theme.ground;
+                    clip: true;
+                    if LyricsChoose.state == ChooseState.list: Flickable {
+                        x: 4px;
+                        y: 4px;
+                        width: parent.width - 8px;
+                        height: parent.height - 8px;
+                        content-height: list.preferred-height;
+                        list := VerticalLayout {
+                            for m[i] in LyricsChoose.matches: MatchRow {
+                                m: m;
+                                first: i == 0;
+                                clicked => {
+                                    LyricsChoose.pick(i);
+                                    root.close();
+                                }
+                            }
+                        }
+                    }
+                    if LyricsChoose.state == ChooseState.loading: sk := Skeleton {
+                        x: 16px;
+                        width: parent.width - 32px;
+                        height: parent.height;
+                        for i in 3: Rectangle {
+                            y: i * root.row-h;
+                            height: root.row-h;
+                            SkeletonBar {
+                                x: 0;
+                                y: 16px;
+                                width: parent.width * [0.42, 0.5, 0.36][i];
+                                sweep: sk.sweep;
+                                fade: sk.fade;
+                            }
+                            SkeletonBar {
+                                x: 0;
+                                y: 40px;
+                                height: 8px;
+                                width: parent.width * [0.3, 0.36, 0.26][i];
+                                sweep: sk.sweep;
+                                fade: sk.fade;
+                            }
+                        }
+                    }
+                    if LyricsChoose.state == ChooseState.empty || LyricsChoose.state == ChooseState.error: Body {
+                        x: 16px;
+                        width: parent.width - 32px;
+                        text: LyricsChoose.state == ChooseState.error ? @tr("LRCLIB isn't answering. Try again later.") : @tr("No matches on LRCLIB. Try other words.");
+                        color: Theme.text2;
+                        vertical-alignment: center;
+                        wrap: word-wrap;
+                    }
+                }
+                HorizontalLayout {
+                    padding-top: Theme.s4;
+                    spacing: Theme.s2;
+                    VerticalLayout {
+                        alignment: center;
+                        TextLink {
+                            text: LyricsChoose.picked ? @tr("Back to the automatic match") : @tr("None of these: no lyrics for this song");
+                            clicked => {
+                                if LyricsChoose.picked {
+                                    LyricsChoose.automatic();
+                                } else {
+                                    LyricsChoose.pick-none();
+                                }
+                                root.close();
+                            }
+                        }
+                    }
+                    Rectangle { horizontal-stretch: 1; }
+                    Pill {
+                        label: @tr("Close");
+                        clicked => { root.close(); }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// The ⋯ beside the Lyrics pill, on the lyrics' panel: a round, tonal white button (the
+// panel is deep in either theme), a step brighter while its menu is open.
+export component LyricsMoreButton inherits Rectangle {
+    // `LyricsMenu.open-asked`: bumped, it opens the menu as a click does.
+    in property <int> asked;
+    changed asked => { root.clicked(); }
+    callback clicked();
+    width: 40px;
+    height: 40px;
+    border-radius: self.height / 2;
+    property <brush> ground: LyricsMenu.open || ta.pressed ? #FFFFFF40 : (ta.has-hover ? #FFFFFF33 : #FFFFFF26);
+    animate ground { duration: Theme.t-hover; }
+    background: root.ground;
+    accessible-role: button;
+    accessible-label: @tr("Lyrics menu");
+    accessible-action-default => { root.clicked(); }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+    Icon {
+        width: 20px;
+        height: 20px;
+        commands: Icons.more;
+        stroke: transparent;
+        fill: #FFFFFF;
+    }
+}

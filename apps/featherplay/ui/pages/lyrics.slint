@@ -13,7 +13,7 @@
 // line starts (one single-shot timer per line, only while sound plays and the lyrics are on
 // screen), and only that glide and two lines' colours animate.
 import { Theme, Curves, Icons } from "../theme.slint";
-import { Body, Display, Icon, Pill } from "../parts.slint";
+import { Body, Display, Icon, Pill, TextLink } from "../parts.slint";
 import { Player } from "../player.slint";
 import { Nav, PageKind } from "../nav.slint";
 import { Skeleton, SkeletonBar } from "content.slint";
@@ -89,9 +89,32 @@ export global LyricsData {
     // The desktop lyrics' strip shows (`desktop_lyrics.rs`): lyrics are on screen, whatever
     // the window shows.
     in property <bool> desktop;
+    // The text size (Settings > Lyrics and the lyrics menu): 0 Small, 1 Medium, 2 Large.
+    in property <int> size: 1;
+    // The side tab's lines at that size; the full view's are Now playing's (`full-size`).
+    out property <length> side-size: self.size == 0 ? 17px : (self.size == 2 ? 24px : Theme.t-lyric-side);
+    // The full view's lines at that size, on a stage `wide` (`Theme.lyric-wide-min`) or not.
+    public pure function full-size(wide: bool) -> length {
+        return self.size == 0 ? 20px : (self.size == 2 ? (wide ? 32px : 30px) : (wide ? Theme.t-lyric-wide : Theme.t-lyric-full));
+    }
+    // The timing for this song, as the lyrics menu says it ("On time", "0.5 s later"), and
+    // whether the lines were moved (Reset shows).
+    in property <string> timing: @tr("On time");
+    in property <bool> timing-moved;
+    // The lyrics shown were picked in "Choose other lyrics" (or none were).
+    in property <bool> picked;
+    // The lyrics are on screen (`LyricsWatch`): the size keys work only then.
+    in-out property <bool> on-screen;
     // The lyrics are on screen (`LyricsWatch`, now_playing.slint): Rust asks for lyrics and
     // times the lines only then.
     callback live-changed(bool);
+    // A text size picked (0 Small, 1 Medium, 2 Large): shown at once and saved.
+    callback pick-size(int);
+    // The timing moved half a second later (1) or sooner (-1), or back on time; per song.
+    callback move-timing(int);
+    callback reset-timing();
+    // "Choose other lyrics…": the dialog opens on LRCLIB's matches for the song.
+    callback choose();
     // A click on line `i`: play from its start.
     callback seek-line(int);
     // Try again after a failed lookup.
@@ -107,6 +130,7 @@ export global LyricsData {
     out property <string> why: self.state == LyricsState.error
         ? (self.unavailable ? @tr("LRCLIB isn't answering. featherplay asks again in a minute.") : @tr("Check your connection and try again."))
         : (!Player.has-track ? @tr("Play a song to see its lyrics here.")
+        : self.picked ? @tr("You chose no lyrics for this song.")
         : (self.lrclib ? @tr("Searched LRCLIB and YouTube Music.") : @tr("Searched YouTube Music. LRCLIB is off in Settings.")));
 
     // The Lyrics toggles (the stage's pill, the bar's microphone, Ctrl+L): on Now playing,
@@ -270,6 +294,17 @@ component NoLyrics inherits Rectangle {
             color: Theme.text2;
             wrap: word-wrap;
         }
+        // A song LRCLIB matched wrongly or not at all: the user can look for it.
+        if LyricsData.state == LyricsState.none && LyricsData.lrclib && Player.has-track: VerticalLayout {
+            padding-top: Theme.s3;
+            HorizontalLayout {
+                alignment: start;
+                TextLink {
+                    text: @tr("Search LRCLIB yourself");
+                    clicked => { LyricsData.choose(); }
+                }
+            }
+        }
         if LyricsData.state == LyricsState.error: Rectangle { height: Theme.s5; }
         if LyricsData.state == LyricsState.error: HorizontalLayout {
             alignment: start;
@@ -423,7 +458,7 @@ component LyricsEdge inherits Rectangle {
 // rounded card inside the tab; the full view draws its own panel across the stage and leaves
 // it off.
 export component LyricsView inherits Rectangle {
-    in property <length> size: Theme.t-lyric-side;
+    in property <length> size: LyricsData.side-size;
     // The lines' inset from the view's sides (the hover tile reaches `s3` past it).
     in property <length> pad-x: Theme.s5;
     // Room kept free at the bottom: the floating bar, in the side panel.

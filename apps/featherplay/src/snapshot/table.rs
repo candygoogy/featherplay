@@ -78,6 +78,15 @@ pub const PAGES: &[&str] = &[
     "now-playing-lyrics-full-outage",
     // The full view when LRCLIB is down and the song has no lyrics of its own.
     "now-playing-lyrics-full-unavailable",
+    // The full view with its lyrics menu open from the ⋯ beside the Lyrics pill: at the
+    // defaults (Medium, on time), or set to Large with the lines half a second later; and
+    // "Choose other lyrics", LRCLIB's matches for the song with the one in use marked.
+    "now-playing-lyrics-full-menu",
+    "now-playing-lyrics-full-menu-moved",
+    "now-playing-lyrics-full-choose",
+    // The side tab and the full view at Large (for the narrowest window, 960 px).
+    "now-playing-lyrics-large",
+    "now-playing-lyrics-full-large",
     "settings",
     // Settings with the Last.fm API settings or the ListenBrainz token dialog open.
     "settings-lastfm-keys",
@@ -98,8 +107,8 @@ pub const PAGES: &[&str] = &[
     // when you log in", "Start minimised").
     "settings-window",
     "settings-window-no-tray",
-    // Settings scrolled to the Lyrics group with desktop lyrics on; and as on Wayland, where
-    // the row says it isn't available, its "Why?" open.
+    // Settings scrolled to the Lyrics group with desktop lyrics on, its text size at Large;
+    // and as on Wayland, where the row says it isn't available, its "Why?" open.
     "settings-lyrics",
     "settings-lyrics-wayland",
     // Settings with the new sound rows on (Skip silence at Start and end, Crossfade at 5 s
@@ -388,6 +397,11 @@ pub(super) fn page(name: &str, f: &Fixtures) -> Result<Page, String> {
         | "now-playing-lyrics-full-outage"
         | "now-playing-lyrics-full-unavailable"
         | "sleep-running"
+        | "now-playing-lyrics-full-menu"
+        | "now-playing-lyrics-full-menu-moved"
+        | "now-playing-lyrics-full-choose"
+        | "now-playing-lyrics-large"
+        | "now-playing-lyrics-full-large"
         | "not-for-me" => Page::NowPlaying,
         "settings"
         | "settings-quick-search"

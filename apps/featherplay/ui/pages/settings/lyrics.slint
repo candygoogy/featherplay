@@ -2,7 +2,8 @@
 import { Theme } from "../../theme.slint";
 import { Body, TextLink } from "../../parts.slint";
 import { SettingId, SettingKey, SettingsData } from "data.slint";
-import { Group, SettingRow, ToggleRow } from "rows.slint";
+import { Group, RowChips, SettingRow, ToggleRow } from "rows.slint";
+import { LyricsData } from "../lyrics.slint";
 
 export component LyricsSection inherits Group {
     title: @tr("Lyrics");
@@ -22,6 +23,17 @@ export component LyricsSection inherits Group {
         key: SettingKey.lyrics-lrclib;
         checked: SettingsData.lyrics-lrclib;
         enabled: SettingsData.lyrics;
+    }
+    // One size for the app, also in the lyrics menu (Now playing's ⋯). Hidden with lyrics off.
+    if SettingsData.lyrics: SettingRow {
+        label: @tr("Text size");
+        search: SettingId.lyrics-size;
+        detail: @tr("The lines on Now playing and in the Lyrics tab.");
+        RowChips {
+            labels: [@tr("Small"), @tr("Medium"), @tr("Large")];
+            active: LyricsData.size;
+            selected(i) => { LyricsData.pick-size(i); }
+        }
     }
     // Desktop lyrics follow Show lyrics: off, the row goes.
     if SettingsData.lyrics && SettingsData.desktop-lyrics-here: ToggleRow {
