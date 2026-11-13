@@ -283,6 +283,9 @@ test("the FAQ and features say what the README says", async ({ page }) => {
   expect(faq).toContain("on Linux in your desktop's keyring");
   expect(faq).not.toContain("There's no macOS or Linux version");
   expect(faq).toContain("Look up YouTube directly in Settings > Playback");
+  // 0.4.0: Linux reads the sign-in once the browser is closed; the start entry goes too.
+  expect(faq).toContain("then close the browser");
+  expect(faq).toContain("its entry for starting when you sign in");
   // What it connects to, and what each service gets.
   await expect(page.locator("#questions summary", { hasText: "What does it connect to?" })).toBeVisible();
   expect(faq).toContain("title, artist, album and length");

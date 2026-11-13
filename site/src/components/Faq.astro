@@ -25,7 +25,7 @@ const faqs = [
     a: [
       "On Windows, featherplay opens a small sign-in window, Microsoft Edge WebView2, with Google's own sign-in page. You sign in there as you would in a browser. featherplay doesn't read your password; the code is open. Once you're in, it keeps the YouTube Music session from that window and closes it. The main window never contains a browser. Windows 11 includes WebView2, and most Windows 10 PCs have it with Edge.",
       "If you'd rather sign in in a browser you know, choose Use Microsoft Edge, Use Google Chrome, Use Brave or Use Vivaldi. The browser opens with a temporary profile, with its own address bar, your passkeys and Windows Hello. featherplay keeps only the YouTube Music session from it, then closes the browser and deletes the profile. Your own profile is never touched.",
-      "Linux has no sign-in window: you sign in the same way with Chrome, Chromium, Edge, Brave or Vivaldi. A Snap or Flatpak browser can't be used, because its sandbox keeps it out of the temporary profile.",
+      "Linux has no sign-in window: you sign in with Chrome, Chromium, Edge, Brave or Vivaldi, in a temporary profile, then close the browser. featherplay reads the session from that profile once the browser has closed, so no web page is open while it asks. A Snap or Flatpak browser can't be used, because its sandbox keeps it out of the temporary profile.",
       "The session is kept in Windows Credential Manager, or on Linux in your desktop's keyring (the Secret Service, such as GNOME Keyring or KWallet). While yt-dlp looks up a song's audio it reads the session from a temporary file, which featherplay deletes as soon as yt-dlp is done. The session gives the same access to your account as a signed-in browser, so treat it like a password; Sign out in Settings removes it.",
     ],
   },
@@ -47,7 +47,7 @@ const faqs = [
     q: "What does it connect to?",
     a: [
       "featherplay sends no telemetry and has no server of its own. It connects to YouTube Music and Google for your music, covers, streams and sign-in, and to GitHub to fetch yt-dlp and Deno in the background on the first run and to update yt-dlp. Only when GitHub can't be reached, it fetches them from this site and from Deno's download server instead (on Linux, yt-dlp comes from GitHub only for now).",
-      "LRCLIB gets the song's title, artist, album and length, only while lyrics are on screen. SponsorBlock, on by default, is asked only about music videos and uploads (songs have nothing to skip), by the first four characters of a hash of the video's ID, so it doesn't learn which video you play.",
+      "LRCLIB gets the song's title, artist, album and length, only while lyrics are on screen, and in Choose other lyrics the words you search for. SponsorBlock, on by default, is asked only about music videos and uploads (songs have nothing to skip), by the first four characters of a hash of the video's ID, so it doesn't learn which video you play.",
       "Last.fm and ListenBrainz hear from it only if you connect them, and Discord only if you turn on the status, through the Discord app on your own PC. Google's or Cloudflare's DNS over HTTPS is asked only with Look up YouTube directly on, and only for YouTube's server names.",
     ],
   },
@@ -69,9 +69,9 @@ const faqs = [
     id: "uninstall",
     q: "How do I uninstall it?",
     a: [
-      "Installed: uninstall it from Settings > Apps. That removes everything featherplay keeps: settings, cache, the helpers, the sign-in window's data and its entries in Credential Manager.",
-      "Portable: sign out and disconnect Last.fm in Settings first, which clears both from Credential Manager. Then delete the exe and its two folders, %APPDATA%\\featherplay and %LOCALAPPDATA%\\featherplay.",
-      "Linux: delete the AppImage, or the unpacked .tar.gz and what you installed from it in ~/.local, and the folders ~/.config/featherplay, ~/.cache/featherplay and ~/.local/state/featherplay. Then remove the items whose names end in @featherplay from your keyring.",
+      "Installed: uninstall it from Settings > Apps. That removes everything featherplay keeps: settings, cache, the helpers, the sign-in window's data, its entries in Credential Manager and its entry for starting when you sign in.",
+      "Portable: sign out and disconnect Last.fm in Settings first, which clears both from Credential Manager, and turn off Start when you sign in to Windows if it's on. Then delete the exe and its two folders, %APPDATA%\\featherplay and %LOCALAPPDATA%\\featherplay.",
+      "Linux: turn off Start when you log in if it's on, then delete the AppImage, or the unpacked .tar.gz and what you installed from it in ~/.local, and the folders ~/.config/featherplay, ~/.cache/featherplay and ~/.local/state/featherplay. Then remove the items whose names end in @featherplay from your keyring.",
     ],
   },
   {
