@@ -2,7 +2,8 @@
 //! window is shown): Now playing, the bar and Up next draw them without one `.notdef` box.
 //! The users' examples (2026-11-01) were Mathematical Alphanumeric Symbols, which no font in
 //! the text's family list has, and Japanese with fullwidth brackets. Since 2026-11-08 the
-//! styled letters are shown as plain ones (`text::plain`).
+//! styled letters are shown as plain ones (`text::plain`). Drawing them doesn't copy the
+//! fallback fonts into private memory.
 
 use std::sync::atomic::Ordering;
 
@@ -39,9 +40,18 @@ fn titles_in_other_scripts_draw_no_notdef_boxes() {
     }
 
     let before = NOTDEF_GLYPHS.load(Ordering::Relaxed);
+    let private_before = crate::support::private_mb();
     let shot = scene.ui.window().take_snapshot().expect("render");
+    let grew = crate::support::private_mb() - private_before;
     let boxes = NOTDEF_GLYPHS.load(Ordering::Relaxed) - before;
     // To look at: which fallback font drew each script (CI's Linux job keeps it).
     crate::support::pixels::save("scripts", &shot);
     assert_eq!(boxes, 0, "{boxes} glyphs drew as .notdef boxes");
+    // The fallback fonts are read where the font files are mapped, not copied into private
+    // memory (the vendored renderer's change 20): 12 MB on Windows with the frame, 109 MB
+    // when each font was copied (2026-11-13).
+    assert!(
+        grew < 40.0,
+        "private memory grew {grew:.1} MB drawing the scripts"
+    );
 }

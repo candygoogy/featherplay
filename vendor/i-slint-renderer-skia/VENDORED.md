@@ -1,6 +1,6 @@
 # Vendored: i-slint-renderer-skia 1.18.1
 
-This is the crate as published on crates.io, with nineteen changes. The workspace `Cargo.toml`
+This is the crate as published on crates.io, with twenty changes. The workspace `Cargo.toml`
 swaps it in with `[patch.crates-io]`.
 
 1. `Cargo.toml`: `wgpu-30` is out of the default features.
@@ -187,6 +187,17 @@ Change 19 makes a frame of the playing mark cheaper (measured 2026-11-10):
     the children of a layer are drawn through the Skia renderer, not the partial one, so
     they have no change trackers left dirty by the skip.
 
+20. `font_cache.rs`, `load_typeface_internal`: skia reads a font's bytes where fontique has
+    them (`Data::new_bytes`; a system font's file is memory-mapped) instead of a copy on the
+    heap (`Data::new_copy`), and the blob is kept for the rest of the process, once per blob,
+    since a typeface can outlive its cache entry (marked `featherplay patch`). Upstream copied
+    each font file whole into private memory the first time it drew: Segoe UI Variable's
+    1.8 MB at every start, and 14 MB more for Yu Gothic Bold's collection whenever a
+    Japanese title drew in bold, as one on Home does now and then, which made private memory
+    sit 13-15 MB higher for the whole session (2026-11-13). Drawing the test's titles in other
+    scripts grew private memory 109 MB with the copies and 12 MB without
+    (`apps/featherplay/tests/app/glyph_fallback.rs`).
+
 ## Platforms
 
 Which changes are Windows-specific (2026-11-11). Only code that is Win32's or would behave
@@ -215,6 +226,7 @@ featherplay uses.
 | 17 shadows from colourless masks | Neutral | No | Skia rasterising and a cache. |
 | 18 no SVG renderer | Neutral | No | A Cargo feature and a `cfg(any())` arm. |
 | 19 no layer at alpha 0 | Neutral | No | Skia rasterising. |
+| 20 fonts read in place | Neutral | No | DirectWrite and FreeType both read an `SkData` in place; fontique maps the files on every target. |
 
 ## Why
 
@@ -241,9 +253,10 @@ licence, which allows modified copies).
    new renderer already does the same (then check `scroll_frames.rs` still passes optimised),
    and change 16 (the exe's size shows whether Skia's GPU backend came back), and change
    17 unless the new box shadow cache leaves the colour out of its key (`memory.rs`' glow
-   test shows it), change 18 (the exe's size shows whether resvg came back), and change
+   test shows it), change 18 (the exe's size shows whether resvg came back), change
    19 unless the new `visit_opacity` already skips a layer at alpha 0 (`render_surface.rs`
-   checks the frames).
+   checks the frames), and change 20 unless the new font cache already reads fonts without
+   a copy (`glyph_fallback.rs` checks the memory).
 4. Build. If `i-slint-backend-winit` still calls wgpu-only constructors, port the three
    wgpu `featherplay patch` blocks in `lib.rs` (the git history of this folder has the diff);
    if it now gates them itself, leave those out. Check the Linux build too (see Platforms).
