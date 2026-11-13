@@ -65,7 +65,8 @@ thread_local! {
     static STRIP: RefCell<Option<Rc<Strip>>> = const { RefCell::new(None) };
 }
 
-/// Whether this desktop can show the strip: everywhere but Wayland.
+/// Whether this desktop can show the strip: on Windows, and on Linux in an X11 session (not
+/// on Wayland, nor with no display at all).
 pub fn available() -> bool {
     supports(Feature::DesktopLyrics)
 }

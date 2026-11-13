@@ -3,7 +3,9 @@
 //! on screen with the main window away in the tray, and the tray menu offers Lock; the first
 //! opening says it can be dragged and locked, once. A+ widens it and Lock locks it, both kept;
 //! its × turns desktop lyrics off and drops the window. With "Show lyrics" off it's neither
-//! shown nor offered, and with it off nothing of it exists.
+//! shown nor offered, and with it off nothing of it exists. On a desktop that can't show it
+//! (Wayland, or Linux with no display at all, as in CI) the switch shows nothing and nothing
+//! offers it.
 
 use featherplay::desktop_lyrics;
 use featherplay::lyrics;
@@ -34,11 +36,30 @@ fn strip() -> DesktopLyrics {
     desktop_lyrics::strip().expect("the strip shows")
 }
 
+/// Whether this desktop shows the strip: always on Windows; on Linux in an X11 session only.
+/// Where it doesn't, turned on it's still neither shown nor offered, it doesn't count as
+/// lyrics on screen, and Settings' row says it isn't available here.
+fn here(scene: &Scene) -> bool {
+    let here = desktop_lyrics::available();
+    assert!(here || !cfg!(windows), "Windows always has desktop lyrics");
+    if !here {
+        turn(scene, SettingKey::DesktopLyrics, true);
+        assert!(desktop_lyrics::strip().is_none(), "shown where it can't be");
+        assert!(!desktop_lyrics::menu_state().offered);
+        assert!(!scene.ui.global::<LyricsData>().get_desktop());
+        assert!(!scene.ui.global::<SettingsData>().get_desktop_lyrics_here());
+    }
+    here
+}
+
 #[test]
 fn turned_on_it_shows_the_line_being_sung_with_the_window_in_the_tray() {
     let scene = scene();
     let lyrics_data = scene.ui.global::<LyricsData>();
     assert!(desktop_lyrics::strip().is_none() && !lyrics_data.get_desktop());
+    if !here(&scene) {
+        return;
+    }
     let asked = lyrics::lookups();
 
     turn(&scene, SettingKey::DesktopLyrics, true);
@@ -90,6 +111,9 @@ fn turned_on_it_shows_the_line_being_sung_with_the_window_in_the_tray() {
 #[test]
 fn with_show_lyrics_off_it_closes_and_isnt_offered() {
     let scene = scene();
+    if !here(&scene) {
+        return;
+    }
     turn(&scene, SettingKey::DesktopLyrics, true);
     assert!(desktop_lyrics::strip().is_some());
 
