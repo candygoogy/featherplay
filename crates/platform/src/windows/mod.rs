@@ -1,6 +1,7 @@
 //! Windows: the Win32, WinRT and COM code, moved here from the other crates. One file per
 //! area; each area's functions live in its own file.
 
+pub mod autostart;
 pub mod browsers;
 pub mod clipboard;
 pub mod credentials;

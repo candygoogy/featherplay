@@ -8,6 +8,7 @@
 //! `Unsupported` or nothing. One file per area, as for Windows; there's no `webview`
 //! (WebView2 sign-in is Windows only).
 
+pub mod autostart;
 pub mod browsers;
 pub(crate) mod bus;
 pub mod clipboard;

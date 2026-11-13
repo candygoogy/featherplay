@@ -330,7 +330,7 @@ fn read_shortcut(path: &Path) -> Result<Shortcut, String> {
 }
 
 /// A `REG_SZ` value under HKCU, if it is there.
-fn read_hkcu_string(subkey: &str, name: &str) -> Option<String> {
+pub(crate) fn read_hkcu_string(subkey: &str, name: &str) -> Option<String> {
     let subkey = HSTRING::from(subkey);
     let name = HSTRING::from(name);
     let mut buf = [0u16; 1024];
@@ -357,7 +357,7 @@ fn read_hkcu_string(subkey: &str, name: &str) -> Option<String> {
 }
 
 /// Creates `HKCU\{subkey}` if needed and sets each value as `REG_SZ`.
-fn write_hkcu_strings(subkey: &str, values: &[(&str, String)]) -> Result<(), String> {
+pub(crate) fn write_hkcu_strings(subkey: &str, values: &[(&str, String)]) -> Result<(), String> {
     let path = HSTRING::from(subkey);
     let mut key = HKEY::default();
     // SAFETY: HKCU is a predefined key; `key` receives the opened handle, closed below.

@@ -3,6 +3,7 @@
 //! part (`pub use crate::common::tray::*`), so it's defined once and named the same way
 //! everywhere.
 
+pub mod autostart;
 pub mod browsers;
 pub mod clipboard;
 pub mod identity;
