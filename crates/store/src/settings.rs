@@ -141,6 +141,8 @@ pub struct Settings {
     /// "Start in the tray" (Settings > Window, shown while featherplay starts when the user
     /// signs in): a start at sign-in shows no window, only the tray icon (off by default).
     /// Whether it starts at sign-in at all isn't kept here: the system's entry is the truth.
+    /// Anything but a bool loads as off.
+    #[serde(deserialize_with = "lenient")]
     pub start_in_tray: bool,
     /// The equalizer (Settings > Sound): Off (the default), a preset, or the user's bands.
     /// A value this build doesn't know loads as Off.

@@ -1,6 +1,7 @@
 //! Desktop lyrics (Settings > Lyrics): the strip that shows the line being sung above other
 //! apps. Stored as the `[desktop_lyrics]` table of the settings; missing keys take their
-//! defaults, and a value this build doesn't know takes the default for that key only.
+//! defaults, and a value this build doesn't know (or of the wrong type) takes the default for
+//! that key only.
 
 use serde::{Deserialize, Serialize};
 
@@ -9,9 +10,11 @@ use serde::{Deserialize, Serialize};
 #[serde(default)]
 pub struct DesktopLyrics {
     /// The strip shows (off by default), while lyrics are on and the desktop allows it.
+    #[serde(deserialize_with = "lenient")]
     pub on: bool,
     /// Clicks, the wheel and hover go through it to the app beneath (off at first, so it
     /// can be dragged into place).
+    #[serde(deserialize_with = "lenient")]
     pub locked: bool,
     #[serde(deserialize_with = "lenient")]
     pub size: StripSize,
@@ -19,6 +22,7 @@ pub struct DesktopLyrics {
     #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "lenient")]
     pub place: Option<StripPlace>,
     /// The first opening's line saying it can be dragged and locked has been shown.
+    #[serde(deserialize_with = "lenient")]
     pub hinted: bool,
 }
 

@@ -1259,3 +1259,68 @@ fn a_lyrics_size_this_build_doesnt_know_loads_as_medium() {
     fs::write(p.config.join("settings.toml"), "lyrics_size = \"large\"").unwrap();
     assert_eq!(Settings::load(&p).lyrics_size, LyricsSize::Large);
 }
+
+/// Desktop lyrics' values a newer featherplay or a hand edit left: each key that isn't one
+/// this build reads takes its default, and the strip's other keys and the rest of the file
+/// count. A place far off any screen loads as it was; the app then finds no screen with that
+/// work area and puts the strip above the taskbar.
+#[test]
+fn bad_desktop_lyrics_values_take_their_defaults_key_by_key() {
+    let Some(home) = TestHome::new("settings-desktop-lyrics-bad") else {
+        return;
+    };
+    let p = home.paths();
+    fs::create_dir_all(&p.config).unwrap();
+    let file = p.config.join("settings.toml");
+    let text = "volume = 0.5
+
+[desktop_lyrics]
+on = true
+locked = \"yes\"
+size = \"huge\"
+place = { x = \"left\", bottom = 990 }
+hinted = 3
+";
+    fs::write(&file, text).unwrap();
+    let s = Settings::load(&p);
+    assert_eq!(
+        s.desktop_lyrics,
+        DesktopLyrics {
+            on: true,
+            ..DesktopLyrics::default()
+        }
+    );
+    assert_eq!(s.volume, 0.5);
+
+    let far = "[desktop_lyrics]
+locked = true
+size = \"large\"
+place = { x = 2000000000, bottom = -2000000000, screen = [0, 0, 1, 1] }
+";
+    fs::write(&file, far).unwrap();
+    let s = Settings::load(&p).desktop_lyrics;
+    assert!(s.locked && s.size == StripSize::Large);
+    assert_eq!(
+        s.place.map(|p| (p.x, p.bottom)),
+        Some((2_000_000_000, -2_000_000_000))
+    );
+}
+
+/// "Start in the tray" that isn't a bool (a hand edit, a newer featherplay's) loads as off,
+/// and the rest of the file counts.
+#[test]
+fn a_start_in_tray_that_isnt_a_bool_loads_as_off_and_keeps_the_rest() {
+    let Some(home) = TestHome::new("settings-start-in-tray-bad") else {
+        return;
+    };
+    let p = home.paths();
+    fs::create_dir_all(&p.config).unwrap();
+    let file = p.config.join("settings.toml");
+    for value in ["\"yes\"", "1", "[true]"] {
+        fs::write(&file, format!("start_in_tray = {value}\nvolume = 0.5\n")).unwrap();
+        let s = Settings::load(&p);
+        assert_eq!((s.start_in_tray, s.volume), (false, 0.5), "{value}");
+    }
+    fs::write(&file, "start_in_tray = true\n").unwrap();
+    assert!(Settings::load(&p).start_in_tray);
+}
