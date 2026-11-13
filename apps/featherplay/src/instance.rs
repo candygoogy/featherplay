@@ -67,7 +67,7 @@ pub fn start(what: Ask) -> Start {
     let deadline = Instant::now() + HANDOFF;
     loop {
         if ask(&key, what) {
-            log!("featherplay is already running; it answered ({what:?})");
+            log!("featherplay is already running; {}", answered(what));
             return Start::Exit;
         }
         // Starting (no window yet) or closing (it said no): if it ends, this run takes over.
@@ -79,5 +79,24 @@ pub fn start(what: Ask) -> Start {
             log!("featherplay is already running but didn't answer; not starting another");
             return Start::Exit;
         }
+    }
+}
+
+/// What the running featherplay did for this launch, as the log says it.
+fn answered(what: Ask) -> &'static str {
+    match what {
+        Ask::Show => "it showed its window",
+        Ask::QuickSearch => "it opened the quick search",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The desktop rig (`scripts/rig/desktop/app.sh`) reads this line from a second launch.
+    #[test]
+    fn a_plain_second_launch_logs_that_the_window_showed() {
+        assert_eq!(answered(Ask::Show), "it showed its window");
     }
 }

@@ -247,10 +247,7 @@ pub fn ask(key: &str, what: Ask) -> Result<bool, String> {
     let answer = (|| {
         stream.set_read_timeout(Some(ASK_TIMEOUT))?;
         stream.set_write_timeout(Some(ASK_TIMEOUT))?;
-        stream.write_all(match what {
-            Ask::Show => REQUEST,
-            Ask::QuickSearch => FIND,
-        })?;
+        stream.write_all(request(what))?;
         let mut byte = [0u8];
         stream.read_exact(&mut byte)?;
         io::Result::Ok(byte[0])
@@ -304,6 +301,22 @@ fn bind(path: &Path) -> io::Result<UnixListener> {
     }
 }
 
+/// What a second launch writes for `what`: `show` for a plain launch (what every release has
+/// sent), `find` for `--quick-search`.
+fn request(what: Ask) -> &'static [u8] {
+    match what {
+        Ask::Show => REQUEST,
+        Ask::QuickSearch => FIND,
+    }
+}
+
+/// What a request read from a second launch asks for, if it's one.
+fn asked(bytes: &[u8]) -> Option<Ask> {
+    [Ask::Show, Ask::QuickSearch]
+        .into_iter()
+        .find(|&what| request(what) == bytes)
+}
+
 /// Reads one request from `stream` and answers it.
 fn answer(mut stream: UnixStream, show: &Show) {
     let _ = stream.set_read_timeout(Some(ASK_TIMEOUT));
@@ -313,11 +326,7 @@ fn answer(mut stream: UnixStream, show: &Show) {
     if stream.read_exact(&mut request).is_err() {
         return;
     }
-    let ask = match &request[..] {
-        r if r == REQUEST => Ask::Show,
-        r if r == FIND => Ask::QuickSearch,
-        _ => return,
-    };
+    let Some(ask) = asked(&request) else { return };
     let shown = (show.on_show)(ask);
     let _ = stream.write_all(&[u8::from(shown)]);
 }
@@ -335,6 +344,17 @@ mod tests {
             "/nonexistent/featherplay-test-{test}-{}",
             std::process::id()
         ))))
+    }
+
+    #[test]
+    fn a_plain_second_launch_asks_for_the_window_as_every_release_has() {
+        assert_eq!(request(Ask::Show), b"show\n");
+        for what in [Ask::Show, Ask::QuickSearch] {
+            // `answer` reads `REQUEST.len()` bytes.
+            assert_eq!(request(what).len(), REQUEST.len(), "{what:?}");
+            assert_eq!(asked(request(what)), Some(what));
+        }
+        assert_eq!(asked(b"shown"), None);
     }
 
     #[test]
