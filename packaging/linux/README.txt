@@ -26,9 +26,10 @@ Updates: this copy tells you when a new version is out, but doesn't install it. 
 updates itself.
 
 What it needs: glibc 2.35 or newer (Ubuntu 22.04, Debian 12, Fedora 36 or newer),
-fontconfig, FreeType and ALSA (with PipeWire or PulseAudio behind it, as desktops have), and
-a Wayland or X11 session (libwayland-client, libxkbcommon, or libX11 and libxcb), and the
-system's CA certificates (ca-certificates on Debian, Ubuntu, Fedora and Arch). A desktop
+fontconfig, FreeType and ALSA (with PipeWire or PulseAudio behind it, as desktops have),
+a Wayland or X11 session and its libraries (libxkbcommon, with libwayland-client, or with
+libX11, libX11-xcb, libxcb, libxkbcommon-x11, libXcursor and libXi), and the system's CA
+certificates (ca-certificates on Debian, Ubuntu, Fedora and Arch). A desktop
 distribution has all of these. Its TLS is built in (no OpenSSL needed); it trusts the
 certificates your system trusts, and with none installed, the Mozilla roots it carries.
 Settings go in ~/.config/featherplay, the cache in ~/.cache/featherplay.
