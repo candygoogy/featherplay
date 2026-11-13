@@ -289,4 +289,31 @@ mod tests {
         );
         assert!(a.refresh(Path::new(r"F:\featherplay.exe")).unwrap());
     }
+
+    /// A Run value someone garbled is still an entry: the next start points it back at the
+    /// exe. One that isn't text, or too long to read, reads as no entry, and turning it on
+    /// replaces it.
+    #[test]
+    fn a_garbled_entry_is_repaired_or_replaced() {
+        let entry = TestEntry::new("autostart-garbled");
+        let a = &entry.0;
+        let exe = PathBuf::from(r"E:\Apps\featherplay\featherplay.exe");
+        for garbled in ["", r#""E:\Apps\featherplay"#, "--autostart \"\"\"\u{FFFD}"] {
+            write_hkcu_strings(&a.run, &[(NAME, garbled.to_string())]).unwrap();
+            assert_eq!(a.state(), State::On, "{garbled:?}");
+            assert!(a.refresh(&exe).unwrap(), "{garbled:?}");
+            assert_eq!(a.command(), Some(command_line(&exe)));
+            assert!(!a.refresh(&exe).unwrap());
+        }
+        set_binary(&a.run, NAME, &[0xFF, 0x00, 0x13]).unwrap();
+        assert_eq!((a.state(), a.command()), (State::Off, None));
+        assert!(!a.refresh(&exe).unwrap());
+        write_hkcu_strings(&a.run, &[(NAME, "x".repeat(5000))]).unwrap();
+        assert_eq!((a.state(), a.command()), (State::Off, None));
+        a.enable(&exe).unwrap();
+        assert_eq!(
+            (a.state(), a.command()),
+            (State::On, Some(command_line(&exe)))
+        );
+    }
 }

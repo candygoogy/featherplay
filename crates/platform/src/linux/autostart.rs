@@ -104,13 +104,18 @@ impl Autostart {
     }
 
     /// Points an entry that's there at `exe`, if its `Exec` names another path (the AppImage
-    /// moved). One the desktop turned off stays off: only `Exec` changes. Returns whether it
-    /// changed anything.
+    /// moved). One the desktop turned off stays off: only `Exec` changes. One with no
+    /// `[Desktop Entry]` group (garbled) is written anew. Returns whether it changed anything.
     pub fn refresh(&self, exe: &Path) -> Result<bool, String> {
         let Ok(text) = fs::read_to_string(&self.file) else {
             return Ok(false);
         };
         let wanted = exec(exe);
+        if !text.lines().any(|l| l.trim() == "[Desktop Entry]") {
+            fs::write(&self.file, entry(exe))
+                .map_err(|e| format!("{}: {e}", self.file.display()))?;
+            return Ok(true);
+        }
         if key(&text, "Exec") == Some(wanted.as_str()) {
             return Ok(false);
         }
@@ -249,6 +254,35 @@ mod tests {
         a.disable().unwrap();
         assert_eq!(a.state(), State::Off);
         a.disable().unwrap();
+        a.remove_for_tests();
+    }
+
+    /// An entry someone garbled: the next start points it back at the binary, whether its
+    /// `Exec` is wrong, missing, or the file has no `[Desktop Entry]` group at all. One that
+    /// isn't text reads as off, and turning it on replaces it.
+    #[test]
+    fn a_garbled_entry_is_repaired_or_replaced() {
+        let a = Autostart::for_tests("autostart-garbled");
+        a.remove_for_tests();
+        let exe = Path::new("/home/u/featherplay.AppImage");
+        a.enable(exe).unwrap();
+        for garbled in [
+            "[Desktop Entry]\nType=Application\nExec=\"/home/u/feather\n",
+            "[Desktop Entry]\nType=Application\nExec\nHidden=false\n",
+            "garbage\nExec=nothing\n\u{0}",
+            "",
+        ] {
+            fs::write(&a.file, garbled).unwrap();
+            assert_eq!(a.state(), State::On, "{garbled:?}");
+            assert!(a.refresh(exe).unwrap(), "{garbled:?}");
+            assert_eq!(a.command(), Some(exec(exe)), "{garbled:?}");
+            assert!(!a.refresh(exe).unwrap(), "{garbled:?}");
+        }
+        fs::write(&a.file, [0xFF, 0xFE, 0x00, 0x80]).unwrap();
+        assert_eq!((a.state(), a.command()), (State::Off, None));
+        assert!(!a.refresh(exe).unwrap());
+        a.enable(exe).unwrap();
+        assert_eq!((a.state(), a.command()), (State::On, Some(exec(exe))));
         a.remove_for_tests();
     }
 }
