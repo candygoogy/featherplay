@@ -12,8 +12,8 @@
 //! no window and no timer. While it shows it counts as lyrics on screen
 //! (`LyricsData.desktop`), so the lookup and the one timer per line (`lyrics::sync`) run for
 //! it even with the main window in the tray; `lyrics` hands it each change (`refresh`), and it
-//! repaints once per line. Nothing ticks between lines; a drag's end is saved by one short
-//! single-shot timer.
+//! paints once per line (with motion, a 200 ms change of lines, `show_lines`). Nothing ticks
+//! between lines; a drag's end is saved by one short single-shot timer.
 //!
 //! Its place: first just above the taskbar, centred on the main window's screen; once dragged,
 //! where it was left, as the middle of its bottom edge, so a longer line grows it upward and a
@@ -538,15 +538,28 @@ pub fn refresh(ctx: &Ctx) {
             featherplay_core::tr!("Drag to move it · lock it to let clicks through").into();
         shown.quiet = true;
     }
-    let data = strip.ui.global::<StripData>();
-    if data.get_line() != shown.line.as_str() {
+    show_lines(&strip.ui.global::<StripData>(), shown);
+    resized(&strip.ui);
+}
+
+/// Puts `shown` on the strip. A new first line takes the place of the one before, the
+/// second line going with it (the strip animates that); a new second line alone changes in
+/// place.
+fn show_lines(data: &StripData, shown: Shown) {
+    let line = data.get_line();
+    if line != shown.line.as_str() {
+        if !line.is_empty() {
+            data.set_was_line(line);
+            data.set_was_under(data.get_under());
+            data.set_was_quiet(data.get_quiet());
+            data.set_turn(data.get_turn().wrapping_add(1));
+        }
         data.set_line(shown.line.into());
     }
     if data.get_under() != shown.under.as_str() {
         data.set_under(shown.under.into());
     }
     data.set_quiet(shown.quiet);
-    resized(&strip.ui);
 }
 
 /// What the strip is given to show.

@@ -327,6 +327,7 @@ export global Theme {
     out property <duration> t-skeleton-delay: 150ms;                          // no skeleton flash on fast loads
     out property <duration> t-skeleton-sweep: 2200ms;                         // one skeleton sweep and its rest
     out property <duration> t-lyrics: moving ? 300ms : 0ms;                   // the lyrics toggle: the cover glides to its column, the lines fade in
+    out property <duration> t-strip-line: moving ? 200ms : 0ms;              // desktop lyrics: a line giving way to the next (instant without motion)
     out property <duration> t-follow: moving ? 400ms : 0ms;                   // lyrics glide to the next line (ambient, so calmer than a UI move)
     out property <duration> t-line: fading && !switching ? 400ms : 0ms;       // a line's colour as it becomes current or sung (stays without motion)
 

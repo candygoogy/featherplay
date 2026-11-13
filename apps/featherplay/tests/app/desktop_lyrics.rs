@@ -6,7 +6,7 @@
 //! shown nor offered, and with it off nothing of it exists. On a desktop that can't show it
 //! (Wayland, or Linux with no display at all, as in CI) the switch shows nothing and nothing
 //! offers it. It shows the view's line and the next through picks, timing changes and gaps,
-//! and its frames on screen match a full render.
+//! and its frames on screen match a full render; a new line moves in, at once without motion.
 
 use featherplay::desktop_lyrics;
 use featherplay::lyrics;
@@ -300,4 +300,78 @@ fn the_strip_shows_the_views_line_across_a_gap_after_a_pick_and_a_timing_change(
     scene.settle();
     seek(2);
     agrees(&scene, "the automatic match again");
+}
+
+/// A new line rises into place as the one before goes up and fades, the next line with it,
+/// in ~200 ms; at rest nothing animates. Without motion the change is instant. The strip's
+/// lines fade in when it appears.
+#[test]
+fn a_new_line_moves_in_and_without_motion_it_is_instant() {
+    use featherplay::offscreen;
+    use featherplay::ui::Theme;
+    use std::time::Duration;
+    let scene = Scene::new(1280, 800, false, true).expect("scene");
+    scene.ui.global::<Theme>().set_motion(true);
+    scene.play(false).expect("player");
+    scene.open("home").expect("home");
+    scene.ui.global::<Frame>().set_hidden(true);
+    scene.settle();
+    if !here(&scene) {
+        return;
+    }
+    // Shown once (its lyrics looked up, its hint spent), then again on a frozen clock.
+    turn(&scene, SettingKey::DesktopLyrics, true);
+    let first = strip();
+    first.global::<StripData>().invoke_lock();
+    first.global::<StripData>().invoke_lock();
+    drop(first);
+    turn(&scene, SettingKey::DesktopLyrics, false);
+    offscreen::freeze_clock();
+    let settings = scene.ui.global::<SettingsData>();
+    settings.invoke_toggled(SettingKey::DesktopLyrics, true);
+    scene.run_queued();
+    let shown = strip();
+    let w = shown.window();
+    let data = shown.global::<StripData>();
+    let frames = |ms: u64| {
+        for _ in 0..ms / 16 {
+            offscreen::advance(Duration::from_millis(16));
+            offscreen::present(w).expect("present");
+        }
+    };
+    frames(32);
+    assert!(
+        w.has_active_animations(),
+        "the strip appeared without its fade"
+    );
+    frames(400);
+    assert!(!w.has_active_animations(), "something animates at rest");
+
+    let lyrics_data = scene.ui.global::<LyricsData>();
+    let line = |i: i32| {
+        lyrics_data.invoke_seek_line(i);
+        scene.run_queued();
+    };
+    let start = lyrics_data.get_current();
+    let was = data.get_line();
+    line(start + 1);
+    assert_eq!(
+        data.get_was_line(),
+        was,
+        "the line going isn't the one shown"
+    );
+    frames(16);
+    assert!(w.has_active_animations(), "the new line jumped in");
+    frames(80);
+    assert!(w.has_active_animations(), "the change ended too soon");
+    frames(240);
+    assert!(!w.has_active_animations(), "the change went on too long");
+    agrees(&scene, "after the change");
+
+    // Windows' animation effects off: at once.
+    shown.global::<Theme>().set_motion(false);
+    line(start + 2);
+    offscreen::advance(Duration::from_millis(1));
+    assert!(!w.has_active_animations(), "the line moved without motion");
+    agrees(&scene, "without motion");
 }
