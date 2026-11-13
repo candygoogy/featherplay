@@ -23,27 +23,30 @@ A Cargo workspace. The app is `apps/featherplay`; the rest are libraries it uses
 
 | Crate | What it does |
 |---|---|
-| `crates/core` | The pure logic: the track model, the play queue, the player state machine and the scrobble rules. No I/O. |
+| `crates/core` | The pure logic: the track model, the play queue, the player state machine, the scrobble rules and what a signed-in session's cookies look like. No I/O. |
 | `crates/ytm` | The music catalogue and library over ytmapi-rs, signed in with the session's cookies or signed out; `convert` turns raw responses into `core` types and is tested on recorded fixtures. |
 | `crates/streams` | Stream URLs for tracks: one InnerTube request of its own, else the yt-dlp sidecar. Also downloads and checks the yt-dlp and Deno sidecars. |
 | `crates/audio` | The audio engine on its own thread: 1 MiB `Range` downloads into a temp file, AAC/MP4 decoding with Symphonia and Opus/WebM with opus-decoder, the sound processing (`dsp/`: equalizer, compressor, limiter; crossfade, speed and silence skipping beside it), output through rodio and cpal. |
-| `crates/store` | What's kept on disk and in the OS: paths, settings, the saved session, Credential Manager secrets, the Library's cache and where songs are silent. |
-| `crates/proxy` | Which proxy a request goes through: the environment, else Windows' auto-detection, proxy script or manual proxy, looked up in the background. Every HTTP client is built from its `client()`. |
+| `crates/store` | What's kept on disk and in the OS: paths, settings, the saved session, secrets (Credential Manager on Windows, the Secret Service on Linux), the Library's cache and where songs are silent. |
+| `crates/proxy` | Which proxy a request goes through: the environment, else Windows' auto-detection, proxy script or manual proxy, looked up in the background (on Linux, the environment only). Every HTTP client is built from its `client()`, with its TLS. Also the check whether the DNS sends YouTube's hosts away from Google (`dns`), and the DNS over HTTPS lookup behind "Look up YouTube directly" (`doh`). |
 | `crates/lyrics` | The LRC format and the LRCLIB lookup. No cache, no retries. |
 | `crates/lastfm` | The Last.fm client: request signing, the desktop auth flow, scrobbling and the offline queue. |
 | `crates/listenbrainz` | The ListenBrainz client: `submit-listens` (now playing, single listens, the offline queue) and `validate-token`. |
-| `crates/integrations` | Windows integrations: media controls, taskbar buttons, the tray icon, toasts and global hotkeys, plus SponsorBlock, Discord presence, the local API and Amuse endpoint, and the app's identity for the shell. |
+| `crates/integrations` | The services and the commands: global hotkeys, SponsorBlock, Discord presence, the local API and Amuse endpoint, and `UiCommand` and `NowPlaying`, which turn the OS parts' events into commands and the playing song into what they show. |
+| `crates/platform` | Everything that talks to the operating system, behind plain functions and types: the tray, media controls (SMTC, MPRIS), taskbar buttons, notifications, the credential store, the browsers for the sign-in, windows, the single-instance guard, fonts, the clipboard, threads and memory. One module per OS (`windows`, `linux`), picked at compile time; `supports()` says which features an OS lacks. |
 | `crates/controller` | Everything the app does without a window: the controller that ties the crates together, scrobbling, Discord presence, the data source the pages share (and its `--fixtures`), the log and Copy diagnostics, the update check. Its tests need no window: `cargo nextest run -p featherplay-controller`. |
 | `apps/featherplay` | The app: the Slint UI (`ui/`), the pages and the window, startup, and the offscreen snapshot mode. `apps/featherplay/ui/README.md` explains how the UI is laid out. |
 
 `vendor/` holds patched third-party crates and stays out of fmt and clippy. `site/` is the
-website, and `packaging/` holds the installer script and the winget and Scoop manifests.
+website, and `packaging/` holds the installer script, the winget and Scoop manifests and
+the Linux packaging (`packaging/linux/`). `scripts/` has the quick Linux check and the
+Linux test rigs CI runs.
 
 ## Building
 
-You need Windows 10 or 11 and Rust from [rustup](https://rustup.rs). `rust-toolchain.toml`
-picks the stable toolchain with clippy and rustfmt, so rustup installs the right one on the
-first build.
+You need Windows 10 or 11 (or Linux, below) and Rust from [rustup](https://rustup.rs).
+`rust-toolchain.toml` picks the stable toolchain with clippy and rustfmt, so rustup installs
+the right one on the first build.
 
 ```
 cargo build -p featherplay
@@ -54,6 +57,11 @@ Set `FEATHERPLAY_HOME` to a folder of your own while you work. Settings, cache a
 helpers then go there instead of `%APPDATA%` and `%LOCALAPPDATA%`, and your installed
 featherplay is left alone.
 
+`FEATHERPLAY_SIDECARS_DIR` names another folder for the helpers, yt-dlp and Deno, in every
+build, release builds included: featherplay uses them from there instead of `sidecars` in
+its cache folder, and downloads them there when they're missing. Testers' launchers and
+packagers who provide their own helpers use it.
+
 The build keys are optional. Official builds compile in a Last.fm API key and secret and a
 Discord application ID from `LASTFM_API_KEY`, `LASTFM_API_SECRET` and `DISCORD_CLIENT_ID`.
 Without them everything builds and the tests pass; Last.fm then needs your own API key
@@ -63,6 +71,33 @@ The installer needs [Inno Setup](https://jrsoftware.org/isinfo.php) 6.7 or later
 `packaging/windows/build-installer.sh` builds the release exe and then
 `target/installer/featherplay-setup-<version>.exe`. It refuses to build without the keys
 unless you set `ALLOW_NO_KEYS=1`; its header lists the other settings.
+
+### Linux
+
+The Linux build is experimental, for x86_64 and aarch64. On Debian or Ubuntu, install the
+headers the native crates build against (the list CI's `linux` job in
+`.github/workflows/ci.yml` installs):
+
+```
+sudo apt-get install pkg-config clang libfontconfig1-dev libfreetype-dev libxkbcommon-dev \
+  libxkbcommon-x11-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev \
+  libxi-dev libasound2-dev libdbus-1-dev
+```
+
+Then build with the same `cargo` commands. No OpenSSL is needed: the TLS is rustls, built
+into the binary. Without `FEATHERPLAY_HOME`, settings go in `~/.config/featherplay`, the
+cache in `~/.cache/featherplay` and the log in `~/.local/state/featherplay/logs`.
+
+`packaging/linux/build-linux.sh` builds the release binary and packages it for the
+machine's architecture as `target/linux/featherplay-<arch>.AppImage` and
+`featherplay-<arch>.tar.gz`. It downloads appimagetool and the AppImage runtime, pinned by
+SHA256, and takes the keys and `ALLOW_NO_KEYS=1` as the installer script does; its header
+lists the other settings. Releases are built on Ubuntu 22.04, so the binary needs glibc 2.35
+or newer. A build on a newer distribution needs that one's glibc; `MAX_GLIBC=2.35` makes the
+script refuse such a binary.
+
+`scripts/linux-check.sh` runs `cargo check` and clippy for `x86_64-unknown-linux-gnu`, on
+Linux or in WSL: a quick check before a push.
 
 ## Tests
 
@@ -76,7 +111,10 @@ cargo fmt --all --check
 CI runs the same four, plus `cargo deny check` against `deny.toml` (advisories, licences,
 crate sources). On pushes and pull requests it uses nextest's `ci` profile, which leaves out
 the slow frame-cost and CPU-time ceilings. The weekly run's and `release.yml`'s x64 tests
-run everything; their ARM64 jobs use the `ci` profile too.
+run everything; their ARM64 jobs use the `ci` profile too. A `linux` job runs clippy and
+the tests on Ubuntu, x86_64 and aarch64, and CI also runs the Linux rigs in `scripts/rig/`:
+the sound output, the app on a real X11 and Wayland desktop, and the AppImage in several
+distributions' containers.
 
 The tests need [cargo-nextest](https://nexte.st), because it runs each test in its own
 process: Slint allows one platform per process, and most app tests install the offscreen
@@ -95,6 +133,18 @@ one test:
 ```
 cargo nextest run -p featherplay -E 'test(name)'
 ```
+
+The same commands work on Linux. There, use nextest's `ci` profile (`--profile ci`), as CI
+does: the frame-cost and CPU-time ceilings were set on Windows, and the CPU-time ones count
+thread cycles, which only Windows reports. Run the tests under a session bus
+(`dbus-run-session -- cargo nextest run ...`), as a desktop has one, with the Noto fonts
+(`fonts-noto-core`, `fonts-noto-cjk`, `fonts-noto-color-emoji`) for the titles in other
+scripts. Linux has no Segoe UI Variable, so the pixel checks that measure text in the body
+font would fail: `FEATHERPLAY_PIXELS=unchecked` makes them save their images (to
+`FEATHERPLAY_TEST_SHOTS`) and skip those checks. The tests of Windows-only parts (the
+installer script, the single-instance mutex, the registry's browser policies, the tray's
+mini player placement, case-insensitive install folders, the exclusive open of temp files,
+thread cycle counts) are left out of the Linux build or ignored there, with the reason.
 
 ### Live tests
 
@@ -120,7 +170,7 @@ main one, and don't run them in a loop.
 To see a UI change without opening the window, render a page offscreen to a PNG:
 
 ```
-./target/debug/featherplay.exe --snapshot album --fixtures --theme dark --out <a scratch folder>/album-dark.png
+./target/debug/featherplay --snapshot album --fixtures --theme dark --out <a scratch folder>/album-dark.png
 ```
 
 `--fixtures` uses the recorded, scrubbed responses in `crates/ytm/tests/fixtures`;
@@ -137,7 +187,8 @@ ID or personal playlist titles.
 
 featherplay exists to be light, so these limits hold for every change:
 
-- The release `featherplay.exe` is at most 32 MB. `release.yml` fails a release over it.
+- The release `featherplay.exe` is at most 32 MB, and the Linux binary at most 33 MB.
+  `release.yml` fails a release over either.
 - Paused, stopped, minimised or hidden, it uses at most 0.012 % of the machine's CPU, so
   nothing may run a timer or an animation then (`apps/featherplay/tests/app/paused_idle.rs`).
   Playing, at most 0.2 %.
