@@ -5,15 +5,18 @@
 #   target/linux/featherplay-<arch>.tar.gz     the same files as a plain archive; only told of updates
 # Both hold the binary, the desktop entry, the icons (the hicolor PNGs build.rs renders, and
 # the SVG), the AppStream metadata, LICENSE and THIRD_PARTY.md (the AppImage under
-# usr/share/doc/featherplay/, the archive at its top, with README.txt). Nothing else is
-# bundled: the libraries the binary needs are a desktop's own (README.txt lists them).
+# usr/share/doc/featherplay/, the archive at its top, with README.txt). The archive bundles
+# no libraries: those the binary needs are a desktop's own (README.txt lists them). The
+# AppImage also carries, in usr/lib/, those of them that the AppImage excludelist doesn't
+# expect every system to have (xkbcommon and some X11 libraries; see `bundled` below), so it
+# starts on a bare system too.
 #
 # Usage: packaging/linux/build-linux.sh [--skip-build]
 #   --skip-build  package the binary already at target/release/featherplay
 #
-# Needs: curl, sha256sum, tar, gzip, readelf; cargo unless --skip-build. Uses
-# desktop-file-validate and appstreamcli to check the desktop entry and the metadata when
-# they're installed (release.yml installs both), and says so when they aren't.
+# Needs: curl, sha256sum, tar, gzip, readelf, ldconfig, patchelf; cargo unless --skip-build.
+# Uses desktop-file-validate and appstreamcli to check the desktop entry and the metadata
+# when they're installed (release.yml installs both), and says so when they aren't.
 #
 # appimagetool and the AppImage runtime are downloaded into TOOLS_DIR (default
 # target/linux-tools), pinned below by version and SHA256, and checked before use. The
@@ -55,11 +58,13 @@ x86_64)
     appimagetool_sha256=ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0
     runtime_sha256=2fca8b443c92510f1483a883f60061ad09b46b978b2631c807cd873a47ec260d
     elf_machine="Advanced Micro Devices X86-64"
+    ld_tag=x86-64
     ;;
 aarch64)
     appimagetool_sha256=f0837e7448a0c1e4e650a93bb3e85802546e60654ef287576f46c71c126a9158
     runtime_sha256=00cbdfcf917cc6c0ff6d3347d59e0ca1f7f45a6df1a428a0d6d8a78664d87444
     elf_machine="AArch64"
+    ld_tag=AArch64
     ;;
 *) die "no AppImage tools pinned for $arch" ;;
 esac
@@ -176,6 +181,40 @@ cp -r "$stage/share" "$appdir/usr/"
 # README has its users copy that folder into ~/.local/share).
 install -Dm 644 -t "$appdir/usr/share/doc/featherplay" LICENSE THIRD_PARTY.md
 install -m 755 "$bin" "$appdir/usr/bin/featherplay"
+
+# The libraries the binary loads for its window (xkbcommon-dl and x11-dl dlopen them) that
+# the AppImage excludelist leaves to the AppImage
+# (https://github.com/AppImageCommunity/pkg2appimage/blob/master/excludelist), with the
+# ones they link that it leaves too, copied from this machine: the build image, so the
+# oldest versions supported. The rest of what it loads (glibc, libstdc++, Fontconfig,
+# FreeType, ALSA, libX11, libX11-xcb, libxcb, libwayland-client) is on the excludelist.
+# The AppImage's binary finds these first by its RUNPATH, $ORIGIN/../lib (which its dlopen
+# calls search too), and each of them the others by its own, $ORIGIN. The archive's binary
+# is left as it is, and there's no AppRun with LD_LIBRARY_PATH: that would reach the
+# programs featherplay starts (the browser, yt-dlp, Deno).
+bundled=(libxkbcommon.so.0 libxkbcommon-x11.so.0 libxcb-xkb.so.1 libXcursor.so.1 libXi.so.6
+    libXrender.so.1 libXfixes.so.3 libXext.so.6)
+system_libs=(libc.so.6 ld-linux-x86-64.so.2 ld-linux-aarch64.so.1 libX11.so.6 libxcb.so.1)
+ldconfig=$(command -v ldconfig || echo /sbin/ldconfig)
+mkdir -p "$appdir/usr/lib"
+for so in "${bundled[@]}"; do
+    path=$("$ldconfig" -p | awk -v so="$so" -v tag="$ld_tag" '$1 == so && index($0, tag) { print $NF; exit }')
+    [ -n "$path" ] || die "no $so here to bundle (its package is a dependency of the -dev packages)"
+    lib=$appdir/usr/lib/$so
+    install -m 644 "$(readlink -f "$path")" "$lib"
+    for needed in $(readelf -d "$lib" | sed -n 's/.*Shared library: \[\(.*\)\]/\1/p'); do
+        [[ " ${bundled[*]} ${system_libs[*]} " == *" $needed "* ]] ||
+            die "$so links $needed, which is neither bundled nor left to the system"
+    done
+    # shellcheck disable=SC2016 # $ORIGIN is for the loader
+    patchelf --set-rpath '$ORIGIN' "$lib"
+done
+# shellcheck disable=SC2016
+patchelf --set-rpath '$ORIGIN/../lib' "$appdir/usr/bin/featherplay"
+readelf -d "$appdir/usr/bin/featherplay" | grep -q 'RUNPATH.*\[\$ORIGIN/\.\./lib\]' ||
+    die "the AppImage's binary didn't get its RUNPATH"
+echo "the AppImage carries ${bundled[*]}"
+
 ln -s usr/bin/featherplay "$appdir/AppRun"
 cp "$stage/share/applications/$app_id.desktop" "$appdir/"
 cp "$stage/share/icons/hicolor/256x256/apps/$app_id.png" "$appdir/"

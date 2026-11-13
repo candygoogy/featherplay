@@ -307,8 +307,8 @@ jobs:
         with:
           persist-credentials: false
 
-      # The headers the build needs (as in ci.yml), and the checkers for the desktop entry
-      # and the metadata.
+      # The headers the build needs (as in ci.yml), the checkers for the desktop entry and
+      # the metadata, and patchelf (build-linux.sh's AppImage libraries).
       - name: System packages
         run: |
           sudo apt-get update
@@ -316,7 +316,7 @@ jobs:
             pkg-config clang libfontconfig1-dev libfreetype-dev libxkbcommon-dev \
             libxkbcommon-x11-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev \
             libxi-dev libasound2-dev libdbus-1-dev \
-            desktop-file-utils appstream
+            desktop-file-utils appstream patchelf
 
       # Native to the runner, as in test-linux.
       - name: Rust toolchain
