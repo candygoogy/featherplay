@@ -107,6 +107,26 @@ fn with_show_lyrics_off_it_closes_and_isnt_offered() {
     assert!(desktop_lyrics::strip().is_some());
 }
 
+/// At its largest size a long line wraps to a second line and the strip grows to hold it
+/// (nothing is cut off); a longer one still stops at two lines.
+#[test]
+fn a_long_line_at_the_largest_size_wraps_and_the_strip_grows() {
+    let _scene = Scene::new(1280, 800, true, false).expect("scene");
+    let ui = DesktopLyrics::new().expect("strip");
+    let data = ui.global::<StripData>();
+    data.set_size(2);
+    data.set_under("And the next line".into());
+    data.set_line("A short line".into());
+    let one = ui.get_wanted_height();
+    data.set_line(
+        "Whenever the long road home is calling out my name again, I follow the river down".into(),
+    );
+    let two = ui.get_wanted_height();
+    assert!(two >= one + 32.0, "one line {one}, two lines {two}");
+    data.set_line("Whenever the long road home is calling ".repeat(8).into());
+    assert_eq!(ui.get_wanted_height(), two, "more than two lines");
+}
+
 #[test]
 #[ignore = "a measurement: prints private memory with the strip never shown, shown, and closed"]
 fn memory_with_the_strip_off_and_on() {
