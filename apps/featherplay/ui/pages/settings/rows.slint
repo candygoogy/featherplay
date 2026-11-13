@@ -300,7 +300,9 @@ component RowDivider {
     in property <SettingId> search;
     in property <bool> divider;
     if root.divider && !SettingsSearch.hit(root.search).first: Rectangle {
+        x: 0;
         y: 0;
+        width: root.width;
         height: 1px;
         background: Theme.hairline;
     }
@@ -325,6 +327,8 @@ component RowBack inherits Rectangle {
         height: parent.height;
     }
     RowDivider {
+        width: parent.width;
+        height: parent.height;
         search: root.search;
         divider: root.divider;
     }
