@@ -11,6 +11,11 @@
 //! to stdout as `log: …`, among them its glitch report: `late output callback(s)` and `ring
 //! ran dry` (`glitches.rs`), which the rig counts as underruns. The last lines are `rig: key=value`
 //! facts. Exits 1 on an engine error, no device, or no `Started`/`Ended` in time.
+//!
+//! On Linux it also reports the process's CPU, as % of one core: while it played
+//! (`cpu_playing_pct`) and over `PAUSED_SPELL` once the pause has stopped the output
+//! (`cpu_paused_pct`), where a stream left spinning shows (cpal's ALSA pause did on a stream
+//! WSLg's server had stalled).
 #![allow(
     clippy::print_stdout,
     clippy::print_stderr,
@@ -26,6 +31,35 @@ use featherplay_audio::{AudioEngine, AudioEvent, StreamSource};
 
 /// From `load` to the first sound reaching the device.
 const START_TIMEOUT: Duration = Duration::from_secs(10);
+/// After the pause: the engine stops the output 1 s in (`STOP_AFTER`), then this long is
+/// measured.
+const PAUSED_SETTLE: Duration = Duration::from_millis(1500);
+const PAUSED_SPELL: Duration = Duration::from_secs(5);
+
+/// The process's CPU time so far (user + system, all threads), from `/proc/self/stat`, in
+/// clock ticks of 10 ms (USER_HZ is 100 on every Linux the rig runs).
+#[cfg(target_os = "linux")]
+fn cpu_time() -> Option<Duration> {
+    let stat = std::fs::read_to_string("/proc/self/stat").ok()?;
+    // The fields after the command name, which is in parentheses and may hold spaces.
+    let rest = stat.rsplit_once(')')?.1;
+    let f: Vec<&str> = rest.split_whitespace().collect();
+    // utime and stime are fields 14 and 15, so 11 and 12 after the state (field 3).
+    let ticks = f.get(11)?.parse::<u64>().ok()? + f.get(12)?.parse::<u64>().ok()?;
+    Some(Duration::from_millis(ticks * 10))
+}
+
+#[cfg(not(target_os = "linux"))]
+fn cpu_time() -> Option<Duration> {
+    None
+}
+
+/// CPU used between two readings over `wall`, as % of one core, to two decimals.
+fn cpu_pct(from: Option<Duration>, to: Option<Duration>, wall: Duration) -> Option<f64> {
+    let used = to?.checked_sub(from?)?;
+    (wall > Duration::ZERO)
+        .then(|| (used.as_secs_f64() / wall.as_secs_f64() * 10_000.0).round() / 100.0)
+}
 
 struct Echo;
 
@@ -137,6 +171,7 @@ fn run() -> Result<(), String> {
     engine.play();
 
     let mut started = None;
+    let mut cpu_at_start = None;
     let mut buffering = 0u32;
     let mut stop_at = None;
     let ended;
@@ -152,6 +187,7 @@ fn run() -> Result<(), String> {
             Ok(AudioEvent::Started) => {
                 let now = Instant::now();
                 started = Some(now);
+                cpu_at_start = cpu_time();
                 stop_at = a.seconds.map(|s| now + Duration::from_secs_f64(s));
                 println!("rig: started_after_ms={}", (now - t).as_millis());
             }
@@ -176,13 +212,27 @@ fn run() -> Result<(), String> {
         }
     }
     let played = started.map_or(Duration::ZERO, |s| s.elapsed());
+    let cpu_playing = cpu_pct(cpu_at_start, cpu_time(), played);
     let position = engine.position();
+    if ended {
+        // The app pauses when a queue runs out; the measurement below needs the same.
+        engine.pause();
+    }
     // The glitch report goes out on the engine thread as it handles the pause.
     std::thread::sleep(Duration::from_millis(300));
     println!("rig: ended={ended}");
     println!("rig: played_ms={}", played.as_millis());
     println!("rig: position_ms={}", position.as_millis());
     println!("rig: buffering={buffering}");
+    std::thread::sleep(PAUSED_SETTLE.saturating_sub(Duration::from_millis(300)));
+    let before = cpu_time();
+    std::thread::sleep(PAUSED_SPELL);
+    if let Some(p) = cpu_playing {
+        println!("rig: cpu_playing_pct={p}");
+    }
+    if let Some(p) = cpu_pct(before, cpu_time(), PAUSED_SPELL) {
+        println!("rig: cpu_paused_pct={p}");
+    }
     println!("rig: result=ok");
     Ok(())
 }

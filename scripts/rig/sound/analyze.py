@@ -57,6 +57,9 @@ DROPOUT_LEVEL = 2  # in s16 steps (of 32768)
 DROPOUT_MIN_MS = 10
 MAX_PW_XRUNS = 0
 MAX_LATE_CALLBACKS = 0
+# The player's CPU over 5 s once paused, as % of one core: a stopped output costs nothing,
+# where cpal's ALSA pause on a stalled stream left its thread spinning (play_file.rs).
+MAX_PAUSED_CPU_PCT = 2.0
 EXCERPT_S = 10
 
 
@@ -283,6 +286,13 @@ def main():
     )
     buffering = p["facts"].get("buffering")
     check("buffering", buffering == "0", f"Buffering(true) events: {buffering}")
+    paused_cpu = p["facts"].get("cpu_paused_pct")
+    check(
+        "paused cpu",
+        paused_cpu is not None and float(paused_cpu) <= MAX_PAUSED_CPU_PCT,
+        f"{paused_cpu} % of a core over 5 s once paused (max {MAX_PAUSED_CPU_PCT}); while playing "
+        f"{p['facts'].get('cpu_playing_pct')} %",
+    )
 
     if a.server == "pipewire":
         x = pw_xruns(a.out / "pw-top.txt")
