@@ -94,13 +94,9 @@ fn settings_defaults_when_missing() {
     assert_eq!(s, Settings::default());
 }
 
-#[test]
-fn settings_roundtrip() {
-    let Some(home) = TestHome::new("settings-roundtrip") else {
-        return;
-    };
-    let p = home.paths();
-    let s = Settings {
+/// Settings with every key changed from its default.
+fn every_setting_changed() -> Settings {
+    Settings {
         schema: SCHEMA,
         close_action: CloseAction::Tray,
         tray_notice_shown: true,
@@ -180,7 +176,16 @@ fn settings_roundtrip() {
         dns_over_https: true,
         settings_in_suggestions: false,
         lyrics_size: LyricsSize::Large,
+    }
+}
+
+#[test]
+fn settings_roundtrip() {
+    let Some(home) = TestHome::new("settings-roundtrip") else {
+        return;
     };
+    let p = home.paths();
+    let s = every_setting_changed();
     s.save(&p).unwrap();
     assert!(p.config.join("settings.toml").is_file());
     assert_eq!(Settings::load(&p), s);
@@ -1235,6 +1240,82 @@ fn saving_over_a_newer_file_keeps_its_schema_and_unknown_keys() {
         Some(1)
     );
     assert_eq!(file["discord_options"]["links"].as_bool(), Some(false));
+}
+
+/// A value of the wrong type for a key read strictly (a hand edit) takes the default, the
+/// struct's own (`notifications` is off, `discord_options.links` on), and every other
+/// setting, in a table or not, loads as it was.
+#[test]
+fn a_value_of_the_wrong_type_takes_its_default_and_keeps_the_rest() {
+    let Some(home) = TestHome::new("settings-salvage") else {
+        return;
+    };
+    let p = home.paths();
+    let mut s = every_setting_changed();
+    s.pins.insert(
+        String::new(),
+        vec!["playlist:PL1".into(), "album:MPRE1".into()],
+    );
+    s.save(&p).unwrap();
+    let mut file = settings_file(&p);
+    file.insert("volume".into(), toml::Value::String("loud".into()));
+    file.insert("notifications".into(), toml::Value::Integer(3));
+    file.get_mut("discord_options")
+        .and_then(toml::Value::as_table_mut)
+        .unwrap()
+        .insert("links".into(), toml::Value::String("x".into()));
+    fs::write(
+        p.config.join("settings.toml"),
+        toml::to_string(&file).unwrap(),
+    )
+    .unwrap();
+
+    let loaded = Settings::load(&p);
+
+    let defaults = Settings::default();
+    assert_eq!(
+        loaded,
+        Settings {
+            volume: defaults.volume,
+            notifications: defaults.notifications,
+            discord_options: DiscordOptions {
+                links: defaults.discord_options.links,
+                ..s.discord_options.clone()
+            },
+            ..s
+        }
+    );
+}
+
+/// Over a newer featherplay's file, a load that leaves a bad value out still saves back the
+/// keys this build doesn't know, and the bad value as the default.
+#[test]
+fn a_newer_file_with_a_bad_value_keeps_its_unknown_keys_on_save() {
+    let Some(home) = TestHome::new("settings-salvage-newer") else {
+        return;
+    };
+    let p = home.paths();
+    fs::create_dir_all(&p.config).unwrap();
+    fs::write(
+        p.config.join("settings.toml"),
+        format!("notifications = 3\n{NEWER}"),
+    )
+    .unwrap();
+
+    let s = Settings::load(&p);
+    assert_eq!((s.volume, s.discord_options.links), (0.3, false));
+    s.save(&p).unwrap();
+
+    let file = settings_file(&p);
+    assert_eq!(file["schema"].as_integer(), Some(99));
+    assert_eq!(file["notifications"].as_bool(), Some(false));
+    assert_eq!(file["volume"].as_float(), Some(0.3));
+    assert_eq!(file["future_key"].as_str(), Some("x"));
+    assert_eq!(file["future_table"]["a"].as_integer(), Some(1));
+    assert_eq!(
+        file["discord_options"]["future_option"].as_integer(),
+        Some(1)
+    );
 }
 
 #[test]

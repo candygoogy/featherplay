@@ -11,9 +11,9 @@ use crate::{DesktopLyrics, Paths, atomic};
 /// migration, and add that step to `MIGRATIONS`.
 pub const SCHEMA: u32 = 1;
 
-/// User settings, stored in `config/settings.toml`. Missing keys take their defaults;
-/// unknown keys are ignored, and dropped on save, unless the file comes from a newer
-/// featherplay (see `save`).
+/// User settings, stored in `config/settings.toml`. Missing keys and values of the wrong
+/// type take their defaults (see `load`); unknown keys are ignored, and dropped on save,
+/// unless the file comes from a newer featherplay (see `save`).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Settings {
@@ -658,6 +658,71 @@ fn read_table(p: &Paths) -> Option<toml::Table> {
     toml::from_str(&text).ok()
 }
 
+/// Whether `table` loads as settings.
+fn loads(table: &toml::Table) -> bool {
+    Settings::deserialize(toml::Value::Table(table.clone())).is_ok()
+}
+
+/// Puts `value` at `key` in `kept` when the settings still load with it, and says so;
+/// otherwise leaves `kept` as it was.
+fn keep_if_it_loads(kept: &mut toml::Table, key: &str, value: toml::Value) -> bool {
+    let before = kept.insert(key.to_owned(), value);
+    if loads(kept) {
+        return true;
+    }
+    if let Some(v) = before {
+        kept.insert(key.to_owned(), v);
+    } else {
+        kept.remove(key);
+    }
+    false
+}
+
+/// Loads a file that doesn't load as a whole (a value of the wrong type for a key read
+/// strictly, such as `volume = "loud"`) key by key, so only the bad values are lost. A key is
+/// kept when the settings still load with it; a table that doesn't (`[discord_options]`,
+/// `[hotkeys]`, the pins) is tried key by key the same way. What's left out takes its value
+/// from `Settings::default()`, as a missing key does, which is right for every key (`lenient`
+/// gives the type's default: off, for a switch that's on by default). Logs the keys left
+/// out, by name only.
+fn salvage(file: toml::Table) -> Settings {
+    let mut kept = toml::Table::new();
+    let mut dropped = Vec::new();
+    for (key, value) in file {
+        if keep_if_it_loads(&mut kept, &key, value.clone()) {
+            continue;
+        }
+        let toml::Value::Table(inner) = value else {
+            dropped.push(key);
+            continue;
+        };
+        let mut inner_dropped = Vec::new();
+        for (name, v) in inner {
+            let mut table = kept
+                .get(&key)
+                .and_then(toml::Value::as_table)
+                .cloned()
+                .unwrap_or_default();
+            table.insert(name.clone(), v);
+            if !keep_if_it_loads(&mut kept, &key, toml::Value::Table(table)) {
+                inner_dropped.push(format!("{key}.{name}"));
+            }
+        }
+        if kept.contains_key(&key) {
+            dropped.extend(inner_dropped);
+        } else {
+            dropped.push(key);
+        }
+    }
+    if !dropped.is_empty() {
+        log::warn!(
+            "settings.toml: {} didn't load, using the defaults",
+            dropped.join(", ")
+        );
+    }
+    Settings::deserialize(toml::Value::Table(kept)).unwrap_or_default()
+}
+
 /// Adds every key of `theirs` that `ours` lacks, table by table; ours win.
 fn keep_missing(ours: &mut toml::Table, theirs: toml::Table) {
     for (key, value) in theirs {
@@ -695,8 +760,10 @@ impl Settings {
     /// uses no Ctrl+Alt+K.
     pub const QUICK_SEARCH_KEY: &str = "Ctrl+Alt+K";
 
-    /// Loads the settings. A missing, unreadable or invalid file gives the defaults. An
-    /// older file is migrated first; a newer one keeps its schema number.
+    /// Loads the settings. A missing or unreadable file, or one that isn't TOML, gives the
+    /// defaults; in a file that is, a value of the wrong type takes its default and the
+    /// other keys count (`salvage`). An older file is migrated first; a newer one keeps its
+    /// schema number.
     pub fn load(p: &Paths) -> Settings {
         let Some(mut table) = read_table(p) else {
             return Settings::default();
@@ -704,7 +771,7 @@ impl Settings {
         let from = schema_of(&table);
         migrate(from, &mut table);
         table.insert("schema".into(), i64::from(from.max(SCHEMA)).into());
-        Settings::deserialize(toml::Value::Table(table)).unwrap_or_default()
+        Settings::deserialize(toml::Value::Table(table.clone())).unwrap_or_else(|_| salvage(table))
     }
 
     /// Writes the settings. Over a file from a newer featherplay (a higher schema), the
