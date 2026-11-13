@@ -13,7 +13,7 @@ touches another. The shared files below change only when a page needs something 
 | `nav.slint` | `PageKind`, `Nav` (the navigation callbacks) and `Frame` (`queue-open`, Now playing's `side-open`, …) | frame (shared) |
 | `player.slint` | `Player`: the current track and the transport, for the bar, Now playing and the Home hero | frame (shared) |
 | `sidebar.slint`, `bottom_bar.slint` | The frame's sidebar (`SidebarData`: Home, Library, Explore, History, Liked songs, then the library as a list under the Playlists, Albums and Artists chips, pinned entries first; `src/sidebar.rs`, its order in `src/library_list.rs`) and bottom bar | frame |
-| `top_bar.slint` | The top bar above every page but Now playing and Sign in: the search field (`TopBarData.query`, filled by `src/top_bar.rs` and cleared off search pages) with its right-click menu | frame |
+| `top_bar.slint` | The top bar above every page but Now playing and Sign in: the search field (`TopBarData.query`, filled by `src/top_bar.rs` and cleared off search pages) with its right-click menu. On Settings the same field is "Search settings": it filters the page (`src/pages/settings/search.rs`), drops no suggestions, and the music field's text comes back when Settings is left | frame |
 | `toast.slint` | Toasts: one short line at a time, bottom centre above the bar; `src/toast.rs` shows and closes them | frame (shared) |
 | `queue_panel.slint` | The Up next panel (`QueueData`) | now playing |
 | `mini_player.slint` | The tray's mini player (`MiniPlayer`, `MiniData`): its own small window, opened by a left click on the tray icon; `src/mini.rs` | tray |
@@ -142,14 +142,15 @@ The keys are handled in `app.slint`'s `keys` scope, and each one is also listed 
 - Ctrl+K focuses the top bar's search field. Enter searches; a pasted link opens what it
   points at (`src/link.rs`: a song or video link shows that one song on Search, a playlist
   link the playlist, a music-site channel or `MPRE` album link the artist or album). Escape
-  clears the field, then leaves it; × clears it.
+  clears the field, then leaves it; × clears it. On Settings the field searches the
+  settings, and Ctrl+F focuses it too.
 - Alt+Left and Alt+Right go back and forward; Escape leaves Now playing.
 - Ctrl+L turns the full lyrics view on or off (from another page it opens Now playing on the
   lyrics). Ctrl+= (or Ctrl++) and Ctrl+- step the lyrics' text size while lyrics are on
   screen, and Ctrl+Shift+L turns desktop lyrics on or off while they're offered (lyrics on,
   and not under Wayland).
-- Ctrl+F on Settings goes to its search field; Ctrl+M opens or closes the mini player where
-  the desktop has no tray (the bar's button then); Ctrl+/ opens the list of shortcuts.
+- Ctrl+M opens or closes the mini player where the desktop has no tray (the bar's button
+  then); Ctrl+/ opens the list of shortcuts.
 
 Pages start below the 64 px top bar (`Theme.top-bar-h`); Now playing and Sign in have none
 (Ctrl+K leaves Now playing first, and goes Home from Sign in). Sign in centres its block, its
@@ -213,7 +214,8 @@ synced lines from LRCLIB or YouTube Music, or plain lyrics. It appears in the Ly
   (`LyricsData.timing` says how, "On time" or "0.5 s later", and the credit line notes it),
   and "Choose other lyrics…" replaces the automatic match. Both are kept per song on this PC
   (`featherplay_store::LyricsChoices`). The tab's empty state offers the same search ("Search
-  LRCLIB yourself").
+  LRCLIB yourself"). A song the user chose no lyrics for keeps the full view, which says so,
+  with the ways back: "Choose other lyrics…" and "Use the automatic match".
 
 ## Checking your work: offscreen snapshots
 

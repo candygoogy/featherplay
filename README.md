@@ -281,9 +281,10 @@ All off until you turn them on, except Match song volumes.
 
 - Dark, light, or System to follow Windows; the whole window crossfades as it changes.
 - The accent comes from the cover that's playing, or pick a fixed colour.
-- **Search settings**, beside the Settings title (`Ctrl+F` there), finds a setting. Settings
-  also show in the top search's suggestions, until you turn off Show settings in search
-  suggestions (Settings > Window).
+- On Settings, the top bar's field searches the settings instead of music (`Ctrl+K` or
+  `Ctrl+F` there), and a link after the results searches music for the same words. Settings
+  also show in the top search's suggestions on other pages, until you turn off Show settings
+  in search suggestions (Settings > Window).
 
 <table>
   <tr>

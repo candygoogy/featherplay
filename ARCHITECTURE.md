@@ -164,6 +164,7 @@ controls and the tray (`apps/featherplay/src/shell.rs`).
 | `featherplay-discord` | Discord's blocking IPC | `crates/controller/src/presence.rs` |
 | `featherplay-proxy` | Asks WinHTTP for a proxy script or auto-detection | `crates/proxy/src/lookups.rs` |
 | `featherplay-log` | Appends log lines to the file | `crates/controller/src/diagnostics.rs` |
+| `featherplay-writes` | The UI's saves nobody waits for (the lyrics' choices, the sidebar's recent list), one after another in the order they were made; started by the first | `crates/controller/src/task.rs` |
 | `featherplay-endsession` | A hidden window that hears Windows' end-of-session messages and second launches (to show the window, or with `--quick-search` to open the quick search box) | `crates/platform/src/windows/session_end.rs` |
 | ksni's thread (Linux) | The tray icon's StatusNotifierItem and menu on the session bus; their events go to the main thread with `slint::invoke_from_event_loop` | `crates/platform/src/linux/tray.rs` |
 | global-hotkey's thread (Linux, X11) | The hotkeys' key grabs. global-hotkey takes one event handler per process, so featherplay installs one that looks each press up among the keys registered now (`ROUTES`): the three hotkeys send a `UiCommand`, the quick search's key opens the box | `crates/integrations/src/hotkeys.rs` |
@@ -235,9 +236,9 @@ featherplay (app) ─┬─ controller ─┬─ lastfm ────── proxy
 ```
 
 The vendored crates are `vendor/i-slint-backend-winit` (frame pacing: one paint per
-redraw), `vendor/i-slint-renderer-skia` (wgpu taken out, and renderer changes for the
-software surface), `vendor/opus-decoder` (rustfft in place of a naive DFT) and
-`vendor/symphonia-core` (its FFT tables built on first use, not stored in the binary).
+redraw), `vendor/i-slint-renderer-skia` (wgpu taken out, renderer changes for the
+software surface, and fonts read where they're mapped, not copied), `vendor/opus-decoder`
+(rustfft in place of a naive DFT) and `vendor/symphonia-core` (its FFT tables built on first use, not stored in the binary).
 
 ## Where things live
 
@@ -249,11 +250,14 @@ software surface), `vendor/opus-decoder` (rustfft in place of a naive DFT) and
 `$XDG_CONFIG_HOME/featherplay` and `$XDG_CACHE_HOME/featherplay` (`~/.config`, `~/.cache`).
 `{state}` below, the logs' folder, is `$XDG_STATE_HOME/featherplay` (`~/.local/state`) on
 Linux and the cache folder everywhere else. Nothing is created until something is saved.
-A file that's missing or unreadable gives the defaults. Many settings, and every setting
-and file added in 0.4.0, are read key by key: a value of the wrong type, out of range or
-from a newer version takes that key's default, and the rest are kept. The older plain
-switches and numbers of `settings.toml` (`notifications`, `lyrics`, `volume` and the like)
-aren't yet: one of the wrong type makes the whole file load as the defaults.
+A file that's missing or unreadable gives the defaults. Otherwise the settings, and the
+files added in 0.4.0, are read key by key: a value of the wrong type, out of range or from a
+newer version takes that key's default, and the rest are kept. In `settings.toml` that holds
+for every setting and for each key of a table such as `[discord_options]`; the log names the
+keys it dropped. Every save writes a temp file of its own beside the target and renames it
+over (`crates/store/src/atomic.rs`), so two saves at once both land whole; the UI's saves
+that nobody waits for (the lyrics' choices, the sidebar's recent list) run one after another
+on `featherplay-writes`, so the newer copy lands last.
 
 | Where | What | Written by |
 |---|---|---|

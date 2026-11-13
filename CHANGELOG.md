@@ -26,9 +26,10 @@ Notable changes to featherplay, newest first. The format follows
     puts them back.
   - **Choose other lyrics…**, with LRCLIB on: LRCLIB's matches for the song, the one in use
     marked, and a field to search with other words. A pick shows at once and stays with the
-    song; "None of these" shows no lyrics for it, and "Back to the automatic match" forgets
-    the pick. The Lyrics tab's empty state offers the same search ("Search LRCLIB
-    yourself").
+    song; "Back to the automatic match" forgets the pick. "None of these" shows no lyrics
+    for the song: the lyrics view stays and says so, with **Choose other lyrics…** and
+    **Use the automatic match** as the ways back. The Lyrics tab's empty state offers the
+    same search ("Search LRCLIB yourself").
   - The timing and the picks are kept on this PC, in `lyrics.json` in the settings folder,
     for up to 1,000 songs. **Reset lyrics settings**, at the end of Settings > Lyrics and
     shown only when something differs from the defaults, asks first, then puts the text
@@ -48,8 +49,10 @@ Notable changes to featherplay, newest first. The format follows
   front, on its screen. Typing brings the top bar's suggestions, top results first with the
   match marked, then searches. `Enter` plays, `Shift+Enter` plays next (the box stays open,
   and several picks play in the order you picked them), and `Ctrl+Enter` opens the page in
-  featherplay. Empty, it lists your last five picks, kept on this PC; opening it asks nothing
-  of the network. `Esc`, `Enter` or the shortcut again close it and give the focus back to
+  featherplay. Each result reads title, artist and kind, and the footer names what `Enter`
+  does for the highlighted row (Play, Play album, Play artist, Search) and shows the song
+  playing. With no results, a row searches featherplay for the text. Empty, it lists your
+  last five picks, kept on this PC; opening it asks nothing of the network. `Esc`, `Enter` or the shortcut again close it and give the focus back to
   the app you were in. With featherplay in front, the shortcut does what `Ctrl+K` does.
   Settings has a field to press a new shortcut in, with Reset; one another app holds, one
   the system keeps, a key without Ctrl, Alt, Shift or Win, or one of your own global hotkeys
@@ -64,10 +67,16 @@ Notable changes to featherplay, newest first. The format follows
   next Play. While it runs, the bar's button shows the time left, as room allows. Pausing by
   hand doesn't stop it, and it isn't kept when featherplay quits. While it's off, nothing of
   it runs.
-- Every new setting, and the new files, are read leniently: a value of the wrong type, out of
-  range or from a newer version takes that setting's default, and the others are kept.
+- The new settings and files are read leniently too: a value of the wrong type, out of range
+  or from a newer version takes that setting's default, and the others are kept.
 
 ### Changed
+
+- On Settings, the top bar's field searches the settings: it reads "Search settings", `Ctrl+K`
+  and `Ctrl+F` both go to it, what you type filters the page as before, no suggestions drop
+  down and `Enter` does nothing. After the results, and when nothing matches, a link searches
+  music for the same words. Leaving Settings brings back what the field held for music.
+  Settings' own field in its header is gone.
 
 - On Linux, the browser sign-in runs the browser as you'd start it yourself, with no pipe
   and no switch about automation, and featherplay reads the session once you've closed it.
@@ -91,6 +100,18 @@ Notable changes to featherplay, newest first. The format follows
   binary's library path only, so the browser, yt-dlp and Deno it starts don't see them. The
   `.tar.gz` is unchanged. Their licences are in `THIRD_PARTY.md`.
 - Global hotkeys changed in Settings work at once, without a restart.
+- A setting of the wrong type in `settings.toml` (`volume = "loud"`, say) no longer makes the
+  whole file load as the defaults. Every setting, and each key of a table such as
+  `[discord_options]`, is read on its own: only the bad values take their defaults, and the
+  log names the keys it dropped.
+- Two saves of one file at once no longer lose a change: each write has a temp file of its
+  own, and the lyrics' choices and the sidebar's recent list are saved one after another, in
+  the order they were made.
+- Memory no longer stays higher for the whole session after a song title in Japanese (or
+  another script featherplay finds a fallback font for) draws in bold. The font cache copied
+  each fallback font it drew with into private memory, Yu Gothic Bold's 14 MB collection
+  among them, and Segoe UI Variable's 1.8 MB at every start; it now reads them where the
+  system maps them. This is why some measuring runs sat about 15 MB higher than the others.
 
 ## [0.3.0] - 2026-11-13
 
