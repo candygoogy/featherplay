@@ -30,6 +30,7 @@ pub mod busy;
 pub mod chrome;
 pub mod close;
 pub mod covers;
+pub mod desktop_lyrics;
 pub mod follow;
 pub mod fonts;
 pub mod frame_log;

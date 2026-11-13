@@ -21,7 +21,7 @@ import { ArtistPage } from "pages/artist.slint";
 import { SearchPage } from "pages/search.slint";
 import { NowPlayingPage, SideTabs, LyricsWatch } from "pages/now_playing.slint";
 import { LyricsData } from "pages/lyrics.slint";
-import { SettingsPage, SettingsData, SettingsDialog, SettingsDialogLayer, SettingsSearch } from "pages/settings.slint";
+import { SettingsPage, SettingsData, SettingsDialog, SettingsDialogLayer, SettingsSearch, SettingKey } from "pages/settings.slint";
 import { AboutPage } from "pages/about.slint";
 import { SignInPage } from "pages/sign_in.slint";
 import { SongMenu, SongMenuLayer } from "song_menu.slint";
@@ -87,6 +87,8 @@ export { BrowserBlock, BrowserChoice, SessionStore, SignInData, SignInWay } from
 export { SignInWindow } from "sign_in_window.slint";
 
 export { MiniPlayer, MiniData } from "mini_player.slint";
+
+export { DesktopLyrics, StripData } from "desktop_lyrics.slint";
 
 export { CloseChoice } from "close_dialog.slint";
 
@@ -251,6 +253,15 @@ export component AppWindow inherits Window {
                 Shortcuts.used(ShortcutKind.search-settings);
                 if Nav.page == PageKind.settings && !root.overlay-open {
                     SettingsSearch.focus-asks += 1;
+                }
+                return accept;
+            }
+            // Desktop lyrics on or off, as Settings' switch: only while it's offered (lyrics
+            // on, and a desktop that can keep a strip on top). A held key acts once.
+            if e.modifiers.control && e.modifiers.shift && !e.modifiers.alt && !e.modifiers.meta && (e.text == "l" || e.text == "L") {
+                Shortcuts.used(ShortcutKind.desktop-lyrics);
+                if SettingsData.lyrics && SettingsData.desktop-lyrics-here && !e.repeat {
+                    SettingsData.toggled(SettingKey.desktop-lyrics, !SettingsData.desktop-lyrics);
                 }
                 return accept;
             }

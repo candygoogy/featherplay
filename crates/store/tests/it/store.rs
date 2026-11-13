@@ -7,9 +7,10 @@ use featherplay_core::model::{
 };
 use featherplay_store::settings::SCHEMA;
 use featherplay_store::{
-    Accent, AccentColour, CloseAction, DiscordOptions, DiscordStatusText, DiscordTime, Equalizer,
-    Hotkeys, Loudness, Paths, Settings, SkipSilence, StreamingQuality, ThemeMode,
-    load_client_version, load_session, save_client_version, save_session,
+    Accent, AccentColour, CloseAction, DesktopLyrics, DiscordOptions, DiscordStatusText,
+    DiscordTime, Equalizer, Hotkeys, Loudness, Paths, Settings, SkipSilence, StreamingQuality,
+    StripPlace, StripSize, ThemeMode, load_client_version, load_session, save_client_version,
+    save_session,
 };
 
 use crate::home::{self, TestHome};
@@ -58,6 +59,7 @@ fn settings_defaults_when_missing() {
             sign_in_browser: None,
             lyrics: true,
             lyrics_lrclib: true,
+            desktop_lyrics: DesktopLyrics::default(),
             autoplay: true,
             pins: Default::default(),
             check_for_updates: true,
@@ -133,6 +135,17 @@ fn settings_roundtrip() {
         sign_in_browser: Some("brave".into()),
         lyrics: false,
         lyrics_lrclib: false,
+        desktop_lyrics: DesktopLyrics {
+            on: true,
+            locked: true,
+            size: StripSize::Small,
+            place: Some(StripPlace {
+                x: -960,
+                bottom: 1000,
+                screen: [-1920, 0, 0, 1032],
+            }),
+            hinted: true,
+        },
         autoplay: false,
         pins: Default::default(),
         check_for_updates: false,

@@ -1,0 +1,239 @@
+// Desktop lyrics: a small borderless strip, always on top, with the line being sung and the
+// next one under it, on the lyrics' panel in the cover's colour (`src/desktop_lyrics.rs`
+// creates it when turned on, places it and drops it when turned off). The current line in
+// Manrope 700, centred, wrapping to two lines (the window then grows upward); the next line
+// dimmer and smaller, on one line. Without lines to follow (none, plain, looking up, nothing
+// playing) the first line says so or names the song, and the second is a quiet note.
+//
+// Unlocked, a press anywhere off its controls moves it, and the pointer over it shows a grip
+// on the left and five small controls in the next line's place: A− and A+ (its size), Lock
+// (clicks then go through it), Open featherplay, and × (desktop lyrics off). They fade in at
+// once and out a second after the pointer leaves; the current line never moves. Locked, it
+// takes no clicks, wheel or hover at all (Rust makes the window click-through), so it shows
+// no controls.
+//
+// It has its own `Theme` (globals belong to their window): Rust copies the main window's in,
+// and the lyrics' inks for both themes. Nothing in it runs a timer; Rust sets the lines when
+// the app's line changes.
+import { Theme } from "theme.slint";
+import { Icon } from "parts.slint";
+import { LyricInk } from "pages/lyrics.slint";
+
+export global StripData {
+    // The first line: the line being sung, "♪" between lines, or what the strip says instead
+    // (the song's title when it has no lyrics, "Finding lyrics…").
+    in property <string> line;
+    // The second: the next line, or a note.
+    in property <string> under;
+    // The second line is a quiet note (the states, the first opening's hint), not the next
+    // line of the song.
+    in property <bool> quiet;
+    // The lyrics' panel and lines for each theme (`LyricsData.ink-dark`, `ink-light`).
+    in property <LyricInk> ink-dark;
+    in property <LyricInk> ink-light;
+    out property <LyricInk> ink: {
+        ground: Theme.pick(self.ink-dark.ground, self.ink-light.ground),
+        current: Theme.pick(self.ink-dark.current, self.ink-light.current),
+        next: Theme.pick(self.ink-dark.next, self.ink-light.next),
+        past: Theme.pick(self.ink-dark.past, self.ink-light.past),
+    };
+    // 0 Small, 1 Medium, 2 Large: 600, 760 or 920 px wide, the line 22, 26 or 32 px.
+    in property <int> size: 1;
+    // Clicks go through it: no controls, no hover.
+    in property <bool> locked;
+    // A− (-1) and A+ (1).
+    callback step-size(int);
+    callback lock();
+    callback open-app();
+    // The ×: desktop lyrics off.
+    callback close();
+    // A left press off the controls, unlocked: move the window with the pointer.
+    callback drag();
+}
+
+// One of the hover controls: 28 px, white on the strip's faint dark pill, a lighter circle
+// under the pointer.
+component StripButton inherits Rectangle {
+    in property <string> icon;
+    in property <string> text;
+    in property <string> label;
+    in property <bool> enabled: true;
+    in property <float> fade: 1.0;
+    callback clicked();
+    width: 28px;
+    height: 28px;
+    border-radius: 14px;
+    background: (ta.has-hover && root.enabled ? #FFFFFF2E : #FFFFFF00).transparentize(1 - root.fade);
+    accessible-role: button;
+    accessible-label: root.label;
+    accessible-enabled: root.enabled;
+    accessible-action-default => { root.clicked(); }
+    ta := TouchArea {
+        enabled: root.enabled && root.fade > 0.5;
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+    property <color> ink: #FFFFFF.transparentize(1 - (root.enabled ? 1.0 : 0.4) * root.fade);
+    if root.text != "": Text {
+        text: root.text;
+        font-family: Theme.body-font;
+        font-size: 12px;
+        font-weight: 700;
+        color: root.ink;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+    if root.icon != "": Icon {
+        width: 16px;
+        height: 16px;
+        commands: root.icon;
+        stroke: root.ink;
+    }
+}
+
+export component DesktopLyrics inherits Window {
+    property <length> line-size: StripData.size == 0 ? 22px : (StripData.size == 2 ? 32px : 26px);
+    property <length> next-size: StripData.size == 0 ? 14px : (StripData.size == 2 ? 20px : 17px);
+    // The size Rust gives the window: its width for the size, its height for the lines.
+    out property <length> wanted-width: StripData.size == 0 ? 600px : (StripData.size == 2 ? 920px : 760px);
+    out property <length> wanted-height: lay.preferred-height;
+    // The pointer is over it, unlocked: the controls and the grip show.
+    property <bool> pointed: area.has-hover && !StripData.locked;
+    // The controls from 0 to 1: in at once, out a second after the pointer leaves.
+    property <float> tools: root.pointed ? 1 : 0;
+    animate tools {
+        duration: Theme.moving ? 150ms : 0ms;
+        delay: root.pointed ? 0ms : 1000ms;
+    }
+
+    title: @tr("featherplay desktop lyrics");
+    width: root.wanted-width;
+    no-frame: true;
+    always-on-top: true;
+    background: StripData.ink.ground;
+    default-font-family: Theme.body-font;
+
+    // The panel, its colour easing between songs as the lyrics' panel does.
+    Rectangle {
+        background: StripData.ink.ground;
+        animate background { duration: Theme.t-colour; easing: ease-in-out; }
+    }
+
+    area := TouchArea {
+        mouse-cursor: StripData.locked ? default : move;
+        pointer-event(e) => {
+            if !StripData.locked && e.kind == PointerEventKind.down && e.button == PointerEventButton.left {
+                StripData.drag();
+            }
+        }
+
+        lay := VerticalLayout {
+            padding-top: 14px;
+            padding-bottom: 14px;
+            padding-left: 28px;
+            padding-right: 28px;
+            spacing: 4px;
+            alignment: center;
+            Text {
+                text: StripData.line;
+                font-family: Theme.display-font;
+                font-weight: 700;
+                font-size: root.line-size;
+                letter-spacing: self.font-size * -0.01;
+                color: StripData.ink.current;
+                horizontal-alignment: center;
+                wrap: word-wrap;
+                max-lines: 2;
+                overflow: elide;
+            }
+            // The second line, and over it, while pointed at, the controls.
+            Rectangle {
+                min-height: max(24px, under.preferred-height);
+                under := Text {
+                    width: parent.width;
+                    text: StripData.under;
+                    font-family: StripData.quiet ? Theme.body-font : Theme.display-font;
+                    font-weight: 600;
+                    font-size: StripData.quiet ? 13px : root.next-size;
+                    color: StripData.ink.next.transparentize(1 - (StripData.quiet ? 0.9 : 0.82) * (1 - root.tools));
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                    overflow: elide;
+                }
+                if root.tools > 0: Rectangle {
+                    width: tools.preferred-width;
+                    height: 32px;
+                    border-radius: 16px;
+                    background: #0000002E.transparentize(1 - root.tools);
+                    tools := HorizontalLayout {
+                        padding: 2px;
+                        spacing: 2px;
+                        alignment: center;
+                        // A− and A+: the letter for text size, which a language may have its own of.
+                        StripButton {
+                            text: @tr("A−");
+                            label: @tr("Smaller");
+                            fade: root.tools;
+                            enabled: StripData.size > 0;
+                            clicked => { StripData.step-size(-1); }
+                        }
+                        StripButton {
+                            text: @tr("A+");
+                            label: @tr("Larger");
+                            fade: root.tools;
+                            enabled: StripData.size < 2;
+                            clicked => { StripData.step-size(1); }
+                        }
+                        Rectangle {
+                            width: 9px;
+                            Rectangle {
+                                width: 1px;
+                                height: 16px;
+                                background: #FFFFFF40.transparentize(1 - root.tools);
+                            }
+                        }
+                        StripButton {
+                            // A padlock, shut.
+                            icon: "M7 10.5 H17 A1.5 1.5 0 0 1 18.5 12 V18 A1.5 1.5 0 0 1 17 19.5 H7 A1.5 1.5 0 0 1 5.5 18 V12 A1.5 1.5 0 0 1 7 10.5 Z M8.5 10.5 V8 A3.5 3.5 0 0 1 15.5 8 V10.5";
+                            label: @tr("Lock: let clicks through");
+                            fade: root.tools;
+                            clicked => { StripData.lock(); }
+                        }
+                        StripButton {
+                            // A window with an arrow out of its corner.
+                            icon: "M13.5 4.5 H19.5 V10.5 M19.5 4.5 L11 13 M17 14 V18.5 A1 1 0 0 1 16 19.5 H5.5 A1 1 0 0 1 4.5 18.5 V8 A1 1 0 0 1 5.5 7 H10";
+                            label: @tr("Open featherplay");
+                            fade: root.tools;
+                            clicked => { StripData.open-app(); }
+                        }
+                        StripButton {
+                            icon: "M6.5 6.5 L17.5 17.5 M17.5 6.5 L6.5 17.5";
+                            label: @tr("Turn off desktop lyrics");
+                            fade: root.tools;
+                            clicked => { StripData.close(); }
+                        }
+                    }
+                }
+            }
+        }
+
+        // The grip, at the left while pointed at: it says the strip moves.
+        if root.tools > 0: Icon {
+            x: 12px;
+            y: (root.height - self.height) / 2;
+            width: 20px;
+            height: 20px;
+            commands: "M9 7 h.01 M15 7 h.01 M9 12 h.01 M15 12 h.01 M9 17 h.01 M15 17 h.01";
+            stroke: #FFFFFF.transparentize(1 - 0.55 * root.tools);
+            stroke-width: 2.6px;
+        }
+    }
+
+    // The edge: a hairline, lighter while pointed at. Windows rounds the window's corners
+    // (8 px) and draws its shadow.
+    Rectangle {
+        border-radius: 8px;
+        border-width: root.pointed ? 1.5px : 1px;
+        border-color: root.pointed ? #FFFFFF59 : #FFFFFF14;
+    }
+}

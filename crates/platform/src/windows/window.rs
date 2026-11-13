@@ -26,13 +26,13 @@ use windows::Win32::UI::Shell::{DefSubclassProc, RemoveWindowSubclass, SetWindow
 use windows::Win32::UI::WindowsAndMessaging::{
     CallNextHookEx, CreateIconFromResourceEx, DestroyIcon, GA_ROOT, GetAncestor, GetClassNameW,
     GetForegroundWindow, HC_ACTION, HHOOK, HICON, ICON_BIG, ICON_SMALL, IsIconic, LR_DEFAULTCOLOR,
-    MSLLHOOKSTRUCT, RegisterWindowMessageW, SC_MINIMIZE, SC_RESTORE, SIZE_MAXIMIZED,
+    LWA_ALPHA, MSLLHOOKSTRUCT, RegisterWindowMessageW, SC_MINIMIZE, SC_RESTORE, SIZE_MAXIMIZED,
     SIZE_MINIMIZED, SIZE_RESTORED, SPI_GETCLIENTAREAANIMATION, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS,
-    SendMessageW, SetForegroundWindow, SetWindowsHookExW, SystemParametersInfoW,
-    UnhookWindowsHookEx, WH_MOUSE_LL, WINDOW_EX_STYLE, WM_DISPLAYCHANGE, WM_DPICHANGED,
-    WM_LBUTTONDOWN, WM_MBUTTONDOWN, WM_MOUSEACTIVATE, WM_MOUSEWHEEL, WM_NCDESTROY, WM_PAINT,
-    WM_POINTERACTIVATE, WM_POINTERDOWN, WM_RBUTTONDOWN, WM_SETICON, WM_SETTINGCHANGE, WM_SIZE,
-    WM_SYSCOMMAND, WM_XBUTTONDOWN, WS_OVERLAPPEDWINDOW, WindowFromPoint,
+    SendMessageW, SetForegroundWindow, SetLayeredWindowAttributes, SetWindowsHookExW,
+    SystemParametersInfoW, UnhookWindowsHookEx, WH_MOUSE_LL, WINDOW_EX_STYLE, WM_DISPLAYCHANGE,
+    WM_DPICHANGED, WM_LBUTTONDOWN, WM_MBUTTONDOWN, WM_MOUSEACTIVATE, WM_MOUSEWHEEL, WM_NCDESTROY,
+    WM_PAINT, WM_POINTERACTIVATE, WM_POINTERDOWN, WM_RBUTTONDOWN, WM_SETICON, WM_SETTINGCHANGE,
+    WM_SIZE, WM_SYSCOMMAND, WM_XBUTTONDOWN, WS_OVERLAPPEDWINDOW, WindowFromPoint,
 };
 
 pub use crate::common::window::*;
@@ -98,6 +98,17 @@ pub fn opaque(h: Handle) -> Result<(), String> {
     };
     // SAFETY: a live HWND and a filled-in DWM_BLURBEHIND.
     unsafe { DwmEnableBlurBehindWindow(h.hwnd(), &off) }.map_err(|e| e.message())
+}
+
+/// Keeps a window that winit has just made click-through visible and opaque. Winit makes a
+/// window let clicks through (`set_cursor_hittest(false)`) with the extended styles
+/// WS_EX_TRANSPARENT and WS_EX_LAYERED; a layered window shows nothing until it's given its
+/// opacity, which winit never does. Call it after each such change: dropping WS_EX_LAYERED
+/// forgets the opacity.
+pub fn layered_opaque(h: Handle) -> Result<(), String> {
+    // SAFETY: a handle-only call; a stale or non-layered window makes it fail.
+    unsafe { SetLayeredWindowAttributes(h.hwnd(), COLORREF(0), 255, LWA_ALPHA) }
+        .map_err(|e| e.message())
 }
 
 /// The subclass that watches paints (`repaint_when_invalidated`).

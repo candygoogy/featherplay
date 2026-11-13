@@ -3,8 +3,8 @@
 
 use featherplay_core::player::Input;
 use featherplay_store::{
-    Accent, AccentColour, CloseAction, DiscordOptions, Equalizer, Hotkeys, Loudness, Settings,
-    SkipSilence, StreamingQuality, ThemeMode,
+    Accent, AccentColour, CloseAction, DesktopLyrics, DiscordOptions, Equalizer, Hotkeys, Loudness,
+    Settings, SkipSilence, StreamingQuality, ThemeMode,
 };
 
 use super::start_presence;
@@ -47,6 +47,8 @@ pub enum Change {
     Lyrics(bool),
     /// The lyrics view looks up synced lyrics on LRCLIB.
     LyricsLrclib(bool),
+    /// Desktop lyrics on or off, and how the strip was left (locked, its size, its place).
+    DesktopLyrics(DesktopLyrics),
     /// A list that runs out plays on with similar songs (on) or restarts (off).
     Autoplay(bool),
     /// What an identity (its key) pinned to the top of the sidebar's list, newest first.
@@ -123,6 +125,7 @@ impl Change {
             Change::Hotkeys(v) => s.hotkeys = v,
             Change::Lyrics(v) => s.lyrics = v,
             Change::LyricsLrclib(v) => s.lyrics_lrclib = v,
+            Change::DesktopLyrics(v) => s.desktop_lyrics = v,
             Change::Autoplay(v) => s.autoplay = v,
             Change::CheckForUpdates(v) => s.check_for_updates = v,
             Change::InstallUpdates(v) => s.install_updates = v,
@@ -311,6 +314,10 @@ mod tests {
             })),
             Change::Lyrics(false),
             Change::LyricsLrclib(false),
+            Change::DesktopLyrics(DesktopLyrics {
+                on: true,
+                ..DesktopLyrics::default()
+            }),
             Change::Autoplay(false),
             Change::CheckForUpdates(false),
             Change::InstallUpdates(false),
@@ -354,6 +361,7 @@ mod tests {
         assert!(s.amuse);
         assert!(!s.discord_options.play_button);
         assert!(!s.lyrics && !s.lyrics_lrclib);
+        assert!(s.desktop_lyrics.on);
         assert!(!s.autoplay);
         assert!(!s.skip_disliked);
         assert_eq!(s.streaming_quality, StreamingQuality::Standard);

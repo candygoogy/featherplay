@@ -1,6 +1,8 @@
 // Settings' Lyrics section.
+import { Theme } from "../../theme.slint";
+import { Body, TextLink } from "../../parts.slint";
 import { SettingId, SettingKey, SettingsData } from "data.slint";
-import { Group, ToggleRow } from "rows.slint";
+import { Group, SettingRow, ToggleRow } from "rows.slint";
 
 export component LyricsSection inherits Group {
     title: @tr("Lyrics");
@@ -20,5 +22,55 @@ export component LyricsSection inherits Group {
         key: SettingKey.lyrics-lrclib;
         checked: SettingsData.lyrics-lrclib;
         enabled: SettingsData.lyrics;
+    }
+    // Desktop lyrics follow Show lyrics: off, the row goes.
+    if SettingsData.lyrics && SettingsData.desktop-lyrics-here: ToggleRow {
+        label: @tr("Desktop lyrics");
+        search: SettingId.desktop-lyrics;
+        detail: @tr("The line being sung, in a small strip that stays on top of other apps. Drag it where you like; lock it to let clicks through.");
+        key: SettingKey.desktop-lyrics;
+        checked: SettingsData.desktop-lyrics;
+    }
+    // Wayland keeps a window on top, places it and lets clicks through it only for the
+    // desktop's own: the row says so calmly, with "Why?" for the detail.
+    if SettingsData.lyrics && !SettingsData.desktop-lyrics-here: VerticalLayout {
+        SettingRow {
+            label: @tr("Desktop lyrics");
+            search: SettingId.desktop-lyrics;
+            detail: @tr("Not available on Wayland.");
+            TextLink {
+                text: @tr("Why?");
+                font-size: Theme.t-meta;
+                font-weight: 400;
+                expands: true;
+                expanded: SettingsData.desktop-lyrics-why;
+                clicked => { SettingsData.desktop-lyrics-why = !SettingsData.desktop-lyrics-why; }
+            }
+        }
+        // The detail, on a card 460 px wide (its text wraps to that width).
+        if SettingsData.desktop-lyrics-why: Rectangle {
+            height: note.preferred-height + 2 * Theme.s3 + Theme.s4;
+            Rectangle {
+                x: 0;
+                y: 0;
+                width: min(460px, parent.width);
+                height: parent.height - Theme.s4;
+                border-radius: Theme.r-m;
+                background: Theme.card;
+                border-width: 1px;
+                border-color: Theme.card-edge;
+                note := Body {
+                    x: 14px;
+                    y: Theme.s3;
+                    width: parent.width - 28px;
+                    height: self.preferred-height;
+                    text: @tr("Wayland leaves where windows sit, and what stays on top, to your desktop, so featherplay can't keep a strip above other apps, put it in one place or let clicks through it. In an X11 session it works.");
+                    font-size: Theme.t-meta;
+                    color: Theme.text2;
+                    wrap: word-wrap;
+                    overflow: clip;
+                }
+            }
+        }
     }
 }

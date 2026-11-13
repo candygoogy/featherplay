@@ -546,6 +546,8 @@ pub fn wire(ctx: &Rc<Ctx>, ui: &AppWindow) {
     toast::init(ctx);
     refused::init(ctx);
     pages::init(ctx);
+    // After the settings: the strip shows if desktop lyrics were left on.
+    crate::desktop_lyrics::init(ctx);
 }
 
 /// An event from the controller, on the UI thread.

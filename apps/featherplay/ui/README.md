@@ -17,6 +17,7 @@ touches another. The shared files below change only when a page needs something 
 | `toast.slint` | Toasts: one short line at a time, bottom centre above the bar; `src/toast.rs` shows and closes them | frame (shared) |
 | `queue_panel.slint` | The Up next panel (`QueueData`) | now playing |
 | `mini_player.slint` | The tray's mini player (`MiniPlayer`, `MiniData`): its own small window, opened by a left click on the tray icon; `src/mini.rs` | tray |
+| `desktop_lyrics.slint` | Desktop lyrics (`DesktopLyrics`, `StripData`): a borderless strip, always on top, with the line being sung and the next, its hover controls (size, lock, open, close); its own window while desktop lyrics are on; `src/desktop_lyrics.rs` | lyrics |
 | `account_menu.slint` | The account menu from the sidebar's account row (`AccountMenu`, `AccountItem`): identities, Switch Google account, Sign out | account |
 | `song_menu.slint` | The song menu (`SongMenu`, drawn over everything by `SongMenuLayer` in `app.slint`): Play next, Add to queue, Like or Dislike, Add to playlist, Start radio; `src/song_menu.rs` | menus |
 | `playlist_menu.slint`, `playlist_menu_layer.slint` | The sidebar list's right-click menu (albums and artists get Play, Shuffle, Go to, Pin to top; playlists also Pin to top), in the song menu's style: the state (`PlaylistMenu`, `PlaylistKind`, `PlaylistDialog`), then the panel and its Rename and Delete dialogs (Settings' `Dialog`). Split so the sidebar can import the state without an import cycle; `src/playlist_menu.rs` | menus |

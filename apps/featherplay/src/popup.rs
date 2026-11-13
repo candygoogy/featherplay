@@ -23,6 +23,9 @@ const GAP: f32 = 12.0;
 thread_local! {
     /// Set while a popup's window is created, for `window_attributes`.
     static CREATING: Cell<bool> = const { Cell::new(false) };
+    /// Set while one is created that mustn't take the activation as it shows (the desktop
+    /// lyrics' strip, over whatever app is in use).
+    static QUIET: Cell<bool> = const { Cell::new(false) };
 }
 
 /// Runs `f`, which creates a popup's window, with `window_attributes` on for it. The window
@@ -31,6 +34,15 @@ pub fn creating<T>(f: impl FnOnce() -> T) -> T {
     CREATING.set(true);
     let made = f();
     CREATING.set(false);
+    made
+}
+
+/// As `creating`, for a popup that shows without taking the activation from the app in
+/// front.
+pub fn creating_quiet<T>(f: impl FnOnce() -> T) -> T {
+    QUIET.set(true);
+    let made = creating(f);
+    QUIET.set(false);
     made
 }
 
@@ -48,7 +60,10 @@ pub fn window_attributes(attrs: WindowAttributes) -> WindowAttributes {
     if !CREATING.get() {
         return attrs;
     }
-    let attrs = attrs.with_decorations(!placed()).with_resizable(false);
+    let attrs = attrs
+        .with_decorations(!placed())
+        .with_resizable(false)
+        .with_active(!QUIET.get());
     #[cfg(windows)]
     let attrs = attrs
         .with_skip_taskbar(true)

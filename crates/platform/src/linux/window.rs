@@ -207,6 +207,12 @@ pub fn work_area_at(x: i32, y: i32) -> Option<(ScreenRect, f32)> {
         .ok()
 }
 
+/// Nothing to do: X11 lets clicks through by the window's input shape alone, which winit
+/// sets.
+pub fn layered_opaque(_h: Handle) -> Result<(), String> {
+    Ok(())
+}
+
 /// Nothing to do: the desktop draws its own border, if any.
 pub fn popup_border(_h: Handle, _colour: Rgb) -> Result<(), String> {
     Ok(())

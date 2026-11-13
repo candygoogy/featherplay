@@ -28,11 +28,14 @@ pub enum Feature {
     TitleBarColour,
     /// Secrets kept in the system's credential store.
     SecretStorage,
+    /// Desktop lyrics: a strip kept above other apps, placed by the app, that lets clicks
+    /// through when locked.
+    DesktopLyrics,
 }
 
 impl Feature {
     /// Every feature, in declaration order.
-    pub const ALL: [Feature; 10] = [
+    pub const ALL: [Feature; 11] = [
         Feature::TaskbarButtons,
         Feature::Tray,
         Feature::MiniPlayerPlacement,
@@ -43,6 +46,7 @@ impl Feature {
         Feature::InPlaceUpdate,
         Feature::TitleBarColour,
         Feature::SecretStorage,
+        Feature::DesktopLyrics,
     ];
 }
 
@@ -59,7 +63,8 @@ pub fn supports(feature: Feature) -> bool {
         | Feature::WebViewSignIn
         | Feature::InPlaceUpdate
         | Feature::TitleBarColour
-        | Feature::SecretStorage => true,
+        | Feature::SecretStorage
+        | Feature::DesktopLyrics => true,
     }
 }
 
@@ -68,7 +73,7 @@ pub fn supports(feature: Feature) -> bool {
 /// a notification server does, the media controls (MPRIS) when there's a session bus at all;
 /// the tray while the desktop's tray (a StatusNotifierWatcher) shows the app's icon, so it's
 /// false until `tray::Tray::new` has put one there, and false again if the watcher goes;
-/// placing the mini player and global hotkeys only in an X11 session (Wayland allows
+/// placing the mini player, global hotkeys and desktop lyrics only in an X11 session (Wayland allows
 /// neither); the update in place only in a copy that runs from an AppImage
 /// (`installer::appimage`). The sign-in has no window of the app's own on Linux: there's no
 /// WebView2.
@@ -79,7 +84,9 @@ pub fn supports(feature: Feature) -> bool {
         Feature::Notifications => crate::notify::available(),
         Feature::MediaControls => crate::linux::bus::session().is_some(),
         Feature::Tray => crate::tray::available(),
-        Feature::MiniPlayerPlacement | Feature::GlobalHotkeys => crate::window::x11_session(),
+        Feature::MiniPlayerPlacement | Feature::GlobalHotkeys | Feature::DesktopLyrics => {
+            crate::window::x11_session()
+        }
         Feature::InPlaceUpdate => crate::installer::appimage().is_some(),
         Feature::TaskbarButtons | Feature::WebViewSignIn | Feature::TitleBarColour => false,
     }
@@ -115,6 +122,7 @@ mod tests {
                 Feature::MiniPlayerPlacement,
                 Feature::GlobalHotkeys,
                 Feature::InPlaceUpdate,
+                Feature::DesktopLyrics,
             ];
             if cfg!(target_os = "linux") && on_the_session.contains(&feature) {
                 continue;

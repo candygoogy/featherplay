@@ -23,6 +23,7 @@ export enum SettingKey {
     hotkeys,
     lyrics,
     lyrics-lrclib,
+    desktop-lyrics,
     autoplay,
     check-for-updates,
     install-updates,
@@ -155,6 +156,7 @@ export enum SettingId {
     // Lyrics.
     lyrics,
     lyrics-lrclib,
+    desktop-lyrics,
     // Scrobbling.
     scrobbling,
     scrobble-other-media,
@@ -391,6 +393,12 @@ export global SettingsData {
     // Lyrics: shown at all ("Show lyrics"), and looked up on LRCLIB.
     in property <bool> lyrics: true;
     in property <bool> lyrics-lrclib: true;
+    // Desktop lyrics, the strip above other apps (`desktop_lyrics.rs`), and whether this desktop
+    // can show it (not Wayland: the row says so instead).
+    in property <bool> desktop-lyrics;
+    in property <bool> desktop-lyrics-here: true;
+    // Its "Why?" is open, where it isn't available.
+    in-out property <bool> desktop-lyrics-why;
     // Ask GitHub once a day whether a newer featherplay is out.
     in property <bool> check-for-updates: true;
     // Download a newer release's setup and offer "Restart to update" (the installed copy).

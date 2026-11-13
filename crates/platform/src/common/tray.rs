@@ -42,6 +42,31 @@ pub struct MenuState {
     pub has_track: bool,
     pub playing: bool,
     pub liked: bool,
+    /// The desktop lyrics' entries: offered (lyrics are on and the desktop can keep a strip
+    /// on top), whether the strip shows, and whether it lets clicks through.
+    pub desktop_lyrics: DesktopLyricsMenu,
+}
+
+/// The desktop lyrics' group of the menu: "Desktop lyrics" (checked while the strip shows)
+/// and, while it shows, "Lock desktop lyrics" or "Unlock desktop lyrics".
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct DesktopLyricsMenu {
+    pub offered: bool,
+    pub on: bool,
+    pub locked: bool,
+}
+
+impl DesktopLyricsMenu {
+    /// The lock entry's label while the strip shows, else `None` (the entry is left out).
+    pub fn lock_label(self) -> Option<&'static str> {
+        (self.offered && self.on).then(|| {
+            if self.locked {
+                tr!("Unlock desktop lyrics")
+            } else {
+                tr!("Lock desktop lyrics")
+            }
+        })
+    }
 }
 
 /// An entry of the menu that does something.
@@ -52,17 +77,23 @@ pub enum TrayChoice {
     Next,
     Like,
     NotForMe,
+    /// Desktop lyrics on or off.
+    DesktopLyrics,
+    /// The shown strip locked (clicks go through it) or unlocked.
+    LockDesktopLyrics,
     Show,
     Quit,
 }
 
 impl TrayChoice {
-    const ALL: [TrayChoice; 7] = [
+    const ALL: [TrayChoice; 9] = [
         TrayChoice::PlayPause,
         TrayChoice::Previous,
         TrayChoice::Next,
         TrayChoice::Like,
         TrayChoice::NotForMe,
+        TrayChoice::DesktopLyrics,
+        TrayChoice::LockDesktopLyrics,
         TrayChoice::Show,
         TrayChoice::Quit,
     ];
@@ -75,6 +106,8 @@ impl TrayChoice {
             TrayChoice::Next => "next",
             TrayChoice::Like => "like",
             TrayChoice::NotForMe => "not-for-me",
+            TrayChoice::DesktopLyrics => "desktop-lyrics",
+            TrayChoice::LockDesktopLyrics => "lock-desktop-lyrics",
             TrayChoice::Show => "show",
             TrayChoice::Quit => "quit",
         }
@@ -226,7 +259,27 @@ mod tests {
             has_track: true,
             playing,
             liked,
+            ..MenuState::default()
         }
+    }
+
+    #[test]
+    fn the_lock_entry_shows_only_while_the_strip_does_and_says_what_it_will_do() {
+        let menu = |offered, on, locked| DesktopLyricsMenu {
+            offered,
+            on,
+            locked,
+        };
+        assert_eq!(menu(true, false, false).lock_label(), None);
+        assert_eq!(menu(false, true, true).lock_label(), None, "not offered");
+        assert_eq!(
+            menu(true, true, false).lock_label(),
+            Some("Lock desktop lyrics")
+        );
+        assert_eq!(
+            menu(true, true, true).lock_label(),
+            Some("Unlock desktop lyrics")
+        );
     }
 
     fn utf16_len(s: &str) -> usize {

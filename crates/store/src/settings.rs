@@ -5,7 +5,7 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{Paths, atomic};
+use crate::{DesktopLyrics, Paths, atomic};
 
 /// The settings file layout this build writes. Raise it with each change that needs a
 /// migration, and add that step to `MIGRATIONS`.
@@ -80,6 +80,9 @@ pub struct Settings {
     /// The lyrics view looks up synced lyrics on LRCLIB (on by default); off, it shows only
     /// the music service's own lyrics (timed for some songs).
     pub lyrics_lrclib: bool,
+    /// Desktop lyrics: the strip above other apps, and how it was left.
+    #[serde(deserialize_with = "lenient")]
+    pub desktop_lyrics: DesktopLyrics,
     /// When a list (not a radio) runs out with Repeat off, play on with a radio of its last
     /// track (on by default); off, the list restarts from the top.
     pub autoplay: bool,
@@ -384,6 +387,7 @@ impl Default for Settings {
             sign_in_browser: None,
             lyrics: true,
             lyrics_lrclib: true,
+            desktop_lyrics: DesktopLyrics::default(),
             autoplay: true,
             pins: BTreeMap::new(),
             check_for_updates: true,

@@ -385,7 +385,7 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
         scene.play_track(
             matches!(
                 o.page.as_str(),
-                "home-fresh" | "mini-player-idle" | "settings-idle"
+                "home-fresh" | "mini-player-idle" | "settings-idle" | "desktop-lyrics-idle"
             ),
             o.track,
         )?;
@@ -728,6 +728,44 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
     } else {
         None
     };
+    let strip = if let Some(state) = o.page.strip_prefix("desktop-lyrics") {
+        use crate::lyrics::SnapshotLyrics;
+        use featherplay_store::StripSize;
+        let kind = match state {
+            "-none" => Some(SnapshotLyrics::None),
+            "-plain" => Some(SnapshotLyrics::Plain),
+            "-loading" => Some(SnapshotLyrics::Loading),
+            "-unavailable" => Some(SnapshotLyrics::Unavailable),
+            "-idle" => None,
+            _ => Some(SnapshotLyrics::Synced),
+        };
+        if let Some(kind) = kind {
+            crate::lyrics::show_for_snapshot(ctx, kind);
+            settle();
+        }
+        let size = match state {
+            "-small" | "-none" => StripSize::Small,
+            "-large" => StripSize::Large,
+            _ => StripSize::Medium,
+        };
+        let strip = crate::desktop_lyrics::show_for_snapshot(ctx, size, state == "-first")?;
+        strip
+            .window()
+            .dispatch_event(WindowEvent::ScaleFactorChanged {
+                scale_factor: o.scale,
+            });
+        settle();
+        if state == "-hover" {
+            let position = slint::LogicalPosition::new(strip.get_wanted_width() / 2.0, 20.0);
+            strip
+                .window()
+                .dispatch_event(WindowEvent::PointerMoved { position });
+            settle();
+        }
+        Some(strip)
+    } else {
+        None
+    };
     let frame = if o.page.starts_with("sign-in-window") {
         let source = match o.page.as_str() {
             "sign-in-window-lookalike" => {
@@ -750,15 +788,19 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
     } else {
         None
     };
-    let window = match (&mini, &frame) {
-        (Some(m), _) => m.window(),
-        (None, Some(f)) => f.window(),
-        (None, None) => ui.window(),
+    let window = match (&mini, &frame, &strip) {
+        (Some(m), _, _) => m.window(),
+        (None, Some(f), _) => f.window(),
+        (None, None, Some(s)) => s.window(),
+        (None, None, None) => ui.window(),
     };
     let logical = mini
         .as_ref()
         .map(|_| crate::mini::SIZE)
-        .or(frame.as_ref().map(|_| crate::pages::sign_in::WINDOW_SIZE));
+        .or(frame.as_ref().map(|_| crate::pages::sign_in::WINDOW_SIZE))
+        .or(strip
+            .as_ref()
+            .map(|s| (s.get_wanted_width(), s.get_wanted_height())));
     let (width, height) = match logical {
         Some((w, h)) => ((w * o.scale).round() as u32, (h * o.scale).round() as u32),
         None => (o.width, o.height),
@@ -770,8 +812,18 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
         Hold::Error if o.page.starts_with("now-playing-lyrics") => {}
         Hold::Error => hold_error(ctx, ui)?,
     }
+    if o.page.starts_with("settings-lyrics") {
+        let data = ui.global::<crate::ui::SettingsData>();
+        data.set_desktop_lyrics(true);
+        if o.page == "settings-lyrics-wayland" {
+            data.set_desktop_lyrics_here(false);
+            data.set_desktop_lyrics_why(true);
+        }
+        settle();
+    }
     if o.page == "settings-discord"
         || o.page.starts_with("settings-window")
+        || o.page.starts_with("settings-lyrics")
         || o.page == "settings-picked"
         || o.pointer.is_some()
     {
@@ -788,6 +840,10 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
     }
     if o.page.starts_with("settings-window") {
         scroll_to_group(window, "Window")?;
+        settle();
+    }
+    if o.page.starts_with("settings-lyrics") {
+        scroll_to_group(window, "Lyrics")?;
         settle();
     }
     if o.page == "settings-picked" {

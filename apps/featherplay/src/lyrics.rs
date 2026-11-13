@@ -1,19 +1,18 @@
 //! The Lyrics tab (ui/pages/lyrics.slint), beside Up next and Related in Now playing and
 //! in the Up next panel, and Now playing's full lyrics view.
 //!
-//! Requests: only while lyrics are on screen (the full view, or the tab in either panel:
-//! `LyricsData.live-changed`, from `LyricsWatch`), for the current track, and again when the
-//! next track starts while they stay, once that track has stayed a second (`SKIP_WAIT`:
-//! skipping through songs asks nothing); never in the background; never with Settings'
-//! "Show lyrics" off. LRCLIB's synced lyrics first, when Settings allows it (it gets the
-//! title, artist, album and length, and no cookies), then the song's own timed lyrics from
-//! YouTube Music, then LRCLIB's plain lyrics, then the song's own plain ones (`settle`).
-//! Results are kept per track for the session (a bounded map); failures aren't, so the tab
-//! asks again the next time it opens on that track. Nor is the song's plain
-//! text when LRCLIB failed rather than missed: a passing error mustn't hide synced lyrics.
-//! Shown, that fallback says synced lyrics are unavailable for now, and while the view stays
-//! open on it LRCLIB is asked once more a minute later (`RESYNC_AFTER`); synced lyrics
-//! found then take its place.
+//! Requests: only while lyrics are on screen (the full view, the tab in either panel, or the
+//! desktop lyrics' strip: `LyricsData.live-changed`, from `LyricsWatch`), for the current
+//! track, and again when the next track starts while they stay, once that track has stayed a
+//! second (`SKIP_WAIT`: skipping through songs asks nothing); never in the background; never
+//! with Settings' "Show lyrics" off. LRCLIB's synced lyrics first, when Settings allows it (it
+//! gets the title, artist, album and length, and no cookies), then the song's own timed lyrics
+//! from YouTube Music, then LRCLIB's plain lyrics, then the song's own plain ones (`settle`).
+//! Results are kept per track for the session (a bounded map); failures aren't, so the tab asks
+//! again the next time it opens on that track. Nor is the song's plain text when LRCLIB failed
+//! rather than missed: a passing error mustn't hide synced lyrics. Shown, that fallback says
+//! synced lyrics are unavailable for now, and while the view stays open on it LRCLIB is asked
+//! once more a minute later (`RESYNC_AFTER`); synced lyrics found then take its place.
 //!
 //! Timing: nothing ticks. While sound plays and lyrics are on screen, one single-shot timer
 //! waits for the next line's start, read from the bar's clock (`bar::position`); a pause, a
@@ -169,6 +168,7 @@ pub fn refresh_inks(ui: &crate::ui::AppWindow) {
     let data = ui.global::<LyricsData>();
     data.set_ink_dark(inks.dark);
     data.set_ink_light(inks.light);
+    crate::desktop_lyrics::inks_changed(ui);
 }
 
 /// Plain lyrics as lines, in the synced lines' type: blank lines between verses kept as one
@@ -412,9 +412,21 @@ fn stop_feed() {
     FEEDING.with(|f| f.borrow_mut().take());
 }
 
+/// Times the lines (`time_lines`) and shows the change on the desktop lyrics' strip, if it
+/// shows.
+fn sync(ctx: &Rc<Ctx>) {
+    time_lines(ctx);
+    crate::desktop_lyrics::refresh(ctx);
+}
+
+/// The synced lines shown now (empty for plain lyrics, none, or while looking).
+pub fn synced_lines() -> Rc<[Line]> {
+    STATE.with(|s| s.borrow().lines.clone())
+}
+
 /// Marks the line playing now and arms the timer for the next one, while sound plays and
 /// the tab is on screen.
-fn sync(ctx: &Rc<Ctx>) {
+fn time_lines(ctx: &Rc<Ctx>) {
     let (lines, live) = STATE.with(|s| {
         let s = s.borrow();
         (s.lines.clone(), s.live)

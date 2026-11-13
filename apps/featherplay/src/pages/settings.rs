@@ -22,7 +22,7 @@ use featherplay_controller::presence::Status as DiscordStatus;
 use featherplay_controller::scrobbler::build_keys;
 use featherplay_integrations::local_api::Token;
 use featherplay_platform::{Feature, supports};
-use featherplay_store::{CloseAction, Equalizer, Paths, Settings};
+use featherplay_store::{CloseAction, DesktopLyrics, Equalizer, Paths, Settings};
 use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
 
 use crate::app::Ctx;
@@ -30,7 +30,7 @@ use crate::controller::{
     AccountAction, Action, Change, LastfmStatus, ListenBrainzStatus, PlayerState,
 };
 use crate::ui::{Player, SettingKey, SettingsData, SettingsDialog, Theme, Tooltips};
-use crate::{follow, language, lyrics, shell, updates};
+use crate::{desktop_lyrics, follow, language, lyrics, shell, updates};
 
 mod discord;
 mod local_api;
@@ -110,6 +110,18 @@ pub fn set_close_action(ctx: &Ctx, action: CloseAction) {
 /// Whether lyrics show at all ("Show lyrics"): off, nothing looks them up.
 pub fn lyrics_shown() -> bool {
     SETTINGS.with(|s| s.borrow().lyrics)
+}
+
+/// Desktop lyrics: on or off, and how the strip was left.
+pub fn desktop_lyrics() -> DesktopLyrics {
+    SETTINGS.with(|s| s.borrow().desktop_lyrics.clone())
+}
+
+/// Saves desktop lyrics' setting and how the strip was left (`desktop_lyrics`).
+pub fn set_desktop_lyrics(ctx: &Ctx, value: DesktopLyrics) {
+    if desktop_lyrics() != value {
+        commit(ctx, Change::DesktopLyrics(value));
+    }
 }
 
 /// Whether the lyrics view may look up synced lyrics on LRCLIB.
@@ -470,6 +482,8 @@ fn show(ctx: &Ctx) {
     data.set_signed_in(ctx.signed_in());
     data.set_lyrics(s.lyrics);
     data.set_lyrics_lrclib(s.lyrics_lrclib);
+    data.set_desktop_lyrics(s.desktop_lyrics.on);
+    data.set_desktop_lyrics_here(desktop_lyrics::available());
     data.set_check_for_updates(s.check_for_updates);
     data.set_install_updates(s.install_updates);
     data.set_dns_over_https(s.dns_over_https);
@@ -646,6 +660,11 @@ fn toggled(ctx: &Rc<Ctx>, key: SettingKey, on: bool) {
             data.set_lyrics(on);
             commit(ctx, Change::Lyrics(on));
             lyrics::on_changed(ctx, on);
+            desktop_lyrics::apply(ctx);
+            return;
+        }
+        SettingKey::DesktopLyrics => {
+            desktop_lyrics::set_on(ctx, on);
             return;
         }
         SettingKey::LyricsLrclib => {

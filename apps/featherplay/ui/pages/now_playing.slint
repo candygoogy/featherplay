@@ -200,13 +200,14 @@ export component SideTabs inherits Rectangle {
 
 // Whether lyrics are on screen: Now playing's full lyrics view, or the Lyrics tab picked in
 // Now playing's side panel or the frame's Up next panel, whichever the page shows and if it's
-// open, with the window neither minimized nor hidden in the tray. One instance, in
+// open, with the window neither minimized nor hidden in the tray; or the desktop lyrics'
+// strip, whatever the window shows. One instance, in
 // `AppWindow`, which passes its `minimized`; Rust asks for lyrics and times lines only while
 // it holds. It also keeps the full view through a lookup that began while it showed
 // (`LyricsData.held`), and the Lyrics pill's note for a few seconds (`LyricsData.hint`).
 export component LyricsWatch {
     in property <bool> minimized;
-    property <bool> live: LyricsData.on && ((NowPlayingData.tab == 2 && (Nav.page == PageKind.now-playing ? Frame.side-open : Frame.queue-open)) || LyricsData.wanted) && !Frame.hidden && !root.minimized;
+    property <bool> live: LyricsData.on && ((((NowPlayingData.tab == 2 && (Nav.page == PageKind.now-playing ? Frame.side-open : Frame.queue-open)) || LyricsData.wanted) && !Frame.hidden && !root.minimized) || LyricsData.desktop);
     changed live => { LyricsData.live-changed(self.live); }
     property <bool> showing: LyricsData.showing;
     changed showing => { LyricsData.held = self.showing; }

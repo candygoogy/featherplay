@@ -29,6 +29,7 @@ mod card_hint;
 mod card_veil;
 mod close_choice;
 mod content_fade;
+mod desktop_lyrics;
 mod diagnostics;
 mod discord_card;
 mod first_frames;

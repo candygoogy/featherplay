@@ -195,6 +195,13 @@ fn table() -> Vec<Row> {
             &[],
             tr!("search keywords" => "karaoke, timed"),
         ),
+        row(
+            SettingId::DesktopLyrics,
+            2,
+            tr!("Desktop lyrics"),
+            &[],
+            tr!("search keywords" => "karaoke, overlay, floating, on top, strip"),
+        ),
         // Scrobbling.
         row(
             SettingId::Scrobbling,
@@ -508,6 +515,8 @@ struct View {
     has_notifications: bool,
     has_hotkeys: bool,
     on_windows: bool,
+    lyrics: bool,
+    desktop_lyrics_here: bool,
     lastfm: LastfmState,
     lastfm_message: bool,
     lastfm_key: bool,
@@ -531,6 +540,8 @@ impl View {
             has_notifications: data.get_has_notifications(),
             has_hotkeys: data.get_has_hotkeys(),
             on_windows: data.get_on_windows(),
+            lyrics: data.get_lyrics(),
+            desktop_lyrics_here: data.get_desktop_lyrics_here(),
             lastfm: data.get_lastfm_state(),
             lastfm_message: !data.get_lastfm_message().is_empty(),
             lastfm_key: data.get_lastfm_builtin_key() || data.get_lastfm_custom_key(),
@@ -565,6 +576,7 @@ impl View {
             S::CloseAction | S::TrayClickOpensWindow => self.has_tray,
             S::Notifications => self.has_notifications,
             S::Hotkeys => self.has_hotkeys,
+            S::DesktopLyrics => self.lyrics,
             _ => true,
         }
     }
@@ -629,6 +641,10 @@ impl View {
             ),
             S::LyricsLrclib => tr!(
                 "Lines follow the song. While lyrics are on screen, LRCLIB gets the song's title, artist, album and length. Off: only the lyrics that come with the song, synced for some songs."
+            ),
+            S::DesktopLyrics if !self.desktop_lyrics_here => tr!("Not available on Wayland."),
+            S::DesktopLyrics => tr!(
+                "The line being sung, in a small strip that stays on top of other apps. Drag it where you like; lock it to let clicks through."
             ),
             S::Scrobbling => tr!(
                 "Send what you play to Last.fm and ListenBrainz, once you've played half a track or 4 minutes of it."
@@ -1302,6 +1318,8 @@ mod tests {
             has_notifications: true,
             has_hotkeys: false,
             on_windows: true,
+            lyrics: false,
+            desktop_lyrics_here: true,
             lastfm: LastfmState::SignedOut,
             lastfm_message: false,
             lastfm_key: true,
@@ -1324,6 +1342,7 @@ mod tests {
             SettingId::DiscordLinks,
             SettingId::LocalApiPort,
             SettingId::ScrobbleLastfm,
+            SettingId::DesktopLyrics,
         ] {
             assert!(!view.has(id), "{id:?}");
         }

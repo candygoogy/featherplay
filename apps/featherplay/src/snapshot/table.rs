@@ -98,6 +98,10 @@ pub const PAGES: &[&str] = &[
     // when you log in", "Start minimised").
     "settings-window",
     "settings-window-no-tray",
+    // Settings scrolled to the Lyrics group with desktop lyrics on; and as on Wayland, where
+    // the row says it isn't available, its "Why?" open.
+    "settings-lyrics",
+    "settings-lyrics-wayland",
     // Settings with the new sound rows on (Skip silence at Start and end, Crossfade at 5 s
     // with Fade on skip, Bass, Light), and with the Equalizer's bands open.
     "settings-sound",
@@ -189,6 +193,20 @@ pub const PAGES: &[&str] = &[
     "mini-player-disliked",
     "mini-player-idle",
     "mini-player-pinned",
+    // The desktop lyrics' strip alone (its own window, Medium): a line being sung with the
+    // next under it; pointed at (its controls); its first opening (the hint); Small and
+    // Large; a song with no lyrics, plain lyrics only, still looking, LRCLIB down, and
+    // nothing playing.
+    "desktop-lyrics",
+    "desktop-lyrics-hover",
+    "desktop-lyrics-first",
+    "desktop-lyrics-small",
+    "desktop-lyrics-large",
+    "desktop-lyrics-none",
+    "desktop-lyrics-plain",
+    "desktop-lyrics-loading",
+    "desktop-lyrics-unavailable",
+    "desktop-lyrics-idle",
     // Home with the close dialog open, as the first close asks.
     "close-dialog",
     // Home after a scroll near its end loaded the next page (the community shelf), with that
@@ -236,6 +254,16 @@ pub(super) fn page(name: &str, f: &Fixtures) -> Result<Page, String> {
         | "mini-player-disliked"
         | "mini-player-idle"
         | "mini-player-pinned"
+        | "desktop-lyrics"
+        | "desktop-lyrics-hover"
+        | "desktop-lyrics-first"
+        | "desktop-lyrics-small"
+        | "desktop-lyrics-large"
+        | "desktop-lyrics-none"
+        | "desktop-lyrics-plain"
+        | "desktop-lyrics-loading"
+        | "desktop-lyrics-unavailable"
+        | "desktop-lyrics-idle"
         | "close-dialog"
         | "speed-popup"
         | "silences"
@@ -330,6 +358,8 @@ pub(super) fn page(name: &str, f: &Fixtures) -> Result<Page, String> {
         | "settings-discord"
         | "settings-window"
         | "settings-window-no-tray"
+        | "settings-lyrics"
+        | "settings-lyrics-wayland"
         | "settings-sound"
         | "settings-equalizer"
         | "settings-speed"

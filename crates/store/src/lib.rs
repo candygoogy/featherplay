@@ -2,6 +2,7 @@
 //! the Library's cache, the songs' silences.
 
 mod atomic;
+pub mod desktop_lyrics;
 pub mod library_cache;
 pub mod paths;
 pub mod secrets;
@@ -10,6 +11,7 @@ pub mod settings;
 pub mod silence_cache;
 
 pub use atomic::write as write_atomic;
+pub use desktop_lyrics::{DesktopLyrics, StripPlace, StripSize};
 pub use library_cache::{LibraryCache, LibraryList};
 pub use paths::Paths;
 pub use secrets::{SecretKey, StoreError, delete_secret, get_secret, set_secret};

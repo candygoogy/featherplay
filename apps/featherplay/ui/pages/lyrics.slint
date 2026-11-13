@@ -86,6 +86,9 @@ export global LyricsData {
         next: Theme.pick(self.ink-dark.next, self.ink-light.next),
         past: Theme.pick(self.ink-dark.past, self.ink-light.past),
     };
+    // The desktop lyrics' strip shows (`desktop_lyrics.rs`): lyrics are on screen, whatever
+    // the window shows.
+    in property <bool> desktop;
     // The lyrics are on screen (`LyricsWatch`, now_playing.slint): Rust asks for lyrics and
     // times the lines only then.
     callback live-changed(bool);

@@ -1,8 +1,9 @@
 //! The tray icon's right-click menu: Windows' own, built with muda (tray-icon shows it on a
 //! right click). A grey first line names the song, then Pause or Play, Previous, Next; Like
-//! (checked when liked) and Not for me; Show featherplay and Quit. The labels follow the
-//! player (`TrayMenu::show`), and the menu opens in the taskbar's light or dark mode
-//! (`in_taskbar_mode`).
+//! (checked when liked) and Not for me; while lyrics are on, Desktop lyrics (checked while
+//! the strip shows) and, while it shows, Lock or Unlock desktop lyrics; Show featherplay and
+//! Quit. The labels follow the player (`TrayMenu::show`), and the menu opens in the
+//! taskbar's light or dark mode (`in_taskbar_mode`).
 
 use std::cell::RefCell;
 
@@ -17,7 +18,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
 };
 use windows::core::{PCSTR, w};
 
-use crate::common::tray::{Labels, MenuState, TrayChoice, labels};
+use crate::common::tray::{DesktopLyricsMenu, Labels, MenuState, TrayChoice, labels};
 use crate::windows::taskbar::light_taskbar;
 
 /// The menu and the entries whose labels follow the player.
@@ -31,7 +32,17 @@ pub struct TrayMenu {
     not_for_me: MenuItem,
     /// The labels last set, so an unchanged state costs nothing.
     shown: RefCell<Labels>,
+    /// The desktop lyrics' group, put in before Show featherplay while it's offered.
+    desktop: CheckMenuItem,
+    lock: MenuItem,
+    desktop_end: PredefinedMenuItem,
+    /// The group as it's in the menu now.
+    desktop_shown: RefCell<DesktopLyricsMenu>,
 }
+
+/// Where the desktop lyrics' group starts: after the header, the transport and the rating,
+/// each group with its separator.
+const DESKTOP_AT: usize = 9;
 
 impl TrayMenu {
     /// Builds the menu for nothing loaded.
@@ -48,6 +59,20 @@ impl TrayMenu {
             like: CheckMenuItem::with_id(TrayChoice::Like.id(), l.like, l.controls, l.liked, None),
             not_for_me: item(TrayChoice::NotForMe, tr!("Not for me"), l.controls),
             shown: RefCell::new(l),
+            desktop: CheckMenuItem::with_id(
+                TrayChoice::DesktopLyrics.id(),
+                tr!("Desktop lyrics"),
+                true,
+                false,
+                None,
+            ),
+            lock: item(
+                TrayChoice::LockDesktopLyrics,
+                tr!("Lock desktop lyrics"),
+                true,
+            ),
+            desktop_end: PredefinedMenuItem::separator(),
+            desktop_shown: RefCell::new(DesktopLyricsMenu::default()),
         };
         let show = item(TrayChoice::Show, tr!("Show featherplay"), true);
         let quit = item(TrayChoice::Quit, tr!("Quit"), true);
@@ -77,6 +102,7 @@ impl TrayMenu {
 
     /// Sets the labels for the player's state `s`; only what changed is sent to Windows.
     pub fn show(&self, s: &MenuState) {
+        self.show_desktop_lyrics(s.desktop_lyrics);
         let new = labels(s);
         // A click on Like flips the check by itself, whether or not the like then goes
         // through: the player has the last word.
@@ -101,6 +127,41 @@ impl TrayMenu {
                 item.set_enabled(new.controls);
             }
             self.like.set_enabled(new.controls);
+        }
+        *old = new;
+    }
+
+    /// Puts the desktop lyrics' group in or takes it out, and sets its check and lock label.
+    fn show_desktop_lyrics(&self, new: DesktopLyricsMenu) {
+        // A click on the entry flips its check by itself: the strip has the last word.
+        if self.desktop.is_checked() != new.on {
+            self.desktop.set_checked(new.on);
+        }
+        let mut old = self.desktop_shown.borrow_mut();
+        if *old == new {
+            return;
+        }
+        let had_lock = old.lock_label().is_some();
+        if old.offered && !new.offered {
+            let _ = self.menu.remove(&self.desktop);
+            let _ = self.menu.remove(&self.desktop_end);
+        } else if !old.offered && new.offered {
+            let _ = self
+                .menu
+                .insert_items(&[&self.desktop, &self.desktop_end], DESKTOP_AT);
+        }
+        let label = new.lock_label();
+        match (had_lock, label) {
+            (true, None) => {
+                let _ = self.menu.remove(&self.lock);
+            }
+            (false, Some(_)) => {
+                let _ = self.menu.insert(&self.lock, DESKTOP_AT + 1);
+            }
+            _ => {}
+        }
+        if let Some(label) = label {
+            self.lock.set_text(label);
         }
         *old = new;
     }

@@ -271,6 +271,7 @@ pub fn theme_changed(ctx: &Rc<Ctx>) {
     // The start on screen (the old theme, until the first step), or the end at once.
     step(&ui, if duration.is_zero() { 1.0 } else { 0.0 });
     crate::mini::theme_changed(ctx);
+    crate::desktop_lyrics::theme_changed(ctx);
 
     let began = i_slint_core::animations::current_tick();
     let weak = ui.as_weak();

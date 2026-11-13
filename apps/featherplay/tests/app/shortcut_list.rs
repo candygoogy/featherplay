@@ -29,6 +29,7 @@ fn key(cap: &str) -> (SharedString, bool) {
     match cap {
         "Ctrl" => (Key::Control.into(), true),
         "Alt" => (Key::Alt.into(), true),
+        "Shift" => (Key::Shift.into(), true),
         "Space" => (" ".into(), false),
         "Esc" => (Key::Escape.into(), false),
         "←" => (Key::LeftArrow.into(), false),

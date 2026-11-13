@@ -175,12 +175,15 @@ pub fn tray_choice(choice: TrayChoice) {
             set_tray_menu(&player);
         }
         TrayChoice::NotForMe => crate::not_for_me::from_tray(&ctx),
+        TrayChoice::DesktopLyrics => crate::desktop_lyrics::toggle(&ctx),
+        TrayChoice::LockDesktopLyrics => crate::desktop_lyrics::toggle_lock(&ctx),
         TrayChoice::Show => app::show_window(&ctx),
         TrayChoice::Quit => ctx.quit(),
     }
 }
 
-/// Sets the tray icon's menu for the main window's player: the song, Pause or Play, Like.
+/// Sets the tray icon's menu for the main window's player: the song, Pause or Play, Like;
+/// and the desktop lyrics' entries.
 pub fn set_tray_menu(player: &Player) {
     let state = MenuState {
         title: player.get_title().into(),
@@ -188,6 +191,7 @@ pub fn set_tray_menu(player: &Player) {
         has_track: player.get_has_track(),
         playing: player.get_playing(),
         liked: player.get_liked(),
+        desktop_lyrics: crate::desktop_lyrics::menu_state(),
     };
     INTEGRATIONS.with(|i| {
         if let Some(tray) = i.borrow().as_ref().and_then(|it| it.tray.as_ref()) {

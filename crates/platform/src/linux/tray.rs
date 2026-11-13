@@ -147,7 +147,8 @@ impl ksni::Tray for Item {
     }
 
     /// The menu: the song (greyed), Pause or Play, Previous, Next; Like (checked when liked)
-    /// and Not for me; Show featherplay and Quit, as on Windows (`windows::tray::menu`).
+    /// and Not for me; while offered, Desktop lyrics and its Lock or Unlock; Show featherplay
+    /// and Quit, as on Windows (`windows::tray::menu`).
     fn menu(&self) -> Vec<MenuItem<Self>> {
         let l = labels(&self.state);
         let item = |c: TrayChoice, text: &str, enabled: bool| -> MenuItem<Self> {
@@ -159,7 +160,7 @@ impl ksni::Tray for Item {
             }
             .into()
         };
-        vec![
+        let mut menu = vec![
             StandardItem {
                 label: label(&header_text(&self.state)),
                 enabled: false,
@@ -181,9 +182,26 @@ impl ksni::Tray for Item {
             .into(),
             item(TrayChoice::NotForMe, tr!("Not for me"), l.controls),
             MenuItem::Separator,
-            item(TrayChoice::Show, tr!("Show featherplay"), true),
-            item(TrayChoice::Quit, tr!("Quit"), true),
-        ]
+        ];
+        let desktop = self.state.desktop_lyrics;
+        if desktop.offered {
+            menu.push(
+                CheckmarkItem {
+                    label: label(tr!("Desktop lyrics")),
+                    checked: desktop.on,
+                    activate: Item::choice(TrayChoice::DesktopLyrics),
+                    ..Default::default()
+                }
+                .into(),
+            );
+            if let Some(lock) = desktop.lock_label() {
+                menu.push(item(TrayChoice::LockDesktopLyrics, lock, true));
+            }
+            menu.push(MenuItem::Separator);
+        }
+        menu.push(item(TrayChoice::Show, tr!("Show featherplay"), true));
+        menu.push(item(TrayChoice::Quit, tr!("Quit"), true));
+        menu
     }
 
     fn watcher_online(&self) {
