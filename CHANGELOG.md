@@ -6,6 +6,97 @@ Notable changes to featherplay, newest first. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- An experimental Linux build, for x86_64 and aarch64: `featherplay-<arch>.AppImage`, which
+  updates itself, and `featherplay-<arch>.tar.gz`, which only says when a new version is
+  out. It needs glibc 2.35 or newer (Ubuntu 22.04, Debian 12, Fedora 36 or later) and a
+  Wayland or X11 session. No libraries are bundled, and its TLS is built in, so it needs no
+  OpenSSL. What works:
+  - Media controls over MPRIS: play, pause, next, previous and seeking from the desktop, with
+    the song, its cover, its position and the playback speed. Track notifications go to the
+    desktop's notification server; with none, Settings hides them.
+  - A tray icon (StatusNotifierItem) with the same menu and mini player as on Windows.
+    Without a tray (GNOME without the AppIndicator extension, WSL), closing the window
+    quits, and a mini player button in the player bar, or `Ctrl+M`, opens the mini player.
+    On Wayland it opens where the desktop puts it, as a framed window.
+  - The session and tokens are kept in the Secret Service (GNOME Keyring, KWallet). With no
+    keyring running, a sign-in lasts until featherplay closes, and it says so. Nothing goes to
+    a plain file.
+  - Browser sign-in with Chrome, Chromium, Edge, Brave or Vivaldi. A Snap or Flatpak
+    browser is found but not started, and the page says why. Linux has no sign-in window.
+  - The AppImage downloads a new release, checks it against the signed `SHA256SUMS.txt` as
+    the Windows setup is checked, and replaces itself on "Restart to update".
+  - Global hotkeys in an X11 session. Wayland lets no app hear keys pressed in another, so
+    there Settings hides them.
+  - yt-dlp and Deno for Linux, pinned by SHA256 as on Windows (yt-dlp from GitHub only for
+    now). One featherplay runs per home folder, and a second launch brings the first forward
+    where the desktop allows it.
+  - Settings in `~/.config/featherplay`, the cache in `~/.cache/featherplay` and the log in
+    `~/.local/state/featherplay/logs`. The body text is Inter, set to Segoe UI Variable's
+    line spacing, so the pages are laid out as on Windows. A proxy comes from `HTTPS_PROXY`
+    or `ALL_PROXY` only.
+- A search on Settings, in its header: from two letters it hides the rows that don't match
+  and the sections left empty, and the index counts what's left. A row matches by its name,
+  its line, an option's name or a few hidden keywords ("theme" finds Appearance, "scrobble"
+  finds Last.fm), and the words found are marked. `Ctrl+F` on Settings goes to the field;
+  Escape clears it, and a second Escape leaves it.
+- The top bar's search suggestions end with up to three settings that match, from the third
+  letter. A pick opens Settings at that row and lights it for a moment. **Show settings in
+  search suggestions** (Settings > Window, on by default) turns them off.
+- **Look up YouTube directly** (Settings > Playback, off by default), for networks whose DNS
+  service or filter sends YouTube to servers abroad, where YouTube then refuses the songs
+  not licensed there. featherplay asks Google's DNS over HTTPS, or Cloudflare's when
+  Google's doesn't answer, where YouTube's servers are, instead of the system's DNS. Other
+  hosts are looked up as before, and through a proxy nothing changes. When neither service
+  answers within a second, the system's answer is used. Turning it on tries the refused
+  songs again.
+- A few seconds after it starts, featherplay checks whether the DNS sends YouTube's servers
+  somewhere that isn't Google. When it does and songs are refused, the toast says so ("Songs
+  can't play: DNS reroutes YouTube.") with a **Look up directly** button that turns the
+  setting above on. Behind a proxy the check is skipped.
+- Copy diagnostics has a "DNS:" line with that check's answer, "YouTube's region:" (the
+  country YouTube last gave a stream for), the Look up YouTube directly setting, and, for
+  the last five songs started, which step found the stream: featherplay's own request,
+  yt-dlp, or one saved from the last session. On Linux the system line is "System:" with
+  the distribution's name.
+
+### Changed
+
+- "Not for me" is a toggle. On a song it shows as disliked, the filled thumbs-down (in the
+  bar, on Now playing or in the mini player) takes the dislike off, and the song plays on.
+  The first press still dislikes and skips, with Undo in the toast. The tray's item still
+  sets the song aside.
+- Switching between Dark and Light (or the system's mode under System) crossfades the whole
+  window over 200 ms: the pages, the title bar, the player bar's cover tint, Home's wash and
+  an open mini player, all together. The player bar and the mini player used to change a
+  moment after the rest. Without animation effects it switches at once.
+- Songs YouTube refuses ("This video is not available", e.g. songs not licensed where
+  YouTube places you) no longer stop the queue. featherplay
+  remembers them for 6 hours: Next and the end of a song pass over them, they aren't looked
+  up ahead, and one toast per queue says "Some songs here can't play right now. featherplay
+  skips them." Their rows (Up next, Home, playlists, albums, Liked songs, search, history,
+  an artist's top songs) show dimmed, with "YouTube won't play this song in featherplay
+  right now" on hover, which screen readers hear too. A song you start yourself is still
+  tried. Such a song now fails in about a second, instead of after ~4 s of yt-dlp getting
+  the same answer.
+
+### Fixed
+
+- Home loads past "Albums for you" again. At a start, the feed shown from the cache never
+  loaded its next page, and a feed stopped after 6 pages. Home now pages on with the fresh
+  feed's answer, leaves out a shelf it already shows, and goes up to 10 pages.
+- Songs no longer start slowly for 5 minutes after three of them were looked up at once
+  (a song started with the ones ahead of it): each could fail on the same stale answer and
+  count once, which turned featherplay's own lookup off. They now share one fresh answer.
+- The player bar's transport and seek line no longer run into the right-hand buttons at the
+  narrowest window sizes, with the speed pill showing or with Linux's mini player button:
+  they move left to stay clear of them.
+- The mini player's colours follow a song change's crossfade in step with the player bar,
+  and it takes the neutral accent for grey covers, as the bar does.
+- The browser sign-in asks a browser that's slow to start for the cookies again every 5 s
+  until it first answers, in case it lost the first question.
+
 ## [0.2.2] - 2026-11-10
 
 ### Added
