@@ -26,6 +26,7 @@ fn signed_in_cookies() -> Vec<Cookie> {
 }
 
 #[test]
+#[cfg(windows)]
 fn the_session_counts_once_it_has_settled_for_3_s() {
     let t0 = Instant::now();
     let mut s = Settle::new(Duration::from_secs(3));
@@ -52,6 +53,7 @@ fn the_session_counts_once_it_has_settled_for_3_s() {
 }
 
 #[test]
+#[cfg(windows)]
 fn losing_the_session_while_settling_starts_over() {
     let t0 = Instant::now();
     let mut s = Settle::new(Duration::from_secs(3));
@@ -67,6 +69,7 @@ fn losing_the_session_while_settling_starts_over() {
 }
 
 #[test]
+#[cfg(windows)]
 fn a_google_session_without_youtube_isnt_signed_in() {
     let mut s = Settle::new(Duration::ZERO);
     let google = [cookie("SAPISID", ".google.com")];
@@ -143,6 +146,7 @@ fn with_the_policy_off_the_browser_isnt_started() {
 }
 
 #[test]
+#[cfg(windows)]
 fn the_arguments_are_the_profile_the_pipe_and_the_sign_in_page() {
     let a = args(
         &EDGE,
@@ -150,29 +154,60 @@ fn the_arguments_are_the_profile_the_pipe_and_the_sign_in_page() {
         session::SIGN_IN_URL,
     );
     let a: Vec<&str> = a.iter().map(|s| s.to_str().unwrap()).collect();
-    let quiet: &[&str] = if cfg!(windows) {
-        &["--no-first-run", "--no-default-browser-check"]
-    } else {
-        // Linux keeps the throwaway profile's cookies out of the desktop's keyring, and
-        // `navigator.webdriver` false, without a bar about the switch.
-        &[
+    assert_eq!(
+        a,
+        [
+            r"--user-data-dir=C:\cache\signin-1-ab",
+            "--remote-debugging-pipe",
+            "--no-first-run",
+            "--no-default-browser-check",
+            session::SIGN_IN_URL,
+        ]
+    );
+    assert!(!a.iter().any(|s| s.contains("remote-debugging-port")));
+}
+
+/// Linux's sign-in window is the browser as the user would start it: no pipe, and nothing
+/// that marks it as automated or hides that mark.
+#[test]
+#[cfg(target_os = "linux")]
+fn the_sign_in_window_has_no_pipe_and_no_automation_switches() {
+    let a = window_args(
+        &EDGE,
+        Path::new("/home/ada/.cache/featherplay/signin-1-ab"),
+        session::SIGN_IN_URL,
+    );
+    let a: Vec<&str> = a.iter().map(|s| s.to_str().unwrap()).collect();
+    assert_eq!(
+        a,
+        [
+            "--user-data-dir=/home/ada/.cache/featherplay/signin-1-ab",
             "--no-first-run",
             "--no-default-browser-check",
             "--password-store=basic",
-            "--disable-blink-features=AutomationControlled",
-            "--test-type",
+            session::SIGN_IN_URL,
         ]
-    };
-    let expected: Vec<&str> = [
-        r"--user-data-dir=C:\cache\signin-1-ab",
-        "--remote-debugging-pipe",
-    ]
-    .into_iter()
-    .chain(quiet.iter().copied())
-    .chain([session::SIGN_IN_URL])
-    .collect();
-    assert_eq!(a, expected);
-    assert!(!a.iter().any(|s| s.contains("remote-debugging-port")));
+    );
+}
+
+/// The read that follows is headless, on a blank page: the pipe is never open on Google's.
+#[test]
+#[cfg(target_os = "linux")]
+fn the_read_is_headless_on_a_blank_page() {
+    let a = read_args(&EDGE, Path::new("/home/ada/.cache/featherplay/signin-1-ab"));
+    let a: Vec<&str> = a.iter().map(|s| s.to_str().unwrap()).collect();
+    assert_eq!(
+        a,
+        [
+            "--user-data-dir=/home/ada/.cache/featherplay/signin-1-ab",
+            "--remote-debugging-pipe",
+            "--headless=new",
+            "--no-first-run",
+            "--no-default-browser-check",
+            "--password-store=basic",
+            "about:blank",
+        ]
+    );
 }
 
 /// The browser's process, as the tests drive it.
@@ -182,6 +217,9 @@ struct FakeProcess {
     killed: AtomicBool,
     /// `Browser.close` is answered but the process stays.
     ignores_close: AtomicBool,
+    /// Asked to quit, as closing its window would (Linux).
+    #[cfg(target_os = "linux")]
+    quit: AtomicBool,
 }
 
 impl Process for FakeProcess {
@@ -199,14 +237,22 @@ impl Process for FakeProcess {
         self.killed.store(true, Ordering::Relaxed);
         self.exited.store(true, Ordering::Relaxed);
     }
+    #[cfg(target_os = "linux")]
+    fn quit(&self) {
+        self.quit.store(true, Ordering::Relaxed);
+        self.exited.store(true, Ordering::Relaxed);
+    }
 }
 
 fn quick() -> Limits {
     Limits {
+        #[cfg(windows)]
         poll: Duration::from_millis(10),
+        #[cfg(windows)]
         settle: Duration::from_millis(30),
         first_reply: Duration::from_millis(1000),
         resend: Duration::from_millis(100),
+        #[cfg(windows)]
         reply: Duration::from_millis(300),
         timeout: Duration::from_secs(5),
         close: Duration::from_secs(2),
@@ -219,6 +265,8 @@ enum Answer {
     Silence,
     /// No cookies, after this long.
     Late(Duration),
+    /// Windows only: Linux asks once, and a reply that never comes is `Silence` there.
+    #[cfg(windows)]
     Hang,
     ExitProcess,
     ClosePipe,
@@ -299,6 +347,7 @@ fn serve(
                     return;
                 }
             }
+            #[cfg(windows)]
             Answer::Hang => std::thread::sleep(Duration::from_secs(60)),
             Answer::ExitProcess => process.exited.store(true, Ordering::Relaxed),
             Answer::ClosePipe => return,
@@ -314,6 +363,7 @@ fn write_reply(to: &mut PipeWriter, id: u64, result: serde_json::Value) -> std::
     to.write_all(&bytes)
 }
 
+#[cfg(windows)]
 fn run_fake(fb: &mut FakeBrowser, cancel: &AtomicBool, limits: &Limits) -> Outcome {
     watch(
         &*fb.process,
@@ -326,6 +376,7 @@ fn run_fake(fb: &mut FakeBrowser, cancel: &AtomicBool, limits: &Limits) -> Outco
 }
 
 #[test]
+#[cfg(windows)]
 fn a_settled_session_gives_the_music_header_and_closes_the_browser() {
     let mut fb = fake_browser(|n| match n {
         1 | 2 => Answer::Cookies(vec![cookie("NID", ".google.com")]),
@@ -351,6 +402,7 @@ fn a_settled_session_gives_the_music_header_and_closes_the_browser() {
 }
 
 #[test]
+#[cfg(windows)]
 fn a_browser_that_stays_after_browser_close_is_ended() {
     let mut fb = fake_browser(|_| Answer::Cookies(signed_in_cookies()));
     fb.process.ignores_close.store(true, Ordering::Relaxed);
@@ -364,6 +416,7 @@ fn a_browser_that_stays_after_browser_close_is_ended() {
 }
 
 #[test]
+#[cfg(windows)]
 fn closing_the_browser_while_the_session_settles_keeps_the_sign_in() {
     let mut fb = fake_browser(|n| match n {
         1 => Answer::Cookies(signed_in_cookies()),
@@ -380,6 +433,7 @@ fn closing_the_browser_while_the_session_settles_keeps_the_sign_in() {
 }
 
 #[test]
+#[cfg(windows)]
 fn a_browser_exiting_at_once_didnt_start() {
     let mut fb = fake_browser(|_| Answer::ExitProcess);
     assert!(matches!(
@@ -389,6 +443,7 @@ fn a_browser_exiting_at_once_didnt_start() {
 }
 
 #[test]
+#[cfg(windows)]
 fn a_browser_closed_later_without_ever_answering_was_closed() {
     // The pipe turned off by policy: no answer, then the user closes the window.
     let process = FakeProcess::default();
@@ -402,6 +457,7 @@ fn a_browser_closed_later_without_ever_answering_was_closed() {
 }
 
 #[test]
+#[cfg(windows)]
 fn the_pipe_closing_as_the_browser_exits_means_closed() {
     let process = FakeProcess::default();
     process.exited.store(true, Ordering::Relaxed);
@@ -418,6 +474,7 @@ fn the_debug_form_leaves_the_header_out() {
 }
 
 #[test]
+#[cfg(windows)]
 fn closing_the_browser_ends_the_sign_in() {
     let mut fb = fake_browser(|n| match n {
         1 => Answer::Cookies(vec![]),
@@ -430,6 +487,7 @@ fn closing_the_browser_ends_the_sign_in() {
 }
 
 #[test]
+#[cfg(windows)]
 fn no_first_answer_means_blocked() {
     let mut fb = fake_browser(|_| Answer::Silence);
     assert_eq!(
@@ -442,6 +500,7 @@ fn no_first_answer_means_blocked() {
 /// A browser that starts slowly answers its first command late: the first reply gets
 /// longer than the others.
 #[test]
+#[cfg(windows)]
 fn a_slow_first_answer_is_waited_for() {
     let mut fb = fake_browser(|n| match n {
         1 => Answer::Late(Duration::from_millis(600)),
@@ -454,6 +513,7 @@ fn a_slow_first_answer_is_waited_for() {
 /// A browser that isn't up yet may lose the first command: until the first answer, the
 /// cookies are asked for again.
 #[test]
+#[cfg(windows)]
 fn a_lost_first_question_is_asked_again() {
     let mut fb = fake_browser(|n| match n {
         1 | 2 => Answer::Silence,
@@ -467,6 +527,7 @@ fn a_lost_first_question_is_asked_again() {
 
 /// Once the browser has answered, a missing reply isn't asked again: it stopped answering.
 #[test]
+#[cfg(windows)]
 fn after_the_first_answer_nothing_is_asked_again() {
     let mut fb = fake_browser(|n| match n {
         1 => Answer::Cookies(vec![]),
@@ -483,10 +544,12 @@ fn the_first_answer_waits_longer_on_linux_only() {
     let first = if cfg!(target_os = "linux") { 60 } else { 15 };
     assert_eq!(l.first_reply, Duration::from_secs(first));
     assert_eq!(l.resend, Duration::from_secs(5));
+    #[cfg(windows)]
     assert_eq!(l.reply, Duration::from_secs(15));
 }
 
 #[test]
+#[cfg(windows)]
 fn no_later_answer_means_lost() {
     let mut fb = fake_browser(|n| match n {
         1 => Answer::Cookies(vec![]),
@@ -500,6 +563,7 @@ fn no_later_answer_means_lost() {
 }
 
 #[test]
+#[cfg(windows)]
 fn a_broken_pipe_while_the_browser_runs_means_lost() {
     let mut fb = fake_browser(|n| match n {
         1 => Answer::Cookies(vec![]),
@@ -513,6 +577,7 @@ fn a_broken_pipe_while_the_browser_runs_means_lost() {
 }
 
 #[test]
+#[cfg(windows)]
 fn no_sign_in_in_time_ends_it() {
     let mut fb = fake_browser(|_| Answer::Cookies(vec![]));
     let limits = Limits {
@@ -527,6 +592,7 @@ fn no_sign_in_in_time_ends_it() {
 }
 
 #[test]
+#[cfg(windows)]
 fn cancel_ends_it() {
     let mut fb = fake_browser(|_| Answer::Cookies(vec![]));
     let cancel = Arc::new(AtomicBool::new(false));
@@ -537,6 +603,137 @@ fn cancel_ends_it() {
     });
     assert_eq!(run_fake(&mut fb, &cancel, &quick()), Outcome::Cancelled);
     assert!(fb.process.killed.load(Ordering::Relaxed));
+}
+
+/// Linux: the headless read, against the fake browser.
+#[cfg(target_os = "linux")]
+fn read_fake(fb: &mut FakeBrowser, limits: &Limits) -> Result<Vec<Cookie>, Outcome> {
+    let never = AtomicBool::new(false);
+    read_and_close(&*fb.process, &mut fb.client, &fb.replies, &never, limits)
+}
+
+#[test]
+#[cfg(target_os = "linux")]
+fn the_read_sends_exactly_the_two_commands() {
+    let mut fb = fake_browser(|_| Answer::Cookies(signed_in_cookies()));
+    let cookies = read_fake(&mut fb, &quick()).unwrap();
+    assert_eq!(cookies, signed_in_cookies());
+    assert_eq!(
+        *fb.methods.lock().unwrap(),
+        ["Storage.getCookies", "Browser.close"]
+    );
+    assert!(
+        !fb.process.killed.load(Ordering::Relaxed),
+        "it closed by itself"
+    );
+}
+
+#[test]
+#[cfg(target_os = "linux")]
+fn a_read_with_no_answer_is_blocked_and_the_browser_ended() {
+    let mut fb = fake_browser(|_| Answer::Silence);
+    assert_eq!(read_fake(&mut fb, &quick()).unwrap_err(), Outcome::Blocked);
+    assert!(fb.process.killed.load(Ordering::Relaxed));
+    let methods = fb.methods.lock().unwrap().clone();
+    assert!(
+        methods.iter().all(|m| m == "Storage.getCookies"),
+        "{methods:?}"
+    );
+}
+
+#[test]
+#[cfg(target_os = "linux")]
+fn a_headless_browser_gone_before_it_answers_didnt_start() {
+    let answers: [fn(usize) -> Answer; 2] = [|_| Answer::ExitProcess, |_| Answer::ClosePipe];
+    for answer in answers {
+        let mut fb = fake_browser(answer);
+        let out = read_fake(&mut fb, &quick()).unwrap_err();
+        assert!(matches!(out, Outcome::DidntStart(_)), "{out:?}");
+        assert!(fb.process.killed.load(Ordering::Relaxed));
+    }
+}
+
+/// A browser that starts slowly answers late: the read waits for it.
+#[test]
+#[cfg(target_os = "linux")]
+fn a_slow_first_answer_is_waited_for_by_the_read() {
+    let mut fb = fake_browser(|_| Answer::Late(Duration::from_millis(600)));
+    assert_eq!(read_fake(&mut fb, &quick()).unwrap(), Vec::<Cookie>::new());
+}
+
+#[test]
+#[cfg(target_os = "linux")]
+fn the_profile_with_a_session_is_signed_in_and_one_without_was_closed() {
+    assert_eq!(
+        session_or(&signed_in_cookies(), NOW, Ended::Closed),
+        Outcome::SignedIn("SAPISID=v-SAPISID; SID=v-SID".into())
+    );
+    let google_only = [cookie("SAPISID", ".google.com")];
+    assert_eq!(
+        session_or(&google_only, NOW, Ended::Closed),
+        Outcome::Closed
+    );
+}
+
+#[test]
+#[cfg(target_os = "linux")]
+fn closing_the_sign_in_window_goes_on_to_the_read() {
+    let process = FakeProcess::default();
+    let never = AtomicBool::new(false);
+    let limits = Limits {
+        timeout: EARLY_EXIT * 3,
+        ..quick()
+    };
+    std::thread::scope(|s| {
+        // The user closes it once it has been up a while.
+        s.spawn(|| {
+            std::thread::sleep(EARLY_EXIT + Duration::from_millis(200));
+            process.exited.store(true, Ordering::Relaxed);
+        });
+        assert_eq!(wait_closed(&process, &never, &limits), Ok(Ended::Closed));
+    });
+    assert!(!process.killed.load(Ordering::Relaxed));
+}
+
+#[test]
+#[cfg(target_os = "linux")]
+fn the_sign_in_window_ends_on_an_early_exit_or_cancel() {
+    let exited = FakeProcess::default();
+    exited.exited.store(true, Ordering::Relaxed);
+    let never = AtomicBool::new(false);
+    assert!(matches!(
+        wait_closed(&exited, &never, &quick()),
+        Err(Outcome::DidntStart(_))
+    ));
+
+    let running = FakeProcess::default();
+    let cancel = AtomicBool::new(true);
+    assert_eq!(
+        wait_closed(&running, &cancel, &quick()),
+        Err(Outcome::Cancelled)
+    );
+    assert!(running.killed.load(Ordering::Relaxed));
+}
+
+/// Someone who signed in and left the window open keeps the sign-in: at the limit the
+/// browser is asked to quit (not killed), and its profile is read as after a close.
+#[test]
+#[cfg(target_os = "linux")]
+fn at_the_time_limit_the_window_is_closed_and_a_sign_in_still_read() {
+    let open = FakeProcess::default();
+    let never = AtomicBool::new(false);
+    let limits = Limits {
+        timeout: Duration::from_millis(100),
+        ..quick()
+    };
+    assert_eq!(wait_closed(&open, &never, &limits), Ok(Ended::TimeLimit));
+    assert!(open.quit.load(Ordering::Relaxed));
+    assert!(!open.killed.load(Ordering::Relaxed), "it quit when asked");
+    assert_eq!(
+        session_or(&signed_in_cookies(), NOW, Ended::TimeLimit),
+        Outcome::SignedIn("SAPISID=v-SAPISID; SID=v-SID".into())
+    );
+    assert_eq!(session_or(&[], NOW, Ended::TimeLimit), Outcome::TimedOut);
 }
 
 #[allow(clippy::print_stderr, reason = "the live checks report what they saw")]
@@ -587,8 +784,13 @@ impl Live {
         if let Some(prefs) = browser.preferences {
             profile::seed(&profile, prefs).unwrap();
         }
-        let (process, pipes) =
-            browsers::launch(exe, &args(browser, &profile, "about:blank")).unwrap();
+        // As the sign-in starts it with the pipe: on Windows, the window (here on a blank
+        // page); on Linux, the headless read.
+        #[cfg(windows)]
+        let args = args(browser, &profile, "about:blank");
+        #[cfg(target_os = "linux")]
+        let args = read_args(browser, &profile);
+        let (process, pipes) = browsers::launch(exe, &args).unwrap();
         Self {
             process: Some(process),
             client: Client::new(pipes.to_browser),
@@ -636,7 +838,7 @@ impl Drop for Live {
 
 /// Every known browser installed here, for real, on the pipe: on about:blank with a
 /// temporary profile under the test home, so no Google page and no account. Each one's
-/// window shows for a moment.
+/// window shows for a moment (on Linux it's headless, as the sign-in's read is, so none does).
 /// `FEATHERPLAY_HOME=<a test home> cargo nextest run -p featherplay --lib --run-ignored only
 /// -E 'test(live_browsers)' --no-capture`
 #[test]

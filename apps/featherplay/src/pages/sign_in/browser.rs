@@ -12,10 +12,13 @@
 //!    it; on Linux `PATH`, then where its package puts it). A Snap or a Flatpak, or a policy
 //!    that turns the pipe off, means it isn't started (`Outcome::Unusable`).
 //! 2. Make a temporary profile, `{cache}/signin-{pid}-{random}` (`profile`). The user's own
-//!    browser profile is never touched, and no browser's cookie files are read.
+//!    browser profile is never touched, and featherplay reads no browser's cookie files
+//!    itself: the browser reports its cookies.
+//!
+//! Then, on Windows:
 //! 3. Start the browser on it with `--remote-debugging-pipe`, on Google's sign-in page,
-//!    inside a kill-on-close job object on Windows, a process group of its own on Linux
-//!    (`browsers::launch`, which documents how the pipe reaches Chromium). A pipe only: never `--remote-debugging-port`, so no other program can
+//!    inside a kill-on-close job object (`browsers::launch`, which documents how the pipe
+//!    reaches Chromium). A pipe only: never `--remote-debugging-port`, so no other program can
 //!    connect. No switch that marks the browser as automated.
 //! 4. About once a second, ask for the profile's cookies (`cdp`: the app can send only
 //!    `Storage.getCookies` and `Browser.close`). Until the browser first answers, the
@@ -29,9 +32,28 @@
 //!
 //! It ends early, ending the job and deleting the profile, when the browser's process exits
 //! (the user closed it), after 10 minutes without a sign-in, when the pipe breaks, when the
-//! browser doesn't answer within 15 s (a policy may block DevTools; on Linux its first answer
-//! gets 60 s, see `first_reply`), or on Cancel. Profiles a crash left behind are deleted at
-//! the next start (`sweep`).
+//! browser doesn't answer within 15 s (a policy may block DevTools), or on Cancel.
+//!
+//! On Linux the pipe and Google's pages are never open at once: with the pipe, Chromium tells
+//! every page it's automated (`navigator.webdriver`), and Google's sign-in refuses such a
+//! browser. So:
+//! 3. Start the browser plainly on the profile, on Google's sign-in page, in a process group
+//!    of its own (`browsers::launch_plain`): no pipe, no switch about automation. The user
+//!    signs in and closes it; closing it writes the profile's cookies to its folder. Left
+//!    open for 15 minutes, it's asked to quit as closing it would (`Running::quit`), and
+//!    ended 5 s later if it's still there; the read follows all the same, so a sign-in that
+//!    happened isn't lost.
+//! 4. Once its process has exited, start it again on that profile, headless and on a blank
+//!    page, with the pipe (`browsers::launch`, `browsers::HEADLESS`), so no Google page is
+//!    open while the pipe is. Ask for the cookies once (again every 5 s until the first
+//!    answer, which gets 60 s, see `first_reply`), then `Browser.close`, as above.
+//! 5. Signed in = the session cookies, and the same header, as above; none means the browser
+//!    was closed before the sign-in finished (or, at the time limit, `TimedOut`). Then the
+//!    profile is deleted.
+//!
+//! It ends early, ending the browser and deleting the profile, when the browser exits within
+//! 3 s (it didn't start) or on Cancel. Profiles a crash left behind are deleted at the next
+//! start (`sweep`).
 //!
 //! "Switch Google account" stays on the WebView2 window: it relies on that window's
 //! profile remembering earlier logins for Google's account chooser, and this profile is
@@ -168,9 +190,11 @@ pub fn sweep(cache: &Path) -> usize {
 /// The waits and limits of a sign-in.
 #[derive(Clone, Debug)]
 struct Limits {
-    /// Between two cookie reads.
+    /// Between two cookie reads (Windows, which reads while the user signs in).
+    #[cfg(windows)]
     poll: Duration,
     /// After the session cookies appear, before the last read.
+    #[cfg(windows)]
     settle: Duration,
     /// For the first reply, which comes once the browser has started; none means it doesn't
     /// allow the pipe.
@@ -178,8 +202,9 @@ struct Limits {
     /// Until the first reply, how often the cookies are asked for again (`ask`).
     resend: Duration,
     /// For any later reply.
+    #[cfg(windows)]
     reply: Duration,
-    /// For the whole sign-in.
+    /// For the whole sign-in (on Linux, for the sign-in window).
     timeout: Duration,
     /// For the browser to exit after `Browser.close`.
     close: Duration,
@@ -188,10 +213,13 @@ struct Limits {
 impl Limits {
     fn real() -> Self {
         Self {
+            #[cfg(windows)]
             poll: Duration::from_secs(1),
+            #[cfg(windows)]
             settle: Duration::from_secs(3),
             first_reply: first_reply(),
             resend: Duration::from_secs(5),
+            #[cfg(windows)]
             reply: Duration::from_secs(15),
             timeout: timeout(),
             close: Duration::from_secs(5),
@@ -206,19 +234,24 @@ impl Limits {
 /// On a fresh GitHub runner (2026-11-12) Edge 157's first start gave no answer within 30 s,
 /// and the next one answered after 11 s (1 s in WSL); Chromium 156 gave none in 60 s, and
 /// answered in 0.4 s when started again. Linux reads the `RemoteDebuggingAllowed` policy
-/// before the start (`Browser::blocked`), so a missing answer there is rarely a block.
+/// before the start (`Browser::blocked`), so a missing answer there is rarely a block. There
+/// it's the headless read's first answer, which comes right after the sign-in window closed,
+/// so the browser is rarely cold by then.
 fn first_reply() -> Duration {
     Duration::from_secs(if cfg!(target_os = "linux") { 60 } else { 15 })
 }
 
-/// 10 minutes. A debug build takes `FEATHERPLAY_BROWSER_TIMEOUT_SECS` instead, to try the
-/// timeout by hand.
+/// 10 minutes on Windows. 15 on Linux, where the time runs until the user closes the window
+/// rather than until the session shows, and a slow 2-step verification shouldn't run into
+/// it. A debug build takes `FEATHERPLAY_BROWSER_TIMEOUT_SECS` instead, to try the timeout by
+/// hand.
 fn timeout() -> Duration {
     let dev = cfg!(debug_assertions)
         .then(|| std::env::var("FEATHERPLAY_BROWSER_TIMEOUT_SECS").ok())
         .flatten()
         .and_then(|s| s.trim().parse().ok());
-    Duration::from_secs(dev.unwrap_or(10 * 60))
+    let minutes = if cfg!(target_os = "linux") { 15 } else { 10 };
+    Duration::from_secs(dev.unwrap_or(minutes * 60))
 }
 
 /// What the sign-in watches besides the pipe: the browser's own process.
@@ -227,6 +260,9 @@ trait Process {
     fn wait(&self, limit: Duration) -> bool;
     /// Ends it and everything it started.
     fn kill(&self);
+    /// Asks it to quit, as closing its window would.
+    #[cfg(target_os = "linux")]
+    fn quit(&self);
 }
 
 impl Process for browsers::Running {
@@ -238,6 +274,10 @@ impl Process for browsers::Running {
     }
     fn kill(&self) {
         browsers::Running::kill(self)
+    }
+    #[cfg(target_os = "linux")]
+    fn quit(&self) {
+        browsers::Running::quit(self)
     }
 }
 
@@ -303,6 +343,9 @@ fn display_name(p: &Path) -> String {
         .unwrap_or_default()
 }
 
+/// Windows: the browser on Google's sign-in page with the pipe, its cookies read until the
+/// session is there.
+#[cfg(windows)]
 fn launch_and_watch(browser: &Browser, exe: &Path, profile: &Path, cancel: &AtomicBool) -> Outcome {
     let args = args(browser, profile, session::SIGN_IN_URL);
     let (process, pipes) = match browsers::launch(exe, &args) {
@@ -339,14 +382,234 @@ fn launch_and_watch(browser: &Browser, exe: &Path, profile: &Path, cancel: &Atom
     outcome
 }
 
-/// The browser's arguments: the temporary profile, the pipe, its own switches, the page.
+/// Windows: the browser's arguments: the temporary profile, the pipe, its own switches, the
+/// page.
+#[cfg(windows)]
 fn args(b: &Browser, profile: &Path, url: &str) -> Vec<OsString> {
-    let mut dir = OsString::from("--user-data-dir=");
-    dir.push(profile);
-    let mut out = vec![dir, "--remote-debugging-pipe".into()];
+    let mut out = vec![user_data_dir(profile), "--remote-debugging-pipe".into()];
     out.extend(b.switches.iter().map(OsString::from));
     out.push(url.into());
     out
+}
+
+/// Linux: the sign-in window with no pipe, then, once the user has closed it, the headless
+/// read of its profile.
+#[cfg(target_os = "linux")]
+fn launch_and_watch(browser: &Browser, exe: &Path, profile: &Path, cancel: &AtomicBool) -> Outcome {
+    let limits = Limits::real();
+    let url = session::SIGN_IN_URL;
+    let ended = match sign_in_window(browser, exe, profile, url, cancel, &limits) {
+        Ok(ended) => ended,
+        Err(outcome) => return outcome,
+    };
+    match read_profile(browser, exe, profile, cancel, &limits) {
+        Ok(cookies) => session_or(&cookies, wall_now(), ended),
+        Err(outcome) => outcome,
+    }
+}
+
+/// How Linux's sign-in window went away.
+#[cfg(target_os = "linux")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Ended {
+    /// The user closed it.
+    Closed,
+    /// featherplay closed it at the time limit.
+    TimeLimit,
+}
+
+/// Linux's sign-in window: the temporary profile, its own switches, the page. No pipe, and
+/// nothing that marks the browser as automated or hides that mark.
+#[cfg(target_os = "linux")]
+fn window_args(b: &Browser, profile: &Path, url: &str) -> Vec<OsString> {
+    let mut out = vec![user_data_dir(profile)];
+    out.extend(b.switches.iter().map(OsString::from));
+    out.push(url.into());
+    out
+}
+
+/// Linux's read of that profile: the profile, the pipe, headless, its own switches (the same
+/// cookie store), a blank page.
+#[cfg(target_os = "linux")]
+fn read_args(b: &Browser, profile: &Path) -> Vec<OsString> {
+    let mut out = vec![
+        user_data_dir(profile),
+        "--remote-debugging-pipe".into(),
+        browsers::HEADLESS.into(),
+    ];
+    out.extend(b.switches.iter().map(OsString::from));
+    out.push("about:blank".into());
+    out
+}
+
+fn user_data_dir(profile: &Path) -> OsString {
+    let mut dir = OsString::from("--user-data-dir=");
+    dir.push(profile);
+    dir
+}
+
+/// Starts `browser` plainly on `url` and waits for it to go (`wait_closed`): how it went, or
+/// the outcome when the sign-in ends here.
+#[cfg(target_os = "linux")]
+fn sign_in_window(
+    browser: &Browser,
+    exe: &Path,
+    profile: &Path,
+    url: &str,
+    cancel: &AtomicBool,
+    limits: &Limits,
+) -> Result<Ended, Outcome> {
+    let process =
+        browsers::launch_plain(exe, &window_args(browser, profile, url)).map_err(|e| {
+            log!("browser sign-in: {} didn't start: {e}", browser.name);
+            Outcome::DidntStart(e.to_string())
+        })?;
+    log!(
+        "browser sign-in: {} started (pid {}), no pipe",
+        browser.name,
+        process.pid
+    );
+    let closed = wait_closed(&process, cancel, limits);
+    // Ending its group ends any helper that's left, before the read starts on the profile.
+    drop(process);
+    closed
+}
+
+/// Waits for the browser's process to exit: the user closed it. At `limits.timeout` it's asked
+/// to quit, as closing it would, so it writes its cookies, and ended if it hasn't within
+/// `limits.close`; either way its profile is read next. Ended on Cancel; one that exits within
+/// `EARLY_EXIT` didn't start.
+#[cfg(target_os = "linux")]
+fn wait_closed(
+    process: &impl Process,
+    cancel: &AtomicBool,
+    limits: &Limits,
+) -> Result<Ended, Outcome> {
+    let started = Instant::now();
+    loop {
+        match check(process, cancel) {
+            Ok(()) if started.elapsed() >= limits.timeout => {
+                log!(
+                    "browser sign-in: still open after {} s; closing it",
+                    limits.timeout.as_secs()
+                );
+                process.quit();
+                if !process.wait(limits.close) {
+                    log!("browser sign-in: the browser didn't quit; ending it");
+                    process.kill();
+                }
+                return Ok(Ended::TimeLimit);
+            }
+            Ok(()) => std::thread::sleep(SLICE),
+            Err(Stop::Cancelled) => {
+                log!("browser sign-in: cancelled");
+                process.kill();
+                return Err(Outcome::Cancelled);
+            }
+            Err(_) if started.elapsed() < EARLY_EXIT => {
+                log!("browser sign-in: the browser exited at once");
+                return Err(Outcome::DidntStart("the browser exited at once".into()));
+            }
+            Err(_) => {
+                log!("browser sign-in: the browser was closed; reading its profile");
+                return Ok(Ended::Closed);
+            }
+        }
+    }
+}
+
+/// Starts `browser` headless on the closed sign-in window's profile and reads its cookies
+/// (`read_and_close`).
+#[cfg(target_os = "linux")]
+fn read_profile(
+    browser: &Browser,
+    exe: &Path,
+    profile: &Path,
+    cancel: &AtomicBool,
+    limits: &Limits,
+) -> Result<Vec<Cookie>, Outcome> {
+    let (process, pipes) = browsers::launch(exe, &read_args(browser, profile)).map_err(|e| {
+        log!(
+            "browser sign-in: {} didn't start headless: {e}",
+            browser.name
+        );
+        Outcome::DidntStart(e.to_string())
+    })?;
+    log!(
+        "browser sign-in: {} started headless to read the profile (pid {})",
+        browser.name,
+        process.pid
+    );
+    let replies = match cdp::read_replies(pipes.from_browser) {
+        Ok(rx) => rx,
+        Err(e) => {
+            process.kill();
+            return Err(Outcome::DidntStart(format!("pipe reader: {e}")));
+        }
+    };
+    let mut client = Client::new(pipes.to_browser);
+    let read = read_and_close(&process, &mut client, &replies, cancel, limits);
+    drop(client);
+    drop(process);
+    read
+}
+
+/// The headless browser's two commands: `Storage.getCookies` (sent again every
+/// `limits.resend` until the first answer), then `Browser.close`; ended if it doesn't exit
+/// within `limits.close`, or when the read failed.
+#[cfg(target_os = "linux")]
+fn read_and_close<W: Write>(
+    process: &impl Process,
+    client: &mut Client<W>,
+    replies: &Receiver<Reply>,
+    cancel: &AtomicBool,
+    limits: &Limits,
+) -> Result<Vec<Cookie>, Outcome> {
+    let resend = Some(limits.resend);
+    let read = match ask(client, replies, process, cancel, limits.first_reply, resend) {
+        Ok(result) => result.and_then(cdp::cookies).map_err(|e| {
+            log!("browser sign-in: reading the cookies failed: {e}");
+            Outcome::Lost(e)
+        }),
+        Err(Stop::Cancelled) => {
+            log!("browser sign-in: cancelled");
+            Err(Outcome::Cancelled)
+        }
+        Err(Stop::NoReply) => {
+            log!("browser sign-in: no answer on the pipe; a policy may block it");
+            Err(Outcome::Blocked)
+        }
+        Err(Stop::Exited | Stop::PipeClosed) => {
+            log!("browser sign-in: the headless browser exited before it answered");
+            Err(Outcome::DidntStart(
+                "the browser exited before it answered".into(),
+            ))
+        }
+    };
+    if read.is_ok() && client.send(Method::CloseBrowser).is_ok() && process.wait(limits.close) {
+        log!("browser sign-in: the browser closed");
+    } else {
+        process.kill();
+    }
+    read
+}
+
+/// The sign-in, from the cookies the closed browser kept: the header with its session, else
+/// `Closed` (it was closed before the sign-in finished) or, at the time limit, `TimedOut`.
+/// `wall` is the clock cookies expire by.
+#[cfg(target_os = "linux")]
+fn session_or(cookies: &[Cookie], wall: f64, ended: Ended) -> Outcome {
+    let music = session::music_cookies(cookies, wall);
+    if session::signed_in(&music) {
+        log!("browser sign-in: signed in, {} cookies", music.len());
+        Outcome::SignedIn(session::header(&music))
+    } else {
+        log!("browser sign-in: no session in the profile");
+        match ended {
+            Ended::Closed => Outcome::Closed,
+            Ended::TimeLimit => Outcome::TimedOut,
+        }
+    }
 }
 
 fn wall_now() -> f64 {
@@ -359,6 +622,7 @@ fn wall_now() -> f64 {
 /// Reads the cookies until the session is there and settled, then closes the browser; or
 /// ends the browser when the sign-in ends any other way. `wall` is the clock cookies expire
 /// by.
+#[cfg(windows)]
 fn watch<W: Write>(
     process: &impl Process,
     client: &mut Client<W>,
@@ -394,6 +658,7 @@ enum Stop {
     NoReply,
 }
 
+#[cfg(windows)]
 fn poll<W: Write>(
     process: &impl Process,
     client: &mut Client<W>,
@@ -450,6 +715,7 @@ fn poll<W: Write>(
 const EARLY_EXIT: Duration = Duration::from_secs(3);
 
 /// How the sign-in ends on `stop`, `ran` after the browser started.
+#[cfg(windows)]
 fn stopped(stop: Stop, answered: bool, ran: Duration, process: &impl Process) -> Outcome {
     match stop {
         Stop::Cancelled => {
@@ -529,6 +795,7 @@ fn ask<W: Write>(
 }
 
 /// Waits `span` between reads, watching Cancel, the browser's process and the pipe.
+#[cfg(windows)]
 fn pause(
     span: Duration,
     replies: &Receiver<Reply>,
@@ -561,6 +828,7 @@ fn check(process: &impl Process, cancel: &AtomicBool) -> Result<(), Stop> {
 
 /// The signed-in rule with its settle: the session cookies first seen, then the header
 /// from a read `settle` later (music.youtube.com sets its own cookies in between).
+#[cfg(windows)]
 struct Settle {
     settle: Duration,
     since: Option<Instant>,
@@ -568,6 +836,7 @@ struct Settle {
     last: Option<String>,
 }
 
+#[cfg(windows)]
 #[derive(Debug, PartialEq)]
 enum Seen {
     /// No session yet.
@@ -578,6 +847,7 @@ enum Seen {
     Ready(String),
 }
 
+#[cfg(windows)]
 impl Settle {
     fn new(settle: Duration) -> Self {
         Self {

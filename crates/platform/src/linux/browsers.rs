@@ -1,13 +1,23 @@
 //! Finding Chrome, Chromium, Edge, Brave and Vivaldi on a Linux PC (`PATH`, the folders their
-//! packages use, their policy files, the default browser: `ThisPc`), and starting one with the
-//! DevTools pipe on descriptors 3 and 4 in a process group of its own (`launch`). The
-//! browsers, and the order they're offered in, are in `common`.
+//! packages use, their policy files, the default browser: `ThisPc`), and starting one in a
+//! process group of its own: plainly, for the user to sign in (`launch_plain`), or headless
+//! with the DevTools pipe on descriptors 3 and 4 (`launch`, with `HEADLESS`), to read the
+//! profile once that window is closed. The pipe and Google's pages are never open at the same
+//! time. The browsers, and the order they're offered in, are in `common`.
 //!
 //! # Where each fact comes from (checked 2026-11-12)
 //! - **The pipe**: `--remote-debugging-pipe` reads CDP on descriptor 3 and writes on 4
 //!   (`DevToolsAgentHost::StartRemoteDebuggingPipeHandler`, content/browser/devtools/
 //!   devtools_agent_host_impl.cc, `kReadFD = 3`, `kWriteFD = 4`), as Puppeteer and Playwright
 //!   hand them over on Linux (`stdio: [..., 'pipe', 'pipe']`).
+//! - **Two starts on one profile**: Chromium keeps one browser process per `--user-data-dir`
+//!   (`chrome/browser/process_singleton_posix.cc`, its `SingletonLock` in that folder), so a
+//!   start on the temporary profile never hands over to a browser the user already has open,
+//!   and the headless start finds the profile free once the first one has exited. Closing its
+//!   last window ends the browser and writes its cookie store; cookies with an expiry come back
+//!   in the next start, session cookies don't (Google's session cookies all have one). Seen in
+//!   WSL with Chrome 157 (2026-11-13): a local page's cookies, set in a plain start that then
+//!   closed, read by a headless one, and `navigator.webdriver` false in the plain one.
 //! - **Commands**: each package's launcher on `PATH`: Google's .deb and .rpm put
 //!   `google-chrome-stable` (and `google-chrome`) in /usr/bin, a link to the wrapper script
 //!   /opt/google/chrome/google-chrome, which `exec`s the browser, so the descriptors go
@@ -35,7 +45,7 @@
 //!   between MIME types and applications" spec lists them.
 //!
 //! Only Google Chrome has run here (in WSL); the platform's
-//! `live_browser_answers_on_the_pipe_with_a_local_pages_cookies` runs on any of them.
+//! `live_browser_signs_in_plainly_then_is_read_headless` runs on any of them.
 
 use std::ffi::OsString;
 use std::fs::File;
@@ -404,6 +414,10 @@ fn https_entry(mimeapps: &str) -> Option<String> {
 const READ_FD: RawFd = 3;
 const WRITE_FD: RawFd = 4;
 
+/// Chromium's headless mode (`--headless=new`, the same browser with no window,
+/// `headless/README.md`): the start that reads the profile, on a blank page.
+pub const HEADLESS: &str = "--headless=new";
+
 /// The running browser, the leader of its own process group. Dropping it ends the group:
 /// the browser and every helper it started.
 pub struct Running {
@@ -430,6 +444,20 @@ impl Running {
                 return false;
             }
             std::thread::sleep(left.min(Duration::from_millis(20)));
+        }
+    }
+
+    /// Asks the browser to quit as closing its last window does: SIGINT, which Chromium's
+    /// shutdown handler takes as a clean exit that writes its cookie store first. Not SIGTERM:
+    /// Chrome 157 ended at once on it, without writing them (seen in WSL, 2026-11-13: cookies
+    /// a page had set 12 s before were gone after SIGTERM and kept after SIGINT or SIGHUP;
+    /// Chromium writes them every 30 s anyway). `wait` then tells when it has exited.
+    pub fn quit(&self) {
+        let pid = libc::pid_t::try_from(self.pid).unwrap_or(0);
+        if pid > 0 && !self.exited() {
+            // SAFETY: a signal to our own child, which `exited` says hasn't been reaped yet, so
+            // its pid can't belong to another process; no memory is touched.
+            unsafe { libc::kill(pid, libc::SIGINT) };
         }
     }
 
@@ -473,13 +501,7 @@ pub fn launch(exe: &Path, args: &[OsString]) -> io::Result<(Running, Pipes)> {
     let (browser_read, to_browser) = io::pipe()?;
     let (from_browser, browser_write) = io::pipe()?;
     let (read, write) = (browser_read.as_raw_fd(), browser_write.as_raw_fd());
-    let mut command = Command::new(exe);
-    command
-        .args(args)
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .process_group(0);
+    let mut command = command(exe, args);
     // SAFETY: `hand_over` only calls fcntl, dup2 and prctl, which are async-signal-safe, and
     // touches no memory of the parent's; `read` and `write` stay open in the parent until
     // `spawn` returns.
@@ -491,12 +513,8 @@ pub fn launch(exe: &Path, args: &[OsString]) -> io::Result<(Running, Pipes)> {
     drop(browser_read);
     drop(browser_write);
     let child = started?;
-    let pid = child.id();
     Ok((
-        Running {
-            child: Mutex::new(child),
-            pid,
-        },
+        running(child),
         Pipes {
             to_browser: File::from(OwnedFd::from(to_browser)),
             from_browser: File::from(OwnedFd::from(from_browser)),
@@ -504,15 +522,48 @@ pub fn launch(exe: &Path, args: &[OsString]) -> io::Result<(Running, Pipes)> {
     ))
 }
 
+/// Starts `exe` with `args` as `launch` does, but with no pipe: a browser as the user would
+/// start it, for the sign-in window. Nothing of the app's reaches it but its arguments.
+pub fn launch_plain(exe: &Path, args: &[OsString]) -> io::Result<Running> {
+    let mut command = command(exe, args);
+    // SAFETY: `orphan_ends` only calls prctl, which is async-signal-safe, and touches no
+    // memory of the parent's.
+    unsafe {
+        command.pre_exec(orphan_ends);
+    }
+    command.spawn().map(running)
+}
+
+/// `exe` with `args`, standard descriptors on /dev/null, in a process group of its own.
+fn command(exe: &Path, args: &[OsString]) -> Command {
+    let mut command = Command::new(exe);
+    command
+        .args(args)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .process_group(0);
+    command
+}
+
+fn running(child: Child) -> Running {
+    let pid = child.id();
+    Running {
+        child: Mutex::new(child),
+        pid,
+    }
+}
+
+fn check(r: libc::c_int) -> io::Result<libc::c_int> {
+    if r == -1 {
+        Err(io::Error::last_os_error())
+    } else {
+        Ok(r)
+    }
+}
+
 /// In the child, between fork and exec: puts the browser's pipe ends on 3 and 4.
 fn hand_over(read: RawFd, write: RawFd) -> io::Result<()> {
-    let check = |r: libc::c_int| {
-        if r == -1 {
-            Err(io::Error::last_os_error())
-        } else {
-            Ok(r)
-        }
-    };
     // Copies above 4 first, so placing one can't overwrite the other (either may be 3 or 4).
     // They're close-on-exec, so they go at the exec.
     // SAFETY: fcntl on descriptors that are open in this process.
@@ -524,6 +575,11 @@ fn hand_over(read: RawFd, write: RawFd) -> io::Result<()> {
     check(unsafe { libc::dup2(read, READ_FD) })?;
     // SAFETY: as above.
     check(unsafe { libc::dup2(write, WRITE_FD) })?;
+    orphan_ends()
+}
+
+/// In the child: it's killed when the thread that started it ends.
+fn orphan_ends() -> io::Result<()> {
     // SAFETY: prctl with two integer arguments; it sets this process's own death signal.
     check(unsafe { libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGKILL) })?;
     Ok(())

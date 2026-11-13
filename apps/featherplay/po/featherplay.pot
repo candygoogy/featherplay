@@ -185,10 +185,10 @@ msgstr ""
 
 #: ../../crates/integrations/src/tooltip.rs:21
 #: ../../crates/integrations/src/tooltip.rs:21
-#: ../../crates/integrations/src/tooltip.rs:21 ui/bottom_bar.slint:612
-#: ../../crates/integrations/src/tooltip.rs:21 ui/bottom_bar.slint:612 ui/mini_player.slint:134 ui/pages/lyrics.slint:102
-#: ../../crates/integrations/src/tooltip.rs:21 ui/bottom_bar.slint:612 ui/mini_player.slint:134 ui/pages/lyrics.slint:102 ui/pages/now_playing.slint:719
-#: ../../crates/integrations/src/tooltip.rs:21 ui/bottom_bar.slint:612 ui/mini_player.slint:134 ui/pages/lyrics.slint:102 ui/pages/now_playing.slint:719
+#: ../../crates/integrations/src/tooltip.rs:21 ui/bottom_bar.slint:617
+#: ../../crates/integrations/src/tooltip.rs:21 ui/bottom_bar.slint:617 ui/mini_player.slint:134 ui/pages/lyrics.slint:102
+#: ../../crates/integrations/src/tooltip.rs:21 ui/bottom_bar.slint:617 ui/mini_player.slint:134 ui/pages/lyrics.slint:102 ui/pages/now_playing.slint:719
+#: ../../crates/integrations/src/tooltip.rs:21 ui/bottom_bar.slint:617 ui/mini_player.slint:134 ui/pages/lyrics.slint:102 ui/pages/now_playing.slint:719
 msgid "Nothing playing"
 msgstr ""
 
@@ -235,18 +235,18 @@ msgstr ""
 #: ../../crates/platform/src/linux/tray.rs:171
 #: ../../crates/platform/src/linux/tray.rs:171
 #: ../../crates/platform/src/linux/tray.rs:171
-#: ../../crates/platform/src/linux/tray.rs:171 ui/bottom_bar.slint:702
-#: ../../crates/platform/src/linux/tray.rs:171 ui/bottom_bar.slint:702 ui/pages/settings/shortcuts.slint:126
-#: ../../crates/platform/src/linux/tray.rs:171 ui/bottom_bar.slint:702 ui/pages/settings/shortcuts.slint:126 ui/shortcuts.slint:38
+#: ../../crates/platform/src/linux/tray.rs:171 ui/bottom_bar.slint:707
+#: ../../crates/platform/src/linux/tray.rs:171 ui/bottom_bar.slint:707 ui/pages/settings/shortcuts.slint:126
+#: ../../crates/platform/src/linux/tray.rs:171 ui/bottom_bar.slint:707 ui/pages/settings/shortcuts.slint:126 ui/shortcuts.slint:38
 msgid "Previous"
 msgstr ""
 
 #: ../../crates/platform/src/linux/tray.rs:172
 #: ../../crates/platform/src/linux/tray.rs:172
 #: ../../crates/platform/src/linux/tray.rs:172
-#: ../../crates/platform/src/linux/tray.rs:172 ui/bottom_bar.slint:716
-#: ../../crates/platform/src/linux/tray.rs:172 ui/bottom_bar.slint:716 ui/pages/settings/shortcuts.slint:126
-#: ../../crates/platform/src/linux/tray.rs:172 ui/bottom_bar.slint:716 ui/pages/settings/shortcuts.slint:126 ui/shortcuts.slint:39
+#: ../../crates/platform/src/linux/tray.rs:172 ui/bottom_bar.slint:721
+#: ../../crates/platform/src/linux/tray.rs:172 ui/bottom_bar.slint:721 ui/pages/settings/shortcuts.slint:126
+#: ../../crates/platform/src/linux/tray.rs:172 ui/bottom_bar.slint:721 ui/pages/settings/shortcuts.slint:126 ui/shortcuts.slint:39
 msgid "Next"
 msgstr ""
 
@@ -421,7 +421,7 @@ msgstr ""
 msgid "Signed in for now: no keyring is running to save it."
 msgstr ""
 
-#: src/app.rs:642 ui/pages/about.slint:399
+#: src/app.rs:642 ui/pages/about.slint:400
 msgid "Copy diagnostics"
 msgstr ""
 
@@ -477,92 +477,92 @@ msgstr ""
 msgid "tokio and reqwest"
 msgstr ""
 
-#: src/pages/about.rs:47
+#: src/pages/about.rs:42
 msgid "The Unlicense. Downloaded on first run, not bundled."
 msgstr ""
 
-#: src/pages/about.rs:51
+#: src/pages/about.rs:46
 msgid "MIT License. Downloaded on first run, not bundled."
 msgstr ""
 
-#: src/pages/about.rs:54
+#: src/pages/about.rs:49
 msgid "Every other component"
 msgstr ""
 
-#: src/pages/about.rs:55
+#: src/pages/about.rs:50
 msgid "Listed with its licence in THIRD_PARTY.md in the source repository."
 msgstr ""
 
-#: src/pages/about.rs:102 src/pages/settings/search.rs:439
-#: src/pages/about.rs:102 src/pages/settings/search.rs:439
+#: src/pages/about.rs:125 src/pages/settings/search.rs:439
+#: src/pages/about.rs:125 src/pages/settings/search.rs:439
 msgid "Check for updates"
 msgstr ""
 
-#: src/pages/about.rs:103 src/updates.rs:207 ui/pages/about.slint:97
-#: src/pages/about.rs:103 src/updates.rs:207 ui/pages/about.slint:97 ui/pages/home.slint:540 ui/pages/lyrics.slint:274
-#: src/pages/about.rs:103 src/updates.rs:207 ui/pages/about.slint:97 ui/pages/home.slint:540 ui/pages/lyrics.slint:274
+#: src/pages/about.rs:126 src/updates.rs:207 ui/pages/about.slint:98
+#: src/pages/about.rs:126 src/updates.rs:207 ui/pages/about.slint:98 ui/pages/home.slint:540 ui/pages/lyrics.slint:274
+#: src/pages/about.rs:126 src/updates.rs:207 ui/pages/about.slint:98 ui/pages/home.slint:540 ui/pages/lyrics.slint:274
 msgid "Try again"
 msgstr ""
 
-#: src/pages/about.rs:106
+#: src/pages/about.rs:129
 msgid "featherplay {} is out."
 msgstr ""
 
-#: src/pages/about.rs:109
+#: src/pages/about.rs:132
 msgid "Checking for updates…"
 msgstr ""
 
-#: src/pages/about.rs:109 ui/pages/sign_in.slint:592
+#: src/pages/about.rs:132 ui/pages/sign_in.slint:592
 msgid "Checking…"
 msgstr ""
 
-#: src/pages/about.rs:114
+#: src/pages/about.rs:137
 msgid "GitHub is busy. Try again after {}."
 msgstr ""
 
-#: src/pages/about.rs:120
+#: src/pages/about.rs:143
 msgid "Couldn't check: no connection."
 msgstr ""
 
-#: src/pages/about.rs:121
+#: src/pages/about.rs:144
 msgid "Couldn't check: GitHub answered {}."
 msgstr ""
 
-#: src/pages/about.rs:123
+#: src/pages/about.rs:146
 msgid "Couldn't check: the answer wasn't readable."
 msgstr ""
 
-#: src/pages/about.rs:136
+#: src/pages/about.rs:159
 msgid "Up to date. Checked just now."
 msgstr ""
 
-#: src/pages/about.rs:138
+#: src/pages/about.rs:161
 msgid "Up to date. Checked {n} minute ago."
 msgid_plural "Up to date. Checked {n} minutes ago."
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/pages/about.rs:143
+#: src/pages/about.rs:166
 msgid "Up to date. Checked {n} hour ago."
 msgid_plural "Up to date. Checked {n} hours ago."
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/pages/about.rs:145
+#: src/pages/about.rs:168
 msgid "Up to date. Checked {n} day ago."
 msgid_plural "Up to date. Checked {n} days ago."
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/pages/about.rs:202
+#: src/pages/about.rs:226
 msgid "SIL Open Font License 1.1. The body face, embedded."
 msgstr ""
 
-#: src/pages/about.rs:221
+#: src/pages/about.rs:246
 msgid "Command copied"
 msgstr ""
 
-#: src/pages/about.rs:237 src/pages/about.rs:244
+#: src/pages/about.rs:262 src/pages/about.rs:269
 msgid "Diagnostics copied"
 msgstr ""
 
@@ -681,8 +681,8 @@ msgid "Paste your user token first."
 msgstr ""
 
 #: src/pages/settings/search.rs:54 ui/pages/settings/playback.slint:50
-#: src/pages/settings/search.rs:54 ui/pages/settings/playback.slint:50 ui/pages/settings/sound.slint:15
-#: src/pages/settings/search.rs:54 ui/pages/settings/playback.slint:50 ui/pages/settings/sound.slint:15
+#: src/pages/settings/search.rs:54 ui/pages/settings/playback.slint:50 ui/pages/settings/sound.slint:14
+#: src/pages/settings/search.rs:54 ui/pages/settings/playback.slint:50 ui/pages/settings/sound.slint:14
 msgid "Off"
 msgstr ""
 
@@ -791,23 +791,23 @@ msgid "DNS, network, unavailable, region, DNS over HTTPS"
 msgstr ""
 
 #: src/pages/settings/search.rs:145 ui/pages/settings/equalizer.slint:229
-#: src/pages/settings/search.rs:145 ui/pages/settings/equalizer.slint:229 ui/pages/settings/sound.slint:11
+#: src/pages/settings/search.rs:145 ui/pages/settings/equalizer.slint:229 ui/pages/settings/sound.slint:10
 msgid "Equalizer"
 msgstr ""
 
-#: src/pages/settings/search.rs:148 ui/pages/settings/sound.slint:15
+#: src/pages/settings/search.rs:148 ui/pages/settings/sound.slint:14
 msgid "Bass"
 msgstr ""
 
-#: src/pages/settings/search.rs:149 ui/pages/settings/sound.slint:15
+#: src/pages/settings/search.rs:149 ui/pages/settings/sound.slint:14
 msgid "Treble"
 msgstr ""
 
-#: src/pages/settings/search.rs:150 ui/pages/settings/sound.slint:15
+#: src/pages/settings/search.rs:150 ui/pages/settings/sound.slint:14
 msgid "Vocal"
 msgstr ""
 
-#: src/pages/settings/search.rs:151 ui/pages/settings/sound.slint:15
+#: src/pages/settings/search.rs:151 ui/pages/settings/sound.slint:14
 msgid "Custom…"
 msgstr ""
 
@@ -816,15 +816,15 @@ msgctxt "search keywords"
 msgid "EQ, bass, treble, bands"
 msgstr ""
 
-#: src/pages/settings/search.rs:158 ui/pages/settings/sound.slint:21
+#: src/pages/settings/search.rs:158 ui/pages/settings/sound.slint:20
 msgid "Even out loudness"
 msgstr ""
 
-#: src/pages/settings/search.rs:159 ui/pages/settings/sound.slint:25
+#: src/pages/settings/search.rs:159 ui/pages/settings/sound.slint:24
 msgid "Light"
 msgstr ""
 
-#: src/pages/settings/search.rs:159 ui/pages/settings/sound.slint:25
+#: src/pages/settings/search.rs:159 ui/pages/settings/sound.slint:24
 msgid "Strong"
 msgstr ""
 
@@ -833,7 +833,7 @@ msgctxt "search keywords"
 msgid "compressor, dynamic range, volume"
 msgstr ""
 
-#: src/pages/settings/search.rs:165 ui/pages/settings/sound.slint:31
+#: src/pages/settings/search.rs:165 ui/pages/settings/sound.slint:30
 msgid "Match song volumes"
 msgstr ""
 
@@ -842,15 +842,15 @@ msgctxt "search keywords"
 msgid "volume, loudness, normalise, normalize, ReplayGain"
 msgstr ""
 
-#: src/pages/settings/search.rs:172 ui/pages/settings/sound.slint:38
+#: src/pages/settings/search.rs:172 ui/pages/settings/sound.slint:37
 msgid "Streaming quality"
 msgstr ""
 
-#: src/pages/settings/search.rs:173 ui/pages/settings/sound.slint:42
+#: src/pages/settings/search.rs:173 ui/pages/settings/sound.slint:41
 msgid "High"
 msgstr ""
 
-#: src/pages/settings/search.rs:173 ui/pages/settings/sound.slint:42
+#: src/pages/settings/search.rs:173 ui/pages/settings/sound.slint:41
 msgid "Standard"
 msgstr ""
 
@@ -859,7 +859,7 @@ msgctxt "search keywords"
 msgid "bitrate, audio quality, data"
 msgstr ""
 
-#: src/pages/settings/search.rs:179 ui/pages/settings/sound.slint:48
+#: src/pages/settings/search.rs:179 ui/pages/settings/sound.slint:47
 msgid "Output device"
 msgstr ""
 
@@ -1331,30 +1331,30 @@ msgid ""
 "because a DNS service routes YouTube abroad."
 msgstr ""
 
-#: src/pages/settings/search.rs:585 ui/pages/settings/sound.slint:13
+#: src/pages/settings/search.rs:585 ui/pages/settings/sound.slint:12
 msgid "Shapes the sound of every song. Custom… lets you set each band."
 msgstr ""
 
-#: src/pages/settings/search.rs:586 ui/pages/settings/sound.slint:23
+#: src/pages/settings/search.rs:586 ui/pages/settings/sound.slint:22
 msgid ""
 "Brings quiet parts up and loud parts down, for low volume or a noisy room. "
 "Strong flattens a lot."
 msgstr ""
 
-#: src/pages/settings/search.rs:589 ui/pages/settings/sound.slint:33
+#: src/pages/settings/search.rs:589 ui/pages/settings/sound.slint:32
 msgid ""
 "Turns louder songs down to the same level, as YouTube Music's own player "
 "does."
 msgstr ""
 
-#: src/pages/settings/search.rs:592 ui/pages/settings/sound.slint:40
+#: src/pages/settings/search.rs:592 ui/pages/settings/sound.slint:39
 msgid ""
 "High plays Opus, which sounds better than AAC at about the same data use. "
 "Standard always plays AAC at 128 kbps. Songs already loaded keep their "
 "quality."
 msgstr ""
 
-#: src/pages/settings/search.rs:596 ui/pages/settings/sound.slint:50
+#: src/pages/settings/search.rs:596 ui/pages/settings/sound.slint:49
 msgid ""
 "If the device goes away, playback pauses and moves to the system default."
 msgstr ""
@@ -1678,7 +1678,7 @@ msgstr ""
 msgid "Pick or add a Google account in the sign-in window"
 msgstr ""
 
-#: src/pages/sign_in.rs:289 src/pages/sign_in.rs:510 src/pages/sign_in.rs:581
+#: src/pages/sign_in.rs:289 src/pages/sign_in.rs:516 src/pages/sign_in.rs:595
 msgid "Checking the session…"
 msgstr ""
 
@@ -1686,7 +1686,7 @@ msgstr ""
 msgid "The sign-in window closed"
 msgstr ""
 
-#: src/pages/sign_in.rs:295 src/pages/sign_in.rs:506
+#: src/pages/sign_in.rs:295 src/pages/sign_in.rs:512
 msgid "It closed before you finished signing in. Try again when you're ready."
 msgstr ""
 
@@ -1698,64 +1698,80 @@ msgstr ""
 msgid "Something went wrong inside it. Try again, or use another way below."
 msgstr ""
 
-#: src/pages/sign_in.rs:463
+#: src/pages/sign_in.rs:464
+msgid ""
+"Sign in in {}, then close that window. featherplay picks up the session once "
+"it's closed."
+msgstr ""
+
+#: src/pages/sign_in.rs:469
 msgid "Finish signing in in {}. featherplay closes it once you're in."
 msgstr ""
 
-#: src/pages/sign_in.rs:493
+#: src/pages/sign_in.rs:499
 msgid "Closing {}…"
 msgstr ""
 
-#: src/pages/sign_in.rs:527
+#: src/pages/sign_in.rs:533
 msgid "{} closed"
 msgstr ""
 
-#: src/pages/sign_in.rs:529
+#: src/pages/sign_in.rs:536
+msgid "{} closed after 15 minutes"
+msgstr ""
+
+#: src/pages/sign_in.rs:537
+msgid ""
+"featherplay closes it when it stays open that long, and found no sign-in in "
+"it. Try again when you're ready."
+msgstr ""
+
+#: src/pages/sign_in.rs:543
 msgid "{} closed after 10 minutes"
 msgstr ""
 
-#: src/pages/sign_in.rs:530
+#: src/pages/sign_in.rs:544
 msgid ""
 "featherplay closes it when the sign-in takes that long. Try again when "
 "you're ready."
 msgstr ""
 
-#: src/pages/sign_in.rs:539
+#: src/pages/sign_in.rs:553
 msgid "{} isn't on this PC"
 msgstr ""
 
-#: src/pages/sign_in.rs:546
+#: src/pages/sign_in.rs:560
 msgid "{} didn't start"
 msgstr ""
 
-#: src/pages/sign_in.rs:549
+#: src/pages/sign_in.rs:563
 msgid "{} didn't let featherplay in"
 msgstr ""
 
-#: src/pages/sign_in.rs:551
+#: src/pages/sign_in.rs:565
 msgid "A setting on this PC may block it. Sign in with Google works without it."
 msgstr ""
 
-#: src/pages/sign_in.rs:553
+#: src/pages/sign_in.rs:567
 msgid ""
 "A setting on this PC may block it. Pasting a cookie header works without it."
 msgstr ""
 
-#: src/pages/sign_in.rs:560
+#: src/pages/sign_in.rs:574
 msgid "featherplay lost touch with {}"
 msgstr ""
 
-#: src/pages/sign_in.rs:609
+#: src/pages/sign_in.rs:623
 msgid "Paste the cookie header first."
 msgstr ""
 
-#: src/pages/sign_in.rs:612
+#: src/pages/sign_in.rs:626
 msgid ""
 "That doesn't look like a cookie header: it should be name=value pairs "
 "separated by semicolons."
 msgstr ""
 
-#: src/pages/sign_in.rs:620
+#: src/pages/sign_in.rs:634
 msgid ""
 "That cookie header has no SAPISID, so it isn't signed in. Copy it from a tab "
 "that is signed in."
@@ -1881,7 +1897,7 @@ msgstr ""
 msgid "Removed from Liked songs"
 msgstr ""
 
-#: src/updates.rs:179 src/updates.rs:189 ui/pages/about.slint:86
+#: src/updates.rs:179 src/updates.rs:189 ui/pages/about.slint:87
 msgid "featherplay {} is out"
 msgstr ""
 
@@ -1889,7 +1905,7 @@ msgstr ""
 msgid "featherplay {} is ready to install"
 msgstr ""
 
-#: src/updates.rs:206 ui/pages/about.slint:85
+#: src/updates.rs:206 ui/pages/about.slint:86
 msgid "The update to {} didn't install"
 msgstr ""
 
@@ -2018,55 +2034,55 @@ msgstr ""
 msgid "Playback speed, {}"
 msgstr ""
 
-#: ui/bottom_bar.slint:612
+#: ui/bottom_bar.slint:617
 msgid "Now playing: {}"
 msgstr ""
 
-#: ui/bottom_bar.slint:692
+#: ui/bottom_bar.slint:697
 msgid "Shuffle on"
 msgstr ""
 
-#: ui/bottom_bar.slint:692
+#: ui/bottom_bar.slint:697
 msgid "Shuffle off"
 msgstr ""
 
-#: ui/bottom_bar.slint:694
+#: ui/bottom_bar.slint:699
 msgid "Ctrl+S"
 msgstr ""
 
-#: ui/bottom_bar.slint:704
+#: ui/bottom_bar.slint:709
 msgid "Ctrl+←"
 msgstr ""
 
-#: ui/bottom_bar.slint:718
+#: ui/bottom_bar.slint:723
 msgid "Ctrl+→"
 msgstr ""
 
-#: ui/bottom_bar.slint:727
+#: ui/bottom_bar.slint:732
 msgid "Repeat one"
 msgstr ""
 
-#: ui/bottom_bar.slint:727
+#: ui/bottom_bar.slint:732
 msgid "Repeat all"
 msgstr ""
 
-#: ui/bottom_bar.slint:727
+#: ui/bottom_bar.slint:732
 msgid "Repeat off"
 msgstr ""
 
-#: ui/bottom_bar.slint:729
+#: ui/bottom_bar.slint:734
 msgid "Ctrl+R"
 msgstr ""
 
-#: ui/bottom_bar.slint:804
+#: ui/bottom_bar.slint:809
 msgid "Mute"
 msgstr ""
 
-#: ui/bottom_bar.slint:804
+#: ui/bottom_bar.slint:809
 msgid "Unmute"
 msgstr ""
 
-#: ui/bottom_bar.slint:820 ui/pages/now_playing.slint:116
+#: ui/bottom_bar.slint:825 ui/pages/now_playing.slint:116
 msgid "Up next"
 msgstr ""
 
@@ -2141,98 +2157,98 @@ msgstr ""
 msgid "· Dislike and skip"
 msgstr ""
 
-#: ui/pages/about.slint:87
+#: ui/pages/about.slint:88
 msgid "Downloading the update…"
 msgstr ""
 
-#: ui/pages/about.slint:88
+#: ui/pages/about.slint:89
 msgid ""
 "You have {}. The update is downloaded and installs when featherplay restarts."
 msgstr ""
 
-#: ui/pages/about.slint:89
+#: ui/pages/about.slint:90
 msgid "The download didn't finish. You have {}."
 msgstr ""
 
-#: ui/pages/about.slint:90
+#: ui/pages/about.slint:91
 msgid "It can't be installed from here. You have {}."
 msgstr ""
 
-#: ui/pages/about.slint:91
+#: ui/pages/about.slint:92
 msgid "You still have {}. The log folder has the details."
 msgstr ""
 
-#: ui/pages/about.slint:92
+#: ui/pages/about.slint:93
 msgid "Starting the update…"
 msgstr ""
 
-#: ui/pages/about.slint:93
+#: ui/pages/about.slint:94
 msgid ""
 "This update couldn't be verified. Download it from "
 "featherplay.candygoogy.dev."
 msgstr ""
 
-#: ui/pages/about.slint:94
+#: ui/pages/about.slint:95
 msgid "You have {}."
 msgstr ""
 
-#: ui/pages/about.slint:98
+#: ui/pages/about.slint:99
 msgid "Copy command"
 msgstr ""
 
-#: ui/pages/about.slint:100
+#: ui/pages/about.slint:101
 msgid "Get it on GitHub"
 msgstr ""
 
-#: ui/pages/about.slint:101 ui/pages/about.slint:394
+#: ui/pages/about.slint:102 ui/pages/about.slint:395
 msgid "Open log folder"
 msgstr ""
 
-#: ui/pages/about.slint:102
+#: ui/pages/about.slint:103
 msgid "What's new"
 msgstr ""
 
-#: ui/pages/about.slint:137
+#: ui/pages/about.slint:138
 msgid "Update with Scoop:"
 msgstr ""
 
-#: ui/pages/about.slint:211
+#: ui/pages/about.slint:212
 msgid "Version {}"
 msgstr ""
 
-#: ui/pages/about.slint:221
+#: ui/pages/about.slint:222
 msgid "Checking for updates"
 msgstr ""
 
-#: ui/pages/about.slint:288
+#: ui/pages/about.slint:289
 msgid "Hide the licence of {}"
 msgstr ""
 
-#: ui/pages/about.slint:288
+#: ui/pages/about.slint:289
 msgid "Show the licence of {}"
 msgstr ""
 
-#: ui/pages/about.slint:296
+#: ui/pages/about.slint:297
 msgid "Hide licence"
 msgstr ""
 
-#: ui/pages/about.slint:296
+#: ui/pages/about.slint:297
 msgid "Show licence"
 msgstr ""
 
-#: ui/pages/about.slint:363
+#: ui/pages/about.slint:364
 msgid "A fast, lightweight desktop player for YouTube Music."
 msgstr ""
 
-#: ui/pages/about.slint:371
+#: ui/pages/about.slint:372
 msgid "featherplay is not affiliated with Google or YouTube."
 msgstr ""
 
-#: ui/pages/about.slint:381
+#: ui/pages/about.slint:382
 msgid "Logs and bug reports"
 msgstr ""
 
-#: ui/pages/about.slint:384
+#: ui/pages/about.slint:385
 msgid ""
 "If something goes wrong, the log folder holds what featherplay noted, with a "
 "crash file for each crash. Copy diagnostics puts the versions, which "
@@ -2240,11 +2256,11 @@ msgid ""
 "report. Neither names your account."
 msgstr ""
 
-#: ui/pages/about.slint:413
+#: ui/pages/about.slint:414
 msgid "Licences"
 msgstr ""
 
-#: ui/pages/about.slint:423
+#: ui/pages/about.slint:424
 msgid "SIL Open Font License 1.1. The heading face, embedded."
 msgstr ""
 

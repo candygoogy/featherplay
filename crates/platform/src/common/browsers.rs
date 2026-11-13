@@ -63,8 +63,7 @@ pub struct Browser {
     /// Its installer can install for one user, without administrator rights.
     pub per_user: bool,
     /// Its switches besides the profile and the pipe: no welcome pages, no "make me the
-    /// default" bar. Nothing that marks the browser as automated (on Linux, they take off
-    /// the mark the pipe leaves on pages).
+    /// default" bar. Nothing that marks the browser as automated or hides that mark.
     pub switches: &'static [&'static str],
     /// Its policies' key, in HKLM and HKCU. Its `RemoteDebuggingAllowed` set to 0 turns
     /// the DevTools pipe off.
@@ -78,25 +77,19 @@ pub struct Browser {
 #[cfg(windows)]
 const QUIET_START: &[&str] = &["--no-first-run", "--no-default-browser-check"];
 
-/// As on Windows, and:
-/// - the throwaway profile keeps its cookies in Chromium's own basic store rather than the
-///   desktop's keyring (`--password-store`, `chrome/common/chrome_switches.cc`), so a sign-in
-///   never adds an item there or asks to unlock a wallet;
-/// - pages see `navigator.webdriver` false, as in a browser the user started. Chromium hands
-///   `--remote-debugging-pipe` on to every renderer, which then reports `navigator.webdriver`
-///   true (seen in WSL, Chrome 157, 2026-11-12: the only difference a page could see between
-///   the sign-in's launch and a plain one), and Google's sign-in then refused with "This
-///   browser or app may not be secure". `--disable-blink-features=AutomationControlled` turns
-///   that Blink feature off; `--test-type` keeps Chromium from adding a bar that warns about
-///   that switch ("unsupported command-line flag", `chrome/browser/ui/startup/
-///   bad_flags_prompt.cc`, which skips its check under `--test-type`).
+/// As on Windows, and the throwaway profile keeps its cookies in Chromium's own basic store
+/// rather than the desktop's keyring (`--password-store`, `chrome/common/chrome_switches.cc`),
+/// so a sign-in never adds an item there or asks to unlock a wallet, and the headless start
+/// that reads the profile afterwards (with the same switch) can decrypt them.
+///
+/// Linux's sign-in window gets no pipe at all (`linux::browsers`): Chromium hands
+/// `--remote-debugging-pipe` on to every renderer, whose pages then see `navigator.webdriver`
+/// true (WSL, Chrome 157, 2026-11-12), and Google's sign-in refuses such a browser, rightly.
 #[cfg(target_os = "linux")]
 const QUIET_START: &[&str] = &[
     "--no-first-run",
     "--no-default-browser-check",
     "--password-store=basic",
-    "--disable-blink-features=AutomationControlled",
-    "--test-type",
 ];
 
 pub const EDGE: Browser = Browser {
