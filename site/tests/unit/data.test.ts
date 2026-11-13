@@ -206,6 +206,19 @@ describe("release", () => {
     expect(release.sizeMB).toBeGreaterThan(0);
     expect(release.url).toMatch(/^https:\/\//);
   });
+  it("lists the four Linux files release.yml builds, at this version, the x86_64 AppImage first", () => {
+    const linux = release.linux!;
+    expect(linux.files.map((f) => f.name)).toEqual([
+      "featherplay-x86_64.AppImage",
+      "featherplay-x86_64.tar.gz",
+      "featherplay-aarch64.AppImage",
+      "featherplay-aarch64.tar.gz",
+    ]);
+    expect(linux.appImage).toBe(linux.files[0]);
+    for (const f of linux.files)
+      expect(f.url).toBe(`https://github.com/candygoogy/featherplay/releases/download/v${release.version}/${f.name}`);
+    expect(linux.page).toBe(`https://github.com/candygoogy/featherplay/releases/tag/v${release.version}`);
+  });
 });
 
 describe("colour helpers", () => {
@@ -257,7 +270,7 @@ describe("the features' zoom", () => {
 import { downloadOptions } from "../../src/data/release";
 describe("the download's options", () => {
   const file = { name: "f", bytes: 10_485_760, sizeMB: 10, url: "https://example.org/" };
-  const base = { version: "1.0.0", url: "https://example.org/", sizeMB: 10 };
+  const base = { version: "1.0.0", url: "https://example.org/", sizeMB: 10, linux: null };
   it("recommends the installer when there is one, with the exe beside it", () => {
     const o = downloadOptions({ ...base, installer: file, portable: file });
     expect(o.map((x) => [x.id, x.primary])).toEqual([

@@ -2,12 +2,15 @@
 // The download: one card with the app's icon, the version and the systems it runs on, then
 // each way to get it (release.ts: the installer, recommended, and the portable exe; either
 // may be left out) with its size and its own button. In the card, under them, two small
-// notes for the first run: the SmartScreen warning and where it keeps things.
+// notes for the first run: the SmartScreen warning and where it keeps things. Then, smaller,
+// the experimental Linux build: its x86_64 AppImage, and a link to the release for the rest.
 import { downloadOptions, release, sizeLabel } from "../data/release";
+import { links } from "../data/links";
 import Logo from "./Logo.astro";
 import Icon from "./Icon.astro";
 
 const options = downloadOptions();
+const linux = release.linux;
 ---
 
 <section id="download" class="download" aria-labelledby="download-title">
@@ -76,6 +79,35 @@ const options = downloadOptions();
           </div>
         </div>
       </div>
+
+      <!-- The experimental Linux build: one row, after Windows' notes. -->
+      {
+        linux && (
+          <div class="linux" data-download-linux>
+            <div class="what">
+              <h3 class="o-title">Linux (experimental)</h3>
+              <p class="l-note">
+                An AppImage for x86_64, on glibc 2.35 or newer. Tested automatically on Ubuntu, Debian, Fedora and Arch,
+                little on real desktops yet. The .tar.gz and the aarch64 builds are on the{" "}
+                <a href={linux.page}>release page</a>, the steps and limits in the <a href={links.linux}>README</a>.
+              </p>
+            </div>
+            <div class="get">
+              <a class="button tonal" href={linux.appImage.url} data-release-link>
+                Download the AppImage
+              </a>
+              <span class="size">
+                <span class="visually-hidden">{linux.appImage.name}, </span>
+                {linux.appImage.sizeMB == null ? (
+                  <span data-size aria-label="size not known yet">{sizeLabel(linux.appImage)}</span>
+                ) : (
+                  <span data-size>{sizeLabel(linux.appImage)}</span>
+                )}
+              </span>
+            </div>
+          </div>
+        )
+      }
 
       <p class="fine">
         Free and unofficial. Not made by or affiliated with Google or YouTube.
@@ -189,6 +221,32 @@ const options = downloadOptions();
   .button.tonal:hover {
     background: var(--pressed);
   }
+  /* Linux, experimental: one row on the options' ground, its button the quiet one. */
+  .linux {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 16px 24px;
+    padding: 20px 22px 20px 26px;
+    border-radius: 22px;
+    background: var(--card);
+  }
+  .linux .o-title {
+    line-height: 1.3;
+  }
+  .l-note {
+    max-width: 70ch;
+    margin-top: 4px;
+    color: var(--text-muted);
+    font-size: 0.9375rem;
+    line-height: 1.5;
+  }
+  .l-note a {
+    color: var(--text);
+    font-weight: 700;
+    text-underline-offset: 0.2em;
+  }
   .fine {
     grid-column: 1 / -1;
     display: flex;
@@ -272,7 +330,8 @@ const options = downloadOptions();
       padding: 0 22px;
       font-size: 1rem;
     }
-    .option {
+    .option,
+    .linux {
       grid-template-columns: minmax(0, 1fr);
       padding: 18px;
     }

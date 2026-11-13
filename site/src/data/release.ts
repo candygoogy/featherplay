@@ -7,6 +7,10 @@
 // entry, an uninstaller that removes everything) and the portable exe. A file's bytes are
 // null until it's measured, shown as a dash. Set a file to null to leave it out; the
 // download card (Download.astro) and every size on the page read from here.
+//
+// The experimental Linux build (from 0.3.0): an AppImage and a .tar.gz for x86_64 and for
+// aarch64 (release.yml's build-linux). The card offers the x86_64 AppImage and points to the
+// release page for the rest. Its links read `version` as the Windows files' do.
 
 import { links } from "./links";
 
@@ -26,8 +30,19 @@ export type Release = {
   url: string;
   installer: ReleaseFile | null;
   portable: ReleaseFile | null;
+  /** The experimental Linux build, or null to leave it out. */
+  linux: LinuxBuild | null;
   /** The size of the first option offered whose size is known (for search engines). */
   sizeMB: number;
+};
+
+export type LinuxBuild = {
+  /** The one the card offers directly: the x86_64 AppImage. */
+  appImage: ReleaseFile;
+  /** Every Linux file on the release, the AppImage first. */
+  files: ReleaseFile[];
+  /** This version's release page, with the .tar.gz and the aarch64 files. */
+  page: string;
 };
 
 const releases = links.releases;
@@ -42,12 +57,23 @@ const file = (name: string, bytes: number | null): ReleaseFile => ({
 });
 const installer: ReleaseFile | null = file(`featherplay-setup-${version}.exe`, 11_194_840);
 const portable: ReleaseFile | null = file("featherplay.exe", 29_626_880);
+// TODO(0.3.0 release): v0.2.2 has no Linux files, so these links work only once `version` is
+// "0.3.0". Then fill in each file's bytes from the v0.3.0 release, with the installer's and
+// the exe's.
+const linuxFiles = [
+  file("featherplay-x86_64.AppImage", null),
+  file("featherplay-x86_64.tar.gz", null),
+  file("featherplay-aarch64.AppImage", null),
+  file("featherplay-aarch64.tar.gz", null),
+];
+const linux: LinuxBuild | null = { appImage: linuxFiles[0], files: linuxFiles, page: `${releases}/tag/v${version}` };
 
 export const release: Release = {
   version,
   url: releases,
   installer,
   portable,
+  linux,
   sizeMB: [installer, portable].find((f) => f?.sizeMB != null)?.sizeMB ?? 0,
 };
 

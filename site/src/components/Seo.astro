@@ -24,7 +24,7 @@ const ld = app
       url: site.href,
       applicationCategory: "MultimediaApplication",
       applicationSubCategory: "Music player",
-      operatingSystem: "Windows 10, Windows 11",
+      operatingSystem: release.linux ? "Windows 10, Windows 11, Linux" : "Windows 10, Windows 11",
       softwareVersion: release.version,
       fileSize: `${release.sizeMB.toFixed(2)} MB`,
       downloadUrl: release.url,

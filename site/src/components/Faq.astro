@@ -3,7 +3,7 @@
 // group, so one answer is open at a time, it works without script and with the keyboard,
 // and every one starts closed. Where the browser can, an answer opens and closes by easing
 // its height (::details-content); elsewhere it simply appears. Facts from the repo's README.
-import { repo } from "../data/links";
+import { links, repo } from "../data/links";
 const faqs = [
   {
     id: "official",
@@ -23,15 +23,16 @@ const faqs = [
   {
     q: "How does signing in work?",
     a: [
-      "featherplay opens a small sign-in window, Microsoft Edge WebView2, with Google's own sign-in page. You sign in there as you would in a browser. featherplay doesn't read your password; the code is open. Once you're in, it keeps the YouTube Music session from that window and closes it. The main window never contains a browser.",
-      "If you'd rather sign in in a browser you know, choose Use Microsoft Edge. Edge opens with a temporary profile, with its own address bar, passkeys and Windows Hello. featherplay keeps only the YouTube Music session from it, then closes Edge and deletes the profile. Your own Edge profile is never touched.",
-      "The session is kept in Windows Credential Manager. While yt-dlp looks up a song's audio it reads the session from a temporary file, which featherplay deletes as soon as yt-dlp is done. The session gives the same access to your account as a signed-in browser, so treat it like a password; Sign out in Settings removes it. Windows 11 includes WebView2, and most Windows 10 PCs have it with Edge.",
+      "On Windows, featherplay opens a small sign-in window, Microsoft Edge WebView2, with Google's own sign-in page. You sign in there as you would in a browser. featherplay doesn't read your password; the code is open. Once you're in, it keeps the YouTube Music session from that window and closes it. The main window never contains a browser. Windows 11 includes WebView2, and most Windows 10 PCs have it with Edge.",
+      "If you'd rather sign in in a browser you know, choose Use Microsoft Edge, Use Google Chrome, Use Brave or Use Vivaldi. The browser opens with a temporary profile, with its own address bar, your passkeys and Windows Hello. featherplay keeps only the YouTube Music session from it, then closes the browser and deletes the profile. Your own profile is never touched.",
+      "Linux has no sign-in window: you sign in the same way with Chrome, Chromium, Edge, Brave or Vivaldi. A Snap or Flatpak browser can't be used, because its sandbox keeps it out of the temporary profile.",
+      "The session is kept in Windows Credential Manager, or on Linux in your desktop's keyring (the Secret Service, such as GNOME Keyring or KWallet). While yt-dlp looks up a song's audio it reads the session from a temporary file, which featherplay deletes as soon as yt-dlp is done. The session gives the same access to your account as a signed-in browser, so treat it like a password; Sign out in Settings removes it.",
     ],
   },
   {
     q: "Is my account safe with it?",
     a: [
-      "Your YouTube Music session, your Last.fm session and your ListenBrainz token stay on your PC, in Windows Credential Manager. The YouTube Music session also goes into a temporary file while yt-dlp looks up a song, deleted as soon as it's done. The code is public for anyone to read.",
+      "Your YouTube Music session, your Last.fm session and your ListenBrainz token stay on your PC, in Windows Credential Manager, or on Linux in your desktop's keyring. With no keyring running, Linux keeps a sign-in only until featherplay closes, never in a file. The YouTube Music session also goes into a temporary file while yt-dlp looks up a song, deleted as soon as it's done. The code is public for anyone to read.",
       "It is still an unofficial client, using YouTube Music in a way Google doesn't support. If that worries you, sign in with a second account, or listen without signing in.",
     ],
   },
@@ -45,9 +46,9 @@ const faqs = [
     id: "connects",
     q: "What does it connect to?",
     a: [
-      "featherplay sends no telemetry and has no server of its own. It connects to YouTube Music and Google for your music, covers, streams and sign-in, and to GitHub to fetch yt-dlp and Deno in the background on the first run and to update yt-dlp. Only when GitHub can't be reached, it fetches them from this site and from Deno's download server instead.",
+      "featherplay sends no telemetry and has no server of its own. It connects to YouTube Music and Google for your music, covers, streams and sign-in, and to GitHub to fetch yt-dlp and Deno in the background on the first run and to update yt-dlp. Only when GitHub can't be reached, it fetches them from this site and from Deno's download server instead (on Linux, yt-dlp comes from GitHub only for now).",
       "LRCLIB gets the song's title, artist, album and length, only while lyrics are on screen. SponsorBlock, on by default, is asked only about music videos and uploads (songs have nothing to skip), by the first four characters of a hash of the video's ID, so it doesn't learn which video you play.",
-      "Last.fm and ListenBrainz hear from it only if you connect them, and Discord only if you turn on the status, through the Discord app on your own PC.",
+      "Last.fm and ListenBrainz hear from it only if you connect them, and Discord only if you turn on the status, through the Discord app on your own PC. Google's or Cloudflare's DNS over HTTPS is asked only with Look up YouTube directly on, and only for YouTube's server names.",
     ],
   },
   {
@@ -60,7 +61,7 @@ const faqs = [
   {
     q: "Does it download anything else?",
     a: [
-      "Yes, two helpers, in the background on the first run: yt-dlp, which finds the audio stream of the songs featherplay can't find by itself, and Deno, which yt-dlp needs to do it. Most songs don't need them: featherplay answers YouTube's player challenges with the JavaScript engine built into it, so the first song you click doesn't wait for the download. featherplay fetches both helpers from their GitHub releases, or from this site and Deno's download server when GitHub can't be reached, and checks each file against a SHA256 written into its own code; a file that doesn't match is deleted, not run.",
+      "Yes, two helpers, in the background on the first run: yt-dlp, which finds the audio stream of the songs featherplay can't find by itself, and Deno, which yt-dlp needs to do it. Most songs don't need them: featherplay answers YouTube's player challenges with the JavaScript engine built into it, so the first song you click doesn't wait for the download. featherplay fetches both helpers from their GitHub releases, or from this site and Deno's download server when GitHub can't be reached (on Linux, yt-dlp from GitHub only), and checks each file against a SHA256 written into its own code; a file that doesn't match is deleted, not run.",
       "After that it updates yt-dlp at most once a day, because YouTube changes often. Nothing else is downloaded, and never the music itself.",
     ],
   },
@@ -70,17 +71,30 @@ const faqs = [
     a: [
       "Installed: uninstall it from Settings > Apps. That removes everything featherplay keeps: settings, cache, the helpers, the sign-in window's data and its entries in Credential Manager.",
       "Portable: sign out and disconnect Last.fm in Settings first, which clears both from Credential Manager. Then delete the exe and its two folders, %APPDATA%\\featherplay and %LOCALAPPDATA%\\featherplay.",
+      "Linux: delete the AppImage, or the unpacked .tar.gz and what you installed from it in ~/.local, and the folders ~/.config/featherplay, ~/.cache/featherplay and ~/.local/state/featherplay. Then remove the items whose names end in @featherplay from your keyring.",
     ],
   },
   {
-    q: "Why only Windows?",
+    id: "systems",
+    q: "Does it run on Linux or macOS?",
     a: [
-      "featherplay is built on Windows' own parts: the media overlay, the taskbar buttons, the notification area and Credential Manager. That's a lot of what keeps it light. There's no macOS or Linux version.",
+      "Windows is the main one. featherplay is built on Windows' own parts there: the media overlay, the taskbar buttons, the notification area and Credential Manager. That's a lot of what keeps it light.",
+      "There's also an experimental Linux build: an AppImage and a .tar.gz, for x86_64 and aarch64, on glibc 2.35 or newer (Ubuntu 22.04, Debian 12, Fedora 36 or later). Automatic tests run it on Ubuntu, Debian, Fedora and Arch, but few people have used it on a real desktop yet, so reports help. There's no macOS version.",
     ],
+    link: { href: links.linux, text: "Linux: the steps and the known limits" },
   },
   {
     q: "Is it free?",
     a: ["Yes. It's free and open source under the MIT licence, with no paid tier and no account to create."],
+  },
+  {
+    id: "cant-play",
+    q: "Some songs won't play. Why?",
+    a: [
+      "YouTube refuses some songs where it places you, when they aren't licensed there. featherplay dims them, skips them in the queue and says so once per queue.",
+      "If many songs fail but play in a browser, the usual cause is a DNS service or filter that sends YouTube to its own servers in another country, as NextDNS's YouTube option and some smart-DNS services do. featherplay may then say \"Songs can't play: DNS reroutes YouTube.\" Turn that option off in your DNS service, or turn on Look up YouTube directly in Settings > Playback: featherplay then asks Google's or Cloudflare's DNS over HTTPS for YouTube's servers only.",
+    ],
+    link: { href: links.cantPlay, text: "How to check, in the README" },
   },
   {
     q: "How do I report a bug?",

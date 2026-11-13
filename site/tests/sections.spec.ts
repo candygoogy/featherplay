@@ -82,8 +82,9 @@ test("the FAQ answers the questions people ask, before the download", async ({ p
     "Is my account safe with it?",
     "What does it sound like?",
     "Does it work with stream overlays and Stream Deck?",
-    "Why only Windows?",
+    "Does it run on Linux or macOS?",
     "Is it free?",
+    "Some songs won't play. Why?",
     "How do I report a bug?",
   ]) {
     await expect(faq.locator("summary", { hasText: q })).toBeVisible();
@@ -163,15 +164,17 @@ test("the download sits close to the footer, and the card keeps its parts togeth
       return {
         // the bare ground between the card and the footer's band
         toBand: b("footer .band").top - card.bottom,
-        // inside the card: the top row to the notes, the notes to the fine print
+        // inside the card: the top row to the notes, the notes to Linux, Linux to the fine print
         toNotes: b("[data-first-run]").top - row,
-        toFine: b("[data-download-card] .fine").top - b("[data-first-run]").bottom,
+        toLinux: b("[data-download-linux]").top - b("[data-first-run]").bottom,
+        toFine: b("[data-download-card] .fine").top - b("[data-download-linux]").bottom,
       };
     });
     expect(m.toBand, `${width}px: card to footer`).toBeLessThanOrEqual(width < 640 ? 96 : 160);
     expect(m.toBand, `${width}px: card to footer`).toBeGreaterThanOrEqual(72);
     expect(m.toNotes, `${width}px: top row to notes`).toBeLessThanOrEqual(40);
-    expect(m.toFine, `${width}px: notes to fine print`).toBeLessThanOrEqual(40);
+    expect(m.toLinux, `${width}px: notes to Linux`).toBeLessThanOrEqual(40);
+    expect(m.toFine, `${width}px: Linux to fine print`).toBeLessThanOrEqual(40);
   }
 });
 
@@ -184,6 +187,23 @@ test("the card offers the installer (recommended) and the portable exe, each wit
   await expect(installer).toContainText("featherplay-setup-0.2.2.exe");
   await expect(installer.locator("[data-size]")).toHaveText("10.68 MB");
   await expect(card.locator('[data-download-option="portable"] [data-size]')).toHaveText("28.25 MB");
+});
+
+test("the card's Linux row, marked experimental, offers the x86_64 AppImage and points to the rest", async ({ page }) => {
+  await page.goto("/");
+  const linux = page.locator("[data-download-card] [data-download-linux]");
+  await expect(linux.getByRole("heading", { name: "Linux (experimental)" })).toBeVisible();
+  const appImage = release.linux!.appImage;
+  await expect(linux.getByRole("link", { name: "Download the AppImage" })).toHaveAttribute("href", appImage.url);
+  await expect(linux.getByRole("link", { name: "Download the AppImage" })).toHaveClass(/tonal/);
+  await expect(linux).toContainText(appImage.name);
+  await expect(linux.locator("[data-size]")).toHaveText(sizeLabel(appImage));
+  await expect(linux.getByRole("link", { name: "release page" })).toHaveAttribute("href", release.linux!.page);
+  await expect(linux.getByRole("link", { name: "README" })).toHaveAttribute(
+    "href",
+    "https://github.com/candygoogy/featherplay#linux-experimental",
+  );
+  await expect(linux).toContainText("glibc 2.35");
 });
 test("the footer: short link columns, the plain unofficial line, the version and what it runs on; the music credits only as a link to their own page", async ({ page }) => {
   await page.goto("/");
@@ -215,6 +235,7 @@ test("the footer: short link columns, the plain unofficial line, the version and
   await expect(footer).toContainText("unofficial");
   await expect(footer).toContainText(`Version ${release.version}`);
   await expect(footer).toContainText("Windows 10 and 11, 64-bit");
+  await expect(footer).toContainText("Linux (experimental), glibc 2.35+");
   // Every in-page link lands on something that exists.
   for (const id of ["download", "kept", "light", "lyrics", "yours", "questions", "official", "connects", "uninstall"]) {
     await expect(page.locator(`#${id}`)).toHaveCount(1);
@@ -253,9 +274,15 @@ test("the FAQ and features say what the README says", async ({ page }) => {
   const faq = await text("#questions");
   // Signing in.
   expect(faq).toContain("doesn't read your password; the code is open");
-  expect(faq).toContain("Use Microsoft Edge");
+  expect(faq).toContain("Use Microsoft Edge, Use Google Chrome, Use Brave or Use Vivaldi");
   expect(faq).toContain("Sign out");
   expect(faq).toContain("ListenBrainz token");
+  // 0.3.0: Linux, experimental, its sign-in and its keyring; songs that can't play.
+  expect(faq).toContain("experimental Linux build");
+  expect(faq).toContain("Linux has no sign-in window");
+  expect(faq).toContain("on Linux in your desktop's keyring");
+  expect(faq).not.toContain("There's no macOS or Linux version");
+  expect(faq).toContain("Look up YouTube directly in Settings > Playback");
   // What it connects to, and what each service gets.
   await expect(page.locator("#questions summary", { hasText: "What does it connect to?" })).toBeVisible();
   expect(faq).toContain("title, artist, album and length");
