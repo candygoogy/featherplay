@@ -9,7 +9,7 @@ featherplay data is there already. Reads only: it never deletes anything.
 
 The list matches packaging/windows/featherplay.iss: the program folder, the settings and
 cache folders, the shortcuts, the Apps entry, the registry keys of featherplay's
-AppUserModelID, and featherplay's secrets in Credential Manager (by exact name).
+AppUserModelID, its sign-in start entry, and featherplay's secrets in Credential Manager (by exact name).
 
 .PARAMETER CredService
 The service part of the credential names, "featherplay" unless the installer was built
@@ -55,6 +55,16 @@ foreach ($p in $paths) {
     $there = Test-Path -LiteralPath $p
     '{0,-8} {1}' -f ($(if ($there) { 'LEFT' } else { 'gone' })), $p
     if ($there) { $left += $p }
+}
+# The sign-in start entry: a value named featherplay, not a key.
+$values = @(
+    'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run',
+    'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run'
+)
+foreach ($k in $values) {
+    $there = $null -ne (Get-ItemProperty -LiteralPath $k -Name 'featherplay' -ErrorAction SilentlyContinue)
+    '{0,-8} {1}' -f ($(if ($there) { 'LEFT' } else { 'gone' })), "$k\featherplay"
+    if ($there) { $left += "$k\featherplay" }
 }
 foreach ($k in $keys) {
     $there = Test-Path -LiteralPath $k

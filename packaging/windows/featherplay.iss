@@ -10,7 +10,7 @@
 ; - Uninstalling removes everything featherplay keeps: the program folder, its settings
 ;   (%APPDATA%\featherplay), its cache, sidecars and sign-in browser profile
 ;   (%LOCALAPPDATA%\featherplay), its secrets in Windows Credential Manager, the registry
-;   keys of its AppUserModelID, and the shortcuts. Only exact names that are featherplay's
+;   keys of its AppUserModelID, its sign-in start entry, and the shortcuts. Only exact names that are featherplay's
 ;   own; nothing is matched by wildcard outside those folders.
 
 #ifndef AppVersion
@@ -388,6 +388,10 @@ begin
   RegDeleteKeyIncludingSubkeys(HKCU, 'Software\Classes\AppUserModelId\{#AppUserModelId}');
   // Windows' notification settings for featherplay's AppUserModelID.
   RegDeleteKeyIncludingSubkeys(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Notifications\Settings\{#AppUserModelId}');
+  // "Start when you sign in to Windows" (crates/platform/src/windows/autostart.rs), and
+  // Windows' Startup apps note about it.
+  RegDeleteValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Run', '{#AppName}');
+  RegDeleteValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run', '{#AppName}');
 end;
 
 // featherplay started this setup to update itself: silent, with /RELAUNCH on the command
