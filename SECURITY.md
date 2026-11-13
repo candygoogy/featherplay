@@ -16,12 +16,22 @@ it.
 
 ## What's in scope
 
-- The app, `featherplay.exe`, and the code in this repository.
+- The app, `featherplay.exe` (on Linux the AppImage and the binary in the `.tar.gz`), and the
+  code in this repository.
 - Credential storage. featherplay keeps your YouTube Music session, your Last.fm session
   (and your own Last.fm API key, if you set one), your ListenBrainz token and the local API's
-  token in Windows Credential Manager. A way to read them from outside your Windows account, or to make
-  featherplay write them somewhere else (a file, a log, a request to the wrong host), is in
-  scope.
+  token in Windows Credential Manager, or on Linux in the Secret Service (your desktop's
+  keyring). A way to read them from outside your account, or to make featherplay write them
+  somewhere else (a file, a log, a request to the wrong host), is in scope.
+- What some features keep on your PC, and send nowhere: the lyrics' timing and the lyrics
+  you picked, per song (`lyrics.json` in the settings folder: video ids and LRCLIB's words,
+  nothing about your account); the quick search's last five picks (`quick-search.json` in the
+  cache folder); the desktop lyrics' place on screen (in `settings.toml`); and, with **Start when you sign in** on, the entry the
+  system runs at sign-in (the `featherplay` value under
+  `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, or
+  `~/.config/autostart/dev.candygoogy.featherplay.desktop`), which starts the exe or AppImage
+  it was turned on in with `--autostart`. A way to make any of them leave your PC, or to make
+  that entry start something other than featherplay, is in scope.
 - The one file a secret goes in. yt-dlp takes cookies as a file, so for each song it looks
   up while you're signed in, featherplay writes the YouTube Music session to a temporary
   `cookies-*.txt` in `%LOCALAPPDATA%\featherplay\tmp` and deletes it when yt-dlp is done
@@ -64,15 +74,15 @@ it.
   install a file that's unsigned, signed for another release, or doesn't match its
   checksum, or an older version, is in scope. Versions up to 0.1.2 check only the SHA256.
 - The installer and uninstaller (`packaging/windows/`), including what the uninstaller
-  deletes and which processes it closes.
+  deletes (the start entry above among it) and which processes it closes.
 
 Out of scope:
 
 - Problems in YouTube Music, Google sign-in, WebView2, yt-dlp or Deno themselves. Report
   those to their projects.
-- Programs that already run as your Windows user. They can read Credential Manager entries
-  like any saved password, and the temporary cookie file too, and featherplay can't prevent
-  it.
+- Programs that already run as your user. They can read Credential Manager entries or the
+  keyring like any saved password, and the temporary cookie file too, and featherplay can't
+  prevent it.
 - The Last.fm API key and secret built into the release. Any desktop Last.fm client has to
   ship its pair inside the program, where anyone can extract it, so they aren't secret. The
   pair belongs to an API account used only by featherplay and can be rotated. If you'd

@@ -21,8 +21,8 @@ this file does; when the two disagree, the code is right and this file needs fix
 | `spikes/` | Early experiments, kept for reference. Not part of the build. |
 | `docs/` | User-facing docs, such as `docs/local-api.md`. |
 
-The app crate is about 44,000 lines of Rust and 17,000 of Slint. The crates together are
-about the same again.
+The app crate is about 54,000 lines of Rust, its tests included, and 20,000 of Slint. The
+crates together have about 79,000 lines of Rust.
 
 ## How a click becomes sound
 
@@ -46,7 +46,8 @@ there and its first 256 KB already in memory.
 
 The controller (`crates/controller/src/controller.rs`) runs one loop (`Controller::run`). It
 waits on a timer tick, the background results (`Msg`), the integrations' commands
-(`UiCommand`) and the window's actions (`Action`). `Action::Play` becomes
+(`UiCommand`), the window's actions (`Action`) and, only while the sleep timer runs, that
+timer's next wake (`crates/controller/src/controller/sleep.rs`). `Action::Play` becomes
 `Input::PlayTracks` for the player state machine in `crates/core/src/player.rs`.
 
 The player is pure logic, with no I/O. It answers each input with a list of `Effect`s:
@@ -151,7 +152,7 @@ controls and the tray (`apps/featherplay/src/shell.rs`).
 
 | Thread or runtime | Owns | Started in |
 |---|---|---|
-| Main thread (Slint's event loop) | The window, pages, `Ctx`, covers shown, the tray icon, media controls, taskbar buttons, hotkeys, the mini player, the quick search box | `app::run`, `run_window` (`apps/featherplay/src/app.rs`) |
+| Main thread (Slint's event loop) | The window, pages, `Ctx`, covers shown, the tray icon, media controls, taskbar buttons, hotkeys, and the windows that exist only while they show: the mini player, the quick search box (`apps/featherplay/src/quick_search.rs`) and the desktop lyrics' strip (`apps/featherplay/src/desktop_lyrics.rs`) | `app::run`, `run_window` (`apps/featherplay/src/app.rs`) |
 | `featherplay-controller` | The controller loop: the player, the music API client, the resolver, the audio engine handle, settings, scrobblers | `app::run` |
 | The shared tokio runtime (multi-thread) | Every async task: the controller (run with `block_on` on its thread), resolves, API calls, the UI's page loads (`Ctx::load`), cover fetches, the local API server. Cover decoding runs on its blocking pool. | `app::run` |
 | `featherplay-audio` | The engine: voices, the output device, `AudioEvent`s | `crates/audio/src/engine.rs` |
@@ -163,10 +164,11 @@ controls and the tray (`apps/featherplay/src/shell.rs`).
 | `featherplay-discord` | Discord's blocking IPC | `crates/controller/src/presence.rs` |
 | `featherplay-proxy` | Asks WinHTTP for a proxy script or auto-detection | `crates/proxy/src/lookups.rs` |
 | `featherplay-log` | Appends log lines to the file | `crates/controller/src/diagnostics.rs` |
-| `featherplay-endsession` | A hidden window that hears Windows' end-of-session messages and second launches | `crates/platform/src/windows/session_end.rs` |
+| `featherplay-endsession` | A hidden window that hears Windows' end-of-session messages and second launches (to show the window, or with `--quick-search` to open the quick search box) | `crates/platform/src/windows/session_end.rs` |
 | ksni's thread (Linux) | The tray icon's StatusNotifierItem and menu on the session bus; their events go to the main thread with `slint::invoke_from_event_loop` | `crates/platform/src/linux/tray.rs` |
-| global-hotkey's thread (Linux, X11) | The hotkeys' key grabs; a press is a `UiCommand` | `crates/integrations/src/hotkeys.rs` |
-| `featherplay-signin`, `featherplay-browser-signin`, `featherplay-browser-pipe` | The WebView2 sign-in, with its own COM apartment and message loop; the browser sign-in and its DevTools pipe | `crates/platform/src/windows/webview.rs`, `apps/featherplay/src/pages/sign_in/browser.rs`, `apps/featherplay/src/pages/sign_in/browser/cdp.rs` |
+| global-hotkey's thread (Linux, X11) | The hotkeys' key grabs. global-hotkey takes one event handler per process, so featherplay installs one that looks each press up among the keys registered now (`ROUTES`): the three hotkeys send a `UiCommand`, the quick search's key opens the box | `crates/integrations/src/hotkeys.rs` |
+| `featherplay-signin`, `featherplay-browser-signin`, `featherplay-browser-pipe` | The WebView2 sign-in (Windows), with its own COM apartment and message loop; the browser sign-in and its DevTools pipe. On Linux the browser sign-in thread starts the browser plainly, waits for the user to close it (15 minutes at most), then starts it headless on the same profile with the pipe | `crates/platform/src/windows/webview.rs`, `apps/featherplay/src/pages/sign_in/browser.rs`, `apps/featherplay/src/pages/sign_in/browser/cdp.rs` |
+| `featherplay-instance`, `featherplay-session-end`, `featherplay-spawner` (Linux) | The single-instance socket, which a second launch asks to show the window or, with `--quick-search`, to open the quick search box; `SIGTERM` and `SIGHUP`, which close the app as Windows' end of session does; the thread the helpers start on, so the kernel ties them to the app | `crates/platform/src/linux/instance.rs`, `crates/platform/src/linux/session_end.rs`, `crates/platform/src/linux/process.rs` |
 
 There are also short-lived threads, such as opening the log folder and registering the app's
 identity. And there are child processes: yt-dlp, Deno, and featherplay itself with
@@ -195,17 +197,17 @@ They talk like this:
 | Crate | Package | What it does | May depend on |
 |---|---|---|---|
 | `crates/core` | `featherplay-core` | Pure logic: the track model, the queue, the player state machine, scrobble rules, the session cookie rules and `cookie:` header both sign-ins use (`session`), translations (`tr!`). No I/O. | serde only |
-| `crates/platform` | `featherplay-platform` | Everything that talks to the OS, one module per OS (`windows`, `linux`), and which features an OS lacks (`supports`). Phase 2 moved the OS code into it and phase 5 wrote the `linux` module ([Target structure](#phase-2-a-platform-crate)); what Linux lacks, `supports` reports. | core |
+| `crates/platform` | `featherplay-platform` | Everything that talks to the OS, one module per OS (`windows`, `linux`), and which features an OS lacks (`supports`), among them the entry that starts featherplay at sign-in (`autostart`: the HKCU `Run` value, or the XDG autostart file). Phase 2 moved the OS code into it and phase 5 wrote the `linux` module ([Target structure](#phase-2-a-platform-crate)); what Linux lacks, `supports` reports. | core |
 | `crates/proxy` | `featherplay-proxy` | The proxy every HTTP client and yt-dlp go through: the environment, else Windows' settings | platform |
-| `crates/store` | `featherplay-store` | Paths, settings, the saved session, secrets in Credential Manager or the Secret Service, the library and silence caches | core, platform |
+| `crates/store` | `featherplay-store` | Paths, settings (with the desktop lyrics' table), the saved session, the lyrics chosen per song, secrets in Credential Manager or the Secret Service, the library and silence caches | core, platform |
 | `crates/ytm` | `featherplay-ytm` | The YouTube Music client over ytmapi-rs: requests (`crates/ytm/src/api.rs`) and parsing (`crates/ytm/src/convert.rs`) | core, proxy |
 | `crates/streams` | `featherplay-streams` | The stream resolver: native step, QuickJS, yt-dlp, the helper downloads | core, proxy, platform |
 | `crates/audio` | `featherplay-audio` | The audio engine: download, decode, sound chain, output | core, proxy, platform (tests also use streams) |
 | `crates/lastfm` | `featherplay-lastfm` | Last.fm: signing, auth, scrobbles, the offline queue | core, proxy |
 | `crates/listenbrainz` | `featherplay-listenbrainz` | ListenBrainz: now playing, listens, token checks | proxy |
-| `crates/lyrics` | `featherplay-lyrics` | LRC parsing and LRCLIB lookups | proxy |
-| `crates/integrations` | `featherplay-integrations` | Hotkeys, SponsorBlock, Discord and the local API; `UiCommand` and `NowPlaying`, which the platform's tray, media controls and thumb buttons map to and from; the tray's hover text and the track's toast | core, proxy, store, platform |
-| `crates/controller` | `featherplay-controller` | The app's logic that needs no window ([Target structure](#phase-3-a-controller-crate)): the controller loop (`controller`), scrobbling (`scrobbler`), Discord presence (`presence`), the data source the pages share (`catalog`) and the recorded `fixtures`, diagnostics (the log, `log!`, crash files, Copy diagnostics), link parsing, the search suggestions' pacing, the update check and download, the detached task helpers, and `Place` (where a pick leads or a queue came from), which the app maps to its pages | core, platform, proxy, store, streams, ytm, audio, integrations, lastfm, listenbrainz, lyrics |
+| `crates/lyrics` | `featherplay-lyrics` | LRC parsing, LRCLIB lookups and its text search ("Choose other lyrics") | proxy |
+| `crates/integrations` | `featherplay-integrations` | Hotkeys (the three of Settings and the quick search's), SponsorBlock, Discord and the local API; `UiCommand` and `NowPlaying`, which the platform's tray, media controls and thumb buttons map to and from; the tray's hover text and the track's toast | core, proxy, store, platform |
+| `crates/controller` | `featherplay-controller` | The app's logic that needs no window ([Target structure](#phase-3-a-controller-crate)): the controller loop (`controller`, with the sleep timer and its fade in `controller/sleep.rs`), scrobbling (`scrobbler`), Discord presence (`presence`), the data source the pages share (`catalog`) and the recorded `fixtures`, diagnostics (the log, `log!`, crash files, Copy diagnostics), link parsing, the search suggestions' pacing, the update check and download, the detached task helpers, and `Place` (where a pick leads or a queue came from), which the app maps to its pages | core, platform, proxy, store, streams, ytm, audio, integrations, lastfm, listenbrainz, lyrics |
 | `apps/featherplay` | `featherplay` | Everything else: startup, the window, pages, the UI bridge, the update check's triggers and toasts, sign-in, the perf harness | all of the above, Slint |
 
 The rules: library crates never depend on Slint or on the app; the controller crate not on
@@ -247,10 +249,16 @@ software surface), `vendor/opus-decoder` (rustfft in place of a naive DFT) and
 `$XDG_CONFIG_HOME/featherplay` and `$XDG_CACHE_HOME/featherplay` (`~/.config`, `~/.cache`).
 `{state}` below, the logs' folder, is `$XDG_STATE_HOME/featherplay` (`~/.local/state`) on
 Linux and the cache folder everywhere else. Nothing is created until something is saved.
+A file that's missing or unreadable gives the defaults. Many settings, and every setting
+and file added in 0.4.0, are read key by key: a value of the wrong type, out of range or
+from a newer version takes that key's default, and the rest are kept. The older plain
+switches and numbers of `settings.toml` (`notifications`, `lyrics`, `volume` and the like)
+aren't yet: one of the wrong type makes the whole file load as the defaults.
 
 | Where | What | Written by |
 |---|---|---|
-| `{config}/settings.toml` | Settings | `crates/store/src/settings.rs` |
+| `{config}/settings.toml` | Settings; its `[desktop_lyrics]` table holds the strip's switch, size, lock and place | `crates/store/src/settings.rs`, `crates/store/src/desktop_lyrics.rs` |
+| `{config}/lyrics.json` | The lyrics' timing and the lyrics picked, per song (at most 1,000 songs) | `crates/store/src/lyrics_choices.rs` |
 | `{config}/session.json` | The queue and position, restored paused | `crates/store/src/session.rs` |
 | `{config}/scrobble-queue.json`, `{config}/listenbrainz-queue.json` | Scrobbles waiting to be sent | `crates/controller/src/scrobbler.rs` |
 | `{state}/logs/` | `featherplay.log` and `featherplay.1.log` (about 1 MB each), crash files | `crates/controller/src/diagnostics/logfile.rs`, `crates/controller/src/diagnostics/crash.rs` |
@@ -259,12 +267,21 @@ Linux and the cache folder everywhere else. Nothing is created until something i
 | `{cache}/streams.json` | Resolved streams kept for the next start | `crates/controller/src/controller/streams.rs` |
 | `{cache}/silences.json` | Silences found by skip silence | `crates/store/src/silence_cache.rs` |
 | `{cache}/client-version.txt` | The client version of the last session | `crates/store/src/session.rs` |
+| `{cache}/quick-search.json` | The quick search's last five picks | `apps/featherplay/src/quick_search.rs` |
 | `{cache}/sidecars/` | yt-dlp and Deno (`FEATHERPLAY_SIDECARS_DIR` overrides this in dev builds) | `crates/streams/src/sidecars.rs` |
 | `{cache}/resolver/` | The native resolver's `state.json` and preprocessed players (`players/`) | `crates/streams/src/native.rs` |
 | `{cache}/yt-dlp-cache/`, `{cache}/deno-dir/` | The helpers' own caches | `crates/streams/src/ytdlp.rs`, `crates/streams/src/sidecars.rs` |
 | `{cache}/tmp/` | Audio being downloaded; stale files cleared at start | `crates/audio/src/tmp.rs` |
 | `{cache}/updates/`, `{cache}/update-check.json` | A downloaded setup and the last update check | `crates/controller/src/updates.rs`, `crates/controller/src/updates/install.rs` |
 | `{cache}/webview2/`, `{cache}/signin-*` | The WebView2 sign-in profile; a browser sign-in's temporary profile | `apps/featherplay/src/pages/sign_in.rs`, `apps/featherplay/src/pages/sign_in/browser/profile.rs` |
+
+Outside these folders, **Start when you sign in** keeps one entry the system runs at
+sign-in (`crates/platform/src/windows/autostart.rs`, `crates/platform/src/linux/autostart.rs`):
+the `featherplay` value under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` (Windows'
+Startup apps turn it off in `...\Explorer\StartupApproved\Run`), or
+`$XDG_CONFIG_HOME/autostart/dev.candygoogy.featherplay.desktop`. Each starts featherplay with
+`--autostart`. Whether it's on is read from there, never kept in the settings, and every
+start repoints an entry left at an old path (`apps/featherplay/src/autostart.rs`).
 
 ### Credentials
 
@@ -292,7 +309,7 @@ services.
 ### Logs and Copy diagnostics
 
 Every `log!` line, and every `log` record from the crates, is redacted and written to
-`{cache}/logs/featherplay.log` by the `featherplay-log` thread
+`{state}/logs/featherplay.log` by the `featherplay-log` thread
 (`crates/controller/src/diagnostics.rs`). A panic leaves a crash file beside it. Settings >
 About's "Copy diagnostics" builds a short report (`crates/controller/src/diagnostics/report.rs`):
 versions, the output device, which services are on, the proxy, the last helper download and
@@ -348,7 +365,15 @@ the release's `featherplay-<arch>.AppImage` and checks it the same way. "Restart
 writes it beside the running AppImage, flushes it, gives it the old file's permissions and
 renames it over the old one (`platform::installer::replace_file`), then starts it once
 featherplay has quit. A copy from the `.tar.gz` or a distribution's package only announces
-a new version. `packaging/linux/build-linux.sh` makes both Linux files.
+a new version. `packaging/linux/build-linux.sh` makes both Linux files. The AppImage also
+carries, in `usr/lib/`, the libraries the window loads that the AppImage excludelist doesn't
+expect every system to have (libxkbcommon, libxkbcommon-x11, libxcb-xkb, libXcursor, libXi,
+libXrender, libXfixes, libXext), copied from the build image. `patchelf` gives the AppImage's
+copy of the binary the RUNPATH `$ORIGIN/../lib`, which its `dlopen` calls search too, and
+each library `$ORIGIN`; there's no `LD_LIBRARY_PATH`, which would reach the browser, yt-dlp
+and Deno. The `.tar.gz` binary has no RUNPATH and bundles nothing. The x86_64 release binary
+is linked with `--icf=all`, which folds identical functions as link.exe's `/OPT:ICF` does
+for the Windows exe (`apps/featherplay/build.rs`).
 
 The release itself is in `RELEASING.md`. `.github/workflows/release.yml` builds both
 architectures and the installers, writes `SHA256SUMS.txt` and makes a draft. The maintainer

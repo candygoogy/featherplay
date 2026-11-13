@@ -34,7 +34,11 @@ RUSTFLAGS="--cfg ci" cargo nextest run --workspace
 RUSTFLAGS="--cfg ci" cargo test --workspace --doc
 ```
 
-Commit as `chore: release X.Y.Z`, push `main`, and wait for CI to pass on that commit.
+Commit as `chore: release X.Y.Z`, push `main`, and wait for CI to pass on that commit. Its
+Linux rigs include `linux-rig-appimage.yml`'s `bare` job: the release AppImage on a bare
+Ubuntu 22.04 with no network, D-Bus or keyring, as the AppImage catalog tests it, which must
+show its window within 30 s. A red `bare` usually means the AppImage needs a library it
+doesn't carry (`bundled` in `packaging/linux/build-linux.sh`).
 
 ## 3. Tag
 
@@ -103,7 +107,10 @@ install, the yt-dlp and deno it downloaded stay, and keep running as x64.)
 
 On Linux (WSL will do), run the AppImage once: `chmod +x featherplay-x86_64.AppImage`, then
 `./featherplay-x86_64.AppImage` (add `--appimage-extract-and-run` where there's no FUSE). It
-should start, play, and quit from its window. The aarch64 files are tested by the workflow
+should start, play, and quit from its window. Its own binary should find the libraries it
+carries: after `./featherplay-x86_64.AppImage --appimage-extract`,
+`readelf -d squashfs-root/usr/bin/featherplay` shows the RUNPATH `$ORIGIN/../lib`, and
+`squashfs-root/usr/lib/` holds the libraries `build-linux.sh` bundles with patchelf. The aarch64 files are tested by the workflow
 only (the release notes say so); there's no hand check for them.
 
 ### Sign it

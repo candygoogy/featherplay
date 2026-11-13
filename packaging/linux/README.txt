@@ -19,8 +19,9 @@ Or install it for your user, so it shows in your desktop's app list:
   cp -r share/. ~/.local/share/
 
 The desktop entry starts `featherplay` from your PATH; ~/.local/bin is on it in most
-distributions. To remove it, delete ~/.local/bin/featherplay and the files named
-dev.candygoogy.featherplay.* under ~/.local/share.
+distributions. To remove it, turn off "Start when you log in" (Settings > Window) if it's
+on, then delete ~/.local/bin/featherplay and the files named dev.candygoogy.featherplay.*
+under ~/.local/share.
 
 Updates: this copy tells you when a new version is out, but doesn't install it. The AppImage
 updates itself.
@@ -30,6 +31,7 @@ fontconfig, FreeType and ALSA (with PipeWire or PulseAudio behind it, as desktop
 a Wayland or X11 session and its libraries (libxkbcommon, with libwayland-client, or with
 libX11, libX11-xcb, libxcb, libxkbcommon-x11, libXcursor and libXi), and the system's CA
 certificates (ca-certificates on Debian, Ubuntu, Fedora and Arch). A desktop
-distribution has all of these. Its TLS is built in (no OpenSSL needed); it trusts the
+distribution has all of these. (The AppImage carries its own libxkbcommon, libxkbcommon-x11,
+libXcursor and libXi; this archive carries no libraries.) Its TLS is built in (no OpenSSL needed); it trusts the
 certificates your system trusts, and with none installed, the Mozilla roots it carries.
 Settings go in ~/.config/featherplay, the cache in ~/.cache/featherplay.

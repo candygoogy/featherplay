@@ -27,13 +27,13 @@ A Cargo workspace. The app is `apps/featherplay`; the rest are libraries it uses
 | `crates/ytm` | The music catalogue and library over ytmapi-rs, signed in with the session's cookies or signed out; `convert` turns raw responses into `core` types and is tested on recorded fixtures. |
 | `crates/streams` | Stream URLs for tracks: one InnerTube request of its own, else the yt-dlp sidecar. Also downloads and checks the yt-dlp and Deno sidecars. |
 | `crates/audio` | The audio engine on its own thread: 1 MiB `Range` downloads into a temp file, AAC/MP4 decoding with Symphonia and Opus/WebM with opus-decoder, the sound processing (`dsp/`: equalizer, compressor, limiter; crossfade, speed and silence skipping beside it), output through rodio and cpal. |
-| `crates/store` | What's kept on disk and in the OS: paths, settings, the saved session, secrets (Credential Manager on Windows, the Secret Service on Linux), the Library's cache and where songs are silent. |
+| `crates/store` | What's kept on disk and in the OS: paths, settings, the saved session, the lyrics chosen per song, secrets (Credential Manager on Windows, the Secret Service on Linux), the Library's cache and where songs are silent. |
 | `crates/proxy` | Which proxy a request goes through: the environment, else Windows' auto-detection, proxy script or manual proxy, looked up in the background (on Linux, the environment only). Every HTTP client is built from its `client()`, with its TLS. Also the check whether the DNS sends YouTube's hosts away from Google (`dns`), and the DNS over HTTPS lookup behind "Look up YouTube directly" (`doh`). |
-| `crates/lyrics` | The LRC format and the LRCLIB lookup. No cache, no retries. |
+| `crates/lyrics` | The LRC format, the LRCLIB lookup and its text search. No cache, no retries. |
 | `crates/lastfm` | The Last.fm client: request signing, the desktop auth flow, scrobbling and the offline queue. |
 | `crates/listenbrainz` | The ListenBrainz client: `submit-listens` (now playing, single listens, the offline queue) and `validate-token`. |
-| `crates/integrations` | The services and the commands: global hotkeys, SponsorBlock, Discord presence, the local API and Amuse endpoint, and `UiCommand` and `NowPlaying`, which turn the OS parts' events into commands and the playing song into what they show. |
-| `crates/platform` | Everything that talks to the operating system, behind plain functions and types: the tray, media controls (SMTC, MPRIS), taskbar buttons, notifications, the credential store, the browsers for the sign-in, windows, the single-instance guard, fonts, the clipboard, threads and memory. One module per OS (`windows`, `linux`), picked at compile time; `supports()` says which features an OS lacks. |
+| `crates/integrations` | The services and the commands: global hotkeys (with the quick search's), SponsorBlock, Discord presence, the local API and Amuse endpoint, and `UiCommand` and `NowPlaying`, which turn the OS parts' events into commands and the playing song into what they show. |
+| `crates/platform` | Everything that talks to the operating system, behind plain functions and types: the tray, media controls (SMTC, MPRIS), taskbar buttons, notifications, the credential store, the browsers for the sign-in, windows, the single-instance guard, the entry that starts featherplay at sign-in, fonts, the clipboard, threads and memory. One module per OS (`windows`, `linux`), picked at compile time; `supports()` says which features an OS lacks. |
 | `crates/controller` | Everything the app does without a window: the controller that ties the crates together, scrobbling, Discord presence, the data source the pages share (and its `--fixtures`), the log and Copy diagnostics, the update check. Its tests need no window: `cargo nextest run -p featherplay-controller`. |
 | `apps/featherplay` | The app: the Slint UI (`ui/`), the pages and the window, startup, and the offscreen snapshot mode. `apps/featherplay/ui/README.md` explains how the UI is laid out. |
 
@@ -92,9 +92,11 @@ cache in `~/.cache/featherplay` and the log in `~/.local/state/featherplay/logs`
 machine's architecture as `target/linux/featherplay-<arch>.AppImage` and
 `featherplay-<arch>.tar.gz`. It downloads appimagetool and the AppImage runtime, pinned by
 SHA256, and takes the keys and `ALLOW_NO_KEYS=1` as the installer script does; its header
-lists the other settings. Releases are built on Ubuntu 22.04, so the binary needs glibc 2.35
-or newer. A build on a newer distribution needs that one's glibc; `MAX_GLIBC=2.35` makes the
-script refuse such a binary.
+lists the other settings. It also needs `patchelf`: the AppImage carries the keyboard and X11
+libraries that the AppImage excludelist leaves to the AppImage, copied from the build
+machine, and its copy of the binary finds them through its RUNPATH. Releases are built on
+Ubuntu 22.04, so the binary needs glibc 2.35 or newer. A build on a newer distribution needs that one's glibc;
+`MAX_GLIBC=2.35` makes the script refuse such a binary.
 
 `scripts/linux-check.sh` runs `cargo check` and clippy for `x86_64-unknown-linux-gnu`, on
 Linux or in WSL: a quick check before a push.
@@ -114,7 +116,8 @@ the slow frame-cost and CPU-time ceilings. The weekly run's and `release.yml`'s 
 run everything; their ARM64 jobs use the `ci` profile too. A `linux` job runs clippy and
 the tests on Ubuntu, x86_64 and aarch64, and CI also runs the Linux rigs in `scripts/rig/`:
 the sound output, the app on a real X11 and Wayland desktop, and the AppImage in several
-distributions' containers.
+distributions' containers and on a bare Ubuntu 22.04 with no network, D-Bus or keyring, as
+the AppImage catalog tests it.
 
 The tests need [cargo-nextest](https://nexte.st), because it runs each test in its own
 process: Slint allows one platform per process, and most app tests install the offscreen

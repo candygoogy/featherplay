@@ -18,6 +18,7 @@ touches another. The shared files below change only when a page needs something 
 | `queue_panel.slint` | The Up next panel (`QueueData`) | now playing |
 | `mini_player.slint` | The tray's mini player (`MiniPlayer`, `MiniData`): its own small window, opened by a left click on the tray icon; `src/mini.rs` | tray |
 | `desktop_lyrics.slint` | Desktop lyrics (`DesktopLyrics`, `StripData`): a borderless strip, always on top, with the line being sung and the next, its hover controls (size, lock, open, close); its own window while desktop lyrics are on; `src/desktop_lyrics.rs` | lyrics |
+| `lyrics_menu.slint` | The lyrics menu, the ⋯ (`LyricsMoreButton`) beside the Lyrics pill while the full lyrics view shows, in the song menu's style (`LyricsMenu`, `LyricsMenuLayer`): text size, timing for this song with Reset, the desktop lyrics' switch and Unlock, "Choose other lyrics…"; that dialog (`LyricsChoose`, `LyricsChooseLayer`: LRCLIB's matches, the one in use marked, a search field), and the confirmation of Settings' "Reset lyrics settings" (`LyricsResetLayer`); `src/lyrics.rs`, `src/lyrics/choose.rs` | lyrics |
 | `quick_search.slint` | The quick search box (`QuickSearch`, `QuickData`, `QuickRow`): its own borderless window over any app, opened by the quick search's global hotkey; the field, the recent picks or the top bar's suggestions (results first, the match bright), the key hints. Its key's Settings row is `pages/settings/quick_key.slint` (`QuickKeyData`, the key-capture field); `src/quick_search.rs`, `src/pages/settings/quick_key.rs` | search |
 | `account_menu.slint` | The account menu from the sidebar's account row (`AccountMenu`, `AccountItem`): identities, Switch Google account, Sign out | account |
 | `song_menu.slint` | The song menu (`SongMenu`, drawn over everything by `SongMenuLayer` in `app.slint`): Play next, Add to queue, Like or Dislike, Add to playlist, Start radio; `src/song_menu.rs` | menus |
@@ -144,7 +145,11 @@ The keys are handled in `app.slint`'s `keys` scope, and each one is also listed 
   clears the field, then leaves it; × clears it.
 - Alt+Left and Alt+Right go back and forward; Escape leaves Now playing.
 - Ctrl+L turns the full lyrics view on or off (from another page it opens Now playing on the
-  lyrics), and Ctrl+/ opens the list of shortcuts.
+  lyrics). Ctrl+= (or Ctrl++) and Ctrl+- step the lyrics' text size while lyrics are on
+  screen, and Ctrl+Shift+L turns desktop lyrics on or off while they're offered (lyrics on,
+  and not under Wayland).
+- Ctrl+F on Settings goes to its search field; Ctrl+M opens or closes the mini player where
+  the desktop has no tray (the bar's button then); Ctrl+/ opens the list of shortcuts.
 
 Pages start below the 64 px top bar (`Theme.top-bar-h`); Now playing and Sign in have none
 (Ctrl+K leaves Now playing first, and goes Home from Sign in). Sign in centres its block, its
@@ -199,8 +204,16 @@ synced lines from LRCLIB or YouTube Music, or plain lyrics. It appears in the Ly
   back when it closes. With nothing to show, the tab keeps its place and shows an empty state
   (`NoLyrics`: the microphone's tile, what happened, where featherplay looked, and Try again
   after a failure).
-- Nothing is looked up until a lyrics view is on screen. With Settings' "Show lyrics" off
+- Nothing is looked up until a lyrics view is on screen; the desktop lyrics' strip counts as
+  one (`LyricsData.desktop`), whatever the window shows. With Settings' "Show lyrics" off
   (`LyricsData.on`), the toggles and the tab are gone and nothing is looked up at all.
+- The text size (`LyricsData.size`: Small, Medium, Large) sets the lines in the tab and in
+  the full view; Settings > Lyrics, the lyrics menu and Ctrl+= / Ctrl+- change it.
+- The lyrics menu's timing moves the lines half a second at a time for the song
+  (`LyricsData.timing` says how, "On time" or "0.5 s later", and the credit line notes it),
+  and "Choose other lyrics…" replaces the automatic match. Both are kept per song on this PC
+  (`featherplay_store::LyricsChoices`). The tab's empty state offers the same search ("Search
+  LRCLIB yourself").
 
 ## Checking your work: offscreen snapshots
 
