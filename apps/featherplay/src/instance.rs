@@ -15,6 +15,7 @@ use featherplay_platform::instance;
 pub use featherplay_platform::instance::{
     Claim, Guard, Running, claim, key, mutex_name, show_message,
 };
+pub use featherplay_platform::session_end::Ask;
 
 /// How long a second launch keeps trying: the first may still be starting (its end-session
 /// window not made yet) or closing (saving its session).
@@ -30,7 +31,12 @@ pub fn key_here() -> String {
 /// Asks the featherplay of this key to show its window. True once one answered that it
 /// did; false if none did (none is running, it is still starting, or it is closing).
 pub fn ask_to_show(key: &str) -> bool {
-    instance::ask_to_show(key).unwrap_or_else(|e| {
+    ask(key, Ask::Show)
+}
+
+/// Asks the featherplay of this key for `what`, as `ask_to_show` does.
+pub fn ask(key: &str, what: Ask) -> bool {
+    instance::ask(key, what).unwrap_or_else(|e| {
         log!("single instance: {e}");
         false
     })
@@ -45,8 +51,10 @@ pub enum Start {
     Exit,
 }
 
-/// Call on the main thread, first thing in a windowed run.
-pub fn start() -> Start {
+/// Call on the main thread, first thing in a windowed run. Another featherplay of this home
+/// is asked for `what` (its window; with `--quick-search`, the quick search box). With none
+/// running, this one starts as usual.
+pub fn start(what: Ask) -> Start {
     let key = key_here();
     let mut running = match claim(&mutex_name(&key)) {
         Ok(Claim::First(guard)) => return Start::Run(Some(guard)),
@@ -58,8 +66,8 @@ pub fn start() -> Start {
     };
     let deadline = Instant::now() + HANDOFF;
     loop {
-        if ask_to_show(&key) {
-            log!("featherplay is already running; it showed its window");
+        if ask(&key, what) {
+            log!("featherplay is already running; it answered ({what:?})");
             return Start::Exit;
         }
         // Starting (no window yet) or closing (it said no): if it ends, this run takes over.

@@ -30,6 +30,15 @@ pub struct Settings {
     pub notifications: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub hotkeys: Option<Hotkeys>,
+    /// "Quick search from anywhere" (Settings > Window, off by default): `quick_search_key`
+    /// opens the quick search box over any app. A value that isn't a bool loads as off.
+    #[serde(deserialize_with = "lenient")]
+    pub quick_search: bool,
+    /// The quick search's key, e.g. `"Ctrl+Alt+K"` (`QUICK_SEARCH_KEY`); kept while the
+    /// switch is off. A value that isn't text loads as "", which the app takes as the
+    /// default, as it does any text that isn't a key it can use.
+    #[serde(deserialize_with = "lenient")]
+    pub quick_search_key: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub output_device: Option<String>,
     pub volume: f32,
@@ -374,6 +383,8 @@ impl Default for Settings {
             tray_notice_shown: false,
             notifications: false,
             hotkeys: None,
+            quick_search: false,
+            quick_search_key: Settings::QUICK_SEARCH_KEY.to_string(),
             output_device: None,
             volume: 0.7,
             queue_open: false,
@@ -658,6 +669,9 @@ impl Settings {
     pub const SLEEP_FADES: [u8; 4] = [0, 10, 20, 30];
     /// The sleep timer's fade by default, in seconds.
     pub const SLEEP_FADE: u8 = 20;
+    /// The quick search's default key: Ctrl+K is the search inside featherplay, and Windows
+    /// uses no Ctrl+Alt+K.
+    pub const QUICK_SEARCH_KEY: &str = "Ctrl+Alt+K";
 
     /// Loads the settings. A missing, unreadable or invalid file gives the defaults. An
     /// older file is migrated first; a newer one keeps its schema number.

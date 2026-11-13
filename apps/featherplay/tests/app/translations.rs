@@ -322,6 +322,8 @@ const NOT_TRANSLATED: &[&str] = &[
     "#4390EE",
     "cookie: SID=…; HSID=…; SAPISID=…",
     "scoop update featherplay",
+    // The command a Wayland desktop shortcut runs (Settings › Window).
+    "featherplay --quick-search",
     "K",
     // Keys on the shortcuts list (F also on Settings' search field).
     "R",

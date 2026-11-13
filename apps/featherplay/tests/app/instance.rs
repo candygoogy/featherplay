@@ -120,8 +120,10 @@ fn asking_to_show_reaches_the_window_of_the_same_home() {
         || {},
         Some(session_end::Show {
             message: instance::show_message(&key).expect("register the message"),
-            on_show: Box::new(move || {
-                count.fetch_add(1, Ordering::SeqCst);
+            on_show: Box::new(move |ask| {
+                if ask == session_end::Ask::Show {
+                    count.fetch_add(1, Ordering::SeqCst);
+                }
                 true
             }),
         }),
@@ -129,6 +131,9 @@ fn asking_to_show_reaches_the_window_of_the_same_home() {
     .expect("listen");
 
     assert!(instance::ask_to_show(&key), "no window answered");
+    assert_eq!(shown.load(Ordering::SeqCst), 1);
+    // `--quick-search` asks the same window for the box, not for the main window.
+    assert!(instance::ask(&key, instance::Ask::QuickSearch), "no answer");
     assert_eq!(shown.load(Ordering::SeqCst), 1);
 }
 
@@ -140,7 +145,7 @@ fn asking_to_show_passes_over_the_window_of_another_home() {
         || {},
         Some(session_end::Show {
             message: instance::show_message(&test_key("mine")).expect("register the message"),
-            on_show: Box::new(move || {
+            on_show: Box::new(move |_| {
                 count.fetch_add(1, Ordering::SeqCst);
                 true
             }),
@@ -159,7 +164,7 @@ fn a_closing_instance_does_not_count_as_shown() {
         || {},
         Some(session_end::Show {
             message: instance::show_message(&key).expect("register the message"),
-            on_show: Box::new(|| false),
+            on_show: Box::new(|_| false),
         }),
     )
     .expect("listen");

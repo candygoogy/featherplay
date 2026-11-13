@@ -43,6 +43,10 @@ pub enum Change {
     CustomAccent(AccentColour),
     Theme(ThemeMode),
     Hotkeys(Option<Hotkeys>),
+    /// "Quick search from anywhere" on or off (the window registers its key).
+    QuickSearch(bool),
+    /// The quick search's key, as `"Ctrl+Alt+K"`.
+    QuickSearchKey(String),
     /// Lyrics show at all: the Lyrics toggles and tab, and their lookups.
     Lyrics(bool),
     /// The lyrics view looks up synced lyrics on LRCLIB.
@@ -128,6 +132,8 @@ impl Change {
             }
             Change::Theme(v) => s.theme = v,
             Change::Hotkeys(v) => s.hotkeys = v,
+            Change::QuickSearch(v) => s.quick_search = v,
+            Change::QuickSearchKey(v) => s.quick_search_key = v,
             Change::Lyrics(v) => s.lyrics = v,
             Change::LyricsLrclib(v) => s.lyrics_lrclib = v,
             Change::DesktopLyrics(v) => s.desktop_lyrics = v,
@@ -321,6 +327,8 @@ mod tests {
                 next: "Ctrl+Alt+Right".into(),
                 previous: "Ctrl+Alt+Left".into(),
             })),
+            Change::QuickSearch(true),
+            Change::QuickSearchKey("Ctrl+Shift+Space".into()),
             Change::Lyrics(false),
             Change::LyricsLrclib(false),
             Change::DesktopLyrics(DesktopLyrics {
@@ -366,6 +374,8 @@ mod tests {
         assert!(!s.scrobbling && s.listenbrainz_enabled);
         assert!(!s.alternative_titles && !s.alternative_artists);
         assert!(s.hotkeys.is_some());
+        assert!(s.quick_search);
+        assert_eq!(s.quick_search_key, "Ctrl+Shift+Space");
         assert_eq!(s.theme, ThemeMode::Light);
         assert!(s.local_api);
         assert_eq!(s.local_api_port, 31000);

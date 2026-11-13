@@ -6,7 +6,8 @@
 //!
 //! The window: `app` (context, startup), `router` (pages and history), `pages` (one module
 //! per page), `sidebar`, `top_bar` (search), `bar`, `queue_panel`, `ui_bridge` (model to Slint
-//! rows). `mini` is the tray's mini player, a window of its own (`popup` places it); the tray
+//! rows). `mini` is the tray's mini player and `quick_search` the quick search box, windows of
+//! their own (`popup` places the mini player); the tray
 //! icon's hover text and right-click menu are Windows' own (`shell`). The Slint side is in `ui/`;
 //! `ui/README.md` says which file owns what.
 
@@ -53,6 +54,7 @@ pub mod playlist_menu;
 pub mod popup;
 pub mod prepare;
 pub mod queue_panel;
+pub mod quick_search;
 pub mod refused;
 pub mod repaint;
 pub mod router;

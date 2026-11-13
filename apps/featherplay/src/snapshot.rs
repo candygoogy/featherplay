@@ -210,6 +210,8 @@ impl Scene {
         // No offscreen window is ever in front, so the mini player's poll mustn't read the
         // desktop's: a test puts its own windows in front.
         crate::mini::read_foreground_with(|| None);
+        // Nor does a test or a snapshot take the quick search's key from the system.
+        crate::quick_search::register_keys_with(|_| Ok(None));
         // English, whatever the machine's languages or settings, so renders don't depend on
         // them; a test picks another with `language::apply`.
         crate::language::apply("");
@@ -649,6 +651,30 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
         crate::pages::settings::show_shortcuts_for_snapshot(ctx, o.page == "shortcuts-hotkeys");
         settle();
     }
+    if let Some(state) = o.page.strip_prefix("settings-quick-search") {
+        let key = if state == "-changed" {
+            "Ctrl+Shift+Space"
+        } else {
+            featherplay_store::Settings::QUICK_SEARCH_KEY
+        };
+        let state = state.trim_start_matches('-');
+        crate::pages::settings::show_quick_key_for_snapshot(ctx, key, state);
+        if state == "wayland" {
+            ui.global::<crate::ui::SettingsData>()
+                .set_has_hotkeys(false);
+            ui.global::<crate::ui::QuickKeyData>().set_why_open(true);
+        }
+        settle();
+    }
+    if o.page == "shortcuts-quick-search" {
+        crate::pages::settings::show_quick_key_for_snapshot(
+            ctx,
+            featherplay_store::Settings::QUICK_SEARCH_KEY,
+            "",
+        );
+        crate::pages::settings::show_shortcuts_for_snapshot(ctx, true);
+        settle();
+    }
     if o.page == "settings-local-api" {
         crate::pages::settings::show_local_api_for_snapshot(ctx);
         settle();
@@ -795,6 +821,10 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
     } else {
         None
     };
+    let quick = match o.page.strip_prefix("quick-search") {
+        Some(state) => Some(quick_search_for_snapshot(&scene, state, o.scale)?),
+        None => None,
+    };
     let frame = if o.page.starts_with("sign-in-window") {
         let source = match o.page.as_str() {
             "sign-in-window-lookalike" => {
@@ -817,11 +847,12 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
     } else {
         None
     };
-    let window = match (&mini, &frame, &strip) {
-        (Some(m), _, _) => m.window(),
-        (None, Some(f), _) => f.window(),
-        (None, None, Some(s)) => s.window(),
-        (None, None, None) => ui.window(),
+    let window = match (&mini, &frame, &strip, &quick) {
+        (Some(m), _, _, _) => m.window(),
+        (None, Some(f), _, _) => f.window(),
+        (None, None, Some(s), _) => s.window(),
+        (None, None, None, Some(q)) => q.window(),
+        (None, None, None, None) => ui.window(),
     };
     let logical = mini
         .as_ref()
@@ -829,7 +860,10 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
         .or(frame.as_ref().map(|_| crate::pages::sign_in::WINDOW_SIZE))
         .or(strip
             .as_ref()
-            .map(|s| (s.get_wanted_width(), s.get_wanted_height())));
+            .map(|s| (s.get_wanted_width(), s.get_wanted_height())))
+        .or(quick
+            .as_ref()
+            .map(|q| (crate::quick_search::WIDTH, q.get_box_height())));
     let (width, height) = match logical {
         Some((w, h)) => ((w * o.scale).round() as u32, (h * o.scale).round() as u32),
         None => (o.width, o.height),
@@ -841,6 +875,7 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
         Hold::Error if o.page.starts_with("now-playing-lyrics") => {}
         Hold::Error => hold_error(ctx, ui)?,
     }
+    let quick_key = o.page.starts_with("settings-quick-search");
     if o.page.starts_with("settings-lyrics") {
         let data = ui.global::<crate::ui::SettingsData>();
         data.set_desktop_lyrics(true);
@@ -854,6 +889,7 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
         || o.page.starts_with("settings-window")
         || o.page.starts_with("settings-lyrics")
         || o.page == "settings-picked"
+        || quick_key
         || o.pointer.is_some()
     {
         // Laid out at the snapshot's size first, so the scroll and the pointer land on what
@@ -873,6 +909,10 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
     }
     if o.page.starts_with("settings-lyrics") {
         scroll_to_group(window, "Lyrics")?;
+        settle();
+    }
+    if quick_key {
+        scroll_to_group(window, "Window")?;
         settle();
     }
     if o.page == "settings-picked" {
@@ -908,6 +948,94 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
         started.elapsed().as_millis()
     );
     Ok(())
+}
+
+/// The quick search box over the demo set (`FEATHERPLAY_FIXTURES=demo`), for `state`: ""
+/// (the recent picks), "-typing", "-keys", "-none", "-offline" or "-first".
+fn quick_search_for_snapshot(
+    scene: &Scene,
+    state: &str,
+    scale: f32,
+) -> Result<crate::ui::QuickSearch, String> {
+    use crate::quick_search::{self as quick, Recent};
+    use featherplay_ytm::HomeItem;
+    let e = |err: featherplay_ytm::ApiError| err.to_string();
+    let f = &scene.fixtures;
+    let songs = f.radio().map_err(e)?;
+    let song = |title: &str| songs.iter().find(|t| t.title == title).cloned();
+    let playlist = f
+        .library_playlists()
+        .map_err(e)?
+        .into_iter()
+        .find(|p| p.title == "Quiet hours");
+    let artist = f
+        .library_artists()
+        .map_err(e)?
+        .into_iter()
+        .find(|a| a.name == "Scott Buckley");
+    let picks = if state == "-first" {
+        Vec::new()
+    } else {
+        [
+            song("California Lullabye").map(|t| (HomeItem::Track(t), "Song • Josh Woodward")),
+            playlist.map(|p| (HomeItem::Playlist(p), "Playlist • Listener")),
+            artist.map(|a| (HomeItem::Artist(a), "Artist")),
+            song("Origami").map(|t| (HomeItem::Track(t), "Song • Scott Buckley")),
+        ]
+        .into_iter()
+        .flatten()
+        .map(|(item, subtitle)| Recent {
+            item,
+            subtitle: subtitle.into(),
+        })
+        .collect()
+    };
+    quick::recent_for_snapshot(picks);
+    let ctx = &scene.ctx;
+    let ui = quick::create(ctx)?;
+    let w = ui.window();
+    w.dispatch_event(WindowEvent::ScaleFactorChanged {
+        scale_factor: scale,
+    });
+    w.dispatch_event(WindowEvent::WindowActiveChanged(true));
+    scene.settle();
+    let key = |text: slint::SharedString, down: bool| {
+        w.dispatch_event(if down {
+            WindowEvent::KeyPressed { text }
+        } else {
+            WindowEvent::KeyReleased { text }
+        });
+    };
+    let tap = |text: slint::SharedString| {
+        key(text.clone(), true);
+        key(text, false);
+    };
+    match state {
+        "-typing" | "-keys" | "-offline" => quick::type_for_snapshot(ctx, &ui, "josh"),
+        "-none" => quick::type_for_snapshot(ctx, &ui, "xqzv"),
+        _ => {}
+    }
+    scene.settle();
+    if state == "-offline" {
+        quick::offline_for_snapshot();
+    }
+    if state == "-keys" {
+        use slint::platform::Key;
+        // ↓ ↓ to Invisible Light, Shift+Enter (it plays next), ↓ to She Dreams in Blue.
+        tap(Key::DownArrow.into());
+        tap(Key::DownArrow.into());
+        key(Key::Shift.into(), true);
+        tap(Key::Return.into());
+        key(Key::Shift.into(), false);
+        tap(Key::DownArrow.into());
+    }
+    ui.invoke_focus_input();
+    scene.settle();
+    // A frame makes the rows, which the box's height counts.
+    w.take_snapshot()
+        .map_err(|e| format!("take_snapshot: {e}"))?;
+    scene.settle();
+    Ok(ui)
 }
 
 /// Scrolls the page so the settings group titled `title` has its title just under the top

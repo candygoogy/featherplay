@@ -1,0 +1,587 @@
+// The quick search box: a small borderless window over whatever app is in front, opened by
+// the quick search's global hotkey (`src/quick_search.rs` creates it, places it and drops it
+// on close). The field, then the rows: the last picks while it's empty (`Recent`), the top
+// bar's suggestions once typed (results first, then completions after the one divider), or
+// a calm line (no results, offline, nothing picked yet); last, a quiet footer with the keys.
+//
+// Its height follows its rows; Rust keeps its top edge where it opened. The window shows at
+// once; its content fades in and settles 4 px over `t-menu` (the app's menus), the rows fade
+// in over 120 ms when the list goes from empty to full, and the highlight moves at once. It
+// has its own `Theme` global, which Rust copies from the main window's.
+import { Theme, Icons, Curves } from "theme.slint";
+import { Icon, Body, Cover } from "parts.slint";
+import { SuggestionKind } from "top_bar.slint";
+import { SmallLogo } from "logo.slint";
+
+// One row: a result (song, album, artist, playlist) or a completion (`query`). A result's
+// title and line come in three parts, the typed text's match in the middle (bright); a
+// completion's title is the part typed and `tail` the rest.
+export struct QuickRow {
+    kind: SuggestionKind,
+    lead: string,
+    hit: string,
+    tail: string,
+    sub-lead: string,
+    sub-hit: string,
+    sub-tail: string,
+    cover: image,
+    // "Plays next", "Plays after it": set by Shift+Enter, kept while the box is open.
+    tag: string,
+}
+
+// What the box shows under the field.
+export enum QuickState {
+    // The field is empty: the last picks, under "Recent".
+    recent,
+    // Empty and nothing picked yet: a hint line.
+    fresh,
+    // Typed, and the answer isn't in yet: nothing under the field.
+    waiting,
+    // The answer's rows.
+    results,
+    // The answer has no rows.
+    none,
+    // No connection.
+    offline,
+}
+
+// How a row was picked: Enter (play), Shift+Enter (play next), Ctrl+Enter (open).
+export enum QuickPick { play, next, open }
+
+export global QuickData {
+    in-out property <string> query;
+    in property <[QuickRow]> rows;
+    // Where the completions start among the rows, after the divider; -1 for none.
+    in property <int> completions-from: -1;
+    in property <QuickState> state: QuickState.fresh;
+    // "No results for “xqzv”".
+    in property <string> none-title;
+    // The highlighted row, -1 for none (the field). Typing puts it back on the top result.
+    in-out property <int> highlighted: -1;
+    // The pointer moved the highlight (it eases as a hover does); the keys move it at once.
+    in-out property <bool> by-pointer;
+    // Counts up each time the list goes from empty to full: its rows fade in.
+    in property <int> arrived;
+    // An ordinary window in the desktop's frame, where the app can't place it (Wayland).
+    in property <bool> framed;
+    callback edited(string);
+    callback pick(int, QuickPick);
+    // Escape: close, the focus back to the window that had it.
+    callback dismiss();
+    // The box's height changed with its rows: the window follows.
+    callback height-changed(length);
+}
+
+// A key of the footer's actions: a small filled chip, no outline.
+component Cap inherits Rectangle {
+    in property <string> text;
+    height: 18px;
+    min-width: self.height;
+    border-radius: 4px;
+    background: Theme.pick(#FFFFFF17, #0000000F);
+    // ↵ and ⇧ are drawn: the body fonts draw them too small to read.
+    property <string> glyph: root.text == "↵" ? "M18 6.5 V11.5 A1.5 1.5 0 0 1 16.5 13 H6.5 M9.5 10 L6.5 13 L9.5 16" : (root.text == "⇧" ? "M12 5.5 L18.5 12 H15 V18.5 H9 V12 H5.5 Z" : "");
+    if root.glyph != "": Icon {
+        width: 14px;
+        height: 14px;
+        commands: root.glyph;
+        stroke: Theme.text2;
+        stroke-width: 1.6px;
+    }
+    if root.glyph == "": HorizontalLayout {
+        padding-left: 5px;
+        padding-right: 5px;
+        Text {
+            text: root.text;
+            font-family: Theme.body-font;
+            font-size: 11px;
+            font-weight: 600;
+            color: Theme.text2;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+    }
+}
+
+// An action in the footer: its name in text2, then its keys.
+component Action inherits HorizontalLayout {
+    in property <string> label;
+    in property <[string]> keys;
+    spacing: 6px;
+    Text {
+        text: root.label;
+        font-family: Theme.body-font;
+        font-size: Theme.t-meta;
+        color: Theme.text2;
+        vertical-alignment: center;
+    }
+    HorizontalLayout {
+        spacing: 3px;
+        for k in root.keys: VerticalLayout {
+            alignment: center;
+            Cap {
+                text: k;
+            }
+        }
+    }
+}
+
+// A group's label above its rows: "Recent", "Top results", "Searches".
+component Section inherits HorizontalLayout {
+    in property <string> text;
+    padding-left: 20px;
+    height: 30px;
+    Text {
+        text: root.text;
+        font-family: Theme.body-font;
+        font-size: Theme.t-meta;
+        font-weight: 600;
+        color: Theme.text3;
+        vertical-alignment: center;
+    }
+}
+
+// A title or a line in three parts, the middle one marked.
+component Marked inherits HorizontalLayout {
+    in property <string> lead;
+    in property <string> hit;
+    in property <string> tail;
+    in property <length> size;
+    in property <color> plain;
+    in property <color> bright;
+    in property <int> weight;
+    alignment: start;
+    if root.lead != "": Text {
+        text: root.lead;
+        font-size: root.size;
+        font-weight: root.weight;
+        color: root.plain;
+        vertical-alignment: center;
+        overflow: clip;
+        horizontal-stretch: 0;
+    }
+    if root.hit != "": Text {
+        text: root.hit;
+        font-size: root.size;
+        font-weight: 600;
+        color: root.bright;
+        vertical-alignment: center;
+        overflow: clip;
+        horizontal-stretch: 0;
+    }
+    Text {
+        text: root.tail;
+        font-size: root.size;
+        font-weight: root.weight;
+        color: root.plain;
+        vertical-alignment: center;
+        overflow: elide;
+        horizontal-stretch: 1;
+    }
+}
+
+component Row inherits Rectangle {
+    in property <QuickRow> item;
+    in property <bool> highlighted;
+    in property <color> fill;
+    callback clicked();
+    callback hovered(bool);
+    property <bool> completion: root.item.kind == SuggestionKind.query || root.item.kind == SuggestionKind.history;
+    height: root.completion ? 40px : 56px;
+    accessible-role: list-item;
+    accessible-label: root.item.lead + root.item.hit + root.item.tail + (root.item.sub-lead + root.item.sub-hit + root.item.sub-tail != "" ? ", " + root.item.sub-lead + root.item.sub-hit + root.item.sub-tail : "");
+    accessible-action-default => { root.clicked(); }
+    // The highlight, inset 8 px from the box's edges: instant on the keys, a hover's ease for
+    // the pointer.
+    Rectangle {
+        x: 8px;
+        width: parent.width - 16px;
+        border-radius: Theme.r-m;
+        background: root.highlighted ? root.fill : transparent;
+        animate background { duration: QuickData.by-pointer ? Theme.t-hover : 0ms; }
+    }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+        changed has-hover => { root.hovered(self.has-hover); }
+    }
+    if root.completion: Icon {
+        x: 28px;
+        width: 18px;
+        height: 18px;
+        commands: Icons.search;
+        stroke: Theme.text3;
+    }
+    if root.completion: Marked {
+        x: 66px;
+        width: parent.width - self.x - Theme.s5;
+        lead: "";
+        hit: root.item.lead;
+        tail: root.item.tail;
+        size: Theme.t-body;
+        weight: 400;
+        plain: Theme.text2;
+        bright: Theme.text1;
+    }
+    if !root.completion: Cover {
+        x: 16px;
+        y: (parent.height - self.height) / 2;
+        width: 40px;
+        height: 40px;
+        radius: 8px;
+        round: root.item.kind == SuggestionKind.artist;
+        source: root.item.cover;
+    }
+    if !root.completion: VerticalLayout {
+        x: 68px;
+        width: (root.item.tag != "" ? tag.x - Theme.s3 : parent.width - Theme.s5) - self.x;
+        alignment: center;
+        spacing: 2px;
+        // The title: the match in text1/600, the rest text2; a title without the match is
+        // all text1.
+        Marked {
+            lead: root.item.lead;
+            hit: root.item.hit;
+            tail: root.item.tail;
+            size: Theme.t-body;
+            weight: 600;
+            plain: root.item.hit == "" ? Theme.text1 : Theme.text2;
+            bright: Theme.text1;
+        }
+        if root.item.sub-lead + root.item.sub-hit + root.item.sub-tail != "": Marked {
+            lead: root.item.sub-lead;
+            hit: root.item.sub-hit;
+            tail: root.item.sub-tail;
+            size: Theme.t-meta;
+            weight: 400;
+            plain: Theme.text3;
+            bright: Theme.text2;
+        }
+    }
+    // "✓ Plays next": a quiet pill in the highlight's fill.
+    tag := Rectangle {
+        visible: root.item.tag != "";
+        x: parent.width - 8px - Theme.s3 - self.width;
+        y: (parent.height - self.height) / 2;
+        width: tag-row.preferred-width + 2 * Theme.s3;
+        height: 26px;
+        border-radius: self.height / 2;
+        background: root.fill;
+        tag-row := HorizontalLayout {
+            padding-left: Theme.s3;
+            padding-right: Theme.s3;
+            spacing: 6px;
+            alignment: center;
+            Icon {
+                y: (parent.height - self.height) / 2;
+                width: 14px;
+                height: 14px;
+                commands: "M5.5 12.5 L10 17 L18.5 7.5";
+                stroke: Theme.text1;
+                stroke-width: 2px;
+            }
+            Text {
+                text: root.item.tag;
+                font-family: Theme.body-font;
+                font-size: Theme.t-meta;
+                font-weight: 600;
+                color: Theme.text1;
+                vertical-alignment: center;
+            }
+        }
+    }
+}
+
+// A calm line or two in place of the rows.
+component Calm inherits VerticalLayout {
+    in property <string> title;
+    in property <string> line;
+    padding-left: 22px;
+    padding-right: 22px;
+    padding-top: Theme.s3;
+    padding-bottom: Theme.s5;
+    spacing: Theme.s1;
+    if root.title != "": Body {
+        text: root.title;
+        font-weight: 600;
+        color: Theme.text1;
+        overflow: elide;
+    }
+    Body {
+        text: root.line;
+        color: Theme.text2;
+        wrap: word-wrap;
+    }
+}
+
+export component QuickSearch inherits Window {
+    property <length> head-h: 64px;
+    property <length> foot-h: 40px;
+    // The footer's actions follow the highlighted row: a completion searches, anything else
+    // plays (and plays next with Shift).
+    property <bool> has-row: QuickData.highlighted >= 0 && QuickData.highlighted < QuickData.rows.length;
+    property <bool> on-search: root.has-row && QuickData.rows[QuickData.highlighted].kind == SuggestionKind.query;
+    // The highlight and the tag: the accent's tonal fill.
+    property <color> fill: Theme.accent.with-alpha(Theme.between(0.18, 0.12));
+    // The box's height for its rows (`quick_search` sizes the window by it).
+    out property <length> box-height: root.head-h + body.preferred-height + root.foot-h;
+    changed box-height => {
+        QuickData.height-changed(self.box-height);
+    }
+
+    title: @tr("featherplay quick search");
+    // `quick_search` sizes the window by `box-height` (`height-changed`): a binding here
+    // would be undone by the first resize.
+    width: 640px;
+    preferred-height: root.box-height;
+    no-frame: !QuickData.framed;
+    always-on-top: true;
+    // The player bar's colour, which carries the cover's tint.
+    background: Theme.bar;
+    default-font-family: Theme.body-font;
+    default-font-size: Theme.t-body;
+    forward-focus: input;
+    // The field takes the keys, its text cursor at the end.
+    public function focus-input() {
+        input.focus();
+        input.set-selection-offsets(2147483647, 2147483647);
+    }
+
+    // Opening: the content snaps to its start (clear, 4 px down), then eases into place.
+    property <bool> entered: false;
+    init => {
+        enter.running = true;
+    }
+    enter := Timer {
+        interval: 1ms;
+        running: false;
+        triggered => {
+            self.running = false;
+            root.entered = true;
+        }
+    }
+    // The rows' own fade, when the list goes from empty to full.
+    property <bool> rows-in: true;
+    property <int> arrived: QuickData.arrived;
+    changed arrived => {
+        root.rows-in = false;
+        rows-enter.running = true;
+    }
+    rows-enter := Timer {
+        interval: 1ms;
+        running: false;
+        triggered => {
+            self.running = false;
+            root.rows-in = true;
+        }
+    }
+
+    // A faint wash of the accent fading out over the top 150 px.
+    Rectangle {
+        y: 0;
+        height: min(150px, root.height);
+        background: @linear-gradient(180deg, Theme.accent.with-alpha(Theme.between(0.09, 0.07)) 0%, Theme.accent.with-alpha(0) 100%);
+    }
+    // The 1 px highlight inside the edge, a little brighter along the top.
+    Rectangle {
+        border-width: 1px;
+        border-color: Theme.pick(#FFFFFF0F, #FFFFFFB3);
+    }
+    Rectangle {
+        x: 1px;
+        y: 0;
+        width: parent.width - 2px;
+        height: 1px;
+        background: Theme.pick(#FFFFFF1F, #FFFFFF);
+    }
+
+    // The footer's band, a step off the list's surface, under one full-bleed hairline; and
+    // the hairline under the field.
+    Rectangle {
+        y: root.height - root.foot-h;
+        height: root.foot-h;
+        background: Theme.pick(Theme.bar.mix(#000000, 0.72), Theme.bar.mix(#FFFFFF, 0.5));
+    }
+    Rectangle {
+        y: root.height - root.foot-h;
+        height: 1px;
+        background: Theme.hairline;
+    }
+    Rectangle {
+        y: root.head-h - 1px;
+        height: 1px;
+        background: Theme.hairline;
+    }
+
+    content := Rectangle {
+        y: root.entered ? 0px : Theme.nudge;
+        opacity: root.entered ? 1 : 0;
+        animate y, opacity { duration: root.entered ? Theme.t-menu : 0ms; easing: Curves.ease-out; }
+
+        Icon {
+            x: 24px;
+            y: (root.head-h - self.height) / 2;
+            width: 20px;
+            height: 20px;
+            commands: Icons.search;
+            stroke: Theme.text2;
+        }
+        if QuickData.query == "": Text {
+            x: 58px + input.text-cursor-width + 2px;
+            y: 0;
+            width: parent.width - self.x - Theme.s5;
+            height: root.head-h;
+            text: @tr("Search songs, albums, artists");
+            font-family: Theme.display-font;
+            font-size: Theme.t-display-xs;
+            color: Theme.text3;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+        input := TextInput {
+            x: 58px;
+            y: 0;
+            width: parent.width - self.x - Theme.s5;
+            height: root.head-h;
+            text <=> QuickData.query;
+            single-line: true;
+            vertical-alignment: center;
+            font-family: Theme.display-font;
+            font-size: Theme.t-display-xs;
+            color: Theme.text1;
+            text-cursor-width: 2px;
+            selection-background-color: Theme.accent;
+            selection-foreground-color: Theme.on-solid;
+            accessible-role: text-input;
+            accessible-label: @tr("Quick search");
+            key-pressed(e) => {
+                if e.text == Key.Escape {
+                    QuickData.dismiss();
+                    return accept;
+                }
+                // ↓ on the last row stays put: no wrap. ↑ from the first goes back to the
+                // field only among the recent picks.
+                if e.text == Key.DownArrow {
+                    if QuickData.rows.length > 0 {
+                        QuickData.by-pointer = false;
+                        QuickData.highlighted = min(QuickData.highlighted + 1, QuickData.rows.length - 1);
+                    }
+                    return accept;
+                }
+                if e.text == Key.UpArrow {
+                    if QuickData.rows.length > 0 {
+                        QuickData.by-pointer = false;
+                        QuickData.highlighted = max(QuickData.highlighted - 1, QuickData.state == QuickState.recent ? -1 : 0);
+                    }
+                    return accept;
+                }
+                if e.text == Key.Return {
+                    if QuickData.highlighted >= 0 && QuickData.highlighted < QuickData.rows.length {
+                        QuickData.pick(QuickData.highlighted, e.modifiers.shift ? QuickPick.next : (e.modifiers.control ? QuickPick.open : QuickPick.play));
+                    }
+                    return accept;
+                }
+                reject
+            }
+            edited => {
+                QuickData.edited(self.text);
+            }
+        }
+
+        body := VerticalLayout {
+            y: root.head-h;
+            width: parent.width;
+            height: self.preferred-height;
+            if QuickData.state == QuickState.recent: Section {
+                text: @tr("Recent");
+            }
+            if QuickData.state == QuickState.recent || QuickData.state == QuickState.results: VerticalLayout {
+                padding-bottom: 4px;
+                opacity: root.rows-in ? 1 : 0;
+                animate opacity { duration: root.rows-in && Theme.fading ? 120ms : 0ms; easing: Curves.ease-out; }
+                for item[i] in QuickData.rows: VerticalLayout {
+                    // The groups' labels separate them; no line between.
+                    if QuickData.state == QuickState.results && i == 0 && QuickData.completions-from != 0: Section {
+                        text: @tr("Top results");
+                    }
+                    if QuickData.state == QuickState.results && i == QuickData.completions-from: Section {
+                        text: @tr("Searches");
+                    }
+                    Row {
+                        item: item;
+                        fill: root.fill;
+                        highlighted: QuickData.highlighted == i;
+                        clicked => { QuickData.pick(i, QuickPick.play); }
+                        hovered(over) => {
+                            if over {
+                                QuickData.by-pointer = true;
+                                QuickData.highlighted = i;
+                            }
+                        }
+                    }
+                }
+            }
+            if QuickData.state == QuickState.fresh: Calm {
+                padding-top: Theme.s4;
+                line: @tr("Type to find a song, album, artist or playlist. Enter plays it.");
+            }
+            if QuickData.state == QuickState.none: Calm {
+                title: QuickData.none-title;
+                line: @tr("Check the spelling, or try fewer words.");
+            }
+            if QuickData.state == QuickState.offline: Calm {
+                title: @tr("You're offline");
+                line: @tr("Search comes back with the connection.");
+            }
+        }
+
+        // The footer: the mark and the name on the left; the highlighted row's action and
+        // Play next on the right. Ctrl+Enter (open in featherplay) is in the action's
+        // accessible description.
+        SmallLogo {
+            x: 20px;
+            y: root.height - root.foot-h + (root.foot-h - self.height) / 2;
+            width: 14px;
+            height: 14px;
+        }
+        Text {
+            x: 40px;
+            y: root.height - root.foot-h;
+            height: root.foot-h;
+            text: "featherplay";
+            font-family: Theme.body-font;
+            font-size: Theme.t-meta;
+            font-weight: 600;
+            color: Theme.text3;
+            vertical-alignment: center;
+        }
+        if root.has-row: Rectangle {
+            x: parent.width - self.width - Theme.s4;
+            y: root.height - root.foot-h;
+            width: actions.preferred-width;
+            height: root.foot-h;
+            accessible-role: text;
+            accessible-label: root.on-search ? @tr("Enter searches") : @tr("Enter plays, Shift+Enter plays next");
+            accessible-description: root.on-search ? "" : @tr("Ctrl+Enter opens it in featherplay");
+            actions := HorizontalLayout {
+                spacing: Theme.s3;
+                Action {
+                    label: root.on-search ? @tr("Search") : @tr("Play");
+                    keys: ["↵"];
+                }
+                if !root.on-search: VerticalLayout {
+                    alignment: center;
+                    Rectangle {
+                        width: 1px;
+                        height: 16px;
+                        background: Theme.hairline;
+                    }
+                }
+                if !root.on-search: Action {
+                    label: @tr("Play next");
+                    keys: ["⇧", "↵"];
+                }
+            }
+        }
+    }
+}

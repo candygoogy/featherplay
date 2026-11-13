@@ -94,6 +94,7 @@ mod prepare_rows;
 mod present_damage;
 mod press_feedback;
 mod queue_panel;
+mod quick_search;
 mod refused_dns_toast;
 mod refused_rows;
 mod related_scroll;

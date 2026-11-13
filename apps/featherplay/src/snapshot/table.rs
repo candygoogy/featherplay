@@ -198,6 +198,24 @@ pub const PAGES: &[&str] = &[
     // The tray's mini player alone (its own 340 x 170 window), with the fixture track playing
     // or paused, the same with a title too long for two lines or rated Dislike, or with
     // nothing to play; then pinned, with the fixture track playing.
+    // The quick search box (render with FEATHERPLAY_FIXTURES=demo): just opened with the
+    // recent picks; "josh" typed; Shift+Enter on the third row, then ↓ to the fourth; no
+    // results; offline; and the first use, with no picks yet.
+    "quick-search",
+    "quick-search-typing",
+    "quick-search-keys",
+    "quick-search-none",
+    "quick-search-offline",
+    "quick-search-first",
+    // Settings › Window with "Quick search from anywhere" on: its default key; the field
+    // listening with Ctrl and Shift held; another key, with Reset; the key held by another
+    // app; and Wayland's calm row with "Why?" open. Then the shortcuts' list with its line.
+    "settings-quick-search",
+    "settings-quick-search-listening",
+    "settings-quick-search-changed",
+    "settings-quick-search-taken",
+    "settings-quick-search-wayland",
+    "shortcuts-quick-search",
     "mini-player",
     "mini-player-paused",
     "mini-player-long",
@@ -285,6 +303,13 @@ pub(super) fn page(name: &str, f: &Fixtures) -> Result<Page, String> {
         | "silences-played"
         | "shortcuts"
         | "shortcuts-hotkeys"
+        | "shortcuts-quick-search"
+        | "quick-search"
+        | "quick-search-typing"
+        | "quick-search-keys"
+        | "quick-search-none"
+        | "quick-search-offline"
+        | "quick-search-first"
         | "home-more"
         | "home-more-loading"
         | "home-more-failed"
@@ -365,6 +390,11 @@ pub(super) fn page(name: &str, f: &Fixtures) -> Result<Page, String> {
         | "sleep-running"
         | "not-for-me" => Page::NowPlaying,
         "settings"
+        | "settings-quick-search"
+        | "settings-quick-search-listening"
+        | "settings-quick-search-changed"
+        | "settings-quick-search-taken"
+        | "settings-quick-search-wayland"
         | "settings-lastfm-keys"
         | "settings-listenbrainz"
         | "settings-idle"

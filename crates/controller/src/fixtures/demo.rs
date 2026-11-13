@@ -18,8 +18,8 @@ use featherplay_core::model::{
 use featherplay_lyrics::lrc::Line;
 use featherplay_ytm::{
     AccountIdentity, AccountInfo, Album, AlbumSummary, ApiError, Artist, ArtistSummary, HistoryDay,
-    HomeFeed, HomeItem, HomeShelf, Identity, Playlist, PlaylistSummary, SearchFilter,
-    SearchResults,
+    HomeFeed, HomeItem, HomeShelf, Identity, Playlist, PlaylistSummary, QuerySuggestion,
+    SearchFilter, SearchResults, SearchSuggestions, SuggestedResult,
 };
 use serde::Deserialize;
 
@@ -360,6 +360,57 @@ impl Demo {
             SearchFilter::Artists => out.artists = self.library_artists(),
             SearchFilter::Playlists => out.playlists = self.library_playlists(),
         }
+        out
+    }
+
+    /// The suggestions for `query`, made up from the songs: the artists whose name has it,
+    /// then the songs whose title or artist has it (at most five results), and the
+    /// completions an artist's name starting with it gives (the name, then the name and each
+    /// of their songs' titles, at most three).
+    pub fn search_suggestions(&self, query: &str) -> SearchSuggestions {
+        let q = query.trim().to_lowercase();
+        let mut out = SearchSuggestions::default();
+        if q.is_empty() {
+            return out;
+        }
+        let has = |text: &str| text.to_lowercase().contains(&q);
+        for artist in self.library_artists() {
+            if has(&artist.name) {
+                out.results.push(SuggestedResult {
+                    item: HomeItem::Artist(artist),
+                    subtitle: "Artist".into(),
+                });
+            }
+        }
+        for t in &self.data.tracks {
+            if has(&t.title) || has(&t.artist) {
+                out.results.push(SuggestedResult {
+                    item: HomeItem::Track(self.track_of(t)),
+                    subtitle: format!("Song • {}", t.artist),
+                });
+            }
+        }
+        out.results.truncate(5);
+        let mut seen = HashSet::new();
+        for t in &self.data.tracks {
+            let name = t.artist.to_lowercase();
+            if !name.starts_with(&q) {
+                continue;
+            }
+            if seen.insert(name.clone()) {
+                out.queries.push(QuerySuggestion {
+                    text: name.clone(),
+                    typed: q.len(),
+                    history: false,
+                });
+            }
+            out.queries.push(QuerySuggestion {
+                text: format!("{name} {}", t.title.to_lowercase()),
+                typed: q.len(),
+                history: false,
+            });
+        }
+        out.queries.truncate(3);
         out
     }
 

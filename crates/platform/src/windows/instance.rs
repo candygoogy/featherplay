@@ -33,7 +33,7 @@ use windows::core::HSTRING;
 
 use crate::common::identity::AUMID;
 use crate::common::instance::fnv1a;
-use crate::session_end;
+use crate::session_end::{self, Ask};
 
 /// How long one window may take to answer.
 const ASK_TIMEOUT_MS: u32 = 2000;
@@ -161,6 +161,12 @@ pub fn claim(name: &str) -> Result<Claim, String> {
 /// did; false if none did (none is running, it is still starting, or it is closing). An
 /// error if the message to ask with couldn't be registered.
 pub fn ask_to_show(key: &str) -> Result<bool, String> {
+    ask(key, Ask::Show)
+}
+
+/// Asks the featherplay of this key for `what` (its window, or the quick search), as
+/// `ask_to_show` does.
+pub fn ask(key: &str, what: Ask) -> Result<bool, String> {
     let message = show_message(key)?;
     let class = HSTRING::from(session_end::CLASS);
     let title = HSTRING::from(session_end::TITLE);
@@ -182,7 +188,7 @@ pub fn ask_to_show(key: &str) -> Result<bool, String> {
             SendMessageTimeoutW(
                 hwnd,
                 message,
-                WPARAM(0),
+                WPARAM(session_end::ask_wparam(what)),
                 LPARAM(0),
                 SMTO_ABORTIFHUNG,
                 ASK_TIMEOUT_MS,

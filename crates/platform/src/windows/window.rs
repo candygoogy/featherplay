@@ -25,14 +25,15 @@ use windows::Win32::UI::HiDpi::{AdjustWindowRectExForDpi, GetDpiForMonitor, MDT_
 use windows::Win32::UI::Shell::{DefSubclassProc, RemoveWindowSubclass, SetWindowSubclass};
 use windows::Win32::UI::WindowsAndMessaging::{
     CallNextHookEx, CreateIconFromResourceEx, DestroyIcon, GA_ROOT, GetAncestor, GetClassNameW,
-    GetForegroundWindow, HC_ACTION, HHOOK, HICON, ICON_BIG, ICON_SMALL, IsIconic, LR_DEFAULTCOLOR,
-    LWA_ALPHA, MSLLHOOKSTRUCT, RegisterWindowMessageW, SC_MINIMIZE, SC_RESTORE, SIZE_MAXIMIZED,
-    SIZE_MINIMIZED, SIZE_RESTORED, SPI_GETCLIENTAREAANIMATION, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS,
-    SendMessageW, SetForegroundWindow, SetLayeredWindowAttributes, SetWindowsHookExW,
-    SystemParametersInfoW, UnhookWindowsHookEx, WH_MOUSE_LL, WINDOW_EX_STYLE, WM_DISPLAYCHANGE,
-    WM_DPICHANGED, WM_LBUTTONDOWN, WM_MBUTTONDOWN, WM_MOUSEACTIVATE, WM_MOUSEWHEEL, WM_NCDESTROY,
-    WM_PAINT, WM_POINTERACTIVATE, WM_POINTERDOWN, WM_RBUTTONDOWN, WM_SETICON, WM_SETTINGCHANGE,
-    WM_SIZE, WM_SYSCOMMAND, WM_XBUTTONDOWN, WS_OVERLAPPEDWINDOW, WindowFromPoint,
+    GetCursorPos, GetForegroundWindow, GetWindowRect, HC_ACTION, HHOOK, HICON, ICON_BIG,
+    ICON_SMALL, IsIconic, LR_DEFAULTCOLOR, LWA_ALPHA, MSLLHOOKSTRUCT, RegisterWindowMessageW,
+    SC_MINIMIZE, SC_RESTORE, SIZE_MAXIMIZED, SIZE_MINIMIZED, SIZE_RESTORED,
+    SPI_GETCLIENTAREAANIMATION, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS, SendMessageW,
+    SetForegroundWindow, SetLayeredWindowAttributes, SetWindowsHookExW, SystemParametersInfoW,
+    UnhookWindowsHookEx, WH_MOUSE_LL, WINDOW_EX_STYLE, WM_DISPLAYCHANGE, WM_DPICHANGED,
+    WM_LBUTTONDOWN, WM_MBUTTONDOWN, WM_MOUSEACTIVATE, WM_MOUSEWHEEL, WM_NCDESTROY, WM_PAINT,
+    WM_POINTERACTIVATE, WM_POINTERDOWN, WM_RBUTTONDOWN, WM_SETICON, WM_SETTINGCHANGE, WM_SIZE,
+    WM_SYSCOMMAND, WM_XBUTTONDOWN, WS_OVERLAPPEDWINDOW, WindowFromPoint,
 };
 
 pub use crate::common::window::*;
@@ -597,6 +598,22 @@ pub fn foreground() -> Option<Foreground> {
         window: Handle::from_hwnd(h),
         class: class_of(h),
     })
+}
+
+/// A point on the screen the user is working on (physical pixels), for a window to open
+/// there: the centre of the window in front, else the pointer.
+pub fn active_point() -> Option<(i32, i32)> {
+    // SAFETY: no preconditions; null when no window is in front.
+    let front = unsafe { GetForegroundWindow() };
+    let mut r = RECT::default();
+    // SAFETY: a window handle (a null or stale one fails) and an out-parameter.
+    if !front.is_invalid() && unsafe { GetWindowRect(front, &mut r) }.is_ok() {
+        return Some(((r.left + r.right) / 2, (r.top + r.bottom) / 2));
+    }
+    let mut p = POINT::default();
+    // SAFETY: an out-parameter.
+    unsafe { GetCursorPos(&mut p) }.ok()?;
+    Some((p.x, p.y))
 }
 
 /// A window's class, as `GetClassNameW` gives it; empty for no window or a stale handle.

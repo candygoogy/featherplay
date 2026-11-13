@@ -1,11 +1,12 @@
-// Settings' Window section: starting when the user signs in, closing, the tray, the appearance, the language, the accent
-// and its custom colour, notifications, tooltips, the search's suggestions, the shortcuts
-// and the global hotkeys.
+// Settings' Window section: starting when the user signs in, closing, the tray, the
+// appearance, the language, the accent and its custom colour, notifications, tooltips, the
+// search's suggestions, the shortcuts, the global hotkeys and the quick search's key.
 import { Theme, Appearance } from "../../theme.slint";
 import { Body } from "../../parts.slint";
 import { Chips } from "../content.slint";
 import { SettingId, SettingKey, SettingsData, SettingsDialog, SettingsSearch } from "data.slint";
 import { DeviceRow, Field, Group, RowButton, RowChoices, SettingRow, ToggleRow } from "rows.slint";
+import { QuickKeyRows } from "quick_key.slint";
 
 // An accent: a dot of its colour, ringed in `text1` when it's the one picked.
 component Swatch inherits Rectangle {
@@ -362,5 +363,7 @@ export component WindowSection inherits Group {
                 wrap: word-wrap;
             }
         }
+        // Its own row, apart from the three hotkeys: a taken key here never drops those.
+        QuickKeyRows { }
     }
 }

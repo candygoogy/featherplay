@@ -1,0 +1,317 @@
+// Settings › Window's "Quick search from anywhere": its switch, and while it's on, the key
+// row with a key-capture field (a click or Enter listens, the next combination pressed with
+// Ctrl, Alt, Shift or Win becomes the key, Esc cancels), Reset when the key isn't the
+// default, and a calm line when another app holds the key. On Wayland, which lets no app
+// hear keys pressed in another, the row says so, with "Why?" for the way round it.
+// `src/pages/settings/quick_key.rs` fills `QuickKeyData` and listens to it.
+import { Theme } from "../../theme.slint";
+import { Body, TextLink } from "../../parts.slint";
+import { SettingId, SettingsData, SettingsSearch } from "data.slint";
+import { RowButton, SettingRow, Switch } from "rows.slint";
+
+export global QuickKeyData {
+    // The switch.
+    in property <bool> on;
+    // The key, a keycap per key ("Ctrl", "Alt", "K"), and as words for screen readers.
+    in property <[string]> keys;
+    in property <string> key-text;
+    // The key is the default (Ctrl+Alt+K): no Reset.
+    in property <bool> is-default: true;
+    // The field listens for the next combination, and the modifiers held so far.
+    in-out property <bool> listening;
+    in-out property <bool> held-ctrl;
+    in-out property <bool> held-alt;
+    in-out property <bool> held-shift;
+    in-out property <bool> held-meta;
+    // Why the key isn't working (another app holds it, featherplay uses it), or "".
+    in property <string> error;
+    // Wayland's "Why?" is open.
+    in-out property <bool> why-open;
+    callback toggled(bool);
+    // A click or Enter on the field (true), or Esc and leaving it (false).
+    callback listen(bool);
+    // A key pressed while listening: its text as the key event has it, and the modifiers held.
+    callback captured(string, bool, bool, bool, bool);
+    callback reset();
+    // Wayland's "Why?": copy the command a desktop shortcut runs.
+    callback copy-command();
+}
+
+// A small keycap, as the field shows the key.
+component Cap inherits Rectangle {
+    in property <string> text;
+    height: 22px;
+    min-width: self.height;
+    border-radius: Theme.r-s;
+    border-width: 1px;
+    border-color: Theme.field-edge-hover;
+    background: Theme.pick(#FFFFFF08, Theme.ground);
+    HorizontalLayout {
+        padding-left: 6px;
+        padding-right: 6px;
+        Text {
+            text: root.text;
+            font-family: Theme.body-font;
+            font-size: Theme.t-meta;
+            font-weight: 600;
+            color: Theme.text1;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+    }
+}
+
+// The key-capture field: the key as keycaps; listening, the modifiers held so far and
+// "+ a key…", ringed in the accent.
+component KeyField inherits Rectangle {
+    width: 200px;
+    height: 36px;
+    border-radius: Theme.r-m;
+    background: Theme.field;
+    border-width: QuickKeyData.listening ? 1px : (Theme.dark ? 0px : 1px);
+    border-color: QuickKeyData.listening ? Theme.accent : Theme.hairline;
+    accessible-role: button;
+    accessible-label: @tr("Quick search shortcut");
+    accessible-value: QuickKeyData.listening ? @tr("Press the new keys. Esc cancels.") : QuickKeyData.key-text;
+    accessible-action-default => { root.begin(); }
+    function begin() {
+        QuickKeyData.held-ctrl = false;
+        QuickKeyData.held-alt = false;
+        QuickKeyData.held-shift = false;
+        QuickKeyData.held-meta = false;
+        keys.focus();
+        QuickKeyData.listen(true);
+    }
+    function held(e: KeyEvent) {
+        QuickKeyData.held-ctrl = e.modifiers.control;
+        QuickKeyData.held-alt = e.modifiers.alt;
+        QuickKeyData.held-shift = e.modifiers.shift;
+        QuickKeyData.held-meta = e.modifiers.meta;
+    }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.begin(); }
+    }
+    keys := FocusScope {
+        key-pressed(e) => {
+            if !QuickKeyData.listening {
+                if e.text == Key.Return {
+                    root.begin();
+                    return accept;
+                }
+                return reject;
+            }
+            if e.text == Key.Escape {
+                QuickKeyData.listen(false);
+                return accept;
+            }
+            root.held(e);
+            if e.text == Key.Control {
+                QuickKeyData.held-ctrl = true;
+                return accept;
+            }
+            if e.text == Key.Alt || e.text == Key.AltGr {
+                QuickKeyData.held-alt = true;
+                return accept;
+            }
+            if e.text == Key.Shift {
+                QuickKeyData.held-shift = true;
+                return accept;
+            }
+            if e.text == Key.Meta {
+                QuickKeyData.held-meta = true;
+                return accept;
+            }
+            QuickKeyData.captured(e.text, e.modifiers.control, e.modifiers.alt, e.modifiers.shift, e.modifiers.meta);
+            accept
+        }
+        key-released(e) => {
+            if !QuickKeyData.listening {
+                return reject;
+            }
+            root.held(e);
+            if e.text == Key.Control {
+                QuickKeyData.held-ctrl = false;
+            }
+            if e.text == Key.Alt || e.text == Key.AltGr {
+                QuickKeyData.held-alt = false;
+            }
+            if e.text == Key.Shift {
+                QuickKeyData.held-shift = false;
+            }
+            if e.text == Key.Meta {
+                QuickKeyData.held-meta = false;
+            }
+            accept
+        }
+        focus-lost => {
+            if QuickKeyData.listening {
+                QuickKeyData.listen(false);
+            }
+        }
+    }
+    HorizontalLayout {
+        padding-left: Theme.s2;
+        padding-right: Theme.s3;
+        spacing: Theme.s1;
+        alignment: start;
+        if !QuickKeyData.listening: HorizontalLayout {
+            spacing: Theme.s1;
+            alignment: start;
+            for k in QuickKeyData.keys: VerticalLayout {
+                alignment: center;
+                Cap {
+                    text: k;
+                }
+            }
+        }
+        if QuickKeyData.listening && QuickKeyData.held-ctrl: VerticalLayout {
+            alignment: center;
+            Cap {
+                text: @tr("Ctrl");
+            }
+        }
+        if QuickKeyData.listening && QuickKeyData.held-alt: VerticalLayout {
+            alignment: center;
+            Cap {
+                text: @tr("Alt");
+            }
+        }
+        if QuickKeyData.listening && QuickKeyData.held-shift: VerticalLayout {
+            alignment: center;
+            Cap {
+                text: @tr("Shift");
+            }
+        }
+        if QuickKeyData.listening && QuickKeyData.held-meta: VerticalLayout {
+            alignment: center;
+            Cap {
+                text: SettingsData.on-windows ? @tr("Win") : @tr("Super");
+            }
+        }
+        if QuickKeyData.listening: Body {
+            text: @tr("+ a key…");
+            color: Theme.text3;
+            vertical-alignment: center;
+        }
+    }
+}
+
+// The switch's row, and the key's under it while it's on.
+export component QuickKeyRows inherits VerticalLayout {
+    property <bool> hidden: SettingsSearch.hit(SettingId.quick-search).hidden;
+    if SettingsData.has-hotkeys: SettingRow {
+        label: @tr("Quick search from anywhere");
+        search: SettingId.quick-search;
+        detail: @tr("Press the shortcut in any app to find a song and play it.");
+        Switch {
+            checked: QuickKeyData.on;
+            label: @tr("Quick search from anywhere");
+            setting: SettingId.quick-search;
+            toggled(on) => { QuickKeyData.toggled(on); }
+        }
+    }
+    if SettingsData.has-hotkeys && QuickKeyData.on && !root.hidden: VerticalLayout {
+        padding-bottom: Theme.s3;
+        spacing: Theme.s1;
+        Rectangle {
+            height: 44px;
+            Body {
+                x: 0;
+                width: parent.width - 240px;
+                height: parent.height;
+                text: @tr("Shortcut");
+                color: Theme.text2;
+                vertical-alignment: center;
+            }
+            if !QuickKeyData.is-default && !QuickKeyData.listening: TextLink {
+                x: field.x - Theme.s4 - self.width;
+                y: (parent.height - self.height) / 2;
+                text: @tr("Reset");
+                clicked => { QuickKeyData.reset(); }
+            }
+            field := KeyField {
+                x: parent.width - self.width;
+                y: (parent.height - self.height) / 2;
+            }
+        }
+        if QuickKeyData.listening && QuickKeyData.error == "": Body {
+            text: @tr("Press the new keys. Esc cancels.");
+            font-size: Theme.t-meta;
+            color: Theme.text3;
+            wrap: word-wrap;
+        }
+        if QuickKeyData.error != "": Body {
+            text: QuickKeyData.error;
+            font-size: Theme.t-meta;
+            color: Theme.text1;
+            wrap: word-wrap;
+        }
+    }
+    // Wayland: a calm row, no switch (house style rule 4), "Why?" for the way round it.
+    if !SettingsData.has-hotkeys && !root.hidden: VerticalLayout {
+        Rectangle {
+            height: 1px;
+            background: Theme.hairline;
+        }
+        VerticalLayout {
+            padding-top: 18px;
+            padding-bottom: QuickKeyData.why-open ? Theme.s2 : 18px;
+            spacing: Theme.s1;
+            Body {
+                text: @tr("Quick search from anywhere");
+                font-size: Theme.t-body-l;
+                font-weight: 500;
+                color: Theme.text1;
+            }
+            HorizontalLayout {
+                alignment: start;
+                spacing: Theme.s1;
+                Body {
+                    text: @tr("Not available on Wayland.");
+                    font-size: Theme.t-meta;
+                    color: Theme.text2.mix(Theme.text1, 0.75);
+                    vertical-alignment: center;
+                }
+                TextLink {
+                    text: @tr("Why?");
+                    font-size: Theme.t-meta;
+                    expands: true;
+                    expanded: QuickKeyData.why-open;
+                    clicked => { QuickKeyData.why-open = !QuickKeyData.why-open; }
+                }
+            }
+        }
+        if QuickKeyData.why-open: VerticalLayout {
+            padding-bottom: Theme.s4;
+            spacing: Theme.s2;
+            Body {
+                text: @tr("Wayland doesn't let apps hear keys pressed in other apps. Add a shortcut in your desktop's keyboard settings instead, with this command:");
+                font-size: Theme.t-meta;
+                color: Theme.text2;
+                wrap: word-wrap;
+            }
+            HorizontalLayout {
+                alignment: start;
+                spacing: Theme.s3;
+                Rectangle {
+                    width: command.preferred-width + 2 * Theme.s3;
+                    height: 32px;
+                    border-radius: Theme.r-s;
+                    background: Theme.field;
+                    command := Text {
+                        text: "featherplay --quick-search";
+                        font-family: "Cascadia Mono";
+                        font-size: Theme.t-meta;
+                        color: Theme.text1;
+                        vertical-alignment: center;
+                    }
+                }
+                RowButton {
+                    label: @tr("Copy");
+                    clicked => { QuickKeyData.copy-command(); }
+                }
+            }
+        }
+    }
+}

@@ -88,3 +88,27 @@ fn other_actions_are_not_queue_edits() {
     assert!(queue_edit(Action::Toggle).is_none());
     assert!(add_input(QueueAction::Clear).is_none());
 }
+
+/// The quick search's Play next, picked twice: the second goes after the first, so they play
+/// in the order picked; once the first has played, the next pick goes right after the current
+/// track again.
+#[test]
+fn quick_search_picks_play_next_in_the_order_picked() {
+    use featherplay_controller::controller::play_after_inputs;
+    let mut player = player_with(&["now", "a", "b"]);
+    for input in play_after_inputs(player.queue(), vec![track("x")], None) {
+        player.handle(input);
+    }
+    let x = TrackId("x".into());
+    let two = vec![track("y"), track("z")];
+    for input in play_after_inputs(player.queue(), two, Some(&x)) {
+        player.handle(input);
+    }
+    assert_eq!(upcoming(&player), ["x", "y", "z", "a", "b"]);
+    // `x` has played: what comes after it goes right after the current track.
+    let mut player = player_with(&["now", "a"]);
+    for input in play_after_inputs(player.queue(), vec![track("w")], Some(&x)) {
+        player.handle(input);
+    }
+    assert_eq!(upcoming(&player), ["w", "a"]);
+}

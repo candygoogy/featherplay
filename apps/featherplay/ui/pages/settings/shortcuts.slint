@@ -4,6 +4,7 @@ import { Body, Display } from "../../parts.slint";
 import { Shortcuts, ShortcutRow } from "../../shortcuts.slint";
 import { SettingsData } from "data.slint";
 import { Rows, RowButton } from "rows.slint";
+import { QuickKeyData } from "quick_key.slint";
 
 // A key in the shortcuts' list, as a keycap like the search field's Ctrl K: 22 px, a 1 px
 // edge, 12/600 in `text2`. An empty key, between two keys that each do it, is the word "or".
@@ -110,9 +111,14 @@ component KeyList inherits VerticalLayout {
     }
 }
 
+// Quick search's row is listed while it's on, where the desktop lets it work.
+global QuickListed {
+    out property <bool> shown: QuickKeyData.on && SettingsData.has-hotkeys;
+}
+
 // What works from any app: the media keys always, and the global hotkeys with the user's
 // keys while they're on (otherwise a line says where to turn them on, where the desktop
-// has them).
+// has them), and the quick search's key while it's on.
 component FromAnyApp inherits VerticalLayout {
     KeyGroup {
         text: @tr("From any app");
@@ -130,6 +136,11 @@ component FromAnyApp inherits VerticalLayout {
         }
     }
     // Where the desktop has none (Wayland), there's nothing to turn on.
+    if QuickListed.shown: KeyRow {
+        label: @tr("Quick search");
+        note: @tr("Global hotkey");
+        keys: QuickKeyData.keys;
+    }
     if SettingsData.hotkey-keys.length == 0 && SettingsData.has-hotkeys: Body {
         text: @tr("Global hotkeys are off. Turn them on in Settings › Window to play, pause and skip with your own keys.");
         font-size: Theme.t-meta;
@@ -147,7 +158,7 @@ component FromAnyApp inherits VerticalLayout {
 export component ShortcutsDialog inherits Rectangle {
     // The one column's height (title, groups, Done, padding), and whether it fits.
     property <length> chrome: 2 * Theme.s5 + 28px + 2 * Theme.s4 + Theme.s2 + 32px;
-    property <length> from-any-app: SettingsData.hotkey-keys.length > 0 ? Keys.group(4) : Keys.group(1) + 40px;
+    property <length> from-any-app: (SettingsData.hotkey-keys.length > 0 ? Keys.group(4) : Keys.group(1) + 40px) + (QuickListed.shown ? Keys.row-h : 0px);
     property <length> one-h: root.chrome + Keys.group(Shortcuts.playback.length) + Keys.group(Shortcuts.moving.length) + root.from-any-app;
     property <bool> two: root.height < root.one-h + 2 * Theme.s5;
     property <bool> shown: false;

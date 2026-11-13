@@ -151,7 +151,7 @@ controls and the tray (`apps/featherplay/src/shell.rs`).
 
 | Thread or runtime | Owns | Started in |
 |---|---|---|
-| Main thread (Slint's event loop) | The window, pages, `Ctx`, covers shown, the tray icon, media controls, taskbar buttons, hotkeys, the mini player | `app::run`, `run_window` (`apps/featherplay/src/app.rs`) |
+| Main thread (Slint's event loop) | The window, pages, `Ctx`, covers shown, the tray icon, media controls, taskbar buttons, hotkeys, the mini player, the quick search box | `app::run`, `run_window` (`apps/featherplay/src/app.rs`) |
 | `featherplay-controller` | The controller loop: the player, the music API client, the resolver, the audio engine handle, settings, scrobblers | `app::run` |
 | The shared tokio runtime (multi-thread) | Every async task: the controller (run with `block_on` on its thread), resolves, API calls, the UI's page loads (`Ctx::load`), cover fetches, the local API server. Cover decoding runs on its blocking pool. | `app::run` |
 | `featherplay-audio` | The engine: voices, the output device, `AudioEvent`s | `crates/audio/src/engine.rs` |

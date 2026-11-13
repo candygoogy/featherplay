@@ -54,8 +54,8 @@ pub use account::{
 pub use interface::{Action, Options, PlayerState, UiEvent, UiLink};
 pub use local_api::{LocalApiNotice, LocalApiStatus};
 pub use queue::{
-    PlayingFrom, QueueAction, QueueInfo, add_input, back_to_inputs, playing_from, queue_edit,
-    queue_info, with_likes,
+    PlayingFrom, QueueAction, QueueInfo, add_input, back_to_inputs, play_after_inputs,
+    playing_from, queue_edit, queue_info, with_likes,
 };
 pub use silences::Mark;
 pub use sleep::{SleepAction, SleepKind, SleepState};

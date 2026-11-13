@@ -471,6 +471,13 @@ fn table() -> Vec<Row> {
             &[],
             tr!("search keywords" => "media keys, shortcuts"),
         ),
+        row(
+            SettingId::QuickSearch,
+            6,
+            tr!("Quick search from anywhere"),
+            &[],
+            tr!("search keywords" => "launcher, hotkey, shortcut"),
+        ),
         // Account.
         row(
             SettingId::Account,
@@ -776,6 +783,10 @@ impl View {
             }
             S::Hotkeys => {
                 tr!("Play, pause and skip from any app. Each key needs Ctrl, Alt, Shift or Super.")
+            }
+            // Wayland's row says it isn't available there, which isn't searched.
+            S::QuickSearch if self.has_hotkeys => {
+                tr!("Press the shortcut in any app to find a song and play it.")
             }
             S::Account if !self.signed_in => tr!("Not signed in."),
             S::CheckForUpdates => tr!(

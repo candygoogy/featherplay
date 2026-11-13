@@ -3,8 +3,10 @@
 //! close featherplay; it asks until set, or hides the window to the tray) saves the session
 //! and exits. Everything but argument parsing lives in the library (`src/lib.rs`).
 //! One featherplay runs per home (`instance`): starting it again brings the running one's
-//! window up (its other flags are ignored then). `--snapshot` and `--unregister` runs don't
-//! check.
+//! window up (its other flags are ignored then), or with `--quick-search` opens its quick
+//! search box (what a desktop shortcut runs where the app can't hear keys pressed in other
+//! apps; with none running, featherplay starts as usual). `--snapshot` and `--unregister`
+//! runs don't check.
 //!
 //! `--autostart` is how the entry Settings > Window adds starts featherplay when the user
 //! signs in (`autostart`): no focus taken, or no window at all with "Start in the tray".
@@ -44,7 +46,7 @@ use featherplay_controller::diagnostics;
 use featherplay_core::model::TrackId;
 use featherplay_store::Paths;
 
-const USAGE: &str = "usage: featherplay [--autostart] [--play <videoId>] [--volume <0..1>] [--start-at <secs>] [--timing]
+const USAGE: &str = "usage: featherplay [--autostart] [--play <videoId>] [--volume <0..1>] [--start-at <secs>] [--timing] [--quick-search]
        featherplay --unregister
        featherplay --snapshot <page> --fixtures [--theme dark|light] [--size WxH] [--scale F] [--queue] [--hover X,Y | --press X,Y] [--hold-loading | --hold-error] [--signed-out] [--track N] [--shuffle] [--language CODE] --out <png>";
 
@@ -96,6 +98,7 @@ fn parse_args() -> Result<Mode, String> {
             }
             "--timing" => app.timing = true,
             featherplay_platform::autostart::FLAG => app.autostart = true,
+            "--quick-search" => app.quick_search = true,
             "--snapshot" => snap = Some(value("--snapshot")?),
             "--fixtures" => fixtures = true,
             "--theme" => {
@@ -207,7 +210,12 @@ fn main() -> ExitCode {
         Ok(Mode::App(opts, app)) => {
             // Before anything is made: if this home's featherplay is running, it shows its
             // window and this launch ends. The guard stays on this thread until the end.
-            let _guard = match instance::start() {
+            let ask = if app.quick_search {
+                instance::Ask::QuickSearch
+            } else {
+                instance::Ask::Show
+            };
+            let _guard = match instance::start(ask) {
                 Start::Run(guard) => guard,
                 Start::Exit => return ExitCode::SUCCESS,
             };

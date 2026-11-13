@@ -35,7 +35,7 @@ pub(super) fn keycaps(hotkey: &str) -> ModelRc<SharedString> {
 
 /// A keycap per key of a hotkey, in the names the list uses whatever spelling the parser
 /// took: "ctrl+alt+ArrowRight" is Ctrl, Alt, →; "Super+KeyP" is Win, P.
-fn keycap_names(hotkey: &str) -> Vec<String> {
+pub(super) fn keycap_names(hotkey: &str) -> Vec<String> {
     hotkey
         .split('+')
         .map(str::trim)

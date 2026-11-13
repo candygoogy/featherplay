@@ -169,7 +169,7 @@ unsafe extern "system" fn window_proc(
             }
             LRESULT(0)
         }
-        _ => match show_answer(msg) {
+        _ => match show_answer(msg, wparam) {
             Some(answer) => answer,
             // SAFETY: the arguments this window procedure was called with.
             None => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
@@ -177,13 +177,31 @@ unsafe extern "system" fn window_proc(
     }
 }
 
-/// The answer to a second launch's `Show::message`; None for any other message.
-fn show_answer(msg: u32) -> Option<LRESULT> {
+/// The answer to a second launch's `Show::message`, which asks in `wparam` (`ask_wparam`);
+/// None for any other message.
+fn show_answer(msg: u32, wparam: WPARAM) -> Option<LRESULT> {
     SHOW.with(|cell| {
         let show = cell.borrow();
         let show = show.as_ref().filter(|s| s.message == msg)?;
-        Some(LRESULT(if (show.on_show)() { SHOWN as isize } else { 0 }))
+        let ask = if wparam.0 == ask_wparam(Ask::QuickSearch) {
+            Ask::QuickSearch
+        } else {
+            Ask::Show
+        };
+        Some(LRESULT(if (show.on_show)(ask) {
+            SHOWN as isize
+        } else {
+            0
+        }))
     })
+}
+
+/// What a second launch puts in the show message's wParam for `ask`.
+pub fn ask_wparam(ask: Ask) -> usize {
+    match ask {
+        Ask::Show => 0,
+        Ask::QuickSearch => 1,
+    }
 }
 
 #[cfg(test)]

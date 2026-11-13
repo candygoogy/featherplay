@@ -29,6 +29,8 @@ fn settings_defaults_when_missing() {
             tray_notice_shown: false,
             notifications: false,
             hotkeys: None,
+            quick_search: false,
+            quick_search_key: "Ctrl+Alt+K".into(),
             output_device: None,
             volume: 0.7,
             queue_open: false,
@@ -107,6 +109,8 @@ fn settings_roundtrip() {
             next: "Ctrl+Alt+Right".into(),
             previous: "Ctrl+Alt+Left".into(),
         }),
+        quick_search: true,
+        quick_search_key: "Ctrl+Shift+Space".into(),
         output_device: Some("Speakers (Realtek(R) Audio) ♪".into()),
         volume: 0.25,
         queue_open: true,
@@ -192,6 +196,26 @@ fn settings_roundtrip() {
         .map(|e| e.unwrap().file_name())
         .collect();
     assert_eq!(names, ["settings.toml"]);
+}
+
+/// The quick search's values of the wrong type (hand-edited, a newer featherplay's) load as
+/// off and an empty key, which the app takes as the default; the rest of the file counts.
+#[test]
+fn quick_search_values_of_the_wrong_type_dont_drop_the_file() {
+    let Some(home) = TestHome::new("settings-quick-search") else {
+        return;
+    };
+    let p = home.paths();
+    fs::create_dir_all(&p.config).unwrap();
+    let text = "quick_search = \"yes\"
+quick_search_key = { keys = [\"Ctrl\", \"K\"] }
+volume = 0.5
+";
+    fs::write(p.config.join("settings.toml"), text).unwrap();
+    let s = Settings::load(&p);
+    assert!(!s.quick_search);
+    assert_eq!(s.quick_search_key, "");
+    assert_eq!(s.volume, 0.5);
 }
 
 #[test]

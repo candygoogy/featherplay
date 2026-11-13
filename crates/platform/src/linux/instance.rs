@@ -29,13 +29,15 @@ use std::time::{Duration, Instant};
 
 use crate::common::identity::AUMID;
 use crate::common::instance::fnv1a;
-use crate::common::session_end::Show;
+use crate::common::session_end::{Ask, Show};
 
 /// How long one side waits for the other's request or answer.
 const ASK_TIMEOUT: Duration = Duration::from_secs(2);
 /// How often `Running::wait` tries the lock again.
 const POLL: Duration = Duration::from_millis(25);
 const REQUEST: &[u8] = b"show\n";
+/// The quick search's request (`Ask::QuickSearch`), as long as `REQUEST`.
+const FIND: &[u8] = b"find\n";
 
 /// The guard's key: the app ID, plus a hash of the home when `FEATHERPLAY_HOME` is set (an
 /// empty one counts as unset). It holds no path separator.
@@ -222,6 +224,12 @@ pub fn claim(name: &str) -> Result<Claim, String> {
 /// Asks the featherplay of this key to show its window. True once one answered that it
 /// did; false if none did (none is running, it is still starting, or it is closing).
 pub fn ask_to_show(key: &str) -> Result<bool, String> {
+    ask(key, Ask::Show)
+}
+
+/// Asks the featherplay of this key for `what` (its window, or the quick search), as
+/// `ask_to_show` does.
+pub fn ask(key: &str, what: Ask) -> Result<bool, String> {
     let path = socket_for(key);
     let mut stream = match UnixStream::connect(&path) {
         Ok(s) => s,
@@ -239,7 +247,10 @@ pub fn ask_to_show(key: &str) -> Result<bool, String> {
     let answer = (|| {
         stream.set_read_timeout(Some(ASK_TIMEOUT))?;
         stream.set_write_timeout(Some(ASK_TIMEOUT))?;
-        stream.write_all(REQUEST)?;
+        stream.write_all(match what {
+            Ask::Show => REQUEST,
+            Ask::QuickSearch => FIND,
+        })?;
         let mut byte = [0u8];
         stream.read_exact(&mut byte)?;
         io::Result::Ok(byte[0])
@@ -299,10 +310,15 @@ fn answer(mut stream: UnixStream, show: &Show) {
     let _ = stream.set_write_timeout(Some(ASK_TIMEOUT));
     let mut request = [0u8; REQUEST.len()];
     // Anything else (a probe that connected and left, say) isn't a request.
-    if stream.read_exact(&mut request).is_err() || request != REQUEST {
+    if stream.read_exact(&mut request).is_err() {
         return;
     }
-    let shown = (show.on_show)();
+    let ask = match &request[..] {
+        r if r == REQUEST => Ask::Show,
+        r if r == FIND => Ask::QuickSearch,
+        _ => return,
+    };
+    let shown = (show.on_show)(ask);
     let _ = stream.write_all(&[u8::from(shown)]);
 }
 
@@ -354,13 +370,18 @@ mod tests {
         let count = shown.clone();
         serve(Show {
             message: show_message(&key).unwrap(),
-            on_show: Box::new(move || {
-                count.fetch_add(1, Ordering::SeqCst);
+            on_show: Box::new(move |ask| {
+                if ask == Ask::Show {
+                    count.fetch_add(1, Ordering::SeqCst);
+                }
                 true
             }),
         })
         .unwrap();
         assert!(ask_to_show(&key).unwrap(), "no answer");
+        assert_eq!(shown.load(Ordering::SeqCst), 1);
+        // The quick search's request is answered too, and isn't taken for a show.
+        assert!(ask(&key, Ask::QuickSearch).unwrap(), "no answer to find");
         assert_eq!(shown.load(Ordering::SeqCst), 1);
         // Another home's launch doesn't reach it.
         assert!(!ask_to_show(&test_key("other")).unwrap());

@@ -55,6 +55,12 @@ pub fn pointer() -> Option<(i32, i32)> {
         .ok()
 }
 
+/// A point on the screen the user is working on (physical pixels), for a window to open
+/// there: the pointer, on an X11 desktop; `None` elsewhere.
+pub fn active_point() -> Option<(i32, i32)> {
+    pointer()
+}
+
 /// A window, as the window functions take it: here its X11 window or its Wayland surface.
 /// Made from the windowing library's raw handle (`from_raw`); its `Debug` prints it in hex.
 #[derive(Clone, Copy, PartialEq, Eq)]

@@ -721,6 +721,8 @@ pub struct AppOptions {
     pub timing: bool,
     /// `--autostart`: started by the sign-in entry (`autostart`).
     pub autostart: bool,
+    /// `--quick-search`: ask the running featherplay to open the quick search box.
+    pub quick_search: bool,
 }
 
 /// The app with its window: runs until the window closes, Quit, or Ctrl+C.
@@ -758,6 +760,9 @@ pub fn run(opts: Options, app: AppOptions) -> ExitCode {
     // The controller loads them too; the UI thread only needs the hotkeys, and the language
     // before the controller shows any string (the window's part follows in `settings::init`).
     let settings = Settings::load(&paths);
+    let quick_key = settings
+        .quick_search
+        .then(|| crate::quick_search::usable_key(&settings.quick_search_key).to_string());
     let hotkeys = settings.hotkeys;
     let start = crate::autostart::Start::new(app.autostart, settings.start_in_tray);
     language::install();
@@ -820,13 +825,22 @@ pub fn run(opts: Options, app: AppOptions) -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    // Another launch of this home: show the window, as the tray's Show does.
+    // Another launch of this home: show the window, as the tray's Show does, or open the
+    // quick search (`--quick-search`), as its key does.
     let show = match instance::show_message(&instance::key_here()) {
         Ok(message) => Some(session_end::Show {
             message,
-            on_show: Box::new(|| {
+            on_show: Box::new(|ask| {
                 !CLOSING.load(Ordering::Acquire)
-                    && slint::invoke_from_event_loop(|| on_event(UiEvent::ShowWindow)).is_ok()
+                    && match ask {
+                        session_end::Ask::Show => {
+                            slint::invoke_from_event_loop(|| on_event(UiEvent::ShowWindow))
+                        }
+                        session_end::Ask::QuickSearch => {
+                            slint::invoke_from_event_loop(crate::quick_search::pressed)
+                        }
+                    }
+                    .is_ok()
             }),
         }),
         Err(e) => {
@@ -849,6 +863,13 @@ pub fn run(opts: Options, app: AppOptions) -> ExitCode {
         log!("{e}");
     }
 
+    // The quick search's key, on this thread as the hotkeys are, on its own: a taken one
+    // never drops them. Taken, Settings' row says so, and the next start or change tries again.
+    if let Some(key) = quick_key
+        .filter(|_| featherplay_platform::supports(featherplay_platform::Feature::GlobalHotkeys))
+    {
+        let _ = crate::quick_search::set_key(Some(&key));
+    }
     let ui = run_window(&paths, catalog, action_tx, tx.clone(), hotkeys, app, start);
     closing();
     if let Err(e) = &ui {
@@ -1047,6 +1068,8 @@ fn run_window(
     let res = slint::run_event_loop_until_quit().map_err(|e| format!("event loop: {e}"));
     // Drops the media session, thumb buttons, tray icon and hotkeys on this thread.
     shell::stop();
+    crate::quick_search::close(false);
+    let _ = crate::quick_search::set_key(None);
     CTX.with(|c| c.borrow_mut().take());
     drop(ctx);
     drop(ui);

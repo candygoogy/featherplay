@@ -272,6 +272,7 @@ pub fn theme_changed(ctx: &Rc<Ctx>) {
     step(&ui, if duration.is_zero() { 1.0 } else { 0.0 });
     crate::mini::theme_changed(ctx);
     crate::desktop_lyrics::theme_changed(ctx);
+    crate::quick_search::theme_changed(ctx);
 
     let began = i_slint_core::animations::current_tick();
     let weak = ui.as_weak();

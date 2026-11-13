@@ -5,8 +5,9 @@
 //! here (`From`), and a `NowPlaying` becomes what they show: the media card's `MediaState`,
 //! the tray's hover text (`tooltip_text`, `tray_tooltip`), the track's toast (`notify_track`).
 //!
-//! `Hotkeys` lives on the UI thread, the one that owns the window and pumps its messages.
-//! Events go to the controller as `UiCommand`s over a `Sender`, which never blocks.
+//! `Hotkeys` and `QuickKey` live on the UI thread, the one that owns the window and pumps its
+//! messages. `Hotkeys`' events go to the controller as `UiCommand`s over a `Sender`, which
+//! never blocks; `QuickKey`'s run the app's own callback.
 //! `sponsorblock`, `discord` and `local_api` are driven by the controller, off the UI thread.
 #![cfg_attr(
     test,
@@ -30,7 +31,7 @@ pub mod sponsorblock;
 mod tooltip;
 
 pub use discord::Discord;
-pub use hotkeys::{Hotkeys, parse_hotkey};
+pub use hotkeys::{Hotkeys, KeyError, QuickKey, parse_hotkey, same_hotkey};
 pub use notify::notify_track;
 pub use tooltip::{tooltip_text, tray_tooltip};
 

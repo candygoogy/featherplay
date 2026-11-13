@@ -35,6 +35,7 @@ use crate::{desktop_lyrics, follow, language, lyrics, shell, updates};
 mod discord;
 mod local_api;
 mod playback;
+mod quick_key;
 mod scrobbling;
 pub mod search;
 mod shortcuts;
@@ -45,6 +46,7 @@ mod window;
 pub use discord::{Preview, PreviewTime, discord_changed, discord_preview, step_minutes};
 pub use local_api::{local_api_changed, mask, parse_port, show_local_api_for_snapshot};
 pub use playback::{show_sleep_timer_for_snapshot, show_speed_for_snapshot};
+pub use quick_key::{capture_text, show_for_snapshot as show_quick_key_for_snapshot};
 pub use scrobbling::{
     check_keys, lastfm_changed, lastfm_keys_changed, listenbrainz_changed, show_dialog_for_snapshot,
 };
@@ -259,6 +261,7 @@ pub fn init(ctx: &Rc<Ctx>) {
     data.on_custom_hex_entered(move |text| custom_hex_entered(&c, &text));
     let c = ctx.clone();
     data.on_hotkey_edited(move |_, _| hotkeys_edited(&c));
+    quick_key::init(ctx);
     let c = ctx.clone();
     data.on_lastfm_connect(move || {
         lastfm_changed(&c, LastfmStatus::Opening, None);
@@ -488,6 +491,7 @@ fn show(ctx: &Ctx) {
         data.set_hotkey_next(h.next.as_str().into());
         data.set_hotkey_previous(h.previous.as_str().into());
     }
+    quick_key::show(ctx, &s);
     data.set_signed_in(ctx.signed_in());
     data.set_lyrics(s.lyrics);
     data.set_lyrics_lrclib(s.lyrics_lrclib);

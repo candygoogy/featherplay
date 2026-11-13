@@ -222,7 +222,7 @@ impl Source {
         match self {
             Source::Unreachable => Err(unreachable()),
             Source::Live(api) | Source::SignedOut(api) => api.search_suggestions(q).await,
-            Source::Fixtures(f) => f.search_suggestions(),
+            Source::Fixtures(f) => f.search_suggestions(q),
         }
     }
 

@@ -342,10 +342,11 @@ impl Fixtures {
         Ok(out)
     }
 
-    /// The recorded suggestions for "daft pu"; the demo set has none.
-    pub fn search_suggestions(&self) -> Result<SearchSuggestions, ApiError> {
-        if self.demo.is_some() {
-            return Ok(SearchSuggestions::default());
+    /// The recorded suggestions for "daft pu", whatever `query` is; the demo set's are made
+    /// up for `query` from its songs.
+    pub fn search_suggestions(&self, query: &str) -> Result<SearchSuggestions, ApiError> {
+        if let Some(d) = &self.demo {
+            return Ok(d.search_suggestions(query));
         }
         convert::search_suggestions(&self.raw("search_suggestions")?)
     }

@@ -25,6 +25,13 @@ pub enum QueueAction {
     /// A whole list after the current track, in order (the sidebar menu's Play next).
     PlayNextAll(Vec<Track>),
     Enqueue(Vec<Track>),
+    /// The quick search's Play next: `tracks` right after the current track, or right after
+    /// `after` (what the same box set to play next before) while that's still to come, so
+    /// several picks play in the order they were made (`play_after_inputs`).
+    PlayAfter {
+        tracks: Vec<Track>,
+        after: Option<TrackId>,
+    },
     /// Play the upcoming track at this index now.
     SkipTo(usize),
     /// `Action::Play` with where the tracks come from: "Liked songs", a playlist's title,
@@ -103,6 +110,31 @@ pub fn add_input(edit: QueueAction) -> Option<Input> {
         QueueAction::Enqueue(tracks) => Some(Input::Enqueue(tracks)),
         _ => None,
     }
+}
+
+/// What puts `tracks` next in `queue`: right after the current track, then, when `after`
+/// is still to come (by its id or its song version's), each moved to just after it, in
+/// their order. Nothing for no tracks.
+pub fn play_after_inputs(queue: &Queue, tracks: Vec<Track>, after: Option<&TrackId>) -> Vec<Input> {
+    let count = tracks.len();
+    if count == 0 {
+        return Vec::new();
+    }
+    let at = after.and_then(|id| {
+        queue.upcoming().iter().position(|t| {
+            t.id == *id || t.counterpart.as_deref().is_some_and(|song| song.id == *id)
+        })
+    });
+    let mut inputs = vec![Input::PlayNextAll(tracks)];
+    // Once in, the tracks are upcoming 0..count and `after` is at `at + count`: each first
+    // one moved to `at + count` lands right after it, behind the ones moved before.
+    if let Some(at) = at {
+        inputs.extend((0..count).map(|_| Input::MoveUpcoming {
+            from: 0,
+            to: at + count,
+        }));
+    }
+    inputs
 }
 
 /// `input` with the ratings the user made this session on the tracks it brings. A page keeps
@@ -212,6 +244,13 @@ impl Controller {
                 if let Some(input) = add_input(edit) {
                     self.input(input);
                 }
+            }
+            QueueAction::PlayAfter { tracks, after } => {
+                if self.player.queue().current().is_none() {
+                    self.playing_from = PlayingFrom::default();
+                }
+                let inputs = play_after_inputs(self.player.queue(), tracks, after.as_ref());
+                self.inputs(inputs);
             }
             QueueAction::SkipTo(i) => self.input(Input::SkipTo(i)),
             QueueAction::PlayFrom {
