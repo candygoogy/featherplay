@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Installs, as root inside a distribution's container, one of three package sets, and lists
+# Installs, as root inside a distribution's container, one of four package sets, and lists
 # what it installed in $OUT/packages-<set>.txt:
 #   runtime  what featherplay's AppImage needs and a desktop install already has: the
 #            libraries the binary links (fontconfig, FreeType, ALSA; no OpenSSL, its TLS is
@@ -10,26 +10,36 @@
 #            update server), procps (pgrep), findutils and useradd.
 #   sound    a sound server for the null sink, as a desktop has one: PulseAudio, pactl, and
 #            ALSA's pulse plugin (the route ALSA programs such as featherplay take to it).
+#   bare     for bare.sh, Ubuntu and Debian only: of the libraries the binary loads, only
+#            those the AppImage excludelist expects every system to have (fontconfig,
+#            FreeType, ALSA, libX11, libX11-xcb, libxcb, libwayland-client), and the
+#            keyboard data (xkb-data), which every system with a display server has
+#            (xkbcommon can't start without it); the AppImage brings the rest.
 # The distribution is /etc/os-release's ID: ubuntu, debian, fedora or arch.
 #
-# Usage: packages.sh runtime|rig|sound
+# Usage: packages.sh runtime|rig|sound|bare
 set -euo pipefail
 
-set_name=${1:?usage: packages.sh runtime|rig|sound}
+set_name=${1:?usage: packages.sh runtime|rig|sound|bare}
 out=${OUT:-/rig/out}
 mkdir -p "$out"
 # shellcheck disable=SC1091
 . /etc/os-release
 
 case "$ID:$set_name" in
-ubuntu:runtime | debian:runtime)
+ubuntu:runtime | debian:runtime | ubuntu:bare | debian:bare)
     # 24.04 and Debian 13 renamed ALSA's library for the 64-bit time_t move.
     apt-get update -qq
     t64=
     if apt-cache show libasound2t64 >/dev/null 2>&1; then t64=t64; fi
-    pkgs="libfontconfig1 libfreetype6 libasound2$t64 libx11-6 libx11-xcb1
-          libxcursor1 libxi6 libxcb1 libxkbcommon0 libxkbcommon-x11-0 libwayland-client0
-          fonts-dejavu-core"
+    if [ "$set_name" = bare ]; then
+        pkgs="libfontconfig1 libfreetype6 libasound2$t64 libx11-6 libx11-xcb1 libxcb1
+              libwayland-client0 xkb-data"
+    else
+        pkgs="libfontconfig1 libfreetype6 libasound2$t64 libx11-6 libx11-xcb1
+              libxcursor1 libxi6 libxcb1 libxkbcommon0 libxkbcommon-x11-0 libwayland-client0
+              fonts-dejavu-core"
+    fi
     ;;
 ubuntu:rig | debian:rig)
     pkgs="xvfb python3 procps findutils passwd"

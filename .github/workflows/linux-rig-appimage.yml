@@ -21,8 +21,13 @@ name: Linux rig (AppImage)
 #                  PulseAudio null sink), update (from release.sh's local release, signed
 #                  with a key made for the run: downloaded, verified, replaced in place,
 #                  restarted into the newer version).
+#   bare           the release AppImage (x86_64) as the AppImage catalog tests one, in
+#                  scripts/rig/appimage/bare.sh: an Ubuntu 22.04 container with only the
+#                  libraries the AppImage excludelist expects a system to have and the
+#                  keyboard data, no network, no D-Bus or keyring; its window must show on
+#                  Xvfb within 30 s.
 # Each distribution's results and packages are in the run's summary; its logs are the
-# `rig-appimage-<arch>-<distribution>` artifacts.
+# `rig-appimage-<arch>-<distribution>` artifacts (bare's: `rig-appimage-x86_64-bare`).
 
 on:
   workflow_call:
@@ -251,6 +256,52 @@ jobs:
         if: always()
         with:
           name: rig-appimage-${{ matrix.arch }}-${{ env.SLUG }}
+          path: rig/out
+          if-no-files-found: warn
+          retention-days: 14
+
+  bare:
+    needs: build-release
+    name: bare ubuntu:22.04 (x86_64)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: rig-appimage-release-x86_64
+          path: rig/release
+
+      # The X server and the window check run here, outside the container.
+      - name: Xvfb and xdotool
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xvfb xdotool
+
+      - name: Run in a bare ubuntu:22.04
+        shell: bash
+        run: scripts/rig/appimage/bare.sh ubuntu:22.04 rig/release/featherplay-x86_64.AppImage rig/out
+
+      - name: Summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "### bare ubuntu:22.04 (x86_64)"
+            echo '```'
+            cat rig/out/results.txt 2>/dev/null || echo "no results"
+            echo
+            cat rig/out/packages-bare.txt 2>/dev/null
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: rig-appimage-x86_64-bare
           path: rig/out
           if-no-files-found: warn
           retention-days: 14
