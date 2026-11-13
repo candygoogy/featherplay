@@ -295,10 +295,10 @@ Measured on one Windows PC with 16 logical processors, each app playing a song o
 With the equalizer, Even out loudness, Skip silence and a 5 s crossfade all on, featherplay
 0.2.0 used 56 MB of memory and 0.087 % CPU while playing (one run, 9 November).
 
-**On Linux:** _PLACEHOLDER: memory and CPU, to be measured in WSL with the same method
-before release._
-
-<!-- TODO Linux figures (WSL): memory and CPU -->
+**On Linux**, measured in WSL on the same PC (not a real desktop), featherplay 0.3.0's AppImage
+used 85 MB of memory both playing and paused, 0.26 % CPU while playing and 0.001 % while paused,
+as a share of the 12 processors WSL had (three runs, the median; the queue played on rather than
+repeating one song). It runs as 2 processes: the app and the AppImage's own file server.
 
 Pear does much more than featherplay, and [Coming from Pear?](#coming-from-pear) lists which
 of its plugins carry over. Its own tracker has reports of high CPU use
