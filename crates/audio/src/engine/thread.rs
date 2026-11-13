@@ -177,11 +177,8 @@ impl Engine {
             }
             if self.stop_at.is_some_and(|t| Instant::now() >= t) {
                 self.stop_at = None;
-                if self.controls.paused.load(Ordering::SeqCst)
-                    && let Some(sink) = &mut self.sink
-                {
-                    // Fails only if the stream's thread is gone, which reports its own error.
-                    let _ = sink.set_playing(false);
+                if self.controls.paused.load(Ordering::SeqCst) {
+                    self.stop_output();
                 }
             }
         }
@@ -617,6 +614,23 @@ impl Engine {
             ready: false,
             attach_after: None,
             loaded: None,
+        }
+    }
+
+    /// Stops the paused output's stream. On Linux it's replaced by a new one that isn't started,
+    /// which waits on nothing: a stream paused with cpal's ALSA pause (`snd_pcm_pause`) keeps
+    /// its thread polling the device, and where the sound server had stalled the stream
+    /// (WSLg's, 2026-11-13) that poll spun at 15 % of a core for as long as the pause lasted.
+    /// Through a server that doesn't stall it stayed idle either way (the sound rig). The new
+    /// stream starts on the play as any does, as one opened after `WAKE_AFTER` already did;
+    /// failing to open one, the old one is paused as elsewhere.
+    fn stop_output(&mut self) {
+        if REOPEN_IDLE && self.sink.is_some() && self.open_output(self.device.clone()).is_ok() {
+            return;
+        }
+        if let Some(sink) = &mut self.sink {
+            // Fails only if the stream's thread is gone, which reports its own error.
+            let _ = sink.set_playing(false);
         }
     }
 
