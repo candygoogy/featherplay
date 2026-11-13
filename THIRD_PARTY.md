@@ -796,19 +796,19 @@ Builds says which builds compile the crate in: all four, Windows (x64 and ARM64)
 | event-listener-strategy | 0.5.4 | Apache-2.0 OR MIT | Linux |
 | fastrand | 2.5.0 | Apache-2.0 OR MIT | all |
 | fdeflate | 0.3.7 | MIT OR Apache-2.0 | all |
-| featherplay | 0.2.2 | MIT | all |
-| featherplay-audio | 0.2.2 | MIT | all |
-| featherplay-controller | 0.2.2 | MIT | all |
-| featherplay-core | 0.2.2 | MIT | all |
-| featherplay-integrations | 0.2.2 | MIT | all |
-| featherplay-lastfm | 0.2.2 | MIT | all |
-| featherplay-listenbrainz | 0.2.2 | MIT | all |
-| featherplay-lyrics | 0.2.2 | MIT | all |
-| featherplay-platform | 0.2.2 | MIT | all |
-| featherplay-proxy | 0.2.2 | MIT | all |
-| featherplay-store | 0.2.2 | MIT | all |
-| featherplay-streams | 0.2.2 | MIT | all |
-| featherplay-ytm | 0.2.2 | MIT | all |
+| featherplay | 0.3.0 | MIT | all |
+| featherplay-audio | 0.3.0 | MIT | all |
+| featherplay-controller | 0.3.0 | MIT | all |
+| featherplay-core | 0.3.0 | MIT | all |
+| featherplay-integrations | 0.3.0 | MIT | all |
+| featherplay-lastfm | 0.3.0 | MIT | all |
+| featherplay-listenbrainz | 0.3.0 | MIT | all |
+| featherplay-lyrics | 0.3.0 | MIT | all |
+| featherplay-platform | 0.3.0 | MIT | all |
+| featherplay-proxy | 0.3.0 | MIT | all |
+| featherplay-store | 0.3.0 | MIT | all |
+| featherplay-streams | 0.3.0 | MIT | all |
+| featherplay-ytm | 0.3.0 | MIT | all |
 | field-offset | 0.3.6 | MIT OR Apache-2.0 | all |
 | fixed_decimal | 0.7.3 | Unicode-3.0 | all |
 | fixedbitset | 0.5.7 | MIT OR Apache-2.0 | Linux |
@@ -6261,7 +6261,7 @@ SOFTWARE.
 
 ### MIT License
 
-Used by: chrono 0.4.45, dasp_sample 0.11.0, dpi 0.1.2, featherplay 0.2.2, featherplay-audio 0.2.2, featherplay-controller 0.2.2, featherplay-core 0.2.2, featherplay-integrations 0.2.2, featherplay-lastfm 0.2.2, featherplay-listenbrainz 0.2.2, featherplay-lyrics 0.2.2, featherplay-platform 0.2.2, featherplay-proxy 0.2.2, featherplay-store 0.2.2, featherplay-streams 0.2.2, featherplay-ytm 0.2.2, json-crawler 0.1.0, libm 0.2.16, lyon_algorithms 1.0.22, lyon_extra 1.1.0, lyon_geom 1.0.20, lyon_path 1.0.19, minisign-verify 0.3.0, opus-decoder 0.1.1, rquickjs-core 0.14.0, skia-bindings 0.153.3, skia-safe 0.153.3, taffy 0.10.1, tauri-winrt-notification 0.8.1, webview2-com 0.39.1, webview2-com-macros 0.8.1, webview2-com-sys 0.39.1, windows 0.62.2, windows-collections 0.3.2, windows-core 0.62.2, windows-future 0.3.2, windows-implement 0.60.2, windows-interface 0.59.3, windows-link 0.2.1, windows-numerics 0.3.1, windows-registry 0.6.1, windows-result 0.4.1, windows-strings 0.5.1, windows-sys 0.52.0, windows-sys 0.59.0, windows-sys 0.61.2, windows-targets 0.52.6, windows-threading 0.2.1, windows-version 0.1.7, windows_aarch64_msvc 0.52.6, windows_x86_64_msvc 0.52.6, ytmapi-rs 0.3.3
+Used by: chrono 0.4.45, dasp_sample 0.11.0, dpi 0.1.2, featherplay 0.3.0, featherplay-audio 0.3.0, featherplay-controller 0.3.0, featherplay-core 0.3.0, featherplay-integrations 0.3.0, featherplay-lastfm 0.3.0, featherplay-listenbrainz 0.3.0, featherplay-lyrics 0.3.0, featherplay-platform 0.3.0, featherplay-proxy 0.3.0, featherplay-store 0.3.0, featherplay-streams 0.3.0, featherplay-ytm 0.3.0, json-crawler 0.1.0, libm 0.2.16, lyon_algorithms 1.0.22, lyon_extra 1.1.0, lyon_geom 1.0.20, lyon_path 1.0.19, minisign-verify 0.3.0, opus-decoder 0.1.1, rquickjs-core 0.14.0, skia-bindings 0.153.3, skia-safe 0.153.3, taffy 0.10.1, tauri-winrt-notification 0.8.1, webview2-com 0.39.1, webview2-com-macros 0.8.1, webview2-com-sys 0.39.1, windows 0.62.2, windows-collections 0.3.2, windows-core 0.62.2, windows-future 0.3.2, windows-implement 0.60.2, windows-interface 0.59.3, windows-link 0.2.1, windows-numerics 0.3.1, windows-registry 0.6.1, windows-result 0.4.1, windows-strings 0.5.1, windows-sys 0.52.0, windows-sys 0.59.0, windows-sys 0.61.2, windows-targets 0.52.6, windows-threading 0.2.1, windows-version 0.1.7, windows_aarch64_msvc 0.52.6, windows_x86_64_msvc 0.52.6, ytmapi-rs 0.3.3
 
 ```
 MIT License
