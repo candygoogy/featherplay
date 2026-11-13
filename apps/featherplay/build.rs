@@ -107,6 +107,17 @@ fn main() {
         }
     }
 
+    // Linux x86_64, release: the linker folds identical functions into one, as link.exe's
+    // /OPT:ICF does for the Windows exe; 0.3 MB less (2026-11-13). The default linker there
+    // is rust-lld; aarch64 links with the system's ld, which has no `--icf`.
+    let target = |key: &str| std::env::var(key).unwrap_or_default();
+    if target("CARGO_CFG_TARGET_OS") == "linux"
+        && target("CARGO_CFG_TARGET_ARCH") == "x86_64"
+        && target("PROFILE") == "release"
+    {
+        println!("cargo:rustc-link-arg-bins=-Wl,--icf=all");
+    }
+
     // Resource ID 1 is the first icon group, the one Explorer and the shell pick.
     let rc = Path::new(&out).join("featherplay.rc");
     let ico_path = ico.display().to_string().replace('\\', "/");
