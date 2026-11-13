@@ -171,7 +171,7 @@ msgstr "[A helper download arrived damaged.]"
 msgid "Couldn't save helpers. Is the disk full?"
 msgstr "[Couldn't save helpers. Is the disk full?]"
 
-#: ../../crates/integrations/src/discord.rs:28
+#: ../../crates/integrations/src/discord.rs:28 src/quick_search.rs:627
 msgid "Play song"
 msgstr "[Play song]"
 
@@ -218,7 +218,7 @@ msgstr "[Lock desktop lyrics]"
 #: ../../crates/platform/src/common/tray.rs:194 ui/bottom_bar.slint:409
 #: ../../crates/platform/src/common/tray.rs:194 ui/bottom_bar.slint:409 ui/pages/content.slint:450
 #: ../../crates/platform/src/common/tray.rs:194 ui/bottom_bar.slint:409 ui/pages/content.slint:450 ui/parts/buttons.slint:26
-#: ../../crates/platform/src/common/tray.rs:194 ui/bottom_bar.slint:409 ui/pages/content.slint:450 ui/parts/buttons.slint:26 ui/quick_search.slint:569
+#: ../../crates/platform/src/common/tray.rs:194 ui/bottom_bar.slint:409 ui/pages/content.slint:450 ui/parts/buttons.slint:26
 msgid "Play"
 msgstr "[Play]"
 
@@ -679,11 +679,12 @@ msgid "Diagnostics copied"
 msgstr "[Diagnostics copied]"
 
 #: src/pages/album.rs:128 src/pages/settings/discord.rs:139
+#: src/pages/album.rs:128 src/pages/settings/discord.rs:139
 msgid "Album"
 msgstr "[Album]"
 
 #: src/pages/artist.rs:108 src/pages/settings/discord.rs:136
-#: src/pages/artist.rs:108 src/pages/settings/discord.rs:136
+#: src/pages/artist.rs:108 src/pages/settings/discord.rs:136 src/ui_bridge.rs:109
 msgid "Artist"
 msgstr "[Artist]"
 
@@ -750,7 +751,7 @@ msgstr "[Similar to]"
 msgid "Couldn't load related tracks"
 msgstr "[Couldn't load related tracks]"
 
-#: src/pages/playlist.rs:122
+#: src/pages/playlist.rs:122 src/quick_search.rs:632
 msgid "Playlist"
 msgstr "[Playlist]"
 
@@ -2165,15 +2166,49 @@ msgstr "[Removed {} from your library]"
 msgid "Couldn't remove {}."
 msgstr "[Couldn't remove {}.]"
 
-#: src/quick_search.rs:493 ui/pages/search.slint:90
+#: src/quick_search.rs:519 ui/pages/search.slint:90
 msgid "No results for “{}”"
 msgstr "[No results for “{}”]"
 
-#: src/quick_search.rs:740
+#. A link isn't repeated as the title: the field above shows it.
+#: src/quick_search.rs:576 src/quick_search.rs:596 ui/pages/search.slint:44
+#: src/quick_search.rs:576 src/quick_search.rs:596 ui/pages/search.slint:44 ui/shortcuts.slint:59 ui/top_bar.slint:355
+msgid "Search"
+msgstr "[Search]"
+
+#: src/quick_search.rs:586
+msgid "Search for “{}”"
+msgstr "[Search for “{}”]"
+
+#: src/quick_search.rs:625
+msgid "Video"
+msgstr "[Video]"
+
+#: src/quick_search.rs:625
+msgid "Play video"
+msgstr "[Play video]"
+
+#: src/quick_search.rs:627
+msgid "Song"
+msgstr "[Song]"
+
+#: src/quick_search.rs:628
+msgid "Play album"
+msgstr "[Play album]"
+
+#: src/quick_search.rs:629
+msgid "Play artist"
+msgstr "[Play artist]"
+
+#: src/quick_search.rs:633
+msgid "Play playlist"
+msgstr "[Play playlist]"
+
+#: src/quick_search.rs:767
 msgid "Plays after it"
 msgstr "[Plays after it]"
 
-#: src/quick_search.rs:742
+#: src/quick_search.rs:769
 msgid "Plays next"
 msgstr "[Plays next]"
 
@@ -3077,12 +3112,6 @@ msgid "Songs added to it show up here."
 msgstr "[Songs added to it show up here.]"
 
 #. A link isn't repeated as the title: the field above shows it.
-#: ui/pages/search.slint:44 ui/quick_search.slint:569 ui/shortcuts.slint:49
-#: ui/pages/search.slint:44 ui/quick_search.slint:569 ui/shortcuts.slint:49 ui/top_bar.slint:355
-msgid "Search"
-msgstr "[Search]"
-
-#. A link isn't repeated as the title: the field above shows it.
 #: ui/pages/search.slint:44
 msgid "Results for"
 msgstr "[Results for]"
@@ -3537,7 +3566,7 @@ msgstr "[play, pause, next, previous · always on]"
 msgid "Global hotkey"
 msgstr "[Global hotkey]"
 
-#: ui/pages/settings/shortcuts.slint:140 ui/quick_search.slint:456
+#: ui/pages/settings/shortcuts.slint:140 ui/quick_search.slint:507
 msgid "Quick search"
 msgstr "[Quick search]"
 
@@ -3756,8 +3785,8 @@ msgstr "[Artist menu]"
 msgid "Start radio"
 msgstr "[Start radio]"
 
-#: ui/playlist_menu_layer.slint:234 ui/quick_search.slint:581
-#: ui/playlist_menu_layer.slint:234 ui/quick_search.slint:581
+#: ui/playlist_menu_layer.slint:234 ui/quick_search.slint:670
+#: ui/playlist_menu_layer.slint:234 ui/quick_search.slint:670
 msgid "Play next"
 msgstr "[Play next]"
 
@@ -3825,51 +3854,59 @@ msgstr "[Remove from queue]"
 msgid "Nothing up next"
 msgstr "[Nothing up next]"
 
-#: ui/quick_search.slint:332
+#: ui/quick_search.slint:384
 msgid "featherplay quick search"
 msgstr "[featherplay quick search]"
 
-#: ui/quick_search.slint:434
+#: ui/quick_search.slint:485
 msgid "Search songs, albums, artists"
 msgstr "[Search songs, albums, artists]"
 
-#: ui/quick_search.slint:496
-msgid "Recent"
-msgstr "[Recent]"
+#: ui/quick_search.slint:552
+msgid "Nothing picked here yet"
+msgstr "[Nothing picked here yet]"
 
-#: ui/quick_search.slint:505
-msgid "Top results"
-msgstr "[Top results]"
+#: ui/quick_search.slint:553
+msgid "Type a song, album, artist or playlist. Enter plays it."
+msgstr "[Type a song, album, artist or playlist. Enter plays it.]"
 
-#: ui/quick_search.slint:508
-msgid "Searches"
-msgstr "[Searches]"
-
-#: ui/quick_search.slint:526
-msgid "Type to find a song, album, artist or playlist. Enter plays it."
-msgstr "[Type to find a song, album, artist or playlist. Enter plays it.]"
-
-#: ui/quick_search.slint:530
+#: ui/quick_search.slint:558
 msgid "Check the spelling, or try fewer words."
 msgstr "[Check the spelling, or try fewer words.]"
 
-#: ui/quick_search.slint:533
+#: ui/quick_search.slint:563
 msgid "You're offline"
 msgstr "[You're offline]"
 
-#: ui/quick_search.slint:534
+#: ui/quick_search.slint:564
 msgid "Search comes back with the connection."
 msgstr "[Search comes back with the connection.]"
 
-#: ui/quick_search.slint:564
+#: ui/quick_search.slint:574
+msgid "Recent"
+msgstr "[Recent]"
+
+#: ui/quick_search.slint:580
+msgid "Top results"
+msgstr "[Top results]"
+
+#: ui/quick_search.slint:584
+msgid "Searches"
+msgstr "[Searches]"
+
+#: ui/quick_search.slint:641
+msgid "Playing now: {}"
+msgstr "[Playing now: {}]"
+
+#: ui/quick_search.slint:651
 msgid "Enter searches"
 msgstr "[Enter searches]"
 
-#: ui/quick_search.slint:564
+#: ui/quick_search.slint:651
 msgid "Enter plays, Shift+Enter plays next"
 msgstr "[Enter plays, Shift+Enter plays next]"
 
-#: ui/quick_search.slint:565
+#: ui/quick_search.slint:652
 msgid "Ctrl+Enter opens it in featherplay"
 msgstr "[Ctrl+Enter opens it in featherplay]"
 

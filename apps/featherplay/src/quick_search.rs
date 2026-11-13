@@ -22,7 +22,7 @@ use std::rc::Rc;
 use std::time::Instant;
 
 use featherplay_controller::suggest::{INTERVAL, Next, PAUSE, Suggester};
-use featherplay_core::model::{AlbumId, ArtistId, PlaylistId, Track, TrackId};
+use featherplay_core::model::{AlbumId, ArtistId, PlaylistId, Track, TrackId, VideoType};
 use featherplay_core::tr;
 use featherplay_integrations::{KeyError, QuickKey};
 use featherplay_platform::window::{self, Handle};
@@ -37,9 +37,10 @@ use crate::controller::{Action, QueueAction};
 use crate::pages::content;
 use crate::router::Page;
 use crate::ui::{
-    AppWindow, QuickData, QuickPick, QuickRow, QuickSearch, QuickState, SettingsData,
+    AppWindow, Player, QuickData, QuickPick, QuickRow, QuickSearch, QuickState, SettingsData,
     SuggestionKind, Theme, TopBarData,
 };
+use crate::ui_bridge::{artist_names, shown};
 use crate::{link, popup, shell, song_menu};
 
 /// The box's width, in logical pixels.
@@ -83,6 +84,8 @@ enum Shown {
     Nothing,
     Recent(Vec<Recent>),
     Answer(SearchSuggestions),
+    /// An answer without rows for this text: one row searches featherplay for it.
+    None(String),
 }
 
 /// Registers a key for `set_key`: the system's (`QuickKey`), or a test's stand-in, which
@@ -238,6 +241,7 @@ pub fn create(ctx: &Rc<Ctx>) -> Result<QuickSearch, String> {
     });
     BOX.with_borrow_mut(|b| *b = Some(quick.clone()));
     wire(ctx, &ui);
+    sync_playing(&ui, &main);
     show_recent(ctx, &quick);
     ui.window()
         .set_size(slint::LogicalSize::new(WIDTH, ui.get_box_height()));
@@ -332,6 +336,27 @@ pub fn theme_changed(ctx: &Ctx) {
     }
 }
 
+/// The song changed or stopped: the open box's footer follows.
+pub fn update(ctx: &Ctx) {
+    let Some(quick) = BOX.with_borrow(Clone::clone) else {
+        return;
+    };
+    if let Some(main) = ctx.window() {
+        sync_playing(&quick.ui, &main);
+    }
+}
+
+/// The footer's song playing now: the main window's, none without a track.
+fn sync_playing(ui: &QuickSearch, main: &AppWindow) {
+    let player = main.global::<Player>();
+    let title = if player.get_has_track() {
+        player.get_title()
+    } else {
+        Default::default()
+    };
+    ui.global::<QuickData>().set_playing(title);
+}
+
 fn sync_theme(ui: &QuickSearch, main: &AppWindow) {
     popup::sync_theme(
         &main.global::<Theme>(),
@@ -399,10 +424,10 @@ fn act(ctx: &Rc<Ctx>, quick: &Rc<QuickBox>, next: Next) {
     }
 }
 
-/// Typed, and the answer for the text isn't in yet: the rows for an older text stay; the
-/// recent picks (an empty field's) go.
+/// Typed, and the answer for the text isn't in yet: the rows (or the no-results line) for an
+/// older text stay; the recent picks (an empty field's) go.
 fn waiting(quick: &QuickBox) {
-    if matches!(*quick.shown.borrow(), Shown::Answer(_)) {
+    if matches!(*quick.shown.borrow(), Shown::Answer(_) | Shown::None(_)) {
         return;
     }
     quick.shown.replace(Shown::Nothing);
@@ -476,7 +501,7 @@ fn show_recent(ctx: &Ctx, quick: &QuickBox) {
     }
     let (rows, covers): (Vec<QuickRow>, Vec<Option<String>>) = picks
         .iter()
-        .map(|r| (result_row(&r.item, &r.subtitle, ""), cover_of(&r.item)))
+        .map(|r| (result_row(&r.item, &r.subtitle), cover_of(&r.item)))
         .unzip();
     set_rows(ctx, quick, rows, covers);
     data.set_state(QuickState::Recent);
@@ -489,14 +514,17 @@ fn show_answer(ctx: &Ctx, quick: &QuickBox, mut s: SearchSuggestions) {
     let data = quick.ui.global::<QuickData>();
     let query = data.get_query().trim().to_string();
     if s.results.is_empty() && s.queries.is_empty() {
-        data.set_rows(ModelRc::default());
+        // Enter still does something: it searches featherplay for the text.
+        data.set_rows(ModelRc::new(VecModel::from(vec![search_for_row(&query)])));
         data.set_none_title(tr!("No results for “{}”", query).into());
+        data.set_completions_from(0);
+        data.set_highlighted(0);
         data.set_state(QuickState::None);
-        quick.shown.replace(Shown::Answer(s));
+        quick.shown.replace(Shown::None(query));
         return;
     }
-    let (rows, covers) = rows(&s, &query);
-    let had_rows = data.get_rows().row_count() > 0;
+    let (rows, covers) = rows(&s);
+    let had_rows = data.get_state() == QuickState::Results;
     set_rows(ctx, quick, rows, covers);
     data.set_completions_from(if s.queries.is_empty() {
         -1
@@ -532,24 +560,42 @@ fn set_rows(ctx: &Ctx, quick: &QuickBox, rows: Vec<QuickRow>, covers: Vec<Option
         .fill(&model, covers, COVER_PX, |row, img| row.cover = img);
 }
 
-/// The rows for `s` as the box shows them: the results (their match with `query` marked),
-/// then the completions; and each one's cover URL.
-pub fn rows(s: &SearchSuggestions, query: &str) -> (Vec<QuickRow>, Vec<Option<String>>) {
+/// The rows for `s` as the box shows them: the results, then the completions (the words they
+/// add to the typed text bright); and each one's cover URL.
+pub fn rows(s: &SearchSuggestions) -> (Vec<QuickRow>, Vec<Option<String>>) {
     let results = s
         .results
         .iter()
-        .map(|r| (result_row(&r.item, &r.subtitle, query), cover_of(&r.item)));
+        .map(|r| (result_row(&r.item, &r.subtitle), cover_of(&r.item)));
     let completions = s.queries.iter().map(|q| {
         let (typed, rest) = q.text.split_at(q.typed.min(q.text.len()));
         let row = QuickRow {
             kind: SuggestionKind::Query,
             lead: typed.into(),
-            tail: rest.into(),
+            hit: rest.into(),
+            action: tr!("Search").into(),
             ..QuickRow::default()
         };
         (row, None)
     });
     results.chain(completions).unzip()
+}
+
+/// The row under "No results": “Search for “xqzv””, the text bright.
+pub fn search_for_row(query: &str) -> QuickRow {
+    let full = tr!("Search for “{}”", query);
+    let (lead, hit, tail) = match full.find(query) {
+        Some(at) => (&full[..at], query, &full[at + query.len()..]),
+        None => (full.as_str(), "", ""),
+    };
+    QuickRow {
+        kind: SuggestionKind::Query,
+        lead: lead.into(),
+        hit: hit.into(),
+        tail: tail.into(),
+        action: tr!("Search").into(),
+        ..QuickRow::default()
+    }
 }
 
 fn title_of(item: &HomeItem) -> String {
@@ -570,79 +616,59 @@ fn cover_of(item: &HomeItem) -> Option<String> {
     }
 }
 
-/// A result's row: the match with `query` marked in the title; failing that, in the line.
-fn result_row(item: &HomeItem, subtitle: &str, query: &str) -> QuickRow {
-    let kind = match item {
-        HomeItem::Track(_) => SuggestionKind::Song,
-        HomeItem::Album(_) => SuggestionKind::Album,
-        HomeItem::Artist(_) => SuggestionKind::Artist,
-        HomeItem::Playlist(_) => SuggestionKind::Playlist,
+/// A result's row: its title; its line, the artist (an album's or a song's) or the playlist's
+/// author, from the reply's line when the item doesn't name them, none for an artist; its kind
+/// and Enter's name for it; an artist without a photo, their initials.
+fn result_row(item: &HomeItem, subtitle: &str) -> QuickRow {
+    let (kind, what, action) = match item {
+        HomeItem::Track(t) if t.video_type != VideoType::Song => {
+            (SuggestionKind::Song, tr!("Video"), tr!("Play video"))
+        }
+        HomeItem::Track(_) => (SuggestionKind::Song, tr!("Song"), tr!("Play song")),
+        HomeItem::Album(_) => (SuggestionKind::Album, tr!("Album"), tr!("Play album")),
+        HomeItem::Artist(_) => (SuggestionKind::Artist, tr!("Artist"), tr!("Play artist")),
+        HomeItem::Playlist(_) => (
+            SuggestionKind::Playlist,
+            tr!("Playlist"),
+            tr!("Play playlist"),
+        ),
     };
-    let title = crate::ui_bridge::shown(&title_of(item)).to_string();
-    let subtitle = crate::ui_bridge::shown(subtitle).to_string();
-    let mut row = QuickRow {
+    let named = match item {
+        HomeItem::Track(t) => artist_names(&t.artists),
+        HomeItem::Album(a) => artist_names(&a.artists),
+        HomeItem::Playlist(p) => p.author.clone().unwrap_or_default(),
+        HomeItem::Artist(_) => String::new(),
+    };
+    // "Song • Josh Woodward • 111M plays": the part after the kind.
+    let line = if named.is_empty() && !matches!(item, HomeItem::Artist(_)) {
+        subtitle.split(" • ").nth(1).unwrap_or_default().to_string()
+    } else {
+        named
+    };
+    let title = title_of(item);
+    let initials = match item {
+        HomeItem::Artist(a) if a.thumbnail.is_none() => initials(&title),
+        _ => String::new(),
+    };
+    QuickRow {
         kind,
+        title: shown(&title),
+        line: shown(&line),
+        what: what.into(),
+        action: action.into(),
+        initials: initials.into(),
         ..QuickRow::default()
-    };
-    match find(&title, query) {
-        Some((a, b)) => {
-            (row.lead, row.hit, row.tail) =
-                (title[..a].into(), title[a..b].into(), title[b..].into());
-            row.sub_tail = subtitle.into();
-        }
-        None => {
-            row.tail = title.into();
-            match find(&subtitle, query) {
-                Some((a, b)) => {
-                    (row.sub_lead, row.sub_hit, row.sub_tail) = (
-                        subtitle[..a].into(),
-                        subtitle[a..b].into(),
-                        subtitle[b..].into(),
-                    );
-                }
-                None => row.sub_tail = subtitle.into(),
-            }
-        }
     }
-    row
 }
 
-/// Where `needle` first shows in `hay`, case aside, as byte offsets into `hay`; at a word's
-/// start first ("Josh" in "Song • Josh Woodward", not in "Joshua"'s middle).
-pub fn find(hay: &str, needle: &str) -> Option<(usize, usize)> {
-    let needle: Vec<char> = needle.trim().chars().flat_map(char::to_lowercase).collect();
-    if needle.is_empty() {
-        return None;
-    }
-    let at = |start: usize| -> Option<usize> {
-        let mut want = needle.iter();
-        let mut next = want.next();
-        for (i, c) in hay[start..].char_indices() {
-            for lower in c.to_lowercase() {
-                match next {
-                    Some(w) if *w == lower => next = want.next(),
-                    Some(_) => return None,
-                    None => return Some(start + i),
-                }
-            }
-            if next.is_none() {
-                return Some(start + i + c.len_utf8());
-            }
-        }
-        None
-    };
-    let starts: Vec<usize> = hay.char_indices().map(|(i, _)| i).collect();
-    let word_start = |i: usize| {
-        hay[..i]
-            .chars()
-            .next_back()
-            .is_none_or(|c| !c.is_alphanumeric())
-    };
-    starts
-        .iter()
-        .filter(|&&i| word_start(i))
-        .chain(starts.iter())
-        .find_map(|&i| at(i).map(|end| (i, end)))
+/// "JW" for "Josh Woodward": the first letters of the first two words, capitals.
+pub fn initials(name: &str) -> String {
+    shown(name)
+        .split_whitespace()
+        .filter_map(|w| w.chars().find(|c| c.is_alphanumeric()))
+        .take(2)
+        .flat_map(char::to_uppercase)
+        .collect()
 }
 
 /// What row `i` of what the box shows is.
@@ -654,6 +680,7 @@ enum Picked {
 fn picked(quick: &QuickBox, i: usize) -> Option<Picked> {
     match &*quick.shown.borrow() {
         Shown::Nothing => None,
+        Shown::None(query) => (i == 0).then(|| Picked::Search(query.clone())),
         Shown::Recent(picks) => picks.get(i).cloned().map(Picked::Item),
         Shown::Answer(s) => match s.results.get(i) {
             Some(r) => Some(Picked::Item(Recent {
@@ -862,6 +889,15 @@ pub fn type_for_snapshot(ctx: &Rc<Ctx>, ui: &QuickSearch, text: &str) {
     }
 }
 
+/// `--snapshot quick-search-waiting`: `text` typed, its first answer on its way.
+pub fn waiting_for_snapshot(ui: &QuickSearch, text: &str) {
+    ui.global::<QuickData>().set_query(text.into());
+    if let Some(quick) = BOX.with_borrow(Clone::clone) {
+        quick.timer.stop();
+        waiting(&quick);
+    }
+}
+
 /// `--snapshot quick-search-offline`: the box as it is when the answer couldn't come.
 pub fn offline_for_snapshot() {
     if let Some(quick) = BOX.with_borrow(Clone::clone) {
@@ -875,25 +911,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_match_is_found_at_a_words_start_case_aside() {
-        assert_eq!(find("Josh Woodward", "josh"), Some((0, 4)));
-        assert_eq!(find("Song • Josh Woodward", "JOSH"), Some((9, 13)));
-        // A word's start wins over an earlier middle.
-        assert_eq!(find("Banjo Jo", "jo"), Some((6, 8)));
-        assert_eq!(find("Banjo", "jo"), Some((3, 5)));
-        assert_eq!(find("Invisible Light", "josh"), None);
-        assert_eq!(find("Ölfarbe", "öl"), Some((0, 3)));
-        assert_eq!(find("anything", "  "), None);
-    }
-
-    #[test]
-    fn the_match_is_bright_in_the_title_or_else_in_the_line() {
-        use featherplay_core::model::{ArtistId, LikeStatus, VideoType};
+    fn a_result_reads_title_artist_kind_and_a_completion_brightens_what_it_adds() {
+        use featherplay_core::model::{ArtistRef, LikeStatus};
         use featherplay_ytm::{QuerySuggestion, SuggestedResult};
         let song = Track {
             id: TrackId("demo-invisible-light".into()),
             title: "Invisible Light".into(),
-            artists: Vec::new(),
+            artists: vec![ArtistRef {
+                name: "Josh Woodward".into(),
+                id: None,
+            }],
             album: None,
             duration: None,
             video_type: VideoType::Song,
@@ -914,37 +941,49 @@ mod tests {
                         name: "Josh Woodward".into(),
                         thumbnail: None,
                     }),
-                    subtitle: "Artist".into(),
+                    subtitle: "Artist • 1.2K monthly audience".into(),
                 },
                 SuggestedResult {
                     item: HomeItem::Track(song),
-                    subtitle: "Song • Josh Woodward".into(),
+                    subtitle: "Song • Josh Woodward • 111 plays".into(),
                 },
             ],
         };
-        let (rows, _) = rows(&s, "josh");
+        let (rows, _) = rows(&s);
         let parts = |r: &QuickRow| {
-            [
-                &r.lead,
-                &r.hit,
-                &r.tail,
-                &r.sub_lead,
-                &r.sub_hit,
-                &r.sub_tail,
-            ]
-            .map(|p| p.to_string())
+            [&r.title, &r.line, &r.what, &r.initials, &r.action].map(|p| p.to_string())
         };
-        assert_eq!(parts(&rows[0]), ["", "Josh", " Woodward", "", "", "Artist"]);
+        // An artist without a photo: no line, their initials.
+        assert_eq!(
+            parts(&rows[0]),
+            ["Josh Woodward", "", "Artist", "JW", "Play artist"]
+        );
         assert_eq!(
             parts(&rows[1]),
-            ["", "", "Invisible Light", "Song • ", "Josh", " Woodward"]
+            ["Invisible Light", "Josh Woodward", "Song", "", "Play song"]
         );
-        // Results first, the completion after them: the typed part, then the rest.
+        // Results first, the completion after them: the typed part, then the words it adds.
         assert_eq!(rows[2].kind, SuggestionKind::Query);
         assert_eq!(
-            (rows[2].lead.as_str(), rows[2].tail.as_str()),
-            ("josh", " woodward")
+            (
+                rows[2].lead.as_str(),
+                rows[2].hit.as_str(),
+                rows[2].action.as_str()
+            ),
+            ("josh", " woodward", "Search")
         );
+    }
+
+    #[test]
+    fn no_results_offers_to_search_for_the_text() {
+        let row = search_for_row("xqzv");
+        assert_eq!(row.kind, SuggestionKind::Query);
+        assert_eq!(
+            [&row.lead, &row.hit, &row.tail].map(|p| p.to_string()),
+            ["Search for “", "xqzv", "”"]
+        );
+        assert_eq!(initials("scott  buckley trio"), "SB");
+        assert_eq!(initials("Madonna"), "M");
     }
 
     #[test]

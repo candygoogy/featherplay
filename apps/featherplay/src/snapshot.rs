@@ -978,7 +978,7 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
 }
 
 /// The quick search box over the demo set (`FEATHERPLAY_FIXTURES=demo`), for `state`: ""
-/// (the recent picks), "-typing", "-keys", "-none", "-offline" or "-first".
+/// (the recent picks), "-typing", "-keys", "-none", "-offline", "-first" or "-waiting".
 fn quick_search_for_snapshot(
     scene: &Scene,
     state: &str,
@@ -1045,6 +1045,15 @@ fn quick_search_for_snapshot(
     scene.settle();
     if state == "-offline" {
         quick::offline_for_snapshot();
+    }
+    if state == "-waiting" {
+        quick::waiting_for_snapshot(&ui, "josh");
+        // A frame starts the sweep's delay; then past it.
+        scene.settle();
+        w.take_snapshot()
+            .map_err(|e| format!("take_snapshot: {e}"))?;
+        std::thread::sleep(Duration::from_millis(200));
+        scene.settle();
     }
     if state == "-keys" {
         use slint::platform::Key;

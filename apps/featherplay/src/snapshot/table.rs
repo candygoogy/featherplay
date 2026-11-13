@@ -215,13 +215,14 @@ pub const PAGES: &[&str] = &[
     // nothing to play; then pinned, with the fixture track playing.
     // The quick search box (render with FEATHERPLAY_FIXTURES=demo): just opened with the
     // recent picks; "josh" typed; Shift+Enter on the third row, then ↓ to the fourth; no
-    // results; offline; and the first use, with no picks yet.
+    // results; offline; the first use, with no picks yet; and waiting for the first answer.
     "quick-search",
     "quick-search-typing",
     "quick-search-keys",
     "quick-search-none",
     "quick-search-offline",
     "quick-search-first",
+    "quick-search-waiting",
     // Settings › Window with "Quick search from anywhere" on: its default key; the field
     // listening with Ctrl and Shift held; another key, with Reset; the key held by another
     // app; and Wayland's calm row with "Why?" open. Then the shortcuts' list with its line.
@@ -325,6 +326,7 @@ pub(super) fn page(name: &str, f: &Fixtures) -> Result<Page, String> {
         | "quick-search-none"
         | "quick-search-offline"
         | "quick-search-first"
+        | "quick-search-waiting"
         | "home-more"
         | "home-more-loading"
         | "home-more-failed"

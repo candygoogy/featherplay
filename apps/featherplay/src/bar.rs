@@ -164,6 +164,7 @@ pub fn apply(ctx: &Rc<Ctx>, state: &PlayerState) {
         shell::idle();
         shell::set_tray_menu(&p);
         mini::update(ctx);
+        crate::quick_search::update(ctx);
         return;
     };
     p.set_has_track(true);
@@ -229,6 +230,7 @@ pub fn apply(ctx: &Rc<Ctx>, state: &PlayerState) {
     });
     shell::set_tray_menu(&p);
     mini::update(ctx);
+    crate::quick_search::update(ctx);
 }
 
 /// The most marks the seek line draws: a song with more gaps keeps its longest.

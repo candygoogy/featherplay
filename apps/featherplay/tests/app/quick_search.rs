@@ -15,7 +15,7 @@ use featherplay::quick_search;
 use featherplay::router::Page;
 use featherplay::snapshot::Scene;
 use featherplay::ui::{
-    QuickData, QuickKeyData, QuickSearch, QuickState, SettingId, SettingKey, SettingsData,
+    Player, QuickData, QuickKeyData, QuickSearch, QuickState, SettingId, SettingKey, SettingsData,
     ShortcutKind, Shortcuts, SuggestionKind,
 };
 use featherplay_integrations::KeyError;
@@ -111,6 +111,11 @@ fn results_come_first_and_enter_plays_the_pick_and_closes_the_box() {
         assert_eq!(completion, i as i32 >= from, "row {i}");
     }
     assert_eq!(data.get_highlighted(), 0, "the top result is highlighted");
+    // The footer: the song playing now, and Enter's name for the highlighted row.
+    assert_eq!(data.get_playing(), scene.ui.global::<Player>().get_title());
+    assert!(!data.get_playing().is_empty(), "no song in the footer");
+    let top = rows.row_data(0).unwrap();
+    assert_eq!(top.action, format!("Play {}", top.what.to_lowercase()));
 
     let song = first(&quick, SuggestionKind::Song);
     down_to(&scene, &quick, song);
