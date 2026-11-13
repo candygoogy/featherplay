@@ -479,6 +479,12 @@ Broadcom Corporation:
 https://datatracker.ietf.org/ipr/1526/
 ```
 
+## Symphonia
+
+AAC is decoded by Symphonia (MPL-2.0). `symphonia-core` is built from a modified copy in
+`vendor/symphonia-core/` (its FFT tables are built on first use; see its `VENDORED.md`); the
+changed file keeps its MPL-2.0 header, and its source is in this repository.
+
 ## TLS and cryptography on Linux
 
 On Windows, HTTPS goes through the system's SChannel (native-tls). The Linux builds use rustls,

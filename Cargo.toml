@@ -151,6 +151,9 @@ i-slint-backend-winit = { path = "vendor/i-slint-backend-winit" }
 # The pure-Rust Opus decoder with its naive DFT swapped for rustfft (4-5x realtime to ~325x).
 # See vendor/opus-decoder/VENDORED.md.
 opus-decoder = { path = "vendor/opus-decoder" }
+# symphonia-core with its FFT twiddle tables built on first use, not stored zero-filled in the
+# binary (0.5 MB). See vendor/symphonia-core/VENDORED.md.
+symphonia-core = { path = "vendor/symphonia-core" }
 
 # Full debug info made each UI test's PDB ~560 MB, and a workspace test run links dozens
 # of them. Line tables (~158 MB) keep file:line in panics and backtraces; dependencies

@@ -15,7 +15,7 @@ this file does; when the two disagree, the code is right and this file needs fix
 |---|---|
 | `apps/featherplay` | The app: startup, the window and its pages (Rust in `src/`, Slint in `ui/`), the controller, and the app's own tests (`tests/app/`). |
 | `crates/*` | Twelve library crates: the music logic, the network clients, the audio engine, the stream resolver, saved state, the integrations, the platform layer and the app's logic that needs no window (the controller crate). None of them uses Slint. |
-| `vendor/` | Three patched third-party crates, swapped in through `[patch.crates-io]` in `Cargo.toml`. Each has a `VENDORED.md` that lists its changes. |
+| `vendor/` | Four patched third-party crates, swapped in through `[patch.crates-io]` in `Cargo.toml`. Each has a `VENDORED.md` that lists its changes. |
 | `packaging/` | The Inno Setup installer, the Linux AppImage and archive (`packaging/linux/`), the winget and Scoop manifests, the third-party licence list, and the release signing scripts. |
 | `site/` | The website. |
 | `spikes/` | Early experiments, kept for reference. Not part of the build. |
@@ -234,7 +234,8 @@ featherplay (app) ─┬─ controller ─┬─ lastfm ────── proxy
 
 The vendored crates are `vendor/i-slint-backend-winit` (frame pacing: one paint per
 redraw), `vendor/i-slint-renderer-skia` (wgpu taken out, and renderer changes for the
-software surface) and `vendor/opus-decoder` (rustfft in place of a naive DFT).
+software surface), `vendor/opus-decoder` (rustfft in place of a naive DFT) and
+`vendor/symphonia-core` (its FFT tables built on first use, not stored in the binary).
 
 ## Where things live
 
