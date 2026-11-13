@@ -22,7 +22,7 @@ import { ArtistPage } from "pages/artist.slint";
 import { SearchPage } from "pages/search.slint";
 import { NowPlayingPage, SideTabs, LyricsWatch } from "pages/now_playing.slint";
 import { LyricsData } from "pages/lyrics.slint";
-import { SettingsPage, SettingsData, SettingsDialog, SettingsDialogLayer, SettingsSearch, SettingKey } from "pages/settings.slint";
+import { SettingsPage, SettingsData, SettingsDialog, SettingsDialogLayer, SettingKey } from "pages/settings.slint";
 import { AboutPage } from "pages/about.slint";
 import { SignInPage } from "pages/sign_in.slint";
 import { SongMenu, SongMenuLayer } from "song_menu.slint";
@@ -254,12 +254,12 @@ export component AppWindow inherits Window {
                 top-bar.focus-search();
                 return accept;
             }
-            // Settings' own search (on Settings only, not under a menu or a dialog): the page
-            // scrolls to its top and the field there takes the keys, its text selected.
+            // Settings' search (on Settings only, not under a menu or a dialog): the top bar's
+            // field, which searches the settings there, takes the keys, its text selected.
             if e.modifiers.control && !e.modifiers.alt && !e.modifiers.meta && (e.text == "f" || e.text == "F") {
                 Shortcuts.used(ShortcutKind.search-settings);
                 if Nav.page == PageKind.settings && !root.overlay-open {
-                    SettingsSearch.focus-asks += 1;
+                    top-bar.focus-search();
                 }
                 return accept;
             }
@@ -377,8 +377,7 @@ export component AppWindow inherits Window {
                 Shortcuts.used(ShortcutKind.escape);
                 // In the search field: the first Escape clears it, the next leaves it.
                 if top-bar.searching && TopBarData.query != "" {
-                    TopBarData.query = "";
-                    TopBarData.edited("");
+                    top-bar.clear-search();
                     return accept;
                 }
                 if root.full-page {
@@ -496,6 +495,7 @@ export component AppWindow inherits Window {
                 clear: root.under-top || root.home-wash;
                 narrow: root.rail;
                 area-h: parent.height;
+                settings: Nav.page == PageKind.settings;
                 submitted(q) => {
                     root.navigate-by-key();
                     Nav.search(q);

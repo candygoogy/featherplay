@@ -46,7 +46,7 @@ export global Shortcuts {
     // Ctrl+M only where the desktop has no tray, as the bar's mini player button (Windows
     // always has one).
     out property <[ShortcutRow]> moving: SettingsData.has-tray ? [
-        { kind: ShortcutKind.search, label: @tr("Search"), keys: [@tr("Ctrl"), "K"] },
+        { kind: ShortcutKind.search, label: @tr("Search (on Settings: search settings)"), keys: [@tr("Ctrl"), "K"] },
         { kind: ShortcutKind.search-settings, label: @tr("Search settings (on Settings)"), keys: [@tr("Ctrl"), "F"] },
         { kind: ShortcutKind.lyrics, label: @tr("Lyrics on or off"), keys: [@tr("Ctrl"), "L"] },
         { kind: ShortcutKind.desktop-lyrics, label: @tr("Desktop lyrics on or off"), keys: [@tr("Ctrl"), @tr("Shift"), "L"] },
@@ -56,7 +56,7 @@ export global Shortcuts {
         { kind: ShortcutKind.escape, label: @tr("Clear the search, or leave Now playing"), keys: [@tr("Esc")] },
         { kind: ShortcutKind.shortcuts, label: @tr("Keyboard shortcuts"), keys: [@tr("Ctrl"), "/"] },
     ] : [
-        { kind: ShortcutKind.search, label: @tr("Search"), keys: [@tr("Ctrl"), "K"] },
+        { kind: ShortcutKind.search, label: @tr("Search (on Settings: search settings)"), keys: [@tr("Ctrl"), "K"] },
         { kind: ShortcutKind.search-settings, label: @tr("Search settings (on Settings)"), keys: [@tr("Ctrl"), "F"] },
         { kind: ShortcutKind.lyrics, label: @tr("Lyrics on or off"), keys: [@tr("Ctrl"), "L"] },
         { kind: ShortcutKind.desktop-lyrics, label: @tr("Desktop lyrics on or off"), keys: [@tr("Ctrl"), @tr("Shift"), "L"] },

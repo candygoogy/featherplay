@@ -1,21 +1,48 @@
 //! The top bar's search field (ui/top_bar.slint): it shows the search page's query. Typing,
 //! Enter and the keys are handled in Slint, which calls `Nav.search`; a paste that brings
-//! line breaks or tabs is put on one line here (`single_line`).
+//! line breaks or tabs is put on one line here (`single_line`). On Settings the field is
+//! Settings' search: the music's text waits here until Settings is left.
 
-use slint::ComponentHandle;
+use std::cell::RefCell;
+
+use slint::{ComponentHandle, SharedString};
 
 use crate::router::Page;
-use crate::ui::{AppWindow, TopBarData};
+use crate::ui::{AppWindow, SettingsSearch, TopBarData};
+
+thread_local! {
+    /// While Settings shows: the music's text the field had, and the page it was on.
+    static MUSIC: RefCell<Option<(SharedString, Option<Page>)>> = const { RefCell::new(None) };
+}
 
 /// `page` is shown, after `before` (`None` for the first page): a search page (also by back
 /// and forward) puts its query in the field, and going to any other page clears it, so a
-/// finished search doesn't linger over Settings. The same page shown again (a rename, a Try
-/// again) leaves what's being typed. Another page closes the suggestions.
+/// finished search doesn't linger. The same page shown again (a rename, a Try again) leaves
+/// what's being typed. Another page closes the suggestions. Settings borrows the field for
+/// its own search; leaving it, the field is as if Settings hadn't been shown (the music's
+/// text back, with the page it was on as the page before).
 pub fn page_shown(ui: &AppWindow, page: &Page, before: Option<&Page>) {
     if before != Some(page) {
         crate::suggest::close(ui);
     }
     let field = ui.global::<TopBarData>();
+    if *page == Page::Settings {
+        if before != Some(page) {
+            MUSIC.with(|m| *m.borrow_mut() = Some((field.get_query(), before.cloned())));
+            field.set_query(ui.global::<SettingsSearch>().get_query());
+        }
+        return;
+    }
+    let left = (before == Some(&Page::Settings))
+        .then(|| MUSIC.with(|m| m.borrow_mut().take()))
+        .flatten();
+    let before = match &left {
+        Some((text, was)) => {
+            field.set_query(text.clone());
+            was.as_ref()
+        }
+        None => before,
+    };
     match page.query() {
         Some(query) => field.set_query(query.into()),
         None if before != Some(page) => field.set_query("".into()),

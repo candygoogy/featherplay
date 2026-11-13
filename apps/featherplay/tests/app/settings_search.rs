@@ -1,10 +1,12 @@
-//! Settings' search, on the offscreen platform with fixture data (no window is shown): Ctrl+F
-//! on Settings puts the keys in the field in the page's header; typing hides the rows not
-//! found and the sections left without any, the index listing the others with their counts;
-//! nothing found shows the empty state; the first Escape clears the field, the next leaves
-//! it. In the top bar, the settings that match follow the music's suggestions unless "Show
-//! settings in search suggestions" is off, and picking one opens Settings at its row, lit,
-//! its switch taking the keys when picked with the keyboard.
+//! Settings' search, on the offscreen platform with fixture data (no window is shown): on
+//! Settings the top bar's field is the settings search, Ctrl+K and Ctrl+F both put the keys
+//! in it; typing hides the rows not found and the sections left without any, the index
+//! listing the others with their counts; nothing found shows the empty state; the first
+//! Escape clears the field, the next leaves it. No suggestions drop down there, Enter does
+//! nothing, a link after the results searches music for the text, and leaving Settings
+//! brings the music's text back. On other pages, the settings that match follow the music's
+//! suggestions unless "Show settings in search suggestions" is off, and picking one opens
+//! Settings at its row, lit, its switch taking the keys when picked with the keyboard.
 
 use std::ops::ControlFlow;
 use std::time::Duration;
@@ -186,6 +188,7 @@ fn nothing_found_shows_the_empty_state() {
     assert!(search.get_active());
     assert_eq!(search.get_total(), 0);
     assert!(find(&scene, "No settings match “weather”").is_some());
+    assert!(find(&scene, "Search music for “weather”").is_some());
     assert!(find(&scene, "Prefer song versions").is_none());
     // One letter filters nothing.
     tap(scene.ui.window(), Key::Escape.into());
@@ -212,10 +215,14 @@ fn sleep_timer_finds_its_switch_and_once_on_its_fade() {
 }
 
 #[test]
-fn ctrl_f_brings_the_field_back_at_the_page_top() {
+fn the_top_bar_is_the_settings_search_on_settings() {
     let scene = settings();
+    offscreen::freeze_clock();
+    let field = scene.ui.global::<TopBarData>();
+    let search = scene.ui.global::<SettingsSearch>();
+    // One field, the top bar's: it stays put while the page scrolls.
     let top = find(&scene, "Search settings").expect("the field");
-    // Scrolled down, the field goes with the title.
+    assert!(top < 64.0, "the field isn't in the top bar");
     scene
         .ui
         .window()
@@ -225,18 +232,79 @@ fn ctrl_f_brings_the_field_back_at_the_page_top() {
             delta_y: -1500.0,
         });
     scene.settle();
-    assert!(find(&scene, "Search settings").is_none_or(|y| y < top - 100.0));
-    ctrl(&scene, "f");
     assert_eq!(find(&scene, "Search settings"), Some(top));
+
+    // Ctrl+K puts the keys in it: what's typed filters the page, and nothing drops down.
+    ctrl(&scene, "k");
     type_text(&scene, "tray");
-    assert_eq!(scene.ui.global::<SettingsSearch>().get_query(), "tray");
+    assert_eq!(field.get_query(), "tray");
+    assert_eq!(search.get_query(), "tray");
+    assert!(search.get_active());
+    offscreen::advance(Duration::from_millis(1000));
+    scene.settle();
+    assert_eq!(field.get_suggestions().row_count(), 0);
+    // Enter stays on Settings.
+    tap(scene.ui.window(), Key::Return.into());
+    scene.settle();
+    assert_eq!(scene.ctx.current_page(), Page::Settings);
+    assert_eq!(search.get_query(), "tray");
+    // Ctrl+F selects the text: what's typed next replaces it.
+    ctrl(&scene, "f");
+    type_text(&scene, "dark");
+    assert_eq!(search.get_query(), "dark");
+    assert_eq!(counts(&scene), [0, 0, 0, 0, 0, 0, 1, 0]);
+
     // Leaving Settings and coming back, the search is gone.
     scene.open("home").expect("home");
     scene.settle();
+    assert_eq!(field.get_query(), "");
     scene.open("settings").expect("settings");
     scene.settle();
-    assert_eq!(scene.ui.global::<SettingsSearch>().get_query(), "");
-    assert!(!scene.ui.global::<SettingsSearch>().get_active());
+    assert_eq!(search.get_query(), "");
+    assert_eq!(field.get_query(), "");
+    assert!(!search.get_active());
+}
+
+#[test]
+fn leaving_settings_brings_the_music_text_back() {
+    let scene = Scene::new(1568, 980, true, false).expect("scene");
+    scene.open("home").expect("home");
+    scene.settle();
+    offscreen::freeze_clock();
+    scene
+        .ui
+        .window()
+        .dispatch_event(WindowEvent::WindowActiveChanged(true));
+    let field = scene.ui.global::<TopBarData>();
+    suggest(&scene, "daft");
+    scene.open("settings").expect("settings");
+    scene.settle();
+    assert_eq!(field.get_query(), "", "the music's text over Settings");
+    ctrl(&scene, "k");
+    type_text(&scene, "cross");
+    scene.ctx.back();
+    scene.settle();
+    assert_eq!(scene.ctx.current_page(), Page::Home);
+    assert_eq!(field.get_query(), "daft");
+}
+
+#[test]
+fn the_link_after_the_results_searches_music() {
+    let scene = settings();
+    ctrl(&scene, "f");
+    type_text(&scene, "cross");
+    assert!(find(&scene, "Search music for “cross”").is_some());
+    // Tab from the field reaches it; Enter opens Search with the text.
+    tap(scene.ui.window(), Key::Tab.into());
+    tap(scene.ui.window(), Key::Return.into());
+    scene.settle();
+    assert_eq!(
+        scene.ctx.current_page(),
+        Page::Search {
+            query: "cross".into()
+        }
+    );
+    assert_eq!(scene.ui.global::<TopBarData>().get_query(), "cross");
 }
 
 /// Home with `text` typed in the top bar, its suggestions in.

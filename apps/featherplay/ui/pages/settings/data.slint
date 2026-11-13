@@ -228,18 +228,19 @@ export struct RowHit {
     hint-marks: [TextMark],
 }
 
-// Settings' search: the field in the page's header, and the row a top bar suggestion opens.
-// Filled by `src/pages/settings/search.rs`.
+// Settings' search: the top bar's field while Settings shows, and the row a top bar
+// suggestion opens. Filled by `src/pages/settings/search.rs`.
 export global SettingsSearch {
-    // The field's text.
+    // The field's text (the top bar's, on Settings).
     in-out property <string> query;
     // The page is filtered (two letters or more).
     in property <bool> active;
     // Each section's rows found, in the index's order.
     in property <[int]> counts: [0, 0, 0, 0, 0, 0, 0, 0];
     in property <int> total;
-    // Ctrl+F on Settings: the page scrolls to its top and the field takes the keys. Counts up.
-    in-out property <int> focus-asks;
+    // Tab from the top bar's field while the page is filtered: the "Search music" link
+    // takes the keys. Counts up.
+    in-out property <int> link-asks;
     // The row a suggestion opened, lit for a moment (`lit-on`, then fading), and whether it
     // was picked with the keyboard (then its switch takes the keys with its ring).
     in property <SettingId> lit;

@@ -92,6 +92,11 @@ export component TextLink inherits Rectangle {
     accessible-action-default => { root.clicked(); }
     // Focused from the keyboard: the ring shows (not after a click).
     property <bool> ring;
+    // Takes the keys as Tab would give them, its ring showing.
+    public function focus-by-key() {
+        fs.focus();
+        root.ring = true;
+    }
     fs := FocusScope {
         focus-gained(reason) => { root.ring = reason == FocusReason.tab-navigation; }
         focus-lost => { root.ring = false; }

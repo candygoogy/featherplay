@@ -1,4 +1,4 @@
-//! Settings' search (the field in the page's header, `SettingsSearch` in
+//! Settings' search (the top bar's field while Settings shows, `SettingsSearch` in
 //! ui/pages/settings/data.slint) and the settings the top bar's suggestions end with.
 //!
 //! One table says what each row is found by: its name, its line, its options' names (chips
@@ -25,7 +25,7 @@ use crate::app::Ctx;
 use crate::router::Page;
 use crate::ui::{
     AppWindow, LastfmState, ListenBrainzState, RowHit, SettingId, SettingsData, SettingsSearch,
-    TextMark,
+    TextMark, TopBarData,
 };
 
 /// The page filters from this many letters (and digits) typed.
@@ -1152,11 +1152,16 @@ pub fn refresh(ui: &AppWindow) {
     }
 }
 
-/// Settings opens: the search is empty, and no row is lit.
+/// Settings opens: the search is empty (the top bar's field too, which is the search on
+/// Settings), and no row is lit.
 pub fn reset(ui: &AppWindow) {
     let search = ui.global::<SettingsSearch>();
     if !search.get_query().is_empty() {
         search.set_query(SharedString::default());
+    }
+    let field = ui.global::<TopBarData>();
+    if !field.get_query().is_empty() {
+        field.set_query(SharedString::default());
     }
     filter(ui, "");
     search.set_lit(SettingId::None);
@@ -1227,7 +1232,8 @@ pub fn open_at(ctx: &Rc<Ctx>, id: SettingId, by_key: bool) {
     search.set_lit_asks(search.get_lit_asks().wrapping_add(1));
 }
 
-/// `--snapshot settings-search-*`: Ctrl+F on Settings, then `text` typed in the field.
+/// `--snapshot settings-search-*`: Ctrl+F on Settings, then `text` typed in the top bar's
+/// field.
 pub fn show_for_snapshot(ctx: &Rc<Ctx>, text: &str) {
     use slint::platform::{Key, WindowEvent};
     let Some(ui) = ctx.window() else { return };

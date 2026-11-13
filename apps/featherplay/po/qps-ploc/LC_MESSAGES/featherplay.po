@@ -1460,45 +1460,45 @@ msgctxt "search keywords"
 msgid "version, licence, license, credits"
 msgstr "[version, licence, license, credits]"
 
-#: src/pages/settings/search.rs:523 ui/pages/settings.slint:301
-#: src/pages/settings/search.rs:523 ui/pages/settings.slint:301 ui/pages/settings/shortcuts.slint:228
+#: src/pages/settings/search.rs:523 ui/pages/settings.slint:318
+#: src/pages/settings/search.rs:523 ui/pages/settings.slint:318 ui/pages/settings/shortcuts.slint:228
 msgid "Playback"
 msgstr "[Playback]"
 
-#: src/pages/settings/search.rs:524 ui/pages/settings.slint:301
-#: src/pages/settings/search.rs:524 ui/pages/settings.slint:301
+#: src/pages/settings/search.rs:524 ui/pages/settings.slint:318
+#: src/pages/settings/search.rs:524 ui/pages/settings.slint:318
 msgid "Sound"
 msgstr "[Sound]"
 
 #: src/pages/settings/search.rs:525 ui/bottom_bar.slint:353
 #: src/pages/settings/search.rs:525 ui/bottom_bar.slint:353 ui/pages/now_playing.slint:115
-#: src/pages/settings/search.rs:525 ui/bottom_bar.slint:353 ui/pages/now_playing.slint:115 ui/pages/settings.slint:301
-#: src/pages/settings/search.rs:525 ui/bottom_bar.slint:353 ui/pages/now_playing.slint:115 ui/pages/settings.slint:301
+#: src/pages/settings/search.rs:525 ui/bottom_bar.slint:353 ui/pages/now_playing.slint:115 ui/pages/settings.slint:318
+#: src/pages/settings/search.rs:525 ui/bottom_bar.slint:353 ui/pages/now_playing.slint:115 ui/pages/settings.slint:318
 msgid "Lyrics"
 msgstr "[Lyrics]"
 
-#: src/pages/settings/search.rs:526 ui/pages/settings.slint:301
-#: src/pages/settings/search.rs:526 ui/pages/settings.slint:301
+#: src/pages/settings/search.rs:526 ui/pages/settings.slint:318
+#: src/pages/settings/search.rs:526 ui/pages/settings.slint:318
 msgid "Scrobbling"
 msgstr "[Scrobbling]"
 
-#: src/pages/settings/search.rs:527 ui/pages/settings.slint:301
-#: src/pages/settings/search.rs:527 ui/pages/settings.slint:301
+#: src/pages/settings/search.rs:527 ui/pages/settings.slint:318
+#: src/pages/settings/search.rs:527 ui/pages/settings.slint:318
 msgid "Discord"
 msgstr "[Discord]"
 
-#: src/pages/settings/search.rs:528 ui/pages/settings.slint:301
-#: src/pages/settings/search.rs:528 ui/pages/settings.slint:301
+#: src/pages/settings/search.rs:528 ui/pages/settings.slint:318
+#: src/pages/settings/search.rs:528 ui/pages/settings.slint:318
 msgid "Local API"
 msgstr "[Local API]"
 
-#: src/pages/settings/search.rs:529 ui/pages/settings.slint:301
-#: src/pages/settings/search.rs:529 ui/pages/settings.slint:301
+#: src/pages/settings/search.rs:529 ui/pages/settings.slint:318
+#: src/pages/settings/search.rs:529 ui/pages/settings.slint:318
 msgid "Window"
 msgstr "[Window]"
 
-#: src/pages/settings/search.rs:530 ui/pages/settings.slint:301
-#: src/pages/settings/search.rs:530 ui/pages/settings.slint:301 ui/sidebar.slint:417
+#: src/pages/settings/search.rs:530 ui/pages/settings.slint:318
+#: src/pages/settings/search.rs:530 ui/pages/settings.slint:318 ui/sidebar.slint:417
 msgid "Account"
 msgstr "[Account]"
 
@@ -1870,7 +1870,7 @@ msgstr "[Version, licences and credits.]"
 msgid "Matches “{}”"
 msgstr "[Matches “{}”]"
 
-#: src/pages/settings/search.rs:1205
+#: src/pages/settings/search.rs:1210
 msgid "Setting • {}"
 msgstr "[Setting • {}]"
 
@@ -2172,7 +2172,7 @@ msgstr "[No results for “{}”]"
 
 #. A link isn't repeated as the title: the field above shows it.
 #: src/quick_search.rs:576 src/quick_search.rs:596 ui/pages/search.slint:44
-#: src/quick_search.rs:576 src/quick_search.rs:596 ui/pages/search.slint:44 ui/shortcuts.slint:59 ui/top_bar.slint:355
+#: src/quick_search.rs:576 src/quick_search.rs:596 ui/pages/search.slint:44
 msgid "Search"
 msgstr "[Search]"
 
@@ -3140,95 +3140,103 @@ msgstr "[It may be private or removed. Try searching for its title.]"
 msgid "Check the spelling or try another filter."
 msgstr "[Check the spelling or try another filter.]"
 
-#: ui/pages/settings.slint:240 ui/sidebar.slint:396
+#: ui/pages/settings.slint:232 ui/sidebar.slint:396
 msgid "Settings"
 msgstr "[Settings]"
 
-#: ui/pages/settings.slint:255
+#: ui/pages/settings.slint:240
 msgid "No settings match “{}”"
 msgstr "[No settings match “{}”]"
 
-#: ui/pages/settings.slint:256
+#: ui/pages/settings.slint:241
 msgid "Check the spelling, or try a word for what the setting does."
 msgstr "[Check the spelling, or try a word for what the setting does.]"
 
-#: ui/pages/settings.slint:300
+#: ui/pages/settings.slint:251 ui/pages/settings.slint:300
+msgid "Search music for “{}”"
+msgstr "[Search music for “{}”]"
+
+#: ui/pages/settings.slint:295
+msgid "Not a setting?"
+msgstr "[Not a setting?]"
+
+#: ui/pages/settings.slint:317
 msgid "Settings sections"
 msgstr "[Settings sections]"
 
-#: ui/pages/settings.slint:337
+#: ui/pages/settings.slint:354
 msgid "Last.fm API settings"
 msgstr "[Last.fm API settings]"
 
 #. Two sentences: whose API account is in use, then how to make one.
-#: ui/pages/settings.slint:339
+#: ui/pages/settings.slint:356
 msgid "Your own API account is in use."
 msgstr "[Your own API account is in use.]"
 
-#: ui/pages/settings.slint:340
+#: ui/pages/settings.slint:357
 msgid "featherplay's own API account is in use; you can use yours instead."
 msgstr "[featherplay's own API account is in use; you can use yours instead.]"
 
-#: ui/pages/settings.slint:341
+#: ui/pages/settings.slint:358
 msgid "This build has no API account of its own, so Last.fm needs yours."
 msgstr "[This build has no API account of its own, so Last.fm needs yours.]"
 
-#: ui/pages/settings.slint:342
+#: ui/pages/settings.slint:359
 msgid ""
 "Create one at last.fm/api/account/create, leaving the callback URL empty. "
 "Saving signs you out of Last.fm."
 msgstr "[Create one at last.fm/api/account/create, leaving the callback URL empty. Saving signs you out of Last.fm.]"
 
-#: ui/pages/settings.slint:344
+#: ui/pages/settings.slint:361
 msgid "Remove your key"
 msgstr "[Remove your key]"
 
-#: ui/pages/settings.slint:350
+#: ui/pages/settings.slint:367
 msgid "API key"
 msgstr "[API key]"
 
-#: ui/pages/settings.slint:351
+#: ui/pages/settings.slint:368
 msgid "Enter a new key to replace yours"
 msgstr "[Enter a new key to replace yours]"
 
-#: ui/pages/settings.slint:351
+#: ui/pages/settings.slint:368
 msgid "32 letters and digits"
 msgstr "[32 letters and digits]"
 
-#: ui/pages/settings.slint:356
+#: ui/pages/settings.slint:373
 msgid "Shared secret"
 msgstr "[Shared secret]"
 
-#: ui/pages/settings.slint:357
+#: ui/pages/settings.slint:374
 msgid "Shown below the key on Last.fm"
 msgstr "[Shown below the key on Last.fm]"
 
-#: ui/pages/settings.slint:367
+#: ui/pages/settings.slint:384
 msgid "ListenBrainz token"
 msgstr "[ListenBrainz token]"
 
 #. Where the token is kept: the same store as the session (`SignInData`).
-#: ui/pages/settings.slint:369
+#: ui/pages/settings.slint:386
 msgid ""
 "Paste the user token from listenbrainz.org/settings. featherplay checks it "
 "with ListenBrainz, then keeps it in Windows Credential Manager."
 msgstr "[Paste the user token from listenbrainz.org/settings. featherplay checks it with ListenBrainz, then keeps it in Windows Credential Manager.]"
 
-#: ui/pages/settings.slint:370
+#: ui/pages/settings.slint:387
 msgid ""
 "Paste the user token from listenbrainz.org/settings. featherplay checks it "
 "with ListenBrainz, then keeps it in your keyring."
 msgstr "[Paste the user token from listenbrainz.org/settings. featherplay checks it with ListenBrainz, then keeps it in your keyring.]"
 
-#: ui/pages/settings.slint:376
+#: ui/pages/settings.slint:393
 msgid "User token"
 msgstr "[User token]"
 
-#: ui/pages/settings.slint:377
+#: ui/pages/settings.slint:394
 msgid "Paste a new token to replace yours"
 msgstr "[Paste a new token to replace yours]"
 
-#: ui/pages/settings.slint:377
+#: ui/pages/settings.slint:394
 msgid "Paste your user token"
 msgstr "[Paste your user token]"
 
@@ -3449,14 +3457,13 @@ msgstr "[Quick search shortcut]"
 msgid "Press the new keys. Esc cancels."
 msgstr "[Press the new keys. Esc cancels.]"
 
-#: ui/pages/settings/quick_key.slint:171
 #: ui/pages/settings/quick_key.slint:171 ui/shortcuts.slint:40
 #: ui/pages/settings/quick_key.slint:171 ui/shortcuts.slint:40 ui/shortcuts.slint:42 ui/shortcuts.slint:43
 #: ui/pages/settings/quick_key.slint:171 ui/shortcuts.slint:40 ui/shortcuts.slint:42 ui/shortcuts.slint:43 ui/shortcuts.slint:50 ui/shortcuts.slint:51
 #: ui/pages/settings/quick_key.slint:171 ui/shortcuts.slint:40 ui/shortcuts.slint:42 ui/shortcuts.slint:43 ui/shortcuts.slint:50 ui/shortcuts.slint:51 ui/shortcuts.slint:53 ui/shortcuts.slint:57
 #: ui/pages/settings/quick_key.slint:171 ui/shortcuts.slint:40 ui/shortcuts.slint:42 ui/shortcuts.slint:43 ui/shortcuts.slint:50 ui/shortcuts.slint:51 ui/shortcuts.slint:53 ui/shortcuts.slint:57 ui/shortcuts.slint:60 ui/shortcuts.slint:61
 #: ui/pages/settings/quick_key.slint:171 ui/shortcuts.slint:40 ui/shortcuts.slint:42 ui/shortcuts.slint:43 ui/shortcuts.slint:50 ui/shortcuts.slint:51 ui/shortcuts.slint:53 ui/shortcuts.slint:57 ui/shortcuts.slint:60 ui/shortcuts.slint:61 ui/shortcuts.slint:63 ui/shortcuts.slint:64
-#: ui/pages/settings/quick_key.slint:171 ui/shortcuts.slint:40 ui/shortcuts.slint:42 ui/shortcuts.slint:43 ui/shortcuts.slint:50 ui/shortcuts.slint:51 ui/shortcuts.slint:53 ui/shortcuts.slint:57 ui/shortcuts.slint:60 ui/shortcuts.slint:61 ui/shortcuts.slint:63 ui/shortcuts.slint:64 ui/top_bar.slint:414
+#: ui/pages/settings/quick_key.slint:171 ui/shortcuts.slint:40 ui/shortcuts.slint:42 ui/shortcuts.slint:43 ui/shortcuts.slint:50 ui/shortcuts.slint:51 ui/shortcuts.slint:53 ui/shortcuts.slint:57 ui/shortcuts.slint:60 ui/shortcuts.slint:61 ui/shortcuts.slint:63 ui/shortcuts.slint:64 ui/top_bar.slint:444
 msgid "Ctrl"
 msgstr "[Ctrl]"
 
@@ -3532,19 +3539,6 @@ msgstr "[Change token…]"
 #: ui/pages/settings/scrobbling.slint:96
 msgid "Remove"
 msgstr "[Remove]"
-
-#: ui/pages/settings/search_field.slint:51
-#: ui/pages/settings/search_field.slint:51
-msgid "Search settings"
-msgstr "[Search settings]"
-
-#: ui/pages/settings/search_field.slint:69
-msgid "Ctrl+F"
-msgstr "[Ctrl+F]"
-
-#: ui/pages/settings/search_field.slint:108 ui/top_bar.slint:425
-msgid "Clear search"
-msgstr "[Clear search]"
 
 #: ui/pages/settings/shortcuts.slint:24
 msgid "or"
@@ -3922,6 +3916,10 @@ msgstr "[Repeat: off, all, one]"
 msgid "Volume up or down"
 msgstr "[Volume up or down]"
 
+#: ui/shortcuts.slint:49 ui/shortcuts.slint:59
+msgid "Search (on Settings: search settings)"
+msgstr "[Search (on Settings: search settings)]"
+
 #: ui/shortcuts.slint:50 ui/shortcuts.slint:60
 msgid "Search settings (on Settings)"
 msgstr "[Search settings (on Settings)]"
@@ -4043,26 +4041,34 @@ msgstr "[Song menu]"
 msgid "Add to playlist"
 msgstr "[Add to playlist]"
 
-#: ui/top_bar.slint:207
+#: ui/top_bar.slint:211
 msgid "Search suggestions"
 msgstr "[Search suggestions]"
 
-#: ui/top_bar.slint:303
+#: ui/top_bar.slint:320 ui/top_bar.slint:372
+msgid "Search settings"
+msgstr "[Search settings]"
+
+#: ui/top_bar.slint:320
 msgid "Search songs, albums, artists, playlists"
 msgstr "[Search songs, albums, artists, playlists]"
 
-#: ui/top_bar.slint:315
+#: ui/top_bar.slint:332
 msgid "Cut"
 msgstr "[Cut]"
 
-#: ui/top_bar.slint:325
+#: ui/top_bar.slint:342
 msgid "Paste"
 msgstr "[Paste]"
 
-#: ui/top_bar.slint:334
+#: ui/top_bar.slint:351
 msgid "Select all"
 msgstr "[Select all]"
 
-#: ui/top_bar.slint:356
+#: ui/top_bar.slint:373
 msgid "Ctrl+K"
 msgstr "[Ctrl+K]"
+
+#: ui/top_bar.slint:455
+msgid "Clear search"
+msgstr "[Clear search]"

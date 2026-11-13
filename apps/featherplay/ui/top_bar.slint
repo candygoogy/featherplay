@@ -4,8 +4,11 @@
 // While the user types, suggestions drop down under the field (`src/suggest.rs`): Down and
 // Up move through them, Enter picks the one highlighted, Escape closes them first. After the
 // music, after a divider, come up to three settings that match (`settings/search.rs`).
+// On Settings the field is Settings' search instead: it reads "Search settings", what's
+// typed filters the page (`SettingsSearch`), and nothing drops down under it.
 import { Theme, Icons, Curves } from "theme.slint";
 import { Icon, Body, Cover } from "parts.slint";
+import { SettingsSearch } from "pages/settings/data.slint";
 
 // What a suggestion row is.
 export enum SuggestionKind { query, history, song, album, artist, playlist, setting }
@@ -24,7 +27,8 @@ export struct Suggestion {
 
 export global TopBarData {
     // The field's text: what the user types, and the search page's query once one is shown
-    // (back and forward included).
+    // (back and forward included). On Settings, Settings' search (`src/top_bar.rs` keeps
+    // the music's text meanwhile).
     in-out property <string> query;
     // The text on one line: line breaks, tabs and other control characters become spaces,
     // the ends trimmed (`top_bar::single_line`).
@@ -257,8 +261,11 @@ export component Keycap inherits Rectangle {
     }
 }
 
-// The wide rounded field. Enter submits; Escape bubbles up to the window.
+// The wide rounded field. Enter submits; Escape bubbles up to the window. On Settings
+// (`settings`) it searches the settings: its text goes to `SettingsSearch` as typed, Enter
+// does nothing, and no suggestions show.
 component SearchField inherits Rectangle {
+    in property <bool> settings;
     callback submitted(string);
     // A suggestion picked with Enter.
     callback picked-by-key(int);
@@ -266,10 +273,20 @@ component SearchField inherits Rectangle {
     callback escaped();
     out property <bool> focused: input.has-focus;
     // The suggestions show: wanted, rows to show, and the field has the keys.
-    out property <bool> suggestions-open: TopBarData.suggesting && input.has-focus && TopBarData.query != "" && TopBarData.suggestions.length > 0;
+    out property <bool> suggestions-open: !root.settings && TopBarData.suggesting && input.has-focus && TopBarData.query != "" && TopBarData.suggestions.length > 0;
     public function focus-input() {
         input.focus();
         input.select-all();
+    }
+    // The text changed: the suggestions for it, or on Settings the page filtered by it.
+    public function set(text: string) {
+        TopBarData.query = text;
+        if root.settings {
+            SettingsSearch.query = text;
+            SettingsSearch.edited(text);
+        } else {
+            TopBarData.edited(text);
+        }
     }
     property <bool> has-text: TopBarData.query != "";
     property <bool> hovered: ta.has-hover && !input.has-focus;
@@ -300,7 +317,7 @@ component SearchField inherits Rectangle {
             x: root.lead + input.text-cursor-width + 2px;
             width: parent.width - self.x - root.trail;
             height: parent.height;
-            text: @tr("Search songs, albums, artists, playlists");
+            text: root.settings ? @tr("Search settings") : @tr("Search songs, albums, artists, playlists");
             color: Theme.text3;
             vertical-alignment: center;
         }
@@ -352,9 +369,13 @@ component SearchField inherits Rectangle {
                 selection-background-color: Theme.accent;
                 selection-foreground-color: Theme.on-solid;
                 accessible-role: text-input;
-                accessible-label: @tr("Search");
+                accessible-label: root.settings ? @tr("Search settings") : @tr("Search");
                 accessible-description: @tr("Ctrl+K");
-                accepted => { root.submitted(self.text); }
+                accepted => {
+                    if !root.settings {
+                        root.submitted(self.text);
+                    }
+                }
                 // Paste keys are only noted here; the input still pastes them itself.
                 // The arrows move through the suggestions (Down past the last one comes back
                 // to the field), Enter picks the one highlighted, Escape closes them; with
@@ -362,6 +383,15 @@ component SearchField inherits Rectangle {
                 key-pressed(e) => {
                     if (e.modifiers.control && (e.text == "v" || e.text == "V")) || (e.modifiers.shift && e.text == Key.Insert) {
                         TopBarData.pasting();
+                    }
+                    if root.settings {
+                        // Tab: the "Search music" link under the results, while the page
+                        // is filtered.
+                        if e.text == Key.Tab && !e.modifiers.shift && SettingsSearch.active {
+                            SettingsSearch.link-asks += 1;
+                            return accept;
+                        }
+                        return reject;
                     }
                     if e.text == Key.DownArrow && TopBarData.suggestions.length > 0 && TopBarData.query != "" {
                         if root.suggestions-open {
@@ -398,7 +428,7 @@ component SearchField inherits Rectangle {
                     }
                     // Typing brings the keys back to the field, off any row.
                     TopBarData.highlighted = -1;
-                    TopBarData.edited(TopBarData.query);
+                    root.set(TopBarData.query);
                 }
             }
         }
@@ -424,16 +454,14 @@ component SearchField inherits Rectangle {
             accessible-role: button;
             accessible-label: @tr("Clear search");
             accessible-action-default => {
-                TopBarData.query = "";
-                TopBarData.edited("");
+                root.set("");
                 input.focus();
             }
             animate background { duration: Theme.t-hover; }
             cta := TouchArea {
                 mouse-cursor: pointer;
                 clicked => {
-                    TopBarData.query = "";
-                    TopBarData.edited("");
+                    root.set("");
                     input.focus();
                 }
             }
@@ -455,6 +483,8 @@ export component TopBar inherits Rectangle {
     in property <bool> clear: false;
     // The content area's height from the bar's top: the suggestions end above its foot.
     in property <length> area-h: 0px;
+    // On Settings: the field searches the settings.
+    in property <bool> settings;
     out property <bool> searching: field.focused;
     out property <bool> suggestions-open: field.suggestions-open;
     callback submitted(string);
@@ -477,6 +507,11 @@ export component TopBar inherits Rectangle {
     public function focus-search() {
         field.focus-input();
     }
+    // Escape's first press in the field (the window's key handler).
+    public function clear-search() {
+        field.set("");
+    }
+
     height: Theme.top-bar-h;
     background: root.clear ? transparent : Theme.ground;
     // Clicks on the bar beside the field don't reach a page's rows scrolled under it.
@@ -505,6 +540,7 @@ export component TopBar inherits Rectangle {
     }
     // Left-aligned with the pages' content, like their titles.
     field := SearchField {
+        settings: root.settings;
         x: Theme.page-pad;
         y: (parent.height - self.height) / 2;
         width: max(0px, min(root.narrow ? Theme.top-search-narrow : Theme.top-search-w, parent.width - 2 * Theme.page-pad));

@@ -4,15 +4,16 @@
 // (`SettingsDialogLayer`), which also lists the keyboard shortcuts (over any page). Filled and
 // applied by `src/pages/settings.rs`; changes apply at once and are saved by the controller.
 // The sections, their shared rows and the dialogs are in `settings/`; this file lays out the
-// page around them. The search field in the header filters the rows (`SettingsSearch`):
-// only the sections with rows found stay, the index lists them with their counts, and with
-// none found the page says so.
+// page around them. On Settings the top bar's field searches the settings and filters the
+// rows (`SettingsSearch`): only the sections with rows found stay, the index lists them with
+// their counts, and with none found the page says so. After the results (or the empty state)
+// a link searches music for the text instead.
+import { Nav } from "../nav.slint";
 import { Theme, Icons } from "../theme.slint";
-import { Body, PageTitle } from "../parts.slint";
+import { Body, PageTitle, TextLink } from "../parts.slint";
 import { EmptyState } from "content.slint";
 import { ListenBrainzState, SettingId, SettingsData, SettingsDialog, SettingsSearch } from "settings/data.slint";
 import { Rows } from "settings/rows.slint";
-import { SettingsSearchField } from "settings/search_field.slint";
 import { Dialog, DialogField } from "settings/dialog.slint";
 import { EqualizerDialog } from "settings/equalizer.slint";
 import { ShortcutsDialog } from "settings/shortcuts.slint";
@@ -171,12 +172,9 @@ export component SettingsPage inherits Rectangle {
         flick.content-y = -min(max(0px, root.tops[i] - Theme.s5), root.max-scroll);
     }
 
-    // Ctrl+F (the window's key handler): the page's top, where the field is, and the keys in it.
-    property <int> focus-asks: SettingsSearch.focus-asks;
-    changed focus-asks => {
-        flick.content-y = 0;
-        field.focus-input();
-    }
+    // Typing in the top bar's field puts the page back at its top.
+    property <string> query: SettingsSearch.query;
+    changed query => { flick.content-y = 0; }
 
     // A search suggestion picked: once every section is made and laid out, the page asks
     // the row where it is, and the next tick brings it to the reading line (a third of the
@@ -230,21 +228,8 @@ export component SettingsPage inherits Rectangle {
             // leaves none.
             spacing: 0;
 
-            // The title, and the search field right-aligned to the column's edge, centred
-            // on the title's line.
-            Rectangle {
-                height: title.height;
-                title := PageTitle {
-                    x: 0;
-                    width: parent.width - field.width - Theme.s4;
-                    text: @tr("Settings");
-                }
-                field := SettingsSearchField {
-                    x: parent.width - self.width;
-                    y: (parent.height - self.height) / 2;
-                    // Typing puts the page back at its top.
-                    edited => { flick.content-y = 0; }
-                }
+            PageTitle {
+                text: @tr("Settings");
             }
 
             // Nothing found: the app's empty state, where the first section's title would be.
@@ -254,6 +239,19 @@ export component SettingsPage inherits Rectangle {
                     glyph: Icons.search;
                     title: @tr("No settings match “{}”", SettingsSearch.query);
                     line: @tr("Check the spelling, or try a word for what the setting does.");
+                }
+                // The way on, for someone who meant a song.
+                HorizontalLayout {
+                    padding-top: Theme.s2;
+                    alignment: start;
+                    // Tab from the field (`SettingsSearch.link-asks`).
+                    property <int> asks: SettingsSearch.link-asks;
+                    changed asks => { music-link-none.focus-by-key(); }
+                    music-link-none := TextLink {
+                        text: @tr("Search music for “{}”", SettingsSearch.query);
+                        font-weight: 400;
+                        clicked => { Nav.search(SettingsSearch.query); }
+                    }
                 }
             }
 
@@ -284,6 +282,25 @@ export component SettingsPage inherits Rectangle {
 
             account-section := AccountSection {
                 made: root.made;
+            }
+
+            // After the results: music is a click away.
+            if SettingsSearch.active && SettingsSearch.total > 0: HorizontalLayout {
+                padding-top: Theme.s5;
+                alignment: start;
+                spacing: Theme.s1;
+                property <int> asks: SettingsSearch.link-asks;
+                changed asks => { music-link.focus-by-key(); }
+                Body {
+                    text: @tr("Not a setting?");
+                    color: Theme.text2;
+                    vertical-alignment: center;
+                }
+                music-link := TextLink {
+                    text: @tr("Search music for “{}”", SettingsSearch.query);
+                    font-weight: 400;
+                    clicked => { Nav.search(SettingsSearch.query); }
+                }
             }
         }
     }
