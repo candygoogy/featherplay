@@ -262,19 +262,29 @@ fn open(ctx: &Rc<Ctx>) -> Result<(), String> {
     match placed {
         Some((work, scale)) => {
             let height = ui.get_box_height();
-            let (mut left, top) = place(work, scale, WIDTH);
+            let (left, top) = place(work, scale, WIDTH);
             ui.window().set_position(PhysicalPosition::new(left, top));
             popup::creating(|| ui.window().show()).map_err(|e| format!("show: {e}"))?;
-            // Made at another monitor's scale: centred by its own width.
-            let real = ui.window().size().width as i32;
-            let wanted = (WIDTH * scale).round() as i32;
-            if real > 0 && real != wanted {
-                left += (wanted - real) / 2;
-                ui.window().set_position(PhysicalPosition::new(left, top));
-            }
             log!(
                 "quick search opened at {left},{top} ({WIDTH}x{height}, {:.1} ms)",
                 started.elapsed().as_secs_f64() * 1000.0
+            );
+            // Centred again by the width the window really got, once it exists: right after
+            // `show`, Slint's own size can still be the one at 100 %.
+            shell::when_handle(
+                &ui,
+                move |ui, _| {
+                    let real = ui.window().with_winit_window(|w| w.inner_size().width);
+                    let Some(real) = real.and_then(|r| i32::try_from(r).ok()) else {
+                        return;
+                    };
+                    let (x, y) = centred(work, real);
+                    if real > 0 && x != left {
+                        ui.window().set_position(PhysicalPosition::new(x, y));
+                        log!("quick search: {real} px wide, moved to {x},{y}");
+                    }
+                },
+                |_| {},
             );
         }
         None => {
@@ -299,11 +309,16 @@ fn open(ctx: &Rc<Ctx>) -> Result<(), String> {
 }
 
 /// Where the box's top-left corner goes on a monitor whose work area is `work` (physical
-/// pixels) at `scale`: centred, its top a fifth of the way down.
+/// pixels) at `scale`, for a box `width` logical pixels wide: centred, its top a fifth of the
+/// way down.
 pub fn place(work: window::ScreenRect, scale: f32, width: f32) -> (i32, i32) {
+    centred(work, (width * scale).round() as i32)
+}
+
+/// As `place`, for a box `width` physical pixels wide.
+pub fn centred(work: window::ScreenRect, width: i32) -> (i32, i32) {
     let (left, top, right, bottom) = work;
-    let w = (width * scale).round() as i32;
-    (left + (right - left - w) / 2, top + (bottom - top) / 5)
+    (left + (right - left - width) / 2, top + (bottom - top) / 5)
 }
 
 /// Closes and drops the box, if it shows; `give_back` hands the focus back to the window
@@ -988,8 +1003,25 @@ mod tests {
 
     #[test]
     fn the_box_sits_centred_a_fifth_of_the_way_down() {
-        // 1920 x 1032 at 100 %, and a second monitor on the left at 150 %.
+        // 100 %, 125 %, 150 % and 200 % (1920, 2400, 3840, 3840 px wide), less the taskbar.
         assert_eq!(place((0, 0, 1920, 1032), 1.0, 640.0), (640, 206));
+        assert_eq!(place((0, 0, 2400, 1290), 1.25, 640.0), (800, 258));
+        assert_eq!(place((0, 0, 3840, 2088), 1.5, 640.0), (1440, 417));
+        assert_eq!(place((0, 0, 3840, 2064), 2.0, 640.0), (1280, 412));
+        // A monitor on the left at 150 %, and one above and to the right at 125 %.
         assert_eq!(place((-2560, 0, 0, 1392), 1.5, 640.0), (-1760, 278));
+        assert_eq!(place((1920, -1440, 4480, -60), 1.25, 640.0), (2800, -1164));
+        // Each box's centre is the work area's.
+        for (work, scale) in [((0, 0, 3840, 2088), 1.5), ((1920, -1440, 4480, -60), 1.25)] {
+            let (x, _) = place(work, scale, 640.0);
+            assert_eq!(x * 2 + (640.0 * scale) as i32, work.0 + work.2);
+        }
+    }
+
+    #[test]
+    fn a_window_that_got_another_width_is_centred_by_it() {
+        // Made at 100 % on a 150 % monitor: 640 px rather than 960, still in the middle.
+        assert_eq!(centred((0, 0, 3840, 2088), 640), (1600, 417));
+        assert_eq!(centred((0, 0, 3840, 2088), 960), (1440, 417));
     }
 }
