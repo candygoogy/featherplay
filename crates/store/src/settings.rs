@@ -126,6 +126,10 @@ pub struct Settings {
     /// to 0.1.1 may also hold `mini_pinned`, the mini player's pin, kept between openings
     /// then; it's an unknown key now, so it's ignored and not written back.
     pub tray_click_opens_window: bool,
+    /// "Start in the tray" (Settings > Window, shown while featherplay starts when the user
+    /// signs in): a start at sign-in shows no window, only the tray icon (off by default).
+    /// Whether it starts at sign-in at all isn't kept here: the system's entry is the truth.
+    pub start_in_tray: bool,
     /// The equalizer (Settings > Sound): Off (the default), a preset, or the user's bands.
     /// A value this build doesn't know loads as Off.
     #[serde(deserialize_with = "lenient")]
@@ -392,6 +396,7 @@ impl Default for Settings {
             skip_disliked: true,
             streaming_quality: StreamingQuality::High,
             tray_click_opens_window: false,
+            start_in_tray: false,
             equalizer: Equalizer::Off,
             equalizer_bands: [0; 5],
             loudness: Loudness::Off,

@@ -348,6 +348,31 @@ fn table() -> Vec<Row> {
         ),
         // Window.
         row(
+            SettingId::StartWithSystem,
+            6,
+            if cfg!(windows) {
+                tr!("Start when you sign in to Windows")
+            } else {
+                tr!("Start when you log in")
+            },
+            &[],
+            tr!("search keywords" => "startup, autostart, boot, login, sign in"),
+        ),
+        row(
+            SettingId::StartInTray,
+            6,
+            tr!("Start in the tray"),
+            &[],
+            tr!("search keywords" => "startup, autostart, boot, login, sign in, minimised, minimized"),
+        ),
+        row(
+            SettingId::StartMinimised,
+            6,
+            tr!("Start minimised"),
+            &[],
+            tr!("search keywords" => "startup, autostart, boot, login, sign in, tray, minimized"),
+        ),
+        row(
             SettingId::CloseAction,
             6,
             tr!("When I close the window"),
@@ -477,6 +502,7 @@ fn section_name(section: usize) -> &'static str {
 /// What the page shows now, as far as which rows there are and what their lines say.
 struct View {
     crossfade: bool,
+    start_with_system: bool,
     proxied: bool,
     has_tray: bool,
     has_notifications: bool,
@@ -499,6 +525,7 @@ impl View {
     fn read(data: &SettingsData) -> Self {
         Self {
             crossfade: data.get_crossfade() != 0,
+            start_with_system: data.get_start_with_system(),
             proxied: data.get_youtube_proxied(),
             has_tray: data.get_has_tray(),
             has_notifications: data.get_has_notifications(),
@@ -533,6 +560,8 @@ impl View {
             | S::DiscordTime
             | S::DiscordStatusText => self.discord,
             S::LocalApiPort | S::LocalApiToken => self.local_api,
+            S::StartInTray => self.start_with_system && self.has_tray,
+            S::StartMinimised => self.start_with_system && !self.has_tray,
             S::CloseAction | S::TrayClickOpensWindow => self.has_tray,
             S::Notifications => self.has_notifications,
             S::Hotkeys => self.has_hotkeys,
@@ -665,6 +694,16 @@ impl View {
             S::Amuse if !self.amuse => tr!(
                 "Lets Amuse show what's playing. It needs no token: any app on this PC can see it, but no website other than Amuse's."
             ),
+            S::StartWithSystem if win => tr!(
+                "featherplay opens by itself when you sign in. Nothing plays until you press play."
+            ),
+            S::StartWithSystem => tr!(
+                "featherplay opens by itself when you log in. Nothing plays until you press play."
+            ),
+            S::StartInTray => tr!(
+                "At sign-in there's no window, just the tray icon. Click it for the mini player."
+            ),
+            S::StartMinimised => tr!("Your desktop has no tray, so the window starts minimised."),
             S::CloseAction => {
                 tr!("In the tray, the music keeps going; quit from the tray icon's menu.")
             }
@@ -1257,6 +1296,7 @@ mod tests {
     fn rows_the_page_doesnt_show_now_are_not_searched() {
         let mut view = View {
             crossfade: false,
+            start_with_system: false,
             proxied: false,
             has_tray: false,
             has_notifications: true,
@@ -1276,6 +1316,8 @@ mod tests {
         };
         for id in [
             SettingId::FadeOnSkip,
+            SettingId::StartInTray,
+            SettingId::StartMinimised,
             SettingId::CloseAction,
             SettingId::TrayClickOpensWindow,
             SettingId::Hotkeys,
@@ -1288,6 +1330,12 @@ mod tests {
         assert!(view.has(SettingId::Crossfade));
         view.crossfade = true;
         assert!(view.has(SettingId::FadeOnSkip));
+        // "Start in the tray" shows once featherplay starts by itself; without a tray it's
+        // "Start minimised".
+        view.start_with_system = true;
+        assert!(view.has(SettingId::StartMinimised) && !view.has(SettingId::StartInTray));
+        view.has_tray = true;
+        assert!(view.has(SettingId::StartInTray) && !view.has(SettingId::StartMinimised));
     }
 
     #[test]

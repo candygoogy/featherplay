@@ -628,6 +628,17 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
         ui.global::<crate::ui::SettingsData>().set_discord(true);
         settle();
     }
+    if o.page.starts_with("settings-window") {
+        // As after a click on the first switch: the fixtures have no entry to read.
+        let data = ui.global::<crate::ui::SettingsData>();
+        data.set_start_with_system(true);
+        data.set_start_in_tray(true);
+        // A desktop without a tray is a Linux one, and the rows speak of logging in there.
+        let tray = o.page != "settings-window-no-tray";
+        data.set_has_tray(tray);
+        data.set_on_windows(tray);
+        settle();
+    }
     if o.page == "settings-speed" || o.page == "speed-popup" {
         crate::pages::settings::show_speed_for_snapshot(ctx, 125, o.page == "speed-popup");
         settle();
@@ -759,7 +770,11 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
         Hold::Error if o.page.starts_with("now-playing-lyrics") => {}
         Hold::Error => hold_error(ctx, ui)?,
     }
-    if o.page == "settings-discord" || o.page == "settings-picked" || o.pointer.is_some() {
+    if o.page == "settings-discord"
+        || o.page.starts_with("settings-window")
+        || o.page == "settings-picked"
+        || o.pointer.is_some()
+    {
         // Laid out at the snapshot's size first, so the scroll and the pointer land on what
         // the picture shows there.
         window.dispatch_event(WindowEvent::Resized {
@@ -769,6 +784,10 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
     }
     if o.page == "settings-discord" {
         scroll_to_group(window, "Discord")?;
+        settle();
+    }
+    if o.page.starts_with("settings-window") {
+        scroll_to_group(window, "Window")?;
         settle();
     }
     if o.page == "settings-picked" {

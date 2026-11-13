@@ -39,6 +39,7 @@ mod scrobbling;
 pub mod search;
 mod shortcuts;
 mod sound;
+mod startup;
 mod window;
 
 pub use discord::{Preview, PreviewTime, discord_changed, discord_preview, step_minutes};
@@ -49,6 +50,7 @@ pub use scrobbling::{
 };
 pub use shortcuts::show_shortcuts_for_snapshot;
 pub use sound::show_sound_for_snapshot;
+pub use startup::use_entry as use_autostart_entry;
 pub use window::{apply_theme, check_hotkeys};
 
 use discord::{
@@ -331,6 +333,8 @@ pub fn init(ctx: &Rc<Ctx>) {
 pub fn open(ctx: &Rc<Ctx>) {
     show(ctx);
     if let Some(ui) = ctx.window() {
+        // Windows' Startup apps may have turned featherplay off since.
+        startup::show(ctx, &ui.global::<SettingsData>());
         // No option is under the pointer yet (one hovered as the page was left is gone).
         unlight(&ui.global::<SettingsData>());
         // A search left behind is gone: the page opens whole.
@@ -448,6 +452,7 @@ fn show(ctx: &Ctx) {
     ));
     data.set_close_action(close_action_index(s.close_action));
     data.set_tray_click_opens_window(s.tray_click_opens_window);
+    data.set_start_in_tray(s.start_in_tray);
     data.set_has_tray(supports(Feature::Tray));
     data.set_has_hotkeys(supports(Feature::GlobalHotkeys));
     data.set_on_windows(cfg!(windows));
@@ -580,6 +585,16 @@ fn toggled(ctx: &Rc<Ctx>, key: SettingKey, on: bool) {
         SettingKey::TrayClickOpensWindow => {
             data.set_tray_click_opens_window(on);
             Change::TrayClickOpensWindow(on)
+        }
+        SettingKey::StartWithSystem => {
+            startup::toggled(ctx, &data, on);
+            // "Start in the tray" comes or goes with it.
+            search::refresh(&ui);
+            return;
+        }
+        SettingKey::StartInTray => {
+            data.set_start_in_tray(on);
+            Change::StartInTray(on)
         }
         SettingKey::Tooltips => {
             data.set_tooltips(on);

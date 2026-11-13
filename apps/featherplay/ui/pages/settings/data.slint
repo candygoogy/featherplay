@@ -34,6 +34,8 @@ export enum SettingKey {
     tooltips,
     dns-over-https,
     settings-in-suggestions,
+    start-with-system,
+    start-in-tray,
 }
 
 // The Discord connection, live from the presence worker.
@@ -177,6 +179,9 @@ export enum SettingId {
     local-api-token,
     amuse,
     // Window.
+    start-with-system,
+    start-in-tray,
+    start-minimised,
     close-action,
     tray-click-opens-window,
     appearance,
@@ -331,6 +336,11 @@ export global SettingsData {
     in property <LocalApiState> amuse-state;
     in property <string> amuse-message;
     // Window.
+    // featherplay starts when the user signs in: its entry is there and the system runs it
+    // (read from the system when the page opens; off when Windows' Startup apps turned it off).
+    in property <bool> start-with-system;
+    // "Start in the tray": a start at sign-in shows no window (without a tray, minimised).
+    in property <bool> start-in-tray;
     in property <bool> notifications;
     // The system shows notifications (Linux: a notification server is running); else the
     // "Track notifications" switch is hidden.

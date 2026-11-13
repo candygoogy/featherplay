@@ -70,6 +70,8 @@ pub enum Change {
     StreamingQuality(StreamingQuality),
     /// A left click on the tray icon opens the main window (on) or the mini player (off).
     TrayClickOpensWindow(bool),
+    /// A start at sign-in shows no window, only the tray icon.
+    StartInTray(bool),
     /// "Show tooltips": the player bar's buttons name themselves when the pointer rests.
     Tooltips(bool),
     /// "Show settings in search suggestions": the top bar's suggestions end with settings.
@@ -138,6 +140,7 @@ impl Change {
             Change::VolumeStep(v) => s.volume_step = v,
             Change::StreamingQuality(v) => s.streaming_quality = v,
             Change::TrayClickOpensWindow(v) => s.tray_click_opens_window = v,
+            Change::StartInTray(v) => s.start_in_tray = v,
             Change::Tooltips(v) => s.tooltips = v,
             Change::SettingsInSuggestions(v) => s.settings_in_suggestions = v,
             Change::Equalizer(v, bands) => {
@@ -317,6 +320,7 @@ mod tests {
             Change::SkipDisliked(false),
             Change::StreamingQuality(StreamingQuality::Standard),
             Change::TrayClickOpensWindow(true),
+            Change::StartInTray(true),
             Change::Tooltips(false),
             Change::SettingsInSuggestions(false),
             Change::Equalizer(Equalizer::Custom, [4, 0, -3, 0, 2]),
@@ -354,6 +358,7 @@ mod tests {
         assert!(!s.skip_disliked);
         assert_eq!(s.streaming_quality, StreamingQuality::Standard);
         assert!(s.tray_click_opens_window);
+        assert!(s.start_in_tray);
         assert!(!s.tooltips);
         assert!(!s.settings_in_suggestions);
         assert_eq!(

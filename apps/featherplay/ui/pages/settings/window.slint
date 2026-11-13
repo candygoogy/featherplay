@@ -1,4 +1,4 @@
-// Settings' Window section: closing, the tray, the appearance, the language, the accent
+// Settings' Window section: starting when the user signs in, closing, the tray, the appearance, the language, the accent
 // and its custom colour, notifications, tooltips, the search's suggestions, the shortcuts
 // and the global hotkeys.
 import { Theme, Appearance } from "../../theme.slint";
@@ -205,10 +205,29 @@ export component WindowSection inherits Group {
     title: @tr("Window");
     section: 6;
     if root.made >= 2: VerticalLayout {
+        // What happens when the app starts, then what happens when it's closed.
+        ToggleRow {
+            divider: false;
+            label: SettingsData.on-windows ? @tr("Start when you sign in to Windows") : @tr("Start when you log in");
+            search: SettingId.start-with-system;
+            detail: SettingsData.on-windows ? @tr("featherplay opens by itself when you sign in. Nothing plays until you press play.")
+                : @tr("featherplay opens by itself when you log in. Nothing plays until you press play.");
+            key: SettingKey.start-with-system;
+            checked: SettingsData.start-with-system;
+        }
+        // Hidden, not greyed, while featherplay doesn't start by itself. Without a tray the
+        // window starts minimised, and the row says so.
+        if SettingsData.start-with-system: ToggleRow {
+            label: SettingsData.has-tray ? @tr("Start in the tray") : @tr("Start minimised");
+            search: SettingsData.has-tray ? SettingId.start-in-tray : SettingId.start-minimised;
+            detail: SettingsData.has-tray ? @tr("At sign-in there's no window, just the tray icon. Click it for the mini player.")
+                : @tr("Your desktop has no tray, so the window starts minimised.");
+            key: SettingKey.start-in-tray;
+            checked: SettingsData.start-in-tray;
+        }
         // Without a tray, closing the window quits: nothing to choose.
         if SettingsData.has-tray: VerticalLayout {
             SettingRow {
-                divider: false;
                 label: @tr("When I close the window");
                 search: SettingId.close-action;
                 detail: @tr("In the tray, the music keeps going; quit from the tray icon's menu.");
@@ -230,8 +249,6 @@ export component WindowSection inherits Group {
             }
         }
         SettingRow {
-            // The first row has no line above it.
-            divider: SettingsData.has-tray;
             label: @tr("Appearance");
             search: SettingId.appearance;
             detail: SettingsData.on-windows ? @tr("System follows Windows' light or dark mode.") : @tr("System follows your desktop's light or dark mode.");

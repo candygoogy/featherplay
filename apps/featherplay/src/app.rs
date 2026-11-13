@@ -24,6 +24,7 @@ use featherplay_store::{Paths, Settings};
 use slint::ComponentHandle;
 use tokio::sync::mpsc;
 
+use crate::autostart::Start;
 use crate::busy::Busy;
 use crate::controller::{Action, Controller, Options, PlayerState, UiEvent, UiLink};
 use crate::covers::Covers;
@@ -678,6 +679,12 @@ pub fn show_window(ctx: &Ctx) {
     // Before the show: the button may be made while it runs.
     let wait = from_tray && window.as_ref().is_some_and(|w| w.animations_enabled());
     RESTORE_PENDING.set(wait);
+    // A start in the tray opens its first page with the window's first show.
+    if crate::autostart::page_pending()
+        && let Some(ctx) = Ctx::get()
+    {
+        crate::autostart::window_shown(&ctx);
+    }
     if let Some(ui) = ctx.window() {
         ui.global::<Frame>().set_hidden(false);
         let _ = ui.show();
@@ -708,6 +715,8 @@ fn restore_pending(window: &dyn NativeWindow) {
 pub struct AppOptions {
     /// Print `first_frame_ms=<n>` (process start to the first rendered frame) to stderr.
     pub timing: bool,
+    /// `--autostart`: started by the sign-in entry (`autostart`).
+    pub autostart: bool,
 }
 
 /// The app with its window: runs until the window closes, Quit, or Ctrl+C.
@@ -719,7 +728,9 @@ pub fn run(opts: Options, app: AppOptions) -> ExitCode {
     if let Err(e) = slint::BackendSelector::new()
         .backend_name("winit".into())
         .renderer_name("skia-software".into())
-        .with_winit_window_attributes_hook(popup::window_attributes)
+        .with_winit_window_attributes_hook(|attrs| {
+            crate::autostart::window_attributes(popup::window_attributes(attrs))
+        })
         .select()
     {
         log!("featherplay: UI backend: {e}");
@@ -744,6 +755,7 @@ pub fn run(opts: Options, app: AppOptions) -> ExitCode {
     // before the controller shows any string (the window's part follows in `settings::init`).
     let settings = Settings::load(&paths);
     let hotkeys = settings.hotkeys;
+    let start = crate::autostart::Start::new(app.autostart, settings.start_in_tray);
     language::install();
     featherplay_core::i18n::select(&language::for_setting(&settings.language));
     let catalog = match Catalog::new(runtime.handle().clone()) {
@@ -833,7 +845,7 @@ pub fn run(opts: Options, app: AppOptions) -> ExitCode {
         log!("{e}");
     }
 
-    let ui = run_window(&paths, catalog, action_tx, tx.clone(), hotkeys, app);
+    let ui = run_window(&paths, catalog, action_tx, tx.clone(), hotkeys, app, start);
     closing();
     if let Err(e) = &ui {
         log!("{e}");
@@ -858,7 +870,10 @@ fn run_window(
     tx: mpsc::UnboundedSender<UiCommand>,
     hotkeys: Option<featherplay_store::Hotkeys>,
     app: AppOptions,
+    start: Start,
 ) -> Result<(), String> {
+    // Before the window is made: its attributes are set then.
+    crate::autostart::prepare(start);
     let ui = AppWindow::new().map_err(|e| format!("window: {e}"))?;
     ui.global::<Theme>()
         .set_motion(window::animations_enabled());
@@ -873,11 +888,21 @@ fn run_window(
     queue_panel::restore(&ctx);
     // The real window only: tests and snapshots never ask GitHub.
     updates::arm(paths.cache.clone());
-    ctx.show_current();
+    // Started in the tray, the first page opens with the window (`autostart::window_shown`).
+    if start != Start::Tray {
+        ctx.show_current();
+    }
     // The close button asks, quits or hides to the tray, as Settings says (`close`).
     close::install(&ctx, &ui, shell::has_tray);
 
-    ui.show().map_err(|e| format!("show window: {e}"))?;
+    if start == Start::Tray {
+        // Made but not shown: the tray icon, the media controls and the hotkeys still get
+        // its handle.
+        ui.global::<Frame>().set_hidden(true);
+        log!("started at sign-in, in the tray");
+    } else {
+        ui.show().map_err(|e| format!("show window: {e}"))?;
+    }
     let weak = ui.as_weak();
     let c = ctx.clone();
     let find = ui.as_weak();
@@ -885,6 +910,13 @@ fn run_window(
     let timing = app.timing;
     shell::start(find_handle, tx, hotkeys, move |handle| {
         c.handle.set(Some(handle));
+        // Started in the tray with no tray to go to (`run_window` showed it): minimised.
+        if start == Start::Tray
+            && !shell::has_tray()
+            && let Some(ui) = weak.upgrade()
+        {
+            ui.window().set_minimized(true);
+        }
         c.set_native(Rc::new(Win32(handle)));
         #[cfg(feature = "perf-harness")]
         crate::perf::start(&c, handle);
@@ -994,6 +1026,18 @@ fn run_window(
     // Whether the desktop shows the tray icon, now that `start` has put it there (Linux):
     // Settings' tray options and the bar's mini player button, before the first frame.
     pages::settings::tray_changed(&ctx);
+    if start == Start::Tray {
+        if shell::has_tray() {
+            // Nothing drawn and no covers kept until it's shown.
+            memory::hidden(&ctx, true);
+        } else {
+            // No tray to start in: the window shows, minimised once it's made (above).
+            log!("no tray to start in: starting minimised");
+            crate::autostart::window_shown(&ctx);
+            ui.global::<Frame>().set_hidden(false);
+            ui.show().map_err(|e| format!("show window: {e}"))?;
+        }
+    }
 
     // Keeps running while the window is hidden in the tray, until Quit.
     let res = slint::run_event_loop_until_quit().map_err(|e| format!("event loop: {e}"));

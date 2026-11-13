@@ -6,6 +6,9 @@
 //! window up (its other flags are ignored then). `--snapshot` and `--unregister` runs don't
 //! check.
 //!
+//! `--autostart` is how the entry Settings > Window adds starts featherplay when the user
+//! signs in (`autostart`): no focus taken, or no window at all with "Start in the tray".
+//!
 //! Debug flags: `--play <videoId>`, `--volume <0..1>` (this run only), `--start-at <secs>`,
 //! `--timing` (prints `first_frame_ms=<n>`), and the offscreen render
 //! `--snapshot <page> --fixtures [--theme dark|light] [--size WxH] [--scale F] [--queue]
@@ -36,12 +39,12 @@ use featherplay::app::{self, AppOptions};
 use featherplay::controller::{self, Options};
 use featherplay::instance::{self, Start};
 use featherplay::snapshot::{self, Hold, PAGES, SnapshotOptions};
-use featherplay::{identity, language};
+use featherplay::{autostart, identity, language};
 use featherplay_controller::diagnostics;
 use featherplay_core::model::TrackId;
 use featherplay_store::Paths;
 
-const USAGE: &str = "usage: featherplay [--play <videoId>] [--volume <0..1>] [--start-at <secs>] [--timing]
+const USAGE: &str = "usage: featherplay [--autostart] [--play <videoId>] [--volume <0..1>] [--start-at <secs>] [--timing]
        featherplay --unregister
        featherplay --snapshot <page> --fixtures [--theme dark|light] [--size WxH] [--scale F] [--queue] [--hover X,Y | --press X,Y] [--hold-loading | --hold-error] [--signed-out] [--track N] [--shuffle] [--language CODE] --out <png>";
 
@@ -92,6 +95,7 @@ fn parse_args() -> Result<Mode, String> {
                 opts.start_at = Some(Duration::from_secs_f64(s));
             }
             "--timing" => app.timing = true,
+            featherplay_platform::autostart::FLAG => app.autostart = true,
             "--snapshot" => snap = Some(value("--snapshot")?),
             "--fixtures" => fixtures = true,
             "--theme" => {
@@ -211,6 +215,8 @@ fn main() -> ExitCode {
             diagnostics::start(&Paths::resolve());
             // Before any window, so the window and its media session carry the AUMID.
             identity::startup();
+            // A moved exe or AppImage: its sign-in entry follows it.
+            autostart::refresh_entry();
             let code = app::run(opts, app);
             diagnostics::flush();
             code

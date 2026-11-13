@@ -93,6 +93,11 @@ pub const PAGES: &[&str] = &[
     // Settings scrolled to the Discord group, with Discord status on: the profile card
     // beside its options.
     "settings-discord",
+    // Settings scrolled to the Window group with "Start when you sign in to Windows" on and
+    // "Start in the tray" under it; and the same on a Linux desktop with no tray ("Start
+    // when you log in", "Start minimised").
+    "settings-window",
+    "settings-window-no-tray",
     // Settings with the new sound rows on (Skip silence at Start and end, Crossfade at 5 s
     // with Fade on skip, Bass, Light), and with the Equalizer's bands open.
     "settings-sound",
@@ -323,6 +328,8 @@ pub(super) fn page(name: &str, f: &Fixtures) -> Result<Page, String> {
         | "settings-scripts"
         | "settings-local-api"
         | "settings-discord"
+        | "settings-window"
+        | "settings-window-no-tray"
         | "settings-sound"
         | "settings-equalizer"
         | "settings-speed"

@@ -24,6 +24,7 @@ pub mod account_menu;
 pub mod account_picker;
 pub mod album_actions;
 pub mod app;
+pub mod autostart;
 pub mod bar;
 pub mod busy;
 pub mod chrome;

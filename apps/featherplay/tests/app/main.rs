@@ -118,6 +118,7 @@ mod skeleton_sweep;
 mod smoothness;
 mod song_menu_place;
 mod space_play;
+mod start_with_system;
 mod startup_session;
 mod tab_pill;
 mod theme_switch;
