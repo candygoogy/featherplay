@@ -197,7 +197,7 @@ pub fn open(ctx: &Rc<Ctx>, x: i32, y: i32) -> Result<(), String> {
     let ui = create(ctx)?;
     let border = popup::border(&ui.global::<Theme>());
     let at = if popup::placed() {
-        let (left, top) = popup::show_at(ui.window(), (x, y), SIZE)?;
+        let (left, top) = popup::show_at(&ui, (x, y), SIZE)?;
         format!("at {left},{top}")
     } else {
         popup::show_unplaced(ui.window())?;

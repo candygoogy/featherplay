@@ -8,6 +8,7 @@ use std::cell::Cell;
 
 use featherplay_platform::window::{self, Handle, ScreenRect};
 use featherplay_platform::{Feature, supports};
+use slint::winit_030::WinitWindowAccessor;
 #[cfg(windows)]
 use slint::winit_030::winit::platform::windows::{CornerPreference, WindowAttributesExtWindows};
 use slint::winit_030::winit::window::WindowAttributes;
@@ -15,7 +16,7 @@ use slint::{ComponentHandle, PhysicalPosition};
 
 use crate::ui::{AppWindow, Appearance, Player, Theme};
 use crate::ui_bridge::format_duration;
-use crate::{bar, chrome};
+use crate::{bar, chrome, shell};
 
 /// From the taskbar and the screen's edges, in logical pixels (Windows 11's flyouts keep 12).
 const GAP: f32 = 12.0;
@@ -83,11 +84,11 @@ pub fn show_unplaced(window: &slint::Window) -> Result<(), String> {
     creating(|| window.show()).map_err(|e| format!("show: {e}"))
 }
 
-/// Shows `window`, `size` logical pixels, for a click on the tray icon at `(x, y)` (physical
-/// screen pixels). Returns where its top-left corner went. Once its window exists
+/// Shows `ui`'s window, `size` logical pixels, for a click on the tray icon at `(x, y)`
+/// (physical screen pixels). Returns where its top-left corner went. Once its window exists
 /// (`shell::when_handle`), `dress` it.
-pub fn show_at(
-    window: &slint::Window,
+pub fn show_at<C: ComponentHandle + 'static>(
+    ui: &C,
     (x, y): (i32, i32),
     size: (f32, f32),
 ) -> Result<(i32, i32), String> {
@@ -98,16 +99,27 @@ pub fn show_at(
     );
     let gap = (GAP * scale).round() as i32;
     let (left, top) = place((x, y), physical, work, gap);
+    let window = ui.window();
     window.set_position(PhysicalPosition::new(left, top));
     creating(|| window.show()).map_err(|e| format!("show: {e}"))?;
-    // The monitor's scale may differ from the one the window got; place it by its own size.
-    let real = window.size();
-    let real = (real.width as i32, real.height as i32);
-    let (mut left, mut top) = (left, top);
-    if real != physical && real.0 > 0 {
-        (left, top) = place((x, y), real, work, gap);
-        window.set_position(PhysicalPosition::new(left, top));
-    }
+    // Placed again by the size the window really got, once it exists: right after `show`,
+    // Slint's own size can still be the one at 100 %.
+    shell::when_handle(
+        ui,
+        move |ui, _| {
+            let real = ui.window().with_winit_window(|w| {
+                let s = w.inner_size();
+                (s.width as i32, s.height as i32)
+            });
+            let Some(real) = real.filter(|r| r.0 > 0 && *r != physical) else {
+                return;
+            };
+            let (left, top) = place((x, y), real, work, gap);
+            ui.window().set_position(PhysicalPosition::new(left, top));
+            log!("popup: {}x{} px, moved to {left},{top}", real.0, real.1);
+        },
+        |_| {},
+    );
     Ok((left, top))
 }
 
@@ -282,6 +294,22 @@ mod tests {
         // 150 %: 510 x 180 physical, an 18 px gap, a 72 px taskbar.
         let work = (0, 0, 3840, 2088);
         assert_eq!(place((3800, 2120), (510, 180), work, 18), (3312, 1890));
+    }
+
+    #[test]
+    fn it_sits_by_the_tray_at_every_scale() {
+        // 340 x 120 logical above a bottom taskbar, clicked 300 px (logical) from the right:
+        // at 100 %, 125 %, 150 % and 200 %, everything in physical pixels scales with it.
+        for (scale, at) in [(1.0, (1330, 900)), (1.25, (1663, 1125))] {
+            let px = |v: i32| (v as f32 * scale).round() as i32;
+            let work = (0, 0, px(1920), px(1032));
+            let size = (px(340), px(120));
+            assert_eq!(place((px(1500), px(1050)), size, work, px(12)), at);
+        }
+        let work = (0, 0, 3840, 2088);
+        assert_eq!(place((3000, 2120), (510, 180), work, 18), (2745, 1890));
+        let work = (0, 0, 3840, 2064);
+        assert_eq!(place((3000, 2100), (680, 240), work, 24), (2660, 1800));
     }
 
     #[test]
