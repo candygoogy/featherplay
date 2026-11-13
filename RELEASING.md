@@ -48,7 +48,7 @@ the tag matches the crate version, builds `featherplay.exe` for each with the bu
 from the repository secrets, fails if either exe is over 32 MB, builds both installers with
 Inno Setup, runs the Linux tests on Ubuntu 24.04 and builds the Linux files on Ubuntu 22.04,
 each for x86_64 and for aarch64 on GitHub's ARM64 runners (`packaging/linux/build-linux.sh`,
-which fails if the binary is over 33 MB or needs a glibc newer than 2.35), and creates a
+which fails if the binary is over 34 MB or needs a glibc newer than 2.35), and creates a
 **draft** release with:
 
 - `featherplay.exe` and `featherplay.exe.sha256` (x64)
