@@ -17,8 +17,8 @@ test("index has title, description, canonical, og:image and SoftwareApplication 
   expect(ld.operatingSystem).toMatch(/Windows/);
   expect(ld.operatingSystem).toMatch(/Linux/);
   expect(ld.offers.price).toBe("0");
-  expect(ld.softwareVersion).toBe("0.2.2");
-  expect(ld.fileSize).toBe("10.68 MB");
+  expect(ld.softwareVersion).toBe("0.3.0");
+  expect(ld.fileSize).toBe("10.78 MB");
   expect(ld.aggregateRating).toBeUndefined();
 });
 

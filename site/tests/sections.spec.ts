@@ -184,9 +184,9 @@ test("the card offers the installer (recommended) and the portable exe, each wit
   await expect(card.locator("[data-download-option]")).toHaveCount(2);
   const installer = card.locator('[data-download-option="installer"]');
   await expect(installer).toContainText("Recommended");
-  await expect(installer).toContainText("featherplay-setup-0.2.2.exe");
-  await expect(installer.locator("[data-size]")).toHaveText("10.68 MB");
-  await expect(card.locator('[data-download-option="portable"] [data-size]')).toHaveText("28.25 MB");
+  await expect(installer).toContainText("featherplay-setup-0.3.0.exe");
+  await expect(installer.locator("[data-size]")).toHaveText("10.78 MB");
+  await expect(card.locator('[data-download-option="portable"] [data-size]')).toHaveText("28.75 MB");
 });
 
 test("the card's Linux row, marked experimental, offers the x86_64 AppImage and points to the rest", async ({ page }) => {
