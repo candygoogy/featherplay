@@ -18,7 +18,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use featherplay_core::tr;
 use ksni::blocking::{Handle, TrayMethods};
-use ksni::menu::{CheckmarkItem, StandardItem};
+use ksni::menu::{CheckmarkItem, StandardItem, SubMenu};
 use ksni::{Icon, MenuItem, OfflineReason, ToolTip};
 
 pub use crate::common::tray::*;
@@ -147,8 +147,9 @@ impl ksni::Tray for Item {
     }
 
     /// The menu: the song (greyed), Pause or Play, Previous, Next; Like (checked when liked)
-    /// and Not for me; while offered, Desktop lyrics and its Lock or Unlock; Show featherplay
-    /// and Quit, as on Windows (`windows::tray::menu`).
+    /// and Not for me; the sleep timer's submenu while its setting is on; while offered,
+    /// Desktop lyrics and its Lock or Unlock; Show featherplay and Quit, as on Windows
+    /// (`windows::tray::menu`).
     fn menu(&self) -> Vec<MenuItem<Self>> {
         let l = labels(&self.state);
         let item = |c: TrayChoice, text: &str, enabled: bool| -> MenuItem<Self> {
@@ -160,6 +161,23 @@ impl ksni::Tray for Item {
             }
             .into()
         };
+        let sleep: Option<MenuItem<Self>> = l.sleep.as_ref().map(|s| {
+            let submenu = s
+                .entries
+                .iter()
+                .map(|e| match e {
+                    Some((c, text)) => item(*c, text, true),
+                    None => MenuItem::Separator,
+                })
+                .collect();
+            SubMenu {
+                label: label(&s.item),
+                enabled: s.enabled,
+                submenu,
+                ..Default::default()
+            }
+            .into()
+        });
         let mut menu = vec![
             StandardItem {
                 label: label(&header_text(&self.state)),
@@ -181,8 +199,11 @@ impl ksni::Tray for Item {
             }
             .into(),
             item(TrayChoice::NotForMe, tr!("Not for me"), l.controls),
-            MenuItem::Separator,
         ];
+        if let Some(sleep) = sleep {
+            menu.extend([MenuItem::Separator, sleep]);
+        }
+        menu.push(MenuItem::Separator);
         let desktop = self.state.desktop_lyrics;
         if desktop.offered {
             menu.push(

@@ -1,0 +1,243 @@
+// The sleep timer (Settings › Playback › Sleep timer, off by default): its button in the
+// player bar and its popup, the speed popup's twin. Idle, the button is a crescent; running,
+// a pill on the accent's tonal fill that reads as the time left ("24 min left", else
+// "24 min" where the bar has less room, else the crescent alone with the time in its
+// tooltip), and "Fading out" over the last seconds. The bar works out the room
+// (`BottomBar.sleep-room`). `src/sleep.rs` fills `Sleep` and listens to it; the timer itself
+// runs in the controller.
+import { Theme, Curves } from "theme.slint";
+import { Body, Icon, Pill, TextLink } from "parts.slint";
+import { BarTip } from "bar_tip.slint";
+import { Chips } from "pages/content.slint";
+import { Player } from "player.slint";
+
+export global Sleep {
+    in property <bool> running;
+    in property <bool> fading;
+    // The minutes left, rounded up.
+    in property <int> minutes;
+    // The popup's line while it runs: "Pauses at 23:47 (in 24 min)".
+    in property <string> line;
+    // The list chip, named after the list playing ("End of album", "End of playlist");
+    // empty hides it (a radio has no end).
+    in property <string> list-chip;
+    in-out property <bool> open;
+    // A chip: 0 to 3 the times (15, 30, 45 min, 1 hour), 4 the song's end, 5 the list's.
+    callback pick(int);
+    callback add-quarter();
+    callback turn-off();
+    // The popup opens: its line's clock time is worked out again.
+    callback opening();
+    // The running pill's texts, the longer first.
+    out property <string> long-text: root.fading ? @tr("Fading out") : @tr("{} min left", root.minutes);
+    out property <string> short-text: root.fading ? @tr("Fading out") : @tr("{} min", root.minutes);
+    // A crescent, the common sign for sleep.
+    out property <string> icon: "M19.2 14.8 A7.6 7.6 0 1 1 9.2 4.8 A6 6 0 0 0 19.2 14.8 Z";
+    // The pill's room besides its text: 10 px, the 15 px crescent, 6 px, the text, 12 px.
+    out property <length> pill-pad: 43px;
+}
+
+// The bar's button: 36 px idle, or the running pill as wide as `text` needs (the crescent
+// alone, on the tonal fill, when `text` is empty). A click opens the popup; while the music
+// fades out, it adds 15 minutes instead.
+export component SleepButton inherits Rectangle {
+    // How far above the button's 36 px row the tooltip ends (the bar lifts it clear of itself).
+    in property <length> above: Theme.s2;
+    // What the running pill says; the bar picks it for the room it has.
+    in property <string> text;
+    property <bool> pill: Sleep.running && root.text != "";
+    property <bool> enabled: Player.has-track || Sleep.running;
+    height: 36px;
+    face := Rectangle {
+        y: root.pill ? 4px : 0px;
+        height: root.pill ? 28px : 36px;
+        border-radius: self.height / 2;
+        background: Sleep.running ? (ta.has-hover || ta.pressed || Sleep.open ? Theme.accent-tonal-hover : Theme.accent-tonal) : (root.enabled ? Theme.state(ta.pressed, ta.has-hover) : transparent);
+        accessible-role: button;
+        accessible-label: @tr("Sleep timer");
+        accessible-description: Sleep.running ? Sleep.long-text : "";
+        accessible-action-default => { root.open(); }
+        animate background { duration: Theme.t-hover; }
+        ta := TouchArea {
+            enabled: root.enabled;
+            mouse-cursor: pointer;
+            clicked => {
+                tip.dismiss();
+                root.open();
+            }
+        }
+        Icon {
+            x: root.pill ? 10px : (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            width: root.pill ? 15px : 20px;
+            height: self.width;
+            commands: Sleep.icon;
+            stroke-width: root.pill ? 1.7px : 1.6px;
+            stroke: (Sleep.running ? Theme.text1 : Theme.text2).transparentize(root.enabled ? 0 : 0.6);
+        }
+        if root.pill: Body {
+            x: 31px;
+            width: parent.width - 31px - 12px;
+            text: root.text;
+            font-size: Theme.t-meta;
+            font-weight: 600;
+            color: Theme.text1;
+            vertical-alignment: center;
+            overflow: clip;
+        }
+    }
+    tip := BarTip {
+        over: ta.has-hover;
+        name: @tr("Sleep timer");
+        // Without the time on the button, it says it here.
+        hint: Sleep.running && !root.pill ? Sleep.long-text : "";
+        above: root.above;
+    }
+    // While it fades, a click is "+15 min": the music comes back at once.
+    function open() {
+        if Sleep.fading {
+            Sleep.add-quarter();
+            return;
+        }
+        Sleep.opening();
+        Sleep.open = true;
+    }
+}
+
+// The popup: "Sleep timer", while it runs the line with when it pauses, the times' chips and
+// the ends' chips, and while it runs "+15 min" and Turn off. In a panel `s2` above the bar,
+// centred on the button. A pick, Escape or a click outside closes it. app.slint draws it over
+// everything while `Sleep.open`.
+export component SleepLayer inherits Rectangle {
+    // The bar's top edge, and the button's centre (window coordinates).
+    in property <length> bottom;
+    in property <length> anchor;
+    callback closed();
+    property <bool> open: Sleep.open;
+    changed open => {
+        if self.open {
+            keys.focus();
+        }
+    }
+    function close() {
+        Sleep.open = false;
+        root.closed();
+    }
+    TouchArea {
+        pointer-event(e) => {
+            if e.kind == PointerEventKind.down {
+                root.close();
+            }
+        }
+        scroll-event(e) => {
+            root.close();
+            accept
+        }
+    }
+    Rectangle {
+        width: max(times.preferred-width, ends.preferred-width, Sleep.running ? line.preferred-width : 0px) + 2 * Theme.s4;
+        height: lay.preferred-height;
+        x: max(8px, min(root.anchor - self.width / 2, root.width - self.width - 8px));
+        y: root.bottom - Theme.s2 - self.height;
+        border-radius: Theme.r-l;
+        background: Theme.panel;
+        border-width: 1px;
+        border-color: Theme.card-edge;
+        drop-shadow-blur: 24px;
+        drop-shadow-offset-y: 8px;
+        drop-shadow-color: Theme.cover-shadow;
+        accessible-role: list;
+        accessible-label: @tr("Sleep timer");
+        // Swallows clicks on the panel's padding.
+        TouchArea { }
+        keys := FocusScope {
+            key-pressed(e) => {
+                if e.text == Key.Escape {
+                    root.close();
+                    return accept;
+                }
+                reject
+            }
+        }
+        lay := VerticalLayout {
+            padding: Theme.s4;
+            spacing: 0px;
+            Body {
+                height: 20px;
+                text: @tr("Sleep timer");
+                font-weight: 600;
+                color: Theme.text1;
+                vertical-alignment: center;
+            }
+            if Sleep.running: Rectangle {
+                height: 18px;
+                Body {
+                    x: 0;
+                    y: 2px;
+                    width: parent.width;
+                    height: 16px;
+                    text: Sleep.line;
+                    font-size: Theme.t-meta;
+                    color: Theme.text2;
+                    vertical-alignment: center;
+                }
+            }
+            Rectangle {
+                height: Theme.s3;
+            }
+            times := Chips {
+                labels: [@tr("15 min"), @tr("30 min"), @tr("45 min"), @tr("1 hour")];
+                active: -1;
+                selected(i) => {
+                    Sleep.pick(i);
+                    root.close();
+                }
+            }
+            Rectangle {
+                height: Theme.s2;
+            }
+            ends := Chips {
+                labels: Sleep.list-chip != "" ? [@tr("End of song"), Sleep.list-chip] : [@tr("End of song")];
+                active: -1;
+                selected(i) => {
+                    Sleep.pick(4 + i);
+                    root.close();
+                }
+            }
+            if Sleep.running: VerticalLayout {
+                padding-top: 14px;
+                spacing: 14px;
+                Rectangle {
+                    height: 1px;
+                    background: Theme.hairline;
+                }
+                HorizontalLayout {
+                    alignment: start;
+                    spacing: Theme.s4;
+                    Pill {
+                        compact: true;
+                        label: @tr("+15 min");
+                        clicked => {
+                            Sleep.add-quarter();
+                            root.close();
+                        }
+                    }
+                    TextLink {
+                        y: (parent.height - self.height) / 2;
+                        text: @tr("Turn off");
+                        clicked => {
+                            Sleep.turn-off();
+                            root.close();
+                        }
+                    }
+                }
+            }
+        }
+    }
+    // Measures the line, which shows only while it runs.
+    line := Body {
+        visible: false;
+        text: Sleep.line;
+        font-size: Theme.t-meta;
+    }
+}

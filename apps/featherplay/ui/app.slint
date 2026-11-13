@@ -10,6 +10,7 @@ import { Probe, ProbeRegion } from "probe.slint";
 import { Sidebar } from "sidebar.slint";
 import { TopBar, TopBarData } from "top_bar.slint";
 import { BottomBar, SpeedLayer } from "bottom_bar.slint";
+import { Sleep, SleepLayer } from "sleep_timer.slint";
 import { QueuePanel } from "queue_panel.slint";
 import { HomePage, HomeData } from "pages/home.slint";
 import { LibraryPage } from "pages/library.slint";
@@ -44,6 +45,7 @@ export { SidebarData } from "sidebar.slint";
 export { TopBarData, Suggestion, SuggestionKind } from "top_bar.slint";
 export { QueueData } from "queue_panel.slint";
 export { Tooltips } from "bar_tip.slint";
+export { Sleep } from "sleep_timer.slint";
 export { Shortcuts, ShortcutKind, ShortcutRow } from "shortcuts.slint";
 
 export { HomeData, HomeShelfRow, ShelfShape, MoreState } from "pages/home.slint";
@@ -223,7 +225,7 @@ export component AppWindow inherits Window {
     }
 
     // A menu, a popup or a dialog is open over the window: the transport keys and Ctrl+/ wait.
-    property <bool> overlay-open: CloseChoice.open || SettingsData.dialog != SettingsDialog.none || AlbumMenu.open || AlbumMenu.dialog || SongMenu.open || PlaylistMenu.open || PlaylistMenu.dialog != PlaylistDialog.none || AccountMenu.open || AccountPicker.open || Player.speed-open;
+    property <bool> overlay-open: CloseChoice.open || SettingsData.dialog != SettingsDialog.none || AlbumMenu.open || AlbumMenu.dialog || SongMenu.open || PlaylistMenu.open || PlaylistMenu.dialog != PlaylistDialog.none || AccountMenu.open || AccountPicker.open || Player.speed-open || Sleep.open;
 
     // The shortcuts, listed for Settings' "Keyboard shortcuts" in shortcuts.slint: each one
     // taken here is reported there (`Shortcuts.used`). A new one goes in both.
@@ -574,6 +576,18 @@ export component AppWindow inherits Window {
             visible: Player.speed-open;
             bottom: root.bar-top;
             anchor: bottom-bar.x + bottom-bar.speed-centre;
+            closed => { keys.focus(); }
+        }
+
+        // The bar's sleep timer popup, from its button.
+        SleepLayer {
+            x: 0;
+            y: 0;
+            width: root.width;
+            height: root.height;
+            visible: Sleep.open;
+            bottom: root.bar-top;
+            anchor: bottom-bar.x + bottom-bar.sleep-centre;
             closed => { keys.focus(); }
         }
 

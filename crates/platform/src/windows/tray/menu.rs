@@ -1,14 +1,15 @@
 //! The tray icon's right-click menu: Windows' own, built with muda (tray-icon shows it on a
 //! right click). A grey first line names the song, then Pause or Play, Previous, Next; Like
-//! (checked when liked) and Not for me; while lyrics are on, Desktop lyrics (checked while
-//! the strip shows) and, while it shows, Lock or Unlock desktop lyrics; Show featherplay and
-//! Quit. The labels follow the player (`TrayMenu::show`), and the menu opens in the
-//! taskbar's light or dark mode (`in_taskbar_mode`).
+//! (checked when liked) and Not for me; while its setting is on, the sleep timer's submenu;
+//! while lyrics are on, Desktop lyrics (checked while the strip shows) and, while it shows,
+//! Lock or Unlock desktop lyrics; Show featherplay and Quit. The labels follow the player
+//! (`TrayMenu::show`), and the menu opens in the taskbar's light or dark mode
+//! (`in_taskbar_mode`).
 
 use std::cell::RefCell;
 
 use featherplay_core::tr;
-use tray_icon::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem};
+use tray_icon::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu};
 use windows::Win32::System::LibraryLoader::{
     GetProcAddress, LOAD_LIBRARY_SEARCH_SYSTEM32, LoadLibraryExW,
 };
@@ -18,7 +19,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
 };
 use windows::core::{PCSTR, w};
 
-use crate::common::tray::{DesktopLyricsMenu, Labels, MenuState, TrayChoice, labels};
+use crate::common::tray::{DesktopLyricsMenu, Labels, MenuState, SleepLabels, TrayChoice, labels};
 use crate::windows::taskbar::light_taskbar;
 
 /// The menu and the entries whose labels follow the player.
@@ -30,6 +31,10 @@ pub struct TrayMenu {
     next: MenuItem,
     like: CheckMenuItem,
     not_for_me: MenuItem,
+    /// The sleep timer's submenu and the separator before it: in the menu only while its
+    /// setting is on.
+    sleep: Submenu,
+    sleep_separator: PredefinedMenuItem,
     /// The labels last set, so an unchanged state costs nothing.
     shown: RefCell<Labels>,
     /// The desktop lyrics' group, put in before Show featherplay while it's offered.
@@ -58,6 +63,8 @@ impl TrayMenu {
             next: item(TrayChoice::Next, tr!("Next"), l.controls),
             like: CheckMenuItem::with_id(TrayChoice::Like.id(), l.like, l.controls, l.liked, None),
             not_for_me: item(TrayChoice::NotForMe, tr!("Not for me"), l.controls),
+            sleep: Submenu::with_id("sleep", tr!("Sleep timer"), true),
+            sleep_separator: PredefinedMenuItem::separator(),
             shown: RefCell::new(l),
             desktop: CheckMenuItem::with_id(
                 TrayChoice::DesktopLyrics.id(),
@@ -128,6 +135,9 @@ impl TrayMenu {
             }
             self.like.set_enabled(new.controls);
         }
+        if old.sleep != new.sleep {
+            self.show_sleep(old.sleep.as_ref(), new.sleep.as_ref());
+        }
         *old = new;
     }
 
@@ -142,13 +152,20 @@ impl TrayMenu {
             return;
         }
         let had_lock = old.lock_label().is_some();
+        // After the sleep timer's submenu and its separator, while they're in.
+        let at = DESKTOP_AT
+            + if self.shown.borrow().sleep.is_some() {
+                2
+            } else {
+                0
+            };
         if old.offered && !new.offered {
             let _ = self.menu.remove(&self.desktop);
             let _ = self.menu.remove(&self.desktop_end);
         } else if !old.offered && new.offered {
             let _ = self
                 .menu
-                .insert_items(&[&self.desktop, &self.desktop_end], DESKTOP_AT);
+                .insert_items(&[&self.desktop, &self.desktop_end], at);
         }
         let label = new.lock_label();
         match (had_lock, label) {
@@ -156,7 +173,7 @@ impl TrayMenu {
                 let _ = self.menu.remove(&self.lock);
             }
             (false, Some(_)) => {
-                let _ = self.menu.insert(&self.lock, DESKTOP_AT + 1);
+                let _ = self.menu.insert(&self.lock, at + 1);
             }
             _ => {}
         }
@@ -164,6 +181,41 @@ impl TrayMenu {
             self.lock.set_text(label);
         }
         *old = new;
+    }
+
+    /// Puts the sleep timer's submenu in after Not for me, takes it out, or brings its labels
+    /// up to date.
+    fn show_sleep(&self, old: Option<&SleepLabels>, new: Option<&SleepLabels>) {
+        // After the header, its separator, the three controls, a separator, Like and Not
+        // for me.
+        const AT: usize = 8;
+        let Some(new) = new else {
+            let _ = self.menu.remove(&self.sleep_separator);
+            let _ = self.menu.remove(&self.sleep);
+            return;
+        };
+        if old.is_none() {
+            let _ = self.menu.insert(&self.sleep_separator, AT);
+            let _ = self.menu.insert(&self.sleep, AT + 1);
+        }
+        if old.map(|o| &o.item) != Some(&new.item) {
+            self.sleep.set_text(&new.item);
+        }
+        if old.map(|o| o.enabled) != Some(new.enabled) {
+            self.sleep.set_enabled(new.enabled);
+        }
+        if old.map(|o| &o.entries) != Some(&new.entries) {
+            while self.sleep.remove_at(0).is_some() {}
+            for entry in &new.entries {
+                let _ = match entry {
+                    Some((c, text)) => {
+                        self.sleep
+                            .append(&MenuItem::with_id(c.id(), text, true, None))
+                    }
+                    None => self.sleep.append(&PredefinedMenuItem::separator()),
+                };
+            }
+        }
     }
 }
 

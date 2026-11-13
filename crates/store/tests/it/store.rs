@@ -81,6 +81,8 @@ fn settings_defaults_when_missing() {
             crossfade: 0,
             fade_on_skip: false,
             playback_speed: 100,
+            sleep_timer: false,
+            sleep_fade: 20,
             tooltips: true,
             dns_over_https: false,
             settings_in_suggestions: true,
@@ -167,6 +169,8 @@ fn settings_roundtrip() {
         crossfade: 12,
         fade_on_skip: true,
         playback_speed: 125,
+        sleep_timer: true,
+        sleep_fade: 0,
         tooltips: false,
         dns_over_https: true,
         settings_in_suggestions: false,
@@ -1017,6 +1021,39 @@ volume = 0.5
     .unwrap();
     let s = Settings::load(&p);
     assert_eq!((s.playback_speed, s.volume), (100, 0.5));
+}
+
+#[test]
+fn bad_sleep_timer_values_load_as_the_defaults_and_keep_the_rest() {
+    let Some(home) = TestHome::new("settings-sleep-bad") else {
+        return;
+    };
+    let p = home.paths();
+    let file = p.config.join("settings.toml");
+    fs::create_dir_all(&p.config).unwrap();
+    // A fade no build offers, a negative one, one too large for a byte, the wrong types.
+    for (timer, fade) in [
+        ("true", "15"),
+        ("true", "-10"),
+        ("true", "100000"),
+        ("\"yes\"", "\"20 s\""),
+        ("3", "[30]"),
+    ] {
+        let text = format!(
+            "sleep_timer = {timer}
+sleep_fade = {fade}
+volume = 0.5
+"
+        );
+        fs::write(&file, text).unwrap();
+        let s = Settings::load(&p);
+        let on = timer == "true";
+        assert_eq!(
+            (s.sleep_timer, s.sleep_fade, s.volume),
+            (on, 20, 0.5),
+            "{timer} / {fade}"
+        );
+    }
 }
 
 #[test]

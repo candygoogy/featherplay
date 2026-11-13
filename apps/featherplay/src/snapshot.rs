@@ -470,9 +470,38 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
             settle();
         }
     }
+    // The sleep timer on: idle with its popup open; running with the popup open, or
+    // closed with the time left in three digits (beside the speed pill too), or fading.
+    if o.page.starts_with("sleep-")
+        || o.page == "settings-sleep"
+        || o.page == "settings-search-sleep"
+    {
+        crate::pages::settings::show_sleep_timer_for_snapshot(ctx);
+        let running = |minutes: u32, fading: bool| {
+            Some(crate::controller::SleepState {
+                kind: crate::controller::SleepKind::Time,
+                minutes,
+                fading,
+                left: std::time::Duration::from_secs(u64::from(minutes) * 60 - 30),
+            })
+        };
+        let state = match o.page.as_str() {
+            "sleep-running" => running(24, false),
+            "sleep-long" | "sleep-speed" => running(135, false),
+            "sleep-fading" => running(1, true),
+            _ => None,
+        };
+        if o.page == "sleep-speed" {
+            crate::pages::settings::show_speed_for_snapshot(ctx, 125, false);
+        }
+        let open = o.page == "sleep-popup" || o.page == "sleep-running";
+        crate::sleep::show_for_snapshot(ctx, state, open);
+        settle();
+    }
     if let Some(text) = o.page.strip_prefix("settings-search-") {
         let text = match text {
-            "none" => "sleep timer",
+            "none" => "weather",
+            "sleep" => "sleep timer",
             other => other,
         };
         crate::pages::settings::search::show_for_snapshot(ctx, text);

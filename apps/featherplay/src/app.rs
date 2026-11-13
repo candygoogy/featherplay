@@ -536,6 +536,7 @@ pub fn wire(ctx: &Rc<Ctx>, ui: &AppWindow) {
     top_bar::init(ui);
     suggest::init(ctx);
     bar::init(ctx);
+    crate::sleep::init(ctx);
     queue_panel::init(ctx);
     song_menu::init(ctx);
     prepare::init(ctx);
@@ -655,6 +656,7 @@ pub fn on_event(ev: UiEvent) {
             pages::settings::look_up_directly,
         ),
         UiEvent::Silences(marks) => bar::show_silences(&ctx, &marks),
+        UiEvent::Sleep(state) => crate::sleep::apply(&ctx, state),
         UiEvent::Refused(ids) => refused::show(&ctx, &ids),
         UiEvent::LocalApi(notice) => pages::settings::local_api_changed(&ctx, notice),
     }

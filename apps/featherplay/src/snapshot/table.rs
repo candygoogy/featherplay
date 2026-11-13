@@ -110,8 +110,19 @@ pub const PAGES: &[&str] = &[
     // pill's popup open.
     "settings-speed",
     "speed-popup",
+    // The sleep timer turned on: Home with its popup open; Now playing with it running (24 min
+    // left) and the popup open; Home running with 135 min left, beside the speed pill at
+    // 1.25x too (at `--size 960x800` the bar's narrowest cases); Home fading out. Settings
+    // with its switch on, and found by searching "sleep timer".
+    "sleep-popup",
+    "sleep-running",
+    "sleep-long",
+    "sleep-speed",
+    "sleep-fading",
+    "settings-sleep",
+    "settings-search-sleep",
     // Settings' search with the sound rows on (as `settings-sound`), Ctrl+F and a word in
-    // the field: "cross", "volume", "dark", or "sleep timer", which finds nothing.
+    // the field: "cross", "volume", "dark", or "weather", which finds nothing.
     "settings-search-cross",
     "settings-search-volume",
     "settings-search-dark",
@@ -266,6 +277,10 @@ pub(super) fn page(name: &str, f: &Fixtures) -> Result<Page, String> {
         | "desktop-lyrics-idle"
         | "close-dialog"
         | "speed-popup"
+        | "sleep-popup"
+        | "sleep-long"
+        | "sleep-speed"
+        | "sleep-fading"
         | "silences"
         | "silences-played"
         | "shortcuts"
@@ -347,6 +362,7 @@ pub(super) fn page(name: &str, f: &Fixtures) -> Result<Page, String> {
         | "now-playing-lyrics-full-none"
         | "now-playing-lyrics-full-outage"
         | "now-playing-lyrics-full-unavailable"
+        | "sleep-running"
         | "not-for-me" => Page::NowPlaying,
         "settings"
         | "settings-lastfm-keys"
@@ -367,6 +383,8 @@ pub(super) fn page(name: &str, f: &Fixtures) -> Result<Page, String> {
         | "settings-search-volume"
         | "settings-search-dark"
         | "settings-search-none"
+        | "settings-sleep"
+        | "settings-search-sleep"
         | "settings-picked" => Page::Settings,
         p if p == "about" || p.starts_with("about-") => Page::About,
         "sign-in"

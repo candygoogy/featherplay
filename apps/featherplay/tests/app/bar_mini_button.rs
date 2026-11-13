@@ -1,12 +1,21 @@
 //! The bar's mini player button, on the offscreen platform (no window is shown): it's there
 //! only while the desktop has no tray (`SettingsData.has-tray`: always on Windows, on Linux
 //! while a StatusNotifierWatcher shows the icon), and a click on it opens the mini player,
-//! another closes it, as a click on the tray icon does; Ctrl+M too.
+//! another closes it, as a click on the tray icon does; Ctrl+M too. And at the narrowest
+//! window, the bar's right-hand side with everything in it (the sleep timer too) still
+//! clears the transport.
 
-use featherplay::controller::Action;
+use std::ops::ControlFlow;
+use std::time::Duration;
+
+use featherplay::app;
+use featherplay::controller::{Action, SleepKind, SleepState, UiEvent};
 use featherplay::mini;
 use featherplay::snapshot::Scene;
-use featherplay::ui::{SettingsData, Theme};
+use featherplay::ui::{Player, SettingsData, Theme};
+use i_slint_core::accessibility::AccessibleStringProperty;
+use i_slint_core::item_tree::ItemRc;
+use i_slint_core::window::WindowInner;
 use slint::platform::{Key, PointerEventButton, WindowEvent};
 use slint::{ComponentHandle, LogicalPosition, SharedString};
 
@@ -143,4 +152,104 @@ fn at_the_narrowest_window_the_mini_player_button_clears_the_transport() {
         mini_start - repeat_end >= 8.0,
         "Repeat ends at {repeat_end}, the mini player button starts at {mini_start}"
     );
+}
+
+/// Where the bar's element named `label` sits, its left and right edges in the window: the
+/// lowest one when several are (the bar is at the bottom), visible ones only.
+fn span(scene: &Scene, label: &str) -> Option<(f32, f32)> {
+    let root = ItemRc::new_root(WindowInner::from_pub(scene.ui.window()).component());
+    let mut lowest: Option<(f32, f32, f32)> = None;
+    root.visit_descendants(|item| {
+        let named = item
+            .accessible_string_property(AccessibleStringProperty::Label)
+            .is_some_and(|l| l == label);
+        if named && item.is_visible() {
+            let at = item.map_to_window(item.geometry().origin);
+            let right = at.x + item.geometry().width();
+            if lowest.is_none_or(|(_, _, y)| at.y > y) {
+                lowest = Some((at.x, right, at.y));
+            }
+        }
+        ControlFlow::<()>::Continue(())
+    });
+    lowest.map(|(left, right, _)| (left, right))
+}
+
+/// The bar at the narrowest window with the sleep timer on and running for `minutes`, the
+/// speed at 1.25x if `speed`, the tray there or not: (Repeat's right edge, where the
+/// right-hand side starts (the speed pill, else the group's first button), the title's right
+/// edge, the time row's left edge).
+fn narrow_bar(has_tray: bool, speed: bool, minutes: u32) -> (Scene, [f32; 4]) {
+    const NARROW: u32 = 960;
+    let scene = Scene::new(NARROW, H, true, false).expect("scene");
+    scene.play(false).expect("player");
+    let size = slint::LogicalSize::new(NARROW as f32, H as f32);
+    scene
+        .ui
+        .window()
+        .dispatch_event(WindowEvent::Resized { size });
+    scene.settle();
+    let data = scene.ui.global::<SettingsData>();
+    data.set_has_tray(has_tray);
+    data.set_sleep_timer(true);
+    if speed {
+        scene.ui.global::<Player>().set_speed(3);
+    }
+    app::on_event(UiEvent::Sleep(Some(SleepState {
+        kind: SleepKind::Time,
+        minutes,
+        fading: false,
+        left: Duration::from_secs(u64::from(minutes) * 60),
+    })));
+    scene.settle();
+    let edge = |label: &str| span(&scene, label).unwrap_or_else(|| panic!("no {label:?}"));
+    let repeat_end = edge("Repeat off").1;
+    let right_start = if speed {
+        edge("Playback speed, 1.25×").0
+    } else if has_tray {
+        edge("Sleep timer").0
+    } else {
+        edge("Mini player").0
+    };
+    let title = scene.ui.global::<Player>().get_title();
+    let title_end = edge(&title).1;
+    // The elapsed time (44 px) and its gap (12 px) before the seek line.
+    let time_start = edge("Seek").0 - 44.0 - 12.0;
+    (scene, [repeat_end, right_start, title_end, time_start])
+}
+
+/// Frame H's worst case: Linux without a tray (the mini player button), the speed pill and
+/// the sleep timer running. The time row gives some of its width, so Repeat still clears the
+/// right-hand side and the title ends before the time row.
+#[test]
+fn at_the_narrowest_window_everything_in_the_bar_still_fits() {
+    let (_scene, [repeat_end, right_start, title_end, time_start]) = narrow_bar(false, true, 24);
+    assert!(
+        right_start - repeat_end >= 8.0,
+        "Repeat ends at {repeat_end}, the right-hand side starts at {right_start}"
+    );
+    assert!(
+        title_end <= time_start,
+        "the title ends at {title_end}, the time row starts at {time_start}"
+    );
+}
+
+/// On Windows at the narrowest window, a three-digit time left still shows on the pill (the
+/// shorter form), and the bar keeps its spacing.
+#[test]
+fn at_the_narrowest_window_a_three_digit_sleep_timer_shows_its_minutes() {
+    let (scene, [repeat_end, right_start, title_end, time_start]) = narrow_bar(true, false, 135);
+    assert!(
+        span(&scene, "135 min").is_some(),
+        "the pill doesn't read 135 min"
+    );
+    assert!(
+        span(&scene, "135 min left").is_none(),
+        "no room for the long form"
+    );
+    assert!(
+        right_start - repeat_end >= 8.0,
+        "{repeat_end} / {right_start}"
+    );
+    assert!(title_end <= time_start, "{title_end} / {time_start}");
 }

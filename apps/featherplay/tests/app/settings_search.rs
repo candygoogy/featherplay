@@ -181,17 +181,34 @@ fn typing_filters_the_rows_and_the_index_counts_them() {
 fn nothing_found_shows_the_empty_state() {
     let scene = settings();
     ctrl(&scene, "f");
-    type_text(&scene, "sleep timer");
+    type_text(&scene, "weather");
     let search = scene.ui.global::<SettingsSearch>();
     assert!(search.get_active());
     assert_eq!(search.get_total(), 0);
-    assert!(find(&scene, "No settings match “sleep timer”").is_some());
+    assert!(find(&scene, "No settings match “weather”").is_some());
     assert!(find(&scene, "Prefer song versions").is_none());
     // One letter filters nothing.
     tap(scene.ui.window(), Key::Escape.into());
     type_text(&scene, "s");
     assert!(!search.get_active());
     assert!(find(&scene, "Prefer song versions").is_some());
+}
+
+#[test]
+fn sleep_timer_finds_its_switch_and_once_on_its_fade() {
+    let scene = settings();
+    ctrl(&scene, "f");
+    type_text(&scene, "sleep timer");
+    let search = scene.ui.global::<SettingsSearch>();
+    assert_eq!(search.get_total(), 1);
+    assert_eq!(counts(&scene), [1, 0, 0, 0, 0, 0, 0, 0]);
+    // Turned on, the Fade out row shows, found by its line.
+    scene
+        .ui
+        .global::<SettingsData>()
+        .invoke_toggled(SettingKey::SleepTimer, true);
+    scene.settle();
+    assert_eq!(search.get_total(), 2);
 }
 
 #[test]

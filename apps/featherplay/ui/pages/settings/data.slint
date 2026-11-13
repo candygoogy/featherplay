@@ -31,6 +31,7 @@ export enum SettingKey {
     amuse,
     tray-click-opens-window,
     fade-on-skip,
+    sleep-timer,
     match-volumes,
     tooltips,
     dns-over-https,
@@ -144,6 +145,8 @@ export enum SettingId {
     skip-silence,
     crossfade,
     fade-on-skip,
+    sleep-timer,
+    sleep-fade,
     playback-speed,
     volume-step,
     dns-over-https,
@@ -265,6 +268,9 @@ export global SettingsData {
     // Crossfade: 0 Off, 1 2 s, 2 5 s, 3 8 s, 4 12 s. Fade on skip shows only while it's on.
     in property <int> crossfade: 0;
     in property <bool> fade-on-skip;
+    // The sleep timer's button and tray submenu; its fade, an index into the Fade out chips.
+    in property <bool> sleep-timer;
+    in property <int> sleep-fade: 2;
     // The Volume step: 0 1 %, 1 2 %, 2 5 %, 3 10 %.
     in property <int> volume-step: 2;
     // Sound. The Equalizer: 0 Off, 1 Bass, 2 Treble, 3 Vocal, 4 Custom; the bands it plays
@@ -429,6 +435,7 @@ export global SettingsData {
     callback pick-loudness(int);
     callback pick-skip-silence(int);
     callback pick-crossfade(int);
+    callback pick-sleep-fade(int);
     callback pick-streaming-quality(int);
     // 0 play/pause, 1 next, 2 previous; the text as typed.
     callback hotkey-edited(int, string);

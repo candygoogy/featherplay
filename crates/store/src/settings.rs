@@ -165,6 +165,15 @@ pub struct Settings {
     /// one of `SPEEDS`, 100 (the default) being normal. Any other value loads as 100.
     #[serde(deserialize_with = "lenient_speed")]
     pub playback_speed: u8,
+    /// "Sleep timer" (Settings > Playback, off by default): the player bar's button and the
+    /// tray menu's submenu that pause the music after a while. Anything but a bool loads as
+    /// off.
+    #[serde(deserialize_with = "lenient")]
+    pub sleep_timer: bool,
+    /// "Fade out": how many seconds the music fades out before the sleep timer pauses it,
+    /// one of `SLEEP_FADES`; 20 by default. Any other value loads as 20.
+    #[serde(deserialize_with = "lenient_sleep_fade")]
+    pub sleep_fade: u8,
     /// "Show tooltips" (Settings > Window): the player bar's buttons name themselves and
     /// their shortcut when the pointer rests on them (on by default).
     pub tooltips: bool,
@@ -409,6 +418,8 @@ impl Default for Settings {
             crossfade: 0,
             fade_on_skip: false,
             playback_speed: Settings::NORMAL_SPEED,
+            sleep_timer: false,
+            sleep_fade: Settings::SLEEP_FADE,
             tooltips: true,
             dns_over_https: false,
             settings_in_suggestions: true,
@@ -539,6 +550,19 @@ where
         .unwrap_or(0))
 }
 
+/// Reads the sleep timer's fade: one of `Settings::SLEEP_FADES`, or the default.
+fn lenient_sleep_fade<'de, D>(d: D) -> Result<u8, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value = toml::Value::deserialize(d)?;
+    Ok(value
+        .as_integer()
+        .and_then(|n| u8::try_from(n).ok())
+        .filter(|s| Settings::SLEEP_FADES.contains(s))
+        .unwrap_or(Settings::SLEEP_FADE))
+}
+
 /// Reads the playback speed: one of `Settings::SPEEDS`, or normal.
 fn lenient_speed<'de, D>(d: D) -> Result<u8, D::Error>
 where
@@ -630,6 +654,10 @@ impl Settings {
     pub const SPEEDS: [u8; 6] = [50, 75, 100, 125, 150, 200];
     /// Normal speed, in percent.
     pub const NORMAL_SPEED: u8 = 100;
+    /// The sleep timer's fades Settings offers, in seconds; 0 is no fade.
+    pub const SLEEP_FADES: [u8; 4] = [0, 10, 20, 30];
+    /// The sleep timer's fade by default, in seconds.
+    pub const SLEEP_FADE: u8 = 20;
 
     /// Loads the settings. A missing, unreadable or invalid file gives the defaults. An
     /// older file is migrated first; a newer one keeps its schema number.

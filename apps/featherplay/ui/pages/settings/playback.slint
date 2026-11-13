@@ -69,6 +69,24 @@ export component PlaybackSection inherits Group {
         key: SettingKey.fade-on-skip;
         checked: SettingsData.fade-on-skip;
     }
+    ToggleRow {
+        label: @tr("Sleep timer");
+        search: SettingId.sleep-timer;
+        detail: SettingsData.has-tray ? @tr("Adds a Sleep timer button to the player bar and to the tray menu, to pause the music after a while.")
+            : @tr("Adds a Sleep timer button to the player bar, to pause the music after a while.");
+        key: SettingKey.sleep-timer;
+        checked: SettingsData.sleep-timer;
+    }
+    if SettingsData.sleep-timer: SettingRow {
+        label: @tr("Fade out");
+        search: SettingId.sleep-fade;
+        detail: @tr("Before the sleep timer pauses, the music fades out over this long.");
+        RowChips {
+            labels: [@tr("No fade"), @tr("{} s", 10), @tr("{} s", 20), @tr("{} s", 30)];
+            active: SettingsData.sleep-fade;
+            selected(i) => { SettingsData.pick-sleep-fade(i); }
+        }
+    }
     SettingRow {
         label: @tr("Playback speed");
         search: SettingId.playback-speed;

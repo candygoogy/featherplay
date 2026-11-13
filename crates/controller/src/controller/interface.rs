@@ -9,7 +9,9 @@ use featherplay_integrations::UiCommand;
 use featherplay_streams::ResolvedStream;
 use tokio::sync::mpsc;
 
-use super::{AccountAction, LocalApiNotice, Mark, QueueAction, QueueInfo, account};
+use super::{
+    AccountAction, LocalApiNotice, Mark, QueueAction, QueueInfo, SleepAction, SleepState, account,
+};
 use crate::catalog::Catalog;
 use crate::updates;
 
@@ -86,6 +88,8 @@ pub enum Action {
     /// window has it: resolved ahead while a song plays (`streams.rs`). Replaces the last;
     /// empty when none shows (a page without songs, the window minimised or hidden).
     Prepare(Vec<(TrackId, Option<Track>)>),
+    /// The sleep timer's popup and tray submenu: start it, add to it, turn it off.
+    Sleep(SleepAction),
     /// A page's Try again while the stored session can't connect (`Source::Unreachable`):
     /// connect with it again (`reconnect.rs`).
     Reconnect,
@@ -171,6 +175,8 @@ pub enum UiEvent {
     /// What Skip silence drops from the current track, for the seek bar (`silences.rs`);
     /// empty while it's off, and from a track change until the new track is scanned.
     Silences(Vec<Mark>),
+    /// The sleep timer started, changed its minutes or fade, or stopped (`None`).
+    Sleep(Option<SleepState>),
     /// The songs YouTube refuses to play now, all of them, each time one comes or goes:
     /// their rows show greyed (`streams.rs`).
     Refused(Vec<TrackId>),

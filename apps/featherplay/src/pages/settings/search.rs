@@ -118,6 +118,20 @@ fn table() -> Vec<Row> {
             tr!("search keywords" => "crossfade, gapless, transition"),
         ),
         row(
+            SettingId::SleepTimer,
+            0,
+            tr!("Sleep timer"),
+            &[],
+            tr!("search keywords" => "sleep, bedtime, night, timer, fade out"),
+        ),
+        row(
+            SettingId::SleepFade,
+            0,
+            tr!("Fade out"),
+            &[tr!("No fade")],
+            tr!("search keywords" => "sleep, bedtime, night, timer"),
+        ),
+        row(
             SettingId::PlaybackSpeed,
             0,
             tr!("Playback speed"),
@@ -510,6 +524,7 @@ fn section_name(section: usize) -> &'static str {
 struct View {
     crossfade: bool,
     start_with_system: bool,
+    sleep_timer: bool,
     proxied: bool,
     has_tray: bool,
     has_notifications: bool,
@@ -535,6 +550,7 @@ impl View {
         Self {
             crossfade: data.get_crossfade() != 0,
             start_with_system: data.get_start_with_system(),
+            sleep_timer: data.get_sleep_timer(),
             proxied: data.get_youtube_proxied(),
             has_tray: data.get_has_tray(),
             has_notifications: data.get_has_notifications(),
@@ -561,6 +577,7 @@ impl View {
         use SettingId as S;
         match id {
             S::FadeOnSkip => self.crossfade,
+            S::SleepFade => self.sleep_timer,
             S::ScrobbleLastfm => self.lastfm == LastfmState::SignedIn,
             S::ScrobbleListenbrainz => self.listenbrainz == ListenBrainzState::SignedIn,
             S::DiscordAutoReconnect
@@ -611,6 +628,17 @@ impl View {
             S::FadeOnSkip => tr!(
                 "Next, Previous and a click on another song fade over 2 seconds instead of cutting."
             ),
+            S::SleepTimer if self.has_tray => tr!(
+                "Adds a Sleep timer button to the player bar and to the tray menu, to pause the music after a while."
+            ),
+            S::SleepTimer => {
+                tr!(
+                    "Adds a Sleep timer button to the player bar, to pause the music after a while."
+                )
+            }
+            S::SleepFade => {
+                tr!("Before the sleep timer pauses, the music fades out over this long.")
+            }
             S::PlaybackSpeed => tr!(
                 "Faster or slower, at the same pitch. While it isn't 1×, the player bar shows it."
             ),
@@ -1313,6 +1341,7 @@ mod tests {
         let mut view = View {
             crossfade: false,
             start_with_system: false,
+            sleep_timer: false,
             proxied: false,
             has_tray: false,
             has_notifications: true,
@@ -1336,6 +1365,7 @@ mod tests {
             SettingId::FadeOnSkip,
             SettingId::StartInTray,
             SettingId::StartMinimised,
+            SettingId::SleepFade,
             SettingId::CloseAction,
             SettingId::TrayClickOpensWindow,
             SettingId::Hotkeys,
@@ -1355,6 +1385,9 @@ mod tests {
         assert!(view.has(SettingId::StartMinimised) && !view.has(SettingId::StartInTray));
         view.has_tray = true;
         assert!(view.has(SettingId::StartInTray) && !view.has(SettingId::StartMinimised));
+        assert!(view.has(SettingId::SleepTimer));
+        view.sleep_timer = true;
+        assert!(view.has(SettingId::SleepFade));
     }
 
     #[test]

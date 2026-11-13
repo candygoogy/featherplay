@@ -18,7 +18,9 @@ use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use slint::{ComponentHandle, Timer, TimerMode};
 
 use crate::app::{self, Ctx};
+use crate::controller::SleepAction;
 use crate::pages::settings;
+use crate::sleep;
 use crate::ui::Player;
 
 /// How often to look for the window handle, which exists once the event loop has started.
@@ -179,11 +181,19 @@ pub fn tray_choice(choice: TrayChoice) {
         TrayChoice::LockDesktopLyrics => crate::desktop_lyrics::toggle_lock(&ctx),
         TrayChoice::Show => app::show_window(&ctx),
         TrayChoice::Quit => ctx.quit(),
+        TrayChoice::Sleep15 => sleep::from_tray(&ctx, SleepAction::Minutes(15)),
+        TrayChoice::Sleep30 => sleep::from_tray(&ctx, SleepAction::Minutes(30)),
+        TrayChoice::Sleep45 => sleep::from_tray(&ctx, SleepAction::Minutes(45)),
+        TrayChoice::Sleep60 => sleep::from_tray(&ctx, SleepAction::Minutes(60)),
+        TrayChoice::SleepSongEnd => sleep::from_tray(&ctx, SleepAction::SongEnd),
+        TrayChoice::SleepListEnd => sleep::from_tray(&ctx, SleepAction::ListEnd),
+        TrayChoice::SleepAdd => sleep::from_tray(&ctx, SleepAction::AddQuarter),
+        TrayChoice::SleepOff => sleep::from_tray(&ctx, SleepAction::Off),
     }
 }
 
 /// Sets the tray icon's menu for the main window's player: the song, Pause or Play, Like;
-/// and the desktop lyrics' entries.
+/// the desktop lyrics' entries; and the sleep timer's submenu while its setting is on.
 pub fn set_tray_menu(player: &Player) {
     let state = MenuState {
         title: player.get_title().into(),
@@ -192,6 +202,7 @@ pub fn set_tray_menu(player: &Player) {
         playing: player.get_playing(),
         liked: player.get_liked(),
         desktop_lyrics: crate::desktop_lyrics::menu_state(),
+        sleep: sleep::menu(),
     };
     INTEGRATIONS.with(|i| {
         if let Some(tray) = i.borrow().as_ref().and_then(|it| it.tray.as_ref()) {

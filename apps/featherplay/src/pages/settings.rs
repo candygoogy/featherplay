@@ -44,7 +44,7 @@ mod window;
 
 pub use discord::{Preview, PreviewTime, discord_changed, discord_preview, step_minutes};
 pub use local_api::{local_api_changed, mask, parse_port, show_local_api_for_snapshot};
-pub use playback::show_speed_for_snapshot;
+pub use playback::{show_sleep_timer_for_snapshot, show_speed_for_snapshot};
 pub use scrobbling::{
     check_keys, lastfm_changed, lastfm_keys_changed, listenbrainz_changed, show_dialog_for_snapshot,
 };
@@ -58,8 +58,8 @@ use discord::{
 };
 use local_api::{copy_api_token, local_api_port_entered};
 use playback::{
-    crossfade_index, pick_crossfade, pick_skip_silence, pick_speed, pick_volume_step, show_speed,
-    show_volume_step, skip_silence_index,
+    crossfade_index, pick_crossfade, pick_skip_silence, pick_sleep_fade, pick_speed,
+    pick_volume_step, show_speed, show_volume_step, skip_silence_index, sleep_fade_index,
 };
 use scrobbling::{lastfm_state, listenbrainz_state, save_keys, save_token};
 use shortcuts::keycaps;
@@ -193,6 +193,11 @@ pub fn mark_tray_notice_shown(ctx: &Ctx) {
 /// ("Turn off the mini player").
 pub fn tray_click_opens_window() -> bool {
     SETTINGS.with(|s| s.borrow().tray_click_opens_window)
+}
+
+/// Whether the sleep timer's button and tray submenu show ("Sleep timer").
+pub fn sleep_timer() -> bool {
+    SETTINGS.with(|s| s.borrow().sleep_timer)
 }
 
 /// Whether the player bar's buttons show their tooltips ("Show tooltips").
@@ -335,6 +340,8 @@ pub fn init(ctx: &Rc<Ctx>) {
     data.on_pick_skip_silence(move |i| pick_skip_silence(&c, i));
     let c = ctx.clone();
     data.on_pick_crossfade(move |i| pick_crossfade(&c, i));
+    let c = ctx.clone();
+    data.on_pick_sleep_fade(move |i| pick_sleep_fade(&c, i));
     // Settings' row and the bar's popup share the chips.
     let c = ctx.clone();
     ui.global::<Player>()
@@ -444,6 +451,8 @@ fn show(ctx: &Ctx) {
     data.set_skip_silence(skip_silence_index(s.skip_silence));
     data.set_crossfade(crossfade_index(s.crossfade));
     data.set_fade_on_skip(s.fade_on_skip);
+    data.set_sleep_timer(s.sleep_timer);
+    data.set_sleep_fade(sleep_fade_index(s.sleep_fade));
     show_speed(ctx, s.playback_speed);
     data.set_streaming_quality(streaming_quality_index(s.streaming_quality));
     data.set_skip_disliked(s.skip_disliked);
@@ -530,6 +539,12 @@ fn toggled(ctx: &Rc<Ctx>, key: SettingKey, on: bool) {
         SettingKey::FadeOnSkip => {
             data.set_fade_on_skip(on);
             Change::FadeOnSkip(on)
+        }
+        SettingKey::SleepTimer => {
+            data.set_sleep_timer(on);
+            commit(ctx, Change::SleepTimer(on));
+            crate::sleep::setting_changed(ctx);
+            return;
         }
         SettingKey::MatchVolumes => {
             data.set_match_volumes(on);

@@ -138,6 +138,7 @@ pub fn init(ctx: &Rc<Ctx>) {
 /// Shows the controller's state in the bar and on the integrations.
 pub fn apply(ctx: &Rc<Ctx>, state: &PlayerState) {
     let Some(ui) = ctx.window() else { return };
+    crate::sleep::follow(ctx, state);
     let p = ui.global::<Player>();
     p.set_volume(state.volume);
     p.set_playing(state.playing);

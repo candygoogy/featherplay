@@ -25,6 +25,7 @@ mod notice;
 mod queue;
 mod reconnect;
 mod silences;
+mod sleep;
 mod song_versions;
 mod startup;
 mod streams;
@@ -57,6 +58,7 @@ pub use queue::{
     queue_info, with_likes,
 };
 pub use silences::Mark;
+pub use sleep::{SleepAction, SleepKind, SleepState};
 
 use messages::Msg;
 use startup::cookie_header;
@@ -138,6 +140,8 @@ pub struct Controller {
     shown_marks: Option<Vec<Mark>>,
     /// The refused songs' toast has said the network's DNS is why (`refused_toast`).
     network_told: bool,
+    /// The sleep timer (`sleep.rs`).
+    sleep: sleep::SleepTimer,
 }
 
 /// A future boxed in this crate.
@@ -219,6 +223,9 @@ impl Controller {
                 .as_ref()
                 .and_then(reconnect::Reconnect::due);
             let reconnect_at = reconnect_due.map_or_else(tokio::time::Instant::now, Into::into);
+            // The sleep timer's next minute, fade step or end; no timer otherwise.
+            let sleep_due = self.sleep_wake();
+            let sleep_at = sleep_due.map_or_else(tokio::time::Instant::now, Into::into);
             tokio::select! {
                 pressed = &mut ctrl_c, if ctrl_c_live => {
                     if let Err(e) = pressed {
@@ -237,6 +244,8 @@ impl Controller {
                 _ = tokio::time::sleep_until(reconnect_at), if reconnect_due.is_some() => {
                     self.reconnect();
                 }
+                // `sleep_check` below does the work.
+                _ = tokio::time::sleep_until(sleep_at), if sleep_due.is_some() => {}
                 Some(msg) = self.rx.recv() => self.message(msg),
                 cmd = self.ui.commands.recv() => {
                     // `None`: every sender is gone, so the UI has shut down.
@@ -259,6 +268,7 @@ impl Controller {
                     self.action(action);
                 }
             }
+            self.sleep_check();
         }
         self.audio.pause();
         self.persist();
@@ -354,6 +364,7 @@ impl Controller {
             },
             Action::Prepare(rows) => self.prepare(rows),
             Action::WakeOutput => self.audio.wake(),
+            Action::Sleep(a) => self.sleep_action(a),
             // `run` stops for it before it gets here.
             Action::Quit => {}
         }

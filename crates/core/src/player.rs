@@ -125,6 +125,10 @@ pub enum Input {
     /// remembers), or played it after all (`false`). Moving on passes over the tracks it
     /// refuses, as over disliked ones: one the user starts directly is still tried.
     SetRefused(TrackId, bool),
+    /// The sleep timer: when the current song ends, move on to the next one paused instead
+    /// of playing it, with no crossfade into it (`true`); once used, or `false`, songs play
+    /// on as usual.
+    PauseAtEnd(bool),
 }
 
 /// What core needs from a resolved stream.
@@ -304,6 +308,8 @@ pub struct Player {
     scrobble: ScrobbleTracker,
     /// The current track started before any tick; `start` the tracker on the next one.
     scrobble_start_pending: bool,
+    /// `Input::PauseAtEnd`: the current song's end pauses.
+    pause_at_end: bool,
 }
 
 impl Player {
@@ -340,6 +346,7 @@ impl Player {
             unsaved: false,
             scrobble: ScrobbleTracker::default(),
             scrobble_start_pending: false,
+            pause_at_end: false,
         }
     }
 
@@ -371,6 +378,11 @@ impl Player {
             Status::Loading => self.play_intent,
             _ => false,
         }
+    }
+
+    /// Whether the current song's end will pause (`Input::PauseAtEnd`), until it does.
+    pub fn pauses_at_end(&self) -> bool {
+        self.pause_at_end
     }
 
     /// Whether the controller's timer must keep sending `Tick`: the position advances, a
@@ -524,6 +536,7 @@ impl Player {
                 }
             }
             Input::SkipTo(index) => self.skip_to(index, &mut out),
+            Input::PauseAtEnd(on) => self.pause_at_end = on,
             Input::SetLike(id, like) => {
                 if self.queue.set_like(&id, like) {
                     self.queue_edited(&mut out);
@@ -928,7 +941,9 @@ impl Player {
         let Some(want) = self.prefs.crossfade else {
             return;
         };
-        if self.repeat == RepeatMode::One
+        // The song's end pauses, so nothing fades in.
+        if self.pause_at_end
+            || self.repeat == RepeatMode::One
             || !matches!(self.phase, Phase::Loaded { started: true, .. })
         {
             return;
@@ -1044,7 +1059,16 @@ impl Player {
             return;
         }
         self.expired_retries = 0;
-        if self.move_on() {
+        if std::mem::take(&mut self.pause_at_end) {
+            // The sleep timer: the next song waits, paused at its start (or, at the end of
+            // the queue, the last one stays).
+            self.play_intent = false;
+            if self.move_on() {
+                self.enter_track(Duration::ZERO, out);
+            } else {
+                self.set_status(Status::Idle, out);
+            }
+        } else if self.move_on() {
             self.enter_track(Duration::ZERO, out);
         } else if self.continuation_pending {
             self.waiting_for_continuation = true;

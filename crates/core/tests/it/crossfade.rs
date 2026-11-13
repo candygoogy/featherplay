@@ -472,3 +472,32 @@ fn fade_on_skip_does_nothing_with_crossfade_off() {
         [Effect::Pause, load("b"), Effect::Play]
     );
 }
+
+#[test]
+fn the_sleep_timers_song_end_pauses_on_the_next_song_without_a_fade() {
+    let mut p = playing(5);
+    run(&mut p, Input::PauseAtEnd(true));
+    assert!(p.pauses_at_end());
+    // Where it would fade, it plays on to the end.
+    assert!(!run(&mut p, tick(secs(196))).contains(&crossfade("b", secs(5))));
+    assert_eq!(current(&p), "a");
+    let fx = run(&mut p, Input::AudioEnded);
+    assert_eq!(current(&p), "b");
+    assert!(fx.contains(&load("b")), "{fx:?}");
+    assert!(!fx.contains(&Effect::Play), "{fx:?}");
+    assert!(!p.wants_play() && !p.pauses_at_end());
+}
+
+#[test]
+fn the_sleep_timers_song_end_once_turned_off_plays_on() {
+    let mut p = playing_with(
+        prefs(None, false),
+        vec![track("a", Some("x")), track("b", Some("y"))],
+        secs(200),
+    );
+    run(&mut p, Input::PauseAtEnd(true));
+    run(&mut p, Input::PauseAtEnd(false));
+    run(&mut p, Input::AudioEnded);
+    assert_eq!(current(&p), "b");
+    assert!(p.wants_play());
+}

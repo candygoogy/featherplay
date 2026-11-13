@@ -45,6 +45,8 @@ pub struct MenuState {
     /// The desktop lyrics' entries: offered (lyrics are on and the desktop can keep a strip
     /// on top), whether the strip shows, and whether it lets clicks through.
     pub desktop_lyrics: DesktopLyricsMenu,
+    /// The sleep timer's submenu; `None` while its setting is off.
+    pub sleep: Option<SleepMenu>,
 }
 
 /// The desktop lyrics' group of the menu: "Desktop lyrics" (checked while the strip shows)
@@ -69,6 +71,16 @@ impl DesktopLyricsMenu {
     }
 }
 
+/// What the sleep timer's submenu shows.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct SleepMenu {
+    /// While it runs, the time left: "24 min left", "Fading out".
+    pub left: Option<String>,
+    /// The list playing's end, named after it: an album (`Some(true)`) or a playlist;
+    /// `None` hides it (a radio has no end).
+    pub list: Option<bool>,
+}
+
 /// An entry of the menu that does something.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TrayChoice {
@@ -83,10 +95,20 @@ pub enum TrayChoice {
     LockDesktopLyrics,
     Show,
     Quit,
+    /// The sleep timer's submenu: pause in 15, 30, 45 or 60 minutes, at the end of the song
+    /// or of the list, 15 minutes more, off.
+    Sleep15,
+    Sleep30,
+    Sleep45,
+    Sleep60,
+    SleepSongEnd,
+    SleepListEnd,
+    SleepAdd,
+    SleepOff,
 }
 
 impl TrayChoice {
-    const ALL: [TrayChoice; 9] = [
+    const ALL: [TrayChoice; 17] = [
         TrayChoice::PlayPause,
         TrayChoice::Previous,
         TrayChoice::Next,
@@ -96,6 +118,14 @@ impl TrayChoice {
         TrayChoice::LockDesktopLyrics,
         TrayChoice::Show,
         TrayChoice::Quit,
+        TrayChoice::Sleep15,
+        TrayChoice::Sleep30,
+        TrayChoice::Sleep45,
+        TrayChoice::Sleep60,
+        TrayChoice::SleepSongEnd,
+        TrayChoice::SleepListEnd,
+        TrayChoice::SleepAdd,
+        TrayChoice::SleepOff,
     ];
 
     /// The entry's muda id.
@@ -110,6 +140,14 @@ impl TrayChoice {
             TrayChoice::LockDesktopLyrics => "lock-desktop-lyrics",
             TrayChoice::Show => "show",
             TrayChoice::Quit => "quit",
+            TrayChoice::Sleep15 => "sleep-15",
+            TrayChoice::Sleep30 => "sleep-30",
+            TrayChoice::Sleep45 => "sleep-45",
+            TrayChoice::Sleep60 => "sleep-60",
+            TrayChoice::SleepSongEnd => "sleep-song-end",
+            TrayChoice::SleepListEnd => "sleep-list-end",
+            TrayChoice::SleepAdd => "sleep-add",
+            TrayChoice::SleepOff => "sleep-off",
         }
     }
 
@@ -132,10 +170,24 @@ pub struct Labels {
     pub liked: bool,
     /// Whether the controls (play, previous, next, like, not for me) work.
     pub controls: bool,
+    /// The sleep timer's submenu, while its setting is on.
+    pub sleep: Option<SleepLabels>,
+}
+
+/// The sleep timer's submenu as the menus show it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SleepLabels {
+    /// "Sleep timer", or while it runs "Sleep timer · 24 min left".
+    pub item: String,
+    /// Greyed with nothing playing, unless it runs.
+    pub enabled: bool,
+    /// The submenu's entries in order; `None` is a separator.
+    pub entries: Vec<Option<(TrayChoice, &'static str)>>,
 }
 
 /// The labels for the player's state `s`.
 pub fn labels(s: &MenuState) -> Labels {
+    let sleep = s.sleep.as_ref().map(|m| sleep_labels(m, s.has_track));
     if !s.has_track {
         return Labels {
             header: tr!("Nothing playing").into(),
@@ -143,6 +195,7 @@ pub fn labels(s: &MenuState) -> Labels {
             like: tr!("Like"),
             liked: false,
             controls: false,
+            sleep,
         };
     }
     Labels {
@@ -151,6 +204,43 @@ pub fn labels(s: &MenuState) -> Labels {
         like: if s.liked { tr!("Liked") } else { tr!("Like") },
         liked: s.liked,
         controls: true,
+        sleep,
+    }
+}
+
+/// The sleep timer's submenu: while it runs, Add 15 min and Turn off first; then the times,
+/// and the song's and the list's end.
+fn sleep_labels(m: &SleepMenu, has_track: bool) -> SleepLabels {
+    let mut entries = Vec::new();
+    if m.left.is_some() {
+        entries.push(Some((TrayChoice::SleepAdd, tr!("Add 15 min"))));
+        entries.push(Some((TrayChoice::SleepOff, tr!("Turn off"))));
+        entries.push(None);
+    }
+    entries.extend([
+        Some((TrayChoice::Sleep15, tr!("Pause in 15 min"))),
+        Some((TrayChoice::Sleep30, tr!("Pause in 30 min"))),
+        Some((TrayChoice::Sleep45, tr!("Pause in 45 min"))),
+        Some((TrayChoice::Sleep60, tr!("Pause in 1 hour"))),
+        None,
+        Some((
+            TrayChoice::SleepSongEnd,
+            tr!("Pause at the end of this song"),
+        )),
+    ]);
+    let list = match m.list {
+        Some(true) => Some(tr!("Pause at the end of this album")),
+        Some(false) => Some(tr!("Pause at the end of this playlist")),
+        None => None,
+    };
+    entries.extend(list.map(|text| Some((TrayChoice::SleepListEnd, text))));
+    SleepLabels {
+        item: match &m.left {
+            Some(left) => tr!("Sleep timer · {}", left),
+            None => tr!("Sleep timer").into(),
+        },
+        enabled: has_track || m.left.is_some(),
+        entries,
     }
 }
 
@@ -297,8 +387,53 @@ mod tests {
                 like: "Like",
                 liked: false,
                 controls: true,
+                sleep: None,
             }
         );
+    }
+
+    #[test]
+    fn the_sleep_timer_shows_only_while_its_setting_is_on() {
+        assert_eq!(labels(&state("T", "A", true, false)).sleep, None);
+        let s = MenuState {
+            sleep: Some(SleepMenu {
+                left: None,
+                list: Some(false),
+            }),
+            ..state("T", "A", true, false)
+        };
+        let sleep = labels(&s).sleep.expect("the submenu");
+        assert_eq!(sleep.item, "Sleep timer");
+        assert!(sleep.enabled);
+        assert_eq!(sleep.entries.len(), 7);
+        assert_eq!(
+            sleep.entries.last(),
+            Some(&Some((
+                TrayChoice::SleepListEnd,
+                "Pause at the end of this playlist"
+            )))
+        );
+    }
+
+    #[test]
+    fn a_running_sleep_timer_says_whats_left_and_offers_more_and_off() {
+        let s = MenuState {
+            sleep: Some(SleepMenu {
+                left: Some("24 min left".into()),
+                list: None,
+            }),
+            ..MenuState::default()
+        };
+        let sleep = labels(&s).sleep.expect("the submenu");
+        assert_eq!(sleep.item, "Sleep timer · 24 min left");
+        // Nothing playing, but it runs: it can still be turned off.
+        assert!(sleep.enabled);
+        assert_eq!(sleep.entries[0], Some((TrayChoice::SleepAdd, "Add 15 min")));
+        assert_eq!(sleep.entries[1], Some((TrayChoice::SleepOff, "Turn off")));
+        // A radio: no list's end.
+        let list_end =
+            |e: &Option<(TrayChoice, &str)>| matches!(e, Some((TrayChoice::SleepListEnd, _)));
+        assert!(!sleep.entries.iter().any(list_end));
     }
 
     #[test]
@@ -356,8 +491,7 @@ mod tests {
 
     #[test]
     fn every_choice_comes_back_from_its_id() {
-        use TrayChoice::*;
-        for c in [PlayPause, Previous, Next, Like, NotForMe, Show, Quit] {
+        for c in TrayChoice::ALL {
             assert_eq!(TrayChoice::from_id(c.id()), Some(c));
         }
         assert_eq!(TrayChoice::from_id("header"), None);

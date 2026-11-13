@@ -58,6 +58,7 @@ pub mod repaint;
 pub mod router;
 pub mod shell;
 pub mod sidebar;
+pub mod sleep;
 pub mod snapshot;
 pub mod song_menu;
 pub mod suggest;

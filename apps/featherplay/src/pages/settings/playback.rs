@@ -1,5 +1,6 @@
 //! Settings' Playback section (ui/pages/settings/playback.slint): the chips' choices (Skip
-//! silence, Crossfade, Playback speed, Volume step); its switches go through `toggled`.
+//! silence, Crossfade, the sleep timer's Fade out, Playback speed, Volume step); its switches
+//! go through `toggled`.
 
 use std::rc::Rc;
 
@@ -85,6 +86,30 @@ pub(super) fn pick_crossfade(ctx: &Ctx, i: i32) {
     }
 }
 
+pub(super) fn sleep_fade_index(secs: u8) -> i32 {
+    let place = |secs: u8| Settings::SLEEP_FADES.iter().position(|&x| x == secs);
+    place(secs)
+        .or_else(|| place(Settings::SLEEP_FADE))
+        .unwrap_or_default() as i32
+}
+
+/// The sleep timer's Fade out chip at `i`, shown and saved; the controller reads it when
+/// the timer ends.
+pub(super) fn pick_sleep_fade(ctx: &Ctx, i: i32) {
+    let Some(&secs) = usize::try_from(i)
+        .ok()
+        .and_then(|i| Settings::SLEEP_FADES.get(i))
+    else {
+        return;
+    };
+    let Some(ui) = ctx.window() else { return };
+    ui.global::<SettingsData>()
+        .set_sleep_fade(sleep_fade_index(secs));
+    if SETTINGS.with(|s| s.borrow().sleep_fade != secs) {
+        commit(ctx, Change::SleepFade(secs));
+    }
+}
+
 /// Shows the Playback speed (percent) on its chips and the bar's pill.
 pub(super) fn show_speed(ctx: &Ctx, percent: u8) {
     let Some(ui) = ctx.window() else { return };
@@ -113,6 +138,13 @@ pub(super) fn pick_speed(ctx: &Ctx, i: i32) {
 
 /// `--snapshot` at a playback speed (`--speed`): the row and the bar's pill show it, and
 /// `open` opens the pill's popup. Shown only, not saved.
+/// The Sleep timer switch on, as if turned on: for the snapshots.
+pub fn show_sleep_timer_for_snapshot(ctx: &Ctx) {
+    SETTINGS.with(|s| s.borrow_mut().sleep_timer = true);
+    let Some(ui) = ctx.window() else { return };
+    ui.global::<SettingsData>().set_sleep_timer(true);
+}
+
 pub fn show_speed_for_snapshot(ctx: &Rc<Ctx>, percent: u8, open: bool) {
     show_speed(ctx, percent);
     let Some(ui) = ctx.window() else { return };

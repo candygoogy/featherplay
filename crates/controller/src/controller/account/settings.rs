@@ -91,6 +91,11 @@ pub enum Change {
     FadeOnSkip(bool),
     /// The playback speed in percent, one of `Settings::SPEEDS` (100 is normal).
     PlaybackSpeed(u8),
+    /// The sleep timer's button and tray submenu; off also turns a running timer off.
+    SleepTimer(bool),
+    /// Seconds the music fades out before the sleep timer pauses (one of
+    /// `Settings::SLEEP_FADES`); 0 is no fade.
+    SleepFade(u8),
     /// The browser the sign-in page's browser row opened or was switched to, by its id.
     SignInBrowser(String),
     /// "Look up YouTube directly": YouTube's hosts over DNS over HTTPS.
@@ -156,6 +161,8 @@ impl Change {
             Change::Crossfade(v) => s.crossfade = v,
             Change::FadeOnSkip(v) => s.fade_on_skip = v,
             Change::PlaybackSpeed(v) => s.playback_speed = v,
+            Change::SleepTimer(v) => s.sleep_timer = v,
+            Change::SleepFade(v) => s.sleep_fade = v,
             Change::SignInBrowser(v) => s.sign_in_browser = Some(v),
             Change::DnsOverHttps(v) => s.dns_over_https = v,
         }
@@ -192,6 +199,8 @@ impl Controller {
                 self.input(Input::SetPrefs(prefs(&self.settings)));
                 self.push_now_playing();
             }
+            // At once, without a fade, and the volume comes back.
+            Change::SleepTimer(false) => self.sleep_action(crate::controller::SleepAction::Off),
             // Streams already resolved keep their format.
             Change::StreamingQuality(q) => self.resolver.set_quality(stream_quality(q)),
             // Heard within a device buffer, mid-song too.
@@ -337,6 +346,8 @@ mod tests {
             Change::Crossfade(8),
             Change::FadeOnSkip(true),
             Change::PlaybackSpeed(150),
+            Change::SleepTimer(true),
+            Change::SleepFade(10),
             Change::SignInBrowser("brave".into()),
             Change::DnsOverHttps(true),
         ];
@@ -378,6 +389,7 @@ mod tests {
         assert_eq!(s.skip_silence, SkipSilence::Everywhere);
         assert_eq!((s.crossfade, s.fade_on_skip), (8, true));
         assert_eq!(s.playback_speed, 150);
+        assert_eq!((s.sleep_timer, s.sleep_fade), (true, 10));
         assert_eq!(s.sign_in_browser.as_deref(), Some("brave"));
         assert!(!s.check_for_updates && !s.install_updates);
         assert!(s.dns_over_https);

@@ -2,10 +2,11 @@
 // `Theme.bar-inset` in from its edges (app.slint places it). The track on the left; in the
 // middle the transport around the round play button, with the time, the seek line and the
 // length under it; Lyrics (the microphone), "Not for me" (a thumbs-down), like, volume and
-// the Up next button on the right, and where the desktop has no tray, the mini player's
-// button before them. It reads and drives the `Player` global; `src/bar.rs` connects that to
-// the controller. The transport, the mini player, Lyrics, "Not for me" and the speed pill
-// share one tooltip (`BarTip`): the name, then the shortcut.
+// the Up next button on the right, and before them the sleep timer's button while its
+// setting is on, and where the desktop has no tray, the mini player's button first. It reads
+// and drives the `Player` global; `src/bar.rs` connects that to the controller. The
+// transport, the mini player, the sleep timer, Lyrics, "Not for me" and the speed pill share
+// one tooltip (`BarTip`): the name, then the shortcut.
 import { Theme, Icons, Curves } from "theme.slint";
 import { Body, Cover, IconButton, Icon, PlayButton } from "parts.slint";
 import { Player, Repeat } from "player.slint";
@@ -15,6 +16,7 @@ import { BarTip } from "bar_tip.slint";
 import { LyricsData, LyricsState } from "pages/lyrics.slint";
 import { Chips } from "pages/content.slint";
 import { SettingsData } from "pages/settings/data.slint";
+import { Sleep, SleepButton } from "sleep_timer.slint";
 
 // The seek line, between the time and the length: 4 px, 6 px while hovered, with round ends;
 // click or drag anywhere on it to seek. Hovered, a thumb sits at the fill's end and a tooltip
@@ -583,14 +585,29 @@ export component BottomBar inherits Rectangle {
     // The right-hand buttons sit as far in from the bar's right end as from its top and bottom,
     // so the last one is centred in the rounded end, as the cover is at the left.
     property <length> end-gap: (Theme.bar-h - 36px) / 2;
-    property <length> center-w: max(320px, min(600px, self.width - 2 * (root.right-w + root.end-gap + 2px)));
+    // What the middle column stays clear of: the speed pill while it shows, else the group.
+    property <length> anchor: Player.speed != 2 ? speed-pill.x : actions.x;
+    // The time row is 320 px at least, and the title 80 px from x 84, 16 px before it. Only
+    // when the right-hand group leaves less (Linux without a tray, with the speed pill and the
+    // sleep timer at the narrowest window) does the time row give up to 40 px.
+    property <length> center-w: max(280px, min(max(320px, min(600px, self.width - 2 * (root.right-w + root.end-gap + 2px))), root.anchor - 12px - 180px));
     // Where the speed popup centres (in the bar).
     out property <length> speed-centre: speed-pill.x + speed-pill.width / 2;
+    // The sleep timer's button: after the mini player's, if that shows. Idle 36 px; running,
+    // it takes the time left's text only while that leaves the time row 320 px and the title
+    // 80 px (`sleep-room`), the long form first.
+    property <length> sleep-room: self.width - root.end-gap - tail.preferred-width - (SettingsData.has-tray ? 0px : 40px) - 4px - (Player.speed != 2 ? speed-pill.width + 4px : 0px) - 12px - 320px - 180px;
+    property <length> sleep-long-w: sleep-long.preferred-width + Sleep.pill-pad;
+    property <length> sleep-short-w: sleep-short.preferred-width + Sleep.pill-pad;
+    out property <string> sleep-text: !Sleep.running ? "" : (root.sleep-long-w <= root.sleep-room ? Sleep.long-text : (root.sleep-short-w <= root.sleep-room ? Sleep.short-text : ""));
+    property <length> sleep-w: root.sleep-text == "" ? 36px : (root.sleep-text == Sleep.long-text ? root.sleep-long-w : root.sleep-short-w);
+    // Where the sleep timer's popup centres (in the bar).
+    out property <length> sleep-centre: actions.x + (SettingsData.has-tray ? 0px : 40px) + root.sleep-w / 2;
     // The middle column's left edge: centred on the bar, unless that would run it into the
     // right-hand group (the narrowest windows with the speed pill, or Linux's mini player
     // button), then shifted left to stay 12 px clear of it.
     property <length> middle-w: max(root.center-w, transport.preferred-width);
-    property <length> middle-x: min((self.width - root.middle-w) / 2, (Player.speed != 2 ? speed-pill.x : actions.x) - 12px - root.middle-w);
+    property <length> middle-x: min((self.width - root.middle-w) / 2, root.anchor - 12px - root.middle-w);
     property <length> left-w: max(80px, root.middle-x + (root.middle-w - root.center-w) / 2 - 100px);
     // The transport row, and the time row under it.
     property <length> transport-y: 8px;
@@ -777,6 +794,20 @@ export component BottomBar inherits Rectangle {
         }
     }
 
+    // Measure the running pill's texts.
+    sleep-long := Body {
+        visible: false;
+        text: Sleep.long-text;
+        font-size: Theme.t-meta;
+        font-weight: 600;
+    }
+    sleep-short := Body {
+        visible: false;
+        text: Sleep.short-text;
+        font-size: Theme.t-meta;
+        font-weight: 600;
+    }
+
     speed-pill := SpeedPill {
         x: actions.x - self.width - 4px;
         y: actions.y;
@@ -796,46 +827,57 @@ export component BottomBar inherits Rectangle {
             above: (Theme.bar-h - 36px) / 2 + Theme.s2;
             clicked => { root.toggle-mini(); }
         }
-        // Not there with lyrics off in Settings.
-        if LyricsData.on: LyricsButton {
+        // Only with its setting on; it grows to the left, so the buttons after it stay put.
+        if SettingsData.sleep-timer: SleepButton {
+            width: root.sleep-w;
+            text: root.sleep-text;
             above: (Theme.bar-h - 36px) / 2 + Theme.s2;
         }
-        NotForMeButton {
-            above: (Theme.bar-h - 36px) / 2 + Theme.s2;
-        }
-        LikeButton { }
-        IconButton {
-            icon: Player.volume > 0 ? Icons.volume : Icons.volume-off;
-            label: Player.volume > 0 ? @tr("Mute") : @tr("Unmute");
-            clicked => {
-                if Player.volume > 0 {
-                    root.unmuted = Player.volume;
-                    Player.set-volume(0, true);
-                } else {
-                    Player.set-volume(root.unmuted, true);
+        // The rest, in a layout of its own, so the sleep timer's room is measured without
+        // the sleep timer.
+        tail := HorizontalLayout {
+            spacing: 4px;
+            // Not there with lyrics off in Settings.
+            if LyricsData.on: LyricsButton {
+                above: (Theme.bar-h - 36px) / 2 + Theme.s2;
+            }
+            NotForMeButton {
+                above: (Theme.bar-h - 36px) / 2 + Theme.s2;
+            }
+            LikeButton { }
+            IconButton {
+                icon: Player.volume > 0 ? Icons.volume : Icons.volume-off;
+                label: Player.volume > 0 ? @tr("Mute") : @tr("Unmute");
+                clicked => {
+                    if Player.volume > 0 {
+                        root.unmuted = Player.volume;
+                        Player.set-volume(0, true);
+                    } else {
+                        Player.set-volume(root.unmuted, true);
+                    }
                 }
             }
-        }
-        volume := VolumeSlider { }
-        Rectangle {
-            width: 8px;
-        }
-        IconButton {
-            icon: Icons.queue;
-            label: @tr("Up next");
-            // On Now playing it shows and hides the page's own side panel; elsewhere the
-            // frame's Up next panel. Each keeps its own state.
-            active: Frame.full-page ? Frame.side-open : Frame.queue-open;
-            // The open panel shows the state; a circle here, lit all the time on Now playing
-            // (its side panel is open by default), only looked stuck.
-            circle: false;
-            clicked => {
-                if Frame.full-page {
-                    Frame.side-open = !Frame.side-open;
-                    Frame.side-toggled(Frame.side-open);
-                } else {
-                    Frame.queue-open = !Frame.queue-open;
-                    Frame.queue-toggled(Frame.queue-open);
+            volume := VolumeSlider { }
+            Rectangle {
+                width: 8px;
+            }
+            IconButton {
+                icon: Icons.queue;
+                label: @tr("Up next");
+                // On Now playing it shows and hides the page's own side panel; elsewhere the
+                // frame's Up next panel. Each keeps its own state.
+                active: Frame.full-page ? Frame.side-open : Frame.queue-open;
+                // The open panel shows the state; a circle here, lit all the time on Now
+                // playing (its side panel is open by default), only looked stuck.
+                circle: false;
+                clicked => {
+                    if Frame.full-page {
+                        Frame.side-open = !Frame.side-open;
+                        Frame.side-toggled(Frame.side-open);
+                    } else {
+                        Frame.queue-open = !Frame.queue-open;
+                        Frame.queue-toggled(Frame.queue-open);
+                    }
                 }
             }
         }

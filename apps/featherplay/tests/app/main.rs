@@ -116,6 +116,7 @@ mod sign_in_unsaved;
 mod signed_out;
 mod skeleton_frames;
 mod skeleton_sweep;
+mod sleep_timer;
 mod smoothness;
 mod song_menu_place;
 mod space_play;
