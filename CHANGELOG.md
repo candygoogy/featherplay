@@ -6,6 +6,92 @@ Notable changes to featherplay, newest first. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Start when you sign in to Windows** (on Linux, **Start when you log in**), first in
+  Settings > Window and off by default. It adds a `featherplay` value under the current
+  user's `Run` key on Windows, or an XDG autostart entry on Linux, for the exe or AppImage
+  you turned it on in, and every start moves the entry along if that file moved. When
+  Windows' Startup apps or the desktop's own settings turn the entry off, Settings shows it
+  off, and featherplay doesn't turn it back on by itself. Under it, shown while it's on,
+  **Start in the tray** (off by default) starts with no window, only the tray icon; where the
+  desktop has no tray, the window starts minimised instead. A start at sign-in never takes
+  the focus and plays nothing until you press Play, and in the tray it loads Home only once
+  the window opens. Uninstalling removes the entry.
+- A lyrics menu, the ⋯ beside the Lyrics pill on Now playing's full lyrics view:
+  - **Text size**, Small, Medium or Large, for Now playing and the Lyrics tab. Also in
+    Settings > Lyrics, and `Ctrl+=` and `Ctrl+-` while lyrics show.
+  - **Timing**, for synced lyrics: the lines half a second sooner or later, for this song,
+    on top of any offset the lyrics carry. The credit line under them says so, and Reset
+    puts them back.
+  - **Choose other lyrics…**, with LRCLIB on: LRCLIB's matches for the song, the one in use
+    marked, and a field to search with other words. A pick shows at once and stays with the
+    song; "None of these" shows no lyrics for it, and "Back to the automatic match" forgets
+    the pick. The Lyrics tab's empty state offers the same search ("Search LRCLIB
+    yourself").
+  - The timing and the picks are kept on this PC, in `lyrics.json` in the settings folder,
+    for up to 1,000 songs. **Reset lyrics settings**, at the end of Settings > Lyrics and
+    shown only when something differs from the defaults, asks first, then puts the text
+    size, the desktop lyrics' size, place and lock, and every song's timing and pick back as
+    they were. Whether lyrics and desktop lyrics are on stays as it is.
+- **Desktop lyrics**: the line being sung and the next, in a borderless strip above other
+  apps, in the lyrics' panel colour. Off by default; on from Settings > Lyrics, the lyrics
+  menu, the tray menu or `Ctrl+Shift+L`. Unlocked at first, it moves by a drag and keeps its
+  place for each screen; locked, clicks, the wheel and the pointer go through it to the app
+  beneath, and the tray menu or the lyrics menu unlocks it. Its hover controls make it
+  smaller or larger, lock it, open featherplay or turn it off. While it shows, lyrics count
+  as on screen, so they're looked up even with the window in the tray; with it off there's no
+  window and no timer. On Windows and in an X11 session; under Wayland, which leaves where
+  windows sit and what stays on top to the desktop, Settings says it isn't available and why.
+- **Quick search from anywhere** (Settings > Window, off by default): a global shortcut,
+  `Ctrl+Alt+K` unless you set another, opens a small search box over whatever app is in
+  front, on its screen. Typing brings the top bar's suggestions, top results first with the
+  match marked, then searches. `Enter` plays, `Shift+Enter` plays next (the box stays open,
+  and several picks play in the order you picked them), and `Ctrl+Enter` opens the page in
+  featherplay. Empty, it lists your last five picks, kept on this PC; opening it asks nothing
+  of the network. `Esc`, `Enter` or the shortcut again close it and give the focus back to
+  the app you were in. With featherplay in front, the shortcut does what `Ctrl+K` does.
+  Settings has a field to press a new shortcut in, with Reset; one another app holds, one
+  the system keeps, a key without Ctrl, Alt, Shift or Win, or one of your own global hotkeys
+  is refused with a line saying why, and not saved. Under Wayland the row says it isn't
+  available and gives `featherplay --quick-search`, a command to bind to a shortcut in the
+  desktop's keyboard settings, which opens the box in the running featherplay.
+- A **sleep timer** (Settings > Playback, off by default). On, it adds a Sleep timer button
+  to the player bar and a submenu to the tray menu: pause in 15, 30 or 45 minutes or an
+  hour, at the end of this song, or at the end of this album or playlist; then +15 min (up to
+  12 hours) and Turn off. Over the last seconds (**Fade out**: none, 10, 20 or 30 s, 20 by
+  default) the music fades to silence, then playback pauses, and the volume is back with the
+  next Play. While it runs, the bar's button shows the time left, as room allows. Pausing by
+  hand doesn't stop it, and it isn't kept when featherplay quits. While it's off, nothing of
+  it runs.
+- Every new setting, and the new files, are read leniently: a value of the wrong type, out of
+  range or from a newer version takes that setting's default, and the others are kept.
+
+### Changed
+
+- On Linux, the browser sign-in runs the browser as you'd start it yourself, with no pipe
+  and no switch about automation, and featherplay reads the session once you've closed it.
+  Chromium tells every page that a browser with the pipe is automated, and 0.3.0 hid that
+  with two switches; both are gone. After you close the browser, featherplay starts it again
+  on the same temporary profile, headless and on a blank page, asks it for the cookies over
+  the pipe and closes it, so no web page is open while the pipe is. A window left open is
+  asked to quit after 15 minutes, and its profile is read all the same. The sign-in page
+  says to close the browser once you're signed in. Windows is unchanged.
+- The release binaries are smaller: on Linux x86_64 the linker folds identical functions
+  into one, as it already did for the Windows exe, and symphonia's FFT tables are built the
+  first time they're used instead of being stored in the program.
+  <!-- TODO 0.4.0 figures -->
+
+### Fixed
+
+- The x86_64 AppImage starts on a system without the desktop's keyboard and X11 libraries,
+  as the AppImage catalog's test system is, instead of exiting at once ("Library
+  libxkbcommon-x11.so could not be loaded"). It now carries libxkbcommon, libxkbcommon-x11,
+  libxcb-xkb, libXcursor, libXi, libXrender, libXfixes and libXext, found through its own
+  binary's library path only, so the browser, yt-dlp and Deno it starts don't see them. The
+  `.tar.gz` is unchanged. Their licences are in `THIRD_PARTY.md`.
+- Global hotkeys changed in Settings work at once, without a restart.
+
 ## [0.3.0] - 2026-11-13
 
 ### Added
