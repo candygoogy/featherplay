@@ -6,6 +6,8 @@ Notable changes to featherplay, newest first. The format follows
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-14
+
 ### Added
 
 - **Start when you sign in to Windows** (on Linux, **Start when you log in**), first in
@@ -88,9 +90,11 @@ Notable changes to featherplay, newest first. The format follows
   the pipe and closes it, so no web page is open while the pipe is. A window left open is
   asked to quit after 15 minutes, and its profile is read all the same. The sign-in page
   says to close the browser once you're signed in. Windows is unchanged.
-- The release binaries are smaller: on Linux x86_64 the linker folds identical functions
-  into one, as it already did for the Windows exe, and symphonia's FFT tables are built the
-  first time they're used instead of being stored in the program.
+- Two changes take about 0.5 MB off the Windows exe and 0.8 MB off the Linux binary, which
+  this release's features grow all the same: on Linux x86_64 the linker folds identical
+  functions into one, as it already did for the Windows exe, and symphonia's FFT tables are
+  built the first time they're used instead of being stored in the program. The Linux
+  binary's size limit is now 34 MB.
   <!-- TODO 0.4.0 figures -->
 
 ### Fixed
@@ -608,7 +612,8 @@ as a per-user installer or a portable exe.
 - A Language setting. featherplay ships in English and is ready for translations
   (CONTRIBUTING.md says how to add one).
 
-[Unreleased]: https://github.com/candygoogy/featherplay/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/candygoogy/featherplay/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/candygoogy/featherplay/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/candygoogy/featherplay/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/candygoogy/featherplay/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/candygoogy/featherplay/compare/v0.2.0...v0.2.1
