@@ -1,12 +1,12 @@
-//! Home (ui/pages/home.slint): the hero, then the Home feed shelves, each in the shape of what
-//! it holds (`arrange`), your mixes first.
+//! Home (ui/pages/home.slint): the band, then the Home feed's shelves as rails, each in the
+//! shape of what it holds (`arrange`), your mixes first.
 //!
 //! The feed is fetched once and kept for `FEED_TTL` (Home is opened often; the feed changes
 //! slowly), and again after a sign-in. It goes on as the user scrolls near its end, a page at
 //! a time (`Paging`): never two at once, at most `MAX_PAGES` per feed, and none without a
-//! scroll. Liked songs is pinned as the first shortcut (`with_liked`). The hero follows the
-//! player: `choose_hero` picks "pick up where you left off" when there's a current track,
-//! else a featured pick from the first shelf.
+//! scroll. Liked songs is pinned as the first tile of your mixes, "Shuffle Liked songs"
+//! (`with_liked`). The band follows the player: `choose_hero` picks the session when there's
+//! a current track, else a featured pick from the first shelf.
 //!
 //! Signed in, the first pages' shelves are kept on disk for the identity (`CachedFeed`), so
 //! the next start shows Home at once from them while the feed is fetched behind. A fresh feed
@@ -18,13 +18,12 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
-use featherplay_core::model::{Track, TrackId};
+use featherplay_core::model::{PlaylistId, Track, TrackId};
 use featherplay_ytm::{HomeFeed, HomeItem, HomeShelf};
 use slint::{ComponentHandle, Model, ModelRc, VecModel};
 
 use crate::app::Ctx;
 use crate::controller::{Action, PlayerState};
-use crate::follow::colour::Lch;
 use crate::pages::content;
 use crate::router::Page;
 use crate::sidebar;
@@ -67,9 +66,8 @@ struct State {
     account: u64,
     hero: Option<Hero>,
     hero_url: Option<String>,
-    /// The resumed song's cover the wash is (being) worked out for, and its colour once it is.
-    wash_url: Option<String>,
-    wash_seed: Option<Lch>,
+    /// The featured pick's cover the band's colour is (being) worked out for.
+    ink_url: Option<String>,
     next: Vec<TrackId>,
     paging: Paging,
     /// The shelves `HomeData` shows, so a later page's are added to them.
@@ -105,21 +103,9 @@ pub fn init(ctx: &Rc<Ctx>) {
     data.on_retry_more(move || more(&c, true));
     bind_rows(&ui);
     let c = ctx.clone();
-    data.on_play_next(move |i| {
-        // Jumps by playing the same queue from that row on.
-        let Some(state) = c.player() else { return };
-        let Some(current) = state.current else { return };
-        let start = i.max(0) as usize + 1;
-        let mut tracks = vec![current];
-        tracks.extend(state.upcoming);
-        if start < tracks.len() {
-            c.send(Action::Play {
-                tracks,
-                start,
-                radio: state.radio,
-            });
-        }
-    });
+    data.on_show_queue(move || crate::queue_panel::show_up_next(&c));
+    let c = ctx.clone();
+    data.on_shuffle_liked(move || content::shuffle_playlist(&c, PlaylistId("LM".into())));
     let c = ctx.clone();
     data.on_play_featured(move || {
         if let Some(item) = featured(0) {

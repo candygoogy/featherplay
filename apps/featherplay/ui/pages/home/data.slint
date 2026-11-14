@@ -1,5 +1,6 @@
 // Home's data from `src/pages/home.rs`: the shelves' shapes and rows, and `HomeData`.
 import { TrackRow, CardItem } from "../../parts.slint";
+import { LyricInk } from "../lyrics.slint";
 
 // How a shelf shows, from what it holds (`home.rs::shape`).
 export enum ShelfShape { cards, songs, mixes, videos, playlists, artists }
@@ -24,26 +25,28 @@ export global HomeData {
     in property <string> error;
     // The feed loaded and has no shelves (an identity with no history yet).
     in property <bool> empty;
-    // The hero: true resumes the session, false features a pick (when there is one).
+    // The band: true resumes the session (or shows it playing), false features a pick (when
+    // there is one).
     in property <bool> resume;
+    // The band's cover (`home.rs::HERO_COVER`).
     in property <image> hero-cover;
-    // The header's wash from the resumed song's cover, per theme (`home.rs::show_wash`; the
-    // accent's on grey art), already over the ground, opaque; transparent until it's worked
-    // out. Shown only while resuming.
-    in property <color> wash-dark;
-    in property <color> wash-light;
-    // The wash shows behind the top bar (set by `HomePage`, until the page has scrolled the
-    // bar's height): the frame clears the bar's ground and leaves out its fade below, so the
-    // wash runs up behind the search field to the window's top.
-    in-out property <bool> wash-behind-bar;
-    // Resume: the next 3 tracks of the queue.
+    // The song the band's actions (Like, Add to playlist, Start radio, Go to artist) act on:
+    // the current track while resuming, the featured song on a fresh start.
+    in property <TrackRow> track;
+    // Resume: what's next in the queue, three rows a column (`home.rs::HERO_NEXT` at most).
     in property <[TrackRow]> next;
-    // Featured: the pick, the heading over the rest ("More from Quick picks"), and 4 more
-    // from that shelf.
+    // Featured: the pick, its shelf's title ("Quick picks"), the heading over the rest ("More
+    // from Quick picks"), and 3 more from that shelf.
     in property <bool> has-featured;
     in property <CardItem> featured;
+    in property <string> featured-shelf;
     in property <string> featured-from;
     in property <[CardItem]> featured-more;
+    // The featured pick's own panel, per theme, from its cover (`follow::lyric_inks_for`, as
+    // the lyrics panel's); graphite until its colour is known. Resuming, the band takes the
+    // lyrics panel's own (`LyricsData.ink`), which follows the current song.
+    in property <LyricInk> featured-ink-dark;
+    in property <LyricInk> featured-ink-light;
     in property <[HomeShelfRow]> shelves;
     in property <MoreState> more;
     // How many rows the page has: the top, the shelves, then the next page's row while it
@@ -54,11 +57,13 @@ export global HomeData {
     in property <[int]> rows;
 
     callback resume-clicked();
-    // Plays the queue from row `i` of `next`.
-    callback play-next(int);
     callback play-featured();
     // The featured pick (-1) or one of `featured-more`.
     callback open-featured(int);
+    // Opens the Up next panel ("Show all", "Up next · N").
+    callback show-queue();
+    // The Liked songs tile on the first rail: plays Liked songs shuffled.
+    callback shuffle-liked();
     // A song card on a shelf: plays it, with radio after it.
     callback play-song(string);
     // Fetches the feed again after an error.

@@ -102,11 +102,17 @@ pub fn init(ctx: &Rc<Ctx>) {
 /// Autoplay), Up next, in Now playing's side panel there (shown if it was hidden) and in the
 /// frame's panel elsewhere.
 fn open_source(ctx: &Rc<Ctx>) {
-    let Some(ui) = ctx.window() else { return };
     if let Some(page) = SOURCE.with(|s| s.borrow().clone()) {
         ctx.navigate(page);
         return;
     }
+    show_up_next(ctx);
+}
+
+/// Shows Up next: in Now playing's side panel there (shown if it was hidden), in the frame's
+/// panel elsewhere (Home's "Show all").
+pub fn show_up_next(ctx: &Rc<Ctx>) {
+    let Some(ui) = ctx.window() else { return };
     ui.global::<NowPlayingData>().set_tab(0);
     let frame = ui.global::<Frame>();
     if ctx.current_page() == Page::NowPlaying {

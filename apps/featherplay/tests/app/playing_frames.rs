@@ -29,8 +29,8 @@ const FRAME: Duration = Duration::from_millis(4);
 const SPOTS: f64 = 0.02;
 /// What playing may add to a scroll, as a share of what it repaints paused. Only the mark's
 /// steps add anything; what they add depends on how the frame's three dirty rectangles merge.
-/// While Home's header wash is in view it is one more rectangle, so a step merges into a
-/// taller box: 2.07 % of this scroll (1.80 % without the wash, 2026-10-31).
+/// A Home with a cover wash in view (since replaced by the band) made one more rectangle, so a
+/// step merged into a taller box: 2.07 % of this scroll (1.80 % without it, 2026-10-31).
 const SCROLL_SPOTS: f64 = 0.025;
 
 /// Frames between two steps of the mark (`Mark.step`, 33 ms, at 240 Hz), rounded down.

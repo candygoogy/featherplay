@@ -38,14 +38,13 @@ mod first_run_toast;
 mod frame;
 mod glyph_fallback;
 mod grid_cover;
-mod hero_menu;
+mod home_band;
 mod home_covers;
 mod home_more;
 mod home_scroll_bump;
 mod home_shapes;
 mod home_shelves_dropped;
 mod home_video_covers;
-mod home_wash;
 mod hover_play;
 // The Windows installer's script (Inno Setup) and the Windows names it repeats.
 #[cfg(windows)]
@@ -103,7 +102,6 @@ mod related_scroll;
 mod render_surface;
 mod render_timing;
 mod resize_frames;
-mod resume_card;
 mod row_menus;
 mod scroll_frames;
 mod search_link;

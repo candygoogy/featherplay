@@ -49,10 +49,11 @@ pub(crate) fn shelf_row(
     } else if shape == ShelfShape::Videos {
         // 16:9 art, as the tile shows it (no square's middle band).
         let urls = s.items.iter().map(home_thumbnail).collect();
-        ctx.covers.cards_wide(page, &cards, urls, cover_px(shape));
+        ctx.covers
+            .cards_wide(page, &cards, urls, cover_px(shape, page));
     } else {
         let urls = s.items.iter().map(home_thumbnail).collect();
-        ctx.covers.cards(page, &cards, urls, cover_px(shape));
+        ctx.covers.cards(page, &cards, urls, cover_px(shape, page));
     }
     HomeShelfRow {
         title: s.title.as_str().into(),
@@ -64,21 +65,23 @@ pub(crate) fn shelf_row(
     }
 }
 
-/// The size, in logical pixels, a shape's covers are fetched at: about a tile's width
-/// (`Shapes.tile-max` in home.slint, which tiles don't grow past). Covers are square, except a
-/// video tile's: 16:9, this wide.
-fn cover_px(shape: ShelfShape) -> u32 {
+/// The size, in logical pixels, a shape's covers are fetched at on `page`: a tile's width,
+/// which tiles don't grow past (home.slint: Home's `Rails.tile-w`, Explore's
+/// `Shapes.tile-max`). Covers are square, except a video tile's: 16:9, this wide.
+fn cover_px(shape: ShelfShape, page: PageKind) -> u32 {
     match shape {
         ShelfShape::Songs => ROW_COVER,
-        ShelfShape::Mixes => 64,
+        ShelfShape::Videos if page == PageKind::Home => 300,
         ShelfShape::Videos => 320,
+        _ if page == PageKind::Home => CARD_COVER,
+        ShelfShape::Mixes => 64,
         ShelfShape::Playlists => 160,
         ShelfShape::Artists => 140,
         _ => CARD_COVER,
     }
 }
 
-/// Rows per column of a song grid (`Shapes.grid-rows`): fewer songs than that stay cards.
+/// The fewest songs that make a song grid: fewer stay cards.
 const SONG_GRID_ROWS: usize = 4;
 
 fn as_track(item: &HomeItem) -> Option<&Track> {
@@ -89,7 +92,7 @@ fn as_track(item: &HomeItem) -> Option<&Track> {
 }
 
 /// The shelves to show, in order, as (index in `shelves`, shape): empty shelves are dropped,
-/// and the first shelf of your mixes moves up under the hero (they're what gets replayed most).
+/// and the first shelf of your mixes moves up under the band (they're what gets replayed most).
 pub fn arrange(shelves: &[HomeShelf]) -> Vec<(usize, ShelfShape)> {
     let mut out: Vec<(usize, ShelfShape)> = shelves
         .iter()
@@ -164,7 +167,7 @@ fn shortcuts_title() -> &'static str {
 }
 
 /// The row `with_liked` makes without mixes: Liked songs, then playlists and albums, shown
-/// as your mixes are, as wide shortcut tiles.
+/// as your mixes are, as a rail.
 pub(super) fn is_shortcuts(s: &HomeShelf) -> bool {
     s.title == shortcuts_title()
         && matches!(s.items.first(), Some(HomeItem::Playlist(p)) if p.id.0 == LIKED)

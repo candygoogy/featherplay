@@ -451,6 +451,17 @@ pub fn play_album(ctx: &Rc<Ctx>, id: AlbumId) {
 /// Plays a whole playlist from the start: its first page as soon as it's read, the rest
 /// joining the queue as it comes (`Arriving`).
 pub fn play_playlist(ctx: &Rc<Ctx>, id: PlaylistId) {
+    stream_playlist(ctx, id, false);
+}
+
+/// Plays a whole playlist in a random order, as its page's Shuffle does: the first page
+/// shuffled as soon as it's read, the rest mixed in as it comes (Home's "Shuffle Liked
+/// songs").
+pub fn shuffle_playlist(ctx: &Rc<Ctx>, id: PlaylistId) {
+    stream_playlist(ctx, id, true);
+}
+
+fn stream_playlist(ctx: &Rc<Ctx>, id: PlaylistId, mix: bool) {
     let arriving = Arriving::default();
     let mut from = None;
     let wanted = id.clone();
@@ -467,10 +478,10 @@ pub fn play_playlist(ctx: &Rc<Ctx>, id: PlaylistId) {
                 };
                 let page = Place::Playlist(id.clone());
                 from = Some(PlayingFrom::on_page(label, page));
-                start_or_join(ctx, &arriving, from.as_ref(), p.tracks)
+                start_or_join(ctx, &arriving, from.as_ref(), p.tracks, mix)
             }
             playlist::Part::Page(PlaylistPart::More(tracks), _) => {
-                start_or_join(ctx, &arriving, from.as_ref(), tracks)
+                start_or_join(ctx, &arriving, from.as_ref(), tracks, mix)
             }
             playlist::Part::End(result, _) => {
                 if let Err(e) = result {
@@ -483,12 +494,13 @@ pub fn play_playlist(ctx: &Rc<Ctx>, id: PlaylistId) {
 }
 
 /// A card's playlist page: the first songs that arrive start the queue, the later ones
-/// join it. Stops once the queue is from elsewhere.
+/// join it (`mix`: shuffled, the later ones mixed in). Stops once the queue is from elsewhere.
 fn start_or_join(
     ctx: &Ctx,
     arriving: &Arriving,
     from: Option<&PlayingFrom>,
     tracks: Vec<Track>,
+    mix: bool,
 ) -> ControlFlow<()> {
     let started = arriving.0.borrow().is_some();
     if started {
@@ -502,8 +514,13 @@ fn start_or_join(
         return ControlFlow::Break(());
     };
     if !tracks.is_empty() {
-        arriving.played(started_play(), false, from.clone());
+        arriving.played(started_play(), mix, from.clone());
         song_menu::remember(&tracks);
+        let tracks = if mix {
+            shuffled(&tracks, seed())
+        } else {
+            tracks
+        };
         ctx.send(Action::Queue(QueueAction::PlayFrom {
             tracks,
             start: 0,

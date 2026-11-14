@@ -17,6 +17,8 @@ export component Card inherits Rectangle {
     in property <bool> playable: false;
     // On its row's visible page: off, the cover takes no layer (see `Cover.layered`).
     in property <bool> on-page: true;
+    // The cover takes its layer at its decoded size too (`Cover.layer-at-size`: Home's rails).
+    in property <bool> layer-at-size: false;
     callback clicked();
     callback play();
     property <bool> button-shown: root.playable && ta.has-hover;
@@ -57,6 +59,7 @@ export component Card inherits Rectangle {
             source: root.item.cover;
             round: root.item.round;
             layered: root.on-page;
+            layer-at-size: root.layer-at-size;
         }
         // Over the cover, not in it: inside, every frame of the veil's fade drew the cover's
         // layer again (about 1 ms a frame per card at 4K, while the pointer crossed a shelf).

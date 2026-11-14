@@ -11,7 +11,7 @@ touches another. The shared files below change only when a page needs something 
 | `theme.slint` | `Theme` (colours, interaction states, type, spacing, sizes, durations; dark, light or Windows' mode per the Appearance setting) and `Icons` | frame (shared) |
 | `parts.slint` | Shared pieces: `TrackRow`, `CardItem`, `Icon`, `Display`, `Body`, `PageTitle`, `ShelfTitle`, `Bands`, `Cover`, `CoverPlay`, `PlayButton`, `PlayingMark`, `HoverIntent` (a song row rested on), `PageIntent` (a card rested on, read ahead by `pages/ahead.rs`), `RowsShown` (which rows of a song list show, for `ShownRows` and `src/prepare.rs`), `IconButton`, `Pill`, `ProgressRail`, `Card`, `Shelf`, `ShelfArrows`, `SongRow`, `TrackListRow`, `Tabs`, `TextLink` (the underlined tertiary action), `ChoiceList` and `ChoiceRow` (several ways to do one thing as rows of one card: icon tile, title, one line, chevron or a "Why?"; the recommended one lit) | frame (shared) |
 | `nav.slint` | `PageKind`, `Nav` (the navigation callbacks) and `Frame` (`queue-open`, Now playing's `side-open`, …) | frame (shared) |
-| `player.slint` | `Player`: the current track and the transport, for the bar, Now playing and the Home hero | frame (shared) |
+| `player.slint` | `Player`: the current track and the transport, for the bar, Now playing and the Home band | frame (shared) |
 | `sidebar.slint`, `bottom_bar.slint` | The frame's sidebar (`SidebarData`: Home, Library, Explore, History, Liked songs, then the library as a list under the Playlists, Albums and Artists chips, pinned entries first; `src/sidebar.rs`, its order in `src/library_list.rs`) and bottom bar | frame |
 | `top_bar.slint` | The top bar above every page but Now playing and Sign in: the search field (`TopBarData.query`, filled by `src/top_bar.rs` and cleared off search pages) with its right-click menu. On Settings the same field is "Search settings": it filters the page (`src/pages/settings/search.rs`), drops no suggestions, and the music field's text comes back when Settings is left | frame |
 | `toast.slint` | Toasts: one short line at a time, bottom centre above the bar; `src/toast.rs` shows and closes them | frame (shared) |
@@ -35,7 +35,7 @@ touches another. The shared files below change only when a page needs something 
 | `shortcuts.slint` | `Shortcuts`, the window's keyboard shortcuts listed once: Settings' "Keyboard shortcuts" dialog (`ShortcutsDialog`, Ctrl+/) shows them, and `app.slint`'s key handler reports each one it takes (`Shortcuts.used`), so a test checks the two agree | frame (shared) |
 | `probe.slint` | `Probe`, a small animated region that only `tests/app/smoothness.rs` turns on, to price a continuously animated indicator | tests |
 | `pages/content.slint` | The page-level pieces the content pages share (Home, Library, album, playlist, artist, search): headers, skeletons, error and empty states, `TopScrim` | content pages |
-| `pages/home.slint` | `HomePage`, `HomeData`; `ShelfShape` and `Shapes`, how each shelf lays out from what it holds (`src/pages/home.rs::arrange`) | home |
+| `pages/home.slint`, `pages/home/` | `HomePage`, `HomeData` (`home/data.slint`), the band (`home/hero.slint`); `ShelfShape`, `Rails` (how each Home rail lays out from what it holds, `src/pages/home.rs::arrange`) and `Shapes` (Explore's shelves) | home |
 | `pages/{library,album,playlist,artist,search}.slint` | One page each, with its `…Data` global | content pages |
 | `pages/explore.slint` | `ExplorePage` (New releases, Charts with the country picker and the top artists, Moods & genres) and `MoodPage` (a mood's curated playlists), `ExploreData`, `MoodData`; `src/pages/explore.rs` | discovery |
 | `pages/history.slint` | `HistoryPage`, `HistoryData`: the songs played lately, under a heading per day; `src/pages/history.rs` | discovery |
@@ -160,14 +160,8 @@ right of the sidebar, left of Up next while it's open, above the bar.
 Album, playlist and artist pages run up under the top bar instead, clear, so their wash or
 photo reaches the window's top: they start their content `Theme.top-bar-h` down and draw a
 `TopScrim` (content.slint) that brings the ground back as content scrolls under the bar.
-Home's wash (the resumed song's cover; the accent's on grey art; none with nothing to resume)
-reaches the top differently: Home starts below the bar, and its wash, behind the `ListView`
-and following its scroll, starts the bar's height above the page. While it shows behind
-the bar (`HomeData.wash-behind-bar`) the frame clears the bar and leaves out the fade below
-it, and Home brings the ground back there itself over the first 64 px of scroll, as
-`TopScrim` does; past that the frame's own bar and fade take over and the wash isn't drawn
-above the page, so nothing up there repaints while Home scrolls (the wash is opaque, down to
-the ground, in solid `Bands`). A new track crossfades it.
+Home starts below the bar like the other pages: its colour is the band at its top
+(`home/hero.slint`), a rounded panel in the lyrics panel's ink, inside the page's padding.
 
 ## Exports
 

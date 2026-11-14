@@ -171,11 +171,11 @@ msgstr ""
 msgid "Couldn't save helpers. Is the disk full?"
 msgstr ""
 
-#: ../../crates/integrations/src/discord.rs:28 src/quick_search.rs:627
+#: ../../crates/integrations/src/discord.rs:28 src/quick_search.rs:642
 msgid "Play song"
 msgstr ""
 
-#: ../../crates/integrations/src/discord.rs:32 ui/parts/covers.slint:162
+#: ../../crates/integrations/src/discord.rs:32 ui/parts/covers.slint:166
 msgid "Paused"
 msgstr ""
 
@@ -185,14 +185,14 @@ msgstr ""
 
 #: ../../crates/integrations/src/tooltip.rs:21
 #: ../../crates/integrations/src/tooltip.rs:21
-#: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:590
-#: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:590 ui/bottom_bar.slint:669 ui/mini_player.slint:134
-#: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:590 ui/bottom_bar.slint:669 ui/mini_player.slint:134 ui/pages/now_playing.slint:681
-#: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:590 ui/bottom_bar.slint:669 ui/mini_player.slint:134 ui/pages/now_playing.slint:681 ui/queue_panel.slint:270
+#: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:619
+#: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:619 ui/bottom_bar.slint:669 ui/mini_player.slint:134
+#: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:619 ui/bottom_bar.slint:669 ui/mini_player.slint:134 ui/pages/now_playing.slint:681
+#: ../../crates/integrations/src/tooltip.rs:21 src/desktop_lyrics.rs:619 ui/bottom_bar.slint:669 ui/mini_player.slint:134 ui/pages/now_playing.slint:681 ui/queue_panel.slint:270
 msgid "Nothing playing"
 msgstr ""
 
-#: ../../crates/integrations/src/tooltip.rs:29 ui/pages/home/hero.slint:141
+#: ../../crates/integrations/src/tooltip.rs:29
 msgid "{0} of {1}"
 msgstr ""
 
@@ -225,15 +225,13 @@ msgstr ""
 #: ../../crates/platform/src/common/tray.rs:195
 #: ../../crates/platform/src/common/tray.rs:195 src/album_actions.rs:275
 #: ../../crates/platform/src/common/tray.rs:195 src/album_actions.rs:275 ui/not_for_me.slint:20 ui/pages/content.slint:322
-#: ../../crates/platform/src/common/tray.rs:195 src/album_actions.rs:275 ui/not_for_me.slint:20 ui/pages/content.slint:322 ui/song_menu.slint:282
+#: ../../crates/platform/src/common/tray.rs:195 src/album_actions.rs:275 ui/not_for_me.slint:20 ui/pages/content.slint:322 ui/parts/rows.slint:220 ui/song_menu.slint:282
 msgid "Like"
 msgstr ""
 
-#. As wide as the wider label, so Go to album doesn't shift as it toggles.
 #: ../../crates/platform/src/common/tray.rs:203
 #: ../../crates/platform/src/common/tray.rs:203 ui/bottom_bar.slint:409
-#: ../../crates/platform/src/common/tray.rs:203 ui/bottom_bar.slint:409 ui/pages/home/hero.slint:164
-#: ../../crates/platform/src/common/tray.rs:203 ui/bottom_bar.slint:409 ui/pages/home/hero.slint:164
+#: ../../crates/platform/src/common/tray.rs:203 ui/bottom_bar.slint:409
 msgid "Pause"
 msgstr ""
 
@@ -508,23 +506,23 @@ msgstr ""
 msgid "Right-click the tray icon to show the window or quit."
 msgstr ""
 
-#: src/desktop_lyrics.rs:538
+#: src/desktop_lyrics.rs:547
 msgid "Drag to move it · lock it to let clicks through"
 msgstr ""
 
-#: src/desktop_lyrics.rs:591
+#: src/desktop_lyrics.rs:620
 msgid "Play a song to see its lyrics here"
 msgstr ""
 
-#: src/desktop_lyrics.rs:614
+#: src/desktop_lyrics.rs:643
 msgid "Lines aren't synced for this song"
 msgstr ""
 
-#: src/desktop_lyrics.rs:616 ui/pages/lyrics.slint:142
+#: src/desktop_lyrics.rs:645 ui/pages/lyrics.slint:142
 msgid "No lyrics for this song"
 msgstr ""
 
-#: src/desktop_lyrics.rs:625 ui/pages/now_playing.slint:260
+#: src/desktop_lyrics.rs:654 ui/pages/now_playing.slint:260
 msgid "Finding lyrics…"
 msgstr ""
 
@@ -611,8 +609,8 @@ msgid "Check for updates"
 msgstr ""
 
 #: src/pages/about.rs:126 src/updates.rs:207 ui/pages/about.slint:98
-#: src/pages/about.rs:126 src/updates.rs:207 ui/pages/about.slint:98 ui/pages/home.slint:540 ui/pages/lyrics.slint:402
-#: src/pages/about.rs:126 src/updates.rs:207 ui/pages/about.slint:98 ui/pages/home.slint:540 ui/pages/lyrics.slint:402
+#: src/pages/about.rs:126 src/updates.rs:207 ui/pages/about.slint:98 ui/pages/home.slint:500 ui/pages/lyrics.slint:402
+#: src/pages/about.rs:126 src/updates.rs:207 ui/pages/about.slint:98 ui/pages/home.slint:500 ui/pages/lyrics.slint:402
 msgid "Try again"
 msgstr ""
 
@@ -730,28 +728,28 @@ msgstr ""
 msgid "History"
 msgstr ""
 
-#: src/pages/home/hero.rs:98
+#: src/pages/home/hero.rs:111
 msgid "More from {}"
 msgstr ""
 
-#: src/pages/home/shelves.rs:146 src/pages/playlist.rs:73 ui/sidebar.slint:229
-#: src/pages/home/shelves.rs:146 src/pages/playlist.rs:73 ui/sidebar.slint:229
+#: src/pages/home/shelves.rs:148 src/pages/playlist.rs:73 ui/sidebar.slint:229
+#: src/pages/home/shelves.rs:148 src/pages/playlist.rs:73 ui/sidebar.slint:229
 msgid "Liked songs"
 msgstr ""
 
-#: src/pages/home/shelves.rs:163
+#: src/pages/home/shelves.rs:165
 msgid "Shortcuts"
 msgstr ""
 
-#: src/pages/home/shelves.rs:220
+#: src/pages/home/shelves.rs:222
 msgid "Similar to"
 msgstr ""
 
-#: src/pages/now_playing.rs:294
+#: src/pages/now_playing.rs:296
 msgid "Couldn't load related tracks"
 msgstr ""
 
-#: src/pages/playlist.rs:122 src/quick_search.rs:632
+#: src/pages/playlist.rs:122 src/quick_search.rs:647
 msgid "Playlist"
 msgstr ""
 
@@ -2166,49 +2164,49 @@ msgstr ""
 msgid "Couldn't remove {}."
 msgstr ""
 
-#: src/quick_search.rs:519 ui/pages/search.slint:90
+#: src/quick_search.rs:534 ui/pages/search.slint:90
 msgid "No results for “{}”"
 msgstr ""
 
 #. A link isn't repeated as the title: the field above shows it.
-#: src/quick_search.rs:576 src/quick_search.rs:596 ui/pages/search.slint:44
-#: src/quick_search.rs:576 src/quick_search.rs:596 ui/pages/search.slint:44
+#: src/quick_search.rs:591 src/quick_search.rs:611 ui/pages/search.slint:44
+#: src/quick_search.rs:591 src/quick_search.rs:611 ui/pages/search.slint:44
 msgid "Search"
 msgstr ""
 
-#: src/quick_search.rs:586
+#: src/quick_search.rs:601
 msgid "Search for “{}”"
 msgstr ""
 
-#: src/quick_search.rs:625
+#: src/quick_search.rs:640
 msgid "Video"
 msgstr ""
 
-#: src/quick_search.rs:625
+#: src/quick_search.rs:640
 msgid "Play video"
 msgstr ""
 
-#: src/quick_search.rs:627
+#: src/quick_search.rs:642
 msgid "Song"
 msgstr ""
 
-#: src/quick_search.rs:628
+#: src/quick_search.rs:643
 msgid "Play album"
 msgstr ""
 
-#: src/quick_search.rs:629
+#: src/quick_search.rs:644
 msgid "Play artist"
 msgstr ""
 
-#: src/quick_search.rs:633
+#: src/quick_search.rs:648
 msgid "Play playlist"
 msgstr ""
 
-#: src/quick_search.rs:767
+#: src/quick_search.rs:782
 msgid "Plays after it"
 msgstr ""
 
-#: src/quick_search.rs:769
+#: src/quick_search.rs:784
 msgid "Plays next"
 msgstr ""
 
@@ -2464,7 +2462,8 @@ msgstr ""
 msgid "Unmute"
 msgstr ""
 
-#: ui/bottom_bar.slint:866 ui/pages/now_playing.slint:115
+#: ui/bottom_bar.slint:866 ui/pages/home/hero.slint:508
+#: ui/bottom_bar.slint:866 ui/pages/home/hero.slint:508
 msgid "Up next"
 msgstr ""
 
@@ -2488,35 +2487,35 @@ msgstr ""
 msgid "Remember my choice"
 msgstr ""
 
-#: ui/desktop_lyrics.slint:109
+#: ui/desktop_lyrics.slint:196
 msgid "featherplay desktop lyrics"
 msgstr ""
 
-#: ui/desktop_lyrics.slint:174
+#: ui/desktop_lyrics.slint:282
 msgid "A−"
 msgstr ""
 
-#: ui/desktop_lyrics.slint:175
+#: ui/desktop_lyrics.slint:283
 msgid "Smaller"
 msgstr ""
 
-#: ui/desktop_lyrics.slint:181
+#: ui/desktop_lyrics.slint:289
 msgid "A+"
 msgstr ""
 
-#: ui/desktop_lyrics.slint:182
+#: ui/desktop_lyrics.slint:290
 msgid "Larger"
 msgstr ""
 
-#: ui/desktop_lyrics.slint:198
+#: ui/desktop_lyrics.slint:306
 msgid "Lock: let clicks through"
 msgstr ""
 
-#: ui/desktop_lyrics.slint:205 ui/mini_player.slint:177
+#: ui/desktop_lyrics.slint:313 ui/mini_player.slint:177
 msgid "Open featherplay"
 msgstr ""
 
-#: ui/desktop_lyrics.slint:211
+#: ui/desktop_lyrics.slint:319
 msgid "Turn off desktop lyrics"
 msgstr ""
 
@@ -2639,7 +2638,7 @@ msgid "Keeps the mini player open and above other windows"
 msgstr ""
 
 #: ui/mini_player.slint:230 ui/not_for_me.slint:20 ui/pages/content.slint:322
-#: ui/mini_player.slint:230 ui/not_for_me.slint:20 ui/pages/content.slint:322 ui/song_menu.slint:282
+#: ui/mini_player.slint:230 ui/not_for_me.slint:20 ui/pages/content.slint:322 ui/parts/rows.slint:220 ui/song_menu.slint:282
 msgid "Remove like"
 msgstr ""
 
@@ -2913,59 +2912,86 @@ msgstr ""
 msgid "Plays on your other devices count too."
 msgstr ""
 
-#: ui/pages/home.slint:325 ui/parts/cards.slint:116 ui/parts/covers.slint:197
-#: ui/pages/home.slint:325 ui/parts/cards.slint:116 ui/parts/covers.slint:197
-msgid "Play {}"
+#: ui/pages/home.slint:179 ui/pages/home.slint:223
+msgid "Shuffle Liked songs"
 msgstr ""
 
-#: ui/pages/home.slint:505
+#: ui/pages/home.slint:235
+msgid "Everything you liked"
+msgstr ""
+
+#: ui/pages/home.slint:465
 msgid "Loading more of Home"
 msgstr ""
 
-#: ui/pages/home.slint:530 ui/pages/home.slint:535
+#: ui/pages/home.slint:490 ui/pages/home.slint:495
 msgid "More of Home didn’t load"
 msgstr ""
 
-#: ui/pages/home.slint:579
-msgid "Pick up where you left off"
-msgstr ""
-
-#: ui/pages/home.slint:579
-msgid "Start listening"
-msgstr ""
-
-#: ui/pages/home.slint:603
+#: ui/pages/home.slint:548
 msgid "Nothing on Home yet"
 msgstr ""
 
-#: ui/pages/home.slint:604
+#: ui/pages/home.slint:549
 msgid "Home fills in as you listen. Use Search to find something to play."
 msgstr ""
 
-#. As wide as the wider label, so Go to album doesn't shift as it toggles.
-#: ui/pages/home/hero.slint:162 ui/pages/home/hero.slint:164
+#: ui/pages/home/hero.slint:313
+msgid "Start listening · from"
+msgstr ""
+
+#: ui/pages/home/hero.slint:313
+msgid "Now playing"
+msgstr ""
+
+#: ui/pages/home/hero.slint:313
+msgid "Pick up where you left off"
+msgstr ""
+
+#: ui/pages/home/hero.slint:374
+msgid "Open {}"
+msgstr ""
+
+#: ui/pages/home/hero.slint:374
 msgid "Resume"
 msgstr ""
 
-#: ui/pages/home/hero.slint:170 ui/pages/home/hero.slint:293
-#: ui/pages/home/hero.slint:170 ui/pages/home/hero.slint:293
-msgid "Go to album"
+#: ui/pages/home/hero.slint:391 ui/pages/home/hero.slint:419
+msgid "Paused at"
 msgstr ""
 
-#: ui/pages/home/hero.slint:195
-msgid "Next in queue"
-msgstr ""
-
-#: ui/pages/home/hero.slint:205
-msgid "Nothing after this one"
-msgstr ""
-
-#: ui/pages/home/hero.slint:293 ui/playlist_menu_layer.slint:224
+#: ui/pages/home/hero.slint:432 ui/pages/home/hero.slint:471
+#: ui/pages/home/hero.slint:432 ui/pages/home/hero.slint:471
 msgid "Go to artist"
 msgstr ""
 
-#: ui/pages/home/hero.slint:293
+#: ui/pages/home/hero.slint:432 ui/playlist_menu_layer.slint:224
+msgid "Go to album"
+msgstr ""
+
+#: ui/pages/home/hero.slint:432
 msgid "Open playlist"
+msgstr ""
+
+#: ui/pages/home/hero.slint:453 ui/song_menu.slint:301 ui/song_menu.slint:339
+msgid "Add to playlist"
+msgstr ""
+
+#: ui/pages/home/hero.slint:466 ui/playlist_menu_layer.slint:215
+#: ui/pages/home/hero.slint:466 ui/playlist_menu_layer.slint:215
+msgid "Start radio"
+msgstr ""
+
+#: ui/pages/home/hero.slint:484
+msgid "Up next · {}"
+msgstr ""
+
+#: ui/pages/home/hero.slint:517
+msgid "Show all {}"
+msgstr ""
+
+#: ui/pages/home/hero.slint:525
+msgid "Nothing after this one"
 msgstr ""
 
 #: ui/pages/library.slint:42 ui/sidebar.slint:189
@@ -3735,11 +3761,15 @@ msgstr ""
 msgid "Continue without signing in"
 msgstr ""
 
-#: ui/parts/covers.slint:162
+#: ui/parts/cards.slint:119 ui/parts/covers.slint:201 ui/parts/rows.slint:197
+msgid "Play {}"
+msgstr ""
+
+#: ui/parts/covers.slint:166
 msgid "Playing"
 msgstr ""
 
-#: ui/parts/covers.slint:197 ui/parts/rows.slint:197
+#: ui/parts/covers.slint:201 ui/parts/rows.slint:197
 msgid "Pause {}"
 msgstr ""
 
@@ -3773,10 +3803,6 @@ msgstr ""
 
 #: ui/playlist_menu_layer.slint:126
 msgid "Artist menu"
-msgstr ""
-
-#: ui/playlist_menu_layer.slint:215 ui/song_menu.slint:315
-msgid "Start radio"
 msgstr ""
 
 #: ui/playlist_menu_layer.slint:234 ui/quick_search.slint:670
@@ -4035,10 +4061,6 @@ msgstr ""
 
 #: ui/song_menu.slint:196
 msgid "Song menu"
-msgstr ""
-
-#: ui/song_menu.slint:301 ui/song_menu.slint:339
-msgid "Add to playlist"
 msgstr ""
 
 #: ui/top_bar.slint:211

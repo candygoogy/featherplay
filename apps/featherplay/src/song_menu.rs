@@ -190,6 +190,13 @@ pub fn show_rating(ctx: &Ctx, id: &TrackId, status: LikeStatus) {
     for rows in &models {
         content::set_liked(rows, &id.0, liked);
     }
+    // Home's band: its heart, on a fresh start (resuming it follows the bar's).
+    let home = ui.global::<HomeData>();
+    let mut band = home.get_track();
+    if band.id.as_str() == id.0 && band.liked != liked {
+        band.liked = liked;
+        home.set_track(band);
+    }
     let player = ui.global::<Player>();
     if player.get_track_id().as_str() == id.0 {
         player.set_liked(liked);

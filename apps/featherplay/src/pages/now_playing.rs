@@ -212,7 +212,9 @@ pub fn set_cover_colour(ui: &AppWindow, washes: Option<follow::Washes>) {
     data.set_wash_light(light);
 }
 
-fn show_year(ctx: &Rc<Ctx>, track: Option<&Track>) {
+/// The current album's year into `NowPlayingData.year`, read once per album (Home's band shows
+/// it too).
+pub(crate) fn show_year(ctx: &Rc<Ctx>, track: Option<&Track>) {
     let Some(ui) = ctx.window() else { return };
     let data = ui.global::<NowPlayingData>();
     let Some(album) = track.and_then(|t| t.album.as_ref()).map(|a| a.id.clone()) else {

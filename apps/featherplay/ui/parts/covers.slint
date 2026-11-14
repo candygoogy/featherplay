@@ -27,6 +27,10 @@ export component Cover inherits Rectangle {
     // pages): Slint draws a layer even where it's clipped away, so each one off the page
     // would still cost its whole draw when its row enters.
     in property <bool> layered: true;
+    // Takes its layer even when the art is decoded at the size shown (no resampling to
+    // save): drawn through its rounded clip, art at Home's tile size still cost a 4K scroll
+    // frame ~6 ms more than none (`tests/app/home_covers.rs`).
+    in property <bool> layer-at-size: false;
     // The art underneath while a crossfade runs, the art last shown, and whether the top
     // layer has settled.
     property <image> under;
@@ -82,7 +86,7 @@ export component Cover inherits Rectangle {
         border-radius: parent.border-radius;
         clip: true;
         // `layered` last: a cover without art never depends on it, so a change to it repaints nothing.
-        cache-rendering-hint: root.source.width > 0 && abs(root.source.width * 1phx - root.width) > 0.01px && root.layered;
+        cache-rendering-hint: root.source.width > 0 && (root.layer-at-size || abs(root.source.width * 1phx - root.width) > 0.01px) && root.layered;
         // A plain cover fades its art in as a whole; a crossfade fades `top` over `under` in it.
         opacity: root.crossfade || root.source.width > 0 ? 1 : 0;
         animate opacity { duration: Theme.t-fast; easing: Curves.ease-hover; }

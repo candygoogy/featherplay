@@ -1,322 +1,559 @@
-// Home's hero: "Pick up where you left off" (`ResumeCard`) and, on a fresh start,
-// "Start listening" (`FeaturedCard`) with its rows (`ItemRow`). `HomeTop` lays them out.
+// Home's band (`Band`): the session in its cover's colour at the top of the page. Resuming:
+// "Pick up where you left off · <source>", the song, Resume and where it was paused; playing:
+// "Now playing · <source>" and Open <source>; on a fresh start: a featured pick from the first
+// shelf with Play. The same four round actions on the song in every state (Like, Add to
+// playlist, Start radio, Go to artist), then on the right what's next in the queue (or more
+// from the pick's shelf). `HomeTop` (home.slint) places it.
+//
+// The band is the lyrics panel's ink (`LyricsData.ink`, from the current cover, deep in both
+// themes); a featured pick takes its own (`HomeData.featured-ink-*`). Its text is white and
+// the ink's `next` level.
 import { Theme, Curves, Icons } from "../../theme.slint";
-import { CardItem, ItemKind, Body, Display, Cover, Pill, ProgressRail, SongRow, PageIntent } from "../../parts.slint";
-import { Nav } from "../../nav.slint";
+import { CardItem, ItemKind, TrackRow, Body, Display, Cover, Icon } from "../../parts.slint";
+import { Nav, Frame } from "../../nav.slint";
 import { Player } from "../../player.slint";
 import { SongMenu } from "../../song_menu.slint";
+import { QueueData } from "../../queue_panel.slint";
+import { BarTip } from "../../bar_tip.slint";
+import { LyricsData } from "../lyrics.slint";
+import { NowPlayingData } from "../now_playing.slint";
 import { HomeData } from "data.slint";
 
-// A compact item row for the featured mode's right column: cover, title, subtitle.
-component ItemRow inherits Rectangle {
-    in property <CardItem> item;
+// The band's sizes.
+export global BandSizes {
+    out property <length> height: 224px;
+    out property <length> pad: 24px;
+    out property <length> cover: 176px;
+    // The text column's left edge: the padding, the cover, a 28 px gap.
+    out property <length> text-x: 228px;
+    // The divider before Up next, and the column after it.
+    out property <length> rule-x: 708px;
+    out property <length> next-x: 732px;
+    // The queue shows from this wide (its titles elide past ~220 px, better than an empty
+    // stretch); another column joins when each can be `col-min`, each at most `col-max`.
+    out property <length> show-min: 280px;
+    out property <length> col-min: 420px;
+    out property <length> col-max: 520px;
+    out property <length> col-gap: 24px;
+    out property <length> row-h: 52px;
+    // The four actions: 40 px each, 8 apart.
+    out property <length> actions-w: 4 * 40px + 3 * 8px;
+}
+
+// A pill on the band: solid white (Resume, Play) or tonal (Open <source>). Its label elides
+// past `max-w`.
+component BandPill inherits Rectangle {
+    in property <string> label;
+    in property <string> icon;
+    in property <bool> solid;
+    in property <length> max-w: 10000px;
+    // Its width with the whole label.
+    out property <length> natural: (root.icon != "" ? 16px + 18px + 8px : 20px) + lab.preferred-width + 20px;
     callback clicked();
-    height: Theme.row-h;
-    border-radius: Theme.r-m;
-    background: Theme.state(ta.pressed, ta.has-hover);
+    width: min(root.max-w, root.natural);
+    height: 40px;
+    border-radius: 20px;
     accessible-role: button;
-    accessible-label: root.item.title;
+    accessible-label: root.label;
     accessible-action-default => { root.clicked(); }
-    animate background { duration: Theme.t-hover; easing: Curves.ease-hover; }
-    PageIntent {
-        hovered: ta.has-hover;
-        pressed: ta.pressed;
-        pointer-x: ta.mouse-x;
-        pointer-y: ta.mouse-y;
-        kind: root.item.kind;
-        id: root.item.id;
+    Rectangle {
+        border-radius: root.border-radius;
+        background: root.solid ? (ta.pressed ? Theme.panel-solid-pressed : (ta.has-hover ? Theme.panel-solid-hover : Theme.panel-solid)) : (ta.pressed ? #FFFFFF4D : (ta.has-hover ? #FFFFFF40 : #FFFFFF2E));
+        animate background { duration: Theme.t-hover; }
+        transform-scale: ta.pressed ? Theme.press-scale : 1.0;
+        animate transform-scale {
+            duration: ta.pressed ? Theme.t-press : Theme.t-release;
+            easing: ta.pressed ? Curves.ease-out : Curves.release;
+        }
+        ta := TouchArea {
+            mouse-cursor: pointer;
+            clicked => { root.clicked(); }
+        }
+        if root.icon != "": Icon {
+            x: 16px;
+            y: (parent.height - self.height) / 2;
+            width: 18px;
+            height: 18px;
+            commands: root.icon;
+            fill: root.solid ? #0F0F0F : #FFFFFF;
+            stroke: transparent;
+        }
+        lab := Body {
+            x: root.icon != "" ? 42px : 20px;
+            width: root.width - self.x - 20px;
+            height: root.height;
+            text: root.label;
+            font-weight: 600;
+            color: root.solid ? #0F0F0F : #FFFFFF;
+            vertical-alignment: center;
+        }
     }
+}
+
+// A round action on the band, named in the bar's tooltip.
+component BandButton inherits Rectangle {
+    in property <string> icon;
+    in property <bool> filled;
+    in property <string> name;
+    in property <bool> enabled: true;
+    callback clicked();
+    width: 40px;
+    height: 40px;
+    border-radius: 20px;
+    background: !root.enabled ? #FFFFFF14 : (ta.pressed ? #FFFFFF4D : (ta.has-hover ? #FFFFFF40 : #FFFFFF26));
+    animate background { duration: Theme.t-hover; }
+    accessible-role: button;
+    accessible-label: root.name;
+    accessible-enabled: root.enabled;
+    accessible-action-default => { root.clicked(); }
+    ta := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: pointer;
+        clicked => {
+            tip.dismiss();
+            root.clicked();
+        }
+    }
+    Icon {
+        width: 20px;
+        height: 20px;
+        commands: root.icon;
+        stroke: root.filled ? transparent : #FFFFFF.transparentize(root.enabled ? 0 : 0.6);
+        fill: root.filled ? #FFFFFF : transparent;
+    }
+    tip := BarTip {
+        over: ta.has-hover && root.enabled;
+        name: root.name;
+    }
+}
+
+// A song (or a pick) in the band's right column: its cover, title and second line, and the
+// length at the end; a click plays it, a right-click opens the song menu.
+component BandRow inherits Rectangle {
+    in property <image> cover;
+    in property <bool> round;
+    in property <string> title;
+    in property <string> subtitle;
+    in property <string> duration;
+    in property <color> ink2;
+    callback clicked();
+    // Right-click: the menu at this point (window coordinates).
+    callback menu(length, length);
+    height: BandSizes.row-h;
+    border-radius: Theme.r-m;
+    background: Theme.panel-state(ta.pressed, ta.has-hover);
+    animate background { duration: Theme.t-hover; easing: Curves.ease-hover; }
+    accessible-role: button;
+    accessible-label: root.title + ", " + root.subtitle;
+    accessible-action-default => { root.clicked(); }
     ta := TouchArea {
         mouse-cursor: pointer;
         clicked => { root.clicked(); }
+        pointer-event(e) => {
+            if e.button == PointerEventButton.right && e.kind == PointerEventKind.up {
+                root.menu(root.absolute-position.x + self.mouse-x, root.absolute-position.y + self.mouse-y);
+            }
+        }
     }
     Cover {
         x: 8px;
         y: (parent.height - self.height) / 2;
-        width: Theme.row-cover;
-        height: Theme.row-cover;
+        width: 40px;
+        height: 40px;
         radius: Theme.r-s;
-        round: root.item.round;
-        source: root.item.cover;
+        round: root.round;
+        source: root.cover;
     }
     VerticalLayout {
-        x: 8px + Theme.row-cover + 12px;
-        width: parent.width - self.x - 8px;
+        x: 60px;
+        width: parent.width - self.x - (root.duration != "" ? dur.preferred-width + 20px : 8px);
         alignment: center;
         spacing: 1px;
         Body {
-            text: root.item.title;
+            text: root.title;
             font-weight: 600;
+            color: #FFFFFF;
         }
         Body {
-            text: root.item.subtitle;
+            text: root.subtitle;
             font-size: Theme.t-meta;
-            color: Theme.text2;
+            color: root.ink2;
         }
+    }
+    dur := Body {
+        x: parent.width - self.width - 8px;
+        width: self.preferred-width;
+        height: parent.height;
+        visible: root.duration != "";
+        text: root.duration;
+        font-size: Theme.t-meta;
+        color: root.ink2;
+        vertical-alignment: center;
     }
 }
 
-// "Pick up where you left off": one card as wide as the shelf row under it (`HomeTop`), so it
-// stops where Home's shelves stop instead of running the full width. The 152 px cover, then
-// the song on one column: the title and artist on short lines (no separators), the progress
-// line with its times across the column, and Pause or Resume and Go to album at the cover's
-// foot. A hairline, then what's next in the queue as a column of rows under a plain label.
-// The card ends with the shelf row, so the two columns can't drift apart as the window
-// grows. A card too narrow for both (the Up next panel open) drops the queue's: the song's
-// column keeps the room its buttons need.
-export component ResumeCard inherits Rectangle {
-    property <length> pad: Theme.hero-pad;
-    property <length> cover: Theme.hero-cover;
-    property <length> text-x: root.pad + root.cover + Theme.s5;
-    // The room the song's column needs beside the queue: the buttons, and a title's worth.
-    property <length> song-min-w: max(260px, buttons.preferred-width);
-    // The queue's rows, their 8 px insets included: about a third of the card.
-    property <length> rows-w: clamp(floor(root.width * 0.3 / 1px) * 1px, 260px, 320px);
-    // The rows' hover tiles reach 8 px past the column on both sides, as Quick picks' do.
-    property <length> rows-x: root.width - root.pad + 8px - root.rows-w;
-    // The hairline, a gap left of the rows' covers.
-    property <length> rule-x: root.rows-x + 8px - Theme.s5 - 1px;
-    // The song's column beside the queue, while that leaves it its room.
-    property <length> with-queue-w: root.rule-x - Theme.s5 - root.text-x;
-    property <bool> has-queue: root.with-queue-w >= root.song-min-w;
-    property <length> text-w: root.has-queue ? root.with-queue-w : root.width - root.text-x - root.pad;
-    height: root.cover + 2 * root.pad;
-    border-radius: Theme.r-l;
-    background: Theme.card;
-    border-width: 1px;
-    border-color: Theme.card-edge;
+// Underlined white text that does something ("Show all 12", "Up next · 12 ›", the source).
+component BandLink inherits Rectangle {
+    in property <string> text;
+    in property <bool> chevron;
+    in property <bool> underline: true;
+    in property <bool> enabled: true;
+    callback clicked();
+    // Its width with the whole text.
+    out property <length> natural: t.preferred-width + (root.chevron ? 18px : 0px);
+    width: root.natural;
+    height: 20px;
+    accessible-role: button;
+    accessible-enabled: root.enabled;
+    accessible-label: root.text;
+    accessible-action-default => { root.clicked(); }
+    t := Body {
+        x: 0;
+        width: min(self.preferred-width, root.width - (root.chevron ? 18px : 0px));
+        height: root.height;
+        text: root.text;
+        font-weight: 600;
+        color: #FFFFFF;
+        vertical-alignment: center;
+    }
+    if root.underline || ta.has-hover: Rectangle {
+        x: 0;
+        y: 18px;
+        width: t.width;
+        height: 1px;
+        background: #FFFFFF;
+    }
+    if root.chevron: Icon {
+        x: t.width + 2px;
+        y: 2px;
+        width: 16px;
+        height: 16px;
+        commands: Icons.chevron-right;
+        stroke: #FFFFFF;
+    }
+    ta := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: root.enabled ? MouseCursor.pointer : MouseCursor.default;
+        clicked => { root.clicked(); }
+    }
+}
 
-    Cover {
+// The band. Its right column (Up next, or more from the pick's shelf) shows from a band
+// `next-x + show-min + pad` wide with the Up next panel closed; resuming without it, "Up
+// next · N ›" at the top right opens the panel (nothing while the panel is open, which shows
+// the queue). Wider, the queue runs in more columns of three rows, each up to `col-max`.
+export component Band inherits Rectangle {
+    property <bool> resume: HomeData.resume;
+    property <bool> playing: root.resume && Player.playing;
+    property <bool> song: root.resume || HomeData.featured.kind == ItemKind.song;
+    property <color> ink-ground: root.resume ? LyricsData.ink.ground : Theme.pick(HomeData.featured-ink-dark.ground, HomeData.featured-ink-light.ground);
+    property <color> ink2: root.resume ? LyricsData.ink.next : Theme.pick(HomeData.featured-ink-dark.next, HomeData.featured-ink-light.next);
+    property <length> pad: BandSizes.pad;
+    property <int> queued: QueueData.upcoming.length;
+    property <int> rows-n: root.resume ? HomeData.next.length : HomeData.featured-more.length;
+    property <bool> wide: root.width >= BandSizes.next-x + BandSizes.show-min + root.pad;
+    property <bool> column: root.wide && (!root.resume || !Frame.queue-open) && (root.resume || root.rows-n > 0);
+    property <bool> link: root.resume && !root.column && !Frame.queue-open && root.queued > 0;
+    // The queue's columns: as many as fit and have songs, three rows each.
+    property <length> cols-room: root.width - BandSizes.next-x - root.pad;
+    property <int> cols: max(1, min(ceil(root.rows-n / 3), floor((root.cols-room + BandSizes.col-gap) / (BandSizes.col-min + BandSizes.col-gap))));
+    property <length> col-w: min(BandSizes.col-max, floor((root.cols-room - (root.cols - 1) * BandSizes.col-gap) / root.cols / 1px) * 1px);
+    property <length> cols-w: root.cols * root.col-w + (root.cols - 1) * BandSizes.col-gap;
+    property <int> shown: min(root.rows-n, 3 * root.cols);
+    // Too narrow for the song beside the cover and its row (the Up next panel open beside a
+    // narrow window): a smaller cover, the title a size down, and the row under them both.
+    property <bool> compact: root.width < BandSizes.text-x + root.pad + 340px;
+    property <length> cover: root.compact ? 112px : BandSizes.cover;
+    property <length> text-x: root.compact ? root.pad + root.cover + Theme.s4 + Theme.s1 : BandSizes.text-x;
+    property <length> text-w: (root.column ? BandSizes.rule-x - root.pad : root.width - root.pad) - root.text-x;
+    property <bool> liked: root.resume ? Player.liked : HomeData.track.liked;
+    property <string> source: root.resume ? QueueData.playing-from : HomeData.featured-shelf;
+    height: BandSizes.height;
+    border-radius: Theme.r-l;
+    background: root.ink-ground;
+    animate background { duration: Theme.t-colour; easing: Curves.ease-hover; }
+
+    // The cover, its shadow under it.
+    Rectangle {
         x: root.pad;
         y: root.pad;
         width: root.cover;
         height: root.cover;
-        crossfade: true;
-        source: HomeData.hero-cover;
+        border-radius: Theme.r-m;
+        drop-shadow-blur: 28px;
+        drop-shadow-offset-y: 10px;
+        drop-shadow-color: #00000059;
+        background: Theme.cover-empty;
+        Cover {
+            width: parent.width;
+            height: parent.height;
+            crossfade: true;
+            round: !root.resume && HomeData.featured.round;
+            source: HomeData.hero-cover;
+        }
     }
 
     Rectangle {
         x: root.text-x;
         y: root.pad;
         width: root.text-w;
-        height: root.cover;
-        Display {
+        height: BandSizes.cover;
+        // "Pick up where you left off · Daily mix": the source a link to it (the pick's shelf
+        // isn't one). Clear of the Up next link at the band's top right.
+        Rectangle {
+            property <length> room: parent.width - (root.link ? up-link.width + Theme.s4 : 0px);
             x: 0;
             y: 0;
-            width: parent.width;
-            height: 36px;
-            text: Player.title;
-            font-size: Theme.t-display-m;
-            vertical-alignment: center;
-        }
-        Body {
-            x: 0;
-            y: 38px;
-            width: parent.width;
+            width: self.room;
             height: 20px;
-            text: Player.artist;
-            font-size: Theme.t-body-l;
-            color: Theme.text2;
-            vertical-alignment: center;
+            lead := Body {
+                x: 0;
+                width: min(self.preferred-width, parent.room);
+                height: parent.height;
+                text: !root.resume ? @tr("Start listening · from") + " " : (root.playing ? @tr("Now playing") : @tr("Pick up where you left off")) + (root.source != "" ? " · " : "");
+                font-weight: 600;
+                color: root.ink2;
+                vertical-alignment: center;
+            }
+            if root.source != "": BandLink {
+                x: lead.width;
+                width: min(self.natural, parent.room - lead.width);
+                text: root.source;
+                underline: false;
+                enabled: root.resume;
+                clicked => { QueueData.open-source(); }
+            }
         }
-        // Across the column, a line's gap over the buttons. The elapsed time is as wide as the
-        // length, so the line doesn't shift as it ticks.
-        if Player.duration-s > 0: HorizontalLayout {
+        Display {
             x: 0;
-            y: parent.height - 40px - Theme.s4 - self.height;
+            y: 24px;
             width: parent.width;
-            height: 16px;
-            spacing: Theme.s3;
-            Body {
-                width: total.preferred-width;
-                text: Player.elapsed;
-                font-size: Theme.t-meta;
-                color: Theme.text2;
+            height: root.compact ? 40px : 48px;
+            text: root.resume ? Player.title : HomeData.featured.title;
+            font-size: root.compact ? Theme.t-display-m : Theme.t-display-l;
+            vertical-alignment: center;
+            color: #FFFFFF;
+            accessible-role: text;
+        }
+        // "Josh Woodward · The Beautiful Machine · 2014": the artist in white.
+        Rectangle {
+            property <string> artist: root.resume ? Player.artist : (root.song ? HomeData.track.artist : HomeData.featured.subtitle);
+            property <string> album: root.resume ? Player.album : (root.song ? HomeData.track.album : "");
+            property <string> year: root.resume && Player.album != "" ? NowPlayingData.year : "";
+            property <string> rest: (self.album != "" ? " · " + self.album : "") + (self.year != "" ? " · " + self.year : "");
+            x: 0;
+            y: root.compact ? 66px : 74px;
+            width: parent.width;
+            height: 22px;
+            artist := Body {
+                x: 0;
+                // The album keeps a little room when the artist runs long.
+                width: min(self.preferred-width, parent.rest != "" ? max(parent.width * 0.6, parent.width - rest.preferred-width) : parent.width);
+                height: parent.height;
+                text: parent.artist;
+                font-size: Theme.t-body-l;
+                font-weight: 600;
+                color: #FFFFFF;
                 vertical-alignment: center;
-                overflow: clip;
             }
-            Rectangle {
-                horizontal-stretch: 1;
-                accessible-role: progress-indicator;
-                accessible-label: @tr("{0} of {1}", Player.elapsed, Player.total);
-                ProgressRail {
-                    y: (parent.height - self.height) / 2;
-                    width: parent.width;
-                    progress: Player.position-s / Player.duration-s;
-                }
-            }
-            total := Body {
-                text: Player.total;
-                font-size: Theme.t-meta;
-                color: Theme.text2;
+            rest := Body {
+                x: artist.width;
+                width: parent.width - self.x;
+                height: parent.height;
+                text: parent.rest;
+                font-size: Theme.t-body-l;
+                color: root.ink2;
                 vertical-alignment: center;
             }
         }
-        buttons := HorizontalLayout {
-            x: 0;
-            y: parent.height - self.height;
-            width: self.preferred-width;
+        // The row at the cover's foot: the main pill, where it was paused, a hairline, the
+        // four actions. "Paused at" goes first when the column is too narrow for it all; then
+        // the pill's label elides.
+        act := Rectangle {
+            property <bool> has-main: !root.playing || QueueData.playing-from != "";
+            property <string> main-label: !root.resume ? @tr("Play") : (root.playing ? @tr("Open {}", QueueData.playing-from) : @tr("Resume"));
+            property <length> main-natural: (root.playing ? 20px : 42px) + main-measure.preferred-width + 20px;
+            property <length> fixed: (self.has-main && root.song ? Theme.s4 + 1px + Theme.s4 : 0px) + (root.song ? BandSizes.actions-w : 0px);
+            property <length> paused-w: paused-lead.preferred-width + 4px + paused-time.preferred-width;
+            property <bool> paused-shown: root.resume && !root.playing && self.main-natural + Theme.s4 + self.paused-w + self.fixed <= self.width;
+            x: root.compact ? root.pad - root.text-x : 0px;
+            y: parent.height - 40px;
+            width: root.compact ? root.width - 2 * root.pad : parent.width;
             height: 40px;
-            spacing: Theme.s2;
-            Pill {
-                label: Player.playing ? @tr("Pause") : @tr("Resume");
-                // As wide as the wider label, so Go to album doesn't shift as it toggles.
-                alt-label: Player.playing ? @tr("Resume") : @tr("Pause");
-                icon: Player.playing ? Icons.pause : Icons.play;
-                solid: true;
-                clicked => { HomeData.resume-clicked(); }
+            // Only measured.
+            main-measure := Body {
+                visible: false;
+                text: act.main-label;
+                font-weight: 600;
             }
-            if Player.album-id != "": Pill {
-                label: @tr("Go to album");
-                clicked => { Nav.open-album(Player.album-id); }
+            paused-lead := Body {
+                visible: false;
+                text: @tr("Paused at");
+            }
+            paused-time := Body {
+                visible: false;
+                text: Player.elapsed;
+                font-weight: 600;
+            }
+            HorizontalLayout {
+                alignment: start;
+                spacing: Theme.s4;
+                if act.has-main: BandPill {
+                    max-w: act.width - act.fixed;
+                    label: act.main-label;
+                    icon: root.playing ? "" : Icons.play;
+                    solid: !root.playing;
+                    clicked => {
+                        if !root.resume {
+                            HomeData.play-featured();
+                        } else if root.playing {
+                            QueueData.open-source();
+                        } else {
+                            HomeData.resume-clicked();
+                        }
+                    }
+                }
+                if act.paused-shown: HorizontalLayout {
+                    spacing: 4px;
+                    Body {
+                        text: @tr("Paused at");
+                        color: root.ink2;
+                        vertical-alignment: center;
+                    }
+                    Body {
+                        text: Player.elapsed;
+                        font-weight: 600;
+                        color: #FFFFFF;
+                        vertical-alignment: center;
+                    }
+                }
+                // A pick that isn't a song: Go to album, Open playlist or Go to artist.
+                if !root.song: BandPill {
+                    label: HomeData.featured.kind == ItemKind.artist ? @tr("Go to artist") : (HomeData.featured.kind == ItemKind.album ? @tr("Go to album") : @tr("Open playlist"));
+                    clicked => { HomeData.open-featured(-1); }
+                }
+                if root.song && act.has-main: Rectangle {
+                    width: 1px;
+                    Rectangle {
+                        y: 8px;
+                        height: 24px;
+                        background: #FFFFFF2E;
+                    }
+                }
+                if root.song: HorizontalLayout {
+                    spacing: Theme.s2;
+                    BandButton {
+                        icon: Icons.heart;
+                        filled: root.liked;
+                        name: root.liked ? @tr("Remove like") : @tr("Like");
+                        clicked => { SongMenu.like(HomeData.track.id, !root.liked); }
+                    }
+                    BandButton {
+                        icon: Icons.plus;
+                        name: @tr("Add to playlist");
+                        clicked => {
+                            SongMenu.show(HomeData.track, self.absolute-position.x, self.absolute-position.y + self.height + Theme.s1, self.absolute-position.y);
+                            if SongMenu.signed-in {
+                                SongMenu.choosing = true;
+                            } else {
+                                SongMenu.close();
+                                SongMenu.add-signed-out();
+                            }
+                        }
+                    }
+                    BandButton {
+                        icon: Icons.radio;
+                        name: @tr("Start radio");
+                        clicked => { SongMenu.start-radio(HomeData.track.id); }
+                    }
+                    BandButton {
+                        icon: Icons.person;
+                        name: @tr("Go to artist");
+                        enabled: HomeData.track.artist-id != "";
+                        clicked => { Nav.open-artist(HomeData.track.artist-id); }
+                    }
+                }
             }
         }
     }
 
-    if root.has-queue: Rectangle {
-        x: root.rule-x;
+    up-link := BandLink {
+        x: root.width - root.pad - self.width;
+        y: root.pad;
+        visible: root.link;
+        text: @tr("Up next · {}", root.queued);
+        chevron: true;
+        clicked => { HomeData.show-queue(); }
+    }
+
+    if root.column: Rectangle {
+        x: BandSizes.rule-x;
         y: root.pad;
         width: 1px;
-        height: root.cover;
-        background: Theme.hairline;
+        height: BandSizes.cover;
+        background: #FFFFFF26;
     }
-    // The label, then the rows from the top (`home.rs::HERO_NEXT`, three at most; two or one when
-    // the queue holds fewer), over the cover's height and 4 px past it at both ends.
-    if root.has-queue: Rectangle {
-        x: root.rows-x;
-        y: root.pad - 4px;
-        width: root.rows-w;
-        height: root.cover + 8px;
+    // "Up next" and "Show all N" over three rows a column; on a fresh start, "More from Quick
+    // picks" over three of them.
+    if root.column: Rectangle {
+        x: BandSizes.next-x;
+        y: root.pad;
+        width: root.cols-w;
+        height: BandSizes.cover;
         Body {
             x: 8px;
-            y: -4px;
-            width: parent.width - 16px;
+            y: 0;
+            width: parent.width - 16px - (all.visible ? all.width + Theme.s4 : 0px);
             height: 20px;
-            text: @tr("Next in queue");
+            text: root.resume ? @tr("Up next") : HomeData.featured-from;
             font-weight: 600;
-            color: Theme.text2;
+            color: root.ink2;
             vertical-alignment: center;
         }
-        if HomeData.next.length == 0: Body {
+        all := BandLink {
+            x: parent.width - 8px - self.width;
+            y: 0;
+            visible: root.resume && root.queued > root.shown;
+            text: @tr("Show all {}", root.queued);
+            clicked => { HomeData.show-queue(); }
+        }
+        if root.resume && root.rows-n == 0: Body {
             x: 8px;
-            y: 24px;
+            y: 32px;
             width: parent.width - 16px;
             height: 20px;
             text: @tr("Nothing after this one");
-            color: Theme.text3;
+            color: root.ink2;
             vertical-alignment: center;
         }
-        for t[i] in HomeData.next: SongRow {
-            x: 0;
-            y: parent.height - 3 * Theme.track-row-h + i * Theme.track-row-h;
-            width: parent.width;
-            height: Theme.track-row-h;
-            track: t;
-            menu: true;
-            show-duration: false;
-            double-clicked => { HomeData.play-next(i); }
-            play => { HomeData.play-next(i); }
-            menu-requested(x, y, top) => { SongMenu.show(t, x, y, top); }
-        }
-    }
-}
-
-// "Start listening" on a fresh start: a 152 px cover, the pick on short lines, Play and Go to
-// it; on the right, more from its shelf as a 2 x 2 grid of rows under a plain column heading.
-// The pick's column takes what it needs, up to 520 px, and the rows take the rest, so on a
-// wide window the two halves stay together instead of drifting to the card's ends. A card
-// too narrow for the rows (the Up next panel open at 1280) drops them.
-export component FeaturedCard inherits Rectangle {
-    property <length> pad: Theme.hero-pad;
-    property <length> cover: Theme.hero-cover;
-    property <length> text-x: root.pad + root.cover + Theme.s5;
-    // The room right of the cover, for the text, the gap and the rows.
-    property <length> avail: root.width - root.text-x - root.pad;
-    property <bool> has-list: root.avail >= 300px + Theme.s5 + 260px;
-    property <length> text-w: root.has-list ? max(300px, min(520px, root.avail - Theme.s5 - 428px)) : root.avail;
-    property <length> list-w: root.avail - root.text-w - Theme.s5;
-    property <int> cols: root.list-w >= 420px ? 2 : 1;
-    property <length> col-w: floor((root.list-w - (root.cols - 1) * Theme.s2) / root.cols / 1px) * 1px;
-    height: root.cover + 2 * root.pad;
-    border-radius: Theme.r-l;
-    background: Theme.card;
-    border-width: 1px;
-    border-color: Theme.card-edge;
-
-    Cover {
-        x: root.pad;
-        y: root.pad;
-        width: root.cover;
-        height: root.cover;
-        crossfade: true;
-        round: HomeData.featured.round;
-        source: HomeData.hero-cover;
-    }
-
-    Rectangle {
-        x: root.text-x;
-        y: root.pad;
-        width: root.text-w;
-        height: root.cover;
-        Display {
-            x: 0;
-            y: 0;
-            width: parent.width;
-            height: 36px;
-            text: HomeData.featured.title;
-            font-size: Theme.t-display-m;
-            vertical-alignment: center;
-        }
-        Body {
-            x: 0;
-            y: 38px;
-            width: parent.width;
-            height: 20px;
-            text: HomeData.featured.subtitle;
-            font-size: Theme.t-body-l;
-            color: Theme.text2;
-            vertical-alignment: center;
-        }
-        HorizontalLayout {
-            x: 0;
-            y: parent.height - self.height;
-            height: 40px;
-            alignment: start;
-            spacing: Theme.s2;
-            Pill {
-                label: @tr("Play");
-                icon: Icons.play;
-                solid: true;
-                clicked => { HomeData.play-featured(); }
-            }
-            if HomeData.featured.kind != ItemKind.song: Pill {
-                label: HomeData.featured.kind == ItemKind.artist ? @tr("Go to artist") : (HomeData.featured.kind == ItemKind.album ? @tr("Go to album") : @tr("Open playlist"));
-                clicked => { HomeData.open-featured(-1); }
+        if root.resume: Rectangle {
+            for t[i] in HomeData.next: BandRow {
+                x: floor(i / 3) * (root.col-w + BandSizes.col-gap);
+                y: 20px + mod(i, 3) * BandSizes.row-h;
+                width: root.col-w;
+                visible: i < root.shown;
+                cover: t.cover;
+                title: t.title;
+                subtitle: t.artist;
+                duration: t.duration;
+                ink2: root.ink2;
+                clicked => { QueueData.play(i); }
+                menu(x, y) => { SongMenu.show(t, x, y, y); }
             }
         }
-    }
-
-    if root.has-list: Rectangle {
-        x: root.width - root.list-w - root.pad;
-        y: root.pad;
-        width: root.list-w;
-        height: root.cover;
-        Body {
-            x: 8px;
-            y: 0;
-            width: parent.width - 16px;
-            height: 24px;
-            text: HomeData.featured-from;
-            font-weight: 600;
-            vertical-alignment: center;
-        }
-        for it[i] in HomeData.featured-more: ItemRow {
-            x: mod(i, root.cols) * (root.col-w + Theme.s2);
-            y: parent.height - 2 * Theme.row-h + floor(i / root.cols) * Theme.row-h;
-            width: root.col-w;
-            item: it;
-            visible: i < 2 * root.cols;
-            clicked => { HomeData.open-featured(i); }
+        if !root.resume: Rectangle {
+            for it[i] in HomeData.featured-more: BandRow {
+                x: floor(i / 3) * (root.col-w + BandSizes.col-gap);
+                y: 20px + mod(i, 3) * BandSizes.row-h;
+                width: root.col-w;
+                visible: i < root.shown;
+                cover: it.cover;
+                round: it.round;
+                title: it.title;
+                subtitle: it.subtitle;
+                ink2: root.ink2;
+                clicked => { HomeData.open-featured(i); }
+            }
         }
     }
 }

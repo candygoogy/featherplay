@@ -1,7 +1,7 @@
 //! The Up next panel in a narrow window, on the offscreen platform (no window is shown).
 //!
 //! At the window's least width (960 logical px: 1440 px at 150 %, beside the rail) the page
-//! makes room for the panel: it ends at the panel's left edge, and Home's rows end at the
+//! makes room for the panel: it ends at the panel's left edge, and Home's band ends at the
 //! page's padding left of it rather than running on under the panel. Where making room beside
 //! the full sidebar would leave the page narrower than `Theme.page-min-w` (1100 px), the
 //! sidebar folds to the rail while the panel is open; nothing floats over a darkened page.
@@ -31,18 +31,19 @@ fn the_page_ends_at_the_panel_and_the_sidebar_folds_to_make_room() {
     );
     assert!(ui.get_page_width() >= theme.get_page_min_w());
 
-    // Nothing of the page's rows in its right padding, just left of the panel: each row
-    // of pixels there is the ground or the wash (horizontal bands), as in the left padding.
+    // Nothing of the band in the page's right padding, just left of the panel: each row of
+    // pixels there down to the band's foot (the 64 px top bar, 32 px, 224 px) is the ground,
+    // as in the left padding. (The rails under it run on to the page's edge on purpose.)
     let shot = offscreen::shown(w).expect("shown");
     let px = |x: f32, y: u32| {
         let p = shot.as_slice()[(y * shot.width() + (x * SCALE) as u32) as usize];
         [p.r, p.g, p.b]
     };
     let near = |a: [u8; 3], b: [u8; 3]| a.iter().zip(b).all(|(a, b)| a.abs_diff(b) <= 6);
-    let bar_top = ((w.size().height as f32 / SCALE - theme.get_bar_clear()) * SCALE) as u32;
+    let band_foot = ((64.0 + 32.0 + 224.0) * SCALE) as u32;
     let left = theme.get_rail_w() + 2.0;
     let mut stray = Vec::new();
-    for y in 0..bar_top {
+    for y in 0..band_foot {
         let ground = px(left, y);
         let mut x = panel_x - pad + 2.0;
         while x < panel_x - 2.0 {

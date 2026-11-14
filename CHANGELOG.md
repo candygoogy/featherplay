@@ -6,6 +6,21 @@ Notable changes to featherplay, newest first. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **A new Home.** It opens on a band in the colour of the song's cover (deep in the light
+  theme too): the cover, "Pick up where you left off" (or "Now playing") with where it's
+  playing from, the title, the artist, album and year, and one row: Resume and where you
+  paused (Open the source while it plays; Play on a fresh start), then Like, Add to playlist,
+  Start radio and Go to artist. On its right, the next three songs and **Show all**, which
+  opens Up next; in a narrower window an **Up next** link at its top right instead, and
+  nothing there while the Up next panel is open. Under it, every shelf is one row of large
+  covers that pages sideways with the arrows shown on hover, the next cover cut off at the
+  window's edge; Quick picks keep their song grid, two rows. Your mixes open with **Shuffle
+  Liked songs**, which plays Liked songs shuffled (the sidebar still opens the page). It
+  replaces the "Pick up where you left off" card, the shortcut tiles and the cover wash
+  behind the search bar.
+
 ### Fixed
 
 - The player bar holds up in a window narrower than its 960 px minimum, as some Linux window

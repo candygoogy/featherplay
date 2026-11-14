@@ -734,7 +734,16 @@ impl Driver {
             PageKind::History => rows!(HistoryData, get_tracks, invoke_play),
             PageKind::Search => rows!(SearchData, get_songs, invoke_play),
             PageKind::Artist => rows!(ArtistData, get_top_songs, invoke_play),
-            PageKind::Home => rows!(HomeData, get_next, invoke_play_next),
+            // The band's Up next rows play from the queue, as the panel's do.
+            PageKind::Home => {
+                let rows = ui.global::<HomeData>().get_next();
+                let play: Box<dyn Fn(i32)> = Box::new(move |i| {
+                    if let Some(ui) = w.upgrade() {
+                        ui.global::<crate::ui::QueueData>().invoke_play(i);
+                    }
+                });
+                (rows, play)
+            }
             other => return Err(format!("no song rows on {other:?}")),
         })
     }

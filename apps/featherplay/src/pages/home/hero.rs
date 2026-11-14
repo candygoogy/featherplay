@@ -1,4 +1,4 @@
-//! Home's hero: the resume card or the featured pick, and the header's wash.
+//! Home's band: the session (resuming or playing) or a featured pick, and the pick's colour.
 
 use std::rc::Rc;
 
@@ -10,23 +10,21 @@ use slint::ComponentHandle;
 use super::STATE;
 use crate::app::Ctx;
 use crate::controller::{Action, PlayerState};
-use crate::follow::{
-    self,
-    colour::{self, Lch, Rgb},
-};
+use crate::follow;
 use crate::pages::content::ROW_COVER;
+use crate::pages::now_playing;
 use crate::song_menu;
-use crate::ui::HomeData;
+use crate::ui::{HomeData, TrackRow};
 use crate::ui_bridge::{home_card, home_thumbnail, model, to_rows};
 
-/// The hero's cover, in logical pixels (`Theme.hero-cover`).
-const HERO_COVER: u32 = 152;
-/// Rows in the fresh-start hero's right column (two rows of two).
-const HERO_ROWS: usize = 4;
-/// Rows in the resume card's queue column, at most (`ResumeCard`).
-const HERO_NEXT: usize = 3;
+/// The band's cover, in logical pixels (`BandSizes.cover`).
+const HERO_COVER: u32 = 176;
+/// Rows in the fresh-start band's right column (`Band`: one column of three).
+const HERO_ROWS: usize = 3;
+/// Rows in the band's queue: three columns of three at most (`Band`, from ~1700 px).
+const HERO_NEXT: usize = 9;
 
-/// What the hero shows.
+/// What the band shows.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Hero {
     /// The current track and what's next in the queue.
@@ -49,7 +47,7 @@ pub fn choose_hero(state: Option<&PlayerState>, shelves: &[HomeShelf]) -> Hero {
     }
 }
 
-/// Shows the hero the player state and the feed call for; cheap when nothing changed.
+/// Shows the band the player state and the feed call for; cheap when nothing changed.
 pub(super) fn show_hero(ctx: &Rc<Ctx>) {
     let Some(ui) = ctx.window() else { return };
     let data = ui.global::<HomeData>();
@@ -62,9 +60,19 @@ pub(super) fn show_hero(ctx: &Rc<Ctx>) {
     match &hero {
         Hero::Resume => {
             let Some(state) = state else { return };
-            let url = state.current.as_ref().and_then(|t| t.thumbnail.clone());
-            set_hero_cover(ctx, url.clone());
-            show_wash(ctx, url);
+            let current = state.current.as_ref();
+            let url = current.and_then(|t| t.thumbnail.clone());
+            let new_track = current.is_some_and(|t| data.get_track().id != t.id.0.as_str());
+            if let Some(t) = current {
+                // The band's actions find it (`song_menu::find`).
+                song_menu::remember(std::slice::from_ref(t));
+                set_track(ctx, row_of(t));
+            }
+            set_hero_cover(ctx, url);
+            if new_track {
+                // "album · year": the year is the album's, as Now playing shows it.
+                now_playing::show_year(ctx, current);
+            }
             let next: Vec<Track> = state.upcoming.iter().take(HERO_NEXT).cloned().collect();
             let ids: Vec<TrackId> = next.iter().map(|t| t.id.clone()).collect();
             if changed || STATE.with(|s| s.borrow().next != ids) {
@@ -88,15 +96,22 @@ pub(super) fn show_hero(ctx: &Rc<Ctx>) {
             });
             let title = STATE.with(|s| s.borrow().shelves[*shelf].title.clone());
             if let HomeItem::Track(t) = &items[0] {
+                song_menu::remember(std::slice::from_ref(t));
+                set_track(ctx, row_of(t));
                 // Its Play button starts at once.
                 ctx.send(Action::Prefetch {
                     id: t.id.clone(),
                     track: Some(t.clone()),
                 });
+            } else {
+                set_track(ctx, TrackRow::default());
             }
             data.set_featured(home_card(&items[0]));
+            data.set_featured_shelf(title.as_str().into());
             data.set_featured_from(tr!("More from {}", title).into());
-            set_hero_cover(ctx, home_thumbnail(&items[0]));
+            let url = home_thumbnail(&items[0]);
+            set_hero_cover(ctx, url.clone());
+            show_ink(ctx, url);
             let more = &items[1..];
             let (rows, model) = model(more.iter().map(home_card).collect());
             data.set_featured_more(model);
@@ -108,6 +123,32 @@ pub(super) fn show_hero(ctx: &Rc<Ctx>) {
         _ => {}
     }
     STATE.with(|s| s.borrow_mut().hero = Some(hero));
+}
+
+fn row_of(t: &Track) -> TrackRow {
+    let mut row = to_rows(std::slice::from_ref(t)).pop().unwrap_or_default();
+    // A like made since the track was loaded.
+    if let Some(like) = song_menu::like_of(&t.id) {
+        row.liked = like == featherplay_core::model::LikeStatus::Like;
+    }
+    row
+}
+
+/// The song the band's actions act on, with the band's cover once it's in (the song menu's
+/// head shows it).
+fn set_track(ctx: &Ctx, mut row: TrackRow) {
+    let Some(ui) = ctx.window() else { return };
+    let data = ui.global::<HomeData>();
+    let old = data.get_track();
+    if old.id == row.id {
+        row.cover = old.cover.clone();
+    } else {
+        row.cover = data.get_hero_cover();
+    }
+    // Set only when it changed: the player's state comes again with every position.
+    if row != old {
+        data.set_track(row);
+    }
 }
 
 fn set_hero_cover(ctx: &Ctx, url: Option<String>) {
@@ -123,61 +164,46 @@ fn set_hero_cover(ctx: &Ctx, url: Option<String>) {
     ctx.covers.load(&url, HERO_COVER, move |img| {
         let still = STATE.with(|s| s.borrow().hero_url.as_deref() == Some(wanted.as_str()));
         if still && let Some(ui) = weak.upgrade() {
-            ui.global::<HomeData>().set_hero_cover(img);
+            let data = ui.global::<HomeData>();
+            data.set_hero_cover(img.clone());
+            let mut track = data.get_track();
+            track.cover = img;
+            data.set_track(track);
         }
     });
 }
 
-/// The header's wash from the resumed song's cover: its colour is worked out once per cover,
-/// off the UI thread. Until the new one is known the last one stays, so a track change
-/// crossfades colour to colour (`HomePage.wash`).
-fn show_wash(ctx: &Rc<Ctx>, url: Option<String>) {
-    if STATE.with(|s| s.borrow().wash_url != url) {
-        STATE.with(|s| s.borrow_mut().wash_url = url.clone());
-        let Some(url) = url else {
-            STATE.with(|s| s.borrow_mut().wash_seed = None);
-            if let Some(ui) = ctx.window() {
-                let data = ui.global::<HomeData>();
-                data.set_wash_dark(Default::default());
-                data.set_wash_light(Default::default());
-            }
-            return;
-        };
-        let wanted = url.clone();
-        let c = ctx.clone();
-        ctx.covers.load(&url, HERO_COVER, move |img| {
-            let current = |w: &str| STATE.with(|s| s.borrow().wash_url.as_deref() == Some(w));
-            if !current(&wanted) {
-                return;
-            }
-            let paint = c.clone();
-            follow::cover_seed(&c, &img, move |seed| {
-                if current(&wanted) {
-                    STATE.with(|s| s.borrow_mut().wash_seed = Some(seed));
-                    paint_wash(&paint);
-                }
-            });
-        });
-    }
-    paint_wash(ctx);
-}
-
-/// Sets the wash for the known cover colour.
-fn paint_wash(ctx: &Ctx) {
-    let Some(ui) = ctx.window() else { return };
-    let Some(seed) = STATE.with(|s| s.borrow().wash_seed) else {
+/// The featured pick's panel from its cover's colour, worked out once per cover off the UI
+/// thread, as the lyrics panel's is (`follow::lyric_inks_for`; graphite for grey art). Until
+/// it's known the band is graphite, then it crossfades (`Band`).
+fn show_ink(ctx: &Rc<Ctx>, url: Option<String>) {
+    if STATE.with(|s| s.borrow().ink_url == url) {
         return;
-    };
-    let washes = follow::washes_on_ground(hero_washes(seed));
-    let data = ui.global::<HomeData>();
-    data.set_wash_dark(washes.dark);
-    data.set_wash_light(washes.light);
+    }
+    STATE.with(|s| s.borrow_mut().ink_url = url.clone());
+    paint_ink(ctx, follow::lyric_inks_for(None, None));
+    let Some(url) = url else { return };
+    let wanted = url.clone();
+    let c = ctx.clone();
+    ctx.covers.load(&url, HERO_COVER, move |img| {
+        let current = |w: &str| STATE.with(|s| s.borrow().ink_url.as_deref() == Some(w));
+        if !current(&wanted) {
+            return;
+        }
+        let paint = c.clone();
+        follow::cover_seed(&c, &img, move |seed| {
+            if current(&wanted) {
+                paint_ink(&paint, follow::lyric_inks_for(Some(seed), None));
+            }
+        });
+    });
 }
 
-/// The header wash's two shades for the resumed song's cover: its own colour, grey for
-/// grey art (below `NEUTRAL_CHROMA`), as Now playing's wash and the neutral accent.
-fn hero_washes(seed: Lch) -> (Rgb, Rgb) {
-    colour::washes(seed)
+fn paint_ink(ctx: &Ctx, inks: follow::LyricInks) {
+    let Some(ui) = ctx.window() else { return };
+    let data = ui.global::<HomeData>();
+    data.set_featured_ink_dark(inks.dark);
+    data.set_featured_ink_light(inks.light);
 }
 
 #[cfg(test)]
@@ -238,28 +264,5 @@ mod tests {
             choose_hero(Some(&state(None, Vec::new())), &[shelf("x", Vec::new())]),
             Hero::Empty
         );
-    }
-
-    #[test]
-    fn the_header_washes_in_a_colourful_covers_own_colour() {
-        let seed = Lch {
-            l: 0.6,
-            c: 0.14,
-            h: 1.0,
-        };
-        assert_eq!(hero_washes(seed), colour::washes(seed));
-    }
-
-    #[test]
-    fn grey_art_washes_the_header_grey() {
-        let grey = Lch {
-            l: 0.5,
-            c: 0.02,
-            h: 0.3,
-        };
-        let (dark, light) = hero_washes(grey);
-        for shade in [dark, light] {
-            assert!(colour::to_lch(shade).c < 0.005, "a tinted wash: {shade:?}");
-        }
     }
 }

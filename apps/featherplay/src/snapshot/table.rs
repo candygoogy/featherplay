@@ -7,11 +7,13 @@ use crate::router::{ExploreTab, LibraryTab, Page};
 
 pub const PAGES: &[&str] = &[
     "home",
-    // Home on a fresh start: no session, so the hero features a pick.
+    // Home with the session paused: the band's "Pick up where you left off" and Resume.
+    "home-paused",
+    // Home on a fresh start: no session, so the band features a pick.
     "home-fresh",
-    // Home playing titles in styled maths letters, shown plain on the card and in its queue.
+    // Home playing titles in styled maths letters, shown plain in the band and its queue.
     "home-styled",
-    // Home resuming a title too long for the resume card's line, by many artists.
+    // Home playing a title too long for the band's line, by many artists.
     "home-long",
     "library",
     "library-playlists",
@@ -289,6 +291,7 @@ pub(super) fn page(name: &str, f: &Fixtures) -> Result<Page, String> {
     let e = |err: featherplay_ytm::ApiError| err.to_string();
     Ok(match name {
         "home"
+        | "home-paused"
         | "home-fresh"
         | "home-styled"
         | "home-long"

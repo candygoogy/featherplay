@@ -1,42 +1,37 @@
-// Home (the layout chosen 2026-10-30: shelves by kind, with the mixes as shortcuts):
-// the hero, titled like a shelf, then the Home feed. Data comes from
-// `src/pages/home.rs` through `HomeData`.
+// Home (the layout chosen 2026-11-14: a band and rails): the band, then the Home feed as
+// rails. Data comes from `src/pages/home.rs` through `HomeData`.
 //
-// The hero has two modes. With a session or a queue: "Pick up where you left off"
-// (`ResumeCard`, as wide as the shelf row under it), the current track (from `Player`) with
-// the progress, Pause or Resume and Go to album, and beside it what's next in the queue as a
-// column of rows. On a fresh start with an empty queue: a featured pick from the first shelf,
-// with more from it (`FeaturedCard`).
+// The band (`Band`, in `home/hero.slint`) is the session in its cover's colour: "Pick up where
+// you left off" with Resume, "Now playing" while it plays, or on a fresh start with an empty
+// queue a featured pick from the first shelf with Play; the song's four actions; what's next
+// in the queue on its right.
 //
-// Every shelf takes the shape of what it holds (`home.rs::arrange`), so the eye tells the
-// shelves apart before reading them: your mixes as wide shortcuts right under the hero (what
-// gets replayed most, one click away), quick picks as a dense song grid, videos as wide 16:9
-// tiles, playlists as smaller cards, artists as round faces with only their names, and albums
-// and anything else as standard cards. Liked songs is always the first shortcut (a red tile
-// with a white heart, as on its own page), and a community playlist wears its creator's
-// round photo over its collage's bottom-left corner.
+// Every shelf is one rail of large tiles that pages sideways (`TileShelf`), running past the
+// page's right padding to its edge, so the cut-off tile says there's more. Each takes the
+// shape of what it holds (`home.rs::arrange`): videos as wide 16:9 tiles, artists as round
+// faces with only their names, the rest square; quick picks stay a dense song grid of two
+// rows. Your mixes come first, opened by "Shuffle Liked songs" (a red tile with a white
+// heart, as on its own page, and a shuffle badge), and a community playlist wears its
+// creator's round photo over its collage's bottom-left corner.
 //
 // More shelves load as the user scrolls near the end (`home.rs::Paging`): a quiet skeleton
 // shelf while a page loads, a quiet Try again if it fails; Home itself never errors for it.
 //
-// The hero's cards are in `home/hero.slint`, and `HomeData` in `home/data.slint`; this file
-// lays out the page and its shelves.
+// `HomeData` is in `home/data.slint`; this file lays out the page and its shelves.
 import { ListView } from "../list_view.slint";
 import { Theme, Curves, Icons } from "../theme.slint";
-import { CardItem, ItemKind, Body, Display, Cover, Card, Icon, Pill, SongRow, ShelfArrows, Bands, RowsShown, SongList, PageIntent } from "../parts.slint";
+import { CardItem, ItemKind, Body, Display, Card, Icon, Pill, SongRow, ShelfArrows, RowsShown, SongList, PageIntent } from "../parts.slint";
 import { Skeleton, SkeletonBlock, SkeletonBar, SkeletonRow, SkeletonCard, ErrorState, EmptyState, Open } from "content.slint";
 import { SongMenu } from "../song_menu.slint";
 import { ShelfShape, MoreState, HomeShelfRow, HomeData } from "home/data.slint";
-import { ResumeCard, FeaturedCard } from "home/hero.slint";
+import { Band, BandSizes } from "home/hero.slint";
 
 export { ShelfShape, MoreState, HomeShelfRow, HomeData } from "home/data.slint";
 
-// The sizes each shape lays out with. A tile has one steady width (`tile-max`, its width at a
-// 1568 px window) and a row holds as many as fit, the rest of the row left empty: so tiles
-// don't grow and shrink as the page widens and fits another column (opening or closing the side
-// panel resized every shelf). Only a page too narrow for two shrinks them. Shortcuts keep a row
-// of a few together instead (`mix-w`). Covers are fetched at about a tile's width
-// (`home.rs::cover_px`).
+// The sizes Explore's shelves lay out with, in the shapes Home gives them
+// (`home.rs::arrange`). A tile has one steady width (`tile-max`) and a row holds as many as
+// fit, the rest of the row left empty. Only a page too narrow for two shrinks them. Covers are
+// fetched at about a tile's width (`shelves.rs::cover_px`).
 export global Shapes {
     out property <length> head-h: 48px;
     out property <length> mix-h: 64px;
@@ -48,8 +43,7 @@ export global Shapes {
     out property <length> grid-col: 380px;
     // A community playlist's avatar badge (`home.rs::BADGE`), its ring included.
     out property <length> badge: 32px;
-    // Mixes: the narrowest a shortcut may get, so a row of four holds together down to a
-    // 1280 px window (`mix-w`). The other shapes: their one width.
+    // Mixes: the narrowest a shortcut may get. The other shapes: their one width.
     public pure function tile-max(s: ShelfShape) -> length {
         return s == ShelfShape.mixes ? 220px : (s == ShelfShape.videos ? 300px : (s == ShelfShape.playlists ? 160px : (s == ShelfShape.artists ? 120px : 192px)));
     }
@@ -62,25 +56,9 @@ export global Shapes {
     public pure function tile-w(s: ShelfShape, w: length) -> length {
         return min(Shapes.tile-max(s), floor((w - (Shapes.per-row(s, w) - 1) * Shapes.gap(s)) / Shapes.per-row(s, w) / 1px) * 1px);
     }
-    // A shortcut (a mix) in a row of `n`: the row's tiles share the width, up to `mix-max` each.
-    // So a row of a few keeps one length however wide the page is, rather than its tiles
-    // getting narrower as the page widens and fits another column (opening and closing the
-    // side panel moved its end), and the resume card above lines up with it.
-    out property <length> mix-max: 240px;
-    public pure function mix-w(w: length, n: int) -> length {
-        return min(root.mix-max, floor((w - (min(Shapes.per-row(ShelfShape.mixes, w), max(1, n)) - 1) * root.mix-gap) / min(Shapes.per-row(ShelfShape.mixes, w), max(1, n)) / 1px) * 1px);
-    }
     public pure function art-h(s: ShelfShape, w: length) -> length {
         return s == ShelfShape.videos ? round(Shapes.tile-w(s, w) * 9 / 16 / 1px) * 1px : Shapes.tile-w(s, w);
     }
-    // How far a row of `n` tiles reaches in `w`, from the first tile's left edge to the
-    // last's right: a shelf with fewer items than fit stops short of the content's edge.
-    public pure function row-w(s: ShelfShape, w: length, n: int) -> length {
-        return min(n, Shapes.per-row(s, w)) * ((s == ShelfShape.mixes ? Shapes.mix-w(w, n) : Shapes.tile-w(s, w)) + Shapes.gap(s)) - Shapes.gap(s);
-    }
-    // The shortcuts Home counts on before the feed is in, or when it has no row of them: as
-    // many as the Shortcuts row holds (`home.rs::SHORTCUTS`).
-    out property <int> lead-tiles: 4;
     public pure function rows(n: int, w: length) -> int {
         return max(1, min(root.mix-rows, ceil(n / Shapes.per-row(ShelfShape.mixes, w))));
     }
@@ -96,6 +74,37 @@ export global Shapes {
     }
 }
 
+// Home's rails. A tile has one width whatever the page's (200 px, a video 300); a rail holds
+// as many as fit, and the next one shows cut off at the page's edge. Covers are fetched at a
+// tile's width (`shelves.rs::cover_px`).
+export global Rails {
+    out property <length> head-h: 48px;
+    // The gap between the band and the rails, and between rails.
+    out property <length> gap: Theme.s6;
+    // Quick picks: columns of two rows, as many 380 px columns as fit.
+    out property <int> grid-rows: 2;
+    out property <length> grid-col: 380px;
+    // A community playlist's avatar badge (`home.rs::BADGE`), its ring included.
+    out property <length> badge: 32px;
+    public pure function tile-w(s: ShelfShape) -> length {
+        return s == ShelfShape.videos ? 300px : 200px;
+    }
+    // Whole tiles in `w` (paging moves by these).
+    public pure function per-row(s: ShelfShape, w: length) -> int {
+        return max(1, floor((w + Theme.card-gap) / (Rails.tile-w(s) + Theme.card-gap)));
+    }
+    public pure function art-h(s: ShelfShape) -> length {
+        return s == ShelfShape.videos ? round(Rails.tile-w(s) * 9 / 16 / 1px) * 1px : Rails.tile-w(s);
+    }
+    // A shelf's height with its heading.
+    public pure function height(s: ShelfShape) -> length {
+        if s == ShelfShape.songs {
+            return root.head-h + root.grid-rows * Theme.row-h;
+        }
+        return root.head-h + Rails.art-h(s) + Theme.card-text-gap + (s == ShelfShape.artists ? 24px : 40px);
+    }
+}
+
 // A shelf's heading: optional lead words in text2 ("Similar to"), the title, and the paging
 // arrows while the shelf is hovered and has more than a page.
 component ShelfHead inherits Rectangle {
@@ -106,7 +115,7 @@ component ShelfHead inherits Rectangle {
     in property <bool> can-forward;
     callback back();
     callback forward();
-    height: Shapes.head-h;
+    height: Rails.head-h;
     HorizontalLayout {
         x: 0;
         y: 0;
@@ -158,15 +167,94 @@ global Tiles {
     }
 }
 
-// A row of cards shaped for its shelf (videos 16:9, playlists small, artists round faces
-// without a subtitle, the rest standard), paged a row at a time.
+// "Shuffle Liked songs", the first rail's first tile: the Liked songs tile (red, a white
+// heart) with a shuffle badge; a click plays Liked songs shuffled (the sidebar still opens
+// the page).
+component ShuffleLiked inherits Rectangle {
+    in property <length> size;
+    callback clicked();
+    width: root.size;
+    height: root.size + Theme.card-text-gap + 40px;
+    accessible-role: button;
+    accessible-label: @tr("Shuffle Liked songs");
+    accessible-action-default => { root.clicked(); }
+    Rectangle {
+        x: 0;
+        y: 0;
+        width: root.size;
+        height: root.size;
+        border-radius: Theme.r-m;
+        clip: true;
+        transform-scale: ta.pressed ? Theme.press-scale : 1.0;
+        animate transform-scale {
+            duration: ta.pressed ? Theme.t-press : Theme.t-release;
+            easing: ta.pressed ? Curves.ease-out : Curves.release;
+        }
+        background: @linear-gradient(135deg, Theme.brand-accent 0%, #7A0E20 100%);
+        Icon {
+            width: 56px;
+            height: 56px;
+            commands: Icons.heart;
+            fill: #FFFFFF;
+            stroke: transparent;
+        }
+        Rectangle {
+            x: Theme.s3;
+            y: parent.height - self.height - Theme.s3;
+            width: 44px;
+            height: 44px;
+            border-radius: self.width / 2;
+            background: #000000BF;
+            Icon {
+                width: 20px;
+                height: 20px;
+                commands: Icons.shuffle;
+                stroke: #FFFFFF;
+            }
+        }
+        Rectangle {
+            background: ta.pressed ? Theme.cover-pressed : (ta.has-hover ? Theme.cover-hover : transparent);
+            animate background { duration: Theme.t-hover; }
+        }
+    }
+    title := Body {
+        y: root.size + Theme.card-text-gap;
+        width: root.size;
+        text: @tr("Shuffle Liked songs");
+        font-weight: 600;
+    }
+    if ta.has-hover: Rectangle {
+        y: root.size + Theme.card-text-gap + 18px;
+        width: min(root.size, title.preferred-width);
+        height: 1px;
+        background: Theme.text1;
+    }
+    Body {
+        y: root.size + Theme.card-text-gap + 20px;
+        width: root.size;
+        text: @tr("Everything you liked");
+        font-size: Theme.t-meta;
+        color: Theme.text2;
+    }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+}
+
+// A rail of tiles shaped for its shelf (videos 16:9, artists round faces without a subtitle,
+// the rest square), paged a page of whole tiles at a time. The tiles run on past the shelf's
+// right edge by `bleed` (the page's padding), where the next one shows cut off.
 component TileShelf inherits Rectangle {
     in property <HomeShelfRow> shelf;
+    in property <length> bleed;
     // Some of it shows: the warming starts then.
     in property <bool> in-sight: true;
     property <ShelfShape> shape: root.shelf.shape;
-    property <int> per-row: Shapes.per-row(root.shape, root.width);
-    property <length> tile-w: Shapes.tile-w(root.shape, root.width);
+    property <int> per-row: Rails.per-row(root.shape, root.width);
+    property <length> tile-w: Rails.tile-w(root.shape);
+    // Whole tiles and the one cut off at the edge.
+    property <int> in-view: ceil((root.width + root.bleed + Theme.card-gap) / (root.tile-w + Theme.card-gap));
     property <int> first: 0;
     // The tile at the left edge, eased while paging; the tiles follow it, so a resize
     // moves them at once.
@@ -185,10 +273,10 @@ component TileShelf inherits Rectangle {
         running: !root.warmed && root.in-sight;
         triggered => {
             root.warm += 1;
-            root.warmed = root.warm >= max(1, root.per-row);
+            root.warmed = root.warm >= max(1, root.in-view);
         }
     }
-    height: Shapes.height(root.shape, root.width, root.shelf.items.length);
+    height: Rails.height(root.shape);
     hover := TouchArea {
         ShelfHead {
             x: 0;
@@ -203,42 +291,54 @@ component TileShelf inherits Rectangle {
             forward => { root.first = min(root.last-first, root.first + root.per-row); }
         }
         Rectangle {
-            y: Shapes.head-h;
-            height: parent.height - Shapes.head-h;
+            x: 0;
+            y: Rails.head-h;
+            width: parent.width + root.bleed;
+            height: parent.height - Rails.head-h;
             clip: true;
-            for it[i] in root.shelf.items: Card {
+            for it[i] in root.shelf.items: Rectangle {
                 x: (i - root.at) * (root.tile-w + Theme.card-gap);
                 y: 0;
-                size: root.tile-w;
-                art-h: Shapes.art-h(root.shape, root.width);
-                subtitle: root.shape != ShelfShape.artists;
-                item: it;
-                playable: true;
+                width: root.tile-w;
+                height: parent.height;
                 // Shown, or partly shown while paging (the others draw nothing), and warm.
-                on-page: i + 1 > root.at && i < root.at + root.per-row && (root.warmed || i - root.first < root.warm);
-                clicked => { Tiles.open(it); }
-                play => { Tiles.play(it); }
-                // The creator's photo, over the collage's bottom-left corner (the play button
-                // takes the bottom-right). A ring of the ground keeps it apart from the art.
-                if i < root.shelf.badges.length && root.shelf.badges[i].width > 0: Rectangle {
-                    x: Theme.s2;
-                    y: Shapes.art-h(root.shape, root.width) - self.height - Theme.s2;
-                    width: Shapes.badge;
-                    height: Shapes.badge;
-                    border-radius: self.width / 2;
-                    background: Theme.ground;
-                    Rectangle {
-                        x: 2px;
-                        y: 2px;
-                        width: parent.width - 4px;
-                        height: parent.height - 4px;
+                property <bool> on-page: i + 1 > root.at && i < root.at + root.in-view && (root.warmed || i - root.first < root.warm);
+                if it.id == "LM": ShuffleLiked {
+                    size: root.tile-w;
+                    clicked => { HomeData.shuffle-liked(); }
+                }
+                if it.id != "LM": Card {
+                    size: root.tile-w;
+                    art-h: Rails.art-h(root.shape);
+                    subtitle: root.shape != ShelfShape.artists;
+                    item: it;
+                    playable: true;
+                    on-page: parent.on-page;
+                    layer-at-size: true;
+                    clicked => { Tiles.open(it); }
+                    play => { Tiles.play(it); }
+                    // The creator's photo, over the collage's bottom-left corner (the play button
+                    // takes the bottom-right). A ring of the ground keeps it apart from the art.
+                    if i < root.shelf.badges.length && root.shelf.badges[i].width > 0: Rectangle {
+                        x: Theme.s2;
+                        y: Rails.art-h(root.shape) - self.height - Theme.s2;
+                        width: Rails.badge;
+                        height: Rails.badge;
                         border-radius: self.width / 2;
-                        clip: true;
-                        Image {
-                            width: parent.width;
-                            height: parent.height;
-                            source: root.shelf.badges[i];
-                            image-fit: cover;
+                        background: Theme.ground;
+                        Rectangle {
+                            x: 2px;
+                            y: 2px;
+                            width: parent.width - 4px;
+                            height: parent.height - 4px;
+                            border-radius: self.width / 2;
+                            clip: true;
+                            Image {
+                                width: parent.width;
+                                height: parent.height;
+                                source: root.shelf.badges[i];
+                                image-fit: cover;
+                            }
                         }
                     }
                 }
@@ -247,154 +347,22 @@ component TileShelf inherits Rectangle {
     }
 }
 
-// One mix as a shortcut: a wide tile on the raised card colour, the cover flush at its left
-// and the title beside it; hovering shows an accent play at its right end.
-component Shortcut inherits Rectangle {
-    in property <CardItem> item;
-    callback clicked();
-    callback play();
-    height: Shapes.mix-h;
-    border-radius: Theme.r-m;
-    background: Theme.card;
-    clip: true;
-    accessible-role: button;
-    accessible-label: root.item.title;
-    accessible-action-default => { root.clicked(); }
-    property <bool> liked: root.item.id == "LM";
-    if !root.liked: Cover {
-        x: 0;
-        y: 0;
-        width: root.height;
-        height: root.height;
-        radius: 0px;
-        source: root.item.cover;
-    }
-    // Liked songs: the red tile with a white heart, as its page and the sidebar show it.
-    if root.liked: Rectangle {
-        x: 0;
-        y: 0;
-        width: root.height;
-        height: root.height;
-        background: @linear-gradient(135deg, Theme.brand-accent 0%, #7A0E20 100%);
-        Icon {
-            width: 28px;
-            height: 28px;
-            commands: Icons.heart;
-            fill: #FFFFFF;
-            stroke: transparent;
-        }
-    }
-    Rectangle {
-        background: Theme.state(ta.pressed, ta.has-hover);
-        animate background { duration: Theme.t-hover; easing: Curves.ease-hover; }
-    }
-    Body {
-        x: root.height + Theme.s3;
-        // The play button's room is kept, so the title doesn't re-elide on hover.
-        width: root.width - self.x - 56px;
-        height: root.height;
-        text: root.item.title;
-        font-weight: 600;
-        vertical-alignment: center;
-    }
-    PageIntent {
-        hovered: ta.has-hover;
-        pressed: ta.pressed;
-        pointer-x: ta.mouse-x;
-        pointer-y: ta.mouse-y;
-        kind: root.item.kind;
-        id: root.item.id;
-    }
-    ta := TouchArea {
-        mouse-cursor: pointer;
-        clicked => { root.clicked(); }
-        // Inside the touch area, so hovering the button keeps the tile hovered.
-        if ta.has-hover: Rectangle {
-            x: root.width - self.width - Theme.s3;
-            y: (root.height - self.height) / 2;
-            width: 36px;
-            height: 36px;
-            border-radius: self.width / 2;
-            background: Theme.accent-state(pa.pressed, pa.has-hover);
-            transform-scale: pa.pressed ? Theme.press-scale : 1.0;
-            animate transform-scale {
-                duration: pa.pressed ? Theme.t-press : Theme.t-release;
-                easing: pa.pressed ? Curves.ease-out : Curves.release;
-            }
-            accessible-role: button;
-            accessible-label: @tr("Play {}", root.item.title);
-            accessible-action-default => { root.play(); }
-            pa := TouchArea {
-                mouse-cursor: pointer;
-                clicked => { root.play(); }
-            }
-            Icon {
-                width: 18px;
-                height: 18px;
-                commands: Icons.play;
-                fill: Theme.on-accent;
-                stroke: transparent;
-            }
-        }
-    }
-}
-
-// Your mixes as shortcuts: two rows at most, paged a page (both rows) at a time.
-component MixShelf inherits Rectangle {
-    in property <HomeShelfRow> shelf;
-    property <int> cols: Shapes.per-row(ShelfShape.mixes, root.width);
-    property <int> rows: Shapes.rows(root.shelf.items.length, root.width);
-    property <int> per-page: root.cols * root.rows;
-    property <int> pages: ceil(root.shelf.items.length / root.per-page);
-    property <length> tile-w: Shapes.mix-w(root.width, root.shelf.items.length);
-    property <int> page: 0;
-    property <float> at: root.page;
-    animate at { duration: Theme.moving ? Theme.t-panel + 40ms : 0ms; easing: Curves.ease-in-out; }
-    height: Shapes.height(ShelfShape.mixes, root.width, root.shelf.items.length);
-    hover := TouchArea {
-        ShelfHead {
-            x: 0;
-            y: 0;
-            width: parent.width;
-            lead: root.shelf.lead;
-            title: root.shelf.title;
-            arrows: hover.has-hover && root.pages > 1;
-            can-back: root.page > 0;
-            can-forward: root.page < root.pages - 1;
-            back => { root.page = max(0, root.page - 1); }
-            forward => { root.page = min(root.pages - 1, root.page + 1); }
-        }
-        Rectangle {
-            y: Shapes.head-h;
-            height: parent.height - Shapes.head-h;
-            clip: true;
-            for it[i] in root.shelf.items: Shortcut {
-                property <int> j: mod(i, root.per-page);
-                x: (floor(i / root.per-page) - root.at) * (root.width + Shapes.mix-gap) + mod(self.j, root.cols) * (root.tile-w + Shapes.mix-gap);
-                y: floor(self.j / root.cols) * (Shapes.mix-h + Shapes.mix-gap);
-                width: root.tile-w;
-                item: it;
-                clicked => { Open.item(it); }
-                play => { HomeData.play-card(it); }
-            }
-        }
-    }
-}
-
-// Quick picks as a dense grid: columns of four rows with small covers, as many 380 px columns
-// as fit, paged a page of columns at a time. A click plays; right-click and ⋯ open the menu.
+// Quick picks as a dense grid: columns of two rows with small covers, as many 380 px columns
+// as fit, paged a page of columns at a time, the next column cut off past the edge (`bleed`).
+// A click plays; right-click and ⋯ open the menu.
 component SongGrid inherits Rectangle {
     in property <HomeShelfRow> shelf;
-    property <int> rows: Shapes.grid-rows;
-    property <int> per-page: max(2, floor((root.width + Theme.card-gap) / (Shapes.grid-col + Theme.card-gap)));
+    in property <length> bleed;
+    property <int> rows: Rails.grid-rows;
+    property <int> per-page: max(2, floor((root.width + Theme.card-gap) / (Rails.grid-col + Theme.card-gap)));
     property <int> columns: ceil(root.shelf.songs.length / root.rows);
-    property <length> col-w: min(Shapes.grid-col, floor((root.width - (root.per-page - 1) * Theme.card-gap) / root.per-page / 1px) * 1px);
+    property <length> col-w: min(Rails.grid-col, floor((root.width - (root.per-page - 1) * Theme.card-gap) / root.per-page / 1px) * 1px);
     // The first column shown (`FeedShelf` reads it).
     in-out property <int> first: 0;
     property <float> at: root.first;
     animate at { duration: Theme.moving ? Theme.t-panel + 40ms : 0ms; easing: Curves.ease-in-out; }
     property <int> last-first: max(0, root.columns - root.per-page);
-    height: Shapes.height(ShelfShape.songs, root.width, root.shelf.songs.length);
+    height: Rails.height(ShelfShape.songs);
     hover := TouchArea {
         ShelfHead {
             x: 0;
@@ -411,9 +379,9 @@ component SongGrid inherits Rectangle {
         // The rows' hover tiles reach 8 px past the column on both sides.
         Rectangle {
             x: -8px;
-            y: Shapes.head-h;
-            width: parent.width + 16px;
-            height: parent.height - Shapes.head-h;
+            y: Rails.head-h;
+            width: parent.width + 8px + root.bleed;
+            height: parent.height - Rails.head-h;
             clip: true;
             for t[i] in root.shelf.songs: SongRow {
                 x: (floor(i / root.rows) - root.at) * (root.col-w + Theme.card-gap);
@@ -431,77 +399,69 @@ component SongGrid inherits Rectangle {
     }
 }
 
-// The feed while it loads, in the shapes it usually arrives in: a row of mix shortcuts, the
-// Quick picks grid, then a shelf of standard cards. Laid out as the shelves lay themselves
-// out, so nothing jumps when the data lands.
+// Home while the feed loads: on a fresh start the band's shape (nothing to show in it yet),
+// then one rail of tiles running to the page's edge. Laid out as the band and the rails lay
+// themselves out, so nothing jumps when the data lands.
 component HomeSkeleton inherits Skeleton {
-    property <int> mix-cols: Shapes.per-row(ShelfShape.mixes, root.width);
-    property <length> mix-w: Shapes.mix-w(root.width, Shapes.lead-tiles);
-    property <length> mixes-h: Shapes.height(ShelfShape.mixes, root.width, root.mix-cols);
-    property <length> grid-y: root.mixes-h + Theme.section-gap;
-    property <int> grid-cols: max(2, floor((root.width + Theme.card-gap) / (Shapes.grid-col + Theme.card-gap)));
-    property <length> col-w: min(Shapes.grid-col, floor((root.width - (root.grid-cols - 1) * Theme.card-gap) / root.grid-cols / 1px) * 1px);
-    property <length> cards-y: root.grid-y + Shapes.height(ShelfShape.songs, root.width, 0) + Theme.section-gap;
-    property <int> per-row: Shapes.per-row(ShelfShape.cards, root.width);
-    property <length> card: Shapes.tile-w(ShelfShape.cards, root.width);
-    height: root.cards-y + Shapes.height(ShelfShape.cards, root.width, 0);
-    for y in [0px, root.grid-y, root.cards-y]: SkeletonBlock {
+    in property <bool> band;
+    in property <length> bleed;
+    property <length> rail-y: root.band ? BandSizes.height + Rails.gap : 0px;
+    property <length> tile: Rails.tile-w(ShelfShape.cards);
+    property <int> tiles: ceil((root.width + root.bleed + Theme.card-gap) / (root.tile + Theme.card-gap));
+    height: root.rail-y + Rails.height(ShelfShape.cards);
+    // Not clipped as other skeletons are: the rail runs on to the page's edge (`bleed`).
+    clip: false;
+    if root.band: SkeletonBlock {
         x: 0;
-        y: y + 8px;
+        y: 0;
+        width: root.width;
+        height: BandSizes.height;
+        border-radius: Theme.r-l;
+        sweep: root.sweep;
+        fade: root.fade;
+        SkeletonBlock {
+            x: BandSizes.pad;
+            y: BandSizes.pad;
+            width: BandSizes.cover;
+            height: BandSizes.cover;
+            border-radius: Theme.r-m;
+            sweep: root.sweep;
+            fade: root.fade;
+        }
+        for b[i] in [{ y: 27px, w: 180px, h: 14px }, { y: 55px, w: 360px, h: 34px }, { y: 101px, w: 260px, h: 14px }]: SkeletonBlock {
+            x: BandSizes.text-x;
+            y: b.y;
+            width: min(b.w, root.width - BandSizes.text-x - BandSizes.pad);
+            height: b.h;
+            border-radius: Theme.r-s;
+            sweep: root.sweep;
+            fade: root.fade;
+        }
+    }
+    SkeletonBlock {
+        x: 0;
+        y: root.rail-y + 8px;
         width: 180px;
         height: 16px;
         border-radius: Theme.r-s;
         sweep: root.sweep;
         fade: root.fade;
     }
-    // As many shortcuts as the Shortcuts row holds (`Shapes.lead-tiles`).
-    for i in min(root.mix-cols, Shapes.lead-tiles): Rectangle {
-        x: i * (root.mix-w + Shapes.mix-gap);
-        y: Shapes.head-h;
-        width: root.mix-w;
-        height: Shapes.mix-h;
-        SkeletonBlock {
-            width: Shapes.mix-h;
-            height: Shapes.mix-h;
-            x: 0;
-            y: 0;
-            border-radius: Theme.r-m;
-            sweep: root.sweep;
-            fade: root.fade;
-        }
-        SkeletonBar {
-            x: Shapes.mix-h + Theme.s3;
-            y: (parent.height - self.height) / 2;
-            width: floor(min(parent.width - self.x - 56px, 140px) * [0.7, 0.5, 0.62, 0.56, 0.66, 0.48, 0.6][mod(i, 7)] / 1px) * 1px;
-            sweep: root.sweep;
-            fade: root.fade;
-        }
-    }
-    for i in root.grid-cols * Shapes.grid-rows: SkeletonRow {
-        x: floor(i / Shapes.grid-rows) * (root.col-w + Theme.card-gap) - 8px;
-        y: root.grid-y + Shapes.head-h + mod(i, Shapes.grid-rows) * Theme.row-h;
-        width: root.col-w + 16px;
-        index: i;
-        compact: true;
-        duration: false;
-        sweep: root.sweep;
-        fade: root.fade;
-    }
-    for i in root.per-row: SkeletonCard {
-        x: i * (root.card + Theme.card-gap);
-        y: root.cards-y + Shapes.head-h;
-        size: root.card;
+    for i in root.tiles: SkeletonCard {
+        x: i * (root.tile + Theme.card-gap);
+        y: root.rail-y + Rails.head-h;
+        size: root.tile;
         index: i;
         sweep: root.sweep;
         fade: root.fade;
     }
 }
 
-// The row after the last shelf while the next page loads: a shelf's skeleton, small cards.
+// The row after the last shelf while the next page loads: a rail's skeleton.
 component MoreSkeleton inherits Skeleton {
-    property <int> per-row: Shapes.per-row(ShelfShape.playlists, root.width);
-    property <length> card: Shapes.tile-w(ShelfShape.playlists, root.width);
-    height: Shapes.height(ShelfShape.playlists, root.width, 0);
+    property <int> per-row: Rails.per-row(ShelfShape.cards, root.width);
+    property <length> card: Rails.tile-w(ShelfShape.cards);
+    height: Rails.height(ShelfShape.cards);
     accessible-label: @tr("Loading more of Home");
     SkeletonBlock {
         x: 0;
@@ -514,7 +474,7 @@ component MoreSkeleton inherits Skeleton {
     }
     for i in root.per-row: SkeletonCard {
         x: i * (root.card + Theme.card-gap);
-        y: Shapes.head-h;
+        y: Rails.head-h;
         size: root.card;
         index: i;
         sweep: root.sweep;
@@ -546,52 +506,37 @@ component MoreFailed inherits Rectangle {
 // One shelf of the feed, in its shape; its height follows the shape so the column can stack.
 component FeedShelf inherits Rectangle {
     in property <HomeShelfRow> shelf;
+    in property <length> bleed;
     // Some of it shows: its covers may start taking layers (`TileShelf.warm`).
     in property <bool> in-sight: true;
     // A song grid's first column shown (the feed's row reports its songs, `RowsShown`).
     in-out property <int> grid-first;
-    height: Shapes.height(root.shelf.shape, root.width, root.shelf.shape == ShelfShape.songs ? root.shelf.songs.length : root.shelf.items.length);
+    height: Rails.height(root.shelf.shape);
     if root.shelf.shape == ShelfShape.songs: SongGrid {
         width: parent.width;
         shelf: root.shelf;
+        bleed: root.bleed;
         first <=> root.grid-first;
     }
-    if root.shelf.shape == ShelfShape.mixes: MixShelf {
+    if root.shelf.shape != ShelfShape.songs: TileShelf {
         width: parent.width;
         shelf: root.shelf;
-    }
-    if root.shelf.shape != ShelfShape.songs && root.shelf.shape != ShelfShape.mixes: TileShelf {
-        width: parent.width;
-        shelf: root.shelf;
+        bleed: root.bleed;
         in-sight: root.in-sight;
     }
 }
 
-// The top of the feed: the hero, then the loading, error or empty state, a section apart.
+// The top of the feed: the band, then the loading, error or empty state.
 component HomeTop inherits VerticalLayout {
     in property <length> inner;
-    spacing: Theme.section-gap;
-    // Home has no "Home" title: the hero is titled like a shelf, so the page reads as one
-    // rhythm of 24 px headings.
-    if HomeData.resume || HomeData.has-featured: VerticalLayout {
-        spacing: 0;
-        ShelfHead {
-            title: HomeData.resume ? @tr("Pick up where you left off") : @tr("Start listening");
-        }
-        // As wide as a row of four shortcuts under it (996 px once they're at their full 240 px),
-        // which keeps one length however wide the page is (`Shapes.mix-max`): steady, and lined
-        // up with the Shortcuts row.
-        if HomeData.resume: Rectangle {
-            height: card.height;
-            card := ResumeCard {
-                x: 0;
-                y: 0;
-                width: min(parent.width, Shapes.row-w(ShelfShape.mixes, parent.width, Shapes.lead-tiles));
-            }
-        }
-        if !HomeData.resume: FeaturedCard { }
+    in property <length> bleed;
+    spacing: Rails.gap;
+    if HomeData.resume || HomeData.has-featured: Band { }
+    // With a session the band shows at once (it's local); only the rails wait.
+    if HomeData.loading && HomeData.shelves.length == 0: HomeSkeleton {
+        band: !HomeData.resume && !HomeData.has-featured;
+        bleed: root.bleed;
     }
-    if HomeData.loading && HomeData.shelves.length == 0: HomeSkeleton { }
     if !HomeData.loading && HomeData.error != "": ErrorState {
         width: min(480px, root.inner);
         message: HomeData.error;
@@ -607,26 +552,11 @@ component HomeTop inherits VerticalLayout {
 
 export component HomePage inherits Rectangle {
     property <length> pad: Theme.page-pad;
-    // The wash: the resumed song's colour from the window's top, behind the clear top bar,
-    // fading into the ground by the Shortcuts row. A new track crossfades it, colour to
-    // colour; nothing to resume leaves the page plain. The page itself starts below the bar,
-    // so nothing scrolls under it: as the page scrolls the bar's height, the ground comes back
-    // behind the bar (`TopScrim`, as on album pages), and from there the wash is clipped to
-    // the page, so the bar isn't repainted with every scroll frame.
-    property <color> wash: Theme.pick(HomeData.wash-dark, HomeData.wash-light);
-    animate wash { duration: Theme.t-colour; easing: Curves.ease-hover; }
-    // From the window's top (and `rise` above it, for the page's enter offset).
-    property <length> wash-top: Theme.top-bar-h + Theme.rise;
-    property <length> wash-h: root.wash-top + 420px;
-    property <length> scrolled: -list.content-y;
-    property <bool> wash-on: HomeData.resume && root.scrolled < root.wash-h - root.wash-top;
-    property <bool> wash-under-bar: root.wash-on && root.scrolled < Theme.top-bar-h;
-    changed wash-under-bar => { HomeData.wash-behind-bar = self.wash-under-bar; }
     property <length> inner: self.width - 2 * self.pad;
     property <int> count: HomeData.shelves.length;
     // Rows: the top, the shelves, then the next page's row while it loads or failed.
     property <int> rows: HomeData.row-count;
-    // `HomeTop` shows something (so the first shelf keeps a section's distance from it).
+    // `HomeTop` shows something (so the first shelf keeps a gap's distance from it).
     property <bool> top-shown: HomeData.resume || HomeData.has-featured || (HomeData.loading && root.count == 0) || (!HomeData.loading && (HomeData.error != "" || HomeData.empty));
 
     // The rows' model follows `rows`, a row at a time at its end. Not `for i in root.rows`:
@@ -634,28 +564,8 @@ export component HomePage inherits Rectangle {
     // model drops every row and builds them again (every shelf on screen, its cards and their
     // covers' layers: a 40 ms frame at 4K when the next page's row came, another when it
     // landed).
-    init => {
-        HomeData.sync-rows(root.rows);
-        HomeData.wash-behind-bar = root.wash-under-bar;
-    }
+    init => { HomeData.sync-rows(root.rows); }
     changed rows => { HomeData.sync-rows(root.rows); }
-
-    // Behind the list, not in a row: it follows the scroll (`content-y`) without depending
-    // on row 0 being alive, and is gone once scrolled past. Opaque, down to the ground, in
-    // solid bands rather than a gradient (`Bands`: even a two-stop opaque gradient is filled
-    // pixel by pixel, ~0.6 ms of a 4K scroll frame). Once the bar has its ground back, the
-    // part scrolled above the page isn't drawn (its top colour moves down the bands instead),
-    // so nothing above the page repaints while Home scrolls.
-    if root.wash-on: Bands {
-        property <length> full-y: list.content-y - root.wash-top;
-        property <length> cut: max(0px, (root.wash-under-bar ? -root.wash-top : 0px) - self.full-y);
-        y: self.full-y + self.cut;
-        width: root.width;
-        height: root.wash-h - self.cut;
-        count: 64;
-        top: root.wash.mix(Theme.ground, 1 - self.cut / root.wash-h);
-        bottom: Theme.ground;
-    }
 
     // A ListView, so only the rows near the window exist: a shelf scrolled far away is dropped
     // with its cards, their art and their covers' layers (a long Home kept every card's).
@@ -689,49 +599,29 @@ export component HomePage inherits Rectangle {
             RowsShown {
                 list: SongList.home;
                 part: i - 1;
-                first: feed-row.grid-first * Shapes.grid-rows;
-                last: feed-row.songs && feed-row.in-sight && feed-row.y + list.content-y + feed-row.height > 0 ? min(HomeData.shelves[i - 1].songs.length, (feed-row.grid-first + max(2, floor((root.inner + Theme.card-gap) / (Shapes.grid-col + Theme.card-gap)))) * Shapes.grid-rows) - 1 : -1;
+                first: feed-row.grid-first * Rails.grid-rows;
+                last: feed-row.songs && feed-row.in-sight && feed-row.y + list.content-y + feed-row.height > 0 ? min(HomeData.shelves[i - 1].songs.length, (feed-row.grid-first + max(2, floor((root.inner + Theme.card-gap) / (Rails.grid-col + Theme.card-gap)))) * Rails.grid-rows) - 1 : -1;
             }
             row := VerticalLayout {
                 width: parent.width;
                 padding-left: root.pad;
                 padding-right: root.pad;
-                padding-top: i == 0 ? Theme.page-top : (i == 1 && !root.top-shown ? 0px : Theme.section-gap);
+                padding-top: i == 0 ? Theme.page-top : (i == 1 && !root.top-shown ? 0px : Rails.gap);
                 // Past the floating bar, with the usual gap.
                 padding-bottom: i == HomeData.rows.length - 1 ? Theme.page-end : 0px;
                 if i == 0: HomeTop {
                     inner: root.inner;
+                    bleed: root.pad;
                 }
                 if i > 0 && i <= root.count: FeedShelf {
                     shelf: HomeData.shelves[i - 1];
+                    bleed: root.pad;
                     in-sight: feed-row.in-sight;
                     grid-first <=> feed-row.grid-first;
                 }
                 if i > root.count && HomeData.more == MoreState.loading: MoreSkeleton { }
                 if i > root.count && HomeData.more == MoreState.failed: MoreFailed { }
             }
-        }
-    }
-    // Behind the bar (the page starts below it), while the wash shows there, the ground comes
-    // back over the first `top-bar-h` of scroll, fading out just below the bar, as album pages'
-    // `TopScrim` does; then the frame's own bar and fade take over, the same. A flat fill and
-    // a short two-stop fade, their alpha following the scroll (an `opacity` would draw them
-    // through a layer).
-    if root.wash-under-bar && root.scrolled > 0: Rectangle {
-        property <color> ink: Theme.ground.transparentize(1 - clamp(root.scrolled / Theme.top-bar-h, 0, 1));
-        y: -Theme.top-bar-h;
-        height: Theme.top-bar-h + Theme.s4;
-        Rectangle {
-            y: 0;
-            height: Theme.top-bar-h;
-            background: parent.ink;
-        }
-        Bands {
-            y: Theme.top-bar-h;
-            height: Theme.s4;
-            count: 16;
-            top: parent.ink;
-            bottom: parent.ink.transparentize(1);
         }
     }
 }

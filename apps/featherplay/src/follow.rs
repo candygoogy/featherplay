@@ -704,24 +704,6 @@ fn translucent((dark, light): (Rgb, Rgb)) -> Washes {
     }
 }
 
-/// A wash's two shades (`colour::washes`) already laid over each theme's ground at the
-/// wash's alphas: opaque, so a gradient from them down to the ground looks the same as the
-/// translucent wash and costs less to fill (nothing to blend).
-pub fn washes_on_ground((dark, light): (Rgb, Rgb)) -> Washes {
-    Washes {
-        dark: to_color(colour::over(
-            dark,
-            colour::WASH_ALPHA_DARK,
-            colour::DARK.ground,
-        )),
-        light: to_color(colour::over(
-            light,
-            colour::WASH_ALPHA_LIGHT,
-            colour::LIGHT.ground,
-        )),
-    }
-}
-
 /// The lyrics' colours for one cover: the cover-colour panel and its three levels of text,
 /// for each theme (`colour::lyric_panel`).
 #[derive(Clone, Debug, PartialEq)]
@@ -753,7 +735,7 @@ pub fn lyric_inks_for(seed: Option<Lch>, fixed: Option<Color>) -> LyricInks {
 }
 
 /// Works out `img`'s colour off the UI thread (`colour::dominant`), then calls `done` with it
-/// on the UI thread: what the lyrics' panel and Home's header wash are made from.
+/// on the UI thread: what the lyrics' panel and Home's band (a featured pick's) are made from.
 pub fn cover_seed(ctx: &Rc<Ctx>, img: &slint::Image, done: impl FnOnce(Lch) + 'static) {
     let Some(buffer) = img.to_rgba8() else { return };
     let Some(pixels) =

@@ -12,7 +12,7 @@ import { TopBar, TopBarData } from "top_bar.slint";
 import { BottomBar, SpeedLayer } from "bottom_bar.slint";
 import { Sleep, SleepLayer } from "sleep_timer.slint";
 import { QueuePanel } from "queue_panel.slint";
-import { HomePage, HomeData } from "pages/home.slint";
+import { HomePage } from "pages/home.slint";
 import { LibraryPage } from "pages/library.slint";
 import { ExplorePage, MoodPage } from "pages/explore.slint";
 import { HistoryPage } from "pages/history.slint";
@@ -166,10 +166,6 @@ export component AppWindow inherits Window {
     }
     property <bool> under-top: Nav.page == PageKind.album || Nav.page == PageKind.playlist || Nav.page == PageKind.artist;
     property <length> top-h: root.full-page || root.under-top || root.no-top ? 0px : Theme.top-bar-h;
-    // Home's wash shows behind the top bar, from the window's top: the bar is clear and the
-    // fade below it is left out (Home still starts below the bar; it brings the ground back
-    // itself as it scrolls, then hands over to these).
-    property <bool> home-wash: Nav.page == PageKind.home && HomeData.wash-behind-bar;
 
     // Page enter: a new page (another kind, or another album, playlist or artist) rises
     // `rise` over `t-page`. It doesn't fade: a fade would draw the whole page through a layer
@@ -480,7 +476,7 @@ export component AppWindow inherits Window {
             }
             // Content scrolling up under the bar fades out rather than being cut. At rest the
             // pages' top padding is blank ground, so the fade is invisible.
-            if !root.full-page && !root.under-top && !root.home-wash && !root.no-top: Bands {
+            if !root.full-page && !root.under-top && !root.no-top: Bands {
                 y: Theme.top-bar-h;
                 height: Theme.s4;
                 count: 16;
@@ -492,7 +488,7 @@ export component AppWindow inherits Window {
                 y: 0;
                 width: parent.width;
                 visible: !root.full-page && !root.no-top;
-                clear: root.under-top || root.home-wash;
+                clear: root.under-top;
                 narrow: root.rail;
                 area-h: parent.height;
                 settings: Nav.page == PageKind.settings;

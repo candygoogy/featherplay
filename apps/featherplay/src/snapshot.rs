@@ -779,9 +779,9 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
         crate::lyrics::choose_for_snapshot(ctx);
         settle();
     }
-    // The mini player: a paused song, or one with a title too long for its room.
+    // The mini player or Home: a paused song; the mini player with a title too long for its room.
     let player = ui.global::<crate::ui::Player>();
-    if o.page == "mini-player-paused" {
+    if o.page == "mini-player-paused" || o.page == "home-paused" {
         player.set_playing(false);
     }
     if o.page == "mini-player-long" {
