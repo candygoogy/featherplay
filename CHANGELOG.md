@@ -40,9 +40,11 @@ Notable changes to featherplay, newest first. The format follows
   menu, the tray menu or `Ctrl+Shift+L`. Unlocked at first, it moves by a drag and keeps its
   place for each screen; locked, clicks, the wheel and the pointer go through it to the app
   beneath, and the tray menu or the lyrics menu unlocks it. Its hover controls make it
-  smaller or larger, lock it, open featherplay or turn it off. While it shows, lyrics count
-  as on screen, so they're looked up even with the window in the tray; with it off there's no
-  window and no timer. On Windows and in an X11 session; under Wayland, which leaves where
+  smaller or larger, lock it, open featherplay or turn it off. It fades in as it appears, and
+  each new line rises into place over 230 ms as the one before moves up and fades out (at
+  once, with the system's animation effects off). While it shows, lyrics count as on screen,
+  so they're looked up even with the window in the tray; with it off there's no window and no
+  timer. On Windows and in an X11 session; under Wayland, which leaves where
   windows sit and what stays on top to the desktop, Settings says it isn't available and why.
 - **Quick search from anywhere** (Settings > Window, off by default): a global shortcut,
   `Ctrl+Alt+K` unless you set another, opens a small search box over whatever app is in
@@ -100,6 +102,11 @@ Notable changes to featherplay, newest first. The format follows
   binary's library path only, so the browser, yt-dlp and Deno it starts don't see them. The
   `.tar.gz` is unchanged. Their licences are in `THIRD_PARTY.md`.
 - Global hotkeys changed in Settings work at once, without a restart.
+- The mini player opens by the tray icon at display scales above 100 % too; it was placed
+  again by its size at 100 % and ended up off the icon's spot. Opened from the hidden icons'
+  flyout, it now sits where Windows' own flyouts do, in the corner at the notification
+  area's end of the taskbar, on the taskbar's screen and clear of a taskbar that hides
+  itself, instead of over the flyout.
 - A setting of the wrong type in `settings.toml` (`volume = "loud"`, say) no longer makes the
   whole file load as the defaults. Every setting, and each key of a table such as
   `[discord_options]`, is read on its own: only the bad values take their defaults, and the

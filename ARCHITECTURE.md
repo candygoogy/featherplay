@@ -152,7 +152,7 @@ controls and the tray (`apps/featherplay/src/shell.rs`).
 
 | Thread or runtime | Owns | Started in |
 |---|---|---|
-| Main thread (Slint's event loop) | The window, pages, `Ctx`, covers shown, the tray icon, media controls, taskbar buttons, hotkeys, and the windows that exist only while they show: the mini player, the quick search box (`apps/featherplay/src/quick_search.rs`) and the desktop lyrics' strip (`apps/featherplay/src/desktop_lyrics.rs`) | `app::run`, `run_window` (`apps/featherplay/src/app.rs`) |
+| Main thread (Slint's event loop) | The window, pages, `Ctx`, covers shown, the tray icon, media controls, taskbar buttons, hotkeys, and the windows that exist only while they show: the mini player (placed by `apps/featherplay/src/popup.rs` beside the tray icon's click, or, for a click in the hidden icons' flyout, in the work area's corner at the notification area's end of the taskbar, which `platform::window::taskbar` finds), the quick search box (`apps/featherplay/src/quick_search.rs`, centred by the size its window really got) and the desktop lyrics' strip (`apps/featherplay/src/desktop_lyrics.rs`) | `app::run`, `run_window` (`apps/featherplay/src/app.rs`) |
 | `featherplay-controller` | The controller loop: the player, the music API client, the resolver, the audio engine handle, settings, scrobblers | `app::run` |
 | The shared tokio runtime (multi-thread) | Every async task: the controller (run with `block_on` on its thread), resolves, API calls, the UI's page loads (`Ctx::load`), cover fetches, the local API server. Cover decoding runs on its blocking pool. | `app::run` |
 | `featherplay-audio` | The engine: voices, the output device, `AudioEvent`s | `crates/audio/src/engine.rs` |
@@ -237,8 +237,11 @@ featherplay (app) ─┬─ controller ─┬─ lastfm ────── proxy
 
 The vendored crates are `vendor/i-slint-backend-winit` (frame pacing: one paint per
 redraw), `vendor/i-slint-renderer-skia` (wgpu taken out, renderer changes for the
-software surface, and fonts read where they're mapped, not copied), `vendor/opus-decoder`
-(rustfft in place of a naive DFT) and `vendor/symphonia-core` (its FFT tables built on first use, not stored in the binary).
+software surface, fonts read where they're mapped, not copied, and, change 21, a text read
+where it's drawn, so it repaints whenever only its words change, even after the text layout
+cache replaced its entry), `vendor/opus-decoder` (rustfft in place of a naive DFT) and
+`vendor/symphonia-core` (its FFT tables built on first use, not stored in the binary). Each
+`VENDORED.md` lists its changes by number.
 
 ## Where things live
 
