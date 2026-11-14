@@ -6,6 +6,13 @@ Notable changes to featherplay, newest first. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- The player bar holds up in a window narrower than its 960 px minimum, as some Linux window
+  managers allow: the song's title no longer runs into the transport. As the bar narrows, the
+  title shortens first, then the speed pill, the volume, and the mini player, sleep timer and
+  Lyrics buttons give way in that order. From 960 px up the bar is as before.
+
 ## [0.4.0] - 2026-11-14
 
 ### Added

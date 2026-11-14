@@ -6,7 +6,8 @@
 // setting is on, and where the desktop has no tray, the mini player's button first. It reads
 // and drives the `Player` global; `src/bar.rs` connects that to the controller. The
 // transport, the mini player, the sleep timer, Lyrics, "Not for me" and the speed pill share
-// one tooltip (`BarTip`): the name, then the shortcut.
+// one tooltip (`BarTip`): the name, then the shortcut. Below the window's minimum width the bar
+// gives up the speed pill, the volume and the extra buttons in turn (`show-speed`).
 import { Theme, Icons, Curves } from "theme.slint";
 import { Body, Cover, IconButton, Icon, PlayButton } from "parts.slint";
 import { Player, Repeat } from "player.slint";
@@ -577,26 +578,47 @@ export component BottomBar inherits Rectangle {
     public function toggle-mini() {
         Frame.toggle-mini(root.absolute-position.x + actions.x + 18px, root.absolute-position.y + actions.y);
     }
+    // The right-hand buttons sit as far in from the bar's right end as from its top and bottom,
+    // so the last one is centred in the rounded end, as the cover is at the left.
+    property <length> end-gap: (Theme.bar-h - 36px) / 2;
+    // A bar narrower than the window's minimum (a window manager may ignore it) gives things
+    // up: first the title shortens to 80 px and the time row to 280, then whole groups go, in
+    // this order: the speed pill, the volume (its button and slider), then the extra buttons
+    // (the mini player's, the sleep timer's and Lyrics). A group goes once keeping it would
+    // bring the time row within 8 px of the title's 80 px. Counted from the buttons' fixed
+    // sizes (the sleep timer's idle 36 px), not from the layout, so what shows never feeds
+    // back into the count. At the window's minimum width everything still shows.
+    property <length> fit-x: 84px + 80px + 8px + 280px + 12px;
+    // Not for me, like and Up next, each 36 px, and the gaps either side of the volume.
+    property <length> core-w: 3 * 36px + 3 * 4px;
+    property <length> volume-w: 36px + 4px + 88px + 4px + 8px;
+    property <length> extras-w: (LyricsData.on ? 40px : 0px) + (SettingsData.has-tray ? 0px : 40px) + (SettingsData.sleep-timer ? 40px : 0px);
+    property <length> pill-w: speed-pill.width + 4px;
+    property <bool> show-extras: self.width - root.end-gap - root.core-w - root.extras-w >= root.fit-x;
+    property <bool> show-volume: root.show-extras && self.width - root.end-gap - root.core-w - root.extras-w - root.volume-w >= root.fit-x;
+    property <bool> show-speed: Player.speed != 2 && root.show-volume && self.width - root.end-gap - root.core-w - root.extras-w - root.volume-w - root.pill-w >= root.fit-x;
+    // Even the core buttons leave too little: the title shortens past 80 px, and the time row
+    // to the transport's width.
+    property <bool> squeezed: self.width - root.end-gap - root.core-w < root.fit-x;
     // The middle column (the transport, the time and the line), and what's left either side
     // for the title: it stays clear of the buttons on the right at the narrowest window.
     // The speed pill, while it shows, sits just left of the right-hand group, which then
     // takes its room too.
-    property <length> right-w: actions.preferred-width + (Player.speed != 2 ? speed-pill.width + 4px : 0px);
-    // The right-hand buttons sit as far in from the bar's right end as from its top and bottom,
-    // so the last one is centred in the rounded end, as the cover is at the left.
-    property <length> end-gap: (Theme.bar-h - 36px) / 2;
+    property <length> right-w: actions.preferred-width + (root.show-speed ? root.pill-w : 0px);
     // What the middle column stays clear of: the speed pill while it shows, else the group.
-    property <length> anchor: Player.speed != 2 ? speed-pill.x : actions.x;
+    property <length> anchor: root.show-speed ? speed-pill.x : actions.x;
     // The time row is 320 px at least, and the title 80 px from x 84, 16 px before it. Only
     // when the right-hand group leaves less (Linux without a tray, with the speed pill and the
-    // sleep timer at the narrowest window) does the time row give up to 40 px.
-    property <length> center-w: max(280px, min(max(320px, min(600px, self.width - 2 * (root.right-w + root.end-gap + 2px))), root.anchor - 12px - 180px));
+    // sleep timer at the narrowest window, or a narrower bar) does the time row give up to
+    // 40 px. Centred, it keeps the title's 180 px on the left as well as the group's room on
+    // the right.
+    property <length> center-w: max(root.squeezed ? transport.preferred-width : 280px, min(max(320px, min(600px, self.width - 2 * max(root.right-w + root.end-gap + 2px, 180px))), root.anchor - 12px - 180px));
     // Where the speed popup centres (in the bar).
     out property <length> speed-centre: speed-pill.x + speed-pill.width / 2;
     // The sleep timer's button: after the mini player's, if that shows. Idle 36 px; running,
     // it takes the time left's text only while that leaves the time row 320 px and the title
     // 80 px (`sleep-room`), the long form first.
-    property <length> sleep-room: self.width - root.end-gap - tail.preferred-width - (SettingsData.has-tray ? 0px : 40px) - 4px - (Player.speed != 2 ? speed-pill.width + 4px : 0px) - 12px - 320px - 180px;
+    property <length> sleep-room: self.width - root.end-gap - tail.preferred-width - (SettingsData.has-tray ? 0px : 40px) - 4px - (root.show-speed ? root.pill-w : 0px) - 12px - 320px - 180px;
     property <length> sleep-long-w: sleep-long.preferred-width + Sleep.pill-pad;
     property <length> sleep-short-w: sleep-short.preferred-width + Sleep.pill-pad;
     out property <string> sleep-text: !Sleep.running ? "" : (root.sleep-long-w <= root.sleep-room ? Sleep.long-text : (root.sleep-short-w <= root.sleep-room ? Sleep.short-text : ""));
@@ -605,10 +627,11 @@ export component BottomBar inherits Rectangle {
     out property <length> sleep-centre: actions.x + (SettingsData.has-tray ? 0px : 40px) + root.sleep-w / 2;
     // The middle column's left edge: centred on the bar, unless that would run it into the
     // right-hand group (the narrowest windows with the speed pill, or Linux's mini player
-    // button), then shifted left to stay 12 px clear of it.
+    // button, or a bar that gave groups up), then shifted left to stay 12 px clear of it; and
+    // no further left than the title's 80 px, 16 px before it, while there's room for that.
     property <length> middle-w: max(root.center-w, transport.preferred-width);
-    property <length> middle-x: min((self.width - root.middle-w) / 2, root.anchor - 12px - root.middle-w);
-    property <length> left-w: max(80px, root.middle-x + (root.middle-w - root.center-w) / 2 - 100px);
+    property <length> middle-x: min(max((self.width - root.middle-w) / 2, 180px), root.anchor - 12px - root.middle-w);
+    property <length> left-w: max(root.squeezed ? 0px : 80px, root.middle-x + (root.middle-w - root.center-w) / 2 - 100px);
     // The transport row, and the time row under it.
     property <length> transport-y: 8px;
     property <length> time-y: 60px;
@@ -812,7 +835,7 @@ export component BottomBar inherits Rectangle {
         x: actions.x - self.width - 4px;
         y: actions.y;
         above: (Theme.bar-h - 36px) / 2 + Theme.s2;
-        visible: Player.speed != 2;
+        visible: root.show-speed;
     }
 
     actions := HorizontalLayout {
@@ -822,13 +845,14 @@ export component BottomBar inherits Rectangle {
         width: self.preferred-width;
         spacing: 4px;
         // The tooltips end `s2` above the bar (the buttons sit centred in it).
-        // Only without a tray (`if`: a hidden element keeps its room).
-        if !SettingsData.has-tray: MiniPlayerButton {
+        // Only without a tray (`if`: a hidden element keeps its room). It, the sleep timer's
+        // button and Lyrics, the extra buttons, show only while the bar has room for them.
+        if !SettingsData.has-tray && root.show-extras: MiniPlayerButton {
             above: (Theme.bar-h - 36px) / 2 + Theme.s2;
             clicked => { root.toggle-mini(); }
         }
         // Only with its setting on; it grows to the left, so the buttons after it stay put.
-        if SettingsData.sleep-timer: SleepButton {
+        if SettingsData.sleep-timer && root.show-extras: SleepButton {
             width: root.sleep-w;
             text: root.sleep-text;
             above: (Theme.bar-h - 36px) / 2 + Theme.s2;
@@ -838,28 +862,39 @@ export component BottomBar inherits Rectangle {
         tail := HorizontalLayout {
             spacing: 4px;
             // Not there with lyrics off in Settings.
-            if LyricsData.on: LyricsButton {
+            if LyricsData.on && root.show-extras: LyricsButton {
                 above: (Theme.bar-h - 36px) / 2 + Theme.s2;
             }
             NotForMeButton {
                 above: (Theme.bar-h - 36px) / 2 + Theme.s2;
             }
             LikeButton { }
-            IconButton {
-                icon: Player.volume > 0 ? Icons.volume : Icons.volume-off;
-                label: Player.volume > 0 ? @tr("Mute") : @tr("Unmute");
-                clicked => {
-                    if Player.volume > 0 {
-                        root.unmuted = Player.volume;
-                        Player.set-volume(0, true);
-                    } else {
-                        Player.set-volume(root.unmuted, true);
+            // The volume, its button and slider, with the gap before Up next: no width and
+            // hidden while the bar has no room for it, but kept (not an `if`), so Up and Down
+            // still step it.
+            Rectangle {
+                width: root.show-volume ? root.volume-w : 0px;
+                visible: root.show-volume;
+                HorizontalLayout {
+                    width: root.volume-w;
+                    spacing: 4px;
+                    IconButton {
+                        icon: Player.volume > 0 ? Icons.volume : Icons.volume-off;
+                        label: Player.volume > 0 ? @tr("Mute") : @tr("Unmute");
+                        clicked => {
+                            if Player.volume > 0 {
+                                root.unmuted = Player.volume;
+                                Player.set-volume(0, true);
+                            } else {
+                                Player.set-volume(root.unmuted, true);
+                            }
+                        }
+                    }
+                    volume := VolumeSlider { }
+                    Rectangle {
+                        width: 8px;
                     }
                 }
-            }
-            volume := VolumeSlider { }
-            Rectangle {
-                width: 8px;
             }
             IconButton {
                 icon: Icons.queue;
