@@ -1,8 +1,8 @@
-//! The player bar below the window's minimum width, on the offscreen platform (no window is
-//! shown): a window manager may ignore the 960 px minimum, so the bar mustn't rely on it. As
-//! it narrows, the title shortens, then the speed pill, the volume and the extra buttons go in
-//! turn; the title, the transport and the time row never run into each other or into the
-//! right-hand side. At 960 px everything still shows.
+//! The player bar from 960 px down to 640, on the offscreen platform (no window is shown). As
+//! it narrows, the title shortens, then the speed pill, the volume's slider (its button stays)
+//! and the extra buttons go in turn; the title, the transport and the time row never run into
+//! each other or into the right-hand side. At 960 px everything still shows. The steps below
+//! 640 px are `narrow_shell.rs`'s.
 
 use std::ops::ControlFlow;
 

@@ -1,0 +1,347 @@
+//! The window's frame in a narrow window, on the offscreen platform (no window is shown):
+//! below 560 px the sidebar is a drawer from the top bar's menu button (Escape, a click
+//! outside and a pick close it, and the keys go into it and come back); below the room for
+//! the rail, the Up next panel and a page (952 px) Up next is a sheet above the bar; the bar
+//! gives up its groups in order and nothing in it overlaps, down to 360 px; where the
+//! volume's slider doesn't fit, its button opens it in a popup.
+
+use std::ops::ControlFlow;
+
+use featherplay::snapshot::Scene;
+use featherplay::ui::{Frame, Nav, PageKind, Player, Theme};
+use i_slint_core::accessibility::AccessibleStringProperty;
+use i_slint_core::item_tree::ItemRc;
+use i_slint_core::window::WindowInner;
+use slint::platform::{Key, PointerEventButton, WindowEvent};
+use slint::{ComponentHandle, LogicalPosition, LogicalSize, PhysicalSize, SharedString};
+
+const H: u32 = 800;
+
+/// The visible elements named `label`, as left, top, right and bottom edges.
+fn rects(scene: &Scene, label: &str) -> Vec<[f32; 4]> {
+    let root = ItemRc::new_root(WindowInner::from_pub(scene.ui.window()).component());
+    let mut found = Vec::new();
+    root.visit_descendants(|item| {
+        let named = item
+            .accessible_string_property(AccessibleStringProperty::Label)
+            .is_some_and(|l| l == label);
+        if named && item.is_visible() {
+            let g = item.geometry();
+            let at = item.map_to_window(g.origin);
+            found.push([at.x, at.y, at.x + g.width(), at.y + g.height()]);
+        }
+        ControlFlow::<()>::Continue(())
+    });
+    found
+}
+
+/// The one visible element named `label` at or below `top`, if there is one.
+fn rect(scene: &Scene, label: &str, top: f32) -> Option<[f32; 4]> {
+    rects(scene, label).into_iter().find(|r| r[1] >= top)
+}
+
+fn centre(r: [f32; 4]) -> LogicalPosition {
+    LogicalPosition::new((r[0] + r[2]) / 2.0, (r[1] + r[3]) / 2.0)
+}
+
+fn click(scene: &Scene, at: LogicalPosition) {
+    let w = scene.ui.window();
+    let button = PointerEventButton::Left;
+    w.dispatch_event(WindowEvent::PointerMoved { position: at });
+    w.dispatch_event(WindowEvent::PointerPressed {
+        position: at,
+        button,
+    });
+    w.dispatch_event(WindowEvent::PointerReleased {
+        position: at,
+        button,
+    });
+    scene.settle();
+}
+
+fn click_named(scene: &Scene, label: &str) {
+    let r = rect(scene, label, 0.0).unwrap_or_else(|| panic!("no {label:?} to click"));
+    click(scene, centre(r));
+}
+
+fn key(scene: &Scene, text: impl Into<SharedString>) {
+    let w = scene.ui.window();
+    let text = text.into();
+    w.dispatch_event(WindowEvent::KeyPressed { text: text.clone() });
+    w.dispatch_event(WindowEvent::KeyReleased { text });
+    scene.settle();
+}
+
+fn resize(scene: &Scene, width: u32) {
+    let w = scene.ui.window();
+    w.set_size(PhysicalSize::new(width, H));
+    w.dispatch_event(WindowEvent::Resized {
+        size: LogicalSize::new(width as f32, H as f32),
+    });
+    scene.settle();
+}
+
+/// Home at `width` × 800 with the fixture radio playing and the keys in the window.
+fn home(width: u32) -> Scene {
+    let scene = Scene::new(width, H, true, false).expect("scene");
+    scene.play(false).expect("player");
+    scene.open("home").expect("page");
+    resize(&scene, width);
+    scene
+        .ui
+        .window()
+        .dispatch_event(WindowEvent::WindowActiveChanged(true));
+    scene
+}
+
+#[test]
+fn the_drawer_opens_from_the_menu_and_closes_by_escape_a_click_outside_and_a_pick() {
+    let scene = home(480);
+    let frame = scene.ui.global::<Frame>();
+    let page = || scene.ui.global::<Nav>().get_page();
+    assert!(
+        rect(&scene, "Library", 0.0).is_none(),
+        "a sidebar at 480 px"
+    );
+    assert_eq!(
+        scene.ui.get_page_x(),
+        0.0,
+        "the page doesn't start at the edge"
+    );
+
+    click_named(&scene, "Menu");
+    assert!(frame.get_drawer_open(), "the menu button didn't open it");
+    let library = rect(&scene, "Library", 0.0).expect("no Library in the drawer");
+    assert!(library[0] >= 0.0, "the drawer didn't slide all the way in");
+    key(&scene, Key::Escape);
+    assert!(!frame.get_drawer_open(), "Escape didn't close it");
+
+    click_named(&scene, "Menu");
+    click(&scene, LogicalPosition::new(420.0, 400.0));
+    assert!(!frame.get_drawer_open(), "a click outside didn't close it");
+    assert_eq!(page(), PageKind::Home, "the click outside went through");
+
+    click_named(&scene, "Menu");
+    click_named(&scene, "Library");
+    assert!(!frame.get_drawer_open(), "picking a page didn't close it");
+    assert_eq!(page(), PageKind::Library);
+
+    // From the keyboard: Ctrl+K, then Shift+Tab, reaches the menu button; Enter opens the
+    // drawer with the keys in it on the page shown; Down and Enter pick the next entry; the
+    // keys come back to the button, so Enter opens it again.
+    let w = scene.ui.window();
+    w.dispatch_event(WindowEvent::KeyPressed {
+        text: Key::Control.into(),
+    });
+    key(&scene, "k");
+    w.dispatch_event(WindowEvent::KeyReleased {
+        text: Key::Control.into(),
+    });
+    key(&scene, Key::Backtab);
+    key(&scene, Key::Return);
+    assert!(
+        frame.get_drawer_open(),
+        "Enter on the menu button didn't open it"
+    );
+    key(&scene, Key::DownArrow);
+    key(&scene, Key::Return);
+    assert_eq!(page(), PageKind::Explore, "Down and Enter from Library");
+    assert!(!frame.get_drawer_open());
+    key(&scene, Key::Return);
+    assert!(
+        frame.get_drawer_open(),
+        "the keys didn't come back to the menu button"
+    );
+    key(&scene, Key::Escape);
+    assert!(!frame.get_drawer_open());
+
+    // At 560 px the rail is back, and with it no menu button.
+    resize(&scene, 560);
+    assert!(
+        rect(&scene, "Menu", 0.0).is_none(),
+        "a menu button beside the rail"
+    );
+    assert_eq!(
+        scene.ui.get_page_x(),
+        scene.ui.global::<Theme>().get_rail_w()
+    );
+}
+
+#[test]
+fn up_next_is_the_panel_down_to_952_px_and_a_sheet_below() {
+    let scene = home(953);
+    let (ui, frame) = (&scene.ui, scene.ui.global::<Frame>());
+    let theme = ui.global::<Theme>();
+    frame.set_queue_open(true);
+    scene.settle();
+    let beside = |width: f32| width - theme.get_rail_w() - theme.get_panel_w();
+    assert!(!ui.get_sheet());
+    assert_eq!(ui.get_page_width(), beside(953.0), "no panel at 953 px");
+    assert!(ui.get_page_width() >= theme.get_page_min_w());
+
+    // A pixel or two under the fit (a half-snapped window is about 958): the page has the
+    // width, the panel waits, and the bar's Up next button opens the sheet instead.
+    resize(&scene, 951);
+    assert!(ui.get_sheet());
+    assert_eq!(ui.get_page_width(), 951.0 - theme.get_rail_w());
+    assert!(
+        rect(&scene, "Close Up next", 0.0).is_none(),
+        "the sheet opened by itself"
+    );
+    let bar_top = H as f32 - theme.get_bar_clear();
+    click(
+        &scene,
+        centre(rect(&scene, "Up next", bar_top).expect("no Up next button")),
+    );
+    assert!(frame.get_sheet_open());
+    let close = rect(&scene, "Close Up next", 0.0).expect("no sheet");
+    assert!(
+        close[1] >= theme.get_sheet_top() && close[2] <= 951.0 - theme.get_bar_inset(),
+        "the sheet's close button at {close:?}"
+    );
+    key(&scene, Key::Escape);
+    assert!(!frame.get_sheet_open(), "Escape didn't close the sheet");
+    click(
+        &scene,
+        centre(rect(&scene, "Up next", bar_top).expect("no Up next button")),
+    );
+    click_named(&scene, "Close Up next");
+    assert!(!frame.get_sheet_open(), "its close button didn't close it");
+
+    // The panel kept its state: wide again, it's there.
+    resize(&scene, 953);
+    assert!(!ui.get_sheet());
+    assert_eq!(
+        ui.get_page_width(),
+        beside(953.0),
+        "the panel didn't come back"
+    );
+}
+
+#[test]
+fn the_bar_gives_up_its_groups_in_order_and_nothing_overlaps() {
+    let scene = home(640);
+    let theme = scene.ui.global::<Theme>();
+    let player = scene.ui.global::<Player>();
+    let top = H as f32 - theme.get_bar_clear();
+    let groups = ["Shuffle off", "Repeat off", "Not for me", "Volume"];
+    let title = player.get_title().to_string();
+    let elapsed = player.get_elapsed().to_string();
+
+    for (width, shown, times) in [
+        (640, &groups[..], true),
+        (560, &["Volume"][..], true),
+        (480, &[][..], false),
+        (360, &[][..], false),
+    ] {
+        resize(&scene, width);
+        for label in groups {
+            assert_eq!(
+                rect(&scene, label, top).is_some(),
+                shown.contains(&label),
+                "{width} px: is {label:?} there?"
+            );
+        }
+        assert_eq!(
+            rect(&scene, &elapsed, top).is_some(),
+            times,
+            "{width} px: the times"
+        );
+        // Everything the bar shows, none overlapping another: the cover and title, the
+        // transport, the right-hand buttons, the times and the seek line.
+        let mut parts: Vec<(String, [f32; 4])> = Vec::new();
+        let now = format!("Now playing: {title}");
+        let named = [
+            now.as_str(),
+            "Previous",
+            "Pause",
+            "Play",
+            "Next",
+            "Like",
+            "Up next",
+            "Seek",
+        ];
+        for label in named
+            .iter()
+            .copied()
+            .chain(groups)
+            .chain([elapsed.as_str()])
+        {
+            if let Some(r) = rect(&scene, label, top) {
+                parts.push((label.to_string(), r));
+            }
+        }
+        let seek = parts
+            .iter()
+            .find(|p| p.0 == "Seek")
+            .expect("no seek line")
+            .1;
+        let inset = theme.get_bar_inset();
+        if !times {
+            assert!(
+                seek[0] <= inset + theme.get_r_xl() + 1.0
+                    && seek[2] >= width as f32 - inset - theme.get_r_xl() - 1.0,
+                "{width} px: the seek line at {seek:?} doesn't run the bar's width"
+            );
+        }
+        for (i, (a, ra)) in parts.iter().enumerate() {
+            assert!(
+                ra[0] >= inset && ra[2] <= width as f32 - inset,
+                "{width} px: {a} at {ra:?} runs out of the bar"
+            );
+            for (b, rb) in &parts[i + 1..] {
+                let apart = ra[2] <= rb[0] || rb[2] <= ra[0] || ra[3] <= rb[1] || rb[3] <= ra[1];
+                assert!(apart, "{width} px: {a} {ra:?} overlaps {b} {rb:?}");
+            }
+        }
+    }
+}
+
+#[test]
+fn the_volume_button_opens_the_slider_in_a_popup() {
+    let scene = home(960);
+    let theme = scene.ui.global::<Theme>();
+    let (frame, player) = (scene.ui.global::<Frame>(), scene.ui.global::<Player>());
+    let top = H as f32 - theme.get_bar_clear();
+    assert!(rect(&scene, "Mute", top).is_some(), "no slider at 960 px");
+    assert!(rect(&scene, "Volume", top).is_some_and(|r| r[2] - r[0] > 36.0));
+
+    // At 800 px the slider doesn't fit: its button opens it above the bar.
+    resize(&scene, 800);
+    let button = rect(&scene, "Volume", top).expect("no volume button at 800 px");
+    assert_eq!(
+        button[2] - button[0],
+        36.0,
+        "the slider is still in the bar"
+    );
+    click(&scene, centre(button));
+    assert!(frame.get_volume_open(), "the button didn't open the popup");
+    let mute = rect(&scene, "Mute", 0.0).expect("no mute button in the popup");
+    assert!(mute[3] <= top, "the popup at {mute:?} isn't above the bar");
+
+    // Up steps the volume while it's open; Escape closes it.
+    player.set_volume_step(5);
+    player.set_volume(0.5);
+    let weak = scene.ui.as_weak();
+    player.on_set_volume(move |value, _| {
+        if let Some(ui) = weak.upgrade() {
+            ui.global::<Player>().set_volume(value);
+        }
+    });
+    key(&scene, Key::UpArrow);
+    assert!((player.get_volume() - 0.55).abs() < 1e-4, "Up in the popup");
+    key(&scene, Key::Escape);
+    assert!(!frame.get_volume_open(), "Escape didn't close it");
+
+    // Below the button's room, the volume is a row in the Up next sheet.
+    resize(&scene, 480);
+    assert!(
+        rect(&scene, "Volume", top).is_none(),
+        "a volume button at 480 px"
+    );
+    assert!(frame.get_volume_in_sheet());
+    frame.set_sheet_open(true);
+    scene.settle();
+    let row = rect(&scene, "Mute", 0.0).expect("no volume row in the sheet");
+    assert!(row[3] <= top, "the sheet's volume row at {row:?}");
+}
