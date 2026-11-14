@@ -91,7 +91,12 @@ pub fn init(ctx: &Rc<Ctx>) {
             // A page on its way out may still say what it shows as it goes.
             let Some(ctx) = c.upgrade() else { return };
             let on = is_on(list, part, ctx.current_page().kind());
-            shown(list, part, first, if on { last } else { -1 });
+            let last = if on { last } else { -1 };
+            // Up next asks for its covers by the same rows.
+            if list == SongList::UpNext {
+                crate::queue_panel::rows_shown(&ctx, part, first, last);
+            }
+            shown(list, part, first, last);
         });
 }
 

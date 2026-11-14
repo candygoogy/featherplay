@@ -1,6 +1,6 @@
 //! The Up next panel's pinned row shows the current track's cover, also when that cover is
-//! already in memory (shown in the list the track was played from, or as an upcoming row
-//! before the track started); and a queue played from Liked songs says so. On the
+//! already in memory (shown in the list the track was played from, or as an upcoming row on
+//! screen before the track started); and a queue played from Liked songs says so. On the
 //! offscreen platform with the fixtures and generated covers: nothing is fetched.
 
 use std::path::{Path, PathBuf};
@@ -13,8 +13,8 @@ use featherplay::controller::{Action, PlayerState, QueueAction, QueueInfo};
 use featherplay::covers::Covers;
 use featherplay::offscreen;
 use featherplay::pages::playlist;
-use featherplay::queue_panel;
-use featherplay::ui::{AppWindow, PlaylistData, QueueData, Theme};
+use featherplay::ui::{AppWindow, Frame, PlaylistData, QueueData, Theme};
+use featherplay::{prepare, queue_panel};
 use featherplay_controller::catalog::{Catalog, Source};
 use featherplay_controller::fixtures::Fixtures;
 use featherplay_core::model::{PlaylistId, Track};
@@ -61,6 +61,18 @@ fn state(current: &Track, upcoming: &[Track]) -> PlayerState {
     }
 }
 
+/// The next action the window sent, past the rows on screen it asked to resolve ahead.
+fn next_sent(
+    sent: &mut mpsc::UnboundedReceiver<Action>,
+) -> Result<Action, mpsc::error::TryRecvError> {
+    loop {
+        match sent.try_recv() {
+            Ok(Action::Prepare(_)) => continue,
+            other => return other,
+        }
+    }
+}
+
 fn has_cover(img: &slint::Image) -> bool {
     img.size().width > 0
 }
@@ -99,6 +111,15 @@ fn current_row_cover_and_liked_songs_label() {
     ui.global::<Theme>().set_still(true);
     let ctx: Rc<Ctx> = Ctx::new(&ui, catalog, covers, actions);
     let data = ui.global::<QueueData>();
+    // Up next asks for the covers of the rows it shows: the panel is open, and drawn.
+    prepare::init(&ctx);
+    ui.window().set_size(slint::PhysicalSize::new(1280, 800));
+    ui.global::<Frame>().set_queue_open(true);
+    ui.show().expect("show");
+    let draw = || {
+        ui.window().request_redraw();
+        ui.window().take_snapshot().expect("snapshot");
+    };
 
     // 1. The track's 40 px cover is in memory (the Liked list's row showed it), then it
     // starts playing.
@@ -116,6 +137,7 @@ fn current_row_cover_and_liked_songs_label() {
     // 2. The next track's cover is shown in its upcoming row; then it becomes current.
     queue_panel::update(&ctx, &state(&tracks[0], &tracks[2..4]));
     let upcoming_shown = || {
+        draw();
         let rows = data.get_upcoming();
         rows.row_count() == 2 && rows.iter().all(|r| has_cover(&r.cover))
     };
@@ -142,16 +164,16 @@ fn current_row_cover_and_liked_songs_label() {
         "Liked songs loads"
     );
     // Opening the list resolves its first row ahead, and only that one.
-    match sent.try_recv() {
+    match next_sent(&mut sent) {
         Ok(Action::Prefetch { id, track }) => {
             assert_eq!(id.0, pdata.get_tracks().row_data(0).unwrap().id.as_str());
             assert!(track.is_some());
         }
         other => panic!("expected the first row's prefetch, got {other:?}"),
     }
-    assert!(sent.try_recv().is_err(), "one prefetch");
+    assert!(next_sent(&mut sent).is_err(), "one prefetch");
     pdata.invoke_play(0);
-    match sent.try_recv() {
+    match next_sent(&mut sent) {
         Ok(Action::Queue(QueueAction::PlayFrom { from, start, .. })) => {
             assert_eq!(from.label, "Liked songs");
             assert_eq!(start, 0);
@@ -159,7 +181,7 @@ fn current_row_cover_and_liked_songs_label() {
         other => panic!("expected a labelled play, got {other:?}"),
     }
     pdata.invoke_shuffle();
-    match sent.try_recv() {
+    match next_sent(&mut sent) {
         Ok(Action::Queue(QueueAction::PlayFrom { from, .. })) => {
             assert_eq!(from.label, "Liked songs")
         }
