@@ -306,6 +306,12 @@ impl Queue {
         self.list_end = list_end;
     }
 
+    /// Every entry in play order (history, the current track, then Up next), and the
+    /// current one's index into them (the length when there's none).
+    pub fn all(&self) -> (&[Track], usize) {
+        (&self.tracks, self.index.min(self.tracks.len()))
+    }
+
     /// The tracks after the current one, in play order.
     pub fn upcoming(&self) -> &[Track] {
         self.tracks.get(self.index + 1..).unwrap_or(&[])

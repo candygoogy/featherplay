@@ -684,6 +684,44 @@ fn session_roundtrip() {
     assert_eq!(load_session(&p), None);
 }
 
+/// A session save that can't replace the file (here another program holds it open without
+/// letting it be replaced) fails whole: the saved session stays as it was, and no temp file
+/// is left behind.
+#[cfg(windows)]
+#[test]
+fn a_session_save_that_fails_leaves_the_saved_one() {
+    use std::os::windows::fs::OpenOptionsExt;
+
+    let Some(home) = TestHome::new("session-held") else {
+        return;
+    };
+    let p = home.paths();
+    let mut s = Session {
+        queue: Vec::new(),
+        index: 0,
+        position_ms: 1_000,
+        radio: false,
+        shuffle: false,
+        repeat: RepeatMode::Off,
+    };
+    save_session(&s, &p).unwrap();
+    // FILE_SHARE_READ only: no rename over it while it's open.
+    let held = fs::OpenOptions::new()
+        .read(true)
+        .share_mode(1)
+        .open(p.config.join("session.json"))
+        .unwrap();
+    s.position_ms = 2_000;
+    assert!(save_session(&s, &p).is_err());
+    drop(held);
+    assert_eq!(load_session(&p).map(|s| s.position_ms), Some(1_000));
+    let names: Vec<_> = fs::read_dir(&p.config)
+        .unwrap()
+        .map(|e| e.unwrap().file_name())
+        .collect();
+    assert_eq!(names, ["session.json"]);
+}
+
 #[test]
 fn the_client_version_is_kept_for_the_next_start() {
     let Some(home) = TestHome::new("client-version") else {

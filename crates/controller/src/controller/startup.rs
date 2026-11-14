@@ -249,6 +249,7 @@ impl Controller {
             presence,
             segments: None,
             settings,
+            session_file: super::session_file::SessionFile::new(paths.clone()),
             paths,
             volume: opts.volume,
             fixture_stream: opts.fixture_stream,

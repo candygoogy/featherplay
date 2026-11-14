@@ -24,6 +24,7 @@ mod messages;
 mod notice;
 mod queue;
 mod reconnect;
+mod session_file;
 mod silences;
 mod sleep;
 mod song_versions;
@@ -43,7 +44,7 @@ use featherplay_core::scrobble::Alternates;
 use featherplay_core::tr;
 use featherplay_integrations::sponsorblock::{self, Segment};
 use featherplay_integrations::{NowPlaying, UiCommand};
-use featherplay_store::{Loudness, Paths, Settings, SkipSilence, StreamingQuality, save_session};
+use featherplay_store::{Loudness, Paths, Settings, SkipSilence, StreamingQuality};
 use featherplay_streams::{Quality, ResolvedStream, YtDlpResolver};
 use featherplay_ytm::YtMusic;
 use tokio::sync::mpsc;
@@ -146,6 +147,8 @@ pub struct Controller {
     network_told: bool,
     /// The sleep timer (`sleep.rs`).
     sleep: sleep::SleepTimer,
+    /// Writes the session off this loop (`session_file.rs`).
+    session_file: session_file::SessionFile,
 }
 
 /// A future boxed in this crate.
@@ -275,7 +278,7 @@ impl Controller {
             self.sleep_check();
         }
         self.audio.pause();
-        self.persist();
+        self.persist_now();
         self.save_streams(true);
         if let Some(presence) = self.presence.take() {
             presence.quit();
@@ -546,19 +549,17 @@ impl Controller {
         self.restore_refused();
     }
 
+    /// Saves the session in the background: this loop only copies it.
     fn persist(&self) {
-        if self.player.queue().current().is_none() {
-            return;
+        if self.player.queue().current().is_some() {
+            self.session_file.save_later(self.player.session());
         }
-        let session = self.player.session();
-        match save_session(&session, &self.paths) {
-            Ok(()) => log!(
-                "session saved: {} tracks, index {}, at {:.1}s",
-                session.queue.len(),
-                session.index,
-                session.position_ms as f64 / 1000.0
-            ),
-            Err(e) => log!("saving the session failed: {e}"),
+    }
+
+    /// Saves the session before returning, after any save on its way (at quit).
+    fn persist_now(&self) {
+        if self.player.queue().current().is_some() {
+            self.session_file.save_now(&self.player.session());
         }
     }
 

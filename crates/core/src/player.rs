@@ -393,19 +393,11 @@ impl Player {
     }
 
     /// The state to persist: the whole queue (history included), the position and modes.
+    /// Copies the tracks once, and nothing else of the queue.
     pub fn session(&self) -> Session {
-        let mut walk = self.queue.clone();
-        let mut history = Vec::new();
-        while walk.back(Duration::ZERO) == BackAction::Previous {
-            history.extend(walk.current().cloned());
-        }
-        let index = history.len();
-        history.reverse();
-        let mut queue = history;
-        queue.extend(self.queue.current().cloned());
-        queue.extend(self.queue.upcoming().iter().cloned());
+        let (tracks, index) = self.queue.all();
         Session {
-            queue,
+            queue: tracks.to_vec(),
             index,
             position_ms: self.position.as_millis() as u64,
             radio: self.is_radio(),
