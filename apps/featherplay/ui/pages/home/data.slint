@@ -33,8 +33,11 @@ export global HomeData {
     // The song the band's actions (Like, Add to playlist, Start radio, Go to artist) act on:
     // the current track while resuming, the featured song on a fresh start.
     in property <TrackRow> track;
-    // Resume: what's next in the queue, three rows a column (`home.rs::HERO_NEXT` at most).
+    // Resume: what's next in the queue, three rows a column (`hero.rs::HERO_NEXT` at most).
     in property <[TrackRow]> next;
+    // Resume with fewer than three songs next: "More like this" fills the column's other rows,
+    // from the song's Related tab when it's loaded (`hero.rs::more_like_this`); empty otherwise.
+    in property <[TrackRow]> related;
     // Featured: the pick, its shelf's title ("Quick picks"), the heading over the rest ("More
     // from Quick picks"), and 3 more from that shelf.
     in property <bool> has-featured;
@@ -65,6 +68,8 @@ export global HomeData {
     callback open-featured(int);
     // Opens the Up next panel ("Show all", "Up next · N").
     callback show-queue();
+    // One of `related`: plays it as the Related tab does.
+    callback play-related(int);
     // The Liked songs tile on the first rail: plays Liked songs shuffled.
     callback shuffle-liked();
     // A song card on a shelf: plays it, with radio after it.

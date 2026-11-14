@@ -2,7 +2,8 @@
 //! paused session, opens the source while it plays and plays the pick on a fresh start; its
 //! round actions act on the band's song; Up next shows its rows and "Show all" beside the
 //! song in a wide window, and an "Up next · N" link in a narrow one, both opening the panel;
-//! the band's queue follows the player's, the Up next panel open or not.
+//! the band's queue follows the player's, the Up next panel open or not; a second column
+//! only for six songs and room for it; "More like this" under a short queue.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -190,6 +191,66 @@ fn up_next_shows_beside_the_song_or_as_a_link_and_opens_the_panel() {
         PointerEventButton::Left,
     );
     assert_eq!(*did.borrow(), ["show queue"], "the link");
+}
+
+#[test]
+fn a_second_column_needs_six_songs_and_room_and_a_short_queue_gets_more_like_this() {
+    let _pump = offscreen::install().expect("platform");
+    let ui = window(1920.0);
+    let w = ui.window();
+    let did = Rc::new(RefCell::new(Vec::<String>::new()));
+    let data = ui.global::<HomeData>();
+    let queue = ui.global::<QueueData>();
+    let d = did.clone();
+    queue.on_play(move |i| d.borrow_mut().push(format!("play {i}")));
+    let d = did.clone();
+    data.on_play_related(move |i| d.borrow_mut().push(format!("related {i}")));
+    data.set_resume(true);
+    data.set_track(row("t1"));
+    // Row `r` of a column, 26 px into it: under the 20 px heading, 52 px rows.
+    let row_y = |r: f32| BAND_Y + 24.0 + 20.0 + r * 52.0 + 26.0;
+    let clicks = |x: f32, ys: &[f32]| {
+        did.borrow_mut().clear();
+        for &y in ys {
+            click(w, BAND_X + x, y, PointerEventButton::Left);
+        }
+        std::mem::take(&mut *did.borrow_mut())
+    };
+
+    // At 1920 the band is 1600 px. Four songs: one 520 px column at its right end, from
+    // 1056 px in, the song's side taking the rest; no second column for the fourth song.
+    data.set_next(rows(4));
+    queue.set_upcoming(rows(4));
+    assert_eq!(clicks(1056.0 + 120.0, &[row_y(0.0)]), ["play 0"]);
+    assert!(
+        clicks(732.0 + 120.0, &[row_y(0.0)]).is_empty(),
+        "the song's side"
+    );
+    // Six: two 410 px columns from 732 px, three rows each.
+    data.set_next(rows(6));
+    queue.set_upcoming(rows(6));
+    assert_eq!(
+        clicks(732.0 + 434.0 + 120.0, &[row_y(0.0), row_y(2.0)]),
+        ["play 3", "play 5"]
+    );
+
+    // At 1568 (a 1248 px band) six don't fit in two: one column, from 732 px.
+    w.set_size(slint::LogicalSize::new(1568.0, 900.0));
+    w.dispatch_event(WindowEvent::Resized {
+        size: slint::LogicalSize::new(1568.0, 900.0),
+    });
+    assert_eq!(clicks(732.0 + 120.0, &[row_y(2.0)]), ["play 2"]);
+
+    // One song left: it, then "More like this" with two related songs, in 44 px rows (the
+    // second heading 4 px under the queue's row).
+    data.set_next(rows(1));
+    queue.set_upcoming(rows(1));
+    data.set_related(rows(2));
+    let more_y = BAND_Y + 24.0 + 20.0 + 44.0 + 4.0 + 20.0;
+    assert_eq!(
+        clicks(732.0 + 120.0, &[more_y + 22.0, more_y + 44.0 + 22.0]),
+        ["related 0", "related 1"]
+    );
 }
 
 /// The controller's state as a radio has it: `current` playing, `upcoming` after it.

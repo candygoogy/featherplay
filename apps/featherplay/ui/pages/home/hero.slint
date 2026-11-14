@@ -57,19 +57,23 @@ export global BandSizes {
     out property <length> cover: 176px;
     // The text column's left edge: the padding, the cover, a 28 px gap.
     out property <length> text-x: 228px;
-    // The text column beside Up next: 456 px (the divider at 708, the column from 732), giving
-    // up to 126 px to a narrow band before the queue goes (the row then drops "Paused at").
+    // The text column beside Up next: 456 px (the divider at 708, the column from 732) until
+    // the queue is `col-max` wide, then whatever the queue leaves; it gives up to 126 px to a
+    // narrow band before the queue goes (the row then drops "Paused at").
     out property <length> text-max: 456px;
     out property <length> text-min: 330px;
     // The queue shows down to this wide (its titles and artists elide, the lengths go below
-    // `row-full`): narrower, the "Up next · N" link; another column joins when each can be
-    // `col-min`, each at most `col-max`.
+    // `row-full`): narrower, the "Up next · N" link. A second column joins with six songs next
+    // once each can be `col-min`; each is at most `col-max`.
     out property <length> show-min: 220px;
     out property <length> row-full: 280px;
-    out property <length> col-min: 420px;
+    out property <length> col-min: 400px;
     out property <length> col-max: 520px;
     out property <length> col-gap: 24px;
     out property <length> row-h: 52px;
+    // A short queue's rows with "More like this" under them: two headings and three rows in
+    // the cover's height, a 4 px gap before the second heading.
+    out property <length> row-h-tight: 44px;
     // The four actions: 40 px each, 8 apart.
     out property <length> actions-w: 4 * 40px + 3 * 8px;
 }
@@ -274,10 +278,13 @@ component BandLink inherits Rectangle {
 
 // The band. Its right column (Up next, or more from the pick's shelf) shows once the song's
 // column (`text-min` to `text-max`) and `show-min` of queue fit beside the cover, the Up next
-// panel open or not: it's the same queue the panel shows. The song's column gives way first,
-// then the queue narrows. Narrower, resuming, "Up next · N ›" at the top right opens the panel
-// (nothing while the panel is open, which shows the queue). Wider, the queue runs in more
-// columns of three rows, each up to `col-max`.
+// panel open or not: it's the same queue the panel shows. The queue narrows first, then the
+// song's column. Narrower, resuming, "Up next · N ›" at the top right opens the panel (nothing
+// while the panel is open, which shows the queue). Three songs a column; a second column with
+// six or more next, when each can be `col-min` beside `text-max` of song, never a third nor a
+// part-filled one. Past `col-max` a column, the room goes to the song's side. A queue shorter
+// than a column is filled with "More like this" under its own heading (`HomeData.related`);
+// with nothing next and nothing related the song takes the band's width.
 export component Band inherits Rectangle {
     property <bool> resume: HomeData.resume;
     property <bool> playing: root.resume && Player.playing;
@@ -287,20 +294,29 @@ export component Band inherits Rectangle {
     property <length> pad: BandSizes.pad;
     property <int> queued: QueueData.upcoming.length;
     property <int> rows-n: root.resume ? HomeData.next.length : HomeData.featured-more.length;
-    // Beside the queue: the song's column as wide as leaves the queue `show-min`, up to
-    // `text-max`; the divider a gap after it, the queue a gap after that.
-    property <length> beside-w: min(BandSizes.text-max, root.width - BandSizes.text-x - 3 * root.pad - BandSizes.show-min);
+    // "More like this" under a short queue (resuming only; `hero.rs` fills it then).
+    property <int> more-n: root.resume ? HomeData.related.length : 0;
+    // The song's column and the queue share this, less the gaps around the divider and the
+    // right padding.
+    property <length> room: root.width - BandSizes.text-x - 3 * root.pad;
+    // Two columns with six songs next, when each gets `col-min` beside `text-max` of song.
+    property <int> cols: root.resume && root.rows-n >= 6 && root.room - BandSizes.text-max >= 2 * BandSizes.col-min + BandSizes.col-gap ? 2 : 1;
+    property <length> col-w: root.cols == 2 ? min(BandSizes.col-max, floor((root.room - BandSizes.text-max - BandSizes.col-gap) / 2 / 1px) * 1px) : max(BandSizes.show-min, min(BandSizes.col-max, root.room - BandSizes.text-max));
+    property <length> cols-w: root.cols * root.col-w + (root.cols - 1) * BandSizes.col-gap;
+    // Beside the queue: the song's column, what the queue leaves (`text-max` at least, until
+    // the queue is down to `show-min`); the divider a gap after it, the queue a gap after that.
+    property <length> beside-w: root.room - root.cols-w;
     property <bool> wide: root.beside-w >= BandSizes.text-min;
-    property <bool> column: root.wide && (root.resume || root.rows-n > 0);
+    property <bool> column: root.wide && root.rows-n + root.more-n > 0;
     property <bool> link: root.resume && !root.column && !Frame.queue-open && root.queued > 0;
     property <length> rule-x: BandSizes.text-x + root.beside-w + root.pad;
     property <length> next-x: root.rule-x + root.pad;
-    // The queue's columns: as many as fit and have songs, three rows each.
-    property <length> cols-room: root.width - root.next-x - root.pad;
-    property <int> cols: max(1, min(ceil(root.rows-n / 3), floor((root.cols-room + BandSizes.col-gap) / (BandSizes.col-min + BandSizes.col-gap))));
-    property <length> col-w: min(BandSizes.col-max, floor((root.cols-room - (root.cols - 1) * BandSizes.col-gap) / root.cols / 1px) * 1px);
-    property <length> cols-w: root.cols * root.col-w + (root.cols - 1) * BandSizes.col-gap;
     property <int> shown: min(root.rows-n, 3 * root.cols);
+    // A short queue over "More like this": both in the cover's height, so tighter rows.
+    property <bool> mixed: root.rows-n > 0 && root.more-n > 0;
+    property <length> row-h: root.mixed ? BandSizes.row-h-tight : BandSizes.row-h;
+    // "More like this": under the queue's rows and a 4 px gap, or at the top without a queue.
+    property <length> more-y: root.rows-n > 0 ? 20px + root.rows-n * root.row-h + 4px : 0px;
     // Too narrow for the song beside the cover and its row (the Up next panel open beside a
     // narrow window): a smaller cover, the title a size down, and the row under them both.
     property <bool> compact: root.width < BandSizes.text-x + root.pad + 340px;
@@ -539,14 +555,14 @@ export component Band inherits Rectangle {
         height: BandSizes.cover;
         background: BandInk.rule;
     }
-    // "Up next" and "Show all N" over three rows a column; on a fresh start, "More from Quick
-    // picks" over three of them.
+    // "Up next" and "Show all N" over three rows a column, then "More like this" under a short
+    // queue; on a fresh start, "More from Quick picks" over three of them.
     if root.column: Rectangle {
         x: root.next-x;
         y: root.pad;
         width: root.cols-w;
         height: BandSizes.cover;
-        Body {
+        if !root.resume || root.rows-n > 0: Body {
             x: 8px;
             y: 0;
             width: parent.width - 16px - (all.visible ? all.width + Theme.s4 : 0px);
@@ -563,20 +579,12 @@ export component Band inherits Rectangle {
             text: @tr("Show all {}", root.queued);
             clicked => { HomeData.show-queue(); }
         }
-        if root.resume && root.rows-n == 0: Body {
-            x: 8px;
-            y: 32px;
-            width: parent.width - 16px;
-            height: 20px;
-            text: @tr("Nothing after this one");
-            color: root.ink2;
-            vertical-alignment: center;
-        }
         if root.resume: Rectangle {
             for t[i] in HomeData.next: BandRow {
                 x: floor(i / 3) * (root.col-w + BandSizes.col-gap);
-                y: 20px + mod(i, 3) * BandSizes.row-h;
+                y: 20px + mod(i, 3) * root.row-h;
                 width: root.col-w;
+                height: root.row-h;
                 visible: i < root.shown;
                 cover: t.cover;
                 title: t.title;
@@ -584,6 +592,31 @@ export component Band inherits Rectangle {
                 duration: root.col-w >= BandSizes.row-full ? t.duration : "";
                 ink2: root.ink2;
                 clicked => { QueueData.play(i); }
+                menu(x, y) => { SongMenu.show(t, x, y, y); }
+            }
+        }
+        if root.more-n > 0: Body {
+            x: 8px;
+            y: root.more-y;
+            width: parent.width - 16px;
+            height: 20px;
+            text: @tr("More like this");
+            font-weight: 600;
+            color: root.ink2;
+            vertical-alignment: center;
+        }
+        if root.more-n > 0: Rectangle {
+            for t[i] in HomeData.related: BandRow {
+                x: 0;
+                y: root.more-y + 20px + i * root.row-h;
+                width: root.col-w;
+                height: root.row-h;
+                cover: t.cover;
+                title: t.title;
+                subtitle: t.artist;
+                duration: root.col-w >= BandSizes.row-full ? t.duration : "";
+                ink2: root.ink2;
+                clicked => { HomeData.play-related(i); }
                 menu(x, y) => { SongMenu.show(t, x, y, y); }
             }
         }

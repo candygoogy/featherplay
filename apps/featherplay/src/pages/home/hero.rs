@@ -21,8 +21,11 @@ use crate::ui_bridge::{home_card, home_thumbnail, model, to_rows};
 const HERO_COVER: u32 = 176;
 /// Rows in the fresh-start band's right column (`Band`: one column of three).
 const HERO_ROWS: usize = 3;
-/// Rows in the band's queue: three columns of three at most (`Band`, from ~1700 px).
-const HERO_NEXT: usize = 9;
+/// Rows in the band's queue: two columns of three at most (`Band`: the second once six songs
+/// are next and the band has room for it).
+const HERO_NEXT: usize = 6;
+/// Rows in a column of the band: a queue shorter than this is filled with "More like this".
+const HERO_COLUMN: usize = 3;
 
 /// What the band shows.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -84,6 +87,7 @@ pub(super) fn show_hero(ctx: &Rc<Ctx>) {
                     .fill(&rows, urls, ROW_COVER, |row, img| row.cover = img);
                 STATE.with(|s| s.borrow_mut().next = ids);
             }
+            show_more_like_this(ctx, &state);
         }
         Hero::Featured { shelf } if changed => {
             let items: Vec<HomeItem> = STATE.with(|s| {
@@ -119,10 +123,68 @@ pub(super) fn show_hero(ctx: &Rc<Ctx>) {
             ctx.covers
                 .fill(&rows, urls, ROW_COVER, |row, img| row.cover = img);
             STATE.with(|s| s.borrow_mut().next.clear());
+            clear_more_like_this(ctx);
         }
         _ => {}
     }
     STATE.with(|s| s.borrow_mut().hero = Some(hero));
+}
+
+/// Which of the song's related tracks fill a queue shorter than a column, as indexes into
+/// `related`: the first ones that aren't the song or already next, as many as the queue
+/// leaves rows for.
+fn more_like_this(current: &TrackId, upcoming: &[Track], related: &[Track]) -> Vec<usize> {
+    let room = HERO_COLUMN.saturating_sub(upcoming.len());
+    related
+        .iter()
+        .enumerate()
+        .filter(|(_, t)| &t.id != current && !upcoming.iter().any(|u| u.id == t.id))
+        .map(|(i, _)| i)
+        .take(room)
+        .collect()
+}
+
+/// "More like this" under a short queue, from the song's Related tab when it has been loaded
+/// (`now_playing::related_of`; nothing is asked for here). Rebuilt only when what it shows
+/// changes.
+fn show_more_like_this(ctx: &Ctx, state: &PlayerState) {
+    let Some(current) = &state.current else {
+        clear_more_like_this(ctx);
+        return;
+    };
+    let related = now_playing::related_of(&current.id).unwrap_or_default();
+    let at = more_like_this(&current.id, &state.upcoming, &related);
+    let ids: Vec<TrackId> = at.iter().map(|&i| related[i].id.clone()).collect();
+    if STATE.with(|s| s.borrow().related == ids) {
+        return;
+    }
+    let Some(ui) = ctx.window() else { return };
+    let shown: Vec<Track> = at.iter().map(|&i| related[i].clone()).collect();
+    song_menu::remember(&shown);
+    let urls = shown.iter().map(|t| t.thumbnail.clone()).collect();
+    let (rows, model) = model(to_rows(&shown));
+    ui.global::<HomeData>().set_related(model);
+    ctx.covers
+        .fill(&rows, urls, ROW_COVER, |row, img| row.cover = img);
+    STATE.with(|s| {
+        let mut s = s.borrow_mut();
+        s.related = ids;
+        s.related_at = at;
+    });
+}
+
+fn clear_more_like_this(ctx: &Ctx) {
+    if STATE.with(|s| s.borrow().related.is_empty()) {
+        return;
+    }
+    if let Some(ui) = ctx.window() {
+        ui.global::<HomeData>().set_related(Default::default());
+    }
+    STATE.with(|s| {
+        let mut s = s.borrow_mut();
+        s.related.clear();
+        s.related_at.clear();
+    });
 }
 
 fn row_of(t: &Track) -> TrackRow {
@@ -256,6 +318,21 @@ mod tests {
             Hero::Featured { shelf: 1 }
         );
         assert_eq!(choose_hero(None, &shelves), Hero::Featured { shelf: 1 });
+    }
+
+    #[test]
+    fn more_like_this_fills_a_short_queue_only() {
+        let ids = |v: &[&str]| v.iter().map(|i| track(i)).collect::<Vec<_>>();
+        let related = ids(&["a", "r1", "b", "r2", "r3", "r4"]);
+        let current = TrackId("a".into());
+        // A radio still loading: three related tracks, not the song itself.
+        assert_eq!(more_like_this(&current, &[], &related), [1, 2, 3]);
+        // The end of an album, one song left: two, none already next.
+        assert_eq!(more_like_this(&current, &ids(&["b"]), &related), [1, 3]);
+        assert_eq!(more_like_this(&current, &ids(&["x", "y"]), &related), [1]);
+        // A full column needs none; nothing loaded gives none.
+        assert!(more_like_this(&current, &ids(&["x", "y", "z"]), &related).is_empty());
+        assert!(more_like_this(&current, &[], &[]).is_empty());
     }
 
     #[test]

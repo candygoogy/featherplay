@@ -60,23 +60,8 @@ pub fn init(ctx: &Rc<Ctx>) {
     });
     let c = ctx.clone();
     data.on_play_related(move |i| {
-        let Some(seed) = c.player().and_then(|s| s.current) else {
-            return;
-        };
-        let Some(tracks) = STATE.with(|s| s.borrow().related.get(&seed.id).cloned().flatten())
-        else {
-            return;
-        };
-        let Ok(start) = usize::try_from(i) else {
-            return;
-        };
-        if start < tracks.len() {
-            c.send(Action::Queue(QueueAction::PlayFrom {
-                tracks,
-                start,
-                radio: true,
-                from: PlayingFrom::named(format!("{} radio", seed.display_title())),
-            }));
+        if let Ok(start) = usize::try_from(i) {
+            play_related(&c, start);
         }
     });
     let c = ctx.clone();
@@ -87,6 +72,31 @@ pub fn init(ctx: &Rc<Ctx>) {
         load_cover(&c, url);
     });
     lyrics::init(ctx);
+}
+
+/// The current song's related tracks, if they've been loaded (the Related tab asks for them;
+/// this doesn't).
+pub(crate) fn related_of(id: &TrackId) -> Option<Vec<Track>> {
+    STATE.with(|s| s.borrow().related.get(id).cloned().flatten())
+}
+
+/// Plays the current song's related tracks from `start`, as a radio of the song: the Related
+/// tab's rows and Home's "More like this".
+pub(crate) fn play_related(ctx: &Ctx, start: usize) {
+    let Some(seed) = ctx.player().and_then(|s| s.current) else {
+        return;
+    };
+    let Some(tracks) = related_of(&seed.id) else {
+        return;
+    };
+    if start < tracks.len() {
+        ctx.send(Action::Queue(QueueAction::PlayFrom {
+            tracks,
+            start,
+            radio: true,
+            from: PlayingFrom::named(format!("{} radio", seed.display_title())),
+        }));
+    }
 }
 
 /// The size the page draws the cover at most, as it last said (`cover-wide`).
@@ -303,6 +313,8 @@ fn show_related(ctx: &Rc<Ctx>) {
                             .related
                             .insert(seed.id.clone(), Some(tracks.clone()))
                     });
+                    // Home's band fills a short queue with them.
+                    crate::pages::home::related_changed(ctx);
                     let current = ctx.player().and_then(|s| s.current).map(|t| t.id);
                     let data = ui.global::<NowPlayingData>();
                     if current.as_ref() == Some(&seed.id) && data.get_tab() == 1 {

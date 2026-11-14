@@ -69,6 +69,10 @@ struct State {
     /// The featured pick's cover the band's colour is (being) worked out for.
     ink_url: Option<String>,
     next: Vec<TrackId>,
+    /// "More like this" under a short queue: the related tracks shown, and where each is in
+    /// the song's related list (`now_playing::related_of`), which a click plays from.
+    related: Vec<TrackId>,
+    related_at: Vec<usize>,
     paging: Paging,
     /// The shelves `HomeData` shows, so a later page's are added to them.
     rows: Option<Rc<VecModel<HomeShelfRow>>>,
@@ -104,6 +108,15 @@ pub fn init(ctx: &Rc<Ctx>) {
     bind_rows(&ui);
     let c = ctx.clone();
     data.on_show_queue(move || crate::queue_panel::show_up_next(&c));
+    let c = ctx.clone();
+    data.on_play_related(move |i| {
+        let at = usize::try_from(i)
+            .ok()
+            .and_then(|i| STATE.with(|s| s.borrow().related_at.get(i).copied()));
+        if let Some(at) = at {
+            crate::pages::now_playing::play_related(&c, at);
+        }
+    });
     let c = ctx.clone();
     data.on_shuffle_liked(move || content::shuffle_playlist(&c, PlaylistId("LM".into())));
     let c = ctx.clone();
@@ -298,6 +311,12 @@ fn sync_rows(rows: &VecModel<i32>, count: i32) {
 
 /// The controller's state changed (track, play/pause, queue).
 pub fn player_changed(ctx: &Rc<Ctx>, _state: &PlayerState) {
+    show_hero(ctx);
+}
+
+/// The current song's related tracks came (the Related tab asked for them): the band fills a
+/// short queue with them.
+pub fn related_changed(ctx: &Rc<Ctx>) {
     show_hero(ctx);
 }
 
