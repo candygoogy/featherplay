@@ -610,7 +610,7 @@ export component AppWindow inherits Window {
         // drawer, and the page under it doesn't scroll. Faded through its colour.
         Rectangle {
             visible: root.drawer && (root.drawer-shown || root.d-out < 1);
-            background: root.drawer-shown ? Theme.scrim : Theme.scrim.transparentize(100%);
+            background: root.drawer-shown ? Theme.drawer-scrim : Theme.drawer-scrim.transparentize(100%);
             animate background { duration: root.drawer-shown ? (root.drawer-by-key ? 0ms : Theme.t-menu) : (root.drawer-snap ? 0ms : Theme.t-fast); easing: Curves.ease-out; }
             TouchArea {
                 pointer-event(e) => {

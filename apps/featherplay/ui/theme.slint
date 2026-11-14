@@ -131,6 +131,9 @@ export global Theme {
     out property <color> cover-glow: neutral ? pick(#FFFFFF1A, #00000000) : accent.with-alpha(between(0.33, 0.22));
     out property <color> avatar: pick(#3A3A3A, #E0E0E0);
     out property <color> scrim: pick(#00000080, #0000002E);      // under overlays
+    // Under the sidebar's drawer, which lies flush on a page cut off at its edge: deeper, so
+    // the page recedes (a bright cover band at half strength read as part of the layout).
+    out property <color> drawer-scrim: pick(#000000B3, #00000066);
     // The current song's row rests on a light tile (hover and press still apply on top).
     out property <color> playing-row: pick(#FFFFFF0F, #0000000A);
     // The recommended row of a list of choices (`ChoiceRow.lit`), a shade over the panel.
