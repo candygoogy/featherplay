@@ -31,15 +31,36 @@ export struct LyricInk {
     past: color,
 }
 
+// Optional text under one displayed line. Empty fields take no room. The model always lines
+// up with `lines` or `plain-lines`, whichever is showing.
+export struct LyricDecoration {
+    romanization: string,
+    translation: string,
+}
+
 export global LyricsData {
     in property <LyricsState> state: LyricsState.idle;
     // Synced: one entry per timed line; "" is a gap between lines.
     in property <[string]> lines;
+    in property <[LyricDecoration]> decorations;
     // The line playing, or -1 before the first.
     in property <int> current: -1;
     // Plain: the whole text, and the same as lines ("" between verses).
     in property <string> plain;
     in property <[string]> plain-lines;
+    // The two compact buttons beside Lyrics in Now playing's full view. Their state is kept
+    // between starts. Results stay in memory for the session, never on disk.
+    in property <bool> translation-on;
+    in property <bool> romanization-on;
+    in property <bool> has-non-latin;
+    in property <bool> translation-loading;
+    in property <bool> romanization-loading;
+    callback set-translation(bool);
+    callback set-romanization(bool);
+    // A main-window lyrics view (not the desktop strip) is on screen. Enrichment requests
+    // run only then, because the strip does not show the extra text.
+    in-out property <bool> decorations-on-screen;
+    callback decorations-live-changed(bool);
     // The plain lyrics show because LRCLIB failed (an outage), not because it has no synced
     // lines for the song: the note says so.
     in property <bool> synced-unavailable;
@@ -201,6 +222,8 @@ export global LyricsData {
 // One line. `level`: -1 sung, 0 playing, 1 to come; plain lyrics are all `plain`.
 component LyricLine inherits Rectangle {
     in property <string> text;
+    in property <string> romanization;
+    in property <string> translation;
     in property <int> level: 1;
     in property <bool> plain;
     in property <length> size;
@@ -231,7 +254,9 @@ component LyricLine inherits Rectangle {
     background: root.ground;
     accessible-role: button;
     accessible-enabled: root.live;
-    accessible-label: root.text;
+    accessible-label: root.text
+        + (root.romanization != "" ? ". " + root.romanization : "")
+        + (root.translation != "" ? ". " + root.translation : "");
     accessible-description: root.live ? @tr("Plays from this line") : "";
     accessible-action-default => { root.clicked(); }
     ta := TouchArea {
@@ -244,12 +269,16 @@ component LyricLine inherits Rectangle {
             }
         }
     }
-    lay := HorizontalLayout {
+    // Better Lyrics' hierarchy: the original stays large, a romanization sits in a compact
+    // outlined pill, and the translation is a quieter line below it.
+    property <color> decoration-ink: root.ink.transparentize(root.level == 0 || root.plain ? 0.18 : 0.12);
+    lay := VerticalLayout {
         padding-left: Theme.s3;
         padding-right: Theme.s3;
         // A sixth of the type above and below: the lines keep their spacing at any size.
         padding-top: root.size / 6;
         padding-bottom: root.size / 6;
+        spacing: root.size * 0.22;
         if !root.gap: Display {
             text: root.text;
             font-size: root.size;
@@ -264,6 +293,35 @@ component LyricLine inherits Rectangle {
             // drawn.
             stroke: root.heavy ? self.color : transparent;
             stroke-width: 0.35px;
+        }
+        if !root.gap && root.romanization != "": HorizontalLayout {
+            alignment: start;
+            Rectangle {
+                width: romanized.preferred-width + 16px;
+                height: max(22px, root.size * 0.9);
+                border-radius: 8px;
+                background: #FFFFFF0F;
+                border-width: 1px;
+                border-color: #FFFFFF24;
+                romanized := Body {
+                    x: 8px;
+                    width: parent.width - 16px;
+                    height: parent.height;
+                    text: root.romanization;
+                    font-size: max(11px, root.size * 0.52);
+                    font-weight: 600;
+                    color: root.decoration-ink.transparentize(1 - root.reveal);
+                    vertical-alignment: center;
+                }
+            }
+        }
+        if !root.gap && root.translation != "": Body {
+            text: root.translation;
+            font-size: max(12px, root.size * 0.66);
+            font-weight: 600;
+            color: root.decoration-ink.transparentize(1 - root.reveal);
+            wrap: word-wrap;
+            overflow: clip;
         }
     }
 }
@@ -484,6 +542,8 @@ component SyncedLines inherits Rectangle {
             spacing: root.size * 0.18;
             for line[i] in LyricsData.lines: LyricLine {
                 text: line;
+                romanization: LyricsData.romanization-on ? LyricsData.decorations[i].romanization : "";
+                translation: LyricsData.translation-on ? LyricsData.decorations[i].translation : "";
                 size: root.size;
                 level: i == LyricsData.current ? 0 : (i < LyricsData.current ? -1 : 1);
                 hot: i == root.hot;
@@ -641,8 +701,10 @@ export component LyricsView inherits Rectangle {
                         reveal: root.reveal;
                     }
                 }
-                for line in LyricsData.plain-lines: LyricLine {
+                for line[i] in LyricsData.plain-lines: LyricLine {
                     text: line;
+                    romanization: LyricsData.romanization-on ? LyricsData.decorations[i].romanization : "";
+                    translation: LyricsData.translation-on ? LyricsData.decorations[i].translation : "";
                     size: root.size;
                     plain: true;
                     reveal: root.reveal;

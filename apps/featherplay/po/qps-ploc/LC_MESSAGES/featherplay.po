@@ -559,6 +559,14 @@ msgstr "[{} s sooner for this song]"
 msgid "From YouTube Music"
 msgstr "[From YouTube Music]"
 
+#: src/lyrics/enrich.rs:317
+msgid "Couldn't translate the lyrics. Try again later."
+msgstr "[Couldn't translate the lyrics. Try again later.]"
+
+#: src/lyrics/enrich.rs:323
+msgid "Couldn't romanize the lyrics. Try again later."
+msgstr "[Couldn't romanize the lyrics. Try again later.]"
+
 #: src/lyrics/lookup.rs:24
 msgid "Lyrics from LRCLIB"
 msgstr "[Lyrics from LRCLIB]"
@@ -3124,6 +3132,22 @@ msgstr "[Playing from]"
 #: ui/pages/now_playing.slint:613 ui/shortcuts.slint:54 ui/shortcuts.slint:65
 msgid "Back"
 msgstr "[Back]"
+
+#: ui/pages/now_playing.slint:920
+msgid "Translating lyrics…"
+msgstr "[Translating lyrics…]"
+
+#: ui/pages/now_playing.slint:920
+msgid "Translate lyrics to English"
+msgstr "[Translate lyrics to English]"
+
+#: ui/pages/now_playing.slint:927
+msgid "Romanizing lyrics…"
+msgstr "[Romanizing lyrics…]"
+
+#: ui/pages/now_playing.slint:927
+msgid "Romanize lyrics"
+msgstr "[Romanize lyrics]"
 
 #: ui/pages/playlist.slint:99
 msgid "Sign in to see your liked songs"

@@ -17,6 +17,9 @@
 //! The lyrics menu (ui/lyrics_menu.slint) sets the text size (Settings' too) and moves the lines
 //! half a second sooner or later for the song (`nudge`), kept per song on this PC with what
 //! "Choose other lyrics" picked (`choose`), on top of any `[offset:]` the LRC carries.
+//! Translation and romanization (`enrich`) are off by default. Their compact buttons keep
+//! their state in settings; while a main-window lyrics view is on screen, the displayed lines
+//! are sent in batches to Google Translate and the answers are cached for the session.
 //!
 //! Timing: nothing ticks. While sound plays and lyrics are on screen, one single-shot timer
 //! waits for the next line's start, read from the bar's clock (`bar::position`); a pause, a
@@ -40,6 +43,7 @@ use crate::pages::settings;
 use crate::ui::{LyricsData, LyricsState, Player, Theme};
 
 mod choose;
+mod enrich;
 mod lookup;
 
 pub use lookup::Found;
@@ -155,6 +159,7 @@ pub fn init(ctx: &Rc<Ctx>) {
     data.on_unlock_desktop(move || crate::desktop_lyrics::toggle_lock(&c));
     let c = ctx.clone();
     data.on_reset(move || settings::reset_lyrics(&c));
+    enrich::init(ctx, &data);
     choose::init(ctx, &ui);
     let c = ctx.clone();
     data.on_retry(move || {
@@ -287,6 +292,7 @@ pub fn player_changed(ctx: &Rc<Ctx>) {
         if data.get_state() != LyricsState::Idle {
             data.set_state(LyricsState::Idle);
         }
+        enrich::clear(&data);
     }
 }
 
@@ -327,6 +333,7 @@ fn show(ctx: &Rc<Ctx>, wait: bool) {
             s.nudge_ms = nudge_ms;
         });
         show_timing(&data, nudge_ms);
+        enrich::clear(&data);
         match track {
             None => data.set_state(LyricsState::Idle),
             Some(track) => {
@@ -337,7 +344,7 @@ fn show(ctx: &Rc<Ctx>, wait: bool) {
                 });
                 match known {
                     Some(Some(found)) => {
-                        fill(&data, &found);
+                        fill(ctx, &data, &track.id, &found);
                         if found.synced_unavailable() {
                             resync_later(ctx, &track.id, Again::Synced);
                         }
@@ -360,7 +367,7 @@ fn show(ctx: &Rc<Ctx>, wait: bool) {
 }
 
 /// Puts `found` on the tab.
-fn fill(data: &LyricsData, found: &Found) {
+fn fill(ctx: &Rc<Ctx>, data: &LyricsData, id: &TrackId, found: &Found) {
     let nudge_ms = STATE.with(|s| s.borrow().nudge_ms);
     let synced = matches!(found.lyrics, Some(Lyrics::Synced(_)));
     data.set_credit(credit_line(&found.credit, if synced { nudge_ms } else { 0 }).into());
@@ -368,18 +375,30 @@ fn fill(data: &LyricsData, found: &Found) {
     data.set_synced_unavailable(found.synced_unavailable());
     match &found.lyrics {
         Some(Lyrics::Synced(lines)) => {
-            let texts: Vec<SharedString> = lines.iter().map(|l| l.text.as_str().into()).collect();
+            let source: Vec<String> = lines.iter().map(|line| line.text.clone()).collect();
+            let texts: Vec<SharedString> = source.iter().map(|text| text.as_str().into()).collect();
             data.set_current(-1);
             data.set_lines(ModelRc::from(feed(texts)));
             STATE.with(|s| s.borrow_mut().lines = Rc::from(lines.as_slice()));
             data.set_state(LyricsState::Synced);
+            enrich::lines_changed(ctx, data, id, source);
         }
         Some(Lyrics::Plain(text)) => {
+            let source: Vec<String> = plain_lines(text)
+                .into_iter()
+                .map(|line| line.to_string())
+                .collect();
             data.set_plain(text.as_str().into());
-            data.set_plain_lines(ModelRc::from(feed(plain_lines(text))));
+            data.set_plain_lines(ModelRc::from(feed(
+                source.iter().map(|line| line.as_str().into()).collect(),
+            )));
             data.set_state(LyricsState::Plain);
+            enrich::lines_changed(ctx, data, id, source);
         }
-        None => data.set_state(LyricsState::None),
+        None => {
+            enrich::lines_changed(ctx, data, id, Vec::new());
+            data.set_state(LyricsState::None);
+        }
     }
 }
 
@@ -656,6 +675,8 @@ pub fn choose_for_snapshot(ctx: &Rc<Ctx>) {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SnapshotLyrics {
     Synced,
+    /// Synced Japanese sample lines with romanization and English translation under them.
+    Enriched,
     Plain,
     None,
     /// The user chose no lyrics for the song ("None of these").
@@ -682,6 +703,25 @@ pub fn show_for_snapshot(ctx: &Rc<Ctx>, kind: SnapshotLyrics) {
     };
     let found = match kind {
         SnapshotLyrics::Synced => lookup(true),
+        SnapshotLyrics::Enriched => Ok(Found {
+            lyrics: Some(Lyrics::Synced(
+                [
+                    (0, "今ここで歌っている"),
+                    (12, "何度でも思い出す"),
+                    (24, "七色にきらめいて"),
+                    (36, "明日へ歩き出す"),
+                ]
+                .into_iter()
+                .map(|(seconds, text)| Line {
+                    start: Duration::from_secs(seconds),
+                    text: text.into(),
+                })
+                .collect(),
+            )),
+            credit: tr!("Lyrics from LRCLIB").into(),
+            keep: true,
+            ..Found::default()
+        }),
         SnapshotLyrics::Plain => lookup(false),
         SnapshotLyrics::Outage => lookup(false).map(|f| Found { keep: false, ..f }),
         SnapshotLyrics::None => Ok(Found {
@@ -727,6 +767,9 @@ pub fn show_for_snapshot(ctx: &Rc<Ctx>, kind: SnapshotLyrics) {
                 s.generation += 1;
             });
             live_changed(ctx, true);
+            if kind == SnapshotLyrics::Enriched {
+                enrich::show_for_snapshot(&ui.global::<LyricsData>());
+            }
         }
         Err(e) => log!("{e}"),
     }

@@ -51,6 +51,10 @@ pub enum Change {
     Lyrics(bool),
     /// The lyrics view looks up synced lyrics on LRCLIB.
     LyricsLrclib(bool),
+    /// An English translation under the lyric lines.
+    LyricsTranslation(bool),
+    /// A Latin-script rendering under lyric lines written in another script.
+    LyricsRomanization(bool),
     /// Desktop lyrics on or off, and how the strip was left (locked, its size, its place).
     DesktopLyrics(DesktopLyrics),
     /// A list that runs out plays on with similar songs (on) or restarts (off).
@@ -140,6 +144,8 @@ impl Change {
             Change::QuickSearchKey(v) => s.quick_search_key = v,
             Change::Lyrics(v) => s.lyrics = v,
             Change::LyricsLrclib(v) => s.lyrics_lrclib = v,
+            Change::LyricsTranslation(v) => s.lyrics_translation = v,
+            Change::LyricsRomanization(v) => s.lyrics_romanization = v,
             Change::DesktopLyrics(v) => s.desktop_lyrics = v,
             Change::Autoplay(v) => s.autoplay = v,
             Change::CheckForUpdates(v) => s.check_for_updates = v,
@@ -317,6 +323,8 @@ mod tests {
         };
         let changes = [
             Change::TrayNoticeShown,
+            Change::LyricsTranslation(true),
+            Change::LyricsRomanization(true),
             Change::Equalizer(Equalizer::Custom, [4, 0, -3, 0, 2]),
             Change::SignInBrowser("brave".into()),
             Change::MainWindow(place),
@@ -327,6 +335,7 @@ mod tests {
             c.apply(&mut s);
         }
         assert!(s.tray_notice_shown);
+        assert!(s.lyrics_translation && s.lyrics_romanization);
         assert_eq!(
             (s.equalizer, s.equalizer_bands),
             (Equalizer::Custom, [4, 0, -3, 0, 2])

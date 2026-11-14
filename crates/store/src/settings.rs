@@ -85,6 +85,12 @@ pub struct Settings {
     /// The lyrics view looks up synced lyrics on LRCLIB (on by default); off, it shows only
     /// the music service's own lyrics (timed for some songs).
     pub lyrics_lrclib: bool,
+    /// Show an English translation under each lyric line. Off by default; while on, lyrics
+    /// shown for a new song are sent to Google Translate.
+    pub lyrics_translation: bool,
+    /// Show a Latin-script rendering under lyric lines written in another script. Off by
+    /// default; while on, those lines are sent to Google Translate for romanization.
+    pub lyrics_romanization: bool,
     /// Desktop lyrics: the strip above other apps, and how it was left.
     #[serde(deserialize_with = "lenient")]
     pub desktop_lyrics: DesktopLyrics,
@@ -429,6 +435,8 @@ impl Default for Settings {
             sign_in_browser: None,
             lyrics: true,
             lyrics_lrclib: true,
+            lyrics_translation: false,
+            lyrics_romanization: false,
             desktop_lyrics: DesktopLyrics::default(),
             autoplay: true,
             pins: BTreeMap::new(),

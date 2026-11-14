@@ -126,6 +126,9 @@ The Linux build's figures, measured in WSL, are in
 - Synced lyrics, from LRCLIB or YouTube Music, follow the song in its cover's colour; click a
   line to jump there. Set their size, move a song's timing, find other lyrics when the match
   is wrong, or keep the line being sung in a small strip above other apps.
+- In the full lyrics view, Translate adds an English line and Romanize adds a compact
+  Latin-script line under lyrics written in another script. Both are off until you turn them
+  on.
 - Songs play YouTube Music's Opus stream, and only the audio: a music video with a song
   version plays as the song, and SponsorBlock skips the talking in the music videos that
   remain.
@@ -285,7 +288,7 @@ Most of Pear's plugins are settings in featherplay. Plugin by plugin, as of toda
 | Shortcuts | **Built in.** Media keys and the system's media controls always; your own global hotkeys in Settings > Window (off by default; not on Wayland), and a shortcut for quick search from any app. |
 | SponsorBlock | **Built in**, on by default: skips non-music segments in music videos. |
 | Discord Rich Presence | **Built in**, off by default, with Pear's options: status text, time display, links, the Play song button, clear after a pause, reconnect automatically. |
-| Synced Lyrics | **Built in.** LRCLIB and YouTube Music's own timed lyrics, with plain lyrics as the fallback; click a line to jump to it. Three text sizes, the timing moved per song, other lyrics chosen from LRCLIB, and desktop lyrics in a strip above other apps. A setting turns lyrics off completely. |
+| Synced Lyrics | **Built in.** LRCLIB and YouTube Music's own timed lyrics, with plain lyrics as the fallback; click a line to jump to it. Three text sizes, timing adjustments, other lyrics, desktop lyrics, English translation and romanization. |
 | Notifications | **Built in.** Track-change notifications, off by default (Settings > Window). |
 | Custom Output Device | **Built in.** Pick the device in Settings > Sound; if it disappears, playback pauses and moves to the default one. |
 | Exponential Volume | **Built in.** The volume slider follows a perceptual curve. |
@@ -380,6 +383,9 @@ featherplay's site and Deno's download server for the helpers). The rest hear fr
 when a feature needs them:
 
 - **LRCLIB**, for lyrics, only while lyrics are on screen;
+- **Google Translate**, only while lyrics are on screen and Translation or Romanization is
+  on. It receives the displayed lyric lines in batches; results stay in memory for the
+  session;
 - **SponsorBlock**, on by default, only for music videos and uploads, asked by the first four
   characters of a hash of the video's ID, so the server doesn't learn which video you play;
 - **Last.fm and ListenBrainz**, only if you connect them;

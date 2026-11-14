@@ -62,6 +62,8 @@ fn settings_defaults_when_missing() {
             sign_in_browser: None,
             lyrics: true,
             lyrics_lrclib: true,
+            lyrics_translation: false,
+            lyrics_romanization: false,
             desktop_lyrics: DesktopLyrics::default(),
             autoplay: true,
             pins: Default::default(),
@@ -140,6 +142,8 @@ fn every_setting_changed() -> Settings {
         sign_in_browser: Some("brave".into()),
         lyrics: false,
         lyrics_lrclib: false,
+        lyrics_translation: true,
+        lyrics_romanization: true,
         desktop_lyrics: DesktopLyrics {
             on: true,
             locked: true,

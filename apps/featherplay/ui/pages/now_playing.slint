@@ -211,10 +211,15 @@ export component SideTabs inherits Rectangle {
 // (`LyricsData.held`), and the Lyrics pill's note for a few seconds (`LyricsData.hint`).
 export component LyricsWatch {
     in property <bool> minimized;
-    property <bool> live: LyricsData.on && ((((NowPlayingData.tab == 2 && Frame.tabs-open) || LyricsData.wanted) && !Frame.hidden && !root.minimized) || LyricsData.desktop);
+    property <bool> main-live: LyricsData.on && ((NowPlayingData.tab == 2 && Frame.tabs-open) || LyricsData.wanted) && !Frame.hidden && !root.minimized;
+    property <bool> live: root.main-live || (LyricsData.on && LyricsData.desktop);
     changed live => {
         LyricsData.on-screen = self.live;
         LyricsData.live-changed(self.live);
+    }
+    changed main-live => {
+        LyricsData.decorations-on-screen = self.main-live;
+        LyricsData.decorations-live-changed(self.main-live);
     }
     property <bool> showing: LyricsData.showing;
     changed showing => { LyricsData.held = self.showing; }
@@ -337,6 +342,52 @@ component LyricsToggle inherits Rectangle {
             }
         }
     }
+}
+
+// Translation and romanization beside the Lyrics pill. Inactive they are the panel's tonal
+// controls; active they turn solid, as the Lyrics pill itself does.
+component LyricsDecorationButton inherits Rectangle {
+    in property <string> icon;
+    in property <string> label;
+    in property <bool> active;
+    in property <bool> loading;
+    callback clicked();
+    width: 40px;
+    height: 40px;
+    border-radius: self.height / 2;
+    property <brush> ground: root.active
+        ? (ta.pressed ? Theme.panel-solid-pressed : (ta.has-hover ? Theme.panel-solid-hover : Theme.panel-solid))
+        : (ta.pressed ? #FFFFFF40 : (ta.has-hover ? #FFFFFF33 : #FFFFFF26));
+    animate ground { duration: Theme.t-hover; }
+    background: root.ground;
+    transform-scale: ta.pressed ? Theme.press-scale : 1.0;
+    animate transform-scale {
+        duration: ta.pressed ? Theme.t-press : Theme.t-release;
+        easing: ta.pressed ? Curves.ease-out : Curves.release;
+    }
+    accessible-role: button;
+    accessible-label: root.label;
+    accessible-checked: root.active;
+    accessible-action-default => { root.clicked(); }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+    Icon {
+        width: 19px;
+        height: 19px;
+        commands: root.icon;
+        stroke-width: 1.8px;
+        stroke: root.active ? LyricsData.ink.ground : LyricsData.ink.current;
+        opacity: root.loading ? 0.65 : 1;
+    }
+}
+
+global LyricsDecorationIcons {
+    // Two original 24 px-grid marks: scripts becoming an A (translation), and a line of
+    // non-Latin text crossing an arrow into Latin letters (romanization).
+    out property <string> translation: "M3.5 5.5 H13.5 M8.5 3 V5.5 M5 8.5 C6.4 11.7 9.1 14 12.5 15.4 M12.5 8.5 C11.3 12.2 8.3 15.3 4 17 M14 20 L17.5 10.5 L21 20 M15.2 16.8 H19.8";
+    out property <string> romanization: "M3 4.5 H10 V13.5 H3 Z M5 7 H8 M5 10 H8 M11.5 9 H16 M13.8 6.8 L16.2 9 L13.8 11.2 M15 20 L18 12.5 L21 20 M16.2 17 H19.8";
 }
 
 // Where the queue comes from, centred in the stage's header: a small "Playing from" over
@@ -617,7 +668,7 @@ export component NowPlayingPage inherits Rectangle {
         // "Playing from" in the middle of the header row, clear of the pill and the lyrics
         // menu's ⋯ beside it on either side; only when the queue's source is known, and only
         // with room for its label (a very narrow stage drops it: the bar's Up next has it).
-        property <length> source-room: root.stage-w - 2 * (Theme.s5 + lyrics-pill.width + Theme.s3 + (root.full ? 40px + Theme.s3 : 0px));
+        property <length> source-room: root.stage-w - 2 * (Theme.s5 + lyrics-pill.width + Theme.s3 + (root.full ? lyrics-actions.preferred-width + Theme.s3 : 0px));
         if Player.has-track && QueueData.playing-from != "" && stage.source-room >= 96px: SourceButton {
             x: (root.stage-w - self.width) / 2;
             y: Theme.s4 + 20px - self.height / 2;
@@ -856,12 +907,32 @@ export component NowPlayingPage inherits Rectangle {
             on: root.full;
             clicked => { LyricsData.toggle-view(); }
         }
-        // The lyrics menu's ⋯, left of the pill, while the lyrics show.
-        if root.full: LyricsMoreButton {
-            x: lyrics-pill.x - Theme.s3 - self.width;
+        // Translation, romanization and the lyrics menu, left of the pill while the lyrics
+        // show. Romanization only appears when at least one displayed line uses another
+        // writing system.
+        lyrics-actions := HorizontalLayout {
+            x: lyrics-pill.x - Theme.s3 - self.preferred-width;
             y: Theme.s4;
-            asked: LyricsMenu.open-asked;
-            clicked => { root.open-lyrics-menu(); }
+            spacing: Theme.s2;
+            visible: root.full;
+            if LyricsData.has-lines: LyricsDecorationButton {
+                icon: LyricsDecorationIcons.translation;
+                label: LyricsData.translation-loading ? @tr("Translating lyrics…") : @tr("Translate lyrics to English");
+                active: LyricsData.translation-on;
+                loading: LyricsData.translation-loading;
+                clicked => { LyricsData.set-translation(!LyricsData.translation-on); }
+            }
+            if LyricsData.has-lines && LyricsData.has-non-latin: LyricsDecorationButton {
+                icon: LyricsDecorationIcons.romanization;
+                label: LyricsData.romanization-loading ? @tr("Romanizing lyrics…") : @tr("Romanize lyrics");
+                active: LyricsData.romanization-on;
+                loading: LyricsData.romanization-loading;
+                clicked => { LyricsData.set-romanization(!LyricsData.romanization-on); }
+            }
+            LyricsMoreButton {
+                asked: LyricsMenu.open-asked;
+                clicked => { root.open-lyrics-menu(); }
+            }
         }
     }
     // The lyrics menu opens under the ⋯, ending at the pill's right edge.

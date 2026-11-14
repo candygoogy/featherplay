@@ -30,7 +30,7 @@ use crate::controller::{
     AccountAction, Action, Change, LastfmStatus, ListenBrainzStatus, PlayerState,
 };
 use crate::router::Page;
-use crate::ui::{Player, SettingKey, SettingsData, SettingsDialog, Theme, Tooltips};
+use crate::ui::{LyricsData, Player, SettingKey, SettingsData, SettingsDialog, Theme, Tooltips};
 use crate::{desktop_lyrics, follow, language, lyrics, shell, updates};
 
 mod discord;
@@ -164,6 +164,30 @@ pub fn set_main_window(ctx: &Ctx, place: WindowPlace) {
 /// Whether the lyrics view may look up synced lyrics on LRCLIB.
 pub fn lyrics_lrclib() -> bool {
     SETTINGS.with(|s| s.borrow().lyrics_lrclib)
+}
+
+/// Whether the lyrics view shows an English translation under each line.
+pub fn lyrics_translation() -> bool {
+    SETTINGS.with(|s| s.borrow().lyrics_translation)
+}
+
+/// Saves the translation button's state.
+pub fn set_lyrics_translation(ctx: &Ctx, on: bool) {
+    if lyrics_translation() != on {
+        commit(ctx, Change::LyricsTranslation(on));
+    }
+}
+
+/// Whether the lyrics view shows a Latin rendering of non-Latin lines.
+pub fn lyrics_romanization() -> bool {
+    SETTINGS.with(|s| s.borrow().lyrics_romanization)
+}
+
+/// Saves the romanization button's state.
+pub fn set_lyrics_romanization(ctx: &Ctx, on: bool) {
+    if lyrics_romanization() != on {
+        commit(ctx, Change::LyricsRomanization(on));
+    }
 }
 
 /// Whether the app may ask GitHub about newer releases on its own ("Check for updates");
@@ -534,6 +558,9 @@ fn show(ctx: &Ctx) {
     data.set_signed_in(ctx.signed_in());
     data.set_lyrics(s.lyrics);
     data.set_lyrics_lrclib(s.lyrics_lrclib);
+    let lyrics_data = ui.global::<LyricsData>();
+    lyrics_data.set_translation_on(s.lyrics_translation);
+    lyrics_data.set_romanization_on(s.lyrics_romanization);
     data.set_desktop_lyrics(s.desktop_lyrics.on);
     data.set_desktop_lyrics_here(desktop_lyrics::available());
     show_lyrics_size(ctx, s.lyrics_size);

@@ -22,6 +22,10 @@ Notable changes to featherplay, newest first. The format follows
 
 ### Added
 
+- **Lyrics translation and romanization**: two compact buttons beside Lyrics in Now
+  playing's full lyrics view. Translation adds an English line under every lyric;
+  romanization, offered for non-Latin lyrics, adds a Latin rendering in a small outlined
+  pill. Both are off by default and cached only for the session.
 - On Linux, software centres and app catalogs that read featherplay's AppStream metadata show
   four screenshots: Home, Now playing with lyrics, a playlist in the light theme, and search.
 

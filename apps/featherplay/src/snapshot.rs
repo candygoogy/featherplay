@@ -768,6 +768,7 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
             }
             ("now-playing-lyrics-full-outage", _) => SnapshotLyrics::Outage,
             ("now-playing-lyrics-full-unavailable", _) => SnapshotLyrics::Unavailable,
+            ("now-playing-lyrics-full-enriched", _) => SnapshotLyrics::Enriched,
             _ => SnapshotLyrics::Synced,
         };
         let lyrics = ui.global::<crate::ui::LyricsData>();
@@ -782,6 +783,7 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
         let lines = matches!(
             kind,
             SnapshotLyrics::Synced
+                | SnapshotLyrics::Enriched
                 | SnapshotLyrics::Plain
                 | SnapshotLyrics::Outage
                 | SnapshotLyrics::ChoseNone

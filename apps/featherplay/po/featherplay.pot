@@ -559,6 +559,14 @@ msgstr ""
 msgid "From YouTube Music"
 msgstr ""
 
+#: src/lyrics/enrich.rs:317
+msgid "Couldn't translate the lyrics. Try again later."
+msgstr ""
+
+#: src/lyrics/enrich.rs:323
+msgid "Couldn't romanize the lyrics. Try again later."
+msgstr ""
+
 #: src/lyrics/lookup.rs:24
 msgid "Lyrics from LRCLIB"
 msgstr ""
@@ -3123,6 +3131,22 @@ msgstr ""
 #: ui/pages/now_playing.slint:613 ui/shortcuts.slint:54 ui/shortcuts.slint:65
 #: ui/pages/now_playing.slint:613 ui/shortcuts.slint:54 ui/shortcuts.slint:65
 msgid "Back"
+msgstr ""
+
+#: ui/pages/now_playing.slint:920
+msgid "Translating lyrics…"
+msgstr ""
+
+#: ui/pages/now_playing.slint:920
+msgid "Translate lyrics to English"
+msgstr ""
+
+#: ui/pages/now_playing.slint:927
+msgid "Romanizing lyrics…"
+msgstr ""
+
+#: ui/pages/now_playing.slint:927
+msgid "Romanize lyrics"
 msgstr ""
 
 #: ui/pages/playlist.slint:99

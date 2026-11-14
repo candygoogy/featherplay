@@ -184,7 +184,7 @@ fn resync(ctx: &Rc<Ctx>, id: TrackId, again: Again) {
                 s.shown.as_ref() == Some(&id)
             });
             if shown {
-                fill(&ui.global::<LyricsData>(), &found);
+                fill(ctx, &ui.global::<LyricsData>(), &id, &found);
                 sync(ctx);
             }
         },
@@ -207,7 +207,7 @@ pub(super) fn fetch(ctx: &Rc<Ctx>, track: Track) {
             s.shown.as_ref() == Some(&track.id)
         });
         if shown && let Some(ui) = ctx.window() {
-            fill(&ui.global::<LyricsData>(), &found);
+            fill(ctx, &ui.global::<LyricsData>(), &track.id, &found);
             sync(ctx);
         }
         return;
@@ -254,7 +254,7 @@ pub(super) fn fetch(ctx: &Rc<Ctx>, track: Track) {
                 let data = ui.global::<LyricsData>();
                 match found {
                     Ok(f) => {
-                        fill(&data, &f);
+                        fill(ctx, &data, &id, &f);
                         if f.synced_unavailable() {
                             resync_later(ctx, &id, Again::Synced);
                         }

@@ -207,6 +207,11 @@ synced lines from LRCLIB or YouTube Music, or plain lyrics. It appears in the Ly
   (`LyricsData.on`), the toggles and the tab are gone and nothing is looked up at all.
 - The text size (`LyricsData.size`: Small, Medium, Large) sets the lines in the tab and in
   the full view; Settings > Lyrics, the lyrics menu and Ctrl+= / Ctrl+- change it.
+- The full view's compact Translation and Romanization buttons sit beside Lyrics. They are
+  off by default and kept in settings; while on, `src/lyrics/enrich.rs` batches the displayed
+  lines through `featherplay-lyrics`, caches the answer for the session and fills each
+  `LyricDecoration` a few rows per frame. A line keeps its large source text, then shows the
+  Latin rendering in a small outlined pill and the English translation below it.
 - The lyrics menu's timing moves the lines half a second at a time for the song
   (`LyricsData.timing` says how, "On time" or "0.5 s later", and the credit line notes it),
   and "Choose other lyrics…" replaces the automatic match. Both are kept per song on this PC

@@ -13,6 +13,9 @@ featherplay sends no telemetry and has no server, only a static website. It conn
 - **LRCLIB**, for lyrics, only while lyrics are on screen (desktop lyrics count). It gets the
   song's title, artist, album and length, and in **Choose other lyrics** the words you search
   for;
+- **Google Translate**, only while lyrics are on screen and Translation or Romanization is
+  on. It gets the displayed lyric lines in batches and returns their English translation or
+  Latin-script rendering. Results are kept in memory for the session, not on disk;
 - **SponsorBlock**, on by default, only for music videos and uploads (songs have nothing to
   skip). It asks by the first four characters of a hash of the video's ID, so the server
   doesn't learn which video you play;
@@ -46,7 +49,7 @@ token are kept in Windows Credential Manager, or on Linux in your keyring.
 
 | | Windows | Linux |
 |---|---|---|
-| Settings, the play queue, scrobbles waiting to be sent, the lyrics' timing and picks per song | `%APPDATA%\featherplay` | `~/.config/featherplay` |
+| Settings (including whether translation and romanization are on), the play queue, scrobbles waiting to be sent, the lyrics' timing and picks per song | `%APPDATA%\featherplay` | `~/.config/featherplay` |
 | Covers, the library's pages, the helpers, quick search's last picks (on Windows, the sign-in window's data too) | `%LOCALAPPDATA%\featherplay` | `~/.cache/featherplay` |
 | Logs | `%LOCALAPPDATA%\featherplay\logs` | `~/.local/state/featherplay/logs` |
 
