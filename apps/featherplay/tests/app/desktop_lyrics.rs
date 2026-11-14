@@ -302,14 +302,11 @@ fn the_strip_shows_the_views_line_across_a_gap_after_a_pick_and_a_timing_change(
     agrees(&scene, "the automatic match again");
 }
 
-/// A new line rises into place as the one before goes up and fades, the next line with it,
-/// in ~200 ms; at rest nothing animates. Without motion the change is instant. The strip's
-/// lines fade in when it appears.
-#[test]
-fn a_new_line_moves_in_and_without_motion_it_is_instant() {
+/// With motion, the strip shown once (its lyrics looked up, its hint spent), then again on a
+/// frozen clock, just made; none where this desktop can't show it.
+fn moving_strip() -> Option<(Scene, DesktopLyrics)> {
     use featherplay::offscreen;
     use featherplay::ui::Theme;
-    use std::time::Duration;
     let scene = Scene::new(1280, 800, false, true).expect("scene");
     scene.ui.global::<Theme>().set_motion(true);
     scene.play(false).expect("player");
@@ -317,9 +314,8 @@ fn a_new_line_moves_in_and_without_motion_it_is_instant() {
     scene.ui.global::<Frame>().set_hidden(true);
     scene.settle();
     if !here(&scene) {
-        return;
+        return None;
     }
-    // Shown once (its lyrics looked up, its hint spent), then again on a frozen clock.
     turn(&scene, SettingKey::DesktopLyrics, true);
     let first = strip();
     first.global::<StripData>().invoke_lock();
@@ -331,14 +327,32 @@ fn a_new_line_moves_in_and_without_motion_it_is_instant() {
     settings.invoke_toggled(SettingKey::DesktopLyrics, true);
     scene.run_queued();
     let shown = strip();
+    Some((scene, shown))
+}
+
+/// Presents the strip's frames over `ms`, 16 ms apart.
+fn frames(w: &slint::Window, ms: u64) {
+    use featherplay::offscreen;
+    for _ in 0..ms / 16 {
+        offscreen::advance(std::time::Duration::from_millis(16));
+        offscreen::present(w).expect("present");
+    }
+}
+
+/// A new line rises into place as the one before goes up and fades, the next line with it,
+/// in ~230 ms; at rest nothing animates. Without motion the change is instant. The strip's
+/// lines fade in when it appears.
+#[test]
+fn a_new_line_moves_in_and_without_motion_it_is_instant() {
+    use featherplay::offscreen;
+    use featherplay::ui::Theme;
+    use std::time::Duration;
+    let Some((scene, shown)) = moving_strip() else {
+        return;
+    };
     let w = shown.window();
     let data = shown.global::<StripData>();
-    let frames = |ms: u64| {
-        for _ in 0..ms / 16 {
-            offscreen::advance(Duration::from_millis(16));
-            offscreen::present(w).expect("present");
-        }
-    };
+    let frames = |ms: u64| frames(w, ms);
     frames(32);
     assert!(
         w.has_active_animations(),
@@ -374,4 +388,62 @@ fn a_new_line_moves_in_and_without_motion_it_is_instant() {
     offscreen::advance(Duration::from_millis(1));
     assert!(!w.has_active_animations(), "the line moved without motion");
     agrees(&scene, "without motion");
+}
+
+/// Every new line moves in at once, for its whole ~230 ms: while the strip fades in as it
+/// appears, and when lines come faster than that, each taking over from where the one before
+/// had got to; it ends on the last of them.
+#[test]
+fn a_line_moves_in_as_the_strip_appears_and_when_it_comes_mid_change() {
+    let Some((scene, shown)) = moving_strip() else {
+        return;
+    };
+    let w = shown.window();
+    let data = shown.global::<StripData>();
+    let lyrics_data = scene.ui.global::<LyricsData>();
+    let line = |i: i32| {
+        lyrics_data.invoke_seek_line(i);
+        scene.run_queued();
+    };
+    let start = lyrics_data.get_current();
+
+    // During the appear fade (180 ms): the change runs on after the fade has ended.
+    frames(w, 32);
+    let was = data.get_line();
+    line(start + 1);
+    assert_eq!(
+        data.get_was_line(),
+        was,
+        "the line going isn't the one shown"
+    );
+    frames(w, 192);
+    assert!(
+        w.has_active_animations(),
+        "the line didn't move in as the strip appeared"
+    );
+    frames(w, 400);
+    assert!(!w.has_active_animations(), "something animates at rest");
+
+    // Lines 144 ms apart: each takes over at once from the one moving in, and the last runs
+    // its whole change.
+    for i in 2..6 {
+        let was = data.get_line();
+        line(start + i);
+        assert_eq!(
+            data.get_was_line(),
+            was,
+            "line {i}: the line going isn't the one moving in"
+        );
+        frames(w, 16);
+        assert!(w.has_active_animations(), "line {i} jumped in");
+        frames(w, 128);
+    }
+    frames(w, 64);
+    assert!(
+        w.has_active_animations(),
+        "the last change ended with the one before"
+    );
+    frames(w, 160);
+    assert!(!w.has_active_animations(), "the change went on too long");
+    agrees(&scene, "after quick changes");
 }

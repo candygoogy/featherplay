@@ -12,7 +12,7 @@
 //! no window and no timer. While it shows it counts as lyrics on screen
 //! (`LyricsData.desktop`), so the lookup and the one timer per line (`lyrics::sync`) run for
 //! it even with the main window in the tray; `lyrics` hands it each change (`refresh`), and it
-//! paints once per line (with motion, a 200 ms change of lines, `show_lines`). Nothing ticks
+//! paints once per line (with motion, a 230 ms change of lines, `show_lines`). Nothing ticks
 //! between lines; a drag's end is saved by one short single-shot timer.
 //!
 //! Its place: first just above the taskbar, centred on the main window's screen; once dragged,
@@ -59,6 +59,9 @@ struct Strip {
     settle: slint::Timer,
     /// The first opening's hint shows in the second line.
     hint: Cell<bool>,
+    /// Which of the song's lines the first line is (-1 for a note): a line sung again, the
+    /// same words, still takes the place of the one before.
+    at: Cell<i32>,
 }
 
 thread_local! {
@@ -192,6 +195,7 @@ pub fn create(ctx: &Rc<Ctx>) -> Result<DesktopLyrics, String> {
         dragging: Cell::new(false),
         settle: slint::Timer::default(),
         hint: Cell::new(!s.hinted),
+        at: Cell::new(-1),
     });
     if !s.hinted {
         settings::set_desktop_lyrics(
@@ -533,33 +537,45 @@ pub fn refresh(ctx: &Ctx) {
         current: lyrics.get_current(),
         failed: &message,
     });
+    let at = if shown.quiet {
+        -1
+    } else {
+        lyrics.get_current()
+    };
     if strip.hint.get() {
         shown.under =
             featherplay_core::tr!("Drag to move it · lock it to let clicks through").into();
         shown.quiet = true;
     }
-    show_lines(&strip.ui.global::<StripData>(), shown);
+    show_lines(&strip, shown, at);
     resized(&strip.ui);
 }
 
-/// Puts `shown` on the strip. A new first line takes the place of the one before, the
-/// second line going with it (the strip animates that); a new second line alone changes in
-/// place.
-fn show_lines(data: &StripData, shown: Shown) {
+/// Puts `shown` on the strip, its first line being the song's line `at`. A new first line
+/// (or the same words sung again) takes the place of the one before, the second line going
+/// with it: the strip animates that from wherever the lines are (`turn`). A new second line
+/// alone changes in place.
+fn show_lines(strip: &Strip, shown: Shown, at: i32) {
+    let data = strip.ui.global::<StripData>();
     let line = data.get_line();
+    let was_at = strip.at.replace(at);
+    if gives_way((&line, was_at), (&shown.line, at)) {
+        strip.ui.invoke_turn();
+    }
     if line != shown.line.as_str() {
-        if !line.is_empty() {
-            data.set_was_line(line);
-            data.set_was_under(data.get_under());
-            data.set_was_quiet(data.get_quiet());
-            data.set_turn(data.get_turn().wrapping_add(1));
-        }
         data.set_line(shown.line.into());
     }
     if data.get_under() != shown.under.as_str() {
         data.set_under(shown.under.into());
     }
     data.set_quiet(shown.quiet);
+}
+
+/// Whether the first line `now` (the song's line at that index, -1 for a note) takes the
+/// place of the one `shown`: other words, or the same words as another line of the song. The
+/// strip's first line, with nothing shown before it, just shows.
+fn gives_way(shown: (&str, i32), now: (&str, i32)) -> bool {
+    !shown.0.is_empty() && (shown.0 != now.0 || (now.1 >= 0 && shown.1 != now.1))
 }
 
 /// What the strip is given to show.
@@ -691,6 +707,16 @@ mod tests {
         }
         assert_eq!(shown(&now(LyricsState::Synced, &l, 1)).under, "Two");
         assert_eq!(shown(&now(LyricsState::Synced, &l, -1)).under, "One");
+    }
+
+    #[test]
+    fn a_new_line_gives_way_also_with_the_same_words() {
+        assert!(gives_way(("One", 0), ("Two", 1)));
+        assert!(gives_way(("La la", 3), ("La la", 4)), "a line sung again");
+        assert!(gives_way(("♪", -1), ("One", 0)));
+        assert!(!gives_way(("One", 0), ("One", 0)), "the same line again");
+        assert!(!gives_way(("Finding lyrics…", -1), ("Finding lyrics…", -1)));
+        assert!(!gives_way(("", -1), ("One", 0)), "the strip's first line");
     }
 
     #[test]

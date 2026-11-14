@@ -12,11 +12,12 @@
 // takes no clicks, wheel or hover at all (Rust makes the window click-through), so it shows
 // no controls.
 //
-// A new line rises into place (`Theme.rise`, fading in) while the one before goes up and
-// fades out, over `t-strip-line` (ease-out); the next line under it does the same. Rust bumps
-// `turn` for that and hands over the lines going (`was-line`, `was-under`); a change of the
-// second line alone (the hint gone, a note) is in place. Without motion it's instant. When the
-// strip appears its lines fade in and settle 4 px, as the app's menus do (`t-menu`).
+// A new line rises into place (`Theme.strip-rise`, fading in) while the one before goes up
+// and fades out, over `t-strip-line` (ease-out); the next line under it does the same. Rust
+// calls `turn` for that just before it sets the new lines; a change that comes while one runs
+// starts its own at once, from where the lines are. A change of the second line alone (the
+// hint gone, a note) is in place. Without motion it's instant. When the strip appears its
+// lines fade in and settle 4 px, as the app's menus do (`t-menu`).
 //
 // It has its own `Theme` (globals belong to their window): Rust copies the main window's in,
 // and the lyrics' inks for both themes. Nothing in it runs between lines; Rust sets the lines
@@ -34,12 +35,10 @@ export global StripData {
     // The second line is a quiet note (the states, the first opening's hint), not the next
     // line of the song.
     in property <bool> quiet;
-    // Bumped when the first line changes: the lines below give way to `line` and `under`.
-    in property <int> turn;
-    // The lines giving way, as they were.
-    in property <string> was-line;
-    in property <string> was-under;
-    in property <bool> was-quiet;
+    // The lines giving way, as they were (`DesktopLyrics.turn` sets them).
+    in-out property <string> was-line;
+    in-out property <string> was-under;
+    in-out property <bool> was-quiet;
     // The lyrics' panel and lines for each theme (`LyricsData.ink-dark`, `ink-light`).
     in property <LyricInk> ink-dark;
     in property <LyricInk> ink-light;
@@ -146,12 +145,35 @@ export component DesktopLyrics inherits Window {
         duration: Theme.moving ? 150ms : 0ms;
         delay: root.pointed ? 0ms : 1000ms;
     }
-    // A line giving way: `glide` follows `turn`, so `step` goes from 0 to 1 over the change
-    // and rests at 1.
-    property <float> glide: StripData.turn;
+    // A line giving way: `glide` follows `target`, which `turn` puts one past where `glide`
+    // is, so `step` goes from 0 to 1 over the change, from its start even when it comes
+    // during another, and rests at 1.
+    property <float> target;
+    property <float> glide: root.target;
     animate glide { duration: Theme.t-strip-line; easing: Curves.ease-out; }
-    property <float> step: clamp(1 - (StripData.turn - root.glide), 0, 1);
-    property <length> lift: Theme.rise;
+    property <float> step: clamp(1 - (root.target - root.glide), 0, 1);
+    property <length> lift: Theme.strip-rise;
+    // Where the lines going start from: their offset (in lifts, up negative) and opacity. At
+    // rest, in place; caught by a change mid-change, the lines coming in go on from where they
+    // got to, or (barely in yet) the ones going keep going from where they are.
+    property <float> from-y: 0;
+    property <float> from-opacity: 1;
+    property <length> going-y: root.lift * (root.from-y + (-1 - root.from-y) * root.step);
+    property <float> going-opacity: root.from-opacity * (1 - root.step);
+    // The first line is about to change: the lines shown give way to the new ones.
+    public function turn() {
+        if root.step >= 0.5 {
+            StripData.was-line = StripData.line;
+            StripData.was-under = StripData.under;
+            StripData.was-quiet = StripData.quiet;
+            root.from-y = 1 - root.step;
+            root.from-opacity = root.step;
+        } else {
+            root.from-y = root.from-y + (-1 - root.from-y) * root.step;
+            root.from-opacity = root.from-opacity * (1 - root.step);
+        }
+        root.target = root.glide + 1;
+    }
     // Appearing: the lines fade in and settle 4 px over `t-menu` (ease-out), timed from when
     // the strip is made rather than from its first frame, which may come later. One timer
     // ends it; nothing runs after.
@@ -210,8 +232,8 @@ export component DesktopLyrics inherits Window {
                     preferred-height: line.preferred-height;
                     if root.step < 1: StripLine {
                         width: parent.width;
-                        y: -root.lift * root.step;
-                        opacity: 1 - root.step;
+                        y: root.going-y;
+                        opacity: root.going-opacity;
                         text: StripData.was-line;
                         size: root.line-size;
                     }
@@ -229,8 +251,8 @@ export component DesktopLyrics inherits Window {
                     if root.step < 1: StripNext {
                         width: parent.width;
                         height: parent.height;
-                        y: -root.lift * root.step;
-                        opacity: 1 - root.step;
+                        y: root.going-y;
+                        opacity: root.going-opacity;
                         text: StripData.was-under;
                         quiet: StripData.was-quiet;
                         size: root.next-size;

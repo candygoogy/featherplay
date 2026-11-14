@@ -327,12 +327,13 @@ export global Theme {
     out property <duration> t-skeleton-delay: 150ms;                          // no skeleton flash on fast loads
     out property <duration> t-skeleton-sweep: 2200ms;                         // one skeleton sweep and its rest
     out property <duration> t-lyrics: moving ? 300ms : 0ms;                   // the lyrics toggle: the cover glides to its column, the lines fade in
-    out property <duration> t-strip-line: moving ? 200ms : 0ms;              // desktop lyrics: a line giving way to the next (instant without motion)
+    out property <duration> t-strip-line: moving ? 230ms : 0ms;              // desktop lyrics: a line giving way to the next (instant without motion)
     out property <duration> t-follow: moving ? 400ms : 0ms;                   // lyrics glide to the next line (ambient, so calmer than a UI move)
     out property <duration> t-line: fading && !switching ? 400ms : 0ms;       // a line's colour as it becomes current or sung (stays without motion)
 
     // Distances: zero when motion is off, so the same code fades in place.
     out property <length> rise: moving ? 8px : 0px;          // page and toast enter offset
+    out property <length> strip-rise: moving ? 14px : 0px;   // desktop lyrics: how far a line rises as it gives way
     out property <length> nudge: moving ? 4px : 0px;         // menu enter offset
     out property <float> pop-from: moving ? 0.96 : 1.0;      // menu, popover start scale
     out property <float> press-scale: moving ? 0.96 : 1.0;   // pills, play button, cards
