@@ -87,6 +87,11 @@ pub(super) fn show_hero(ctx: &Rc<Ctx>) {
                     .fill(&rows, urls, ROW_COVER, |row, img| row.cover = img);
                 STATE.with(|s| s.borrow_mut().next = ids);
             }
+            // On Home, a short queue's "More like this" is asked for at once, not when the
+            // Related tab opens (once a song).
+            if ctx.current_page() == crate::router::Page::Home {
+                now_playing::want_related(ctx, &state);
+            }
             show_more_like_this(ctx, &state);
         }
         Hero::Featured { shelf } if changed => {

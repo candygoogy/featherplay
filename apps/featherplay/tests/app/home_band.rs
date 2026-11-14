@@ -289,6 +289,11 @@ fn the_bands_queue_follows_the_players_with_the_panel_open() {
     scene.settle();
     let data = ui.global::<HomeData>();
     assert_eq!(data.get_next().row_count(), 0);
+    // Nothing next: "More like this" fills the column without the Related tab being opened.
+    assert!(
+        data.get_related().row_count() > 0,
+        "the band didn't ask for related songs"
+    );
 
     // The continuation: the band shows the panel's first songs, beside the open panel.
     app::on_event(UiEvent::Player(Box::new(radio_state(&current, &tracks))));

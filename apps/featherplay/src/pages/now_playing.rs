@@ -3,9 +3,9 @@
 //! (`queue_panel.rs`); this module fills the large cover, the album's year and the Related
 //! tab, and opens the song menu for the current track.
 //!
-//! Requests stay small: Related is the current track's radio, fetched once per track and
-//! only when the tab is shown; the year comes from the album, fetched once per album while
-//! the page is open. Results are kept, so reopening the page asks for nothing again.
+//! Requests stay small: Related is the current track's radio, fetched once per track when
+//! the tab is shown, or once ahead of it when Home shows a short queue (`want_related`); the
+//! year comes from the album, fetched once per album while the page is open. Results are kept, so reopening the page asks for nothing again.
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -30,6 +30,8 @@ const COVER: u32 = 440;
 const COVER_WIDE: u32 = 560;
 /// Related row covers.
 const ROW_COVER: u32 = 40;
+/// A queue shorter than this gets "More like this" in Home's band (`hero.rs::HERO_COLUMN`).
+const SHORT_QUEUE: usize = 3;
 
 #[derive(Default)]
 struct State {
@@ -40,6 +42,8 @@ struct State {
     cover_url: String,
     /// Related tracks by seed; `None` while the request runs.
     related: HashMap<TrackId, Option<Vec<Track>>>,
+    /// The songs whose related tracks were asked for ahead of the tab (`ask_ahead`).
+    asked_ahead: Vec<TrackId>,
     /// Album years; `None` while the request runs or when the album has none.
     years: HashMap<AlbumId, Option<String>>,
 }
@@ -74,8 +78,8 @@ pub fn init(ctx: &Rc<Ctx>) {
     lyrics::init(ctx);
 }
 
-/// The current song's related tracks, if they've been loaded (the Related tab asks for them;
-/// this doesn't).
+/// The current song's related tracks, if they've been loaded (the Related tab or
+/// `want_related` asks for them; this doesn't).
 pub(crate) fn related_of(id: &TrackId) -> Option<Vec<Track>> {
     STATE.with(|s| s.borrow().related.get(id).cloned().flatten())
 }
@@ -278,6 +282,30 @@ pub(crate) fn show_year(ctx: &Rc<Ctx>, track: Option<&Track>) {
     }
 }
 
+/// Home shows the playing song (`hero.rs`): with fewer than `SHORT_QUEUE` songs next, its
+/// related tracks are asked for ahead of the Related tab, through the tab's own request and
+/// cache, so the band's "More like this" (or, in a narrow window, the Up next sheet's
+/// Related tab) fills without waiting for the tab to open.
+pub(crate) fn want_related(ctx: &Rc<Ctx>, state: &PlayerState) {
+    let Some(seed) = &state.current else { return };
+    if STATE.with(|s| ask_ahead(&mut s.borrow_mut(), &seed.id, state.upcoming.len())) {
+        fetch_related(ctx, seed.clone());
+    }
+}
+
+/// Whether `seed`'s related tracks are asked for ahead of the tab, with `queued` songs next:
+/// only for a short queue, at most once a song, and not when they're in or on their way. A
+/// failed request isn't made again (the tab, opened, still asks).
+fn ask_ahead(state: &mut State, seed: &TrackId, queued: usize) -> bool {
+    let ask = queued < SHORT_QUEUE
+        && !state.related.contains_key(seed)
+        && !state.asked_ahead.contains(seed);
+    if ask {
+        state.asked_ahead.push(seed.clone());
+    }
+    ask
+}
+
 /// Fills the Related tab for the current track, asking once per track.
 fn show_related(ctx: &Rc<Ctx>) {
     let Some(ui) = ctx.window() else { return };
@@ -299,46 +327,53 @@ fn show_related(ctx: &Rc<Ctx>) {
         None => {
             data.set_loading(true);
             data.set_related(Default::default());
-            STATE.with(|s| s.borrow_mut().related.insert(seed.id.clone(), None));
-            let id = seed.id.clone();
-            ctx.load(
-                move |source| async move { source.radio(&id).await },
-                move |ctx, ui, result| {
-                    let tracks = match result {
-                        Ok(tracks) => tracks
-                            .into_iter()
-                            .filter(|t| t.id != seed.id)
-                            .collect::<Vec<_>>(),
-                        Err(e) => {
-                            log!("now playing: related for {}: {e}", seed.id.0);
-                            // Asked again next time the tab is shown for this track.
-                            STATE.with(|s| s.borrow_mut().related.remove(&seed.id));
-                            let current = ctx.player().and_then(|s| s.current).map(|t| t.id);
-                            if current.as_ref() == Some(&seed.id) {
-                                let data = ui.global::<NowPlayingData>();
-                                data.set_loading(false);
-                                data.set_error(tr!("Couldn't load related tracks").into());
-                            }
-                            return;
-                        }
-                    };
-                    STATE.with(|s| {
-                        s.borrow_mut()
-                            .related
-                            .insert(seed.id.clone(), Some(tracks.clone()))
-                    });
-                    // Home's band fills a short queue with them.
-                    crate::pages::home::related_changed(ctx);
-                    let current = ctx.player().and_then(|s| s.current).map(|t| t.id);
-                    let data = ui.global::<NowPlayingData>();
-                    if current.as_ref() == Some(&seed.id) && data.get_tab() == 1 {
-                        data.set_loading(false);
-                        fill_related(ctx, &tracks);
-                    }
-                },
-            );
+            fetch_related(ctx, seed);
         }
     }
+}
+
+/// Asks for `seed`'s related tracks, into the cache; the Related tab shows them if it's open
+/// on the song by then, and Home's band fills a short queue with them.
+fn fetch_related(ctx: &Rc<Ctx>, seed: Track) {
+    STATE.with(|s| s.borrow_mut().related.insert(seed.id.clone(), None));
+    let id = seed.id.clone();
+    ctx.load(
+        move |source| async move { source.radio(&id).await },
+        move |ctx, ui, result| {
+            let tracks = match result {
+                Ok(tracks) => tracks
+                    .into_iter()
+                    .filter(|t| t.id != seed.id)
+                    .collect::<Vec<_>>(),
+                Err(e) => {
+                    log!("now playing: related for {}: {e}", seed.id.0);
+                    // Asked again next time the tab is shown for this track, never
+                    // again ahead of it (`asked_ahead`).
+                    STATE.with(|s| s.borrow_mut().related.remove(&seed.id));
+                    let current = ctx.player().and_then(|s| s.current).map(|t| t.id);
+                    if current.as_ref() == Some(&seed.id) {
+                        let data = ui.global::<NowPlayingData>();
+                        data.set_loading(false);
+                        data.set_error(tr!("Couldn't load related tracks").into());
+                    }
+                    return;
+                }
+            };
+            STATE.with(|s| {
+                s.borrow_mut()
+                    .related
+                    .insert(seed.id.clone(), Some(tracks.clone()))
+            });
+            // Home's band fills a short queue with them.
+            crate::pages::home::related_changed(ctx);
+            let current = ctx.player().and_then(|s| s.current).map(|t| t.id);
+            let data = ui.global::<NowPlayingData>();
+            if current.as_ref() == Some(&seed.id) && data.get_tab() == 1 {
+                data.set_loading(false);
+                fill_related(ctx, &tracks);
+            }
+        },
+    );
 }
 
 fn fill_related(ctx: &Rc<Ctx>, tracks: &[Track]) {
@@ -349,4 +384,30 @@ fn fill_related(ctx: &Rc<Ctx>, tracks: &[Track]) {
     crate::prepare::rows_changed(crate::ui::SongList::Related);
     ctx.covers
         .fill(&rows, urls, ROW_COVER, |row, img| row.cover = img);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Home's band asks for a song's related tracks ahead of the tab only under a short queue,
+    /// once a song, and never again after a failure.
+    #[test]
+    fn related_is_asked_ahead_once_a_song_and_only_for_a_short_queue() {
+        let mut s = State::default();
+        let (a, b) = (TrackId("a".into()), TrackId("b".into()));
+        assert!(!ask_ahead(&mut s, &a, 3), "a long queue");
+        assert!(ask_ahead(&mut s, &a, 2), "a short queue");
+        // On its way (`fetch_related`), then in: nothing more.
+        s.related.insert(a.clone(), None);
+        assert!(!ask_ahead(&mut s, &a, 0), "on its way");
+        s.related.insert(a.clone(), Some(Vec::new()));
+        assert!(!ask_ahead(&mut s, &a, 0), "in");
+        // Another song asks once and fails (`fetch_related` forgets it): no retry, even when
+        // the song comes back.
+        assert!(ask_ahead(&mut s, &b, 0));
+        s.related.insert(b.clone(), None);
+        s.related.remove(&b);
+        assert!(!ask_ahead(&mut s, &b, 0), "asked again");
+    }
 }
