@@ -9,8 +9,8 @@ use featherplay_store::settings::SCHEMA;
 use featherplay_store::{
     Accent, AccentColour, CloseAction, DesktopLyrics, DiscordOptions, DiscordStatusText,
     DiscordTime, Equalizer, Hotkeys, Loudness, LyricsSize, Paths, Settings, SkipSilence,
-    StreamingQuality, StripPlace, StripSize, ThemeMode, load_client_version, load_session,
-    save_client_version, save_session, write_atomic,
+    StreamingQuality, StripPlace, StripSize, ThemeMode, WindowPlace, load_client_version,
+    load_session, save_client_version, save_session, write_atomic,
 };
 
 use crate::home::{self, TestHome};
@@ -89,6 +89,7 @@ fn settings_defaults_when_missing() {
             dns_over_https: false,
             settings_in_suggestions: true,
             lyrics_size: LyricsSize::Medium,
+            main_window: None,
         }
     );
     assert_eq!(s, Settings::default());
@@ -176,6 +177,14 @@ fn every_setting_changed() -> Settings {
         dns_over_https: true,
         settings_in_suggestions: false,
         lyrics_size: LyricsSize::Large,
+        main_window: Some(WindowPlace {
+            width: 1101.33,
+            height: 744.67,
+            position: Some([-1890.5, 12.0]),
+            scale: 1.5,
+            maximised: true,
+            monitor: Some([-2880, 0, 0, 1620]),
+        }),
     }
 }
 
@@ -1171,6 +1180,54 @@ fn a_0_1_0_file_without_a_schema_loads() {
             ..Settings::default()
         }
     );
+}
+
+/// A file from before the window's place was kept opens the window as before; a table this
+/// build can't read is dropped whole (a place without its size is no place), and the rest of
+/// the file counts. Where the desktop doesn't say where windows are (Wayland), the place has
+/// no position, and saves and loads that way.
+#[test]
+fn the_main_windows_place_is_none_in_older_files_and_round_trips_without_a_position() {
+    let Some(home) = TestHome::new("settings-main-window") else {
+        return;
+    };
+    let p = home.paths();
+    fs::create_dir_all(&p.config).unwrap();
+    let file = p.config.join("settings.toml");
+    fs::write(
+        &file,
+        "schema = 1
+volume = 0.4
+",
+    )
+    .unwrap();
+    assert_eq!(Settings::load(&p).main_window, None);
+
+    fs::write(
+        &file,
+        "volume = 0.4
+[main_window]
+position = [10.0, 20.0]
+maximised = true
+",
+    )
+    .unwrap();
+    let s = Settings::load(&p);
+    assert_eq!((s.main_window, s.volume), (None, 0.4));
+
+    let s = Settings {
+        main_window: Some(WindowPlace {
+            width: 900.0,
+            height: 640.0,
+            position: None,
+            scale: 2.0,
+            maximised: false,
+            monitor: None,
+        }),
+        ..Settings::default()
+    };
+    s.save(&p).unwrap();
+    assert_eq!(Settings::load(&p), s);
 }
 
 #[test]

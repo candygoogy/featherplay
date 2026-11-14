@@ -10,6 +10,7 @@ pub mod secrets;
 pub mod session;
 pub mod settings;
 pub mod silence_cache;
+pub mod window_place;
 
 pub use atomic::write as write_atomic;
 pub use desktop_lyrics::{DesktopLyrics, StripPlace, StripSize};
@@ -23,3 +24,4 @@ pub use settings::{
     Hotkeys, Loudness, LyricsSize, Settings, SkipSilence, StreamingQuality, ThemeMode,
 };
 pub use silence_cache::{SilenceCache, SongSilences};
+pub use window_place::WindowPlace;

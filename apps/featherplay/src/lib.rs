@@ -69,6 +69,7 @@ pub mod top_bar;
 pub mod ui_bridge;
 pub mod updates;
 pub mod wheel;
+pub mod window_place;
 
 /// The controller crate's interface (`Action`, `UiEvent`, `PlayerState`, `Options`, `UiLink`),
 /// under the name the pages have always used.

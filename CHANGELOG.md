@@ -6,6 +6,16 @@ Notable changes to featherplay, newest first. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **The window opens where you left it.** featherplay remembers the main window's size,
+  position and whether it was maximised, and opens that way the next time, also when it
+  starts in the tray and is shown later. The size keeps its look across a change of display
+  scale and is cut to fit the screen; a window that would open off every screen (a monitor
+  unplugged, a new layout) opens centred on the main one. On Wayland, which places windows
+  itself, the size and the maximised state are kept. The first start opens at 1280 × 800 as
+  before.
+
 ### Changed
 
 - **A new Home.** It opens on a band in the colour of the song's cover, deep with white text

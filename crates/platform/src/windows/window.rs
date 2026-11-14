@@ -4,7 +4,8 @@
 //! taskbar button; Windows' animation setting. For the tray's mini player: the work area and
 //! scale of the screen under a point, where the taskbar is, the popup's border, whether a press is what brought it
 //! to the front, which window is in front, and presses anywhere on screen. For the sign-in
-//! window: where a window's client area is, and a window frame's size.
+//! window: where a window's client area is, and a window frame's size. For the main window's
+//! place between runs: the monitors, and its restored bounds.
 
 use std::cell::{Cell, RefCell};
 use std::ffi::c_void;
@@ -17,8 +18,8 @@ use windows::Win32::Graphics::Dwm::{
     DwmSetWindowAttribute,
 };
 use windows::Win32::Graphics::Gdi::{
-    ClientToScreen, GetMonitorInfoW, GetUpdateRect, MONITOR_DEFAULTTONEAREST, MONITORINFO,
-    MonitorFromPoint,
+    ClientToScreen, EnumDisplayMonitors, GetMonitorInfoW, GetUpdateRect, HDC, HMONITOR,
+    MONITOR_DEFAULTTONEAREST, MONITORINFO, MonitorFromPoint, MonitorFromRect,
 };
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::HiDpi::{AdjustWindowRectExForDpi, GetDpiForMonitor, MDT_EFFECTIVE_DPI};
@@ -27,16 +28,18 @@ use windows::Win32::UI::Shell::{
     RemoveWindowSubclass, SHAppBarMessage, SetWindowSubclass,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    CallNextHookEx, CreateIconFromResourceEx, DestroyIcon, GA_ROOT, GetAncestor, GetClassNameW,
-    GetCursorPos, GetForegroundWindow, GetWindowRect, HC_ACTION, HHOOK, HICON, ICON_BIG,
-    ICON_SMALL, IsIconic, LR_DEFAULTCOLOR, LWA_ALPHA, MSLLHOOKSTRUCT, RegisterWindowMessageW,
-    SC_MINIMIZE, SC_RESTORE, SIZE_MAXIMIZED, SIZE_MINIMIZED, SIZE_RESTORED,
+    CallNextHookEx, CreateIconFromResourceEx, DestroyIcon, GA_ROOT, GWL_EXSTYLE, GWL_STYLE,
+    GetAncestor, GetClassNameW, GetCursorPos, GetForegroundWindow, GetWindowLongPtrW,
+    GetWindowPlacement, GetWindowRect, HC_ACTION, HHOOK, HICON, ICON_BIG, ICON_SMALL, IsIconic,
+    IsZoomed, LR_DEFAULTCOLOR, LWA_ALPHA, MONITORINFOF_PRIMARY, MSLLHOOKSTRUCT,
+    RegisterWindowMessageW, SC_MINIMIZE, SC_RESTORE, SIZE_MAXIMIZED, SIZE_MINIMIZED, SIZE_RESTORED,
     SPI_GETCLIENTAREAANIMATION, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS, SendMessageW,
     SetForegroundWindow, SetLayeredWindowAttributes, SetWindowsHookExW, SystemParametersInfoW,
-    UnhookWindowsHookEx, WH_MOUSE_LL, WINDOW_EX_STYLE, WM_DISPLAYCHANGE, WM_DPICHANGED,
-    WM_LBUTTONDOWN, WM_MBUTTONDOWN, WM_MOUSEACTIVATE, WM_MOUSEWHEEL, WM_NCDESTROY, WM_PAINT,
-    WM_POINTERACTIVATE, WM_POINTERDOWN, WM_RBUTTONDOWN, WM_SETICON, WM_SETTINGCHANGE, WM_SIZE,
-    WM_SYSCOMMAND, WM_XBUTTONDOWN, WS_OVERLAPPEDWINDOW, WindowFromPoint,
+    UnhookWindowsHookEx, WH_MOUSE_LL, WINDOW_EX_STYLE, WINDOW_STYLE, WINDOWPLACEMENT,
+    WM_DISPLAYCHANGE, WM_DPICHANGED, WM_LBUTTONDOWN, WM_MBUTTONDOWN, WM_MOUSEACTIVATE,
+    WM_MOUSEWHEEL, WM_NCDESTROY, WM_PAINT, WM_POINTERACTIVATE, WM_POINTERDOWN, WM_RBUTTONDOWN,
+    WM_SETICON, WM_SETTINGCHANGE, WM_SIZE, WM_SYSCOMMAND, WM_XBUTTONDOWN, WPF_RESTORETOMAXIMIZED,
+    WS_OVERLAPPEDWINDOW, WindowFromPoint,
 };
 
 pub use crate::common::window::*;
@@ -765,6 +768,38 @@ unsafe extern "system" fn button_proc(
 pub fn work_area_at(x: i32, y: i32) -> Option<(ScreenRect, f32)> {
     // SAFETY: MonitorFromPoint has no preconditions; NEAREST always returns a monitor.
     let monitor = unsafe { MonitorFromPoint(POINT { x, y }, MONITOR_DEFAULTTONEAREST) };
+    monitor_of(monitor).map(|m| (m.work, m.scale))
+}
+
+/// Every monitor there is now, with its work area and scale.
+pub fn monitors() -> Vec<Monitor> {
+    unsafe extern "system" fn each(
+        monitor: HMONITOR,
+        _dc: HDC,
+        _clip: *mut RECT,
+        found: LPARAM,
+    ) -> windows::core::BOOL {
+        // SAFETY: `found` is the list `monitors` passed, alive for the whole enumeration.
+        let found = unsafe { &mut *(found.0 as *mut Vec<Monitor>) };
+        found.extend(monitor_of(monitor));
+        true.into()
+    }
+    let mut found: Vec<Monitor> = Vec::new();
+    // SAFETY: the whole virtual screen (no DC, no clip); the callback gets `found`, which
+    // outlives the call.
+    let _ = unsafe {
+        EnumDisplayMonitors(
+            None,
+            None,
+            Some(each),
+            LPARAM(&mut found as *mut Vec<Monitor> as isize),
+        )
+    };
+    found
+}
+
+/// A monitor's rectangle, work area and scale.
+fn monitor_of(monitor: HMONITOR) -> Option<Monitor> {
     let mut info = MONITORINFO {
         cbSize: size_of::<MONITORINFO>() as u32,
         ..Default::default()
@@ -780,8 +815,145 @@ pub fn work_area_at(x: i32, y: i32) -> Option<(ScreenRect, f32)> {
             Ok(()) => dpi_x as f32 / 96.0,
             Err(_) => 1.0,
         };
-    let w = info.rcWork;
-    Some(((w.left, w.top, w.right, w.bottom), scale))
+    let rect = |r: RECT| (r.left, r.top, r.right, r.bottom);
+    Some(Monitor {
+        rect: rect(info.rcMonitor),
+        work: rect(info.rcWork),
+        scale,
+        primary: info.dwFlags & MONITORINFOF_PRIMARY != 0,
+    })
+}
+
+/// Maximises the window on the monitor it's on without showing it or taking the focus: one
+/// not shown yet appears maximised when it's shown, one on screen becomes maximised where it
+/// is. Restoring it brings back the bounds it had. `ShowWindow`'s maximise would show a hidden
+/// window at once, unpainted, and activate it either way.
+///
+/// This is what `CreateWindowEx` makes of a window created with `WS_MAXIMIZE`: the style, and
+/// the work area with the frame's sizing border off screen on every side, as Windows places a
+/// maximised window.
+pub fn maximise_quietly(h: Handle) -> Result<(), String> {
+    use windows::Win32::Graphics::Gdi::MonitorFromWindow;
+    use windows::Win32::UI::WindowsAndMessaging::{
+        IsWindowVisible, SW_HIDE, SW_SHOWNA, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOZORDER,
+        SetWindowLongPtrW, SetWindowPlacement, SetWindowPos, WS_MAXIMIZE,
+    };
+    let hwnd = h.hwnd();
+    // SAFETY: a handle-only call; NEAREST always returns a monitor.
+    let monitor = monitor_of(unsafe { MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST) })
+        .ok_or("no monitor")?;
+    // SAFETY: handle-only reads; a stale handle reads 0 and as hidden.
+    let (style, ex_style, shown) = unsafe {
+        (
+            GetWindowLongPtrW(hwnd, GWL_STYLE),
+            GetWindowLongPtrW(hwnd, GWL_EXSTYLE),
+            IsWindowVisible(hwnd).as_bool(),
+        )
+    };
+    let mut frame = RECT::default();
+    let dpi = (monitor.scale * 96.0).round() as u32;
+    // SAFETY: an in-out rectangle; the styles are plain flags.
+    unsafe {
+        AdjustWindowRectExForDpi(
+            &mut frame,
+            WINDOW_STYLE(style as u32),
+            false,
+            WINDOW_EX_STYLE(ex_style as u32),
+            dpi,
+        )
+    }
+    .map_err(|e| e.message())?;
+    let border = -frame.left;
+    let (l, t, r, b) = monitor.work;
+    let mut placement = WINDOWPLACEMENT {
+        length: size_of::<WINDOWPLACEMENT>() as u32,
+        ..Default::default()
+    };
+    // SAFETY: a window handle and a WINDOWPLACEMENT with its length filled in.
+    unsafe { GetWindowPlacement(hwnd, &mut placement) }.map_err(|e| e.message())?;
+    // SAFETY: a window of this thread and plain flags; neither shown (no SWP_SHOWWINDOW) nor
+    // activated.
+    unsafe {
+        SetWindowLongPtrW(hwnd, GWL_STYLE, style | WS_MAXIMIZE.0 as isize);
+        SetWindowPos(
+            hwnd,
+            None,
+            l - border,
+            t - border,
+            r - l + 2 * border,
+            b - t + 2 * border,
+            SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED,
+        )
+    }
+    .map_err(|e| e.message())?;
+    // The move took the maximised bounds as the ones to restore to: the old ones go back, and
+    // the window stays as shown or hidden as it was.
+    placement.showCmd = if shown { SW_SHOWNA } else { SW_HIDE }.0 as u32;
+    // SAFETY: the placement read above, for the same window.
+    unsafe { SetWindowPlacement(hwnd, &placement) }.map_err(|e| e.message())
+}
+
+/// The window's restored bounds as Windows keeps them (`GetWindowPlacement`), right also while
+/// it's maximised, minimised or hidden in the tray, with the scale of the monitor they're on.
+/// The inner size takes off the frame the window's own styles have at that scale.
+pub fn restored_bounds(h: Handle) -> Option<Restored> {
+    let hwnd = h.hwnd();
+    let mut placement = WINDOWPLACEMENT {
+        length: size_of::<WINDOWPLACEMENT>() as u32,
+        ..Default::default()
+    };
+    // SAFETY: a window handle and a WINDOWPLACEMENT with its length filled in; a stale
+    // handle fails.
+    unsafe { GetWindowPlacement(hwnd, &mut placement) }.ok()?;
+    // SAFETY: handle-only calls; a stale handle reads as neither.
+    let (minimised, zoomed) = unsafe { (IsIconic(hwnd).as_bool(), IsZoomed(hwnd).as_bool()) };
+    let maximised = if minimised {
+        placement.flags.contains(WPF_RESTORETOMAXIMIZED)
+    } else {
+        zoomed
+    };
+    let normal = placement.rcNormalPosition;
+    // SAFETY: a rectangle on the stack; NEAREST always returns a monitor.
+    let monitor = monitor_of(unsafe { MonitorFromRect(&normal, MONITOR_DEFAULTTONEAREST) })?;
+    // The rectangle is in workspace coordinates, which start at the work area's corner: off
+    // from the screen's by a taskbar at the monitor's top or left.
+    let (dx, dy) = (
+        monitor.work.0 - monitor.rect.0,
+        monitor.work.1 - monitor.rect.1,
+    );
+    // SAFETY: handle-only reads; a stale handle reads 0.
+    let (style, ex_style) = unsafe {
+        (
+            GetWindowLongPtrW(hwnd, GWL_STYLE),
+            GetWindowLongPtrW(hwnd, GWL_EXSTYLE),
+        )
+    };
+    let mut frame = RECT::default();
+    let dpi = (monitor.scale * 96.0).round() as u32;
+    // SAFETY: an in-out rectangle; the styles are plain flags.
+    let framed = unsafe {
+        AdjustWindowRectExForDpi(
+            &mut frame,
+            WINDOW_STYLE(style as u32),
+            false,
+            WINDOW_EX_STYLE(ex_style as u32),
+            dpi,
+        )
+    };
+    if framed.is_err() {
+        frame = RECT::default();
+    }
+    let inner = |outer: i32, frame: i32| u32::try_from(outer - frame).unwrap_or(0);
+    Some(Restored {
+        position: (normal.left + dx, normal.top + dy),
+        size: (
+            inner(normal.right - normal.left, frame.right - frame.left),
+            inner(normal.bottom - normal.top, frame.bottom - frame.top),
+        ),
+        scale: monitor.scale,
+        maximised,
+        minimised,
+    })
 }
 
 /// The primary taskbar, where the notification area and its hidden icons' flyout are: its

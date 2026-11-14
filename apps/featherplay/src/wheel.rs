@@ -19,7 +19,8 @@
 //! pointer, or a button, lifts it before Slint sees that event. Nothing is timed.
 //!
 //! The same filter, the only one a window can have, sends the mouse's side buttons to
-//! `Nav.back` and `Nav.forward` (`mouse_nav`).
+//! `Nav.back` and `Nav.forward` (`mouse_nav`), and tells `window_place` when the window moves
+//! or changes size.
 
 use std::cell::Cell;
 
@@ -128,6 +129,10 @@ pub fn install(ui: &AppWindow) {
                     }
                     _ => EventResult::Propagate,
                 }
+            }
+            WindowEvent::Moved(_) | WindowEvent::Resized(_) => {
+                crate::window_place::changed();
+                EventResult::Propagate
             }
             _ => EventResult::Propagate,
         });

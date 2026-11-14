@@ -264,7 +264,7 @@ on `featherplay-writes`, so the newer copy lands last.
 
 | Where | What | Written by |
 |---|---|---|
-| `{config}/settings.toml` | Settings; its `[desktop_lyrics]` table holds the strip's switch, size, lock and place | `crates/store/src/settings.rs`, `crates/store/src/desktop_lyrics.rs` |
+| `{config}/settings.toml` | Settings; its `[desktop_lyrics]` table holds the strip's switch, size, lock and place, and `[main_window]` where the main window was left (`apps/featherplay/src/window_place.rs` saves it, `crates/controller/src/window_place.rs` decides where it opens) | `crates/store/src/settings.rs`, `crates/store/src/desktop_lyrics.rs`, `crates/store/src/window_place.rs` |
 | `{config}/lyrics.json` | The lyrics' timing and the lyrics picked, per song (at most 1,000 songs) | `crates/store/src/lyrics_choices.rs` |
 | `{config}/session.json` | The queue and position, restored paused | `crates/store/src/session.rs` |
 | `{config}/scrobble-queue.json`, `{config}/listenbrainz-queue.json` | Scrobbles waiting to be sent | `crates/controller/src/scrobbler.rs` |

@@ -7,7 +7,8 @@
 //! nor learn where anything is on screen, so there `work_area_at` finds nothing and the mini
 //! player opens as an ordinary window (`supports(Feature::MiniPlayerPlacement)` is false).
 //! `bring_forward` asks the X11 window manager to bring a window back; Wayland's compositor
-//! decides that alone.
+//! decides that alone. For the same reason `monitors`, which the main window's place between
+//! runs is checked against, lists the X11 monitors and none on Wayland.
 
 use std::sync::OnceLock;
 
@@ -216,6 +217,29 @@ pub fn work_area_at(x: i32, y: i32) -> Option<(ScreenRect, f32)> {
     x11::work_area_at(x, y)
         .inspect_err(|e| log::warn!("work area: {e}"))
         .ok()
+}
+
+/// On an X11 desktop, every monitor (RandR) with its part of the work area and the scale;
+/// none on Wayland, where nothing is known of the screen.
+pub fn monitors() -> Vec<Monitor> {
+    if !x11_session() {
+        return Vec::new();
+    }
+    x11::monitors()
+        .inspect_err(|e| log::warn!("monitors: {e}"))
+        .unwrap_or_default()
+}
+
+/// Not needed here: a window made maximised (winit's attribute) is mapped so by the window
+/// manager or compositor, without showing first.
+pub fn maximise_quietly(_h: Handle) -> Result<(), String> {
+    Err("made maximised by its attributes on Linux".into())
+}
+
+/// Not kept anywhere an app can read it: `None`, and the app reads the window's own bounds
+/// while it's on screen and not maximised.
+pub fn restored_bounds(_h: Handle) -> Option<Restored> {
+    None
 }
 
 /// Nothing to do: X11 lets clicks through by the window's input shape alone, which winit

@@ -1,5 +1,5 @@
-//! What the mini player's placement asks the X server, over a connection of its own made for
-//! each question (a click on the tray icon is rare): the pointer, the monitors (RandR), the
+//! What the mini player's placement and the main window's start ask the X server, over a
+//! connection of its own made for each question (rare): the pointer, the monitors (RandR), the
 //! work area the window manager leaves beside its panels (`_NET_WORKAREA`), and the scale
 //! winit gives windows (`WINIT_X11_SCALE_FACTOR`, else `Xft.dpi`). And bringing a window back
 //! (`activate`).
@@ -11,7 +11,7 @@ use x11rb::protocol::xproto::{
 };
 use x11rb::rust_connection::RustConnection;
 
-use crate::common::window::ScreenRect;
+use crate::common::window::{Monitor, ScreenRect};
 
 fn connect() -> Result<(RustConnection, Window), String> {
     let (conn, screen) = x11rb::connect(None).map_err(|e| format!("X display: {e}"))?;
@@ -66,7 +66,36 @@ pub fn activate(window: Window) -> Result<(), String> {
 /// scale.
 pub fn work_area_at(x: i32, y: i32) -> Result<(ScreenRect, f32), String> {
     let (conn, root) = connect()?;
-    let monitors: Vec<ScreenRect> = conn
+    let monitors: Vec<ScreenRect> = randr_monitors(&conn, root)?
+        .into_iter()
+        .map(|(rect, _)| rect)
+        .collect();
+    let monitor = nearest(&monitors, (x, y)).ok_or("no monitor")?;
+    let work = net_workarea(&conn, root).unwrap_or(monitor);
+    Ok((within(monitor, work), scale(&conn)))
+}
+
+/// Every monitor, with the part of the work area on it, and the scale (one for all of them on
+/// X11).
+pub fn monitors() -> Result<Vec<Monitor>, String> {
+    let (conn, root) = connect()?;
+    let found = randr_monitors(&conn, root)?;
+    let work = net_workarea(&conn, root);
+    let scale = scale(&conn);
+    Ok(found
+        .into_iter()
+        .map(|(rect, primary)| Monitor {
+            rect,
+            work: work.map_or(rect, |w| within(rect, w)),
+            scale,
+            primary,
+        })
+        .collect())
+}
+
+/// The monitors RandR reports, and which is the primary one.
+fn randr_monitors(conn: &RustConnection, root: Window) -> Result<Vec<(ScreenRect, bool)>, String> {
+    Ok(conn
         .randr_get_monitors(root, true)
         .map_err(|e| e.to_string())?
         .reply()
@@ -75,17 +104,15 @@ pub fn work_area_at(x: i32, y: i32) -> Result<(ScreenRect, f32), String> {
         .iter()
         .map(|m| {
             let (left, top) = (i32::from(m.x), i32::from(m.y));
-            (
+            let rect = (
                 left,
                 top,
                 left + i32::from(m.width),
                 top + i32::from(m.height),
-            )
+            );
+            (rect, m.primary)
         })
-        .collect();
-    let monitor = nearest(&monitors, (x, y)).ok_or("no monitor")?;
-    let work = net_workarea(&conn, root).unwrap_or(monitor);
-    Ok((within(monitor, work), scale(&conn)))
+        .collect())
 }
 
 /// The monitor holding `point`, else the one nearest it.

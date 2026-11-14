@@ -1,6 +1,6 @@
 //! What the window functions take and give on every OS: a plain colour, a screen
-//! rectangle, the taskbar, the window in front, and the entry of an `.ico` for a size. The window
-//! itself, `Handle`, is each OS's own.
+//! rectangle, the taskbar, the window in front, the monitors, a window's restored bounds, and
+//! the entry of an `.ico` for a size. The window itself, `Handle`, is each OS's own.
 
 use crate::window::Handle;
 
@@ -29,6 +29,33 @@ pub enum Edge {
 pub struct Taskbar {
     pub edge: Edge,
     pub rect: ScreenRect,
+}
+
+/// A monitor, as `monitors` lists them: its rectangle and its work area (the rectangle less
+/// the taskbar or the panels), physical pixels, and the scale windows get there.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Monitor {
+    pub rect: ScreenRect,
+    pub work: ScreenRect,
+    pub scale: f32,
+    /// The primary monitor, where a window with nowhere else to go opens.
+    pub primary: bool,
+}
+
+/// A window's restored (normal) bounds as the system keeps them, also while it's maximised,
+/// minimised or hidden: what `restored_bounds` reads.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Restored {
+    /// The outer top-left corner (its frame's, invisible borders included), physical pixels.
+    pub position: (i32, i32),
+    /// The inner (client area) size, physical pixels.
+    pub size: (u32, u32),
+    /// The scale of the monitor those bounds are on.
+    pub scale: f32,
+    /// It's maximised, or minimised from maximised (it comes back maximised).
+    pub maximised: bool,
+    /// It's minimised (hidden or not).
+    pub minimised: bool,
 }
 
 /// The window in front: what `foreground` reads.

@@ -12,7 +12,8 @@
 //! queue came from, which the app maps to its pages. `updates` checks for a newer release
 //! and downloads its setup. `task` has the detached task helpers everything here spawns
 //! with. `catalog` is the data source the pages and the controller share: the music API, or
-//! the recorded `fixtures`.
+//! the recorded `fixtures`. `window_place` is where the main window opens, from the place it
+//! was left.
 
 /// Writes a line to the log file (`diagnostics`), prefixed with the time and the seconds
 /// since start; debug builds print it to stderr too.
@@ -34,3 +35,4 @@ pub mod scrobbler;
 pub mod suggest;
 pub mod task;
 pub mod updates;
+pub mod window_place;

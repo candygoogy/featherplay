@@ -213,6 +213,8 @@ impl Ctx {
     /// the event loop. With no controller left, the event loop ends here.
     pub fn quit(&self) {
         closing();
+        // Where the window was left, before the controller's last save.
+        crate::window_place::quitting(self);
         if self.actions.send(Action::Quit).is_err() {
             let _ = slint::quit_event_loop();
         }
@@ -919,13 +921,17 @@ fn run_window(
     }
     // The close button asks, quits or hides to the tray, as Settings says (`close`).
     close::install(&ctx, &ui, shell::has_tray);
+    // Where it was left, before it's made: it appears there (`window_place`). To open
+    // maximised on Windows, it's shown once it's made and maximised (`window_place::made`),
+    // but by a start at sign-in, which shows it without the focus first.
+    let show_when_made = crate::window_place::restore(&ui) && start == Start::Window;
 
     if start == Start::Tray {
         // Made but not shown: the tray icon, the media controls and the hotkeys still get
         // its handle.
         ui.global::<Frame>().set_hidden(true);
         log!("started at sign-in, in the tray");
-    } else {
+    } else if !show_when_made {
         ui.show().map_err(|e| format!("show window: {e}"))?;
     }
     let weak = ui.as_weak();
@@ -935,6 +941,9 @@ fn run_window(
     let timing = app.timing;
     shell::start(find_handle, tx, hotkeys, move |handle| {
         c.handle.set(Some(handle));
+        if let Some(ui) = weak.upgrade() {
+            crate::window_place::made(&ui, handle, show_when_made);
+        }
         // Started in the tray with no tray to go to (`run_window` showed it): minimised.
         if start == Start::Tray
             && !shell::has_tray()

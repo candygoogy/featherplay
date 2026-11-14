@@ -22,7 +22,7 @@ use featherplay_controller::presence::Status as DiscordStatus;
 use featherplay_controller::scrobbler::build_keys;
 use featherplay_integrations::local_api::Token;
 use featherplay_platform::{Feature, supports};
-use featherplay_store::{CloseAction, DesktopLyrics, Equalizer, Paths, Settings};
+use featherplay_store::{CloseAction, DesktopLyrics, Equalizer, Paths, Settings, WindowPlace};
 use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
 
 use crate::app::Ctx;
@@ -128,6 +128,18 @@ pub fn set_desktop_lyrics(ctx: &Ctx, value: DesktopLyrics) {
         commit(ctx, Change::DesktopLyrics(value));
         show_lyrics_resettable(ctx);
     }
+}
+
+/// Where the main window was left (`window_place`).
+pub fn main_window() -> Option<WindowPlace> {
+    SETTINGS.with(|s| s.borrow().main_window)
+}
+
+/// Saves where the main window was left. Not a row of the page, so its search stays as it is.
+pub fn set_main_window(ctx: &Ctx, place: WindowPlace) {
+    let change = Change::MainWindow(place);
+    SETTINGS.with(|s| change.apply(&mut s.borrow_mut()));
+    ctx.send(Action::Account(AccountAction::Set(change)));
 }
 
 /// Whether the lyrics view may look up synced lyrics on LRCLIB.

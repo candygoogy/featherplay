@@ -4,7 +4,7 @@
 use featherplay_core::player::Input;
 use featherplay_store::{
     Accent, AccentColour, CloseAction, DesktopLyrics, DiscordOptions, Equalizer, Hotkeys, Loudness,
-    LyricsSize, Settings, SkipSilence, StreamingQuality, ThemeMode,
+    LyricsSize, Settings, SkipSilence, StreamingQuality, ThemeMode, WindowPlace,
 };
 
 use super::start_presence;
@@ -106,6 +106,8 @@ pub enum Change {
     DnsOverHttps(bool),
     /// The lyrics' text size (the window applies it).
     LyricsSize(LyricsSize),
+    /// Where the main window was left (the window saves it as it settles and at quit).
+    MainWindow(WindowPlace),
 }
 
 impl Change {
@@ -174,6 +176,7 @@ impl Change {
             Change::SignInBrowser(v) => s.sign_in_browser = Some(v),
             Change::DnsOverHttps(v) => s.dns_over_https = v,
             Change::LyricsSize(v) => s.lyrics_size = v,
+            Change::MainWindow(v) => s.main_window = Some(v),
         }
     }
 }
@@ -361,6 +364,14 @@ mod tests {
             Change::SleepFade(10),
             Change::SignInBrowser("brave".into()),
             Change::DnsOverHttps(true),
+            Change::MainWindow(WindowPlace {
+                width: 900.0,
+                height: 700.0,
+                position: None,
+                scale: 1.0,
+                maximised: true,
+                monitor: None,
+            }),
         ];
         for c in &changes {
             c.apply(&mut s);
@@ -406,6 +417,7 @@ mod tests {
         assert_eq!(s.sign_in_browser.as_deref(), Some("brave"));
         assert!(!s.check_for_updates && !s.install_updates);
         assert!(s.dns_over_https);
+        assert!(s.main_window.is_some_and(|w| w.maximised));
         assert_eq!(s.volume, d.volume, "the volume isn't a page setting");
     }
 

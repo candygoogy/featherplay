@@ -5,7 +5,7 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{DesktopLyrics, Paths, atomic};
+use crate::{DesktopLyrics, Paths, WindowPlace, atomic};
 
 /// The settings file layout this build writes. Raise it with each change that needs a
 /// migration, and add that step to `MIGRATIONS`.
@@ -199,6 +199,11 @@ pub struct Settings {
     /// default) or Large. A value this build doesn't know loads as Medium.
     #[serde(deserialize_with = "lenient")]
     pub lyrics_size: LyricsSize,
+    /// Where the main window was left (`[main_window]`), saved as it's moved, resized,
+    /// maximised and closed. `None` (the first run, a file from before 0.4.1, or a table
+    /// this build can't read) opens it at its own size where the desktop puts it.
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "lenient")]
+    pub main_window: Option<WindowPlace>,
 }
 
 /// The lyrics' text size, on Now playing and in the Lyrics tab.
@@ -456,6 +461,7 @@ impl Default for Settings {
             dns_over_https: false,
             settings_in_suggestions: true,
             lyrics_size: LyricsSize::Medium,
+            main_window: None,
         }
     }
 }
