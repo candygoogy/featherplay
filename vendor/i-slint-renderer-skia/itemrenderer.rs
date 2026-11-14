@@ -496,12 +496,24 @@ impl<'a> SkiaItemRenderer<'a> {
                             / skia_image.height() as f32,
                     ))
                     * Matrix::translate((-(tiled_offset.x as i32), -(tiled_offset.y as i32)));
+                // featherplay patch: on Windows without the `opengl` feature or wgpu every canvas
+                // is a raster one, which has no recording context; asking for it would link all
+                // of Skia's GPU backend (Ganesh) into the exe. See VENDORED.md.
+                #[cfg(any(feature = "opengl", skia_backend_wgpu, not(target_family = "windows")))]
+                let mut recording_context = self.canvas.recording_context();
+                #[cfg(any(feature = "opengl", skia_backend_wgpu, not(target_family = "windows")))]
+                let recorder = recording_context
+                    .as_mut()
+                    .map(|c| c.as_recorder() as &mut dyn skia_safe::Recorder);
+                #[cfg(not(any(
+                    feature = "opengl",
+                    skia_backend_wgpu,
+                    not(target_family = "windows")
+                )))]
+                let recorder: Option<&mut dyn skia_safe::Recorder> = None;
                 if let Some(shader) = skia_image
                     .make_subset(
-                        self.canvas
-                            .recording_context()
-                            .as_mut()
-                            .map(|c| c.as_recorder() as &mut dyn skia_safe::Recorder),
+                        recorder,
                         src,
                         skia_safe::image::RequiredProperties::default(),
                     )

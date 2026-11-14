@@ -1,6 +1,6 @@
 # Vendored: i-slint-renderer-skia 1.18.1
 
-This is the crate as published on crates.io, with twenty-one changes. The workspace `Cargo.toml`
+This is the crate as published on crates.io, with twenty-two changes. The workspace `Cargo.toml`
 swaps it in with `[patch.crates-io]`.
 
 1. `Cargo.toml`: `wgpu-30` is out of the default features.
@@ -145,7 +145,8 @@ Change 16 makes the exe smaller (measured 2026-11-08):
     returns an error (`opengl_left_out_surface_factory`), as change 2 does for wgpu; marked
     `featherplay patch`. featherplay asks for `skia-software`, so that path never runs. The
     surface was the only thing reaching Skia's GPU backend (Ganesh over OpenGL, with its GL
-    interface and shader code): leaving it out took 496,640 bytes off the release exe.
+    interface and shader code): leaving it out took 496,640 bytes off the release exe. The
+    rest of Ganesh stayed in through three calls that change 22 leaves out.
 
 Change 17 keeps a colour fade's shadows out of memory (measured 2026-11-08):
 
@@ -212,6 +213,23 @@ Change 21 makes a changed text always repaint (2026-11-13):
     under it moved on; the offscreen frames didn't reproduce it. It's one property read per
     drawn text.
 
+Change 22 makes the exe smaller (measured 2026-11-14):
+
+22. `lib.rs`, `render_components_to_canvas`, and `itemrenderer.rs`, `draw_image_impl` (the
+    tiled image's `make_subset`): on Windows without the `opengl` feature or wgpu, the two
+    `ctx.flush(None)` on the GPU context and the `canvas.recording_context()` passed to
+    `make_subset` as its recorder are left out (`None` is passed instead), each behind
+    `#[cfg(any(feature = "opengl", skia_backend_wgpu, not(target_family = "windows")))]` and
+    marked `featherplay patch`. These three calls were all that still linked Skia's GPU
+    backend (Ganesh: `GrDirectContext`, its device, the tessellation shaders) into the exe
+    once change 16 had left out the OpenGL surface. They never ran: on Windows the only
+    surface is the software one, which passes no GPU context, and `take_snapshot` and the
+    parked recording of change 5 pass none either; every canvas is a raster one (the
+    window's buffer, `src/offscreen.rs`' buffer, the layers made with `new_surface` on
+    them), and a raster canvas has no recording context. Nothing in featherplay tiles an
+    image anyway. The offscreen snapshots stayed byte-identical. It took 1,350,144 bytes off
+    the release exe.
+
 ## Platforms
 
 Which changes are Windows-specific (2026-11-11). Only code that is Win32's or would behave
@@ -242,6 +260,7 @@ featherplay uses.
 | 19 no layer at alpha 0 | Neutral | No | Skia rasterising. |
 | 20 fonts read in place | Neutral | No | DirectWrite and FreeType both read an `SkData` in place; fontique maps the files on every target. |
 | 21 a text read where it's drawn | Neutral | No | Property tracking, the same everywhere. |
+| 22 no GPU flush or recording context | Windows | Yes, `any(feature = "opengl", skia_backend_wgpu, not(target_family = "windows"))` | Only Windows lacks every GPU surface (changes 1 and 16); elsewhere the OpenGL surface passes its context, so the calls stay as upstream. |
 
 ## Why
 
@@ -273,7 +292,10 @@ licence, which allows modified copies).
    checks the frames), and change 20 unless the new font cache already reads fonts without
    a copy (`glyph_fallback.rs` checks the memory), and change 21 unless the new `draw_text` or
    the text layout cache already makes a text change repaint the item after its entry was
-   replaced.
+   replaced, and change 22: find every use of the GPU context (`gr_context`,
+   `recording_context()`, `DirectContext`) the new `lib.rs` and `itemrenderer.rs` make outside
+   the OpenGL and wgpu surfaces and gate it the same way (the exe's size shows whether Ganesh
+   came back).
 4. Build. If `i-slint-backend-winit` still calls wgpu-only constructors, port the three
    wgpu `featherplay patch` blocks in `lib.rs` (the git history of this folder has the diff);
    if it now gates them itself, leave those out. Check the Linux build too (see Platforms).

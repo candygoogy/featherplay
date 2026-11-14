@@ -941,6 +941,8 @@ impl SkiaRenderer {
                 // For the BeforeRendering rendering notifier callback it's important that this happens *after* clearing
                 // the back buffer, in order to allow the callback to provide its own rendering of the background.
                 // Skia's clear() will merely schedule a clear call, so flush right away to make it immediate.
+                // featherplay patch: only where a GPU surface is compiled in (see below).
+                #[cfg(any(feature = "opengl", skia_backend_wgpu, not(target_family = "windows")))]
                 if let Some(ctx) = gr_context.as_mut() {
                     ctx.flush(None);
                 }
@@ -989,9 +991,15 @@ impl SkiaRenderer {
             }
         }
 
+        // featherplay patch: on Windows without the `opengl` feature or wgpu the only surface is
+        // the software one, which never passes a GPU context, so there's nothing to flush; the
+        // flush would link all of Skia's GPU backend (Ganesh) into the exe. See VENDORED.md.
+        #[cfg(any(feature = "opengl", skia_backend_wgpu, not(target_family = "windows")))]
         if let Some(ctx) = gr_context.as_mut() {
             ctx.flush(None);
         }
+        #[cfg(not(any(feature = "opengl", skia_backend_wgpu, not(target_family = "windows"))))]
+        let _ = &mut gr_context;
 
         dirty_region
     }
