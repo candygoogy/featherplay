@@ -2,11 +2,14 @@
 //! below 560 px the sidebar is a drawer from the top bar's menu button (Escape, a click
 //! outside and a pick close it, and the keys go into it and come back); below the room for
 //! the rail, the Up next panel and a page (952 px) Up next is a sheet above the bar; the bar
-//! gives up its groups in order and nothing in it overlaps, down to 360 px; where the
+//! gives up its groups in order (the title keeps its room) and nothing in it overlaps, down to
+//! 360 px; the wheel over it sets the volume, never scrolling the page; where the
 //! volume's slider doesn't fit, its button opens it in a popup.
 
 use std::ops::ControlFlow;
+use std::time::Duration;
 
+use featherplay::offscreen;
 use featherplay::snapshot::Scene;
 use featherplay::ui::{Frame, Nav, PageKind, Player, Theme};
 use i_slint_core::accessibility::AccessibleStringProperty;
@@ -229,8 +232,9 @@ fn the_bar_gives_up_its_groups_in_order_and_nothing_overlaps() {
     let elapsed = player.get_elapsed().to_string();
 
     for (width, shown, times) in [
-        (640, &groups[..], true),
-        (560, &["Volume"][..], true),
+        (640, &groups[..3], true),
+        (600, &["Not for me"][..], true),
+        (560, &[][..], true),
         (480, &[][..], false),
         (360, &[][..], false),
     ] {
@@ -295,6 +299,93 @@ fn the_bar_gives_up_its_groups_in_order_and_nothing_overlaps() {
             }
         }
     }
+}
+
+/// From where the bar squeezes (under about 666 px) to where it runs out of things to give
+/// up, the title keeps 112 px: the volume's button goes first, then the other groups.
+#[test]
+fn the_title_keeps_112_px_from_560_to_660_px() {
+    let scene = home(640);
+    let top = H as f32 - scene.ui.global::<Theme>().get_bar_clear();
+    let title = scene.ui.global::<Player>().get_title();
+    for width in [560, 580, 600, 620, 640, 660] {
+        resize(&scene, width);
+        let r = rect(&scene, &title, top).unwrap_or_else(|| panic!("{width} px: no title"));
+        assert!(
+            r[2] - r[0] >= 112.0,
+            "{width} px: the title has only {} px",
+            r[2] - r[0]
+        );
+    }
+}
+
+/// The window's rows `y0..y1`, as RGB.
+fn rows(scene: &Scene, y0: u32, y1: u32) -> Vec<[u8; 3]> {
+    let shot = scene.ui.window().take_snapshot().expect("snapshot");
+    let w = shot.width() as usize;
+    shot.as_slice()[y0 as usize * w..y1 as usize * w]
+        .iter()
+        .map(|p| [p.r, p.g, p.b])
+        .collect()
+}
+
+/// A wheel notch over the bar, here over its title, moves the volume one step at every
+/// width and doesn't scroll the page; where the bar has no slider, a level card shows above
+/// the bar while it changes.
+#[test]
+fn the_wheel_over_the_bar_sets_the_volume_and_leaves_the_page_still() {
+    let scene = home(480);
+    let top = H as f32 - scene.ui.global::<Theme>().get_bar_clear();
+    let player = scene.ui.global::<Player>();
+    player.set_volume_step(5);
+    player.set_volume(0.5);
+    let weak = scene.ui.as_weak();
+    player.on_set_volume(move |value, _| {
+        if let Some(ui) = weak.upgrade() {
+            ui.global::<Player>().set_volume(value.clamp(0.0, 1.0));
+        }
+    });
+    offscreen::freeze_clock();
+    let w = scene.ui.window();
+    let title = format!("Now playing: {}", player.get_title());
+    // The page above the bar and its fade, and the strip just above the bar.
+    let page = (120, top as u32 - 60);
+    let card = (top as u32 - 48, top as u32 - 4);
+    let mut volume = 0.5;
+    for width in [480, 560, 640, 800, 1280] {
+        resize(&scene, width);
+        let over = centre(rect(&scene, &title, top).expect("no title in the bar"));
+        let (still, bare) = (rows(&scene, page.0, page.1), rows(&scene, card.0, card.1));
+        offscreen::wheel(w, over, 1.0);
+        offscreen::advance(Duration::from_millis(500));
+        volume += 0.05;
+        let v = player.get_volume();
+        assert!(
+            (v - volume).abs() < 1e-4,
+            "{width} px: a notch up from {volume} made {v}"
+        );
+        assert!(
+            rows(&scene, page.0, page.1) == still,
+            "{width} px: the page scrolled"
+        );
+        // At 1280 px the slider shows its own value, in the bar.
+        if width < 1280 {
+            assert!(
+                rows(&scene, card.0, card.1) != bare,
+                "{width} px: no level shown"
+            );
+        }
+        offscreen::advance(Duration::from_secs(3));
+    }
+
+    // Over the page, the same notch scrolls it.
+    let still = rows(&scene, page.0, page.1);
+    offscreen::wheel(w, LogicalPosition::new(640.0, 400.0), -1.0);
+    offscreen::advance(Duration::from_millis(500));
+    assert!(
+        rows(&scene, page.0, page.1) != still,
+        "the page didn't scroll"
+    );
 }
 
 #[test]

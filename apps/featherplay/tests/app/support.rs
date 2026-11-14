@@ -280,6 +280,31 @@ pub fn sweep(w: &slint::Window, at: LogicalPosition) {
     }
 }
 
+/// The bar's volume slider, as left, top, right and bottom edges: the one visible "Volume"
+/// slider (found by its label: the wheel no longer tells, since all the bar takes it).
+pub fn volume_slider(ui: &AppWindow) -> [f32; 4] {
+    use i_slint_core::accessibility::AccessibleStringProperty;
+    use i_slint_core::item_tree::ItemRc;
+    use i_slint_core::items::AccessibleRole;
+    use i_slint_core::window::WindowInner;
+    let root = ItemRc::new_root(WindowInner::from_pub(ui.window()).component());
+    let mut found = None;
+    root.visit_descendants(|item| {
+        let slider = item.accessible_role() == AccessibleRole::Slider
+            && item
+                .accessible_string_property(AccessibleStringProperty::Label)
+                .is_some_and(|l| l == "Volume");
+        if slider && item.is_visible() {
+            let g = item.geometry();
+            let at = item.map_to_window(g.origin);
+            found = Some([at.x, at.y, at.x + g.width(), at.y + g.height()]);
+            return std::ops::ControlFlow::Break(());
+        }
+        std::ops::ControlFlow::Continue(())
+    });
+    found.expect("no volume slider")
+}
+
 /// The side panel at the right of a `width`-logical-px window: its left edge and width.
 pub fn panel(ui: &AppWindow, width: f32) -> (f32, f32) {
     let side = ui.global::<Theme>().get_nowplaying_side_w();

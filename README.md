@@ -352,7 +352,7 @@ Most of Pear's plugins are settings in featherplay. Plugin by plugin, as of toda
 | Notifications | **Built in.** Track-change notifications, off by default (Settings > Window). |
 | Custom Output Device | **Built in.** Pick the device in Settings > Sound; if it disappears, playback pauses and moves to the default one. |
 | Exponential Volume | **Built in.** The volume slider follows a perceptual curve. |
-| Precise Volume | **Built in**, as Volume step (Settings > Playback): 1, 2, 5 or 10 % for each turn of the mouse wheel or press of Up or Down. The volume shows above the slider while it changes. |
+| Precise Volume | **Built in**, as Volume step (Settings > Playback): 1, 2, 5 or 10 % for each turn of the mouse wheel over the player bar or press of Up or Down. The volume shows above the slider, or above the bar in a narrow window, while it changes. |
 | Disable Autoplay | **Built in.** featherplay restores your last session paused and never starts playing by itself. |
 | Video Toggle | **Built in.** Audio only, always, plus "Prefer song versions" (plays the song instead of its music video) and "Skip non-music in radio". |
 | Album Color Theme | **Built in**, and the default: the accent comes from the current cover (Settings > Window > Accent: From the cover, a fixed colour or a custom one). |

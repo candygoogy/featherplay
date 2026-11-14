@@ -8,8 +8,9 @@
 // transport, the mini player, the sleep timer, Lyrics, "Not for me" and the speed pill share
 // one tooltip (`BarTip`): the name, then the shortcut. Below 960 px the bar gives up the speed
 // pill, the volume's slider (to a popup from its button) and the extra buttons in turn
-// (`show-speed`); below about 630, Shuffle and Repeat (to the Up next sheet), Not for me, the
-// volume's button (to the sheet too) and the times (`show-order`).
+// (`show-speed`); below about 666, the volume's button (to the Up next sheet), then Shuffle and
+// Repeat (to the sheet too), Not for me and the times (`show-order`). The wheel anywhere over
+// the bar sets the volume, at every width.
 import { Theme, Icons, Curves } from "theme.slint";
 import { Body, Cover, IconButton, Icon, PlayButton } from "parts.slint";
 import { Player, Repeat } from "player.slint";
@@ -221,8 +222,9 @@ component VolumeSlider inherits Rectangle {
     // The wheel or the keys changed the volume and it isn't saved yet: `save` saves it a
     // second after the last change.
     property <bool> unsaved: false;
-    // The value shows: from a change until `rest` ends, and while the slider is pressed.
-    property <bool> changing: false;
+    // The value shows: from a change until `rest` ends, and while the slider is pressed. The
+    // bar shows it in its level card while the slider itself is hidden.
+    out property <bool> changing: false;
     property <bool> tip: root.changing || ta.pressed;
     // How long the value stays after the last change: long enough to read after a wheel
     // or key step, shorter after a drag, which showed it all along.
@@ -759,25 +761,28 @@ export component BottomBar inherits Rectangle {
     property <length> pill-w: speed-pill.width + 4px;
     // The volume's button alone, while it shows without its slider.
     property <length> knob-w: !root.show-volume && root.volume-button ? 36px : 0px;
+    // What the volume takes in the bar now: its slider, its button, or nothing.
+    property <length> volume-now: root.show-volume ? root.volume-w : root.knob-w;
     property <bool> show-extras: self.width - root.end-gap - root.core-w - 36px - root.extras-w >= root.fit-x;
     property <bool> show-volume: root.show-extras && self.width - root.end-gap - root.core-w - root.extras-w - root.volume-w >= root.fit-x;
     property <bool> show-speed: Player.speed != 2 && root.show-volume && self.width - root.end-gap - root.core-w - root.extras-w - root.volume-w - root.pill-w >= root.fit-x;
-    // Narrower still (a window under about 630 px), more go, each once keeping it would leave
-    // the title under 80 px or the middle column under its least, in this order: Shuffle and
-    // Repeat (the Up next sheet holds them then, and the Up next button wears a dot while
-    // either is on), Not for me (Now playing and the song menu have it), the volume's button
-    // (the sheet has a volume row then), then the times: the seek line runs along the bar's
-    // foot, and its tooltip tells the time. The middle column's least is the whole transport
-    // (240 px) while it has Shuffle and Repeat, then a 200 px time row (an 88 px line).
-    // `title-room`: the cover, the title's 80 px and the 16 px before the middle column;
-    // `narrow-r`: the right-hand group with Not for me, like, the volume's button and Up next.
-    property <length> title-room: 84px + 80px + 16px;
-    property <length> narrow-r: root.end-gap + 4 * 36px + 3 * 4px;
+    // Narrower still (a window under about 666 px, `squeezed`), the middle column keeps to its
+    // least and the title takes the rest, 112 px at least while anything is left to give up.
+    // First the volume's button goes: the wheel over the bar, Up and Down and a row in the Up
+    // next sheet still set the volume. Then, each once keeping it would leave the title under
+    // 112 px: Shuffle and Repeat (the sheet holds them, and the Up next button wears a dot
+    // while either is on), Not for me (Now playing and the song menu have it), then the
+    // times: the seek line runs along the bar's foot, and its tooltip tells the time. The
+    // middle column's least is the whole transport (240 px) while it has Shuffle and Repeat,
+    // then a 200 px time row (an 88 px line).
+    // `title-room`: the cover, the title's 112 px and the 16 px before the middle column;
+    // `narrow-r`: the right-hand group with Not for me, like and Up next.
+    property <length> title-room: 84px + 112px + 16px;
+    property <length> narrow-r: root.end-gap + 3 * 36px + 2 * 4px;
+    out property <bool> volume-button: !root.squeezed;
     out property <bool> show-order: self.width - root.narrow-r - 12px - 240px - root.title-room >= 0;
     property <bool> show-dislike: root.show-order || self.width - root.narrow-r - 12px - 200px - root.title-room >= 0;
-    out property <bool> volume-button: root.show-dislike || self.width - (root.narrow-r - 36px) - 12px - 200px - root.title-room >= 0;
-    // Not for me's slot and the volume's keep their 4 px gaps once empty: each frees 36 px.
-    out property <bool> show-times: root.volume-button || self.width - (root.narrow-r - 72px) - 12px - 200px - root.title-room >= 0;
+    out property <bool> show-times: root.show-dislike || self.width - (root.narrow-r - 40px) - 12px - 200px - root.title-room >= 0;
     // The sheet holds what the bar gave up (`Frame`, for the sheet and Rust).
     init => {
         Frame.order-in-sheet = !root.show-order;
@@ -794,9 +799,10 @@ export component BottomBar inherits Rectangle {
     }
     // Where the volume popup centres (in the bar): on the button, just left of Up next.
     out property <length> volume-centre: actions.x + actions.width - 36px - 4px - 18px;
-    // Even the core buttons leave too little: the title shortens past 80 px, and the time row
-    // to the transport's width.
-    property <bool> squeezed: self.width - root.end-gap - root.core-w - root.knob-w < root.fit-x;
+    // Even the core buttons and the volume's button leave too little for the title's 80 px and
+    // a 280 px time row: the time row narrows to the transport's width, and the title takes
+    // the rest.
+    property <bool> squeezed: self.width - root.end-gap - root.core-w - 36px < root.fit-x;
     // The middle column (the transport, the time and the line), and what's left either side
     // for the title: it stays clear of the buttons on the right at the narrowest window.
     // The speed pill, while it shows, sits just left of the right-hand group, which then
@@ -829,9 +835,11 @@ export component BottomBar inherits Rectangle {
     // right-hand group (the narrowest windows with the speed pill, or Linux's mini player
     // button, or a bar that gave groups up), then shifted left to stay 12 px clear of it; and
     // no further left than the title's 80 px, 16 px before it, while there's room for that.
-    // Narrow, it sits 12 px from the right-hand group, and the title takes the rest.
+    // Narrow, it sits 12 px from the right-hand group, and the title takes the rest; without
+    // the times, 24 px, twice the transport's own gaps, so the two read as two groups (down
+    // to 12 px, where the window is too narrow for a title and that would reach the cover).
     property <length> middle-w: max(root.center-w, root.transport-w);
-    property <length> middle-x: !root.show-times || root.squeezed ? root.anchor - 12px - root.middle-w : min(max((self.width - root.middle-w) / 2, 180px), root.anchor - 12px - root.middle-w);
+    property <length> middle-x: !root.show-times ? max(root.anchor - 24px - root.middle-w, min(root.anchor - 12px - root.middle-w, 84px)) : (root.squeezed ? root.anchor - 12px - root.middle-w : min(max((self.width - root.middle-w) / 2, 180px), root.anchor - 12px - root.middle-w));
     property <length> left-w: max(root.squeezed ? 0px : 80px, root.middle-x + (root.middle-w - root.center-w) / 2 - 100px);
     // The title and the artist show while they have a word's room.
     property <bool> titled: root.left-w >= 32px;
@@ -839,8 +847,12 @@ export component BottomBar inherits Rectangle {
     // either side while they show; its left edge, centred over the time row.
     property <length> transport-w: transport.preferred-width + (root.show-order ? 2 * (36px + 12px) : 0px);
     property <length> transport-x: root.middle-x + (root.middle-w - root.transport-w) / 2;
-    // The transport row, and the time row under it.
+    // The transport row, and the time row under it. Without the times, Previous, play and Next
+    // (`row-y`) and the right-hand group (`actions-y`) come down onto the cover's middle, one
+    // row above the seek line; what shows only with the times keeps the fixed places.
     property <length> transport-y: 8px;
+    property <length> row-y: root.show-times ? root.transport-y : 14px;
+    property <length> actions-y: root.show-times ? (root.height - 36px) / 2 : 20px;
     property <length> time-y: 60px;
     property <length> time-x: root.middle-x + (root.middle-w - root.center-w) / 2;
     height: Theme.bar-h;
@@ -852,6 +864,19 @@ export component BottomBar inherits Rectangle {
     drop-shadow-offset-y: 4px;
     drop-shadow-color: Theme.cover-shadow;
     animate background { duration: Theme.t-colour; }
+
+    // The wheel over the bar sets the volume, as over the slider, wherever nothing in the bar
+    // takes the wheel itself (the slider and the volume's button do the same), and never
+    // scrolls the page under the bar. At every width: below the slider's room it's the
+    // quickest way to the volume.
+    TouchArea {
+        scroll-event(e) => {
+            if e.delta-y != 0 {
+                volume.wheel(e.delta-y);
+            }
+            accept
+        }
+    }
 
     // Cover, title and artist: open Now playing (or close it).
     // Without the times it ends above the seek line along the foot; without the title, at
@@ -981,13 +1006,13 @@ export component BottomBar inherits Rectangle {
     }
     transport := HorizontalLayout {
         x: root.transport-x + (root.show-order ? 36px + 12px : 0px);
-        y: root.transport-y;
+        y: root.row-y;
         height: Theme.play-size;
         width: self.preferred-width;
         spacing: 12px;
         TransportButton {
             y: (Theme.play-size - self.height) / 2;
-            above: root.transport-y + self.y + Theme.s2;
+            above: root.row-y + self.y + Theme.s2;
             icon: Icons.prev;
             label: @tr("Previous");
             tip: self.label;
@@ -997,11 +1022,11 @@ export component BottomBar inherits Rectangle {
             clicked => { Player.previous(); }
         }
         BarPlayButton {
-            above: root.transport-y + Theme.s2;
+            above: root.row-y + Theme.s2;
         }
         TransportButton {
             y: (Theme.play-size - self.height) / 2;
-            above: root.transport-y + self.y + Theme.s2;
+            above: root.row-y + self.y + Theme.s2;
             icon: Icons.next;
             label: @tr("Next");
             tip: self.label;
@@ -1062,6 +1087,38 @@ export component BottomBar inherits Rectangle {
         font-weight: 600;
     }
 
+    // The volume while the wheel over the bar, or Up or Down, changes it and the bar has no
+    // slider to show it: a small card `s2` above the bar, over the volume's button, or at
+    // the bar's right end by Up next, whose sheet holds the volume then. It shows while the
+    // slider's own value would (`VolumeSlider.changing`), without a fade (the exe's room).
+    Rectangle {
+        property <length> anchor: root.volume-button ? root.volume-centre : actions.x + actions.width - 18px;
+        x: min(self.anchor - self.width / 2, root.width - self.width);
+        y: -Theme.s2 - self.height;
+        width: 76px;
+        height: 32px;
+        border-radius: Theme.r-s;
+        background: Theme.card;
+        drop-shadow-blur: 8px;
+        drop-shadow-color: Theme.cover-shadow;
+        visible: volume.changing && !root.show-volume;
+        Icon {
+            x: 10px;
+            width: 16px;
+            height: 16px;
+            commands: Icons.volume;
+        }
+        Body {
+            x: 32px;
+            width: 34px;
+            text: @tr("{} %", round(Player.volume * 100));
+            font-size: Theme.t-meta;
+            font-weight: 600;
+            color: Theme.text1;
+            vertical-alignment: center;
+        }
+    }
+
     speed-pill := SpeedPill {
         x: actions.x - self.width - 4px;
         y: actions.y;
@@ -1071,7 +1128,7 @@ export component BottomBar inherits Rectangle {
 
     actions := HorizontalLayout {
         x: parent.width - self.width - root.end-gap;
-        y: (parent.height - 36px) / 2;
+        y: root.actions-y;
         height: 36px;
         width: self.preferred-width;
         spacing: 4px;
@@ -1096,22 +1153,29 @@ export component BottomBar inherits Rectangle {
             if LyricsData.on && root.show-extras: LyricsButton {
                 above: (Theme.bar-h - 36px) / 2 + Theme.s2;
             }
-            // Gone, it keeps its 4 px gap, as the volume's slot does.
+            // Not for me and like, 4 px apart; gone, Not for me takes its gap with it.
             Rectangle {
-                width: root.show-dislike ? 36px : 0px;
-                visible: root.show-dislike;
-                NotForMeButton {
-                    above: (Theme.bar-h - 36px) / 2 + Theme.s2;
+                width: root.show-dislike ? 76px : 36px;
+                Rectangle {
+                    x: 0;
+                    width: 36px;
+                    visible: root.show-dislike;
+                    NotForMeButton {
+                        above: (Theme.bar-h - 36px) / 2 + Theme.s2;
+                    }
+                }
+                LikeButton {
+                    x: parent.width - 36px;
                 }
             }
-            LikeButton { }
-            // The volume, its button and slider, with the gap before Up next; where the
-            // slider doesn't fit, its button alone, which opens it in a popup. No width and
-            // hidden once the bar has no room even for the button, but kept (not an `if`), so
-            // Up and Down still step it.
+            // The volume, its button and slider, then Up next; where the slider doesn't fit, its
+            // button alone, which opens it in a popup. Once the bar has no room even for the
+            // button, hidden with its gap, but kept (not an `if`), so Up and Down and the wheel
+            // over the bar still step it.
             Rectangle {
-                width: root.show-volume ? root.volume-w : root.knob-w;
+                width: root.volume-now + (root.volume-now > 0 ? 4px : 0px) + 36px;
                 Rectangle {
+                    x: 0;
                     width: root.volume-w;
                     visible: root.show-volume;
                     HorizontalLayout {
@@ -1128,52 +1192,55 @@ export component BottomBar inherits Rectangle {
                     }
                 }
                 Rectangle {
+                    x: 0;
+                    width: 36px;
                     visible: root.knob-w > 0;
                     VolumeButton {
                         above: (Theme.bar-h - 36px) / 2 + Theme.s2;
                         wheel(dy) => { volume.wheel(dy); }
                     }
                 }
-            }
-            Rectangle {
-                width: 36px;
-                height: 36px;
-                IconButton {
-                    icon: Icons.queue;
-                    label: @tr("Up next");
-                    description: root.order-mark ? @tr("Shuffle or repeat is on") : "";
-                    // In a window too narrow for a side panel, it opens and closes the Up next
-                    // sheet. Otherwise, on Now playing it shows and hides the page's own side
-                    // panel; elsewhere the frame's Up next panel. Each keeps its own state.
-                    active: Frame.sheet ? Frame.sheet-open : (Frame.full-page ? Frame.side-open : Frame.queue-open);
-                    // The open panel shows the state; a circle here, lit all the time on Now
-                    // playing (its side panel is open by default), only looked stuck.
-                    circle: false;
-                    clicked => {
-                        if Frame.sheet {
-                            Frame.sheet-open = !Frame.sheet-open;
-                        } else if Frame.full-page {
-                            Frame.side-open = !Frame.side-open;
-                            Frame.side-toggled(Frame.side-open);
-                        } else {
-                            Frame.queue-open = !Frame.queue-open;
-                            Frame.queue-toggled(Frame.queue-open);
+                Rectangle {
+                    x: parent.width - 36px;
+                    width: 36px;
+                    height: 36px;
+                    IconButton {
+                        icon: Icons.queue;
+                        label: @tr("Up next");
+                        description: root.order-mark ? @tr("Shuffle or repeat is on") : "";
+                        // In a window too narrow for a side panel, it opens and closes the Up next
+                        // sheet. Otherwise, on Now playing it shows and hides the page's own side
+                        // panel; elsewhere the frame's Up next panel. Each keeps its own state.
+                        active: Frame.sheet ? Frame.sheet-open : (Frame.full-page ? Frame.side-open : Frame.queue-open);
+                        // The open panel shows the state; a circle here, lit all the time on Now
+                        // playing (its side panel is open by default), only looked stuck.
+                        circle: false;
+                        clicked => {
+                            if Frame.sheet {
+                                Frame.sheet-open = !Frame.sheet-open;
+                            } else if Frame.full-page {
+                                Frame.side-open = !Frame.side-open;
+                                Frame.side-toggled(Frame.side-open);
+                            } else {
+                                Frame.queue-open = !Frame.queue-open;
+                                Frame.queue-toggled(Frame.queue-open);
+                            }
                         }
                     }
-                }
-                // Shuffle or repeat is on while the sheet holds their toggles: a dot in the
-                // accent at the glyph's upper right, ringed in the bar's colour so it stands
-                // clear of the glyph's stroke.
-                Rectangle {
-                    x: 24px;
-                    y: 4px;
-                    width: 9px;
-                    height: 9px;
-                    border-radius: self.width / 2;
-                    border-width: 1.5px;
-                    border-color: Theme.bar;
-                    background: Theme.accent;
-                    visible: root.order-mark;
+                    // Shuffle or repeat is on while the sheet holds their toggles: a dot in the
+                    // accent at the glyph's upper right, ringed in the bar's colour so it stands
+                    // clear of the glyph's stroke.
+                    Rectangle {
+                        x: 24px;
+                        y: 4px;
+                        width: 9px;
+                        height: 9px;
+                        border-radius: self.width / 2;
+                        border-width: 1.5px;
+                        border-color: Theme.bar;
+                        background: Theme.accent;
+                        visible: root.order-mark;
+                    }
                 }
             }
         }

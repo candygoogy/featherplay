@@ -12,6 +12,8 @@ use featherplay::ui::Player;
 use slint::platform::WindowEvent;
 use slint::{ComponentHandle, LogicalPosition};
 
+use crate::support::volume_slider;
+
 type Calls = Rc<RefCell<Vec<(f32, bool)>>>;
 
 /// Records `set-volume` calls and applies them, as `bar.rs` does.
@@ -31,20 +33,18 @@ fn record(scene: &Scene) -> Calls {
     calls
 }
 
-/// The slider, found by trying a notch along the bar's right side.
+/// A point near the slider's top left, where one notch has just gone.
 fn slider(scene: &Scene, calls: &Calls) -> LogicalPosition {
     let w = scene.ui.window();
-    for y in (700..800).step_by(4) {
-        for x in (800..1280).step_by(6) {
-            let at = LogicalPosition::new(x as f32, y as f32);
-            w.dispatch_event(WindowEvent::PointerMoved { position: at });
-            offscreen::wheel(w, at, 1.0);
-            if !calls.borrow().is_empty() {
-                return at;
-            }
-        }
-    }
-    panic!("no volume slider took the wheel");
+    let r = volume_slider(&scene.ui);
+    let at = LogicalPosition::new(r[0] + 2.0, r[1] + 2.0);
+    w.dispatch_event(WindowEvent::PointerMoved { position: at });
+    offscreen::wheel(w, at, 1.0);
+    assert!(
+        !calls.borrow().is_empty(),
+        "the slider didn't take the wheel"
+    );
+    at
 }
 
 #[test]

@@ -10,15 +10,19 @@ Notable changes to featherplay, newest first. The format follows
 
 - **A narrow window.** The window now narrows to 480 px, thin enough to sit beside other work
   or in a third of a large screen. Below 560 px the sidebar steps aside for a menu button
-  beside search, which opens it over the page; Escape, a click outside it or picking a page
-  closes it, and it works from the keyboard (arrows or Tab, Enter, Escape). Where Up next no
-  longer fits beside the page (under 952 px), the bar's Up next button opens it as a sheet
+  beside search, which opens it over the dimmed page; Escape, a click outside it or picking a
+  page closes it, and it works from the keyboard (arrows or Tab, Enter, Escape). Where Up next
+  no longer fits beside the page (under 952 px), the bar's Up next button opens it as a sheet
   above the bar, with the same tabs, on Now playing too. The player bar keeps the volume at
-  every width: a button that opens the slider in a popup where the slider doesn't fit, then a
-  row in the Up next sheet. Narrower still, Shuffle and Repeat move into the sheet (the Up next
-  button wears a small dot while either is on), then Not for me and the times go, and the
-  seek line runs the bar's full width. Nothing overlaps even in a window a tiling window
-  manager makes narrower than 480 px.
+  every width: a button that opens the slider in a popup where the slider doesn't fit, then,
+  below about 660 px, a row in the Up next sheet, so the song's title keeps its room. Narrower
+  still, Shuffle and Repeat move into the sheet (the Up next button wears a small dot while
+  either is on), then Not for me and the times go, and the seek line runs the bar's full width
+  under one row: the cover, the title, the transport, Like and Up next. Nothing overlaps even
+  in a window a tiling window manager makes narrower than 480 px.
+- **The mouse wheel over the player bar sets the volume**, at any width and anywhere on the
+  bar, one Volume step a notch, without scrolling the page. Where the bar has no slider, a
+  small card above it shows the level while it changes.
 - **The window opens where you left it.** featherplay remembers the main window's size,
   position and whether it was maximised, and opens that way the next time, also when it
   starts in the tray and is shown later. The size keeps its look across a change of display

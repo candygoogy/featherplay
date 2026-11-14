@@ -10,6 +10,8 @@ use featherplay::ui::{Frame, Player, Theme};
 use slint::platform::WindowEvent;
 use slint::{ComponentHandle, LogicalPosition};
 
+use crate::support::volume_slider;
+
 /// Whether the slider took a wheel notch at `at` (it calls `set-volume`).
 fn takes_wheel(scene: &Scene, calls: &Rc<RefCell<usize>>, at: LogicalPosition) -> bool {
     let before = *calls.borrow();
@@ -45,24 +47,9 @@ fn the_slider_stays_lit_while_the_wheel_holds_the_hover() {
     player.on_set_volume(move |_, _| *seen.borrow_mut() += 1);
     let w = scene.ui.window();
 
-    // The slider's left edge and its vertical extent, by trying notches.
-    let mut found = None;
-    'scan: for y in (700..800).step_by(4) {
-        for x in (800..1280).step_by(6) {
-            let at = LogicalPosition::new(x as f32, y as f32);
-            w.dispatch_event(WindowEvent::PointerMoved { position: at });
-            if takes_wheel(&scene, &calls, at) {
-                found = Some(at);
-                break 'scan;
-            }
-        }
-    }
-    let top = found.expect("no volume slider took the wheel");
-    let mut bottom = top.y;
-    while takes_wheel(&scene, &calls, LogicalPosition::new(top.x, bottom + 1.0)) {
-        bottom += 1.0;
-    }
-    let fill = LogicalPosition::new(top.x + 3.0, ((top.y + bottom) / 2.0).round());
+    // On the slider's fill, at its left end and half way down.
+    let r = volume_slider(&scene.ui);
+    let fill = LogicalPosition::new(r[0] + 3.0, ((r[1] + r[3]) / 2.0).round());
 
     w.dispatch_event(WindowEvent::PointerMoved { position: fill });
     scene.settle();
