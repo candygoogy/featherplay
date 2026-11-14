@@ -46,6 +46,10 @@ export component NotForMeButton inherits Rectangle {
     in property <float> fade: 1.0;
     // The target's side: the bar's 36 px, or Now playing's 40.
     in property <length> size: 36px;
+    // The glyph's colours, rated and not: Now playing's stacked header gives the lyrics
+    // panel's inks.
+    in property <color> ink: Theme.text1;
+    in property <color> quiet: Theme.text2;
     width: btn.width;
     height: btn.height;
     btn := IconButton {
@@ -57,7 +61,7 @@ export component NotForMeButton inherits Rectangle {
         filled: Player.disliked;
         label: Player.disliked ? @tr("Remove dislike") : @tr("Not for me");
         description: Player.disliked ? @tr("Tells YouTube Music you no longer dislike the song") : @tr("Skips the song and tells YouTube Music you dislike it");
-        tint: Player.disliked ? Theme.text1 : Theme.text2;
+        tint: Player.disliked ? root.ink : root.quiet;
         enabled: Player.has-track;
         fade: root.fade;
         clicked => {
