@@ -979,6 +979,12 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
         }
         settle();
     }
+    // A frame makes the lists' rows, and Up next asks for the covers of the rows it shows
+    // as they're made: they come in before the picture is taken.
+    window
+        .take_snapshot()
+        .map_err(|e| format!("take_snapshot: {e}"))?;
+    settle();
     offscreen::snapshot(window, width, height, &o.out)?;
     println!(
         "wrote {} ({}x{}, {} ms)",
