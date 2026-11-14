@@ -63,7 +63,9 @@ which fails if the binary is over 34 MB or needs a glibc newer than 2.35), and c
 - `featherplay-x86_64.tar.gz` and `featherplay-x86_64.tar.gz.sha256` (Linux)
 - `featherplay-aarch64.AppImage` and `featherplay-aarch64.AppImage.sha256` (Linux, ARM64)
 - `featherplay-aarch64.tar.gz` and `featherplay-aarch64.tar.gz.sha256` (Linux, ARM64)
-- `SHA256SUMS.txt`, covering all eight and `THIRD_PARTY.md`
+- `featherplay-x86_64.AppImage.zsync`, for AppImageUpdate (the AppImage's update information points to it)
+- `featherplay-aarch64.AppImage.zsync`, the same for the ARM64 AppImage
+- `SHA256SUMS.txt`, covering all eight, the two `.zsync` files and `THIRD_PARTY.md`
 - `THIRD_PARTY.md`
 
 Its signature, `SHA256SUMS.txt.minisig`, comes from your PC in step 4.

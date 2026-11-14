@@ -2,6 +2,8 @@
 # Builds featherplay's Linux release files from the release binary, for this machine's
 # architecture (`uname -m`: x86_64, or aarch64):
 #   target/linux/featherplay-<arch>.AppImage   updates itself (crates/controller/src/updates/install.rs)
+#   target/linux/featherplay-<arch>.AppImage.zsync  for AppImageUpdate, which the AppImage's
+#                                              update information points to
 #   target/linux/featherplay-<arch>.tar.gz     the same files as a plain archive; only told of updates
 # Both hold the binary, the desktop entry, the icons (the hicolor PNGs build.rs renders, and
 # the SVG), the AppStream metadata, LICENSE and THIRD_PARTY.md (the AppImage under
@@ -220,11 +222,20 @@ cp "$stage/share/applications/$app_id.desktop" "$appdir/"
 cp "$stage/share/icons/hicolor/256x256/apps/$app_id.png" "$appdir/"
 ln -s "$app_id.png" "$appdir/.DirIcon"
 image=$out/featherplay-$arch.AppImage
-rm -f "$image"
-# No update information: the app updates itself from the signed release.
+zsync=$(basename "$image").zsync
+rm -f "$image" "$image.zsync" "$zsync"
+# The app updates itself from the signed release. The update information and the .zsync
+# file (made by the zsyncmake appimagetool bundles) are for AppImageUpdate and the tools
+# built on it: they fetch the latest release's featherplay-<arch>.AppImage.zsync, then
+# only the blocks of the AppImage beside it that changed. appimagetool writes the .zsync
+# into the current directory.
 APPIMAGE_EXTRACT_AND_RUN=1 ARCH=$arch VERSION=$version \
-    "$appimagetool" --no-appstream --runtime-file "$runtime" "$appdir" "$image"
+    "$appimagetool" --no-appstream --runtime-file "$runtime" \
+    -u "gh-releases-zsync|candygoogy|featherplay|latest|$zsync" \
+    "$appdir" "$image"
 chmod 755 "$image"
+[ -f "$zsync" ] || die "appimagetool made no $zsync"
+mv "$zsync" "$image.zsync"
 
 # The archive: featherplay/ with the binary, share/, and the notes.
 tree=$out/tar/featherplay
@@ -236,4 +247,4 @@ install -m 644 packaging/linux/README.txt LICENSE THIRD_PARTY.md "$tree/"
 archive=$out/featherplay-$arch.tar.gz
 tar -C "$out/tar" --owner=0 --group=0 --numeric-owner -czf "$archive" featherplay
 
-ls -l "$image" "$archive"
+ls -l "$image" "$image.zsync" "$archive"

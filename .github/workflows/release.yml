@@ -36,6 +36,8 @@ name: Release
 #   featherplay-aarch64.AppImage             Linux, aarch64 (experimental, tested automatically
 #   featherplay-aarch64.tar.gz               only: CI's ARM64 runner, never by hand)
 #   <each of the above>.sha256               its `sha256sum` line (Scoop's autoupdate reads featherplay.exe.sha256)
+#   featherplay-<arch>.AppImage.zsync        for AppImageUpdate, which each AppImage's update
+#                                            information points to (x86_64 and aarch64)
 #   SHA256SUMS.txt                           all of them, plus THIRD_PARTY.md: `sha256sum -c SHA256SUMS.txt`
 #   THIRD_PARTY.md                           the licence notices, which a portable exe needs beside it
 # The release notes list each file's SHA256 as well. One more file is added by hand, never
@@ -352,6 +354,7 @@ jobs:
           name: featherplay-linux-${{ matrix.arch }}
           path: |
             target/linux/featherplay-${{ matrix.arch }}.AppImage
+            target/linux/featherplay-${{ matrix.arch }}.AppImage.zsync
             target/linux/featherplay-${{ matrix.arch }}.tar.gz
           if-no-files-found: error
           retention-days: 7
@@ -459,7 +462,7 @@ jobs:
           name: featherplay-arm64-exe
           path: target/aarch64-pc-windows-msvc/release
 
-      # Every architecture's AppImage and .tar.gz, from build-linux.
+      # Every architecture's AppImage, .zsync and .tar.gz, from build-linux.
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: featherplay-linux-*
@@ -501,24 +504,28 @@ jobs:
           cp target/release/featherplay.exe dist/
           cp "$ARM64_EXE" dist/featherplay-arm64.exe
           cp "target/installer/$setup" "target/installer/$setup_arm64" dist/
-          cp target/linux/featherplay-*.AppImage target/linux/featherplay-*.tar.gz dist/
+          cp target/linux/featherplay-*.AppImage target/linux/featherplay-*.AppImage.zsync \
+            target/linux/featherplay-*.tar.gz dist/
           cp THIRD_PARTY.md dist/
           cd dist
           linux=()
+          zsync=()
           for arch in x86_64 aarch64; do
-            for f in "featherplay-$arch.AppImage" "featherplay-$arch.tar.gz"; do
+            for f in "featherplay-$arch.AppImage" "featherplay-$arch.tar.gz" "featherplay-$arch.AppImage.zsync"; do
               if [ ! -f "$f" ]; then
                 echo "::error::build-linux's $f is missing"
                 exit 1
               fi
-              linux+=("$f")
             done
+            linux+=("featherplay-$arch.AppImage" "featherplay-$arch.tar.gz")
+            zsync+=("featherplay-$arch.AppImage.zsync")
           done
           files=(featherplay.exe "$setup" featherplay-arm64.exe "$setup_arm64" "${linux[@]}")
           for f in "${files[@]}"; do
             sha256sum "$f" > "$f.sha256"
           done
-          sha256sum "${files[@]}" THIRD_PARTY.md > SHA256SUMS.txt
+          # The .zsync files are in SHA256SUMS.txt but get no .sha256 of their own.
+          sha256sum "${files[@]}" "${zsync[@]}" THIRD_PARTY.md > SHA256SUMS.txt
           cat SHA256SUMS.txt
 
       - name: Release notes
@@ -586,6 +593,7 @@ jobs:
           for f in dist/featherplay-*.AppImage dist/featherplay-*.tar.gz; do
             linux+=("$f" "$f.sha256")
           done
+          linux+=(dist/featherplay-*.AppImage.zsync)
           gh release create "$GITHUB_REF_NAME" \
             "dist/featherplay.exe" "dist/featherplay.exe.sha256" \
             "dist/$setup" "dist/$setup.sha256" \
