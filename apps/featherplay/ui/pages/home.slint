@@ -75,33 +75,44 @@ export global Shapes {
 }
 
 // Home's rails. A tile has one width whatever the page's (200 px, a video 300); a rail holds
-// as many as fit, and the next one shows cut off at the page's edge. Covers are fetched at a
-// tile's width (`shelves.rs::cover_px`).
+// as many as fit, and the next one shows cut off at the page's edge. Only a page too narrow
+// for two whole tiles (a video: most of one) shrinks them to fit. Covers are fetched at a
+// tile's width at most (`shelves.rs::cover_px`).
 export global Rails {
     out property <length> head-h: 48px;
     // The gap between the band and the rails, and between rails.
     out property <length> gap: Theme.s6;
-    // Quick picks: columns of two rows, as many 380 px columns as fit.
+    // Quick picks: columns of two rows, as many 380 px columns as fit. A page too narrow for
+    // a column and a good part of the next shows one column its whole width.
     out property <int> grid-rows: 2;
     out property <length> grid-col: 380px;
+    out property <length> grid-peek: 80px;
     // A community playlist's avatar badge (`home.rs::BADGE`), its ring included.
     out property <length> badge: 32px;
-    public pure function tile-w(s: ShelfShape) -> length {
-        return s == ShelfShape.videos ? 300px : 200px;
+    public pure function tile-w(s: ShelfShape, w: length) -> length {
+        // Two whole tiles and a sliver of the third past the padding (a gap's worth).
+        return s == ShelfShape.videos ? min(300px, floor(w * 0.8 / 1px) * 1px) : min(200px, floor((w - 2 * Theme.card-gap) / 2 / 1px) * 1px);
     }
     // Whole tiles in `w` (paging moves by these).
     public pure function per-row(s: ShelfShape, w: length) -> int {
-        return max(1, floor((w + Theme.card-gap) / (Rails.tile-w(s) + Theme.card-gap)));
+        return max(1, floor((w + Theme.card-gap) / (Rails.tile-w(s, w) + Theme.card-gap)));
     }
-    public pure function art-h(s: ShelfShape) -> length {
-        return s == ShelfShape.videos ? round(Rails.tile-w(s) * 9 / 16 / 1px) * 1px : Rails.tile-w(s);
+    public pure function art-h(s: ShelfShape, w: length) -> length {
+        return s == ShelfShape.videos ? round(Rails.tile-w(s, w) * 9 / 16 / 1px) * 1px : Rails.tile-w(s, w);
     }
     // A shelf's height with its heading.
-    public pure function height(s: ShelfShape) -> length {
+    public pure function height(s: ShelfShape, w: length) -> length {
         if s == ShelfShape.songs {
             return root.head-h + root.grid-rows * Theme.row-h;
         }
-        return root.head-h + Rails.art-h(s) + Theme.card-text-gap + (s == ShelfShape.artists ? 24px : 40px);
+        return root.head-h + Rails.art-h(s, w) + Theme.card-text-gap + (s == ShelfShape.artists ? 24px : 40px);
+    }
+    // Quick picks' whole columns in `w`, and a column's width.
+    public pure function grid-per-page(w: length) -> int {
+        return max(1, floor((w + Theme.card-gap) / (root.grid-col + Theme.card-gap)));
+    }
+    public pure function grid-col-w(w: length) -> length {
+        return Rails.grid-per-page(w) == 1 && w < root.grid-col + Theme.card-gap + root.grid-peek ? w : min(root.grid-col, floor((w - (Rails.grid-per-page(w) - 1) * Theme.card-gap) / Rails.grid-per-page(w) / 1px) * 1px);
     }
 }
 
@@ -254,7 +265,7 @@ component TileShelf inherits Rectangle {
     in property <bool> in-sight: true;
     property <ShelfShape> shape: root.shelf.shape;
     property <int> per-row: Rails.per-row(root.shape, root.width);
-    property <length> tile-w: Rails.tile-w(root.shape);
+    property <length> tile-w: Rails.tile-w(root.shape, root.width);
     // Whole tiles and the one cut off at the edge.
     property <int> in-view: ceil((root.width + root.bleed + Theme.card-gap) / (root.tile-w + Theme.card-gap));
     property <int> first: 0;
@@ -278,7 +289,7 @@ component TileShelf inherits Rectangle {
             root.warmed = root.warm >= max(1, root.in-view);
         }
     }
-    height: Rails.height(root.shape);
+    height: Rails.height(root.shape, root.width);
     hover := TouchArea {
         // One clip for the heading and the tiles: as the page scrolls, a shelf adds its two
         // rectangles (where it was and where it is) to the frame's damage, not its heading's
@@ -315,7 +326,7 @@ component TileShelf inherits Rectangle {
                 }
                 if it.id != "LM": Card {
                     size: root.tile-w;
-                    art-h: Rails.art-h(root.shape);
+                    art-h: Rails.art-h(root.shape, root.width);
                     subtitle: root.shape != ShelfShape.artists;
                     item: it;
                     playable: true;
@@ -327,7 +338,7 @@ component TileShelf inherits Rectangle {
                     // takes the bottom-right). A ring of the ground keeps it apart from the art.
                     if i < root.shelf.badges.length && root.shelf.badges[i].width > 0: Rectangle {
                         x: Theme.s2;
-                        y: Rails.art-h(root.shape) - self.height - Theme.s2;
+                        y: Rails.art-h(root.shape, root.width) - self.height - Theme.s2;
                         width: Rails.badge;
                         height: Rails.badge;
                         border-radius: self.width / 2;
@@ -360,15 +371,15 @@ component SongGrid inherits Rectangle {
     in property <HomeShelfRow> shelf;
     in property <length> bleed;
     property <int> rows: Rails.grid-rows;
-    property <int> per-page: max(2, floor((root.width + Theme.card-gap) / (Rails.grid-col + Theme.card-gap)));
+    property <int> per-page: Rails.grid-per-page(root.width);
     property <int> columns: ceil(root.shelf.songs.length / root.rows);
-    property <length> col-w: min(Rails.grid-col, floor((root.width - (root.per-page - 1) * Theme.card-gap) / root.per-page / 1px) * 1px);
+    property <length> col-w: Rails.grid-col-w(root.width);
     // The first column shown (`FeedShelf` reads it).
     in-out property <int> first: 0;
     property <float> at: root.first;
     animate at { duration: Theme.moving ? Theme.t-panel + 40ms : 0ms; easing: Curves.ease-in-out; }
     property <int> last-first: max(0, root.columns - root.per-page);
-    height: Rails.height(ShelfShape.songs);
+    height: Rails.height(ShelfShape.songs, root.width);
     hover := TouchArea {
         // One clip for the heading and the rows, as `TileShelf` has. The rows' hover tiles
         // reach 8 px past the column on both sides.
@@ -412,33 +423,40 @@ component SongGrid inherits Rectangle {
 component HomeSkeleton inherits Skeleton {
     in property <bool> band;
     in property <length> bleed;
-    property <length> rail-y: root.band ? BandSizes.height + Rails.gap : 0px;
-    property <length> tile: Rails.tile-w(ShelfShape.cards);
+    // The band's shape at this width: the narrow band's in a narrow page.
+    property <bool> narrow: BandSizes.narrow(root.width);
+    property <length> band-pad: root.narrow ? BandSizes.narrow-pad : BandSizes.pad;
+    property <length> band-cover: root.narrow ? BandSizes.narrow-cover : BandSizes.cover;
+    property <length> band-text-x: root.narrow ? root.band-pad + root.band-cover + Theme.s4 : BandSizes.text-x;
+    property <length> rail-y: root.band ? BandSizes.height-for(root.width) + Rails.gap : 0px;
+    property <length> tile: Rails.tile-w(ShelfShape.cards, root.width);
     property <int> tiles: ceil((root.width + root.bleed + Theme.card-gap) / (root.tile + Theme.card-gap));
-    height: root.rail-y + Rails.height(ShelfShape.cards);
+    height: root.rail-y + Rails.height(ShelfShape.cards, root.width);
     // Not clipped as other skeletons are: the rail runs on to the page's edge (`bleed`).
     clip: false;
     if root.band: SkeletonBlock {
         x: 0;
         y: 0;
         width: root.width;
-        height: BandSizes.height;
+        height: BandSizes.height-for(root.width);
         border-radius: Theme.r-l;
         sweep: root.sweep;
         fade: root.fade;
         SkeletonBlock {
-            x: BandSizes.pad;
-            y: BandSizes.pad;
-            width: BandSizes.cover;
-            height: BandSizes.cover;
+            x: root.band-pad;
+            y: root.band-pad;
+            width: root.band-cover;
+            height: root.band-cover;
             border-radius: Theme.r-m;
             sweep: root.sweep;
             fade: root.fade;
         }
-        for b[i] in [{ y: 27px, w: 180px, h: 14px }, { y: 55px, w: 360px, h: 34px }, { y: 101px, w: 260px, h: 14px }]: SkeletonBlock {
-            x: BandSizes.text-x;
+        // The lead line, the title and the artist line (in the narrow band, beside the cover
+        // as its text is, the row under them left blank).
+        for b[i] in root.narrow ? [{ y: 23px, w: 160px, h: 14px }, { y: 50px, w: 240px, h: 28px }, { y: 90px, w: 200px, h: 12px }] : [{ y: 27px, w: 180px, h: 14px }, { y: 55px, w: 360px, h: 34px }, { y: 101px, w: 260px, h: 14px }]: SkeletonBlock {
+            x: root.band-text-x;
             y: b.y;
-            width: min(b.w, root.width - BandSizes.text-x - BandSizes.pad);
+            width: min(b.w, root.width - root.band-text-x - root.band-pad);
             height: b.h;
             border-radius: Theme.r-s;
             sweep: root.sweep;
@@ -467,8 +485,8 @@ component HomeSkeleton inherits Skeleton {
 // The row after the last shelf while the next page loads: a rail's skeleton.
 component MoreSkeleton inherits Skeleton {
     property <int> per-row: Rails.per-row(ShelfShape.cards, root.width);
-    property <length> card: Rails.tile-w(ShelfShape.cards);
-    height: Rails.height(ShelfShape.cards);
+    property <length> card: Rails.tile-w(ShelfShape.cards, root.width);
+    height: Rails.height(ShelfShape.cards, root.width);
     accessible-label: @tr("Loading more of Home");
     SkeletonBlock {
         x: 0;
@@ -518,7 +536,7 @@ component FeedShelf inherits Rectangle {
     in property <bool> in-sight: true;
     // A song grid's first column shown (the feed's row reports its songs, `RowsShown`).
     in-out property <int> grid-first;
-    height: Rails.height(root.shelf.shape);
+    height: Rails.height(root.shelf.shape, root.width);
     if root.shelf.shape == ShelfShape.songs: SongGrid {
         width: parent.width;
         shelf: root.shelf;
@@ -558,7 +576,7 @@ component HomeTop inherits VerticalLayout {
 }
 
 export component HomePage inherits Rectangle {
-    property <length> pad: Theme.page-pad;
+    property <length> pad: Theme.pad-for(self.width);
     property <length> inner: self.width - 2 * self.pad;
     property <int> count: HomeData.shelves.length;
     // Rows: the top, the shelves, then the next page's row while it loads or failed.
@@ -607,7 +625,7 @@ export component HomePage inherits Rectangle {
                 list: SongList.home;
                 part: i - 1;
                 first: feed-row.grid-first * Rails.grid-rows;
-                last: feed-row.songs && feed-row.in-sight && feed-row.y + list.content-y + feed-row.height > 0 ? min(HomeData.shelves[i - 1].songs.length, (feed-row.grid-first + max(2, floor((root.inner + Theme.card-gap) / (Rails.grid-col + Theme.card-gap)))) * Rails.grid-rows) - 1 : -1;
+                last: feed-row.songs && feed-row.in-sight && feed-row.y + list.content-y + feed-row.height > 0 ? min(HomeData.shelves[i - 1].songs.length, (feed-row.grid-first + Rails.grid-per-page(root.inner)) * Rails.grid-rows) - 1 : -1;
             }
             row := VerticalLayout {
                 width: parent.width;

@@ -76,6 +76,21 @@ export global BandSizes {
     out property <length> row-h-tight: 44px;
     // The four actions: 40 px each, 8 apart.
     out property <length> actions-w: 4 * 40px + 3 * 8px;
+    // The narrow band, for a band too narrow for the song beside the cover and its row (a
+    // narrow window, or the Up next panel open beside one): a 96 px cover with the song beside
+    // it, the row under both, 20 px in from the edges.
+    out property <length> narrow-h: 192px;
+    out property <length> narrow-pad: 20px;
+    out property <length> narrow-cover: 96px;
+    public pure function narrow(w: length) -> bool {
+        return w < self.text-x + self.pad + 340px;
+    }
+    public pure function height-for(w: length) -> length {
+        return BandSizes.narrow(w) ? self.narrow-h : self.height;
+    }
+    // "Up next · N" needs this much band beside "Pick up where you left off": narrower (a
+    // window under about 560 px), the bar's Up next button is the way to the queue.
+    out property <length> link-min: 520px;
 }
 
 // A pill on the band: solid white (Resume, Play) or tonal (Open <source>). Its label elides
@@ -291,7 +306,12 @@ export component Band inherits Rectangle {
     property <bool> song: root.resume || HomeData.featured.kind == ItemKind.song;
     property <color> ink-ground: BandInk.ground;
     property <color> ink2: BandInk.text2;
-    property <length> pad: BandSizes.pad;
+    // Too narrow for the song beside the cover and its row (a narrow window, or the Up next
+    // panel open beside one): the narrow band, the cover smaller, the title a size down (two
+    // below a 488 px band), the row under them both.
+    property <bool> compact: BandSizes.narrow(root.width);
+    property <bool> tight: root.width < 488px;
+    property <length> pad: root.compact ? BandSizes.narrow-pad : BandSizes.pad;
     property <int> queued: QueueData.upcoming.length;
     property <int> rows-n: root.resume ? HomeData.next.length : HomeData.featured-more.length;
     // "More like this" under a short queue (resuming only; `hero.rs` fills it then).
@@ -308,7 +328,7 @@ export component Band inherits Rectangle {
     property <length> beside-w: root.room - root.cols-w;
     property <bool> wide: root.beside-w >= BandSizes.text-min;
     property <bool> column: root.wide && root.rows-n + root.more-n > 0;
-    property <bool> link: root.resume && !root.column && !Frame.queue-open && root.queued > 0;
+    property <bool> link: root.resume && !root.column && !Frame.queue-open && root.queued > 0 && root.width >= BandSizes.link-min;
     property <length> rule-x: BandSizes.text-x + root.beside-w + root.pad;
     property <length> next-x: root.rule-x + root.pad;
     property <int> shown: min(root.rows-n, 3 * root.cols);
@@ -317,15 +337,14 @@ export component Band inherits Rectangle {
     property <length> row-h: root.mixed ? BandSizes.row-h-tight : BandSizes.row-h;
     // "More like this": under the queue's rows and a 4 px gap, or at the top without a queue.
     property <length> more-y: root.rows-n > 0 ? 20px + root.rows-n * root.row-h + 4px : 0px;
-    // Too narrow for the song beside the cover and its row (the Up next panel open beside a
-    // narrow window): a smaller cover, the title a size down, and the row under them both.
-    property <bool> compact: root.width < BandSizes.text-x + root.pad + 340px;
-    property <length> cover: root.compact ? 112px : BandSizes.cover;
-    property <length> text-x: root.compact ? root.pad + root.cover + Theme.s4 + Theme.s1 : BandSizes.text-x;
+    property <length> cover: root.compact ? BandSizes.narrow-cover : BandSizes.cover;
+    property <length> text-x: root.compact ? root.pad + root.cover + Theme.s4 : BandSizes.text-x;
+    // The title's line: the display face at 40, 32 in the narrow band, 24 in a tight one.
+    property <length> title-h: root.compact ? (root.tight ? 32px : 40px) : 48px;
     property <length> text-w: root.column ? root.beside-w : root.width - root.pad - root.text-x;
     property <bool> liked: root.resume ? Player.liked : HomeData.track.liked;
     property <string> source: root.resume ? QueueData.playing-from : HomeData.featured-shelf;
-    height: BandSizes.height;
+    height: root.compact ? BandSizes.narrow-h : BandSizes.height;
     border-radius: Theme.r-l;
     background: root.ink-ground;
     animate background { duration: Theme.t-colour; easing: Curves.ease-hover; }
@@ -354,7 +373,7 @@ export component Band inherits Rectangle {
         x: root.text-x;
         y: root.pad;
         width: root.text-w;
-        height: BandSizes.cover;
+        height: root.cover;
         // "Pick up where you left off · Daily mix": the source a link to it (the pick's shelf
         // isn't one). Clear of the Up next link at the band's top right.
         Rectangle {
@@ -383,11 +402,11 @@ export component Band inherits Rectangle {
         }
         Display {
             x: 0;
-            y: 24px;
+            y: root.compact ? 26px : 24px;
             width: parent.width;
-            height: root.compact ? 40px : 48px;
+            height: root.title-h;
             text: root.resume ? Player.title : HomeData.featured.title;
-            font-size: root.compact ? Theme.t-display-m : Theme.t-display-l;
+            font-size: root.compact ? (root.tight ? Theme.t-display-s : Theme.t-display-m) : Theme.t-display-l;
             vertical-alignment: center;
             color: BandInk.text;
             accessible-role: text;
@@ -399,9 +418,11 @@ export component Band inherits Rectangle {
             property <string> year: root.resume && Player.album != "" ? NowPlayingData.year : "";
             property <string> rest: (self.album != "" ? " · " + self.album : "") + (self.year != "" ? " · " + self.year : "");
             x: 0;
-            y: root.compact ? 66px : 74px;
+            y: root.compact ? 26px + root.title-h : 74px;
             width: parent.width;
             height: 22px;
+            // A size down in the narrow band.
+            property <length> size: root.compact ? Theme.t-body : Theme.t-body-l;
             artist := Body {
                 x: 0;
                 // The album follows right after; it elides first, and goes once the artists
@@ -409,7 +430,7 @@ export component Band inherits Rectangle {
                 width: min(self.preferred-width, parent.width);
                 height: parent.height;
                 text: parent.artist;
-                font-size: Theme.t-body-l;
+                font-size: parent.size;
                 font-weight: 600;
                 color: BandInk.text;
                 vertical-alignment: center;
@@ -421,7 +442,7 @@ export component Band inherits Rectangle {
                 visible: self.width >= 48px;
                 height: parent.height;
                 text: parent.rest;
-                font-size: Theme.t-body-l;
+                font-size: parent.size;
                 color: root.ink2;
                 vertical-alignment: center;
             }
@@ -433,17 +454,29 @@ export component Band inherits Rectangle {
             property <bool> has-main: !root.playing || QueueData.playing-from != "";
             property <string> main-label: !root.resume ? @tr("Play") : (root.playing ? @tr("Open {}", QueueData.playing-from) : @tr("Resume"));
             property <length> main-natural: (root.playing ? 20px : 42px) + main-measure.preferred-width + 20px;
-            property <length> fixed: (self.has-main && root.song ? Theme.s4 + 1px + Theme.s4 : 0px) + (root.song ? BandSizes.actions-w : 0px);
+            // The least the main pill takes whole ("Open" while playing). In a row too short
+            // for it beside everything else (a band about 320 px wide), the hairline goes, then
+            // Go to artist (the artist's name above is a link to the same page).
+            property <length> main-least: root.playing ? 40px + open-measure.preferred-width : self.main-natural;
+            property <bool> rule-shown: self.has-main && root.song && self.main-least + Theme.s4 + 1px + Theme.s4 + BandSizes.actions-w <= self.width;
+            property <bool> artist-shown: !self.has-main || self.main-least + Theme.s4 + BandSizes.actions-w <= self.width;
+            property <length> fixed: (self.has-main && root.song ? (self.rule-shown ? Theme.s4 + 1px + Theme.s4 : Theme.s4) : 0px) + (root.song ? BandSizes.actions-w - (self.artist-shown ? 0px : 40px + Theme.s2) : 0px);
             property <length> paused-w: paused-lead.preferred-width + 4px + paused-time.preferred-width;
             property <bool> paused-shown: root.resume && !root.playing && self.main-natural + Theme.s4 + self.paused-w + self.fixed <= self.width;
+            // In the narrow band, under the cover and the song, 16 px below them.
             x: root.compact ? root.pad - root.text-x : 0px;
-            y: parent.height - 40px;
+            y: root.compact ? root.cover + Theme.s4 : parent.height - 40px;
             width: root.compact ? root.width - 2 * root.pad : parent.width;
             height: 40px;
             // Only measured.
             main-measure := Body {
                 visible: false;
                 text: act.main-label;
+                font-weight: 600;
+            }
+            open-measure := Body {
+                visible: false;
+                text: @tr("Open");
                 font-weight: 600;
             }
             paused-lead := Body {
@@ -494,7 +527,7 @@ export component Band inherits Rectangle {
                     label: HomeData.featured.kind == ItemKind.artist ? @tr("Go to artist") : (HomeData.featured.kind == ItemKind.album ? @tr("Go to album") : @tr("Open playlist"));
                     clicked => { HomeData.open-featured(-1); }
                 }
-                if root.song && act.has-main: Rectangle {
+                if act.rule-shown: Rectangle {
                     width: 1px;
                     Rectangle {
                         y: 8px;
@@ -528,7 +561,7 @@ export component Band inherits Rectangle {
                         name: @tr("Start radio");
                         clicked => { SongMenu.start-radio(HomeData.track.id); }
                     }
-                    BandButton {
+                    if act.artist-shown: BandButton {
                         icon: Icons.person;
                         name: @tr("Go to artist");
                         enabled: HomeData.track.artist-id != "";
