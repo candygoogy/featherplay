@@ -44,6 +44,9 @@ pub fn init(ctx: &Rc<Ctx>) {
 pub fn open(ctx: &Rc<Ctx>, page: &Page) {
     // Its card is gone: what's read ahead for another page needn't come.
     ahead::shown(page);
+    if *page != Page::Home {
+        home::closed();
+    }
     match page {
         Page::Home => home::open(ctx),
         Page::Explore { tab } => explore::open(ctx, *tab),

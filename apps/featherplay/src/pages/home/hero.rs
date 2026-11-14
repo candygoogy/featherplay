@@ -14,7 +14,7 @@ use crate::follow;
 use crate::pages::content::ROW_COVER;
 use crate::pages::now_playing;
 use crate::song_menu;
-use crate::ui::{HomeData, TrackRow};
+use crate::ui::{Frame, HomeData, TrackRow};
 use crate::ui_bridge::{home_card, home_thumbnail, model, to_rows};
 
 /// The band's cover, in logical pixels (`BandSizes.cover`).
@@ -87,11 +87,7 @@ pub(super) fn show_hero(ctx: &Rc<Ctx>) {
                     .fill(&rows, urls, ROW_COVER, |row, img| row.cover = img);
                 STATE.with(|s| s.borrow_mut().next = ids);
             }
-            // On Home, a short queue's "More like this" is asked for at once, not when the
-            // Related tab opens (once a song).
-            if ctx.current_page() == crate::router::Page::Home {
-                now_playing::want_related(ctx, &state);
-            }
+            want_related(ctx, &state);
             show_more_like_this(ctx, &state);
         }
         Hero::Featured { shelf } if changed => {
@@ -133,6 +129,28 @@ pub(super) fn show_hero(ctx: &Rc<Ctx>) {
         _ => {}
     }
     STATE.with(|s| s.borrow_mut().hero = Some(hero));
+}
+
+/// On Home, a short queue's "More like this" is asked for at once rather than when the
+/// Related tab opens (once a song), while something on screen would show it: the band's
+/// queue column, or the Up next panel or sheet.
+fn want_related(ctx: &Rc<Ctx>, state: &PlayerState) {
+    let Some(ui) = ctx.window() else { return };
+    if ctx.current_page() == crate::router::Page::Home {
+        let column = STATE.with(|s| s.borrow().band_column);
+        let shown = column || ui.global::<Frame>().get_tabs_open();
+        now_playing::want_related(ctx, state, shown);
+    }
+}
+
+/// The band got room for its queue column or lost it, or the Up next panel or sheet opened
+/// or closed (`HomeData.band-column`): a short queue's "More like this" is asked for if it
+/// shows now.
+pub(super) fn band_column(ctx: &Rc<Ctx>, room: bool) {
+    STATE.with(|s| s.borrow_mut().band_column = room);
+    if let Some(state) = ctx.player() {
+        want_related(ctx, &state);
+    }
 }
 
 /// Which of the song's related tracks fill a queue shorter than a column, as indexes into

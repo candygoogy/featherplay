@@ -73,6 +73,9 @@ struct State {
     /// the song's related list (`now_playing::related_of`), which a click plays from.
     related: Vec<TrackId>,
     related_at: Vec<usize>,
+    /// The band has room for its queue column, where "More like this" shows, as it last
+    /// said (`HomeData.band-column`); forgotten as Home closes, with the band.
+    band_column: bool,
     paging: Paging,
     /// The shelves `HomeData` shows, so a later page's are added to them.
     rows: Option<Rc<VecModel<HomeShelfRow>>>,
@@ -117,6 +120,8 @@ pub fn init(ctx: &Rc<Ctx>) {
             crate::pages::now_playing::play_related(&c, at);
         }
     });
+    let c = ctx.clone();
+    data.on_band_column(move |room| hero::band_column(&c, room));
     let c = ctx.clone();
     data.on_shuffle_liked(move || content::shuffle_playlist(&c, PlaylistId("LM".into())));
     let c = ctx.clone();
@@ -185,6 +190,11 @@ fn open_item(ctx: &Rc<Ctx>, item: HomeItem) {
         HomeItem::Playlist(p) => ctx.navigate(Page::Playlist { id: p.id }),
         HomeItem::Artist(a) => ctx.navigate(Page::Artist { id: a.id }),
     }
+}
+
+/// Another page is shown: the band went with Home, and says again when it's back.
+pub fn closed() {
+    STATE.with(|s| s.borrow_mut().band_column = false);
 }
 
 /// The page is being shown.

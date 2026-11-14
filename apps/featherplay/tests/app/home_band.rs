@@ -3,7 +3,8 @@
 //! round actions act on the band's song; Up next shows its rows and "Show all" beside the
 //! song in a wide window, and an "Up next · N" link in a narrow one, both opening the panel;
 //! the band's queue follows the player's, the Up next panel open or not; a second column
-//! only for six songs and room for it; "More like this" under a short queue.
+//! only for six songs and room for it; "More like this" under a short queue, asked for only
+//! where something would show it.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -324,4 +325,50 @@ fn the_bands_queue_follows_the_players_with_the_panel_open() {
             .any(|a| matches!(a, Action::Queue(QueueAction::SkipTo(1)))),
         "the band's second row didn't play"
     );
+}
+
+#[test]
+fn more_like_this_is_asked_for_only_where_it_would_show() {
+    // 1100 px with the panel shut: the band has no room for its queue column, so nothing
+    // would show a short queue's related songs, and nothing asks for them.
+    let scene = Scene::new(1100, 900, true, false).expect("scene");
+    let ui = &scene.ui;
+    let tracks = Fixtures::load().expect("fixtures").radio().expect("radio");
+    let data = ui.global::<HomeData>();
+    let frame = ui.global::<Frame>();
+    let settle = || {
+        // A frame, as the window draws one, then the queued work.
+        let _ = ui.window().take_snapshot();
+        scene.settle();
+    };
+    app::on_event(UiEvent::Player(Box::new(radio_state(&tracks[0], &[]))));
+    scene.open("home").expect("home");
+    ui.show().expect("show");
+    settle();
+    assert_eq!(
+        data.get_related().row_count(),
+        0,
+        "asked in a narrow window"
+    );
+
+    // The Up next panel opens: asked for then.
+    frame.set_queue_open(true);
+    frame.invoke_queue_toggled(true);
+    settle();
+    assert!(data.get_related().row_count() > 0, "the panel didn't ask");
+
+    // The next song, the panel shut: nothing again, until the window widens to 1568 px.
+    frame.set_queue_open(false);
+    app::on_event(UiEvent::Player(Box::new(radio_state(&tracks[1], &[]))));
+    settle();
+    assert_eq!(
+        data.get_related().row_count(),
+        0,
+        "asked with the panel shut"
+    );
+    let size = slint::LogicalSize::new(1568.0, 900.0);
+    ui.window().set_size(size);
+    ui.window().dispatch_event(WindowEvent::Resized { size });
+    settle();
+    assert!(data.get_related().row_count() > 0, "widening didn't ask");
 }

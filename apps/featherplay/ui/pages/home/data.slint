@@ -68,6 +68,10 @@ export global HomeData {
     callback show-queue();
     // One of `related`: plays it as the Related tab does.
     callback play-related(int);
+    // Whether the band has room for its queue column (`Band`), told as that changes and as the
+    // Up next panel or sheet opens or closes: `related` is asked for ahead of the Related tab
+    // only while one of them would show it (`hero.rs::band_column`).
+    callback band-column(bool);
     // The Liked songs tile on the first rail: plays Liked songs shuffled.
     callback shuffle-liked();
     // A song card on a shelf: plays it, with radio after it.

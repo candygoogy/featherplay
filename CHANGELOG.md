@@ -44,8 +44,9 @@ Notable changes to featherplay, newest first. The format follows
   when there's room: six in two columns when six or more are next and the window is wide
   enough, otherwise the song's side takes the room. A queue shorter than three (a radio
   still loading, the end of an album) is filled with **More like this**, the song's related
-  songs, asked for as soon as Home shows the short queue rather than when the Related tab
-  opens (once a song; the tab then reuses them); with nothing next and nothing related the
+  songs, asked for as soon as Home shows the short queue where they'd show (the band's
+  column, or the Up next panel or sheet) rather than when the Related tab opens (once a
+  song; the tab then reuses them); with nothing next and nothing related the
   song takes the band's width. In a narrower window an **Up next**
   link at its top right instead. Under it, every shelf is one row of large covers that pages
   sideways with the arrows shown on hover, the next cover cut off at the window's edge;

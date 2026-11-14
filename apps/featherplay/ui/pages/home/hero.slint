@@ -327,6 +327,20 @@ export component Band inherits Rectangle {
     property <length> beside-w: root.room - root.cols-w;
     property <bool> wide: root.beside-w >= BandSizes.text-min;
     property <bool> column: root.wide && root.rows-n + root.more-n > 0;
+    // Room for the queue's column, where "More like this" shows (`HomeData.band-column`),
+    // told from the turn after the band is made, once it's laid out (its width at `init`
+    // isn't yet the layout's); and again as the Up next panel or sheet, which shows it too,
+    // opens or closes.
+    property <bool> laid-out;
+    property <bool> column-room: root.laid-out && root.wide;
+    property <bool> tabs-open: Frame.tabs-open;
+    changed column-room => { HomeData.band-column(self.column-room); }
+    changed tabs-open => { HomeData.band-column(self.column-room); }
+    Timer {
+        interval: 0ms;
+        running: !root.laid-out;
+        triggered => { root.laid-out = true; }
+    }
     property <bool> link: root.resume && !root.column && !Frame.queue-open && root.queued > 0 && root.width >= BandSizes.link-min;
     property <length> rule-x: BandSizes.text-x + root.beside-w + root.pad;
     property <length> next-x: root.rule-x + root.pad;

@@ -4,8 +4,10 @@
 //! tab, and opens the song menu for the current track.
 //!
 //! Requests stay small: Related is the current track's radio, fetched once per track when
-//! the tab is shown, or once ahead of it when Home shows a short queue (`want_related`); the
-//! year comes from the album, fetched once per album while the page is open. Results are kept, so reopening the page asks for nothing again.
+//! the tab is shown, or once ahead of it when Home shows a short queue and something on
+//! screen would show them (`want_related`); the year comes from the album, fetched once per
+//! album while the page is open. Results are kept, so reopening the page asks for nothing
+//! again.
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -282,22 +284,25 @@ pub(crate) fn show_year(ctx: &Rc<Ctx>, track: Option<&Track>) {
     }
 }
 
-/// Home shows the playing song (`hero.rs`): with fewer than `SHORT_QUEUE` songs next, its
-/// related tracks are asked for ahead of the Related tab, through the tab's own request and
-/// cache, so the band's "More like this" (or, in a narrow window, the Up next sheet's
-/// Related tab) fills without waiting for the tab to open.
-pub(crate) fn want_related(ctx: &Rc<Ctx>, state: &PlayerState) {
+/// Home shows the playing song (`hero.rs`): with fewer than `SHORT_QUEUE` songs next and
+/// something on screen to show them (`shown`: the band's queue column, or the Up next panel
+/// or sheet), its related tracks are asked for ahead of the Related tab, through the tab's
+/// own request and cache, so "More like this" fills without waiting for the tab to open.
+pub(crate) fn want_related(ctx: &Rc<Ctx>, state: &PlayerState, shown: bool) {
     let Some(seed) = &state.current else { return };
-    if STATE.with(|s| ask_ahead(&mut s.borrow_mut(), &seed.id, state.upcoming.len())) {
+    let queued = state.upcoming.len();
+    if STATE.with(|s| ask_ahead(&mut s.borrow_mut(), &seed.id, queued, shown)) {
         fetch_related(ctx, seed.clone());
     }
 }
 
 /// Whether `seed`'s related tracks are asked for ahead of the tab, with `queued` songs next:
-/// only for a short queue, at most once a song, and not when they're in or on their way. A
-/// failed request isn't made again (the tab, opened, still asks).
-fn ask_ahead(state: &mut State, seed: &TrackId, queued: usize) -> bool {
-    let ask = queued < SHORT_QUEUE
+/// only for a short queue something on screen would show them in (`shown`), at most once a
+/// song, and not when they're in or on their way. A failed request isn't made again (the
+/// tab, opened, still asks).
+fn ask_ahead(state: &mut State, seed: &TrackId, queued: usize, shown: bool) -> bool {
+    let ask = shown
+        && queued < SHORT_QUEUE
         && !state.related.contains_key(seed)
         && !state.asked_ahead.contains(seed);
     if ask {
@@ -390,24 +395,33 @@ fn fill_related(ctx: &Rc<Ctx>, tracks: &[Track]) {
 mod tests {
     use super::*;
 
-    /// Home's band asks for a song's related tracks ahead of the tab only under a short queue,
-    /// once a song, and never again after a failure.
+    /// Home asks for a song's related tracks ahead of the tab only under a short queue and
+    /// with something on screen to show them, once a song, and never again after a failure.
     #[test]
     fn related_is_asked_ahead_once_a_song_and_only_for_a_short_queue() {
         let mut s = State::default();
         let (a, b) = (TrackId("a".into()), TrackId("b".into()));
-        assert!(!ask_ahead(&mut s, &a, 3), "a long queue");
-        assert!(ask_ahead(&mut s, &a, 2), "a short queue");
+        assert!(!ask_ahead(&mut s, &a, 3, true), "a long queue");
+        assert!(ask_ahead(&mut s, &a, 2, true), "a short queue");
         // On its way (`fetch_related`), then in: nothing more.
         s.related.insert(a.clone(), None);
-        assert!(!ask_ahead(&mut s, &a, 0), "on its way");
+        assert!(!ask_ahead(&mut s, &a, 0, true), "on its way");
         s.related.insert(a.clone(), Some(Vec::new()));
-        assert!(!ask_ahead(&mut s, &a, 0), "in");
+        assert!(!ask_ahead(&mut s, &a, 0, true), "in");
         // Another song asks once and fails (`fetch_related` forgets it): no retry, even when
         // the song comes back.
-        assert!(ask_ahead(&mut s, &b, 0));
+        assert!(ask_ahead(&mut s, &b, 0, true));
         s.related.insert(b.clone(), None);
         s.related.remove(&b);
-        assert!(!ask_ahead(&mut s, &b, 0), "asked again");
+        assert!(!ask_ahead(&mut s, &b, 0, true), "asked again");
+
+        // A narrow window with the panel shut: nothing shows them, so nothing is asked; the
+        // panel opening (or the window widening) asks once.
+        for seed in ["panel", "wider"].map(|id| TrackId(id.into())) {
+            assert!(!ask_ahead(&mut s, &seed, 0, false), "nothing shows them");
+            assert!(!ask_ahead(&mut s, &seed, 1, false), "nothing shows them");
+            assert!(ask_ahead(&mut s, &seed, 0, true), "{} didn't ask", seed.0);
+            assert!(!ask_ahead(&mut s, &seed, 0, true), "{} asked twice", seed.0);
+        }
     }
 }
