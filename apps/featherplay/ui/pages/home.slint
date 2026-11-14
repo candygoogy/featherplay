@@ -223,7 +223,9 @@ component ShuffleLiked inherits Rectangle {
         text: @tr("Shuffle Liked songs");
         font-weight: 600;
     }
+    // From the title's left edge: without an x, Slint centres it in the tile.
     if ta.has-hover: Rectangle {
+        x: 0;
         y: root.size + Theme.card-text-gap + 18px;
         width: min(root.size, title.preferred-width);
         height: 1px;
