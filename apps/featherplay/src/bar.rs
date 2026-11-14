@@ -4,14 +4,16 @@
 //!
 //! The position advances on a timer aligned to whole seconds of playback, so the bar
 //! redraws once a second while sound plays and never while paused. While the window is
-//! minimized the timer keeps time but leaves the properties alone. The tray's mini player,
-//! when open, follows the same state and tick (`mini`).
+//! minimized the timer keeps time but leaves the properties alone; while it shows nothing at
+//! all (minimised or in the tray) and the tray's mini player is closed, the timer stops, and
+//! the time is brought up to date when either shows (`showing`). The mini player, when open,
+//! follows the same state and tick (`mini`).
 
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
-use featherplay_core::model::{LikeStatus, RepeatMode, TrackId};
+use featherplay_core::model::{LikeStatus, RepeatMode, Track, TrackId};
 use featherplay_core::tr;
 use featherplay_integrations::NowPlaying;
 use slint::{ComponentHandle, Model, ModelRc, Timer, TimerMode, VecModel};
@@ -36,6 +38,9 @@ struct Clock {
     has_track: Cell<bool>,
     timer: Timer,
     cover_url: RefCell<String>,
+    /// The track whose names and length the bar shows: they're made again only when it
+    /// changes, not with every state (a pause, a seek, a like).
+    shown: RefCell<Option<Track>>,
 }
 
 impl Clock {
@@ -159,7 +164,9 @@ pub fn apply(ctx: &Rc<Ctx>, state: &PlayerState) {
         p.set_cover(Default::default());
         p.set_disliked(false);
         clock.timer.stop();
+        crate::memory::playing(false);
         clock.cover_url.borrow_mut().clear();
+        clock.shown.borrow_mut().take();
         clock.has_track.set(false);
         shell::idle();
         shell::set_tray_menu(&p);
@@ -168,6 +175,49 @@ pub fn apply(ctx: &Rc<Ctx>, state: &PlayerState) {
         return;
     };
     p.set_has_track(true);
+    if clock.shown.borrow().as_ref() != Some(track) {
+        show_track(&p, track);
+        *clock.shown.borrow_mut() = Some(track.clone());
+    }
+    p.set_liked(track.like == LikeStatus::Like);
+    p.set_disliked(track.like == LikeStatus::Dislike);
+    let duration = track.duration;
+
+    let url = track.thumbnail.clone().unwrap_or_default();
+    if *clock.cover_url.borrow() != url {
+        *clock.cover_url.borrow_mut() = url.clone();
+        p.set_cover(Default::default());
+        p.set_cover_url(url.as_str().into());
+        let weak = ui.as_weak();
+        let wanted = url.clone();
+        ctx.covers.load(&url, BAR_COVER, move |img| {
+            let still = CLOCK.with(|k| *k.cover_url.borrow() == wanted);
+            if still && let Some(ui) = weak.upgrade() {
+                ui.global::<Player>().set_cover(img);
+            }
+        });
+    }
+
+    clock.has_track.set(true);
+    clock.at.set(state.position);
+    clock.speed.set(state.speed);
+    clock.since.set(state.audible.then(Instant::now));
+    clock.duration.set(duration);
+    crate::memory::playing(state.audible);
+    show_position(ctx, state.position);
+    schedule(ctx);
+
+    shell::apply(NowPlaying {
+        speed: state.speed,
+        ..now_playing(track, state.playing, state.position)
+    });
+    shell::set_tray_menu(&p);
+    mini::update(ctx);
+    crate::quick_search::update(ctx);
+}
+
+/// The track's names, links and length in the bar.
+fn show_track(p: &Player, track: &Track) {
     p.set_track_id(track.id.0.as_str().into());
     p.set_title(shown(&track.display_title()));
     p.set_artist(shown(&artist_names(&track.artists)));
@@ -195,42 +245,14 @@ pub fn apply(ctx: &Rc<Ctx>, state: &PlayerState) {
             .unwrap_or_default()
             .into(),
     );
-    p.set_liked(track.like == LikeStatus::Like);
-    p.set_disliked(track.like == LikeStatus::Dislike);
-    let duration = track.duration;
-    p.set_duration_s(duration.map(|d| d.as_secs_f32()).unwrap_or(0.0));
-    p.set_total(duration.map(format_duration).unwrap_or_default().into());
-
-    let url = track.thumbnail.clone().unwrap_or_default();
-    if *clock.cover_url.borrow() != url {
-        *clock.cover_url.borrow_mut() = url.clone();
-        p.set_cover(Default::default());
-        p.set_cover_url(url.as_str().into());
-        let weak = ui.as_weak();
-        let wanted = url.clone();
-        ctx.covers.load(&url, BAR_COVER, move |img| {
-            let still = CLOCK.with(|k| *k.cover_url.borrow() == wanted);
-            if still && let Some(ui) = weak.upgrade() {
-                ui.global::<Player>().set_cover(img);
-            }
-        });
-    }
-
-    clock.has_track.set(true);
-    clock.at.set(state.position);
-    clock.speed.set(state.speed);
-    clock.since.set(state.audible.then(Instant::now));
-    clock.duration.set(duration);
-    show_position(ctx, state.position);
-    schedule(ctx);
-
-    shell::apply(NowPlaying {
-        speed: state.speed,
-        ..now_playing(track, state.playing, state.position)
-    });
-    shell::set_tray_menu(&p);
-    mini::update(ctx);
-    crate::quick_search::update(ctx);
+    p.set_duration_s(track.duration.map(|d| d.as_secs_f32()).unwrap_or(0.0));
+    p.set_total(
+        track
+            .duration
+            .map(format_duration)
+            .unwrap_or_default()
+            .into(),
+    );
 }
 
 /// The most marks the seek line draws: a song with more gaps keeps its longest.
@@ -294,10 +316,24 @@ fn show_position(ctx: &Ctx, at: Duration) {
     p.set_elapsed(format_duration(at).into());
 }
 
-/// Ticks at the next whole second of playback while sound plays.
+/// The window shows again, or the mini player opened: the time shown is brought up to date
+/// and ticks on while sound plays (`schedule` stops while nothing shows it).
+pub fn showing(ctx: &Rc<Ctx>) {
+    let clock = CLOCK.with(Rc::clone);
+    if !clock.has_track.get() {
+        return;
+    }
+    let at = clock.now();
+    show_position(ctx, at);
+    mini::tick(at);
+    schedule(ctx);
+}
+
+/// Ticks at the next whole second of playback while sound plays and something shows the
+/// time: the window, or the mini player.
 fn schedule(ctx: &Rc<Ctx>) {
     let clock = CLOCK.with(Rc::clone);
-    if clock.since.get().is_none() {
+    if clock.since.get().is_none() || (crate::memory::is_hidden() && !mini::is_open()) {
         clock.timer.stop();
         return;
     }
@@ -314,7 +350,6 @@ fn schedule(ctx: &Rc<Ctx>) {
             show_position(&ctx, at);
         }
         mini::tick(at);
-        crate::memory::tick(&ctx);
         schedule(&ctx);
     });
 }

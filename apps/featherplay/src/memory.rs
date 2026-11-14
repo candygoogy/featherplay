@@ -8,14 +8,14 @@
 //! covers come back from that cache and the first frame paints the window whole, as it does
 //! after a restore anyway (`repaint`).
 //!
-//! While sound plays, the private bytes go to the log once a minute (`tick`, from the bar's
-//! clock, so nothing runs for it while paused).
+//! While sound plays, the private bytes go to the log once a minute (`tick`, on a timer of its
+//! own that runs only while sound plays, so nothing runs for it while paused).
 
 use std::cell::Cell;
 use std::time::{Duration, Instant};
 
 use i_slint_core::window::WindowInner;
-use slint::ComponentHandle;
+use slint::{ComponentHandle, Timer, TimerMode};
 
 use crate::app::Ctx;
 
@@ -30,6 +30,8 @@ thread_local! {
     static HIDDEN: Cell<bool> = const { Cell::new(false) };
     /// When `tick` last logged.
     static LOGGED: Cell<Option<Instant>> = const { Cell::new(None) };
+    /// `tick`'s timer, running while sound plays.
+    static LOG_TIMER: Timer = Timer::default();
 }
 
 fn mb(bytes: u64) -> f64 {
@@ -60,6 +62,10 @@ pub fn hidden(ctx: &Ctx, hidden: bool) {
         ctx.covers.show(Some(ctx.current_page().kind()));
         if let Some(ui) = ctx.window() {
             resume_drawing(ui.window());
+        }
+        // The bar's clock stopped while nothing showed the time.
+        if let Some(ctx) = Ctx::get() {
+            crate::bar::showing(&ctx);
         }
     }
 }
@@ -92,8 +98,30 @@ pub(crate) fn resume_drawing(window: &slint::Window) {
     crate::repaint::all(window);
 }
 
-/// Called each second of playback (the bar's clock): logs the private bytes once a minute.
-pub fn tick(ctx: &Ctx) {
+/// Sound plays (`true`) or stopped: the memory log's timer runs only while it plays, shown or
+/// not. The first line comes as sound starts, if a minute has passed since the last.
+pub fn playing(on: bool) {
+    LOG_TIMER.with(|timer| {
+        if !on {
+            timer.stop();
+            return;
+        }
+        if timer.running() {
+            return;
+        }
+        if let Some(ctx) = Ctx::get() {
+            tick(&ctx);
+        }
+        timer.start(TimerMode::Repeated, EVERY, || {
+            if let Some(ctx) = Ctx::get() {
+                tick(&ctx);
+            }
+        });
+    });
+}
+
+/// Logs the private bytes, once a minute at most.
+fn tick(ctx: &Ctx) {
     let now = Instant::now();
     let due = LOGGED.get().is_none_or(|t| now.duration_since(t) >= EVERY);
     if !due {

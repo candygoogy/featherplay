@@ -185,6 +185,8 @@ pub fn create(ctx: &Rc<Ctx>) -> Result<MiniPlayer, String> {
     // Registered first: a cover already decoded arrives inside `sync`.
     MINI.with_borrow_mut(|m| *m = Some(mini.clone()));
     sync(ctx, &mini, &main);
+    // The bar's clock stops while the main window shows nothing: it ticks again for this.
+    crate::bar::showing(ctx);
     watch(&mini);
     Ok(ui)
 }
