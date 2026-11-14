@@ -2,6 +2,8 @@
 //! window's `Action`s, the `UiEvent`s back with the `PlayerState`, and the `UiLink` that
 //! carries them.
 
+use std::ops::Deref;
+use std::sync::Arc;
 use std::time::Duration;
 
 use featherplay_core::model::{LikeStatus, PlaylistId, RepeatMode, Track, TrackId};
@@ -103,7 +105,7 @@ pub enum Action {
 pub struct PlayerState {
     /// With likes the user changed this session applied.
     pub current: Option<Track>,
-    pub upcoming: Vec<Track>,
+    pub upcoming: SharedTracks,
     /// Audible, or loading with the intent to play: what the buttons show.
     pub playing: bool,
     /// Sound is coming out; the progress line advances only then (not while the stream
@@ -122,6 +124,53 @@ pub struct PlayerState {
     pub queue: QueueInfo,
     /// The playback speed (1.0 is normal): the position advances this much per second.
     pub speed: f32,
+}
+
+/// Tracks shared by every copy of the state that has them (each one sent, the window's,
+/// `Ctx::player`'s): a clone counts a reference instead of copying a long queue. Reads as a
+/// `&[Track]`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SharedTracks(Arc<[Track]>);
+
+impl Default for SharedTracks {
+    fn default() -> Self {
+        SharedTracks(Arc::new([]))
+    }
+}
+
+impl Deref for SharedTracks {
+    type Target = [Track];
+
+    fn deref(&self) -> &[Track] {
+        &self.0
+    }
+}
+
+impl<'a> IntoIterator for &'a SharedTracks {
+    type Item = &'a Track;
+    type IntoIter = std::slice::Iter<'a, Track>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
+    }
+}
+
+impl From<Vec<Track>> for SharedTracks {
+    fn from(tracks: Vec<Track>) -> Self {
+        SharedTracks(tracks.into())
+    }
+}
+
+impl From<&[Track]> for SharedTracks {
+    fn from(tracks: &[Track]) -> Self {
+        SharedTracks(tracks.into())
+    }
+}
+
+impl FromIterator<Track> for SharedTracks {
+    fn from_iter<I: IntoIterator<Item = Track>>(tracks: I) -> Self {
+        SharedTracks(tracks.into_iter().collect())
+    }
 }
 
 /// Sent to the UI thread through `UiLink::events`.

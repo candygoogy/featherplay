@@ -304,7 +304,7 @@ mod tests {
     fn state(current: Option<Track>, upcoming: Vec<Track>) -> PlayerState {
         PlayerState {
             current,
-            upcoming,
+            upcoming: upcoming.into(),
             playing: false,
             audible: false,
             loading: false,

@@ -258,7 +258,7 @@ fn a_second_column_needs_six_songs_and_room_and_a_short_queue_gets_more_like_thi
 fn radio_state(current: &Track, upcoming: &[Track]) -> PlayerState {
     PlayerState {
         current: Some(current.clone()),
-        upcoming: upcoming.to_vec(),
+        upcoming: upcoming.into(),
         playing: true,
         audible: true,
         loading: false,

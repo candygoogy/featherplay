@@ -47,7 +47,7 @@ fn home_with_covers(tracks: &[Track]) -> PathBuf {
 fn state(current: &Track, upcoming: &[Track]) -> PlayerState {
     PlayerState {
         current: Some(current.clone()),
-        upcoming: upcoming.to_vec(),
+        upcoming: upcoming.into(),
         playing: true,
         audible: false,
         loading: false,

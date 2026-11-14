@@ -9,7 +9,7 @@ use featherplay_core::player::Input;
 use featherplay_core::queue::Queue;
 use featherplay_core::tr;
 
-use super::{Action, Controller};
+use super::{Action, Controller, SharedTracks};
 use crate::place::Place;
 
 #[derive(Debug)]
@@ -167,6 +167,38 @@ pub fn with_likes(mut input: Input, likes: &HashMap<TrackId, LikeStatus>) -> Inp
     input
 }
 
+/// `t` with the like the user gave it this session, if any, as the window shows it.
+pub(super) fn liked(t: &Track, likes: &HashMap<TrackId, LikeStatus>) -> Track {
+    let mut t = t.clone();
+    if let Some(l) = likes.get(&t.id) {
+        t.like = *l;
+    }
+    t
+}
+
+/// `upcoming` as the window shows it (each track `liked`): `last` itself, shared and not
+/// copied, when it's that already; else a new copy.
+pub(super) fn shown_upcoming(
+    last: &SharedTracks,
+    upcoming: &[Track],
+    likes: &HashMap<TrackId, LikeStatus>,
+) -> SharedTracks {
+    let same = last.len() == upcoming.len()
+        && last
+            .iter()
+            .zip(upcoming)
+            .all(|(shown, t)| match likes.get(&t.id) {
+                // The queue usually has the like already (`Input::SetLike`), so this is rare.
+                Some(&like) if like != t.like => *shown == Track { like, ..t.clone() },
+                _ => shown == t,
+            });
+    if same {
+        last.clone()
+    } else {
+        upcoming.iter().map(|t| liked(t, likes)).collect()
+    }
+}
+
 /// What takes the player back to `track` at `at` (Undo after "Not for me"): when it's the
 /// track before the current one, back to it, so the queue after it is as it was (the
 /// position first goes to 0, so "previous" doesn't restart the current track instead);
@@ -316,5 +348,51 @@ pub fn queue_info(queue: &Queue, from: &PlayingFrom) -> QueueInfo {
     QueueInfo {
         playing_from: from.clone(),
         autoplay_at: queue.autoplay_start(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use featherplay_core::model::{LikeStatus, Track, TrackId, VideoType};
+
+    use super::{SharedTracks, shown_upcoming};
+
+    fn track(id: &str) -> Track {
+        Track {
+            id: TrackId(id.into()),
+            title: id.into(),
+            artists: Vec::new(),
+            album: None,
+            duration: None,
+            video_type: VideoType::Song,
+            thumbnail: None,
+            like: LikeStatus::Indifferent,
+            counterpart: None,
+        }
+    }
+
+    /// The window's copy of Up next is shared while it stays the same; a change (here a
+    /// like given this session) makes a new one with it, and the copy held before keeps
+    /// what it showed.
+    #[test]
+    fn up_next_is_shared_until_it_changes() {
+        let queue = [track("a"), track("b")];
+        let mut likes = HashMap::new();
+        let shown = shown_upcoming(&SharedTracks::default(), &queue, &likes);
+        assert_eq!(&shown[..], &queue[..]);
+        let again = shown_upcoming(&shown, &queue, &likes);
+        assert!(std::ptr::eq(shown.as_ptr(), again.as_ptr()), "not copied");
+
+        likes.insert(TrackId("b".into()), LikeStatus::Like);
+        let liked = shown_upcoming(&again, &queue, &likes);
+        assert_eq!(liked[1].like, LikeStatus::Like);
+        assert_eq!(&shown[..], &queue[..]);
+        let after = shown_upcoming(&liked, &queue, &likes);
+        assert!(
+            std::ptr::eq(liked.as_ptr(), after.as_ptr()),
+            "the like is seen as shown"
+        );
     }
 }

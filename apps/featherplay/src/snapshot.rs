@@ -270,7 +270,8 @@ impl Scene {
     /// one playing: the queue in other scripts.
     pub fn play_titled(&self, titles: &[(&str, &str)]) -> Result<(), String> {
         let mut state = player_state(&self.fixtures, 0)?;
-        let tracks = state.current.iter_mut().chain(state.upcoming.iter_mut());
+        let mut upcoming = state.upcoming.to_vec();
+        let tracks = state.current.iter_mut().chain(upcoming.iter_mut());
         for (track, (title, artist)) in tracks.zip(titles) {
             track.title = (*title).to_owned();
             track.artists = vec![ArtistRef {
@@ -278,6 +279,7 @@ impl Scene {
                 name: (*artist).to_owned(),
             }];
         }
+        state.upcoming = upcoming.into();
         app::on_event(UiEvent::Player(Box::new(state)));
         Ok(())
     }
@@ -1206,7 +1208,7 @@ const VOLUME: f32 = 0.7;
 fn idle_state() -> PlayerState {
     PlayerState {
         current: None,
-        upcoming: Vec::new(),
+        upcoming: Vec::new().into(),
         playing: false,
         audible: false,
         loading: false,
@@ -1257,7 +1259,7 @@ fn player_state(f: &Fixtures, track: usize) -> Result<PlayerState, String> {
     };
     Ok(PlayerState {
         current: Some(current),
-        upcoming: tracks,
+        upcoming: tracks.into(),
         playing: true,
         audible: false,
         loading: false,

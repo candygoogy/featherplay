@@ -261,6 +261,7 @@ impl Controller {
             ui,
             shown: None,
             shown_state: None,
+            shown_upcoming: Default::default(),
             buffering: false,
             likes: HashMap::new(),
             playing_from,

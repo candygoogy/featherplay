@@ -51,7 +51,7 @@ use tokio::sync::mpsc;
 pub use account::{
     AccountAction, AccountEvent, ApiKeys, Change, Cookies, LastfmStatus, ListenBrainzStatus, Token,
 };
-pub use interface::{Action, Options, PlayerState, UiEvent, UiLink};
+pub use interface::{Action, Options, PlayerState, SharedTracks, UiEvent, UiLink};
 pub use local_api::{LocalApiNotice, LocalApiStatus};
 pub use queue::{
     PlayingFrom, QueueAction, QueueInfo, add_input, back_to_inputs, play_after_inputs,
@@ -61,6 +61,7 @@ pub use silences::Mark;
 pub use sleep::{SleepAction, SleepKind, SleepState};
 
 use messages::Msg;
+use queue::{liked, shown_upcoming};
 use startup::cookie_header;
 
 use crate::presence::Presence;
@@ -108,6 +109,9 @@ pub struct Controller {
     shown: Option<(NowPlaying, bool)>,
     /// The last state sent to the window.
     shown_state: Option<PlayerState>,
+    /// The last Up next sent (`PlayerState::upcoming`), shared with the window's copy and
+    /// sent again while it's the same, uncopied. Kept when `shown_state` is cleared.
+    shown_upcoming: SharedTracks,
     /// The engine's output is starved (`AudioEvent::Buffering`): the position stands still.
     buffering: bool,
     /// Likes changed this session. The queue takes them (`Input::SetLike`), and so do the
@@ -599,17 +603,11 @@ impl Controller {
     /// Sends the whole player state to the window when it changed. The window derives the
     /// media card and taskbar state from it (`bar.rs`).
     fn push_state(&mut self) {
-        let like = |t: &Track| {
-            let mut t = t.clone();
-            if let Some(l) = self.likes.get(&t.id) {
-                t.like = *l;
-            }
-            t
-        };
         let queue = self.player.queue();
+        self.shown_upcoming = shown_upcoming(&self.shown_upcoming, queue.upcoming(), &self.likes);
         let state = PlayerState {
-            current: queue.current().map(like),
-            upcoming: queue.upcoming().iter().map(like).collect(),
+            current: queue.current().map(|t| liked(t, &self.likes)),
+            upcoming: self.shown_upcoming.clone(),
             playing: self.player.wants_play(),
             audible: matches!(self.player.status(), Status::Playing) && !self.buffering,
             loading: matches!(self.player.status(), Status::Loading) && self.player.wants_play(),
@@ -623,6 +621,7 @@ impl Controller {
         };
         // Every time, not only on a change: the API takes the position's progress too.
         self.publish_api(&state);
+        // Cheap: the tracks up next are shared, and compared as one when they are.
         if self.shown_state.as_ref() != Some(&state) {
             self.shown_state = Some(state.clone());
             (self.ui.events)(UiEvent::Player(Box::new(state)));

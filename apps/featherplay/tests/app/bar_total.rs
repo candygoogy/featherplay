@@ -20,7 +20,7 @@ use tokio::sync::mpsc;
 fn state(p: &Player) -> PlayerState {
     PlayerState {
         current: p.queue().current().cloned(),
-        upcoming: p.queue().upcoming().to_vec(),
+        upcoming: p.queue().upcoming().into(),
         playing: p.wants_play(),
         audible: matches!(p.status(), Status::Playing),
         loading: matches!(p.status(), Status::Loading),

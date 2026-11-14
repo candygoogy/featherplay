@@ -45,7 +45,7 @@ fn at_1_5x_the_clock_runs_one_and_a_half_seconds_a_second() {
     let from = Duration::from_secs(10);
     let state = PlayerState {
         current: Some(song),
-        upcoming: Vec::new(),
+        upcoming: Vec::new().into(),
         playing: true,
         audible: true,
         loading: false,

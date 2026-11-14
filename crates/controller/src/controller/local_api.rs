@@ -353,7 +353,7 @@ mod tests {
     fn state() -> PlayerState {
         PlayerState {
             current: None,
-            upcoming: Vec::new(),
+            upcoming: Vec::new().into(),
             playing: true,
             audible: false,
             loading: true,

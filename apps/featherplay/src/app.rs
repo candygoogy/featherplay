@@ -220,7 +220,8 @@ impl Ctx {
         }
     }
 
-    /// The latest player state from the controller.
+    /// The latest player state from the controller. A cheap copy: Up next is shared
+    /// (`SharedTracks`), so only the current track is copied.
     pub fn player(&self) -> Option<PlayerState> {
         self.player.borrow().clone()
     }
