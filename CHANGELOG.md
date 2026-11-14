@@ -13,8 +13,8 @@ Notable changes to featherplay, newest first. The format follows
   playing from, the title, the artist, album and year, and one row: Resume and where you
   paused (Open the source while it plays; Play on a fresh start), then Like, Add to playlist,
   Start radio and Go to artist. On its right, the next three songs and **Show all**, which
-  opens Up next; in a narrower window an **Up next** link at its top right instead, and
-  nothing there while the Up next panel is open. Under it, every shelf is one row of large
+  opens Up next, with the Up next panel open too when there's room; in a narrower window an
+  **Up next** link at its top right instead. Under it, every shelf is one row of large
   covers that pages sideways with the arrows shown on hover, the next cover cut off at the
   window's edge; Quick picks keep their song grid, two rows. Your mixes open with **Shuffle
   Liked songs**, which plays Liked songs shuffled (the sidebar still opens the page). It

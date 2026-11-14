@@ -241,12 +241,12 @@ component BandLink inherits Rectangle {
     }
 }
 
-// The band. Its right column (Up next, or more from the pick's shelf) shows with the Up next
-// panel closed once the song's column (`text-min` to `text-max`) and `show-min` of queue fit
-// beside the cover; the song's column gives way first, then the queue narrows. Narrower,
-// resuming, "Up next · N ›" at the top right opens the panel (nothing while the panel is
-// open, which shows the queue). Wider, the queue runs in more columns of three rows, each up
-// to `col-max`.
+// The band. Its right column (Up next, or more from the pick's shelf) shows once the song's
+// column (`text-min` to `text-max`) and `show-min` of queue fit beside the cover, the Up next
+// panel open or not: it's the same queue the panel shows. The song's column gives way first,
+// then the queue narrows. Narrower, resuming, "Up next · N ›" at the top right opens the panel
+// (nothing while the panel is open, which shows the queue). Wider, the queue runs in more
+// columns of three rows, each up to `col-max`.
 export component Band inherits Rectangle {
     property <bool> resume: HomeData.resume;
     property <bool> playing: root.resume && Player.playing;
@@ -260,7 +260,7 @@ export component Band inherits Rectangle {
     // `text-max`; the divider a gap after it, the queue a gap after that.
     property <length> beside-w: min(BandSizes.text-max, root.width - BandSizes.text-x - 3 * root.pad - BandSizes.show-min);
     property <bool> wide: root.beside-w >= BandSizes.text-min;
-    property <bool> column: root.wide && (!root.resume || !Frame.queue-open) && (root.resume || root.rows-n > 0);
+    property <bool> column: root.wide && (root.resume || root.rows-n > 0);
     property <bool> link: root.resume && !root.column && !Frame.queue-open && root.queued > 0;
     property <length> rule-x: BandSizes.text-x + root.beside-w + root.pad;
     property <length> next-x: root.rule-x + root.pad;

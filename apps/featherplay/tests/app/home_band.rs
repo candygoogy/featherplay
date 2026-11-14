@@ -1,17 +1,25 @@
 //! Home's band, on the offscreen platform (no window is shown): its main pill resumes a
 //! paused session, opens the source while it plays and plays the pick on a fresh start; its
 //! round actions act on the band's song; Up next shows its rows and "Show all" beside the
-//! song in a wide window, and an "Up next · N" link in a narrow one, both opening the panel.
+//! song in a wide window, and an "Up next · N" link in a narrow one, both opening the panel;
+//! the band's queue follows the player's, the Up next panel open or not.
 
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::time::Duration;
 
+use featherplay::app;
+use featherplay::controller::{Action, PlayerState, PlayingFrom, QueueAction, QueueInfo, UiEvent};
 use featherplay::offscreen;
+use featherplay::snapshot::Scene;
 use featherplay::ui::{
-    AppWindow, CardItem, HomeData, ItemKind, Nav, Player, QueueData, SongMenu, Theme, TrackRow,
+    AppWindow, CardItem, Frame, HomeData, ItemKind, Nav, Player, QueueData, SongMenu, Theme,
+    TrackRow,
 };
+use featherplay_controller::fixtures::Fixtures;
+use featherplay_core::model::{RepeatMode, Track};
 use slint::platform::{PointerEventButton, WindowEvent};
-use slint::{ComponentHandle, LogicalPosition, ModelRc, VecModel};
+use slint::{ComponentHandle, LogicalPosition, Model, ModelRc, VecModel};
 
 fn row(id: &str) -> TrackRow {
     TrackRow {
@@ -182,4 +190,72 @@ fn up_next_shows_beside_the_song_or_as_a_link_and_opens_the_panel() {
         PointerEventButton::Left,
     );
     assert_eq!(*did.borrow(), ["show queue"], "the link");
+}
+
+/// The controller's state as a radio has it: `current` playing, `upcoming` after it.
+fn radio_state(current: &Track, upcoming: &[Track]) -> PlayerState {
+    PlayerState {
+        current: Some(current.clone()),
+        upcoming: upcoming.to_vec(),
+        playing: true,
+        audible: true,
+        loading: false,
+        position: Duration::from_secs(8),
+        shuffle: false,
+        repeat: RepeatMode::Off,
+        radio: true,
+        volume: 1.0,
+        queue: QueueInfo {
+            playing_from: PlayingFrom::named("A radio"),
+            autoplay_at: None,
+        },
+        speed: 1.0,
+    }
+}
+
+#[test]
+fn the_bands_queue_follows_the_players_with_the_panel_open() {
+    // 2000 px with the 400 px Up next panel open: the band is 1280 px, room for its queue.
+    let scene = Scene::new(2000, 900, true, false).expect("scene");
+    let ui = &scene.ui;
+    let mut tracks = Fixtures::load().expect("fixtures").radio().expect("radio");
+    let current = tracks.remove(0);
+    ui.global::<Frame>().set_queue_open(true);
+    // A radio just started: nothing after the song until its continuation comes.
+    app::on_event(UiEvent::Player(Box::new(radio_state(&current, &[]))));
+    scene.open("home").expect("home");
+    ui.show().expect("show");
+    scene.settle();
+    let data = ui.global::<HomeData>();
+    assert_eq!(data.get_next().row_count(), 0);
+
+    // The continuation: the band shows the panel's first songs, beside the open panel.
+    app::on_event(UiEvent::Player(Box::new(radio_state(&current, &tracks))));
+    scene.settle();
+    let panel = ui.global::<QueueData>().get_upcoming();
+    assert!(
+        data.get_next().row_count() >= 3,
+        "the band's queue didn't follow"
+    );
+    for i in 0..3 {
+        assert_eq!(
+            data.get_next().row_data(i).map(|r| r.id),
+            panel.row_data(i).map(|r| r.id),
+            "the band and the panel differ at {i}"
+        );
+    }
+    let _ = scene.take_actions();
+    click(
+        ui.window(),
+        BAND_X + 732.0 + 120.0,
+        BAND_Y + 24.0 + 20.0 + 52.0 + 26.0,
+        PointerEventButton::Left,
+    );
+    assert!(
+        scene
+            .take_actions()
+            .iter()
+            .any(|a| matches!(a, Action::Queue(QueueAction::SkipTo(1)))),
+        "the band's second row didn't play"
+    );
 }
