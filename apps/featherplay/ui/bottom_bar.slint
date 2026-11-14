@@ -1089,32 +1089,58 @@ export component BottomBar inherits Rectangle {
 
     // The volume while the wheel over the bar, or Up or Down, changes it and the bar has no
     // slider to show it: a small card `s2` above the bar, over the volume's button, or at
-    // the bar's right end by Up next, whose sheet holds the volume then. It shows while the
-    // slider's own value would (`VolumeSlider.changing`), without a fade (the exe's room).
+    // the bar's right end by Up next, whose sheet holds the volume then. The speaker, the
+    // level as a short line (the slider's rail, its fill in the accent, as under a hand) and
+    // the value. It shows while the slider's own value would (`VolumeSlider.changing`) and
+    // fades as that value does: in quickly, out more gently, shorter without motion; the
+    // line's fill glides to each step as the value's card does (at once without motion).
     Rectangle {
         property <length> anchor: root.volume-button ? root.volume-centre : actions.x + actions.width - 18px;
+        property <bool> on: volume.changing && !root.show-volume;
         x: min(self.anchor - self.width / 2, root.width - self.width);
         y: -Theme.s2 - self.height;
-        width: 76px;
+        width: 136px;
         height: 32px;
         border-radius: Theme.r-s;
         background: Theme.card;
+        border-width: 1px;
+        border-color: Theme.card-edge;
         drop-shadow-blur: 8px;
+        drop-shadow-offset-y: 2px;
         drop-shadow-color: Theme.cover-shadow;
-        visible: volume.changing && !root.show-volume;
+        opacity: self.on ? 1 : 0;
+        visible: self.opacity > 0;
+        animate opacity { duration: self.on ? Theme.t-fast : Theme.t-linger; easing: Curves.ease-out; }
         Icon {
             x: 10px;
             width: 16px;
             height: 16px;
             commands: Icons.volume;
         }
+        Rectangle {
+            x: 34px;
+            y: (parent.height - self.height) / 2;
+            width: 48px;
+            height: 4px;
+            border-radius: 2px;
+            background: Theme.track;
+            Rectangle {
+                x: 0;
+                width: parent.width * clamp(Player.volume, 0, 1);
+                border-radius: 2px;
+                background: Theme.accent;
+                animate width { duration: Theme.t-step; easing: Curves.ease-out; }
+            }
+        }
+        // Right-aligned, so "%" stays put as the digits change.
         Body {
-            x: 32px;
+            x: parent.width - 10px - self.width;
             width: 34px;
             text: @tr("{} %", round(Player.volume * 100));
             font-size: Theme.t-meta;
             font-weight: 600;
             color: Theme.text1;
+            horizontal-alignment: right;
             vertical-alignment: center;
         }
     }

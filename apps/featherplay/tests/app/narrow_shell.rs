@@ -329,9 +329,32 @@ fn rows(scene: &Scene, y0: u32, y1: u32) -> Vec<[u8; 3]> {
         .collect()
 }
 
+/// The level card's line in `strip` (rows of a `width`-px window, `bare` before the card
+/// showed): the longest stretch of the accent in a row, in px.
+fn level_line(scene: &Scene, strip: &[[u8; 3]], bare: &[[u8; 3]], width: u32) -> usize {
+    let a = scene.ui.global::<Theme>().get_accent();
+    let lit = |p: &[u8; 3]| {
+        [a.red(), a.green(), a.blue()]
+            .iter()
+            .zip(p)
+            .all(|(c, v)| c.abs_diff(*v) <= 8)
+    };
+    strip
+        .chunks(width as usize)
+        .zip(bare.chunks(width as usize))
+        .flat_map(|(row, was)| {
+            row.iter().zip(was).scan(0, |run, (p, w)| {
+                *run = if p != w && lit(p) { *run + 1 } else { 0 };
+                Some(*run)
+            })
+        })
+        .max()
+        .unwrap_or(0)
+}
+
 /// A wheel notch over the bar, here over its title, moves the volume one step at every
 /// width and doesn't scroll the page; where the bar has no slider, a level card shows above
-/// the bar while it changes.
+/// the bar while it changes, its line lit to the level.
 #[test]
 fn the_wheel_over_the_bar_sets_the_volume_and_leaves_the_page_still() {
     let scene = home(480);
@@ -368,11 +391,15 @@ fn the_wheel_over_the_bar_sets_the_volume_and_leaves_the_page_still() {
             rows(&scene, page.0, page.1) == still,
             "{width} px: the page scrolled"
         );
-        // At 1280 px the slider shows its own value, in the bar.
+        // At 1280 px the slider shows its own value, in the bar. Elsewhere the card's line
+        // (48 px) is lit to the level, give or take its rounded ends.
         if width < 1280 {
+            let strip = rows(&scene, card.0, card.1);
+            assert!(strip != bare, "{width} px: no level shown");
+            let lit = level_line(&scene, &strip, &bare, width) as f32;
             assert!(
-                rows(&scene, card.0, card.1) != bare,
-                "{width} px: no level shown"
+                (lit - 48.0 * volume).abs() <= 2.0,
+                "{width} px: {lit} px of the line lit at {volume}"
             );
         }
         offscreen::advance(Duration::from_secs(3));
