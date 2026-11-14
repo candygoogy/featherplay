@@ -22,7 +22,8 @@ fn the_page_ends_at_the_panel_and_the_sidebar_folds_to_make_room() {
     let theme = ui.global::<Theme>();
     let width = 960.0;
     let panel_x = width - theme.get_panel_w();
-    let pad = theme.get_page_pad();
+    // A 548 px page has the narrow padding (`Theme.pad-for`).
+    let pad = theme.invoke_pad_for(ui.get_page_width());
 
     assert_eq!(
         theme.get_rail_w() + ui.get_page_width(),
@@ -32,15 +33,17 @@ fn the_page_ends_at_the_panel_and_the_sidebar_folds_to_make_room() {
     assert!(ui.get_page_width() >= theme.get_page_min_w());
 
     // Nothing of the band in the page's right padding, just left of the panel: each row of
-    // pixels there down to the band's foot (the 64 px top bar, 32 px, 224 px) is the ground,
-    // as in the left padding. (The rails under it run on to the page's edge on purpose.)
+    // pixels there down to the band's foot (the 64 px top bar, 32 px, the narrow band's
+    // 192 px: the page's 500 px of content is too narrow for the song beside the cover) is
+    // the ground, as in the left padding. (The rails under it run on to the page's edge on
+    // purpose.)
     let shot = offscreen::shown(w).expect("shown");
     let px = |x: f32, y: u32| {
         let p = shot.as_slice()[(y * shot.width() + (x * SCALE) as u32) as usize];
         [p.r, p.g, p.b]
     };
     let near = |a: [u8; 3], b: [u8; 3]| a.iter().zip(b).all(|(a, b)| a.abs_diff(b) <= 6);
-    let band_foot = ((64.0 + 32.0 + 224.0) * SCALE) as u32;
+    let band_foot = ((64.0 + 32.0 + 192.0) * SCALE) as u32;
     let left = theme.get_rail_w() + 2.0;
     let mut stray = Vec::new();
     for y in 0..band_foot {

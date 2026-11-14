@@ -77,6 +77,7 @@ mod memory;
 mod mini_follow;
 mod mini_player;
 mod motion_idle;
+mod narrow_pages;
 mod narrow_panel;
 mod narrow_shell;
 mod neutral_accent;

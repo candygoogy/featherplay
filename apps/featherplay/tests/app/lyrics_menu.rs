@@ -345,10 +345,15 @@ fn assert_laid_out(rects: &[LogicalRect], right: f32, size: f32, view: &str) {
 fn large_text_fits_the_narrowest_window_in_the_full_view_and_the_side_tab() {
     // SAFETY: as in `scene`.
     unsafe { std::env::set_var("FEATHERPLAY_FIXTURES", "demo") };
-    // The window's least width.
-    let scene = Scene::new(960, 640, true, false).expect("scene");
+    // The window's least width: the full view stacks under the song's header, its lines the
+    // window's width less the padding, at the side tab's Large size (24 px).
+    let scene = Scene::new(480, 640, true, false).expect("scene");
+    scene
+        .ui
+        .window()
+        .set_size(slint::PhysicalSize::new(480, 640));
     scene.ui.window().dispatch_event(WindowEvent::Resized {
-        size: slint::LogicalSize::new(960.0, 640.0),
+        size: slint::LogicalSize::new(480.0, 640.0),
     });
     scene.play(false).expect("player");
     scene.open("now-playing").expect("now playing");
@@ -359,19 +364,29 @@ fn large_text_fits_the_narrowest_window_in_the_full_view_and_the_side_tab() {
     scene.settle();
     scene.ui.window().take_snapshot().expect("frame");
     assert!(data.get_showing());
-    // Below `wide-min`, Now playing's side panel is `panel-w` wide; the stage is the rest.
-    // Open, as the side tab needs it below.
+    // Each line is its row, whose hover tile reaches 12 px past the 20 px padding.
+    assert_laid_out(
+        &line_rects(&scene, 0.0, 480.0),
+        472.0,
+        24.0,
+        "the full view",
+    );
+
+    // The side tab, in the narrowest window with Now playing's side panel: 960 px. Below
+    // `wide-min` the panel is `panel-w` wide; the stage is the rest. Open, as the side tab
+    // needs it.
+    scene
+        .ui
+        .window()
+        .set_size(slint::PhysicalSize::new(960, 640));
+    scene.ui.window().dispatch_event(WindowEvent::Resized {
+        size: slint::LogicalSize::new(960.0, 640.0),
+    });
     scene.ui.global::<Frame>().set_side_open(true);
     scene.settle();
     scene.ui.window().take_snapshot().expect("frame");
     let t = scene.ui.global::<Theme>();
     let stage = 960.0 - t.get_panel_w();
-    assert_laid_out(
-        &line_rects(&scene, 0.0, stage),
-        stage,
-        30.0,
-        "the full view",
-    );
 
     // The side tab, at Large.
     data.invoke_toggle_view();
