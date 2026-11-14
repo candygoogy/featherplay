@@ -34,12 +34,12 @@ touches another. The shared files below change only when a page needs something 
 | `made_with_slint.slint` | `MadeWithSlint`, std-widgets' `AboutSlint` (the badge Slint's royalty-free licence asks for, at the end of About) with its badge drawn as paths, for the same reason | account |
 | `shortcuts.slint` | `Shortcuts`, the window's keyboard shortcuts listed once: Settings' "Keyboard shortcuts" dialog (`ShortcutsDialog`, Ctrl+/) shows them, and `app.slint`'s key handler reports each one it takes (`Shortcuts.used`), so a test checks the two agree | frame (shared) |
 | `probe.slint` | `Probe`, a small animated region that only `tests/app/smoothness.rs` turns on, to price a continuously animated indicator | tests |
-| `pages/content.slint` | The page-level pieces the content pages share (Home, Library, album, playlist, artist, search): headers, skeletons, error and empty states, `TopScrim` | content pages |
+| `pages/content.slint` | The page-level pieces the content pages share (Home, Library, album, playlist, artist, search): headers (`HeaderSizes`, `content/header_sizes.slint`: the album and playlist header's sizes, stacked on a narrow page), skeletons, error and empty states, `TopScrim` | content pages |
 | `pages/home.slint`, `pages/home/` | `HomePage`, `HomeData` (`home/data.slint`), the band (`home/hero.slint`); `ShelfShape`, `Rails` (how each Home rail lays out from what it holds, `src/pages/home.rs::arrange`) and `Shapes` (Explore's shelves) | home |
 | `pages/{library,album,playlist,artist,search}.slint` | One page each, with its `…Data` global | content pages |
 | `pages/explore.slint` | `ExplorePage` (New releases, Charts with the country picker and the top artists, Moods & genres) and `MoodPage` (a mood's curated playlists), `ExploreData`, `MoodData`; `src/pages/explore.rs` | discovery |
 | `pages/history.slint` | `HistoryPage`, `HistoryData`: the songs played lately, under a heading per day; `src/pages/history.rs` | discovery |
-| `pages/now_playing.slint` | `NowPlayingPage`, `NowPlayingData`: "Playing from" centred in the stage's header (`QueueData.open-source`: the album or playlist page, or Up next for a radio; `src/queue_panel.rs`), then one block the cover's width: the cover with a glow in the accent, the title (two lines at most) with the song's buttons pinned at the cover's right edge, the artists, and "album · year"; in a short or narrow stage the title steps down a size and the cover gives way first. Also `SideTabs`, the side panel's Up next, Related and Lyrics tabs | now playing |
+| `pages/now_playing.slint` | `NowPlayingPage`, `NowPlayingData`: "Playing from" centred in the stage's header (`QueueData.open-source`: the album or playlist page, or Up next for a radio; `src/queue_panel.rs`), then one block the cover's width: the cover with a glow in the accent, the title (two lines at most) with the song's buttons pinned at the cover's right edge, the artists, and "album · year"; in a short or narrow stage the title steps down a size and the cover gives way first. Below an 800 px stage the lyrics view stacks: the song as a header in the top left, the lines under it; the side panel shows only where the stage keeps `page-min-w` beside it. Also `SideTabs`, the side panel's Up next, Related and Lyrics tabs | now playing |
 | `pages/lyrics.slint` | `LyricsView`, `LyricsData`: the lyrics, in the Lyrics tab and in Now playing's full lyrics view (see [Lyrics](#lyrics)); `src/lyrics.rs` | lyrics |
 | `pages/{settings,about,sign_in}.slint` | One page each | account |
 
@@ -261,6 +261,13 @@ times, gaps, wheel messages and the UI thread's CPU time inside the paints (`src
 ## Rules the design sets
 
 - Colours, sizes and durations come from `Theme`; no literal colours in pages.
+- Pages lay out down to a 480 px window (360 without overlaps, which some window managers
+  force). A page's side padding is `Theme.pad-for(its width)` (40, then 24 and 20 px as it
+  narrows); two things side by side stack where the narrower would drop under its least
+  (Settings' `RowPlan`, the album header's `HeaderSizes.stacked`), and long text elides.
+  What changes a component's arrangement with its own width inside a layout (`Chips`, the
+  Accent row) is worked out in a change handler, not bound: bound, its size would feed back
+  into the width the layout gives it.
 - Everything clickable shows hover and pressed: `Theme.state(pressed, hovered)` for overlays,
   `Theme.tonal(…)` and `Theme.solid-state(…)` for buttons, over `Theme.t-hover`.
 - The accent comes from the current cover by default (`src/follow.rs`; on black-and-white,

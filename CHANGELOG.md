@@ -45,6 +45,17 @@ Notable changes to featherplay, newest first. The format follows
   Quick picks keep their song grid, two rows. Your mixes open with **Shuffle Liked songs**,
   which plays Liked songs shuffled (the sidebar still opens the page). It replaces the "Pick
   up where you left off" card, the shortcut tiles and the cover wash behind the search bar.
+- **The pages work in a narrow window**, down to 480 px wide. Now playing below 800 px with
+  lyrics on shows the song as a small header (the cover, title, artists, album and its
+  buttons) with the lyrics under it, filling the window's height; without lyrics the cover
+  keeps the same margin, so turning lyrics on shrinks it in place. Its side panel steps aside
+  where it would leave the song too little room. Home's band takes a narrower form, with
+  the row of buttons under the cover; its rails keep two covers in view, and Quick picks show
+  one column. Album and playlist headers put the cover above the title. Settings rows put
+  their controls under the label when they'd crowd it, and the Accent colours go on a line of
+  their own. Song rows give the room to the title, the heart showing on hover in place of the
+  length. Filter chips narrow to fit, and About's update banner and buttons stack. Pages use
+  less padding as they narrow (24 px, then 20).
 
 ### Fixed
 
