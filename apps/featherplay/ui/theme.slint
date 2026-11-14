@@ -265,6 +265,9 @@ export global Theme {
     out property <length> sidebar-w: 240px;
     out property <length> rail-w: 72px;            // the sidebar below `wide-min`
     out property <length> wide-min: 1100px;        // below: icon rail (and while Up next needs the room)
+    // Below: no sidebar at all; the top bar's menu button opens the full one as a drawer.
+    // 569 px, a third of a 2560 px screen at 150 %, stays on the rail.
+    out property <length> drawer-below: 560px;
     // The player bar floats `bar-inset` in from the window's left, right and bottom edges,
     // over the pages; `bar-clear` is the room it takes from the bottom (its top edge), which
     // the sidebar and the panels keep clear and the pages scroll past (`page-end`).
@@ -278,6 +281,12 @@ export global Theme {
     out property <length> panel-w: 340px;           // the Up next panel, below `panel-wide-min`
     out property <length> panel-wide-min: 1280px;   // from here it's `nowplaying-side-w` wide
     out property <length> nowplaying-side-w: 400px;
+    // Where the panel doesn't fit beside the page, Up next is a sheet over it: from this far
+    // down (clear of the top bar and of Now playing's header row) to just above the bar.
+    out property <length> sheet-top: 72px;
+    // At most this wide, at the right above the bar's Up next button: a wider list only puts
+    // its lengths further from their titles.
+    out property <length> sheet-max-w: 640px;
     // The narrowest a page is laid out beside the Up next panel; narrower beside the full
     // sidebar, the sidebar folds to the rail (`app.slint`: `fold`). Home sets it: two shortcut
     // tiles at their 220 px least, and the hero's Resume and Go to album beside its cover, each

@@ -110,12 +110,14 @@ fn open_source(ctx: &Rc<Ctx>) {
 }
 
 /// Shows Up next: in Now playing's side panel there (shown if it was hidden), in the frame's
-/// panel elsewhere (Home's "Show all").
+/// panel elsewhere (Home's "Show all"), and in a window too narrow for either, in the sheet.
 pub fn show_up_next(ctx: &Rc<Ctx>) {
     let Some(ui) = ctx.window() else { return };
     ui.global::<NowPlayingData>().set_tab(0);
     let frame = ui.global::<Frame>();
-    if ctx.current_page() == Page::NowPlaying {
+    if ui.get_sheet() {
+        frame.set_sheet_open(true);
+    } else if ctx.current_page() == Page::NowPlaying {
         if !frame.get_side_open() {
             frame.set_side_open(true);
             frame.invoke_side_toggled(true);

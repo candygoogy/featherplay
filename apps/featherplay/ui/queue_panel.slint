@@ -1,10 +1,14 @@
 // The Up next panel: "Playing from …", the current track pinned,
 // then the queue with drag to reorder, remove on hover and Clear, and a quiet divider
 // where a radio continuation starts. `UpNext` is also the now-playing page's Up next tab.
+// In a window too narrow for a side panel the same panel is the Up next sheet (`QueuePanel`'s
+// `sheet`), whose header also holds Shuffle and Repeat once the bar has given them up.
 // Filled by `src/queue_panel.rs`.
 import { ListView } from "list_view.slint";
 import { Theme, Icons, Curves } from "theme.slint";
 import { TrackRow, Body, SongRow, Cover, IconButton, RowsShown, ShownRows, SongList } from "parts.slint";
+import { Frame } from "nav.slint";
+import { Player, Repeat } from "player.slint";
 
 export global QueueData {
     in property <TrackRow> current;
@@ -207,6 +211,10 @@ export component UpNext inherits Rectangle {
     property <bool> labelled: QueueData.playing-from != "";
     property <length> head-h: root.labelled ? 64px : 32px + Theme.s2;
     property <length> list-y: QueueData.has-current ? root.head-h + Theme.row-h + Theme.s2 : root.head-h;
+    // In the sheet, once the bar has given them up: Shuffle and Repeat before Clear, and the
+    // room they take from "Playing from".
+    property <bool> order: Frame.sheet && Frame.order-in-sheet && root.place == 0;
+    property <length> order-w: root.order ? order-row.width + Theme.s2 : 0px;
     // The rows end where the header and Clear end; the list's scrollbar sits in the gutter.
     property <length> gutter: Theme.s2;
     property <length> row-w: root.width - 2 * Theme.s4 - root.gutter;
@@ -227,7 +235,7 @@ export component UpNext inherits Rectangle {
     Body {
         x: Theme.s5;
         y: Theme.s2;
-        width: parent.width - 2 * Theme.s5 - clear.width;
+        width: parent.width - 2 * Theme.s5 - clear.width - root.order-w;
         height: 16px;
         visible: root.labelled;
         text: @tr("Playing from");
@@ -238,12 +246,48 @@ export component UpNext inherits Rectangle {
     Body {
         x: Theme.s5;
         y: 26px;
-        width: parent.width - 2 * Theme.s5 - clear.width - Theme.s2;
+        width: parent.width - 2 * Theme.s5 - clear.width - Theme.s2 - root.order-w;
         height: 20px;
         visible: root.labelled;
         text: QueueData.playing-from;
         font-weight: 600;
         vertical-alignment: center;
+    }
+    // Lit as the bar's are; Ctrl+S and Ctrl+R work as ever. Hidden, not made and unmade: each
+    // `if` costs the exe a component of its own.
+    order-row := Rectangle {
+        x: clear.x - Theme.s2 - self.width;
+        y: clear.y + (clear.height - self.height) / 2;
+        width: 2 * 36px + Theme.s1;
+        height: 36px;
+        visible: root.order;
+        IconButton {
+            x: 0;
+            icon: Icons.shuffle;
+            label: Player.shuffle ? @tr("Shuffle on") : @tr("Shuffle off");
+            active: Player.shuffle;
+            enabled: Player.has-track;
+            clicked => { Player.toggle-shuffle(); }
+        }
+        IconButton {
+            x: 36px + Theme.s1;
+            icon: Icons.repeat;
+            label: Player.repeat == Repeat.one ? @tr("Repeat one") : (Player.repeat == Repeat.all ? @tr("Repeat all") : @tr("Repeat off"));
+            active: Player.repeat != Repeat.off;
+            enabled: Player.has-track;
+            clicked => { Player.cycle-repeat(); }
+        }
+        // Repeat one: a small 1 at the glyph's upper right, as in the bar.
+        Text {
+            x: 2 * 36px + Theme.s1 - 13px;
+            y: 4px;
+            visible: Player.repeat == Repeat.one;
+            text: "1";
+            font-family: Theme.body-font;
+            font-size: 9px;
+            font-weight: 700;
+            color: Theme.accent;
+        }
     }
     clear := TextButton {
         x: parent.width - self.width - Theme.s3;
@@ -359,15 +403,21 @@ export component UpNext inherits Rectangle {
 
 // The frame's side panel: its ground, its left hairline, and its contents (app.slint gives
 // it Now playing's Up next and Related tabs, `SideTabs`, so the two panels read the same).
+// As the sheet, a card instead: rounded as the bar is, with the cards' edge.
 export component QueuePanel inherits Rectangle {
     // The panel is opening or open: its contents fade in as it slides, so a full
     // list doesn't slide in as a slab.
     in property <bool> open: true;
+    in property <bool> sheet: false;
     background: Theme.panel;
+    border-radius: root.sheet ? Theme.r-xl : 0px;
+    border-width: root.sheet ? 1px : 0px;
+    border-color: Theme.card-edge;
     clip: true;
     Rectangle {
         x: 0;
         width: 1px;
+        visible: !root.sheet;
         background: Theme.hairline;
     }
     Rectangle {

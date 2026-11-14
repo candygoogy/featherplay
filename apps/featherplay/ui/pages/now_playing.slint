@@ -91,8 +91,10 @@ component LinkText inherits Rectangle {
 // Related picked it asks Rust for the current track's (cached per track).
 export component SideTabs inherits Rectangle {
     in property <bool> shown: true;
-    // Which panel it is, for `RowsShown`: 0 the frame's, 1 Now playing's.
+    // Which panel it is, for `RowsShown`: 0 the frame's (the sheet too), 1 Now playing's.
     in property <int> place;
+    // Room kept free right of the tabs (the sheet's close button).
+    in property <length> trail: 0px;
     changed shown => {
         if root.shown && NowPlayingData.tab == 1 {
             NowPlayingData.tab-selected(1);
@@ -111,7 +113,7 @@ export component SideTabs inherits Rectangle {
     Tabs {
         x: Theme.s5;
         y: Theme.s3;
-        width: parent.width - 2 * Theme.s5;
+        width: parent.width - 2 * Theme.s5 - root.trail;
         labels: root.lyrics-away ? [@tr("Up next"), @tr("Related")] : [@tr("Up next"), @tr("Related"), @tr("Lyrics")];
         active: root.tab;
         selected(i) => {
@@ -206,7 +208,7 @@ export component SideTabs inherits Rectangle {
 // (`LyricsData.held`), and the Lyrics pill's note for a few seconds (`LyricsData.hint`).
 export component LyricsWatch {
     in property <bool> minimized;
-    property <bool> live: LyricsData.on && ((((NowPlayingData.tab == 2 && (Nav.page == PageKind.now-playing ? Frame.side-open : Frame.queue-open)) || LyricsData.wanted) && !Frame.hidden && !root.minimized) || LyricsData.desktop);
+    property <bool> live: LyricsData.on && ((((NowPlayingData.tab == 2 && Frame.tabs-open) || LyricsData.wanted) && !Frame.hidden && !root.minimized) || LyricsData.desktop);
     changed live => {
         LyricsData.on-screen = self.live;
         LyricsData.live-changed(self.live);
@@ -395,7 +397,8 @@ component SourceButton inherits Rectangle {
 
 export component NowPlayingPage inherits Rectangle {
     // The side panel's width, and the room it takes from the stage. The bar's Up next button
-    // shows and hides it (`Frame.side-open`). It slides like the frame's Up next panel: the
+    // shows and hides it (`Frame.side-open`); in a window too narrow for it, it steps aside
+    // for the Up next sheet (`Frame.side-shown`). It slides like the frame's Up next panel: the
     // stage is laid out once at its new width rather than eased (that would lay it out and
     // repaint it on every frame of the slide). Opening, the panel slides in over the stage,
     // which narrows when the slide ends; closing, the stage widens at once under the panel
@@ -403,13 +406,13 @@ export component NowPlayingPage inherits Rectangle {
     property <length> panel-w: root.width >= Theme.wide-min ? Theme.nowplaying-side-w : Theme.panel-w;
     // How much of the panel is slid out past the right edge: that eases, not `x`, so the
     // panel stays at the edge while the window resizes.
-    property <float> side-out: Frame.side-open ? 0 : 1;
-    animate side-out { duration: Frame.side-open ? Theme.t-panel : Theme.t-panel * 0.8; easing: Curves.ease-drawer; }
+    property <float> side-out: Frame.side-shown ? 0 : 1;
+    animate side-out { duration: Frame.side-shown ? Theme.t-panel : Theme.t-panel * 0.8; easing: Curves.ease-drawer; }
     // The panel has slid all the way in: set from the slide's end, not bound to it, so the
     // stage's width depends on it alone and isn't re-evaluated on every frame of the slide.
     property <bool> side-in;
     changed side-out => { root.side-in = root.side-out <= 0; }
-    property <length> side-w: Frame.side-open && root.side-in ? root.panel-w : 0px;
+    property <length> side-w: Frame.side-shown && root.side-in ? root.panel-w : 0px;
     property <length> stage-w: self.width - self.side-w;
     // The page runs under the floating bar; the stage centres in the room above it.
     property <length> stage-h: self.height - Theme.bar-clear;
@@ -461,7 +464,7 @@ export component NowPlayingPage inherits Rectangle {
     // opaque, so a ground here would only be one more 4K fill under them in every frame.
     init => {
         root.shown = true;
-        root.side-in = Frame.side-open;
+        root.side-in = Frame.side-shown;
         root.ask-cover();
         // Back on the page with lyrics on: it opens on the view, through a lookup if the song
         // changed meanwhile, as when it showed.
@@ -826,7 +829,7 @@ export component NowPlayingPage inherits Rectangle {
             background: Theme.hairline;
         }
         SideTabs {
-            shown: Frame.side-open;
+            shown: Frame.side-shown;
             place: 1;
         }
     }

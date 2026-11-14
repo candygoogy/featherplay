@@ -39,6 +39,26 @@ export global Frame {
     // queue button there. Its own state: the frame's panel keeps `queue-open`.
     in-out property <bool> side-open: true;
     callback side-toggled(bool);
+    // The window is too narrow for a side panel beside the page (`AppWindow.sheet`, set by
+    // the window): Up next opens as a sheet above the bar instead, on every page, and Now
+    // playing's side panel steps aside. The two panels keep their saved states for when the
+    // window widens again.
+    in-out property <bool> sheet: false;
+    // The sheet is open. Not saved: it's a passing look, like a menu.
+    in-out property <bool> sheet-open: false;
+    // Now playing's side panel shows: open, and the window wide enough for it.
+    out property <bool> side-shown: side-open && !sheet;
+    // The page's Up next, Related and Lyrics tabs are open, wherever they show: the sheet, Now
+    // playing's side panel, or the frame's.
+    out property <bool> tabs-open: sheet ? sheet-open : (Nav.page == PageKind.now-playing ? side-open : queue-open);
+    // The bar has given Shuffle and Repeat to the sheet (set by the window), and the volume
+    // too (`volume-in-sheet`), each when the bar has no room left for it.
+    in-out property <bool> order-in-sheet: false;
+    in-out property <bool> volume-in-sheet: false;
+    // The bar's volume popup, from its volume button where the slider doesn't fit.
+    in-out property <bool> volume-open: false;
+    // Below `Theme.drawer-below`: the sidebar's drawer, from the top bar's menu button.
+    in-out property <bool> drawer-open: false;
     // The bar's mini player button, shown where the desktop has no tray: opens the mini
     // player above the point given (the button's top centre, logical pixels in the window),
     // or closes it, as a click on the tray icon does.

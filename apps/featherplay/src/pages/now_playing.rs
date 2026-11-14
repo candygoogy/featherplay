@@ -167,7 +167,14 @@ pub fn player_changed(ctx: &Rc<Ctx>, state: &PlayerState) {
 /// don't rebuild the list.
 fn side_changed(ctx: &Rc<Ctx>, state: &PlayerState) {
     let Some(ui) = ctx.window() else { return };
-    if !ui.global::<Frame>().get_queue_open() || ui.global::<NowPlayingData>().get_tab() != 1 {
+    let frame = ui.global::<Frame>();
+    // In a narrow window the tabs are the Up next sheet's.
+    let open = if frame.get_sheet() {
+        frame.get_sheet_open()
+    } else {
+        frame.get_queue_open()
+    };
+    if !open || ui.global::<NowPlayingData>().get_tab() != 1 {
         return;
     }
     let id = state.current.as_ref().map(|t| t.id.clone());
@@ -203,7 +210,14 @@ fn show(ctx: &Rc<Ctx>, state: &PlayerState) {
     }
 
     show_year(ctx, track);
-    if data.get_tab() == 1 && ui.global::<Frame>().get_side_open() {
+    let frame = ui.global::<Frame>();
+    // The side panel, or in a narrow window the Up next sheet in its place.
+    let side = if frame.get_sheet() {
+        frame.get_sheet_open()
+    } else {
+        frame.get_side_open()
+    };
+    if data.get_tab() == 1 && side {
         show_related(ctx);
     } else {
         // Shown when the tab is picked, or the hidden side panel shown again.

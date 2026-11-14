@@ -2,14 +2,14 @@
 // switch. Pages live in pages/*.slint, one file each; see ui/README.md for who owns what.
 import "fonts/manrope/Manrope-Variable.ttf";
 
-import { Theme, Curves } from "theme.slint";
+import { Theme, Curves, Icons } from "theme.slint";
 import { Nav, PageKind, Frame } from "nav.slint";
-import { Mark, Bands } from "parts.slint";
+import { Mark, Bands, Icon } from "parts.slint";
 import { Player } from "player.slint";
 import { Probe, ProbeRegion } from "probe.slint";
 import { Sidebar } from "sidebar.slint";
 import { TopBar, TopBarData } from "top_bar.slint";
-import { BottomBar, SpeedLayer } from "bottom_bar.slint";
+import { BottomBar, SpeedLayer, VolumeLayer, VolumeRow } from "bottom_bar.slint";
 import { Sleep, SleepLayer } from "sleep_timer.slint";
 import { QueuePanel } from "queue_panel.slint";
 import { HomePage } from "pages/home.slint";
@@ -103,7 +103,7 @@ export component AppWindow inherits Window {
     title: "featherplay";
     preferred-width: 1280px;
     preferred-height: 800px;
-    min-width: 960px;
+    min-width: 480px;
     min-height: 600px;
     background: Theme.ground;
     default-font-family: Theme.body-font;
@@ -111,6 +111,85 @@ export component AppWindow inherits Window {
     forward-focus: keys;
 
     property <bool> wide: self.width >= Theme.wide-min;
+    // Below `Theme.drawer-below` there's no sidebar beside the page: the top bar's menu button
+    // opens the full one as a drawer over it (`Frame.drawer-open`).
+    property <bool> drawer: self.width < Theme.drawer-below;
+    // The Up next panel fits beside the page while the window holds the rail, the panel and
+    // the page's least width: 72 + 340 + 540 = 952 px. Worked out, not a round 960: a window
+    // snapped to half a 1920 px screen is about 958 px wide, and keeps the panel. Narrower,
+    // Up next is a sheet above the bar on every page (`Frame.sheet`), Now playing's side panel
+    // included. Rust reads `sheet` (the Frame copy follows a turn of the event loop later).
+    property <length> panel-fit: Theme.rail-w + Theme.panel-w + Theme.page-min-w;
+    out property <bool> sheet: self.width < root.panel-fit;
+    init => { Frame.sheet = root.sheet; }
+    changed sheet => {
+        Frame.sheet = root.sheet;
+        if !root.sheet {
+            Frame.sheet-open = false;
+        }
+    }
+    // Widened past it with the drawer open: the sidebar is back beside the page, and the keys
+    // come back to the window.
+    changed drawer => {
+        if !root.drawer && Frame.drawer-open {
+            Frame.drawer-open = false;
+            keys.focus();
+        }
+    }
+    property <bool> drawer-shown: root.drawer && Frame.drawer-open && !root.full-page;
+    property <bool> sheet-shown: root.sheet && Frame.sheet-open;
+    // Keyboard actions don't animate: a drawer opened with the keys is there at once, and
+    // Escape closes the drawer or the sheet at once. A click or the bar's button eases them.
+    property <bool> drawer-by-key;
+    property <bool> drawer-snap;
+    property <bool> sheet-snap;
+    // How far the drawer is slid out past the left edge, and the sheet down behind the bar:
+    // these ease, and the geometry follows from them, so a resize moves them at once.
+    property <float> d-out: root.drawer-shown ? 0 : 1;
+    animate d-out {
+        duration: root.drawer-shown ? (root.drawer-by-key ? 0ms : Theme.t-panel) : (root.drawer-snap ? 0ms : Theme.t-panel * 0.8);
+        easing: Curves.ease-drawer;
+    }
+    property <float> s-out: root.sheet-shown ? 0 : 1;
+    animate s-out {
+        duration: root.sheet-shown ? Theme.t-panel : (root.sheet-snap ? 0ms : Theme.t-panel * 0.8);
+        easing: Curves.ease-drawer;
+    }
+    // The sheet: from `Theme.sheet-top` to 8 px above the bar, `bar-inset` in from the sides as
+    // the bar is, up to `Theme.sheet-max-w` wide at the right, above the Up next button. Once
+    // the bar has no volume button, a volume row at its foot.
+    property <length> sheet-h: root.bar-top - Theme.s2 - Theme.sheet-top;
+    property <length> sheet-w: min(root.width - 2 * Theme.bar-inset, Theme.sheet-max-w);
+    property <length> sheet-foot: Frame.volume-in-sheet ? 57px : 0px;
+    function open-drawer(by-key: bool) {
+        root.drawer-by-key = by-key;
+        root.drawer-snap = false;
+        Frame.drawer-open = true;
+        sidebar.take-keys(by-key);
+    }
+    // The keys go back where they came from: the menu button if it opened the drawer from
+    // the keyboard (and the page picked still has the top bar), else the window.
+    function close-drawer(by-key: bool) {
+        if !Frame.drawer-open {
+            return;
+        }
+        root.drawer-snap = by-key;
+        Frame.drawer-open = false;
+        if root.drawer-by-key && !root.no-top && !root.full-page {
+            top-bar.focus-menu();
+        } else {
+            keys.focus();
+        }
+    }
+    function close-sheet(by-key: bool) {
+        root.sheet-snap = by-key;
+        Frame.sheet-open = false;
+    }
+    changed sheet-shown => {
+        if root.sheet-shown {
+            root.sheet-snap = false;
+        }
+    }
     // Now playing takes the whole body; the sidebar and the panel step aside. From
     // `Frame.full-page`, which Rust sets only when it changes: bound to `Nav.page` straight,
     // everything it places (the sidebar, Up next, the bar's clear) was marked dirty by every
@@ -120,8 +199,8 @@ export component AppWindow inherits Window {
     property <bool> full-page: Frame.full-page;
     // The sidebar shows as the icon rail below `wide-min`, and while the Up next panel is in
     // where making room for it beside the full sidebar would leave the page narrower than
-    // `Theme.page-min-w` (from `wide-min` to 1120 px). Beside the rail there's always room:
-    // the window's least width (960) less the rail and the panel leaves the page 548 px.
+    // `Theme.page-min-w` (from `wide-min` to 1120 px). Beside the rail there's room down to
+    // `panel-fit`; narrower, Up next is the sheet, and below `drawer-below` there's no rail.
     // It folds with the page's one relayout once the panel is in, and unfolds at once
     // as the panel leaves (`panel-push`). The width is read first and `panel-in` before
     // `panel-shown`: read first, the panel's state marked the sidebar and the page dirty in
@@ -129,14 +208,17 @@ export component AppWindow inherits Window {
     // (`tests/app/first_frames.rs`).
     property <bool> fold: root.width - Theme.sidebar-w - root.panel-w < Theme.page-min-w && root.panel-in && root.panel-shown;
     property <bool> rail: !root.wide || root.fold;
-    property <length> side-w: root.full-page ? 0px : (root.rail ? Theme.rail-w : Theme.sidebar-w);
+    property <length> side-w: root.full-page || root.drawer ? 0px : (root.rail ? Theme.rail-w : Theme.sidebar-w);
     // The player bar floats over the bottom of everything (`Theme.bar-inset` in from the
     // edges): the sidebar and the panel run the window's height behind it with their rows
     // ending at its top; the pages end at its top, fading into the ground just above it.
     property <length> bar-top: self.height - Theme.bar-clear;
     // How far above the bar's top the pages start fading into the ground.
     property <length> bar-fade: Theme.s5;
-    property <bool> panel-shown: Frame.queue-open && !root.full-page;
+    // Open, and the page beside it (`panel-shown`): in a window too narrow for it, the panel
+    // keeps its state, hidden, for when the window widens again.
+    property <bool> panel-open: Frame.queue-open && !root.full-page;
+    property <bool> panel-shown: root.panel-open && !root.sheet;
     // The Up next panel: as wide as Now playing's side panel on a wide window, so titles
     // aren't cut short; narrower below `panel-wide-min`.
     property <length> panel-w: self.width >= Theme.panel-wide-min ? Theme.nowplaying-side-w : Theme.panel-w;
@@ -177,6 +259,11 @@ export component AppWindow inherits Window {
     changed page => { root.page-changed(); }
     changed page-id => { root.page-changed(); }
     function page-changed() {
+        // Another page closes the drawer and the sheet, which lie over it.
+        root.close-drawer(Frame.instant);
+        if Frame.sheet-open {
+            root.close-sheet(true);
+        }
         if Frame.instant || !Theme.fading || Nav.page == PageKind.now-playing {
             root.entered = true;
         } else {
@@ -226,7 +313,7 @@ export component AppWindow inherits Window {
     }
 
     // A menu, a popup or a dialog is open over the window: the transport keys and Ctrl+/ wait.
-    property <bool> overlay-open: CloseChoice.open || SettingsData.dialog != SettingsDialog.none || AlbumMenu.open || AlbumMenu.dialog || SongMenu.open || PlaylistMenu.open || PlaylistMenu.dialog != PlaylistDialog.none || AccountMenu.open || AccountPicker.open || Player.speed-open || Sleep.open || LyricsMenu.open || LyricsChoose.open || LyricsData.reset-asked;
+    property <bool> overlay-open: CloseChoice.open || SettingsData.dialog != SettingsDialog.none || AlbumMenu.open || AlbumMenu.dialog || SongMenu.open || PlaylistMenu.open || PlaylistMenu.dialog != PlaylistDialog.none || AccountMenu.open || AccountPicker.open || Player.speed-open || Sleep.open || Frame.volume-open || root.drawer-shown || LyricsMenu.open || LyricsChoose.open || LyricsData.reset-asked;
 
     // The shortcuts, listed for Settings' "Keyboard shortcuts" in shortcuts.slint: each one
     // taken here is reported there (`Shortcuts.used`). A new one goes in both.
@@ -376,6 +463,16 @@ export component AppWindow inherits Window {
                     top-bar.clear-search();
                     return accept;
                 }
+                // Then the drawer or the Up next sheet, before leaving Now playing.
+                if root.drawer-shown {
+                    root.close-drawer(true);
+                    return accept;
+                }
+                if root.sheet-shown {
+                    root.close-sheet(true);
+                    keys.focus();
+                    return accept;
+                }
                 if root.full-page {
                     root.navigate-by-key();
                     Nav.back();
@@ -384,15 +481,6 @@ export component AppWindow inherits Window {
                 return accept;
             }
             reject
-        }
-
-        sidebar := Sidebar {
-            x: 0;
-            y: 0;
-            height: root.height;
-            clear: Theme.bar-clear;
-            visible: !root.full-page;
-            rail: root.rail;
         }
 
         Rectangle {
@@ -489,7 +577,16 @@ export component AppWindow inherits Window {
                 width: parent.width;
                 visible: !root.full-page && !root.no-top;
                 clear: root.under-top;
-                narrow: root.rail;
+                narrow: root.rail || root.drawer;
+                menu: root.drawer && !root.no-top && !root.full-page;
+                menu-open: root.drawer-shown;
+                menu-pressed(by-key) => {
+                    if root.drawer-shown {
+                        root.close-drawer(by-key);
+                    } else {
+                        root.open-drawer(by-key);
+                    }
+                }
                 area-h: parent.height;
                 settings: Nav.page == PageKind.settings;
                 submitted(q) => {
@@ -509,21 +606,124 @@ export component AppWindow inherits Window {
             }
         }
 
-        QueuePanel {
-            // How much of it is slid out past the right edge: that eases, not `x`, so
-            // the panel stays at the edge while the window resizes.
-            property <float> out: root.panel-shown ? 0 : 1;
-            animate out { duration: root.panel-shown ? Theme.t-panel : Theme.t-panel * 0.8; easing: Curves.ease-drawer; }
-            init => { root.panel-in = self.out <= 0; }
-            changed out => { root.panel-in = self.out <= 0; }
-            x: root.width - root.panel-w * (1 - self.out);
+        // The drawer's scrim, over the page and under the drawer: a click on it closes the
+        // drawer, and the page under it doesn't scroll. Faded through its colour.
+        Rectangle {
+            visible: root.drawer && (root.drawer-shown || root.d-out < 1);
+            background: root.drawer-shown ? Theme.scrim : Theme.scrim.transparentize(100%);
+            animate background { duration: root.drawer-shown ? (root.drawer-by-key ? 0ms : Theme.t-menu) : (root.drawer-snap ? 0ms : Theme.t-fast); easing: Curves.ease-out; }
+            TouchArea {
+                pointer-event(e) => {
+                    if e.kind == PointerEventKind.down {
+                        root.close-drawer(false);
+                    }
+                }
+                scroll-event(e) => { accept }
+            }
+        }
+
+        // The sidebar, after the page so that, as the drawer, it lies over it (beside the page
+        // the two never meet). The drawer is the full sidebar slid in from the left edge.
+        sidebar := Sidebar {
+            x: root.drawer ? -Theme.sidebar-w * root.d-out : 0;
             y: 0;
-            width: root.panel-w;
             height: root.height;
-            visible: self.out < 1;
-            open: root.panel-shown;
-            SideTabs {
-                shown: root.panel-shown;
+            clear: Theme.bar-clear;
+            visible: root.drawer ? root.d-out < 1 : !root.full-page;
+            rail: root.rail && !root.drawer;
+            drawer: root.drawer;
+            picked => { root.close-drawer(false); }
+            escaped => { root.close-drawer(true); }
+        }
+
+        // The sheet's scrim, over the page and the rail, under the sheet and the bar.
+        Rectangle {
+            visible: root.sheet && (root.sheet-shown || root.s-out < 1);
+            background: root.sheet-shown ? Theme.scrim : Theme.scrim.transparentize(100%);
+            animate background { duration: root.sheet-shown ? Theme.t-menu : (root.sheet-snap ? 0ms : Theme.t-fast); easing: Curves.ease-out; }
+            TouchArea {
+                pointer-event(e) => {
+                    if e.kind == PointerEventKind.down {
+                        root.close-sheet(false);
+                    }
+                }
+                scroll-event(e) => { accept }
+            }
+        }
+
+        // Up next: the side panel at the window's right edge, or where it doesn't fit beside
+        // the page, the sheet, the same panel as a card above the bar. The sheet rises from
+        // behind the bar's top edge, where it's cut off (`clip`).
+        Rectangle {
+            y: 0;
+            height: root.sheet ? root.bar-top : root.height;
+            clip: root.sheet;
+            QueuePanel {
+                // How much of it is slid out past the right edge: that eases, not `x`, so
+                // the panel stays at the edge while the window resizes.
+                property <float> out: root.panel-open ? 0 : 1;
+                animate out { duration: root.panel-open ? Theme.t-panel : Theme.t-panel * 0.8; easing: Curves.ease-drawer; }
+                init => { root.panel-in = self.out <= 0; }
+                changed out => { root.panel-in = self.out <= 0; }
+                sheet: root.sheet;
+                x: root.sheet ? root.width - Theme.bar-inset - root.sheet-w : root.width - root.panel-w * (1 - self.out);
+                y: root.sheet ? Theme.sheet-top + root.s-out * (root.sheet-h + Theme.s2) : 0;
+                width: root.sheet ? root.sheet-w : root.panel-w;
+                height: root.sheet ? root.sheet-h : root.height;
+                visible: root.sheet ? root.s-out < 1 : self.out < 1;
+                open: root.sheet ? root.sheet-shown : root.panel-shown;
+                // In the sheet, its lists end 12 px above the volume row, or the sheet's foot:
+                // they keep the panel's room for the bar below them, which the sheet cuts off.
+                SideTabs {
+                    y: 0;
+                    height: root.sheet ? parent.height + Theme.bar-clear - root.sheet-foot - Theme.s3 : parent.height;
+                    shown: root.sheet ? root.sheet-shown : root.panel-shown;
+                    trail: root.sheet ? 36px + Theme.s2 : 0px;
+                }
+                // Closes the sheet, as Escape, a click outside it and the bar's button do. Its
+                // right edge on the rows' (left of the list's scroll bar), as Clear's is.
+                Rectangle {
+                    visible: root.sheet;
+                    x: parent.width - Theme.s4 - Theme.s2 - self.width;
+                    y: Theme.s3 + 2px;
+                    width: 36px;
+                    height: 36px;
+                    border-radius: self.height / 2;
+                    background: Theme.tonal(close-ta.pressed, close-ta.has-hover);
+                    accessible-role: button;
+                    accessible-label: @tr("Close Up next");
+                    accessible-action-default => { root.close-sheet(false); }
+                    animate background { duration: Theme.t-hover; }
+                    close-ta := TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => { root.close-sheet(false); }
+                    }
+                    Icon {
+                        width: 18px;
+                        height: 18px;
+                        commands: Icons.close;
+                        stroke: Theme.text1;
+                    }
+                }
+                // The volume, once the bar has no button for it: a row at the sheet's foot,
+                // the mute button under the rows' covers, the value under their lengths.
+                Rectangle {
+                    visible: root.sheet && Frame.volume-in-sheet;
+                    y: parent.height - root.sheet-foot;
+                    height: root.sheet-foot;
+                    Rectangle {
+                        x: Theme.s4;
+                        y: 0;
+                        width: parent.width - 2 * Theme.s4 - Theme.s2;
+                        height: 1px;
+                        background: Theme.hairline;
+                    }
+                    VolumeRow {
+                        x: Theme.s4;
+                        y: 1px + (parent.height - 1px - self.height) / 2;
+                        width: parent.width - 2 * Theme.s4 - Theme.s2 - Theme.s3;
+                    }
+                }
             }
         }
 
@@ -601,6 +801,18 @@ export component AppWindow inherits Window {
             closed => { keys.focus(); }
         }
 
+        // The bar's volume popup, from its volume button where the slider doesn't fit.
+        VolumeLayer {
+            x: 0;
+            y: 0;
+            width: root.width;
+            height: root.height;
+            visible: Frame.volume-open;
+            bottom: root.bar-top;
+            anchor: bottom-bar.x + bottom-bar.volume-centre;
+            closed => { keys.focus(); }
+        }
+
         // The account menu, from the sidebar's account row.
         AccountMenuLayer {
             x: 0;
@@ -634,7 +846,7 @@ export component AppWindow inherits Window {
             y: 0;
             width: root.width;
             height: root.height;
-            room-w: Nav.page == PageKind.now-playing && Frame.side-open ? root.width - (root.width >= Theme.wide-min ? Theme.nowplaying-side-w : Theme.panel-w) : root.width;
+            room-w: Nav.page == PageKind.now-playing && Frame.side-shown ? root.width - (root.width >= Theme.wide-min ? Theme.nowplaying-side-w : Theme.panel-w) : root.width;
             closed => { keys.focus(); }
         }
         if LyricsData.reset-asked: LyricsResetLayer {

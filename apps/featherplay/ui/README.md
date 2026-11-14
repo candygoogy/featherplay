@@ -12,10 +12,10 @@ touches another. The shared files below change only when a page needs something 
 | `parts.slint` | Shared pieces: `TrackRow`, `CardItem`, `Icon`, `Display`, `Body`, `PageTitle`, `ShelfTitle`, `Bands`, `Cover`, `CoverPlay`, `PlayButton`, `PlayingMark`, `HoverIntent` (a song row rested on), `PageIntent` (a card rested on, read ahead by `pages/ahead.rs`), `RowsShown` (which rows of a song list show, for `ShownRows` and `src/prepare.rs`), `IconButton`, `Pill`, `ProgressRail`, `Card`, `Shelf`, `ShelfArrows`, `SongRow`, `TrackListRow`, `Tabs`, `TextLink` (the underlined tertiary action), `ChoiceList` and `ChoiceRow` (several ways to do one thing as rows of one card: icon tile, title, one line, chevron or a "Why?"; the recommended one lit) | frame (shared) |
 | `nav.slint` | `PageKind`, `Nav` (the navigation callbacks) and `Frame` (`queue-open`, Now playing's `side-open`, …) | frame (shared) |
 | `player.slint` | `Player`: the current track and the transport, for the bar, Now playing and the Home band | frame (shared) |
-| `sidebar.slint`, `bottom_bar.slint` | The frame's sidebar (`SidebarData`: Home, Library, Explore, History, Liked songs, then the library as a list under the Playlists, Albums and Artists chips, pinned entries first; `src/sidebar.rs`, its order in `src/library_list.rs`) and bottom bar | frame |
-| `top_bar.slint` | The top bar above every page but Now playing and Sign in: the search field (`TopBarData.query`, filled by `src/top_bar.rs` and cleared off search pages) with its right-click menu. On Settings the same field is "Search settings": it filters the page (`src/pages/settings/search.rs`), drops no suggestions, and the music field's text comes back when Settings is left | frame |
+| `sidebar.slint`, `bottom_bar.slint` | The frame's sidebar (`SidebarData`: Home, Library, Explore, History, Liked songs, then the library as a list under the Playlists, Albums and Artists chips, pinned entries first; `src/sidebar.rs`, its order in `src/library_list.rs`; the icon rail below 1100 px, a drawer from the top bar's menu button below 560) and bottom bar (below 960 px it gives up groups in turn, the volume to a popup and then to the Up next sheet) | frame |
+| `top_bar.slint` | The top bar above every page but Now playing and Sign in: the search field (`TopBarData.query`, filled by `src/top_bar.rs` and cleared off search pages) with its right-click menu. On Settings the same field is "Search settings": it filters the page (`src/pages/settings/search.rs`), drops no suggestions, and the music field's text comes back when Settings is left. Below 560 px the menu button left of the field opens the sidebar's drawer | frame |
 | `toast.slint` | Toasts: one short line at a time, bottom centre above the bar; `src/toast.rs` shows and closes them | frame (shared) |
-| `queue_panel.slint` | The Up next panel (`QueueData`) | now playing |
+| `queue_panel.slint` | The Up next panel (`QueueData`), and in a narrow window the Up next sheet (`Frame.sheet`), whose header also holds Shuffle and Repeat once the bar has given them up | now playing |
 | `mini_player.slint` | The tray's mini player (`MiniPlayer`, `MiniData`): its own small window, opened by a left click on the tray icon; `src/mini.rs` | tray |
 | `desktop_lyrics.slint` | Desktop lyrics (`DesktopLyrics`, `StripData`): a borderless strip, always on top, with the line being sung and the next, its hover controls (size, lock, open, close); its own window while desktop lyrics are on; `src/desktop_lyrics.rs` | lyrics |
 | `lyrics_menu.slint` | The lyrics menu, the ⋯ (`LyricsMoreButton`) beside the Lyrics pill while the full lyrics view shows, in the song menu's style (`LyricsMenu`, `LyricsMenuLayer`): text size, timing for this song with Reset, the desktop lyrics' switch and Unlock, "Choose other lyrics…"; that dialog (`LyricsChoose`, `LyricsChooseLayer`: LRCLIB's matches, the one in use marked, a search field), and the confirmation of Settings' "Reset lyrics settings" (`LyricsResetLayer`); `src/lyrics.rs`, `src/lyrics/choose.rs` | lyrics |
@@ -229,8 +229,11 @@ such as `now-playing-lyrics-full`, `settings-sound`, `mini-player-paused` or
 
 - `--theme dark|light`;
 - `--size WxH`, in physical pixels (default 1280x800; below 1100 px wide the sidebar becomes
-  a rail), and `--scale F`, the display scale (e.g. 2 for a 4K screen at 200 %);
-- `--queue` opens the Up next panel;
+  a rail, below 560 a drawer), and `--scale F`, the display scale (e.g. 2 for a 4K screen at
+  200 %);
+- `--queue` opens the Up next panel (below 952 px wide, the Up next sheet);
+- `--drawer` opens the sidebar's drawer (below 560 px wide), and `--volume-popup` the bar's
+  volume popup (where the bar has a volume button);
 - `--hover X,Y` or `--press X,Y`, in logical pixels: the pointer rests there, or also holds
   the left button, to show hover and pressed states;
 - `--hold-loading` shows the page still loading, and `--hold-error` its "Try again" state;
@@ -286,6 +289,10 @@ times, gaps, wheel messages and the UI thread's CPU time inside the paints (`src
   out down to `Theme.page-min-w` (540 px) beside it; where making room beside the full
   sidebar would leave less, the sidebar folds to the icon rail while the panel is in, in the
   same relayout, and nothing floats over a darkened page (`tests/app/narrow_panel.rs`).
+  Where even the rail, the panel and that least page don't fit (under 952 px, worked out from
+  the three, not a round number), Up next is a sheet over the page instead, above the bar, on
+  every page; below 560 px the sidebar is a drawer from the top bar's menu button. Both lie
+  over a scrim and close with Escape or a click outside (`tests/app/narrow_shell.rs`).
 - A page enters with a short rise, never a fade (see the `opacity` rule below).
 - The player bar floats over the bottom of the window (`Theme.bar-inset` in, `Theme.bar-clear`
   tall from the bottom edge). Pages end at its top (`app.slint` clips them there and fades

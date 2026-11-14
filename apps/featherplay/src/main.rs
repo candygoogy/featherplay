@@ -14,7 +14,7 @@
 //! Debug flags: `--play <videoId>`, `--volume <0..1>` (this run only), `--start-at <secs>`,
 //! `--timing` (prints `first_frame_ms=<n>`), and the offscreen render
 //! `--snapshot <page> --fixtures [--theme dark|light] [--size WxH] [--scale F] [--queue]
-//! [--hover X,Y | --press X,Y] [--hold-loading | --hold-error] [--signed-out] [--track N] [--shuffle] [--language CODE] --out <png>`.
+//! [--drawer] [--volume-popup] [--hover X,Y | --press X,Y] [--hold-loading | --hold-error] [--signed-out] [--track N] [--shuffle] [--language CODE] --out <png>`.
 //! `--unregister` removes the Start menu shortcut and registry entry that a normal start
 //! adds so the media card names the app (`identity`), then exits.
 //! `--preprocess-player`, alone, is how featherplay starts itself to preprocess a new
@@ -48,7 +48,7 @@ use featherplay_store::Paths;
 
 const USAGE: &str = "usage: featherplay [--autostart] [--play <videoId>] [--volume <0..1>] [--start-at <secs>] [--timing] [--quick-search]
        featherplay --unregister
-       featherplay --snapshot <page> --fixtures [--theme dark|light] [--size WxH] [--scale F] [--queue] [--hover X,Y | --press X,Y] [--hold-loading | --hold-error] [--signed-out] [--track N] [--shuffle] [--language CODE] --out <png>";
+       featherplay --snapshot <page> --fixtures [--theme dark|light] [--size WxH] [--scale F] [--queue] [--drawer] [--volume-popup] [--hover X,Y | --press X,Y] [--hold-loading | --hold-error] [--signed-out] [--track N] [--shuffle] [--language CODE] --out <png>";
 
 enum Mode {
     App(Options, AppOptions),
@@ -65,6 +65,8 @@ fn parse_args() -> Result<Mode, String> {
     let mut size = (1280, 800);
     let mut scale = 1.0;
     let mut queue_open = false;
+    let mut drawer_open = false;
+    let mut volume_open = false;
     let mut signed_out = false;
     let mut pointer: Option<(f32, f32)> = None;
     let mut press = false;
@@ -127,6 +129,8 @@ fn parse_args() -> Result<Mode, String> {
                 };
             }
             "--queue" => queue_open = true,
+            "--drawer" => drawer_open = true,
+            "--volume-popup" => volume_open = true,
             "--signed-out" => signed_out = true,
             "--hover" | "--press" => {
                 let name = if arg == "--hover" {
@@ -183,6 +187,8 @@ fn parse_args() -> Result<Mode, String> {
         height: size.1,
         scale,
         queue_open,
+        drawer_open,
+        volume_open,
         signed_out,
         pointer,
         press,

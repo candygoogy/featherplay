@@ -124,7 +124,12 @@ pub struct SnapshotOptions {
     pub height: u32,
     /// The display's scale (Windows' 150 % is 1.5): logical pixels are this many physical.
     pub scale: f32,
+    /// Up next open: the panel, or in a narrow window the sheet.
     pub queue_open: bool,
+    /// In a window without a sidebar, its drawer open.
+    pub drawer_open: bool,
+    /// Where the bar has a volume button, its popup open.
+    pub volume_open: bool,
     /// Signed out, as with no session: the window as a visitor sees it.
     pub signed_out: bool,
     /// Where the pointer rests, in logical pixels.
@@ -403,9 +408,15 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
         ui.global::<Frame>().set_side_open(false);
     }
     scene.open(&o.page)?;
+    // After the page change's own handler, which closes the drawer and the sheet.
+    scene.settle_once();
+    let frame = ui.global::<Frame>();
     if o.queue_open {
-        ui.global::<Frame>().set_queue_open(true);
+        frame.set_queue_open(true);
+        frame.set_sheet_open(true);
     }
+    frame.set_drawer_open(o.drawer_open);
+    frame.set_volume_open(o.volume_open);
     // After `wire` applied the saved Appearance setting and the page showed it.
     scene.theme(o.dark);
     let settle = || scene.settle();

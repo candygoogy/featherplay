@@ -6,6 +6,8 @@
 // music, after a divider, come up to three settings that match (`settings/search.rs`).
 // On Settings the field is Settings' search instead: it reads "Search settings", what's
 // typed filters the page (`SettingsSearch`), and nothing drops down under it.
+// In a window without a sidebar (below `Theme.drawer-below`) a menu button left of the field
+// opens the sidebar as a drawer (app.slint); it takes Tab's focus, and Enter or Space opens it.
 import { Theme, Icons, Curves } from "theme.slint";
 import { Icon, Body, Cover } from "parts.slint";
 import { SettingsSearch } from "pages/settings/data.slint";
@@ -261,6 +263,76 @@ export component Keycap inherits Rectangle {
     }
 }
 
+// The menu button: the field's round twin (its fill, its edge lifting on hover), with three
+// lines. Focused from the keyboard, the accent ring shows, as on the app's other rings.
+component MenuButton inherits Rectangle {
+    // There's no sidebar beside the page: it shows, and Tab reaches it.
+    in property <bool> shown;
+    // The drawer it opens is open.
+    in property <bool> open;
+    // Clicked, or Enter or Space while it has the keys (`by-key`).
+    callback activated(bool);
+    // Takes the keys back as the drawer closes, its ring showing.
+    public function focus-by-key() {
+        fs.focus();
+        root.ring = true;
+    }
+    property <bool> ring;
+    width: 40px;
+    height: 40px;
+    visible: root.shown;
+    border-radius: self.height / 2;
+    background: Theme.field-solid;
+    border-width: 1px;
+    border-color: ta.has-hover || root.open ? Theme.field-edge-hover : Theme.field-edge;
+    accessible-role: button;
+    accessible-label: @tr("Menu");
+    accessible-description: @tr("Shows the sidebar");
+    accessible-expandable: true;
+    accessible-expanded: root.open;
+    accessible-action-default => { root.activated(false); }
+    animate border-color { duration: Theme.t-hover; easing: Curves.ease-hover; }
+    fs := FocusScope {
+        enabled: root.shown;
+        focus-on-click: false;
+        focus-gained(reason) => { root.ring = reason == FocusReason.tab-navigation; }
+        focus-lost => { root.ring = false; }
+        key-pressed(e) => {
+            if (e.text == Key.Return || e.text == " ") && !e.repeat {
+                root.activated(true);
+                return accept;
+            }
+            reject
+        }
+    }
+    // Above the focus scope, so a click is the touch area's.
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.activated(false); }
+    }
+    Rectangle {
+        border-radius: root.border-radius;
+        background: Theme.state(ta.pressed, ta.has-hover);
+        animate background { duration: Theme.t-hover; }
+    }
+    Icon {
+        width: 20px;
+        height: 20px;
+        commands: "M5 7.5 H19 M5 12 H19 M5 16.5 H19";
+        stroke: ta.has-hover || root.open ? Theme.text1 : Theme.text2;
+    }
+    Rectangle {
+        visible: fs.has-focus && root.ring;
+        x: -3px;
+        y: -3px;
+        width: parent.width + 6px;
+        height: parent.height + 6px;
+        border-radius: self.height / 2;
+        border-width: 2px;
+        border-color: Theme.accent;
+    }
+}
+
 // The wide rounded field. Enter submits; Escape bubbles up to the window. On Settings
 // (`settings`) it searches the settings: its text goes to `SettingsSearch` as typed, Enter
 // does nothing, and no suggestions show.
@@ -291,8 +363,10 @@ component SearchField inherits Rectangle {
     property <bool> has-text: TopBarData.query != "";
     property <bool> hovered: ta.has-hover && !input.has-focus;
     property <length> lead: 48px;
+    // The Ctrl K keycaps step aside in a short field (a narrow window), for the placeholder.
+    property <bool> hinted: !root.has-text && !input.has-focus && root.width >= 400px;
     // Room on the right: the × button, or the Ctrl K keycaps.
-    property <length> trail: root.has-text ? 44px : (input.has-focus ? Theme.s4 : keycaps.width + Theme.s3 + Theme.s2);
+    property <length> trail: root.has-text ? 44px : (root.hinted ? keycaps.width + Theme.s3 + Theme.s2 : Theme.s4);
     height: 40px;
     border-radius: self.height / 2;
     // Opaque, so it reads the same over a page's wash or an artist's photo as on the ground,
@@ -439,7 +513,7 @@ component SearchField inherits Rectangle {
             y: (parent.height - self.height) / 2;
             width: self.preferred-width;
             height: self.preferred-height;
-            visible: !root.has-text && !input.has-focus;
+            visible: root.hinted;
             spacing: Theme.s1;
             Keycap { text: @tr("Ctrl"); }
             Keycap { text: "K"; }
@@ -485,6 +559,15 @@ export component TopBar inherits Rectangle {
     in property <length> area-h: 0px;
     // On Settings: the field searches the settings.
     in property <bool> settings;
+    // No sidebar beside the page: the menu button shows, left of the field (`menu-open`: its
+    // drawer is open).
+    in property <bool> menu: false;
+    in property <bool> menu-open: false;
+    // The menu button was pressed, by a click or a key (`by-key`).
+    callback menu-pressed(bool);
+    public function focus-menu() {
+        menu-button.focus-by-key();
+    }
     out property <bool> searching: field.focused;
     out property <bool> suggestions-open: field.suggestions-open;
     callback submitted(string);
@@ -538,12 +621,23 @@ export component TopBar inherits Rectangle {
             accept
         }
     }
-    // Left-aligned with the pages' content, like their titles.
+    // The pages' padding, which narrows with them: 24 px under a 720 px page, 20 under 520.
+    property <length> pad: root.width < 520px ? 20px : (root.width < 720px ? 24px : Theme.page-pad);
+    // Before Tab reaches the field, so Shift+Tab from the field (Ctrl+K) lands on it.
+    menu-button := MenuButton {
+        x: root.pad;
+        y: (parent.height - self.height) / 2;
+        shown: root.menu;
+        open: root.menu-open;
+        activated(by-key) => { root.menu-pressed(by-key); }
+    }
+    // Left-aligned with the pages' content, like their titles; past the menu button when it shows.
+    property <length> field-x: root.pad + (root.menu ? 40px + Theme.s3 : 0px);
     field := SearchField {
         settings: root.settings;
-        x: Theme.page-pad;
+        x: root.field-x;
         y: (parent.height - self.height) / 2;
-        width: max(0px, min(root.narrow ? Theme.top-search-narrow : Theme.top-search-w, parent.width - 2 * Theme.page-pad));
+        width: max(0px, min(root.narrow ? Theme.top-search-narrow : Theme.top-search-w, parent.width - root.field-x - root.pad));
         submitted(q) => {
             root.close-suggestions(true);
             TopBarData.dismissed();

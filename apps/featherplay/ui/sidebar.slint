@@ -1,8 +1,11 @@
 // The sidebar (given more entries on 2026-10-30): Home, Library, Explore and
 // History, Liked songs, then the library as a list under three chips (Playlists, Albums,
 // Artists), pinned entries first, then Settings and the account. 240 px wide; an icon rail
-// below `Theme.wide-min` (the rail shows the list without its chips). Filled by
-// `src/sidebar.rs`. Search is the top bar's (top_bar.slint).
+// below `Theme.wide-min` (the rail shows the list without its chips); below
+// `Theme.drawer-below`, the full sidebar as a drawer over the page (`drawer`), opened by the
+// top bar's menu button, which takes the keys while it's open: Up, Down, Tab and Shift+Tab
+// move through its entries, Home and End to the ends, Enter opens one, Escape closes it.
+// Filled by `src/sidebar.rs`. Search is the top bar's (top_bar.slint).
 import { ListView } from "list_view.slint";
 import { Theme, Icons, Curves } from "theme.slint";
 import { CardItem, ItemKind, Icon, Body, Cover, IconButton, Pill, PageIntent } from "parts.slint";
@@ -107,6 +110,8 @@ component NavItem inherits Rectangle {
     in property <string> label;
     in property <bool> active;
     in property <bool> rail;
+    // The drawer's keyboard cursor is on it: the focus ring.
+    in property <bool> ring;
     callback clicked();
     // A right-click, in window coordinates.
     callback right-clicked(length, length);
@@ -142,19 +147,139 @@ component NavItem inherits Rectangle {
         font-weight: root.active ? 600 : 400;
         vertical-alignment: center;
     }
+    // The keyboard's focus ring, as the app's other rings: 2 px of the accent.
+    Rectangle {
+        visible: root.ring;
+        border-radius: Theme.r-m;
+        border-width: 2px;
+        border-color: Theme.accent;
+    }
 }
 
 export component Sidebar inherits Rectangle {
     in property <bool> rail: false;
+    // Shown as the drawer over the page: a hairline at its edge, and the keys while it's open.
+    in property <bool> drawer: false;
     // The sidebar runs the window's height, behind the floating bar; its rows end `clear`
     // above the bottom, at the bar's top.
     in property <length> clear: 0px;
+    // A page was picked here (the drawer closes), or Escape pressed in the drawer.
+    callback picked();
+    callback escaped();
     property <length> foot: self.height - root.clear;
     function account-clicked() {
         if SidebarData.signed-in {
             AccountMenu.show(account-row.absolute-position.x, account-row.absolute-position.y);
         } else {
             Nav.go(PageKind.sign-in);
+            root.picked();
+        }
+    }
+
+    // The drawer's keyboard cursor: Home, Library, Explore, History and Liked songs (0 to 4),
+    // the list's entries, then Settings and the account; -1 before the first key. The ring
+    // shows only once a key has moved it, or the drawer was opened with the keys.
+    property <int> listed: SidebarData.items.length;
+    property <int> count: 7 + root.listed;
+    property <int> cursor: -1;
+    property <bool> ring: false;
+    property <int> ring-at: root.ring && keys.has-focus ? root.cursor : -1;
+    // The drawer opened: the keys go into it, the cursor on the page shown.
+    public function take-keys(by-key: bool) {
+        keys.focus();
+        root.ring = by-key;
+        root.cursor = by-key ? root.shown-index() : -1;
+        root.reveal();
+    }
+    pure function shown-index() -> int {
+        if Nav.page == PageKind.library {
+            return 1;
+        }
+        if Nav.page == PageKind.explore || Nav.page == PageKind.mood {
+            return 2;
+        }
+        if Nav.page == PageKind.history {
+            return 3;
+        }
+        if Nav.page == PageKind.playlist && Nav.page-id == "LM" {
+            return 4;
+        }
+        if Nav.page == PageKind.settings || Nav.page == PageKind.about {
+            return 5 + root.listed;
+        }
+        return 0;
+    }
+    function move(by: int) {
+        root.cursor = root.cursor < 0 ? root.shown-index() : Math.mod(root.cursor + by + root.count, root.count);
+        root.ring = true;
+        root.reveal();
+    }
+    // Scrolls the list to the entry under the cursor, if it's one of the list's.
+    function reveal() {
+        let i = root.cursor - 5;
+        if i < 0 || i >= root.listed {
+            return;
+        }
+        let top = i * 40px;
+        if top + playlists.content-y < 0 {
+            playlists.content-y = -top;
+        } else if top + 40px + playlists.content-y > playlists.visible-height {
+            playlists.content-y = playlists.visible-height - top - 40px;
+        }
+    }
+    function activate(i: int) {
+        if i == 0 {
+            Nav.go(PageKind.home);
+        } else if i == 1 {
+            Nav.open-library(0);
+        } else if i == 2 {
+            Nav.go(PageKind.explore);
+        } else if i == 3 {
+            Nav.go(PageKind.history);
+        } else if i == 4 {
+            Nav.open-playlist("LM");
+        } else if i < 5 + root.listed {
+            SideOpen.item(SidebarData.items[i - 5]);
+        } else if i == 5 + root.listed {
+            Nav.go(PageKind.settings);
+        } else {
+            root.account-clicked();
+            return;
+        }
+        root.picked();
+    }
+    keys := FocusScope {
+        enabled: root.drawer;
+        focus-on-click: false;
+        focus-on-tab-navigation: false;
+        key-pressed(e) => {
+            if e.text == Key.Escape {
+                root.escaped();
+                return accept;
+            }
+            if e.modifiers.control || e.modifiers.alt || e.modifiers.meta {
+                return reject;
+            }
+            if e.text == Key.DownArrow || (e.text == Key.Tab && !e.modifiers.shift) {
+                root.move(1);
+                return accept;
+            }
+            // Shift+Tab arrives as Backtab.
+            if e.text == Key.UpArrow || e.text == Key.Backtab || e.text == Key.Tab {
+                root.move(-1);
+                return accept;
+            }
+            if e.text == Key.Home || e.text == Key.End {
+                root.cursor = e.text == Key.Home ? 0 : root.count - 1;
+                root.ring = true;
+                root.reveal();
+                return accept;
+            }
+            if e.text == Key.Return && root.cursor >= 0 {
+                root.activate(root.cursor);
+                return accept;
+            }
+            reject
         }
     }
     property <length> inset: 8px;
@@ -178,7 +303,8 @@ export component Sidebar inherits Rectangle {
         icon: Icons.home;
         label: @tr("Home");
         active: Nav.page == PageKind.home;
-        clicked => { Nav.go(PageKind.home); }
+        ring: root.ring-at == 0;
+        clicked => { root.activate(0); }
     }
     NavItem {
         x: root.inset;
@@ -188,7 +314,8 @@ export component Sidebar inherits Rectangle {
         icon: Icons.library;
         label: @tr("Library");
         active: Nav.page == PageKind.library;
-        clicked => { Nav.open-library(0); }
+        ring: root.ring-at == 1;
+        clicked => { root.activate(1); }
     }
     NavItem {
         x: root.inset;
@@ -198,7 +325,8 @@ export component Sidebar inherits Rectangle {
         icon: SideIcons.explore;
         label: @tr("Explore");
         active: Nav.page == PageKind.explore || Nav.page == PageKind.mood;
-        clicked => { Nav.go(PageKind.explore); }
+        ring: root.ring-at == 2;
+        clicked => { root.activate(2); }
     }
     NavItem {
         x: root.inset;
@@ -208,7 +336,8 @@ export component Sidebar inherits Rectangle {
         icon: Icons.history;
         label: @tr("History");
         active: Nav.page == PageKind.history;
-        clicked => { Nav.go(PageKind.history); }
+        ring: root.ring-at == 3;
+        clicked => { root.activate(3); }
     }
 
     Rectangle {
@@ -228,7 +357,8 @@ export component Sidebar inherits Rectangle {
         icon: Icons.heart;
         label: @tr("Liked songs");
         active: Nav.page == PageKind.playlist && Nav.page-id == "LM";
-        clicked => { Nav.open-playlist("LM"); }
+        ring: root.ring-at == 4;
+        clicked => { root.activate(4); }
         // Signed out, Liked songs is the account's: its page asks to sign in, and it has no
         // menu.
         right-clicked(x, y) => {
@@ -272,7 +402,7 @@ export component Sidebar inherits Rectangle {
                 background: Theme.state-on(self.active || (PlaylistMenu.open && PlaylistMenu.item.id == p.id), pta.pressed, pta.has-hover);
                 accessible-role: button;
                 accessible-label: self.pinned ? @tr("{}, pinned", p.title) : p.title;
-                accessible-action-default => { SideOpen.item(p); }
+                accessible-action-default => { root.activate(5 + i); }
                 animate background { duration: Theme.t-hover; }
                 // Starts loading its page, unless it's the one shown.
                 PageIntent {
@@ -285,7 +415,7 @@ export component Sidebar inherits Rectangle {
                 }
                 pta := TouchArea {
                     mouse-cursor: pointer;
-                    clicked => { SideOpen.item(p); }
+                    clicked => { root.activate(5 + i); }
                     // The playlist menu, at the pointer.
                     pointer-event(e) => {
                         if e.button == PointerEventButton.right && e.kind == PointerEventKind.up {
@@ -318,6 +448,13 @@ export component Sidebar inherits Rectangle {
                     commands: SideIcons.pin;
                     stroke: Theme.text3;
                     stroke-width: 1.8px;
+                }
+                // The keyboard's focus ring, as the app's other rings: 2 px of the accent.
+                Rectangle {
+                    visible: root.ring-at == 5 + i;
+                    border-radius: Theme.r-m;
+                    border-width: 2px;
+                    border-color: Theme.accent;
                 }
             }
         }
@@ -364,7 +501,10 @@ export component Sidebar inherits Rectangle {
                 Pill {
                     label: @tr("Sign in");
                     compact: true;
-                    clicked => { Nav.go(PageKind.sign-in); }
+                    clicked => {
+                        Nav.go(PageKind.sign-in);
+                        root.picked();
+                    }
                 }
             }
         }
@@ -395,7 +535,8 @@ export component Sidebar inherits Rectangle {
         icon: Icons.gear;
         label: @tr("Settings");
         active: Nav.page == PageKind.settings || Nav.page == PageKind.about;
-        clicked => { Nav.go(PageKind.settings); }
+        ring: root.ring-at == 5 + root.listed;
+        clicked => { root.activate(5 + root.listed); }
     }
     Rectangle {
         x: 20px;
@@ -467,5 +608,19 @@ export component Sidebar inherits Rectangle {
                 font-weight: 600;
             }
         }
+        // The keyboard's focus ring, as the app's other rings: 2 px of the accent.
+        Rectangle {
+            visible: root.ring-at == 6 + root.listed;
+            border-radius: Theme.r-m;
+            border-width: 2px;
+            border-color: Theme.accent;
+        }
+    }
+    // The drawer's edge, over the page.
+    Rectangle {
+        visible: root.drawer;
+        x: parent.width - 1px;
+        width: 1px;
+        background: Theme.hairline;
     }
 }
