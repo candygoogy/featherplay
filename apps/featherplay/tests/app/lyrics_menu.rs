@@ -364,13 +364,9 @@ fn large_text_fits_the_narrowest_window_in_the_full_view_and_the_side_tab() {
     scene.settle();
     scene.ui.window().take_snapshot().expect("frame");
     assert!(data.get_showing());
-    // Each line is its row, whose hover tile reaches 12 px past the 20 px padding.
-    assert_laid_out(
-        &line_rects(&scene, 0.0, 480.0),
-        472.0,
-        24.0,
-        "the full view",
-    );
+    // Each line is its row, whose hover tile reaches 12 px past the 20 px padding: rows that
+    // start there (the Up next sheet keeps a Lyrics tab of its own, further in).
+    assert_laid_out(&line_rects(&scene, 0.0, 20.0), 472.0, 24.0, "the full view");
 
     // The side tab, in the narrowest window with Now playing's side panel: 960 px. Below
     // `wide-min` the panel is `panel-w` wide; the stage is the rest. Open, as the side tab

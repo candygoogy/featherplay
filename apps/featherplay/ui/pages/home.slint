@@ -20,6 +20,7 @@
 // `HomeData` is in `home/data.slint`; this file lays out the page and its shelves.
 import { ListView } from "../list_view.slint";
 import { Theme, Curves, Icons } from "../theme.slint";
+import { Frame } from "../nav.slint";
 import { CardItem, ItemKind, Body, Display, Card, Icon, Pill, SongRow, ShelfArrows, RowsShown, SongList, PageIntent } from "../parts.slint";
 import { Skeleton, SkeletonBlock, SkeletonBar, SkeletonRow, SkeletonCard, ErrorState, EmptyState, Open } from "content.slint";
 import { SongMenu } from "../song_menu.slint";
@@ -107,9 +108,10 @@ export global Rails {
         }
         return root.head-h + Rails.art-h(s, w) + Theme.card-text-gap + (s == ShelfShape.artists ? 24px : 40px);
     }
-    // Quick picks' whole columns in `w`, and a column's width.
+    // Quick picks' whole columns in `w`, and a column's width. Beside the Up next panel in
+    // a wide window, two narrower columns at least, as always there.
     public pure function grid-per-page(w: length) -> int {
-        return max(1, floor((w + Theme.card-gap) / (root.grid-col + Theme.card-gap)));
+        return max(Frame.sheet ? 1 : 2, floor((w + Theme.card-gap) / (root.grid-col + Theme.card-gap)));
     }
     public pure function grid-col-w(w: length) -> length {
         return Rails.grid-per-page(w) == 1 && w < root.grid-col + Theme.card-gap + root.grid-peek ? w : min(root.grid-col, floor((w - (Rails.grid-per-page(w) - 1) * Theme.card-gap) / Rails.grid-per-page(w) / 1px) * 1px);

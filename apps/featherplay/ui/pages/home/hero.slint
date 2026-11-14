@@ -76,12 +76,13 @@ export global BandSizes {
     out property <length> row-h-tight: 44px;
     // The four actions: 40 px each, 8 apart.
     out property <length> actions-w: 4 * 40px + 3 * 8px;
-    // The narrow band, for a band too narrow for the song beside the cover and its row (a
-    // narrow window, or the Up next panel open beside one): a 96 px cover with the song beside
-    // it, the row under both, 20 px in from the edges.
-    out property <length> narrow-h: 192px;
-    out property <length> narrow-pad: 20px;
-    out property <length> narrow-cover: 96px;
+    // The narrow band, for a band too narrow for the song beside the cover and its row: in
+    // a narrow window (`Frame.sheet`) a 96 px cover with the song beside it, the row under
+    // both, 20 px in from the edges; beside the Up next panel in a wider one, as it always
+    // was there, a 112 px cover and the band's usual height and padding.
+    out property <length> narrow-h: Frame.sheet ? 192px : self.height;
+    out property <length> narrow-pad: Frame.sheet ? 20px : self.pad;
+    out property <length> narrow-cover: Frame.sheet ? 96px : 112px;
     public pure function narrow(w: length) -> bool {
         return w < self.text-x + self.pad + 340px;
     }
@@ -310,7 +311,10 @@ export component Band inherits Rectangle {
     // panel open beside one): the narrow band, the cover smaller, the title a size down (two
     // below a 488 px band), the row under them both.
     property <bool> compact: BandSizes.narrow(root.width);
-    property <bool> tight: root.width < 488px;
+    // The narrow band proper, in a narrow window (`BandSizes.narrow-*`): its title steps down
+    // again in a band under 488 px, and its meta line a size.
+    property <bool> slim: root.compact && Frame.sheet;
+    property <bool> tight: root.slim && root.width < 488px;
     property <length> pad: root.compact ? BandSizes.narrow-pad : BandSizes.pad;
     property <int> queued: QueueData.upcoming.length;
     property <int> rows-n: root.resume ? HomeData.next.length : HomeData.featured-more.length;
@@ -338,7 +342,7 @@ export component Band inherits Rectangle {
     // "More like this": under the queue's rows and a 4 px gap, or at the top without a queue.
     property <length> more-y: root.rows-n > 0 ? 20px + root.rows-n * root.row-h + 4px : 0px;
     property <length> cover: root.compact ? BandSizes.narrow-cover : BandSizes.cover;
-    property <length> text-x: root.compact ? root.pad + root.cover + Theme.s4 : BandSizes.text-x;
+    property <length> text-x: root.compact ? root.pad + root.cover + Theme.s4 + (root.slim ? 0px : Theme.s1) : BandSizes.text-x;
     // The title's line: the display face at 40, 32 in the narrow band, 24 in a tight one.
     property <length> title-h: root.compact ? (root.tight ? 32px : 40px) : 48px;
     property <length> text-w: root.column ? root.beside-w : root.width - root.pad - root.text-x;
@@ -402,7 +406,7 @@ export component Band inherits Rectangle {
         }
         Display {
             x: 0;
-            y: root.compact ? 26px : 24px;
+            y: root.slim ? 26px : 24px;
             width: parent.width;
             height: root.title-h;
             text: root.resume ? Player.title : HomeData.featured.title;
@@ -418,11 +422,11 @@ export component Band inherits Rectangle {
             property <string> year: root.resume && Player.album != "" ? NowPlayingData.year : "";
             property <string> rest: (self.album != "" ? " · " + self.album : "") + (self.year != "" ? " · " + self.year : "");
             x: 0;
-            y: root.compact ? 26px + root.title-h : 74px;
+            y: root.slim ? 26px + root.title-h : (root.compact ? 66px : 74px);
             width: parent.width;
             height: 22px;
             // A size down in the narrow band.
-            property <length> size: root.compact ? Theme.t-body : Theme.t-body-l;
+            property <length> size: root.slim ? Theme.t-body : Theme.t-body-l;
             artist := Body {
                 x: 0;
                 // The album follows right after; it elides first, and goes once the artists
@@ -465,7 +469,7 @@ export component Band inherits Rectangle {
             property <bool> paused-shown: root.resume && !root.playing && self.main-natural + Theme.s4 + self.paused-w + self.fixed <= self.width;
             // In the narrow band, under the cover and the song, 16 px below them.
             x: root.compact ? root.pad - root.text-x : 0px;
-            y: root.compact ? root.cover + Theme.s4 : parent.height - 40px;
+            y: root.slim ? root.cover + Theme.s4 : BandSizes.cover - 40px;
             width: root.compact ? root.width - 2 * root.pad : parent.width;
             height: 40px;
             // Only measured.

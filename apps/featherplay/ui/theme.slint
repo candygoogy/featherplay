@@ -1,6 +1,7 @@
 // featherplay's design tokens. Every colour, size, spacing and
 // duration the UI uses lives here; pages never hard-code colours.
 import { Palette } from "std-widgets.slint";
+import { Frame } from "nav.slint";
 
 // The Appearance setting (`Settings.theme`).
 export enum Appearance { dark, light, system }
@@ -298,10 +299,12 @@ export global Theme {
 
     // Density: comfortable.
     out property <length> page-pad: 40px;
-    // A page's side padding for its width: `page-pad`, then 24 px below a 720 px page and
-    // 20 px below a 520 px one, so a narrow window keeps its room for content.
+    // A page's side padding for its width, the top bar's with it: in a narrow window (too
+    // narrow for a side panel, `Frame.sheet`) 24 px below a 720 px page and 20 px below a
+    // 520 px one, so the content keeps its room; otherwise `page-pad`, the Up next panel open
+    // or not.
     public pure function pad-for(w: length) -> length {
-        return w < 520px ? 20px : (w < 720px ? 24px : page-pad);
+        return !Frame.sheet ? page-pad : (w < 520px ? 20px : (w < 720px ? 24px : page-pad));
     }
     // Below a page's last row: past the floating bar, with the usual gap.
     out property <length> page-end: bar-clear + s5;

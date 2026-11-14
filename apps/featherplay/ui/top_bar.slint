@@ -621,8 +621,8 @@ export component TopBar inherits Rectangle {
             accept
         }
     }
-    // The pages' padding, which narrows with them: 24 px under a 720 px page, 20 under 520.
-    property <length> pad: root.width < 520px ? 20px : (root.width < 720px ? 24px : Theme.page-pad);
+    // The pages' padding (`Theme.pad-for`), so the field lines up with their content.
+    property <length> pad: Theme.pad-for(root.width);
     // Before Tab reaches the field, so Shift+Tab from the field (Ctrl+K) lands on it.
     menu-button := MenuButton {
         x: root.pad;

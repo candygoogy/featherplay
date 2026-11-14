@@ -262,8 +262,8 @@ times, gaps, wheel messages and the UI thread's CPU time inside the paints (`src
 
 - Colours, sizes and durations come from `Theme`; no literal colours in pages.
 - Pages lay out down to a 480 px window (360 without overlaps, which some window managers
-  force). A page's side padding is `Theme.pad-for(its width)` (40, then 24 and 20 px as it
-  narrows); two things side by side stack where the narrower would drop under its least
+  force). A page's side padding, and the top bar's, is `Theme.pad-for(its width)`: 40 px,
+  and in a narrow window (`Frame.sheet`) 24 and 20 px as the page narrows; two things side by side stack where the narrower would drop under its least
   (Settings' `RowPlan`, the album header's `HeaderSizes.stacked`), and long text elides.
   What changes a component's arrangement with its own width inside a layout (`Chips`, the
   Accent row) is worked out in a change handler, not bound: bound, its size would feed back
