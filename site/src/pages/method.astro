@@ -1,6 +1,6 @@
 ---
 // How the comparison's figures were measured, and where each one comes from. The setups are
-// the two measurements' (featherplay 0.3.0 on 13 November 2026, Pear Desktop and Edge on
+// the two measurements' (featherplay 0.4.0 on 14 November 2026, Pear Desktop and Edge on
 // 1 November; their write-ups are kept outside the repo), plus 0.2.0's one run with the sound
 // features on (9 November); the figures and the sizes come from numbers.ts and release.ts.
 import Base from "../layouts/Base.astro";
@@ -40,7 +40,7 @@ const { startToSoundS: start, clickToSoundS: click, hovered, notHovered, prepare
     <h1>How these were measured</h1>
     <p class="lede">
       All three players were measured on one PC: Pear Desktop and Edge on the evening of 1 November 2026, featherplay
-      {fp.version} early on 13 November. Every figure on the home page comes from those two measurements, and each one
+      {fp.version} early on 14 November. Every figure on the home page comes from those two measurements, and each one
       names its files below.
     </p>
 
@@ -52,12 +52,14 @@ const { startToSoundS: start, clickToSoundS: click, hovered, notHovered, prepare
           Workstations, build 26300.
         </li>
         <li>
-          featherplay {fp.version}, the release's own portable exe, the one offered for download, checked against the
-          release's checksums: the exe is{release.portable ? ` ${sizeLabel(release.portable)}` : ""}, the installer
+          featherplay {fp.version}, built for release on that PC from the same code as the release, so not the exe
+          offered for download: its code differs from that one's only in the version it logs. The release's exe
+          is{release.portable ? ` ${sizeLabel(release.portable)}` : ""}, the installer
           {release.installer ? ` ${sizeLabel(release.installer)}` : ""}. It ran on a copy of a long-used featherplay
           folder (settings, saved queue, kept streams and covers), with Streaming quality on High, so every song played
           as Opus. The settings were its owner's (lyrics on, a 2 s crossfade, the equalizer, Even out loudness and Skip
-          silence off), with Discord status off. Last.fm was off, as the folder wasn't signed in to it.
+          silence off), with Discord status off and {fp.version}'s new features (quick search, the sleep timer, desktop
+          lyrics) off, as they are by default. Last.fm was off, as the folder wasn't signed in to it.
         </li>
         <li>Pear Desktop {pear.version}, installed, with its owner's settings left as they were.</li>
         <li>
@@ -75,10 +77,10 @@ const { startToSoundS: start, clickToSoundS: click, hovered, notHovered, prepare
           player running. Pear Desktop stayed open but paused while Edge was measured, and wasn't counted.
         </li>
         <li>
-          featherplay, on 13 November: one song on repeat, at featherplay's volume of 2 % (Windows' own volume left as
+          featherplay, on 14 November: one song on repeat, at featherplay's volume of 2 % (Windows' own volume left as
           it was), three runs. Each figure is the median of the three. Pear Desktop wasn't running at any point.
           featherplay ran on a Windows desktop of its own, so its window never showed while the PC was in use; the
-          whole machine averaged 8 to 9 % CPU over each part of a run.
+          whole machine averaged 9 to 10 % CPU over each part of a run.
         </li>
         <li>The window was minimised, and no games were running.</li>
         <li>Five minutes playing, then three minutes paused, with a sample every 5 seconds.</li>
@@ -111,7 +113,7 @@ const { startToSoundS: start, clickToSoundS: click, hovered, notHovered, prepare
           Warm starts, with featherplay and its folder already used: one start to warm up, not counted, then{" "}
           {start.n}. The median is {formatFigure("startToSoundS", start.median)}, and they took {s(start.min)} to{" "}
           {s(start.max)}. All {start.n} played the stream featherplay had kept from the last session, with no lookup, so
-          from Play to the first sound was the stream's first request and the seek: 0.10 to 0.22 s.
+          from Play to the first sound was the stream's first request and the seek: 0.12 to 0.21 s.
         </li>
         <li>
           A new install has nothing kept yet. In 0.2.0, a new install's very
@@ -160,7 +162,8 @@ const { startToSoundS: start, clickToSoundS: click, hovered, notHovered, prepare
         <li>
           By what was ready: {preparedAhead.n} of the {click.n} songs had been prepared while another played (median{" "}
           {s(preparedAhead.median)}, {s(preparedAhead.min)} to {s(preparedAhead.max)}). A prepared song's stream isn't
-          fetched ahead, so a click on one waits for the stream's first request; a hovered one plays from memory. One
+          fetched ahead: the click's first press starts it, and a quick click may wait for it, as 2 of these did (0.12
+          and 0.29 s); a hovered one plays from memory. One
           session's first click was ready from its hover alone ({s(hoveredOnly.median)}). The other session's first was
           cold: it waited for its lookup and its stream's first request ({s(cold.median)}).
         </li>
@@ -182,9 +185,9 @@ const { startToSoundS: start, clickToSoundS: click, hovered, notHovered, prepare
         <li>
           CPU is a share of the whole processor: the CPU seconds the processes used, divided by the seconds measured,
           divided by the 16 logical processors. Windows charges CPU time in 15.6 ms ticks, which can miss very short
-          wakes; 0.2.0's paused figure of 0% came from that. For {fp.version} the processor cycles were counted too.
-          While playing they agree with the CPU seconds; paused, the CPU seconds are five or six of those ticks in three
-          minutes, and the cycles come to 0.002% against their 0.003%.
+          wakes; 0.2.0's paused figure of 0% came from that. For {fp.version} the processor cycles were counted too, and
+          they agree with the CPU seconds: paused, where the CPU seconds are one to three of those ticks in three
+          minutes, both come to 0.002%.
         </li>
         <li>
           Download is what you download to install it: featherplay's installer (or the{" "}
@@ -212,17 +215,22 @@ const { startToSoundS: start, clickToSoundS: click, hovered, notHovered, prepare
           is fixed. That run's memory, 999 MB, agrees with the run that's used.
         </li>
       </ul>
-      <p class="para">On 13 November:</p>
+      <p class="para">On 14 November:</p>
       <ul class="facts">
         <li>
           A trial run, which looked up the runs' song once so that every run played it from the stream featherplay had
           kept, wasn't counted.
         </li>
         <li>
-          One of the three runs sat at 58 MB of memory from the start, the other two at 41 and 42 MB, with the same song.
-          0.2.2's runs did the same (one of three at 57 MB), as did 0.2.0's exe when it was tried. The cause was found
-          later: until 0.4.0, the font cache copied each fallback font a title drew with into private memory, 14 MB for
-          Yu Gothic Bold when a Japanese title showed in bold. The median of the three is the figure used.
+          All three runs sat at 38 to 39 MB of memory while playing. Until 0.4.0, about one run in three sat some 15 MB
+          higher from the start (0.3.0's at 58 MB, 0.2.2's at 57 MB), and why wasn't known. It was the font cache: it
+          copied each fallback font a title drew with into private memory, 14 MB for Yu Gothic Bold when a Japanese
+          title showed in bold. 0.4.0 reads those fonts where Windows keeps them. No Japanese, Chinese or Korean title
+          was on screen in these runs, so they show the usual case rather than the fix at work.
+        </li>
+        <li>
+          Two earlier sets of three runs, on 13 November, of 0.4.0's code before that fix, all sat at 54 to 56 MB. They
+          aren't used.
         </li>
       </ul>
     </section>
@@ -232,7 +240,7 @@ const { startToSoundS: start, clickToSoundS: click, hovered, notHovered, prepare
       <p class="para">
         PowerShell scripts took the samples and wrote them to CSV files. On 1 November, <code>measure-pear.ps1</code>{" "}
         for Pear Desktop and <code>measure-edge.ps1</code> for Edge, which reads each process's CPU time from Windows'
-        own process list (Win32_Process). On 13 November, <code>measure-pass.ps1</code> for featherplay (the method of
+        own process list (Win32_Process). On 14 November, <code>measure-pass.ps1</code> for featherplay (the method of
         the 1 November script, with more columns, the processor cycles among them), and <code>run-starts.ps1</code> and{" "}
         <code>run-clicks.ps1</code> for the two timings.
       </p>

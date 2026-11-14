@@ -111,18 +111,18 @@ describe("figures", () => {
     expect(figures.map((f) => f.app)).toEqual(["featherplay", "Pear Desktop", "YouTube Music in Edge"]);
   });
 
-  it("holds featherplay 0.3.0's measurement of 13 November 2026 and the others' of 1 November, nothing provisional", () => {
+  it("holds featherplay 0.4.0's measurement of 14 November 2026 and the others' of 1 November, nothing provisional", () => {
     const by = Object.fromEntries(figures.map((f) => [f.app, f]));
     expect(by["featherplay"]).toMatchObject({
-      version: "0.3.0",
-      memoryMB: 42,
-      memoryPausedMB: 41,
-      cpuPlayingPct: 0.061,
-      cpuPausedPct: 0.003,
+      version: "0.4.0",
+      memoryMB: 39,
+      memoryPausedMB: 37,
+      cpuPlayingPct: 0.063,
+      cpuPausedPct: 0.002,
       processes: { min: 1, max: 1 },
-      startToSoundS: 0.228,
-      clickToSoundS: 0.024,
-      downloadMB: 10.78,
+      startToSoundS: 0.237,
+      clickToSoundS: 0.009,
+      downloadMB: 11.12,
     });
     expect(by["Pear Desktop"]).toMatchObject({
       version: "3.12.0",
@@ -159,7 +159,7 @@ describe("figures", () => {
         else expect(f.sources[m], `${f.app} ${m}`).toMatch(/^measurements\/[^/]*final/);
       }
     }
-    expect(figures[0].sources.memoryMB).toMatch(/final-0\.3\.0\/csv\/default-/);
+    expect(figures[0].sources.memoryMB).toMatch(/final-0\.4\.0\/final-df6db1f\/csv\/default-/);
     expect(figures[0].sources.clickToSoundS).toMatch(/click-to-sound/);
     expect(figures[2].sources.cpuPlayingPct).toMatch(/edge_final-playing3_/);
   });
@@ -174,8 +174,8 @@ describe("figures", () => {
   });
 
   it("works out how many times less featherplay uses, from the figures", () => {
-    expect(timesLess("memoryMB", "Pear Desktop")).toBe(19);
-    expect(timesLess("memoryMB", "YouTube Music in Edge")).toBe(24);
+    expect(timesLess("memoryMB", "Pear Desktop")).toBe(20);
+    expect(timesLess("memoryMB", "YouTube Music in Edge")).toBe(25);
     expect(timesLess("cpuPlayingPct", "Pear Desktop")).toBe(3);
     expect(timesLess("cpuPlayingPct", "YouTube Music in Edge")).toBe(2);
     expect(timesLess("downloadMB", "Pear Desktop")).toBe(25);
@@ -183,15 +183,15 @@ describe("figures", () => {
 
   it("reads each figure the way the page shows it", () => {
     const [fp, pear, edge] = figures;
-    expect(figureText(fp, "memoryMB")).toBe("42 MB");
-    expect(figureText(fp, "cpuPlayingPct")).toBe("0.061%");
-    expect(figureText(fp, "cpuPausedPct")).toBe("0.003%");
+    expect(figureText(fp, "memoryMB")).toBe("39 MB");
+    expect(figureText(fp, "cpuPlayingPct")).toBe("0.063%");
+    expect(figureText(fp, "cpuPausedPct")).toBe("0.002%");
     expect(figureText(pear, "cpuPausedPct")).toBe("0.05%");
-    expect(figureText(fp, "startToSoundS")).toBe("0.23 s");
-    expect(figureText(fp, "clickToSoundS")).toBe("0.024 s");
+    expect(figureText(fp, "startToSoundS")).toBe("0.24 s");
+    expect(figureText(fp, "clickToSoundS")).toBe("0.009 s");
     expect(figureText(pear, "startToSoundS")).toBe("—");
     expect(figureText(edge, "clickToSoundS")).toBe("—");
-    expect(figureText(fp, "downloadMB")).toBe("10.78 MB");
+    expect(figureText(fp, "downloadMB")).toBe("11.12 MB");
     expect(figureText(pear, "downloadMB")).toBe("274 MB");
     expect(figureText(edge, "downloadMB")).toBe("None");
     expect(figureText(fp, "processes")).toBe("1");
@@ -283,21 +283,21 @@ describe("the download's options", () => {
     expect(o).toHaveLength(1);
     expect(o[0]).toMatchObject({ id: "portable", primary: true, action: "Download for Windows" });
   });
-  it("offers the per-user installer and the exe by name, with the v0.3.0 release's sizes and direct links", async () => {
+  it("offers the per-user installer and the exe by name, with the v0.4.0 release's sizes and direct links", async () => {
     const { release, sizeLabel } = await import("../../src/data/release");
     expect(release.installer?.name).toBe(`featherplay-setup-${release.version}.exe`);
-    expect(release.version).toBe("0.3.0");
-    expect(release.installer?.bytes).toBe(11_303_044);
-    expect(release.portable?.bytes).toBe(30_142_976);
+    expect(release.version).toBe("0.4.0");
+    expect(release.installer?.bytes).toBe(11_659_916);
+    expect(release.portable?.bytes).toBe(31_679_488);
     expect(release.installer?.url).toBe(
-      "https://github.com/candygoogy/featherplay/releases/download/v0.3.0/featherplay-setup-0.3.0.exe",
+      "https://github.com/candygoogy/featherplay/releases/download/v0.4.0/featherplay-setup-0.4.0.exe",
     );
-    expect(release.portable?.url).toBe("https://github.com/candygoogy/featherplay/releases/download/v0.3.0/featherplay.exe");
+    expect(release.portable?.url).toBe("https://github.com/candygoogy/featherplay/releases/download/v0.4.0/featherplay.exe");
     // MB as Windows counts them (1,048,576 bytes).
-    expect(release.installer && sizeLabel(release.installer)).toBe("10.78 MB");
-    expect(release.portable && sizeLabel(release.portable)).toBe("28.75 MB");
+    expect(release.installer && sizeLabel(release.installer)).toBe("11.12 MB");
+    expect(release.portable && sizeLabel(release.portable)).toBe("30.21 MB");
     // Search engines get the first size that's known: the installer's.
-    expect(release.sizeMB).toBe(10.78);
+    expect(release.sizeMB).toBe(11.12);
   });
   it("shows a dash for a file not measured yet", async () => {
     const { sizeLabel } = await import("../../src/data/release");

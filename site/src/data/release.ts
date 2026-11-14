@@ -1,7 +1,7 @@
-// The download: version 0.3.0, the files on the v0.3.0 release (built by release.yml on
-// 13 November 2026). Each file links straight to its download; the release page has the
+// The download: version 0.4.0, the files on the v0.4.0 release (built by release.yml on
+// 14 November 2026). Each file links straight to its download; the release page has the
 // checksums and notes. featherplay's memory, CPU and timing figures (numbers.ts) were
-// measured on 13 November, on this release's own portable exe.
+// measured on 14 November, on a release build of the same code made on the measuring PC.
 //
 // Two ways to get it: the per-user installer (recommended: no admin prompt, a Start menu
 // entry, an uninstaller that removes everything) and the portable exe. A file's bytes are
@@ -46,7 +46,7 @@ export type LinuxBuild = {
 };
 
 const releases = links.releases;
-const version = "0.3.0";
+const version = "0.4.0";
 /** Bytes as MB the way Windows counts them (1,048,576 bytes), to two decimals. */
 export const toMB = (bytes: number): number => Math.round((bytes / 1_048_576) * 100) / 100;
 const file = (name: string, bytes: number | null): ReleaseFile => ({
@@ -55,13 +55,13 @@ const file = (name: string, bytes: number | null): ReleaseFile => ({
   sizeMB: bytes == null ? null : toMB(bytes),
   url: `${releases}/download/v${version}/${name}`,
 });
-const installer: ReleaseFile | null = file(`featherplay-setup-${version}.exe`, 11_303_044);
-const portable: ReleaseFile | null = file("featherplay.exe", 30_142_976);
+const installer: ReleaseFile | null = file(`featherplay-setup-${version}.exe`, 11_659_916);
+const portable: ReleaseFile | null = file("featherplay.exe", 31_679_488);
 const linuxFiles = [
-  file("featherplay-x86_64.AppImage", 14_584_312),
-  file("featherplay-x86_64.tar.gz", 14_862_300),
-  file("featherplay-aarch64.AppImage", 14_428_680),
-  file("featherplay-aarch64.tar.gz", 14_544_640),
+  file("featherplay-x86_64.AppImage", 15_260_152),
+  file("featherplay-x86_64.tar.gz", 15_356_446),
+  file("featherplay-aarch64.AppImage", 15_227_400),
+  file("featherplay-aarch64.tar.gz", 15_102_411),
 ];
 const linux: LinuxBuild | null = { appImage: linuxFiles[0], files: linuxFiles, page: `${releases}/tag/v${version}` };
 
