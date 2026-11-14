@@ -201,6 +201,11 @@ pub fn when_taskbar_button(_h: Handle, _created: impl Fn() + 'static) -> Result<
     Ok(())
 }
 
+/// Where the taskbar is: never known here, so the mini player goes by the click alone.
+pub fn taskbar() -> Option<Taskbar> {
+    None
+}
+
 /// On an X11 desktop, the work area (the monitor's, less the panels) of the monitor at
 /// `(x, y)` (physical pixels), and the scale winit gives windows there; `None` on Wayland,
 /// where nothing is known of the screen.

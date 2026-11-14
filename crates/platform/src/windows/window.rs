@@ -2,7 +2,7 @@
 //! colours, an opaque surface that's repainted whole when Windows drops it, the window icon,
 //! minimising it and bringing it forward, and watching its theme, displays, size, presses and
 //! taskbar button; Windows' animation setting. For the tray's mini player: the work area and
-//! scale of the screen under a point, the popup's border, whether a press is what brought it
+//! scale of the screen under a point, where the taskbar is, the popup's border, whether a press is what brought it
 //! to the front, which window is in front, and presses anywhere on screen. For the sign-in
 //! window: where a window's client area is, and a window frame's size.
 
@@ -22,7 +22,10 @@ use windows::Win32::Graphics::Gdi::{
 };
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::HiDpi::{AdjustWindowRectExForDpi, GetDpiForMonitor, MDT_EFFECTIVE_DPI};
-use windows::Win32::UI::Shell::{DefSubclassProc, RemoveWindowSubclass, SetWindowSubclass};
+use windows::Win32::UI::Shell::{
+    ABE_LEFT, ABE_RIGHT, ABE_TOP, ABM_GETTASKBARPOS, APPBARDATA, DefSubclassProc,
+    RemoveWindowSubclass, SHAppBarMessage, SetWindowSubclass,
+};
 use windows::Win32::UI::WindowsAndMessaging::{
     CallNextHookEx, CreateIconFromResourceEx, DestroyIcon, GA_ROOT, GetAncestor, GetClassNameW,
     GetCursorPos, GetForegroundWindow, GetWindowRect, HC_ACTION, HHOOK, HICON, ICON_BIG,
@@ -779,6 +782,30 @@ pub fn work_area_at(x: i32, y: i32) -> Option<(ScreenRect, f32)> {
         };
     let w = info.rcWork;
     Some(((w.left, w.top, w.right, w.bottom), scale))
+}
+
+/// The primary taskbar, where the notification area and its hidden icons' flyout are: its
+/// edge and its rectangle (where it shows, also while it's hidden away).
+pub fn taskbar() -> Option<Taskbar> {
+    let mut data = APPBARDATA {
+        cbSize: size_of::<APPBARDATA>() as u32,
+        ..Default::default()
+    };
+    // SAFETY: an APPBARDATA with its size filled in, which the shell fills.
+    if unsafe { SHAppBarMessage(ABM_GETTASKBARPOS, &mut data) } == 0 {
+        return None;
+    }
+    let edge = match data.uEdge {
+        ABE_LEFT => Edge::Left,
+        ABE_TOP => Edge::Top,
+        ABE_RIGHT => Edge::Right,
+        _ => Edge::Bottom,
+    };
+    let r = data.rc;
+    Some(Taskbar {
+        edge,
+        rect: (r.left, r.top, r.right, r.bottom),
+    })
 }
 
 /// The border Windows 11 draws around a rounded popup, in the app's hairline colour rather

@@ -1,5 +1,5 @@
 //! What the window functions take and give on every OS: a plain colour, a screen
-//! rectangle, the window in front, and the entry of an `.ico` for a size. The window
+//! rectangle, the taskbar, the window in front, and the entry of an `.ico` for a size. The window
 //! itself, `Handle`, is each OS's own.
 
 use crate::window::Handle;
@@ -14,6 +14,22 @@ pub struct Rgb {
 
 /// A screen rectangle in physical pixels: left, top, right, bottom.
 pub type ScreenRect = (i32, i32, i32, i32);
+
+/// The edge of its monitor a taskbar sits on.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Edge {
+    Left,
+    Top,
+    Right,
+    Bottom,
+}
+
+/// The taskbar, as `taskbar` reads it: its edge and where it is (physical pixels).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Taskbar {
+    pub edge: Edge,
+    pub rect: ScreenRect,
+}
 
 /// The window in front: what `foreground` reads.
 #[derive(Clone, Debug, PartialEq, Eq)]

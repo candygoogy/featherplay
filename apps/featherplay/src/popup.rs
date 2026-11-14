@@ -6,7 +6,7 @@
 
 use std::cell::Cell;
 
-use featherplay_platform::window::{self, Handle, ScreenRect};
+use featherplay_platform::window::{self, Edge, Handle, ScreenRect, Taskbar};
 use featherplay_platform::{Feature, supports};
 use slint::winit_030::WinitWindowAccessor;
 #[cfg(windows)]
@@ -85,20 +85,28 @@ pub fn show_unplaced(window: &slint::Window) -> Result<(), String> {
 }
 
 /// Shows `ui`'s window, `size` logical pixels, for a click on the tray icon at `(x, y)`
-/// (physical screen pixels). Returns where its top-left corner went. Once its window exists
-/// (`shell::when_handle`), `dress` it.
+/// (physical screen pixels): by the click on the taskbar, else (an icon in the hidden icons'
+/// flyout) by the taskbar's notification area, on its monitor (`place_from_tray`). Returns
+/// where its top-left corner went. Once its window exists (`shell::when_handle`), `dress` it.
 pub fn show_at<C: ComponentHandle + 'static>(
     ui: &C,
     (x, y): (i32, i32),
     size: (f32, f32),
 ) -> Result<(i32, i32), String> {
-    let (work, scale) = window::work_area_at(x, y).ok_or("no monitor at the click")?;
+    let taskbar = window::taskbar();
+    let (mut work, mut scale) = window::work_area_at(x, y).ok_or("no monitor at the click")?;
+    if let Some(t) = taskbar.filter(|t| !on_taskbar((x, y), work, *t)) {
+        let (l, top, r, b) = t.rect;
+        if let Some(there) = window::work_area_at((l + r) / 2, (top + b) / 2) {
+            (work, scale) = there;
+        }
+    }
     let physical = (
         (size.0 * scale).round() as i32,
         (size.1 * scale).round() as i32,
     );
     let gap = (GAP * scale).round() as i32;
-    let (left, top) = place((x, y), physical, work, gap);
+    let (left, top) = place_from_tray((x, y), physical, work, gap, taskbar);
     let window = ui.window();
     window.set_position(PhysicalPosition::new(left, top));
     creating(|| window.show()).map_err(|e| format!("show: {e}"))?;
@@ -114,7 +122,7 @@ pub fn show_at<C: ComponentHandle + 'static>(
             let Some(real) = real.filter(|r| r.0 > 0 && *r != physical) else {
                 return;
             };
-            let (left, top) = place((x, y), real, work, gap);
+            let (left, top) = place_from_tray((x, y), real, work, gap, taskbar);
             ui.window().set_position(PhysicalPosition::new(left, top));
             log!("popup: {}x{} px, moved to {left},{top}", real.0, real.1);
         },
@@ -133,11 +141,61 @@ pub fn dress(handle: Handle, border: slint::Color) {
     window::bring_forward(handle);
 }
 
+/// Where a popup opened from the tray icon goes, everything in physical pixels: for a click
+/// at `point` on the `taskbar`, by the click (`place`); for one elsewhere (an icon in the
+/// hidden icons' flyout), as Windows' own flyouts sit: in the corner of the work area at the
+/// notification area's end of the taskbar, `gap` from it and from the screen's edge. `work`
+/// is the work area of the taskbar's monitor then. A taskbar that hides itself lies over the
+/// work area: the popup stays clear of it all the same. With no taskbar known, by the click.
+pub fn place_from_tray(
+    point: (i32, i32),
+    size: (i32, i32),
+    work: ScreenRect,
+    gap: i32,
+    taskbar: Option<Taskbar>,
+) -> (i32, i32) {
+    let Some(t) = taskbar else {
+        return place(point, size, work, gap);
+    };
+    let work = clear_of(work, t);
+    if on_taskbar(point, work, t) {
+        return place(point, size, work, gap);
+    }
+    let ((w, h), (left, top, right, bottom)) = (size, work);
+    match t.edge {
+        Edge::Bottom | Edge::Right => (right - gap - w, bottom - gap - h),
+        Edge::Top => (right - gap - w, top + gap),
+        Edge::Left => (left + gap, bottom - gap - h),
+    }
+}
+
+/// Whether `point` is on the taskbar `t`: on it, or outside the work area, where only a
+/// taskbar is.
+fn on_taskbar(point: (i32, i32), work: ScreenRect, t: Taskbar) -> bool {
+    let inside =
+        |(px, py): (i32, i32), (l, top, r, b): ScreenRect| px >= l && px < r && py >= top && py < b;
+    inside(point, t.rect) || !inside(point, work)
+}
+
+/// `work` less the taskbar `t` where it lies over it (one that hides itself).
+fn clear_of(work: ScreenRect, t: Taskbar) -> ScreenRect {
+    let ((l, top, r, b), (tl, tt, tr, tb)) = (work, t.rect);
+    if tl >= r || tr <= l || tt >= b || tb <= top {
+        return work;
+    }
+    match t.edge {
+        Edge::Bottom => (l, top, r, b.min(tt)),
+        Edge::Top => (l, top.max(tb), r, b),
+        Edge::Left => (l.max(tr), top, r, b),
+        Edge::Right => (l, top, r.min(tl), b),
+    }
+}
+
 /// Where a popup's top-left corner goes for a click at `point`, everything in physical
 /// pixels: above a taskbar at the bottom, below one at the top, beside one on the left or
-/// right, centred on the click along the taskbar; for a click inside the work area (the
-/// hidden icons' flyout), above the point, or below it when there's no room. Always inside
-/// the work area, `gap` from its edges.
+/// right, centred on the click along the taskbar; for a point inside the work area (the
+/// bar's button where there's no tray), above the point, or below it when there's no room.
+/// Always inside the work area, `gap` from its edges.
 pub fn place(point: (i32, i32), size: (i32, i32), work: ScreenRect, gap: i32) -> (i32, i32) {
     let ((px, py), (w, h), (left, top, right, bottom)) = (point, size, work);
     let x = if px < left {
@@ -280,7 +338,7 @@ mod tests {
     }
 
     #[test]
-    fn overflow_flyout_click_opens_above_the_point() {
+    fn a_point_inside_the_work_area_opens_above_it() {
         assert_eq!(place((1500, 900), SIZE, WORK, 12), (1330, 768));
     }
 
@@ -310,6 +368,75 @@ mod tests {
         assert_eq!(place((3000, 2120), (510, 180), work, 18), (2745, 1890));
         let work = (0, 0, 3840, 2064);
         assert_eq!(place((3000, 2100), (680, 240), work, 24), (2660, 1800));
+    }
+
+    const fn bar(edge: Edge, rect: ScreenRect) -> Option<Taskbar> {
+        Some(Taskbar { edge, rect })
+    }
+
+    /// A 48 px taskbar at the bottom of a 1920 x 1080 screen.
+    const BOTTOM: Option<Taskbar> = bar(Edge::Bottom, (0, 1032, 1920, 1080));
+
+    #[test]
+    fn tray_icon_on_the_taskbar_opens_by_the_click() {
+        let at = place_from_tray((1500, 1050), SIZE, WORK, 12, BOTTOM);
+        assert_eq!(at, (1330, 900));
+    }
+
+    #[test]
+    fn tray_icon_in_the_overflow_flyout_opens_in_the_corner_above_the_taskbar() {
+        // The flyout sits above the taskbar, inside the work area.
+        let at = place_from_tray((1500, 900), SIZE, WORK, 12, BOTTOM);
+        assert_eq!(at, (1568, 900));
+        // 150 %: 510 x 180 physical, an 18 px gap, a 72 px taskbar.
+        let taskbar = bar(Edge::Bottom, (0, 2088, 3840, 2160));
+        let at = place_from_tray((3000, 1800), (510, 180), (0, 0, 3840, 2088), 18, taskbar);
+        assert_eq!(at, (3312, 1890));
+    }
+
+    #[test]
+    fn taskbar_on_the_other_edges() {
+        let top = bar(Edge::Top, (0, 0, 1920, 48));
+        let work = (0, 48, 1920, 1080);
+        assert_eq!(place_from_tray((1500, 20), SIZE, work, 12, top), (1330, 60));
+        assert_eq!(
+            place_from_tray((1500, 200), SIZE, work, 12, top),
+            (1568, 60)
+        );
+        let left = bar(Edge::Left, (0, 0, 48, 1080));
+        let work = (48, 0, 1920, 1080);
+        assert_eq!(place_from_tray((20, 1000), SIZE, work, 12, left), (60, 868));
+        assert_eq!(place_from_tray((200, 900), SIZE, work, 12, left), (60, 948));
+        let right = bar(Edge::Right, (1872, 0, 1920, 1080));
+        let work = (0, 0, 1872, 1080);
+        assert_eq!(
+            place_from_tray((1890, 1000), SIZE, work, 12, right),
+            (1520, 868)
+        );
+        assert_eq!(
+            place_from_tray((1700, 900), SIZE, work, 12, right),
+            (1520, 948)
+        );
+    }
+
+    #[test]
+    fn a_taskbar_that_hides_itself_is_never_overlapped() {
+        // The work area is the whole screen; the taskbar shows over its bottom 48 px.
+        let work = (0, 0, 1920, 1080);
+        assert_eq!(
+            place_from_tray((1500, 1050), SIZE, work, 12, BOTTOM),
+            (1330, 900)
+        );
+        assert_eq!(
+            place_from_tray((1500, 900), SIZE, work, 12, BOTTOM),
+            (1568, 900)
+        );
+    }
+
+    #[test]
+    fn with_no_taskbar_known_it_opens_by_the_click() {
+        let at = place_from_tray((1500, 900), SIZE, WORK, 12, None);
+        assert_eq!(at, (1330, 768));
     }
 
     #[test]
