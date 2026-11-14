@@ -160,6 +160,8 @@ impl Controller {
             if self.sleep.quiet && playing {
                 self.sleep_volume_back();
             }
+            // Turned off (Turn off, the tray, the setting): the window's pill goes.
+            self.push_sleep(Duration::ZERO);
             return;
         }
         // The player paused at the song's end.

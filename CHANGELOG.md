@@ -27,6 +27,8 @@ Notable changes to featherplay, newest first. The format follows
   managers allow: the song's title no longer runs into the transport. As the bar narrows, the
   title shortens first, then the speed pill, the volume, and the mini player, sleep timer and
   Lyrics buttons give way in that order. From 960 px up the bar is as before.
+- The sleep timer's **Turn off** (in its popup and in the tray menu) now clears the time left
+  from the player bar's button; the timer was off, but the button still showed it running.
 
 ## [0.4.0] - 2026-11-14
 

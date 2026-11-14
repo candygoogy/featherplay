@@ -1,6 +1,7 @@
 //! The sleep timer in the player bar, on the offscreen platform (no window is shown): off by
 //! default there's no button; turned on, the button opens the popup, a chip there starts the
-//! timer and closes it; running, the button reads as the time left.
+//! timer and closes it; running, the button reads as the time left, and Turn off in the
+//! popup asks the controller to turn it off.
 
 use std::ops::ControlFlow;
 use std::time::Duration;
@@ -111,5 +112,38 @@ fn running_the_button_reads_as_the_time_left() {
     assert!(
         centre(&scene, "Sleep timer").is_some(),
         "the button went with the timer"
+    );
+}
+
+#[test]
+fn turn_off_in_the_popup_sends_off_and_closes_it() {
+    let scene = playing();
+    scene.ui.global::<SettingsData>().set_sleep_timer(true);
+    app::on_event(UiEvent::Sleep(Some(SleepState {
+        kind: SleepKind::Time,
+        minutes: 15,
+        fading: false,
+        left: Duration::from_secs(15 * 60),
+    })));
+    scene.settle();
+    let button = centre(&scene, "Sleep timer").expect("no button");
+    click(&scene, button);
+    assert!(
+        scene.ui.global::<Sleep>().get_open(),
+        "the popup didn't open"
+    );
+
+    scene.take_actions();
+    let off = centre(&scene, "Turn off").expect("no Turn off");
+    click(&scene, off);
+    let sent = scene.take_actions();
+    assert!(
+        sent.iter()
+            .any(|a| matches!(a, Action::Sleep(SleepAction::Off))),
+        "{sent:?}"
+    );
+    assert!(
+        !scene.ui.global::<Sleep>().get_open(),
+        "Turn off left it open"
     );
 }
