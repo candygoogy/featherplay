@@ -3,15 +3,16 @@
   songs, our own covers, a made-up account) at 1280 x 800 and 125 %, made by a script kept
   outside the repo; tray.png is the one real capture. MadeWithSlint-logo-*.svg: Slint's badge,
   unmodified (CC BY-ND 4.0), as its licence asks. now-playing-lyrics, settings-discord, search
-  and mini-player stay for the site and release notes, but aren't shown here.
+  and mini-player stay for the site and release notes, but aren't shown here. The header
+  picture is the page's h1, so tools that read the first heading find the app's name.
 -->
 
-<p align="center">
+<h1 align="center">
   <picture>
     <source media="(prefers-color-scheme: light)" srcset=".github/readme/header-light.png">
     <img src=".github/readme/header-dark.png" alt="featherplay: a native Windows player for YouTube Music, light enough to forget it's running. While playing it uses 39 MB of memory, 1 process and 0.063 % CPU. Beside the name, a laptop shows featherplay's Now playing view with synced lyrics for California Lullabye, over a mauve glow, the colour the app takes from the song's cover." width="100%">
   </picture>
-</p>
+</h1>
 
 <p align="center">
   <a href="https://github.com/candygoogy/featherplay/releases/latest"><b>Download for Windows</b></a>
