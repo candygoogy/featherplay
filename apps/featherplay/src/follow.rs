@@ -479,10 +479,7 @@ fn extract(ctx: &Rc<Ctx>, url: String, generation: u64) {
         if STATE.with(|s| s.borrow().generation != generation) {
             return;
         }
-        let pixels = img.and_then(|img| img.to_rgba8()).and_then(|buffer| {
-            image::RgbaImage::from_raw(buffer.width(), buffer.height(), buffer.as_bytes().to_vec())
-        });
-        let Some(pixels) = pixels else {
+        let Some(buffer) = img.and_then(|img| img.to_rgba8()) else {
             // The cover failed to load: neutral, as for a song with no art.
             no_colour(&c);
             return;
@@ -490,11 +487,12 @@ fn extract(ctx: &Rc<Ctx>, url: String, generation: u64) {
         c.load(
             move |_| async move {
                 tokio::task::spawn_blocking(move || {
-                    let seed = colour::dominant(&pixels);
-                    (seed, colour::palettes_for(seed))
+                    let seed = colour::dominant(&rgba_view(&buffer)?);
+                    Some((seed, colour::palettes_for(seed)))
                 })
                 .await
                 .ok()
+                .flatten()
             },
             move |ctx, _, found| {
                 let Some((seed, palettes)) = found else {
@@ -670,20 +668,18 @@ pub struct Washes {
     pub light: Color,
 }
 
-/// Works out `img`'s washes off the UI thread, then calls `done` on it. One copy of the
-/// pixels and one short job per cover; nothing repeats.
+/// Works out `img`'s washes off the UI thread, then calls `done` on it. One short job per
+/// cover, on the cover's own pixels; nothing repeats.
 pub fn washes(ctx: &Rc<Ctx>, img: &slint::Image, done: impl FnOnce(Washes) + 'static) {
     let Some(buffer) = img.to_rgba8() else { return };
-    let Some(pixels) =
-        image::RgbaImage::from_raw(buffer.width(), buffer.height(), buffer.as_bytes().to_vec())
-    else {
-        return;
-    };
     ctx.load(
         move |_| async move {
-            tokio::task::spawn_blocking(move || colour::washes(colour::dominant(&pixels)))
-                .await
-                .ok()
+            tokio::task::spawn_blocking(move || {
+                Some(colour::washes(colour::dominant(&rgba_view(&buffer)?)))
+            })
+            .await
+            .ok()
+            .flatten()
         },
         move |_, _, washes| {
             let Some(washes) = washes else { return };
@@ -742,16 +738,12 @@ pub fn lyric_inks_for(seed: Option<Lch>, fixed: Option<Color>) -> LyricInks {
 /// on the UI thread: what the lyrics' panel and Home's band (a featured pick's) are made from.
 pub fn cover_seed(ctx: &Rc<Ctx>, img: &slint::Image, done: impl FnOnce(Lch) + 'static) {
     let Some(buffer) = img.to_rgba8() else { return };
-    let Some(pixels) =
-        image::RgbaImage::from_raw(buffer.width(), buffer.height(), buffer.as_bytes().to_vec())
-    else {
-        return;
-    };
     ctx.load(
         move |_| async move {
-            tokio::task::spawn_blocking(move || colour::dominant(&pixels))
+            tokio::task::spawn_blocking(move || Some(colour::dominant(&rgba_view(&buffer)?)))
                 .await
                 .ok()
+                .flatten()
         },
         move |_, _, seed| {
             if let Some(seed) = seed {
@@ -759,6 +751,14 @@ pub fn cover_seed(ctx: &Rc<Ctx>, img: &slint::Image, done: impl FnOnce(Lch) + 's
             }
         },
     );
+}
+
+/// A cover's pixels as an image, borrowed: `Image::to_rgba8` shares a decoded cover's buffer,
+/// so the blocking task reads the pixels in place and the UI thread copies none.
+fn rgba_view(
+    buffer: &slint::SharedPixelBuffer<slint::Rgba8Pixel>,
+) -> Option<image::ImageBuffer<image::Rgba<u8>, &[u8]>> {
+    image::ImageBuffer::from_raw(buffer.width(), buffer.height(), buffer.as_bytes())
 }
 
 fn with_alpha(rgb: Rgb, alpha: f32) -> Color {

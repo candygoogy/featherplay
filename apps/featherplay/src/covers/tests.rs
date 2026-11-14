@@ -81,6 +81,43 @@ fn decode_square_keeps_the_centred_square() {
     assert_eq!((out.width(), out.height()), (300, 300));
 }
 
+/// Resizing from the crop's view gives the pixels a resize of a copy of the crop gave.
+#[test]
+fn decode_resizes_the_crop_as_a_copy_of_it_would() {
+    let img = image::RgbaImage::from_fn(97, 61, |x, y| {
+        image::Rgba([
+            (x * 7 % 256) as u8,
+            (y * 11 % 256) as u8,
+            ((x * y) % 256) as u8,
+            255,
+        ])
+    });
+    let mut png = std::io::Cursor::new(Vec::new());
+    img.write_to(&mut png, image::ImageFormat::Png)
+        .expect("png");
+    let png = png.into_inner();
+    let copy = |x, y, w, h, to_w, to_h| {
+        let crop = image::imageops::crop_imm(&img, x, y, w, h).to_image();
+        image::imageops::resize(&crop, to_w, to_h, FilterType::CatmullRom).into_raw()
+    };
+    let bytes = |b: SharedPixelBuffer<Rgba8Pixel>| b.as_bytes().to_vec();
+    // A square from the middle, smaller; and a 16:9 band, larger.
+    assert_eq!(
+        bytes(decode(&png, 40, 40).expect("decode")),
+        copy(18, 0, 61, 61, 40, 40)
+    );
+    assert_eq!(
+        bytes(decode(&png, 160, 90).expect("decode")),
+        copy(0, 3, 97, 54, 160, 90)
+    );
+    // The whole image, resized or as it is.
+    assert_eq!(
+        bytes(decode(&png, 194, 122).expect("decode")),
+        copy(0, 0, 97, 61, 194, 122)
+    );
+    assert_eq!(bytes(decode(&png, 97, 61).expect("decode")), img.into_raw());
+}
+
 /// What the window keeps while it shows nothing: the named covers, and their bytes.
 #[test]
 fn retain_keeps_only_the_named_covers() {

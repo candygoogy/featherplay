@@ -4,8 +4,8 @@
 //! Works in OKLCH so lightness can move without shifting the hue. Pure; runs off the UI
 //! thread.
 
-use image::RgbaImage;
 use image::imageops::FilterType;
+use image::{ImageBuffer, Rgba, RgbaImage};
 
 pub type Rgb = [f32; 3];
 
@@ -142,8 +142,9 @@ pub fn contrast(a: Rgb, b: Rgb) -> f32 {
 }
 
 /// The cover's most prominent colour: a chroma-weighted hue histogram on a 48 px
-/// thumbnail. A neutral (chroma 0) when the art has almost no colour.
-pub fn dominant(cover: &RgbaImage) -> Lch {
+/// thumbnail. A neutral (chroma 0) when the art has almost no colour. `cover` may borrow its
+/// pixels (a cover's own buffer, `follow::rgba_view`).
+pub fn dominant<C: std::ops::Deref<Target = [u8]>>(cover: &ImageBuffer<Rgba<u8>, C>) -> Lch {
     let small = image::imageops::resize(cover, 48, 48, FilterType::Triangle);
     const BINS: usize = 36;
     let mut weight = [0f32; BINS];
