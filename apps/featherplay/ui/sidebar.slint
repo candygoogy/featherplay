@@ -158,7 +158,8 @@ component NavItem inherits Rectangle {
 
 export component Sidebar inherits Rectangle {
     in property <bool> rail: false;
-    // Shown as the drawer over the page: a hairline at its edge, and the keys while it's open.
+    // Shown as the drawer over the page: a hairline at its edge, a soft shadow past it, and the
+    // keys while it's open.
     in property <bool> drawer: false;
     // The sidebar runs the window's height, behind the floating bar; its rows end `clear`
     // above the bottom, at the bar's top.
@@ -294,6 +295,10 @@ export component Sidebar inherits Rectangle {
     property <length> list-bottom: root.foot - 128px;
     width: root.rail ? Theme.rail-w : Theme.sidebar-w;
     background: Theme.surface;
+    // As the drawer, a soft shadow past its hairline edge lifts it off the dimmed page (the
+    // other edges are off the window). It slides with the drawer: one blur, made once.
+    drop-shadow-blur: root.drawer ? 32px : 0px;
+    drop-shadow-color: root.drawer ? Theme.drawer-shadow : transparent;
 
     NavItem {
         x: root.inset;

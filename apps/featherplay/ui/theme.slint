@@ -134,6 +134,8 @@ export global Theme {
     // Under the sidebar's drawer, which lies flush on a page cut off at its edge: deeper, so
     // the page recedes (a bright cover band at half strength read as part of the layout).
     out property <color> drawer-scrim: pick(#000000B3, #00000066);
+    // The drawer's shadow, along its right edge over that scrim.
+    out property <color> drawer-shadow: pick(#00000099, #00000040);
     // The current song's row rests on a light tile (hover and press still apply on top).
     out property <color> playing-row: pick(#FFFFFF0F, #0000000A);
     // The recommended row of a list of choices (`ChoiceRow.lit`), a shade over the panel.
