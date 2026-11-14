@@ -281,12 +281,15 @@ export component AppWindow inherits Window {
             root.entered = true;
         }
     }
-    // The playing mark's one clock (`Mark`): steps only while sound plays and the window is
-    // on screen. Paused, stopped, loading, minimized, hidden in the tray or with reduced
-    // motion, it isn't armed.
+    // The playing mark's one clock (`Mark`): steps only while sound plays, the window is on
+    // screen and something on it can show a mark: a page with song rows, or Up next in the
+    // panel or the sheet. Paused, stopped, loading, minimized, hidden in the tray, with
+    // reduced motion, or on Explore, a mood, Settings, About or Sign in with Up next closed,
+    // it isn't armed.
+    property <bool> marks-shown: (Nav.page != PageKind.explore && Nav.page != PageKind.mood && Nav.page != PageKind.settings && Nav.page != PageKind.about && Nav.page != PageKind.sign-in) || root.panel-shown || root.sheet-shown;
     Timer {
         interval: Mark.step;
-        running: Player.playing && !Player.loading && Theme.moving && !root.minimized && !Frame.hidden;
+        running: Player.playing && !Player.loading && Theme.moving && !root.minimized && !Frame.hidden && root.marks-shown;
         triggered => { Mark.frame += 1; }
     }
     // The Lyrics tab's lines are timed only while it's on screen (pages/lyrics.slint).

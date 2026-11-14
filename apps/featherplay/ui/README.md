@@ -286,7 +286,9 @@ times, gaps, wheel messages and the UI thread's CPU time inside the paints (`src
   (set by `--snapshot` and the offscreen tests) makes everything instant. Nothing animates
   continuously except the playing mark (`PlayingMark`, a wave: one stroked `Path`, so a step
   dirties one small rectangle per mark): one 30 fps `Timer` in `AppWindow` steps `Mark.frame`
-  while sound plays and the window is on screen, never a per-frame tick. Paused, loading or
+  while sound plays and the window shows something that can hold a mark (a page with song
+  rows, or Up next), never a per-frame tick. A new page or panel with a `PlayingMark` joins
+  `marks-shown` there. Paused, loading or
   with motion off the wave rests, still. Nothing redraws while paused, minimized or hidden in
   the tray.
 - Ease what the user moves, not geometry that follows the window: animate an offset (the Up next

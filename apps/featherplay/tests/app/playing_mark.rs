@@ -1,16 +1,17 @@
 //! The playing mark (the wave) moves only while sound plays, on the offscreen platform (no
 //! window is shown), with Windows' animation effects on: its one clock (`Mark`) steps at
 //! 30 fps while the current track plays, and nothing is armed or redrawn when nothing plays,
-//! or when it's paused, loading, minimized, hidden in the tray, or with reduced motion.
+//! or when it's paused, loading, minimized, hidden in the tray, with reduced motion, or on a
+//! page with no song rows while Up next is closed.
 
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
 use featherplay::offscreen;
 use featherplay::ui::{
-    AppWindow, Frame, Mark, Nav, PageKind, Player, PlaylistData, Theme, TrackRow,
+    AppWindow, Frame, Mark, Nav, PageKind, Player, PlaylistData, QueueData, Theme, TrackRow,
 };
-use slint::{ComponentHandle, ModelRc, Rgba8Pixel, SharedPixelBuffer, VecModel};
+use slint::{ComponentHandle, Model, ModelRc, Rgba8Pixel, SharedPixelBuffer, VecModel};
 
 /// Three rows; `b` is the current track.
 fn rows() -> ModelRc<TrackRow> {
@@ -177,6 +178,19 @@ fn the_wave_moves_only_while_playing_and_shown() {
     assert_idle(w, &mark, "with reduced motion");
     theme.set_motion(true);
     assert_moving(w, &mark, "with motion back on");
+
+    // A page with no song rows shows no mark: the clock rests there until Up next opens.
+    let nav = ui.global::<Nav>();
+    let queue = ui.global::<QueueData>();
+    queue.set_current(rows().row_data(1).expect("the current row"));
+    queue.set_has_current(true);
+    nav.set_page(PageKind::Settings);
+    assert_idle(w, &mark, "on Settings");
+    frame.set_queue_open(true);
+    assert_moving(w, &mark, "on Settings with Up next open");
+    frame.set_queue_open(false);
+    nav.set_page(PageKind::Playlist);
+    assert_moving(w, &mark, "back on the playlist");
 
     // Stopped: nothing current.
     player.set_playing(false);
