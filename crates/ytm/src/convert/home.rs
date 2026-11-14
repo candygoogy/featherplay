@@ -185,7 +185,7 @@ fn two_row_item(item: &Value, r: &Value) -> Option<HomeItem> {
         .unwrap_or_default();
     let nav = r.get("navigationEndpoint")?;
     if let Some(w) = nav.get("watchEndpoint") {
-        let (artists, album) = byline(subtitle);
+        let (artists, album) = byline(without_kind(subtitle));
         return watch_track(w, title, artists, album, thumbnail).map(HomeItem::Track);
     }
     let (id, page) = browse_target(r)?;
@@ -213,6 +213,34 @@ fn two_row_item(item: &Value, r: &Value) -> Option<HomeItem> {
         })),
         _ => None,
     }
+}
+
+/// A song or video card's subtitle past the kind word some shelves put first (Listen
+/// again's `Song • Cece Natalie`, `Video • Artist • 3M views`), which isn't an artist.
+/// Told by its shape, as the word follows the account's language: one unlinked run, a `•`,
+/// then a group that links an artist. Other subtitles (`Artist • 907M views`, an unlinked
+/// artist included) are left whole.
+fn without_kind(runs: &[Value]) -> &[Value] {
+    let unlinked = |run: &Value| browse_target(run).is_none();
+    let is_dot = |run: &Value| run.get("text").and_then(Value::as_str).map(str::trim) == Some("•");
+    let rest = match runs {
+        [first, dot, rest @ ..] if unlinked(first) && is_dot(dot) => rest,
+        _ => return runs,
+    };
+    // The group after the dot: values at even places, up to the next `•`.
+    let links_an_artist = rest
+        .iter()
+        .enumerate()
+        .take_while(|(i, run)| i % 2 == 0 || !is_dot(run))
+        .filter(|(i, _)| i % 2 == 0)
+        .any(|(_, run)| {
+            browse_target(run).is_some_and(|(id, page)| {
+                page == "MUSIC_PAGE_TYPE_ARTIST"
+                    || page == "MUSIC_PAGE_TYPE_USER_CHANNEL"
+                    || id.starts_with("UC")
+            })
+        });
+    if links_an_artist { rest } else { runs }
 }
 
 /// A row (Quick picks): title column with the watch endpoint, then

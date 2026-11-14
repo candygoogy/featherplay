@@ -357,6 +357,106 @@ fn home_keeps_forgotten_favorites_of_music_videos_only() {
     assert!(video_shelves_titles(&pages).contains(&"Forgotten favorites".to_string()));
 }
 
+/// A first Home page with one shelf of `cards`.
+fn home_page_of(cards: Vec<Value>) -> String {
+    json!({ "contents": { "singleColumnBrowseResultsRenderer": { "tabs": [{ "tabRenderer": {
+        "content": { "sectionListRenderer": { "contents": [{ "musicCarouselShelfRenderer": {
+            "header": { "musicCarouselShelfBasicHeaderRenderer": {
+                "title": { "runs": [{ "text": "Listen again" }] } } },
+            "contents": cards
+        } }] } }
+    } }] } } })
+    .to_string()
+}
+
+fn home_track_artists(page: String) -> Vec<String> {
+    let shelves = convert::home(&[page]).expect("parse");
+    let HomeItem::Track(t) = &shelves[0].items[0] else {
+        panic!("not a track: {:?}", shelves[0].items[0]);
+    };
+    t.artists.iter().map(|a| a.name.clone()).collect()
+}
+
+#[test]
+fn a_song_cards_kind_word_is_not_an_artist() {
+    let artist = |name: &str, id: &str| {
+        json!({ "text": name, "navigationEndpoint": { "browseEndpoint": { "browseId": id,
+            "browseEndpointContextSupportedConfigs": { "browseEndpointContextMusicConfig": {
+                "pageType": "MUSIC_PAGE_TYPE_ARTIST" } } } } })
+    };
+    let plain = |t: &str| json!({ "text": t });
+    let dot = || plain(" • ");
+    let cases: Vec<(Vec<Value>, Vec<&str>)> = vec![
+        (
+            vec![plain("Song"), dot(), artist("Cece Natalie", "UCa")],
+            vec!["Cece Natalie"],
+        ),
+        (
+            vec![
+                plain("Song"),
+                dot(),
+                artist("Petite Meller", "UCa"),
+                plain(", "),
+                artist("Marlon Hoffstadt", "UCb"),
+            ],
+            vec!["Petite Meller", "Marlon Hoffstadt"],
+        ),
+        (
+            vec![
+                plain("Video"),
+                dot(),
+                artist("The Marías", "UCa"),
+                dot(),
+                plain("3M views"),
+            ],
+            vec!["The Marías"],
+        ),
+        // The word follows the account's language.
+        (
+            vec![plain("Titel"), dot(), artist("Cece Natalie", "UCa")],
+            vec!["Cece Natalie"],
+        ),
+        (vec![artist("Cece Natalie", "UCa")], vec!["Cece Natalie"]),
+        (vec![plain("Cece Natalie")], vec!["Cece Natalie"]),
+        // A video card's unlinked artist, then its views: no kind word.
+        (
+            vec![plain("Daft Punk"), dot(), plain("907M views")],
+            vec!["Daft Punk"],
+        ),
+        (
+            vec![artist("Daft Punk", "UCa"), dot(), plain("907M views")],
+            vec!["Daft Punk"],
+        ),
+    ];
+    for (runs, want) in cases {
+        let card = json!({ "musicTwoRowItemRenderer": {
+            "title": { "runs": [{ "text": "Exitin" }] },
+            "subtitle": { "runs": runs.clone() },
+            "navigationEndpoint": { "watchEndpoint": { "videoId": "v1" } }
+        } });
+        assert_eq!(
+            home_track_artists(home_page_of(vec![card])),
+            want,
+            "{runs:?}"
+        );
+    }
+}
+
+#[test]
+fn a_recorded_song_card_names_only_its_artist() {
+    // The artist page's "From your library": `Song • Daft Punk`, as Listen again has them.
+    let page: Value = serde_json::from_str(&fixture("artist")).unwrap();
+    let card = page
+        .pointer("/contents/singleColumnBrowseResultsRenderer/tabs/0/tabRenderer/content/sectionListRenderer/contents/5/musicCarouselShelfRenderer/contents/0")
+        .unwrap()
+        .clone();
+    assert_eq!(
+        card.pointer("/musicTwoRowItemRenderer/subtitle/runs/0/text"),
+        Some(&json!("Song"))
+    );
+    assert_eq!(home_track_artists(home_page_of(vec![card])), ["Daft Punk"]);
+}
+
 #[test]
 fn home_strapline_is_scrubbed() {
     let account = std::env::var("FEATHERPLAY_ACCOUNT_NAME")

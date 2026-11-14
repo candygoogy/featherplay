@@ -65,6 +65,9 @@ Notable changes to featherplay, newest first. The format follows
   Lyrics buttons give way in that order. From 960 px up the bar is as before.
 - The sleep timer's **Turn off** (in its popup and in the tray menu) now clears the time left
   from the player bar's button; the timer was off, but the button still showed it running.
+- A song from a Home card whose subtitle starts with its kind, as Listen again's do, no
+  longer names "Song" as its first artist ("Song, Cece Natalie") on the card and in the
+  player bar, so it's no longer scrobbled with "Song" as the artist either.
 
 ## [0.4.0] - 2026-11-14
 
