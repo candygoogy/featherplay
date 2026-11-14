@@ -372,3 +372,47 @@ fn more_like_this_is_asked_for_only_where_it_would_show() {
     settle();
     assert!(data.get_related().row_count() > 0, "widening didn't ask");
 }
+
+#[test]
+fn the_band_follows_the_player_only_while_home_shows_and_catches_up_on_opening() {
+    // Every fixture cover has art.
+    crate::support::fixture_covers();
+    let scene = Scene::new(1600, 900, true, false).expect("scene");
+    let ui = &scene.ui;
+    let tracks = Fixtures::load().expect("fixtures").radio().expect("radio");
+    let data = ui.global::<HomeData>();
+    let play = |i: usize| {
+        let state = radio_state(&tracks[i], &tracks[i + 1..i + 4]);
+        app::on_event(UiEvent::Player(Box::new(state)));
+    };
+    play(0);
+    scene.open("home").expect("home");
+    ui.show().expect("show");
+    scene.settle();
+    assert_eq!(data.get_track().id.as_str(), tracks[0].id.0);
+
+    // Songs change on another page: the band is left as it was, nothing loaded for it.
+    scene.open("settings").expect("settings");
+    scene.settle();
+    play(1);
+    play(2);
+    scene.settle();
+    assert_eq!(
+        data.get_track().id.as_str(),
+        tracks[0].id.0,
+        "the band followed the player off Home"
+    );
+
+    // Home again: the band shows the song playing now and its queue at once, then its cover.
+    scene.open("home").expect("home");
+    assert_eq!(data.get_track().id.as_str(), tracks[2].id.0);
+    assert_eq!(
+        data.get_next().row_data(0).map(|r| r.id.to_string()),
+        Some(tracks[3].id.0.clone())
+    );
+    scene.settle();
+    assert!(
+        tracks[2].thumbnail.is_none() || data.get_hero_cover().size().width > 0,
+        "the band's cover didn't come"
+    );
+}

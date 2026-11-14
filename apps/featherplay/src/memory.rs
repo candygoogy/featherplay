@@ -63,9 +63,11 @@ pub fn hidden(ctx: &Ctx, hidden: bool) {
         if let Some(ui) = ctx.window() {
             resume_drawing(ui.window());
         }
-        // The bar's clock stopped while nothing showed the time.
+        // The bar's clock stopped while nothing showed the time, and Home's band didn't
+        // follow the player.
         if let Some(ctx) = Ctx::get() {
             crate::bar::showing(&ctx);
+            crate::pages::home::shown_again(&ctx);
         }
     }
 }

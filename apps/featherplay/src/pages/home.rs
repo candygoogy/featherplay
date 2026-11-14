@@ -319,15 +319,33 @@ fn sync_rows(rows: &VecModel<i32>, count: i32) {
     }
 }
 
-/// The controller's state changed (track, play/pause, queue).
+/// The controller's state changed (track, play/pause, queue): the band follows it while Home
+/// is on screen. Elsewhere, minimised or in the tray, nothing is loaded for it (its cover,
+/// its rows' covers, the album's year); `open` and `shown_again` catch up.
 pub fn player_changed(ctx: &Rc<Ctx>, _state: &PlayerState) {
-    show_hero(ctx);
+    if on_screen(ctx) {
+        show_hero(ctx);
+    }
 }
 
 /// The current song's related tracks came (the Related tab asked for them): the band fills a
 /// short queue with them.
 pub fn related_changed(ctx: &Rc<Ctx>) {
-    show_hero(ctx);
+    if on_screen(ctx) {
+        show_hero(ctx);
+    }
+}
+
+/// The window shows again (`memory::hidden`): on Home, the band catches up with the player.
+pub fn shown_again(ctx: &Rc<Ctx>) {
+    if on_screen(ctx) {
+        show_hero(ctx);
+    }
+}
+
+/// Whether Home shows: its page, in a window that shows something.
+fn on_screen(ctx: &Ctx) -> bool {
+    ctx.current_page() == Page::Home && !crate::memory::is_hidden()
 }
 
 /// Signed in or out: the feed is the account's, so it's fetched again.
