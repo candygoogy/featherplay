@@ -278,29 +278,33 @@ component TileShelf inherits Rectangle {
     }
     height: Rails.height(root.shape);
     hover := TouchArea {
-        ShelfHead {
-            x: 0;
-            y: 0;
-            width: parent.width;
-            lead: root.shelf.lead;
-            title: root.shelf.title;
-            arrows: hover.has-hover && root.shelf.items.length > root.per-row;
-            can-back: root.first > 0;
-            can-forward: root.first < root.last-first;
-            back => { root.first = max(0, root.first - root.per-row); }
-            forward => { root.first = min(root.last-first, root.first + root.per-row); }
-        }
+        // One clip for the heading and the tiles: as the page scrolls, a shelf adds its two
+        // rectangles (where it was and where it is) to the frame's damage, not its heading's
+        // two besides, which pushed the playing mark's step into a merge with them
+        // (`tests/app/playing_frames.rs`).
         Rectangle {
             x: 0;
-            y: Rails.head-h;
+            y: 0;
             width: parent.width + root.bleed;
-            height: parent.height - Rails.head-h;
+            height: parent.height;
             clip: true;
+            ShelfHead {
+                x: 0;
+                y: 0;
+                width: root.width;
+                lead: root.shelf.lead;
+                title: root.shelf.title;
+                arrows: hover.has-hover && root.shelf.items.length > root.per-row;
+                can-back: root.first > 0;
+                can-forward: root.first < root.last-first;
+                back => { root.first = max(0, root.first - root.per-row); }
+                forward => { root.first = min(root.last-first, root.first + root.per-row); }
+            }
             for it[i] in root.shelf.items: Rectangle {
                 x: (i - root.at) * (root.tile-w + Theme.card-gap);
-                y: 0;
+                y: Rails.head-h;
                 width: root.tile-w;
-                height: parent.height;
+                height: parent.height - Rails.head-h;
                 // Shown, or partly shown while paging (the others draw nothing), and warm.
                 property <bool> on-page: i + 1 > root.at && i < root.at + root.in-view && (root.warmed || i - root.first < root.warm);
                 if it.id == "LM": ShuffleLiked {
@@ -364,28 +368,29 @@ component SongGrid inherits Rectangle {
     property <int> last-first: max(0, root.columns - root.per-page);
     height: Rails.height(ShelfShape.songs);
     hover := TouchArea {
-        ShelfHead {
-            x: 0;
-            y: 0;
-            width: parent.width;
-            lead: root.shelf.lead;
-            title: root.shelf.title;
-            arrows: hover.has-hover && root.columns > root.per-page;
-            can-back: root.first > 0;
-            can-forward: root.first < root.last-first;
-            back => { root.first = max(0, root.first - root.per-page); }
-            forward => { root.first = min(root.last-first, root.first + root.per-page); }
-        }
-        // The rows' hover tiles reach 8 px past the column on both sides.
+        // One clip for the heading and the rows, as `TileShelf` has. The rows' hover tiles
+        // reach 8 px past the column on both sides.
         Rectangle {
             x: -8px;
-            y: Rails.head-h;
+            y: 0;
             width: parent.width + 8px + root.bleed;
-            height: parent.height - Rails.head-h;
+            height: parent.height;
             clip: true;
+            ShelfHead {
+                x: 8px;
+                y: 0;
+                width: root.width;
+                lead: root.shelf.lead;
+                title: root.shelf.title;
+                arrows: hover.has-hover && root.columns > root.per-page;
+                can-back: root.first > 0;
+                can-forward: root.first < root.last-first;
+                back => { root.first = max(0, root.first - root.per-page); }
+                forward => { root.first = min(root.last-first, root.first + root.per-page); }
+            }
             for t[i] in root.shelf.songs: SongRow {
                 x: (floor(i / root.rows) - root.at) * (root.col-w + Theme.card-gap);
-                y: mod(i, root.rows) * Theme.row-h;
+                y: Rails.head-h + mod(i, root.rows) * Theme.row-h;
                 width: root.col-w + 16px;
                 height: Theme.row-h;
                 track: t;
