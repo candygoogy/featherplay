@@ -22,7 +22,7 @@ pub mod colour;
 
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use featherplay_store::{Accent, AccentColour};
 use slint::{Color, ComponentHandle, Timer, TimerMode};
@@ -594,16 +594,13 @@ fn show(ctx: &Rc<Ctx>, colours: Colours, dark: bool) {
     }
     crate::mini::follow_changed(&theme, false);
     let timer = Rc::new(Timer::default());
-    let started = Instant::now();
+    let began = i_slint_core::animations::current_tick();
     let weak = ui.as_weak();
     let stop = Rc::downgrade(&timer);
-    let mut ticks = 0u32;
     timer.start(TimerMode::Repeated, FRAME, move || {
-        // By the clock, or by the frames when they come late (a busy thread, or the
-        // offscreen tests' stepped clock): never longer than `duration` in frames.
-        ticks += 1;
-        let by_frames = ticks as f32 * FRAME.as_secs_f32();
-        let elapsed = started.elapsed().as_secs_f32().max(by_frames);
+        // The animation clock, as the theme switch's: the offscreen tests step it as they
+        // draw frames, so a busy machine can't end the fade between their steps.
+        let elapsed = (i_slint_core::animations::current_tick() - began).as_secs_f32();
         let t = (elapsed / duration.as_secs_f32()).min(1.0);
         if let Some(ui) = weak.upgrade() {
             let theme = ui.global::<Theme>();
