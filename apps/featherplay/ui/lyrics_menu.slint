@@ -733,8 +733,8 @@ export component LyricsChooseLayer inherits Rectangle {
     }
 }
 
-// The ⋯ beside the Lyrics pill, on the lyrics' panel: a round, tonal white button (the
-// panel is deep in either theme), a step brighter while its menu is open.
+// The ⋯ beside the Lyrics pill, on the lyrics' panel: a round tonal button
+// (`Theme.panel-tonal`), a step stronger while its menu is open.
 export component LyricsMoreButton inherits Rectangle {
     // `LyricsMenu.open-asked`: bumped, it opens the menu as a click does.
     in property <int> asked;
@@ -743,7 +743,7 @@ export component LyricsMoreButton inherits Rectangle {
     width: 40px;
     height: 40px;
     border-radius: self.height / 2;
-    property <brush> ground: LyricsMenu.open || ta.pressed ? #FFFFFF40 : (ta.has-hover ? #FFFFFF33 : #FFFFFF26);
+    property <brush> ground: Theme.panel-tonal(LyricsMenu.open || ta.pressed, ta.has-hover);
     animate ground { duration: Theme.t-hover; }
     background: root.ground;
     accessible-role: button;
@@ -758,7 +758,7 @@ export component LyricsMoreButton inherits Rectangle {
         height: 20px;
         commands: Icons.more;
         stroke: transparent;
-        fill: #FFFFFF;
+        fill: LyricsData.ink.current;
     }
 }
 

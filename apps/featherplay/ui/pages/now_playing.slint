@@ -246,7 +246,7 @@ export component LyricsWatch {
 }
 
 // Lyrics on and off for the stage (the full lyrics view): a tonal pill with the microphone,
-// the filled pill while on (white on the lyrics' panel, the panel's colour for its ink). It
+// the filled pill while on (the panel's solid, its colour for the ink). It
 // says what the lookup found: "Finding lyrics…" while the one it asked for runs, a quieter
 // "No lyrics" when there are none, "Retry lyrics" after a failure (a press asks again). A
 // press on "No lyrics", or a lookup a press waited on that ends so, shows a note
@@ -265,7 +265,7 @@ component LyricsToggle inherits Rectangle {
     property <string> label: root.failed ? @tr("Retry lyrics") : (root.none ? @tr("No lyrics") : (root.finding ? @tr("Finding lyrics…") : @tr("Lyrics")));
     property <color> ink: root.on ? LyricsData.ink.ground : (root.none || root.finding ? Theme.text2 : Theme.text1);
     background: root.on
-        ? (ta.pressed ? Theme.panel-solid-pressed : (ta.has-hover ? Theme.panel-solid-hover : Theme.panel-solid))
+        ? Theme.panel-solid-state(ta.pressed, ta.has-hover)
         : Theme.tonal(ta.pressed, ta.has-hover);
     animate background { duration: Theme.t-hover; }
     transform-scale: ta.pressed ? Theme.press-scale : 1.0;

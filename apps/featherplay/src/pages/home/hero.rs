@@ -266,7 +266,7 @@ fn paint_ink(ctx: &Ctx, inks: follow::LyricInks) {
     let Some(ui) = ctx.window() else { return };
     let data = ui.global::<HomeData>();
     data.set_featured_ink_dark(inks.dark);
-    data.set_featured_ink_light(inks.band_light);
+    data.set_featured_ink_light(inks.tint);
 }
 
 #[cfg(test)]

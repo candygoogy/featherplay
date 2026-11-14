@@ -170,15 +170,16 @@ export global Theme {
     out property <color> cover-playing: #000000D1;
     out property <color> cover-button-hover: #000000CC;
     out property <color> cover-button-pressed: #000000E0;
-    // On the lyrics' cover-colour panel, in either theme: light overlays, since the panel is
-    // always deep.
-    out property <color> panel-hover: #FFFFFF1F;
-    out property <color> panel-pressed: #FFFFFF33;
-    out property <color> panel-solid: #FFFFFF;
-    out property <color> panel-solid-hover: #EBEBEB;
-    out property <color> panel-solid-pressed: #D4D4D4;
-    out property <color> panel-skeleton: #FFFFFF1A;
-    out property <color> panel-skeleton-hi: #FFFFFF2E;
+    // On the lyrics' cover-colour panel and Home's band: deep in the dark theme, so light
+    // overlays and a white solid; a light tint in the light one, so the theme's own dark
+    // overlays and a black solid.
+    out property <color> panel-hover: pick(#FFFFFF1F, #00000012);
+    out property <color> panel-pressed: pick(#FFFFFF33, #0000002B);
+    out property <color> panel-solid: pick(#FFFFFF, #0F0F0F);
+    out property <color> panel-solid-hover: pick(#EBEBEB, #2E2E2E);
+    out property <color> panel-solid-pressed: pick(#D4D4D4, #474747);
+    out property <color> panel-skeleton: pick(#FFFFFF1A, #0000000F);
+    out property <color> panel-skeleton-hi: pick(#FFFFFF2E, #0000001A);
 
     // The overlay for a touch area's state: pressed, else hovered, else nothing.
     public pure function state(down: bool, over: bool) -> color {
@@ -199,6 +200,13 @@ export global Theme {
     // An overlay on the lyrics' cover-colour panel.
     public pure function panel-state(down: bool, over: bool) -> color {
         return down ? panel-pressed : (over ? panel-hover : transparent);
+    }
+    // The solid and a tonal button on it.
+    public pure function panel-solid-state(down: bool, over: bool) -> color {
+        return down ? panel-solid-pressed : (over ? panel-solid-hover : panel-solid);
+    }
+    public pure function panel-tonal(down: bool, over: bool) -> color {
+        return pick(down ? #FFFFFF40 : (over ? #FFFFFF33 : #FFFFFF26), down ? #00000033 : (over ? #00000026 : #00000017));
     }
     // An accent fill's background (the play button, the selected chip).
     public pure function accent-state(down: bool, over: bool) -> color {

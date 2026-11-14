@@ -3,10 +3,12 @@
 // synced lines from LRCLIB, or the plain lyrics that come with the song.
 //
 // The look (option A of the lyrics gate, 2026-10-30): the lines on a solid panel in the
-// cover's colour, with light text in three levels: sung, playing, to come. The light theme
-// keeps the panel, with less of the cover's colour (`colour::lyric_panel`).
+// cover's colour, with text in three levels: sung, playing, to come. In the dark theme the
+// panel is deep and the text light (`colour::lyric_panel`); in the light theme it's Home's
+// band's light tint with dark text (`colour::light_tint`).
 // Every line is one bold weight at one size, so becoming current never re-wraps it; only its
-// colour changes (past, current, to come), through the text's colour, never `opacity`. The
+// colour changes (past, current, to come), through the text's colour, never `opacity` (and on
+// the light tint a hairline stroke thickens the line playing, `LyricLine.heavy`). The
 // lines start at the top of the panel; once the current line passes a third of the way down,
 // the view glides to keep it there. A manual scroll pauses that for 5 s; a click on a line
 // seeks there. Nothing ticks: Rust sets `current` when the next
@@ -80,14 +82,16 @@ export global LyricsData {
     // lookup ends, the song changes or the note's time runs out with no lookup running
     // (`LyricsWatch`), so a later song never shows the note on its own.
     in-out property <bool> asked: false;
-    // The cover's panel and lines, per theme.
+    // The cover's panel and lines: deep in the dark theme, the light tint in the light one
+    // (Home's band takes both too). `ink-light`, a softer deep panel, is the desktop lyrics'.
     in property <LyricInk> ink-dark;
     in property <LyricInk> ink-light;
+    in property <LyricInk> ink-tint;
     out property <LyricInk> ink: {
-        ground: Theme.pick(self.ink-dark.ground, self.ink-light.ground),
-        current: Theme.pick(self.ink-dark.current, self.ink-light.current),
-        next: Theme.pick(self.ink-dark.next, self.ink-light.next),
-        past: Theme.pick(self.ink-dark.past, self.ink-light.past),
+        ground: Theme.pick(self.ink-dark.ground, self.ink-tint.ground),
+        current: Theme.pick(self.ink-dark.current, self.ink-tint.current),
+        next: Theme.pick(self.ink-dark.next, self.ink-tint.next),
+        past: Theme.pick(self.ink-dark.past, self.ink-tint.past),
     };
     // The desktop lyrics' strip shows (`desktop_lyrics.rs`): lyrics are on screen, whatever
     // the window shows.
@@ -217,6 +221,7 @@ component LyricLine inherits Rectangle {
     // The line's level eases on its own; the toggle's fade is applied over it, every frame.
     property <color> ink: root.plain || root.level == 0 ? LyricsData.ink.current : (root.level < 0 ? LyricsData.ink.past : LyricsData.ink.next);
     animate ink { duration: root.on-screen ? Theme.t-line : 0ms; easing: Curves.ease-out; }
+    property <bool> heavy: root.level == 0 && root.live && !Theme.dark;
     min-height: root.gap ? root.gap-h : lay.min-height;
     preferred-height: root.gap ? root.gap-h : lay.preferred-height;
     border-radius: Theme.r-m;
@@ -252,6 +257,13 @@ component LyricLine inherits Rectangle {
             color: root.ink.transparentize(1 - root.reveal);
             wrap: word-wrap;
             overflow: clip;
+            // On the light tint the line playing is a touch heavier too, dark text on a light
+            // ground reading thinner than light on deep: a hairline of its own colour round
+            // its glyphs, which changes no metrics, so it never re-wraps. It takes the line's
+            // easing colour; transparent, on the other lines and in the dark theme, it isn't
+            // drawn.
+            stroke: root.heavy ? self.color : transparent;
+            stroke-width: 0.35px;
         }
     }
 }
@@ -270,8 +282,9 @@ component LyricsNote inherits HorizontalLayout {
     }
 }
 
-// A pill on the lyrics' panel (deep in either theme), as the stage's Lyrics pill and ⋯ are:
-// `solid`, white with the panel's colour for its ink; otherwise a white tonal one.
+// A pill on the lyrics' panel, as the stage's Lyrics pill and ⋯ are: `solid`, white on the
+// deep panel and black on the light tint, with the panel's colour for its ink; otherwise
+// tonal (`Theme.panel-*`).
 component PanelPill inherits Rectangle {
     in property <string> label;
     in property <bool> solid;
@@ -280,8 +293,8 @@ component PanelPill inherits Rectangle {
     width: lay.preferred-width;
     border-radius: self.height / 2;
     property <brush> ground: root.solid
-        ? (ta.pressed ? Theme.panel-solid-pressed : (ta.has-hover ? Theme.panel-solid-hover : Theme.panel-solid))
-        : (ta.pressed ? #FFFFFF40 : (ta.has-hover ? #FFFFFF33 : #FFFFFF26));
+        ? Theme.panel-solid-state(ta.pressed, ta.has-hover)
+        : Theme.panel-tonal(ta.pressed, ta.has-hover);
     animate ground { duration: Theme.t-hover; }
     background: root.ground;
     transform-scale: ta.pressed ? Theme.press-scale : 1.0;
@@ -326,7 +339,7 @@ component NoLyrics inherits Rectangle {
                 width: 56px;
                 height: 56px;
                 border-radius: Theme.r-l;
-                background: root.on-panel ? #FFFFFF1A : Theme.card;
+                background: root.on-panel ? Theme.panel-skeleton : Theme.card;
                 border-width: root.on-panel ? 0px : 1px;
                 border-color: Theme.card-edge;
                 Icon {

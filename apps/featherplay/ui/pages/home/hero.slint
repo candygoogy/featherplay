@@ -7,7 +7,8 @@
 //
 // The band takes its colours from `BandInk`: in the dark theme the lyrics panel's deep ink with
 // white text, in the light one a light tint of the cover's hue with dark text and dark buttons
-// (`colour::band_light`). Resuming they follow the current cover; a featured pick has its own.
+// (`colour::light_tint`, as the lyrics panel's). Resuming they follow the current cover; a
+// featured pick has its own.
 import { Theme, Curves, Icons } from "../../theme.slint";
 import { CardItem, ItemKind, TrackRow, Body, Display, Cover, Icon } from "../../parts.slint";
 import { Nav, Frame } from "../../nav.slint";
@@ -19,14 +20,14 @@ import { LyricsData, LyricInk } from "../lyrics.slint";
 import { NowPlayingData } from "../now_playing.slint";
 import { HomeData } from "data.slint";
 
-// The band's colours. Dark theme: the lyrics panel's deep ink (`LyricsData.ink-dark`), white
-// text and white overlays. Light theme: a light tint of the cover's hue (`session-ink-light`,
-// or the pick's), dark text tinted from the hue and dark overlays, the solid pill black as the
-// light theme's is. `text2` is the second level (the ink's `next`), AA on the band and on a
+// The band's colours, the lyrics panel's (`LyricsData.ink`) or the pick's own. Dark theme: the
+// deep ink, white text and white overlays. Light theme: a light tint of the cover's hue, dark
+// text tinted from the hue and dark overlays, the solid pill black as the light theme's is
+// (`Theme.panel-*`). `text2` is the second level (the ink's `next`), AA on the band and on a
 // hovered row in both.
 global BandInk {
     out property <LyricInk> dark: HomeData.resume ? LyricsData.ink-dark : HomeData.featured-ink-dark;
-    out property <LyricInk> light: HomeData.resume ? HomeData.session-ink-light : HomeData.featured-ink-light;
+    out property <LyricInk> light: HomeData.resume ? LyricsData.ink-tint : HomeData.featured-ink-light;
     out property <color> ground: Theme.pick(self.dark.ground, self.light.ground);
     out property <color> text: Theme.pick(#FFFFFF, self.light.current);
     out property <color> text2: Theme.pick(self.dark.next, self.light.next);
@@ -35,18 +36,12 @@ global BandInk {
     public pure function round(down: bool, over: bool, enabled: bool) -> color {
         return !enabled ? Theme.pick(#FFFFFF14, #0000000A) : (down ? Theme.pick(#FFFFFF4D, #0000002E) : (over ? Theme.pick(#FFFFFF40, #00000021) : Theme.pick(#FFFFFF26, #00000012)));
     }
-    // The solid pill (Resume, Play): white on the deep band, black on the light one.
-    public pure function solid(down: bool, over: bool) -> color {
-        return Theme.pick(down ? Theme.panel-solid-pressed : (over ? Theme.panel-solid-hover : Theme.panel-solid), down ? #474747 : (over ? #2E2E2E : #0F0F0F));
-    }
+    // On the solid pill (Resume, Play; `Theme.panel-solid-state`): white on the deep band,
+    // black on the light one.
     out property <color> on-solid: Theme.pick(#0F0F0F, #FFFFFF);
     // The tonal pill (Open <source>).
     public pure function tonal(down: bool, over: bool) -> color {
         return down ? Theme.pick(#FFFFFF4D, #00000033) : (over ? Theme.pick(#FFFFFF40, #00000026) : Theme.pick(#FFFFFF2E, #00000017));
-    }
-    // A row hovered or pressed.
-    public pure function row(down: bool, over: bool) -> color {
-        return down ? Theme.pick(Theme.panel-pressed, #0000002B) : (over ? Theme.pick(Theme.panel-hover, #00000012) : transparent);
     }
 }
 
@@ -112,7 +107,7 @@ component BandPill inherits Rectangle {
     accessible-action-default => { root.clicked(); }
     Rectangle {
         border-radius: root.border-radius;
-        background: root.solid ? BandInk.solid(ta.pressed, ta.has-hover) : BandInk.tonal(ta.pressed, ta.has-hover);
+        background: root.solid ? Theme.panel-solid-state(ta.pressed, ta.has-hover) : BandInk.tonal(ta.pressed, ta.has-hover);
         animate background { duration: Theme.t-hover; }
         transform-scale: ta.pressed ? Theme.press-scale : 1.0;
         animate transform-scale {
@@ -195,7 +190,7 @@ component BandRow inherits Rectangle {
     callback menu(length, length);
     height: BandSizes.row-h;
     border-radius: Theme.r-m;
-    background: BandInk.row(ta.pressed, ta.has-hover);
+    background: Theme.panel-state(ta.pressed, ta.has-hover);
     animate background { duration: Theme.t-hover; easing: Curves.ease-hover; }
     accessible-role: button;
     accessible-label: root.title + ", " + root.subtitle;

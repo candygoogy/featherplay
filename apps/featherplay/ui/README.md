@@ -183,7 +183,9 @@ that's out of date. `CONTRIBUTING.md` explains the files.
 
 ## Lyrics
 
-`LyricsView` shows the lyrics on a panel in the cover's colour (the accent's for grey art):
+`LyricsView` shows the lyrics on a panel in the cover's colour (the accent's for grey art),
+deep with light text in the dark theme and Home's band's light tint with dark text in the
+light one (`LyricsData.ink`; the overlays and buttons on it are `Theme.panel-*`):
 synced lines from LRCLIB or YouTube Music, or plain lyrics. It appears in the Lyrics tab of
 `SideTabs` and in Now playing's full lyrics view.
 

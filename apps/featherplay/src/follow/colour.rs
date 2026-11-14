@@ -453,17 +453,18 @@ pub fn lyric_panel(seed: Lch, dark: bool) -> LyricInk {
     }
 }
 
-/// The light theme's overlays on Home's band, a row hovered and pressed (`Theme.hover`,
-/// `Theme.pressed`): its second-level text keeps AA on them too.
-const BAND_HOVER: f32 = 0x12 as f32 / 255.0;
-const BAND_PRESSED: f32 = 0x2B as f32 / 255.0;
+/// The light theme's overlays on the tint, a line or row hovered and pressed
+/// (`Theme.panel-hover`, `Theme.panel-pressed`): the text keeps its contrast on them too.
+const TINT_HOVER: f32 = 0x12 as f32 / 255.0;
+const TINT_PRESSED: f32 = 0x2B as f32 / 255.0;
 
-/// Home's band in the light theme (`Band`): a light tint of the cover's hue, light enough to
-/// sit in a light page, with enough chroma to read as the cover's colour (grey for neutral
-/// art), and dark text tinted from the hue: `current` for the title and names, `next` for the
-/// second level, both AA on the tint and on a hovered or pressed row. The dark theme's band
-/// is the lyrics' panel (`lyric_panel`).
-pub fn band_light(seed: Lch) -> LyricInk {
+/// The light theme's panel, for the lyrics and Home's band: a light tint of the cover's hue,
+/// light enough to sit in a light page, with enough chroma to read as the cover's colour
+/// (grey for neutral art), and dark text tinted from the hue in the lyrics' three levels:
+/// `current` (the line playing; the band's title and names), `next` (the lines to come, the
+/// credit; the band's second level) and `past` (the lines sung), each keeping its floor on the
+/// tint and on a hovered or pressed line. The dark theme's is `lyric_panel`.
+pub fn light_tint(seed: Lch) -> LyricInk {
     let neutral = seed.c < NEUTRAL_CHROMA;
     let c = if neutral {
         0.0
@@ -481,15 +482,20 @@ pub fn band_light(seed: Lch) -> LyricInk {
     let black = hex(0x000000);
     let surfaces = [
         ground,
-        over(black, BAND_HOVER, ground),
-        over(black, BAND_PRESSED, ground),
+        over(black, TINT_HOVER, ground),
+        over(black, TINT_PRESSED, ground),
     ];
     let text = |l: f32, cc: f32, min: f32| quantise(clamp(lch(l, cc), -0.01, &surfaces, min));
+    let past = text(0.58, (c * 0.9).min(0.06), LYRIC_PAST + 0.1);
+    // At least `LYRIC_STEP_NEXT` darker than the sung lines (a hair over, for the rounding).
+    let next_l = (to_lch(past).l - LYRIC_STEP_NEXT - 0.005).min(0.45);
     LyricInk {
         ground: quantise(ground),
-        current: text(0.22, (c * 0.6).min(0.035), LYRIC_CURRENT),
-        next: text(0.45, (c * 0.9).min(0.06), LYRIC_NEXT + 0.1),
-        past: text(0.58, (c * 0.9).min(0.06), LYRIC_PAST + 0.1),
+        // Near black, as far from the lines to come as the tint allows: the line playing
+        // stands out by contrast alone, every line being one weight.
+        current: text(0.16, (c * 0.6).min(0.035), LYRIC_CURRENT),
+        next: text(next_l, (c * 0.9).min(0.06), LYRIC_NEXT + 0.1),
+        past,
     }
 }
 
@@ -676,7 +682,7 @@ mod tests {
     #[test]
     fn the_light_band_is_a_light_tint_with_dark_text() {
         for seed in seeds() {
-            let ink = band_light(seed);
+            let ink = light_tint(seed);
             let ground = to_lch(ink.ground);
             assert!(ground.l >= 0.88, "{seed:?}: a deep band {ground:?}");
             if seed.c >= NEUTRAL_CHROMA {
@@ -686,11 +692,45 @@ mod tests {
             } else {
                 assert!(ground.c < 0.005, "{seed:?}: grey art tinted {ground:?}");
             }
-            for under in [ink.ground, over(hex(0), BAND_HOVER, ink.ground)] {
+            for under in [ink.ground, over(hex(0), TINT_HOVER, ink.ground)] {
                 let (c, n) = (contrast(ink.current, under), contrast(ink.next, under));
                 assert!(c >= LYRIC_CURRENT, "{seed:?}: text {c}");
                 assert!(n >= 4.5, "{seed:?}: second level {n}");
             }
+        }
+    }
+
+    /// The lyrics on the light tint: the line playing at 7:1, the lines to come and the
+    /// credit at body text's 4.5:1, the lines sung at 3:1, on a hovered or pressed line too,
+    /// and each level a clear step of lightness from the next, so the line playing stands
+    /// out; pale, dark, grey and saturated covers alike. On the tint the big step is the line
+    /// playing's (dark text has less room above AA than light text on a deep panel).
+    #[test]
+    fn the_light_lyrics_keep_their_levels_on_the_tint() {
+        for seed in seeds() {
+            let ink = light_tint(seed);
+            for under in [
+                ink.ground,
+                over(hex(0), TINT_HOVER, ink.ground),
+                over(hex(0), TINT_PRESSED, ink.ground),
+            ] {
+                let what = format!("{seed:?} on {under:?}");
+                let c = contrast(ink.current, under);
+                let n = contrast(ink.next, under);
+                let p = contrast(ink.past, under);
+                assert!(c >= LYRIC_CURRENT, "{what}: current {c}");
+                assert!(n >= LYRIC_NEXT, "{what}: next {n}");
+                assert!(p >= LYRIC_PAST, "{what}: past {p}");
+            }
+            let [c, n, p] = [ink.current, ink.next, ink.past].map(|x| to_lch(x).l);
+            assert!(
+                n - c >= LYRIC_STEP_PAST,
+                "{seed:?}: current {c} vs to come {n}"
+            );
+            assert!(
+                p - n >= LYRIC_STEP_NEXT,
+                "{seed:?}: to come {n} vs sung {p}"
+            );
         }
     }
 }
