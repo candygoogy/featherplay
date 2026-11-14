@@ -9,7 +9,6 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use featherplay_core::model::TrackId;
-use featherplay_store::{Paths, Settings};
 use slint::{ComponentHandle, Image, Model, SharedString, VecModel};
 
 use crate::app::Ctx;
@@ -132,11 +131,11 @@ pub fn show_up_next(ctx: &Rc<Ctx>) {
 /// if it was hidden. Not called for `--snapshot`.
 pub fn restore(ctx: &Rc<Ctx>) {
     let Some(ui) = ctx.window() else { return };
-    let settings = Settings::load(&Paths::resolve());
-    if settings.queue_open {
+    let (queue_open, side_open) = crate::pages::settings::panels_at_start();
+    if queue_open {
         ui.global::<Frame>().set_queue_open(true);
     }
-    if !settings.nowplaying_side_open {
+    if !side_open {
         ui.global::<Frame>().set_side_open(false);
     }
 }

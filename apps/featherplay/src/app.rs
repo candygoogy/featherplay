@@ -760,13 +760,13 @@ pub fn run(opts: Options, app: AppOptions) -> ExitCode {
         }
     };
     let paths = Paths::resolve();
-    // The controller loads them too; the UI thread only needs the hotkeys, and the language
-    // before the controller shows any string (the window's part follows in `settings::init`).
+    // The controller loads them too. The UI thread reads them once, here: the hotkeys, and
+    // the language before the controller shows any string; the window's part follows in
+    // `settings::init`, from this copy.
     let settings = Settings::load(&paths);
     let quick_key = settings
         .quick_search
         .then(|| crate::quick_search::usable_key(&settings.quick_search_key).to_string());
-    let hotkeys = settings.hotkeys;
     let start = crate::autostart::Start::new(app.autostart, settings.start_in_tray);
     language::install();
     featherplay_core::i18n::select(&language::for_setting(&settings.language));
@@ -873,7 +873,7 @@ pub fn run(opts: Options, app: AppOptions) -> ExitCode {
     {
         let _ = crate::quick_search::set_key(Some(&key));
     }
-    let ui = run_window(&paths, catalog, action_tx, tx.clone(), hotkeys, app, start);
+    let ui = run_window(&paths, catalog, action_tx, tx.clone(), settings, app, start);
     closing();
     if let Err(e) = &ui {
         log!("{e}");
@@ -896,10 +896,12 @@ fn run_window(
     catalog: Catalog,
     actions: mpsc::UnboundedSender<Action>,
     tx: mpsc::UnboundedSender<UiCommand>,
-    hotkeys: Option<featherplay_store::Hotkeys>,
+    settings: Settings,
     app: AppOptions,
     start: Start,
 ) -> Result<(), String> {
+    let hotkeys = settings.hotkeys.clone();
+    pages::settings::read_at_start(settings);
     // Before the window is made: its attributes are set then.
     crate::autostart::prepare(start);
     let ui = AppWindow::new().map_err(|e| format!("window: {e}"))?;

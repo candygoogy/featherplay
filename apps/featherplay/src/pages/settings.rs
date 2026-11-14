@@ -29,6 +29,7 @@ use crate::app::Ctx;
 use crate::controller::{
     AccountAction, Action, Change, LastfmStatus, ListenBrainzStatus, PlayerState,
 };
+use crate::router::Page;
 use crate::ui::{Player, SettingKey, SettingsData, SettingsDialog, Theme, Tooltips};
 use crate::{desktop_lyrics, follow, language, lyrics, shell, updates};
 
@@ -93,6 +94,24 @@ thread_local! {
     static PREVIEW: RefCell<Option<Preview>> = const { RefCell::new(None) };
     /// The local API's token, for Copy.
     static API_TOKEN: RefCell<Option<Token>> = const { RefCell::new(None) };
+    /// The settings `app::run` read at startup, for `init`: the file is read once.
+    static AT_START: RefCell<Option<Settings>> = const { RefCell::new(None) };
+}
+
+/// The settings as `app::run` read them at startup: `init` takes them instead of reading the
+/// file again. Without them (tests, snapshots), `init` reads the file.
+pub fn read_at_start(settings: Settings) {
+    AT_START.with(|s| *s.borrow_mut() = Some(settings));
+}
+
+/// Whether the Up next panel was open and Now playing's side panel shown when the app last
+/// ran, as the settings were read at startup (`queue_panel::restore`). The controller saves
+/// their later changes, which this copy doesn't follow.
+pub fn panels_at_start() -> (bool, bool) {
+    SETTINGS.with(|s| {
+        let s = s.borrow();
+        (s.queue_open, s.nowplaying_side_open)
+    })
 }
 
 /// What closing the window does.
@@ -226,7 +245,9 @@ pub fn tooltips() -> bool {
 /// Once at startup: load the settings, apply the theme and the accent, connect
 /// `SettingsData`.
 pub fn init(ctx: &Rc<Ctx>) {
-    let settings = Settings::load(&Paths::resolve());
+    let settings = AT_START
+        .with(|s| s.borrow_mut().take())
+        .unwrap_or_else(|| Settings::load(&Paths::resolve()));
     let (accent, custom) = (settings.accent, settings.custom_accent);
     let theme = settings.theme;
     let show_lyrics = settings.lyrics;
@@ -398,11 +419,13 @@ pub fn open(ctx: &Rc<Ctx>) {
 }
 
 /// The controller's state changed: the accent follows the cover, and the Discord preview
-/// the track.
+/// the track while Settings shows (`open` brings it up to date).
 pub fn player_changed(ctx: &Rc<Ctx>, state: &PlayerState) {
     follow::player_changed(ctx, state);
-    let options = SETTINGS.with(|s| s.borrow().discord_options.clone());
-    show_preview(ctx, &options, Some(state));
+    if ctx.current_page() == Page::Settings {
+        let options = SETTINGS.with(|s| s.borrow().discord_options.clone());
+        show_preview(ctx, &options, Some(state));
+    }
 }
 
 /// The desktop's tray came or went (`shell::tray_shown`), or the tray icon was just put
