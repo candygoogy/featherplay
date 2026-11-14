@@ -373,7 +373,7 @@ impl RingSource {
         } else {
             &mut self.local
         };
-        to.extend((read..read + n).map(|i| f32::from_bits(slots.at(i).load(Ordering::Relaxed))));
+        slots.load(read, n as usize, to);
         // A seek published while copying may have overwritten what was copied.
         fence(Ordering::Acquire);
         if v.seek_seq.load(Ordering::Relaxed) != seq {

@@ -27,10 +27,35 @@ impl Slots {
     pub(super) fn len(&self) -> u64 {
         self.0.len() as u64
     }
-    /// The slot of sample `index`.
-    pub(super) fn at(&self, index: u64) -> &AtomicU32 {
-        // In range: `index % len` < len.
-        &self.0[(index % self.len()) as usize]
+    /// The slots of samples `from..from + n`, in order: up to the ring's end, then on from
+    /// its start. Found once for the run: a slot looked up by `index % len` cost a division
+    /// for every sample, on the audio thread and on the decoder's.
+    fn run(&self, from: u64, n: usize) -> (&[AtomicU32], &[AtomicU32]) {
+        // Never more than the ring: the decoder checks `room`, and the audio thread takes
+        // what was written.
+        let n = n.min(self.0.len());
+        let (wrapped, first) = self.0.split_at((from % self.len()) as usize);
+        let head = n.min(first.len());
+        (&first[..head], &wrapped[..n - head])
+    }
+    /// Writes `samples` from sample `from` on.
+    fn store(&self, from: u64, samples: &[Sample]) {
+        let (a, b) = self.run(from, samples.len());
+        for (slot, s) in a.iter().chain(b).zip(samples) {
+            slot.store(s.to_bits(), Ordering::Relaxed);
+        }
+    }
+    /// Appends samples `from..from + n` to `to`.
+    pub(super) fn load(&self, from: u64, n: usize, to: &mut Vec<Sample>) {
+        let (a, b) = self.run(from, n);
+        to.extend(
+            a.iter()
+                .map(|s| Sample::from_bits(s.load(Ordering::Relaxed))),
+        );
+        to.extend(
+            b.iter()
+                .map(|s| Sample::from_bits(s.load(Ordering::Relaxed))),
+        );
     }
 }
 
@@ -58,9 +83,7 @@ impl VoiceShared {
     /// Appends `samples`; the caller checked `room`.
     pub(super) fn push(&self, slots: &Slots, samples: &[Sample]) {
         let w = self.write.load(Ordering::Relaxed);
-        for (i, s) in samples.iter().enumerate() {
-            slots.at(w + i as u64).store(s.to_bits(), Ordering::Relaxed);
-        }
+        slots.store(w, samples);
         self.write
             .store(w + samples.len() as u64, Ordering::Release);
     }
@@ -146,6 +169,26 @@ mod tests {
             .expect("the audio thread waited for the decoder's lock");
         drop(held);
         assert_eq!(samples, ramp(0, 8192));
+    }
+
+    /// Samples written across the ring's end, and read across it, come back whole and in
+    /// order: each run is taken in two parts there, the slots' end and then their start.
+    #[test]
+    fn samples_written_across_the_rings_end_are_read_back_in_order() {
+        let v = voice();
+        let slots = v.slots.get().unwrap();
+        let (tx, _rx) = mpsc::channel();
+        let mut src = v.source(playing(), tx).unwrap();
+        // Twice round the ring and a bit, in steps that don't divide it.
+        let total = slots.len() as usize * 2 + 1000;
+        assert_ne!(slots.len() % 3000, 0);
+        let mut heard = Vec::with_capacity(total);
+        while heard.len() < total {
+            let n = (v.room(slots) as usize).min(3000).min(total - heard.len());
+            v.push(slots, &ramp(heard.len(), n));
+            heard.extend(src.by_ref().take(n));
+        }
+        assert_eq!(heard, ramp(0, total));
     }
 
     #[test]
