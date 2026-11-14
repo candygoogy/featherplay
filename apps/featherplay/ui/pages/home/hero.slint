@@ -149,8 +149,10 @@ component BandButton inherits Rectangle {
     width: 40px;
     height: 40px;
     border-radius: 20px;
-    background: BandInk.round(ta.pressed, ta.has-hover, root.enabled);
-    animate background { duration: Theme.t-hover; }
+    // Animated as a private property: a root animating a public one is copied into each use.
+    property <brush> ground: BandInk.round(ta.pressed, ta.has-hover, root.enabled);
+    animate ground { duration: Theme.t-hover; }
+    background: root.ground;
     accessible-role: button;
     accessible-label: root.name;
     accessible-enabled: root.enabled;
@@ -190,8 +192,10 @@ component BandRow inherits Rectangle {
     callback menu(length, length);
     height: BandSizes.row-h;
     border-radius: Theme.r-m;
-    background: Theme.panel-state(ta.pressed, ta.has-hover);
-    animate background { duration: Theme.t-hover; easing: Curves.ease-hover; }
+    // Animated as a private property, as `BandButton`'s.
+    property <brush> ground: Theme.panel-state(ta.pressed, ta.has-hover);
+    animate ground { duration: Theme.t-hover; easing: Curves.ease-hover; }
+    background: root.ground;
     accessible-role: button;
     accessible-label: root.title + ", " + root.subtitle;
     accessible-action-default => { root.clicked(); }
