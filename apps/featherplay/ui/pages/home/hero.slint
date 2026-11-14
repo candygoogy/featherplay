@@ -381,7 +381,7 @@ export component Band inherits Rectangle {
         }
         // The row at the cover's foot: the main pill, where it was paused, a hairline, the
         // four actions. "Paused at" goes first when the column is too narrow for it all; then
-        // the pill's label elides.
+        // "Open <source>" becomes "Open", and other labels elide.
         act := Rectangle {
             property <bool> has-main: !root.playing || QueueData.playing-from != "";
             property <string> main-label: !root.resume ? @tr("Play") : (root.playing ? @tr("Open {}", QueueData.playing-from) : @tr("Resume"));
@@ -413,7 +413,9 @@ export component Band inherits Rectangle {
                 spacing: Theme.s4;
                 if act.has-main: BandPill {
                     max-w: act.width - act.fixed;
-                    label: act.main-label;
+                    // "Open <source>" too long for the row: just "Open" (the line above
+                    // names the source), never a cut-off name.
+                    label: root.playing && act.main-natural > act.width - act.fixed ? @tr("Open") : act.main-label;
                     icon: root.playing ? "" : Icons.play;
                     solid: !root.playing;
                     clicked => {

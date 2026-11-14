@@ -732,16 +732,16 @@ msgstr ""
 msgid "More from {}"
 msgstr ""
 
-#: src/pages/home/shelves.rs:148 src/pages/playlist.rs:73 ui/sidebar.slint:229
-#: src/pages/home/shelves.rs:148 src/pages/playlist.rs:73 ui/sidebar.slint:229
+#: src/pages/home/shelves.rs:149 src/pages/playlist.rs:73 ui/sidebar.slint:229
+#: src/pages/home/shelves.rs:149 src/pages/playlist.rs:73 ui/sidebar.slint:229
 msgid "Liked songs"
 msgstr ""
 
-#: src/pages/home/shelves.rs:165
+#: src/pages/home/shelves.rs:166
 msgid "Shortcuts"
 msgstr ""
 
-#: src/pages/home/shelves.rs:222
+#: src/pages/home/shelves.rs:223
 msgid "Similar to"
 msgstr ""
 
@@ -2462,8 +2462,8 @@ msgstr ""
 msgid "Unmute"
 msgstr ""
 
-#: ui/bottom_bar.slint:866 ui/pages/home/hero.slint:508
-#: ui/bottom_bar.slint:866 ui/pages/home/hero.slint:508
+#: ui/bottom_bar.slint:866 ui/pages/home/hero.slint:523
+#: ui/bottom_bar.slint:866 ui/pages/home/hero.slint:523
 msgid "Up next"
 msgstr ""
 
@@ -2936,61 +2936,66 @@ msgstr ""
 msgid "Home fills in as you listen. Use Search to find something to play."
 msgstr ""
 
-#: ui/pages/home/hero.slint:313
+#: ui/pages/home/hero.slint:323
 msgid "Start listening · from"
 msgstr ""
 
-#: ui/pages/home/hero.slint:313
+#: ui/pages/home/hero.slint:323
 msgid "Now playing"
 msgstr ""
 
-#: ui/pages/home/hero.slint:313
+#: ui/pages/home/hero.slint:323
 msgid "Pick up where you left off"
 msgstr ""
 
-#: ui/pages/home/hero.slint:374
+#: ui/pages/home/hero.slint:387
 msgid "Open {}"
 msgstr ""
 
-#: ui/pages/home/hero.slint:374
+#: ui/pages/home/hero.slint:387
 msgid "Resume"
 msgstr ""
 
-#: ui/pages/home/hero.slint:391 ui/pages/home/hero.slint:419
+#: ui/pages/home/hero.slint:404 ui/pages/home/hero.slint:434
 msgid "Paused at"
 msgstr ""
 
-#: ui/pages/home/hero.slint:432 ui/pages/home/hero.slint:471
-#: ui/pages/home/hero.slint:432 ui/pages/home/hero.slint:471
+#. names the source), never a cut-off name.
+#: ui/pages/home/hero.slint:418
+msgid "Open"
+msgstr ""
+
+#: ui/pages/home/hero.slint:447 ui/pages/home/hero.slint:486
+#: ui/pages/home/hero.slint:447 ui/pages/home/hero.slint:486
 msgid "Go to artist"
 msgstr ""
 
-#: ui/pages/home/hero.slint:432 ui/playlist_menu_layer.slint:224
+#: ui/pages/home/hero.slint:447 ui/playlist_menu_layer.slint:224
 msgid "Go to album"
 msgstr ""
 
-#: ui/pages/home/hero.slint:432
+#: ui/pages/home/hero.slint:447
 msgid "Open playlist"
 msgstr ""
 
-#: ui/pages/home/hero.slint:453 ui/song_menu.slint:301 ui/song_menu.slint:339
+#: ui/pages/home/hero.slint:468 ui/song_menu.slint:301 ui/song_menu.slint:339
 msgid "Add to playlist"
 msgstr ""
 
-#: ui/pages/home/hero.slint:466 ui/playlist_menu_layer.slint:215
-#: ui/pages/home/hero.slint:466 ui/playlist_menu_layer.slint:215
+#: ui/pages/home/hero.slint:481 ui/playlist_menu_layer.slint:215
+#: ui/pages/home/hero.slint:481 ui/playlist_menu_layer.slint:215
 msgid "Start radio"
 msgstr ""
 
-#: ui/pages/home/hero.slint:484
+#: ui/pages/home/hero.slint:499
 msgid "Up next · {}"
 msgstr ""
 
-#: ui/pages/home/hero.slint:517
+#: ui/pages/home/hero.slint:532
 msgid "Show all {}"
 msgstr ""
 
-#: ui/pages/home/hero.slint:525
+#: ui/pages/home/hero.slint:540
 msgid "Nothing after this one"
 msgstr ""
 
