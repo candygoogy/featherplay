@@ -1,6 +1,6 @@
 //! The main window's place between runs, with no window: where a saved place opens on the
-//! monitors there are now (`opening`), and the place to save for bounds the window reports
-//! (`place_of`). The app reads and sets the window (`apps/featherplay/src/window_place.rs`).
+//! monitors there are now (`opening`), where it is then if it opens maximised (`maximised`),
+//! and the place to save for bounds the window reports (`place_of`). The app reads and sets the window (`apps/featherplay/src/window_place.rs`).
 //!
 //! A saved place opens at its size, cut to the work area of the monitor it lands on and never
 //! below the window's minimum, and at its position when its title bar shows on a monitor
@@ -30,6 +30,17 @@ pub struct Opening {
     /// The outer top-left corner, physical pixels; `None` leaves it to the desktop.
     pub position: Option<(i32, i32)>,
     pub maximised: bool,
+}
+
+/// Where a window that opens maximised is made (Windows), as `maximised` finds it.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Maximised {
+    /// The inner (client area) size, logical pixels.
+    pub size: (f64, f64),
+    /// The outer top-left corner, physical pixels.
+    pub position: (i32, i32),
+    /// The outer rectangle restoring it brings back, physical pixels: the opening's.
+    pub normal: ScreenRect,
 }
 
 /// Where `saved` opens on `monitors`, for a window whose least inner size is `min` (logical
@@ -92,6 +103,44 @@ pub fn opening(
             work.1 + (work.3 - work.1 - height).max(0) / 2,
         )),
         maximised,
+    })
+}
+
+/// Where a window that opens as `open` is once maximised (Windows): on the monitor its
+/// restored bounds overlap most, over that monitor's work area with the frame's sizing border
+/// off screen on every side and the title bar inside, as Windows maximises a window. `insets`
+/// gives the frame round the client area at a scale (left, top, right, bottom, physical
+/// pixels: `platform::window::frame_insets`). `None` where no monitor is known.
+pub fn maximised(
+    open: &Opening,
+    monitors: &[Monitor],
+    frame: Frame,
+    insets: impl Fn(f32) -> ScreenRect,
+) -> Option<Maximised> {
+    let at = open.position?;
+    let m = monitors
+        .iter()
+        .max_by_key(|m| area(outer(at, open.size, frame, m.scale), m.rect))?;
+    let (l, t, r, b) = insets(m.scale);
+    let scale = f64::from(m.scale);
+    let px = |logical: f64| to_px(logical, scale);
+    let normal = (
+        at.0,
+        at.1,
+        at.0 + px(open.size.0) + l + r,
+        at.1 + px(open.size.1) + t + b,
+    );
+    // The sizing border is the frame's left side; the top has the title bar too.
+    let (wl, wt, wr, wb) = m.work;
+    let outer = (wl - l, wt - l, wr + l, wb + l);
+    let inner = |from: i32, to: i32| f64::from(to - from) / scale;
+    Some(Maximised {
+        size: (
+            inner(outer.0 + l, outer.2 - r),
+            inner(outer.1 + t, outer.3 - b),
+        ),
+        position: (outer.0, outer.1),
+        normal,
     })
 }
 
@@ -286,6 +335,44 @@ mod tests {
         for (case, place, monitors, want) in cases {
             assert_eq!(opening(&place, monitors, MIN, FRAME), Some(want), "{case}");
         }
+    }
+
+    #[test]
+    fn maximised_it_covers_the_work_area_of_its_monitor() {
+        let main = monitor((0, 0, 3840, 2160), 1.5, true);
+        let left = monitor((-1920, 0, 0, 1080), 1.0, false);
+        // Windows 11's frame at 150 %.
+        let insets = |scale: f32| {
+            if scale == 1.5 {
+                (11, 45, 11, 11)
+            } else {
+                (8, 31, 8, 8)
+            }
+        };
+        let open = |position| Opening {
+            size: (1000.0, 700.0),
+            position: Some(position),
+            maximised: true,
+        };
+        let on_main = Maximised {
+            size: (2560.0, 2078.0 / 1.5),
+            position: (-11, -11),
+            normal: (300, 200, 1822, 1306),
+        };
+        let on_left = Maximised {
+            size: (1920.0, 1009.0),
+            position: (-1928, -8),
+            normal: (-1500, 100, -484, 839),
+        };
+        let monitors = [main, left];
+        assert_eq!(
+            maximised(&open((300, 200)), &monitors, FRAME, insets),
+            Some(on_main)
+        );
+        assert_eq!(
+            maximised(&open((-1500, 100)), &monitors, FRAME, insets),
+            Some(on_left)
+        );
     }
 
     #[test]

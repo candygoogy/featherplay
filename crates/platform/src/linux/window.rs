@@ -232,8 +232,13 @@ pub fn monitors() -> Vec<Monitor> {
 
 /// Not needed here: a window made maximised (winit's attribute) is mapped so by the window
 /// manager or compositor, without showing first.
-pub fn maximise_quietly(_h: Handle) -> Result<(), String> {
+pub fn maximise_quietly(_h: Handle, _normal: Option<ScreenRect>) -> Result<(u32, u32), String> {
     Err("made maximised by its attributes on Linux".into())
+}
+
+/// Nothing to do: a window is never shown before it's maximised here (`maximise_quietly`).
+pub fn cloak(_h: Handle, _cloaked: bool) -> Result<(), String> {
+    Ok(())
 }
 
 /// Not kept anywhere an app can read it: `None`, and the app reads the window's own bounds

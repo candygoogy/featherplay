@@ -5,10 +5,11 @@
 //!
 //! - **Opening** (`restore`): the place is given to the window before it's made, so it's made
 //!   there at that size, with no move after it appears. Maximised, on Linux it's made so too;
-//!   on Windows it's maximised once it exists, still hidden (`made`), and a normal start
-//!   shows it then. A start in the tray makes its hidden window the same way, and it shows
-//!   there. A start at sign-in that shows the window without the focus shows it first and
-//!   maximises it then, as Windows can't show a window maximised without activating it.
+//!   on Windows it's made hidden at its maximised bounds, maximised once it exists with no
+//!   change of size, and shown then (`made`), its first frame drawn at the size it shows at.
+//!   A start in the tray makes its hidden window the same way, and it shows there. A start at
+//!   sign-in, which mustn't take the focus, shows it before maximising it, hidden from the
+//!   screen meanwhile (DWM's cloak): winit shows a window without the focus as a restored one.
 //!   With nothing saved (the first run, an older settings file) it opens at its preferred
 //!   size where the desktop puts it, as before.
 //! - **Saving**: each move or resize (winit's `Moved` and `Resized`, which `wheel`'s filter
@@ -24,7 +25,7 @@ use std::cell::Cell;
 use std::time::Duration;
 
 use featherplay_controller::window_place::{self as rules, Frame};
-use featherplay_platform::window;
+use featherplay_platform::window::{self, ScreenRect};
 use featherplay_store::WindowPlace;
 use i_slint_core::item_tree::ItemTreeRc;
 use i_slint_core::layout::Orientation;
@@ -33,11 +34,14 @@ use slint::winit_030::WinitWindowAccessor;
 use slint::{ComponentHandle, LogicalSize, PhysicalPosition, Timer, TimerMode};
 
 use crate::app::Ctx;
+use crate::autostart::Start;
 use crate::pages::settings;
 use crate::ui::AppWindow;
 
 /// How long the window stands still before its place is saved.
 const SETTLES: Duration = Duration::from_millis(600);
+/// How long a window maximised to another size takes to draw a frame at it, at most.
+const REDRAWN: Duration = Duration::from_millis(150);
 
 thread_local! {
     /// The real window's place is kept (`restore` ran): the offscreen windows of the tests
@@ -45,6 +49,8 @@ thread_local! {
     static KEPT: Cell<bool> = const { Cell::new(false) };
     /// Windows: the window opens maximised, which `made` does once it exists.
     static MAXIMISE: Cell<bool> = const { Cell::new(false) };
+    /// Windows: the bounds restoring it brings back, for a window made at its maximised ones.
+    static NORMAL: Cell<Option<ScreenRect>> = const { Cell::new(None) };
     /// The position the window was made at, until it's first read back (`as_asked`).
     static ASKED: Cell<Option<(i32, i32)>> = const { Cell::new(None) };
     /// How far from that position the window says it is (`as_asked`).
@@ -55,7 +61,8 @@ thread_local! {
 }
 
 /// Before the main window is made: it opens where it was left, and from now on its place is
-/// kept. Returns whether it's maximised once it's made (`made`), which only Windows does.
+/// kept. Returns whether it's maximised once it's made and shown then (`made`), which only
+/// Windows does.
 pub fn restore(ui: &AppWindow) -> bool {
     KEPT.set(true);
     let Some(saved) = settings::main_window() else {
@@ -75,10 +82,15 @@ pub fn restore(ui: &AppWindow) -> bool {
     }
     // winit makes a window maximised on Windows by showing it so and hiding it again, a flash
     // that takes the focus, and shows a maximised window with the focus whatever the start
-    // asked. There it's maximised once it's made (`made`). On Linux the window manager or
-    // compositor maps it maximised.
+    // asked. There it's made at its maximised bounds and maximised once it's made (`made`).
+    // On Linux the window manager or compositor maps it maximised.
     if open.maximised {
         if cfg!(windows) {
+            if let Some(max) = rules::maximised(&open, &monitors, frame(), window::frame_insets) {
+                w.set_size(LogicalSize::new(max.size.0 as f32, max.size.1 as f32));
+                w.set_position(PhysicalPosition::new(max.position.0, max.position.1));
+                NORMAL.set(Some(max.normal));
+            }
             MAXIMISE.set(true);
         } else {
             w.set_maximized(true);
@@ -95,26 +107,69 @@ pub fn restore(ui: &AppWindow) -> bool {
     MAXIMISE.get()
 }
 
-/// The main window has been made (its handle is known): one to open maximised is maximised
-/// now, without the focus. Not shown yet, it appears maximised when it's shown: with `show`,
-/// that's on the event loop's next turn, once Slint has heard of its new size, so its first
-/// frame is drawn at that size. A window shown already (a start at sign-in, which mustn't
-/// take the focus) is maximised where it is.
-pub fn made(ui: &AppWindow, handle: window::Handle, show: bool) {
-    if MAXIMISE.replace(false)
-        && let Err(e) = window::maximise_quietly(handle)
-    {
-        log!("main window: maximise: {e}");
+/// The main window has been made (its handle is known), hidden: one to open maximised is
+/// maximised now, without the focus, and shown as `start` shows it (`restore` returned true;
+/// in the tray it stays hidden). Made at its maximised bounds, it keeps its size, so it's shown
+/// at once, its first frame drawn at that size. Otherwise (Windows placed it elsewhere: a
+/// monitor of another scale) it's shown on the event loop's next turn, once Slint has heard of
+/// its new size.
+///
+/// winit shows a window without the focus (a start at sign-in) as a restored one, then
+/// maximises it with the focus: that one is shown first, cloaked, then maximised, and
+/// uncloaked once its frame at the maximised size is drawn.
+pub fn made(ui: &AppWindow, handle: window::Handle, start: Start) {
+    if !MAXIMISE.replace(false) {
+        return;
     }
-    if show {
-        let weak = ui.as_weak();
-        Timer::single_shot(Duration::ZERO, move || {
-            if let Some(ui) = weak.upgrade()
-                && let Err(e) = ui.show()
-            {
-                log!("show window: {e}");
+    let quiet = start == Start::Quiet;
+    if quiet {
+        if let Err(e) = window::cloak(handle, true) {
+            log!("main window: cloak: {e}");
+        }
+        show(ui);
+    }
+    let drawn = match window::maximise_quietly(handle, NORMAL.take()) {
+        Ok(size) => {
+            let drawn = ui.window().size();
+            size == (drawn.width, drawn.height)
+        }
+        Err(e) => {
+            log!("main window: maximise: {e}");
+            true
+        }
+    };
+    if !drawn {
+        log!("main window: maximised to another size than it was made at, shown once redrawn");
+    }
+    match start {
+        Start::Window if drawn => show(ui),
+        Start::Window => {
+            let weak = ui.as_weak();
+            Timer::single_shot(Duration::ZERO, move || {
+                if let Some(ui) = weak.upgrade() {
+                    show(&ui);
+                }
+            });
+        }
+        Start::Quiet => {
+            let uncloak = move || {
+                if let Err(e) = window::cloak(handle, false) {
+                    log!("main window: uncloak: {e}");
+                }
+            };
+            if drawn {
+                uncloak();
+            } else {
+                Timer::single_shot(REDRAWN, uncloak);
             }
-        });
+        }
+        Start::Tray => {}
+    }
+}
+
+fn show(ui: &AppWindow) {
+    if let Err(e) = ui.show() {
+        log!("show window: {e}");
     }
 }
 

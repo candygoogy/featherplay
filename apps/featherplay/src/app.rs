@@ -922,9 +922,8 @@ fn run_window(
     // The close button asks, quits or hides to the tray, as Settings says (`close`).
     close::install(&ctx, &ui, shell::has_tray);
     // Where it was left, before it's made: it appears there (`window_place`). To open
-    // maximised on Windows, it's shown once it's made and maximised (`window_place::made`),
-    // but by a start at sign-in, which shows it without the focus first.
-    let show_when_made = crate::window_place::restore(&ui) && start == Start::Window;
+    // maximised on Windows, it's shown once it's made and maximised (`window_place::made`).
+    let show_when_made = crate::window_place::restore(&ui) && start != Start::Tray;
 
     if start == Start::Tray {
         // Made but not shown: the tray icon, the media controls and the hotkeys still get
@@ -941,8 +940,17 @@ fn run_window(
     let timing = app.timing;
     shell::start(find_handle, tx, hotkeys, move |handle| {
         c.handle.set(Some(handle));
+        // Before a window that opens maximised is first shown (`window_place::made`).
         if let Some(ui) = weak.upgrade() {
-            crate::window_place::made(&ui, handle, show_when_made);
+            let t = ui.global::<Theme>();
+            if let Err(e) = chrome::title_bar(handle, t.get_dark(), t.get_ground(), t.get_text1()) {
+                log!("title bar: {e}");
+            }
+            c.covers.set_scale(ui.window().scale_factor());
+            if let Err(e) = chrome::set_icon(handle, ui.window().scale_factor()) {
+                log!("window icon: {e}");
+            }
+            crate::window_place::made(&ui, handle, start);
         }
         // Started in the tray with no tray to go to (`run_window` showed it): minimised.
         if start == Start::Tray
@@ -1045,16 +1053,6 @@ fn run_window(
         });
         if let Err(e) = watched {
             log!("restore on taskbar button: {e}");
-        }
-        if let Some(ui) = weak.upgrade() {
-            let t = ui.global::<Theme>();
-            if let Err(e) = chrome::title_bar(handle, t.get_dark(), t.get_ground(), t.get_text1()) {
-                log!("title bar: {e}");
-            }
-            c.covers.set_scale(ui.window().scale_factor());
-            if let Err(e) = chrome::set_icon(handle, ui.window().scale_factor()) {
-                log!("window icon: {e}");
-            }
         }
     });
     // Whether the desktop shows the tray icon, now that `start` has put it there (Linux):

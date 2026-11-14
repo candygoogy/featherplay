@@ -832,13 +832,18 @@ fn monitor_of(monitor: HMONITOR) -> Option<Monitor> {
 /// This is what `CreateWindowEx` makes of a window created with `WS_MAXIMIZE`: the style, and
 /// the work area with the frame's sizing border off screen on every side, as Windows places a
 /// maximised window.
-pub fn maximise_quietly(h: Handle) -> Result<(), String> {
+///
+/// `normal` is the outer rectangle (screen coordinates, physical pixels) restoring it brings
+/// back, for a window made at its maximised bounds; `None` keeps the bounds it has. Returns
+/// its client area's size now, physical pixels.
+pub fn maximise_quietly(h: Handle, normal: Option<ScreenRect>) -> Result<(u32, u32), String> {
     use windows::Win32::Graphics::Gdi::MonitorFromWindow;
     use windows::Win32::UI::WindowsAndMessaging::{
         IsWindowVisible, SW_HIDE, SW_SHOWNA, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOZORDER,
         SetWindowLongPtrW, SetWindowPlacement, SetWindowPos, WS_MAXIMIZE,
     };
     let hwnd = h.hwnd();
+    let before = client_size(hwnd);
     // SAFETY: a handle-only call; NEAREST always returns a monitor.
     let monitor = monitor_of(unsafe { MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST) })
         .ok_or("no monitor")?;
@@ -871,6 +876,25 @@ pub fn maximise_quietly(h: Handle) -> Result<(), String> {
     };
     // SAFETY: a window handle and a WINDOWPLACEMENT with its length filled in.
     unsafe { GetWindowPlacement(hwnd, &mut placement) }.map_err(|e| e.message())?;
+    if let Some((l, t, r, b)) = normal {
+        let rect = RECT {
+            left: l,
+            top: t,
+            right: r,
+            bottom: b,
+        };
+        // SAFETY: a rectangle on the stack; NEAREST always returns a monitor.
+        let on = monitor_of(unsafe { MonitorFromRect(&rect, MONITOR_DEFAULTTONEAREST) })
+            .ok_or("no monitor")?;
+        // In workspace coordinates, which start at the work area's corner (`restored_bounds`).
+        let (dx, dy) = (on.work.0 - on.rect.0, on.work.1 - on.rect.1);
+        placement.rcNormalPosition = RECT {
+            left: l - dx,
+            top: t - dy,
+            right: r - dx,
+            bottom: b - dy,
+        };
+    }
     // SAFETY: a window of this thread and plain flags; neither shown (no SWP_SHOWWINDOW) nor
     // activated.
     unsafe {
@@ -886,11 +910,45 @@ pub fn maximise_quietly(h: Handle) -> Result<(), String> {
         )
     }
     .map_err(|e| e.message())?;
-    // The move took the maximised bounds as the ones to restore to: the old ones go back, and
-    // the window stays as shown or hidden as it was.
+    let after = client_size(hwnd);
+    if after == before {
+        // Made at its maximised bounds, its client area kept its size, and Windows sends no
+        // WM_SIZE for that: winit learns from one that the window is maximised, and without
+        // it would drop WS_MAXIMIZE at its next change of the window's styles.
+        let size = (after.0 & 0xffff) | (after.1 & 0xffff) << 16;
+        // SAFETY: a window of this thread; WM_SIZE carries no pointers.
+        unsafe {
+            SendMessageW(
+                hwnd,
+                WM_SIZE,
+                Some(WPARAM(SIZE_MAXIMIZED as usize)),
+                Some(LPARAM(size as isize)),
+            )
+        };
+    }
+    // The move took the maximised bounds as the ones to restore to: the old ones (or `normal`)
+    // go back, and the window stays as shown or hidden as it was.
     placement.showCmd = if shown { SW_SHOWNA } else { SW_HIDE }.0 as u32;
     // SAFETY: the placement read above, for the same window.
-    unsafe { SetWindowPlacement(hwnd, &placement) }.map_err(|e| e.message())
+    unsafe { SetWindowPlacement(hwnd, &placement) }.map_err(|e| e.message())?;
+    Ok(after)
+}
+
+/// The size of the window's client area, physical pixels; zero for a stale handle.
+fn client_size(hwnd: HWND) -> (u32, u32) {
+    use windows::Win32::UI::WindowsAndMessaging::GetClientRect;
+    let mut r = RECT::default();
+    // SAFETY: a handle and an out-parameter; a stale handle fails and leaves it empty.
+    let _ = unsafe { GetClientRect(hwnd, &mut r) };
+    let side = |a: i32, b: i32| u32::try_from(b - a).unwrap_or(0);
+    (side(r.left, r.right), side(r.top, r.bottom))
+}
+
+/// Hides the window from the screen while Windows still counts it shown (DWM's cloak), or
+/// shows it again: what it draws meanwhile is kept, and appears with it.
+pub fn cloak(h: Handle, cloaked: bool) -> Result<(), String> {
+    use windows::Win32::Graphics::Dwm::DWMWA_CLOAK;
+    set(h, DWMWA_CLOAK, &windows::core::BOOL::from(cloaked))
 }
 
 /// The window's restored bounds as Windows keeps them (`GetWindowPlacement`), right also while
