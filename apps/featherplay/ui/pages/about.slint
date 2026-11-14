@@ -78,8 +78,60 @@ global ScoopCommand {
     out property <string> text: "scoop update featherplay";
 }
 
+// The update banner's title and line.
+component BannerText inherits VerticalLayout {
+    in property <string> title;
+    in property <string> line;
+    in property <bool> scoop;
+    alignment: center;
+    spacing: 2px;
+    horizontal-stretch: 1;
+    Body {
+        text: root.title;
+        font-size: Theme.t-body-l;
+        font-weight: 600;
+        overflow: clip;
+        wrap: word-wrap;
+    }
+    if !root.scoop: Body {
+        text: root.line;
+        font-size: Theme.t-meta;
+        color: Theme.text2;
+        overflow: clip;
+        wrap: word-wrap;
+    }
+    // "Update with Scoop: `scoop update featherplay`", the command in a code span.
+    if root.scoop: HorizontalLayout {
+        alignment: start;
+        spacing: 6px;
+        Body {
+            text: @tr("Update with Scoop:");
+            font-size: Theme.t-meta;
+            color: Theme.text2;
+            vertical-alignment: center;
+        }
+        Rectangle {
+            border-radius: 4px;
+            background: Theme.selected;
+            width: cmd.preferred-width + 12px;
+            height: cmd.preferred-height + 2px;
+            accessible-role: text;
+            accessible-label: ScoopCommand.text;
+            cmd := Text {
+                text: ScoopCommand.text;
+                font-family: "Cascadia Mono";
+                font-size: Theme.t-meta;
+                color: Theme.text2;
+                accessible-role: none;
+            }
+        }
+    }
+}
+
 // A newer release is out: its version, what's happening with it, and what to do.
 component UpdateBanner inherits Rectangle {
+    // A narrow page: the actions under the text.
+    in property <bool> narrow;
     callback copy-command();
     property <UpdateState> state: AboutData.update-state;
     property <string> title: root.state == UpdateState.install-failed
@@ -108,76 +160,47 @@ component UpdateBanner inherits Rectangle {
     preferred-height: max(72px, lay.preferred-height);
     accessible-role: groupbox;
     accessible-label: root.title;
-    lay := HorizontalLayout {
+    // Narrow (a narrow page), the actions go under the text, from its left edge.
+    lay := VerticalLayout {
         padding: Theme.s4;
         padding-left: Theme.s5;
-        spacing: Theme.s4;
-        VerticalLayout {
-            alignment: center;
-            spacing: 2px;
-            horizontal-stretch: 1;
-            Body {
-                text: root.title;
-                font-size: Theme.t-body-l;
-                font-weight: 600;
-                overflow: clip;
-                wrap: word-wrap;
+        spacing: Theme.s3;
+        if root.narrow: BannerText {
+            title: root.title;
+            line: root.line;
+            scoop: root.state == UpdateState.scoop;
+        }
+        HorizontalLayout {
+            spacing: Theme.s4;
+            alignment: start;
+            if !root.narrow: BannerText {
+                horizontal-stretch: 1;
+                title: root.title;
+                line: root.line;
+                scoop: root.state == UpdateState.scoop;
             }
-            if root.state != UpdateState.scoop: Body {
-                text: root.line;
-                font-size: Theme.t-meta;
-                color: Theme.text2;
-                overflow: clip;
-                wrap: word-wrap;
-            }
-            // "Update with Scoop: `scoop update featherplay`", the command in a code span.
-            if root.state == UpdateState.scoop: HorizontalLayout {
-                alignment: start;
-                spacing: 6px;
-                Body {
-                    text: @tr("Update with Scoop:");
-                    font-size: Theme.t-meta;
-                    color: Theme.text2;
-                    vertical-alignment: center;
-                }
-                Rectangle {
-                    border-radius: 4px;
-                    background: Theme.selected;
-                    width: cmd.preferred-width + 12px;
-                    height: cmd.preferred-height + 2px;
-                    accessible-role: text;
-                    accessible-label: ScoopCommand.text;
-                    cmd := Text {
-                        text: ScoopCommand.text;
-                        font-family: "Cascadia Mono";
-                        font-size: Theme.t-meta;
-                        color: Theme.text2;
-                        accessible-role: none;
-                    }
+            if root.secondary != "": VerticalLayout {
+                alignment: center;
+                horizontal-stretch: 0;
+                padding-left: root.narrow ? 0px : 12px;
+                padding-right: root.primary != "" ? 12px : 0px;
+                TextLink {
+                    text: root.secondary;
+                    clicked => { AboutData.update-secondary(); }
                 }
             }
-        }
-        if root.secondary != "": VerticalLayout {
-            alignment: center;
-            horizontal-stretch: 0;
-            padding-left: 12px;
-            padding-right: root.primary != "" ? 12px : 0px;
-            TextLink {
-                text: root.secondary;
-                clicked => { AboutData.update-secondary(); }
-            }
-        }
-        if root.primary != "": VerticalLayout {
-            alignment: center;
-            horizontal-stretch: 0;
-            Pill {
-                label: root.primary;
-                solid: root.state != UpdateState.scoop;
-                clicked => {
-                    if root.state == UpdateState.scoop {
-                        root.copy-command();
-                    } else {
-                        AboutData.get-update();
+            if root.primary != "": VerticalLayout {
+                alignment: center;
+                horizontal-stretch: 0;
+                Pill {
+                    label: root.primary;
+                    solid: root.state != UpdateState.scoop;
+                    clicked => {
+                        if root.state == UpdateState.scoop {
+                            root.copy-command();
+                        } else {
+                            AboutData.get-update();
+                        }
                     }
                 }
             }
@@ -323,8 +346,33 @@ component LicenceRow inherits Rectangle {
     }
 }
 
+// Open log folder and Copy diagnostics: side by side, or one under the other in a narrow
+// column.
+component LogButtons inherits Rectangle {
+    in property <bool> narrow;
+    callback copy-diagnostics();
+    height: root.narrow ? 2 * 32px + Theme.s3 : 32px;
+    open := Pill {
+        x: 0;
+        y: 0;
+        height: 32px;
+        label: @tr("Open log folder");
+        clicked => { AboutData.open-log-folder(); }
+    }
+    Pill {
+        x: root.narrow ? 0px : open.width + Theme.s3;
+        y: root.narrow ? 32px + Theme.s3 : 0px;
+        height: 32px;
+        label: @tr("Copy diagnostics");
+        clicked => { root.copy-diagnostics(); }
+    }
+}
+
 export component AboutPage inherits Rectangle {
-    property <length> col-w: min(self.width - 2 * Theme.page-pad, 640px);
+    property <length> pad: Theme.pad-for(self.width);
+    property <length> col-w: min(self.width - 2 * root.pad, 640px);
+    // A narrow column: the banner's actions and the log buttons go under one another.
+    property <bool> narrow: root.col-w < 440px;
 
     flick := Flickable {
         width: parent.width;
@@ -332,13 +380,14 @@ export component AboutPage inherits Rectangle {
         content-height: col.preferred-height + Theme.page-top + Theme.page-end;
 
         col := VerticalLayout {
-            x: Theme.page-pad;
+            x: root.pad;
             y: Theme.page-top;
             width: root.col-w;
             height: self.preferred-height;
             spacing: Theme.s7;
 
             if AboutData.update-state != UpdateState.none: UpdateBanner {
+                narrow: root.narrow;
                 copy-command => {
                     copy-field.text = ScoopCommand.text;
                     copy-field.select-all();
@@ -387,24 +436,14 @@ export component AboutPage inherits Rectangle {
                     overflow: clip;
                     wrap: word-wrap;
                 }
-                HorizontalLayout {
-                    alignment: start;
-                    spacing: Theme.s3;
-                    Pill {
-                        height: 32px;
-                        label: @tr("Open log folder");
-                        clicked => { AboutData.open-log-folder(); }
-                    }
-                    Pill {
-                        height: 32px;
-                        label: @tr("Copy diagnostics");
-                        clicked => {
-                            copy-field.text = AboutData.diagnostics();
-                            copy-field.select-all();
-                            copy-field.copy();
-                            copy-field.clear-selection();
-                            AboutData.copied();
-                        }
+                LogButtons {
+                    narrow: root.narrow;
+                    copy-diagnostics => {
+                        copy-field.text = AboutData.diagnostics();
+                        copy-field.select-all();
+                        copy-field.copy();
+                        copy-field.clear-selection();
+                        AboutData.copied();
                     }
                 }
             }

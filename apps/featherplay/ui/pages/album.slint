@@ -10,7 +10,7 @@ import { TrackRow, TrackListRow, RowsShown, ShownRows, SongList } from "../parts
 import { Nav } from "../nav.slint";
 import { SongMenu } from "../song_menu.slint";
 import { AlbumMenu } from "../album_menu.slint";
-import { CollectionHeader, SkeletonCollection, ErrorState, EmptyState, FadeIn, TopScrim } from "content.slint";
+import { CollectionHeader, SkeletonCollection, HeaderSizes, HeaderTitle, ErrorState, EmptyState, FadeIn, TopScrim } from "content.slint";
 
 export global AlbumData {
     in property <bool> loading;
@@ -60,7 +60,15 @@ component Header inherits CollectionHeader {
 
 export component AlbumPage inherits Rectangle {
     // The page runs up under the clear top bar (app.slint), so its header starts below it.
-    property <length> header-h: Theme.top-bar-h + Theme.page-top + (root.width >= 900px ? 232px : 200px) + Theme.s6;
+    // Its height: `HeaderSizes`, as the header lays itself out, with the title measured as the
+    // stacked header sets it.
+    property <length> pad: Theme.pad-for(root.width);
+    title-probe := HeaderTitle {
+        visible: false;
+        width: root.width - 2 * root.pad;
+        text: AlbumData.title;
+    }
+    property <length> header-h: HeaderSizes.height(root.width, title-probe.preferred-height, AlbumData.kind != "", AlbumData.artist != "", AlbumData.meta != "", true);
     // Loading: the shape of the header and the rows.
     if AlbumData.loading && AlbumData.title == "": SkeletonCollection {
         row-covers: false;
@@ -73,16 +81,16 @@ export component AlbumPage inherits Rectangle {
             width: root.width;
         }
         if AlbumData.error != "": ErrorState {
-            x: Theme.page-pad;
+            x: root.pad;
             y: AlbumData.title != "" ? root.header-h : Theme.top-bar-h + Theme.page-top;
-            width: min(480px, root.width - 2 * Theme.page-pad);
+            width: min(480px, root.width - 2 * root.pad);
             message: AlbumData.error;
             retry => { AlbumData.retry(); }
         }
         if AlbumData.error == "" && AlbumData.title != "": EmptyState {
-            x: Theme.page-pad;
+            x: root.pad;
             y: root.header-h;
-            width: min(480px, root.width - 2 * Theme.page-pad);
+            width: min(480px, root.width - 2 * root.pad);
             title: @tr("This album has no tracks to play");
             line: @tr("They may not be available where you are.");
         }
@@ -97,9 +105,9 @@ export component AlbumPage inherits Rectangle {
                     width: parent.width;
                 }
                 TrackListRow {
-                    x: Theme.page-pad - 8px;
+                    x: root.pad - 8px;
                     y: i == 0 ? root.header-h : 0px;
-                    width: parent.width - 2 * Theme.page-pad + 16px;
+                    width: parent.width - 2 * root.pad + 16px;
                     // Album rows have no cover, so they're shorter than song rows.
                     height: Theme.track-row-h;
                     track: t;

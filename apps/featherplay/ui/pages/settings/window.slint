@@ -129,6 +129,56 @@ component HueSlider inherits Rectangle {
     }
 }
 
+// The Accent row's choices: "From the cover", the colours, and the custom colour. In a row
+// too narrow for them on one line (a narrow window), the colours go on a line of their own
+// under the chip. Worked out when the width changes, not bound to it, so the row's height
+// feeds nothing back into its width.
+component AccentChoices inherits Rectangle {
+    property <int> count: SettingsData.accents.length + 1;
+    property <length> step: 32px + Theme.s2;
+    property <length> swatches-w: root.count * root.step - Theme.s2;
+    property <length> line-w: chip.preferred-width + Theme.s2 + root.swatches-w;
+    property <bool> two-lines;
+    function fit() {
+        root.two-lines = root.width < root.line-w;
+    }
+    init => { root.fit(); }
+    changed width => { root.fit(); }
+    changed line-w => { root.fit(); }
+    preferred-width: root.line-w;
+    min-width: root.swatches-w;
+    max-width: root.line-w;
+    preferred-height: root.two-lines ? 36px + Theme.s2 + 32px : 36px;
+    min-height: self.preferred-height;
+    chip := Chips {
+        x: 0;
+        y: 0;
+        width: min(self.preferred-width, root.width);
+        labels: [@tr("From the cover")];
+        active: SettingsData.accent == 0 ? 0 : -1;
+        selected => { SettingsData.pick-accent(0); }
+    }
+    property <length> swatches-x: root.two-lines ? 0px : chip.preferred-width + Theme.s2;
+    property <length> swatches-y: root.two-lines ? 36px + Theme.s2 : 2px;
+    for swatch[i] in SettingsData.accents: Swatch {
+        x: root.swatches-x + i * root.step;
+        y: root.swatches-y;
+        name: swatch.name;
+        colour: Theme.pick(swatch.dark, swatch.light);
+        selected: SettingsData.accent == i + 1;
+        clicked => { SettingsData.pick-accent(i + 1); }
+    }
+    // The custom colour: a hue wheel, the usual sign for "any colour".
+    Swatch {
+        x: root.swatches-x + SettingsData.accents.length * root.step;
+        y: root.swatches-y;
+        name: @tr("Custom colour");
+        colour: @conic-gradient(#E5484D 0deg, #E58A3C 45deg, #D9C23A 90deg, #5CB85C 135deg, #3BB5C9 180deg, #4C7EE5 225deg, #9061E0 270deg, #D9509E 315deg, #E5484D 360deg);
+        selected: SettingsData.accent == SettingsData.accents.length + 1;
+        clicked => { SettingsData.pick-accent(SettingsData.accents.length + 1); }
+    }
+}
+
 // The custom colour, under the Accent row while it's picked: the colour as this theme
 // shows it, the hue slider and the hex field. A line below says when the theme adjusts the
 // colour to keep it visible, or why a typed code was refused.
@@ -276,24 +326,7 @@ export component WindowSection inherits Group {
             label: @tr("Accent");
             search: SettingId.accent;
             detail: @tr("From the cover takes the colour of the song that's playing, and a plain grey when the art has none.");
-            Chips {
-                labels: [@tr("From the cover")];
-                active: SettingsData.accent == 0 ? 0 : -1;
-                selected => { SettingsData.pick-accent(0); }
-            }
-            for swatch[i] in SettingsData.accents: Swatch {
-                name: swatch.name;
-                colour: Theme.pick(swatch.dark, swatch.light);
-                selected: SettingsData.accent == i + 1;
-                clicked => { SettingsData.pick-accent(i + 1); }
-            }
-            // The custom colour: a hue wheel, the usual sign for "any colour".
-            Swatch {
-                name: @tr("Custom colour");
-                colour: @conic-gradient(#E5484D 0deg, #E58A3C 45deg, #D9C23A 90deg, #5CB85C 135deg, #3BB5C9 180deg, #4C7EE5 225deg, #9061E0 270deg, #D9509E 315deg, #E5484D 360deg);
-                selected: SettingsData.accent == SettingsData.accents.length + 1;
-                clicked => { SettingsData.pick-accent(SettingsData.accents.length + 1); }
-            }
+            AccentChoices { }
         }
         if SettingsData.accent == SettingsData.accents.length + 1 && !SettingsSearch.hit(SettingId.accent).hidden: CustomPicker { }
         if SettingsData.has-notifications: ToggleRow {

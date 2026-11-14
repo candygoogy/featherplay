@@ -2,6 +2,7 @@
 // rows and cards, and the shapes of the pages they stand in for.
 import { Theme, Curves } from "../../theme.slint";
 import { Grid } from "grid.slint";
+import { HeaderSizes } from "header_sizes.slint";
 
 // Holds a page's skeleton. Hidden for `t-skeleton-delay`, so a fast load never
 // flashes it; then the placeholder blocks fade in through their colour (`fade`, no opacity
@@ -187,7 +188,7 @@ export component SkeletonList inherits Skeleton {
     in property <bool> cover: true;
     in property <bool> album: true;
     in property <bool> compact: false;
-    in property <length> pad: Theme.page-pad;
+    in property <length> pad: Theme.pad-for(root.width);
     in property <length> top: 0px;
     property <int> rows: max(1, min(root.count, ceil((root.height - root.top) / Theme.row-h)));
     for i in root.rows: SkeletonRow {
@@ -207,7 +208,7 @@ export component SkeletonList inherits Skeleton {
 // as the height shows, three at most.
 export component SkeletonGrid inherits Skeleton {
     in property <bool> round: false;
-    in property <length> pad: Theme.page-pad;
+    in property <length> pad: Theme.pad-for(root.width);
     in property <length> top: 0px;
     property <length> inner: root.width - 2 * root.pad;
     property <int> per-row: Grid.per-row(root.inner);
@@ -231,7 +232,7 @@ export component SkeletonGrid inherits Skeleton {
 export component SkeletonShelves inherits Skeleton {
     in property <int> count: 2;
     in property <int> grids: 0;
-    in property <length> pad: Theme.page-pad;
+    in property <length> pad: Theme.pad-for(root.width);
     in property <length> top: 0px;
     property <length> inner: root.width - 2 * root.pad;
     property <int> per-row: Grid.per-row(root.inner);
@@ -297,11 +298,14 @@ export component SkeletonCollection inherits Skeleton {
     in property <bool> row-covers: true;
     // These pages run up under the clear top bar (`TopScrim`), so they start below it.
     property <length> top: Theme.top-bar-h + Theme.page-top;
-    property <length> pad: Theme.page-pad;
-    property <length> cover-size: root.width >= 900px ? 232px : 200px;
-    property <length> text-x: root.pad + root.cover-size + Theme.s6;
-    property <length> buttons-y: root.top + root.cover-size - 40px;
-    property <length> rows-y: root.top + root.cover-size + Theme.s6;
+    property <length> pad: Theme.pad-for(root.width);
+    // The header's shape as `CollectionHeader` lays it out: the lines beside the cover, or
+    // stacked under it on a narrow page (a one-line title).
+    property <bool> stacked: HeaderSizes.stacked(root.width);
+    property <length> cover-size: HeaderSizes.cover(root.width);
+    property <length> text-x: root.stacked ? root.pad : root.pad + root.cover-size + Theme.s6;
+    property <length> buttons-y: root.stacked ? root.top + root.cover-size + Theme.s5 + 20px + 48px + 4px + 26px + 20px + Theme.s4 : root.top + root.cover-size - 40px;
+    property <length> rows-y: root.stacked ? root.buttons-y + 40px + Theme.s6 : root.top + root.cover-size + Theme.s6;
     property <length> row-h: root.row-covers ? Theme.row-h : Theme.track-row-h;
     property <int> rows: max(1, min(12, ceil((root.height - root.rows-y) / root.row-h)));
     SkeletonBlock {

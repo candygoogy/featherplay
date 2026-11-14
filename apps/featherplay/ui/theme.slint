@@ -298,6 +298,11 @@ export global Theme {
 
     // Density: comfortable.
     out property <length> page-pad: 40px;
+    // A page's side padding for its width: `page-pad`, then 24 px below a 720 px page and
+    // 20 px below a 520 px one, so a narrow window keeps its room for content.
+    public pure function pad-for(w: length) -> length {
+        return w < 520px ? 20px : (w < 720px ? 24px : page-pad);
+    }
     // Below a page's last row: past the floating bar, with the usual gap.
     out property <length> page-end: bar-clear + s5;
     out property <length> page-top: 32px;

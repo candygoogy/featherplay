@@ -154,7 +154,7 @@ export component ExploreShelf inherits Rectangle {
 export component ShelfList inherits Rectangle {
     in property <[HomeShelfRow]> shelves;
     in property <length> top: 0px;
-    in property <length> pad: Theme.page-pad;
+    in property <length> pad: Theme.pad-for(root.width);
     callback play-song(string);
     callback play-card(CardItem);
     ListView {
@@ -424,7 +424,7 @@ component MoodButton inherits Rectangle {
 }
 
 export component ExplorePage inherits Rectangle {
-    property <length> pad: Theme.page-pad;
+    property <length> pad: Theme.pad-for(root.width);
     property <length> list-y: Theme.page-top + 48px + Theme.s4 + 36px + Theme.s2;
     property <length> inner: root.width - 2 * root.pad;
     // Moods: as many ~200 px tiles a row as fit.
@@ -565,7 +565,7 @@ export component ExplorePage inherits Rectangle {
 
 // A mood or genre's page: its name, then its shelves of curated playlists.
 export component MoodPage inherits Rectangle {
-    property <length> pad: Theme.page-pad;
+    property <length> pad: Theme.pad-for(root.width);
     property <length> list-y: Theme.page-top + 48px;
     PageTitle {
         x: root.pad;

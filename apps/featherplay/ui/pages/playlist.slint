@@ -10,7 +10,7 @@ import { TrackRow, RowsShown, ShownRows, SongList } from "../parts.slint";
 import { SongMenu } from "../song_menu.slint";
 import { Nav, PageKind } from "../nav.slint";
 import { SidebarData } from "../sidebar.slint";
-import { CollectionHeader, SongListRow, SkeletonCollection, SkeletonList, ErrorState, EmptyState, AccountGate, FadeIn, TopScrim } from "content.slint";
+import { CollectionHeader, SongListRow, SkeletonCollection, HeaderSizes, HeaderTitle, SkeletonList, ErrorState, EmptyState, AccountGate, FadeIn, TopScrim } from "content.slint";
 
 export global PlaylistData {
     in property <bool> loading;
@@ -58,7 +58,15 @@ component Header inherits CollectionHeader {
 
 export component PlaylistPage inherits Rectangle {
     // The page runs up under the clear top bar (app.slint), so its header starts below it.
-    property <length> header-h: Theme.top-bar-h + Theme.page-top + (root.width >= 900px ? 232px : 200px) + Theme.s6;
+    // Its height: `HeaderSizes`, as the header lays itself out, with the title measured as the
+    // stacked header sets it.
+    property <length> pad: Theme.pad-for(root.width);
+    title-probe := HeaderTitle {
+        visible: false;
+        width: root.width - 2 * root.pad;
+        text: PlaylistData.title;
+    }
+    property <length> header-h: HeaderSizes.height(root.width, title-probe.preferred-height, PlaylistData.kind != "", PlaylistData.byline != "", PlaylistData.meta != "", !(PlaylistData.liked-songs && SidebarData.signed-out));
     property <bool> sign-in: PlaylistData.liked-songs && SidebarData.signed-out;
     // Loading: the shape of the header and the rows. Liked songs knows its header already.
     if PlaylistData.loading && PlaylistData.title == "": SkeletonCollection { }
@@ -83,25 +91,25 @@ export component PlaylistPage inherits Rectangle {
         }
         // The header's tile is the heart already, so the gate has none of its own.
         if root.sign-in: AccountGate {
-            x: Theme.page-pad;
+            x: root.pad;
             y: root.header-h;
-            width: min(460px, root.width - 2 * Theme.page-pad);
+            width: min(460px, root.width - 2 * root.pad);
             glyph: "";
             explore: false;
             title: @tr("Sign in to see your liked songs");
             line: @tr("Your account keeps the songs you like, on every device.");
         }
         if PlaylistData.error != "" && !root.sign-in: ErrorState {
-            x: Theme.page-pad;
+            x: root.pad;
             y: PlaylistData.title != "" ? root.header-h : Theme.top-bar-h + Theme.page-top;
-            width: min(480px, root.width - 2 * Theme.page-pad);
+            width: min(480px, root.width - 2 * root.pad);
             message: PlaylistData.error;
             retry => { PlaylistData.retry(); }
         }
         if PlaylistData.error == "" && PlaylistData.title != "" && !root.sign-in: EmptyState {
-            x: Theme.page-pad;
+            x: root.pad;
             y: root.header-h;
-            width: min(480px, root.width - 2 * Theme.page-pad);
+            width: min(480px, root.width - 2 * root.pad);
             glyph: PlaylistData.liked-songs ? Icons.heart : Icons.note;
             title: PlaylistData.liked-songs ? @tr("Songs you like show up here") : @tr("This playlist is empty");
             line: PlaylistData.liked-songs ? @tr("Like a song with its heart to keep it here.") : @tr("Songs added to it show up here.");
@@ -120,9 +128,9 @@ export component PlaylistPage inherits Rectangle {
                     width: parent.width;
                 }
                 SongListRow {
-                    x: Theme.page-pad - 8px;
+                    x: root.pad - 8px;
                     y: i == 0 ? root.header-h : 0px;
-                    width: parent.width - 2 * Theme.page-pad + 16px;
+                    width: parent.width - 2 * root.pad + 16px;
                     track: t;
                     show-liked: !PlaylistData.liked-songs;
                     activated => { PlaylistData.play(i); }

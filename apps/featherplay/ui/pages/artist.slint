@@ -34,7 +34,7 @@ export global ArtistData {
 // The banner: the photo across the page, cropped from the top, fading into the ground
 // under the name, the meta line and the actions. Until the photo arrives it's a quiet grey.
 component Banner inherits Rectangle {
-    property <length> pad: Theme.page-pad;
+    property <length> pad: Theme.pad-for(root.width);
     property <length> buttons-y: root.height - 40px - Theme.s5;
     property <length> meta-y: root.buttons-y - Theme.s4 - 20px;
     property <length> name-y: root.meta-y - 68px;
@@ -96,7 +96,7 @@ component Banner inherits Rectangle {
 }
 
 export component ArtistPage inherits Rectangle {
-    property <length> pad: Theme.page-pad;
+    property <length> pad: Theme.pad-for(root.width);
     property <length> inner: self.width - 2 * self.pad;
     // The page runs up under the clear top bar (app.slint): the banner's photo reaches up
     // behind it, and everything else starts below it.

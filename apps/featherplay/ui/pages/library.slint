@@ -30,7 +30,7 @@ export global LibraryData {
 }
 
 export component LibraryPage inherits Rectangle {
-    property <length> pad: Theme.page-pad;
+    property <length> pad: Theme.pad-for(root.width);
     property <length> list-y: Theme.page-top + 48px + Theme.s4 + 36px + Theme.s2;
     property <bool> account: !SidebarData.signed-out;
     property <bool> empty: root.account && !LibraryData.loading && LibraryData.error == "" && (LibraryData.tab == 0 ? LibraryData.liked.length == 0 : LibraryData.cards.length == 0);

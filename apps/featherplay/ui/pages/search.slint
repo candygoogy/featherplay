@@ -30,7 +30,7 @@ export global SearchData {
 }
 
 export component SearchPage inherits Rectangle {
-    property <length> pad: Theme.page-pad;
+    property <length> pad: Theme.pad-for(root.width);
     // Without the chips, a link's song sits right under the title.
     property <length> list-y: Theme.page-top + 20px + 48px + (SearchData.link ? Theme.s2 : Theme.s4 + 36px + Theme.s2);
     property <bool> empty: !SearchData.loading && SearchData.error == "" && (SearchData.filter == 0 ? SearchData.songs.length == 0 : SearchData.cards.length == 0);

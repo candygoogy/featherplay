@@ -29,7 +29,7 @@ export global Grid {
 export component CardGrid inherits Rectangle {
     in property <[CardItem]> items;
     // Left and right inset of the cards inside the list.
-    in property <length> pad: Theme.page-pad;
+    in property <length> pad: Theme.pad-for(root.width);
     // Space above the first line (scrolls with the grid).
     in property <length> top: 0px;
     // Cards show a play button on hover (`play`).

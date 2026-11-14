@@ -1,0 +1,35 @@
+// The album and playlist header's sizes (`CollectionHeader`, content.slint), for the header,
+// its skeleton and the pages that place their rows under it.
+import { Theme } from "../../theme.slint";
+import { Display } from "../../parts.slint";
+
+export global HeaderSizes {
+    // The cover beside the lines.
+    public pure function wide-cover(w: length) -> length {
+        return w >= 900px ? 232px : 200px;
+    }
+    // A page too narrow for the lines beside the cover (under 300 px of them, a page under
+    // about 600 px): the cover and the lines stack on the page's left edge.
+    public pure function stacked(w: length) -> bool {
+        return w - 2 * Theme.pad-for(w) - HeaderSizes.wide-cover(w) - Theme.s6 < 300px;
+    }
+    // Stacked, the cover is smaller (under half the page), so a track or two still shows.
+    public pure function cover(w: length) -> length {
+        return HeaderSizes.stacked(w) ? clamp(floor((w - 2 * Theme.pad-for(w)) * 0.45 / 1px) * 1px, 144px, 200px) : HeaderSizes.wide-cover(w);
+    }
+    // The header's height: the cover's beside the lines; stacked, the cover, then the kind
+    // line, the title (`title-h`, one line or two: `HeaderTitle`'s height), the byline, the
+    // meta and the buttons, each only when it shows.
+    public pure function height(w: length, title-h: length, kind: bool, byline: bool, meta: bool, actions: bool) -> length {
+        return Theme.top-bar-h + Theme.page-top + HeaderSizes.cover(w) + Theme.s6 + (HeaderSizes.stacked(w) ? Theme.s5 + (kind ? 20px : 0px) + title-h + 4px + (byline ? 26px : 0px) + (meta ? 20px : 0px) + (actions ? Theme.s4 + 40px : 0px) : 0px);
+    }
+}
+
+// The stacked header's title: up to two lines at a page's content width. Pages measure their
+// title with a hidden one (`HeaderSizes.height`).
+export component HeaderTitle inherits Display {
+    font-size: Theme.t-display-l;
+    font-weight: 800;
+    wrap: word-wrap;
+    max-lines: 2;
+}

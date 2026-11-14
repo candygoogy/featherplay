@@ -194,6 +194,8 @@ export global Rows {
     out property <color> detail: Theme.text2.mix(Theme.text1, 0.75);
     // Above each group's title (and between the page's title and the first group).
     out property <length> gap: Theme.s7;
+    // The least a row's label keeps beside its controls; narrower, they go under it.
+    out property <length> label-min: 180px;
 }
 
 // A group heading above its rows.
@@ -375,16 +377,41 @@ component RowLabel inherits VerticalLayout {
     }
 }
 
-// One setting: its name and a line of detail on the left, the control on the right. While
-// the search hides it, it takes no room.
+// Where a row's label and controls go (`SettingRow`), worked out once here rather than in
+// every row: the controls on the right, both centred in the row's height; or, in a row too
+// narrow to keep `label-min` of label beside them (a narrow window), stacked, the controls
+// under the label on its left edge.
+component RowPlan {
+    in property <length> row-w;
+    in property <length> label-h;
+    in property <length> controls-w;
+    in property <length> controls-h;
+    out property <bool> stacked: root.row-w < root.controls-w + Theme.s6 + Rows.label-min;
+    out property <length> label-w: root.stacked ? root.row-w : root.row-w - root.controls-w - Theme.s6;
+    out property <length> body-h: root.stacked ? root.label-h + Theme.s3 + root.controls-h : max(root.label-h, root.controls-h);
+    out property <length> label-y: Rows.pad-y + (root.stacked ? 0px : (root.body-h - root.label-h) / 2);
+    out property <length> controls-x: root.stacked ? 0px : root.row-w - root.controls-w;
+    out property <length> controls-y: Rows.pad-y + (root.stacked ? root.label-h + Theme.s3 : (root.body-h - root.controls-h) / 2);
+    out property <length> controls-room: root.stacked ? min(root.controls-w, root.row-w) : root.controls-w;
+    out property <length> row-h: root.body-h + 2 * Rows.pad-y;
+}
+
+// One setting: its name and a line of detail on the left, the control on the right (under
+// the name in a narrow row, `RowPlan`). While the search hides it, it takes no room.
 export component SettingRow inherits Rectangle {
     in property <string> label;
     in property <string> detail;
     in property <bool> divider: true;
     // Its row in the search's table (none: never hidden, nothing marked).
     in property <SettingId> search: SettingId.none;
-    min-height: text.hidden ? 0px : lay.min-height;
-    preferred-height: text.hidden ? 0px : lay.preferred-height;
+    min-height: text.hidden ? 0px : plan.row-h;
+    preferred-height: self.min-height;
+    plan := RowPlan {
+        row-w: root.width;
+        label-h: text.preferred-height;
+        controls-w: controls.preferred-width;
+        controls-h: controls.preferred-height;
+    }
     // Hidden on an element inside it, not on the row itself: `visible` on a component's
     // root has Slint copy the component into every place it's used, ToggleRow's 28 too.
     Rectangle {
@@ -393,25 +420,22 @@ export component SettingRow inherits Rectangle {
             search: root.search;
             divider: root.divider;
         }
-        lay := HorizontalLayout {
-            padding-top: Rows.pad-y;
-            padding-bottom: Rows.pad-y;
-            spacing: Theme.s6;
-            text := RowLabel {
-                horizontal-stretch: 1;
-                label: root.label;
-                detail: root.detail;
-                search: root.search;
-            }
-            VerticalLayout {
-                alignment: center;
-                horizontal-stretch: 0;
-                HorizontalLayout {
-                    alignment: end;
-                    spacing: Theme.s2;
-                    @children
-                }
-            }
+        text := RowLabel {
+            x: 0;
+            y: plan.label-y;
+            width: plan.label-w;
+            height: self.preferred-height;
+            label: root.label;
+            detail: root.detail;
+            search: root.search;
+        }
+        controls := HorizontalLayout {
+            x: plan.controls-x;
+            y: plan.controls-y;
+            width: plan.controls-room;
+            height: self.preferred-height;
+            spacing: Theme.s2;
+            @children
         }
     }
 }

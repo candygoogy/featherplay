@@ -85,11 +85,13 @@ export component SettingsPage inherits Rectangle {
     // side panel is open or not; the column takes the rest, up to `col-max`, so the switches
     // stay near their labels.
     property <length> index-w: 184px;
+    // The page's padding: less on a narrow page.
+    property <length> pad: Theme.pad-for(self.width);
     property <length> index-gap: Theme.s7;
-    property <bool> indexed: self.width >= 2 * Theme.page-pad + root.index-w + root.index-gap + root.beside-min;
+    property <bool> indexed: self.width >= 2 * root.pad + root.index-w + root.index-gap + root.beside-min;
     property <length> index-room: root.indexed ? root.index-w + root.index-gap : 0px;
-    property <length> col-w: min(self.width - 2 * Theme.page-pad - root.index-room, root.col-max);
-    property <length> block-x: Theme.page-pad;
+    property <length> col-w: min(self.width - 2 * root.pad - root.index-room, root.col-max);
+    property <length> block-x: root.pad;
     property <length> col-x: root.block-x + root.index-room;
     // The Discord profile card sits beside the Discord options when the Discord panel can
     // hold both: the options at `options-min` or more, the gap, the card at `card-min` or
@@ -108,7 +110,7 @@ export component SettingsPage inherits Rectangle {
     property <length> options-min: 400px;
     property <length> options-ease: 480px;
     property <length> beside-min: 2 * Rows.inset + root.options-min + root.card-gap + root.card-min;
-    property <length> margin-room: self.width - Theme.page-pad - root.col-x - root.col-w;
+    property <length> margin-room: self.width - root.pad - root.col-x - root.col-w;
     property <length> wide-panel: root.col-w + (root.margin-room >= root.card-gap + root.card-w ? root.card-gap + root.card-w : 0px);
     property <bool> card-beside: root.wide-panel >= root.beside-min;
     property <length> beside-card-w: max(root.card-min, min(root.card-w, root.wide-panel - 2 * Rows.inset - root.card-gap - root.options-ease));

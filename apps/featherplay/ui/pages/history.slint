@@ -26,7 +26,7 @@ export global HistoryData {
 }
 
 export component HistoryPage inherits Rectangle {
-    property <length> pad: Theme.page-pad;
+    property <length> pad: Theme.pad-for(root.width);
     property <length> list-y: Theme.page-top + 48px + Theme.s3;
     property <length> day-h: 56px;
     property <bool> account: !SidebarData.signed-out;

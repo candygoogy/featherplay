@@ -142,14 +142,19 @@ export component TrackListRow inherits Rectangle {
     callback menu-clicked();
     // Right-click, at this point of the row (the song menu).
     callback context-menu(length, length);
-    property <length> artist-w: root.compilation ? 240px : 0px;
+    // A narrow row (a narrow window): the heart shows on hover in the duration's place, as
+    // `SongListRow`'s does, and a compilation's artists take a share of the room, not 240 px.
+    property <bool> narrow: root.width < 520px;
+    property <length> right-w: root.narrow ? 100px : 156px;
+    property <length> artist-w: !root.compilation ? 0px : (root.narrow ? floor(max(0px, root.width - 64px - root.right-w) * 0.4 / 1px) * 1px : 240px);
     property <bool> hovered: ta.has-hover;
+    property <bool> heart-shown: root.hovered || (root.track.liked && !root.narrow);
     // YouTube refuses the song now (`Refused`): greyed as `ChoiceRow.dimmed` is, and why
     // shows after the title while hovered. A click still tries it.
     property <bool> refused: Refused.changes >= 0 && Refused.has(root.track.id);
     property <float> alpha: root.refused ? 0.45 : 1.0;
     property <bool> why-shown: root.refused && root.hovered;
-    property <length> title-room: root.width - 64px - 156px - root.artist-w;
+    property <length> title-room: root.width - 64px - root.right-w - root.artist-w;
     // Album rows have no cover: 48 px.
     height: Theme.track-row-h;
     border-radius: Theme.r-m;
@@ -213,8 +218,8 @@ export component TrackListRow inherits Rectangle {
         }
         // They stay instantiated and fade with the hover.
         IconButton {
-            property <bool> shown: root.hovered || root.track.liked;
-            x: parent.width - 140px;
+            property <bool> shown: root.heart-shown;
+            x: root.narrow ? parent.width - 90px : parent.width - 140px;
             y: (parent.height - self.height) / 2;
             icon: Icons.heart;
             label: root.track.liked ? @tr("Remove like") : @tr("Like");
@@ -275,8 +280,8 @@ export component TrackListRow inherits Rectangle {
         accessible-role: none;
     }
     if root.compilation: Body {
-        x: parent.width - 148px - root.artist-w;
-        width: root.artist-w - 24px;
+        x: parent.width - root.right-w + 8px - root.artist-w;
+        width: root.artist-w - (root.narrow ? 12px : 24px);
         height: parent.height;
         text: root.track.artist;
         color: Theme.text2.transparentize(1 - root.alpha);
@@ -286,6 +291,8 @@ export component TrackListRow inherits Rectangle {
         x: parent.width - 92px;
         width: 44px;
         height: parent.height;
+        // Narrow, the heart takes its place while it shows.
+        visible: !(root.narrow && root.heart-shown);
         text: root.track.duration;
         color: Theme.text2.transparentize(1 - root.alpha);
         horizontal-alignment: right;
