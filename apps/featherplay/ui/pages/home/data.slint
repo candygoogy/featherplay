@@ -42,11 +42,14 @@ export global HomeData {
     in property <string> featured-shelf;
     in property <string> featured-from;
     in property <[CardItem]> featured-more;
-    // The featured pick's own panel, per theme, from its cover (`follow::lyric_inks_for`, as
-    // the lyrics panel's); graphite until its colour is known. Resuming, the band takes the
-    // lyrics panel's own (`LyricsData.ink`), which follows the current song.
+    // The featured pick's own band, per theme, from its cover (`follow::lyric_inks_for`, as
+    // the lyrics panel's): deep in the dark theme, a light tint with dark text in the light
+    // one (`colour::band_light`); grey until its colour is known. Resuming, the band takes the
+    // lyrics panel's dark ink (`LyricsData.ink-dark`), which follows the current song, and
+    // `session-ink-light`, its light tint, set with it (`lyrics::refresh_inks`).
     in property <LyricInk> featured-ink-dark;
     in property <LyricInk> featured-ink-light;
+    in property <LyricInk> session-ink-light;
     in property <[HomeShelfRow]> shelves;
     in property <MoreState> more;
     // How many rows the page has: the top, the shelves, then the next page's row while it

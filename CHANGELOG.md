@@ -8,18 +8,18 @@ Notable changes to featherplay, newest first. The format follows
 
 ### Changed
 
-- **A new Home.** It opens on a band in the colour of the song's cover (deep in the light
-  theme too): the cover, "Pick up where you left off" (or "Now playing") with where it's
-  playing from, the title, the artist, album and year, and one row: Resume and where you
-  paused (Open the source while it plays; Play on a fresh start), then Like, Add to playlist,
-  Start radio and Go to artist. On its right, the next three songs and **Show all**, which
-  opens Up next, with the Up next panel open too when there's room; in a narrower window an
-  **Up next** link at its top right instead. Under it, every shelf is one row of large
-  covers that pages sideways with the arrows shown on hover, the next cover cut off at the
-  window's edge; Quick picks keep their song grid, two rows. Your mixes open with **Shuffle
-  Liked songs**, which plays Liked songs shuffled (the sidebar still opens the page). It
-  replaces the "Pick up where you left off" card, the shortcut tiles and the cover wash
-  behind the search bar.
+- **A new Home.** It opens on a band in the colour of the song's cover, deep with white text
+  in the dark theme and a light tint of the cover's colour with dark text in the light one:
+  the cover, "Pick up where you left off" (or "Now playing") with where it's playing from,
+  the title, the artist, album and year, and one row: Resume and where you paused (Open the
+  source while it plays; Play on a fresh start), then Like, Add to playlist, Start radio and
+  Go to artist. On its right, the next three songs and **Show all**, which opens Up next,
+  with the Up next panel open too when there's room; in a narrower window an **Up next**
+  link at its top right instead. Under it, every shelf is one row of large covers that pages
+  sideways with the arrows shown on hover, the next cover cut off at the window's edge;
+  Quick picks keep their song grid, two rows. Your mixes open with **Shuffle Liked songs**,
+  which plays Liked songs shuffled (the sidebar still opens the page). It replaces the "Pick
+  up where you left off" card, the shortcut tiles and the cover wash behind the search bar.
 
 ### Fixed
 

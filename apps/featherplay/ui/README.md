@@ -161,7 +161,8 @@ Album, playlist and artist pages run up under the top bar instead, clear, so the
 photo reaches the window's top: they start their content `Theme.top-bar-h` down and draw a
 `TopScrim` (content.slint) that brings the ground back as content scrolls under the bar.
 Home starts below the bar like the other pages: its colour is the band at its top
-(`home/hero.slint`), a rounded panel in the lyrics panel's ink, inside the page's padding.
+(`home/hero.slint`), a rounded panel inside the page's padding: the lyrics panel's ink in the
+dark theme, a light tint of the cover's colour in the light one (`BandInk`).
 
 ## Exports
 

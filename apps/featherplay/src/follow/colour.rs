@@ -453,6 +453,46 @@ pub fn lyric_panel(seed: Lch, dark: bool) -> LyricInk {
     }
 }
 
+/// The light theme's overlays on Home's band, a row hovered and pressed (`Theme.hover`,
+/// `Theme.pressed`): its second-level text keeps AA on them too.
+const BAND_HOVER: f32 = 0x12 as f32 / 255.0;
+const BAND_PRESSED: f32 = 0x2B as f32 / 255.0;
+
+/// Home's band in the light theme (`Band`): a light tint of the cover's hue, light enough to
+/// sit in a light page, with enough chroma to read as the cover's colour (grey for neutral
+/// art), and dark text tinted from the hue: `current` for the title and names, `next` for the
+/// second level, both AA on the tint and on a hovered or pressed row. The dark theme's band
+/// is the lyrics' panel (`lyric_panel`).
+pub fn band_light(seed: Lch) -> LyricInk {
+    let neutral = seed.c < NEUTRAL_CHROMA;
+    let c = if neutral {
+        0.0
+    } else {
+        (seed.c * 0.5).clamp(0.045, 0.07)
+    };
+    let lch = |l: f32, c: f32| Lch { l, c, h: seed.h };
+    // As light as the hue keeps its colour: blues and violets hold little chroma that light,
+    // so they sit a few steps deeper.
+    let ground = [0.93, 0.92, 0.91, 0.90, 0.89]
+        .into_iter()
+        .map(|l| to_srgb(lch(l, c)))
+        .find(|g| to_lch(*g).c >= c.min(0.04))
+        .unwrap_or_else(|| to_srgb(lch(0.89, c)));
+    let black = hex(0x000000);
+    let surfaces = [
+        ground,
+        over(black, BAND_HOVER, ground),
+        over(black, BAND_PRESSED, ground),
+    ];
+    let text = |l: f32, cc: f32, min: f32| quantise(clamp(lch(l, cc), -0.01, &surfaces, min));
+    LyricInk {
+        ground: quantise(ground),
+        current: text(0.22, (c * 0.6).min(0.035), LYRIC_CURRENT),
+        next: text(0.45, (c * 0.9).min(0.06), LYRIC_NEXT + 0.1),
+        past: text(0.58, (c * 0.9).min(0.06), LYRIC_PAST + 0.1),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -628,6 +668,29 @@ mod tests {
                 light.c,
                 dark.c
             );
+        }
+    }
+
+    /// Home's light band: a light tint in the cover's hue under dark text that keeps AA, on
+    /// a hovered row too; pale, dark and saturated covers alike.
+    #[test]
+    fn the_light_band_is_a_light_tint_with_dark_text() {
+        for seed in seeds() {
+            let ink = band_light(seed);
+            let ground = to_lch(ink.ground);
+            assert!(ground.l >= 0.88, "{seed:?}: a deep band {ground:?}");
+            if seed.c >= NEUTRAL_CHROMA {
+                assert!(ground.c >= 0.035, "{seed:?}: no colour {ground:?}");
+                let turn = (ground.h - seed.h).sin().abs();
+                assert!(turn < 0.2, "{seed:?}: another hue {ground:?}");
+            } else {
+                assert!(ground.c < 0.005, "{seed:?}: grey art tinted {ground:?}");
+            }
+            for under in [ink.ground, over(hex(0), BAND_HOVER, ink.ground)] {
+                let (c, n) = (contrast(ink.current, under), contrast(ink.next, under));
+                assert!(c >= LYRIC_CURRENT, "{seed:?}: text {c}");
+                assert!(n >= 4.5, "{seed:?}: second level {n}");
+            }
         }
     }
 }

@@ -5,9 +5,9 @@
 // playlist, Start radio, Go to artist), then on the right what's next in the queue (or more
 // from the pick's shelf). `HomeTop` (home.slint) places it.
 //
-// The band is the lyrics panel's ink (`LyricsData.ink`, from the current cover, deep in both
-// themes); a featured pick takes its own (`HomeData.featured-ink-*`). Its text is white and
-// the ink's `next` level.
+// The band takes its colours from `BandInk`: in the dark theme the lyrics panel's deep ink with
+// white text, in the light one a light tint of the cover's hue with dark text and dark buttons
+// (`colour::band_light`). Resuming they follow the current cover; a featured pick has its own.
 import { Theme, Curves, Icons } from "../../theme.slint";
 import { CardItem, ItemKind, TrackRow, Body, Display, Cover, Icon } from "../../parts.slint";
 import { Nav, Frame } from "../../nav.slint";
@@ -15,9 +15,40 @@ import { Player } from "../../player.slint";
 import { SongMenu } from "../../song_menu.slint";
 import { QueueData } from "../../queue_panel.slint";
 import { BarTip } from "../../bar_tip.slint";
-import { LyricsData } from "../lyrics.slint";
+import { LyricsData, LyricInk } from "../lyrics.slint";
 import { NowPlayingData } from "../now_playing.slint";
 import { HomeData } from "data.slint";
+
+// The band's colours. Dark theme: the lyrics panel's deep ink (`LyricsData.ink-dark`), white
+// text and white overlays. Light theme: a light tint of the cover's hue (`session-ink-light`,
+// or the pick's), dark text tinted from the hue and dark overlays, the solid pill black as the
+// light theme's is. `text2` is the second level (the ink's `next`), AA on the band and on a
+// hovered row in both.
+global BandInk {
+    out property <LyricInk> dark: HomeData.resume ? LyricsData.ink-dark : HomeData.featured-ink-dark;
+    out property <LyricInk> light: HomeData.resume ? HomeData.session-ink-light : HomeData.featured-ink-light;
+    out property <color> ground: Theme.pick(self.dark.ground, self.light.ground);
+    out property <color> text: Theme.pick(#FFFFFF, self.light.current);
+    out property <color> text2: Theme.pick(self.dark.next, self.light.next);
+    out property <color> rule: Theme.pick(#FFFFFF26, #0000001F);
+    // A round action: at rest, hovered, pressed, unavailable.
+    public pure function round(down: bool, over: bool, enabled: bool) -> color {
+        return !enabled ? Theme.pick(#FFFFFF14, #0000000A) : (down ? Theme.pick(#FFFFFF4D, #0000002E) : (over ? Theme.pick(#FFFFFF40, #00000021) : Theme.pick(#FFFFFF26, #00000012)));
+    }
+    // The solid pill (Resume, Play): white on the deep band, black on the light one.
+    public pure function solid(down: bool, over: bool) -> color {
+        return Theme.pick(down ? Theme.panel-solid-pressed : (over ? Theme.panel-solid-hover : Theme.panel-solid), down ? #474747 : (over ? #2E2E2E : #0F0F0F));
+    }
+    out property <color> on-solid: Theme.pick(#0F0F0F, #FFFFFF);
+    // The tonal pill (Open <source>).
+    public pure function tonal(down: bool, over: bool) -> color {
+        return down ? Theme.pick(#FFFFFF4D, #00000033) : (over ? Theme.pick(#FFFFFF40, #00000026) : Theme.pick(#FFFFFF2E, #00000017));
+    }
+    // A row hovered or pressed.
+    public pure function row(down: bool, over: bool) -> color {
+        return down ? Theme.pick(Theme.panel-pressed, #0000002B) : (over ? Theme.pick(Theme.panel-hover, #00000012) : transparent);
+    }
+}
 
 // The band's sizes.
 export global BandSizes {
@@ -61,7 +92,7 @@ component BandPill inherits Rectangle {
     accessible-action-default => { root.clicked(); }
     Rectangle {
         border-radius: root.border-radius;
-        background: root.solid ? (ta.pressed ? Theme.panel-solid-pressed : (ta.has-hover ? Theme.panel-solid-hover : Theme.panel-solid)) : (ta.pressed ? #FFFFFF4D : (ta.has-hover ? #FFFFFF40 : #FFFFFF2E));
+        background: root.solid ? BandInk.solid(ta.pressed, ta.has-hover) : BandInk.tonal(ta.pressed, ta.has-hover);
         animate background { duration: Theme.t-hover; }
         transform-scale: ta.pressed ? Theme.press-scale : 1.0;
         animate transform-scale {
@@ -78,7 +109,7 @@ component BandPill inherits Rectangle {
             width: 18px;
             height: 18px;
             commands: root.icon;
-            fill: root.solid ? #0F0F0F : #FFFFFF;
+            fill: root.solid ? BandInk.on-solid : BandInk.text;
             stroke: transparent;
         }
         lab := Body {
@@ -87,7 +118,7 @@ component BandPill inherits Rectangle {
             height: root.height;
             text: root.label;
             font-weight: 600;
-            color: root.solid ? #0F0F0F : #FFFFFF;
+            color: root.solid ? BandInk.on-solid : BandInk.text;
             vertical-alignment: center;
         }
     }
@@ -103,7 +134,7 @@ component BandButton inherits Rectangle {
     width: 40px;
     height: 40px;
     border-radius: 20px;
-    background: !root.enabled ? #FFFFFF14 : (ta.pressed ? #FFFFFF4D : (ta.has-hover ? #FFFFFF40 : #FFFFFF26));
+    background: BandInk.round(ta.pressed, ta.has-hover, root.enabled);
     animate background { duration: Theme.t-hover; }
     accessible-role: button;
     accessible-label: root.name;
@@ -121,8 +152,8 @@ component BandButton inherits Rectangle {
         width: 20px;
         height: 20px;
         commands: root.icon;
-        stroke: root.filled ? transparent : #FFFFFF.transparentize(root.enabled ? 0 : 0.6);
-        fill: root.filled ? #FFFFFF : transparent;
+        stroke: root.filled ? transparent : BandInk.text.transparentize(root.enabled ? 0 : 0.6);
+        fill: root.filled ? BandInk.text : transparent;
     }
     tip := BarTip {
         over: ta.has-hover && root.enabled;
@@ -144,7 +175,7 @@ component BandRow inherits Rectangle {
     callback menu(length, length);
     height: BandSizes.row-h;
     border-radius: Theme.r-m;
-    background: Theme.panel-state(ta.pressed, ta.has-hover);
+    background: BandInk.row(ta.pressed, ta.has-hover);
     animate background { duration: Theme.t-hover; easing: Curves.ease-hover; }
     accessible-role: button;
     accessible-label: root.title + ", " + root.subtitle;
@@ -175,7 +206,7 @@ component BandRow inherits Rectangle {
         Body {
             text: root.title;
             font-weight: 600;
-            color: #FFFFFF;
+            color: BandInk.text;
         }
         Body {
             text: root.subtitle;
@@ -216,7 +247,7 @@ component BandLink inherits Rectangle {
         height: root.height;
         text: root.text;
         font-weight: 600;
-        color: #FFFFFF;
+        color: BandInk.text;
         vertical-alignment: center;
     }
     if root.underline || ta.has-hover: Rectangle {
@@ -224,7 +255,7 @@ component BandLink inherits Rectangle {
         y: 18px;
         width: t.width;
         height: 1px;
-        background: #FFFFFF;
+        background: BandInk.text;
     }
     if root.chevron: Icon {
         x: t.width + 2px;
@@ -232,7 +263,7 @@ component BandLink inherits Rectangle {
         width: 16px;
         height: 16px;
         commands: Icons.chevron-right;
-        stroke: #FFFFFF;
+        stroke: BandInk.text;
     }
     ta := TouchArea {
         enabled: root.enabled;
@@ -251,8 +282,8 @@ export component Band inherits Rectangle {
     property <bool> resume: HomeData.resume;
     property <bool> playing: root.resume && Player.playing;
     property <bool> song: root.resume || HomeData.featured.kind == ItemKind.song;
-    property <color> ink-ground: root.resume ? LyricsData.ink.ground : Theme.pick(HomeData.featured-ink-dark.ground, HomeData.featured-ink-light.ground);
-    property <color> ink2: root.resume ? LyricsData.ink.next : Theme.pick(HomeData.featured-ink-dark.next, HomeData.featured-ink-light.next);
+    property <color> ink-ground: BandInk.ground;
+    property <color> ink2: BandInk.text2;
     property <length> pad: BandSizes.pad;
     property <int> queued: QueueData.upcoming.length;
     property <int> rows-n: root.resume ? HomeData.next.length : HomeData.featured-more.length;
@@ -342,7 +373,7 @@ export component Band inherits Rectangle {
             text: root.resume ? Player.title : HomeData.featured.title;
             font-size: root.compact ? Theme.t-display-m : Theme.t-display-l;
             vertical-alignment: center;
-            color: #FFFFFF;
+            color: BandInk.text;
             accessible-role: text;
         }
         // "Josh Woodward · The Beautiful Machine · 2014": the artist in white.
@@ -364,7 +395,7 @@ export component Band inherits Rectangle {
                 text: parent.artist;
                 font-size: Theme.t-body-l;
                 font-weight: 600;
-                color: #FFFFFF;
+                color: BandInk.text;
                 vertical-alignment: center;
             }
             rest := Body {
@@ -438,7 +469,7 @@ export component Band inherits Rectangle {
                     Body {
                         text: Player.elapsed;
                         font-weight: 600;
-                        color: #FFFFFF;
+                        color: BandInk.text;
                         vertical-alignment: center;
                     }
                 }
@@ -452,7 +483,7 @@ export component Band inherits Rectangle {
                     Rectangle {
                         y: 8px;
                         height: 24px;
-                        background: #FFFFFF2E;
+                        background: Theme.pick(#FFFFFF2E, #00000024);
                     }
                 }
                 if root.song: HorizontalLayout {
@@ -506,7 +537,7 @@ export component Band inherits Rectangle {
         y: root.pad;
         width: 1px;
         height: BandSizes.cover;
-        background: #FFFFFF26;
+        background: BandInk.rule;
     }
     // "Up next" and "Show all N" over three rows a column; on a fresh start, "More from Quick
     // picks" over three of them.

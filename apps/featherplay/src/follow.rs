@@ -705,11 +705,13 @@ fn translucent((dark, light): (Rgb, Rgb)) -> Washes {
 }
 
 /// The lyrics' colours for one cover: the cover-colour panel and its three levels of text,
-/// for each theme (`colour::lyric_panel`).
+/// for each theme (`colour::lyric_panel`), and Home's band in the light theme, a light tint
+/// with dark text (`colour::band_light`; the dark theme's band is `dark`).
 #[derive(Clone, Debug, PartialEq)]
 pub struct LyricInks {
     pub dark: crate::ui::LyricInk,
     pub light: crate::ui::LyricInk,
+    pub band_light: crate::ui::LyricInk,
 }
 
 /// The inks for a cover's `seed` (`None`: no cover). With a fixed accent (`fixed`,
@@ -731,6 +733,7 @@ pub fn lyric_inks_for(seed: Option<Lch>, fixed: Option<Color>) -> LyricInks {
     LyricInks {
         dark: ink(colour::lyric_panel(seed, true)),
         light: ink(colour::lyric_panel(seed, false)),
+        band_light: ink(colour::band_light(seed)),
     }
 }
 

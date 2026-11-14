@@ -173,9 +173,10 @@ fn set_hero_cover(ctx: &Ctx, url: Option<String>) {
     });
 }
 
-/// The featured pick's panel from its cover's colour, worked out once per cover off the UI
-/// thread, as the lyrics panel's is (`follow::lyric_inks_for`; graphite for grey art). Until
-/// it's known the band is graphite, then it crossfades (`Band`).
+/// The featured pick's band from its cover's colour, worked out once per cover off the UI
+/// thread, as the lyrics panel's is (`follow::lyric_inks_for`: the panel's deep ink in the
+/// dark theme, a light tint in the light one; grey for grey art). Until it's known the band
+/// is grey, then it crossfades (`Band`).
 fn show_ink(ctx: &Rc<Ctx>, url: Option<String>) {
     if STATE.with(|s| s.borrow().ink_url == url) {
         return;
@@ -203,7 +204,7 @@ fn paint_ink(ctx: &Ctx, inks: follow::LyricInks) {
     let Some(ui) = ctx.window() else { return };
     let data = ui.global::<HomeData>();
     data.set_featured_ink_dark(inks.dark);
-    data.set_featured_ink_light(inks.light);
+    data.set_featured_ink_light(inks.band_light);
 }
 
 #[cfg(test)]

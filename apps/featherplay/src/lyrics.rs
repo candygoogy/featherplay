@@ -187,6 +187,9 @@ pub fn refresh_inks(ui: &crate::ui::AppWindow) {
     let data = ui.global::<LyricsData>();
     data.set_ink_dark(inks.dark);
     data.set_ink_light(inks.light);
+    // Home's band takes the same cover's colour: the dark ink, or its own light tint.
+    ui.global::<crate::ui::HomeData>()
+        .set_session_ink_light(inks.band_light);
     crate::desktop_lyrics::inks_changed(ui);
 }
 
