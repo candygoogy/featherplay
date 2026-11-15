@@ -249,6 +249,8 @@ async fn send_text<W: AsyncWrite + Unpin>(wr: &mut W, text: &str) -> io::Result<
 
 #[cfg(test)]
 mod tests {
+    use proptest::prelude::*;
+
     use super::*;
 
     #[test]
@@ -292,5 +294,63 @@ mod tests {
         let mut big = vec![0x81, 0x80 | 127];
         big.extend_from_slice(&(10_000u64).to_be_bytes());
         assert!(read_frame(&mut big.as_slice()).await.is_err());
+    }
+
+    /// Reads one frame from `bytes` to completion: reading a slice never waits.
+    fn read_from(bytes: &[u8]) -> io::Result<Frame> {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .build()
+            .expect("a runtime");
+        rt.block_on(read_frame(&mut &bytes[..]))
+    }
+
+    /// A client frame of `opcode` and `payload`, masked with `mask`, its length written
+    /// in the 7-bit, 16-bit or 64-bit form (`wide`: 0, 1 or 2; any that holds it).
+    fn client_frame(opcode: u8, fin: bool, payload: &[u8], mask: [u8; 4], wide: u8) -> Vec<u8> {
+        let n = payload.len();
+        let mut out = vec![if fin { 0x80 } else { 0 } | opcode];
+        match wide {
+            0 if n <= 125 => out.push(0x80 | n as u8),
+            0 | 1 => {
+                out.push(0x80 | 126);
+                out.extend_from_slice(&(n as u16).to_be_bytes());
+            }
+            _ => {
+                out.push(0x80 | 127);
+                out.extend_from_slice(&(n as u64).to_be_bytes());
+            }
+        }
+        out.extend_from_slice(&mask);
+        out.extend(payload.iter().enumerate().map(|(i, b)| b ^ mask[i % 4]));
+        out
+    }
+
+    proptest! {
+        /// A masked frame the server takes is read back as sent, whatever its mask and
+        /// the form its length is written in.
+        #[test]
+        fn a_client_frame_is_read_back(
+            (opcode, fin, payload) in prop_oneof![
+                (prop::sample::select(vec![CONTINUATION, TEXT, BINARY]), any::<bool>(),
+                    prop::collection::vec(any::<u8>(), 0..=MAX_FRAME as usize)),
+                (prop::sample::select(vec![CLOSE, PING, PONG]), Just(true),
+                    prop::collection::vec(any::<u8>(), 0..=125)),
+            ],
+            mask in any::<[u8; 4]>(),
+            wide in 0u8..3,
+        ) {
+            let f = read_from(&client_frame(opcode, fin, &payload, mask, wide)).unwrap();
+            prop_assert_eq!(f.opcode, opcode);
+            prop_assert_eq!(f.payload, payload);
+        }
+
+        /// Any bytes give a frame or an error, never a panic, and never a payload larger
+        /// than the server takes.
+        #[test]
+        fn any_bytes_give_a_small_frame_or_an_error(bytes in prop::collection::vec(any::<u8>(), 0..1200)) {
+            if let Ok(f) = read_from(&bytes) {
+                prop_assert!(f.payload.len() as u64 <= MAX_FRAME);
+            }
+        }
     }
 }
