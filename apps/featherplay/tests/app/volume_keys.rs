@@ -1,7 +1,6 @@
 //! Up and Down change the volume by the Volume step setting from anywhere in the window,
 //! offscreen with fixture data: onto the step's grid (37 % and Up at 5 % is 40 %), within
-//! 0–100 %, saved once the keys rest. Not while a text field has the keys (the search field
-//! moves its cursor or its suggestions with them).
+//! 0–100 %, saved once the keys rest. A text field keeping them is in `transport_keys.rs`.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -9,7 +8,7 @@ use std::time::Duration;
 
 use featherplay::offscreen;
 use featherplay::snapshot::Scene;
-use featherplay::ui::{Player, TopBarData};
+use featherplay::ui::Player;
 use slint::platform::{Key, WindowEvent};
 use slint::{ComponentHandle, SharedString};
 
@@ -26,16 +25,6 @@ fn up(w: &slint::Window) {
 
 fn down(w: &slint::Window) {
     tap(w, Key::DownArrow.into());
-}
-
-fn ctrl_k(w: &slint::Window) {
-    w.dispatch_event(WindowEvent::KeyPressed {
-        text: Key::Control.into(),
-    });
-    tap(w, "k".into());
-    w.dispatch_event(WindowEvent::KeyReleased {
-        text: Key::Control.into(),
-    });
 }
 
 /// Records `set-volume` calls and applies them, as `bar.rs` does.
@@ -120,30 +109,4 @@ fn up_and_down_step_the_volume_on_the_grid_and_save_once_they_rest() {
     assert_volume(&player, 0.0, "4 % and Down at 10 %");
     down(w);
     assert_volume(&player, 0.0, "Down at 0 %");
-}
-
-#[test]
-fn up_and_down_in_the_search_field_leave_the_volume() {
-    let scene = scene();
-    let w = scene.ui.window();
-    let player = scene.ui.global::<Player>();
-    player.set_volume(0.5);
-    let calls = record(&scene);
-
-    ctrl_k(w);
-    tap(w, "a".into());
-    up(w);
-    down(w);
-    assert_eq!(scene.ui.global::<TopBarData>().get_query(), "a");
-    assert!(
-        calls.borrow().is_empty(),
-        "the field's arrows moved the volume"
-    );
-    assert_volume(&player, 0.5, "in the search field");
-
-    // Out of the field (Escape clears, then leaves), Up raises it again.
-    tap(w, Key::Escape.into());
-    tap(w, Key::Escape.into());
-    up(w);
-    assert_volume(&player, 0.55, "Up after leaving the field");
 }
