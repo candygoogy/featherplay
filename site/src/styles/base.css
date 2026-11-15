@@ -104,31 +104,31 @@ main:focus {
   outline: none;
 }
 
-/* Selected text: a soft wash of the accent under the text's own colour (AA holds: the wash
-   is light on light grounds and deep on dark ones). Browsers can't animate ::selection, so
-   it's soft rather than moving.
+/* Selected text: a soft wash of the playing song's colour under the text's own colour (AA
+   holds: the wash is light on light grounds and deep on dark ones). On a solid fill (the
+   buttons, the red pill) the wash is the text's own colour instead.
    The rules leave out <html>, <body>, <main> and the page's blocks while they take a theme
    switch (.theme-quiet, src/scripts/theme.ts): Chrome works out a selection style for every
    element it restyles, which doubles the work of each frame of the switch. */
 :where(:not(:root, body, main, .theme-quiet, .theme-quiet *))::selection {
-  background: light-dark(color-mix(in srgb, var(--accent) 20%, transparent), color-mix(in srgb, var(--accent) 34%, transparent));
+  /* Written here, not as a token on the root: there --song is not yet the song's. */
+  background: light-dark(color-mix(in srgb, var(--song) 30%, transparent), color-mix(in srgb, var(--song) 44%, transparent));
 }
-/* On an accent fill (the buttons), the wash is the text's colour instead. */
-.button:where(:not(.theme-quiet *))::selection,
-.button :where(:not(.theme-quiet *))::selection {
-  background: color-mix(in srgb, var(--on-accent) 26%, transparent);
+:is(.button, .btn):where(:not(.theme-quiet *))::selection,
+:is(.button, .btn) :where(:not(.theme-quiet *))::selection {
+  background: color-mix(in srgb, currentColor 26%, transparent);
 }
 
 /* With script and motion the selection is drawn instead (src/scripts/selection.ts): rounded
-   pieces of the same wash that fade and grow in and follow the selection. The native
-   highlight steps aside (it still selects, copies and reads out); fields keep it. */
-:root.sel-drawn :where(:not(body, main, .theme-quiet, .theme-quiet *))::selection,
-:root.sel-drawn .button:where(:not(.theme-quiet *))::selection,
-:root.sel-drawn .button :where(:not(.theme-quiet *))::selection {
+   pieces of the same wash that fade and grow in, follow the selection and ease to each song's
+   colour. The native highlight steps aside (it still selects, copies and reads out); fields
+   keep it, and so does what floats over the page (the bar, flyouts, the menu, the dialog), which
+   the drawn pieces lie under. */
+:root.sel-drawn :where(:not(body, main, .theme-quiet, .theme-quiet *, [popover] *, dialog *, [data-site-bar] *))::selection {
   background: transparent;
 }
 :root.sel-drawn :is(input, textarea):where(:not(.theme-quiet *))::selection {
-  background: light-dark(color-mix(in srgb, var(--accent) 20%, transparent), color-mix(in srgb, var(--accent) 34%, transparent));
+  background: light-dark(color-mix(in srgb, var(--song) 30%, transparent), color-mix(in srgb, var(--song) 44%, transparent));
 }
 .sel-layer {
   position: absolute;
@@ -136,15 +136,19 @@ main:focus {
   left: 0;
   width: 0;
   height: 0;
-  z-index: 60;
+  /* Over the page and the window, under the bar (z 50). */
+  z-index: 45;
   pointer-events: none;
-  /* Over the text, blended so it reads as under it: multiplied on light grounds (dark text
-     stays dark), screened on dark ones (light text stays light). The layer blends as one,
-     so overlapping pieces never darken. */
+  /* Over the text, blended so it reads as under it: multiplied under dark ink (dark text stays
+     dark), screened under light ink (light text stays light); which pieces go where is the
+     script's (the text's own colour). Each layer blends as one, so overlapping pieces never
+     darken. The song's colour eases here, on the one colour clock. */
   mix-blend-mode: multiply;
-  transition: opacity 140ms ease;
+  transition:
+    opacity 140ms ease,
+    --song var(--t-glow) ease;
 }
-:root[data-theme="dark"] .sel-layer {
+.sel-layer[data-blend="screen"] {
   mix-blend-mode: screen;
 }
 .sel-layer[data-out="true"] {
@@ -155,12 +159,16 @@ main:focus {
   top: 0;
   left: 0;
   border-radius: 6px;
-  background: color-mix(in srgb, color-mix(in srgb, var(--accent) 24%, transparent) calc(var(--light) * 100%), color-mix(in srgb, var(--accent) 40%, transparent));
+  /* Multiplied, a lighter wash does as much; screened on a dark ground it needs more. */
+  background: color-mix(in oklab, var(--song) 34%, transparent);
   transform-origin: 0 50%;
   contain: strict;
   transition:
     opacity 140ms ease,
     scale 180ms var(--ease-out);
+}
+.sel-layer[data-blend="screen"] > span {
+  background: color-mix(in oklab, var(--song) 46%, transparent);
 }
 @starting-style {
   .sel-layer > span {
@@ -178,7 +186,6 @@ main:focus {
     width 110ms var(--ease-out),
     height 110ms var(--ease-out);
 }
-
 [hidden] {
   display: none !important;
 }

@@ -1,8 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
 import { mergeLines } from "../src/scripts/selection";
 
-// Selected text: rounded pieces of a soft accent wash, drawn behind the selected lines
-// (src/scripts/selection.ts); native selection stays underneath, so copying works as ever.
+// Selected text: rounded pieces of a soft wash in the playing song's colour, drawn behind the
+// selected lines (src/scripts/selection.ts); native selection stays underneath, so copying
+// works as ever.
 
 const selectLede = (page: Page) =>
   page.evaluate(() => {
@@ -73,7 +74,7 @@ test("text fields keep the native highlight", async ({ page }) => {
     }
     return null;
   });
-  expect(rule).toMatch(/color-mix/);
+  expect(rule).toMatch(/--song/);
   expect(await page.locator("html").getAttribute("class")).toContain("sel-drawn");
 });
 
@@ -93,6 +94,74 @@ test.describe("reduced motion", () => {
     expect(Number(alpha![1] ?? alpha![2])).toBeGreaterThan(0.1);
     expect(sel.color).toBe(sel.text);
   });
+  test("the native wash is the playing song's colour too", async ({ page }) => {
+    await page.goto("/");
+    const wash = () => page.evaluate(() => getComputedStyle(document.querySelector("[data-stage] .col .t-lede")!, "::selection").backgroundColor);
+    const before = await wash();
+    await page.evaluate(() => document.querySelector<HTMLElement>('#fly-song [data-song="watching-seabirds-soar"]')!.click());
+    await expect.poll(wash).not.toBe(before);
+  });
+});
+
+/** Selects the text of the first element matching `sel` (scrolled into view first). */
+const selectIn = (page: Page, sel: string) =>
+  page.evaluate((sel) => {
+    const el = document.querySelector<HTMLElement>(sel)!;
+    el.scrollIntoView({ block: "center", behavior: "instant" });
+    const r = document.createRange();
+    r.selectNodeContents(el);
+    const s = document.getSelection()!;
+    s.removeAllRanges();
+    s.addRange(r);
+  }, sel);
+
+test("the pieces wear the playing song's colour, and ease to the next song's on the colour clock", async ({ page }) => {
+  await page.route("**/music/**", (r) => r.abort());
+  await page.goto("/");
+  await selectLede(page);
+  const layer = page.locator(".sel-layer").filter({ has: page.locator("span") });
+  await expect(page.locator(".sel-layer > span").first()).toBeVisible();
+  const song = () => layer.evaluate((el) => getComputedStyle(el).getPropertyValue("--song").trim());
+  // California Lullabye's colour, #E8894A.
+  expect(await song()).toBe("rgb(232, 137, 74)");
+  await page.evaluate(() => document.querySelector<HTMLElement>('#fly-song [data-song="origami"]')!.click());
+  // On its way, by the one colour clock (900 ms), not at once.
+  const fading = await layer.evaluate((el) => el.getAnimations().some((a) => a instanceof CSSTransition && a.transitionProperty === "--song"));
+  expect(fading).toBe(true);
+  await expect.poll(song, { timeout: 3000 }).toBe("rgb(212, 162, 58)");
+  // The pieces themselves are a wash of it.
+  const bg = await page.locator(".sel-layer > span").first().evaluate((el) => getComputedStyle(el).backgroundColor);
+  expect(bg).not.toMatch(/rgba\(0, 0, 0, 0\)|transparent/);
+});
+
+test("light ink is screened and dark ink multiplied, so the text keeps its colour on any surface", async ({ page }) => {
+  await page.emulateMedia({ colorScheme: "light" });
+  await page.goto("/");
+  // Dark ink on the paper desk.
+  await selectLede(page);
+  await expect(page.locator(".sel-layer[data-blend='multiply'] > span").first()).toBeVisible();
+  await expect(page.locator(".sel-layer[data-blend='screen'] > span")).toHaveCount(0);
+  // White lines on the lyric card's deep colour, in the light theme too.
+  await selectIn(page, "[data-piece='lyrics'] [data-lc-lines]");
+  await expect(page.locator(".sel-layer[data-blend='screen'] > span").first()).toBeVisible();
+  await expect(page.locator(".sel-layer[data-blend='multiply'] > span")).toHaveCount(0);
+  for (const blend of ["multiply", "screen"]) {
+    expect(await page.locator(`.sel-layer[data-blend='${blend}']`).evaluate((el) => getComputedStyle(el).mixBlendMode)).toBe(blend);
+  }
+});
+
+test("over the bar and in what floats over the page (flyouts, the menu, the dialog) the native wash stays, and nothing is drawn", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.locator("[data-window]")).toHaveClass(/\bplaced\b/);
+  // The drawn pieces lie under the bar, never over its glass.
+  const z = await page.evaluate(() => [Number(getComputedStyle(document.querySelector(".sel-layer")!).zIndex), Number(getComputedStyle(document.querySelector("[data-site-bar]")!).zIndex)]);
+  expect(z[0]).toBeLessThan(z[1]);
+  await page.evaluate(() => document.getElementById("fly-song")!.showPopover());
+  await selectIn(page, "#fly-song .fq-title");
+  await page.waitForTimeout(200);
+  await expect(page.locator(".sel-layer > span")).toHaveCount(0);
+  const bg = await page.evaluate(() => getComputedStyle(document.querySelector("#fly-song .fq-title")!, "::selection").backgroundColor);
+  expect(bg).not.toMatch(/rgba\(0, 0, 0, 0\)|transparent/);
 });
 
 test("line boxes merge into one piece per run of text on a line", () => {
@@ -107,4 +176,16 @@ test("line boxes merge into one piece per run of text on a line", () => {
     { left: 0, top: 24, right: 80, bottom: 44 },
     { left: 300, top: 24, right: 340, bottom: 44 },
   ]);
+});
+
+test("a piece is never drawn where its text is clipped away (the lyric card's lines out of its window)", async ({ page }) => {
+  await page.goto("/");
+  await selectIn(page, "[data-piece='lyrics'] [data-lc-lines]");
+  await expect(page.locator(".sel-layer > span").first()).toBeVisible();
+  const view = (await page.locator("[data-piece='lyrics'] [data-lc-view]").boundingBox())!;
+  for (const p of await page.locator(".sel-layer > span").all()) {
+    const r = (await p.boundingBox())!;
+    expect(r.y).toBeGreaterThanOrEqual(view.y - 3);
+    expect(r.y + r.height).toBeLessThanOrEqual(view.y + view.height + 3);
+  }
 });
