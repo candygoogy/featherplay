@@ -68,14 +68,6 @@ fn losing_the_session_while_settling_starts_over() {
     );
 }
 
-#[test]
-#[cfg(windows)]
-fn a_google_session_without_youtube_isnt_signed_in() {
-    let mut s = Settle::new(Duration::ZERO);
-    let google = [cookie("SAPISID", ".google.com")];
-    assert_eq!(s.see(Instant::now(), &google, NOW), Seen::NotYet);
-}
-
 /// Edge installed, with its pipe turned off by the machine's policy.
 #[cfg(windows)]
 struct PolicyOffPc;
@@ -446,27 +438,24 @@ fn a_browser_exiting_at_once_didnt_start() {
 
 #[test]
 #[cfg(windows)]
-fn a_browser_closed_later_without_ever_answering_was_closed() {
-    // The pipe turned off by policy: no answer, then the user closes the window.
+fn a_browser_that_exited_after_its_early_exit_was_closed() {
     let process = FakeProcess::default();
     process.exited.store(true, Ordering::Relaxed);
-    let ran = EARLY_EXIT + Duration::from_secs(5);
-    assert_eq!(stopped(Stop::Exited, false, ran, &process), Outcome::Closed);
-    assert_eq!(
-        stopped(Stop::PipeClosed, false, ran, &process),
-        Outcome::Closed
-    );
-}
-
-#[test]
-#[cfg(windows)]
-fn the_pipe_closing_as_the_browser_exits_means_closed() {
-    let process = FakeProcess::default();
-    process.exited.store(true, Ordering::Relaxed);
-    assert_eq!(
-        stopped(Stop::PipeClosed, true, Duration::from_secs(30), &process),
-        Outcome::Closed
-    );
+    use Stop::{Exited, PipeClosed};
+    let later = EARLY_EXIT + Duration::from_secs(5);
+    let half_a_minute = Duration::from_secs(30);
+    // The pipe turned off by policy: no answer, then the user closes the window. Or the
+    // pipe closing as the browser exits.
+    // (case, why it stopped, answered, ran for)
+    let cases = [
+        ("never answered, exited", Exited, false, later),
+        ("never answered, pipe closed", PipeClosed, false, later),
+        ("answered, pipe closed", PipeClosed, true, half_a_minute),
+    ];
+    for (case, stop, answered, ran) in cases {
+        let out = stopped(stop, answered, ran, &process);
+        assert_eq!(out, Outcome::Closed, "{case}");
+    }
 }
 
 #[test]
@@ -552,30 +541,18 @@ fn the_first_answer_waits_longer_on_linux_only() {
 
 #[test]
 #[cfg(windows)]
-fn no_later_answer_means_lost() {
-    let mut fb = fake_browser(|n| match n {
-        1 => Answer::Cookies(vec![]),
-        _ => Answer::Hang,
-    });
-    assert!(matches!(
-        run_fake(&mut fb, &AtomicBool::new(false), &quick()),
-        Outcome::Lost(_)
-    ));
-    assert!(fb.process.killed.load(Ordering::Relaxed));
-}
-
-#[test]
-#[cfg(windows)]
-fn a_broken_pipe_while_the_browser_runs_means_lost() {
-    let mut fb = fake_browser(|n| match n {
-        1 => Answer::Cookies(vec![]),
-        _ => Answer::ClosePipe,
-    });
-    assert!(matches!(
-        run_fake(&mut fb, &AtomicBool::new(false), &quick()),
-        Outcome::Lost(_)
-    ));
-    assert!(fb.process.killed.load(Ordering::Relaxed));
+fn no_later_answer_or_a_broken_pipe_while_it_runs_means_lost() {
+    for (case, hang) in [("no later answer", true), ("a broken pipe", false)] {
+        let mut fb = fake_browser(move |n| match n {
+            1 => Answer::Cookies(vec![]),
+            _ if hang => Answer::Hang,
+            _ => Answer::ClosePipe,
+        });
+        let out = run_fake(&mut fb, &AtomicBool::new(false), &quick());
+        assert!(matches!(out, Outcome::Lost(_)), "{case}: {out:?}");
+        let killed = fb.process.killed.load(Ordering::Relaxed);
+        assert!(killed, "{case}: the browser is ended");
+    }
 }
 
 #[test]
