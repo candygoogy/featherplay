@@ -152,30 +152,6 @@ fn a_long_line_at_the_largest_size_wraps_and_the_strip_grows() {
     assert_eq!(ui.get_wanted_height(), two, "more than two lines");
 }
 
-#[test]
-#[ignore = "a measurement: prints private memory with the strip never shown, shown, and closed"]
-fn memory_with_the_strip_off_and_on() {
-    let scene = scene();
-    for _ in 0..3 {
-        scene.settle();
-    }
-    let off = crate::support::private_mb();
-    turn(&scene, SettingKey::DesktopLyrics, true);
-    let shown = strip();
-    shown.window().take_snapshot().expect("first frame");
-    scene.settle();
-    let on = crate::support::private_mb();
-    drop(shown);
-    turn(&scene, SettingKey::DesktopLyrics, false);
-    scene.settle();
-    let closed = crate::support::private_mb();
-    eprintln!(
-        "desktop lyrics, private memory: never shown {off:.1} MB, shown {on:.1} MB (+{:.1}), \
-         closed again {closed:.1} MB",
-        on - off
-    );
-}
-
 /// The line the lyrics view marks and the next line with words after it, as the view has
 /// them (its lines and its current line): what the strip must show.
 fn views_lines(scene: &Scene) -> (String, String) {
