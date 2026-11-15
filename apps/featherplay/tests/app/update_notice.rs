@@ -105,7 +105,13 @@ fn about_with(f: impl FnOnce(&mut updates::Status)) -> Scene {
 fn the_version_row_says_what_the_last_check_found() {
     let now = now();
     // (case, the updater's state, the row's line, its pill)
-    let cases: [(&str, fn(&mut updates::Status, u64), &str, &str); 9] = [
+    type Case = (
+        &'static str,
+        fn(&mut updates::Status, u64),
+        &'static str,
+        &'static str,
+    );
+    let cases: [Case; 9] = [
         ("never checked", |_, _| {}, "", "Check for updates"),
         (
             "checked 20 s ago",

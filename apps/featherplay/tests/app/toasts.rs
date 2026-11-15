@@ -44,7 +44,8 @@ fn each_event_toasts_its_words_with_its_button_and_tone_on_one_line() {
     let blocked = Notice::HelpersFailed(HelperFault::Blocked).text();
 
     // (case, the event, its line, its button, its tone)
-    let cases: [(&str, fn() -> UiEvent, &str, &str, ToastTone); 5] = [
+    type Case<'a> = (&'a str, fn() -> UiEvent, &'a str, &'a str, ToastTone);
+    let cases: [Case; 5] = [
         (
             "the helpers' first download says why the song waits",
             || UiEvent::Toast(getting_ready()),

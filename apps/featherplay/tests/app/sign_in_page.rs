@@ -189,7 +189,14 @@ fn a_blocked_browser_says_so_in_its_row_and_why_opens_the_detail() {
     let scene = sign_in_page(false);
     let data = scene.ui.global::<SignInData>();
     // (case, the browsers found, the one offered, its row, the detail's policy)
-    let cases: [(&str, &[(&str, bool)], &str, &str, fn(&str) -> bool); 2] = [
+    type Case = (
+        &'static str,
+        &'static [(&'static str, bool)],
+        &'static str,
+        &'static str,
+        fn(&str) -> bool,
+    );
+    let cases: [Case; 2] = [
         (
             "Edge alone, blocked",
             &[("edge", true)],
