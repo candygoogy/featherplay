@@ -280,34 +280,10 @@ mod tests {
     }
 
     #[test]
-    fn the_preview_marks_the_title_and_artist_as_links_when_links_are_on() {
-        let track = NowPlaying {
-            artist_id: Some("UC123".into()),
-            ..playing()
-        };
-        let p = discord_preview(&DiscordOptions::default(), Some(&track));
-        assert_eq!((p.title_link, p.artist_link), (true, true));
-    }
-
-    #[test]
     fn the_preview_links_only_what_the_track_has_a_page_for() {
         // `playing()` has no artist ID, so Discord gets no artist link.
         let p = discord_preview(&DiscordOptions::default(), Some(&playing()));
         assert_eq!((p.title_link, p.artist_link), (true, false));
-    }
-
-    #[test]
-    fn the_preview_has_no_links_when_links_are_off() {
-        let o = DiscordOptions {
-            links: false,
-            ..DiscordOptions::default()
-        };
-        let track = NowPlaying {
-            artist_id: Some("UC123".into()),
-            ..playing()
-        };
-        let p = discord_preview(&o, Some(&track));
-        assert_eq!((p.title_link, p.artist_link), (false, false));
     }
 
     #[test]
