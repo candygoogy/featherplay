@@ -1,57 +1,20 @@
 //! Skip silence's marks on the seek line, on the offscreen platform (no window is shown):
-//! the controller's marks reach the bar's data (`Player.silences`) as they come, and none
-//! after a track change; hovered, a mark's tip says so, and a click inside one seeks to its
-//! end.
+//! hovered, a mark's tip says so, and a click inside one seeks to its end; once the
+//! controller sends none (Skip silence off, a track change), a click seeks where it lands.
 
 use std::ops::ControlFlow;
-use std::path::PathBuf;
 
-use featherplay::app::Ctx;
 use featherplay::bar;
 use featherplay::controller::Action;
-use featherplay::covers::Covers;
-use featherplay::offscreen;
 use featherplay::snapshot::Scene;
-use featherplay::ui::{AppWindow, Player};
-use featherplay_controller::catalog::Catalog;
+use featherplay::ui::Player;
 use i_slint_core::accessibility::AccessibleStringProperty;
 use i_slint_core::item_tree::ItemRc;
 use i_slint_core::items::AccessibleRole;
 use i_slint_core::lengths::LogicalRect;
 use i_slint_core::window::WindowInner;
 use slint::platform::{PointerEventButton, WindowEvent};
-use slint::{ComponentHandle, LogicalPosition, Model};
-use tokio::sync::mpsc;
-
-#[test]
-fn the_bar_takes_the_marks_and_drops_them_with_the_track() {
-    let _pump = offscreen::install().expect("platform");
-    let rt = tokio::runtime::Builder::new_multi_thread()
-        .worker_threads(1)
-        .enable_all()
-        .build()
-        .expect("runtime");
-    let ui = AppWindow::new().expect("window");
-    let catalog = Catalog::new(rt.handle().clone()).expect("catalog");
-    let cache = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("bar_silences");
-    let covers = Covers::new(rt.handle().clone(), cache, None);
-    let (actions, _) = mpsc::unbounded_channel();
-    let ctx = Ctx::new(&ui, catalog, covers, actions);
-
-    let spans = || {
-        let m = ui.global::<Player>().get_silences();
-        (0..m.row_count())
-            .filter_map(|i| m.row_data(i))
-            .map(|s| (s.start, s.end))
-            .collect::<Vec<_>>()
-    };
-    assert!(spans().is_empty());
-    bar::show_silences(&ctx, &[(0.0, 0.1), (0.85, 1.0)]);
-    assert_eq!(spans(), [(0.0, 0.1), (0.85, 1.0)]);
-    // A track change: the controller sends none.
-    bar::show_silences(&ctx, &[]);
-    assert!(spans().is_empty());
-}
+use slint::{ComponentHandle, LogicalPosition};
 
 /// A mark narrower than the bar's minimum is hit where it's drawn: pinned to the line's
 /// start or end, centred inside it.
@@ -167,36 +130,31 @@ fn sought(scene: &Scene) -> Vec<f32> {
 }
 
 #[test]
-fn a_click_inside_a_mark_seeks_to_its_end() {
-    let scene = with_marks(&[(0.4, 0.6)]);
-    click(&scene, along(&scene, 0.45));
-    let to = sought(&scene);
-    assert_eq!(to.len(), 1, "{to:?}");
-    assert!(
-        (to[0] - 0.6).abs() < 0.001,
-        "sought {to:?}, not the mark's end"
-    );
-}
-
-#[test]
-fn hovered_over_a_mark_the_tip_says_silence() {
+fn a_mark_says_silence_when_hovered_and_a_click_inside_seeks_to_its_end() {
     let scene = with_marks(&[(0.4, 0.6)]);
     hover(&scene, along(&scene, 0.2));
-    assert!(!shows(&scene, "Silence"), "over the plain line");
+    assert!(!shows(&scene, "Silence"), "a tip over the plain line");
     hover(&scene, along(&scene, 0.5));
-    assert!(shows(&scene, "Silence"), "over the mark");
-}
+    assert!(shows(&scene, "Silence"), "no tip over the mark");
+    click(&scene, along(&scene, 0.45));
+    let to = sought(&scene);
+    assert_eq!(to.len(), 1, "a click inside the mark: {to:?}");
+    assert!(
+        (to[0] - 0.6).abs() < 0.001,
+        "a click inside the mark sought {to:?}, not the mark's end"
+    );
 
-#[test]
-fn with_skip_silence_off_a_click_seeks_where_it_lands() {
-    let scene = with_marks(&[(0.4, 0.6)]);
-    // Turned off: the controller sends no marks.
+    // Skip silence turned off, or a track change: the controller sends no marks, and a
+    // click seeks where it lands.
     bar::show_silences(&scene.ctx, &[]);
     scene.settle();
     hover(&scene, along(&scene, 0.5));
-    assert!(!shows(&scene, "Silence"));
+    assert!(!shows(&scene, "Silence"), "a tip with the marks gone");
     click(&scene, along(&scene, 0.45));
     let to = sought(&scene);
-    assert_eq!(to.len(), 1, "{to:?}");
-    assert!((to[0] - 0.45).abs() < 0.01, "sought {to:?}");
+    assert_eq!(to.len(), 1, "a click with the marks gone: {to:?}");
+    assert!(
+        (to[0] - 0.45).abs() < 0.01,
+        "a click with the marks gone sought {to:?}"
+    );
 }
