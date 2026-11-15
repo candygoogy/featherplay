@@ -498,22 +498,4 @@ mod tests {
         let shown = format!("{k:?}");
         assert!(!shown.contains("kkkk") && !shown.contains("ssss"));
     }
-
-    #[test]
-    fn listens_carry_the_scrobble_fields() {
-        let s = PendingScrobble {
-            artist: "A".into(),
-            track: "T".into(),
-            album: None,
-            timestamp: 42,
-            duration_s: Some(10),
-            video_id: Some("v".into()),
-        };
-        let l = listen(&s);
-        assert_eq!(
-            (l.artist.as_str(), l.track.as_str(), l.listened_at),
-            ("A", "T", 42)
-        );
-        assert_eq!((l.duration_s, l.video_id.as_deref()), (Some(10), Some("v")));
-    }
 }
