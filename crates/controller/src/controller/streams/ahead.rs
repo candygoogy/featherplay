@@ -464,6 +464,7 @@ mod tests {
     /// `d` before now, to age a mark by hand. `Instant` counts from the machine's start, so
     /// on a machine up for less than `d` there is no such instant: `None`, and the test
     /// skips its aged half, saying so.
+    #[allow(clippy::print_stderr, reason = "a test says why it skips")]
     fn ago(d: Duration) -> Option<Instant> {
         let at = Instant::now().checked_sub(d);
         if at.is_none() {

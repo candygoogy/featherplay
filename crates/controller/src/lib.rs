@@ -41,6 +41,7 @@ pub mod window_place;
 /// `None` when `FEATHERPLAY_HOME` isn't set: the test skips, saying so, and writes nothing
 /// anywhere else.
 #[cfg(test)]
+#[allow(clippy::print_stderr, reason = "a test says why it skips")]
 pub(crate) fn test_home(name: &str) -> Option<std::path::PathBuf> {
     let Some(base) = std::env::var_os("FEATHERPLAY_HOME") else {
         eprintln!("skipped: FEATHERPLAY_HOME isn't set");

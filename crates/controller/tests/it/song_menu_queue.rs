@@ -59,7 +59,8 @@ fn send(player: &mut Player, action: Action) {
 /// after it is the row's.
 #[test]
 fn each_queue_edit_lands_in_its_place() {
-    let cases: [(&str, &[&str], fn(&mut Player), &[&str]); 3] = [
+    type Edit = fn(&mut Player);
+    let cases: [(&str, &[&str], Edit, &[&str]); 3] = [
         (
             "play next goes right after the current track",
             &["now", "a", "b"],

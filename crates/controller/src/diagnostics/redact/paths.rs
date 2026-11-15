@@ -338,7 +338,8 @@ mod tests {
     /// the result).
     #[test]
     fn other_profiles_are_masked() {
-        let cases: [(&str, &[(&'static str, &str)], &str, &str); 5] = [
+        type Vars = &'static [(&'static str, &'static str)];
+        let cases: [(&str, Vars, &str, &str); 5] = [
             (
                 "a linux home",
                 &[("HOME", "/home/ada")],

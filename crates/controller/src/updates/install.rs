@@ -865,7 +865,8 @@ pub(super) mod tests {
         };
         // The signed checksums list the x64 and ARM64 setups, not this one.
         let unlisted = |p: &mut Plan| p.setup.name = "featherplay-setup-9.0.1.exe".into();
-        let cases: [(&str, &'static [u8], fn(&mut Plan), Refusal); 4] = [
+        type Change = fn(&mut Plan);
+        let cases: [(&str, &'static [u8], Change, Refusal); 4] = [
             (
                 "a release without a signature",
                 BY_MAIN,
