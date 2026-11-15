@@ -103,6 +103,8 @@ pub fn next_start(lines: &[Line], at: Duration) -> Option<Duration> {
 
 #[cfg(test)]
 mod tests {
+    use proptest::prelude::*;
+
     use super::*;
 
     fn ms(n: u64) -> Duration {
@@ -168,5 +170,57 @@ mod tests {
         assert_eq!(next_start(&lines, ms(500)), Some(ms(1_000)));
         assert_eq!(next_start(&lines, ms(4_000)), Some(ms(9_000)));
         assert_eq!(next_start(&lines, ms(9_500)), None);
+    }
+
+    /// Text made of LRC's own pieces (brackets, colons, digit runs of any length, offsets,
+    /// tags, line breaks) as well as any characters, so most lines get far into the parser.
+    fn lrc_like() -> impl Strategy<Value = String> {
+        let piece = prop_oneof![
+            Just("[".to_string()),
+            Just("]".to_string()),
+            Just(":".to_string()),
+            Just(".".to_string()),
+            Just("offset:".to_string()),
+            Just("ar:".to_string()),
+            Just("+".to_string()),
+            Just("-".to_string()),
+            Just("\n".to_string()),
+            Just("\r\n".to_string()),
+            "[0-9]{1,22}",
+            "\\[[0-9]{1,20}:[0-9]{1,20}([.:][0-9]{1,5})?\\]",
+            "\\[offset:[+-]?[0-9]{1,20}\\]",
+            any::<String>(),
+        ];
+        prop::collection::vec(piece, 0..40).prop_map(|p| p.concat())
+    }
+
+    proptest! {
+        /// Any text gives lines or `None`, never a panic, and the lines are in time order.
+        #[test]
+        fn any_text_parses_into_lines_in_time_order(text in lrc_like()) {
+            if let Some(lines) = parse(&text) {
+                prop_assert!(lines.is_sorted_by_key(|l| l.start), "{lines:?}");
+            }
+        }
+
+        /// Well-formed timed lines, in any order, come back sorted by time; lines that share
+        /// a time keep the file's order.
+        #[test]
+        fn timed_lines_come_back_in_time_order(
+            written in prop::collection::vec((0u64..6_000_000, "[a-zA-Z0-9 ,.'!?]{0,24}"), 1..20),
+        ) {
+            let text: String = written
+                .iter()
+                .map(|(t, words)| {
+                    format!("[{:02}:{:02}.{:03}]{words}\n", t / 60_000, t / 1_000 % 60, t % 1_000)
+                })
+                .collect();
+            let mut want: Vec<Line> = written
+                .iter()
+                .map(|(t, words)| line(*t, words.trim()))
+                .collect();
+            want.sort_by_key(|l| l.start);
+            prop_assert_eq!(parse(&text), Some(want));
+        }
     }
 }
