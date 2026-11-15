@@ -319,12 +319,9 @@ mod tests {
     /// doesn't bring the file back.
     #[test]
     fn signing_out_removes_the_saved_streams() {
-        // Under `FEATHERPLAY_HOME`, else the temp folder.
-        let base = std::env::var("FEATHERPLAY_HOME")
-            .map(std::path::PathBuf::from)
-            .unwrap_or_else(|_| std::env::temp_dir().join("featherplay-tests"));
-        let dir = base.join(format!("test-saved-streams-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).unwrap();
+        let Some(dir) = crate::test_home("saved-streams") else {
+            return;
+        };
         let path = dir.join(SAVED_STREAMS);
         let mut s = Streams::default();
         s.done(&id("a"), Some(&stream(HOURS)), &[]);

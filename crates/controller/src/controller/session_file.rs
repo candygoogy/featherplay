@@ -99,13 +99,10 @@ mod tests {
         }
     }
 
-    /// A fresh folder of its own under `FEATHERPLAY_HOME`; `None` (the test skips) when
-    /// it isn't set, so nothing is written elsewhere.
+    /// A fresh home of its own (`crate::test_home`); `None` (the test skips) without
+    /// `FEATHERPLAY_HOME`.
     fn home(name: &str) -> Option<(PathBuf, Paths)> {
-        let base = std::env::var_os("FEATHERPLAY_HOME")?;
-        let root =
-            PathBuf::from(base).join(format!("test-session-file-{name}-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&root);
+        let root = crate::test_home(&format!("session-file-{name}"))?;
         let paths = Paths::from_home(&root);
         Some((root, paths))
     }

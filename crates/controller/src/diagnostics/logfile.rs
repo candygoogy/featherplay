@@ -69,24 +69,15 @@ fn append(path: &Path) -> io::Result<File> {
 mod tests {
     use super::*;
 
-    fn scratch(name: &str) -> PathBuf {
-        let base = std::env::var("FEATHERPLAY_HOME")
-            .map(PathBuf::from)
-            .unwrap_or_else(|_| std::env::temp_dir().join("featherplay-tests"));
-        let dir = base
-            .join("test-diagnostics")
-            .join(format!("{name}-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
-        dir
-    }
-
     fn read(dir: &Path, name: &str) -> String {
         std::fs::read_to_string(dir.join(name)).unwrap_or_default()
     }
 
     #[test]
     fn lines_are_appended_across_opens() {
-        let dir = scratch("append");
+        let Some(dir) = crate::test_home("log-append") else {
+            return;
+        };
         LogFile::open(&dir, LIMIT).unwrap().write("one\n").unwrap();
         LogFile::open(&dir, LIMIT).unwrap().write("two\n").unwrap();
         assert_eq!(read(&dir, CURRENT), "one\ntwo\n");
@@ -95,7 +86,9 @@ mod tests {
 
     #[test]
     fn the_file_rotates_at_the_size_limit_keeping_two() {
-        let dir = scratch("rotate");
+        let Some(dir) = crate::test_home("log-rotate") else {
+            return;
+        };
         let mut log = LogFile::open(&dir, 100).unwrap();
         // 40 bytes a line: two fit under 100, the third rotates.
         let line = |n: usize| format!("{n:039}\n");
@@ -113,7 +106,9 @@ mod tests {
 
     #[test]
     fn a_reopened_file_counts_what_it_already_holds() {
-        let dir = scratch("reopen");
+        let Some(dir) = crate::test_home("log-reopen") else {
+            return;
+        };
         LogFile::open(&dir, 100)
             .unwrap()
             .write(&"a".repeat(80))
