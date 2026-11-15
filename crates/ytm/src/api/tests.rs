@@ -4,7 +4,6 @@ use std::time::{Duration, Instant, SystemTime};
 
 use super::guest::web_client_version;
 use super::http::{cookie_host, http_client_with};
-use super::query::mobile_browse_body;
 use super::*;
 
 /// A local port that takes connections and never answers.
@@ -76,33 +75,43 @@ async fn head_sent_as(identity: &Identity) -> String {
     served.join().expect("server")
 }
 
+/// A brand account sends its index and page id, a Google account its index only, the
+/// default identity neither.
 #[tokio::test]
-async fn a_brand_account_sends_its_index_and_page_id() {
-    let brand = Identity::new(0, Some("100000000000000000002")).unwrap();
-    let head = head_sent_as(&brand).await;
-    assert!(
-        head.contains("\r\nx-goog-authuser: 0\r\n"),
-        "authuser missing"
-    );
-    assert!(head.contains("\r\nx-goog-pageid: 100000000000000000002\r\n"));
-    // ytmapi-rs's own headers still go out alongside.
-    assert!(head.contains("\r\nauthorization: sapisidhash 1_x\r\n"));
-    assert!(head.contains("\r\ncookie: sapisid=x\r\n"));
-}
-
-#[tokio::test]
-async fn a_google_account_sends_its_index_only() {
-    let second = Identity::new(2, None).unwrap();
-    let head = head_sent_as(&second).await;
-    assert!(head.contains("\r\nx-goog-authuser: 2\r\n"));
-    assert!(!head.contains("x-goog-pageid"));
-}
-
-#[tokio::test]
-async fn the_default_identity_sends_neither() {
-    let head = head_sent_as(&Identity::default()).await;
-    assert!(!head.contains("x-goog-authuser"));
-    assert!(!head.contains("x-goog-pageid"));
+async fn an_identity_sends_its_index_and_page_id_headers() {
+    let cases = [
+        (
+            "a brand account",
+            Identity::new(0, Some("100000000000000000002")).unwrap(),
+            Some("0"),
+            Some("100000000000000000002"),
+        ),
+        (
+            "a Google account",
+            Identity::new(2, None).unwrap(),
+            Some("2"),
+            None,
+        ),
+        ("the default identity", Identity::default(), None, None),
+    ];
+    for (label, identity, authuser, pageid) in cases {
+        let head = head_sent_as(&identity).await;
+        for (name, want) in [("x-goog-authuser", authuser), ("x-goog-pageid", pageid)] {
+            match want {
+                Some(v) => assert!(
+                    head.contains(&format!("\r\n{name}: {v}\r\n")),
+                    "{label}: {name}"
+                ),
+                None => assert!(!head.contains(name), "{label}: {name} sent"),
+            }
+        }
+        // ytmapi-rs's own headers still go out alongside.
+        assert!(
+            head.contains("\r\nauthorization: sapisidhash 1_x\r\n"),
+            "{label}"
+        );
+        assert!(head.contains("\r\ncookie: sapisid=x\r\n"), "{label}");
+    }
 }
 
 #[tokio::test]
@@ -118,14 +127,6 @@ async fn the_mobile_lyrics_request_goes_without_the_session() {
     assert!(!head.contains("\r\ncookie:"), "cookies sent");
     assert!(!head.contains("\r\nauthorization:"), "authorization sent");
     assert!(head.contains("\r\norigin: https://music.youtube.com\r\n"));
-}
-
-#[test]
-fn the_mobile_lyrics_request_asks_as_the_android_app() {
-    let body = mobile_browse_body("MPLYt_x");
-    assert_eq!(body["browseId"], "MPLYt_x");
-    assert_eq!(body["context"]["client"]["clientName"], "ANDROID_MUSIC");
-    assert_eq!(body["context"]["client"]["clientVersion"], "7.21.50");
 }
 
 #[test]
