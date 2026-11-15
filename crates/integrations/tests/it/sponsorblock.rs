@@ -2,13 +2,11 @@ use std::time::Duration;
 
 use featherplay_core::model::{TrackId, VideoType};
 use featherplay_integrations::sponsorblock::{Segment, applies, hash_prefix, skip_target};
-use sha2::{Digest, Sha256};
 
 #[test]
 fn hash_prefix_known() {
-    let digest = Sha256::digest(b"dQw4w9WgXcQ");
-    let hex: String = digest.iter().map(|b| format!("{b:02x}")).collect();
-    assert_eq!(hash_prefix(&TrackId("dQw4w9WgXcQ".into())), hex[..4]);
+    // The first 4 hex characters of SHA-256("dQw4w9WgXcQ").
+    assert_eq!(hash_prefix(&TrackId("dQw4w9WgXcQ".into())), "5f6b");
 }
 
 #[test]

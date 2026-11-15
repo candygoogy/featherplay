@@ -104,3 +104,65 @@ fn parse(body: &[u8], id: &TrackId) -> Result<Vec<Segment>, String> {
     out.sort_by_key(|s| s.start);
     Ok(out)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn id() -> TrackId {
+        TrackId("dQw4w9WgXcQ".into())
+    }
+
+    fn secs(start: f64, end: f64) -> Segment {
+        Segment {
+            start: Duration::from_secs_f64(start),
+            end: Duration::from_secs_f64(end),
+        }
+    }
+
+    #[test]
+    fn a_reply_gives_this_videos_skip_segments_sorted() {
+        // The prefix lookup also returns other videos; a mute segment isn't skipped; a
+        // backwards, negative or empty one is dropped.
+        let body = br#"[
+            {"videoID": "other", "segments": [{"segment": [1, 2], "actionType": "skip"}]},
+            {"videoID": "dQw4w9WgXcQ", "segments": [
+                {"segment": [30.5, 40], "actionType": "skip", "UUID": "a"},
+                {"segment": [0, 12.25]},
+                {"segment": [50, 60], "actionType": "mute"},
+                {"segment": [70, 65], "actionType": "skip"},
+                {"segment": [-1, 5], "actionType": "skip"},
+                {"segment": [80, 80], "actionType": "skip"}
+            ]}
+        ]"#;
+        assert_eq!(
+            parse(body, &id()),
+            Ok(vec![secs(0.0, 12.25), secs(30.5, 40.0)])
+        );
+    }
+
+    #[test]
+    fn an_empty_reply_gives_no_segments() {
+        assert_eq!(parse(b"[]", &id()), Ok(Vec::new()));
+        let none_for_it = br#"[{"videoID": "other", "segments": [{"segment": [1, 2]}]}]"#;
+        assert_eq!(parse(none_for_it, &id()), Ok(Vec::new()));
+    }
+
+    #[test]
+    fn a_malformed_reply_is_an_error() {
+        for (case, body) in [
+            ("not json", &b"<html>busy</html>"[..]),
+            ("not a list", br#"{"videoID": "dQw4w9WgXcQ"}"#),
+            (
+                "a segment without its end",
+                br#"[{"videoID": "dQw4w9WgXcQ", "segments": [{"segment": [1]}]}]"#,
+            ),
+        ] {
+            let got = parse(body, &id());
+            assert!(
+                got.as_ref().is_err_and(|e| e.starts_with("bad response")),
+                "{case}: {got:?}"
+            );
+        }
+    }
+}
