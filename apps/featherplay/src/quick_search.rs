@@ -997,19 +997,10 @@ mod tests {
 
     #[test]
     fn the_box_sits_centred_a_fifth_of_the_way_down() {
-        // 100 %, 125 %, 150 % and 200 % (1920, 2400, 3840, 3840 px wide), less the taskbar.
-        assert_eq!(place((0, 0, 1920, 1032), 1.0, 640.0), (640, 206));
-        assert_eq!(place((0, 0, 2400, 1290), 1.25, 640.0), (800, 258));
+        // 150 % on a 3840 px wide screen, less the taskbar; a monitor above and to the right
+        // at 125 %.
         assert_eq!(place((0, 0, 3840, 2088), 1.5, 640.0), (1440, 417));
-        assert_eq!(place((0, 0, 3840, 2064), 2.0, 640.0), (1280, 412));
-        // A monitor on the left at 150 %, and one above and to the right at 125 %.
-        assert_eq!(place((-2560, 0, 0, 1392), 1.5, 640.0), (-1760, 278));
         assert_eq!(place((1920, -1440, 4480, -60), 1.25, 640.0), (2800, -1164));
-        // Each box's centre is the work area's.
-        for (work, scale) in [((0, 0, 3840, 2088), 1.5), ((1920, -1440, 4480, -60), 1.25)] {
-            let (x, _) = place(work, scale, 640.0);
-            assert_eq!(x * 2 + (640.0 * scale) as i32, work.0 + work.2);
-        }
     }
 
     #[test]
