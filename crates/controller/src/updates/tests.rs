@@ -1,5 +1,3 @@
-#[cfg(target_os = "linux")]
-use super::install::tests::test_cache;
 use super::install::tests::{BY_MAIN, SETUP, SIGNED_SUMS, serve};
 use super::*;
 
@@ -81,7 +79,9 @@ async fn a_manual_check_on_the_installed_copy_downloads_the_setup() {
 async fn an_appimage_is_replaced_by_the_signed_release() {
     use std::os::unix::fs::PermissionsExt;
 
-    let cache = test_cache("appimage-run");
+    let Some(cache) = crate::test_home("updates-appimage-run") else {
+        return;
+    };
     let base = github(true);
     let image = cache.join("Apps").join("featherplay.AppImage");
     std::fs::create_dir_all(image.parent().unwrap()).unwrap();

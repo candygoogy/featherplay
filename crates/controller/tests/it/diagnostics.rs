@@ -6,20 +6,6 @@ use std::path::PathBuf;
 
 use featherplay_controller::diagnostics;
 
-/// The Linux test's folder. The other tests use `crate::test_home`, which skips without
-/// `FEATHERPLAY_HOME`.
-#[cfg(not(windows))]
-fn scratch(name: &str) -> PathBuf {
-    let base = std::env::var("FEATHERPLAY_HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| std::env::temp_dir().join("featherplay-tests"));
-    let dir = base
-        .join("test-diagnostics")
-        .join(format!("{name}-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
-    dir
-}
-
 fn read_log(dir: &std::path::Path) -> String {
     std::fs::read_to_string(dir.join("featherplay.log")).unwrap_or_default()
 }
@@ -73,7 +59,9 @@ fn log_lines_reach_the_file_without_their_secrets() {
 #[test]
 #[cfg(not(windows))]
 fn log_lines_name_no_home_folder() {
-    let dir = scratch("home");
+    let Some(dir) = crate::test_home("diagnostics-home") else {
+        return;
+    };
     diagnostics::init(&dir).expect("init");
     // This machine's own home, so no path is written into the test.
     let home = std::env::var("HOME").expect("HOME");

@@ -1,16 +1,5 @@
 use super::*;
 
-/// A folder of this test's own (not created), under `FEATHERPLAY_HOME`, else the temp
-/// folder. Only the Unix test still writes here; the others take `crate::test_dir`.
-#[cfg(unix)]
-fn scratch(name: &str) -> PathBuf {
-    std::env::var("FEATHERPLAY_HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| std::env::temp_dir().join("featherplay-tests"))
-        .join("test-streams")
-        .join(format!("{name}-{}", std::process::id()))
-}
-
 /// Every system's pins: Windows x64 and ARM64, Linux x86_64 and aarch64.
 const ALL: [&Pins; 4] = [&X64, &ARM64, &LINUX_X64, &LINUX_ARM64];
 
@@ -203,8 +192,9 @@ fn a_linux_build_downloads_the_linux_helpers() {
 #[tokio::test]
 async fn an_installed_helper_is_executable() {
     use std::os::unix::fs::PermissionsExt;
-    let dir = scratch("mode");
-    std::fs::create_dir_all(&dir).unwrap();
+    let Some(dir) = crate::test_dir("mode") else {
+        return;
+    };
     let (part, exe) = (dir.join("yt-dlp.part"), dir.join("yt-dlp"));
     std::fs::write(&part, b"#!/bin/sh\n").unwrap();
     std::fs::set_permissions(&part, std::fs::Permissions::from_mode(0o600)).unwrap();

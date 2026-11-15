@@ -735,21 +735,6 @@ pub(super) mod tests {
 
     pub(crate) const SETUP: &[u8] = b"not really a setup, but bytes to check";
 
-    /// The AppImage test's folder. The other tests use `crate::test_home`, which skips
-    /// without `FEATHERPLAY_HOME`.
-    #[cfg(target_os = "linux")]
-    pub(crate) fn test_cache(name: &str) -> PathBuf {
-        let base = std::env::var("FEATHERPLAY_HOME")
-            .map(PathBuf::from)
-            .unwrap_or_else(|_| std::env::temp_dir().join("featherplay-tests"));
-        let cache = base
-            .join("test-updates")
-            .join(format!("{name}-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&cache);
-        std::fs::create_dir_all(&cache).unwrap();
-        cache
-    }
-
     /// Answers each GET with `route(path)`, one connection at a time.
     pub(crate) fn serve(route: impl Fn(&str) -> (u16, Vec<u8>) + Send + 'static) -> String {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
