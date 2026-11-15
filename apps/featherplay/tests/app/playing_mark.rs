@@ -68,9 +68,19 @@ fn content(shot: &SharedPixelBuffer<Rgba8Pixel>) -> Vec<Rgba8Pixel> {
 }
 
 /// Settles, then checks nothing animates, no timer is armed, the clock holds still and no
-/// frame changes.
+/// frame changes. A page change's enter rise starts a tick after the page's first frame, and
+/// Settings makes its lower sections over the ticks after that, so where frames are slow
+/// (Linux CI) they can outlast the 300 ms: settling waits for them, up to 2 s. A clock that
+/// keeps stepping still fails.
 fn assert_idle(w: &slint::Window, mark: &Mark, after: &str) {
     run_for(w, 300);
+    let end = Instant::now() + Duration::from_secs(2);
+    while (w.has_active_animations()
+        || slint::platform::duration_until_next_timer_update().is_some())
+        && Instant::now() < end
+    {
+        run_for(w, 16);
+    }
     slint::platform::update_timers_and_animations();
     w.take_snapshot().expect("snapshot");
     assert!(!w.has_active_animations(), "still animating {after}");
