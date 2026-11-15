@@ -22,7 +22,7 @@ fn each_switch_starts_at_its_default_and_sets_its_setting() {
         fn() -> bool,
         &'static [bool],
     );
-    let cases: [Case; 3] = [
+    let cases: [Case; 4] = [
         (
             "Check for updates",
             SettingKey::CheckForUpdates,
@@ -45,6 +45,14 @@ fn each_switch_starts_at_its_default_and_sets_its_setting() {
             false,
             |d| d.get_dns_over_https(),
             pages::settings::dns_over_https,
+            &[true, false],
+        ),
+        (
+            "Turn off the mini player (a tray click opens the window)",
+            SettingKey::TrayClickOpensWindow,
+            false,
+            |d| d.get_tray_click_opens_window(),
+            pages::settings::tray_click_opens_window,
             &[true, false],
         ),
     ];

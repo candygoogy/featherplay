@@ -32,20 +32,6 @@ fn hide_to_tray(scene: &Scene) {
 }
 
 #[test]
-fn the_switch_sets_the_setting() {
-    let scene = Scene::new(1280, 800, true, false).expect("scene");
-    scene.open("settings").expect("settings");
-    scene.settle();
-    let data = scene.ui.global::<SettingsData>();
-    data.invoke_toggled(SettingKey::TrayClickOpensWindow, true);
-    assert!(data.get_tray_click_opens_window());
-    assert!(featherplay::pages::settings::tray_click_opens_window());
-    data.invoke_toggled(SettingKey::TrayClickOpensWindow, false);
-    assert!(!data.get_tray_click_opens_window());
-    assert!(!featherplay::pages::settings::tray_click_opens_window());
-}
-
-#[test]
 #[cfg_attr(
     not(windows),
     ignore = "Windows only: the mini player is placed by the tray (MiniPlayerPlacement)"
