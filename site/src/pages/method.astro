@@ -52,9 +52,9 @@ const { startToSoundS: start, clickToSoundS: click, hovered, notHovered, prepare
           Workstations, build 26300.
         </li>
         <li>
-          featherplay {fp.version}, built for release on that PC from the same code as the release, so not the exe
-          offered for download: its code differs from that one's only in the version it logs. The release's exe
-          is{release.portable ? ` ${sizeLabel(release.portable)}` : ""}, the installer
+          featherplay {fp.version}, built for release on that PC from the same code as the {fp.version} release, so not
+          that release's exe: its code differs from that one's only in the version it logs. {release.version} wasn't
+          measured again; its exe is{release.portable ? ` ${sizeLabel(release.portable)}` : ""}, the installer
           {release.installer ? ` ${sizeLabel(release.installer)}` : ""}. It ran on a copy of a long-used featherplay
           folder (settings, saved queue, kept streams and covers), with Streaming quality on High, so every song played
           as Opus. The settings were its owner's (lyrics on, a 2 s crossfade, the equalizer, Even out loudness and Skip
@@ -190,7 +190,7 @@ const { startToSoundS: start, clickToSoundS: click, hovered, notHovered, prepare
           minutes, both come to 0.002%.
         </li>
         <li>
-          Download is what you download to install it: featherplay's installer (or the{" "}
+          Download is what you download to install it: featherplay {release.version}'s installer (or the{" "}
           {release.portable ? sizeLabel(release.portable) : ""} portable exe), Pear Desktop's {figureText(pear, "downloadMB")}{" "}
           installer. Edge comes with Windows, so there's nothing to download.
         </li>

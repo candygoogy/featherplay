@@ -110,7 +110,8 @@ export const withProcessing = {
 export const figures: Figure[] = [
   {
     app: "featherplay",
-    version: release.version,
+    // The version measured; 0.4.1 wasn't measured again. Only the download is release.ts's.
+    version: "0.4.0",
     memoryMB: 39,
     memoryPausedMB: 37,
     cpuPlayingPct: 0.063,
@@ -118,7 +119,7 @@ export const figures: Figure[] = [
     processes: { min: 1, max: 1 },
     startToSoundS: timings.startToSoundS.median,
     clickToSoundS: timings.clickToSoundS.median,
-    // The installer (release.ts); the portable exe is the other option.
+    // The installer (release.ts, the current release's); the portable exe is the other option.
     downloadMB: release.installer!.sizeMB!,
     download: "the installer",
     sources: {
@@ -129,7 +130,7 @@ export const figures: Figure[] = [
       processes: `${V040}csv/default-{1,2,3}-playing.csv`,
       startToSoundS: `${V040}csv/start-to-sound.csv`,
       clickToSoundS: `${V040}csv/click-to-sound-{A,B}.csv`,
-      downloadMB: `${M}final-0.4.0/README.md`,
+      downloadMB: `The v${release.version} release's files`,
     },
   },
   {
