@@ -992,10 +992,23 @@ mod tests {
     }
 
     #[test]
-    fn the_tonal_alphas_match_the_theme() {
+    fn rust_and_the_theme_agree() {
+        // The tonal alphas, and the red `ui/theme.slint` starts on before Rust applies the
+        // setting.
         let theme = include_str!("../ui/theme.slint");
-        assert!(theme.contains("accent-tonal: accent.transparentize(between(0.78, 0.86));"));
-        assert!(theme.contains("accent-tonal-hover: accent.transparentize(between(0.7, 0.8));"));
+        for line in [
+            "accent-tonal: accent.transparentize(between(0.78, 0.86));",
+            "accent-tonal-hover: accent.transparentize(between(0.7, 0.8));",
+            "in-out property <color> preset-dark: #FF3B55;",
+            "in-out property <color> preset-light: #CC1036;",
+        ] {
+            assert!(theme.contains(line), "theme.slint lacks {line:?}");
+        }
+        // The cover setting falls back to the brand red, the ground tables' accent.
+        assert_eq!(preset(Accent::Cover), preset(Accent::Red), "cover");
+        let (dark, light) = preset(Accent::Red);
+        assert_eq!(colour::hex(dark), DARK.accent, "dark");
+        assert_eq!(colour::hex(light), LIGHT.accent, "light");
     }
 
     /// The fixed accents a grey cover falls back to: red (the "From the cover" setting), each
@@ -1091,21 +1104,5 @@ mod tests {
                 assert!(p >= colour::LYRIC_PAST, "{what}: past {p}");
             }
         }
-    }
-
-    #[test]
-    fn the_cover_setting_falls_back_to_the_brand_red() {
-        assert_eq!(preset(Accent::Cover), preset(Accent::Red));
-        let (dark, light) = preset(Accent::Red);
-        assert_eq!(colour::hex(dark), DARK.accent);
-        assert_eq!(colour::hex(light), LIGHT.accent);
-    }
-
-    #[test]
-    fn the_presets_match_the_theme_defaults() {
-        // `ui/theme.slint` starts on red before Rust applies the setting.
-        let theme = include_str!("../ui/theme.slint");
-        assert!(theme.contains("in-out property <color> preset-dark: #FF3B55;"));
-        assert!(theme.contains("in-out property <color> preset-light: #CC1036;"));
     }
 }
