@@ -1,6 +1,7 @@
 //! The bar's volume slider follows the mouse wheel, offscreen: a notch up or down moves the
-//! volume 5 %, within 0–100 %, without saving; the setting is saved a second after the wheel
-//! rests, and the value above the line stays 1.5 s, then fades.
+//! volume by the Volume step setting (5 % by default), within 0–100 %, without saving; the
+//! setting is saved a second after the wheel rests, and the value above the line stays
+//! 1.5 s, then fades.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -48,7 +49,7 @@ fn slider(scene: &Scene, calls: &Calls) -> LogicalPosition {
 }
 
 #[test]
-fn a_notch_moves_the_volume_5_percent_and_saves_once_it_rests() {
+fn a_notch_moves_the_volume_by_the_step_and_saves_once_it_rests() {
     let scene = Scene::new(1280, 800, true, false).expect("scene");
     scene.play(false).expect("player");
     scene.ui.show().expect("show");
@@ -61,7 +62,11 @@ fn a_notch_moves_the_volume_5_percent_and_saves_once_it_rests() {
     let at = slider(&scene, &calls);
     let w = scene.ui.window();
 
-    assert_eq!(calls.borrow().as_slice(), &[(0.55, false)]);
+    assert_eq!(
+        calls.borrow().as_slice(),
+        &[(0.55, false)],
+        "a notch up at 5 %"
+    );
     offscreen::wheel(w, at, -1.0);
     offscreen::wheel(w, at, -1.0);
     let v = player.get_volume();
@@ -75,11 +80,22 @@ fn a_notch_moves_the_volume_5_percent_and_saves_once_it_rests() {
     slint::platform::update_timers_and_animations();
     let saves: Vec<f32> = calls.borrow().iter().filter(|c| c.1).map(|c| c.0).collect();
     assert_eq!(saves.len(), 1, "saves after the wheel rested: {saves:?}");
-    assert!((saves[0] - 0.45).abs() < 1e-4);
+    assert!((saves[0] - 0.45).abs() < 1e-4, "saved {}", saves[0]);
 
     player.set_volume(0.98);
     offscreen::wheel(w, at, 1.0);
     assert_eq!(player.get_volume(), 1.0, "a notch past full stops at 100 %");
+
+    // Other steps.
+    player.set_volume_step(2);
+    player.set_volume(0.5);
+    offscreen::wheel(w, at, 1.0);
+    let v = player.get_volume();
+    assert!((v - 0.52).abs() < 1e-4, "a notch up at 2 %: {v}");
+    player.set_volume_step(10);
+    offscreen::wheel(w, at, -1.0);
+    let v = player.get_volume();
+    assert!((v - 0.42).abs() < 1e-4, "a notch down at 10 %: {v}");
 }
 
 /// The pixels just above the slider, where its value shows (`at` is near its top left).
@@ -157,24 +173,4 @@ fn the_value_stays_a_second_and_a_half_after_a_notch_then_fades() {
     above(w, at);
     offscreen::advance(Duration::from_millis(300));
     assert_eq!(above(w, at), bare, "the value still shows after a click");
-}
-
-#[test]
-fn a_notch_moves_the_volume_by_the_volume_step() {
-    let scene = Scene::new(1280, 800, true, false).expect("scene");
-    scene.play(false).expect("player");
-    scene.ui.show().expect("show");
-    scene.settle();
-    let player = scene.ui.global::<Player>();
-    player.set_volume_step(2);
-    player.set_volume(0.5);
-    let calls = record(&scene);
-    let at = slider(&scene, &calls);
-    let v = player.get_volume();
-    assert!((v - 0.52).abs() < 1e-4, "a notch up at 2 %: {v}");
-
-    player.set_volume_step(10);
-    offscreen::wheel(scene.ui.window(), at, -1.0);
-    let v = player.get_volume();
-    assert!((v - 0.42).abs() < 1e-4, "a notch down at 10 %: {v}");
 }
