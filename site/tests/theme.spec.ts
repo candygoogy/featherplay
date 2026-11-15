@@ -49,13 +49,21 @@ const mode = (page: import("@playwright/test").Page) =>
     const o = (s: string) => Number(getComputedStyle(b.querySelector(s)!).opacity);
     return {
       name: b.getAttribute("aria-label"),
-      // The bar's tooltip says the toggle's name (src/scripts/bar.ts).
-      tip: b.getAttribute("aria-label"),
       stored: localStorage.getItem("fp-theme"),
       theme: document.documentElement.dataset.theme,
       icons: { system: o(".system"), sun: o(".sun"), moon: o(".moon") },
     };
   });
+
+/** What the bar's tooltip says once the pointer rests on the toggle (src/scripts/bar.ts). */
+async function tip(page: import("@playwright/test").Page) {
+  await page.mouse.move(5, 500);
+  await expect(page.locator("[data-bar-tip]")).not.toHaveAttribute("data-on", /.*/);
+  await page.waitForTimeout(600);
+  await page.locator(toggle).hover();
+  await expect(page.locator("[data-bar-tip]")).toHaveAttribute("data-on", "");
+  return page.locator("[data-bar-tip]").textContent();
+}
 
 test("the toggle cycles System, Light, Dark and back to System, saying each", async ({ page }) => {
   await page.emulateMedia({ colorScheme: "dark" });
@@ -69,13 +77,15 @@ test("the toggle cycles System, Light, Dark and back to System, saying each", as
   ];
   for (const [i, step] of steps.entries()) {
     if (i) await page.locator(toggle).click();
-    await expect.poll(() => mode(page)).toEqual({ ...step, tip: step.name });
+    await expect.poll(() => mode(page)).toEqual(step);
+    // The tooltip says the same as the name.
+    expect(await tip(page)).toBe(step.name);
   }
   // Dark is remembered over a reload, and says so.
   await page.locator(toggle).click();
   await page.locator(toggle).click();
   await page.reload();
-  await expect.poll(() => mode(page)).toEqual({ ...steps[2], tip: steps[2].name });
+  await expect.poll(() => mode(page)).toEqual(steps[2]);
 });
 
 test("back on System the page follows the OS live again; on Light or Dark it doesn't", async ({ page }) => {
