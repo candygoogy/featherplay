@@ -3,8 +3,9 @@
 //! Windows' animation effects on: on each page once it has loaded, after pausing from the
 //! tray icon's menu, on each page again once a song has played, after opening and closing the
 //! mini player (open and unpinned, its foreground poll is the one timer), and with it pinned.
+//! On a frozen clock, so a timer or an animation that would run in the time checked does.
 
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use featherplay::snapshot::Scene;
 use featherplay::ui::{Frame, MiniData, Player, Theme};
@@ -13,16 +14,17 @@ use featherplay_platform::tray::TrayChoice;
 use slint::ComponentHandle;
 use slint::platform::WindowEvent;
 
-/// Runs timers and animations for `ms`, rendering a frame every few milliseconds as the
-/// window would.
+/// Moves the frozen clock on by `ms`, running the queued work and rendering every window
+/// every 50 ms. The step's length doesn't matter to the checks: a timer or an animation that
+/// runs in the time asks for a frame or stays armed either way.
 fn run_for(scene: &Scene, windows: &[&slint::Window], ms: u64) {
-    let end = Instant::now() + Duration::from_millis(ms);
-    while Instant::now() < end {
+    const STEP: u64 = 50;
+    for _ in 0..ms.div_ceil(STEP) {
+        offscreen::advance(Duration::from_millis(STEP));
         scene.settle_once();
         for w in windows {
             w.take_snapshot().expect("snapshot");
         }
-        std::thread::sleep(Duration::from_millis(4));
     }
 }
 
@@ -87,6 +89,8 @@ fn paused_nothing_renders_and_no_timer_is_armed() {
     scene.sound(false).expect("paused");
     scene.theme(true);
     scene.ui.show().expect("show");
+    scene.settle();
+    offscreen::freeze_clock();
     let main = scene.ui.window();
     for page in PAGES {
         scene.open(page).expect("page");

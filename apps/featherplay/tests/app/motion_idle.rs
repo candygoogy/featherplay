@@ -1,26 +1,17 @@
 //! Motion runs, then stops, on the offscreen platform (no window is
-//! shown), with Windows' animation effects on: a page fades in after a navigation, and once
-//! it has settled nothing animates and no timer is armed, so a paused app doesn't redraw.
+//! shown) on a frozen clock, with Windows' animation effects on: a page fades in after a
+//! navigation, and once it has settled nothing animates and no timer is armed, so a paused
+//! app doesn't redraw.
 
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
+use crate::support::{FRAME_60, run_for};
 use featherplay::offscreen;
 use featherplay::ui::{
     AlbumData, AppWindow, Frame, Nav, PageKind, Player, SongMenu, Theme, Toast, TrackRow,
 };
 use slint::platform::WindowEvent;
 use slint::{ComponentHandle, LogicalPosition};
-
-/// Runs timers and animations for `ms`, rendering a frame every few milliseconds as the
-/// window would.
-fn run_for(w: &slint::Window, ms: u64) {
-    let end = Instant::now() + Duration::from_millis(ms);
-    while Instant::now() < end {
-        slint::platform::update_timers_and_animations();
-        w.take_snapshot().expect("snapshot");
-        std::thread::sleep(Duration::from_millis(4));
-    }
-}
 
 /// After a last frame: is any animation still running, or any timer armed?
 fn busy(w: &slint::Window) -> (bool, Option<Duration>) {
@@ -61,6 +52,7 @@ fn motion_settles_and_leaves_nothing_running() {
     let theme = ui.global::<Theme>();
     theme.set_motion(true);
     ui.show().expect("show");
+    offscreen::freeze_clock();
     let w = ui.window();
     assert_idle(w, "showing the window");
 
@@ -69,13 +61,13 @@ fn motion_settles_and_leaves_nothing_running() {
     album.set_title("Album title".into());
     let nav = ui.global::<Nav>();
     nav.set_page(PageKind::Album);
-    let mut frames = Vec::new();
-    let end = Instant::now() + Duration::from_millis(400);
-    while Instant::now() < end {
-        slint::platform::update_timers_and_animations();
-        frames.push(w.take_snapshot().expect("snapshot"));
-        std::thread::sleep(Duration::from_millis(4));
-    }
+    // 400 ms of frames.
+    let frames: Vec<_> = (0..25)
+        .map(|_| {
+            offscreen::advance(FRAME_60);
+            w.take_snapshot().expect("snapshot")
+        })
+        .collect();
     let last = frames.last().expect("frames").as_slice().to_vec();
     let differing = frames
         .iter()

@@ -1,23 +1,14 @@
 //! The song rows on screen go to the controller to be resolved ahead of a click
 //! (`prepare.rs`): a list's top rows once it opens, the rows a scroll settles on, none when
-//! another page shows or the window is minimised. Offscreen platform with fixture data.
+//! another page shows or the window is minimised. Offscreen platform with fixture data and a
+//! frozen clock.
 
-use std::time::{Duration, Instant};
-
+use crate::support::run_for;
 use featherplay::controller::Action;
+use featherplay::offscreen;
 use featherplay::snapshot::Scene;
 use featherplay::ui::{AlbumData, Frame, HomeData, LibraryData, QueueData, ShelfShape, TrackRow};
 use slint::{ComponentHandle, LogicalPosition, Model, ModelRc};
-
-/// Runs timers for `ms`, rendering as the window would.
-fn run_for(scene: &Scene, ms: u64) {
-    let end = Instant::now() + Duration::from_millis(ms);
-    while Instant::now() < end {
-        slint::platform::update_timers_and_animations();
-        scene.ui.window().take_snapshot().expect("snapshot");
-        std::thread::sleep(Duration::from_millis(4));
-    }
-}
 
 /// The rows of each `Action::Prepare` sent since the last call.
 fn prepared(scene: &Scene) -> Vec<Vec<String>> {
@@ -41,7 +32,8 @@ fn the_rows_on_screen_are_sent_once_a_list_settles_and_none_off_it() {
     let scene = Scene::new(1280, 800, true, false).expect("scene");
     scene.open("library").expect("library");
     scene.settle();
-    run_for(&scene, 500);
+    offscreen::freeze_clock();
+    run_for(scene.ui.window(), 500);
     let liked = ids(scene.ui.global::<LibraryData>().get_liked());
     let sent = prepared(&scene);
     let top = sent.last().expect("the rows on screen weren't sent");
@@ -49,8 +41,8 @@ fn the_rows_on_screen_are_sent_once_a_list_settles_and_none_off_it() {
     assert_eq!(top[..], liked[..top.len()], "the top first");
 
     // Scrolled down: once the list stops, the rows it shows now.
-    featherplay::offscreen::wheel(scene.ui.window(), LogicalPosition::new(700.0, 500.0), -6.0);
-    run_for(&scene, 800);
+    offscreen::wheel(scene.ui.window(), LogicalPosition::new(700.0, 500.0), -6.0);
+    run_for(scene.ui.window(), 800);
     let sent = prepared(&scene);
     let scrolled = sent.last().expect("nothing sent after the scroll");
     assert_ne!(scrolled[0], liked[0], "{scrolled:?}");
@@ -60,7 +52,7 @@ fn the_rows_on_screen_are_sent_once_a_list_settles_and_none_off_it() {
     scene.open("album").expect("album");
     assert_eq!(prepared(&scene), [Vec::<String>::new()]);
     scene.settle();
-    run_for(&scene, 500);
+    run_for(scene.ui.window(), 500);
     let album = ids(scene.ui.global::<AlbumData>().get_tracks());
     let sent = prepared(&scene);
     let rows = sent.last().expect("the album's rows weren't sent");
@@ -75,7 +67,7 @@ fn the_rows_on_screen_are_sent_once_a_list_settles_and_none_off_it() {
     // Home: the songs of its song grids on screen, those of the grid's first page.
     scene.open("home").expect("home");
     scene.settle();
-    run_for(&scene, 500);
+    run_for(scene.ui.window(), 500);
     let grids: Vec<String> = scene
         .ui
         .global::<HomeData>()
@@ -101,7 +93,8 @@ fn up_next_is_sent_again_when_its_rows_show_other_songs() {
     scene.ui.global::<Frame>().set_queue_open(true);
     scene.play_track(false, 0).expect("play");
     scene.settle();
-    run_for(&scene, 500);
+    offscreen::freeze_clock();
+    run_for(scene.ui.window(), 500);
     let upcoming = || ids(scene.ui.global::<QueueData>().get_upcoming());
     let before = upcoming();
     let sent = prepared(&scene);
@@ -111,7 +104,7 @@ fn up_next_is_sent_again_when_its_rows_show_other_songs() {
     // The next song plays: as many songs to come, each a row up.
     scene.play_track(false, 1).expect("next");
     scene.settle();
-    run_for(&scene, 500);
+    run_for(scene.ui.window(), 500);
     let after = upcoming();
     assert_eq!(after.len(), before.len());
     assert_ne!(after[0], before[0]);

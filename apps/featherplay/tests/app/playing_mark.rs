@@ -5,8 +5,9 @@
 //! page with no song rows while Up next is closed.
 
 use std::rc::Rc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
+use crate::support::FRAME_60;
 use featherplay::offscreen;
 use featherplay::ui::{
     AppWindow, Frame, Mark, Nav, PageKind, Player, PlaylistData, QueueData, Theme, TrackRow,
@@ -32,17 +33,15 @@ fn rows() -> ModelRc<TrackRow> {
     ModelRc::from(Rc::new(VecModel::from(rows)))
 }
 
-/// Runs timers and animations for `ms`, rendering a frame every few milliseconds as the
-/// window would, and returns the frames.
+/// Moves the frozen clock on by `ms`, rendering a frame every 16 ms as the window would, and
+/// returns the frames.
 fn run_for(w: &slint::Window, ms: u64) -> Vec<SharedPixelBuffer<Rgba8Pixel>> {
-    let end = Instant::now() + Duration::from_millis(ms);
-    let mut frames = Vec::new();
-    while Instant::now() < end {
-        slint::platform::update_timers_and_animations();
-        frames.push(w.take_snapshot().expect("snapshot"));
-        std::thread::sleep(Duration::from_millis(4));
-    }
-    frames
+    (0..ms.div_ceil(16))
+        .map(|_| {
+            offscreen::advance(FRAME_60);
+            w.take_snapshot().expect("snapshot")
+        })
+        .collect()
 }
 
 /// The distinct frames among `frames`.
@@ -68,17 +67,17 @@ fn content(shot: &SharedPixelBuffer<Rgba8Pixel>) -> Vec<Rgba8Pixel> {
 }
 
 /// Settles, then checks nothing animates, no timer is armed, the clock holds still and no
-/// frame changes. A page change's enter rise starts a tick after the page's first frame, and
-/// Settings makes its lower sections over the ticks after that, so where frames are slow
-/// (Linux CI) they can outlast the 300 ms: settling waits for them, up to 2 s. A clock that
-/// keeps stepping still fails.
+/// frame changes. Settling takes up to 2 s: a pause's fades, a page change's enter rise a
+/// tick after the page's first frame, and Settings making its lower sections over the ticks
+/// after that can outlast 300 ms. A clock that keeps stepping still fails.
 fn assert_idle(w: &slint::Window, mark: &Mark, after: &str) {
     run_for(w, 300);
-    let end = Instant::now() + Duration::from_secs(2);
-    while (w.has_active_animations()
-        || slint::platform::duration_until_next_timer_update().is_some())
-        && Instant::now() < end
-    {
+    for _ in 0..2000 / 16 {
+        if !w.has_active_animations()
+            && slint::platform::duration_until_next_timer_update().is_none()
+        {
+            break;
+        }
         run_for(w, 16);
     }
     slint::platform::update_timers_and_animations();
@@ -93,19 +92,17 @@ fn assert_idle(w: &slint::Window, mark: &Mark, after: &str) {
 }
 
 /// The clock is armed and steps at its rate (30 fps, every 33 ms), and the wave visibly moves.
-/// The rate is counted with timers alone: snapshots take long enough to delay the steps.
+/// The rate is counted with timers alone, the clock stepped 2 ms at a time.
 fn assert_moving(w: &slint::Window, mark: &Mark, when: &str) {
     run_for(w, 300);
     let frame = mark.get_frame();
-    let end = Instant::now() + Duration::from_millis(650);
-    while Instant::now() < end {
-        slint::platform::update_timers_and_animations();
-        std::thread::sleep(Duration::from_millis(2));
+    for _ in 0..325 {
+        offscreen::advance(Duration::from_millis(2));
     }
     let steps = mark.get_frame() - frame;
-    // 30 fps is 19 or 20 steps; 10 fps would be 6 or 7.
+    // 30 fps is 19 or 20 steps in 650 ms; 10 fps would be 6 or 7.
     assert!(
-        (13..=22).contains(&steps),
+        (19..=20).contains(&steps),
         "the mark's clock stepped {steps} times in 650 ms {when}"
     );
     let frames = run_for(w, 400);
@@ -129,6 +126,7 @@ fn the_wave_moves_only_while_playing_and_shown() {
     let theme = ui.global::<Theme>();
     theme.set_motion(true);
     ui.show().expect("show");
+    offscreen::freeze_clock();
     let w = ui.window();
     let mark = ui.global::<Mark>();
     let player = ui.global::<Player>();
