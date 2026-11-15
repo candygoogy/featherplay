@@ -268,18 +268,31 @@ mod tests {
     }
 
     #[test]
-    fn the_clock_moving_on_is_no_change() {
+    fn what_is_no_change() {
         let s = playing();
-        assert!(!worth_sending(&s, &later(&s, 250)));
-        assert!(!worth_sending(&s, &later(&s, 60_000)));
-    }
-
-    #[test]
-    fn a_paused_track_standing_still_is_no_change() {
-        let mut s = playing();
-        s.playing = false;
-        s.audible = false;
-        assert!(!worth_sending(&s, &later(&s, 5_000)));
+        let mut paused = playing();
+        paused.playing = false;
+        paused.audible = false;
+        let mut wobble = later(&s, 1_000);
+        wobble.position -= Duration::from_millis(400);
+        let mut liked = later(&s, 250);
+        if let Some(t) = &mut liked.track {
+            t.like = LikeStatus::Indifferent;
+        }
+        let cases = [
+            ("the clock moving on a moment", &s, later(&s, 250)),
+            ("the clock moving on a minute", &s, later(&s, 60_000)),
+            (
+                "a paused track standing still",
+                &paused,
+                later(&paused, 5_000),
+            ),
+            ("a small wobble is no jump", &s, wobble),
+            ("a like alone", &s, liked),
+        ];
+        for (case, prev, next) in cases {
+            assert!(!worth_sending(prev, &next), "{case}");
+        }
     }
 
     #[test]
@@ -308,14 +321,6 @@ mod tests {
             types(&events(&s, &seeked, seeked.read_at)),
             ["POSITION_CHANGED"]
         );
-    }
-
-    #[test]
-    fn a_small_wobble_is_no_jump() {
-        let s = playing();
-        let mut next = later(&s, 1_000);
-        next.position -= Duration::from_millis(400);
-        assert!(!worth_sending(&s, &next));
     }
 
     #[test]
@@ -376,16 +381,6 @@ mod tests {
         assert_eq!(evs[0]["volume"], 80);
         assert_eq!(evs[1]["repeat"], "ALL");
         assert_eq!(evs[2]["shuffle"], true);
-    }
-
-    #[test]
-    fn a_like_alone_is_no_event() {
-        let s = playing();
-        let mut next = later(&s, 250);
-        if let Some(t) = &mut next.track {
-            t.like = LikeStatus::Indifferent;
-        }
-        assert!(!worth_sending(&s, &next));
     }
 
     #[test]
