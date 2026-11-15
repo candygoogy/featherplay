@@ -1,0 +1,765 @@
+---
+// The bar: docked along the top of the first screen (mockup 9's slim bar: the mark and name,
+// the sections, the tray icon, the theme, the visitor's clock and Download), and once the page
+// moves, one floating capsule (the mark, the sections, the song, Download). One component with
+// exactly two states, `data-state="docked"` and `"capsule"`, each laid out by CSS alone; the
+// change between them is decoration over the new layout (src/scripts/bar.ts: the parts glide
+// from where they were by transform, the grounds fade), so the bar can never rest half-way.
+// It collapses by rule as the room narrows (container queries on its own width): the
+// sections' words go to icons under 1,180 px, then the sections and the tray step aside for
+// the song under 800 px, then the name under 420 px; the capsule drops the sections under
+// 560 px. The docked bar's frost is painted (only still ground passes under it); the capsule,
+// its flyouts, the menu and the tooltip are real glass (the page moves behind them).
+import Logo from "./Logo.astro";
+import Icon from "./Icon.astro";
+import MediaFlyout from "./pieces/MediaFlyout.astro";
+import { songs, demoStart, songById } from "../data/songs";
+import { formatTime } from "../demo/player";
+import { release, sizeLabel } from "../data/release";
+
+const song = songById(demoStart.songId)!;
+const sections = [
+  { id: "app", label: "The app", tip: "The app, stepping back", d: "M4 6.5 a2 2 0 0 1 2 -2 h12 a2 2 0 0 1 2 2 v11 a2 2 0 0 1 -2 2 h-12 a2 2 0 0 1 -2 -2 Z M4 8.8 H20" },
+  { id: "light", label: "Numbers", tip: "Light, and it shows", d: "M4.5 17 A8 8 0 1 1 19.5 17 M12 14.2 L15.4 9.8 M10.6 14.2 a1.4 1.4 0 1 0 2.8 0 a1.4 1.4 0 1 0 -2.8 0" },
+  { id: "lyrics", label: "Lyrics", tip: "Lyrics, up close", d: "M12 3.5 a3 3 0 0 0 -3 3 V11.5 a3 3 0 0 0 6 0 V6.5 a3 3 0 0 0 -3 -3 Z M6 11 A6 6 0 0 0 18 11 M12 17 V20.5" },
+  { id: "questions", label: "Questions", tip: "Questions and answers", d: "M12 3.5 a8.5 8.5 0 1 0 0.01 0 Z M9.7 9.6 a2.4 2.4 0 1 1 3.3 2.2 c-0.6 0.3 -1 0.8 -1 1.5 V14 M12 16.9 V17" },
+];
+const downloads = [
+  release.installer && { name: "Installer", note: "Windows 10 and 11, recommended", file: release.installer },
+  release.portable && { name: "Portable exe", note: "One file, nothing to install", file: release.portable },
+  release.linux && { name: "Linux AppImage", note: "x86_64, experimental", file: release.linux.appImage },
+].filter(Boolean) as { name: string; note: string; file: NonNullable<typeof release.installer> }[];
+const arrow = "M12 4.5 V15 M7.5 10.5 L12 15 L16.5 10.5 M5 19.5 H19";
+---
+
+<span class="bar-sentinel" data-bar-sentinel aria-hidden="true"></span>
+<header class="bar" data-site-bar data-state="docked">
+  <div class="dock" aria-hidden="true"></div>
+  <div class="row" data-row>
+    <span class="cap-bg glass live float" aria-hidden="true"></span>
+    <a class="bp brand" href="#top" data-part aria-label="featherplay, back to the top">
+      <Logo size={22} />
+      <span class="bn only-dock">featherplay</span>
+    </a>
+    <span class="b-div only-cap" data-part aria-hidden="true"></span>
+    <nav class="b-nav" aria-label="Sections">
+      {
+        sections.map((s) => (
+          <a class="bp b-sec" href={`#${s.id}`} data-part data-sec={s.id} data-tip={s.tip}>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d={s.d} />
+            </svg>
+            <span class="lbl">{s.label}</span>
+          </a>
+        ))
+      }
+    </nav>
+    <div class="b-end">
+      <button class="bp b-np" type="button" data-part data-np data-tray-target popovertarget="fly-song" aria-label={`${song.title}: the song and the player`}>
+        <span class="np-thumb"><img data-np-cover src={song.cover} width="28" height="28" alt="" /></span>
+        <svg class="np-chev" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 10 L12 15 L17 10"></path></svg>
+      </button>
+      <div class="fly glass live float" id="fly-song" popover data-fly role="group" aria-label="The song and the player">
+        <MediaFlyout />
+        <button class="fly-show" type="button" data-show-window>
+          <Logo size={16} /><span>Show featherplay’s window</span>
+        </button>
+        <ol class="fly-queue" aria-label="The demo’s six songs">
+          {
+            songs.map((s) => (
+              <li>
+                <button class="fq" type="button" data-do="play" data-song={s.id} aria-current={s.id === song.id ? "true" : undefined}>
+                  <img src={s.cover} width="40" height="40" alt="" loading="lazy" decoding="async" />
+                  <span class="fq-text"><span class="fq-title">{s.title}</span><span class="fq-artist">{s.artist}</span></span>
+                  <span class="fq-time num">{formatTime(s.durationMs)}</span>
+                </button>
+              </li>
+            ))
+          }
+        </ol>
+      </div>
+      <button class="bp b-tray only-dock" type="button" data-part data-tray data-tray-target data-tip="featherplay: show or hide the window" aria-label="featherplay in the tray: show or hide the window">
+        <Logo size={18} />
+      </button>
+      <button class="bp b-theme only-dock" type="button" data-part data-theme-toggle data-choice="system" aria-label="Theme: System. Switch to Light" hidden>
+        <svg class="system" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="12" cy="12" r="7.5" fill="none" stroke="currentColor" stroke-width="1.6"></circle><path d="M12 4.5 A7.5 7.5 0 0 1 12 19.5 Z" fill="currentColor"></path></svg>
+        <svg class="sun" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="currentColor"></circle><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path></svg>
+        <svg class="moon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M19.5 14.6A8 8 0 0 1 9.4 4.5a8 8 0 1 0 10.1 10.1Z" fill="currentColor"></path></svg>
+      </button>
+      <time class="bp b-clock only-dock num" data-part data-clock aria-hidden="true"><span data-clock-time></span><span data-clock-date></span></time>
+      <a class="bp b-dl" href="#download" data-part data-dl aria-describedby="fly-dl-h">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={arrow}></path></svg>
+        Download
+      </a>
+      <div class="fly fly-dl glass live float" id="fly-dl" popover data-fly role="group" aria-labelledby="fly-dl-h">
+        <p class="dlf-h" id="fly-dl-h">featherplay {release.version}</p>
+        {
+          downloads.map((d) => (
+            <a class="dlf-row" href={d.file.url}>
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={arrow} /></svg>
+              <span class="dlf-text"><b>{d.name}</b><i>{d.note}</i></span>
+              <span class="dlf-size num">{sizeLabel(d.file).replace(" ", " ")}</span>
+            </a>
+          ))
+        }
+        <a class="dlf-more" href="#download">All the ways to get it</a>
+      </div>
+    </div>
+  </div>
+  <span class="bar-tip glass live float" role="tooltip" id="bar-tip" data-bar-tip aria-hidden="true"></span>
+  <!-- A right-click on the empty desk (or Shift+F10, or the menu key): the app's own menu. -->
+  <div class="ctx glass live float" role="menu" aria-label="Desktop" popover data-ctx>
+    <button class="ctx-item" type="button" role="menuitem" data-ctx-do="toggle">
+      <span class="pp" aria-hidden="true"><Icon name="play" size={18} class="i-play" /><Icon name="pause" size={18} class="i-pause" /></span>
+      <span data-ctx-play>Play</span>
+    </button>
+    <button class="ctx-item" type="button" role="menuitem" data-ctx-do="next"><Icon name="next" size={18} /><span>Next song</span></button>
+    <button class="ctx-item" type="button" role="menuitem" data-ctx-do="theme">
+      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="12" cy="12" r="7.5" fill="none" stroke="currentColor" stroke-width="1.6"></circle><path d="M12 4.5 A7.5 7.5 0 0 1 12 19.5 Z" fill="currentColor"></path></svg>
+      <span data-ctx-theme>Switch to light</span>
+    </button>
+    <span class="ctx-div" role="separator"></span>
+    <a class="ctx-item" href="#download" role="menuitem" data-ctx-do="download">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={arrow}></path></svg>
+      <span>Download for Windows</span>
+    </a>
+  </div>
+</header>
+
+<script>
+  import { bindReplicas } from "../demo/replica";
+  import { bindBar } from "../scripts/bar";
+  const player = bindReplicas();
+  const bar = document.querySelector<HTMLElement>("[data-site-bar]");
+  if (bar && player) bindBar(bar, player);
+</script>
+
+<style>
+  /* Scrolled past this, the bar floats (an observer, never a scroll handler). */
+  .bar-sentinel {
+    position: absolute;
+    top: 8px;
+    left: 0;
+    width: 1px;
+    height: 1px;
+    pointer-events: none;
+  }
+  .bar {
+    position: fixed;
+    z-index: 50;
+    inset: 0 0 auto;
+    height: calc(var(--cap-top) + var(--cap-h));
+    color: var(--text);
+    font-size: var(--fs-bar);
+    font-weight: 600;
+    pointer-events: none;
+    container: bar / inline-size;
+  }
+
+  /* ---- The grounds: the docked bar's painted frost, and the capsule's glass ---- */
+  .dock {
+    position: absolute;
+    inset: 0 0 auto;
+    height: var(--bar-h);
+    background: var(--mat-dock);
+    box-shadow: inset 0 -1px 0 var(--edge);
+    transition:
+      opacity var(--t-small) var(--ease-out),
+      translate var(--t-medium) var(--ease-window);
+  }
+  .dock::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: var(--grain);
+    opacity: 0.05;
+  }
+  .row {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center;
+    column-gap: var(--s4);
+    width: min(var(--frame-max), 100% - 2 * var(--gut));
+    height: var(--bar-h);
+    margin-inline: auto;
+    pointer-events: auto;
+  }
+  .cap-bg {
+    --mat: var(--mat-capsule);
+    position: absolute;
+    inset: 0;
+    border-radius: var(--r-float);
+    opacity: 0;
+    scale: 0.96;
+    pointer-events: none;
+    transition:
+      opacity var(--t-small) var(--ease-out),
+      scale var(--t-medium) var(--ease-window);
+  }
+  /* The capsule's blur only while it is the capsule: hidden glass blurs nothing. */
+  .bar:not([data-state="capsule"]) .cap-bg {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .bar[data-state="capsule"] .dock {
+    opacity: 0;
+    translate: 0 -100%;
+  }
+  .bar[data-state="capsule"] .row {
+    display: flex;
+    gap: var(--s2);
+    width: max-content;
+    max-width: calc(100% - 2 * var(--s3));
+    height: var(--cap-h);
+    margin-top: var(--cap-top);
+    padding: 0 6px;
+  }
+  .bar[data-state="capsule"] .cap-bg {
+    opacity: 1;
+    scale: 1;
+  }
+
+  /* ---- The parts ---- */
+  .bp {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--s2);
+    height: 40px;
+    min-width: 0;
+    padding: 0 10px;
+    border: 0;
+    border-radius: var(--r-control);
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition:
+      background-color var(--t-hover) ease,
+      color var(--t-hover) ease;
+  }
+  /* Every part's target reaches the bar's height. */
+  .bp::before {
+    content: "";
+    position: absolute;
+    inset: -6px -1px;
+  }
+  .bar[data-state="capsule"] .bp {
+    height: 36px;
+    border-radius: var(--r-pill);
+  }
+  @media (hover: hover) {
+    .bp:hover {
+      background: var(--part-hover);
+    }
+  }
+  .bp:active {
+    background: var(--part-press);
+  }
+  .bp > :is(svg, .np-thumb) {
+    flex: none;
+    transition: scale var(--t-release) var(--spring-release);
+  }
+  .bp:active > :is(svg, .np-thumb) {
+    scale: var(--press-icon);
+    transition: scale var(--t-press) var(--ease-out);
+  }
+  .bp:focus-visible {
+    outline: 2px solid var(--text);
+    outline-offset: -2px;
+  }
+  .brand {
+    justify-self: start;
+    gap: 10px;
+    padding-left: 9px;
+  }
+  .bar[data-state="capsule"] .brand {
+    width: 36px;
+    padding: 0;
+  }
+  .bn {
+    font-size: var(--fs-text);
+    font-weight: var(--fw-bold);
+    letter-spacing: -0.03em;
+  }
+  .b-div {
+    flex: none;
+    width: 1px;
+    height: 20px;
+    background: color-mix(in srgb, var(--text) 16%, transparent);
+  }
+  .b-nav {
+    justify-self: center;
+    display: flex;
+    gap: 2px;
+  }
+  .b-sec {
+    padding: 0 11px;
+    color: var(--ink2);
+  }
+  .b-sec[aria-current="true"],
+  .b-sec:hover {
+    color: var(--text);
+  }
+  .bar[data-state="capsule"] .b-sec[aria-current="true"] {
+    background: var(--part-on);
+  }
+  .lbl {
+    letter-spacing: -0.005em;
+  }
+  /* A section's words, hidden, stay its name. */
+  .bar[data-state="capsule"] .b-sec:not([aria-current="true"]) .lbl,
+  .b-sec.icon-only .lbl {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .bar[data-state="capsule"] .b-sec:not([aria-current="true"]) {
+    width: 40px;
+    padding: 0;
+  }
+  .b-end {
+    justify-self: end;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+  .b-np {
+    gap: 4px;
+    padding: 0 6px;
+  }
+  .np-thumb {
+    display: block;
+    width: 28px;
+    height: 28px;
+    border-radius: var(--r-control);
+    overflow: hidden;
+    box-shadow: 0 0 0 1px var(--hairline);
+  }
+  .np-thumb img {
+    width: 28px;
+    height: 28px;
+    object-fit: cover;
+  }
+  .np-chev {
+    color: var(--ink2);
+    transition: rotate var(--t-small) var(--ease-out);
+  }
+  .b-np[aria-expanded="true"] .np-chev {
+    rotate: 180deg;
+  }
+  .b-tray,
+  .b-theme {
+    width: 34px;
+    padding: 0;
+  }
+  :global(:root[data-window-minimised]) .b-tray {
+    background: none;
+    box-shadow: inset 0 -2px 0 -0.5px var(--ink3);
+  }
+  .b-clock {
+    display: grid;
+    justify-items: end;
+    align-content: center;
+    gap: 0;
+    padding: 0 var(--s2);
+    font-size: var(--fs-bar-clock);
+    font-weight: var(--fw-medium);
+    line-height: 16px;
+    cursor: default;
+    pointer-events: none;
+  }
+  .b-dl {
+    gap: 6px;
+    height: 32px;
+    margin-left: 6px;
+    padding: 0 var(--s4) 0 var(--s3);
+    border-radius: var(--r-pill);
+    background: var(--accent);
+    color: var(--on-accent);
+    font-weight: var(--fw-bold);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.22), 0 1px 2px var(--shade-1);
+  }
+  .bar[data-state="capsule"] .b-dl {
+    height: 32px;
+  }
+  @media (hover: hover) {
+    .b-dl:hover {
+      background: var(--red-hover);
+    }
+  }
+  .b-dl:active {
+    background: var(--red-pressed);
+  }
+  .b-dl:focus-visible {
+    outline-offset: 2px;
+  }
+  /* The theme toggle: the mode it's in (System, Light, Dark), turning like a dial on the
+     theme's own clock. */
+  .bp.b-theme > svg {
+    grid-area: 1 / 1;
+    position: absolute;
+    opacity: 0;
+    rotate: -90deg;
+    scale: 0.6;
+    transition-property: opacity, rotate, scale;
+    transition-duration: var(--t-theme);
+    transition-timing-function: var(--ease-theme);
+  }
+  .b-theme[data-choice="system"] > .moon,
+  .b-theme[data-choice="light"] > .system,
+  .b-theme[data-choice="dark"] > .sun {
+    rotate: 90deg;
+  }
+  .b-theme[data-choice="system"] > .system,
+  .b-theme[data-choice="light"] > .sun,
+  .b-theme[data-choice="dark"] > .moon {
+    opacity: 1;
+    rotate: 0deg;
+    scale: 1;
+  }
+
+  /* ---- Which parts each state has ---- */
+  .only-cap,
+  .b-np {
+    display: none;
+  }
+  .bar[data-state="capsule"] .only-dock {
+    display: none;
+  }
+  .bar[data-state="capsule"] .only-cap {
+    display: block;
+  }
+  .bar[data-state="capsule"] .b-np {
+    display: inline-flex;
+  }
+  /* The keyboard brings the theme toggle into the capsule. */
+  .bar[data-state="capsule"][data-kbd] .b-theme:not([hidden]) {
+    display: inline-flex;
+  }
+
+  /* ---- Collapse by rule, by the bar's own width ---- */
+  @container bar (width < 1180px) {
+    .bar[data-state="docked"] .b-sec {
+      width: 40px;
+      padding: 0;
+    }
+    .bar[data-state="docked"] .b-sec .lbl {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+  }
+  /* The compact bar: the name, the song, the theme and Download. */
+  @container bar (width < 800px) {
+    .bar[data-state="docked"] .b-nav,
+    .bar[data-state="docked"] .b-tray,
+    .bar[data-state="docked"] .b-clock {
+      display: none;
+    }
+    .bar[data-state="docked"] .b-np {
+      display: inline-flex;
+    }
+    .bar[data-state="docked"] .row {
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+  }
+  @container bar (width < 560px) {
+    .bar[data-state="capsule"] .b-nav,
+    .bar[data-state="capsule"] .b-div {
+      display: none;
+    }
+  }
+  @container bar (width < 420px) {
+    .bn {
+      display: none;
+    }
+    .brand {
+      width: 40px;
+      padding: 0;
+    }
+  }
+
+  /* ---- The flyouts: under their part, growing out of the bar ---- */
+  .fly {
+    --mat: var(--mat-fly);
+    position: fixed;
+    inset: auto;
+    width: min(22rem, 100vw - 16px);
+    max-height: calc(100vh - 80px);
+    margin: 0;
+    padding: var(--s2);
+    overflow: auto;
+    border: 0;
+    border-radius: var(--r-float);
+    color: var(--text);
+    font-size: var(--fs-small);
+    font-weight: var(--fw-text);
+    opacity: 1;
+    translate: 0 0;
+    transition:
+      opacity var(--t-small) var(--ease-out),
+      translate var(--t-medium) var(--ease-window),
+      overlay var(--t-small) allow-discrete,
+      display var(--t-small) allow-discrete;
+  }
+  .fly:not(:popover-open) {
+    opacity: 0;
+    translate: 0 -6px;
+  }
+  @starting-style {
+    .fly:popover-open {
+      opacity: 0;
+      translate: 0 -6px;
+    }
+  }
+  .fly :global(.m-media) {
+    padding: var(--s3) var(--s3) var(--s2);
+  }
+  .fly-show {
+    display: none;
+    align-items: center;
+    gap: var(--s2);
+    width: 100%;
+    min-height: 40px;
+    padding: 0 var(--s3);
+    border: 0;
+    border-radius: var(--r-small);
+    background: var(--tonal);
+    color: var(--text);
+    font: inherit;
+    font-weight: var(--fw-bold);
+    cursor: pointer;
+  }
+  :global(:root[data-window-minimised]) .fly-show {
+    display: flex;
+  }
+  .fly-show:hover {
+    background: var(--tonal-hover);
+  }
+  .fly-queue {
+    display: grid;
+    gap: 2px;
+    margin: var(--s2) 0 0;
+    padding: var(--s2) 0 0;
+    border-top: 1px solid var(--hairline);
+    list-style: none;
+  }
+  .fq {
+    display: grid;
+    grid-template-columns: 40px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--s3);
+    width: 100%;
+    min-height: 52px;
+    padding: 6px var(--s2);
+    border: 0;
+    border-radius: var(--r-small);
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color var(--t-hover) ease;
+  }
+  .fq:hover,
+  .fq:focus-visible {
+    background: var(--hover);
+  }
+  .fq:focus-visible {
+    outline-offset: -2px;
+  }
+  .fq[aria-current="true"] {
+    background: var(--part-on);
+  }
+  .fq img {
+    width: 40px;
+    height: 40px;
+    border-radius: var(--r-control);
+    object-fit: cover;
+  }
+  .fq-text {
+    display: grid;
+    min-width: 0;
+  }
+  .fq-title,
+  .fq-artist {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .fq-title {
+    font-weight: var(--fw-bold);
+  }
+  .fq-artist,
+  .fq-time {
+    color: var(--ink2);
+    font-weight: var(--fw-medium);
+  }
+  .dlf-h {
+    padding: var(--s2) var(--s2) var(--s2);
+    color: var(--ink2);
+    font-weight: var(--fw-medium);
+  }
+  .dlf-row {
+    display: grid;
+    grid-template-columns: 18px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--s3);
+    min-height: 52px;
+    padding: 6px var(--s3) 6px var(--s2);
+    border-radius: var(--r-small);
+    color: var(--text);
+    text-decoration: none;
+    transition: background-color var(--t-hover) ease;
+  }
+  .dlf-row:hover,
+  .dlf-row:focus-visible {
+    background: var(--hover);
+  }
+  .dlf-row:focus-visible,
+  .dlf-more:focus-visible {
+    outline-offset: -2px;
+  }
+  .dlf-row svg {
+    color: var(--ink2);
+  }
+  .dlf-text {
+    display: grid;
+  }
+  .dlf-text b {
+    font-weight: var(--fw-bold);
+  }
+  .dlf-text i {
+    color: var(--ink2);
+    font-style: normal;
+    font-weight: var(--fw-medium);
+  }
+  .dlf-size {
+    color: var(--ink2);
+  }
+  .dlf-row:hover .dlf-size {
+    color: var(--text);
+  }
+  .dlf-more {
+    display: block;
+    margin-top: var(--s1);
+    padding: var(--s2);
+    border-radius: var(--r-small);
+    color: var(--text);
+    font-weight: var(--fw-bold);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    text-decoration-color: color-mix(in srgb, var(--text) 45%, transparent);
+  }
+
+  /* ---- Windows' tooltip, Windows' timing (bar.ts) ---- */
+  .bar-tip {
+    --mat: var(--mat-solid);
+    position: fixed;
+    left: 0;
+    top: 0;
+    padding: 6px var(--s3);
+    border-radius: var(--r-small);
+    font-size: var(--fs-small);
+    font-weight: var(--fw-medium);
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 100ms ease;
+  }
+  .bar-tip[data-on] {
+    opacity: 1;
+  }
+  .bar-tip:not([data-on]) {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  /* ---- The desktop's menu (the app's own, song_menu.slint) ---- */
+  .ctx {
+    --mat: var(--mat-solid);
+    position: fixed;
+    inset: auto;
+    width: 15rem;
+    margin: 0;
+    padding: var(--s2);
+    border: 0;
+    border-radius: var(--r-panel);
+    color: var(--text);
+    font-size: var(--fs-small);
+  }
+  .ctx:popover-open {
+    display: grid;
+    animation: ctx-in var(--t-small) var(--ease-out);
+  }
+  @keyframes ctx-in {
+    from {
+      opacity: 0;
+      scale: 0.96;
+    }
+  }
+  .ctx-item {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: var(--s3);
+    height: 36px;
+    padding: 0 var(--s2) 0 10px;
+    border: 0;
+    border-radius: var(--r-control);
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    font-weight: var(--fw-medium);
+    text-align: left;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .ctx-item > :is(svg, .pp) {
+    flex: none;
+    width: 18px;
+    height: 18px;
+    color: var(--ink2);
+  }
+  .ctx-item:hover,
+  .ctx-item:focus-visible {
+    background: var(--hover);
+    outline: none;
+  }
+  .ctx-div {
+    height: 9px;
+    margin: 0 var(--s2);
+    background: linear-gradient(transparent 4px, var(--hairline) 4px 5px, transparent 5px);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .dock,
+    .cap-bg,
+    .fly {
+      transition-property: opacity;
+      translate: none;
+      scale: none;
+    }
+    .ctx:popover-open {
+      animation: none;
+    }
+  }
+  @media (forced-colors: active) {
+    .dock,
+    .cap-bg {
+      border: 1px solid CanvasText;
+    }
+  }
+</style>

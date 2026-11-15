@@ -100,8 +100,7 @@ test("dragged by its title bar, the window moves and stays wholly in view", asyn
   expect(end.y + end.height).toBeLessThanOrEqual(900.5);
 });
 
-// The old 72 px header covers a maximised title bar until the bar replaces it (task 6).
-test.fixme("maximise fills the screen under the bar; restore and a double-click on the title bar bring it back", async ({ page }) => {
+test("maximise fills the screen under the bar; restore and a double-click on the title bar bring it back", async ({ page }) => {
   await page.goto("/");
   await wake(page);
   const before = await windowBox(page);

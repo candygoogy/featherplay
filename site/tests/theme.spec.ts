@@ -43,13 +43,14 @@ test("the toggle persists across reloads", async ({ page }) => {
 // One button, three modes: System (follow Windows), Light, Dark, and round again. Its icon is
 // the mode it's in (a monitor, the sun, the moon), its name and tooltip say the mode and what a
 // click does next.
-const toggle = "[data-site-header] [data-theme-toggle]";
+const toggle = "[data-site-bar] [data-theme-toggle]";
 const mode = (page: import("@playwright/test").Page) =>
   page.locator(toggle).evaluate((b) => {
     const o = (s: string) => Number(getComputedStyle(b.querySelector(s)!).opacity);
     return {
       name: b.getAttribute("aria-label"),
-      tip: b.querySelector("[data-tip]")?.textContent?.trim() ?? null,
+      // The bar's tooltip says the toggle's name (src/scripts/bar.ts).
+      tip: b.getAttribute("aria-label"),
       stored: localStorage.getItem("fp-theme"),
       theme: document.documentElement.dataset.theme,
       icons: { system: o(".system"), sun: o(".sun"), moon: o(".moon") },
@@ -101,36 +102,38 @@ test("back on System the page follows the OS live again; on Light or Dark it doe
 test("the tooltip shows on hover and keyboard focus, and Escape puts it away", async ({ page }) => {
   await page.goto("/");
   await page.waitForTimeout(400);
-  const tip = page.locator(`${toggle} [data-tip]`);
-  await expect(tip).toHaveCSS("opacity", "0");
+  const tip = page.locator("[data-bar-tip]");
+  await expect(tip).not.toHaveAttribute("data-on", /.*/);
   await page.locator(toggle).hover();
-  await expect(tip).toHaveCSS("opacity", "1");
+  await expect(tip).toHaveAttribute("data-on", "");
+  await expect(tip).toHaveText("Theme: System. Switch to Light");
   await page.keyboard.press("Escape");
-  await expect(tip).toHaveCSS("opacity", "0");
+  await expect(tip).not.toHaveAttribute("data-on", /.*/);
   await page.mouse.move(0, 400);
   await page.locator(toggle).focus();
   await page.keyboard.press("Shift+Tab");
   await page.keyboard.press("Tab");
   await expect(page.locator(toggle)).toBeFocused();
-  await expect(tip).toHaveCSS("opacity", "1");
+  await expect(tip).toHaveAttribute("data-on", "");
 });
 
 for (const [label, viewport] of [
-  ["the pills", { width: 1440, height: 900 }],
-  ["a phone", { width: 390, height: 844 }],
+  ["the docked bar", { width: 1440, height: 900 }],
+  ["the compact bar", { width: 390, height: 844 }],
 ] as const) {
   test(`the toggle works as ${label}`, async ({ page }) => {
     await page.setViewportSize(viewport);
     await page.emulateMedia({ colorScheme: "dark" });
     await page.goto("/");
-    await page.evaluate(() => scrollTo({ top: 2400, behavior: "instant" }));
-    await expect(page.locator("[data-site-header]")).toHaveAttribute("data-floating", "");
     await page.waitForTimeout(400);
     await page.locator(toggle).click();
     await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
     await expect(page.locator(toggle)).toHaveAttribute("aria-label", "Theme: Light. Switch to Dark");
     // Its tooltip stays inside the window.
-    const r = await page.locator(`${toggle} [data-tip]`).evaluate((el) => el.getBoundingClientRect().toJSON());
+    await page.mouse.move(0, viewport.height - 10);
+    await page.locator(toggle).hover();
+    await expect(page.locator("[data-bar-tip]")).toHaveAttribute("data-on", "");
+    const r = await page.locator("[data-bar-tip]").evaluate((el) => el.getBoundingClientRect().toJSON());
     expect(r.left).toBeGreaterThanOrEqual(0);
     expect(r.right).toBeLessThanOrEqual(viewport.width);
   });

@@ -2,7 +2,8 @@
 // Windows' media controls for featherplay's song, as the system's media flyout shows them: the
 // app, the time, the cover, the title and artist, the line and the three keys. Live on the
 // player store (src/demo/bind-pieces.ts); the keys play, pause and skip the page's one player.
-// `surface` gives it its own glass (on the page); inside a flyout it takes the flyout's.
+// `surface` gives it its own glass, painted (it lies on a still panel); inside a flyout it
+// takes the flyout's.
 import "../../styles/pieces.css";
 import Icon from "../Icon.astro";
 import Logo from "../Logo.astro";
@@ -20,7 +21,7 @@ const song = songById(demoStart.songId)!;
 ---
 
 <div
-  class:list={["m-media", className, { "glass float live": surface }]}
+  class:list={["m-media", className, { "glass float": surface }]}
   data-piece="media"
   role="group"
   aria-label="Now playing in featherplay, as Windows' media controls show it"

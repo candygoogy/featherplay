@@ -68,15 +68,17 @@ const steps = [
 <p class="visually-hidden" role="status" data-announce></p>
 
 <!-- The three steps: the story's words for reading in order, and plain blocks where it doesn't run. -->
-<section class="steps frame" id="after-app" tabindex="-1" aria-label="How featherplay steps back" data-steps>
-  {
-    steps.map((s) => (
-      <div class="step">
-        <h2 class="t-title">{s.h}</h2>
-        <p class="t-lede ink2">{s.p}</p>
-      </div>
-    ))
-  }
+<section class="steps" id="after-app" tabindex="-1" aria-label="How featherplay steps back" data-steps>
+  <div class="frame steps-in">
+    {
+      steps.map((s) => (
+        <div class="step">
+          <h2 class="t-title">{s.h}</h2>
+          <p class="t-lede ink2">{s.p}</p>
+        </div>
+      ))
+    }
+  </div>
 </section>
 
 <script>
@@ -170,8 +172,10 @@ const steps = [
     visibility: hidden;
   }
   .steps {
-    display: grid;
     background: var(--desk);
+  }
+  .steps-in {
+    display: grid;
     gap: var(--s7);
     padding-block: var(--s8);
   }

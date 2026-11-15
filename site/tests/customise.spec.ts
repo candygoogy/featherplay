@@ -41,7 +41,10 @@ test("until a theme is picked the window follows the page, and can go back to it
   await open(page);
   const section = page.locator("#yours");
   await expect(section.getByRole("radio", { name: "Match the page" })).toBeChecked();
+  // The bar's theme toggle is the docked bar's: at the top of the page.
+  await page.evaluate(() => scrollTo(0, 0));
   await page.locator("[data-theme-toggle]").click();
+  await section.scrollIntoViewIfNeeded();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   await expect.poll(() => bg(page, "[data-yours] [data-replica]")).toBe("rgb(255, 255, 255)");
 

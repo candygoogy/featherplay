@@ -15,7 +15,7 @@ const { corner = false, class: className } = Astro.props;
 {
   corner ? (
     <span class:list={["tray-corner", className]} data-piece="tray" role="img" aria-label="featherplay’s icon in the tray, its tooltip naming the song">
-      <span class="tray-tip glass float live" aria-hidden="true">
+      <span class="tray-tip glass float" aria-hidden="true">
         <span data-tray-1>featherplay</span>
         <span data-tray-2>Nothing playing</span>
       </span>
@@ -28,7 +28,7 @@ const { corner = false, class: className } = Astro.props;
       </span>
     </span>
   ) : (
-    <span class:list={["tray-tip glass float live", className]} data-piece="tray">
+    <span class:list={["tray-tip glass float", className]} data-piece="tray">
       <span data-tray-1>featherplay</span>
       <span data-tray-2>Nothing playing</span>
     </span>

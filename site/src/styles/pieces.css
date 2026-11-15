@@ -547,7 +547,7 @@
   text-wrap: balance;
   cursor: pointer;
   transition:
-    color 400ms ease,
+    color calc(400ms * var(--colour-easing)) ease,
     background-color var(--t-hover) ease;
 }
 .lc-line[data-state="next"] {

@@ -718,7 +718,11 @@ function bindReplica(root: HTMLElement, player: Player) {
     last.lyricsOn = s.lyricsOn;
   }
 
+  // Its first drawing (a window wired late, as it comes near) catches up with the player at
+  // once: no line fading to its colour, nothing easing on a clock of its own.
+  root.classList.add("theme-quiet");
   player.subscribe(render);
+  requestAnimationFrame(() => requestAnimationFrame(() => root.classList.remove("theme-quiet")));
 }
 
 let bound = false;
