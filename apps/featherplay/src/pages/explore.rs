@@ -399,25 +399,19 @@ mod tests {
     }
 
     #[test]
-    fn the_services_own_channels_are_not_named_on_cards() {
-        let shown = unbranded(&[chart_playlist(Some("YouTube Charts"))]);
-        assert_eq!(author(&shown), None);
+    fn the_services_own_channels_are_not_named_on_cards_and_other_authors_stay() {
+        // (author, shown)
+        for (by, want) in [("YouTube Charts", None), ("Kocky Ka", Some("Kocky Ka"))] {
+            let shown = unbranded(&[chart_playlist(Some(by))]);
+            assert_eq!(author(&shown).as_deref(), want, "{by}");
+        }
     }
 
     #[test]
-    fn other_authors_stay() {
-        let shown = unbranded(&[chart_playlist(Some("Kocky Ka"))]);
-        assert_eq!(author(&shown).as_deref(), Some("Kocky Ka"));
-    }
-
-    #[test]
-    fn the_picker_marks_the_country_shown() {
-        assert_eq!(country_index(&charts(Some("ZZ"))), 1);
-    }
-
-    #[test]
-    fn a_country_the_menu_lacks_marks_none() {
-        assert_eq!(country_index(&charts(Some("FR"))), -1);
-        assert_eq!(country_index(&charts(None)), -1);
+    fn the_picker_marks_the_country_shown_or_none_the_menu_lacks() {
+        // (country shown, marked row)
+        for (shown, want) in [(Some("ZZ"), 1), (Some("FR"), -1), (None, -1)] {
+            assert_eq!(country_index(&charts(shown)), want, "{shown:?}");
+        }
     }
 }
