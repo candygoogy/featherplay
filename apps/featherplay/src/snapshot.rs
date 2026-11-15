@@ -82,6 +82,16 @@ const SOUNDTRACK_ALBUM: &str = "Cyberpunk: Edgerunners 2 (Original Series Soundt
 /// ceiling is for slow machines: a CI runner decoding a 4K Home's ~120 covers in a debug build
 /// took over 15 s.
 const SETTLE: Duration = Duration::from_secs(60);
+/// Whether a `settle` that runs out of time panics instead of going on (`settle_must_finish`).
+static SETTLE_MUST_FINISH: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+
+/// From here on, a `settle` whose loads are still pending after its ceiling panics. The
+/// snapshot command renders what it has; a test that went on would pass a minute late with a
+/// load stuck (a timer that never fires on a frozen clock) and nobody would see it.
+pub fn settle_must_finish() {
+    SETTLE_MUST_FINISH.store(true, std::sync::atomic::Ordering::Relaxed);
+}
 /// The fixture track's position, the same in every snapshot.
 const POSITION: Duration = Duration::from_secs(161);
 
@@ -343,6 +353,12 @@ impl Scene {
     /// Runs queued work until every load and cover has arrived.
     pub fn settle(&self) {
         if !self.pump.until(|| busy::pending() == 0, SETTLE) {
+            assert!(
+                !SETTLE_MUST_FINISH.load(std::sync::atomic::Ordering::Relaxed),
+                "{} loads still pending after {}s",
+                busy::pending(),
+                SETTLE.as_secs()
+            );
             log!(
                 "featherplay: snapshot: {} loads still pending after {}s, rendering anyway",
                 busy::pending(),

@@ -50,6 +50,8 @@ extern "C" fn fresh_home() {
     // Windows hands a process ID out again: one that died may have left its home behind.
     let _ = std::fs::remove_dir_all(&home);
     std::fs::create_dir_all(&home).expect("test home");
+    // A wait that runs out of time fails the test instead of passing a minute late.
+    featherplay::snapshot::settle_must_finish();
     // SAFETY: before `main`, on the process's only thread; `remove` is a plain function.
     unsafe {
         std::env::set_var("FEATHERPLAY_HOME", &home);
@@ -351,6 +353,23 @@ pub fn step(scene: &Scene) -> Frame1 {
         cpu: cpu::ms(cpu::cycles() - c),
         damaged: p.damaged,
     }
+}
+
+/// Frames until nothing loads: the wait on a frozen clock for a load that hangs on a timer.
+/// The lyrics are looked up a second after they're asked for and their lines come a few a
+/// frame, and `Scene::settle` alone moves no clock, so it would wait its whole ceiling.
+pub fn settle_in_frames(scene: &Scene) {
+    for _ in 0..2000 {
+        scene.settle_once();
+        frames(scene.ui.window(), 1, |_| {});
+        if featherplay::busy::pending() == 0 {
+            return;
+        }
+    }
+    panic!(
+        "{} loads still pending after 2000 frames",
+        featherplay::busy::pending()
+    );
 }
 
 /// `n` frames of `step`.

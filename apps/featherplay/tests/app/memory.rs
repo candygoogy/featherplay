@@ -16,7 +16,7 @@
 
 use std::path::{Path, PathBuf};
 
-use crate::support::{click_tab, frames, private_mb, scene_at, sweep};
+use crate::support::{click_tab, frames, private_mb, scene_at, settle_in_frames, sweep};
 use featherplay::snapshot::Scene;
 use featherplay::ui::{HomeData, LyricsData, Theme};
 use serde_json::Value;
@@ -212,7 +212,7 @@ fn session(log: bool) -> Vec<(&'static str, f64)> {
     scene.settle();
     let lyrics = ui.global::<LyricsData>();
     lyrics.invoke_toggle_view();
-    scene.settle();
+    settle_in_frames(&scene);
     frames(w, 120, |_| {});
     note("lyrics");
 

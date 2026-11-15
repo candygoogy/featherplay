@@ -29,7 +29,7 @@ export component Cover inherits Rectangle {
     in property <bool> layered: true;
     // Takes its layer even when the art is decoded at the size shown (no resampling to
     // save): drawn through its rounded clip, art at Home's tile size still cost a 4K scroll
-    // frame ~6 ms more than none (`tests/app/home_covers.rs`).
+    // frame ~6 ms more than none (`tests/app/scroll_frames.rs`).
     in property <bool> layer-at-size: false;
     // The art underneath while a crossfade runs, the art last shown, and whether the top
     // layer has settled.

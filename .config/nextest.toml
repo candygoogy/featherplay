@@ -19,7 +19,7 @@ serial-perf = { max-threads = 1 }
 # Frame-cost and CPU-time ceilings, and the measurements (ignored, run with
 # `--run-ignored only`). Their numbers only mean something on an otherwise idle machine.
 [[profile.default.overrides]]
-filter = 'package(featherplay) & binary(app) & test(/^(smoothness|first_frames|home_scroll_bump|home_covers|lyrics_frames|related_scroll|scroll_frames|side_panel|render_timing|resize_frames|lyrics_gate|lyrics_toggle|lyrics_arrive|lyrics_button|skeleton_frames|content_fade|memory)::/)'
+filter = 'package(featherplay) & binary(app) & test(/^(smoothness|first_frames|home_scroll_bump|lyrics_frames|scroll_frames|resize_frames|lyrics_arrive|lyrics_button|skeleton_frames|content_fade|memory)::/)'
 test-group = 'serial-perf'
 threads-required = 'num-test-threads'
 
@@ -30,13 +30,13 @@ threads-required = 'num-test-threads'
 # CI's Linux job always runs this profile: the ceilings were set on Windows, and the CPU-time
 # ones count thread cycles, which only Windows reports.
 [profile.ci]
-default-filter = 'not (package(featherplay) & binary(app) & test(/^(smoothness|first_frames|home_scroll_bump|home_covers|lyrics_frames|related_scroll|scroll_frames|side_panel|render_timing|resize_frames|lyrics_gate|lyrics_toggle|lyrics_arrive|lyrics_button|skeleton_frames|content_fade|memory)::/))'
+default-filter = 'not (package(featherplay) & binary(app) & test(/^(smoothness|first_frames|home_scroll_bump|lyrics_frames|scroll_frames|resize_frames|lyrics_arrive|lyrics_button|skeleton_frames|content_fade|memory)::/))'
 
-# Tests on Slint's real clock: they sleep a few hundred milliseconds and expect motion to have
-# run (or not) in that time. Beside a full machine a frame can take longer than a fade, and
-# `motion_idle` failed so ("the page appeared without its enter fade").
+# The no-lyrics tests run on Slint's real clock: a lyrics lookup starts on a timer, which a
+# frozen clock never fires. Beside a full machine a frame can take longer than a fade, so they
+# run alone. The other motion tests step a frozen clock and run beside everything else.
 [[profile.default.overrides]]
-filter = 'package(featherplay) & binary(app) & test(/^(motion_idle|playing_mark|paused_idle|library_refresh|lyrics_none|prepare_rows)::/)'
+filter = 'package(featherplay) & binary(app) & test(/^lyrics_none::/)'
 test-group = 'serial-perf'
 threads-required = 'num-test-threads'
 
@@ -55,10 +55,10 @@ filter = 'package(featherplay-streams) | (package(featherplay-controller) & test
 slow-timeout = { period = "30s", terminate-after = 2 }
 
 # Settings' Discord card, settled offscreen in a few seconds, the activity sent to Discord,
-# built without one, and the Amuse endpoint's requests: a test that hangs is ended after a
-# minute too.
+# built without one, and the local API's and the Amuse endpoint's requests to a server on
+# this machine: a test that hangs is ended after a minute too.
 [[profile.default.overrides]]
-filter = '(package(featherplay) & binary(app) & test(/^discord_card::/)) | (package(featherplay-integrations) & test(/^(discord|amuse)::/))'
+filter = '(package(featherplay) & binary(app) & test(/^discord_card::/)) | (package(featherplay-integrations) & test(/^(discord|amuse|local_api)::/))'
 slow-timeout = { period = "30s", terminate-after = 2 }
 
 # Now playing's info block and its no-lyrics state, settled offscreen in a few seconds:

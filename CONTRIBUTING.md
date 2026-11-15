@@ -166,7 +166,8 @@ variable before Credential Manager. Use it to run a dev build signed in: a dev b
 signs in through its window writes the same Credential Manager entries as your installed
 featherplay, whatever `FEATHERPLAY_HOME` says. A few of these tests write and undo (a like,
 then back; a playlist made and then deleted), so use a second Google account, never your
-main one, and don't run them in a loop.
+main one, and don't run them in a loop. The `live_record_*` tests save raw responses for new
+fixtures into `FEATHERPLAY_RECORD_DIR` and skip, saying so, when it isn't set.
 
 ### Offscreen snapshots
 
