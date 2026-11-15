@@ -164,6 +164,8 @@ test("closing to the tray keeps the song playing; closing featherplay stops it",
 });
 
 test("the wheel over the window scrolls the page until the visitor clicks into it", async ({ page }) => {
+  // The window still (no scroll story), so the wheel's effect on the page is plain to see.
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
   await wake(page);
   const lines = (await replica(page).locator("[data-lyrics]").boundingBox())!;

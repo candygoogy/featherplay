@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { reach } from "./helpers";
 import { songs } from "../src/data/songs";
 
 // "Make it yours": a theme for the app's window (not the page) and a cover that plays and
@@ -12,7 +13,7 @@ const bg = (page: Page, sel: string) =>
 
 async function open(page: Page) {
   await page.goto("/");
-  await page.locator("#yours").scrollIntoViewIfNeeded();
+  await reach(page, "#yours");
 }
 
 test("picking light or dark restyles the replica only, not the page", async ({ page }) => {
@@ -144,7 +145,7 @@ test("pressing Lyrics in the window keeps the window's size, and the cover glide
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/");
   const win = page.locator("[data-yours-window]");
-  await win.scrollIntoViewIfNeeded();
+  await reach(page, "[data-yours-window]");
   const before = (await win.boundingBox())!;
   const cover = page.locator("#replica-yours .np-cover");
   const start = (await cover.boundingBox())!;

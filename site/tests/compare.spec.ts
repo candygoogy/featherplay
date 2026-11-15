@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { reach } from "./helpers";
 import { figures, metrics, timesLess } from "../src/data/numbers";
 import { figureText, formatFigure } from "../src/data/format";
 
@@ -72,10 +73,11 @@ test.describe("on a phone", () => {
 
 test("what it leaves out: four quiet notes, none struck through, and no ads wording", async ({ page }) => {
   await page.goto("/");
+  await reach(page, "#light [data-leaves-out]");
   const items = section(page).locator("[data-leaves-out] li");
   await expect(items).toHaveCount(4);
-  const names = await items.locator(".note-name").allInnerTexts();
-  expect(names).toEqual(["Chromium", "Electron", "Video", "Telemetry"]);
+  // Read once the section has rendered (it waits, content-visibility, until it's near).
+  await expect.poll(() => items.locator(".note-name").allInnerTexts()).toEqual(["Chromium", "Electron", "Video", "Telemetry"]);
   await expect(items.locator("s, del")).toHaveCount(0);
   for (const n of await items.locator(".note-name").all()) {
     expect(await n.evaluate((el) => getComputedStyle(el).textDecorationLine)).not.toContain("line-through");
@@ -122,7 +124,7 @@ test("each note lights its files in Pear's folder: on hover, on focus, and press
 test("the sizes are weighed like with like: Pear installed against featherplay installed, and the exe", async ({ page }) => {
   await page.goto("/");
   const weigh = section(page).locator("[data-weigh]");
-  await weigh.scrollIntoViewIfNeeded();
+  await reach(page, "#light [data-weigh]");
   // MB as Windows counts them, the same unit for every size.
   await expect(weigh.locator("[data-weigh-row='pear']")).toContainText("Pear Desktop, installed");
   await expect(weigh.locator("[data-weigh-row='pear']")).toContainText("396 MB");

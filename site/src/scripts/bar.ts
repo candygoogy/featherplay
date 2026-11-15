@@ -61,7 +61,9 @@ export function bindBar(bar: HTMLElement, player: Player): { readonly state: Bar
     if (next === state) return;
     state = next;
     hideTip();
-    for (const f of flyouts) if (f.matches(":popover-open") && !held.has(f)) f.hidePopover();
+    // A flyout the pointer opened goes with the old layout; one opened by a click, or by the
+    // story's beat in the tray (data-story), stays and follows its part.
+    for (const f of flyouts) if (f.matches(":popover-open") && !held.has(f) && !f.hasAttribute("data-story")) f.hidePopover();
     relayout(() => (bar.dataset.state = next), animate);
     bar.dispatchEvent(new CustomEvent("barstate", { detail: next }));
   }

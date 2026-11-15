@@ -132,6 +132,8 @@ test("hovering Not for me for a moment shows what it does", async ({ page }) => 
 });
 
 test("the toast stays while the pointer rests on it, whatever the other players' toasts do", async ({ page }) => {
+  // The window still (no scroll story moving it from under the resting pointer).
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await page.clock.install();
   await ready(page);
   await bar(page).getByRole("button", { name: "Not for me" }).click();

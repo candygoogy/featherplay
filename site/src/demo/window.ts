@@ -20,6 +20,8 @@ export type WindowController = {
   readonly home: Frame;
   /** Where it is drawn now (the pin's coordinates). */
   readonly frame: Frame;
+  /** Where it rests by the visitor's own placement (home, dragged or maximised). */
+  readonly rested: Frame;
   readonly maximised: boolean;
   readonly minimised: boolean;
   /** Measure again (a resize, the fonts arriving). */
@@ -46,6 +48,10 @@ const reduced = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 const tf = (f: Frame, off: { x: number; y: number }) =>
   `translate(${(f.x - off.x).toFixed(2)}px, ${(f.y - off.y).toFixed(2)}px) scale(${f.s.toFixed(5)})`;
 
+let ready: (w: WindowController) => void;
+/** The page's window, once it is bound (the story waits for it). */
+export const whenWindow = new Promise<WindowController>((r) => (ready = r));
+
 export function bindWindow(el: HTMLElement, player: Player): WindowController {
   const slot = el.parentElement as HTMLElement;
   const pin = el.closest<HTMLElement>("[data-pin]") ?? document.body;
@@ -62,6 +68,7 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
   let driven: Frame | null = null;
   let shown: Frame = home;
   let size = { w: 0, h: 0 };
+  let scaleTimer = 0;
   const layoutFns: (() => void)[] = [];
 
   // ---- Geometry ----
@@ -104,7 +111,11 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
     }
     el.style.transform = tf(f, slotOff);
     el.style.opacity = f.o >= 1 ? "" : f.o.toFixed(3);
-    el.style.setProperty("--s", f.s.toFixed(4));
+    // The scale for the page-size caption targets and corners: written once the window rests
+    // (it changes their layout), not on every frame of a move.
+    clearTimeout(scaleTimer);
+    const s = f.s.toFixed(4);
+    if (el.style.getPropertyValue("--s") !== s) scaleTimer = window.setTimeout(() => el.style.setProperty("--s", s), 120);
     shown = f;
   };
   /** Glides from where the window is drawn now to `to`, then rests there. */
@@ -161,7 +172,7 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
 
   // ---- Maximise and restore ----
   function setMax(on: boolean, ms = MAX_MS) {
-    if (on && !desk.matches) return;
+    if ((on && !desk.matches) || driven) return;
     maxed = on;
     el.toggleAttribute("data-max", on);
     replica.querySelector('[data-act="maximise"]')?.setAttribute("aria-label", on ? "Restore featherplay" : "Maximise featherplay");
@@ -323,13 +334,16 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
   layout();
   document.fonts?.ready.then(relayout);
 
-  return {
+  const controller: WindowController = {
     el,
     get home() {
       return home;
     },
     get frame() {
       return shown;
+    },
+    get rested() {
+      return rested();
     },
     get maximised() {
       return maxed;
@@ -340,6 +354,8 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
     layout,
     drive(f) {
       driven = f;
+      // Out of sight (gone into the tray, faded for a change of shape), out of the keyboard's way.
+      el.inert = minimised || (!!f && f.o < 0.5);
       if (f) {
         for (const a of el.getAnimations()) a.cancel();
         draw(f);
@@ -357,4 +373,6 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
       layoutFns.push(fn);
     },
   };
+  ready(controller);
+  return controller;
 }

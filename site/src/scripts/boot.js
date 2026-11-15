@@ -9,6 +9,10 @@
   if (t !== "dark" && t !== "light") t = matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
   document.documentElement.dataset.theme = t;
   document.documentElement.classList.add("js", "booting");
+  // The scroll story's pinned stage (src/scripts/story.ts STORY), before the first paint, so
+  // the page's height doesn't change under the visitor.
+  if (matchMedia("(min-width: 761px) and (min-height: 600px) and (prefers-reduced-motion: no-preference)").matches)
+    document.documentElement.dataset.story = "";
   // Nothing eases until the styles are in (base.css): DOMContentLoaded comes after the module
   // scripts, which wait for the stylesheets; then two frames.
   addEventListener("DOMContentLoaded", () =>

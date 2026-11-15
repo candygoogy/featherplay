@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { reach } from "./helpers";
 import { demoStart, songs } from "../src/data/songs";
 import { currentLineIndex } from "../src/demo/player";
 
@@ -7,7 +8,7 @@ const lines = (page: Page) => show(page).locator("[data-showcase-lines]");
 
 async function open(page: Page) {
   await page.goto("/");
-  await show(page).scrollIntoViewIfNeeded();
+  await reach(page, "#lyrics");
 }
 
 const shift = (page: Page) =>
