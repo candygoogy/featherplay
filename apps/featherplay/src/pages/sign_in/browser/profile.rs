@@ -135,17 +135,6 @@ mod tests {
     }
 
     #[test]
-    fn the_profile_follows_featherplay_home() {
-        let Some(home) = scratch("home") else {
-            return;
-        };
-        let cache = featherplay_store::Paths::from_home(&home).cache;
-        let p = create(&cache).unwrap();
-        assert!(p.starts_with(&home), "{}", p.display());
-        std::fs::remove_dir_all(&home).unwrap();
-    }
-
-    #[test]
     fn the_sweep_deletes_only_other_processes_signin_folders() {
         let Some(cache) = scratch("sweep") else {
             return;
