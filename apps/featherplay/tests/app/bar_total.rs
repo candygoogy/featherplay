@@ -1,9 +1,10 @@
 //! The bottom bar's total and scrubber for a track the catalog gave no length (a Home
 //! shelf's quick pick), on the offscreen platform (no window is shown): empty while the
-//! stream resolves, then the stream's length.
+//! stream resolves, then the stream's length. That the player fills the length in from the
+//! stream is `featherplay-core`'s test (`the_stream_length_fills_in_a_missing_duration`).
 
 use std::path::PathBuf;
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
 
 use featherplay::app::Ctx;
 use featherplay::bar;
@@ -13,18 +14,28 @@ use featherplay::offscreen;
 use featherplay::ui::{AppWindow, Player as Bar};
 use featherplay_controller::catalog::Catalog;
 use featherplay_core::model::{LikeStatus, Track, TrackId, VideoType};
-use featherplay_core::player::{Input, PlaybackPrefs, Player, Status, StreamInfo};
 use slint::ComponentHandle;
 use tokio::sync::mpsc;
 
-fn state(p: &Player) -> PlayerState {
+/// The quick pick playing from its start, its length `duration` (none until it resolves).
+fn playing(duration: Option<Duration>) -> PlayerState {
     PlayerState {
-        current: p.queue().current().cloned(),
-        upcoming: p.queue().upcoming().into(),
-        playing: p.wants_play(),
-        audible: matches!(p.status(), Status::Playing),
-        loading: matches!(p.status(), Status::Loading),
-        position: p.position(),
+        current: Some(Track {
+            id: TrackId("sleepless".into()),
+            title: "Sleepless".into(),
+            artists: Vec::new(),
+            album: None,
+            duration,
+            video_type: VideoType::Song,
+            thumbnail: None,
+            like: LikeStatus::Indifferent,
+            counterpart: None,
+        }),
+        upcoming: Vec::new().into(),
+        playing: true,
+        audible: duration.is_some(),
+        loading: duration.is_none(),
+        position: Duration::ZERO,
         shuffle: false,
         repeat: Default::default(),
         radio: false,
@@ -51,45 +62,11 @@ fn the_total_appears_once_the_stream_resolves() {
     let ctx = Ctx::new(&ui, catalog, covers, actions);
     let bar_of = || ui.global::<Bar>();
 
-    let quick_pick = Track {
-        id: TrackId("sleepless".into()),
-        title: "Sleepless".into(),
-        artists: Vec::new(),
-        album: None,
-        duration: None,
-        video_type: VideoType::Song,
-        thumbnail: None,
-        like: LikeStatus::Indifferent,
-        counterpart: None,
-    };
-    let mut p = Player::new(PlaybackPrefs {
-        prefer_song_versions: true,
-        skip_non_music_in_radio: true,
-        scrobble_other_media: true,
-        list_end: Default::default(),
-        skip_disliked: true,
-        crossfade: None,
-        fade_on_skip: false,
-        speed_percent: 100,
-    });
-    p.handle(Input::PlayTracks {
-        tracks: vec![quick_pick],
-        start: 0,
-        radio: false,
-    });
-    bar::apply(&ctx, &state(&p));
-    assert_eq!(bar_of().get_total().as_str(), "");
+    bar::apply(&ctx, &playing(None));
+    assert_eq!(bar_of().get_total().as_str(), "", "a total with no length");
     assert_eq!(bar_of().get_duration_s(), 0.0);
 
-    p.handle(Input::Resolved {
-        id: TrackId("sleepless".into()),
-        result: Ok(StreamInfo {
-            expires_at: SystemTime::now() + Duration::from_secs(6 * 3600),
-            duration: Some(Duration::from_secs(215)),
-        }),
-    });
-    p.handle(Input::AudioStarted);
-    bar::apply(&ctx, &state(&p));
+    bar::apply(&ctx, &playing(Some(Duration::from_secs(215))));
     assert_eq!(bar_of().get_total().as_str(), "3:35");
     assert_eq!(bar_of().get_duration_s(), 215.0);
     assert_eq!(bar_of().get_elapsed().as_str(), "0:00");
