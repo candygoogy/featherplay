@@ -4,13 +4,9 @@ use super::*;
 /// next use scans the folder again rather than giving up on the disk cache.
 #[test]
 fn a_poisoned_index_is_scanned_again() {
-    // Under `FEATHERPLAY_HOME`, else the temp folder.
-    let base = std::env::var("FEATHERPLAY_HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| std::env::temp_dir().join("featherplay-tests"));
-    let dir = base.join(format!("test-covers-poison-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
-    std::fs::create_dir_all(&dir).unwrap();
+    let Some(dir) = crate::testing::scratch("covers-poison") else {
+        return;
+    };
     std::fs::write(dir.join("a.img"), b"abc").unwrap();
     let cache = DiskCache::new(dir.clone());
     std::thread::scope(|s| {

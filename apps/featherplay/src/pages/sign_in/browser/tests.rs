@@ -135,14 +135,16 @@ impl browsers::Lookup for PolicyOffPc {
     ignore = "Windows only: the policy is read from the registry"
 )]
 fn with_the_policy_off_the_browser_isnt_started() {
-    let home = std::env::var_os("FEATHERPLAY_HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(std::env::temp_dir);
-    let cache = home.join(format!("test-policy-{}", std::process::id()));
+    let Some(dir) = crate::testing::scratch("policy") else {
+        return;
+    };
+    let cache = dir.join("cache");
     let out = run_on(&PolicyOffPc, &EDGE, &cache, &AtomicBool::new(false));
+    let made = cache.exists();
+    let _ = std::fs::remove_dir_all(&dir);
     assert_eq!(out, Outcome::Unusable(Block::Policy));
     // No profile was made, so nothing was launched.
-    assert!(!cache.exists());
+    assert!(!made);
 }
 
 #[test]

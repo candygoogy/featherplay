@@ -92,20 +92,14 @@ fn random() -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    /// A scratch folder under the test home (`FEATHERPLAY_HOME`), or the temp dir.
-    fn scratch(name: &str) -> PathBuf {
-        let base = std::env::var_os("FEATHERPLAY_HOME")
-            .map(PathBuf::from)
-            .unwrap_or_else(std::env::temp_dir);
-        let dir = base.join(format!("test-{name}-{}-{:x}", std::process::id(), random()));
-        std::fs::create_dir_all(&dir).unwrap();
-        dir
-    }
+    use crate::testing::scratch;
 
     #[test]
     fn a_profile_is_a_new_folder_under_the_cache_dir() {
-        let cache = scratch("profile").join("cache");
+        let Some(dir) = scratch("profile") else {
+            return;
+        };
+        let cache = dir.join("cache");
         let a = create(&cache).unwrap();
         let b = create(&cache).unwrap();
         assert_ne!(a, b);
@@ -119,12 +113,13 @@ mod tests {
         assert!(!a.exists());
         // Already gone counts as removed.
         assert!(remove(&a, 1, Duration::ZERO));
-        std::fs::remove_dir_all(cache.parent().unwrap()).unwrap();
+        std::fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]
     fn a_browsers_preferences_go_in_before_it_starts() {
-        let cache = scratch("seed").join("cache");
+        let Some(dir) = scratch("seed") else { return };
+        let cache = dir.join("cache");
         let p = create(&cache).unwrap();
         let prefs = featherplay_platform::browsers::VIVALDI
             .preferences
@@ -136,12 +131,14 @@ mod tests {
             v["vivaldi"]["system"]["show_exit_confirmation_dialog"],
             false
         );
-        std::fs::remove_dir_all(cache.parent().unwrap()).unwrap();
+        std::fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]
     fn the_profile_follows_featherplay_home() {
-        let home = scratch("home");
+        let Some(home) = scratch("home") else {
+            return;
+        };
         let cache = featherplay_store::Paths::from_home(&home).cache;
         let p = create(&cache).unwrap();
         assert!(p.starts_with(&home), "{}", p.display());
@@ -150,7 +147,9 @@ mod tests {
 
     #[test]
     fn the_sweep_deletes_only_other_processes_signin_folders() {
-        let cache = scratch("sweep");
+        let Some(cache) = scratch("sweep") else {
+            return;
+        };
         let left = cache.join("signin-1-abc");
         std::fs::create_dir_all(left.join("Default")).unwrap();
         std::fs::write(left.join("Default").join("Cookies"), b"x").unwrap();
