@@ -20,9 +20,7 @@ pub struct Settings {
     /// The layout of the file: [`SCHEMA`] for this build. A file without it is 0, from
     /// 0.1.0. `load` migrates older files; a newer file loads what this build knows.
     pub schema: u32,
-    /// What the window's close button does. Files from before the setting had
-    /// `close_to_tray` instead; it's ignored, so both values load as `Ask`: the old `true`
-    /// was a default, not the user's choice.
+    /// What the window's close button does.
     #[serde(deserialize_with = "lenient")]
     pub close_action: CloseAction,
     /// The one-time "still playing in the tray" notice has been shown.
@@ -60,9 +58,7 @@ pub struct Settings {
     pub discord: bool,
     pub prefer_song_versions: bool,
     pub skip_non_music_in_radio: bool,
-    /// The accent: from the current cover (the default), or a fixed colour. Files from
-    /// before the setting had `follow_music` instead; it's ignored, so `true` and `false`
-    /// both load as `Cover`, the default the user approved.
+    /// The accent: from the current cover (the default), or a fixed colour.
     #[serde(deserialize_with = "lenient")]
     pub accent: Accent,
     /// The colour the user picked for `Accent::Custom`, kept while another accent is in use
