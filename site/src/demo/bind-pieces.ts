@@ -15,11 +15,16 @@ import { followLyrics } from "./follow";
 const $$ = <T extends Element = HTMLElement>(sel: string, root: ParentNode = document) => [...root.querySelectorAll<T>(sel)];
 const reduced = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-/** Runs a progress line from where the song is to its end, on the compositor. */
+/** Rendered now: not in a closed popover, a hidden page or a section that waits to render. */
+export const rendered = (el: Element) => !el.checkVisibility || el.checkVisibility({ contentVisibilityAuto: true });
+
+/** Runs a progress line from where the song is to its end, on the compositor. One that isn't
+ *  rendered just takes its place: an animation there can't run on the compositor, and the
+ *  main thread would tick it every frame for nothing; it starts when it shows. */
 function runLine(el: HTMLElement, from: string, to: string, ms: number, playing: boolean) {
   for (const a of el.getAnimations()) a.cancel();
   el.style.transform = from;
-  if (playing && ms > 0) el.animate([{ transform: from }, { transform: to }], { duration: ms, easing: "linear", fill: "forwards" });
+  if (playing && ms > 0 && rendered(el)) el.animate([{ transform: from }, { transform: to }], { duration: ms, easing: "linear", fill: "forwards" });
 }
 
 /** A small cover changing song: the new one fades over the old (no hard cut). */
@@ -66,7 +71,16 @@ export function bindPieces(player: Player): void {
       player.seek(Number(line.dataset.at));
       if (!player.state.playing) player.resume();
     });
-    return { card, list, follow, line: -2, instant: true };
+    const c = { card, list, follow, line: -2, instant: true };
+    // In a section that waits to render (content-visibility) the lines have no place to measure:
+    // they're placed when it shows.
+    card.closest("section")?.addEventListener("contentvisibilityautostatechange", (e) => {
+      if ((e as Event & { skipped: boolean }).skipped) return;
+      c.line = -2;
+      c.instant = true;
+      render(player.state);
+    });
+    return c;
   });
   const buildLines = (song: Song) =>
     song.lyrics.map((l) => {
@@ -142,6 +156,17 @@ export function bindPieces(player: Player): void {
   }
 
   let last: { song?: string; playing?: boolean; jumps?: number; second?: number } = {};
+  // A part showing (a flyout opening, a section rendering): its lines start from where the
+  // song is.
+  let resync = false;
+  const again = () => {
+    resync = true;
+    render(player.state);
+  };
+  for (const fly of document.querySelectorAll<HTMLElement>("[data-fly]")) fly.addEventListener("toggle", (e) => (e as ToggleEvent).newState === "open" && again());
+  for (const s of new Set([...document.querySelectorAll("[data-piece]")].map((p) => p.closest("section")))) {
+    s?.addEventListener("contentvisibilityautostatechange", (e) => !(e as Event & { skipped: boolean }).skipped && again());
+  }
 
   const render = (s: PlayerState) => {
     const song = s.song;
@@ -202,7 +227,8 @@ export function bindPieces(player: Player): void {
     }
 
     // Progress lines: from here to the end, restarted when the song, play or the place changes.
-    if (songChanged || playChanged || jumped) {
+    if (songChanged || playChanged || jumped || resync) {
+      resync = false;
       const f = Math.min(1, s.positionMs / song.durationMs);
       const left = Math.max(0, song.durationMs - s.positionMs);
       for (const el of $$("[data-piece] [data-fill]")) runLine(el, `scaleX(${f})`, "scaleX(1)", left, s.playing);
@@ -241,10 +267,11 @@ export function bindPieces(player: Player): void {
       }
     }
 
-    // The lyric cards' current line.
+    // The lyric cards' current line (not while their section is skipped: nothing to measure).
     const line = currentLineIndex(song, s.positionMs);
     for (const c of cards) {
       if (line === c.line) continue;
+      if (c.card.checkVisibility && !c.card.checkVisibility({ contentVisibilityAuto: true })) continue;
       c.line = line;
       [...c.list.querySelectorAll<HTMLElement>(".lc-line")].forEach((b, i) => {
         b.dataset.state = i < line ? "past" : i === line ? "current" : "next";

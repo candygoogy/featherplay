@@ -46,10 +46,14 @@ import { links } from "../data/links";
 </section>
 
 <style>
+  /* Below the fold: skipped (no style, layout or paint, the ring's per-second fill included)
+     until it comes near; it keeps its real height once seen. */
   .kept {
     display: grid;
     gap: var(--s6);
     padding-block: var(--s9);
+    content-visibility: auto;
+    contain-intrinsic-size: auto 1800px;
   }
   .kept-head {
     display: grid;

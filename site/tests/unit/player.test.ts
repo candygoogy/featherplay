@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createPlayer, currentLineIndex, formatTime, lyricsSource, SOUND_DRIFT_MS } from "../../src/demo/player";
+import { createPlayer, currentLineIndex, formatTime, lyricsSource, nextEventDelay, SOUND_DRIFT_MS } from "../../src/demo/player";
 import { songs } from "../../src/data/songs";
 
 // A frame clock the tests drive: rAF becomes a 16 ms timer on vitest's fake clock.
@@ -416,5 +416,25 @@ describe("the app's controls in the store", () => {
   it("names where the lyrics come from: the artist, under the song's licence", () => {
     const s = songs.find((x) => x.lyrics.length > 0)!;
     expect(lyricsSource(s)).toBe(`Lyrics: ${s.artist}, ${s.credit!.licence}`);
+  });
+});
+
+describe("the clock wakes only when something can change", () => {
+  const song = songs.find((s) => s.id === "california-lullabye")!; // lines at 20 450 and 25 690 ms
+  it("at the next lyric line, when it comes before the next second", () => {
+    expect(nextEventDelay(song, 25_600)).toBe(90);
+  });
+  it("at the next whole second (the time shown), when that comes first", () => {
+    expect(nextEventDelay(song, 20_900)).toBe(100);
+  });
+  it("at the song's end", () => {
+    expect(nextEventDelay(song, song.durationMs - 40)).toBe(40);
+  });
+  it("at least four times a second, to keep to the sound", () => {
+    expect(nextEventDelay(song, 21_000)).toBe(250);
+    expect(nextEventDelay(songs.find((s) => s.lyrics.length === 0)!, 1_000)).toBe(250);
+  });
+  it("never at once (no loop of zero waits)", () => {
+    expect(nextEventDelay(song, 25_690)).toBeGreaterThan(0);
   });
 });

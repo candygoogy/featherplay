@@ -19,6 +19,7 @@ import { followLyrics } from "./follow";
 import { bindAudio } from "./audio";
 import { bindCredits } from "./credit";
 import { trayLines } from "./pieces";
+import { rendered } from "./bind-pieces";
 
 let shared: Player | null = null;
 
@@ -535,15 +536,16 @@ function bindReplica(root: HTMLElement, player: Player) {
     if (song) {
       // The progress (the bar's line and its thumb, the resume card's line) runs on the
       // compositor: one linear animation from here to the song's end, started again only when
-      // the song, play or the place changes. Nothing is restyled or laid out per frame.
-      const run = `${song.id}|${s.playing}|${s.jumps}`;
+      // the song, play, the place or the page shown changes. Nothing is restyled or laid out
+      // per frame, and a line that isn't rendered (a page not shown) waits for its page.
+      const run = `${song.id}|${s.playing}|${s.jumps}|${s.view}`;
       if (run !== last.run) {
         const fraction = Math.min(1, s.positionMs / song.durationMs);
         const left = Math.max(0, song.durationMs - s.positionMs);
         const go = (el: HTMLElement, prop: "transform" | "translate", from: string, to: string) => {
           for (const a of el.getAnimations()) a.cancel();
           el.style[prop] = from;
-          if (s.playing && left > 0) el.animate([{ [prop]: from }, { [prop]: to }], { duration: left, easing: "linear", fill: "forwards" });
+          if (s.playing && left > 0 && rendered(el)) el.animate([{ [prop]: from }, { [prop]: to }], { duration: left, easing: "linear", fill: "forwards" });
         };
         setAll(root, "[data-progress]", (el) => go(el, "transform", `scaleX(${fraction})`, "scaleX(1)"));
         if (thumb) go(thumb, "translate", `${(fraction * 100).toFixed(3)}cqw 0`, "100cqw 0");

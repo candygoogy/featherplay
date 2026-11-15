@@ -136,8 +136,13 @@ const fold = (s: string) =>
 export function createPlayer(songs: Song[], options: PlayerOptions = {}): Player {
   const hasDom = typeof window !== "undefined" && typeof document !== "undefined";
   const now = options.now ?? (() => performance.now());
-  const raf = options.raf ?? ((cb) => requestAnimationFrame(cb));
-  const caf = options.caf ?? ((id) => cancelAnimationFrame(id));
+  // The clock's next step: by default only when something it shows can change (the next lyric
+  // line, the next whole second, the song's end; four times a second at least, to keep to the
+  // sound), not every animation frame: what moves smoothly with it (the progress lines, the
+  // thumb) runs on the compositor, so the page rests between steps. Tests give it frames.
+  const raf =
+    options.raf ?? ((cb) => window.setTimeout(() => cb(now()), state.song ? nextEventDelay(state.song, base + (now() - since)) : 250));
+  const caf = options.caf ?? ((id) => clearTimeout(id));
   const visible = options.visible ?? (() => !hasDom || document.visibilityState === "visible");
   const random = options.random ?? Math.random;
 
@@ -503,6 +508,19 @@ export function createPlayer(songs: Song[], options: PlayerOptions = {}): Player
     document.addEventListener("visibilitychange", () => player.visibilityChanged());
   }
   return player;
+}
+
+/** How long until something the clock shows can change at `ms` into `song`: the next lyric
+ *  line, the next whole second or the song's end, and 250 ms at most (to keep to the sound). */
+export function nextEventDelay(song: Song, ms: number): number {
+  let d = Math.min(250, 1000 - (Math.floor(ms) % 1000), song.durationMs - ms);
+  for (const l of song.lyrics) {
+    if (l.atMs > ms) {
+      d = Math.min(d, l.atMs - ms);
+      break;
+    }
+  }
+  return Math.max(1, Math.ceil(d));
 }
 
 /** The line being sung at `ms`, or -1 before the first (and for songs without lyrics). */
