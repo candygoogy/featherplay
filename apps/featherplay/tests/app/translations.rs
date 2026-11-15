@@ -33,7 +33,7 @@ fn shows(scene: &Scene, text: &str) -> bool {
 
 #[test]
 #[cfg_attr(not(debug_assertions), ignore)]
-fn the_test_language_translates_a_rendered_page() {
+fn the_test_language_translates_a_rendered_page_and_english_comes_back_on_the_spot() {
     let scene = Scene::new(1280, 800, true, false).expect("scene");
     scene.open("home").expect("home");
     scene.settle();
@@ -41,22 +41,15 @@ fn the_test_language_translates_a_rendered_page() {
     scene.settle();
     assert_eq!(
         (shows(&scene, "[Settings]"), shows(&scene, "Settings")),
-        (true, false)
+        (true, false),
+        "the test language: [Settings], not Settings"
     );
-}
-
-#[test]
-#[cfg_attr(not(debug_assertions), ignore)]
-fn english_comes_back_on_the_spot() {
-    let scene = Scene::new(1280, 800, true, false).expect("scene");
-    scene.open("home").expect("home");
-    language::apply(language::PSEUDO);
-    scene.settle();
     language::apply("en");
     scene.settle();
     assert_eq!(
         (shows(&scene, "Settings"), shows(&scene, "[Settings]")),
-        (true, false)
+        (true, false),
+        "English again: Settings, not [Settings]"
     );
 }
 
@@ -76,25 +69,10 @@ fn the_test_language_translates_a_toast_from_rust() {
     );
 }
 
+/// Picking a language in Settings applies it, to the page and to the texts Rust filled in.
 #[test]
 #[cfg_attr(not(debug_assertions), ignore)]
-fn texts_rust_filled_in_follow_a_language_change() {
-    let scene = Scene::new(1280, 800, true, false).expect("scene");
-    scene.open("settings").expect("settings");
-    scene.settle();
-    language::apply(language::PSEUDO);
-    let names = scene.ui.global::<SettingsData>().get_language_names();
-    let first = if cfg!(windows) {
-        "[Windows default]"
-    } else {
-        "[System default]"
-    };
-    assert_eq!(names.row_data(0).unwrap_or_default().as_str(), first);
-}
-
-#[test]
-#[cfg_attr(not(debug_assertions), ignore)]
-fn picking_a_language_in_settings_applies_it() {
+fn picking_a_language_in_settings_applies_it_to_the_texts_rust_filled_in_too() {
     let scene = Scene::new(1280, 800, true, false).expect("scene");
     scene.open("settings").expect("settings");
     scene.settle();
@@ -109,6 +87,19 @@ fn picking_a_language_in_settings_applies_it() {
     assert_eq!(
         (data.get_language(), shows(&scene, "[Settings]")),
         (at as i32, true)
+    );
+    let first = if cfg!(windows) {
+        "[Windows default]"
+    } else {
+        "[System default]"
+    };
+    assert_eq!(
+        data.get_language_names()
+            .row_data(0)
+            .unwrap_or_default()
+            .as_str(),
+        first,
+        "a text Rust filled in"
     );
 }
 
@@ -425,20 +416,14 @@ fn every_string_the_ui_shows_is_marked() {
 }
 
 #[test]
-fn the_pot_holds_every_marked_string() {
-    let missing: Vec<_> = sources().difference(&pot()).cloned().collect();
+fn the_pot_holds_exactly_the_marked_strings() {
+    let (sources, pot) = (sources(), pot());
+    let missing: Vec<_> = sources.difference(&pot).cloned().collect();
+    let stale: Vec<_> = pot.difference(&sources).cloned().collect();
     assert!(
-        missing.is_empty(),
-        "run po/update.sh; missing from the .pot: {missing:?}"
-    );
-}
-
-#[test]
-fn the_pot_has_no_string_the_sources_dropped() {
-    let stale: Vec<_> = pot().difference(&sources()).cloned().collect();
-    assert!(
-        stale.is_empty(),
-        "run po/update.sh; no longer in the sources: {stale:?}"
+        missing.is_empty() && stale.is_empty(),
+        "run po/update.sh; missing from the .pot: {missing:?}; no longer in the sources: \
+         {stale:?}"
     );
 }
 

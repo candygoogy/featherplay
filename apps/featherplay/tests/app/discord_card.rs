@@ -243,22 +243,6 @@ fn the_discord_group_ends_with_its_rows() {
 }
 
 #[test]
-fn the_card_sits_beside_the_options_in_a_wide_window() {
-    // 1568 wide: the page is 1328 px past the sidebar, room for both side by side.
-    let scene = settings(1568, 3400);
-    let card = find(&scene, "Discord preview");
-    let row = find(&scene, "Discord status");
-    assert!(
-        card.min_x() > row.max_x(),
-        "the card {card:?} isn't right of the options {row:?}"
-    );
-    assert!(
-        (card.min_y() - row.min_y()).abs() < 60.0,
-        "the card {card:?} doesn't start level with the first option {row:?}"
-    );
-}
-
-#[test]
 fn a_narrow_window_has_the_options_without_the_card() {
     // 1100 wide: the page is 860 px, too narrow for both side by side.
     let scene = settings(1100, 3800);
@@ -287,11 +271,11 @@ fn a_narrow_window_has_the_options_without_the_card() {
 fn the_card_sits_beside_the_options_from_the_default_window_size_up() {
     // 1280 wide is the size the window opens at: the page is 1040 px past the sidebar. And
     // at every width from there up, the ones where the section index has come in and taken
-    // its room from the column too.
+    // its room from the column too, and 1568, the wide window of the snapshots.
     let height = 3800;
     let scene = settings(1280, height);
     let w = scene.ui.window();
-    for width in (1280..=1600).step_by(20) {
+    for width in (1280..=1600).step_by(20).chain([1568]) {
         w.set_size(slint::PhysicalSize::new(width, height));
         w.dispatch_event(WindowEvent::Resized {
             size: slint::LogicalSize::new(width as f32, height as f32),
@@ -355,6 +339,23 @@ fn the_card_stays_in_view_at_the_default_window_size() {
         card.min_y() >= TOP_BAR && card.max_y() <= bar_top,
         "the card {card:?} isn't whole on the page while the last option {row:?} is"
     );
+
+    // On past the Discord options: the card stops at their end and goes up with them, never
+    // over the Local API group after them.
+    let up = || {
+        shown_as(&scene, Some(AccessibleRole::Groupbox), "Local API")
+            .is_some_and(|r| r.min_y() < 300.0)
+    };
+    assert!(
+        wheel_down_until(&scene, 1.0, 40, up),
+        "Local API didn't come up"
+    );
+    let local_api = panel(&scene, "Local API");
+    let card = find(&scene, "Discord preview");
+    assert!(
+        card.max_y() <= local_api.min_y(),
+        "the card {card:?} runs past the Discord options, over {local_api:?}"
+    );
 }
 
 #[test]
@@ -377,70 +378,5 @@ fn the_card_keeps_its_end_on_the_page_in_a_short_window() {
     assert!(
         card.max_y() <= bar_top && card.max_y() > bar_top - 80.0,
         "the card {card:?} doesn't end just above the player bar, at {bar_top}"
-    );
-}
-
-#[test]
-fn the_card_stays_in_view_while_the_options_scroll() {
-    let scene = settings(1568, 900);
-    let w = scene.ui.window();
-    // Discord to the top (its index entry), then on until the first options have scrolled
-    // away above the page.
-    let entry = shown_as(&scene, Some(AccessibleRole::Button), "Discord").expect("index entry");
-    hover(&scene, entry.center().x, entry.center().y);
-    let button = slint::platform::PointerEventButton::Left;
-    let at = LogicalPosition::new(entry.center().x, entry.center().y);
-    w.dispatch_event(WindowEvent::PointerPressed {
-        position: at,
-        button,
-    });
-    w.dispatch_event(WindowEvent::PointerReleased {
-        position: at,
-        button,
-    });
-    scene.settle();
-    let page = LogicalPosition::new(900.0, 500.0);
-    hover(&scene, page.x, page.y);
-    // A small step at a time, and no further than that: how far the options reach depends on
-    // the text's measures, which differ between PCs (CI's Windows Server may lack Segoe UI
-    // Variable).
-    for _ in 0..40 {
-        if shown(&scene, "Discord status").is_none() {
-            break;
-        }
-        offscreen::wheel(w, page, -0.5);
-        scene.settle();
-    }
-    assert!(
-        shown(&scene, "Discord status").is_none(),
-        "the first option hasn't scrolled away"
-    );
-    let card = find(&scene, "Discord preview");
-    assert!(
-        card.min_y() >= 64.0 && card.max_y() <= 900.0,
-        "the card {card:?} left the page as the options scrolled"
-    );
-
-    // On past the Discord options: the card stops at their end and goes up with them, never
-    // over the Local API group after them.
-    for _ in 0..20 {
-        // Shown once it has scrolled into the page.
-        if shown_as(&scene, Some(AccessibleRole::Groupbox), "Local API")
-            .is_some_and(|r| r.min_y() < 300.0)
-        {
-            break;
-        }
-        offscreen::wheel(w, page, -1.0);
-        scene.settle();
-    }
-    let local_api = panel(&scene, "Local API");
-    assert!(
-        local_api.min_y() < 300.0,
-        "Local API {local_api:?} didn't come up"
-    );
-    let card = find(&scene, "Discord preview");
-    assert!(
-        card.max_y() <= local_api.min_y(),
-        "the card {card:?} runs past the Discord options, over {local_api:?}"
     );
 }

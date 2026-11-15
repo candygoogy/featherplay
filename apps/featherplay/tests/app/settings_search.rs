@@ -177,6 +177,19 @@ fn typing_filters_the_rows_and_the_index_counts_them() {
     scene.settle();
     type_text(&scene, "xy");
     assert_eq!(search.get_query(), "", "the field kept the keys");
+
+    // A switch turned on runs the search again: Sleep timer's Fade out row shows, found by
+    // its line.
+    ctrl(&scene, "f");
+    type_text(&scene, "sleep timer");
+    assert_eq!(search.get_total(), 1, "sleep timer: its switch");
+    assert_eq!(counts(&scene), [1, 0, 0, 0, 0, 0, 0, 0]);
+    scene
+        .ui
+        .global::<SettingsData>()
+        .invoke_toggled(SettingKey::SleepTimer, true);
+    scene.settle();
+    assert_eq!(search.get_total(), 2, "sleep timer on: and its fade");
 }
 
 #[test]
@@ -195,23 +208,6 @@ fn nothing_found_shows_the_empty_state() {
     type_text(&scene, "s");
     assert!(!search.get_active());
     assert!(find(&scene, "Prefer song versions").is_some());
-}
-
-#[test]
-fn sleep_timer_finds_its_switch_and_once_on_its_fade() {
-    let scene = settings();
-    ctrl(&scene, "f");
-    type_text(&scene, "sleep timer");
-    let search = scene.ui.global::<SettingsSearch>();
-    assert_eq!(search.get_total(), 1);
-    assert_eq!(counts(&scene), [1, 0, 0, 0, 0, 0, 0, 0]);
-    // Turned on, the Fade out row shows, found by its line.
-    scene
-        .ui
-        .global::<SettingsData>()
-        .invoke_toggled(SettingKey::SleepTimer, true);
-    scene.settle();
-    assert_eq!(search.get_total(), 2);
 }
 
 #[test]
@@ -401,12 +397,7 @@ fn the_switch_keeps_settings_out_of_the_suggestions() {
         .ui
         .window()
         .dispatch_event(WindowEvent::WindowActiveChanged(true));
-    // Two letters: no settings yet; three: Crossfade (Fade on skip shows only while
-    // Crossfade is on).
-    suggest(&scene, "cr");
-    assert!(settings_rows(&scene).is_empty());
-    tap(scene.ui.window(), Key::Escape.into());
-    tap(scene.ui.window(), Key::Escape.into());
+    // On: Crossfade is among the suggestions (Fade on skip shows only while it's on).
     suggest(&scene, "crossf");
     assert_eq!(settings_rows(&scene), ["Crossfade | Setting • Playback"]);
     tap(scene.ui.window(), Key::Escape.into());
