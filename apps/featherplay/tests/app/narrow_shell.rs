@@ -299,15 +299,9 @@ fn the_bar_gives_up_its_groups_in_order_and_nothing_overlaps() {
             }
         }
     }
-}
 
-/// From where the bar squeezes (under about 666 px) to where it runs out of things to give
-/// up, the title keeps 112 px: the volume's button goes first, then the other groups.
-#[test]
-fn the_title_keeps_112_px_from_560_to_660_px() {
-    let scene = home(640);
-    let top = H as f32 - scene.ui.global::<Theme>().get_bar_clear();
-    let title = scene.ui.global::<Player>().get_title();
+    // From where the bar squeezes (under about 666 px) to where it runs out of things to give
+    // up, the title keeps 112 px: the volume's button goes first, then the other groups.
     for width in [560, 580, 600, 620, 640, 660] {
         resize(&scene, width);
         let r = rect(&scene, &title, top).unwrap_or_else(|| panic!("{width} px: no title"));

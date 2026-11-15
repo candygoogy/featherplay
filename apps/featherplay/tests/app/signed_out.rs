@@ -70,7 +70,7 @@ fn signed_out_on_home() -> Scene {
 }
 
 #[test]
-fn signed_out_the_window_stays_and_the_library_asks_to_sign_in() {
+fn signed_out_the_window_stays_and_the_library_history_and_liked_songs_ask_to_sign_in() {
     let scene = signed_out_on_home();
     assert_eq!(
         scene.ctx.current_page(),
@@ -82,8 +82,15 @@ fn signed_out_the_window_stays_and_the_library_asks_to_sign_in() {
     scene.settle();
     assert!(shown(&scene, "Sign in to see your library"));
     assert!(!shown(&scene, "This didn\u{2019}t load"));
+    let library = top(&scene, "Sign in to see your library");
 
-    // Liked songs keeps its header, and asks under it rather than listing.
+    scene.open("history").expect("history");
+    scene.settle();
+    let history = top(&scene, "Sign in to see your history");
+    assert_eq!(library, history, "the gates sit at different heights");
+
+    // Liked songs keeps its header (its title right of the sidebar's entry), and asks under
+    // it rather than listing.
     scene.open("liked").expect("liked songs");
     scene.settle();
     assert!(shown(&scene, "Sign in to see your liked songs"));
@@ -91,6 +98,23 @@ fn signed_out_the_window_stays_and_the_library_asks_to_sign_in() {
         scene.ui.global::<PlaylistData>().get_tracks().row_count(),
         0
     );
+    let sidebar = scene.ui.global::<Theme>().get_sidebar_w();
+    assert!(
+        rects(&scene, "Liked songs")
+            .iter()
+            .any(|r| r.origin.x > sidebar),
+        "no header"
+    );
+    // The bar at the bottom has a Shuffle of its own; the header's would be above it.
+    let bar = top(&scene, "Previous");
+    for label in ["Play", "Shuffle"] {
+        assert!(
+            rects(&scene, label)
+                .iter()
+                .all(|r| r.origin.y >= bar - 24.0),
+            "the header shows {label}"
+        );
+    }
 }
 
 #[test]
@@ -125,45 +149,4 @@ fn a_session_that_ended_goes_to_sign_in() {
     scene.settle();
 
     assert_eq!(scene.ctx.current_page(), Page::SignIn);
-}
-
-#[test]
-fn signed_out_library_and_history_ask_at_the_same_height() {
-    let scene = signed_out_on_home();
-    scene.open("library").expect("library");
-    scene.settle();
-    let library = top(&scene, "Sign in to see your library");
-
-    scene.open("history").expect("history");
-    scene.settle();
-    let history = top(&scene, "Sign in to see your history");
-
-    assert_eq!(library, history, "the gates sit at different heights");
-}
-
-#[test]
-fn signed_out_liked_songs_has_no_play_or_shuffle() {
-    let scene = signed_out_on_home();
-    scene.open("liked").expect("liked songs");
-    scene.settle();
-    // The header is there (its title right of the sidebar's entry), and the gate under it.
-    let sidebar = scene.ui.global::<Theme>().get_sidebar_w();
-    assert!(
-        rects(&scene, "Liked songs")
-            .iter()
-            .any(|r| r.origin.x > sidebar),
-        "no header"
-    );
-    assert!(shown(&scene, "Sign in to see your liked songs"));
-
-    // The bar at the bottom has a Shuffle of its own; the header's would be above it.
-    let bar = top(&scene, "Previous");
-    for label in ["Play", "Shuffle"] {
-        assert!(
-            rects(&scene, label)
-                .iter()
-                .all(|r| r.origin.y >= bar - 24.0),
-            "the header shows {label}"
-        );
-    }
 }
