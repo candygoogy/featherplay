@@ -151,7 +151,15 @@ fn every_setting_changed() -> Settings {
             hinted: true,
         },
         autoplay: false,
-        pins: Default::default(),
+        // Per identity, the cookies' own ("") included.
+        pins: [
+            (
+                String::new(),
+                vec!["album:MPREb_x".into(), "playlist:PLa".into()],
+            ),
+            ("0/123".into(), vec!["artist:UCx".into()]),
+        ]
+        .into(),
         check_for_updates: false,
         install_updates: false,
         local_api: true,
@@ -214,45 +222,136 @@ fn settings_roundtrip() {
     assert_eq!(names, ["settings.toml"]);
 }
 
-/// The quick search's values of the wrong type (hand-edited, a newer featherplay's) load as
-/// off and an empty key, which the app takes as the default; the rest of the file counts.
-#[test]
-fn quick_search_values_of_the_wrong_type_dont_drop_the_file() {
-    let Some(home) = TestHome::new("settings-quick-search") else {
-        return;
-    };
-    let p = home.paths();
+/// Writes `text` as the settings file and loads it.
+fn load_text(p: &Paths, text: &str) -> Settings {
     fs::create_dir_all(&p.config).unwrap();
-    let text = "quick_search = \"yes\"
-quick_search_key = { keys = [\"Ctrl\", \"K\"] }
-volume = 0.5
-";
     fs::write(p.config.join("settings.toml"), text).unwrap();
-    let s = Settings::load(&p);
-    assert!(!s.quick_search);
-    assert_eq!(s.quick_search_key, "");
-    assert_eq!(s.volume, 0.5);
+    Settings::load(p)
 }
 
+/// A value this build can't use (a hand edit, a newer featherplay's) takes that key's
+/// default, and the rest of the file loads: each file below starts `volume = 0.5`.
+///
+/// Where the key's default is its type's, `salvage` alone would give the same; the rows
+/// that pin the `lenient` readers are the quick search key (its type's default, "", not
+/// the setting's) and the numbers checked against their choices (port, volume step,
+/// equalizer bands, crossfade, speed, sleep fade).
 #[test]
-fn a_local_api_port_that_isnt_one_loads_as_pears() {
-    let Some(home) = TestHome::new("settings-api-port") else {
+fn a_bad_value_takes_its_keys_default_and_the_rest_loads() {
+    let Some(home) = TestHome::new("settings-bad-values") else {
         return;
     };
     let p = home.paths();
-    fs::create_dir_all(&p.config).unwrap();
+    let d = Settings::default;
+    let mut cases: Vec<(String, Settings)> = vec![
+        (
+            "quick_search = \"yes\"\nquick_search_key = { keys = [\"Ctrl\", \"K\"] }".into(),
+            Settings {
+                quick_search_key: String::new(),
+                ..d()
+            },
+        ),
+        (
+            "discord = true".into(),
+            Settings {
+                discord: true,
+                ..d()
+            },
+        ),
+        (
+            "discord = true
+
+[discord_options]
+time = \"sideways\"
+status_text = \"artist\"
+clear_after_minutes = 3"
+                .into(),
+            Settings {
+                discord: true,
+                discord_options: DiscordOptions {
+                    status_text: DiscordStatusText::Artist,
+                    clear_after_minutes: 3,
+                    ..DiscordOptions::default()
+                },
+                ..d()
+            },
+        ),
+        ("close_action = \"minimize\"".into(), d()),
+        ("accent = \"plaid\"".into(), d()),
+        (
+            "accent = \"custom\"\ncustom_accent = \"blue\"".into(),
+            Settings {
+                accent: Accent::Custom,
+                ..d()
+            },
+        ),
+        ("skip_silence = \"always\"".into(), d()),
+        ("crossfade = 7".into(), d()),
+        ("playback_speed = 25".into(), d()),
+    ];
     for bad in ["80", "70000", "-1", "\"high\""] {
-        let text = format!(
-            "local_api = true
-local_api_port = {bad}
-volume = 0.5
-"
+        cases.push((
+            format!("local_api = true\nlocal_api_port = {bad}"),
+            Settings {
+                local_api: true,
+                ..d()
+            },
+        ));
+    }
+    for bad in ["0", "3", "-1", "300", "2.5", "\"ten\""] {
+        cases.push((format!("volume_step = {bad}"), d()));
+    }
+    for bad in ["\"lossless\"", "\"High\"", "3", "true"] {
+        cases.push((format!("streaming_quality = {bad}"), d()));
+    }
+    // Out of range bands load clamped; anything but five numbers loads flat. An unknown
+    // choice loads as Off.
+    for (bands, want) in [
+        ("[20, -30, 1, 2, 3]", [12, -12, 1, 2, 3]),
+        ("[1, 2, 3]", [0; 5]),
+        ("\"loud\"", [0; 5]),
+        ("[1, 2, \"x\", 4, 5]", [0; 5]),
+    ] {
+        cases.push((
+            format!("equalizer = \"party\"\nequalizer_bands = {bands}\nloudness = 3"),
+            Settings {
+                equalizer_bands: want,
+                ..d()
+            },
+        ));
+    }
+    // A fade no build offers, a negative one, one too large for a byte, the wrong types.
+    for (timer, fade) in [
+        ("true", "15"),
+        ("true", "-10"),
+        ("true", "100000"),
+        ("\"yes\"", "\"20 s\""),
+        ("3", "[30]"),
+    ] {
+        cases.push((
+            format!("sleep_timer = {timer}\nsleep_fade = {fade}"),
+            Settings {
+                sleep_timer: timer == "true",
+                ..d()
+            },
+        ));
+    }
+    for bad in ["\"huge\"", "7", "true"] {
+        cases.push((format!("lyrics_size = {bad}"), d()));
+    }
+    for bad in ["\"yes\"", "1", "[true]"] {
+        cases.push((format!("start_in_tray = {bad}"), d()));
+    }
+    for (text, want) in cases {
+        let want = Settings {
+            volume: 0.5,
+            ..want
+        };
+        assert_eq!(
+            load_text(&p, &format!("volume = 0.5\n{text}\n")),
+            want,
+            "{text}"
         );
-        fs::write(p.config.join("settings.toml"), text).unwrap();
-        let s = Settings::load(&p);
-        assert_eq!(s.local_api_port, Settings::LOCAL_API_PORT, "{bad}");
-        // The rest of the file still counts.
-        assert!(s.local_api && s.volume == 0.5, "{bad}");
     }
 }
 
@@ -278,76 +377,11 @@ fn settings_unknown_keys_ignored_and_bad_file_falls_back_to_defaults() {
         }
     );
 
-    // A file from before a key existed keeps its other values; the new key takes its default.
-    fs::write(
-        &file,
-        "volume = 0.4
-sponsorblock = false
-",
-    )
-    .unwrap();
-    let old = Settings::load(&p);
-    assert!(!old.queue_open);
-    assert!(
-        old.nowplaying_side_open,
-        "Now playing's side panel shows unless hidden"
-    );
-    assert!(old.autoplay);
-    assert!(old.skip_disliked);
-    assert_eq!((old.volume, old.sponsorblock), (0.4, false));
-    fs::write(
-        &file,
-        "queue_open = true
-",
-    )
-    .unwrap();
-    assert!(Settings::load(&p).queue_open);
-
     fs::write(&file, "this is = = not toml [").unwrap();
     assert_eq!(Settings::load(&p), Settings::default());
 
     fs::write(&file, "volume = \"loud\"\n").unwrap();
     assert_eq!(Settings::load(&p), Settings::default());
-}
-
-#[test]
-fn discord_options_take_defaults_key_by_key() {
-    let Some(home) = TestHome::new("settings-discord") else {
-        return;
-    };
-    let p = home.paths();
-    fs::create_dir_all(&p.config).unwrap();
-    let file = p.config.join("settings.toml");
-
-    // A file from before the options existed.
-    fs::write(
-        &file,
-        "discord = true
-",
-    )
-    .unwrap();
-    let old = Settings::load(&p);
-    assert!(old.discord);
-    assert_eq!(old.discord_options, DiscordOptions::default());
-
-    // An unknown choice falls back for that key only; the others are kept.
-    fs::write(
-        &file,
-        "discord = true
-
-[discord_options]
-time = \"sideways\"
-status_text = \"artist\"
-clear_after_minutes = 3
-",
-    )
-    .unwrap();
-    let s = Settings::load(&p);
-    assert!(s.discord);
-    assert_eq!(s.discord_options.time, DiscordTime::Bar);
-    assert_eq!(s.discord_options.status_text, DiscordStatusText::Artist);
-    assert_eq!(s.discord_options.clear_after_minutes, 3);
-    assert!(s.discord_options.auto_reconnect);
 }
 
 #[test]
@@ -362,206 +396,127 @@ fn discord_pause_timeout_is_clamped() {
     assert_eq!(o.clear_after(), None);
 }
 
+/// Each choice's spelling in the file, both ways: the text loads as the value, and the value
+/// saves as the text. A renamed variant breaks it, which `settings_roundtrip` can't see, as
+/// both of its sides change with the name.
 #[test]
-fn accent_defaults_to_the_cover_in_older_files() {
-    let Some(home) = TestHome::new("settings-accent-default") else {
+fn each_choice_is_spelled_the_same_in_the_file() {
+    let Some(home) = TestHome::new("settings-spellings") else {
         return;
     };
     let p = home.paths();
-    fs::create_dir_all(&p.config).unwrap();
-    let file = p.config.join("settings.toml");
-
-    // A file written before the setting existed.
-    fs::write(&file, "notifications = true\nvolume = 0.5\n").unwrap();
-    let old = Settings::load(&p);
-    assert_eq!(old.accent, Accent::Cover);
-    assert!(old.notifications);
-}
-
-#[test]
-fn close_action_defaults_to_ask() {
-    assert_eq!(Settings::default().close_action, CloseAction::Ask);
-}
-
-#[test]
-fn the_old_close_to_tray_switch_loads_as_ask_either_way() {
-    let Some(home) = TestHome::new("settings-close-migration") else {
-        return;
-    };
-    let p = home.paths();
-    fs::create_dir_all(&p.config).unwrap();
-    let file = p.config.join("settings.toml");
-    for old in ["true", "false"] {
-        fs::write(&file, format!("close_to_tray = {old}\nvolume = 0.5\n")).unwrap();
-        let s = Settings::load(&p);
-        assert_eq!(s.close_action, CloseAction::Ask, "close_to_tray = {old}");
-        assert_eq!(s.volume, 0.5, "the rest of the file still loads");
-    }
-}
-
-#[test]
-fn the_old_close_to_tray_switch_is_dropped_when_saving() {
-    let Some(home) = TestHome::new("settings-close-drop") else {
-        return;
-    };
-    let p = home.paths();
-    fs::create_dir_all(&p.config).unwrap();
-    let file = p.config.join("settings.toml");
-    fs::write(&file, "close_to_tray = true\n").unwrap();
-    Settings::load(&p).save(&p).unwrap();
-    let text = fs::read_to_string(&file).unwrap();
-    assert!(!text.contains("close_to_tray"), "{text}");
-    assert!(text.contains("close_action = \"ask\""), "{text}");
-}
-
-#[test]
-fn every_close_action_round_trips() {
-    let Some(home) = TestHome::new("settings-close-roundtrip") else {
-        return;
-    };
-    let p = home.paths();
-    for close_action in [CloseAction::Ask, CloseAction::Quit, CloseAction::Tray] {
+    let d = Settings::default;
+    let mut cases: Vec<(String, Settings)> = vec![
+        (
+            "accent = \"custom\"\ncustom_accent = \"#3A7BFF\"".into(),
+            Settings {
+                accent: Accent::Custom,
+                custom_accent: AccentColour(0x3A7BFF),
+                ..d()
+            },
+        ),
+        (
+            "equalizer = \"vocal\"\nequalizer_bands = [-12, 0, 4, 0, 1]\nloudness = \"strong\""
+                .into(),
+            Settings {
+                equalizer: Equalizer::Vocal,
+                equalizer_bands: [-12, 0, 4, 0, 1],
+                loudness: Loudness::Strong,
+                ..d()
+            },
+        ),
+        (
+            "skip_silence = \"start_and_end\"".into(),
+            Settings {
+                skip_silence: SkipSilence::StartAndEnd,
+                ..d()
+            },
+        ),
+        (
+            "crossfade = 8\nfade_on_skip = true".into(),
+            Settings {
+                crossfade: 8,
+                fade_on_skip: true,
+                ..d()
+            },
+        ),
+        (
+            "playback_speed = 150".into(),
+            Settings {
+                playback_speed: 150,
+                ..d()
+            },
+        ),
+        (
+            "lyrics_size = \"large\"".into(),
+            Settings {
+                lyrics_size: LyricsSize::Large,
+                ..d()
+            },
+        ),
+        (
+            "start_in_tray = true".into(),
+            Settings {
+                start_in_tray: true,
+                ..d()
+            },
+        ),
+    ];
+    for (name, close_action) in [
+        ("ask", CloseAction::Ask),
+        ("quit", CloseAction::Quit),
+        ("tray", CloseAction::Tray),
+    ] {
         let s = Settings {
             close_action,
-            ..Settings::default()
+            ..d()
         };
-        s.save(&p).unwrap();
-        assert_eq!(Settings::load(&p).close_action, close_action);
+        cases.push((format!("close_action = \"{name}\""), s));
     }
-}
-
-#[test]
-fn an_unknown_close_action_asks_and_keeps_the_rest() {
-    let Some(home) = TestHome::new("settings-close-unknown") else {
-        return;
-    };
-    let p = home.paths();
-    fs::create_dir_all(&p.config).unwrap();
-    let file = p.config.join("settings.toml");
-    fs::write(&file, "close_action = \"minimize\"\nvolume = 0.5\n").unwrap();
-    let s = Settings::load(&p);
-    assert_eq!(s.close_action, CloseAction::Ask);
-    assert_eq!(s.volume, 0.5);
-}
-
-#[test]
-fn follow_the_music_on_or_off_both_become_the_cover_accent() {
-    let Some(home) = TestHome::new("settings-accent-migration") else {
-        return;
-    };
-    let p = home.paths();
-    fs::create_dir_all(&p.config).unwrap();
-    let file = p.config.join("settings.toml");
-    for old in ["true", "false"] {
-        fs::write(&file, format!("follow_music = {old}\nvolume = 0.5\n")).unwrap();
-        let s = Settings::load(&p);
-        assert_eq!(s.accent, Accent::Cover, "follow_music = {old}");
-        assert_eq!(s.volume, 0.5, "the rest of the file still loads");
+    let accents = [
+        ("cover", Accent::Cover),
+        ("red", Accent::Red),
+        ("rose", Accent::Rose),
+        ("amber", Accent::Amber),
+        ("teal", Accent::Teal),
+        ("violet", Accent::Violet),
+        ("custom", Accent::Custom),
+    ];
+    assert_eq!(accents.map(|(_, a)| a), Accent::ALL, "a row per accent");
+    for (name, accent) in accents {
+        cases.push((format!("accent = \"{name}\""), Settings { accent, ..d() }));
     }
-}
-
-#[test]
-fn the_old_switch_is_dropped_when_saving() {
-    let Some(home) = TestHome::new("settings-accent-drop") else {
-        return;
-    };
-    let p = home.paths();
-    fs::create_dir_all(&p.config).unwrap();
-    let file = p.config.join("settings.toml");
-    fs::write(&file, "follow_music = false\n").unwrap();
-    Settings::load(&p).save(&p).unwrap();
-    let text = fs::read_to_string(&file).unwrap();
-    assert!(!text.contains("follow_music"), "{text}");
-    assert!(text.contains("accent = \"cover\""), "{text}");
-}
-
-#[test]
-fn every_accent_round_trips() {
-    let Some(home) = TestHome::new("settings-accent-roundtrip") else {
-        return;
-    };
-    let p = home.paths();
-    for accent in Accent::ALL {
+    for (name, theme) in [
+        ("dark", ThemeMode::Dark),
+        ("light", ThemeMode::Light),
+        ("system", ThemeMode::System),
+    ] {
+        cases.push((format!("theme = \"{name}\""), Settings { theme, ..d() }));
+    }
+    for (name, streaming_quality) in [
+        ("high", StreamingQuality::High),
+        ("standard", StreamingQuality::Standard),
+    ] {
         let s = Settings {
-            accent,
-            ..Settings::default()
+            streaming_quality,
+            ..d()
         };
-        s.save(&p).unwrap();
-        assert_eq!(Settings::load(&p).accent, accent);
+        cases.push((format!("streaming_quality = \"{name}\""), s));
     }
-}
-
-#[test]
-fn an_unknown_accent_takes_the_default_and_keeps_the_rest() {
-    let Some(home) = TestHome::new("settings-accent-unknown") else {
-        return;
-    };
-    let p = home.paths();
-    fs::create_dir_all(&p.config).unwrap();
-    let file = p.config.join("settings.toml");
-    fs::write(&file, "accent = \"plaid\"\nvolume = 0.5\n").unwrap();
-    let s = Settings::load(&p);
-    assert_eq!(s.accent, Accent::Cover);
-    assert_eq!(s.volume, 0.5);
-}
-
-#[test]
-fn a_custom_accent_round_trips_with_its_colour() {
-    let Some(home) = TestHome::new("settings-accent-custom") else {
-        return;
-    };
-    let p = home.paths();
-    let s = Settings {
-        accent: Accent::Custom,
-        custom_accent: AccentColour(0x3A7BFF),
-        ..Settings::default()
-    };
-    s.save(&p).unwrap();
-    let text = fs::read_to_string(p.config.join("settings.toml")).unwrap();
-    assert!(text.contains("accent = \"custom\""), "{text}");
-    assert!(text.contains("custom_accent = \"#3A7BFF\""), "{text}");
-    assert_eq!(Settings::load(&p), s);
-}
-
-#[test]
-fn files_from_before_the_custom_accent_load_its_default_colour() {
-    let Some(home) = TestHome::new("settings-accent-custom-old") else {
-        return;
-    };
-    let p = home.paths();
-    fs::create_dir_all(&p.config).unwrap();
-    fs::write(
-        p.config.join("settings.toml"),
-        "accent = \"teal\"
-volume = 0.5
-",
-    )
-    .unwrap();
-    let s = Settings::load(&p);
-    assert_eq!(s.accent, Accent::Teal);
-    assert_eq!(s.custom_accent, AccentColour::default());
-    assert_eq!(s.volume, 0.5);
-}
-
-#[test]
-fn a_bad_custom_colour_takes_the_default_and_keeps_the_rest() {
-    let Some(home) = TestHome::new("settings-accent-custom-bad") else {
-        return;
-    };
-    let p = home.paths();
-    fs::create_dir_all(&p.config).unwrap();
-    fs::write(
-        p.config.join("settings.toml"),
-        "accent = \"custom\"
-custom_accent = \"blue\"
-volume = 0.5
-",
-    )
-    .unwrap();
-    let s = Settings::load(&p);
-    assert_eq!(s.accent, Accent::Custom);
-    assert_eq!(s.custom_accent, AccentColour::default());
-    assert_eq!(s.volume, 0.5);
+    for volume_step in Settings::VOLUME_STEPS {
+        let s = Settings { volume_step, ..d() };
+        cases.push((format!("volume_step = {volume_step}"), s));
+    }
+    for (text, want) in cases {
+        assert_eq!(load_text(&p, &text), want, "{text}: loaded");
+        want.save(&p).unwrap();
+        let saved = settings_file(&p);
+        let lines: toml::Table = toml::from_str(&text).unwrap();
+        for (key, value) in &lines {
+            assert_eq!(saved.get(key), Some(value), "{text}: saved as");
+        }
+        assert_eq!(Settings::load(&p), want, "{text}: saved and loaded");
+    }
 }
 
 #[test]
@@ -574,39 +529,6 @@ fn accent_colours_parse_as_typed() {
         assert_eq!(parse(bad), None, "{bad:?}");
     }
     assert_eq!(AccentColour(0x0A0B0C).to_string(), "#0A0B0C");
-}
-
-#[test]
-fn theme_defaults_to_dark_in_older_files_and_round_trips() {
-    let Some(home) = TestHome::new("settings-theme") else {
-        return;
-    };
-    let p = home.paths();
-    fs::create_dir_all(&p.config).unwrap();
-    let file = p.config.join("settings.toml");
-
-    // A file written before the setting existed.
-    fs::write(
-        &file,
-        "volume = 0.5
-",
-    )
-    .unwrap();
-    let old = Settings::load(&p);
-    assert_eq!(old.theme, ThemeMode::Dark);
-
-    for mode in [ThemeMode::Light, ThemeMode::System, ThemeMode::Dark] {
-        let s = Settings {
-            theme: mode,
-            ..old.clone()
-        };
-        s.save(&p).unwrap();
-        assert_eq!(Settings::load(&p), s);
-    }
-    fs::write(&file, "theme = \"light\"\n").unwrap();
-    assert_eq!(Settings::load(&p).theme, ThemeMode::Light);
-    fs::write(&file, "theme = \"system\"\n").unwrap();
-    assert_eq!(Settings::load(&p).theme, ThemeMode::System);
 }
 
 #[test]
@@ -764,91 +686,6 @@ fn paths_honour_featherplay_home() {
 }
 
 #[test]
-fn lrclib_lyrics_are_on_in_older_files_and_off_stays_off() {
-    let Some(home) = TestHome::new("settings-lyrics") else {
-        return;
-    };
-    let p = home.paths();
-    fs::create_dir_all(&p.config).unwrap();
-    let file = p.config.join("settings.toml");
-
-    // A file written before the setting existed.
-    fs::write(&file, "notifications = true\nvolume = 0.5\n").unwrap();
-    let old = Settings::load(&p);
-    assert!(old.lyrics_lrclib);
-    assert!(old.lyrics, "lyrics show in older files");
-    assert!(old.notifications, "the rest of the file still loads");
-
-    fs::write(&file, "lyrics_lrclib = false\n").unwrap();
-    let off = Settings::load(&p);
-    assert!(!off.lyrics_lrclib);
-    off.save(&p).unwrap();
-    assert!(!Settings::load(&p).lyrics_lrclib);
-}
-
-#[test]
-fn update_checks_are_on_in_older_files_and_off_stays_off() {
-    let Some(home) = TestHome::new("settings-updates") else {
-        return;
-    };
-    let p = home.paths();
-    fs::create_dir_all(&p.config).unwrap();
-    let file = p.config.join("settings.toml");
-
-    // A file written before the setting existed.
-    fs::write(&file, "notifications = true\n").unwrap();
-    assert!(Settings::load(&p).check_for_updates);
-
-    fs::write(&file, "check_for_updates = false\n").unwrap();
-    let off = Settings::load(&p);
-    assert!(!off.check_for_updates);
-    off.save(&p).unwrap();
-    assert!(!Settings::load(&p).check_for_updates);
-}
-
-#[test]
-fn dns_over_https_is_off_in_older_files_and_on_stays_on() {
-    let Some(home) = TestHome::new("settings-dns-over-https") else {
-        return;
-    };
-    let p = home.paths();
-    fs::create_dir_all(&p.config).unwrap();
-    let file = p.config.join("settings.toml");
-
-    // A file written before the setting existed.
-    fs::write(&file, "notifications = true\n").unwrap();
-    assert!(!Settings::load(&p).dns_over_https);
-
-    fs::write(&file, "dns_over_https = true\n").unwrap();
-    let on = Settings::load(&p);
-    assert!(on.dns_over_https);
-    on.save(&p).unwrap();
-    assert!(Settings::load(&p).dns_over_https);
-}
-
-#[test]
-fn a_tray_click_opens_the_mini_player_in_older_files_and_on_stays_on() {
-    let Some(home) = TestHome::new("settings-tray-click") else {
-        return;
-    };
-    let p = home.paths();
-    fs::create_dir_all(&p.config).unwrap();
-    let file = p.config.join("settings.toml");
-
-    // A file written before the setting existed.
-    fs::write(&file, "notifications = true\n").unwrap();
-    let old = Settings::load(&p);
-    assert!(!old.tray_click_opens_window);
-    assert!(old.notifications, "the rest of the file still loads");
-
-    fs::write(&file, "tray_click_opens_window = true\n").unwrap();
-    let on = Settings::load(&p);
-    assert!(on.tray_click_opens_window);
-    on.save(&p).unwrap();
-    assert!(Settings::load(&p).tray_click_opens_window);
-}
-
-#[test]
 fn an_old_mini_player_pin_still_loads_and_is_not_written_again() {
     let Some(home) = TestHome::new("settings-mini-pinned") else {
         return;
@@ -867,318 +704,6 @@ fn an_old_mini_player_pin_still_loads_and_is_not_written_again() {
 }
 
 #[test]
-fn the_language_follows_windows_in_older_files() {
-    let Some(home) = TestHome::new("settings-language") else {
-        return;
-    };
-    let p = home.paths();
-    fs::create_dir_all(&p.config).unwrap();
-    fs::write(p.config.join("settings.toml"), "notifications = true\n").unwrap();
-    assert_eq!(Settings::load(&p).language, "");
-}
-
-#[test]
-fn the_volume_step_is_5_in_older_files_and_falls_back_to_5_when_not_a_choice() {
-    let Some(home) = TestHome::new("settings-volume-step") else {
-        return;
-    };
-    let p = home.paths();
-    fs::create_dir_all(&p.config).unwrap();
-    let file = p.config.join("settings.toml");
-
-    // A file written before the setting existed.
-    fs::write(&file, "notifications = true\n").unwrap();
-    assert_eq!(Settings::load(&p).volume_step, 5);
-
-    for bad in ["0", "3", "-1", "300", "2.5", "\"ten\""] {
-        fs::write(&file, format!("volume_step = {bad}\nvolume = 0.5\n")).unwrap();
-        let s = Settings::load(&p);
-        assert_eq!(s.volume_step, 5, "{bad}");
-        // The rest of the file still counts.
-        assert_eq!(s.volume, 0.5, "{bad}");
-    }
-    for step in Settings::VOLUME_STEPS {
-        fs::write(&file, format!("volume_step = {step}\n")).unwrap();
-        assert_eq!(Settings::load(&p).volume_step, step);
-    }
-}
-
-#[test]
-fn streaming_quality_is_high_in_older_files_and_for_an_unknown_value() {
-    let Some(home) = TestHome::new("settings-streaming-quality") else {
-        return;
-    };
-    let p = home.paths();
-    fs::create_dir_all(&p.config).unwrap();
-    let file = p.config.join("settings.toml");
-
-    // A file written before the setting existed.
-    fs::write(
-        &file,
-        "notifications = true
-",
-    )
-    .unwrap();
-    assert_eq!(Settings::load(&p).streaming_quality, StreamingQuality::High);
-
-    for bad in ["\"lossless\"", "\"High\"", "3", "true"] {
-        fs::write(
-            &file,
-            format!(
-                "streaming_quality = {bad}
-volume = 0.5
-"
-            ),
-        )
-        .unwrap();
-        let s = Settings::load(&p);
-        assert_eq!(s.streaming_quality, StreamingQuality::High, "{bad}");
-        // The rest of the file still counts.
-        assert_eq!(s.volume, 0.5, "{bad}");
-    }
-}
-
-#[test]
-fn streaming_quality_round_trips_as_lowercase() {
-    let Some(home) = TestHome::new("settings-streaming-quality-rt") else {
-        return;
-    };
-    let p = home.paths();
-    for quality in [StreamingQuality::High, StreamingQuality::Standard] {
-        let s = Settings {
-            streaming_quality: quality,
-            ..Settings::default()
-        };
-        s.save(&p).unwrap();
-        assert_eq!(Settings::load(&p).streaming_quality, quality);
-    }
-    let text = fs::read_to_string(p.config.join("settings.toml")).unwrap();
-    assert!(text.contains("streaming_quality = \"standard\""), "{text}");
-}
-
-#[test]
-fn the_sound_settings_round_trip_and_load_off_or_flat_when_unknown() {
-    let Some(home) = TestHome::new("settings-sound") else {
-        return;
-    };
-    let p = home.paths();
-    let s = Settings {
-        equalizer: Equalizer::Vocal,
-        equalizer_bands: [-12, 0, 4, 0, 1],
-        loudness: Loudness::Strong,
-        ..Settings::default()
-    };
-    s.save(&p).unwrap();
-    assert_eq!(Settings::load(&p), s);
-    let text = fs::read_to_string(p.config.join("settings.toml")).unwrap();
-    assert!(text.contains("equalizer = \"vocal\""), "{text}");
-    assert!(text.contains("loudness = \"strong\""), "{text}");
-
-    // Out of range bands load clamped; anything but five numbers loads flat. An unknown
-    // choice loads as Off. The rest of the file still counts.
-    let file = p.config.join("settings.toml");
-    for (bands, want) in [
-        ("[20, -30, 1, 2, 3]", [12, -12, 1, 2, 3]),
-        ("[1, 2, 3]", [0; 5]),
-        ("\"loud\"", [0; 5]),
-        ("[1, 2, \"x\", 4, 5]", [0; 5]),
-    ] {
-        fs::write(
-            &file,
-            format!(
-                "equalizer = \"party\"\nequalizer_bands = {bands}\nloudness = 3\nvolume = 0.5\n"
-            ),
-        )
-        .unwrap();
-        let s = Settings::load(&p);
-        assert_eq!(s.equalizer_bands, want, "{bands}");
-        assert_eq!((s.equalizer, s.loudness), (Equalizer::Off, Loudness::Off));
-        assert_eq!(s.volume, 0.5, "{bands}");
-    }
-}
-
-#[test]
-fn skip_silence_round_trips_and_loads_off_when_unknown() {
-    let Some(home) = TestHome::new("settings-skip-silence") else {
-        return;
-    };
-    let p = home.paths();
-    let s = Settings {
-        skip_silence: SkipSilence::StartAndEnd,
-        ..Settings::default()
-    };
-    s.save(&p).unwrap();
-    assert_eq!(Settings::load(&p), s);
-    let file = p.config.join("settings.toml");
-    let text = fs::read_to_string(&file).unwrap();
-    assert!(text.contains("skip_silence = \"start_and_end\""), "{text}");
-
-    fs::write(
-        &file,
-        "skip_silence = \"always\"
-volume = 0.5
-",
-    )
-    .unwrap();
-    let s = Settings::load(&p);
-    assert_eq!((s.skip_silence, s.volume), (SkipSilence::Off, 0.5));
-}
-
-#[test]
-fn match_song_volumes_is_on_in_older_files_and_off_stays_off() {
-    let Some(home) = TestHome::new("settings-match-volumes") else {
-        return;
-    };
-    let p = home.paths();
-    let file = p.config.join("settings.toml");
-    fs::create_dir_all(&p.config).unwrap();
-    fs::write(&file, "volume = 0.5\n").unwrap();
-    assert!(Settings::load(&p).match_volumes);
-    let s = Settings {
-        match_volumes: false,
-        ..Settings::default()
-    };
-    s.save(&p).unwrap();
-    assert!(!Settings::load(&p).match_volumes);
-    let text = fs::read_to_string(&file).unwrap();
-    assert!(text.contains("match_volumes = false"), "{text}");
-}
-
-#[test]
-fn crossfade_round_trips_and_loads_off_when_unknown() {
-    let Some(home) = TestHome::new("settings-crossfade") else {
-        return;
-    };
-    let p = home.paths();
-    assert_eq!(
-        (
-            Settings::default().crossfade,
-            Settings::default().fade_on_skip
-        ),
-        (0, false)
-    );
-    let s = Settings {
-        crossfade: 8,
-        fade_on_skip: true,
-        ..Settings::default()
-    };
-    s.save(&p).unwrap();
-    assert_eq!(Settings::load(&p), s);
-    let file = p.config.join("settings.toml");
-    let text = fs::read_to_string(&file).unwrap();
-    assert!(text.contains("crossfade = 8"), "{text}");
-
-    fs::write(&file, "crossfade = 7\nvolume = 0.5\n").unwrap();
-    let s = Settings::load(&p);
-    assert_eq!((s.crossfade, s.volume), (0, 0.5));
-}
-
-#[test]
-fn playback_speed_round_trips_and_loads_normal_when_unknown() {
-    let Some(home) = TestHome::new("settings-speed") else {
-        return;
-    };
-    let p = home.paths();
-    assert_eq!(Settings::default().playback_speed, 100);
-    let s = Settings {
-        playback_speed: 150,
-        ..Settings::default()
-    };
-    s.save(&p).unwrap();
-    assert_eq!(Settings::load(&p), s);
-    let file = p.config.join("settings.toml");
-    let text = fs::read_to_string(&file).unwrap();
-    assert!(text.contains("playback_speed = 150"), "{text}");
-
-    fs::write(
-        &file,
-        "playback_speed = 25
-volume = 0.5
-",
-    )
-    .unwrap();
-    let s = Settings::load(&p);
-    assert_eq!((s.playback_speed, s.volume), (100, 0.5));
-}
-
-#[test]
-fn bad_sleep_timer_values_load_as_the_defaults_and_keep_the_rest() {
-    let Some(home) = TestHome::new("settings-sleep-bad") else {
-        return;
-    };
-    let p = home.paths();
-    let file = p.config.join("settings.toml");
-    fs::create_dir_all(&p.config).unwrap();
-    // A fade no build offers, a negative one, one too large for a byte, the wrong types.
-    for (timer, fade) in [
-        ("true", "15"),
-        ("true", "-10"),
-        ("true", "100000"),
-        ("\"yes\"", "\"20 s\""),
-        ("3", "[30]"),
-    ] {
-        let text = format!(
-            "sleep_timer = {timer}
-sleep_fade = {fade}
-volume = 0.5
-"
-        );
-        fs::write(&file, text).unwrap();
-        let s = Settings::load(&p);
-        let on = timer == "true";
-        assert_eq!(
-            (s.sleep_timer, s.sleep_fade, s.volume),
-            (on, 20, 0.5),
-            "{timer} / {fade}"
-        );
-    }
-}
-
-#[test]
-fn tooltips_show_in_older_files_and_off_stays_off() {
-    let Some(home) = TestHome::new("settings-tooltips") else {
-        return;
-    };
-    let p = home.paths();
-    fs::create_dir_all(&p.config).unwrap();
-    let file = p.config.join("settings.toml");
-    fs::write(&file, "volume = 0.5\n").unwrap();
-    assert!(Settings::load(&p).tooltips);
-
-    fs::write(&file, "tooltips = false\n").unwrap();
-    let off = Settings::load(&p);
-    assert!(!off.tooltips);
-    off.save(&p).unwrap();
-    assert!(!Settings::load(&p).tooltips);
-}
-
-#[test]
-fn the_equalizer_presets_give_their_bands() {
-    let custom = [1, 2, 3, 4, 5];
-    assert_eq!(Equalizer::Off.bands(custom), None);
-    assert_eq!(Equalizer::Bass.bands(custom), Some([8, 0, 0, 0, 0]));
-    assert_eq!(Equalizer::Treble.bands(custom), Some([0, 0, 0, 3, 6]));
-    assert_eq!(Equalizer::Vocal.bands(custom), Some([0, -2, 3, 4, 0]));
-    assert_eq!(Equalizer::Custom.bands(custom), Some(custom));
-}
-
-#[test]
-fn pins_round_trip_per_identity_including_the_cookies_own() {
-    let Some(home) = TestHome::new("settings-pins") else {
-        return;
-    };
-    let p = home.paths();
-    let mut s = Settings::default();
-    s.pins.insert(
-        String::new(),
-        vec!["album:MPREb_x".into(), "playlist:PLa".into()],
-    );
-    s.pins.insert("0/123".into(), vec!["artist:UCx".into()]);
-    s.save(&p).unwrap();
-    assert_eq!(Settings::load(&p).pins, s.pins);
-}
-
-#[test]
 fn no_pins_write_nothing() {
     let Some(home) = TestHome::new("settings-no-pins") else {
         return;
@@ -1193,31 +718,6 @@ fn no_pins_write_nothing() {
 fn settings_file(p: &Paths) -> toml::Table {
     let text = fs::read_to_string(p.config.join("settings.toml")).unwrap();
     toml::from_str(&text).unwrap()
-}
-
-#[test]
-fn settings_default_to_the_current_schema() {
-    assert_eq!(Settings::default().schema, SCHEMA);
-}
-
-#[test]
-fn a_0_1_0_file_without_a_schema_loads() {
-    let Some(home) = TestHome::new("settings-schema-0") else {
-        return;
-    };
-    let p = home.paths();
-    fs::create_dir_all(&p.config).unwrap();
-    fs::write(p.config.join("settings.toml"), "volume = 0.4\n").unwrap();
-
-    let s = Settings::load(&p);
-
-    assert_eq!(
-        s,
-        Settings {
-            volume: 0.4,
-            ..Settings::default()
-        }
-    );
 }
 
 /// A file from before the window's place was kept opens the window as before; a table this
@@ -1413,29 +913,6 @@ fn a_newer_file_with_a_bad_value_keeps_its_unknown_keys_on_save() {
     );
 }
 
-#[test]
-fn a_lyrics_size_this_build_doesnt_know_loads_as_medium() {
-    let Some(home) = TestHome::new("lyrics-size-unknown") else {
-        return;
-    };
-    let p = home.paths();
-    fs::create_dir_all(&p.config).unwrap();
-    for value in ["\"huge\"", "7", "true"] {
-        fs::write(
-            p.config.join("settings.toml"),
-            format!("lyrics_size = {value}"),
-        )
-        .unwrap();
-        assert_eq!(
-            Settings::load(&p).lyrics_size,
-            LyricsSize::Medium,
-            "{value}"
-        );
-    }
-    fs::write(p.config.join("settings.toml"), "lyrics_size = \"large\"").unwrap();
-    assert_eq!(Settings::load(&p).lyrics_size, LyricsSize::Large);
-}
-
 /// Desktop lyrics' values a newer featherplay or a hand edit left: each key that isn't one
 /// this build reads takes its default, and the strip's other keys and the rest of the file
 /// count. A place far off any screen loads as it was; the app then finds no screen with that
@@ -1480,25 +957,6 @@ place = { x = 2000000000, bottom = -2000000000, screen = [0, 0, 1, 1] }
         s.place.map(|p| (p.x, p.bottom)),
         Some((2_000_000_000, -2_000_000_000))
     );
-}
-
-/// "Start in the tray" that isn't a bool (a hand edit, a newer featherplay's) loads as off,
-/// and the rest of the file counts.
-#[test]
-fn a_start_in_tray_that_isnt_a_bool_loads_as_off_and_keeps_the_rest() {
-    let Some(home) = TestHome::new("settings-start-in-tray-bad") else {
-        return;
-    };
-    let p = home.paths();
-    fs::create_dir_all(&p.config).unwrap();
-    let file = p.config.join("settings.toml");
-    for value in ["\"yes\"", "1", "[true]"] {
-        fs::write(&file, format!("start_in_tray = {value}\nvolume = 0.5\n")).unwrap();
-        let s = Settings::load(&p);
-        assert_eq!((s.start_in_tray, s.volume), (false, 0.5), "{value}");
-    }
-    fs::write(&file, "start_in_tray = true\n").unwrap();
-    assert!(Settings::load(&p).start_in_tray);
 }
 
 /// Many writes of one file at once (saves from several threads) all succeed, each whole, and
