@@ -567,70 +567,38 @@ mod tests {
     }
 
     #[test]
-    fn the_window_in_front_at_the_start_leaves_it_open() {
-        let mut last = Some(w(APP));
-        let app = front(APP, "Chrome_WidgetWin_1");
-        assert!(!moved_away(Some(&app), Some(w(OWN)), &mut last));
-    }
-
-    #[test]
-    fn another_app_coming_to_the_front_closes_it() {
-        let mut last = Some(w(0x10));
-        let app = front(APP, "Chrome_WidgetWin_1");
-        assert!(moved_away(Some(&app), Some(w(OWN)), &mut last));
-    }
-
-    #[test]
-    fn the_desktop_coming_to_the_front_closes_it() {
-        for class in ["Progman", "WorkerW"] {
-            let mut last = Some(w(0x10));
-            let desktop = front(0x30, class);
-            assert!(
-                moved_away(Some(&desktop), Some(w(OWN)), &mut last),
-                "{class}"
-            );
-        }
-    }
-
-    #[test]
-    fn the_mini_player_itself_coming_to_the_front_leaves_it_open() {
-        let mut last = Some(w(0x10));
-        let own = front(OWN, "Window Class");
-        assert!(!moved_away(Some(&own), Some(w(OWN)), &mut last));
-        assert_eq!(last, Some(w(OWN)));
-    }
-
-    #[test]
-    fn nothing_closes_it_before_its_own_window_is_known() {
-        // Winit makes the window after `show` returns: until its handle is known, the mini
-        // player coming to the front (a press on its play button) looks like any other window.
-        let mut last = Some(w(0x20));
-        let itself = front(OWN, "Window Class");
-        assert!(!moved_away(Some(&itself), None, &mut last));
-        assert_eq!(
-            last,
-            Some(w(0x20)),
-            "a window it couldn't judge was taken as seen"
-        );
-    }
-
-    #[test]
-    fn the_shell_and_the_tray_menu_coming_to_the_front_leave_it_open() {
+    fn only_another_window_coming_to_the_front_closes_it() {
+        const CHROME: &str = "Chrome_WidgetWin_1";
+        const ITSELF: &str = "Window Class";
+        // (case, last, in front, its class, closes, last after)
+        let mut cases = vec![
+            ("in front at the start", APP, APP, CHROME, false, APP),
+            ("another app", 0x10, APP, CHROME, true, APP),
+            ("the desktop", 0x10, 0x30, "Progman", true, 0x30),
+            ("the desktop", 0x10, 0x30, "WorkerW", true, 0x30),
+            ("the mini player itself", 0x10, OWN, ITSELF, false, OWN),
+        ];
         for class in NEUTRAL {
-            let mut last = Some(w(APP));
-            let shell = front(0x20, class);
-            assert!(
-                !moved_away(Some(&shell), Some(w(OWN)), &mut last),
-                "{class}"
-            );
+            cases.push(("shell or tray menu", APP, 0x20, class, false, 0x20));
         }
-    }
+        for (case, last_seen, n, class, closes, after) in cases {
+            let mut last = Some(w(last_seen));
+            let away = moved_away(Some(&front(n, class)), Some(w(OWN)), &mut last);
+            assert_eq!((away, last), (closes, Some(w(after))), "{case} ({class})");
+        }
 
-    #[test]
-    fn no_window_in_front_leaves_it_open_and_the_last_one_kept() {
+        // Winit makes the window after `show` returns: until its handle is known, the mini
+        // player coming to the front (a press on its play button) looks like any other
+        // window, so it isn't judged, or taken as seen.
+        let mut last = Some(w(0x20));
+        let away = moved_away(Some(&front(OWN, ITSELF)), None, &mut last);
+        let want = (false, Some(w(0x20)));
+        assert_eq!((away, last), want, "its own window not known yet");
+
         let mut last = Some(w(0x10));
-        assert!(!moved_away(None, Some(w(OWN)), &mut last));
-        assert_eq!(last, Some(w(0x10)));
+        let away = moved_away(None, Some(w(OWN)), &mut last);
+        let want = (false, Some(w(0x10)));
+        assert_eq!((away, last), want, "no window in front");
     }
 
     #[test]
@@ -643,26 +611,22 @@ mod tests {
     }
 
     #[test]
-    fn a_press_on_the_taskbar_closes_it() {
-        for class in ["Shell_TrayWnd", "Shell_SecondaryTrayWnd"] {
-            assert!(closes_on_press(class), "{class}");
-        }
-    }
-
-    #[test]
-    fn a_press_anywhere_else_leaves_it_to_the_poll() {
-        let elsewhere = [
-            "TopLevelWindowForOverflowXamlIsland",
-            "NotifyIconOverflowWindow",
-            "ForegroundStaging",
-            "#32768",
-            "Window Class",
-            "Chrome_WidgetWin_1",
-            "Progman",
-            "",
+    fn a_press_on_the_taskbar_closes_it_and_one_elsewhere_is_left_to_the_poll() {
+        // (class, closes)
+        let cases = [
+            ("Shell_TrayWnd", true),
+            ("Shell_SecondaryTrayWnd", true),
+            ("TopLevelWindowForOverflowXamlIsland", false),
+            ("NotifyIconOverflowWindow", false),
+            ("ForegroundStaging", false),
+            ("#32768", false),
+            ("Window Class", false),
+            ("Chrome_WidgetWin_1", false),
+            ("Progman", false),
+            ("", false),
         ];
-        for class in elsewhere {
-            assert!(!closes_on_press(class), "{class}");
+        for (class, closes) in cases {
+            assert_eq!(closes_on_press(class), closes, "{class:?}");
         }
     }
 }
