@@ -9,24 +9,30 @@ use std::time::{Duration, Instant};
 use super::media::SHORT_READ_TIMEOUT;
 use super::{engine_tmp, fixture, serve, src, wait_event};
 
+/// On a slow link the engine plays from the first part of the download. The server sends
+/// a third of the file and holds the rest back, so the start and a moving position can
+/// only come before the download ends.
 #[test]
 fn engine_sounds_long_before_the_download_ends() {
     let data = fixture("tone-10s-frag.m4a");
+    let third = data.len() as u64 / 3;
     let server = serve(data, 16 << 10, Duration::ZERO);
+    // Every request stops at a third of the file and hangs there.
+    server.log.stall.store(u32::MAX, Ordering::SeqCst);
+    server.log.stall_at.store(third, Ordering::SeqCst);
     let engine = crate::AudioEngine::new_null(engine_tmp());
     let events = engine.events();
-    let t = Instant::now();
     engine.load(src(&server.url), Duration::ZERO);
     engine.play();
-    wait_event(&events, Duration::from_secs(3), crate::AudioEvent::Started);
-    let started = t.elapsed();
-    assert!(
-        started < Duration::from_millis(1500),
-        "Started after {started:?}"
-    );
-    std::thread::sleep(Duration::from_millis(500));
-    let at = engine.position();
-    assert!(at >= Duration::from_millis(300), "position {at:?}");
+    wait_event(&events, Duration::from_secs(10), crate::AudioEvent::Started);
+    let t = Instant::now();
+    while engine.position() == Duration::ZERO {
+        assert!(
+            t.elapsed() < Duration::from_secs(10),
+            "started, but the position never moved"
+        );
+        std::thread::sleep(Duration::from_millis(10));
+    }
 }
 
 #[test]
