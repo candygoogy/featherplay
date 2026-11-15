@@ -70,36 +70,64 @@ fn the_pins_are_sha256_hex() {
     }
 }
 
-/// Each architecture downloads its own build, and both pin the same releases, so the
-/// weekly pin check (sidecar-pins.yml) reads one version for each helper.
+/// Each system and architecture downloads its own build, and all pin the same releases, so
+/// the weekly pin check (sidecar-pins.yml) reads one version for each helper. Linux's are
+/// the glibc builds, named without `.exe`, with no yt-dlp mirror (over the site's 25 MiB a
+/// file).
 #[test]
-fn the_architectures_pin_the_same_releases_of_their_own_builds() {
+fn the_pins_are_the_same_releases_of_each_systems_own_builds() {
     let release = |url: &'static str| url.rsplit_once('/').map(|(dir, _)| dir);
-    assert_eq!(release(X64.ytdlp_url), release(ARM64.ytdlp_url));
-    assert_eq!(release(X64.deno_url), release(ARM64.deno_url));
-    assert!(X64.deno_zip.contains("x86_64") && ARM64.deno_zip.contains("aarch64"));
-    assert!(ARM64.ytdlp_url.ends_with("/yt-dlp_arm64.exe"));
-    assert!(X64.ytdlp_url.ends_with("/yt-dlp.exe"));
-    assert_ne!(X64.ytdlp_sha256, ARM64.ytdlp_sha256);
-    assert_ne!(X64.deno_sha256, ARM64.deno_sha256);
-    assert_ne!(X64.deno_cdn_sha256, ARM64.deno_cdn_sha256);
-}
-
-/// Linux pins the same releases as Windows, of its glibc builds, named without `.exe`.
-#[test]
-fn linux_pins_the_same_releases_of_its_own_builds() {
-    let release = |url: &'static str| url.rsplit_once('/').map(|(dir, _)| dir);
-    for linux in [&LINUX_X64, &LINUX_ARM64] {
-        assert_eq!(release(linux.ytdlp_url), release(X64.ytdlp_url));
-        assert_eq!(release(linux.deno_url), release(X64.deno_url));
-        assert!(linux.deno_zip.ends_with("-unknown-linux-gnu.zip"));
-        assert_eq!(linux.ytdlp_mirror, None, "over the site's 25 MiB a file");
+    let cases: [(&str, &Pins, &str, &str, bool); 4] = [
+        (
+            "Windows x64",
+            &X64,
+            "/yt-dlp.exe",
+            "x86_64-pc-windows-msvc.zip",
+            true,
+        ),
+        (
+            "Windows ARM64",
+            &ARM64,
+            "/yt-dlp_arm64.exe",
+            "aarch64-pc-windows-msvc.zip",
+            true,
+        ),
+        (
+            "Linux x86_64",
+            &LINUX_X64,
+            "/yt-dlp_linux",
+            "x86_64-unknown-linux-gnu.zip",
+            false,
+        ),
+        (
+            "Linux aarch64",
+            &LINUX_ARM64,
+            "/yt-dlp_linux_aarch64",
+            "aarch64-unknown-linux-gnu.zip",
+            false,
+        ),
+    ];
+    for (label, pins, ytdlp, deno, mirror) in cases {
+        assert_eq!(release(pins.ytdlp_url), release(X64.ytdlp_url), "{label}");
+        assert_eq!(release(pins.deno_url), release(X64.deno_url), "{label}");
+        assert!(pins.ytdlp_url.ends_with(ytdlp), "{label}");
+        assert!(pins.deno_zip.ends_with(deno), "{label}");
+        assert_eq!(pins.ytdlp_mirror.is_some(), mirror, "{label}");
     }
-    assert!(LINUX_X64.ytdlp_url.ends_with("/yt-dlp_linux"));
-    assert!(LINUX_ARM64.ytdlp_url.ends_with("/yt-dlp_linux_aarch64"));
-    assert!(LINUX_X64.deno_zip.contains("x86_64") && LINUX_ARM64.deno_zip.contains("aarch64"));
-    assert_ne!(LINUX_X64.ytdlp_sha256, LINUX_ARM64.ytdlp_sha256);
-    assert_ne!(LINUX_X64.deno_sha256, LINUX_ARM64.deno_sha256);
+    // Each its own build: no two share a hash.
+    let distinct = |hash: fn(&Pins) -> &'static str| {
+        ALL.iter()
+            .map(|p| hash(p))
+            .collect::<std::collections::HashSet<_>>()
+            .len()
+    };
+    assert_eq!(distinct(|p| p.ytdlp_sha256), ALL.len(), "yt-dlp");
+    assert_eq!(distinct(|p| p.deno_sha256), ALL.len(), "deno");
+    assert_eq!(
+        distinct(|p| p.deno_cdn_sha256),
+        ALL.len(),
+        "deno's second source"
+    );
 }
 
 /// The second sources hold the same releases, under the same file names: the site's
@@ -202,8 +230,17 @@ async fn live_the_pinned_releases_install() {
     sidecars.ensure(|_, _, _| {}).await.unwrap();
     assert!(sidecars.ytdlp().is_file() && sidecars.deno().is_file());
     let (ytdlp, deno) = sidecars.versions().await;
-    assert_eq!(ytdlp.as_deref(), Some("2026.10.26"));
-    assert_eq!(deno.as_deref(), Some("2.9.8"));
+    // The versions the pins name: `/download/<version>/` and `/download/v<version>/`.
+    let pinned = |url: &str| {
+        let (_, rest) = url
+            .split_once("/releases/download/")
+            .expect("a release URL");
+        rest.split('/')
+            .next()
+            .map(|v| v.trim_start_matches('v').to_string())
+    };
+    assert_eq!(ytdlp, pinned(PINS.ytdlp_url));
+    assert_eq!(deno, pinned(PINS.deno_url));
     std::fs::remove_dir_all(&dir).unwrap();
 }
 
@@ -253,27 +290,26 @@ fn held_step(
     (step, calls)
 }
 
+/// A file step waits while antivirus holds the file, fails after five tries if it holds it
+/// too long, and fails at once on other errors.
 #[tokio::test]
 async fn a_file_step_waits_while_antivirus_holds_the_file() {
-    let (step, calls) = held_step(2, 32);
-    assert_eq!(patiently(step).await.unwrap(), 7);
-    assert_eq!(calls.load(Ordering::SeqCst), 3);
-}
-
-#[tokio::test]
-async fn a_file_held_too_long_fails_after_five_tries() {
-    let (step, calls) = held_step(usize::MAX, 5);
-    let err = patiently(step).await.unwrap_err();
-    assert_eq!(err.raw_os_error(), Some(5));
-    assert_eq!(calls.load(Ordering::SeqCst), 5);
-}
-
-#[tokio::test]
-async fn other_file_errors_fail_at_once() {
-    // ERROR_DISK_FULL
-    let (step, calls) = held_step(usize::MAX, 112);
-    assert_eq!(patiently(step).await.unwrap_err().raw_os_error(), Some(112));
-    assert_eq!(calls.load(Ordering::SeqCst), 1);
+    /// A label, how often the file is held, the os error, the answer (the step's, or the
+    /// error's code) and the calls.
+    type Case = (&'static str, usize, i32, Result<u8, i32>, u64);
+    let cases: [Case; 3] = [
+        ("held twice, then through", 2, 32, Ok(7), 3),
+        ("held too long", usize::MAX, 5, Err(5), 5),
+        ("disk full: at once", usize::MAX, 112, Err(112), 1),
+    ];
+    for (label, held, code, want, tries) in cases {
+        let (step, calls) = held_step(held, code);
+        let got = patiently(step)
+            .await
+            .map_err(|e| e.raw_os_error().unwrap_or(-1));
+        assert_eq!(got, want, "{label}");
+        assert_eq!(calls.load(Ordering::SeqCst), tries, "{label}");
+    }
 }
 
 /// A connection that drops mid-file is tried again, like one that couldn't connect.
