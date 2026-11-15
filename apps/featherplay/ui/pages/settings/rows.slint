@@ -194,6 +194,9 @@ export global Rows {
     out property <color> detail: Theme.text2.mix(Theme.text1, 0.75);
     // Above each group's title (and between the page's title and the first group).
     out property <length> gap: Theme.s7;
+    // Where the Lyrics section starts at the least, from the page's title: under Playback
+    // and Sound at their shortest (the widest column, the rows that come and go hidden).
+    out property <length> lyrics-least-y: 1500px;
     // The least a row's label keeps beside its controls; narrower, they go under it.
     out property <length> label-min: 180px;
 }

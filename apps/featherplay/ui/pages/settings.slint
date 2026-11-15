@@ -118,17 +118,24 @@ export component SettingsPage inherits Rectangle {
     // above the player bar and the fade over its top (`bar-fade` in app.slint).
     property <length> discord-top: col.y + discord-section.y + Rows.gap + Rows.title-h + Theme.s3 + Rows.pad-top;
     property <length> view-h: flick.height - Theme.bar-clear - Theme.s5;
-    // How many of the sections below the fold (Discord, Window, Account) are made: one
-    // more each tick after the page's first frame, not all with it. Making and laying out
-    // every row, its text shaped, was most of the page's first frame (~13 ms at 4K shown
-    // again, ~21 the first time; measured 2026-11-01). Until then a
-    // section is its title on an empty panel, out of sight.
+    // How many of the sections below the fold (Lyrics, Scrobbling, Discord, Window, Account)
+    // are made: one more each tick after the page's first frame, not all with it. Making and
+    // laying out every row, its text shaped, was most of the page's first frame (~13 ms at 4K
+    // shown again, ~21 the first time; measured 2026-11-01). Until then a section is its
+    // title on an empty panel, out of sight.
     property <int> made: 0;
     Timer {
         interval: 1ms;
-        running: root.made < 3;
+        running: root.made < 5;
         triggered => { root.made += 1; }
     }
+    // Lyrics and Scrobbling start under Playback and Sound, at least `Rows.lyrics-least-y`
+    // down the page (`tests/app/settings_fold.rs` holds that). A view no taller than that
+    // can't show them in its first frame, so they are made after it like the rest; a taller
+    // one, or a page opened while a search hides the sections above them, makes them with
+    // the page. (Asking the two sections for their heights instead cost most of what making
+    // these later saves.)
+    property <int> made-early: flick.height > Rows.lyrics-least-y || SettingsSearch.active ? 5 : root.made;
 
     // Where each section's title is in the scrolled content, in the index's order (a
     // section the search hides is where the next one shown starts).
@@ -193,7 +200,7 @@ export component SettingsPage inherits Rectangle {
     }
     Timer {
         interval: 1ms;
-        running: root.made >= 3 && root.revealed != SettingsSearch.lit-asks;
+        running: root.made >= 5 && root.revealed != SettingsSearch.lit-asks;
         triggered => {
             root.revealed = SettingsSearch.lit-asks;
             SettingsSearch.lit-measure += 1;
@@ -261,9 +268,13 @@ export component SettingsPage inherits Rectangle {
 
             sound-section := SoundSection { }
 
-            lyrics-section := LyricsSection { }
+            lyrics-section := LyricsSection {
+                made: root.made-early;
+            }
 
-            scrobbling-section := ScrobblingSection { }
+            scrobbling-section := ScrobblingSection {
+                made: root.made-early;
+            }
 
             discord-section := DiscordSection {
                 extend: root.card-beside ? root.wide-panel - root.col-w : 0px;

@@ -99,6 +99,7 @@ mod search_link;
 mod search_paste;
 mod search_suggestions;
 mod setting_switches;
+mod settings_fold;
 mod settings_index;
 mod settings_search;
 mod shortcut_list;

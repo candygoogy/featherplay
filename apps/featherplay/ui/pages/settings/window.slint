@@ -255,7 +255,7 @@ export component WindowSection inherits Group {
     in property <int> made;
     title: @tr("Window");
     section: 6;
-    if root.made >= 2: VerticalLayout {
+    if root.made >= 4: VerticalLayout {
         // What happens when the app starts, then what happens when it's closed.
         ToggleRow {
             divider: false;

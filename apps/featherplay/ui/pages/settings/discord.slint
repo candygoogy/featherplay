@@ -81,7 +81,7 @@ export component DiscordSection inherits Group {
     // Two columns while the card fits beside the options: the rows on the left,
     // the card's lane on the right, the card placed over the layout. Otherwise
     // the rows alone.
-    if root.made >= 1: block := Rectangle {
+    if root.made >= 3: block := Rectangle {
         property <length> card-w: root.beside-card-w;
         property <length> pane-h: pane.preferred-height + 2 * Rows.pad-y;
         min-width: columns.min-width;
