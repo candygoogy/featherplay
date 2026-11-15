@@ -128,7 +128,6 @@ mod translations;
 mod transport_keys;
 mod tray_click;
 mod tray_hide;
-mod ui_bridge;
 mod update_notice;
 mod upnext_cover;
 mod upnext_rows;
