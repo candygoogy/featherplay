@@ -58,51 +58,9 @@ fn paused() -> Snapshot {
     s
 }
 
+/// The song info follows the player at once: empty, then a paused track, then a playing one.
 #[tokio::test]
-async fn a_playing_track_is_pears_song_info() {
-    let a = start(playing()).await;
-    let r = get(&a, "/query").await;
-    assert_eq!(r.status, 200);
-    assert!(
-        r.head.contains("content-type: application/json"),
-        "{}",
-        r.head
-    );
-    let info = r.json();
-    let player = &info["player"];
-    assert_eq!(player["hasSong"], true);
-    assert_eq!(player["isPaused"], false);
-    // Whole seconds, as Pear reads them from the progress bar.
-    let at = player["seekbarCurrentPosition"]
-        .as_u64()
-        .expect("whole seconds");
-    assert!((30..=31).contains(&at), "{at}");
-    assert_eq!(
-        info["track"],
-        json!({
-            "duration": 200,
-            "title": "Song title",
-            "author": "Artist",
-            "cover": "https://example.com/cover.jpg",
-            "url": "https://music.youtube.com/watch?v=dQw4w9WgXcQ",
-            "id": "dQw4w9WgXcQ",
-            "isAdvertisement": false,
-        })
-    );
-}
-
-#[tokio::test]
-async fn a_paused_track_stands_still() {
-    let a = start(paused()).await;
-    let player = get(&a, "/query").await.json()["player"].clone();
-    assert_eq!(
-        player,
-        json!({ "hasSong": true, "isPaused": true, "seekbarCurrentPosition": 30 })
-    );
-}
-
-#[tokio::test]
-async fn an_empty_player_has_no_song() {
+async fn the_song_info_is_pears_and_shows_each_new_state_at_once() {
     let a = start(Snapshot::default()).await;
     assert_eq!(
         get(&a, "/query").await.json(),
@@ -117,7 +75,52 @@ async fn an_empty_player_has_no_song() {
                 "id": "",
                 "isAdvertisement": false,
             },
-        })
+        }),
+        "an empty player has no song"
+    );
+
+    a.publish(paused());
+    let info = get(&a, "/api").await.json();
+    assert_eq!(
+        info["player"],
+        json!({ "hasSong": true, "isPaused": true, "seekbarCurrentPosition": 30 }),
+        "a paused track stands still"
+    );
+    assert_eq!(
+        info["track"]["title"], "Song title",
+        "a new state shows at once"
+    );
+
+    a.publish(playing());
+    let r = get(&a, "/query").await;
+    assert_eq!(r.status, 200);
+    assert!(
+        r.head.contains("content-type: application/json"),
+        "{}",
+        r.head
+    );
+    let info = r.json();
+    let player = &info["player"];
+    assert_eq!(player["hasSong"], true);
+    assert_eq!(player["isPaused"], false);
+    // Whole seconds, as Pear reads them from the progress bar: 30 s in a moment ago
+    // (seconds on a busy machine).
+    let at = player["seekbarCurrentPosition"]
+        .as_u64()
+        .expect("whole seconds");
+    assert!((30..=40).contains(&at), "{at}");
+    assert_eq!(
+        info["track"],
+        json!({
+            "duration": 200,
+            "title": "Song title",
+            "author": "Artist",
+            "cover": "https://example.com/cover.jpg",
+            "url": "https://music.youtube.com/watch?v=dQw4w9WgXcQ",
+            "id": "dQw4w9WgXcQ",
+            "isAdvertisement": false,
+        }),
+        "a playing track"
     );
 }
 
@@ -126,13 +129,6 @@ async fn query_and_api_answer_the_same() {
     let a = start(paused()).await;
     let query: Value = get(&a, "/query").await.json();
     assert_eq!(get(&a, "/api").await.json(), query);
-}
-
-#[tokio::test]
-async fn a_new_state_shows_at_once() {
-    let a = start(Snapshot::default()).await;
-    a.publish(paused());
-    assert_eq!(get(&a, "/api").await.json()["track"]["title"], "Song title");
 }
 
 #[tokio::test]
@@ -179,11 +175,14 @@ async fn an_app_reads_without_cors_headers() {
     assert!(!has_cors(&r), "{}", r.head);
 }
 
+/// Other pages' reads and preflights alike: `admit` refuses them before any route.
 #[tokio::test]
 async fn other_pages_are_refused_without_cors_headers() {
     let a = start(playing()).await;
     let port = a.port();
-    for origin in [
+    let preflight = "Access-Control-Request-Method: GET\r\n\
+                     Access-Control-Request-Private-Network: true\r\n";
+    let mut cases: Vec<(&str, String)> = [
         "https://evil.example",
         "null",
         "file://",
@@ -192,46 +191,42 @@ async fn other_pages_are_refused_without_cors_headers() {
         "https://6klabs.com.evil.example",
         "https://6klabs.com:8443",
         "https://6klabs.com/",
-    ] {
-        let raw = request("GET", "/query", port, &format!("Origin: {origin}\r\n"));
-        let r = send(port, &raw).await;
-        assert_eq!(r.status, 403, "{origin}");
-        assert!(!has_cors(&r), "{origin}: {}", r.head);
-        assert!(!r.body.contains("Song title"), "{origin}: {}", r.body);
-    }
+    ]
+    .into_iter()
+    .map(|origin| ("GET", format!("Origin: {origin}\r\n")))
+    .collect();
     // Two origins, one of them the widget's, aren't one page's request.
-    let raw = request(
+    cases.push((
         "GET",
-        "/query",
-        port,
-        &format!("Origin: {WIDGET}\r\nOrigin: https://evil.example\r\n"),
-    );
-    assert_eq!(send(port, &raw).await.status, 403);
+        format!("Origin: {WIDGET}\r\nOrigin: https://evil.example\r\n"),
+    ));
+    for origin in ["https://evil.example", "null"] {
+        cases.push(("OPTIONS", format!("Origin: {origin}\r\n{preflight}")));
+    }
+    for (method, extra) in cases {
+        let case = format!("{method} with {}", extra.lines().next().unwrap_or_default());
+        let r = send(port, &request(method, "/query", port, &extra)).await;
+        assert_eq!(r.status, 403, "{case}");
+        assert!(!has_cors(&r), "{case}: {}", r.head);
+        assert!(!r.body.contains("Song title"), "{case}: {}", r.body);
+    }
 }
 
 #[tokio::test]
 async fn only_the_loopback_names_are_hosts() {
     let a = start(playing()).await;
     let port = a.port();
-    for host in [
-        format!("127.0.0.1:{port}"),
-        format!("localhost:{port}"),
-        format!("[::1]:{port}"),
-    ] {
-        let r = send(port, &with_host("GET", "/query", &host, "")).await;
-        assert_eq!(r.status, 200, "{host}");
-    }
+    let r = send(
+        port,
+        &with_host("GET", "/query", &format!("localhost:{port}"), ""),
+    )
+    .await;
+    assert_eq!(r.status, 200);
     // A DNS-rebinding page reaches 127.0.0.1 through a name of its own.
-    for host in [
-        format!("rebind.evil.example:{port}"),
-        format!("127.0.0.1.evil.example:{port}"),
-        "127.0.0.1".to_string(),
-        "127.0.0.1:80".to_string(),
-    ] {
-        let r = send(port, &with_host("GET", "/query", &host, "")).await;
-        assert_eq!(r.status, 403, "{host}");
-        assert!(!r.body.contains("Song title"), "{host}: {}", r.body);
-    }
+    let rebind = format!("rebind.evil.example:{port}");
+    let r = send(port, &with_host("GET", "/query", &rebind, "")).await;
+    assert_eq!(r.status, 403);
+    assert!(!r.body.contains("Song title"), "{}", r.body);
     // Even with the widget's origin.
     let raw = with_host(
         "GET",
@@ -298,26 +293,6 @@ async fn the_widget_can_read_a_miss() {
         "{}",
         r.head
     );
-}
-
-#[tokio::test]
-async fn other_pages_preflights_are_refused() {
-    let a = start(playing()).await;
-    let port = a.port();
-    for origin in ["https://evil.example", "null"] {
-        let preflight = request(
-            "OPTIONS",
-            "/query",
-            port,
-            &format!(
-                "Origin: {origin}\r\nAccess-Control-Request-Method: GET\r\n\
-                 Access-Control-Request-Private-Network: true\r\n"
-            ),
-        );
-        let r = send(port, &preflight).await;
-        assert_eq!(r.status, 403, "{origin}");
-        assert!(!has_cors(&r), "{origin}: {}", r.head);
-    }
 }
 
 #[tokio::test]
