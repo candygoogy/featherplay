@@ -158,10 +158,18 @@ its minute fails the test.
 
 The same commands work on Linux. There, use nextest's `ci` profile (`--profile ci`), as CI
 does: the frame-cost and CPU-time ceilings were set on Windows, and the CPU-time ones count
-thread cycles, which only Windows reports. Run the tests under a session bus
-(`dbus-run-session -- cargo nextest run ...`), as a desktop has one, with the Noto fonts
-(`fonts-noto-core`, `fonts-noto-cjk`, `fonts-noto-color-emoji`) for the titles in other
-scripts. Linux has no Segoe UI Variable, so the pixel checks that measure text in the body
+thread cycles, which only Windows reports. Run the tests under a session bus of their own,
+as a desktop has one, with the Noto fonts (`fonts-noto-core`, `fonts-noto-cjk`,
+`fonts-noto-color-emoji`) for the titles in other scripts:
+
+```
+dbus-run-session --config-file=scripts/test-session-bus.conf -- cargo nextest run --workspace --profile ci
+```
+
+That bus starts nothing, so the tests find what CI's runner has (no keyring, notification
+daemon or portal) on any desktop. With the stock bus (`dbus-run-session --`) on a desktop
+that runs GNOME Keyring, each call to the keyring waits 25 s for an answer that never comes,
+and one sign-in test takes over a minute. Linux has no Segoe UI Variable, so the pixel checks that measure text in the body
 font would fail: `FEATHERPLAY_PIXELS=unchecked` makes them save their images (to
 `FEATHERPLAY_TEST_SHOTS`) and skip those checks. The tests of Windows-only parts (the
 installer script, the single-instance mutex, the registry's browser policies, the tray's
