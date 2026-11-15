@@ -10,10 +10,15 @@ use crate::support::{Frame1, idle, playing_4k, show, step, three_tries};
 use featherplay::snapshot::Scene;
 use slint::ComponentHandle;
 
-/// The most a frame of a page's first show may cost, ms of CPU (optimised).
-const FIRST_MAX_MS: f64 = 16.0;
 /// The most a frame of a page shown again may cost, ms of CPU (optimised).
 const RESHOW_MAX_MS: f64 = 10.0;
+/// Settings' own two: the most a frame of its first show in the session may cost, and of it
+/// shown again. It is the longest page (115 rows; 67 when it was held to 16 and 10 ms, which
+/// it then met at ~12 and ~8): half of its first frame is painting the rows a 4K view shows,
+/// half making and laying them out, the sections below the fold left for the frames after.
+/// Measured 2026-11-15: 14 to 15.5 ms the first time, 8.3 to 9.5 shown again.
+const SETTINGS_FIRST_MAX_MS: f64 = 18.0;
+const SETTINGS_RESHOW_MAX_MS: f64 = 12.0;
 /// The window, physical pixels.
 const WINDOW: f64 = 3840.0 * 2160.0;
 
@@ -105,8 +110,14 @@ fn settings_shows_without_a_long_frame() {
         frames[0].cpu
     );
     assert!(
-        cfg!(debug_assertions) || worst <= FIRST_MAX_MS,
-        "a frame of Settings' first show cost {worst:.2} ms, over {FIRST_MAX_MS}"
+        cfg!(debug_assertions) || worst <= SETTINGS_FIRST_MAX_MS,
+        "a frame of Settings' first show cost {worst:.2} ms, over {SETTINGS_FIRST_MAX_MS}"
     );
-    three_tries(|_| worst_within(&enter(&scene, "settings"), "settings", RESHOW_MAX_MS));
+    three_tries(|_| {
+        worst_within(
+            &enter(&scene, "settings"),
+            "settings",
+            SETTINGS_RESHOW_MAX_MS,
+        )
+    });
 }
