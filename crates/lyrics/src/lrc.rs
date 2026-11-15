@@ -54,7 +54,7 @@ pub fn parse(text: &str) -> Option<Vec<Line>> {
     let lines = timed
         .into_iter()
         .map(|(ms, text)| Line {
-            start: Duration::from_millis(u64::try_from(ms - offset_ms).unwrap_or(0)),
+            start: Duration::from_millis(u64::try_from(ms.saturating_sub(offset_ms)).unwrap_or(0)),
             text,
         })
         .collect();
@@ -81,7 +81,12 @@ fn stamp_ms(tag: &str) -> Option<i64> {
         2 => fraction.parse::<i64>().ok()? * 10,
         _ => fraction.get(..3)?.parse::<i64>().ok()?,
     };
-    Some((minutes * 60 + seconds) * 1000 + frac_ms)
+    // A stamp too far out for milliseconds in an `i64` is no stamp.
+    minutes
+        .checked_mul(60)?
+        .checked_add(seconds)?
+        .checked_mul(1000)?
+        .checked_add(frac_ms)
 }
 
 /// The line playing at `at`: the last one that has started. `None` before the first.
@@ -139,6 +144,16 @@ mod tests {
         assert_eq!(
             parse("[offset:-250]\n[00:01.00]One"),
             Some(vec![line(1_250, "One")])
+        );
+        // A stamp past what milliseconds in an `i64` hold is left out; an offset that
+        // would push a line past them stops it there.
+        assert_eq!(
+            parse("[200000000000000:00]Too late\n[00:01.00]One"),
+            Some(vec![line(1_000, "One")])
+        );
+        assert_eq!(
+            parse("[offset:-9223372036854775808]\n[153722867280912:00]Last"),
+            Some(vec![line(i64::MAX as u64, "Last")])
         );
     }
 
