@@ -100,8 +100,6 @@ thread_local! {
     static REGISTER: Cell<Register> = const { Cell::new(register_system_key) };
     /// Why the key last couldn't be registered, for Settings' row.
     static KEY_ERROR: RefCell<Option<KeyError>> = const { RefCell::new(None) };
-    /// Where the recent picks are kept: `{cache}/quick-search.json` (a test's own folder).
-    static RECENT_FILE: RefCell<Option<PathBuf>> = const { RefCell::new(None) };
     /// A snapshot's recent picks, read instead of the file.
     static RECENT_SHOWN: RefCell<Option<Vec<Recent>>> = const { RefCell::new(None) };
 }
@@ -832,17 +830,9 @@ fn put_next(ctx: &Ctx, tracks: Vec<Track>) {
     ctx.send(Action::Queue(QueueAction::PlayAfter { tracks, after }));
 }
 
-/// The file the recent picks are kept in.
+/// The file the recent picks are kept in: `{cache}/quick-search.json`.
 fn recent_file() -> PathBuf {
-    RECENT_FILE.with_borrow(|f| {
-        f.clone()
-            .unwrap_or_else(|| Paths::resolve().cache.join("quick-search.json"))
-    })
-}
-
-/// Keeps the recent picks in `path` from now on (a test's or a snapshot's own).
-pub fn keep_recent_in(path: PathBuf) {
-    RECENT_FILE.set(Some(path));
+    Paths::resolve().cache.join("quick-search.json")
 }
 
 /// `--snapshot quick-search…`: `picks` are the recent picks, whatever the file has.
