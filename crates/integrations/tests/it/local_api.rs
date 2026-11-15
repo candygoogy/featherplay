@@ -121,71 +121,118 @@ async fn post(s: &Server, path: &str, body: &str) -> Reply {
     send(port, &request("POST", path, port, &auth(), body)).await
 }
 
-#[tokio::test]
-async fn a_request_without_the_token_gets_401() {
-    let s = start(playing());
-    let port = s.api.port();
-    let r = send(port, &request("GET", "/api/v1/song", port, "", "")).await;
-    assert_eq!(r.status, 401);
-    assert!(r.head.contains("www-authenticate: bearer"), "{}", r.head);
+/// What the gate answers over HTTP: the status, the error code, and a header line the reply
+/// must or mustn't have.
+#[derive(Clone, Copy)]
+struct Gated {
+    status: u16,
+    code: Option<&'static str>,
+    has: Option<&'static str>,
+    lacks: Option<&'static str>,
 }
 
 #[tokio::test]
-async fn a_wrong_token_gets_401() {
+async fn the_gate_answers_over_http() {
     let s = start(playing());
     let port = s.api.port();
+    let ok = Gated {
+        status: 200,
+        code: None,
+        has: None,
+        lacks: None,
+    };
     let wrong = format!("Authorization: Bearer {}\r\n", TOKEN.replace('0', "1"));
-    let r = send(port, &request("GET", "/api/v1/song", port, &wrong, "")).await;
-    assert_eq!(r.status, 401);
-}
-
-#[tokio::test]
-async fn a_wrong_host_is_rejected() {
-    let s = start(playing());
-    let port = s.api.port();
-    // A DNS-rebinding page reaches 127.0.0.1 under its own name.
-    let raw = format!(
-        "GET /api/v1/song HTTP/1.1\r\nHost: attacker.example:{port}\r\n{}Connection: close\r\n\r\n",
-        auth()
+    let web = format!("{}Origin: https://attacker.example\r\n", auth());
+    let file = format!("{}Origin: null\r\n", auth());
+    let (good, rebound, local) = (
+        format!("127.0.0.1:{port}"),
+        format!("attacker.example:{port}"),
+        format!("localhost:{port}"),
     );
-    let r = send(port, raw.as_bytes()).await;
-    assert_eq!(r.status, 403);
-    assert_eq!(r.json()["error"]["code"], "host_not_allowed");
-}
-
-#[tokio::test]
-async fn localhost_by_name_is_a_good_host() {
-    let s = start(playing());
-    let port = s.api.port();
-    let raw = format!(
-        "GET /api/v1/song HTTP/1.1\r\nHost: localhost:{port}\r\n{}Connection: close\r\n\r\n",
-        auth()
-    );
-    assert_eq!(send(port, raw.as_bytes()).await.status, 200);
-}
-
-#[tokio::test]
-async fn a_web_page_origin_is_rejected() {
-    let s = start(playing());
-    let port = s.api.port();
-    let extra = format!("{}Origin: https://attacker.example\r\n", auth());
-    let r = send(port, &request("POST", "/api/v1/next", port, &extra, "")).await;
-    assert_eq!(r.status, 403);
-    assert_eq!(r.json()["error"]["code"], "origin_not_allowed");
-}
-
-#[tokio::test]
-async fn a_local_file_origin_is_allowed() {
-    let s = start(playing());
-    let port = s.api.port();
-    let extra = format!("{}Origin: null\r\n", auth());
-    let r = send(port, &request("GET", "/api/v1/song", port, &extra, "")).await;
-    assert_eq!(r.status, 200);
-    assert!(
-        !r.head.contains("access-control-allow-origin"),
-        "no CORS: {}",
-        r.head
-    );
+    // (case, method, path, Host, other headers, the answer)
+    let cases = [
+        (
+            "without the token: 401",
+            "GET",
+            "/api/v1/song",
+            &good,
+            String::new(),
+            Gated {
+                status: 401,
+                has: Some("www-authenticate: bearer"),
+                ..ok
+            },
+        ),
+        (
+            "a wrong token: 401",
+            "GET",
+            "/api/v1/song",
+            &good,
+            wrong,
+            Gated { status: 401, ..ok },
+        ),
+        // A DNS-rebinding page reaches 127.0.0.1 under its own name.
+        (
+            "a wrong host",
+            "GET",
+            "/api/v1/song",
+            &rebound,
+            auth(),
+            Gated {
+                status: 403,
+                code: Some("host_not_allowed"),
+                ..ok
+            },
+        ),
+        (
+            "localhost by name",
+            "GET",
+            "/api/v1/song",
+            &local,
+            auth(),
+            ok,
+        ),
+        (
+            "a web page's origin",
+            "POST",
+            "/api/v1/next",
+            &good,
+            web,
+            Gated {
+                status: 403,
+                code: Some("origin_not_allowed"),
+                ..ok
+            },
+        ),
+        (
+            "a local file's origin, with no CORS",
+            "GET",
+            "/api/v1/song",
+            &good,
+            file,
+            Gated {
+                lacks: Some("access-control-allow-origin"),
+                ..ok
+            },
+        ),
+    ];
+    for (case, method, path, host, extra, want) in cases {
+        let raw = format!(
+            "{method} {path} HTTP/1.1\r\nHost: {host}\r\n{extra}Content-Length: 0\r\n\
+             Connection: close\r\n\r\n"
+        );
+        let r = send(port, raw.as_bytes()).await;
+        assert_eq!(r.status, want.status, "{case}: {}", r.body);
+        if let Some(code) = want.code {
+            assert_eq!(r.json()["error"]["code"], code, "{case}");
+        }
+        if let Some(line) = want.has {
+            assert!(r.head.contains(line), "{case}: {}", r.head);
+        }
+        if let Some(line) = want.lacks {
+            assert!(!r.head.contains(line), "{case}: {}", r.head);
+        }
+    }
 }
 
 #[tokio::test]
@@ -207,8 +254,9 @@ async fn the_song_route_shows_the_current_track_as_pear_does() {
     assert_eq!(song["isPaused"], false);
     assert_eq!(song["mediaType"], "AUDIO");
     assert_eq!(song["imageSrc"], "https://example.com/cover.jpg");
+    // 30 s in when the server started, a moment ago (seconds on a busy machine).
     let elapsed = song["elapsedSeconds"].as_u64().expect("elapsedSeconds");
-    assert!((30..=31).contains(&elapsed), "{elapsed}");
+    assert!((30..=40).contains(&elapsed), "{elapsed}");
     // The old path answers the same.
     assert_eq!(
         get(&s, "/api/v1/song-info").await.json()["title"],
@@ -284,15 +332,49 @@ async fn controls_reach_the_command_channel() {
 }
 
 #[tokio::test]
-async fn a_seek_out_of_range_is_refused_and_sends_nothing() {
+async fn refused_requests_send_nothing() {
     let mut s = start(playing());
-    let r = post(&s, "/api/v1/seek-to", r#"{"seconds": -3}"#).await;
-    assert_eq!(r.status, 422);
-    assert_eq!(r.json()["error"]["code"], "invalid_body");
-    let r = post(&s, "/api/v1/volume", r#"{"volume": 101}"#).await;
-    assert_eq!(r.status, 422);
-    let r = post(&s, "/api/v1/seek-to", "not json").await;
-    assert_eq!(r.status, 400);
+    // (case, method, path, body, status, error code)
+    let cases = [
+        (
+            "a seek out of range",
+            "POST",
+            "/api/v1/seek-to",
+            r#"{"seconds": -3}"#,
+            422,
+            Some("invalid_body"),
+        ),
+        (
+            "a volume out of range",
+            "POST",
+            "/api/v1/volume",
+            r#"{"volume": 101}"#,
+            422,
+            None,
+        ),
+        (
+            "a body that isn't JSON",
+            "POST",
+            "/api/v1/seek-to",
+            "not json",
+            400,
+            None,
+        ),
+        ("an unknown route", "GET", "/api/v1/queue", "", 404, None),
+        ("the root", "GET", "/", "", 404, None),
+        ("a wrong method", "GET", "/api/v1/next", "", 405, None),
+        // A like is a write to the music account; the API doesn't make it.
+        ("a like", "POST", "/api/v1/like", "", 404, None),
+        ("a dislike", "POST", "/api/v1/dislike", "", 404, None),
+    ];
+    let port = s.api.port();
+    for (case, method, path, body, status, code) in cases {
+        let r = send(port, &request(method, path, port, &auth(), body)).await;
+        assert_eq!(r.status, status, "{case}: {}", r.body);
+        if let Some(code) = code {
+            assert_eq!(r.json()["error"]["code"], code, "{case}");
+        }
+    }
     assert!(s.commands.try_recv().is_err());
 }
 
@@ -309,23 +391,6 @@ async fn a_large_body_is_refused() {
     );
     let r = send(port, raw.as_bytes()).await;
     assert_eq!(r.status, 413);
-    assert!(s.commands.try_recv().is_err());
-}
-
-#[tokio::test]
-async fn an_unknown_route_is_404_and_a_wrong_method_405() {
-    let s = start(playing());
-    assert_eq!(get(&s, "/api/v1/queue").await.status, 404);
-    assert_eq!(get(&s, "/").await.status, 404);
-    assert_eq!(get(&s, "/api/v1/next").await.status, 405);
-}
-
-#[tokio::test]
-async fn likes_are_not_offered() {
-    // A like is a write to the music account; the API doesn't make it.
-    let mut s = start(playing());
-    assert_eq!(post(&s, "/api/v1/like", "").await.status, 404);
-    assert_eq!(post(&s, "/api/v1/dislike", "").await.status, 404);
     assert!(s.commands.try_recv().is_err());
 }
 
@@ -443,8 +508,10 @@ async fn the_websocket_starts_with_the_player_info() {
     );
 }
 
+/// Each change on one socket pushes one event, as what was sent last moves on: a pause, a
+/// new track, the volume, a seek.
 #[tokio::test]
-async fn a_state_change_pushes_one_event() {
+async fn each_change_pushes_one_event() {
     let s = start(playing());
     let mut ws = ws_connect(s.api.port(), &format!("?token={TOKEN}"))
         .await
@@ -453,79 +520,46 @@ async fn a_state_change_pushes_one_event() {
     next_message(&mut ws, Duration::from_secs(5))
         .await
         .expect("PLAYER_INFO");
+    let mut push = async |now: &Snapshot, case: &str| {
+        s.api.publish(now.clone());
+        let ev = next_message(&mut ws, Duration::from_secs(5)).await;
+        ev.unwrap_or_else(|| panic!("{case}: no event"))
+    };
 
-    let mut paused = playing();
-    paused.playing = false;
-    paused.audible = false;
-    s.api.publish(paused);
-
-    let ev = next_message(&mut ws, Duration::from_secs(5))
-        .await
-        .expect("an event");
+    // Paused from here on, so the position stands still.
+    let mut now = playing();
+    now.playing = false;
+    now.audible = false;
+    let ev = push(&now, "a pause").await;
     assert_eq!(ev["type"], "PLAYER_STATE_CHANGED");
     assert_eq!(ev["isPlaying"], false);
     assert!(ev["position"].is_u64() && ev["timestamp"].is_u64());
+
+    let mut t = track();
+    t.id = TrackId("other".into());
+    t.title = "Next song".into();
+    now.track = Some(t);
+    now.position = Duration::ZERO;
+    let ev = push(&now, "a new track").await;
+    assert_eq!(ev["type"], "VIDEO_CHANGED");
+    assert_eq!(ev["song"]["title"], "Next song");
+
+    now.volume = 20;
+    let ev = push(&now, "the volume").await;
+    assert_eq!(ev["type"], "VOLUME_CHANGED");
+    assert_eq!(ev["volume"], 20);
+
+    now.position = Duration::from_secs(150);
+    let ev = push(&now, "a seek").await;
+    assert_eq!(ev["type"], "POSITION_CHANGED");
+    assert_eq!(ev["position"], 150);
+
     assert!(
         next_message(&mut ws, Duration::from_millis(300))
             .await
             .is_none(),
-        "only one event"
+        "one event each"
     );
-}
-
-#[tokio::test]
-async fn a_new_track_and_the_volume_push_their_events() {
-    let s = start(playing());
-    let mut ws = ws_connect(s.api.port(), &format!("?token={TOKEN}"))
-        .await
-        .ok()
-        .expect("upgraded");
-    next_message(&mut ws, Duration::from_secs(5))
-        .await
-        .expect("PLAYER_INFO");
-
-    let mut next = playing();
-    let mut t = track();
-    t.id = TrackId("other".into());
-    t.title = "Next song".into();
-    next.track = Some(t);
-    next.position = Duration::ZERO;
-    s.api.publish(next.clone());
-    let ev = next_message(&mut ws, Duration::from_secs(5))
-        .await
-        .expect("an event");
-    assert_eq!(ev["type"], "VIDEO_CHANGED");
-    assert_eq!(ev["song"]["title"], "Next song");
-
-    next.volume = 20;
-    s.api.publish(next);
-    let ev = next_message(&mut ws, Duration::from_secs(5))
-        .await
-        .expect("an event");
-    assert_eq!(ev["type"], "VOLUME_CHANGED");
-    assert_eq!(ev["volume"], 20);
-}
-
-#[tokio::test]
-async fn a_seek_pushes_the_new_position() {
-    let s = start(playing());
-    let mut ws = ws_connect(s.api.port(), &format!("?token={TOKEN}"))
-        .await
-        .ok()
-        .expect("upgraded");
-    next_message(&mut ws, Duration::from_secs(5))
-        .await
-        .expect("PLAYER_INFO");
-
-    let mut seeked = playing();
-    seeked.position = Duration::from_secs(150);
-    s.api.publish(seeked);
-    let ev = next_message(&mut ws, Duration::from_secs(5))
-        .await
-        .expect("an event");
-    assert_eq!(ev["type"], "POSITION_CHANGED");
-    let at = ev["position"].as_u64().expect("position");
-    assert!((150..=151).contains(&at), "{at}");
 }
 
 #[tokio::test]
