@@ -326,8 +326,6 @@ fn install_with(presenting: bool) -> Result<Pump, String> {
 /// One presented frame.
 #[derive(Debug, Clone, Copy)]
 pub struct Presented {
-    /// The renderer's whole frame: dirty tracking, drawing and the copy to the window.
-    pub elapsed: Duration,
     /// Physical pixels copied to the window.
     pub damaged: u64,
     /// The bounding box of what was copied (x0, y0, x1, y1, physical pixels), if anything was.
@@ -369,7 +367,6 @@ pub fn present(window: &Window) -> Result<Presented, String> {
         screen.damaged.set(0);
         screen.bounds.set(None);
     }
-    let started = Instant::now();
     let outcome = adapter
         .renderer
         .render()
@@ -377,14 +374,9 @@ pub fn present(window: &Window) -> Result<Presented, String> {
     if outcome != DrawOutcome::Success {
         return Err(format!("render: {outcome:?}"));
     }
-    let elapsed = started.elapsed();
     let damaged = adapter.screen.as_ref().map_or(0, |s| s.damaged.get());
     let bounds = adapter.screen.as_ref().and_then(|s| s.bounds.get());
-    Ok(Presented {
-        elapsed,
-        damaged,
-        bounds,
-    })
+    Ok(Presented { damaged, bounds })
 }
 
 /// Pixel buffers the presenting windows have made so far: a new one for a new size, as
