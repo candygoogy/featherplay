@@ -5,9 +5,10 @@ import { defineConfig, devices } from "@playwright/test";
 const port = 4329;
 export const wranglerPort = 8788;
 
-/** Specs that measure motion in real time: the hero's moment and landing, the header's
- *  pills, the theme switch, the wheel's glide, the lyrics' glide and the sound. */
-const timing = ["**/hero.spec.ts", "**/landing.spec.ts", "**/header.spec.ts", "**/theme.spec.ts", "**/smooth.spec.ts", "**/lyrics.spec.ts", "**/sound.spec.ts", "**/customise.spec.ts"];
+/** Specs that time motion or the page's cost in real time: the scroll story and its settling,
+ *  the bar's glide, the window's glides, the theme switch, the lyrics' glide, the sound, the
+ *  colour picker's fades and the speed checks. */
+const timing = ["**/story.spec.ts", "**/bar.spec.ts", "**/window.spec.ts", "**/theme.spec.ts", "**/lyrics.spec.ts", "**/sound.spec.ts", "**/customise.spec.ts", "**/speed.spec.ts"];
 
 // On CI (a smaller, shared Linux runner, .github/workflows/site.yml): twice the waits, one
 // retry with a trace, and an HTML report the workflow uploads when a test fails.

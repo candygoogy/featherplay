@@ -73,11 +73,18 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
 
   // ---- Geometry ----
   const pinRect = () => pin.getBoundingClientRect();
-  /** The viewport below the docked bar, in the pin's coordinates. */
+  /** Where the pin's top is at rest, from the top of the page: the stage's, which never sticks
+   *  (the pin itself does while the story holds it). */
+  const pinHome = () => {
+    const stage = pin.parentElement ?? pin;
+    return stage.getBoundingClientRect().top + scrollY;
+  };
+  /** The first screen's viewport below the docked bar, in the pin's coordinates: wherever the
+   *  page is scrolled, a dragged or maximised window stays on the first screen (it never comes
+   *  down over the sections after it). */
   const viewportBox = (): Box => {
-    const p = pinRect();
     const vw = document.documentElement.clientWidth;
-    return { x: -p.left, y: -p.top + BAR, w: vw, h: innerHeight - BAR };
+    return { x: -pinRect().left, y: BAR - pinHome(), w: vw, h: innerHeight - BAR };
   };
   const rested = (): Frame => {
     if (maxed) {
@@ -87,9 +94,13 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
     }
     return { ...home, x: home.x + drag.x, y: home.y + drag.y };
   };
+  /** The bar's part the window goes into: the tray icon, or the capsule's song (whichever this
+   *  state shows). */
+  const trayTarget = () =>
+    [...document.querySelectorAll<HTMLElement>("[data-tray-target]")].find((t) => t.getClientRects().length && getComputedStyle(t).visibility !== "hidden");
   const trayPoint = () => {
     const p = pinRect();
-    const icon = [...document.querySelectorAll<HTMLElement>("[data-tray-target]")].find((t) => t.getClientRects().length && getComputedStyle(t).visibility !== "hidden");
+    const icon = trayTarget();
     if (icon) {
       const r = icon.getBoundingClientRect();
       return { x: r.left + r.width / 2 - p.left, y: r.top + r.height / 2 - p.top };
@@ -118,9 +129,16 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
     if (el.style.getPropertyValue("--s") !== s) scaleTimer = window.setTimeout(() => el.style.setProperty("--s", s), 120);
     shown = f;
   };
+  /** Where the window is on screen now: in the middle of a glide, where the glide has got to. */
+  const current = (): Frame => {
+    if (!el.getAnimations().length) return shown;
+    const cs = getComputedStyle(el);
+    const m = new DOMMatrixReadOnly(cs.transform === "none" ? undefined : cs.transform);
+    return { ...shown, x: m.e + slotOff.x, y: m.f + slotOff.y, s: m.a, o: Number(cs.opacity) };
+  };
   /** Glides from where the window is drawn now to `to`, then rests there. */
   const glide = (to: Frame, ms: number) => {
-    const from = shown;
+    const from = current();
     for (const a of el.getAnimations()) a.cancel();
     draw(to);
     if (reduced() || ms <= 0) return;
@@ -149,8 +167,11 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
     slotOff = { x: s.left - p.left, y: s.top - p.top };
     // The slot, but never more than the viewport: on the first screen the window ends inside
     // it (from the pin's top); in the page's flow it fits one screen under the bar.
+    // The room is the first screen's, wherever the page is scrolled (the slot's top as it is at
+    // rest, not as the pinned stage shows it now). On a phone the slot itself is sized in small
+    // viewport units (Stage.astro), so a toolbar showing and hiding never resizes the window.
     const vw = document.documentElement.clientWidth;
-    const room = desk.matches ? innerHeight - (s.top + scrollY) - 8 : innerHeight - BAR - 16;
+    const room = desk.matches ? innerHeight - (pinHome() + slotOff.y) - 8 : s.height;
     const box: Box = { x: slotOff.x, y: slotOff.y, w: Math.min(s.width, vw), h: Math.max(1, Math.min(s.height, room)) };
     const fit: Fit = fitWindow(box);
     const at = placeIn(box, fit, desk.matches ? "end" : "center", "start");
@@ -171,15 +192,21 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
   }
 
   // ---- Maximise and restore ----
-  function setMax(on: boolean, ms = MAX_MS) {
-    if ((on && !desk.matches) || driven) return;
+  const maxButton = replica.querySelector<HTMLButtonElement>('[data-act="maximise"]');
+  /** The state, and the caption button's name saying what it does next (as Windows' does). */
+  const markMax = (on: boolean) => {
     maxed = on;
     el.toggleAttribute("data-max", on);
-    replica.querySelector('[data-act="maximise"]')?.setAttribute("aria-label", on ? "Restore featherplay" : "Maximise featherplay");
-    replica.querySelector('[data-act="maximise"]')?.setAttribute("aria-pressed", String(on));
+    maxButton?.setAttribute("aria-label", on ? "Restore featherplay" : "Maximise featherplay");
+  };
+  function setMax(on: boolean, ms = MAX_MS) {
+    if ((on && !desk.matches) || driven) return;
+    markMax(on);
     if (on) drag = { x: 0, y: 0 };
     settle(ms);
   }
+  // Too small a screen to maximise on: the button says it can't.
+  const deskOnly = () => maxButton?.setAttribute("aria-disabled", String(!desk.matches));
 
   // ---- Minimise to the tray, and back ----
   const setMinimised = (on: boolean) => {
@@ -190,7 +217,8 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
     document.documentElement.toggleAttribute("data-window-minimised", on);
     el.inert = on;
     if (!driven) glide(on ? trayFrame(rested()) : rested(), on ? MIN_MS : RESTORE_MS);
-    if (on && hadFocus) document.querySelector<HTMLElement>("[data-tray-target]")?.focus({ preventScroll: true });
+    // The keys go where the window went: the tray icon, or the capsule's song.
+    if (on && hadFocus) trayTarget()?.focus({ preventScroll: true });
   };
   player.subscribe((s) => setMinimised(s.minimised));
 
@@ -264,8 +292,7 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
       // A maximised window comes back to its size under the pointer, as Windows does.
       const f = shown;
       const k = (e.clientX - pinRect().left - f.x) / (f.w * f.s);
-      maxed = false;
-      el.removeAttribute("data-max");
+      markMax(false);
       const w = home.w * home.s;
       drag = { x: e.clientX - pinRect().left - k * w - home.x, y: f.y - home.y };
       draw(rested());
@@ -275,7 +302,8 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
   });
   let moveFrame = 0;
   titlebar.addEventListener("pointermove", (e) => {
-    if (!dragFrom) return;
+    // The story took the window over (the page scrolled under the drag): it draws it now.
+    if (!dragFrom || driven) return;
     const want = { x: dragFrom.x + e.clientX - dragFrom.px, y: dragFrom.y + e.clientY - dragFrom.py };
     if (moveFrame) cancelAnimationFrame(moveFrame);
     moveFrame = requestAnimationFrame(() => {
@@ -331,6 +359,8 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
   new ResizeObserver(relayout).observe(slot);
   addEventListener("resize", relayout);
   desk.addEventListener("change", relayout);
+  desk.addEventListener("change", deskOnly);
+  deskOnly();
   layout();
   document.fonts?.ready.then(relayout);
 
@@ -354,8 +384,13 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
     layout,
     drive(f) {
       driven = f;
-      // Out of sight (gone into the tray, faded for a change of shape), out of the keyboard's way.
-      el.inert = minimised || (!!f && f.o < 0.5);
+      // The story takes over from a drag in progress.
+      if (f && dragFrom) endDrag();
+      // Out of sight (gone into the tray, faded for a change of shape), out of the keyboard's way;
+      // keys that were in it go on from the steps after the stage.
+      const out = minimised || (!!f && f.o < 0.5);
+      if (out && !el.inert && el.contains(document.activeElement)) document.querySelector<HTMLElement>("[data-steps]")?.focus({ preventScroll: true });
+      el.inert = out;
       if (f) {
         for (const a of el.getAnimations()) a.cancel();
         draw(f);
@@ -363,10 +398,7 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
     },
     forget() {
       drag = { x: 0, y: 0 };
-      if (maxed) {
-        maxed = false;
-        el.removeAttribute("data-max");
-      }
+      if (maxed) markMax(false);
     },
     trayPoint,
     onLayout(fn) {

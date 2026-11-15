@@ -106,7 +106,9 @@ test("maximise fills the screen under the bar; restore and a double-click on the
   const before = await windowBox(page);
   await caption(page, /^Maximise/).click();
   await expect(win(page)).toHaveAttribute("data-max", "");
-  await expect(caption(page, /^Restore/)).toHaveAttribute("aria-pressed", "true");
+  // Its name says what it does next, as Windows' does; not also "pressed".
+  await expect(caption(page, /^Restore/)).toBeVisible();
+  expect(await caption(page, /^Restore/).getAttribute("aria-pressed")).toBeNull();
   await expect.poll(async () => (await windowBox(page)).width).toBeGreaterThan(before.width + 200);
   const max = await windowBox(page);
   expect(max.x).toBeGreaterThanOrEqual(-0.5);
@@ -116,6 +118,104 @@ test("maximise fills the screen under the bar; restore and a double-click on the
   await expect.poll(async () => Math.round((await windowBox(page)).width)).toBe(Math.round(before.width));
   await replica(page).locator(".titlebar-name").dblclick();
   await expect(win(page)).toHaveAttribute("data-max", "");
+});
+
+test("dragged out of maximised, the window's button says Maximise again", async ({ page }) => {
+  await page.goto("/");
+  await wake(page);
+  await caption(page, /^Maximise/).click();
+  await expect(win(page)).toHaveAttribute("data-max", "");
+  await page.waitForTimeout(400);
+  const t = (await replica(page).locator(".titlebar-name").boundingBox())!;
+  await page.mouse.move(t.x + 5, t.y + t.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(t.x + 200, t.y + 160, { steps: 6 });
+  await page.mouse.up();
+  await expect(win(page)).not.toHaveAttribute("data-max", /.*/);
+  await expect(caption(page, /^Maximise/)).toBeVisible();
+});
+
+test("on a phone the window can't be maximised, and its button says so", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  await wake(page);
+  await expect(caption(page, /^Maximise/)).toHaveAttribute("aria-disabled", "true");
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await expect(caption(page, /^Maximise/)).toHaveAttribute("aria-disabled", "false");
+});
+
+test("minimised from the keyboard, the keys go to the tray icon the window went into", async ({ page }) => {
+  await page.goto("/");
+  await wake(page);
+  await caption(page, /^Minimise/).focus();
+  await page.keyboard.press("Enter");
+  await expect(win(page)).toHaveAttribute("data-minimised", "");
+  await expect(page.locator("[data-site-bar] [data-tray]")).toBeFocused();
+});
+
+test("closed to the tray from the keyboard, the keys go to the tray icon too", async ({ page }) => {
+  await page.goto("/");
+  await wake(page);
+  await caption(page, /^Close/).focus();
+  await page.keyboard.press("Enter");
+  await page.getByRole("button", { name: "Keep playing in the tray" }).focus();
+  await page.keyboard.press("Enter");
+  await expect(win(page)).toHaveAttribute("data-minimised", "");
+  await expect(page.locator("[data-site-bar] [data-tray]")).toBeFocused();
+});
+
+test("restored part-way into the tray, the window glides back from where it had got to, no jump", async ({ page }) => {
+  await page.goto("/");
+  await wake(page);
+  // Minimised, and 60 ms into its glide restored (the tray icon): where it starts back from is
+  // where it had got to.
+  const { mid, first } = await page.evaluate(
+    () =>
+      new Promise<{ mid: { x: number; y: number }; first: { x: number; y: number } }>((r) => {
+        const el = document.querySelector<HTMLElement>("[data-window]")!;
+        const at = () => {
+          const m = new DOMMatrixReadOnly(getComputedStyle(el).transform);
+          return { x: m.e, y: m.f };
+        };
+        el.querySelector<HTMLElement>('[data-act="minimise"]')!.click();
+        setTimeout(() => {
+          const mid = at();
+          (document.querySelector("[data-site-bar] [data-tray]") as HTMLElement).click();
+          r({ mid, first: at() });
+        }, 60);
+      }),
+  );
+  expect(Math.hypot(first.x - mid.x, first.y - mid.y)).toBeLessThan(12);
+});
+
+test("laid out again part-way through the story (a resize there), the window is still its size back at the top", async ({ page }) => {
+  await page.goto("/");
+  await wake(page);
+  const home = await windowBox(page);
+  await page.evaluate(() => scrollTo(0, 0.12 * 2400));
+  await page.waitForTimeout(500);
+  await page.setViewportSize({ width: 1441, height: 900 });
+  await page.waitForTimeout(200);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.waitForTimeout(200);
+  await page.evaluate(() => scrollTo(0, 0));
+  await expect.poll(async () => Math.round((await windowBox(page)).height)).toBe(Math.round(home.height));
+  expect(Math.round((await windowBox(page)).width)).toBe(Math.round(home.width));
+});
+
+test.describe("where the story doesn't run (a short screen)", () => {
+  test.use({ viewport: { width: 1280, height: 560 } });
+  test("a maximised window stays on the first screen: scrolled down and resized, it never covers the sections after it", async ({ page }) => {
+    await page.goto("/");
+    await wake(page);
+    await caption(page, /^Maximise/).click();
+    await expect(win(page)).toHaveAttribute("data-max", "");
+    await page.evaluate(() => scrollTo(0, 700));
+    await page.setViewportSize({ width: 1260, height: 560 });
+    await page.waitForTimeout(400);
+    const stage = await page.locator("[data-stage]").evaluate((s) => s.getBoundingClientRect().bottom);
+    expect((await windowBox(page)).y + (await windowBox(page)).height).toBeLessThanOrEqual(stage + 1);
+  });
 });
 
 test("minimise sends the window to the tray: hidden and out of the keyboard's way", async ({ page }) => {

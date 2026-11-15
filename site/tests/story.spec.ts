@@ -7,10 +7,26 @@ import { HOLDS } from "../src/scripts/story-math";
 test.use({ viewport: { width: 1440, height: 900 } });
 
 const LEN = 2400;
+/** Scrolls to `p` and waits until the story has arrived there: the page where it was sent and
+ *  the window drawn at the same place a quarter of a second apart, with no glide running (no
+ *  fixed wait: polled). */
 const at = async (page: Page, p: number) => {
-  await page.evaluate((y) => scrollTo(0, y), Math.round(p * LEN));
-  // The story's smoothing arrives, and the page has nothing to settle.
-  await page.waitForTimeout(700);
+  const y = Math.round(p * LEN);
+  await page.evaluate((y) => scrollTo(0, y), y);
+  await expect.poll(() => page.evaluate(() => scrollY)).toBe(y);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          new Promise<boolean>((r) => {
+            const el = document.querySelector<HTMLElement>("[data-window]")!;
+            const read = () => `${el.style.transform}|${el.style.opacity}|${el.style.width}`;
+            const a = read();
+            setTimeout(() => r(read() === a && !el.getAnimations().length), 250);
+          }),
+      ),
+    )
+    .toBe(true);
 };
 const appWidth = (page: Page) => page.locator("[data-window] [data-replica]").evaluate((r) => r.clientWidth);
 const capOpacity = (page: Page, i: number) => page.locator(`[data-cap="${i}"]`).evaluate((c) => Number(getComputedStyle(c).opacity));
@@ -119,11 +135,71 @@ test("a window sent to the tray by the visitor comes back as the page moves on",
   await expect(page.locator("[data-window]")).toBeVisible();
 });
 
-test('"The app" in the bar goes to the whole window', async ({ page }) => {
+test('"The app" in the bar goes to the whole window, and the keys go with it', async ({ page }) => {
   await page.goto("/");
   await page.locator("[data-site-bar]").getByRole("link", { name: "The app" }).click();
   await expect.poll(() => page.evaluate(() => scrollY), { timeout: 3000 }).toBeGreaterThan(HOLDS[0] * LEN - 4);
+  await expect(page.locator("[data-stage]")).toBeFocused();
 });
+
+test("the story's flyout in the tray goes when the story stops (the screen made narrow there)", async ({ page }) => {
+  await page.goto("/");
+  await wake(page);
+  await at(page, HOLDS[2]);
+  await expect(page.locator("#fly-song")).toBeVisible();
+  await page.setViewportSize({ width: 700, height: 900 });
+  await expect(page.locator("html")).not.toHaveAttribute("data-story", /.*/);
+  await expect(page.locator("#fly-song")).toBeHidden();
+});
+
+test("the keys in the first screen's words, as they leave, go on to the steps rather than to nowhere", async ({ page }) => {
+  await page.goto("/");
+  await wake(page);
+  await page.locator("[data-stage] .actions a").first().focus();
+  await at(page, 0.1);
+  expect(await page.evaluate(() => document.activeElement?.closest("[data-steps]") !== null)).toBe(true);
+});
+
+test("a drag the page scrolls under is let go: the story draws the window", async ({ page }) => {
+  await page.goto("/");
+  await wake(page);
+  const t = (await page.locator("[data-window] .titlebar-name").boundingBox())!;
+  await page.mouse.move(t.x + 5, t.y + 5);
+  await page.mouse.down();
+  await page.mouse.move(t.x - 40, t.y + 20, { steps: 3 });
+  await at(page, HOLDS[0]);
+  await page.mouse.move(t.x - 300, t.y + 200, { steps: 4 });
+  await expect(page.locator("[data-window]")).not.toHaveAttribute("data-dragging", /.*/);
+  const whole = await windowBox(page);
+  expect(Math.abs(whole.x + whole.width / 2 - 720)).toBeLessThan(2);
+  await page.mouse.up();
+});
+
+test("a reload part-way through a move is finished the way it was going", async ({ page }) => {
+  await page.goto("/");
+  await wake(page);
+  await page.evaluate(() => scrollTo(0, Math.round(0.4 * 2400)));
+  await page.waitForTimeout(100);
+  await page.reload();
+  await expect.poll(() => page.evaluate(() => scrollY), { timeout: 5000 }).toBe(HOLDS[1] * LEN);
+});
+
+for (const [w, h] of [
+  [1000, 620],
+  [1280, 600],
+  [761, 650],
+]) {
+  test(`at ${w} x ${h} the whole window's words sit under it, inside the screen`, async ({ page }) => {
+    await page.setViewportSize({ width: w, height: h });
+    await page.goto("/");
+    await wake(page);
+    await at(page, HOLDS[0]);
+    const win = await windowBox(page);
+    const cap = (await page.locator('[data-cap="0"]').boundingBox())!;
+    expect(cap.y).toBeGreaterThanOrEqual(win.y + win.height - 0.5);
+    expect(cap.y + cap.height).toBeLessThanOrEqual(h + 0.5);
+  });
+}
 
 for (const [label, use] of [
   ["a phone", { viewport: { width: 390, height: 844 } }],

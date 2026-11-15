@@ -22,7 +22,7 @@ const steps = [
 ];
 ---
 
-<section class="stage" id="app" data-stage aria-labelledby="hero-title">
+<section class="stage" id="app" tabindex="-1" data-stage aria-labelledby="hero-title">
   <span class="anchor" id="top" aria-hidden="true"></span>
   <div class="pin" data-pin>
     <div class="frame first">
@@ -162,9 +162,11 @@ const steps = [
     position: relative;
     min-height: 0;
   }
+  /* Shown under the bar, never behind it. */
   .skip-app {
     position: absolute;
-    z-index: 30;
+    z-index: 70;
+    top: calc(var(--bar-h) + var(--s3));
   }
   .caps {
     position: absolute;
@@ -209,6 +211,11 @@ const steps = [
   .steps {
     background: var(--desk);
   }
+  /* Focus is moved here (and to the stage) only to carry the keys on: no ring. */
+  .stage:focus,
+  .steps:focus {
+    outline: none;
+  }
   .steps-in {
     display: grid;
     gap: var(--s7);
@@ -230,8 +237,11 @@ const steps = [
         "win";
       min-height: 0;
     }
+    /* In small viewport units: a phone's toolbar showing and hiding never resizes the window;
+       never taller than the screen under the bar. */
     .slot {
       height: clamp(26rem, 78svh, 47rem);
+      max-height: calc(100svh - var(--bar-h) - 16px);
     }
   }
 

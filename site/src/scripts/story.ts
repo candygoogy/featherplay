@@ -40,6 +40,13 @@ export async function startStory(player: Player): Promise<void> {
   const icon = stage.querySelector<HTMLElement>("[data-ghost-icon]")!;
   const snap = stage.querySelector<HTMLElement>("[data-snap]")!;
   const songFly = document.getElementById("fly-song");
+  const steps = document.querySelector<HTMLElement>("[data-steps]");
+  /** The story's flyout goes when its beat ends, or the story does. */
+  const endBeat = () => {
+    if (!songFly?.hasAttribute("data-story")) return;
+    delete songFly.dataset.story;
+    if (songFly.matches(":popover-open")) songFly.hidePopover();
+  };
 
   let G: {
     top: number;
@@ -57,15 +64,29 @@ export async function startStory(player: Player): Promise<void> {
     const frame = stage!.querySelector<HTMLElement>(".first")!.getBoundingClientRect();
     const fl = frame.left;
     const L = { w: win.home.w, h: win.home.h };
-    // Hold 1: the whole window, centred and large, its words under it.
+    // Hold 1: the whole window, centred and large, its words under it, as wide as the window but
+    // never narrower than a comfortable measure (measured at the width they will have: narrower,
+    // they take another line, and the window gives way to them).
     const side = Math.max(fl, 40);
-    caps[0].style.width = `${Math.round(Math.min(vw - 2 * side, L.w))}px`;
-    const capH0 = caps[0].offsetHeight;
-    const roomH = vh - CAP_B - 20 - capH0 - 28 - 24;
-    const s1 = Math.min(1, (vw - 2 * side) / L.w, roomH / L.h);
-    const w1 = L.w * s1;
+    const capMin = Math.min(vw - 2 * side, 416);
+    let w1 = Math.min(vw - 2 * side, L.w);
+    let capW = w1;
+    let roomH = 0;
+    let s1 = 1;
+    for (let i = 0; i < 3; i++) {
+      capW = Math.max(capMin, w1);
+      caps[0].style.width = `${Math.round(capW)}px`;
+      roomH = vh - CAP_B - 20 - caps[0].offsetHeight - 28 - 24;
+      s1 = Math.min(1, (vw - 2 * side) / L.w, roomH / L.h);
+      if (Math.abs(L.w * s1 - w1) < 1) break;
+      w1 = L.w * s1;
+    }
+    w1 = L.w * s1;
     const h1 = L.h * s1;
-    caps[0].style.width = `${Math.round(w1)}px`;
+    if (Math.round(Math.max(capMin, w1)) !== Math.round(capW)) {
+      capW = Math.max(capMin, w1);
+      caps[0].style.width = `${Math.round(capW)}px`;
+    }
     const r1 = { x: (vw - w1) / 2, y: CAP_B + 20 + Math.max(0, (roomH - h1) / 2), w: w1, h: h1, s: s1 };
     // Hold 2: the narrow window beside its words.
     const capW1 = caps[1].offsetWidth;
@@ -80,7 +101,7 @@ export async function startStory(player: Player): Promise<void> {
       r1,
       r2,
       caps: [
-        { x: r1.x, y: r1.y + h1 + 28 },
+        { x: (vw - capW) / 2, y: r1.y + h1 + 28 },
         { x: fl, y: r2.y + H2 / 2 - caps[1].offsetHeight / 2 },
         { x: fl, y: CAP_B + (vh - CAP_B) / 2 - caps[2].offsetHeight / 2 },
       ],
@@ -92,6 +113,9 @@ export async function startStory(player: Player): Promise<void> {
     cur = target;
     trayAt = null;
     render(cur, true);
+    // Laid out part-way through a move (a reload, a resize there): finished the way it was going.
+    clearTimeout(settleTimer);
+    settleTimer = window.setTimeout(settle, 160);
   }
 
   // ---- One picture of the story at `p` ----
@@ -109,19 +133,19 @@ export async function startStory(player: Player): Promise<void> {
     if (inBeat !== beat && songFly) {
       beat = inBeat;
       if (inBeat && !songFly.matches(":popover-open")) {
-        songFly.showPopover();
+        // Marked first: the bar places the story's flyout under the capsule's song.
         songFly.dataset.story = "";
-      } else if (!inBeat && songFly.hasAttribute("data-story")) {
-        delete songFly.dataset.story;
-        if (songFly.matches(":popover-open")) songFly.hidePopover();
-      }
+        songFly.showPopover();
+      } else if (!inBeat) endBeat();
     }
-    // The first screen's words leave first.
+    // The first screen's words leave first (keys that were in them go on from the steps).
     const out = seg(p, 0, 0.07);
     for (const el of hero) {
       el.style.opacity = out ? String(1 - out * out * (3 - 2 * out)) : "";
       el.style.translate = out ? `0 ${(-out * 12).toFixed(1)}px` : "";
-      el.inert = out > 0.5;
+      const gone = out > 0.5;
+      if (gone && !el.inert && el.contains(document.activeElement)) steps?.focus({ preventScroll: true });
+      el.inert = gone;
     }
     caps.forEach((cap, i) => {
       const o = captionOpacity(i, p);
@@ -162,7 +186,8 @@ export async function startStory(player: Player): Promise<void> {
       // back laid out narrow.
       gr = { x: lerp(G.r1.x, G.r2.x, b), y: lerp(G.r1.y, G.r2.y, b), w: lerp(G.r1.w, G.r2.w, b), h: lerp(G.r1.h, G.r2.h, b) };
       ghostO = Math.min(seg(b, 0, 0.2), 1 - seg(b, 0.85, 1));
-      f = b < 0.5 ? { w: L.w, h: L.h, ...G.r1, o: 1 - seg(b, 0, 0.35) } : { w: NARROW.w, h: NARROW.h, ...G.r2, o: seg(b, 0.8, 1) };
+      // The rect gives the place and the scale; the size the app is laid out at is its own.
+      f = b < 0.5 ? { ...G.r1, w: L.w, h: L.h, o: 1 - seg(b, 0, 0.35) } : { ...G.r2, w: NARROW.w, h: NARROW.h, o: seg(b, 0.8, 1) };
     } else {
       // Into the tray: toward the capsule's song, smaller, then gone (where the song is, read
       // once as the move starts, not every frame).
@@ -241,12 +266,13 @@ export async function startStory(player: Player): Promise<void> {
     settleTimer = window.setTimeout(settle, 40);
   });
 
-  // "The app" in the bar goes to the first hold, the whole window.
+  // "The app" in the bar goes to the first hold, the whole window, and the keys go there too.
   document.addEventListener("click", (e) => {
     const a = (e.target as Element).closest?.('a[href="#app"]');
     if (!a || !G) return;
     e.preventDefault();
     scrollTo({ top: Math.round(G.top + HOLDS[0] * LEN), behavior: "smooth" });
+    stage!.focus({ preventScroll: true });
   });
 
   // ---- On and off with the screen's size and the visitor's motion setting ----
@@ -255,6 +281,8 @@ export async function startStory(player: Player): Promise<void> {
     if (mq.matches) requestAnimationFrame(measure);
     else {
       G = null;
+      beat = false;
+      endBeat();
       win.drive(null);
       for (const el of [...hero, ...caps, ghost, snap, icon]) el.removeAttribute("style");
       for (const el of hero) el.inert = false;
