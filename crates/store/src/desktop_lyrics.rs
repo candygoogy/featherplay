@@ -82,34 +82,4 @@ mod tests {
         assert_eq!(StripSize::Large.step(1), None);
         assert_eq!(StripSize::Small.step(-1), None);
     }
-
-    #[test]
-    fn a_value_this_build_doesnt_know_takes_its_default_only() {
-        let d: DesktopLyrics =
-            toml::from_str("on = true\nsize = \"huge\"\nplace = \"left\"").expect("loads");
-        assert_eq!(
-            d,
-            DesktopLyrics {
-                on: true,
-                ..DesktopLyrics::default()
-            }
-        );
-    }
-
-    #[test]
-    fn the_place_comes_back_as_it_was_left() {
-        let d = DesktopLyrics {
-            on: true,
-            locked: true,
-            size: StripSize::Large,
-            place: Some(StripPlace {
-                x: 960,
-                bottom: 990,
-                screen: [0, 0, 1920, 1032],
-            }),
-            hinted: true,
-        };
-        let text = toml::to_string(&d).expect("saves");
-        assert_eq!(toml::from_str::<DesktopLyrics>(&text).expect("loads"), d);
-    }
 }

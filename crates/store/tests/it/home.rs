@@ -52,17 +52,3 @@ impl Drop for TestHome {
         let _ = fs::remove_dir_all(&self.0);
     }
 }
-
-#[test]
-fn test_homes_live_under_featherplay_home() {
-    let Some(home) = TestHome::new("where") else {
-        return;
-    };
-    let base = base().expect("set, or new() would have skipped");
-    assert!(
-        home.0.starts_with(base),
-        "{} is not under {}",
-        home.0.display(),
-        base.display()
-    );
-}

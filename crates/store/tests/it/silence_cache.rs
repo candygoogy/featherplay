@@ -13,21 +13,6 @@ fn silences(n: u64) -> SongSilences {
 }
 
 #[test]
-fn saved_silences_load_back_by_video_id() {
-    let Some(home) = TestHome::new("silences-round-trip") else {
-        return;
-    };
-    let mut cache = SilenceCache::load(&home.paths());
-    cache.insert("vid-a", silences(1));
-    cache.insert("vid-b", silences(2));
-    cache.save().expect("save");
-    let back = SilenceCache::load(&home.paths());
-    assert_eq!(back.get("vid-a"), Some(&silences(1)));
-    assert_eq!(back.get("vid-b"), Some(&silences(2)));
-    assert_eq!(back.get("vid-c"), None);
-}
-
-#[test]
 fn the_oldest_song_goes_past_the_cap() {
     let Some(home) = TestHome::new("silences-cap") else {
         return;

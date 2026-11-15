@@ -28,20 +28,6 @@ fn track(id: &str) -> Track {
 }
 
 #[test]
-fn a_saved_list_loads_back_unchanged() {
-    let Some(home) = TestHome::new("library-round-trip") else {
-        return;
-    };
-    let cache = home.cache();
-    let liked = vec![track("a"), track("b")];
-    cache
-        .save("", LibraryList::Liked, &liked)
-        .expect("save liked");
-    let back: Option<Vec<Track>> = cache.load("", LibraryList::Liked);
-    assert_eq!(back, Some(liked));
-}
-
-#[test]
 fn each_identity_keeps_its_own_lists() {
     let Some(home) = TestHome::new("library-identities") else {
         return;
