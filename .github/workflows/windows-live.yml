@@ -1,0 +1,79 @@
+name: Windows live
+
+# The Windows tests that start real browser parts, which CI's `check` job leaves ignored:
+# WebView2's sign-in window, hidden on about:blank (crates/platform/src/windows/webview/tests.rs);
+# what the registry says about the installed browsers and the https default
+# (windows/browsers.rs); and the browser sign-in with the runner's Edge and Chrome, started
+# plainly on a local page that sets test cookies, then headless with the pipe, and asked to
+# quit by closing their windows (crates/platform/src/common/browsers/live.rs,
+# apps/featherplay/src/pages/sign_in/browser/tests.rs). No Google page and no account: every
+# browser gets a temporary profile under the test home and deletes it. The Linux rig runs the
+# same browser checks there (scripts/rig/desktop/live.sh).
+#
+# They open windows and real browsers, so not on every push: once a week, and by hand.
+
+on:
+  schedule:
+    - cron: "0 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-live
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  # As in ci.yml: the engine tests that open an audio device are left out, and the build cache
+  # is the same kind.
+  RUSTFLAGS: --cfg ci
+
+jobs:
+  live:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Rust toolchain
+        shell: bash
+        run: |
+          rustup toolchain install
+          rustup show active-toolchain
+          cargo --version
+
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+
+      - uses: taiki-e/install-action@1919c4a95903d2c33e4a221102edca87309fc14b # v2.89.0
+        with:
+          tool: nextest
+
+      # The tests by name, not every ignored one, so a measurement ignored later doesn't land
+      # here. `--no-capture` shows what each reports (the browsers found, the cookies read) and
+      # runs them one at a time, so no two browsers start together.
+      - name: WebView2, this PC's browsers, the browser sign-in
+        shell: bash
+        run: |
+          export FEATHERPLAY_HOME="$RUNNER_TEMP/featherplay-home"
+          mkdir -p "$FEATHERPLAY_HOME"
+          cargo nextest run -p featherplay-platform --lib --locked --run-ignored only \
+            --no-fail-fast --no-capture \
+            -E 'test(/^windows::webview::tests::live_/) | test(this_pc) | test(live_browser)'
+
+      - name: The app's browser client
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          export FEATHERPLAY_HOME="$RUNNER_TEMP/featherplay-home"
+          mkdir -p "$FEATHERPLAY_HOME"
+          cargo nextest run -p featherplay --lib --locked --run-ignored only \
+            --no-fail-fast --no-capture -E 'test(live_browsers)'
+          left=$(find "$FEATHERPLAY_HOME" -maxdepth 3 \( -iname '*signin*' -o -iname 'test-webview2-*' \))
+          if [ -n "$left" ]; then
+            echo "::error::Browser profiles were left in the test home: $left"
+            exit 1
+          fi
