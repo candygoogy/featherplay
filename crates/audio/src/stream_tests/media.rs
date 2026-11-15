@@ -1,11 +1,10 @@
 //! A stream opened and decoded over the throttled server: first audio, seeks, the head in
 //! memory, a server that ignores `Range`, the ad gate and stalls.
 
-use std::path::PathBuf;
 use std::sync::atomic::Ordering;
 use std::time::{Duration, Instant};
 
-use super::{env, env_with_read_timeout, fixture, serve};
+use super::{env, env_with_read_timeout, fixture, local, serve};
 use crate::decoder::Decoder;
 use crate::head;
 
@@ -105,15 +104,8 @@ fn seek_back_and_past_the_end() {
 
 #[test]
 fn unfragmented_local_file_plays_and_seeks() {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/tone-10s.m4a");
-    let url = format!(
-        "file:///{}",
-        path.to_string_lossy()
-            .replace('\\', "/")
-            .trim_start_matches('/')
-    );
     let env = env();
-    let (media, n, _) = env.open(&url);
+    let (media, n, _) = env.open(&local("tone-10s.m4a").url);
     let mut dec = Decoder::open(media, n, "audio/mp4").expect("decoder");
     dec.try_seek(Duration::from_secs(9)).expect("seek");
     let left = drain(&mut dec);

@@ -1,28 +1,20 @@
 //! Skip silence on the engine: the silence it skips, and its scan of the whole track.
 
-use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
 use std::time::{Duration, Instant};
 
 use super::webm::WEBM;
-use super::{engine_tmp, env, local, near, process_cpu, src, wait_event};
+use super::{engine_tmp, env, local, near, process_cpu, wait_event};
 
 /// `silence-ends.m4a`: 2 s of silence, 2 s of a 440 Hz tone, then 2 s of silence, made with
 /// `ffmpeg -f lavfi -i "sine=frequency=440:sample_rate=44100:duration=2,adelay=2s:all=1,
 /// apad=pad_dur=2" -ac 2 -c:a aac -b:a 48k -movflags +faststart silence-ends.m4a`.
 #[test]
 fn engine_skips_the_silence_a_track_starts_and_ends_with() {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/silence-ends.m4a");
-    let url = format!(
-        "file:///{}",
-        path.to_string_lossy()
-            .replace('\\', "/")
-            .trim_start_matches('/')
-    );
     let engine = crate::AudioEngine::new_null(engine_tmp());
     engine.set_skip_silences(crate::SkipSilence::StartAndEnd);
     let events = engine.events();
-    engine.load(src(&url), Duration::ZERO);
+    engine.load(local("silence-ends.m4a"), Duration::ZERO);
     engine.play();
     wait_event(&events, Duration::from_secs(3), crate::AudioEvent::Skipped);
     let at = engine.position();
