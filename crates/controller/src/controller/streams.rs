@@ -732,16 +732,6 @@ mod tests {
         assert_eq!(s.want(&id("a"), now), Want::Start);
     }
 
-    /// A preload refused again right after its re-resolve isn't resolved a third time
-    /// while paused: Play resolves it then. No request loop.
-    #[test]
-    fn a_refused_preload_is_resolved_again_once() {
-        let mut s = Streams::default();
-        assert!(s.again_after_refusal(&id("a")));
-        assert!(!s.again_after_refusal(&id("a")), "not twice in a row");
-        assert!(s.again_after_refusal(&id("b")));
-    }
-
     #[test]
     fn the_players_streams_outlive_many_hints() {
         let mut s = Streams::default();
@@ -772,20 +762,27 @@ mod tests {
     }
 
     /// The next stream comes from the server most of the kept ones are on more often than
-    /// from the last one's.
+    /// from the last one's; of two with as many streams, the newer.
     #[test]
     fn the_likely_server_is_the_one_most_kept_streams_are_on() {
-        let mut s = Streams::default();
-        assert_eq!(s.likely_server(), None, "no stream kept, no guess");
-        resolved_on(&mut s, &["rr3", "rr1", "rr3", "rr5"], "1.2.3.4");
-        assert_eq!(s.likely_server(), Some("https://rr3.example.invalid"));
-    }
-
-    #[test]
-    fn the_newer_of_two_servers_with_as_many_streams_is_the_likely_one() {
-        let mut s = Streams::default();
-        resolved_on(&mut s, &["rr3", "rr1", "rr1", "rr3", "rr5"], "1.2.3.4");
-        assert_eq!(s.likely_server(), Some("https://rr3.example.invalid"));
+        let cases: [(&str, &[&str], Option<&str>); 3] = [
+            ("no stream kept, no guess", &[], None),
+            (
+                "the most streams",
+                &["rr3", "rr1", "rr3", "rr5"],
+                Some("https://rr3.example.invalid"),
+            ),
+            (
+                "the newer of two with as many",
+                &["rr3", "rr1", "rr1", "rr3", "rr5"],
+                Some("https://rr3.example.invalid"),
+            ),
+        ];
+        for (label, servers, want) in cases {
+            let mut s = Streams::default();
+            resolved_on(&mut s, servers, "1.2.3.4");
+            assert_eq!(s.likely_server(), want, "{label}");
+        }
     }
 
     /// The last session's streams stand in until a resolve shows this session's address;

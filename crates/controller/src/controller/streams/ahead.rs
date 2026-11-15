@@ -461,6 +461,17 @@ mod tests {
         s.waiting.iter().map(|(id, _)| id.clone()).collect()
     }
 
+    /// `d` before now, to age a mark by hand. `Instant` counts from the machine's start, so
+    /// on a machine up for less than `d` there is no such instant: `None`, and the test
+    /// skips its aged half, saying so.
+    fn ago(d: Duration) -> Option<Instant> {
+        let at = Instant::now().checked_sub(d);
+        if at.is_none() {
+            eprintln!("skipped the aged half: the machine has been up for less than {d:?}");
+        }
+        at
+    }
+
     #[test]
     fn hints_are_bounded_and_deduplicated() {
         let mut s = Streams::default();
@@ -597,10 +608,11 @@ mod tests {
         s.on_screen(vec![id("a")], now);
         assert!(s.start_hints().is_empty());
 
+        let Some(past) = ago(super::super::UNAVAILABLE_FOR) else {
+            return;
+        };
         for (_, at, _) in &mut s.unavailable {
-            *at = Instant::now()
-                .checked_sub(super::super::UNAVAILABLE_FOR)
-                .unwrap();
+            *at = past;
         }
         s.hint(&id("a"), now);
         assert_eq!(ids(s.start_hints()), [id("a")]);
@@ -661,13 +673,15 @@ mod tests {
     }
 
     /// A stream refused, resolved again and refused again isn't resolved ahead on every
-    /// later state change: the player resolves it when it gets there.
+    /// later state change, nor a third time while paused: the player resolves it when it
+    /// gets there. No request loop.
     #[test]
     fn a_stream_refused_twice_is_not_resolved_ahead_again() {
         let mut s = Streams::default();
         let now = SystemTime::now();
         assert!(s.again_after_refusal(&id("q1")));
-        assert!(!s.again_after_refusal(&id("q1")));
+        assert!(!s.again_after_refusal(&id("q1")), "not twice in a row");
+        assert!(s.again_after_refusal(&id("b")), "another song's own once");
         s.ahead(None, &[id("q1")], now);
         assert!(s.start_hints().is_empty());
     }
@@ -762,8 +776,11 @@ mod tests {
         }
         assert_eq!(looked_up, PAGE_PER_MINUTE);
         // A minute on, they go on.
+        let Some(past) = ago(MINUTE) else {
+            return;
+        };
         for at in &mut s.page_starts {
-            *at = Instant::now().checked_sub(MINUTE).unwrap();
+            *at = past;
         }
         assert!(!s.start_hints().is_empty());
     }
