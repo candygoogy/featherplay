@@ -69,7 +69,6 @@ mod lyrics_menu;
 mod lyrics_no_duplicate;
 mod lyrics_none;
 mod lyrics_off;
-mod lyrics_outage;
 mod lyrics_toggle;
 mod lyrics_unavailable;
 mod lyrics_view;
