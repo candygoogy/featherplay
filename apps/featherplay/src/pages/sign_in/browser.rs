@@ -184,6 +184,9 @@ struct Limits {
     resend: Duration,
     /// For the sign-in window.
     timeout: Duration,
+    /// The sign-in window exiting sooner than this after the start didn't start; later, the
+    /// user closed it.
+    early_exit: Duration,
     /// For the browser to exit after `Browser.close`.
     close: Duration,
 }
@@ -194,6 +197,7 @@ impl Limits {
             first_reply: first_reply(),
             resend: Duration::from_secs(5),
             timeout: timeout(),
+            early_exit: Duration::from_secs(3),
             close: Duration::from_secs(5),
         }
     }
@@ -392,7 +396,7 @@ fn sign_in_window(
 /// Waits for the browser's process to exit: the user closed it. At `limits.timeout` it's asked
 /// to quit, as closing it would, so it writes its cookies, and ended if it hasn't within
 /// `limits.close`; either way its profile is read next. Ended on Cancel; one that exits within
-/// `EARLY_EXIT` didn't start.
+/// `limits.early_exit` didn't start.
 fn wait_closed(
     process: &impl Process,
     cancel: &AtomicBool,
@@ -419,7 +423,7 @@ fn wait_closed(
                 process.kill();
                 return Err(Outcome::Cancelled);
             }
-            Err(_) if started.elapsed() < EARLY_EXIT => {
+            Err(_) if started.elapsed() < limits.early_exit => {
                 log!("browser sign-in: the browser exited at once");
                 return Err(Outcome::DidntStart("the browser exited at once".into()));
             }
@@ -539,10 +543,6 @@ enum Stop {
     /// No reply in time.
     NoReply,
 }
-
-/// The sign-in window exiting sooner than this after the start didn't start; later, the user
-/// closed it.
-const EARLY_EXIT: Duration = Duration::from_secs(3);
 
 /// How often waits look at Cancel and the browser's process.
 const SLICE: Duration = Duration::from_millis(100);

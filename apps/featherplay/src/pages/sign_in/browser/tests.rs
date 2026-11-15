@@ -159,6 +159,7 @@ fn quick() -> Limits {
         first_reply: Duration::from_millis(1000),
         resend: Duration::from_millis(100),
         timeout: Duration::from_secs(5),
+        early_exit: Duration::from_millis(100),
         close: Duration::from_secs(2),
     }
 }
@@ -275,6 +276,7 @@ fn the_first_answer_waits_longer_on_linux_only() {
     assert_eq!(l.first_reply, Duration::from_secs(first));
     assert_eq!(l.resend, Duration::from_secs(5));
     assert_eq!(l.timeout, Duration::from_secs(15 * 60));
+    assert_eq!(l.early_exit, Duration::from_secs(3));
 }
 
 /// The headless read, against the fake browser.
@@ -357,14 +359,11 @@ fn the_profile_with_a_session_is_signed_in_and_one_without_was_closed() {
 fn closing_the_sign_in_window_goes_on_to_the_read() {
     let process = FakeProcess::default();
     let never = AtomicBool::new(false);
-    let limits = Limits {
-        timeout: EARLY_EXIT * 3,
-        ..quick()
-    };
+    let limits = quick();
     std::thread::scope(|s| {
         // The user closes it once it has been up a while.
         s.spawn(|| {
-            std::thread::sleep(EARLY_EXIT + Duration::from_millis(200));
+            std::thread::sleep(limits.early_exit + Duration::from_millis(200));
             process.exited.store(true, Ordering::Relaxed);
         });
         assert_eq!(wait_closed(&process, &never, &limits), Ok(Ended::Closed));
