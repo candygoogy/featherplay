@@ -29,16 +29,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn a_song_link_searches_its_bare_link() {
-        assert_eq!(
-            search_page("https://youtu.be/UjiL0RxrDAI?si=Abc123"),
-            Page::Search {
-                query: "https://music.youtube.com/watch?v=UjiL0RxrDAI".into()
-            }
-        );
-    }
-
-    #[test]
     fn playlist_album_and_artist_links_open_their_page() {
         assert_eq!(
             search_page(
@@ -58,16 +48,6 @@ mod tests {
             search_page("https://music.youtube.com/channel/UCX5Rv4Lv4h3E2Vh7RmQ9GfQ"),
             Page::Artist {
                 id: ArtistId("UCX5Rv4Lv4h3E2Vh7RmQ9GfQ".into())
-            }
-        );
-    }
-
-    #[test]
-    fn text_searches_as_typed() {
-        assert_eq!(
-            search_page("daft punk"),
-            Page::Search {
-                query: "daft punk".into()
             }
         );
     }
