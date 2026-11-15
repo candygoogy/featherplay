@@ -370,4 +370,31 @@ mod tests {
         // No fade: the end.
         assert_eq!(next_wake(secs(50), Duration::ZERO, false), secs(50));
     }
+
+    #[test]
+    fn turned_off_the_window_is_told_once() {
+        let mut timer = SleepTimer {
+            mode: Mode::At(Instant::now() + secs(15 * 60)),
+            ..SleepTimer::default()
+        };
+        assert!(matches!(
+            timer.news(secs(15 * 60)),
+            Some(UiEvent::Sleep(Some(_)))
+        ));
+        assert!(timer.off_tick().is_continue(), "running, the tick goes on");
+
+        // Turn off, the tray or the setting.
+        timer.mode = Mode::Off;
+        assert!(
+            matches!(
+                timer.off_tick(),
+                ControlFlow::Break(Some(UiEvent::Sleep(None)))
+            ),
+            "the window kept the time left"
+        );
+        assert!(
+            matches!(timer.off_tick(), ControlFlow::Break(None)),
+            "the window was told again"
+        );
+    }
 }
