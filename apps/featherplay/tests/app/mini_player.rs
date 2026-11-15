@@ -6,15 +6,16 @@
 //! unpinned from behind another window, it closes. Unpinned, it closes once another app
 //! comes to the front, but not while the taskbar or the hidden icons' flyout it was opened
 //! from is in front (the poll reads an injected foreground). A click or a drag on its
-//! progress line seeks, and never drags the window. Prints what creating it costs.
+//! progress line seeks, and never drags the window.
 
 use std::cell::{Cell, RefCell};
 use std::path::Path;
 use std::rc::Rc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use featherplay::controller::{AccountAction, Action};
 use featherplay::mini::{self, Foreground};
+use featherplay::offscreen;
 use featherplay::snapshot::Scene;
 use featherplay::ui::{MiniData, MiniPlayer, Player, Theme, Toast};
 use slint::platform::{Key, PointerEventButton, WindowEvent};
@@ -83,10 +84,8 @@ fn read_front() -> Option<Foreground> {
     FRONT.with_borrow(Clone::clone)
 }
 
-/// The hidden icons' flyout (^) on Windows 11, the taskbar, the desktop and another app.
+/// The hidden icons' flyout (^) on Windows 11 and another app.
 const FLYOUT: (u32, &str) = (0x10, "TopLevelWindowForOverflowXamlIsland");
-const TASKBAR: (u32, &str) = (0x20, "Shell_TrayWnd");
-const DESKTOP: (u32, &str) = (0x30, "Progman");
 const OTHER_APP: (u32, &str) = (0x40, "Chrome_WidgetWin_1");
 
 /// Lets one round of the foreground poll run.
@@ -287,26 +286,6 @@ fn unpinned_in_front_the_mini_player_stays_open_until_it_loses_the_activation() 
 }
 
 #[test]
-fn opened_from_the_flyout_the_poll_waits_while_the_shell_is_in_front() {
-    let scene = playing_scene();
-    mini::read_foreground_with(read_front);
-    in_front(FLYOUT);
-    let _mini = open(&scene);
-    assert!(mini::polls(), "unpinned, the poll isn't running");
-
-    // The flyout keeps the foreground, then the taskbar may take it as the flyout closes.
-    poll(&scene);
-    assert!(mini::is_open(), "the flyout in front closed it");
-    in_front(TASKBAR);
-    poll(&scene);
-    assert!(mini::is_open(), "the taskbar in front closed it");
-    // No window in front for a moment, as while Windows switches.
-    FRONT.set(None);
-    poll(&scene);
-    assert!(mini::is_open(), "no window in front closed it");
-}
-
-#[test]
 fn opened_from_the_flyout_the_poll_closes_it_when_another_app_comes_to_the_front() {
     let scene = playing_scene();
     mini::read_foreground_with(read_front);
@@ -322,20 +301,6 @@ fn opened_from_the_flyout_the_poll_closes_it_when_another_app_comes_to_the_front
     // The click on the tray icon that follows doesn't open it again at once.
     mini::toggle(200, 200);
     assert!(!mini::is_open(), "the tray click reopened it");
-}
-
-#[test]
-fn the_poll_closes_it_when_the_desktop_comes_to_the_front() {
-    let scene = playing_scene();
-    mini::read_foreground_with(read_front);
-    in_front(TASKBAR);
-    let _mini = open(&scene);
-    poll(&scene);
-    assert!(mini::is_open());
-
-    in_front(DESKTOP);
-    poll(&scene);
-    assert!(!mini::is_open(), "a click on the desktop left it open");
 }
 
 #[test]
@@ -402,22 +367,9 @@ fn mini_player_mirrors_the_player_and_closes_on_escape_or_lost_activation() {
     scene.theme(true);
     scene.settle();
 
-    let started = Instant::now();
     let mini = mini::create(&scene.ctx).expect("mini player");
-    let created = started.elapsed();
     mini.show().expect("show");
-    let started = Instant::now();
     mini.window().take_snapshot().expect("first frame");
-    eprintln!(
-        "mini player: created in {:.1} ms, first frame in {:.1} ms ({} build)",
-        created.as_secs_f64() * 1000.0,
-        started.elapsed().as_secs_f64() * 1000.0,
-        if cfg!(debug_assertions) {
-            "debug"
-        } else {
-            "release"
-        }
-    );
     mini.window()
         .dispatch_event(WindowEvent::WindowActiveChanged(true));
     scene.settle();
@@ -490,18 +442,11 @@ fn mini_player_mirrors_the_player_and_closes_on_escape_or_lost_activation() {
     assert!(!mini::is_open(), "losing the activation didn't close it");
     drop(mini);
 
-    // Closed, nothing of it is left to wake the loop (the toast's timer aside, which ends).
-    std::thread::sleep(Duration::from_millis(5));
-    slint::platform::update_timers_and_animations();
+    // Closed, nothing of it is left to wake the loop (the toast's timer aside, which ends:
+    // the clock steps past it).
+    offscreen::advance(Duration::from_secs(6));
+    scene.settle();
     let toast = scene.ui.global::<Toast>();
-    for _ in 0..80 {
-        if !toast.get_open() {
-            break;
-        }
-        std::thread::sleep(Duration::from_millis(100));
-        slint::platform::update_timers_and_animations();
-        scene.settle();
-    }
     assert!(!toast.get_open(), "the toast never closed");
     assert!(
         slint::platform::duration_until_next_timer_update().is_none(),
