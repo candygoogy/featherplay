@@ -178,10 +178,12 @@ To see a UI change without opening the window, render a page offscreen to a PNG:
 
 `--fixtures` uses the recorded, scrubbed responses in `crates/ytm/tests/fixtures`;
 `FEATHERPLAY_FIXTURES=demo` uses the demo set the README's images come from. The pages are
-listed in `PAGES` in `apps/featherplay/src/snapshot.rs`, and the other flags (`--size`,
-`--queue`, `--hover`, `--press`, `--hold-loading`, ...) in the usage line of
-`apps/featherplay/src/main.rs`; `apps/featherplay/ui/README.md` explains them. For a UI change, attach a before and after in dark and
-light to the pull request.
+listed in `PAGES` in `apps/featherplay/src/snapshot/table.rs`, and the other flags (`--size`,
+`--queue`, `--drawer`, `--volume-popup`, `--hover`, `--press`, `--hold-loading`, ...) in the
+usage line of `apps/featherplay/src/main.rs`; `apps/featherplay/ui/README.md` explains them.
+The window lays out down to 480 px wide, so check a layout change at a narrow `--size` too
+(below 952 px Up next is a sheet, below 560 the sidebar a drawer). For a UI change, attach a
+before and after in dark and light to the pull request.
 
 Recorded fixtures must be scrubbed before they're committed: no account name, email, channel
 ID or personal playlist titles.

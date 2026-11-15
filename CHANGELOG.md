@@ -13,66 +13,91 @@ Notable changes to featherplay, newest first. The format follows
   beside search, which opens it over the dimmed page; Escape, a click outside it or picking a
   page closes it, and it works from the keyboard (arrows or Tab, Enter, Escape). Where Up next
   no longer fits beside the page (under 952 px), the bar's Up next button opens it as a sheet
-  above the bar, with the same tabs, on Now playing too. The player bar keeps the volume at
-  every width: a button that opens the slider in a popup where the slider doesn't fit, then,
-  below about 660 px, a row in the Up next sheet, so the song's title keeps its room. Narrower
-  still, Shuffle and Repeat move into the sheet (the Up next button wears a small dot while
-  either is on), then Not for me and the times go, and the seek line runs the bar's full width
-  under one row: the cover, the title, the transport, Like and Up next. Nothing overlaps even
-  in a window a tiling window manager makes narrower than 480 px.
-- **The mouse wheel over the player bar sets the volume**, at any width and anywhere on the
-  bar, one Volume step a notch, without scrolling the page. Where the bar has no slider, a
-  small card above it shows the level while it changes.
-- **The window opens where you left it.** featherplay remembers the main window's size,
-  position and whether it was maximised, and opens that way the next time, also when it
-  starts in the tray and is shown later. The size keeps its look across a change of display
-  scale and is cut to fit the screen; a window that would open off every screen (a monitor
-  unplugged, a new layout) opens centred on the main one. On Wayland, which places windows
-  itself, the size and the maximised state are kept. The first start opens at 1280 × 800 as
-  before.
-
-### Changed
-
-- **A new Home.** It opens on a band in the colour of the song's cover, deep with white text
-  in the dark theme and a light tint of the cover's colour with dark text in the light one,
-  as the lyrics panel now is in the light theme too (the line playing in the darkest and
-  heaviest text, the others lighter and still easy to read): the cover, "Pick up where you
-  left off" (or "Now playing") with where it's playing from, the title, the artist, album
-  and year, and one row: Resume and where you paused (Open the source while it plays; Play on
-  a fresh start), then Like, Add to playlist, Start radio and Go to artist. On its right, the
-  next three songs and **Show all**, which opens Up next, with the Up next panel open too
-  when there's room: six in two columns when six or more are next and the window is wide
-  enough, otherwise the song's side takes the room. A queue shorter than three (a radio
-  still loading, the end of an album) is filled with **More like this**, the song's related
-  songs, asked for as soon as Home shows the short queue where they'd show (the band's
-  column, or the Up next panel or sheet) rather than when the Related tab opens (once a
-  song; the tab then reuses them); with nothing next and nothing related the
-  song takes the band's width. In a narrower window an **Up next**
-  link at its top right instead. Under it, every shelf is one row of large covers that pages
-  sideways with the arrows shown on hover, the next cover cut off at the window's edge;
-  Quick picks keep their song grid, two rows. Your mixes open with **Shuffle Liked songs**,
-  which plays Liked songs shuffled (the sidebar still opens the page). It replaces the "Pick
-  up where you left off" card, the shortcut tiles and the cover wash behind the search bar.
+  above the bar, with the same tabs, on Now playing too. From 960 px up the player bar is as
+  before. Below that it gives things up in turn, the song's title shortening first: the speed
+  pill, the volume's slider (a button opens it in a popup), then the mini player, sleep timer
+  and Lyrics buttons; below about 660 px the volume becomes a row in the Up next sheet, so the
+  title keeps its room. Narrower still, Shuffle and Repeat move into the sheet (the Up next
+  button wears a small dot while either is on), then Not for me and the times go, and the seek
+  line runs the bar's full width under one row: the cover, the title, the transport, Like and
+  Up next. Nothing overlaps even in a window a tiling window manager makes narrower than
+  480 px; in 0.4.0, a window some Linux window managers made narrower than the 960 px
+  minimum ran the song's title into the transport.
 - **The pages work in a narrow window**, down to 480 px wide. Now playing below 800 px with
   lyrics on shows the song as a small header (the cover, title, artists, album and its
   buttons) with the lyrics under it, filling the window's height; without lyrics the cover
   keeps the same margin, so turning lyrics on shrinks it in place. Home's band takes a
   narrower form, with the row of buttons under the cover; its rails keep two covers in view,
-  and Quick picks show one column. Album and playlist headers put the cover above the title. Settings rows put
-  their controls under the label when they'd crowd it, and the Accent colours go on a line of
-  their own. Song rows give the room to the title, the heart showing on hover in place of the
-  length. Filter chips narrow to fit, and About's update banner and buttons stack. In a
-  narrow window pages and the search field use less padding (24 px, then 20); a wide window
-  with Up next open keeps its layout.
+  and Quick picks show one column. Album and playlist headers put the cover above the title.
+  Settings rows put their controls under the label when they'd crowd it, and the Accent
+  colours go on a line of their own. Song rows give the room to the title, the heart showing
+  on hover in place of the length. Filter chips narrow to fit, and About's update banner and
+  buttons stack. In a narrow window pages and the search field use less padding (24 px, then
+  20); a wide window with Up next open keeps its layout.
+- **The mouse wheel over the player bar sets the volume**, at any width and anywhere on the
+  bar, one Volume step a notch, without scrolling the page. Where the bar has no slider, a
+  small card above it shows the level, as a short line and the value, while it changes (Up
+  and Down too).
+- **The window opens where you left it.** featherplay remembers the main window's size,
+  position and whether it was maximised, and opens that way the next time, also when it
+  starts in the tray and is shown later. A maximised window shows maximised at once, at
+  sign-in too, without first appearing at its normal size. The size keeps its look across a
+  change of display scale and is cut to fit the screen; a window that would open off every
+  screen (a monitor unplugged, a new layout) opens centred on the main one. On Wayland, which
+  places windows itself, the size and the maximised state are kept. The first start opens at
+  1280 × 800 as before.
+- On Linux, each AppImage carries update information, and each release has a
+  `featherplay-<arch>.AppImage.zsync` beside it (listed in `SHA256SUMS.txt`), so AppImageUpdate
+  and the tools built on it can update the AppImage, downloading only the parts that changed.
+  featherplay's own signed update is unchanged.
+
+### Changed
+
+- **A new Home.** It opens on a band in the colour of the song's cover, deep with white text
+  in the dark theme and a light tint of the cover's colour with dark text in the light one:
+  the cover, "Pick up where you left off" (or "Now playing") with where it's playing from,
+  the title, the artist, album and year, and one row: Resume and where you paused (Open the
+  source while it plays; Play on a fresh start), then Like, Add to playlist, Start radio and
+  Go to artist. On its right are the next three songs and **Show all**, which opens Up next;
+  they stay while the Up next panel is open, where there's room. With six or more songs next
+  and a wide enough window they fill two columns; otherwise the song's side takes the room,
+  and where the band has no room for them, an **Up next** link at its top right opens the
+  queue instead. A queue shorter than three (a radio still loading, the end of an album) is
+  filled with **More like this**, the song's related songs. They're asked for as soon as Home
+  shows the short queue where they'd show (the band's column, or the Up next panel or sheet),
+  once a song, and the Related tab then reuses them. With nothing next and nothing related,
+  the song takes the band's width. Under the band, every shelf is one row of large covers
+  that pages sideways with the arrows shown on hover, the next cover cut off at the window's
+  edge; Quick picks keep their song grid, two rows. Your mixes open with **Shuffle Liked
+  songs**, which plays Liked songs shuffled (the sidebar still opens the page). It replaces
+  the "Pick up where you left off" card, the shortcut tiles and the cover wash behind the
+  search bar.
+- In the light theme the lyrics panel (Now playing's full view, the Lyrics tab and the
+  stacked view of a narrow window) takes the band's light tint of the cover's colour, with
+  dark text: the line playing darkest and drawn a touch heavier, the lines to come lighter,
+  the lines sung lighter still, all easy to read. The dark theme, the desktop lyrics and the
+  mini player are unchanged.
+- **Less work while playing.** Two changes to the audio path take about 3 % and about 8 %
+  off featherplay's CPU while playing: the samples between the decoder and the output are
+  copied in runs instead of placed one at a time, and the Opus decoder (nearly every song is
+  Opus) is built for speed rather than size, for 71 KB of the exe. With the window minimised
+  or in the tray, the player bar's clock no longer wakes the window's thread every second.
+  Home's band follows the player only while Home is on screen, and the playing mark's 30 fps
+  clock rests on pages that can't show a mark while Up next is closed. Saving the session
+  every 10 s of playback no longer holds up the controller, and a new player state no longer
+  copies the whole queue: a pause or a seek copies no track. Up next loads covers only for
+  the rows on screen and a few either side, and edits its rows in place when the queue
+  moves instead of building the list again. Covers decode without a full-size copy (5.8 MB
+  for a 1,200 px cover), and the window reads the settings once at startup, not three times.
+- Skia's GPU backend, which the Windows build never used, is no longer linked into the
+  Windows exe: 1.29 MB less. With that, the x64 exe is about 0.9 MB smaller than 0.4.0's
+  (built the same way), this release's features and the faster Opus decoder included.
 
 ### Fixed
 
-- The player bar holds up in a window narrower than its 960 px minimum, as some Linux window
-  managers allow: the song's title no longer runs into the transport. As the bar narrows, the
-  title shortens first, then the speed pill, the volume, and the mini player, sleep timer and
-  Lyrics buttons give way in that order. From 960 px up the bar is as before.
-- The sleep timer's **Turn off** (in its popup and in the tray menu) now clears the time left
-  from the player bar's button; the timer was off, but the button still showed it running.
+- The sleep timer's **Turn off** (in its popup and in the tray menu), or turning the timer's
+  setting off, now clears the time left from the player bar's button; the timer was off, but
+  the button still showed it running.
 - A song from a Home card whose subtitle starts with its kind, as Listen again's do, no
   longer names "Song" as its first artist ("Song, Cece Natalie") on the card and in the
   player bar, so it's no longer scrobbled with "Song" as the artist either.

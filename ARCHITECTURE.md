@@ -21,8 +21,8 @@ this file does; when the two disagree, the code is right and this file needs fix
 | `spikes/` | Early experiments, kept for reference. Not part of the build. |
 | `docs/` | User-facing docs, such as `docs/local-api.md`. |
 
-The app crate is about 54,000 lines of Rust, its tests included, and 20,000 of Slint. The
-crates together have about 79,000 lines of Rust.
+The app crate is about 57,000 lines of Rust, its tests included, and 22,000 of Slint. The
+crates together have about 81,000 lines of Rust.
 
 ## How a click becomes sound
 
@@ -142,11 +142,21 @@ wait down step by step.
 
 ### 8. Back to the window
 
-After each change the controller sends `UiEvent::Player` with a `PlayerState`. The
+After each change the controller sends `UiEvent::Player` with a `PlayerState`. Its Up next
+(`upcoming`) is a `SharedTracks` (`crates/controller/src/controller/interface.rs`), a shared
+slice: the controller sends the same one again while the queue still matches it, so a pause
+or a seek copies no track, and neither do the window's copies of the state. The
 `events` callback in `UiLink` posts it to the UI thread with
 `slint::invoke_from_event_loop`. There, `on_event` (`apps/featherplay/src/app.rs`) updates
 the bar, the queue panel, the pages and, through `apps/featherplay/src/bar.rs`, the media
 controls and the tray (`apps/featherplay/src/shell.rs`).
+
+The frame lays itself out by the window's width (`apps/featherplay/ui/app.slint`), down to
+480 px: the full sidebar, the icon rail below 1100 px and a drawer from the top bar's menu
+button below 560; Up next as a panel beside the page, or a sheet above the bar where the
+rail, the panel and a page's least width don't fit side by side (under 952 px). The player
+bar gives up its groups in turn below 960 px (`apps/featherplay/ui/bottom_bar.slint`).
+`apps/featherplay/ui/README.md` has the widths and the rules.
 
 ## Threads and how they talk
 
@@ -164,7 +174,7 @@ controls and the tray (`apps/featherplay/src/shell.rs`).
 | `featherplay-discord` | Discord's blocking IPC | `crates/controller/src/presence.rs` |
 | `featherplay-proxy` | Asks WinHTTP for a proxy script or auto-detection | `crates/proxy/src/lookups.rs` |
 | `featherplay-log` | Appends log lines to the file | `crates/controller/src/diagnostics.rs` |
-| `featherplay-writes` | The UI's saves nobody waits for (the lyrics' choices, the sidebar's recent list), one after another in the order they were made; started by the first | `crates/controller/src/task.rs` |
+| `featherplay-writes` | The saves nobody waits for (the lyrics' choices, the sidebar's recent list, the session every 10 s of playback), one after another in the order they were made; started by the first | `crates/controller/src/task.rs` |
 | `featherplay-endsession` | A hidden window that hears Windows' end-of-session messages and second launches (to show the window, or with `--quick-search` to open the quick search box) | `crates/platform/src/windows/session_end.rs` |
 | ksni's thread (Linux) | The tray icon's StatusNotifierItem and menu on the session bus; their events go to the main thread with `slint::invoke_from_event_loop` | `crates/platform/src/linux/tray.rs` |
 | global-hotkey's thread (Linux, X11) | The hotkeys' key grabs. global-hotkey takes one event handler per process, so featherplay installs one that looks each press up among the keys registered now (`ROUTES`): the three hotkeys send a `UiCommand`, the quick search's key opens the box | `crates/integrations/src/hotkeys.rs` |
@@ -259,15 +269,15 @@ files added in 0.4.0, are read key by key: a value of the wrong type, out of ran
 newer version takes that key's default, and the rest are kept. In `settings.toml` that holds
 for every setting and for each key of a table such as `[discord_options]`; the log names the
 keys it dropped. Every save writes a temp file of its own beside the target and renames it
-over (`crates/store/src/atomic.rs`), so two saves at once both land whole; the UI's saves
-that nobody waits for (the lyrics' choices, the sidebar's recent list) run one after another
-on `featherplay-writes`, so the newer copy lands last.
+over (`crates/store/src/atomic.rs`), so two saves at once both land whole; the saves
+that nobody waits for (the lyrics' choices, the sidebar's recent list, the session) run one
+after another on `featherplay-writes`, so the newer copy lands last.
 
 | Where | What | Written by |
 |---|---|---|
 | `{config}/settings.toml` | Settings; its `[desktop_lyrics]` table holds the strip's switch, size, lock and place, and `[main_window]` where the main window was left (`apps/featherplay/src/window_place.rs` saves it, `crates/controller/src/window_place.rs` decides where it opens) | `crates/store/src/settings.rs`, `crates/store/src/desktop_lyrics.rs`, `crates/store/src/window_place.rs` |
 | `{config}/lyrics.json` | The lyrics' timing and the lyrics picked, per song (at most 1,000 songs) | `crates/store/src/lyrics_choices.rs` |
-| `{config}/session.json` | The queue and position, restored paused | `crates/store/src/session.rs` |
+| `{config}/session.json` | The queue and position, restored paused. Every 10 s of playback the controller copies the session and `SessionFile` writes it on `featherplay-writes`, only the newest of those waiting; at quit the last one is written on the controller's thread | `crates/store/src/session.rs`, `crates/controller/src/controller/session_file.rs` |
 | `{config}/scrobble-queue.json`, `{config}/listenbrainz-queue.json` | Scrobbles waiting to be sent | `crates/controller/src/scrobbler.rs` |
 | `{state}/logs/` | `featherplay.log` and `featherplay.1.log` (about 1 MB each), crash files | `crates/controller/src/diagnostics/logfile.rs`, `crates/controller/src/diagnostics/crash.rs` |
 | `{cache}/covers/` | Cover art, an LRU disk cache | `apps/featherplay/src/covers.rs` |
@@ -617,20 +627,32 @@ through re-exports, so no caller changed. Where the split went further than prop
 stamp), each to bring its parent under 1,000 lines. `parts.slint`, `settings.slint`,
 `home.slint` and `content.slint` re-export what moved out of them, so no `import` changed.
 
-**Left over 1,000 lines**, on purpose:
+**Over 1,000 lines now** (counted for 0.4.1, the tests inside a file included). The test
+files and `player.rs` stay on purpose; the others passed 1,000 after phase 4, and the last
+column gives the split that would help:
 
-| File | Lines | Why |
+| File | Lines | Why, or the split that would help |
 |---|---|---|
-| `crates/core/src/player.rs` | 1,386 | One state machine reads best in one place (decision 9) |
+| `crates/ytm/tests/it/convert.rs` | 1,569 | Test file (decision 8) |
+| `crates/store/tests/it/store.rs` | 1,536 | Test file (decision 8) |
 | `crates/core/tests/it/player.rs` | 1,535 | Test file (decision 8) |
-| `crates/ytm/tests/it/convert.rs` | 1,469 | Test file (decision 8) |
-| `crates/store/tests/it/store.rs` | 1,135 | Test file (decision 8) |
-| `crates/streams/src/chain/tests.rs` | 1,113 | Test file (decision 8): `chain.rs`'s tests, moved out whole |
+| `crates/core/src/player.rs` | 1,479 | One state machine reads best in one place (decision 9) |
+| `apps/featherplay/src/pages/settings/search.rs` | 1,430 | `table()`, the settings' row table, to `search/table.rs`, and the tests to `search/tests.rs` |
+| `apps/featherplay/src/snapshot.rs` | 1,283 | The tests' offscreen `Scene` apart from the `--snapshot` command (`run`, `render`); `snapshot/table.rs` already holds the page list |
+| `apps/featherplay/ui/bottom_bar.slint` | 1,274 | The volume's pieces (`VolumeSlider`, `VolumeRow`, `VolumeButton`, `VolumeLayer`) and the speed's (`SpeedPill`, `SpeedLayer`) to files of their own |
+| `crates/streams/src/chain/tests.rs` | 1,151 | Test file (decision 8): `chain.rs`'s tests, moved out whole |
+| `crates/platform/src/windows/window.rs` | 1,149 | The tests to `window/tests.rs` |
+| `apps/featherplay/src/follow.rs` | 1,111 | The tests to `follow/tests.rs` |
+| `apps/featherplay/src/app.rs` | 1,100 | `Ctx` and its load helpers apart from `run`, `run_window` and `on_event`; not an obvious line |
+| `crates/controller/src/updates/install.rs` | 1,032 | The tests to `updates/install/tests.rs` |
+| `apps/featherplay/src/quick_search.rs` | 1,027 | The code alone is about 920 lines: the tests can move out if it grows |
 
-**Duplicates** (`cargo tree -d`, normal dependencies, Windows x64). The workspace's unused
-`symphonia = "=0.6.1"` entry is gone (the audio crate pins 0.5.5, rodio's version). Every
-other duplicate comes from a crate we don't own, and none can go with a lock-file change
-alone:
+**Duplicates** (`cargo tree -d`, normal dependencies, Windows x64, checked for 0.4.1). The
+workspace's unused `symphonia = "=0.6.1"` entry is gone (the audio crate pins 0.5.5, rodio's
+version). Every other duplicate comes from a crate we don't own, and none can go with a
+lock-file change alone. The newest copies are `windows-sys` 0.61, `keyboard-types` 0.8
+(muda 0.21), `itertools` 0.15 and `syn` 3 (Slint's compiler, at build time), `hashbrown` 0.17
+(fontique, parley, indexmap) and `miniz_oxide` 0.9 (flate2); the older ones:
 
 | Older copy | Pulled in by | To remove it |
 |---|---|---|
@@ -643,6 +665,7 @@ alone:
 | `itertools` 0.14 | ytmapi-rs 0.3.3 | upstream |
 | `hashbrown` 0.14, 0.16 | rowan, clru (Slint) | upstream |
 | `smol_str` 0.2, `syn` 2 | winit; proc macros (build time) | upstream |
+| `miniz_oxide` 0.8 | png 0.18 (image, tiny-skia) | upstream |
 
 Phase 5 took souvlaki 0.9.3 for the Windows media card: the same SMTC calls on `windows`
 0.62, so `windows` 0.44 left the tree. It stays Windows only: its MPRIS backends poll every

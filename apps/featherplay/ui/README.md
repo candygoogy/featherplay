@@ -224,7 +224,7 @@ FEATHERPLAY_HOME=<your dev home> cargo run -p featherplay -- \
   --snapshot album --fixtures --theme dark --out <a scratch folder>/album-dark.png
 ```
 
-The pages are listed in `PAGES` in `src/snapshot.rs`, most with a line on what they show:
+The pages are listed in `PAGES` in `src/snapshot/table.rs`, most with a line on what they show:
 every page (`home`, `album`, `now-playing`, `settings`, `sign-in`, …) and variants of them
 such as `now-playing-lyrics-full`, `settings-sound`, `mini-player-paused` or
 `playlist-menu`. The options:
@@ -247,9 +247,10 @@ such as `now-playing-lyrics-full`, `settings-sound`, `mini-player-paused` or
 Data comes from `crates/ytm/tests/fixtures/*.json`, covers from
 `$FEATHERPLAY_HOME/design-covers` (not every fixture image was downloaded; those stay
 empty). Motion is off in snapshots, and the render waits until every load and cover has
-arrived. A few pages need more: `settings-long` shows the Discord preview only with
-`discord = true` in the home's `config/settings.toml`, and needs a tall `--size`, about
-1280x3600.
+arrived. It draws a frame before it waits, so the covers that rows ask for as they're made
+(Up next, the playlist, Liked songs and History lists) are in the picture too. A few pages
+need more: `settings-long` shows the Discord preview only with `discord = true` in the
+home's `config/settings.toml`, and needs a tall `--size`, about 1280x3600.
 
 To check frames as the window presents them (partial rendering, motion on, a frozen clock
 stepped 16 ms at a time), use `snapshot::Scene` with `offscreen::install_presenting`, as

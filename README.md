@@ -173,7 +173,10 @@ into one program that opens at once and stays quiet while it plays. It leaves ou
 
 - Without an account: search, artists, albums, public playlists, Home, Explore, radio and
   lyrics. Signed in: your library, likes and History, with what you played on other devices.
-- Home has your shelves and mixes; Explore has new releases, charts, moods and genres.
+- Home opens on a band in the colour of the song's cover, with Resume, the song's buttons
+  and what plays next (filled with More like this when the queue runs short), then your
+  shelves as rows of large covers and your mixes, Shuffle Liked songs first. Explore has new
+  releases, charts, moods and genres.
 - The sidebar holds your liked songs, playlists, albums and artists, the most recently played
   first. Pin any of them to the top.
 - Search (`Ctrl+K`) filters by songs, albums, artists and playlists, and opens any YouTube or
@@ -218,7 +221,8 @@ into one program that opens at once and stays quiet while it plays. It leaves ou
 - Songs YouTube won't play right now show dimmed, say why when you point at them, and are
   skipped, with one notice for the queue.
 - If the output device you picked goes away, playback pauses and moves to the default one.
-  The volume follows a curve that matches how loudness sounds, in steps you choose.
+  The volume follows a curve that matches how loudness sounds, in steps you choose, and the
+  mouse wheel anywhere over the player bar sets it.
 
 <br clear="right">
 
@@ -257,6 +261,9 @@ All off until you turn them on, except Match song volumes.
 - **Start when you sign in to Windows**, in Settings > Window, off by default, opens
   featherplay when you sign in, without taking the focus and paused until you press play;
   with **Start in the tray** it shows only the tray icon.
+- The window opens where you left it, at the same size, maximised if it was. It narrows to
+  480 px, enough to sit beside other work: there the sidebar opens from a menu button, and Up
+  next as a sheet above the player bar.
 - Song-change notifications and global hotkeys of your own are in Settings > Window. On
   Linux, media keys go through MPRIS, and the tray works where the desktop has one.
 
@@ -533,8 +540,10 @@ chmod +x featherplay-x86_64.AppImage
 It needs FUSE's `fusermount`, which most desktops have; without it, start it with
 `--appimage-extract-and-run`. It carries the keyboard and X11 libraries a minimal system may
 lack, so it starts there too. In a folder you can write to, it updates itself as the Windows
-installer does. To remove it, turn off **Start when you log in** (Settings > Window) if it's
-on, delete the file and the three folders listed under [Privacy](#privacy), then remove the
+installer does. From 0.4.1 it also carries update information, and each release a `.zsync`
+file, so AppImageUpdate and the tools built on it can update it too, downloading only the
+parts that changed. To remove it, turn off **Start when you log in** (Settings > Window) if
+it's on, delete the file and the three folders listed under [Privacy](#privacy), then remove the
 items whose names end in `@featherplay` from your keyring (in Seahorse, for example).
 
 **The .tar.gz.** Unpack it and run `./featherplay` in the `featherplay` folder, or install it
