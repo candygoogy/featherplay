@@ -82,7 +82,7 @@ test.describe("reduced motion", () => {
   test("the native soft wash stays, under the text's own colour", async ({ page }) => {
     await page.goto("/");
     const sel = await page.evaluate(() => {
-      const p = document.querySelector(".hero-line")!;
+      const p = document.querySelector("[data-stage] .col .t-lede")!;
       const s = getComputedStyle(p, "::selection");
       return { bg: s.backgroundColor, color: s.color, text: getComputedStyle(p).color, layer: !!document.querySelector(".sel-layer") };
     });

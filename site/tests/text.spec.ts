@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 // Text the visitor reads must never show an escape that didn't turn into its character
-// ("YouTube00a0Music", " ", "&nbsp;").
+// ("YouTube00a0Music", " ", "&nbsp;").
 const escapes = /\\u[0-9a-f]{4}|00a0|&(?:nbsp|#160|#xa0);/i;
 
 for (const path of ["/", "/method"]) {
@@ -15,13 +15,13 @@ for (const path of ["/", "/method"]) {
   });
 }
 
-test("the hero line keeps \"YouTube Music\" together on one line", async ({ page }) => {
+test('the first screen keeps "YouTube Music" together on one line', async ({ page }) => {
   for (const width of [390, 1024, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto("/");
-    const line = page.locator(".hero-line");
-    await expect(line).toContainText("for YouTube Music, light enough");
-    const rects = await line.locator(".rise", { hasText: "YouTube Music" }).evaluate((el) => el.getClientRects().length);
-    expect(rects, `at ${width} px`).toBe(1);
+    const lede = page.locator("[data-stage] .col .t-lede");
+    await expect(lede).toContainText(/for YouTube\sMusic on Windows/);
+    // The two words never part: a no-break space joins them.
+    expect(await lede.evaluate((el) => el.textContent!.includes("YouTube Music")), `at ${width} px`).toBe(true);
   }
 });

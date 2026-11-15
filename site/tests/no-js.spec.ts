@@ -8,14 +8,14 @@ const sectionHeadings = [
   "Light, and it shows",
   "Lyrics, up close",
   "Make it yours",
-  "Everything you'd miss, kept",
   "Questions",
   "Download for Windows",
 ];
 
 test("the headline, the download link and every section heading are there", async ({ page }) => {
   await page.goto("/");
-  await expect(page.locator("h1")).toContainText("featherplay");
+  await expect(page.locator("h1")).toHaveText("Light enough to forget it’s running.");
+  await expect(page.locator("[data-stage] .col .t-lede")).toContainText("featherplay is a free, native player");
   await expect(page.getByRole("link", { name: /download/i }).first()).toBeVisible();
   for (const name of sectionHeadings) {
     await expect(page.getByRole("heading", { level: 2, name, exact: true })).toBeVisible();

@@ -111,8 +111,9 @@
   scroll-padding-top: calc(var(--cap-top) + var(--cap-h) + var(--s4));
   scrollbar-color: color-mix(in srgb, var(--text) 26%, transparent) transparent;
 }
+/* The body keeps the old sections ground (base.css) until they move to the system; the new
+   parts lie on the desk themselves. */
 :root.sys body {
-  background: transparent;
   font-size: var(--fs-text);
   line-height: var(--lh-text);
   font-kerning: normal;

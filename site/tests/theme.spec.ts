@@ -366,7 +366,7 @@ test("the blocks out of view sit out the switch at their size and come back in t
     const during = {
       height: document.documentElement.scrollHeight,
       footer: getComputedStyle(footer).contentVisibility,
-      hero: getComputedStyle(document.querySelector("[data-hero]")!).contentVisibility,
+      hero: getComputedStyle(document.querySelector("[data-stage]")!).contentVisibility,
       quiet: blocks.every((b) => b.classList.contains("theme-quiet")),
     };
     await new Promise((r) => setTimeout(r, 1500));

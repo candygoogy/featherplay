@@ -1,5 +1,4 @@
 import { expect, test } from "@playwright/test";
-import { skipTour, wake } from "./helpers";
 
 // The privacy rule: no trackers, no cookies, nothing fetched from anywhere else.
 for (const path of ["/", "/method", "/no-such-page"]) {
@@ -14,9 +13,7 @@ for (const path of ["/", "/method", "/no-such-page"]) {
     await page.waitForLoadState("networkidle");
     if (path === "/") {
       // Play with the demo a little: still nothing leaves the page.
-      await wake(page);
-      await skipTour(page);
-      await page.locator("[data-hero] .bar .fp-play").click();
+      await page.locator("[data-window] .bar .fp-play").click();
       await page.evaluate(() => scrollTo({ top: document.body.scrollHeight, behavior: "instant" }));
       await page.waitForLoadState("networkidle");
     }

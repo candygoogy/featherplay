@@ -3,75 +3,6 @@ import { downloadOptions, release, sizeLabel } from "../src/data/release";
 
 test.use({ viewport: { width: 1440, height: 900 } });
 
-test("hovering or focusing a feature points at its place on the laptop", async ({ page }) => {
-  await page.goto("/");
-  const kept = page.locator("#kept");
-  await kept.scrollIntoViewIfNeeded();
-  for (const id of ["scrobble", "discord", "keys", "sponsor", "tray"]) {
-    const item = kept.locator(`[data-feature="${id}"]`);
-    await item.hover();
-    await expect(kept).toHaveAttribute("data-highlight", id);
-    await expect(kept.locator(`[data-spot="${id}"]`)).toHaveCSS("opacity", "1");
-    await expect(item).toHaveAttribute("aria-pressed", "true");
-  }
-  // The scrobbling ring sits round the song in the replica's bar.
-  await kept.locator('[data-feature="scrobble"]').hover();
-  await page.waitForTimeout(900);
-  const ring = (await kept.locator('[data-spot="scrobble"]').boundingBox())!;
-  const song = (await kept.locator("[data-replica] [data-bar] .bar-song").boundingBox())!;
-  expect(Math.abs(ring.x + ring.width / 2 - (song.x + song.width / 2))).toBeLessThan(6);
-  expect(ring.width).toBeGreaterThan(song.width);
-  // The keyboard reaches them too.
-  await page.mouse.move(0, 0);
-  await kept.locator('[data-feature="tray"]').focus();
-  await expect(kept).toHaveAttribute("data-highlight", "tray");
-});
-
-test("scrolling through the features, each one in turn zooms the laptop to its place", async ({ page }) => {
-  await page.goto("/");
-  const kept = page.locator("#kept");
-  const zoom = kept.locator("[data-kept-zoom]");
-  const scaleOf = () => zoom.evaluate((el) => new DOMMatrixReadOnly(getComputedStyle(el).transform).a);
-  // Above the first step: the whole laptop.
-  await kept.evaluate((el) => scrollTo({ top: el.getBoundingClientRect().top + scrollY - innerHeight / 2, behavior: "instant" }));
-  await expect.poll(scaleOf).toBeCloseTo(1, 2);
-  for (const id of ["scrobble", "discord", "keys", "sponsor", "tray"]) {
-    const step = kept.locator(`[data-step="${id}"]`);
-    await step.evaluate((el) => {
-      const r = el.getBoundingClientRect();
-      scrollTo({ top: r.top + scrollY + r.height / 2 - innerHeight / 2, behavior: "instant" });
-    });
-    await expect(kept).toHaveAttribute("data-highlight", id);
-    await expect(kept.locator(`[data-spot="${id}"]`)).toHaveCSS("opacity", "1");
-    await expect.poll(scaleOf, { timeout: 3000 }).toBeGreaterThan(1.15);
-    await page.waitForTimeout(850);
-    // Framed well: the laptop whole in its frame, the place marked inside the screen.
-    const frame = (await kept.locator("[data-kept-frame]").boundingBox())!;
-    const laptop = (await kept.locator("[data-laptop]").boundingBox())!;
-    expect(laptop.y).toBeGreaterThanOrEqual(frame.y);
-    expect(laptop.y + laptop.height).toBeLessThanOrEqual(frame.y + frame.height);
-    expect(laptop.y).toBeGreaterThanOrEqual(0);
-    expect(laptop.y + laptop.height).toBeLessThanOrEqual(900);
-    const screen = (await kept.locator("[data-screen]").boundingBox())!;
-    const spot = (await kept.locator(`[data-spot="${id}"]`).boundingBox())!;
-    const cx = spot.x + spot.width / 2;
-    const cy = spot.y + spot.height / 2;
-    expect(cx).toBeGreaterThan(screen.x);
-    expect(cx).toBeLessThan(screen.x + screen.width);
-    expect(cy).toBeGreaterThan(screen.y);
-    expect(cy).toBeLessThan(screen.y + screen.height);
-    // The progress shows which of the five this is.
-    await expect(kept.locator(`[data-progress="${id}"]`)).toHaveCSS("width", "40px");
-  }
-});
-
-test("the features say a lot in a few words, and leave the plugin talk out", async ({ page }) => {
-  await page.goto("/");
-  const kept = page.locator("#kept");
-  await expect(kept).not.toContainText(/plugins?/i);
-  for (const body of await kept.locator(".f-body").allTextContents()) expect(body.trim().length).toBeLessThan(90);
-});
-
 test("the FAQ answers the questions people ask, before the download", async ({ page }) => {
   await page.goto("/");
   const faq = page.locator("#questions");
@@ -250,7 +181,7 @@ test("the footer: short link columns, the plain unofficial line, the version and
 
 test("each player's credit line links to the full credits, at the song playing", async ({ page }) => {
   await page.goto("/");
-  const link = page.locator("[data-hero] [data-credit] [data-credit-all]");
+  const link = page.locator("[data-stage] [data-credit] [data-credit-all]");
   await expect(link).toHaveAttribute("href", "/credits#california-lullabye");
   await page.goto("/credits#california-lullabye");
   await expect(page.locator("#california-lullabye")).toContainText("California Lullabye");

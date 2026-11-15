@@ -1,0 +1,27 @@
+---
+// featherplay's window on the page: the replica (the app's own layout, Replica.astro) in a
+// frame that is a size container, so the app lays itself out for the window's size, as the
+// real one does (replica.css). Without script it fills its slot, a still of the app at that
+// size; src/demo/window.ts then sizes, scales and moves it.
+import Replica from "./Replica.astro";
+---
+
+<div class="window" data-window>
+  <div class="win-body" data-win-body>
+    <Replica view="lyrics" />
+  </div>
+</div>
+
+<style>
+  .window {
+    position: absolute;
+    inset: 0;
+  }
+  .win-body {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    border-radius: var(--r-small);
+    container: app / size;
+  }
+</style>

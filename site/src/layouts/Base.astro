@@ -12,15 +12,21 @@ interface Props {
   description: string;
   noindex?: boolean;
   app?: boolean;
+  /**
+   * The page is built on the redesign's system (system.css): the desk's ground, the page's
+   * type, and its own skip link first in the document. The page then puts its parts in this
+   * order, as siblings: the bar (`<header>`), `<main id="main">`, the footer.
+   */
+  system?: boolean;
 }
-const { title, description, noindex, app } = Astro.props;
+const { title, description, noindex, app, system = false } = Astro.props;
 // The cover glow starts on the demo's first song, on the root alone: every replica, wallpaper
 // and band reads it from there, so src/demo/glow.ts changes them all at once.
 const glow = songById(demoStart.songId)!.colour;
 ---
 
 <!doctype html>
-<html lang="en" style={`--glow:${glow}`}>
+<html lang="en" class:list={{ sys: system }} style={`--glow:${glow}`}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -40,16 +46,17 @@ const glow = songById(demoStart.songId)!.colour;
     <script is:inline src={bootUrl}></script>
   </head>
   <body>
+    {system && <a class="skip" href="#main">Skip to the page</a>}
     <slot />
     <script>
       import { initTheme } from "../scripts/theme";
       import { bindSelection } from "../scripts/selection";
       import { bindAnchors } from "../scripts/anchors";
-      import { bindSmoothScroll } from "../scripts/smooth";
+      // The wheel scrolls natively: the redesign's scroll story settles into its holds on its
+      // own, and a glide of the wheel on top of that would fight it.
       initTheme();
       bindSelection();
       bindAnchors();
-      bindSmoothScroll();
     </script>
   </body>
 </html>

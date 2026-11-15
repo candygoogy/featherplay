@@ -20,7 +20,7 @@ test("Play from the start goes home", async ({ page }) => {
   await page.goto("/404");
   await page.getByRole("link", { name: "Play from the start" }).click();
   await expect(page).toHaveURL(/\/$/);
-  await expect(page.locator("h1")).toContainText("featherplay");
+  await expect(page.locator("h1#hero-title")).toBeVisible();
 });
 
 test("the 404 page is light (its HTML, CSS and script under 100 KB; the budget script checks the rest)", async ({ page }) => {
