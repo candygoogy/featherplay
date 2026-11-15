@@ -23,7 +23,9 @@ const TIP_RESHOW = 500;
 
 const reduced = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-export function bindBar(bar: HTMLElement, player: Player): { readonly state: BarState } {
+/** `player` is null on the pages without the app (method, credits, the 404): their bar has no
+ *  song, tray icon or desktop menu. */
+export function bindBar(bar: HTMLElement, player: Player | null): { readonly state: BarState } {
   const row = bar.querySelector<HTMLElement>("[data-row]")!;
   const parts = () => [...row.querySelectorAll<HTMLElement>("[data-part]")];
   let state: BarState = bar.dataset.state === "capsule" ? "capsule" : "docked";
@@ -73,7 +75,14 @@ export function bindBar(bar: HTMLElement, player: Player): { readonly state: Bar
   let first = true;
   if (sentinel && "IntersectionObserver" in window) {
     new IntersectionObserver(([e]) => {
+      // The first answer (a load part-way down) is the state as it is: its grounds don’t fade
+      // or grow in either (data-instant, for one frame).
+      if (first) bar.toggleAttribute("data-instant", true);
       setState(e.isIntersecting ? "docked" : "capsule", !first);
+      if (first) {
+        void bar.offsetWidth;
+        requestAnimationFrame(() => bar.removeAttribute("data-instant"));
+      }
       first = false;
     }).observe(sentinel);
   }
@@ -167,14 +176,14 @@ export function bindBar(bar: HTMLElement, player: Player): { readonly state: Bar
   document.addEventListener("keydown", (e) => e.key === "Escape" && hideTip());
 
   // ---- The flyouts: popovers under their part ----
-  const songFly = bar.querySelector<HTMLElement>("#fly-song")!;
+  const songFly = bar.querySelector<HTMLElement>("#fly-song");
   const dlFly = bar.querySelector<HTMLElement>("#fly-dl")!;
-  const flyouts = [songFly, dlFly];
-  const np = bar.querySelector<HTMLElement>("[data-np]")!;
-  const tray = bar.querySelector<HTMLElement>("[data-tray]")!;
+  const flyouts = [songFly, dlFly].filter((f): f is HTMLElement => !!f);
+  const np = bar.querySelector<HTMLElement>("[data-np]");
+  const tray = bar.querySelector<HTMLElement>("[data-tray]");
   const dl = bar.querySelector<HTMLElement>("[data-dl]")!;
   const anchor = new Map<HTMLElement, HTMLElement>([
-    [songFly, np],
+    ...(songFly && np ? [[songFly, np] as [HTMLElement, HTMLElement]] : []),
     [dlFly, dl],
   ]);
   /** Flyouts opened by something other than the pointer resting (kept on a state change). */
@@ -194,7 +203,7 @@ export function bindBar(bar: HTMLElement, player: Player): { readonly state: Bar
    *  once it has (toggle, its real width). */
   const place = (fly: HTMLElement, early = false) => {
     let a = anchor.get(fly)!;
-    if (!shows(a) && fly === songFly) a = [np, tray].find(shows) ?? a;
+    if (!shows(a) && fly === songFly && np && tray) a = [np, tray].find(shows) ?? a;
     if (!shows(a)) {
       if (!early) fly.hidePopover();
       return;
@@ -210,18 +219,18 @@ export function bindBar(bar: HTMLElement, player: Player): { readonly state: Bar
   for (const fly of flyouts) {
     fly.addEventListener("beforetoggle", (e) => {
       if ((e as ToggleEvent).newState !== "open") return;
-      if (fly.hasAttribute("data-story")) anchor.set(fly, np);
+      if (fly.hasAttribute("data-story") && np) anchor.set(fly, np);
       place(fly, true);
     });
     fly.addEventListener("toggle", (e) => {
       const open = (e as ToggleEvent).newState === "open";
       // The story's beat in the tray shows the song under the capsule's song.
-      if (open && fly.hasAttribute("data-story")) anchor.set(fly, np);
+      if (open && fly.hasAttribute("data-story") && np) anchor.set(fly, np);
       if (open) {
         place(fly);
         hideTip();
       } else held.delete(fly);
-      if (fly === songFly) np.setAttribute("aria-expanded", String(open));
+      if (fly === songFly) np?.setAttribute("aria-expanded", String(open));
       else dl.setAttribute("aria-expanded", String(open));
     });
   }
@@ -238,9 +247,10 @@ export function bindBar(bar: HTMLElement, player: Player): { readonly state: Bar
     if (fly.matches(":popover-open")) place(fly);
     else fly.showPopover();
   };
-  np.addEventListener("click", () => {
-    anchor.set(songFly, np);
-    held.add(songFly);
+  if (songFly && np)
+    np.addEventListener("click", () => {
+      anchor.set(songFly, np);
+      held.add(songFly);
   });
   // A change of state: placed for the new layout at once (where the parts will rest, not where
   // their glide starts).
@@ -271,7 +281,7 @@ export function bindBar(bar: HTMLElement, player: Player): { readonly state: Bar
         }, 260);
       });
   };
-  rest(tray, songFly);
+  if (tray && songFly) rest(tray, songFly);
   rest(dl, dlFly);
   // Download's flyout opens for the keyboard too, and Tab goes on into it (it follows the link).
   dl.addEventListener("focus", () => dl.matches(":focus-visible") && open(dlFly, dl));
@@ -286,6 +296,15 @@ export function bindBar(bar: HTMLElement, player: Player): { readonly state: Bar
     }),
   );
 
+  // The app's own parts: on the pages with the app only.
+  if (player && songFly && np && tray) bindApp(player, songFly, np, tray);
+  return {
+    get state() {
+      return state;
+    },
+  };
+
+  function bindApp(player: Player, songFly: HTMLElement, np: HTMLElement, tray: HTMLElement) {
   // The tray icon shows and hides the window, as Windows' does.
   tray.addEventListener("click", () => {
     trayClickAt = performance.now();
@@ -380,10 +399,5 @@ export function bindBar(bar: HTMLElement, player: Player): { readonly state: Bar
     }
   });
   addEventListener("scroll", () => ctx.matches(":popover-open") && ctx.hidePopover(), { passive: true });
-
-  return {
-    get state() {
-      return state;
-    },
-  };
+  }
 }

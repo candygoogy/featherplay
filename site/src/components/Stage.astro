@@ -97,7 +97,8 @@ const steps = [
     bindPieces(player);
     startStory(player);
   }
-  for (const el of document.querySelectorAll<HTMLElement>("[data-clock]")) startClock(el);
+  // The bar starts its own clock (Bar.astro).
+  for (const el of document.querySelectorAll<HTMLElement>("[data-clock]:not([data-site-bar] *)")) startClock(el);
 </script>
 
 <style>

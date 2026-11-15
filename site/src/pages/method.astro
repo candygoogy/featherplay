@@ -4,7 +4,8 @@
 // 1 November; their write-ups are kept outside the repo), plus 0.2.0's one run with the sound
 // features on (9 November); the figures and the sizes come from numbers.ts and release.ts.
 import Base from "../layouts/Base.astro";
-import Header from "../components/Header.astro";
+import Bar from "../components/Bar.astro";
+import SiteFooter from "../components/SiteFooter.astro";
 import { figureFor, figures, installFolders, metrics, timings, withProcessing, type Metric } from "../data/numbers";
 import { figureText, formatBytes, formatFigure } from "../data/format";
 import { release, sizeLabel } from "../data/release";
@@ -34,11 +35,12 @@ const { startToSoundS: start, clickToSoundS: click, hovered, notHovered, prepare
 <Base
   title="How featherplay's figures were measured"
   description="The PC, the versions and the method behind the memory, CPU, timing and download figures that compare featherplay with Pear Desktop and YouTube Music in Edge."
+  system
 >
-  <Header />
-  <main id="main" tabindex="-1" class="wrap method">
-    <h1>How these were measured</h1>
-    <p class="lede">
+  <Bar home={false} />
+  <main id="main" tabindex="-1" class="frame doc method">
+    <h1 class="t-display">How these were measured</h1>
+    <p class="lede t-lede ink2">
       All three players were measured on one PC: Pear Desktop and Edge on the evening of 1 November 2026, featherplay
       {fp.version} early on 14 November. Every figure on the home page comes from those two measurements, and each one
       names its files below.
@@ -272,22 +274,20 @@ const { startToSoundS: start, clickToSoundS: click, hovered, notHovered, prepare
 
     <p class="back"><a href="/#light">Back to the comparison</a></p>
   </main>
+  <SiteFooter />
 </Base>
 
 <style>
+  .doc > :not(.lede) {
+    max-width: 60rem;
+  }
   .method {
-    padding-block: clamp(48px, 8vw, 120px);
-    max-width: 960px;
+    padding-block: calc(var(--bar-h) + var(--s8)) clamp(48px, 8vw, 120px);
   }
-  h1 {
-    font-size: clamp(2.75rem, 7vw, 5.5rem);
-  }
+  /* On the system: the page’s title and lede sizes, the column on the bar’s left edge. */
   .lede {
-    max-width: 44ch;
-    margin-top: 24px;
-    font-size: clamp(1.125rem, 1.6vw, 1.375rem);
-    font-weight: 600;
-    line-height: 1.35;
+    max-width: 46ch;
+    margin-top: var(--s5);
   }
   .para {
     max-width: 64ch;

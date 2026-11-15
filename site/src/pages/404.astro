@@ -1,13 +1,14 @@
 ---
 // The 404: a state the app really has, Now playing with nothing to play and nothing up next.
-// A blank cover, "404" by "page not found", the bar at 0:00 of 4:04, and one way back. A
-// still frame of the app (replica.css), no demo script, so it stays light.
+// A blank cover, "404" by "page not found", the bar at 0:00 of 4:04, and one way back. The
+// app's window on the desk, as on the home page (no laptop): a still frame of the app
+// (replica.css) laid out for the window's size by the app's own container rules, no demo
+// script, so it stays light.
 import "../styles/app-controls.css";
 import "../styles/replica.css";
 import Base from "../layouts/Base.astro";
-import Header from "../components/Header.astro";
-import Laptop from "../components/Laptop.astro";
-import Desktop from "../components/Desktop.astro";
+import Bar from "../components/Bar.astro";
+import SiteFooter from "../components/SiteFooter.astro";
 import Icon from "../components/Icon.astro";
 ---
 
@@ -15,17 +16,16 @@ import Icon from "../components/Icon.astro";
   title="Page not found | featherplay"
   description="This page isn't in the queue. Go back to featherplay's home page."
   noindex
+  system
 >
-  <Header />
-  <main id="main" tabindex="-1" class="nf">
-    <div class="wrap nf-head">
-      <h1>Not in the queue</h1>
-      <p>The page you asked for isn't here. It may have moved, or the link may be wrong.</p>
+  <Bar home={false} />
+  <main id="main" tabindex="-1" class="nf frame">
+    <div class="nf-head">
+      <h1 class="t-display">Not in the queue</h1>
+      <p class="t-lede ink2">The page you asked for isn’t here. It may have moved, or the link may be wrong.</p>
     </div>
-    <div class="wrap nf-stage">
-      <div class="glow" aria-hidden="true"></div>
-      <Laptop class="nf-laptop" label="featherplay showing an empty Now playing: 404, page not found" crop>
-        <Desktop id="nf-desktop" tooltip={["featherplay", "Nothing playing"]}>
+    <div class="nf-desk">
+      <div class="nf-win win-body" role="group" aria-label="featherplay showing an empty Now playing: 404, page not found">
           <div class="replica" data-view="now" data-playing="false" data-lyrics-on="true" data-has-lyrics="false" style="--song:#808080">
             <div class="titlebar">
               <span class="art" aria-hidden="true">
@@ -81,10 +81,10 @@ import Icon from "../components/Icon.astro";
               </div>
             </div>
           </div>
-        </Desktop>
-      </Laptop>
+      </div>
     </div>
   </main>
+  <SiteFooter />
 </Base>
 
 <style>
@@ -94,32 +94,47 @@ import Icon from "../components/Icon.astro";
     color: var(--text);
   }
   .nf {
-    padding-bottom: clamp(48px, 8vw, 120px);
+    padding-top: calc(var(--bar-h) + var(--s8));
   }
   .nf-head {
-    padding-block: clamp(32px, 6vw, 72px) clamp(24px, 3vw, 40px);
+    display: grid;
+    gap: var(--s4);
+    max-width: 46rem;
   }
-  h1 {
-    font-size: clamp(3rem, 9vw, 8rem);
-  }
-  .nf-head p {
+  .nf-head .t-lede {
     max-width: 44ch;
-    margin-top: 16px;
-    font-size: clamp(1.0625rem, 1.4vw, 1.25rem);
   }
-  .nf-stage {
-    position: relative;
+  /* The app's window on the desk: laid out at the window's own size by the app's container
+     rules (wide down to its narrow layout); on a phone, the narrow window drawn smaller. */
+  .nf-desk {
+    margin-top: var(--s7);
   }
-  .nf-stage :global(.nf-laptop) {
+  .nf-win {
     position: relative;
-    max-width: 1100px;
+    width: min(100%, 1100px);
+    aspect-ratio: 1440 / 852;
     margin-inline: auto;
+    overflow: hidden;
+    border-radius: 8px;
+    container: app / size;
+    box-shadow:
+      0 0 0 1px var(--edge),
+      0 1px 2px var(--shade-1),
+      0 4px 16px var(--shade-2),
+      0 16px 56px var(--shade-3);
   }
-  .glow {
-    position: absolute;
-    inset: -20% -10%;
-    background: radial-gradient(closest-side, color-mix(in srgb, var(--accent) 34%, transparent), transparent); /* taste-skill-ignore: the cover glow, in the plain accent with no cover */
-    pointer-events: none;
+  @media (width < 760px) {
+    .nf-win {
+      width: 480px;
+      aspect-ratio: auto;
+      height: 780px;
+      zoom: 0.8;
+    }
+  }
+  @media (width < 440px) {
+    .nf-win {
+      zoom: 0.7;
+    }
   }
   /* The empty cover: the app's cover-empty ground with its note. */
   .blank {
@@ -128,13 +143,22 @@ import Icon from "../components/Icon.astro";
     background: var(--cover-empty);
     color: var(--text-faint);
   }
-  .nf :global(.replica .app) {
-    grid-template-columns: 1fr 400px;
+  /* Wide: Now playing beside the queue, a smaller cover than the player's so the line and the
+     button under it clear the bar. Narrow, the app's own narrow layout. */
+  @container app (width >= 1000px) {
+    .nf :global(.replica .app) {
+      grid-template-columns: 1fr 400px;
+    }
+    .nf :global(.replica .np) {
+      top: 32px;
+      width: 272px;
+    }
   }
-  /* A smaller cover than the player's, so the line and the button under it clear the bar. */
-  .nf :global(.replica .np) {
-    top: 64px;
-    width: 400px;
+  /* Narrow: a smaller blank cover, so the words and the way back stay clear of the bar. */
+  @container app (width < 1000px) {
+    .nf :global(.replica .np-cover.blank) {
+      width: min(220px, 60%);
+    }
   }
   .nf :global(.replica .np-cover.blank) {
     aspect-ratio: 1;
