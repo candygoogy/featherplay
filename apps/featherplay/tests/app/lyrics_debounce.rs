@@ -3,8 +3,9 @@
 //! still looks up at once. On the offscreen platform with the fixtures and a frozen clock; no
 //! window is shown.
 
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
+use featherplay::busy;
 use featherplay::lyrics;
 use featherplay::offscreen;
 use featherplay::snapshot::Scene;
@@ -38,9 +39,20 @@ fn rapid_skips_look_up_only_the_track_that_stays() {
     assert_eq!(lyrics::lookups(), asked, "a skip looked its track up");
     assert_eq!(data.get_state(), LyricsState::Loading);
 
-    // A second after the last skip, its track is looked up, once.
+    // A second after the last skip, its track is looked up, once. Its lines then come a few
+    // per frame (`lyrics::feed`), so the frozen clock steps a frame at a time until they're in.
     offscreen::advance(Duration::from_millis(1000));
-    scene.settle();
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while busy::pending() > 0 {
+        assert!(
+            Instant::now() < deadline,
+            "{} loads still pending 10 s after the lookup was due",
+            busy::pending()
+        );
+        std::thread::sleep(Duration::from_millis(1));
+        scene.run_queued();
+        offscreen::advance(Duration::from_millis(4));
+    }
     assert_eq!(
         lyrics::lookups(),
         asked + 1,
