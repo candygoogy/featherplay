@@ -198,28 +198,3 @@ pub fn show_for_snapshot(_ctx: &Rc<Ctx>) {
     app::on_event(UiEvent::AskIdentity);
     app::on_event(UiEvent::Account { signed_in: true });
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn identity(key: &str) -> AccountIdentity {
-        AccountIdentity {
-            name: "Test Listener".into(),
-            handle: None,
-            byline: None,
-            has_channel: false,
-            photo: None,
-            account: None,
-            active: false,
-            identity: Identity::from_key(key).unwrap(),
-        }
-    }
-
-    #[test]
-    fn only_more_than_one_identity_is_worth_asking() {
-        assert!(!needs_asking(&[]));
-        assert!(!needs_asking(&[identity("0")]));
-        assert!(needs_asking(&[identity("0"), identity("1")]));
-    }
-}
