@@ -200,27 +200,9 @@ fn the_default_browser_comes_from_mimeapps_list() {
     assert_eq!(pc.https_handler(), None);
 }
 
-#[test]
-fn a_blocked_browser_gives_way_to_one_that_works() {
-    let mut pc = pc(&["/snap/bin/chromium", "/usr/bin/microsoft-edge"]);
-    pc.links.insert("/snap/bin/chromium", "/usr/bin/snap");
-    let found = found(&pc);
-    let offered = pick(&found, Some("chromium"), None).map(|i| found[i].browser.id);
-    assert_eq!(offered, Some("edge"));
-}
-
 /// A process to start that runs a while and does nothing: `sleep`.
 fn sleeper() -> (PathBuf, Vec<OsString>) {
     ("/bin/sleep".into(), vec!["60".into()])
-}
-
-#[test]
-fn a_launched_process_runs_and_kill_ends_it() {
-    let (exe, args) = sleeper();
-    let (child, _pipes) = launch(&exe, &args).unwrap();
-    assert!(!child.exited(), "it should be running");
-    child.kill();
-    assert!(child.exited());
 }
 
 #[test]
@@ -299,24 +281,6 @@ fn a_missing_exe_is_an_error() {
     assert!(launch(Path::new("/definitely/not/here/chrome"), &[]).is_err());
 }
 
-/// The sign-in window is a browser as the user would start it: its switches neither mark it
-/// as automated nor hide such a mark, and keep its cookies out of the keyring.
-#[test]
-fn every_browser_starts_plainly() {
-    for b in ALL {
-        assert_eq!(
-            b.switches,
-            [
-                "--no-first-run",
-                "--no-default-browser-check",
-                "--password-store=basic"
-            ],
-            "{}",
-            b.name
-        );
-    }
-}
-
 #[test]
 fn a_plain_launch_runs_in_its_own_group_and_kill_ends_it() {
     let (exe, args) = sleeper();
@@ -337,29 +301,6 @@ fn quit_asks_the_process_to_exit() {
     assert!(child.wait(Duration::from_secs(5)), "sleep exits on SIGINT");
     // Once it's gone, quitting again does nothing.
     child.quit();
-}
-
-/// What this PC really has: the known browsers found, the default browser, and the one
-/// offered. Nothing is started.
-/// `cargo nextest run -p featherplay-platform --lib --run-ignored only -E 'test(this_pc)' --no-capture`
-#[test]
-#[ignore = "reads this PC's browsers and reports what it finds"]
-#[allow(clippy::print_stderr, reason = "the live check reports what it saw")]
-fn this_pc_lists_its_browsers_and_its_default() {
-    let found = found(&ThisPc);
-    for f in &found {
-        eprintln!(
-            "found {}: {} (blocked: {:?})",
-            f.browser.name,
-            f.exe.display(),
-            f.blocked
-        );
-        assert!(ThisPc.is_file(&f.exe));
-    }
-    let default = ThisPc.https_handler();
-    eprintln!("https links open with: {default:?}");
-    let offered = pick(&found, None, default.as_deref()).map(|i| found[i].browser.name);
-    eprintln!("offered: {offered:?}");
 }
 
 /// A web server on 127.0.0.1 whose one page sets two test cookies named like Google's

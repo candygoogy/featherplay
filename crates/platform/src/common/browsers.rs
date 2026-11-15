@@ -219,3 +219,181 @@ fn same_path(a: &Path, b: &Path) -> bool {
 fn same_path(a: &Path, b: &Path) -> bool {
     a == b
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The sign-in window is a browser as the user would start it: its switches neither mark
+    /// it as automated nor hide such a mark, and on Linux keep its cookies out of the keyring.
+    #[test]
+    fn every_browser_starts_plainly() {
+        for b in ALL {
+            for s in b.switches {
+                assert!(
+                    !s.contains("automation")
+                        && !s.contains("headless")
+                        && !s.contains("remote-debugging")
+                        && !s.starts_with("--disable-")
+                        && !s.contains("test"),
+                    "{}: {s}",
+                    b.name
+                );
+            }
+            #[cfg(target_os = "linux")]
+            assert!(b.switches.contains(&"--password-store=basic"), "{}", b.name);
+        }
+    }
+
+    #[test]
+    fn the_ids_are_distinct_and_lead_back_to_their_browser() {
+        for browser in ALL {
+            assert_eq!(by_id(browser.id), Some(browser));
+        }
+        assert_eq!(by_id("opera"), None);
+    }
+
+    /// Where `browser` is installed in these cases: a made-up path of its own.
+    fn exe(browser: &Browser) -> String {
+        format!("/apps/{}/{}", browser.id, browser.exe)
+    }
+
+    fn at(browser: &'static Browser, blocked: Option<Block>) -> Found {
+        Found {
+            browser,
+            exe: exe(browser).into(),
+            blocked,
+        }
+    }
+
+    struct Case {
+        label: &'static str,
+        found: Vec<Found>,
+        remembered: Option<&'static str>,
+        default: Option<String>,
+        offered: Option<&'static str>,
+    }
+
+    #[test]
+    fn pick_offers_the_one_used_last_then_the_default_then_the_first_that_works() {
+        let usual = || vec![at(&EDGE, None), at(&CHROME, None), at(&BRAVE, None)];
+        let two = || vec![at(&EDGE, None), at(&CHROME, None)];
+        let policy = Some(Block::Policy);
+        let firefox = "/apps/firefox/firefox.exe".to_string();
+        #[cfg_attr(not(windows), allow(unused_mut, reason = "Windows adds a case"))]
+        let mut cases = vec![
+            Case {
+                label: "no default: the first found",
+                found: usual(),
+                remembered: None,
+                default: None,
+                offered: Some("edge"),
+            },
+            Case {
+                label: "a default the sign-in doesn't know: the first found",
+                found: usual(),
+                remembered: None,
+                default: Some(firefox),
+                offered: Some("edge"),
+            },
+            Case {
+                label: "no default, other browsers: the first found",
+                found: vec![at(&BRAVE, None), at(&VIVALDI, None)],
+                remembered: None,
+                default: None,
+                offered: Some("brave"),
+            },
+            Case {
+                label: "a known default",
+                found: usual(),
+                remembered: None,
+                default: Some(exe(&BRAVE)),
+                offered: Some("brave"),
+            },
+            Case {
+                label: "the one used last comes before the default",
+                found: usual(),
+                remembered: Some("brave"),
+                default: Some(exe(&CHROME)),
+                offered: Some("brave"),
+            },
+            Case {
+                label: "one used last that's gone",
+                found: two(),
+                remembered: Some("vivaldi"),
+                default: Some(exe(&CHROME)),
+                offered: Some("chrome"),
+            },
+            Case {
+                label: "one used last that's unknown",
+                found: two(),
+                remembered: Some("netscape"),
+                default: Some(exe(&CHROME)),
+                offered: Some("chrome"),
+            },
+            Case {
+                label: "the one used last and the default are blocked",
+                found: vec![at(&EDGE, policy), at(&CHROME, policy), at(&BRAVE, None)],
+                remembered: Some("edge"),
+                default: Some(exe(&CHROME)),
+                offered: Some("brave"),
+            },
+            Case {
+                label: "the first is blocked: the default among those that work",
+                found: vec![at(&EDGE, policy), at(&CHROME, None), at(&BRAVE, None)],
+                remembered: None,
+                default: Some(exe(&BRAVE)),
+                offered: Some("brave"),
+            },
+            Case {
+                label: "the first is blocked: the one used last among those that work",
+                found: vec![at(&EDGE, policy), at(&CHROME, None), at(&BRAVE, None)],
+                remembered: Some("chrome"),
+                default: Some(exe(&BRAVE)),
+                offered: Some("chrome"),
+            },
+            Case {
+                label: "a Snap used last gives way",
+                found: vec![at(&CHROMIUM, Some(Block::Snap)), at(&EDGE, None)],
+                remembered: Some("chromium"),
+                default: None,
+                offered: Some("edge"),
+            },
+            Case {
+                label: "every one blocked, no default: the first",
+                found: vec![at(&EDGE, policy), at(&CHROME, policy)],
+                remembered: None,
+                default: None,
+                offered: Some("edge"),
+            },
+            Case {
+                label: "every one blocked: the default",
+                found: vec![at(&EDGE, policy), at(&CHROME, policy)],
+                remembered: None,
+                default: Some(exe(&CHROME)),
+                offered: Some("chrome"),
+            },
+            Case {
+                label: "nothing found",
+                found: Vec::new(),
+                remembered: Some("edge"),
+                default: None,
+                offered: None,
+            },
+        ];
+        // Windows' paths compare without case.
+        #[cfg(windows)]
+        cases.push(Case {
+            label: "a default in other case (Windows)",
+            found: usual(),
+            remembered: None,
+            default: Some(exe(&CHROME).to_uppercase()),
+            offered: Some("chrome"),
+        });
+        for c in cases {
+            let default = c.default.as_deref().map(Path::new);
+            let offered = pick(&c.found, c.remembered, default).map(|i| c.found[i].browser.id);
+            assert_eq!(offered, c.offered, "{}", c.label);
+        }
+    }
+}

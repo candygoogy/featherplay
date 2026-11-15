@@ -100,7 +100,6 @@ mod tests {
         env: HashMap<&'static str, &'static str>,
         files: Vec<PathBuf>,
         dwords: HashMap<(Hive, &'static str, &'static str), u32>,
-        https: Option<&'static str>,
     }
 
     impl Lookup for FakePc {
@@ -123,7 +122,7 @@ mod tests {
                 .map(|(_, d)| *d)
         }
         fn https_handler(&self) -> Option<PathBuf> {
-            self.https.map(PathBuf::from)
+            None
         }
     }
 
@@ -133,38 +132,29 @@ mod tests {
     }
 
     #[test]
-    fn the_machines_policy_at_0_blocks_the_pipe() {
-        let mut pc = pc();
-        policy(&mut pc, &EDGE, Hive::LocalMachine, 0);
-        assert!(EDGE.pipe_blocked(&pc));
-    }
-
-    #[test]
-    fn the_users_policy_at_0_blocks_the_pipe() {
-        let mut pc = pc();
-        policy(&mut pc, &EDGE, Hive::CurrentUser, 0);
-        assert!(EDGE.pipe_blocked(&pc));
-    }
-
-    #[test]
-    fn the_machines_policy_wins_over_the_users() {
-        let mut pc = pc();
-        policy(&mut pc, &EDGE, Hive::LocalMachine, 1);
-        policy(&mut pc, &EDGE, Hive::CurrentUser, 0);
-        assert!(!EDGE.pipe_blocked(&pc));
-    }
-
-    #[test]
-    fn no_policy_leaves_the_pipe_alone() {
-        assert!(!EDGE.pipe_blocked(&pc()));
-    }
-
-    #[test]
-    fn the_policy_at_1_leaves_the_pipe_alone() {
-        let mut pc = pc();
-        policy(&mut pc, &EDGE, Hive::LocalMachine, 1);
-        policy(&mut pc, &EDGE, Hive::CurrentUser, 1);
-        assert!(!EDGE.pipe_blocked(&pc));
+    fn a_policy_at_0_blocks_the_pipe_and_the_machines_wins_over_the_users() {
+        // (case, the machine's policy, the user's, blocked)
+        let cases = [
+            ("the machine's at 0", Some(0), None, true),
+            ("the user's at 0", None, Some(0), true),
+            (
+                "the machine's at 1 over the user's at 0",
+                Some(1),
+                Some(0),
+                false,
+            ),
+            ("no policy", None, None, false),
+            ("both at 1", Some(1), Some(1), false),
+        ];
+        for (label, machine, user, blocked) in cases {
+            let mut pc = pc();
+            for (hive, value) in [(Hive::LocalMachine, machine), (Hive::CurrentUser, user)] {
+                if let Some(value) = value {
+                    policy(&mut pc, &EDGE, hive, value);
+                }
+            }
+            assert_eq!(EDGE.pipe_blocked(&pc), blocked, "{label}");
+        }
     }
 
     #[test]
@@ -197,152 +187,136 @@ mod tests {
     }
 
     #[test]
-    fn the_users_app_path_comes_first() {
-        let mut pc = pc();
-        pc.app_paths
-            .insert((Hive::CurrentUser, "msedge.exe"), r"D:\Edge\msedge.exe");
-        pc.app_paths
-            .insert((Hive::LocalMachine, "msedge.exe"), r"E:\Edge\msedge.exe");
-        pc.files = vec![r"D:\Edge\msedge.exe".into(), r"E:\Edge\msedge.exe".into()];
-        assert_eq!(EDGE.find(&pc), Some(r"D:\Edge\msedge.exe".into()));
-    }
-
-    #[test]
-    fn the_machines_app_path_is_next_and_may_be_quoted() {
-        let mut pc = pc();
-        pc.app_paths.insert(
-            (Hive::LocalMachine, "msedge.exe"),
-            r#""C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe""#,
-        );
-        pc.files = vec![EDGE_EXE.into()];
-        assert_eq!(EDGE.find(&pc), Some(EDGE_EXE.into()));
-    }
-
-    #[test]
-    fn a_registration_comes_before_program_files() {
-        let mut pc = pc();
-        pc.app_paths
-            .insert((Hive::LocalMachine, "msedge.exe"), r"D:\Edge\msedge.exe");
-        pc.files = vec![EDGE_EXE.into(), r"D:\Edge\msedge.exe".into()];
-        assert_eq!(EDGE.find(&pc), Some(r"D:\Edge\msedge.exe".into()));
-    }
-
-    #[test]
-    fn a_registration_whose_file_is_gone_falls_back_to_program_files() {
-        let mut pc = pc();
-        pc.app_paths
-            .insert((Hive::CurrentUser, "msedge.exe"), r"D:\Gone\msedge.exe");
-        pc.files = vec![r"C:\Program Files\Microsoft\Edge\Application\msedge.exe".into()];
-        assert_eq!(
-            EDGE.find(&pc),
-            Some(r"C:\Program Files\Microsoft\Edge\Application\msedge.exe".into())
-        );
-    }
-
-    #[test]
-    fn program_files_x86_comes_before_program_files() {
-        let mut pc = pc();
-        pc.files = vec![
-            r"C:\Program Files\Microsoft\Edge\Application\msedge.exe".into(),
-            EDGE_EXE.into(),
+    fn app_paths_come_first_then_program_files_x86_then_program_files() {
+        const EDGE_X64: &str = r"C:\Program Files\Microsoft\Edge\Application\msedge.exe";
+        const CHROME_USERS: &str =
+            r"C:\Users\ada\AppData\Local\Google\Chrome\Application\chrome.exe";
+        // (case, browser, its App Paths, the files on the PC, what's found)
+        let cases: [(&str, &Browser, &[(Hive, &str)], &[&str], Option<&str>); 8] = [
+            (
+                "the user's App Path comes first",
+                &EDGE,
+                &[
+                    (Hive::CurrentUser, r"D:\Edge\msedge.exe"),
+                    (Hive::LocalMachine, r"E:\Edge\msedge.exe"),
+                ],
+                &[r"D:\Edge\msedge.exe", r"E:\Edge\msedge.exe"],
+                Some(r"D:\Edge\msedge.exe"),
+            ),
+            (
+                "the machine's App Path is next and may be quoted",
+                &EDGE,
+                &[(
+                    Hive::LocalMachine,
+                    r#""C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe""#,
+                )],
+                &[EDGE_EXE],
+                Some(EDGE_EXE),
+            ),
+            (
+                "a registration comes before Program Files",
+                &EDGE,
+                &[(Hive::LocalMachine, r"D:\Edge\msedge.exe")],
+                &[EDGE_EXE, r"D:\Edge\msedge.exe"],
+                Some(r"D:\Edge\msedge.exe"),
+            ),
+            (
+                "a registration whose file is gone falls back to Program Files",
+                &EDGE,
+                &[(Hive::CurrentUser, r"D:\Gone\msedge.exe")],
+                &[EDGE_X64],
+                Some(EDGE_X64),
+            ),
+            (
+                "Program Files (x86) comes before Program Files",
+                &EDGE,
+                &[],
+                &[EDGE_X64, EDGE_EXE],
+                Some(EDGE_EXE),
+            ),
+            ("nothing found", &EDGE, &[], &[], None),
+            (
+                "a relative registration isn't trusted",
+                &EDGE,
+                &[(Hive::CurrentUser, "msedge.exe")],
+                &["msedge.exe"],
+                None,
+            ),
+            (
+                "the machine's install comes before the user's",
+                &CHROME,
+                &[],
+                &[CHROME_USERS, CHROME_EXE],
+                Some(CHROME_EXE),
+            ),
         ];
-        assert_eq!(EDGE.find(&pc), Some(EDGE_EXE.into()));
-    }
-
-    #[test]
-    fn nothing_found_is_none() {
-        assert_eq!(EDGE.find(&pc()), None);
-        // A relative registration isn't trusted.
-        let mut pc = pc();
-        pc.app_paths
-            .insert((Hive::CurrentUser, "msedge.exe"), "msedge.exe");
-        pc.files = vec!["msedge.exe".into()];
-        assert_eq!(EDGE.find(&pc), None);
-    }
-
-    #[test]
-    fn each_browser_is_found_by_its_own_registration() {
-        for browser in ALL {
+        for (label, browser, app_paths, files, expected) in cases {
             let mut pc = pc();
-            let exe = match browser.id {
-                "edge" => r"D:\Apps\msedge.exe",
-                "chrome" => r"D:\Apps\chrome.exe",
-                "brave" => r"D:\Apps\brave.exe",
-                _ => r"D:\Apps\vivaldi.exe",
-            };
-            pc.app_paths.insert((Hive::LocalMachine, browser.exe), exe);
-            pc.files = vec![exe.into()];
+            for &(hive, value) in app_paths {
+                pc.app_paths.insert((hive, browser.exe), value);
+            }
+            pc.files = files.iter().map(PathBuf::from).collect();
+            assert_eq!(browser.find(&pc), expected.map(PathBuf::from), "{label}");
+        }
+    }
+
+    #[test]
+    fn each_browser_is_found_where_its_installer_puts_it() {
+        // (browser, a registration of its own, its machine install, its per-user install)
+        let cases = [
+            (&EDGE, r"D:\Apps\msedge.exe", EDGE_EXE, None),
+            (
+                &CHROME,
+                r"D:\Apps\chrome.exe",
+                CHROME_EXE,
+                Some(r"C:\Users\ada\AppData\Local\Google\Chrome\Application\chrome.exe"),
+            ),
+            (
+                &BRAVE,
+                r"D:\Apps\brave.exe",
+                BRAVE_EXE,
+                Some(
+                    r"C:\Users\ada\AppData\Local\BraveSoftware\Brave-Browser\Application\brave.exe",
+                ),
+            ),
+            (
+                &VIVALDI,
+                r"D:\Apps\vivaldi.exe",
+                r"C:\Program Files\Vivaldi\Application\vivaldi.exe",
+                Some(VIVALDI_EXE),
+            ),
+        ];
+        for (browser, registered, machine, per_user) in cases {
+            let id = browser.id;
+            // Its registration finds it, and none of the others.
+            let mut pc = pc();
+            pc.app_paths
+                .insert((Hive::LocalMachine, browser.exe), registered);
+            pc.files = vec![registered.into()];
             let found: Vec<&str> = ALL
                 .iter()
                 .filter(|b| b.find(&pc).is_some())
                 .map(|b| b.id)
                 .collect();
-            assert_eq!(found, [browser.id]);
-        }
-    }
+            assert_eq!(found, [id], "{id} by its registration");
 
-    #[test]
-    fn a_machine_install_is_found_under_program_files() {
-        let mut pc = pc();
-        pc.files = vec![
-            CHROME_EXE.into(),
-            BRAVE_EXE.into(),
-            r"C:\Program Files\Vivaldi\Application\vivaldi.exe".into(),
-        ];
-        assert_eq!(CHROME.find(&pc), Some(CHROME_EXE.into()));
-        assert_eq!(BRAVE.find(&pc), Some(BRAVE_EXE.into()));
-        assert_eq!(
-            VIVALDI.find(&pc),
-            Some(r"C:\Program Files\Vivaldi\Application\vivaldi.exe".into())
-        );
-    }
-
-    #[test]
-    fn a_per_user_install_is_found_under_local_app_data() {
-        let mut pc = pc();
-        let chrome = r"C:\Users\ada\AppData\Local\Google\Chrome\Application\chrome.exe";
-        let brave = r"C:\Users\ada\AppData\Local\BraveSoftware\Brave-Browser\Application\brave.exe";
-        pc.files = vec![chrome.into(), brave.into(), VIVALDI_EXE.into()];
-        assert_eq!(CHROME.find(&pc), Some(chrome.into()));
-        assert_eq!(BRAVE.find(&pc), Some(brave.into()));
-        assert_eq!(VIVALDI.find(&pc), Some(VIVALDI_EXE.into()));
-    }
-
-    #[test]
-    fn the_machines_install_comes_before_the_users() {
-        let mut pc = pc();
-        let users = r"C:\Users\ada\AppData\Local\Google\Chrome\Application\chrome.exe";
-        pc.files = vec![users.into(), CHROME_EXE.into()];
-        assert_eq!(CHROME.find(&pc), Some(CHROME_EXE.into()));
-    }
-
-    #[test]
-    fn edge_isnt_looked_for_under_local_app_data() {
-        let mut pc = pc();
-        pc.files = vec![r"C:\Users\ada\AppData\Local\Microsoft\Edge\Application\msedge.exe".into()];
-        assert_eq!(EDGE.find(&pc), None);
-    }
-
-    #[test]
-    fn no_browsers_switches_mark_it_as_automated() {
-        for s in ALL.iter().flat_map(|b| b.switches) {
-            assert!(
-                !s.contains("automation")
-                    && !s.contains("headless")
-                    && !s.contains("remote-debugging")
-                    && !s.starts_with("--disable-")
-                    && !s.contains("test"),
-                "{s}"
+            let mut pc = self::pc();
+            pc.files = vec![machine.into()];
+            assert_eq!(
+                browser.find(&pc),
+                Some(machine.into()),
+                "{id} for the machine"
             );
-        }
-    }
 
-    #[test]
-    fn the_ids_are_distinct_and_lead_back_to_their_browser() {
-        for browser in ALL {
-            assert_eq!(by_id(browser.id), Some(browser));
+            // One that installs for the machine only isn't looked for under LOCALAPPDATA.
+            let mut pc = self::pc();
+            pc.files =
+                vec![per_user.map(PathBuf::from).unwrap_or_else(|| {
+                    Path::new(LOCAL).join(browser.install_dir).join(browser.exe)
+                })];
+            let expected = per_user.map(PathBuf::from);
+            assert_eq!(browser.find(&pc), expected, "{id} for one user");
         }
-        assert_eq!(by_id("opera"), None);
     }
 
     /// A PC with these browsers installed where their installers put them.
@@ -364,12 +338,6 @@ mod tests {
         found.iter().map(|f| f.browser.id).collect()
     }
 
-    /// The id of the browser `pick` offers on `pc`.
-    fn offered(pc: &FakePc, remembered: Option<&str>) -> Option<&'static str> {
-        let found = found(pc);
-        pick(&found, remembered, pc.https_handler().as_deref()).map(|i| found[i].browser.id)
-    }
-
     #[test]
     fn the_found_browsers_come_in_the_order_edge_chrome_brave_vivaldi() {
         let pc = pc_with(&[&VIVALDI, &BRAVE, &EDGE, &CHROME]);
@@ -385,71 +353,5 @@ mod tests {
         policy(&mut pc, &CHROME, Hive::CurrentUser, 0);
         let blocked: Vec<bool> = found(&pc).iter().map(|f| f.blocked.is_some()).collect();
         assert_eq!(blocked, [false, true]);
-    }
-
-    #[test]
-    fn without_a_known_default_the_first_found_is_offered() {
-        let mut pc = pc_with(&[&EDGE, &CHROME, &BRAVE]);
-        assert_eq!(offered(&pc, None), Some("edge"));
-        // Firefox is the default: not one the sign-in knows.
-        pc.https = Some(r"C:\Program Files\Mozilla Firefox\firefox.exe");
-        assert_eq!(offered(&pc, None), Some("edge"));
-        assert_eq!(offered(&pc_with(&[&BRAVE, &VIVALDI]), None), Some("brave"));
-    }
-
-    #[test]
-    fn the_default_browser_is_offered_when_its_a_known_one() {
-        let mut pc = pc_with(&[&EDGE, &CHROME, &BRAVE]);
-        pc.https = Some(BRAVE_EXE);
-        assert_eq!(offered(&pc, None), Some("brave"));
-        // Windows' paths compare without case.
-        pc.https = Some(r"c:\program files\google\chrome\application\CHROME.EXE");
-        assert_eq!(offered(&pc, None), Some("chrome"));
-    }
-
-    #[test]
-    fn the_one_used_last_comes_before_the_default() {
-        let mut pc = pc_with(&[&EDGE, &CHROME, &BRAVE]);
-        pc.https = Some(CHROME_EXE);
-        assert_eq!(offered(&pc, Some("brave")), Some("brave"));
-    }
-
-    #[test]
-    fn one_used_last_thats_gone_or_unknown_is_passed_over() {
-        let mut pc = pc_with(&[&EDGE, &CHROME]);
-        pc.https = Some(CHROME_EXE);
-        assert_eq!(offered(&pc, Some("vivaldi")), Some("chrome"));
-        assert_eq!(offered(&pc, Some("netscape")), Some("chrome"));
-    }
-
-    #[test]
-    fn a_blocked_browser_gives_way_to_one_that_works() {
-        // The one used last and the default are both blocked.
-        let mut pc = pc_with(&[&EDGE, &CHROME, &BRAVE]);
-        pc.https = Some(CHROME_EXE);
-        policy(&mut pc, &CHROME, Hive::LocalMachine, 0);
-        policy(&mut pc, &EDGE, Hive::LocalMachine, 0);
-        assert_eq!(offered(&pc, Some("edge")), Some("brave"));
-        // Among those that work, the usual order holds.
-        let mut pc = pc_with(&[&EDGE, &CHROME, &BRAVE]);
-        pc.https = Some(BRAVE_EXE);
-        policy(&mut pc, &EDGE, Hive::LocalMachine, 0);
-        assert_eq!(offered(&pc, None), Some("brave"));
-        assert_eq!(offered(&pc, Some("chrome")), Some("chrome"));
-    }
-
-    #[test]
-    fn with_every_browser_blocked_the_usual_one_is_offered() {
-        let mut pc = pc_with(&[&EDGE, &CHROME]);
-        policy(&mut pc, &EDGE, Hive::LocalMachine, 0);
-        policy(&mut pc, &CHROME, Hive::LocalMachine, 0);
-        assert_eq!(offered(&pc, None), Some("edge"));
-        pc.https = Some(CHROME_EXE);
-        assert_eq!(offered(&pc, None), Some("chrome"));
-    }
-
-    #[test]
-    fn nothing_found_offers_nothing() {
-        assert_eq!(offered(&pc(), Some("edge")), None);
     }
 }
