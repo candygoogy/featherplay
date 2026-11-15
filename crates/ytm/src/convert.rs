@@ -587,52 +587,59 @@ mod tests {
 
     const ROW: &str = "/contents/x/sectionListRenderer/contents/1/musicShelfRenderer/contents/20/musicResponsiveListItemRenderer/flexColumns/1/musicResponsiveListItemFlexColumnRenderer/text/runs";
 
+    /// The item an error pointer names: the innermost `/<index>/<renderer>` in it, a
+    /// renderer counting only as a whole segment right after an index.
     #[test]
-    fn an_error_inside_a_row_names_the_row_and_its_list() {
-        assert_eq!(
-            item_at(ROW),
-            Some((
-                "/contents/x/sectionListRenderer/contents/1/musicShelfRenderer/contents",
-                20,
-                "musicResponsiveListItemRenderer"
-            ))
+    fn an_error_pointer_names_the_item_it_is_in() {
+        /// A label, the pointer, and the item: its list, its index and its renderer.
+        type Case = (
+            &'static str,
+            &'static str,
+            Option<(&'static str, usize, &'static str)>,
         );
-    }
-
-    #[test]
-    fn an_error_at_a_row_itself_names_it() {
-        let at = "/a/contents/3/musicTwoRowItemRenderer";
-        assert_eq!(
-            item_at(at),
-            Some(("/a/contents", 3, "musicTwoRowItemRenderer"))
-        );
-    }
-
-    #[test]
-    fn the_innermost_item_is_the_one_named() {
-        let at = "/l/0/musicTwoRowItemRenderer/inner/7/musicResponsiveListItemRenderer/title";
-        assert_eq!(
-            item_at(at),
-            Some((
-                "/l/0/musicTwoRowItemRenderer/inner",
-                7,
-                "musicResponsiveListItemRenderer"
-            ))
-        );
-    }
-
-    #[test]
-    fn an_error_outside_every_item_names_none() {
-        assert_eq!(
-            item_at("/contents/x/sectionListRenderer/contents/1/musicShelfRenderer"),
-            None
-        );
-    }
-
-    #[test]
-    fn a_renderer_counts_only_as_a_whole_segment_after_an_index() {
-        assert_eq!(item_at("/l/2/musicTwoRowItemRendererX/a"), None);
-        assert_eq!(item_at("/l/header/musicTwoRowItemRenderer/a"), None);
+        let cases: [Case; 6] = [
+            (
+                "inside a row: the row and its list",
+                ROW,
+                Some((
+                    "/contents/x/sectionListRenderer/contents/1/musicShelfRenderer/contents",
+                    20,
+                    "musicResponsiveListItemRenderer",
+                )),
+            ),
+            (
+                "at a row itself",
+                "/a/contents/3/musicTwoRowItemRenderer",
+                Some(("/a/contents", 3, "musicTwoRowItemRenderer")),
+            ),
+            (
+                "the innermost item",
+                "/l/0/musicTwoRowItemRenderer/inner/7/musicResponsiveListItemRenderer/title",
+                Some((
+                    "/l/0/musicTwoRowItemRenderer/inner",
+                    7,
+                    "musicResponsiveListItemRenderer",
+                )),
+            ),
+            (
+                "outside every item",
+                "/contents/x/sectionListRenderer/contents/1/musicShelfRenderer",
+                None,
+            ),
+            (
+                "a renderer's name as part of a segment",
+                "/l/2/musicTwoRowItemRendererX/a",
+                None,
+            ),
+            (
+                "a renderer not after an index",
+                "/l/header/musicTwoRowItemRenderer/a",
+                None,
+            ),
+        ];
+        for (label, at, want) in cases {
+            assert_eq!(item_at(at), want, "{label}");
+        }
     }
 
     #[test]
