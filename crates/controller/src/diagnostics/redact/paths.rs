@@ -238,142 +238,142 @@ mod tests {
         ])
     }
 
-    fn masked(text: &str) -> String {
-        mask(text, &ada())
+    /// Lines masked with ada's folders (`ada()`): (what the case is, the line, the result).
+    #[test]
+    fn the_users_folders_are_masked() {
+        let cases = [
+            (
+                "app data folders come before the profile",
+                r"config C:\Users\ada\AppData\Roaming\featherplay, cache C:\Users\ada\AppData\Local\featherplay",
+                r"config %APPDATA%\featherplay, cache %LOCALAPPDATA%\featherplay",
+            ),
+            (
+                "the profile folder",
+                r"opened C:\Users\ada\Music\a.flac",
+                r"opened %USERPROFILE%\Music\a.flac",
+            ),
+            (
+                "the case doesn't matter",
+                r"yt-dlp or deno is missing in c:\USERS\Ada\appdata\LOCAL\featherplay\sidecars",
+                r"yt-dlp or deno is missing in %LOCALAPPDATA%\featherplay\sidecars",
+            ),
+            (
+                "forward slashes",
+                "C:/Users/ada/AppData/Local/featherplay/logs",
+                "%LOCALAPPDATA%/featherplay/logs",
+            ),
+            (
+                "a verbatim prefix goes too",
+                r"canonical \\?\C:\Users\ada\AppData\Local\featherplay",
+                r"canonical %LOCALAPPDATA%\featherplay",
+            ),
+            (
+                "a debug-formatted path",
+                r#"path "C:\\Users\\ada\\AppData\\Local\\featherplay""#,
+                r#"path "%LOCALAPPDATA%\\featherplay""#,
+            ),
+            (
+                "the folder alone, before a full stop",
+                r"home is C:\Users\ada.",
+                "home is %USERPROFILE%.",
+            ),
+            (
+                "the folder alone, in brackets",
+                r"(C:\Users\ada)",
+                "(%USERPROFILE%)",
+            ),
+            (
+                "another user's folder",
+                r"C:\Users\bob\Downloads\a.txt and C:/users/bob/x",
+                r"%USERPROFILE%\Downloads\a.txt and %USERPROFILE%/x",
+            ),
+            (
+                "a name that starts like the user's is masked whole",
+                r"C:\Users\adam\x",
+                r"%USERPROFILE%\x",
+            ),
+            (
+                "another user's folder at the end of a clause keeps the sentence",
+                r"missing in C:\Users\bob, retrying",
+                "missing in %USERPROFILE%, retrying",
+            ),
+            (
+                "a path outside the profile stays: another drive",
+                r"library D:\Music\a.flac",
+                r"library D:\Music\a.flac",
+            ),
+            (
+                "a path outside the profile stays: Program Files",
+                r"C:\Program Files\featherplay\featherplay.exe",
+                r"C:\Program Files\featherplay\featherplay.exe",
+            ),
+            (
+                "a path outside the profile stays: Users without a name",
+                r"C:\Users\ and C:\Users",
+                r"C:\Users\ and C:\Users",
+            ),
+            (
+                "a path outside the profile stays: a verbatim path",
+                r"\\?\D:\Music",
+                r"\\?\D:\Music",
+            ),
+            (
+                "a path outside the profile stays: a link",
+                "https://music.example.com/watch?v=abc:def",
+                "https://music.example.com/watch?v=abc:def",
+            ),
+            (
+                "a path outside the profile stays: Usersx",
+                r"C:\Usersx\ada",
+                r"C:\Usersx\ada",
+            ),
+        ];
+        let profile = ada();
+        for (label, line, want) in cases {
+            assert_eq!(mask(line, &profile), want, "{label}");
+        }
     }
 
+    /// Lines masked with a profile of their own: (what the case is, the folders, the line,
+    /// the result).
     #[test]
-    fn a_linux_home_is_masked() {
-        let home = Profile::new(&[("HOME", "/home/ada")]);
-        assert_eq!(
-            mask(
+    fn other_profiles_are_masked() {
+        let cases: [(&str, &[(&'static str, &str)], &str, &str); 5] = [
+            (
+                "a linux home",
+                &[("HOME", "/home/ada")],
                 "config /home/ada/.config/featherplay, logs /home/ada/.local/state/featherplay, \
                  not /home/adam/x",
-                &home
+                "config %HOME%/.config/featherplay, logs %HOME%/.local/state/featherplay, \
+                 not /home/adam/x",
             ),
-            "config %HOME%/.config/featherplay, logs %HOME%/.local/state/featherplay, \
-             not /home/adam/x"
-        );
-    }
-
-    #[test]
-    fn app_data_folders_come_before_the_profile() {
-        assert_eq!(
-            masked(
-                r"config C:\Users\ada\AppData\Roaming\featherplay, cache C:\Users\ada\AppData\Local\featherplay"
+            (
+                "a folder name with spaces, with no folders of its own",
+                &[],
+                r"C:\Users\Ada Lovelace\AppData\x",
+                r"%USERPROFILE%\AppData\x",
             ),
-            r"config %APPDATA%\featherplay, cache %LOCALAPPDATA%\featherplay"
-        );
-    }
-
-    #[test]
-    fn the_profile_folder_is_masked() {
-        assert_eq!(
-            masked(r"opened C:\Users\ada\Music\a.flac"),
-            r"opened %USERPROFILE%\Music\a.flac"
-        );
-    }
-
-    #[test]
-    fn the_case_doesnt_matter() {
-        assert_eq!(
-            masked(r"yt-dlp or deno is missing in c:\USERS\Ada\appdata\LOCAL\featherplay\sidecars"),
-            r"yt-dlp or deno is missing in %LOCALAPPDATA%\featherplay\sidecars"
-        );
-    }
-
-    #[test]
-    fn forward_slashes_are_masked() {
-        assert_eq!(
-            masked("C:/Users/ada/AppData/Local/featherplay/logs"),
-            "%LOCALAPPDATA%/featherplay/logs"
-        );
-    }
-
-    #[test]
-    fn a_verbatim_prefix_goes_too() {
-        assert_eq!(
-            masked(r"canonical \\?\C:\Users\ada\AppData\Local\featherplay"),
-            r"canonical %LOCALAPPDATA%\featherplay"
-        );
-    }
-
-    #[test]
-    fn a_debug_formatted_path_is_masked() {
-        assert_eq!(
-            masked(r#"path "C:\\Users\\ada\\AppData\\Local\\featherplay""#),
-            r#"path "%LOCALAPPDATA%\\featherplay""#
-        );
-    }
-
-    #[test]
-    fn the_folder_alone_is_masked() {
-        assert_eq!(masked(r"home is C:\Users\ada."), "home is %USERPROFILE%.");
-        assert_eq!(masked(r"(C:\Users\ada)"), "(%USERPROFILE%)");
-    }
-
-    #[test]
-    fn another_users_folder_is_masked() {
-        assert_eq!(
-            masked(r"C:\Users\bob\Downloads\a.txt and C:/users/bob/x"),
-            r"%USERPROFILE%\Downloads\a.txt and %USERPROFILE%/x"
-        );
-    }
-
-    #[test]
-    fn a_name_that_starts_like_the_users_is_masked_whole() {
-        assert_eq!(
-            masked(r"C:\Users\adam\x"),
-            r"%USERPROFILE%\x",
-            "the user's folder matched inside another name"
-        );
-    }
-
-    #[test]
-    fn another_users_folder_at_the_end_of_a_clause_keeps_the_sentence() {
-        assert_eq!(
-            masked(r"missing in C:\Users\bob, retrying"),
-            "missing in %USERPROFILE%, retrying"
-        );
-    }
-
-    #[test]
-    fn a_folder_name_with_spaces_is_masked() {
-        assert_eq!(
-            mask(r"C:\Users\Ada Lovelace\AppData\x", &Profile::default()),
-            r"%USERPROFILE%\AppData\x"
-        );
-    }
-
-    #[test]
-    fn a_profile_outside_users_is_masked() {
-        let profile = Profile::new(&[("USERPROFILE", r"E:\Home\ada\")]);
-        assert_eq!(mask(r"E:\home\ADA\x", &profile), r"%USERPROFILE%\x");
-    }
-
-    #[test]
-    fn a_non_ascii_name_matches_in_any_case() {
-        let profile = Profile::new(&[("USERPROFILE", r"E:\Home\Ülla")]);
-        assert_eq!(mask(r"e:\home\üLLA\x", &profile), r"%USERPROFILE%\x");
-    }
-
-    #[test]
-    fn a_drive_root_is_not_a_profile() {
-        let profile = Profile::new(&[("USERPROFILE", r"C:\")]);
-        assert_eq!(mask(r"C:\Windows\x", &profile), r"C:\Windows\x");
-    }
-
-    #[test]
-    fn paths_outside_the_profile_stay() {
-        for line in [
-            r"library D:\Music\a.flac",
-            r"C:\Program Files\featherplay\featherplay.exe",
-            r"C:\Users\ and C:\Users",
-            r"\\?\D:\Music",
-            "https://music.example.com/watch?v=abc:def",
-            r"C:\Usersx\ada",
-        ] {
-            assert_eq!(masked(line), line);
+            (
+                "a profile outside Users",
+                &[("USERPROFILE", r"E:\Home\ada\")],
+                r"E:\home\ADA\x",
+                r"%USERPROFILE%\x",
+            ),
+            (
+                "a non-ASCII name matches in any case",
+                &[("USERPROFILE", r"E:\Home\Ülla")],
+                r"e:\home\üLLA\x",
+                r"%USERPROFILE%\x",
+            ),
+            (
+                "a drive root is not a profile",
+                &[("USERPROFILE", r"C:\")],
+                r"C:\Windows\x",
+                r"C:\Windows\x",
+            ),
+        ];
+        for (label, vars, line, want) in cases {
+            assert_eq!(mask(line, &Profile::new(vars)), want, "{label}");
         }
     }
 }

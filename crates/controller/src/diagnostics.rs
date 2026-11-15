@@ -346,6 +346,16 @@ mod tests {
         assert_eq!(r.ytdlp.as_deref(), Some("2026.10.26"));
         assert_eq!(r.deno, None);
         assert_eq!(r.version, env!("CARGO_PKG_VERSION"));
+
+        // Scrobbling off turns both services off.
+        let settings = Settings {
+            scrobbling: false,
+            lastfm_enabled: true,
+            listenbrainz_enabled: true,
+            ..Settings::default()
+        };
+        let r = report(false, &settings);
+        assert!(!r.lastfm && !r.listenbrainz, "scrobbling off");
     }
 
     #[test]
@@ -362,17 +372,5 @@ mod tests {
             region_of("https://x.googlevideo.com/videoplayback?gcr=x1y"),
             None
         );
-    }
-
-    #[test]
-    fn scrobbling_off_turns_both_services_off() {
-        let settings = Settings {
-            scrobbling: false,
-            lastfm_enabled: true,
-            listenbrainz_enabled: true,
-            ..Settings::default()
-        };
-        let r = report(false, &settings);
-        assert!(!r.lastfm && !r.listenbrainz);
     }
 }

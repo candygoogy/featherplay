@@ -109,183 +109,118 @@ fn list(out: &mut String, title: &str, entries: &[String]) {
 mod tests {
     use super::*;
 
-    fn report() -> Report {
-        Report {
+    /// Windows names itself; elsewhere the line holds the distribution's name.
+    const OS: &str = if cfg!(windows) { "Windows" } else { "System" };
+
+    /// Every fact known and every service on but one: each has its line, an error stays on
+    /// one line, and the last songs name the step that gave their stream.
+    #[test]
+    fn every_fact_has_its_line() {
+        let text = Report {
             version: "0.1.0".into(),
             os: "Windows 11 25H2, build 26300.7171".into(),
             ytdlp: Some("2026.10.26".into()),
-            deno: None,
+            deno: Some("2.5.4".into()),
             js_engine: "QuickJS-NG 0.16.2".into(),
             output_device: Some("Speakers (Realtek(R) Audio)".into()),
             signed_in: true,
             lastfm: true,
             listenbrainz: false,
             discord: true,
-            proxy: None,
-            dns: None,
-            dns_over_https: false,
-            region: None,
-            helpers: None,
-            sign_in_save: None,
+            proxy: Some("http://proxy.corp:3128".into()),
+            dns: Some(
+                "www.youtube.com resolves to 203.0.113.7, outside Google's own ranges \
+                 and unlike music.youtube.com (142.250.180.14)"
+                    .into(),
+            ),
+            dns_over_https: true,
+            region: Some("IT".into()),
+            helpers: Some("blocked, os error 32".into()),
+            sign_in_save: Some(
+                "credential store: Platform failure: Windows error code 1783".into(),
+            ),
             errors: vec![
                 "14:03:11 abc: yt-dlp failed (1): ERROR: one\nsecond line".into(),
                 "14:05:00 def: unavailable: private video".into(),
             ],
-            played: Vec::new(),
-        }
-    }
-
-    #[test]
-    fn every_fact_has_its_line() {
-        let text = report().text();
-        // Windows names itself; elsewhere the line holds the distribution's name.
-        let os = if cfg!(windows) {
-            "Windows: Windows 11 25H2, build 26300.7171"
-        } else {
-            "System: Windows 11 25H2, build 26300.7171"
-        };
-        for line in [
-            "featherplay 0.1.0",
-            os,
-            "yt-dlp: 2026.10.26",
-            "Deno: unknown",
-            "JavaScript: QuickJS-NG 0.16.2 (built in)",
-            "Output device: Speakers (Realtek(R) Audio)",
-            "Signed in: yes",
-            "Last.fm: on",
-            "ListenBrainz: off",
-            "Discord: on",
-            "Recent resolver errors:",
-            "  14:05:00 def: unavailable: private video",
-        ] {
-            assert!(text.lines().any(|l| l == line), "no {line:?} in\n{text}");
-        }
-    }
-
-    #[test]
-    fn the_last_songs_name_the_step_that_gave_their_stream() {
-        let text = Report {
             played: vec![
                 "14:06:02 abc: native embedded (QuickJS)".into(),
                 "14:09:40 def: yt-dlp default".into(),
             ],
-            ..report()
         }
         .text();
-        let section = "Recent songs played via:\n  \
-                       14:06:02 abc: native embedded (QuickJS)\n  \
-                       14:09:40 def: yt-dlp default\n";
-        assert!(text.ends_with(section), "{text}");
-        let text = report().text();
-        assert!(text.ends_with("Recent songs played via: none\n"), "{text}");
-    }
-
-    #[test]
-    fn an_error_stays_on_one_line() {
-        let text = report().text();
-        assert!(
-            text.lines()
-                .any(|l| l == "  14:03:11 abc: yt-dlp failed (1): ERROR: one / second line"),
-            "{text}"
+        let want = format!(
+            "featherplay 0.1.0\n\
+             {OS}: Windows 11 25H2, build 26300.7171\n\
+             yt-dlp: 2026.10.26\n\
+             Deno: 2.5.4\n\
+             JavaScript: QuickJS-NG 0.16.2 (built in)\n\
+             Output device: Speakers (Realtek(R) Audio)\n\
+             Signed in: yes\n\
+             Last.fm: on\n\
+             ListenBrainz: off\n\
+             Discord: on\n\
+             Proxy: http://proxy.corp:3128\n\
+             DNS: www.youtube.com resolves to 203.0.113.7, outside Google's own ranges \
+             and unlike music.youtube.com (142.250.180.14)\n\
+             Look up YouTube directly: on\n\
+             YouTube's region: IT\n\
+             Last helpers download error: blocked, os error 32\n\
+             Last sign-in save error: credential store: Platform failure: Windows error code 1783\n\
+             Recent resolver errors:\n  \
+             14:03:11 abc: yt-dlp failed (1): ERROR: one / second line\n  \
+             14:05:00 def: unavailable: private video\n\
+             Recent songs played via:\n  \
+             14:06:02 abc: native embedded (QuickJS)\n  \
+             14:09:40 def: yt-dlp default\n"
         );
+        assert_eq!(text, want);
     }
 
+    /// Nothing known yet and everything off: each line says so.
     #[test]
-    fn the_default_device_and_no_errors_are_said_so() {
+    fn every_unknown_fact_is_said_so() {
         let text = Report {
-            output_device: None,
-            errors: Vec::new(),
-            ..report()
+            version: "0.1.0".into(),
+            os: "Windows 11 25H2, build 26300.7171".into(),
+            js_engine: "QuickJS-NG 0.16.2".into(),
+            ..Report::default()
         }
         .text();
-        assert!(text.contains("Output device: System default"), "{text}");
-        assert!(text.contains("Recent resolver errors: none"), "{text}");
-    }
-
-    #[test]
-    fn the_proxy_and_the_last_helpers_error_have_their_lines() {
-        let text = Report {
-            proxy: Some("http://proxy.corp:3128".into()),
-            helpers: Some("blocked, os error 32".into()),
-            ..report()
-        }
-        .text();
-        for line in [
-            "Proxy: http://proxy.corp:3128",
-            "Last helpers download error: blocked, os error 32",
-        ] {
-            assert!(text.lines().any(|l| l == line), "no {line:?} in\n{text}");
-        }
-        let text = report().text();
-        assert!(text.contains("Proxy: none\n"), "{text}");
-        assert!(
-            text.contains("Last helpers download error: none\n"),
-            "{text}"
+        let want = format!(
+            "featherplay 0.1.0\n\
+             {OS}: Windows 11 25H2, build 26300.7171\n\
+             yt-dlp: unknown\n\
+             Deno: unknown\n\
+             JavaScript: QuickJS-NG 0.16.2 (built in)\n\
+             Output device: System default\n\
+             Signed in: no\n\
+             Last.fm: off\n\
+             ListenBrainz: off\n\
+             Discord: off\n\
+             Proxy: none\n\
+             DNS: not checked yet\n\
+             Look up YouTube directly: off\n\
+             YouTube's region: unknown\n\
+             Last helpers download error: none\n\
+             Last sign-in save error: none\n\
+             Recent resolver errors: none\n\
+             Recent songs played via: none\n"
         );
+        assert_eq!(text, want);
     }
 
     #[test]
-    fn a_dns_redirect_has_its_line() {
-        let found = "www.youtube.com resolves to 203.0.113.7, outside Google's own ranges \
-                     and unlike music.youtube.com (142.250.180.14)";
+    fn folders_secrets_and_emails_in_errors_are_masked() {
         let text = Report {
-            dns: Some(found.into()),
-            ..report()
+            errors: vec![
+                r"10:00:00 x: no yt-dlp in C:\Users\bob\AppData\Local\x, failed for ada@example.com with SAPISID=s3cr3t".into(),
+            ],
+            ..Report::default()
         }
         .text();
-        let with_region = Report {
-            region: Some("IT".into()),
-            ..report()
+        for secret in ["bob", "ada@example.com", "s3cr3t"] {
+            assert!(!text.contains(secret), "{secret} in\n{text}");
         }
-        .text();
-        assert!(
-            with_region.contains("\nYouTube's region: IT\n"),
-            "{with_region}"
-        );
-        assert!(text.contains("\nYouTube's region: unknown\n"), "{text}");
-        let line = format!("DNS: {found}");
-        assert!(text.lines().any(|l| l == line), "no {line:?} in\n{text}");
-        let text = report().text();
-        assert!(text.contains("DNS: not checked yet\n"), "{text}");
-        assert!(text.contains("\nLook up YouTube directly: off\n"), "{text}");
-    }
-
-    #[test]
-    fn a_sign_in_that_wasnt_saved_has_its_line() {
-        let text = Report {
-            sign_in_save: Some(
-                "credential store: Platform failure: Windows error code 1783".into(),
-            ),
-            ..report()
-        }
-        .text();
-        let line =
-            "Last sign-in save error: credential store: Platform failure: Windows error code 1783";
-        assert!(text.lines().any(|l| l == line), "no {line:?} in\n{text}");
-        let text = report().text();
-        assert!(text.contains("Last sign-in save error: none\n"), "{text}");
-    }
-
-    #[test]
-    fn a_users_folder_in_an_error_is_masked() {
-        let text = Report {
-            errors: vec![r"10:00:00 x: no yt-dlp in C:\Users\bob\AppData\Local\x".into()],
-            ..report()
-        }
-        .text();
-        assert!(!text.contains("bob"), "{text}");
-    }
-
-    #[test]
-    fn secrets_and_emails_in_errors_are_masked() {
-        let text = Report {
-            errors: vec!["10:00:00 x: failed for ada@example.com with SAPISID=s3cr3t".into()],
-            ..report()
-        }
-        .text();
-        assert!(
-            !text.contains("ada@example.com") && !text.contains("s3cr3t"),
-            "{text}"
-        );
     }
 }

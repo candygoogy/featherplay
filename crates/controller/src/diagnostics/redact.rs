@@ -162,57 +162,44 @@ fn mask_emails(text: &str) -> String {
 mod tests {
     use super::*;
 
+    /// Each secret is masked; the names, the separators and the rest of the line stay.
     #[test]
-    fn cookie_values_are_masked() {
-        let out = redact("cookies: SAPISID=abc/def123; __Secure-3PSID=g.a000xyz; PREF=f6=4");
-        assert!(!out.contains("abc/def123"), "{out}");
-        assert!(!out.contains("g.a000xyz"), "{out}");
-        assert!(out.contains("SAPISID=***"), "{out}");
-        assert!(out.contains("__Secure-3PSID=***"), "{out}");
-    }
-
-    #[test]
-    fn a_cookie_header_is_masked_to_the_end_of_its_line() {
-        let out = redact("request failed\nCookie: YSC=x1; VISITOR=y2 z3\nstatus 403");
-        assert_eq!(out, "request failed\nCookie: ***\nstatus 403");
-    }
-
-    #[test]
-    fn an_authorization_header_is_masked() {
-        let out = redact(r#"headers {"authorization": "SAPISIDHASH 1700_abcdef", "x": 1}"#);
-        assert!(!out.contains("abcdef"), "{out}");
-    }
-
-    #[test]
-    fn query_secrets_are_masked() {
-        let out = redact(
-            "GET https://ws.audioscrobbler.com/2.0/?method=track.scrobble&api_key=K123&sk=S456&api_sig=G789&token=T000&format=json",
-        );
-        for secret in ["K123", "S456", "G789", "T000"] {
-            assert!(!out.contains(secret), "{secret} in {out}");
+    fn secrets_are_masked() {
+        let cases = [
+            (
+                "cookie values",
+                "cookies: SAPISID=abc/def123; __Secure-3PSID=g.a000xyz; PREF=f6=4",
+                "cookies: SAPISID=***; __Secure-3PSID=***; PREF=f6=4",
+            ),
+            (
+                "a cookie header, to the end of its line",
+                "request failed\nCookie: YSC=x1; VISITOR=y2 z3\nstatus 403",
+                "request failed\nCookie: ***\nstatus 403",
+            ),
+            (
+                "an authorization header",
+                r#"headers {"authorization": "SAPISIDHASH 1700_abcdef", "x": 1}"#,
+                r#"headers {"authorization": ***"#,
+            ),
+            (
+                "query secrets",
+                "GET https://ws.audioscrobbler.com/2.0/?method=track.scrobble&api_key=K123&sk=S456&api_sig=G789&token=T000&format=json",
+                "GET https://ws.audioscrobbler.com/2.0/?method=track.scrobble&api_key=***&sk=***&api_sig=***&token=***&format=json",
+            ),
+            (
+                "json secrets",
+                r#"{"session_key": "abc123", "user_token":"lb-0001", "name": "x"}"#,
+                r#"{"session_key": "***", "user_token":"***", "name": "x"}"#,
+            ),
+            (
+                "an email address",
+                "signed in as ada.lovelace+yt@example.co.uk, ok",
+                "signed in as <email>, ok",
+            ),
+        ];
+        for (label, line, want) in cases {
+            assert_eq!(redact(line), want, "{label}");
         }
-        assert!(out.contains("method=track.scrobble"), "{out}");
-        assert!(out.contains("format=json"), "{out}");
-    }
-
-    #[test]
-    fn json_secrets_are_masked() {
-        let out = redact(r#"{"session_key": "abc123", "user_token":"lb-0001", "name": "x"}"#);
-        assert!(!out.contains("abc123") && !out.contains("lb-0001"), "{out}");
-        assert!(out.contains(r#""name": "x""#), "{out}");
-    }
-
-    #[test]
-    fn email_addresses_are_masked() {
-        let out = redact("signed in as ada.lovelace+yt@example.co.uk, ok");
-        assert_eq!(out, "signed in as <email>, ok");
-    }
-
-    #[test]
-    fn a_users_folder_is_masked() {
-        let out = redact(r"yt-dlp or deno is missing in C:\Users\bob\AppData\Local\x\sidecars");
-        assert!(!out.contains("bob"), "{out}");
-        assert!(out.ends_with(r"%\AppData\Local\x\sidecars"), "{out}");
     }
 
     #[test]

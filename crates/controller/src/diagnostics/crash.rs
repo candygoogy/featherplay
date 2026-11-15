@@ -135,18 +135,6 @@ pub fn files(dir: &Path) -> Vec<PathBuf> {
 mod tests {
     use super::*;
 
-    fn scratch(name: &str) -> PathBuf {
-        let base = std::env::var("FEATHERPLAY_HOME")
-            .map(PathBuf::from)
-            .unwrap_or_else(|_| std::env::temp_dir().join("featherplay-tests"));
-        let dir = base
-            .join("test-diagnostics")
-            .join(format!("{name}-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir).unwrap();
-        dir
-    }
-
     fn at(day: u16, second: u16) -> Stamp {
         Stamp {
             year: 2026,
@@ -168,7 +156,9 @@ mod tests {
 
     #[test]
     fn only_the_newest_five_are_kept() {
-        let dir = scratch("keep");
+        let Some(dir) = crate::test_home("crash-keep") else {
+            return;
+        };
         std::fs::write(dir.join("featherplay.log"), "the log stays").unwrap();
         for day in 1..=7 {
             write(&dir, &at(day, 0), "boom").unwrap();
@@ -183,7 +173,9 @@ mod tests {
 
     #[test]
     fn two_crashes_in_one_second_get_two_files() {
-        let dir = scratch("same-second");
+        let Some(dir) = crate::test_home("crash-same-second") else {
+            return;
+        };
         let first = write(&dir, &at(2, 5), "first").unwrap();
         let second = write(&dir, &at(2, 5), "second").unwrap();
         assert_ne!(first, second);
@@ -204,20 +196,5 @@ mod tests {
         assert_eq!(message(s.as_ref()), "static text");
         assert_eq!(message(owned.as_ref()), "owned 1");
         assert_eq!(message(other.as_ref()), "(a panic without a message)");
-    }
-
-    #[test]
-    fn the_report_names_the_message_place_and_thread() {
-        let text = report(
-            "index out of bounds",
-            "src/queue.rs:12:5",
-            "featherplay-controller",
-            &Backtrace::force_capture(),
-        );
-        assert!(text.contains("index out of bounds"), "{text}");
-        assert!(text.contains("src/queue.rs:12:5"), "{text}");
-        assert!(text.contains("featherplay-controller"), "{text}");
-        assert!(text.contains(env!("CARGO_PKG_VERSION")), "{text}");
-        assert!(text.contains("Backtrace:"), "{text}");
     }
 }

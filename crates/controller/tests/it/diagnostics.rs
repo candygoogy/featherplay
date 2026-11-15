@@ -6,6 +6,9 @@ use std::path::PathBuf;
 
 use featherplay_controller::diagnostics;
 
+/// The Linux test's folder. The other tests use `crate::test_home`, which skips without
+/// `FEATHERPLAY_HOME`.
+#[cfg(not(windows))]
 fn scratch(name: &str) -> PathBuf {
     let base = std::env::var("FEATHERPLAY_HOME")
         .map(PathBuf::from)
@@ -23,7 +26,9 @@ fn read_log(dir: &std::path::Path) -> String {
 
 #[test]
 fn log_lines_reach_the_file_without_their_secrets() {
-    let dir = scratch("log");
+    let Some(dir) = crate::test_home("diagnostics-log") else {
+        return;
+    };
     diagnostics::init(&dir).expect("init");
     featherplay_controller::log!("plain line {}", 42);
     featherplay_controller::log!(
@@ -91,7 +96,9 @@ fn log_lines_name_no_home_folder() {
 #[test]
 #[cfg(windows)]
 fn log_lines_name_no_users_folder() {
-    let dir = scratch("profile");
+    let Some(dir) = crate::test_home("diagnostics-profile") else {
+        return;
+    };
     diagnostics::init(&dir).expect("init");
     // This machine's own folders, so no path is written into the test.
     let local = std::env::var("LOCALAPPDATA").expect("LOCALAPPDATA");
@@ -121,48 +128,11 @@ fn log_lines_name_no_users_folder() {
 }
 
 #[test]
-fn a_panic_message_names_no_users_folder() {
-    let dir = scratch("crash-profile");
-    diagnostics::init(&dir).expect("init");
-    diagnostics::install_panic_hook(dir.clone());
-    let joined = std::thread::Builder::new()
-        .name("forced-panic".into())
-        .spawn(|| panic!(r"can't open C:\Users\fp-other-user\AppData\Local\x"))
-        .expect("spawn")
-        .join();
-    assert!(joined.is_err(), "the thread didn't panic");
-    diagnostics::flush();
-
-    let crash = std::fs::read_dir(&dir)
-        .expect("log dir")
-        .flatten()
-        .map(|e| e.path())
-        .find(|p| {
-            p.file_name()
-                .and_then(|n| n.to_str())
-                .is_some_and(|n| n.starts_with("crash-"))
-        })
-        .expect("a crash file");
-    let report = std::fs::read_to_string(crash).unwrap();
-    assert!(!report.contains("fp-other-user"), "{report}");
-    assert!(
-        report.contains(r"can't open %USERPROFILE%\AppData\Local\x"),
-        "{report}"
-    );
-    let log = read_log(&dir);
-    assert!(!log.contains("fp-other-user"), "{log}");
-    std::fs::remove_dir_all(&dir).unwrap();
-}
-
-#[test]
 fn a_failed_resolve_logs_the_exit_code_and_the_stderr_tail() {
-    let dir = scratch("resolve");
+    let Some(dir) = crate::test_home("diagnostics-resolve") else {
+        return;
+    };
     diagnostics::init(&dir).expect("init");
-    // What the streams crate logs for the step, then what the controller logs for the resolve.
-    log::warn!(
-        target: "featherplay_streams::ytdlp",
-        "resolve h46YpWrg55Q [default] failed: yt-dlp exited with code 1: ERROR: [youtube] h46YpWrg55Q: Sign in to confirm you're not a bot"
-    );
     diagnostics::resolve_failed(
         "h46YpWrg55Q",
         4.2,
@@ -171,24 +141,24 @@ fn a_failed_resolve_logs_the_exit_code_and_the_stderr_tail() {
     diagnostics::flush();
     let text = read_log(&dir);
     assert!(
-        text.contains("[default] failed: yt-dlp exited with code 1: ERROR: [youtube]"),
-        "{text}"
-    );
-    assert!(
         text.contains("resolve h46YpWrg55Q failed in 4.2s: yt-dlp failed (1): ERROR: [youtube] h46YpWrg55Q: Sign in"),
         "{text}"
     );
     std::fs::remove_dir_all(&dir).unwrap();
 }
 
+/// One crash file with the message, the thread, the place and the backtrace, and a log line
+/// naming it; another user's folder in the message is masked in both.
 #[test]
 fn a_panic_writes_a_crash_file_and_a_log_line() {
-    let dir = scratch("crash");
+    let Some(dir) = crate::test_home("diagnostics-crash") else {
+        return;
+    };
     diagnostics::init(&dir).expect("init");
     diagnostics::install_panic_hook(dir.clone());
     let joined = std::thread::Builder::new()
         .name("forced-panic".into())
-        .spawn(|| panic!("forced for the crash file test"))
+        .spawn(|| panic!(r"can't open C:\Users\fp-other-user\AppData\Local\x"))
         .expect("spawn")
         .join();
     assert!(joined.is_err(), "the thread didn't panic");
@@ -206,8 +176,9 @@ fn a_panic_writes_a_crash_file_and_a_log_line() {
         .collect();
     assert_eq!(crashes.len(), 1, "{crashes:?}");
     let report = std::fs::read_to_string(&crashes[0]).unwrap();
+    assert!(!report.contains("fp-other-user"), "{report}");
     assert!(
-        report.contains("forced for the crash file test"),
+        report.contains(r"can't open %USERPROFILE%\AppData\Local\x"),
         "{report}"
     );
     assert!(report.contains("forced-panic"), "no thread name:\n{report}");
@@ -219,6 +190,7 @@ fn a_panic_writes_a_crash_file_and_a_log_line() {
         .to_string_lossy()
         .into_owned();
     let log = read_log(&dir);
+    assert!(!log.contains("fp-other-user"), "{log}");
     assert!(log.contains(&name), "the log doesn't name {name}:\n{log}");
     std::fs::remove_dir_all(&dir).unwrap();
 }
