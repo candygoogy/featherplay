@@ -170,6 +170,37 @@ function bindReplica(root: HTMLElement, player: Player) {
   const seekLine = $(root, "[data-seek-line]");
   const seekTip = $(root, "[data-seek-tip]");
   const thumb = $(root, "[data-thumb]");
+  // Out of view (the stage scrolled away, Make it yours not reached yet), nothing in it runs:
+  // its progress lines wait in place and its playing mark holds still (app-controls.css),
+  // starting from where the song is when it comes back. Off screen, the browser may tick
+  // them on the page's own thread.
+  if ("IntersectionObserver" in window) {
+    new IntersectionObserver(
+      ([e]) => {
+        if (e.isIntersecting === !root.hasAttribute("data-away")) return;
+        root.toggleAttribute("data-away", !e.isIntersecting);
+        last.run = "";
+        render(player.state);
+      },
+      { rootMargin: "64px" },
+    ).observe(root);
+  }
+  for (const type of ["pointerenter", "pointerleave", "focusin", "focusout"])
+    seekLine?.addEventListener(type, () => {
+      last.run = "";
+      render(player.state);
+    });
+  if (thumb?.parentElement && "ResizeObserver" in window) {
+    let lineW = -1;
+    new ResizeObserver(([e]) => {
+      const w = Math.round(e.contentRect.width);
+      if (lineW >= 0 && w !== lineW) {
+        last.run = "";
+        render(player.state);
+      }
+      lineW = w;
+    }).observe(thumb.parentElement);
+  }
   const searchInput = $<HTMLInputElement>(root, "[data-search-input]");
   const volume = $<HTMLInputElement>(root, "[data-volume]");
   const volumeWrap = $(root, "[data-volume-wrap]");
@@ -546,12 +577,24 @@ function bindReplica(root: HTMLElement, player: Player) {
         const fraction = Math.min(1, s.positionMs / song.durationMs);
         const left = Math.max(0, song.durationMs - s.positionMs);
         const go = (el: HTMLElement, prop: "transform" | "translate", from: string, to: string) => {
-          for (const a of el.getAnimations()) a.cancel();
+          for (const a of el.getAnimations()) if (!(a instanceof CSSTransition)) a.cancel();
           el.style[prop] = from;
-          if (s.playing && left > 0 && rendered(el)) el.animate([{ [prop]: from }, { [prop]: to }], { duration: left, easing: "linear", fill: "forwards" });
+          if (s.playing && left > 0 && rendered(el) && !root.hasAttribute("data-away")) el.animate([{ [prop]: from }, { [prop]: to }], { duration: left, easing: "linear", fill: "forwards" });
         };
         setAll(root, "[data-progress]", (el) => go(el, "transform", `scaleX(${fraction})`, "scaleX(1)"));
-        if (thumb) go(thumb, "translate", `${(fraction * 100).toFixed(3)}cqw 0`, "100cqw 0");
+        // The thumb shows only while the line is pointed at or focused, and runs only then: an
+        // unseen element's animation isn't given to the compositor, and would restyle the page
+        // every frame. In pixels of its line; the line changing width, or the pointer coming
+        // or going, starts it again (below).
+        if (thumb) {
+          const w = thumb.parentElement?.clientWidth ?? 0;
+          const from = `${(fraction * w).toFixed(2)}px 0`;
+          if (seekLine?.matches(":hover, :focus-within")) go(thumb, "translate", from, `${w}px 0`);
+          else {
+            for (const a of thumb.getAnimations()) if (!(a instanceof CSSTransition)) a.cancel();
+            thumb.style.translate = from;
+          }
+        }
         last.run = run;
       }
       const second = Math.floor(s.positionMs / 1000);

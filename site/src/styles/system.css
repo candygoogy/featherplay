@@ -106,7 +106,9 @@
 }
 
 /* The playing song's colour, for everything on the page that wears it: it follows the cover
-   glow (--glow, set on the root by src/demo/glow.ts) as a plain fade on the one colour clock.
+   glow (--glow, set on the root by src/demo/glow.ts). The page takes it at once; each thing
+   that wears it fades to it on the one colour clock itself (`transition: --song var(--t-glow)`),
+   so a song change restyles those few things for the fade, not every element on the page.
    The replica sets its own --song for itself. */
 @property --song {
   syntax: "<color>";
@@ -124,7 +126,6 @@
    parts lie on the desk themselves. */
 :root.sys body {
   --song: var(--glow);
-  transition: --song var(--t-glow) ease;
   font-size: var(--fs-text);
   line-height: var(--lh-text);
   font-kerning: normal;

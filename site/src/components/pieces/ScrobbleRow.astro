@@ -2,7 +2,8 @@
 // Scrobbling, as the app's Settings shows it: the song, its state, and a ring that fills with
 // the time actually heard; at half the song (four minutes at most) the ring closes and a tick
 // draws in, and the song joins the two scrobbled before it. The ring and the tick are CSS
-// (stroke-dashoffset on pathLength), live on the player store (src/demo/pieces.ts createListen).
+// (stroke-dashoffset on pathLength), live on the player store (src/demo/pieces.ts createListen),
+// the ring drawn in small steps (src/demo/bind-pieces.ts).
 import "../../styles/pieces.css";
 import { demoStart, songById } from "../../data/songs";
 

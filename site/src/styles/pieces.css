@@ -315,7 +315,6 @@
   stroke-dashoffset: calc(100 - var(--p) * 100);
   transform: rotate(-90deg);
   transform-origin: 10px 10px;
-  transition: stroke-dashoffset 1s linear;
 }
 .sc-tick {
   stroke: currentColor;
@@ -399,6 +398,7 @@
   border-radius: var(--r-panel);
   background: light-dark(color-mix(in srgb, var(--song) 9%, #f7f7f7), color-mix(in srgb, var(--song) 14%, #181818));
   color: var(--text);
+  transition: --song var(--t-glow) ease;
   box-shadow: 0 0 0 1px light-dark(#00000014, #ffffff0d);
   font-size: var(--fs-small);
   font-weight: var(--fw-medium);
@@ -495,6 +495,7 @@
 /* ---------- The lyric card ---------- */
 .lyric-card {
   --card: color-mix(in srgb, var(--song) 60%, #0f0f0f);
+  transition: --song var(--t-glow) ease;
   position: relative;
   isolation: isolate;
   height: clamp(24rem, 64vh, 38rem);
@@ -514,6 +515,8 @@
   filter: blur(56px) saturate(1.1);
   opacity: 0.3;
   pointer-events: none;
+  /* Its own layer: the card's colour fading under it never blurs the cover again. */
+  will-change: transform;
 }
 .lc-view {
   position: absolute;

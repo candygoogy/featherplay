@@ -156,10 +156,10 @@
   max-width: none;
 }
 @media (prefers-reduced-motion: no-preference) {
-  [data-playing="true"] .fp-mark .travel {
+  [data-playing="true"] .fp-mark:not([data-away] *) .travel {
     animation: fp-mark-travel 0.8s linear infinite;
   }
-  [data-playing="true"] .fp-mark .swell {
+  [data-playing="true"] .fp-mark:not([data-away] *) .swell {
     animation: fp-mark-swell 1.6s ease-in-out infinite alternate;
   }
 }

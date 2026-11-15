@@ -9,7 +9,7 @@
 
 import type { Song } from "../data/songs";
 import { currentLineIndex, formatTime, lyricsSource, type Player, type PlayerState } from "./player";
-import { createListen, mediaMetadataFor, sponsorPlayhead, trayLines } from "./pieces";
+import { createListen, mediaMetadataFor, scrobbleAfterMs, sponsorPlayhead, trayLines } from "./pieces";
 import { followLyrics } from "./follow";
 
 const $$ = <T extends Element = HTMLElement>(sel: string, root: ParentNode = document) => [...root.querySelectorAll<T>(sel)];
@@ -100,6 +100,24 @@ export function bindPieces(player: Player): void {
   // ---- Scrobbling ----
   const scrobbles = $$("[data-piece='scrobble']");
   const listen = createListen();
+  // The ring fills with the time heard, drawn about one device pixel of its round at a time
+  // (some 130 steps to the scrobble), only where it shows: a few small restyles a second,
+  // not an animation ticking every frame (stroke-dashoffset can't run on the compositor).
+  const ring = { heardMs: 0, needMs: Infinity, at: 0, playing: false, scrobbled: false };
+  let ringTimer = 0;
+  const drawRings = () => {
+    clearTimeout(ringTimer);
+    const heard = ring.heardMs + (ring.playing ? performance.now() - ring.at : 0);
+    const p = ring.scrobbled ? 1 : Math.min(1, heard / ring.needMs);
+    let shown = false;
+    for (const sc of scrobbles) {
+      const el = sc.querySelector<SVGElement>("[data-sc-ring]");
+      if (!el || !rendered(el)) continue;
+      shown = true;
+      el.style.setProperty("--p", p.toFixed(4));
+    }
+    if (shown && ring.playing && !ring.scrobbled && p < 1) ringTimer = window.setTimeout(drawRings, Math.max(200, ring.needMs / 130));
+  };
   const addPast = (song: Song) => {
     for (const s of scrobbles) {
       const past = s.querySelector("[data-sc-past]");
@@ -166,6 +184,19 @@ export function bindPieces(player: Player): void {
     render(player.state);
   };
   for (const fly of document.querySelectorAll<HTMLElement>("[data-fly]")) fly.addEventListener("toggle", (e) => (e as ToggleEvent).newState === "open" && again());
+  if ("ResizeObserver" in window) {
+    const widths = new WeakMap<Element, number>();
+    const ro = new ResizeObserver((es) => {
+      let changed = false;
+      for (const e of es) {
+        const w = Math.round(e.contentRect.width);
+        if (widths.has(e.target) && widths.get(e.target) !== w) changed = true;
+        widths.set(e.target, w);
+      }
+      if (changed) again();
+    });
+    for (const el of $$("[data-sp-head]")) if (el.parentElement) ro.observe(el.parentElement);
+  }
   for (const s of new Set([...document.querySelectorAll("[data-piece]")].map((p) => p.closest("section")))) {
     s?.addEventListener("contentvisibilityautostatechange", (e) => !(e as Event & { skipped: boolean }).skipped && again());
   }
@@ -229,12 +260,18 @@ export function bindPieces(player: Player): void {
     }
 
     // Progress lines: from here to the end, restarted when the song, play or the place changes.
+    const resynced = resync;
     if (songChanged || playChanged || jumped || resync) {
       resync = false;
       const f = Math.min(1, s.positionMs / song.durationMs);
       const left = Math.max(0, song.durationMs - s.positionMs);
       for (const el of $$("[data-piece] [data-fill]")) runLine(el, `scaleX(${f})`, "scaleX(1)", left, s.playing);
-      for (const el of $$("[data-sp-head]")) runLine(el, `translateX(${sponsorPlayhead(f)}cqw)`, `translateX(${sponsorPlayhead(1)}cqw)`, left, s.playing);
+      // SponsorBlock's head in pixels of its rail (an animation in container units can't run on
+      // the compositor); the rail changing width starts it again.
+      for (const el of $$("[data-sp-head]")) {
+        const w = (el.parentElement?.clientWidth ?? 0) / 100;
+        runLine(el, `translateX(${(sponsorPlayhead(f) * w).toFixed(2)}px)`, `translateX(${(sponsorPlayhead(1) * w).toFixed(2)}px)`, left, s.playing);
+      }
     }
 
     if (songChanged || secondChanged || playChanged) {
@@ -258,11 +295,12 @@ export function bindPieces(player: Player): void {
     // Scrobbling counts on every step (time heard, not where the song is).
     const l = listen.step(s);
     if (l.finished) addPast(l.finished);
-    if (songChanged || secondChanged || l.justScrobbled || playChanged) {
+    if (songChanged || secondChanged || l.justScrobbled || playChanged || resynced) {
+      Object.assign(ring, { heardMs: l.heardMs, needMs: scrobbleAfterMs(song.durationMs), at: performance.now(), playing: s.playing, scrobbled: l.scrobbled });
+      if (scrobbles.length) drawRings();
       for (const sc of scrobbles) {
         const row = sc.querySelector<HTMLElement>("[data-sc-row]");
         row?.toggleAttribute("data-scrobbled", l.scrobbled);
-        sc.querySelector<SVGElement>("[data-sc-ring]")?.style.setProperty("--p", l.progress.toFixed(4));
         const label = sc.querySelector("[data-sc-label]");
         const text = l.scrobbled ? "Scrobbled" : s.playing ? "Scrobbling now" : "Paused";
         if (label && label.textContent !== text) label.textContent = text;
