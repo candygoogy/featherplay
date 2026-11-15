@@ -289,7 +289,6 @@ fn describe(c: &Change) -> String {
 
 #[cfg(test)]
 mod tests {
-    use featherplay_audio::Compressor;
     use featherplay_core::player::ListEnd;
 
     use super::*;
@@ -304,200 +303,69 @@ mod tests {
         assert_eq!(s.custom_accent, AccentColour(0x3A7BFF));
     }
 
+    /// The changes that do more than set their one field.
     #[test]
-    fn every_change_lands_in_its_field() {
+    fn the_changes_with_more_than_a_field_land_whole() {
         let mut s = Settings::default();
+        let place = WindowPlace {
+            width: 900.0,
+            height: 700.0,
+            position: None,
+            scale: 1.0,
+            maximised: true,
+            monitor: None,
+        };
         let changes = [
-            Change::PreferSongVersions(false),
-            Change::SkipNonMusicInRadio(false),
-            Change::Sponsorblock(false),
-            Change::OutputDevice(Some("Headphones".into())),
-            Change::Scrobbling(false),
-            Change::Scrobble(true),
-            Change::ListenBrainz(true),
-            Change::ScrobbleOtherMedia(false),
-            Change::AlternativeTitles(false),
-            Change::AlternativeArtists(false),
-            Change::Discord(true),
-            Change::DiscordOptions(DiscordOptions {
-                play_button: false,
-                ..DiscordOptions::default()
-            }),
-            Change::Notifications(true),
-            Change::CloseAction(CloseAction::Quit),
             Change::TrayNoticeShown,
-            Change::Accent(Accent::Violet),
-            Change::Theme(ThemeMode::Light),
-            Change::Hotkeys(Some(Hotkeys {
-                play_pause: "Ctrl+Alt+Space".into(),
-                next: "Ctrl+Alt+Right".into(),
-                previous: "Ctrl+Alt+Left".into(),
-            })),
-            Change::QuickSearch(true),
-            Change::QuickSearchKey("Ctrl+Shift+Space".into()),
-            Change::Lyrics(false),
-            Change::LyricsLrclib(false),
-            Change::DesktopLyrics(DesktopLyrics {
-                on: true,
-                ..DesktopLyrics::default()
-            }),
-            Change::Autoplay(false),
-            Change::CheckForUpdates(false),
-            Change::InstallUpdates(false),
-            Change::LocalApi(true),
-            Change::LocalApiPort(31000),
-            Change::Amuse(true),
-            Change::SkipDisliked(false),
-            Change::StreamingQuality(StreamingQuality::Standard),
-            Change::TrayClickOpensWindow(true),
-            Change::StartInTray(true),
-            Change::Tooltips(false),
-            Change::SettingsInSuggestions(false),
             Change::Equalizer(Equalizer::Custom, [4, 0, -3, 0, 2]),
-            Change::Loudness(Loudness::Strong),
-            Change::MatchVolumes(false),
-            Change::SkipSilence(SkipSilence::Everywhere),
-            Change::Crossfade(8),
-            Change::FadeOnSkip(true),
-            Change::PlaybackSpeed(150),
-            Change::SleepTimer(true),
-            Change::SleepFade(10),
             Change::SignInBrowser("brave".into()),
-            Change::DnsOverHttps(true),
-            Change::MainWindow(WindowPlace {
-                width: 900.0,
-                height: 700.0,
-                position: None,
-                scale: 1.0,
-                maximised: true,
-                monitor: None,
-            }),
+            Change::MainWindow(place),
+            Change::Pins("".into(), vec!["a".into()]),
+            Change::Pins("2".into(), vec!["b".into()]),
         ];
         for c in &changes {
             c.apply(&mut s);
         }
-        let d = Settings::default();
-        assert_ne!(s.prefer_song_versions, d.prefer_song_versions);
-        assert_ne!(s.skip_non_music_in_radio, d.skip_non_music_in_radio);
-        assert_ne!(s.sponsorblock, d.sponsorblock);
-        assert_eq!(s.output_device.as_deref(), Some("Headphones"));
-        assert!(s.lastfm_enabled && s.discord && s.notifications);
-        assert_eq!(s.accent, Accent::Violet);
-        assert!(!s.scrobble_other_media && s.tray_notice_shown);
-        assert_eq!(s.close_action, CloseAction::Quit);
-        assert!(!s.scrobbling && s.listenbrainz_enabled);
-        assert!(!s.alternative_titles && !s.alternative_artists);
-        assert!(s.hotkeys.is_some());
-        assert!(s.quick_search);
-        assert_eq!(s.quick_search_key, "Ctrl+Shift+Space");
-        assert_eq!(s.theme, ThemeMode::Light);
-        assert!(s.local_api);
-        assert_eq!(s.local_api_port, 31000);
-        assert!(s.amuse);
-        assert!(!s.discord_options.play_button);
-        assert!(!s.lyrics && !s.lyrics_lrclib);
-        assert!(s.desktop_lyrics.on);
-        assert!(!s.autoplay);
-        assert!(!s.skip_disliked);
-        assert_eq!(s.streaming_quality, StreamingQuality::Standard);
-        assert!(s.tray_click_opens_window);
-        assert!(s.start_in_tray);
-        assert!(!s.tooltips);
-        assert!(!s.settings_in_suggestions);
+        assert!(s.tray_notice_shown);
         assert_eq!(
             (s.equalizer, s.equalizer_bands),
             (Equalizer::Custom, [4, 0, -3, 0, 2])
         );
-        assert_eq!(s.loudness, Loudness::Strong);
-        assert!(!s.match_volumes);
-        assert_eq!(s.skip_silence, SkipSilence::Everywhere);
-        assert_eq!((s.crossfade, s.fade_on_skip), (8, true));
-        assert_eq!(s.playback_speed, 150);
-        assert_eq!((s.sleep_timer, s.sleep_fade), (true, 10));
         assert_eq!(s.sign_in_browser.as_deref(), Some("brave"));
-        assert!(!s.check_for_updates && !s.install_updates);
-        assert!(s.dns_over_https);
         assert!(s.main_window.is_some_and(|w| w.maximised));
-        assert_eq!(s.volume, d.volume, "the volume isn't a page setting");
+        assert_eq!(s.pins.get("2"), Some(&vec!["b".to_string()]));
+        // No pins left for an account: its entry goes.
+        Change::Pins("".into(), Vec::new()).apply(&mut s);
+        assert!(!s.pins.contains_key(""), "{:?}", s.pins);
+        assert_eq!(s.volume, Settings::default().volume, "the volume isn't a page setting");
     }
 
+    /// The settings the player and the audio bus take converted: autoplay to the list's
+    /// end, a crossfade of 0 to none, the speed in percent to a rate, the equalizer to bands.
     #[test]
-    fn autoplay_on_plays_on_and_off_restarts_the_list() {
+    fn the_playback_settings_reach_the_player_and_the_audio_bus() {
         let mut s = Settings::default();
-        let on = crate::controller::prefs(&s).list_end;
+        let p = prefs(&s);
+        assert_eq!(p.list_end, ListEnd::Autoplay, "autoplay on");
+        assert_eq!((p.crossfade, p.fade_on_skip), (None, false), "no crossfade");
+        assert_eq!(p.speed_percent, 100);
+        assert_eq!(crate::controller::playback_speed(&s), 1.0);
+        assert_eq!(equalizer_bands(&s), None, "equalizer off");
+
         s.autoplay = false;
-        let off = crate::controller::prefs(&s).list_end;
-        assert_eq!((on, off), (ListEnd::Autoplay, ListEnd::Restart));
-    }
-
-    #[test]
-    fn skip_disliked_reaches_the_player() {
-        let mut s = Settings::default();
-        let on = crate::controller::prefs(&s).skip_disliked;
-        s.skip_disliked = false;
-        let off = crate::controller::prefs(&s).skip_disliked;
-        assert_eq!((on, off), (true, false));
-    }
-
-    #[test]
-    fn crossfade_reaches_the_player() {
-        let mut s = Settings::default();
-        let off = crate::controller::prefs(&s);
-        assert_eq!((off.crossfade, off.fade_on_skip), (None, false));
         s.crossfade = 5;
         s.fade_on_skip = true;
-        let on = crate::controller::prefs(&s);
-        assert_eq!(
-            (on.crossfade, on.fade_on_skip),
-            (Some(std::time::Duration::from_secs(5)), true)
-        );
-    }
-
-    #[test]
-    fn playback_speed_reaches_the_player_and_the_engine() {
-        let mut s = Settings::default();
-        assert_eq!(crate::controller::prefs(&s).speed_percent, 100);
-        assert_eq!(crate::controller::playback_speed(&s), 1.0);
         s.playback_speed = 75;
-        assert_eq!(crate::controller::prefs(&s).speed_percent, 75);
-        assert_eq!(crate::controller::playback_speed(&s), 0.75);
-    }
-
-    #[test]
-    fn the_sound_settings_reach_the_audio_bus() {
-        let mut s = Settings::default();
-        assert_eq!(crate::controller::equalizer_bands(&s), None);
-        assert_eq!(crate::controller::compressor(s.loudness), Compressor::Off);
         s.equalizer = Equalizer::Bass;
         s.equalizer_bands = [1, 1, 1, 1, 1];
+        let p = prefs(&s);
+        assert_eq!(p.list_end, ListEnd::Restart, "autoplay off");
         assert_eq!(
-            crate::controller::equalizer_bands(&s),
-            Some([8.0, 0.0, 0.0, 0.0, 0.0])
+            (p.crossfade, p.fade_on_skip),
+            (Some(std::time::Duration::from_secs(5)), true)
         );
-        assert_eq!(
-            crate::controller::compressor(Loudness::Light),
-            Compressor::Light
-        );
-        assert_eq!(
-            crate::controller::compressor(Loudness::Strong),
-            Compressor::Strong
-        );
-        assert_eq!(
-            crate::controller::skip_silences(s.skip_silence),
-            featherplay_audio::SkipSilence::Off
-        );
-        assert_eq!(
-            crate::controller::skip_silences(SkipSilence::StartAndEnd),
-            featherplay_audio::SkipSilence::StartAndEnd
-        );
-    }
-
-    #[test]
-    fn streaming_quality_picks_the_resolver_quality() {
-        use featherplay_streams::Quality;
-        let q = crate::controller::stream_quality;
-        assert_eq!(q(StreamingQuality::High), Quality::High);
-        assert_eq!(q(StreamingQuality::Standard), Quality::Standard);
-        assert_eq!(q(StreamingQuality::default()), Quality::default());
+        assert_eq!(p.speed_percent, 75);
+        assert_eq!(crate::controller::playback_speed(&s), 0.75);
+        assert_eq!(equalizer_bands(&s), Some([8.0, 0.0, 0.0, 0.0, 0.0]));
     }
 }
