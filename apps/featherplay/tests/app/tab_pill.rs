@@ -182,11 +182,18 @@ fn the_tab_pill_slides_at_once_lands_on_time_and_stops() {
     let ui = &scene.ui;
     let w = ui.window();
     // Related and Lyrics once, so their rows and lines are there when the pill slides to
-    // them (not their skeletons, whose light sweeps for as long as they load).
+    // them (not their skeletons, whose light sweeps for as long as they load). Each until
+    // nothing loads or animates, the frames moving the clock on: the lyrics are looked up a
+    // second after they're asked for, and their lines come a few a frame.
     for tab in [1, 2, 0] {
         click_tab(ui, WIDTH, tab);
-        scene.settle();
-        frames(w, 250, |_| {});
+        for _ in 0..500 {
+            scene.settle_once();
+            frames(w, 1, |_| {});
+            if featherplay::busy::pending() == 0 && !w.has_active_animations() {
+                break;
+            }
+        }
     }
     let look = Look::at_rest(ui);
     let (left, seg) = segments(ui);
