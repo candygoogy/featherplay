@@ -258,9 +258,10 @@ main:focus {
    measure their lines as they start, and a skipped section gives them no size. A page that
    loads part-way down (Base.astro's data-land) renders them all from the start: the browser
    puts it back in place after the first layout, and a skipped section it lands on would show
-   for a frame as the bare ground. */
-:root:not([data-land]) :is(#light, #questions, #download),
-:root:not([data-land]) body > footer {
+   for a frame as the bare ground. A link within the page renders them all for its jump
+   (data-reach, src/scripts/anchors.ts), so it lands where it says. */
+:root:not([data-land]):not([data-reach]) :is(#light, #questions, #download),
+:root:not([data-land]):not([data-reach]) body > footer {
   content-visibility: auto;
   contain-intrinsic-size: auto 1000px;
 }

@@ -55,6 +55,11 @@ import { links } from "../data/links";
     content-visibility: auto;
     contain-intrinsic-size: auto 1800px;
   }
+  /* A link within the page lays it out for its jump (src/scripts/anchors.ts), and a page
+     loading part-way down from the start (base.css). */
+  :global(:root:is([data-reach], [data-land])) .kept {
+    content-visibility: visible;
+  }
   .kept-head {
     display: grid;
     gap: var(--s3);
