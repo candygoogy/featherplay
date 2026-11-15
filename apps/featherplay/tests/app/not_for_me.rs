@@ -76,19 +76,30 @@ fn run(player: &mut Player, actions: Vec<Action>) {
 
 const AT: Duration = Duration::from_secs(83);
 
+/// A first press on a song not disliked: rate it Dislike, then skip it, whatever its rating.
 #[test]
 fn not_for_me_dislikes_the_song_then_skips_it() {
-    let mut player = player_with(&["a", "b", "c"]);
-    let (actions, _) = not_for_me::actions(&track("a"), AT);
-    assert!(
-        matches!(
-            &actions[..],
-            [Action::Rate(id, LikeStatus::Dislike), Action::Next] if id.0 == "a"
-        ),
-        "{actions:?}"
-    );
-    run(&mut player, actions);
-    assert_eq!(current(&player), Some("b"));
+    for like in [LikeStatus::Indifferent, LikeStatus::Like] {
+        let mut player = player_with(&["a", "b", "c"]);
+        let mut song = track("a");
+        song.like = like;
+        let not_for_me::Press::Mark(now, _) = not_for_me::press(&song, AT) else {
+            panic!("a first press on a song rated {like:?} took a dislike off");
+        };
+        assert!(
+            matches!(
+                &now[..],
+                [Action::Rate(id, LikeStatus::Dislike), Action::Next] if id.0 == "a"
+            ),
+            "a song rated {like:?}: {now:?}"
+        );
+        run(&mut player, now);
+        assert_eq!(
+            current(&player),
+            Some("b"),
+            "a song rated {like:?} wasn't skipped"
+        );
+    }
 }
 
 /// The tray's item, which doesn't show the rating.
@@ -238,22 +249,4 @@ fn a_press_on_a_song_shown_disliked_only_takes_the_dislike_off() {
         player.queue().current().map(|t| t.like),
         Some(LikeStatus::Indifferent)
     );
-}
-
-#[test]
-fn a_first_press_marks_and_skips_as_before() {
-    for like in [LikeStatus::Indifferent, LikeStatus::Like] {
-        let mut song = track("a");
-        song.like = like;
-        let not_for_me::Press::Mark(now, _) = not_for_me::press(&song, AT) else {
-            panic!("a first press on a song rated {like:?} took a dislike off");
-        };
-        assert!(
-            matches!(
-                &now[..],
-                [Action::Rate(_, LikeStatus::Dislike), Action::Next]
-            ),
-            "{now:?}"
-        );
-    }
 }
