@@ -99,7 +99,7 @@ fn current_row_cover_and_liked_songs_label() {
     ui.global::<Theme>().set_still(true);
     let data = ui.global::<QueueData>();
     // Up next asks for the covers of the rows it shows: the panel is open, and drawn.
-    prepare::init(&ctx);
+    prepare::init(ctx);
     ui.window().set_size(slint::PhysicalSize::new(1280, 800));
     ui.global::<Frame>().set_queue_open(true);
     ui.show().expect("show");
@@ -115,33 +115,33 @@ fn current_row_cover_and_liked_songs_label() {
     let url = tracks[1].thumbnail.clone().unwrap_or_default();
     ctx.covers.load(&url, 40, move |_| l.set(true));
     assert!(pump.until(|| loaded.get(), WAIT), "the list's cover loads");
-    queue_panel::update(&ctx, &state(&tracks[1], &tracks[2..3]));
+    queue_panel::update(ctx, &state(&tracks[1], &tracks[2..3]));
     assert!(
         pump.until(|| has_cover(&data.get_current().cover), WAIT),
         "the current row shows a cover already in memory"
     );
 
     // 2. The next track's cover is shown in its upcoming row; then it becomes current.
-    queue_panel::update(&ctx, &state(&tracks[0], &tracks[2..4]));
+    queue_panel::update(ctx, &state(&tracks[0], &tracks[2..4]));
     let upcoming_shown = || {
         draw();
         let rows = data.get_upcoming();
         rows.row_count() == 2 && rows.iter().all(|r| has_cover(&r.cover))
     };
     assert!(pump.until(upcoming_shown, WAIT), "the upcoming covers load");
-    queue_panel::update(&ctx, &state(&tracks[2], &tracks[3..4]));
+    queue_panel::update(ctx, &state(&tracks[2], &tracks[3..4]));
     assert_eq!(data.get_current().id.as_str(), tracks[2].id.0);
     assert!(
         pump.until(|| has_cover(&data.get_current().cover), WAIT),
         "the current row keeps the cover its upcoming row had"
     );
     // A later state for the same track keeps it.
-    queue_panel::update(&ctx, &state(&tracks[2], &tracks[3..4]));
+    queue_panel::update(ctx, &state(&tracks[2], &tracks[3..4]));
     assert!(has_cover(&data.get_current().cover));
 
     // 3. Played from Liked songs, the panel says so.
-    playlist::init(&ctx);
-    playlist::open(&ctx, &PlaylistId("LM".into()));
+    playlist::init(ctx);
+    playlist::open(ctx, &PlaylistId("LM".into()));
     let pdata = ui.global::<PlaylistData>();
     assert!(
         pump.until(

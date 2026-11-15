@@ -52,11 +52,11 @@ fn the_total_appears_once_the_stream_resolves() {
     let (ui, ctx) = (&bare.ui, &bare.ctx);
     let bar_of = || ui.global::<Bar>();
 
-    bar::apply(&ctx, &playing(None));
+    bar::apply(ctx, &playing(None));
     assert_eq!(bar_of().get_total().as_str(), "", "a total with no length");
     assert_eq!(bar_of().get_duration_s(), 0.0);
 
-    bar::apply(&ctx, &playing(Some(Duration::from_secs(215))));
+    bar::apply(ctx, &playing(Some(Duration::from_secs(215))));
     assert_eq!(bar_of().get_total().as_str(), "3:35");
     assert_eq!(bar_of().get_duration_s(), 215.0);
     assert_eq!(bar_of().get_elapsed().as_str(), "0:00");

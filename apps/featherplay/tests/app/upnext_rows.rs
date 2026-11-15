@@ -118,15 +118,15 @@ fn up_next_loads_the_covers_on_screen_and_follows_the_queue_in_place() {
     ui.window().set_size(slint::PhysicalSize::new(1280, 800));
     ui.global::<Theme>().set_still(true);
     // The rows on screen reach Up next through `ShownRows`.
-    prepare::init(&ctx);
+    prepare::init(ctx);
     ui.global::<Frame>().set_queue_open(true);
     ui.show().expect("show");
     let data = ui.global::<QueueData>();
 
     // Song 0 playing, 1 to 79 next: the panel shows about ten rows.
     let all: Vec<usize> = (0..SONGS).collect();
-    play(&ctx, &all);
-    settle(&ui, &pump);
+    play(ctx, &all);
+    settle(ui, pump);
     let rows = data.get_upcoming();
     assert_eq!(rows.row_count(), SONGS - 1);
     for i in 0..8 {
@@ -149,7 +149,7 @@ fn up_next_loads_the_covers_on_screen_and_follows_the_queue_in_place() {
     );
 
     // The next song: the same list, its first row gone, the rest as they were.
-    play(&ctx, &all[1..]);
+    play(ctx, &all[1..]);
     assert!(
         data.get_upcoming() == rows,
         "the next song built the list again"
@@ -158,7 +158,7 @@ fn up_next_loads_the_covers_on_screen_and_follows_the_queue_in_place() {
     let first = rows.row_data(0).expect("row");
     assert_eq!(first.id.as_str(), "song-2");
     assert!(shows(&first, 2), "a row that stayed lost its cover");
-    settle(&ui, &pump);
+    settle(ui, pump);
     assert!(
         rows.iter()
             .enumerate()
@@ -169,15 +169,15 @@ fn up_next_loads_the_covers_on_screen_and_follows_the_queue_in_place() {
     // front. Song 80's cover, asked for at row 0, lands at row 2, where it is by then.
     let mut queue = vec![1, SONGS];
     queue.extend(2..SONGS);
-    play(&ctx, &queue);
+    play(ctx, &queue);
     let mut queue = vec![1, SONGS + 1, SONGS + 2, SONGS];
     queue.extend(2..SONGS);
-    play(&ctx, &queue);
+    play(ctx, &queue);
     assert!(
         data.get_upcoming() == rows,
         "Play next built the list again"
     );
-    settle(&ui, &pump);
+    settle(ui, pump);
     for (i, song) in [SONGS + 1, SONGS + 2, SONGS, 2, 3].into_iter().enumerate() {
         let row = rows.row_data(i).expect("row");
         assert_eq!(row.id.as_str(), format!("song-{song}"));

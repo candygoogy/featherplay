@@ -48,7 +48,7 @@ fn at_1_5x_the_clock_runs_one_and_a_half_seconds_a_second() {
     };
     let wait = Duration::from_millis(400);
     let started = Instant::now();
-    bar::apply(&ctx, &state);
+    bar::apply(ctx, &state);
     std::thread::sleep(wait);
     let at = bar::position().expect("a track") - from;
     let most = started.elapsed().mul_f64(1.5);
