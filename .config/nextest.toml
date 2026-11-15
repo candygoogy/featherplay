@@ -39,14 +39,6 @@ default-filter = 'not (package(featherplay) & binary(app) & test(/^(smoothness|f
 [profile.ceilings]
 default-filter = 'package(featherplay) & binary(app) & test(/^(first_frames|home_scroll_bump|lyrics_frames|scroll_frames|lyrics_arrive|lyrics_button|skeleton_frames|content_fade)::/)'
 
-# The no-lyrics tests run on Slint's real clock: a lyrics lookup starts on a timer, which a
-# frozen clock never fires. Beside a full machine a frame can take longer than a fade, so they
-# run alone. The other motion tests step a frozen clock and run beside everything else.
-[[profile.default.overrides]]
-filter = 'package(featherplay) & binary(app) & test(/^lyrics_none::/)'
-test-group = 'serial-perf'
-threads-required = 'num-test-threads'
-
 # The audio engine beside a full CPU (ignored, a measurement): it fills every core itself,
 # so it runs alone.
 [[profile.default.overrides]]
