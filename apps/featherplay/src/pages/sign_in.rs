@@ -459,18 +459,11 @@ fn show_running(data: &SignInData, browser: &Browser) {
     data.set_browser_running(true);
     data.set_choosing(false);
     clear_problem(data);
-    // Linux reads the sign-in once the browser is closed (`browser`), Windows while it's open.
-    let status = if cfg!(target_os = "linux") {
-        tr!(
-            "Sign in in {}, then close that window. featherplay picks up the session once it's closed.",
-            browser.name
-        )
-    } else {
-        tr!(
-            "Finish signing in in {}. featherplay closes it once you're in.",
-            browser.name
-        )
-    };
+    // The sign-in is read once the browser is closed (`browser`).
+    let status = tr!(
+        "Sign in in {}, then close that window. featherplay picks up the session once it's closed.",
+        browser.name
+    );
     data.set_status(status.into());
 }
 
@@ -531,18 +524,11 @@ fn browser_done(browser: &'static Browser, outcome: browser::Outcome) {
             return;
         }
         Outcome::Closed => (tr!("{} closed", short), not_yet, SignInWay::Browser),
-        // Linux gives the window 15 minutes (`browser::timeout`), and reads it even then.
-        Outcome::TimedOut if cfg!(target_os = "linux") => (
+        // The window gets 15 minutes (`browser::timeout`), and is read even then.
+        Outcome::TimedOut => (
             tr!("{} closed after 15 minutes", short),
             tr!(
                 "featherplay closes it when it stays open that long, and found no sign-in in it. Try again when you're ready."
-            ),
-            SignInWay::Browser,
-        ),
-        Outcome::TimedOut => (
-            tr!("{} closed after 10 minutes", short),
-            tr!(
-                "featherplay closes it when the sign-in takes that long. Try again when you're ready."
             ),
             SignInWay::Browser,
         ),

@@ -25,49 +25,6 @@ fn signed_in_cookies() -> Vec<Cookie> {
     ]
 }
 
-#[test]
-#[cfg(windows)]
-fn the_session_counts_once_it_has_settled_for_3_s() {
-    let t0 = Instant::now();
-    let mut s = Settle::new(Duration::from_secs(3));
-    assert_eq!(
-        s.see(t0, &[cookie("PREF", ".youtube.com")], NOW),
-        Seen::NotYet
-    );
-    let at = t0 + Duration::from_secs(1);
-    assert_eq!(
-        s.see(at, &signed_in_cookies(), NOW),
-        Seen::Settling(Duration::from_secs(3))
-    );
-    assert_eq!(
-        s.see(at + Duration::from_secs(1), &signed_in_cookies(), NOW),
-        Seen::Settling(Duration::from_secs(2))
-    );
-    // The last read decides the header: music.youtube.com's own cookie is in it now.
-    let mut later = signed_in_cookies();
-    later.push(cookie("YSC", "music.youtube.com"));
-    assert_eq!(
-        s.see(at + Duration::from_secs(3), &later, NOW),
-        Seen::Ready("SAPISID=v-SAPISID; SID=v-SID; YSC=v-YSC".into())
-    );
-}
-
-#[test]
-#[cfg(windows)]
-fn losing_the_session_while_settling_starts_over() {
-    let t0 = Instant::now();
-    let mut s = Settle::new(Duration::from_secs(3));
-    assert!(matches!(
-        s.see(t0, &signed_in_cookies(), NOW),
-        Seen::Settling(_)
-    ));
-    assert_eq!(s.see(t0 + Duration::from_secs(2), &[], NOW), Seen::NotYet);
-    assert_eq!(
-        s.see(t0 + Duration::from_secs(4), &signed_in_cookies(), NOW),
-        Seen::Settling(Duration::from_secs(3))
-    );
-}
-
 /// Edge installed, with its pipe turned off by the machine's policy.
 #[cfg(windows)]
 struct PolicyOffPc;
@@ -139,69 +96,30 @@ fn with_the_policy_off_the_browser_isnt_started() {
     assert!(!made);
 }
 
+/// The sign-in window is the browser as the user would start it: the profile, its own
+/// switches (which neither mark it as automated nor hide that, see `browsers`), the page. No
+/// pipe.
 #[test]
-#[cfg(windows)]
-fn the_arguments_are_the_profile_the_pipe_and_the_sign_in_page() {
-    let a = args(
-        &EDGE,
-        Path::new(r"C:\cache\signin-1-ab"),
-        session::SIGN_IN_URL,
-    );
-    let a: Vec<&str> = a.iter().map(|s| s.to_str().unwrap()).collect();
-    assert_eq!(
-        a,
-        [
-            r"--user-data-dir=C:\cache\signin-1-ab",
-            "--remote-debugging-pipe",
-            "--no-first-run",
-            "--no-default-browser-check",
-            session::SIGN_IN_URL,
-        ]
-    );
-    assert!(!a.iter().any(|s| s.contains("remote-debugging-port")));
-}
-
-/// Linux's sign-in window is the browser as the user would start it: no pipe, and nothing
-/// that marks it as automated or hides that mark.
-#[test]
-#[cfg(target_os = "linux")]
-fn the_sign_in_window_has_no_pipe_and_no_automation_switches() {
-    let a = window_args(
-        &EDGE,
-        Path::new("/home/ada/.cache/featherplay/signin-1-ab"),
-        session::SIGN_IN_URL,
-    );
-    let a: Vec<&str> = a.iter().map(|s| s.to_str().unwrap()).collect();
-    assert_eq!(
-        a,
-        [
-            "--user-data-dir=/home/ada/.cache/featherplay/signin-1-ab",
-            "--no-first-run",
-            "--no-default-browser-check",
-            "--password-store=basic",
-            session::SIGN_IN_URL,
-        ]
-    );
+fn the_sign_in_window_has_no_pipe() {
+    let a = window_args(&EDGE, Path::new("signin-1-ab"), session::SIGN_IN_URL);
+    let mut want = vec![OsString::from("--user-data-dir=signin-1-ab")];
+    want.extend(EDGE.switches.iter().map(OsString::from));
+    want.push(session::SIGN_IN_URL.into());
+    assert_eq!(a, want);
 }
 
 /// The read that follows is headless, on a blank page: the pipe is never open on Google's.
 #[test]
-#[cfg(target_os = "linux")]
 fn the_read_is_headless_on_a_blank_page() {
-    let a = read_args(&EDGE, Path::new("/home/ada/.cache/featherplay/signin-1-ab"));
-    let a: Vec<&str> = a.iter().map(|s| s.to_str().unwrap()).collect();
-    assert_eq!(
-        a,
-        [
-            "--user-data-dir=/home/ada/.cache/featherplay/signin-1-ab",
-            "--remote-debugging-pipe",
-            "--headless=new",
-            "--no-first-run",
-            "--no-default-browser-check",
-            "--password-store=basic",
-            "about:blank",
-        ]
-    );
+    let a = read_args(&EDGE, Path::new("signin-1-ab"));
+    let mut want: Vec<OsString> = vec![
+        "--user-data-dir=signin-1-ab".into(),
+        "--remote-debugging-pipe".into(),
+        "--headless=new".into(),
+    ];
+    want.extend(EDGE.switches.iter().map(OsString::from));
+    want.push("about:blank".into());
+    assert_eq!(a, want);
 }
 
 /// The browser's process, as the tests drive it.
@@ -211,8 +129,7 @@ struct FakeProcess {
     killed: AtomicBool,
     /// `Browser.close` is answered but the process stays.
     ignores_close: AtomicBool,
-    /// Asked to quit, as closing its window would (Linux).
-    #[cfg(target_os = "linux")]
+    /// Asked to quit, as closing its window would.
     quit: AtomicBool,
 }
 
@@ -231,7 +148,6 @@ impl Process for FakeProcess {
         self.killed.store(true, Ordering::Relaxed);
         self.exited.store(true, Ordering::Relaxed);
     }
-    #[cfg(target_os = "linux")]
     fn quit(&self) {
         self.quit.store(true, Ordering::Relaxed);
         self.exited.store(true, Ordering::Relaxed);
@@ -240,14 +156,8 @@ impl Process for FakeProcess {
 
 fn quick() -> Limits {
     Limits {
-        #[cfg(windows)]
-        poll: Duration::from_millis(10),
-        #[cfg(windows)]
-        settle: Duration::from_millis(30),
         first_reply: Duration::from_millis(1000),
         resend: Duration::from_millis(100),
-        #[cfg(windows)]
-        reply: Duration::from_millis(300),
         timeout: Duration::from_secs(5),
         close: Duration::from_secs(2),
     }
@@ -259,9 +169,6 @@ enum Answer {
     Silence,
     /// No cookies, after this long.
     Late(Duration),
-    /// Windows only: Linux asks once, and a reply that never comes is `Silence` there.
-    #[cfg(windows)]
-    Hang,
     ExitProcess,
     ClosePipe,
 }
@@ -341,8 +248,6 @@ fn serve(
                     return;
                 }
             }
-            #[cfg(windows)]
-            Answer::Hang => std::thread::sleep(Duration::from_secs(60)),
             Answer::ExitProcess => process.exited.store(true, Ordering::Relaxed),
             Answer::ClosePipe => return,
         }
@@ -357,176 +262,10 @@ fn write_reply(to: &mut PipeWriter, id: u64, result: serde_json::Value) -> std::
     to.write_all(&bytes)
 }
 
-#[cfg(windows)]
-fn run_fake(fb: &mut FakeBrowser, cancel: &AtomicBool, limits: &Limits) -> Outcome {
-    watch(
-        &*fb.process,
-        &mut fb.client,
-        &fb.replies,
-        cancel,
-        limits,
-        || NOW,
-    )
-}
-
-#[test]
-#[cfg(windows)]
-fn a_settled_session_gives_the_music_header_and_closes_the_browser() {
-    let mut fb = fake_browser(|n| match n {
-        1 | 2 => Answer::Cookies(vec![cookie("NID", ".google.com")]),
-        _ => Answer::Cookies(signed_in_cookies()),
-    });
-    let out = run_fake(&mut fb, &AtomicBool::new(false), &quick());
-    assert_eq!(
-        out,
-        Outcome::SignedIn("SAPISID=v-SAPISID; SID=v-SID".into())
-    );
-    let methods = fb.methods.lock().unwrap().clone();
-    assert_eq!(methods.last().map(String::as_str), Some("Browser.close"));
-    assert!(
-        methods[..methods.len() - 1]
-            .iter()
-            .all(|m| m == "Storage.getCookies"),
-        "{methods:?}"
-    );
-    assert!(
-        !fb.process.killed.load(Ordering::Relaxed),
-        "it closed by itself"
-    );
-}
-
-#[test]
-#[cfg(windows)]
-fn a_browser_that_stays_after_browser_close_is_ended() {
-    let mut fb = fake_browser(|_| Answer::Cookies(signed_in_cookies()));
-    fb.process.ignores_close.store(true, Ordering::Relaxed);
-    let limits = Limits {
-        close: Duration::from_millis(100),
-        ..quick()
-    };
-    let out = run_fake(&mut fb, &AtomicBool::new(false), &limits);
-    assert!(matches!(out, Outcome::SignedIn(_)), "{out:?}");
-    assert!(fb.process.killed.load(Ordering::Relaxed));
-}
-
-#[test]
-#[cfg(windows)]
-fn closing_the_browser_while_the_session_settles_keeps_the_sign_in() {
-    let mut fb = fake_browser(|n| match n {
-        1 => Answer::Cookies(signed_in_cookies()),
-        _ => Answer::ExitProcess,
-    });
-    let limits = Limits {
-        settle: Duration::from_millis(200),
-        ..quick()
-    };
-    assert_eq!(
-        run_fake(&mut fb, &AtomicBool::new(false), &limits),
-        Outcome::SignedIn("SAPISID=v-SAPISID; SID=v-SID".into())
-    );
-}
-
-#[test]
-#[cfg(windows)]
-fn a_browser_exiting_at_once_didnt_start() {
-    let mut fb = fake_browser(|_| Answer::ExitProcess);
-    assert!(matches!(
-        run_fake(&mut fb, &AtomicBool::new(false), &quick()),
-        Outcome::DidntStart(_)
-    ));
-}
-
-#[test]
-#[cfg(windows)]
-fn a_browser_that_exited_after_its_early_exit_was_closed() {
-    let process = FakeProcess::default();
-    process.exited.store(true, Ordering::Relaxed);
-    use Stop::{Exited, PipeClosed};
-    let later = EARLY_EXIT + Duration::from_secs(5);
-    let half_a_minute = Duration::from_secs(30);
-    // The pipe turned off by policy: no answer, then the user closes the window. Or the
-    // pipe closing as the browser exits.
-    // (case, why it stopped, answered, ran for)
-    let cases = [
-        ("never answered, exited", Exited, false, later),
-        ("never answered, pipe closed", PipeClosed, false, later),
-        ("answered, pipe closed", PipeClosed, true, half_a_minute),
-    ];
-    for (case, stop, answered, ran) in cases {
-        let out = stopped(stop, answered, ran, &process);
-        assert_eq!(out, Outcome::Closed, "{case}");
-    }
-}
-
 #[test]
 fn the_debug_form_leaves_the_header_out() {
     let o = Outcome::SignedIn("SAPISID=secret".into());
     assert!(!format!("{o:?}").contains("secret"));
-}
-
-#[test]
-#[cfg(windows)]
-fn closing_the_browser_ends_the_sign_in() {
-    let mut fb = fake_browser(|n| match n {
-        1 => Answer::Cookies(vec![]),
-        _ => Answer::ExitProcess,
-    });
-    assert_eq!(
-        run_fake(&mut fb, &AtomicBool::new(false), &quick()),
-        Outcome::Closed
-    );
-}
-
-#[test]
-#[cfg(windows)]
-fn no_first_answer_means_blocked() {
-    let mut fb = fake_browser(|_| Answer::Silence);
-    assert_eq!(
-        run_fake(&mut fb, &AtomicBool::new(false), &quick()),
-        Outcome::Blocked
-    );
-    assert!(fb.process.killed.load(Ordering::Relaxed));
-}
-
-/// A browser that starts slowly answers its first command late: the first reply gets
-/// longer than the others.
-#[test]
-#[cfg(windows)]
-fn a_slow_first_answer_is_waited_for() {
-    let mut fb = fake_browser(|n| match n {
-        1 => Answer::Late(Duration::from_millis(600)),
-        _ => Answer::Cookies(signed_in_cookies()),
-    });
-    let out = run_fake(&mut fb, &AtomicBool::new(false), &quick());
-    assert!(matches!(out, Outcome::SignedIn(_)), "{out:?}");
-}
-
-/// A browser that isn't up yet may lose the first command: until the first answer, the
-/// cookies are asked for again.
-#[test]
-#[cfg(windows)]
-fn a_lost_first_question_is_asked_again() {
-    let mut fb = fake_browser(|n| match n {
-        1 | 2 => Answer::Silence,
-        _ => Answer::Cookies(signed_in_cookies()),
-    });
-    let out = run_fake(&mut fb, &AtomicBool::new(false), &quick());
-    assert!(matches!(out, Outcome::SignedIn(_)), "{out:?}");
-    let methods = fb.methods.lock().unwrap().clone();
-    assert!(methods.len() >= 4, "{methods:?}");
-}
-
-/// Once the browser has answered, a missing reply isn't asked again: it stopped answering.
-#[test]
-#[cfg(windows)]
-fn after_the_first_answer_nothing_is_asked_again() {
-    let mut fb = fake_browser(|n| match n {
-        1 => Answer::Cookies(vec![]),
-        _ => Answer::Silence,
-    });
-    let out = run_fake(&mut fb, &AtomicBool::new(false), &quick());
-    assert!(matches!(out, Outcome::Lost(_)), "{out:?}");
-    assert_eq!(fb.methods.lock().unwrap().len(), 2);
 }
 
 #[test]
@@ -535,64 +274,16 @@ fn the_first_answer_waits_longer_on_linux_only() {
     let first = if cfg!(target_os = "linux") { 60 } else { 15 };
     assert_eq!(l.first_reply, Duration::from_secs(first));
     assert_eq!(l.resend, Duration::from_secs(5));
-    #[cfg(windows)]
-    assert_eq!(l.reply, Duration::from_secs(15));
+    assert_eq!(l.timeout, Duration::from_secs(15 * 60));
 }
 
-#[test]
-#[cfg(windows)]
-fn no_later_answer_or_a_broken_pipe_while_it_runs_means_lost() {
-    for (case, hang) in [("no later answer", true), ("a broken pipe", false)] {
-        let mut fb = fake_browser(move |n| match n {
-            1 => Answer::Cookies(vec![]),
-            _ if hang => Answer::Hang,
-            _ => Answer::ClosePipe,
-        });
-        let out = run_fake(&mut fb, &AtomicBool::new(false), &quick());
-        assert!(matches!(out, Outcome::Lost(_)), "{case}: {out:?}");
-        let killed = fb.process.killed.load(Ordering::Relaxed);
-        assert!(killed, "{case}: the browser is ended");
-    }
-}
-
-#[test]
-#[cfg(windows)]
-fn no_sign_in_in_time_ends_it() {
-    let mut fb = fake_browser(|_| Answer::Cookies(vec![]));
-    let limits = Limits {
-        timeout: Duration::from_millis(100),
-        ..quick()
-    };
-    assert_eq!(
-        run_fake(&mut fb, &AtomicBool::new(false), &limits),
-        Outcome::TimedOut
-    );
-    assert!(fb.process.killed.load(Ordering::Relaxed));
-}
-
-#[test]
-#[cfg(windows)]
-fn cancel_ends_it() {
-    let mut fb = fake_browser(|_| Answer::Cookies(vec![]));
-    let cancel = Arc::new(AtomicBool::new(false));
-    let c = cancel.clone();
-    std::thread::spawn(move || {
-        std::thread::sleep(Duration::from_millis(50));
-        c.store(true, Ordering::Relaxed);
-    });
-    assert_eq!(run_fake(&mut fb, &cancel, &quick()), Outcome::Cancelled);
-    assert!(fb.process.killed.load(Ordering::Relaxed));
-}
-
-/// Linux: the headless read, against the fake browser.
-#[cfg(target_os = "linux")]
+/// The headless read, against the fake browser.
 fn read_fake(fb: &mut FakeBrowser, limits: &Limits) -> Result<Vec<Cookie>, Outcome> {
     let never = AtomicBool::new(false);
     read_and_close(&*fb.process, &mut fb.client, &fb.replies, &never, limits)
 }
 
 #[test]
-#[cfg(target_os = "linux")]
 fn the_read_sends_exactly_the_two_commands() {
     let mut fb = fake_browser(|_| Answer::Cookies(signed_in_cookies()));
     let cookies = read_fake(&mut fb, &quick()).unwrap();
@@ -608,7 +299,6 @@ fn the_read_sends_exactly_the_two_commands() {
 }
 
 #[test]
-#[cfg(target_os = "linux")]
 fn a_read_with_no_answer_is_blocked_and_the_browser_ended() {
     let mut fb = fake_browser(|_| Answer::Silence);
     assert_eq!(read_fake(&mut fb, &quick()).unwrap_err(), Outcome::Blocked);
@@ -621,7 +311,6 @@ fn a_read_with_no_answer_is_blocked_and_the_browser_ended() {
 }
 
 #[test]
-#[cfg(target_os = "linux")]
 fn a_headless_browser_gone_before_it_answers_didnt_start() {
     let answers: [fn(usize) -> Answer; 2] = [|_| Answer::ExitProcess, |_| Answer::ClosePipe];
     for answer in answers {
@@ -632,16 +321,26 @@ fn a_headless_browser_gone_before_it_answers_didnt_start() {
     }
 }
 
+#[test]
+fn a_browser_that_stays_after_browser_close_is_ended() {
+    let mut fb = fake_browser(|_| Answer::Cookies(signed_in_cookies()));
+    fb.process.ignores_close.store(true, Ordering::Relaxed);
+    let limits = Limits {
+        close: Duration::from_millis(100),
+        ..quick()
+    };
+    assert_eq!(read_fake(&mut fb, &limits).unwrap(), signed_in_cookies());
+    assert!(fb.process.killed.load(Ordering::Relaxed));
+}
+
 /// A browser that starts slowly answers late: the read waits for it.
 #[test]
-#[cfg(target_os = "linux")]
 fn a_slow_first_answer_is_waited_for_by_the_read() {
     let mut fb = fake_browser(|_| Answer::Late(Duration::from_millis(600)));
     assert_eq!(read_fake(&mut fb, &quick()).unwrap(), Vec::<Cookie>::new());
 }
 
 #[test]
-#[cfg(target_os = "linux")]
 fn the_profile_with_a_session_is_signed_in_and_one_without_was_closed() {
     assert_eq!(
         session_or(&signed_in_cookies(), NOW, Ended::Closed),
@@ -655,7 +354,6 @@ fn the_profile_with_a_session_is_signed_in_and_one_without_was_closed() {
 }
 
 #[test]
-#[cfg(target_os = "linux")]
 fn closing_the_sign_in_window_goes_on_to_the_read() {
     let process = FakeProcess::default();
     let never = AtomicBool::new(false);
@@ -675,7 +373,6 @@ fn closing_the_sign_in_window_goes_on_to_the_read() {
 }
 
 #[test]
-#[cfg(target_os = "linux")]
 fn the_sign_in_window_ends_on_an_early_exit_or_cancel() {
     let exited = FakeProcess::default();
     exited.exited.store(true, Ordering::Relaxed);
@@ -697,7 +394,6 @@ fn the_sign_in_window_ends_on_an_early_exit_or_cancel() {
 /// Someone who signed in and left the window open keeps the sign-in: at the limit the
 /// browser is asked to quit (not killed), and its profile is read as after a close.
 #[test]
-#[cfg(target_os = "linux")]
 fn at_the_time_limit_the_window_is_closed_and_a_sign_in_still_read() {
     let open = FakeProcess::default();
     let never = AtomicBool::new(false);
@@ -763,11 +459,7 @@ impl Live {
         if let Some(prefs) = browser.preferences {
             profile::seed(&profile, prefs).unwrap();
         }
-        // As the sign-in starts it with the pipe: on Windows, the window (here on a blank
-        // page); on Linux, the headless read.
-        #[cfg(windows)]
-        let args = args(browser, &profile, "about:blank");
-        #[cfg(target_os = "linux")]
+        // As the sign-in starts it with the pipe: the headless read.
         let args = read_args(browser, &profile);
         let (process, pipes) = browsers::launch(exe, &args).unwrap();
         Self {
@@ -815,9 +507,9 @@ impl Drop for Live {
     }
 }
 
-/// Every known browser installed here, for real, on the pipe: on about:blank with a
-/// temporary profile under the test home, so no Google page and no account. Each one's
-/// window shows for a moment (on Linux it's headless, as the sign-in's read is, so none does).
+/// Every known browser installed here, for real, on the pipe: headless on about:blank, as the
+/// sign-in's read is, with a temporary profile under the test home, so no Google page and no
+/// account.
 /// `FEATHERPLAY_HOME=<a test home> cargo nextest run -p featherplay --lib --run-ignored only
 /// -E 'test(live_browsers)' --no-capture`
 #[test]
@@ -853,46 +545,42 @@ fn live_browsers_answer_on_the_pipe_and_close() {
     }
 }
 
-/// Does each browser's process exit when its last window is closed (WM_CLOSE), with the
-/// pipe open? The sign-in takes that as "the user closed it". About:blank, temporary
-/// profile, as above. Windows only: Linux has no `visible_windows` to close.
+/// Does each browser quit when asked (`Running::quit`, WM_CLOSE to its windows), as the
+/// sign-in asks a window left open at its time limit? Started as the sign-in window is, with
+/// no pipe, on about:blank with a temporary profile as above. Windows only: Linux's quit is a
+/// signal (`quit_asks_the_process_to_exit` in the platform).
 #[cfg(windows)]
 #[test]
 #[ignore = "starts every known browser that's installed (about:blank, temporary profile)"]
-fn live_browsers_exit_when_their_window_closes() {
+fn live_browsers_quit_when_asked() {
     for (browser, exe) in live_browsers() {
-        exits_when_its_window_closes(browser, &exe);
+        quits_when_asked(browser, &exe);
     }
 }
 
 #[cfg(windows)]
-fn exits_when_its_window_closes(browser: &Browser, exe: &Path) {
+fn quits_when_asked(browser: &Browser, exe: &Path) {
     let name = browser.name;
-    let mut live = Live::start(browser, exe);
-    let answered = live.cookies().is_some();
-    report(&format!("{name}: answers on the pipe: {answered}"));
-    let mut found = Vec::new();
+    let home = std::env::var_os("FEATHERPLAY_HOME").expect("set FEATHERPLAY_HOME");
+    let cache = featherplay_store::Paths::from_home(Path::new(&home)).cache;
+    report(&format!("{name}: starting {}", exe.display()));
+    let profile = TempProfile(profile::create(&cache).unwrap());
+    if let Some(prefs) = browser.preferences {
+        profile::seed(&profile.0, prefs).unwrap();
+    }
+    let window = browsers::launch_plain(exe, &window_args(browser, &profile.0, "about:blank"));
+    let window = window.unwrap();
     // Its window may take a moment.
-    for _ in 0..50 {
-        found = browsers::visible_windows(live.process().pid);
-        if !found.is_empty() {
-            break;
+    let shown = (0..50).any(|_| {
+        !browsers::visible_windows(window.pid).is_empty() || {
+            std::thread::sleep(Duration::from_millis(200));
+            false
         }
-        std::thread::sleep(Duration::from_millis(200));
-    }
-    assert!(!found.is_empty(), "{name}: no visible window");
-    report(&format!(
-        "{name}: {} visible window(s); sending WM_CLOSE",
-        found.len()
-    ));
-    for &window in &found {
-        browsers::close_window(window);
-    }
-    let exited = live.process().wait(Duration::from_secs(10));
-    report(&format!("{name}: exited within 10 s of WM_CLOSE: {exited}"));
-    assert!(
-        live.finish(),
-        "{name}: the temporary profile is still there"
-    );
-    assert!(exited, "{name} kept running after its window closed");
+    });
+    assert!(shown, "{name}: no visible window");
+    window.quit();
+    let exited = window.wait(Duration::from_secs(10));
+    report(&format!("{name}: exited within 10 s of quit: {exited}"));
+    drop(window);
+    assert!(exited, "{name} kept running after it was asked to quit");
 }
