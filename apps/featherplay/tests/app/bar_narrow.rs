@@ -5,7 +5,10 @@
 //! 640 px are `narrow_shell.rs`'s.
 
 use std::ops::ControlFlow;
+use std::time::Duration;
 
+use featherplay::app;
+use featherplay::controller::{SleepKind, SleepState, UiEvent};
 use featherplay::snapshot::Scene;
 use featherplay::ui::{Player, SettingsData, Theme};
 use i_slint_core::accessibility::AccessibleStringProperty;
@@ -38,7 +41,8 @@ fn span(scene: &Scene, label: &str, top: f32) -> Option<(f32, f32)> {
 }
 
 /// The worst case for room: Linux without a tray (the mini player's button), the sleep timer
-/// on and the speed at 1.25x (its pill), at 960, 800 and 640 px.
+/// on (its crescent, or running: its wider pill) and the speed at 1.25x (its pill), at 960,
+/// 800 and 640 px.
 #[test]
 fn a_narrow_bar_gives_groups_up_and_nothing_overlaps() {
     let scene = Scene::new(960, H, true, false).expect("scene");
@@ -60,28 +64,41 @@ fn a_narrow_bar_gives_groups_up_and_nothing_overlaps() {
         "Mute",
     ];
 
-    // The window's width, and what shows on the right at it.
-    for (width, shown) in [
-        (960, &right[..]),
+    // The window's width, the sleep timer's minutes left if it runs, and what shows on the
+    // right then.
+    for (width, running, shown) in [
+        (960, Some(24), &right[..]),
+        (960, None, &right[..]),
         (
             800,
+            None,
             &["Mini player", "Sleep timer", "Lyrics", "Not for me"][..],
         ),
-        (640, &["Not for me"][..]),
+        (640, None, &["Not for me"][..]),
     ] {
+        app::on_event(UiEvent::Sleep(running.map(|minutes| SleepState {
+            kind: SleepKind::Time,
+            minutes,
+            fading: false,
+            left: Duration::from_secs(u64::from(minutes) * 60),
+        })));
+        let case = match running {
+            Some(m) => format!("{width} px, the timer at {m} min"),
+            None => format!("{width} px"),
+        };
         let w = scene.ui.window();
         w.set_size(slint::PhysicalSize::new(width, H));
         let size = slint::LogicalSize::new(width as f32, H as f32);
         w.dispatch_event(WindowEvent::Resized { size });
         scene.settle();
         let edge = |label: &str| {
-            span(&scene, label, top).unwrap_or_else(|| panic!("{width} px: no {label:?}"))
+            span(&scene, label, top).unwrap_or_else(|| panic!("{case}: no {label:?}"))
         };
         for label in right {
             assert_eq!(
                 span(&scene, label, top).is_some(),
                 shown.contains(&label),
-                "{width} px: is {label:?} there?"
+                "{case}: is {label:?} there?"
             );
         }
         let right_start = right
@@ -97,17 +114,17 @@ fn a_narrow_bar_gives_groups_up_and_nothing_overlaps() {
         let (time_start, time_end) = (seek.0 - 56.0, seek.1 + 56.0);
         assert!(
             title_end <= time_start && title_end < shuffle_start,
-            "{width} px: the title ends at {title_end}, the time row starts at {time_start}, \
+            "{case}: the title ends at {title_end}, the time row starts at {time_start}, \
              Shuffle at {shuffle_start}"
         );
         assert!(
             right_start - repeat_end >= 8.0 && right_start - time_end >= 8.0,
-            "{width} px: Repeat ends at {repeat_end}, the time row at {time_end}, the \
+            "{case}: Repeat ends at {repeat_end}, the time row at {time_end}, the \
              right-hand side starts at {right_start}"
         );
         assert!(
             title_end - title_x >= 80.0,
-            "{width} px: the title has only {} px",
+            "{case}: the title has only {} px",
             title_end - title_x
         );
     }
