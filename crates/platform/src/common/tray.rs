@@ -372,24 +372,58 @@ mod tests {
         );
     }
 
-    fn utf16_len(s: &str) -> usize {
-        s.encode_utf16().count()
-    }
-
     #[test]
-    fn playing_offers_pause_and_names_the_song() {
-        let l = labels(&state("faceplant", "LØLØ", true, false));
-        assert_eq!(
-            l,
-            Labels {
-                header: "faceplant (LØLØ)".into(),
-                play: "Pause",
-                like: "Like",
-                liked: false,
-                controls: true,
+    fn the_labels_follow_the_players_state() {
+        // (case, state, header, play, like, liked, controls)
+        let cases = [
+            (
+                "playing offers Pause and names the song",
+                state("faceplant", "LØLØ", true, false),
+                "faceplant (LØLØ)",
+                "Pause",
+                "Like",
+                false,
+                true,
+            ),
+            (
+                "paused offers Play",
+                state("T", "A", false, false),
+                "T (A)",
+                "Play",
+                "Like",
+                false,
+                true,
+            ),
+            (
+                "a liked song is checked and says Liked",
+                state("T", "A", true, true),
+                "T (A)",
+                "Pause",
+                "Liked",
+                true,
+                true,
+            ),
+            (
+                "with nothing loaded the controls rest",
+                MenuState::default(),
+                "Nothing playing",
+                "Play",
+                "Like",
+                false,
+                false,
+            ),
+        ];
+        for (case, s, header, play, like, liked, controls) in cases {
+            let expected = Labels {
+                header: header.into(),
+                play,
+                like,
+                liked,
+                controls,
                 sleep: None,
-            }
-        );
+            };
+            assert_eq!(labels(&s), expected, "{case}");
+        }
     }
 
     #[test]
@@ -437,29 +471,32 @@ mod tests {
     }
 
     #[test]
-    fn paused_offers_play() {
-        assert_eq!(labels(&state("T", "A", false, false)).play, "Play");
-    }
-
-    #[test]
-    fn a_liked_song_is_checked_and_says_liked() {
-        let l = labels(&state("T", "A", true, true));
-        assert!(l.liked);
-        assert_eq!(l.like, "Liked");
-    }
-
-    #[test]
-    fn with_nothing_loaded_the_controls_rest() {
-        let l = labels(&MenuState::default());
-        assert_eq!(l.header, "Nothing playing");
-        assert!(!l.controls);
-        assert!(!l.liked);
-        assert_eq!(l.play, "Play");
-    }
-
-    #[test]
-    fn without_an_artist_the_title_stands_alone() {
-        assert_eq!(labels(&state("Title", "", true, false)).header, "Title");
+    fn the_header_is_title_then_artist_on_one_line_with_ampersands_doubled() {
+        // (case, title, artist, header)
+        let cases = [
+            (
+                "without an artist the title stands alone",
+                "Title",
+                "",
+                "Title",
+            ),
+            (
+                "an ampersand shows as itself, not as a shortcut",
+                "Rock & Roll",
+                "A&B",
+                "Rock && Roll (A&&B)",
+            ),
+            (
+                "a title keeps to one line",
+                "Two\nlines\tand a tab",
+                "A",
+                "Two lines and a tab (A)",
+            ),
+        ];
+        for (case, title, artist, header) in cases {
+            let l = labels(&state(title, artist, true, false));
+            assert_eq!(l.header, header, "{case}");
+        }
     }
 
     #[test]
@@ -478,18 +515,6 @@ mod tests {
     }
 
     #[test]
-    fn an_ampersand_shows_as_itself_not_as_a_shortcut() {
-        let l = labels(&state("Rock & Roll", "A&B", true, false));
-        assert_eq!(l.header, "Rock && Roll (A&&B)");
-    }
-
-    #[test]
-    fn a_title_keeps_to_one_line() {
-        let l = labels(&state("Two\nlines\tand a tab", "A", true, false));
-        assert_eq!(l.header, "Two lines and a tab (A)");
-    }
-
-    #[test]
     fn every_choice_comes_back_from_its_id() {
         for c in TrayChoice::ALL {
             assert_eq!(TrayChoice::from_id(c.id()), Some(c));
@@ -498,13 +523,19 @@ mod tests {
     }
 
     #[test]
-    fn cut_keeps_short_text_whole() {
-        assert_eq!(cut_utf16("featherplay", TOOLTIP_MAX_UTF16), "featherplay");
-    }
-
-    #[test]
-    fn cut_never_splits_a_surrogate_pair() {
-        // "𝄞" is two UTF-16 units: with room for three, the second one doesn't fit.
-        assert_eq!(cut_utf16("a𝄞𝄞", 3), "a𝄞");
+    fn cut_keeps_short_text_whole_and_never_splits_a_surrogate_pair() {
+        let cases = [
+            (
+                "short text stays whole",
+                "featherplay",
+                TOOLTIP_MAX_UTF16,
+                "featherplay",
+            ),
+            // "𝄞" is two UTF-16 units: with room for three, the second one doesn't fit.
+            ("a surrogate pair stays whole", "a𝄞𝄞", 3, "a𝄞"),
+        ];
+        for (case, text, max, cut) in cases {
+            assert_eq!(cut_utf16(text, max), cut, "{case}");
+        }
     }
 }
