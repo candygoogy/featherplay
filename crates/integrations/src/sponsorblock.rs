@@ -95,9 +95,11 @@ fn parse(body: &[u8], id: &TrackId) -> Result<Vec<Segment>, String> {
         .filter(|s| s.action_type.as_deref().is_none_or(|a| a == "skip"))
         .filter_map(|s| {
             let [start, end] = s.segment;
-            (start.is_finite() && end.is_finite() && start >= 0.0 && end > start).then(|| Segment {
-                start: Duration::from_secs_f64(start),
-                end: Duration::from_secs_f64(end),
+            // A time past what a `Duration` holds is dropped like the other bad ones.
+            let times = (start >= 0.0 && end > start).then_some((start, end))?;
+            Some(Segment {
+                start: Duration::try_from_secs_f64(times.0).ok()?,
+                end: Duration::try_from_secs_f64(times.1).ok()?,
             })
         })
         .collect();
@@ -123,7 +125,8 @@ mod tests {
     #[test]
     fn a_reply_gives_this_videos_skip_segments_sorted() {
         // The prefix lookup also returns other videos; a mute segment isn't skipped; a
-        // backwards, negative or empty one is dropped.
+        // backwards, negative or empty one is dropped, and so is one whose time is past
+        // what a `Duration` holds.
         let body = br#"[
             {"videoID": "other", "segments": [{"segment": [1, 2], "actionType": "skip"}]},
             {"videoID": "dQw4w9WgXcQ", "segments": [
@@ -132,7 +135,8 @@ mod tests {
                 {"segment": [50, 60], "actionType": "mute"},
                 {"segment": [70, 65], "actionType": "skip"},
                 {"segment": [-1, 5], "actionType": "skip"},
-                {"segment": [80, 80], "actionType": "skip"}
+                {"segment": [80, 80], "actionType": "skip"},
+                {"segment": [90, 1e20], "actionType": "skip"}
             ]}
         ]"#;
         assert_eq!(
