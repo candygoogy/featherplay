@@ -3,7 +3,6 @@
 //! saying the session has ended; once the session is back, Home fills in. On the offscreen
 //! platform with the fixtures: nothing is fetched.
 
-use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -13,6 +12,7 @@ use featherplay::router::{LibraryTab, Page};
 use featherplay::ui::{HomeData, LibraryData, Theme};
 use featherplay_controller::catalog::Source;
 use featherplay_controller::fixtures::Fixtures;
+use featherplay_store::Paths;
 use slint::{ComponentHandle, Model};
 
 use crate::support;
@@ -24,14 +24,10 @@ const SETTLE: Duration = Duration::from_millis(300);
 /// One test: the platform can be installed once per process.
 #[test]
 fn pages_wait_for_the_stored_session_at_startup() {
-    let home = Path::new(env!("CARGO_TARGET_TMPDIR")).join("startup-session-home");
-    std::fs::create_dir_all(&home).expect("home");
-    // SAFETY: set before any other thread of this test process starts.
-    unsafe { std::env::set_var("FEATHERPLAY_HOME", &home) };
-
     let fixtures = Arc::new(Fixtures::load().expect("fixtures"));
-    // As in the app: the controller sets the source once it has signed in.
-    let bare = support::bare(home.join("cache"), Some(fixtures.clone()));
+    // As in the app: the controller sets the source once it has signed in. The covers' cache
+    // is the test's own home's.
+    let bare = support::bare(Paths::resolve().cache, Some(fixtures.clone()));
     let (ui, ctx, pump, catalog) = (&bare.ui, &bare.ctx, &bare.pump, &bare.catalog);
     ui.global::<Theme>().set_still(true);
     app::wire(ctx, ui);

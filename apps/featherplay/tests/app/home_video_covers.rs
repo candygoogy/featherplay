@@ -9,7 +9,7 @@ use featherplay::ui::{HomeData, ShelfShape};
 use slint::{ComponentHandle, Model};
 
 /// A 640×480 thumbnail for every fixture URL, its picture between letterbox bands.
-fn fixture_covers() {
+fn letterboxed_covers() {
     let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("home-video-covers");
     std::fs::create_dir_all(&dir).expect("covers dir");
     let img = image::RgbImage::from_fn(640, 480, |_, y| {
@@ -26,7 +26,7 @@ fn fixture_covers() {
 
 #[test]
 fn video_tiles_get_16_9_art_and_card_shelves_square_art() {
-    fixture_covers();
+    letterboxed_covers();
     let scene = Scene::new(1280, 800, true, false).expect("scene");
     scene.play(true).expect("player");
     scene.open("home").expect("home");

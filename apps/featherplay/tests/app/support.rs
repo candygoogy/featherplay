@@ -38,7 +38,7 @@ const COVER_SIDE: u32 = 544;
 /// This is the one place: nextest runs each test in its own process, and the C runtime
 /// calls `fresh_home` as the process starts, before `main` (the MSVC runtime's `.CRT$XCU`
 /// initialisers on Windows, `.init_array` on Linux). A test that wants something in its home
-/// sets its own after that (`home_with_covers`, `mini_player`, `startup_session`).
+/// sets its own after that (`home_with_covers`, `mini_player`).
 #[used]
 #[cfg_attr(windows, unsafe(link_section = ".CRT$XCU"))]
 #[cfg_attr(not(windows), unsafe(link_section = ".init_array"))]
