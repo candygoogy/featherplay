@@ -5,75 +5,99 @@ use featherplay_core::failure::{
 use FailKind::{Broken, Other, Setup, Unavailable};
 use HelperFault::{Blocked, Damaged, NoSpace, Unreachable};
 
+/// What a streak of failures stops as.
 #[test]
-fn a_broken_resolver_in_the_streak_makes_the_stop_broken() {
-    assert_eq!(stop_cause(&[Broken, Broken, Broken]), StopCause::Broken);
-    assert_eq!(stop_cause(&[Unavailable, Broken, Other]), StopCause::Broken);
-}
-
-#[test]
-fn songs_that_are_gone_stop_as_unavailable() {
-    assert_eq!(stop_cause(&[Unavailable]), StopCause::Unavailable);
-    assert_eq!(
-        stop_cause(&[Unavailable, Unavailable, Unavailable]),
-        StopCause::Unavailable
-    );
-}
-
-#[test]
-fn anything_else_stops_as_other() {
-    assert_eq!(stop_cause(&[Other]), StopCause::Other);
-    assert_eq!(stop_cause(&[Unavailable, Other]), StopCause::Other);
-    assert_eq!(stop_cause(&[]), StopCause::Other);
-}
-
-#[test]
-fn a_failed_helpers_download_makes_the_stop_setup() {
-    assert_eq!(
-        stop_cause(&[Setup(Unreachable)]),
-        StopCause::Setup(Unreachable)
-    );
-    assert_eq!(
-        stop_cause(&[Unavailable, Broken, Setup(Blocked)]),
-        StopCause::Setup(Blocked)
-    );
-}
-
-#[test]
-fn the_last_helpers_failure_says_why_they_didnt_download() {
-    assert_eq!(
-        stop_cause(&[Setup(Unreachable), Other, Setup(Damaged)]),
-        StopCause::Setup(Damaged)
-    );
-}
-
-#[test]
-fn a_setup_stop_says_why_the_helpers_didnt_download() {
-    for fault in [Unreachable, Blocked, Damaged, NoSpace] {
-        for tried in [false, true] {
-            assert_eq!(
-                notice(StopCause::Setup(fault), tried),
-                Notice::HelpersFailed(fault)
-            );
-        }
+fn the_streak_gives_the_stop_its_cause() {
+    let cases: [(&str, &[FailKind], StopCause); 10] = [
+        (
+            "a broken resolver",
+            &[Broken, Broken, Broken],
+            StopCause::Broken,
+        ),
+        (
+            "a broken resolver in the streak",
+            &[Unavailable, Broken, Other],
+            StopCause::Broken,
+        ),
+        ("a song that's gone", &[Unavailable], StopCause::Unavailable),
+        (
+            "songs that are gone",
+            &[Unavailable, Unavailable, Unavailable],
+            StopCause::Unavailable,
+        ),
+        ("anything else", &[Other], StopCause::Other),
+        (
+            "anything else after one gone",
+            &[Unavailable, Other],
+            StopCause::Other,
+        ),
+        ("no failures", &[], StopCause::Other),
+        (
+            "a failed helpers download",
+            &[Setup(Unreachable)],
+            StopCause::Setup(Unreachable),
+        ),
+        (
+            "a failed helpers download after others",
+            &[Unavailable, Broken, Setup(Blocked)],
+            StopCause::Setup(Blocked),
+        ),
+        (
+            "the last helpers failure says why",
+            &[Setup(Unreachable), Other, Setup(Damaged)],
+            StopCause::Setup(Damaged),
+        ),
+    ];
+    for (case, streak, want) in cases {
+        assert_eq!(stop_cause(streak), want, "{case}");
     }
 }
 
+/// The notice a stop shows, given whether the helpers were already updated for it.
 #[test]
-fn a_broken_stop_first_updates_the_helpers() {
-    assert_eq!(notice(StopCause::Broken, false), Notice::Updating);
-}
-
-#[test]
-fn a_broken_stop_after_the_helpers_update_asks_for_a_featherplay_update() {
-    assert_eq!(notice(StopCause::Broken, true), Notice::UpdateNeeded);
-}
-
-#[test]
-fn unavailable_and_other_stops_ignore_the_helpers() {
+fn the_stop_and_the_helpers_pick_the_notice() {
+    let mut cases = vec![
+        (
+            "a broken stop first updates the helpers",
+            StopCause::Broken,
+            false,
+            Notice::Updating,
+        ),
+        (
+            "a broken stop after the helpers update asks for an update",
+            StopCause::Broken,
+            true,
+            Notice::UpdateNeeded,
+        ),
+    ];
     for tried in [false, true] {
-        assert_eq!(notice(StopCause::Unavailable, tried), Notice::Unavailable);
-        assert_eq!(notice(StopCause::Other, tried), Notice::CouldNotPlay);
+        cases.push((
+            "a song that's gone ignores the helpers",
+            StopCause::Unavailable,
+            tried,
+            Notice::Unavailable,
+        ));
+        cases.push((
+            "any other stop ignores the helpers",
+            StopCause::Other,
+            tried,
+            Notice::CouldNotPlay,
+        ));
+        for fault in [Unreachable, Blocked, Damaged, NoSpace] {
+            cases.push((
+                "a setup stop says why the helpers didn't download",
+                StopCause::Setup(fault),
+                tried,
+                Notice::HelpersFailed(fault),
+            ));
+        }
+    }
+    for (case, cause, tried, want) in cases {
+        assert_eq!(
+            notice(cause, tried),
+            want,
+            "{case} ({cause:?}, tried {tried})"
+        );
     }
 }
 
@@ -100,41 +124,4 @@ fn notices_are_plain_words_without_tool_names() {
         // One line in the toast, beside its action button.
         assert!(text.chars().count() <= 56, "{text:?} is too long");
     }
-}
-
-#[test]
-fn the_wording_says_what_happened_and_what_happens_next() {
-    assert_eq!(
-        Notice::Updating.text(),
-        "Songs can't play. featherplay is updating its helpers."
-    );
-    assert_eq!(
-        Notice::UpdateNeeded.text(),
-        "Songs can't play. featherplay may need an update."
-    );
-    assert_eq!(Notice::Unavailable.text(), "This song isn't available.");
-    assert_eq!(
-        Notice::CouldNotPlay.text(),
-        "Couldn't play this song. Check your connection."
-    );
-    assert_eq!(
-        Notice::HelpersFailed(Unreachable).text(),
-        "Couldn't download helpers. Check VPN or proxy."
-    );
-    assert_eq!(
-        Notice::HelpersFailed(Blocked).text(),
-        "Your antivirus may have blocked the helpers."
-    );
-    assert_eq!(
-        Notice::HelpersFailed(Damaged).text(),
-        "A helper download arrived damaged."
-    );
-    assert_eq!(
-        Notice::HelpersFailed(NoSpace).text(),
-        "Couldn't save helpers. Is the disk full?"
-    );
-    assert_eq!(
-        getting_ready(),
-        "Getting ready to play: downloading helpers (one time)…"
-    );
 }

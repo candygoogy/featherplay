@@ -53,57 +53,61 @@ static CATALOG: Catalog = Catalog {
     entries: &ENTRIES,
 };
 
+/// Language 0 is English, the source text; 1 and 2 are the catalogue's (de, pl).
 #[test]
-fn english_is_the_source_text() {
-    assert_eq!(CATALOG.text(0, "", "Like"), "Like");
-}
-
-#[test]
-fn a_language_gives_its_translation() {
-    assert_eq!(CATALOG.text(1, "", "Like"), "Gefällt mir");
-}
-
-#[test]
-fn the_context_tells_apart_two_meanings_of_one_word() {
-    assert_eq!(CATALOG.text(1, "verb", "Like"), "Liken");
-}
-
-#[test]
-fn an_untranslated_string_falls_back_to_english() {
-    assert_eq!(CATALOG.text(2, "", "Like"), "Like");
-}
-
-#[test]
-fn a_string_missing_from_the_catalogue_is_shown_in_english() {
-    assert_eq!(
-        CATALOG.text(1, "", "Not in the catalogue"),
-        "Not in the catalogue"
-    );
+fn text_looks_up_by_language_and_context() {
+    let cases = [
+        ("English is the source text", 0, "", "Like", "Like"),
+        (
+            "a language gives its translation",
+            1,
+            "",
+            "Like",
+            "Gefällt mir",
+        ),
+        (
+            "the context tells apart two meanings of one word",
+            1,
+            "verb",
+            "Like",
+            "Liken",
+        ),
+        (
+            "an untranslated string falls back to English",
+            2,
+            "",
+            "Like",
+            "Like",
+        ),
+        (
+            "a string missing from the catalogue is shown in English",
+            1,
+            "",
+            "Not in the catalogue",
+            "Not in the catalogue",
+        ),
+    ];
+    for (case, language, context, id, want) in cases {
+        assert_eq!(CATALOG.text(language, context, id), want, "{case}");
+    }
 }
 
 #[test]
 fn plurals_follow_the_language_rule() {
-    let forms: Vec<_> = [1, 3, 5, 22, 25]
-        .iter()
-        .map(|&n| CATALOG.plural(2, "", "{n} song", "{n} songs", n))
-        .collect();
-    assert_eq!(
-        forms,
-        [
-            "{n} utwór",
-            "{n} utwory",
-            "{n} utworów",
-            "{n} utwory",
-            "{n} utworów"
-        ]
-    );
-}
-
-#[test]
-fn english_plurals_pick_one_or_many() {
-    let one = CATALOG.plural(0, "", "{n} song", "{n} songs", 1);
-    let many = CATALOG.plural(0, "", "{n} song", "{n} songs", 0);
-    assert_eq!((one, many), ("{n} song", "{n} songs"));
+    // (language, n, form)
+    let cases = [
+        (0, 1, "{n} song"),
+        (0, 0, "{n} songs"),
+        (2, 1, "{n} utwór"),
+        (2, 3, "{n} utwory"),
+        (2, 5, "{n} utworów"),
+        (2, 22, "{n} utwory"),
+        (2, 25, "{n} utworów"),
+    ];
+    for (language, n, want) in cases {
+        let form = CATALOG.plural(language, "", "{n} song", "{n} songs", n);
+        assert_eq!(form, want, "language {language}, n = {n}");
+    }
 }
 
 #[test]
@@ -122,32 +126,42 @@ fn a_broken_plural_rule_falls_back_to_english() {
 }
 
 #[test]
-fn placeholders_fill_in_order() {
-    assert_eq!(
-        format("{} by {}", None, &[&"Da Funk", &"Daft Punk"]),
-        "Da Funk by Daft Punk"
+fn format_fills_the_placeholders() {
+    // (case, template, count, arguments, text)
+    type Case = (
+        &'static str,
+        &'static str,
+        Option<i64>,
+        &'static [&'static dyn std::fmt::Display],
+        &'static str,
     );
-}
-
-#[test]
-fn a_translation_may_reorder_the_placeholders() {
-    assert_eq!(
-        format("{1}: {0}", None, &[&"Da Funk", &"Daft Punk"]),
-        "Daft Punk: Da Funk"
-    );
-}
-
-#[test]
-fn the_count_fills_n() {
-    assert_eq!(
-        format("{n} songs from {}", Some(3), &[&"Homework"]),
-        "3 songs from Homework"
-    );
-}
-
-#[test]
-fn doubled_braces_are_literal() {
-    assert_eq!(format("{{}} {}", None, &[&1]), "{} 1");
+    let cases: [Case; 4] = [
+        (
+            "placeholders fill in order",
+            "{} by {}",
+            None,
+            &[&"Da Funk", &"Daft Punk"],
+            "Da Funk by Daft Punk",
+        ),
+        (
+            "a translation may reorder the placeholders",
+            "{1}: {0}",
+            None,
+            &[&"Da Funk", &"Daft Punk"],
+            "Daft Punk: Da Funk",
+        ),
+        (
+            "the count fills {n}",
+            "{n} songs from {}",
+            Some(3),
+            &[&"Homework"],
+            "3 songs from Homework",
+        ),
+        ("doubled braces are literal", "{{}} {}", None, &[&1], "{} 1"),
+    ];
+    for (case, template, n, args, want) in cases {
+        assert_eq!(format(template, n, args), want, "{case}");
+    }
 }
 
 #[test]
