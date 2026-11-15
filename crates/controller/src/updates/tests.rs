@@ -1,4 +1,6 @@
-use super::install::tests::{BY_MAIN, SETUP, SIGNED_SUMS, serve, test_cache};
+use super::install::tests::{BY_MAIN, SETUP, SIGNED_SUMS, serve};
+#[cfg(target_os = "linux")]
+use super::install::tests::test_cache;
 use super::*;
 
 /// `releases/latest` for 9.0.0, its files on the project's releases, as GitHub gives;
@@ -42,7 +44,9 @@ fn github(signed: bool) -> String {
 
 #[tokio::test]
 async fn a_manual_check_on_the_installed_copy_downloads_the_setup() {
-    let cache = test_cache("manual-run");
+    let Some(cache) = crate::test_home("updates-manual-run") else {
+        return;
+    };
     let base = github(true);
 
     // "Check for updates" off: the click asks all the same.
@@ -116,7 +120,9 @@ async fn an_appimage_is_replaced_by_the_signed_release() {
 
 #[tokio::test]
 async fn an_unsigned_release_is_refused_for_good_and_said() {
-    let cache = test_cache("unsigned-run");
+    let Some(cache) = crate::test_home("updates-unsigned-run") else {
+        return;
+    };
     let base = github(false);
 
     let running = Running::begin(true).expect("no run going");
@@ -150,4 +156,91 @@ fn a_second_run_while_one_is_running_does_nothing() {
     drop(first);
     assert!(!status().checking);
     assert!(Running::begin(true).is_some(), "free again once it ended");
+}
+
+/// About's banner, one row per state: the stamp a check for 9.0.0 left, what this copy is,
+/// and what is going on, with "Install updates automatically" on.
+#[test]
+fn the_banner_says_where_the_update_is() {
+    let at = SystemTime::UNIX_EPOCH + Duration::from_secs(1_800_000_000);
+    let found = || {
+        let mut stamp = Stamp::default();
+        let release = Release {
+            version: "9.0.0".into(),
+            url: format!("{PAGES}releases/tag/v9.0.0"),
+            assets: Vec::new(),
+        };
+        stamp.record(Ok(Some(release)), at);
+        stamp
+    };
+    let downloaded = || {
+        let mut stamp = found();
+        stamp.ready = Some(Ready {
+            version: "9.0.0".into(),
+            file: "featherplay-setup-9.0.0.exe".into(),
+            sha256: "ab".repeat(32),
+            signed: true,
+        });
+        stamp
+    };
+    let installed = |stamp: Stamp| Status {
+        stamp,
+        kind: Kind::Installed,
+        ..Status::default()
+    };
+    let cases = [
+        ("nothing newer", installed(Stamp::default()), Banner::None),
+        ("a portable copy", Status { stamp: found(), ..Status::default() }, Banner::Get),
+        (
+            "downloading",
+            Status { downloading: true, ..installed(found()) },
+            Banner::Downloading,
+        ),
+        ("downloaded", installed(downloaded()), Banner::Ready),
+        (
+            "a failed download",
+            installed({
+                let mut s = found();
+                s.fetch_tried("9.0.0", at, false);
+                s
+            }),
+            Banner::DownloadFailed,
+        ),
+        (
+            "a setup that wouldn't start",
+            Status { launch_failed: true, ..installed(downloaded()) },
+            Banner::CannotInstall,
+        ),
+        (
+            "started, and this version still runs",
+            installed({
+                let mut s = downloaded();
+                s.launched = Some("9.0.0".into());
+                s
+            }),
+            Banner::InstallFailed,
+        ),
+        (
+            "scoop's copy",
+            Status { stamp: found(), kind: Kind::Scoop, ..Status::default() },
+            Banner::Scoop,
+        ),
+        (
+            "restart clicked",
+            Status { restarting: true, ..installed(downloaded()) },
+            Banner::Starting,
+        ),
+        (
+            "unsigned checksums",
+            installed({
+                let mut s = found();
+                s.fetch_unverified("9.0.0", at);
+                s
+            }),
+            Banner::Unverified,
+        ),
+    ];
+    for (label, status, want) in cases {
+        assert_eq!(status.banner(true), want, "{label}");
+    }
 }

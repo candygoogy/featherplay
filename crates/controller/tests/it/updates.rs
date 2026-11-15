@@ -6,12 +6,11 @@
 //! with test keys, `tests/fixtures/signing/`), and whether this is the installed copy, or
 //! Scoop's. No request is made.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use featherplay_controller::updates::install::{
-    self, Keys, Ready, SignatureError, is_installed, is_scoop, parse_sums, setup_name, update_name,
-    verify_sums,
+    self, Keys, Ready, SignatureError, is_installed, is_scoop, parse_sums, update_name, verify_sums,
 };
 use featherplay_controller::updates::{
     Asset, CheckError, Release, Stamp, classify, is_newer, may_request, parse_issue, parse_release,
@@ -53,57 +52,42 @@ fn release(version: &str) -> Release {
 }
 
 #[test]
-fn a_newer_version_is_newer() {
-    assert!(is_newer("v0.2.0", "0.1.0"));
-    assert!(is_newer("0.1.1", "0.1.0"));
-    assert!(is_newer("v1.0.0", "0.9.9"));
-    // Numbers, not text: 10 comes after 9.
-    assert!(is_newer("v0.10.0", "0.9.0"));
-}
-
-#[test]
-fn the_same_version_is_not_newer() {
-    assert!(!is_newer("v0.1.0", "0.1.0"));
-    assert!(!is_newer("0.1.0", "0.1.0"));
-}
-
-#[test]
-fn an_older_version_is_not_newer() {
-    assert!(!is_newer("v0.0.9", "0.1.0"));
-    assert!(!is_newer("v0.1.0", "1.0.0"));
-}
-
-#[test]
-fn a_pre_release_is_ignored() {
-    assert!(!is_newer("v0.2.0-beta.1", "0.1.0"));
-    assert!(!is_newer("v9.0.0-rc1", "0.1.0"));
-}
-
-#[test]
-fn a_release_is_newer_than_its_own_pre_release() {
-    assert!(is_newer("v0.2.0", "0.2.0-dev"));
-}
-
-#[test]
-fn a_malformed_version_is_never_newer() {
-    for tag in [
-        "", "v", "latest", "v1.2", "1.2.3.4", "v1.x.0", "vv1.0.0", " 1.0.0", "1..0",
-    ] {
-        assert!(!is_newer(tag, "0.1.0"), "{tag:?}");
+fn a_version_is_newer_only_by_its_numbers() {
+    let cases = [
+        ("newer", "v0.2.0", "0.1.0", true),
+        ("newer patch", "0.1.1", "0.1.0", true),
+        ("newer major", "v1.0.0", "0.9.9", true),
+        // Numbers, not text: 10 comes after 9.
+        ("10 after 9", "v0.10.0", "0.9.0", true),
+        ("the same", "v0.1.0", "0.1.0", false),
+        ("the same, no v", "0.1.0", "0.1.0", false),
+        ("older", "v0.0.9", "0.1.0", false),
+        ("older major", "v0.1.0", "1.0.0", false),
+        ("a pre-release", "v0.2.0-beta.1", "0.1.0", false),
+        ("a release candidate", "v9.0.0-rc1", "0.1.0", false),
+        ("a release over its pre-release", "v0.2.0", "0.2.0-dev", true),
+        ("empty", "", "0.1.0", false),
+        ("only v", "v", "0.1.0", false),
+        ("a word", "latest", "0.1.0", false),
+        ("two numbers", "v1.2", "0.1.0", false),
+        ("four numbers", "1.2.3.4", "0.1.0", false),
+        ("a letter", "v1.x.0", "0.1.0", false),
+        ("two v", "vv1.0.0", "0.1.0", false),
+        ("a space", " 1.0.0", "0.1.0", false),
+        ("an empty number", "1..0", "0.1.0", false),
+        ("a malformed running version", "v9.0.0", "not a version", false),
+    ];
+    for (label, tag, current, newer) in cases {
+        assert_eq!(is_newer(tag, current), newer, "{label}: {tag:?} over {current:?}");
     }
-    assert!(!is_newer("v9.0.0", "not a version"));
 }
 
 #[test]
-fn the_latest_release_reply_gives_the_version_and_its_page() {
+fn the_latest_release_reply_gives_the_version_its_page_and_its_release_files() {
     let r = parse_release(RELEASE).expect("a release");
     let want = release("0.2.0");
-    assert_eq!((r.version, r.url), (want.version, want.url));
-}
-
-#[test]
-fn the_reply_keeps_only_the_files_downloaded_from_the_projects_releases() {
-    let r = parse_release(RELEASE).expect("a release");
+    assert_eq!((&r.version, &r.url), (&want.version, &want.url));
+    // Only the files downloaded from the project's releases.
     let names: Vec<_> = r.assets.iter().map(|a| a.name.as_str()).collect();
     assert_eq!(
         names,
@@ -121,13 +105,27 @@ fn the_reply_keeps_only_the_files_downloaded_from_the_projects_releases() {
 }
 
 #[test]
-fn a_pre_release_or_draft_reply_gives_nothing() {
-    let pre = RELEASE.replace("\"prerelease\": false", "\"prerelease\": true");
-    assert_eq!(parse_release(&pre), None);
-    let draft = RELEASE.replace("\"draft\": false", "\"draft\": true");
-    assert_eq!(parse_release(&draft), None);
-    let tagged = RELEASE.replace("\"tag_name\": \"v0.2.0\"", "\"tag_name\": \"v0.2.0-rc.1\"");
-    assert_eq!(parse_release(&tagged), None);
+fn a_reply_that_is_not_a_published_release_gives_nothing() {
+    let cases = [
+        (
+            "a pre-release",
+            RELEASE.replace("\"prerelease\": false", "\"prerelease\": true"),
+        ),
+        (
+            "a draft",
+            RELEASE.replace("\"draft\": false", "\"draft\": true"),
+        ),
+        (
+            "a pre-release tag",
+            RELEASE.replace("\"tag_name\": \"v0.2.0\"", "\"tag_name\": \"v0.2.0-rc.1\""),
+        ),
+        ("an empty reply", String::new()),
+        ("not found", "{\"message\": \"Not Found\"}".into()),
+        ("not an object", "[1, 2]".into()),
+    ];
+    for (label, reply) in cases {
+        assert_eq!(parse_release(&reply), None, "{label}");
+    }
 }
 
 #[test]
@@ -145,13 +143,6 @@ fn a_release_page_elsewhere_is_refused() {
         );
         assert_eq!(parse_release(&json), None, "{url}");
     }
-}
-
-#[test]
-fn a_reply_that_is_not_a_release_gives_nothing() {
-    assert_eq!(parse_release(""), None);
-    assert_eq!(parse_release("{\"message\": \"Not Found\"}"), None);
-    assert_eq!(parse_release("[1, 2]"), None);
 }
 
 #[test]
@@ -211,24 +202,19 @@ fn the_maintainers_issue_is_found_behind_a_users() {
 }
 
 #[test]
-fn a_first_run_is_due_for_a_check() {
-    assert!(Stamp::default().due(now()));
-}
-
-#[test]
-fn a_check_lasts_a_day() {
+fn a_check_is_due_on_the_first_run_then_a_day_later() {
+    assert!(Stamp::default().due(now()), "a first run");
     let mut s = Stamp::default();
     s.record(Ok(None), now());
-    assert!(!s.due(now() + HOUR));
-    assert!(!s.due(now() + 23 * HOUR));
-    assert!(s.due(now() + 24 * HOUR));
-}
-
-#[test]
-fn a_clock_set_back_makes_the_check_due() {
-    let mut s = Stamp::default();
-    s.record(Ok(None), now());
-    assert!(s.due(now() - HOUR));
+    let cases = [
+        ("an hour later", now() + HOUR, false),
+        ("23 hours later", now() + 23 * HOUR, false),
+        ("a day later", now() + 24 * HOUR, true),
+        ("the clock set back", now() - HOUR, true),
+    ];
+    for (label, at, due) in cases {
+        assert_eq!(s.due(at), due, "{label}");
+    }
 }
 
 #[test]
@@ -338,32 +324,6 @@ fn the_running_version_or_an_older_one_is_not_news() {
     assert_eq!(s.newer("0.1.0"), None);
 }
 
-#[test]
-fn the_stamp_survives_a_restart() {
-    let dir = std::env::var("FEATHERPLAY_HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| std::env::temp_dir().join("featherplay-tests"))
-        .join("test-updates")
-        .join(format!("stamp-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
-    let path = dir.join("update-check.json");
-    assert_eq!(Stamp::load(&path), Stamp::default(), "none yet");
-
-    let mut s = Stamp::default();
-    s.record(Ok(Some(release("0.2.0"))), now());
-    s.announced("0.2.0");
-    s.save(&path).expect("saved");
-    assert_eq!(Stamp::load(&path), s);
-
-    std::fs::write(&path, "not json").unwrap();
-    assert_eq!(
-        Stamp::load(&path),
-        Stamp::default(),
-        "a broken file starts over"
-    );
-    std::fs::remove_dir_all(&dir).unwrap();
-}
-
 const SUMS: &str = "\
 1111111111111111111111111111111111111111111111111111111111111111  featherplay.exe
 AbCdEf0123456789abcdef0123456789ABCDEF0123456789abcdef0123456789  featherplay-setup-0.2.0.exe
@@ -371,31 +331,46 @@ AbCdEf0123456789abcdef0123456789ABCDEF0123456789abcdef0123456789  featherplay-se
 ";
 
 #[test]
-fn the_checksums_give_the_setups_sha256_in_lower_case() {
-    assert_eq!(
-        parse_sums(SUMS, "featherplay-setup-0.2.0.exe").as_deref(),
-        Some("abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789")
-    );
-    // Binary-mode lines (`*name`) and CRLF line ends read the same.
-    assert_eq!(
-        parse_sums(&SUMS.replace('\n', "\r\n"), "THIRD_PARTY.md").as_deref(),
-        Some("2222222222222222222222222222222222222222222222222222222222222222")
-    );
-}
-
-#[test]
-fn a_file_the_checksums_dont_list_has_no_sha256() {
-    assert_eq!(parse_sums(SUMS, "featherplay-setup-0.2.0-arm64.exe"), None);
-    // Not a prefix match either.
-    assert_eq!(parse_sums(SUMS, "featherplay-setup-0.2.0"), None);
-    assert_eq!(parse_sums("", "featherplay.exe"), None);
-}
-
-#[test]
-fn a_malformed_or_contradictory_checksum_is_refused() {
-    assert_eq!(parse_sums("abc  featherplay.exe", "featherplay.exe"), None);
+fn the_checksums_give_a_listed_files_sha256_in_lower_case_or_nothing() {
     let twice = format!("{SUMS}{}  featherplay.exe\n", "3".repeat(64));
-    assert_eq!(parse_sums(&twice, "featherplay.exe"), None);
+    let cases = [
+        (
+            "the setup, in lower case",
+            SUMS.to_string(),
+            "featherplay-setup-0.2.0.exe",
+            Some("abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"),
+        ),
+        // Binary-mode lines (`*name`) and CRLF line ends read the same.
+        (
+            "a binary-mode line with CRLF",
+            SUMS.replace('\n', "\r\n"),
+            "THIRD_PARTY.md",
+            Some("2222222222222222222222222222222222222222222222222222222222222222"),
+        ),
+        (
+            "a file not listed",
+            SUMS.to_string(),
+            "featherplay-setup-0.2.0-arm64.exe",
+            None,
+        ),
+        (
+            "not a prefix match",
+            SUMS.to_string(),
+            "featherplay-setup-0.2.0",
+            None,
+        ),
+        ("empty checksums", String::new(), "featherplay.exe", None),
+        (
+            "a malformed sha256",
+            "abc  featherplay.exe".into(),
+            "featherplay.exe",
+            None,
+        ),
+        ("a file listed twice", twice, "featherplay.exe", None),
+    ];
+    for (label, sums, name, want) in cases {
+        assert_eq!(parse_sums(&sums, name).as_deref(), want, "{label}");
+    }
 }
 
 /// `SHA256SUMS.txt` for 9.0.0, and its signatures: by the test main key, the test backup
@@ -414,19 +389,14 @@ fn test_keys() -> Keys {
 }
 
 #[test]
-fn checksums_signed_with_the_main_key_are_trusted() {
-    assert_eq!(
-        verify_sums(SIGNED_SUMS, BY_MAIN, "9.0.0", &test_keys()),
-        Ok(())
-    );
-}
-
-#[test]
-fn checksums_signed_with_the_backup_key_are_trusted() {
-    assert_eq!(
-        verify_sums(SIGNED_SUMS, BY_BACKUP, "9.0.0", &test_keys()),
-        Ok(())
-    );
+fn checksums_signed_with_the_main_or_the_backup_key_are_trusted() {
+    for (label, sig) in [("the main key", BY_MAIN), ("the backup key", BY_BACKUP)] {
+        assert_eq!(
+            verify_sums(SIGNED_SUMS, sig, "9.0.0", &test_keys()),
+            Ok(()),
+            "{label}"
+        );
+    }
 }
 
 #[test]
@@ -501,21 +471,45 @@ fn the_test_keys_sign_nothing_for_the_release_keys() {
 }
 
 #[test]
-fn the_setup_is_picked_by_architecture() {
-    assert_eq!(
-        setup_name("0.2.0", "x86_64").as_deref(),
-        Some("featherplay-setup-0.2.0.exe")
-    );
-    assert_eq!(
-        setup_name("0.2.0", "aarch64").as_deref(),
-        Some("featherplay-setup-0.2.0-arm64.exe")
-    );
-    assert_eq!(setup_name("0.2.0", "x86"), None);
-    assert_eq!(
-        setup_name("../0.2.0", "x86_64"),
-        None,
-        "only digits and dots"
-    );
+fn the_update_file_is_picked_by_os_and_architecture() {
+    let cases = [
+        (
+            "windows x64",
+            "windows",
+            "0.2.0",
+            "x86_64",
+            Some("featherplay-setup-0.2.0.exe"),
+        ),
+        (
+            "windows arm64",
+            "windows",
+            "0.2.0",
+            "aarch64",
+            Some("featherplay-setup-0.2.0-arm64.exe"),
+        ),
+        ("windows x86", "windows", "0.2.0", "x86", None),
+        ("windows, only digits and dots", "windows", "../0.2.0", "x86_64", None),
+        (
+            "linux x86_64",
+            "linux",
+            "0.2.0",
+            "x86_64",
+            Some("featherplay-x86_64.AppImage"),
+        ),
+        (
+            "linux aarch64",
+            "linux",
+            "0.2.0",
+            "aarch64",
+            Some("featherplay-aarch64.AppImage"),
+        ),
+        ("linux riscv64", "linux", "0.2.0", "riscv64", None),
+        ("linux, only digits and dots", "linux", "0.2.0/..", "x86_64", None),
+        ("macos", "macos", "0.2.0", "aarch64", None),
+    ];
+    for (label, os, version, arch, want) in cases {
+        assert_eq!(update_name(os, version, arch).as_deref(), want, "{label}");
+    }
 }
 
 fn with_assets(names: &[&str]) -> Release {
@@ -530,89 +524,103 @@ fn with_assets(names: &[&str]) -> Release {
     r
 }
 
+/// A release without this machine's setup, or without checksums, is only announced (no
+/// plan). A plan takes the checksums, and their signature if the release has one; unsigned,
+/// it's still a plan, which the download then refuses (`fetch`).
 #[test]
-fn a_release_without_this_architectures_setup_is_only_announced() {
-    let x64_only = with_assets(&["featherplay-setup-0.2.0.exe", "SHA256SUMS.txt"]);
-    let plan = install::plan(&x64_only, "windows", "x86_64").expect("x64 has its setup");
-    assert_eq!(plan.setup.name, "featherplay-setup-0.2.0.exe");
-    assert_eq!(plan.sums.name, "SHA256SUMS.txt");
-    assert_eq!(install::plan(&x64_only, "windows", "aarch64"), None);
-
-    let both = with_assets(&[
+fn the_plan_takes_this_machines_setup_its_checksums_and_their_signature() {
+    let x64_only: &[&str] = &["featherplay-setup-0.2.0.exe", "SHA256SUMS.txt"];
+    let both_setups: &[&str] = &[
         "featherplay-setup-0.2.0.exe",
         "featherplay-setup-0.2.0-arm64.exe",
         "SHA256SUMS.txt",
-    ]);
-    let arm = install::plan(&both, "windows", "aarch64").expect("arm64 has its setup");
-    assert_eq!(arm.setup.name, "featherplay-setup-0.2.0-arm64.exe");
-}
-
-#[test]
-fn linux_takes_the_appimage_for_its_architecture() {
-    assert_eq!(
-        update_name("linux", "0.2.0", "x86_64").as_deref(),
-        Some("featherplay-x86_64.AppImage")
-    );
-    assert_eq!(
-        update_name("linux", "0.2.0", "aarch64").as_deref(),
-        Some("featherplay-aarch64.AppImage")
-    );
-    assert_eq!(update_name("linux", "0.2.0", "riscv64"), None);
-    assert_eq!(update_name("linux", "0.2.0/..", "x86_64"), None);
-    assert_eq!(
-        update_name("windows", "0.2.0", "x86_64").as_deref(),
-        Some("featherplay-setup-0.2.0.exe")
-    );
-    assert_eq!(update_name("macos", "0.2.0", "aarch64"), None);
-
-    let r = with_assets(&[
+    ];
+    let x86_64_image: &[&str] = &[
         "featherplay-setup-0.2.0.exe",
         "featherplay-x86_64.AppImage",
         "featherplay-x86_64.tar.gz",
         "SHA256SUMS.txt",
-    ]);
-    let plan = install::plan(&r, "linux", "x86_64").expect("x86_64 has its AppImage");
-    assert_eq!(plan.setup.name, "featherplay-x86_64.AppImage");
-    assert_eq!(install::plan(&r, "linux", "aarch64"), None);
-
-    let both = with_assets(&[
+    ];
+    let both_images: &[&str] = &[
         "featherplay-x86_64.AppImage",
         "featherplay-aarch64.AppImage",
         "featherplay-aarch64.tar.gz",
         "SHA256SUMS.txt",
-    ]);
-    let arm = install::plan(&both, "linux", "aarch64").expect("aarch64 has its AppImage");
-    assert_eq!(arm.setup.name, "featherplay-aarch64.AppImage");
-    let x64 = install::plan(&both, "linux", "x86_64").expect("x86_64 has its AppImage");
-    assert_eq!(x64.setup.name, "featherplay-x86_64.AppImage");
-}
-
-#[test]
-fn a_release_without_checksums_is_only_announced() {
-    let r = with_assets(&["featherplay-setup-0.2.0.exe"]);
-    assert_eq!(install::plan(&r, "windows", "x86_64"), None);
-}
-
-#[test]
-fn the_plan_carries_the_checksums_signature_if_the_release_has_one() {
-    let signed = with_assets(&[
+    ];
+    let signed: &[&str] = &[
         "featherplay-setup-0.2.0.exe",
         "SHA256SUMS.txt",
         "SHA256SUMS.txt.minisig",
-    ]);
-    let plan = install::plan(&signed, "windows", "x86_64").expect("a plan");
-    assert_eq!(
-        plan.sig.map(|a| a.name).as_deref(),
-        Some("SHA256SUMS.txt.minisig")
-    );
-    // Unsigned: still a plan, which the download then refuses (`fetch`).
-    let unsigned = with_assets(&["featherplay-setup-0.2.0.exe", "SHA256SUMS.txt"]);
-    assert_eq!(
-        install::plan(&unsigned, "windows", "x86_64")
-            .expect("a plan")
-            .sig,
-        None
-    );
+    ];
+    let cases = [
+        (
+            "windows x64, x64 only",
+            x64_only,
+            "windows",
+            "x86_64",
+            Some(("featherplay-setup-0.2.0.exe", None)),
+        ),
+        ("windows arm64, x64 only", x64_only, "windows", "aarch64", None),
+        (
+            "windows arm64, both",
+            both_setups,
+            "windows",
+            "aarch64",
+            Some(("featherplay-setup-0.2.0-arm64.exe", None)),
+        ),
+        (
+            "linux x86_64",
+            x86_64_image,
+            "linux",
+            "x86_64",
+            Some(("featherplay-x86_64.AppImage", None)),
+        ),
+        ("linux aarch64, x86_64 only", x86_64_image, "linux", "aarch64", None),
+        (
+            "linux aarch64, both",
+            both_images,
+            "linux",
+            "aarch64",
+            Some(("featherplay-aarch64.AppImage", None)),
+        ),
+        (
+            "linux x86_64, both",
+            both_images,
+            "linux",
+            "x86_64",
+            Some(("featherplay-x86_64.AppImage", None)),
+        ),
+        (
+            "no checksums",
+            &["featherplay-setup-0.2.0.exe"],
+            "windows",
+            "x86_64",
+            None,
+        ),
+        (
+            "signed",
+            signed,
+            "windows",
+            "x86_64",
+            Some(("featherplay-setup-0.2.0.exe", Some("SHA256SUMS.txt.minisig"))),
+        ),
+        (
+            "unsigned",
+            &["featherplay-setup-0.2.0.exe", "SHA256SUMS.txt"],
+            "windows",
+            "x86_64",
+            Some(("featherplay-setup-0.2.0.exe", None)),
+        ),
+    ];
+    for (label, assets, os, arch, want) in cases {
+        let plan = install::plan(&with_assets(assets), os, arch);
+        if let Some(plan) = &plan {
+            assert_eq!(plan.sums.name, "SHA256SUMS.txt", "{label}");
+        }
+        let got = plan.map(|p| (p.setup.name, p.sig.map(|a| a.name)));
+        let want = want.map(|(setup, sig)| (setup.to_string(), sig.map(str::to_string)));
+        assert_eq!(got, want, "{label}");
+    }
 }
 
 #[test]
@@ -776,22 +784,17 @@ fn a_downloaded_setup_is_offered_until_it_is_installed() {
     assert_eq!(s.pending("0.1.0"), None);
 }
 
-fn test_dir(name: &str) -> PathBuf {
-    let dir = std::env::var("FEATHERPLAY_HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| std::env::temp_dir().join("featherplay-tests"))
-        .join("test-updates")
-        .join(format!("{name}-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
-    dir
-}
-
 #[test]
-fn the_downloaded_setup_survives_a_restart() {
-    let dir = test_dir("ready");
+fn the_stamp_and_the_downloaded_setup_survive_a_restart() {
+    let Some(dir) = crate::test_home("updates-stamp") else {
+        return;
+    };
     let path = dir.join("update-check.json");
+    assert_eq!(Stamp::load(&path), Stamp::default(), "none yet");
+
     let mut s = Stamp::default();
     s.record(Ok(Some(with_assets(&["SHA256SUMS.txt"]))), now());
+    s.announced("0.2.0");
     s.fetch_tried("0.2.0", now(), false);
     s.ready = Some(ready("0.2.0"));
     s.launched = Some("0.2.0".into());
@@ -801,14 +804,22 @@ fn the_downloaded_setup_survives_a_restart() {
         !dir.join("update-check.json.tmp").exists(),
         "renamed into place"
     );
+
+    std::fs::write(&path, "not json").unwrap();
+    assert_eq!(
+        Stamp::load(&path),
+        Stamp::default(),
+        "a broken file starts over"
+    );
     std::fs::remove_dir_all(&dir).unwrap();
 }
 
 #[test]
 fn an_old_stamp_with_fetched_still_loads() {
-    let dir = test_dir("old-stamp");
+    let Some(dir) = crate::test_home("updates-old-stamp") else {
+        return;
+    };
     let path = dir.join("update-check.json");
-    std::fs::create_dir_all(&dir).unwrap();
     // From before automatic updates.
     std::fs::write(
         &path,

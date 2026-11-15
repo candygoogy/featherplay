@@ -735,6 +735,9 @@ pub(super) mod tests {
 
     pub(crate) const SETUP: &[u8] = b"not really a setup, but bytes to check";
 
+    /// The AppImage test's folder. The other tests use `crate::test_home`, which skips
+    /// without `FEATHERPLAY_HOME`.
+    #[cfg(target_os = "linux")]
     pub(crate) fn test_cache(name: &str) -> PathBuf {
         let base = std::env::var("FEATHERPLAY_HOME")
             .map(PathBuf::from)
@@ -823,7 +826,9 @@ pub(super) mod tests {
 
     #[tokio::test]
     async fn a_setup_that_matches_its_checksum_is_kept() {
-        let cache = test_cache("match");
+        let Some(cache) = crate::test_home("updates-match") else {
+            return;
+        };
         let base = release_files(BY_MAIN, SETUP);
 
         let ready = fetch(&cache, &plan(&base), &Origin::local(), &test_keys())
@@ -843,56 +848,78 @@ pub(super) mod tests {
         std::fs::remove_dir_all(&cache).unwrap();
     }
 
-    #[tokio::test]
-    async fn a_release_without_a_signature_is_not_downloaded() {
-        let cache = test_cache("unsigned");
-        let base = release_files(BY_MAIN, SETUP);
-        let mut unsigned = plan(&base);
-        unsigned.sig = None;
-
-        let err = fetch(&cache, &unsigned, &Origin::local(), &test_keys())
-            .await
-            .unwrap_err();
-
-        assert_eq!(err, FetchError::Unverified(SignatureError::Missing));
-        assert!(!cache.join("updates").exists(), "nothing downloaded");
-        std::fs::remove_dir_all(&cache).unwrap();
+    /// What a refused `fetch` gives: this error, or a refusal whose text holds this.
+    enum Refusal {
+        Is(FetchError),
+        Says(&'static str),
     }
 
+    /// Each refusal downloads nothing: no `updates` folder is made.
     #[tokio::test]
-    async fn checksums_signed_with_another_key_download_no_setup() {
-        let cache = test_cache("unknown-key");
-        let base = release_files(BY_UNKNOWN, SETUP);
+    async fn a_refused_release_downloads_nothing() {
+        let unsigned = |p: &mut Plan| p.sig = None;
+        let as_is = |_: &mut Plan| {};
+        let not_newer = |p: &mut Plan| {
+            *p = plan("http://127.0.0.1:9");
+            p.version = super::super::CURRENT.into();
+        };
+        // The signed checksums list the x64 and ARM64 setups, not this one.
+        let unlisted = |p: &mut Plan| p.setup.name = "featherplay-setup-9.0.1.exe".into();
+        let cases: [(&str, &'static [u8], fn(&mut Plan), Refusal); 4] = [
+            (
+                "a release without a signature",
+                BY_MAIN,
+                unsigned,
+                Refusal::Is(FetchError::Unverified(SignatureError::Missing)),
+            ),
+            (
+                "checksums signed with another key",
+                BY_UNKNOWN,
+                as_is,
+                Refusal::Is(FetchError::Unverified(SignatureError::UnknownKey)),
+            ),
+            (
+                "a version not newer than this one",
+                BY_MAIN,
+                not_newer,
+                Refusal::Says("isn't newer"),
+            ),
+            (
+                "a setup missing from the checksums",
+                BY_MAIN,
+                unlisted,
+                Refusal::Says("no sha256"),
+            ),
+        ];
+        let Some(cache) = crate::test_home("updates-refused") else {
+            return;
+        };
+        for (label, sig, change, want) in cases {
+            let base = release_files(sig, SETUP);
+            let mut p = plan(&base);
+            change(&mut p);
 
-        let err = fetch(&cache, &plan(&base), &Origin::local(), &test_keys())
-            .await
-            .unwrap_err();
+            let err = fetch(&cache, &p, &Origin::local(), &test_keys())
+                .await
+                .unwrap_err();
 
-        assert_eq!(err, FetchError::Unverified(SignatureError::UnknownKey));
-        assert!(!cache.join("updates").exists(), "nothing downloaded");
-        std::fs::remove_dir_all(&cache).unwrap();
-    }
-
-    #[tokio::test]
-    async fn a_version_not_newer_than_this_one_is_refused() {
-        let cache = test_cache("not-newer");
-        let mut old = plan("http://127.0.0.1:9");
-        old.version = super::super::CURRENT.into();
-
-        let err = fetch(&cache, &old, &Origin::local(), &test_keys())
-            .await
-            .unwrap_err();
-
-        assert!(
-            matches!(&err, FetchError::Refused(e) if e.contains("isn't newer")),
-            "{err}"
-        );
+            match want {
+                Refusal::Is(want) => assert_eq!(err, want, "{label}"),
+                Refusal::Says(text) => assert!(
+                    matches!(&err, FetchError::Refused(e) if e.contains(text)),
+                    "{label}: {err}"
+                ),
+            }
+            assert!(!cache.join("updates").exists(), "{label}: nothing downloaded");
+        }
         std::fs::remove_dir_all(&cache).unwrap();
     }
 
     #[tokio::test]
     async fn a_setup_that_does_not_match_is_deleted() {
-        let cache = test_cache("mismatch");
+        let Some(cache) = crate::test_home("updates-mismatch") else {
+            return;
+        };
         let base = release_files(BY_MAIN, b"something else");
 
         let err = fetch(&cache, &plan(&base), &Origin::local(), &test_keys())
@@ -913,28 +940,10 @@ pub(super) mod tests {
     }
 
     #[tokio::test]
-    async fn a_setup_missing_from_the_checksums_is_not_downloaded() {
-        let cache = test_cache("unlisted");
-        let base = release_files(BY_MAIN, SETUP);
-        // The signed checksums list the x64 and ARM64 setups, not this one.
-        let mut unlisted = plan(&base);
-        unlisted.setup.name = "featherplay-setup-9.0.1.exe".into();
-
-        let err = fetch(&cache, &unlisted, &Origin::local(), &test_keys())
-            .await
-            .unwrap_err();
-
-        assert!(
-            matches!(&err, FetchError::Refused(e) if e.contains("no sha256")),
-            "{err}"
-        );
-        assert!(!cache.join("updates").exists());
-        std::fs::remove_dir_all(&cache).unwrap();
-    }
-
-    #[tokio::test]
     async fn a_url_off_the_projects_releases_is_refused() {
-        let cache = test_cache("elsewhere");
+        let Some(cache) = crate::test_home("updates-elsewhere") else {
+            return;
+        };
         let mut p = plan("https://example.com/candygoogy/featherplay/releases/download/v9.0.0");
         p.sums.url = "https://example.com/SHA256SUMS.txt".into();
 
@@ -976,7 +985,9 @@ pub(super) mod tests {
 
     #[test]
     fn old_setups_are_cleaned_and_the_ready_one_kept() {
-        let cache = test_cache("clean");
+        let Some(cache) = crate::test_home("updates-clean") else {
+            return;
+        };
         let dir = cache.join("updates");
         std::fs::create_dir_all(&dir).unwrap();
         for f in [
