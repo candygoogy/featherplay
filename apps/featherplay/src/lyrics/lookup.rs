@@ -608,9 +608,8 @@ mod tests {
 
     /// The track of the recorded LRCLIB record.
     fn track() -> Track {
-        use featherplay_core::model::{AlbumId, AlbumRef, ArtistRef, LikeStatus, VideoType};
+        use featherplay_core::model::{AlbumId, AlbumRef, ArtistRef};
         Track {
-            id: TrackId("t".into()),
             title: "Get Lucky".into(),
             artists: vec![ArtistRef {
                 id: None,
@@ -621,10 +620,7 @@ mod tests {
                 title: "Random Access Memories".into(),
             }),
             duration: Some(Duration::from_secs(367)),
-            video_type: VideoType::Song,
-            thumbnail: None,
-            like: LikeStatus::Indifferent,
-            counterpart: None,
+            ..crate::testing::track("t")
         }
     }
 

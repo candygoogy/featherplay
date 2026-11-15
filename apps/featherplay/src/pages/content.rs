@@ -559,21 +559,15 @@ fn play_tracks(ctx: &Ctx, tracks: Vec<Track>) {
 
 #[cfg(test)]
 mod tests {
-    use featherplay_core::model::{ArtistId, LikeStatus, VideoType};
+    use featherplay_core::model::ArtistId;
 
     use super::*;
 
     fn track(id: &str, artists: &[&str], secs: u64) -> Track {
         Track {
-            id: TrackId(id.into()),
-            title: id.into(),
             artists: artists.iter().map(|a| artist(a)).collect(),
-            album: None,
             duration: (secs > 0).then(|| Duration::from_secs(secs)),
-            video_type: VideoType::Song,
-            thumbnail: None,
-            like: LikeStatus::Indifferent,
-            counterpart: None,
+            ..crate::testing::track(id)
         }
     }
 

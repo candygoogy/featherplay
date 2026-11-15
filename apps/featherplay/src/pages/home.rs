@@ -368,24 +368,11 @@ pub fn account_changed(ctx: &Rc<Ctx>, signed_in: bool) {
 /// What the tests in `home/` build their shelves from.
 #[cfg(test)]
 mod test_items {
-    use featherplay_core::model::{ArtistId, LikeStatus, PlaylistId, VideoType};
+    use featherplay_core::model::{ArtistId, PlaylistId, VideoType};
     use featherplay_ytm::{AlbumSummary, ArtistSummary, PlaylistSummary};
 
     use super::*;
-
-    pub(super) fn track(id: &str) -> Track {
-        Track {
-            id: TrackId(id.into()),
-            title: id.into(),
-            artists: Vec::new(),
-            album: None,
-            duration: None,
-            video_type: VideoType::Song,
-            thumbnail: None,
-            like: LikeStatus::Indifferent,
-            counterpart: None,
-        }
-    }
+    pub(super) use crate::testing::track;
 
     pub(super) fn shelf(title: &str, items: Vec<HomeItem>) -> HomeShelf {
         HomeShelf {

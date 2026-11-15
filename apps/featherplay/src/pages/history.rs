@@ -116,21 +116,7 @@ pub fn account_changed(ctx: &Rc<Ctx>, _signed_in: bool) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use featherplay_core::model::{LikeStatus, TrackId, VideoType};
-
-    fn track(id: &str) -> Track {
-        Track {
-            id: TrackId(id.into()),
-            title: id.into(),
-            artists: Vec::new(),
-            album: None,
-            duration: None,
-            video_type: VideoType::Song,
-            thumbnail: None,
-            like: LikeStatus::Indifferent,
-            counterpart: None,
-        }
-    }
+    use crate::testing::track;
 
     fn day(title: &str, ids: &[&str]) -> HistoryDay {
         HistoryDay {

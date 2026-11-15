@@ -312,22 +312,16 @@ pub fn show_for_snapshot(ctx: &Rc<Ctx>, text: &str) {
 
 #[cfg(test)]
 mod tests {
-    use featherplay_core::model::{AlbumId, ArtistId, Track, TrackId};
+    use featherplay_core::model::{AlbumId, ArtistId, Track};
     use featherplay_ytm::{AlbumSummary, ArtistSummary, QuerySuggestion, SuggestedResult};
 
     use super::*;
 
     fn mixed() -> SearchSuggestions {
         let track = Track {
-            id: TrackId("qe8Q7mjxjig".into()),
             title: "Veridis Quo".into(),
-            artists: Vec::new(),
-            album: None,
-            duration: None,
-            video_type: featherplay_core::model::VideoType::Song,
             thumbnail: Some("https://example.test/song".into()),
-            like: featherplay_core::model::LikeStatus::Indifferent,
-            counterpart: None,
+            ..crate::testing::track("qe8Q7mjxjig")
         };
         SearchSuggestions {
             queries: vec![

@@ -927,21 +927,15 @@ mod tests {
 
     #[test]
     fn a_result_reads_title_artist_kind_and_a_completion_brightens_what_it_adds() {
-        use featherplay_core::model::{ArtistRef, LikeStatus};
+        use featherplay_core::model::ArtistRef;
         use featherplay_ytm::{QuerySuggestion, SuggestedResult};
         let song = Track {
-            id: TrackId("demo-invisible-light".into()),
             title: "Invisible Light".into(),
             artists: vec![ArtistRef {
                 name: "Josh Woodward".into(),
                 id: None,
             }],
-            album: None,
-            duration: None,
-            video_type: VideoType::Song,
-            thumbnail: None,
-            like: LikeStatus::Indifferent,
-            counterpart: None,
+            ..crate::testing::track("demo-invisible-light")
         };
         let s = SearchSuggestions {
             queries: vec![QuerySuggestion {
