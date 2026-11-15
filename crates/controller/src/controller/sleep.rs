@@ -12,6 +12,7 @@
 //! song's or list's end follows the position on the ticks that run while it plays, and
 //! the song's end itself is the player's (`Input::PauseAtEnd`). Off, nothing runs.
 
+use std::ops::ControlFlow;
 use std::time::{Duration, Instant};
 
 use featherplay_core::player::Input;
@@ -156,12 +157,11 @@ impl Controller {
     /// again after a pause it made.
     pub(super) fn sleep_check(&mut self) {
         let playing = self.player.wants_play();
-        if self.sleep.mode == Mode::Off {
+        if let ControlFlow::Break(news) = self.sleep.off_tick() {
             if self.sleep.quiet && playing {
                 self.sleep_volume_back();
             }
-            // Turned off (Turn off, the tray, the setting): the window's pill goes.
-            self.push_sleep(Duration::ZERO);
+            self.tell_window(news);
             return;
         }
         // The player paused at the song's end.
@@ -284,7 +284,32 @@ impl Controller {
 
     /// Sends the window the timer's state when its kind, minutes or fade changed.
     fn push_sleep(&mut self, left: Duration) {
-        let state = match self.sleep.mode {
+        let news = self.sleep.news(left);
+        self.tell_window(news);
+    }
+
+    fn tell_window(&self, news: Option<UiEvent>) {
+        if let Some(event) = news {
+            (self.ui.events)(event);
+        }
+    }
+}
+
+impl SleepTimer {
+    /// A tick while the timer is off: `Break` with what to tell the window, `Continue` while
+    /// it runs.
+    fn off_tick(&mut self) -> ControlFlow<Option<UiEvent>> {
+        if self.mode != Mode::Off {
+            return ControlFlow::Continue(());
+        }
+        // Turned off (Turn off, the tray, the setting): the window's pill goes.
+        ControlFlow::Break(self.news(Duration::ZERO))
+    }
+
+    /// What to tell the window with `left` to go: the timer's state when its kind, minutes or
+    /// fade changed since the last time, else nothing.
+    fn news(&mut self, left: Duration) -> Option<UiEvent> {
+        let state = match self.mode {
             Mode::Off => None,
             Mode::At(_) => Some(SleepKind::Time),
             Mode::SongEnd => Some(SleepKind::SongEnd),
@@ -293,14 +318,14 @@ impl Controller {
         .map(|kind| SleepState {
             kind,
             minutes: minutes_left(left),
-            fading: self.sleep.fading,
+            fading: self.fading,
             left,
         });
         let key = state.map(|s| (s.kind, s.minutes, s.fading));
-        if key != self.sleep.shown {
-            self.sleep.shown = key;
-            (self.ui.events)(UiEvent::Sleep(state));
-        }
+        (key != self.shown).then(|| {
+            self.shown = key;
+            UiEvent::Sleep(state)
+        })
     }
 }
 
