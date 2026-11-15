@@ -5,7 +5,7 @@
 //! opens the page in featherplay, Escape closes it and its window goes. With featherplay in
 //! front, the key does what Ctrl+K does. Settings' switch registers the key (a stand-in
 //! here), says when another app holds it or featherplay's own hotkeys use it, and the search
-//! finds the row. `memory` (ignored) prints what the box costs open and after it closed.
+//! finds the row. The recent picks are kept in the test's own home.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -19,22 +19,14 @@ use featherplay::ui::{
     ShortcutKind, Shortcuts, SuggestionKind,
 };
 use featherplay_integrations::KeyError;
+use featherplay_store::Paths;
 use slint::platform::{Key, WindowEvent};
 use slint::{ComponentHandle, Model, SharedString};
-
-use crate::support::private_mb;
 
 fn scene() -> Scene {
     let scene = Scene::new(1280, 800, true, false).expect("scene");
     scene.play(false).expect("play");
     scene.settle();
-    // A file of this test's own, so picks don't meet another test's or the user's.
-    let file = std::env::temp_dir().join(format!(
-        "featherplay-quick-search-{}.json",
-        std::process::id()
-    ));
-    let _ = std::fs::remove_file(&file);
-    quick_search::keep_recent_in(file);
     scene
 }
 
@@ -316,18 +308,14 @@ fn the_switch_registers_the_key_and_says_when_it_cant() {
 #[test]
 fn a_corrupt_recent_file_or_a_hand_edited_key_never_breaks_it() {
     let scene = scene();
-    let file = std::env::temp_dir().join(format!(
-        "featherplay-quick-search-corrupt-{}.json",
-        std::process::id()
-    ));
-    std::fs::write(&file, b"{ not the picks").expect("write");
-    quick_search::keep_recent_in(file.clone());
+    let cache = Paths::resolve().cache;
+    std::fs::create_dir_all(&cache).expect("cache");
+    std::fs::write(cache.join("quick-search.json"), b"{ not the picks").expect("write");
     assert!(quick_search::load_recent().is_empty());
     let quick = open(&scene);
     assert_eq!(quick.global::<QuickData>().get_state(), QuickState::Fresh);
     drop(quick);
     quick_search::close(false);
-    let _ = std::fs::remove_file(&file);
 
     // A saved key it can't use (empty, unknown, without a modifier) falls back to the default.
     for stored in ["", "Ctrl+Nope", "K", "Hyper+Ctrl+K+Q"] {
@@ -349,41 +337,4 @@ fn settings_search_finds_the_row() {
             "{text:?} didn't find it"
         );
     }
-}
-
-/// What the box costs, in private memory: before it ever opened (the main window drawn),
-/// open with results drawn, closed, and closed again after ten more openings. Closed, it
-/// should cost nothing: its window, timer and suggester go.
-#[test]
-#[ignore = "a measurement: cargo nextest run -p featherplay --run-ignored only -E 'test(quick_search::memory)'"]
-#[allow(clippy::print_stdout, reason = "a measurement reports its numbers")]
-fn memory() {
-    let scene = scene();
-    let cycle = |frame: bool| {
-        let quick = open(&scene);
-        typed(&scene, &quick, "daft");
-        if frame {
-            quick.window().take_snapshot().expect("frame");
-        }
-        let open = private_mb();
-        drop(quick);
-        quick_search::close(false);
-        scene.settle();
-        open
-    };
-    scene.ui.window().take_snapshot().expect("frame");
-    scene.settle();
-    let before = private_mb();
-    let open = cycle(true);
-    let closed = private_mb();
-    for _ in 0..10 {
-        cycle(true);
-    }
-    let after = private_mb();
-    println!(
-        "quick search: never opened {before:.2} MB; open {open:.2} MB ({:+.2}); closed {closed:.2} MB ({:+.2}); after 10 more {after:.2} MB ({:+.2})",
-        open - before,
-        closed - before,
-        after - before
-    );
 }
