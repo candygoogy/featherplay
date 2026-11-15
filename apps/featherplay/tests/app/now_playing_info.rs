@@ -109,7 +109,7 @@ fn now_playing() -> Scene {
 }
 
 #[test]
-fn the_header_names_the_source_and_hides_without_one() {
+fn the_header_names_the_source_opens_it_or_up_next_and_hides_without_one() {
     let scene = now_playing();
     let from = header(&scene).expect("no Playing from in the header");
     // Centred in the stage, in its top row with the back button.
@@ -120,14 +120,6 @@ fn the_header_names_the_source_and_hides_without_one() {
     );
     assert!(from.max_y() <= 64.0, "below the header row: {from:?}");
 
-    scene.play_from(PlayingFrom::default()).expect("no source");
-    scene.settle();
-    assert!(header(&scene).is_none(), "it shows with no source");
-}
-
-#[test]
-fn the_header_opens_the_source_or_up_next() {
-    let scene = now_playing();
     // A radio has no page: the side panel comes back on Up next.
     let frame = scene.ui.global::<Frame>();
     let np = scene.ui.global::<NowPlayingData>();
@@ -135,9 +127,20 @@ fn the_header_opens_the_source_or_up_next() {
     np.set_tab(1);
     scene.settle();
     click(&scene, header(&scene).expect("the header"));
-    assert!(frame.get_side_open(), "the side panel stayed hidden");
-    assert_eq!(np.get_tab(), 0, "not on Up next");
-    assert_eq!(scene.ctx.current_page(), Page::NowPlaying);
+    assert!(
+        frame.get_side_open(),
+        "a radio's header: the side panel stayed hidden"
+    );
+    assert_eq!(np.get_tab(), 0, "a radio's header: not on Up next");
+    assert_eq!(
+        scene.ctx.current_page(),
+        Page::NowPlaying,
+        "a radio's header left Now playing"
+    );
+
+    scene.play_from(PlayingFrom::default()).expect("no source");
+    scene.settle();
+    assert!(header(&scene).is_none(), "it shows with no source");
 
     // An album: its page.
     let album = Place::Album(AlbumId("MPREb_hw".into()));
@@ -146,7 +149,11 @@ fn the_header_opens_the_source_or_up_next() {
         .expect("album");
     scene.settle();
     click(&scene, header(&scene).expect("the header"));
-    assert_eq!(scene.ctx.current_page(), Page::from(album));
+    assert_eq!(
+        scene.ctx.current_page(),
+        Page::from(album),
+        "an album's header didn't open its page"
+    );
 }
 
 #[test]
@@ -179,21 +186,18 @@ fn no_lyric_line_shows_under_the_credits() {
 }
 
 #[test]
-fn the_cover_has_its_full_size_with_lyrics_on_in_a_1280_by_800_window() {
+fn the_cover_has_its_full_size_at_1280_by_800_and_in_small_windows_the_title_steps_down() {
     let scene = now_playing();
+    // With lyrics on, in a 1280 x 800 window, the cover has its full size beside the panel.
     lyrics::show_for_snapshot(&scene.ctx, SnapshotLyrics::Synced);
     scene.settle();
     let (cover, _, _) = block(&scene);
     let full = scene.ui.global::<Theme>().get_nowplaying_cover();
     assert!(
         (cover - full).abs() < 0.5,
-        "the cover is {cover} px beside the panel, not {full}"
+        "1280 x 800: the cover is {cover} px beside the panel, not {full}"
     );
-}
 
-#[test]
-fn in_small_windows_the_title_steps_down_and_the_block_ends_above_the_bar() {
-    let scene = now_playing();
     // A title that wraps to its second line.
     scene
         .ui
