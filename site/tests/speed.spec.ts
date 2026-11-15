@@ -88,6 +88,12 @@ test("measured: with each section on screen while a song plays, the page restyle
   const m = async () => Object.fromEntries((await cdp.send("Performance.getMetrics")).metrics.map((x) => [x.name, x.value]));
   const found: string[] = [];
   const ids = await page.evaluate(() => [...document.querySelectorAll("main > section[id]")].map((s) => s.id).filter((id) => id !== "app"));
+  // Every section seen once first: what plays once as it comes into view has played.
+  for (const id of ids) {
+    await page.evaluate((id) => document.getElementById(id)!.scrollIntoView(), id);
+    await page.waitForTimeout(400);
+  }
+  await page.waitForTimeout(1500);
   for (const id of ids) {
     await page.evaluate((id) => document.getElementById(id)!.scrollIntoView(), id);
     await page.waitForTimeout(800);
