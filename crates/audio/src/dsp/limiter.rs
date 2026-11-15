@@ -65,10 +65,8 @@ mod tests {
         assert!(20.0 * peak.log10() <= -0.3 + 1e-4);
         // It limits, it doesn't mute.
         assert!(peak > 0.9 * CEILING, "peak {peak}");
-    }
-
-    #[test]
-    fn the_ceiling_is_minus_0_3_dbfs() {
-        assert!((20.0 * CEILING.log10() + 0.3).abs() < 1e-5);
+        // The ceiling itself is −0.3 dBFS, not lower.
+        let db = 20.0 * CEILING.log10();
+        assert!((db + 0.3).abs() < 1e-5, "the ceiling is {db} dBFS");
     }
 }

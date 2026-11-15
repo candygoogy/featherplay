@@ -585,22 +585,6 @@ mod tests {
     }
 
     #[test]
-    fn output_length_follows_the_speed() {
-        let input = sine(440.0, 3 * RATE as usize);
-        for speed in [1.5, 0.75] {
-            let mut stretch = Stretch::new(2, RATE);
-            stretch.set_speed(speed);
-            let frames = run(&mut stretch, &input, 512).len() / 2;
-            let expected = (3.0 * RATE as f32 / speed) as usize;
-            println!("{speed}x: {frames} frames, expected {expected}");
-            assert!(
-                frames.abs_diff(expected) <= SEQUENCE,
-                "{speed}x: {frames} frames, expected {expected}"
-            );
-        }
-    }
-
-    #[test]
     fn a_sine_keeps_its_pitch_and_has_no_hard_splices() {
         let input = sine(440.0, 3 * RATE as usize);
         for speed in [MIN_SPEED, MAX_SPEED] {
@@ -677,20 +661,35 @@ mod tests {
         }
     }
 
+    /// The output is the input's length over the speed, within one sequence (40 ms), in any
+    /// layout and rate, and with blocks that split frames.
     #[test]
-    fn other_layouts_and_odd_blocks_keep_the_length() {
-        for (channels, rate) in [(1_u16, 44_100_u32), (6, 8_000)] {
+    fn output_length_follows_the_speed() {
+        let all: &[f32] = &[0.5, 1.0, 1.5, 2.0];
+        // (label, channels, rate, input, block in samples, speeds)
+        let cases = [
+            (
+                "3 s stereo sine",
+                2,
+                RATE,
+                sine(440.0, 3 * RATE as usize),
+                512,
+                &[1.5, 0.75][..],
+            ),
+            ("2 s mono noise", 1, 44_100, noise(2 * 44_100, 1), 37, all),
+            ("2 s 6 ch noise", 6, 8_000, noise(2 * 8_000, 6), 37 * 6, all),
+        ];
+        for (label, channels, rate, input, block, speeds) in cases {
             let ch = usize::from(channels);
-            let input = noise(2 * rate as usize, ch);
-            for speed in [0.5, 1.0, 1.5, 2.0] {
+            let sequence = rate as usize / 25;
+            for &speed in speeds {
                 let mut stretch = Stretch::new(channels, rate);
                 stretch.set_speed(speed);
-                let frames = run(&mut stretch, &input, 37 * ch).len() / ch;
-                let expected = (2.0 * rate as f32 / speed) as usize;
-                let sequence = rate as usize / 25;
+                let frames = run(&mut stretch, &input, block).len() / ch;
+                let expected = ((input.len() / ch) as f32 / speed) as usize;
                 assert!(
                     frames.abs_diff(expected) <= sequence,
-                    "{channels} ch at {rate} Hz, {speed}x: {frames} frames, expected {expected}"
+                    "{label} at {rate} Hz, {speed}x: {frames} frames, expected {expected}"
                 );
             }
         }
