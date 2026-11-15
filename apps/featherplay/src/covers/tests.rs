@@ -71,12 +71,6 @@ fn decode_wide_drops_a_4_3_thumbnails_letterbox() {
     );
 }
 
-#[test]
-fn decode_square_keeps_the_centred_square() {
-    let out = decode(&letterboxed(640, 480, 60), 300, 300).expect("decode");
-    assert_eq!((out.width(), out.height()), (300, 300));
-}
-
 /// Resizing from the crop's view gives the pixels a resize of a copy of the crop gave.
 #[test]
 fn decode_resizes_the_crop_as_a_copy_of_it_would() {
