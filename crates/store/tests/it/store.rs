@@ -5,6 +5,7 @@ use featherplay_core::model::{
     AlbumId, AlbumRef, ArtistId, ArtistRef, LikeStatus, RepeatMode, Session, Track, TrackId,
     VideoType,
 };
+use featherplay_core::player::{Input, PlaybackPrefs, Player, Status};
 use featherplay_store::settings::SCHEMA;
 use featherplay_store::{
     Accent, AccentColour, CloseAction, DesktopLyrics, DiscordOptions, DiscordStatusText,
@@ -604,6 +605,47 @@ fn session_roundtrip() {
 
     fs::write(p.config.join("session.json"), "{\"queue\": [").unwrap();
     assert_eq!(load_session(&p), None);
+}
+
+/// A saved session whose index is past the end of its queue (a hand edit, a file from
+/// another build) loads, and restores on its last track rather than on none.
+#[test]
+fn a_session_index_past_its_queue_restores_on_the_last_track() {
+    let Some(home) = TestHome::new("session-index-past-end") else {
+        return;
+    };
+    let p = home.paths();
+    fs::create_dir_all(&p.config).unwrap();
+    let track = |id: &str| {
+        format!(
+            r#"{{"id":"{id}","title":"T","artists":[],"album":null,"duration":null,
+            "video_type":"Song","thumbnail":null,"like":"Indifferent"}}"#
+        )
+    };
+    let text = format!(
+        r#"{{"queue":[{},{}],"index":7,"position_ms":5000,"radio":false,"shuffle":false,
+        "repeat":"Off"}}"#,
+        track("a"),
+        track("b")
+    );
+    fs::write(p.config.join("session.json"), text).unwrap();
+    let session = load_session(&p).expect("the session loads");
+    assert_eq!(session.index, 7);
+
+    let mut player = Player::new(PlaybackPrefs {
+        prefer_song_versions: true,
+        skip_non_music_in_radio: true,
+        scrobble_other_media: true,
+        list_end: Default::default(),
+        skip_disliked: true,
+        crossfade: None,
+        fade_on_skip: false,
+        speed_percent: 100,
+    });
+    player.handle(Input::Restore(session));
+    assert_eq!(player.queue().current().map(|t| t.id.0.as_str()), Some("b"));
+    assert_eq!(player.status(), &Status::Paused);
+    assert_eq!(player.session().index, 1);
 }
 
 /// A session save that can't replace the file (here another program holds it open without
