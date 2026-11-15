@@ -35,102 +35,131 @@ fn engine_sounds_long_before_the_download_ends() {
     }
 }
 
-#[test]
-fn engine_starts_a_prefetched_stream_without_the_network() {
-    let data = fixture("tone-10s-frag.m4a");
-    // Every request takes 1.5 s to answer.
-    let server = serve(data, 1 << 20, Duration::from_millis(1500));
-    let engine = crate::AudioEngine::new_null(engine_tmp());
-    let events = engine.events();
-    engine.prefetch(&src(&server.url));
-    std::thread::sleep(Duration::from_millis(2500));
-    let t = Instant::now();
-    engine.load(src(&server.url), Duration::ZERO);
-    engine.play();
-    wait_event(&events, Duration::from_secs(3), crate::AudioEvent::Started);
-    let started = t.elapsed();
-    assert!(
-        started < Duration::from_millis(300),
-        "Started after {started:?}"
-    );
-    assert_eq!(
-        server.log.starts.lock().unwrap().len(),
-        1,
-        "one request, the prefetch"
-    );
+/// How a track is fetched ahead of its load.
+#[derive(Clone, Copy, Debug)]
+enum Ahead {
+    /// Its head only, as for a track resolved ahead.
+    Prefetch,
+    /// Opened and decoding, as the next track.
+    Preload,
 }
 
-/// A click on a song resolved just before it: its head is on its way. The load waits for
-/// that response instead of sending a second request, which would start later and come
-/// later (on a second connection, over the network).
+/// A track fetched ahead, then loaded and played: how soon it starts after the load, and
+/// whether the load made a request of its own. Each case has an engine and a server of its
+/// own, on a thread named after it, and they run side by side.
 #[test]
-fn engine_load_takes_the_head_that_is_on_its_way() {
-    let data = fixture("tone-10s-frag.m4a");
-    // Every request takes 600 ms to answer.
-    let server = serve(data, 1 << 20, Duration::from_millis(600));
-    let engine = crate::AudioEngine::new_null(engine_tmp());
-    let events = engine.events();
-    engine.prefetch(&src(&server.url));
-    std::thread::sleep(Duration::from_millis(250));
-    let t = Instant::now();
-    engine.load(src(&server.url), Duration::ZERO);
-    engine.play();
-    wait_event(&events, Duration::from_secs(3), crate::AudioEvent::Started);
-    let started = t.elapsed();
-    let starts = server.log.starts.lock().unwrap().clone();
-    assert_eq!(starts, [0], "one request for the start, the prefetch's");
-    // The head comes ~350 ms after the load; a request of its own would take 600 ms.
-    assert!(
-        started < Duration::from_millis(550),
-        "Started after {started:?}"
-    );
-}
-
-/// On a slow link the head takes seconds to come in whole: the load takes its request over
-/// and plays from its first bytes, as a request of its own would.
-#[test]
-fn engine_load_on_a_slow_link_takes_the_head_request_over() {
-    let data = fixture("tone-10s-frag.m4a");
-    // ~5 s for the whole file.
-    let server = serve(data, 16 << 10, Duration::ZERO);
-    let engine = crate::AudioEngine::new_null(engine_tmp());
-    let events = engine.events();
-    engine.prefetch(&src(&server.url));
-    std::thread::sleep(Duration::from_millis(250));
-    let t = Instant::now();
-    engine.load(src(&server.url), Duration::ZERO);
-    engine.play();
-    wait_event(&events, Duration::from_secs(3), crate::AudioEvent::Started);
-    let started = t.elapsed();
-    let starts = server.log.starts.lock().unwrap().clone();
-    assert_eq!(starts, [0], "one request for the start, the prefetch's");
-    assert!(
-        started < Duration::from_millis(500),
-        "Started after {started:?}"
-    );
-}
-
-/// A head's answer that comes late still wins if it beats the request the load then sends
-/// of its own: the load never comes later than it would have without the head.
-#[test]
-fn engine_load_takes_a_late_head_if_it_answers_first() {
-    let data = fixture("tone-10s-frag.m4a");
-    // Every request takes 1.3 s to answer: longer than a load waits for the head's.
-    let server = serve(data, 1 << 20, Duration::from_millis(1300));
-    let engine = crate::AudioEngine::new_null(engine_tmp());
-    let events = engine.events();
-    engine.prefetch(&src(&server.url));
-    std::thread::sleep(Duration::from_millis(100));
-    let t = Instant::now();
-    engine.load(src(&server.url), Duration::ZERO);
-    engine.play();
-    wait_event(&events, Duration::from_secs(4), crate::AudioEvent::Started);
-    let started = t.elapsed();
-    // The head answers ~1.2 s after the load; a request of its own would answer later.
-    assert!(
-        started < Duration::from_millis(1600),
-        "Started after {started:?}"
-    );
+fn engine_starts_a_track_fetched_ahead_without_waiting() {
+    struct Case {
+        label: &'static str,
+        /// The server's rate in bytes/s, and how long it takes to answer each request.
+        rate: u64,
+        delay: Duration,
+        ahead: Ahead,
+        /// From the fetch ahead to the load.
+        then: Duration,
+        /// How long to wait for `Started`, and the bound it must come within.
+        wait: Duration,
+        within: Duration,
+        /// The only request is the one ahead (from byte 0): the load sent none.
+        one_request: bool,
+    }
+    let ms = Duration::from_millis;
+    let cases = [
+        // The head is in memory before the load: it starts without the network.
+        Case {
+            label: "a prefetched stream starts without the network",
+            rate: 1 << 20,
+            delay: ms(1500),
+            ahead: Ahead::Prefetch,
+            then: ms(2500),
+            wait: ms(3000),
+            within: ms(300),
+            one_request: true,
+        },
+        // A click on a song resolved just before it: its head is on its way. The load
+        // waits for that response instead of sending a second request, which would start
+        // later and come later (on a second connection, over the network). The head comes
+        // ~350 ms after the load; a request of its own would take 600 ms.
+        Case {
+            label: "the load takes the head that is on its way",
+            rate: 1 << 20,
+            delay: ms(600),
+            ahead: Ahead::Prefetch,
+            then: ms(250),
+            wait: ms(3000),
+            within: ms(550),
+            one_request: true,
+        },
+        // On a slow link (~5 s for the whole file) the head takes seconds to come in
+        // whole: the load takes its request over and plays from its first bytes, as a
+        // request of its own would.
+        Case {
+            label: "on a slow link the load takes the head request over",
+            rate: 16 << 10,
+            delay: Duration::ZERO,
+            ahead: Ahead::Prefetch,
+            then: ms(250),
+            wait: ms(3000),
+            within: ms(500),
+            one_request: true,
+        },
+        // A head's answer that comes late (1.3 s, longer than a load waits for it) still
+        // wins if it beats the request the load then sends of its own: the load never
+        // comes later than it would have without the head. The head answers ~1.2 s after
+        // the load; a request of its own would answer later.
+        Case {
+            label: "the load takes a late head if it answers first",
+            rate: 1 << 20,
+            delay: ms(1300),
+            ahead: Ahead::Prefetch,
+            then: ms(100),
+            wait: ms(4000),
+            within: ms(1600),
+            one_request: false,
+        },
+        Case {
+            label: "a preloaded stream starts at once",
+            rate: 1 << 20,
+            delay: ms(1000),
+            ahead: Ahead::Preload,
+            then: ms(2000),
+            wait: ms(3000),
+            within: ms(300),
+            one_request: false,
+        },
+    ];
+    std::thread::scope(|scope| {
+        for case in &cases {
+            std::thread::Builder::new()
+                .name(case.label.into())
+                .spawn_scoped(scope, move || {
+                    let label = case.label;
+                    let server = serve(fixture("tone-10s-frag.m4a"), case.rate, case.delay);
+                    let engine = crate::AudioEngine::new_null(engine_tmp());
+                    let events = engine.events();
+                    match case.ahead {
+                        Ahead::Prefetch => engine.prefetch(&src(&server.url)),
+                        Ahead::Preload => engine.preload(src(&server.url)),
+                    }
+                    std::thread::sleep(case.then);
+                    let t = Instant::now();
+                    engine.load(src(&server.url), Duration::ZERO);
+                    engine.play();
+                    wait_event(&events, case.wait, crate::AudioEvent::Started);
+                    let started = t.elapsed();
+                    if case.one_request {
+                        let starts = server.log.starts.lock().unwrap().clone();
+                        assert_eq!(starts, [0], "{label}: one request, the {:?}'s", case.ahead);
+                    }
+                    assert!(
+                        started < case.within,
+                        "{label}: Started after {started:?}, want under {:?}",
+                        case.within
+                    );
+                })
+                .unwrap();
+        }
+    });
 }
 
 /// A server that keeps its connections open between requests, as the stream servers do,
@@ -271,25 +300,6 @@ fn engine_opens_no_second_connection_ahead() {
         "the second call sent nothing"
     );
     assert_eq!(server.connections.load(Ordering::SeqCst), 1);
-}
-
-#[test]
-fn engine_starts_a_preloaded_stream_at_once() {
-    let data = fixture("tone-10s-frag.m4a");
-    let server = serve(data, 1 << 20, Duration::from_millis(1000));
-    let engine = crate::AudioEngine::new_null(engine_tmp());
-    let events = engine.events();
-    engine.preload(src(&server.url));
-    std::thread::sleep(Duration::from_millis(2000));
-    let t = Instant::now();
-    engine.load(src(&server.url), Duration::ZERO);
-    engine.play();
-    wait_event(&events, Duration::from_secs(3), crate::AudioEvent::Started);
-    let started = t.elapsed();
-    assert!(
-        started < Duration::from_millis(300),
-        "Started after {started:?}"
-    );
 }
 
 /// A preload whose URL is refused says so, so the app can resolve it again before Play
