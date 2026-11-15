@@ -127,7 +127,7 @@ an otherwise idle Windows machine; it is one of the release checks in `RELEASING
 The tests need [cargo-nextest](https://nexte.st), because it runs each test in its own
 process: Slint allows one platform per process, and most app tests install the offscreen
 one, so plain `cargo test` fails them. nextest skips doctests, hence the second line.
-`--cfg ci` skips the tests that open an audio device. Some tests write
+`--cfg ci` skips the tests that open an audio device (`RELEASING.md` runs those by hand). Some tests write
 files under `FEATHERPLAY_HOME` and skip, saying so, when it isn't set. The tests in
 `apps/featherplay/tests/app/` don't use yours: each starts in a fresh, empty home of its own
 under `target/tmp`, so the settings of a home you ran the app in can't fail them. That home

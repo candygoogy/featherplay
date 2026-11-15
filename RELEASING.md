@@ -45,6 +45,14 @@ RUSTFLAGS="--cfg ci" cargo nextest run --release -p featherplay --profile ceilin
 A limit that fails gets three tries by itself; one that still fails is a frame that got more
 expensive since the last release, so look into it before tagging.
 
+`--cfg ci` leaves out the four tests that play through the real sound device (seeking,
+pausing and resuming, a device that is gone). No workflow can run them, so run them here,
+without the flag; one plays a quiet tone for a moment:
+
+```
+cargo nextest run -p featherplay-audio --test it -E 'test(/^engine_local::/)'
+```
+
 Commit as `chore: release X.Y.Z`, push `main`, and wait for CI to pass on that commit. Its
 Linux rigs include `linux-rig-appimage.yml`'s `bare` job: the release AppImage on a bare
 Ubuntu 22.04 with no network, D-Bus or keyring, as the AppImage catalog tests it, which must
