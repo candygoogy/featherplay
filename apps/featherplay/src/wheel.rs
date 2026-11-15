@@ -141,60 +141,29 @@ pub fn install(ui: &AppWindow) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use MouseScrollDelta::{LineDelta, PixelDelta};
     use slint::winit_030::winit::dpi::PhysicalPosition;
 
-    #[test]
-    fn a_notch_eases() {
-        assert_eq!(
-            route(MouseScrollDelta::LineDelta(0.0, -1.0), true),
-            Route::Eased
-        );
+    const fn direct(dy: f32) -> Route {
+        Route::Direct { dx: 0.0, dy }
     }
 
     #[test]
-    fn several_notches_at_once_ease() {
-        assert_eq!(
-            route(MouseScrollDelta::LineDelta(0.0, 3.0), true),
-            Route::Eased
-        );
-    }
-
-    #[test]
-    fn a_tilt_notch_eases() {
-        assert_eq!(
-            route(MouseScrollDelta::LineDelta(1.0, 0.0), true),
-            Route::Eased
-        );
-    }
-
-    #[test]
-    fn a_touchpad_step_goes_straight_through() {
-        // 15 of WHEEL_DELTA's 120: an eighth of a notch.
-        assert_eq!(
-            route(MouseScrollDelta::LineDelta(0.0, 0.125), true),
-            Route::Direct { dx: 0.0, dy: 7.5 }
-        );
-    }
-
-    #[test]
-    fn a_step_past_a_whole_notch_goes_straight_through() {
-        assert_eq!(
-            route(MouseScrollDelta::LineDelta(0.0, -1.5), true),
-            Route::Direct { dx: 0.0, dy: -90.0 }
-        );
-    }
-
-    #[test]
-    fn a_notch_jumps_without_animation_effects() {
-        assert_eq!(
-            route(MouseScrollDelta::LineDelta(0.0, -1.0), false),
-            Route::Direct { dx: 0.0, dy: -60.0 }
-        );
-    }
-
-    #[test]
-    fn pixel_deltas_are_left_to_slint() {
-        let delta = MouseScrollDelta::PixelDelta(PhysicalPosition::new(0.0, 12.0));
-        assert_eq!(route(delta, true), Route::Eased);
+    fn whole_notches_ease_and_the_rest_goes_straight_through() {
+        let pixels = PixelDelta(PhysicalPosition::new(0.0, 12.0));
+        // (case, delta, animation effects on, want)
+        let cases = [
+            ("a notch", LineDelta(0.0, -1.0), true, Route::Eased),
+            ("notches", LineDelta(0.0, 3.0), true, Route::Eased),
+            ("a tilt notch", LineDelta(1.0, 0.0), true, Route::Eased),
+            // 15 of WHEEL_DELTA's 120: an eighth of a notch.
+            ("a touchpad step", LineDelta(0.0, 0.125), true, direct(7.5)),
+            ("past a notch", LineDelta(0.0, -1.5), true, direct(-90.0)),
+            ("effects off", LineDelta(0.0, -1.0), false, direct(-60.0)),
+            ("pixel deltas", pixels, true, Route::Eased),
+        ];
+        for (case, delta, motion, want) in cases {
+            assert_eq!(route(delta, motion), want, "{case}");
+        }
     }
 }

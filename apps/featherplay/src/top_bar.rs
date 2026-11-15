@@ -96,32 +96,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn windows_line_breaks_become_one_space() {
-        assert_eq!(single_line("daft\r\npunk"), "daft punk");
-    }
-
-    #[test]
-    fn tabs_become_spaces() {
-        assert_eq!(single_line("daft\tpunk\t\tlive"), "daft punk live");
-    }
-
-    #[test]
-    fn spaces_round_a_break_fold_into_it() {
-        assert_eq!(single_line("air  \r\n  moon"), "air moon");
-    }
-
-    #[test]
-    fn ends_are_trimmed() {
-        assert_eq!(single_line("\r\n  homework \r\n"), "homework");
-    }
-
-    #[test]
-    fn only_breaks_leave_nothing() {
-        assert_eq!(single_line("\r\n\t \u{b}"), "");
-    }
-
-    #[test]
-    fn spaces_inside_a_line_are_kept() {
-        assert_eq!(single_line("one  two\nthree"), "one  two three");
+    fn pasted_text_becomes_one_line() {
+        // (case, pasted, want): breaks and tabs become one space each, with the spaces round
+        // them; the ends are trimmed; spaces inside a line are kept.
+        let cases = [
+            ("Windows break", "daft\r\npunk", "daft punk"),
+            ("tabs", "daft\tpunk\t\tlive", "daft punk live"),
+            ("spaces round a break", "air  \r\n  moon", "air moon"),
+            ("trimmed ends", "\r\n  homework \r\n", "homework"),
+            ("only breaks", "\r\n\t \u{b}", ""),
+            ("spaces in a line", "one  two\nthree", "one  two three"),
+        ];
+        for (case, pasted, want) in cases {
+            assert_eq!(single_line(pasted), want, "{case}");
+        }
     }
 }

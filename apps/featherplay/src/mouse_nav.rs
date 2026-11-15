@@ -38,33 +38,22 @@ mod tests {
     use super::*;
 
     #[test]
-    fn button_4_released_goes_back() {
-        assert_eq!(
-            press(MouseButton::Back, ElementState::Released),
-            Some(Press::Go(Step::Back))
-        );
-    }
-
-    #[test]
-    fn button_5_released_goes_forward() {
-        assert_eq!(
-            press(MouseButton::Forward, ElementState::Released),
-            Some(Press::Go(Step::Forward))
-        );
-    }
-
-    #[test]
-    fn a_side_button_going_down_only_holds() {
-        assert_eq!(
-            press(MouseButton::Back, ElementState::Pressed),
-            Some(Press::Held)
-        );
-    }
-
-    #[test]
-    fn other_buttons_are_left_to_slint() {
-        for button in [MouseButton::Left, MouseButton::Right, MouseButton::Middle] {
-            assert_eq!(press(button, ElementState::Released), None);
+    fn side_buttons_hold_then_go_and_the_rest_is_left_to_slint() {
+        use ElementState::{Pressed, Released};
+        use MouseButton::{Back, Forward, Left, Middle, Right};
+        use Press::{Go, Held};
+        // (case, button, state, want): a side button going down only holds, coming up goes;
+        // other buttons are left to Slint.
+        let cases = [
+            ("button 4 up", Back, Released, Some(Go(Step::Back))),
+            ("button 5 up", Forward, Released, Some(Go(Step::Forward))),
+            ("button 4 down", Back, Pressed, Some(Held)),
+            ("left", Left, Released, None),
+            ("right", Right, Released, None),
+            ("middle", Middle, Released, None),
+        ];
+        for (case, button, state, want) in cases {
+            assert_eq!(press(button, state), want, "{case}");
         }
     }
 }
