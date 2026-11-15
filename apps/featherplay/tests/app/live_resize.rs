@@ -22,7 +22,9 @@ use slint::ComponentHandle;
 #[test]
 fn the_buffer_is_the_windows_size_and_only_grows_during_a_live_resize() {
     type Size = (u32, u32);
-    let cases: [(&str, Size, Size, bool, fn(Size) -> bool); 7] = [
+    /// A label, the buffer, the window, whether in a live resize, what the new buffer holds to.
+    type Case = (&'static str, Size, Size, bool, fn(Size) -> bool);
+    let cases: [Case; 7] = [
         ("outside, no buffer yet", (0, 0), (1280, 800), false, |s| {
             s == (1280, 800)
         }),
