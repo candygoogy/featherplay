@@ -678,13 +678,12 @@ mod tests {
         }
     }
 
-    /// Home's light band: a light tint in the cover's hue under dark text that keeps AA, on
-    /// a hovered row too; pale, dark and saturated covers alike.
+    /// Home's light band: a light tint in the cover's hue; pale, dark and saturated covers
+    /// alike. Its dark text keeps AA on it (the next test).
     #[test]
-    fn the_light_band_is_a_light_tint_with_dark_text() {
+    fn the_light_band_is_a_light_tint_in_the_covers_hue() {
         for seed in seeds() {
-            let ink = light_tint(seed);
-            let ground = to_lch(ink.ground);
+            let ground = to_lch(light_tint(seed).ground);
             assert!(ground.l >= 0.88, "{seed:?}: a deep band {ground:?}");
             if seed.c >= NEUTRAL_CHROMA {
                 assert!(ground.c >= 0.035, "{seed:?}: no colour {ground:?}");
@@ -692,11 +691,6 @@ mod tests {
                 assert!(turn < 0.2, "{seed:?}: another hue {ground:?}");
             } else {
                 assert!(ground.c < 0.005, "{seed:?}: grey art tinted {ground:?}");
-            }
-            for under in [ink.ground, over(hex(0), TINT_HOVER, ink.ground)] {
-                let (c, n) = (contrast(ink.current, under), contrast(ink.next, under));
-                assert!(c >= LYRIC_CURRENT, "{seed:?}: text {c}");
-                assert!(n >= 4.5, "{seed:?}: second level {n}");
             }
         }
     }
