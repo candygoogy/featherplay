@@ -90,96 +90,78 @@ mod tests {
     }
 
     #[test]
-    fn tooltip_playing_is_the_title_then_artist_and_time_of_length() {
-        let text = tooltip_text(
-            Some(&np("faceplant", "LØLØ", true)),
-            Duration::from_secs(63),
-        );
-        assert_eq!(
-            text,
-            "faceplant
-LØLØ, 1:03 of 2:31"
-        );
-    }
-
-    #[test]
-    fn tooltip_paused_says_where_it_paused() {
-        let text = tooltip_text(
-            Some(&np("faceplant", "LØLØ", false)),
-            Duration::from_secs(63),
-        );
-        assert_eq!(
-            text,
-            "faceplant
-LØLØ, paused at 1:03"
-        );
-    }
-
-    #[test]
-    fn tooltip_with_nothing_loaded_names_the_app() {
-        assert_eq!(
-            tooltip_text(None, Duration::ZERO),
-            "featherplay\nNothing playing"
-        );
-    }
-
-    #[test]
-    fn tooltip_without_a_length_shows_the_time_alone() {
-        let mut n = np("Live", "Someone", true);
-        n.duration = None;
-        let text = tooltip_text(Some(&n), Duration::from_secs(3725));
-        assert_eq!(
-            text,
-            "Live
-Someone, 1:02:05"
-        );
-    }
-
-    #[test]
-    fn tooltip_time_never_passes_the_length() {
-        let text = tooltip_text(Some(&np("T", "A", true)), Duration::from_secs(400));
-        assert!(text.ends_with("2:31 of 2:31"), "{text}");
-    }
-
-    #[test]
-    fn tooltip_without_an_artist_keeps_the_time() {
-        let playing = tooltip_text(Some(&np("Title", "", true)), Duration::ZERO);
-        assert_eq!(
-            playing,
-            "Title
-0:00 of 2:31"
-        );
-        let paused = tooltip_text(Some(&np("Title", "", false)), Duration::ZERO);
-        assert_eq!(
-            paused,
-            "Title
-Paused at 0:00"
-        );
-    }
-
-    #[test]
-    fn tooltip_shows_styled_letters_plain() {
-        let text = tooltip_text(Some(&np("𝙡𝙪𝙪", "𝔅𝔩𝔬𝔬𝔡𝔪𝔬𝔬𝔫", true)), Duration::ZERO);
-        assert_eq!(
-            text,
-            "luu
-Bloodmoon, 0:00 of 2:31"
-        );
-    }
-
-    #[test]
-    fn tooltip_keeps_a_title_on_one_line() {
-        let text = tooltip_text(
-            Some(&np(
-                "Two
-lines",
-                "A",
-                true,
-            )),
-            Duration::ZERO,
-        );
-        assert_eq!(text.lines().count(), 2, "{text}");
-        assert_eq!(text.lines().next(), Some("Two lines"));
+    fn tooltip_texts() {
+        let secs = Duration::from_secs;
+        let live = NowPlaying {
+            duration: None,
+            ..np("Live", "Someone", true)
+        };
+        // (case, what plays, the time, the hover text)
+        let cases = [
+            (
+                "playing: the title, then the artist and the time of the length",
+                Some(np("faceplant", "LØLØ", true)),
+                secs(63),
+                "faceplant\nLØLØ, 1:03 of 2:31",
+            ),
+            (
+                "paused: where it paused",
+                Some(np("faceplant", "LØLØ", false)),
+                secs(63),
+                "faceplant\nLØLØ, paused at 1:03",
+            ),
+            (
+                "nothing loaded names the app",
+                None,
+                Duration::ZERO,
+                "featherplay\nNothing playing",
+            ),
+            (
+                "without a length the time alone",
+                Some(live),
+                secs(3725),
+                "Live\nSomeone, 1:02:05",
+            ),
+            (
+                "the time never passes the length",
+                Some(np("T", "A", true)),
+                secs(400),
+                "T\nA, 2:31 of 2:31",
+            ),
+            (
+                "without an artist the time stays, playing",
+                Some(np("Title", "", true)),
+                Duration::ZERO,
+                "Title\n0:00 of 2:31",
+            ),
+            (
+                "without an artist the time stays, paused",
+                Some(np("Title", "", false)),
+                Duration::ZERO,
+                "Title\nPaused at 0:00",
+            ),
+            (
+                "styled letters show plain",
+                Some(np("𝙡𝙪𝙪", "𝔅𝔩𝔬𝔬𝔡𝔪𝔬𝔬𝔫", true)),
+                Duration::ZERO,
+                "luu\nBloodmoon, 0:00 of 2:31",
+            ),
+            (
+                "a title keeps to one line",
+                Some(np("Two\nlines", "A", true)),
+                Duration::ZERO,
+                "Two lines\nA, 0:00 of 2:31",
+            ),
+            (
+                "non-ASCII stays whole",
+                Some(np("Ølstua · 夜に駆ける", "LØLØ", false)),
+                Duration::ZERO,
+                "Ølstua · 夜に駆ける\nLØLØ, paused at 0:00",
+            ),
+        ];
+        for (case, np, at, text) in cases {
+            assert_eq!(tooltip_text(np.as_ref(), at), text, "{case}");
+        }
     }
 
     #[test]
