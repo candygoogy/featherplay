@@ -119,30 +119,143 @@ fn load(s: &str) -> Effect {
     }
 }
 
+/// Where the end of a song starts to fade into the next one, and over how long: a tick just
+/// before is quiet, the tick at that point gives the crossfade.
 #[test]
 fn the_end_of_a_song_fades_into_the_next_one() {
-    let mut p = playing(5);
-    assert!(run(&mut p, tick(ms(194_900))).is_empty());
-    let fx = run(&mut p, tick(secs(195)));
-    assert_eq!(fx, [crossfade("b", secs(5))]);
-    assert_eq!(current(&p).as_deref(), Some("b"));
-    // The sound never stops, so the player shows playing throughout.
-    assert_eq!(p.status(), &Status::Playing);
-}
-
-#[test]
-fn at_2x_a_fade_starts_twice_as_far_from_the_end_and_lasts_as_long() {
-    let mut p = playing_with(
-        PlaybackPrefs {
-            speed_percent: 200,
-            ..prefs(Some(secs(5)), false)
+    struct Case {
+        case: &'static str,
+        fade: u64,
+        speed_percent: u16,
+        /// The queue's albums: "a" on the first, "b" on the second, and so on.
+        albums: &'static [Option<&'static str>],
+        length: Duration,
+        /// Where the tail scan says the music ends.
+        music_end: Option<Duration>,
+        seek: Option<Duration>,
+        quiet_at: Option<Duration>,
+        fade_at: Duration,
+        want: Duration,
+    }
+    let three = &[Some("x"), Some("y"), Some("z")];
+    let two = &[Some("x"), Some("y")];
+    let cases = [
+        Case {
+            case: "the fade's length before the end",
+            fade: 5,
+            speed_percent: 100,
+            albums: three,
+            length: secs(200),
+            music_end: None,
+            seek: None,
+            quiet_at: Some(ms(194_900)),
+            fade_at: secs(195),
+            want: secs(5),
         },
-        vec![track("a", Some("x")), track("b", Some("y"))],
-        secs(200),
-    );
-    // 5 s of listening is 10 s of the song.
-    assert!(run(&mut p, tick(ms(189_900))).is_empty());
-    assert_eq!(run(&mut p, tick(secs(190))), [crossfade("b", secs(5))]);
+        Case {
+            case: "at 2x, twice as far from the end and as long",
+            fade: 5,
+            speed_percent: 200,
+            albums: two,
+            length: secs(200),
+            music_end: None,
+            seek: None,
+            quiet_at: Some(ms(189_900)),
+            fade_at: secs(190),
+            want: secs(5),
+        },
+        Case {
+            case: "where the music ends, not at the trailing silence",
+            fade: 5,
+            speed_percent: 100,
+            albums: three,
+            length: secs(200),
+            music_end: Some(secs(188)),
+            seek: None,
+            quiet_at: Some(ms(182_900)),
+            fade_at: secs(183),
+            want: secs(5),
+        },
+        Case {
+            case: "a seek into the last seconds fades over what is left",
+            fade: 12,
+            speed_percent: 100,
+            albums: three,
+            length: secs(200),
+            music_end: None,
+            seek: Some(ms(197_500)),
+            quiet_at: None,
+            fade_at: ms(197_500),
+            want: ms(2_500),
+        },
+        Case {
+            case: "past the music, the next song fades in over a second",
+            fade: 12,
+            speed_percent: 100,
+            albums: three,
+            length: secs(200),
+            music_end: Some(secs(190)),
+            seek: None,
+            quiet_at: None,
+            fade_at: secs(195),
+            want: secs(1),
+        },
+        Case {
+            case: "a short song fades over half its length at most",
+            fade: 12,
+            speed_percent: 100,
+            albums: two,
+            length: secs(10),
+            music_end: None,
+            seek: None,
+            quiet_at: Some(ms(4_900)),
+            fade_at: secs(5),
+            want: secs(5),
+        },
+        Case {
+            case: "songs without an album still fade",
+            fade: 5,
+            speed_percent: 100,
+            albums: &[None, None],
+            length: secs(200),
+            music_end: None,
+            seek: None,
+            quiet_at: None,
+            fade_at: secs(195),
+            want: secs(5),
+        },
+    ];
+    for c in cases {
+        let case = c.case;
+        let queue = ["a", "b", "c"]
+            .into_iter()
+            .zip(c.albums)
+            .map(|(s, album)| track(s, *album))
+            .collect();
+        let prefs = PlaybackPrefs {
+            speed_percent: c.speed_percent,
+            ..prefs(Some(secs(c.fade)), false)
+        };
+        let mut p = playing_with(prefs, queue, c.length);
+        let at = |position| match c.music_end {
+            Some(end) => tick_ending(position, end),
+            None => tick(position),
+        };
+        if let Some(to) = c.seek {
+            run(&mut p, Input::SeekTo(to));
+        }
+        if let Some(quiet) = c.quiet_at {
+            assert_eq!(run(&mut p, at(quiet)), [], "{case}: before the fade");
+        }
+        assert_eq!(
+            run(&mut p, at(c.fade_at)),
+            [crossfade("b", c.want)],
+            "{case}"
+        );
+        assert_eq!(current(&p).as_deref(), Some("b"), "{case}");
+        // The sound never stops, so the player shows playing throughout.
+        assert_eq!(p.status(), &Status::Playing, "{case}");
+    }
 }
 
 #[test]
@@ -180,80 +293,66 @@ fn a_song_whose_stream_ends_before_the_fade_moves_on_with_a_cut() {
     assert_eq!(current(&p).as_deref(), Some("b"));
 }
 
+/// Where the end of a song doesn't fade: the last tick before it is quiet, and the end
+/// loads the next song with a cut (or stops at the end of the queue).
 #[test]
-fn the_fade_starts_where_the_music_ends_not_at_the_trailing_silence() {
-    let mut p = playing(5);
-    // The last 12 s are silent.
-    assert!(run(&mut p, tick_ending(ms(182_900), secs(188))).is_empty());
-    let fx = run(&mut p, tick_ending(secs(183), secs(188)));
-    assert_eq!(fx, [crossfade("b", secs(5))]);
-}
-
-#[test]
-fn a_seek_into_the_last_seconds_fades_over_what_is_left() {
-    let mut p = playing(12);
-    run(&mut p, Input::SeekTo(ms(197_500)));
-    let fx = run(&mut p, tick(ms(197_500)));
-    assert_eq!(fx, [crossfade("b", ms(2_500))]);
-}
-
-#[test]
-fn past_the_music_the_next_song_fades_in_over_a_second() {
-    let mut p = playing(12);
-    let fx = run(&mut p, tick_ending(secs(195), secs(190)));
-    assert_eq!(fx, [crossfade("b", secs(1))]);
-}
-
-#[test]
-fn a_short_song_fades_over_half_its_length_at_most() {
-    let mut p = playing_with(
-        prefs(Some(secs(12)), false),
-        vec![track("a", Some("x")), track("b", Some("y"))],
-        secs(10),
+fn some_ends_cut_without_a_fade() {
+    // (case, crossfade, the queue's albums, repeat, what the end loads; None: it stops)
+    type Case = (
+        &'static str,
+        Option<u64>,
+        &'static [Option<&'static str>],
+        Option<RepeatMode>,
+        Option<&'static str>,
     );
-    assert!(run(&mut p, tick(ms(4_900))).is_empty());
-    assert_eq!(run(&mut p, tick(secs(5))), [crossfade("b", secs(5))]);
-}
-
-#[test]
-fn songs_from_the_same_album_play_on_without_a_fade() {
-    let mut p = playing_with(
-        prefs(Some(secs(5)), false),
-        vec![track("a", Some("x")), track("b", Some("x"))],
-        secs(200),
-    );
-    assert!(run(&mut p, tick(ms(199_750))).is_empty());
-    assert_eq!(run(&mut p, Input::AudioEnded), [load("b"), Effect::Play]);
-}
-
-#[test]
-fn songs_without_an_album_still_fade() {
-    let mut p = playing_with(
-        prefs(Some(secs(5)), false),
-        vec![track("a", None), track("b", None)],
-        secs(200),
-    );
-    assert_eq!(run(&mut p, tick(secs(195))), [crossfade("b", secs(5))]);
-}
-
-#[test]
-fn repeat_one_starts_the_song_over_without_a_fade() {
-    let mut p = playing(5);
-    run(&mut p, Input::SetRepeat(RepeatMode::One));
-    assert!(run(&mut p, tick(ms(199_750))).is_empty());
-    assert_eq!(run(&mut p, Input::AudioEnded), [load("a"), Effect::Play]);
-}
-
-#[test]
-fn the_last_song_of_the_queue_ends_without_a_fade() {
-    let mut p = playing_with(
-        prefs(Some(secs(5)), false),
-        vec![track("a", Some("x"))],
-        secs(200),
-    );
-    assert!(run(&mut p, tick(ms(199_750))).is_empty());
-    run(&mut p, Input::AudioEnded);
-    assert_eq!(p.status(), &Status::Idle);
+    let cases: [Case; 4] = [
+        (
+            "songs from the same album play on",
+            Some(5),
+            &[Some("x"), Some("x")],
+            None,
+            Some("b"),
+        ),
+        (
+            "Repeat One starts the song over",
+            Some(5),
+            &[Some("x"), Some("y"), Some("z")],
+            Some(RepeatMode::One),
+            Some("a"),
+        ),
+        (
+            "the last song of the queue ends",
+            Some(5),
+            &[Some("x")],
+            None,
+            None,
+        ),
+        (
+            "crossfade off waits for the end",
+            None,
+            &[Some("x"), Some("y")],
+            None,
+            Some("b"),
+        ),
+    ];
+    for (case, fade, albums, repeat, next) in cases {
+        let queue = ["a", "b", "c"]
+            .into_iter()
+            .zip(albums)
+            .map(|(s, album)| track(s, *album))
+            .collect();
+        // Crossfade off with "Fade on skip" on: the end still cuts.
+        let mut p = playing_with(prefs(fade.map(secs), fade.is_none()), queue, secs(200));
+        if let Some(mode) = repeat {
+            run(&mut p, Input::SetRepeat(mode));
+        }
+        assert_eq!(run(&mut p, tick(ms(199_750))), [], "{case}");
+        let fx = run(&mut p, Input::AudioEnded);
+        match next {
+            Some(s) => assert_eq!(fx, [load(s), Effect::Play], "{case}"),
+            None => assert_eq!(p.status(), &Status::Idle, "{case}"),
+        }
+    }
 }
 
 #[test]
@@ -279,17 +378,6 @@ fn no_fade_while_the_next_song_is_still_resolving() {
 }
 
 #[test]
-fn crossfade_off_waits_for_the_end() {
-    let mut p = playing_with(
-        prefs(None, true),
-        vec![track("a", Some("x")), track("b", Some("y"))],
-        secs(200),
-    );
-    assert!(run(&mut p, tick(ms(199_750))).is_empty());
-    assert_eq!(run(&mut p, Input::AudioEnded), [load("b"), Effect::Play]);
-}
-
-#[test]
 fn paused_near_the_end_nothing_fades() {
     let mut p = playing(5);
     run(&mut p, tick(secs(190)));
@@ -298,13 +386,36 @@ fn paused_near_the_end_nothing_fades() {
     assert_eq!(current(&p).as_deref(), Some("a"));
 }
 
+/// Next cuts by default, while paused with "Fade on skip" on, and with "Fade on skip" on but
+/// crossfade off; by default Previous and a click cut too.
 #[test]
-fn next_previous_and_a_click_cut_by_default() {
+fn a_skip_cuts_unless_it_fades() {
+    let cases = [
+        ("by default", playing(5), false),
+        ("fade on skip, paused", fading_on_skip(), true),
+        (
+            "fade on skip, crossfade off",
+            playing_with(
+                prefs(None, true),
+                vec![track("a", Some("x")), track("b", Some("y"))],
+                secs(200),
+            ),
+            false,
+        ),
+    ];
+    for (case, mut p, paused) in cases {
+        if paused {
+            run(&mut p, Input::Toggle);
+        }
+        assert_eq!(
+            run(&mut p, Input::Next),
+            [Effect::Pause, load("b"), Effect::Play],
+            "{case}"
+        );
+    }
+
     let mut p = playing(5);
-    assert_eq!(
-        run(&mut p, Input::Next),
-        [Effect::Pause, load("b"), Effect::Play]
-    );
+    run(&mut p, Input::Next);
     run(&mut p, Input::AudioStarted);
     assert_eq!(
         run(&mut p, Input::Previous),
@@ -338,19 +449,6 @@ fn fade_on_skip_fades_next_over_two_seconds_at_most() {
         [Effect::FadeOut(secs(2)), crossfade("b", secs(2))]
     );
     assert_eq!(p.status(), &Status::Playing);
-}
-
-#[test]
-fn fade_on_skip_is_never_longer_than_the_crossfade() {
-    let mut p = playing_with(
-        prefs(Some(secs(2)), true),
-        vec![track("a", Some("x")), track("b", Some("y"))],
-        secs(200),
-    );
-    assert_eq!(
-        run(&mut p, Input::Next),
-        [Effect::FadeOut(secs(2)), crossfade("b", secs(2))]
-    );
 }
 
 #[test]
@@ -421,29 +519,6 @@ fn previous_during_a_crossfade_goes_back_to_the_old_song() {
         [Effect::Pause, load("a"), Effect::Play]
     );
     assert_eq!(current(&p).as_deref(), Some("a"));
-}
-
-#[test]
-fn fade_on_skip_cuts_while_paused() {
-    let mut p = fading_on_skip();
-    run(&mut p, Input::Toggle);
-    assert_eq!(
-        run(&mut p, Input::Next),
-        [Effect::Pause, load("b"), Effect::Play]
-    );
-}
-
-#[test]
-fn fade_on_skip_does_nothing_with_crossfade_off() {
-    let mut p = playing_with(
-        prefs(None, true),
-        vec![track("a", Some("x")), track("b", Some("y"))],
-        secs(200),
-    );
-    assert_eq!(
-        run(&mut p, Input::Next),
-        [Effect::Pause, load("b"), Effect::Play]
-    );
 }
 
 #[test]
