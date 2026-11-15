@@ -145,10 +145,7 @@ mod tests {
         let ids: Vec<&str> = tracks.iter().map(|t| t.id.0.as_str()).collect();
         assert_eq!(ids, ["a", "b", "c"]);
         assert_eq!(heads, ["Today", "", "Yesterday"]);
-    }
-
-    #[test]
-    fn no_days_is_no_rows() {
-        assert_eq!(flatten(Vec::new()), (Vec::new(), Vec::new()));
+        let none = flatten(Vec::new());
+        assert_eq!(none, (Vec::new(), Vec::new()), "no days is no rows");
     }
 }
