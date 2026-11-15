@@ -121,20 +121,16 @@ ways in:
   accounts. Linux has no such window.
 - **Use Microsoft Edge**, **Use Google Chrome**, **Use Brave** or **Use Vivaldi** (on Linux,
   Chromium too) opens that browser itself, with its own address bar, your passkeys and Windows
-  Hello, in a temporary profile, never your own. featherplay talks to it over a private pipe,
-  not a network port, and can only ask for that profile's cookies and for the browser to close.
-  It keeps the YouTube Music session, drops every other cookie and deletes the profile; if you
-  close it before you've signed in, or don't sign in within 10 minutes, nothing is kept. The
-  option offers the browser you used last, else your default one, else the first installed
-  (**Change** lists the others). Opera and Firefox aren't offered: Opera starts through a
-  launcher, and Firefox has no such pipe.
-
-  **On Linux, close the browser once you're signed in.** There the browser has no pipe while
-  Google's page is open, so it's just the browser, as you'd start it yourself. Once you've
+  Hello, in a temporary profile, never your own. **Close the browser once you're signed in.**
+  While Google's page is open it's just the browser, as you'd start it yourself. Once you've
   closed it, featherplay starts it again on the same profile, headless (no window) and on a
-  blank page, asks it for the cookies over the pipe, and closes it. If you leave the window
-  open, featherplay closes it after 15 minutes and still reads the profile, so a sign-in you
-  finished isn't lost.
+  blank page, and talks to it over a private pipe, not a network port: it can only ask for
+  that profile's cookies and for the browser to close. It keeps the YouTube Music session,
+  drops every other cookie and deletes the profile. If you close it before you've signed in,
+  nothing is kept; if you leave it open, featherplay closes it after 15 minutes and still reads
+  the profile, so a sign-in you finished isn't lost. The option offers the browser you used
+  last, else your default one, else the first installed (**Change** lists the others). Opera
+  and Firefox aren't offered: Opera starts through a launcher, and Firefox has no such pipe.
 - **Paste a cookie header**, for advanced users, takes a `Cookie` header copied from a
   signed-in browser. It can stop working after a while, because the browser keeps renewing
   its own copy.
@@ -427,8 +423,8 @@ Update featherplay first. If the latest version fails too,
   their sandbox keeps them out of the temporary profile (Ubuntu's Chromium is a Snap). Install
   one from a `.deb` or `.rpm`, such as Google Chrome, Microsoft Edge, Brave or Vivaldi, or
   paste a cookie header.
-- **On Linux, nothing happens once you've signed in:** close the browser window featherplay
-  opened. featherplay reads the session only once that browser has closed.
+- **Nothing happens once you've signed in in a browser:** close the browser window
+  featherplay opened. featherplay reads the session only once that browser has closed.
 - **On Linux, "Signed in for this run only":** no keyring is running to keep the session, so
   featherplay holds it in memory until it quits and never writes it to a file. Start GNOME
   Keyring, KWallet or another Secret Service, then sign in again.

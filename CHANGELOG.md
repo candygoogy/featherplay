@@ -8,6 +8,15 @@ Notable changes to featherplay, newest first. The format follows
 
 ### Changed
 
+- On Windows too, the browser sign-in (**Use Microsoft Edge**, **Use Google Chrome**, **Use
+  Brave**, **Use Vivaldi**) runs the browser as you'd start it yourself, with no pipe, and
+  featherplay reads the session once you've closed it, as on Linux since 0.4.1. With the pipe
+  open, Chromium tells every page that the browser is automated, and Google's sign-in can
+  refuse such a browser with a security error. After you close the browser, featherplay starts
+  it again on the same temporary profile, headless and on a blank page, asks it for the
+  cookies over the pipe and closes it. A window left open is asked to close after 15 minutes
+  (10 before), and its profile is read all the same. The sign-in page says to close the
+  browser once you're signed in.
 - Opening and closing the lyrics on Now playing takes less work per frame (up to a third
   less on a 4K screen). After a new cover had faded in over the last one, the old cover
   stayed underneath and was drawn again, hidden, in every frame the cover moved; it now
