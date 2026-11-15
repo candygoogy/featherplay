@@ -1,0 +1,34 @@
+---
+// The Discord status friends see while featherplay plays (its Rich Presence): "Listening to
+// featherplay", the cover with the app's badge, the song, the artist and album, and the time.
+// Live on the player store; its line moves only while a song plays.
+import "../../styles/pieces.css";
+import { demoStart, songById } from "../../data/songs";
+import { formatTime } from "../../demo/player";
+
+interface Props {
+  class?: string;
+}
+const { class: className } = Astro.props;
+const song = songById(demoStart.songId)!;
+---
+
+<div class:list={["m-discord", className]} data-piece="discord" role="group" aria-label="Your Discord status, as friends see it">
+  <p class="dc-h">Listening to featherplay</p>
+  <div class="dc-act">
+    <span class="dc-art">
+      <img data-bind="cover" src={song.cover} width="88" height="88" alt="" decoding="async" />
+      <span class="dc-badge"><img src="/tri-vane.svg" width="16" height="16" alt="" /></span>
+    </span>
+    <div class="dc-text">
+      <p class="dc-title" data-bind="title">{song.title}</p>
+      <p class="dc-line">by <span data-bind="artist">{song.artist}</span></p>
+      <p class="dc-line" data-bind-wrap="album" hidden={!song.album}>on <span data-bind="album">{song.album?.title}</span></p>
+    </div>
+  </div>
+  <div class="dc-time num" aria-hidden="true">
+    <span data-bind="at">{formatTime(demoStart.positionMs)}</span>
+    <span class="rail dc-rail"><span data-fill style={`transform:scaleX(${demoStart.positionMs / song.durationMs})`}></span></span>
+    <span data-bind="duration">{formatTime(song.durationMs)}</span>
+  </div>
+</div>

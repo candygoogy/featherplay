@@ -1,0 +1,38 @@
+---
+// The song's synced lyrics on a card of its colour, large: the lines follow the song (the one
+// sung held a third of the way down, src/demo/follow.ts), a click on a line seeks there, the
+// wheel or a finger moves them for a while. A song without lyrics says so. Live on the player
+// store (src/demo/bind-pieces.ts).
+import "../../styles/pieces.css";
+import { demoStart, songById } from "../../data/songs";
+import { currentLineIndex, lyricsSource } from "../../demo/player";
+
+interface Props {
+  class?: string;
+}
+const { class: className } = Astro.props;
+const song = songById(demoStart.songId)!;
+const current = currentLineIndex(song, demoStart.positionMs);
+---
+
+<div class:list={["lyric-card", className]} data-piece="lyrics" data-has-lyrics={String(song.lyrics.length > 0)} role="group" aria-label="The song’s lyrics">
+  <img class="lc-art" data-bind="cover" src={song.cover} width="600" height="600" alt="" decoding="async" loading="lazy" />
+  <div class="lc-view" data-lc-view>
+    <ol class="lc-lines" data-lc-lines>
+      {
+        song.lyrics.map((l, i) => (
+          <li>
+            <button class="lc-line" type="button" data-at={l.atMs} data-state={i < current ? "past" : i === current ? "current" : "next"}>
+              {l.line}
+            </button>
+          </li>
+        ))
+      }
+    </ol>
+  </div>
+  <div class="lc-none">
+    <p class="lc-none-h">No lyrics for this song</p>
+    <p class="lc-none-why">Searched LRCLIB and YouTube Music.</p>
+  </div>
+  <p class="lc-source" data-lc-source>{lyricsSource(song)}</p>
+</div>

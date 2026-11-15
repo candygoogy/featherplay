@@ -1,0 +1,47 @@
+---
+// Windows' media controls for featherplay's song, as the system's media flyout shows them: the
+// app, the time, the cover, the title and artist, the line and the three keys. Live on the
+// player store (src/demo/bind-pieces.ts); the keys play, pause and skip the page's one player.
+// `surface` gives it its own glass (on the page); inside a flyout it takes the flyout's.
+import "../../styles/pieces.css";
+import Icon from "../Icon.astro";
+import Logo from "../Logo.astro";
+import { demoStart, songById } from "../../data/songs";
+import { formatTime } from "../../demo/player";
+
+interface Props {
+  surface?: boolean;
+  /** The cover's side, in px. */
+  cover?: number;
+  class?: string;
+}
+const { surface = false, cover = 72, class: className } = Astro.props;
+const song = songById(demoStart.songId)!;
+---
+
+<div
+  class:list={["m-media", className, { "glass float live": surface }]}
+  data-piece="media"
+  role="group"
+  aria-label="Now playing in featherplay, as Windows' media controls show it"
+  style={`--cover:${cover}px`}
+>
+  <p class="mm-app">
+    <Logo size={16} />featherplay<span class="mm-time num"><span data-bind="at">{formatTime(demoStart.positionMs)}</span> of <span data-bind="duration">{formatTime(song.durationMs)}</span></span>
+  </p>
+  <div class="mm-row">
+    <span class="mm-cover"><img data-bind="cover" src={song.cover} width={cover} height={cover} alt="" decoding="async" /></span>
+    <div class="mm-text">
+      <p class="mm-title" data-bind="title">{song.title}</p>
+      <p class="mm-artist" data-bind="artist">{song.artist}</p>
+    </div>
+  </div>
+  <span class="rail mm-rail" aria-hidden="true"><span data-fill style={`transform:scaleX(${demoStart.positionMs / song.durationMs})`}></span></span>
+  <div class="mm-keys">
+    <button type="button" data-do="previous" aria-label="Previous"><Icon name="prev" size={18} /></button>
+    <button type="button" data-do="toggle" data-play-label aria-label="Play">
+      <span class="pp" aria-hidden="true"><Icon name="play" size={18} class="i-play" /><Icon name="pause" size={18} class="i-pause" /></span>
+    </button>
+    <button type="button" data-do="next" aria-label="Next"><Icon name="next" size={18} /></button>
+  </div>
+</div>

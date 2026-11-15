@@ -40,7 +40,7 @@
   --s7: 3rem;
   --s8: 4.5rem;
   --s9: 7.5rem;
-  --pad: var(--s6); /* the one panel padding (24 px on a phone) */
+  --panel-pad: var(--s6); /* the one panel padding (24 px on a phone) */
 
   /* ---- Shape: five radii ---- */
   --r-control: 6px; /* controls inside pieces */
@@ -87,7 +87,7 @@
 }
 @media (width < 600px) {
   :root {
-    --pad: var(--s5);
+    --panel-pad: var(--s5);
   }
 }
 
@@ -105,6 +105,15 @@
   }
 }
 
+/* The playing song's colour, for everything on the page that wears it: it follows the cover
+   glow (--glow, set on the root by src/demo/glow.ts) as a plain fade on the one colour clock.
+   The replica sets its own --song for itself. */
+@property --song {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #e8894a;
+}
+
 /* ---------- The page on the system ---------- */
 :root.sys {
   background: var(--desk);
@@ -114,6 +123,8 @@
 /* The body keeps the old sections ground (base.css) until they move to the system; the new
    parts lie on the desk themselves. */
 :root.sys body {
+  --song: var(--glow);
+  transition: --song var(--t-glow) ease;
   font-size: var(--fs-text);
   line-height: var(--lh-text);
   font-kerning: normal;

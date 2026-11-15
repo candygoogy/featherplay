@@ -64,6 +64,9 @@ const steps = [
   </div>
 </section>
 
+<!-- What’s playing, said once a song (and when it pauses), never per line. -->
+<p class="visually-hidden" role="status" data-announce></p>
+
 <!-- The three steps: the story's words for reading in order, and plain blocks where it doesn't run. -->
 <section class="steps frame" id="after-app" tabindex="-1" aria-label="How featherplay steps back" data-steps>
   {
@@ -75,6 +78,15 @@ const steps = [
     ))
   }
 </section>
+
+<script>
+  import { bindReplicas } from "../demo/replica";
+  import { bindPieces } from "../demo/bind-pieces";
+  import { startClock } from "../scripts/clock";
+  const player = bindReplicas();
+  if (player) bindPieces(player);
+  for (const el of document.querySelectorAll<HTMLElement>("[data-clock]")) startClock(el);
+</script>
 
 <style>
   .stage {

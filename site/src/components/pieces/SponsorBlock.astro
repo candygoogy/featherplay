@@ -1,0 +1,29 @@
+---
+// SponsorBlock: the song as its music video, whose opening and closing talk the app skips. The
+// talk is marked on the line; the playhead hops over it as a song starts and ends (it lands on
+// the video's 7 % and leaves at 88 %), and says so. A picture of what happens: hidden from
+// assistive technology, which the cell's words tell. Live on the player store.
+import "../../styles/pieces.css";
+import { demoStart, songById } from "../../data/songs";
+import { sponsorPlayhead } from "../../demo/pieces";
+
+interface Props {
+  class?: string;
+}
+const { class: className } = Astro.props;
+const song = songById(demoStart.songId)!;
+const at = sponsorPlayhead(demoStart.positionMs / song.durationMs);
+---
+
+<div class:list={["m-sponsor", className]} data-piece="sponsor" aria-hidden="true">
+  <div class="sp-top">
+    <img data-bind="cover" src={song.cover} width="44" height="44" alt="" decoding="async" />
+    <span class="sp-text"><span class="sp-title" data-bind="title">{song.title}</span><span class="sp-sub">Music video</span></span>
+    <span class="sp-said">Skipped the talking</span>
+  </div>
+  <div class="sp-rail">
+    <i class="sp-skip a"></i><i class="sp-skip b"></i>
+    <i class="sp-head" data-sp-head style={`transform:translateX(${at}cqw)`}></i>
+  </div>
+  <div class="sp-labels"><span>Talking, skipped</span><span>Talking, skipped</span></div>
+</div>

@@ -1,0 +1,262 @@
+// Draws every small live piece on the page from the one player store (the replica's,
+// src/demo/replica.ts): the media controls, the tray's tooltip, the Discord status, scrobbling,
+// SponsorBlock, the lyric card, the first screen's play button, and the system's own media
+// controls (Media Session). One sound, one clock: none of them keeps time of its own.
+//
+// The store speaks on every frame while a song plays; each piece works only when something it
+// shows has changed (the song, play or pause, a jump, the second, the line). Progress lines run
+// on the compositor: one linear animation to the song's end, restarted on a change.
+
+import type { Song } from "../data/songs";
+import { currentLineIndex, formatTime, lyricsSource, type Player, type PlayerState } from "./player";
+import { createListen, mediaMetadataFor, sponsorPlayhead, trayLines } from "./pieces";
+import { followLyrics } from "./follow";
+
+const $$ = <T extends Element = HTMLElement>(sel: string, root: ParentNode = document) => [...root.querySelectorAll<T>(sel)];
+const reduced = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/** Runs a progress line from where the song is to its end, on the compositor. */
+function runLine(el: HTMLElement, from: string, to: string, ms: number, playing: boolean) {
+  for (const a of el.getAnimations()) a.cancel();
+  el.style.transform = from;
+  if (playing && ms > 0) el.animate([{ transform: from }, { transform: to }], { duration: ms, easing: "linear", fill: "forwards" });
+}
+
+/** A small cover changing song: the new one fades over the old (no hard cut). */
+function swapCover(img: HTMLImageElement, src: string) {
+  if (img.getAttribute("src") === src) return;
+  if (reduced() || !img.isConnected || !img.offsetParent) {
+    img.src = src;
+    return;
+  }
+  img.src = src;
+  img.animate([{ opacity: 0.2 }, { opacity: 1 }], { duration: 200, easing: "ease-out" });
+}
+
+let bound = false;
+
+export function bindPieces(player: Player): void {
+  if (bound || typeof document === "undefined") return;
+  bound = true;
+  const doc = document.documentElement;
+
+  // ---- Buttons anywhere on the page that act on the player ----
+  document.addEventListener("click", (e) => {
+    const b = (e.target as Element).closest<HTMLElement>("[data-do]");
+    if (!b) return;
+    const act = b.dataset.do;
+    if (act === "toggle") player.toggle();
+    else if (act === "previous") player.previous();
+    else if (act === "next") player.next();
+    else if (act === "play" && b.dataset.song) {
+      if (player.state.song?.id === b.dataset.song) player.toggle();
+      else player.play(b.dataset.song);
+    }
+  });
+
+  // ---- The lyric cards: lines that follow the song; a click on one seeks there ----
+  const cards = $$("[data-piece='lyrics']").map((card) => {
+    const view = card.querySelector<HTMLElement>("[data-lc-view]")!;
+    const list = card.querySelector<HTMLElement>("[data-lc-lines]")!;
+    const follow = followLyrics(view, list);
+    list.addEventListener("click", (e) => {
+      const line = (e.target as Element).closest<HTMLElement>(".lc-line");
+      if (!line) return;
+      follow.release();
+      player.seek(Number(line.dataset.at));
+      if (!player.state.playing) player.resume();
+    });
+    return { card, list, follow, line: -2, instant: true };
+  });
+  const buildLines = (song: Song) =>
+    song.lyrics.map((l) => {
+      const li = document.createElement("li");
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "lc-line";
+      b.dataset.at = String(l.atMs);
+      b.dataset.state = "next";
+      b.textContent = l.line;
+      li.append(b);
+      return li;
+    });
+
+  // ---- Scrobbling ----
+  const scrobbles = $$("[data-piece='scrobble']");
+  const listen = createListen();
+  const addPast = (song: Song) => {
+    for (const s of scrobbles) {
+      const past = s.querySelector("[data-sc-past]");
+      if (!past) continue;
+      const li = document.createElement("li");
+      const img = document.createElement("img");
+      img.src = song.cover;
+      img.width = img.height = 32;
+      img.alt = "";
+      const b = document.createElement("b");
+      b.textContent = song.title;
+      const t = document.createElement("span");
+      t.textContent = "Scrobbled";
+      li.append(img, b, t);
+      past.prepend(li);
+      while (past.children.length > 2) past.lastElementChild!.remove();
+    }
+  };
+
+  // ---- SponsorBlock: the hop over the talk as a song starts and ends ----
+  const sponsors = $$("[data-piece='sponsor']");
+  let hopTimer = 0;
+  let hopped = "";
+  const hop = (side: "a" | "b") => {
+    hopped = side;
+    for (const s of sponsors) s.dataset.hop = side;
+    clearTimeout(hopTimer);
+    hopTimer = window.setTimeout(() => sponsors.forEach((s) => delete s.dataset.hop), 1900);
+  };
+
+  // ---- The first screen's play button: "Play a song", then Pause and Play ----
+  const toggles = $$("[data-play-toggle]");
+  let started = false;
+  for (const t of toggles) t.hidden = false;
+
+  // ---- The song's announcement: polite, once a song and when it pauses ----
+  const announcer = document.querySelector<HTMLElement>("[data-announce]");
+  let announceTimer = 0;
+  let announced = "";
+
+  // ---- Media Session: the page's song in the system's own media controls ----
+  const ms = "mediaSession" in navigator ? navigator.mediaSession : null;
+  if (ms) {
+    const set = (action: MediaSessionAction, fn: MediaSessionActionHandler) => {
+      try {
+        ms.setActionHandler(action, fn);
+      } catch {
+        // An action this browser doesn't offer.
+      }
+    };
+    set("play", () => player.resume());
+    set("pause", () => player.pause());
+    set("previoustrack", () => player.previous());
+    set("nexttrack", () => player.next());
+    set("seekto", (d) => d.seekTime != null && player.seek(d.seekTime * 1000));
+  }
+
+  let last: { song?: string; playing?: boolean; jumps?: number; second?: number } = {};
+
+  const render = (s: PlayerState) => {
+    const song = s.song;
+    if (!song) return;
+    const songChanged = song.id !== last.song;
+    const playChanged = s.playing !== last.playing;
+    const jumped = s.jumps !== last.jumps;
+    const second = Math.floor(s.positionMs / 1000);
+    const secondChanged = second !== last.second;
+    if (s.playing) started = true;
+
+    if (songChanged) {
+      for (const el of $$("[data-piece] [data-bind='title']")) el.textContent = song.title;
+      for (const el of $$("[data-piece] [data-bind='artist']")) el.textContent = song.artist;
+      for (const el of $$("[data-piece] [data-bind='album']")) el.textContent = song.album?.title ?? "";
+      for (const el of $$("[data-piece] [data-bind-wrap='album']")) el.hidden = !song.album;
+      for (const el of $$("[data-piece] [data-bind='duration']")) el.textContent = formatTime(song.durationMs);
+      for (const img of $$<HTMLImageElement>("[data-piece] img[data-bind='cover']")) swapCover(img, song.cover);
+      for (const c of cards) {
+        const has = song.lyrics.length > 0;
+        c.card.dataset.hasLyrics = String(has);
+        c.list.replaceChildren(...buildLines(song));
+        const src = c.card.querySelector("[data-lc-source]");
+        if (src) src.textContent = has ? lyricsSource(song) : "";
+        c.follow.release();
+        c.line = -2;
+        c.instant = true;
+      }
+      if (last.song !== undefined && sponsors.length) setTimeout(() => hop("a"), 520);
+      if (ms) {
+        try {
+          ms.metadata = new MediaMetadata(mediaMetadataFor(song, location.origin));
+        } catch {
+          // No MediaMetadata here.
+        }
+      }
+    }
+
+    if (playChanged) {
+      doc.dataset.playing = String(s.playing);
+      for (const el of $$("[data-piece][data-piece='discord']")) el.toggleAttribute("data-on", s.playing);
+      for (const el of $$("[data-play-label]")) el.setAttribute("aria-label", s.playing ? "Pause" : "Play");
+      if (ms) ms.playbackState = s.playing ? "playing" : "paused";
+    }
+    if (playChanged || songChanged) {
+      const label = s.playing ? "Pause" : started ? "Play" : "Play a song";
+      for (const t of toggles) {
+        const text = t.querySelector("[data-play-toggle-text]");
+        if (text) text.textContent = label;
+      }
+      clearTimeout(announceTimer);
+      if (announcer && started) {
+        announceTimer = window.setTimeout(() => {
+          const text = s.playing ? `Playing ${song.title} by ${song.artist}` : `Paused: ${song.title}`;
+          if (text !== announced) announcer.textContent = announced = text;
+        }, 350);
+      }
+    }
+
+    // Progress lines: from here to the end, restarted when the song, play or the place changes.
+    if (songChanged || playChanged || jumped) {
+      const f = Math.min(1, s.positionMs / song.durationMs);
+      const left = Math.max(0, song.durationMs - s.positionMs);
+      for (const el of $$("[data-piece] [data-fill]")) runLine(el, `scaleX(${f})`, "scaleX(1)", left, s.playing);
+      for (const el of $$("[data-sp-head]")) runLine(el, `translateX(${sponsorPlayhead(f)}cqw)`, `translateX(${sponsorPlayhead(1)}cqw)`, left, s.playing);
+    }
+
+    if (songChanged || secondChanged || playChanged) {
+      const at = formatTime(s.positionMs);
+      for (const el of $$("[data-piece] [data-bind='at']")) el.textContent = at;
+      const [a, b] = trayLines(s);
+      for (const el of $$("[data-tray-1]")) el.textContent = a;
+      for (const el of $$("[data-tray-2]")) el.textContent = b;
+      if (ms?.setPositionState) {
+        try {
+          ms.setPositionState({ duration: song.durationMs / 1000, position: Math.min(s.positionMs, song.durationMs) / 1000, playbackRate: 1 });
+        } catch {
+          // A position a moment past the end.
+        }
+      }
+      const f = s.positionMs / song.durationMs;
+      if (f > 0.985 && hopped !== "b") hop("b");
+      else if (f < 0.5 && hopped === "b") hopped = "";
+    }
+
+    // Scrobbling counts on every step (time heard, not where the song is).
+    const l = listen.step(s);
+    if (l.finished) addPast(l.finished);
+    if (songChanged || secondChanged || l.justScrobbled || playChanged) {
+      for (const sc of scrobbles) {
+        const row = sc.querySelector<HTMLElement>("[data-sc-row]");
+        row?.toggleAttribute("data-scrobbled", l.scrobbled);
+        sc.querySelector<SVGElement>("[data-sc-ring]")?.style.setProperty("--p", l.progress.toFixed(4));
+        const label = sc.querySelector("[data-sc-label]");
+        const text = l.scrobbled ? "Scrobbled" : s.playing ? "Scrobbling now" : "Paused";
+        if (label && label.textContent !== text) label.textContent = text;
+      }
+    }
+
+    // The lyric cards' current line.
+    const line = currentLineIndex(song, s.positionMs);
+    for (const c of cards) {
+      if (line === c.line) continue;
+      c.line = line;
+      [...c.list.querySelectorAll<HTMLElement>(".lc-line")].forEach((b, i) => {
+        b.dataset.state = i < line ? "past" : i === line ? "current" : "next";
+        if (i === line) b.setAttribute("aria-current", "true");
+        else b.removeAttribute("aria-current");
+      });
+      const li = line >= 0 ? (c.list.children[line] as HTMLElement | undefined) : undefined;
+      c.follow.follow(li ?? null, c.instant);
+      c.instant = false;
+    }
+
+    last = { song: song.id, playing: s.playing, jumps: s.jumps, second };
+  };
+  player.subscribe(render);
+}

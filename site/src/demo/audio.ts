@@ -7,7 +7,7 @@
 // `state.jumps`), never on the clock's ticks, so a clip that's still loading isn't seeked
 // over and over. When the browser refuses to start it (its autoplay rules), the demo goes
 // on muted and the Sound switch shows it; pressing Sound is a gesture, and tries again.
-// A hidden tab, or the demo scrolled out of view, pauses the player and so the sound.
+// A hidden tab pauses the player and so the sound.
 
 import type { Player, PlayerState } from "./player";
 
@@ -110,16 +110,6 @@ export function bindAudio(player: Player): void {
     if (document.hidden && player.state.playing) player.pause();
   });
 
-  // The demo scrolled out of view (every player on the page off screen) pauses it.
-  if (typeof IntersectionObserver !== "undefined") {
-    const shown = new Set<Element>();
-    const io = new IntersectionObserver((entries) => {
-      for (const e of entries) {
-        if (e.isIntersecting) shown.add(e.target);
-        else shown.delete(e.target);
-      }
-      if (!shown.size && player.state.playing && audio) player.pause();
-    });
-    for (const el of document.querySelectorAll("[data-replica], [data-showcase-panel]")) io.observe(el);
-  }
+  // Scrolling on doesn't pause it: the song plays on down the page, as the app plays on in the
+  // tray, with the bar's capsule, the media keys and the system's controls in reach.
 }

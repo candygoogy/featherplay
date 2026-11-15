@@ -18,6 +18,7 @@ import { setGlow } from "./glow";
 import { followLyrics } from "./follow";
 import { bindAudio } from "./audio";
 import { bindCredits } from "./credit";
+import { trayLines } from "./pieces";
 
 let shared: Player | null = null;
 
@@ -362,10 +363,9 @@ function bindReplica(root: HTMLElement, player: Player) {
 
   function tooltip(s: PlayerState) {
     if (!desktop || !s.song) return;
-    const at = formatTime(s.positionMs);
-    const line2 = s.playing ? `${s.song.artist}, ${at} of ${formatTime(s.song.durationMs)}` : `${s.song.artist}, paused at ${at}`;
-    setAll(desktop, '[data-tray-line="1"]', (el) => (el.textContent = s.song!.title));
-    setAll(desktop, '[data-tray-line="2"]', (el) => (el.textContent = line2));
+    const [a, b] = trayLines(s);
+    setAll(desktop, '[data-tray-line="1"]', (el) => (el.textContent = a));
+    setAll(desktop, '[data-tray-line="2"]', (el) => (el.textContent = b));
   }
 
   const fill = (list: HTMLElement | null, ids: string[], current: string | null) => {

@@ -1,0 +1,83 @@
+---
+// "Everything you'd miss, kept": the live pieces on one surface in cells, each with its words.
+// A plain placement for now (phase 2 composes the section); every piece is live on the page's
+// one player. Facts from the repo's README ("Coming from Pear?").
+import MediaFlyout from "./pieces/MediaFlyout.astro";
+import DiscordCard from "./pieces/DiscordCard.astro";
+import ScrobbleRow from "./pieces/ScrobbleRow.astro";
+import SponsorBlock from "./pieces/SponsorBlock.astro";
+import TrayTip from "./pieces/TrayTip.astro";
+import LyricCard from "./pieces/LyricCard.astro";
+import { links } from "../data/links";
+---
+
+<section id="kept" class="kept frame" aria-labelledby="kept-title">
+  <div class="kept-head">
+    <h2 id="kept-title" class="t-title">Everything you’d miss, kept</h2>
+    <p class="t-lede ink2">Built in from the first run. No add-ons to find.</p>
+  </div>
+  <div class="cells panel">
+    <article class="cell">
+      <div class="cell-text"><h3 class="t-subtitle">Media keys</h3><p class="ink2">Play, pause and skip from your keyboard, the Windows media overlay or the taskbar.</p></div>
+      <div class="cell-piece"><MediaFlyout surface cover={88} /></div>
+    </article>
+    <article class="cell">
+      <div class="cell-text"><h3 class="t-subtitle">Discord status</h3><p class="ink2">Friends see what you’re playing, with a preview in Settings. Off until you turn it on.</p></div>
+      <div class="cell-piece"><DiscordCard /></div>
+    </article>
+    <article class="cell">
+      <div class="cell-text"><h3 class="t-subtitle">Scrobbling</h3><p class="ink2">Songs you play past halfway go to Last.fm, ListenBrainz or both.</p></div>
+      <div class="cell-piece"><ScrobbleRow /></div>
+    </article>
+    <article class="cell">
+      <div class="cell-text"><h3 class="t-subtitle">SponsorBlock</h3><p class="ink2">featherplay skips the talking in music videos, so you hear the song.</p></div>
+      <div class="cell-piece"><SponsorBlock /></div>
+    </article>
+    <article class="cell">
+      <div class="cell-text"><h3 class="t-subtitle">The tray</h3><p class="ink2">Closing the window asks to quit or play on in the tray, until you tell it to remember.</p></div>
+      <div class="cell-piece"><TrayTip corner /></div>
+    </article>
+    <article class="cell">
+      <div class="cell-text"><h3 class="t-subtitle">Synced lyrics</h3><p class="ink2">Lines that follow the song in its cover's colour. Click one to jump there.</p></div>
+      <div class="cell-piece"><LyricCard /></div>
+    </article>
+  </div>
+  <p class="more">Coming from Pear Desktop? <a class="text-link" href={links.comingFromPear}>See what carries over</a>.</p>
+</section>
+
+<style>
+  .kept {
+    display: grid;
+    gap: var(--s6);
+    padding-block: var(--s9);
+  }
+  .kept-head {
+    display: grid;
+    gap: var(--s3);
+  }
+  .cells {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 30rem), 1fr));
+    overflow: clip;
+  }
+  .cell {
+    display: grid;
+    align-content: start;
+    gap: var(--s5);
+    padding: var(--panel-pad);
+    box-shadow: 0 0 0 0.5px var(--hairline);
+  }
+  .cell-text {
+    display: grid;
+    gap: var(--s2);
+    max-width: 34rem;
+  }
+  .cell-piece {
+    display: grid;
+    justify-items: start;
+    min-width: 0;
+  }
+  .cell-piece > :global(.lyric-card) {
+    width: 100%;
+  }
+</style>

@@ -1,6 +1,5 @@
 import { existsSync, readdirSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
-import { skipTour, wake } from "./helpers";
 import { songs } from "../src/data/songs";
 
 // The demo plays real clips under free licences: nothing loads until
@@ -30,14 +29,12 @@ function musicRequests(page: Page) {
   return urls;
 }
 
-const heroPlay = (page: Page) => page.locator("[data-hero] .bar .fp-play").first();
-const heroCredit = (page: Page) => page.locator("[data-hero] [data-credit]");
+const heroPlay = (page: Page) => page.locator("[data-window] .bar .fp-play").first();
+const heroCredit = (page: Page) => page.locator("[data-stage] [data-credit]");
 
 test("nothing under /music/ loads before the first press of play, even scrolling the whole page", async ({ page }) => {
   const music = musicRequests(page);
   await page.goto("/");
-  await wake(page);
-  await skipTour(page);
   await page.evaluate(async () => {
     for (let y = 0; y < document.body.scrollHeight; y += innerHeight / 2) {
       scrollTo({ top: y, behavior: "instant" });
@@ -52,8 +49,6 @@ test("pressing play loads the song's clip, and its credit sits by the controls",
   await watchAudio(page);
   const music = musicRequests(page);
   await page.goto("/");
-  await wake(page);
-  await skipTour(page);
   const first = songs[0];
   // The credit is there for the loaded song from the start, by the laptop's bar.
   await expect(heroCredit(page)).toBeVisible();
@@ -65,12 +60,12 @@ test("pressing play loads the song's clip, and its credit sits by the controls",
   await expect.poll(() => music).toContain(first.clip!.opus);
   await expect.poll(() => sounding(page)).toBe(true);
   // The sound switch is on, and mutes.
-  const sound = page.locator("[data-hero] [data-sound]");
+  const sound = page.locator("[data-stage] [data-sound]");
   await expect(sound).toBeVisible();
   await expect(sound).toHaveAttribute("aria-pressed", "true");
 
   // Another song: its clip, its credit.
-  await page.locator("[data-hero] [data-replica]").getByRole("button", { name: "Next", exact: true }).click();
+  await page.locator("[data-window] [data-replica]").getByRole("button", { name: "Next", exact: true }).click();
   const second = songs[1];
   await expect.poll(() => music).toContain(second.clip!.opus);
   await expect(heroCredit(page)).toContainText(`“${second.title}” by ${second.artist}`);
@@ -81,10 +76,8 @@ test("pressing play loads the song's clip, and its credit sits by the controls",
 test("the Sound switch mutes and unmutes the clip", async ({ page }) => {
   await watchAudio(page);
   await page.goto("/");
-  await wake(page);
-  await skipTour(page);
   await heroPlay(page).click();
-  const sound = page.locator("[data-hero] [data-sound]");
+  const sound = page.locator("[data-stage] [data-sound]");
   // One icon at a time: the speaker while on, the struck speaker while muted.
   await expect(sound.locator("svg:visible")).toHaveCount(1);
   await sound.click();
@@ -103,8 +96,6 @@ test("the Sound switch mutes and unmutes the clip", async ({ page }) => {
 test("a hidden tab pauses the demo and its sound", async ({ page }) => {
   await watchAudio(page);
   await page.goto("/");
-  await wake(page);
-  await skipTour(page);
   await heroPlay(page).click();
   await expect.poll(() => sounding(page)).toBe(true);
   await page.evaluate(() => {
@@ -113,19 +104,18 @@ test("a hidden tab pauses the demo and its sound", async ({ page }) => {
     document.dispatchEvent(new Event("visibilitychange"));
   });
   await expect.poll(() => sounding(page)).toBe(false);
-  await expect(page.locator("[data-hero] [data-replica]")).toHaveAttribute("data-playing", "false");
+  await expect(page.locator("[data-window] [data-replica]")).toHaveAttribute("data-playing", "false");
 });
 
-test("scrolling the demo out of view pauses it", async ({ page }) => {
+test("scrolling on down the page keeps the song playing, as the app plays on in the tray", async ({ page }) => {
   await watchAudio(page);
   await page.goto("/");
-  await wake(page);
-  await skipTour(page);
   await heroPlay(page).click();
   await expect.poll(() => sounding(page)).toBe(true);
   await page.locator("#download").scrollIntoViewIfNeeded();
-  await expect.poll(() => sounding(page)).toBe(false);
-  await expect(page.locator("[data-hero] [data-replica]")).toHaveAttribute("data-playing", "false");
+  await page.waitForTimeout(400);
+  expect(await sounding(page)).toBe(true);
+  await expect(page.locator("[data-window] [data-replica]")).toHaveAttribute("data-playing", "true");
 });
 
 test("the credits page credits all six tracks with their licence links", async ({ page }) => {
@@ -149,36 +139,9 @@ test("the built site ships only the web clips: no raw downloads, no unused lyric
   expect(readdirSync(new URL("music/", dist)).sort()).toEqual(songs.flatMap((s) => [`${s.id}.m4a`, `${s.id}.webm`]).sort());
 });
 
-test("the tour's Start over cues the first song paused, without a blip of sound", async ({ page }) => {
-  await watchAudio(page);
-  await page.goto("/");
-  await wake(page);
-  await heroPlay(page).click();
-  await expect.poll(() => sounding(page)).toBe(true);
-  await heroPlay(page).click(); // pause
-  await expect.poll(() => sounding(page)).toBe(false);
-  await page.evaluate(() => {
-    const w = window as unknown as { __plays: number };
-    w.__plays = 0;
-    const play = HTMLMediaElement.prototype.play;
-    HTMLMediaElement.prototype.play = function (this: HTMLMediaElement) {
-      w.__plays++;
-      return play.call(this);
-    };
-    document.querySelector<HTMLButtonElement>("[data-tour-restart]")!.click();
-  });
-  const r = page.locator("[data-hero] [data-replica]");
-  await expect(r).toHaveAttribute("data-song", songs[0].id);
-  await expect(r).toHaveAttribute("data-playing", "false");
-  await page.waitForTimeout(200);
-  expect(await page.evaluate(() => (window as unknown as { __plays: number }).__plays)).toBe(0);
-});
-
 test("while it plays, the clip is seeked only when the position jumps, not on the clock's ticks", async ({ page }) => {
   await watchAudio(page);
   await page.goto("/");
-  await wake(page);
-  await skipTour(page);
   await heroPlay(page).click();
   await expect.poll(() => sounding(page)).toBe(true);
   // Once the clip is under way (the first placement, applied as its data arrives, is done).
@@ -196,7 +159,7 @@ test("while it plays, the clip is seeked only when the position jumps, not on th
   await page.waitForTimeout(1500);
   expect(await page.evaluate(() => (window as unknown as { __seeks: number }).__seeks)).toBe(0);
   // A click on a line is a jump: one seek.
-  await page.locator("[data-hero] [data-lyrics] .line").nth(5).evaluate((b: HTMLElement) => b.click());
+  await page.locator("[data-window] [data-lyrics] .line").nth(5).evaluate((b: HTMLElement) => b.click());
   await expect.poll(() => page.evaluate(() => (window as unknown as { __seeks: number }).__seeks)).toBe(1);
 });
 
@@ -210,32 +173,23 @@ test("when the browser refuses to start the sound, the demo goes on muted and do
     };
   });
   await page.goto("/");
-  await wake(page);
-  await skipTour(page);
   await heroPlay(page).click();
-  const sound = page.locator("[data-hero] [data-sound]");
+  const sound = page.locator("[data-stage] [data-sound]");
   await expect(sound).toHaveAttribute("aria-pressed", "false");
-  await expect(page.locator("[data-hero] [data-replica]")).toHaveAttribute("data-playing", "true");
+  await expect(page.locator("[data-window] [data-replica]")).toHaveAttribute("data-playing", "true");
   await page.waitForTimeout(800);
   expect(await page.evaluate(() => (window as unknown as { __plays: number }).__plays)).toBe(1);
 });
 
-test("every player carries the same line, sound then credit, attached under it", async ({ page }) => {
+test("every player carries the same line, sound then credit", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/");
-  await wake(page);
   const lines = page.locator("[data-now-playing]");
   await expect(lines).toHaveCount(3);
   for (const line of await lines.all()) {
     await expect(line.locator("[data-sound]")).toHaveCount(1);
     await expect(line.locator("[data-credit]")).toHaveCount(1);
   }
-  // In the hero: centred under the laptop, just below it.
-  const laptop = (await page.locator("[data-hero] [data-laptop]").boundingBox())!;
-  const hero = (await page.locator("[data-hero] [data-now-playing]").boundingBox())!;
-  expect(hero.y - (laptop.y + laptop.height)).toBeGreaterThanOrEqual(0);
-  expect(hero.y - (laptop.y + laptop.height)).toBeLessThan(24);
-  expect(Math.abs(hero.x + hero.width / 2 - (laptop.x + laptop.width / 2))).toBeLessThan(2);
 });
 
 for (const theme of ["dark", "light"]) {

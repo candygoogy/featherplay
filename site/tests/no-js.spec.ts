@@ -8,6 +8,7 @@ const sectionHeadings = [
   "Light, and it shows",
   "Lyrics, up close",
   "Make it yours",
+  "Everything you’d miss, kept",
   "Questions",
   "Download for Windows",
 ];
