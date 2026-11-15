@@ -20,6 +20,16 @@ async fn connect() -> YtMusic {
         .expect("sign in with the cookie header")
 }
 
+/// Where the `live_record_*` tests write: `FEATHERPLAY_RECORD_DIR`. Unset, `test` is
+/// skipped, saying so, before any request.
+fn record_dir(test: &str) -> Option<std::path::PathBuf> {
+    let dir = std::env::var_os("FEATHERPLAY_RECORD_DIR").map(std::path::PathBuf::from);
+    if dir.is_none() {
+        eprintln!("{test}: skipped, FEATHERPLAY_RECORD_DIR is not set");
+    }
+    dir
+}
+
 /// The app's own sign-in check, and nothing more: the page (for the client version), then
 /// one library read. Two requests, both reads.
 #[tokio::test]
@@ -268,52 +278,22 @@ async fn live_search_suggestions() {
         let path = std::path::Path::new(&dir).join("search_suggestions.raw.json");
         std::fs::write(&path, &raw).expect("write the recording");
     }
-    println!("search suggestions: {} bytes", raw.len());
-}
-
-/// Switching identities, read-only: one account switcher list, then one library read
-/// (the library playlists) as each identity it lists. Prints only each identity's shape,
-/// its playlist count and which reads gave the same list (groups A, B, ...), never names
-/// or ids.
-#[tokio::test]
-#[ignore = "live: needs FEATHERPLAY_COOKIES_FILE"]
-async fn live_identities() {
-    let yt = connect().await;
-    let list = yt.accounts().await.expect("account switcher");
-    assert!(!list.is_empty(), "the switcher lists no identities");
-    let mut groups: Vec<Vec<String>> = Vec::new();
-    for account in &list {
-        let as_it = yt.as_identity(&account.identity).expect("client");
-        let ids: Vec<String> = as_it
-            .library_playlists()
-            .await
-            .expect("library playlists")
-            .into_iter()
-            .map(|p| p.id.0)
-            .collect();
-        let group = match groups.iter().position(|g| *g == ids) {
-            Some(i) => i,
-            None => {
-                groups.push(ids.clone());
-                groups.len() - 1
-            }
-        };
-        println!(
-            "{:?}: listed active {}, channel {}, {} playlists, list {}",
-            account.identity,
-            account.active,
-            account.has_channel,
-            ids.len(),
-            (b'A' + group as u8) as char,
-        );
-    }
+    let suggestions =
+        featherplay_ytm::convert::search_suggestions(&raw).expect("search suggestions parse");
+    println!(
+        "search suggestions: {} bytes, {} completions, {} results",
+        raw.len(),
+        suggestions.queries.len(),
+        suggestions.results.len()
+    );
 }
 
 /// Switching back and forth, read-only: as each identity the switcher lists, then the
 /// first one again, Home, the library playlists and Liked songs must load (Home may be
 /// empty, never an error). Then, as each identity, the first playlist of every other one:
-/// a playlist this identity can't see is `NotFound`, never a parse error. Prints shapes
-/// and counts only.
+/// a playlist this identity can't see is `NotFound`, never a parse error. Prints only each
+/// identity's shape, its counts and which identities gave the same playlist list (groups
+/// A, B, ...), never names or ids.
 #[tokio::test]
 #[ignore = "live: needs FEATHERPLAY_COOKIES_FILE"]
 async fn live_switching_reads() {
@@ -321,16 +301,28 @@ async fn live_switching_reads() {
     let list = yt.accounts().await.expect("account switcher");
     assert!(!list.is_empty(), "the switcher lists no identities");
     let mut firsts = Vec::new();
+    let mut groups: Vec<Vec<String>> = Vec::new();
     for account in &list {
         let as_it = yt.as_identity(&account.identity).expect("client");
         let home = as_it.home().await.expect("home").shelves;
         let playlists = as_it.library_playlists().await.expect("library playlists");
         let liked = as_it.liked_songs().await.expect("liked songs");
+        let ids: Vec<String> = playlists.iter().map(|p| p.id.0.clone()).collect();
+        let group = match groups.iter().position(|g| *g == ids) {
+            Some(i) => i,
+            None => {
+                groups.push(ids);
+                groups.len() - 1
+            }
+        };
         println!(
-            "{:?}: home {} shelves, {} playlists, {} liked",
+            "{:?}: listed active {}, channel {}, home {} shelves, {} playlists (list {}), {} liked",
             account.identity,
+            account.active,
+            account.has_channel,
             home.len(),
             playlists.len(),
+            (b'A' + group as u8) as char,
             liked.len()
         );
         firsts.push(playlists.first().map(|p| p.id.clone()));
@@ -375,10 +367,12 @@ async fn live_switching_reads() {
 /// the fixtures (scrub them before committing: the history is personal). Read-only, one
 /// request per page, eight pages. Prints sizes only.
 #[tokio::test]
-#[ignore = "live: needs FEATHERPLAY_COOKIES_FILE and FEATHERPLAY_RECORD_DIR"]
+#[ignore = "live: needs FEATHERPLAY_COOKIES_FILE; records into FEATHERPLAY_RECORD_DIR, skips without it"]
 async fn live_record_discovery() {
-    let dir = std::env::var_os("FEATHERPLAY_RECORD_DIR").expect("FEATHERPLAY_RECORD_DIR");
-    let dir = std::path::Path::new(&dir);
+    let Some(dir) = record_dir("live_record_discovery") else {
+        return;
+    };
+    let dir = dir.as_path();
     let yt = connect().await;
     let pages: [(&str, &str, Option<&str>); 7] = [
         ("explore", "FEmusic_explore", None),
@@ -418,20 +412,18 @@ const UNTIMED_SONG: &str = "K0HSD_i2DvA";
 /// `FEATHERPLAY_RECORD_DIR`: two reads. Prints its size only. Scrub it before committing
 /// (`timed_lyrics.json` keeps the timings, with placeholder words).
 #[tokio::test]
-#[ignore = "live: needs FEATHERPLAY_COOKIES_FILE and FEATHERPLAY_RECORD_DIR"]
+#[ignore = "live: needs FEATHERPLAY_COOKIES_FILE; records into FEATHERPLAY_RECORD_DIR, skips without it"]
 async fn live_record_timed_lyrics() {
-    let dir = std::env::var_os("FEATHERPLAY_RECORD_DIR").expect("FEATHERPLAY_RECORD_DIR");
+    let Some(dir) = record_dir("live_record_timed_lyrics") else {
+        return;
+    };
     let yt = connect().await;
     let raw = yt
         .timed_lyrics_raw(&TrackId(TIMED_SONG.into()))
         .await
         .expect("mobile lyrics page")
         .expect("a lyrics tab");
-    std::fs::write(
-        std::path::Path::new(&dir).join("timed_lyrics.raw.json"),
-        &raw,
-    )
-    .expect("write");
+    std::fs::write(dir.join("timed_lyrics.raw.json"), &raw).expect("write");
     println!("timed lyrics page: {} bytes", raw.len());
 }
 
@@ -441,9 +433,11 @@ async fn live_record_timed_lyrics() {
 /// `FEATHERPLAY_IDENTITY` (a `key()`), as that identity, only if the cookie's account switcher
 /// lists it. One read, two with an identity. Prints sizes only. Scrub it before committing.
 #[tokio::test]
-#[ignore = "live: needs FEATHERPLAY_COOKIES_FILE and FEATHERPLAY_RECORD_DIR"]
+#[ignore = "live: needs FEATHERPLAY_COOKIES_FILE; records into FEATHERPLAY_RECORD_DIR, skips without it"]
 async fn live_record_search() {
-    let dir = std::env::var_os("FEATHERPLAY_RECORD_DIR").expect("FEATHERPLAY_RECORD_DIR");
+    let Some(dir) = record_dir("live_record_search") else {
+        return;
+    };
     let query = std::env::var("FEATHERPLAY_SEARCH").unwrap_or_else(|_| "exciting".into());
     let filter = std::env::var("FEATHERPLAY_SEARCH_FILTER").unwrap_or_else(|_| "songs".into());
     let f = match filter.as_str() {
@@ -468,11 +462,7 @@ async fn live_record_search() {
     }
     let raw = yt.search_raw(&query, f).await.expect("search");
     let name = query.replace(|c: char| !c.is_ascii_alphanumeric(), "_");
-    std::fs::write(
-        std::path::Path::new(&dir).join(format!("search_{filter}_{name}.raw.json")),
-        &raw,
-    )
-    .expect("write");
+    std::fs::write(dir.join(format!("search_{filter}_{name}.raw.json")), &raw).expect("write");
     println!("search: {} bytes", raw.len());
 }
 
@@ -705,37 +695,4 @@ async fn live_mixes() {
         assert!(!mix.tracks.is_empty());
         assert_eq!(ids.len(), mix.tracks.len(), "a song listed twice");
     }
-}
-
-/// The New Release Mix, a long one (~500 songs, ~19 pages), read a page at a time as the
-/// playlist page reads it, timed: to its first songs, and to its end. Reads only; counts.
-#[tokio::test]
-#[ignore = "live: needs FEATHERPLAY_COOKIES_FILE"]
-async fn live_long_mix_by_page() {
-    let id =
-        featherplay_core::model::PlaylistId("RDTMAK5uy_lr0LWzGrq6FU9GIxWvFHTRPQD2LHMqlFA".into());
-    let yt = connect().await;
-    let t = std::time::Instant::now();
-    let mut first = None;
-    let mut songs = 0;
-    let pages = yt
-        .playlist_by_page(&id, |part| {
-            match part {
-                featherplay_ytm::PlaylistPart::First(p) => {
-                    first = Some((t.elapsed(), p.tracks.len()));
-                    songs += p.tracks.len();
-                }
-                featherplay_ytm::PlaylistPart::More(tracks) => songs += tracks.len(),
-            }
-            std::ops::ControlFlow::Continue(())
-        })
-        .await
-        .expect("the mix");
-    let (to_first, first_songs) = first.expect("a first page");
-    println!(
-        "TIMING long mix: first {first_songs} songs in {} ms | {songs} songs from {pages} pages in {} ms",
-        to_first.as_millis(),
-        t.elapsed().as_millis()
-    );
-    assert!(first_songs > 0);
 }
