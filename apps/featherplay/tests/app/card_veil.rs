@@ -62,18 +62,12 @@ fn a_card_shades_its_art_when_hovered_and_more_when_pressed() {
     let _ = frames(w, 60, |_| {});
     let left = shot();
 
-    if let Some(dir) = std::env::var_os("CARD_VEIL_SHOTS") {
-        for (name, s) in [
-            ("rest", &rest),
-            ("hovered", &hovered),
-            ("pressed", &pressed),
-        ] {
-            let path = std::path::Path::new(&dir).join(format!("card-veil-{name}.png"));
-            image::RgbaImage::from_raw(s.width(), s.height(), s.as_bytes().to_vec())
-                .expect("image")
-                .save(path)
-                .expect("save");
-        }
+    for (name, s) in [
+        ("rest", &rest),
+        ("hovered", &hovered),
+        ("pressed", &pressed),
+    ] {
+        crate::support::pixels::save(name, s);
     }
 
     let (r, h, p, l) = (

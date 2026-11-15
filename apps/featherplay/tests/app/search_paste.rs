@@ -50,20 +50,12 @@ fn pasted_text_stays_on_one_line() {
     w.dispatch_event(WindowEvent::WindowActiveChanged(true));
     with_ctrl(w, "k");
 
-    assert_eq!(
-        paste(&ui, "daft punk"),
-        "daft punk",
-        "a plain paste lands as it is"
-    );
+    // How the text is made one line is `top_bar::single_line`'s, tested beside it; here, that
+    // a paste into the field goes through it.
     assert_eq!(
         paste(&ui, "daft\r\npunk\tlive\r\n"),
         "daft punk live",
         "line breaks and tabs become spaces, the ends are trimmed"
-    );
-    assert_eq!(
-        paste(&ui, "\r\n\t "),
-        "",
-        "nothing but breaks leaves it empty"
     );
     let long = "around the world ".repeat(30);
     let pasted = paste(&ui, &format!("{long}\r\n{long}"));
