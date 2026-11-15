@@ -9,8 +9,9 @@ use std::rc::Rc;
 
 use featherplay::offscreen;
 use featherplay::ui::{AppWindow, Frame, QueueData, Theme, TrackRow};
-use slint::platform::{PointerEventButton, WindowEvent};
 use slint::{ComponentHandle, LogicalPosition, ModelRc, VecModel};
+
+use crate::support::{click, point, press, release};
 
 fn row(id: &str) -> TrackRow {
     TrackRow {
@@ -43,30 +44,6 @@ fn at(x: f32, y: f32) -> LogicalPosition {
 /// On row `i`'s title.
 fn on_row(i: usize) -> LogicalPosition {
     at(PANEL_X + 120.0, row_y(i))
-}
-
-fn move_to(w: &slint::Window, p: LogicalPosition) {
-    w.dispatch_event(WindowEvent::PointerMoved { position: p });
-}
-
-fn press(w: &slint::Window, p: LogicalPosition) {
-    move_to(w, p);
-    w.dispatch_event(WindowEvent::PointerPressed {
-        position: p,
-        button: PointerEventButton::Left,
-    });
-}
-
-fn release(w: &slint::Window, p: LogicalPosition) {
-    w.dispatch_event(WindowEvent::PointerReleased {
-        position: p,
-        button: PointerEventButton::Left,
-    });
-}
-
-fn click(w: &slint::Window, p: LogicalPosition) {
-    press(w, p);
-    release(w, p);
 }
 
 /// Whether row `i` shows the hover tile: the pixel left of its cover differs from the same
@@ -105,7 +82,7 @@ fn drag_reorders_click_plays_hover_removes_and_follows_the_pointer() {
     // Drag the first row down two rows.
     press(w, on_row(0));
     for step in 1..=10 {
-        move_to(w, at(PANEL_X + 120.0, row_y(0) + step as f32 * 11.2));
+        point(w, at(PANEL_X + 120.0, row_y(0) + step as f32 * 11.2));
     }
     release(w, on_row(2));
     assert_eq!(*log.borrow(), ["move 0 2"], "a drag reorders");
@@ -119,7 +96,7 @@ fn drag_reorders_click_plays_hover_removes_and_follows_the_pointer() {
     log.borrow_mut().clear();
     press(w, on_row(1));
     let wobble = at(PANEL_X + 120.0, row_y(1) + 2.0);
-    move_to(w, wobble);
+    point(w, wobble);
     release(w, wobble);
     assert_eq!(*log.borrow(), ["play 1"], "a wobble is a click");
 
@@ -127,23 +104,23 @@ fn drag_reorders_click_plays_hover_removes_and_follows_the_pointer() {
     log.borrow_mut().clear();
     click(w, at(1280.0 - 16.0 - 4.0 - 18.0, row_y(4)));
     assert_eq!(*log.borrow(), ["remove 4"], "the × removes");
-    move_to(w, at(300.0, 400.0));
+    point(w, at(300.0, 400.0));
 
     let ids = ["a", "b", "c", "d", "e", "f", "g", "h", "i"];
 
     // Plain hover lights the row under the pointer, and only that one.
     data.set_upcoming(ModelRc::from(rows(&ids)));
-    move_to(w, on_row(1));
+    point(w, on_row(1));
     assert!(lit(w, 1), "hovering a row lights it");
     assert!(!lit(w, 0), "the row above stays quiet");
-    move_to(w, at(300.0, 400.0));
+    point(w, at(300.0, 400.0));
     assert!(!lit(w, 1), "leaving the row clears it");
 
     // A row is removed above the hovered one: the hovered row slides up, away from the
     // pointer, and the one below slides under it.
     let model = rows(&ids);
     data.set_upcoming(ModelRc::from(model.clone()));
-    move_to(w, on_row(1));
+    point(w, on_row(1));
     assert!(lit(w, 1), "hovering a row lights it");
     model.remove(0);
     assert!(
@@ -155,25 +132,25 @@ fn drag_reorders_click_plays_hover_removes_and_follows_the_pointer() {
         "the row that slid under the resting pointer lit up"
     );
     // Windows sends a move at the same place now and then (a window above changed).
-    move_to(w, on_row(1));
+    point(w, on_row(1));
     assert!(
         !lit(w, 1),
         "a move without movement lit the row that slid under the pointer"
     );
-    move_to(w, at(PANEL_X + 124.0, row_y(1) + 1.0));
+    point(w, at(PANEL_X + 124.0, row_y(1) + 1.0));
     assert!(lit(w, 1), "moving the pointer lights the row it's on");
-    move_to(w, at(300.0, 400.0));
+    point(w, at(300.0, 400.0));
 
     // Clicking a row plays it: the controller's next state drops it from the list, so the
     // next row takes its place under the pointer.
     data.set_upcoming(ModelRc::from(rows(&ids)));
     click(w, on_row(0));
     data.set_upcoming(ModelRc::from(rows(&ids[1..])));
-    move_to(w, on_row(0));
+    point(w, on_row(0));
     assert!(
         !lit(w, 0),
         "the next row lit up under the pointer that played the row before it"
     );
-    move_to(w, at(PANEL_X + 124.0, row_y(0) + 1.0));
+    point(w, at(PANEL_X + 124.0, row_y(0) + 1.0));
     assert!(lit(w, 0), "moving the pointer lights the row it's on");
 }

@@ -8,20 +8,19 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Duration;
 
-use featherplay::app::Ctx;
 use featherplay::controller::{Action, PlayerState, QueueAction, QueueInfo};
-use featherplay::covers::Covers;
-use featherplay::offscreen;
 use featherplay::pages::playlist;
-use featherplay::ui::{AppWindow, Frame, PlaylistData, QueueData, Theme};
+use featherplay::ui::{Frame, PlaylistData, QueueData, Theme};
 use featherplay::{prepare, queue_panel};
-use featherplay_controller::catalog::{Catalog, Source};
+use featherplay_controller::catalog::Source;
 use featherplay_controller::fixtures::Fixtures;
 use featherplay_core::model::{PlaylistId, Track};
 use featherplay_store::Paths;
 use sha1::{Digest, Sha1};
 use slint::{ComponentHandle, Model};
 use tokio::sync::mpsc;
+
+use crate::support;
 
 const WAIT: Duration = Duration::from_secs(10);
 
@@ -92,24 +91,12 @@ fn current_row_cover_and_liked_songs_label() {
     // SAFETY: set before any other thread of this test process starts.
     unsafe { std::env::set_var("FEATHERPLAY_HOME", &home) };
 
-    let pump = offscreen::install().expect("platform");
-    let runtime = tokio::runtime::Builder::new_multi_thread()
-        .worker_threads(2)
-        .enable_all()
-        .build()
-        .expect("runtime");
     let fixtures = Arc::new(Fixtures::load().expect("fixtures"));
-    let catalog = Catalog::new(runtime.handle().clone()).expect("catalog");
-    catalog.set(Source::Fixtures(fixtures.clone()));
-    let covers = Covers::new(
-        runtime.handle().clone(),
-        Paths::resolve().cache,
-        Some(fixtures),
-    );
-    let (actions, mut sent) = mpsc::unbounded_channel();
-    let ui = AppWindow::new().expect("window");
+    let mut bare = support::bare(Paths::resolve().cache, Some(fixtures.clone()));
+    bare.catalog.set(Source::Fixtures(fixtures));
+    let (ui, ctx, pump) = (&bare.ui, &bare.ctx, &bare.pump);
+    let sent = &mut bare.sent;
     ui.global::<Theme>().set_still(true);
-    let ctx: Rc<Ctx> = Ctx::new(&ui, catalog, covers, actions);
     let data = ui.global::<QueueData>();
     // Up next asks for the covers of the rows it shows: the panel is open, and drawn.
     prepare::init(&ctx);
@@ -164,16 +151,16 @@ fn current_row_cover_and_liked_songs_label() {
         "Liked songs loads"
     );
     // Opening the list resolves its first row ahead, and only that one.
-    match next_sent(&mut sent) {
+    match next_sent(sent) {
         Ok(Action::Prefetch { id, track }) => {
             assert_eq!(id.0, pdata.get_tracks().row_data(0).unwrap().id.as_str());
             assert!(track.is_some());
         }
         other => panic!("expected the first row's prefetch, got {other:?}"),
     }
-    assert!(next_sent(&mut sent).is_err(), "one prefetch");
+    assert!(next_sent(sent).is_err(), "one prefetch");
     pdata.invoke_play(0);
-    match next_sent(&mut sent) {
+    match next_sent(sent) {
         Ok(Action::Queue(QueueAction::PlayFrom { from, start, .. })) => {
             assert_eq!(from.label, "Liked songs");
             assert_eq!(start, 0);
@@ -181,7 +168,7 @@ fn current_row_cover_and_liked_songs_label() {
         other => panic!("expected a labelled play, got {other:?}"),
     }
     pdata.invoke_shuffle();
-    match next_sent(&mut sent) {
+    match next_sent(sent) {
         Ok(Action::Queue(QueueAction::PlayFrom { from, .. })) => {
             assert_eq!(from.label, "Liked songs")
         }

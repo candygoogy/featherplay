@@ -1,21 +1,29 @@
 //! Helpers several test modules share: a fresh home for every test, generated covers for the
 //! fixtures and long lyrics, the long Home and long lists, the scene at 4K, frames on the
-//! frozen clock timed in this thread's CPU time, the pointer, the ceilings' three tries, and
-//! private memory.
+//! frozen clock timed in this thread's CPU time, the pointer, the window's elements by their
+//! accessible label, pixel comparisons, a bare window and its `Ctx`, the ceilings' three
+//! tries, and private memory.
 
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
+use std::sync::Arc;
 use std::time::Duration;
 
+use featherplay::app::Ctx;
+use featherplay::controller::Action;
+use featherplay::covers::Covers;
 use featherplay::offscreen;
 use featherplay::snapshot::Scene;
 use featherplay::ui::{
     AppWindow, CardItem, Frame, HomeData, HomeShelfRow, LyricsData, Theme, TrackRow,
 };
+use featherplay_controller::catalog::Catalog;
+use featherplay_controller::fixtures::Fixtures;
 use slint::platform::{PointerEventButton, WindowEvent};
 use slint::{
     ComponentHandle, LogicalPosition, LogicalSize, Model, ModelRc, PhysicalSize, VecModel,
 };
+use tokio::sync::mpsc;
 
 /// One frame at 240 Hz (Slint's clock counts whole milliseconds).
 pub const FRAME_240: Duration = Duration::from_millis(4);
@@ -313,6 +321,42 @@ pub fn scene_at(width: u32, height: u32, scale: f32, page: &str, sound: bool) ->
     scene
 }
 
+/// A window and its `Ctx` without a `Scene` around them, for the tests that play the
+/// controller's part themselves: the offscreen platform, a runtime, a catalogue with no
+/// source yet, covers cached in `cache` (from `fixtures`' art, when given) and the actions
+/// the window sends. Nothing is wired. The fields drop in order: the window before the
+/// runtime and the platform.
+pub struct Bare {
+    pub ctx: Rc<Ctx>,
+    pub ui: AppWindow,
+    pub catalog: Catalog,
+    pub sent: mpsc::UnboundedReceiver<Action>,
+    pub runtime: tokio::runtime::Runtime,
+    pub pump: offscreen::Pump,
+}
+
+pub fn bare(cache: PathBuf, fixtures: Option<Arc<Fixtures>>) -> Bare {
+    let pump = offscreen::install().expect("platform");
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(2)
+        .enable_all()
+        .build()
+        .expect("runtime");
+    let catalog = Catalog::new(runtime.handle().clone()).expect("catalog");
+    let covers = Covers::new(runtime.handle().clone(), cache, fixtures);
+    let (actions, sent) = mpsc::unbounded_channel();
+    let ui = AppWindow::new().expect("window");
+    let ctx = Ctx::new(&ui, catalog.clone(), covers, actions);
+    Bare {
+        ctx,
+        ui,
+        catalog,
+        sent,
+        runtime,
+        pump,
+    }
+}
+
 /// `scene_at` on Home, silent.
 pub fn home_at(width: u32, height: u32, scale: f32) -> Scene {
     scene_at(width, height, scale, "home", false)
@@ -379,6 +423,24 @@ pub fn idle(scene: &Scene, n: usize) {
     }
 }
 
+/// Presents a frame and returns what the window then shows.
+pub fn frame(scene: &Scene) -> image::RgbaImage {
+    let w = scene.ui.window();
+    offscreen::present(w).expect("present");
+    let px = offscreen::shown(w).expect("shown");
+    image::RgbaImage::from_raw(px.width(), px.height(), px.as_bytes().to_vec()).expect("image")
+}
+
+/// How far apart two pixels' colours are: the sum of the red, green and blue differences.
+pub fn dist(a: [u8; 4], b: [u8; 4]) -> u32 {
+    (0..3).map(|i| u32::from(a[i].abs_diff(b[i]))).sum()
+}
+
+/// Whether two pixels are different colours altogether, as text is from its ground.
+pub fn far(a: [u8; 4], b: [u8; 4]) -> bool {
+    dist(a, b) > 120
+}
+
 /// Moves the frozen clock on by `ms`, a frame every 16 ms rendered as the window would: for
 /// the tests that take snapshots rather than present.
 pub fn run_for(w: &slint::Window, ms: u64) {
@@ -409,35 +471,63 @@ fn logical(scene: &Scene) -> LogicalSize {
     w.size().to_logical(w.scale_factor())
 }
 
-pub fn point(scene: &Scene, at: LogicalPosition) {
-    scene
-        .ui
-        .window()
+/// What the pointer acts on: a scene, or a bare window (`AppWindow::window()`).
+pub trait OnWindow {
+    fn on_window(&self) -> &slint::Window;
+}
+
+impl OnWindow for Scene {
+    fn on_window(&self) -> &slint::Window {
+        self.ui.window()
+    }
+}
+
+impl OnWindow for slint::Window {
+    fn on_window(&self) -> &slint::Window {
+        self
+    }
+}
+
+/// The pointer moves to `at`.
+pub fn point(on: &impl OnWindow, at: LogicalPosition) {
+    on.on_window()
         .dispatch_event(WindowEvent::PointerMoved { position: at });
 }
 
-pub fn press(scene: &Scene, at: LogicalPosition) {
-    let w = scene.ui.window();
-    w.dispatch_event(WindowEvent::PointerMoved { position: at });
-    w.dispatch_event(WindowEvent::PointerPressed {
+/// The pointer moves to `at` and presses the left button.
+pub fn press(on: &impl OnWindow, at: LogicalPosition) {
+    point(on, at);
+    on.on_window().dispatch_event(WindowEvent::PointerPressed {
         position: at,
         button: PointerEventButton::Left,
     });
 }
 
-pub fn release(scene: &Scene, at: LogicalPosition) {
-    scene
-        .ui
-        .window()
-        .dispatch_event(WindowEvent::PointerReleased {
-            position: at,
-            button: PointerEventButton::Left,
-        });
+/// The left button lets go at `at`.
+pub fn release(on: &impl OnWindow, at: LogicalPosition) {
+    on.on_window().dispatch_event(WindowEvent::PointerReleased {
+        position: at,
+        button: PointerEventButton::Left,
+    });
 }
 
-pub fn click(scene: &Scene, at: LogicalPosition) {
-    press(scene, at);
-    release(scene, at);
+/// A left click at `at`: the pointer moves there, presses and lets go.
+pub fn click(on: &impl OnWindow, at: LogicalPosition) {
+    click_with(on, at, PointerEventButton::Left);
+}
+
+/// A click of `button` at `at`: the pointer moves there, presses and lets go.
+pub fn click_with(on: &impl OnWindow, at: LogicalPosition, button: PointerEventButton) {
+    let w = on.on_window();
+    w.dispatch_event(WindowEvent::PointerMoved { position: at });
+    w.dispatch_event(WindowEvent::PointerPressed {
+        position: at,
+        button,
+    });
+    w.dispatch_event(WindowEvent::PointerReleased {
+        position: at,
+        button,
+    });
 }
 
 /// Somewhere with nothing under it that reacts: the top bar's empty middle.
@@ -601,16 +691,7 @@ pub fn click_tab(ui: &AppWindow, width: f32, i: usize) {
     let s5 = ui.global::<Theme>().get_s5();
     let seg = (side - 2.0 * s5) / 3.0;
     let at = LogicalPosition::new(x0 + s5 + seg * (i as f32 + 0.5), TABS_Y + TABS_H / 2.0);
-    let w = ui.window();
-    w.dispatch_event(WindowEvent::PointerMoved { position: at });
-    w.dispatch_event(WindowEvent::PointerPressed {
-        position: at,
-        button: PointerEventButton::Left,
-    });
-    w.dispatch_event(WindowEvent::PointerReleased {
-        position: at,
-        button: PointerEventButton::Left,
-    });
+    click(ui.window(), at);
 }
 
 /// `rows` repeated to `n` rows, in a new model; only the first copy keeps its playing mark.

@@ -9,9 +9,9 @@
 use featherplay::lyrics::{self, SnapshotLyrics};
 use featherplay::snapshot::Scene;
 use featherplay::ui::{LyricsData, Player, Theme};
-use slint::platform::WindowEvent;
 use slint::{ComponentHandle, Model};
 
+use crate::support;
 use crate::support::label::{self, LogicalRect};
 
 /// Where the shown elements named `label` are, in window coordinates.
@@ -30,11 +30,7 @@ fn first(scene: &Scene, label: &str) -> LogicalRect {
 }
 
 fn resize(scene: &Scene, width: u32, height: u32) {
-    let w = scene.ui.window();
-    w.set_size(slint::PhysicalSize::new(width, height));
-    w.dispatch_event(WindowEvent::Resized {
-        size: slint::LogicalSize::new(width as f32, height as f32),
-    });
+    support::resize(scene.ui.window(), width, height);
     frame(scene);
 }
 

@@ -3,20 +3,9 @@
 
 use featherplay::offscreen;
 use featherplay::ui::{AppWindow, SongMenu, Theme, TrackRow};
-use slint::platform::{PointerEventButton, WindowEvent};
 use slint::{ComponentHandle, LogicalPosition};
 
-fn click(w: &slint::Window, p: LogicalPosition) {
-    w.dispatch_event(WindowEvent::PointerMoved { position: p });
-    w.dispatch_event(WindowEvent::PointerPressed {
-        position: p,
-        button: PointerEventButton::Left,
-    });
-    w.dispatch_event(WindowEvent::PointerReleased {
-        position: p,
-        button: PointerEventButton::Left,
-    });
-}
+use crate::support::click;
 
 /// The panel swallows clicks on its padding; a click anywhere else closes the menu. So a
 /// click 3 px inside the panel's left edge, at `y`, tells whether the panel covers `y`.

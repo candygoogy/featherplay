@@ -21,25 +21,14 @@ use featherplay::ui::{MiniData, MiniPlayer, Player, Theme, Toast};
 use slint::platform::{Key, PointerEventButton, WindowEvent};
 use slint::{ComponentHandle, LogicalPosition, Rgba8Pixel, SharedPixelBuffer};
 
+use crate::support::click;
+
 fn rgba(c: slint::Color) -> Rgba8Pixel {
     Rgba8Pixel::new(c.red(), c.green(), c.blue(), c.alpha())
 }
 
 fn pixel(shot: &SharedPixelBuffer<Rgba8Pixel>, x: u32, y: u32) -> Rgba8Pixel {
     shot.as_slice()[(y * shot.width() + x) as usize]
-}
-
-fn click(w: &slint::Window, x: f32, y: f32) {
-    let position = LogicalPosition::new(x, y);
-    w.dispatch_event(WindowEvent::PointerMoved { position });
-    w.dispatch_event(WindowEvent::PointerPressed {
-        position,
-        button: PointerEventButton::Left,
-    });
-    w.dispatch_event(WindowEvent::PointerReleased {
-        position,
-        button: PointerEventButton::Left,
-    });
 }
 
 fn open(scene: &Scene) -> MiniPlayer {
@@ -140,7 +129,10 @@ fn a_click_on_the_mini_players_line_seeks_there() {
     let duration = mini.global::<Player>().get_duration_s();
     assert!(duration > 0.0);
 
-    click(mini.window(), LINE.0 + LINE.1 * 0.25, LINE.2);
+    click(
+        mini.window(),
+        LogicalPosition::new(LINE.0 + LINE.1 * 0.25, LINE.2),
+    );
     scene.settle();
     let sought = seeks(&scene);
     assert_eq!(sought.len(), 1, "{sought:?}");
@@ -158,7 +150,7 @@ fn pinned_a_drag_on_the_line_seeks_on_release_and_does_not_move_the_window() {
     let scene = playing_scene();
     let mini = open(&scene);
     let duration = mini.global::<Player>().get_duration_s();
-    click(mini.window(), PIN.0, PIN.1);
+    click(mini.window(), LogicalPosition::new(PIN.0, PIN.1));
     scene.settle();
     scene.take_actions();
     let drags = Rc::new(Cell::new(0));
@@ -194,7 +186,7 @@ fn pinned_mini_player_stays_open_without_the_activation_and_closes_on_its_cross(
     let mini = open(&scene);
     assert!(!mini.global::<MiniData>().get_pinned());
 
-    click(mini.window(), PIN.0, PIN.1);
+    click(mini.window(), LogicalPosition::new(PIN.0, PIN.1));
     scene.settle();
     assert!(
         mini.global::<MiniData>().get_pinned(),
@@ -210,7 +202,7 @@ fn pinned_mini_player_stays_open_without_the_activation_and_closes_on_its_cross(
     assert!(mini::is_open(), "pinned, the tray menu closed it");
 
     // The × in the corner closes it.
-    click(mini.window(), CORNER.0, CORNER.1);
+    click(mini.window(), LogicalPosition::new(CORNER.0, CORNER.1));
     scene.settle();
     assert!(!mini::is_open(), "the × didn't close it");
 }
@@ -233,7 +225,7 @@ fn every_mini_player_opens_unpinned_even_when_the_settings_file_says_pinned() {
     );
 
     // Pinned, closed and opened again, it's unpinned.
-    click(mini.window(), PIN.0, PIN.1);
+    click(mini.window(), LogicalPosition::new(PIN.0, PIN.1));
     scene.settle();
     assert!(mini.global::<MiniData>().get_pinned());
     mini.window().dispatch_event(WindowEvent::KeyPressed {
@@ -253,14 +245,14 @@ fn every_mini_player_opens_unpinned_even_when_the_settings_file_says_pinned() {
 fn unpinned_from_behind_another_window_the_mini_player_closes() {
     let scene = playing_scene();
     let mini = open(&scene);
-    click(mini.window(), PIN.0, PIN.1);
+    click(mini.window(), LogicalPosition::new(PIN.0, PIN.1));
     scene.settle();
     lose_activation(&mini, &scene);
     assert!(mini::is_open());
 
     // The press on the pin is what brings it to the front.
     mini::pressed(true);
-    click(mini.window(), PIN.0, PIN.1);
+    click(mini.window(), LogicalPosition::new(PIN.0, PIN.1));
     scene.settle();
     assert!(!mini::is_open(), "unpinned from behind, it stayed open");
 }
@@ -269,11 +261,11 @@ fn unpinned_from_behind_another_window_the_mini_player_closes() {
 fn unpinned_in_front_the_mini_player_stays_open_until_it_loses_the_activation() {
     let scene = playing_scene();
     let mini = open(&scene);
-    click(mini.window(), PIN.0, PIN.1);
+    click(mini.window(), LogicalPosition::new(PIN.0, PIN.1));
     scene.settle();
 
     mini::pressed(false);
-    click(mini.window(), PIN.0, PIN.1);
+    click(mini.window(), LogicalPosition::new(PIN.0, PIN.1));
     scene.settle();
     assert!(!mini.global::<MiniData>().get_pinned());
     assert!(mini::is_open(), "unpinned in front, it closed");
@@ -311,7 +303,7 @@ fn the_poll_never_closes_a_pinned_mini_player_and_runs_only_while_unpinned() {
     let mini = open(&scene);
     assert!(mini::polls());
 
-    click(mini.window(), PIN.0, PIN.1);
+    click(mini.window(), LogicalPosition::new(PIN.0, PIN.1));
     scene.settle();
     assert!(!mini::polls(), "pinned, the poll still runs");
     in_front(OTHER_APP);
@@ -320,7 +312,7 @@ fn the_poll_never_closes_a_pinned_mini_player_and_runs_only_while_unpinned() {
 
     // Unpinned in front, the poll runs again, from the window in front now.
     mini::pressed(false);
-    click(mini.window(), PIN.0, PIN.1);
+    click(mini.window(), LogicalPosition::new(PIN.0, PIN.1));
     scene.settle();
     assert!(mini::polls(), "unpinned, the poll didn't restart");
     poll(&scene);
@@ -343,18 +335,18 @@ fn pinned_a_press_off_the_controls_drags_the_mini_player() {
         .on_drag(move || count.set(count.get() + 1));
 
     // Unpinned, nothing drags.
-    click(mini.window(), 44.0, 44.0);
+    click(mini.window(), LogicalPosition::new(44.0, 44.0));
     assert_eq!(drags.get(), 0, "unpinned, a press on the cover dragged it");
 
-    click(mini.window(), PIN.0, PIN.1);
+    click(mini.window(), LogicalPosition::new(PIN.0, PIN.1));
     scene.settle();
     assert_eq!(drags.get(), 0, "the pin's own click dragged it");
     // The cover, and the ground beside the progress line's times.
-    click(mini.window(), 44.0, 44.0);
-    click(mini.window(), 170.0, 104.0);
+    click(mini.window(), LogicalPosition::new(44.0, 44.0));
+    click(mini.window(), LogicalPosition::new(170.0, 104.0));
     assert_eq!(drags.get(), 2, "a press off the controls didn't drag it");
     // A control is still a control.
-    click(mini.window(), 170.0, 136.0);
+    click(mini.window(), LogicalPosition::new(170.0, 136.0));
     assert_eq!(drags.get(), 2, "the play button dragged it");
 }
 
@@ -413,12 +405,12 @@ fn mini_player_mirrors_the_player_and_closes_on_escape_or_lost_activation() {
     main.on_toggle(move || count.set(count.get() + 1));
     // The play button: in the middle of the window, on the controls' row (114 px down, 44
     // px tall).
-    click(mini.window(), 170.0, 136.0);
+    click(mini.window(), LogicalPosition::new(170.0, 136.0));
     assert_eq!(toggled.get(), 1);
 
     // "Not for me", the row's right end, goes the tray's way (the window is on screen: the
     // toast with Undo).
-    click(mini.window(), 256.0 + 18.0, 136.0);
+    click(mini.window(), LogicalPosition::new(256.0 + 18.0, 136.0));
     scene.settle();
     assert!(
         scene.ui.global::<Toast>().get_open(),

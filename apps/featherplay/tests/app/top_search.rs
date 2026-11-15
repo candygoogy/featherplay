@@ -9,8 +9,10 @@ use featherplay::offscreen;
 use featherplay::router::Page;
 use featherplay::top_bar;
 use featherplay::ui::{AppWindow, Nav, PageKind, TopBarData};
-use slint::platform::{Key, PointerEventButton, WindowEvent};
+use slint::platform::{Key, WindowEvent};
 use slint::{ComponentHandle, LogicalPosition, SharedString};
+
+use crate::support::click;
 
 fn tap(w: &slint::Window, text: SharedString) {
     w.dispatch_event(WindowEvent::KeyPressed { text: text.clone() });
@@ -30,18 +32,6 @@ fn ctrl_k(w: &slint::Window) {
     tap(w, "k".into());
     w.dispatch_event(WindowEvent::KeyReleased {
         text: Key::Control.into(),
-    });
-}
-
-fn click(w: &slint::Window, position: LogicalPosition) {
-    w.dispatch_event(WindowEvent::PointerMoved { position });
-    w.dispatch_event(WindowEvent::PointerPressed {
-        position,
-        button: PointerEventButton::Left,
-    });
-    w.dispatch_event(WindowEvent::PointerReleased {
-        position,
-        button: PointerEventButton::Left,
     });
 }
 

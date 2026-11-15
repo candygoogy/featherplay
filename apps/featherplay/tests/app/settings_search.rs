@@ -19,7 +19,7 @@ use featherplay::ui::{
 use slint::platform::{Key, WindowEvent};
 use slint::{ComponentHandle, Model, Rgba8Pixel, SharedPixelBuffer, SharedString};
 
-use crate::support::{label, pixels};
+use crate::support::{self, label, pixels};
 
 /// At 1920 wide the index sits left of the column, 40 px into the page past the sidebar.
 const INDEX_LEFT: usize = 240 + 40;
@@ -63,10 +63,7 @@ fn frames(scene: &Scene) {
 fn resize(scene: &Scene, width: u32, height: u32) {
     let w = scene.ui.window();
     w.dispatch_event(WindowEvent::ScaleFactorChanged { scale_factor: 1.0 });
-    w.set_size(slint::PhysicalSize::new(width, height));
-    w.dispatch_event(WindowEvent::Resized {
-        size: slint::LogicalSize::new(width as f32, height as f32),
-    });
+    support::resize(w, width, height);
 }
 
 /// Settings at 1920 × 1080 with every section made, the keys in the window.

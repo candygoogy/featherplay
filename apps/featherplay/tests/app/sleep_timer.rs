@@ -9,10 +9,9 @@ use featherplay::app;
 use featherplay::controller::{Action, SleepAction, SleepKind, SleepState, UiEvent};
 use featherplay::snapshot::Scene;
 use featherplay::ui::{SettingsData, Sleep};
-use slint::platform::{PointerEventButton, WindowEvent};
 use slint::{ComponentHandle, LogicalPosition};
 
-use crate::support::label;
+use crate::support::{self, label};
 
 /// The centre of the visible element named `name`, the lowest one if several are.
 fn centre(scene: &Scene, name: &str) -> Option<LogicalPosition> {
@@ -23,17 +22,7 @@ fn centre(scene: &Scene, name: &str) -> Option<LogicalPosition> {
 }
 
 fn click(scene: &Scene, at: LogicalPosition) {
-    let w = scene.ui.window();
-    let button = PointerEventButton::Left;
-    w.dispatch_event(WindowEvent::PointerMoved { position: at });
-    w.dispatch_event(WindowEvent::PointerPressed {
-        position: at,
-        button,
-    });
-    w.dispatch_event(WindowEvent::PointerReleased {
-        position: at,
-        button,
-    });
+    support::click(scene, at);
     scene.settle();
 }
 

@@ -13,6 +13,7 @@ use i_slint_core::items::AccessibleRole;
 use slint::platform::WindowEvent;
 use slint::{ComponentHandle, LogicalPosition};
 
+use crate::support;
 use crate::support::label::{self, LogicalRect};
 
 /// Settings at `width` × `height`, playing, with Discord status on and every section made.
@@ -262,10 +263,7 @@ fn the_card_sits_beside_the_options_from_the_default_window_size_up() {
     let scene = settings(1280, height);
     let w = scene.ui.window();
     for width in (1280..=1600).step_by(20).chain([1568]) {
-        w.set_size(slint::PhysicalSize::new(width, height));
-        w.dispatch_event(WindowEvent::Resized {
-            size: slint::LogicalSize::new(width as f32, height as f32),
-        });
+        support::resize(w, width, height);
         scene.settle();
         let card = find(&scene, "Discord preview");
         let row = find(&scene, "Discord status");

@@ -5,31 +5,20 @@
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
-use featherplay::app::Ctx;
 use featherplay::bar;
 use featherplay::controller::{PlayerState, QueueInfo};
-use featherplay::covers::Covers;
-use featherplay::offscreen;
-use featherplay::ui::AppWindow;
-use featherplay_controller::catalog::Catalog;
 use featherplay_core::model::{LikeStatus, Track, TrackId, VideoType};
-use tokio::sync::mpsc;
+
+use crate::support;
 
 /// One test: the platform can be installed once per process.
 #[test]
 fn at_1_5x_the_clock_runs_one_and_a_half_seconds_a_second() {
-    let _pump = offscreen::install().expect("platform");
-    let rt = tokio::runtime::Builder::new_multi_thread()
-        .worker_threads(1)
-        .enable_all()
-        .build()
-        .expect("runtime");
-    let ui = AppWindow::new().expect("window");
-    let catalog = Catalog::new(rt.handle().clone()).expect("catalog");
-    let cache = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("bar_speed");
-    let covers = Covers::new(rt.handle().clone(), cache, None);
-    let (actions, _) = mpsc::unbounded_channel();
-    let ctx = Ctx::new(&ui, catalog, covers, actions);
+    let bare = support::bare(
+        PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("bar_speed"),
+        None,
+    );
+    let (_ui, ctx) = (&bare.ui, &bare.ctx);
 
     let song = Track {
         id: TrackId("song".into()),

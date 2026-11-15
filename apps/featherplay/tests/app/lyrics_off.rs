@@ -4,23 +4,18 @@
 //! is shown, and no controller runs, so the setting isn't saved.
 
 use featherplay::lyrics;
-use featherplay::offscreen;
 use featherplay::snapshot::Scene;
 use featherplay::ui::{LyricsData, NowPlayingData, SettingKey, SettingsData, Theme};
 use slint::ComponentHandle;
 
-use crate::support::label;
+use crate::support::{self, label};
 
 const W: u32 = 1280;
 const H: u32 = 800;
 
 /// The window's pixels in `x0..x1`, `y0..y1`, as presented.
 fn region(scene: &Scene, (x0, y0): (u32, u32), (x1, y1): (u32, u32)) -> Vec<u8> {
-    let w = scene.ui.window();
-    offscreen::present(w).expect("present");
-    let px = offscreen::shown(w).expect("shown");
-    let img =
-        image::RgbaImage::from_raw(px.width(), px.height(), px.as_bytes().to_vec()).expect("image");
+    let img = support::frame(scene);
     (y0..y1)
         .flat_map(|y| (x0..x1).map(move |x| (x, y)))
         .flat_map(|(x, y)| img.get_pixel(x, y).0)

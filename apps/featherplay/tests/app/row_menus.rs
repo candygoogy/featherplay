@@ -9,8 +9,10 @@ use featherplay::offscreen;
 use featherplay::ui::{
     AlbumData, AppWindow, Nav, PageKind, PlaylistData, SongMenu, Theme, TrackRow,
 };
-use slint::platform::{PointerEventButton, WindowEvent};
+use slint::platform::PointerEventButton;
 use slint::{ComponentHandle, LogicalPosition, ModelRc, VecModel};
+
+use crate::support::{click_with, point};
 
 fn rows() -> ModelRc<TrackRow> {
     let rows: Vec<TrackRow> = ["a", "b", "c"]
@@ -29,29 +31,13 @@ fn rows() -> ModelRc<TrackRow> {
     ModelRc::from(Rc::new(VecModel::from(rows)))
 }
 
-fn move_to(w: &slint::Window, p: LogicalPosition) {
-    w.dispatch_event(WindowEvent::PointerMoved { position: p });
-}
-
-fn click(w: &slint::Window, p: LogicalPosition, button: PointerEventButton) {
-    move_to(w, p);
-    w.dispatch_event(WindowEvent::PointerPressed {
-        position: p,
-        button,
-    });
-    w.dispatch_event(WindowEvent::PointerReleased {
-        position: p,
-        button,
-    });
-}
-
 /// The middle of row `id`, found by right-clicking down the page (the headers' heights
 /// depend on the page), at `x`.
 fn row_centre(w: &slint::Window, menu: &SongMenu, x: f32, id: &str) -> f32 {
     let mut hits = Vec::new();
     for y in (80..700).step_by(4) {
         let y = y as f32;
-        click(w, LogicalPosition::new(x, y), PointerEventButton::Right);
+        click_with(w, LogicalPosition::new(x, y), PointerEventButton::Right);
         if menu.get_open() && menu.get_track().id == id {
             hits.push(y);
         }
@@ -66,10 +52,10 @@ fn more_opens_the_menu(w: &slint::Window, menu: &SongMenu, page: &str) {
     // 1280 px wide without the panel: the content runs from 240 to 1280, the rows from
     // 32 px in on either side, and the ⋯ (36 px) ends 8 px before the row's right edge.
     let y = row_centre(w, menu, 700.0, "b");
-    move_to(w, LogicalPosition::new(700.0, y));
+    point(w, LogicalPosition::new(700.0, y));
     let more = LogicalPosition::new(1248.0 - 8.0 - 18.0, y);
-    move_to(w, more);
-    click(w, more, PointerEventButton::Left);
+    point(w, more);
+    click_with(w, more, PointerEventButton::Left);
     assert!(menu.get_open(), "{page}: the ⋯ didn't open the song menu");
     assert_eq!(menu.get_track().id, "b", "{page}");
     // Anchored on the row it came from: an upward menu ends at the row's top, a downward one
@@ -95,11 +81,11 @@ fn more_opens_the_menu(w: &slint::Window, menu: &SongMenu, page: &str) {
 fn heart_likes(w: &slint::Window, menu: &SongMenu, liked: &Cell<i32>, page: &str) {
     // The heart (36 px) starts 140 px before the row's right edge.
     let y = row_centre(w, menu, 700.0, "c");
-    move_to(w, LogicalPosition::new(700.0, y));
+    point(w, LogicalPosition::new(700.0, y));
     let heart = LogicalPosition::new(1248.0 - 140.0 + 18.0, y);
-    move_to(w, heart);
+    point(w, heart);
     liked.set(-1);
-    click(w, heart, PointerEventButton::Left);
+    click_with(w, heart, PointerEventButton::Left);
     assert_eq!(liked.get(), 2, "{page}: the heart didn't like the row");
 }
 

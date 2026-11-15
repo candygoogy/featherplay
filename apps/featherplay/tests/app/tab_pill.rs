@@ -4,7 +4,7 @@
 //! runs. At 4K 150 % with Up next open, through the app's own present path, the clock stepped
 //! 4 ms (240 Hz); the pill's centre is read from the pixels the window shows.
 
-use crate::support::{FRAME_240, TABS_H, TABS_Y, click_tab, frames, home_at, panel};
+use crate::support::{FRAME_240, TABS_H, TABS_Y, click_tab, dist, frames, home_at, panel};
 use featherplay::offscreen;
 use featherplay::ui::Theme;
 use slint::ComponentHandle;
@@ -26,10 +26,6 @@ fn segments(ui: &featherplay::ui::AppWindow) -> (f64, f64) {
 
 fn row(w: &slint::Window) -> Vec<[u8; 4]> {
     offscreen::shown_row(w, (PROBE_Y * SCALE).round() as u32).expect("row")
-}
-
-fn dist(a: [u8; 4], b: [u8; 4]) -> u32 {
-    (0..3).map(|i| u32::from(a[i].abs_diff(b[i]))).sum()
 }
 
 /// What the pill and the ground beside it look like on the probe row.

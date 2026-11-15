@@ -21,8 +21,10 @@ use featherplay::offscreen;
 use featherplay::snapshot::Scene;
 use featherplay::ui::{LyricsData, LyricsState, Theme};
 use image::RgbaImage;
+use slint::ComponentHandle;
 use slint::platform::WindowEvent;
-use slint::{ComponentHandle, LogicalSize, PhysicalSize};
+
+use crate::support;
 
 /// One frame at 60 Hz (Slint's clock counts whole milliseconds).
 const FRAME: Duration = Duration::from_millis(16);
@@ -76,10 +78,7 @@ fn scene(width: u32, height: u32, scale: f32) -> Scene {
         scale_factor: scale,
     });
     scene.ctx.covers.set_scale(scale);
-    w.set_size(PhysicalSize::new(width, height));
-    w.dispatch_event(WindowEvent::Resized {
-        size: LogicalSize::new(width as f32 / scale, height as f32 / scale),
-    });
+    support::resize(w, width, height);
     scene.play(false).expect("player");
     scene.open("now-playing").expect("now playing");
     scene.theme(true);

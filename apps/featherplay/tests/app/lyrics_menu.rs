@@ -18,6 +18,7 @@ use i_slint_core::items::AccessibleRole;
 use slint::platform::{Key, WindowEvent};
 use slint::{ComponentHandle, Model};
 
+use crate::support;
 use crate::support::label::{self, ItemRc, LogicalRect};
 
 /// Now playing's full lyrics view on the demo set's first song, its synced lines in.
@@ -326,13 +327,7 @@ fn large_text_fits_the_narrowest_window_in_the_full_view_and_the_side_tab() {
     // The window's least width: the full view stacks under the song's header, its lines the
     // window's width less the padding, at the side tab's Large size (24 px).
     let scene = Scene::new(480, 640, true, false).expect("scene");
-    scene
-        .ui
-        .window()
-        .set_size(slint::PhysicalSize::new(480, 640));
-    scene.ui.window().dispatch_event(WindowEvent::Resized {
-        size: slint::LogicalSize::new(480.0, 640.0),
-    });
+    support::resize(scene.ui.window(), 480, 640);
     scene.play(false).expect("player");
     scene.open("now-playing").expect("now playing");
     scene.settle();
@@ -349,13 +344,7 @@ fn large_text_fits_the_narrowest_window_in_the_full_view_and_the_side_tab() {
     // The side tab, in the narrowest window with Now playing's side panel: 960 px. Below
     // `wide-min` the panel is `panel-w` wide; the stage is the rest. Open, as the side tab
     // needs it.
-    scene
-        .ui
-        .window()
-        .set_size(slint::PhysicalSize::new(960, 640));
-    scene.ui.window().dispatch_event(WindowEvent::Resized {
-        size: slint::LogicalSize::new(960.0, 640.0),
-    });
+    support::resize(scene.ui.window(), 960, 640);
     scene.ui.global::<Frame>().set_side_open(true);
     scene.settle();
     scene.ui.window().take_snapshot().expect("frame");

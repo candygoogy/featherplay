@@ -7,8 +7,9 @@ use std::rc::Rc;
 
 use featherplay::offscreen;
 use featherplay::ui::{AppWindow, CardItem, HomeData, HomeShelfRow, ItemKind, ShelfShape, Theme};
-use slint::platform::{PointerEventButton, WindowEvent};
 use slint::{ComponentHandle, LogicalPosition, ModelRc, VecModel};
+
+use crate::support::click;
 
 fn card(id: &str, kind: ItemKind) -> CardItem {
     CardItem {
@@ -27,18 +28,6 @@ fn shelf(title: &str, shape: ShelfShape, items: Vec<CardItem>) -> HomeShelfRow {
         shape,
         ..Default::default()
     }
-}
-
-fn click(w: &slint::Window, p: LogicalPosition) {
-    w.dispatch_event(WindowEvent::PointerMoved { position: p });
-    w.dispatch_event(WindowEvent::PointerPressed {
-        position: p,
-        button: PointerEventButton::Left,
-    });
-    w.dispatch_event(WindowEvent::PointerReleased {
-        position: p,
-        button: PointerEventButton::Left,
-    });
 }
 
 /// One test: the platform can be installed once per process.

@@ -6,11 +6,11 @@
 //! playing reaches a third of the way down. On the offscreen platform with the fixtures (the
 //! song at 2:41, line 15 of 24 playing); no window is shown.
 
-use featherplay::offscreen;
 use featherplay::snapshot::Scene;
 use featherplay::ui::{LyricsData, LyricsState, NowPlayingData, Theme};
 use slint::ComponentHandle;
-use slint::platform::WindowEvent;
+
+use crate::support::{self, frame};
 
 const W: u32 = 1280;
 const H: u32 = 800;
@@ -54,13 +54,6 @@ fn side_card(t: &Theme) -> Area {
     )
 }
 
-fn frame(scene: &Scene) -> image::RgbaImage {
-    let w = scene.ui.window();
-    offscreen::present(w).expect("present");
-    let px = offscreen::shown(w).expect("shown");
-    image::RgbaImage::from_raw(px.width(), px.height(), px.as_bytes().to_vec()).expect("image")
-}
-
 /// The line playing's colour.
 fn current_rgb(data: &LyricsData) -> [u8; 3] {
     let c = data.get_ink().current;
@@ -79,15 +72,7 @@ fn current_ink(img: &image::RgbaImage, (x0, y0, x1, y1): Area, ink: [u8; 3]) -> 
 /// panel's colour, read in the middle of that first row.
 fn first_text_row(img: &image::RgbaImage, x0: u32, x1: u32, y0: u32, y1: u32) -> Option<u32> {
     let ground = img.get_pixel((x0 + x1) / 2, y0).0;
-    (y0..y1).find(|&y| {
-        (x0..x1).any(|x| {
-            let p = img.get_pixel(x, y).0;
-            (0..3)
-                .map(|i| u32::from(p[i].abs_diff(ground[i])))
-                .sum::<u32>()
-                > 120
-        })
-    })
+    (y0..y1).find(|&y| (x0..x1).any(|x| support::far(img.get_pixel(x, y).0, ground)))
 }
 
 fn save(img: &image::RgbaImage, name: &str) {
@@ -193,10 +178,7 @@ fn the_lyrics_start_at_the_top_and_show_the_line_playing() {
     // A resize lays the lines out again: still on the line playing.
     let w = scene.ui.window();
     for (width, height) in [(1000.0, 640.0), (W as f32, H as f32)] {
-        w.set_size(slint::PhysicalSize::new(width as u32, height as u32));
-        w.dispatch_event(WindowEvent::Resized {
-            size: slint::LogicalSize::new(width, height),
-        });
+        support::resize(w, width as u32, height as u32);
         scene.settle();
     }
     let full = frame(&scene);

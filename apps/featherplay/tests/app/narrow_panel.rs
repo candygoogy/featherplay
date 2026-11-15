@@ -7,11 +7,10 @@
 //! leave the page narrower than `Theme.page-min-w` (540 px), the sidebar folds to the rail
 //! while the panel is open; nothing floats over a darkened page.
 
-use crate::support::{frames, home_at};
+use crate::support::{frames, home_at, resize};
 use featherplay::offscreen;
 use featherplay::ui::{Frame, Theme};
-use slint::platform::WindowEvent;
-use slint::{ComponentHandle, LogicalSize, PhysicalSize};
+use slint::ComponentHandle;
 
 const SCALE: f32 = 1.5;
 
@@ -63,10 +62,7 @@ fn the_page_ends_at_the_panel_and_the_sidebar_folds_to_make_room() {
 
     // 1100 px: beside the full sidebar, making room would leave the page 520 px, so the
     // sidebar folds to the rail while the panel is open, and the page makes room.
-    w.set_size(PhysicalSize::new(1650, 1200));
-    w.dispatch_event(WindowEvent::Resized {
-        size: LogicalSize::new(1100.0, 800.0),
-    });
+    resize(w, 1650, 1200);
     let _ = frames(w, 120, |_| {});
     let beside = 1100.0 - theme.get_rail_w() - theme.get_panel_w();
     assert_eq!(

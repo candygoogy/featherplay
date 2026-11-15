@@ -13,6 +13,8 @@ use featherplay_ytm::PlaylistSummary;
 use slint::platform::{Key, PointerEventButton, WindowEvent};
 use slint::{ComponentHandle, LogicalPosition, Model};
 
+use crate::support::click_with;
+
 const WIDTH: u32 = 1280;
 const HEIGHT: u32 = 800;
 
@@ -22,20 +24,8 @@ const FIRST_ROW: f32 = 296.0;
 const SECOND_ROW: f32 = 336.0;
 const LIKED: f32 = 208.0;
 
-fn click(w: &slint::Window, p: LogicalPosition, button: PointerEventButton) {
-    w.dispatch_event(WindowEvent::PointerMoved { position: p });
-    w.dispatch_event(WindowEvent::PointerPressed {
-        position: p,
-        button,
-    });
-    w.dispatch_event(WindowEvent::PointerReleased {
-        position: p,
-        button,
-    });
-}
-
 fn right_click(scene: &Scene, y: f32) {
-    click(
+    click_with(
         scene.ui.window(),
         LogicalPosition::new(120.0, y),
         PointerEventButton::Right,
@@ -104,7 +94,7 @@ fn click_row(scene: &Scene, label: &str) {
     let menu = scene.ui.global::<PlaylistMenu>();
     let y = row_y(scene, label).unwrap_or_else(|| panic!("no {label} row"));
     let x = menu.get_anchor_x() + 120.0;
-    click(
+    click_with(
         scene.ui.window(),
         LogicalPosition::new(x, y),
         PointerEventButton::Left,
@@ -144,7 +134,7 @@ fn the_sidebar_playlist_menu() {
     assert_eq!(menu.get_item().id, saved.id);
     assert_eq!(menu.get_kind(), PlaylistKind::Saved);
     // A click outside closes it.
-    click(
+    click_with(
         w,
         LogicalPosition::new(900.0, 500.0),
         PointerEventButton::Left,

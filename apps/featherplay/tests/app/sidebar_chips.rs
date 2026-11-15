@@ -4,8 +4,9 @@
 
 use featherplay::snapshot::Scene;
 use featherplay::ui::SidebarData;
-use slint::platform::{PointerEventButton, WindowEvent};
 use slint::{ComponentHandle, LogicalPosition};
+
+use crate::support;
 
 const WIDTH: u32 = 1280;
 const HEIGHT: u32 = 800;
@@ -13,17 +14,7 @@ const HEIGHT: u32 = 800;
 const CHIPS_Y: f32 = 254.0;
 
 fn click(scene: &Scene, x: f32) {
-    let w = scene.ui.window();
-    let position = LogicalPosition::new(x, CHIPS_Y);
-    w.dispatch_event(WindowEvent::PointerMoved { position });
-    w.dispatch_event(WindowEvent::PointerPressed {
-        position,
-        button: PointerEventButton::Left,
-    });
-    w.dispatch_event(WindowEvent::PointerReleased {
-        position,
-        button: PointerEventButton::Left,
-    });
+    support::click(scene, LogicalPosition::new(x, CHIPS_Y));
     scene.settle();
 }
 

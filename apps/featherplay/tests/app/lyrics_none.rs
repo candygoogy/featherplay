@@ -10,28 +10,16 @@ use std::cell::Cell;
 use std::rc::Rc;
 
 use featherplay::lyrics::{self, SnapshotLyrics};
-use featherplay::offscreen;
 use featherplay::snapshot::Scene;
 use featherplay::ui::{LyricsData, LyricsState, Nav, NowPlayingData, PageKind, Theme};
 use featherplay_controller::fixtures::Fixtures;
 use image::RgbaImage;
 use slint::ComponentHandle;
 
-use crate::support::{self, label};
+use crate::support::{self, far, frame, label};
 
 const W: u32 = 1280;
 const H: u32 = 800;
-
-fn frame(scene: &Scene) -> RgbaImage {
-    let w = scene.ui.window();
-    offscreen::present(w).expect("present");
-    let px = offscreen::shown(w).expect("shown");
-    RgbaImage::from_raw(px.width(), px.height(), px.as_bytes().to_vec()).expect("image")
-}
-
-fn far(p: [u8; 4], q: [u8; 4]) -> bool {
-    (0..3).map(|i| u32::from(p[i].abs_diff(q[i]))).sum::<u32>() > 120
-}
 
 /// The cover on the stage, left to right: the first row well under the header where most of
 /// a wide stretch differs from the stage's ground.

@@ -9,27 +9,17 @@ use std::time::Duration;
 use featherplay::offscreen;
 use featherplay::snapshot::Scene;
 use featherplay::ui::{Frame, Player, Theme};
-use slint::platform::{PointerEventButton, WindowEvent};
 use slint::{ComponentHandle, LogicalPosition};
+
+use crate::support;
 
 const WIDTH: f32 = 1280.0;
 const HEIGHT: f32 = 800.0;
 
 fn click(w: &slint::Window, at: LogicalPosition) {
-    w.dispatch_event(WindowEvent::PointerMoved { position: at });
-    let button = PointerEventButton::Left;
-    w.dispatch_event(WindowEvent::PointerPressed {
-        position: at,
-        button,
-    });
-    w.dispatch_event(WindowEvent::PointerReleased {
-        position: at,
-        button,
-    });
+    support::click(w, at);
     // Off the button again, so its hover doesn't stay in the frames that follow.
-    w.dispatch_event(WindowEvent::PointerMoved {
-        position: LogicalPosition::new(WIDTH / 2.0, 20.0),
-    });
+    support::point(w, LogicalPosition::new(WIDTH / 2.0, 20.0));
 }
 
 /// Frames until every slide and fade has ended.

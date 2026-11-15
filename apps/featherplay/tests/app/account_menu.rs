@@ -7,31 +7,15 @@ use std::rc::Rc;
 
 use featherplay::offscreen;
 use featherplay::ui::{AccountItem, AccountMenu, AppWindow, Nav, PageKind, SidebarData, Theme};
-use slint::platform::{Key, PointerEventButton, WindowEvent};
+use slint::platform::{Key, WindowEvent};
 use slint::{ComponentHandle, LogicalPosition, ModelRc, VecModel};
+
+use crate::support::click;
 
 const W: f32 = 1280.0;
 const H: f32 = 800.0;
 /// The account row's top: 64 px above the sidebar rows' foot, the floating bar's top (98 px up).
 const ROW_TOP: f32 = H - 98.0 - 64.0;
-
-fn click(w: &slint::Window, p: LogicalPosition) {
-    w.dispatch_event(WindowEvent::PointerMoved { position: p });
-    for pressed in [true, false] {
-        let button = PointerEventButton::Left;
-        w.dispatch_event(if pressed {
-            WindowEvent::PointerPressed {
-                position: p,
-                button,
-            }
-        } else {
-            WindowEvent::PointerReleased {
-                position: p,
-                button,
-            }
-        });
-    }
-}
 
 fn click_row(w: &slint::Window) {
     click(w, LogicalPosition::new(100.0, ROW_TOP + 28.0));

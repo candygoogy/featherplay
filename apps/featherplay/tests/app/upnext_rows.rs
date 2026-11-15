@@ -9,15 +9,15 @@ use std::time::Duration;
 
 use featherplay::app::Ctx;
 use featherplay::controller::{PlayerState, QueueInfo};
-use featherplay::covers::{Covers, sized_url};
-use featherplay::offscreen::{self, Pump};
+use featherplay::covers::sized_url;
+use featherplay::offscreen::Pump;
 use featherplay::ui::{AppWindow, Frame, QueueData, Theme, TrackRow};
 use featherplay::{busy, prepare, queue_panel};
-use featherplay_controller::catalog::Catalog;
 use featherplay_core::model::{LikeStatus, Track, TrackId, VideoType};
 use sha2::{Digest, Sha256};
 use slint::{ComponentHandle, Model};
-use tokio::sync::mpsc;
+
+use crate::support;
 
 const WAIT: Duration = Duration::from_secs(10);
 const SONGS: usize = 80;
@@ -113,19 +113,10 @@ fn up_next_loads_the_covers_on_screen_and_follows_the_queue_in_place() {
         cache_cover(&cache, i);
     }
 
-    let pump = offscreen::install().expect("platform");
-    let runtime = tokio::runtime::Builder::new_multi_thread()
-        .worker_threads(2)
-        .enable_all()
-        .build()
-        .expect("runtime");
-    let catalog = Catalog::new(runtime.handle().clone()).expect("catalog");
-    let covers = Covers::new(runtime.handle().clone(), cache, None);
-    let (actions, _sent) = mpsc::unbounded_channel();
-    let ui = AppWindow::new().expect("window");
+    let bare = support::bare(cache, None);
+    let (ui, ctx, pump) = (&bare.ui, &bare.ctx, &bare.pump);
     ui.window().set_size(slint::PhysicalSize::new(1280, 800));
     ui.global::<Theme>().set_still(true);
-    let ctx: Rc<Ctx> = Ctx::new(&ui, catalog, covers, actions);
     // The rows on screen reach Up next through `ShownRows`.
     prepare::init(&ctx);
     ui.global::<Frame>().set_queue_open(true);
@@ -196,6 +187,7 @@ fn up_next_loads_the_covers_on_screen_and_follows_the_queue_in_place() {
             shown_colour(&row)
         );
     }
+    let support::Bare { ui, runtime, .. } = bare;
     drop(ui);
     runtime.shutdown_timeout(Duration::from_secs(1));
 }

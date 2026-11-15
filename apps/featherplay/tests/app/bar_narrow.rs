@@ -11,9 +11,8 @@ use featherplay::controller::{SleepKind, SleepState, UiEvent};
 use featherplay::snapshot::Scene;
 use featherplay::ui::{Player, SettingsData, Theme};
 use slint::ComponentHandle;
-use slint::platform::WindowEvent;
 
-use crate::support::label;
+use crate::support::{self, label};
 
 const H: u32 = 800;
 
@@ -73,9 +72,7 @@ fn a_narrow_bar_gives_groups_up_and_nothing_overlaps() {
             None => format!("{width} px"),
         };
         let w = scene.ui.window();
-        w.set_size(slint::PhysicalSize::new(width, H));
-        let size = slint::LogicalSize::new(width as f32, H as f32);
-        w.dispatch_event(WindowEvent::Resized { size });
+        support::resize(w, width, H);
         scene.settle();
         let edge = |label: &str| {
             span(&scene, label, top).unwrap_or_else(|| panic!("{case}: no {label:?}"))

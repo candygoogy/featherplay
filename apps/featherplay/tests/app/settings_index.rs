@@ -6,10 +6,10 @@
 //! there's no index and the column starts at the page's padding.
 
 use featherplay::snapshot::Scene;
-use slint::platform::{PointerEventButton, WindowEvent};
+use slint::platform::WindowEvent;
 use slint::{ComponentHandle, LogicalPosition, Rgba8Pixel, SharedPixelBuffer};
 
-use crate::support::pixels;
+use crate::support::{self, pixels};
 
 /// At 1920 wide the page is 1680 px past the 240 px sidebar; the index (184), its gap (40)
 /// and the column (920) start at the page's 40 px padding.
@@ -52,29 +52,13 @@ fn runs(rows: &[usize]) -> Vec<(usize, usize)> {
 fn resize(scene: &Scene, width: u32, height: u32) {
     let w = scene.ui.window();
     w.dispatch_event(WindowEvent::ScaleFactorChanged { scale_factor: 1.0 });
-    w.set_size(slint::PhysicalSize::new(width, height));
-    w.dispatch_event(WindowEvent::Resized {
-        size: slint::LogicalSize::new(width as f32, height as f32),
-    });
+    support::resize(w, width, height);
 }
 
 fn click(scene: &Scene, x: f32, y: f32) {
-    let w = scene.ui.window();
-    let p = LogicalPosition::new(x, y);
-    let button = PointerEventButton::Left;
-    w.dispatch_event(WindowEvent::PointerMoved { position: p });
-    w.dispatch_event(WindowEvent::PointerPressed {
-        position: p,
-        button,
-    });
-    w.dispatch_event(WindowEvent::PointerReleased {
-        position: p,
-        button,
-    });
+    support::click(scene, LogicalPosition::new(x, y));
     // Away again, so no hover remains on the entry.
-    w.dispatch_event(WindowEvent::PointerMoved {
-        position: LogicalPosition::new(1200.0, 500.0),
-    });
+    support::point(scene, LogicalPosition::new(1200.0, 500.0));
 }
 
 /// One test: the platform can be installed once per process.

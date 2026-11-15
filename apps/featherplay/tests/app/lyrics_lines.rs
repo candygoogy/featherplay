@@ -7,19 +7,12 @@ use std::cell::Cell;
 use std::rc::Rc;
 
 use featherplay::lyrics::{self, SnapshotLyrics};
-use featherplay::offscreen;
 use featherplay::snapshot::Scene;
 use featherplay::ui::{LyricsData, LyricsState, Player};
-use image::RgbaImage;
 use slint::platform::{PointerEventButton, WindowEvent};
 use slint::{ComponentHandle, LogicalPosition};
 
-fn frame(scene: &Scene) -> RgbaImage {
-    let w = scene.ui.window();
-    offscreen::present(w).expect("present");
-    let px = offscreen::shown(w).expect("shown");
-    RgbaImage::from_raw(px.width(), px.height(), px.as_bytes().to_vec()).expect("image")
-}
+use crate::support::frame;
 
 /// The pointer moves onto `at` (two moves, as a hand makes) and rests there: how many pixels
 /// changed.

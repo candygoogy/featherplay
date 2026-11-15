@@ -7,8 +7,10 @@
 use featherplay::router::Page;
 use featherplay::snapshot::Scene;
 use featherplay::ui::{LyricsData, LyricsState, NowPlayingData, Theme};
-use slint::platform::{PointerEventButton, WindowEvent};
+use slint::platform::WindowEvent;
 use slint::{ComponentHandle, LogicalPosition};
+
+use crate::support;
 
 const W: u32 = 1280;
 const H: u32 = 800;
@@ -29,18 +31,9 @@ fn bar_lyrics(scene: &Scene) -> LogicalPosition {
 }
 
 fn click(scene: &Scene, at: LogicalPosition) {
-    let w = scene.ui.window();
-    w.dispatch_event(WindowEvent::PointerMoved { position: at });
-    w.dispatch_event(WindowEvent::PointerPressed {
-        position: at,
-        button: PointerEventButton::Left,
-    });
-    w.dispatch_event(WindowEvent::PointerReleased {
-        position: at,
-        button: PointerEventButton::Left,
-    });
+    support::click(scene, at);
     // Away again, so the next click is a fresh hover.
-    w.dispatch_event(WindowEvent::PointerExited);
+    scene.ui.window().dispatch_event(WindowEvent::PointerExited);
     scene.settle();
 }
 

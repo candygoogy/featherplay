@@ -9,26 +9,15 @@ use featherplay::pages::settings;
 use featherplay::snapshot::Scene;
 use featherplay::ui::{CloseChoice, Frame, SettingsData};
 use featherplay_store::CloseAction;
-use slint::platform::{Key, PointerEventButton, WindowEvent};
+use slint::platform::{Key, WindowEvent};
 use slint::{ComponentHandle, LogicalPosition, SharedString};
+
+use crate::support::click;
 
 fn key(w: &slint::Window, k: impl Into<SharedString>) {
     let text = k.into();
     w.dispatch_event(WindowEvent::KeyPressed { text: text.clone() });
     w.dispatch_event(WindowEvent::KeyReleased { text });
-}
-
-fn click(w: &slint::Window, x: f32, y: f32) {
-    let position = LogicalPosition::new(x, y);
-    w.dispatch_event(WindowEvent::PointerMoved { position });
-    for pressed in [true, false] {
-        let button = PointerEventButton::Left;
-        w.dispatch_event(if pressed {
-            WindowEvent::PointerPressed { position, button }
-        } else {
-            WindowEvent::PointerReleased { position, button }
-        });
-    }
 }
 
 /// Sets the close action back to Ask through the Settings page, then shows the window again
@@ -78,7 +67,7 @@ fn closing_asks_until_a_choice_is_remembered() {
     // A click on the scrim cancels too.
     request_close(&scene);
     assert!(choice.get_open());
-    click(w, 20.0, 20.0);
+    click(w, LogicalPosition::new(20.0, 20.0));
     assert!(!choice.get_open(), "a click on the scrim didn't cancel");
     assert!(w.is_visible());
     assert_eq!(settings::close_action(), CloseAction::Ask);

@@ -21,9 +21,10 @@ use featherplay::router::Page;
 use featherplay::snapshot::Scene;
 use featherplay::ui::{BrowserBlock, Frame, SessionStore, SignInData, Theme, TopBarData};
 use i_slint_core::accessibility::AccessibleStringProperty;
-use slint::platform::{Key, PointerEventButton, WindowEvent};
-use slint::{ComponentHandle, LogicalSize, PhysicalSize, SharedString};
+use slint::platform::{Key, WindowEvent};
+use slint::{ComponentHandle, SharedString};
 
+use crate::support;
 use crate::support::label::{self, ItemRc};
 
 /// The first visible element whose label passes `test`.
@@ -243,19 +244,8 @@ fn without_a_sign_in_window_the_browser_row_leads_and_a_snap_says_why() {
 /// A left click with the pointer in the middle of what says `label`.
 fn click(scene: &Scene, label: &str) {
     let item = find(scene, |l| l == label).unwrap_or_else(|| panic!("nothing says {label:?}"));
-    let g = item.geometry();
-    let at = item.map_to_window(g.center());
-    let position = slint::LogicalPosition::new(at.x, at.y);
-    let w = scene.ui.window();
-    w.dispatch_event(WindowEvent::PointerMoved { position });
-    w.dispatch_event(WindowEvent::PointerPressed {
-        position,
-        button: PointerEventButton::Left,
-    });
-    w.dispatch_event(WindowEvent::PointerReleased {
-        position,
-        button: PointerEventButton::Left,
-    });
+    let at = item.map_to_window(item.geometry().center());
+    support::click(scene, slint::LogicalPosition::new(at.x, at.y));
     scene.settle();
 }
 
@@ -404,11 +394,7 @@ fn bounds(scene: &Scene, label: &str) -> (f32, f32, f32, f32) {
 
 /// The window at `width`×`height` logical pixels (scale 1).
 fn resize(scene: &Scene, width: u32, height: u32) {
-    let w = scene.ui.window();
-    w.set_size(PhysicalSize::new(width, height));
-    w.dispatch_event(WindowEvent::Resized {
-        size: LogicalSize::new(width as f32, height as f32),
-    });
+    support::resize(scene.ui.window(), width, height);
     scene.settle();
 }
 

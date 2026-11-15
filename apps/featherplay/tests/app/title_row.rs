@@ -8,9 +8,10 @@ use featherplay::snapshot::Scene;
 use featherplay::song_menu;
 use featherplay::ui::{Frame, Player, Theme};
 use featherplay_core::model::{LikeStatus, TrackId};
+use slint::ComponentHandle;
 use slint::platform::WindowEvent;
-use slint::{ComponentHandle, LogicalSize, PhysicalSize};
 
+use crate::support;
 use crate::support::label::{self, LogicalRect};
 
 const LONG: &str = "In Love With Myself (feat. Somebody) – Extended Club Mix Remastered 2026";
@@ -127,10 +128,7 @@ fn the_title_rows_buttons_stay_put_whatever_the_title() {
     // The user's narrow window, 1440 px at 150 %, with Up next open beside the page.
     let w = scene.ui.window();
     w.dispatch_event(WindowEvent::ScaleFactorChanged { scale_factor: 1.5 });
-    w.set_size(PhysicalSize::new(1440, 1200));
-    w.dispatch_event(WindowEvent::Resized {
-        size: LogicalSize::new(960.0, 800.0),
-    });
+    support::resize(w, 1440, 1200);
     scene.ui.global::<Frame>().set_queue_open(true);
     scene.settle();
     check(&scene, 960.0);

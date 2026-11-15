@@ -11,8 +11,10 @@ use featherplay::ui::{
     AlbumData, AppWindow, Frame, Nav, PageKind, Player, PlaylistData, QueueData, SongMenu, Theme,
     TrackRow,
 };
-use slint::platform::{PointerEventButton, WindowEvent};
+use slint::platform::PointerEventButton;
 use slint::{ComponentHandle, LogicalPosition, ModelRc, VecModel};
+
+use crate::support::{click_with, point};
 
 /// Three rows; `b` is the current track.
 fn rows() -> ModelRc<TrackRow> {
@@ -33,29 +35,13 @@ fn rows() -> ModelRc<TrackRow> {
     ModelRc::from(Rc::new(VecModel::from(rows)))
 }
 
-fn move_to(w: &slint::Window, p: LogicalPosition) {
-    w.dispatch_event(WindowEvent::PointerMoved { position: p });
-}
-
-fn click(w: &slint::Window, p: LogicalPosition, button: PointerEventButton) {
-    move_to(w, p);
-    w.dispatch_event(WindowEvent::PointerPressed {
-        position: p,
-        button,
-    });
-    w.dispatch_event(WindowEvent::PointerReleased {
-        position: p,
-        button,
-    });
-}
-
 /// The middle of row `id`, found by right-clicking down the page (the headers' heights
 /// depend on the page), at `x`.
 fn row_centre(w: &slint::Window, menu: &SongMenu, x: f32, id: &str) -> f32 {
     let mut hits = Vec::new();
     for y in (80..700).step_by(4) {
         let y = y as f32;
-        click(w, LogicalPosition::new(x, y), PointerEventButton::Right);
+        click_with(w, LogicalPosition::new(x, y), PointerEventButton::Right);
         if menu.get_open() && menu.get_track().id == id {
             hits.push(y);
         }
@@ -82,9 +68,9 @@ fn around(w: &slint::Window, p: LogicalPosition) -> Vec<slint::Rgba8Pixel> {
 /// Whether hovering `p` (after resting on the row at `x = 700`) changes what's drawn there:
 /// the play glyph shows.
 fn hover_shows_play(w: &slint::Window, p: LogicalPosition) -> bool {
-    move_to(w, LogicalPosition::new(700.0, p.y));
+    point(w, LogicalPosition::new(700.0, p.y));
     let before = around(w, p);
-    move_to(w, p);
+    point(w, p);
     around(w, p) != before
 }
 
@@ -106,11 +92,11 @@ fn plays_and_toggles(w: &slint::Window, menu: &SongMenu, calls: &Calls, x: f32, 
     let c = LogicalPosition::new(x, row_centre(w, menu, 700.0, "c"));
     assert!(hover_shows_play(w, c), "{page}: hovering didn't show play");
     calls.reset();
-    click(w, c, PointerEventButton::Left);
+    click_with(w, c, PointerEventButton::Left);
     assert_eq!(calls.played.get(), 2, "{page}: play didn't play the row");
     assert_eq!(calls.toggled.get(), 0, "{page}: play toggled the player");
     // A right-click there still opens the row's song menu.
-    click(w, c, PointerEventButton::Right);
+    click_with(w, c, PointerEventButton::Right);
     assert!(
         menu.get_open(),
         "{page}: right-click on play didn't open the menu"
@@ -124,14 +110,14 @@ fn plays_and_toggles(w: &slint::Window, menu: &SongMenu, calls: &Calls, x: f32, 
         "{page}: hovering the current row didn't show pause"
     );
     calls.reset();
-    click(w, b, PointerEventButton::Left);
+    click_with(w, b, PointerEventButton::Left);
     assert_eq!(
         calls.toggled.get(),
         1,
         "{page}: pause didn't toggle the player"
     );
     assert_eq!(calls.played.get(), -1, "{page}: pause restarted the row");
-    move_to(w, LogicalPosition::new(700.0, 760.0));
+    point(w, LogicalPosition::new(700.0, 760.0));
 }
 
 /// One test: the platform can be installed once per process.
@@ -187,14 +173,14 @@ fn hover_play_plays_the_row() {
     ui.global::<Frame>().set_queue_open(true);
     let cover = LogicalPosition::new(880.0 + 16.0 + 8.0 + 20.0, 64.0 + 40.0 + 28.0);
     calls.reset();
-    move_to(w, LogicalPosition::new(1200.0, cover.y));
+    point(w, LogicalPosition::new(1200.0, cover.y));
     let before = around(w, cover);
-    move_to(w, cover);
+    point(w, cover);
     assert!(
         around(w, cover) != before,
         "Up next: hovering didn't show pause"
     );
-    click(w, cover, PointerEventButton::Left);
+    click_with(w, cover, PointerEventButton::Left);
     assert_eq!(
         calls.toggled.get(),
         1,

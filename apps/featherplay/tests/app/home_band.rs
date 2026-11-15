@@ -20,8 +20,10 @@ use featherplay::ui::{
 };
 use featherplay_controller::fixtures::Fixtures;
 use featherplay_core::model::{RepeatMode, Track};
-use slint::platform::{PointerEventButton, WindowEvent};
+use slint::platform::PointerEventButton;
 use slint::{ComponentHandle, LogicalPosition, Model, ModelRc, VecModel};
+
+use crate::support;
 
 fn row(id: &str) -> TrackRow {
     TrackRow {
@@ -40,20 +42,9 @@ fn rows(n: usize) -> ModelRc<TrackRow> {
 }
 
 fn click(w: &slint::Window, x: f32, y: f32, button: PointerEventButton) {
-    let p = LogicalPosition::new(x, y);
-    w.dispatch_event(WindowEvent::PointerMoved { position: p });
-    w.dispatch_event(WindowEvent::PointerPressed {
-        position: p,
-        button,
-    });
-    w.dispatch_event(WindowEvent::PointerReleased {
-        position: p,
-        button,
-    });
+    support::click_with(w, LogicalPosition::new(x, y), button);
     // Away, so the next click's hover starts fresh.
-    w.dispatch_event(WindowEvent::PointerMoved {
-        position: LogicalPosition::new(4.0, 4.0),
-    });
+    support::point(w, LogicalPosition::new(4.0, 4.0));
 }
 
 fn window(width: f32) -> AppWindow {
@@ -180,10 +171,7 @@ fn up_next_shows_beside_the_song_or_as_a_link_and_opens_the_panel() {
 
     // At 1100 px the band is 780 px: no column, the link at its top right instead.
     did.borrow_mut().clear();
-    w.set_size(slint::LogicalSize::new(1100.0, 900.0));
-    w.dispatch_event(WindowEvent::Resized {
-        size: slint::LogicalSize::new(1100.0, 900.0),
-    });
+    support::resize(w, 1100, 900);
     let band_w = 1100.0 - 240.0 - 80.0;
     click(
         w,
@@ -236,10 +224,7 @@ fn a_second_column_needs_six_songs_and_room_and_a_short_queue_gets_more_like_thi
     );
 
     // At 1568 (a 1248 px band) six don't fit in two: one column, from 732 px.
-    w.set_size(slint::LogicalSize::new(1568.0, 900.0));
-    w.dispatch_event(WindowEvent::Resized {
-        size: slint::LogicalSize::new(1568.0, 900.0),
-    });
+    support::resize(w, 1568, 900);
     assert_eq!(clicks(732.0 + 120.0, &[row_y(2.0)]), ["play 2"]);
 
     // One song left: it, then "More like this" with two related songs, in 44 px rows (the
@@ -366,9 +351,7 @@ fn more_like_this_is_asked_for_only_where_it_would_show() {
         0,
         "asked with the panel shut"
     );
-    let size = slint::LogicalSize::new(1568.0, 900.0);
-    ui.window().set_size(size);
-    ui.window().dispatch_event(WindowEvent::Resized { size });
+    support::resize(ui.window(), 1568, 900);
     settle();
     assert!(data.get_related().row_count() > 0, "widening didn't ask");
 }

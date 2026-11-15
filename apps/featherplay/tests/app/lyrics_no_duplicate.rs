@@ -2,10 +2,11 @@
 //! next and the Lyrics tab steps aside; closing the full view brings back the tab the user
 //! had. On the offscreen platform with the fixtures; no window is shown.
 
-use featherplay::offscreen;
 use featherplay::snapshot::Scene;
 use featherplay::ui::{LyricsData, LyricsState, NowPlayingData, Theme};
 use slint::ComponentHandle;
+
+use crate::support;
 
 const W: u32 = 1280;
 const H: u32 = 800;
@@ -13,11 +14,7 @@ const H: u32 = 800;
 /// The side panel's pixels in the lyrics' panel colour (`LyricInk.ground`): the Lyrics tab's
 /// card fills most of the panel when it shows.
 fn lyrics_card(scene: &Scene) -> usize {
-    let w = scene.ui.window();
-    offscreen::present(w).expect("present");
-    let px = offscreen::shown(w).expect("shown");
-    let img =
-        image::RgbaImage::from_raw(px.width(), px.height(), px.as_bytes().to_vec()).expect("image");
+    let img = support::frame(scene);
     let ground = scene.ui.global::<LyricsData>().get_ink().ground;
     let want = [ground.red(), ground.green(), ground.blue()];
     let t = scene.ui.global::<Theme>();

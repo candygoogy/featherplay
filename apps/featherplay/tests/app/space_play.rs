@@ -12,8 +12,10 @@ use featherplay::controller::Action;
 use featherplay::mini;
 use featherplay::snapshot::Scene;
 use featherplay::ui::{Frame, LyricsData, Player, SettingKey, SettingsData, Theme};
-use slint::platform::{Key, PointerEventButton, WindowEvent};
+use slint::platform::{Key, WindowEvent};
 use slint::{ComponentHandle, LogicalPosition, SharedString};
+
+use crate::support::click;
 
 fn tap(w: &slint::Window, text: SharedString) {
     w.dispatch_event(WindowEvent::KeyPressed { text: text.clone() });
@@ -31,19 +33,6 @@ fn held_space(w: &slint::Window, repeats: usize) {
         w.dispatch_event(WindowEvent::KeyPressRepeated { text: " ".into() });
     }
     w.dispatch_event(WindowEvent::KeyReleased { text: " ".into() });
-}
-
-fn click(w: &slint::Window, x: f32, y: f32) {
-    let position = LogicalPosition::new(x, y);
-    w.dispatch_event(WindowEvent::PointerMoved { position });
-    w.dispatch_event(WindowEvent::PointerPressed {
-        position,
-        button: PointerEventButton::Left,
-    });
-    w.dispatch_event(WindowEvent::PointerReleased {
-        position,
-        button: PointerEventButton::Left,
-    });
 }
 
 /// How many toggles the window asked the controller for since the last call.
@@ -123,7 +112,7 @@ fn space_toggles_playing_then_paused_then_playing() {
     // row 8 px down from the bar's top.
     scene.take_actions();
     let bar_top = 800.0 - scene.ui.global::<Theme>().get_bar_clear();
-    click(w, 640.0, bar_top + 8.0 + 22.0);
+    click(w, LogicalPosition::new(640.0, bar_top + 8.0 + 22.0));
     assert_eq!(toggles(&scene), 1, "the click missed the play button");
     space(w);
     assert_eq!(toggles(&scene), 1, "Space after a click on play");
@@ -152,7 +141,7 @@ fn a_clicked_settings_switch_leaves_space_to_playback_and_flips_on_enter() {
 
     // The first switch on the page: Playback's first row.
     let (x, y) = SWITCH;
-    click(w, x, y);
+    click(w, LogicalPosition::new(x, y));
     assert_eq!(flipped.borrow().len(), 1, "the click missed the switch");
 
     // Clicking it gave it the keys (its focus ring shows). Space doesn't click it again: it

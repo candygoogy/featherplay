@@ -11,10 +11,10 @@ use std::time::Duration;
 use featherplay::offscreen;
 use featherplay::snapshot::Scene;
 use featherplay::ui::{Frame, Nav, PageKind, Player, Theme};
-use slint::platform::{Key, PointerEventButton, WindowEvent};
-use slint::{ComponentHandle, LogicalPosition, LogicalSize, PhysicalSize, SharedString};
+use slint::platform::{Key, WindowEvent};
+use slint::{ComponentHandle, LogicalPosition, SharedString};
 
-use crate::support::label;
+use crate::support::{self, label};
 
 const H: u32 = 800;
 
@@ -36,17 +36,7 @@ fn centre(r: [f32; 4]) -> LogicalPosition {
 }
 
 fn click(scene: &Scene, at: LogicalPosition) {
-    let w = scene.ui.window();
-    let button = PointerEventButton::Left;
-    w.dispatch_event(WindowEvent::PointerMoved { position: at });
-    w.dispatch_event(WindowEvent::PointerPressed {
-        position: at,
-        button,
-    });
-    w.dispatch_event(WindowEvent::PointerReleased {
-        position: at,
-        button,
-    });
+    support::click(scene, at);
     scene.settle();
 }
 
@@ -64,11 +54,7 @@ fn key(scene: &Scene, text: impl Into<SharedString>) {
 }
 
 fn resize(scene: &Scene, width: u32) {
-    let w = scene.ui.window();
-    w.set_size(PhysicalSize::new(width, H));
-    w.dispatch_event(WindowEvent::Resized {
-        size: LogicalSize::new(width as f32, H as f32),
-    });
+    support::resize(scene.ui.window(), width, H);
     scene.settle();
 }
 

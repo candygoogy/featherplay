@@ -7,12 +7,11 @@
 //! cover layer again, and Library's Playlists missed ~10 frames on its first draw (measured
 //! 2026-11-08).
 
-use crate::support::{fixture_covers, frames};
+use crate::support::{fixture_covers, frames, resize};
 use featherplay::offscreen;
 use featherplay::snapshot::Scene;
 use featherplay::ui::{LibraryData, Theme};
-use slint::platform::WindowEvent;
-use slint::{ComponentHandle, LogicalSize, Model, PhysicalSize};
+use slint::{ComponentHandle, Model};
 
 const W: u32 = 1600;
 const H: u32 = 1000;
@@ -28,10 +27,7 @@ fn a_cover_arriving_repaints_only_its_card() {
     scene.ui.show().expect("show");
     scene.settle();
     offscreen::freeze_clock();
-    w.set_size(PhysicalSize::new(W, H));
-    w.dispatch_event(WindowEvent::Resized {
-        size: LogicalSize::new(W as f32, H as f32),
-    });
+    resize(w, W, H);
     scene.settle();
     frames(w, 120, |_| {});
 

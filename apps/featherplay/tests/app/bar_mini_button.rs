@@ -12,31 +12,16 @@ use featherplay::controller::{SleepKind, SleepState, UiEvent};
 use featherplay::mini;
 use featherplay::snapshot::Scene;
 use featherplay::ui::{Player, SettingsData, Theme};
-use slint::platform::{Key, PointerEventButton, WindowEvent};
+use slint::platform::{Key, WindowEvent};
 use slint::{ComponentHandle, LogicalPosition, SharedString};
 
-use crate::support::label;
+use crate::support::{self, label};
 
 const W: u32 = 1280;
 const H: u32 = 800;
 
 fn click(scene: &Scene, at: LogicalPosition) {
-    let w = scene.ui.window();
-    w.dispatch_event(WindowEvent::PointerMoved { position: at });
-    for pressed in [true, false] {
-        let button = PointerEventButton::Left;
-        w.dispatch_event(if pressed {
-            WindowEvent::PointerPressed {
-                position: at,
-                button,
-            }
-        } else {
-            WindowEvent::PointerReleased {
-                position: at,
-                button,
-            }
-        });
-    }
+    support::click(scene, at);
     scene.settle_once();
 }
 

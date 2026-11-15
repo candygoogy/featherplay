@@ -6,16 +6,13 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-use featherplay::app::Ctx;
 use featherplay::bar;
 use featherplay::controller::{PlayerState, QueueInfo};
-use featherplay::covers::Covers;
-use featherplay::offscreen;
-use featherplay::ui::{AppWindow, Player as Bar};
-use featherplay_controller::catalog::Catalog;
+use featherplay::ui::Player as Bar;
 use featherplay_core::model::{LikeStatus, Track, TrackId, VideoType};
 use slint::ComponentHandle;
-use tokio::sync::mpsc;
+
+use crate::support;
 
 /// The quick pick playing from its start, its length `duration` (none until it resolves).
 fn playing(duration: Option<Duration>) -> PlayerState {
@@ -48,18 +45,11 @@ fn playing(duration: Option<Duration>) -> PlayerState {
 /// One test: the platform can be installed once per process.
 #[test]
 fn the_total_appears_once_the_stream_resolves() {
-    let _pump = offscreen::install().expect("platform");
-    let rt = tokio::runtime::Builder::new_multi_thread()
-        .worker_threads(1)
-        .enable_all()
-        .build()
-        .expect("runtime");
-    let ui = AppWindow::new().expect("window");
-    let catalog = Catalog::new(rt.handle().clone()).expect("catalog");
-    let cache = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("bar_total");
-    let covers = Covers::new(rt.handle().clone(), cache, None);
-    let (actions, _) = mpsc::unbounded_channel();
-    let ctx = Ctx::new(&ui, catalog, covers, actions);
+    let bare = support::bare(
+        PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("bar_total"),
+        None,
+    );
+    let (ui, ctx) = (&bare.ui, &bare.ctx);
     let bar_of = || ui.global::<Bar>();
 
     bar::apply(&ctx, &playing(None));

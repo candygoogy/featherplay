@@ -11,9 +11,9 @@ use featherplay::snapshot::Scene;
 use featherplay::ui::{Frame, LyricsData, NowPlayingData, Player, QueueData, Theme};
 use featherplay_controller::place::Place;
 use featherplay_core::model::AlbumId;
-use slint::platform::{PointerEventButton, WindowEvent};
 use slint::{ComponentHandle, LogicalPosition, Model};
 
+use crate::support;
 use crate::support::label::{self, LogicalRect};
 
 /// The stage's right edge: the side panel takes the rest.
@@ -68,12 +68,7 @@ fn block(scene: &Scene) -> (f32, LogicalRect, LogicalRect) {
 }
 
 fn click(scene: &Scene, r: LogicalRect) {
-    let w = scene.ui.window();
-    let position = LogicalPosition::new(r.center().x, r.center().y);
-    let button = PointerEventButton::Left;
-    w.dispatch_event(WindowEvent::PointerMoved { position });
-    w.dispatch_event(WindowEvent::PointerPressed { position, button });
-    w.dispatch_event(WindowEvent::PointerReleased { position, button });
+    support::click(scene, LogicalPosition::new(r.center().x, r.center().y));
     scene.settle();
 }
 
@@ -184,10 +179,7 @@ fn the_cover_has_its_full_size_at_1280_by_800_and_in_small_windows_the_title_ste
     // The last is a 1456 x 1000 window at 150 %.
     for (width, height) in [(1100, 700), (1000, 650), (970, 667)] {
         let w = scene.ui.window();
-        w.set_size(slint::PhysicalSize::new(width, height));
-        w.dispatch_event(WindowEvent::Resized {
-            size: slint::LogicalSize::new(width as f32, height as f32),
-        });
+        support::resize(w, width, height);
         scene.settle();
         let (cover, title, album) = block(&scene);
         assert!(
