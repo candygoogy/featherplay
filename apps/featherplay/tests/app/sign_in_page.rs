@@ -242,10 +242,8 @@ fn without_a_sign_in_window_the_browser_row_leads_and_a_snap_says_why() {
 }
 
 /// A left click with the pointer in the middle of what says `label`.
-fn click(scene: &Scene, label: &str) {
-    let item = find(scene, |l| l == label).unwrap_or_else(|| panic!("nothing says {label:?}"));
-    let at = item.map_to_window(item.geometry().center());
-    support::click(scene, slint::LogicalPosition::new(at.x, at.y));
+fn click(scene: &Scene, name: &str) {
+    label::click(scene, name);
     scene.settle();
 }
 

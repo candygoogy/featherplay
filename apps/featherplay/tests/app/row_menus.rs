@@ -12,6 +12,7 @@ use featherplay::ui::{
 use slint::platform::PointerEventButton;
 use slint::{ComponentHandle, LogicalPosition, ModelRc, VecModel};
 
+use crate::support::label::{self, LogicalRect};
 use crate::support::{click_with, point};
 
 fn rows() -> ModelRc<TrackRow> {
@@ -31,29 +32,37 @@ fn rows() -> ModelRc<TrackRow> {
     ModelRc::from(Rc::new(VecModel::from(rows)))
 }
 
-/// The middle of row `id`, found by right-clicking down the page (the headers' heights
-/// depend on the page), at `x`.
-fn row_centre(w: &slint::Window, menu: &SongMenu, x: f32, id: &str) -> f32 {
-    let mut hits = Vec::new();
-    for y in (80..700).step_by(4) {
-        let y = y as f32;
-        click_with(w, LogicalPosition::new(x, y), PointerEventButton::Right);
-        if menu.get_open() && menu.get_track().id == id {
-            hits.push(y);
-        }
-        menu.invoke_close();
-    }
-    assert!(!hits.is_empty(), "row {id} not found");
-    (hits[0] + hits[hits.len() - 1]) / 2.0
+/// Where the row of song `id` is, found by its label: "Title <id>" on an album's page, and
+/// with the artist after it (`artist`) on a playlist's.
+fn row(w: &slint::Window, id: &str, artist: bool) -> LogicalRect {
+    let name = if artist {
+        format!("Title {id}, Artist")
+    } else {
+        format!("Title {id}")
+    };
+    label::rect(&label::find(w, &name).unwrap_or_else(|| panic!("no row {name:?}")))
+}
+
+/// Hovers `row` and finds its button labelled `name`, which shows on hover.
+fn hover_button(w: &slint::Window, row: LogicalRect, name: &str) -> LogicalRect {
+    point(w, LogicalPosition::new(row.center().x, row.center().y));
+    let found = label::shown_where(w, |item, l| {
+        let r = label::rect(item);
+        l == name && r.min_y() >= row.min_y() && r.max_y() <= row.max_y()
+    });
+    label::rect(
+        found
+            .first()
+            .unwrap_or_else(|| panic!("no {name:?} on the row")),
+    )
 }
 
 /// Hovers the row, moves onto its ⋯ and clicks it: the menu opens for that row.
-fn more_opens_the_menu(w: &slint::Window, menu: &SongMenu, page: &str) {
-    // 1280 px wide without the panel: the content runs from 240 to 1280, the rows from
-    // 32 px in on either side, and the ⋯ (36 px) ends 8 px before the row's right edge.
-    let y = row_centre(w, menu, 700.0, "b");
-    point(w, LogicalPosition::new(700.0, y));
-    let more = LogicalPosition::new(1248.0 - 8.0 - 18.0, y);
+fn more_opens_the_menu(w: &slint::Window, menu: &SongMenu, page: &str, artist: bool) {
+    let b = row(w, "b", artist);
+    let y = b.center().y;
+    let button = hover_button(w, b, "More");
+    let more = LogicalPosition::new(button.center().x, button.center().y);
     point(w, more);
     click_with(w, more, PointerEventButton::Left);
     assert!(menu.get_open(), "{page}: the ⋯ didn't open the song menu");
@@ -71,18 +80,16 @@ fn more_opens_the_menu(w: &slint::Window, menu: &SongMenu, page: &str) {
     );
     let x = menu.get_anchor_x();
     assert!(
-        (1248.0 - 8.0 - 36.0..=1248.0 - 8.0).contains(&x),
+        (button.min_x()..=button.max_x()).contains(&x),
         "{page}: menu anchor x {x} isn't on the ⋯"
     );
     menu.invoke_close();
 }
 
 /// Hovers an unliked row, moves onto its heart and clicks it: `liked` gets the row's index.
-fn heart_likes(w: &slint::Window, menu: &SongMenu, liked: &Cell<i32>, page: &str) {
-    // The heart (36 px) starts 140 px before the row's right edge.
-    let y = row_centre(w, menu, 700.0, "c");
-    point(w, LogicalPosition::new(700.0, y));
-    let heart = LogicalPosition::new(1248.0 - 140.0 + 18.0, y);
+fn heart_likes(w: &slint::Window, liked: &Cell<i32>, page: &str, artist: bool) {
+    let button = hover_button(w, row(w, "c", artist), "Like");
+    let heart = LogicalPosition::new(button.center().x, button.center().y);
     point(w, heart);
     liked.set(-1);
     click_with(w, heart, PointerEventButton::Left);
@@ -107,8 +114,8 @@ fn more_and_heart_buttons_work() {
     ui.global::<Nav>().set_page(PageKind::Album);
     let l = liked.clone();
     album.on_like(move |i| l.set(i));
-    more_opens_the_menu(w, &menu, "album (TrackListRow)");
-    heart_likes(w, &menu, &liked, "album (TrackListRow)");
+    more_opens_the_menu(w, &menu, "album (TrackListRow)", false);
+    heart_likes(w, &liked, "album (TrackListRow)", false);
 
     let playlist = ui.global::<PlaylistData>();
     playlist.set_title("Playlist".into());
@@ -116,6 +123,6 @@ fn more_and_heart_buttons_work() {
     ui.global::<Nav>().set_page(PageKind::Playlist);
     let l = liked.clone();
     playlist.on_like(move |i| l.set(i));
-    more_opens_the_menu(w, &menu, "playlist (SongListRow)");
-    heart_likes(w, &menu, &liked, "playlist (SongListRow)");
+    more_opens_the_menu(w, &menu, "playlist (SongListRow)", true);
+    heart_likes(w, &liked, "playlist (SongListRow)", true);
 }

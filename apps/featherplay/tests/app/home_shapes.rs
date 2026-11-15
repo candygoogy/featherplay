@@ -7,9 +7,9 @@ use std::rc::Rc;
 
 use featherplay::offscreen;
 use featherplay::ui::{AppWindow, CardItem, HomeData, HomeShelfRow, ItemKind, ShelfShape, Theme};
-use slint::{ComponentHandle, LogicalPosition, ModelRc, VecModel};
+use slint::{ComponentHandle, ModelRc, VecModel};
 
-use crate::support::click;
+use crate::support::{label, point};
 
 fn card(id: &str, kind: ItemKind) -> CardItem {
     CardItem {
@@ -67,20 +67,13 @@ fn the_liked_tile_shuffles_and_mix_and_video_tiles_play() {
         ),
     ])));
 
-    // No band: the feed starts 32 px below the 64 px top bar, at x 280. The mixes' 200 px
-    // tiles sit under their 48 px heading, 20 px apart.
-    let art_y = 64.0 + 32.0 + 48.0;
-    click(w, LogicalPosition::new(280.0 + 100.0, art_y + 100.0));
-    // The play button shows on hover at the art's bottom right: 40 px, 8 px in.
-    click(
-        w,
-        LogicalPosition::new(280.0 + 220.0 + 200.0 - 28.0, art_y + 200.0 - 28.0),
-    );
-
-    // The videos 32 px below the mixes' rail (its art, 8 px, two 20 px lines): 300 px 16:9
-    // tiles, art 169 px tall.
-    let video_y = art_y + 200.0 + 8.0 + 40.0 + 32.0 + 48.0 + 84.0;
-    click(w, LogicalPosition::new(280.0 + 150.0, video_y));
+    // A frame lays the rails out (their tiles are made as they come into view).
+    w.take_snapshot().expect("frame");
+    label::click(w, "Shuffle Liked songs");
+    // The play button shows on the art while the mix's tile is hovered.
+    point(w, label::centre(w, "Title RDTMAK5uy_a"));
+    label::click(w, "Play Title RDTMAK5uy_a");
+    label::click(w, "Title v1");
 
     assert_eq!(
         *did.borrow(),

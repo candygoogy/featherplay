@@ -6,10 +6,11 @@
 //! there's no index and the column starts at the page's padding.
 
 use featherplay::snapshot::Scene;
+use i_slint_core::items::AccessibleRole;
 use slint::platform::WindowEvent;
 use slint::{ComponentHandle, LogicalPosition, Rgba8Pixel, SharedPixelBuffer};
 
-use crate::support::{self, pixels};
+use crate::support::{self, label, pixels};
 
 /// At 1920 wide the page is 1680 px past the 240 px sidebar; the index (184), its gap (40)
 /// and the column (920) start at the page's 40 px padding.
@@ -139,8 +140,11 @@ fn settings_widen_and_index_their_sections_at_wide_windows() {
     );
 
     // A click on Account scrolls there and marks it.
-    let y = (last.0 + last.1) as f32 / 2.0;
-    click(&scene, INDEX_LEFT as f32 + 40.0, y);
+    let account = label::shown_where(&scene, |item, l| {
+        l == "Account" && item.accessible_role() == AccessibleRole::Button
+    });
+    let at = label::rect(account.first().expect("the index's Account")).center();
+    click(&scene, at.x, at.y);
     let after = shot(&scene);
     let entries = runs(&busy_rows(&after, 64, 700));
     assert_eq!(entries.len(), 8, "after the click: {entries:?}");

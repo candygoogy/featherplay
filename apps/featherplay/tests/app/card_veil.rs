@@ -3,17 +3,43 @@
 //! The veil is drawn over the cover rather than in the cover's layer (`Card`, ui/parts.slint),
 //! so this holds that it still shows, and only over the art.
 
+use crate::support::label;
 use crate::support::{frames, home_at};
 use featherplay::offscreen;
-use featherplay::ui::Theme;
+use featherplay::snapshot::Scene;
+use featherplay::ui::{HomeData, Theme};
+use i_slint_core::items::AccessibleRole;
 use slint::platform::{PointerEventButton, WindowEvent};
-use slint::{ComponentHandle, LogicalPosition, Rgba8Pixel, SharedPixelBuffer};
+use slint::{ComponentHandle, LogicalPosition, Model, Rgba8Pixel, SharedPixelBuffer};
 
-/// The "Listen together" card's art at 1920×1360, scale 1, Up next open, light (tall enough
-/// for the card's text to clear the floating bar under the band and two rails).
-const ART: LogicalPosition = LogicalPosition::new(420.0, 1000.0);
-/// Below the art, in the card's text: no veil there.
-const TEXT_GAP: LogicalPosition = LogicalPosition::new(540.0, 1104.0);
+/// The "Listen together" shelf's first card at 1920×1360, scale 1, Up next open, light (tall
+/// enough for the card's text to clear the floating bar under the band and two rails): the
+/// middle of its art, and a point on its title's line past the title's end, where no veil
+/// goes. The art is the card above its title, less the gap between them.
+fn card_points(scene: &Scene) -> (LogicalPosition, LogicalPosition) {
+    let shelves = scene.ui.global::<HomeData>().get_shelves();
+    let shelf = shelves
+        .iter()
+        .find(|s| s.title == "Listen together")
+        .expect("a Listen together shelf");
+    let title = shelf.items.row_data(0).expect("a card").title;
+    let with = |role: AccessibleRole| {
+        let found = label::shown_where(scene, |item, l| {
+            l == title.as_str() && item.accessible_role() == role
+        });
+        label::rect(
+            found
+                .first()
+                .unwrap_or_else(|| panic!("no {title:?} {role:?}")),
+        )
+    };
+    let (card, text) = (with(AccessibleRole::Button), with(AccessibleRole::Text));
+    let art_foot = text.min_y() - scene.ui.global::<Theme>().get_card_text_gap();
+    (
+        LogicalPosition::new(card.center().x, (card.min_y() + art_foot) / 2.0),
+        LogicalPosition::new(text.max_x() - 40.0, text.center().y),
+    )
+}
 
 fn luma(shot: &SharedPixelBuffer<Rgba8Pixel>, at: LogicalPosition) -> f64 {
     // The mean over a 9×9 patch: the art is noisy.
@@ -34,6 +60,7 @@ fn a_card_shades_its_art_when_hovered_and_more_when_pressed() {
     scene.theme(false);
     scene.ui.global::<Theme>().set_motion(true);
     let w = scene.ui.window();
+    let (art, text_gap) = card_points(&scene);
     // Off the cards first, then let the covers' layers warm.
     w.dispatch_event(WindowEvent::PointerMoved {
         position: LogicalPosition::new(1000.0, 60.0),
@@ -42,18 +69,18 @@ fn a_card_shades_its_art_when_hovered_and_more_when_pressed() {
     let shot = || offscreen::shown(w).expect("shown");
     let rest = shot();
 
-    w.dispatch_event(WindowEvent::PointerMoved { position: ART });
+    w.dispatch_event(WindowEvent::PointerMoved { position: art });
     let _ = frames(w, 60, |_| {});
     let hovered = shot();
 
     w.dispatch_event(WindowEvent::PointerPressed {
-        position: ART,
+        position: art,
         button: PointerEventButton::Left,
     });
     let _ = frames(w, 60, |_| {});
     let pressed = shot();
     w.dispatch_event(WindowEvent::PointerReleased {
-        position: ART,
+        position: art,
         button: PointerEventButton::Left,
     });
     w.dispatch_event(WindowEvent::PointerMoved {
@@ -71,10 +98,10 @@ fn a_card_shades_its_art_when_hovered_and_more_when_pressed() {
     }
 
     let (r, h, p, l) = (
-        luma(&rest, ART),
-        luma(&hovered, ART),
-        luma(&pressed, ART),
-        luma(&left, ART),
+        luma(&rest, art),
+        luma(&hovered, art),
+        luma(&pressed, art),
+        luma(&left, art),
     );
     println!("art luma: rest {r:.1}, hovered {h:.1}, pressed {p:.1}, left {l:.1}");
     assert!(
@@ -90,7 +117,7 @@ fn a_card_shades_its_art_when_hovered_and_more_when_pressed() {
         "leaving doesn't clear it ({r:.1} → {l:.1})"
     );
     assert!(
-        (luma(&hovered, TEXT_GAP) - luma(&rest, TEXT_GAP)).abs() < 1.0,
+        (luma(&hovered, text_gap) - luma(&rest, text_gap)).abs() < 1.0,
         "the veil spills past the art"
     );
 }

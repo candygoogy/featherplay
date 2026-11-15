@@ -616,11 +616,16 @@ pub mod label {
     pub use i_slint_core::item_tree::ItemRc;
     pub use i_slint_core::lengths::LogicalRect;
     use i_slint_core::window::WindowInner;
-    use slint::ComponentHandle;
+    use slint::LogicalPosition;
+
+    use super::OnWindow;
 
     /// Every element, shown or hidden, whose label passes `keep`, in the tree's order.
-    pub fn any_where(scene: &Scene, mut keep: impl FnMut(&ItemRc, &str) -> bool) -> Vec<ItemRc> {
-        let root = ItemRc::new_root(WindowInner::from_pub(scene.ui.window()).component());
+    pub fn any_where(
+        on: &impl OnWindow,
+        mut keep: impl FnMut(&ItemRc, &str) -> bool,
+    ) -> Vec<ItemRc> {
+        let root = ItemRc::new_root(WindowInner::from_pub(on.on_window()).component());
         let mut found = Vec::new();
         root.visit_descendants(|item| {
             if item
@@ -635,23 +640,26 @@ pub mod label {
     }
 
     /// The shown elements whose label passes `keep`.
-    pub fn shown_where(scene: &Scene, mut keep: impl FnMut(&ItemRc, &str) -> bool) -> Vec<ItemRc> {
-        any_where(scene, |item, l| item.is_visible() && keep(item, l))
+    pub fn shown_where(
+        on: &impl OnWindow,
+        mut keep: impl FnMut(&ItemRc, &str) -> bool,
+    ) -> Vec<ItemRc> {
+        any_where(on, |item, l| item.is_visible() && keep(item, l))
     }
 
     /// The shown elements labelled `label`.
-    pub fn all(scene: &Scene, label: &str) -> Vec<ItemRc> {
-        shown_where(scene, |_, l| l == label)
+    pub fn all(on: &impl OnWindow, label: &str) -> Vec<ItemRc> {
+        shown_where(on, |_, l| l == label)
     }
 
     /// The first shown element labelled `label`.
-    pub fn find(scene: &Scene, label: &str) -> Option<ItemRc> {
-        all(scene, label).into_iter().next()
+    pub fn find(on: &impl OnWindow, label: &str) -> Option<ItemRc> {
+        all(on, label).into_iter().next()
     }
 
     /// Whether a shown element is labelled `label`.
-    pub fn shows(scene: &Scene, label: &str) -> bool {
-        find(scene, label).is_some()
+    pub fn shows(on: &impl OnWindow, label: &str) -> bool {
+        find(on, label).is_some()
     }
 
     /// Where `item` is, in window coordinates.
@@ -661,8 +669,21 @@ pub mod label {
     }
 
     /// Where the shown elements labelled `label` are, in window coordinates.
-    pub fn rects(scene: &Scene, label: &str) -> Vec<LogicalRect> {
-        all(scene, label).iter().map(rect).collect()
+    pub fn rects(on: &impl OnWindow, label: &str) -> Vec<LogicalRect> {
+        all(on, label).iter().map(rect).collect()
+    }
+
+    /// The middle of the first shown element labelled `label`.
+    pub fn centre(on: &impl OnWindow, label: &str) -> LogicalPosition {
+        let item = find(on, label).unwrap_or_else(|| panic!("nothing visible says {label:?}"));
+        let c = rect(&item).center();
+        LogicalPosition::new(c.x, c.y)
+    }
+
+    /// A left click in the middle of the first shown element labelled `label`, as the user
+    /// makes it.
+    pub fn click(on: &impl OnWindow, label: &str) {
+        super::click(on, centre(on, label));
     }
 
     /// Presses the first shown element labelled `label`, as a screen reader does, and lets

@@ -10,15 +10,16 @@ use featherplay::ui::{AccountItem, AccountMenu, AppWindow, Nav, PageKind, Sideba
 use slint::platform::{Key, WindowEvent};
 use slint::{ComponentHandle, LogicalPosition, ModelRc, VecModel};
 
-use crate::support::click;
+use crate::support::{click, label};
 
 const W: f32 = 1280.0;
 const H: f32 = 800.0;
 /// The account row's top: 64 px above the sidebar rows' foot, the floating bar's top (98 px up).
 const ROW_TOP: f32 = H - 98.0 - 64.0;
 
+/// The sidebar's account row, signed in.
 fn click_row(w: &slint::Window) {
-    click(w, LogicalPosition::new(100.0, ROW_TOP + 28.0));
+    label::click(w, "Account, Test Listener");
 }
 
 fn accounts() -> ModelRc<AccountItem> {
@@ -42,15 +43,6 @@ fn accounts() -> ModelRc<AccountItem> {
     ])))
 }
 
-/// Where the menu's rows are, from its layout (ui/account_menu.slint): it ends 4 px above
-/// the row; 8 px padding, a 32 px title, 52 px identity rows, a 9 px divider, 36 px actions.
-fn layout(rows: usize) -> (f32, f32) {
-    let h = 16.0 + 32.0 + rows as f32 * 52.0 + 9.0 + 72.0;
-    let top = ROW_TOP - 4.0 - h;
-    let first_row = top + 8.0 + 32.0;
-    (first_row, first_row + rows as f32 * 52.0 + 9.0)
-}
-
 /// One test: the platform can be installed once per process.
 #[test]
 fn the_account_row_opens_the_account_menu() {
@@ -67,7 +59,7 @@ fn the_account_row_opens_the_account_menu() {
     let went = Rc::new(Cell::new(None));
     let g = went.clone();
     ui.global::<Nav>().on_go(move |k| g.set(Some(k)));
-    click_row(w);
+    label::click(w, "Sign in");
     assert!(!menu.get_open(), "signed out, the row opened the menu");
     assert_eq!(went.get(), Some(PageKind::SignIn));
 
@@ -97,26 +89,22 @@ fn the_account_row_opens_the_account_menu() {
     assert_eq!(menu.get_anchor_top(), ROW_TOP);
 
     // The active identity closes the menu without a pick; another one picks its key.
-    let (first_row, actions_top) = layout(3);
-    click(w, LogicalPosition::new(120.0, first_row + 26.0));
+    label::click(w, "Test Listener, @testlistener, current account");
     assert!(!menu.get_open());
     assert!(
         picked.borrow().is_empty(),
         "the active identity was picked again"
     );
     click_row(w);
-    click(
-        w,
-        LogicalPosition::new(120.0, first_row + 2.0 * 52.0 + 26.0),
-    );
+    label::click(w, "Test Channel, 12 subscribers");
     assert_eq!(*picked.borrow(), ["0/100000000000000000002"]);
     assert!(!menu.get_open());
 
     // The two actions.
     click_row(w);
-    click(w, LogicalPosition::new(120.0, actions_top + 18.0));
+    label::click(w, "Switch Google account");
     click_row(w);
-    click(w, LogicalPosition::new(120.0, actions_top + 36.0 + 18.0));
+    label::click(w, "Sign out");
     assert_eq!(*actions.borrow(), ["switch", "sign out"]);
 
     // A click outside closes it, and so does Escape.

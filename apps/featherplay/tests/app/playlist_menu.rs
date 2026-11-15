@@ -13,92 +13,42 @@ use featherplay_ytm::PlaylistSummary;
 use slint::platform::{Key, PointerEventButton, WindowEvent};
 use slint::{ComponentHandle, LogicalPosition, Model};
 
-use crate::support::click_with;
+use crate::support::{click_with, label};
 
 const WIDTH: u32 = 1280;
 const HEIGHT: u32 = 800;
 
-/// The sidebar's first list row (the list starts 280 px down, under the chips; rows are
-/// 40 px), and Liked songs (188 px down).
-const FIRST_ROW: f32 = 296.0;
-const SECOND_ROW: f32 = 336.0;
-const LIKED: f32 = 208.0;
+/// What the sidebar's `i`th list entry says.
+fn entry(scene: &Scene, i: usize) -> String {
+    let sidebar = scene.ui.global::<SidebarData>();
+    let title = sidebar.get_items().row_data(i).expect("an entry").title;
+    if sidebar.get_pinned().row_data(i).unwrap_or(false) {
+        format!("{title}, pinned")
+    } else {
+        title.to_string()
+    }
+}
 
-fn right_click(scene: &Scene, y: f32) {
-    click_with(
-        scene.ui.window(),
-        LogicalPosition::new(120.0, y),
-        PointerEventButton::Right,
-    );
+/// Right-clicks the middle of the sidebar's entry labelled `name`; where it clicked.
+fn right_click(scene: &Scene, name: &str) -> LogicalPosition {
+    let side = scene.ui.global::<Theme>().get_sidebar_w();
+    let found = label::shown_where(scene, |item, l| {
+        l == name && label::rect(item).max_x() <= side
+    });
+    let c = label::rect(
+        found
+            .first()
+            .unwrap_or_else(|| panic!("no {name:?} in the sidebar")),
+    )
+    .center();
+    let at = LogicalPosition::new(c.x, c.y);
+    click_with(scene, at, PointerEventButton::Right);
+    at
 }
 
 fn key(w: &slint::Window, k: Key) {
     w.dispatch_event(WindowEvent::KeyPressed { text: k.into() });
     w.dispatch_event(WindowEvent::KeyReleased { text: k.into() });
-}
-
-/// The rows the open menu shows, top to bottom, as screen readers find them.
-fn row_y(scene: &Scene, label: &str) -> Option<f32> {
-    // 8 px padding, the 56 px head, a 9 px divider, then 36 px rows with 9 px dividers
-    // between the groups. It opens down from the anchor, or up from it when it wouldn't fit
-    // above the bar.
-    let menu = scene.ui.global::<PlaylistMenu>();
-    let pin = if menu.get_pinned() {
-        "Unpin"
-    } else {
-        "Pin to top"
-    };
-    let groups: Vec<Vec<&str>> = match menu.get_kind() {
-        PlaylistKind::Own => vec![
-            vec!["Play", "Shuffle", "Start radio"],
-            vec!["Play next", "Add to queue"],
-            vec!["Copy link", pin],
-            vec!["Rename…", "Delete…"],
-        ],
-        PlaylistKind::Saved => vec![
-            vec!["Play", "Shuffle", "Start radio"],
-            vec!["Play next", "Add to queue"],
-            vec!["Copy link", pin],
-            vec!["Remove from library"],
-        ],
-        PlaylistKind::Liked => vec![
-            vec!["Play", "Shuffle"],
-            vec!["Play next", "Add to queue"],
-            vec!["Copy link"],
-        ],
-        PlaylistKind::Album => vec![vec!["Play", "Shuffle", "Go to album"], vec![pin]],
-        PlaylistKind::Artist => vec![vec!["Play", "Shuffle", "Go to artist"], vec![pin]],
-    };
-    let rows: usize = groups.iter().map(Vec::len).sum();
-    let h = 16.0 + 56.0 + 9.0 + rows as f32 * 36.0 + (groups.len() - 1) as f32 * 9.0;
-    let bottom = HEIGHT as f32 - scene.ui.global::<Theme>().get_bar_clear();
-    let top = if menu.get_anchor_y() + h + 8.0 > bottom {
-        (menu.get_anchor_top() - h).max(8.0)
-    } else {
-        menu.get_anchor_y()
-    };
-    let mut y = top + 8.0 + 56.0 + 9.0;
-    for group in &groups {
-        for row in group {
-            if *row == label {
-                return Some(y + 18.0);
-            }
-            y += 36.0;
-        }
-        y += 9.0;
-    }
-    None
-}
-
-fn click_row(scene: &Scene, label: &str) {
-    let menu = scene.ui.global::<PlaylistMenu>();
-    let y = row_y(scene, label).unwrap_or_else(|| panic!("no {label} row"));
-    let x = menu.get_anchor_x() + 120.0;
-    click_with(
-        scene.ui.window(),
-        LogicalPosition::new(x, y),
-        PointerEventButton::Left,
-    );
 }
 
 /// One test: the platform can be installed once per process.
@@ -119,18 +69,18 @@ fn the_sidebar_playlist_menu() {
     let saved = playlists.row_data(1).expect("second");
 
     // The account's own playlist.
-    right_click(&scene, FIRST_ROW);
+    let at = right_click(&scene, &entry(&scene, 0));
     assert!(menu.get_open(), "a right-click didn't open the menu");
     assert_eq!(menu.get_item().id, own.id);
     assert_eq!(menu.get_kind(), PlaylistKind::Own);
     // Opens at the pointer, down and to the right.
-    assert_eq!(menu.get_anchor_x(), 120.0);
-    assert_eq!(menu.get_anchor_y(), FIRST_ROW);
+    assert_eq!(menu.get_anchor_x(), at.x);
+    assert_eq!(menu.get_anchor_y(), at.y);
     key(w, Key::Escape);
     assert!(!menu.get_open(), "Escape didn't close the menu");
 
     // A saved one.
-    right_click(&scene, SECOND_ROW);
+    right_click(&scene, &entry(&scene, 1));
     assert_eq!(menu.get_item().id, saved.id);
     assert_eq!(menu.get_kind(), PlaylistKind::Saved);
     // A click outside closes it.
@@ -142,13 +92,13 @@ fn the_sidebar_playlist_menu() {
     assert!(!menu.get_open(), "a click outside didn't close the menu");
 
     // Liked songs.
-    right_click(&scene, LIKED);
+    right_click(&scene, "Liked songs");
     assert!(menu.get_open(), "Liked songs has no menu");
     assert_eq!(menu.get_item().id, "LM");
     assert_eq!(menu.get_kind(), PlaylistKind::Liked);
 
     // Copy link: the playlist's link on the clipboard, and a toast says so.
-    click_row(&scene, "Copy link");
+    label::click(&scene, "Copy link");
     assert!(!menu.get_open(), "Copy link left the menu open");
     assert_eq!(
         offscreen::clipboard().as_deref(),
@@ -157,8 +107,8 @@ fn the_sidebar_playlist_menu() {
     assert_eq!(ui.global::<Toast>().get_text(), "Link copied");
 
     // Delete asks first; Cancel leaves the playlist alone.
-    right_click(&scene, FIRST_ROW);
-    click_row(&scene, "Delete…");
+    right_click(&scene, &entry(&scene, 0));
+    label::click(&scene, "Delete…");
     assert!(!menu.get_open());
     assert_eq!(menu.get_dialog(), PlaylistDialog::Delete);
     assert_eq!(menu.get_target().id, own.id);
@@ -170,8 +120,8 @@ fn the_sidebar_playlist_menu() {
     );
 
     // Confirmed, it's deleted (fixtures accept the write) and the toast names it.
-    right_click(&scene, FIRST_ROW);
-    click_row(&scene, "Delete…");
+    right_click(&scene, &entry(&scene, 0));
+    label::click(&scene, "Delete…");
     menu.invoke_delete(own.id.clone());
     scene.settle();
     assert_eq!(menu.get_dialog(), PlaylistDialog::None);
@@ -181,8 +131,8 @@ fn the_sidebar_playlist_menu() {
     );
 
     // Rename starts from the current name and refuses an empty one.
-    right_click(&scene, FIRST_ROW);
-    click_row(&scene, "Rename…");
+    right_click(&scene, &entry(&scene, 0));
+    label::click(&scene, "Rename…");
     assert_eq!(menu.get_dialog(), PlaylistDialog::Rename);
     assert_eq!(menu.get_draft(), own.title);
     menu.invoke_rename(own.id.clone(), "   ".into());
@@ -216,8 +166,8 @@ fn the_sidebar_playlist_menu() {
         thumbnail: None,
         owned: true,
     }]);
-    right_click(&scene, FIRST_ROW);
-    click_row(&scene, "Rename…");
+    right_click(&scene, &entry(&scene, 0));
+    label::click(&scene, "Rename…");
     assert_eq!(menu.get_draft(), styled);
     ui.global::<Toast>().set_text("".into());
     menu.invoke_rename(own.id.clone(), menu.get_draft());
@@ -230,8 +180,8 @@ fn the_sidebar_playlist_menu() {
     );
 
     // Remove from library, on the saved one.
-    right_click(&scene, SECOND_ROW);
-    click_row(&scene, "Remove from library");
+    right_click(&scene, &entry(&scene, 1));
+    label::click(&scene, "Remove from library");
     scene.settle();
     assert!(!menu.get_open());
     assert_eq!(
@@ -243,9 +193,9 @@ fn the_sidebar_playlist_menu() {
     // offers Unpin.
     let sidebar = ui.global::<SidebarData>();
     let second = sidebar.get_items().row_data(1).expect("a second entry");
-    right_click(&scene, SECOND_ROW);
+    right_click(&scene, &entry(&scene, 1));
     assert!(!menu.get_pinned());
-    click_row(&scene, "Pin to top");
+    label::click(&scene, "Pin to top");
     assert_eq!(
         sidebar.get_items().row_data(0).expect("first").id,
         second.id
@@ -255,9 +205,9 @@ fn the_sidebar_playlist_menu() {
         ui.global::<Toast>().get_text(),
         format!("Pinned \u{201C}{}\u{201D} to the top", second.title)
     );
-    right_click(&scene, FIRST_ROW);
+    right_click(&scene, &entry(&scene, 0));
     assert!(menu.get_pinned());
-    click_row(&scene, "Unpin");
+    label::click(&scene, "Unpin");
     assert_eq!(sidebar.get_pinned().row_data(0), Some(false));
 
     // The Albums chip: its entries get the album menu.
@@ -265,7 +215,7 @@ fn the_sidebar_playlist_menu() {
     scene.settle();
     assert_eq!(sidebar.get_chip(), 1);
     let album = sidebar.get_items().row_data(0).expect("an album");
-    right_click(&scene, FIRST_ROW);
+    right_click(&scene, &entry(&scene, 0));
     assert_eq!(menu.get_kind(), PlaylistKind::Album);
     assert_eq!(menu.get_item().id, album.id);
     key(w, Key::Escape);

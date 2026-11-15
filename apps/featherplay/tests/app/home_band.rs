@@ -23,7 +23,7 @@ use featherplay_core::model::{RepeatMode, Track};
 use slint::platform::PointerEventButton;
 use slint::{ComponentHandle, LogicalPosition, Model, ModelRc, VecModel};
 
-use crate::support;
+use crate::support::{self, label};
 
 fn row(id: &str) -> TrackRow {
     TrackRow {
@@ -47,6 +47,23 @@ fn click(w: &slint::Window, x: f32, y: f32, button: PointerEventButton) {
     support::point(w, LogicalPosition::new(4.0, 4.0));
 }
 
+/// Clicks the middle of the band's element labelled `name` with `button`: the shown one
+/// above the bar, which has a Play of its own.
+fn band_click(ui: &AppWindow, name: &str, button: PointerEventButton) {
+    let w = ui.window();
+    let bar_top = w.size().height as f32 / w.scale_factor() - ui.global::<Theme>().get_bar_clear();
+    let found = label::shown_where(w, |item, l| {
+        l == name && label::rect(item).max_y() <= bar_top
+    });
+    let c = label::rect(
+        found
+            .first()
+            .unwrap_or_else(|| panic!("no {name:?} in the band")),
+    )
+    .center();
+    click(w, c.x, c.y, button);
+}
+
 fn window(width: f32) -> AppWindow {
     let ui = AppWindow::new().expect("window");
     // Home's rows, as the app's wiring gives them.
@@ -58,18 +75,14 @@ fn window(width: f32) -> AppWindow {
 }
 
 // At 1568 px the band runs from x 280 (the 240 px sidebar, the 40 px padding) for 1248 px,
-// from y 96 (the 64 px top bar, 32 px of page top); its text column from 228 px in, its row
-// of actions at the foot of the 176 px cover, 24 px in.
+// from y 96 (the 64 px top bar, 32 px of page top).
 const BAND_X: f32 = 280.0;
 const BAND_Y: f32 = 96.0;
-const TEXT_X: f32 = BAND_X + 228.0;
-const ROW_Y: f32 = BAND_Y + 24.0 + 136.0 + 20.0;
 
 #[test]
 fn the_bands_pill_follows_the_session_and_its_actions_act_on_the_song() {
     let _pump = offscreen::install().expect("platform");
     let ui = window(1568.0);
-    let w = ui.window();
     let did = Rc::new(RefCell::new(Vec::<String>::new()));
     let data = ui.global::<HomeData>();
     let queue = ui.global::<QueueData>();
@@ -87,13 +100,13 @@ fn the_bands_pill_follows_the_session_and_its_actions_act_on_the_song() {
     ui.global::<Nav>()
         .on_open_artist(move |id| d.borrow_mut().push(format!("artist {id}")));
 
-    // Paused: Resume. Playing: Open <source>, in the same place.
+    // Paused: Resume. Playing: Open <source>.
     data.set_resume(true);
     data.set_track(row("t1"));
     queue.set_playing_from("Daily mix".into());
-    click(w, TEXT_X + 40.0, ROW_Y, PointerEventButton::Left);
+    band_click(&ui, "Resume", PointerEventButton::Left);
     player.set_playing(true);
-    click(w, TEXT_X + 40.0, ROW_Y, PointerEventButton::Left);
+    band_click(&ui, "Open Daily mix", PointerEventButton::Left);
     // A fresh start: Play on the featured song.
     data.set_resume(false);
     data.set_has_featured(true);
@@ -103,7 +116,7 @@ fn the_bands_pill_follows_the_session_and_its_actions_act_on_the_song() {
         title: "Title t1".into(),
         ..Default::default()
     });
-    click(w, TEXT_X + 40.0, ROW_Y, PointerEventButton::Left);
+    band_click(&ui, "Play", PointerEventButton::Left);
     assert_eq!(
         *did.borrow(),
         ["resume", "open source", "play featured"],
@@ -111,16 +124,16 @@ fn the_bands_pill_follows_the_session_and_its_actions_act_on_the_song() {
     );
 
     // Playing from a source without a name, there's no pill: the four actions start the row
-    // (Like, Add to playlist, Start radio, Go to artist; 40 px, 8 apart).
+    // (Like, Add to playlist, Start radio, Go to artist).
     did.borrow_mut().clear();
     data.set_resume(true);
     queue.set_playing_from("".into());
-    click(w, TEXT_X + 96.0 + 20.0, ROW_Y, PointerEventButton::Left);
-    click(w, TEXT_X + 144.0 + 20.0, ROW_Y, PointerEventButton::Left);
+    band_click(&ui, "Start radio", PointerEventButton::Left);
+    band_click(&ui, "Go to artist", PointerEventButton::Left);
     assert_eq!(*did.borrow(), ["radio t1", "artist UCt1"], "the actions");
     // Add to playlist opens the song menu on its playlists.
     menu.set_signed_in(true);
-    click(w, TEXT_X + 48.0 + 20.0, ROW_Y, PointerEventButton::Left);
+    band_click(&ui, "Add to playlist", PointerEventButton::Left);
     assert!(
         menu.get_open() && menu.get_choosing(),
         "no playlist chooser"
@@ -146,25 +159,12 @@ fn up_next_shows_beside_the_song_or_as_a_link_and_opens_the_panel() {
     data.set_next(rows(3));
     queue.set_upcoming(rows(12));
 
-    // The column from 732 px in: its heading 20 px tall, then 52 px rows; "Show all 12" at
-    // its right end, 24 + 8 px from the band's.
-    let col_x = BAND_X + 732.0;
-    let rows_y = BAND_Y + 24.0 + 20.0;
-    click(
-        w,
-        col_x + 120.0,
-        rows_y + 52.0 + 26.0,
-        PointerEventButton::Left,
-    );
-    click(
-        w,
-        BAND_X + 1248.0 - 32.0 - 20.0,
-        BAND_Y + 24.0 + 10.0,
-        PointerEventButton::Left,
-    );
+    // The column: its rows, and "Show all 12" at its right end.
+    band_click(&ui, "Title q1, Artist", PointerEventButton::Left);
+    band_click(&ui, "Show all 12", PointerEventButton::Left);
     assert_eq!(*did.borrow(), ["play 1", "show queue"], "the column");
     // A right-click on a row opens the song menu on it.
-    click(w, col_x + 120.0, rows_y + 26.0, PointerEventButton::Right);
+    band_click(&ui, "Title q0, Artist", PointerEventButton::Right);
     assert!(menu.get_open());
     assert_eq!(menu.get_track().id, "q0");
     menu.invoke_close();
@@ -172,13 +172,7 @@ fn up_next_shows_beside_the_song_or_as_a_link_and_opens_the_panel() {
     // At 1100 px the band is 780 px: no column, the link at its top right instead.
     did.borrow_mut().clear();
     support::resize(w, 1100, 900);
-    let band_w = 1100.0 - 240.0 - 80.0;
-    click(
-        w,
-        BAND_X + band_w - 24.0 - 40.0,
-        BAND_Y + 24.0 + 10.0,
-        PointerEventButton::Left,
-    );
+    band_click(&ui, "Up next · 12", PointerEventButton::Left);
     assert_eq!(*did.borrow(), ["show queue"], "the link");
 }
 
@@ -297,10 +291,10 @@ fn the_bands_queue_follows_the_players_with_the_panel_open() {
         );
     }
     let _ = scene.take_actions();
-    click(
-        ui.window(),
-        BAND_X + 732.0 + 120.0,
-        BAND_Y + 24.0 + 20.0 + 52.0 + 26.0,
+    let second = data.get_next().row_data(1).expect("a second row");
+    band_click(
+        ui,
+        &format!("{}, {}", second.title, second.artist),
         PointerEventButton::Left,
     );
     assert!(
