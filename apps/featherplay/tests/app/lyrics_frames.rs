@@ -4,14 +4,6 @@
 //! line's glide there and in the full view, and the full view's toggle both ways, each frame
 //! timed in this thread's CPU time on a frozen clock stepped 4 ms (240 Hz), through the app's
 //! own present path (`offscreen::install_presenting`). The ceilings hold in optimised builds.
-//!
-//! `bench` (ignored) prints the same frames. Run it optimised:
-//!
-//! ```sh
-//! CARGO_PROFILE_RELEASE_LTO=false CARGO_PROFILE_RELEASE_CODEGEN_UNITS=16 \
-//!   FEATHERPLAY_HOME=<dir> RUSTFLAGS="--cfg ci" \
-//!   cargo test --release -p featherplay --test app -- lyrics_frames:: --ignored --nocapture
-//! ```
 
 use std::path::PathBuf;
 
@@ -20,41 +12,26 @@ use featherplay::offscreen;
 use featherplay::snapshot::Scene;
 use featherplay::ui::{LyricsData, LyricsState, NowPlayingData, Theme};
 use slint::platform::WindowEvent;
-use slint::{ComponentHandle, LogicalSize, Model, PhysicalSize};
+use slint::{ComponentHandle, LogicalSize, PhysicalSize};
 
 const W: u32 = 3840;
 const H: u32 = 2160;
 const SCALE: f32 = 1.5;
 
-/// One frame's CPU time (ms), the physical pixels it copied and their bounding box.
+/// One frame's CPU time (ms) and the physical pixels it copied.
 pub(crate) struct Frame {
     pub(crate) cpu: f64,
     pub(crate) damaged: u64,
-    bounds: Option<(u32, u32, u32, u32)>,
-}
-
-thread_local! {
-    /// Self-paced (`LYRICS_FRAMES_PACED`): the clock moves on by what the last frame cost (at
-    /// least 4 ms), as the window's event loop does when a frame takes longer than a refresh.
-    static LAST: std::cell::Cell<f64> = const { std::cell::Cell::new(4.0) };
 }
 
 pub(crate) fn step(scene: &Scene) -> Frame {
-    let by = if std::env::var_os("LYRICS_FRAMES_PACED").is_some() {
-        std::time::Duration::from_millis(LAST.get().ceil().max(4.0) as u64)
-    } else {
-        FRAME_240
-    };
     let c = cpu::cycles();
-    offscreen::advance(by);
+    offscreen::advance(FRAME_240);
     scene.run_queued();
     let p = offscreen::present(scene.ui.window()).expect("present");
-    let cpu = cpu::ms(cpu::cycles() - c);
-    LAST.set(if p.damaged > 0 { cpu } else { 4.0 });
     Frame {
-        cpu,
+        cpu: cpu::ms(cpu::cycles() - c),
         damaged: p.damaged,
-        bounds: p.bounds,
     }
 }
 
@@ -113,10 +90,8 @@ pub(crate) fn long_lyrics() -> PathBuf {
 /// looked up; the clock frozen.
 pub(crate) fn scene() -> Scene {
     fixture_covers();
-    if std::env::var_os("LYRICS_FRAMES_SHORT").is_none() {
-        // SAFETY: set before the scene starts any other thread.
-        unsafe { std::env::set_var("FEATHERPLAY_FIXTURE_LYRICS", long_lyrics()) };
-    }
+    // SAFETY: set before the scene starts any other thread.
+    unsafe { std::env::set_var("FEATHERPLAY_FIXTURE_LYRICS", long_lyrics()) };
     let scene = Scene::new(1280, 800, false, true).expect("scene");
     scene.ui.global::<Theme>().set_motion(true);
     let w = scene.ui.window();
@@ -182,49 +157,6 @@ fn toggle(scene: &Scene) -> Vec<Frame> {
         step(scene);
     }
     f
-}
-
-fn summary(label: &str, runs: &[Vec<Frame>]) {
-    let px = f64::from(W) * f64::from(H);
-    let cpu: Vec<f64> = runs
-        .iter()
-        .flatten()
-        .filter(|f| f.damaged > 0)
-        .map(|f| f.cpu)
-        .collect();
-    let dmg: Vec<f64> = runs
-        .iter()
-        .flatten()
-        .filter(|f| f.damaged > 0)
-        .map(|f| f.damaged as f64 / px * 100.0)
-        .collect();
-    let firsts: Vec<f64> = runs
-        .iter()
-        .filter_map(|r| r.first())
-        .map(|f| f.cpu)
-        .collect();
-    let rest: Vec<f64> = runs
-        .iter()
-        .flat_map(|r| r.iter().skip(1))
-        .filter(|f| f.damaged > 0)
-        .map(|f| f.cpu)
-        .collect();
-    println!(
-        "{label:<28} median {:6.2}  p95 {:6.2}  max {:6.2}  | after the first: median {:6.2} max {:6.2} | first {:6.2} | damage {:4.1} %  ({} frames)",
-        quantile(&cpu, 0.5),
-        quantile(&cpu, 0.95),
-        quantile(&cpu, 1.0),
-        quantile(&rest, 0.5),
-        quantile(&rest, 1.0),
-        quantile(&firsts, 0.5),
-        quantile(&dmg, 0.5),
-        cpu.len()
-    );
-    if std::env::var_os("LYRICS_FRAMES_BOUNDS").is_some() {
-        for f in runs.iter().flatten() {
-            println!("    {:6.2} ms {:?} {}", f.cpu, f.bounds, f.damaged);
-        }
-    }
 }
 
 /// The repainted frames' CPU time, without each run's first frame if `skip_first`.
@@ -314,29 +246,4 @@ fn lyrics_motion_fits_its_4k_frame_budget() {
         };
     }
     panic!("{last}");
-}
-
-/// Prints the frames of the glides and the toggle, as the test measures them (with
-/// `LYRICS_FRAMES_BOUNDS`, each frame and what it repainted; with `LYRICS_FRAMES_PACED`, the
-/// clock moving on by each frame's cost).
-#[test]
-#[ignore]
-fn bench() {
-    let scene = scene();
-    let np = scene.ui.global::<NowPlayingData>();
-    println!(
-        "{} lines; playing marks on; 4K 150 %; cover {:?}; wash dark {:?}",
-        scene.ui.global::<LyricsData>().get_lines().row_count(),
-        np.get_cover().size(),
-        np.get_wash_dark()
-    );
-    side_tab(&scene);
-    let side = glides(&scene, 30, 6);
-    summary("glide, side tab", &side);
-    let open = toggle(&scene);
-    summary("toggle open", &[open]);
-    let full = glides(&scene, 36, 6);
-    summary("glide, full view", &full);
-    let close = toggle(&scene);
-    summary("toggle close", &[close]);
 }

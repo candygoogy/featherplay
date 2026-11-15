@@ -4,15 +4,13 @@
 //! still worked out; a new song's colour still crossfades into it after. On the offscreen
 //! platform with the fixtures; no window is shown.
 
-use std::time::Instant;
-
 use featherplay::snapshot::Scene;
 use featherplay::ui::Theme;
-use featherplay::{mini, offscreen, repaint};
+use featherplay::{mini, offscreen};
 use featherplay_controller::fixtures::Fixtures;
 use slint::ComponentHandle;
 
-use crate::support::{self, FRAME_240, frames};
+use crate::support::{self, frames};
 
 const W: u32 = 1280;
 const H: u32 = 800;
@@ -233,44 +231,5 @@ fn without_motion_a_switch_while_a_cover_is_analysed_recolours_at_once_then_fade
     assert!(
         midway != light && midway != next,
         "the new cover's tint crossfades: {light:?} to {next:?}, {midway:?} after 160 ms"
-    );
-}
-
-/// The cost of a switch's frames at 1600 x 1000, each a full repaint, beside a full repaint
-/// of the window at rest. A measurement: `--run-ignored only`.
-#[test]
-#[ignore]
-fn switch_frames_cost_about_a_full_repaint() {
-    let (w, h) = (1600, 1000);
-    let scene = red_song("theme-switch-cost", w, h);
-    let window = scene.ui.window();
-    let full = (0..10)
-        .map(|_| {
-            repaint::all(window);
-            offscreen::advance(FRAME_240);
-            let started = Instant::now();
-            offscreen::present(window).expect("present");
-            started.elapsed()
-        })
-        .max()
-        .expect("frames");
-    scene.theme(false);
-    let mut switch = Vec::new();
-    for _ in 0..60 {
-        offscreen::advance(FRAME_240);
-        let started = Instant::now();
-        let shown = offscreen::present(window).expect("present");
-        if shown.damaged > 0 {
-            switch.push(started.elapsed());
-        }
-    }
-    let worst = switch.iter().max().expect("switch frames");
-    println!(
-        "full repaint at rest {full:?}; {} switch frames, the worst {worst:?}",
-        switch.len()
-    );
-    assert!(
-        *worst < full * 3,
-        "a switch frame took {worst:?}, a full repaint {full:?}"
     );
 }

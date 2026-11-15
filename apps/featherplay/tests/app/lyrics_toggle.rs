@@ -20,7 +20,7 @@ use std::time::Duration;
 use featherplay::offscreen;
 use featherplay::snapshot::Scene;
 use featherplay::ui::{LyricsData, LyricsState, Theme};
-use image::{GenericImage, RgbaImage, imageops};
+use image::RgbaImage;
 use slint::platform::WindowEvent;
 use slint::{ComponentHandle, LogicalSize, PhysicalSize};
 
@@ -32,13 +32,11 @@ fn shot(scene: &Scene) -> RgbaImage {
     RgbaImage::from_raw(px.width(), px.height(), px.as_bytes().to_vec()).expect("image")
 }
 
-/// One frame: the clock moves on and the window presents. How long the present took.
-fn step(scene: &Scene) -> Duration {
+/// One frame: the clock moves on and the window presents.
+fn step(scene: &Scene) {
     offscreen::advance(FRAME);
     scene.run_queued();
-    offscreen::present(scene.ui.window())
-        .expect("present")
-        .elapsed
+    offscreen::present(scene.ui.window()).expect("present");
 }
 
 /// Frames until nothing animates (at most 200).
@@ -54,20 +52,19 @@ fn rest(scene: &Scene) -> usize {
     }
 }
 
-/// The toggle, frame by frame: every frame and the time each took, until the window rests.
-fn toggle(scene: &Scene) -> (Vec<RgbaImage>, Vec<Duration>) {
+/// The toggle, frame by frame, until the window rests.
+fn toggle(scene: &Scene) -> Vec<RgbaImage> {
     scene.ui.global::<LyricsData>().invoke_toggle_view();
     let w = scene.ui.window();
     let mut frames = Vec::new();
-    let mut took = Vec::new();
     for _ in 0..200 {
-        took.push(step(scene));
+        step(scene);
         frames.push(shot(scene));
         if !w.has_active_animations() {
             break;
         }
     }
-    (frames, took)
+    frames
 }
 
 /// The scene on Now playing with the cover view at rest, the synced lyrics known.
@@ -120,7 +117,7 @@ fn the_lyrics_toggle_glides_both_ways_then_rests() {
     let cover_view = shot(&scene);
 
     // Opening: about 300 ms of frames, then nothing runs.
-    let (opening, _) = toggle(&scene);
+    let opening = toggle(&scene);
     let n = opening.len();
     assert!((15..=25).contains(&n), "the opening ran {n} frames");
     let lyrics_view = opening[n - 1].clone();
@@ -144,7 +141,7 @@ fn the_lyrics_toggle_glides_both_ways_then_rests() {
     );
 
     // Closing reverses it and lands on the cover view as it was.
-    let (closing, _) = toggle(&scene);
+    let closing = toggle(&scene);
     let n = closing.len();
     assert!((15..=25).contains(&n), "the closing ran {n} frames");
     let back = &closing[n - 1];
@@ -155,52 +152,8 @@ fn the_lyrics_toggle_glides_both_ways_then_rests() {
     // the Lyrics pill's short colour fade (which stays without motion) still running.
     scene.ui.global::<Theme>().set_motion(false);
     for way in ["opening", "closing"] {
-        let (frames, _) = toggle(&scene);
+        let frames = toggle(&scene);
         let off = differs(&frames[0], &frames[frames.len() - 1]);
         assert!(off < 6_000, "{way} without motion moved ({off} px)");
-    }
-}
-
-/// The frames of the toggle at 4K 150 %: the median and slowest frame, best of 3 rounds.
-#[test]
-#[ignore]
-fn toggle_frames_at_4k() {
-    let scene = scene(3840, 2160, 1.5);
-    let mut medians = Vec::new();
-    let mut worst = Vec::new();
-    let mut strip_frames = Vec::new();
-    for round in 0..3 {
-        for _ in 0..2 {
-            let (frames, mut took) = toggle(&scene);
-            if round == 0 {
-                strip_frames.extend(frames.into_iter().step_by(4));
-            }
-            took.sort_unstable();
-            medians.push(took[took.len() / 2]);
-            worst.push(took[took.len() - 1]);
-            rest(&scene);
-        }
-    }
-    let ms = |d: &Duration| d.as_secs_f64() * 1000.0;
-    println!(
-        "toggle at 4K 150 %: median frame {:.2} ms (best round), slowest {:.2} ms",
-        medians.iter().map(ms).fold(f64::MAX, f64::min),
-        worst.iter().map(ms).fold(f64::MAX, f64::min)
-    );
-    if let Some(dir) = std::env::var_os("LYRICS_TOGGLE_SHOTS") {
-        let (cw, ch) = (640, 360);
-        let gap = 8;
-        let mut out = RgbaImage::from_pixel(
-            strip_frames.len() as u32 * (cw + gap) - gap,
-            ch,
-            image::Rgba([128, 128, 128, 255]),
-        );
-        for (i, f) in strip_frames.iter().enumerate() {
-            let small = imageops::resize(f, cw, ch, imageops::FilterType::Triangle);
-            out.copy_from(&small, i as u32 * (cw + gap), 0)
-                .expect("fits");
-        }
-        out.save(std::path::Path::new(&dir).join("toggle-strip.png"))
-            .expect("png");
     }
 }
