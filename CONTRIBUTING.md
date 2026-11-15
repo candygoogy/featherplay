@@ -119,6 +119,11 @@ the sound output, the app on a real X11 and Wayland desktop, and the AppImage in
 distributions' containers and on a bare Ubuntu 22.04 with no network, D-Bus or keyring, as
 the AppImage catalog tests it.
 
+All of those are debug builds, and the frame-cost tests check their millisecond limits in
+optimised builds only (a debug build checks what they repaint, not what it costs). The run
+that holds the limits is `cargo nextest run --release -p featherplay --profile ceilings`, on
+an otherwise idle Windows machine; it is one of the release checks in `RELEASING.md`.
+
 The tests need [cargo-nextest](https://nexte.st), because it runs each test in its own
 process: Slint allows one platform per process, and most app tests install the offscreen
 one, so plain `cargo test` fails them. nextest skips doctests, hence the second line.

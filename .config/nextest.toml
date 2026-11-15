@@ -32,6 +32,13 @@ threads-required = 'num-test-threads'
 [profile.ci]
 default-filter = 'not (package(featherplay) & binary(app) & test(/^(smoothness|first_frames|home_scroll_bump|lyrics_frames|scroll_frames|resize_frames|lyrics_arrive|lyrics_button|skeleton_frames|content_fade|memory)::/))'
 
+# The `ceilings` profile: only the frame-cost ceilings, for an optimised build
+# (`cargo nextest run --release -p featherplay --profile ceilings`). Their millisecond limits
+# are checked in optimised builds only, and every other run is a debug build, so this is the
+# run that holds the limits. On the machine the limits were set on, with nothing else running.
+[profile.ceilings]
+default-filter = 'package(featherplay) & binary(app) & test(/^(first_frames|home_scroll_bump|lyrics_frames|scroll_frames|lyrics_arrive|lyrics_button|skeleton_frames|content_fade)::/)'
+
 # The no-lyrics tests run on Slint's real clock: a lyrics lookup starts on a timer, which a
 # frozen clock never fires. Beside a full machine a frame can take longer than a fade, so they
 # run alone. The other motion tests step a frozen clock and run beside everything else.

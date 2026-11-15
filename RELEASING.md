@@ -34,6 +34,17 @@ RUSTFLAGS="--cfg ci" cargo nextest run --workspace
 RUSTFLAGS="--cfg ci" cargo test --workspace --doc
 ```
 
+Those are debug builds, where the frame-cost tests skip their millisecond limits. Run the
+limits in an optimised build too, with nothing else running on the machine (about a minute
+once built):
+
+```
+RUSTFLAGS="--cfg ci" cargo nextest run --release -p featherplay --profile ceilings
+```
+
+A limit that fails gets three tries by itself; one that still fails is a frame that got more
+expensive since the last release, so look into it before tagging.
+
 Commit as `chore: release X.Y.Z`, push `main`, and wait for CI to pass on that commit. Its
 Linux rigs include `linux-rig-appimage.yml`'s `bare` job: the release AppImage on a bare
 Ubuntu 22.04 with no network, D-Bus or keyring, as the AppImage catalog tests it, which must
