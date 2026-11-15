@@ -12,12 +12,9 @@ use featherplay_streams::{Sidecars, StreamResolver, YtDlpResolver};
 #[ignore = "live: two yt-dlp resolves and two 1 MiB fetches"]
 async fn live_resolve_and_range_fetch() {
     let home = PathBuf::from(std::env::var("FEATHERPLAY_HOME").expect("set FEATHERPLAY_HOME"));
-    let r = YtDlpResolver::new(
-        Sidecars {
-            dir: home.join("sidecars"),
-        },
-        None,
-    );
+    let r = YtDlpResolver::new(Sidecars {
+        dir: home.join("sidecars"),
+    });
     let http = reqwest::Client::new();
     for id in ["swJOIjjW69U", "juRFjpB5Ppg"] {
         let t = Instant::now();
@@ -66,7 +63,7 @@ async fn live_resolve_timing() {
     let sidecars = std::env::var("FEATHERPLAY_SIDECARS_DIR")
         .map(PathBuf::from)
         .unwrap_or_else(|_| home.join("sidecars"));
-    let r = YtDlpResolver::new(Sidecars { dir: sidecars }, None);
+    let r = YtDlpResolver::new(Sidecars { dir: sidecars });
     let http = reqwest::Client::new();
     let ids = std::env::var("TIMING_IDS").expect("set TIMING_IDS");
     for (i, id) in ids.split(',').map(str::trim).enumerate() {
@@ -113,12 +110,9 @@ async fn live_first_run() {
     let home = PathBuf::from(std::env::var("FEATHERPLAY_HOME").expect("set FEATHERPLAY_HOME"));
     assert!(!home.join("resolver").exists(), "not a first run");
     let t = Instant::now();
-    let mut r = YtDlpResolver::new(
-        Sidecars {
-            dir: home.join("sidecars"),
-        },
-        None,
-    )
+    let mut r = YtDlpResolver::new(Sidecars {
+        dir: home.join("sidecars"),
+    })
     .with_downloads(featherplay_streams::Downloads::pinned());
     if let Ok(exe) = std::env::var("MEASURE_PREPROCESSOR") {
         r = r.with_preprocessor(featherplay_streams::Preprocessor::Child(exe.into()));

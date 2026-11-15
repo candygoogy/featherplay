@@ -1,7 +1,6 @@
-use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU64, Ordering};
 use std::sync::{Mutex, OnceLock};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime};
 
 use featherplay_core::model::TrackId;
 use featherplay_core::sync::LockExt;
@@ -134,13 +133,13 @@ type Told = Box<dyn Fn(&TrackId) + Send + Sync>;
 /// ~2.5 s in all instead of ~4 s plus the ~5 s gate of the TV clients.
 const EMBEDDED_ARGS: &str =
     "youtube:player_client=web_embedded;player_skip=webpage,initial_data;skip=hls";
-/// Resolves streams, without cookies unless a cookie header is given (cookies made
-/// resolving ~2x slower with the same result, measured 2026-10-26). The steps, in the
-/// order and with the rules of `Chain::resolve`:
+/// Resolves streams, without cookies (cookies made resolving ~2x slower with the same
+/// result, measured 2026-10-26). The steps, in the order and with the rules of
+/// `Chain::resolve`:
 ///
 /// 1. The embedded player's client, asked from Rust (`native`: one request, ~0.3 s once
-///    the player is cached). Not with cookies. It needs no helper: the player's challenges
-///    run in the QuickJS built in.
+///    the player is cached). It needs no helper: the player's challenges run in the
+///    QuickJS built in.
 /// 2. The same client through yt-dlp (`EMBEDDED_ARGS`, ~2.6 s).
 /// 3. yt-dlp's default clients (the TV clients, which gate their URLs behind a pre-roll ad
 ///    until `available_at`).
@@ -149,7 +148,6 @@ const EMBEDDED_ARGS: &str =
 /// waits for their download only when it gets to one of them (`helpers`).
 pub struct YtDlpResolver {
     sidecars: Sidecars,
-    cookie_header: Option<String>,
     chain: Chain,
     native: Option<NativeResolver>,
     /// The songs whose resolve waits for the helpers' download now.
@@ -176,25 +174,17 @@ pub struct YtDlpResolver {
 }
 
 impl YtDlpResolver {
-    pub fn new(sidecars: Sidecars, cookie_header: Option<String>) -> Self {
+    pub fn new(sidecars: Sidecars) -> Self {
         let native = NativeResolver::new(sidecars.home().join("resolver"));
         Self {
             proxy: || featherplay_proxy::for_url(featherplay_proxy::YOUTUBE),
-            ..Self::with_native(sidecars, cookie_header, native)
+            ..Self::with_native(sidecars, native)
         }
     }
 
-    fn with_native(
-        sidecars: Sidecars,
-        cookie_header: Option<String>,
-        native: Option<NativeResolver>,
-    ) -> Self {
-        if cookie_header.is_some() {
-            CookieFile::sweep(&sidecars.home().join("tmp"));
-        }
+    fn with_native(sidecars: Sidecars, native: Option<NativeResolver>) -> Self {
         Self {
             sidecars,
-            cookie_header,
             chain: Chain::default(),
             native,
             waiting: Mutex::default(),
@@ -257,12 +247,9 @@ impl YtDlpResolver {
     }
 
     /// For the app's start: has the native step ready for the first song (a first run
-    /// fetches and preprocesses its player now, `NativeResolver::prepare`). Nothing to do
-    /// with cookies, which the native step doesn't take.
+    /// fetches and preprocesses its player now, `NativeResolver::prepare`).
     pub async fn prepare(&self) {
-        if self.cookie_header.is_none()
-            && let Some(native) = &self.native
-        {
+        if let Some(native) = &self.native {
             native.prepare().await;
         }
     }
@@ -385,22 +372,19 @@ impl YtDlpResolver {
             Probe::Default => None,
             Probe::Args(a) => Some(a),
         };
-        self.run(id, None, args, quality)
-            .await
-            .map_err(|e| e.to_string())
+        self.run(id, args, quality).await.map_err(|e| e.to_string())
     }
 
     async fn run(
         &self,
         id: &TrackId,
-        cookies: Option<&CookieFile>,
         extractor_args: Option<&str>,
         quality: Quality,
     ) -> Result<ResolvedStream, ResolveError> {
         if !self.sidecars.ytdlp().is_file() || !self.sidecars.deno().is_file() {
             return Err(ResolveError::ToolMissing);
         }
-        let cmd = self.command(id, cookies, extractor_args, quality);
+        let cmd = self.command(id, extractor_args, quality);
         let out = match tokio::time::timeout(RESOLVE_TIMEOUT, crate::sidecars::output(cmd)).await {
             Ok(Ok(out)) => out,
             Ok(Err(e)) if e.kind() == std::io::ErrorKind::NotFound => {
@@ -434,7 +418,6 @@ impl YtDlpResolver {
     fn command(
         &self,
         id: &TrackId,
-        cookies: Option<&CookieFile>,
         extractor_args: Option<&str>,
         quality: Quality,
     ) -> tokio::process::Command {
@@ -445,9 +428,6 @@ impl YtDlpResolver {
             .arg(self.sidecars.home().join("yt-dlp-cache"))
             .arg("--js-runtimes")
             .arg(format!("deno:{}", self.sidecars.deno().display()));
-        if let Some(c) = cookies {
-            cmd.arg("--cookies").arg(&c.path);
-        }
         if let Some(a) = extractor_args {
             cmd.arg("--extractor-args").arg(a);
         }
@@ -484,23 +464,9 @@ impl YtDlpResolver {
                 id.0
             )));
         }
-        let quality = self.quality();
-        // Lives for every step; dropping it deletes the file, on every return path.
-        let cookies = match &self.cookie_header {
-            Some(header) => Some(
-                CookieFile::write(&self.sidecars.home().join("tmp"), header).map_err(|e| {
-                    ResolveError::ToolFailed {
-                        code: -1,
-                        stderr_tail: format!("writing the cookie file: {e}"),
-                    }
-                })?,
-            ),
-            None => None,
-        };
         let steps = Live {
             r: self,
-            cookies: cookies.as_ref(),
-            quality,
+            quality: self.quality(),
             aside: matches!(ahead, Some((_, Ahead::Maybe))),
         };
         match ahead {
@@ -546,7 +512,6 @@ impl Drop for Waiting<'_> {
 /// The steps as `resolve` runs them, for `Chain::resolve`.
 struct Live<'a> {
     r: &'a YtDlpResolver,
-    cookies: Option<&'a CookieFile>,
     /// Read once when the resolve starts.
     quality: Quality,
     /// A song prepared in case it's clicked (`Ahead::Maybe`): its native failure doesn't
@@ -556,9 +521,6 @@ struct Live<'a> {
 
 impl Steps for Live<'_> {
     async fn native(&self, id: &TrackId) -> Option<Result<ResolvedStream, NativeError>> {
-        if self.cookies.is_some() {
-            return None;
-        }
         let native = self.r.native.as_ref()?;
         Some(if self.aside {
             native.resolve_aside(&id.0, self.quality).await
@@ -568,9 +530,6 @@ impl Steps for Live<'_> {
     }
 
     async fn native_fresh(&self, id: &TrackId) -> Option<Result<ResolvedStream, NativeError>> {
-        if self.cookies.is_some() {
-            return None;
-        }
         Some(
             self.r
                 .native
@@ -593,14 +552,12 @@ impl Steps for Live<'_> {
 
     async fn embedded(&self, id: &TrackId) -> Result<ResolvedStream, ResolveError> {
         self.r.helpers(id).await?;
-        self.r
-            .run(id, self.cookies, Some(EMBEDDED_ARGS), self.quality)
-            .await
+        self.r.run(id, Some(EMBEDDED_ARGS), self.quality).await
     }
 
     async fn default_clients(&self, id: &TrackId) -> Result<ResolvedStream, ResolveError> {
         self.r.helpers(id).await?;
-        self.r.run(id, self.cookies, None, self.quality).await
+        self.r.run(id, None, self.quality).await
     }
 
     async fn update(&self) -> bool {
@@ -674,76 +631,6 @@ pub enum Probe<'a> {
     Default,
     /// yt-dlp with these `--extractor-args`, such as `youtube:player_client=tv`.
     Args(&'a str),
-}
-
-/// A Netscape cookie file for yt-dlp's `--cookies`: plaintext, so it lives only for one
-/// resolve and is deleted on drop. The app never passes cookies to yt-dlp.
-struct CookieFile {
-    path: PathBuf,
-}
-
-impl CookieFile {
-    fn write(dir: &Path, header: &str) -> std::io::Result<Self> {
-        static SEQ: AtomicU64 = AtomicU64::new(0);
-        std::fs::create_dir_all(dir)?;
-        let n = SEQ.fetch_add(1, Ordering::Relaxed);
-        let nanos = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_nanos();
-        // The guard exists before the write, so a partial file is removed too.
-        let file = Self {
-            path: dir.join(format!("cookies-{}-{nanos}-{n}.txt", std::process::id())),
-        };
-        std::fs::write(&file.path, netscape_cookies(header))?;
-        Ok(file)
-    }
-}
-
-impl CookieFile {
-    /// Deletes cookie files that other (killed) processes left in `dir`.
-    fn sweep(dir: &Path) {
-        let ours = format!("cookies-{}-", std::process::id());
-        let Ok(entries) = std::fs::read_dir(dir) else {
-            return;
-        };
-        for entry in entries.flatten() {
-            let name = entry.file_name();
-            let Some(name) = name.to_str() else { continue };
-            if name.starts_with("cookies-") && name.ends_with(".txt") && !name.starts_with(&ours) {
-                let _ = std::fs::remove_file(entry.path());
-            }
-        }
-    }
-}
-
-impl Drop for CookieFile {
-    fn drop(&mut self) {
-        let _ = std::fs::remove_file(&self.path);
-    }
-}
-
-/// `name=value; name2=value2` as `.youtube.com` cookies, valid for a year.
-fn netscape_cookies(header: &str) -> String {
-    let expiry = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs()
-        + 365 * 24 * 3600;
-    let mut out = String::from("# Netscape HTTP Cookie File\n");
-    for pair in header.split(';') {
-        let Some((name, value)) = pair.trim().split_once('=') else {
-            continue;
-        };
-        let clean = |s: &str| s.trim().replace(['\t', '\r', '\n'], "");
-        let (name, value) = (clean(name), clean(value));
-        if !name.is_empty() {
-            out.push_str(&format!(
-                ".youtube.com\tTRUE\t/\tTRUE\t{expiry}\t{name}\t{value}\n"
-            ));
-        }
-    }
-    out
 }
 
 #[cfg(test)]

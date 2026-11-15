@@ -415,7 +415,7 @@ fn timing_engine() {
     let sidecars = env("FEATHERPLAY_SIDECARS_DIR")
         .map(Into::into)
         .unwrap_or_else(|| home.join("sidecars"));
-    let resolver = YtDlpResolver::new(Sidecars { dir: sidecars }, None);
+    let resolver = YtDlpResolver::new(Sidecars { dir: sidecars });
     let rt = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(2)
         .enable_all()
@@ -607,7 +607,7 @@ fn timing_click() {
     let sidecars = Sidecars {
         dir: home.join("sidecars"),
     };
-    let resolver = YtDlpResolver::new(sidecars, None);
+    let resolver = YtDlpResolver::new(sidecars);
     let rt = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(2)
         .enable_all()

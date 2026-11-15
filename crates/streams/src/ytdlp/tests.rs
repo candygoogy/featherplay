@@ -1,3 +1,5 @@
+use std::path::{Path, PathBuf};
+
 use super::*;
 use crate::native::test_server;
 use crate::sidecars::{DENO_EXE, YTDLP_EXE};
@@ -20,7 +22,7 @@ fn test_home(name: &str) -> PathBuf {
 async fn the_daily_update_runs_when_the_last_one_is_a_day_old() {
     let home = test_home("update-daily");
     let dir = home.join("sidecars");
-    let r = YtDlpResolver::with_native(Sidecars { dir: dir.clone() }, None, None);
+    let r = YtDlpResolver::with_native(Sidecars { dir: dir.clone() }, None);
     assert!(!r.update_daily().await, "no helpers, nothing to update");
 
     // Not programs: an update fails at once, which still counts as one that ran.
@@ -57,7 +59,7 @@ async fn the_helpers_are_forced_up_to_date_once_a_session() {
     std::fs::write(dir.join(YTDLP_EXE), b"not a program").unwrap();
     let stamp = dir.join("yt-dlp.updated");
     std::fs::write(&stamp, b"").unwrap();
-    let r = YtDlpResolver::with_native(Sidecars { dir: dir.clone() }, None, None);
+    let r = YtDlpResolver::with_native(Sidecars { dir: dir.clone() }, None);
 
     assert!(!r.helpers_tried());
     assert!(
@@ -87,11 +89,9 @@ fn a_run_keeps_yt_dlps_warnings_for_the_failure_log() {
             dir: PathBuf::from("sidecars"),
         },
         None,
-        None,
     );
     let cmd = r.command(
         &TrackId("kXbeLiZY6jc".into()),
-        None,
         Some(EMBEDDED_ARGS),
         Quality::Standard,
     );
@@ -148,7 +148,6 @@ async fn a_failed_native_resolve_falls_back_to_yt_dlp() {
         Sidecars {
             dir: home.join("sidecars"),
         },
-        None,
         native,
     );
     let err = r.resolve(&TrackId("h46YpWrg55Q".into())).await.unwrap_err();
@@ -237,7 +236,7 @@ mod first_run {
 
     fn resolver(home: &Path, downloads: Downloads) -> YtDlpResolver {
         let dir = home.join("sidecars");
-        YtDlpResolver::with_native(Sidecars { dir }, None, None).with_downloads(downloads)
+        YtDlpResolver::with_native(Sidecars { dir }, None).with_downloads(downloads)
     }
 
     /// Past the helpers: the stand-ins aren't programs, so yt-dlp fails to start.
@@ -256,7 +255,7 @@ mod first_run {
         let native = NativeResolver::with_dirs(home.join("resolver"), &base);
         let told = std::sync::Arc::new(Mutex::new(Vec::new()));
         let waits = told.clone();
-        let r = YtDlpResolver::with_native(Sidecars { dir: dir.clone() }, None, native)
+        let r = YtDlpResolver::with_native(Sidecars { dir: dir.clone() }, native)
             .with_downloads(downloads)
             .on_helpers_wait(move |id| waits.lock().unwrap().push(id.clone()));
         let id = TrackId("h46YpWrg55Q".into());
@@ -490,14 +489,13 @@ fn a_proxy_is_handed_to_yt_dlp() {
             dir: PathBuf::from("sidecars"),
         },
         None,
-        None,
     );
     let id = TrackId("kXbeLiZY6jc".into());
-    let args = command_args(&r.command(&id, None, None, Quality::High));
+    let args = command_args(&r.command(&id, None, Quality::High));
     assert!(!args.iter().any(|a| a == "--proxy"), "{args:?}");
 
     r.proxy = || Proxy::parse("http://proxy.corp:3128");
-    let args = command_args(&r.command(&id, None, None, Quality::High));
+    let args = command_args(&r.command(&id, None, Quality::High));
     assert!(
         args.windows(2)
             .any(|w| w == ["--proxy", "http://proxy.corp:3128/"]),
@@ -513,11 +511,10 @@ fn the_quality_setting_picks_the_format_yt_dlp_is_asked_for() {
             dir: PathBuf::from("sidecars"),
         },
         None,
-        None,
     );
     let id = TrackId("kXbeLiZY6jc".into());
     let format = |r: &YtDlpResolver| {
-        let args = command_args(&r.command(&id, None, None, r.quality()));
+        let args = command_args(&r.command(&id, None, r.quality()));
         let i = args.iter().position(|a| a == "-f").expect("-f");
         args[i + 1].clone()
     };

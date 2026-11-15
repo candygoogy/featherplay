@@ -34,7 +34,7 @@ async fn resolve_steps_time_each_step_and_its_first_chunk() {
         .await
         .expect("download the sidecars");
     let http = reqwest::Client::new();
-    let r = YtDlpResolver::new(sidecars(), None);
+    let r = YtDlpResolver::new(sidecars());
     let mode = std::env::var("RESOLVE_STEPS").unwrap_or_default();
     let steps: Vec<(&str, &str, Probe<'_>)> = if mode == "chain" || mode == "gate" {
         Vec::new()

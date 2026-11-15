@@ -98,7 +98,7 @@ impl Controller {
         let (tx, rx) = mpsc::unbounded_channel();
         let (waits, gates) = (tx.clone(), tx.clone());
         let resolver = Arc::new(
-            YtDlpResolver::new(Sidecars { dir: sidecars }, None)
+            YtDlpResolver::new(Sidecars { dir: sidecars })
                 .with_downloads(Downloads::pinned())
                 .with_preprocessor(preprocessor())
                 .on_helpers_wait(move |id| {

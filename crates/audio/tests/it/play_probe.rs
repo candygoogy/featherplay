@@ -118,7 +118,7 @@ async fn play_probe_sweeps_every_step() {
                 tokio::time::sleep(PAUSE).await;
             }
             // A fresh resolver each time: no step inherits another's health or state.
-            let resolver = YtDlpResolver::new(sidecars(), None);
+            let resolver = YtDlpResolver::new(sidecars());
             let row = probe_one(&resolver, &http, song, name, *step).await;
             println!(
                 "PROBE {} | {} | {} | resolve {} ms | total {} ms | {}",

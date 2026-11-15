@@ -1,10 +1,6 @@
-use std::path::PathBuf;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use featherplay_core::model::TrackId;
-use featherplay_streams::{
-    ResolveError, Sidecars, StreamResolver, YtDlpResolver, classify_failure, parse_ytdlp_json,
-};
+use featherplay_streams::{ResolveError, classify_failure, parse_ytdlp_json};
 
 const FIXTURE_140: &str = include_str!("../fixtures/ytdlp_140.json");
 const UNAVAILABLE_STDERR: &str = include_str!("../fixtures/unavailable.stderr.txt");
@@ -84,57 +80,4 @@ fn parse_reports_webm_for_format_251() {
     )
     .unwrap();
     assert_eq!(s.mime, "audio/webm");
-}
-
-/// A fresh dir under `FEATHERPLAY_HOME`, else the temp folder, laid out like the app's:
-/// `{home}/sidecars`, `{home}/tmp`.
-fn test_home(name: &str) -> PathBuf {
-    let base = std::env::var("FEATHERPLAY_HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| std::env::temp_dir().join("featherplay-tests"));
-    let home = base
-        .join("test-streams")
-        .join(format!("{name}-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&home);
-    std::fs::create_dir_all(home.join("sidecars")).unwrap();
-    home
-}
-
-#[tokio::test]
-async fn cookie_tempfile_removed_after_error() {
-    let home = test_home("cookie");
-    // No yt-dlp.exe in this sidecar dir, so the spawn fails after the cookie file is written.
-    let r = YtDlpResolver::new(
-        Sidecars {
-            dir: home.join("sidecars"),
-        },
-        Some("SID=abc; HSID=def".into()),
-    );
-    let err = r.resolve(&TrackId("Jb6gcoR266U".into())).await.unwrap_err();
-    assert!(matches!(err, ResolveError::ToolMissing), "got {err:?}");
-    let tmp = home.join("tmp");
-    assert!(tmp.is_dir(), "the cookie file was written to {{home}}/tmp");
-    let left: Vec<_> = std::fs::read_dir(&tmp).unwrap().collect();
-    assert!(left.is_empty(), "cookie temp file left behind: {left:?}");
-    std::fs::remove_dir_all(&home).unwrap();
-}
-
-#[test]
-fn a_cookie_file_left_by_a_killed_process_is_swept() {
-    let home = test_home("cookie-sweep");
-    let tmp = home.join("tmp");
-    std::fs::create_dir_all(&tmp).unwrap();
-    let stale = tmp.join("cookies-1-123-0.txt");
-    std::fs::write(&stale, "SID\tabc").unwrap();
-    let audio = tmp.join("featherplay-audio-x");
-    std::fs::write(&audio, "").unwrap();
-    let _r = YtDlpResolver::new(
-        Sidecars {
-            dir: home.join("sidecars"),
-        },
-        Some("SID=abc".into()),
-    );
-    assert!(!stale.exists(), "the stale cookie file is still there");
-    assert!(audio.exists(), "only cookie files are swept");
-    std::fs::remove_dir_all(&home).unwrap();
 }

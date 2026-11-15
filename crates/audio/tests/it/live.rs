@@ -44,12 +44,9 @@ fn drain(rx: &Receiver<AudioEvent>, t0: Instant) {
 fn live_stream_starts_fast_and_seeks_cold() {
     let home = PathBuf::from(std::env::var("FEATHERPLAY_HOME").expect("set FEATHERPLAY_HOME"));
     let tmp = home.join("tmp");
-    let resolver = YtDlpResolver::new(
-        Sidecars {
-            dir: home.join("sidecars"),
-        },
-        None,
-    );
+    let resolver = YtDlpResolver::new(Sidecars {
+        dir: home.join("sidecars"),
+    });
     let t = Instant::now();
     let s = tokio::runtime::Runtime::new()
         .unwrap()
