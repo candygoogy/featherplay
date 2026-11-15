@@ -185,40 +185,43 @@ fn a_blocked_browser_in_the_list_says_so_with_why_and_cant_be_picked() {
 }
 
 #[test]
-fn with_every_browser_blocked_the_row_says_so_as_with_one() {
-    let scene = sign_in_page_with(&[("edge", true), ("chrome", true)], "chrome");
-    assert!(!enabled(&scene, "Use Google Chrome"));
-    assert_eq!(
-        line(&scene, "Use Google Chrome"),
-        "Not available on this PC"
-    );
-    assert!(!shown(&scene, "Change"));
-    press(&scene, "Why?");
-    assert!(
-        find(&scene, |l| l.starts_with("Chrome on this PC")).is_some(),
-        "Why? didn't name Chrome's policy"
-    );
-}
-
-#[test]
-fn edge_blocked_says_so_in_its_row_and_why_opens_the_detail() {
-    let scene = sign_in_page(true);
-    assert!(!enabled(&scene, "Use Microsoft Edge"));
-    assert_eq!(
-        line(&scene, "Use Microsoft Edge"),
-        "Not available on this PC"
-    );
-    let policy = |l: &str| l.contains("RemoteDebuggingAllowed");
-    assert!(
-        find(&scene, policy).is_none(),
-        "the policy shows before Why?"
-    );
-
-    press(&scene, "Why?");
-    assert!(
-        find(&scene, policy).is_some(),
-        "Why? didn't open the detail"
-    );
+fn a_blocked_browser_says_so_in_its_row_and_why_opens_the_detail() {
+    let scene = sign_in_page(false);
+    let data = scene.ui.global::<SignInData>();
+    // (case, the browsers found, the one offered, its row, the detail's policy)
+    let cases: [(&str, &[(&str, bool)], &str, &str, fn(&str) -> bool); 2] = [
+        (
+            "Edge alone, blocked",
+            &[("edge", true)],
+            "edge",
+            "Use Microsoft Edge",
+            |l| l.contains("RemoteDebuggingAllowed"),
+        ),
+        (
+            "every browser blocked, as with one",
+            &[("edge", true), ("chrome", true)],
+            "chrome",
+            "Use Google Chrome",
+            |l| l.starts_with("Chrome on this PC"),
+        ),
+    ];
+    for (case, installed, offered, row, policy) in cases {
+        data.set_why_open(false);
+        featherplay::pages::sign_in::offer_for_snapshot(&scene.ctx, installed, offered);
+        scene.settle();
+        assert!(!enabled(&scene, row), "{case}: {row:?} is on");
+        assert_eq!(line(&scene, row), "Not available on this PC", "{case}");
+        assert!(!shown(&scene, "Change"), "{case}: nothing to choose from");
+        assert!(
+            find(&scene, policy).is_none(),
+            "{case}: the policy shows before Why?"
+        );
+        press(&scene, "Why?");
+        assert!(
+            find(&scene, policy).is_some(),
+            "{case}: Why? didn't open the detail"
+        );
+    }
 }
 
 /// The page as Linux shows it, on any OS: no sign-in window, so its row is gone and the
@@ -260,14 +263,6 @@ fn click(scene: &Scene, label: &str) {
         button: PointerEventButton::Left,
     });
     scene.settle();
-}
-
-#[test]
-fn a_click_on_the_cookie_row_opens_the_paste_field() {
-    let scene = sign_in_page(false);
-    assert!(!shown(&scene, "Cookie header"));
-    click(&scene, "Paste a cookie header");
-    assert!(shown(&scene, "Cookie header"), "no paste field");
 }
 
 /// Where the top of what says `label` is in the window.
@@ -317,45 +312,13 @@ fn why_eases_open_and_shut_and_the_rows_below_follow() {
     assert!(find(&scene, policy).is_none(), "the detail stayed");
 }
 
-#[test]
-#[cfg_attr(not(windows), ignore = "the sign-in window is Windows only")]
-fn a_sign_in_window_with_no_handle_says_so_plainly_with_try_again() {
-    let scene = sign_in_page(false);
-    let data = scene.ui.global::<SignInData>();
-    press(&scene, "Sign in with Google");
-    assert!(data.get_busy(), "the sign-in didn't start");
-
-    // The offscreen platform never makes the window: the page waits for its handle, then
-    // gives up.
-    let end = Instant::now() + Duration::from_secs(5);
-    while data.get_busy() && Instant::now() < end {
-        slint::platform::update_timers_and_animations();
-        std::thread::sleep(Duration::from_millis(10));
-    }
-    scene.settle();
-    assert!(!data.get_busy(), "still waiting after 5 s");
-    assert!(shown(&scene, "The sign-in window didn't open"));
-    assert!(shown(&scene, "Try again, or use another way below."));
-    assert!(
-        find(&scene, |l| l.contains("handle")).is_none(),
-        "the log's detail is on the page"
-    );
-    assert!(enabled(&scene, "Sign in with Google"));
-
-    // Try again takes the same way.
-    let tried = Rc::new(Cell::new(false));
-    let t = tried.clone();
-    data.on_open_window(move || t.set(true));
-    press(&scene, "Try again");
-    assert!(tried.get(), "Try again didn't open the window");
-}
-
-/// The log says how much memory the app holds as the sign-in window opens, and again a
+/// A sign-in window that never gets its handle ends the sign-in in plain words, with Try
+/// again. The log says how much memory the app holds as the window opens, and again a
 /// minute after it closed: what a hand test reads to see that the window gave its memory
 /// back.
 #[test]
 #[cfg_attr(not(windows), ignore = "the sign-in window is Windows only")]
-fn the_log_says_what_the_app_holds_a_minute_after_the_sign_in_window_closed() {
+fn a_sign_in_window_with_no_handle_says_so_plainly_with_try_again_and_the_log_follows_it() {
     let dir = std::path::Path::new(env!("CARGO_TARGET_TMPDIR"))
         .join(format!("sign-in-memory-log-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
@@ -367,20 +330,31 @@ fn the_log_says_what_the_app_holds_a_minute_after_the_sign_in_window_closed() {
     let scene = sign_in_page(false);
     let data = scene.ui.global::<SignInData>();
     press(&scene, "Sign in with Google");
+    assert!(data.get_busy(), "the sign-in didn't start");
     assert!(
         log().contains("sign-in window opening: private "),
         "no memory line as the window opened"
     );
 
-    // The offscreen platform never makes the window: its frame closes once the wait is over.
+    // The offscreen platform never makes the window: the page waits for its handle, then
+    // gives up, and its frame closes.
     let end = Instant::now() + Duration::from_secs(5);
     while data.get_busy() && Instant::now() < end {
         slint::platform::update_timers_and_animations();
         std::thread::sleep(Duration::from_millis(10));
     }
-    assert!(!data.get_busy(), "still waiting after 5 s");
     let after = "sign-in window closed a minute ago: private ";
     offscreen::freeze_clock();
+    scene.settle();
+    assert!(!data.get_busy(), "still waiting after 5 s");
+    assert!(shown(&scene, "The sign-in window didn't open"));
+    assert!(shown(&scene, "Try again, or use another way below."));
+    assert!(
+        find(&scene, |l| l.contains("handle")).is_none(),
+        "the log's detail is on the page"
+    );
+    assert!(enabled(&scene, "Sign in with Google"));
+
     offscreen::advance(Duration::from_secs(59));
     assert!(!log().contains(after), "the memory line came early");
     offscreen::advance(Duration::from_secs(1));
@@ -388,13 +362,22 @@ fn the_log_says_what_the_app_holds_a_minute_after_the_sign_in_window_closed() {
         log().contains(after),
         "no memory line a minute after it closed"
     );
+
+    // Try again takes the same way.
+    let tried = Rc::new(Cell::new(false));
+    let t = tried.clone();
+    data.on_open_window(move || t.set(true));
+    press(&scene, "Try again");
+    assert!(tried.get(), "Try again didn't open the window");
     let _ = std::fs::remove_dir_all(&dir);
 }
 
 #[test]
-fn a_paste_that_cant_be_used_says_why_under_the_field() {
+fn a_click_on_the_cookie_row_opens_the_field_and_a_paste_that_cant_be_used_says_why() {
     let scene = sign_in_page(false);
+    assert!(!shown(&scene, "Cookie header"));
     click(&scene, "Paste a cookie header");
+    assert!(shown(&scene, "Cookie header"), "no paste field");
     let why = |l: &str| l.contains("name=value");
     assert!(find(&scene, why).is_none(), "a reason before any paste");
     scene
