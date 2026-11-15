@@ -1,10 +1,11 @@
 //! The Up next panel in a narrow window, on the offscreen platform (no window is shown).
 //!
-//! At the window's least width (960 logical px: 1440 px at 150 %, beside the rail) the page
-//! makes room for the panel: it ends at the panel's left edge, and Home's band ends at the
-//! page's padding left of it rather than running on under the panel. Where making room beside
-//! the full sidebar would leave the page narrower than `Theme.page-min-w` (1100 px), the
-//! sidebar folds to the rail while the panel is open; nothing floats over a darkened page.
+//! At 960 logical px (1440 px at 150 %, beside the rail), near the narrowest window that keeps
+//! the panel beside the page (under 952 px it's a sheet), the page makes room for the panel:
+//! it ends at the panel's left edge, and Home's band ends at the page's padding left of it
+//! rather than running on under the panel. Where making room beside the full sidebar would
+//! leave the page narrower than `Theme.page-min-w` (540 px), the sidebar folds to the rail
+//! while the panel is open; nothing floats over a darkened page.
 
 use crate::support::{frames, home_at};
 use featherplay::offscreen;

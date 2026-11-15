@@ -804,7 +804,7 @@ export component BottomBar inherits Rectangle {
     // the rest.
     property <bool> squeezed: self.width - root.end-gap - root.core-w - 36px < root.fit-x;
     // The middle column (the transport, the time and the line), and what's left either side
-    // for the title: it stays clear of the buttons on the right at the narrowest window.
+    // for the title: it stays clear of the buttons on the right at 960 px, every group in.
     // The speed pill, while it shows, sits just left of the right-hand group, which then
     // takes its room too.
     property <length> right-w: actions.preferred-width + (root.show-speed ? root.pill-w : 0px);
@@ -812,7 +812,7 @@ export component BottomBar inherits Rectangle {
     property <length> anchor: root.show-speed ? speed-pill.x : actions.x;
     // The time row is 320 px at least, and the title 80 px from x 84, 16 px before it. Only
     // when the right-hand group leaves less (Linux without a tray, with the speed pill and the
-    // sleep timer at the narrowest window, or a narrower bar) does the time row give up to
+    // sleep timer at 960 px, or a narrower bar) does the time row give up to
     // 40 px. Centred, it keeps the title's 180 px on the left as well as the group's room on
     // the right.
     // Narrow (`squeezed`), the middle column keeps to its least (the whole transport while it
@@ -832,7 +832,7 @@ export component BottomBar inherits Rectangle {
     // Where the sleep timer's popup centres (in the bar).
     out property <length> sleep-centre: actions.x + (SettingsData.has-tray ? 0px : 40px) + root.sleep-w / 2;
     // The middle column's left edge: centred on the bar, unless that would run it into the
-    // right-hand group (the narrowest windows with the speed pill, or Linux's mini player
+    // right-hand group (a bar near 960 px with the speed pill, or Linux's mini player
     // button, or a bar that gave groups up), then shifted left to stay 12 px clear of it; and
     // no further left than the title's 80 px, 16 px before it, while there's room for that.
     // Narrow, it sits 12 px from the right-hand group, and the title takes the rest; without

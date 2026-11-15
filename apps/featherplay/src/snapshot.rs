@@ -86,7 +86,7 @@ const SETTLE: Duration = Duration::from_secs(60);
 const POSITION: Duration = Duration::from_secs(161);
 
 /// Titles and artists in styled maths letters, shown as plain letters (`text::plain`):
-/// `home-styled` plays them, the rest in the resume card's queue.
+/// `home-styled` plays them, the rest in the band's queue.
 const STYLED_TITLES: &[(&str, &str)] = &[
     ("𝙡𝙪𝙪 - 𝙚𝙭 𝙛𝙧𝙚𝙪𝙣𝙙𝙞𝙣 ( 𝙎𝙡𝙤𝙬𝙚𝙙 )", "𝓑𝓵𝓸𝓸𝓭𝓶𝓸𝓸𝓷"),
     ("𝔅𝔩𝔬𝔬𝔡𝔪𝔬𝔬𝔫", "ℌ𝔞𝔩𝔣𝔪𝔬𝔬𝔫"),

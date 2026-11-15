@@ -90,7 +90,8 @@ pub const PAGES: &[&str] = &[
     "now-playing-lyrics-full-menu",
     "now-playing-lyrics-full-menu-moved",
     "now-playing-lyrics-full-choose",
-    // The side tab and the full view at Large (for the narrowest window, 960 px).
+    // The side tab and the full view at Large (for a narrow `--size`: 960 px wide for the side
+    // tab beside the stage, 480 for the full view stacked under the song).
     "now-playing-lyrics-large",
     "now-playing-lyrics-full-large",
     "settings",
@@ -129,8 +130,8 @@ pub const PAGES: &[&str] = &[
     "speed-popup",
     // The sleep timer turned on: Home with its popup open; Now playing with it running (24 min
     // left) and the popup open; Home running with 135 min left, beside the speed pill at
-    // 1.25x too (at `--size 960x800` the bar's narrowest cases); Home fading out. Settings
-    // with its switch on, and found by searching "sleep timer".
+    // 1.25x too (at `--size 960x800`, the narrowest bar that keeps every group); Home fading
+    // out. Settings with its switch on, and found by searching "sleep timer".
     "sleep-popup",
     "sleep-running",
     "sleep-long",

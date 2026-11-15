@@ -302,9 +302,10 @@ export global Theme {
     // its lengths further from their titles.
     out property <length> sheet-max-w: 640px;
     // The narrowest a page is laid out beside the Up next panel; narrower beside the full
-    // sidebar, the sidebar folds to the rail (`app.slint`: `fold`). Home sets it: two shortcut
-    // tiles at their 220 px least, and the hero's Resume and Go to album beside its cover, each
-    // need about 530 px with the page's padding. Every other page fits there too.
+    // sidebar, the sidebar folds to the rail (`app.slint`: `fold`). Home set it in 0.4.0 (two
+    // shortcut tiles at their 220 px least, and the hero's Resume and Go to album beside its
+    // cover, each about 530 px with the page's padding); its band and rails, and every other
+    // page, fit there too.
     out property <length> page-min-w: 540px;
     out property <length> nowplaying-cover: 440px;  // the largest now-playing cover beside its panel
     out property <length> nowplaying-cover-wide: 560px;  // the largest with the panel hidden

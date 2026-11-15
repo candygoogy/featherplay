@@ -1,9 +1,9 @@
 //! The bar's mini player button, on the offscreen platform (no window is shown): it's there
 //! only while the desktop has no tray (`SettingsData.has-tray`: always on Windows, on Linux
 //! while a StatusNotifierWatcher shows the icon), and a click on it opens the mini player,
-//! another closes it, as a click on the tray icon does; Ctrl+M too. And at the narrowest
-//! window, the bar's right-hand side with everything in it (the sleep timer too) still
-//! clears the transport.
+//! another closes it, as a click on the tray icon does; Ctrl+M too. And at 960 px, the
+//! narrowest bar that keeps every group, the bar's right-hand side with everything in it (the
+//! sleep timer too) still clears the transport.
 
 use std::ops::ControlFlow;
 use std::time::Duration;
@@ -106,8 +106,8 @@ fn the_mini_player_button_shows_only_without_a_tray_and_toggles_it() {
     assert!(!mini::is_open(), "Ctrl+M didn't close it");
 }
 
-/// At the narrowest window (960 px), the mini player button's extra room mustn't run the
-/// right-hand group into the transport: Repeat and the button stay apart.
+/// At 960 px, the narrowest bar that keeps every group, the mini player button's extra room
+/// mustn't run the right-hand group into the transport: Repeat and the button stay apart.
 #[test]
 fn at_the_narrowest_window_the_mini_player_button_clears_the_transport() {
     const NARROW: u32 = 960;
@@ -175,7 +175,7 @@ fn span(scene: &Scene, label: &str) -> Option<(f32, f32)> {
     lowest.map(|(left, right, _)| (left, right))
 }
 
-/// The bar at the narrowest window with the sleep timer on and running for `minutes`, the
+/// The bar at 960 px (the narrowest that keeps every group) with the sleep timer on and running for `minutes`, the
 /// speed at 1.25x if `speed`, the tray there or not: (Repeat's right edge, where the
 /// right-hand side starts (the speed pill, else the group's first button), the title's right
 /// edge, the time row's left edge).
@@ -234,7 +234,7 @@ fn at_the_narrowest_window_everything_in_the_bar_still_fits() {
     );
 }
 
-/// On Windows at the narrowest window, a three-digit time left still shows on the pill (the
+/// On Windows at 960 px, a three-digit time left still shows on the pill (the
 /// shorter form), and the bar keeps its spacing.
 #[test]
 fn at_the_narrowest_window_a_three_digit_sleep_timer_shows_its_minutes() {
