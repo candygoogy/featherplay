@@ -3,20 +3,21 @@
 //! as it is, with a note under the pill saying where featherplay looked. The side panel's
 //! Lyrics tab stays and shows an empty state; after a failed lookup it, and the pill, offer to
 //! ask again. A song with lyrics still opens the view, and the view stays open through a new
-//! song's lookup. On the offscreen platform with the fixtures and art on every cover; no
-//! window is shown.
+//! song's lookup. On the offscreen platform with the fixtures and art on every cover, on a
+//! frozen clock; no window is shown.
 
 use std::cell::Cell;
 use std::rc::Rc;
 
 use featherplay::lyrics::{self, SnapshotLyrics};
+use featherplay::offscreen;
 use featherplay::snapshot::Scene;
 use featherplay::ui::{LyricsData, LyricsState, Nav, NowPlayingData, PageKind, Theme};
 use featherplay_controller::fixtures::Fixtures;
 use image::RgbaImage;
 use slint::ComponentHandle;
 
-use crate::support::{self, far, frame, label};
+use crate::support::{self, far, frame, label, settle_in_frames};
 
 const W: u32 = 1280;
 const H: u32 = 800;
@@ -66,16 +67,24 @@ fn scene() -> Scene {
     scene.open("now-playing").expect("now playing");
     scene.theme(true);
     scene.ui.show().expect("show");
-    scene.settle();
+    // The lookups start on a timer: the frames move the frozen clock on to it.
+    offscreen::freeze_clock();
+    settle_in_frames(&scene);
     scene
+}
+
+/// Presses what says `name`, then the frames until nothing loads.
+fn press(scene: &Scene, name: &str) {
+    label::act(scene, name);
+    settle_in_frames(scene);
 }
 
 /// The full view asked for, then the lookup ends with `kind`.
 fn lyrics_on(scene: &Scene, kind: SnapshotLyrics) {
     scene.ui.global::<LyricsData>().set_full(true);
-    scene.settle();
+    settle_in_frames(scene);
     lyrics::show_for_snapshot(&scene.ctx, kind);
-    scene.settle();
+    settle_in_frames(scene);
 }
 
 #[test]
@@ -105,7 +114,7 @@ fn no_lyrics_keep_the_cover_view_and_the_pill_says_so() {
 
     // A press on the pill changes nothing but the note.
     data.set_hint(false);
-    label::press(&scene, "No lyrics");
+    press(&scene, "No lyrics");
     assert!(!data.get_showing(), "a press opened the full view");
     assert!(data.get_full(), "a press turned lyrics off for the session");
     assert!(data.get_hint(), "a press didn't show the note");
@@ -120,10 +129,9 @@ fn no_lyrics_keep_the_cover_view_and_the_pill_says_so() {
     scene.open("home").expect("home");
     data.set_hint(false);
     data.invoke_toggle_view();
-    // Read before `settle`: the note shows for 4 s of real time, and on a loaded machine
-    // settling the page change can take longer than that.
+    // Read before the frames that settle the page change: the note shows for 4 s.
     let hint = data.get_hint();
-    scene.settle();
+    settle_in_frames(&scene);
     assert_eq!(scene.ui.global::<Nav>().get_page(), PageKind::NowPlaying);
     assert!(!data.get_showing(), "the microphone opened the full view");
     assert!(hint, "the microphone didn't show the note");
@@ -165,15 +173,15 @@ fn a_failed_lookup_offers_try_again_in_the_tab_and_the_pill() {
     let a = asked.clone();
     data.on_retry(move || a.set(a.get() + 1));
 
-    label::press(&scene, "Try again");
+    press(&scene, "Try again");
     assert_eq!(asked.get(), 1, "the tab's Try again didn't ask");
-    label::press(&scene, "Retry lyrics");
+    press(&scene, "Retry lyrics");
     assert_eq!(asked.get(), 2, "the pill didn't ask again");
 
     // LRCLIB down: the same offer, saying so.
     lyrics_on(&scene, SnapshotLyrics::Unavailable);
     assert_eq!(data.get_message(), "Lyrics are unavailable right now");
-    label::press(&scene, "Try again");
+    press(&scene, "Try again");
     assert_eq!(asked.get(), 3, "Try again didn't ask after an outage");
 }
 
@@ -186,27 +194,27 @@ fn a_song_with_lyrics_still_opens_the_view_and_keeps_it_through_a_lookup() {
     lyrics_on(&scene, SnapshotLyrics::None);
     assert!(!data.get_showing());
     lyrics::show_for_snapshot(&scene.ctx, SnapshotLyrics::Synced);
-    scene.settle();
+    settle_in_frames(&scene);
     assert!(data.get_showing(), "synced lyrics didn't open the view");
 
     // A new song's lookup keeps it open; one that finds nothing closes it, with no note: nobody
     // pressed anything.
     lyrics::show_for_snapshot(&scene.ctx, SnapshotLyrics::Loading);
-    scene.settle();
+    settle_in_frames(&scene);
     assert!(data.get_showing(), "the view closed during a lookup");
     lyrics::show_for_snapshot(&scene.ctx, SnapshotLyrics::None);
-    scene.settle();
+    settle_in_frames(&scene);
     assert!(!data.get_showing(), "the view stayed open on no lyrics");
     assert!(!data.get_hint(), "the note showed on its own");
 
     // The toggle still closes and opens it on a song with lyrics.
     lyrics::show_for_snapshot(&scene.ctx, SnapshotLyrics::Synced);
-    scene.settle();
+    settle_in_frames(&scene);
     data.invoke_toggle_view();
-    scene.settle();
+    settle_in_frames(&scene);
     assert!(!data.get_showing() && !data.get_full());
     data.invoke_toggle_view();
-    scene.settle();
+    settle_in_frames(&scene);
     assert!(data.get_showing());
 }
 
@@ -218,23 +226,23 @@ fn the_note_shows_for_a_press_and_never_on_its_own_for_a_later_song() {
     // Pressed while the song is still looked up: the pill waits, and the lookup that finds
     // nothing shows the note.
     lyrics::show_for_snapshot(&scene.ctx, SnapshotLyrics::Loading);
-    scene.settle();
-    label::press(&scene, "Lyrics");
+    settle_in_frames(&scene);
+    press(&scene, "Lyrics");
     assert!(
         label::find(&scene, "Finding lyrics…").is_some(),
         "the pill doesn't wait"
     );
     lyrics::show_for_snapshot(&scene.ctx, SnapshotLyrics::None);
-    scene.settle();
+    settle_in_frames(&scene);
     assert!(data.get_hint(), "the press got no answer");
 
     // The next songs with none say "No lyrics" on the pill, with no note until it's pressed.
     data.set_hint(false);
     for _ in 0..2 {
         lyrics::show_for_snapshot(&scene.ctx, SnapshotLyrics::Loading);
-        scene.settle();
+        settle_in_frames(&scene);
         lyrics::show_for_snapshot(&scene.ctx, SnapshotLyrics::None);
-        scene.settle();
+        settle_in_frames(&scene);
         assert!(
             !data.get_hint(),
             "the note showed on its own for a later song"
@@ -244,7 +252,7 @@ fn the_note_shows_for_a_press_and_never_on_its_own_for_a_later_song() {
             "the pill doesn't say so"
         );
     }
-    label::press(&scene, "No lyrics");
+    press(&scene, "No lyrics");
     assert!(data.get_hint(), "a press didn't show the note");
 
     // The microphone from another page, where Now playing then looks the song up again: the
@@ -252,11 +260,11 @@ fn the_note_shows_for_a_press_and_never_on_its_own_for_a_later_song() {
     scene.open("home").expect("home");
     data.set_hint(false);
     data.invoke_toggle_view();
-    scene.settle();
+    settle_in_frames(&scene);
     lyrics::show_for_snapshot(&scene.ctx, SnapshotLyrics::Loading);
-    scene.settle();
+    settle_in_frames(&scene);
     lyrics::show_for_snapshot(&scene.ctx, SnapshotLyrics::None);
-    scene.settle();
+    settle_in_frames(&scene);
     assert!(
         data.get_hint(),
         "a lookup after the press hid its note for good"
@@ -265,8 +273,8 @@ fn the_note_shows_for_a_press_and_never_on_its_own_for_a_later_song() {
     // Spent once answered: the next lookup that finds nothing shows no note.
     data.set_hint(false);
     lyrics::show_for_snapshot(&scene.ctx, SnapshotLyrics::Loading);
-    scene.settle();
+    settle_in_frames(&scene);
     lyrics::show_for_snapshot(&scene.ctx, SnapshotLyrics::None);
-    scene.settle();
+    settle_in_frames(&scene);
     assert!(!data.get_hint(), "the press was answered twice");
 }

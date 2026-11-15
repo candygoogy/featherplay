@@ -686,12 +686,16 @@ pub mod label {
         super::click(on, centre(on, label));
     }
 
-    /// Presses the first shown element labelled `label`, as a screen reader does, and lets
-    /// what it starts settle.
-    pub fn press(scene: &Scene, label: &str) {
-        find(scene, label)
+    /// Presses the first shown element labelled `label`, as a screen reader does.
+    pub fn act(on: &impl OnWindow, label: &str) {
+        find(on, label)
             .unwrap_or_else(|| panic!("nothing visible says {label:?}"))
             .accessible_action(&AccessibilityAction::Default);
+    }
+
+    /// `act`, then lets what it starts settle.
+    pub fn press(scene: &Scene, label: &str) {
+        act(scene, label);
         scene.settle();
     }
 }
