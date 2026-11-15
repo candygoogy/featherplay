@@ -135,46 +135,27 @@ mod tests {
         e(Kind::Playlist, id)
     }
 
-    fn ids(list: &[(Entry, bool)]) -> Vec<&str> {
-        list.iter().map(|(e, _)| e.id.as_str()).collect()
-    }
-
     #[test]
-    fn without_pins_or_plays_the_list_keeps_the_librarys_order() {
-        let shown = order(&[p("a"), p("b"), p("c")], &[], &[]);
-        assert_eq!(ids(&shown), ["a", "b", "c"]);
-        assert!(shown.iter().all(|(_, pinned)| !pinned));
-    }
-
-    #[test]
-    fn played_lately_comes_first_latest_on_top() {
-        let shown = order(&[p("a"), p("b"), p("c")], &[], &[p("c"), p("b")]);
-        assert_eq!(ids(&shown), ["c", "b", "a"]);
-    }
-
-    #[test]
-    fn pins_come_before_everything_and_are_marked() {
-        let pins = vec![key(Kind::Playlist, "b")];
-        let shown = order(&[p("a"), p("b"), p("c")], &pins, &[p("c")]);
-        assert_eq!(ids(&shown), ["b", "c", "a"]);
-        assert_eq!(
-            shown.iter().map(|(_, pinned)| *pinned).collect::<Vec<_>>(),
-            [true, false, false]
-        );
-    }
-
-    #[test]
-    fn pins_and_plays_of_entries_gone_from_the_library_dont_show() {
-        let pins = vec![key(Kind::Playlist, "gone")];
-        let shown = order(&[p("a")], &pins, &[p("also-gone")]);
-        assert_eq!(ids(&shown), ["a"]);
-    }
-
-    #[test]
-    fn a_pin_of_another_kind_doesnt_match() {
-        let pins = vec![key(Kind::Album, "b")];
-        let shown = order(&[p("a"), p("b")], &pins, &[]);
-        assert_eq!(ids(&shown), ["a", "b"]);
+    fn pins_then_plays_then_the_library_each_once() {
+        // Playlists by id, space-separated; a pinned entry shows as `*id`.
+        let playlists = |ids: &str| ids.split_whitespace().map(p).collect::<Vec<_>>();
+        // (case, library, pins, played lately, want)
+        let cases: [(&str, &str, &[&str], &str, &str); 5] = [
+            ("the library's order", "a b c", &[], "", "a b c"),
+            ("played lately first", "a b c", &[], "c b", "c b a"),
+            ("pins first", "a b c", &["playlist:b"], "c", "*b c a"),
+            ("gone", "a", &["playlist:gone"], "also-gone", "a"),
+            ("a pin of another kind", "a b", &["album:b"], "", "a b"),
+        ];
+        for (case, items, pins, recent, want) in cases {
+            let pins: Vec<String> = pins.iter().map(|k| k.to_string()).collect();
+            let shown = order(&playlists(items), &pins, &playlists(recent));
+            let shown: Vec<String> = shown
+                .iter()
+                .map(|(e, pinned)| format!("{}{}", if *pinned { "*" } else { "" }, e.id))
+                .collect();
+            assert_eq!(shown.join(" "), want, "{case}");
+        }
     }
 
     #[test]
