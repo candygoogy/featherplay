@@ -41,28 +41,33 @@ fn strip(scene: &Scene, hover: Option<f32>, centre: f32) -> Vec<Rgba8Pixel> {
 }
 
 #[test]
-fn next_shows_a_tooltip() {
+fn next_shows_a_tooltip_and_show_tooltips_turns_them_off_and_on() {
     let scene = scene();
+
+    // Next has one, on Home.
     let off = strip(&scene, None, NEXT_X);
     assert_ne!(
         strip(&scene, Some(NEXT_X), NEXT_X),
         off,
         "no tooltip over the hovered Next"
     );
-}
 
-#[test]
-fn show_tooltips_off_hides_them_and_on_brings_them_back() {
-    let scene = scene();
+    // Settings' switch: off hides them, on brings them back.
     scene.open("settings").expect("settings");
     scene.settle();
     let data = scene.ui.global::<SettingsData>();
     let without = strip(&scene, None, PLAY_X);
 
     data.invoke_toggled(SettingKey::Tooltips, false);
-    assert!(!data.get_tooltips());
-    assert!(!scene.ui.global::<Tooltips>().get_on());
-    assert!(!featherplay::pages::settings::tooltips());
+    assert!(!data.get_tooltips(), "the switch still shows on");
+    assert!(
+        !scene.ui.global::<Tooltips>().get_on(),
+        "the tooltips are still on"
+    );
+    assert!(
+        !featherplay::pages::settings::tooltips(),
+        "the setting kept on"
+    );
     assert_eq!(
         strip(&scene, Some(PLAY_X), PLAY_X),
         without,
@@ -71,7 +76,10 @@ fn show_tooltips_off_hides_them_and_on_brings_them_back() {
 
     strip(&scene, None, PLAY_X);
     data.invoke_toggled(SettingKey::Tooltips, true);
-    assert!(featherplay::pages::settings::tooltips());
+    assert!(
+        featherplay::pages::settings::tooltips(),
+        "the setting stayed off"
+    );
     assert_ne!(
         strip(&scene, Some(PLAY_X), PLAY_X),
         without,
