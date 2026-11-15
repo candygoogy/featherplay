@@ -61,7 +61,8 @@ mod tests {
         }
         let (tx, rx) = mpsc::channel();
         write_in_order(move || tx.send(()).unwrap());
-        rx.recv().unwrap();
+        rx.recv_timeout(std::time::Duration::from_secs(10))
+            .expect("the saves ran within 10 s");
         assert_eq!(*done.lock().unwrap(), (0..200).collect::<Vec<_>>());
     }
 }
