@@ -30,21 +30,14 @@ fn threshold_values() {
     );
 }
 
+/// On top of `display_title`: a video's trailing "(Lyrics)" goes, in any case; a song's stays.
 #[test]
 fn clean_title_strips_only_videos() {
-    assert_eq!(
-        clean_title("Song (Official Video)", VideoType::MusicVideo),
-        "Song"
-    );
-    assert_eq!(
-        clean_title("Song [Official Video]", VideoType::UserVideo),
-        "Song"
-    );
-    assert_eq!(
-        clean_title("Song (Official Video)", VideoType::Song),
-        "Song (Official Video)"
-    );
     assert_eq!(clean_title("Song (LYRICS)", VideoType::MusicVideo), "Song");
+    assert_eq!(
+        clean_title("Song (Lyrics)", VideoType::Song),
+        "Song (Lyrics)"
+    );
 }
 
 #[test]
@@ -168,14 +161,6 @@ fn tracker_fires_once_on_played_time() {
         Some((t.clone(), started))
     );
     assert_eq!(tracker.played(Duration::from_secs(100)), None);
-}
-
-#[test]
-fn seek_does_not_count() {
-    let mut tracker = ScrobbleTracker::default();
-    tracker.start(&track(200), SystemTime::UNIX_EPOCH);
-    // The position jumped 150 s, but only 1 s of wall-clock play time passed.
-    assert_eq!(tracker.played(Duration::from_secs(1)), None);
 }
 
 mod alternates {

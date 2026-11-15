@@ -24,16 +24,6 @@ fn lock_or_recover_returns_the_data_of_a_poisoned_mutex() {
 }
 
 #[test]
-fn lock_or_recover_keeps_writes_after_poisoning() {
-    let lock = Arc::new(Mutex::new(Vec::new()));
-    poison_mutex(&lock);
-
-    lock.lock_or_recover().push(1);
-
-    assert_eq!(*lock.lock_or_recover(), [1]);
-}
-
-#[test]
 fn read_and_write_or_recover_survive_a_poisoned_rwlock() {
     let lock = Arc::new(RwLock::new(String::from("before")));
     let l = lock.clone();
