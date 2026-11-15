@@ -6,6 +6,16 @@ Notable changes to featherplay, newest first. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- A SponsorBlock reply holding a segment with an impossible time (far past any song's
+  length) no longer stops the song's segments from being read: that segment is left out, as
+  is one too short to skip.
+- A line of synced lyrics whose time stamp is absurdly large is left out, where it could
+  have appeared at a wrong time; the rest of the lyrics show as before.
+- With **Look up YouTube directly** on, an address that a DNS answer lists twice is kept for
+  the shorter of its two lifetimes, so it's looked up again on time.
+
 ## [0.4.1] - 2026-11-15
 
 ### Added

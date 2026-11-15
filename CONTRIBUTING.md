@@ -149,6 +149,13 @@ a dev-dependency of the crates that use it: any input gives a value or an error 
 panic, plus what the parser promises about a good one. A `proptest-regressions/*.txt` file
 holds the inputs that once failed, so they run first every time; commit it with the fix.
 
+The window tests share their helpers in `apps/featherplay/tests/app/support.rs`. Find and
+press things by their accessible label (`support::label`), not at coordinates copied from
+the `.slint` files, so a restyle doesn't break the test. `Scene::settle` waits for loads but
+moves no clock: on a frozen clock, a load that hangs on a timer (the lyrics lookup starts a
+second after it's asked for) needs `support::settle_in_frames`, and a `settle` that runs out
+its minute fails the test.
+
 The same commands work on Linux. There, use nextest's `ci` profile (`--profile ci`), as CI
 does: the frame-cost and CPU-time ceilings were set on Windows, and the CPU-time ones count
 thread cycles, which only Windows reports. Run the tests under a session bus

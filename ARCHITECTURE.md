@@ -21,7 +21,7 @@ this file does; when the two disagree, the code is right and this file needs fix
 | `spikes/` | Early experiments, kept for reference. Not part of the build. |
 | `docs/` | User-facing docs, such as `docs/local-api.md`. |
 
-The app crate is about 57,000 lines of Rust, its tests included, and 22,000 of Slint. The
+The app crate is about 54,000 lines of Rust, its tests included, and 22,000 of Slint. The
 crates together have about 81,000 lines of Rust.
 
 ## How a click becomes sound
@@ -633,9 +633,9 @@ column gives the split that would help:
 
 | File | Lines | Why, or the split that would help |
 |---|---|---|
-| `crates/ytm/tests/it/convert.rs` | 1,569 | Test file (decision 8) |
-| `crates/store/tests/it/store.rs` | 1,536 | Test file (decision 8) |
-| `crates/core/tests/it/player.rs` | 1,535 | Test file (decision 8) |
+| `crates/ytm/tests/it/convert.rs` | 1,556 | Test file (decision 8) |
+| `crates/core/tests/it/player.rs` | 1,472 | Test file (decision 8) |
+| `crates/store/tests/it/store.rs` | 1,036 | Test file (decision 8); its per-key tests are two tables now |
 | `crates/core/src/player.rs` | 1,479 | One state machine reads best in one place (decision 9) |
 | `apps/featherplay/src/pages/settings/search.rs` | 1,430 | `table()`, the settings' row table, to `search/table.rs`, and the tests to `search/tests.rs` |
 | `apps/featherplay/src/snapshot.rs` | 1,283 | The tests' offscreen `Scene` apart from the `--snapshot` command (`run`, `render`); `snapshot/table.rs` already holds the page list |
