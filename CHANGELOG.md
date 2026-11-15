@@ -6,6 +6,14 @@ Notable changes to featherplay, newest first. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- Opening and closing the lyrics on Now playing takes less work per frame (up to a third
+  less on a 4K screen). After a new cover had faded in over the last one, the old cover
+  stayed underneath and was drawn again, hidden, in every frame the cover moved; it now
+  goes when the fade ends. The covers in the bar, the mini player, the menus and Home's
+  hero gain the same.
+
 ### Fixed
 
 - A SponsorBlock reply holding a segment with an impossible time (far past any song's

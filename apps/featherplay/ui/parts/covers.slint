@@ -90,7 +90,10 @@ export component Cover inherits Rectangle {
         // A plain cover fades its art in as a whole; a crossfade fades `top` over `under` in it.
         opacity: root.crossfade || root.source.width > 0 ? 1 : 0;
         animate opacity { duration: Theme.t-fast; easing: Curves.ease-hover; }
-        if root.crossfade && root.under.width > 0 && root.source.width > 0: Image {
+        // Under the new art only while that fades in. Left there after, it was drawn in every
+        // frame the cover repaints, hidden by the art over it, and resampled when the two were
+        // decoded at different sizes: ~3 ms of a 4K frame of the lyrics toggle.
+        if root.crossfade && root.under.width > 0 && root.source.width > 0 && !(root.settled && top.opacity >= 1): Image {
             width: parent.width;
             height: parent.height;
             source: root.under;

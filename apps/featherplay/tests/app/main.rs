@@ -31,6 +31,7 @@ mod card_hint;
 mod card_veil;
 mod close_choice;
 mod content_fade;
+mod cover_crossfade;
 mod desktop_lyrics;
 mod diagnostics;
 mod discord_card;
