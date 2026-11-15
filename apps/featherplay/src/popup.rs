@@ -307,141 +307,85 @@ mod tests {
 
     /// A 1920 x 1080 screen with a 48 px taskbar at the bottom.
     const WORK: ScreenRect = (0, 0, 1920, 1032);
-    const SIZE: (i32, i32) = (340, 120);
+    /// The same screen's work area with the taskbar on the top, left or right edge.
+    const W_TOP: ScreenRect = (0, 48, 1920, 1080);
+    const W_LEFT: ScreenRect = (48, 0, 1920, 1080);
+    const W_RIGHT: ScreenRect = (0, 0, 1872, 1080);
+    /// 150 % on a 3840 x 2160 screen, a 72 px taskbar.
+    const W_150: ScreenRect = (0, 0, 3840, 2088);
 
-    #[test]
-    fn bottom_taskbar_opens_above_it_centred_on_the_click() {
-        assert_eq!(place((1500, 1050), SIZE, WORK, 12), (1330, 900));
+    /// A 340 x 120 popup and a 12 px gap at `scale`, in physical pixels.
+    fn size_and_gap(scale: f32) -> ((i32, i32), i32) {
+        let px = |v: i32| (v as f32 * scale).round() as i32;
+        ((px(340), px(120)), px(12))
     }
 
     #[test]
-    fn near_the_right_edge_it_stays_on_screen() {
-        assert_eq!(place((1900, 1050), SIZE, WORK, 12), (1568, 900));
-    }
-
-    #[test]
-    fn top_taskbar_opens_below_it() {
-        let work = (0, 48, 1920, 1080);
-        assert_eq!(place((1500, 20), SIZE, work, 12), (1330, 60));
-    }
-
-    #[test]
-    fn left_taskbar_opens_beside_it() {
-        let work = (48, 0, 1920, 1080);
-        assert_eq!(place((20, 1000), SIZE, work, 12), (60, 868));
-    }
-
-    #[test]
-    fn right_taskbar_flips_to_the_left_of_it() {
-        let work = (0, 0, 1872, 1080);
-        assert_eq!(place((1890, 1000), SIZE, work, 12), (1520, 868));
-    }
-
-    #[test]
-    fn a_point_inside_the_work_area_opens_above_it() {
-        assert_eq!(place((1500, 900), SIZE, WORK, 12), (1330, 768));
-    }
-
-    #[test]
-    fn click_near_the_top_of_the_work_area_opens_below_the_point() {
-        assert_eq!(place((800, 50), SIZE, WORK, 12), (630, 62));
-    }
-
-    #[test]
-    fn scaled_screen_keeps_the_gap_in_physical_pixels() {
-        // 150 %: 510 x 180 physical, an 18 px gap, a 72 px taskbar.
-        let work = (0, 0, 3840, 2088);
-        assert_eq!(place((3800, 2120), (510, 180), work, 18), (3312, 1890));
-    }
-
-    #[test]
-    fn it_sits_by_the_tray_at_every_scale() {
-        // 340 x 120 logical above a bottom taskbar, clicked 300 px (logical) from the right:
-        // at 100 %, 125 %, 150 % and 200 %, everything in physical pixels scales with it.
-        for (scale, at) in [(1.0, (1330, 900)), (1.25, (1663, 1125))] {
-            let px = |v: i32| (v as f32 * scale).round() as i32;
-            let work = (0, 0, px(1920), px(1032));
-            let size = (px(340), px(120));
-            assert_eq!(place((px(1500), px(1050)), size, work, px(12)), at);
+    fn a_popup_opens_by_the_point_and_stays_on_its_screen() {
+        // The "bottom taskbar" row and the 125 %, 150 % and 200 % ones are the same click,
+        // 300 px (logical) from the right above a bottom taskbar, at each scale.
+        const W_125: ScreenRect = (0, 0, 2400, 1290);
+        const W_200: ScreenRect = (0, 0, 3840, 2064);
+        const W_WEST: ScreenRect = (-1920, 0, 0, 1032);
+        // (case, scale, point, work, want)
+        let cases = [
+            ("bottom taskbar", 1.0, (1500, 1050), WORK, (1330, 900)),
+            ("near the right edge", 1.0, (1900, 1050), WORK, (1568, 900)),
+            ("top taskbar", 1.0, (1500, 20), W_TOP, (1330, 60)),
+            ("left taskbar", 1.0, (20, 1000), W_LEFT, (60, 868)),
+            ("right taskbar", 1.0, (1890, 1000), W_RIGHT, (1520, 868)),
+            ("inside the work area", 1.0, (1500, 900), WORK, (1330, 768)),
+            ("near its top", 1.0, (800, 50), WORK, (630, 62)),
+            ("150 %, corner", 1.5, (3800, 2120), W_150, (3312, 1890)),
+            ("125 %", 1.25, (1875, 1313), W_125, (1663, 1125)),
+            ("150 %", 1.5, (3000, 2120), W_150, (2745, 1890)),
+            ("200 %", 2.0, (3000, 2100), W_200, (2660, 1800)),
+            ("left monitor", 1.0, (-100, 1050), W_WEST, (-352, 900)),
+        ];
+        for (case, scale, point, work, want) in cases {
+            let (size, gap) = size_and_gap(scale);
+            assert_eq!(place(point, size, work, gap), want, "{case}");
         }
-        let work = (0, 0, 3840, 2088);
-        assert_eq!(place((3000, 2120), (510, 180), work, 18), (2745, 1890));
-        let work = (0, 0, 3840, 2064);
-        assert_eq!(place((3000, 2100), (680, 240), work, 24), (2660, 1800));
     }
 
     const fn bar(edge: Edge, rect: ScreenRect) -> Option<Taskbar> {
         Some(Taskbar { edge, rect })
     }
 
-    /// A 48 px taskbar at the bottom of a 1920 x 1080 screen.
-    const BOTTOM: Option<Taskbar> = bar(Edge::Bottom, (0, 1032, 1920, 1080));
-
     #[test]
-    fn tray_icon_on_the_taskbar_opens_by_the_click() {
-        let at = place_from_tray((1500, 1050), SIZE, WORK, 12, BOTTOM);
-        assert_eq!(at, (1330, 900));
-    }
-
-    #[test]
-    fn tray_icon_in_the_overflow_flyout_opens_in_the_corner_above_the_taskbar() {
-        // The flyout sits above the taskbar, inside the work area.
-        let at = place_from_tray((1500, 900), SIZE, WORK, 12, BOTTOM);
-        assert_eq!(at, (1568, 900));
-        // 150 %: 510 x 180 physical, an 18 px gap, a 72 px taskbar.
-        let taskbar = bar(Edge::Bottom, (0, 2088, 3840, 2160));
-        let at = place_from_tray((3000, 1800), (510, 180), (0, 0, 3840, 2088), 18, taskbar);
-        assert_eq!(at, (3312, 1890));
-    }
-
-    #[test]
-    fn taskbar_on_the_other_edges() {
-        let top = bar(Edge::Top, (0, 0, 1920, 48));
-        let work = (0, 48, 1920, 1080);
-        assert_eq!(place_from_tray((1500, 20), SIZE, work, 12, top), (1330, 60));
-        assert_eq!(
-            place_from_tray((1500, 200), SIZE, work, 12, top),
-            (1568, 60)
-        );
-        let left = bar(Edge::Left, (0, 0, 48, 1080));
-        let work = (48, 0, 1920, 1080);
-        assert_eq!(place_from_tray((20, 1000), SIZE, work, 12, left), (60, 868));
-        assert_eq!(place_from_tray((200, 900), SIZE, work, 12, left), (60, 948));
-        let right = bar(Edge::Right, (1872, 0, 1920, 1080));
-        let work = (0, 0, 1872, 1080);
-        assert_eq!(
-            place_from_tray((1890, 1000), SIZE, work, 12, right),
-            (1520, 868)
-        );
-        assert_eq!(
-            place_from_tray((1700, 900), SIZE, work, 12, right),
-            (1520, 948)
-        );
-    }
-
-    #[test]
-    fn a_taskbar_that_hides_itself_is_never_overlapped() {
-        // The work area is the whole screen; the taskbar shows over its bottom 48 px.
-        let work = (0, 0, 1920, 1080);
-        assert_eq!(
-            place_from_tray((1500, 1050), SIZE, work, 12, BOTTOM),
-            (1330, 900)
-        );
-        assert_eq!(
-            place_from_tray((1500, 900), SIZE, work, 12, BOTTOM),
-            (1568, 900)
-        );
-    }
-
-    #[test]
-    fn with_no_taskbar_known_it_opens_by_the_click() {
-        let at = place_from_tray((1500, 900), SIZE, WORK, 12, None);
-        assert_eq!(at, (1330, 768));
-    }
-
-    #[test]
-    fn second_monitor_to_the_left_uses_its_own_work_area() {
-        let work = (-1920, 0, 0, 1032);
-        assert_eq!(place((-100, 1050), SIZE, work, 12), (-352, 900));
+    fn a_tray_popup_opens_by_the_click_or_in_the_flyouts_corner() {
+        type Screen = (ScreenRect, Option<Taskbar>);
+        // A 48 px taskbar on each edge of a 1920 x 1080 screen, with its work area.
+        const BOTTOM: Screen = (WORK, bar(Edge::Bottom, (0, 1032, 1920, 1080)));
+        const TOP: Screen = (W_TOP, bar(Edge::Top, (0, 0, 1920, 48)));
+        const LEFT: Screen = (W_LEFT, bar(Edge::Left, (0, 0, 48, 1080)));
+        const RIGHT: Screen = (W_RIGHT, bar(Edge::Right, (1872, 0, 1920, 1080)));
+        const BOTTOM_150: Screen = (W_150, bar(Edge::Bottom, (0, 2088, 3840, 2160)));
+        // A taskbar that hides itself: the work area is the whole screen, the taskbar shows
+        // over its bottom 48 px.
+        const HIDING: Screen = ((0, 0, 1920, 1080), BOTTOM.1);
+        const NONE: Screen = (WORK, None);
+        // A click on the taskbar opens by the click; one elsewhere (the overflow flyout,
+        // which sits above the taskbar inside the work area) in the work area's corner.
+        // (case, scale, point, screen, want)
+        let cases = [
+            ("bottom, on it", 1.0, (1500, 1050), BOTTOM, (1330, 900)),
+            ("bottom, flyout", 1.0, (1500, 900), BOTTOM, (1568, 900)),
+            ("150 %, flyout", 1.5, (3000, 1800), BOTTOM_150, (3312, 1890)),
+            ("top, on it", 1.0, (1500, 20), TOP, (1330, 60)),
+            ("top, flyout", 1.0, (1500, 200), TOP, (1568, 60)),
+            ("left, on it", 1.0, (20, 1000), LEFT, (60, 868)),
+            ("left, flyout", 1.0, (200, 900), LEFT, (60, 948)),
+            ("right, on it", 1.0, (1890, 1000), RIGHT, (1520, 868)),
+            ("right, flyout", 1.0, (1700, 900), RIGHT, (1520, 948)),
+            ("hiding, on it", 1.0, (1500, 1050), HIDING, (1330, 900)),
+            ("hiding, flyout", 1.0, (1500, 900), HIDING, (1568, 900)),
+            ("no taskbar known", 1.0, (1500, 900), NONE, (1330, 768)),
+        ];
+        for (case, scale, point, (work, taskbar), want) in cases {
+            let (size, gap) = size_and_gap(scale);
+            let at = place_from_tray(point, size, work, gap, taskbar);
+            assert_eq!(at, want, "{case}");
+        }
     }
 }
