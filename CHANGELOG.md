@@ -6,6 +6,11 @@ Notable changes to featherplay, newest first. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- On Linux, software centres and app catalogs that read featherplay's AppStream metadata show
+  four screenshots: Home, Now playing with lyrics, a playlist in the light theme, and search.
+
 ### Changed
 
 - On Windows too, the browser sign-in (**Use Microsoft Edge**, **Use Google Chrome**, **Use

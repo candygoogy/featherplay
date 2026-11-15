@@ -3,6 +3,8 @@
 # The Linux packages' desktop entry, metadata and notes go into the AppImage and the
 # archive as they are checked out: LF, as Linux reads them.
 packaging/linux/** text eol=lf
+# ...but not the AppStream screenshots, which are pictures.
+packaging/linux/screenshots/** binary
 # The signed update fixtures are checked byte for byte: a CRLF checkout would break their
 # signatures.
 crates/controller/tests/fixtures/signing/** -text
