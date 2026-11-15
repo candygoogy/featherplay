@@ -565,24 +565,13 @@ mod tests {
     }
 
     #[test]
-    fn a_plain_fallback_after_an_lrclib_failure_should_be_shown_but_not_kept() {
-        let found = settle(failed(), plain()).expect("plain lyrics");
-        assert!(matches!(found.lyrics, Some(Lyrics::Plain(_))));
-        assert!(!found.keep, "asked again the next time the tab opens");
-    }
-
-    #[test]
-    fn a_plain_fallback_after_an_lrclib_miss_should_be_kept() {
-        let found = settle(FromLrclib::Missed, plain()).expect("plain lyrics");
-        assert!(found.keep);
-    }
-
-    #[test]
     fn only_a_plain_fallback_after_an_lrclib_failure_says_synced_lyrics_are_unavailable() {
+        // Shown, not kept: asked again the next time the tab opens.
         let failed = settle(failed(), plain()).expect("plain lyrics");
         assert!(failed.synced_unavailable());
         let missed = settle(FromLrclib::Missed, plain()).expect("plain lyrics");
         assert!(!missed.synced_unavailable(), "LRCLIB answered: not synced");
+        assert!(missed.keep, "LRCLIB answered: kept");
         let synced = fixture(true).expect("fixture");
         assert!(!synced.synced_unavailable());
     }
@@ -684,41 +673,30 @@ mod tests {
 
     #[tokio::test]
     async fn asking_lrclib_again_should_change_nothing_while_it_still_fails() {
-        let lrclib = LrcLib::with_base(&stand_in(503, "{}", 2)).expect("client");
-        assert!(
-            ask_lrclib_again(&lrclib, &track(), Again::Synced)
-                .await
-                .is_none()
-        );
+        for again in [Again::Synced, Again::Any] {
+            let lrclib = LrcLib::with_base(&stand_in(503, "{}", 2)).expect("client");
+            let found = ask_lrclib_again(&lrclib, &track(), again).await;
+            assert!(found.is_none(), "{again:?}: {found:?}");
+        }
     }
 
     #[tokio::test]
-    async fn asking_lrclib_again_should_keep_the_fallback_when_it_has_only_plain_lyrics() {
+    async fn plain_lyrics_asked_again_keep_the_fallback_or_fill_a_song_without_lyrics() {
         let plain_only = Box::leak(
             RECORD
                 .replace("\"syncedLyrics\"", "\"unusedSyncedLyrics\"")
                 .into_boxed_str(),
         );
-        let lrclib = LrcLib::with_base(&stand_in(200, plain_only, 2)).expect("client");
-        assert!(
-            ask_lrclib_again(&lrclib, &track(), Again::Synced)
-                .await
-                .is_none()
-        );
-    }
-
-    #[tokio::test]
-    async fn asking_lrclib_again_for_a_song_without_lyrics_should_take_plain_ones_too() {
-        let plain_only = Box::leak(
-            RECORD
-                .replace("\"syncedLyrics\"", "\"unusedSyncedLyrics\"")
-                .into_boxed_str(),
-        );
-        let lrclib = LrcLib::with_base(&stand_in(200, plain_only, 2)).expect("client");
+        let lrclib = LrcLib::with_base(&stand_in(200, plain_only, 4)).expect("client");
+        let synced = ask_lrclib_again(&lrclib, &track(), Again::Synced).await;
+        assert!(synced.is_none(), "the fallback stays: {synced:?}");
         let found = ask_lrclib_again(&lrclib, &track(), Again::Any)
             .await
             .expect("an answer");
-        assert!(matches!(found.lyrics, Some(Lyrics::Plain(_))));
+        assert!(
+            matches!(found.lyrics, Some(Lyrics::Plain(_))),
+            "a song without lyrics takes plain ones: {found:?}"
+        );
     }
 
     #[tokio::test]
@@ -730,33 +708,27 @@ mod tests {
         assert!(found.lyrics.is_none() && found.keep);
     }
 
-    #[tokio::test]
-    async fn asking_lrclib_again_for_a_song_without_lyrics_should_change_nothing_while_it_fails() {
-        let lrclib = LrcLib::with_base(&stand_in(503, "{}", 2)).expect("client");
-        assert!(
-            ask_lrclib_again(&lrclib, &track(), Again::Any)
-                .await
-                .is_none()
-        );
-    }
-
     #[test]
-    fn nothing_found_after_an_lrclib_failure_should_be_an_error() {
-        assert!(settle(FromLrclib::Failed("timed out".into()), Ok(None)).is_err());
-        assert!(settle(FromLrclib::Missed, Ok(None)).is_ok_and(|f| f.lyrics.is_none() && f.keep));
-    }
-
-    #[test]
-    fn lrclib_down_with_no_lyrics_of_the_songs_own_should_be_unavailable() {
-        let failure = settle(failed(), Ok(None)).expect_err("a failure");
-        assert!(matches!(failure, Failure::Unavailable(_)), "{failure:?}");
-    }
-
-    #[test]
-    fn the_songs_own_lyrics_failing_should_be_a_failed_lookup() {
-        for lrclib in [FromLrclib::Missed, failed()] {
-            let failure = settle(lrclib, Err("offline".into())).expect_err("a failure");
-            assert!(matches!(failure, Failure::Failed(_)), "{failure:?}");
+    fn no_lyrics_settle_as_none_unavailable_or_a_failed_lookup() {
+        use FromLrclib::Missed;
+        let timed_out = || FromLrclib::Failed("timed out".into());
+        let offline = || Err("offline".into());
+        // (case: LRCLIB, then the song's own lyrics; from LRCLIB, the song's own, want)
+        let cases = [
+            ("missed, none own", Missed, Ok(None), "none, kept"),
+            ("failed, none own", failed(), Ok(None), "unavailable"),
+            ("timed out, none own", timed_out(), Ok(None), "unavailable"),
+            ("missed, own failed", Missed, offline(), "failed"),
+            ("failed, own failed", failed(), offline(), "failed"),
+        ];
+        for (case, lrclib, own, want) in cases {
+            let got = match settle(lrclib, own) {
+                Ok(f) if f.lyrics.is_none() && f.keep => "none, kept",
+                Ok(_) => "lyrics, or not kept",
+                Err(Failure::Unavailable(_)) => "unavailable",
+                Err(Failure::Failed(_)) => "failed",
+            };
+            assert_eq!(got, want, "{case}");
         }
     }
 }
