@@ -254,9 +254,8 @@ home's `config/settings.toml`, and needs a tall `--size`, about 1280x3600.
 
 To check frames as the window presents them (partial rendering, motion on, a frozen clock
 stepped 16 ms at a time), use `snapshot::Scene` with `offscreen::install_presenting`, as
-`tests/app/render_surface.rs` (nothing shows through), `tests/app/playing_frames.rs` (playing repaints
-only small spots) and `tests/app/render_timing.rs` (frame times, ignored) do. `tests/app/smoothness.rs`
-(ignored) measures frames at 4K.
+`tests/app/render_surface.rs` (nothing shows through) and `tests/app/playing_frames.rs` (playing
+repaints only small spots) do. `tests/app/smoothness.rs` (ignored) measures frames at 4K.
 
 In the real window, `FEATHERPLAY_FRAME_LOG=1` logs the frames once a second to stderr: paint
 times, gaps, wheel messages and the UI thread's CPU time inside the paints (`src/frame_log.rs`).
