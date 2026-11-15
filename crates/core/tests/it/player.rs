@@ -906,7 +906,7 @@ fn shuffle_and_repeat_are_saved_and_replan_the_preload() {
     assert!(fx.contains(&Effect::PersistSession));
     assert_eq!(resolves(&fx), Vec::<String>::new());
     assert_eq!(p.session().repeat, RepeatMode::One);
-    assert_eq!(p.queue().peek_next().map(|t| t.id.clone()), Some(id("a")));
+    assert_eq!(p.ahead(1), [id("a")]);
 
     // Off again: "b" is next once more, and its stream is still good, so no resolve.
     let fx = run(&mut p, Input::SetRepeat(RepeatMode::Off));

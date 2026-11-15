@@ -79,11 +79,6 @@ impl Queue {
         self.tracks.get(self.index.checked_sub(1)?)
     }
 
-    /// The track `advance()` would move to, without moving.
-    pub fn peek_next(&self) -> Option<&Track> {
-        self.peek_next_past(|_| false)
-    }
-
     /// The track `advance_past(skip)` would move to, without moving.
     pub fn peek_next_past(&self, skip: impl Fn(&Track) -> bool) -> Option<&Track> {
         self.tracks.get(self.next_index(skip)?)

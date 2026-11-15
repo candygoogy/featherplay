@@ -119,7 +119,7 @@ fn repeat_all_drops_the_autoplay_songs_not_played_yet() {
     let (mut p, _) = playing(ListEnd::Autoplay, &["a", "b", "c"], 2);
     p.handle(Input::ContinuationLoaded(id("c"), tracks(&["x", "y"])));
     p.handle(Input::SetRepeat(RepeatMode::All));
-    assert_eq!(p.queue().peek_next().map(|t| t.id.0.as_str()), Some("a"));
+    assert_eq!(p.ahead(1), [id("a")]);
 }
 
 #[test]
