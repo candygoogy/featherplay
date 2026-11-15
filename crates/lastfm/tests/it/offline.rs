@@ -4,12 +4,16 @@ use featherplay_lastfm::{OfflineQueue, PendingScrobble};
 
 const DAY: i64 = 86_400;
 
-/// A folder of this test's own, under `FEATHERPLAY_HOME`, else the temp folder.
-fn test_dir() -> PathBuf {
-    let base = std::env::var("FEATHERPLAY_HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| std::env::temp_dir().join("featherplay-tests"));
-    base.join(format!("test-lastfm-offline-{}", std::process::id()))
+/// A folder of this test's own under `FEATHERPLAY_HOME` (so never on C: or in a real
+/// profile). `None`, after printing why, when the variable is unset: the test returns early.
+fn test_dir() -> Option<PathBuf> {
+    let Some(base) = std::env::var_os("FEATHERPLAY_HOME").filter(|v| !v.is_empty()) else {
+        eprintln!(
+            "skipped: FEATHERPLAY_HOME is not set; point it at a scratch folder to run this test"
+        );
+        return None;
+    };
+    Some(PathBuf::from(base).join(format!("test-lastfm-offline-{}", std::process::id())))
 }
 
 fn pending(i: i64, timestamp: i64) -> PendingScrobble {
@@ -25,6 +29,9 @@ fn pending(i: i64, timestamp: i64) -> PendingScrobble {
 
 #[test]
 fn offline_drops_old_and_batches_50() {
+    let Some(dir) = test_dir() else {
+        return;
+    };
     let now = 1_800_000_000;
     let mut queue = OfflineQueue::default();
     for i in 0..120 {
@@ -34,7 +41,6 @@ fn offline_drops_old_and_batches_50() {
     }
 
     // Round-trip through disk so the batches come from a loaded queue.
-    let dir = test_dir();
     let path = dir.join("scrobble-queue.json");
     queue.save(&path).unwrap();
     let mut queue = OfflineQueue::load(&path);
