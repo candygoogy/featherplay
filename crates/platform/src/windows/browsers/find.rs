@@ -191,8 +191,15 @@ mod tests {
         const EDGE_X64: &str = r"C:\Program Files\Microsoft\Edge\Application\msedge.exe";
         const CHROME_USERS: &str =
             r"C:\Users\ada\AppData\Local\Google\Chrome\Application\chrome.exe";
-        // (case, browser, its App Paths, the files on the PC, what's found)
-        let cases: [(&str, &Browser, &[(Hive, &str)], &[&str], Option<&str>); 8] = [
+        /// A case, the browser, its App Paths, the files on the PC, what's found.
+        type Case<'a> = (
+            &'a str,
+            &'a Browser,
+            &'a [(Hive, &'a str)],
+            &'a [&'a str],
+            Option<&'a str>,
+        );
+        let cases: [Case; 8] = [
             (
                 "the user's App Path comes first",
                 &EDGE,

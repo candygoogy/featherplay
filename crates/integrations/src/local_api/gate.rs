@@ -202,14 +202,14 @@ mod tests {
             ),
             (
                 "the query's token where it counts",
-                headers(&[host.clone()]),
+                headers(std::slice::from_ref(&host)),
                 Some(&query),
                 true,
                 Ok(()),
             ),
             (
                 "the query's token where it doesn't",
-                headers(&[host.clone()]),
+                headers(std::slice::from_ref(&host)),
                 Some(&query),
                 false,
                 Err(Refusal::Token),
