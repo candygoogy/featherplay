@@ -113,6 +113,29 @@
 @property --folder { syntax: "<color>"; inherits: true; initial-value: transparent; }
 @property --file-ours { syntax: "<color>"; inherits: true; initial-value: transparent; }
 @property --file-lit { syntax: "<color>"; inherits: true; initial-value: transparent; }
+/* The page system (system.css): the desk, its inks, its surfaces and its glass. */
+@property --desk { syntax: "<color>"; inherits: true; initial-value: transparent; }
+@property --ink2 { syntax: "<color>"; inherits: true; initial-value: transparent; }
+@property --ink3 { syntax: "<color>"; inherits: true; initial-value: transparent; }
+@property --hand { syntax: "<color>"; inherits: true; initial-value: transparent; }
+@property --tonal { syntax: "<color>"; inherits: true; initial-value: transparent; }
+@property --red-hover { syntax: "<color>"; inherits: true; initial-value: transparent; }
+@property --red-pressed { syntax: "<color>"; inherits: true; initial-value: transparent; }
+@property --panel-bg { syntax: "<color>"; inherits: true; initial-value: transparent; }
+@property --panel-tint { syntax: "<color>"; inherits: true; initial-value: transparent; }
+@property --mat-dock { syntax: "<color>"; inherits: true; initial-value: transparent; }
+@property --mat-capsule { syntax: "<color>"; inherits: true; initial-value: transparent; }
+@property --mat-fly { syntax: "<color>"; inherits: true; initial-value: transparent; }
+@property --mat-solid { syntax: "<color>"; inherits: true; initial-value: transparent; }
+@property --rim { syntax: "<color>"; inherits: true; initial-value: transparent; }
+@property --edge { syntax: "<color>"; inherits: true; initial-value: transparent; }
+@property --shade-1 { syntax: "<color>"; inherits: true; initial-value: transparent; }
+@property --shade-2 { syntax: "<color>"; inherits: true; initial-value: transparent; }
+@property --shade-3 { syntax: "<color>"; inherits: true; initial-value: transparent; }
+@property --part-hover { syntax: "<color>"; inherits: true; initial-value: transparent; }
+@property --part-press { syntax: "<color>"; inherits: true; initial-value: transparent; }
+@property --part-on { syntax: "<color>"; inherits: true; initial-value: transparent; }
+@property --cap-close { syntax: "<color>"; inherits: true; initial-value: transparent; }
 
 /* The pairs, (light, dark). On :root and on every themed element, so a nested theme resolves
    them for itself, and with the colours derived from them (their var()s resolve where they're
@@ -210,6 +233,36 @@
   --file-ours: light-dark(#cc10361a, #ff3b5529);
   --file-lit: light-dark(#cc103624, #ff3b5538);
 
+
+  /* The page's system (mockup 10, system.css): the desk it all sits on, the page's inks, the
+     content surfaces and the three glass materials. Glass is a tint of the ground, a blur only
+     where things move behind it, a 1 px light edge on top and, on what truly floats, the
+     three-layer shadow (--shade-*). Reduced transparency and forced colours make them solid
+     (system.css). */
+  --desk: light-dark(#f4f3f1, #0b0b0c);
+  --ink2: light-dark(#4b4743, #aaaaaa);
+  --ink3: light-dark(#67625d, #8f8f8f);
+  --hand: light-dark(rgb(70 66 62), rgb(196 196 196));
+  --tonal: light-dark(#0000001a, #ffffff21);
+  --red-hover: light-dark(#b80d30, #ff5a70);
+  --red-pressed: light-dark(#a30b2a, #e9304a);
+  --panel-bg: light-dark(rgb(255 255 255 / 0.9), rgb(24 24 24 / 0.94));
+  --panel-tint: light-dark(rgb(0 0 0 / 0.035), rgb(255 255 255 / 0.045));
+  --mat-dock: light-dark(rgb(250 250 252 / 0.74), rgb(27 28 32 / 0.74));
+  --mat-capsule: light-dark(rgb(250 250 251 / 0.8), rgb(27 28 32 / 0.78));
+  --mat-fly: light-dark(rgb(250 250 251 / 0.86), rgb(30 31 35 / 0.86));
+  --mat-solid: light-dark(rgb(250 250 251 / 0.92), rgb(32 33 37 / 0.9));
+  --rim: light-dark(rgb(255 255 255 / 0.95), rgb(255 255 255 / 0.1));
+  --edge: light-dark(rgb(0 0 0 / 0.07), rgb(0 0 0 / 0.36));
+  --shade-1: light-dark(rgb(20 24 40 / 0.08), rgb(0 0 0 / 0.3));
+  --shade-2: light-dark(rgb(20 24 40 / 0.08), rgb(0 0 0 / 0.26));
+  --shade-3: light-dark(rgb(20 24 40 / 0.14), rgb(0 0 0 / 0.26));
+  --part-hover: light-dark(rgb(0 0 0 / 0.055), rgb(255 255 255 / 0.085));
+  --part-press: light-dark(rgb(0 0 0 / 0.035), rgb(255 255 255 / 0.05));
+  --part-on: light-dark(rgb(0 0 0 / 0.075), rgb(255 255 255 / 0.12));
+  /* Windows' own close button under the pointer, the same in both themes. */
+  --cap-close: light-dark(#c42b1c, #c42b1c);
+
   /* Derived: they follow the pairs as they ease. */
   --accent-hover: color-mix(in srgb, var(--accent) 84%, var(--text));
   --accent-pressed: color-mix(in srgb, var(--accent) 70%, var(--text));
@@ -293,7 +346,29 @@
     --tour-card-hover,
     --folder,
     --file-ours,
-    --file-lit;
+    --file-lit,
+    --desk,
+    --ink2,
+    --ink3,
+    --hand,
+    --tonal,
+    --red-hover,
+    --red-pressed,
+    --panel-bg,
+    --panel-tint,
+    --mat-dock,
+    --mat-capsule,
+    --mat-fly,
+    --mat-solid,
+    --rim,
+    --edge,
+    --shade-1,
+    --shade-2,
+    --shade-3,
+    --part-hover,
+    --part-press,
+    --part-on,
+    --cap-close;
   transition-duration: var(--t-theme);
   transition-timing-function: var(--ease-theme);
 }

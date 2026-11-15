@@ -1,0 +1,335 @@
+/* The page's system (the redesign, from mockup 10): six type sizes and four weights, one space
+   scale, five radii, the fluid frame, the three materials and the motion language. Colours are
+   theme pairs in tokens.css; the app inside the window keeps its own type and tokens
+   (replica.css). Nothing here scales with the window's width: the root stays 16 px, the frame
+   grows to 1,560 px and wider rooms get margins. */
+
+:root {
+  /* ---- Type: six sizes, four weights, each size with its leading and tracking ---- */
+  --fs-display: clamp(3.4rem, min(5.6vw, 9.5vh), 5.75rem); /* 54 to 92 */
+  --fs-title: 2.5rem; /* 40 */
+  --fs-subtitle: 1.5rem; /* 24 */
+  --fs-lede: 1.1875rem; /* 19 */
+  --fs-text: 1rem; /* 16 */
+  --fs-small: 0.84375rem; /* 13.5 */
+  --fw-text: 400;
+  --fw-medium: 500;
+  --fw-bold: 700;
+  --fw-display: 800;
+  --lh-display: 0.94; /* two short lines, set solid */
+  --lh-title: 1.08;
+  --lh-subtitle: 1.2;
+  --lh-lede: 1.5;
+  --lh-text: 1.55;
+  --lh-small: 1.45;
+  --tr-display: -0.04em;
+  --tr-title: -0.03em;
+  --tr-subtitle: -0.02em;
+  --tr-lede: -0.006em;
+  /* The bar's own type (mockup 9's bar): the one stated exception to the six sizes. */
+  --fs-bar: 0.8125rem; /* 13, at 600 */
+  --fs-bar-clock: 0.75rem; /* 12 */
+
+  /* ---- Space: one scale ---- */
+  --s1: 0.25rem;
+  --s2: 0.5rem;
+  --s3: 0.75rem;
+  --s4: 1rem;
+  --s5: 1.5rem;
+  --s6: 2rem;
+  --s7: 3rem;
+  --s8: 4.5rem;
+  --s9: 7.5rem;
+  --pad: var(--s6); /* the one panel padding (24 px on a phone) */
+
+  /* ---- Shape: five radii ---- */
+  --r-control: 6px; /* controls inside pieces */
+  --r-small: 10px; /* covers, menus, tooltips, windows */
+  --r-panel: 16px; /* panels, the dialog */
+  --r-float: 24px; /* the capsule, flyouts */
+  --r-pill: 999px;
+
+  /* ---- The frame: fluid, 1,560 px at most; then the margins grow ---- */
+  --gut: clamp(20px, 4vw, 64px);
+  --frame-max: 97.5rem;
+  --bar-h: 52px; /* the docked bar */
+  --cap-top: 12px; /* the capsule's distance from the top */
+  --cap-h: 48px;
+
+  /* ---- Glass: a tint of the ground (tokens.css), a blur where things move behind it, a
+     fine grain, a 1 px light edge on top; the layered shadow only on what truly floats ---- */
+  --mat-blur: blur(36px) saturate(1.5);
+  --grain: url("/grain.svg");
+  --lit: inset 0 1px 0 var(--rim);
+  --ring: 0 0 0 1px var(--edge);
+  --shadow: 0 1px 2px var(--shade-1), 0 4px 16px var(--shade-2), 0 16px 56px var(--shade-3);
+
+  /* ---- Motion: the motion audit's language. The app's own curves and times (--ease-out,
+     --spring-*, --t-hover, --t-press, --t-release, --t-morph) are in tokens.css; the song's
+     colour changes on one clock, --t-glow (900 ms). ---- */
+  --ease-window: cubic-bezier(0.32, 0.72, 0, 1); /* the window and the capsule */
+  --ease-move: cubic-bezier(0.37, 0, 0.63, 1); /* scroll-driven travel only */
+  --ease-pen: cubic-bezier(0.45, 0.1, 0.3, 1); /* the hand */
+  --t-small: 180ms;
+  --t-medium: 280ms;
+  --t-large: 480ms;
+  --t-pen: 600ms;
+  --rise: 8px;
+  --press-surface: 0.96;
+  --press-icon: 0.88;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --rise: 0px;
+    --press-surface: 1;
+    --press-icon: 1;
+  }
+}
+@media (width < 600px) {
+  :root {
+    --pad: var(--s5);
+  }
+}
+
+/* Glass becomes the solid surface where transparency is unwanted or colours are forced. */
+@media (prefers-reduced-transparency: reduce), (forced-colors: active) {
+  :root {
+    --mat-blur: none;
+  }
+  :root,
+  [data-theme] {
+    --mat-dock: light-dark(rgb(250 250 252), rgb(27 28 32));
+    --mat-capsule: light-dark(rgb(250 250 251), rgb(27 28 32));
+    --mat-fly: light-dark(rgb(250 250 251), rgb(30 31 35));
+    --mat-solid: light-dark(rgb(250 250 251), rgb(32 33 37));
+  }
+}
+
+/* ---------- The page on the system ---------- */
+:root.sys {
+  background: var(--desk);
+  scroll-padding-top: calc(var(--cap-top) + var(--cap-h) + var(--s4));
+  scrollbar-color: color-mix(in srgb, var(--text) 26%, transparent) transparent;
+}
+:root.sys body {
+  background: transparent;
+  font-size: var(--fs-text);
+  line-height: var(--lh-text);
+  font-kerning: normal;
+}
+
+/* The frame: two left edges a screen, the content column fluid to 1,560 px. */
+.frame {
+  width: min(var(--frame-max), 100% - 2 * var(--gut));
+  margin-inline: auto;
+}
+
+/* ---------- The type roles ---------- */
+.t-display {
+  font-size: var(--fs-display);
+  font-weight: var(--fw-display);
+  line-height: var(--lh-display);
+  letter-spacing: var(--tr-display);
+  text-wrap: balance;
+}
+.t-title {
+  font-size: var(--fs-title);
+  font-weight: var(--fw-bold);
+  line-height: var(--lh-title);
+  letter-spacing: var(--tr-title);
+  text-wrap: balance;
+}
+.t-subtitle {
+  font-size: var(--fs-subtitle);
+  font-weight: var(--fw-bold);
+  line-height: var(--lh-subtitle);
+  letter-spacing: var(--tr-subtitle);
+  text-wrap: balance;
+}
+.t-lede {
+  font-size: var(--fs-lede);
+  font-weight: var(--fw-medium);
+  line-height: var(--lh-lede);
+  letter-spacing: var(--tr-lede);
+  text-wrap: pretty;
+}
+.t-text {
+  font-size: var(--fs-text);
+  font-weight: var(--fw-text);
+  line-height: var(--lh-text);
+}
+.t-small {
+  font-size: var(--fs-small);
+  font-weight: var(--fw-medium);
+  line-height: var(--lh-small);
+}
+.ink2 {
+  color: var(--ink2);
+}
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Material 2: a content surface, flat, lit from the top ---------- */
+.panel {
+  border: 1px solid transparent;
+  border-radius: var(--r-panel);
+  background:
+    linear-gradient(var(--panel-bg), var(--panel-bg)) padding-box,
+    radial-gradient(130% 100% at 50% 0%, var(--rim), var(--panel-tint) 80%) border-box;
+}
+
+/* ---------- Material 3: glass, for what floats and only that ----------
+   .glass is the painted frost (the tint and the grain, no filter): for glass over a still
+   ground. .glass.live adds the real blur, for glass with things moving behind it. .float adds
+   the layered shadow. The tint is the element's --mat (a mat token). */
+.glass {
+  --mat: var(--mat-fly);
+  position: relative;
+  isolation: isolate;
+  background: var(--mat);
+  box-shadow: var(--lit), var(--ring);
+}
+.glass::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background-image: var(--grain);
+  opacity: 0.05;
+  pointer-events: none;
+}
+.glass.live {
+  -webkit-backdrop-filter: var(--mat-blur);
+  backdrop-filter: var(--mat-blur);
+}
+.glass.float {
+  box-shadow: var(--lit), var(--ring), var(--shadow);
+}
+@media (forced-colors: active) {
+  .glass {
+    border: 1px solid CanvasText;
+  }
+}
+
+/* ---------- Buttons on the page: the red pill (Download only) and the tonal pill ---------- */
+.btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s2);
+  height: 3rem;
+  padding: 0 var(--s5);
+  border: 0;
+  border-radius: var(--r-pill);
+  font: inherit;
+  font-size: var(--fs-text);
+  font-weight: var(--fw-bold);
+  letter-spacing: -0.005em;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color var(--t-hover) ease,
+    scale var(--t-release) var(--spring-release);
+}
+.btn:active {
+  scale: var(--press-surface);
+  transition:
+    background-color var(--t-hover) ease,
+    scale var(--t-press) var(--ease-out);
+}
+.btn.red {
+  background: var(--accent);
+  color: var(--on-accent);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.22),
+    0 1px 2px var(--shade-1);
+}
+.btn.red:hover {
+  background: var(--red-hover);
+}
+.btn.red:active {
+  background: var(--red-pressed);
+}
+.btn.tonal {
+  background: var(--tonal);
+  color: var(--text);
+}
+.btn.tonal:hover {
+  background: var(--tonal-hover);
+}
+.btn.tonal:active {
+  background: var(--tonal-pressed);
+}
+.btn svg {
+  flex: none;
+}
+@media (forced-colors: active) {
+  .btn {
+    border: 1px solid ButtonText;
+  }
+}
+.text-link {
+  color: var(--text);
+  font-weight: var(--fw-bold);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+  text-decoration-color: color-mix(in srgb, var(--text) 45%, transparent);
+  transition: text-decoration-color var(--t-hover) ease;
+}
+.text-link:hover {
+  text-decoration-color: var(--text);
+}
+
+/* Play and pause in one place: two stacked glyphs that turn into each other, as the app's
+   play button's do. data-playing on an ancestor (a piece, the bar) says which. */
+.pp {
+  display: grid;
+  place-items: center;
+}
+.pp > svg {
+  grid-area: 1 / 1;
+  transition:
+    opacity 120ms var(--ease-out),
+    transform var(--t-morph) var(--spring-morph);
+}
+.pp > .i-pause {
+  opacity: 0;
+  transform: scale(0.6) rotate(-90deg);
+}
+[data-playing="true"] .pp > .i-play {
+  opacity: 0;
+  transform: scale(0.6) rotate(90deg);
+}
+[data-playing="true"] .pp > .i-pause {
+  opacity: 1;
+  transform: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pp > svg {
+    transform: none !important;
+  }
+}
+
+/* ---------- The ways past things, for the keyboard: unseen until focused ---------- */
+.skip {
+  position: fixed;
+  z-index: 70;
+  left: var(--s4);
+  top: var(--s4);
+  padding: var(--s3) var(--s4);
+  border-radius: var(--r-pill);
+  background: var(--solid);
+  color: var(--on-solid);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-bold);
+  text-decoration: none;
+  translate: 0 -300%;
+}
+.skip:focus-visible {
+  translate: none;
+}
