@@ -55,19 +55,6 @@ fn discord_card_defaults_show_the_bar_links_and_button() {
 }
 
 #[test]
-fn at_2x_discords_bar_ends_when_the_song_does() {
-    let fast = NowPlaying {
-        speed: 2.0,
-        ..playing()
-    };
-    // 10 s into a 100 s song is 5 s of listening, with 45 s to go.
-    assert_eq!(
-        timeline(&fast, read_at()),
-        Some((1_699_999_995_000, 1_700_000_045_000))
-    );
-}
-
-#[test]
 fn discord_card_time_can_be_elapsed_only_or_hidden() {
     let elapsed = DiscordOptions {
         time: DiscordTime::Elapsed,
@@ -100,18 +87,21 @@ fn discord_card_time_can_be_elapsed_only_or_hidden() {
 }
 
 #[test]
-fn discord_card_status_text_follows_the_choice() {
-    for choice in [
-        DiscordStatusText::App,
-        DiscordStatusText::Artist,
-        DiscordStatusText::Title,
+fn discord_status_text_follows_the_choice() {
+    // What Discord's member list shows next to the user: the app's name, the state line
+    // (artist) or the details line (title), as `status_display_type` 0, 1 or 2.
+    for (choice, sent_as) in [
+        (DiscordStatusText::App, 0),
+        (DiscordStatusText::Artist, 1),
+        (DiscordStatusText::Title, 2),
     ] {
         let o = DiscordOptions {
             status_text: choice,
             ..Default::default()
         };
         let c = card(&playing(), read_at(), &o);
-        assert_eq!(c.status_text, choice);
+        let sent = serde_json::to_value(discord::activity(&c)).expect("activity as JSON");
+        assert_eq!(sent["status_display_type"], sent_as, "{choice:?}");
         // The lines themselves stay: title above, artist below.
         assert_eq!(c.details, "Windowlicker");
         assert_eq!(c.state.as_deref(), Some("Aphex Twin"));
@@ -198,38 +188,46 @@ fn discord_truncates_on_char_boundary() {
 
 #[test]
 fn discord_timeline_runs_from_the_position() {
-    let read_at = UNIX_EPOCH + Duration::from_millis(1_700_000_000_000);
-    let np = NowPlaying {
-        playing: true,
-        position: Duration::from_millis(5_250),
-        duration: Some(Duration::from_secs(147)),
-        ..Default::default()
-    };
-    // "00:05 ━━━ 02:27": started 5.25 s before the read, ends 147 s after the start.
-    assert_eq!(
-        timeline(&np, read_at),
-        Some((1_699_999_994_750, 1_700_000_141_750))
-    );
-
-    // A seek moves both ends.
-    let seeked = NowPlaying {
-        position: Duration::from_secs(60),
-        ..np.clone()
-    };
-    assert_eq!(
-        timeline(&seeked, read_at),
-        Some((1_699_999_940_000, 1_700_000_087_000))
-    );
-
-    // No bar while paused or without a duration.
-    let paused = NowPlaying {
-        playing: false,
-        ..np.clone()
-    };
-    assert_eq!(timeline(&paused, read_at), None);
-    let live = NowPlaying {
-        duration: None,
-        ..np
-    };
-    assert_eq!(timeline(&live, read_at), None);
+    let secs = |s: u64| Some(Duration::from_secs(s));
+    // (case, position in ms, duration, speed, playing, the bar's start and end)
+    let cases = [
+        // "00:05 ━━━ 02:27": started 5.25 s before the read, ends 147 s after the start.
+        (
+            "playing",
+            5_250,
+            secs(147),
+            1.0,
+            true,
+            Some((1_699_999_994_750, 1_700_000_141_750)),
+        ),
+        (
+            "a seek moves both ends",
+            60_000,
+            secs(147),
+            1.0,
+            true,
+            Some((1_699_999_940_000, 1_700_000_087_000)),
+        ),
+        // 10 s into a 100 s song is 5 s of listening, with 45 s to go.
+        (
+            "at 2x the bar ends when the song does",
+            10_000,
+            secs(100),
+            2.0,
+            true,
+            Some((1_699_999_995_000, 1_700_000_045_000)),
+        ),
+        ("paused: no bar", 5_250, secs(147), 1.0, false, None),
+        ("no duration: no bar", 5_250, None, 1.0, true, None),
+    ];
+    for (case, position, duration, speed, playing, bar) in cases {
+        let np = NowPlaying {
+            playing,
+            position: Duration::from_millis(position),
+            duration,
+            speed,
+            ..Default::default()
+        };
+        assert_eq!(timeline(&np, read_at()), bar, "{case}");
+    }
 }
