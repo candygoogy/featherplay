@@ -40,15 +40,6 @@ filter = 'package(featherplay) & binary(app) & test(/^(motion_idle|playing_mark|
 test-group = 'serial-perf'
 threads-required = 'num-test-threads'
 
-# The audio engine's real-clock stream test times a download against playback; beside a full
-# machine it can miss its window (it fails about once in a few full runs and passes alone).
-# It runs alone and gets two retries.
-[[profile.default.overrides]]
-filter = 'package(featherplay-audio) & test(engine_sounds_long_before_the_download_ends)'
-test-group = 'serial-perf'
-threads-required = 'num-test-threads'
-retries = 2
-
 # The audio engine beside a full CPU (ignored, a measurement): it fills every core itself,
 # so it runs alone.
 [[profile.default.overrides]]
