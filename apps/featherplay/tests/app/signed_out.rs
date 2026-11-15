@@ -3,60 +3,22 @@
 //! the account asks to sign in in place of an error, and a like asks to sign in instead of
 //! writing.
 
-use std::ops::ControlFlow;
-
 use featherplay::app;
 use featherplay::controller::{AccountEvent, Action, UiEvent};
 use featherplay::router::Page;
 use featherplay::snapshot::Scene;
 use featherplay::ui::{Player, PlaylistData, Theme, Toast};
-use i_slint_core::accessibility::AccessibleStringProperty;
-use i_slint_core::item_tree::ItemRc;
-use i_slint_core::lengths::LogicalRect;
-use i_slint_core::window::WindowInner;
 use slint::{ComponentHandle, Model};
 
-/// Whether a visible element says `label`.
-fn shown(scene: &Scene, label: &str) -> bool {
-    let root = ItemRc::new_root(WindowInner::from_pub(scene.ui.window()).component());
-    let found = root.visit_descendants(|item| {
-        let says = item
-            .accessible_string_property(AccessibleStringProperty::Label)
-            .is_some_and(|l| l == label);
-        if says && item.is_visible() {
-            ControlFlow::Break(())
-        } else {
-            ControlFlow::Continue(())
-        }
-    });
-    found.is_some()
-}
+use crate::support::label;
 
-/// Where the shown elements saying `label` are, in window coordinates.
-fn rects(scene: &Scene, label: &str) -> Vec<LogicalRect> {
-    let root = ItemRc::new_root(WindowInner::from_pub(scene.ui.window()).component());
-    let mut found = Vec::new();
-    root.visit_descendants(|item| {
-        if item.is_visible()
-            && item
-                .accessible_string_property(AccessibleStringProperty::Label)
-                .is_some_and(|l| l == label)
-        {
-            let g = item.geometry();
-            found.push(LogicalRect::new(item.map_to_window(g.origin), g.size));
-        }
-        ControlFlow::<()>::Continue(())
-    });
-    found
-}
-
-/// The top of the topmost shown element saying `label`.
-fn top(scene: &Scene, label: &str) -> f32 {
-    rects(scene, label)
+/// The top of the topmost shown element saying `name`.
+fn top(scene: &Scene, name: &str) -> f32 {
+    label::rects(scene, name)
         .iter()
         .map(|r| r.origin.y)
         .min_by(f32::total_cmp)
-        .unwrap_or_else(|| panic!("nothing shown says {label:?}"))
+        .unwrap_or_else(|| panic!("nothing shown says {name:?}"))
 }
 
 fn signed_out_on_home() -> Scene {
@@ -80,8 +42,8 @@ fn signed_out_the_window_stays_and_the_library_history_and_liked_songs_ask_to_si
 
     scene.open("library").expect("library");
     scene.settle();
-    assert!(shown(&scene, "Sign in to see your library"));
-    assert!(!shown(&scene, "This didn\u{2019}t load"));
+    assert!(label::shows(&scene, "Sign in to see your library"));
+    assert!(!label::shows(&scene, "This didn\u{2019}t load"));
     let library = top(&scene, "Sign in to see your library");
 
     scene.open("history").expect("history");
@@ -93,26 +55,26 @@ fn signed_out_the_window_stays_and_the_library_history_and_liked_songs_ask_to_si
     // it rather than listing.
     scene.open("liked").expect("liked songs");
     scene.settle();
-    assert!(shown(&scene, "Sign in to see your liked songs"));
+    assert!(label::shows(&scene, "Sign in to see your liked songs"));
     assert_eq!(
         scene.ui.global::<PlaylistData>().get_tracks().row_count(),
         0
     );
     let sidebar = scene.ui.global::<Theme>().get_sidebar_w();
     assert!(
-        rects(&scene, "Liked songs")
+        label::rects(&scene, "Liked songs")
             .iter()
             .any(|r| r.origin.x > sidebar),
         "no header"
     );
     // The bar at the bottom has a Shuffle of its own; the header's would be above it.
     let bar = top(&scene, "Previous");
-    for label in ["Play", "Shuffle"] {
+    for name in ["Play", "Shuffle"] {
         assert!(
-            rects(&scene, label)
+            label::rects(&scene, name)
                 .iter()
                 .all(|r| r.origin.y >= bar - 24.0),
-            "the header shows {label}"
+            "the header shows {name}"
         );
     }
 }

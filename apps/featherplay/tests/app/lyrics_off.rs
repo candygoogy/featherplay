@@ -3,16 +3,13 @@
 //! for lyrics, whatever the user does. On the offscreen platform with the fixtures; no window
 //! is shown, and no controller runs, so the setting isn't saved.
 
-use std::ops::ControlFlow;
-
 use featherplay::lyrics;
 use featherplay::offscreen;
 use featherplay::snapshot::Scene;
 use featherplay::ui::{LyricsData, NowPlayingData, SettingKey, SettingsData, Theme};
-use i_slint_core::accessibility::AccessibleStringProperty;
-use i_slint_core::item_tree::ItemRc;
-use i_slint_core::window::WindowInner;
 use slint::ComponentHandle;
+
+use crate::support::label;
 
 const W: u32 = 1280;
 const H: u32 = 800;
@@ -45,21 +42,14 @@ fn toggles(scene: &Scene) -> (bool, bool) {
     let bar_top = H as f32 - t.get_bar_clear();
     let stage_right = W as f32 - t.get_nowplaying_side_w();
     let (mut bar, mut pill) = (false, false);
-    let root = ItemRc::new_root(WindowInner::from_pub(scene.ui.window()).component());
-    root.visit_descendants(|item| {
-        let named = item
-            .accessible_string_property(AccessibleStringProperty::Label)
-            .is_some_and(|l| TOGGLES.contains(&l.as_str()));
-        if named && item.is_visible() {
-            let at = item.map_to_window(item.geometry().origin);
-            if at.y >= bar_top {
-                bar = true;
-            } else if at.x < stage_right && at.y < 72.0 {
-                pill = true;
-            }
+    for item in label::shown_where(scene, |_, l| TOGGLES.contains(&l)) {
+        let at = label::rect(&item).origin;
+        if at.y >= bar_top {
+            bar = true;
+        } else if at.x < stage_right && at.y < 72.0 {
+            pill = true;
         }
-        ControlFlow::<()>::Continue(())
-    });
+    }
     (bar, pill)
 }
 

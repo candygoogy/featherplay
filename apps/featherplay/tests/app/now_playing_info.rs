@@ -4,8 +4,6 @@
 //! year", and no lyric line: lyrics show only in their views. The cover has its full size in
 //! a 1280 x 800 window, and in smaller ones the block gives way so it ends above the bar.
 
-use std::ops::ControlFlow;
-
 use featherplay::controller::PlayingFrom;
 use featherplay::lyrics::{self, SnapshotLyrics};
 use featherplay::router::Page;
@@ -13,12 +11,10 @@ use featherplay::snapshot::Scene;
 use featherplay::ui::{Frame, LyricsData, NowPlayingData, Player, QueueData, Theme};
 use featherplay_controller::place::Place;
 use featherplay_core::model::AlbumId;
-use i_slint_core::accessibility::AccessibleStringProperty;
-use i_slint_core::item_tree::ItemRc;
-use i_slint_core::lengths::LogicalRect;
-use i_slint_core::window::WindowInner;
 use slint::platform::{PointerEventButton, WindowEvent};
 use slint::{ComponentHandle, LogicalPosition, Model};
+
+use crate::support::label::{self, LogicalRect};
 
 /// The stage's right edge: the side panel takes the rest.
 fn stage_right(scene: &Scene) -> f32 {
@@ -36,26 +32,11 @@ fn stage_right(scene: &Scene) -> f32 {
     }
 }
 
-/// Where the shown elements whose `property` is `value` are in the stage, in window
-/// coordinates.
-fn shown(scene: &Scene, property: AccessibleStringProperty, value: &str) -> Vec<LogicalRect> {
+/// Where the shown elements labelled `value` are in the stage, in window coordinates.
+fn shown(scene: &Scene, value: &str) -> Vec<LogicalRect> {
     let right = stage_right(scene);
-    let root = ItemRc::new_root(WindowInner::from_pub(scene.ui.window()).component());
-    let mut found = Vec::new();
-    root.visit_descendants(|item| {
-        if item.is_visible()
-            && item
-                .accessible_string_property(property)
-                .is_some_and(|v| v == value)
-        {
-            let g = item.geometry();
-            let r = LogicalRect::new(item.map_to_window(g.origin), g.size);
-            if r.origin.x < right && r.size.width > 0.0 {
-                found.push(r);
-            }
-        }
-        ControlFlow::<()>::Continue(())
-    });
+    let mut found = label::rects(scene, value);
+    found.retain(|r| r.origin.x < right && r.size.width > 0.0);
     found
 }
 
@@ -63,9 +44,7 @@ fn shown(scene: &Scene, property: AccessibleStringProperty, value: &str) -> Vec<
 fn header(scene: &Scene) -> Option<LogicalRect> {
     let from = scene.ui.global::<QueueData>().get_playing_from();
     let label = format!("Playing from {from}");
-    shown(scene, AccessibleStringProperty::Label, &label)
-        .into_iter()
-        .next()
+    shown(scene, &label).into_iter().next()
 }
 
 /// The block under the cover, above the bar: the cover's size (from the title's left edge,
@@ -75,7 +54,7 @@ fn block(scene: &Scene) -> (f32, LogicalRect, LogicalRect) {
     let theme = scene.ui.global::<Theme>();
     let bar_top = scene.ui.window().size().height as f32 - theme.get_bar_clear();
     let above_bar = |label: &str| {
-        shown(scene, AccessibleStringProperty::Label, label)
+        shown(scene, label)
             .into_iter()
             .filter(|r| r.max_y() <= bar_top)
             .min_by(|a, b| a.origin.y.total_cmp(&b.origin.y))
@@ -168,11 +147,7 @@ fn no_lyric_line_shows_under_the_credits() {
         .filter(|l| !l.trim().is_empty())
         .collect();
     assert!(!lines.is_empty(), "no synced lines");
-    let shows_a_line = |scene: &Scene| {
-        lines
-            .iter()
-            .any(|l| !shown(scene, AccessibleStringProperty::Label, l).is_empty())
-    };
+    let shows_a_line = |scene: &Scene| lines.iter().any(|l| !shown(scene, l).is_empty());
     assert!(
         !shows_a_line(&scene),
         "a lyric line shows on the cover view"

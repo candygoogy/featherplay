@@ -5,7 +5,6 @@
 //! bar that keeps every group, a three-digit sleep timer still shows its minutes. The bar
 //! with everything in it at 960 px is `bar_narrow.rs`'s.
 
-use std::ops::ControlFlow;
 use std::time::Duration;
 
 use featherplay::app;
@@ -13,11 +12,10 @@ use featherplay::controller::{SleepKind, SleepState, UiEvent};
 use featherplay::mini;
 use featherplay::snapshot::Scene;
 use featherplay::ui::{Player, SettingsData, Theme};
-use i_slint_core::accessibility::AccessibleStringProperty;
-use i_slint_core::item_tree::ItemRc;
-use i_slint_core::window::WindowInner;
 use slint::platform::{Key, PointerEventButton, WindowEvent};
 use slint::{ComponentHandle, LogicalPosition, SharedString};
+
+use crate::support::label;
 
 const W: u32 = 1280;
 const H: u32 = 800;
@@ -108,23 +106,11 @@ fn the_mini_player_button_shows_only_without_a_tray_and_toggles_it() {
 
 /// Where the bar's element named `label` sits, its left and right edges in the window: the
 /// lowest one when several are (the bar is at the bottom), visible ones only.
-fn span(scene: &Scene, label: &str) -> Option<(f32, f32)> {
-    let root = ItemRc::new_root(WindowInner::from_pub(scene.ui.window()).component());
-    let mut lowest: Option<(f32, f32, f32)> = None;
-    root.visit_descendants(|item| {
-        let named = item
-            .accessible_string_property(AccessibleStringProperty::Label)
-            .is_some_and(|l| l == label);
-        if named && item.is_visible() {
-            let at = item.map_to_window(item.geometry().origin);
-            let right = at.x + item.geometry().width();
-            if lowest.is_none_or(|(_, _, y)| at.y > y) {
-                lowest = Some((at.x, right, at.y));
-            }
-        }
-        ControlFlow::<()>::Continue(())
-    });
-    lowest.map(|(left, right, _)| (left, right))
+fn span(scene: &Scene, name: &str) -> Option<(f32, f32)> {
+    label::rects(scene, name)
+        .into_iter()
+        .reduce(|low, r| if r.origin.y > low.origin.y { r } else { low })
+        .map(|r| (r.min_x(), r.max_x()))
 }
 
 /// The bar at 960 px (the narrowest that keeps every group) on Windows (a tray, so no mini

@@ -2,7 +2,6 @@
 //! an option lights the part of the card it changes; the card sits beside the options at
 //! wide windows, staying in view while they scroll, and is left out at narrow ones.
 
-use std::ops::ControlFlow;
 use std::time::Duration;
 
 use featherplay::app;
@@ -10,13 +9,11 @@ use featherplay::controller::UiEvent;
 use featherplay::offscreen;
 use featherplay::snapshot::Scene;
 use featherplay::ui::{DiscordPart, DiscordState, SettingsData};
-use i_slint_core::accessibility::AccessibleStringProperty;
-use i_slint_core::item_tree::ItemRc;
 use i_slint_core::items::AccessibleRole;
-use i_slint_core::lengths::LogicalRect;
-use i_slint_core::window::WindowInner;
 use slint::platform::WindowEvent;
 use slint::{ComponentHandle, LogicalPosition};
+
+use crate::support::label::{self, LogicalRect};
 
 /// Settings at `width` × `height`, playing, with Discord status on and every section made.
 fn settings(width: u32, height: u32) -> Scene {
@@ -43,23 +40,12 @@ fn settings(width: u32, height: u32) -> Scene {
 
 /// Where the first shown element labelled `label` (with `role`, if given) is, in window
 /// coordinates.
-fn shown_as(scene: &Scene, role: Option<AccessibleRole>, label: &str) -> Option<LogicalRect> {
-    let root = ItemRc::new_root(WindowInner::from_pub(scene.ui.window()).component());
-    let mut found = None;
-    root.visit_descendants(|item| {
-        if item.is_visible()
-            && role.is_none_or(|r| item.accessible_role() == r)
-            && item
-                .accessible_string_property(AccessibleStringProperty::Label)
-                .is_some_and(|v| v == label)
-        {
-            let g = item.geometry();
-            found = Some(LogicalRect::new(item.map_to_window(g.origin), g.size));
-            return ControlFlow::Break(());
-        }
-        ControlFlow::Continue(())
-    });
-    found
+fn shown_as(scene: &Scene, role: Option<AccessibleRole>, name: &str) -> Option<LogicalRect> {
+    label::shown_where(scene, |item, l| {
+        l == name && role.is_none_or(|r| item.accessible_role() == r)
+    })
+    .first()
+    .map(label::rect)
 }
 
 fn shown(scene: &Scene, label: &str) -> Option<LogicalRect> {

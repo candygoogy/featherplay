@@ -4,41 +4,23 @@
 //! a second before them, and they stay inside the stage, beside the Up next panel in a
 //! narrow window too. A song rated Dislike shows the thumbs-down filled.
 
-use std::ops::ControlFlow;
-
 use featherplay::snapshot::Scene;
 use featherplay::song_menu;
 use featherplay::ui::{Frame, Player, Theme};
 use featherplay_core::model::{LikeStatus, TrackId};
-use i_slint_core::accessibility::AccessibleStringProperty;
-use i_slint_core::item_tree::ItemRc;
-use i_slint_core::lengths::LogicalRect;
-use i_slint_core::window::WindowInner;
 use slint::platform::WindowEvent;
 use slint::{ComponentHandle, LogicalSize, PhysicalSize};
 
+use crate::support::label::{self, LogicalRect};
+
 const LONG: &str = "In Love With Myself (feat. Somebody) – Extended Club Mix Remastered 2026";
 
-/// Where every shown element labelled `label` is, in window coordinates, left of `right`
+/// Where every shown element labelled `name` is, in window coordinates, left of `right`
 /// (the stage's right edge: the side panel's rows have titles and ⋯ buttons too). The
 /// lyrics view's wrapped title, hidden in the cover view, has the title's label too.
-fn rects(scene: &Scene, label: &str, right: f32) -> Vec<LogicalRect> {
-    let root = ItemRc::new_root(WindowInner::from_pub(scene.ui.window()).component());
-    let mut found = Vec::new();
-    root.visit_descendants(|item| {
-        if item.is_visible()
-            && item
-                .accessible_string_property(AccessibleStringProperty::Label)
-                .is_some_and(|l| l == label)
-        {
-            let g = item.geometry();
-            let r = LogicalRect::new(item.map_to_window(g.origin), g.size);
-            if r.origin.x < right {
-                found.push(r);
-            }
-        }
-        ControlFlow::<()>::Continue(())
-    });
+fn rects(scene: &Scene, name: &str, right: f32) -> Vec<LogicalRect> {
+    let mut found = label::rects(scene, name);
+    found.retain(|r| r.origin.x < right);
     found
 }
 

@@ -6,35 +6,18 @@
 //! the album header stacks. At 360 px (a window manager may force it) nothing runs past the
 //! window's edge.
 
-use std::ops::ControlFlow;
-
 use featherplay::lyrics::{self, SnapshotLyrics};
 use featherplay::snapshot::Scene;
 use featherplay::ui::{LyricsData, Player, Theme};
-use i_slint_core::accessibility::AccessibleStringProperty;
-use i_slint_core::item_tree::ItemRc;
-use i_slint_core::lengths::LogicalRect;
-use i_slint_core::window::WindowInner;
 use slint::platform::WindowEvent;
 use slint::{ComponentHandle, Model};
 
+use crate::support::label::{self, LogicalRect};
+
 /// Where the shown elements named `label` are, in window coordinates.
-fn shown(scene: &Scene, label: &str) -> Vec<LogicalRect> {
-    let root = ItemRc::new_root(WindowInner::from_pub(scene.ui.window()).component());
-    let mut found = Vec::new();
-    root.visit_descendants(|item| {
-        if item.is_visible()
-            && item
-                .accessible_string_property(AccessibleStringProperty::Label)
-                .is_some_and(|l| l == label)
-        {
-            let g = item.geometry();
-            if g.size.width > 0.0 {
-                found.push(LogicalRect::new(item.map_to_window(g.origin), g.size));
-            }
-        }
-        ControlFlow::<()>::Continue(())
-    });
+fn shown(scene: &Scene, name: &str) -> Vec<LogicalRect> {
+    let mut found = label::rects(scene, name);
+    found.retain(|r| r.size.width > 0.0);
     found
 }
 
@@ -146,20 +129,8 @@ fn home_at_480_has_the_narrow_band_one_column_of_quick_picks_and_no_up_next_link
         "the band's row runs past the window: {radio:?}"
     );
     // The bar's Up next button is the way to the queue: no link in the band.
-    let link = WindowInner::from_pub(scene.ui.window()).component();
-    let mut found = false;
-    ItemRc::new_root(link).visit_descendants(|item| {
-        if item.is_visible()
-            && item
-                .accessible_string_property(AccessibleStringProperty::Label)
-                .is_some_and(|l| l.starts_with("Up next ·"))
-        {
-            found = true;
-            return ControlFlow::Break(());
-        }
-        ControlFlow::Continue(())
-    });
-    assert!(!found, "the band shows its Up next link at 480 px");
+    let link = label::shown_where(&scene, |_, l| l.starts_with("Up next ·"));
+    assert!(link.is_empty(), "the band shows its Up next link at 480 px");
     // Quick picks: one column, its rows on one left edge, the next column out of view.
     let songs = scene.ui.global::<featherplay::ui::HomeData>();
     let quick = (0..songs.get_shelves().row_count())
@@ -238,24 +209,14 @@ fn nothing_runs_past_the_window_at_360() {
             theme.get_top_bar_h(),
             size.height as f32 - theme.get_bar_clear(),
         );
-        let root = ItemRc::new_root(WindowInner::from_pub(scene.ui.window()).component());
         let mut out = Vec::new();
-        root.visit_descendants(|item| {
-            let g = item.geometry();
-            let named = item
-                .accessible_string_property(AccessibleStringProperty::Label)
-                .filter(|l| !l.is_empty());
-            if let Some(label) = named
-                && item.is_visible()
-                && g.size.width > 0.0
-            {
-                let at = item.map_to_window(g.origin);
-                let inside = at.y >= top && at.y + g.size.height <= bottom;
-                if inside && at.x + g.size.width > width + 0.5 {
-                    out.push(format!("{label} ({} to {})", at.x, at.x + g.size.width));
-                }
+        label::shown_where(&scene, |item, l| {
+            let r = label::rect(item);
+            let inside = r.min_y() >= top && r.max_y() <= bottom;
+            if !l.is_empty() && r.size.width > 0.0 && inside && r.max_x() > width + 0.5 {
+                out.push(format!("{l} ({} to {})", r.min_x(), r.max_x()));
             }
-            ControlFlow::<()>::Continue(())
+            false
         });
         assert!(out.is_empty(), "{name}: past the 360 px edge: {out:?}");
     }

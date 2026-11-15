@@ -37,7 +37,7 @@ fn record(scene: &Scene) -> Calls {
 /// A point near the slider's top left, where one notch has just gone.
 fn slider(scene: &Scene, calls: &Calls) -> LogicalPosition {
     let w = scene.ui.window();
-    let r = volume_slider(&scene.ui);
+    let r = volume_slider(&scene);
     let at = LogicalPosition::new(r[0] + 2.0, r[1] + 2.0);
     w.dispatch_event(WindowEvent::PointerMoved { position: at });
     offscreen::wheel(w, at, 1.0);

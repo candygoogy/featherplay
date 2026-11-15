@@ -2,19 +2,15 @@
 //! hovered, a mark's tip says so, and a click inside one seeks to its end; once the
 //! controller sends none (Skip silence off, a track change), a click seeks where it lands.
 
-use std::ops::ControlFlow;
-
 use featherplay::bar;
 use featherplay::controller::Action;
 use featherplay::snapshot::Scene;
 use featherplay::ui::Player;
-use i_slint_core::accessibility::AccessibleStringProperty;
-use i_slint_core::item_tree::ItemRc;
 use i_slint_core::items::AccessibleRole;
-use i_slint_core::lengths::LogicalRect;
-use i_slint_core::window::WindowInner;
 use slint::platform::{PointerEventButton, WindowEvent};
 use slint::{ComponentHandle, LogicalPosition};
+
+use crate::support::label::{self, LogicalRect};
 
 /// A mark narrower than the bar's minimum is hit where it's drawn: pinned to the line's
 /// start or end, centred inside it.
@@ -52,39 +48,10 @@ fn with_marks(marks: &[(f32, f32)]) -> Scene {
 
 /// The seek line, in window coordinates.
 fn seek_line(scene: &Scene) -> LogicalRect {
-    let root = ItemRc::new_root(WindowInner::from_pub(scene.ui.window()).component());
-    let mut found = None;
-    root.visit_descendants(|item| {
-        if item.is_visible()
-            && item.accessible_role() == AccessibleRole::Slider
-            && item
-                .accessible_string_property(AccessibleStringProperty::Label)
-                .is_some_and(|v| v == "Seek")
-        {
-            let g = item.geometry();
-            found = Some(LogicalRect::new(item.map_to_window(g.origin), g.size));
-            return ControlFlow::Break(());
-        }
-        ControlFlow::Continue(())
+    let line = label::shown_where(scene, |item, l| {
+        l == "Seek" && item.accessible_role() == AccessibleRole::Slider
     });
-    found.expect("the seek line")
-}
-
-/// Whether a shown element reads `text`, as a `Text` does.
-fn shows(scene: &Scene, text: &str) -> bool {
-    let root = ItemRc::new_root(WindowInner::from_pub(scene.ui.window()).component());
-    root.visit_descendants(|item| {
-        if item.is_visible()
-            && item
-                .accessible_string_property(AccessibleStringProperty::Label)
-                .is_some_and(|v| v == text)
-        {
-            ControlFlow::Break(())
-        } else {
-            ControlFlow::Continue(())
-        }
-    })
-    .is_some()
+    label::rect(line.first().expect("the seek line"))
 }
 
 /// The point `fraction` along the seek line.
@@ -133,9 +100,12 @@ fn sought(scene: &Scene) -> Vec<f32> {
 fn a_mark_says_silence_when_hovered_and_a_click_inside_seeks_to_its_end() {
     let scene = with_marks(&[(0.4, 0.6)]);
     hover(&scene, along(&scene, 0.2));
-    assert!(!shows(&scene, "Silence"), "a tip over the plain line");
+    assert!(
+        !label::shows(&scene, "Silence"),
+        "a tip over the plain line"
+    );
     hover(&scene, along(&scene, 0.5));
-    assert!(shows(&scene, "Silence"), "no tip over the mark");
+    assert!(label::shows(&scene, "Silence"), "no tip over the mark");
     click(&scene, along(&scene, 0.45));
     let to = sought(&scene);
     assert_eq!(to.len(), 1, "a click inside the mark: {to:?}");
@@ -149,7 +119,10 @@ fn a_mark_says_silence_when_hovered_and_a_click_inside_seeks_to_its_end() {
     bar::show_silences(&scene.ctx, &[]);
     scene.settle();
     hover(&scene, along(&scene, 0.5));
-    assert!(!shows(&scene, "Silence"), "a tip with the marks gone");
+    assert!(
+        !label::shows(&scene, "Silence"),
+        "a tip with the marks gone"
+    );
     click(&scene, along(&scene, 0.45));
     let to = sought(&scene);
     assert_eq!(to.len(), 1, "a click with the marks gone: {to:?}");

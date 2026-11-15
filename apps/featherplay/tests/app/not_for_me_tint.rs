@@ -3,38 +3,17 @@
 //! drawn in `text3`, which doesn't follow). Checked in the bar and in Now playing's title row,
 //! through the renderer's own frames (`offscreen::install_presenting`); no window is shown.
 
-use std::ops::ControlFlow;
 use std::time::Duration;
 
 use featherplay::offscreen;
 use featherplay::snapshot::Scene;
 use featherplay::ui::Theme;
-use i_slint_core::accessibility::AccessibleStringProperty;
-use i_slint_core::item_tree::ItemRc;
-use i_slint_core::lengths::LogicalRect;
-use i_slint_core::window::WindowInner;
 use slint::{Color, ComponentHandle};
+
+use crate::support::label::{self, LogicalRect};
 
 /// A tint no other part of the bar or the stage is drawn in.
 const TINT: (u8, u8, u8) = (0x3c, 0xe8, 0x9a);
-
-/// Where every shown element labelled `label` is, in window coordinates.
-fn rects(scene: &Scene, label: &str) -> Vec<LogicalRect> {
-    let root = ItemRc::new_root(WindowInner::from_pub(scene.ui.window()).component());
-    let mut found = Vec::new();
-    root.visit_descendants(|item| {
-        if item.is_visible()
-            && item
-                .accessible_string_property(AccessibleStringProperty::Label)
-                .is_some_and(|l| l == label)
-        {
-            let g = item.geometry();
-            found.push(LogicalRect::new(item.map_to_window(g.origin), g.size));
-        }
-        ControlFlow::<()>::Continue(())
-    });
-    found
-}
 
 /// How close the glyph in `r` comes to the tint: the least distance of any of its pixels
 /// (0 where the stroke is drawn solid in it).
@@ -65,10 +44,10 @@ fn settle(scene: &Scene) {
     }
 }
 
-/// The glyphs of the shown buttons labelled `label` (left to right) and how close each
+/// The glyphs of the shown buttons labelled `name` (left to right) and how close each
 /// comes to the tint.
-fn tinted(scene: &Scene, label: &str) -> Vec<(f32, u32)> {
-    let mut found: Vec<(f32, u32)> = rects(scene, label)
+fn tinted(scene: &Scene, name: &str) -> Vec<(f32, u32)> {
+    let mut found: Vec<(f32, u32)> = label::rects(scene, name)
         .iter()
         .map(|r| (r.origin.x, nearest_to_tint(scene, r)))
         .collect();

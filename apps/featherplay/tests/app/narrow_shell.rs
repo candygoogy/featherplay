@@ -6,36 +6,24 @@
 //! 360 px; the wheel over it sets the volume, never scrolling the page; where the
 //! volume's slider doesn't fit, its button opens it in a popup.
 
-use std::ops::ControlFlow;
 use std::time::Duration;
 
 use featherplay::offscreen;
 use featherplay::snapshot::Scene;
 use featherplay::ui::{Frame, Nav, PageKind, Player, Theme};
-use i_slint_core::accessibility::AccessibleStringProperty;
-use i_slint_core::item_tree::ItemRc;
-use i_slint_core::window::WindowInner;
 use slint::platform::{Key, PointerEventButton, WindowEvent};
 use slint::{ComponentHandle, LogicalPosition, LogicalSize, PhysicalSize, SharedString};
+
+use crate::support::label;
 
 const H: u32 = 800;
 
 /// The visible elements named `label`, as left, top, right and bottom edges.
-fn rects(scene: &Scene, label: &str) -> Vec<[f32; 4]> {
-    let root = ItemRc::new_root(WindowInner::from_pub(scene.ui.window()).component());
-    let mut found = Vec::new();
-    root.visit_descendants(|item| {
-        let named = item
-            .accessible_string_property(AccessibleStringProperty::Label)
-            .is_some_and(|l| l == label);
-        if named && item.is_visible() {
-            let g = item.geometry();
-            let at = item.map_to_window(g.origin);
-            found.push([at.x, at.y, at.x + g.width(), at.y + g.height()]);
-        }
-        ControlFlow::<()>::Continue(())
-    });
-    found
+fn rects(scene: &Scene, name: &str) -> Vec<[f32; 4]> {
+    label::rects(scene, name)
+        .iter()
+        .map(|r| [r.min_x(), r.min_y(), r.max_x(), r.max_y()])
+        .collect()
 }
 
 /// The one visible element named `label` at or below `top`, if there is one.

@@ -6,7 +6,6 @@
 //! window. On the offscreen platform with the demo
 //! fixtures; no window is shown.
 
-use std::ops::ControlFlow;
 use std::time::{Duration, Instant};
 
 use featherplay::snapshot::Scene;
@@ -14,13 +13,12 @@ use featherplay::ui::{
     ChooseState, Frame, LyricsChoose, LyricsData, LyricsMenu, LyricsState, NowPlayingData, Theme,
 };
 use featherplay_store::{LyricsChoices, LyricsPick, Paths};
-use i_slint_core::accessibility::{AccessibilityAction, AccessibleStringProperty};
-use i_slint_core::item_tree::ItemRc;
+use i_slint_core::accessibility::AccessibilityAction;
 use i_slint_core::items::AccessibleRole;
-use i_slint_core::lengths::LogicalRect;
-use i_slint_core::window::WindowInner;
 use slint::platform::{Key, WindowEvent};
 use slint::{ComponentHandle, Model};
+
+use crate::support::label::{self, ItemRc, LogicalRect};
 
 /// Now playing's full lyrics view on the demo set's first song, its synced lines in.
 fn scene() -> Scene {
@@ -58,21 +56,10 @@ fn saved(scene: &Scene, ok: impl Fn(&featherplay_store::LyricsChoice) -> bool) -
 }
 
 /// The visible buttons whose accessible label is `label`.
-fn find(scene: &Scene, label: &str) -> Vec<ItemRc> {
-    let root = ItemRc::new_root(WindowInner::from_pub(scene.ui.window()).component());
-    let mut found = Vec::new();
-    root.visit_descendants(|item| {
-        if item.is_visible()
-            && item.accessible_role() == AccessibleRole::Button
-            && item
-                .accessible_string_property(AccessibleStringProperty::Label)
-                .is_some_and(|l| l == label)
-        {
-            found.push(item.clone());
-        }
-        ControlFlow::<()>::Continue(())
-    });
-    found
+fn find(scene: &Scene, name: &str) -> Vec<ItemRc> {
+    label::shown_where(scene, |item, l| {
+        l == name && item.accessible_role() == AccessibleRole::Button
+    })
 }
 
 fn press(scene: &Scene, label: &str) {
@@ -297,22 +284,13 @@ fn line_rects(scene: &Scene, from: f32, to: f32) -> Vec<LogicalRect> {
         .filter(|l| !l.is_empty())
         .map(|l| l.to_string())
         .collect();
-    let root = ItemRc::new_root(WindowInner::from_pub(scene.ui.window()).component());
-    let mut rects = Vec::new();
-    root.visit_descendants(|item| {
-        if item.accessible_role() == AccessibleRole::Button
-            && item
-                .accessible_string_property(AccessibleStringProperty::Label)
-                .is_some_and(|v| lines.iter().any(|l| *l == v.as_str()))
-        {
-            let g = item.geometry();
-            let r = LogicalRect::new(item.map_to_window(g.origin), g.size);
-            if (from..to).contains(&r.origin.x) && r.size.height > 0.0 {
-                rects.push(r);
-            }
-        }
-        ControlFlow::<()>::Continue(())
-    });
+    let mut rects: Vec<LogicalRect> = label::any_where(scene, |item, v| {
+        item.accessible_role() == AccessibleRole::Button && lines.iter().any(|l| l == v)
+    })
+    .iter()
+    .map(label::rect)
+    .filter(|r| (from..to).contains(&r.origin.x) && r.size.height > 0.0)
+    .collect();
     rects.sort_by(|a, b| a.origin.y.total_cmp(&b.origin.y));
     rects
 }

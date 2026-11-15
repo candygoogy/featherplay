@@ -4,40 +4,26 @@
 //! each other or into the right-hand side. At 960 px everything still shows. The steps below
 //! 640 px are `narrow_shell.rs`'s.
 
-use std::ops::ControlFlow;
 use std::time::Duration;
 
 use featherplay::app;
 use featherplay::controller::{SleepKind, SleepState, UiEvent};
 use featherplay::snapshot::Scene;
 use featherplay::ui::{Player, SettingsData, Theme};
-use i_slint_core::accessibility::AccessibleStringProperty;
-use i_slint_core::item_tree::ItemRc;
-use i_slint_core::window::WindowInner;
 use slint::ComponentHandle;
 use slint::platform::WindowEvent;
+
+use crate::support::label;
 
 const H: u32 = 800;
 
 /// The left and right edges of the visible element named `label` in the bar (at or below
 /// `top`), if there is one.
-fn span(scene: &Scene, label: &str, top: f32) -> Option<(f32, f32)> {
-    let root = ItemRc::new_root(WindowInner::from_pub(scene.ui.window()).component());
-    let mut found = None;
-    root.visit_descendants(|item| {
-        let named = item
-            .accessible_string_property(AccessibleStringProperty::Label)
-            .is_some_and(|l| l == label);
-        if named && item.is_visible() {
-            let at = item.map_to_window(item.geometry().origin);
-            if at.y >= top {
-                found = Some((at.x, at.x + item.geometry().width()));
-                return ControlFlow::Break(());
-            }
-        }
-        ControlFlow::Continue(())
-    });
-    found
+fn span(scene: &Scene, name: &str, top: f32) -> Option<(f32, f32)> {
+    label::rects(scene, name)
+        .into_iter()
+        .find(|r| r.origin.y >= top)
+        .map(|r| (r.min_x(), r.max_x()))
 }
 
 /// The worst case for room: Linux without a tray (the mini player's button), the sleep timer

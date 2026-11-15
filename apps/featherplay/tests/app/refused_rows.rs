@@ -2,8 +2,6 @@
 //! to screen readers (and on hover), from the moment it's marked to the moment the mark goes,
 //! with the list already on screen. Offscreen, with the fixture playlist.
 
-use std::ops::ControlFlow;
-
 use featherplay::app;
 use featherplay::controller::UiEvent;
 use featherplay::snapshot::Scene;
@@ -11,30 +9,19 @@ use featherplay::ui::{PlaylistData, TrackRow};
 use featherplay_controller::place::Place;
 use featherplay_core::model::{PlaylistId, TrackId};
 use i_slint_core::accessibility::AccessibleStringProperty;
-use i_slint_core::item_tree::ItemRc;
-use i_slint_core::window::WindowInner;
 use slint::{ComponentHandle, Model};
+
+use crate::support::label;
 
 const WHY: &str = "YouTube won't play this song in featherplay right now";
 
 /// What screen readers hear of the shown row labelled `label`, beyond its label.
-fn description(scene: &Scene, label: &str) -> String {
-    let root = ItemRc::new_root(WindowInner::from_pub(scene.ui.window()).component());
-    root.visit_descendants(|item| {
-        let says = item
-            .accessible_string_property(AccessibleStringProperty::Label)
-            .is_some_and(|l| l == label);
-        if says && item.is_visible() {
-            ControlFlow::Break(
-                item.accessible_string_property(AccessibleStringProperty::Description)
-                    .unwrap_or_default()
-                    .to_string(),
-            )
-        } else {
-            ControlFlow::Continue(())
-        }
-    })
-    .unwrap_or_else(|| panic!("no row {label:?} shown"))
+fn description(scene: &Scene, name: &str) -> String {
+    label::find(scene, name)
+        .unwrap_or_else(|| panic!("no row {name:?} shown"))
+        .accessible_string_property(AccessibleStringProperty::Description)
+        .unwrap_or_default()
+        .to_string()
 }
 
 #[test]

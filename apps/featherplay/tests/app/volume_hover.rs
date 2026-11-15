@@ -48,7 +48,7 @@ fn the_slider_stays_lit_while_the_wheel_holds_the_hover() {
     let w = scene.ui.window();
 
     // On the slider's fill, at its left end and half way down.
-    let r = volume_slider(&scene.ui);
+    let r = volume_slider(&scene);
     let fill = LogicalPosition::new(r[0] + 3.0, ((r[1] + r[3]) / 2.0).round());
 
     w.dispatch_event(WindowEvent::PointerMoved { position: fill });

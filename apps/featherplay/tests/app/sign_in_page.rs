@@ -12,7 +12,6 @@
 //! it's open, above the bar.
 
 use std::cell::Cell;
-use std::ops::ControlFlow;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
@@ -21,36 +20,15 @@ use featherplay::offscreen;
 use featherplay::router::Page;
 use featherplay::snapshot::Scene;
 use featherplay::ui::{BrowserBlock, Frame, SessionStore, SignInData, Theme, TopBarData};
-use i_slint_core::accessibility::{AccessibilityAction, AccessibleStringProperty};
-use i_slint_core::item_tree::ItemRc;
-use i_slint_core::window::WindowInner;
+use i_slint_core::accessibility::AccessibleStringProperty;
 use slint::platform::{Key, PointerEventButton, WindowEvent};
 use slint::{ComponentHandle, LogicalSize, PhysicalSize, SharedString};
 
+use crate::support::label::{self, ItemRc};
+
 /// The first visible element whose label passes `test`.
 fn find(scene: &Scene, test: impl Fn(&str) -> bool) -> Option<ItemRc> {
-    let root = ItemRc::new_root(WindowInner::from_pub(scene.ui.window()).component());
-    root.visit_descendants(|item| {
-        let says = item
-            .accessible_string_property(AccessibleStringProperty::Label)
-            .is_some_and(|l| test(&l));
-        if says && item.is_visible() {
-            ControlFlow::Break(item.clone())
-        } else {
-            ControlFlow::Continue(())
-        }
-    })
-}
-
-fn shown(scene: &Scene, label: &str) -> bool {
-    find(scene, |l| l == label).is_some()
-}
-
-fn press(scene: &Scene, label: &str) {
-    find(scene, |l| l == label)
-        .unwrap_or_else(|| panic!("nothing visible says {label:?}"))
-        .accessible_action(&AccessibilityAction::Default);
-    scene.settle();
+    label::shown_where(scene, |_, l| test(l)).into_iter().next()
 }
 
 fn enabled(scene: &Scene, label: &str) -> bool {
@@ -89,20 +67,20 @@ fn sign_in_page(edge_blocked: bool) -> Scene {
 #[test]
 fn the_ways_in_are_rows_of_one_list() {
     let scene = sign_in_page(false);
-    assert!(shown(&scene, "Sign in to featherplay"));
+    assert!(label::shows(&scene, "Sign in to featherplay"));
     for row in ["Use Microsoft Edge", "Paste a cookie header"] {
-        assert!(shown(&scene, row), "no {row:?} row");
+        assert!(label::shows(&scene, row), "no {row:?} row");
         assert!(enabled(&scene, row), "{row:?} is off");
     }
     // The sign-in window is Windows' alone.
     let window = featherplay_platform::supports(featherplay_platform::Feature::WebViewSignIn);
-    assert_eq!(shown(&scene, "Sign in with Google"), window);
+    assert_eq!(label::shows(&scene, "Sign in with Google"), window);
     assert_ne!(
         line(&scene, "Use Microsoft Edge"),
         "Not available on this PC"
     );
-    assert!(!shown(&scene, "Why?"));
-    assert!(!shown(&scene, "Change"), "one browser is no choice");
+    assert!(!label::shows(&scene, "Why?"));
+    assert!(!label::shows(&scene, "Change"), "one browser is no choice");
 }
 
 const BROWSERS: [&str; 3] = ["Microsoft Edge", "Google Chrome", "Brave"];
@@ -120,21 +98,24 @@ fn with_several_browsers_the_row_names_the_one_offered_and_change_lists_them() {
     let found = [("edge", false), ("chrome", false), ("brave", false)];
     let scene = sign_in_page_with(&found, "chrome");
     assert!(enabled(&scene, "Use Google Chrome"));
-    assert!(!shown(&scene, "Use Microsoft Edge"));
+    assert!(!label::shows(&scene, "Use Microsoft Edge"));
     for browser in BROWSERS {
-        assert!(!shown(&scene, browser), "{browser} shows before Change");
+        assert!(
+            !label::shows(&scene, browser),
+            "{browser} shows before Change"
+        );
     }
 
-    press(&scene, "Change");
+    label::press(&scene, "Change");
     for browser in BROWSERS {
-        assert!(shown(&scene, browser), "{browser} isn't listed");
+        assert!(label::shows(&scene, browser), "{browser} isn't listed");
     }
     let checks: Vec<bool> = BROWSERS.iter().map(|b| checked(&scene, b)).collect();
     assert_eq!(checks, [false, true, false]);
 
     // Another way in shuts the list, so it doesn't unfold again when that way ends.
     if featherplay_platform::supports(featherplay_platform::Feature::WebViewSignIn) {
-        press(&scene, "Sign in with Google");
+        label::press(&scene, "Sign in with Google");
         assert!(!scene.ui.global::<SignInData>().get_choosing());
     }
 }
@@ -143,18 +124,21 @@ fn with_several_browsers_the_row_names_the_one_offered_and_change_lists_them() {
 fn picking_a_browser_from_the_list_offers_it_and_remembers_it() {
     let found = [("edge", false), ("chrome", false), ("brave", false)];
     let scene = sign_in_page_with(&found, "chrome");
-    press(&scene, "Change");
+    label::press(&scene, "Change");
     scene.take_actions();
 
-    press(&scene, "Brave");
+    label::press(&scene, "Brave");
     assert!(enabled(&scene, "Use Brave"));
-    assert!(!shown(&scene, "Google Chrome"), "the list stayed open");
+    assert!(
+        !label::shows(&scene, "Google Chrome"),
+        "the list stayed open"
+    );
     let remembered = scene.take_actions().into_iter().any(|a| {
         matches!(a, Action::Account(AccountAction::Set(Change::SignInBrowser(id))) if id == "brave")
     });
     assert!(remembered, "the choice wasn't saved");
     // Opened again, the check has moved.
-    press(&scene, "Change");
+    label::press(&scene, "Change");
     assert!(checked(&scene, "Brave") && !checked(&scene, "Google Chrome"));
 }
 
@@ -164,9 +148,9 @@ fn a_blocked_browser_in_the_list_says_so_with_why_and_cant_be_picked() {
     let scene = sign_in_page_with(&found, "chrome");
     // The row offers one that works, so it isn't the one saying "Why?".
     assert!(enabled(&scene, "Use Google Chrome"));
-    assert!(!shown(&scene, "Why?"));
+    assert!(!label::shows(&scene, "Why?"));
 
-    press(&scene, "Change");
+    label::press(&scene, "Change");
     assert!(!enabled(&scene, "Microsoft Edge"));
     assert_eq!(line(&scene, "Microsoft Edge"), "Not available on this PC");
     let policy = |l: &str| l.starts_with("Edge on this PC");
@@ -174,12 +158,12 @@ fn a_blocked_browser_in_the_list_says_so_with_why_and_cant_be_picked() {
         find(&scene, policy).is_none(),
         "the policy shows before Why?"
     );
-    press(&scene, "Why?");
+    label::press(&scene, "Why?");
     assert!(find(&scene, policy).is_some(), "Why? didn't open the note");
 
-    press(&scene, "Microsoft Edge");
+    label::press(&scene, "Microsoft Edge");
     assert!(
-        shown(&scene, "Use Google Chrome"),
+        label::shows(&scene, "Use Google Chrome"),
         "a blocked one was taken"
     );
 }
@@ -218,12 +202,15 @@ fn a_blocked_browser_says_so_in_its_row_and_why_opens_the_detail() {
         scene.settle();
         assert!(!enabled(&scene, row), "{case}: {row:?} is on");
         assert_eq!(line(&scene, row), "Not available on this PC", "{case}");
-        assert!(!shown(&scene, "Change"), "{case}: nothing to choose from");
+        assert!(
+            !label::shows(&scene, "Change"),
+            "{case}: nothing to choose from"
+        );
         assert!(
             find(&scene, policy).is_none(),
             "{case}: the policy shows before Why?"
         );
-        press(&scene, "Why?");
+        label::press(&scene, "Why?");
         assert!(
             find(&scene, policy).is_some(),
             "{case}: Why? didn't open the detail"
@@ -241,14 +228,14 @@ fn without_a_sign_in_window_the_browser_row_leads_and_a_snap_says_why() {
     data.set_window_way(false);
     data.set_session_store(SessionStore::None);
     scene.settle();
-    assert!(!shown(&scene, "Sign in with Google"));
+    assert!(!label::shows(&scene, "Sign in with Google"));
     assert!(enabled(&scene, "Use Microsoft Edge"));
     assert!(find(&scene, |l| l.contains("lasts until featherplay closes")).is_some());
 
     data.set_browser_blocked(true);
     data.set_browser_block(BrowserBlock::Snap);
     scene.settle();
-    press(&scene, "Why?");
+    label::press(&scene, "Why?");
     assert!(find(&scene, |l| l.starts_with("This Edge is a Snap")).is_some());
     assert!(find(&scene, |l| l.contains("RemoteDebuggingAllowed")).is_none());
 }
@@ -292,7 +279,7 @@ fn why_eases_open_and_shut_and_the_rows_below_follow() {
     let policy = |l: &str| l.starts_with("Edge on this PC");
     let shut = top(&scene, "Paste a cookie header");
 
-    press(&scene, "Why?");
+    label::press(&scene, "Why?");
     offscreen::advance(Duration::from_millis(40));
     let opening = top(&scene, "Paste a cookie header");
     assert!(find(&scene, policy).is_some(), "the detail isn't there");
@@ -303,7 +290,7 @@ fn why_eases_open_and_shut_and_the_rows_below_follow() {
         "the row under it jumped instead of following: {shut} {opening} {open}"
     );
 
-    press(&scene, "Why?");
+    label::press(&scene, "Why?");
     offscreen::advance(Duration::from_millis(40));
     let closing = top(&scene, "Paste a cookie header");
     assert!(
@@ -336,7 +323,7 @@ fn a_sign_in_window_with_no_handle_says_so_plainly_with_try_again_and_the_log_fo
     };
     let scene = sign_in_page(false);
     let data = scene.ui.global::<SignInData>();
-    press(&scene, "Sign in with Google");
+    label::press(&scene, "Sign in with Google");
     assert!(data.get_busy(), "the sign-in didn't start");
     assert!(
         log().contains("sign-in window opening: private "),
@@ -354,8 +341,8 @@ fn a_sign_in_window_with_no_handle_says_so_plainly_with_try_again_and_the_log_fo
     offscreen::freeze_clock();
     scene.settle();
     assert!(!data.get_busy(), "still waiting after 5 s");
-    assert!(shown(&scene, "The sign-in window didn't open"));
-    assert!(shown(&scene, "Try again, or use another way below."));
+    assert!(label::shows(&scene, "The sign-in window didn't open"));
+    assert!(label::shows(&scene, "Try again, or use another way below."));
     assert!(
         find(&scene, |l| l.contains("handle")).is_none(),
         "the log's detail is on the page"
@@ -374,7 +361,7 @@ fn a_sign_in_window_with_no_handle_says_so_plainly_with_try_again_and_the_log_fo
     let tried = Rc::new(Cell::new(false));
     let t = tried.clone();
     data.on_open_window(move || t.set(true));
-    press(&scene, "Try again");
+    label::press(&scene, "Try again");
     assert!(tried.get(), "Try again didn't open the window");
     let _ = std::fs::remove_dir_all(&dir);
 }
@@ -382,9 +369,9 @@ fn a_sign_in_window_with_no_handle_says_so_plainly_with_try_again_and_the_log_fo
 #[test]
 fn a_click_on_the_cookie_row_opens_the_field_and_a_paste_that_cant_be_used_says_why() {
     let scene = sign_in_page(false);
-    assert!(!shown(&scene, "Cookie header"));
+    assert!(!label::shows(&scene, "Cookie header"));
     click(&scene, "Paste a cookie header");
-    assert!(shown(&scene, "Cookie header"), "no paste field");
+    assert!(label::shows(&scene, "Cookie header"), "no paste field");
     let why = |l: &str| l.contains("name=value");
     assert!(find(&scene, why).is_none(), "a reason before any paste");
     scene
@@ -392,15 +379,18 @@ fn a_click_on_the_cookie_row_opens_the_field_and_a_paste_that_cant_be_used_says_
         .global::<SignInData>()
         .set_cookies("hello world".into());
     scene.settle();
-    press(&scene, "Sign in with this cookie");
+    label::press(&scene, "Sign in with this cookie");
     assert!(find(&scene, why).is_some(), "no reason under the field");
-    assert!(!shown(&scene, "Try again"), "a paste is fixed in the field");
+    assert!(
+        !label::shows(&scene, "Try again"),
+        "a paste is fixed in the field"
+    );
 }
 
 #[test]
 fn continue_without_signing_in_goes_home() {
     let scene = sign_in_page(false);
-    press(&scene, "Continue without signing in");
+    label::press(&scene, "Continue without signing in");
     assert_eq!(scene.ctx.current_page(), Page::Home);
 }
 
@@ -477,10 +467,16 @@ fn ctrl_k(scene: &Scene) {
 #[test]
 fn the_page_has_no_search_bar_and_ctrl_k_searches_from_home() {
     let scene = sign_in_page(false);
-    assert!(!shown(&scene, "Search"), "the search bar shows on sign in");
+    assert!(
+        !label::shows(&scene, "Search"),
+        "the search bar shows on sign in"
+    );
     scene.open("home").expect("home");
     scene.settle();
-    assert!(shown(&scene, "Search"), "the search bar is gone from Home");
+    assert!(
+        label::shows(&scene, "Search"),
+        "the search bar is gone from Home"
+    );
 
     // Ctrl+K on sign in: Home, its field taking the keys.
     scene.open("sign-in").expect("sign in");

@@ -3,38 +3,23 @@
 //! timer and closes it; running, the button reads as the time left, and Turn off in the
 //! popup asks the controller to turn it off.
 
-use std::ops::ControlFlow;
 use std::time::Duration;
 
 use featherplay::app;
 use featherplay::controller::{Action, SleepAction, SleepKind, SleepState, UiEvent};
 use featherplay::snapshot::Scene;
 use featherplay::ui::{SettingsData, Sleep};
-use i_slint_core::accessibility::AccessibleStringProperty;
-use i_slint_core::item_tree::ItemRc;
-use i_slint_core::window::WindowInner;
 use slint::platform::{PointerEventButton, WindowEvent};
 use slint::{ComponentHandle, LogicalPosition};
 
-/// The centre of the visible element named `label`, the lowest one if several are.
-fn centre(scene: &Scene, label: &str) -> Option<LogicalPosition> {
-    let root = ItemRc::new_root(WindowInner::from_pub(scene.ui.window()).component());
-    let mut lowest: Option<LogicalPosition> = None;
-    root.visit_descendants(|item| {
-        let named = item
-            .accessible_string_property(AccessibleStringProperty::Label)
-            .is_some_and(|l| l == label);
-        if named && item.is_visible() {
-            let g = item.geometry();
-            let at = item.map_to_window(g.origin);
-            let c = LogicalPosition::new(at.x + g.width() / 2.0, at.y + g.height() / 2.0);
-            if lowest.is_none_or(|l| c.y > l.y) {
-                lowest = Some(c);
-            }
-        }
-        ControlFlow::<()>::Continue(())
-    });
-    lowest
+use crate::support::label;
+
+/// The centre of the visible element named `name`, the lowest one if several are.
+fn centre(scene: &Scene, name: &str) -> Option<LogicalPosition> {
+    label::rects(scene, name)
+        .iter()
+        .map(|r| LogicalPosition::new(r.origin.x + r.width() / 2.0, r.origin.y + r.height() / 2.0))
+        .reduce(|low, c| if c.y > low.y { c } else { low })
 }
 
 fn click(scene: &Scene, at: LogicalPosition) {

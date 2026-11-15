@@ -8,7 +8,6 @@
 //! suggestions unless "Show settings in search suggestions" is off, and picking one opens
 //! Settings at its row, lit, its switch taking the keys when picked with the keyboard.
 
-use std::ops::ControlFlow;
 use std::time::Duration;
 
 use featherplay::offscreen;
@@ -17,13 +16,10 @@ use featherplay::snapshot::Scene;
 use featherplay::ui::{
     SettingId, SettingKey, SettingsData, SettingsSearch, SuggestionKind, TopBarData,
 };
-use i_slint_core::accessibility::AccessibleStringProperty;
-use i_slint_core::item_tree::ItemRc;
-use i_slint_core::window::WindowInner;
 use slint::platform::{Key, WindowEvent};
 use slint::{ComponentHandle, Model, Rgba8Pixel, SharedPixelBuffer, SharedString};
 
-use crate::support::pixels;
+use crate::support::{label, pixels};
 
 /// At 1920 wide the index sits left of the column, 40 px into the page past the sidebar.
 const INDEX_LEFT: usize = 240 + 40;
@@ -88,19 +84,9 @@ fn settings() -> Scene {
     scene
 }
 
-/// The first visible element whose accessible label is `label`, and its top in the window.
-fn find(scene: &Scene, label: &str) -> Option<f32> {
-    let root = ItemRc::new_root(WindowInner::from_pub(scene.ui.window()).component());
-    root.visit_descendants(|item| {
-        let says = item
-            .accessible_string_property(AccessibleStringProperty::Label)
-            .is_some_and(|l| l == label);
-        if says && item.is_visible() {
-            ControlFlow::Break(item.map_to_window(item.geometry().origin).y)
-        } else {
-            ControlFlow::Continue(())
-        }
-    })
+/// The top in the window of the first visible element labelled `name`.
+fn find(scene: &Scene, name: &str) -> Option<f32> {
+    label::find(scene, name).map(|item| label::rect(&item).origin.y)
 }
 
 fn counts(scene: &Scene) -> Vec<i32> {

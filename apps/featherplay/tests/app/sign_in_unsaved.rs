@@ -4,34 +4,24 @@
 //! controller: the test plays its part, as in `account_picker`. That the controller reports
 //! a refused save is tested beside it (`controller::account`).
 
-use std::ops::ControlFlow;
-
 use featherplay::app;
 use featherplay::controller::{AccountAction, Action, UiEvent};
 use featherplay::router::Page;
 use featherplay::snapshot::Scene;
 use featherplay::ui::{AccountPicker, Toast, ToastTone};
-use i_slint_core::accessibility::AccessibleStringProperty;
-use i_slint_core::item_tree::ItemRc;
 use i_slint_core::items::AccessibleRole;
-use i_slint_core::window::WindowInner;
 use slint::ComponentHandle;
 use slint::platform::{Key, WindowEvent};
+
+use crate::support::label;
 
 /// The width of the toast's pill, which is as wide as its line up to 480 px.
 fn pill_width(scene: &Scene) -> f32 {
     let line = scene.ui.global::<Toast>().get_text();
-    let root = ItemRc::new_root(WindowInner::from_pub(scene.ui.window()).component());
-    let mut width = None;
-    root.visit_descendants(|item| {
-        let label = item.accessible_string_property(AccessibleStringProperty::Label);
-        if item.accessible_role() == AccessibleRole::Text && label.is_some_and(|l| l == line) {
-            width = Some(item.geometry().size.width);
-            return ControlFlow::Break(());
-        }
-        ControlFlow::Continue(())
+    let text = label::any_where(scene, |item, l| {
+        l == line.as_str() && item.accessible_role() == AccessibleRole::Text
     });
-    width.expect("the toast")
+    text.first().expect("the toast").geometry().size.width
 }
 
 #[test]

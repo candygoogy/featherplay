@@ -8,27 +8,17 @@
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
-use std::ops::ControlFlow;
-
 use featherplay::language;
 use featherplay::snapshot::Scene;
 use featherplay::ui::{Player, SettingsData, Toast};
-use i_slint_core::accessibility::AccessibleStringProperty;
-use i_slint_core::item_tree::ItemRc;
-use i_slint_core::window::WindowInner;
 use slint::{ComponentHandle, Model};
+
+use crate::support::label;
 
 /// Whether an element of the window has `text` as its accessible label, as a `Text` does
 /// its text.
 fn shows(scene: &Scene, text: &str) -> bool {
-    let root = ItemRc::new_root(WindowInner::from_pub(scene.ui.window()).component());
-    root.visit_descendants(|item| {
-        match item.accessible_string_property(AccessibleStringProperty::Label) {
-            Some(label) if label == text => ControlFlow::Break(()),
-            _ => ControlFlow::Continue(()),
-        }
-    })
-    .is_some()
+    !label::any_where(scene, |_, l| l == text).is_empty()
 }
 
 #[test]

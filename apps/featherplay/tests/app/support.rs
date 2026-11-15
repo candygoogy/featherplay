@@ -507,27 +507,82 @@ pub fn sweep(w: &slint::Window, at: LogicalPosition) {
 
 /// The bar's volume slider, as left, top, right and bottom edges: the one visible "Volume"
 /// slider (found by its label: the wheel no longer tells, since all the bar takes it).
-pub fn volume_slider(ui: &AppWindow) -> [f32; 4] {
-    use i_slint_core::accessibility::AccessibleStringProperty;
-    use i_slint_core::item_tree::ItemRc;
+pub fn volume_slider(scene: &Scene) -> [f32; 4] {
     use i_slint_core::items::AccessibleRole;
-    use i_slint_core::window::WindowInner;
-    let root = ItemRc::new_root(WindowInner::from_pub(ui.window()).component());
-    let mut found = None;
-    root.visit_descendants(|item| {
-        let slider = item.accessible_role() == AccessibleRole::Slider
-            && item
-                .accessible_string_property(AccessibleStringProperty::Label)
-                .is_some_and(|l| l == "Volume");
-        if slider && item.is_visible() {
-            let g = item.geometry();
-            let at = item.map_to_window(g.origin);
-            found = Some([at.x, at.y, at.x + g.width(), at.y + g.height()]);
-            return std::ops::ControlFlow::Break(());
-        }
-        std::ops::ControlFlow::Continue(())
+    let slider = label::shown_where(scene, |item, l| {
+        l == "Volume" && item.accessible_role() == AccessibleRole::Slider
     });
-    found.expect("no volume slider")
+    let r = label::rect(slider.first().expect("no volume slider"));
+    [r.min_x(), r.min_y(), r.max_x(), r.max_y()]
+}
+
+/// The window's elements found by their accessible label, as a screen reader finds them (a
+/// `Text` is labelled with its text).
+pub mod label {
+    use std::ops::ControlFlow;
+
+    use featherplay::snapshot::Scene;
+    use i_slint_core::accessibility::{AccessibilityAction, AccessibleStringProperty};
+    pub use i_slint_core::item_tree::ItemRc;
+    pub use i_slint_core::lengths::LogicalRect;
+    use i_slint_core::window::WindowInner;
+    use slint::ComponentHandle;
+
+    /// Every element, shown or hidden, whose label passes `keep`, in the tree's order.
+    pub fn any_where(scene: &Scene, mut keep: impl FnMut(&ItemRc, &str) -> bool) -> Vec<ItemRc> {
+        let root = ItemRc::new_root(WindowInner::from_pub(scene.ui.window()).component());
+        let mut found = Vec::new();
+        root.visit_descendants(|item| {
+            if item
+                .accessible_string_property(AccessibleStringProperty::Label)
+                .is_some_and(|l| keep(item, &l))
+            {
+                found.push(item.clone());
+            }
+            ControlFlow::<()>::Continue(())
+        });
+        found
+    }
+
+    /// The shown elements whose label passes `keep`.
+    pub fn shown_where(scene: &Scene, mut keep: impl FnMut(&ItemRc, &str) -> bool) -> Vec<ItemRc> {
+        any_where(scene, |item, l| item.is_visible() && keep(item, l))
+    }
+
+    /// The shown elements labelled `label`.
+    pub fn all(scene: &Scene, label: &str) -> Vec<ItemRc> {
+        shown_where(scene, |_, l| l == label)
+    }
+
+    /// The first shown element labelled `label`.
+    pub fn find(scene: &Scene, label: &str) -> Option<ItemRc> {
+        all(scene, label).into_iter().next()
+    }
+
+    /// Whether a shown element is labelled `label`.
+    pub fn shows(scene: &Scene, label: &str) -> bool {
+        find(scene, label).is_some()
+    }
+
+    /// Where `item` is, in window coordinates.
+    pub fn rect(item: &ItemRc) -> LogicalRect {
+        let g = item.geometry();
+        LogicalRect::new(item.map_to_window(g.origin), g.size)
+    }
+
+    /// Where the shown elements labelled `label` are, in window coordinates.
+    pub fn rects(scene: &Scene, label: &str) -> Vec<LogicalRect> {
+        all(scene, label).iter().map(rect).collect()
+    }
+
+    /// Presses the first shown element labelled `label`, as a screen reader does, and lets
+    /// what it starts settle.
+    pub fn press(scene: &Scene, label: &str) {
+        find(scene, label)
+            .unwrap_or_else(|| panic!("nothing visible says {label:?}"))
+            .accessible_action(&AccessibilityAction::Default);
+        scene.settle();
+    }
 }
 
 /// The side panel at the right of a `width`-logical-px window: its left edge and width.

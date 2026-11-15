@@ -7,7 +7,6 @@
 //! window is shown.
 
 use std::cell::Cell;
-use std::ops::ControlFlow;
 use std::rc::Rc;
 
 use featherplay::lyrics::{self, SnapshotLyrics};
@@ -15,13 +14,10 @@ use featherplay::offscreen;
 use featherplay::snapshot::Scene;
 use featherplay::ui::{LyricsData, LyricsState, Nav, NowPlayingData, PageKind, Theme};
 use featherplay_controller::fixtures::Fixtures;
-use i_slint_core::accessibility::{AccessibilityAction, AccessibleStringProperty};
-use i_slint_core::item_tree::ItemRc;
-use i_slint_core::window::WindowInner;
 use image::RgbaImage;
 use slint::ComponentHandle;
 
-use crate::support;
+use crate::support::{self, label};
 
 const W: u32 = 1280;
 const H: u32 = 800;
@@ -35,28 +31,6 @@ fn frame(scene: &Scene) -> RgbaImage {
 
 fn far(p: [u8; 4], q: [u8; 4]) -> bool {
     (0..3).map(|i| u32::from(p[i].abs_diff(q[i]))).sum::<u32>() > 120
-}
-
-/// The first visible element whose accessible label is `label`.
-fn find(scene: &Scene, label: &str) -> Option<ItemRc> {
-    let root = ItemRc::new_root(WindowInner::from_pub(scene.ui.window()).component());
-    root.visit_descendants(|item| {
-        let says = item
-            .accessible_string_property(AccessibleStringProperty::Label)
-            .is_some_and(|l| l == label);
-        if says && item.is_visible() {
-            ControlFlow::Break(item.clone())
-        } else {
-            ControlFlow::Continue(())
-        }
-    })
-}
-
-fn press(scene: &Scene, label: &str) {
-    find(scene, label)
-        .unwrap_or_else(|| panic!("nothing visible says {label:?}"))
-        .accessible_action(&AccessibilityAction::Default);
-    scene.settle();
 }
 
 /// The cover on the stage, left to right: the first row well under the header where most of
@@ -128,7 +102,7 @@ fn no_lyrics_keep_the_cover_view_and_the_pill_says_so() {
     assert_eq!(data.get_state(), LyricsState::None);
     assert!(!data.get_showing(), "the full view opened on no lyrics");
     assert!(
-        find(&scene, "No lyrics").is_some(),
+        label::find(&scene, "No lyrics").is_some(),
         "the pill doesn't say so"
     );
     assert!(!data.get_hint(), "the note showed without a press");
@@ -143,7 +117,7 @@ fn no_lyrics_keep_the_cover_view_and_the_pill_says_so() {
 
     // A press on the pill changes nothing but the note.
     data.set_hint(false);
-    press(&scene, "No lyrics");
+    label::press(&scene, "No lyrics");
     assert!(!data.get_showing(), "a press opened the full view");
     assert!(data.get_full(), "a press turned lyrics off for the session");
     assert!(data.get_hint(), "a press didn't show the note");
@@ -175,7 +149,7 @@ fn the_lyrics_tab_stays_and_says_why() {
     np.invoke_tab_selected(2);
     lyrics_on(&scene, SnapshotLyrics::None);
     assert!(
-        find(
+        label::find(
             &scene,
             "No lyrics for this song. Searched LRCLIB and YouTube Music."
         )
@@ -183,7 +157,7 @@ fn the_lyrics_tab_stays_and_says_why() {
         "the Lyrics tab has no empty state"
     );
     assert!(
-        find(&scene, "Try again").is_none(),
+        label::find(&scene, "Try again").is_none(),
         "none found is an answer: nothing to try again"
     );
     assert_eq!(np.get_tab(), 2);
@@ -203,15 +177,15 @@ fn a_failed_lookup_offers_try_again_in_the_tab_and_the_pill() {
     let a = asked.clone();
     data.on_retry(move || a.set(a.get() + 1));
 
-    press(&scene, "Try again");
+    label::press(&scene, "Try again");
     assert_eq!(asked.get(), 1, "the tab's Try again didn't ask");
-    press(&scene, "Retry lyrics");
+    label::press(&scene, "Retry lyrics");
     assert_eq!(asked.get(), 2, "the pill didn't ask again");
 
     // LRCLIB down: the same offer, saying so.
     lyrics_on(&scene, SnapshotLyrics::Unavailable);
     assert_eq!(data.get_message(), "Lyrics are unavailable right now");
-    press(&scene, "Try again");
+    label::press(&scene, "Try again");
     assert_eq!(asked.get(), 3, "Try again didn't ask after an outage");
 }
 
@@ -257,9 +231,9 @@ fn the_note_shows_for_a_press_and_never_on_its_own_for_a_later_song() {
     // nothing shows the note.
     lyrics::show_for_snapshot(&scene.ctx, SnapshotLyrics::Loading);
     scene.settle();
-    press(&scene, "Lyrics");
+    label::press(&scene, "Lyrics");
     assert!(
-        find(&scene, "Finding lyrics…").is_some(),
+        label::find(&scene, "Finding lyrics…").is_some(),
         "the pill doesn't wait"
     );
     lyrics::show_for_snapshot(&scene.ctx, SnapshotLyrics::None);
@@ -278,11 +252,11 @@ fn the_note_shows_for_a_press_and_never_on_its_own_for_a_later_song() {
             "the note showed on its own for a later song"
         );
         assert!(
-            find(&scene, "No lyrics").is_some(),
+            label::find(&scene, "No lyrics").is_some(),
             "the pill doesn't say so"
         );
     }
-    press(&scene, "No lyrics");
+    label::press(&scene, "No lyrics");
     assert!(data.get_hint(), "a press didn't show the note");
 
     // The microphone from another page, where Now playing then looks the song up again: the

@@ -5,34 +5,24 @@
 //! and a missing output device are reported is tested in `featherplay-streams` and
 //! `featherplay-audio`.
 
-use std::ops::ControlFlow;
-
 use featherplay::controller::{UiEvent, no_sound_output};
 use featherplay::snapshot::Scene;
 use featherplay::ui::{SettingsData, Toast, ToastTone};
 use featherplay::updates::Help;
 use featherplay::{app, pages, toast};
 use featherplay_core::failure::{HelperFault, Notice, getting_ready, songs_refused_by_network};
-use i_slint_core::accessibility::AccessibleStringProperty;
-use i_slint_core::item_tree::ItemRc;
 use i_slint_core::items::AccessibleRole;
-use i_slint_core::window::WindowInner;
 use slint::ComponentHandle;
+
+use crate::support::label;
 
 /// The width of the toast, which is as wide as its line and its button up to 480 px.
 fn toast_width(scene: &Scene) -> f32 {
     let line = scene.ui.global::<Toast>().get_text();
-    let root = ItemRc::new_root(WindowInner::from_pub(scene.ui.window()).component());
-    let mut width = None;
-    root.visit_descendants(|item| {
-        let label = item.accessible_string_property(AccessibleStringProperty::Label);
-        if item.accessible_role() == AccessibleRole::Text && label.is_some_and(|l| l == line) {
-            width = Some(item.geometry().size.width);
-            return ControlFlow::Break(());
-        }
-        ControlFlow::Continue(())
+    let text = label::any_where(scene, |item, l| {
+        l == line.as_str() && item.accessible_role() == AccessibleRole::Text
     });
-    width.expect("the toast")
+    text.first().expect("the toast").geometry().size.width
 }
 
 #[test]
