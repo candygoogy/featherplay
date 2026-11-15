@@ -443,6 +443,8 @@ mod tests {
     use std::net::TcpListener;
     use std::sync::atomic::AtomicUsize;
 
+    use proptest::prelude::*;
+
     use super::*;
 
     /// The redirected answer the system gives in these tests, for every host.
@@ -726,5 +728,81 @@ mod tests {
         );
         assert_eq!(asked.load(Ordering::SeqCst), 0);
         assert_eq!(system.load(Ordering::SeqCst), 0);
+    }
+
+    /// One answer record as a service could write it: an address, a name or junk as its
+    /// data, of the types asked for and others, with or without a TTL.
+    fn record() -> impl Strategy<Value = Value> {
+        let data = prop_oneof![
+            2 => any::<std::net::Ipv4Addr>().prop_map(|ip| Value::from(ip.to_string())),
+            2 => any::<std::net::Ipv6Addr>().prop_map(|ip| Value::from(ip.to_string())),
+            // Often one of two addresses, so the same one comes twice.
+            4 => prop::sample::select(vec!["192.0.2.1", "2001:db8::1"]).prop_map(Value::from),
+            1 => ".{0,12}".prop_map(Value::from),
+            1 => any::<i64>().prop_map(Value::from),
+            1 => Just(Value::Null),
+        ];
+        let kind = prop_oneof![Just(A), Just(AAAA), Just(5), any::<u64>()];
+        (kind, prop::option::of(any::<u64>()), data).prop_map(|(kind, ttl, data)| {
+            let mut r = serde_json::json!({ "type": kind, "data": data });
+            if let Some(ttl) = ttl {
+                r["TTL"] = ttl.into();
+            }
+            r
+        })
+    }
+
+    proptest! {
+        /// A NOERROR answer gives every address of the type asked, once, nothing else, and
+        /// the shortest TTL among the records it took them from.
+        #[test]
+        fn records_give_each_address_of_the_type_asked_once(
+            answer in prop::collection::vec(record(), 0..12),
+            kind in prop_oneof![Just(A), Just(AAAA)],
+        ) {
+            let json = serde_json::json!({ "Status": 0, "Answer": answer });
+            let (ips, ttl) = records(&json, kind).unwrap();
+            // The address a record gives for the question, if it gives one.
+            let fits = |r: &Value| {
+                r["data"]
+                    .as_str()
+                    .and_then(|d| d.parse::<IpAddr>().ok())
+                    .filter(|ip| r["type"].as_u64() == Some(kind) && ip.is_ipv4() == (kind == A))
+            };
+            let wanted: std::collections::HashSet<IpAddr> =
+                answer.iter().filter_map(fits).collect();
+            let given: std::collections::HashSet<IpAddr> = ips.iter().copied().collect();
+            prop_assert_eq!(given.len(), ips.len(), "an address twice in {:?}", ips);
+            prop_assert_eq!(given, wanted);
+            if ips.is_empty() {
+                prop_assert_eq!(ttl, u64::MAX);
+            } else {
+                // The shortest TTL of the records that gave an address (none: 0).
+                let ttls = answer
+                    .iter()
+                    .filter(|r| fits(r).is_some())
+                    .map(|r| r["TTL"].as_u64().unwrap_or(0));
+                prop_assert_eq!(Some(ttl), ttls.min());
+            }
+        }
+
+        /// Any reply body that is JSON gives addresses or an error, never a panic; a status
+        /// other than NOERROR is always an error.
+        #[test]
+        fn any_json_gives_addresses_or_an_error(
+            status in prop_oneof![Just(Value::from(0)), any::<u64>().prop_map(Value::from), ".{0,4}".prop_map(Value::from), Just(Value::Null)],
+            answer in prop_oneof![
+                prop::collection::vec(record(), 0..6).prop_map(Value::from),
+                record(),
+                ".{0,8}".prop_map(Value::from),
+            ],
+            kind in prop_oneof![Just(A), Just(AAAA)],
+        ) {
+            let json = serde_json::json!({ "Status": status, "Answer": answer });
+            let got = records(&json, kind);
+            if status.as_u64() != Some(0) {
+                prop_assert!(got.is_err(), "{got:?}");
+            }
+        }
     }
 }

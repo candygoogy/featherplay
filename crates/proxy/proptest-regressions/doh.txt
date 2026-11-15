@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc b6bd4ae4d0264e418a99922bba0da99f762d6db07c02b2206ec3d1a9188f8259 # shrinks to answer = [Object {"TTL": Number(10713429915008068828), "data": String("192.0.2.1"), "type": Number(1)}, Object {"data": String("192.0.2.1"), "type": Number(1)}], kind = 1
