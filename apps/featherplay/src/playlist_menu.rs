@@ -408,15 +408,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn liked_songs_is_liked_whoever_owns_it() {
-        assert_eq!(kind("LM", false), PlaylistKind::Liked);
-        assert_eq!(kind("LM", true), PlaylistKind::Liked);
-    }
-
-    #[test]
-    fn library_playlists_are_own_or_saved() {
-        assert_eq!(kind("PLmine", true), PlaylistKind::Own);
-        assert_eq!(kind("PLtheirs", false), PlaylistKind::Saved);
+    fn liked_songs_is_liked_whoever_owns_it_and_the_rest_own_or_saved() {
+        // (id, owned, want)
+        let cases = [
+            ("LM", false, PlaylistKind::Liked),
+            ("LM", true, PlaylistKind::Liked),
+            ("PLmine", true, PlaylistKind::Own),
+            ("PLtheirs", false, PlaylistKind::Saved),
+        ];
+        for (id, owned, want) in cases {
+            assert_eq!(kind(id, owned), want, "{id}, owned: {owned}");
+        }
     }
 
     #[test]
