@@ -127,8 +127,9 @@ an otherwise idle Windows machine; it is one of the release checks in `RELEASING
 The tests need [cargo-nextest](https://nexte.st), because it runs each test in its own
 process: Slint allows one platform per process, and most app tests install the offscreen
 one, so plain `cargo test` fails them. nextest skips doctests, hence the second line.
-`--cfg ci` skips the tests that open an audio device (`RELEASING.md` runs those by hand). Some tests write
-files under `FEATHERPLAY_HOME` and skip, saying so, when it isn't set. The tests in
+`--cfg ci` skips the tests that open an audio device (`RELEASING.md` runs those by hand).
+Some tests write files under `FEATHERPLAY_HOME` and skip, saying so, when it isn't set. The
+tests in
 `apps/featherplay/tests/app/` don't use yours: each starts in a fresh, empty home of its own
 under `target/tmp`, so the settings of a home you ran the app in can't fail them. That home
 is removed when the test ends; a failed test's stays.
@@ -141,6 +142,12 @@ one test:
 ```
 cargo nextest run -p featherplay -E 'test(name)'
 ```
+
+Code that reads outside input (a reply from a service, a lyrics file, a client's bytes) has
+property tests next to its example tests, with [proptest](https://proptest-rs.github.io/proptest/),
+a dev-dependency of the crates that use it: any input gives a value or an error and never a
+panic, plus what the parser promises about a good one. A `proptest-regressions/*.txt` file
+holds the inputs that once failed, so they run first every time; commit it with the fix.
 
 The same commands work on Linux. There, use nextest's `ci` profile (`--profile ci`), as CI
 does: the frame-cost and CPU-time ceilings were set on Windows, and the CPU-time ones count
