@@ -11,6 +11,7 @@ import type { Song } from "../data/songs";
 import { currentLineIndex, formatTime, lyricsSource, type Player, type PlayerState } from "./player";
 import { createListen, mediaMetadataFor, scrobbleAfterMs, sponsorPlayhead, trayLines } from "./pieces";
 import { followLyrics } from "./follow";
+import { lineItems, markLines } from "./lyric-lines";
 
 const $$ = <T extends Element = HTMLElement>(sel: string, root: ParentNode = document) => [...root.querySelectorAll<T>(sel)];
 const reduced = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -84,18 +85,7 @@ export function bindPieces(player: Player): void {
     });
     return c;
   });
-  const buildLines = (song: Song) =>
-    song.lyrics.map((l) => {
-      const li = document.createElement("li");
-      const b = document.createElement("button");
-      b.type = "button";
-      b.className = "lc-line";
-      b.dataset.at = String(l.atMs);
-      b.dataset.state = "next";
-      b.textContent = l.line;
-      li.append(b);
-      return li;
-    });
+  const buildLines = (song: Song) => lineItems(song, { className: "lc-line" });
 
   // ---- Scrobbling ----
   const scrobbles = $$("[data-piece='scrobble']");
@@ -314,11 +304,7 @@ export function bindPieces(player: Player): void {
       if (line === c.line) continue;
       if (c.card.checkVisibility && !c.card.checkVisibility({ contentVisibilityAuto: true })) continue;
       c.line = line;
-      [...c.list.querySelectorAll<HTMLElement>(".lc-line")].forEach((b, i) => {
-        b.dataset.state = i < line ? "past" : i === line ? "current" : "next";
-        if (i === line) b.setAttribute("aria-current", "true");
-        else b.removeAttribute("aria-current");
-      });
+      markLines(c.list, ".lc-line", line);
       const li = line >= 0 ? (c.list.children[line] as HTMLElement | undefined) : undefined;
       c.follow.follow(li ?? null, c.instant);
       c.instant = false;

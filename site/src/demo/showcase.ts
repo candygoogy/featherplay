@@ -9,6 +9,7 @@
 import type { Song } from "../data/songs";
 import { currentLineIndex, formatTime, lyricsSource, type Player, type PlayerState } from "./player";
 import { followLyrics } from "./follow";
+import { lineItems, markLines } from "./lyric-lines";
 import { lyricInks } from "../data/colour";
 
 export function bindShowcase(root: HTMLElement, player: Player): void {
@@ -41,18 +42,7 @@ export function bindShowcase(root: HTMLElement, player: Player): void {
   let lyricsOn: boolean | null = null;
   let live: boolean | null = null;
 
-  const build = (s: Song) =>
-    s.lyrics.map((l, i) => {
-      const li = document.createElement("li");
-      if (i > 0 && l.atMs - s.lyrics[i - 1].atMs > 5200) li.className = "verse";
-      const b = document.createElement("button");
-      b.type = "button";
-      b.className = "line";
-      b.dataset.at = String(l.atMs);
-      b.textContent = l.line;
-      li.append(b);
-      return li;
-    });
+  const build = (s: Song) => lineItems(s, { className: "line", verses: true });
 
   // The lines follow the song, and the wheel or a finger can move them for a while.
   const follower = followLyrics(panel, lines);
@@ -166,11 +156,7 @@ export function bindShowcase(root: HTMLElement, player: Player): void {
     const index = currentLineIndex(cur, view.at);
     if (index !== line && s.lyricsOn) {
       line = index;
-      [...lines.querySelectorAll<HTMLElement>(".line")].forEach((b, i) => {
-        b.dataset.state = i < index ? "past" : i === index ? "current" : "next";
-        if (i === index) b.setAttribute("aria-current", "true");
-        else b.removeAttribute("aria-current");
-      });
+      markLines(lines, ".line", index);
       glide(index);
     }
   };

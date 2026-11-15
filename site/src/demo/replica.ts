@@ -20,6 +20,7 @@ import { bindAudio } from "./audio";
 import { bindCredits } from "./credit";
 import { trayLines } from "./pieces";
 import { rendered } from "./bind-pieces";
+import { lineItems, markLines } from "./lyric-lines";
 
 let shared: Player | null = null;
 
@@ -63,22 +64,14 @@ function setAll(root: ParentNode, sel: string, fn: (el: HTMLElement) => void) {
 
 const reduced = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-function lineItems(song: Song): HTMLLIElement[] {
+/** The song's lines, and under them where they come from (as the app's lyrics view ends). */
+function linesWithSource(song: Song): HTMLLIElement[] {
+  const items = lineItems(song, { className: "line" });
+  if (!items.length) return [];
   const source = document.createElement("li");
   source.className = "source";
   source.textContent = lyricsSource(song);
-  const items = song.lyrics.map((l) => {
-    const li = document.createElement("li");
-    const b = document.createElement("button");
-    b.type = "button";
-    b.className = "line";
-    b.dataset.at = String(l.atMs);
-    b.dataset.state = "next";
-    b.textContent = l.line;
-    li.append(b);
-    return li;
-  });
-  return items.length ? [...items, source] : [];
+  return [...items, source];
 }
 
 /** A song row as the app's SongRow draws it, cloned from the Up next list's own markup. */
@@ -539,8 +532,8 @@ function bindReplica(root: HTMLElement, player: Player) {
       );
       fill($(root, "[data-related-list]"), player.related().map((r) => r.id), song.id);
       seek.max = String(song.durationMs);
-      lines.replaceChildren(...lineItems(song));
-      sideLines?.replaceChildren(...lineItems(song));
+      lines.replaceChildren(...linesWithSource(song));
+      sideLines?.replaceChildren(...linesWithSource(song));
       sideFollower?.release();
       last.sideShown = false; // placed at once on the new lines once they show
       follower?.release();
@@ -610,13 +603,7 @@ function bindReplica(root: HTMLElement, player: Player) {
       }
       const line = currentLineIndex(song, s.positionMs);
       if (line !== last.line) {
-        for (const list of sideLines ? [lines, sideLines] : [lines]) {
-          $$<HTMLButtonElement>(list, ".line").forEach((b, i) => {
-            b.dataset.state = i < line ? "past" : i === line ? "current" : "next";
-            if (i === line) b.setAttribute("aria-current", "true");
-            else b.removeAttribute("aria-current");
-          });
-        }
+        for (const list of sideLines ? [lines, sideLines] : [lines]) markLines(list, ".line", line);
         if (s.view === "lyrics") glide(line);
         last.line = line;
       }
