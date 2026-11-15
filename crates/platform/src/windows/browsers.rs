@@ -1,7 +1,9 @@
 //! Finding Edge, Chrome, Brave and Vivaldi on this PC (the registry, the https association,
-//! the disk: `ThisPc`), and starting one with the DevTools pipe in a kill-on-close job
-//! (`launch`). The browsers, and the order they're looked for in, are in `common`; how
-//! they're found is in `find`.
+//! the disk: `ThisPc`), and starting one in a kill-on-close job: plainly, for the user to sign
+//! in (`launch_plain`), or headless with the DevTools pipe (`launch`, with `HEADLESS`), to read
+//! the profile once that window is closed. The pipe and Google's pages are never open at the
+//! same time. The browsers, and the order they're looked for in, are in `common`; how they're
+//! found is in `find`.
 
 mod find;
 mod launch;
@@ -11,7 +13,7 @@ use std::path::{Path, PathBuf};
 
 pub use crate::common::browsers::*;
 pub use find::{Hive, Lookup, found};
-pub use launch::{Pipes, Running, launch};
+pub use launch::{Pipes, Running, launch, launch_plain};
 
 use crate::window::Handle;
 
@@ -140,8 +142,7 @@ fn https_handler() -> Option<PathBuf> {
     exe.is_absolute().then_some(exe)
 }
 
-/// The visible top-level windows of the process `pid`. For the app's live
-/// check that a browser exits when its window is closed.
+/// The visible top-level windows of the process `pid`: the browser's, for `Running::quit`.
 pub fn visible_windows(pid: u32) -> Vec<Handle> {
     use windows::Win32::Foundation::{HWND, LPARAM};
     use windows::Win32::UI::WindowsAndMessaging::{

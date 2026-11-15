@@ -45,7 +45,7 @@
 //!   between MIME types and applications" spec lists them.
 //!
 //! Only Google Chrome has run here (in WSL); the platform's
-//! `live_browser_signs_in_plainly_then_is_read_headless` runs on any of them.
+//! `live_browser_signs_in_plainly_then_is_read_headless` (in `common`) runs on any of them.
 
 use std::ffi::OsString;
 use std::fs::File;
@@ -413,10 +413,6 @@ fn https_entry(mimeapps: &str) -> Option<String> {
 /// The descriptors Chromium's pipe handler uses.
 const READ_FD: RawFd = 3;
 const WRITE_FD: RawFd = 4;
-
-/// Chromium's headless mode (`--headless=new`, the same browser with no window,
-/// `headless/README.md`): the start that reads the profile, on a blank page.
-pub const HEADLESS: &str = "--headless=new";
 
 /// The running browser, the leader of its own process group. Dropping it ends the group:
 /// the browser and every helper it started.

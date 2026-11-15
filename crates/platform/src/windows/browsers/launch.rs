@@ -1,4 +1,5 @@
-//! Starts the browser with a DevTools pipe and nothing else, inside a job object.
+//! Starts the browser inside a job object: plainly, for the sign-in window (`launch_plain`),
+//! or with a DevTools pipe and nothing else (`launch`), for the headless read that follows.
 //!
 //! # How Chromium on Windows gets the pipe
 //! `--remote-debugging-pipe` makes Chromium talk CDP over file descriptors 3 (it reads) and
@@ -55,7 +56,7 @@ use windows::Win32::System::Threading::{
     CREATE_SUSPENDED, CreateProcessW, DeleteProcThreadAttributeList, EXTENDED_STARTUPINFO_PRESENT,
     InitializeProcThreadAttributeList, LPPROC_THREAD_ATTRIBUTE_LIST,
     PROC_THREAD_ATTRIBUTE_HANDLE_LIST, PROCESS_INFORMATION, ResumeThread, STARTF_USESTDHANDLES,
-    STARTUPINFOEXW, TerminateProcess, UpdateProcThreadAttribute, WaitForSingleObject,
+    STARTUPINFOEXW, STARTUPINFOW, TerminateProcess, UpdateProcThreadAttribute, WaitForSingleObject,
 };
 use windows::core::{HSTRING, PCWSTR, PWSTR};
 
@@ -84,17 +85,22 @@ pub struct Plan {
 /// The launch of `exe` with `args`, where `read` and `write` are the browser's ends of the
 /// two pipes.
 pub fn plan(exe: &OsStr, args: &[OsString], read: usize, write: usize) -> Plan {
-    let mut command_line = quote(exe);
-    for a in args {
-        command_line.push(u16::from(b' '));
-        command_line.extend(quote(a));
-    }
-    command_line.push(0);
     Plan {
-        command_line,
+        command_line: command_line(exe, args),
         crt: crt_block(read, write),
         inherit: [read, write],
     }
+}
+
+/// `exe` and `args`, quoted, NUL-terminated.
+fn command_line(exe: &OsStr, args: &[OsString]) -> Vec<u16> {
+    let mut line = quote(exe);
+    for a in args {
+        line.push(u16::from(b' '));
+        line.extend(quote(a));
+    }
+    line.push(0);
+    line
 }
 
 /// The UCRT's inherited-descriptor block: 0-2 not open, 3 = `read`, 4 = `write`.
@@ -170,6 +176,18 @@ impl Running {
     pub fn kill(&self) {
         self.job.end();
     }
+
+    /// Asks the browser to quit as closing its windows does: `WM_CLOSE` to each visible
+    /// window of its process, which Chromium takes as the user closing them, so it writes its
+    /// cookie store before it exits. `wait` then tells when it has exited.
+    pub fn quit(&self) {
+        if self.exited() {
+            return;
+        }
+        for window in super::visible_windows(self.pid) {
+            super::close_window(window);
+        }
+    }
 }
 
 /// The app's ends of the two pipes.
@@ -196,7 +214,58 @@ pub fn launch(exe: &Path, args: &[OsString]) -> io::Result<(Running, Pipes)> {
     drop(browser_read);
     drop(browser_write);
     let (process, thread, pid) = started?;
+    let running = run_in_job(process, &thread, pid)?;
+    Ok((
+        running,
+        Pipes {
+            to_browser: File::from(to_browser),
+            from_browser: File::from(from_browser),
+        },
+    ))
+}
 
+/// Starts `exe` with `args` as `launch` does, in a kill-on-close job, but with no pipe: a
+/// browser as the user would start it, for the sign-in window. It inherits no handle of the
+/// app's; nothing of the app's reaches it but its arguments.
+pub fn launch_plain(exe: &Path, args: &[OsString]) -> io::Result<Running> {
+    let si = STARTUPINFOW {
+        cb: size_of::<STARTUPINFOW>() as u32,
+        dwFlags: STARTF_USESTDHANDLES,
+        ..Default::default()
+    };
+    let mut command_line = command_line(exe.as_os_str(), args);
+    let mut pi = PROCESS_INFORMATION::default();
+    let app = HSTRING::from(exe.as_os_str());
+    // SAFETY: `app` and `command_line` are NUL-terminated and live across the call (the
+    // command line is a mutable copy, as CreateProcessW may write to it); `si` and `pi` are
+    // live. No handle is inherited, and the standard handles are none.
+    unsafe {
+        CreateProcessW(
+            &app,
+            Some(PWSTR(command_line.as_mut_ptr())),
+            None,
+            None,
+            false,
+            CREATE_SUSPENDED,
+            None,
+            PCWSTR::null(),
+            &si,
+            &mut pi,
+        )
+    }?;
+    // SAFETY: CreateProcessW succeeded, so both are fresh handles that only we own.
+    let (process, thread) = unsafe {
+        (
+            OwnedHandle::from_raw_handle(pi.hProcess.0),
+            OwnedHandle::from_raw_handle(pi.hThread.0),
+        )
+    };
+    run_in_job(process, &thread, pi.dwProcessId)
+}
+
+/// Puts the suspended child `process` in a kill-on-close job, then lets its main `thread`
+/// run.
+fn run_in_job(process: OwnedHandle, thread: &OwnedHandle, pid: u32) -> io::Result<Running> {
     let job = match kill_on_close(process.as_raw_handle()) {
         Ok(job) => job,
         Err(e) => {
@@ -208,19 +277,13 @@ pub fn launch(exe: &Path, args: &[OsString]) -> io::Result<(Running, Pipes)> {
         }
     };
     // SAFETY: the live, suspended main thread of our child.
-    if unsafe { ResumeThread(handle(&thread)) } == u32::MAX {
+    if unsafe { ResumeThread(handle(thread)) } == u32::MAX {
         let e = io::Error::last_os_error();
         // This ends the child that never ran.
         job.end();
         return Err(e);
     }
-    Ok((
-        Running { process, job, pid },
-        Pipes {
-            to_browser: File::from(to_browser),
-            from_browser: File::from(from_browser),
-        },
-    ))
+    Ok(Running { process, job, pid })
 }
 
 fn handle(h: &OwnedHandle) -> HANDLE {
@@ -463,5 +526,18 @@ mod tests {
     fn a_missing_exe_is_an_error() {
         let gone = Path::new(r"C:\definitely\not\here\msedge.exe");
         assert!(launch(gone, &[]).is_err());
+        assert!(launch_plain(gone, &[]).is_err());
+    }
+
+    #[test]
+    fn a_plain_launch_runs_in_its_job_and_kill_ends_it() {
+        let (exe, args) = ping();
+        let child = launch_plain(&exe, &args).unwrap();
+        assert!(!child.exited(), "it should be running");
+        // It has no window, so asking it to quit leaves it running.
+        child.quit();
+        assert!(!child.wait(Duration::from_millis(200)));
+        child.kill();
+        assert!(child.wait(Duration::from_secs(5)), "the job didn't end it");
     }
 }

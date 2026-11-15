@@ -42,7 +42,8 @@
 //!
 //! Only Edge has run here against the real browser; the app's
 //! `live_browsers_answer_on_the_pipe_and_close` runs for every one that's installed, e.g. on
-//! a CI runner with Chrome, Brave and Vivaldi.
+//! a CI runner with Chrome, Brave and Vivaldi, and `live::
+//! live_browser_signs_in_plainly_then_is_read_headless` for the first one found.
 
 use std::path::{Path, PathBuf};
 
@@ -73,7 +74,16 @@ pub struct Browser {
     pub preferences: Option<&'static str>,
 }
 
+/// Chromium's headless mode (`--headless=new`, the same browser with no window,
+/// `headless/README.md`): the start that reads the profile, on a blank page.
+pub const HEADLESS: &str = "--headless=new";
+
 /// Chromium's own switches (`chrome/common/chrome_switches.h`), the same in all of them.
+///
+/// The sign-in window gets no pipe at all: Chromium hands `--remote-debugging-pipe` on to
+/// every renderer, whose pages then see `navigator.webdriver` true (seen in WSL with Chrome
+/// 157, 2026-11-12, and on Windows with Edge), and Google's sign-in may refuse such a browser,
+/// rightly ("This browser or app may not be secure").
 #[cfg(windows)]
 const QUIET_START: &[&str] = &["--no-first-run", "--no-default-browser-check"];
 
@@ -81,10 +91,6 @@ const QUIET_START: &[&str] = &["--no-first-run", "--no-default-browser-check"];
 /// rather than the desktop's keyring (`--password-store`, `chrome/common/chrome_switches.cc`),
 /// so a sign-in never adds an item there or asks to unlock a wallet, and the headless start
 /// that reads the profile afterwards (with the same switch) can decrypt them.
-///
-/// Linux's sign-in window gets no pipe at all (`linux::browsers`): Chromium hands
-/// `--remote-debugging-pipe` on to every renderer, whose pages then see `navigator.webdriver`
-/// true (WSL, Chrome 157, 2026-11-12), and Google's sign-in refuses such a browser, rightly.
 #[cfg(target_os = "linux")]
 const QUIET_START: &[&str] = &[
     "--no-first-run",
@@ -219,6 +225,9 @@ fn same_path(a: &Path, b: &Path) -> bool {
 fn same_path(a: &Path, b: &Path) -> bool {
     a == b
 }
+
+#[cfg(test)]
+mod live;
 
 #[cfg(test)]
 mod tests {
