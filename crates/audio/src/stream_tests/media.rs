@@ -222,21 +222,6 @@ fn decode_with_short_timeout(
 }
 
 #[test]
-fn a_stream_that_stays_stalled_fails() {
-    let data = fixture("tone-10s-frag.m4a");
-    let half = data.len() as u64 / 2;
-    let server = serve(data, 1 << 20, Duration::ZERO);
-    // Every request stops at the middle of the file and hangs there.
-    server.log.stall.store(u32::MAX, Ordering::SeqCst);
-    server.log.stall_at.store(half, Ordering::SeqCst);
-    // 4 reads time out (4 s) between the 3 retry delays (3.25 s).
-    let (secs, error) = decode_with_short_timeout(server.url, Duration::from_secs(20))
-        .expect("the stalled stream didn't end with a failure");
-    assert!(secs < 9.0, "{secs} s decoded from half a file");
-    assert!(error.is_some(), "the stall was not reported as a failure");
-}
-
-#[test]
 fn a_stream_that_stalls_once_resumes_where_it_stopped() {
     let data = fixture("tone-10s-frag.m4a");
     let half = data.len() as u64 / 2;

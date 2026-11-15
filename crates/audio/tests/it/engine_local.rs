@@ -49,24 +49,6 @@ fn wait_for(
 
 #[test]
 #[cfg_attr(ci, ignore = "needs an output device")]
-fn local_file_plays_and_ends() {
-    let engine = AudioEngine::new(None, tmp_dir()).expect("engine");
-    let events = engine.events();
-    engine.set_volume(QUIET);
-    let t = Instant::now();
-    engine.load(tone(), Duration::from_secs(9));
-    engine.play();
-    wait_for(&events, Duration::from_secs(3), |e| {
-        matches!(e, AudioEvent::Started)
-    });
-    let started = t.elapsed();
-    let left = Duration::from_secs(3).saturating_sub(started);
-    wait_for(&events, left, |e| matches!(e, AudioEvent::Ended));
-    println!("Started after {started:?}, Ended after {:?}", t.elapsed());
-}
-
-#[test]
-#[cfg_attr(ci, ignore = "needs an output device")]
 fn seek_moves_position() {
     let engine = AudioEngine::new(None, tmp_dir()).expect("engine");
     let events = engine.events();

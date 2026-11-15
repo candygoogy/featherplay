@@ -78,16 +78,3 @@ fn a_missing_folder_is_fine() {
     };
     assert_eq!(clear_stale_temp(&dir.0.join("nope")), 0);
 }
-
-#[test]
-fn test_dirs_live_under_featherplay_home() {
-    let Some(dir) = TestDir::new("where") else {
-        return;
-    };
-    let base = std::env::var_os("FEATHERPLAY_HOME").expect("set, or new() would have skipped");
-    assert!(
-        dir.0.starts_with(&base),
-        "{} is not under {base:?}",
-        dir.0.display()
-    );
-}

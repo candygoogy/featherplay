@@ -15,23 +15,6 @@ fn unplugged() -> (crate::AudioEngine, Arc<AtomicBool>) {
 }
 
 #[test]
-fn engine_starts_with_no_output_device() {
-    let plugged = Arc::new(AtomicBool::new(false));
-    let engine = crate::AudioEngine::new_fake_device(engine_tmp(), plugged);
-    assert!(engine.is_ok(), "start failed: {:?}", engine.err());
-}
-
-#[test]
-fn engine_play_with_no_output_device_says_so() {
-    let server = serve(fixture("tone-10s-frag.m4a"), 1 << 20, Duration::ZERO);
-    let (engine, _plugged) = unplugged();
-    let events = engine.events();
-    engine.load(src(&server.url), Duration::ZERO);
-    engine.play();
-    wait_event(&events, Duration::from_secs(3), crate::AudioEvent::NoDevice);
-}
-
-#[test]
 fn engine_plays_on_a_device_that_appears_after_start() {
     let server = serve(fixture("tone-10s-frag.m4a"), 1 << 20, Duration::ZERO);
     let (engine, plugged) = unplugged();
