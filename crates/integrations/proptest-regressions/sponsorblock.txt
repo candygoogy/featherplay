@@ -1,0 +1,8 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc afc3e7e5f485a66c5d2eef1c9cc982194428bdd310b32e4bfe334597de2a936e # shrinks to videos = [Object {"segments": Array [Object {"segment": Array [Number(-0.0), Number(4.856074742291166e-22)]}], "videoID": String("dQw4w9WgXcQ")}]
+cc 7cc3db65a828bcdfd30b92ce903d71051c1f4f317e96e9fe0b88d824c51ad48f # shrinks to videos = [Object {"segments": Array [Object {"segment": Array [Number(0.0), Number(1.2547448252316512e+47)]}], "videoID": String("dQw4w9WgXcQ")}]

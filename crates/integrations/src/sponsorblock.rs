@@ -110,6 +110,9 @@ fn parse(body: &[u8], id: &TrackId) -> Result<Vec<Segment>, String> {
 
 #[cfg(test)]
 mod tests {
+    use proptest::num;
+    use proptest::prelude::*;
+
     use super::*;
 
     fn id() -> TrackId {
@@ -169,6 +172,58 @@ mod tests {
                 got.as_ref().is_err_and(|e| e.starts_with("bad response")),
                 "{case}: {got:?}"
             );
+        }
+    }
+
+    /// A segment time: mostly a plausible one, else any finite number (huge, tiny,
+    /// negative), which the server could send just as well.
+    fn time() -> impl Strategy<Value = f64> {
+        prop_oneof![
+            3 => 0.0..900.0f64,
+            1 => num::f64::POSITIVE
+                | num::f64::NEGATIVE
+                | num::f64::NORMAL
+                | num::f64::SUBNORMAL
+                | num::f64::ZERO,
+        ]
+    }
+
+    /// A reply in the API's shape: videos sharing the hash prefix, this one among them or
+    /// not, with segments of any action.
+    fn reply() -> impl Strategy<Value = Vec<serde_json::Value>> {
+        let action = prop::option::of(prop::sample::select(vec!["skip", "mute", "poi"]));
+        let segment = (time(), time(), action).prop_map(|(start, end, action)| {
+            let mut s = serde_json::json!({ "segment": [start, end] });
+            if let Some(a) = action {
+                s["actionType"] = a.into();
+            }
+            s
+        });
+        let video = (
+            prop::sample::select(vec!["dQw4w9WgXcQ", "other"]),
+            prop::collection::vec(segment, 0..8),
+        )
+            .prop_map(|(id, segments)| serde_json::json!({ "videoID": id, "segments": segments }));
+        prop::collection::vec(video, 0..4)
+    }
+
+    proptest! {
+        /// Any reply in the API's shape is read, and gives segments sorted by start, each
+        /// ending after it starts.
+        #[test]
+        fn a_reply_gives_sorted_segments_that_end_after_they_start(videos in reply()) {
+            let body = serde_json::to_vec(&videos).unwrap();
+            let segments = parse(&body, &id()).unwrap();
+            prop_assert!(segments.is_sorted_by_key(|s| s.start), "{segments:?}");
+            for s in &segments {
+                prop_assert!(s.start < s.end, "{s:?}");
+            }
+        }
+
+        /// Any bytes give segments or an error, never a panic.
+        #[test]
+        fn any_bytes_give_segments_or_an_error(body in prop::collection::vec(any::<u8>(), 0..256)) {
+            let _ = parse(&body, &id());
         }
     }
 }
