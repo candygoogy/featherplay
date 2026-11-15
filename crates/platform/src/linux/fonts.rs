@@ -301,8 +301,9 @@ impl Drop for CharSet {
 mod tests {
     use super::*;
 
+    /// The fontconfig binding answers, and a family that covers several gaps is listed once.
     #[test]
-    fn the_families_found_are_unique_and_hold_their_samples() {
+    fn fontconfig_names_each_fallback_family_once() {
         let families = fallback_families();
         for (i, f) in families.iter().enumerate() {
             assert!(!families[..i].contains(f), "{f} twice");
