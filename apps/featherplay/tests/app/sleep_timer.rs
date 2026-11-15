@@ -89,7 +89,7 @@ fn the_button_shows_only_with_its_setting_and_a_chip_starts_the_timer() {
 }
 
 #[test]
-fn running_the_button_reads_as_the_time_left() {
+fn running_the_button_reads_as_the_time_left_and_turn_off_sends_off() {
     let scene = playing();
     scene.ui.global::<SettingsData>().set_sleep_timer(true);
     let state = |fading| {
@@ -102,37 +102,18 @@ fn running_the_button_reads_as_the_time_left() {
     };
     app::on_event(state(false));
     scene.settle();
-    assert!(centre(&scene, "24 min left").is_some());
-    app::on_event(state(true));
-    scene.settle();
-    assert!(centre(&scene, "Fading out").is_some());
-    app::on_event(UiEvent::Sleep(None));
-    scene.settle();
-    assert!(centre(&scene, "Fading out").is_none());
     assert!(
-        centre(&scene, "Sleep timer").is_some(),
-        "the button went with the timer"
+        centre(&scene, "24 min left").is_some(),
+        "running, the button doesn't read as the time left"
     );
-}
 
-#[test]
-fn turn_off_in_the_popup_sends_off_and_closes_it() {
-    let scene = playing();
-    scene.ui.global::<SettingsData>().set_sleep_timer(true);
-    app::on_event(UiEvent::Sleep(Some(SleepState {
-        kind: SleepKind::Time,
-        minutes: 15,
-        fading: false,
-        left: Duration::from_secs(15 * 60),
-    })));
-    scene.settle();
+    // Turn off in the popup asks the controller to turn it off, and closes the popup.
     let button = centre(&scene, "Sleep timer").expect("no button");
     click(&scene, button);
     assert!(
         scene.ui.global::<Sleep>().get_open(),
         "the popup didn't open"
     );
-
     scene.take_actions();
     let off = centre(&scene, "Turn off").expect("no Turn off");
     click(&scene, off);
@@ -140,10 +121,28 @@ fn turn_off_in_the_popup_sends_off_and_closes_it() {
     assert!(
         sent.iter()
             .any(|a| matches!(a, Action::Sleep(SleepAction::Off))),
-        "{sent:?}"
+        "Turn off didn't send off: {sent:?}"
     );
     assert!(
         !scene.ui.global::<Sleep>().get_open(),
         "Turn off left it open"
+    );
+
+    // Fading, the button says so; once the controller says it's off, the plain button is back.
+    app::on_event(state(true));
+    scene.settle();
+    assert!(
+        centre(&scene, "Fading out").is_some(),
+        "fading, the button doesn't say so"
+    );
+    app::on_event(UiEvent::Sleep(None));
+    scene.settle();
+    assert!(
+        centre(&scene, "Fading out").is_none(),
+        "off, the button still says it's fading"
+    );
+    assert!(
+        centre(&scene, "Sleep timer").is_some(),
+        "the button went with the timer"
     );
 }
