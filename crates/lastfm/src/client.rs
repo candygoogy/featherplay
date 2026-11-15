@@ -92,6 +92,7 @@ fn param(name: impl Into<String>, value: impl Into<String>) -> (String, String) 
 /// A Last.fm API client. `session` is the key from `get_session`, if signed in.
 pub struct LastFm {
     http: reqwest::Client,
+    api_url: String,
     api_key: String,
     secret: String,
     session: Option<String>,
@@ -104,8 +105,19 @@ impl LastFm {
         secret: &str,
         session: Option<String>,
     ) -> Result<LastFm, LastFmError> {
+        LastFm::with_api_url(api_key, secret, session, API_URL)
+    }
+
+    /// A client that sends its calls to `api_url` instead of Last.fm's (a test server).
+    pub fn with_api_url(
+        api_key: &str,
+        secret: &str,
+        session: Option<String>,
+        api_url: &str,
+    ) -> Result<LastFm, LastFmError> {
         Ok(LastFm {
             http: http_client()?,
+            api_url: api_url.to_string(),
             api_key: api_key.to_string(),
             secret: secret.to_string(),
             session,
@@ -199,7 +211,7 @@ impl LastFm {
         params.push(param("format", "json"));
 
         // Last.fm sends error bodies with 4xx/5xx statuses, so parse the body before the status.
-        let response = self.http.post(API_URL).form(&params).send().await?;
+        let response = self.http.post(&self.api_url).form(&params).send().await?;
         let status = response.status();
         let body = response.text().await?;
         let reply: Value = serde_json::from_str(&body)
