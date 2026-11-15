@@ -3,10 +3,15 @@
 //! for lyrics, whatever the user does. On the offscreen platform with the fixtures; no window
 //! is shown, and no controller runs, so the setting isn't saved.
 
+use std::ops::ControlFlow;
+
 use featherplay::lyrics;
 use featherplay::offscreen;
 use featherplay::snapshot::Scene;
 use featherplay::ui::{LyricsData, NowPlayingData, SettingKey, SettingsData, Theme};
+use i_slint_core::accessibility::AccessibleStringProperty;
+use i_slint_core::item_tree::ItemRc;
+use i_slint_core::window::WindowInner;
 use slint::ComponentHandle;
 
 const W: u32 = 1280;
@@ -25,16 +30,37 @@ fn region(scene: &Scene, (x0, y0): (u32, u32), (x1, y1): (u32, u32)) -> Vec<u8> 
         .collect()
 }
 
-/// The floating bar, where the microphone sits left of the thumbs-down and the heart.
-fn bar(scene: &Scene) -> Vec<u8> {
-    let clear = scene.ui.global::<Theme>().get_bar_clear() as u32;
-    region(scene, (0, H - clear), (W, H))
-}
+/// What the Lyrics toggles read, whatever the lyrics' state.
+const TOGGLES: [&str; 5] = [
+    "Lyrics",
+    "Hide lyrics",
+    "No lyrics",
+    "Retry lyrics",
+    "Finding lyrics…",
+];
 
-/// The stage's top right corner, where the Lyrics pill sits.
-fn pill(scene: &Scene) -> Vec<u8> {
-    let stage_right = W - scene.ui.global::<Theme>().get_nowplaying_side_w() as u32;
-    region(scene, (stage_right - 240, 0), (stage_right, 72))
+/// Whether a Lyrics toggle shows (the bar's microphone, the stage's pill), by its label.
+fn toggles(scene: &Scene) -> (bool, bool) {
+    let t = scene.ui.global::<Theme>();
+    let bar_top = H as f32 - t.get_bar_clear();
+    let stage_right = W as f32 - t.get_nowplaying_side_w();
+    let (mut bar, mut pill) = (false, false);
+    let root = ItemRc::new_root(WindowInner::from_pub(scene.ui.window()).component());
+    root.visit_descendants(|item| {
+        let named = item
+            .accessible_string_property(AccessibleStringProperty::Label)
+            .is_some_and(|l| TOGGLES.contains(&l.as_str()));
+        if named && item.is_visible() {
+            let at = item.map_to_window(item.geometry().origin);
+            if at.y >= bar_top {
+                bar = true;
+            } else if at.x < stage_right && at.y < 72.0 {
+                pill = true;
+            }
+        }
+        ControlFlow::<()>::Continue(())
+    });
+    (bar, pill)
 }
 
 /// The side panel's pixels in the lyrics' panel colour: the Lyrics tab's card fills most of
@@ -62,7 +88,11 @@ fn with_lyrics_off_nothing_is_looked_up_and_no_lyrics_toggle_or_tab_shows() {
     scene.settle();
     let data = scene.ui.global::<LyricsData>();
     let np = scene.ui.global::<NowPlayingData>();
-    let (bar_on, pill_on) = (bar(&scene), pill(&scene));
+    assert_eq!(
+        toggles(&scene),
+        (true, true),
+        "with lyrics on, the bar's microphone and the pill (bar, pill)"
+    );
 
     // The full view is open when lyrics are turned off in Settings: it closes.
     data.invoke_toggle_view();
@@ -91,13 +121,10 @@ fn with_lyrics_off_nothing_is_looked_up_and_no_lyrics_toggle_or_tab_shows() {
     let card = lyrics_card(&scene);
     assert!(card < 1_000, "the Lyrics tab shows ({card} px)");
 
-    // The microphone and the pill are gone (the full view is closed in both shots).
+    // The microphone and the pill are gone.
     scene.play(false).expect("player");
     scene.settle();
-    assert_ne!(bar(&scene), bar_on, "the bar's Lyrics button still shows");
-    assert_ne!(
-        pill(&scene),
-        pill_on,
-        "Now playing's Lyrics pill still shows"
-    );
+    let (bar, pill) = toggles(&scene);
+    assert!(!bar, "the bar's Lyrics button still shows");
+    assert!(!pill, "Now playing's Lyrics pill still shows");
 }
