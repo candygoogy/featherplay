@@ -1,43 +1,13 @@
 //! Songs YouTube refuses (`FailKind::Refused`): the player passes over them from then on and
 //! plays on, says so once a queue, and still tries one the user starts directly.
 
-use std::time::{Duration, SystemTime};
-
 use featherplay_core::failure::{FailKind, Failure, StopCause};
-use featherplay_core::model::{LikeStatus, Track, TrackId, VideoType};
-use featherplay_core::player::{Effect, Input, PlaybackPrefs, Player, Status, StreamInfo};
+use featherplay_core::player::{Effect, Input, Player, Status};
 
-fn id(s: &str) -> TrackId {
-    TrackId(s.to_string())
-}
-
-fn tracks(ids: &[&str]) -> Vec<Track> {
-    ids.iter()
-        .map(|s| Track {
-            id: id(s),
-            title: format!("Title {s}"),
-            artists: Vec::new(),
-            album: None,
-            duration: Some(Duration::from_secs(200)),
-            video_type: VideoType::Song,
-            thumbnail: None,
-            like: LikeStatus::Indifferent,
-            counterpart: None,
-        })
-        .collect()
-}
+use crate::support::{current, id, ok, prefs, resolves, run, tracks};
 
 fn player() -> Player {
-    Player::new(PlaybackPrefs {
-        prefer_song_versions: true,
-        skip_non_music_in_radio: true,
-        scrobble_other_media: true,
-        list_end: Default::default(),
-        skip_disliked: true,
-        crossfade: None,
-        fade_on_skip: false,
-        speed_percent: 100,
-    })
+    Player::new(prefs())
 }
 
 fn play(p: &mut Player, ids: &[&str], start: usize) -> Vec<Effect> {
@@ -51,23 +21,6 @@ fn play(p: &mut Player, ids: &[&str], start: usize) -> Vec<Effect> {
     )
 }
 
-fn run(p: &mut Player, input: Input) -> Vec<Effect> {
-    p.handle(input)
-        .into_iter()
-        .filter(|e| *e != Effect::StateChanged)
-        .collect()
-}
-
-fn ok(s: &str) -> Input {
-    Input::Resolved {
-        id: id(s),
-        result: Ok(StreamInfo {
-            expires_at: SystemTime::now() + Duration::from_secs(6 * 3600),
-            duration: Some(Duration::from_secs(200)),
-        }),
-    }
-}
-
 fn refused(s: &str) -> Input {
     Input::Resolved {
         id: id(s),
@@ -76,15 +29,6 @@ fn refused(s: &str) -> Input {
             detail: format!("unavailable: This video is not available ({s})"),
         }),
     }
-}
-
-fn resolves(fx: &[Effect]) -> Vec<&str> {
-    fx.iter()
-        .filter_map(|e| match e {
-            Effect::Resolve(id) => Some(id.0.as_str()),
-            _ => None,
-        })
-        .collect()
 }
 
 fn told(fx: &[Effect]) -> usize {
@@ -96,10 +40,6 @@ fn stopped(fx: &[Effect]) -> Option<StopCause> {
         Effect::ShowError(stop) => Some(stop.cause),
         _ => None,
     })
-}
-
-fn current(p: &Player) -> &str {
-    p.queue().current().map_or("", |t| t.id.0.as_str())
 }
 
 /// More refused songs in a row than the stop after failures counts: each is skipped on to
@@ -133,7 +73,7 @@ fn a_refused_song_is_passed_over_without_a_resolve() {
     assert_eq!(resolves(&fx), ["c"], "the preload passes over it");
     assert_eq!(p.ahead(2), [id("c")]);
     let fx = run(&mut p, Input::AudioEnded);
-    assert_eq!(current(&p), "c");
+    assert_eq!(current(&p).as_deref(), Some("c"));
     assert_eq!(told(&fx), 1);
 
     // Back from the start, by Next.
@@ -141,7 +81,7 @@ fn a_refused_song_is_passed_over_without_a_resolve() {
     run(&mut p, ok("a"));
     run(&mut p, Input::AudioStarted);
     let fx = run(&mut p, Input::Next);
-    assert_eq!(current(&p), "c");
+    assert_eq!(current(&p).as_deref(), Some("c"));
     assert_eq!(told(&fx), 1, "a new queue is told again");
     // It played after all (a click): the queue has it again.
     run(&mut p, Input::SetRefused(id("b"), false));

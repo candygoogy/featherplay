@@ -15,5 +15,6 @@ mod player;
 mod queue;
 mod refused;
 mod scrobble;
+mod support;
 mod sync;
 mod text;

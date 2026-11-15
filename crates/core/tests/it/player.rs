@@ -1,8 +1,10 @@
 use std::time::{Duration, SystemTime};
 
 use featherplay_core::failure::{FailKind, Failure, HelperFault, StopCause};
-use featherplay_core::model::{LikeStatus, RepeatMode, Session, Track, TrackId, VideoType};
+use featherplay_core::model::{LikeStatus, RepeatMode, Session, Track, VideoType};
 use featherplay_core::player::{Effect, Input, PlaybackPrefs, Player, Status, Stop, StreamInfo};
+
+use crate::support::{current, id, ok, resolves, run, t0, track, tracks, upcoming};
 
 const HOUR: Duration = Duration::from_secs(3600);
 
@@ -10,60 +12,29 @@ fn secs(s: u64) -> Duration {
     Duration::from_secs(s)
 }
 
-fn id(s: &str) -> TrackId {
-    TrackId(s.to_string())
-}
-
-fn track(s: &str) -> Track {
-    typed(s, VideoType::Song)
-}
-
 fn typed(s: &str, video_type: VideoType) -> Track {
     Track {
-        id: id(s),
-        title: format!("Title {s}"),
-        artists: Vec::new(),
-        album: None,
-        duration: Some(secs(200)),
         video_type,
-        thumbnail: None,
-        like: LikeStatus::Indifferent,
-        counterpart: None,
+        ..track(s)
     }
-}
-
-fn tracks(ids: &[&str]) -> Vec<Track> {
-    ids.iter().map(|s| track(s)).collect()
 }
 
 fn prefs(prefer_song_versions: bool, skip_non_music_in_radio: bool) -> PlaybackPrefs {
     PlaybackPrefs {
         prefer_song_versions,
         skip_non_music_in_radio,
-        scrobble_other_media: true,
-        list_end: Default::default(),
-        skip_disliked: true,
-        crossfade: None,
-        fade_on_skip: false,
-        speed_percent: 100,
+        ..crate::support::prefs()
     }
 }
 
-fn t0() -> SystemTime {
-    SystemTime::UNIX_EPOCH + Duration::from_secs(1_800_000_000)
-}
-
-fn info(expires_at: SystemTime) -> StreamInfo {
-    StreamInfo {
-        expires_at,
-        duration: Some(secs(200)),
-    }
-}
-
-fn ok(s: &str, expires_at: SystemTime) -> Input {
+/// `s` resolved to a 200 s stream that stays good until `expires_at`.
+fn ok_until(s: &str, expires_at: SystemTime) -> Input {
     Input::Resolved {
         id: id(s),
-        result: Ok(info(expires_at)),
+        result: Ok(StreamInfo {
+            expires_at,
+            duration: Some(secs(200)),
+        }),
     }
 }
 
@@ -97,14 +68,6 @@ fn tick(position: Duration, now: SystemTime) -> Input {
     }
 }
 
-/// The effects that drive playback; `StateChanged` only tells the UI to refresh.
-fn run(p: &mut Player, input: Input) -> Vec<Effect> {
-    p.handle(input)
-        .into_iter()
-        .filter(|e| *e != Effect::StateChanged)
-        .collect()
-}
-
 /// A player with `ids` queued (not radio), the first track resolved, loaded and audible.
 fn playing(ids: &[&str]) -> Player {
     let mut p = Player::new(prefs(true, true));
@@ -116,7 +79,7 @@ fn playing(ids: &[&str]) -> Player {
             radio: false,
         },
     );
-    run(&mut p, ok(ids[0], t0() + 6 * HOUR));
+    run(&mut p, ok(ids[0]));
     run(&mut p, Input::AudioStarted);
     p
 }
@@ -135,7 +98,7 @@ fn play_tracks_resolves_then_loads() {
     assert_eq!(fx, [Effect::Resolve(id("a"))]);
     assert_eq!(p.status(), &Status::Loading);
 
-    let fx = run(&mut p, ok("a", t0() + 6 * HOUR));
+    let fx = run(&mut p, ok("a"));
     assert_eq!(
         fx,
         [
@@ -167,10 +130,10 @@ fn preload_once_when_the_track_starts() {
             radio: false,
         },
     );
-    run(&mut p, ok("a", t0() + 6 * HOUR));
+    run(&mut p, ok("a"));
     let fx = run(&mut p, Input::AudioStarted);
     assert!(fx.contains(&Effect::Resolve(id("b"))));
-    let fx = run(&mut p, ok("b", t0() + 6 * HOUR));
+    let fx = run(&mut p, ok("b"));
     assert_eq!(fx, [Effect::Preload(id("b"))]);
 
     // Once per track: ticks up to the end don't resolve it again.
@@ -199,7 +162,7 @@ fn preload_once_when_the_track_starts() {
 fn preload_near_expiry_is_resolved_again() {
     let mut p = playing(&["a", "b"]);
     // "b" was preloaded at the start of "a" with a URL that's expiring by its turn.
-    run(&mut p, ok("b", t0() + secs(60)));
+    run(&mut p, ok_until("b", t0() + secs(60)));
     run(&mut p, tick(secs(40), t0() + secs(40)));
     assert_eq!(
         run(&mut p, Input::Next),
@@ -222,7 +185,7 @@ fn radio_fetches_continuation() {
         fx,
         [Effect::Resolve(id("a")), Effect::FetchContinuation(id("c"))]
     );
-    run(&mut p, ok("a", t0() + 6 * HOUR));
+    run(&mut p, ok("a"));
     run(&mut p, Input::AudioStarted);
 
     // Still waiting for the continuation: moving on doesn't ask again.
@@ -563,7 +526,7 @@ fn a_track_that_plays_ends_the_streak() {
         },
     );
     run(&mut p, failed("a", FailKind::Broken));
-    run(&mut p, ok("b", t0() + 6 * HOUR));
+    run(&mut p, ok("b"));
     run(&mut p, Input::AudioStarted);
     run(&mut p, Input::AudioEnded);
     run(&mut p, err("c"));
@@ -611,7 +574,7 @@ fn expired_url_re_resolves_at_position() {
             .any(|e| matches!(e, Effect::Play | Effect::Load { .. }))
     );
 
-    let fx = run(&mut p, ok("a", t0() + 14 * HOUR));
+    let fx = run(&mut p, ok_until("a", t0() + 14 * HOUR));
     assert_eq!(
         fx,
         [
@@ -683,7 +646,7 @@ fn restore_is_paused_at_position() {
     // Play resolves and loads at the saved position.
     assert_eq!(run(&mut p, Input::Toggle), [Effect::Resolve(id("b"))]);
     assert_eq!(
-        run(&mut p, ok("b", t0() + 6 * HOUR)),
+        run(&mut p, ok("b")),
         [
             Effect::Load {
                 id: id("b"),
@@ -830,7 +793,7 @@ fn next_and_previous_silence_the_old_track_while_resolving() {
     assert_eq!(p.status(), &Status::Loading);
     assert_eq!(p.queue().current().map(|t| &t.id), Some(&id("b")));
 
-    run(&mut p, ok("b", t0() + 6 * HOUR));
+    run(&mut p, ok("b"));
     run(&mut p, Input::AudioStarted);
     run(&mut p, tick(secs(10), t0()));
 
@@ -845,7 +808,7 @@ fn next_and_previous_silence_the_old_track_while_resolving() {
 #[test]
 fn previous_reuses_the_stream_of_the_track_left() {
     let mut p = playing(&["a", "b", "c"]);
-    run(&mut p, ok("b", t0() + 6 * HOUR));
+    run(&mut p, ok("b"));
     run(&mut p, tick(secs(1), t0() + secs(1)));
     run(&mut p, Input::Next);
     run(&mut p, Input::AudioStarted);
@@ -890,7 +853,7 @@ fn loading_shows_playing_unless_paused() {
     run(&mut p, Input::Toggle);
     assert_eq!(p.status(), &Status::Loading);
     assert!(p.wants_play());
-    run(&mut p, ok("b", t0() + 6 * HOUR));
+    run(&mut p, ok("b"));
     assert!(p.wants_play());
     run(&mut p, Input::AudioStarted);
     assert_eq!(p.status(), &Status::Playing);
@@ -921,7 +884,7 @@ fn pause_while_next_resolves_is_silent() {
     audible = audible_after(audible, &run(&mut p, Input::Toggle));
     assert!(!audible, "the old track is still playing after pause");
     assert_eq!(p.status(), &Status::Paused);
-    let fx = run(&mut p, ok("b", t0() + 6 * HOUR));
+    let fx = run(&mut p, ok("b"));
     assert_eq!(
         fx,
         [Effect::Load {
@@ -933,27 +896,10 @@ fn pause_while_next_resolves_is_silent() {
     assert_eq!(p.status(), &Status::Paused);
 }
 
-fn upcoming(p: &Player) -> Vec<String> {
-    p.queue()
-        .upcoming()
-        .iter()
-        .map(|t| t.id.0.clone())
-        .collect()
-}
-
-fn resolves(fx: &[Effect]) -> Vec<String> {
-    fx.iter()
-        .filter_map(|e| match e {
-            Effect::Resolve(id) => Some(id.0.clone()),
-            _ => None,
-        })
-        .collect()
-}
-
 #[test]
 fn shuffle_and_repeat_are_saved_and_replan_the_preload() {
     let mut p = playing(&["a", "b", "c", "d", "e", "f", "g", "h"]);
-    run(&mut p, ok("b", t0() + 6 * HOUR));
+    run(&mut p, ok("b"));
 
     // Repeat One: the next track is the current one, so nothing is preloaded.
     let fx = run(&mut p, Input::SetRepeat(RepeatMode::One));
@@ -1003,7 +949,7 @@ fn shuffle_and_repeat_are_saved_and_replan_the_preload() {
 #[test]
 fn reorder_remove_and_clear_edit_upcoming() {
     let mut p = playing(&["a", "b", "c", "d"]);
-    run(&mut p, ok("b", t0() + 6 * HOUR));
+    run(&mut p, ok("b"));
 
     let fx = run(&mut p, Input::MoveUpcoming { from: 0, to: 2 });
     assert_eq!(upcoming(&p), ["c", "d", "b"]);
@@ -1025,7 +971,7 @@ fn reorder_remove_and_clear_edit_upcoming() {
     assert!(fx.contains(&Effect::PersistSession));
     assert_eq!(p.queue().current().map(|t| t.id.clone()), Some(id("a")));
     // The answer for "c" comes in late: it isn't buffered, and Next has nowhere to go.
-    assert_eq!(run(&mut p, ok("c", t0() + 6 * HOUR)), []);
+    assert_eq!(run(&mut p, ok("c")), []);
     assert_eq!(run(&mut p, Input::Next), []);
     assert_eq!(p.status(), &Status::Playing);
 
@@ -1098,7 +1044,7 @@ fn play_next_all_goes_after_the_current_track_and_starts_an_empty_player() {
 fn a_replaced_preload_never_plays() {
     let mut p = playing(&["a", "b", "c"]);
     assert_eq!(
-        run(&mut p, ok("b", t0() + 6 * HOUR)),
+        run(&mut p, ok("b")),
         [Effect::Preload(id("b"))]
     );
 
@@ -1107,7 +1053,7 @@ fn a_replaced_preload_never_plays() {
     assert_eq!(resolves(&fx), ["c"]);
     assert!(!fx.contains(&Effect::Preload(id("b"))));
     assert_eq!(
-        run(&mut p, ok("c", t0() + 6 * HOUR)),
+        run(&mut p, ok("c")),
         [Effect::Preload(id("c"))]
     );
 
@@ -1129,9 +1075,9 @@ fn a_replaced_preload_never_plays() {
     // late answer for the old one is dropped.
     let mut p = playing(&["a", "b", "c"]);
     run(&mut p, Input::PlayNext(track("x")));
-    assert_eq!(run(&mut p, ok("b", t0() + 6 * HOUR)), []);
+    assert_eq!(run(&mut p, ok("b")), []);
     assert_eq!(
-        run(&mut p, ok("x", t0() + 6 * HOUR)),
+        run(&mut p, ok("x")),
         [Effect::Preload(id("x"))]
     );
     assert_eq!(
@@ -1371,13 +1317,9 @@ fn audible_from(prefs: PlaybackPrefs, queue: Vec<Track>, start: usize) -> (Playe
             radio: false,
         },
     );
-    run(&mut p, ok(&first, t0() + 6 * HOUR));
+    run(&mut p, ok(&first));
     let fx = run(&mut p, Input::AudioStarted);
     (p, fx)
-}
-
-fn current(p: &Player) -> Option<String> {
-    p.queue().current().map(|t| t.id.0.clone())
 }
 
 #[test]
@@ -1481,7 +1423,7 @@ fn a_continuation_waited_for_passes_over_its_disliked_tracks() {
             radio: true,
         },
     );
-    run(&mut p, ok("a", t0() + 6 * HOUR));
+    run(&mut p, ok("a"));
     run(&mut p, Input::AudioStarted);
     run(&mut p, Input::AudioEnded);
     assert_eq!(p.status(), &Status::Loading);

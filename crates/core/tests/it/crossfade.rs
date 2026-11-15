@@ -1,11 +1,11 @@
 //! Crossfade: when the end of a song fades into the next, and when it cuts.
 
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
 
-use featherplay_core::model::{
-    AlbumId, AlbumRef, LikeStatus, RepeatMode, Track, TrackId, VideoType,
-};
-use featherplay_core::player::{Effect, Input, ListEnd, PlaybackPrefs, Player, Status, StreamInfo};
+use featherplay_core::model::{AlbumId, AlbumRef, RepeatMode, Track};
+use featherplay_core::player::{Effect, Input, PlaybackPrefs, Player, Status, StreamInfo};
+
+use crate::support::{current, id, t0};
 
 const HOUR: Duration = Duration::from_secs(3600);
 
@@ -17,43 +17,23 @@ fn ms(n: u64) -> Duration {
     Duration::from_millis(n)
 }
 
-fn id(s: &str) -> TrackId {
-    TrackId(s.to_string())
-}
-
 /// A 200 s song, on album `album` if given.
 fn track(s: &str, album: Option<&str>) -> Track {
     Track {
-        id: id(s),
-        title: format!("Title {s}"),
-        artists: Vec::new(),
         album: album.map(|a| AlbumRef {
             id: AlbumId(a.to_string()),
             title: format!("Album {a}"),
         }),
-        duration: Some(secs(200)),
-        video_type: VideoType::Song,
-        thumbnail: None,
-        like: LikeStatus::Indifferent,
-        counterpart: None,
+        ..crate::support::track(s)
     }
 }
 
 fn prefs(crossfade: Option<Duration>, fade_on_skip: bool) -> PlaybackPrefs {
     PlaybackPrefs {
-        prefer_song_versions: true,
-        skip_non_music_in_radio: true,
-        scrobble_other_media: true,
-        list_end: ListEnd::Stop,
-        skip_disliked: true,
         crossfade,
         fade_on_skip,
-        speed_percent: 100,
+        ..crate::support::prefs()
     }
-}
-
-fn t0() -> SystemTime {
-    SystemTime::UNIX_EPOCH + Duration::from_secs(1_800_000_000)
 }
 
 fn resolved(s: &str, length: Duration) -> Input {
@@ -132,13 +112,6 @@ fn crossfade(s: &str, fade: Duration) -> Effect {
     Effect::Crossfade { id: id(s), fade }
 }
 
-fn current(p: &Player) -> String {
-    p.queue()
-        .current()
-        .map(|t| t.id.0.clone())
-        .unwrap_or_default()
-}
-
 fn load(s: &str) -> Effect {
     Effect::Load {
         id: id(s),
@@ -152,7 +125,7 @@ fn the_end_of_a_song_fades_into_the_next_one() {
     assert!(run(&mut p, tick(ms(194_900))).is_empty());
     let fx = run(&mut p, tick(secs(195)));
     assert_eq!(fx, [crossfade("b", secs(5))]);
-    assert_eq!(current(&p), "b");
+    assert_eq!(current(&p).as_deref(), Some("b"));
     // The sound never stops, so the player shows playing throughout.
     assert_eq!(p.status(), &Status::Playing);
 }
@@ -188,12 +161,12 @@ fn the_old_songs_end_after_a_crossfade_does_not_move_on_again() {
     run(&mut p, tick(secs(195)));
     // The old song's stream ended before the engine took the fade over.
     assert!(run(&mut p, Input::AudioEnded).is_empty());
-    assert_eq!(current(&p), "b");
+    assert_eq!(current(&p).as_deref(), Some("b"));
     // Once "b" is heard, its own end moves on.
     run(&mut p, Input::AudioStarted);
     run(&mut p, resolved("c", secs(200)));
     run(&mut p, Input::AudioEnded);
-    assert_eq!(current(&p), "c");
+    assert_eq!(current(&p).as_deref(), Some("c"));
 }
 
 #[test]
@@ -204,7 +177,7 @@ fn a_song_whose_stream_ends_before_the_fade_moves_on_with_a_cut() {
     assert_eq!(run(&mut p, Input::AudioEnded), [load("b"), Effect::Play]);
     // The next tick fades nothing.
     assert!(run(&mut p, tick(secs(1))).is_empty());
-    assert_eq!(current(&p), "b");
+    assert_eq!(current(&p).as_deref(), Some("b"));
 }
 
 #[test]
@@ -322,7 +295,7 @@ fn paused_near_the_end_nothing_fades() {
     run(&mut p, tick(secs(190)));
     run(&mut p, Input::Toggle);
     assert!(run(&mut p, tick(secs(197))).is_empty());
-    assert_eq!(current(&p), "a");
+    assert_eq!(current(&p).as_deref(), Some("a"));
 }
 
 #[test]
@@ -447,7 +420,7 @@ fn previous_during_a_crossfade_goes_back_to_the_old_song() {
         run(&mut p, Input::Previous),
         [Effect::Pause, load("a"), Effect::Play]
     );
-    assert_eq!(current(&p), "a");
+    assert_eq!(current(&p).as_deref(), Some("a"));
 }
 
 #[test]
@@ -480,9 +453,9 @@ fn the_sleep_timers_song_end_pauses_on_the_next_song_without_a_fade() {
     assert!(p.pauses_at_end());
     // Where it would fade, it plays on to the end.
     assert!(!run(&mut p, tick(secs(196))).contains(&crossfade("b", secs(5))));
-    assert_eq!(current(&p), "a");
+    assert_eq!(current(&p).as_deref(), Some("a"));
     let fx = run(&mut p, Input::AudioEnded);
-    assert_eq!(current(&p), "b");
+    assert_eq!(current(&p).as_deref(), Some("b"));
     assert!(fx.contains(&load("b")), "{fx:?}");
     assert!(!fx.contains(&Effect::Play), "{fx:?}");
     assert!(!p.wants_play() && !p.pauses_at_end());
@@ -498,6 +471,6 @@ fn the_sleep_timers_song_end_once_turned_off_plays_on() {
     run(&mut p, Input::PauseAtEnd(true));
     run(&mut p, Input::PauseAtEnd(false));
     run(&mut p, Input::AudioEnded);
-    assert_eq!(current(&p), "b");
+    assert_eq!(current(&p).as_deref(), Some("b"));
     assert!(p.wants_play());
 }

@@ -1,21 +1,15 @@
 use std::time::{Duration, SystemTime};
 
-use featherplay_core::model::{LikeStatus, Track, TrackId, VideoType};
+use featherplay_core::model::{Track, VideoType};
 use featherplay_core::scrobble::{
     ScrobbleTracker, clean_title, display_title, eligible, threshold,
 };
 
+/// A song `secs` long.
 fn track(secs: u64) -> Track {
     Track {
-        id: TrackId("abc".to_string()),
-        title: "Song".to_string(),
-        artists: Vec::new(),
-        album: None,
         duration: Some(Duration::from_secs(secs)),
-        video_type: VideoType::Song,
-        thumbnail: None,
-        like: LikeStatus::Indifferent,
-        counterpart: None,
+        ..crate::support::track("abc")
     }
 }
 

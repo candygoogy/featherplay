@@ -1,53 +1,15 @@
 //! What happens when a list (not a radio) runs out: autoplay continues into a radio of its
 //! last track, or the list restarts from the top.
 
-use std::time::{Duration, SystemTime};
+use featherplay_core::model::RepeatMode;
+use featherplay_core::player::{Effect, Input, ListEnd, PlaybackPrefs, Player, Status};
 
-use featherplay_core::model::{LikeStatus, RepeatMode, Track, TrackId, VideoType};
-use featherplay_core::player::{Effect, Input, ListEnd, PlaybackPrefs, Player, Status, StreamInfo};
-
-fn id(s: &str) -> TrackId {
-    TrackId(s.to_string())
-}
-
-fn track(s: &str) -> Track {
-    Track {
-        id: id(s),
-        title: format!("Title {s}"),
-        artists: Vec::new(),
-        album: None,
-        duration: Some(Duration::from_secs(200)),
-        video_type: VideoType::Song,
-        thumbnail: None,
-        like: LikeStatus::Indifferent,
-        counterpart: None,
-    }
-}
-
-fn tracks(ids: &[&str]) -> Vec<Track> {
-    ids.iter().map(|s| track(s)).collect()
-}
+use crate::support::{current, id, ok, tracks, upcoming};
 
 fn prefs(list_end: ListEnd) -> PlaybackPrefs {
     PlaybackPrefs {
-        prefer_song_versions: true,
-        skip_non_music_in_radio: true,
-        scrobble_other_media: true,
         list_end,
-        skip_disliked: true,
-        crossfade: None,
-        fade_on_skip: false,
-        speed_percent: 100,
-    }
-}
-
-fn ok(s: &str) -> Input {
-    Input::Resolved {
-        id: id(s),
-        result: Ok(StreamInfo {
-            expires_at: SystemTime::now() + Duration::from_secs(6 * 3600),
-            duration: Some(Duration::from_secs(200)),
-        }),
+        ..crate::support::prefs()
     }
 }
 
@@ -65,18 +27,6 @@ fn fetches(fx: &[Effect]) -> Vec<String> {
             Effect::FetchContinuation(id) => Some(id.0.clone()),
             _ => None,
         })
-        .collect()
-}
-
-fn current(p: &Player) -> Option<String> {
-    p.queue().current().map(|t| t.id.0.clone())
-}
-
-fn upcoming(p: &Player) -> Vec<String> {
-    p.queue()
-        .upcoming()
-        .iter()
-        .map(|t| t.id.0.clone())
         .collect()
 }
 

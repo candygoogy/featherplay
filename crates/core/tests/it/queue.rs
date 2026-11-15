@@ -1,25 +1,9 @@
 use std::time::Duration;
 
-use featherplay_core::model::{LikeStatus, RepeatMode, Track, TrackId, VideoType};
+use featherplay_core::model::{RepeatMode, Track};
 use featherplay_core::queue::{BackAction, Queue};
 
-fn track(id: &str) -> Track {
-    Track {
-        id: TrackId(id.to_string()),
-        title: format!("Title {id}"),
-        artists: Vec::new(),
-        album: None,
-        duration: Some(Duration::from_secs(200)),
-        video_type: VideoType::Song,
-        thumbnail: None,
-        like: LikeStatus::Indifferent,
-        counterpart: None,
-    }
-}
-
-fn tracks(ids: &[&str]) -> Vec<Track> {
-    ids.iter().map(|id| track(id)).collect()
-}
+use crate::support::{track, tracks};
 
 fn ids(tracks: &[Track]) -> Vec<&str> {
     tracks.iter().map(|t| t.id.0.as_str()).collect()
