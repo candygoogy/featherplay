@@ -135,7 +135,6 @@ mod tray_hide;
 mod ui_bridge;
 mod update_notice;
 mod upnext_cover;
-mod upnext_hover;
 mod upnext_rows;
 mod upnext_slide;
 mod volume_hover;
