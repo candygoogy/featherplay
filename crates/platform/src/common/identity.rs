@@ -96,7 +96,7 @@ mod tests {
 
     #[test]
     fn guard_skips_dev_and_debug() {
-        let dev = Some(OsStr::new(r"D:\Workspace\Cache\featherplay-dev"));
+        let dev = Some(OsStr::new("/home/ada/featherplay-test"));
         assert!(registration_allowed(true, None));
         assert!(registration_allowed(true, Some(OsStr::new(""))));
         assert!(!registration_allowed(true, dev));
