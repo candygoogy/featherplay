@@ -77,8 +77,12 @@ export function bindBar(bar: HTMLElement, player: Player): { readonly state: Bar
       first = false;
     }).observe(sentinel);
   }
-  // A resize lands every part where its CSS puts it at once.
-  addEventListener("resize", finish);
+  // A resize lands every part where its CSS puts it at once, and the capsule’s ground with them.
+  const capBg = bar.querySelector<HTMLElement>(".cap-bg");
+  addEventListener("resize", () => {
+    finish();
+    for (const a of capBg?.getAnimations() ?? []) a.finish();
+  });
 
   // ---- The section on screen, lit (the capsule shows its name) ----
   const links = [...bar.querySelectorAll<HTMLAnchorElement>("[data-sec]")];
@@ -173,25 +177,60 @@ export function bindBar(bar: HTMLElement, player: Player): { readonly state: Bar
   ]);
   /** Flyouts opened by something other than the pointer resting (kept on a state change). */
   const held = new Set<HTMLElement>();
-  const place = (fly: HTMLElement) => {
-    const a = anchor.get(fly)!;
-    const r = a.getBoundingClientRect();
+  const shows = (el: HTMLElement) => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== "hidden";
+  /** Where a part rests in its layout: its box less the glide it may be in the middle of. */
+  const restRect = (el: HTMLElement) => {
+    const r = el.getBoundingClientRect();
+    const part = el.closest<HTMLElement>("[data-part]");
+    const t = part ? getComputedStyle(part).translate : "none";
+    const [dx = 0, dy = 0] = t === "none" ? [] : t.split(" ").map((v) => parseFloat(v) || 0);
+    return { left: r.left - dx, top: r.top - dy, width: r.width, height: r.height };
+  };
+  /** Under its part, or under the song's other part when that one isn't shown in this state
+   *  (the capsule has no tray icon, the docked bar no song on a wide screen); never past a side. */
+  /** Before it shows (beforetoggle: not laid out yet, so its CSS width, 22rem at most) and again
+   *  once it has (toggle, its real width). */
+  const place = (fly: HTMLElement, early = false) => {
+    let a = anchor.get(fly)!;
+    if (!shows(a) && fly === songFly) a = [np, tray].find(shows) ?? a;
+    if (!shows(a)) {
+      if (!early) fly.hidePopover();
+      return;
+    }
+    anchor.set(fly, a);
+    const r = restRect(a);
     const vw = document.documentElement.clientWidth;
-    const w = fly.offsetWidth;
-    fly.style.left = `${Math.round(Math.min(Math.max(8, r.left + r.width / 2 - w / 2), vw - w - 8))}px`;
+    fly.style.maxWidth = `${vw - 16}px`;
+    const w = fly.offsetWidth || Math.min(22 * 16, vw - 16);
+    fly.style.left = `${Math.round(Math.max(8, Math.min(r.left + r.width / 2 - w / 2, vw - w - 8)))}px`;
     fly.style.top = `${Math.round(row.getBoundingClientRect().bottom + 8)}px`;
   };
   for (const fly of flyouts) {
+    fly.addEventListener("beforetoggle", (e) => {
+      if ((e as ToggleEvent).newState !== "open") return;
+      if (fly.hasAttribute("data-story")) anchor.set(fly, np);
+      place(fly, true);
+    });
     fly.addEventListener("toggle", (e) => {
       const open = (e as ToggleEvent).newState === "open";
+      // The story's beat in the tray shows the song under the capsule's song.
+      if (open && fly.hasAttribute("data-story")) anchor.set(fly, np);
       if (open) {
         place(fly);
         hideTip();
       } else held.delete(fly);
-      const a = anchor.get(fly)!;
-      for (const el of fly === songFly ? [np, tray] : [dl]) el.setAttribute("aria-expanded", String(open && el === a));
+      if (fly === songFly) np.setAttribute("aria-expanded", String(open));
+      else dl.setAttribute("aria-expanded", String(open));
     });
   }
+  // A resize or a turn of the phone: the open flyouts go under their parts again.
+  let placeFrame = 0;
+  addEventListener("resize", () => {
+    cancelAnimationFrame(placeFrame);
+    placeFrame = requestAnimationFrame(() => {
+      for (const f of flyouts) if (f.matches(":popover-open")) place(f);
+    });
+  });
   const open = (fly: HTMLElement, from: HTMLElement) => {
     anchor.set(fly, from);
     if (fly.matches(":popover-open")) place(fly);
@@ -201,8 +240,10 @@ export function bindBar(bar: HTMLElement, player: Player): { readonly state: Bar
     anchor.set(songFly, np);
     held.add(songFly);
   });
+  // A change of state: placed for the new layout at once (where the parts will rest, not where
+  // their glide starts).
   bar.addEventListener("barstate", () => {
-    for (const f of flyouts) if (f.matches(":popover-open")) requestAnimationFrame(() => place(f));
+    for (const f of flyouts) if (f.matches(":popover-open")) place(f);
   });
 
   // Resting the pointer on the tray icon or Download opens its flyout (not straight after a
@@ -275,10 +316,12 @@ export function bindBar(bar: HTMLElement, player: Player): { readonly state: Bar
   const ctx = bar.querySelector<HTMLElement>("[data-ctx]")!;
   const items = [...ctx.querySelectorAll<HTMLElement>(".ctx-item")];
   let ctxBack: HTMLElement | null = null;
-  // The desk is anything that isn't a control, a word or a picture (the window keeps its own).
+  // The desk is the first screen's ground that isn't a control, a word or a picture (the window
+  // keeps its own). Everywhere else the browser's own menu stays, with its translate and
+  // read-aloud.
   const NOT_EMPTY =
     "a, button, input, textarea, select, label, summary, p, h1, h2, h3, h4, li, dt, dd, td, th, img, svg, figure, [data-window], [data-site-bar], [popover], [data-piece], [role]";
-  const empty = (t: EventTarget | null) => t instanceof Element && !t.closest(NOT_EMPTY);
+  const empty = (t: EventTarget | null) => t instanceof Element && !!t.closest("[data-stage]") && !t.closest(NOT_EMPTY);
   const openCtx = (x: number, y: number) => {
     const play = ctx.querySelector("[data-ctx-play]");
     if (play) play.textContent = player.state.playing ? "Pause" : "Play";

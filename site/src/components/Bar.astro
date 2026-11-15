@@ -497,7 +497,8 @@ const arrow = "M12 4.5 V15 M7.5 10.5 L12 15 L16.5 10.5 M5 19.5 H19";
     position: fixed;
     inset: auto;
     width: min(22rem, 100vw - 16px);
-    max-height: calc(100vh - 80px);
+    /* The small viewport: a phone's toolbar never covers the last rows. */
+    max-height: calc(100dvh - 80px);
     margin: 0;
     padding: var(--s2);
     overflow: auto;
@@ -691,6 +692,8 @@ const arrow = "M12 4.5 V15 M7.5 10.5 L12 15 L16.5 10.5 M5 19.5 H19";
   .ctx {
     --mat: var(--mat-solid);
     position: fixed;
+    /* The bar lets the pointer through to the page; its menu takes it. */
+    pointer-events: auto;
     inset: auto;
     width: 15rem;
     margin: 0;
@@ -736,7 +739,11 @@ const arrow = "M12 4.5 V15 M7.5 10.5 L12 15 L16.5 10.5 M5 19.5 H19";
   .ctx-item:hover,
   .ctx-item:focus-visible {
     background: var(--hover);
-    outline: none;
+  }
+  /* The keys' place in the menu: the page's focus ring, inside the item. */
+  .ctx-item:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
   }
   .ctx-div {
     height: 9px;

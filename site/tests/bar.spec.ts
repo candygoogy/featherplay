@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { wake } from "./helpers";
+import { problems, settled, waitSettled, WIDTHS } from "./check";
 
 // The bar: docked at the top, one floating capsule once the page moves; two states and nothing
 // in between, its parts never on top of each other at any width (the owner's report on
@@ -7,48 +8,6 @@ import { wake } from "./helpers";
 test.use({ viewport: { width: 1440, height: 900 } });
 
 const bar = (page: Page) => page.locator("[data-site-bar]");
-/** At rest: two frames for any observer to answer, then no glide running. */
-const settled = (page: Page) =>
-  page.evaluate(
-    () =>
-      new Promise<boolean>((r) =>
-        requestAnimationFrame(() =>
-          requestAnimationFrame(() =>
-            r([...document.querySelectorAll("[data-site-bar] [data-part]")].every((p) => p.getAnimations().every((a) => a instanceof CSSTransition || a.playState === "finished"))),
-          ),
-        ),
-      ),
-  );
-
-/** The visible parts' boxes at rest (a glide in flight is finished first: the layout is what
- *  is judged), and what is wrong with them: overlaps, cut words, off screen. */
-const problems = (page: Page) =>
-  page.evaluate(() => {
-    for (const p of document.querySelectorAll("[data-site-bar] [data-part]")) for (const a of p.getAnimations()) if (!(a instanceof CSSTransition)) a.finish();
-    for (const a of document.querySelector("[data-site-bar] .cap-bg")!.getAnimations()) a.finish();
-    const vw = document.documentElement.clientWidth;
-    const out: string[] = [];
-    const parts = [...document.querySelectorAll<HTMLElement>("[data-site-bar] [data-part]")]
-      .map((el) => ({ el, r: el.getBoundingClientRect(), name: el.getAttribute("aria-label") ?? el.textContent!.trim().slice(0, 12) }))
-      .filter((p) => p.r.width > 0 && getComputedStyle(p.el).visibility !== "hidden");
-    for (const p of parts) {
-      if (p.r.left < -0.5 || p.r.right > vw + 0.5) out.push(`${p.name} off screen`);
-      const lbl = p.el.querySelector<HTMLElement>(".lbl");
-      if (lbl && lbl.clientWidth > 1 && lbl.scrollWidth > lbl.clientWidth + 0.5) out.push(`${p.name} cut`);
-    }
-    for (let i = 0; i < parts.length; i++)
-      for (let j = i + 1; j < parts.length; j++) {
-        const a = parts[i].r;
-        const b = parts[j].r;
-        if (a.left < b.right - 0.5 && b.left < a.right - 0.5 && a.top < b.bottom - 0.5 && b.top < a.bottom - 0.5) out.push(`${parts[i].name} on ${parts[j].name}`);
-      }
-    const state = document.querySelector<HTMLElement>("[data-site-bar]")!.dataset.state;
-    if (state === "capsule") {
-      const cap = document.querySelector("[data-site-bar] .cap-bg")!.getBoundingClientRect();
-      for (const p of parts) if (p.r.left < cap.left - 0.5 || p.r.right > cap.right + 0.5) out.push(`${p.name} outside the capsule`);
-    }
-    return out;
-  });
 
 test("docked at the top, a capsule once the page moves, docked again back at the top", async ({ page }) => {
   await page.goto("/");
@@ -69,24 +28,31 @@ for (const height of [600, 1270]) {
       if (state === "capsule") await page.evaluate(() => scrollTo(0, 800));
       await expect(bar(page)).toHaveAttribute("data-state", state);
       const found: string[] = [];
-      for (let w = 320; w <= 3840; w += w < 1400 ? 10 : 40) {
+      for (const w of WIDTHS) {
         await page.setViewportSize({ width: w, height });
-        await expect.poll(() => settled(page)).toBe(true);
-        const p = await problems(page);
-        if (p.length) found.push(`${w}: ${p.join(", ")}`);
+        await waitSettled(page);
+        found.push(...(await problems(page)));
       }
       expect(found, state).toEqual([]);
     }
   });
 }
 
-test("the change can't be caught half-way: it ends on its own, a resize ends it at once, and a reload part-way down starts as the capsule", async ({ page }) => {
+test("the change can't be caught half-way: a resize in the middle of the glide ends it at once, and a reload part-way down starts as the capsule", async ({ page }) => {
   await page.goto("/");
-  await page.mouse.wheel(0, 400);
-  await expect(bar(page)).toHaveAttribute("data-state", "capsule");
-  // Mid-glide, a resize: every part is at its place at once.
+  await page.waitForTimeout(600);
+  // The glide is under way (the page moved, the parts are still travelling)...
+  const gliding = await page.evaluate(
+    () =>
+      new Promise<boolean>((r) => {
+        document.querySelector("[data-site-bar]")!.addEventListener("barstate", () => r([...document.querySelectorAll("[data-site-bar] [data-part]")].some((p) => p.getAnimations().some((a) => !(a instanceof CSSTransition) && a.playState === "running"))), { once: true });
+        scrollTo(0, 400);
+      }),
+  );
+  expect(gliding).toBe(true);
+  // ...and a resize lands every part where its CSS puts it, within a frame, not 300 ms later.
   await page.setViewportSize({ width: 1000, height: 900 });
-  await expect.poll(() => settled(page)).toBe(true);
+  expect(await settled(page)).toBe(true);
   expect(await problems(page)).toEqual([]);
   await page.evaluate(() => scrollTo(0, 1500));
   await page.reload();
@@ -153,6 +119,71 @@ test("the capsule's song opens its flyout: the media keys and the six songs; Esc
   await expect(np).toBeFocused();
 });
 
+test("an open flyout follows a resize: opened at 1280, the screen turned to 375, it is still on it", async ({ page }) => {
+  await page.route("**/music/**", (r) => r.abort());
+  // No story either side (reduced motion): the bar stays the capsule, only the size changes.
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/");
+  await page.evaluate(() => scrollTo(0, 3200));
+  await expect(bar(page)).toHaveAttribute("data-state", "capsule");
+  await bar(page).getByRole("button", { name: /the song and the player$/ }).click();
+  const fly = page.locator("#fly-song");
+  await expect(fly).toBeVisible();
+  // Placed under the capsule's song, right of the middle.
+  await expect.poll(async () => (await fly.boundingBox())!.x).toBeGreaterThan(400);
+  await page.setViewportSize({ width: 375, height: 800 });
+  await expect
+    .poll(async () => {
+      const f = (await fly.boundingBox())!;
+      return f.x >= 8 - 0.5 && f.x + f.width <= 375 - 8 + 0.5;
+    })
+    .toBe(true);
+});
+
+test("opened from the capsule and back at the top, the song's flyout goes under the tray icon, not to the corner", async ({ page }) => {
+  await page.route("**/music/**", (r) => r.abort());
+  await page.goto("/");
+  await page.evaluate(() => scrollTo(0, 3200));
+  await expect(bar(page)).toHaveAttribute("data-state", "capsule");
+  await bar(page).getByRole("button", { name: /the song and the player$/ }).click();
+  const fly = page.locator("#fly-song");
+  await expect(fly).toBeVisible();
+  await page.evaluate(() => scrollTo(0, 0));
+  await expect(bar(page)).toHaveAttribute("data-state", "docked");
+  await waitSettled(page);
+  const tray = (await bar(page).locator("[data-tray]").boundingBox())!;
+  await expect
+    .poll(async () => {
+      const f = (await fly.boundingBox())!;
+      return Math.abs(f.x + f.width / 2 - (tray.x + tray.width / 2)) < 2 || f.x + f.width >= 1440 - 8 - 16;
+    })
+    .toBe(true);
+  expect((await fly.boundingBox())!.x).toBeGreaterThan(100);
+});
+
+test("the tray icon opens no flyout of its own to the keyboard: it never says it is expanded", async ({ page }) => {
+  await page.route("**/music/**", (r) => r.abort());
+  await page.goto("/");
+  const tray = bar(page).locator("[data-tray]");
+  await tray.hover();
+  await expect(page.locator("#fly-song")).toBeVisible();
+  expect(await tray.getAttribute("aria-expanded")).toBeNull();
+});
+
+test("on a narrow phone the song's flyout stays inside the screen, its last row above the bottom", async ({ page }) => {
+  await page.route("**/music/**", (r) => r.abort());
+  await page.setViewportSize({ width: 360, height: 640 });
+  await page.goto("/");
+  await bar(page).getByRole("button", { name: /the song and the player$/ }).click();
+  const fly = page.locator("#fly-song");
+  await expect(fly).toBeVisible();
+  const f = (await fly.boundingBox())!;
+  expect(f.x).toBeGreaterThanOrEqual(7.5);
+  expect(f.x + f.width).toBeLessThanOrEqual(360 - 7.5);
+  expect(f.y + f.height).toBeLessThanOrEqual(640);
+});
+
 test("Download's flyout opens for the keyboard and Tab goes on into it", async ({ page }) => {
   await page.goto("/");
   const dl = bar(page).getByRole("link", { name: "Download" });
@@ -161,6 +192,52 @@ test("Download's flyout opens for the keyboard and Tab goes on into it", async (
   await page.keyboard.press("Tab");
   await expect(page.locator("#fly-dl a").first()).toBeFocused();
   await expect(page.locator("#fly-dl a").first()).toHaveAttribute("href", /releases\/download\/v0\.4\.1\/featherplay-setup-0\.4\.1\.exe$/);
+});
+
+test("the menu works with the mouse: a click on one of its items does it", async ({ page }) => {
+  await page.goto("/");
+  await page.mouse.click(300, 800, { button: "right" });
+  const menu = page.getByRole("menu", { name: "Desktop" });
+  await expect(menu).toBeVisible();
+  const item = menu.getByRole("menuitem", { name: "Switch to light" });
+  const b = (await item.boundingBox())!;
+  // A real pointer click (not the locator's, which would find its way to the button anyway).
+  await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2);
+  await expect(menu).toBeHidden();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+});
+
+test("the menu's focused item shows the focus ring, in both themes", async ({ page }) => {
+  for (const scheme of ["dark", "light"] as const) {
+    await page.emulateMedia({ colorScheme: scheme });
+    await page.goto("/");
+    await page.keyboard.press("Shift+F10");
+    const menu = page.getByRole("menu", { name: "Desktop" });
+    await expect(menu.getByRole("menuitem").first()).toBeFocused();
+    const ring = await menu.getByRole("menuitem").first().evaluate((el) => {
+      const cs = getComputedStyle(el);
+      return { style: cs.outlineStyle, width: parseFloat(cs.outlineWidth), colour: cs.outlineColor, ground: getComputedStyle(el.closest("[role=menu]")!).backgroundColor };
+    });
+    expect(ring.style, scheme).toBe("solid");
+    expect(ring.width, scheme).toBeGreaterThanOrEqual(2);
+    expect(ring.colour, scheme).not.toBe(ring.ground);
+    await page.keyboard.press("Escape");
+  }
+});
+
+test("the browser's own menu stays everywhere but the first screen's empty desk", async ({ page }) => {
+  await page.goto("/");
+  await page.evaluate(() => document.getElementById("questions")!.scrollIntoView());
+  await page.waitForTimeout(300);
+  // Beside the questions, on the plain ground of a section.
+  const prevented = await page.evaluate(() => {
+    const sec = document.getElementById("questions")!;
+    const e = new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: 5, clientY: 300 });
+    sec.dispatchEvent(e);
+    return e.defaultPrevented;
+  });
+  expect(prevented).toBe(false);
+  await expect(page.getByRole("menu", { name: "Desktop" })).toBeHidden();
 });
 
 test("a right-click on the empty desk opens the app's menu: the arrow keys move in it, Escape closes it", async ({ page }) => {
@@ -202,6 +279,6 @@ test("the keyboard brings the theme toggle into the capsule", async ({ page }) =
   await page.keyboard.press("Tab"); // the bar's mark
   await expect(bar(page)).toHaveAttribute("data-kbd", "");
   await expect(bar(page).locator("[data-theme-toggle]")).toBeVisible();
-  await expect.poll(() => settled(page)).toBe(true);
+  await waitSettled(page);
   expect(await problems(page)).toEqual([]);
 });
