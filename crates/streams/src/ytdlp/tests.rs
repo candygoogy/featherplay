@@ -124,48 +124,6 @@ async fn a_check_asks_for_the_first_byte_and_reads_the_answer() {
     );
 }
 
-#[tokio::test]
-async fn a_failed_native_resolve_falls_back_to_yt_dlp() {
-    let base = std::env::var("FEATHERPLAY_HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| std::env::temp_dir().join("featherplay-tests"));
-    let home = base
-        .join("test-streams")
-        .join(format!("fallback-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&home);
-    std::fs::create_dir_all(home.join("sidecars")).unwrap();
-    // The embed page and a player whose preprocessing fails: EJS finds nothing in it.
-    // No yt-dlp, so the fallback ends in `ToolMissing`.
-    let (url, log) = test_server::serve(|_, path, _| {
-        if path.starts_with("/embed/") {
-            (200, r#"<script src="/s/player/abcd1234/base.js">"#.into())
-        } else {
-            (200, "var x={signatureTimestamp:20752};".into())
-        }
-    });
-    let native = NativeResolver::with_dirs(home.join("resolver"), &url);
-    let r = YtDlpResolver::with_native(
-        Sidecars {
-            dir: home.join("sidecars"),
-        },
-        native,
-    );
-    let err = r.resolve(&TrackId("h46YpWrg55Q".into())).await.unwrap_err();
-    assert_eq!(err, ResolveError::ToolMissing, "yt-dlp was tried next");
-    let id = TrackId("h46YpWrg55Q".into());
-    let why = r.take_fallback_reason(&id).expect("a reason");
-    assert!(why.contains("EJS"), "{why}");
-    assert_eq!(
-        *log.lock().unwrap(),
-        [
-            "GET /embed/h46YpWrg55Q?html5=1",
-            "GET /s/player/abcd1234/player_ias.vflset/en_US/base.js"
-        ]
-    );
-    assert_eq!(r.take_fallback_reason(&id), None, "told once");
-    std::fs::remove_dir_all(&home).unwrap();
-}
-
 /// A first run: the helpers are missing, so resolves download them, from a local
 /// server here (the pins and the GitHub-only policy are `Downloads::pinned`'s).
 mod first_run {
@@ -245,7 +203,8 @@ mod first_run {
     }
 
     /// The native request needs no helper, so it goes first. The song waits for the
-    /// helpers only once that gave nothing and yt-dlp is next, and says so then.
+    /// helpers only once that gave nothing and yt-dlp is next, and says so then. Why the
+    /// native step was left is told once.
     #[tokio::test]
     async fn a_resolve_waits_for_the_helpers_only_once_the_native_step_failed() {
         let Some(home) = test_home("first-run-wait") else {
@@ -282,6 +241,9 @@ mod first_run {
             "told once"
         );
         assert!(!r.waits_for_helpers(&id), "the wait is over");
+        let why = r.take_fallback_reason(&id).expect("a reason");
+        assert!(why.contains("EJS"), "{why}");
+        assert_eq!(r.take_fallback_reason(&id), None, "the reason told once");
         std::fs::remove_dir_all(&home).unwrap();
     }
 
