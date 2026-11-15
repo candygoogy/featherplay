@@ -38,18 +38,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn registered_app_toasts_as_itself() {
-        assert_eq!(app_id(true), identity::AUMID);
-    }
-
-    #[test]
-    fn unregistered_app_borrows_powershells_id() {
-        assert_eq!(app_id(false), Toast::POWERSHELL_APP_ID);
-    }
-
-    #[test]
-    fn a_run_starts_unregistered() {
+    fn toasts_go_out_as_the_app_only_once_it_is_registered() {
+        assert_eq!(app_id(true), identity::AUMID, "registered");
+        assert_eq!(app_id(false), Toast::POWERSHELL_APP_ID, "unregistered");
         // Nothing in this test process registers, so its toasts keep the fallback.
-        assert!(!identity::registered());
+        assert!(!identity::registered(), "a run starts unregistered");
     }
 }

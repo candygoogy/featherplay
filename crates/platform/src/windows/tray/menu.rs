@@ -302,13 +302,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_menu_follows_the_taskbar() {
-        assert_eq!(app_mode(true, false), AppMode::ForceLight);
-        assert_eq!(app_mode(false, false), AppMode::ForceDark);
-    }
-
-    #[test]
-    fn high_contrast_keeps_the_system_colours() {
-        assert_eq!(app_mode(false, true), AppMode::Default);
+    fn the_menu_follows_the_taskbar_unless_high_contrast_keeps_the_system_colours() {
+        // (case, light taskbar, high contrast, mode)
+        let cases = [
+            ("a light taskbar", true, false, AppMode::ForceLight),
+            ("a dark taskbar", false, false, AppMode::ForceDark),
+            ("high contrast", false, true, AppMode::Default),
+        ];
+        for (case, light, high_contrast, mode) in cases {
+            assert_eq!(app_mode(light, high_contrast), mode, "{case}");
+        }
     }
 }

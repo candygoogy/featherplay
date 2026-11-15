@@ -284,19 +284,39 @@ mod tests {
     use windows::Win32::UI::WindowsAndMessaging::{WM_LBUTTONDBLCLK, WM_LBUTTONUP, WM_RBUTTONDOWN};
 
     #[test]
-    fn a_pointer_over_the_icon_is_a_hover_that_tray_icon_never_sees() {
-        assert_eq!(callback(WM_MOUSEMOVE), Callback::Event(TrayEvent::Hover));
-    }
-
-    #[test]
-    fn a_right_click_reaches_tray_icon_which_opens_the_menu() {
-        assert_eq!(callback(WM_RBUTTONUP), Callback::Menu(WM_RBUTTONUP));
-    }
-
-    #[test]
-    fn other_mouse_messages_reach_tray_icon() {
-        for msg in [WM_LBUTTONUP, WM_RBUTTONDOWN, WM_LBUTTONDBLCLK] {
-            assert_eq!(callback(msg), Callback::Legacy(msg));
+    fn the_hover_stays_the_apps_and_the_rest_reaches_tray_icon() {
+        let cases = [
+            // A pointer over the icon is a hover that tray-icon never sees.
+            (
+                "pointer move",
+                WM_MOUSEMOVE,
+                Callback::Event(TrayEvent::Hover),
+            ),
+            // A right click reaches tray-icon, which opens the menu.
+            (
+                "right button up",
+                WM_RBUTTONUP,
+                Callback::Menu(WM_RBUTTONUP),
+            ),
+            // Other mouse messages reach tray-icon as they are.
+            (
+                "left button up",
+                WM_LBUTTONUP,
+                Callback::Legacy(WM_LBUTTONUP),
+            ),
+            (
+                "right button down",
+                WM_RBUTTONDOWN,
+                Callback::Legacy(WM_RBUTTONDOWN),
+            ),
+            (
+                "double click",
+                WM_LBUTTONDBLCLK,
+                Callback::Legacy(WM_LBUTTONDBLCLK),
+            ),
+        ];
+        for (case, msg, expected) in cases {
+            assert_eq!(callback(msg), expected, "{case}");
         }
     }
 }
