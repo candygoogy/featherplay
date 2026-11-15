@@ -1,0 +1,240 @@
+---
+// The footer: one frosted panel in the docked bar's material (the page opens with a frosted bar
+// and closes with its sibling), five columns (featherplay and what it runs on, then Product,
+// Project, Help, Legal), then the small print and the way back up on a step of the panel's
+// tone. The frost is painted: only the still desk lies behind it. No large name. Outside links
+// from src/data/links.ts.
+import { release } from "../data/release";
+import { links } from "../data/links";
+import Logo from "./Logo.astro";
+
+const groups = [
+  {
+    id: "foot-product",
+    title: "Product",
+    items: [
+      { label: "Download", href: "/#download" },
+      { label: "Features", href: "/#kept" },
+      { label: "Lyrics", href: "/#lyrics" },
+      { label: "How light?", href: "/#light" },
+      { label: "Make it yours", href: "/#yours" },
+    ],
+  },
+  {
+    id: "foot-project",
+    title: "Project",
+    items: [
+      { label: "GitHub", href: links.repo },
+      { label: "Releases and changes", href: links.releases },
+      { label: "Report a bug", href: links.issues },
+      { label: "How we measured", href: "/method" },
+    ],
+  },
+  {
+    id: "foot-help",
+    title: "Help",
+    items: [
+      { label: "Questions", href: "/#questions" },
+      { label: "What it connects to", href: "/#connects" },
+      { label: "Uninstalling", href: "/#uninstall" },
+      { label: "Coming from Pear", href: links.comingFromPear },
+    ],
+  },
+  {
+    id: "foot-legal",
+    title: "Legal",
+    items: [
+      { label: "MIT licence", href: links.licence },
+      { label: "Third-party licences", href: links.thirdParty },
+      { label: "Unofficial notice", href: "/#official" },
+      { label: "Music credits", href: "/credits" },
+    ],
+  },
+];
+---
+
+<footer class="foot">
+  <div class="frame">
+    <div class="foot-panel">
+      <div class="foot-cols">
+        <div class="fgroup about">
+          <h2 id="foot-about"><Logo size={18} />featherplay</h2>
+          <ul aria-labelledby="foot-about">
+            <li>Version {release.version}</li>
+            <li>Windows 10 and 11, 64-bit</li>
+            <li>Linux (experimental), glibc 2.35+</li>
+            <li>Free and open source</li>
+          </ul>
+        </div>
+        <nav class="foot-links" aria-label="More from featherplay">
+          {
+            groups.map((g) => (
+              <div class="fgroup">
+                <h2 id={g.id}>{g.title}</h2>
+                <ul aria-labelledby={g.id}>
+                  {g.items.map((l) => (
+                    <li>
+                      <a class="fl" href={l.href}>
+                        {l.label}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))
+          }
+        </nav>
+      </div>
+      <div class="foot-legal">
+        <ul class="foot-fine">
+          <li>© 2026&nbsp;<a class="fl" href={links.author}>candygoogy</a></li>
+          <li>Free and unofficial. Not made by or affiliated with Google or YouTube.</li>
+          <li><a class="fl" href="/#connects">Privacy</a></li>
+        </ul>
+        <a class="fl top" href="#top">Back to top</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<style>
+  .foot {
+    position: relative;
+    margin-top: var(--s9);
+    padding-bottom: var(--s7);
+  }
+  .foot-panel {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    border-radius: var(--r-float);
+    background: var(--mat-dock);
+    box-shadow:
+      var(--lit),
+      var(--ring),
+      0 1px 2px var(--panel-lift),
+      0 24px 56px -28px var(--panel-lift);
+  }
+  .foot-panel::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background-image: var(--grain);
+    opacity: 0.055;
+    pointer-events: none;
+  }
+  .foot-cols {
+    display: grid;
+    grid-template-columns: minmax(0, 1.3fr) repeat(4, minmax(0, 1fr));
+    gap: var(--s7) var(--s6);
+    align-items: start;
+    padding: var(--s7) var(--panel-pad);
+  }
+  .foot-links {
+    display: grid;
+    grid-column: 2 / 6;
+    grid-template-columns: subgrid;
+    row-gap: var(--s7);
+  }
+  .fgroup h2 {
+    display: flex;
+    align-items: center;
+    gap: var(--s2);
+    margin-bottom: var(--s3);
+    font-size: var(--fs-text);
+    font-weight: var(--fw-bold);
+    letter-spacing: 0;
+    line-height: 1.3;
+  }
+  .fgroup ul {
+    display: grid;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: var(--fs-small);
+    font-weight: var(--fw-medium);
+    line-height: 1.35;
+  }
+  .fgroup li {
+    display: flex;
+    align-items: center;
+    min-height: 32px;
+    color: var(--ink2);
+  }
+  /* A footer link: second-level ink; on hover full ink and an underline that draws in. */
+  .fl {
+    color: var(--ink2);
+    text-decoration: none;
+    background: linear-gradient(currentColor, currentColor) 0 100% / 0 1px no-repeat;
+    transition:
+      color var(--t-hover) ease,
+      background-size var(--t-small) var(--ease-out);
+  }
+  .fl:hover,
+  .fl:focus-visible {
+    color: var(--text);
+    background-size: 100% 1px;
+  }
+  .fl:focus-visible {
+    outline-offset: 4px;
+  }
+  @media (pointer: coarse) {
+    .fgroup li {
+      min-height: 44px;
+    }
+  }
+  .foot-legal {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s2) var(--s6);
+    padding: var(--s3) var(--panel-pad);
+    background: color-mix(in srgb, rgb(120 90 60 / 0.06) calc(var(--light) * 100%), rgb(0 0 0 / 0.18));
+    font-size: var(--fs-small);
+    font-weight: var(--fw-medium);
+    line-height: 1.5;
+  }
+  .foot-fine {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s1) var(--s6);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    color: var(--ink2);
+  }
+  .foot-fine li:first-child {
+    color: var(--text);
+  }
+  .top {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    color: var(--text);
+    font-weight: var(--fw-bold);
+  }
+  @media (width < 1100px) {
+    .foot-cols {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+    .about {
+      grid-column: 1 / -1;
+    }
+    .about ul {
+      display: flex;
+      flex-wrap: wrap;
+      column-gap: var(--s5);
+    }
+    .foot-links {
+      grid-column: 1 / -1;
+    }
+  }
+  @media (width < 640px) {
+    .foot-cols {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+</style>

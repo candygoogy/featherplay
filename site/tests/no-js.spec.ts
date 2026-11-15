@@ -6,6 +6,7 @@ test.use({ javaScriptEnabled: false });
 
 const sectionHeadings = [
   "Light, and it shows",
+  "What featherplay leaves out",
   "Lyrics, up close",
   "Make it yours",
   "Everything you’d miss, kept",
@@ -27,7 +28,8 @@ test("the theme still follows the system without JavaScript", async ({ page }) =
   await page.emulateMedia({ colorScheme: "light" });
   await page.goto("/");
   const bg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
-  expect(bg).toBe("rgb(255, 255, 255)");
+  // The light desk: warm paper, not a plain white.
+  expect(bg).toBe("rgb(242, 238, 232)");
 });
 
 test("the app's window is a still to look at, not controls that do nothing; the bar offers nothing that needs script", async ({ page }) => {

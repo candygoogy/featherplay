@@ -96,11 +96,15 @@ test("measured: with each section on screen while a song plays, the page restyle
   await page.waitForTimeout(1500);
   for (const id of ids) {
     await page.evaluate((id) => document.getElementById(id)!.scrollIntoView(), id);
-    await page.waitForTimeout(800);
-    const a = await m();
+    // The song back to its start, so no song change or scrobble falls in the 3 s measured (each
+    // is its own moment of work, not the steady cost).
+    await page.evaluate(() => document.querySelector<HTMLElement>("[data-window] .line")!.click());
+    // Arrived (the bar marks the section, the sections around it render), then 3 s.
     await page.waitForTimeout(2000);
+    const a = await m();
+    await page.waitForTimeout(3000);
     const b = await m();
-    const styles = (b.RecalcStyleCount - a.RecalcStyleCount) / 2;
+    const styles = (b.RecalcStyleCount - a.RecalcStyleCount) / 3;
     if (styles > 30) found.push(`${id}: ${styles} restyles a second`);
   }
   expect(found).toEqual([]);

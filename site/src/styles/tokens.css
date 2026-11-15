@@ -129,6 +129,8 @@
 @property --mat-solid { syntax: "<color>"; inherits: true; initial-value: transparent; }
 @property --rim { syntax: "<color>"; inherits: true; initial-value: transparent; }
 @property --edge { syntax: "<color>"; inherits: true; initial-value: transparent; }
+@property --panel-lift { syntax: "<color>"; inherits: true; initial-value: transparent; }
+@property --panel-edge { syntax: "<color>"; inherits: true; initial-value: transparent; }
 @property --shade-1 { syntax: "<color>"; inherits: true; initial-value: transparent; }
 @property --shade-2 { syntax: "<color>"; inherits: true; initial-value: transparent; }
 @property --shade-3 { syntax: "<color>"; inherits: true; initial-value: transparent; }
@@ -239,24 +241,29 @@
      where things move behind it, a 1 px light edge on top and, on what truly floats, the
      three-layer shadow (--shade-*). Reduced transparency and forced colours make them solid
      (system.css). */
-  --desk: light-dark(#f4f3f1, #0b0b0c);
-  --ink2: light-dark(#4b4743, #aaaaaa);
-  --ink3: light-dark(#67625d, #8f8f8f);
+  /* Daylight is its own world: a warm paper desk, near-white warm panels with a visible edge,
+     warm layered shadows (they do the work in light), pale warm glass with a visible edge. */
+  --desk: light-dark(#f2eee8, #0b0b0c);
+  --ink2: light-dark(#4a4540, #aaaaaa);
+  --ink3: light-dark(#645e57, #8f8f8f);
   --hand: light-dark(rgb(70 66 62), rgb(196 196 196));
   --tonal: light-dark(#0000001a, #ffffff21);
   --red-hover: light-dark(#b80d30, #ff5a70);
   --red-pressed: light-dark(#a30b2a, #e9304a);
-  --panel-bg: light-dark(rgb(255 255 255 / 0.9), rgb(24 24 24 / 0.94));
-  --panel-tint: light-dark(rgb(0 0 0 / 0.035), rgb(255 255 255 / 0.045));
-  --mat-dock: light-dark(rgb(250 250 252 / 0.74), rgb(27 28 32 / 0.74));
-  --mat-capsule: light-dark(rgb(250 250 251 / 0.8), rgb(27 28 32 / 0.78));
-  --mat-fly: light-dark(rgb(250 250 251 / 0.86), rgb(30 31 35 / 0.86));
-  --mat-solid: light-dark(rgb(250 250 251 / 0.92), rgb(32 33 37 / 0.9));
+  --panel-bg: light-dark(rgb(253 252 250 / 0.92), rgb(24 24 24 / 0.94));
+  --panel-edge: light-dark(rgb(120 96 70 / 0.16), rgb(255 255 255 / 0.05));
+  /* A content surface lifts off the paper by a soft warm shadow in light; in dark it is flat. */
+  --panel-lift: light-dark(rgb(80 56 30 / 0.09), rgb(0 0 0 / 0));
+  --panel-tint: light-dark(rgb(90 66 40 / 0.045), rgb(255 255 255 / 0.045));
+  --mat-dock: light-dark(rgb(252 250 247 / 0.76), rgb(27 28 32 / 0.74));
+  --mat-capsule: light-dark(rgb(252 250 247 / 0.8), rgb(27 28 32 / 0.78));
+  --mat-fly: light-dark(rgb(252 251 248 / 0.88), rgb(30 31 35 / 0.86));
+  --mat-solid: light-dark(rgb(253 252 250 / 0.94), rgb(32 33 37 / 0.9));
   --rim: light-dark(rgb(255 255 255 / 0.95), rgb(255 255 255 / 0.1));
-  --edge: light-dark(rgb(0 0 0 / 0.07), rgb(0 0 0 / 0.36));
-  --shade-1: light-dark(rgb(20 24 40 / 0.08), rgb(0 0 0 / 0.3));
-  --shade-2: light-dark(rgb(20 24 40 / 0.08), rgb(0 0 0 / 0.26));
-  --shade-3: light-dark(rgb(20 24 40 / 0.14), rgb(0 0 0 / 0.26));
+  --edge: light-dark(rgb(90 66 40 / 0.14), rgb(0 0 0 / 0.36));
+  --shade-1: light-dark(rgb(70 48 24 / 0.07), rgb(0 0 0 / 0.3));
+  --shade-2: light-dark(rgb(70 48 24 / 0.07), rgb(0 0 0 / 0.26));
+  --shade-3: light-dark(rgb(70 48 24 / 0.12), rgb(0 0 0 / 0.26));
   --part-hover: light-dark(rgb(0 0 0 / 0.055), rgb(255 255 255 / 0.085));
   --part-press: light-dark(rgb(0 0 0 / 0.035), rgb(255 255 255 / 0.05));
   --part-on: light-dark(rgb(0 0 0 / 0.075), rgb(255 255 255 / 0.12));
@@ -362,6 +369,8 @@
     --mat-solid,
     --rim,
     --edge,
+    --panel-edge,
+    --panel-lift,
     --shade-1,
     --shade-2,
     --shade-3,

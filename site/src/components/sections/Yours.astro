@@ -1,0 +1,190 @@
+---
+// Make it yours: the app's theme for its own windows (not the page's) and a cover to play,
+// beside the app at its actual size: the replica laid out as the narrow window it is at 480 px
+// (its real narrow layout, by container size), standing in a recessed piece of the desk.
+// Choosing changes it at once. Narrower screens show the same window scaled to fit.
+import Replica from "../Replica.astro";
+import Segmented from "../Segmented.astro";
+import { demoStart, songs } from "../../data/songs";
+
+const themes = [
+  { value: "page", label: "Match the page", icon: "match" },
+  { value: "dark", label: "Dark", icon: "dark" },
+  { value: "light", label: "Light", icon: "light" },
+] as const;
+---
+
+<section class="sec sec-yours frame" id="yours" aria-labelledby="yours-title">
+  <div class="yours panel" data-yours>
+    <div class="yours-text">
+      <h2 id="yours-title" class="t-title">Make it yours</h2>
+      <p class="t-lede ink2">
+        featherplay comes in dark and light, and takes its accent from the cover that’s playing. Try both on the window here, and pick
+        a song to see its colour.
+      </p>
+      <form class="picks" data-yours-form>
+        <Segmented class="themes" name="yours-theme" legend="featherplay’s theme" options={[...themes]} checked="page" />
+        <fieldset class="covers">
+          <legend>Play a cover</legend>
+          <div class="swatches">
+            {
+              songs.map((s, i) => (
+                <label class="swatch">
+                  <input type="radio" name="yours-song" value={s.id} checked={i === 0} />
+                  <img src={s.cover} width="64" height="64" alt="" loading="lazy" decoding="async" />
+                  <span class="visually-hidden">{s.title}</span>
+                </label>
+              ))
+            }
+          </div>
+        </fieldset>
+      </form>
+    </div>
+    <div class="stage" data-yours-stage>
+      <div class="fit" data-yours-fit>
+        <div class="win-body yours-win" data-yours-window>
+          <Replica id="replica-yours" songId={demoStart.songId} positionMs={demoStart.positionMs} view="lyrics" />
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  import { bindReplicas } from "../../demo/replica";
+  import { bindCustomise } from "../../demo/customise";
+  const root = document.querySelector<HTMLElement>("[data-yours]");
+  const player = bindReplicas();
+  if (root && player) bindCustomise(root, player);
+  // The window at its actual size where it fits; narrower, the same window scaled to fit (a
+  // transform: the app keeps its own layout).
+  const stage = document.querySelector<HTMLElement>("[data-yours-stage]");
+  const fit = document.querySelector<HTMLElement>("[data-yours-fit]");
+  if (stage && fit) {
+    new ResizeObserver(([e]) => {
+      const room = e.contentBoxSize?.[0]?.inlineSize ?? stage.clientWidth;
+      const k = Math.min(1, room / 480);
+      fit.style.setProperty("--k", k.toFixed(4));
+    }).observe(stage);
+  }
+</script>
+
+<style>
+  .yours {
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+    gap: var(--panel-pad);
+    margin-top: var(--s4);
+    padding: var(--panel-pad);
+    overflow: hidden;
+  }
+  .yours-text {
+    align-self: center;
+    display: grid;
+    gap: var(--s4);
+  }
+  .picks {
+    display: grid;
+    gap: var(--s6);
+    margin-top: var(--s4);
+  }
+  .covers {
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+  .covers legend {
+    margin-bottom: var(--s3);
+    padding: 0;
+    color: var(--ink2);
+    font-size: var(--fs-small);
+    font-weight: var(--fw-medium);
+  }
+  .swatches {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 64px));
+    gap: var(--s3);
+  }
+  .swatch {
+    position: relative;
+    display: block;
+    border-radius: var(--r-small);
+    cursor: pointer;
+    transition: scale var(--t-release) var(--spring-release);
+  }
+  .swatch:active {
+    scale: var(--press-surface);
+    transition: scale var(--t-press) var(--ease-out);
+  }
+  .swatch input {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+  .swatch img {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1;
+    border-radius: var(--r-small);
+    object-fit: cover;
+    pointer-events: none;
+    box-shadow: 0 1px 2px var(--shade-1), 0 4px 12px var(--shade-2);
+  }
+  .swatch:has(input:checked) img {
+    box-shadow:
+      0 0 0 2px var(--panel-bg),
+      0 0 0 4px var(--text);
+  }
+  .swatch:has(input:focus-visible) img {
+    outline: 2px solid var(--text);
+    outline-offset: 6px;
+  }
+  /* A recessed piece of the desk for the window to stand on: a step darker than the panel in
+     dark, a warm shade of the paper in light. */
+  .stage {
+    display: grid;
+    place-items: center;
+    min-width: 0;
+    margin: calc(-1 * var(--panel-pad)) calc(-1 * var(--panel-pad)) calc(-1 * var(--panel-pad)) 0;
+    padding: var(--s7);
+    background: color-mix(in srgb, rgb(120 90 60 / 0.07) calc(var(--light) * 100%), rgb(0 0 0 / 0.26));
+    box-shadow: inset 1px 0 0 var(--panel-edge);
+  }
+  .fit {
+    --k: 1;
+    width: calc(480px * var(--k));
+    height: calc(720px * var(--k));
+  }
+  .yours-win {
+    position: relative;
+    width: 480px;
+    height: 720px;
+    overflow: hidden;
+    border-radius: 8px;
+    container: app / size;
+    transform: scale(var(--k));
+    transform-origin: 0 0;
+    box-shadow:
+      0 0 0 1px var(--edge),
+      0 1px 2px var(--shade-1),
+      0 4px 16px var(--shade-2),
+      0 16px 56px var(--shade-3);
+  }
+  @media (width < 1000px) {
+    .yours {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .stage {
+      margin: 0 calc(-1 * var(--panel-pad)) calc(-1 * var(--panel-pad));
+      padding: var(--s6) var(--s4);
+      box-shadow: inset 0 1px 0 var(--panel-edge);
+    }
+  }
+  @media (width < 480px) {
+    .swatches {
+      grid-template-columns: repeat(3, minmax(0, 64px));
+    }
+  }
+</style>

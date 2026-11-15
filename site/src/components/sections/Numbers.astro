@@ -1,0 +1,272 @@
+---
+// Light, and it shows: the measured figures as one calm table on one surface. featherplay's
+// column is a band in the playing cover's tint that breaks out above and below the table;
+// every figure the same size and weight, in tabular figures; the other rows step back under
+// the pointer. Every value comes from src/data/numbers.ts and is in the HTML; the method page
+// says how each was measured. On a phone each measure is a small table of its own, each
+// figure labelled.
+import { figures, timings, type Metric } from "../../data/numbers";
+import { figureText, NOT_MEASURED } from "../../data/format";
+import { release } from "../../data/release";
+
+const s = (v: number) => `${v.toLocaleString("en-GB", { maximumSignificantDigits: 2 })} s`;
+const span = (t: { min: number; max: number }) => `${s(t.min)} to ${s(t.max)}`;
+const rows: { metric: Metric; title: string; note: string }[] = [
+  { metric: "memoryMB", title: "Memory while playing", note: "Private memory of all its processes, window minimised." },
+  { metric: "memoryPausedMB", title: "Memory while paused", note: "The same, with the song paused." },
+  { metric: "cpuPlayingPct", title: "CPU while playing", note: "Share of the whole processor, window minimised." },
+  { metric: "cpuPausedPct", title: "CPU while paused", note: "The same, with the song paused." },
+  { metric: "processes", title: "Processes", note: "Running at once, fewest and most seen. The memory rows count all of them." },
+  {
+    metric: "startToSoundS",
+    title: "Start to music playing",
+    note: `From starting featherplay to the first sound of the song it resumes. Median of ${timings.startToSoundS.n} starts (${span(timings.startToSoundS)}).`,
+  },
+  {
+    metric: "clickToSoundS",
+    title: "Click to sound",
+    note: `From clicking a song’s play button to its first sound. Median of ${timings.clickToSoundS.n} clicks (${span(timings.clickToSoundS)}).`,
+  },
+  {
+    metric: "downloadMB",
+    title: "Download",
+    note: `What you download to install it: featherplay ${release.version}’s installer. Edge comes with Windows.`,
+  },
+];
+const [ours, ...others] = figures;
+const cell = (t: string) => t.replace(/ (MB|s)$/, " $1");
+const head = (app: string) => (app === "YouTube Music in Edge" ? "YouTube Music in Edge" : app);
+const ver = (f: (typeof figures)[number]) => (f.app === "YouTube Music in Edge" ? `Edge ${f.version.split(".")[0]}` : f.version);
+---
+
+<section class="sec sec-numbers frame" id="light" aria-labelledby="light-title">
+  <div class="sec-head">
+    <h2 id="light-title" class="t-title">Light, and it shows</h2>
+    <p class="t-lede ink2">
+      Measured on one Windows PC: featherplay {ours.version} on 14 November 2026, Pear Desktop and Edge on 1 November. Lower is better
+      on every row.
+    </p>
+  </div>
+  <div class="tbl panel">
+    <span class="band" aria-hidden="true"></span>
+    <table class="figures">
+      <caption class="visually-hidden">featherplay, Pear Desktop and YouTube Music in Edge, measured on one Windows PC. Lower is better.</caption>
+      <colgroup><col class="c-m" /><col /><col /><col /></colgroup>
+      <thead>
+        <tr>
+          <th scope="col" class="c-head"><span class="visually-hidden">Measure</span></th>
+          <th scope="col" class="ours">
+            <span class="ours-h"
+              ><span class="art" aria-hidden="true"
+                ><img class="only-dark" src="/tri-vane.svg" width="18" height="18" alt="" /><img
+                  class="only-light"
+                  src="/tri-vane-light.svg"
+                  width="18"
+                  height="18"
+                  alt=""
+                /></span
+              >featherplay</span
+            ><span class="ver">{ver(ours)}</span>
+          </th>
+          {others.map((f) => <th scope="col">{head(f.app)}<span class="ver">{ver(f)}</span></th>)}
+        </tr>
+      </thead>
+      <tbody>
+        {
+          rows.map((r) => (
+            <tr data-metric={r.metric}>
+              <th scope="row">
+                <span class="m">{r.title}</span>
+                <span class="n">{r.note}</span>
+              </th>
+              {figures.map((f) => {
+                const t = figureText(f, r.metric);
+                return (
+                  <td class:list={{ ours: f === ours }} data-who={f.app === "YouTube Music in Edge" ? "In Edge" : f.app} data-figure={`${f.app}:${r.metric}`}>
+                    {t === NOT_MEASURED ? (
+                      <>
+                        <span aria-hidden="true">{t}</span>
+                        <span class="visually-hidden">not measured</span>
+                      </>
+                    ) : (
+                      cell(t)
+                    )}
+                  </td>
+                );
+              })}
+            </tr>
+          ))
+        }
+      </tbody>
+    </table>
+    <p class="table-foot t-small">
+      <span>We didn’t time Pear Desktop or Edge.</span><a class="text-link" href="/method">How these were measured</a>
+    </p>
+  </div>
+</section>
+
+<style>
+  .tbl {
+    /* The cover's tint on the panel, mixed on the theme's eased --light. */
+    --band-ground: color-mix(in oklab, var(--song) calc(24% - 8% * var(--light)), color-mix(in srgb, #ffffff calc(var(--light) * 100%), #1c1c1c));
+    --hair: color-mix(in srgb, var(--text) 10%, transparent);
+    /* It wears the song’s colour, so it fades to the next one itself (system.css). */
+    transition: --song var(--t-glow) ease;
+    position: relative;
+    margin-top: var(--s8);
+    padding: var(--panel-pad);
+  }
+  /* featherplay's column: the table's columns are fixed (40 % for the measure, 20 % each), so
+     the band sits over the second, reaching 28 px past the panel's top and bottom. */
+  .band {
+    position: absolute;
+    top: -28px;
+    bottom: -28px;
+    left: calc(var(--panel-pad) + (100% - 2 * var(--panel-pad)) * 0.4);
+    width: calc((100% - 2 * var(--panel-pad)) * 0.2);
+    border-radius: var(--r-panel);
+    background: var(--band-ground);
+    box-shadow: var(--lit), var(--ring);
+  }
+  .figures {
+    position: relative;
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+  .c-m {
+    width: 40%;
+  }
+  th,
+  td {
+    padding: var(--s4) var(--s5);
+    text-align: right;
+    vertical-align: baseline;
+  }
+  thead th {
+    padding-top: 0;
+    color: var(--ink2);
+    font-size: var(--fs-small);
+    font-weight: var(--fw-medium);
+    line-height: var(--lh-small);
+    vertical-align: bottom;
+  }
+  /* featherplay's heading rides up into the band's overhang. */
+  thead th.ours {
+    color: var(--text);
+    font-size: var(--fs-text);
+    font-weight: var(--fw-bold);
+  }
+  thead th.ours > span {
+    position: relative;
+    top: -40px;
+  }
+  .ours-h {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s2);
+  }
+  .ver {
+    display: block;
+    color: var(--ink2);
+    font-size: var(--fs-small);
+    font-weight: var(--fw-medium);
+  }
+  tbody th {
+    padding-left: 0;
+    text-align: left;
+    font-weight: var(--fw-text);
+  }
+  .m {
+    display: block;
+    font-weight: var(--fw-bold);
+  }
+  .n {
+    display: block;
+    max-width: 44ch;
+    margin-top: 2px;
+    color: var(--ink2);
+    font-size: var(--fs-small);
+    font-weight: var(--fw-medium);
+    line-height: var(--lh-small);
+    text-wrap: pretty;
+  }
+  td {
+    font-size: var(--fs-lede);
+    font-weight: var(--fw-medium);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  tbody tr + tr > * {
+    box-shadow: inset 0 1px 0 var(--hair);
+  }
+  tbody tr {
+    transition: opacity var(--t-small) ease;
+  }
+  @media (hover: hover) {
+    tbody:has(tr:hover) tr:not(:hover) {
+      opacity: 0.62;
+    }
+  }
+  .table-foot {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: var(--s2) var(--s5);
+    padding-top: var(--s5);
+    color: var(--ink2);
+    box-shadow: inset 0 1px 0 var(--hair);
+  }
+
+  /* A phone: each measure a small table of its own, each figure labelled; featherplay's
+     figure on the band's tint. */
+  @media (width < 760px) {
+    .tbl {
+      padding: var(--s3);
+    }
+    .band,
+    thead {
+      display: none;
+    }
+    .figures,
+    tbody,
+    tr,
+    th {
+      display: block;
+    }
+    tbody tr {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: var(--s1);
+      padding: var(--s4) 0;
+    }
+    tbody tr + tr > * {
+      box-shadow: none;
+    }
+    tbody tr + tr {
+      box-shadow: inset 0 1px 0 var(--hair);
+    }
+    tbody th {
+      grid-column: 1 / -1;
+      padding: 0 var(--s2) var(--s2);
+    }
+    td {
+      padding: var(--s2);
+      border-radius: var(--r-small);
+      text-align: left;
+      font-size: var(--fs-text);
+      white-space: normal;
+    }
+    td::before {
+      content: attr(data-who);
+      display: block;
+      color: var(--ink2);
+      font-size: var(--fs-small);
+    }
+    td.ours {
+      background: var(--band-ground);
+    }
+  }
+</style>

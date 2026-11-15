@@ -122,9 +122,8 @@
   scroll-padding-top: calc(var(--cap-top) + var(--cap-h) + var(--s4));
   scrollbar-color: color-mix(in srgb, var(--text) 26%, transparent) transparent;
 }
-/* The body keeps the old sections ground (base.css) until they move to the system; the new
-   parts lie on the desk themselves. */
 :root.sys body {
+  background: var(--desk);
   --song: var(--glow);
   font-size: var(--fs-text);
   line-height: var(--lh-text);
@@ -135,6 +134,21 @@
 .frame {
   width: min(var(--frame-max), 100% - 2 * var(--gut));
   margin-inline: auto;
+}
+
+/* ---------- Sections below the story: each its own composition, on the frame ---------- */
+/* A section: its own composition below a heading (the sections render with the page, base.css). */
+.sec {
+  position: relative;
+  padding-top: var(--s9);
+}
+.sec-head {
+  display: grid;
+  gap: var(--s4);
+  max-width: 46rem;
+}
+.sec-head .t-lede {
+  max-width: 58ch;
 }
 
 /* ---------- The type roles ---------- */
@@ -189,7 +203,10 @@
   border-radius: var(--r-panel);
   background:
     linear-gradient(var(--panel-bg), var(--panel-bg)) padding-box,
-    radial-gradient(130% 100% at 50% 0%, var(--rim), var(--panel-tint) 80%) border-box;
+    radial-gradient(130% 100% at 50% 0%, var(--rim), var(--panel-edge) 70%) border-box;
+  box-shadow:
+    0 1px 2px var(--panel-lift),
+    0 24px 56px -28px var(--panel-lift);
 }
 
 /* ---------- Material 3: glass, for what floats and only that ----------

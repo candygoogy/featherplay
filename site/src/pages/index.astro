@@ -2,13 +2,14 @@
 import Base from "../layouts/Base.astro";
 import Bar from "../components/Bar.astro";
 import Stage from "../components/Stage.astro";
-import Compare from "../components/Compare.astro";
-import LyricsShowcase from "../components/LyricsShowcase.astro";
-import Customise from "../components/Customise.astro";
+import Numbers from "../components/sections/Numbers.astro";
+import LeavesOut from "../components/sections/LeavesOut.astro";
+import Lyrics from "../components/sections/Lyrics.astro";
+import Yours from "../components/sections/Yours.astro";
 import Kept from "../components/Kept.astro";
-import Faq from "../components/Faq.astro";
-import Download from "../components/Download.astro";
-import Footer from "../components/Footer.astro";
+import Questions from "../components/sections/Questions.astro";
+import DownloadSection from "../components/sections/DownloadSection.astro";
+import SiteFooter from "../components/SiteFooter.astro";
 ---
 
 <Base
@@ -20,12 +21,13 @@ import Footer from "../components/Footer.astro";
   <Bar />
   <main id="main" tabindex="-1">
     <Stage />
-    <Compare />
-    <LyricsShowcase />
-    <Customise />
+    <Numbers />
+    <LeavesOut />
+    <Lyrics />
+    <Yours />
     <Kept />
-    <Faq />
-    <Download />
+    <Questions />
+    <DownloadSection />
   </main>
-  <Footer />
+  <SiteFooter />
 </Base>

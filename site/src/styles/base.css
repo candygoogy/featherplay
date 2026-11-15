@@ -252,19 +252,10 @@ main:focus {
   transform: scale(0.97);
 }
 
-/* The plain sections below the first screen skip layout and paint until they come near the
-   viewport (each remembers its real height once seen; the estimate only places the ones
-   never rendered yet). Not the ones holding a featherplay window or synced lines: those
-   measure their lines as they start, and a skipped section gives them no size. A page that
-   loads part-way down (Base.astro's data-land) renders them all from the start: the browser
-   puts it back in place after the first layout, and a skipped section it lands on would show
-   for a frame as the bare ground. A link within the page renders them all for its jump
-   (data-reach, src/scripts/anchors.ts), so it lands where it says. */
-:root:not([data-land]):not([data-reach]) :is(#light, #questions, #download),
-:root:not([data-land]):not([data-reach]) body > footer {
-  content-visibility: auto;
-  contain-intrinsic-size: auto 1000px;
-}
+/* The sections below the first screen render with the page (no content-visibility): laying
+   them all out costs about 13 ms once, and skipping them cost more than it saved. Their
+   estimates threw links off by 2,000 px, and with sections waiting to render the page did
+   work on every frame while a song played (a measured 64 restyles a second at the top). */
 
 /* Starting up (Base.astro, until the page's styles are in and two frames have run): nothing
    eases. A style worked out before the stylesheets arrive (an extension reading the page on a

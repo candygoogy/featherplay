@@ -1,0 +1,383 @@
+---
+// What featherplay leaves out: two folders as Explorer shows them, two solid windows on the
+// desk: Pear Desktop 3.12 installed, every entry tied to what it's there for, and featherplay's
+// one portable exe. Beside them the sizes weighed like with like and four plain notes on what
+// isn't there. Pointing at a note (or focusing, or tapping it) lights its files in Pear's
+// folder; the first is lit to begin with, so the idea shows itself. Facts: src/data/numbers.ts.
+import { installFolders, leftOutTotals, type FolderEntry, type LeftOut } from "../../data/numbers";
+import { formatBytes } from "../../data/format";
+import { release, sizeLabel } from "../../data/release";
+
+const { pear, featherplay } = installFolders;
+// Explorer's own size column: kilobytes, rounded up, with thousands separators.
+const kb = (b: number) => `${Math.ceil(b / 1024).toLocaleString("en-GB")} KB`;
+const mb = (b: number) => formatBytes(b).replace(" ", " ");
+const filesOf = (g: LeftOut) => {
+  const list = pear.entries.filter((e) => e.group === g).sort((a, b) => b.bytes - a.bytes);
+  const named = list.slice(0, 2).map((e) => (e.files ? `${e.name} folder` : e.name));
+  const more = list.length - named.length;
+  return `${named.join(", ")}${more ? ` and ${more} more` : ""}: ${mb(leftOutTotals(g).bytes)} of Pear’s folder`;
+};
+const notes: { word: string; why: string; group?: LeftOut }[] = [
+  {
+    word: "Chromium",
+    group: "chromium",
+    why: "No browser engine in the window. Signing in uses Windows’ own WebView2 once, or your own browser, which you close when you’re in.",
+  },
+  { word: "Electron", group: "electron", why: "One native program, written in Rust and drawn with Slint, instead of a web app in a frame." },
+  { word: "Video", group: "video", why: "It never plays video. A music video with a song version plays as the song." },
+  { word: "Telemetry", why: "No analytics and no tracking, and no server of its own." },
+];
+// A file's type, for its icon: a folder, an app, a library, data or text.
+const kind = (e: FolderEntry) =>
+  e.files ? "folder" : /\.exe$/.test(e.name) ? "app" : /\.dll$/.test(e.name) ? "dll" : /\.(txt|html|json)$/.test(e.name) ? "text" : "data";
+const installedBytes = featherplay.bytes + featherplay.installed.uninstallerBytes + featherplay.installed.runtimeBytes;
+const exeLabel = release.portable ? sizeLabel(release.portable).replace(" ", " ") : mb(featherplay.bytes);
+---
+
+<section class="sec sec-leaves frame" id="leaves" aria-labelledby="leaves-title" data-out data-lit="chromium" data-bar-sec="light">
+  <svg class="sprite" aria-hidden="true">
+    <symbol id="g-folder" viewBox="0 0 16 16"><path d="M1.5 4a1 1 0 0 1 1-1h3.2l1.3 1.4h6.5a1 1 0 0 1 1 1V12a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1Z" fill="var(--folder)"></path></symbol>
+    <symbol id="g-app" viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.2"></rect><path d="M2 5.6h12" stroke="currentColor" stroke-width="1.2"></path></symbol>
+    <symbol id="g-dll" viewBox="0 0 16 16"><path d="M4 1.8h5.2L12.5 5v9.2H4Z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"></path><circle cx="8.2" cy="9.6" r="1.6" fill="none" stroke="currentColor" stroke-width="1.1"></circle></symbol>
+    <symbol id="g-data" viewBox="0 0 16 16"><path d="M4 1.8h5.2L12.5 5v9.2H4Z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"></path><path d="M6 8.5h4.5M6 11h4.5" stroke="currentColor" stroke-width="1.1"></path></symbol>
+    <symbol id="g-text" viewBox="0 0 16 16"><path d="M4 1.8h5.2L12.5 5v9.2H4Z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"></path><path d="M6 7.5h4.5M6 9.6h4.5M6 11.7h3" stroke="currentColor" stroke-width="1"></path></symbol>
+  </svg>
+  <div class="sec-head">
+    <h2 id="leaves-title" class="t-title">What featherplay leaves out</h2>
+    <p class="t-lede ink2">
+      Two folders as Explorer shows them: Pear Desktop 3.12 installed, and featherplay’s portable exe. Installed, featherplay adds only
+      its uninstaller and the Visual&nbsp;C++ runtime.
+    </p>
+  </div>
+  <div class="desk">
+    <figure class="explorer pear" aria-labelledby="pear-folder">
+      <div class="ex-bar" aria-hidden="true">
+        <svg viewBox="0 0 16 16" width="16" height="16"><use href="#g-folder"></use></svg><span>youtube-music</span>
+      </div>
+      <figcaption class="crumbs" id="pear-folder">
+        <span class="visually-hidden">Pear Desktop’s install folder:</span>
+        {pear.path.map((p, i) => <span class:list={["crumb", { here: i === pear.path.length - 1 }]}>{p}</span>)}
+      </figcaption>
+      <div class="cols" aria-hidden="true"><span>Name</span><span>Size</span></div>
+      <ul class="files">
+        {
+          pear.entries.map((e) => (
+            <li data-kind={kind(e)} data-group={e.group}>
+              <svg class="glyph" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+                <use href={`#g-${kind(e)}`} />
+              </svg>
+              <span class="fname">{e.name}</span>
+              <span class="fsize">{e.files ? `${e.files} files` : kb(e.bytes)}</span>
+            </li>
+          ))
+        }
+      </ul>
+      <p class="status"><strong>{pear.files} files</strong>, {mb(pear.bytes)}</p>
+    </figure>
+    <div class="side">
+      <figure class="explorer ours" aria-labelledby="fp-folder">
+        <div class="ex-bar" aria-hidden="true">
+          <svg viewBox="0 0 16 16" width="16" height="16"><use href="#g-folder"></use></svg><span>Downloads</span>
+        </div>
+        <figcaption class="crumbs" id="fp-folder">
+          <span class="visually-hidden">featherplay’s folder:</span>
+          {featherplay.path.map((p) => <span class="crumb here">{p}</span>)}
+        </figcaption>
+        <div class="cols" aria-hidden="true"><span>Name</span><span>Size</span></div>
+        <ul class="files">
+          {
+            featherplay.entries.map((e) => (
+              <li data-kind="app">
+                <span class="art glyph" aria-hidden="true">
+                  <img class="only-dark" src="/tri-vane.svg" width="16" height="16" alt="" />
+                  <img class="only-light" src="/tri-vane-light.svg" width="16" height="16" alt="" />
+                </span>
+                <span class="fname">{e.name}</span>
+                <span class="fsize">{kb(e.bytes)}</span>
+              </li>
+            ))
+          }
+        </ul>
+        <p class="status"><strong>{featherplay.files} file</strong>, {exeLabel}</p>
+      </figure>
+      <p class="weigh" data-weigh>
+        Installed, about {Math.round(installedBytes / 1_048_576)}&nbsp;MB against Pear Desktop’s {mb(pear.bytes)}: the exe, its
+        uninstaller (about {mb(featherplay.installed.uninstallerBytes)}) and the Visual&nbsp;C++ runtime (about {
+          mb(featherplay.installed.runtimeBytes)
+        }), {Math.round(pear.bytes / installedBytes)} times smaller.
+      </p>
+      <div class="outs">
+        <h3 class="outs-h">
+          Not in featherplay’s folder<span class="hint hint-fine">. Point at one to find it in Pear’s.</span><span class="hint hint-touch"
+            >. Tap one to find it in Pear’s.</span
+          >
+        </h3>
+        <ul data-leaves-out>
+          {
+            notes.map((n) => (
+              <li>
+                {n.group ? (
+                  <button class="note-name" type="button" data-note-for={n.group} aria-pressed={String(n.group === "chromium")}>
+                    {n.word}
+                  </button>
+                ) : (
+                  <span class="note-name">{n.word}</span>
+                )}
+                <p class="why">{n.why}</p>
+                {n.group && <p class="which">{filesOf(n.group)}</p>}
+              </li>
+            ))
+          }
+        </ul>
+      </div>
+    </div>
+  </div>
+  <p class="source-line t-small ink2">Listed on the measuring PC on 1 November 2026, sizes as Explorer shows them.</p>
+</section>
+
+<script>
+  // A note lights its files while pointed at or focused; a press keeps it lit (a tap on a
+  // phone). The section names the group lit (data-lit); CSS does the rest.
+  const out = document.querySelector<HTMLElement>("[data-out]");
+  if (out) {
+    const notes = [...out.querySelectorAll<HTMLButtonElement>("[data-note-for]")];
+    const pressed = () => notes.find((n) => n.getAttribute("aria-pressed") === "true")?.dataset.noteFor ?? "";
+    const light = (g: string) => (out.dataset.lit = g);
+    for (const n of notes) {
+      const g = n.dataset.noteFor!;
+      n.addEventListener("pointerenter", () => light(g));
+      n.addEventListener("focus", () => light(g));
+      n.addEventListener("pointerleave", () => light(pressed()));
+      n.addEventListener("blur", () => light(pressed()));
+      n.addEventListener("click", () => {
+        for (const o of notes) o.setAttribute("aria-pressed", String(o === n));
+        light(g);
+      });
+    }
+  }
+</script>
+
+<style>
+  /* The windows and the notes wear the song’s colour: the section fades to the next one
+     itself (system.css). */
+  .sec-leaves {
+    transition: --song var(--t-glow) ease;
+  }
+  .sprite {
+    position: absolute;
+    width: 0;
+    height: 0;
+    overflow: hidden;
+  }
+  .desk {
+    display: grid;
+    grid-template-columns: minmax(0, 6fr) minmax(0, 5fr);
+    align-items: start;
+    gap: var(--s7) var(--s8);
+    margin-top: var(--s7);
+  }
+  .side {
+    display: grid;
+    gap: var(--s5);
+    padding-top: var(--s8);
+  }
+  /* An app window: solid, as windows on Windows are, a faint tint of the song. */
+  .explorer {
+    overflow: hidden;
+    border-radius: var(--r-small);
+    background: color-mix(in srgb, var(--song) 4%, var(--surface));
+    box-shadow: var(--lit), var(--ring), var(--shadow);
+    font-size: var(--fs-small);
+    font-weight: var(--fw-medium);
+  }
+  .explorer.ours {
+    width: min(100%, 28rem);
+  }
+  .ex-bar {
+    display: flex;
+    align-items: center;
+    gap: var(--s2);
+    height: 36px;
+    padding-left: var(--s4);
+    background: color-mix(in srgb, var(--song) 6%, var(--panel-tint));
+  }
+  .crumbs {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: var(--s2) var(--s3) 6px;
+    padding: 6px var(--s3);
+    border-radius: var(--r-control);
+    background: var(--panel-tint);
+    color: var(--ink2);
+  }
+  .crumb::before {
+    content: "›";
+    margin-right: 6px;
+  }
+  .crumb.here {
+    color: var(--text);
+    font-weight: var(--fw-bold);
+  }
+  .cols {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 28px var(--s1) 46px;
+    color: var(--ink2);
+  }
+  .files {
+    display: grid;
+    margin: 0;
+    padding: 0 var(--s3);
+    list-style: none;
+  }
+  .files li {
+    display: grid;
+    grid-template-columns: 16px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--s3);
+    min-height: 28px;
+    padding: 0 var(--s4) 0 var(--s3);
+    border-radius: var(--r-control);
+    transition:
+      background-color var(--t-hover) ease,
+      color var(--t-hover) ease;
+  }
+  .files li:nth-child(odd) {
+    background: color-mix(in srgb, var(--panel-tint) 60%, transparent);
+  }
+  .glyph {
+    color: var(--ink2);
+  }
+  .fname {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .fsize {
+    color: var(--ink2);
+    font-variant-numeric: tabular-nums;
+  }
+  .status {
+    padding: var(--s3) 28px var(--s4);
+    color: var(--ink2);
+  }
+  .status strong {
+    color: var(--text);
+  }
+  .explorer.ours .files li {
+    background: color-mix(in srgb, var(--song) 18%, transparent);
+    font-weight: var(--fw-bold);
+  }
+  .weigh {
+    max-width: 46ch;
+  }
+  .outs-h {
+    font-size: var(--fs-text);
+    font-weight: var(--fw-bold);
+    letter-spacing: 0;
+    line-height: var(--lh-text);
+    text-wrap: pretty;
+  }
+  .hint {
+    color: var(--ink2);
+    font-weight: var(--fw-medium);
+  }
+  .hint-touch {
+    display: none;
+  }
+  @media (hover: none) {
+    .hint-fine {
+      display: none;
+    }
+    .hint-touch {
+      display: inline;
+    }
+  }
+  .outs ul {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--s5) var(--s6);
+    margin: var(--s4) 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .note-name {
+    display: inline-flex;
+    align-items: center;
+    min-height: 36px;
+    margin-left: calc(-1 * var(--s3));
+    padding: 0 var(--s3);
+    border: 0;
+    border-radius: var(--r-pill);
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    font-size: var(--fs-lede);
+    font-weight: var(--fw-bold);
+    letter-spacing: var(--tr-lede);
+    cursor: pointer;
+    transition: background-color var(--t-hover) ease;
+  }
+  span.note-name {
+    margin-left: 0;
+    padding: 0;
+    cursor: default;
+  }
+  button.note-name[aria-pressed="true"] {
+    background: var(--part-on);
+  }
+  @media (hover: hover) {
+    button.note-name:hover {
+      background: var(--part-hover);
+    }
+  }
+  .why {
+    margin-top: 2px;
+  }
+  .which {
+    margin-top: 6px;
+    color: var(--ink2);
+    font-size: var(--fs-small);
+    font-weight: var(--fw-medium);
+    line-height: var(--lh-small);
+  }
+  .source-line {
+    margin-top: var(--s7);
+  }
+  /* The group lit: its files in full ink on the song's tint, the rest step back. */
+  [data-out][data-lit=""] .pear .files li,
+  [data-out]:is([data-lit="chromium"], [data-lit="electron"], [data-lit="video"]) .pear .files li {
+    color: var(--ink3);
+  }
+  [data-out][data-lit="chromium"] .pear .files li[data-group="chromium"],
+  [data-out][data-lit="electron"] .pear .files li[data-group="electron"],
+  [data-out][data-lit="video"] .pear .files li[data-group="video"] {
+    color: var(--text);
+    background: color-mix(in srgb, var(--song) 26%, transparent);
+  }
+  [data-out][data-lit=""] .pear .files li {
+    color: inherit;
+  }
+
+  @media (width < 900px) {
+    .desk {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .side {
+      padding-top: 0;
+    }
+  }
+  @media (width < 560px) {
+    .outs ul {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .files li {
+      padding-inline: var(--s2);
+    }
+    .cols {
+      padding-inline: 36px var(--s5);
+    }
+  }
+</style>

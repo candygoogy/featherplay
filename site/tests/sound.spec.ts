@@ -185,7 +185,8 @@ test("every player carries the same line, sound then credit", async ({ page }) =
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/");
   const lines = page.locator("[data-now-playing]");
-  await expect(lines).toHaveCount(3);
+  // The first screen's player; the other players on the page share its song.
+  await expect(lines).toHaveCount(1);
   for (const line of await lines.all()) {
     await expect(line.locator("[data-sound]")).toHaveCount(1);
     await expect(line.locator("[data-credit]")).toHaveCount(1);
@@ -232,3 +233,35 @@ for (const theme of ["dark", "light"]) {
     }
   });
 }
+
+// The owner's rule: nothing plays by default. Sound starts only from the visitor's own press.
+test("nothing plays on its own: not on load, not through a whole scroll down and back, and no clip is even asked for", async ({ page }) => {
+  test.setTimeout(60_000);
+  const asked: string[] = [];
+  page.on("request", (r) => {
+    if (new URL(r.url()).pathname.startsWith("/music/")) asked.push(r.url());
+  });
+  const playing = () => page.evaluate(() => [...document.querySelectorAll("audio, video")].filter((m) => !(m as HTMLMediaElement).paused).length);
+  await page.goto("/");
+  await page.waitForTimeout(1500);
+  expect(await playing()).toBe(0);
+  await expect(page.locator("html")).not.toHaveAttribute("data-playing", "true");
+  // Down the whole page a screen at a time, the story's holds and every section on the way, and
+  // back up to the top.
+  const height = await page.evaluate(() => document.documentElement.scrollHeight);
+  for (let y = 0; y <= height; y += 600) {
+    await page.mouse.wheel(0, 600);
+    await page.waitForTimeout(120);
+  }
+  await page.waitForTimeout(800);
+  expect(await playing()).toBe(0);
+  for (let y = height; y > 0; y -= 1200) {
+    await page.mouse.wheel(0, -1200);
+    await page.waitForTimeout(100);
+  }
+  await page.evaluate(() => scrollTo(0, 0));
+  await page.waitForTimeout(1200);
+  expect(await playing()).toBe(0);
+  await expect(page.locator("html")).not.toHaveAttribute("data-playing", "true");
+  expect(asked).toEqual([]);
+});

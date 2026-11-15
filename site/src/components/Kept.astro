@@ -1,92 +1,210 @@
 ---
-// "Everything you'd miss, kept": the live pieces on one surface in cells, each with its words.
-// A plain placement for now (phase 2 composes the section); every piece is live on the page's
-// one player. Facts from the repo's README ("Coming from Pear?").
+// Everything you'd miss, kept: one surface divided into cells by 1 px lines, each live piece
+// placed straight on its cell and whole inside it at every width (all on the page's one
+// player), then the small extras as a line of text. Facts from the repo's README ("Coming
+// from Pear?").
 import MediaFlyout from "./pieces/MediaFlyout.astro";
 import DiscordCard from "./pieces/DiscordCard.astro";
 import ScrobbleRow from "./pieces/ScrobbleRow.astro";
 import SponsorBlock from "./pieces/SponsorBlock.astro";
 import TrayTip from "./pieces/TrayTip.astro";
-import LyricCard from "./pieces/LyricCard.astro";
 import { links } from "../data/links";
 ---
 
-<section id="kept" class="kept frame" aria-labelledby="kept-title">
-  <div class="kept-head">
+<section id="kept" class="sec kept frame" aria-labelledby="kept-title">
+  <div class="sec-head">
     <h2 id="kept-title" class="t-title">Everything you’d miss, kept</h2>
     <p class="t-lede ink2">Built in from the first run. No add-ons to find.</p>
   </div>
-  <div class="cells panel">
-    <article class="cell">
-      <div class="cell-text"><h3 class="t-subtitle">Media keys</h3><p class="ink2">Play, pause and skip from your keyboard, the Windows media overlay or the taskbar.</p></div>
+  <div class="cells">
+    <article class="cell c-keys">
+      <div class="cell-text"><h3 class="t-subtitle">Media keys</h3><p>Play, pause and skip from your keyboard, the Windows media overlay or the taskbar.</p></div>
       <div class="cell-piece"><MediaFlyout surface cover={88} /></div>
     </article>
-    <article class="cell">
-      <div class="cell-text"><h3 class="t-subtitle">Discord status</h3><p class="ink2">Friends see what you’re playing, with a preview in Settings. Off until you turn it on.</p></div>
+    <article class="cell c-discord">
+      <div class="cell-text"><h3 class="t-subtitle">Discord status</h3><p>Friends see what you’re playing, with a preview in Settings. Off until you turn it on.</p></div>
       <div class="cell-piece"><DiscordCard /></div>
     </article>
-    <article class="cell">
-      <div class="cell-text"><h3 class="t-subtitle">Scrobbling</h3><p class="ink2">Songs you play past halfway go to Last.fm, ListenBrainz or both.</p></div>
+    <article class="cell c-scrobble">
+      <div class="cell-text"><h3 class="t-subtitle">Scrobbling</h3><p>Songs you play past halfway go to Last.fm, ListenBrainz or both.</p></div>
       <div class="cell-piece"><ScrobbleRow /></div>
     </article>
-    <article class="cell">
-      <div class="cell-text"><h3 class="t-subtitle">SponsorBlock</h3><p class="ink2">featherplay skips the talking in music videos, so you hear the song.</p></div>
+    <article class="cell c-sponsor">
+      <div class="cell-text"><h3 class="t-subtitle">SponsorBlock</h3><p>featherplay skips the talking in music videos, so you hear the song.</p></div>
       <div class="cell-piece"><SponsorBlock /></div>
     </article>
-    <article class="cell">
-      <div class="cell-text"><h3 class="t-subtitle">The tray</h3><p class="ink2">Closing the window asks to quit or play on in the tray, until you tell it to remember.</p></div>
-      <div class="cell-piece"><TrayTip corner /></div>
-    </article>
-    <article class="cell">
-      <div class="cell-text"><h3 class="t-subtitle">Synced lyrics</h3><p class="ink2">Lines that follow the song in its cover's colour. Click one to jump there.</p></div>
-      <div class="cell-piece"><LyricCard /></div>
+    <article class="cell c-tray">
+      <div class="cell-text"><h3 class="t-subtitle">The tray</h3><p>Closing the window asks to quit or play on in the tray, until you tell it to remember.</p></div>
+      <div class="cell-piece tray-piece">
+        <div class="m-close" aria-hidden="true">
+          <p class="mc-h">Close featherplay?</p>
+          <p class="mc-p">Choose what the close button does this time. featherplay will ask again next time.</p>
+          <p class="mc-check"><span class="box"></span>Remember my choice</p>
+          <p class="mc-btns"><span>Keep playing in the tray</span><span class="solid">Close featherplay</span></p>
+        </div>
+        <TrayTip corner />
+      </div>
     </article>
   </div>
-  <p class="more">Coming from Pear Desktop? <a class="text-link" href={links.comingFromPear}>See what carries over</a>.</p>
+  <ul class="extras t-small">
+    <li><b>Local API.</b> Pear Desktop’s routes and WebSocket, for overlays and Stream&nbsp;Deck.</li>
+    <li><b>Opus streams.</b> About 130 to 140&nbsp;kbps where a song has one.</li>
+    <li><b>Starts with Windows,</b> if you ask it to.</li>
+    <li><b>Light and dark,</b> its accent from the cover.</li>
+  </ul>
+  <p class="more ink2">Coming from Pear Desktop? <a class="text-link" href={links.comingFromPear}>See what carries over</a>.</p>
 </section>
 
 <style>
-  /* Below the fold: skipped (no style, layout or paint, the ring's per-second fill included)
-     until it comes near; it keeps its real height once seen. */
   .kept {
-    display: grid;
-    gap: var(--s6);
-    padding-block: var(--s9);
-    content-visibility: auto;
-    contain-intrinsic-size: auto 1800px;
+    --hair: color-mix(in srgb, var(--text) 10%, transparent);
   }
-  /* A link within the page lays it out for its jump (src/scripts/anchors.ts), and a page
-     loading part-way down from the start (base.css). */
-  :global(:root:is([data-reach], [data-land])) .kept {
-    content-visibility: visible;
-  }
-  .kept-head {
-    display: grid;
-    gap: var(--s3);
-  }
+  /* One surface, cut into cells by 1 px lines (the gaps show the line colour beneath). */
   .cells {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 30rem), 1fr));
-    overflow: clip;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 1px;
+    margin-top: var(--s7);
+    overflow: hidden;
+    border-radius: var(--r-panel);
+    /* Solid line tones: a translucent edge over the desk would vanish against the dark cells. */
+    background: color-mix(in srgb, #e5ddd2 calc(var(--light) * 100%), #2b2b2b);
+    box-shadow:
+      0 0 0 1px var(--panel-edge),
+      0 1px 2px var(--panel-lift),
+      0 24px 56px -28px var(--panel-lift);
   }
   .cell {
     display: grid;
+    grid-template-rows: auto 1fr;
     align-content: start;
-    gap: var(--s5);
+    gap: var(--s6);
+    min-width: 0;
     padding: var(--panel-pad);
-    box-shadow: 0 0 0 0.5px var(--hairline);
+    background: color-mix(in srgb, #fdfcfa calc(var(--light) * 100%), #181818);
   }
   .cell-text {
     display: grid;
+    align-content: start;
     gap: var(--s2);
-    max-width: 34rem;
+  }
+  .c-tray .cell-text {
+    align-content: center;
+  }
+  .cell-text p {
+    max-width: 40ch;
+    color: var(--ink2);
   }
   .cell-piece {
-    display: grid;
-    justify-items: start;
+    display: flex;
+    align-items: flex-start;
     min-width: 0;
   }
-  .cell-piece > :global(.lyric-card) {
-    width: 100%;
+  .cell-piece > :global(*) {
+    max-width: 100%;
+  }
+  .c-keys,
+  .c-sponsor {
+    grid-column: span 7;
+  }
+  .c-discord,
+  .c-scrobble {
+    grid-column: span 5;
+  }
+  .c-tray {
+    grid-column: span 12;
+    grid-template-rows: auto;
+    grid-template-columns: minmax(0, 4fr) minmax(0, 8fr);
+  }
+  .tray-piece {
+    align-items: flex-end;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--s6);
+  }
+  /* The app's close dialog, drawn (close_dialog.slint). */
+  .m-close {
+    width: min(26rem, 100%);
+    padding: var(--s5);
+    border-radius: var(--r-panel);
+    background: var(--mat-fly);
+    box-shadow: var(--lit), var(--ring), var(--shadow);
+    font-family: var(--font-ui);
+    font-size: 14px;
+  }
+  .mc-h {
+    font-family: var(--font);
+    font-size: 18px;
+    font-weight: 700;
+  }
+  .mc-p {
+    margin-top: var(--s2);
+    color: var(--ink2);
+  }
+  .mc-check {
+    display: flex;
+    align-items: center;
+    gap: var(--s2);
+    margin-top: var(--s4);
+  }
+  .box {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    box-shadow: inset 0 0 0 1.5px var(--ink2);
+  }
+  .mc-btns {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: var(--s2);
+    margin-top: var(--s4);
+  }
+  .mc-btns span {
+    padding: var(--s2) var(--s4);
+    border-radius: var(--r-pill);
+    background: var(--tonal);
+    font-weight: 600;
+  }
+  .mc-btns .solid {
+    background: var(--solid);
+    color: var(--on-solid);
+  }
+  .extras {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--s5) var(--s6);
+    margin: var(--s6) 0 0;
+    padding: 0 var(--panel-pad);
+    color: var(--ink2);
+    list-style: none;
+  }
+  .extras b {
+    color: var(--text);
+    font-weight: var(--fw-bold);
+  }
+  .more {
+    margin-top: var(--s5);
+    padding: 0 var(--panel-pad);
+  }
+  @media (width < 1100px) {
+    .cell,
+    .c-keys,
+    .c-sponsor,
+    .c-discord,
+    .c-scrobble {
+      grid-column: span 12;
+    }
+    .c-tray {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .extras {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  @media (width < 560px) {
+    .extras {
+      grid-template-columns: minmax(0, 1fr);
+    }
   }
 </style>

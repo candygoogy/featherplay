@@ -22,10 +22,14 @@ export const rendered = (el: Element) => !el.checkVisibility || el.checkVisibili
 /** Runs a progress line from where the song is to its end, on the compositor. One that isn't
  *  rendered just takes its place: an animation there can't run on the compositor, and the
  *  main thread would tick it every frame for nothing; it starts when it shows. */
+/** Pieces out of view (above or below the screen, though their section is rendered): their
+ *  lines hold still until they come back (src/demo/bind-pieces.ts, an observer). */
+const away = new WeakSet<Element>();
 function runLine(el: HTMLElement, from: string, to: string, ms: number, playing: boolean) {
   for (const a of el.getAnimations()) a.cancel();
   el.style.transform = from;
-  if (playing && ms > 0 && rendered(el)) el.animate([{ transform: from }, { transform: to }], { duration: ms, easing: "linear", fill: "forwards" });
+  const piece = el.closest("[data-piece]");
+  if (playing && ms > 0 && rendered(el) && !(piece && away.has(piece))) el.animate([{ transform: from }, { transform: to }], { duration: ms, easing: "linear", fill: "forwards" });
 }
 
 /** A small cover changing song: the new one fades over the old (no hard cut). */
@@ -174,6 +178,24 @@ export function bindPieces(player: Player): void {
     render(player.state);
   };
   for (const fly of document.querySelectorAll<HTMLElement>("[data-fly]")) fly.addEventListener("toggle", (e) => (e as ToggleEvent).newState === "open" && again());
+  // A piece going out of view stops its lines; coming back, they start from where the song is.
+  // (Off screen the browser may tick them on the page's own thread.)
+  if ("IntersectionObserver" in window) {
+    const io = new IntersectionObserver(
+      (es) => {
+        let changed = false;
+        for (const e of es) {
+          if (e.isIntersecting === !away.has(e.target)) continue;
+          if (e.isIntersecting) away.delete(e.target);
+          else away.add(e.target);
+          changed = true;
+        }
+        if (changed) again();
+      },
+      { rootMargin: "64px" },
+    );
+    for (const p of document.querySelectorAll("[data-piece]")) if (!p.closest("[data-fly]")) io.observe(p);
+  }
   if ("ResizeObserver" in window) {
     const widths = new WeakMap<Element, number>();
     const ro = new ResizeObserver((es) => {

@@ -2,8 +2,8 @@ import { expect, test, type Page } from "@playwright/test";
 import { reach } from "./helpers";
 import { songs } from "../src/data/songs";
 
-// "Make it yours": a theme for the app's window (not the page) and a cover that plays and
-// colours the page. Review Focus 5: text over the cover glow keeps AA in both themes.
+// "Make it yours" (Yours.astro): a theme for the app's window (not the page) and a cover that
+// plays and colours the page, beside the app at its actual size. Its words keep AA in both themes.
 
 const yours = (page: Page) => page.locator("[data-yours]");
 const replica = (page: Page) => yours(page).locator("[data-replica]");
@@ -20,7 +20,6 @@ test("picking light or dark restyles the replica only, not the page", async ({ p
   await open(page);
   const section = page.locator("#yours");
   const pageBg = await bg(page, "body");
-  expect(pageBg).toBe("rgb(15, 15, 15)");
 
   await section.getByRole("radio", { name: "Light", exact: true }).check();
   await expect.poll(() => bg(page, "[data-yours] [data-replica]")).toBe("rgb(255, 255, 255)");
@@ -65,8 +64,8 @@ test("picking a cover plays that song and the page glow follows", async ({ page 
   await expect
     .poll(() => page.evaluate(() => document.documentElement.style.getPropertyValue("--glow")))
     .toBe(song.colour);
-  const front = yours(page).locator('[data-glow-layer][data-on="true"]');
-  await expect.poll(() => front.evaluate((el) => el.style.getPropertyValue("--c"))).toBe(song.colour);
+  // The window here is the app at its actual size: its real narrow layout.
+  expect(await replica(page).evaluate((r) => r.clientWidth)).toBe(480);
   // The picker shows what's playing, whoever started it.
   await page.evaluate(() => document.querySelector<HTMLElement>('[data-window] [data-play="watching-seabirds-soar"]')?.click());
   await expect(section.getByRole("radio", { name: "Watching Seabirds Soar (Harmony)" })).toBeChecked();
@@ -104,40 +103,26 @@ function contrast(a: string, b: string) {
 }
 
 for (const theme of ["dark", "light"] as const) {
-  test(`text over the glow keeps AA contrast for every cover (${theme})`, async ({ page }) => {
+  test(`its words keep AA contrast on the panel (${theme})`, async ({ page }) => {
     await page.emulateMedia({ colorScheme: theme });
     await open(page);
-    const section = page.locator("#yours");
-    for (const song of songs) {
-      await section.getByRole("radio", { name: song.title }).check();
-      const front = yours(page).locator('[data-glow-layer][data-on="true"]');
-      await expect.poll(() => front.evaluate((el) => el.style.getPropertyValue("--c"))).toBe(song.colour);
-      const pairs = await page.evaluate(() => {
-        const field = document.querySelector<HTMLElement>("[data-yours] [data-glow]")!;
-        const probe = document.createElement("span");
-        probe.style.cssText =
-          "position:absolute;width:1px;height:1px;background-color:color-mix(in srgb, var(--c) var(--glow-strength), var(--bg))";
-        field.querySelector('[data-glow-layer][data-on="true"]')!.append(probe);
-        const ground = getComputedStyle(probe).backgroundColor;
-        probe.remove();
-        const texts = [...document.querySelectorAll<HTMLElement>("#yours :is(h2, p, legend, label span):not([data-replica] *)")].filter(
-          (el) => el.offsetParent !== null && el.textContent!.trim(),
-        );
-        // Text on a fill of its own (the picked segment) is read against that fill.
-        const groundOf = (el: HTMLElement) => {
-          for (let n: HTMLElement | null = el; n && n.id !== "yours"; n = n.parentElement) {
-            const bg = getComputedStyle(n).backgroundColor;
-            if (bg && !/rgba\(0, 0, 0, 0\)|transparent/.test(bg) && !/,\s*0(\.0+)?\)$/.test(bg)) return bg;
-          }
-          return ground;
-        };
-        return texts.map((el) => ({ text: el.textContent!.trim().slice(0, 30), color: getComputedStyle(el).color, ground: groundOf(el) }));
-      });
-      expect(pairs.length).toBeGreaterThan(3);
-      for (const p of pairs) {
-        expect(contrast(p.color, p.ground), `${song.title}: "${p.text}"`).toBeGreaterThanOrEqual(4.5);
-      }
-    }
+    await page.waitForTimeout(400);
+    const pairs = await page.evaluate(() => {
+      const texts = [...document.querySelectorAll<HTMLElement>("#yours :is(h2, p, legend, label span):not([data-replica] *)")].filter(
+        (el) => el.offsetParent !== null && el.textContent!.trim() && !el.closest(".visually-hidden"),
+      );
+      // Each text against the first fill under it (a picked segment, the panel).
+      const groundOf = (el: HTMLElement) => {
+        for (let n: HTMLElement | null = el; n; n = n.parentElement) {
+          const bg = getComputedStyle(n).backgroundColor;
+          if (bg && !/rgba\(0, 0, 0, 0\)|transparent/.test(bg) && !/,\s*0(\.0+)?\)$/.test(bg)) return bg;
+        }
+        return getComputedStyle(document.body).backgroundColor;
+      };
+      return texts.map((el) => ({ text: el.textContent!.trim().slice(0, 30), color: getComputedStyle(el).color, ground: groundOf(el) }));
+    });
+    expect(pairs.length).toBeGreaterThan(3);
+    for (const p of pairs) expect(contrast(p.color, p.ground), p.text).toBeGreaterThanOrEqual(4.5);
   });
 }
 

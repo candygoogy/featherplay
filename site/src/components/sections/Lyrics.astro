@@ -1,0 +1,193 @@
+---
+// Lyrics, up close: the lyric card large (the song's lines on its cover's deep colour, in
+// both themes, as the app's lyric view), the words beside it, and the song with its play
+// button. Live on the page's one player.
+import LyricCard from "../pieces/LyricCard.astro";
+import Icon from "../Icon.astro";
+import { demoStart, songById, songs } from "../../data/songs";
+import { formatTime } from "../../demo/player";
+
+const song = songById(demoStart.songId)!;
+const withLyrics = songs.filter((s) => s.lyrics.length > 0);
+---
+
+<section class="sec sec-lyrics frame" id="lyrics" aria-labelledby="lyrics-title">
+  <div class="lyr">
+    <LyricCard class="lyr-card" />
+    <div class="lyr-text">
+      <h2 id="lyrics-title" class="t-title">Lyrics, up close</h2>
+      <p class="t-lede ink2">
+        Synced lines that follow the song, in its cover’s colour. Click a line to jump there. Make them larger, nudge a song’s timing,
+        pick other lyrics when the match is wrong, or keep the line in a strip above your other apps. Turn lyrics off and featherplay
+        never looks them up.
+      </p>
+      <div class="now" data-piece="now" inert>
+        <img data-bind="cover" src={song.cover} width="56" height="56" alt="" loading="lazy" decoding="async" />
+        <span class="now-text">
+          <span class="now-title" data-bind="title">{song.title}</span>
+          <span class="now-sub"
+            ><span data-bind="artist">{song.artist}</span>, <span class="num"
+              ><span data-bind="at">{formatTime(demoStart.positionMs)}</span> of <span data-bind="duration">{formatTime(song.durationMs)}</span
+              ></span
+            ></span
+          >
+        </span>
+        <button class="round-play" type="button" data-do="toggle" data-play-label aria-label="Play">
+          <span class="pp" aria-hidden="true"><Icon name="play" size={20} class="i-play" /><Icon name="pause" size={20} class="i-pause" /></span>
+        </button>
+      </div>
+      <!-- Shown when the song playing has no lyrics (the card says so): the ones that do. -->
+      <div class="no-lyr">
+        <p class="t-small ink2">This one has no lyrics. Play one that does:</p>
+        <ul>
+          {
+            withLyrics.map((s) => (
+              <li>
+                <button class="chip" type="button" data-do="play" data-song={s.id}>
+                  <img src={s.cover} width="24" height="24" alt="" loading="lazy" decoding="async" />
+                  {s.title}
+                </button>
+              </li>
+            ))
+          }
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .lyr {
+    display: grid;
+    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+    align-items: center;
+    gap: var(--s8);
+  }
+  .lyr-text {
+    display: grid;
+    gap: var(--s5);
+  }
+  .now {
+    display: grid;
+    grid-template-columns: 56px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--s4);
+    margin-top: var(--s3);
+    padding: var(--s3);
+    border-radius: var(--r-panel);
+    background: var(--panel-bg);
+    box-shadow:
+      inset 0 0 0 1px var(--panel-edge),
+      0 1px 2px var(--panel-lift),
+      0 16px 40px -24px var(--panel-lift);
+  }
+  .now img {
+    width: 56px;
+    height: 56px;
+    border-radius: var(--r-small);
+    object-fit: cover;
+  }
+  .now-text {
+    display: grid;
+    min-width: 0;
+  }
+  .now-title,
+  .now-sub {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .now-title {
+    font-weight: var(--fw-bold);
+  }
+  .now-sub {
+    color: var(--ink2);
+    font-size: var(--fs-small);
+    font-weight: var(--fw-medium);
+  }
+  /* The app's own play button: the accent disc that rounds to a square while playing. */
+  .round-play {
+    display: grid;
+    place-items: center;
+    width: 48px;
+    height: 48px;
+    border: 0;
+    border-radius: 24px;
+    background: var(--accent);
+    color: var(--on-accent);
+    cursor: pointer;
+    transition:
+      border-radius var(--t-morph) var(--spring-morph),
+      scale var(--t-release) var(--spring-release);
+  }
+  :global([data-playing="true"]) .round-play {
+    border-radius: 14.4px;
+  }
+  .round-play:active {
+    scale: var(--press-surface);
+    transition:
+      border-radius var(--t-morph) var(--spring-morph),
+      scale var(--t-press) var(--ease-out);
+  }
+  .round-play .pp {
+    width: 20px;
+    height: 20px;
+  }
+  .round-play :global(svg) {
+    fill: currentColor;
+  }
+  .no-lyr {
+    display: none;
+    gap: var(--s3);
+  }
+  .lyr:has([data-has-lyrics="false"]) .no-lyr {
+    display: grid;
+  }
+  .no-lyr ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s2);
+    min-height: 40px;
+    padding: 0 var(--s4) 0 var(--s2);
+    border: 0;
+    border-radius: var(--r-pill);
+    background: var(--tonal);
+    color: var(--text);
+    font: inherit;
+    font-size: var(--fs-small);
+    font-weight: var(--fw-medium);
+    cursor: pointer;
+    transition:
+      background-color var(--t-hover) ease,
+      scale var(--t-release) var(--spring-release);
+  }
+  .chip:hover {
+    background: var(--tonal-hover);
+  }
+  .chip:active {
+    scale: var(--press-surface);
+    transition: scale var(--t-press) var(--ease-out);
+  }
+  .chip img {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+  }
+  @media (width < 900px) {
+    .lyr {
+      grid-template-columns: minmax(0, 1fr);
+      gap: var(--s6);
+    }
+    .lyr-text {
+      order: -1;
+    }
+  }
+</style>

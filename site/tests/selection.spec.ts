@@ -6,7 +6,7 @@ import { mergeLines } from "../src/scripts/selection";
 
 const selectLede = (page: Page) =>
   page.evaluate(() => {
-    const p = document.querySelector<HTMLElement>("#light .lede")!;
+    const p = document.querySelector<HTMLElement>("#light .t-lede")!;
     p.scrollIntoView({ block: "center", behavior: "instant" });
     const r = document.createRange();
     r.selectNodeContents(p);
@@ -35,7 +35,7 @@ for (const theme of ["dark", "light"] as const) {
     expect(wash).not.toMatch(/rgba\(0, 0, 0, 0\)|transparent/);
     expect(radius).toBeGreaterThanOrEqual(4);
     // Each piece covers its line of text.
-    const lede = (await page.locator("#light .lede").boundingBox())!;
+    const lede = (await page.locator("#light .t-lede").boundingBox())!;
     for (const b of await pieces.all()) {
       const r = (await b.boundingBox())!;
       expect(r.x).toBeGreaterThanOrEqual(lede.x - 4);
@@ -43,7 +43,7 @@ for (const theme of ["dark", "light"] as const) {
       expect(r.y).toBeGreaterThanOrEqual(lede.y - 4);
       expect(r.y + r.height).toBeLessThanOrEqual(lede.y + lede.height + 4);
     }
-    const bg = await page.evaluate(() => getComputedStyle(document.querySelector("#light .lede")!, "::selection").backgroundColor);
+    const bg = await page.evaluate(() => getComputedStyle(document.querySelector("#light .t-lede")!, "::selection").backgroundColor);
     expect(bg).toMatch(/rgba\(0, 0, 0, 0\)|transparent/);
     // Collapsed: the pieces fade and go.
     await page.evaluate(() => document.getSelection()!.removeAllRanges());
