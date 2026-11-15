@@ -206,45 +206,114 @@ fn url(r: Result<ResolvedStream, ResolveError>) -> String {
     r.expect("a stream").url
 }
 
+/// The plain step order, one `resolve` each: the steps called, the stream and the step it
+/// names (or the error's kind), and why the native step was left, if it was.
 #[tokio::test]
-async fn a_native_stream_is_the_answer() {
-    let (chain, s) = (Chain::default(), Script::default().native(Ok(NATIVE_URL)));
-    assert_eq!(url(within(chain.resolve(&s, &id())).await), NATIVE_URL);
-    assert_eq!(s.calls(), ["native"]);
-    assert_eq!(chain.take_fallback_reason(&id()), None);
-}
-
-#[tokio::test]
-async fn a_failed_native_resolve_goes_to_yt_dlps_embedded_client() {
-    let chain = Chain::default();
-    let s = Script::default()
-        .native(Err(NativeError::Failed("deno timed out".into())))
-        .embedded(Ok(EMBEDDED_URL));
-    assert_eq!(url(within(chain.resolve(&s, &id())).await), EMBEDDED_URL);
-    assert_eq!(s.calls(), ["native", "embedded"]);
-    let why = chain.take_fallback_reason(&id()).expect("a reason");
-    assert!(why.contains("deno timed out"), "{why}");
-}
-
-#[tokio::test]
-async fn the_stream_names_the_step_that_gave_it() {
-    let via = |s: Script| async move {
-        within(Chain::default().resolve(&s, &id()))
-            .await
-            .expect("a stream")
-            .via
+async fn the_steps_run_in_order_until_one_answers() {
+    let deno = || NativeError::Failed("deno timed out".into());
+    let no_native = || Script {
+        no_native: true,
+        ..Script::default()
     };
-    let native = Script::default().native(Ok(NATIVE_URL));
-    assert_eq!(via(native).await, Via::NativeEmbedded);
-    let embedded = Script::default()
-        .native(Err(NativeError::Failed("deno timed out".into())))
-        .embedded(Ok(EMBEDDED_URL));
-    assert_eq!(via(embedded).await, Via::YtDlpEmbedded);
-    let default = Script::default()
-        .native(Err(NativeError::Failed("deno timed out".into())))
-        .embedded(Err(failed("ERROR: Requested format is not available")))
-        .default_clients(Ok(TV_URL));
-    assert_eq!(via(default).await, Via::YtDlpDefault);
+    /// A label, the script, the stream and the step it names (or the error), the steps
+    /// called, and a part of the fallback reason.
+    type Case = (
+        &'static str,
+        Script,
+        Result<(&'static str, Via), ResolveError>,
+        &'static [&'static str],
+        Option<&'static str>,
+    );
+    let cases: [Case; 7] = [
+        (
+            "a native stream is the answer",
+            Script::default().native(Ok(NATIVE_URL)),
+            Ok((NATIVE_URL, Via::NativeEmbedded)),
+            &["native"],
+            None,
+        ),
+        (
+            "a failed native resolve goes to yt-dlp's embedded client",
+            Script::default()
+                .native(Err(deno()))
+                .embedded(Ok(EMBEDDED_URL)),
+            Ok((EMBEDDED_URL, Via::YtDlpEmbedded)),
+            &["native", "embedded"],
+            Some("deno timed out"),
+        ),
+        (
+            "a failed embedded run goes to the default clients",
+            Script::default()
+                .native(Err(deno()))
+                .embedded(Err(failed("ERROR: Requested format is not available")))
+                .default_clients(Ok(TV_URL)),
+            Ok((TV_URL, Via::YtDlpDefault)),
+            &["native", "embedded", "default"],
+            Some("deno timed out"),
+        ),
+        (
+            "a video the embedded client refuses goes to the default clients",
+            Script::default()
+                .native(Err(NativeError::Skip(
+                    "UNPLAYABLE: embedding disabled".into(),
+                )))
+                .default_clients(Ok(TV_URL)),
+            Ok((TV_URL, Via::YtDlpDefault)),
+            &["native", "default"],
+            Some("embedding disabled"),
+        ),
+        (
+            "an age check ends the resolve",
+            Script::default().native(Err(NativeError::Skip(
+                "LOGIN_REQUIRED: Sign in to confirm your age".into(),
+            ))),
+            Err(ResolveError::Unavailable(String::new())),
+            &["native"],
+            None,
+        ),
+        (
+            "a broken yt-dlp is updated and tried again",
+            no_native()
+                .embedded(Err(failed("ERROR: Requested format is not available")))
+                .default_clients(Err(failed("ERROR: signature extraction failed")))
+                .default_clients(Ok(TV_URL)),
+            Ok((TV_URL, Via::YtDlpDefault)),
+            &["embedded", "default", "update", "default"],
+            None,
+        ),
+        (
+            "a missing yt-dlp ends the resolve",
+            no_native().embedded(Err(ResolveError::ToolMissing)),
+            Err(ResolveError::ToolMissing),
+            &["embedded"],
+            None,
+        ),
+    ];
+    for (label, s, want, calls, why) in cases {
+        let chain = Chain::default();
+        let got = within(chain.resolve(&s, &id())).await;
+        match (&got, &want) {
+            (Ok(stream), Ok((url, via))) => {
+                assert_eq!((stream.url.as_str(), stream.via), (*url, *via), "{label}");
+            }
+            // The kind only: an age check's message is the service's.
+            (Err(e), Err(w)) => assert_eq!(
+                std::mem::discriminant(e),
+                std::mem::discriminant(w),
+                "{label}: {e:?}"
+            ),
+            _ => panic!("{label}: got {got:?}"),
+        }
+        assert_eq!(s.calls(), calls, "{label}");
+        let reason = chain.take_fallback_reason(&id());
+        match why {
+            Some(w) => assert!(
+                reason.as_deref().is_some_and(|r| r.contains(w)),
+                "{label}: {reason:?}"
+            ),
+            None => assert_eq!(reason, None, "{label}"),
+        }
+    }
 }
 
 #[tokio::test]
@@ -265,18 +334,6 @@ async fn a_yt_dlp_streams_host_is_looked_up_by_the_system() {
     assert!(!from_yt_dlp("r2.example"));
 }
 
-#[tokio::test]
-async fn a_video_the_embedded_client_refuses_goes_to_the_default_clients() {
-    let chain = Chain::default();
-    let s = Script::default()
-        .native(Err(NativeError::Skip(
-            "UNPLAYABLE: embedding disabled".into(),
-        )))
-        .default_clients(Ok(TV_URL));
-    assert_eq!(url(within(chain.resolve(&s, &id())).await), TV_URL);
-    assert_eq!(s.calls(), ["native", "default"]);
-}
-
 /// Both native clients refused the song: yt-dlp's clients would say the same ~4 s later,
 /// so the resolve ends there, ahead of a click too (rows on screen learn it this way).
 #[tokio::test]
@@ -295,46 +352,6 @@ async fn a_song_both_native_clients_refuse_skips_yt_dlp() {
         .unwrap_err();
     assert!(e.is_refusal(), "not deferred: {e:?}");
     assert_eq!(s.calls(), ["native"]);
-}
-
-#[tokio::test]
-async fn an_age_check_ends_the_resolve() {
-    let chain = Chain::default();
-    let s = Script::default().native(Err(NativeError::Skip(
-        "LOGIN_REQUIRED: Sign in to confirm your age".into(),
-    )));
-    let e = within(chain.resolve(&s, &id())).await.unwrap_err();
-    assert!(matches!(e, ResolveError::Unavailable(_)), "{e:?}");
-    assert_eq!(s.calls(), ["native"]);
-}
-
-#[tokio::test]
-async fn a_broken_yt_dlp_is_updated_and_tried_again() {
-    let chain = Chain::default();
-    let s = Script {
-        no_native: true,
-        ..Script::default()
-    }
-    .embedded(Err(failed("ERROR: Requested format is not available")))
-    .default_clients(Err(failed("ERROR: signature extraction failed")))
-    .default_clients(Ok(TV_URL));
-    assert_eq!(url(within(chain.resolve(&s, &id())).await), TV_URL);
-    assert_eq!(s.calls(), ["embedded", "default", "update", "default"]);
-}
-
-#[tokio::test]
-async fn a_missing_yt_dlp_ends_the_resolve() {
-    let chain = Chain::default();
-    let s = Script {
-        no_native: true,
-        ..Script::default()
-    }
-    .embedded(Err(ResolveError::ToolMissing));
-    assert_eq!(
-        within(chain.resolve(&s, &id())).await,
-        Err(ResolveError::ToolMissing)
-    );
-    assert_eq!(s.calls(), ["embedded"]);
 }
 
 #[test]
