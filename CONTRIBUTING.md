@@ -196,6 +196,18 @@ then back; a playlist made and then deleted), so use a second Google account, ne
 main one, and don't run them in a loop. The `live_record_*` tests save raw responses for new
 fixtures into `FEATHERPLAY_RECORD_DIR` and skip, saying so, when it isn't set.
 
+The ignored tests that start WebView2 or the installed browsers for the sign-in (no Google
+page, no account) run weekly and by hand in `.github/workflows/windows-live.yml` on Windows,
+and in the Linux desktop rig (`scripts/rig/desktop/live.sh`). By hand:
+
+```
+FEATHERPLAY_HOME=<a test home> cargo nextest run -p featherplay-platform --lib --run-ignored only --no-capture -E 'test(/^windows::webview::tests::live_/) | test(this_pc) | test(live_browser)'
+FEATHERPLAY_HOME=<a test home> cargo nextest run -p featherplay --lib --run-ignored only --no-capture -E 'test(live_browsers)'
+```
+
+On a PC whose policy turns a browser's DevTools off, point `FEATHERPLAY_PIPE_TEST_BROWSER` at
+another Chromium-based exe; the browser tests start only that one.
+
 ### Offscreen snapshots
 
 To see a UI change without opening the window, render a page offscreen to a PNG:
