@@ -10,8 +10,7 @@
 //! layer once) are one-offs, apart from the fade: the ceiling is on the p95 of the frames that
 //! follow the shelves' arrival. It holds in optimised builds.
 
-use crate::animations::{scene, show, step};
-use crate::support::quantile;
+use crate::support::{playing_4k, quantile, show, step, three_tries};
 use featherplay::ui::ExploreData;
 use slint::{ComponentHandle, Model};
 
@@ -45,22 +44,23 @@ fn enter(scene: &featherplay::snapshot::Scene) -> (f64, Vec<f64>) {
 
 #[test]
 fn explores_cards_fade_their_art_in_without_long_frames() {
-    let scene = scene();
+    let scene = playing_4k();
     // The first visit, so Explore has its shelves.
     enter(&scene);
     show(&scene, "home");
-    let mut last = String::new();
-    for _ in 0..3 {
+    three_tries(|_| {
         let (first, after) = enter(&scene);
         let (p95, max) = (quantile(&after, 0.95), quantile(&after, 1.0));
         println!(
             "Explore's cards at 4K 150 %: the shelves' frame {first:.2} ms, then p95 {p95:.2}, worst {max:.2} ms"
         );
         show(&scene, "home");
-        if cfg!(debug_assertions) || p95 <= FADE_P95_MS {
-            return;
+        if p95 <= FADE_P95_MS {
+            Ok(())
+        } else {
+            Err(format!(
+                "Explore's fade frames had a p95 of {p95:.2} ms, over {FADE_P95_MS}"
+            ))
         }
-        last = format!("Explore's fade frames had a p95 of {p95:.2} ms, over {FADE_P95_MS}");
-    }
-    panic!("{last}");
+    });
 }

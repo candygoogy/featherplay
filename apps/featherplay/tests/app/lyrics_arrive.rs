@@ -5,7 +5,8 @@
 //! ~15 ms there (the real window's log had 12–20 ms frames as each song's lyrics came in), so
 //! `lyrics::fill` hands the lines over a few at a time. The ceiling holds in optimised builds.
 
-use crate::lyrics_frames::{scene, step};
+use crate::lyrics_frames::scene;
+use crate::support::{step, three_tries};
 use featherplay::ui::{LyricsData, LyricsState, NowPlayingData};
 use slint::{ComponentHandle, Model};
 
@@ -65,14 +66,15 @@ fn a_new_songs_lyrics_arrive_without_a_long_frame() {
         step(&scene);
     }
     assert!(data.get_showing(), "the full view didn't open");
-    let mut last = String::new();
-    for attempt in 0..3 {
-        let (worst, frames) = arrive(&scene, 1 + attempt);
+    three_tries(|attempt| {
+        let (worst, frames) = arrive(&scene, 1 + attempt as usize);
         println!("lyrics arriving at 4K 150 %: worst frame {worst:.2} ms ({frames} frames)");
-        if cfg!(debug_assertions) || worst <= ARRIVE_MS {
-            return;
+        if worst <= ARRIVE_MS {
+            Ok(())
+        } else {
+            Err(format!(
+                "a frame cost {worst:.2} ms while the lyrics came in, over {ARRIVE_MS}"
+            ))
         }
-        last = format!("a frame cost {worst:.2} ms while the lyrics came in, over {ARRIVE_MS}");
-    }
-    panic!("{last}");
+    });
 }

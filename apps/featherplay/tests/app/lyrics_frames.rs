@@ -5,93 +5,20 @@
 //! timed in this thread's CPU time on a frozen clock stepped 4 ms (240 Hz), through the app's
 //! own present path (`offscreen::install_presenting`). The ceilings hold in optimised builds.
 
-use std::path::PathBuf;
-
-use crate::support::{FRAME_240, cpu, fixture_covers, quantile};
+use crate::support::{Frame1, fixture_covers, long_lyrics, quantile, resize, step, three_tries};
 use featherplay::offscreen;
 use featherplay::snapshot::Scene;
 use featherplay::ui::{LyricsData, LyricsState, NowPlayingData, Theme};
+use slint::ComponentHandle;
 use slint::platform::WindowEvent;
-use slint::{ComponentHandle, LogicalSize, PhysicalSize};
 
-const W: u32 = 3840;
-const H: u32 = 2160;
 const SCALE: f32 = 1.5;
-
-/// One frame's CPU time (ms) and the physical pixels it copied.
-pub(crate) struct Frame {
-    pub(crate) cpu: f64,
-    pub(crate) damaged: u64,
-}
-
-pub(crate) fn step(scene: &Scene) -> Frame {
-    let c = cpu::cycles();
-    offscreen::advance(FRAME_240);
-    scene.run_queued();
-    let p = offscreen::present(scene.ui.window()).expect("present");
-    Frame {
-        cpu: cpu::ms(cpu::cycles() - c),
-        damaged: p.damaged,
-    }
-}
-
-/// An LRCLIB record as long as a real song's: 80 timed lines, a verse break every eight,
-/// about one in four long enough to wrap in the full view. All of them start before the
-/// fixture's position (2:41), so the app arms no line timer: the test moves `current` itself,
-/// as `lyrics::sync` does.
-pub(crate) fn long_lyrics() -> PathBuf {
-    const WORDS: [&str; 24] = [
-        "light", "harbour", "morning", "never", "walking", "through", "the", "city", "again",
-        "under", "neon", "rain", "and", "your", "voice", "is", "calling", "me", "back", "home",
-        "tonight", "forever", "slowly", "burning",
-    ];
-    let mut seed: u32 = 0x2545_F491;
-    let mut next = |n: u32| {
-        seed ^= seed << 13;
-        seed ^= seed >> 17;
-        seed ^= seed << 5;
-        seed % n
-    };
-    let mut synced = String::new();
-    let mut plain = String::new();
-    for i in 0..80u32 {
-        let t = 10.0 + f64::from(i) * 1.8;
-        let text = if i % 8 == 7 {
-            String::new()
-        } else {
-            let words = if next(4) == 0 {
-                12 + next(4)
-            } else {
-                4 + next(4)
-            };
-            let line: Vec<&str> = (0..words).map(|_| WORDS[next(24) as usize]).collect();
-            let line = line.join(" ");
-            line[..1].to_uppercase() + &line[1..]
-        };
-        synced.push_str(&format!(
-            "[{:02}:{:05.2}] {text}\n",
-            (t / 60.0) as u32,
-            t % 60.0
-        ));
-        plain.push_str(&text);
-        plain.push('\n');
-    }
-    let record = serde_json::json!({
-        "id": 1, "name": "Long", "trackName": "Long", "artistName": "Fixture",
-        "albumName": "Fixture", "duration": 367.0, "instrumental": false,
-        "plainLyrics": plain, "syncedLyrics": synced,
-    });
-    let file = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("lyrics-long.json");
-    std::fs::write(&file, record.to_string()).expect("lyrics file");
-    file
-}
 
 /// Now playing at 4K 150 % with the sound playing, the cover view at rest, the long lyrics
 /// looked up; the clock frozen.
 pub(crate) fn scene() -> Scene {
     fixture_covers();
-    // SAFETY: set before the scene starts any other thread.
-    unsafe { std::env::set_var("FEATHERPLAY_FIXTURE_LYRICS", long_lyrics()) };
+    long_lyrics();
     let scene = Scene::new(1280, 800, false, true).expect("scene");
     scene.ui.global::<Theme>().set_motion(true);
     let w = scene.ui.window();
@@ -99,10 +26,7 @@ pub(crate) fn scene() -> Scene {
         scale_factor: SCALE,
     });
     scene.ctx.covers.set_scale(SCALE);
-    w.set_size(PhysicalSize::new(W, H));
-    w.dispatch_event(WindowEvent::Resized {
-        size: LogicalSize::new(W as f32 / SCALE, H as f32 / SCALE),
-    });
+    resize(w, 3840, 2160);
     scene.sound(true).expect("player");
     scene.open("now-playing").expect("now playing");
     scene.theme(true);
@@ -122,7 +46,7 @@ pub(crate) fn scene() -> Scene {
 }
 
 /// Frames until nothing animates (at most `max`), from a change made just before.
-fn run(scene: &Scene, max: usize) -> Vec<Frame> {
+fn run(scene: &Scene, max: usize) -> Vec<Frame1> {
     let w = scene.ui.window();
     let mut out = Vec::new();
     for _ in 0..max {
@@ -135,7 +59,7 @@ fn run(scene: &Scene, max: usize) -> Vec<Frame> {
 }
 
 /// `n` line changes from line `from`, one line on each, every frame until it rests.
-fn glides(scene: &Scene, from: i32, n: i32) -> Vec<Vec<Frame>> {
+fn glides(scene: &Scene, from: i32, n: i32) -> Vec<Vec<Frame1>> {
     let data = scene.ui.global::<LyricsData>();
     (0..n)
         .map(|k| {
@@ -150,7 +74,7 @@ fn glides(scene: &Scene, from: i32, n: i32) -> Vec<Vec<Frame>> {
         .collect()
 }
 
-fn toggle(scene: &Scene) -> Vec<Frame> {
+fn toggle(scene: &Scene) -> Vec<Frame1> {
     scene.ui.global::<LyricsData>().invoke_toggle_view();
     let f = run(scene, 200);
     for _ in 0..40 {
@@ -160,7 +84,7 @@ fn toggle(scene: &Scene) -> Vec<Frame> {
 }
 
 /// The repainted frames' CPU time, without each run's first frame if `skip_first`.
-fn cpu_of(runs: &[Vec<Frame>], skip_first: bool) -> Vec<f64> {
+fn cpu_of(runs: &[Vec<Frame1>], skip_first: bool) -> Vec<f64> {
     runs.iter()
         .flat_map(|r| r.iter().skip(usize::from(skip_first)))
         .filter(|f| f.damaged > 0)
@@ -171,7 +95,7 @@ fn cpu_of(runs: &[Vec<Frame>], skip_first: bool) -> Vec<f64> {
 /// One round as the user meets it: six glides in the side panel's Lyrics tab beside the cover
 /// view (a glide frame that the bar's tick lands in repaints across the stage), the full view
 /// opening, four glides there, and closing. The glides' runs and the toggles' runs.
-fn round(scene: &Scene, from: i32) -> (Vec<Vec<Frame>>, Vec<Vec<Frame>>) {
+fn round(scene: &Scene, from: i32) -> (Vec<Vec<Frame1>>, Vec<Vec<Frame1>>) {
     let mut glide = glides(scene, from, 6);
     let open = toggle(scene);
     glide.extend(glides(scene, from + 6, 4));
@@ -204,11 +128,8 @@ const FIRST_MS: f64 = 16.0;
 fn lyrics_motion_fits_its_4k_frame_budget() {
     let scene = scene();
     side_tab(&scene);
-    // CPU time per frame is noisy when other builds load the machine: up to 3 tries, and
-    // the test fails only if every one is over.
-    let mut last = String::new();
-    for attempt in 0..3 {
-        let (glide_runs, toggle_runs) = round(&scene, 20 + attempt * 12);
+    three_tries(|attempt| {
+        let (glide_runs, toggle_runs) = round(&scene, 20 + attempt as i32 * 12);
         let glide = cpu_of(&glide_runs, false);
         let toggled = cpu_of(&toggle_runs, true);
         let first = toggle_runs
@@ -227,23 +148,22 @@ fn lyrics_motion_fits_its_4k_frame_budget() {
             glide.len() > 500 && toggled.len() > 100,
             "too few frames repainted"
         );
-        last = if cfg!(debug_assertions) {
-            return;
-        } else if gm > GLIDE_MS.0 || gw > GLIDE_MS.1 {
-            format!(
+        if gm > GLIDE_MS.0 || gw > GLIDE_MS.1 {
+            Err(format!(
                 "a glide frame costs {gm:.2} / {gw:.2} ms, over {} / {}",
                 GLIDE_MS.0, GLIDE_MS.1
-            )
+            ))
         } else if tm > TOGGLE_MS.0 || tw > TOGGLE_MS.1 {
-            format!(
+            Err(format!(
                 "a toggle frame costs {tm:.2} / {tw:.2} ms, over {} / {}",
                 TOGGLE_MS.0, TOGGLE_MS.1
-            )
+            ))
         } else if first > FIRST_MS {
-            format!("the toggle's first frame costs {first:.2} ms, over {FIRST_MS}")
+            Err(format!(
+                "the toggle's first frame costs {first:.2} ms, over {FIRST_MS}"
+            ))
         } else {
-            return;
-        };
-    }
-    panic!("{last}");
+            Ok(())
+        }
+    });
 }

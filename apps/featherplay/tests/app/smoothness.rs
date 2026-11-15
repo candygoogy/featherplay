@@ -24,7 +24,7 @@
 //! `SMOOTHNESS=quick` measures 150 % only; `SMOOTHNESS_ONLY=scroll|playing|region|transitions`
 //! runs one part; `SMOOTHNESS_ROUNDS=n` sets the rounds (3).
 
-use crate::support;
+use crate::support::{self, FRAME_240, cpu, long_rows, quantile, resize};
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
@@ -33,12 +33,8 @@ use featherplay::repaint;
 use featherplay::snapshot::Scene;
 use featherplay::ui::{CardItem, Frame, LibraryData, Mark, PlaylistData, Probe, Theme, TrackRow};
 use slint::platform::WindowEvent;
-use slint::{
-    ComponentHandle, LogicalPosition, LogicalSize, Model, ModelRc, PhysicalSize, VecModel, Window,
-};
+use slint::{ComponentHandle, LogicalPosition, Model, ModelRc, VecModel, Window};
 
-/// One frame at 240 Hz (Slint's clock counts whole milliseconds).
-const FRAME_240: Duration = Duration::from_millis(4);
 /// The 240 Hz budget, in ms.
 const BUDGET_240: f64 = 1000.0 / 240.0;
 /// Rows in the long lists (the fixtures' rows, repeated).
@@ -49,44 +45,6 @@ const HOME_SHELVES: usize = 12;
 const HOME_SHELF_ITEMS: usize = 12;
 /// The machine's logical cores (`[Environment]::ProcessorCount`), for the CPU budget.
 const CORES: f64 = 16.0;
-
-/// This thread's CPU time, from Windows' per-thread cycle counter, and the process raised to
-/// high priority so the measured thread is preempted less.
-mod cpu {
-    use std::sync::OnceLock;
-    use std::time::{Duration, Instant};
-
-    /// Cycles this thread has run.
-    pub fn cycles() -> u64 {
-        featherplay_platform::thread::cycles().unwrap_or(0)
-    }
-
-    /// Cycles per millisecond: the most a 100 ms spin got (a preempted spin gets fewer).
-    fn rate() -> f64 {
-        static RATE: OnceLock<f64> = OnceLock::new();
-        *RATE.get_or_init(|| {
-            (0..5)
-                .map(|_| {
-                    let (t, c) = (Instant::now(), cycles());
-                    while t.elapsed() < Duration::from_millis(100) {
-                        std::hint::spin_loop();
-                    }
-                    (cycles() - c) as f64 / (t.elapsed().as_secs_f64() * 1000.0)
-                })
-                .fold(0.0, f64::max)
-        })
-    }
-
-    pub fn ms(cycles: u64) -> f64 {
-        cycles as f64 / rate()
-    }
-
-    /// High priority, and the rate calibrated now.
-    pub fn prepare() -> f64 {
-        featherplay_platform::thread::raise_process_priority();
-        rate()
-    }
-}
 
 #[derive(Default)]
 struct Stats {
@@ -99,15 +57,6 @@ struct Stats {
     /// Physical pixels each frame copied to the window.
     damaged: Vec<u64>,
     window: u64,
-}
-
-fn quantile(v: &[f64], q: f64) -> f64 {
-    if v.is_empty() {
-        return 0.0;
-    }
-    let mut v = v.to_vec();
-    v.sort_by(f64::total_cmp);
-    v[((v.len() - 1) as f64 * q).round() as usize]
 }
 
 impl Stats {
@@ -189,14 +138,6 @@ fn merge(a: Stats, b: Stats) -> Stats {
     }
 }
 
-fn resize(w: &Window, width: u32, height: u32) {
-    w.set_size(PhysicalSize::new(width, height));
-    let scale = w.scale_factor();
-    w.dispatch_event(WindowEvent::Resized {
-        size: LogicalSize::new(width as f32 / scale, height as f32 / scale),
-    });
-}
-
 fn display(scene: &Scene, width: u32, height: u32, scale: f32) {
     let w = scene.ui.window();
     w.dispatch_event(WindowEvent::ScaleFactorChanged {
@@ -211,14 +152,7 @@ fn display(scene: &Scene, width: u32, height: u32, scale: f32) {
 fn long(rows: ModelRc<TrackRow>) -> ModelRc<TrackRow> {
     let loaded: Vec<TrackRow> = rows.iter().collect();
     assert!(!loaded.is_empty(), "no rows loaded");
-    let many: Vec<TrackRow> = (0..LONG)
-        .map(|i| {
-            let mut row = loaded[i % loaded.len()].clone();
-            row.playing &= i < loaded.len();
-            row
-        })
-        .collect();
-    ModelRc::from(Rc::new(VecModel::from(many)))
+    long_rows(&loaded, LONG)
 }
 
 /// Opens `page`, makes its list long, and lets it settle.
@@ -561,7 +495,9 @@ fn transitions(scene: &Scene, label: &str) {
 #[ignore = "a measurement: run it optimised, see the module docs"]
 fn smoothness() {
     let quick = std::env::var("SMOOTHNESS").is_ok_and(|v| v == "quick");
-    println!("thread cycles: {:.0} per ms", cpu::prepare());
+    // High priority, so the measured thread is preempted less, and the rate calibrated now.
+    featherplay_platform::thread::raise_process_priority();
+    println!("thread cycles: {:.0} per ms", cpu::rate());
     support::fixture_covers();
     let scene = Scene::new(1280, 800, false, true).expect("scene");
     scene.ui.global::<Theme>().set_motion(true);

@@ -16,13 +16,11 @@
 
 use std::path::{Path, PathBuf};
 
-use crate::support::{click_tab, fixture_covers, frames, private_mb, sweep};
-use featherplay::offscreen;
+use crate::support::{click_tab, frames, private_mb, scene_at, sweep};
 use featherplay::snapshot::Scene;
-use featherplay::ui::{Frame, HomeData, LyricsData, Theme};
+use featherplay::ui::{HomeData, LyricsData, Theme};
 use serde_json::Value;
-use slint::platform::WindowEvent;
-use slint::{ComponentHandle, LogicalPosition, LogicalSize, Model, PhysicalSize};
+use slint::{ComponentHandle, LogicalPosition, Model};
 
 const W: u32 = 3840;
 const H: u32 = 2160;
@@ -133,31 +131,10 @@ fn copy_of(v: &Value, k: usize) -> Value {
 /// The scene on the big fixtures, playing with sound, Home open, 4K at 150 %, Up next open,
 /// motion on, the clock frozen.
 fn scene() -> Scene {
-    fixture_covers();
     let dir = big_fixtures();
     // SAFETY: set before the scene starts any other thread.
     unsafe { std::env::set_var("FEATHERPLAY_FIXTURES_DIR", dir) };
-    let scene = Scene::new(1280, 800, false, true).expect("scene");
-    scene.ui.global::<Theme>().set_motion(true);
-    let w = scene.ui.window();
-    w.dispatch_event(WindowEvent::ScaleFactorChanged {
-        scale_factor: SCALE,
-    });
-    scene.ctx.covers.set_scale(SCALE);
-    scene.sound(true).expect("player");
-    scene.open("home").expect("home");
-    scene.theme(true);
-    scene.ui.show().expect("show");
-    scene.settle();
-    offscreen::freeze_clock();
-    scene.ui.global::<Frame>().set_queue_open(true);
-    w.set_size(PhysicalSize::new(W, H));
-    w.dispatch_event(WindowEvent::Resized {
-        size: LogicalSize::new(W as f32 / SCALE, H as f32 / SCALE),
-    });
-    scene.settle();
-    frames(w, 60, |_| {});
-    scene
+    scene_at(W, H, SCALE, "home", true)
 }
 
 /// Home's cards: how many there are, how many show their art, and its decoded bytes.

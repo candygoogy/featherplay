@@ -1,6 +1,7 @@
-//! Shared by the tests that drive a long Home at 4K with art on every card (`home_covers`,
-//! `home_shelves_dropped`) and by the smoothness benchmark: generated covers for the fixtures,
-//! the long Home, the scene at 4K, frames timed in this thread's CPU time, and private memory.
+//! Helpers several test modules share: a fresh home for every test, generated covers for the
+//! fixtures and long lyrics, the long Home and long lists, the scene at 4K, frames on the
+//! frozen clock timed in this thread's CPU time, the pointer, the ceilings' three tries, and
+//! private memory.
 
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
@@ -8,7 +9,9 @@ use std::time::Duration;
 
 use featherplay::offscreen;
 use featherplay::snapshot::Scene;
-use featherplay::ui::{AppWindow, CardItem, Frame, HomeData, HomeShelfRow, Theme, TrackRow};
+use featherplay::ui::{
+    AppWindow, CardItem, Frame, HomeData, HomeShelfRow, LyricsData, Theme, TrackRow,
+};
 use slint::platform::{PointerEventButton, WindowEvent};
 use slint::{
     ComponentHandle, LogicalPosition, LogicalSize, Model, ModelRc, PhysicalSize, VecModel,
@@ -16,6 +19,8 @@ use slint::{
 
 /// One frame at 240 Hz (Slint's clock counts whole milliseconds).
 pub const FRAME_240: Duration = Duration::from_millis(4);
+/// One frame at 60 Hz.
+pub const FRAME_60: Duration = Duration::from_millis(16);
 /// The generated covers: how many, and their side in pixels (the CDN's card size).
 const COVERS: usize = 40;
 const COVER_SIDE: u32 = 544;
@@ -131,9 +136,6 @@ pub fn quantile(v: &[f64], q: f64) -> f64 {
     v[((v.len() - 1) as f64 * q).round() as usize]
 }
 
-/// Noisy images (as costly to draw as photos), made once, as `FEATHERPLAY_FIXTURE_COVERS` for
-/// the scene unless it's set: every fixture thumbnail then has art. `SMOOTHNESS_COVERS` names
-/// a folder of real covers instead.
 /// Points `FEATHERPLAY_HOME` at a home of this test's own whose design-covers folder holds
 /// `covers` (a fixture thumbnail URL and its art), as the dev home's downloaded covers would.
 /// For tests that read a cover's colour: they don't depend on what a machine has cached, and
@@ -159,6 +161,9 @@ pub fn home_with_covers(name: &str, covers: &[(&str, image::RgbImage)]) {
     unsafe { std::env::set_var("FEATHERPLAY_HOME", &home) };
 }
 
+/// Noisy images (as costly to draw as photos), made once, as `FEATHERPLAY_FIXTURE_COVERS` for
+/// the scene unless it's set: every fixture thumbnail then has art. `SMOOTHNESS_COVERS` names
+/// a folder of real covers instead.
 pub fn fixture_covers() {
     if std::env::var_os("FEATHERPLAY_FIXTURE_COVERS").is_some() {
         return;
@@ -213,10 +218,73 @@ pub fn long_home(ui: &AppWindow, shelves: usize, items: usize) {
     d.set_shelves(ModelRc::from(Rc::new(VecModel::from(many))));
 }
 
-/// The scene on the fixtures with art on every card, playing, Home open, presenting at
-/// `width`×`height` physical pixels at `scale` with Up next open, motion on, the clock frozen.
-/// Covers are decoded for `scale`, set before Home loads, as the app does.
-pub fn home_at(width: u32, height: u32, scale: f32) -> Scene {
+/// An LRCLIB record as long as a real song's, as `FEATHERPLAY_FIXTURE_LYRICS`: 80 timed lines,
+/// a verse break every eight, about one in four long enough to wrap in the full view. All of
+/// them start before the fixture's position (2:41), so the app arms no line timer: a test
+/// moves `current` itself, as `lyrics::sync` does. Call it before the scene starts.
+pub fn long_lyrics() {
+    const WORDS: [&str; 24] = [
+        "light", "harbour", "morning", "never", "walking", "through", "the", "city", "again",
+        "under", "neon", "rain", "and", "your", "voice", "is", "calling", "me", "back", "home",
+        "tonight", "forever", "slowly", "burning",
+    ];
+    let mut seed: u32 = 0x2545_F491;
+    let mut next = |n: u32| {
+        seed ^= seed << 13;
+        seed ^= seed >> 17;
+        seed ^= seed << 5;
+        seed % n
+    };
+    let mut synced = String::new();
+    let mut plain = String::new();
+    for i in 0..80u32 {
+        let t = 10.0 + f64::from(i) * 1.8;
+        let text = if i % 8 == 7 {
+            String::new()
+        } else {
+            let words = if next(4) == 0 {
+                12 + next(4)
+            } else {
+                4 + next(4)
+            };
+            let line: Vec<&str> = (0..words).map(|_| WORDS[next(24) as usize]).collect();
+            let line = line.join(" ");
+            line[..1].to_uppercase() + &line[1..]
+        };
+        synced.push_str(&format!(
+            "[{:02}:{:05.2}] {text}\n",
+            (t / 60.0) as u32,
+            t % 60.0
+        ));
+        plain.push_str(&text);
+        plain.push('\n');
+    }
+    let record = serde_json::json!({
+        "id": 1, "name": "Long", "trackName": "Long", "artistName": "Fixture",
+        "albumName": "Fixture", "duration": 367.0, "instrumental": false,
+        "plainLyrics": plain, "syncedLyrics": synced,
+    });
+    let file = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("lyrics-long.json");
+    std::fs::write(&file, record.to_string()).expect("lyrics file");
+    // SAFETY: set before the scene starts any other thread.
+    unsafe { std::env::set_var("FEATHERPLAY_FIXTURE_LYRICS", file) };
+}
+
+/// Resizes the window to `width`×`height` physical pixels at its scale, as the system does.
+pub fn resize(w: &slint::Window, width: u32, height: u32) {
+    w.set_size(PhysicalSize::new(width, height));
+    let scale = w.scale_factor();
+    w.dispatch_event(WindowEvent::Resized {
+        size: LogicalSize::new(width as f32 / scale, height as f32 / scale),
+    });
+}
+
+/// The scene on the fixtures with art on every card, `page` open, presenting at
+/// `width`×`height` physical pixels at `scale` with Up next open, motion on, the clock frozen;
+/// the fixture radio's song playing with sound (`sound`: the marks step, the bar ticks) or
+/// playing as the controller reports it, silent. Covers are decoded for `scale`, set before
+/// the page loads, as the app does.
+pub fn scene_at(width: u32, height: u32, scale: f32, page: &str, sound: bool) -> Scene {
     fixture_covers();
     let scene = Scene::new(1280, 800, false, true).expect("scene");
     scene.ui.global::<Theme>().set_motion(true);
@@ -225,26 +293,164 @@ pub fn home_at(width: u32, height: u32, scale: f32) -> Scene {
         scale_factor: scale,
     });
     scene.ctx.covers.set_scale(scale);
-    scene.play(false).expect("player");
-    scene.open("home").expect("home");
+    if sound {
+        scene.sound(true)
+    } else {
+        scene.play(false)
+    }
+    .expect("player");
+    scene.open(page).expect("page");
     scene.theme(true);
     scene.ui.show().expect("show");
     scene.settle();
     offscreen::freeze_clock();
     scene.ui.global::<Frame>().set_queue_open(true);
-    w.set_size(PhysicalSize::new(width, height));
-    w.dispatch_event(WindowEvent::Resized {
-        size: LogicalSize::new(width as f32 / scale, height as f32 / scale),
-    });
+    resize(w, width, height);
     scene.settle();
     frames(w, 60, |_| {});
     scene
 }
 
+/// `scene_at` on Home, silent.
+pub fn home_at(width: u32, height: u32, scale: f32) -> Scene {
+    scene_at(width, height, scale, "home", false)
+}
+
+/// The user's conditions at 4K 150 %: Home, playing with sound, art on every cover, the long
+/// lyrics, Up next open; the frames after it settled run.
+pub fn playing_4k() -> Scene {
+    long_lyrics();
+    let scene = scene_at(3840, 2160, 1.5, "home", true);
+    idle(&scene, 100);
+    scene
+}
+
+/// Opens `page` and lets it settle and its entry run.
+pub fn show(scene: &Scene, page: &str) {
+    scene.open(page).expect("page");
+    scene.settle();
+    idle(scene, 120);
+}
+
 /// One frame's CPU time (ms) and the physical pixels it copied to the window.
+#[derive(Clone, Copy)]
 pub struct Frame1 {
     pub cpu: f64,
     pub damaged: u64,
+}
+
+/// One turn of the event loop on the frozen clock at 240 Hz: the clock moves on (timers and
+/// animations), the answers that have arrived run, then the render and the copy, in this
+/// thread's CPU time.
+pub fn step(scene: &Scene) -> Frame1 {
+    let c = cpu::cycles();
+    offscreen::advance(FRAME_240);
+    scene.run_queued();
+    let p = offscreen::present(scene.ui.window()).expect("present");
+    Frame1 {
+        cpu: cpu::ms(cpu::cycles() - c),
+        damaged: p.damaged,
+    }
+}
+
+/// `n` frames of `step`.
+pub fn idle(scene: &Scene, n: usize) {
+    for _ in 0..n {
+        step(scene);
+    }
+}
+
+/// Moves the frozen clock on by `ms`, a frame every 16 ms rendered as the window would: for
+/// the tests that take snapshots rather than present.
+pub fn run_for(w: &slint::Window, ms: u64) {
+    for _ in 0..ms.div_ceil(16) {
+        offscreen::advance(FRAME_60);
+        w.take_snapshot().expect("snapshot");
+    }
+}
+
+/// Runs `check` until a run's ceilings hold, three runs at most, and fails with the last
+/// run's excess: CPU time per frame is noisy while other work loads the machine. `check` gets
+/// the run's number, asserts what holds in any build itself and returns the ceilings' excess,
+/// which only an optimised build is held to, so a debug build makes one run.
+pub fn three_tries(mut check: impl FnMut(u32) -> Result<(), String>) {
+    let mut last = String::new();
+    for attempt in 0..3 {
+        match check(attempt) {
+            Err(over) if !cfg!(debug_assertions) => last = over,
+            _ => return,
+        }
+    }
+    panic!("{last}");
+}
+
+/// The window's size in logical pixels.
+fn logical(scene: &Scene) -> LogicalSize {
+    let w = scene.ui.window();
+    w.size().to_logical(w.scale_factor())
+}
+
+pub fn point(scene: &Scene, at: LogicalPosition) {
+    scene
+        .ui
+        .window()
+        .dispatch_event(WindowEvent::PointerMoved { position: at });
+}
+
+pub fn press(scene: &Scene, at: LogicalPosition) {
+    let w = scene.ui.window();
+    w.dispatch_event(WindowEvent::PointerMoved { position: at });
+    w.dispatch_event(WindowEvent::PointerPressed {
+        position: at,
+        button: PointerEventButton::Left,
+    });
+}
+
+pub fn release(scene: &Scene, at: LogicalPosition) {
+    scene
+        .ui
+        .window()
+        .dispatch_event(WindowEvent::PointerReleased {
+            position: at,
+            button: PointerEventButton::Left,
+        });
+}
+
+pub fn click(scene: &Scene, at: LogicalPosition) {
+    press(scene, at);
+    release(scene, at);
+}
+
+/// Somewhere with nothing under it that reacts: the top bar's empty middle.
+pub fn away(scene: &Scene) -> LogicalPosition {
+    LogicalPosition::new(logical(scene).width * 0.45, 30.0)
+}
+
+/// The bar's vertical middle.
+pub fn bar_y(scene: &Scene) -> f32 {
+    let t = scene.ui.global::<Theme>();
+    logical(scene).height - t.get_bar_inset() - t.get_bar_h() / 2.0
+}
+
+/// The bar's microphone, found by clicking along the bar on Now playing: where a click
+/// turns the lyrics on (each hit turned off again).
+pub fn lyrics_button(scene: &Scene) -> LogicalPosition {
+    let data = scene.ui.global::<LyricsData>();
+    let (width, y) = (logical(scene).width, bar_y(scene));
+    let mut hits = Vec::new();
+    for x in (0..400).step_by(3) {
+        let at = LogicalPosition::new(width - 400.0 + x as f32, y);
+        click(scene, at);
+        if data.get_full() {
+            hits.push(at.x);
+            data.set_full(false);
+        }
+        point(scene, away(scene));
+        idle(scene, 2);
+    }
+    assert!(!hits.is_empty(), "the bar's lyrics button not found");
+    idle(scene, 200);
+    LogicalPosition::new((hits[0] + hits[hits.len() - 1]) / 2.0, y)
 }
 
 /// `n` frames of 4 ms; `each` runs first in each one (input).

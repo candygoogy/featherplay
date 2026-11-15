@@ -1,6 +1,6 @@
 //! The smoothness run's inventory (2026-11-01): every kind of motion in the app, timed frame by
 //! frame at 4K 150 % under the user's conditions: art on every cover
-//! (`support::fixture_covers`), real-length lyrics (`lyrics_frames::long_lyrics`), the song
+//! (`support::fixture_covers`), real-length lyrics (`support::long_lyrics`), the song
 //! playing with sound (the playing marks step, the bar ticks), Up next open on the pages that
 //! have it. Each frame is one turn of the event loop on a frozen clock stepped 4 ms (240 Hz):
 //! the input, the queued answers, the timers and animations, then the render and the copy
@@ -24,14 +24,15 @@
 
 use std::rc::Rc;
 
-use crate::support::{FRAME_240, cpu, fixture_covers, quantile};
-use featherplay::offscreen;
+use crate::support::{
+    Frame1, away, bar_y, click, cpu, idle, lyrics_button, playing_4k, point, press, quantile,
+    release, show, step,
+};
 use featherplay::snapshot::Scene;
 use featherplay::ui::{
     AccountMenu, Frame, LyricsData, NowPlayingData, SongMenu, Theme, Toast, TrackRow,
 };
-use slint::platform::{PointerEventButton, WindowEvent};
-use slint::{ComponentHandle, LogicalPosition, LogicalSize, Model, PhysicalSize, VecModel};
+use slint::{ComponentHandle, LogicalPosition, Model, VecModel};
 
 const W: u32 = 3840;
 const H: u32 = 2160;
@@ -40,101 +41,14 @@ const SCALE: f32 = 1.5;
 const LW: f32 = W as f32 / SCALE;
 const LH: f32 = H as f32 / SCALE;
 
-/// One frame: its CPU time (ms) and the physical pixels it copied.
-#[derive(Clone, Copy)]
-pub(crate) struct F {
-    pub(crate) cpu: f64,
-    pub(crate) damaged: u64,
-}
-
-pub(crate) fn step(scene: &Scene) -> F {
-    let c = cpu::cycles();
-    offscreen::advance(FRAME_240);
-    scene.run_queued();
-    let p = offscreen::present(scene.ui.window()).expect("present");
-    F {
-        cpu: cpu::ms(cpu::cycles() - c),
-        damaged: p.damaged,
-    }
-}
-
 /// `n` frames; `first` runs at the start of the first one, before the clock moves (the
 /// input), and its own CPU time comes back apart: a page's `Scene::open` parses its fixtures
 /// there, which the app does on a worker thread.
-fn frames(scene: &Scene, n: usize, first: &dyn Fn()) -> (Vec<F>, f64) {
+fn frames(scene: &Scene, n: usize, first: &dyn Fn()) -> (Vec<Frame1>, f64) {
     let c = cpu::cycles();
     first();
     let input = cpu::ms(cpu::cycles() - c);
     ((0..n).map(|_| step(scene)).collect(), input)
-}
-
-pub(crate) fn idle(scene: &Scene, n: usize) {
-    for _ in 0..n {
-        step(scene);
-    }
-}
-
-pub(crate) fn point(scene: &Scene, at: LogicalPosition) {
-    scene
-        .ui
-        .window()
-        .dispatch_event(WindowEvent::PointerMoved { position: at });
-}
-
-pub(crate) fn press(scene: &Scene, at: LogicalPosition) {
-    let w = scene.ui.window();
-    w.dispatch_event(WindowEvent::PointerMoved { position: at });
-    w.dispatch_event(WindowEvent::PointerPressed {
-        position: at,
-        button: PointerEventButton::Left,
-    });
-}
-
-pub(crate) fn release(scene: &Scene, at: LogicalPosition) {
-    scene
-        .ui
-        .window()
-        .dispatch_event(WindowEvent::PointerReleased {
-            position: at,
-            button: PointerEventButton::Left,
-        });
-}
-
-pub(crate) fn click(scene: &Scene, at: LogicalPosition) {
-    press(scene, at);
-    release(scene, at);
-}
-
-/// Somewhere with nothing under it that reacts: the top bar's empty middle.
-pub(crate) fn away() -> LogicalPosition {
-    LogicalPosition::new(LW * 0.45, 30.0)
-}
-
-/// The bar's vertical middle.
-pub(crate) fn bar_y(scene: &Scene) -> f32 {
-    let t = scene.ui.global::<Theme>();
-    LH - t.get_bar_inset() - t.get_bar_h() / 2.0
-}
-
-/// The bar's microphone, found by clicking along the bar on Now playing: where a click
-/// turns the lyrics on (each hit turned off again).
-pub(crate) fn lyrics_button(scene: &Scene) -> LogicalPosition {
-    let data = scene.ui.global::<LyricsData>();
-    let y = bar_y(scene);
-    let mut hits = Vec::new();
-    for x in (0..400).step_by(3) {
-        let at = LogicalPosition::new(LW - 400.0 + x as f32, y);
-        click(scene, at);
-        if data.get_full() {
-            hits.push(at.x);
-            data.set_full(false);
-        }
-        point(scene, away());
-        idle(scene, 2);
-    }
-    assert!(!hits.is_empty(), "the bar's lyrics button not found");
-    idle(scene, 200);
-    LogicalPosition::new((hits[0] + hits[hits.len() - 1]) / 2.0, y)
 }
 
 struct Stats {
@@ -147,9 +61,9 @@ struct Stats {
     dmg_max: f64,
 }
 
-fn stats(run: &[F]) -> Stats {
+fn stats(run: &[Frame1]) -> Stats {
     let px = f64::from(W) * f64::from(H);
-    let rep: Vec<&F> = run.iter().filter(|f| f.damaged > 0).collect();
+    let rep: Vec<&Frame1> = run.iter().filter(|f| f.damaged > 0).collect();
     let cpu: Vec<f64> = rep.iter().map(|f| f.cpu).collect();
     let dmg: Vec<f64> = rep.iter().map(|f| f.damaged as f64 / px * 100.0).collect();
     Stats {
@@ -171,7 +85,7 @@ fn line(name: &str, which: &str, s: &Stats) {
 }
 
 /// Frame by frame, the cheapest of the runs (they're the same frames).
-fn cheapest(runs: &[Vec<F>]) -> Vec<F> {
+fn cheapest(runs: &[Vec<Frame1>]) -> Vec<Frame1> {
     let mut out = runs[0].clone();
     for r in &runs[1..] {
         for (o, f) in out.iter_mut().zip(r) {
@@ -189,7 +103,7 @@ fn measure(scene: &Scene, name: &str, n: usize, start: &dyn Fn(), undo: &dyn Fn(
         return;
     }
     let mut input = 0.0;
-    let runs: Vec<Vec<F>> = (0..3)
+    let runs: Vec<Vec<Frame1>> = (0..3)
         .map(|i| {
             let (r, ms) = frames(scene, n, start);
             if i == 0 {
@@ -225,52 +139,15 @@ fn track() -> TrackRow {
     }
 }
 
-pub(crate) fn scene() -> Scene {
-    fixture_covers();
-    // SAFETY: set before the scene starts any other thread.
-    unsafe {
-        std::env::set_var(
-            "FEATHERPLAY_FIXTURE_LYRICS",
-            crate::lyrics_frames::long_lyrics(),
-        );
-    }
-    let scene = Scene::new(1280, 800, false, true).expect("scene");
-    scene.ui.global::<Theme>().set_motion(true);
-    let w = scene.ui.window();
-    w.dispatch_event(WindowEvent::ScaleFactorChanged {
-        scale_factor: SCALE,
-    });
-    scene.ctx.covers.set_scale(SCALE);
-    w.set_size(PhysicalSize::new(W, H));
-    w.dispatch_event(WindowEvent::Resized {
-        size: LogicalSize::new(LW, LH),
-    });
-    scene.sound(true).expect("player");
-    scene.open("home").expect("home");
-    scene.theme(true);
-    scene.ui.show().expect("show");
-    scene.settle();
-    offscreen::freeze_clock();
-    scene.ui.global::<Frame>().set_queue_open(true);
-    idle(&scene, 100);
-    scene
-}
-
-pub(crate) fn show(scene: &Scene, page: &str) {
-    scene.open(page).expect("page");
-    scene.settle();
-    idle(scene, 120);
-}
-
 #[test]
 #[ignore = "a measurement: run it optimised, see the module docs"]
 fn inventory() {
-    let scene = scene();
+    let scene = playing_4k();
     let ui = &scene.ui;
     let data = ui.global::<LyricsData>();
     let rest = |n| idle(&scene, n);
     let off = || {
-        point(&scene, away());
+        point(&scene, away(&scene));
     };
     println!("4K 150 %, playing, art on every cover, ms of CPU a repainted frame");
 
@@ -418,8 +295,8 @@ fn inventory() {
         60,
         &|| press(&scene, mic),
         &|| {
-            point(&scene, away());
-            release(&scene, away());
+            point(&scene, away(&scene));
+            release(&scene, away(&scene));
         },
     );
     point(&scene, mic);

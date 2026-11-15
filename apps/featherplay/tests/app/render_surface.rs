@@ -8,12 +8,13 @@
 
 use std::time::Duration;
 
+use crate::support::resize;
 use featherplay::offscreen;
 use featherplay::repaint;
 use featherplay::snapshot::Scene;
 use featherplay::ui::{Frame, Theme};
 use slint::platform::WindowEvent;
-use slint::{ComponentHandle, LogicalPosition, LogicalSize, PhysicalSize, Rgba8Pixel};
+use slint::{ComponentHandle, LogicalPosition, Rgba8Pixel};
 use slint::{SharedPixelBuffer, Window};
 
 /// One frame at 60 Hz.
@@ -58,14 +59,6 @@ fn matches_full_render(w: &Window, what: &str) {
         differ, 0,
         "{what}: {differ} pixels differ from a full render"
     );
-}
-
-fn resize(w: &Window, width: u32, height: u32) {
-    w.set_size(PhysicalSize::new(width, height));
-    let scale = w.scale_factor();
-    w.dispatch_event(WindowEvent::Resized {
-        size: LogicalSize::new(width as f32 / scale, height as f32 / scale),
-    });
 }
 
 fn scroll(w: &Window, at: LogicalPosition) {

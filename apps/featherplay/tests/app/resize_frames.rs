@@ -14,12 +14,11 @@
 //!   cargo test --release -p featherplay --test app -- resize_frames:: --ignored --nocapture
 //! ```
 
-use crate::support::{cpu, home_at, quantile};
+use crate::support::{cpu, home_at, quantile, resize};
 use featherplay::offscreen;
 use featherplay::snapshot::Scene;
 use featherplay::ui::Frame;
-use slint::platform::WindowEvent;
-use slint::{ComponentHandle, LogicalSize, PhysicalSize};
+use slint::ComponentHandle;
 
 const W: u32 = 3840;
 const H: u32 = 2160;
@@ -27,13 +26,6 @@ const SCALE: f32 = 1.5;
 /// Physical pixels per step: a quick drag at 60 Hz.
 const STEP: u32 = 12;
 const STEPS: u32 = 80;
-
-fn resize(w: &slint::Window, width: u32, height: u32) {
-    w.set_size(PhysicalSize::new(width, height));
-    w.dispatch_event(WindowEvent::Resized {
-        size: LogicalSize::new(width as f32 / SCALE, height as f32 / SCALE),
-    });
-}
 
 /// Drags the right edge from `W - STEPS * STEP` to `W`, one frame per step, then reports.
 fn drag(scene: &Scene, label: &str) {
