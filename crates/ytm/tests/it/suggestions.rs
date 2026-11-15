@@ -41,9 +41,13 @@ fn thumbnail() -> Value {
     ] } } })
 }
 
+/// The recorded reply reads whole: the completions in order with their full query, the
+/// first marking the typed part; the direct results in the reply's order, an artist with
+/// its channel photo and audience, a song with its artist and album.
 #[test]
-fn the_completions_come_in_order_with_their_full_query() {
-    let texts: Vec<String> = recorded().queries.into_iter().map(|q| q.text).collect();
+fn the_recorded_reply_reads_whole() {
+    let recorded = recorded();
+    let texts: Vec<&str> = recorded.queries.iter().map(|q| q.text.as_str()).collect();
     assert_eq!(
         texts,
         [
@@ -55,23 +59,17 @@ fn the_completions_come_in_order_with_their_full_query() {
             "daft punk one more time"
         ]
     );
-}
-
-#[test]
-fn a_completion_marks_the_typed_part() {
     assert_eq!(
-        recorded().queries[0],
+        recorded.queries[0],
         QuerySuggestion {
             text: "daft punk".into(),
             typed: "daft pu".len(),
             history: false,
-        }
+        },
+        "the typed part"
     );
-}
 
-#[test]
-fn the_direct_results_follow_the_reply() {
-    let kinds: Vec<&str> = recorded()
+    let kinds: Vec<&str> = recorded
         .results
         .iter()
         .map(|r| match r.item {
@@ -82,11 +80,8 @@ fn the_direct_results_follow_the_reply() {
         })
         .collect();
     assert_eq!(kinds, ["artist", "track", "track", "track", "track"]);
-}
 
-#[test]
-fn an_artist_result_has_its_channel_photo_and_audience() {
-    let first = &recorded().results[0];
+    let first = &recorded.results[0];
     let HomeItem::Artist(artist) = &first.item else {
         panic!("not an artist: {first:?}");
     };
@@ -99,11 +94,8 @@ fn an_artist_result_has_its_channel_photo_and_audience() {
             .is_some_and(|u| u.contains("w120-h120"))
     );
     assert_eq!(first.subtitle, "68.2M monthly audience");
-}
 
-#[test]
-fn a_song_result_plays_with_its_artist_and_album() {
-    let second = &recorded().results[1];
+    let second = &recorded.results[1];
     let HomeItem::Track(track) = &second.item else {
         panic!("not a track: {second:?}");
     };

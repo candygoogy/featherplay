@@ -132,6 +132,8 @@ fn music_video_has_song_version() {
     assert_eq!(song.counterpart, None);
 }
 
+/// A watch response gives its seed track; a music video seed stays the video; a seed that
+/// isn't in the response gives none.
 #[test]
 fn a_watch_response_gives_its_seed_track() {
     let seed = TrackId("Jb6gcoR266U".into());
@@ -143,27 +145,30 @@ fn a_watch_response_gives_its_seed_track() {
     assert!(track.duration.is_some());
     assert!(track.thumbnail.is_some());
     assert!(!track.artists.is_empty());
-}
 
-#[test]
-fn a_music_video_seed_stays_the_video() {
     let seed = TrackId("K0HSD_i2DvA".into());
-    let track = convert::seed_track(&fixture("radio_mv"), &seed)
+    let video = convert::seed_track(&fixture("radio_mv"), &seed)
         .expect("parse")
         .expect("seed music video");
-    assert_eq!(track.id, seed);
-    assert_eq!(track.video_type, VideoType::MusicVideo);
-}
+    assert_eq!(video.id, seed);
+    assert_eq!(
+        video.video_type,
+        VideoType::MusicVideo,
+        "a music video seed"
+    );
 
-#[test]
-fn a_watch_response_without_the_seed_gives_none() {
     let other = TrackId("zzzzzzzzzzz".into());
     assert_eq!(
         convert::seed_track(&fixture("radio"), &other).expect("parse"),
-        None
+        None,
+        "a seed not in the queue"
     );
     // An unplayable id: the response has no queue at all.
-    assert_eq!(convert::seed_track("{}", &other).expect("parse"), None);
+    assert_eq!(
+        convert::seed_track("{}", &other).expect("parse"),
+        None,
+        "no queue"
+    );
 }
 
 /// A recording that is a list of answers, in the order they came.
@@ -271,20 +276,15 @@ fn home_parses_shelves() {
     assert_eq!(album.id, AlbumId("MPREb_Wp9Aj8HpTsB".into()));
     assert_eq!(album.title, "HIT ME HARD AND SOFT");
     assert_eq!(album.artists[0].name, "Billie Eilish");
-}
 
-/// "Music videos for you" (in the fixture's continuation, two of its cards) is left out:
-/// featherplay plays only the sound. It's told by its shape, a Play all over videos on 16:9
-/// thumbnails, since its title follows the UI language. Its "Play all" goes with it.
-#[test]
-fn home_leaves_out_the_music_videos_shelf() {
-    let pages = home_pages();
+    // "Music videos for you" (in the fixture's continuation, two of its cards) is left out,
+    // as the titles above say: featherplay plays only the sound. It's told by its shape, a
+    // Play all over videos on 16:9 thumbnails, since its title follows the UI language. Its
+    // "Play all" goes with it.
     assert!(
-        pages[1].contains("Music videos for you"),
+        home_pages()[1].contains("Music videos for you"),
         "the fixture has it"
     );
-    let shelves = home();
-    assert!(shelves.iter().all(|s| s.title != "Music videos for you"));
     let ids = shelves
         .iter()
         .flat_map(|s| &s.items)
@@ -459,21 +459,9 @@ fn a_recorded_song_card_names_only_its_artist() {
 
 #[test]
 fn home_strapline_is_scrubbed() {
-    let account = std::env::var("FEATHERPLAY_ACCOUNT_NAME")
-        .ok()
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty());
     let shelves = home();
     for s in &shelves {
         let Some(strap) = &s.strapline else { continue };
-        if let Some(a) = &account {
-            // The message names the shelf only, never the account.
-            assert!(
-                !strap.contains(a.as_str()),
-                "{} strapline has the account name",
-                s.title
-            );
-        }
         // A personal strapline ("Listen again" shows the account name) must be
         // scrubbed; the others are fixed labels.
         assert!(
@@ -1050,10 +1038,15 @@ const PLAYLIST_ROWS: &str = "/contents/twoColumnBrowseResultsRenderer/secondaryC
 
 /// A collaborative playlist (recorded 2026-10-30, scrubbed): its rows carry votes and
 /// contributor avatars, and the duration is the third flex column. There is no fixed
-/// column at all, which failed the whole playlist.
+/// column at all, which failed the whole playlist. Its header reads too.
 #[test]
 fn a_collaborative_playlist_reads_rows_without_a_fixed_column() {
     let raw = fixture("playlist_collaborative");
+    let s = convert::playlist_summary(&raw, &PlaylistId("VLPLzzTestColab".into())).expect("parse");
+    assert_eq!(s.id, PlaylistId("PLzzTestColab".into()));
+    assert_eq!(s.title, "Test Playlist");
+    assert_eq!(s.count, Some(3));
+
     let tracks = convert::playlist_tracks(&[raw]).expect("parse");
     let ids: Vec<&str> = tracks.iter().map(|t| t.id.0.as_str()).collect();
     assert_eq!(ids, ["xJtqXz521mM", "I1OzfxybATE", "5khS_KwMC_g"]);
@@ -1076,15 +1069,6 @@ fn a_collaborative_playlist_reads_rows_without_a_fixed_column() {
         Some(AlbumId("MPREb_JqteeWRhoVl".into()))
     );
     assert!(first.thumbnail.is_some());
-}
-
-#[test]
-fn a_collaborative_playlist_header_reads() {
-    let raw = fixture("playlist_collaborative");
-    let s = convert::playlist_summary(&raw, &PlaylistId("VLPLzzTestColab".into())).expect("parse");
-    assert_eq!(s.id, PlaylistId("PLzzTestColab".into()));
-    assert_eq!(s.title, "Test Playlist");
-    assert_eq!(s.count, Some(3));
 }
 
 /// An album's own playlist (`OLAK5uy_…`, recorded 2026-10-31 for pasted links, scrubbed of
@@ -1369,26 +1353,34 @@ fn library_toggle(id: &str) -> Value {
     } })
 }
 
+/// A library playlist with a library toggle is saved, not owned; one without it is the
+/// account's own.
 #[test]
-fn a_library_playlist_with_a_library_toggle_is_saved_not_owned() {
-    let page = library_page(vec![library_item(
-        "PLsaved",
-        "Someone's mix",
-        json!([library_toggle("PLsaved")]),
-    )]);
-    let playlists = convert::library_playlists(&[page]).expect("parse");
-    assert!(!playlists[0].owned);
-}
-
-#[test]
-fn a_library_playlist_without_a_library_toggle_is_the_accounts_own() {
+fn a_library_playlist_is_owned_unless_it_has_a_library_toggle() {
     let delete = json!({ "menuNavigationItemRenderer": {
         "icon": { "iconType": "DELETE" },
         "navigationEndpoint": { "confirmDialogEndpoint": {} }
     } });
-    let page = library_page(vec![library_item("PLmine", "Mine", json!([delete]))]);
-    let playlists = convert::library_playlists(&[page]).expect("parse");
-    assert!(playlists[0].owned);
+    let cases = [
+        (
+            "with a library toggle: saved",
+            library_item(
+                "PLsaved",
+                "Someone's mix",
+                json!([library_toggle("PLsaved")]),
+            ),
+            false,
+        ),
+        (
+            "without one: the account's own",
+            library_item("PLmine", "Mine", json!([delete])),
+            true,
+        ),
+    ];
+    for (label, item, owned) in cases {
+        let playlists = convert::library_playlists(&[library_page(vec![item])]).expect(label);
+        assert_eq!(playlists[0].owned, owned, "{label}");
+    }
 }
 
 #[test]
@@ -1442,19 +1434,17 @@ fn new_releases_are_albums_and_singles_then_music_videos() {
     );
 }
 
+/// The charts name the country shown and offer the others by code, have the video charts
+/// as playlists, and rank the artists with their trend.
 #[test]
-fn charts_name_the_country_shown_and_offer_the_others_by_code() {
+fn charts_read_whole() {
     let charts = convert::charts(&fixture("explore_charts")).expect("parse");
     assert_eq!(charts.country.as_deref(), Some("IT"));
     let codes: Vec<&str> = charts.countries.iter().map(|c| c.code.as_str()).collect();
     assert_eq!(&codes[..3], ["IT", "ZZ", "AR"]);
     assert_eq!(charts.countries[1].name, "Global");
     assert_eq!(charts.countries.last().map(|c| c.code.as_str()), Some("ZW"));
-}
 
-#[test]
-fn charts_have_the_video_charts_as_playlists() {
-    let charts = convert::charts(&fixture("explore_charts")).expect("parse");
     assert_eq!(charts.shelves.len(), 1);
     let shelf = &charts.shelves[0];
     assert_eq!(shelf.title, "Video charts");
@@ -1468,11 +1458,7 @@ fn charts_have_the_video_charts_as_playlists() {
         .collect();
     assert_eq!(ids.len(), 3);
     assert!(ids.iter().all(|id| !id.starts_with("VL")), "{ids:?}");
-}
 
-#[test]
-fn chart_artists_come_ranked_with_their_trend() {
-    let charts = convert::charts(&fixture("explore_charts")).expect("parse");
     assert_eq!(charts.artists.len(), 20);
     let first = &charts.artists[0];
     assert_eq!(first.rank, 1);

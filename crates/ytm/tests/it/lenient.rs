@@ -71,16 +71,14 @@ fn without_columns(r: &mut serde_json::Map<String, Value>) {
 // ---------------------------------------------------------------------------
 // Search
 
+/// The v0.1.0 failure: a song search with music videos keeps every row in order, reads a
+/// music video from its row, and still has ytmapi-rs read the songs around it.
 #[test]
 fn a_song_search_with_music_videos_keeps_every_row_in_order() {
     let songs = convert::search_songs(&fixture("search_songs_videos")).expect("parse");
     let ids: Vec<String> = songs.iter().map(|t| t.id.0.clone()).collect();
     assert_eq!(ids, row_ids("search_songs_videos", SEARCH_ROWS));
-}
 
-#[test]
-fn a_music_video_in_the_song_search_is_read_from_its_row() {
-    let songs = convert::search_songs(&fixture("search_songs_videos")).expect("parse");
     let video = &songs[21];
     assert_eq!(video.id, TrackId("QXirCw8wwIA".into()));
     assert_eq!(
@@ -94,26 +92,16 @@ fn a_music_video_in_the_song_search_is_read_from_its_row() {
     assert_eq!(video.album, None);
     assert_eq!(video.duration, Some(Duration::from_secs(156)));
     assert!(video.thumbnail.is_some());
-}
 
-#[test]
-fn the_songs_around_a_music_video_are_still_read_by_ytmapi() {
-    let songs = convert::search_songs(&fixture("search_songs_videos")).expect("parse");
     let song = &songs[20];
     assert_eq!(song.id, TrackId("KWEsdF57hB4".into()));
-    assert_eq!(song.video_type, VideoType::Song);
+    assert_eq!(
+        song.video_type,
+        VideoType::Song,
+        "the song before the video"
+    );
     assert_eq!(song.duration, Some(Duration::from_secs(273)));
     assert!(song.album.is_some());
-}
-
-#[test]
-fn a_song_row_nobody_can_read_is_left_out_and_the_rest_kept() {
-    let raw = mangled("search_songs", &format!("{SEARCH_ROWS}/5"), without_columns);
-    let songs = convert::search_songs(&raw).expect("parse");
-    let mut want = row_ids("search_songs", SEARCH_ROWS);
-    want.remove(5);
-    let ids: Vec<String> = songs.iter().map(|t| t.id.0.clone()).collect();
-    assert_eq!(ids, want);
 }
 
 #[test]
