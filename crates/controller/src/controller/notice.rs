@@ -127,12 +127,6 @@ impl Controller {
 mod tests {
     use super::*;
 
-    #[test]
-    fn a_song_that_is_gone_is_unavailable() {
-        let f = failure(&ResolveError::Unavailable("Video unavailable".into()));
-        assert_eq!(f.kind, FailKind::Unavailable);
-    }
-
     /// YouTube's "This video is not available" (since 2026-11-11, for some songs on every
     /// route but its music web player): the player passes over the song and plays on.
     #[test]
@@ -172,15 +166,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn a_failed_yt_dlp_is_a_broken_resolver() {
-        let failed = ResolveError::ToolFailed {
-            code: 1,
-            stderr_tail: "ERROR: [youtube] abc: Signature extraction failed".into(),
-        };
-        assert_eq!(failure(&failed).kind, FailKind::Broken);
-    }
-
     /// Offline on a first run, or a download that didn't match its pin: not something a
     /// `yt-dlp -U` could fix, and every song would fail the same way.
     fn sidecar(fault: HelperFault, message: &str) -> ResolveError {
@@ -193,43 +178,66 @@ mod tests {
         })
     }
 
+    /// How the player counts each error, and the raw text the log keeps (where a row has it).
     #[test]
-    fn a_failed_helpers_download_is_setup_with_its_fault() {
-        let offline = sidecar(
-            HelperFault::Unreachable,
-            "https://github.com/…: connection refused",
-        );
-        assert_eq!(
-            failure(&offline).kind,
-            FailKind::Setup(HelperFault::Unreachable)
-        );
-        let damaged = sidecar(HelperFault::Damaged, "sha256 mismatch");
-        assert_eq!(
-            failure(&damaged).kind,
-            FailKind::Setup(HelperFault::Damaged)
-        );
-    }
-
-    #[test]
-    fn a_failed_helpers_download_logs_its_fault() {
-        let held = sidecar(HelperFault::Blocked, "installing deno.exe: in use");
-        assert_eq!(
-            failure(&held).detail,
-            "sidecar (blocked): installing deno.exe: in use"
-        );
-    }
-
-    #[test]
-    fn missing_helpers_are_other() {
-        assert_eq!(failure(&ResolveError::ToolMissing).kind, FailKind::Other);
-    }
-
-    #[test]
-    fn the_raw_text_is_kept_for_the_log() {
-        let failed = ResolveError::ToolFailed {
+    fn each_error_has_its_kind_and_its_text_for_the_log() {
+        let tool_failed = |stderr_tail: &str| ResolveError::ToolFailed {
             code: 1,
-            stderr_tail: "ERROR: boom".into(),
+            stderr_tail: stderr_tail.into(),
         };
-        assert_eq!(failure(&failed).detail, "yt-dlp failed (1): ERROR: boom");
+        let cases = [
+            (
+                "a song that is gone",
+                ResolveError::Unavailable("Video unavailable".into()),
+                FailKind::Unavailable,
+                None,
+            ),
+            (
+                "a failed yt-dlp",
+                tool_failed("ERROR: [youtube] abc: Signature extraction failed"),
+                FailKind::Broken,
+                None,
+            ),
+            (
+                "a helpers download offline",
+                sidecar(
+                    HelperFault::Unreachable,
+                    "https://github.com/…: connection refused",
+                ),
+                FailKind::Setup(HelperFault::Unreachable),
+                None,
+            ),
+            (
+                "a damaged helpers download",
+                sidecar(HelperFault::Damaged, "sha256 mismatch"),
+                FailKind::Setup(HelperFault::Damaged),
+                None,
+            ),
+            (
+                "a blocked helpers download logs its fault",
+                sidecar(HelperFault::Blocked, "installing deno.exe: in use"),
+                FailKind::Setup(HelperFault::Blocked),
+                Some("sidecar (blocked): installing deno.exe: in use"),
+            ),
+            (
+                "missing helpers",
+                ResolveError::ToolMissing,
+                FailKind::Other,
+                None,
+            ),
+            (
+                "the raw text is kept for the log",
+                tool_failed("ERROR: boom"),
+                FailKind::Broken,
+                Some("yt-dlp failed (1): ERROR: boom"),
+            ),
+        ];
+        for (label, error, kind, detail) in cases {
+            let f = failure(&error);
+            assert_eq!(f.kind, kind, "{label}");
+            if let Some(detail) = detail {
+                assert_eq!(f.detail, detail, "{label}");
+            }
+        }
     }
 }
