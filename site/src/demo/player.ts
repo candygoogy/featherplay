@@ -58,6 +58,9 @@ export type PlayerState = {
    * ticks: the sound follows the clock and re-syncs only when this changes.
    */
   jumps: number;
+  /** Counts the times the clock was set back to the sound (a clip that started late or
+   *  stalled): what draws progress from the clock starts again from the new place. */
+  retimes: number;
 };
 
 export type Player = {
@@ -172,6 +175,7 @@ export function createPlayer(songs: Song[], options: PlayerOptions = {}): Player
     history: first ? [first.id] : [],
     toast: null,
     jumps: 0,
+    retimes: 0,
   };
 
   const listeners = new Set<(s: PlayerState) => void>();
@@ -206,6 +210,9 @@ export function createPlayer(songs: Song[], options: PlayerOptions = {}): Player
       base = heard;
       since = now();
       state.positionMs = heard;
+      // Not a jump (the sound isn't sent back to itself), but the progress lines run on from
+      // here, not from where the clock had them.
+      state.retimes++;
     }
     if (state.positionMs >= state.song.durationMs) {
       // The song ended: again (repeat one), or on to the next, as the app's queue would.

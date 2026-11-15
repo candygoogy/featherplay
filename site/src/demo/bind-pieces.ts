@@ -175,7 +175,7 @@ export function bindPieces(player: Player): void {
     set("seekto", (d) => d.seekTime != null && player.seek(d.seekTime * 1000));
   }
 
-  let last: { song?: string; playing?: boolean; jumps?: number; second?: number } = {};
+  let last: { song?: string; playing?: boolean; jumps?: number; retimes?: number; second?: number } = {};
   // A part showing (a flyout opening, a section rendering): its lines start from where the
   // song is.
   let resync = false;
@@ -206,7 +206,8 @@ export function bindPieces(player: Player): void {
     if (!song) return;
     const songChanged = song.id !== last.song;
     const playChanged = s.playing !== last.playing;
-    const jumped = s.jumps !== last.jumps;
+    // A jump, or the clock set back to the sound: the progress lines start again from here.
+    const jumped = s.jumps !== last.jumps || s.retimes !== last.retimes;
     const second = Math.floor(s.positionMs / 1000);
     const secondChanged = second !== last.second;
     if (s.playing) started = true;
@@ -323,7 +324,7 @@ export function bindPieces(player: Player): void {
       c.instant = false;
     }
 
-    last = { song: song.id, playing: s.playing, jumps: s.jumps, second };
+    last = { song: song.id, playing: s.playing, jumps: s.jumps, retimes: s.retimes, second };
   };
   player.subscribe(render);
 }

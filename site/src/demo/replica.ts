@@ -266,7 +266,8 @@ function bindReplica(root: HTMLElement, player: Player) {
     if (!target || !root.contains(target)) return;
     // A click on a control with a tooltip hides the tooltip until the pointer leaves.
     const tipped = target.closest<HTMLElement>(".fp-tipped");
-    if (tipped) {
+    // One listener however often it is pressed (a key repeats and never leaves).
+    if (tipped && !tipped.hasAttribute("data-dismissed")) {
       tipped.dataset.dismissed = "";
       tipped.addEventListener("pointerleave", () => delete tipped.dataset.dismissed, { once: true });
     }
@@ -572,7 +573,7 @@ function bindReplica(root: HTMLElement, player: Player) {
       // compositor: one linear animation from here to the song's end, started again only when
       // the song, play, the place or the page shown changes. Nothing is restyled or laid out
       // per frame, and a line that isn't rendered (a page not shown) waits for its page.
-      const run = `${song.id}|${s.playing}|${s.jumps}|${s.view}`;
+      const run = `${song.id}|${s.playing}|${s.jumps}|${s.retimes}|${s.view}`;
       if (run !== last.run) {
         const fraction = Math.min(1, s.positionMs / song.durationMs);
         const left = Math.max(0, song.durationMs - s.positionMs);

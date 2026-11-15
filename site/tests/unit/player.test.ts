@@ -74,8 +74,10 @@ describe("player", () => {
     const at = p.state.positionMs;
     vi.advanceTimersByTime(1000);
     expect(p.state.positionMs).toBeGreaterThan(at + 900);
-    // And following the sound never counts as a jump (the clip isn't sent back to itself).
+    // And following the sound never counts as a jump (the clip isn't sent back to itself), but
+    // it is counted, so what draws the progress from the clock starts again from there.
     expect(p.state.jumps).toBe(1);
+    expect(p.state.retimes).toBe(1);
   });
 
   it("time stands still while the page is hidden", () => {
