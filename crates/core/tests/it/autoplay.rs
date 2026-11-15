@@ -64,20 +64,27 @@ fn autoplay_follows_the_list_in_up_next() {
     assert_eq!(p.queue().autoplay_start(), Some(0));
 }
 
+/// Next, or the end, on the last song of a list, by the list-end setting: autoplay goes on
+/// into its radio (here already loaded), Restart to the top, Stop stays.
 #[test]
-fn next_on_the_last_song_continues_into_autoplay() {
-    let (mut p, _) = playing(ListEnd::Autoplay, &["a", "b", "c"], 2);
-    p.handle(Input::ContinuationLoaded(id("c"), tracks(&["x", "y"])));
-    p.handle(Input::Next);
-    assert_eq!(current(&p).as_deref(), Some("x"));
-}
-
-#[test]
-fn the_end_of_the_list_plays_on_into_autoplay() {
-    let (mut p, _) = playing(ListEnd::Autoplay, &["a", "b", "c"], 2);
-    p.handle(Input::ContinuationLoaded(id("c"), tracks(&["x", "y"])));
-    p.handle(Input::AudioEnded);
-    assert_eq!(current(&p).as_deref(), Some("x"));
+fn the_last_song_of_a_list_leads_on_by_the_setting() {
+    use Input::{AudioEnded, Next};
+    let cases = [
+        ("autoplay, Next", ListEnd::Autoplay, Next, "x"),
+        ("autoplay, the end", ListEnd::Autoplay, AudioEnded, "x"),
+        ("restart, Next", ListEnd::Restart, Next, "a"),
+        ("restart, the end", ListEnd::Restart, AudioEnded, "a"),
+        ("stop, Next", ListEnd::Stop, Next, "c"),
+    ];
+    for (case, list_end, input, want) in cases {
+        let (mut p, _) = playing(list_end, &["a", "b", "c"], 2);
+        if list_end == ListEnd::Autoplay {
+            p.handle(Input::ContinuationLoaded(id("c"), tracks(&["x", "y"])));
+        }
+        p.handle(input);
+        assert_eq!(current(&p).as_deref(), Some(want), "{case}");
+        assert!(p.wants_play(), "{case}: plays on");
+    }
 }
 
 #[test]
@@ -155,28 +162,7 @@ fn a_radio_continues_whatever_the_list_end_setting() {
 }
 
 #[test]
-fn restart_takes_next_on_the_last_song_to_the_top() {
-    let (mut p, _) = playing(ListEnd::Restart, &["a", "b", "c"], 2);
-    p.handle(Input::Next);
-    assert_eq!(current(&p).as_deref(), Some("a"));
-}
-
-#[test]
-fn restart_plays_the_list_again_from_the_top_at_its_end() {
-    let (mut p, _) = playing(ListEnd::Restart, &["a", "b", "c"], 2);
-    p.handle(Input::AudioEnded);
-    assert_eq!((current(&p).as_deref(), p.wants_play()), (Some("a"), true));
-}
-
-#[test]
 fn restart_never_asks_for_autoplay() {
     let (_, fx) = playing(ListEnd::Restart, &["a", "b", "c"], 2);
     assert!(fetches(&fx).is_empty());
-}
-
-#[test]
-fn stop_keeps_the_last_song_at_the_end() {
-    let (mut p, _) = playing(ListEnd::Stop, &["a", "b", "c"], 2);
-    p.handle(Input::Next);
-    assert_eq!(current(&p).as_deref(), Some("c"));
 }

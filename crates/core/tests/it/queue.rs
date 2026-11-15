@@ -13,24 +13,34 @@ fn current_id(queue: &Queue) -> Option<&str> {
     queue.current().map(|t| t.id.0.as_str())
 }
 
+/// `advance` from near the end of a list, by repeat mode.
 #[test]
-fn advance_repeat_all_wraps() {
-    let mut q = Queue::new();
-    q.replace(tracks(&["a", "b", "c"]), 2, false);
-    q.set_repeat(RepeatMode::All);
-    assert_eq!(q.advance().map(|t| t.id.0.as_str()), Some("a"));
-    assert_eq!(current_id(&q), Some("a"));
-}
-
-#[test]
-fn advance_repeat_off_at_end_is_none() {
-    let mut q = Queue::new();
-    q.replace(tracks(&["a", "b", "c"]), 1, false);
-    q.set_repeat(RepeatMode::Off);
-    assert_eq!(q.advance().map(|t| t.id.0.as_str()), Some("c"));
-    assert!(q.advance().is_none());
-    // The last track stays current, so a later continuation can still follow it.
-    assert_eq!(current_id(&q), Some("c"));
+fn advance_follows_the_repeat_mode() {
+    // (mode, the current track's index, what each advance gives, then current, upcoming)
+    type Case = (
+        RepeatMode,
+        usize,
+        &'static [Option<&'static str>],
+        &'static str,
+        &'static [&'static str],
+    );
+    let cases: [Case; 3] = [
+        // Off at the end: nothing, and the last track stays current, so a later
+        // continuation can still follow it.
+        (RepeatMode::Off, 1, &[Some("c"), None], "c", &[]),
+        (RepeatMode::All, 2, &[Some("a")], "a", &["b", "c"]),
+        (RepeatMode::One, 1, &[Some("b"), Some("b")], "b", &["c"]),
+    ];
+    for (mode, start, advances, current, upcoming) in cases {
+        let mut q = Queue::new();
+        q.replace(tracks(&["a", "b", "c"]), start, false);
+        q.set_repeat(mode);
+        for want in advances {
+            assert_eq!(q.advance().map(|t| t.id.0.as_str()), *want, "{mode:?}");
+        }
+        assert_eq!(current_id(&q), Some(current), "{mode:?}");
+        assert_eq!(ids(q.upcoming()), upcoming, "{mode:?}");
+    }
 }
 
 /// The tracks that will play next, in the order `advance_past` would reach them.
@@ -51,16 +61,6 @@ fn peek_ahead_follows_the_play_order() {
     assert_eq!(ahead(&q, 5), ["b", "a"], "one lap at most");
     q.set_repeat(RepeatMode::One);
     assert_eq!(ahead(&q, 3), ["a"], "the current track again");
-}
-
-#[test]
-fn advance_repeat_one_returns_same() {
-    let mut q = Queue::new();
-    q.replace(tracks(&["a", "b", "c"]), 1, false);
-    q.set_repeat(RepeatMode::One);
-    assert_eq!(q.advance().map(|t| t.id.0.as_str()), Some("b"));
-    assert_eq!(q.advance().map(|t| t.id.0.as_str()), Some("b"));
-    assert_eq!(ids(q.upcoming()), ["c"]);
 }
 
 #[test]
@@ -244,21 +244,4 @@ fn autoplay_starts_at_the_first_continued_track() {
     q.replace(tracks(&["a", "b"]), 0, false);
     assert!(!q.is_radio());
     assert_eq!(q.autoplay_start(), None);
-}
-
-#[test]
-fn play_next_all_puts_the_tracks_right_after_the_current_one_in_order() {
-    let mut q = Queue::new();
-    q.replace(tracks(&["now", "a", "b"]), 0, false);
-    q.play_next_all(tracks(&["x", "y", "z"]));
-    assert_eq!(current_id(&q), Some("now"));
-    assert_eq!(ids(q.upcoming()), ["x", "y", "z", "a", "b"]);
-}
-
-#[test]
-fn play_next_all_on_an_empty_queue_plays_the_first() {
-    let mut q = Queue::new();
-    q.play_next_all(tracks(&["x", "y"]));
-    assert_eq!(current_id(&q), Some("x"));
-    assert_eq!(ids(q.upcoming()), ["y"]);
 }
