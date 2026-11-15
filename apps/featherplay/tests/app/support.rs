@@ -471,7 +471,8 @@ fn logical(scene: &Scene) -> LogicalSize {
     w.size().to_logical(w.scale_factor())
 }
 
-/// What the pointer acts on: a scene, or a bare window (`AppWindow::window()`).
+/// What the pointer and the label lookups act on: a scene, or a bare window
+/// (`AppWindow::window()`).
 pub trait OnWindow {
     fn on_window(&self) -> &slint::Window;
 }
