@@ -75,7 +75,7 @@ impl Streams {
     pub fn hint(&mut self, id: &TrackId, now: SystemTime) {
         self.page_waiting.retain(|w| w != id);
         self.take_over(id, Hint::Row);
-        if self.covered(id, now) || self.known_unavailable(id).is_some() {
+        if self.covered(id, now) || self.known_unavailable(id, Instant::now()).is_some() {
             return;
         }
         self.waiting.push_back((id.clone(), Hint::Row));
@@ -205,12 +205,18 @@ impl Streams {
         self.page_failed.retain(recent);
     }
 
+    /// Drops the starts of rows on screen more than a minute before `now`.
+    fn forget_page_starts(&mut self, now: Instant) {
+        self.page_starts
+            .retain(|at| now.duration_since(*at) < MINUTE);
+    }
+
     fn has_failed(&self, id: &TrackId) -> bool {
         self.failed
             .iter()
             .chain(&self.page_failed)
             .any(|(f, _)| f == id)
-            || self.known_unavailable(id).is_some()
+            || self.known_unavailable(id, Instant::now()).is_some()
     }
 
     /// `id` isn't resolved ahead again for `FAILED_FOR`, as `hint`'s (a row on screen's is
@@ -277,8 +283,7 @@ impl Streams {
             out.push(self.run_hint(id, hint, ahead));
         }
         let now = Instant::now();
-        self.page_starts
-            .retain(|at| now.duration_since(*at) < MINUTE);
+        self.forget_page_starts(now);
         while running(self, true) < PAGE_SLOTS && self.page_starts.len() < PAGE_PER_MINUTE {
             let Some(id) = self.page_waiting.pop_front() else {
                 break;

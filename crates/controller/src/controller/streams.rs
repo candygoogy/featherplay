@@ -291,11 +291,11 @@ impl Streams {
     }
 
     /// What YouTube said when it answered `id` was unavailable, if that was within
-    /// `UNAVAILABLE_FOR`, or when it refused `id` (`refuse`).
-    pub fn known_unavailable(&self, id: &TrackId) -> Option<&str> {
+    /// `UNAVAILABLE_FOR` of `now`, or when it refused `id` (`refuse`).
+    pub fn known_unavailable(&self, id: &TrackId, now: Instant) -> Option<&str> {
         self.unavailable
             .iter()
-            .find(|(u, at, _)| u == id && at.elapsed() < UNAVAILABLE_FOR)
+            .find(|(u, at, _)| u == id && now.saturating_duration_since(*at) < UNAVAILABLE_FOR)
             .map(|(_, _, why)| why.as_str())
             .or_else(|| self.refusal(id))
     }
@@ -359,7 +359,7 @@ impl Streams {
         if waits_to_play(player, id) {
             return None;
         }
-        let why = self.known_unavailable(id)?;
+        let why = self.known_unavailable(id, Instant::now())?;
         Some(ResolveError::Unavailable(why.to_string()))
     }
 
@@ -712,8 +712,8 @@ mod tests {
         s.unavailable(&id("c"), "Video unavailable");
         assert_eq!(s.route_changed(), [id("b")]);
         assert!(s.refused().is_empty());
-        assert_eq!(s.known_unavailable(&id("b")), None);
-        assert_eq!(s.known_unavailable(&id("c")), None);
+        assert_eq!(s.known_unavailable(&id("b"), Instant::now()), None);
+        assert_eq!(s.known_unavailable(&id("c"), Instant::now()), None);
         assert_eq!(s.want(&id("a"), now), Want::Start);
     }
 

@@ -376,7 +376,10 @@ mod tests {
         let mut s = Streams::default();
         s.restore(&before.saved(now), now);
         assert_eq!(s.refused(), [id("new")]);
-        assert_eq!(s.known_unavailable(&id("new")), Some(why));
+        assert_eq!(
+            s.known_unavailable(&id("new"), std::time::Instant::now()),
+            Some(why)
+        );
         // Later the same day, the restored mark keeps its own time.
         let mut later = Streams::default();
         later.restore(&s.saved(now), now + REFUSED_KEPT_FOR / 2);
