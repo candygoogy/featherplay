@@ -95,8 +95,11 @@ function show(block: HTMLElement) {
 // which also completes the art's cross-fades on --light) and the visit's later switches are
 // instant from the start. The controls' own motion (the picker's pill) isn't the tokens', so
 // it still glides.
+// Frame gaps come in whole vsyncs (16.7 ms at 60 Hz) read to 0.1 ms, so each limit sits just
+// over one: a frame of exactly two (33.3) or three (50.0, read as 49.9 to 50.1) vsyncs is on
+// one side of it every time.
 const INSTANT = "fp-theme-instant";
-const FIRST_FRAME = 50;
+const FIRST_FRAME = 51;
 const LONG_FRAME = 34;
 
 function instant(): boolean {

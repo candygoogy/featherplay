@@ -419,17 +419,26 @@ test("on a slow device the switch ends at once, and the visit's later switches a
   await page.emulateMedia({ colorScheme: "dark" });
   await page.goto("/");
   await page.waitForTimeout(600);
-  const cdp = await page.context().newCDPSession(page);
-  await cdp.send("Emulation.setCPUThrottlingRate", { rate: 6 });
+  // The slow device: every frame from here on spends 70 ms in script, so each one runs past
+  // FIRST_FRAME and LONG_FRAME (theme.ts) whatever this machine's speed. (A CPU throttle
+  // made a device that's only just slow: its frames landed on 33 and 50 ms, at the limits.)
+  await page.evaluate(() => {
+    const busy = () => {
+      const t = performance.now();
+      while (performance.now() - t < 70);
+      requestAnimationFrame(busy);
+    };
+    requestAnimationFrame(busy);
+  });
 
-  // Near the hero: the first long frames end it.
+  // Near the hero: the first long frame ends it.
   const first = await switchFrames(page, "[data-theme-toggle]");
   expect(first.flag).toBe("1");
   expect(rgb(first.end)).toEqual([255, 255, 255]);
   expect(first.light).toBe("1");
-  // At most two eased frames: a first frame just under FIRST_FRAME, then the second of two
-  // in a row over LONG_FRAME ends it (theme.ts), depending on how busy the machine is.
-  expect(first.between).toBeLessThanOrEqual(2);
+  // The switch ends on its second frame, as the first one runs over FIRST_FRAME (theme.ts):
+  // only the first can show a colour between the two.
+  expect(first.between).toBeLessThanOrEqual(1);
 
   // Later switches skip the easing from the first frame, wherever the page is.
   await page.evaluate(() =>
@@ -440,7 +449,6 @@ test("on a slow device the switch ends at once, and the visit's later switches a
   expect(rgb(later.end)).toEqual([15, 15, 15]);
   expect(later.light).toBe("0");
   expect(later.between).toBe(0);
-  await cdp.send("Emulation.setCPUThrottlingRate", { rate: 1 });
 });
 
 test("at full speed the switch eases and nothing is remembered", async ({ page }) => {
