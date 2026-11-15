@@ -17,39 +17,47 @@ fn area(r: &[[u32; 4]]) -> u64 {
         .sum()
 }
 
+/// `coalesce_damage` on each case's rectangles: what comes out (sorted), or, where any
+/// split will do, only that it copies no more pixels than went in.
 #[test]
-fn overlapping_rectangles_become_their_bounding_box_when_it_costs_no_more() {
-    let mut r = vec![[0, 0, 100, 100], [10, 0, 110, 100]];
-    coalesce_damage(&mut r);
-    assert_eq!(r, vec![[0, 0, 110, 100]]);
+fn overlaps_merge_only_where_the_bounding_box_costs_no_more() {
+    type Rects = Vec<[u32; 4]>;
+    let cases: [(&str, Rects, Option<Rects>); 4] = [
+        (
+            "overlapping rectangles become their bounding box when it costs no more",
+            vec![[0, 0, 100, 100], [10, 0, 110, 100]],
+            Some(vec![[0, 0, 110, 100]]),
+        ),
+        (
+            "a rectangle inside another goes",
+            vec![[20, 20, 40, 40], [0, 0, 100, 100], [200, 0, 210, 10]],
+            Some(vec![[0, 0, 100, 100], [200, 0, 210, 10]]),
+        ),
+        (
+            "rectangles that don't touch stay apart",
+            vec![[0, 0, 10, 10], [50, 50, 60, 60]],
+            Some(vec![[0, 0, 10, 10], [50, 50, 60, 60]]),
+        ),
+        // An L: the box would add the empty corner (100 × 90 px) and cost more than the
+        // overlap (10 × 10) saves.
+        (
+            "an overlap whose bounding box costs more is never copied beyond its pixels",
+            vec![[0, 0, 100, 10], [90, 0, 100, 100]],
+            None,
+        ),
+    ];
+    for (label, mut r, expected) in cases {
+        let before = area(&r);
+        coalesce_damage(&mut r);
+        r.sort_unstable();
+        match expected {
+            Some(expected) => assert_eq!(r, expected, "{label}"),
+            None => assert!(area(&r) <= before, "{label}: {r:?} copies more than before"),
+        }
+    }
 }
 
-#[test]
-fn a_rectangle_inside_another_goes() {
-    let mut r = vec![[20, 20, 40, 40], [0, 0, 100, 100], [200, 0, 210, 10]];
-    coalesce_damage(&mut r);
-    r.sort_unstable();
-    assert_eq!(r, vec![[0, 0, 100, 100], [200, 0, 210, 10]]);
-}
-
-#[test]
-fn rectangles_that_dont_touch_stay_apart() {
-    let mut r = vec![[0, 0, 10, 10], [50, 50, 60, 60]];
-    coalesce_damage(&mut r);
-    assert_eq!(r.len(), 2);
-}
-
-#[test]
-fn an_overlap_whose_bounding_box_costs_more_is_never_copied_beyond_its_pixels() {
-    // An L: the box would add the empty corner (100 × 90 px) and cost more than the overlap
-    // (10 × 10) saves.
-    let mut r = vec![[0, 0, 100, 10], [90, 0, 100, 100]];
-    let before = area(&r);
-    coalesce_damage(&mut r);
-    assert!(area(&r) <= before, "{r:?} copies more than before");
-}
-
-/// Up next opening at 4K 150 % (its panel slides over the page, which narrows once at the
+/// Up next opening, closing and opening again at 1280 × 800 (its panel slides over the page, which narrows once at the
 /// end): no frame copies more than the window.
 #[test]
 fn no_frame_copies_more_than_the_window() {

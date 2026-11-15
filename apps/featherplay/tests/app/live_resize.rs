@@ -9,46 +9,74 @@
 
 use std::time::Duration;
 
+use crate::support::resize;
 use featherplay::offscreen;
 use featherplay::snapshot::Scene;
 use featherplay::ui::Theme;
 use i_slint_renderer_skia::software_surface::buffer_size;
-use slint::platform::WindowEvent;
-use slint::{ComponentHandle, LogicalSize, PhysicalSize};
+use slint::ComponentHandle;
 
+/// The buffer a frame draws into, from the one it has and the window's size: outside a live
+/// resize the window's size; during one, the buffer kept while the window fits, else a
+/// larger one with room for the next steps.
 #[test]
-fn outside_a_live_resize_the_buffer_is_the_windows_size() {
-    assert_eq!(buffer_size((0, 0), (1280, 800), false), (1280, 800));
-    assert_eq!(buffer_size((3840, 2160), (1280, 800), false), (1280, 800));
-    assert_eq!(buffer_size((1000, 700), (1280, 800), false), (1280, 800));
-}
-
-#[test]
-fn during_a_live_resize_a_buffer_that_fits_is_kept() {
-    assert_eq!(buffer_size((2000, 1200), (1900, 1100), true), (2000, 1200));
-    assert_eq!(buffer_size((2000, 1200), (2000, 1200), true), (2000, 1200));
-}
-
-#[test]
-fn during_a_live_resize_a_buffer_grows_with_room_to_spare() {
-    let (w, h) = buffer_size((2000, 1200), (2010, 1100), true);
-    assert!(
-        w >= 2010 + 2010 / 8,
-        "{w} leaves no room for the next steps"
-    );
-    assert_eq!(h, 1200, "the height that fit changed");
-    let (w, h) = buffer_size((0, 0), (1280, 800), true);
-    assert!(
-        w > 1280 && h > 800,
-        "a first buffer mid-drag has no room: {w}×{h}"
-    );
-}
-
-fn resize(w: &slint::Window, width: u32, height: u32) {
-    w.set_size(PhysicalSize::new(width, height));
-    w.dispatch_event(WindowEvent::Resized {
-        size: LogicalSize::new(width as f32, height as f32),
-    });
+fn the_buffer_is_the_windows_size_and_only_grows_during_a_live_resize() {
+    type Size = (u32, u32);
+    let cases: [(&str, Size, Size, bool, fn(Size) -> bool); 7] = [
+        ("outside, no buffer yet", (0, 0), (1280, 800), false, |s| {
+            s == (1280, 800)
+        }),
+        (
+            "outside, a larger buffer",
+            (3840, 2160),
+            (1280, 800),
+            false,
+            |s| s == (1280, 800),
+        ),
+        (
+            "outside, a smaller buffer",
+            (1000, 700),
+            (1280, 800),
+            false,
+            |s| s == (1280, 800),
+        ),
+        (
+            "during, a buffer that fits",
+            (2000, 1200),
+            (1900, 1100),
+            true,
+            |s| s == (2000, 1200),
+        ),
+        (
+            "during, a buffer just the size",
+            (2000, 1200),
+            (2000, 1200),
+            true,
+            |s| s == (2000, 1200),
+        ),
+        // Room for the next steps, and the height that fit unchanged.
+        (
+            "during, a wider window",
+            (2000, 1200),
+            (2010, 1100),
+            true,
+            |(w, h)| w >= 2010 + 2010 / 8 && h == 1200,
+        ),
+        (
+            "during, a first buffer",
+            (0, 0),
+            (1280, 800),
+            true,
+            |(w, h)| w > 1280 && h > 800,
+        ),
+    ];
+    for (label, buffer, window, live, holds) in cases {
+        let size = buffer_size(buffer, window, live);
+        assert!(
+            holds(size),
+            "{label}: a {window:?} window got a {size:?} buffer"
+        );
+    }
 }
 
 fn frame(w: &slint::Window) {
