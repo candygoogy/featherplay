@@ -160,60 +160,86 @@ mod tests {
     }
 
     #[test]
-    fn a_request_with_the_token_passes() {
-        assert_eq!(check(&with_token(&[]), None, PORT, &token(), false), Ok(()));
-    }
-
-    #[test]
-    fn the_bearer_scheme_is_case_insensitive() {
-        let auth = format!("bearer {}", "ab".repeat(32));
-        let h = headers(&[(HOST, "localhost:26538"), (AUTHORIZATION, &auth)]);
-        assert_eq!(check(&h, None, PORT, &token(), false), Ok(()));
-    }
-
-    #[test]
-    fn a_missing_host_is_refused_before_the_token() {
+    fn check_wants_one_good_host_no_web_origin_and_the_token() {
         let auth = format!("Bearer {}", "ab".repeat(32));
-        let h = headers(&[(AUTHORIZATION, &auth)]);
-        assert_eq!(check(&h, None, PORT, &token(), false), Err(Refusal::Host));
-    }
-
-    #[test]
-    fn two_hosts_are_refused() {
-        let auth = format!("Bearer {}", "ab".repeat(32));
-        let h = headers(&[
-            (HOST, "127.0.0.1:26538"),
-            (HOST, "evil.example:26538"),
-            (AUTHORIZATION, &auth),
-        ]);
-        assert_eq!(check(&h, None, PORT, &token(), false), Err(Refusal::Host));
-    }
-
-    #[test]
-    fn a_web_origin_is_refused_even_with_the_token() {
-        let h = with_token(&[(ORIGIN, "https://evil.example")]);
-        assert_eq!(check(&h, None, PORT, &token(), false), Err(Refusal::Origin));
-    }
-
-    #[test]
-    fn the_query_token_counts_only_where_allowed() {
-        let h = headers(&[(HOST, "127.0.0.1:26538")]);
+        let lower = format!("bearer {}", "ab".repeat(32));
         let query = format!("a=1&token={}", "ab".repeat(32));
-        assert_eq!(check(&h, Some(&query), PORT, &token(), true), Ok(()));
-        assert_eq!(
-            check(&h, Some(&query), PORT, &token(), false),
-            Err(Refusal::Token)
-        );
-    }
-
-    #[test]
-    fn a_wrong_or_missing_token_is_refused() {
-        let h = headers(&[(HOST, "127.0.0.1:26538"), (AUTHORIZATION, "Bearer nope")]);
-        assert_eq!(check(&h, None, PORT, &token(), false), Err(Refusal::Token));
-        let h = headers(&[(HOST, "127.0.0.1:26538"), (AUTHORIZATION, "Basic abc")]);
-        assert_eq!(check(&h, None, PORT, &token(), false), Err(Refusal::Token));
-        let h = headers(&[(HOST, "127.0.0.1:26538")]);
-        assert_eq!(check(&h, None, PORT, &token(), true), Err(Refusal::Token));
+        let host = (HOST, "127.0.0.1:26538");
+        // (case, headers, query, whether the query's token counts, the answer)
+        let cases = [
+            ("the token passes", with_token(&[]), None, false, Ok(())),
+            (
+                "the bearer scheme is case-insensitive",
+                headers(&[(HOST, "localhost:26538"), (AUTHORIZATION, &lower)]),
+                None,
+                false,
+                Ok(()),
+            ),
+            (
+                "a missing host is refused before the token",
+                headers(&[(AUTHORIZATION, &auth)]),
+                None,
+                false,
+                Err(Refusal::Host),
+            ),
+            (
+                "two hosts are refused",
+                headers(&[
+                    (HOST, "127.0.0.1:26538"),
+                    (HOST, "evil.example:26538"),
+                    (AUTHORIZATION, &auth),
+                ]),
+                None,
+                false,
+                Err(Refusal::Host),
+            ),
+            (
+                "a web origin is refused even with the token",
+                with_token(&[(ORIGIN, "https://evil.example")]),
+                None,
+                false,
+                Err(Refusal::Origin),
+            ),
+            (
+                "the query's token where it counts",
+                headers(&[host.clone()]),
+                Some(&query),
+                true,
+                Ok(()),
+            ),
+            (
+                "the query's token where it doesn't",
+                headers(&[host.clone()]),
+                Some(&query),
+                false,
+                Err(Refusal::Token),
+            ),
+            (
+                "a wrong token",
+                headers(&[host.clone(), (AUTHORIZATION, "Bearer nope")]),
+                None,
+                false,
+                Err(Refusal::Token),
+            ),
+            (
+                "another scheme",
+                headers(&[host.clone(), (AUTHORIZATION, "Basic abc")]),
+                None,
+                false,
+                Err(Refusal::Token),
+            ),
+            (
+                "no token at all",
+                headers(&[host]),
+                None,
+                true,
+                Err(Refusal::Token),
+            ),
+        ];
+        for (case, h, query, query_token, expected) in cases {
+            let got = check(&h, query.map(String::as_str), PORT, &token(), query_token);
+            assert_eq!(got, expected, "{case}");
+        }
     }
 
     #[test]
