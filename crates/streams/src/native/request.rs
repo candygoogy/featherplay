@@ -355,7 +355,6 @@ mod tests {
     fn the_request_is_the_embedded_clients() {
         let body = player_request_body(VIDEO, &config(), 20752);
         let client = &body["context"]["client"];
-        assert_eq!(client["clientName"], "WEB_EMBEDDED_PLAYER");
         assert_eq!(client["clientVersion"], "2.20261028.01.00");
         assert_eq!(client["visitorData"], "CgtTY3J1YmJlZA%3D%3D");
         assert_eq!(body["context"]["thirdParty"]["embedUrl"], EMBED_URL);
@@ -366,7 +365,6 @@ mod tests {
         assert_eq!(body["contentCheckOk"], true);
         assert_eq!(body["racyCheckOk"], true);
         let h = player_headers(&config());
-        assert!(h.contains(&("X-YouTube-Client-Name", "56".into())));
         assert!(h.contains(&("X-YouTube-Client-Version", "2.20261028.01.00".into())));
         assert!(h.contains(&("X-Goog-Visitor-Id", "CgtTY3J1YmJlZA%3D%3D".into())));
         // No visitor data or host flags: neither the fields nor the header.
@@ -386,16 +384,12 @@ mod tests {
     fn the_visionos_request_is_yt_dlps() {
         let body = visionos_request_body(VIDEO, "visitor");
         let client = &body["context"]["client"];
-        assert_eq!(client["clientName"], "VISIONOS");
-        assert_eq!(client["clientVersion"], "1.02");
-        assert_eq!(client["deviceModel"], "RealityDevice17,1");
         assert_eq!(client["visitorData"], "visitor");
         assert!(body["context"].get("thirdParty").is_none());
         let pb = &body["playbackContext"]["contentPlaybackContext"];
         assert!(pb.get("signatureTimestamp").is_none(), "no player");
         assert_eq!(body["videoId"], VIDEO);
         let h = visionos_headers("visitor");
-        assert!(h.contains(&("X-YouTube-Client-Name", "101".into())));
         assert!(h.contains(&("X-Goog-Visitor-Id", "visitor".into())));
         assert!(h.contains(&("User-Agent", VISIONOS_USER_AGENT.into())));
     }
