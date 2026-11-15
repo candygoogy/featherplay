@@ -7,5 +7,6 @@
     reason = "tests report skips and measurements"
 )]
 
+mod client;
 mod offline;
 mod sign;
