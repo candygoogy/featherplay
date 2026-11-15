@@ -1,7 +1,9 @@
 ---
 // The app's playing mark (parts.slint, PlayingMark): a short wave in one accent stroke, at
 // rest a still, middling wave. The path runs two wavelengths past each end, so it can travel
-// one wavelength and loop (app-controls.css).
+// one wavelength and loop (app-controls.css). It moves as HTML layers (the travel and the
+// swell are spans around the drawing), which the compositor animates: transforms on SVG
+// groups would be laid out on the main thread every frame.
 interface Props {
   size?: number;
   class?: string;
@@ -11,21 +13,23 @@ const span = size * 0.76;
 const wavelength = span / 1.5;
 const amp = size * 0.32 * 0.6;
 const mid = size / 2;
+const from = -2 * wavelength;
 const pts: string[] = [];
-for (let x = -2 * wavelength; x <= size + 2 * wavelength; x += 1) {
+for (let x = from; x <= size + 2 * wavelength; x += 1) {
   // The app's still wave sits 0.15 of a cycle along.
   const y = mid - amp * Math.sin(((x - size * 0.12) / wavelength - 0.15 * 1.5) * 2 * Math.PI);
-  pts.push(`${x.toFixed(1)} ${y.toFixed(1)}`);
+  pts.push(`${(x - from).toFixed(1)} ${y.toFixed(1)}`);
 }
 const d = `M ${pts.join(" L ")}`;
+const width = size + 4 * wavelength;
 ---
 
-<svg
+<span
   class:list={["fp-mark", className]}
-  viewBox={`0 0 ${size} ${size}`}
-  width={size}
-  height={size}
   aria-hidden="true"
-  style={`--wavelength:${wavelength.toFixed(2)}px`}
-  ><g class="swell"><g class="travel"><path d={d}></path></g></g></svg
+  style={`--wavelength:${wavelength.toFixed(2)}px;--mark:${size}px;--from:${from.toFixed(2)}px`}
+  ><span class="swell"><span class="travel"
+      ><svg viewBox={`0 0 ${width.toFixed(1)} ${size}`} width={width.toFixed(1)} height={size}><path d={d}></path></svg></span
+    ></span
+  ></span
 >

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { skipTour, wake } from "./helpers";
+import { wake } from "./helpers";
 
 const replica = (page: Page) => page.locator("[data-replica]").first();
 
@@ -20,7 +20,7 @@ test("the replica is a labelled demo with a text summary", async ({ page }) => {
 test("clicking a Home card plays it and the glow takes its colour", async ({ page }) => {
   await page.goto("/");
   await wake(page);
-  await skipTour(page);
+
   const r = replica(page);
   // The hero starts on Now playing: Back goes Home.
   await r.getByRole("button", { name: "Back", exact: true }).click();
@@ -34,7 +34,7 @@ test("clicking a Home card plays it and the glow takes its colour", async ({ pag
 test("the lyrics view highlights the current line and clicking a line seeks to it", async ({ page }) => {
   await page.goto("/");
   await wake(page);
-  await skipTour(page);
+
   const r = replica(page);
   const lyrics = r.locator("[data-lyrics]");
   await expect(lyrics).toBeVisible();
@@ -49,7 +49,7 @@ test("the lyrics view highlights the current line and clicking a line seeks to i
 test('a song without lyrics keeps the cover view, and the pill says "No lyrics"', async ({ page }) => {
   await page.goto("/");
   await wake(page);
-  await skipTour(page);
+
   const r = replica(page);
   await r.getByRole("button", { name: /^Play In This Moment/ }).first().click();
   await expect(r.locator("[data-bar-title]")).toHaveText("In This Moment");
@@ -82,7 +82,7 @@ test('a song without lyrics keeps the cover view, and the pill says "No lyrics"'
 test("the side panel's Lyrics tab follows the song beside the cover, and steps aside for the full view", async ({ page }) => {
   await page.goto("/");
   await wake(page);
-  await skipTour(page);
+
   const r = replica(page);
   const tab = r.getByRole("tab", { name: "Lyrics" });
   // The full lyrics view shows the lines: no Lyrics tab beside them.
@@ -129,7 +129,7 @@ test("the side panel's Lyrics tab follows the song beside the cover, and steps a
 test("Up next pins the song playing over the songs after it, and Clear leaves nothing up next", async ({ page }) => {
   await page.goto("/");
   await wake(page);
-  await skipTour(page);
+
   const r = replica(page);
   const next = r.locator('[data-tab-panel="next"]');
   const rows = next.locator("[data-row]");
@@ -154,7 +154,7 @@ test("Up next pins the song playing over the songs after it, and Clear leaves no
 test("on Now playing, Up next hides and shows the side panel, and Playing from opens it", async ({ page }) => {
   await page.goto("/");
   await wake(page);
-  await skipTour(page);
+
   const r = replica(page);
   const upNext = r.locator('.bar [data-act="queue"]');
   const panel = r.locator("[data-queue]");
@@ -179,7 +179,7 @@ test("on Now playing, Up next hides and shows the side panel, and Playing from o
 test("the play button pauses and plays, and time moves only while playing", async ({ page }) => {
   await page.goto("/");
   await wake(page);
-  await skipTour(page);
+
   const r = replica(page);
   const time = r.locator("[data-bar-time]");
   const before = await time.textContent();
@@ -235,15 +235,6 @@ test("Tab reaches every control in the replica and leaves it", async ({ page }) 
   expect(new Set(seen)).toEqual(new Set(controls));
 });
 
-test("the wheel over the laptop scrolls the page", async ({ page }) => {
-  await page.goto("/");
-  const box = (await page.locator("[data-laptop]").first().boundingBox())!;
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height * 0.4);
-  const before = await page.evaluate(() => scrollY);
-  await page.mouse.wheel(0, 500);
-  await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThan(before + 100);
-});
-
 test.describe("without JavaScript", () => {
   test.use({ javaScriptEnabled: false });
   test("the replica shows a static featherplay frame", async ({ page }) => {
@@ -277,22 +268,21 @@ test("on load, and on a new song, the lines are placed at once, not glided in fr
   expect(p.shift).toBeCloseTo(p.rule, 0);
 });
 
-test("the lines' place rendered without script is where the script puts them: no jump on load", async ({ page, browser }) => {
-  await page.goto("/");
-  const p = await placement(page);
-  const still = await browser.newContext({ javaScriptEnabled: false });
+test("without script the window is a still of the app with the line being sung in view", async ({ browser }) => {
+  const still = await browser.newContext({ javaScriptEnabled: false, viewport: { width: 1440, height: 900 } });
   const bare = await still.newPage();
-  await bare.goto(page.url());
-  const ssr = await bare
-    .locator("[data-replica] [data-lines]")
-    .first()
-    .evaluate((el) => -new DOMMatrixReadOnly(getComputedStyle(el).transform).m42);
+  await bare.goto("/");
+  const r = bare.locator("[data-window] [data-replica]");
+  const panel = (await r.locator("[data-lyrics]").boundingBox())!;
+  const line = (await r.locator("[data-lines] .line[data-state='current']").boundingBox())!;
+  expect(line.y).toBeGreaterThanOrEqual(panel.y);
+  expect(line.y + line.height).toBeLessThanOrEqual(panel.y + panel.height);
   await still.close();
-  expect(Math.abs(ssr - p.rule)).toBeLessThan(2);
 });
 
 test.describe("the lines start at the top, as in the app", () => {
-  test.use({ reducedMotion: "reduce", viewport: { width: 1440, height: 900 } });
+  // A screen where the window is the app's whole 1440 x 852 layout, scaled.
+  test.use({ reducedMotion: "reduce", viewport: { width: 1920, height: 1200 } });
 
   /** Measures in the replica's own pixels (the hero draws it scaled on the laptop). */
   const measure = (page: Page) =>
@@ -307,7 +297,7 @@ test.describe("the lines start at the top, as in the app", () => {
   test("at a song's start the first line's top is level with the cover's top edge", async ({ page }) => {
     await page.goto("/");
     await wake(page);
-    await skipTour(page);
+
     await replica(page).locator("[data-lines] .line").first().evaluate((b: HTMLElement) => b.click());
     await page.waitForTimeout(100);
     const m = await measure(page);
@@ -317,7 +307,7 @@ test.describe("the lines start at the top, as in the app", () => {
   test("mid-song the line playing is held a third of the way down; at the end the list stops at its end", async ({ page }) => {
     await page.goto("/");
     await wake(page);
-    await skipTour(page);
+
     const lines = replica(page).locator("[data-lines] .line");
     await lines.nth(7).evaluate((b: HTMLElement) => b.click());
     await page.waitForTimeout(100);
@@ -349,7 +339,7 @@ test.describe("the lines start at the top, as in the app", () => {
   test("the lyrics view has the app's metrics beside the side panel: a line every 45.1 px with no verse gaps, the 208 px cover, the title in its width", async ({ page }) => {
     await page.goto("/");
     await wake(page);
-    await skipTour(page);
+
     await replica(page).locator("[data-lines] .line").first().evaluate((b: HTMLElement) => b.click());
     await page.waitForTimeout(100);
     const m = await replica(page).evaluate((r) => {
@@ -378,7 +368,7 @@ test.describe("the lines start at the top, as in the app", () => {
   test("with the side panel hidden the lyrics view is the app's at 1440 px: the 280 px cover, 26 px lines every 49.4 px", async ({ page }) => {
     await page.goto("/");
     await wake(page);
-    await skipTour(page);
+
     await replica(page).locator('.bar [data-act="queue"]').click();
     await page.waitForTimeout(100);
     const m = await replica(page).evaluate((r) => {
@@ -412,7 +402,7 @@ test.describe("the lines start at the top, as in the app", () => {
 test("the play button's tooltip names its shortcut, Space, as the app's", async ({ page }) => {
   await page.goto("/");
   await wake(page);
-  await skipTour(page);
+
   const r = replica(page);
   const play = r.locator(".bar [data-act='toggle']");
   const tip = r.locator(".bar .fp-tipped:has([data-act='toggle']) > .fp-tip");
@@ -430,7 +420,7 @@ test("focusing a line out of view brings it into view by moving the lines, not b
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/");
   await wake(page);
-  await skipTour(page);
+
   const r = replica(page);
   const panel = r.locator("[data-lyrics]");
   // At the app's pitch the whole song fits the panel from its start, so the song at its end:

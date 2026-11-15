@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { skipTour, wake } from "./helpers";
+import { wake } from "./helpers";
 
 // The Content-Security-Policy in public/_headers, as Cloudflare's runtime serves it (wrangler
 // dev, scripts/wrangler-dev.mjs): every page carries it and loads with no violation, and no
@@ -86,9 +86,9 @@ test("pressing play loads the demo's clip under the CSP (media-src)", async ({ p
   const problems = await watch(page);
   await page.goto(`${cf}/`);
   await wake(page);
-  await skipTour(page);
+
   const clip = page.waitForResponse((r) => new URL(r.url()).pathname.startsWith("/music/"));
-  await page.locator("[data-hero] .bar .fp-play").first().click();
+  await page.locator("[data-window] .bar .fp-play").first().click();
   expect((await clip).ok()).toBe(true);
   expect(await problems()).toEqual([]);
 });

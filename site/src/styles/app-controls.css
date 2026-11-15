@@ -122,11 +122,14 @@
 /* ---------- PlayingMark: one accent stroke, a short wave travelling through the mark while
    the song plays (one wavelength each 0.8 s, swelling over 1.6 s); paused, or without
    motion, a still wave that still says "this one". Drawn as a long wave moved under a mask
-   that pins it towards both ends: transform only. ---------- */
+   that pins it towards both ends: transform only, on HTML layers (Mark.astro), so the
+   compositor runs it. ---------- */
 .fp-mark {
+  position: relative;
   display: block;
-  width: 18px;
-  height: 18px;
+  width: var(--mark, 18px);
+  height: var(--mark, 18px);
+  overflow: clip;
   color: var(--accent);
   mask-image: linear-gradient(90deg, transparent 6%, #000 24%, #000 76%, transparent 94%); /* taste-skill-ignore: the app's playing mark */
 }
@@ -139,7 +142,18 @@
   vector-effect: non-scaling-stroke;
 }
 .fp-mark .swell {
+  position: absolute;
+  inset: 0;
   transform-origin: 50% 50%;
+}
+.fp-mark .travel {
+  position: absolute;
+  top: 0;
+  left: var(--from, -8px);
+}
+.fp-mark svg {
+  display: block;
+  max-width: none;
 }
 @media (prefers-reduced-motion: no-preference) {
   [data-playing="true"] .fp-mark .travel {

@@ -345,3 +345,7 @@
 .skip:focus-visible {
   translate: none;
 }
+/* Out of sight it takes no clicks meant for what's under it. */
+.skip:not(:focus-visible) {
+  pointer-events: none;
+}

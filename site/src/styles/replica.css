@@ -129,10 +129,21 @@
     width: 16px;
     height: 16px;
   }
+  /* The name gives way to the caption buttons in a narrow window; the buttons keep one row. */
+  .titlebar-name {
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
   .caption {
     display: flex;
+    flex: none;
     margin-left: auto;
     align-self: stretch;
+  }
+  .cap {
+    flex: none;
   }
   .cap {
     display: grid;
@@ -147,6 +158,23 @@
   }
   button.cap:hover {
     background: var(--hover);
+  }
+  /* Windows' close button: red under the pointer. Maximised, the middle one restores. */
+  button.cap.close:hover {
+    background: var(--cap-close, #c42b1c);
+    color: #fff;
+  }
+  button.cap:disabled {
+    cursor: default;
+    background: none;
+    color: inherit;
+  }
+  .cap .i-restore,
+  [data-max] & .cap .i-max {
+    display: none;
+  }
+  [data-max] & .cap .i-restore {
+    display: block;
   }
 
   /* ---------- The app's frame ---------- */
@@ -651,6 +679,21 @@
      The lyrics view: the cover's colour, deep, fading in over the first half of the toggle
      (t-lyrics, 300 ms), the lines over the second; closing runs it back. */
   .stage {
+    /* A size container: the lyrics view lays itself out by its width, as now_playing.slint's
+       does. fl-cover a fifth of the stage (160 to 280 px); fl-lw the lines' measure (720 px at
+       most) beside it past an s9 (64 px) gap; fl-x centres the two as one group, the page's
+       pad at least. The cover view's cover: nowplaying-cover (440 px), or with the side panel
+       hidden 0.32 of the stage up to 560 px, never wider than the stage less its sides nor
+       taller than the room under the header leaves (336 px: the header, the bar's clear and
+       the text's two-line room). At 1040 px these are 208, 688 and 40 (lines from x 300); at
+       1440, 280, 720 and 188 (lines from x 520). */
+    --np-pad: 40px;
+    --side: 64px;
+    --cover-cap: 440px;
+    --fl-cover: clamp(160px, 20cqw, 280px);
+    --fl-lw: min(100cqw - 2 * var(--np-pad) - var(--fl-cover) - 64px, 720px);
+    --fl-x: max(var(--np-pad), (100cqw - var(--fl-cover) - 64px - var(--fl-lw)) / 2);
+    container: stage / size;
     position: relative;
     height: 100%;
     overflow: hidden;
@@ -816,12 +859,14 @@
     z-index: 1;
     left: 50%;
     top: 88px;
-    width: 440px;
+    width: max(160px, min(var(--cover-cap), 100cqw - 2 * var(--side), 100cqh - 336px));
     transform: translateX(-50%);
   }
   &[data-side-open="false"] .np {
     top: 78px;
-    width: 461px;
+  }
+  &[data-side-open="false"] .stage {
+    --cover-cap: clamp(440px, 32cqw, 560px);
   }
   .np-cover {
     width: 100%;
@@ -912,9 +957,9 @@
      (fl-top 72 + s5); the title s5 under it in the display face at t-display-s, wrapping in
      the cover's width; the artist s1 under it, in a 24 px row. */
   &[data-view="lyrics"][data-has-lyrics="true"] .np {
-    left: 40px;
+    left: var(--fl-x);
     top: 96px;
-    width: 208px;
+    width: var(--fl-cover);
     transform: none;
   }
   &[data-view="lyrics"][data-has-lyrics="true"] .np-text {
@@ -942,17 +987,8 @@
   }
   /* With the side panel hidden the stage is the window's 1440 px: the cover at its 280 px cap,
      and the column and the 720 px of lines centre as one group in the stage (fl-x 188). The
-     lines are t-lyric-wide there (a stage from lyric-wide-min, 1200 px, wide). */
-  &[data-view="lyrics"][data-has-lyrics="true"][data-side-open="false"] .np {
-    left: 188px;
-    width: 280px;
-  }
-  &[data-side-open="false"] .lyrics {
-    left: 520px;
-    width: 744px;
-    --lyric: 26px;
-    --lyric-row: 36px;
-  }
+     lines are t-lyric-wide there (a stage from lyric-wide-min, 1200 px, wide): the formulas on
+     .stage give exactly that, and the stacked layout below 800 px (the end of this file). */
 
   /* The lines: one bold weight, so a line never re-wraps when it becomes current. Their
      panel starts under the back button's row (now_playing.slint fl-top, 72 px) and is a size
@@ -963,8 +999,8 @@
     --lyric: 24px;
     --lyric-row: 32.8px;
     position: absolute;
-    left: 300px;
-    width: 712px;
+    left: calc(var(--fl-x) + var(--fl-cover) + 64px - 12px);
+    width: calc(var(--fl-lw) + 24px);
     top: 72px;
     bottom: var(--bar-clear);
     overflow: clip;
@@ -1468,6 +1504,7 @@
     display: grid;
     align-items: center;
     height: 16px;
+    container-type: inline-size;
   }
   .rail {
     position: relative;
@@ -1492,7 +1529,7 @@
   }
   .thumb {
     position: absolute;
-    left: calc(var(--at, 0) * 100% - 7px);
+    left: -7px;
     top: 1px;
     width: 14px;
     height: 14px;
@@ -1758,5 +1795,309 @@
     & .bar-artist {
       font-size: 15px;
     }
+  }
+}
+
+/* The replica at any size: featherplay's own layout rules (app.slint, now_playing.slint,
+   bottom_bar.slint, theme.slint) as container queries, so the window on the page reflows as
+   the app does from its 1440 x 852 down to its least, 480 x 600. Three containers:
+   - `app`, the window's body (Window.astro's frame): the sidebar, the side panel, the pages;
+   - `stage`, Now playing (replica.css): the lyrics view stacks under 800 px;
+   - `pbar`, the player bar: what it gives up as it narrows, in the app's order.
+   Where there's no `app` container (a replica on a laptop's screen, the 404) nothing here but the
+   stage's and the bar's rules applies, and at those fixed sizes they don't. */
+
+/* ---------- In a window: the app's height is the window's ---------- */
+.win-body > .replica {
+  --app-h: calc(100cqh - var(--title-h));
+}
+.replica .bar {
+  container: pbar / inline-size;
+}
+@container stage (width >= 1200px) {
+  .replica .lyrics {
+    --lyric: 26px;
+    --lyric-row: 36px;
+  }
+}
+
+/* ---------- The window's width: sidebar, rail, drawer; the panel, or the sheet ---------- */
+/* The panels are 340 px under 1280 (theme.slint panel-wide-min). */
+@container app (width < 1280px) {
+  .replica:is([data-view="now"], [data-view="lyrics"]) .app {
+    grid-template-columns: 1fr 340px;
+  }
+}
+/* Under wide-min (1100 px) the sidebar is the 72 px icon rail. */
+@container app (width < 1100px) {
+  .replica .app {
+    grid-template-columns: 72px 1fr;
+  }
+  .replica[data-queue-open="true"]:not([data-view="now"], [data-view="lyrics"]) .app {
+    grid-template-columns: 72px 1fr 340px;
+  }
+  .replica .sidebar {
+    padding-inline: 12px;
+  }
+  .replica .side-item {
+    justify-content: center;
+    gap: 0;
+    padding: 0;
+  }
+  .replica .side-item > span,
+  .replica .chips,
+  .replica .side-list,
+  .replica .side-rule,
+  .replica .account > span:last-child {
+    display: none;
+  }
+  .replica .account {
+    justify-content: center;
+    padding-inline: 0;
+  }
+  .replica .resume {
+    grid-template-columns: 152px 1fr;
+  }
+  .replica .resume-next {
+    display: none;
+  }
+  .replica .cards {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+/* Under panel-fit (952 px) neither panel fits beside the page: Now playing takes the width,
+   and Up next is a sheet over the page, above the bar, opened by the bar's button. */
+@container app (width < 952px) {
+  .replica:is([data-view="now"], [data-view="lyrics"]) .app {
+    grid-template-columns: 1fr;
+  }
+  .replica[data-queue-open="true"]:not([data-view="now"], [data-view="lyrics"]) .app {
+    grid-template-columns: 72px 1fr;
+  }
+  .replica .queue {
+    display: none;
+  }
+  .replica[data-sheet="true"] .queue {
+    position: absolute;
+    z-index: 5;
+    top: 72px;
+    right: var(--bar-inset);
+    bottom: calc(var(--bar-clear) + 8px);
+    display: flex;
+    width: min(640px, 100cqw - 2 * var(--bar-inset));
+    padding-bottom: 12px;
+    border-radius: 16px;
+    box-shadow: /* taste-skill-ignore: the app's own sheet */
+      0 0 0 1px color-mix(in srgb, #00000014 calc(var(--light) * 100%), #ffffff0d),
+      0 8px 32px color-mix(in srgb, #00000033 calc(var(--light) * 100%), #000000a6);
+    animation: sheet-in var(--t-panel) var(--ease-drawer);
+  }
+  .replica .page,
+  .replica .topbar {
+    padding-inline: 24px;
+  }
+  .replica .field {
+    width: 100%;
+  }
+  .replica .keys {
+    display: none;
+  }
+}
+@keyframes sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .replica[data-sheet="true"] .queue {
+    animation-name: fade-in;
+  }
+}
+@container app (width < 800px) {
+  .replica .cards {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+}
+/* Under drawer-below (560 px) there's no rail: the page has the width. */
+@container app (width < 560px) {
+  .replica .app,
+  .replica[data-queue-open="true"]:not([data-view="now"], [data-view="lyrics"]) .app {
+    grid-template-columns: 1fr;
+  }
+  .replica .sidebar {
+    display: none;
+  }
+  .replica .page,
+  .replica .topbar {
+    padding-inline: 20px;
+  }
+  .replica .resume {
+    grid-template-columns: 112px 1fr;
+    gap: 16px;
+  }
+  .replica .resume-cover {
+    width: 112px;
+    height: 112px;
+  }
+  .replica .resume-title {
+    font-size: 24px;
+  }
+  .replica .cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ---------- Now playing under 800 px: the lyrics view stacks ----------
+   now_playing.slint `stack`: the song as a header in the stage's top left under the back
+   button's row (the cover 128 px, 120 under 560; beside it the title on one line, the
+   artists, "album · year" and the song's buttons), and the lines fill the stage below it at
+   about the side tab's size (22 px, 20 under 560). The cover view keeps the page's pad at its
+   sides. */
+@container stage (width < 800px) {
+  .replica .np,
+  .replica .lyrics {
+    --np-pad: 24px;
+    --side: 24px;
+  }
+  .replica .back {
+    left: 16px;
+  }
+  .replica .lyrics-pill {
+    right: 16px;
+  }
+  .replica[data-view="lyrics"][data-has-lyrics="true"] .np {
+    left: var(--np-pad);
+    top: 76px;
+    display: flex;
+    align-items: start;
+    gap: 20px;
+    width: calc(100cqw - 2 * var(--np-pad));
+  }
+  .replica[data-view="lyrics"][data-has-lyrics="true"] .np-cover {
+    flex: none;
+    width: 128px;
+    border-radius: 10px;
+  }
+  .replica[data-view="lyrics"][data-has-lyrics="true"] .np-text {
+    flex: 1;
+    min-width: 0;
+    margin-top: 2px;
+  }
+  .replica[data-view="lyrics"][data-has-lyrics="true"] .np-row {
+    align-items: center;
+  }
+  .replica[data-view="lyrics"][data-has-lyrics="true"] .np-title {
+    overflow: hidden;
+    font-size: 28px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .replica[data-view="lyrics"][data-has-lyrics="true"] .np-actions {
+    position: static;
+    opacity: 1;
+    visibility: visible;
+  }
+  .replica[data-view="lyrics"][data-has-lyrics="true"] .np-album {
+    color: #ffffffd9;
+    opacity: 1;
+    visibility: visible;
+  }
+  .replica .lyrics {
+    --lyric: 22px;
+    --lyric-row: 30px;
+    left: calc(var(--np-pad) - 12px);
+    top: 232px;
+    width: calc(100cqw - 2 * var(--np-pad) + 24px);
+  }
+}
+@container stage (width < 600px) {
+  .replica .np-source {
+    display: none;
+  }
+}
+@container stage (width < 560px) {
+  .replica .np,
+  .replica .lyrics {
+    --np-pad: 20px;
+    --side: 20px;
+  }
+  .replica[data-view="lyrics"][data-has-lyrics="true"] .np-cover {
+    width: 120px;
+  }
+  .replica[data-view="lyrics"][data-has-lyrics="true"] .np-title {
+    font-size: 24px;
+  }
+  .replica .lyrics {
+    --lyric: 20px;
+    --lyric-row: 27.3px;
+    top: 224px;
+  }
+}
+
+/* ---------- The player bar: what it gives up as it narrows (bottom_bar.slint) ----------
+   The time row narrows first; then, each where keeping it would crowd the title: the
+   volume's slider, the Lyrics button, the volume's button ("squeezed": the middle column
+   keeps to its least and sits by the right-hand group), Shuffle and Repeat, Not for me, and
+   the times, when the seek line runs along the bar's foot. Widths are the bar's. */
+@container pbar (width < 1100px) {
+  .replica .bar {
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  }
+  .replica .seek {
+    width: min(560px, max(280px, 100cqw - 720px));
+  }
+}
+@container pbar (width < 790px) {
+  .replica .volume {
+    display: none;
+  }
+}
+@container pbar (width < 686px) {
+  .replica .bar-end .lyr {
+    display: none;
+  }
+}
+@container pbar (width < 646px) {
+  .replica .bar {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    column-gap: 12px;
+  }
+  .replica .bar-end .mute {
+    display: none;
+  }
+  .replica .seek {
+    width: 240px;
+  }
+}
+@container pbar (width < 606px) {
+  .replica .bar [data-act="shuffle"],
+  .replica .bar [data-act="repeat"] {
+    display: none;
+  }
+  .replica .seek {
+    width: 200px;
+  }
+}
+@container pbar (width < 566px) {
+  .replica .bar-end .nfm {
+    display: none;
+  }
+}
+@container pbar (width < 526px) {
+  .replica .bar-mid {
+    padding-top: 0;
+  }
+  .replica .seek {
+    position: absolute;
+    left: 16px;
+    right: 16px;
+    bottom: 4px;
+    display: block;
+    width: auto;
+  }
+  .replica .seek .time {
+    display: none;
   }
 }

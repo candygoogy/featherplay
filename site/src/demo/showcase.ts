@@ -142,13 +142,14 @@ export function bindShowcase(root: HTMLElement, player: Player): void {
       lyricsOn = s.lyricsOn;
       toggle.setAttribute("aria-checked", String(s.lyricsOn));
       line = -2;
+      // Off: the lines fade out inside the panel and the note fades in, in the same place;
+      // the panel and its caption keep their size (CSS, LyricsShowcase.astro). Written on a
+      // change only: the store speaks every frame while a song plays.
+      calm.hidden = true;
+      off.hidden = false;
+      panel.dataset.state = !s.lyricsOn ? "off" : "lines";
+      if (source) source.dataset.off = String(!s.lyricsOn);
     }
-    // Off: the lines fade out inside the panel and the note fades in, in the same place; the
-    // panel and its caption keep their size (CSS, LyricsShowcase.astro).
-    calm.hidden = true;
-    off.hidden = false;
-    panel.dataset.state = !s.lyricsOn ? "off" : "lines";
-    if (source) source.dataset.off = String(!s.lyricsOn);
 
     const isPlaying = view.live && s.playing;
     if (isPlaying !== playing || view.live !== live) {

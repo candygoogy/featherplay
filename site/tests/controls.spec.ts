@@ -1,17 +1,17 @@
 import { expect, test, type Page } from "@playwright/test";
-import { skipTour, wake } from "./helpers";
+import { wake } from "./helpers";
 
 // The replica's controls behave as the app's do (apps/featherplay/ui: bottom_bar.slint,
 // parts.slint, pages/now_playing.slint, sidebar.slint).
 
 test.use({ viewport: { width: 1440, height: 900 } });
-const replica = (page: Page) => page.locator("[data-hero] [data-replica]");
+const replica = (page: Page) => page.locator("[data-window] [data-replica]");
 const bar = (page: Page) => replica(page).locator("[data-bar]");
 
 async function ready(page: Page) {
   await page.goto("/");
   await wake(page);
-  await skipTour(page);
+
 }
 
 test("the play button morphs into a rounded square while playing, the glyph turning", async ({ page }) => {
@@ -155,18 +155,6 @@ test("the toast is announced once, from one live region that's always on the pag
   await expect(page.locator('[data-toast][role="status"]')).toHaveCount(0);
   await bar(page).getByRole("button", { name: "Not for me" }).click();
   await expect(live).toHaveText("Marked as not for me");
-});
-
-test("minimising applies to the laptop's window only; the window without a taskbar has no minimise", async ({ page }) => {
-  await ready(page);
-  await replica(page).getByRole("button", { name: "Minimise featherplay" }).click();
-  await expect(replica(page)).toHaveAttribute("data-minimised", "");
-  const yours = page.locator("#replica-yours");
-  await expect(yours).not.toHaveAttribute("data-minimised", /.*/);
-  expect(await yours.evaluate((el) => el.inert)).toBe(false);
-  await expect(page.locator("#replica-kept")).not.toHaveAttribute("data-minimised", /.*/);
-  await yours.scrollIntoViewIfNeeded();
-  await expect(yours.locator('[data-act="minimise"]')).toBeHidden();
 });
 
 test("rows built for History say Pause only for the song that's playing", async ({ page }) => {

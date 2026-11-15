@@ -377,7 +377,7 @@ test.describe("lyrics follow the clip", () => {
         return {
           audioMs: a && !a.paused && a.readyState >= 3 ? a.currentTime * 1000 : null,
           shown: text("[data-showcase-lines]"),
-          heroShown: text("[data-hero] [data-lines]"),
+          heroShown: text("[data-window] [data-lines]"),
         };
       });
       if (audioMs === null) continue;

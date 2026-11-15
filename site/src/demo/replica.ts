@@ -137,7 +137,27 @@ function bindReplica(root: HTMLElement, player: Player) {
   // the illustration (inert) and the bare window ("Make it yours") stay as they are, and
   // the bare window has no minimise button.
   const canMinimise = !!desktop?.querySelector("[data-taskbar-app]") && !root.parentElement?.closest("[inert]");
-  if (!desktop) setAll(root, '[data-act="minimise"]', (el) => (el.hidden = true));
+  // On the page's desktop (Window.astro) the caption buttons act on the window: minimise to
+  // the tray, maximise and restore, close (which asks, as the app does). Elsewhere maximise and
+  // close are only drawn, and a window with no taskbar to return from has no minimise.
+  const inWindow = !!root.closest("[data-window]");
+  if (!desktop && !inWindow) setAll(root, '[data-act="minimise"]', (el) => (el.hidden = true));
+  if (!inWindow) {
+    for (const el of $$<HTMLButtonElement>(root, '[data-act="maximise"], [data-act="close"]')) {
+      el.disabled = true;
+      el.setAttribute("aria-hidden", "true");
+      el.tabIndex = -1;
+    }
+  }
+  const windowAct = (act: string) => root.dispatchEvent(new CustomEvent("fp-window", { bubbles: true, detail: act }));
+  // Up next as a sheet over the page, where the window is too narrow for it beside the page
+  // (app.slint panel-fit, 952 px: the end of replica.css); the bar's button opens and closes it.
+  const narrow = () => root.clientWidth > 0 && root.clientWidth < 952;
+  const setSheet = (open: boolean) => {
+    if (open) root.dataset.sheet = "true";
+    else delete root.dataset.sheet;
+    setAll(root, '[data-act="queue"]', (el) => el.setAttribute("aria-pressed", String(open)));
+  };
   const lines = $<HTMLOListElement>(root, "[data-lines]")!;
   // The side panel's Lyrics tab: the same lines on a card, following the song on their own.
   const sideLines = $<HTMLOListElement>(root, "[data-side-lines]");
@@ -182,12 +202,28 @@ function bindReplica(root: HTMLElement, player: Player) {
     history?: string;
     likedList?: string;
     toast?: number | null;
+    run?: string;
   } = {};
 
   // The lines follow the song; the wheel or a finger over them moves them for a while.
   const lyricsPanel = $(root, "[data-lyrics]");
   const follower = lyricsPanel ? followLyrics(lyricsPanel, lines) : null;
   const sideFollower = sidePanel && sideLines ? followLyrics(sidePanel, sideLines) : null;
+  // The window resized (the page's desktop lays the app out for its size): the lines wrap
+  // anew, so the one being sung is placed again at once, as the app's do.
+  if (lyricsPanel && "ResizeObserver" in window) {
+    let seen = "";
+    new ResizeObserver(() => {
+      const size = `${lyricsPanel.clientWidth}x${lyricsPanel.clientHeight}`;
+      if (!lyricsPanel.clientWidth || size === seen) return;
+      seen = size;
+      const song = player.state.song;
+      if (!song) return;
+      const i = currentLineIndex(song, player.state.positionMs);
+      follower?.follow(i >= 0 ? ((lines.children[i] as HTMLElement | undefined) ?? null) : null, true);
+      last.sideShown = false;
+    }).observe(lyricsPanel);
+  }
 
   // --- What the visitor does ---------------------------------------------------------
   root.addEventListener("click", (e) => {
@@ -260,9 +296,23 @@ function bindReplica(root: HTMLElement, player: Player) {
         } else player.show(s.view === "lyrics" ? "now" : "lyrics");
         break;
       case "queue":
+        // A narrow window: the sheet, over whatever page is open.
+        if (narrow()) {
+          const open = root.dataset.sheet !== "true";
+          if (open) {
+            if (isNowView(s.view)) player.toggleSide(true);
+            else player.toggleQueue(true);
+          }
+          setSheet(open);
+          break;
+        }
         // On Now playing it hides and shows the side panel; over a page, Up next.
         if (isNowView(s.view)) player.toggleSide();
         else player.toggleQueue();
+        break;
+      case "maximise":
+      case "close":
+        windowAct(target.dataset.act);
         break;
       case "source":
         // "Playing from": the demo's songs are a list of its own, so it opens Up next.
@@ -483,9 +533,22 @@ function bindReplica(root: HTMLElement, player: Player) {
     }
 
     if (song) {
-      const fraction = Math.min(1, s.positionMs / song.durationMs);
-      setAll(root, "[data-progress]", (el) => (el.style.transform = `scaleX(${fraction})`));
-      thumb?.style.setProperty("--at", String(fraction));
+      // The progress (the bar's line and its thumb, the resume card's line) runs on the
+      // compositor: one linear animation from here to the song's end, started again only when
+      // the song, play or the place changes. Nothing is restyled or laid out per frame.
+      const run = `${song.id}|${s.playing}|${s.jumps}`;
+      if (run !== last.run) {
+        const fraction = Math.min(1, s.positionMs / song.durationMs);
+        const left = Math.max(0, song.durationMs - s.positionMs);
+        const go = (el: HTMLElement, prop: "transform" | "translate", from: string, to: string) => {
+          for (const a of el.getAnimations()) a.cancel();
+          el.style[prop] = from;
+          if (s.playing && left > 0) el.animate([{ [prop]: from }, { [prop]: to }], { duration: left, easing: "linear", fill: "forwards" });
+        };
+        setAll(root, "[data-progress]", (el) => go(el, "transform", `scaleX(${fraction})`, "scaleX(1)"));
+        if (thumb) go(thumb, "translate", `${(fraction * 100).toFixed(3)}cqw 0`, "100cqw 0");
+        last.run = run;
+      }
       const second = Math.floor(s.positionMs / 1000);
       if (second !== last.second) {
         const at = formatTime(s.positionMs);

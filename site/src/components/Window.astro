@@ -1,8 +1,10 @@
 ---
-// featherplay's window on the page: the replica (the app's own layout, Replica.astro) in a
-// frame that is a size container, so the app lays itself out for the window's size, as the
-// real one does (replica.css). Without script it fills its slot, a still of the app at that
-// size; src/demo/window.ts then sizes, scales and moves it.
+// featherplay's window on the page: the replica (the app's own layout, Replica.astro) in a frame
+// that is a size container, so the app lays itself out for the window's size as the real one
+// does (the end of replica.css). Without script it fills its slot, a still of the app at that size;
+// with it, src/demo/window.ts sizes and scales it to fit, never past the viewport, and makes it
+// a window: dragged by its title bar, maximised and restored, minimised to the tray, closed
+// with the app's own question (the dialog below, at the page's size).
 import Replica from "./Replica.astro";
 ---
 
@@ -11,17 +13,163 @@ import Replica from "./Replica.astro";
     <Replica view="lyrics" />
   </div>
 </div>
+<dialog class="closer glass float live" data-closer aria-labelledby="closer-h" aria-describedby="closer-text">
+  <h2 id="closer-h" class="closer-h">Close featherplay?</h2>
+  <p id="closer-text" class="closer-p" data-closer-text>Choose what the close button does this time. featherplay will ask again next time.</p>
+  <label class="closer-check"><input type="checkbox" data-closer-remember /> Remember my choice</label>
+  <div class="closer-btns">
+    <button type="button" class="closer-btn" data-closer-do="tray">Keep playing in the tray</button>
+    <button type="button" class="closer-btn solid" data-closer-do="close">Close featherplay</button>
+  </div>
+</dialog>
+
+<script>
+  import { bindReplicas } from "../demo/replica";
+  import { bindWindow } from "../demo/window";
+  const player = bindReplicas();
+  const el = document.querySelector<HTMLElement>("[data-window]");
+  if (player && el) bindWindow(el, player);
+</script>
 
 <style>
   .window {
+    --s: 1;
     position: absolute;
     inset: 0;
+    z-index: 10;
+  }
+  /* With script, unseen until placed at its size: no frame of the slot's layout first. */
+  :global(.js) .window:not(:global(.placed)) {
+    visibility: hidden;
+  }
+  /* Placed by script: its own size and a transform from its top left. */
+  .window:global(.placed) {
+    inset: auto;
+    left: 0;
+    top: 0;
+    transform-origin: 0 0;
+    will-change: transform;
   }
   .win-body {
     position: absolute;
     inset: 0;
     overflow: hidden;
-    border-radius: var(--r-small);
+    border-radius: calc(8px / var(--s));
     container: app / size;
+    box-shadow:
+      0 0 0 calc(1px / var(--s)) var(--edge),
+      0 calc(1px / var(--s)) calc(2px / var(--s)) var(--shade-1),
+      0 calc(4px / var(--s)) calc(16px / var(--s)) var(--shade-2),
+      0 calc(16px / var(--s)) calc(56px / var(--s)) var(--shade-3);
+  }
+  .window[data-max] .win-body {
+    border-radius: 0;
+  }
+  .window[data-minimised] {
+    visibility: hidden;
+    transition: visibility 0s linear 300ms;
+  }
+  /* The caption buttons' targets are 32 page px tall whatever the window's scale (their width
+     is Windows' 46 px, scaled). */
+  .window :global(button.cap) {
+    position: relative;
+  }
+  .window :global(button.cap::after) {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: max(100%, 32px / var(--s));
+  }
+  /* The title bar is the window's handle. */
+  @media (min-width: 761px) {
+    .window :global(.titlebar) {
+      touch-action: none;
+    }
+    .window[data-dragging] :global(.titlebar) {
+      cursor: grabbing;
+    }
+  }
+  /* Until the visitor clicks into the window, the wheel over it scrolls the page: its lists
+     don't scroll. */
+  .window:not([data-active]) :global(.rows) {
+    overflow: hidden;
+  }
+
+  /* The app's own close dialog (close_dialog.slint), at the page's size, over the window. */
+  .closer {
+    --mat: var(--mat-fly);
+    position: fixed;
+    inset: auto;
+    left: 50%;
+    top: 50%;
+    width: min(28.75rem, 100vw - 32px);
+    margin: 0;
+    padding: var(--s5);
+    border: 0;
+    border-radius: var(--r-panel);
+    color: var(--text);
+    font-family: var(--font-ui);
+    font-size: 14px;
+  }
+  .closer::backdrop {
+    background: rgb(0 0 0 / 0.32);
+  }
+  .closer-h {
+    font-family: var(--font);
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+  .closer-p {
+    margin-top: var(--s2);
+    color: var(--ink2);
+  }
+  .closer-check {
+    display: flex;
+    align-items: center;
+    gap: var(--s2);
+    margin-top: var(--s4);
+    cursor: pointer;
+  }
+  .closer-check input {
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    accent-color: var(--accent);
+  }
+  .closer-btns {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: var(--s2);
+    margin-top: var(--s5);
+  }
+  .closer-btn {
+    min-height: 40px;
+    padding: 0 var(--s4);
+    border: 0;
+    border-radius: var(--r-pill);
+    background: var(--tonal);
+    color: var(--text);
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color var(--t-hover) ease;
+  }
+  .closer-btn:hover {
+    background: var(--tonal-hover);
+  }
+  .closer-btn.solid {
+    background: var(--solid);
+    color: var(--on-solid);
+  }
+  .closer-btn.solid:hover {
+    background: var(--solid-hover);
+  }
+  @media (width < 420px) {
+    .closer-btn {
+      flex: 1 1 100%;
+    }
   }
 </style>

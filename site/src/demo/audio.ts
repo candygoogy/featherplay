@@ -44,13 +44,19 @@ export function bindAudio(player: Player): void {
     return el;
   };
 
+  let shown = "";
   const render = (s: PlayerState) => {
     const clip = s.song?.clip;
     const silent = s.muted || s.volume === 0;
-    for (const b of switches) {
-      b.hidden = !clip;
-      b.setAttribute("aria-pressed", String(!silent));
-      b.dataset.on = String(!silent);
+    // The switches change only with the song or the sound (the store speaks every frame).
+    const key = `${!!clip}|${silent}`;
+    if (key !== shown) {
+      shown = key;
+      for (const b of switches) {
+        b.hidden = !clip;
+        b.setAttribute("aria-pressed", String(!silent));
+        b.dataset.on = String(!silent);
+      }
     }
     if (!clip) {
       audio?.pause();

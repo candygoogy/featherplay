@@ -24,7 +24,7 @@ test("picking light or dark restyles the replica only, not the page", async ({ p
   await section.getByRole("radio", { name: "Light", exact: true }).check();
   await expect.poll(() => bg(page, "[data-yours] [data-replica]")).toBe("rgb(255, 255, 255)");
   // Every featherplay on the page is the same app: the hero's restyles too.
-  await expect.poll(() => bg(page, "[data-hero] [data-replica]")).toBe("rgb(255, 255, 255)");
+  await expect.poll(() => bg(page, "[data-window] [data-replica]")).toBe("rgb(255, 255, 255)");
   expect(await bg(page, "body")).toBe(pageBg);
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   // The window's own art follows its theme: the light Tri-vane in the title bar (both
@@ -64,7 +64,7 @@ test("picking a cover plays that song and the page glow follows", async ({ page 
   const front = yours(page).locator('[data-glow-layer][data-on="true"]');
   await expect.poll(() => front.evaluate((el) => el.style.getPropertyValue("--c"))).toBe(song.colour);
   // The picker shows what's playing, whoever started it.
-  await page.evaluate(() => document.querySelector<HTMLElement>('[data-hero] [data-play="watching-seabirds-soar"]')?.click());
+  await page.evaluate(() => document.querySelector<HTMLElement>('[data-window] [data-play="watching-seabirds-soar"]')?.click());
   await expect(section.getByRole("radio", { name: "Watching Seabirds Soar (Harmony)" })).toBeChecked();
 });
 
