@@ -201,3 +201,166 @@ pub fn ask(key: &str, what: Ask) -> Result<bool, String> {
     }
     Ok(false)
 }
+
+#[cfg(test)]
+mod tests {
+    //! Nothing here touches the user's running featherplay: each test uses a home of its
+    //! own, so its mutex and message are its own.
+
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::{Arc, mpsc};
+
+    use super::*;
+
+    /// A home no featherplay runs with, so the test's mutex and message are its own.
+    fn test_key(test: &str) -> String {
+        key(Some(OsStr::new(&format!(
+            "D:/featherplay-test-{test}-{}",
+            std::process::id()
+        ))))
+    }
+
+    #[test]
+    fn an_installed_run_uses_the_fixed_name() {
+        assert_eq!(
+            mutex_name(&key(None)),
+            r"Local\featherplay-featherplay.featherplay"
+        );
+    }
+
+    #[test]
+    fn each_home_has_a_guard_of_its_own_whatever_its_spelling() {
+        let home = Some(OsStr::new("D:/dev/featherplay-home"));
+        // (case, one home, another, whether they share a guard)
+        let cases: [(&str, Option<&OsStr>, Option<&OsStr>, bool); 4] = [
+            (
+                "an empty home counts as unset",
+                Some(OsStr::new("")),
+                None,
+                true,
+            ),
+            ("a dev home has a guard of its own", home, None, false),
+            (
+                "two homes have two guards",
+                home,
+                Some(OsStr::new("D:/dev/featherplay-other")),
+                false,
+            ),
+            (
+                "one home spelled two ways has one guard",
+                home,
+                Some(OsStr::new(r"d:\dev\Featherplay-Home\")),
+                true,
+            ),
+        ];
+        for (case, a, b, same) in cases {
+            assert_eq!(key(a) == key(b), same, "{case}: {} {}", key(a), key(b));
+        }
+        // A kernel object name may have one backslash, after its namespace.
+        let k = key(Some(OsStr::new(r"D:\dev\cache\featherplay-dev")));
+        assert!(
+            !k.contains(['\\', '/', ':']),
+            "the names hold no path separator: {k}"
+        );
+    }
+
+    #[test]
+    fn a_claim_after_the_first_has_gone_runs() {
+        let name = mutex_name(&test_key("gone"));
+        drop(claim(&name).expect("first claim"));
+        assert!(matches!(
+            claim(&name).expect("claim again"),
+            Claim::First(_)
+        ));
+    }
+
+    #[test]
+    fn waiting_takes_over_once_the_first_lets_go() {
+        let name = mutex_name(&test_key("wait"));
+        let (held_tx, held) = mpsc::channel();
+        let (release_tx, release) = mpsc::channel::<()>();
+        // The first instance on a thread of its own: a mutex is owned by a thread, so this
+        // one can't take it over while the other holds it.
+        let thread_name = name.clone();
+        let first = std::thread::spawn(move || {
+            let guard = claim(&thread_name).expect("first claim");
+            held_tx.send(()).expect("say held");
+            let _ = release.recv();
+            drop(guard);
+        });
+        held.recv().expect("the first holds it");
+        let Claim::Running(running) = claim(&name).expect("second claim") else {
+            panic!("the second claim should find the first running");
+        };
+        let Err(running) = running.wait(Duration::from_millis(50)) else {
+            panic!("taken while the first still holds it");
+        };
+        release_tx.send(()).expect("let go");
+        first.join().expect("first thread");
+        assert!(
+            running.wait(Duration::from_secs(5)).is_ok(),
+            "not taken over once the first let go"
+        );
+    }
+
+    #[test]
+    fn asking_to_show_reaches_the_window_of_the_same_home() {
+        let key = test_key("show");
+        let shown = Arc::new(AtomicUsize::new(0));
+        let count = shown.clone();
+        session_end::listen(
+            || {},
+            Some(session_end::Show {
+                message: show_message(&key).expect("register the message"),
+                on_show: Box::new(move |ask| {
+                    if ask == Ask::Show {
+                        count.fetch_add(1, Ordering::SeqCst);
+                    }
+                    true
+                }),
+            }),
+        )
+        .expect("listen");
+
+        assert!(ask_to_show(&key).expect("ask"), "no window answered");
+        assert_eq!(shown.load(Ordering::SeqCst), 1);
+        // `--quick-search` asks the same window for the box, not for the main window.
+        assert!(ask(&key, Ask::QuickSearch).expect("ask"), "no answer");
+        assert_eq!(shown.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn asking_to_show_passes_over_the_window_of_another_home() {
+        let shown = Arc::new(AtomicUsize::new(0));
+        let count = shown.clone();
+        session_end::listen(
+            || {},
+            Some(session_end::Show {
+                message: show_message(&test_key("mine")).expect("register the message"),
+                on_show: Box::new(move |_| {
+                    count.fetch_add(1, Ordering::SeqCst);
+                    true
+                }),
+            }),
+        )
+        .expect("listen");
+
+        assert!(!ask_to_show(&test_key("theirs")).expect("ask"));
+        assert_eq!(shown.load(Ordering::SeqCst), 0);
+    }
+
+    #[test]
+    fn a_closing_instance_does_not_count_as_shown() {
+        let key = test_key("closing");
+        session_end::listen(
+            || {},
+            Some(session_end::Show {
+                message: show_message(&key).expect("register the message"),
+                on_show: Box::new(|_| false),
+            }),
+        )
+        .expect("listen");
+
+        assert!(!ask_to_show(&key).expect("ask"));
+    }
+}
