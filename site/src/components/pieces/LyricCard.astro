@@ -15,7 +15,7 @@ const song = songById(demoStart.songId)!;
 const current = currentLineIndex(song, demoStart.positionMs);
 ---
 
-<div class:list={["lyric-card", className]} data-piece="lyrics" data-has-lyrics={String(song.lyrics.length > 0)} role="group" aria-label="The song’s lyrics">
+<div class:list={["lyric-card", className]} data-piece="lyrics" inert data-has-lyrics={String(song.lyrics.length > 0)} role="group" aria-label="The song’s lyrics">
   <img class="lc-art" data-bind="cover" src={song.cover} width="600" height="600" alt="" decoding="async" loading="lazy" />
   <div class="lc-view" data-lc-view>
     <ol class="lc-lines" data-lc-lines>

@@ -33,6 +33,8 @@ export async function startStory(player: Player): Promise<void> {
   const stage = document.querySelector<HTMLElement>("[data-stage]");
   const pin = stage?.querySelector<HTMLElement>("[data-pin]");
   if (!stage || !pin) return;
+  // The story's script is here: the pinned stage boot.js promised is kept.
+  root.toggleAttribute("data-story-live", true);
   const win = await whenWindow;
   const hero = [...stage.querySelectorAll<HTMLElement>(".first > .head, .first > .col")];
   const caps = [...stage.querySelectorAll<HTMLElement>("[data-cap]")];

@@ -10,9 +10,18 @@
   document.documentElement.dataset.theme = t;
   document.documentElement.classList.add("js", "booting");
   // The scroll story's pinned stage (src/scripts/story.ts STORY), before the first paint, so
-  // the page's height doesn't change under the visitor.
+  // the page's height doesn't change under the visitor. Only a promise: the story's own script
+  // keeps it (data-story-live). If the page's scripts never ran (blocked, failed to load), by
+  // the time the page has loaded it is the page without script: no pinned stage, and the
+  // window shown as the still it is without script, not hidden waiting to be placed.
   if (matchMedia("(min-width: 761px) and (min-height: 600px) and (prefers-reduced-motion: no-preference)").matches)
     document.documentElement.dataset.story = "";
+  addEventListener("load", () => {
+    const r = document.documentElement;
+    const placed = document.querySelector("[data-window].placed");
+    if (!placed || !r.hasAttribute("data-story-live")) delete r.dataset.story;
+    if (!placed && document.querySelector("[data-window]")) r.classList.remove("js");
+  });
   // Nothing eases until the styles are in (base.css): DOMContentLoaded comes after the module
   // scripts, which wait for the stylesheets; then two frames.
   addEventListener("DOMContentLoaded", () =>

@@ -133,6 +133,9 @@ function glideFrom(el: HTMLElement, from: DOMRect, duration: number) {
 }
 
 function bindReplica(root: HTMLElement, player: Player) {
+  // Inert until now (Replica.astro): without script it is a still of the app, not a hundred
+  // controls that do nothing.
+  root.inert = false;
   const desktop = root.closest<HTMLElement>("[data-desktop]");
   // Only a window on a desktop with a taskbar to come back from can minimise (the hero's);
   // the illustration (inert) and the bare window ("Make it yours") stay as they are, and

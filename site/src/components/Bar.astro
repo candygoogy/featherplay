@@ -763,6 +763,10 @@ const arrow = "M12 4.5 V15 M7.5 10.5 L12 15 L16.5 10.5 M5 19.5 H19";
       animation: none;
     }
   }
+  /* Without script the song’s flyout and the tray icon would open or press to nothing: not shown. */
+  :global(:root:not(.js)) :is(.b-np, .b-tray) {
+    display: none !important;
+  }
   @media (forced-colors: active) {
     .dock,
     .cap-bg {

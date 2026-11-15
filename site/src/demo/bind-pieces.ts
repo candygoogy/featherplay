@@ -44,6 +44,8 @@ export function bindPieces(player: Player): void {
   if (bound || typeof document === "undefined") return;
   bound = true;
   const doc = document.documentElement;
+  // The pieces with controls are inert until their script is here (MediaFlyout, LyricCard).
+  for (const p of $$("[data-piece][inert]")) p.inert = false;
 
   // ---- Buttons anywhere on the page that act on the player ----
   document.addEventListener("click", (e) => {
