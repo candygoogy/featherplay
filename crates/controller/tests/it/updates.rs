@@ -65,7 +65,12 @@ fn a_version_is_newer_only_by_its_numbers() {
         ("older major", "v0.1.0", "1.0.0", false),
         ("a pre-release", "v0.2.0-beta.1", "0.1.0", false),
         ("a release candidate", "v9.0.0-rc1", "0.1.0", false),
-        ("a release over its pre-release", "v0.2.0", "0.2.0-dev", true),
+        (
+            "a release over its pre-release",
+            "v0.2.0",
+            "0.2.0-dev",
+            true,
+        ),
         ("empty", "", "0.1.0", false),
         ("only v", "v", "0.1.0", false),
         ("a word", "latest", "0.1.0", false),
@@ -75,10 +80,19 @@ fn a_version_is_newer_only_by_its_numbers() {
         ("two v", "vv1.0.0", "0.1.0", false),
         ("a space", " 1.0.0", "0.1.0", false),
         ("an empty number", "1..0", "0.1.0", false),
-        ("a malformed running version", "v9.0.0", "not a version", false),
+        (
+            "a malformed running version",
+            "v9.0.0",
+            "not a version",
+            false,
+        ),
     ];
     for (label, tag, current, newer) in cases {
-        assert_eq!(is_newer(tag, current), newer, "{label}: {tag:?} over {current:?}");
+        assert_eq!(
+            is_newer(tag, current),
+            newer,
+            "{label}: {tag:?} over {current:?}"
+        );
     }
 }
 
@@ -488,7 +502,13 @@ fn the_update_file_is_picked_by_os_and_architecture() {
             Some("featherplay-setup-0.2.0-arm64.exe"),
         ),
         ("windows x86", "windows", "0.2.0", "x86", None),
-        ("windows, only digits and dots", "windows", "../0.2.0", "x86_64", None),
+        (
+            "windows, only digits and dots",
+            "windows",
+            "../0.2.0",
+            "x86_64",
+            None,
+        ),
         (
             "linux x86_64",
             "linux",
@@ -504,7 +524,13 @@ fn the_update_file_is_picked_by_os_and_architecture() {
             Some("featherplay-aarch64.AppImage"),
         ),
         ("linux riscv64", "linux", "0.2.0", "riscv64", None),
-        ("linux, only digits and dots", "linux", "0.2.0/..", "x86_64", None),
+        (
+            "linux, only digits and dots",
+            "linux",
+            "0.2.0/..",
+            "x86_64",
+            None,
+        ),
         ("macos", "macos", "0.2.0", "aarch64", None),
     ];
     for (label, os, version, arch, want) in cases {
@@ -560,7 +586,13 @@ fn the_plan_takes_this_machines_setup_its_checksums_and_their_signature() {
             "x86_64",
             Some(("featherplay-setup-0.2.0.exe", None)),
         ),
-        ("windows arm64, x64 only", x64_only, "windows", "aarch64", None),
+        (
+            "windows arm64, x64 only",
+            x64_only,
+            "windows",
+            "aarch64",
+            None,
+        ),
         (
             "windows arm64, both",
             both_setups,
@@ -575,7 +607,13 @@ fn the_plan_takes_this_machines_setup_its_checksums_and_their_signature() {
             "x86_64",
             Some(("featherplay-x86_64.AppImage", None)),
         ),
-        ("linux aarch64, x86_64 only", x86_64_image, "linux", "aarch64", None),
+        (
+            "linux aarch64, x86_64 only",
+            x86_64_image,
+            "linux",
+            "aarch64",
+            None,
+        ),
         (
             "linux aarch64, both",
             both_images,
@@ -602,7 +640,10 @@ fn the_plan_takes_this_machines_setup_its_checksums_and_their_signature() {
             signed,
             "windows",
             "x86_64",
-            Some(("featherplay-setup-0.2.0.exe", Some("SHA256SUMS.txt.minisig"))),
+            Some((
+                "featherplay-setup-0.2.0.exe",
+                Some("SHA256SUMS.txt.minisig"),
+            )),
         ),
         (
             "unsigned",

@@ -337,7 +337,11 @@ mod tests {
         // No pins left for an account: its entry goes.
         Change::Pins("".into(), Vec::new()).apply(&mut s);
         assert!(!s.pins.contains_key(""), "{:?}", s.pins);
-        assert_eq!(s.volume, Settings::default().volume, "the volume isn't a page setting");
+        assert_eq!(
+            s.volume,
+            Settings::default().volume,
+            "the volume isn't a page setting"
+        );
     }
 
     /// The settings the player and the audio bus take converted: autoplay to the list's

@@ -1,6 +1,6 @@
-use super::install::tests::{BY_MAIN, SETUP, SIGNED_SUMS, serve};
 #[cfg(target_os = "linux")]
 use super::install::tests::test_cache;
+use super::install::tests::{BY_MAIN, SETUP, SIGNED_SUMS, serve};
 use super::*;
 
 /// `releases/latest` for 9.0.0, its files on the project's releases, as GitHub gives;
@@ -190,10 +190,20 @@ fn the_banner_says_where_the_update_is() {
     };
     let cases = [
         ("nothing newer", installed(Stamp::default()), Banner::None),
-        ("a portable copy", Status { stamp: found(), ..Status::default() }, Banner::Get),
+        (
+            "a portable copy",
+            Status {
+                stamp: found(),
+                ..Status::default()
+            },
+            Banner::Get,
+        ),
         (
             "downloading",
-            Status { downloading: true, ..installed(found()) },
+            Status {
+                downloading: true,
+                ..installed(found())
+            },
             Banner::Downloading,
         ),
         ("downloaded", installed(downloaded()), Banner::Ready),
@@ -208,7 +218,10 @@ fn the_banner_says_where_the_update_is() {
         ),
         (
             "a setup that wouldn't start",
-            Status { launch_failed: true, ..installed(downloaded()) },
+            Status {
+                launch_failed: true,
+                ..installed(downloaded())
+            },
             Banner::CannotInstall,
         ),
         (
@@ -222,12 +235,19 @@ fn the_banner_says_where_the_update_is() {
         ),
         (
             "scoop's copy",
-            Status { stamp: found(), kind: Kind::Scoop, ..Status::default() },
+            Status {
+                stamp: found(),
+                kind: Kind::Scoop,
+                ..Status::default()
+            },
             Banner::Scoop,
         ),
         (
             "restart clicked",
-            Status { restarting: true, ..installed(downloaded()) },
+            Status {
+                restarting: true,
+                ..installed(downloaded())
+            },
             Banner::Starting,
         ),
         (

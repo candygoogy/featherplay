@@ -910,7 +910,10 @@ pub(super) mod tests {
                     "{label}: {err}"
                 ),
             }
-            assert!(!cache.join("updates").exists(), "{label}: nothing downloaded");
+            assert!(
+                !cache.join("updates").exists(),
+                "{label}: nothing downloaded"
+            );
         }
         std::fs::remove_dir_all(&cache).unwrap();
     }
