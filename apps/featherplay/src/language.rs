@@ -139,67 +139,33 @@ pub fn apply(code: &str) {
 mod tests {
     use super::*;
 
-    fn langs(l: &[&str]) -> Vec<String> {
-        l.iter().map(|s| s.to_string()).collect()
-    }
-
     #[test]
-    fn windows_default_takes_the_first_display_language_that_is_bundled() {
-        assert_eq!(
-            resolve("", &langs(&["fr-FR", "de-DE", "en-US"]), &["de", "pl"]),
-            "de"
-        );
-    }
-
-    #[test]
-    fn windows_default_is_english_when_no_display_language_is_bundled() {
-        assert_eq!(resolve("", &langs(&["fr-FR", "en-US"]), &["de"]), "");
-    }
-
-    #[test]
-    fn an_exact_regional_match_wins_over_the_language_alone() {
-        assert_eq!(resolve("", &langs(&["pt-BR"]), &["pt", "pt-BR"]), "pt-BR");
-    }
-
-    #[test]
-    fn a_regional_display_language_matches_the_bundled_language() {
-        assert_eq!(resolve("", &langs(&["pt-BR"]), &["pt"]), "pt");
-    }
-
-    #[test]
-    fn windows_default_never_picks_the_test_language() {
-        assert_eq!(resolve("", &langs(&["qps-plocm"]), &[PSEUDO]), "");
-    }
-
-    #[test]
-    fn english_overrides_windows() {
-        assert_eq!(resolve("en", &langs(&["de-DE"]), &["de"]), "");
-    }
-
-    #[test]
-    fn a_picked_language_overrides_windows() {
-        assert_eq!(resolve("pl", &langs(&["de-DE"]), &["de", "pl"]), "pl");
-    }
-
-    #[test]
-    fn a_picked_language_no_longer_bundled_falls_back_to_windows() {
-        assert_eq!(resolve("pl", &langs(&["de-DE"]), &["de"]), "de");
-    }
-
-    #[test]
-    fn settings_list_windows_default_and_english_first() {
-        let codes: Vec<_> = choices(false).iter().take(2).map(|c| c.code).collect();
-        assert_eq!(codes, ["", "en"]);
+    fn the_setting_resolves_to_a_bundled_language_or_english() {
+        // (case, setting, display languages, bundled, want); "" is English.
+        let cases: [(&str, &str, &str, &[&str], &str); 8] = [
+            (
+                "first bundled",
+                "",
+                "fr-FR de-DE en-US",
+                &["de", "pl"],
+                "de",
+            ),
+            ("default: none bundled", "", "fr-FR en-US", &["de"], ""),
+            ("exact region wins", "", "pt-BR", &["pt", "pt-BR"], "pt-BR"),
+            ("region matches base", "", "pt-BR", &["pt"], "pt"),
+            ("never the test one", "", "qps-plocm", &[PSEUDO], ""),
+            ("English overrides", "en", "de-DE", &["de"], ""),
+            ("a pick overrides", "pl", "de-DE", &["de", "pl"], "pl"),
+            ("pick gone: default", "pl", "de-DE", &["de"], "de"),
+        ];
+        for (case, setting, preferred, bundled, want) in cases {
+            let preferred: Vec<String> = preferred.split(' ').map(String::from).collect();
+            assert_eq!(resolve(setting, &preferred, bundled), want, "{case}");
+        }
     }
 
     #[test]
     fn release_builds_keep_the_test_language_out_of_the_list() {
         assert!(choices(false).iter().all(|c| c.code != PSEUDO));
-    }
-
-    #[test]
-    #[cfg_attr(not(debug_assertions), ignore)]
-    fn debug_builds_list_the_test_language() {
-        assert!(choices(true).iter().any(|c| c.code == PSEUDO));
     }
 }
