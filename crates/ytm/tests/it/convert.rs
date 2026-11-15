@@ -1191,11 +1191,12 @@ fn a_continuation_with_a_row_without_duration_reads() {
     } } ] });
 
     let (first, second) = (first.to_string(), second.to_string());
+    let mut paging = convert::PlaylistPaging::default();
     assert_eq!(
-        convert::playlist_continuation(&first).as_deref(),
+        paging.next_token(&first).as_deref(),
         Some("NEXT_PAGE_TOKEN")
     );
-    assert_eq!(convert::playlist_continuation(&second), None);
+    assert_eq!(paging.next_token(&second), None);
 
     let tracks = convert::playlist_tracks(&[first, second]).expect("parse");
     assert_eq!(tracks.len(), first_count + more);

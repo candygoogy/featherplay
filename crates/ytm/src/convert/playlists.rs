@@ -79,11 +79,6 @@ impl Listed {
 
 /// The next-page token of a playlist page (first page or continuation): the last row's
 /// continuation item.
-pub fn playlist_continuation(raw: &str) -> Option<String> {
-    let v: Value = serde_json::from_str(raw).ok()?;
-    continuation_token(playlist_rows(&v)?)
-}
-
 fn continuation_token(rows: &[Value]) -> Option<String> {
     rows.last()?
         .pointer(CONTINUATION_TOKEN)
