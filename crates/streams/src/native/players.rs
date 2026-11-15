@@ -273,7 +273,9 @@ mod tests {
 
     #[test]
     fn the_transform_cache_keeps_the_newest_players() {
-        let root = home("cache");
+        let Some(root) = home("cache") else {
+            return;
+        };
         let dir = root.join("players");
         assert_eq!(installed(&dir, "aaaa0001"), None);
         let p = install(&dir, "aaaa0001", 20000, FAKE_PLAYER).unwrap();

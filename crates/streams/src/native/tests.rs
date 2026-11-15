@@ -15,16 +15,9 @@ pub(super) const VIDEO: &str = "h46YpWrg55Q";
 pub(super) const FAKE_PLAYER: &str = r#"_result.n = (n) => n.split("").reverse().join("");
 _result.sig = (s) => s.slice(2).split("").reverse().join("");"#;
 
-pub(super) fn home(name: &str) -> PathBuf {
-    let base = std::env::var("FEATHERPLAY_HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| std::env::temp_dir().join("featherplay-tests"));
-    let dir = base
-        .join("test-streams")
-        .join(format!("native-{name}-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
-    std::fs::create_dir_all(&dir).unwrap();
-    dir
+/// A fresh folder of the test's own, or `None`: the test skips (`crate::test_dir`).
+pub(super) fn home(name: &str) -> Option<PathBuf> {
+    crate::test_dir(&format!("native-{name}"))
 }
 
 pub(super) fn config() -> EmbedConfig {
@@ -37,10 +30,10 @@ pub(super) const AD_SLOT: &str = r#""adSlots":[{"adSlotRenderer":{"adSlotMetadat
 
 /// A resolver over `base` whose state and player are already on disk, asking as the
 /// embed alone: these tests are about that client.
-fn seeded(name: &str, base: &str) -> (NativeResolver, PathBuf) {
-    let (r, dir) = seeded_with_visionos(name, base);
+fn seeded(name: &str, base: &str) -> Option<(NativeResolver, PathBuf)> {
+    let (r, dir) = seeded_with_visionos(name, base)?;
     embedded_only(&r);
-    (r, dir)
+    Some((r, dir))
 }
 
 /// Resolves ask the embedded client alone, as after repeated visionOS failures.
@@ -50,8 +43,8 @@ fn embedded_only(r: &NativeResolver) {
 }
 
 /// A resolver over `base` whose state and player are already on disk.
-fn seeded_with_visionos(name: &str, base: &str) -> (NativeResolver, PathBuf) {
-    let dir = home(name);
+fn seeded_with_visionos(name: &str, base: &str) -> Option<(NativeResolver, PathBuf)> {
+    let dir = home(name)?;
     let player = install(&dir.join("players"), "096efeec", 20752, FAKE_PLAYER).unwrap();
     // Its bytecode now, so no save runs beside the resolves and the folder can go.
     js::warm(&player.path).unwrap();
@@ -62,7 +55,7 @@ fn seeded_with_visionos(name: &str, base: &str) -> (NativeResolver, PathBuf) {
         fetched: SystemTime::now(),
         page: 0,
     });
-    (r, dir)
+    Some((r, dir))
 }
 
 #[tokio::test]
@@ -76,7 +69,9 @@ async fn a_native_resolve_is_one_request() {
                 _ => (404, String::new()),
             },
         );
-    let (r, dir) = seeded("resolve", &base);
+    let Some((r, dir)) = seeded("resolve", &base) else {
+        return;
+    };
     let s = r.resolve(VIDEO, Quality::High).await.unwrap();
     assert_eq!(
         *log.lock().unwrap(),
@@ -126,7 +121,9 @@ fn client(s: &ResolvedStream) -> String {
 #[tokio::test]
 async fn a_resolve_asks_as_visionos_first() {
     let (base, log) = two_clients(VISIONOS_PLAYER.to_string());
-    let (r, dir) = seeded_with_visionos("visionos", &base);
+    let Some((r, dir)) = seeded_with_visionos("visionos", &base) else {
+        return;
+    };
     let s = r.resolve(VIDEO, Quality::High).await.unwrap();
     assert_eq!(log.lock().unwrap().len(), 1, "one request");
     assert_eq!((client(&s).as_str(), s.itag), ("VISIONOS", 251));
@@ -143,7 +140,9 @@ async fn a_resolve_asks_as_visionos_first() {
 async fn without_a_visionos_stream_the_embedded_client_answers() {
     let bot = r#"{"playabilityStatus":{"status":"LOGIN_REQUIRED","reason":"Sign in to confirm you're not a bot"}}"#;
     let (base, log) = two_clients(bot.to_string());
-    let (r, dir) = seeded_with_visionos("no-visionos", &base);
+    let Some((r, dir)) = seeded_with_visionos("no-visionos", &base) else {
+        return;
+    };
     for asked in [2, 4, 6] {
         let s = r.resolve(VIDEO, Quality::High).await.unwrap();
         assert_eq!(client(&s), "WEB_EMBEDDED_PLAYER");
@@ -169,7 +168,9 @@ async fn without_a_visionos_stream_the_embedded_client_answers() {
 async fn a_visionos_answer_with_ads_goes_to_the_embedded_client() {
     let gated = VISIONOS_PLAYER.replacen('{', &format!("{{{AD_SLOT},"), 1);
     let (base, log) = two_clients(gated);
-    let (r, dir) = seeded_with_visionos("visionos-ads", &base);
+    let Some((r, dir)) = seeded_with_visionos("visionos-ads", &base) else {
+        return;
+    };
     let s = r.resolve(VIDEO, Quality::High).await.unwrap();
     assert_eq!(client(&s), "WEB_EMBEDDED_PLAYER");
     assert_eq!(log.lock().unwrap().len(), 2);
@@ -190,7 +191,9 @@ async fn song_refusals_and_resolves_aside_leave_visionos_on() {
         ("aside", bot, true),
     ] {
         let (base, log) = two_clients(answer.to_string());
-        let (r, dir) = seeded_with_visionos(&format!("visionos-{name}"), &base);
+        let Some((r, dir)) = seeded_with_visionos(&format!("visionos-{name}"), &base) else {
+            return;
+        };
         for _ in 0..VISIONOS_MAX_FAILURES {
             let s = if aside {
                 r.resolve_aside(VIDEO, Quality::High).await
@@ -231,7 +234,9 @@ async fn both_clients_refusing_a_song_is_not_available() {
         })
     };
     let (base, log) = route(refused);
-    let (r, dir) = seeded_with_visionos("not-available", &base);
+    let Some((r, dir)) = seeded_with_visionos("not-available", &base) else {
+        return;
+    };
     let e = r.resolve(VIDEO, Quality::High).await.unwrap_err();
     assert_eq!(
         e,
@@ -241,7 +246,9 @@ async fn both_clients_refusing_a_song_is_not_available() {
     std::fs::remove_dir_all(&dir).unwrap();
 
     let (base, _) = route(refused);
-    let (r, dir) = seeded("not-available-embed", &base);
+    let Some((r, dir)) = seeded("not-available-embed", &base) else {
+        return;
+    };
     let e = r.resolve(VIDEO, Quality::High).await.unwrap_err();
     assert_eq!(e, NativeError::Skip("UNPLAYABLE: Video unavailable".into()));
     std::fs::remove_dir_all(&dir).unwrap();
@@ -267,7 +274,9 @@ fn unavailable_for_different_songs_in_a_row_turns_visionos_off() {
 #[tokio::test]
 async fn a_refused_visionos_url_leaves_resolves_to_the_embedded_client() {
     let (base, log) = two_clients(VISIONOS_PLAYER.to_string());
-    let (r, dir) = seeded_with_visionos("visionos-refused", &base);
+    let Some((r, dir)) = seeded_with_visionos("visionos-refused", &base) else {
+        return;
+    };
     r.visionos_refused();
     let s = r.resolve(VIDEO, Quality::High).await.unwrap();
     assert_eq!(client(&s), "WEB_EMBEDDED_PLAYER");
@@ -293,7 +302,9 @@ async fn a_fresh_resolve_uses_a_new_embed_page_once() {
             _ => (404, String::new()),
         }
     });
-    let (r, dir) = seeded("fresh", &base);
+    let Some((r, dir)) = seeded("fresh", &base) else {
+        return;
+    };
     r.resolve_fresh(VIDEO, Quality::High).await.unwrap();
     r.resolve(VIDEO, Quality::High).await.unwrap();
     assert_eq!(
@@ -313,7 +324,9 @@ async fn a_fresh_resolve_uses_a_new_embed_page_once() {
 #[tokio::test]
 async fn a_failed_request_forgets_the_config_and_three_turn_it_off() {
     let (base, log) = test_server::serve(|_, _, _| (500, String::new()));
-    let (r, dir) = seeded("fails", &base);
+    let Some((r, dir)) = seeded("fails", &base) else {
+        return;
+    };
     let e = r.resolve(VIDEO, Quality::High).await.unwrap_err();
     assert!(matches!(e, NativeError::Failed(_)), "{e:?}");
     assert!(
@@ -344,7 +357,9 @@ async fn a_failed_request_forgets_the_config_and_three_turn_it_off() {
 #[tokio::test]
 async fn failures_of_songs_prepared_aside_do_not_turn_it_off() {
     let (base, log) = test_server::serve(|_, _, _| (500, String::new()));
-    let (r, dir) = seeded("aside", &base);
+    let Some((r, dir)) = seeded("aside", &base) else {
+        return;
+    };
     for _ in 0..MAX_FAILURES {
         assert!(r.resolve_aside(VIDEO, Quality::High).await.is_err());
     }
@@ -368,7 +383,9 @@ async fn an_answer_without_a_url_drops_the_kept_page_for_the_next_start() {
             (200, answer.clone())
         }
     });
-    let (r, dir) = seeded("no-url", &base);
+    let Some((r, dir)) = seeded("no-url", &base) else {
+        return;
+    };
     let e = r.resolve(VIDEO, Quality::High).await.unwrap_err();
     assert!(matches!(e, NativeError::NoUrl(_)), "{e:?}");
     let next_start = NativeResolver::with_dirs(dir.clone(), &base).unwrap();
@@ -383,7 +400,9 @@ async fn an_answer_without_a_url_drops_the_kept_page_for_the_next_start() {
 /// without a panic: the next start fetches the page again.
 #[test]
 fn a_kept_state_fetched_too_far_ahead_is_not_loaded() {
-    let (_r, dir) = seeded("far-fetched", "http://127.0.0.1:9");
+    let Some((_r, dir)) = seeded("far-fetched", "http://127.0.0.1:9") else {
+        return;
+    };
     let path = dir.join("state.json");
     let mut v: Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
     v["fetched"] = u64::MAX.into();
@@ -423,7 +442,9 @@ async fn answers_without_urls_from_the_kept_page_ask_again_from_one_fresh_page()
             _ => (404, String::new()),
         }
     });
-    let (r, dir) = seeded("no-url-again", &base);
+    let Some((r, dir)) = seeded("no-url-again", &base) else {
+        return;
+    };
     let (a, b, c) = tokio::join!(
         r.resolve(VIDEO, Quality::High),
         r.resolve(VIDEO, Quality::High),
@@ -467,7 +488,9 @@ async fn the_failures_of_one_page_count_once() {
             (200, bad.clone())
         }
     });
-    let (r, dir) = seeded("no-url-once", &base);
+    let Some((r, dir)) = seeded("no-url-once", &base) else {
+        return;
+    };
     let resolve = || async {
         let e = r.resolve(VIDEO, Quality::High).await;
         let _ = done.send(());
@@ -520,7 +543,9 @@ async fn a_new_player_is_installed_behind_the_older_ones_answer() {
     /// `n` in upper case: not what the older player answers.
     const NEW_PLAYER: &str = "_result.n = (n) => n.toUpperCase(); _result.sig = (s) => s;";
     let (base, log) = new_player_server();
-    let (mut r, dir) = seeded("new-player", &base);
+    let Some((mut r, dir)) = seeded("new-player", &base) else {
+        return;
+    };
     // Preprocessing ends when the test lets it.
     let (go, wait) = std::sync::mpsc::channel::<()>();
     let wait = Mutex::new(wait);
@@ -568,7 +593,9 @@ async fn a_new_player_is_installed_behind_the_older_ones_answer() {
 #[tokio::test]
 async fn a_player_that_couldnt_be_solved_gives_way_to_the_next_one() {
     let (base, log) = new_player_server();
-    let (mut r, dir) = seeded("bad-player", &base);
+    let Some((mut r, dir)) = seeded("bad-player", &base) else {
+        return;
+    };
     r.set_preprocessor(stub(FAKE_PLAYER));
     r.inner.health.lock().unwrap().bad.insert("096efeec".into());
     r.resolve(VIDEO, Quality::High).await.unwrap();
@@ -607,7 +634,9 @@ fn a_player_is_set_aside_for_its_own_failures_and_repeated_timeouts() {
 #[tokio::test]
 async fn a_first_run_has_its_player_before_the_first_song() {
     let (base, log) = new_player_server();
-    let dir = home("first-run");
+    let Some(dir) = home("first-run") else {
+        return;
+    };
     let mut r = NativeResolver::with_dirs(dir.clone(), &base).unwrap();
     embedded_only(&r);
     r.set_preprocessor(stub(FAKE_PLAYER));
@@ -638,7 +667,9 @@ async fn a_first_run_has_its_player_before_the_first_song() {
 #[tokio::test]
 async fn a_preprocessor_that_cannot_start_leaves_the_work_to_this_process() {
     let (base, _log) = new_player_server();
-    let dir = home("no-child");
+    let Some(dir) = home("no-child") else {
+        return;
+    };
     let mut r = NativeResolver::with_dirs(dir.clone(), &base).unwrap();
     r.set_preprocessor(Preprocessor::Child(dir.join("no-such-program.exe")));
     let e = r.resolve(VIDEO, Quality::High).await.unwrap_err();
@@ -681,7 +712,9 @@ async fn measure_resolves_and_a_new_player() {
             _ => (404, String::new()),
         }
     });
-    let dir = home("measure");
+    let Some(dir) = home("measure") else {
+        return;
+    };
     let player = install(&dir.join("players"), "096efeec", sts, body).unwrap();
     let mut r = NativeResolver::with_dirs(dir.clone(), &base).unwrap();
     embedded_only(&r);

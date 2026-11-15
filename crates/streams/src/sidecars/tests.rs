@@ -1,7 +1,8 @@
 use super::*;
 
 /// A folder of this test's own (not created), under `FEATHERPLAY_HOME`, else the temp
-/// folder.
+/// folder. Only the Unix test still writes here; the others take `crate::test_dir`.
+#[cfg(unix)]
 fn scratch(name: &str) -> PathBuf {
     std::env::var("FEATHERPLAY_HOME")
         .map(PathBuf::from)
@@ -211,7 +212,9 @@ async fn live_the_pinned_releases_install() {
 /// `yt-dlp -U` (~10 s, beside the first resolves).
 #[tokio::test]
 async fn an_old_update_stamp_is_made_recent() {
-    let dir = scratch("stamp");
+    let Some(dir) = crate::test_dir("stamp") else {
+        return;
+    };
     std::fs::create_dir_all(&dir).unwrap();
     let stamp = dir.join(UPDATE_STAMP);
     std::fs::write(&stamp, b"").unwrap();
@@ -296,7 +299,9 @@ async fn a_download_cut_off_mid_file_is_tried_again() {
             let _ = s.write_all(answer);
         }
     });
-    let dir = scratch("cut");
+    let Some(dir) = crate::test_dir("cut") else {
+        return;
+    };
     std::fs::create_dir_all(&dir).unwrap();
     let dest = dir.join("yt-dlp.exe.part");
     let from = Downloads::local(&[&base], "", "");
@@ -375,7 +380,9 @@ fn the_waits_are_few_and_short() {
 
 #[tokio::test]
 async fn sha256_mismatch_rejected() {
-    let dir = scratch("sha");
+    let Some(dir) = crate::test_dir("sha") else {
+        return;
+    };
     std::fs::create_dir_all(&dir).unwrap();
     let part = dir.join("yt-dlp.exe.part");
     std::fs::write(&part, b"corrupted download").unwrap();

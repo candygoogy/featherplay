@@ -4,23 +4,21 @@ use super::*;
 use crate::native::test_server;
 use crate::sidecars::{DENO_EXE, YTDLP_EXE};
 
-fn test_home(name: &str) -> PathBuf {
-    let base = std::env::var("FEATHERPLAY_HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| std::env::temp_dir().join("featherplay-tests"));
-    let home = base
-        .join("test-streams")
-        .join(format!("{name}-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&home);
+/// A fresh home of the test's own with an empty `sidecars` folder; `None`: the test skips
+/// (`crate::test_dir`).
+fn test_home(name: &str) -> Option<PathBuf> {
+    let home = crate::test_dir(name)?;
     std::fs::create_dir_all(home.join("sidecars")).unwrap();
-    home
+    Some(home)
 }
 
 /// The daily `yt-dlp -U` runs only when the last one is a day old (or there's none), and
 /// only with the helpers there.
 #[tokio::test]
 async fn the_daily_update_runs_when_the_last_one_is_a_day_old() {
-    let home = test_home("update-daily");
+    let Some(home) = test_home("update-daily") else {
+        return;
+    };
     let dir = home.join("sidecars");
     let r = YtDlpResolver::with_native(Sidecars { dir: dir.clone() }, None);
     assert!(!r.update_daily().await, "no helpers, nothing to update");
@@ -53,7 +51,9 @@ async fn the_daily_update_runs_when_the_last_one_is_a_day_old() {
 /// after that, only once the stamp is a day old. No update loop.
 #[tokio::test]
 async fn the_helpers_are_forced_up_to_date_once_a_session() {
-    let home = test_home("update-once");
+    let Some(home) = test_home("update-once") else {
+        return;
+    };
     let dir = home.join("sidecars");
     // Not a program: the update fails at once, which still counts as an update tried.
     std::fs::write(dir.join(YTDLP_EXE), b"not a program").unwrap();
@@ -248,7 +248,9 @@ mod first_run {
     /// helpers only once that gave nothing and yt-dlp is next, and says so then.
     #[tokio::test]
     async fn a_resolve_waits_for_the_helpers_only_once_the_native_step_failed() {
-        let home = test_home("first-run-wait");
+        let Some(home) = test_home("first-run-wait") else {
+            return;
+        };
         let (downloads, base, log) = helpers_server(0, Duration::ZERO);
         let dir = home.join("sidecars");
         // Its player can't be preprocessed (EJS finds nothing in it), so it fails.
@@ -285,7 +287,9 @@ mod first_run {
 
     #[tokio::test]
     async fn resolves_at_once_share_one_download() {
-        let home = test_home("first-run-share");
+        let Some(home) = test_home("first-run-share") else {
+            return;
+        };
         let (downloads, _, log) = helpers_server(0, Duration::from_millis(300));
         let r = resolver(&home, downloads);
 
@@ -304,7 +308,9 @@ mod first_run {
     /// A server error is tried twice more, after a pause, before the download fails.
     #[tokio::test]
     async fn a_download_that_fails_twice_is_tried_again() {
-        let home = test_home("first-run-again");
+        let Some(home) = test_home("first-run-again") else {
+            return;
+        };
         let (downloads, _, log) = helpers_server(2, Duration::ZERO);
         let r = resolver(&home, downloads);
 
@@ -319,7 +325,9 @@ mod first_run {
     /// second source instead, after GitHub's own tries.
     #[tokio::test]
     async fn what_github_cant_give_comes_from_the_second_source() {
-        let home = test_home("first-run-second");
+        let Some(home) = test_home("first-run-second") else {
+            return;
+        };
         let (github, github_log) = test_server::serve_bytes(|path| match path {
             "/yt-dlp.exe" => (503, b"down".to_vec()),
             _ => (200, b"not the zip".to_vec()),
@@ -352,7 +360,9 @@ mod first_run {
     /// Both sources failing: the toast says what GitHub's failure was.
     #[tokio::test]
     async fn a_file_neither_source_gives_fails_with_githubs_fault() {
-        let home = test_home("first-run-neither");
+        let Some(home) = test_home("first-run-neither") else {
+            return;
+        };
         let (github, _) = test_server::serve_bytes(|_| (503, b"down".to_vec()));
         let (second, _) = test_server::serve_bytes(|_| (404, b"gone".to_vec()));
         let r = resolver(&home, Downloads::local(&[&github, &second], "00", "00"));
@@ -369,7 +379,9 @@ mod first_run {
     /// A file that doesn't match its pin is deleted, and said to be damaged.
     #[tokio::test]
     async fn a_download_that_doesnt_match_its_pin_is_damaged() {
-        let home = test_home("first-run-damaged");
+        let Some(home) = test_home("first-run-damaged") else {
+            return;
+        };
         let (_, base, _) = helpers_server(0, Duration::ZERO);
         let wrong = sha256(b"another file");
         let r = resolver(&home, Downloads::local(&[&base], &wrong, &wrong));
@@ -392,7 +404,9 @@ mod first_run {
     /// A missing file stays missing: no second try.
     #[tokio::test]
     async fn a_download_that_isnt_there_is_not_tried_again() {
-        let home = test_home("first-run-404");
+        let Some(home) = test_home("first-run-404") else {
+            return;
+        };
         let (downloads, _, log) = failing_server(1, 404, Duration::ZERO);
         let r = resolver(&home, downloads);
 
@@ -408,7 +422,9 @@ mod first_run {
 
     #[tokio::test]
     async fn a_failed_download_fails_the_resolve_and_the_next_resolve_tries_again() {
-        let home = test_home("first-run-retry");
+        let Some(home) = test_home("first-run-retry") else {
+            return;
+        };
         let (downloads, _, log) = helpers_server(3, Duration::ZERO);
         let r = resolver(&home, downloads);
         let id = TrackId("h46YpWrg55Q".into());
@@ -432,7 +448,9 @@ mod first_run {
 
     #[tokio::test]
     async fn resolves_waiting_on_a_failed_download_share_its_error() {
-        let home = test_home("first-run-fail-shared");
+        let Some(home) = test_home("first-run-fail-shared") else {
+            return;
+        };
         let (downloads, _, log) = helpers_server(usize::MAX, Duration::from_millis(300));
         let r = resolver(&home, downloads);
 
@@ -451,7 +469,9 @@ mod first_run {
 
     #[tokio::test]
     async fn a_fresh_download_counts_as_todays_update() {
-        let home = test_home("first-run-stamp");
+        let Some(home) = test_home("first-run-stamp") else {
+            return;
+        };
         let (downloads, _, _) = helpers_server(0, Duration::ZERO);
         let r = resolver(&home, downloads);
 
@@ -464,7 +484,9 @@ mod first_run {
 
     #[tokio::test]
     async fn nothing_downloads_when_the_helpers_are_there() {
-        let home = test_home("first-run-present");
+        let Some(home) = test_home("first-run-present") else {
+            return;
+        };
         let dir = home.join("sidecars");
         std::fs::write(dir.join(YTDLP_EXE), YTDLP).unwrap();
         std::fs::write(dir.join(DENO_EXE), b"not really deno").unwrap();

@@ -53,6 +53,25 @@ pub enum Preprocessor {
 #[cfg(test)]
 pub(crate) type Stub = std::sync::Arc<dyn Fn(&str) -> Result<String, String> + Send + Sync>;
 
+/// A fresh, empty folder of a test's own: `{FEATHERPLAY_HOME}/test-streams/<name>-<pid>`.
+/// `None`, after saying so, when `FEATHERPLAY_HOME` isn't set: the test returns early and
+/// writes nothing anywhere else.
+#[cfg(test)]
+pub(crate) fn test_dir(name: &str) -> Option<PathBuf> {
+    let Some(base) = std::env::var_os("FEATHERPLAY_HOME").filter(|v| !v.is_empty()) else {
+        eprintln!(
+            "skipped: FEATHERPLAY_HOME is not set; point it at a scratch folder to run this test"
+        );
+        return None;
+    };
+    let dir = PathBuf::from(base)
+        .join("test-streams")
+        .join(format!("{name}-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    Some(dir)
+}
+
 /// The one argument of the process that preprocesses a player ([`Preprocessor::Child`]).
 pub const PREPROCESS_ARG: &str = "--preprocess-player";
 

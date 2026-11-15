@@ -718,19 +718,12 @@ mod tests {
     const FAKE_PLAYER: &str = r#"_result.n = (n) => n.split("").reverse().join("");
 _result.sig = (s) => s.slice(2).split("").reverse().join("");"#;
 
-    /// A player file with this code, in a folder of its own.
-    fn player(name: &str, code: &str) -> PathBuf {
-        let base = std::env::var("FEATHERPLAY_HOME")
-            .map(PathBuf::from)
-            .unwrap_or_else(|_| std::env::temp_dir().join("featherplay-tests"));
-        let dir = base
-            .join("test-streams")
-            .join(format!("js-{name}-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir).unwrap();
-        let path = dir.join("player.js");
+    /// A player file with this code, in a folder of its own; `None`: the test skips
+    /// (`crate::test_dir`).
+    fn player(name: &str, code: &str) -> Option<PathBuf> {
+        let path = crate::test_dir(&format!("js-{name}"))?.join("player.js");
         std::fs::write(&path, code).unwrap();
-        path
+        Some(path)
     }
 
     /// The bytecode, once the run that answered has saved it.
@@ -782,7 +775,9 @@ _result.sig = (s) => s.slice(2).split("").reverse().join("");"#;
 
     #[tokio::test]
     async fn the_solver_answers_from_the_source_then_from_its_bytecode() {
-        let p = player("solver", FAKE_PLAYER);
+        let Some(p) = player("solver", FAKE_PLAYER) else {
+            return;
+        };
         let solver = Solver::start(&p).unwrap();
         let a = solver
             .solve(&["abc".into()], &["xy123".into()])
@@ -800,7 +795,9 @@ _result.sig = (s) => s.slice(2).split("").reverse().join("");"#;
 
     #[tokio::test]
     async fn bytecode_that_is_damaged_or_another_builds_is_made_again() {
-        let p = player("stale", FAKE_PLAYER);
+        let Some(p) = player("stale", FAKE_PLAYER) else {
+            return;
+        };
         assert_eq!(n(&p, "abc").await.unwrap(), "cba");
         let bytecode = bytecode_path(&p);
         let good = saved_bytecode(&p);
@@ -818,7 +815,9 @@ _result.sig = (s) => s.slice(2).split("").reverse().join("");"#;
 
     #[tokio::test]
     async fn a_player_without_the_functions_says_so() {
-        let p = player("no-functions", "_result.x = 1; throw new Error('boom');");
+        let Some(p) = player("no-functions", "_result.x = 1; throw new Error('boom');") else {
+            return;
+        };
         let e = n(&p, "abc").await.unwrap_err();
         assert!(e.contains("no n function") && e.contains("boom"), "{e}");
         done(&p);
@@ -830,11 +829,13 @@ _result.sig = (s) => s.slice(2).split("").reverse().join("");"#;
         let host = "Deno,process,require,fetch,XMLHttpRequest,WebSocket,Worker,std,os,bjson,\
                     console,print,scriptArgs,navigator,setTimeout,setInterval,importScripts,\
                     WebAssembly,localStorage";
-        let p = player(
+        let Some(p) = player(
             "sandbox",
             r#"_result.n = (names) => names.split(",")
                 .filter((name) => typeof globalThis[name] !== "undefined").join(",") || "none";"#,
-        );
+        ) else {
+            return;
+        };
         assert_eq!(n(&p, host).await.unwrap(), "none");
         done(&p);
     }
@@ -844,7 +845,9 @@ _result.sig = (s) => s.slice(2).split("").reverse().join("");"#;
     #[tokio::test]
     async fn a_player_that_reads_its_own_text_keeps_it_in_its_bytecode() {
         let reads_itself = "_result.n = (n) => n + (function f() { return 1; }).toString().length;";
-        let p = player("own-text", reads_itself);
+        let Some(p) = player("own-text", reads_itself) else {
+            return;
+        };
         let from_source = n(&p, "abc").await.unwrap();
         saved_bytecode(&p);
         assert_eq!(from_source, "abc26");
@@ -873,7 +876,9 @@ _result.sig = (s) => s.slice(2).split("").reverse().join("");"#;
                 "memory",
             ),
         ] {
-            let p = player("limits", code);
+            let Some(p) = player("limits", code) else {
+                return;
+            };
             let solver = Solver::with_limits(&p, limits).unwrap();
             let e = solver.solve(&["abc".into()], &[]).await.unwrap_err();
             assert!(e.to_lowercase().contains(said), "{code}: {e}");
