@@ -206,9 +206,13 @@ fn records(json: &Value, kind: u64) -> Result<(Vec<IpAddr>, u64), String> {
         else {
             continue;
         };
-        if ip.is_ipv4() == (kind == A) && !ips.contains(&ip) {
+        if ip.is_ipv4() != (kind == A) {
+            continue;
+        }
+        // An address listed twice keeps the shorter of its TTLs (RFC 2181, 5.2).
+        ttl = ttl.min(record["TTL"].as_u64().unwrap_or(0));
+        if !ips.contains(&ip) {
             ips.push(ip);
-            ttl = ttl.min(record["TTL"].as_u64().unwrap_or(0));
         }
     }
     Ok((ips, ttl))
@@ -562,15 +566,17 @@ mod tests {
                 {"type":5,"TTL":300,"data":"youtube-ui.l.google.com."},
                 {"type":1,"TTL":200,"data":"142.250.180.14"},
                 {"type":1,"TTL":250,"data":"142.250.180.46"},
-                {"type":28,"TTL":100,"data":"2001:db8::1"}]}"#,
+                {"type":28,"TTL":100,"data":"2001:db8::1"},
+                {"type":28,"TTL":60,"data":"2001:db8::1"}]}"#,
         )
         .unwrap();
         let (ips, ttl) = records(&json, A).unwrap();
         assert_eq!(list(&ips), "142.250.180.14 and 1 more");
         assert_eq!(ttl, 200);
+        // An address listed twice is taken once, with the shorter TTL.
         let (ips, ttl) = records(&json, AAAA).unwrap();
         assert_eq!(list(&ips), "2001:db8::1");
-        assert_eq!(ttl, 100);
+        assert_eq!(ttl, 60);
         let nxdomain: Value = serde_json::from_str(r#"{"Status":3}"#).unwrap();
         assert_eq!(records(&nxdomain, A), Err("DNS status 3".into()));
     }
