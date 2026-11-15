@@ -64,21 +64,22 @@ fn autoplaying(ids: &[&str]) -> Queue {
     q
 }
 
+/// A list keeps its name until autoplay plays; then autoplay names itself.
 #[test]
 fn a_list_keeps_its_name_until_autoplay_plays() {
-    let q = autoplaying(&["a", "b"]);
-    let info = queue_info(&q, &homework());
-    assert_eq!((info.playing_from, info.autoplay_at), (homework(), Some(0)));
-}
-
-#[test]
-fn autoplay_names_itself_once_it_plays() {
     let mut q = autoplaying(&["a", "b"]);
+    let info = queue_info(&q, &homework());
+    assert_eq!(
+        (info.playing_from, info.autoplay_at),
+        (homework(), Some(0)),
+        "the list's last track"
+    );
     q.advance();
     let info = queue_info(&q, &homework());
     assert_eq!(
         (info.playing_from, info.autoplay_at),
-        (PlayingFrom::named("Autoplay"), None)
+        (PlayingFrom::named("Autoplay"), None),
+        "autoplay's first"
     );
 }
 

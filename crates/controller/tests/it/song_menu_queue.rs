@@ -55,32 +55,44 @@ fn send(player: &mut Player, action: Action) {
     player.handle(input);
 }
 
+/// Each edit on "now", then the rest of the list: the current track stays, and what comes
+/// after it is the row's.
 #[test]
-fn play_next_goes_right_after_the_current_track() {
-    let mut player = player_with(&["now", "a", "b"]);
-    send(&mut player, Action::PlayNext(track("x")));
-    assert_eq!(
-        player.queue().current().map(|t| t.id.0.as_str()),
-        Some("now")
-    );
-    assert_eq!(upcoming(&player), ["x", "a", "b"]);
-}
-
-#[test]
-fn add_to_queue_goes_to_the_end() {
-    let mut player = player_with(&["now", "a", "b"]);
-    send(&mut player, Action::AddToQueue(track("x")));
-    assert_eq!(upcoming(&player), ["a", "b", "x"]);
-}
-
-/// The sidebar playlist menu's Play next: the whole playlist, in order, after the current
-/// track.
-#[test]
-fn a_playlists_play_next_goes_after_the_current_track_in_order() {
-    let mut player = player_with(&["now", "a"]);
-    let edit = QueueAction::PlayNextAll(vec![track("x"), track("y")]);
-    player.handle(add_input(edit).expect("a player input"));
-    assert_eq!(upcoming(&player), ["x", "y", "a"]);
+fn each_queue_edit_lands_in_its_place() {
+    let cases: [(&str, &[&str], fn(&mut Player), &[&str]); 3] = [
+        (
+            "play next goes right after the current track",
+            &["now", "a", "b"],
+            |p| send(p, Action::PlayNext(track("x"))),
+            &["x", "a", "b"],
+        ),
+        (
+            "add to queue goes to the end",
+            &["now", "a", "b"],
+            |p| send(p, Action::AddToQueue(track("x"))),
+            &["a", "b", "x"],
+        ),
+        // The sidebar playlist menu's Play next: the whole playlist, in order.
+        (
+            "a playlist's play next goes after the current track in order",
+            &["now", "a"],
+            |p| {
+                let edit = QueueAction::PlayNextAll(vec![track("x"), track("y")]);
+                p.handle(add_input(edit).expect("a player input"));
+            },
+            &["x", "y", "a"],
+        ),
+    ];
+    for (label, ids, edit, want) in cases {
+        let mut player = player_with(ids);
+        edit(&mut player);
+        assert_eq!(
+            player.queue().current().map(|t| t.id.0.as_str()),
+            Some("now"),
+            "{label}"
+        );
+        assert_eq!(upcoming(&player), want, "{label}");
+    }
 }
 
 #[test]

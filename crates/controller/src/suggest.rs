@@ -439,37 +439,43 @@ mod tests {
         }
     }
 
+    /// Each row of `mixed()`, the two completions then the three results, and one past them.
     #[test]
-    fn picking_a_completion_searches_for_it() {
-        assert_eq!(
-            pick_of(&mixed(), 1),
-            Some(Pick::Search("daft punk live".into()))
-        );
-    }
-
-    #[test]
-    fn picking_a_song_plays_it() {
-        assert!(matches!(pick_of(&mixed(), 3), Some(Pick::Play(t)) if t.id.0 == "qe8Q7mjxjig"));
-    }
-
-    #[test]
-    fn picking_an_artist_or_album_opens_its_page() {
-        assert_eq!(
-            pick_of(&mixed(), 2),
-            Some(Pick::Open(Place::Artist(ArtistId(
-                "UCRr1xG_2WIDs18a6cIiCxeA".into()
-            ))))
-        );
-        assert_eq!(
-            pick_of(&mixed(), 4),
-            Some(Pick::Open(Place::Album(AlbumId(
-                "MPREb_dMHztPsrDgN".into()
-            ))))
-        );
-    }
-
-    #[test]
-    fn a_row_past_the_end_picks_nothing() {
-        assert_eq!(pick_of(&mixed(), 5), None);
+    fn each_row_picks_what_it_shows() {
+        let shown = mixed();
+        let HomeItem::Track(song) = &shown.results[1].item else {
+            unreachable!("the second result is the song");
+        };
+        assert_eq!(song.id.0, "qe8Q7mjxjig");
+        let cases = [
+            (
+                "a completion searches for it",
+                1,
+                Some(Pick::Search("daft punk live".into())),
+            ),
+            (
+                "an artist opens its page",
+                2,
+                Some(Pick::Open(Place::Artist(ArtistId(
+                    "UCRr1xG_2WIDs18a6cIiCxeA".into(),
+                )))),
+            ),
+            (
+                "a song plays it",
+                3,
+                Some(Pick::Play(Box::new(song.clone()))),
+            ),
+            (
+                "an album opens its page",
+                4,
+                Some(Pick::Open(Place::Album(AlbumId(
+                    "MPREb_dMHztPsrDgN".into(),
+                )))),
+            ),
+            ("a row past the end picks nothing", 5, None),
+        ];
+        for (label, row, want) in cases {
+            assert_eq!(pick_of(&shown, row), want, "{label}");
+        }
     }
 }

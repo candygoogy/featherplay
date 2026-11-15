@@ -624,22 +624,19 @@ mod tests {
         assert_eq!(page.tracks.len(), 6);
     }
 
+    /// Josh Woodward's songs have timed demo lyrics; Watching Seabirds Soar has none.
     #[test]
-    fn josh_woodward_songs_should_have_timed_demo_lyrics() {
-        let (lines, credit) = demo()
+    fn the_demo_lyrics_are_timed_where_a_song_has_them() {
+        let f = demo();
+        let (lines, credit) = f
             .demo_lyrics(&id("california-lullabye"))
             .expect("read")
             .expect("lyrics");
         assert_eq!(lines[0].text, "But distance lost its fight");
         assert_eq!(lines[0].start, Duration::from_millis(700));
         assert!(credit.contains("Josh Woodward"));
-    }
 
-    #[test]
-    fn watching_seabirds_soar_should_have_no_demo_lyrics() {
-        let found = demo()
-            .demo_lyrics(&id("watching-seabirds-soar"))
-            .expect("read");
-        assert_eq!(found, None);
+        let found = f.demo_lyrics(&id("watching-seabirds-soar")).expect("read");
+        assert_eq!(found, None, "watching seabirds soar");
     }
 }

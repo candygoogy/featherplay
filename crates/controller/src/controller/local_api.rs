@@ -375,15 +375,13 @@ mod tests {
         assert!(s.playing && !s.audible && s.shuffle);
         assert_eq!(s.repeat, RepeatMode::All);
         assert_eq!((s.position, s.read_at), (Duration::from_secs(3), at));
-    }
 
-    #[test]
-    fn a_bad_volume_reads_as_silence() {
+        // A volume out of range reads as silence or full.
         let mut st = state();
         st.volume = f32::NAN;
-        assert_eq!(api_snapshot(&st, SystemTime::now()).volume, 0);
+        assert_eq!(api_snapshot(&st, at).volume, 0, "not a number");
         st.volume = 2.0;
-        assert_eq!(api_snapshot(&st, SystemTime::now()).volume, 100);
+        assert_eq!(api_snapshot(&st, at).volume, 100, "over full");
     }
 
     #[test]
