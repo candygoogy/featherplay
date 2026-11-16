@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { laidOut } from "./helpers";
 
 // The pieces mockup 10 played with Lottie, rebuilt as Web Animations with the files' timings
 // (src/scripts/moves.ts): the mark at load and when a song starts, three of the bar's icons,
@@ -47,6 +48,9 @@ test("the bar's icons move when the pointer comes to them, the question mark sta
 
 test("an icon moves once when its section first becomes the current one", async ({ page }) => {
   await page.goto("/");
+  // (Once the sections above have their true heights: scrolled to before that, the target
+  // lands wherever they then push it.)
+  await laidOut(page);
   await page.evaluate(() => document.getElementById("lyrics")!.scrollIntoView());
   await expect(page.locator('[data-site-bar] a[data-sec="lyrics"]')).toHaveAttribute("aria-current", "true");
   expect(await running(page, '[data-site-bar] svg[data-icon="lyrics"]')).toBeGreaterThan(0);

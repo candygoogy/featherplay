@@ -102,7 +102,10 @@ test("the keyboard opens and closes an answer; with reduced motion the swap is a
   // The next one down, by the keyboard: the one above shuts at once, this one stays put.
   const s = summary(page, "Is it free?");
   await s.focus();
-  // (Where focus has brought it: WebKit scrolls a focused element into view a beat later.)
+  // (Where focus has brought it: WebKit scrolls a focused element into view a beat later, and
+  // under automation sometimes not at all, which leaves the page at its top with nothing to
+  // keep in place. A visitor's Tab always brings the question into view: so does this.)
+  await s.scrollIntoViewIfNeeded();
   await page.waitForTimeout(300);
   const before = (await s.boundingBox())!.y;
   await page.keyboard.press("Enter");
