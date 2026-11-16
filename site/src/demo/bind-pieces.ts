@@ -339,9 +339,10 @@ export function bindPieces(player: Player): void {
       // A piece out of view keeps its time until it is back (again(), which comes here).
       for (const el of $$("[data-piece] [data-bind='at']")) if (!away.has(el.closest("[data-piece]")!)) el.textContent = at;
       const [a, b] = trayLines(s);
-      // (A tooltip out of view keeps its words until it is back, as the times above do.)
+      // (A tooltip out of view keeps its clock until it is back, as the times above do; a new
+      // song, play and pause reach it at once.)
       for (const tip of $$("[data-piece='tray']")) {
-        if (away.has(tip) && !songChanged) continue;
+        if (away.has(tip) && !songChanged && !playChanged) continue;
         tip.querySelector("[data-tray-1]")!.textContent = a;
         tip.querySelector("[data-tray-2]")!.textContent = b;
       }
