@@ -123,59 +123,45 @@ const keys = [
     font-size: var(--fs-small);
     font-weight: var(--fw-medium);
   }
-  /* The keys: a strip of a keyboard. Its plate is let into the well; on it each key is a cap
-     on its skirt, the cap's top lit from above and a little dished. Pressed, the cap goes down
-     into the skirt and comes back on the app's spring; pressed by the player (a key of the
-     visitor's own, the overlay, the cap itself) its mark lights and the light under the key
-     shows at its edges, as on a backlit keyboard. */
+  /* The keys: four key caps as a keyboard's are seen from above and a little in front. Each is
+     its body (the sides, widest at the front) with the top face set into it; pressed, the
+     face goes down and the cap's shadow closes, and it comes back on the app's spring. Pressed
+     by the player (a key of the visitor's own, the overlay, the cap itself) its mark lights. */
   .mk-keys {
+    --kc: 58px;
     position: relative;
     display: flex;
-    gap: 6px;
-    padding: 8px 8px 9px;
-    border-radius: 17px;
-    background: light-dark(#e3dbcf, #0d0d0f);
-    box-shadow:
-      inset 0 1px 3px light-dark(rgb(60 40 20 / 0.2), rgb(0 0 0 / 0.8)),
-      inset 0 0 0 1px light-dark(rgb(60 40 20 / 0.07), rgb(255 255 255 / 0.035)),
-      0 1px 0 light-dark(rgb(255 255 255 / 0.75), rgb(255 255 255 / 0.05));
+    gap: 10px;
   }
   .kc {
     position: relative;
-    padding: 0 0 4px;
+    width: var(--kc);
+    height: var(--kc);
+    padding: 0;
     border: 0;
-    border-radius: 10px;
-    background: none;
+    border-radius: 13px;
+    background: light-dark(linear-gradient(#ebe6de, #d6cec2), linear-gradient(#27272b, #19191c));
+    box-shadow:
+      inset 0 1px 0 light-dark(rgb(255 255 255 / 0.9), rgb(255 255 255 / 0.07)),
+      0 0 0 1px light-dark(rgb(60 40 20 / 0.14), rgb(0 0 0 / 0.55)),
+      0 2px 3px light-dark(rgb(60 40 20 / 0.14), rgb(0 0 0 / 0.5)),
+      0 10px 18px -8px light-dark(rgb(60 40 20 / 0.32), rgb(0 0 0 / 0.75));
     color: var(--ink2);
     cursor: pointer;
-  }
-  /* The skirt, and under it the key's own light (unlit at rest). */
-  .kc::before {
-    content: "";
-    position: absolute;
-    inset: 4px 0 0;
-    z-index: 0;
-    border-radius: inherit;
-    background: light-dark(#cdc4b6, #19191c);
-    box-shadow:
-      0 0 0 1px light-dark(rgb(60 40 20 / 0.12), rgb(0 0 0 / 0.6)),
-      0 0 0 0 transparent;
     transition: box-shadow var(--t-release) ease;
   }
   .kc-top {
-    position: relative;
+    position: absolute;
+    inset: 5px 7px 11px;
     display: grid;
     place-items: center;
-    width: 62px;
-    height: 50px;
-    border-radius: 9px;
+    border-radius: 8px;
     background:
-      radial-gradient(130% 100% at 50% -10%, light-dark(#ffffff, rgb(255 255 255 / 0.075)), transparent 62%),
-      light-dark(linear-gradient(#f9f7f3, #ece7df), linear-gradient(#303035, #252529));
+      radial-gradient(120% 90% at 50% 0%, light-dark(#ffffff, rgb(255 255 255 / 0.06)), transparent 65%),
+      light-dark(linear-gradient(#fbfaf7, #f1ede6), linear-gradient(#37373c, #2c2c31));
     box-shadow:
-      inset 0 1px 0 light-dark(#ffffff, rgb(255 255 255 / 0.11)),
-      inset 0 -1px 0 light-dark(rgb(60 40 20 / 0.06), rgb(0 0 0 / 0.35)),
-      inset 0 0 0 1px light-dark(rgb(60 40 20 / 0.07), rgb(255 255 255 / 0.035));
+      inset 0 1px 0 light-dark(#ffffff, rgb(255 255 255 / 0.12)),
+      0 1px 1px light-dark(rgb(60 40 20 / 0.12), rgb(0 0 0 / 0.45));
     transition:
       translate var(--t-release) var(--spring-release),
       color var(--t-medium) ease;
@@ -187,6 +173,15 @@ const keys = [
   .kc:hover .kc-top {
     color: var(--text);
   }
+  .kc:active,
+  .kc[data-pressed] {
+    box-shadow:
+      inset 0 1px 0 light-dark(rgb(255 255 255 / 0.9), rgb(255 255 255 / 0.07)),
+      0 0 0 1px light-dark(rgb(60 40 20 / 0.14), rgb(0 0 0 / 0.55)),
+      0 1px 1px light-dark(rgb(60 40 20 / 0.14), rgb(0 0 0 / 0.5)),
+      0 3px 6px -4px light-dark(rgb(60 40 20 / 0.32), rgb(0 0 0 / 0.75));
+    transition-duration: var(--t-press);
+  }
   .kc:active .kc-top,
   .kc[data-pressed] .kc-top {
     translate: 0 3px;
@@ -196,12 +191,6 @@ const keys = [
   }
   .kc[data-pressed] .kc-top {
     color: var(--accent);
-  }
-  .kc[data-pressed]::before {
-    box-shadow:
-      0 0 0 1px light-dark(rgb(60 40 20 / 0.12), rgb(0 0 0 / 0.6)),
-      0 0 14px 1px light-dark(color-mix(in srgb, var(--accent) 34%, transparent), color-mix(in srgb, var(--accent) 42%, transparent));
-    transition-duration: var(--t-press);
   }
   .kc:focus-visible {
     outline-offset: 3px;
@@ -214,6 +203,7 @@ const keys = [
     }
   }
   @media (forced-colors: active) {
+    .kc,
     .kc-top {
       border: 1px solid ButtonText;
     }
@@ -230,9 +220,12 @@ const keys = [
     .mk .mm-title {
       font-size: var(--fs-lede);
     }
+    .mk-keys {
+      --kc: 66px;
+      gap: 12px;
+    }
     .kc-top {
-      width: 72px;
-      height: 58px;
+      inset: 6px 8px 12px;
     }
     .kc-top svg {
       width: 20px;
