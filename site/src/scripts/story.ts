@@ -219,20 +219,29 @@ export async function startStory(player: Player): Promise<void> {
   let lastY = scrollY;
   let flyRoom = innerHeight * 0.3;
   let lastGone = false;
+  /** The visitor has scrolled since the last picture (the scroll handler says so). */
+  let nudged = false;
   function render(p: number, force = false) {
     if (!G) return;
     // Past its end the stage scrolls away with the tray's words still in sight: the flyout
     // stays with them, and goes as the next section comes up to it.
     const gone = lastY - (G.top + LEN) > flyRoom;
-    if (p === lastP && gone === lastGone && !force) return;
+    if (p === lastP && gone === lastGone && !force && !nudged) return;
     lastP = p;
     lastGone = gone;
     // The story moves its words (a selection in them is drawn again, src/scripts/selection.ts).
     dispatchEvent(new Event("placechange"));
     const { a, b, c } = phases(p);
-    // The beat in the tray: the capsule's flyout shows the song, still playing.
-    const inBeat = p >= 0.76 && c >= 1 && !gone;
-    if (inBeat !== beat && songFly) {
+    // The beat in the tray: the capsule's flyout shows the song, still playing. It comes out as
+    // the window goes in (the last of its way there), so the hold is never its words alone:
+    // the page rests anywhere from the move's end on, and a flyout that waited past that left
+    // a stretch with nothing in it. Closed by the visitor there (a press beside it, Escape),
+    // it is back when they scroll on (their own scroll: not the picture easing up to where
+    // the page already is, which would undo an Escape pressed just after a scroll).
+    const inBeat = c >= 0.96 && !gone;
+    const again = inBeat && (nudged || force) && !songFly?.matches(":popover-open");
+    nudged = false;
+    if (songFly && (inBeat !== beat || again)) {
       beat = inBeat;
       if (inBeat && !songFly.matches(":popover-open")) {
         // Marked first: the bar places the story's flyout under the capsule's song.
@@ -350,6 +359,25 @@ export async function startStory(player: Player): Promise<void> {
   /** The page's own glide on to a hold, and where it last put the page. */
   let glide: { from: number; edge: number; to: number; t0: number; ms: number; tail: number } | null = null;
   let glideY = 0;
+  // In its beat the flyout is all there is to see, and a press beside it closes it as it would
+  // any flyout (the browser's light dismiss), as does another flyout opening. It comes back
+  // once nothing else is open, unless the visitor closed it on purpose: Escape, or its own
+  // button in the capsule (then it is back when the page moves, as render has it).
+  let meant = -1e9;
+  const mean = () => (meant = performance.now());
+  addEventListener("keydown", (e) => e.key === "Escape" && mean(), true);
+  for (const type of ["pointerdown", "click"]) np?.addEventListener(type, mean);
+  for (const fly of document.querySelectorAll<HTMLElement>("[data-fly]"))
+    fly.addEventListener("toggle", (e) => {
+      if ((e as ToggleEvent).newState !== "closed" || !beat) return;
+      if (fly === songFly && performance.now() - meant < 600) return;
+      // After its way back into the capsule (Bar.astro), so it is seen to come out again.
+      // (Not if Escape came meanwhile: the visitor wants it gone.)
+      window.setTimeout(() => {
+        if (beat && G && performance.now() - meant > 600 && !document.querySelector("[data-fly]:popover-open")) render(lastP, true);
+      }, 380);
+    });
+
   const frame = (now: number) => {
     raf = 0;
     const dt = Math.min(64, now - (last || now));
@@ -399,6 +427,7 @@ export async function startStory(player: Player): Promise<void> {
         return;
       }
       glide = null;
+      nudged = true;
       if (y !== lastY) dir = y > lastY ? 1 : -1;
       lastY = y;
       target = storyProgress(y, G.top, LEN);

@@ -170,6 +170,28 @@ test("the story's flyout in the tray goes when the story stops (the screen made 
   await expect(page.locator("#fly-song")).toBeHidden();
 });
 
+test("the tray's hold is never its words alone: the flyout is there wherever the page rests in it, and comes back from a stray press", async ({ page }) => {
+  await page.goto("/");
+  await wake(page);
+  // Open or not (it stays drawn a moment as it goes, so "visible" wouldn't say).
+  const open = () => page.locator("#fly-song").evaluate((f) => f.matches(":popover-open"));
+  // The hold's stretch begins where the window's move ends (0.74); the page rests anywhere in it.
+  for (const p of [0.745, 0.76, HOLDS[2], 0.95]) {
+    await at(page, p);
+    await expect.poll(open, { message: `at ${p}` }).toBe(true);
+  }
+  // A press on the page closes it as any flyout; here it comes back by itself.
+  await page.mouse.click(300, 800);
+  expect(await open()).toBe(false);
+  await expect.poll(open).toBe(true);
+  // Closed on purpose it stays closed, until the page moves.
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(700);
+  expect(await open()).toBe(false);
+  await at(page, 0.9);
+  await expect.poll(open).toBe(true);
+});
+
 test("the tray's flyout stays through its beat, though the pointer left the tray icon as the bar became the capsule", async ({ page }) => {
   await page.goto("/");
   await wake(page);
