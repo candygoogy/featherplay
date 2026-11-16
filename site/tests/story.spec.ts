@@ -75,6 +75,25 @@ test("the window takes the three holds: whole and large, the app's real narrow l
   await expect(page.locator("#fly-song")).toBeHidden();
 });
 
+test("where the first screen shows the app's narrow layout (1280 x 720), hold 1 shows the whole wide app, by the snap, and the narrow one is home again at the top", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto("/");
+  await wake(page);
+  const home = await appWidth(page);
+  expect(home).toBeLessThanOrEqual(720);
+  // Part-way through the first move: the app faded, its ground carrying its icon.
+  await page.evaluate((y) => scrollTo(0, y), Math.round(0.08 * LEN));
+  await expect.poll(() => page.locator("[data-ghost]").evaluate((g) => Number(getComputedStyle(g).opacity))).toBeGreaterThan(0.5);
+  await at(page, HOLDS[0]);
+  expect(await appWidth(page)).toBe(1440);
+  await inViewport(page, "hold 1 wide at 1280 x 720");
+  // Its lyrics at 13 px or more.
+  const s = await page.locator("[data-window]").evaluate((w) => w.getBoundingClientRect().width / w.offsetWidth);
+  expect(24 * s).toBeGreaterThanOrEqual(13);
+  await at(page, 0);
+  await expect.poll(() => appWidth(page)).toBe(home);
+});
+
 test("a scroll that stops part-way through a move is finished the way it was going", async ({ page }) => {
   await page.goto("/");
   await wake(page);

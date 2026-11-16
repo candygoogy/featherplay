@@ -13,7 +13,8 @@
 
 import type { Player } from "../demo/player";
 import { whenWindow, type Frame } from "../demo/window";
-import { fitWindow } from "../demo/fit";
+import { fitWindow, IDEAL } from "../demo/fit";
+import { LYRICS_MIN } from "./first-math";
 import { HOLDS, captionOpacity, phases, seg, settleTarget, storyProgress } from "./story-math";
 import { hideNote, showNoteAt } from "./notes";
 
@@ -69,25 +70,35 @@ export async function startStory(player: Player): Promise<void> {
     // The frame's left edge: the composition's (first.ts), else where the first screen sits.
     const first = stage!.querySelector<HTMLElement>(".first")!;
     const fl = Number(first.dataset.fl) || first.getBoundingClientRect().left;
-    const L = { w: win.home.w, h: win.home.h };
     // Hold 1: the whole window, centred and large, its words under it, as wide as the window but
     // never narrower than a comfortable measure (measured at the width they will have: narrower,
-    // they take another line, and the window gives way to them).
+    // they take another line, and the window gives way to them). The whole wide app wherever it
+    // reads there (lyrics at 13 px or more), even where the first screen showed the narrow one;
+    // else the first screen's own layout.
     const side = Math.max(fl, 40);
     const capMin = Math.min(vw - 2 * side, 416);
-    let w1 = Math.min(vw - 2 * side, L.w);
-    let capW = w1;
-    let roomH = 0;
-    let s1 = 1;
-    for (let i = 0; i < 3; i++) {
-      capW = Math.max(capMin, w1);
-      caps[0].style.width = `${Math.round(capW)}px`;
-      roomH = vh - CAP_B - 20 - caps[0].offsetHeight - 28 - 24;
-      s1 = Math.min(1, (vw - 2 * side) / L.w, roomH / L.h);
-      if (Math.abs(L.w * s1 - w1) < 1) break;
-      w1 = L.w * s1;
+    const holdFor = (L: { w: number; h: number }) => {
+      let w1 = Math.min(vw - 2 * side, L.w);
+      let capW = w1;
+      let roomH = 0;
+      let s1 = 1;
+      for (let i = 0; i < 3; i++) {
+        capW = Math.max(capMin, w1);
+        caps[0].style.width = `${Math.round(capW)}px`;
+        roomH = vh - CAP_B - 20 - caps[0].offsetHeight - 28 - 24;
+        s1 = Math.min(1, (vw - 2 * side) / L.w, roomH / L.h);
+        if (Math.abs(L.w * s1 - w1) < 1) break;
+        w1 = L.w * s1;
+      }
+      return { capW, roomH, s1 };
+    };
+    let L = { w: IDEAL.w, h: IDEAL.h };
+    let { capW, roomH, s1 } = holdFor(L);
+    if (24 * s1 < LYRICS_MIN && (win.home.w !== L.w || win.home.h !== L.h)) {
+      L = { w: win.home.w, h: win.home.h };
+      ({ capW, roomH, s1 } = holdFor(L));
     }
-    w1 = L.w * s1;
+    let w1 = L.w * s1;
     const h1 = L.h * s1;
     if (Math.round(Math.max(capMin, w1)) !== Math.round(capW)) {
       capW = Math.max(capMin, w1);
@@ -193,9 +204,22 @@ export async function startStory(player: Player): Promise<void> {
     let f: Frame;
     let ghostO = 0;
     let gr: Rect = G.r1;
-    if (b <= 0) {
+    // The snap's progress, in whichever move changes the app's layout (for the icon's fade).
+    let k = b;
+    if (b <= 0 && (from.w !== L.w || from.h !== L.h)) {
+      // The first screen's narrow window becoming the whole wide app: as the snap to narrow,
+      // the app fades, its ground carries its icon from the first screen's rect to hold 1's,
+      // the app is laid out wide once while hidden and fades back.
+      k = a;
+      const r0 = { x: from.x, y: from.y, w: from.w * from.s, h: from.h * from.s };
+      gr = { x: lerp(r0.x, G.r1.x, a), y: lerp(r0.y, G.r1.y, a), w: lerp(r0.w, G.r1.w, a), h: lerp(r0.h, G.r1.h, a) };
+      ghostO = a > 0 ? Math.min(seg(a, 0, 0.2), 1 - seg(a, 0.85, 1)) : 0;
+      f =
+        a < 0.5
+          ? { w: from.w, h: from.h, x: gr.x, y: gr.y, s: gr.w / from.w, o: 1 - seg(a, 0, 0.35) }
+          : { ...G.r1, w: L.w, h: L.h, o: seg(a, 0.8, 1) };
+    } else if (b <= 0) {
       f = { w: L.w, h: L.h, x: lerp(from.x, G.r1.x, a), y: lerp(from.y, G.r1.y, a), s: lerp(from.s, G.r1.s, a), o: 1 };
-      if (from.w !== L.w || from.h !== L.h) f = { ...f, w: from.w, h: from.h };
     } else if (c <= 0) {
       // The snap: the app fades, its ground carries its icon to the narrow rect, the app comes
       // back laid out narrow.
@@ -219,7 +243,7 @@ export async function startStory(player: Player): Promise<void> {
       ghost.style.transform = `translate(${gr.x.toFixed(1)}px, ${gr.y.toFixed(1)}px) scale(${(gr.w / G.r1.w).toFixed(4)}, ${(gr.h / G.r1.h).toFixed(4)})`;
       icon.style.transform = `translate(${(gr.x + gr.w / 2 - 28).toFixed(1)}px, ${(gr.y + gr.h / 2 - 28).toFixed(1)}px)`;
     }
-    icon.style.opacity = (ghostO * Math.min(seg(b, 0.15, 0.35), 1 - seg(b, 0.7, 0.85))).toFixed(3);
+    icon.style.opacity = (ghostO * Math.min(seg(k, 0.15, 0.35), 1 - seg(k, 0.7, 0.85))).toFixed(3);
     const bRaw = seg(p, 0.27, 0.5);
     snap.style.opacity = (seg(bRaw, 0, 0.2) * (1 - seg(bRaw, 0.72, 1))).toFixed(3);
   }

@@ -49,9 +49,12 @@
   --r-float: 24px; /* the capsule, flyouts */
   --r-pill: 999px;
 
-  /* ---- The frame: fluid, 1,560 px at most; then the margins grow ---- */
-  --gut: clamp(20px, 4vw, 64px);
-  --frame-max: 97.5rem;
+  /* ---- The frame: one pair of edges for the whole page (the first screen's, the study's):
+     1,880 px at most, else 89 % of the width, never closer than 20 px to a side; then the
+     margins grow. Running text inside keeps its own measure. src/scripts/first-math.ts frameOf
+     is the same rule. ---- */
+  --gut: max(20px, 5.5vw);
+  --frame-max: 117.5rem;
   --bar-h: 52px; /* the docked bar */
   --cap-top: 12px; /* the capsule's distance from the top */
   --cap-h: 48px;
@@ -154,7 +157,7 @@
 
 /* The frame: two left edges a screen, the content column fluid to 1,560 px. */
 .frame {
-  width: min(var(--frame-max), 100% - 2 * var(--gut));
+  width: min(var(--frame-max), 89%, 100% - 40px);
   margin-inline: auto;
 }
 
