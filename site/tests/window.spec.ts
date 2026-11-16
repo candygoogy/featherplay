@@ -41,7 +41,7 @@ test("the window is never wider or taller than the viewport, and on a wide scree
   }
 });
 
-test("a narrow window is the app's real narrow layout: no side panel, the lyrics stacked under the song", async ({ page }) => {
+test("on a phone the window is the app's compact layout, whole on the first screen with its bar", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
   await wake(page);
@@ -51,9 +51,10 @@ test("a narrow window is the app's real narrow layout: no side panel, the lyrics
   const cover = (await r.locator(".np-cover").boundingBox())!;
   const lines = (await r.locator("[data-lyrics]").boundingBox())!;
   expect(lines.y).toBeGreaterThan(cover.y + cover.height - 1);
-  // The bar keeps the transport; the times give way to a line along its foot.
-  await expect(r.locator(".bar .fp-play")).toBeVisible();
-  await expect(r.locator(".bar [data-act='shuffle']")).toBeHidden();
+  // The bar and its play button on the first screen, without scrolling.
+  await expect(r.locator(".bar .fp-play")).toBeInViewport({ ratio: 1 });
+  const box = await windowBox(page);
+  expect(box.y + box.height).toBeLessThanOrEqual(844);
 });
 
 test("the caption buttons keep one row inside the title bar at every width, never on top of each other", async ({ page }) => {

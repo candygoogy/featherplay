@@ -54,6 +54,13 @@ export function startFirst(): void {
       delete slot.dataset.fitW;
       slot.dataset.fit = "first";
       slot.removeAttribute("style");
+      // A phone: the window takes the rest of the first screen, so all of it shows there, its
+      // bar too, and Play a song is seen to play (never under 300 px: on a short phone it runs
+      // on below). By the layout viewport's height, so a toolbar showing doesn't resize it.
+      if (vw < 761) {
+        const top = slot.getBoundingClientRect().top + scrollY;
+        slot.style.height = px(clamp(root.clientHeight - top - 12, 300, 752));
+      }
       first.dataset.fl = String(first.getBoundingClientRect().left);
       // Stacked in a room too short for it (the first screen held to one screen by the story),
       // the shelf would be pushed onto the words: it steps aside instead (its songs are in the
