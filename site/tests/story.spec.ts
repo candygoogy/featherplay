@@ -261,3 +261,29 @@ for (const [label, use] of [
     });
   });
 }
+
+for (const [w, h] of [[761, 600], [800, 600], [900, 800], [1000, 1024]] as const) {
+  test(`in the tray's hold the song's flyout leaves the hold's words clear (${w}x${h})`, async ({ page }) => {
+    await page.setViewportSize({ width: w, height: h });
+    await page.goto("/");
+    await wake(page);
+    // Straight there from the top, the bar still docked as the story starts to move.
+    await page.waitForTimeout(800);
+    await at(page, HOLDS[2]);
+    await expect(page.locator("#fly-song")).toBeVisible();
+    const f = (await page.locator("#fly-song").boundingBox())!;
+    // Every line of the hold's words, as drawn.
+    const boxes = await page.locator('[data-cap="2"]').evaluate((cap) =>
+      [...cap.querySelectorAll("h2, p")].flatMap((el) => {
+        const r = document.createRange();
+        r.selectNodeContents(el);
+        return [...r.getClientRects()].map((b) => ({ x: b.x, y: b.y, w: b.width, h: b.height }));
+      }),
+    );
+    expect(boxes.length).toBeGreaterThan(1);
+    for (const b of boxes) {
+      const meet = b.x < f.x + f.width && b.x + b.w > f.x && b.y < f.y + f.height && b.y + b.h > f.y;
+      expect(meet, `${JSON.stringify(b)} under the flyout ${JSON.stringify(f)}`).toBe(false);
+    }
+  });
+}

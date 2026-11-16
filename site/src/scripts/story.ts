@@ -62,7 +62,34 @@ export async function startStory(player: Player): Promise<void> {
     r1: Rect & { s: number };
     r2: Rect & { s: number };
     caps: { x: number; y: number }[];
+    /** Caption 3 kept clear of the tray's flyout (fitTrayWords), for this measure. */
+    trayFit?: boolean;
   } | null = null;
+
+  // The tray's hold: the song's flyout opens under the capsule's song (bar.ts), and on a narrow
+  // screen it would cover the hold's words. Before they show, they are kept to the room left of
+  // where the flyout will be (worked out as bar.ts places it, from the capsule as it is now).
+  const siteBar = document.querySelector<HTMLElement>("[data-site-bar]");
+  const np = siteBar?.querySelector<HTMLElement>("[data-np]");
+  function fitTrayWords() {
+    // (Only from the capsule: the flyout opens under it. A jump straight into the story can
+    // come before the bar has become one; then it is done as it does, below.)
+    if (!G || G.trayFit || siteBar?.dataset.state !== "capsule") return;
+    G.trayFit = true;
+    const cap = caps[2];
+    if (!np || !songFly) return;
+    const vw = root.clientWidth;
+    const w = Math.min(22 * 16, vw - 16);
+    // Where the capsule's song rests (less the glide it may be in, as bar.ts reads it).
+    const r = np.getBoundingClientRect();
+    const t = getComputedStyle(np.closest("[data-part]") ?? np).translate;
+    const dx = t === "none" ? 0 : parseFloat(t) || 0;
+    const left = Math.max(8, Math.min(r.left - dx + r.width / 2 - w / 2, vw - w - 8));
+    const room = Math.floor(left - 24 - G.caps[2].x);
+    if (room >= cap.offsetWidth) return;
+    cap.style.width = `${Math.max(200, room)}px`;
+    G.caps[2].y = CAP_B + (innerHeight - CAP_B) / 2 - cap.offsetHeight / 2;
+  }
 
   function measure() {
     if (!mq.matches) return;
@@ -72,6 +99,7 @@ export async function startStory(player: Player): Promise<void> {
     // The frame's left edge: the composition's (first.ts), else where the first screen sits.
     const first = stage!.querySelector<HTMLElement>(".first")!;
     const fl = Number(first.dataset.fl) || first.getBoundingClientRect().left;
+    caps[2].style.width = "";
     // Hold 1: the whole window, centred and large, its words under it, as wide as the window but
     // never narrower than a comfortable measure (measured at the width they will have: narrower,
     // they take another line, and the window gives way to them). The whole wide app wherever it
@@ -165,6 +193,7 @@ export async function startStory(player: Player): Promise<void> {
       } else if (!inBeat) endBeat();
     }
     // The first screen's words leave first (keys that were in them go on from the steps).
+    if (p >= 0.6) fitTrayWords();
     const out = seg(p, 0, 0.07);
     for (const el of hero) {
       el.style.opacity = out ? String(1 - out * out * (3 - 2 * out)) : "";
@@ -334,6 +363,10 @@ export async function startStory(player: Player): Promise<void> {
   };
 
   win.onLayout(() => requestAnimationFrame(measure));
+  if (siteBar)
+    new MutationObserver(() => {
+      if (G && !G.trayFit && lastP >= 0.6) render(lastP, true);
+    }).observe(siteBar, { attributes: true, attributeFilter: ["data-state"] });
   // On the first frame: a width query needs the page's layout to answer, and listening asks it.
   requestAnimationFrame(() => {
     mq.addEventListener("change", apply);
