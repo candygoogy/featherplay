@@ -186,7 +186,7 @@ const groups = [
     }
   }
   /* The small print: one quiet line under a hairline, its parts set apart by a dot, and the
-     way back up as a small button at its end. */
+     way back up at its end: its words and an arrow that lifts when pointed at. */
   .foot-legal {
     display: flex;
     flex-wrap: wrap;
@@ -218,46 +218,36 @@ const groups = [
     display: inline-flex;
     align-items: center;
     gap: var(--s2);
-    height: 2.25rem;
-    padding: 0 var(--s4) 0 var(--s3);
-    border-radius: var(--r-pill);
-    background: var(--tonal);
-    color: var(--text);
+    min-height: 2.25rem;
+    color: var(--ink2);
     font-weight: var(--fw-bold);
     text-decoration: none;
     white-space: nowrap;
-    transition:
-      background-color var(--t-hover) ease,
-      scale var(--t-release) var(--spring-release);
+    transition: color var(--t-hover) ease;
   }
   .to-top svg {
     flex: none;
     transition: translate var(--t-small) var(--ease-out);
   }
-  .to-top:hover {
-    background: var(--tonal-hover);
+  .to-top:hover,
+  .to-top:focus-visible {
+    color: var(--text);
   }
   .to-top:hover svg,
   .to-top:focus-visible svg {
-    translate: 0 -2px;
+    translate: 0 -3px;
   }
-  .to-top:active {
-    background: var(--tonal-pressed);
-    scale: var(--press-surface);
+  .to-top:focus-visible {
+    outline-offset: 4px;
   }
   @media (pointer: coarse) {
     .to-top {
-      height: 2.75rem;
+      min-height: 2.75rem;
     }
   }
   @media (prefers-reduced-motion: reduce) {
     .to-top svg {
       transition: none;
-    }
-  }
-  @media (forced-colors: active) {
-    .to-top {
-      border: 1px solid ButtonText;
     }
   }
   @media (width < 1100px) {
