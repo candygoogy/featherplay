@@ -46,15 +46,20 @@ const layers = ["k-ground", "m k-shade", "m k-lit", "m k-hi", "k-sheen", "k-calm
   if (desk && player) bindDesk(desk, player);
   // The desk's light belongs to the first screen and the footer; under the reading sections it
   // calms (data-low, .k-calm): once the first screen is past the middle of the window, until
-  // the footer comes into view.
+  // the footer comes into view. It comes back for one section on the way, Make it yours, while
+  // that fills the middle of the window: the app takes its colour from the cover, and there the
+  // page shows it as a cover is picked.
   const stage = document.querySelector("[data-stage]");
   const foot = document.querySelector("body > footer");
+  const yours = document.querySelector("#yours");
   if (desk && stage && "IntersectionObserver" in window) {
     let past = false;
     let atFoot = false;
-    const set = () => desk.toggleAttribute("data-low", past && !atFoot);
+    let atYours = false;
+    const set = () => desk.toggleAttribute("data-low", past && !atFoot && !atYours);
     new IntersectionObserver(([e]) => ((past = !e.isIntersecting), set()), { rootMargin: "-50% 0px 0px 0px" }).observe(stage);
     if (foot) new IntersectionObserver(([e]) => ((atFoot = e.isIntersecting), set()), { rootMargin: "0px 0px -15% 0px" }).observe(foot);
+    if (yours) new IntersectionObserver(([e]) => ((atYours = e.isIntersecting), set()), { rootMargin: "-45% 0px -45% 0px" }).observe(yours);
   }
 </script>
 
