@@ -5,7 +5,7 @@
 // busy: the words carry it. Every control here acts on the page's one
 // player (src/demo/bind-pieces.ts), and the key caps press when any of them is used, or when the
 // visitor's own media keys reach the page (Media Session, once a song has played). The four
-// keys are the ones a keyboard has and the app answers: previous, play or pause, stop (which
+// keys, panes of the page's glass, are the ones a keyboard has and the app answers: previous, play or pause, stop (which
 // pauses, as in the app) and next. The slot is for the note by the keys.
 import "../../styles/pieces.css";
 import Icon from "../Icon.astro";
@@ -28,9 +28,8 @@ const keys = [
       <div class="mk-keys" data-piece="keys" inert role="group" aria-label="Media keys">
         {
           keys.map((k) => (
-            <button type="button" class="kc" data-do={k.key} data-key={k.key} data-play-label={k.key === "toggle" ? "" : undefined} aria-label={k.label}>
-              <span class="kc-top">
-                {k.key === "toggle" ? (
+            <button type="button" class="kc glass float" data-do={k.key} data-key={k.key} data-play-label={k.key === "toggle" ? "" : undefined} aria-label={k.label}>
+              {k.key === "toggle" ? (
                   <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="currentColor">
                     <path d="M3.5 6.6 C3.5 6 4.2 5.6 4.7 6 L11.6 11.4 C12 11.7 12 12.3 11.6 12.6 L4.7 18 C4.2 18.4 3.5 18 3.5 17.4 Z" />
                     <rect x="14.2" y="6" width="2.4" height="12" rx="0.8" />
@@ -43,7 +42,6 @@ const keys = [
                 ) : (
                   <Icon name={k.key === "previous" ? "prev" : "next"} size={20} />
                 )}
-              </span>
             </button>
           ))
         }
@@ -123,89 +121,55 @@ const keys = [
     font-size: var(--fs-small);
     font-weight: var(--fw-medium);
   }
-  /* The keys: four key caps as a keyboard's are seen from above and a little in front. Each is
-     its body (the sides, widest at the front) with the top face set into it; pressed, the
-     face goes down and the cap's shadow closes, and it comes back on the app's spring. Pressed
-     by the player (a key of the visitor's own, the overlay, the cap itself) its mark lights. */
+  /* The keys: four small panes of the page's own glass (system.css .glass), the overlay's
+     material, so they read as its keys and as this site's. A press gives as the page's buttons
+     do and comes back on the app's spring; pressed by the player (a key of the visitor's own,
+     the overlay, the key itself) its mark lights. */
   .mk-keys {
-    --kc: 58px;
     position: relative;
     display: flex;
-    gap: 10px;
+    gap: var(--s2);
   }
   .kc {
-    position: relative;
-    width: var(--kc);
-    height: var(--kc);
-    padding: 0;
-    border: 0;
-    border-radius: 13px;
-    background: light-dark(linear-gradient(#ebe6de, #d6cec2), linear-gradient(#27272b, #19191c));
-    box-shadow:
-      inset 0 1px 0 light-dark(rgb(255 255 255 / 0.9), rgb(255 255 255 / 0.07)),
-      0 0 0 1px light-dark(rgb(60 40 20 / 0.14), rgb(0 0 0 / 0.55)),
-      0 2px 3px light-dark(rgb(60 40 20 / 0.14), rgb(0 0 0 / 0.5)),
-      0 10px 18px -8px light-dark(rgb(60 40 20 / 0.32), rgb(0 0 0 / 0.75));
-    color: var(--ink2);
-    cursor: pointer;
-    transition: box-shadow var(--t-release) ease;
-  }
-  .kc-top {
-    position: absolute;
-    inset: 5px 7px 11px;
+    --mat: var(--mat-fly);
     display: grid;
     place-items: center;
-    border-radius: 8px;
-    background:
-      radial-gradient(120% 90% at 50% 0%, light-dark(#ffffff, rgb(255 255 255 / 0.06)), transparent 65%),
-      light-dark(linear-gradient(#fbfaf7, #f1ede6), linear-gradient(#37373c, #2c2c31));
-    box-shadow:
-      inset 0 1px 0 light-dark(#ffffff, rgb(255 255 255 / 0.12)),
-      0 1px 1px light-dark(rgb(60 40 20 / 0.12), rgb(0 0 0 / 0.45));
+    width: 60px;
+    height: 52px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--r-small);
+    color: var(--ink2);
+    cursor: pointer;
     transition:
-      translate var(--t-release) var(--spring-release),
+      scale var(--t-release) var(--spring-release),
       color var(--t-medium) ease;
   }
-  .kc-top svg {
+  .kc svg {
     width: 18px;
     height: 18px;
   }
-  .kc:hover .kc-top {
+  .kc:hover {
     color: var(--text);
   }
   .kc:active,
   .kc[data-pressed] {
-    box-shadow:
-      inset 0 1px 0 light-dark(rgb(255 255 255 / 0.9), rgb(255 255 255 / 0.07)),
-      0 0 0 1px light-dark(rgb(60 40 20 / 0.14), rgb(0 0 0 / 0.55)),
-      0 1px 1px light-dark(rgb(60 40 20 / 0.14), rgb(0 0 0 / 0.5)),
-      0 3px 6px -4px light-dark(rgb(60 40 20 / 0.32), rgb(0 0 0 / 0.75));
-    transition-duration: var(--t-press);
-  }
-  .kc:active .kc-top,
-  .kc[data-pressed] .kc-top {
-    translate: 0 3px;
+    scale: var(--press-scale-play);
     color: var(--text);
     transition-duration: var(--t-press);
     transition-timing-function: var(--ease-out);
   }
-  .kc[data-pressed] .kc-top {
+  .kc[data-pressed] {
     color: var(--accent);
   }
   .kc:focus-visible {
     outline-offset: 3px;
   }
   @media (prefers-reduced-motion: reduce) {
-    .kc:active .kc-top,
-    .kc[data-pressed] .kc-top {
-      translate: none;
-      background: light-dark(#ece7df, #232327);
-    }
-  }
-  @media (forced-colors: active) {
-    .kc,
-    .kc-top {
-      border: 1px solid ButtonText;
+    .kc:active,
+    .kc[data-pressed] {
+      scale: none;
+      background: linear-gradient(var(--tonal), var(--tonal)), var(--pane-hl), var(--mat);
     }
   }
   /* A wide stage (a large screen): the same parts a size up, by layout. */
@@ -220,14 +184,11 @@ const keys = [
     .mk .mm-title {
       font-size: var(--fs-lede);
     }
-    .mk-keys {
-      --kc: 66px;
-      gap: 12px;
+    .kc {
+      width: 68px;
+      height: 58px;
     }
-    .kc-top {
-      inset: 6px 8px 12px;
-    }
-    .kc-top svg {
+    .kc svg {
       width: 20px;
       height: 20px;
     }
