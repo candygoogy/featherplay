@@ -52,6 +52,7 @@ import Note from "../Note.astro";
     </p>
   </div>
   <div class="desk">
+    <div class="pair">
     <figure class="explorer pear" aria-labelledby="pear-folder">
       <div class="ex-bar" aria-hidden="true">
         <svg viewBox="0 0 16 16" width="16" height="16"><use href="#g-folder"></use></svg><span>youtube-music</span>
@@ -109,6 +110,7 @@ import Note from "../Note.astro";
           mb(featherplay.installed.runtimeBytes)
         }), {Math.round(pear.bytes / installedBytes)} times smaller.
       </p>
+    </div>
     </div>
     <div class="outs">
         <div class="outs-head">
@@ -193,25 +195,32 @@ import Note from "../Note.astro";
      their sizes is the point); under both, the four things left out, each with room. */
   .desk {
     display: grid;
-    grid-template-columns: minmax(0, 6fr) minmax(0, 5fr);
-    grid-template-areas: "pear ours" "outs outs";
-    align-items: center;
-    gap: var(--s8) var(--s8);
+    gap: var(--s8);
     margin-top: var(--s7);
+  }
+  /* The two folders start on one line; featherplay's one file stays in view beside Pear's long
+     list as it scrolls past (sticky under the capsule, within the pair), its note and the
+     weighed sizes with it. */
+  .pair {
+    display: grid;
+    grid-template-columns: minmax(0, 6fr) minmax(0, 5fr);
+    grid-template-areas: "pear ours";
+    align-items: start;
+    gap: var(--s8);
   }
   .pear {
     grid-area: pear;
   }
   .side {
     grid-area: ours;
-    position: relative;
+    position: sticky;
+    top: calc(var(--cap-top) + var(--cap-h) + var(--s5));
     display: grid;
     justify-items: center;
     gap: var(--s6);
+    /* Its window's top level with Pear's: the note's room above it hangs over the gap. */
+    margin-top: calc(-1 * var(--s8));
     padding-top: var(--s8);
-  }
-  .outs {
-    grid-area: outs;
   }
   /* An app window: solid, as windows on Windows are, a faint tint of the song. */
   .explorer {
@@ -422,12 +431,15 @@ import Note from "../Note.astro";
     }
   }
   @media (width < 900px) {
-    .desk {
+    .pair {
       grid-template-columns: minmax(0, 1fr);
-      grid-template-areas: "pear" "ours" "outs";
+      grid-template-areas: "pear" "ours";
     }
-    /* Room above featherplay's window for its note. */
+    /* Room above featherplay's window for its note; no sticking where they stack. */
     .side {
+      position: relative;
+      top: auto;
+      margin-top: 0;
       padding-top: var(--s7);
     }
     .side :global(.n-onefile) {
