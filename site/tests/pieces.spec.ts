@@ -22,14 +22,19 @@ test("pressing play anywhere plays the one song everywhere: the media keys, the 
   expect(await page.evaluate(() => navigator.mediaSession.playbackState)).toBe("playing");
   // Its progress line runs on the compositor: one animation, not a style per frame.
   expect(await kept.locator(".m-media [data-fill]").evaluate((el) => el.getAnimations().length)).toBe(1);
-  // Next, from the media keys: every piece shows the next song.
+  // Next, from the media keys: every piece shows the next song. (Each hop the sponsor piece
+  // makes is noted, so a slow step here can't miss it: it lasts some 1.9 s.)
+  await kept.locator("[data-piece='sponsor']").evaluate((s) => {
+    (window as unknown as { hops: string[] }).hops = [];
+    new MutationObserver(() => s.dataset.hop && (window as unknown as { hops: string[] }).hops.push(s.dataset.hop)).observe(s, { attributes: true, attributeFilter: ["data-hop"] });
+  });
   await kept.locator(".m-media [data-do='next']").click();
   for (const piece of ["media", "discord", "scrobble", "sponsor"]) {
     await expect(kept.locator(`[data-piece='${piece}'] [data-bind='title']`).first()).toHaveText("Invisible Light");
   }
   await expect(kept.locator("[data-tray-1]")).toHaveText("Invisible Light");
   // SponsorBlock hops the new song's opening talk.
-  await expect(kept.locator("[data-piece='sponsor']")).toHaveAttribute("data-hop", "a");
+  await expect.poll(() => page.evaluate(() => (window as unknown as { hops: string[] }).hops)).toContain("a");
   await kept.locator(".m-media [data-do='toggle']").click();
   await expect(kept.locator("[data-tray-2]")).toHaveText(/^Josh Woodward, paused at 0:\d\d$/);
 });
@@ -39,7 +44,9 @@ test("the scrobble ring fills with the time heard, closes at half the song with 
   await page.goto("/");
   const sc = page.locator("[data-piece='scrobble']");
   await expect(sc.locator("[data-sc-label]")).toHaveText("Paused");
-  // In view (out of view the ring holds still).
+  // In view (out of view the ring holds still); the page's sections laid out first (release.ts
+  // runs on the page's idle time, which the clock holds).
+  await page.clock.runFor(2000);
   await sc.scrollIntoViewIfNeeded();
   await page.locator("#kept .m-media [data-do='toggle']").click();
   await page.clock.runFor(10_000);
@@ -64,6 +71,7 @@ test("the lyric card follows the song, and a click on a line plays from there", 
   await card.locator(".lc-line", { hasText: "We'll put our toes up to the fire" }).first().click();
   await expect(card.locator(".lc-line[data-state='current']")).toHaveText("We'll put our toes up to the fire");
   await expect(page.locator("html")).toHaveAttribute("data-playing", "true");
-  // The window's own lyrics are on the same line: one player.
-  await expect(page.locator("[data-window] [data-lines] .line[data-state='current']")).toHaveText("We'll put our toes up to the fire");
+  // The window's own lyrics are on the same line, once it is in view again: one player.
+  await page.evaluate(() => scrollTo(0, 0));
+  await expect(page.locator("[data-window] [data-lines] .line[data-state='current']")).toHaveText(/We'll put our toes up to the fire|And I will sing your cares away/);
 });

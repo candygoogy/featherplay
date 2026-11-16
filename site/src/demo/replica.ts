@@ -169,7 +169,7 @@ function bindReplica(root: HTMLElement, player: Player) {
   // starting from where the song is when it comes back. Off screen, the browser may tick
   // them on the page's own thread.
   if ("IntersectionObserver" in window) {
-    new IntersectionObserver(
+    const io = new IntersectionObserver(
       (es) => {
         // The latest answer (a busy moment can deliver two in one call).
         const e = es[es.length - 1];
@@ -184,7 +184,15 @@ function bindReplica(root: HTMLElement, player: Player) {
         render(player.state);
       },
       { rootMargin: "64px" },
-    ).observe(root);
+    );
+    io.observe(root);
+    // Its section waited to be laid out (src/scripts/release.ts): asked again once it is.
+    const ask = () => {
+      io.unobserve(root);
+      io.observe(root);
+    };
+    document.addEventListener("released", (e) => (e as CustomEvent<Element>).detail.contains(root) && ask());
+    root.closest("main > section")?.addEventListener("contentvisibilityautostatechange", (e) => !(e as Event & { skipped: boolean }).skipped && ask());
   }
   for (const type of ["pointerenter", "pointerleave", "focusin", "focusout"])
     seekLine?.addEventListener(type, () => {

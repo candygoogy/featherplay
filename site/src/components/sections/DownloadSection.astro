@@ -1,45 +1,52 @@
 ---
-// Download: one card, "Download for Windows" with the version and what it runs on, the two ways
-// to get it as two rows with their sizes, the two notes for the first run, and a slice of the
-// real window cut off by the card's edge. Linux in its own row outside the Windows card; then
-// the releases and checksums. Every file and size from src/data/release.ts.
+// Download: one card, "Download for Windows" with the version and what it runs on as one meta
+// line, then the two ways to get it: the installer first, on its own step of tone with its
+// "Recommended" badge, the portable exe second; each with its size and its button as one unit,
+// the sizes in one column of tabular figures and the two buttons one width. Under them the two
+// notes for the first run. On the right, the app itself: a third view of the page's one player
+// (the live replica, inert), opening level with the rows and cropped by the card's right and
+// bottom edges, so it follows the song and the theme and is sharp at any size. Linux in its own
+// row outside the card, on the same columns; then the releases and checksums. Every file and
+// size from src/data/release.ts.
 import { downloadOptions, release, sizeLabel } from "../../data/release";
 import { links } from "../../data/links";
+import { demoStart } from "../../data/songs";
 import Icon from "../Icon.astro";
+import Replica from "../Replica.astro";
+import Note from "../Note.astro";
+import DlGlyph from "../DlGlyph.astro";
 
 const options = downloadOptions();
 const linux = release.linux;
-const size = (f: Parameters<typeof sizeLabel>[0]) => sizeLabel(f).replace(" ", " ");
-import Note from "../Note.astro";
-import DlGlyph from "../DlGlyph.astro";
+const size = (f: Parameters<typeof sizeLabel>[0]) => sizeLabel(f).replace(" ", " ");
 ---
 
 <section class="sec sec-dl frame" id="download" aria-labelledby="download-title">
   <div class="dl panel" data-download-card>
     <div class="dl-main">
       <h2 id="download-title" class="t-title">Download for Windows</h2>
-      <p class="dl-meta"><span>Version <span data-version>{release.version}</span></span><span>Windows 10 and 11, 64-bit</span><span>Free</span></p>
+      <p class="dl-meta">
+        <span>Version <span class="num" data-version>{release.version}</span></span><span>Windows 10 and 11, 64-bit</span><span>Free</span>
+      </p>
       <ul class="dl-rows">
         {
           options.map((o) => (
-            <li class="dl-row" data-download-option={o.id}>
+            <li class:list={["dl-row", { first: o.primary }]} data-download-option={o.id}>
               <div class="what">
                 <h3 class="o-title">
                   {o.title}
-                  {o.primary && options.length > 1 && <span class="rec">recommended</span>}
+                  {o.primary && options.length > 1 && <span class="rec">Recommended</span>}
                 </h3>
                 <p class="o-note">{o.note}</p>
               </div>
-              <div class="get">
-                <span class="size num">
-                  <span class="visually-hidden">{o.file.name}, </span>
-                  <span data-size>{size(o.file)}</span>
-                </span>
-                <a class:list={["btn", o.primary ? "red" : "tonal"]} href={o.file.url} data-release-link>
-                  <DlGlyph class="dl-arrow" />
-                  {o.action}
-                </a>
-              </div>
+              <span class="size num">
+                <span class="visually-hidden">{o.file.name}, </span>
+                <span data-size>{size(o.file)}</span>
+              </span>
+              <a class:list={["btn", "get", o.primary ? "red" : "tonal"]} href={o.file.url} data-release-link>
+                <DlGlyph class="dl-arrow" />
+                {o.action}
+              </a>
             </li>
           ))
         }
@@ -47,27 +54,28 @@ import DlGlyph from "../DlGlyph.astro";
       <div class="dl-notes" data-first-run>
         <h3 class="visually-hidden">Before you run it</h3>
         <div class="fr">
-          <Icon name="shield" size={20} />
+          <span class="fr-icon"><Icon name="shield" size={18} /></span>
           <div>
             <h4>“Windows protected your&nbsp;PC”</h4>
             <p>featherplay isn’t code-signed yet, so SmartScreen may warn you once. Choose <strong>More info</strong>, then <strong>Run anyway</strong>.</p>
           </div>
         </div>
         <div class="fr">
-          <Icon name="folder" size={20} />
+          <span class="fr-icon"><Icon name="folder" size={18} /></span>
           <div>
             <h4>Where it keeps things</h4>
             <p>
-              Settings in <span class="path">%APPDATA%\<wbr />featherplay</span>, the cache in <span class="path">%LOCALAPPDATA%\<wbr />featherplay</span>,
-              your sign-in in Credential Manager. The uninstaller removes them all; with the exe, delete them and it’s gone.
+              Settings in <code>%APPDATA%\<wbr />featherplay</code>, the cache in <code>%LOCALAPPDATA%\<wbr />featherplay</code>, your sign-in in
+              Credential Manager. The uninstaller removes them all; with the exe, delete them and it’s gone.
             </p>
           </div>
         </div>
       </div>
     </div>
-    <div class="dl-slice" aria-hidden="true">
-      <img class="only-dark" src="/img/window-slice-dark.webp" width="1200" height="711" alt="" loading="lazy" decoding="async" />
-      <img class="only-light" src="/img/window-slice-light.webp" width="1200" height="711" alt="" loading="lazy" decoding="async" />
+    <div class="dl-shot" aria-hidden="true">
+      <div class="dl-win win-body" inert>
+        <Replica id="replica-dl" songId={demoStart.songId} positionMs={demoStart.positionMs} view="lyrics" nowLabel="Now playing, by the download" />
+      </div>
     </div>
   </div>
   {
@@ -81,95 +89,117 @@ import DlGlyph from "../DlGlyph.astro";
             limits in the <a class="text-link" href={links.linux}>README</a>.
           </p>
         </div>
-        <div class="get">
-          <span class="size num">
-            <span class="visually-hidden">{linux.appImage.name}, </span>
-            <span data-size>{size(linux.appImage)}</span>
-          </span>
-          <a class="btn tonal" href={linux.appImage.url} data-release-link>
-            <DlGlyph class="dl-arrow" />
-            Download the AppImage
-          </a>
-        </div>
+        <span class="size num">
+          <span class="visually-hidden">{linux.appImage.name}, </span>
+          <span data-size>{size(linux.appImage)}</span>
+        </span>
+        <a class="btn get tonal" href={linux.appImage.url} data-release-link>
+          <DlGlyph class="dl-arrow" />
+          Download the AppImage
+        </a>
       </div>
     )
   }
-  <Note id="end" class="n-end" />
-  <p class="fine t-small"><a class="text-link" href={release.url}>All releases and checksums on GitHub</a></p>
+  <div class="dl-foot">
+    <p class="fine"><a class="text-link" href={release.url}>All releases and checksums on GitHub</a></p>
+    <Note id="end" class="n-end" />
+  </div>
 </section>
 
 <style>
   .sec-dl {
-    --hair: color-mix(in srgb, var(--text) 11%, transparent);
+    /* The two columns every row shares, in the card and in Linux's: the size (tabular, set to
+       its right edge) and the button. */
+    --size-w: 5.5rem;
+    --get-w: 17rem;
+    --row-pad: var(--s5);
   }
   .dl {
     display: grid;
     grid-template-columns: minmax(0, 6fr) minmax(0, 5fr);
-    gap: var(--s7);
+    gap: var(--s8);
     padding: var(--panel-pad);
     overflow: hidden;
   }
   .dl-meta {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--s1) var(--s4);
+    gap: var(--s1) var(--s3);
     margin-top: var(--s3);
     color: var(--ink2);
     font-weight: var(--fw-medium);
   }
-  .dl-meta span + span::before {
+  .dl-meta > span + span::before {
     content: "·";
-    margin-right: var(--s4);
+    margin-right: var(--s3);
   }
+  /* The rows on one grid (subgrid): the words, the size, the button. Space and a step of tone
+     part them, no rules. */
   .dl-rows {
-    margin: var(--s6) 0 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) var(--size-w) var(--get-w);
+    gap: var(--s2) 0;
+    margin: var(--s6) calc(-1 * var(--row-pad)) 0;
     padding: 0;
     list-style: none;
   }
   .dl-row {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: subgrid;
+    grid-column: 1 / -1;
     align-items: center;
-    gap: var(--s4) var(--s6);
-    padding: var(--s5) 0;
-    box-shadow: inset 0 1px 0 var(--hair);
+    column-gap: var(--s4);
+    padding: var(--row-pad);
+    border-radius: 16px;
   }
-  .dl-row:last-child {
-    box-shadow:
-      inset 0 1px 0 var(--hair),
-      inset 0 -1px 0 var(--hair);
+  /* The first choice: its own step of tone, so it reads first. */
+  .dl-row.first {
+    background: light-dark(rgb(90 66 40 / 0.055), rgb(255 255 255 / 0.055));
+    box-shadow: inset 0 0 0 1px light-dark(rgb(90 66 40 / 0.07), rgb(255 255 255 / 0.05));
+  }
+  .what {
+    min-width: 0;
+    padding-right: var(--s4);
   }
   .o-title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s1) var(--s3);
     font-size: var(--fs-lede);
     font-weight: var(--fw-bold);
     letter-spacing: var(--tr-lede);
   }
   .rec {
-    margin-left: 6px;
-    color: var(--ink2);
+    display: inline-flex;
+    align-items: center;
+    height: 1.5rem;
+    padding: 0 0.6rem;
+    border-radius: var(--r-pill);
+    background: color-mix(in srgb, var(--accent) 13%, transparent);
+    color: light-dark(#a00a29, #ff9aa8);
     font-size: var(--fs-small);
-    font-weight: var(--fw-medium);
-    letter-spacing: 0;
+    font-weight: var(--fw-bold);
+    letter-spacing: 0.01em;
   }
   .o-note {
-    max-width: 48ch;
+    max-width: 52ch;
     margin-top: var(--s1);
     color: color-mix(in srgb, var(--text) 86%, transparent);
     text-wrap: pretty;
   }
-  .get {
-    display: flex;
-    align-items: center;
-    gap: var(--s4);
-  }
   .size {
+    justify-self: end;
     color: var(--ink2);
-    font-size: var(--fs-small);
     font-weight: var(--fw-medium);
+    font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }
-  .get .btn {
-    min-width: 15.5rem;
+  /* The pair: one width, the arrow at the same place in each, the words after it. */
+  .get {
+    justify-content: flex-start;
+    width: 100%;
+    padding-inline: 1.375rem;
   }
   .dl-notes {
     display: grid;
@@ -179,111 +209,162 @@ import DlGlyph from "../DlGlyph.astro";
   }
   .fr {
     display: grid;
-    grid-template-columns: 20px minmax(0, 1fr);
+    grid-template-columns: 2rem minmax(0, 1fr);
     gap: var(--s3);
-    color: var(--ink2);
-    font-size: var(--fs-small);
-    font-weight: var(--fw-medium);
-    line-height: var(--lh-small);
+    align-items: start;
   }
-  .fr :global(svg) {
-    margin-top: 1px;
+  .fr-icon {
+    display: grid;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 10px;
+    background: var(--tonal);
+    color: var(--text);
   }
   .fr h4 {
-    margin: 0 0 var(--s1);
-    color: var(--text);
+    margin: 0.25rem 0 var(--s1);
     font-size: var(--fs-text);
     font-weight: var(--fw-bold);
+  }
+  .fr p {
+    max-width: 44ch;
+    color: var(--ink2);
+    text-wrap: pretty;
   }
   .fr strong {
     color: var(--text);
     font-weight: var(--fw-bold);
   }
-  .path {
-    padding: 0 4px;
-    border-radius: var(--r-control);
+  .fr code {
+    padding: 0.05em 0.35em;
+    border-radius: 6px;
     background: var(--tonal);
+    color: var(--text);
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    font-size: 0.84em;
+    font-weight: 400;
     white-space: nowrap;
   }
-  /* A slice of the real window, cut off by the card's right and bottom edges. */
-  .dl-slice {
+  /* The app, cropped: its top left corner opens level with the rows, it runs out by the card's
+     right and bottom edges, and a soft shade along those inner edges makes the cut a crop.
+     Drawn at the app's own size and scaled, so it is sharp at any size. */
+  .dl-shot {
+    --k: 0.78;
     position: relative;
-    min-height: 24rem;
-    margin: var(--s8) calc(-1 * var(--panel-pad)) calc(-1 * var(--panel-pad)) 0;
+    min-height: 26rem;
+    margin: calc(var(--s6) + 4.75rem) calc(-1 * var(--panel-pad)) calc(-1 * var(--panel-pad)) 0;
+    overflow: hidden;
   }
-  .dl-slice img {
+  .dl-shot::after {
+    content: "";
     position: absolute;
-    left: 0;
-    top: 0;
-    width: 60rem;
-    max-width: none;
-    height: auto;
-    border-radius: var(--r-small) 0 0 0;
-    box-shadow:
-      0 0 0 1px var(--edge),
-      0 1px 2px var(--shade-1),
-      0 4px 16px var(--shade-2),
-      0 16px 56px var(--shade-3);
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    background:
+      linear-gradient(to left, light-dark(rgb(70 48 24 / 0.09), rgb(0 0 0 / 0.3)), transparent 2.5rem),
+      linear-gradient(to top, light-dark(rgb(70 48 24 / 0.09), rgb(0 0 0 / 0.3)), transparent 2.5rem);
+  }
+  .dl-win {
+    position: absolute;
+    left: 1px;
+    top: 1px;
+    /* As tall as the card leaves it, and past its bottom edge (cut there). */
+    width: 1280px;
+    height: calc(100% / var(--k) + 48px);
+    min-height: 720px;
+    overflow: hidden;
+    border-radius: 12px 0 0 0;
+    container: app / size;
+    transform: scale(var(--k));
+    transform-origin: 0 0;
+    box-shadow: 0 0 0 1px var(--edge);
+  }
+  .dl-foot {
+    position: relative;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: var(--s5);
+    padding-inline: var(--panel-pad);
+  }
+  .sec-dl :global(.n-end) {
+    position: static;
   }
   .linux-row {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) var(--size-w) var(--get-w);
     align-items: center;
-    gap: var(--s4) var(--s7);
+    column-gap: var(--s4);
     margin-top: var(--s5);
     padding: var(--panel-pad);
   }
   .linux-row .o-note {
     max-width: 70ch;
   }
-  .fine {
-    margin-top: var(--s5);
+  @media (width < 1600px) {
+    .dl {
+      grid-template-columns: minmax(0, 7fr) minmax(0, 4fr);
+    }
+    .dl-shot {
+      --k: 0.66;
+    }
   }
-  @media (width < 1000px) {
+  @media (width < 1200px) {
     .dl {
       grid-template-columns: minmax(0, 1fr);
+      gap: 0;
     }
-    .dl-slice {
-      min-height: 16rem;
-      margin: 0 calc(-1 * var(--panel-pad)) calc(-1 * var(--panel-pad)) var(--s5);
-    }
-    .dl-slice img {
-      width: 44rem;
+    .dl-shot {
+      --k: 0.6;
+      min-height: 20rem;
+      margin: var(--s7) calc(-1 * var(--panel-pad)) calc(-1 * var(--panel-pad)) var(--s6);
     }
   }
   @media (width < 700px) {
-    /* Wrapped, a dot would start a line: the gap alone keeps them apart. */
-    .dl-meta span + span::before {
+    .sec-dl {
+      --row-pad: var(--s4);
+    }
+    .dl-meta > span + span::before {
       content: none;
+    }
+    /* One column: the words, the button the full width, its size under it. */
+    .dl-rows,
+    .linux-row {
+      grid-template-columns: minmax(0, 1fr);
     }
     .dl-row,
     .linux-row {
-      grid-template-columns: minmax(0, 1fr);
+      row-gap: var(--s2);
+    }
+    .what {
+      padding-right: 0;
+      padding-bottom: var(--s2);
+    }
+    .get {
+      grid-row: 2;
+      justify-content: center;
+    }
+    .size {
+      grid-row: 3;
+      justify-self: center;
+      font-size: var(--fs-small);
     }
     .dl-notes {
       grid-template-columns: minmax(0, 1fr);
     }
-    .get {
-      flex-direction: row-reverse;
-      justify-content: flex-end;
-    }
-    .get .btn {
-      min-width: 0;
-      flex: 1;
+    .dl-shot {
+      --k: 0.42;
+      min-height: 14rem;
+      margin-left: var(--s4);
     }
   }
-  /* The last word, on the right of the releases line. */
-  .sec-dl :global(.n-end) {
-    right: 0;
-    bottom: calc(-1 * var(--s2));
-  }
-  /* Narrower, under the releases line, in the room before the footer. */
   @media (width < 900px) {
-    .sec-dl :global(.n-end) {
-      right: auto;
-      left: 0;
-      bottom: auto;
-      top: calc(100% + var(--s5));
+    .dl-foot {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: var(--s5);
     }
   }
 </style>

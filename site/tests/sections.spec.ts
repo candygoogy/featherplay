@@ -172,7 +172,7 @@ test("the download card: the version, Windows 10 and 11, each way to get it with
     else await expect(link).toHaveClass(/tonal/);
     await expect(row).toContainText(o.file.name);
   }
-  await expect(card.locator('[data-download-option="installer"]')).toContainText("recommended");
+  await expect(card.locator('[data-download-option="installer"]')).toContainText(/recommended/i);
   await expect(page.locator("#download").getByRole("link", { name: /all releases and checksums/i })).toHaveAttribute("href", release.url);
 });
 

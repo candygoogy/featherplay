@@ -10,7 +10,11 @@
 const WAITING = "main[data-split] > section:not([data-stage]), main[data-split] ~ footer";
 let queue: HTMLElement[] = [];
 
-const release = (el: HTMLElement) => el.toggleAttribute("data-released", true);
+/** Released: laid out from now on; whoever watches what is in it may ask again ("released"). */
+const release = (el: HTMLElement) => {
+  el.toggleAttribute("data-released", true);
+  document.dispatchEvent(new CustomEvent("released", { detail: el }));
+};
 
 /** Every section still waiting, now. */
 export function releaseAll(): void {

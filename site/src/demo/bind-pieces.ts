@@ -213,6 +213,17 @@ export function bindPieces(player: Player): void {
       { rootMargin: "64px" },
     );
     for (const p of document.querySelectorAll("[data-piece]")) if (!p.closest("[data-fly]")) io.observe(p);
+    // A section that waited to be laid out (src/scripts/release.ts) is asked again once it is:
+    // its pieces' answers came while they had no place, and one may not come again by itself.
+    const ask = (sec: Element | null) =>
+      sec?.querySelectorAll("[data-piece]").forEach((p) => {
+        if (p.closest("[data-fly]")) return;
+        io.unobserve(p);
+        io.observe(p);
+      });
+    for (const sec of document.querySelectorAll("main > section"))
+      sec.addEventListener("contentvisibilityautostatechange", (e) => !(e as Event & { skipped: boolean }).skipped && ask(sec));
+    document.addEventListener("released", (e) => ask((e as CustomEvent<Element>).detail));
   }
   if ("ResizeObserver" in window) {
     const widths = new WeakMap<Element, number>();
