@@ -117,6 +117,13 @@ import Note from "./Note.astro";
       display: none;
     }
   }
+  /* Where the note shows, the keys make room for it: the keys and the note are centred under
+     the overlay as one group, so the note stays inside the well. */
+  @media (width >= 760px) {
+    .c-keys :global(.mk-board) {
+      padding-inline-end: calc(var(--fs-pen) * 9.2);
+    }
+  }
   .cell-text p {
     max-width: 40ch;
     color: var(--ink2);

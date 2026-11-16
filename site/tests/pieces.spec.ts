@@ -57,7 +57,7 @@ const catchKeys = (page: Page) =>
 const key = (page: Page, action: string, seekTime?: number) =>
   page.evaluate(([action, seekTime]) => (window as unknown as { keys: Record<string, (d: object) => void> }).keys[action as string]({ action, seekTime }), [action, seekTime] as const);
 
-test("the key caps press for the visitor's own media keys and for the taskbar's and overlay's buttons", async ({ page }) => {
+test("the key caps press for the visitor's own media keys and for the overlay's buttons", async ({ page }) => {
   await catchKeys(page);
   await page.goto("/");
   const stage = page.locator("#kept [data-keys-stage]");
@@ -68,7 +68,7 @@ test("the key caps press for the visitor's own media keys and for the taskbar's 
     // Each time a cap goes down (the attribute added).
     new MutationObserver((rs) => rs.forEach((r) => r.oldValue === null && w.pressed.push((r.target as HTMLElement).dataset.key!))).observe(s, { attributes: true, subtree: true, attributeFilter: ["data-pressed"], attributeOldValue: true });
   });
-  await stage.locator(".mk-thumb [data-do='toggle']").click();
+  await stage.locator(".m-media [data-do='toggle']").click();
   await expect(page.locator("html")).toHaveAttribute("data-playing", "true");
   await key(page, "nexttrack");
   await expect(stage.locator(".m-media [data-bind='title']")).toHaveText("Invisible Light");

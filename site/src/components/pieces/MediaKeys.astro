@@ -1,19 +1,14 @@
 ---
-// The three places featherplay answers play, pause and skip: Windows' media overlay and the
-// taskbar's thumbnail with its three buttons (on the screen, above), and the keyboard's media
-// keys (below, inert until the script is here). Every control here acts on the page's one
+// Where featherplay answers play, pause and skip: Windows' media overlay (on the screen, above)
+// and the keyboard's media keys (below, inert until the script is here). The taskbar's
+// thumbnail, the third place the cell's words name, was drawn here too and made the well too
+// busy: the words carry it. Every control here acts on the page's one
 // player (src/demo/bind-pieces.ts), and the key caps press when any of them is used, or when the
 // visitor's own media keys reach the page (Media Session, once a song has played). The slot is
 // for the note beside the keys.
 import "../../styles/pieces.css";
 import Icon from "../Icon.astro";
-import Logo from "../Logo.astro";
 import MediaFlyout from "./MediaFlyout.astro";
-import { demoStart, songById, songs } from "../../data/songs";
-
-const song = songById(demoStart.songId)!;
-// The window's Home in the thumbnail: the demo's six songs.
-const home = songs;
 const keys = [
   { key: "previous", label: "Previous" },
   { key: "toggle", label: "Play" },
@@ -26,30 +21,6 @@ const keys = [
     <div class="mk-place mk-overlay">
       <MediaFlyout overlay surface cover={76} />
       <p class="mk-cap">Media overlay</p>
-    </div>
-    <div class="mk-place mk-task">
-      <!-- The taskbar's thumbnail of featherplay's window, its buttons under it. A picture with
-           working buttons for the pointer; the keys and the overlay are the ones for the keyboard. -->
-      <div class="mk-thumb glass float" data-piece="taskbar" aria-hidden="true">
-        <p class="tt-head"><Logo size={14} />featherplay</p>
-        <div class="tt-shot">
-          <span class="tt-side"></span>
-          <span class="tt-home"><b>Home</b>
-            {home.map((s) => <img src={s.cover} width="40" height="40" alt="" loading="lazy" decoding="async" />)}
-          </span>
-          <span class="tt-bar">
-            <img data-bind="cover" src={song.cover} width="16" height="16" alt="" decoding="async" />
-            <span class="tt-now"><span data-bind="title">{song.title}</span><span class="rail tt-rail"><span data-fill style={`transform:scaleX(${demoStart.positionMs / song.durationMs})`}></span></span></span>
-          </span>
-        </div>
-        <p class="tt-btns">
-          <span data-do="previous"><Icon name="prev" size={16} /></span>
-          <span data-do="toggle"><span class="pp"><Icon name="play" size={16} class="i-play" /><Icon name="pause" size={16} class="i-pause" /></span></span>
-          <span data-do="next"><Icon name="next" size={16} /></span>
-        </p>
-      </div>
-      <p class="mk-bar" aria-hidden="true"><i></i><i></i><span class="mk-icon"><Logo size={20} /></span><i></i><i></i></p>
-      <p class="mk-cap">Taskbar</p>
     </div>
     <div class="mk-place mk-board">
       <div class="mk-keys" data-piece="keys" inert role="group" aria-label="Media keys">
@@ -118,36 +89,23 @@ const keys = [
     margin-top: 0;
   }
 
-  /* ---------- The media keys: the overlay and the taskbar on the screen, the keys below ---------- */
+  /* ---------- The media keys: the overlay on the screen, the keys below ---------- */
   .mk {
     container: mk / inline-size;
     width: 100%;
   }
-  /* The overlay and the taskbar side by side, shrinking together; the keys under the overlay,
-     the room beside them for the note. */
+  /* The overlay, the keys under it; the room beside the keys is the note's. */
   .mk-in {
     display: grid;
-    grid-template-columns: minmax(0, 21fr) minmax(0, 15fr);
-    grid-template-areas:
-      "overlay task"
-      "board .";
-    align-items: end;
-    gap: var(--s6) clamp(var(--s5), 6cqi, var(--s7));
-    max-width: 39rem;
+    justify-items: center;
+    gap: var(--s6);
+    width: min(24rem, 100%);
     margin-inline: auto;
-  }
-  .mk-overlay {
-    grid-area: overlay;
-  }
-  .mk-task {
-    grid-area: task;
-  }
-  .mk-board {
-    grid-area: board;
   }
   .mk-place {
     display: grid;
     justify-items: center;
+    width: 100%;
     min-width: 0;
   }
   .mk-place > .m-media {
@@ -158,152 +116,6 @@ const keys = [
     color: var(--ink2);
     font-size: var(--fs-small);
     font-weight: var(--fw-medium);
-  }
-  /* The taskbar's thumbnail of the window, as Windows draws it over the app's button. */
-  .mk-thumb {
-    --mat: var(--mat-fly);
-    width: 100%;
-    padding: var(--s2) var(--s2) 6px;
-    border-radius: var(--r-small);
-    color: var(--text);
-    font-family: var(--font-ui);
-  }
-  .tt-head {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 0 2px var(--s2);
-    font-size: 0.75rem;
-    font-weight: var(--fw-medium);
-  }
-  .tt-shot {
-    display: grid;
-    grid-template-columns: 13% minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr) auto;
-    aspect-ratio: 16 / 10;
-    overflow: hidden;
-    border-radius: 6px;
-    background: var(--bg);
-    box-shadow: 0 0 0 1px var(--edge);
-  }
-  .tt-side {
-    background: var(--surface);
-  }
-  .tt-home {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    align-content: start;
-    gap: 5px 6px;
-    min-height: 0;
-    overflow: hidden;
-    padding: 6px 8px;
-  }
-  .tt-home b {
-    grid-column: 1 / -1;
-    font-size: 0.5625rem;
-    line-height: 1.2;
-  }
-  .tt-home img {
-    width: 100%;
-    height: auto;
-    aspect-ratio: 1;
-    border-radius: 3px;
-    object-fit: cover;
-  }
-  .tt-bar {
-    grid-column: 1 / -1;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 5px 8px;
-    background: var(--card);
-    font-size: 0.5625rem;
-    font-weight: var(--fw-bold);
-    line-height: 1.2;
-  }
-  .tt-bar img {
-    flex: none;
-    width: 16px;
-    height: 16px;
-    border-radius: 2px;
-    object-fit: cover;
-  }
-  .tt-now {
-    display: grid;
-    flex: 1;
-    gap: 3px;
-    min-width: 0;
-  }
-  .tt-now > span:first-child {
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-  }
-  .tt-rail {
-    height: 2px;
-  }
-  .tt-btns {
-    display: flex;
-    justify-content: center;
-    gap: var(--s1);
-    margin-top: 6px;
-  }
-  .tt-btns > span {
-    display: grid;
-    place-items: center;
-    width: 40px;
-    height: 30px;
-    border-radius: var(--r-control);
-    cursor: pointer;
-    transition: background-color var(--t-hover) ease;
-  }
-  .tt-btns > span:hover {
-    background: var(--hover);
-  }
-  .tt-btns > span:active {
-    background: var(--tonal);
-  }
-  .tt-btns .pp {
-    width: 16px;
-    height: 16px;
-  }
-  /* The taskbar under it: two neutral apps each side of featherplay's button, lit, its window open. */
-  .mk-bar {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    margin-top: var(--s3);
-    padding: 4px var(--s2);
-    border-radius: var(--r-small);
-    background: var(--mat-dock);
-    box-shadow: var(--lit), var(--ring);
-  }
-  .mk-bar > i {
-    width: 20px;
-    height: 20px;
-    margin: 8px;
-    border-radius: 5px;
-    background: var(--tonal);
-  }
-  .mk-icon {
-    position: relative;
-    display: grid;
-    place-items: center;
-    width: 36px;
-    height: 36px;
-    border-radius: var(--r-control);
-    background: var(--part-hover);
-  }
-  .mk-icon::after {
-    content: "";
-    position: absolute;
-    bottom: 1px;
-    left: 50%;
-    width: 14px;
-    height: 3px;
-    margin-left: -7px;
-    border-radius: var(--r-pill);
-    background: var(--accent);
   }
   /* The keys: a cap on its skirt; pressed, the cap goes down into it. Pressed by a click, and by
      the visitor's own keys or the piece's other buttons (data-pressed, bind-pieces.ts). */
@@ -357,7 +169,7 @@ const keys = [
     transition-duration: var(--t-press);
     transition-timing-function: var(--ease-out);
   }
-  /* Pressed by the player (a key, the overlay, the taskbar, the cap itself): its mark lights. */
+  /* Pressed by the player (a key, the overlay, the cap itself): its mark lights. */
   .kc[data-pressed] .kc-top {
     color: var(--accent);
   }
@@ -379,7 +191,7 @@ const keys = [
   /* A wide stage (a large screen): the same parts a size up, by layout. */
   @container mk (width > 50rem) {
     .mk-in {
-      max-width: 46rem;
+      width: min(29rem, 100%);
     }
     .mk .m-media {
       --cover: 96px !important;
@@ -388,24 +200,9 @@ const keys = [
     .mk .mm-title {
       font-size: var(--fs-lede);
     }
-    .mk .tt-head {
-      font-size: var(--fs-small);
-    }
     .kc-top {
       width: 76px;
       height: 64px;
-    }
-  }
-  /* Narrow (a phone): one above the other, the taskbar left out. */
-  @container mk (width < 28rem) {
-    .mk-in {
-      grid-template-columns: minmax(0, 1fr);
-      grid-template-areas:
-        "overlay"
-        "board";
-    }
-    .mk-task {
-      display: none;
     }
   }
 </style>
