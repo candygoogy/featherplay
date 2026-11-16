@@ -176,6 +176,11 @@ function bindReplica(root: HTMLElement, player: Player) {
         if (e.isIntersecting === !root.hasAttribute("data-away")) return;
         root.toggleAttribute("data-away", !e.isIntersecting);
         last.run = "";
+        // Back in view: its lines are marked and placed again where the song is.
+        if (e.isIntersecting) {
+          last.line = undefined;
+          instant = true;
+        }
         render(player.state);
       },
       { rootMargin: "64px" },
@@ -601,7 +606,8 @@ function bindReplica(root: HTMLElement, player: Player) {
         last.second = second;
       }
       const line = currentLineIndex(song, s.positionMs);
-      if (line !== last.line) {
+      // Out of view the lines wait (each mark is a colour fade, each glide a move).
+      if (line !== last.line && !root.hasAttribute("data-away")) {
         for (const list of sideLines ? [lines, sideLines] : [lines]) markLines(list, ".line", line);
         if (s.view === "lyrics") glide(line);
         last.line = line;

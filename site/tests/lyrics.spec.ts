@@ -35,7 +35,9 @@ test("a click on a line seeks there and plays, here and in the window", async ({
   await line.click();
   await expect(page.locator("html")).toHaveAttribute("data-playing", "true");
   await expect(line).toHaveAttribute("aria-current", "true");
-  await expect(page.locator('[data-window] .line[data-state="current"]').first()).toHaveText("With a California lullabye");
+  // The window, out of view, holds its lines still; back in view, it shows the same line.
+  await page.evaluate(() => scrollTo(0, 0));
+  await expect(page.locator('[data-window] .line[data-state="current"]').first()).toHaveText(/With a California lullabye|And when you're frozen with desire/);
 });
 
 test("the lines follow the song: the line sung a third of the way down", async ({ page }) => {

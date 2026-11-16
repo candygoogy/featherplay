@@ -110,3 +110,14 @@ test("measured: with each section on screen while a song plays, the page restyle
   }
   expect(found).toEqual([]);
 });
+
+test("over several lyric lines with Download on screen, nothing off screen animates (sampled, not one snapshot)", async ({ page }) => {
+  await playAt(page, "download");
+  const off: string[] = [];
+  // Some 6 s of the song: several line changes.
+  for (let i = 0; i < 60; i++) {
+    for (const a of await running(page)) if (!a.inView && a.section !== "download") off.push(`${a.section}: ${a.what} on ${a.cls.split(" ")[0]}`);
+    await page.waitForTimeout(100);
+  }
+  expect([...new Set(off)]).toEqual([]);
+});
