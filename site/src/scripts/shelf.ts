@@ -1,6 +1,6 @@
-// The shelf's sleeves (Shelf.astro): pick one up and drop it on the player, double-click it,
-// press Enter or Space on it, or tap it on a touch screen, and it plays. A mouse's single click
-// only picks up (a click is how a sleeve is taken in hand). While a sleeve is carried over the
+// The shelf's sleeves (Shelf.astro): click one, press Enter or Space on it, tap it, or pick it up
+// and drop it on the player, and it plays. A sleeve carried and let go anywhere else goes back
+// without playing. While a sleeve is carried over the
 // window, the window shows a ring; dropped there, the sleeve goes into it. The one playing is
 // marked. Nothing plays until the visitor does one of these.
 
@@ -45,6 +45,8 @@ export function bindShelf(shelf: HTMLElement, player: Player): void {
     }).observe(shelf);
 
   let held: { el: HTMLElement; sx: number; sy: number; moved: boolean; carry?: HTMLElement; ox: number; oy: number } | null = null;
+  /** This press became a carry: the click that ends it plays nothing. */
+  let carried = false;
   let dropOn = false;
   const mark = (on: boolean) => {
     if (on === dropOn) return;
@@ -59,6 +61,7 @@ export function bindShelf(shelf: HTMLElement, player: Player): void {
   for (const el of sleeves) {
     const id = el.dataset.sleeve!;
     el.addEventListener("pointerdown", (e) => {
+      carried = false;
       if (e.button !== 0 || e.pointerType === "touch") return;
       e.preventDefault();
       el.focus({ preventScroll: true });
@@ -71,6 +74,7 @@ export function bindShelf(shelf: HTMLElement, player: Player): void {
       if (!held.moved) {
         if (Math.hypot(e.clientX - held.sx, e.clientY - held.sy) < 5) return;
         held.moved = true;
+        carried = true;
         const r = el.getBoundingClientRect();
         const c = el.querySelector("img")!.cloneNode() as HTMLElement;
         c.className = "carry";
@@ -120,11 +124,12 @@ export function bindShelf(shelf: HTMLElement, player: Player): void {
     };
     el.addEventListener("pointerup", end);
     el.addEventListener("pointercancel", end);
-    el.addEventListener("dblclick", () => play(id));
-    // The keyboard (Enter, Space: a click with no pointer) and touch play at once.
+    // A click plays: the mouse, the keyboard (Enter, Space: a click with no pointer) or a tap.
+    // Not the click that ends a carry, and not the second click of a double-click (the first
+    // has started the song).
     el.addEventListener("click", (e) => {
-      const touch = (e as PointerEvent).pointerType === "touch" || matchMedia("(pointer: coarse)").matches;
-      if (e.detail === 0 || touch) play(id);
+      if (e.detail === 0 || (!carried && e.detail < 2)) play(id);
+      carried = false;
     });
   }
 }

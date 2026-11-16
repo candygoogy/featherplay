@@ -109,13 +109,10 @@ test.describe("the sleeves", () => {
     await expect(page.locator("[data-sleeve][data-current]")).toHaveCount(1);
   });
 
-  test("a single click only picks it up; a double-click plays it", async ({ page }) => {
-    const s = page.locator("[data-sleeve='invisible-light']");
-    await s.click();
-    await page.waitForTimeout(300);
-    await expect(page.locator("html")).not.toHaveAttribute("data-playing", "true");
-    await s.dblclick();
+  test("a click plays it", async ({ page }) => {
+    await page.locator("[data-sleeve='invisible-light']").click();
     await expect(title(page)).toHaveText("Invisible Light");
+    await expect(page.locator("html")).toHaveAttribute("data-playing", "true");
   });
 
   test("dropped on the player it plays; the window rings while it is over it; dropped elsewhere it goes back", async ({ page }) => {
