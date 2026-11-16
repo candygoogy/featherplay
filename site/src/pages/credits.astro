@@ -4,6 +4,7 @@
 // players on the home page carry the short credit and link here. Then the two typefaces.
 import Base from "../layouts/Base.astro";
 import Bar from "../components/Bar.astro";
+import DeskLite from "../components/DeskLite.astro";
 import SiteFooter from "../components/SiteFooter.astro";
 import { musicCredits, musicCreditsNote, songs } from "../data/songs";
 ---
@@ -13,6 +14,7 @@ import { musicCredits, musicCreditsNote, songs } from "../data/songs";
   description="The six tracks the featherplay website plays, who made them, where they come from and the licences they're shared under."
   system
 >
+  <DeskLite />
   <Bar home={false} />
   <main id="main" tabindex="-1" class="frame doc credits-page" data-music-credits>
     <h1 class="t-display">Music in the demo</h1>

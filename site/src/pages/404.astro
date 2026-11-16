@@ -8,6 +8,7 @@ import "../styles/app-controls.css";
 import "../styles/replica.css";
 import Base from "../layouts/Base.astro";
 import Bar from "../components/Bar.astro";
+import DeskLite from "../components/DeskLite.astro";
 import SiteFooter from "../components/SiteFooter.astro";
 import Icon from "../components/Icon.astro";
 ---
@@ -18,6 +19,7 @@ import Icon from "../components/Icon.astro";
   noindex
   system
 >
+  <DeskLite />
   <Bar home={false} />
   <main id="main" tabindex="-1" class="nf frame">
     <div class="nf-head">

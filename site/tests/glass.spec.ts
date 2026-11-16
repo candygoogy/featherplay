@@ -89,3 +89,22 @@ for (const theme of ["dark", "light"] as const) {
     expect(found).toEqual([]);
   });
 }
+
+for (const theme of ["dark", "light"] as const) {
+  test(`/method, /credits and the 404 lie on the same desk, drawn cheaply, their words AA over it (${theme})`, async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.emulateMedia({ colorScheme: theme });
+    const found: string[] = [];
+    for (const path of ["/method", "/credits", "/a-page-that-is-not-there"]) {
+      const images: string[] = [];
+      page.on("request", (r) => r.resourceType() === "image" && images.push(r.url()));
+      await page.goto(path);
+      await expect(page.locator(".desk-lite")).toHaveCount(1);
+      await page.waitForTimeout(500);
+      // No image of the home page's sheet: gradients and the bar's grain tile only.
+      expect(images.filter((u) => /\/img\/desk\/k2-/.test(u)), path).toEqual([]);
+      found.push(...low(await textContrast(page, "main h1, main h2, main p, main li:not(:has(img))", 14), path));
+    }
+    expect(found).toEqual([]);
+  });
+}

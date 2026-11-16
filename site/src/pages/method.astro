@@ -5,6 +5,7 @@
 // features on (9 November); the figures and the sizes come from numbers.ts and release.ts.
 import Base from "../layouts/Base.astro";
 import Bar from "../components/Bar.astro";
+import DeskLite from "../components/DeskLite.astro";
 import SiteFooter from "../components/SiteFooter.astro";
 import { figureFor, figures, installFolders, metrics, timings, withProcessing, type Metric } from "../data/numbers";
 import { figureText, formatBytes, formatFigure } from "../data/format";
@@ -37,6 +38,7 @@ const { startToSoundS: start, clickToSoundS: click, hovered, notHovered, prepare
   description="The PC, the versions and the method behind the memory, CPU, timing and download figures that compare featherplay with Pear Desktop and YouTube Music in Edge."
   system
 >
+  <DeskLite />
   <Bar home={false} />
   <main id="main" tabindex="-1" class="frame doc method">
     <h1 class="t-display">How these were measured</h1>

@@ -1,0 +1,64 @@
+---
+// The desk on the pages without the app (/method, /credits, the 404): the same frosted sheet as
+// the home page's (Desk.astro) for almost nothing. The field is drawn by CSS gradients in its
+// shape (the lit corner, a weaker light along the top right, the low rise from the lower right,
+// deep behind the words), each with a long tail of stops so no ring shows; the grain is the
+// tile the bar already loads. The tones are the opening song's, by the same rule, so the site
+// looks the same wherever one arrives. Still: nothing moves.
+import { deskTones } from "../data/desk";
+import { demoStart, songById } from "../data/songs";
+
+const c = songById(demoStart.songId)!.colour;
+const d = deskTones(c, "dark");
+const l = deskTones(c, "light");
+const pair = (a: string, b: string) => `light-dark(${a},${b})`;
+// Each light's strength in each theme: the dark rule's layer opacities, the light theme's own.
+const mix = (col: string, pct: number) => `color-mix(in oklab, ${col} ${pct}%, transparent)`;
+const style = [
+  `--lg:${pair(l.qg, d.qg)}`,
+  `--ls:${pair(mix(l.qs, Math.round(l.shade * 100)), mix(d.qs, Math.round(d.shade * 100)))}`,
+  `--ll:${pair(mix(l.ql, Math.round(l.lit * 100)), mix(d.ql, Math.round(d.lit * 100)))}`,
+  `--lh:${pair(mix(l.qh, Math.round(l.hi * 100)), mix(d.qh, Math.round(d.hi * 100)))}`,
+].join(";");
+---
+
+<div class="desk-lite" style={style} aria-hidden="true"></div>
+
+<style>
+  /* Behind the page, fixed to the window, as the home page's desk. */
+  .desk-lite {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    contain: strict;
+    background:
+      /* the brightest, in the corner only */
+      radial-gradient(45% 60% at 2% -8%, var(--lh), color-mix(in oklab, var(--lh) 45%, transparent) 30%, color-mix(in oklab, var(--lh) 12%, transparent) 55%, transparent 80%),
+      /* the corner's light, fading across the top */
+      radial-gradient(70% 85% at 0% -14%, var(--ll), color-mix(in oklab, var(--ll) 70%, transparent) 22%, color-mix(in oklab, var(--ll) 40%, transparent) 42%, color-mix(in oklab, var(--ll) 16%, transparent) 64%, color-mix(in oklab, var(--ll) 5%, transparent) 82%, transparent 100%),
+      /* a weaker one along the top right */
+      radial-gradient(34% 30% at 84% -10%, color-mix(in oklab, var(--ll) 50%, transparent), color-mix(in oklab, var(--ll) 22%, transparent) 40%, color-mix(in oklab, var(--ll) 6%, transparent) 75%, transparent 100%),
+      /* the low rise from the lower right */
+      radial-gradient(40% 46% at 106% 112%, color-mix(in oklab, var(--ll) 62%, transparent), color-mix(in oklab, var(--ll) 28%, transparent) 40%, color-mix(in oklab, var(--ll) 8%, transparent) 75%, transparent 100%),
+      /* the deep behind the words */
+      radial-gradient(46% 34% at 30% 26%, var(--ls), color-mix(in oklab, var(--ls) 50%, transparent) 45%, transparent 100%),
+      var(--lg);
+  }
+  /* The frost's grain: the bar's tile, as faint as on the home page's desk. */
+  .desk-lite::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: var(--grain) 0 0 / 160px;
+    opacity: 0.3;
+  }
+  :global(:root[data-theme="light"]) .desk-lite::after {
+    opacity: 0.2;
+  }
+  @media (forced-colors: active) {
+    .desk-lite {
+      display: none;
+    }
+  }
+</style>
