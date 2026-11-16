@@ -10,7 +10,7 @@
 // page, where a closing answer would pull the page up, the list keeps its height until it's out
 // of view. Reduced motion: the same swap at once. Clicking the open question closes it, leaving
 // none open.
-// A link to a question (#official, #connects, #uninstall) opens its answer.
+// A link to a question (#official, #connects, #uninstall) opens its answer, at the click.
 
 const MS = 280;
 const EASE = "cubic-bezier(0.22, 1, 0.36, 1)";
@@ -104,15 +104,27 @@ export function bindFaq(root: HTMLElement): void {
     });
   }
 
-  const openTarget = () => {
-    const id = decodeURIComponent(location.hash.slice(1));
+  const openAt = (hash: string) => {
+    const id = decodeURIComponent(hash.slice(1));
     const target = id ? document.getElementById(id) : null;
     if (!(target instanceof HTMLDetailsElement) || !root.contains(target)) return;
     for (const o of all) if (o !== target && o.open) o.open = false;
     target.open = true;
   };
+  const openTarget = () => openAt(location.hash);
   addEventListener("hashchange", openTarget);
   openTarget();
+  // A link on this page to a question opens its answer as it is clicked, before the browser
+  // sets off for it: opened a moment later (on hashchange), it changed the page under the
+  // glide, and Firefox's scroll anchoring then shifted the glide's end or stopped it.
+  document.addEventListener(
+    "click",
+    (e) => {
+      const link = (e.target as Element | null)?.closest?.("a[href*='#']");
+      if (link instanceof HTMLAnchorElement && link.origin === location.origin && link.pathname === location.pathname) openAt(link.hash);
+    },
+    true,
+  );
 
   // The index marks the group in view.
   const index = new Map<Element, HTMLAnchorElement>();

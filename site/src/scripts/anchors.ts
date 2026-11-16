@@ -6,7 +6,8 @@
 //
 // A glide's end is fixed as it starts, so any section still waiting to be laid out just after
 // load (src/scripts/release.ts) is laid out first: the target is where the link says, and
-// nothing moves under the glide.
+// nothing moves under the glide. The browser's scroll anchoring is off while it runs: a change
+// of layout on the way must not shift the glide's end, or stop it (Firefox).
 
 import { releaseAll } from "./release";
 
@@ -20,6 +21,7 @@ export function bindAnchors(): void {
   const done = () => {
     clearTimeout(clear);
     root.style.scrollBehavior = "";
+    root.style.overflowAnchor = "";
   };
   // Bubbling to the document: anything that handles the click itself has had its turn.
   document.addEventListener("click", (e) => {
@@ -28,7 +30,10 @@ export function bindAnchors(): void {
     if (!(link instanceof HTMLAnchorElement) || !link.hash) return;
     if (link.origin !== location.origin || link.pathname !== location.pathname || link.search !== location.search) return;
     releaseAll();
-    if (!matchMedia("(prefers-reduced-motion: reduce)").matches) root.style.scrollBehavior = "smooth";
+    if (!matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      root.style.scrollBehavior = "smooth";
+      root.style.overflowAnchor = "none";
+    }
     removeEventListener("scrollend", done);
     addEventListener("scrollend", done, { once: true });
     clearTimeout(clear);

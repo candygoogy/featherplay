@@ -154,6 +154,9 @@ test("the footer's unofficial notice opens the answer to \"Is featherplay offici
   await expect(page.locator("#official")).toHaveAttribute("open", "");
   // (A long glide up from the footer: with every engine at work at once it takes its time.)
   await expect(page.locator("#official")).toBeInViewport({ timeout: 15_000 });
+  // It lands clear of the bar, not under it.
+  await expect.poll(async () => Math.round((await page.locator("#official").boundingBox())!.y), { timeout: 10_000 }).toBeGreaterThan(100);
+  await expect.poll(async () => Math.round((await page.locator("#official").boundingBox())!.y)).toBeLessThan(240);
 });
 
 // The site says what the repo's README says. Closed answers are in the HTML: textContent.
