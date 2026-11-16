@@ -52,7 +52,7 @@ import Note from "./Note.astro";
           ><path d="M2 8h42M37 2l7 6-7 6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"
           ></path></svg
         >
-        <div class="step">
+        <div class="step step-tray">
           <p class="step-l"><span class="step-n">2</span>In the tray, still playing</p>
           <TrayTip corner />
         </div>
@@ -154,7 +154,8 @@ import Note from "./Note.astro";
       font-size: var(--fs-lede);
     }
   }
-  /* A narrow well (a phone): a smaller cover, so the song's title keeps its room. */
+  /* A narrow well (a phone): a smaller cover, so the song's title keeps its room (still taller
+     than the three lines beside it, so the card is one height whatever the song). */
   @container piece (width < 22rem) {
     .c-discord :global(.m-discord) {
       padding: var(--s4);
@@ -163,8 +164,8 @@ import Note from "./Note.astro";
       gap: var(--s3);
     }
     .c-discord :global(.dc-art > img) {
-      width: 64px;
-      height: 64px;
+      width: 68px;
+      height: 68px;
     }
   }
   @container piece (width > 50rem) {
@@ -207,13 +208,30 @@ import Note from "./Note.astro";
     display: flex;
     align-items: flex-end;
     justify-content: center;
-    /* (The gap gives way before the dialog does: its two buttons keep one row.) */
-    gap: var(--s5) clamp(var(--s4), 3.5cqi, var(--s7));
+    /* (The gap gives way before the dialog does: its two buttons keep one row. In steps, not
+       in the container's own units: those are worked out again whenever anything in the well
+       changes, the tooltip's clock every second.) */
+    gap: var(--s5) var(--s4);
   }
   @container (width >= 46rem) {
     .tray-story .mc-btns {
       flex-wrap: nowrap;
       white-space: nowrap;
+    }
+  }
+  @container (width >= 50rem) {
+    .tray-story {
+      column-gap: var(--s5);
+    }
+  }
+  @container (width >= 58rem) {
+    .tray-story {
+      column-gap: var(--s6);
+    }
+  }
+  @container (width >= 68rem) {
+    .tray-story {
+      column-gap: var(--s7);
     }
   }
   @container (width < 46rem) {
@@ -226,8 +244,8 @@ import Note from "./Note.astro";
       margin-top: 0;
     }
     /* One under the other, the tray's step is centred under the dialog as the arrow is. */
-    .tray-story .step:has(.tray-corner),
-    .tray-story .step:has(.tray-corner) :global(.tray-corner) {
+    .tray-story .step-tray,
+    .tray-story .step-tray :global(.tray-corner) {
       justify-items: center;
     }
   }
@@ -239,18 +257,18 @@ import Note from "./Note.astro";
   /* The tray's step keeps one width whatever the song: its tooltip is as wide as its words (a
      long title, a short one), set to the step's right edge with its label, so it grows into
      room that is already there and the dialog beside it never moves. */
-  .step:has(.tray-corner) {
+  .step-tray {
     flex: none;
     /* (A length, not a share of the row: the row is sized by what is in it.) */
     width: 19.5rem;
     max-width: 100%;
     justify-items: end;
   }
-  .step:has(.tray-corner) :global(.tray-corner) {
+  .step-tray :global(.tray-corner) {
     grid-template-columns: minmax(0, 1fr);
     width: 100%;
   }
-  .step:has(.tray-corner) :global(.tray-tip) {
+  .step-tray :global(.tray-tip) {
     max-width: 100%;
   }
   .step-l {

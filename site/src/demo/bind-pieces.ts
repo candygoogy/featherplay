@@ -339,8 +339,12 @@ export function bindPieces(player: Player): void {
       // A piece out of view keeps its time until it is back (again(), which comes here).
       for (const el of $$("[data-piece] [data-bind='at']")) if (!away.has(el.closest("[data-piece]")!)) el.textContent = at;
       const [a, b] = trayLines(s);
-      for (const el of $$("[data-tray-1]")) el.textContent = a;
-      for (const el of $$("[data-tray-2]")) el.textContent = b;
+      // (A tooltip out of view keeps its words until it is back, as the times above do.)
+      for (const tip of $$("[data-piece='tray']")) {
+        if (away.has(tip) && !songChanged) continue;
+        tip.querySelector("[data-tray-1]")!.textContent = a;
+        tip.querySelector("[data-tray-2]")!.textContent = b;
+      }
       if (songChanged) for (const el of $$("[data-tray-size]")) el.textContent = trayWidest(song);
       if (ms?.setPositionState) {
         try {
