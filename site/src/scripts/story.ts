@@ -174,6 +174,8 @@ export async function startStory(player: Player): Promise<void> {
     if (!G) return;
     if (p === lastP && !force) return;
     lastP = p;
+    // The story moves its words (a selection in them is drawn again, src/scripts/selection.ts).
+    dispatchEvent(new Event("placechange"));
     const { a, b, c } = phases(p);
     // The beat in the tray: the capsule's flyout shows the song, still playing.
     const inBeat = p >= 0.76 && p < 0.995 && c >= 1;

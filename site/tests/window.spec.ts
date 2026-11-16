@@ -282,3 +282,34 @@ test("the wheel over the window scrolls the page until the visitor clicks into i
   await expect.poll(shift).not.toBe(t0);
   expect(await page.evaluate(() => scrollY)).toBe(0);
 });
+
+test("a selection in the window moves with it: its drawn pieces follow a drag", async ({ page }) => {
+  await page.goto("/");
+  await wake(page);
+  // The song's title in the window, selected.
+  const sel = () =>
+    page.evaluate(() => {
+      const r = document.getSelection()!.getRangeAt(0).getBoundingClientRect();
+      const p = document.querySelector(".sel-layer > span")!.getBoundingClientRect();
+      return { dx: Math.abs(p.left - r.left), dy: Math.abs(p.top - r.top) };
+    });
+  await page.evaluate(() => {
+    const el = document.querySelector("[data-window] [data-replica] .np-title")!;
+    const r = document.createRange();
+    r.selectNodeContents(el);
+    document.getSelection()!.removeAllRanges();
+    document.getSelection()!.addRange(r);
+  });
+  await expect(page.locator(".sel-layer > span").first()).toBeVisible();
+  await page.waitForTimeout(300);
+  const at = await sel();
+  expect(at.dx + at.dy).toBeLessThan(12);
+  const bar = (await replica(page).locator(".titlebar-name").boundingBox())!;
+  await page.mouse.move(bar.x + 5, bar.y + bar.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(bar.x - 200, bar.y + 120, { steps: 6 });
+  await page.mouse.up();
+  await page.waitForTimeout(300);
+  const after = await sel();
+  expect(Math.abs(after.dx - at.dx) + Math.abs(after.dy - at.dy)).toBeLessThan(3);
+});

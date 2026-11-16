@@ -236,16 +236,26 @@ export function bindSelection(): () => void {
     onScroll();
   };
 
+  // Something moved by script rather than by the scroll (the window dragged, the story's words
+  // and window gliding): read again, if anything is drawn.
+  const onPlace = () => {
+    if (!layers.some((l) => l.children.length)) return;
+    kept = fresh();
+    schedule(false);
+  };
+
   document.addEventListener("selectionchange", onSelection);
   addEventListener("scroll", onScroll, { passive: true });
   addEventListener("resize", onResize, { passive: true });
   addEventListener("themechange", onResize);
+  addEventListener("placechange", onPlace);
   return () => {
     cancelAnimationFrame(frame);
     document.removeEventListener("selectionchange", onSelection);
     removeEventListener("scroll", onScroll);
     removeEventListener("resize", onResize);
     removeEventListener("themechange", onResize);
+    removeEventListener("placechange", onPlace);
     root.classList.remove("sel-drawn");
     for (const l of layers) l.remove();
   };

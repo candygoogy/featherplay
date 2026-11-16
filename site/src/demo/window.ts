@@ -127,6 +127,8 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
     }
     el.style.transform = tf(f, slotOff);
     el.style.opacity = f.o >= 1 ? "" : f.o.toFixed(3);
+    // Text selected in it is drawn where it now is (src/scripts/selection.ts).
+    dispatchEvent(new Event("placechange"));
     // Away from home (dragged, maximised, in the tray, the story's): the first screen's notes
     // about it step aside.
     stage?.toggleAttribute("data-win-away", maxed || minimised || !!driven || !!(drag.x || drag.y));
