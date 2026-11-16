@@ -371,6 +371,8 @@
      in it scrolls (the view clips its own lines), so focus never moves it. */
   overflow: hidden;
   border-radius: var(--r-panel);
+  /* The song's colour, flat, as the app's lyrics panel is (the window on the first screen):
+     a blurred cover behind the lines lit it in patches. */
   background: color-mix(in srgb, var(--paint) 60%, #0f0f0f);
   color: #fff;
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.14), var(--shadow);
@@ -378,19 +380,6 @@
     --paint var(--t-glow) ease,
     background-color var(--t-lyrics) var(--ease-in-out),
     color var(--t-lyrics) var(--ease-in-out);
-}
-.lc-art {
-  position: absolute;
-  z-index: -1;
-  inset: -12%;
-  width: 124%;
-  height: 124%;
-  object-fit: cover;
-  filter: blur(56px) saturate(1.1);
-  opacity: 0.3;
-  pointer-events: none;
-  /* Its own layer: the card's colour fading under it never blurs the cover again. */
-  will-change: transform;
 }
 .lc-view {
   position: absolute;
