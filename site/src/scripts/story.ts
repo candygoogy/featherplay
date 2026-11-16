@@ -58,7 +58,14 @@ export async function startStory(player: Player): Promise<void> {
     if (stillNote) hideNote(stillNote);
     if (!songFly?.hasAttribute("data-story")) return;
     delete songFly.dataset.story;
-    if (songFly.matches(":popover-open")) songFly.hidePopover();
+    if (!songFly.matches(":popover-open")) return;
+    // Back into the capsule's song it came out of (Bar.astro: data-into), which takes it.
+    songFly.hidePopover();
+    const chip = document.querySelector<HTMLElement>("[data-site-bar] [data-np]");
+    if (chip?.getClientRects().length) {
+      chip.toggleAttribute("data-caught", true);
+      setTimeout(() => chip.removeAttribute("data-caught"), 800);
+    }
   };
 
   let G: {
@@ -230,12 +237,15 @@ export async function startStory(player: Player): Promise<void> {
       if (inBeat && !songFly.matches(":popover-open")) {
         // Marked first: the bar places the story's flyout under the capsule's song.
         songFly.dataset.story = "";
+        songFly.dataset.into = "";
         songFly.showPopover();
         // "still playing" beside it, pointing back at it, where its words have room.
         if (stillNote)
           requestAnimationFrame(() => {
             if (!beat || !songFly.matches(":popover-open")) return;
-            const f = songFly.getBoundingClientRect();
+            // Where it rests (its own box in the viewport), not where its way out of the
+            // capsule has got to.
+            const f = { right: songFly.offsetLeft + songFly.offsetWidth, top: songFly.offsetTop, bottom: songFly.offsetTop + songFly.offsetHeight };
             flyRoom = Math.max(0, innerHeight - f.bottom + 64);
             showNoteAt(stillNote, f.right + 12, f.top + 36);
           });

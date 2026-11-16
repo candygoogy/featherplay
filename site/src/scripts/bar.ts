@@ -216,13 +216,20 @@ export function bindBar(bar: HTMLElement, player: Player | null): { readonly sta
     const vw = document.documentElement.clientWidth;
     fly.style.maxWidth = `${vw - 16}px`;
     const w = fly.offsetWidth || Math.min(22 * 16, vw - 16);
-    fly.style.left = `${Math.round(Math.max(8, Math.min(r.left + r.width / 2 - w / 2, vw - w - 8)))}px`;
-    fly.style.top = `${Math.round(row.getBoundingClientRect().bottom + 8)}px`;
+    const left = Math.round(Math.max(8, Math.min(r.left + r.width / 2 - w / 2, vw - w - 8)));
+    const top = Math.round(row.getBoundingClientRect().bottom + 8);
+    fly.style.left = `${left}px`;
+    fly.style.top = `${top}px`;
+    // Its part's middle, from its own corner: where the story's flyout comes from and goes to.
+    fly.style.setProperty("--ox", `${Math.round(r.left + r.width / 2 - left)}px`);
+    fly.style.setProperty("--oy", `${Math.round(r.top + r.height / 2 - top)}px`);
   };
   for (const fly of flyouts) {
     fly.addEventListener("beforetoggle", (e) => {
       if ((e as ToggleEvent).newState !== "open") return;
       if (fly.hasAttribute("data-story") && np) anchor.set(fly, np);
+      // Only the story's goes into the song; one the visitor opens is plain.
+      else delete fly.dataset.into;
       place(fly, true);
     });
     fly.addEventListener("toggle", (e) => {
