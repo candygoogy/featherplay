@@ -101,3 +101,26 @@ test("soon after a fresh load no section is left waiting to be laid out", async 
   await expect(page.locator("html")).toHaveClass(/\bsplit\b/);
   await laidOut(page);
 });
+
+// Wherever a section lands from a link, its title sits wholly below the floating capsule.
+for (const [w, h] of [[390, 844], [1440, 900], [2560, 1270]] as const) {
+  test(`landing on each section from a link leaves its title clear of the capsule (${w}x${h})`, async ({ page }) => {
+    await page.setViewportSize({ width: w, height: h });
+    await page.goto("/");
+    await laidOut(page);
+    const ids = await page.evaluate(() => [...document.querySelectorAll("main > section[id]:not([data-stage]) h2")].map((t) => t.closest("section")!.id));
+    expect(ids.length).toBeGreaterThan(4);
+    // And the questions' groups, which the index links to.
+    for (const id of [...ids, "q-about", "q-account", "q-use"]) {
+      await page.evaluate((id) => (location.hash = id), id);
+      await still(page);
+      const [title, cap] = await page.evaluate((id) => {
+        const t = document.querySelector(`#${id} :is(h2, h3)`)!.getBoundingClientRect();
+        const c = document.querySelector("[data-site-bar] .cap-bg")!.getBoundingClientRect();
+        return [{ top: t.top, bottom: t.bottom }, { bottom: c.height ? c.bottom : 0 }];
+      }, id);
+      expect(title.top, `${id} title under the capsule`).toBeGreaterThanOrEqual(cap.bottom + 8);
+      expect(title.bottom, `${id} title on screen`).toBeLessThanOrEqual(h);
+    }
+  });
+}
