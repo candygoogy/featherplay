@@ -1,4 +1,4 @@
-// The handwritten notes (Note.astro) and pen marks: each writes itself in once, the first time
+// The handwritten notes (Note.astro): each writes itself in once, the first time
 // it is wholly in view, and a note is hidden rather than drawn over anything its words would
 // touch (another's words, a picture, a control, a live piece, the window) or run past the
 // screen's sides, at whatever width the page has. Its arrow may point into what it points at.
@@ -42,7 +42,6 @@ export function collides(note: HTMLElement): boolean {
 export function bindNotes(): void {
   const root = document.documentElement;
   const all = [...document.querySelectorAll<HTMLElement>(".hand[data-note]")];
-  const marks = [...document.querySelectorAll<HTMLElement>(".pen-mark")];
   const placed = all.filter((n) => !n.hasAttribute("data-note-manual"));
 
   // ---- Hidden rather than colliding: measured all first, then marked (one layout) ----
@@ -80,7 +79,7 @@ export function bindNotes(): void {
 
   // ---- Written in once, when wholly in view ----
   if (matchMedia("(prefers-reduced-motion: reduce)").matches || !("IntersectionObserver" in window)) {
-    for (const n of [...placed, ...marks]) n.classList.add("written");
+    for (const n of placed) n.classList.add("written");
     return;
   }
   root.classList.add("pen");
@@ -94,7 +93,7 @@ export function bindNotes(): void {
     },
     { rootMargin: "0px 0px -5% 0px", threshold: 1 },
   );
-  for (const n of [...placed, ...marks]) io.observe(n);
+  for (const n of placed) io.observe(n);
 }
 
 type Rect = { left: number; top: number; right: number; bottom: number };

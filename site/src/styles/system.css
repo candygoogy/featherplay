@@ -416,7 +416,7 @@ section[data-away],
   pointer-events: none;
 }
 
-/* ---------- The hand: the maker's notes and pen marks (Note.astro, src/scripts/notes.ts) ----------
+/* ---------- The hand: the maker's notes (Note.astro, src/scripts/notes.ts) ----------
    Reenie Beanie, cut to the notes' own characters (src/data/notes.ts). Shown as soon as it is
    here or never (it is decoration): no fallback face standing in for it. */
 /* (Its @font-face is Note.astro's, so only pages with notes reference the font.) */
@@ -447,25 +447,16 @@ section[data-away],
   pointer-events: none;
   user-select: none;
 }
-.hand svg,
-.pen-mark {
+.hand svg {
   flex: none;
   overflow: visible;
 }
-.hand path,
-.pen-mark path {
+.hand path {
   fill: none;
   stroke: currentColor;
   stroke-width: 1.5;
   stroke-linecap: round;
   stroke-linejoin: round;
-}
-.pen-mark {
-  color: var(--hand);
-  pointer-events: none;
-}
-.pen-mark path {
-  vector-effect: non-scaling-stroke;
 }
 /* Arrows that sit beside the words' foot or head (in em: they grow with a larger hand). */
 .hand.arrow-down svg,
@@ -522,8 +513,7 @@ section[data-away],
 :root.pen .hand > span {
   clip-path: inset(-40% 106% -40% -6%);
 }
-:root.pen .hand path,
-:root.pen .pen-mark path {
+:root.pen .hand path {
   stroke-dasharray: 1;
   stroke-dashoffset: 1;
 }
@@ -531,13 +521,12 @@ section[data-away],
   clip-path: inset(-40% -6% -40% -6%);
   transition: clip-path var(--t-pen) var(--ease-pen);
 }
-:root.pen :is(.hand, .pen-mark).written path {
+:root.pen .hand.written path {
   stroke-dashoffset: 0;
   transition: stroke-dashoffset 500ms var(--ease-pen) 300ms;
 }
 @media (forced-colors: active) {
-  .hand,
-  .pen-mark {
+  .hand {
     color: CanvasText;
   }
 }
