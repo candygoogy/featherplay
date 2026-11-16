@@ -139,6 +139,36 @@ test.describe("the sleeves", () => {
   });
 });
 
+test.describe("the sleeves on a touch screen", () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+  test("a swipe that starts on a sleeve scrolls the page, as one beside the shelf does", async ({ page }) => {
+    await page.goto("/");
+    await shown(page);
+    const s = page.locator("[data-sleeve]").first();
+    await s.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(300);
+    const cdp = await page.context().newCDPSession(page);
+    const swipe = async (x: number, y: number) => {
+      const before = await page.evaluate(() => scrollY);
+      // A finger 250 px up the screen.
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
+      for (let i = 1; i <= 10; i++) {
+        await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x, y: y - i * 25 }] });
+        await page.waitForTimeout(16);
+      }
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+      await page.waitForTimeout(300);
+      return (await page.evaluate(() => scrollY)) - before;
+    };
+    const b = (await s.boundingBox())!;
+    const [x, y] = [b.x + b.width / 2, b.y + b.height / 2];
+    expect(await page.evaluate(([x, y]) => !!document.elementFromPoint(x, y)?.closest("[data-sleeve]"), [x, y])).toBe(true);
+    expect(await swipe(x, y)).toBeGreaterThan(150);
+    // And beside the shelf, the same.
+    expect(await swipe(8, y)).toBeGreaterThan(150);
+  });
+});
+
 test("the notes step aside while the window is away from home (dragged)", async ({ page }) => {
   await page.setViewportSize({ width: 2560, height: 1270 });
   await page.goto("/");

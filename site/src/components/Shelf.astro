@@ -47,9 +47,16 @@ import { songs } from "../data/songs";
     border-radius: var(--r-small);
     background: transparent;
     cursor: grab;
-    touch-action: none;
+    /* A finger doesn't drag a sleeve (src/scripts/shelf.ts): a swipe on one scrolls the page,
+       a tap plays it. Only a pen, where no screen takes touch, drags instead of scrolling. */
+    touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
     transition: translate 320ms var(--ease-out);
+  }
+  @media (pointer: fine) and (not (any-pointer: coarse)) {
+    .sleeve {
+      touch-action: none;
+    }
   }
   .sleeve img {
     width: 100%;
