@@ -260,6 +260,11 @@ test.describe("reduced motion", () => {
     const n = await page.evaluate(() => document.querySelector("[data-stage]")!.getAnimations({ subtree: true }).filter((a) => !(a instanceof CSSTransition) && !(a.effect as KeyframeEffect).target!.closest("[data-replica]")).map((a) => `${(a as CSSAnimation).animationName ?? "script"} ${(a.effect as KeyframeEffect).target!.className}`));
     expect(n).toEqual([]);
     await expect(page.locator("[data-note='screenshot']")).toHaveAttribute("data-on", "");
+    // The sleeves keep their place under the words (the story, off here, once cleared it).
+    await page.waitForTimeout(600);
+    const [shelf, col] = await Promise.all([box(page, "[data-shelf]"), box(page, "[data-col]")]);
+    expect(shelf.top).toBeGreaterThan(col.bottom);
+    expect(Math.abs(shelf.left - col.left)).toBeLessThan(2);
   });
 });
 

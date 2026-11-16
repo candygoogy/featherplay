@@ -421,9 +421,12 @@ export async function startStory(player: Player): Promise<void> {
       beat = false;
       endBeat();
       win.drive(null);
+      // Only what the story set: the shelf's own style holds its place (first.ts), and
+      // clearing all of it left the sleeves at the screen's corner wherever the story is off
+      // (reduced motion, a short window).
       for (const el of [...hero, ...caps, ghost, snap, icon]) {
-        if (hand(el)) el.style.opacity = "";
-        else el.removeAttribute("style");
+        el.style.opacity = "";
+        if (!hand(el)) for (const p of ["translate", "transform", "visibility"]) el.style.removeProperty(p);
       }
       for (const el of hero) el.inert = false;
     }
