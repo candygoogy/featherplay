@@ -8,7 +8,7 @@
 // on the compositor: one linear animation to the song's end, restarted on a change.
 
 import type { Song } from "../data/songs";
-import { currentLineIndex, formatTime, lyricsSource, type Player, type PlayerState } from "./player";
+import { formatTime, lineNow, lyricsSource, type Player, type PlayerState } from "./player";
 import { createListen, mediaMetadataFor, scrobbleAfterMs, sponsorPlayhead, trayLines } from "./pieces";
 import { followLyrics } from "./follow";
 import { lineItems, markLines } from "./lyric-lines";
@@ -86,6 +86,12 @@ export function bindPieces(player: Player): void {
     // they're placed when it shows.
     card.closest("section")?.addEventListener("contentvisibilityautostatechange", (e) => {
       if ((e as Event & { skipped: boolean }).skipped) return;
+      c.line = -2;
+      c.instant = true;
+      render(player.state);
+    });
+    // Its lines at another size (the lyrics menu's Text size): the line sung placed again at once.
+    card.addEventListener("lc-relayout", () => {
       c.line = -2;
       c.instant = true;
       render(player.state);
@@ -352,7 +358,7 @@ export function bindPieces(player: Player): void {
     }
 
     // The lyric cards' current line (not while their section is skipped: nothing to measure).
-    const line = currentLineIndex(song, s.positionMs);
+    const line = lineNow(s);
     for (const c of cards) {
       if (line === c.line) continue;
       // Out of view: placed when it comes back (again()).

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createPlayer, currentLineIndex, formatTime, lyricsSource, nextEventDelay, SOUND_DRIFT_MS } from "../../src/demo/player";
+import { createPlayer, currentLineIndex, formatTime, lineNow, lyricsSource, nextEventDelay, SOUND_DRIFT_MS } from "../../src/demo/player";
+import { timingLabel } from "../../src/demo/lyric-options";
 import { songs } from "../../src/data/songs";
 
 // A frame clock the tests drive: rAF becomes a 16 ms timer on vitest's fake clock.
@@ -209,6 +210,22 @@ describe("helpers", () => {
     expect(currentLineIndex(withLyrics, l[2].atMs + 10)).toBe(2);
     expect(currentLineIndex(withLyrics, withLyrics.durationMs - 1)).toBe(l.length - 1);
     expect(currentLineIndex(instrumental, 30_000)).toBe(-1);
+  });
+
+  it("moves a song's lines by its timing, for that song only, as far as the app allows", () => {
+    const l = withLyrics.lyrics;
+    const p = createPlayer(songs, { ...frames(), initial: { songId: withLyrics.id, positionMs: l[2].atMs + 100 } });
+    expect(lineNow(p.state)).toBe(2);
+    p.setNudge(500);
+    expect(lineNow(p.state)).toBe(1);
+    expect(timingLabel(p.state.nudges[withLyrics.id])).toBe("0.5 s later");
+    p.setNudge(-99_000);
+    expect(timingLabel(p.state.nudges[withLyrics.id])).toBe("10 s sooner");
+    expect(p.state.playing).toBe(false);
+    p.play(instrumental.id);
+    expect(lineNow({ ...p.state, song: withLyrics })).toBe(currentLineIndex(withLyrics, p.state.positionMs + 10_000));
+    // The clock steps at the moved line, not the old one.
+    expect(nextEventDelay(withLyrics, l[2].atMs + 300, 500)).toBe(200);
   });
 
   it("formats times like the app", () => {

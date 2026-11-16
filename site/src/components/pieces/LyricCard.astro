@@ -2,7 +2,9 @@
 // The song's synced lyrics on a card of its colour, large: the lines follow the song (the one
 // sung held a third of the way down, src/demo/follow.ts), a click on a line seeks there, the
 // wheel or a finger moves them for a while. A song without lyrics says so. Live on the player
-// store (src/demo/bind-pieces.ts).
+// store (src/demo/bind-pieces.ts). The lyrics menu beside it (Lyrics.astro,
+// src/demo/lyric-options.ts) sets its text size (data-size: 0 Small, 1 Medium, 2 Large) and,
+// with lyrics off (data-off), it shows what Now playing shows then: the cover and the song.
 import "../../styles/pieces.css";
 import { demoStart, songById } from "../../data/songs";
 import { currentLineIndex, lyricsSource } from "../../demo/player";
@@ -15,7 +17,15 @@ const song = songById(demoStart.songId)!;
 const current = currentLineIndex(song, demoStart.positionMs);
 ---
 
-<div class:list={["lyric-card", className]} data-piece="lyrics" inert data-has-lyrics={String(song.lyrics.length > 0)} role="group" aria-label="The song’s lyrics">
+<div
+  class:list={["lyric-card", className]}
+  data-piece="lyrics"
+  inert
+  data-has-lyrics={String(song.lyrics.length > 0)}
+  data-size="1"
+  role="group"
+  aria-label="The song’s lyrics"
+>
   <img class="lc-art" data-bind="cover" src={song.cover} width="600" height="600" alt="" decoding="async" loading="lazy" />
   <div class="lc-view" data-lc-view>
     <ol class="lc-lines" data-lc-lines>
@@ -35,4 +45,9 @@ const current = currentLineIndex(song, demoStart.positionMs);
     <p class="lc-none-why">Searched LRCLIB and YouTube Music.</p>
   </div>
   <p class="lc-source" data-lc-source>{lyricsSource(song)}</p>
+  <div class="lc-off">
+    <img class="lc-off-cover" data-bind="cover" src={song.cover} width="600" height="600" alt="" decoding="async" loading="lazy" />
+    <p class="lc-off-title" data-bind="title">{song.title}</p>
+    <p class="lc-off-artist" data-bind="artist">{song.artist}</p>
+  </div>
 </div>

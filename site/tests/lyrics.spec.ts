@@ -204,3 +204,52 @@ for (const [w, h] of [[1024, 768], [390, 844]] as const) {
     }
   });
 }
+
+test.describe("the app's lyric options beside the card", () => {
+  const opts = (page: Page) => sec(page).locator("[data-lyr-opts]");
+  const song = songs.find((s) => s.id === demoStart.songId)!;
+
+  test("Text size makes the lines larger, the line sung still in view", async ({ page }) => {
+    await open(page);
+    const size = () => current(page).evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+    const medium = await size();
+    await opts(page).getByRole("button", { name: "Large" }).click();
+    await expect(opts(page).getByRole("button", { name: "Large" })).toHaveAttribute("aria-pressed", "true");
+    expect(await size()).toBeGreaterThan(medium * 1.15);
+    await expect.poll(() => current(page).evaluate((el) => {
+      const v = el.closest("[data-lc-view]")!.getBoundingClientRect();
+      const r = el.getBoundingClientRect();
+      return r.top >= v.top && r.bottom <= v.bottom;
+    })).toBe(true);
+  });
+
+  test("Timing moves which line is lit, says by how much, and Reset puts it back; nothing plays", async ({ page }) => {
+    await open(page);
+    const later = opts(page).getByRole("button", { name: "Lines half a second later" });
+    for (let i = 0; i < 4; i++) await later.click();
+    await expect(opts(page).locator("[data-lo-timing]")).toHaveText("2 s later");
+    await expect(card(page).locator("[data-lc-source]")).toHaveText("Lyrics: Josh Woodward, CC BY 4.0 · 2 s later for this song");
+    await expect(current(page)).toHaveText(song.lyrics[currentLineIndex(song, demoStart.positionMs - 2000)].line);
+    await opts(page).getByRole("button", { name: "Reset" }).click();
+    await expect(opts(page).locator("[data-lo-timing]")).toHaveText("On time");
+    await expect(current(page)).toHaveText(song.lyrics[currentLineIndex(song, demoStart.positionMs)].line);
+    await expect(page.locator("html")).not.toHaveAttribute("data-playing", "true");
+  });
+
+  test("Desktop lyrics shows the line sung on a strip; Show lyrics off takes the lyrics away here and in the window", async ({ page }) => {
+    await open(page);
+    const strip = sec(page).locator("[data-strip]");
+    await expect(strip).toBeHidden();
+    await opts(page).getByRole("switch", { name: "Desktop lyrics" }).click();
+    await expect(strip).toBeVisible();
+    await expect(strip.locator("[data-st-now] .st-line")).toHaveText(await current(page).innerText());
+    await opts(page).getByRole("switch", { name: "Show lyrics" }).click();
+    await expect(card(page)).toHaveAttribute("data-off", "");
+    await expect(strip).toBeHidden();
+    await expect(view(page)).toBeHidden();
+    await expect(card(page).locator(".lc-off-title")).toHaveText(song.title);
+    await expect(page.locator("[data-replica]").first()).toHaveAttribute("data-lyrics-on", "false");
+    await expect(opts(page).getByRole("button", { name: "Large" })).toBeDisabled();
+    await expect(page.locator("html")).not.toHaveAttribute("data-playing", "true");
+  });
+});

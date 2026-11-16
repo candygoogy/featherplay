@@ -5,9 +5,9 @@ import { songs, type Song } from "../data/songs";
 import {
   albumLine,
   createPlayer,
-  currentLineIndex,
   formatTime,
   isNowView,
+  lineNow,
   lyricsSource,
   type Player,
   type PlayerState,
@@ -257,7 +257,7 @@ function bindReplica(root: HTMLElement, player: Player) {
       seen = size;
       const song = player.state.song;
       if (!song) return;
-      const i = currentLineIndex(song, player.state.positionMs);
+      const i = lineNow(player.state);
       follower?.follow(i >= 0 ? ((lines.children[i] as HTMLElement | undefined) ?? null) : null, true);
       last.sideShown = false;
     }).observe(lyricsPanel);
@@ -594,7 +594,7 @@ function bindReplica(root: HTMLElement, player: Player) {
         seek.setAttribute("aria-valuetext", `${at} of ${formatTime(song.durationMs)}`);
         last.second = second;
       }
-      const line = currentLineIndex(song, s.positionMs);
+      const line = lineNow(s);
       // Out of view the lines wait (each mark is a colour fade, each glide a move).
       if (line !== last.line && !root.hasAttribute("data-away")) {
         for (const list of sideLines ? [lines, sideLines] : [lines]) markLines(list, ".line", line);
@@ -694,7 +694,7 @@ function bindReplica(root: HTMLElement, player: Player) {
     const onNow = isNowView(s.view);
     const sideShown = !!sideFollower && hasLyrics && tab === "lyrics" && !s.minimised && (onNow ? s.sideOpen : s.queueOpen);
     if (sideShown && song && sideLines) {
-      const line = currentLineIndex(song, s.positionMs);
+      const line = lineNow(s);
       const fresh = !last.sideShown || onNow !== last.sideOnNow;
       if (fresh || line !== last.sideLine) {
         const li = line >= 0 ? (sideLines.children[line] as HTMLElement | undefined) : undefined;

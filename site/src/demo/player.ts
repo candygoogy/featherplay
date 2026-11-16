@@ -23,6 +23,9 @@ export type PlayerState = {
   view: View;
   minimised: boolean;
   lyricsOn: boolean;
+  /** The lyrics' timing, moved for a song (the lyrics menu's Timing), in ms by song id:
+   *  positive, the lines come later. Every lyric view on the page keeps to it. */
+  nudges: Record<string, number>;
   theme: Theme;
   /** False until the visitor picks a theme for the app ("Make it yours"); till then it follows the page. */
   themeSet: boolean;
@@ -79,6 +82,8 @@ export type Player = {
   /** Back from Now playing to the page it was opened from. */
   back(): void;
   setLyrics(on: boolean): void;
+  /** The playing song's lines moved to `ms` (later when positive), as the lyrics menu's Timing. */
+  setNudge(ms: number): void;
   /** The app's own theme; "page" goes back to following the page's. */
   setTheme(theme: Theme | "page"): void;
   minimise(): void;
@@ -144,7 +149,8 @@ export function createPlayer(songs: Song[], options: PlayerOptions = {}): Player
   // sound), not every animation frame: what moves smoothly with it (the progress lines, the
   // thumb) runs on the compositor, so the page rests between steps. Tests give it frames.
   const raf =
-    options.raf ?? ((cb) => window.setTimeout(() => cb(now()), state.song ? nextEventDelay(state.song, base + (now() - since)) : 250));
+    options.raf ??
+    ((cb) => window.setTimeout(() => cb(now()), state.song ? nextEventDelay(state.song, base + (now() - since), nudgeOf(state)) : 250));
   const caf = options.caf ?? ((id) => clearTimeout(id));
   const visible = options.visible ?? (() => !hasDom || document.visibilityState === "visible");
   const random = options.random ?? Math.random;
@@ -158,6 +164,7 @@ export function createPlayer(songs: Song[], options: PlayerOptions = {}): Player
     view: init.view ?? "home",
     minimised: false,
     lyricsOn: true,
+    nudges: {},
     theme: "dark",
     themeSet: false,
     query: "",
@@ -351,6 +358,18 @@ export function createPlayer(songs: Song[], options: PlayerOptions = {}): Player
       if (!on && state.view === "lyrics") state.view = "now";
       emit();
     },
+    setNudge(ms) {
+      if (!state.song) return;
+      const to = Math.max(-MAX_NUDGE_MS, Math.min(MAX_NUDGE_MS, Math.round(ms)));
+      if (to === nudgeOf(state)) return;
+      state.nudges = { ...state.nudges, [state.song.id]: to };
+      // The clock's next step comes at the moved line, not the old one (from where it is now).
+      if (frame !== null) {
+        state.positionMs = Math.min(base + (now() - since), state.song.durationMs - 1);
+        startClock();
+      }
+      emit();
+    },
     setTheme(theme) {
       if (theme === "page") {
         if (!state.themeSet) return;
@@ -519,11 +538,11 @@ export function createPlayer(songs: Song[], options: PlayerOptions = {}): Player
 
 /** How long until something the clock shows can change at `ms` into `song`: the next lyric
  *  line, the next whole second or the song's end, and 250 ms at most (to keep to the sound). */
-export function nextEventDelay(song: Song, ms: number): number {
+export function nextEventDelay(song: Song, ms: number, nudgeMs = 0): number {
   let d = Math.min(250, 1000 - (Math.floor(ms) % 1000), song.durationMs - ms);
   for (const l of song.lyrics) {
-    if (l.atMs > ms) {
-      d = Math.min(d, l.atMs - ms);
+    if (l.atMs + nudgeMs > ms) {
+      d = Math.min(d, l.atMs + nudgeMs - ms);
       break;
     }
   }
@@ -538,6 +557,19 @@ export function currentLineIndex(song: Song, ms: number): number {
     else break;
   }
   return index;
+}
+
+/** The lyrics' timing moves this far either way (the app's lyrics.rs). */
+export const MAX_NUDGE_MS = 10_000;
+
+/** How far the playing song's lines are moved (0: on time). */
+export function nudgeOf(s: Pick<PlayerState, "song" | "nudges">): number {
+  return (s.song && s.nudges[s.song.id]) || 0;
+}
+
+/** The line being sung now, with the song's timing as the visitor moved it. */
+export function lineNow(s: Pick<PlayerState, "song" | "nudges" | "positionMs">): number {
+  return s.song ? currentLineIndex(s.song, s.positionMs - nudgeOf(s)) : -1;
 }
 
 /** The line under a song's lyrics: whose they are, and the licence they're shown under. */

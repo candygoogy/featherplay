@@ -504,10 +504,11 @@
 .lyric-card {
   /* Its own copy of the song's colour fades (system.css --paint), not its lines'. */
   --paint: var(--song);
-  transition: --paint var(--t-glow) ease;
   position: relative;
   isolation: isolate;
-  height: clamp(24rem, 64vh, 38rem);
+  container-type: size;
+  /* As tall as the screen allows beside the words (a phone: most of it, under them). */
+  height: clamp(24rem, 64svh, 38rem);
   /* hidden, not clip: tools that judge contrast see the lines past its edge as hidden. Nothing
      in it scrolls (the view clips its own lines), so focus never moves it. */
   overflow: hidden;
@@ -515,6 +516,10 @@
   background: color-mix(in srgb, var(--paint) 60%, #0f0f0f);
   color: #fff;
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.14), var(--shadow);
+  transition:
+    --paint var(--t-glow) ease,
+    background-color var(--t-lyrics) var(--ease-in-out),
+    color var(--t-lyrics) var(--ease-in-out);
 }
 .lc-art {
   position: absolute;
@@ -535,13 +540,17 @@
   inset: 0 0 calc(var(--s4) + 2rem);
   overflow: clip;
   container-type: size;
-  mask-image: linear-gradient(transparent, #000 18%, #000 78%, transparent);
+  /* The app's lyric edge: the lines dissolve where they leave the panel. */
+  mask-image: linear-gradient(transparent, #000 var(--s6), #000 calc(100% - var(--s7)), transparent);
 }
 .lc-lines {
+  /* The lines' size, by the card's width: Medium; the lyrics menu's Small and Large are a
+     step either side (the app's 20, 24 and 30 px in its full view). */
+  --lc-size: clamp(1.375rem, 4.4cqi, 2.5rem);
   display: grid;
-  gap: var(--s2);
+  gap: calc(var(--lc-size) * 0.18);
   margin: 0;
-  padding: var(--s7) var(--s5) 50cqh;
+  padding: var(--s6) var(--s5) 50cqh;
   list-style: none;
   transition: transform var(--t-large) var(--ease-out);
 }
@@ -554,7 +563,7 @@
   background: none;
   color: rgb(255 255 255 / 0.62);
   font: inherit;
-  font-size: var(--fs-subtitle);
+  font-size: var(--lc-size);
   font-weight: var(--fw-bold);
   line-height: var(--lh-subtitle);
   letter-spacing: var(--tr-subtitle);
@@ -606,10 +615,18 @@
 .lc-source {
   position: absolute;
   left: var(--s6);
+  right: var(--s6);
   bottom: var(--s4);
   color: rgb(255 255 255 / 0.85);
   font-size: var(--fs-small);
   font-weight: var(--fw-medium);
+  line-height: var(--lh-small);
+}
+/* A narrow card: room for the credit on two lines (with the timing's note). */
+@container (width < 30rem) {
+  .lc-view {
+    bottom: calc(var(--s4) + 2.75rem);
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .lc-lines {

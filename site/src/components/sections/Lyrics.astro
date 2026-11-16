@@ -1,24 +1,55 @@
 ---
 // Lyrics, up close: the lyric card large (the song's lines on its cover's deep colour, in
-// both themes, as the app's lyric view), the words beside it, and the song with its play
-// button. Live on the page's one player.
+// both themes, as the app's lyric view), the words beside it with the song and its play
+// button, and under them the app's own lyric options, live on this card: the lyrics menu's
+// Text size and Timing (lyrics_menu.slint), Desktop lyrics (a strip over the card's edge, as
+// desktop_lyrics.slint floats it over other apps) and Settings' Show lyrics. "Choose other
+// lyrics…" is left to the paragraph: the demo's lyrics are the artists' own, and there are no
+// other matches to show. Live on the page's one player (src/demo/lyric-options.ts).
 import LyricCard from "../pieces/LyricCard.astro";
 import Icon from "../Icon.astro";
+import Note from "../Note.astro";
 import { demoStart, songById, songs } from "../../data/songs";
 import { formatTime } from "../../demo/player";
 
 const song = songById(demoStart.songId)!;
 const withLyrics = songs.filter((s) => s.lyrics.length > 0);
-import Note from "../Note.astro";
+// The lyrics menu's glyphs (lyrics_menu.slint LyricsIcons), on the app's 24 px grid.
+const glyph = {
+  size: "M3.5 18 L8 6 L12.5 18 M5.2 13.8 H10.8 M14 18 L17 10.5 L20 18 M15 15.6 H19",
+  clock: "M12 4 a8 8 0 1 0 0.01 0 Z M12 8 V12 L15 14",
+  minus: "M7 12 H17",
+  plus: "M7 12 H17 M12 7 V17",
+  strip: "M3.5 6.5 H20.5 V17.5 H3.5 Z M7 10.5 H17 M9 13.5 H15",
+};
+// The three A's, each at its own size (the app's 12, 15 and 19 px).
+const sizes = [
+  { label: "Small", cls: "lo-a-s" },
+  { label: "Medium", cls: "lo-a-m" },
+  { label: "Large", cls: "lo-a-l" },
+];
 ---
 
 <section class="sec sec-lyrics frame" id="lyrics" aria-labelledby="lyrics-title">
   <div class="lyr">
     <div class="lyr-hold">
       <LyricCard class="lyr-card" />
-      <Note id="line" arrow="down" class="n-line" />
+      <!-- Desktop lyrics: the line being sung and the next, on a strip over the card's edge. -->
+      <div class="lyr-strip" data-strip data-st-size="1" role="group" aria-label="Desktop lyrics" hidden>
+        <div class="st-lines" aria-hidden="true">
+          <div class="st-now" data-st-now><p class="st-line"></p><p class="st-next"></p></div>
+          <div class="st-was" data-st-was><p class="st-line"></p><p class="st-next"></p></div>
+        </div>
+        <div class="st-tools">
+          <button class="st-b" type="button" data-st-step="-1" aria-label="Smaller">A−</button>
+          <button class="st-b" type="button" data-st-step="1" aria-label="Larger">A+</button>
+          <span class="st-sep" aria-hidden="true"></span>
+          <button class="st-b" type="button" data-st-close aria-label="Turn off desktop lyrics"><Icon name="close" size={16} /></button>
+        </div>
+      </div>
+      <Note id="line" arrow="down-reach" class="n-line" />
     </div>
-    <div class="lyr-text">
+    <div class="lyr-head">
       <h2 id="lyrics-title" class="t-title">Lyrics, up close</h2>
       <p class="t-lede ink2">
         Synced lines that follow the song, in its cover’s colour. Click a line to jump there. Make them larger, nudge a song’s timing,
@@ -57,40 +88,131 @@ import Note from "../Note.astro";
         </ul>
       </div>
     </div>
+
+    <!-- The app's lyric options, acting on the card (src/demo/lyric-options.ts). -->
+    <div class="lyr-opts panel" data-lyr-opts role="group" aria-label="Lyrics menu" inert>
+      <fieldset class="lo-set" data-lo-set>
+        <div class="lo-row">
+          <svg class="lo-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d={glyph.size}></path></svg>
+          <span class="lo-text"><span class="lo-label" id="lo-size">Text size</span></span>
+          <span class="lo-ctl lo-sizes" role="group" aria-labelledby="lo-size">
+            {
+              sizes.map((s, i) => (
+                <button class:list={["lo-a", s.cls]} type="button" data-lo-size={i} aria-pressed={String(i === 1)} aria-label={s.label}>
+                  A
+                </button>
+              ))
+            }
+          </span>
+        </div>
+        <div class="lo-row">
+          <svg class="lo-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d={glyph.clock}></path></svg>
+          <span class="lo-text">
+            <span class="lo-label">Timing</span>
+            <span class="lo-detail" data-lo-hint>Lines early or late? Move them.</span>
+            <span class="lo-detail" data-lo-moved hidden>For this song · <button class="lo-link" type="button" data-lo-reset>Reset</button></span>
+          </span>
+          <span class="lo-ctl lo-step">
+            <button class="lo-round" type="button" data-lo-nudge="-1" aria-label="Lines half a second sooner">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d={glyph.minus}></path></svg>
+            </button>
+            <output class="lo-value num" data-lo-timing>On time</output>
+            <button class="lo-round" type="button" data-lo-nudge="1" aria-label="Lines half a second later">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d={glyph.plus}></path></svg>
+            </button>
+          </span>
+        </div>
+        <div class="lo-div" aria-hidden="true"></div>
+        <div class="lo-row">
+          <svg class="lo-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d={glyph.strip}></path></svg>
+          <span class="lo-text">
+            <span class="lo-label" id="lo-desk">Desktop lyrics</span>
+            <span class="lo-detail">The line being sung, over other apps</span>
+          </span>
+          <button class="lo-switch" type="button" role="switch" aria-checked="false" aria-labelledby="lo-desk" data-lo-desk></button>
+        </div>
+      </fieldset>
+      <div class="lo-div" aria-hidden="true"></div>
+      <div class="lo-row">
+        <Icon name="lyrics" size={24} class="lo-glyph" />
+        <span class="lo-text">
+          <span class="lo-label" id="lo-show">Show lyrics</span>
+          <span class="lo-detail">Off: they’re hidden, and no lyrics are looked up.</span>
+        </span>
+        <button class="lo-switch" type="button" role="switch" aria-checked="true" aria-labelledby="lo-show" data-lo-show></button>
+      </div>
+    </div>
   </div>
 </section>
 
+<script>
+  import { bindReplicas } from "../../demo/replica";
+  import { bindLyricOptions } from "../../demo/lyric-options";
+  const root = document.getElementById("lyrics");
+  const player = bindReplicas();
+  if (root && player) bindLyricOptions(root, player);
+</script>
+
 <style>
+  /* Wide: the card on the left, as tall as the screen allows; beside it the words and the song,
+     and under them the options, the two centred on the card. Narrow: the words, the card, the
+     options. */
   .lyr {
     display: grid;
     grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
-    align-items: center;
-    gap: var(--s8);
+    grid-template-rows: 1fr auto auto 1fr;
+    grid-template-areas: "hold ." "hold head" "hold opts" "hold .";
+    column-gap: var(--s8);
+    row-gap: var(--s5);
   }
-  /* Over the card's top right, pointing into its lines. */
   .lyr-hold {
+    grid-area: hold;
+    align-self: center;
     position: relative;
     min-width: 0;
+    container: lyr-hold / inline-size;
+    /* Where the card starts in it: the note sits above that, the strip across it. */
+    --card-y: 0px;
+    padding-top: var(--card-y);
   }
-  .lyr-hold :global(.n-line) {
-    right: var(--s7);
-    bottom: calc(100% + 10px);
-    transition: opacity var(--t-small) ease;
-  }
-  /* A song without lyrics has no line to click. */
-  .lyr-hold:has([data-has-lyrics="false"]) :global(.n-line) {
-    opacity: 0;
-  }
-  .lyr-text {
+  .lyr-head {
+    grid-area: head;
     display: grid;
     gap: var(--s5);
+    min-width: 0;
   }
+  .lyr-opts {
+    grid-area: opts;
+    min-width: 0;
+  }
+
+  /* ---- The note: over the card's left edge, its arrow reaching down into the lines ---- */
+  .lyr-hold :global(.n-line) {
+    left: calc(var(--s5) + var(--s3));
+    top: calc(var(--card-y) - 1em - var(--s2));
+    align-items: flex-start;
+    transition: opacity var(--t-small) ease;
+  }
+  .lyr-hold :global(.n-line svg) {
+    margin-top: 0.35em;
+  }
+  /* A song without lyrics, or lyrics off, has no line to click. */
+  .lyr-hold:has(:is([data-has-lyrics="false"], [data-off])) :global(.n-line) {
+    opacity: 0;
+  }
+  /* On a narrow card the strip takes the note's place. */
+  @container lyr-hold (width < 44rem) {
+    .lyr-hold:has(.lyr-strip:not([hidden])) :global(.n-line) {
+      opacity: 0;
+    }
+  }
+
+  /* ---- The song, and its play button ---- */
   .now {
     display: grid;
     grid-template-columns: 56px minmax(0, 1fr) auto;
     align-items: center;
     gap: var(--s4);
-    margin-top: var(--s3);
     padding: var(--s3);
     border-radius: var(--r-panel);
     background: var(--panel-bg);
@@ -158,7 +280,7 @@ import Note from "../Note.astro";
     display: none;
     gap: var(--s3);
   }
-  .lyr:has([data-has-lyrics="false"]) .no-lyr {
+  .lyr:has([data-has-lyrics="false"]:not([data-off])) .no-lyr {
     display: grid;
   }
   .no-lyr ul {
@@ -199,21 +321,477 @@ import Note from "../Note.astro";
     height: 24px;
     border-radius: 6px;
   }
-  @media (width < 900px) {
+
+  /* ---- The options: the lyrics menu's rows (lyrics_menu.slint), on the page's panel ---- */
+  .lyr-opts {
+    --a-tonal: light-dark(color-mix(in srgb, var(--accent) 14%, transparent), color-mix(in srgb, var(--accent) 22%, transparent));
+    --a-tonal-hover: light-dark(color-mix(in srgb, var(--accent) 20%, transparent), color-mix(in srgb, var(--accent) 30%, transparent));
+    display: grid;
+    padding: var(--s2);
+  }
+  /* Without script they would do nothing: the card shows its lines, and the paragraph says the rest. */
+  :global(:root:not(.js)) .lyr-opts {
+    display: none;
+  }
+  .lo-set {
+    display: grid;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+  .lo-row {
+    display: grid;
+    grid-template-columns: 1.25rem minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--s3);
+    min-height: 3.5rem;
+    padding: var(--s2) var(--s2) var(--s2) 0.625rem;
+    transition: opacity var(--t-small) ease;
+  }
+  .lo-row :global(.lo-glyph) {
+    width: 1.25rem;
+    height: 1.25rem;
+    fill: none;
+    stroke: var(--ink2);
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .lo-text {
+    display: grid;
+    gap: 1px;
+    min-width: 0;
+  }
+  .lo-label {
+    font-weight: var(--fw-bold);
+    line-height: 1.35;
+  }
+  .lo-detail {
+    color: var(--ink3);
+    font-size: var(--fs-small);
+    line-height: var(--lh-small);
+    text-wrap: pretty;
+  }
+  .lo-detail[hidden] {
+    display: none;
+  }
+  .lo-div {
+    height: 1px;
+    margin: var(--s1) var(--s2);
+    background: var(--hairline);
+  }
+  /* The lyrics' own options wait while lyrics are off (the app hides them then). */
+  .lo-set:disabled .lo-row {
+    opacity: 0.4;
+  }
+  .lo-set:disabled :is(button, output) {
+    pointer-events: none;
+  }
+
+  /* Text size: an A at each size, the chosen one on the accent's tonal fill. */
+  .lo-sizes {
+    display: flex;
+    gap: 6px;
+  }
+  .lo-a {
+    display: grid;
+    place-items: center;
+    width: 2.5rem;
+    height: 2.25rem;
+    padding: 0;
+    border: 1px solid var(--hairline);
+    border-radius: var(--r-pill);
+    background: transparent;
+    color: var(--ink2);
+    font: inherit;
+    font-weight: var(--fw-bold);
+    line-height: 1;
+    cursor: pointer;
+    transition:
+      background-color var(--t-hover) ease,
+      color var(--t-hover) ease,
+      scale var(--t-release) var(--spring-release);
+  }
+  .lo-a-s {
+    font-size: 0.8125rem;
+  }
+  .lo-a-m {
+    font-size: 1rem;
+  }
+  .lo-a-l {
+    font-size: 1.25rem;
+  }
+  .lo-a:hover {
+    background: var(--hover);
+  }
+  .lo-a[aria-pressed="true"] {
+    border-color: transparent;
+    background: var(--a-tonal);
+    color: var(--text);
+  }
+  .lo-a[aria-pressed="true"]:hover {
+    background: var(--a-tonal-hover);
+  }
+
+  /* Timing: − and + round tonal buttons around the value. */
+  .lo-step {
+    display: flex;
+    align-items: center;
+    gap: var(--s1);
+  }
+  .lo-round {
+    display: grid;
+    place-items: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: var(--tonal);
+    color: var(--text);
+    cursor: pointer;
+    transition:
+      background-color var(--t-hover) ease,
+      opacity var(--t-hover) ease,
+      scale var(--t-release) var(--spring-release);
+  }
+  .lo-round:hover {
+    background: var(--tonal-hover);
+  }
+  .lo-round:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+  .lo-round:disabled:hover {
+    background: var(--tonal);
+  }
+  .lo-round svg {
+    width: 18px;
+    height: 18px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+  }
+  :is(.lo-a, .lo-round):not(:disabled):active {
+    scale: var(--press-surface);
+    transition:
+      background-color var(--t-hover) ease,
+      scale var(--t-press) var(--ease-out);
+  }
+  .lo-value {
+    min-width: 6.25rem;
+    font-weight: var(--fw-bold);
+    text-align: center;
+    white-space: nowrap;
+  }
+  .lo-link {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--text);
+    font: inherit;
+    font-weight: var(--fw-bold);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+    text-decoration-color: color-mix(in srgb, var(--text) 45%, transparent);
+    cursor: pointer;
+    transition: text-decoration-color var(--t-hover) ease;
+  }
+  .lo-link:hover {
+    text-decoration-color: var(--text);
+  }
+
+  /* The switch (settings/rows.slint Switch): an outlined track with a small knob; on, the
+     accent with a larger one; a soft halo under the pointer. */
+  .lo-switch {
+    position: relative;
+    width: 2.5rem;
+    height: 1.375rem;
+    margin-right: var(--s1);
+    padding: 0;
+    border: 1.5px solid var(--ink2);
+    border-radius: var(--r-pill);
+    background: transparent;
+    cursor: pointer;
+    transition:
+      background-color var(--t-hover) ease,
+      border-color var(--t-hover) ease;
+  }
+  .lo-switch::before {
+    content: "";
+    position: absolute;
+    inset: -5.5px;
+    border-radius: inherit;
+    transition: background-color var(--t-hover) ease;
+  }
+  .lo-switch:hover::before {
+    background: var(--hover);
+  }
+  .lo-switch:active::before {
+    background: var(--pressed);
+  }
+  .lo-switch::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 3.5px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--ink2);
+    translate: 0 -50%;
+    transition:
+      translate var(--t-medium) var(--ease-out),
+      scale var(--t-medium) var(--ease-out),
+      background-color var(--t-hover) ease;
+  }
+  .lo-switch[aria-checked="true"] {
+    border-color: var(--accent);
+    background: var(--accent);
+  }
+  .lo-switch[aria-checked="true"]::after {
+    background: var(--on-accent);
+    scale: 1.3333;
+    translate: calc(2.5rem - 3px - 12px - 7px) -50%;
+  }
+  @media (forced-colors: active) {
+    .lo-switch[aria-checked="true"] {
+      background: Highlight;
+    }
+    .lo-a[aria-pressed="true"] {
+      border-color: Highlight;
+    }
+    .lyr-strip {
+      border: 1px solid CanvasText;
+    }
+  }
+
+  /* ---- The desktop lyrics' strip (desktop_lyrics.slint): a softer deep panel in the song's
+     colour, the line being sung in the display face, centred, and the next one under it,
+     dimmer; over the card's top edge, as it floats over other apps. ---- */
+  .lyr-strip {
+    --paint: var(--song);
+    --st-w: 28rem;
+    --st-line: 1.125rem;
+    --st-next: 0.875rem;
+    transition: --paint var(--t-glow) ease;
+    position: absolute;
+    z-index: 3;
+    top: var(--card-y);
+    right: var(--s5);
+    width: min(var(--st-w), 100% - 2 * var(--s4));
+    padding: 0.875rem 1.75rem;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--paint) 30%, #111);
+    color: #fff;
+    text-align: center;
+    translate: 0 -50%;
+    box-shadow:
+      inset 0 0 0 1px rgb(255 255 255 / 0.1),
+      0 2px 6px rgb(0 0 0 / 0.28),
+      0 18px 40px -12px rgb(0 0 0 / 0.55);
+  }
+  .lyr-strip[hidden] {
+    display: none;
+  }
+  .lyr-strip[data-st-size="0"] {
+    --st-w: 24rem;
+    --st-line: 1rem;
+    --st-next: 0.8125rem;
+  }
+  .lyr-strip[data-st-size="2"] {
+    --st-w: 32rem;
+    --st-line: 1.375rem;
+    --st-next: 1rem;
+  }
+  .st-lines {
+    display: grid;
+    overflow: clip;
+  }
+  .st-now,
+  .st-was {
+    grid-area: 1 / 1;
+    display: grid;
+    align-content: center;
+    gap: 2px;
+  }
+  .st-was {
+    visibility: hidden;
+  }
+  .st-line {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    font-size: var(--st-line);
+    font-weight: var(--fw-bold);
+    line-height: 1.3;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+  .st-next {
+    min-height: 1.3em;
+    overflow: hidden;
+    color: rgb(255 255 255 / 0.74);
+    font-size: var(--st-next);
+    font-weight: 600;
+    line-height: 1.3;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    transition: opacity var(--t-fast) ease;
+  }
+  .st-next[data-quiet] {
+    font-size: 0.8125rem;
+    font-weight: var(--fw-medium);
+  }
+  /* Its controls, in the next line's place while pointed at or focused. */
+  .st-tools {
+    position: absolute;
+    left: 50%;
+    bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px;
+    border-radius: var(--r-pill);
+    background: rgb(0 0 0 / 0.18);
+    translate: -50% 0;
+    opacity: 0;
+    transition: opacity var(--t-fast) ease 600ms;
+  }
+  .lyr-strip:is(:hover, :focus-within) .st-tools {
+    opacity: 1;
+    transition-delay: 0ms;
+  }
+  .lyr-strip:is(:hover, :focus-within) .st-now .st-next {
+    opacity: 0;
+  }
+  .st-b {
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: #fff;
+    font: inherit;
+    font-size: 0.75rem;
+    font-weight: var(--fw-bold);
+    cursor: pointer;
+    transition: background-color var(--t-hover) ease;
+  }
+  .st-b:hover {
+    background: rgb(255 255 255 / 0.18);
+  }
+  .st-b:disabled {
+    color: rgb(255 255 255 / 0.4);
+    cursor: default;
+  }
+  .st-b:disabled:hover {
+    background: transparent;
+  }
+  .st-b:focus-visible {
+    outline-color: #fff;
+    outline-offset: -2px;
+  }
+  .st-sep {
+    width: 1px;
+    height: 16px;
+    margin-inline: 4px;
+    background: rgb(255 255 255 / 0.25);
+  }
+
+  /* ---- Narrow: the words, the card, the options ---- */
+  @media (width < 1080px) {
     .lyr {
       grid-template-columns: minmax(0, 1fr);
-      gap: var(--s6);
+      grid-template-rows: none;
+      grid-template-areas: "head" "hold" "opts";
+      row-gap: var(--s6);
     }
-    .lyr-text {
-      order: -1;
-    }
-    /* The card under the words: its note in room of its own above it. */
     .lyr-hold {
-      padding-top: var(--s7);
+      --card-y: var(--s7);
     }
-    .lyr-hold :global(.n-line) {
-      top: 0;
-      bottom: auto;
+    .lyr-head {
+      max-width: 46rem;
     }
+    .lyr-opts {
+      width: min(100%, 34rem);
+    }
+  }
+  /* A phone: a row's controls go under its name where both don't fit on one line. */
+  @media (width < 520px) {
+    .lo-row:has(.lo-ctl) {
+      grid-template-columns: 1.25rem minmax(0, 1fr);
+      row-gap: var(--s2);
+    }
+    .lo-ctl {
+      grid-column: 2;
+    }
+  }
+</style>
+
+<!-- The lyric card's own states set from this section (its text size, lyrics off): here, not in
+     pieces.css, so only the page that has them loads them. -->
+<style is:global>
+  @media (width >= 1080px) {
+    .lyric-card {
+      height: clamp(30rem, 100svh - 15rem, 50rem);
+    }
+  }
+  .lyric-card[data-size="0"] .lc-lines {
+    --lc-size: clamp(1.125rem, 3.5cqi, 2rem);
+  }
+  .lyric-card[data-size="2"] .lc-lines {
+    --lc-size: clamp(1.625rem, 5.5cqi, 3.125rem);
+  }
+  /* Lyrics off (Settings' Show lyrics): what Now playing shows then, the cover and the song on a
+     soft wash of its colour, no lines and nothing looked up. */
+  .lc-off {
+    position: absolute;
+    inset: 0;
+    display: none;
+    place-content: center;
+    justify-items: center;
+    gap: var(--s2);
+    padding: var(--s6);
+    text-align: center;
+  }
+  .lc-off-cover {
+    width: min(16rem, 46cqmin);
+    aspect-ratio: 1;
+    height: auto;
+    margin-bottom: var(--s4);
+    border-radius: var(--r-small);
+    object-fit: cover;
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.2), 0 24px 56px -16px color-mix(in srgb, var(--paint) 70%, #000);
+  }
+  .lc-off-title {
+    font-size: var(--fs-subtitle);
+    font-weight: var(--fw-bold);
+    line-height: var(--lh-subtitle);
+    letter-spacing: var(--tr-subtitle);
+    text-wrap: balance;
+  }
+  .lc-off-artist {
+    color: var(--ink2);
+  }
+  .lyric-card[data-off] {
+    background: color-mix(in srgb, var(--paint) 16%, var(--panel-bg));
+    color: var(--text);
+  }
+  .lyric-card[data-off] .lc-art {
+    opacity: 0.22;
+  }
+  .lyric-card[data-off] :is(.lc-view, .lc-none, .lc-source) {
+    display: none;
+  }
+  .lyric-card[data-off] .lc-off {
+    display: grid;
   }
 </style>
