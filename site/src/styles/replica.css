@@ -960,6 +960,22 @@
     opacity: 0;
     visibility: hidden;
   }
+  /* The song's buttons on the lyrics panel (the stacked header shows them there) wear the
+     lyrics' own inks, as now_playing.slint tints them: the next line's, and the current
+     line's white for a liked heart. The theme's grey would be lost on the song's colour in a
+     light window. */
+  &[data-view="lyrics"][data-has-lyrics="true"] .np-actions .fp-ib {
+    color: #ffffffc7;
+  }
+  &[data-view="lyrics"][data-has-lyrics="true"] .np-actions .like[aria-pressed="true"] {
+    color: #fff;
+  }
+  &[data-view="lyrics"][data-has-lyrics="true"] .np-actions .fp-ib:hover {
+    background: #ffffff1f;
+  }
+  &[data-view="lyrics"][data-has-lyrics="true"] .np-actions .fp-ib:active {
+    background: #ffffff33;
+  }
   /* The lyrics view's column, as now_playing.slint lays it out in the 1040 px stage beside the
      side panel: the cover 208 px (fl-cover, a fifth of the stage) at x 40 (fl-x: the page's
      40 px pad, as the column and the 688 px of lines left for it fill the stage) and y 96
