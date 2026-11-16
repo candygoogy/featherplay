@@ -329,10 +329,11 @@ const steps = [
   .steps:focus {
     outline: none;
   }
+  /* (No room under the last step: the section after brings its own, as every section does.) */
   .steps-in {
     display: grid;
     gap: var(--s7);
-    padding-block: var(--s8);
+    padding-block: var(--s8) 0;
   }
   .step {
     display: grid;

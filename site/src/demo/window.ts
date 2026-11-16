@@ -382,26 +382,29 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
   const deskOnly = () => maxButton?.setAttribute("aria-disabled", String(!desk.matches));
 
   // ---- Minimise to the tray, and back ----
-  // "opens in 0.24 s": by the tray icon, the first time the window comes back by it (not when
-  // the story brings it back, nor from its shortcut on the desk: the note points at the tray
-  // icon), for a few seconds or until the page moves, or the window does (maximised, dragged,
-  // minimised again: it would lie over the note).
+  // "opens in 0.24 s": by the tray icon as it lights again, each time featherplay is opened
+  // after it was closed (not a window shown again from the tray: that isn't the app opening;
+  // nor when the story brings it back), for a few seconds or until the page moves, or the
+  // window does (maximised, dragged, minimised again: it would lie over the note).
   const opensNote = document.querySelector<HTMLElement>("[data-note='opens']");
-  let opensShown = false;
+  let opensTimer = 0;
   const opensOff = () => {
+    clearTimeout(opensTimer);
     if (opensNote) hideNote(opensNote);
     removeEventListener("scroll", opensOff);
   };
   const showOpens = () => {
-    if (!opensNote || opensShown || driven) return;
+    if (!opensNote || driven) return;
+    // Written anew each time.
+    opensOff();
+    opensNote.classList.remove("written");
     const t = trayTarget()?.getBoundingClientRect();
     if (!t) return;
     const p = pinRect();
     const f = rested();
     const win = { left: p.left + f.x, top: p.top + f.y, right: p.left + f.x + f.w * f.s, bottom: p.top + f.y + f.h * f.s };
     if (!showNoteAt(opensNote, t.left + t.width / 2 - 6, t.bottom + 2, [win])) return;
-    opensShown = true;
-    setTimeout(opensOff, 4500);
+    opensTimer = window.setTimeout(opensOff, 4500);
     addEventListener("scroll", opensOff, { passive: true });
   };
 
@@ -430,7 +433,7 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
   const setMinimised = (on: boolean) => {
     if (on === minimised) return;
     minimised = on;
-    if (!on && !byShortcut) showOpens();
+    if (!on && closed) showOpens();
     else opensOff();
     markShut();
     const hadFocus = el.contains(document.activeElement);

@@ -324,8 +324,23 @@ test("while the window is away its shortcut lies where it stood and brings it ba
   await expect(win(page)).not.toHaveAttribute("data-minimised", /.*/);
   await expect(place).toBeHidden();
   await expect(page.locator("html")).not.toHaveAttribute("data-window-closed", /.*/);
-  // "opens in 0.24 s" points at the tray icon: not for a window opened from the desk.
-  await expect(page.locator("[data-note='opens']")).not.toHaveClass(/written/);
+  // "opens in 0.24 s" is for the app opening after a close, every time; not for a window
+  // shown again from the tray.
+  const opens = page.locator("[data-note='opens']");
+  await expect(opens).toHaveAttribute("data-on", "");
+  await wake(page);
+  await caption(page, /^Minimise/).click();
+  await expect(place).toBeVisible();
+  await trayIcon.click();
+  await expect(win(page)).not.toHaveAttribute("data-minimised", /.*/);
+  await expect(opens).not.toHaveAttribute("data-on", /.*/);
+  await wake(page);
+  await caption(page, /^Close/).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Close featherplay" }).click();
+  await expect(place).toBeVisible();
+  await trayIcon.click();
+  await expect(win(page)).not.toHaveAttribute("data-minimised", /.*/);
+  await expect(opens).toHaveAttribute("data-on", "");
   await wake(page);
   await caption(page, /^Minimise/).click();
   await expect(place.getByRole("button", { name: "Show featherplay’s window" })).toBeVisible();
