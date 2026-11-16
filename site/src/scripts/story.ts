@@ -129,14 +129,35 @@ export async function startStory(player: Player): Promise<void> {
       ({ capW, roomH, s1 } = holdFor(L));
     }
     let w1 = L.w * s1;
-    const h1 = L.h * s1;
+    let h1 = L.h * s1;
     if (Math.round(Math.max(capMin, w1)) !== Math.round(capW)) {
       capW = Math.max(capMin, w1);
       caps[0].style.width = `${Math.round(capW)}px`;
     }
-    const r1 = { x: (vw - w1) / 2, y: CAP_B + 20 + Math.max(0, (roomH - h1) / 2), w: w1, h: h1, s: s1 };
-    // Hold 2: the narrow window beside its words.
+    let r1 = { x: (vw - w1) / 2, y: CAP_B + 20 + Math.max(0, (roomH - h1) / 2), w: w1, h: h1, s: s1 };
+    let cap0 = { x: (vw - capW) / 2, y: r1.y + h1 + 28 };
     const capW1 = caps[1].offsetWidth;
+    // A short screen (1024 x 600): under its words the whole app came out smaller than the
+    // narrow one of the next hold. There its words go beside it, as the next hold's do, when
+    // that gives the window more room.
+    const beside = (L: { w: number; h: number }) => Math.min(1, (vw - fl - capW1 - 96 - 24) / L.w, (vh - CAP_B - 56) / L.h);
+    let Ls = { w: IDEAL.w, h: IDEAL.h };
+    let ss = beside(Ls);
+    if (24 * ss < LYRICS_MIN) {
+      Ls = { w: win.home.w, h: win.home.h };
+      ss = beside(Ls);
+    }
+    if (Ls.w * Ls.h * ss * ss > w1 * h1 * 1.1) {
+      L = Ls;
+      s1 = ss;
+      w1 = L.w * s1;
+      h1 = L.h * s1;
+      caps[0].style.width = `${capW1}px`;
+      const x = Math.max(fl + capW1 + 96, vw * 0.52 - w1 / 2);
+      r1 = { x: Math.min(x, vw - w1 - 24), y: CAP_B + (vh - CAP_B - h1) / 2, w: w1, h: h1, s: s1 };
+      cap0 = { x: fl, y: r1.y + h1 / 2 - caps[0].offsetHeight / 2 };
+    }
+    // Hold 2: the narrow window beside its words.
     const f2 = fitWindow({ w: Math.max(240, vw - fl - capW1 - 96 - 24), h: vh - CAP_B - 56 }, { want: NARROW });
     const W2 = NARROW.w * f2.s;
     const H2 = NARROW.h * f2.s;
@@ -148,7 +169,7 @@ export async function startStory(player: Player): Promise<void> {
       r1,
       r2,
       caps: [
-        { x: (vw - capW) / 2, y: r1.y + h1 + 28 },
+        cap0,
         { x: fl, y: r2.y + H2 / 2 - caps[1].offsetHeight / 2 },
         { x: fl, y: CAP_B + (vh - CAP_B) / 2 - caps[2].offsetHeight / 2 },
       ],

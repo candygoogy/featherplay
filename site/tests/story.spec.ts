@@ -227,14 +227,17 @@ for (const [w, h] of [
   [1280, 600],
   [761, 650],
 ]) {
-  test(`at ${w} x ${h} the whole window's words sit under it, inside the screen`, async ({ page }) => {
+  test(`at ${w} x ${h} the whole window's words sit under it or, where that leaves it more room, beside it, inside the screen`, async ({ page }) => {
     await page.setViewportSize({ width: w, height: h });
     await page.goto("/");
     await wake(page);
     await at(page, HOLDS[0]);
     const win = await windowBox(page);
     const cap = (await page.locator('[data-cap="0"]').boundingBox())!;
-    expect(cap.y).toBeGreaterThanOrEqual(win.y + win.height - 0.5);
+    const under = cap.y >= win.y + win.height - 0.5;
+    const beside = cap.x + cap.width <= win.x + 0.5;
+    expect(under || beside).toBe(true);
+    expect(cap.y).toBeGreaterThanOrEqual(-0.5);
     expect(cap.y + cap.height).toBeLessThanOrEqual(h + 0.5);
   });
 }
@@ -285,5 +288,19 @@ for (const [w, h] of [[761, 600], [800, 600], [900, 800], [1000, 1024]] as const
       const meet = b.x < f.x + f.width && b.x + b.w > f.x && b.y < f.y + f.height && b.y + b.h > f.y;
       expect(meet, `${JSON.stringify(b)} under the flyout ${JSON.stringify(f)}`).toBe(false);
     }
+  });
+}
+
+for (const [w, h] of [[1366, 768], [1024, 768], [1024, 600]] as const) {
+  test(`the whole player's hold shows a bigger window than the narrow one's (${w}x${h})`, async ({ page }) => {
+    await page.setViewportSize({ width: w, height: h });
+    await page.goto("/");
+    await wake(page);
+    await at(page, HOLDS[0]);
+    const whole = await windowBox(page);
+    await at(page, HOLDS[1]);
+    const narrow = await windowBox(page);
+    expect(whole.width).toBeGreaterThan(narrow.width * 1.2);
+    expect(whole.width * whole.height).toBeGreaterThan(narrow.width * narrow.height);
   });
 }
