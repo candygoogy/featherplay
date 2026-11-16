@@ -1,6 +1,6 @@
 ---
-// Search and sharing: the canonical address, Open Graph and Twitter cards with the laptop
-// image, and (on the home page) the SoftwareApplication structured data. Facts only: the
+// Search and sharing: the canonical address, Open Graph and Twitter cards with the first
+// screen's image (scripts/og.mjs), and (on the home page) the SoftwareApplication structured data. Facts only: the
 // version, size and price come from release.ts, nothing invented (no ratings).
 import { release } from "../data/release";
 
@@ -47,10 +47,10 @@ const ld = app
 <meta property="og:image:width" content="1200" />
 <meta property="og:image:height" content="630" />
 <meta property="og:image:type" content="image/jpeg" />
-<meta property="og:image:alt" content="featherplay on a Windows laptop, showing a song with its synced lyrics" />
+<meta property="og:image:alt" content="featherplay's first screen: the headline beside the app's window playing a song with its synced lyrics" />
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content={title} />
 <meta name="twitter:description" content={description} />
 <meta name="twitter:image" content={image} />
-<meta name="twitter:image:alt" content="featherplay on a Windows laptop, showing a song with its synced lyrics" />
+<meta name="twitter:image:alt" content="featherplay's first screen: the headline beside the app's window playing a song with its synced lyrics" />
 {ld && <script type="application/ld+json" set:html={JSON.stringify(ld)} />}
