@@ -12,6 +12,7 @@ import { currentLineIndex, formatTime, lyricsSource, type Player, type PlayerSta
 import { createListen, mediaMetadataFor, scrobbleAfterMs, sponsorPlayhead, trayLines } from "./pieces";
 import { followLyrics } from "./follow";
 import { lineItems, markLines } from "./lyric-lines";
+import { runLine } from "./lines";
 
 const $$ = <T extends Element = HTMLElement>(sel: string, root: ParentNode = document) => [...root.querySelectorAll<T>(sel)];
 const reduced = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -25,17 +26,19 @@ export const rendered = (el: Element) => !el.checkVisibility || el.checkVisibili
 /** Pieces out of view (above or below the screen, though their section is rendered): their
  *  lines hold still until they come back (src/demo/bind-pieces.ts, an observer). */
 const away = new WeakSet<Element>();
-function runLine(el: HTMLElement, from: string, to: string, ms: number, playing: boolean) {
-  for (const a of el.getAnimations()) a.cancel();
-  el.style.transform = from;
+/** A piece's progress line, restarted on the next frame with the others (src/demo/lines.ts). */
+function pieceLine(el: HTMLElement, ends: () => [string, string], ms: number, playing: boolean) {
   const piece = el.closest("[data-piece]");
-  if (playing && ms > 0 && rendered(el) && !(piece && away.has(piece))) el.animate([{ transform: from }, { transform: to }], { duration: ms, easing: "linear", fill: "forwards" });
+  runLine({ el, prop: "transform", ends, ms, run: playing && !(piece && away.has(piece)) });
 }
 
 /** A small cover changing song: the new one fades over the old (no hard cut). */
 function swapCover(img: HTMLImageElement, src: string) {
   if (img.getAttribute("src") === src) return;
-  if (reduced() || !img.isConnected || !img.offsetParent) {
+  const piece = img.closest("[data-piece]");
+  // Out of view, simply the new cover (an unseen fade runs on the page's own thread). Nothing is
+  // read from layout here: it runs in the middle of a song change's writes.
+  if (reduced() || !img.isConnected || (piece && away.has(piece))) {
     img.src = src;
     return;
   }
@@ -78,7 +81,7 @@ export function bindPieces(player: Player): void {
       player.seek(Number(line.dataset.at));
       if (!player.state.playing) player.resume();
     });
-    const c = { card, list, follow, line: -2, instant: true };
+    const c: { card: HTMLElement; list: HTMLElement; follow: ReturnType<typeof followLyrics>; line: number; instant: boolean; stale: Song | null } = { card, list, follow, line: -2, instant: true, stale: null };
     // In a section that waits to render (content-visibility) the lines have no place to measure:
     // they're placed when it shows.
     card.closest("section")?.addEventListener("contentvisibilityautostatechange", (e) => {
@@ -90,6 +93,17 @@ export function bindPieces(player: Player): void {
     return c;
   });
   const buildLines = (song: Song) => lineItems(song, { className: "lc-line" });
+  function fillCard(c: (typeof cards)[number], song: Song) {
+    c.stale = null;
+    const has = song.lyrics.length > 0;
+    c.card.dataset.hasLyrics = String(has);
+    c.list.replaceChildren(...buildLines(song));
+    const src = c.card.querySelector("[data-lc-source]");
+    if (src) src.textContent = has ? lyricsSource(song) : "";
+    c.follow.release();
+    c.line = -2;
+    c.instant = true;
+  }
 
   // ---- Scrobbling ----
   const scrobbles = $$("[data-piece='scrobble']");
@@ -106,7 +120,8 @@ export function bindPieces(player: Player): void {
     let shown = false;
     for (const sc of scrobbles) {
       const el = sc.querySelector<SVGElement>("[data-sc-ring]");
-      if (!el || !rendered(el)) continue;
+      // In view only (the observer below); nothing read from layout in the middle of a change.
+      if (!el || away.has(sc)) continue;
       shown = true;
       el.style.setProperty("--p", p.toFixed(4));
     }
@@ -137,7 +152,8 @@ export function bindPieces(player: Player): void {
   let hopped = "";
   const hop = (side: "a" | "b") => {
     hopped = side;
-    for (const s of sponsors) s.dataset.hop = side;
+    // Only where it is seen: out of view its animations would run on the page's own thread.
+    for (const s of sponsors) if (!away.has(s)) s.dataset.hop = side;
     clearTimeout(hopTimer);
     hopTimer = window.setTimeout(() => sponsors.forEach((s) => delete s.dataset.hop), 1900);
   };
@@ -175,6 +191,8 @@ export function bindPieces(player: Player): void {
   let resync = false;
   const again = () => {
     resync = true;
+    // A card back in view takes the song it missed.
+    for (const c of cards) if (c.stale && !away.has(c.card)) fillCard(c, c.stale);
     render(player.state);
   };
   for (const fly of document.querySelectorAll<HTMLElement>("[data-fly]")) fly.addEventListener("toggle", (e) => (e as ToggleEvent).newState === "open" && again());
@@ -231,15 +249,10 @@ export function bindPieces(player: Player): void {
       for (const el of $$("[data-piece] [data-bind-wrap='album']")) el.hidden = !song.album;
       for (const el of $$("[data-piece] [data-bind='duration']")) el.textContent = formatTime(song.durationMs);
       for (const img of $$<HTMLImageElement>("[data-piece] img[data-bind='cover']")) swapCover(img, song.cover);
+      // A card out of view waits for its lines until it comes back (again(), below).
       for (const c of cards) {
-        const has = song.lyrics.length > 0;
-        c.card.dataset.hasLyrics = String(has);
-        c.list.replaceChildren(...buildLines(song));
-        const src = c.card.querySelector("[data-lc-source]");
-        if (src) src.textContent = has ? lyricsSource(song) : "";
-        c.follow.release();
-        c.line = -2;
-        c.instant = true;
+        if (away.has(c.card)) c.stale = song;
+        else fillCard(c, song);
       }
       if (last.song !== undefined && sponsors.length) setTimeout(() => hop("a"), 520);
       if (ms) {
@@ -278,12 +291,19 @@ export function bindPieces(player: Player): void {
       resync = false;
       const f = Math.min(1, s.positionMs / song.durationMs);
       const left = Math.max(0, song.durationMs - s.positionMs);
-      for (const el of $$("[data-piece] [data-fill]")) runLine(el, `scaleX(${f})`, "scaleX(1)", left, s.playing);
+      for (const el of $$("[data-piece] [data-fill]")) pieceLine(el, () => [`scaleX(${f})`, "scaleX(1)"], left, s.playing);
       // SponsorBlock's head in pixels of its rail (an animation in container units can't run on
-      // the compositor); the rail changing width starts it again.
+      // the compositor), the rail read at the frame; the rail changing width starts it again.
       for (const el of $$("[data-sp-head]")) {
-        const w = (el.parentElement?.clientWidth ?? 0) / 100;
-        runLine(el, `translateX(${(sponsorPlayhead(f) * w).toFixed(2)}px)`, `translateX(${(sponsorPlayhead(1) * w).toFixed(2)}px)`, left, s.playing);
+        pieceLine(
+          el,
+          () => {
+            const w = (el.parentElement?.clientWidth ?? 0) / 100;
+            return [`translateX(${(sponsorPlayhead(f) * w).toFixed(2)}px)`, `translateX(${(sponsorPlayhead(1) * w).toFixed(2)}px)`];
+          },
+          left,
+          s.playing,
+        );
       }
     }
 
@@ -324,7 +344,8 @@ export function bindPieces(player: Player): void {
     const line = currentLineIndex(song, s.positionMs);
     for (const c of cards) {
       if (line === c.line) continue;
-      if (c.card.checkVisibility && !c.card.checkVisibility({ contentVisibilityAuto: true })) continue;
+      // Out of view: placed when it comes back (again()).
+      if (away.has(c.card)) continue;
       c.line = line;
       markLines(c.list, ".lc-line", line);
       const li = line >= 0 ? (c.list.children[line] as HTMLElement | undefined) : undefined;

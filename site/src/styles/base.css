@@ -111,10 +111,9 @@ main:focus {
    switch (.theme-quiet, src/scripts/theme.ts): Chrome works out a selection style for every
    element it restyles, which doubles the work of each frame of the switch. */
 :where(:not(:root, body, main, .theme-quiet, .theme-quiet *))::selection {
-  /* The song's colour as it is (--glow, which changes once), not --song, which fades frame by
-     frame on the sections that wear it: every element restyled in that fade would work out a new
-     selection style each frame (a song change cost a third more). The drawn pieces fade. */
-  background: light-dark(color-mix(in srgb, var(--glow) 30%, transparent), color-mix(in srgb, var(--glow) 44%, transparent));
+  /* The song's colour as its colour root has it (src/demo/glow.ts), at once; the drawn pieces
+     fade. */
+  background: light-dark(color-mix(in srgb, var(--song) 30%, transparent), color-mix(in srgb, var(--song) 44%, transparent));
 }
 .button:where(:not(.theme-quiet *))::selection,
 .button :where(:not(.theme-quiet *))::selection,
@@ -138,10 +137,10 @@ main:focus {
 :root.sel-drawn [popover] ::selection,
 :root.sel-drawn dialog ::selection,
 :root.sel-drawn [data-site-bar] ::selection {
-  background: light-dark(color-mix(in srgb, var(--glow) 30%, transparent), color-mix(in srgb, var(--glow) 44%, transparent));
+  background: light-dark(color-mix(in srgb, var(--song) 30%, transparent), color-mix(in srgb, var(--song) 44%, transparent));
 }
 :root.sel-drawn :is(input, textarea):where(:not(.theme-quiet *))::selection {
-  background: light-dark(color-mix(in srgb, var(--glow) 30%, transparent), color-mix(in srgb, var(--glow) 44%, transparent));
+  background: light-dark(color-mix(in srgb, var(--song) 30%, transparent), color-mix(in srgb, var(--song) 44%, transparent));
 }
 .sel-layer {
   position: absolute;
@@ -163,6 +162,10 @@ main:focus {
 }
 .sel-layer[data-blend="screen"] {
   mix-blend-mode: screen;
+}
+/* With nothing drawn, nothing to fade. */
+.sel-layer:empty {
+  transition: opacity 140ms ease;
 }
 .sel-layer[data-out="true"] {
   opacity: 0;

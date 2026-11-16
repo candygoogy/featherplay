@@ -15,6 +15,7 @@ import {
   type View,
 } from "./player";
 import { setGlow } from "./glow";
+import { runLine } from "./lines";
 import { followLyrics } from "./follow";
 import { bindAudio } from "./audio";
 import { bindCredits } from "./credit";
@@ -169,7 +170,9 @@ function bindReplica(root: HTMLElement, player: Player) {
   // them on the page's own thread.
   if ("IntersectionObserver" in window) {
     new IntersectionObserver(
-      ([e]) => {
+      (es) => {
+        // The latest answer (a busy moment can deliver two in one call).
+        const e = es[es.length - 1];
         if (e.isIntersecting === !root.hasAttribute("data-away")) return;
         root.toggleAttribute("data-away", !e.isIntersecting);
         last.run = "";
@@ -570,24 +573,20 @@ function bindReplica(root: HTMLElement, player: Player) {
       if (run !== last.run) {
         const fraction = Math.min(1, s.positionMs / song.durationMs);
         const left = Math.max(0, song.durationMs - s.positionMs);
-        const go = (el: HTMLElement, prop: "transform" | "translate", from: string, to: string) => {
-          for (const a of el.getAnimations()) if (!(a instanceof CSSTransition)) a.cancel();
-          el.style[prop] = from;
-          if (s.playing && left > 0 && rendered(el) && !root.hasAttribute("data-away")) el.animate([{ [prop]: from }, { [prop]: to }], { duration: left, easing: "linear", fill: "forwards" });
-        };
-        setAll(root, "[data-progress]", (el) => go(el, "transform", `scaleX(${fraction})`, "scaleX(1)"));
+        // Restarted on the next frame with every other line, reads before writes (lines.ts).
+        const run = s.playing && !root.hasAttribute("data-away");
+        setAll(root, "[data-progress]", (el) => runLine({ el, prop: "transform", ends: () => [`scaleX(${fraction})`, "scaleX(1)"], ms: left, run }));
         // The thumb shows only while the line is pointed at or focused, and runs only then: an
         // unseen element's animation isn't given to the compositor, and would restyle the page
         // every frame. In pixels of its line; the line changing width, or the pointer coming
         // or going, starts it again (below).
         if (thumb) {
-          const w = thumb.parentElement?.clientWidth ?? 0;
-          const from = `${(fraction * w).toFixed(2)}px 0`;
-          if (seekLine?.matches(":hover, :focus-within")) go(thumb, "translate", from, `${w}px 0`);
-          else {
-            for (const a of thumb.getAnimations()) if (!(a instanceof CSSTransition)) a.cancel();
-            thumb.style.translate = from;
-          }
+          const ends = (): [string, string] => {
+            const w = thumb.parentElement?.clientWidth ?? 0;
+            return [`${(fraction * w).toFixed(2)}px 0`, `${w}px 0`];
+          };
+          // Pointed at or focused: it runs; otherwise it only takes its place.
+          runLine({ el: thumb, prop: "translate", ends, ms: left, run: run && !!seekLine?.matches(":hover, :focus-within") });
         }
         last.run = run;
       }

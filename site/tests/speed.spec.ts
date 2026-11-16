@@ -53,8 +53,9 @@ test("at the top, playing: the window's progress runs, its unseen thumb doesn't"
   await page.goto("/");
   await page.locator("[data-window] .bar .fp-play").click();
   await expect(page.locator("html")).toHaveAttribute("data-playing", "true");
+  // (A line starts on the frame after the change, src/demo/lines.ts.)
+  await expect.poll(async () => (await running(page)).some((a) => a.cls.includes("fill"))).toBe(true);
   const now = await running(page);
-  expect(now.some((a) => a.cls.includes("fill"))).toBe(true);
   expect(now.filter((a) => a.cls.includes("thumb"))).toEqual([]);
   // Pointed at, the thumb shows and runs with the song.
   await page.locator("[data-window] [data-seek-line]").hover();
@@ -71,7 +72,7 @@ test("a song change fades the colour where it is worn, not on every element of t
           requestAnimationFrame(() =>
             r({
               body: document.body.getAnimations().length,
-              card: document.querySelector(".lyric-card")!.getAnimations().filter((a) => (a as CSSTransition).transitionProperty === "--song").length,
+              card: document.querySelector(".lyric-card")!.getAnimations().filter((a) => (a as CSSTransition).transitionProperty === "--paint").length,
             }),
           ),
         );

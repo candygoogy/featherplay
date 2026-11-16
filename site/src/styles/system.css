@@ -129,15 +129,31 @@
   }
 }
 
-/* The playing song's colour, for everything on the page that wears it: it follows the cover
-   glow (--glow, set on the root by src/demo/glow.ts). The page takes it at once; each thing
-   that wears it fades to it on the one colour clock itself (`transition: --song var(--t-glow)`),
-   so a song change restyles those few things for the fade, not every element on the page.
-   The replica sets its own --song for itself. */
+/* The playing song's colour, for everything on the page that wears it: set on a few colour
+   roots (each section, the bar, the footer; src/demo/glow.ts), never on the root, so a song
+   change restyles those, not every element of the page; each thing that paints it fades its own
+   copy on the one colour clock (--paint below). Its first value is the opening song's (the
+   root's, Base.astro). The replicas set their own. */
 @property --song {
   syntax: "<color>";
   inherits: true;
   initial-value: #e8894a;
+}
+/* Out of view (a section, a replica: data-away), the song's colour is simply there: no fade
+   runs where no one sees it. */
+section[data-away],
+[data-replica][data-away] {
+  --t-glow: 0ms;
+  --t-colour: 0ms;
+}
+/* The song's colour where it is painted: each element that paints it takes its own copy and
+   fades that on the colour clock (`--paint: var(--song); transition: --paint var(--t-glow)`).
+   Not inherited, so a song change restyles those few elements each frame of the fade, never the
+   subtrees under them. */
+@property --paint {
+  syntax: "<color>";
+  inherits: false;
+  initial-value: transparent;
 }
 
 /* ---------- The page on the system ---------- */
@@ -149,7 +165,6 @@
 :root.sys body {
   /* The root's ground shows through (and on the home page the desk's glass, Desk.astro). */
   background: transparent;
-  --song: var(--glow);
   font-size: var(--fs-text);
   line-height: var(--lh-text);
   font-kerning: normal;

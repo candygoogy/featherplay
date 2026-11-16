@@ -161,10 +161,12 @@ import Note from "../Note.astro";
 </script>
 
 <style>
-  /* The windows and the notes wear the song’s colour: the section fades to the next one
-     itself (system.css). */
-  .sec-leaves {
-    transition: --song var(--t-glow) ease;
+  /* What wears the song's colour here fades to the next one itself (system.css --paint). */
+  .explorer,
+  .ex-bar,
+  .files li {
+    --paint: var(--song);
+    transition: --paint var(--t-glow) ease;
   }
   .sprite {
     position: absolute;
@@ -189,7 +191,7 @@ import Note from "../Note.astro";
   .explorer {
     overflow: hidden;
     border-radius: var(--r-small);
-    background: color-mix(in srgb, var(--song) 4%, var(--surface));
+    background: color-mix(in srgb, var(--paint) 4%, var(--surface));
     box-shadow: var(--lit), var(--ring), var(--shadow);
     font-size: var(--fs-small);
     font-weight: var(--fw-medium);
@@ -208,7 +210,7 @@ import Note from "../Note.astro";
     gap: var(--s2);
     height: 36px;
     padding-left: var(--s4);
-    background: color-mix(in srgb, var(--song) 6%, var(--panel-tint));
+    background: color-mix(in srgb, var(--paint) 6%, var(--panel-tint));
   }
   .crumbs {
     display: flex;
@@ -275,7 +277,7 @@ import Note from "../Note.astro";
     color: var(--text);
   }
   .explorer.ours .files li {
-    background: color-mix(in srgb, var(--song) 18%, transparent);
+    background: color-mix(in srgb, var(--paint) 18%, transparent);
     font-weight: var(--fw-bold);
   }
   .weigh {
@@ -363,7 +365,7 @@ import Note from "../Note.astro";
   [data-out][data-lit="electron"] .pear .files li[data-group="electron"],
   [data-out][data-lit="video"] .pear .files li[data-group="video"] {
     color: var(--text);
-    background: color-mix(in srgb, var(--song) 26%, transparent);
+    background: color-mix(in srgb, var(--paint) 26%, transparent);
   }
   [data-out][data-lit=""] .pear .files li {
     color: inherit;

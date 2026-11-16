@@ -118,10 +118,9 @@ const ver = (f: (typeof figures)[number]) => (f.app === "YouTube Music in Edge" 
 <style>
   .tbl {
     /* The cover's tint on the panel, mixed on the theme's eased --light. */
-    --band-ground: color-mix(in oklab, var(--song) calc(24% - 8% * var(--light)), color-mix(in srgb, #ffffff calc(var(--light) * 100%), #1c1c1c));
+    --band-ground: color-mix(in oklab, var(--paint) calc(24% - 8% * var(--light)), color-mix(in srgb, #ffffff calc(var(--light) * 100%), #1c1c1c));
     --hair: color-mix(in srgb, var(--text) 10%, transparent);
-    /* It wears the song’s colour, so it fades to the next one itself (system.css). */
-    transition: --song var(--t-glow) ease;
+
     position: relative;
     margin-top: var(--s8);
     padding: var(--panel-pad);
@@ -135,6 +134,9 @@ const ver = (f: (typeof figures)[number]) => (f.app === "YouTube Music in Edge" 
     left: calc(var(--panel-pad) + (100% - 2 * var(--panel-pad)) * 0.4);
     width: calc((100% - 2 * var(--panel-pad)) * 0.2);
     border-radius: var(--r-panel);
+    /* It wears the song's colour, and fades to the next one itself (system.css --paint). */
+    --paint: var(--song);
+    transition: --paint var(--t-glow) ease;
     background: var(--band-ground);
     box-shadow: var(--lit), var(--ring);
   }
@@ -293,6 +295,8 @@ const ver = (f: (typeof figures)[number]) => (f.app === "YouTube Music in Edge" 
       font-size: var(--fs-small);
     }
     td.ours {
+      --paint: var(--song);
+      transition: --paint var(--t-glow) ease;
       background: var(--band-ground);
     }
   }

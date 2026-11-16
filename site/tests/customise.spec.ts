@@ -62,7 +62,7 @@ test("picking a cover plays that song and the page glow follows", async ({ page 
   await expect(replica(page)).toHaveAttribute("data-song", song.id);
   await expect(replica(page)).toHaveAttribute("data-playing", "true");
   await expect
-    .poll(() => page.evaluate(() => document.documentElement.style.getPropertyValue("--glow")))
+    .poll(() => page.evaluate(() => document.querySelector<HTMLElement>("[data-site-bar]")!.style.getPropertyValue("--song")))
     .toBe(song.colour);
   // The window here is the app at its actual size: its real narrow layout.
   expect(await replica(page).evaluate((r) => r.clientWidth)).toBe(480);

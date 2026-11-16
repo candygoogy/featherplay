@@ -20,13 +20,13 @@ interface Props {
   system?: boolean;
 }
 const { title, description, noindex, app, system = false } = Astro.props;
-// The cover glow starts on the demo's first song, on the root alone: every replica, wallpaper
-// and band reads it from there, so src/demo/glow.ts changes them all at once.
+// The song's colour starts on the demo's first song, on the root, as the page's first value;
+// later songs reach the page through its colour roots (src/demo/glow.ts), never the root.
 const glow = songById(demoStart.songId)!.colour;
 ---
 
 <!doctype html>
-<html lang="en" class:list={{ sys: system }} style={`--glow:${glow}`}>
+<html lang="en" class:list={{ sys: system }} style={`--song:${glow}`}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />

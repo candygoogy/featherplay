@@ -400,9 +400,10 @@
   width: min(40rem, 100%);
   padding: var(--s5) var(--s6) var(--s6);
   border-radius: var(--r-panel);
-  background: color-mix(in srgb, var(--song) calc(14% - 5% * var(--light)), color-mix(in srgb, #f7f7f7 calc(var(--light) * 100%), #181818));
+  --paint: var(--song);
+  background: color-mix(in srgb, var(--paint) calc(14% - 5% * var(--light)), color-mix(in srgb, #f7f7f7 calc(var(--light) * 100%), #181818));
   color: var(--text);
-  transition: --song var(--t-glow) ease;
+  transition: --paint var(--t-glow) ease;
   box-shadow: 0 0 0 1px color-mix(in srgb, #00000014 calc(var(--light) * 100%), #ffffff0d);
   font-size: var(--fs-small);
   font-weight: var(--fw-medium);
@@ -501,8 +502,9 @@
 
 /* ---------- The lyric card ---------- */
 .lyric-card {
-  --card: color-mix(in srgb, var(--song) 60%, #0f0f0f);
-  transition: --song var(--t-glow) ease;
+  /* Its own copy of the song's colour fades (system.css --paint), not its lines'. */
+  --paint: var(--song);
+  transition: --paint var(--t-glow) ease;
   position: relative;
   isolation: isolate;
   height: clamp(24rem, 64vh, 38rem);
@@ -510,7 +512,7 @@
      in it scrolls (the view clips its own lines), so focus never moves it. */
   overflow: hidden;
   border-radius: var(--r-panel);
-  background: var(--card);
+  background: color-mix(in srgb, var(--paint) 60%, #0f0f0f);
   color: #fff;
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.14), var(--shadow);
 }

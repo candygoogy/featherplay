@@ -15,15 +15,24 @@ const ms = (frames: number) => (frames * 1000) / 60;
 const bez = (a: number, b: number, c: number, d: number) => `cubic-bezier(${a}, ${b}, ${c}, ${d})`;
 
 type Step = { at: number; v: Keyframe; ease?: string };
+/** Each element's latest piece of motion, kept: asking an element for its animations
+ *  (getAnimations) brings the page's style up to date, which in the middle of a song change
+ *  was most of its cost. */
+const last = new WeakMap<Element, Animation>();
 /** A Lottie property's keys (frames, values, the curve into the next) as one animation. */
 function play(el: Element | null | undefined, steps: Step[], delay = 0): Animation | undefined {
   if (!el) return;
   const start = steps[0].at;
   const end = steps[steps.length - 1].at;
   const frames = steps.map((s) => ({ ...s.v, offset: (s.at - start) / (end - start || 1), easing: s.ease ?? "linear" }));
-  return el.animate(frames, { duration: ms(end - start), delay: delay + ms(start), fill: "backwards" });
+  const a = el.animate(frames, { duration: ms(end - start), delay: delay + ms(start), fill: "backwards" });
+  last.set(el, a);
+  return a;
 }
-const running = (el: Element | null | undefined) => !!el?.getAnimations().some((a) => a.playState === "running");
+const running = (el: Element | null | undefined) => {
+  const a = el ? last.get(el) : undefined;
+  return !!a && (a.playState === "running" || a.pending);
+};
 
 // ---- The mark ----
 

@@ -7,8 +7,9 @@ test.use({ viewport: { width: 1920, height: 1200 } });
 
 const replica = (page: Page) => page.locator("[data-replica]").first();
 
+/** The song's colour on the page: on its colour roots (the bar always), src/demo/glow.ts. */
 async function rootGlow(page: Page) {
-  return page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--glow").trim());
+  return page.evaluate(() => getComputedStyle(document.querySelector("[data-site-bar]")!).getPropertyValue("--song").trim());
 }
 
 test("the replica is a labelled demo with a text summary", async ({ page }) => {

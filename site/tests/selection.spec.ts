@@ -74,7 +74,7 @@ test("text fields keep the native highlight", async ({ page }) => {
     }
     return null;
   });
-  expect(rule).toMatch(/--glow/);
+  expect(rule).toMatch(/--song/);
   expect(await page.locator("html").getAttribute("class")).toContain("sel-drawn");
 });
 

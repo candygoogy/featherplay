@@ -49,6 +49,20 @@ export function followOffset(line: LineBox | null, view: number, content: number
 /** After the lines last moved by hand, the hover highlight waits this long to come back. */
 const REST_MS = 120;
 
+// Every lyric view follows its line on the next frame, all together: each reads where its line
+// is, then each moves. Done where they are asked for, each read would come after the writes the
+// change has just made (the new lines, the colours) and force the page's style and layout again,
+// once a view (a song change at 4x CPU was one 85 ms task of that).
+const queued = new Map<object, () => () => void>();
+let queuedFrame = 0;
+function flushFollows() {
+  queuedFrame = 0;
+  const reads = [...queued.values()];
+  queued.clear();
+  const writes = reads.map((r) => r());
+  for (const w of writes) w();
+}
+
 export function followLyrics(panel: HTMLElement, list: HTMLElement): LyricsFollow {
   let target = 0; // where the song wants the list
   let shown = 0; // where it is
@@ -73,18 +87,10 @@ export function followLyrics(panel: HTMLElement, list: HTMLElement): LyricsFollo
     return h ? panel.getBoundingClientRect().height / h || 1 : 1;
   };
 
-  let placed = false;
   const apply = (y: number, glide: boolean) => {
     shown = y;
     list.style.transition = glide ? "" : "none";
     list.style.transform = `translateY(${-y}px)`;
-    // A jump is committed at once, so a glide right after it starts from here. Not the first
-    // placement: nothing glides in the same task, and on load it would force the whole page's
-    // style and layout while the page is still starting up.
-    if (!glide && placed) {
-      void list.offsetHeight;
-    }
-    placed = true;
   };
 
   const reduce = matchMedia("(prefers-reduced-motion: reduce)");
@@ -226,8 +232,15 @@ export function followLyrics(panel: HTMLElement, list: HTMLElement): LyricsFollo
 
   return {
     follow(line, instant = false) {
-      target = offsetFor(line);
-      if (following) apply(target, !instant);
+      // On the next frame, with every other view's (below): reads first, then writes.
+      queued.set(list, () => {
+        const y = offsetFor(line);
+        return () => {
+          target = y;
+          if (following) apply(target, !instant);
+        };
+      });
+      if (!queuedFrame) queuedFrame = requestAnimationFrame(flushFollows);
     },
     release,
     get following() {
