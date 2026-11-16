@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { downloadOptions, release, sizeLabel } from "../src/data/release";
+import { laidOut } from "./helpers";
 
 // The questions, the download and the footer (Questions.astro, DownloadSection.astro,
 // SiteFooter.astro), and the words the site shares with the README.
@@ -31,13 +32,17 @@ test("the questions people ask, in three groups, before the download", async ({ 
   expect(order).toBeTruthy();
 });
 
-test("they start closed, and several answers can be open at once", async ({ page }) => {
+test("they start closed, and one answer is open at a time; the open one's question closes it", async ({ page }) => {
   await page.goto("/");
   await expect(faq(page).locator("details[open]")).toHaveCount(0);
   await summary(page, /download anything else/i).click();
   await expect(faq(page).locator("details[open] .answer")).toContainText("yt-dlp");
   await summary(page, "Is it free?").click();
-  await expect(faq(page).locator("details[open]")).toHaveCount(2);
+  await expect(faq(page).locator("details[open]:not([data-closing])")).toHaveCount(1);
+  await expect(faq(page).locator("details[open]")).toHaveCount(1);
+  await expect(faq(page).locator("details[open] summary")).toContainText("Is it free?");
+  await summary(page, "Is it free?").click();
+  await expect(faq(page).locator("details[open]")).toHaveCount(0);
   await expect(page.locator("#download")).not.toContainText("yt-dlp");
 });
 
@@ -68,12 +73,15 @@ async function clickAndWatch(page: Page, q: string) {
   );
 }
 
-test("opening and closing never moves the question clicked: in any order, near the end of the page too", async ({ page }) => {
+test("opening and closing never moves the question clicked: the other one closing above or below it, in any order, near the end of the page too", async ({ page }) => {
   await page.goto("/");
   const qs = ["Is featherplay official?", "How does signing in work?", "Some songs won’t play. Why?", "Is it free?", "How do I report a bug?"];
-  // Open them top to bottom, close them in another order, open the last ones again.
-  for (const q of [...qs, qs[1], qs[3], qs[0], qs[4], qs[2], qs[4], qs[2]]) {
+  // Down the list (the open one closes above), back up it (it closes below), skipping about,
+  // and the open one's own question (none left open).
+  for (const q of [...qs, qs[1], qs[3], qs[0], qs[4], qs[2], qs[2], qs[4], qs[0]]) {
     expect(await clickAndWatch(page, q), q).toBeLessThanOrEqual(1);
+    await page.waitForTimeout(150);
+    expect(await faq(page).locator("details[open]").count(), q).toBeLessThanOrEqual(1);
   }
   // At the very end of the page, the last question closed: it stays under the pointer.
   await page.evaluate(() => scrollTo(0, document.documentElement.scrollHeight));
@@ -84,24 +92,34 @@ test("opening and closing never moves the question clicked: in any order, near t
   expect(await clickAndWatch(page, "How do I report a bug?")).toBeLessThanOrEqual(1);
 });
 
-test("the keyboard opens and closes an answer; with reduced motion it opens at once", async ({ page }) => {
+test("the keyboard opens and closes an answer; with reduced motion the swap is at once, the question kept in place", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
-  await summary(page, "Is it free?").focus();
+  await summary(page, "Is featherplay official?").focus();
   await page.keyboard.press("Enter");
-  await expect(faq(page).locator("details[open] summary")).toContainText("Is it free?");
+  await expect(faq(page).locator("details[open] summary")).toContainText("Is featherplay official?");
   expect(await faq(page).locator("details[open] [data-answer]").evaluate((a) => a.getAnimations().length)).toBe(0);
+  // The next one down, by the keyboard: the one above shuts at once, this one stays put.
+  const s = summary(page, "Is it free?");
+  await s.focus();
+  const before = (await s.boundingBox())!.y;
+  await page.keyboard.press("Enter");
+  await expect(faq(page).locator("details[open]")).toHaveCount(1);
+  await expect(faq(page).locator("details[open] summary")).toContainText("Is it free?");
+  expect(Math.abs((await s.boundingBox())!.y - before)).toBeLessThanOrEqual(1);
   await page.keyboard.press("Enter");
   await expect(faq(page).locator("details[open]")).toHaveCount(0);
 });
 
 test.describe("without JavaScript", () => {
   test.use({ javaScriptEnabled: false });
-  test("the questions are plain details that open and close", async ({ page }) => {
+  test("the questions are plain details that open and close, one at a time (the browser's own)", async ({ page }) => {
     await page.goto("/");
     await summary(page, "Is it free?").click();
     await expect(faq(page).locator("details[open] .answer")).toBeVisible();
-    await summary(page, "Is it free?").click();
+    await summary(page, "Do I need an account?").click();
+    await expect(faq(page).locator("details[open]")).toHaveCount(1);
+    await summary(page, "Do I need an account?").click();
     await expect(faq(page).locator("details[open]")).toHaveCount(0);
   });
 });
@@ -259,4 +277,16 @@ test('the page never says "Ads" or offers to download music', async ({ page }) =
     expect(text).not.toMatch(/ad[- ]?block/i);
     expect(text).not.toMatch(/download (the |your )?(music|songs?|tracks?)/i);
   }
+});
+
+test("the questions' index stays in view beside them and marks the group being read", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/");
+  await laidOut(page);
+  const index = page.locator("[data-faq-index]");
+  await page.locator("#q-use").evaluate((g) => g.scrollIntoView({ block: "start" }));
+  await expect(index.locator('a[aria-current="true"]')).toHaveText("Using it");
+  await expect(index).toBeInViewport();
+  await page.locator("#q-account").evaluate((g) => g.scrollIntoView({ block: "start" }));
+  await expect(index.locator('a[aria-current="true"]')).toHaveText("Your account");
 });

@@ -1,27 +1,38 @@
 ---
-// Questions: the heading and the three groups' names on the left (sticky), one readable column
-// of questions on the right. Native <details>; src/scripts/faq.ts eases them open and keeps
-// the clicked question where it is. Answers: src/data/faq.ts.
+// Questions: the heading, the way to ask something else and the three groups' names on the left,
+// held in view while the section is (the group being read marked); the questions on the right on
+// one content panel, set for reading. Native <details> sharing one name: one answer open at a
+// time; src/scripts/faq.ts eases the swap and keeps the clicked question where it is. Answers:
+// src/data/faq.ts (its two marks: a paragraph's run-in, the name of a thing to look for).
 import { faqGroups } from "../../data/faq";
 import { repo } from "../../data/links";
+
+/** A paragraph's text in pieces: plain, the run-in (`**…**`), a name (`*…*`). */
+const pieces = (p: string) =>
+  p
+    .split(/(\*\*[^*]+\*\*|\*[^*]+\*)/)
+    .filter(Boolean)
+    .map((t) => (t.startsWith("**") ? { kind: "lead", t: t.slice(2, -2) } : t.startsWith("*") ? { kind: "name", t: t.slice(1, -1) } : { kind: "text", t }));
 ---
 
 <section class="sec sec-faq frame" id="questions" aria-labelledby="questions-title">
   <div class="faq-grid">
     <div class="faq-intro">
       <h2 id="questions-title" class="t-title">Questions</h2>
-      <p class="t-lede ink2">Something else? <a class="text-link" href={`${repo}/issues`}>Ask on GitHub</a>.</p>
-      <ol class="faq-index">
-        {faqGroups.map((g) => <li><a href={`#${g.id}`}>{g.title}</a></li>)}
-      </ol>
+      <p class="ask">Something else? <a class="text-link" href={`${repo}/issues`}>Ask on GitHub</a>.</p>
+      <nav aria-label="Question groups">
+        <ol class="faq-index" data-faq-index>
+          {faqGroups.map((g) => <li><a href={`#${g.id}`}>{g.title}</a></li>)}
+        </ol>
+      </nav>
     </div>
-    <div class="faq" data-faq>
+    <div class="faq panel" data-faq>
       {
         faqGroups.map((g) => (
           <div class="faq-group" id={g.id}>
-            <h3 class="t-subtitle">{g.title}</h3>
+            <h3 class="g-title">{g.title}</h3>
             {g.items.map((f) => (
-              <details id={f.id}>
+              <details name="faq" id={f.id}>
                 <summary>
                   <span class="q">{f.q}</span>
                   <span class="pm" aria-hidden="true" />
@@ -29,10 +40,12 @@ import { repo } from "../../data/links";
                 <div class="answer-wrap" data-answer>
                   <div class="answer">
                     {f.a.map((p) => (
-                      <p>{p}</p>
+                      <p>
+                        {pieces(p).map((x) => (x.kind === "lead" ? <strong class="lead">{x.t}</strong> : x.kind === "name" ? <span class="name">{x.t}</span> : x.t))}
+                      </p>
                     ))}
                     {f.link && (
-                      <p>
+                      <p class="more">
                         <a class="text-link" href={f.link.href}>
                           {f.link.text}
                         </a>
@@ -57,107 +70,156 @@ import { repo } from "../../data/links";
 
 <style>
   .faq-grid {
-    --hair: color-mix(in srgb, var(--text) 11%, transparent);
+    --hair: color-mix(in srgb, var(--text) 10%, transparent);
+    --row-x: var(--s4);
     display: grid;
     grid-template-columns: minmax(0, 4fr) minmax(0, 8fr);
     gap: var(--s7);
     align-items: start;
   }
+  /* Held in view while the section is, under the capsule; its heading level with the list's
+     first group. */
   .faq-intro {
     position: sticky;
-    top: var(--s9);
+    top: calc(var(--bar-h, 64px) + var(--s6));
     display: grid;
-    gap: var(--s4);
+    gap: var(--s3);
+    padding-top: var(--panel-pad);
+  }
+  .ask {
+    color: var(--ink2);
+    font-size: var(--fs-lede);
+    letter-spacing: var(--tr-lede);
   }
   .faq-index {
     display: grid;
-    gap: var(--s2);
-    margin: var(--s4) 0 0;
+    gap: 2px;
+    margin: var(--s5) 0 0;
     padding: 0;
     list-style: none;
   }
   .faq-index a {
-    display: inline-flex;
+    position: relative;
+    display: flex;
     align-items: center;
-    min-height: 32px;
+    min-height: 40px;
+    padding-left: var(--s4);
     color: var(--ink2);
     font-weight: var(--fw-medium);
     text-decoration: none;
     transition: color var(--t-hover) ease;
   }
+  /* The group being read: its name in the text's ink and a short bar beside it. */
+  .faq-index a::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 50%;
+    width: 3px;
+    height: 0;
+    border-radius: var(--r-pill);
+    background: var(--accent);
+    translate: 0 -50%;
+    transition: height var(--t-small) var(--ease-out);
+  }
+  .faq-index a[aria-current="true"] {
+    color: var(--text);
+  }
+  .faq-index a[aria-current="true"]::before {
+    height: 1.25rem;
+  }
   .faq-index a:hover {
     color: var(--text);
   }
-  /* The browser's own scroll anchoring would move the clicked question (faq.ts). */
+  /* The list on the content panel. The browser's own scroll anchoring would move the clicked
+     question (faq.ts). */
   .faq {
-    max-width: 48rem;
+    padding: var(--panel-pad) calc(var(--panel-pad) - var(--row-x)) calc(var(--panel-pad) - var(--s3));
     overflow-anchor: none;
   }
   .faq-group {
-    scroll-margin-top: var(--s9);
+    scroll-margin-top: calc(var(--bar-h, 64px) + var(--s6));
   }
   .faq-group + .faq-group {
     margin-top: var(--s8);
   }
-  .faq-group h3 {
-    margin-bottom: var(--s4);
+  .g-title {
+    margin: 0 var(--row-x) var(--s3);
+    color: var(--ink2);
+    font-size: var(--fs-text);
+    font-weight: var(--fw-bold);
+    letter-spacing: 0.01em;
   }
-  /* Square while shut (the lines between them run straight to the ends), rounded once open on
-     its lighter fill. */
+  /* Rows: a hairline between them, inset to the words; the open one lifted on a clean, lighter
+     fill with a soft edge (no line next to it). */
   details {
-    margin-inline: calc(-1 * var(--s4));
-    padding-inline: var(--s4);
-    box-shadow: inset 0 1px 0 var(--hair);
-    scroll-margin-top: var(--s9);
+    position: relative;
+    border-radius: 14px;
+    scroll-margin-top: calc(var(--bar-h, 64px) + var(--s6));
     transition:
       background-color var(--t-small) ease,
       box-shadow var(--t-small) ease;
   }
-  details:last-child {
+  details + details::before {
+    content: "";
+    position: absolute;
+    inset: 0 var(--row-x) auto;
+    height: 1px;
+    background: var(--hair);
+    transition: opacity var(--t-small) ease;
+  }
+  details[open]:not([data-closing]) {
+    background: light-dark(rgb(255 255 255 / 0.92), rgb(255 255 255 / 0.06));
     box-shadow:
-      inset 0 1px 0 var(--hair),
-      inset 0 -1px 0 var(--hair);
+      0 0 0 1px light-dark(rgb(90 66 40 / 0.08), rgb(255 255 255 / 0.07)),
+      0 1px 2px light-dark(rgb(70 48 24 / 0.05), rgb(0 0 0 / 0)),
+      0 6px 20px light-dark(rgb(70 48 24 / 0.06), rgb(0 0 0 / 0));
   }
-  /* The open answer on a lighter fill (a warm step of the paper in light). */
-  details[open] {
-    border-radius: var(--r-small);
-    background: color-mix(in srgb, rgb(120 90 60 / 0.07) calc(var(--light) * 100%), rgb(255 255 255 / 0.06));
-    box-shadow: none;
-  }
-  details[open] + details {
-    box-shadow: none;
+  details[open]:not([data-closing])::before,
+  details[open]:not([data-closing]) + details::before {
+    opacity: 0;
   }
   summary {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: var(--s5);
-    min-height: 56px;
-    padding: var(--s3) 0;
+    min-height: 60px;
+    padding: var(--s3) var(--row-x);
+    border-radius: 14px;
     font-size: var(--fs-lede);
     font-weight: var(--fw-medium);
     letter-spacing: var(--tr-lede);
     line-height: 1.35;
     list-style: none;
     cursor: pointer;
+    transition: background-color var(--t-hover) ease;
   }
   summary::-webkit-details-marker {
     display: none;
+  }
+  @media (hover: hover) {
+    details:not([open]) summary:hover {
+      background: var(--part-hover);
+    }
+    summary:hover .pm {
+      color: var(--text);
+    }
   }
   details[open]:not([data-closing]) summary {
     font-weight: var(--fw-bold);
   }
   summary:focus-visible {
-    outline-offset: 2px;
-    border-radius: var(--r-control);
+    outline-offset: -2px;
   }
-  /* Plus, turning to minus. */
+  /* Plus, turning to minus: the upright bar turns flat, 180 ms. */
   .pm {
     position: relative;
     flex: none;
     width: 14px;
     height: 14px;
     color: var(--ink2);
+    transition: color var(--t-hover) ease;
   }
   .pm::before,
   .pm::after {
@@ -169,7 +231,7 @@ import { repo } from "../../data/links";
     height: 2px;
     border-radius: var(--r-pill);
     background: currentColor;
-    transition: rotate var(--t-medium) var(--ease-out);
+    transition: rotate 180ms var(--ease-out);
   }
   .pm::after {
     rotate: 90deg;
@@ -177,15 +239,29 @@ import { repo } from "../../data/links";
   details[open]:not([data-closing]) .pm::after {
     rotate: 0deg;
   }
+  /* Set for reading: about 64 characters a line, open leading, clear space between paragraphs;
+     the first paragraph, the short answer, in the full ink. */
   .answer {
     display: grid;
-    gap: var(--s3);
+    gap: var(--s4);
     max-width: 64ch;
-    padding: 0 0 var(--s5);
-    color: color-mix(in srgb, var(--text) 88%, transparent);
+    padding: var(--s1) var(--row-x) var(--s6);
+    color: color-mix(in srgb, var(--text) 84%, transparent);
+    line-height: 1.68;
   }
   .answer p {
     text-wrap: pretty;
+  }
+  .answer p:first-child {
+    color: var(--text);
+  }
+  .answer .lead {
+    color: var(--text);
+    font-weight: var(--fw-bold);
+  }
+  .answer .name {
+    color: var(--text);
+    font-weight: var(--fw-medium);
   }
   @media (prefers-reduced-motion: reduce) {
     .pm::before,
@@ -196,15 +272,26 @@ import { repo } from "../../data/links";
   @media (width < 900px) {
     .faq-grid {
       grid-template-columns: minmax(0, 1fr);
-      gap: var(--s6);
+      gap: var(--s5);
     }
     .faq-intro {
       position: static;
+      padding-top: 0;
     }
     .faq-index {
       display: flex;
       flex-wrap: wrap;
       gap: var(--s1) var(--s5);
+      margin-top: var(--s2);
+    }
+    .faq-index a {
+      padding-left: 0;
+    }
+    .faq-index a::before {
+      display: none;
+    }
+    .faq {
+      --row-x: var(--s3);
     }
   }
 </style>

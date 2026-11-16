@@ -1,11 +1,14 @@
-// Questions (Questions.astro): native <details>, so it works without script and with the
-// keyboard. With script and motion an answer opens and closes by easing its height (Web
-// Animations, the same in every engine), and the question clicked never moves: several
-// answers may be open at once (nothing above the question is ever closed for it), the list
-// opts out of the browser's scroll anchoring (which picks some line below and moves the
-// clicked question to keep that line still), and while the height eases the page is scrolled
-// by whatever the question would have moved. Near the end of the page, where a closing answer
-// would pull the page up, the list keeps its height until it's out of view.
+// Questions (Questions.astro): native <details> sharing one name, so without script the browser
+// keeps one answer open at a time where it can (and they open independently where it can't),
+// and the keyboard works. With script the script keeps the one-at-a-time rule itself, so it can
+// ease both answers together: opening a question closes the one that was open, the two heights
+// eased on one clock (Web Animations, the same in every engine), and the question clicked never
+// moves on screen, whether the other one closes above or below it. The list opts out of the
+// browser's scroll anchoring (which picks some line below and moves the clicked question to keep
+// that line still); while the heights ease the page is scrolled by whatever the question would
+// have moved. Near the end of the page, where a closing answer would pull the page up, the list
+// keeps its height until it's out of view. Reduced motion: the same swap at once, the question
+// kept in place the same way. Clicking the open question closes it, leaving none open.
 // A link to a question (#official, #connects, #uninstall) opens its answer.
 
 const MS = 280;
@@ -13,6 +16,10 @@ const EASE = "cubic-bezier(0.22, 1, 0.36, 1)";
 
 export function bindFaq(root: HTMLElement): void {
   const reduce = matchMedia("(prefers-reduced-motion: reduce)");
+  const all = [...root.querySelectorAll<HTMLDetailsElement>("details")];
+  // The rule is the script's from here (the browser's would shut the other one at once).
+  for (const d of all) d.removeAttribute("name");
+
   let held = false;
   const release = new IntersectionObserver(([e]) => {
     if (!e.isIntersecting && held) {
@@ -22,57 +29,110 @@ export function bindFaq(root: HTMLElement): void {
   });
   release.observe(root);
 
-  for (const d of root.querySelectorAll<HTMLDetailsElement>("details")) {
-    const summary = d.querySelector<HTMLElement>("summary")!;
-    const body = d.querySelector<HTMLElement>("[data-answer]")!;
-    summary.addEventListener("click", (e) => {
-      if (reduce.matches) return;
-      e.preventDefault();
-      const top = summary.getBoundingClientRect().top;
-      const from = d.open ? body.getBoundingClientRect().height : 0;
-      for (const a of body.getAnimations()) a.cancel();
-      const opening = !d.open || d.dataset.closing === "true";
-      let to = 0;
-      if (opening) {
+  const bodyOf = (d: HTMLDetailsElement) => d.querySelector<HTMLElement>("[data-answer]")!;
+  const isOpen = (d: HTMLDetailsElement) => d.open && d.dataset.closing !== "true";
+
+  /** Eases one answer to open or shut; resolves when it has. */
+  function ease(d: HTMLDetailsElement, open: boolean, ms: number): Promise<void> {
+    const body = bodyOf(d);
+    const from = d.open ? body.getBoundingClientRect().height : 0;
+    for (const a of body.getAnimations()) a.cancel();
+    let to = 0;
+    if (open) {
+      delete d.dataset.closing;
+      d.open = true;
+      to = body.scrollHeight;
+    } else {
+      d.dataset.closing = "true";
+    }
+    if (!ms) {
+      if (!open) {
         delete d.dataset.closing;
-        d.open = true;
-        to = body.scrollHeight;
-      } else {
-        d.dataset.closing = "true";
-        // At the page's end the page would be pulled up as the list shrinks: hold its height.
+        d.open = false;
+      }
+      return Promise.resolve();
+    }
+    const anim = body.animate([{ height: `${from}px` }, { height: `${to}px` }], { duration: ms, easing: EASE });
+    body.style.overflow = "clip";
+    return anim.finished
+      .then(() => {
+        body.style.overflow = "";
+        if (d.dataset.closing === "true") {
+          delete d.dataset.closing;
+          d.open = false;
+        }
+      })
+      .catch(() => {});
+  }
+
+  for (const d of all) {
+    const summary = d.querySelector<HTMLElement>("summary")!;
+    summary.addEventListener("click", (e) => {
+      e.preventDefault();
+      const ms = reduce.matches ? 0 : MS;
+      const top = summary.getBoundingClientRect().top;
+      const opening = !isOpen(d);
+      const others = opening ? all.filter((o) => o !== d && isOpen(o)) : [];
+      // At the page's end the page would be pulled up as the list shrinks: hold its height.
+      const closing = opening ? others : [d];
+      if (closing.length) {
         const doc = document.documentElement;
-        if (scrollY + innerHeight > doc.scrollHeight - from - 2) {
+        const shrink = closing.reduce((n, o) => n + bodyOf(o).getBoundingClientRect().height, 0);
+        if (scrollY + innerHeight > doc.scrollHeight - shrink - 2) {
           root.style.minHeight = `${root.offsetHeight}px`;
           held = true;
         }
       }
-      const anim = body.animate([{ height: `${from}px` }, { height: `${to}px` }], { duration: MS, easing: EASE });
-      body.style.overflow = "clip";
+      // One clock for both.
+      const done = Promise.all([ease(d, opening, ms), ...others.map((o) => ease(o, false, ms))]);
       // The question stays where it was clicked.
+      let running = true;
       const keep = () => {
         const dy = summary.getBoundingClientRect().top - top;
         if (Math.abs(dy) > 0.5) scrollBy(0, dy);
-        if (anim.playState === "running") requestAnimationFrame(keep);
+        if (running) requestAnimationFrame(keep);
       };
-      requestAnimationFrame(keep);
-      anim.finished
-        .then(() => {
-          body.style.overflow = "";
-          if (d.dataset.closing === "true") {
-            delete d.dataset.closing;
-            d.open = false;
-          }
-          keep();
-        })
-        .catch(() => {});
+      keep();
+      done.then(() => {
+        running = false;
+        keep();
+      });
     });
   }
 
   const openTarget = () => {
     const id = decodeURIComponent(location.hash.slice(1));
     const target = id ? document.getElementById(id) : null;
-    if (target instanceof HTMLDetailsElement && root.contains(target)) target.open = true;
+    if (!(target instanceof HTMLDetailsElement) || !root.contains(target)) return;
+    for (const o of all) if (o !== target && o.open) o.open = false;
+    target.open = true;
   };
   addEventListener("hashchange", openTarget);
   openTarget();
+
+  // The index marks the group in view.
+  const index = new Map<Element, HTMLAnchorElement>();
+  for (const a of document.querySelectorAll<HTMLAnchorElement>("[data-faq-index] a")) {
+    const g = document.getElementById(a.hash.slice(1));
+    if (g) index.set(g, a);
+  }
+  if (index.size && "IntersectionObserver" in window) {
+    const shown = new Set<Element>();
+    const mark = () => {
+      // The first group (in order) that reaches into the reading band.
+      const at = [...index.keys()].find((g) => shown.has(g));
+      for (const [g, a] of index) {
+        if (g === at) a.setAttribute("aria-current", "true");
+        else a.removeAttribute("aria-current");
+      }
+    };
+    const io = new IntersectionObserver(
+      (es) => {
+        for (const e of es) e.isIntersecting ? shown.add(e.target) : shown.delete(e.target);
+        mark();
+      },
+      { rootMargin: "-30% 0px -55% 0px" },
+    );
+    for (const g of index.keys()) io.observe(g);
+  }
 }

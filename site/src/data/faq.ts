@@ -4,6 +4,9 @@
 // session afterwards), as Linux has done since 0.4.1.
 import { links, repo } from "./links";
 
+/** An answer's paragraphs. Two marks, nothing else: `**…**` the run-in that names a paragraph's
+ *  case (set bold), `*…*` the name of a thing the visitor will look for (set in the medium
+ *  weight). The words are the README's; the marks only set them. */
 export type Faq = { id?: string; q: string; a: string[]; link?: { href: string; text: string } };
 export type FaqGroup = { id: string; title: string; items: Faq[] };
 
@@ -28,15 +31,15 @@ export const faqGroups: FaqGroup[] = [
         id: "systems",
         q: "Does it run on Linux or macOS?",
         a: [
-          "Windows is the main one. featherplay is built on Windows’ own parts there: the media overlay, the taskbar buttons, the notification area and Credential Manager. That’s a lot of what keeps it light.",
-          "There’s also an experimental Linux build: an AppImage and a .tar.gz, for x86_64 and aarch64, on glibc 2.35 or newer (Ubuntu 22.04, Debian 12, Fedora 36 or later). Automatic tests run it on Ubuntu, Debian, Fedora and Arch, but few people have used it on a real desktop yet, so reports help. There’s no macOS version.",
+          "**Windows is the main one.** featherplay is built on Windows’ own parts there: the media overlay, the taskbar buttons, the notification area and Credential Manager. That’s a lot of what keeps it light.",
+          "**There’s also an experimental Linux build:** an AppImage and a .tar.gz, for x86_64 and aarch64, on glibc 2.35 or newer (Ubuntu 22.04, Debian 12, Fedora 36 or later). Automatic tests run it on Ubuntu, Debian, Fedora and Arch, but few people have used it on a real desktop yet, so reports help. There’s no macOS version.",
         ],
         link: { href: links.linux, text: "Linux: the steps and the known limits" },
       },
       {
         q: "What does it sound like?",
         a: [
-          "featherplay plays YouTube Music’s Opus stream, about 130 to 140 kbps, where a song has one. It sounds better than AAC at about the same data use. Settings > Streaming quality switches to Standard, AAC at 128 kbps.",
+          "featherplay plays YouTube Music’s Opus stream, about 130 to 140 kbps, where a song has one. It sounds better than AAC at about the same data use. *Settings > Streaming quality* switches to Standard, AAC at 128 kbps.",
         ],
       },
     ],
@@ -56,10 +59,10 @@ export const faqGroups: FaqGroup[] = [
         id: "sign-in",
         q: "How does signing in work?",
         a: [
-          "On Windows, featherplay opens a small sign-in window, Microsoft Edge WebView2, with Google’s own sign-in page. You sign in there as you would in a browser. featherplay doesn’t read your password; the code is open. Once you’re in, it keeps the YouTube Music session from that window and closes it. The main window never contains a browser. Windows 11 includes WebView2, and most Windows 10 PCs have it with Edge.",
-          "If you’d rather sign in in a browser you know, choose Use Microsoft Edge, Use Google Chrome, Use Brave or Use Vivaldi. The browser opens as you’d start it yourself, in a temporary profile, with its own address bar, your passkeys and Windows Hello. Sign in, then close the browser. Once it has closed, featherplay opens that profile again without a window, keeps only the YouTube Music session and deletes the profile. If you close the browser before you’ve signed in, nothing is kept; if you leave it open, featherplay closes it after 15 minutes and still keeps a sign-in you finished. Your own profile is never touched.",
-          "Linux has no sign-in window, so it always signs in this way, with Chrome, Chromium, Edge, Brave or Vivaldi. A Snap or Flatpak browser can’t be used, because its sandbox keeps it out of the temporary profile.",
-          "The session is kept in Windows Credential Manager, or on Linux in your desktop’s keyring (the Secret Service, such as GNOME Keyring or KWallet). While yt-dlp looks up a song’s audio it reads the session from a temporary file, which featherplay deletes as soon as yt-dlp is done. The session gives the same access to your account as a signed-in browser, so treat it like a password; Sign out in Settings removes it.",
+          "**On Windows,** featherplay opens a small sign-in window, *Microsoft Edge WebView2*, with Google’s own sign-in page. You sign in there as you would in a browser. featherplay doesn’t read your password; the code is open. Once you’re in, it keeps the YouTube Music session from that window and closes it. The main window never contains a browser. Windows 11 includes WebView2, and most Windows 10 PCs have it with Edge.",
+          "**If you’d rather sign in in a browser you know,** choose *Use Microsoft Edge*, *Use Google Chrome*, *Use Brave* or *Use Vivaldi*. The browser opens as you’d start it yourself, in a temporary profile, with its own address bar, your passkeys and Windows Hello. Sign in, then close the browser. Once it has closed, featherplay opens that profile again without a window, keeps only the YouTube Music session and deletes the profile. If you close the browser before you’ve signed in, nothing is kept; if you leave it open, featherplay closes it after 15 minutes and still keeps a sign-in you finished. Your own profile is never touched.",
+          "**Linux** has no sign-in window, so it always signs in this way, with Chrome, Chromium, Edge, Brave or Vivaldi. A Snap or Flatpak browser can’t be used, because its sandbox keeps it out of the temporary profile.",
+          "**The session is kept** in *Windows Credential Manager*, or on Linux in your desktop’s keyring (the Secret Service, such as GNOME Keyring or KWallet). While yt-dlp looks up a song’s audio it reads the session from a temporary file, which featherplay deletes as soon as yt-dlp is done. The session gives the same access to your account as a signed-in browser, so treat it like a password; *Sign out* in Settings removes it.",
         ],
       },
       {
@@ -87,7 +90,7 @@ export const faqGroups: FaqGroup[] = [
       {
         q: "Does it work with stream overlays and Stream Deck?",
         a: [
-          "Yes, once you turn on the local API in Settings > Local API. It uses the port, routes and WebSocket of Pear Desktop’s API Server, with a token from Settings, so overlays, Stream Deck plugins and scripts on your PC can see what’s playing and control it.",
+          "Yes, once you turn on the local API in *Settings > Local API*. It uses the port, routes and WebSocket of Pear Desktop’s API Server, with a token from Settings, so overlays, Stream Deck plugins and scripts on your PC can see what’s playing and control it.",
           "Amuse support, a switch in the same place, answers the Amuse now-playing widget on port 9863. It only reads, and it has no token, so while it’s on, any app on your PC can see what’s playing. Of websites, only the Amuse widget’s page can.",
         ],
       },
@@ -103,7 +106,7 @@ export const faqGroups: FaqGroup[] = [
         q: "Some songs won’t play. Why?",
         a: [
           "YouTube refuses some songs where it places you, when they aren’t licensed there. featherplay dims them, skips them in the queue and says so once per queue.",
-          "If many songs fail but play in a browser, the usual cause is a DNS service or filter that sends YouTube to its own servers in another country, as NextDNS’s YouTube option and some smart-DNS services do. featherplay may then say “Songs can’t play: DNS reroutes YouTube.” Turn that option off in your DNS service, or turn on Look up YouTube directly in Settings > Playback: featherplay then asks Google’s or Cloudflare’s DNS over HTTPS for YouTube’s servers only.",
+          "If many songs fail but play in a browser, the usual cause is a DNS service or filter that sends YouTube to its own servers in another country, as NextDNS’s YouTube option and some smart-DNS services do. featherplay may then say “Songs can’t play: DNS reroutes YouTube.” Turn that option off in your DNS service, or turn on *Look up YouTube directly* in *Settings > Playback*: featherplay then asks Google’s or Cloudflare’s DNS over HTTPS for YouTube’s servers only.",
         ],
         link: { href: links.cantPlay, text: "How to check, in the README" },
       },
@@ -111,9 +114,9 @@ export const faqGroups: FaqGroup[] = [
         id: "uninstall",
         q: "How do I uninstall it?",
         a: [
-          "Installed: uninstall it from Settings > Apps. That removes everything featherplay keeps: settings, cache, the helpers, the sign-in window’s data, its entries in Credential Manager and its entry for starting when you sign in.",
-          "Portable: sign out and disconnect Last.fm in Settings first, which clears both from Credential Manager, and turn off Start when you sign in to Windows if it’s on. Then delete the exe and its two folders, %APPDATA%\\featherplay and %LOCALAPPDATA%\\featherplay.",
-          "Linux: turn off Start when you log in if it’s on, then delete the AppImage, or the unpacked .tar.gz and what you installed from it in ~/.local, and the folders ~/.config/featherplay, ~/.cache/featherplay and ~/.local/state/featherplay. Then remove the items whose names end in @featherplay from your keyring.",
+          "**Installed:** uninstall it from *Settings > Apps*. That removes everything featherplay keeps: settings, cache, the helpers, the sign-in window’s data, its entries in Credential Manager and its entry for starting when you sign in.",
+          "**Portable:** sign out and disconnect Last.fm in Settings first, which clears both from Credential Manager, and turn off Start when you sign in to Windows if it’s on. Then delete the exe and its two folders, %APPDATA%\\featherplay and %LOCALAPPDATA%\\featherplay.",
+          "**Linux:** turn off Start when you log in if it’s on, then delete the AppImage, or the unpacked .tar.gz and what you installed from it in ~/.local, and the folders ~/.config/featherplay, ~/.cache/featherplay and ~/.local/state/featherplay. Then remove the items whose names end in @featherplay from your keyring.",
         ],
       },
       {
