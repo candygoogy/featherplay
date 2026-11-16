@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { WIDTHS } from "./check";
+import { laidOut } from "./helpers";
 import { notes } from "../src/data/notes";
 
 // The handwritten notes (Note.astro, src/scripts/notes.ts): decoration hidden from assistive
@@ -76,6 +77,9 @@ test("a note writes itself in once, when wholly in view, and stays written", asy
   await expect(note).not.toHaveClass(/written/);
   // Unwritten, its words are wiped away (the pen hasn't been there).
   expect(await note.locator("span").evaluate((s) => getComputedStyle(s).clipPath)).toMatch(/inset/);
+  // The sections laid out first: one still taking its height on the way would move the note
+  // off the middle of the screen as it is scrolled to.
+  await laidOut(page);
   await note.evaluate((n) => n.scrollIntoView({ block: "center" }));
   await expect(note).toHaveClass(/written/);
   await page.evaluate(() => scrollTo(0, 0));
