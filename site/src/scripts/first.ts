@@ -230,7 +230,11 @@ export function startFirst(): void {
         if (win.top > sh.bottom && x > colBox.right + fs * 0.4 && showNoteAt(noteShelf, x, y, avoid)) {
           const r = wordsOf(noteShelf);
           const from = { x: r.right + fs * 0.1, y: r.bottom - fs * 0.2 };
-          const tx = Math.max(from.x + fs * 0.6, (other?.right ?? 0) + fs * 2);
+          // Stacked over "not a screenshot" in the same gap, the two share this one arrow (two
+          // heads landing side by side read as a slip of the pen).
+          const shared = !!other && other.right > r.left && other.left < from.x + fs * 2;
+          if (shared) noteWin!.querySelector("svg.free path")?.setAttribute("d", "M0 0");
+          const tx = Math.max(from.x + fs * 0.6, (other?.right ?? 0) + fs * (shared ? 1 : 2));
           penArrow(noteShelf, from, { x: tx, y: win.top - fs * 0.15 }, -fs * 0.35);
           placed = true;
         }
