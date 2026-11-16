@@ -108,3 +108,101 @@ for (const theme of ["dark", "light"] as const) {
     expect(found).toEqual([]);
   });
 }
+
+// The desk's lit corner stays where it is while the page scrolls over it: every text that
+// passes through the top left on the way down is AA there too (large text 3), at each place.
+/** Each text passing through the top left of the window, at places `step` px apart from `from`
+ *  to the page's end, under AA there (large text 3). */
+async function cornerPass(page: Page, label: string, from: number, step = 360) {
+  const found: string[] = [];
+  const end = await page.evaluate(() => document.documentElement.scrollHeight - innerHeight);
+  for (let y = Math.max(0, from); y <= end; y += step) {
+    await page.evaluate((y) => scrollTo(0, y), y);
+    await page.waitForTimeout(450);
+    const n = await page.evaluate(() => {
+      let n = 0;
+      for (const el of document.querySelectorAll<HTMLElement>("main :is(h1, h2, h3, p, li, a, td, th, dt, dd, figcaption, summary), footer :is(h2, p, a)")) {
+        if (el.closest("[data-stage]")) continue;
+          if (el.querySelector("p, li, h2, h3, a, td") || el.closest("[data-replica], [data-piece], .win-body, .explorer")) continue;
+          // Its own words (not only a row of drawn buttons, each on its own ground).
+          if (![...el.childNodes].some((c) => c.nodeType === 3 && c.textContent!.trim())) continue;
+          const r = el.getBoundingClientRect();
+          if (!r.width || r.top < 0 || r.left > innerWidth * 0.5 || r.top > innerHeight * 0.45) continue;
+          // Shown, and not clipped away or covered (a closed answer, a pane over it).
+          if (!el.checkVisibility({ opacityProperty: true, visibilityProperty: true, contentVisibilityAuto: true })) continue;
+          const hit = document.elementFromPoint(r.left + Math.min(r.width, 40) / 2, r.top + r.height / 2);
+          if (!hit || !(el.contains(hit) || hit.contains(el))) continue;
+          const cs = getComputedStyle(el);
+          const px = parseFloat(cs.fontSize);
+          const large = px >= 24 || (px >= 18.66 && Number(cs.fontWeight) >= 700);
+          el.dataset.corner = large ? "l" : "s";
+          n++;
+        }
+        return n;
+      });
+    if (n) {
+      for (const [k, min] of [["s", 4.5], ["l", 3]] as const)
+        found.push(...(await textContrast(page, `[data-corner="${k}"]`, 40)).filter((r) => r.ratio < min).map((r) => `${label} y=${y}: "${r.text}" ${r.ratio}`));
+      await page.evaluate(() => document.querySelectorAll("[data-corner]").forEach((e) => e.removeAttribute("data-corner")));
+    }
+  }
+  return found;
+}
+
+test("dark: text scrolling through the desk's lit corner stays AA at every place", async ({ page }) => {
+  test.setTimeout(240_000);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await start(page, "dark");
+  const found: string[] = [];
+  for (const id of ["california-lullabye", "watching-seabirds-soar"]) {
+    await pick(page, id);
+    const stageEnd = await page.locator("[data-stage]").evaluate((s) => s.getBoundingClientRect().bottom + scrollY);
+    found.push(...(await cornerPass(page, id, stageEnd - 900)));
+  }
+  expect(found).toEqual([]);
+});
+
+test("dark: on /method and /credits too, text scrolling through the lit corner stays AA", async ({ page }) => {
+  test.setTimeout(240_000);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.emulateMedia({ colorScheme: "dark" });
+  const found: string[] = [];
+  for (const path of ["/method", "/credits"]) {
+    await page.goto(path);
+    await page.waitForTimeout(500);
+    found.push(...(await cornerPass(page, path, 0, 300)));
+  }
+  expect(found).toEqual([]);
+});
+
+// The skip links show at the top left, over the brightest of the desk: their focus ring lies on
+// a halo of the page's own ground, so it reads at 3 or more over any desk, in both themes.
+for (const theme of ["dark", "light"] as const) {
+  test(`the skip links' focus ring lies on its own ground (${theme})`, async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await start(page, theme);
+    for (const sel of ["a.skip[href='#main']", "a.skip-app"]) {
+      const link = page.locator(sel);
+      await page.keyboard.press("Tab");
+      await link.focus();
+      await expect(link).toBeFocused();
+      const ring = await link.evaluate((el) => {
+        const cs = getComputedStyle(el);
+        const m = /(rgba?\([^)]*\)|color\([^)]*\))\s+0px\s+0px\s+0px\s+([\d.]+)px/.exec(cs.boxShadow);
+        return { outline: cs.outlineColor, width: parseFloat(cs.outlineWidth), offset: parseFloat(cs.outlineOffset), halo: m?.[1] ?? "", spread: Number(m?.[2] ?? 0) };
+      });
+      expect(ring.halo, `${sel} has a halo`).not.toBe("");
+      expect(ring.spread, `${sel} halo under the whole ring`).toBeGreaterThanOrEqual(ring.offset + ring.width);
+      const lum = (c: string) => {
+        const unit = c.startsWith("color(") ? 1 : 255;
+        const [r, g, b] = c.replace(/^color\(srgb/, "").match(/[\d.]+/g)!.slice(0, 3).map((v) => {
+          const s = Number(v) / unit;
+          return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+        });
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      };
+      const [x, y] = [lum(ring.outline), lum(ring.halo)].sort((p, q) => q - p);
+      expect((x + 0.05) / (y + 0.05), sel).toBeGreaterThanOrEqual(3);
+    }
+  });
+}

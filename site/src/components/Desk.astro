@@ -35,6 +35,7 @@ const layers = ["k-ground", "m k-shade", "m k-lit", "m k-hi", "k-sheen", "k-grai
 <div class="desk" data-desk aria-hidden="true">
   <div class="slot front" data-slot style={initial}>{layers.map((c) => <i class={c}></i>)}</div>
   <div class="slot" data-slot style={initial}>{layers.map((c) => <i class={c}></i>)}</div>
+  <i class="desk-dim"></i>
   <i class="desk-grain"></i>
 </div>
 
@@ -44,6 +45,11 @@ const layers = ["k-ground", "m k-shade", "m k-lit", "m k-hi", "k-sheen", "k-grai
   const desk = document.querySelector<HTMLElement>("[data-desk]");
   const player = bindReplicas();
   if (desk && player) bindDesk(desk, player);
+  // The first screen gone past the middle of the window: the page's text is on its way through
+  // the lit corner, which dims (.desk-dim).
+  const stage = document.querySelector("[data-stage]");
+  if (desk && stage && "IntersectionObserver" in window)
+    new IntersectionObserver(([e]) => desk.toggleAttribute("data-low", !e.isIntersecting), { rootMargin: "-50% 0px 0px 0px" }).observe(stage);
 </script>
 
 <style>
@@ -127,10 +133,32 @@ const layers = ["k-ground", "m k-shade", "m k-lit", "m k-hi", "k-sheen", "k-grai
     background: url("/img/desk/grain-a.png") 0 0 / 192px;
     opacity: 0.26;
   }
-  .desk-grain {
+  /* Dark: the lit corner made quiet once the first screen has gone (data-low): the light is the
+     first screen's, and grey text scrolling through it fell under AA. Hidden, not just clear,
+     at rest (no layer blended on every frame without a GPU); its fade is the compositor's. */
+  .desk-dim {
     position: absolute;
     inset: 0;
     z-index: 4;
+    background:
+      radial-gradient(70% 85% at 0% 0%, rgb(0 0 0 / var(--dim)), rgb(0 0 0 / calc(var(--dim) * 0.75)) 30%, rgb(0 0 0 / calc(var(--dim) * 0.35)) 60%, transparent 100%),
+      radial-gradient(40% 40% at 85% 0%, rgb(0 0 0 / calc(var(--dim) * 0.5)), transparent 100%);
+    --dim: 0.6;
+    opacity: 0;
+    visibility: hidden;
+    transition:
+      opacity 600ms ease,
+      visibility 0s linear 600ms;
+  }
+  :global(:root[data-theme="dark"]) .desk[data-low] .desk-dim {
+    opacity: 1;
+    visibility: visible;
+    transition: opacity 600ms ease;
+  }
+  .desk-grain {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
     background: url("/img/desk/grain-a.png") 0 0 / 128px;
     opacity: 0.28;
   }

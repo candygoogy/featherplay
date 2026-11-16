@@ -402,6 +402,9 @@ section[data-away],
 }
 .skip:focus-visible {
   translate: none;
+  /* At the top left, over the brightest of the desk: the ring lies on a halo of the page's
+     own ground, so it reads over any desk. */
+  box-shadow: 0 0 0 calc(3px + 2px) var(--bg);
 }
 /* Out of sight it takes no clicks meant for what's under it. */
 .skip:not(:focus-visible) {

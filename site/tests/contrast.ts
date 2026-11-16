@@ -57,7 +57,10 @@ export async function textContrast(page: Page, selector: string, max = 8): Promi
       for (let k = 0; k < d.length; k += 4 * 3) out.push([d[k], d[k + 1], d[k + 2]]);
       return out;
     }, shots[i]);
-    const m = items[i].color.match(/[\d.]+/g)!.map(Number);
+    // rgb() in 0-255, or color(srgb ...) in 0-1.
+    const c = items[i].color;
+    const m = c.replace(/^color\(srgb/, "").match(/[\d.]+/g)!.map(Number);
+    if (c.startsWith("color(")) for (let j = 0; j < 3; j++) m[j] *= 255;
     const ground = px.map(lum).sort((a, b) => a - b);
     const median = ground[Math.floor(ground.length / 2)];
     // The text's colour over the ground (its alpha, if any, over the median).

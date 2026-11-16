@@ -45,6 +45,38 @@ const style = [
       radial-gradient(46% 34% at 30% 26%, var(--ls), color-mix(in oklab, var(--ls) 50%, transparent) 45%, transparent 100%),
       var(--lg);
   }
+  /* Dark: the lit corner made quiet as the page scrolls down (the home page's desk does the
+     same once its first screen has gone): grey text passing through it fell under AA. Tied to
+     the scroll by the compositor, no script; where scroll timelines aren't supported the
+     corner is simply quiet. */
+  .desk-lite::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(70% 85% at 0% 0%, rgb(0 0 0 / 0.6), rgb(0 0 0 / 0.45) 30%, rgb(0 0 0 / 0.21) 60%, transparent 100%),
+      radial-gradient(40% 40% at 85% 0%, rgb(0 0 0 / 0.3), transparent 100%);
+    opacity: 0;
+    /* (The timeline in its own rule, apart from the name: a minifier folding them into the
+       animation shorthand drops it.) */
+    animation-timeline: scroll(root);
+    animation-range: 0 50vh;
+  }
+  :global(:root[data-theme="dark"]) .desk-lite::before {
+    animation-name: desk-low;
+    animation-timing-function: linear;
+    animation-fill-mode: both;
+  }
+  @supports not (animation-timeline: scroll()) {
+    :global(:root[data-theme="dark"]) .desk-lite::before {
+      opacity: 1;
+    }
+  }
+  @keyframes desk-low {
+    to {
+      opacity: 1;
+    }
+  }
   /* The frost's grain: the bar's tile, as faint as on the home page's desk. */
   .desk-lite::after {
     content: "";
