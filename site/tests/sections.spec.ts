@@ -148,6 +148,7 @@ test.describe("without JavaScript", () => {
 
 test("the footer's unofficial notice opens the answer to \"Is featherplay official?\"", async ({ page }) => {
   await page.goto("/");
+  await laidOut(page);
   await page.locator("footer").getByRole("link", { name: "Unofficial notice" }).click();
   await expect(page).toHaveURL(/#official$/);
   await expect(page.locator("#official")).toHaveAttribute("open", "");

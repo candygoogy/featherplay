@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { laidOut } from "./helpers";
 
 // What the page costs while a song plays, with a section on screen (not only at the top): the
 // review found 5.3 % of the main thread at 1x and 68 restyles a second with "Kept" in view (the
@@ -12,6 +13,9 @@ async function playAt(page: Page, id: string) {
   await page.goto("/");
   await page.evaluate(() => document.querySelector<HTMLElement>("#fly-song [data-do='play']")!.click());
   await expect(page.locator("html")).toHaveAttribute("data-playing", "true");
+  // Once the sections have their heights: one laid out later would push this one out of view,
+  // where the page rightly does less (no fades, no clocks).
+  await laidOut(page);
   await page.evaluate((id) => document.getElementById(id)!.scrollIntoView(), id);
   await page.waitForTimeout(1200);
 }
