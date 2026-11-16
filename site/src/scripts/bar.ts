@@ -74,7 +74,10 @@ export function bindBar(bar: HTMLElement, player: Player | null): { readonly sta
   const sentinel = document.querySelector("[data-bar-sentinel]");
   let first = true;
   if (sentinel && "IntersectionObserver" in window) {
-    new IntersectionObserver(([e]) => {
+    new IntersectionObserver((es) => {
+      // The latest answer: a busy start can deliver the page at the top and the page landed
+      // further down (a #section, a reload) in one call.
+      const e = es[es.length - 1];
       // The first answer (a load part-way down) is the state as it is: its grounds don’t fade
       // or grow in either (data-instant, for one frame).
       if (first) bar.toggleAttribute("data-instant", true);
@@ -276,7 +279,8 @@ export function bindBar(bar: HTMLElement, player: Player | null): { readonly sta
         clearTimeout(restTimer);
         clearTimeout(leaveTimer);
         leaveTimer = window.setTimeout(() => {
-          if (held.has(fly) || fly.matches(":hover") || part.matches(":hover") || fly.contains(document.activeElement)) return;
+          // The story's own flyout (its beat in the tray) is the story's to close.
+          if (held.has(fly) || fly.hasAttribute("data-story") || fly.matches(":hover") || part.matches(":hover") || fly.contains(document.activeElement)) return;
           if (fly.matches(":popover-open")) fly.hidePopover();
         }, 260);
       });
