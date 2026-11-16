@@ -93,10 +93,12 @@ export function bindFaq(root: HTMLElement): void {
         if (running) requestAnimationFrame(keep);
       };
       keep();
-      done.then(() => {
+      // (A few frames past the swap too: WebKit scrolls the focused question into view after a
+      // key opens it, a beat later, which would undo its place.)
+      done.then(() => setTimeout(() => {
         running = false;
         keep();
-      });
+      }, 160));
     });
   }
 

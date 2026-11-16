@@ -92,10 +92,7 @@ test("opening and closing never moves the question clicked: the other one closin
   expect(await clickAndWatch(page, "How do I report a bug?")).toBeLessThanOrEqual(1);
 });
 
-test("the keyboard opens and closes an answer; with reduced motion the swap is at once, the question kept in place", async ({ page, browserName }) => {
-  // Open: in Playwright's WebKit for Windows the keyboard swap moves the question by about
-  // 985 px (the mouse doesn't); to be checked in Safari on a Mac.
-  test.fixme(browserName === "webkit", "keyboard swap moves the question in WebKit for Windows");
+test("the keyboard opens and closes an answer; with reduced motion the swap is at once, the question kept in place", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
   await summary(page, "Is featherplay official?").focus();
@@ -105,6 +102,8 @@ test("the keyboard opens and closes an answer; with reduced motion the swap is a
   // The next one down, by the keyboard: the one above shuts at once, this one stays put.
   const s = summary(page, "Is it free?");
   await s.focus();
+  // (Where focus has brought it: WebKit scrolls a focused element into view a beat later.)
+  await page.waitForTimeout(300);
   const before = (await s.boundingBox())!.y;
   await page.keyboard.press("Enter");
   await expect(faq(page).locator("details[open]")).toHaveCount(1);

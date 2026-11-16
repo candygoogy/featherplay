@@ -52,6 +52,11 @@
     // A fresh load at the top: the page's first layout is split (src/scripts/release.ts). Not
     // where the browser puts the page somewhere down it as it loads: that needs every section
     // at its real height.
-    if (!again && !(hash && hash !== "top")) document.documentElement.classList.add("split");
+    // Not in Safari (WebKit): it doesn't keep the page still as sections above the view take
+    // their real height, so a jump past them (a focus, a key) would move the page under the
+    // visitor. There the first layout stays whole.
+    const ua = navigator.userAgent;
+    const webkit = /AppleWebKit/.test(ua) && !/Chrome|Chromium|Edg|OPR/.test(ua);
+    if (!again && !(hash && hash !== "top") && !webkit) document.documentElement.classList.add("split");
   } catch (e) {}
 })();
