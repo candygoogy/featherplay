@@ -61,6 +61,26 @@ test("what it leaves out: four plain notes, none struck through, and no ads word
   await expect.poll(() => notes.locator(".note-name").allInnerTexts()).toEqual(["Chromium", "Electron", "Video", "Telemetry"]);
   await expect(notes.locator("s, del")).toHaveCount(0);
   expect(await leaves(page).innerText()).not.toMatch(/\bads\b/i);
+  // The three that are files are buttons, named by their word; telemetry, no file, is none.
+  await expect(notes.getByRole("button")).toHaveCount(3);
+  await expect(leaves(page).getByRole("button", { name: "Chromium", exact: true })).toHaveAttribute("aria-describedby", /out-chromium-why/);
+  await expect(notes.last().getByRole("button")).toHaveCount(0);
+});
+
+test.describe("on a touch screen", () => {
+  test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
+
+  test("a tap chooses a note, and it stays chosen and lit", async ({ page }) => {
+    await page.goto("/");
+    const out = leaves(page);
+    const video = out.getByRole("button", { name: "Video" });
+    await video.scrollIntoViewIfNeeded();
+    await video.tap();
+    await expect(video).toHaveAttribute("aria-pressed", "true");
+    await expect(out).toHaveAttribute("data-lit", "video");
+    await page.waitForTimeout(300);
+    await expect(out).toHaveAttribute("data-lit", "video");
+  });
 });
 
 test("each note lights its files in Pear's folder: the first to begin with, then on hover, on focus and pressed", async ({ page }) => {

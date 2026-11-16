@@ -17,8 +17,10 @@ const filesOf = (g: LeftOut) => {
   const list = pear.entries.filter((e) => e.group === g).sort((a, b) => b.bytes - a.bytes);
   const named = list.slice(0, 2).map((e) => (e.files ? `${e.name} folder` : e.name));
   const more = list.length - named.length;
-  return `${named.join(", ")}${more ? ` and ${more} more` : ""}: ${mb(leftOutTotals(g).bytes)} of Pear’s folder`;
+  return `${named.join(", ")}${more ? ` and ${more} more` : ""}`;
 };
+// A group’s share of Pear’s folder, the length of its card’s bar.
+const shareOf = (g: LeftOut) => `${((leftOutTotals(g).bytes / pear.bytes) * 100).toFixed(2)}%`;
 const notes: { word: string; why: string; group?: LeftOut }[] = [
   {
     word: "Chromium",
@@ -134,24 +136,34 @@ import Note from "../Note.astro";
             <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"
               ><path d="M4.5 2.5v9l2.4-2.2 1.6 3.6 1.6-.7-1.6-3.5h3.2Z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"
               ></path></svg
-            ><span class="hint-fine">Point at one to find it in Pear’s folder.</span><span class="hint-touch">Tap one to find it in Pear’s folder.</span>
+            ><span>Choose one to see its files in Pear’s folder.</span>
           </p>
         </div>
         <ul data-leaves-out>
           {
-            notes.map((n) => (
-              <li>
-                {n.group ? (
-                  <span class="note-name" data-note-for={n.group}>
-                    {n.word}
-                  </span>
-                ) : (
+            notes.map((n) =>
+              n.group ? (
+                <li class="out out-card" data-note-for={n.group}>
+                    <span class="card-top">
+                      <span class="note-name">{n.word}</span>
+                      <span class="pick" aria-hidden="true" />
+                    </span>
+                    <p class="why" id={`out-${n.group}-why`}>{n.why}</p>
+                    <p class="which" id={`out-${n.group}-which`}>
+                      {filesOf(n.group)}: <span class="of"><strong class="num">{mb(leftOutTotals(n.group).bytes)}</strong> of Pear’s folder</span>
+                    </p>
+                    <svg class="share" aria-hidden="true">
+                      <rect class="track" width="100%" height="100%" rx="2" />
+                      <rect class="fill" width={shareOf(n.group)} height="100%" rx="2" />
+                    </svg>
+                </li>
+              ) : (
+                <li class="out-last">
                   <span class="note-name">{n.word}</span>
-                )}
-                <p class="why">{n.why}</p>
-                {n.group && <p class="which">{filesOf(n.group)}</p>}
-              </li>
-            ))
+                  <p class="why">{n.why}</p>
+                </li>
+              ),
+            )
           }
         </ul>
     </div>
@@ -160,32 +172,42 @@ import Note from "../Note.astro";
 </section>
 
 <script>
-  // A note lights its files while pointed at or focused; a press keeps it lit (a tap on a
-  // phone). The section names the group lit (data-lit); CSS does the rest. Without script the
-  // names are plain words and every file shows alike: they become buttons here.
+  // Each card lights its files in Pear's folder, and its share of the folder on its own bar:
+  // while pointed at (a mouse or a pen) or focused, for a look; pressed (clicked, tapped, Enter
+  // or Space), it stays chosen until another is. The section names the group lit (data-lit);
+  // CSS does the rest. Without script the cards are plain notes to read and every file shows
+  // alike: they become buttons here.
   const out = document.querySelector<HTMLElement>("[data-out]");
   if (out) {
-    const notes = [...out.querySelectorAll<HTMLElement>("[data-note-for]")].map((s) => {
+    // Each card's word and pick become its button, which covers the whole card (CSS): named by
+    // the word, described by its sentence and its files.
+    const cards = [...out.querySelectorAll<HTMLElement>("[data-note-for]")].map((card) => {
+      const g = card.dataset.noteFor!;
+      const top = card.querySelector<HTMLElement>(".card-top")!;
       const b = document.createElement("button");
-      // Every attribute (the class, the group, the styles' scope).
-      for (const a of s.attributes) b.setAttribute(a.name, a.value);
+      // Every attribute (the class, the styles' scope).
+      for (const a of top.attributes) b.setAttribute(a.name, a.value);
       b.type = "button";
-      b.setAttribute("aria-pressed", String(s.dataset.noteFor === "chromium"));
-      b.append(...s.childNodes);
-      s.replaceWith(b);
+      b.dataset.group = g;
+      b.setAttribute("aria-describedby", `out-${g}-why out-${g}-which`);
+      b.setAttribute("aria-pressed", String(g === "chromium"));
+      b.append(...top.childNodes);
+      top.replaceWith(b);
+      card.classList.add("live");
       return b;
     });
     out.dataset.lit = "chromium";
-    const pressed = () => notes.find((n) => n.getAttribute("aria-pressed") === "true")?.dataset.noteFor ?? "";
+    const pressed = () => cards.find((n) => n.getAttribute("aria-pressed") === "true")?.dataset.group ?? "";
     const light = (g: string) => (out.dataset.lit = g);
-    for (const n of notes) {
-      const g = n.dataset.noteFor!;
-      n.addEventListener("pointerenter", () => light(g));
+    for (const n of cards) {
+      const g = n.dataset.group!;
+      // A finger's touch is a press, not a look (its leave comes before its click).
+      n.addEventListener("pointerenter", (e) => e.pointerType !== "touch" && light(g));
+      n.addEventListener("pointerleave", (e) => e.pointerType !== "touch" && light(pressed()));
       n.addEventListener("focus", () => light(g));
-      n.addEventListener("pointerleave", () => light(pressed()));
       n.addEventListener("blur", () => light(pressed()));
       n.addEventListener("click", () => {
-        for (const o of notes) o.setAttribute("aria-pressed", String(o === n));
+        for (const o of cards) o.setAttribute("aria-pressed", String(o === n));
         light(g);
       });
     }
@@ -446,65 +468,255 @@ import Note from "../Note.astro";
   :global(:root:not(.js)) .hint {
     display: none;
   }
-  .hint-touch {
-    display: none;
-  }
+  /* (A mouse pointer says nothing to a finger.) */
   @media (hover: none) {
-    .hint-fine {
+    .hint svg {
       display: none;
     }
-    .hint-touch {
-      display: inline;
-    }
   }
+  /* The three things that are files: three cards, side by side under both folders. Without
+     script they are plain notes; with it, controls (.out-card.live below). Then telemetry, which
+     is no file, on a line of its own: a closing statement, not a fourth card. */
   .outs ul {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: var(--s6) var(--s7);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--s4);
     margin: var(--s5) 0 0;
     padding: 0;
     list-style: none;
   }
-  .note-name {
-    display: inline-flex;
-    align-items: center;
-    min-height: 36px;
-    margin-left: calc(-1 * var(--s3));
-    padding: 0 var(--s3);
+  .out {
+    display: grid;
+  }
+  .out-card {
+    --paint: var(--song);
+    display: grid;
+    grid-template-rows: auto auto 1fr auto;
+    gap: var(--s2);
+    min-width: 0;
+    margin: 0;
+    padding: var(--s5) var(--s5) var(--s5);
     border: 0;
-    border-radius: var(--r-pill);
+    border-radius: var(--r-panel);
     background: transparent;
     color: var(--text);
     font: inherit;
+    text-align: start;
+    transition: --paint var(--t-glow) ease;
+  }
+  .card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s3);
+  }
+  .note-name {
     font-size: var(--fs-lede);
     font-weight: var(--fw-bold);
     letter-spacing: var(--tr-lede);
-    cursor: pointer;
-    transition: background-color var(--t-hover) ease;
-  }
-  span.note-name {
-    margin-left: 0;
-    padding: 0;
-    cursor: default;
-  }
-  button.note-name[aria-pressed="true"] {
-    background: var(--part-on);
-  }
-  @media (hover: hover) {
-    button.note-name:hover {
-      background: var(--part-hover);
-    }
+    line-height: var(--lh-subtitle);
   }
   .why {
-    margin-top: var(--s1);
+    display: block;
     text-wrap: pretty;
   }
   .which {
-    margin-top: 6px;
+    display: block;
+    align-self: end;
+    margin-top: var(--s3);
     color: var(--ink2);
     font-size: var(--fs-small);
     font-weight: var(--fw-medium);
     line-height: var(--lh-small);
+    text-wrap: pretty;
+  }
+  .which .of {
+    white-space: nowrap;
+  }
+  .which strong {
+    color: var(--text);
+    font-weight: var(--fw-bold);
+  }
+  /* The group's share of Pear's folder: the whole bar is the folder (396 MB). */
+  .share {
+    display: block;
+    width: 100%;
+    height: 4px;
+    margin-top: var(--s1);
+    overflow: visible;
+  }
+  .share .track {
+    fill: var(--panel-tint);
+  }
+  .share .fill {
+    --paint: var(--song);
+    fill: color-mix(in srgb, var(--text) 30%, transparent);
+    transition:
+      fill var(--t-hover) ease,
+      --paint var(--t-glow) ease;
+  }
+  /* Without script, plain notes: their words on the section’s edge, like telemetry’s. */
+  .out-card:not(.live) {
+    padding-inline: 0;
+  }
+  :global(:root:not(.js)) .outs ul {
+    column-gap: var(--s7);
+  }
+  /* The pick (with script): an empty ring at rest, a dot in it once chosen, as a radio has. */
+  .pick {
+    display: none;
+  }
+
+  /* ---- With script: real controls, on the windows' own solid material ---- */
+  .out-card.live {
+    position: relative;
+    background: color-mix(in srgb, var(--paint) 4%, var(--surface));
+    box-shadow:
+      var(--lit),
+      var(--ring),
+      0 1px 2px var(--shade-1),
+      0 6px 18px -10px var(--shade-2);
+    cursor: pointer;
+    transition:
+      background-color var(--t-hover) ease,
+      box-shadow var(--t-hover) ease,
+      scale var(--t-release) var(--spring-release),
+      --paint var(--t-glow) ease;
+  }
+  .out-card.live .pick {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--text) 38%, transparent);
+    transition: box-shadow var(--t-hover) ease;
+  }
+  .out-card .pick::after {
+    content: "";
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--text);
+    scale: 0;
+    transition: scale var(--t-release) var(--spring-release);
+  }
+  @media (hover: hover) {
+    .out-card.live:hover {
+      background: color-mix(in srgb, var(--paint) 10%, var(--surface));
+      box-shadow:
+        var(--lit),
+        var(--ring),
+        0 1px 2px var(--shade-1),
+        0 10px 26px -10px var(--shade-2);
+    }
+    .out-card.live:hover .pick {
+      box-shadow: inset 0 0 0 1.5px var(--text);
+    }
+  }
+  .out-card.live:active {
+    scale: 0.985;
+    transition:
+      background-color var(--t-hover) ease,
+      box-shadow var(--t-hover) ease,
+      scale var(--t-press) var(--ease-out),
+      --paint var(--t-glow) ease;
+  }
+  /* Its button: the word and the pick, and (::before) the whole card to press. The ring of
+     focus goes round the card. */
+  button.card-top {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+  }
+  button.card-top::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: var(--r-panel);
+  }
+  button.card-top:focus-visible {
+    outline: none;
+  }
+  .out-card.live:has(:focus-visible) {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+  .out-card [aria-pressed="true"] .pick {
+    box-shadow: inset 0 0 0 1.5px var(--text);
+  }
+  .out-card [aria-pressed="true"] .pick::after {
+    scale: 1;
+  }
+  /* The card lit and its files lit are one thing: the same tint of the song as the rows. */
+  [data-out][data-lit="chromium"] .out-card[data-note-for="chromium"],
+  [data-out][data-lit="electron"] .out-card[data-note-for="electron"],
+  [data-out][data-lit="video"] .out-card[data-note-for="video"] {
+    background: color-mix(in srgb, var(--paint) 26%, var(--surface));
+    box-shadow:
+      var(--lit),
+      0 0 0 1px color-mix(in srgb, var(--paint) 55%, transparent),
+      0 1px 2px var(--shade-1),
+      0 10px 26px -10px var(--shade-2);
+  }
+  [data-out][data-lit="chromium"] .out-card[data-note-for="chromium"] .share .fill,
+  [data-out][data-lit="electron"] .out-card[data-note-for="electron"] .share .fill,
+  [data-out][data-lit="video"] .out-card[data-note-for="video"] .share .fill {
+    fill: light-dark(color-mix(in oklab, var(--paint) 86%, black), var(--paint));
+  }
+  [data-out][data-lit="chromium"] .out-card[data-note-for="chromium"] .share .track,
+  [data-out][data-lit="electron"] .out-card[data-note-for="electron"] .share .track,
+  [data-out][data-lit="video"] .out-card[data-note-for="video"] .share .track {
+    fill: color-mix(in srgb, var(--text) 12%, transparent);
+  }
+  @media (forced-colors: active) {
+    .out-card.live {
+      border: 1px solid ButtonText;
+    }
+    .out-card.live:has([aria-pressed="true"]) {
+      border-width: 3px;
+    }
+    .out-card .pick {
+      border: 1.5px solid ButtonText;
+    }
+    .out-card .pick::after {
+      background: ButtonText;
+    }
+    .share .fill {
+      fill: CanvasText;
+    }
+    .share .track {
+      fill: Canvas;
+      stroke: CanvasText;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .out-card .pick::after {
+      transition: none;
+    }
+  }
+
+  /* Telemetry: no file, so no card; the list's last word, its name run in. */
+  .out-last {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0 var(--s3);
+    grid-column: 1 / -1;
+    margin-top: var(--s4);
+    font-size: var(--fs-lede);
+    line-height: var(--lh-lede);
+    letter-spacing: var(--tr-lede);
+  }
+  .out-last .why {
+    color: var(--ink2);
+    font-weight: var(--fw-medium);
   }
   .source-line {
     margin-top: var(--s7);
@@ -523,10 +735,24 @@ import Note from "../Note.astro";
   [data-out][data-lit=""] .pear .files li {
     color: inherit;
   }
+  @media (forced-colors: active) {
+    [data-out][data-lit="chromium"] .pear .files li[data-group="chromium"],
+    [data-out][data-lit="electron"] .pear .files li[data-group="electron"],
+    [data-out][data-lit="video"] .pear .files li[data-group="video"] {
+      forced-color-adjust: none;
+      background: Highlight;
+      color: HighlightText;
+    }
+    [data-out][data-lit="chromium"] .out-card[data-note-for="chromium"],
+    [data-out][data-lit="electron"] .out-card[data-note-for="electron"],
+    [data-out][data-lit="video"] .out-card[data-note-for="video"] {
+      border-color: Highlight;
+    }
+  }
 
-  @media (width < 1200px) {
+  @media (width < 960px) {
     .outs ul {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-columns: minmax(0, 1fr);
     }
   }
   @media (width < 900px) {
@@ -542,8 +768,11 @@ import Note from "../Note.astro";
     }
   }
   @media (width < 560px) {
-    .outs ul {
-      grid-template-columns: minmax(0, 1fr);
+    .out-card {
+      padding: var(--s4);
+    }
+    .hint {
+      font-size: var(--fs-small);
     }
     .files li {
       padding-inline: var(--s2);
