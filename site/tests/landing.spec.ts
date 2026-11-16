@@ -10,6 +10,8 @@ test.use({ viewport: { width: 1440, height: 900 } });
 
 /** Waits until the page has stopped moving (the same scrollY for 300 ms). */
 async function still(page: Page) {
+  // (A glide may take a moment to start: WebKit's does.)
+  await page.waitForTimeout(250);
   let last = -1;
   let same = 0;
   await expect

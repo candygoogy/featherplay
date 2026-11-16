@@ -18,7 +18,9 @@ export async function textContrast(page: Page, selector: string, max = 8): Promi
     ([sel, max]) => {
       const out: { text: string; color: string; box: { x: number; y: number; width: number; height: number } }[] = [];
       // Any colour syntax (rgb, color(srgb), oklab...) as rgba() 0-255, by painting it.
-      const ctx = new OffscreenCanvas(1, 1).getContext("2d", { willReadFrequently: true })!;
+      const cv = document.createElement("canvas");
+      cv.width = cv.height = 1;
+      const ctx = cv.getContext("2d", { willReadFrequently: true })!;
       const rgba = (c: string) => {
         ctx.clearRect(0, 0, 1, 1);
         ctx.fillStyle = c;
@@ -58,7 +60,7 @@ export async function textContrast(page: Page, selector: string, max = 8): Promi
       const img = new Image();
       img.src = "data:image/png;base64," + b64;
       await img.decode();
-      const c = new OffscreenCanvas(img.width, img.height);
+      const c = Object.assign(document.createElement("canvas"), { width: img.width, height: img.height });
       const x = c.getContext("2d")!;
       x.drawImage(img, 0, 0);
       const d = x.getImageData(0, 0, c.width, c.height).data;

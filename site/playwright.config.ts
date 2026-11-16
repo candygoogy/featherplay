@@ -10,6 +10,9 @@ export const wranglerPort = 8788;
  *  colour picker's fades and the speed checks. */
 const timing = ["**/story.spec.ts", "**/bar.spec.ts", "**/window.spec.ts", "**/theme.spec.ts", "**/lyrics.spec.ts", "**/sound.spec.ts", "**/customise.spec.ts", "**/speed.spec.ts"];
 
+/** Specs worth running in every engine (playwright install firefox webkit). */
+const engines = ["**/sections.spec.ts", "**/no-js.spec.ts"];
+
 // On CI (a smaller, shared Linux runner, .github/workflows/site.yml): twice the waits, one
 // retry with a trace, and an HTML report the workflow uploads when a test fails.
 const ci = !!process.env.CI;
@@ -35,6 +38,11 @@ export default defineConfig({
     // in their own worker, so a busy neighbour never stretches a frame they're measuring.
     // The rest stay parallel.
     { name: "timing", testMatch: timing, fullyParallel: false, workers: 1, use: { ...devices["Desktop Chrome"] } },
+    // Firefox and WebKit for what differs between engines most: the questions' accordion (one
+    // open at a time, the clicked question kept in place) and the page without script. (CI runs
+    // the two projects above by name; these run locally, or by name.)
+    { name: "firefox", testMatch: engines, use: { ...devices["Desktop Firefox"] } },
+    { name: "webkit", testMatch: engines, use: { ...devices["Desktop Safari"], deviceScaleFactor: 1 } },
   ],
   webServer: [
     {
