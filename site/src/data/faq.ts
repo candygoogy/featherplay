@@ -98,7 +98,7 @@ export const faqGroups: FaqGroup[] = [
         q: "Does it download anything else?",
         a: [
           "Yes, two helpers, in the background on the first run: yt-dlp, which finds the audio stream of the songs featherplay can’t find by itself, and Deno, which yt-dlp needs to do it. Most songs don’t need them: featherplay answers YouTube’s player challenges with the JavaScript engine built into it, so the first song you click doesn’t wait for the download. featherplay fetches both helpers from their GitHub releases, or from this site and Deno’s download server when GitHub can’t be reached (on Linux, yt-dlp from GitHub only), and checks each file against a SHA256 written into its own code; a file that doesn’t match is deleted, not run.",
-          "After that it updates yt-dlp at most once a day, because YouTube changes often. Nothing else is downloaded, and never the music itself.",
+          "After that it updates yt-dlp at most once a day, and once more the first time a song fails after it starts, because YouTube changes often. Nothing else is downloaded, and never the music itself.",
         ],
       },
       {
@@ -121,7 +121,7 @@ export const faqGroups: FaqGroup[] = [
       },
       {
         q: "How do I report a bug?",
-        a: ["Open an issue on GitHub. Say what you did, what you expected and what happened, and add the version from Settings, About."],
+        a: ["Open an issue on GitHub. Say what you did, what you expected and what happened, and add the version from *Settings > Account > About featherplay*."],
         link: { href: `${repo}/issues`, text: "Open an issue on GitHub" },
       },
     ],
