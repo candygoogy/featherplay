@@ -1,7 +1,8 @@
 import { expect, test } from "@playwright/test";
 import { statSync } from "node:fs";
+import { wranglerPort } from "../playwright.config";
 
-const cf = "http://127.0.0.1:8788";
+const cf = `http://127.0.0.1:${wranglerPort}`;
 
 test("an unknown path returns status 404 and the 404 page (on Cloudflare's runtime)", async ({ page }) => {
   const res = await page.goto(`${cf}/no/such/page`);

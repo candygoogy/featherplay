@@ -2,11 +2,12 @@ import { expect, test, type Page } from "@playwright/test";
 import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { wake } from "./helpers";
+import { wranglerPort } from "../playwright.config";
 
 // The Content-Security-Policy in public/_headers, as Cloudflare's runtime serves it (wrangler
 // dev, scripts/wrangler-dev.mjs): every page carries it and loads with no violation, and no
 // built page has an inline script, style element or event-handler attribute for it to block.
-const cf = "http://127.0.0.1:8788";
+const cf = `http://127.0.0.1:${wranglerPort}`;
 const site = fileURLToPath(new URL("..", import.meta.url));
 
 /** The site's pages, from src/pages (each `.astro` file is one page). */
