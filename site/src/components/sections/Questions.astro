@@ -269,6 +269,19 @@ const pieces = (p: string) =>
       transition: none;
     }
   }
+  /* Forced colours paint over backgrounds: the plus and the index's bar keep the system's inks. */
+  @media (forced-colors: active) {
+    .pm,
+    .faq-index a::before {
+      forced-color-adjust: none;
+    }
+    .pm {
+      color: CanvasText;
+    }
+    .faq-index a::before {
+      background: Highlight;
+    }
+  }
   @media (width < 900px) {
     .faq-grid {
       grid-template-columns: minmax(0, 1fr);
