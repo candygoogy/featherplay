@@ -39,7 +39,7 @@ export default defineConfig({
     // The rest stay parallel.
     { name: "timing", testMatch: timing, fullyParallel: false, workers: 1, use: { ...devices["Desktop Chrome"] } },
     // Firefox and WebKit for what differs between engines most: the questions' accordion (one
-    // open at a time, the clicked question kept in place) and the page without script. (CI runs
+    // open at a time, the page left where it is) and the page without script. (CI runs
     // the two projects above by name; these run locally, or by name.)
     { name: "firefox", testMatch: engines, use: { ...devices["Desktop Firefox"] } },
     { name: "webkit", testMatch: engines, use: { ...devices["Desktop Safari"], deviceScaleFactor: 1 } },

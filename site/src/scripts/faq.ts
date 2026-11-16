@@ -2,17 +2,20 @@
 // keeps one answer open at a time where it can (and they open independently where it can't),
 // and the keyboard works. With script the script keeps the one-at-a-time rule itself, so it can
 // ease both answers together: opening a question closes the one that was open, the two heights
-// eased on one clock (Web Animations, the same in every engine), and the question clicked never
-// moves on screen, whether the other one closes above or below it. The list opts out of the
-// browser's scroll anchoring (which picks some line below and moves the clicked question to keep
-// that line still); while the heights ease the page is scrolled by whatever the question would
-// have moved. Near the end of the page, where a closing answer would pull the page up, the list
-// keeps its height until it's out of view. Reduced motion: the same swap at once, the question
-// kept in place the same way. Clicking the open question closes it, leaving none open.
+// eased on one clock (Web Animations, the same in every engine). The page itself never scrolls
+// for it: when the answer above closes, the question clicked rises with the list, as the rest of
+// the page stays where it is. (The list opts out of the browser's scroll anchoring, which would
+// scroll the page to keep some line below still.) Only a question that would rise out of sight
+// under the bar is held at the reading line, by scrolling just that much. Near the end of the
+// page, where a closing answer would pull the page up, the list keeps its height until it's out
+// of view. Reduced motion: the same swap at once. Clicking the open question closes it, leaving
+// none open.
 // A link to a question (#official, #connects, #uninstall) opens its answer.
 
 const MS = 280;
 const EASE = "cubic-bezier(0.22, 1, 0.36, 1)";
+/** A question never rises above this line (under the bar) when the answer above it closes. */
+const LINE = 84;
 
 export function bindFaq(root: HTMLElement): void {
   const reduce = matchMedia("(prefers-reduced-motion: reduce)");
@@ -70,7 +73,7 @@ export function bindFaq(root: HTMLElement): void {
     summary.addEventListener("click", (e) => {
       e.preventDefault();
       const ms = reduce.matches ? 0 : MS;
-      const top = summary.getBoundingClientRect().top;
+      const floor = Math.min(summary.getBoundingClientRect().top, LINE);
       const opening = !isOpen(d);
       const others = opening ? all.filter((o) => o !== d && isOpen(o)) : [];
       // At the page's end the page would be pulled up as the list shrinks: hold its height.
@@ -85,20 +88,19 @@ export function bindFaq(root: HTMLElement): void {
       }
       // One clock for both.
       const done = Promise.all([ease(d, opening, ms), ...others.map((o) => ease(o, false, ms))]);
-      // The question stays where it was clicked.
+      // The page stays put and the question moves with the list; it is only kept from rising
+      // out of sight under the bar (a long answer closing above it).
       let running = true;
       const keep = () => {
-        const dy = summary.getBoundingClientRect().top - top;
-        if (Math.abs(dy) > 0.5) scrollBy(0, dy);
+        const dy = summary.getBoundingClientRect().top - floor;
+        if (dy < -0.5) scrollBy({ top: dy, behavior: "instant" });
         if (running) requestAnimationFrame(keep);
       };
       keep();
-      // (A few frames past the swap too: WebKit scrolls the focused question into view after a
-      // key opens it, a beat later, which would undo its place.)
-      done.then(() => setTimeout(() => {
+      done.then(() => {
         running = false;
         keep();
-      }, 160));
+      });
     });
   }
 

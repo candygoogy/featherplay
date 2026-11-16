@@ -46,26 +46,28 @@ test("they start closed, and one answer is open at a time; the open one's questi
   await expect(page.locator("#download")).not.toContainText("yt-dlp");
 });
 
-/** Clicks a question and reports how far its summary moved on screen by the time the answer
- *  has finished opening or closing (read every frame; the worst). */
+/** Clicks a question and reports, by the time the answer has finished opening or closing, how
+ *  far the page scrolled and the highest the question got on screen (read every frame). */
 async function clickAndWatch(page: Page, q: string) {
   const s = summary(page, q);
   // Brought on screen first, and left a moment for the sections around it to render.
   await s.scrollIntoViewIfNeeded();
   await page.waitForTimeout(300);
   await s.scrollIntoViewIfNeeded();
-  const before = (await s.boundingBox())!.y;
+  const before = await page.evaluate(() => scrollY);
   await s.click();
   return page.evaluate(
     ([q, before]) =>
-      new Promise<number>((r) => {
+      new Promise<{ scrolled: number; top: number }>((r) => {
         const el = [...document.querySelectorAll<HTMLElement>("#questions summary")].find((x) => x.textContent!.includes(q as string))!;
-        let worst = 0;
+        let scrolled = 0;
+        let top = Infinity;
         let frames = 0;
         const tick = () => {
-          worst = Math.max(worst, Math.abs(el.getBoundingClientRect().y - (before as number)));
+          scrolled = Math.max(scrolled, Math.abs(scrollY - (before as number)));
+          top = Math.min(top, el.getBoundingClientRect().y);
           if (++frames < 30) requestAnimationFrame(tick);
-          else r(worst);
+          else r({ scrolled, top });
         };
         requestAnimationFrame(tick);
       }),
@@ -73,45 +75,60 @@ async function clickAndWatch(page: Page, q: string) {
   );
 }
 
-test("opening and closing never moves the question clicked: the other one closing above or below it, in any order, near the end of the page too", async ({ page }) => {
+test("opening and closing an answer leaves the page where it is: the other one closing above or below it, in any order, near the end of the page too", async ({ page }) => {
   await page.goto("/");
+  await laidOut(page);
   const qs = ["Is featherplay official?", "How does signing in work?", "Some songs won’t play. Why?", "Is it free?", "How do I report a bug?"];
   // Down the list (the open one closes above), back up it (it closes below), skipping about,
   // and the open one's own question (none left open).
   for (const q of [...qs, qs[1], qs[3], qs[0], qs[4], qs[2], qs[2], qs[4], qs[0]]) {
-    expect(await clickAndWatch(page, q), q).toBeLessThanOrEqual(1);
+    const { scrolled, top } = await clickAndWatch(page, q);
+    // The page stays put; only a question that would have risen out of sight (the long
+    // sign-in answer closing above it) is held at the line under the bar instead.
+    expect(scrolled <= 1 || top >= 83, `${q}: scrolled ${scrolled}, top ${top}`).toBe(true);
+    expect(top, q).toBeGreaterThan(0);
     await page.waitForTimeout(150);
     expect(await faq(page).locator("details[open]").count(), q).toBeLessThanOrEqual(1);
   }
-  // At the very end of the page, the last question closed: it stays under the pointer.
+  // At the very end of the page, the last question closed: the page isn't pulled up.
   await page.evaluate(() => scrollTo(0, document.documentElement.scrollHeight));
   const last = summary(page, "How do I report a bug?");
   if ((await last.locator("xpath=..").getAttribute("open")) === null) await last.click();
   await page.waitForTimeout(400);
   await last.scrollIntoViewIfNeeded();
-  expect(await clickAndWatch(page, "How do I report a bug?")).toBeLessThanOrEqual(1);
+  expect((await clickAndWatch(page, "How do I report a bug?")).scrolled).toBeLessThanOrEqual(1);
 });
 
-test("the keyboard opens and closes an answer; with reduced motion the swap is at once, the question kept in place", async ({ page }) => {
+test("a question that would rise out of sight when a long answer closes above it is held under the bar", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 600 });
+  await page.goto("/");
+  await laidOut(page);
+  const open = summary(page, "How does signing in work?");
+  await open.click();
+  await page.waitForTimeout(400);
+  // The next question, brought just under the bar: the long answer above it closes.
+  const next = open.locator("xpath=../following-sibling::details[1]/summary");
+  await next.evaluate((el) => scrollBy(0, el.getBoundingClientRect().top - 100));
+  await page.waitForTimeout(200);
+  await next.click();
+  await page.waitForTimeout(500);
+  const y = (await next.boundingBox())!.y;
+  expect(y).toBeGreaterThanOrEqual(80);
+  expect(y).toBeLessThanOrEqual(101);
+});
+
+test("the keyboard opens and closes an answer; with reduced motion the swap is at once", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
   await summary(page, "Is featherplay official?").focus();
   await page.keyboard.press("Enter");
   await expect(faq(page).locator("details[open] summary")).toContainText("Is featherplay official?");
   expect(await faq(page).locator("details[open] [data-answer]").evaluate((a) => a.getAnimations().length)).toBe(0);
-  // The next one down, by the keyboard: the one above shuts at once, this one stays put.
-  const s = summary(page, "Is it free?");
-  await s.focus();
-  // (Where focus has brought it: WebKit scrolls a focused element into view a beat later, and
-  // under automation sometimes not at all, which leaves the page at its top with nothing to
-  // keep in place. A visitor's Tab always brings the question into view: so does this.)
-  await s.scrollIntoViewIfNeeded();
-  await page.waitForTimeout(300);
-  const before = (await s.boundingBox())!.y;
+  // The next one down, by the keyboard: the one above shuts at once.
+  await summary(page, "Is it free?").focus();
   await page.keyboard.press("Enter");
   await expect(faq(page).locator("details[open]")).toHaveCount(1);
   await expect(faq(page).locator("details[open] summary")).toContainText("Is it free?");
-  expect(Math.abs((await s.boundingBox())!.y - before)).toBeLessThanOrEqual(1);
   await page.keyboard.press("Enter");
   await expect(faq(page).locator("details[open]")).toHaveCount(0);
 });
