@@ -17,6 +17,15 @@ export async function textContrast(page: Page, selector: string, max = 8): Promi
   const items = await page.evaluate(
     ([sel, max]) => {
       const out: { text: string; color: string; box: { x: number; y: number; width: number; height: number } }[] = [];
+      // Any colour syntax (rgb, color(srgb), oklab...) as rgba() 0-255, by painting it.
+      const ctx = new OffscreenCanvas(1, 1).getContext("2d", { willReadFrequently: true })!;
+      const rgba = (c: string) => {
+        ctx.clearRect(0, 0, 1, 1);
+        ctx.fillStyle = c;
+        ctx.fillRect(0, 0, 1, 1);
+        const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
+        return `rgba(${r}, ${g}, ${b}, ${(a / 255).toFixed(3)})`;
+      };
       for (const el of [...document.querySelectorAll<HTMLElement>(sel)].slice(0, max)) {
         if (!el.getClientRects().length || getComputedStyle(el).visibility === "hidden") continue;
         const r = document.createRange();
@@ -28,7 +37,7 @@ export async function textContrast(page: Page, selector: string, max = 8): Promi
         const w = Math.min(innerWidth, Math.max(...rs.map((q) => q.right))) - x;
         const h = Math.min(innerHeight, Math.max(...rs.map((q) => q.bottom))) - y;
         if (w < 2 || h < 2) continue;
-        out.push({ text: (el.textContent ?? "").trim().slice(0, 30), color: getComputedStyle(el).color, box: { x, y, width: w, height: h } });
+        out.push({ text: (el.textContent ?? "").trim().slice(0, 30), color: rgba(getComputedStyle(el).color), box: { x, y, width: w, height: h } });
       }
       return out;
     },
@@ -57,10 +66,7 @@ export async function textContrast(page: Page, selector: string, max = 8): Promi
       for (let k = 0; k < d.length; k += 4 * 3) out.push([d[k], d[k + 1], d[k + 2]]);
       return out;
     }, shots[i]);
-    // rgb() in 0-255, or color(srgb ...) in 0-1.
-    const c = items[i].color;
-    const m = c.replace(/^color\(srgb/, "").match(/[\d.]+/g)!.map(Number);
-    if (c.startsWith("color(")) for (let j = 0; j < 3; j++) m[j] *= 255;
+    const m = items[i].color.match(/[\d.]+/g)!.map(Number);
     const ground = px.map(lum).sort((a, b) => a - b);
     const median = ground[Math.floor(ground.length / 2)];
     // The text's colour over the ground (its alpha, if any, over the median).

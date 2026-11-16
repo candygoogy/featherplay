@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { wake } from "./helpers";
+import { textContrast } from "./contrast";
 
 // The whole app: at a size where the first screen shows the wide layout (at 1280 x 720 it is
 // the app's narrow one).
@@ -493,3 +494,42 @@ test.describe("light", () => {
     });
   }
 });
+
+// Small text on the song-tinted grounds, in both themes: the pill saying "No lyrics", "Playing
+// from" over the cover view's wash, a hovered row's length; and the lyric card's lines (large
+// text, 3), for songs light and deep.
+for (const scheme of ["light", "dark"] as const) {
+  test(`the window's small words on the song's colour, and the lyric card's lines, read at AA (${scheme})`, async ({ page }) => {
+    test.setTimeout(120_000);
+    await page.emulateMedia({ colorScheme: scheme });
+    await page.route("**/music/**", (r) => r.abort());
+    await page.goto("/");
+    await wake(page);
+    const r = replica(page);
+    const found: string[] = [];
+    const low = (rs: { text: string; ratio: number }[], min: number, label: string) => found.push(...rs.filter((x) => x.ratio < min).map((x) => `${label}: "${x.text}" ${x.ratio}`));
+    for (const id of ["in-this-moment", "origami", "she-dreams-in-blue", "california-lullabye", "invisible-light", "watching-seabirds-soar"]) {
+      await page.evaluate(() => scrollTo(0, 0));
+      await page.evaluate((id) => document.querySelector<HTMLElement>(`#fly-song [data-song="${id}"]`)!.click(), id);
+      await expect(r).toHaveAttribute("data-song", id);
+      await page.waitForTimeout(1300);
+      if ((await r.getAttribute("data-has-lyrics")) === "false") {
+        low(await textContrast(page, "[data-window] .lyrics-pill .pill-none"), 4.5, `${id} pill`);
+        low(await textContrast(page, "[data-window] .src-l"), 4.5, `${id} playing from`);
+      }
+      const row = r.locator(".queue .row:not([aria-current='true'])").first();
+      if (await row.isVisible()) {
+        await row.hover();
+        await page.waitForTimeout(250);
+        low(await textContrast(page, "[data-window] .queue .row:hover .dur"), 4.5, `${id} row length`);
+        await page.mouse.move(0, 0);
+      }
+      if ((await r.getAttribute("data-has-lyrics")) === "true") {
+        await page.locator("#lyrics [data-piece='lyrics']").scrollIntoViewIfNeeded();
+        await page.waitForTimeout(700);
+        low(await textContrast(page, "#lyrics [data-piece='lyrics'] .lc-line", 12), 3, `${id} card line`);
+      }
+    }
+    expect(found).toEqual([]);
+  });
+}

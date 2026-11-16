@@ -779,8 +779,10 @@
       background-color var(--t-hover) ease,
       scale var(--t-press) var(--ease-out);
   }
+  /* (The app's quieter ink fell under AA over the cover view's wash: the main ink, a little
+     eased.) */
   .src-l {
-    color: var(--text2);
+    color: color-mix(in oklab, var(--text) 82%, var(--text2));
     font-size: 12px;
     line-height: 16px;
   }
@@ -839,9 +841,10 @@
   &[data-has-lyrics="true"] .lyrics-pill[aria-pressed="true"]:active {
     background: #d4d4d4;
   }
-  /* No lyrics: the pill stays tonal and says so, in the quieter ink. */
+  /* No lyrics: the pill stays tonal and says so. (The app sets it in the quieter ink; over the
+     song's wash that fell to 2 to 3.8, so here it keeps the main ink.) */
   &[data-has-lyrics="false"] .lyrics-pill {
-    color: var(--text2);
+    color: var(--text);
   }
   .pill-none,
   &[data-has-lyrics="false"] .pill-has {
@@ -1377,6 +1380,10 @@
   }
   .row[aria-current="true"] .dur {
     display: none;
+  }
+  /* On a hovered row's tint the faintest ink fell under AA: one step up. */
+  .row:hover .dur {
+    color: var(--text2);
   }
 
   /* ---------- The bar: a rounded panel floating over the window's foot ---------- */
