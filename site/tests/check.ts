@@ -77,6 +77,31 @@ export function problems(page: Page, label = ""): Promise<string[]> {
       const cap = bar.querySelector(".cap-bg")!.getBoundingClientRect();
       for (const p of parts) if (p.r.left < cap.left - 0.5 || p.r.right > cap.right + 0.5) out.push(`${at}: ${p.n} outside the capsule`);
     }
+
+    // The first screen at the top: the shelf on the screen, and the words, the shelf and the
+    // window apart (the words compared by their lines; the headline's first line may reach over
+    // the window's column, above it).
+    const first = document.querySelector<HTMLElement>("[data-first][data-shown]");
+    if (first && scrollY === 0) {
+      const shelf = first.querySelector<HTMLElement>("[data-shelf]");
+      const s = shelf?.getBoundingClientRect();
+      const w = winEl && getComputedStyle(winEl).visibility !== "hidden" ? winEl.getBoundingClientRect() : null;
+      const hit = (a: DOMRect, b: DOMRect) => a.left < b.right - 0.5 && b.left < a.right - 0.5 && a.top < b.bottom - 0.5 && b.top < a.bottom - 0.5;
+      const lines = (el: Element | null) => {
+        if (!el) return [];
+        const r = document.createRange();
+        r.selectNodeContents(el);
+        return [...r.getClientRects()].filter((x) => x.width > 1);
+      };
+      const words = [...lines(first.querySelector("[data-head]")), ...[...first.querySelectorAll("[data-col] > *")].flatMap((c) => (c.matches(".actions") ? [...c.children].map((b) => b.getBoundingClientRect()) : lines(c)))];
+      if (s && s.width) {
+        if (s.left < -0.5 || s.right > vw + 0.5) out.push(`${at}: the shelf runs off a side`);
+        if (innerWidth >= 761 && s.bottom > vh + 0.5 && first.dataset.laid !== "stack") out.push(`${at}: the shelf runs off the bottom`);
+        if (w && hit(s, w)) out.push(`${at}: the shelf on the window`);
+        if (words.some((x) => hit(x, s))) out.push(`${at}: the words on the shelf`);
+      }
+      if (w && words.some((x) => hit(x, w) && x.top > w.top - 4)) out.push(`${at}: the words on the window`);
+    }
     return out;
   }, label);
 }

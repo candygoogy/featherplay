@@ -1,0 +1,166 @@
+// The first screen (Stage.astro), composed by measure: the words read where the headline set
+// itself, src/scripts/first-math.ts decides the arrangement and the sizes, and this places the
+// words, the shelf, the window's room and the two notes. Measured on load, when the fonts arrive
+// and on resize, never per frame. Phones and small rooms stack by CSS alone (data-laid="stack").
+//
+// Then the arrival, once, at load (not on a reload part-way down, not under reduced motion):
+// the light comes up, the headline sharpens line by line, the sentence, the buttons and the
+// line under them follow, the window opens from the tray, the sleeves land 50 ms apart and the
+// notes write themselves in; about 1.3 s. Until it is laid out the first screen isn't shown
+// (it would only jump), so it never shows half-placed.
+
+import { compose, type Plan } from "./first-math";
+import { whenWindow } from "../demo/window";
+import { showNoteAt, hideNote } from "./notes";
+
+const reduced = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+const EASE_OUT = "cubic-bezier(0.22, 1, 0.36, 1)";
+const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+
+export function startFirst(): void {
+  const stage = document.querySelector<HTMLElement>("[data-stage]");
+  const first = stage?.querySelector<HTMLElement>("[data-first]");
+  if (!stage || !first) return;
+  const root = document.documentElement;
+  const head = first.querySelector<HTMLElement>("[data-head]")!;
+  const lines = [...head.querySelectorAll<HTMLElement>(".line")];
+  const col = first.querySelector<HTMLElement>("[data-col]")!;
+  const actions = col.querySelector<HTMLElement>(".actions")!;
+  const shelf = first.querySelector<HTMLElement>("[data-shelf]");
+  const slot = first.querySelector<HTMLElement>("[data-win-slot]")!;
+  const noteWin = first.querySelector<HTMLElement>("[data-note='screenshot']");
+  const noteShelf = first.querySelector<HTMLElement>("[data-note='sleeves']");
+  let plan: Plan | null = null;
+  let arrived = false;
+
+  const px = (n: number) => `${Math.round(n * 100) / 100}px`;
+  function measure() {
+    const vw = root.clientWidth;
+    const vh = innerHeight;
+    // The column as wide as its buttons need (within 340 to 470), then its height at that width.
+    const aw = [...actions.children].reduce((a, k) => a + (k as HTMLElement).offsetWidth, 0) + 12 * (actions.children.length - 1);
+    const colW = clamp(aw + 2, 340, 470);
+    first.style.setProperty("--col-w", px(colW));
+    const fs = parseFloat(getComputedStyle(head).fontSize);
+    const lh = parseFloat(getComputedStyle(head).lineHeight) || fs * 0.94;
+    const colGap = Math.round(clamp(fs * 0.34, 18, 32));
+    plan = compose(vw, vh, { l1w: lines[0].offsetWidth, l2w: lines[1].offsetWidth, lh, colW, colH: col.offsetHeight, colGap });
+    if (!plan) {
+      first.dataset.laid = "stack";
+      for (const k of ["--hx", "--hy", "--cy", "--first-h", "--col-w"]) first.style.removeProperty(k);
+      delete slot.dataset.fitW;
+      slot.dataset.fit = "first";
+      slot.removeAttribute("style");
+      first.dataset.fl = String(first.getBoundingClientRect().left);
+      // Stacked in a room too short for it (the first screen held to one screen by the story),
+      // the shelf would be pushed onto the words: it steps aside instead (its songs are in the
+      // capsule's song flyout and the app's own queue too).
+      if (shelf) {
+        shelf.removeAttribute("data-off");
+        const s = shelf.getBoundingClientRect();
+        const c = col.getBoundingClientRect();
+        const f = first.getBoundingClientRect();
+        shelf.toggleAttribute("data-off", s.top < c.bottom + 8 || s.bottom > f.bottom + 0.5);
+      }
+      return;
+    }
+    const p = plan;
+    first.dataset.laid = p.kind;
+    first.dataset.fl = String(p.fl);
+    first.style.setProperty("--hx", px(p.text.x));
+    first.style.setProperty("--hy", px(p.text.y));
+    first.style.setProperty("--cy", px(p.text.y + lh * 2 + colGap));
+    first.style.setProperty("--first-h", px(Math.max(vh, p.win.y + p.win.h + 24, p.shelf.off ? 0 : p.shelf.y + p.shelf.h + 24)));
+    if (shelf) {
+      shelf.toggleAttribute("data-off", p.shelf.off);
+      shelf.style.setProperty("--sx", px(p.shelf.x));
+      shelf.style.setProperty("--sy", px(p.shelf.y));
+      shelf.style.setProperty("--sz", `${Math.floor(p.shelf.size)}px`);
+      shelf.style.setProperty("--sg", `${p.shelf.gap}px`);
+      shelf.style.setProperty("--cols", String(p.shelf.cols));
+    }
+    // The window's room is exactly the window: window.ts draws the app at the size decided here.
+    Object.assign(slot.style, { left: px(p.win.x), top: px(p.win.y), width: px(p.win.w), height: px(p.win.h) });
+    slot.dataset.fitW = String(p.fit.w);
+    slot.dataset.fitH = String(p.fit.h);
+    delete slot.dataset.fit;
+  }
+
+  /** The notes, in free ground: "not a screenshot" over the window's top, right of the
+   *  headline; "drop one on the player" over the shelf, pointing at the window. Hidden where
+   *  they would touch anything (showNoteAt). */
+  function notes() {
+    const p = plan;
+    if (!p) {
+      if (noteWin) hideNote(noteWin);
+      if (noteShelf) hideNote(noteShelf);
+      return;
+    }
+    const top = stage!.getBoundingClientRect().top;
+    const l1 = lines[0].getBoundingClientRect();
+    const words = [l1, lines[1].getBoundingClientRect(), col.getBoundingClientRect()];
+    const win = { left: p.win.x, top: p.win.y + top, right: p.win.x + p.win.w, bottom: p.win.y + p.win.h + top };
+    const sh = { left: p.shelf.x, top: p.shelf.y + top, right: p.shelf.x + p.shelf.w, bottom: p.shelf.y + p.shelf.h + top };
+    if (noteWin) {
+      const x = Math.max(l1.right + 32, p.win.x + p.win.w * 0.42);
+      showNoteAt(noteWin, x, p.win.y - 44, [...words, win, sh]);
+    }
+    if (noteShelf && p.shelf.off) hideNote(noteShelf);
+    else if (noteShelf) {
+      const w = noteShelf.offsetWidth || 260;
+      showNoteAt(noteShelf, Math.min(p.shelf.x + p.shelf.w - w + 40, p.win.x - w - 8), p.shelf.y - 56, [...words, sh, win]);
+    }
+  }
+
+  // ---- The arrival ----
+  function arrive(win: Awaited<typeof whenWindow>) {
+    if (arrived) return;
+    arrived = true;
+    const again = root.dataset.land || scrollY > 4;
+    first.toggleAttribute("data-shown", true);
+    if (reduced() || again) {
+      notes();
+      return;
+    }
+    // The visitor moving the page ends the arrival at once: nothing keeps landing out of view.
+    const all: (Animation | undefined)[] = [];
+    addEventListener("scroll", () => all.forEach((a) => a?.finish()), { once: true, passive: true });
+    const rise = (el: Element | null, delay: number, extra: Keyframe = {}) =>
+      el?.animate([{ opacity: 0, translate: "0 8px", ...extra }, { opacity: 1, translate: "0 0", filter: "none" }], { duration: 480, delay, easing: EASE_OUT, fill: "backwards" });
+    // The light: the desk's lit layers come up under the words.
+    for (const l of document.querySelectorAll(".desk .slot.front :is(.k-lit, .k-hi)"))
+      all.push(l.animate([{ opacity: 0 }, { opacity: getComputedStyle(l).opacity }], { duration: 900, easing: "ease-out", fill: "backwards" }));
+    // The headline, line by line, sharpening.
+    lines.forEach((l, i) => all.push(l.animate([{ opacity: 0, filter: "blur(8px)", translate: "0 0.12em" }, { opacity: 1, filter: "blur(0)", translate: "0 0" }], { duration: 480, delay: i * 110, easing: EASE_OUT, fill: "backwards" })));
+    // The sentence, the buttons, the line under them.
+    [...col.children].forEach((c, i) => all.push(rise(c, [200, 280, 340, 380][i] ?? 380)));
+    // The window opens from the tray.
+    win.arrive(450);
+    // The sleeves land 50 ms apart.
+    shelf?.querySelectorAll(".sleeve").forEach((s, i) =>
+      all.push(s.animate([{ opacity: 0, translate: "0 6px", scale: "1.04" }, { opacity: 1, translate: "0 0", scale: "1" }], { duration: 480, delay: 650 + i * 50, easing: EASE_OUT, fill: "backwards" })),
+    );
+    // The notes write themselves in once everything has landed.
+    setTimeout(notes, 1000);
+  }
+
+  // ---- On load, fonts and resize ----
+  let frame = 0;
+  const relayout = () => {
+    if (frame) return;
+    frame = requestAnimationFrame(async () => {
+      frame = 0;
+      measure();
+      const win = await whenWindow;
+      win.layout();
+      if (arrived) notes();
+    });
+  };
+  measure();
+  whenWindow.then((win) => {
+    win.layout();
+    arrive(win);
+  });
+  document.fonts?.ready.then(relayout);
+  addEventListener("resize", relayout);
+}

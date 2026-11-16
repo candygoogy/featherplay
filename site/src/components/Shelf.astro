@@ -1,0 +1,194 @@
+---
+// The shelf under the first screen's words: the demo's six songs as sleeves, three by two. Drop
+// one on the player, double-click it, or press Enter or Space on it, and it plays (a tap on a
+// touch screen too). Its title shows on hover or focus; the one playing is lifted and carries
+// the app's own playing mark. Placed by the first screen's composition (src/scripts/first.ts),
+// wired by src/scripts/shelf.ts. Without script it would do nothing, so it isn't shown.
+import Mark from "./Mark.astro";
+import { songs } from "../data/songs";
+---
+
+<div class="shelf" data-shelf role="group" aria-label="Six songs to play">
+  {
+    songs.map((s, i) => (
+      <button class="sleeve" type="button" data-sleeve={s.id} data-edge={i % 3 === 0 ? "l" : i % 3 === 2 ? "r" : undefined} aria-label={`Play ${s.title} by ${s.artist}`}>
+        <img src={s.cover} width="176" height="176" alt="" draggable="false" decoding="async" />
+        <span class="sl-mark" aria-hidden="true">
+          <Mark size={16} />
+        </span>
+        <span class="sl-tip" aria-hidden="true">
+          <b>{s.title}</b>
+          <i>{s.artist}</i>
+        </span>
+      </button>
+    ))
+  }
+</div>
+
+<style>
+  .shelf {
+    --sz: 132px;
+    --sg: 14px;
+    display: grid;
+    grid-template-columns: repeat(var(--cols, 3), var(--sz));
+    gap: var(--sg);
+    width: max-content;
+  }
+  :global(:root:not(.js)) .shelf {
+    display: none;
+  }
+  .sleeve {
+    position: relative;
+    display: block;
+    width: var(--sz);
+    height: var(--sz);
+    padding: 0;
+    border: 0;
+    border-radius: var(--r-small);
+    background: transparent;
+    cursor: grab;
+    touch-action: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: translate 320ms var(--ease-out);
+  }
+  .sleeve img {
+    width: 100%;
+    height: 100%;
+    border-radius: inherit;
+    object-fit: cover;
+    box-shadow: var(--sleeve-shadow);
+    pointer-events: none;
+    /* Its shadow eases on hover; a theme switch's .theme-quiet holds it to the theme's clock. */
+    transition: box-shadow calc(320ms * var(--colour-easing)) var(--ease-out);
+  }
+  @media (hover: hover) {
+    .sleeve:hover {
+      translate: 0 -4px;
+    }
+    .sleeve:hover img {
+      box-shadow: var(--sleeve-lift);
+    }
+  }
+  .sleeve:focus-visible {
+    translate: 0 -4px;
+    outline: 2px solid var(--text);
+    outline-offset: 4px;
+  }
+  .sleeve:focus-visible img {
+    box-shadow: var(--sleeve-lift);
+  }
+  /* The one playing: lifted a little, ringed, and the app's own playing mark in its corner. */
+  .sleeve[data-current] {
+    translate: 0 -3px;
+  }
+  .sleeve[data-current] img {
+    box-shadow:
+      0 0 0 2px var(--desk),
+      0 0 0 3.5px color-mix(in srgb, var(--text) 80%, transparent),
+      var(--sleeve-lift);
+  }
+  .sl-mark {
+    position: absolute;
+    right: 8px;
+    bottom: 8px;
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: light-dark(rgb(255 255 255 / 0.92), rgb(15 15 15 / 0.8));
+    box-shadow: 0 2px 8px rgb(0 0 0 / 0.3);
+    opacity: 0;
+    scale: 0.8;
+    transition:
+      opacity 200ms var(--ease-out),
+      scale 300ms var(--ease-out);
+  }
+  .sleeve[data-current] .sl-mark {
+    opacity: 1;
+    scale: 1;
+  }
+  :global(:root:not([data-playing="true"])) .sleeve[data-current] .sl-mark :global(.fp-mark) {
+    color: var(--ink2);
+  }
+  /* Its title on hover and focus: a small label under it in the floating glass. */
+  .sl-tip {
+    --mat: var(--mat-solid);
+    position: absolute;
+    z-index: 2;
+    top: calc(100% + 8px);
+    left: 50%;
+    display: grid;
+    padding: 6px 10px 7px;
+    border-radius: var(--r-small);
+    background: var(--mat);
+    box-shadow: var(--lit), var(--ring), var(--shadow);
+    color: var(--text);
+    text-align: left;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    translate: -50% -4px;
+    transition:
+      opacity 120ms ease,
+      translate 200ms var(--ease-out);
+  }
+  .sleeve[data-edge="l"] .sl-tip {
+    left: 0;
+    translate: 0 -4px;
+  }
+  .sleeve[data-edge="r"] .sl-tip {
+    left: auto;
+    right: 0;
+    translate: 0 -4px;
+  }
+  .sl-tip b {
+    font-size: var(--fs-bar);
+    font-weight: var(--fw-bold);
+    line-height: 18px;
+  }
+  .sl-tip i {
+    color: var(--ink2);
+    font-size: var(--fs-bar-clock);
+    font-style: normal;
+    font-weight: var(--fw-medium);
+    line-height: 16px;
+  }
+  @media (hover: hover) {
+    .sleeve:hover .sl-tip {
+      opacity: 1;
+      translate: -50% 0;
+      transition-delay: 180ms;
+    }
+    .sleeve[data-edge]:hover .sl-tip {
+      translate: 0 0;
+    }
+  }
+  .sleeve:focus-visible .sl-tip {
+    opacity: 1;
+    translate: -50% 0;
+  }
+  .sleeve[data-edge]:focus-visible .sl-tip {
+    translate: 0 0;
+  }
+  .sleeve.held {
+    cursor: grabbing;
+  }
+  .sleeve.held .sl-tip {
+    opacity: 0;
+  }
+  .sleeve.ghosted {
+    opacity: 0.35;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .sleeve,
+    .sleeve[data-current] {
+      translate: none !important;
+    }
+  }
+  @media (forced-colors: active) {
+    .sleeve[data-current] img {
+      outline: 3px solid Highlight;
+    }
+  }
+</style>

@@ -27,8 +27,8 @@ test("the headline, the download link and every section heading are there", asyn
 test("the theme still follows the system without JavaScript", async ({ page }) => {
   await page.emulateMedia({ colorScheme: "light" });
   await page.goto("/");
-  const bg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
-  // The light desk: warm paper, not a plain white.
+  const bg = await page.evaluate(() => getComputedStyle(document.documentElement).backgroundColor);
+  // The light desk's ground (under the frosted glass): warm paper, not a plain white.
   expect(bg).toBe("rgb(242, 238, 232)");
 });
 

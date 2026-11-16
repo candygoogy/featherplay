@@ -123,7 +123,8 @@
   scrollbar-color: color-mix(in srgb, var(--text) 26%, transparent) transparent;
 }
 :root.sys body {
-  background: var(--desk);
+  /* The root's ground shows through (and on the home page the desk's glass, Desk.astro). */
+  background: transparent;
   --song: var(--glow);
   font-size: var(--fs-text);
   line-height: var(--lh-text);
@@ -476,4 +477,32 @@
 }
 .hand[data-note-manual][data-on] {
   opacity: 1;
+}
+
+/* ---------- The sleeves (Shelf.astro, src/scripts/shelf.ts) ---------- */
+:root {
+  --sleeve-shadow: 0 1px 0 rgb(255 255 255 / 0.14) inset, 0 12px 24px -10px rgb(0 0 0 / 0.7), 0 3px 6px rgb(0 0 0 / 0.35);
+  --sleeve-lift: 0 1px 0 rgb(255 255 255 / 0.16) inset, 0 26px 44px -14px rgb(0 0 0 / 0.75), 0 8px 16px rgb(0 0 0 / 0.32);
+}
+:root[data-theme="light"] {
+  --sleeve-shadow: 0 1px 0 rgb(255 255 255 / 0.4) inset, 0 12px 24px -12px rgb(60 40 20 / 0.36), 0 3px 6px rgb(60 40 20 / 0.12);
+  --sleeve-lift: 0 1px 0 rgb(255 255 255 / 0.4) inset, 0 26px 44px -16px rgb(60 40 20 / 0.42), 0 8px 16px rgb(60 40 20 / 0.12);
+}
+/* The sleeve in the hand follows the pointer over everything but the bar. */
+.carry {
+  position: fixed;
+  z-index: 45;
+  left: 0;
+  top: 0;
+  border-radius: var(--r-small);
+  box-shadow: var(--sleeve-lift);
+  pointer-events: none;
+  rotate: -3deg;
+  scale: 1.04;
+}
+@media (prefers-reduced-motion: reduce) {
+  .carry {
+    rotate: none;
+    scale: none;
+  }
 }

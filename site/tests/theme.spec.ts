@@ -154,7 +154,7 @@ test("a system change restyles without reload", async ({ page }) => {
   await page.goto("/");
   // Nothing stored means "system".
   expect(await page.evaluate(() => localStorage.getItem("fp-theme"))).toBeNull();
-  const bgDark = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  const bgDark = await page.evaluate(() => getComputedStyle(document.documentElement).backgroundColor);
   const events: string[] = [];
   await page.exposeFunction("recordTheme", (t: string) => events.push(t));
   await page.evaluate(() =>
@@ -167,7 +167,7 @@ test("a system change restyles without reload", async ({ page }) => {
   await page.emulateMedia({ colorScheme: "light" });
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   await expect
-    .poll(() => page.evaluate(() => getComputedStyle(document.body).backgroundColor))
+    .poll(() => page.evaluate(() => getComputedStyle(document.documentElement).backgroundColor))
     .not.toBe(bgDark);
   await expect.poll(() => events).toContain("light");
 });
@@ -231,7 +231,8 @@ async function switchAndWatch(page: import("@playwright/test").Page, selector: s
               a instanceof CSSTransition &&
               (a.effect as KeyframeEffect).target !== root &&
               a.playState === "running" &&
-              /color|background|border|shadow|fill|stroke/.test(a.transitionProperty),
+              // Colours (a pen's stroke-dashoffset, a note writing itself in, is not one).
+              /color|background|border|shadow|fill|stroke(?!-dash)/.test(a.transitionProperty),
           ).length,
       );
       // ~160 ms in by the switch's own clock (a slow machine can start it a frame or two late).

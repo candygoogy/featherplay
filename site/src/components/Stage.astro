@@ -1,8 +1,10 @@
 ---
 // The first screen, and the window stepping back as the page moves (the scroll story): one
-// pinned stage. The first screen here is the plain composition the foundation needs (the
-// headline, the sentence, the buttons, the credit and the window); the real composition comes
-// with the light, after the study. Where the story runs (src/scripts/story.ts: a pointer-sized
+// pinned stage. The first screen is the study's composition (src/scripts/first.ts): the
+// headline top left, the sentence and buttons under it, a shelf of the six sleeves under the
+// words, the window from the middle of the headline's second line as large as the room allows
+// (or the words and the shelf side by side over a full-width window in tall rooms; one column
+// on phones). Without script, a plain grid of the same parts. Where the story runs (src/scripts/story.ts: a pointer-sized
 // screen, motion allowed) the stage is pinned for its length and the window takes three holds:
 // whole, narrow, in the tray. Elsewhere (phones, short windows, reduced motion, no script) the
 // window sits in its slot and the three steps are plain blocks under it.
@@ -11,6 +13,7 @@ import NowPlaying from "./NowPlaying.astro";
 import Logo from "./Logo.astro";
 import Note from "./Note.astro";
 import DlGlyph from "./DlGlyph.astro";
+import Shelf from "./Shelf.astro";
 import { release, sizeLabel } from "../data/release";
 
 const main = release.installer ?? release.portable;
@@ -27,9 +30,9 @@ const steps = [
 <section class="stage" id="app" tabindex="-1" data-stage aria-labelledby="hero-title">
   <span class="anchor" id="top" aria-hidden="true"></span>
   <div class="pin" data-pin>
-    <div class="frame first">
-      <h1 id="hero-title" class="t-display head"><span class="line">Light enough to forget</span> <span class="line">it’s running.</span></h1>
-      <div class="col">
+    <div class="frame first" data-first>
+      <h1 id="hero-title" class="t-display head" data-head><span class="line">Light enough to forget</span> <span class="line">it’s running.</span></h1>
+      <div class="col" data-col>
         <p class="t-lede">featherplay is a free, native player for YouTube&nbsp;Music on Windows and Linux.</p>
         <div class="actions">
           <a class="btn red" href="#download">
@@ -47,6 +50,9 @@ const steps = [
         {main && <p class="t-small ink2 meta">{sizeLabel(main).replace(" ", " ")}, version {release.version}</p>}
         <NowPlaying class="credit" />
       </div>
+      <Shelf />
+      <Note id="screenshot" arrow="down-right" class="n-screenshot" manual />
+      <Note id="sleeves" arrow="right" class="n-sleeves" manual />
       <a class="skip skip-app" href="#after-app" data-before-replica>Skip past the app</a>
       <div class="slot" data-win-slot>
         <Window />
@@ -98,9 +104,14 @@ const steps = [
   import { bindPieces } from "../demo/bind-pieces";
   import { startClock } from "../scripts/clock";
   import { startStory } from "../scripts/story";
+  import { startFirst } from "../scripts/first";
+  import { bindShelf } from "../scripts/shelf";
   const player = bindReplicas();
   if (player) {
     bindPieces(player);
+    startFirst();
+    const shelf = document.querySelector<HTMLElement>("[data-shelf]");
+    if (shelf) bindShelf(shelf, player);
     startStory(player);
   }
   // The bar starts its own clock (Bar.astro).
@@ -110,7 +121,6 @@ const steps = [
 <style>
   .stage {
     position: relative;
-    background: var(--desk);
   }
   .anchor {
     position: absolute;
@@ -123,16 +133,18 @@ const steps = [
     position: relative;
   }
 
-  /* The first screen: the headline across the top; under it the sentence, the buttons and the
-     credit in a column on the left, the window filling the room on the right. One column on a
-     phone, the window under the words. */
+  /* The first screen without its composition (no script, or stacked by it): the headline
+     across the top; under it the sentence, the buttons and the credit in a column on the left,
+     the shelf under them, the window filling the room on the right. One column on a phone: the
+     words, the window, the shelf. */
   .first {
     display: grid;
     grid-template-columns: minmax(16rem, 25rem) minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr);
     grid-template-areas:
       "head head"
-      "col win";
+      "col win"
+      "shelf win";
     column-gap: var(--s7);
     row-gap: var(--s6);
     min-height: 100svh;
@@ -142,11 +154,24 @@ const steps = [
   .head {
     grid-area: head;
   }
+  /* Each line its own box, as wide as its words (first.ts measures them). */
   .head .line {
     display: block;
+    width: fit-content;
+  }
+  .first > :global(.shelf[data-off]),
+  .first:is([data-laid="wide"], [data-laid="tall"]) > :global(.shelf[data-off]) {
+    display: none;
+  }
+  .first > :global(.shelf) {
+    grid-area: shelf;
+    align-self: end;
+    --sz: min(132px, (100vw - 2 * var(--gut) - 28px) / 3);
   }
   .col {
     grid-area: col;
+    /* With script, as wide as the composition gives it, measured at that width (first.ts). */
+    width: var(--col-w, auto);
     display: grid;
     align-content: start;
     gap: var(--s4);
@@ -215,9 +240,6 @@ const steps = [
     opacity: 0;
     visibility: hidden;
   }
-  .steps {
-    background: var(--desk);
-  }
   /* Focus is moved here (and to the stage) only to carry the keys on: no ring. */
   .stage:focus,
   .steps:focus {
@@ -241,8 +263,17 @@ const steps = [
       grid-template-areas:
         "head"
         "col"
-        "win";
+        "win"
+        "shelf";
       min-height: 0;
+    }
+    .first > :global(.shelf) {
+      align-self: start;
+      margin-top: var(--s3);
+    }
+    /* The headline as large as lets its first line fit the phone's width. */
+    .head {
+      font-size: clamp(2rem, 8.7vw, 3.4rem);
     }
     /* In small viewport units: a phone's toolbar showing and hiding never resizes the window;
        never taller than the screen under the bar. */
@@ -250,6 +281,52 @@ const steps = [
       height: clamp(26rem, 78svh, 47rem);
       max-height: calc(100svh - var(--bar-h) - 16px);
     }
+  }
+
+  /* With script, the first screen shows once it is laid out (first.ts), never half-placed. */
+  :global(:root.js) .first:not([data-shown]) {
+    visibility: hidden;
+  }
+  /* Composed (first.ts): every part placed in the room's own coordinates. */
+  .first:is([data-laid="wide"], [data-laid="tall"]) {
+    display: block;
+    position: relative;
+    width: 100%;
+    max-width: none;
+    height: var(--first-h, 100svh);
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+  }
+  .first:is([data-laid="wide"], [data-laid="tall"]) > :is(.head, .col, .slot) {
+    position: absolute;
+    margin: 0;
+  }
+  .first:is([data-laid="wide"], [data-laid="tall"]) > .head {
+    left: var(--hx);
+    top: var(--hy);
+    width: max-content;
+  }
+  .first:is([data-laid="wide"], [data-laid="tall"]) > .col {
+    left: var(--hx);
+    top: var(--cy);
+    width: var(--col-w);
+  }
+  /* (Its own rule: the shelf is another component's, which a scoped group wouldn't reach.) */
+  .first:is([data-laid="wide"], [data-laid="tall"]) > :global(.shelf) {
+    position: absolute;
+    margin: 0;
+    left: var(--sx);
+    top: var(--sy);
+  }
+  /* The two notes the composition places, in the room's coordinates; they step aside while the
+     window is away from home (dragged, maximised, in the tray). */
+  .first > :global(.hand[data-note-manual]) {
+    position: absolute;
+    z-index: 5;
+  }
+  :global(.stage[data-win-away]) .first > :global(.hand) {
+    opacity: 0 !important;
   }
 
   /* The story runs (story.ts sets data-story on the root): the stage is pinned for its length,
@@ -263,7 +340,8 @@ const steps = [
     height: 100svh;
     overflow: clip;
   }
-  :global(:root[data-story]) .first {
+  :global(:root[data-story]) .first,
+  :global(:root[data-story]) .first[data-laid] {
     height: 100svh;
     min-height: 0;
   }

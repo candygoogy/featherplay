@@ -1,6 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
 import { wake } from "./helpers";
 
+// The whole app: at a size where the first screen shows the wide layout (at 1280 x 720 it is
+// the app's narrow one).
+test.use({ viewport: { width: 1920, height: 1200 } });
+
 const replica = (page: Page) => page.locator("[data-replica]").first();
 
 async function rootGlow(page: Page) {

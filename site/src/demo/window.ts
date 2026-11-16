@@ -10,6 +10,7 @@
 // holds the stage, the stage's own otherwise.
 
 import { clampInto, fitWindow, placeIn, type Box, type Fit } from "./fit";
+import { fitFirst } from "../scripts/first-math";
 import type { Player } from "./player";
 import { hideNote, showNoteAt } from "../scripts/notes";
 
@@ -34,6 +35,8 @@ export type WindowController = {
   /** The tray icon's centre (or the capsule's song), in the pin's coordinates. */
   trayPoint(): { x: number; y: number };
   onLayout(fn: () => void): void;
+  /** The first screen's arrival: the window opens from the tray, after `delay` ms. */
+  arrive(delay: number): void;
 };
 
 const MIN_MS = 300;
@@ -60,6 +63,7 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
   const titlebar = replica.querySelector<HTMLElement>(".titlebar")!;
   const dialog = slot.querySelector<HTMLDialogElement>("[data-closer]");
   const desk = matchMedia(DESK);
+  const stage = el.closest<HTMLElement>("[data-stage]");
 
   let slotOff = { x: 0, y: 0 };
   let home: Frame = { w: 1440, h: 852, x: 0, y: 0, s: 1, o: 1 };
@@ -123,6 +127,9 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
     }
     el.style.transform = tf(f, slotOff);
     el.style.opacity = f.o >= 1 ? "" : f.o.toFixed(3);
+    // Away from home (dragged, maximised, in the tray, the story's): the first screen's notes
+    // about it step aside.
+    stage?.toggleAttribute("data-win-away", maxed || minimised || !!driven || !!(drag.x || drag.y));
     // The scale for the page-size caption targets and corners: written once the window rests
     // (it changes their layout), not on every frame of a move.
     clearTimeout(scaleTimer);
@@ -154,6 +161,10 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
   const settle = (ms = 0) => {
     if (driven) return;
     const f = minimised ? trayFrame(rested()) : rested();
+    // Laid out again with nothing changed (the fonts arriving, say): whatever is under way (the
+    // arrival's opening) goes on.
+    const same = (["x", "y", "s", "w", "h", "o"] as const).every((k) => Math.abs(f[k] - shown[k]) < 0.01);
+    if (!ms && same && el.style.transform) return;
     if (ms) glide(f, ms);
     else {
       for (const a of el.getAnimations()) a.cancel();
@@ -174,7 +185,13 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
     const vw = document.documentElement.clientWidth;
     const room = desk.matches ? innerHeight - (pinHome() + slotOff.y) - 8 : s.height;
     const box: Box = { x: slotOff.x, y: slotOff.y, w: Math.min(s.width, vw), h: Math.max(1, Math.min(s.height, room)) };
-    const fit: Fit = fitWindow(box);
+    // The first screen's composition decides the app's size (src/scripts/first.ts: the room is
+    // the window); stacked, the first screen's own rule; elsewhere the general one.
+    const fit: Fit = slot.dataset.fitW
+      ? fitWindow(box, { want: { w: Number(slot.dataset.fitW), h: Number(slot.dataset.fitH) } })
+      : slot.dataset.fit === "first"
+        ? fitFirst(box)
+        : fitWindow(box);
     const at = placeIn(box, fit, desk.matches ? "end" : "center", "start");
     home = { w: fit.w, h: fit.h, s: fit.s, o: 1, ...at };
     // A dragged window stays where it was put, as far as the new viewport allows.
@@ -426,6 +443,20 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
     trayPoint,
     onLayout(fn) {
       layoutFns.push(fn);
+    },
+    arrive(delay) {
+      if (reduced() || driven || minimised || maxed) return;
+      // Drawn invisibly first (it never freezes), then from 0.9 by its top right, the tray's
+      // side, in 240 ms on the window curve.
+      const to = shown;
+      const from = { ...to, s: to.s * 0.9, x: to.x + to.w * to.s * 0.1, o: 0 };
+      el.animate(
+        [
+          { transform: tf(from, slotOff), opacity: 0 },
+          { transform: tf(to, slotOff), opacity: 1 },
+        ],
+        { duration: 240, delay, easing: EASE_WINDOW, fill: "backwards" },
+      );
     },
   };
   ready(controller);

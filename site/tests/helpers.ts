@@ -3,6 +3,8 @@ import { expect, type Page } from "@playwright/test";
 /** Waits until the first screen's window is sized and placed (src/demo/window.ts). */
 export async function wake(page: Page) {
   await expect(page.locator("[data-window]")).toHaveClass(/\bplaced\b/);
+  // Landed: no opening from the tray (the first screen's arrival) still under way.
+  await expect.poll(() => page.locator("[data-window]").evaluate((w) => w.getAnimations().length), { timeout: 3000 }).toBe(0);
 }
 
 /** Scrolls something below the pinned story into view: its section first (a section that

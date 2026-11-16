@@ -62,6 +62,11 @@ import Replica from "./Replica.astro";
       0 calc(4px / var(--s)) calc(16px / var(--s)) var(--shade-2),
       0 calc(16px / var(--s)) calc(56px / var(--s)) var(--shade-3);
   }
+  /* A sleeve carried over it: a ring, the window saying it will take it. */
+  .window[data-drop] .win-body {
+    outline: calc(3px / var(--s)) solid color-mix(in srgb, var(--text) 70%, transparent);
+    outline-offset: calc(4px / var(--s));
+  }
   .window[data-max] .win-body {
     border-radius: 0;
   }

@@ -194,9 +194,24 @@ test("Download's flyout opens for the keyboard and Tab goes on into it", async (
   await expect(page.locator("#fly-dl a").first()).toHaveAttribute("href", /releases\/download\/v0\.4\.1\/featherplay-setup-0\.4\.1\.exe$/);
 });
 
+/** A point on the first screen's empty desk (no word, picture, control or window under it). */
+async function emptyDesk(page: Page) {
+  await expect(page.locator("[data-first]")).toHaveAttribute("data-shown", "");
+  return page.evaluate(() => {
+    const NOT = "a, button, input, p, h1, h2, img, svg, [data-window], [data-site-bar], [popover], [data-shelf], .hand, [role]";
+    for (let y = innerHeight - 30; y > 80; y -= 20)
+      for (let x = 30; x < innerWidth - 30; x += 20) {
+        const e = document.elementFromPoint(x, y);
+        if (e?.closest("[data-stage]") && !e.closest(NOT)) return { x, y };
+      }
+    throw new Error("no empty desk");
+  });
+}
+
 test("the menu works with the mouse: a click on one of its items does it", async ({ page }) => {
   await page.goto("/");
-  await page.mouse.click(300, 800, { button: "right" });
+  const spot = await emptyDesk(page);
+  await page.mouse.click(spot.x, spot.y, { button: "right" });
   const menu = page.getByRole("menu", { name: "Desktop" });
   await expect(menu).toBeVisible();
   const item = menu.getByRole("menuitem", { name: "Switch to light" });
@@ -243,7 +258,8 @@ test("the browser's own menu stays everywhere but the first screen's empty desk"
 test("a right-click on the empty desk opens the app's menu: the arrow keys move in it, Escape closes it", async ({ page }) => {
   await page.route("**/music/**", (r) => r.abort());
   await page.goto("/");
-  await page.mouse.click(300, 800, { button: "right" });
+  const spot = await emptyDesk(page);
+  await page.mouse.click(spot.x, spot.y, { button: "right" });
   const menu = page.getByRole("menu", { name: "Desktop" });
   await expect(menu).toBeVisible();
   await expect(menu.getByRole("menuitem").first()).toBeFocused();
@@ -252,7 +268,7 @@ test("a right-click on the empty desk opens the app's menu: the arrow keys move 
   await page.keyboard.press("Enter");
   await expect(menu).toBeHidden();
   await expect(page.locator("[data-window] [data-bar-title]")).toHaveText("Invisible Light");
-  await page.mouse.click(300, 800, { button: "right" });
+  await page.mouse.click(spot.x, spot.y, { button: "right" });
   await expect(menu).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(menu).toBeHidden();

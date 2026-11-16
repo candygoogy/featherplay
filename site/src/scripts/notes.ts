@@ -115,7 +115,8 @@ export function showNoteAt(note: HTMLElement, x: number, y: number, avoid: Rect[
     words.right <= vw - M &&
     words.top >= M &&
     words.bottom <= innerHeight - M &&
-    !avoid.some((a) => overlaps(words as R, { ...a, width: a.right - a.left }));
+    // (Sides copied one by one: a DOMRect's are getters, which a spread would lose.)
+    !avoid.some((a) => overlaps(words as R, { left: a.left, top: a.top, right: a.right, bottom: a.bottom, width: a.right - a.left }));
   note.toggleAttribute("data-on", fits);
   if (fits) {
     // Written the first time it shows (at once with reduced motion: no transition runs).

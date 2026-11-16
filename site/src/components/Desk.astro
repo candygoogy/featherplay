@@ -1,0 +1,171 @@
+---
+// The desk: one sheet of frosted glass in the playing song's colour, behind the whole page.
+// Nothing behind it has an edge: a broad light in the upper left corner fading across the top,
+// a weaker one along the top right, a low rise from the lower right, deep behind the words and
+// the window (two still masks, made from a designed field and scaled up), then the frost's own
+// crisp grain and a faint lift in from the left edge. Still: nothing moves by itself, with the
+// scroll or with the pointer. The study's recipe ("K2, clean"); the tones by rule
+// (src/data/desk.ts).
+//
+// The song's colour changes by two identical slots, each holding all the layers with its own
+// tones (never animated): the new tones go into the slot underneath, which fades in over the
+// other by opacity, 900 ms, the compositor's work (src/demo/desk.ts). A theme switch fades the
+// same way on the theme's own clock. Before any script, and without one, the opening song's
+// tones for the theme in use, from here.
+import { deskTones } from "../data/desk";
+import { demoStart, songById } from "../data/songs";
+
+const first = songById(demoStart.songId)!.colour;
+const d = deskTones(first, "dark");
+const l = deskTones(first, "light");
+// Colours by the theme in use (light-dark), numbers on the theme's own eased --light.
+const mixNum = (a: number, b: number) => `calc(${a} + ${+(b - a).toFixed(3)} * var(--light))`;
+const initial = [
+  `--qg:light-dark(${l.qg},${d.qg})`,
+  `--qs:light-dark(${l.qs},${d.qs})`,
+  `--ql:light-dark(${l.ql},${d.ql})`,
+  `--qh:light-dark(${l.qh},${d.qh})`,
+  `--lit:${mixNum(d.lit, l.lit)}`,
+  `--hi:${mixNum(d.hi, l.hi)}`,
+  `--shade:${mixNum(d.shade, l.shade)}`,
+].join(";");
+const layers = ["k-ground", "m k-shade", "m k-lit", "m k-hi", "k-sheen", "k-grain"];
+---
+
+<div class="desk" data-desk aria-hidden="true">
+  <div class="slot front" data-slot style={initial}>{layers.map((c) => <i class={c}></i>)}</div>
+  <div class="slot" data-slot style={initial}>{layers.map((c) => <i class={c}></i>)}</div>
+  <i class="desk-grain"></i>
+</div>
+
+<script>
+  import { bindReplicas } from "../demo/replica";
+  import { bindDesk } from "../demo/desk";
+  const desk = document.querySelector<HTMLElement>("[data-desk]");
+  const player = bindReplicas();
+  if (desk && player) bindDesk(desk, player);
+</script>
+
+<style>
+  /* Behind everything on the page (the root's background paints under it), fixed to the
+     window: the page moves over a still sheet. */
+  .desk {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    overflow: hidden;
+    pointer-events: none;
+    contain: strict;
+    background: var(--desk);
+  }
+  /* The slot underneath stays composited (never quite 0), so new tones are painted while it
+     is out of sight, not on the fade's first frame. */
+  .slot {
+    position: absolute;
+    inset: 0;
+    opacity: 0.001;
+    contain: strict;
+    will-change: opacity;
+  }
+  .slot.front {
+    z-index: 2;
+    opacity: 1;
+  }
+  .slot.fading {
+    z-index: 3;
+    transition: opacity var(--fade, 900ms) ease;
+  }
+  .slot.fading.in {
+    opacity: 1;
+  }
+  .slot > i {
+    position: absolute;
+    inset: 0;
+  }
+  /* The masks: still files, luminance, scaled to cover; lossless (a lossy file's blocks show
+     when scaled up eight times). */
+  .m {
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-size: cover;
+    mask-size: cover;
+    -webkit-mask-position: 50% 50%;
+    mask-position: 50% 50%;
+    mask-mode: luminance;
+  }
+  .k-ground {
+    background: var(--qg);
+  }
+  .k-shade {
+    background: var(--qs);
+    opacity: var(--shade);
+    -webkit-mask-image: url("/img/desk/k2-shade-dark.webp");
+    mask-image: url("/img/desk/k2-shade-dark.webp");
+  }
+  .k-lit {
+    background: var(--ql);
+    opacity: var(--lit);
+  }
+  .k-lit,
+  .k-hi {
+    -webkit-mask-image: url("/img/desk/k2-lit.webp");
+    mask-image: url("/img/desk/k2-lit.webp");
+  }
+  /* The brightest light, near the main source only: a gradient seen through the same field. */
+  .k-hi {
+    background: radial-gradient(55% 75% at 4% 0%, var(--qh), color-mix(in oklab, var(--qh) 35%, transparent) 45%, transparent 80%);
+    opacity: var(--hi);
+  }
+  /* The pane's thickness catching the light: a faint lift in from the left edge, gone by a
+     third of the width (a ramp with no peak, never a stripe). */
+  .k-sheen {
+    background: linear-gradient(100deg, rgb(255 255 255 / 0.035), rgb(255 255 255 / 0) 34%);
+  }
+  /* The frost itself is sharp: a crisp grain, a step coarser than the panes'. Blended normally
+     (a full-screen blend costs every frame of the fade without a GPU). */
+  .k-grain {
+    background: url("/img/desk/grain-a.png") 0 0 / 192px;
+    opacity: 0.26;
+  }
+  .desk-grain {
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    background: url("/img/desk/grain-a.png") 0 0 / 128px;
+    opacity: 0.28;
+  }
+  /* Daylight: its own deep, a soft tinted shadow; a brighter lift; finer grain. A slot keeps
+     the theme its tones were made for (data-tones), so a theme switch can fade between them. */
+  :global(:root[data-theme="light"]) .slot:not([data-tones]) .k-shade,
+  .slot[data-tones="light"] .k-shade {
+    -webkit-mask-image: url("/img/desk/k2-shade-light.webp");
+    mask-image: url("/img/desk/k2-shade-light.webp");
+  }
+  .slot[data-tones="dark"] .k-shade {
+    -webkit-mask-image: url("/img/desk/k2-shade-dark.webp");
+    mask-image: url("/img/desk/k2-shade-dark.webp");
+  }
+  :global(:root[data-theme="light"]) .slot:not([data-tones]) .k-sheen,
+  .slot[data-tones="light"] .k-sheen {
+    background: linear-gradient(100deg, rgb(255 255 255 / 0.3), rgb(255 255 255 / 0) 34%);
+  }
+  .slot[data-tones="dark"] .k-sheen {
+    background: linear-gradient(100deg, rgb(255 255 255 / 0.035), rgb(255 255 255 / 0) 34%);
+  }
+  :global(:root[data-theme="light"]) .slot:not([data-tones]) .k-grain,
+  .slot[data-tones="light"] .k-grain {
+    opacity: 0.18;
+  }
+  .slot[data-tones="dark"] .k-grain {
+    opacity: 0.26;
+  }
+  :global(:root[data-theme="light"]) .desk-grain {
+    opacity: 0.2;
+  }
+  /* Forced colours: the system's plain ground. */
+  @media (forced-colors: active) {
+    .desk {
+      display: none;
+    }
+  }
+</style>

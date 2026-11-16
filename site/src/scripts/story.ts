@@ -37,7 +37,7 @@ export async function startStory(player: Player): Promise<void> {
   // The story's script is here: the pinned stage boot.js promised is kept.
   root.toggleAttribute("data-story-live", true);
   const win = await whenWindow;
-  const hero = [...stage.querySelectorAll<HTMLElement>(".first > .head, .first > .col")];
+  const hero = [...stage.querySelectorAll<HTMLElement>(".first > .head, .first > .col, .first > [data-shelf], .first > .hand")];
   const caps = [...stage.querySelectorAll<HTMLElement>("[data-cap]")];
   const ghost = stage.querySelector<HTMLElement>("[data-ghost]")!;
   const icon = stage.querySelector<HTMLElement>("[data-ghost-icon]")!;
@@ -66,8 +66,9 @@ export async function startStory(player: Player): Promise<void> {
     const vw = root.clientWidth;
     const vh = innerHeight;
     const top = stage!.getBoundingClientRect().top + scrollY;
-    const frame = stage!.querySelector<HTMLElement>(".first")!.getBoundingClientRect();
-    const fl = frame.left;
+    // The frame's left edge: the composition's (first.ts), else where the first screen sits.
+    const first = stage!.querySelector<HTMLElement>(".first")!;
+    const fl = Number(first.dataset.fl) || first.getBoundingClientRect().left;
     const L = { w: win.home.w, h: win.home.h };
     // Hold 1: the whole window, centred and large, its words under it, as wide as the window but
     // never narrower than a comfortable measure (measured at the width they will have: narrower,
@@ -158,6 +159,8 @@ export async function startStory(player: Player): Promise<void> {
       const gone = out > 0.5;
       if (gone && !el.inert && el.contains(document.activeElement)) steps?.focus({ preventScroll: true });
       el.inert = gone;
+      // Gone, its live parts (the playing sleeve's mark) hold still.
+      el.toggleAttribute("data-away", gone);
     }
     caps.forEach((cap, i) => {
       const o = captionOpacity(i, p);

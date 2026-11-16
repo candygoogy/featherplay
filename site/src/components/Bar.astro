@@ -253,7 +253,9 @@ const arrow = "M12 4.5 V15 M7.5 10.5 L12 15 L16.5 10.5 M5 19.5 H19";
     grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     align-items: center;
     column-gap: var(--s4);
-    width: min(var(--frame-max), 100% - 2 * var(--gut));
+    /* The first screen's frame (src/scripts/first-math.ts frameOf): its edges line up with the
+       headline's and the window's. */
+    width: min(117.5rem, 89%, 100% - 40px);
     height: var(--bar-h);
     margin-inline: auto;
     pointer-events: auto;

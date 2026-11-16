@@ -40,7 +40,8 @@ test("nothing counts up or races: the figures are final as the table comes into 
   await expect(memory).toHaveText(cellText(figureText(figures[0], "memoryMB")));
   await numbers(page).scrollIntoViewIfNeeded();
   await expect(memory).toHaveText(cellText(figureText(figures[0], "memoryMB")));
-  expect(await numbers(page).evaluate((s) => s.getAnimations({ subtree: true }).filter((a) => a.playState === "running").length)).toBe(0);
+  // (The note and the pen mark write themselves in once, then nothing runs.)
+  await expect.poll(() => numbers(page).evaluate((s) => s.getAnimations({ subtree: true }).filter((a) => a.playState === "running").length), { timeout: 3000 }).toBe(0);
 });
 
 test("pointed at, a row stays and the others step back", async ({ page }) => {
