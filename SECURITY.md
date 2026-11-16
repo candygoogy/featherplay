@@ -7,9 +7,9 @@ repository's **Security** tab and choose **Report a vulnerability**, or go strai
 <https://github.com/candygoogy/featherplay/security/advisories/new>. Only you and the
 maintainer can see the report.
 
-Say which version you used (Settings > About), what you did and what happened, and how to
-reproduce it if you can. Leave out your own cookies, sessions and tokens; a made-up or
-expired value shows the problem just as well.
+Say which version you used (Settings > Account > About featherplay), what you did and what
+happened, and how to reproduce it if you can. Leave out your own cookies, sessions and tokens;
+a made-up or expired value shows the problem just as well.
 
 I'll reply in the report. A fix ships in a new release, and the advisory is published with
 it.

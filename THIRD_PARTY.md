@@ -27,8 +27,9 @@ and checks each file against a SHA256 hash pinned in featherplay's code
 When GitHub can't be reached, Deno comes from Deno's own download server, dl.deno.land, whose
 zip has its own pinned hash, and on Windows the same yt-dlp comes from featherplay's site
 (unchanged, under the same hash).
-After that, yt-dlp updates itself with its own updater (`yt-dlp -U`) at most once a day. They
-are separate programs that featherplay runs; they are not linked into it.
+After that, yt-dlp updates itself with its own updater (`yt-dlp -U`) at most once a day, and
+once more the first time a song fails after featherplay starts. They are separate programs
+that featherplay runs; they are not linked into it.
 
 ## Embedded scripts
 

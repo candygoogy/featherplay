@@ -13,7 +13,7 @@ body:
     id: version
     attributes:
       label: featherplay version
-      description: Settings > About shows it.
+      description: Settings > Account > About featherplay shows it.
       placeholder: "0.1.0"
     validations:
       required: true
@@ -94,7 +94,7 @@ body:
     id: diagnostics
     attributes:
       label: Diagnostics
-      description: Settings > About > Copy diagnostics, then paste here.
+      description: Settings > Account > About featherplay > Copy diagnostics, then paste here.
       render: text
 
   - type: textarea
@@ -102,7 +102,7 @@ body:
     attributes:
       label: Log
       description: |
-        Attach `featherplay.log` (Settings > About > Open log folder): on Windows it's in
+        Attach `featherplay.log` (Settings > Account > About featherplay > Open log folder): on Windows it's in
         `%LOCALAPPDATA%\featherplay\logs`, on Linux in `~/.local/state/featherplay/logs`. Or
         paste the lines from around the problem. featherplay leaves cookies,
         tokens and keys out of its log, but read it before you post it anyway.
