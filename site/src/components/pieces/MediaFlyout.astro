@@ -1,9 +1,10 @@
 ---
-// Windows' media controls for featherplay's song, as the system's media flyout shows them: the
-// app, the time, the cover, the title and artist, the line and the three keys. Live on the
-// player store (src/demo/bind-pieces.ts); the keys play, pause and skip the page's one player.
-// `surface` gives it its own glass, painted (it lies on a still panel); inside a flyout it
-// takes the flyout's.
+// Windows' media controls for featherplay's song: the app, the cover, the title and artist, the
+// line, the time and the three keys. Live on the player store (src/demo/bind-pieces.ts); the
+// keys play, pause and skip the page's one player. `surface` gives it its own glass, painted (it
+// lies on a still panel); inside a flyout it takes the flyout's. `overlay` lays it out as
+// Windows 11's own media overlay does (the app's name over the title and artist, the cover on
+// the right, the time under the line, the keys centred below): the media keys' piece uses it.
 import "../../styles/pieces.css";
 import Icon from "../Icon.astro";
 import Logo from "../Logo.astro";
@@ -12,33 +13,55 @@ import { formatTime } from "../../demo/player";
 
 interface Props {
   surface?: boolean;
+  overlay?: boolean;
   /** The cover's side, in px. */
   cover?: number;
   class?: string;
 }
-const { surface = false, cover = 72, class: className } = Astro.props;
+const { surface = false, overlay = false, cover = 72, class: className } = Astro.props;
 const song = songById(demoStart.songId)!;
+const at = formatTime(demoStart.positionMs);
+const length = formatTime(song.durationMs);
 ---
 
 <div
-  class:list={["m-media", className, { "glass float": surface }]}
+  class:list={["m-media", className, { "glass float": surface, "mm-overlay": overlay }]}
   data-piece="media"
   inert
   role="group"
   aria-label="Now playing in featherplay, as Windows' media controls show it"
   style={`--cover:${cover}px`}
 >
-  <p class="mm-app">
-    <Logo size={16} />featherplay<span class="mm-time num"><span data-bind="at">{formatTime(demoStart.positionMs)}</span> of <span data-bind="duration">{formatTime(song.durationMs)}</span></span>
-  </p>
-  <div class="mm-row">
-    <span class="mm-cover"><img data-bind="cover" src={song.cover} width={cover} height={cover} alt="" decoding="async" /></span>
-    <div class="mm-text">
-      <p class="mm-title" data-bind="title">{song.title}</p>
-      <p class="mm-artist" data-bind="artist">{song.artist}</p>
-    </div>
-  </div>
+  {
+    overlay ? (
+      <div class="mm-head">
+        <div class="mm-text">
+          <p class="mm-app">
+            <Logo size={16} />
+            featherplay
+          </p>
+          <p class="mm-title" data-bind="title">{song.title}</p>
+          <p class="mm-artist" data-bind="artist">{song.artist}</p>
+        </div>
+        <span class="mm-cover"><img data-bind="cover" src={song.cover} width={cover} height={cover} alt="" decoding="async" /></span>
+      </div>
+    ) : (
+      <>
+        <p class="mm-app">
+          <Logo size={16} />featherplay<span class="mm-time num"><span data-bind="at">{at}</span> of <span data-bind="duration">{length}</span></span>
+        </p>
+        <div class="mm-row">
+          <span class="mm-cover"><img data-bind="cover" src={song.cover} width={cover} height={cover} alt="" decoding="async" /></span>
+          <div class="mm-text">
+            <p class="mm-title" data-bind="title">{song.title}</p>
+            <p class="mm-artist" data-bind="artist">{song.artist}</p>
+          </div>
+        </div>
+      </>
+    )
+  }
   <span class="rail mm-rail" aria-hidden="true"><span data-fill style={`transform:scaleX(${demoStart.positionMs / song.durationMs})`}></span></span>
+  {overlay && <p class="mm-times num"><span data-bind="at">{at}</span><span data-bind="duration">{length}</span></p>}
   <div class="mm-keys">
     <button type="button" data-do="previous" aria-label="Previous"><Icon name="prev" size={18} /></button>
     <button type="button" data-do="toggle" data-play-label aria-label="Play">

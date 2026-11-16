@@ -3,7 +3,7 @@
 // placed straight on its cell and whole inside it at every width (all on the page's one
 // player), then the small extras as a line of text. Facts from the repo's README ("Coming
 // from Pear?").
-import MediaFlyout from "./pieces/MediaFlyout.astro";
+import MediaKeys from "./pieces/MediaKeys.astro";
 import DiscordCard from "./pieces/DiscordCard.astro";
 import ScrobbleRow from "./pieces/ScrobbleRow.astro";
 import SponsorBlock from "./pieces/SponsorBlock.astro";
@@ -20,7 +20,7 @@ import Note from "./Note.astro";
   <div class="cells">
     <article class="cell c-keys">
       <div class="cell-text"><h3 class="t-subtitle">Media keys</h3><p>Play, pause and skip from your keyboard, the Windows media overlay or the taskbar.</p></div>
-      <div class="cell-piece"><div class="keys-hold"><MediaFlyout surface cover={88} /><Note id="keys" arrow="up-left" class="n-keys" /></div></div>
+      <div class="cell-piece"><MediaKeys><Note id="keys" arrow="up-left" class="n-keys" /></MediaKeys></div>
     </article>
     <article class="cell c-discord">
       <div class="cell-text"><h3 class="t-subtitle">Discord status</h3><p>Friends see what you’re playing, with a preview in Settings. Off until you turn it on.</p></div>
@@ -106,13 +106,10 @@ import Note from "./Note.astro";
   .c-tray .cell-text {
     align-content: center;
   }
-  /* Beside the media keys' flyout, pointing back at it. */
-  .keys-hold {
-    position: relative;
-  }
+  /* Beside the keys, pointing back up at them. */
   .c-keys :global(.n-keys) {
-    left: calc(100% + var(--s2));
-    top: var(--s6);
+    left: calc(100% + var(--s3));
+    top: 55%;
   }
   /* Phones and tablets: no media keys to try. */
   @media (width < 760px) {
@@ -137,6 +134,39 @@ import Note from "./Note.astro";
   }
   .c-scrobble .cell-piece > :global(*) {
     width: min(100%, 30rem);
+  }
+  /* A wide well (a large screen): Discord's card and SponsorBlock's a size up, by layout, so
+     each fills its well as its neighbours do. */
+  .cell-piece {
+    container: piece / inline-size;
+  }
+  @container piece (width > 36rem) {
+    .c-discord :global(.m-discord) {
+      width: min(31rem, 100%);
+      padding: var(--s5) var(--s6);
+      font-size: var(--fs-text);
+    }
+    .c-discord :global(.dc-art > img) {
+      width: 112px;
+      height: 112px;
+    }
+    .c-discord :global(.dc-title) {
+      font-size: var(--fs-lede);
+    }
+  }
+  @container piece (width > 50rem) {
+    .c-sponsor :global(.m-sponsor) {
+      width: min(46rem, 100%);
+      padding: var(--s6) var(--s7) var(--s7);
+      font-size: var(--fs-text);
+    }
+    .c-sponsor :global(.sp-top img) {
+      width: 56px;
+      height: 56px;
+    }
+    .c-sponsor :global(.sp-title) {
+      font-size: var(--fs-lede);
+    }
   }
   .cell-piece > :global(*) {
     max-width: 100%;

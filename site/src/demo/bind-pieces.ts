@@ -55,11 +55,29 @@ export function bindPieces(player: Player): void {
   // The pieces with controls are inert until their script is here (MediaFlyout, LyricCard).
   for (const p of $$("[data-piece][inert]")) p.inert = false;
 
+  // ---- The media keys: their caps press when the visitor's own keys reach the page (Media
+  // Session, below) or one of the piece's other controls is used ----
+  const caps = $$("[data-key]");
+  const capTimers = new WeakMap<HTMLElement, number>();
+  const press = (key: string) => {
+    for (const c of caps) {
+      if (c.dataset.key !== key) continue;
+      clearTimeout(capTimers.get(c));
+      // Pressed again while still down: up, and down again on the next frame.
+      if (c.hasAttribute("data-pressed")) {
+        c.removeAttribute("data-pressed");
+        requestAnimationFrame(() => c.toggleAttribute("data-pressed", true));
+      } else c.toggleAttribute("data-pressed", true);
+      capTimers.set(c, window.setTimeout(() => c.removeAttribute("data-pressed"), 200));
+    }
+  };
+
   // ---- Buttons anywhere on the page that act on the player ----
   document.addEventListener("click", (e) => {
     const b = (e.target as Element).closest<HTMLElement>("[data-do]");
     if (!b) return;
     const act = b.dataset.do;
+    if (act && b.closest("[data-keys-stage]")) press(act);
     if (act === "toggle") player.toggle();
     else if (act === "previous") player.previous();
     else if (act === "next") player.next();
@@ -184,10 +202,10 @@ export function bindPieces(player: Player): void {
         // An action this browser doesn't offer.
       }
     };
-    set("play", () => player.resume());
-    set("pause", () => player.pause());
-    set("previoustrack", () => player.previous());
-    set("nexttrack", () => player.next());
+    set("play", () => (press("toggle"), player.resume()));
+    set("pause", () => (press("toggle"), player.pause()));
+    set("previoustrack", () => (press("previous"), player.previous()));
+    set("nexttrack", () => (press("next"), player.next()));
     set("seekto", (d) => d.seekTime != null && player.seek(d.seekTime * 1000));
   }
 
@@ -324,9 +342,10 @@ export function bindPieces(player: Player): void {
       }
     }
 
-    if (songChanged || secondChanged || playChanged) {
+    if (songChanged || secondChanged || playChanged || resynced) {
       const at = formatTime(s.positionMs);
-      for (const el of $$("[data-piece] [data-bind='at']")) el.textContent = at;
+      // A piece out of view keeps its time until it is back (again(), which comes here).
+      for (const el of $$("[data-piece] [data-bind='at']")) if (!away.has(el.closest("[data-piece]")!)) el.textContent = at;
       const [a, b] = trayLines(s);
       for (const el of $$("[data-tray-1]")) el.textContent = a;
       for (const el of $$("[data-tray-2]")) el.textContent = b;

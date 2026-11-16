@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 // The small live pieces all follow the page's one player: one song, one clock.
 test.use({ viewport: { width: 1440, height: 900 } });
@@ -41,6 +41,45 @@ test("pressing play anywhere plays the one song everywhere: the media keys, the 
   await expect(kept.locator("[data-tray-2]")).toHaveText(/^Josh Woodward, paused at 0:\d\d$/);
 });
 
+/** The page's Media Session handlers, kept where a test can call them as the system would when
+ *  the visitor presses a media key. */
+const catchKeys = (page: Page) =>
+  page.addInitScript(() => {
+    const ms = navigator.mediaSession;
+    const handlers: Record<string, MediaSessionActionHandler | null> = {};
+    const set = ms.setActionHandler.bind(ms);
+    ms.setActionHandler = (action, fn) => {
+      handlers[action] = fn;
+      set(action, fn);
+    };
+    (window as unknown as { keys: typeof handlers }).keys = handlers;
+  });
+const key = (page: Page, action: string, seekTime?: number) =>
+  page.evaluate(([action, seekTime]) => (window as unknown as { keys: Record<string, (d: object) => void> }).keys[action as string]({ action, seekTime }), [action, seekTime] as const);
+
+test("the key caps press for the visitor's own media keys and for the taskbar's and overlay's buttons", async ({ page }) => {
+  await catchKeys(page);
+  await page.goto("/");
+  const stage = page.locator("#kept [data-keys-stage]");
+  await stage.scrollIntoViewIfNeeded();
+  await stage.evaluate((s) => {
+    const w = window as unknown as { pressed: string[] };
+    w.pressed = [];
+    // Each time a cap goes down (the attribute added).
+    new MutationObserver((rs) => rs.forEach((r) => r.oldValue === null && w.pressed.push((r.target as HTMLElement).dataset.key!))).observe(s, { attributes: true, subtree: true, attributeFilter: ["data-pressed"], attributeOldValue: true });
+  });
+  await stage.locator(".mk-thumb [data-do='toggle']").click();
+  await expect(page.locator("html")).toHaveAttribute("data-playing", "true");
+  await key(page, "nexttrack");
+  await expect(stage.locator(".m-media [data-bind='title']")).toHaveText("Invisible Light");
+  await key(page, "pause");
+  await expect(page.locator("html")).toHaveAttribute("data-playing", "false");
+  await stage.locator(".m-media [data-do='previous']").click();
+  expect(await page.evaluate(() => (window as unknown as { pressed: string[] }).pressed)).toEqual(["toggle", "next", "toggle", "previous"]);
+  // The caps are the keyboard's way in: real buttons, each named.
+  await expect(stage.getByRole("button", { name: "Next" })).toHaveCount(2);
+});
+
 test("the scrobble ring fills with the time heard, closes at half the song with a tick, and the song joins the past ones", async ({ page }) => {
   await page.clock.install();
   await page.goto("/");
@@ -50,7 +89,8 @@ test("the scrobble ring fills with the time heard, closes at half the song with 
   // runs on the page's idle time, which the clock holds).
   await page.clock.runFor(2000);
   await sc.scrollIntoViewIfNeeded();
-  await page.locator("#kept .m-media [data-do='toggle']").click();
+  // (Pressed where it is: the ring stays in view, as a visitor's would below it.)
+  await page.locator("#kept .m-media [data-do='toggle']").evaluate((b: HTMLElement) => b.click());
   await page.clock.runFor(10_000);
   await expect(sc.locator("[data-sc-label]")).toHaveText("Scrobbling now");
   const p = Number(await sc.locator("[data-sc-ring]").evaluate((el) => getComputedStyle(el).getPropertyValue("--p")));
