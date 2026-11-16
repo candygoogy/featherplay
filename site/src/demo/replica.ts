@@ -130,12 +130,11 @@ function bindReplica(root: HTMLElement, player: Player) {
   // controls that do nothing.
   root.inert = false;
   // On the page's desktop (Window.astro) the caption buttons act on the window: minimise to
-  // the tray, maximise and restore, close (which asks, as the app does). Elsewhere maximise and
-  // close are only drawn, and there's no minimise.
+  // the tray, maximise and restore, close (which asks, as the app does). Elsewhere the three are
+  // only drawn: a title bar as Windows draws it, with nothing to press.
   const inWindow = !!root.closest("[data-window]");
-  if (!inWindow) setAll(root, '[data-act="minimise"]', (el) => (el.hidden = true));
   if (!inWindow) {
-    for (const el of $$<HTMLButtonElement>(root, '[data-act="maximise"], [data-act="close"]')) {
+    for (const el of $$<HTMLButtonElement>(root, '[data-act="minimise"], [data-act="maximise"], [data-act="close"]')) {
       el.disabled = true;
       el.setAttribute("aria-hidden", "true");
       el.tabIndex = -1;
