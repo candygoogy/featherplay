@@ -136,6 +136,15 @@
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+}
+/* The second line and its unseen sizer share one row. */
+.tray-tip > [data-tray-2],
+.tray-tip > [data-tray-size] {
+  grid-area: 2 / 1;
+}
+.tray-tip > [data-tray-size] {
+  visibility: hidden;
 }
 .tray-corner {
   position: relative;

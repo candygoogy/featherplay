@@ -194,7 +194,14 @@ import Note from "./Note.astro";
     display: flex;
     align-items: flex-end;
     justify-content: center;
-    gap: var(--s5) var(--s7);
+    /* (The gap gives way before the dialog does: its two buttons keep one row.) */
+    gap: var(--s5) clamp(var(--s4), 3.5cqi, var(--s7));
+  }
+  @container (width >= 46rem) {
+    .tray-story .mc-btns {
+      flex-wrap: nowrap;
+      white-space: nowrap;
+    }
   }
   @container (width < 46rem) {
     .tray-story {
@@ -210,6 +217,23 @@ import Note from "./Note.astro";
     display: grid;
     justify-items: start;
     gap: var(--s3);
+  }
+  /* The tray's step keeps one width whatever the song: its tooltip is as wide as its words (a
+     long title, a short one), set to the step's right edge with its label, so it grows into
+     room that is already there and the dialog beside it never moves. */
+  .step:has(.tray-corner) {
+    flex: none;
+    /* (A length, not a share of the row: the row is sized by what is in it.) */
+    width: 19.5rem;
+    max-width: 100%;
+    justify-items: end;
+  }
+  .step:has(.tray-corner) :global(.tray-corner) {
+    grid-template-columns: minmax(0, 1fr);
+    width: 100%;
+  }
+  .step:has(.tray-corner) :global(.tray-tip) {
+    max-width: 100%;
   }
   .step-l {
     display: flex;

@@ -9,7 +9,7 @@
 
 import type { Song } from "../data/songs";
 import { formatTime, lineNow, lyricsSource, type Player, type PlayerState } from "./player";
-import { createListen, mediaMetadataFor, scrobbleAfterMs, sponsorPlayhead, trayLines } from "./pieces";
+import { createListen, mediaMetadataFor, scrobbleAfterMs, sponsorPlayhead, trayLines, trayWidest } from "./pieces";
 import { followLyrics } from "./follow";
 import { lineItems, markLines } from "./lyric-lines";
 import { runLine } from "./lines";
@@ -341,6 +341,7 @@ export function bindPieces(player: Player): void {
       const [a, b] = trayLines(s);
       for (const el of $$("[data-tray-1]")) el.textContent = a;
       for (const el of $$("[data-tray-2]")) el.textContent = b;
+      if (songChanged) for (const el of $$("[data-tray-size]")) el.textContent = trayWidest(song);
       if (ms?.setPositionState) {
         try {
           ms.setPositionState({ duration: song.durationMs / 1000, position: Math.min(s.positionMs, song.durationMs) / 1000, playbackRate: 1 });

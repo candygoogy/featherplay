@@ -14,6 +14,15 @@ export function trayLines({ song, playing, positionMs }: Now): [string, string] 
   return [song.title, playing ? `${song.artist}, ${at} of ${formatTime(song.durationMs)}` : `${song.artist}, paused at ${at}`];
 }
 
+/** The longer of the tooltip's two second lines for a song (playing, paused), at the song's
+ *  longest time: what the tooltip is sized by, so it doesn't change width on a pause. */
+export function trayWidest(song: Now["song"]): string {
+  if (!song) return "";
+  const full = formatTime(song.durationMs);
+  const lines = [`${song.artist}, ${full} of ${full}`, `${song.artist}, paused at ${full}`];
+  return lines[0].length >= lines[1].length ? lines[0] : lines[1];
+}
+
 /** Last.fm's rule: a song is scrobbled once half of it has been heard, four minutes at most. */
 export function scrobbleAfterMs(durationMs: number): number {
   return Math.min(durationMs / 2, 240_000);

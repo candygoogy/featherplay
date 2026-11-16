@@ -97,14 +97,11 @@ const keys = [
     padding-bottom: var(--s3);
   }
   /* A long title takes a second line rather than losing its end. */
+  /* One line, cut with an ellipsis as Windows cuts it: a long title doesn't make the overlay
+     taller (and move what is under it). */
   .mm-overlay .mm-title {
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
     font-size: var(--fs-text);
     line-height: 1.3;
-    white-space: normal;
-    text-wrap: balance;
   }
   .mm-overlay .mm-rail {
     margin: var(--s4) 0 0;

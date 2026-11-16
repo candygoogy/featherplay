@@ -1,7 +1,9 @@
 ---
 // featherplay's tray icon and Windows' two-line tooltip on it (the song, then the artist and
 // the time), live on the player store (src/demo/pieces.ts trayLines). With `corner`, drawn in
-// the corner of a taskbar with the chevron and the visitor's clock, the tooltip over it.
+// the corner of a taskbar with the chevron and the visitor's clock, the tooltip over it. A
+// third, unseen line holds the longer of the second line's two wordings (trayWidest), so the
+// tooltip keeps one width whether the song plays or is paused and nothing beside it shifts.
 import "../../styles/pieces.css";
 import Logo from "../Logo.astro";
 
@@ -18,6 +20,7 @@ const { corner = false, class: className } = Astro.props;
       <span class="tray-tip glass float" aria-hidden="true">
         <span data-tray-1>featherplay</span>
         <span data-tray-2>Nothing playing</span>
+        <span data-tray-size />
       </span>
       <span class="tray-row" aria-hidden="true">
         <span class="tb">
@@ -31,6 +34,7 @@ const { corner = false, class: className } = Astro.props;
     <span class:list={["tray-tip glass float", className]} data-piece="tray">
       <span data-tray-1>featherplay</span>
       <span data-tray-2>Nothing playing</span>
+      <span data-tray-size aria-hidden="true" />
     </span>
   )
 }

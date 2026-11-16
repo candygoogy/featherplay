@@ -175,8 +175,11 @@ const half = (scrobbleAfterMs(song.durationMs) / song.durationMs) * 100;
   [data-scrobbled] .sc-half {
     color: var(--accent);
   }
-  /* The songs scrobbled this visit. */
+  /* The songs scrobbled this visit: the list has its three rows' room from the start (the
+     empty line fills it), so a song landing in it moves nothing on the page. */
   .sc-recent {
+    --sc-room: 156px;
+    display: grid;
     margin-top: var(--s5);
     padding-top: var(--s4);
     border-top: 1px solid var(--hairline);
@@ -194,8 +197,14 @@ const half = (scrobbleAfterMs(song.durationMs) / song.durationMs) * 100;
     font-size: 0.75rem;
     font-weight: var(--fw-medium);
   }
+  .sc-past,
+  .sc-empty {
+    grid-area: 2 / 1;
+    min-height: var(--sc-room);
+  }
   .sc-past {
     display: grid;
+    align-content: start;
     gap: 6px;
     margin: var(--s3) 0 0;
     padding: 0;
@@ -233,7 +242,6 @@ const half = (scrobbleAfterMs(song.durationMs) / song.durationMs) * 100;
   .sc-empty {
     display: grid;
     place-items: center;
-    min-height: 48px;
     margin-top: var(--s3);
     padding: var(--s2) var(--s4);
     border-radius: var(--r-small);
@@ -248,6 +256,9 @@ const half = (scrobbleAfterMs(song.durationMs) / song.durationMs) * 100;
   /* Narrow (a phone): the state under the song, the services under each scrobbled one, so the
      titles keep their room. */
   @container sc (width < 19rem) {
+    .sc-recent {
+      --sc-room: 210px;
+    }
     .sc-now {
       grid-template-columns: 56px minmax(0, 1fr);
       row-gap: 0;
