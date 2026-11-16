@@ -152,7 +152,8 @@ test("the footer's unofficial notice opens the answer to \"Is featherplay offici
   await page.locator("footer").getByRole("link", { name: "Unofficial notice" }).click();
   await expect(page).toHaveURL(/#official$/);
   await expect(page.locator("#official")).toHaveAttribute("open", "");
-  await expect(page.locator("#official")).toBeInViewport();
+  // (A long glide up from the footer: with every engine at work at once it takes its time.)
+  await expect(page.locator("#official")).toBeInViewport({ timeout: 15_000 });
 });
 
 // The site says what the repo's README says. Closed answers are in the HTML: textContent.
