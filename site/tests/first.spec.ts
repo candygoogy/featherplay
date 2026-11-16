@@ -232,6 +232,19 @@ test.describe("the desk", () => {
     expect(fade.props).toEqual(["opacity"]);
     await expect.poll(front, { timeout: 2000 }).toBe("dark:#3E4FA8");
   });
+  test("the desk's light is the first screen's and the footer's: under the reading sections it calms", async ({ page }) => {
+    await page.goto("/");
+    await shown(page);
+    const desk = page.locator("[data-desk]");
+    const calm = page.locator("[data-desk] [data-slot].front .k-calm");
+    await expect(desk).not.toHaveAttribute("data-low", /.*/);
+    await expect(calm).toHaveCSS("visibility", "hidden");
+    await page.evaluate(() => document.getElementById("kept")!.scrollIntoView());
+    await expect(desk).toHaveAttribute("data-low", "");
+    await expect.poll(() => calm.evaluate((c) => Number(getComputedStyle(c).opacity))).toBeGreaterThan(0.8);
+    await page.evaluate(() => scrollTo(0, document.documentElement.scrollHeight));
+    await expect(desk).not.toHaveAttribute("data-low", /.*/);
+  });
   test("at rest the slot underneath is hidden (nothing blended on every frame without a GPU)", async ({ page }) => {
     await page.goto("/");
     await shown(page);
