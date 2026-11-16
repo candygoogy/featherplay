@@ -51,6 +51,8 @@ export function startFirst(): void {
     if (!plan) {
       first.dataset.laid = "stack";
       for (const k of ["--hx", "--hy", "--cy", "--first-h", "--col-w"]) first.style.removeProperty(k);
+      // The shelf's place and size in the composition go with it: stacked, its CSS sizes it.
+      for (const k of ["--sx", "--sy", "--sz", "--sg", "--cols"]) shelf?.style.removeProperty(k);
       delete slot.dataset.fitW;
       slot.dataset.fit = "first";
       slot.removeAttribute("style");
