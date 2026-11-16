@@ -154,6 +154,19 @@ import Note from "./Note.astro";
       font-size: var(--fs-lede);
     }
   }
+  /* A narrow well (a phone): a smaller cover, so the song's title keeps its room. */
+  @container piece (width < 22rem) {
+    .c-discord :global(.m-discord) {
+      padding: var(--s4);
+    }
+    .c-discord :global(.dc-act) {
+      gap: var(--s3);
+    }
+    .c-discord :global(.dc-art > img) {
+      width: 64px;
+      height: 64px;
+    }
+  }
   @container piece (width > 50rem) {
     .c-sponsor :global(.m-sponsor) {
       width: min(46rem, 100%);
@@ -211,6 +224,11 @@ import Note from "./Note.astro";
     .tray-story .step-arrow {
       rotate: 90deg;
       margin-top: 0;
+    }
+    /* One under the other, the tray's step is centred under the dialog as the arrow is. */
+    .tray-story .step:has(.tray-corner),
+    .tray-story .step:has(.tray-corner) :global(.tray-corner) {
+      justify-items: center;
     }
   }
   .step {

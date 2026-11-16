@@ -200,6 +200,14 @@ const sizes = [
   .lyr-hold:has(:is([data-has-lyrics="false"], [data-off])) :global(.n-line) {
     opacity: 0;
   }
+  /* On a narrow card the lines begin nearer its top: a shorter arrow, so it stops above the
+     first line's words instead of on them (the arrow's own size is set on it, in em). */
+  @container lyr-hold (width < 44rem) {
+    .lyr-hold :global(.n-line svg) {
+      width: auto !important;
+      height: 1.05em !important;
+    }
+  }
   /* On a narrow card the strip takes the note's place. */
   @container lyr-hold (width < 44rem) {
     .lyr-hold:has(.lyr-strip:not([hidden])) :global(.n-line) {
@@ -739,9 +747,11 @@ const sizes = [
 <!-- The lyric card's own states set from this section (its text size, lyrics off): here, not in
      pieces.css, so only the page that has them loads them. -->
 <style is:global>
+  /* As tall as the screen allows, but no taller than about its own width (a tall, narrow
+     window: half a wide screen), where its lines wouldn't fill it and a band would lie empty. */
   @media (width >= 1080px) {
     .lyric-card {
-      height: clamp(30rem, 100svh - 15rem, 50rem);
+      height: clamp(30rem, min(100svh - 15rem, 105cqi), 50rem);
     }
   }
   .lyric-card[data-size="0"] .lc-lines {
