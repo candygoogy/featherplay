@@ -221,7 +221,7 @@ export function followLyrics(panel: HTMLElement, list: HTMLElement): LyricsFollo
   // while). The panel clips (overflow: clip), so focus can't scroll the box itself and leave
   // the lines' anchor off for good.
   panel.addEventListener("focusin", (e) => {
-    const line = (e.target as Element).closest?.(".line");
+    const line = (e.target as Element).closest?.(".line, .lc-line");
     if (!line || !list.contains(line)) return;
     const box = panel.getBoundingClientRect();
     const r = line.getBoundingClientRect();

@@ -179,3 +179,26 @@ test("with a clip playing, the card's line follows the clip's own time", async (
   }
   expect(checked).toBeGreaterThan(4);
 });
+
+for (const [w, h] of [[1024, 768], [390, 844]] as const) {
+  test(`Tab onto a line out of sight brings it into the card's view (${w}x${h})`, async ({ page }) => {
+    await page.setViewportSize({ width: w, height: h });
+    await open(page);
+    const all = lines(page).locator(".lc-line");
+    const n = await all.count();
+    await all.first().focus();
+    for (let i = 0; i < n; i++) {
+      if (i) await page.keyboard.press("Tab");
+      await expect(all.nth(i)).toBeFocused();
+      await page.waitForTimeout(450);
+      // The line's middle shows inside the card's view.
+      const seen = await all.nth(i).evaluate((el) => {
+        const v = el.closest("[data-lc-view]")!.getBoundingClientRect();
+        const r = el.getBoundingClientRect();
+        const y = (r.top + r.bottom) / 2;
+        return y > v.top && y < v.bottom;
+      });
+      expect(seen, `line ${i + 1}`).toBe(true);
+    }
+  });
+}
