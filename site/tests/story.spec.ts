@@ -58,7 +58,6 @@ test("the window takes the three holds: whole and large, the app's real narrow l
   await expect(page.locator("[data-window] [data-queue]")).toBeHidden();
   expect(await capOpacity(page, 1)).toBe(1);
   expect(await capOpacity(page, 0)).toBe(0);
-  expect(await page.locator("[data-snap]").evaluate((s) => Number(getComputedStyle(s).opacity))).toBe(0);
   await inViewport(page, "narrow");
   // At rest in a hold the window is the app, there to use.
   expect(await page.locator("[data-window]").evaluate((w) => w.inert)).toBe(false);

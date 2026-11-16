@@ -9,11 +9,13 @@
 // The loop runs only while something moves (the scroll's smoothing settling), reads no layout
 // (geometry is measured on resize and when the window lays out) and moves the window, its
 // ground and the words by transform and opacity. The change of shape is Windows' snap: the
-// app fades, its ground carries its icon from the whole rect to the narrow one, the app is laid
-// out narrow (once, while hidden) and fades back in; the snap outline marks where it goes.
+// app fades into its ground, which travels from the whole rect to the narrow one, the app is
+// laid out narrow (once, at the middle, unseen) and fades back out of it. The ground is the
+// view's own: the song's colour on Now playing and lyrics (the window never turns into a blank
+// box on the way), the app's plain surface with its icon on a browsing page.
 // A window the visitor dragged, maximised or sent to the tray joins in from where it is.
 
-import type { Player } from "../demo/player";
+import { isNowView, type Player } from "../demo/player";
 import { whenWindow, type Frame } from "../demo/window";
 import { fitWindow, IDEAL } from "../demo/fit";
 import { LYRICS_MIN } from "./first-math";
@@ -46,10 +48,11 @@ export async function startStory(player: Player): Promise<void> {
   const caps = [...stage.querySelectorAll<HTMLElement>("[data-cap]")];
   const ghost = stage.querySelector<HTMLElement>("[data-ghost]")!;
   const icon = stage.querySelector<HTMLElement>("[data-ghost-icon]")!;
-  const snap = stage.querySelector<HTMLElement>("[data-snap]")!;
   const songFly = document.getElementById("fly-song");
   const stillNote = stage.querySelector<HTMLElement>("[data-note='playing']");
   const steps = document.querySelector<HTMLElement>("[data-steps]");
+  /** Whether the ground wears Now playing's colour (data-ghost-now on the stage). */
+  let ghostNow: boolean | null = null;
   /** The story's flyout goes when its beat ends, or the story does. */
   const endBeat = () => {
     if (stillNote) hideNote(stillNote);
@@ -190,7 +193,6 @@ export async function startStory(player: Player): Promise<void> {
     };
     ghost.style.width = `${w1}px`;
     ghost.style.height = `${h1}px`;
-    Object.assign(snap.style, { width: `${W2}px`, height: `${H2}px`, transform: `translate(${r2.x}px, ${r2.y}px)` });
     target = storyProgress(scrollY, G.top, LEN);
     cur = target;
     trayAt = null;
@@ -205,15 +207,24 @@ export async function startStory(player: Player): Promise<void> {
   let trayAt: { x: number; y: number } | null = null;
   let beat = false;
   let lastP = -1;
+  /** Where the page is (the scroll handler keeps it), and how far past the pin's end the tray's
+   *  flyout stays: until the next section would come up under it (set as it opens). */
+  let lastY = scrollY;
+  let flyRoom = innerHeight * 0.3;
+  let lastGone = false;
   function render(p: number, force = false) {
     if (!G) return;
-    if (p === lastP && !force) return;
+    // Past its end the stage scrolls away with the tray's words still in sight: the flyout
+    // stays with them, and goes as the next section comes up to it.
+    const gone = lastY - (G.top + LEN) > flyRoom;
+    if (p === lastP && gone === lastGone && !force) return;
     lastP = p;
+    lastGone = gone;
     // The story moves its words (a selection in them is drawn again, src/scripts/selection.ts).
     dispatchEvent(new Event("placechange"));
     const { a, b, c } = phases(p);
     // The beat in the tray: the capsule's flyout shows the song, still playing.
-    const inBeat = p >= 0.76 && p < 0.995 && c >= 1;
+    const inBeat = p >= 0.76 && c >= 1 && !gone;
     if (inBeat !== beat && songFly) {
       beat = inBeat;
       if (inBeat && !songFly.matches(":popover-open")) {
@@ -225,6 +236,7 @@ export async function startStory(player: Player): Promise<void> {
           requestAnimationFrame(() => {
             if (!beat || !songFly.matches(":popover-open")) return;
             const f = songFly.getBoundingClientRect();
+            flyRoom = Math.max(0, innerHeight - f.bottom + 64);
             showNoteAt(stillNote, f.right + 12, f.top + 36);
           });
       } else if (!inBeat) endBeat();
@@ -261,7 +273,6 @@ export async function startStory(player: Player): Promise<void> {
     if (p <= 0) {
       win.drive(null);
       ghost.style.opacity = "0";
-      snap.style.opacity = "0";
       return;
     }
     // Leaving the first screen, the visitor's placement (dragged, maximised) is carried along;
@@ -288,7 +299,7 @@ export async function startStory(player: Player): Promise<void> {
       const r0 = { x: from.x, y: from.y, w: from.w * from.s, h: from.h * from.s };
       gr = { x: lerp(r0.x, G.r1.x, a), y: lerp(r0.y, G.r1.y, a), w: lerp(r0.w, G.r1.w, a), h: lerp(r0.h, G.r1.h, a) };
       ghostO = a > 0 ? Math.min(seg(a, 0, 0.2), 1 - seg(a, 0.85, 1)) : 0;
-      f = a < 0.5 ? riding(from.w, from.h, 1 - seg(a, 0, 0.42)) : riding(L.w, L.h, seg(a, 0.58, 1));
+      f = a < 0.5 ? riding(from.w, from.h, 1 - seg(a, 0.06, 0.5)) : riding(L.w, L.h, seg(a, 0.5, 0.94));
     } else if (b <= 0) {
       f = { w: L.w, h: L.h, x: lerp(from.x, G.r1.x, a), y: lerp(from.y, G.r1.y, a), s: lerp(from.s, G.r1.s, a), o: 1 };
     } else if (c <= 0) {
@@ -297,7 +308,7 @@ export async function startStory(player: Player): Promise<void> {
       gr = { x: lerp(G.r1.x, G.r2.x, b), y: lerp(G.r1.y, G.r2.y, b), w: lerp(G.r1.w, G.r2.w, b), h: lerp(G.r1.h, G.r2.h, b) };
       ghostO = Math.min(seg(b, 0, 0.2), 1 - seg(b, 0.85, 1));
       // The size the app is laid out at is its own; its place and scale are its ground's.
-      f = b < 0.5 ? riding(L.w, L.h, 1 - seg(b, 0, 0.42)) : riding(NARROW.w, NARROW.h, seg(b, 0.58, 1));
+      f = b < 0.5 ? riding(L.w, L.h, 1 - seg(b, 0.06, 0.5)) : riding(NARROW.w, NARROW.h, seg(b, 0.5, 0.94));
     } else {
       // Into the tray: toward the capsule's song, smaller, then gone (where the song is, read
       // once as the move starts, not every frame).
@@ -311,12 +322,13 @@ export async function startStory(player: Player): Promise<void> {
     win.drive(f);
     ghost.style.opacity = ghostO.toFixed(3);
     if (ghostO > 0) {
+      // The ground of the view the window is on (read as the move begins).
+      const now = isNowView(player.state.view);
+      if (now !== ghostNow) stage!.toggleAttribute("data-ghost-now", (ghostNow = now));
       ghost.style.transform = `translate(${gr.x.toFixed(1)}px, ${gr.y.toFixed(1)}px) scale(${(gr.w / G.r1.w).toFixed(4)}, ${(gr.h / G.r1.h).toFixed(4)})`;
       icon.style.transform = `translate(${(gr.x + gr.w / 2 - 28).toFixed(1)}px, ${(gr.y + gr.h / 2 - 28).toFixed(1)}px)`;
     }
     icon.style.opacity = (ghostO * Math.min(seg(k, 0.2, 0.4), 1 - seg(k, 0.58, 0.76))).toFixed(3);
-    const bRaw = seg(p, 0.27, 0.5);
-    snap.style.opacity = (seg(bRaw, 0, 0.2) * (1 - seg(bRaw, 0.72, 1))).toFixed(3);
   }
 
   // ---- Scroll: a target from scrollY, smoothed; the loop sleeps when it arrives ----
@@ -324,7 +336,6 @@ export async function startStory(player: Player): Promise<void> {
   let cur = 0;
   let raf = 0;
   let last = 0;
-  let lastY = scrollY;
   let dir = 1;
   /** The page's own glide on to a hold, and where it last put the page. */
   let glide: { from: number; edge: number; to: number; t0: number; ms: number; tail: number } | null = null;
@@ -424,7 +435,7 @@ export async function startStory(player: Player): Promise<void> {
       // Only what the story set: the shelf's own style holds its place (first.ts), and
       // clearing all of it left the sleeves at the screen's corner wherever the story is off
       // (reduced motion, a short window).
-      for (const el of [...hero, ...caps, ghost, snap, icon]) {
+      for (const el of [...hero, ...caps, ghost, icon]) {
         el.style.opacity = "";
         if (!hand(el)) for (const p of ["translate", "transform", "visibility"]) el.style.removeProperty(p);
       }
