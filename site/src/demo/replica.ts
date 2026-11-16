@@ -507,10 +507,12 @@ function bindReplica(root: HTMLElement, player: Player) {
       last.theme = theme;
     }
 
+    // The song's colour restyles the whole window: an unseen one takes it when it comes back
+    // into view (render runs again then), not with every song change.
+    if (song && !root.hasAttribute("data-away") && root.style.getPropertyValue("--song") !== song.colour) root.style.setProperty("--song", song.colour);
     if (songChanged && song) {
       root.dataset.song = song.id;
       root.dataset.hasLyrics = String(song.lyrics.length > 0);
-      root.style.setProperty("--song", song.colour);
       for (const img of $$<HTMLImageElement>(root, "[data-bar-cover], [data-np-cover], [data-resume-cover]")) {
         img.src = song.cover;
       }

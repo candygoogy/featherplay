@@ -28,7 +28,9 @@ test("pressing play anywhere plays the one song everywhere: the media keys, the 
     (window as unknown as { hops: string[] }).hops = [];
     new MutationObserver(() => s.dataset.hop && (window as unknown as { hops: string[] }).hops.push(s.dataset.hop)).observe(s, { attributes: true, attributeFilter: ["data-hop"] });
   });
-  await kept.locator(".m-media [data-do='next']").click();
+  // (Clicked where it is: the sponsor piece stays in view, as a visitor's would below it.)
+  await kept.locator("[data-piece='sponsor']").scrollIntoViewIfNeeded();
+  await kept.locator(".m-media [data-do='next']").evaluate((b: HTMLElement) => b.click());
   for (const piece of ["media", "discord", "scrobble", "sponsor"]) {
     await expect(kept.locator(`[data-piece='${piece}'] [data-bind='title']`).first()).toHaveText("Invisible Light");
   }

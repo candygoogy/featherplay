@@ -42,7 +42,9 @@ test("while a song plays with Kept on screen, nothing animates unseen and the ri
   expect(now.filter((a) => !a.inView && a.section !== "kept"), "off screen").toEqual([]);
   expect(now.filter((a) => !a.shown), "unseen").toEqual([]);
   expect(now.filter((a) => a.cls.includes("sc-fill")), "the ring").toEqual([]);
-  // The ring still fills, in small steps.
+  // The ring still fills, in small steps (its piece in view).
+  await page.locator("[data-sc-ring]").first().scrollIntoViewIfNeeded();
+  await page.waitForTimeout(300);
   const p0 = await page.locator("[data-sc-ring]").evaluate((r) => Number(getComputedStyle(r).getPropertyValue("--p")));
   await page.waitForTimeout(1500);
   expect(await page.locator("[data-sc-ring]").evaluate((r) => Number(getComputedStyle(r).getPropertyValue("--p")))).toBeGreaterThan(p0);
