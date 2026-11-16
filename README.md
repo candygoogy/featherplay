@@ -4,13 +4,15 @@
   outside the repo; tray.png is the one real capture. MadeWithSlint-logo-*.svg: Slint's badge,
   unmodified (CC BY-ND 4.0), as its licence asks. now-playing-lyrics, settings-discord, search
   and mini-player stay for the site and release notes, but aren't shown here. The header
-  picture is the page's h1, so tools that read the first heading find the app's name.
+  picture is the page's h1, so tools that read the first heading find the app's name; it is
+  made from the built website (its background and its live window), by a script kept outside
+  the repo too.
 -->
 
 <h1 align="center">
   <picture>
     <source media="(prefers-color-scheme: light)" srcset=".github/readme/header-light.png">
-    <img src=".github/readme/header-dark.png" alt="featherplay: a native Windows player for YouTube Music, light enough to forget it's running. While playing it uses 39 MB of memory, 1 process and 0.063 % CPU. Beside the name, a laptop shows featherplay's Now playing view with synced lyrics for California Lullabye, over a mauve glow, the colour the app takes from the song's cover." width="100%">
+    <img src=".github/readme/header-dark.png" alt="featherplay: light enough to forget it's running. A free, native player for YouTube Music on Windows and Linux. While a song played it used 39 MB of memory, 1 process and 0.063 % CPU. Beside the name, featherplay's window shows the Now playing view with synced lyrics for California Lullabye and the queue, on a frosted background in the colour the app takes from the song's cover." width="100%">
   </picture>
 </h1>
 
