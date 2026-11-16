@@ -160,7 +160,14 @@ import Note from "../Note.astro";
   /* In the well's top left, pointing down at the window, while it is at its actual size. */
   .stage :global(.n-actual) {
     left: var(--s4);
-    top: var(--s2);
+    top: calc(var(--s2) - 0.15em);
+  }
+  /* Its arrow stops short of the window: the hand's ink is the page's, and on a window set to
+     the other theme (a light window on the dark page) the head drawn over it couldn't be seen.
+     (The arrow's own size is set on it, in em.) */
+  .stage :global(.n-actual svg) {
+    width: auto !important;
+    height: 0.7em !important;
   }
   .stage:not([data-actual]) :global(.n-actual) {
     display: none;
