@@ -25,9 +25,9 @@ const initial = [
   `--qs:light-dark(${l.qs},${d.qs})`,
   `--ql:light-dark(${l.ql},${d.ql})`,
   `--qh:light-dark(${l.qh},${d.qh})`,
-  `--lit:${mixNum(d.lit, l.lit)}`,
-  `--hi:${mixNum(d.hi, l.hi)}`,
-  `--shade:${mixNum(d.shade, l.shade)}`,
+  `--q-lit:${mixNum(d.lit, l.lit)}`,
+  `--q-hi:${mixNum(d.hi, l.hi)}`,
+  `--q-shade:${mixNum(d.shade, l.shade)}`,
 ].join(";");
 const layers = ["k-ground", "m k-shade", "m k-lit", "m k-hi", "k-sheen", "k-grain"];
 ---
@@ -98,13 +98,13 @@ const layers = ["k-ground", "m k-shade", "m k-lit", "m k-hi", "k-sheen", "k-grai
   }
   .k-shade {
     background: var(--qs);
-    opacity: var(--shade);
+    opacity: var(--q-shade);
     -webkit-mask-image: url("/img/desk/k2-shade-dark.webp");
     mask-image: url("/img/desk/k2-shade-dark.webp");
   }
   .k-lit {
     background: var(--ql);
-    opacity: var(--lit);
+    opacity: var(--q-lit);
   }
   .k-lit,
   .k-hi {
@@ -114,7 +114,7 @@ const layers = ["k-ground", "m k-shade", "m k-lit", "m k-hi", "k-sheen", "k-grai
   /* The brightest light, near the main source only: a gradient seen through the same field. */
   .k-hi {
     background: radial-gradient(55% 75% at 4% 0%, var(--qh), color-mix(in oklab, var(--qh) 35%, transparent) 45%, transparent 80%);
-    opacity: var(--hi);
+    opacity: var(--q-hi);
   }
   /* The pane's thickness catching the light: a faint lift in from the left edge, gone by a
      third of the width (a ramp with no peak, never a stripe). */

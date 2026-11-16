@@ -255,10 +255,13 @@
   /* A content surface lifts off the paper by a soft warm shadow in light; in dark it is flat. */
   --panel-lift: light-dark(rgb(80 56 30 / 0.09), rgb(0 0 0 / 0));
   --panel-tint: light-dark(rgb(90 66 40 / 0.045), rgb(255 255 255 / 0.045));
-  --mat-dock: light-dark(rgb(252 250 247 / 0.76), rgb(27 28 32 / 0.74));
-  --mat-capsule: light-dark(rgb(252 250 247 / 0.8), rgb(27 28 32 / 0.78));
-  --mat-fly: light-dark(rgb(252 251 248 / 0.88), rgb(30 31 35 / 0.86));
-  --mat-solid: light-dark(rgb(253 252 250 / 0.94), rgb(32 33 37 / 0.9));
+  /* Glass over the desk's frosted sheet (the study's panes): the docked bar thin, the capsule
+     and the footer panel a step denser; flyouts, the menu, tooltips and the dialog denser still
+     (their text sits over the moving window). */
+  --mat-dock: light-dark(rgb(252 250 247 / 0.52), rgb(30 31 36 / 0.56));
+  --mat-capsule: light-dark(rgb(252 250 247 / 0.78), rgb(30 31 36 / 0.74));
+  --mat-fly: light-dark(rgb(252 251 248 / 0.88), rgb(30 31 35 / 0.9));
+  --mat-solid: light-dark(rgb(253 252 250 / 0.94), rgb(32 33 37 / 0.92));
   --rim: light-dark(rgb(255 255 255 / 0.95), rgb(255 255 255 / 0.1));
   --edge: light-dark(rgb(90 66 40 / 0.14), rgb(0 0 0 / 0.36));
   --shade-1: light-dark(rgb(70 48 24 / 0.07), rgb(0 0 0 / 0.3));

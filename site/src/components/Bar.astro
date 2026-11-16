@@ -230,12 +230,16 @@ const arrow = "M12 4.5 V15 M7.5 10.5 L12 15 L16.5 10.5 M5 19.5 H19";
   }
 
   /* ---- The grounds: the docked bar’s painted frost, and the capsule’s glass ---- */
+  /* Painted frost (only the still desk passes under it): the thin tint, a highlight from the
+     top, a lit lower edge over a dark hair, the panes' fine grain. */
   .dock {
     position: absolute;
     inset: 0 0 auto;
     height: var(--bar-h);
-    background: var(--mat-dock);
-    box-shadow: inset 0 -1px 0 var(--edge);
+    background: var(--pane-hl), var(--mat-dock);
+    box-shadow:
+      inset 0 -1px 0 light-dark(rgb(255 255 255 / 0.85), rgb(255 255 255 / 0.09)),
+      0 1px 0 light-dark(rgb(60 40 20 / 0.11), rgb(0 0 0 / 0.42));
     transition:
       opacity var(--t-small) var(--ease-out),
       translate var(--t-medium) var(--ease-window);
@@ -244,8 +248,8 @@ const arrow = "M12 4.5 V15 M7.5 10.5 L12 15 L16.5 10.5 M5 19.5 H19";
     content: "";
     position: absolute;
     inset: 0;
-    background-image: var(--grain);
-    opacity: 0.05;
+    background: var(--grain) 0 0 / 96px;
+    opacity: var(--pane-grain);
   }
   .row {
     position: relative;
@@ -262,6 +266,8 @@ const arrow = "M12 4.5 V15 M7.5 10.5 L12 15 L16.5 10.5 M5 19.5 H19";
   }
   .cap-bg {
     --mat: var(--mat-capsule);
+    -webkit-backdrop-filter: var(--mat-blur-lift);
+    backdrop-filter: var(--mat-blur-lift);
     position: absolute;
     inset: 0;
     border-radius: var(--r-float);
@@ -593,6 +599,13 @@ const arrow = "M12 4.5 V15 M7.5 10.5 L12 15 L16.5 10.5 M5 19.5 H19";
   }
 
   /* ---- The flyouts: under their part, growing out of the bar ---- */
+  /* On a pane over the moving window the second ink steps up a little in dark: the rows' own
+     lift lightens the ground under it. */
+  .fly,
+  .ctx,
+  .bar-tip {
+    --ink2: light-dark(#4a4540, #bcbcbc);
+  }
   .fly {
     --mat: var(--mat-fly);
     position: fixed;

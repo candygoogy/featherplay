@@ -20,7 +20,8 @@ export function bindDesk(desk: HTMLElement, player: Player): void {
 
   const paint = (slot: HTMLElement, hex: string, t: Theme) => {
     const v = deskTones(hex, t);
-    for (const [k, val] of Object.entries(v)) slot.style.setProperty(`--${k}`, String(val));
+    // Colours as --qg, --qs, --ql, --qh; the layers' opacities as --q-lit, --q-hi, --q-shade.
+    for (const [k, val] of Object.entries(v)) slot.style.setProperty(k.startsWith("q") ? `--${k}` : `--q-${k}`, String(val));
     slot.dataset.tones = t;
     slot.dataset.key = `${t}:${hex}`;
   };

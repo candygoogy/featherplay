@@ -32,3 +32,13 @@ const a = arrow === "none" ? null : ARROWS[arrow];
     a && !a.before && <svg viewBox={`0 0 ${a.w} ${a.h}`} width={a.w} height={a.h}><path pathLength="1" d={a.d} /></svg>
   }
 </p>
+
+<style is:global>
+  /* The hand's face, with the notes only (the pages without notes don't reference it). */
+  @font-face {
+    font-family: "Reenie Beanie";
+    src: url("/fonts/reenie-beanie-subset.woff2") format("woff2");
+    font-weight: 400;
+    font-display: block;
+  }
+</style>

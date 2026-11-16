@@ -108,20 +108,17 @@ const groups = [
     isolation: isolate;
     overflow: hidden;
     border-radius: var(--r-float);
-    background: var(--mat-dock);
-    box-shadow:
-      var(--lit),
-      var(--ring),
-      0 1px 2px var(--panel-lift),
-      0 24px 56px -28px var(--panel-lift);
+    /* Painted (the still desk is all that passes under it): the capsule's denser tint. */
+    background: var(--pane-hl), var(--mat-capsule);
+    box-shadow: var(--pane-edge), var(--pane-rim);
   }
   .foot-panel::before {
     content: "";
     position: absolute;
     inset: 0;
     z-index: -1;
-    background-image: var(--grain);
-    opacity: 0.055;
+    background: var(--grain) 0 0 / 96px;
+    opacity: var(--pane-grain);
     pointer-events: none;
   }
   .foot-cols {

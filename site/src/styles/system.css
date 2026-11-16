@@ -58,8 +58,18 @@
 
   /* ---- Glass: a tint of the ground (tokens.css), a blur where things move behind it, a
      fine grain, a 1 px light edge on top; the layered shadow only on what truly floats ---- */
-  --mat-blur: blur(36px) saturate(1.5);
-  --grain: url("/grain.svg");
+  --mat-blur: blur(22px) saturate(1.5);
+  /* The capsule's: its blur also lifts what passes under it a little. */
+  --mat-blur-lift: blur(22px) saturate(1.5) brightness(1.12);
+  --grain: url("/img/desk/grain-a.png");
+  /* The panes' own material (the study's): a highlight falling off from the top, a crisp light
+     edge on top and a fainter one all round, a hair of dark rim, a fine grain (96 px, finer than
+     the desk's), and on what truly floats a close contact shadow. */
+  --pane-hl: linear-gradient(rgb(255 255 255 / 0.075), rgb(255 255 255 / 0) 60%);
+  --pane-edge: inset 0 1px 0 rgb(255 255 255 / 0.16), inset 0 0 0 1px rgb(255 255 255 / 0.055);
+  --pane-rim: 0 0 0 1px rgb(0 0 0 / 0.45);
+  --pane-contact: 0 1px 2px rgb(0 0 0 / 0.32), 0 8px 20px -8px rgb(0 0 0 / 0.5);
+  --pane-grain: 0.2;
   --lit: inset 0 1px 0 var(--rim);
   --ring: 0 0 0 1px var(--edge);
   --shadow: 0 1px 2px var(--shade-1), 0 4px 16px var(--shade-2), 0 16px 56px var(--shade-3);
@@ -78,6 +88,15 @@
   --press-surface: 0.96;
   --press-icon: 0.88;
 }
+:root[data-theme="light"] {
+  --mat-blur: blur(22px) saturate(1.6);
+  --mat-blur-lift: blur(22px) saturate(1.6) brightness(1.06);
+  --pane-hl: linear-gradient(rgb(255 255 255 / 0.55), rgb(255 255 255 / 0) 60%);
+  --pane-edge: inset 0 1px 0 rgb(255 255 255 / 0.95), inset 0 0 0 1px rgb(255 255 255 / 0.45);
+  --pane-rim: 0 0 0 1px rgb(60 40 20 / 0.11);
+  --pane-contact: 0 1px 2px rgb(60 40 20 / 0.08), 0 8px 20px -8px rgb(60 40 20 / 0.22);
+  --pane-grain: 0.14;
+}
 @media (prefers-reduced-motion: reduce) {
   :root {
     --rise: 0px;
@@ -93,8 +112,10 @@
 
 /* Glass becomes the solid surface where transparency is unwanted or colours are forced. */
 @media (prefers-reduced-transparency: reduce), (forced-colors: active) {
-  :root {
+  :root,
+  :root[data-theme="light"] {
     --mat-blur: none;
+    --mat-blur-lift: none;
   }
   :root,
   [data-theme] {
@@ -218,8 +239,8 @@
   --mat: var(--mat-fly);
   position: relative;
   isolation: isolate;
-  background: var(--mat);
-  box-shadow: var(--lit), var(--ring);
+  background: var(--pane-hl), var(--mat);
+  box-shadow: var(--pane-edge), var(--pane-rim);
 }
 .glass::before {
   content: "";
@@ -227,8 +248,8 @@
   inset: 0;
   z-index: -1;
   border-radius: inherit;
-  background-image: var(--grain);
-  opacity: 0.05;
+  background: var(--grain) 0 0 / 96px;
+  opacity: var(--pane-grain);
   pointer-events: none;
 }
 .glass.live {
@@ -236,7 +257,7 @@
   backdrop-filter: var(--mat-blur);
 }
 .glass.float {
-  box-shadow: var(--lit), var(--ring), var(--shadow);
+  box-shadow: var(--pane-edge), var(--pane-rim), var(--pane-contact);
 }
 @media (forced-colors: active) {
   .glass {
@@ -372,12 +393,7 @@
 /* ---------- The hand: the maker's notes and pen marks (Note.astro, src/scripts/notes.ts) ----------
    Reenie Beanie, cut to the notes' own characters (src/data/notes.ts). Shown as soon as it is
    here or never (it is decoration): no fallback face standing in for it. */
-@font-face {
-  font-family: "Reenie Beanie";
-  src: url("/fonts/reenie-beanie-subset.woff2") format("woff2");
-  font-weight: 400;
-  font-display: block;
-}
+/* (Its @font-face is Note.astro's, so only pages with notes reference the font.) */
 :root {
   --fs-pen: 1.875rem; /* 30: the hand, its own face, the stated exception to the six sizes */
 }

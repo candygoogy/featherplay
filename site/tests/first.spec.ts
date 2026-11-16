@@ -191,6 +191,8 @@ test.describe("the desk", () => {
     const front = () => page.locator("[data-desk] [data-slot].front").getAttribute("data-key");
     expect(await front()).toBe("dark:#E8894A");
     await page.evaluate(() => document.querySelector<HTMLElement>('#fly-song [data-song="invisible-light"]')!.click());
+    // The new tones are painted out of sight first, then the fade starts.
+    await expect(page.locator("[data-desk] [data-slot].fading.in")).toHaveCount(1);
     const fade = await page.evaluate(() => {
       const f = document.querySelector("[data-desk] [data-slot].fading")!;
       const anims = document.querySelector("[data-desk]")!.getAnimations({ subtree: true }).filter((a) => a instanceof CSSTransition);
