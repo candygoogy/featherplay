@@ -208,9 +208,11 @@ const steps = [
   .first:is([data-laid="wide"], [data-laid="tall"]) > :global(.shelf[data-off]) {
     display: none;
   }
+  /* (Right under the words: in a tall room its foot would otherwise fall to the screen's,
+     leaving a hole between the words and the sleeves.) */
   .first > :global(.shelf) {
     grid-area: shelf;
-    align-self: end;
+    align-self: start;
     --sz: min(132px, (100vw - 2 * var(--gut) - 28px) / 3);
   }
   .col {
