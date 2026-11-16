@@ -25,6 +25,9 @@ export function bindDesk(desk: HTMLElement, player: Player): void {
     slot.dataset.tones = t;
     slot.dataset.key = `${t}:${hex}`;
   };
+  // A change while a fade runs waits for it to end, then fades on from there: cutting it short
+  // repainted the slot that was showing with the new tones at once (a jump in one frame).
+  let next: { hex: string; ms: number } | null = null;
   const finish = () => {
     if (!timer) return;
     clearTimeout(timer);
@@ -34,13 +37,22 @@ export function bindDesk(desk: HTMLElement, player: Player): void {
     back.classList.remove("fading", "in");
     slots[front].classList.remove("front");
     front = 1 - front;
+    // (A frame later: the slot that was showing has gone out of sight by then, with no fade,
+    // so the next fade starts from nothing.)
+    if (next) {
+      const n = next;
+      next = null;
+      requestAnimationFrame(() => requestAnimationFrame(() => set(n.hex, n.ms)));
+    }
   };
   const set = (hex: string, ms: number) => {
     const t = theme();
     const key = `${t}:${hex}`;
-    // Already fading to these tones: let the fade run.
-    if (timer && slots[1 - front].dataset.key === key) return;
-    finish();
+    if (timer) {
+      // Already fading to these tones: let the fade run; else the next waits for it.
+      next = slots[1 - front].dataset.key === key ? null : { hex, ms };
+      return;
+    }
     const f = slots[front];
     if (f.dataset.key === key) return;
     if (reduced.matches || ms <= 0 || !f.dataset.key) {

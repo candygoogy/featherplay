@@ -65,13 +65,18 @@ const layers = ["k-ground", "m k-shade", "m k-lit", "m k-hi", "k-sheen", "k-grai
     background: var(--desk);
   }
   /* The slot underneath stays composited (never quite 0), so new tones are painted while it
-     is out of sight, not on the fade's first frame. */
+     is out of sight, not on the fade's first frame (desk.ts gives it two frames for that). At
+     rest it is hidden: without a GPU, a composited layer at 0.001 is still blended on every
+     frame while a song plays (some 13 % of a core). */
   .slot {
     position: absolute;
     inset: 0;
     opacity: 0.001;
     contain: strict;
     will-change: opacity;
+  }
+  .slot:not(.front, .fading) {
+    visibility: hidden;
   }
   .slot.front {
     z-index: 2;

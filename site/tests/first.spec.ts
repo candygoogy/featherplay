@@ -232,6 +232,41 @@ test.describe("the desk", () => {
     expect(fade.props).toEqual(["opacity"]);
     await expect.poll(front, { timeout: 2000 }).toBe("dark:#3E4FA8");
   });
+  test("at rest the slot underneath is hidden (nothing blended on every frame without a GPU)", async ({ page }) => {
+    await page.goto("/");
+    await shown(page);
+    await expect(page.locator("[data-desk] [data-slot]:not(.front)")).toHaveCSS("visibility", "hidden");
+    await expect(page.locator("[data-desk] [data-slot].front")).toHaveCSS("visibility", "visible");
+  });
+  test("a second song within the fade waits for it: the fading slot is never cut short", async ({ page }) => {
+    await page.route("**/music/**", (r) => r.abort());
+    await page.goto("/");
+    await shown(page);
+    const pick = (id: string) => page.evaluate((id) => document.querySelector<HTMLElement>(`#fly-song [data-song="${id}"]`)!.click(), id);
+    await pick("invisible-light");
+    await expect(page.locator("[data-desk] [data-slot].fading.in")).toHaveCount(1);
+    await page.waitForTimeout(400);
+    // Frame by frame across the second change: the slot that takes the new song's tones comes in
+    // from out of sight, a little a frame (once it was repainted while still showing).
+    const cut = await page.evaluate(async () => {
+      const slots = [...document.querySelectorAll<HTMLElement>("[data-desk] [data-slot]")];
+      const bad: string[] = [];
+      let last = -1;
+      document.querySelector<HTMLElement>('#fly-song [data-song="origami"]')!.click();
+      for (let i = 0; i < 120; i++) {
+        await new Promise((r) => requestAnimationFrame(r));
+        const s = slots.find((x) => x.dataset.key?.endsWith("#D4A23A"));
+        if (!s) continue;
+        const o = Number(getComputedStyle(s).opacity);
+        if (last < 0 ? o > 0.05 : o - last > 0.15) bad.push(`frame ${i}: ${last.toFixed(3)} to ${o.toFixed(3)}`);
+        last = o;
+      }
+      return bad;
+    });
+    expect(cut).toEqual([]);
+    // And it ends on the second song's tones.
+    await expect.poll(() => page.locator("[data-desk] [data-slot].front").getAttribute("data-key"), { timeout: 4000 }).toBe("dark:#D4A23A");
+  });
   test("the warm opening song's dark desk falls nearer to black away from its lit corner than the study's did", async ({ page }) => {
     await page.goto("/");
     await shown(page);
