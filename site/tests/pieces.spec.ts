@@ -78,6 +78,12 @@ test("the key caps press for the visitor's own media keys and for the overlay's 
   expect(await page.evaluate(() => (window as unknown as { pressed: string[] }).pressed)).toEqual(["toggle", "next", "toggle", "previous"]);
   // The caps are the keyboard's way in: real buttons, each named.
   await expect(stage.getByRole("button", { name: "Next" })).toHaveCount(2);
+  // Stop is a key too: it pauses, as the app answers it.
+  await stage.locator(".m-media [data-do='toggle']").click();
+  await expect(page.locator("html")).toHaveAttribute("data-playing", "true");
+  await key(page, "stop");
+  await expect(page.locator("html")).toHaveAttribute("data-playing", "false");
+  await expect(stage.getByRole("button", { name: "Stop" })).toHaveCount(1);
 });
 
 test("scrobbling counts the time heard, not a seek, and at half the song drops it into the list", async ({ page }) => {
@@ -92,6 +98,8 @@ test("scrobbling counts the time heard, not a seek, and at half the song drops i
   await sc.scrollIntoViewIfNeeded();
   await expect(sc.locator(".sc-empty")).toBeVisible();
   await page.locator("#kept .m-media [data-do='toggle']").click();
+  // Back to the piece (the press may have scrolled to the overlay): out of view it holds still.
+  await sc.scrollIntoViewIfNeeded();
   await page.clock.runFor(10_000);
   await expect(sc.locator("[data-sc-label]")).toHaveText("Scrobbling now");
   await expect(sc.locator("[data-sc-heard]")).toHaveText(/^0:(09|10)$/);

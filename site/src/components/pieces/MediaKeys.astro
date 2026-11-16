@@ -4,14 +4,16 @@
 // thumbnail, the third place the cell's words name, was drawn here too and made the well too
 // busy: the words carry it. Every control here acts on the page's one
 // player (src/demo/bind-pieces.ts), and the key caps press when any of them is used, or when the
-// visitor's own media keys reach the page (Media Session, once a song has played). The slot is
-// for the note beside the keys.
+// visitor's own media keys reach the page (Media Session, once a song has played). The four
+// keys are the ones a keyboard has and the app answers: previous, play or pause, stop (which
+// pauses, as in the app) and next. The slot is for the note by the keys.
 import "../../styles/pieces.css";
 import Icon from "../Icon.astro";
 import MediaFlyout from "./MediaFlyout.astro";
 const keys = [
   { key: "previous", label: "Previous" },
   { key: "toggle", label: "Play" },
+  { key: "stop", label: "Stop" },
   { key: "next", label: "Next" },
 ] as const;
 ---
@@ -33,6 +35,10 @@ const keys = [
                     <path d="M3.5 6.6 C3.5 6 4.2 5.6 4.7 6 L11.6 11.4 C12 11.7 12 12.3 11.6 12.6 L4.7 18 C4.2 18.4 3.5 18 3.5 17.4 Z" />
                     <rect x="14.2" y="6" width="2.4" height="12" rx="0.8" />
                     <rect x="18.6" y="6" width="2.4" height="12" rx="0.8" />
+                  </svg>
+                ) : k.key === "stop" ? (
+                  <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="currentColor">
+                    <rect x="6.5" y="6.5" width="11" height="11" rx="1.8" />
                   </svg>
                 ) : (
                   <Icon name={k.key === "previous" ? "prev" : "next"} size={20} />
@@ -117,61 +123,85 @@ const keys = [
     font-size: var(--fs-small);
     font-weight: var(--fw-medium);
   }
-  /* The keys: a cap on its skirt; pressed, the cap goes down into it. Pressed by a click, and by
-     the visitor's own keys or the piece's other buttons (data-pressed, bind-pieces.ts). */
+  /* The keys: a strip of a keyboard. Its plate is let into the well; on it each key is a cap
+     on its skirt, the cap's top lit from above and a little dished. Pressed, the cap goes down
+     into the skirt and comes back on the app's spring; pressed by the player (a key of the
+     visitor's own, the overlay, the cap itself) its mark lights and the light under the key
+     shows at its edges, as on a backlit keyboard. */
   .mk-keys {
     position: relative;
     display: flex;
-    gap: var(--s3);
+    gap: 6px;
+    padding: 8px 8px 9px;
+    border-radius: 17px;
+    background: light-dark(#e3dbcf, #0d0d0f);
+    box-shadow:
+      inset 0 1px 3px light-dark(rgb(60 40 20 / 0.2), rgb(0 0 0 / 0.8)),
+      inset 0 0 0 1px light-dark(rgb(60 40 20 / 0.07), rgb(255 255 255 / 0.035)),
+      0 1px 0 light-dark(rgb(255 255 255 / 0.75), rgb(255 255 255 / 0.05));
   }
   .kc {
     position: relative;
-    padding: 0 0 5px;
+    padding: 0 0 4px;
     border: 0;
-    border-radius: 11px;
+    border-radius: 10px;
     background: none;
     color: var(--ink2);
     cursor: pointer;
   }
+  /* The skirt, and under it the key's own light (unlit at rest). */
   .kc::before {
     content: "";
     position: absolute;
-    inset: 5px 0 0;
+    inset: 4px 0 0;
     z-index: 0;
     border-radius: inherit;
-    background: light-dark(#d8d0c3, #111113);
+    background: light-dark(#cdc4b6, #19191c);
     box-shadow:
-      0 0 0 1px light-dark(rgb(60 40 20 / 0.1), rgb(0 0 0 / 0.55)),
-      0 12px 20px -12px light-dark(rgb(60 40 20 / 0.45), rgb(0 0 0 / 0.8));
+      0 0 0 1px light-dark(rgb(60 40 20 / 0.12), rgb(0 0 0 / 0.6)),
+      0 0 0 0 transparent;
+    transition: box-shadow var(--t-release) ease;
   }
   .kc-top {
     position: relative;
     display: grid;
     place-items: center;
-    width: 64px;
-    height: 54px;
-    border-radius: 10px;
-    background: light-dark(linear-gradient(#ffffff, #f5f2ed), linear-gradient(#36363c, #2a2a2f));
+    width: 62px;
+    height: 50px;
+    border-radius: 9px;
+    background:
+      radial-gradient(130% 100% at 50% -10%, light-dark(#ffffff, rgb(255 255 255 / 0.075)), transparent 62%),
+      light-dark(linear-gradient(#f9f7f3, #ece7df), linear-gradient(#303035, #252529));
     box-shadow:
-      inset 0 1px 0 light-dark(#ffffff, rgb(255 255 255 / 0.1)),
-      inset 0 0 0 1px light-dark(rgb(60 40 20 / 0.08), rgb(255 255 255 / 0.04));
+      inset 0 1px 0 light-dark(#ffffff, rgb(255 255 255 / 0.11)),
+      inset 0 -1px 0 light-dark(rgb(60 40 20 / 0.06), rgb(0 0 0 / 0.35)),
+      inset 0 0 0 1px light-dark(rgb(60 40 20 / 0.07), rgb(255 255 255 / 0.035));
     transition:
       translate var(--t-release) var(--spring-release),
       color var(--t-medium) ease;
+  }
+  .kc-top svg {
+    width: 18px;
+    height: 18px;
   }
   .kc:hover .kc-top {
     color: var(--text);
   }
   .kc:active .kc-top,
   .kc[data-pressed] .kc-top {
-    translate: 0 4px;
+    translate: 0 3px;
     color: var(--text);
     transition-duration: var(--t-press);
     transition-timing-function: var(--ease-out);
   }
-  /* Pressed by the player (a key, the overlay, the cap itself): its mark lights. */
   .kc[data-pressed] .kc-top {
     color: var(--accent);
+  }
+  .kc[data-pressed]::before {
+    box-shadow:
+      0 0 0 1px light-dark(rgb(60 40 20 / 0.12), rgb(0 0 0 / 0.6)),
+      0 0 14px 1px light-dark(color-mix(in srgb, var(--accent) 34%, transparent), color-mix(in srgb, var(--accent) 42%, transparent));
+    transition-duration: var(--t-press);
   }
   .kc:focus-visible {
     outline-offset: 3px;
@@ -201,8 +231,12 @@ const keys = [
       font-size: var(--fs-lede);
     }
     .kc-top {
-      width: 76px;
-      height: 64px;
+      width: 72px;
+      height: 58px;
+    }
+    .kc-top svg {
+      width: 20px;
+      height: 20px;
     }
   }
 </style>

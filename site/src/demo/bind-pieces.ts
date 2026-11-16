@@ -81,6 +81,8 @@ export function bindPieces(player: Player): void {
     if (act === "toggle") player.toggle();
     else if (act === "previous") player.previous();
     else if (act === "next") player.next();
+    // Stop pauses, as the app answers it.
+    else if (act === "stop") player.pause();
     else if (act === "play" && b.dataset.song) {
       if (player.state.song?.id === b.dataset.song) player.toggle();
       else player.play(b.dataset.song);
@@ -196,6 +198,7 @@ export function bindPieces(player: Player): void {
     };
     set("play", () => (press("toggle"), player.resume()));
     set("pause", () => (press("toggle"), player.pause()));
+    set("stop", () => (press("stop"), player.pause()));
     set("previoustrack", () => (press("previous"), player.previous()));
     set("nexttrack", () => (press("next"), player.next()));
     set("seekto", (d) => d.seekTime != null && player.seek(d.seekTime * 1000));
