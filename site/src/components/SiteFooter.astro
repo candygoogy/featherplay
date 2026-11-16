@@ -1,9 +1,9 @@
 ---
 // The footer: one frosted panel in the docked bar's material (the page opens with a frosted bar
 // and closes with its sibling), five columns (featherplay and what it runs on, then Product,
-// Project, Help, Legal), then the small print and the way back up on a step of the panel's
-// tone. The frost is painted: only the still desk lies behind it. No large name. Outside links
-// from src/data/links.ts.
+// Project, Help, Legal), then, under a hairline, one line of small print and the way back up.
+// The frost is painted: only the still desk lies behind it. No large name. Outside links from
+// src/data/links.ts.
 import { release } from "../data/release";
 import { links } from "../data/links";
 import Logo from "./Logo.astro";
@@ -91,7 +91,10 @@ const groups = [
           <li>Free and unofficial. Not made by or affiliated with Google or YouTube.</li>
           <li><a class="fl" href="/#connects">Privacy</a></li>
         </ul>
-        <a class="fl top" href="#top">Back to top</a>
+        <a class="to-top" href="#top">
+          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 13V3.5M3.75 7.5 8 3.25l4.25 4.25"></path></svg>
+          Back to top
+        </a>
       </div>
     </div>
   </div>
@@ -100,7 +103,7 @@ const groups = [
 <style>
   .foot {
     position: relative;
-    margin-top: var(--s9);
+    margin-top: var(--s8);
     padding-bottom: var(--s7);
   }
   .foot-panel {
@@ -159,11 +162,12 @@ const groups = [
     min-height: 32px;
     color: var(--ink2);
   }
-  /* A footer link: second-level ink; on hover full ink and an underline that draws in. */
+  /* A footer link: second-level ink; on hover full ink and an underline that draws in from
+     where the pointer came in (--ux, src/scripts/underline.ts; from the left without one). */
   .fl {
     color: var(--ink2);
     text-decoration: none;
-    background: linear-gradient(currentColor, currentColor) 0 100% / 0 1px no-repeat;
+    background: linear-gradient(currentColor, currentColor) var(--ux, 0%) 100% / 0 1px no-repeat;
     transition:
       color var(--t-hover) ease,
       background-size var(--t-small) var(--ease-out);
@@ -181,14 +185,17 @@ const groups = [
       min-height: 44px;
     }
   }
+  /* The small print: one quiet line under a hairline, its parts set apart by a dot, and the
+     way back up as a small button at its end. */
   .foot-legal {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
-    gap: var(--s2) var(--s6);
-    padding: var(--s3) var(--panel-pad);
-    background: color-mix(in srgb, rgb(120 90 60 / 0.06) calc(var(--light) * 100%), rgb(0 0 0 / 0.18));
+    gap: var(--s3) var(--s6);
+    margin-inline: var(--panel-pad);
+    padding-block: var(--s4);
+    border-top: 1px solid var(--hairline);
     font-size: var(--fs-small);
     font-weight: var(--fw-medium);
     line-height: 1.5;
@@ -197,21 +204,61 @@ const groups = [
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: var(--s1) var(--s6);
+    gap: var(--s1) 0;
     margin: 0;
     padding: 0;
     list-style: none;
-    color: var(--ink2);
+    color: var(--ink3);
   }
-  .foot-fine li:first-child {
-    color: var(--text);
+  .foot-fine li + li::before {
+    content: "·";
+    margin-inline: var(--s3);
   }
-  .top {
+  .to-top {
     display: inline-flex;
     align-items: center;
-    min-height: 44px;
+    gap: var(--s2);
+    height: 2.25rem;
+    padding: 0 var(--s4) 0 var(--s3);
+    border-radius: var(--r-pill);
+    background: var(--tonal);
     color: var(--text);
     font-weight: var(--fw-bold);
+    text-decoration: none;
+    white-space: nowrap;
+    transition:
+      background-color var(--t-hover) ease,
+      scale var(--t-release) var(--spring-release);
+  }
+  .to-top svg {
+    flex: none;
+    transition: translate var(--t-small) var(--ease-out);
+  }
+  .to-top:hover {
+    background: var(--tonal-hover);
+  }
+  .to-top:hover svg,
+  .to-top:focus-visible svg {
+    translate: 0 -2px;
+  }
+  .to-top:active {
+    background: var(--tonal-pressed);
+    scale: var(--press-surface);
+  }
+  @media (pointer: coarse) {
+    .to-top {
+      height: 2.75rem;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .to-top svg {
+      transition: none;
+    }
+  }
+  @media (forced-colors: active) {
+    .to-top {
+      border: 1px solid ButtonText;
+    }
   }
   @media (width < 1100px) {
     .foot-cols {
@@ -232,6 +279,14 @@ const groups = [
   @media (width < 640px) {
     .foot-cols {
       grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    /* A phone: the small print's parts one under the other, without the dots. */
+    .foot-fine {
+      display: grid;
+      gap: var(--s1);
+    }
+    .foot-fine li + li::before {
+      content: none;
     }
   }
 </style>
