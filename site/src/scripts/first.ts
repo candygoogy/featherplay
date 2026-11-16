@@ -59,7 +59,7 @@ export function startFirst(): void {
       // on below). By the layout viewport's height, so a toolbar showing doesn't resize it.
       if (vw < 761) {
         const top = slot.getBoundingClientRect().top + scrollY;
-        slot.style.height = px(clamp(root.clientHeight - top - 12, 300, 752));
+        slot.style.height = px(clamp(root.clientHeight - top - 12, root.clientHeight < 800 ? 250 : 300, 752));
       }
       first.dataset.fl = String(first.getBoundingClientRect().left);
       // Stacked in a room too short for it (the first screen held to one screen by the story),

@@ -388,6 +388,22 @@ const steps = [
     margin-bottom: var(--s2);
   }
 
+  /* A short phone (360 x 740): the same words at the same sizes, closer together, and the
+     size line left to the Download section, so the whole window fits on the first screen. */
+  @media (width < 761px) and (height < 800px) {
+    .first {
+      row-gap: var(--s4);
+    }
+    .col {
+      gap: var(--s3);
+    }
+    .actions {
+      margin-top: 0;
+    }
+    .meta {
+      display: none;
+    }
+  }
   @media (width < 761px) {
     .first {
       grid-template-columns: minmax(0, 1fr);
