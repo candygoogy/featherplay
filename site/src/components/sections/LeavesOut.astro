@@ -19,8 +19,6 @@ const filesOf = (g: LeftOut) => {
   const more = list.length - named.length;
   return `${named.join(", ")}${more ? ` and ${more} more` : ""}`;
 };
-// A group’s share of Pear’s folder, the length of its card’s bar.
-const shareOf = (g: LeftOut) => `${((leftOutTotals(g).bytes / pear.bytes) * 100).toFixed(2)}%`;
 const notes: { word: string; why: string; group?: LeftOut }[] = [
   {
     word: "Chromium",
@@ -146,16 +144,11 @@ import Note from "../Note.astro";
                 <li class="out out-card" data-note-for={n.group}>
                     <span class="card-top">
                       <span class="note-name">{n.word}</span>
-                      <span class="pick" aria-hidden="true" />
                     </span>
                     <p class="why" id={`out-${n.group}-why`}>{n.why}</p>
                     <p class="which" id={`out-${n.group}-which`}>
                       {filesOf(n.group)}: <span class="of"><strong class="num">{mb(leftOutTotals(n.group).bytes)}</strong> of Pear’s folder</span>
                     </p>
-                    <svg class="share" aria-hidden="true">
-                      <rect class="track" width="100%" height="100%" rx="2" />
-                      <rect class="fill" width={shareOf(n.group)} height="100%" rx="2" />
-                    </svg>
                 </li>
               ) : (
                 <li class="out-last">
@@ -172,15 +165,14 @@ import Note from "../Note.astro";
 </section>
 
 <script>
-  // Each card lights its files in Pear's folder, and its share of the folder on its own bar:
-  // while pointed at (a mouse or a pen) or focused, for a look; pressed (clicked, tapped, Enter
+  // Each of the three lights its files in Pear's folder: while pointed at (a mouse or a pen) or focused, for a look; pressed (clicked, tapped, Enter
   // or Space), it stays chosen until another is. The section names the group lit (data-lit);
   // CSS does the rest. Without script the cards are plain notes to read and every file shows
   // alike: they become buttons here.
   const out = document.querySelector<HTMLElement>("[data-out]");
   if (out) {
-    // Each card's word and pick become its button, which covers the whole card (CSS): named by
-    // the word, described by its sentence and its files.
+    // Each one's word becomes its button, which covers the whole note (CSS): named by the
+    // word, described by its sentence and its files.
     const cards = [...out.querySelectorAll<HTMLElement>("[data-note-for]")].map((card) => {
       const g = card.dataset.noteFor!;
       const top = card.querySelector<HTMLElement>(".card-top")!;
@@ -474,13 +466,13 @@ import Note from "../Note.astro";
       display: none;
     }
   }
-  /* The three things that are files: three cards, side by side under both folders. Without
-     script they are plain notes; with it, controls (.out-card.live below). Then telemetry, which
-     is no file, on a line of its own: a closing statement, not a fourth card. */
+  /* The three things that are files, side by side under both folders: plain notes, each
+     under its word. With script the word is a chip to press (.out-card.live below). Then
+     telemetry, which is no file, on a line of its own: a closing statement, not a fourth. */
   .outs ul {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: var(--s4);
+    gap: var(--s5) var(--s7);
     margin: var(--s5) 0 0;
     padding: 0;
     list-style: none;
@@ -489,26 +481,13 @@ import Note from "../Note.astro";
     display: grid;
   }
   .out-card {
-    --paint: var(--song);
     display: grid;
-    grid-template-rows: auto auto 1fr auto;
+    grid-template-rows: auto auto 1fr;
+    justify-items: start;
     gap: var(--s2);
     min-width: 0;
     margin: 0;
-    padding: var(--s5) var(--s5) var(--s5);
-    border: 0;
-    border-radius: var(--r-panel);
-    background: transparent;
     color: var(--text);
-    font: inherit;
-    text-align: start;
-    transition: --paint var(--t-glow) ease;
-  }
-  .card-top {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--s3);
   }
   .note-name {
     font-size: var(--fs-lede);
@@ -537,94 +516,11 @@ import Note from "../Note.astro";
     color: var(--text);
     font-weight: var(--fw-bold);
   }
-  /* The group's share of Pear's folder: the whole bar is the folder (396 MB). */
-  .share {
-    display: block;
-    width: 100%;
-    height: 4px;
-    margin-top: var(--s1);
-    overflow: visible;
-  }
-  .share .track {
-    fill: var(--panel-tint);
-  }
-  .share .fill {
-    --paint: var(--song);
-    fill: color-mix(in srgb, var(--text) 30%, transparent);
-    transition:
-      fill var(--t-hover) ease,
-      --paint var(--t-glow) ease;
-  }
-  /* Without script, plain notes: their words on the section’s edge, like telemetry’s. */
-  .out-card:not(.live) {
-    padding-inline: 0;
-  }
-  :global(:root:not(.js)) .outs ul {
-    column-gap: var(--s7);
-  }
-  /* The pick (with script): an empty ring at rest, a dot in it once chosen, as a radio has. */
-  .pick {
-    display: none;
-  }
-
-  /* ---- With script: real controls, on the windows' own solid material ---- */
+  /* ---- With script: each word is a chip to press, and the whole note presses it ---- */
   .out-card.live {
     position: relative;
-    background: color-mix(in srgb, var(--paint) 4%, var(--surface));
-    box-shadow:
-      var(--lit),
-      var(--ring),
-      0 1px 2px var(--shade-1),
-      0 6px 18px -10px var(--shade-2);
     cursor: pointer;
-    transition:
-      background-color var(--t-hover) ease,
-      box-shadow var(--t-hover) ease,
-      scale var(--t-release) var(--spring-release),
-      --paint var(--t-glow) ease;
   }
-  .out-card.live .pick {
-    display: grid;
-    place-items: center;
-    flex: none;
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--text) 38%, transparent);
-    transition: box-shadow var(--t-hover) ease;
-  }
-  .out-card .pick::after {
-    content: "";
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background: var(--text);
-    scale: 0;
-    transition: scale var(--t-release) var(--spring-release);
-  }
-  @media (hover: hover) {
-    .out-card.live:hover {
-      background: color-mix(in srgb, var(--paint) 10%, var(--surface));
-      box-shadow:
-        var(--lit),
-        var(--ring),
-        0 1px 2px var(--shade-1),
-        0 10px 26px -10px var(--shade-2);
-    }
-    .out-card.live:hover .pick {
-      box-shadow: inset 0 0 0 1.5px var(--text);
-    }
-  }
-  .out-card.live:active {
-    scale: 0.985;
-    transition:
-      background-color var(--t-hover) ease,
-      box-shadow var(--t-hover) ease,
-      scale var(--t-press) var(--ease-out),
-      --paint var(--t-glow) ease;
-  }
-  /* Its button: the word and the pick, and (::before) the whole card to press. The ring of
-     focus goes round the card. */
   button.card-top {
     margin: 0;
     padding: 0;
@@ -638,71 +534,71 @@ import Note from "../Note.astro";
   button.card-top::before {
     content: "";
     position: absolute;
-    inset: 0;
-    border-radius: var(--r-panel);
+    inset: calc(var(--s2) * -1) calc(var(--s3) * -1);
+    border-radius: var(--r-small);
+  }
+  .out-card.live .note-name {
+    /* (--paint isn't inherited: the chip wears the song's colour itself.) */
+    --paint: var(--song);
+    display: inline-flex;
+    align-items: center;
+    min-height: 2rem;
+    padding: 0 var(--s3);
+    border-radius: var(--r-pill);
+    background: var(--tonal);
+    box-shadow: inset 0 0 0 1px transparent;
+    transition:
+      background-color var(--t-hover) ease,
+      box-shadow var(--t-hover) ease,
+      scale var(--t-release) var(--spring-release),
+      --paint var(--t-glow) ease;
+  }
+  @media (hover: hover) {
+    .out-card.live:hover .note-name {
+      background: var(--tonal-hover);
+    }
+  }
+  .out-card.live:active .note-name {
+    scale: var(--press-surface);
+    transition:
+      background-color var(--t-hover) ease,
+      scale var(--t-press) var(--ease-out),
+      --paint var(--t-glow) ease;
   }
   button.card-top:focus-visible {
     outline: none;
   }
-  .out-card.live:has(:focus-visible) {
+  .out-card.live:has(:focus-visible) .note-name {
     outline: 2px solid var(--accent);
-    outline-offset: 3px;
+    outline-offset: 2px;
   }
-  .out-card [aria-pressed="true"] .pick {
-    box-shadow: inset 0 0 0 1.5px var(--text);
-  }
-  .out-card [aria-pressed="true"] .pick::after {
-    scale: 1;
-  }
-  /* The card lit and its files lit are one thing: the same tint of the song as the rows. */
-  [data-out][data-lit="chromium"] .out-card[data-note-for="chromium"],
-  [data-out][data-lit="electron"] .out-card[data-note-for="electron"],
-  [data-out][data-lit="video"] .out-card[data-note-for="video"] {
+  /* The one lit and its files lit are one thing: its chip takes the rows' tint of the song. */
+  [data-out][data-lit="chromium"] .out-card[data-note-for="chromium"] .note-name,
+  [data-out][data-lit="electron"] .out-card[data-note-for="electron"] .note-name,
+  [data-out][data-lit="video"] .out-card[data-note-for="video"] .note-name {
     background: color-mix(in srgb, var(--paint) 26%, var(--surface));
-    box-shadow:
-      var(--lit),
-      0 0 0 1px color-mix(in srgb, var(--paint) 55%, transparent),
-      0 1px 2px var(--shade-1),
-      0 10px 26px -10px var(--shade-2);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--paint) 45%, transparent);
   }
-  [data-out][data-lit="chromium"] .out-card[data-note-for="chromium"] .share .fill,
-  [data-out][data-lit="electron"] .out-card[data-note-for="electron"] .share .fill,
-  [data-out][data-lit="video"] .out-card[data-note-for="video"] .share .fill {
-    fill: light-dark(color-mix(in oklab, var(--paint) 86%, black), var(--paint));
+  /* The others' words step back a little, as the other files do. */
+  [data-out]:is([data-lit="chromium"], [data-lit="electron"], [data-lit="video"]) .out-card.live .why {
+    color: var(--ink2);
+    transition: color var(--t-hover) ease;
   }
-  [data-out][data-lit="chromium"] .out-card[data-note-for="chromium"] .share .track,
-  [data-out][data-lit="electron"] .out-card[data-note-for="electron"] .share .track,
-  [data-out][data-lit="video"] .out-card[data-note-for="video"] .share .track {
-    fill: color-mix(in srgb, var(--text) 12%, transparent);
+  [data-out][data-lit="chromium"] .out-card[data-note-for="chromium"] .why,
+  [data-out][data-lit="electron"] .out-card[data-note-for="electron"] .why,
+  [data-out][data-lit="video"] .out-card[data-note-for="video"] .why {
+    color: var(--text);
   }
   @media (forced-colors: active) {
-    .out-card.live {
+    .out-card.live .note-name {
       border: 1px solid ButtonText;
     }
-    .out-card.live:has([aria-pressed="true"]) {
+    .out-card.live:has([aria-pressed="true"]) .note-name {
       border-width: 3px;
-    }
-    .out-card .pick {
-      border: 1.5px solid ButtonText;
-    }
-    .out-card .pick::after {
-      background: ButtonText;
-    }
-    .share .fill {
-      fill: CanvasText;
-    }
-    .share .track {
-      fill: Canvas;
-      stroke: CanvasText;
-    }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .out-card .pick::after {
-      transition: none;
     }
   }
 
-  /* Telemetry: no file, so no card; the list's last word, its name run in. */
+  /* Telemetry: no file, so no chip; the list's last word, its name run in. */
   .out-last {
     display: flex;
     flex-wrap: wrap;
@@ -743,9 +639,9 @@ import Note from "../Note.astro";
       background: Highlight;
       color: HighlightText;
     }
-    [data-out][data-lit="chromium"] .out-card[data-note-for="chromium"],
-    [data-out][data-lit="electron"] .out-card[data-note-for="electron"],
-    [data-out][data-lit="video"] .out-card[data-note-for="video"] {
+    [data-out][data-lit="chromium"] .out-card[data-note-for="chromium"] .note-name,
+    [data-out][data-lit="electron"] .out-card[data-note-for="electron"] .note-name,
+    [data-out][data-lit="video"] .out-card[data-note-for="video"] .note-name {
       border-color: Highlight;
     }
   }
@@ -768,9 +664,6 @@ import Note from "../Note.astro";
     }
   }
   @media (width < 560px) {
-    .out-card {
-      padding: var(--s4);
-    }
     .hint {
       font-size: var(--fs-small);
     }
