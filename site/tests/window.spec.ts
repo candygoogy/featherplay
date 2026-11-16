@@ -298,6 +298,9 @@ test("while the window is away its shortcut lies where it stood and brings it ba
   await page.getByRole("dialog").getByRole("button", { name: "Close featherplay" }).click();
   await expect(place).toBeVisible();
   await expect(place).toContainText("now it really isn’t running");
+  // The bar's tray icon says it is closed, not in the tray.
+  await expect(page.locator("html")).toHaveAttribute("data-window-closed", "");
+  await expect(page.locator("[data-site-bar] [data-tray]")).toHaveAccessibleName("featherplay is closed: open it");
   // Its shortcut in the middle of where the window stood, a listener's other icons about it,
   // each inside that place: pressed, one says what it has to do with featherplay.
   const b = (await place.getByRole("button", { name: "Open featherplay" }).boundingBox())!;
@@ -315,6 +318,9 @@ test("while the window is away its shortcut lies where it stood and brings it ba
   await place.getByRole("button", { name: "Open featherplay" }).click();
   await expect(win(page)).not.toHaveAttribute("data-minimised", /.*/);
   await expect(place).toBeHidden();
+  await expect(page.locator("html")).not.toHaveAttribute("data-window-closed", /.*/);
+  // "opens in 0.24 s" points at the tray icon: not for a window opened from the desk.
+  await expect(page.locator("[data-note='opens']")).not.toHaveClass(/written/);
   await wake(page);
   await caption(page, /^Minimise/).click();
   await expect(place.getByRole("button", { name: "Show featherplay’s window" })).toBeVisible();

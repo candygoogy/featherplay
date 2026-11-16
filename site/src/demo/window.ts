@@ -382,9 +382,10 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
   const deskOnly = () => maxButton?.setAttribute("aria-disabled", String(!desk.matches));
 
   // ---- Minimise to the tray, and back ----
-  // "opens in 0.24 s": by the tray icon, the first time the window comes back from the tray
-  // (not when the story brings it back), for a few seconds or until the page moves, or the
-  // window does (maximised, dragged, minimised again: it would lie over the note).
+  // "opens in 0.24 s": by the tray icon, the first time the window comes back by it (not when
+  // the story brings it back, nor from its shortcut on the desk: the note points at the tray
+  // icon), for a few seconds or until the page moves, or the window does (maximised, dragged,
+  // minimised again: it would lie over the note).
   const opensNote = document.querySelector<HTMLElement>("[data-note='opens']");
   let opensShown = false;
   const opensOff = () => {
@@ -407,8 +408,17 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
   const setMinimised = (on: boolean) => {
     if (on === minimised) return;
     minimised = on;
-    if (!on) showOpens();
+    if (!on && !byShortcut) showOpens();
     else opensOff();
+    // Closed, not in the tray: the bar's tray icon says so (Bar.astro dims it), and offers to
+    // open it.
+    const shut = on && closed;
+    document.documentElement.toggleAttribute("data-window-closed", shut);
+    const trayIcon = document.querySelector<HTMLElement>("[data-site-bar] [data-tray]");
+    if (trayIcon) {
+      trayIcon.dataset.tip = shut ? "featherplay is closed: open it" : "featherplay: show or hide the window";
+      trayIcon.setAttribute("aria-label", shut ? "featherplay is closed: open it" : "featherplay in the tray: show or hide the window");
+    }
     const hadFocus = el.contains(document.activeElement);
     el.toggleAttribute("data-minimised", on);
     document.documentElement.toggleAttribute("data-window-minimised", on);
