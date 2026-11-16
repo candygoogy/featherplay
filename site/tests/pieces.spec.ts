@@ -80,29 +80,38 @@ test("the key caps press for the visitor's own media keys and for the taskbar's 
   await expect(stage.getByRole("button", { name: "Next" })).toHaveCount(2);
 });
 
-test("the scrobble ring fills with the time heard, closes at half the song with a tick, and the song joins the past ones", async ({ page }) => {
+test("scrobbling counts the time heard, not a seek, and at half the song drops it into the list", async ({ page }) => {
+  await catchKeys(page);
   await page.clock.install();
   await page.goto("/");
   const sc = page.locator("[data-piece='scrobble']");
   await expect(sc.locator("[data-sc-label]")).toHaveText("Paused");
-  // In view (out of view the ring holds still); the page's sections laid out first (release.ts
-  // runs on the page's idle time, which the clock holds).
+  // The page's sections laid out first (release.ts runs on the page's idle time, which the clock
+  // holds), the piece in view.
   await page.clock.runFor(2000);
   await sc.scrollIntoViewIfNeeded();
-  // (Pressed where it is: the ring stays in view, as a visitor's would below it.)
-  await page.locator("#kept .m-media [data-do='toggle']").evaluate((b: HTMLElement) => b.click());
+  await expect(sc.locator(".sc-empty")).toBeVisible();
+  await page.locator("#kept .m-media [data-do='toggle']").click();
   await page.clock.runFor(10_000);
   await expect(sc.locator("[data-sc-label]")).toHaveText("Scrobbling now");
-  const p = Number(await sc.locator("[data-sc-ring]").evaluate((el) => getComputedStyle(el).getPropertyValue("--p")));
-  expect(p).toBeGreaterThan(0.3);
-  expect(p).toBeLessThan(0.45);
-  await page.clock.runFor(18_000);
+  await expect(sc.locator("[data-sc-heard]")).toHaveText(/^0:(09|10)$/);
+  // A seek forward: the song plays out with less than half of it heard, so it isn't scrobbled.
+  await key(page, "seekto", 40);
+  await page.clock.runFor(16_000);
+  await expect(sc.locator("[data-bind='title']")).toHaveText("Invisible Light");
+  await expect(sc.locator("[data-sc-past] li")).toHaveCount(0);
+  // The next one heard to its half (29.95 s of 59.9): scrobbled, and in the list at once.
+  await page.clock.runFor(31_000);
   await expect(sc.locator("[data-sc-label]")).toHaveText("Scrobbled");
-  await expect(sc.locator("[data-sc-row]")).toHaveAttribute("data-scrobbled", "");
-  await page.locator("#kept .m-media [data-do='next']").click();
+  await expect(sc).toHaveAttribute("data-scrobbled", "");
   await expect(sc.locator("[data-sc-past] li")).toHaveCount(1);
-  await expect(sc.locator("[data-sc-past] li b")).toHaveText("California Lullabye");
-  await expect(sc.locator("[data-sc-label]")).toHaveText("Scrobbling now");
+  await expect(sc.locator("[data-sc-past] li b")).toHaveText("Invisible Light");
+  await expect(sc.locator(".sc-empty")).toBeHidden();
+  // Back to its start, it stays scrobbled once.
+  await key(page, "seekto", 0);
+  await page.clock.runFor(2000);
+  await expect(sc.locator("[data-sc-label]")).toHaveText("Scrobbled");
+  await expect(sc.locator("[data-sc-past] li")).toHaveCount(1);
 });
 
 test("the lyric card follows the song, and a click on a line plays from there", async ({ page }) => {

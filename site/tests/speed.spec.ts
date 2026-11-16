@@ -35,19 +35,17 @@ const running = (page: Page) =>
       }),
   );
 
-test("while a song plays with Kept on screen, nothing animates unseen and the ring isn't a running transition", async ({ page }) => {
+test("while a song plays with Kept on screen, nothing animates unseen and the scrobble line runs on the compositor", async ({ page }) => {
   await playAt(page, "kept");
   const now = await running(page);
   // Off screen, only in the section being read (the rest wait out of view, or aren’t rendered).
   expect(now.filter((a) => !a.inView && a.section !== "kept"), "off screen").toEqual([]);
   expect(now.filter((a) => !a.shown), "unseen").toEqual([]);
-  expect(now.filter((a) => a.cls.includes("sc-fill")), "the ring").toEqual([]);
-  // The ring still fills, in small steps (its piece in view).
-  await page.locator("[data-sc-ring]").first().scrollIntoViewIfNeeded();
-  await page.waitForTimeout(300);
-  const p0 = await page.locator("[data-sc-ring]").evaluate((r) => Number(getComputedStyle(r).getPropertyValue("--p")));
-  await page.waitForTimeout(1500);
-  expect(await page.locator("[data-sc-ring]").evaluate((r) => Number(getComputedStyle(r).getPropertyValue("--p")))).toBeGreaterThan(p0);
+  // The scrobble line: one linear transform animation to the song's end, not a style a step.
+  const line = page.locator("[data-sc-fill]").first();
+  // (Scrolled to by the page: a line that moves is never "stable" enough for the locator's own.)
+  await line.evaluate((el) => el.scrollIntoView({ block: "center" }));
+  await expect.poll(() => line.evaluate((el) => el.getAnimations().map((a) => Object.keys((a.effect as KeyframeEffect).getKeyframes()[0]).includes("transform")))).toEqual([true]);
 });
 
 test("at the top, playing: the window's progress runs, its unseen thumb doesn't", async ({ page }) => {

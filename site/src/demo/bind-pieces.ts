@@ -129,44 +129,36 @@ export function bindPieces(player: Player): void {
     c.instant = true;
   }
 
-  // ---- Scrobbling ----
+  // ---- Scrobbling: the time heard fills the line toward the halfway mark; there the song drops
+  // into the list scrobbled this visit (three at most, the newest first; a song scrobbled again
+  // moves to the top). Kept on this page: nothing is sent. ----
   const scrobbles = $$("[data-piece='scrobble']");
   const listen = createListen();
-  // The ring fills with the time heard, drawn about one device pixel of its round at a time
-  // (some 130 steps to the scrobble), only where it shows: a few small restyles a second,
-  // not an animation ticking every frame (stroke-dashoffset can't run on the compositor).
-  const ring = { heardMs: 0, needMs: Infinity, at: 0, playing: false, scrobbled: false };
-  let ringTimer = 0;
-  const drawRings = () => {
-    clearTimeout(ringTimer);
-    const heard = ring.heardMs + (ring.playing ? performance.now() - ring.at : 0);
-    const p = ring.scrobbled ? 1 : Math.min(1, heard / ring.needMs);
-    let shown = false;
-    for (const sc of scrobbles) {
-      const el = sc.querySelector<SVGElement>("[data-sc-ring]");
-      // In view only (the observer below); nothing read from layout in the middle of a change.
-      if (!el || away.has(sc)) continue;
-      shown = true;
-      el.style.setProperty("--p", p.toFixed(4));
-    }
-    if (shown && ring.playing && !ring.scrobbled && p < 1) ringTimer = window.setTimeout(drawRings, Math.max(200, ring.needMs / 130));
+  let heardShown = -1;
+  const make = <K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, text = "") => {
+    const e = document.createElement(tag);
+    e.className = cls;
+    e.textContent = text;
+    return e;
   };
   const addPast = (song: Song) => {
     for (const s of scrobbles) {
       const past = s.querySelector("[data-sc-past]");
       if (!past) continue;
+      past.querySelector(`[data-id="${song.id}"]`)?.remove();
       const li = document.createElement("li");
+      li.dataset.id = song.id;
       const img = document.createElement("img");
       img.src = song.cover;
-      img.width = img.height = 32;
+      img.width = img.height = 36;
       img.alt = "";
-      const b = document.createElement("b");
-      b.textContent = song.title;
-      const t = document.createElement("span");
-      t.textContent = "Scrobbled";
-      li.append(img, b, t);
+      const text = make("span", "sc-text");
+      text.append(make("b", "sc-title", song.title), make("span", "sc-artist", song.artist));
+      const to = make("span", "sc-to");
+      to.append(make("span", "", "Last.fm"), make("span", "", "ListenBrainz"));
+      li.append(img, text, to);
       past.prepend(li);
-      while (past.children.length > 2) past.lastElementChild!.remove();
+      while (past.children.length > 3) past.lastElementChild!.remove();
     }
   };
 
@@ -363,16 +355,26 @@ export function bindPieces(player: Player): void {
 
     // Scrobbling counts on every step (time heard, not where the song is).
     const l = listen.step(s);
-    if (l.finished) addPast(l.finished);
-    if (songChanged || secondChanged || l.justScrobbled || playChanged || resynced) {
-      Object.assign(ring, { heardMs: l.heardMs, needMs: scrobbleAfterMs(song.durationMs), at: performance.now(), playing: s.playing, scrobbled: l.scrobbled });
-      if (scrobbles.length) drawRings();
+    if (l.justScrobbled) addPast(song);
+    const heardSecond = Math.floor(l.heardMs / 1000);
+    const restart = songChanged || playChanged || jumped || resynced || l.justScrobbled;
+    if (scrobbles.length && (restart || heardSecond !== heardShown)) {
+      heardShown = heardSecond;
+      const text = l.scrobbled ? "Scrobbled" : s.playing ? "Scrobbling now" : "Paused";
+      const heard = formatTime(l.heardMs);
+      // The line is the song's length; what has been heard of it, from here to its end.
+      const h = Math.min(1, l.heardMs / song.durationMs);
       for (const sc of scrobbles) {
-        const row = sc.querySelector<HTMLElement>("[data-sc-row]");
-        row?.toggleAttribute("data-scrobbled", l.scrobbled);
+        // Out of view, its words wait: coming back (again()) brings it up to date.
+        if (away.has(sc) && !l.justScrobbled && !songChanged) continue;
+        sc.toggleAttribute("data-scrobbled", l.scrobbled);
         const label = sc.querySelector("[data-sc-label]");
-        const text = l.scrobbled ? "Scrobbled" : s.playing ? "Scrobbling now" : "Paused";
         if (label && label.textContent !== text) label.textContent = text;
+        const hs = sc.querySelector("[data-sc-heard]");
+        if (hs && hs.textContent !== heard) hs.textContent = heard;
+        if (songChanged) sc.style.setProperty("--half", `${((scrobbleAfterMs(song.durationMs) / song.durationMs) * 100).toFixed(2)}%`);
+        const fill = sc.querySelector<HTMLElement>("[data-sc-fill]");
+        if (fill && restart) pieceLine(fill, () => [`scaleX(${h})`, "scaleX(1)"], Math.max(0, song.durationMs - l.heardMs), s.playing);
       }
     }
 
