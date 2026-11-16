@@ -403,6 +403,7 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
    *  note over it for the way it went: closed (and paused), or in the tray, playing on. The note
    *  is written each time (the pen's reveal starts over). */
   const goneHand = gone?.querySelector<HTMLElement>("[data-gone-hand]");
+  const gonePick = gone?.querySelector<HTMLElement>("[data-gone-pick]");
   let goneWas: "closed" | "tray" | null = null;
   function showGone(on: boolean, rest: Frame = driven ?? rested()) {
     if (!gone || !goneBack) return;
@@ -411,6 +412,7 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
     if (!on) {
       goneWas = null;
       goneHand?.classList.remove("written");
+      gonePick?.classList.remove("written");
       goneSay?.removeAttribute("data-on");
       return;
     }
@@ -419,9 +421,9 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
     gone.style.width = `${bw.toFixed(1)}px`;
     gone.style.height = `${bh.toFixed(1)}px`;
     gone.style.translate = `${(rest.x - slotOff.x).toFixed(1)}px ${(rest.y - slotOff.y).toFixed(1)}px`;
-    // The others only where they lie clear of the note in the middle (its words are some
-    // 21 rem wide).
-    gone.toggleAttribute("data-slim", bw < 700 || bh < 420);
+    // The others only where the window had the room for them (they lie some 18.5 rem either
+    // side of its middle, 13 rem above and 11 below).
+    gone.toggleAttribute("data-slim", bw < 620 || bh < 430);
     // Placed again by a new measure, the note stays as it was written.
     const which = closed ? "closed" : "tray";
     if (which === goneWas) return;
@@ -432,6 +434,9 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
       goneHand.classList.remove("written");
       // Once the window has gone and the shortcut is in (Window.astro's delay).
       setTimeout(() => goneWas === which && goneHand.classList.add("written"), 420);
+      // "click one" after it, once the first note is read.
+      gonePick?.classList.remove("written");
+      setTimeout(() => goneWas === which && gonePick?.classList.add("written"), 1500);
     }
   }
   /** The window is coming back by its shortcut on the desk (it opens out of that). */

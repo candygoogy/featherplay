@@ -11,7 +11,8 @@
 // one leaves such things, the icons of a listener's desktop: the three apps featherplay works
 // with (Discord, Last.fm, OBS Studio: their own marks, from the Simple Icons set, shown as one
 // shows an app one connects to; no other brand's, and never Google's) and the Recycle Bin in
-// its corner. Pressed, each says in a word what it has to do with featherplay.
+// its corner, a small "click one" by the first of them. Pressed, each says in a word what it
+// has to do with featherplay.
 import Replica from "./Replica.astro";
 import Logo from "./Logo.astro";
 import { notes } from "../data/notes";
@@ -46,6 +47,9 @@ import { notes } from "../data/notes";
   <button class="shortcut sc-other at-4" type="button" data-say="Empty. featherplay’s uninstaller leaves nothing behind.">
     <span class="sc-app a-bin"><svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 7.5 H19.5 M9.5 7.5 V5.6 a1 1 0 0 1 1 -1 h3 a1 1 0 0 1 1 1 V7.5 M6.6 7.5 l0.8 10.9 a1.6 1.6 0 0 0 1.6 1.5 h6 a1.6 1.6 0 0 0 1.6 -1.5 l0.8 -10.9 M10.2 11 v5.6 M13.8 11 v5.6"></path></svg></span><span class="sc-name">Recycle Bin</span>
   </button>
+  <p class="hand pick-hand arrow-down-left" data-judged data-gone-pick aria-hidden="true">
+    <svg viewBox="0 0 44 30"><path pathLength="1" d="M40 5 C 30 6.5, 17 12, 8 24 M8.5 15.6 L7.6 24.4 L15.6 21.6"></path></svg><span>{notes.pick}</span>
+  </p>
   <p class="sc-say glass float" data-desk-say role="status"></p>
 </div>
 <dialog class="closer glass float live" data-closer aria-labelledby="closer-h" aria-describedby="closer-text">
@@ -115,9 +119,10 @@ import { notes } from "../data/notes";
   /* Where the window stood while it is away: a box of the window's own size and place
      (src/demo/window.ts sets them), with a desk's things in it. The app's shortcut in the
      middle, the maker's note over it with its arrow down to it; the others about it, each
-     where it was left, not in a row (a share of the box each, so they keep their places at
-     any size), in the second ink. Each is lit under the pointer as Windows lights a desktop
-     icon. In once the window has gone, out at once as it comes back. */
+     where it was left, not in a row, in the second ink: near enough to read as one desk
+     (set from the middle in rem, so they keep together at any size, clear of the note's 21
+     rem of words). Each is lit under the pointer as Windows lights a desktop icon. In once
+     the window has gone, out at once as it comes back. */
   .win-gone {
     position: absolute;
     left: 0;
@@ -137,20 +142,34 @@ import { notes } from "../data/notes";
     top: 50%;
   }
   .at-1 {
-    left: 11%;
-    top: 19%;
+    left: calc(50% - 15rem);
+    top: calc(50% - 7.75rem);
   }
   .at-2 {
-    left: 23%;
-    top: 79%;
+    left: calc(50% - 11rem);
+    top: calc(50% + 7.5rem);
   }
   .at-3 {
-    left: 87%;
-    top: 27%;
+    left: calc(50% + 15rem);
+    top: calc(50% - 4.5rem);
   }
   .at-4 {
-    left: 91%;
-    top: 85%;
+    left: calc(50% + 12rem);
+    top: calc(50% + 8rem);
+  }
+  /* "click one", up and to the right of the first of them, its arrow down to it. A size down
+     from the note in the middle: an aside to the aside. */
+  .pick-hand {
+    left: calc(50% - 13.4rem);
+    top: calc(50% - 12.85rem);
+    font-size: calc(var(--fs-pen) * 0.8);
+  }
+  .pick-hand svg {
+    width: 1.4667em;
+    height: 1em;
+  }
+  .win-gone[data-slim] .pick-hand {
+    display: none;
   }
   .sc-other {
     color: var(--ink2);

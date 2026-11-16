@@ -19,10 +19,10 @@ describe("the hand's font", () => {
     expect(statSync(font).size).toBeLessThan(12_000);
     expect(existsSync("public/fonts/reenie-beanie-OFL.txt")).toBe(true);
   });
-  it("keeps to eight to ten notes on the page (and two only a visitor who puts the window away sees), in the maker's plain lowercase voice", () => {
+  it("keeps to eight to ten notes on the page (and three only a visitor who puts the window away sees), in the maker's plain lowercase voice", () => {
     const all = Object.values(notes);
-    const { closed, tray, ...onThePage } = notes;
-    expect(closed && tray).toBeTruthy();
+    const { closed, tray, pick, ...onThePage } = notes;
+    expect(closed && tray && pick).toBeTruthy();
     expect(Object.keys(onThePage).length).toBeGreaterThanOrEqual(8);
     expect(Object.keys(onThePage).length).toBeLessThanOrEqual(10);
     for (const n of all) expect(n).toBe(n.toLowerCase());
