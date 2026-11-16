@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { HOLDS, ZONES, bezier, captionOpacity, phases, settleTarget, storyProgress } from "../../src/scripts/story-math";
+import { HOLDS, MOVES, ZONES, bezier, captionOpacity, glidePath, phases, settleTarget, storyProgress } from "../../src/scripts/story-math";
 
 describe("the story's progress", () => {
   it("runs 0 to 1 over the pinned distance, and stays at its ends", () => {
@@ -52,6 +52,22 @@ describe("settling", () => {
     expect(settleTarget(0, 1)).toBeNull();
     expect(settleTarget(1, -1)).toBeNull();
     expect(settleTarget(0.9, 1)).toBeNull();
+  });
+});
+
+describe("the settling glide", () => {
+  it("runs to where the picture stops moving, timed by how much of the move is left, then on to the hold", () => {
+    const on = glidePath(0.335, HOLDS[1]);
+    expect(on.edge).toBe(MOVES.b[1]);
+    expect(on.tail).toBeGreaterThan(0);
+    const back = glidePath(0.335, HOLDS[0]);
+    expect(back.edge).toBe(MOVES.b[0]);
+    // Less of the move left, less time: but never rushed.
+    expect(back.ms).toBeLessThan(on.ms);
+    expect(back.ms).toBeGreaterThanOrEqual(400);
+    expect(on.ms).toBeLessThanOrEqual(820);
+    // Back to the top of the story: the move's start is the resting place itself.
+    expect(glidePath(0.05, 0)).toMatchObject({ edge: 0, tail: 0 });
   });
 });
 

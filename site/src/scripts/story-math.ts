@@ -2,7 +2,10 @@
 // The stage is pinned for a fixed distance; `p` runs 0..1 over it. The window takes three
 // holds the page settles into: whole (centred and large), narrow (the app's real narrow
 // layout, beside its words), in the tray. The moves between them are short, the holds long,
-// and inside a hold's zone nothing moves at all (mockup 10's timings).
+// and inside a hold's zone nothing moves at all (mockup 10's timings). A move follows the
+// scroll closely (so the window answers the first notch), and a scroll that stops part-way is
+// carried on by the page's glide, timed in the picture's terms: off at the speed it had, then
+// a long soft landing.
 
 /** The moves, as [from, to] in p. */
 export const MOVES = { a: [0, 0.16], b: [0.27, 0.5], c: [0.6, 0.74] } as const;
@@ -43,8 +46,22 @@ export function bezier(x1: number, y1: number, x2: number, y2: number): (t: numb
     return y(clamp01(t));
   };
 }
-/** The scroll-driven travel's curve (the motion language's `--ease-move`). */
-export const easeMove = bezier(0.37, 0, 0.63, 1);
+/** The scroll-driven travel's curve: nearly the scroll itself, its two ends a little eased. */
+export const easeMove = (t: number) => t + (smooth(t) - t) * 0.4;
+
+/** The settling glide's curve: off at once from the visitor's own scroll, a long soft landing. */
+export const easeGlide = bezier(0.2, 0.7, 0.2, 1);
+/** The glide after a scroll stopped at `p`, on its way to the hold `to`: `edge` is where the
+ *  picture finishes moving (the move's end on that side), reached in `ms` on `easeGlide` (a whole
+ *  move's worth of picture takes 820 ms, the last of one 400); the still stretch from there to
+ *  the hold, where nothing shows, takes `tail` more. */
+export function glidePath(p: number, to: number): { edge: number; ms: number; tail: number } {
+  const move = Object.values(MOVES).find(([a, b]) => p > a && p < b);
+  if (!move) return { edge: to, ms: 0, tail: 260 };
+  const edge = to > p ? move[1] : move[0];
+  const left = Math.abs(edge - p) / (move[1] - move[0]);
+  return { edge, ms: Math.round(400 + 420 * left), tail: edge === to ? 0 : 260 };
+}
 
 export function storyProgress(scrollY: number, top: number, length: number): number {
   return length > 0 ? clamp01((scrollY - top) / length) : 0;

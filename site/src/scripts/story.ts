@@ -1,8 +1,10 @@
 // The scroll story (Stage.astro): with the stage pinned for 2,400 px, the window steps back as
 // the app does: whole (centred and large), narrow (the app's real narrow layout, beside its
 // words), into the tray (the capsule's song, its flyout showing the song still playing). The
-// page settles into each hold. Only where it can be seen whole: a pointer-sized screen
-// (761 px wide, 600 tall), motion allowed; elsewhere the three steps are plain blocks.
+// page settles into each hold: a scroll that stops part-way through a move is carried on by
+// the page's own glide (its own clock and curve, so the move has time to be seen and lands
+// softly), until the visitor scrolls again. Only where it can be seen whole: a pointer-sized
+// screen (761 px wide, 600 tall), motion allowed; elsewhere the three steps are plain blocks.
 //
 // The loop runs only while something moves (the scroll's smoothing settling), reads no layout
 // (geometry is measured on resize and when the window lays out) and moves the window, its
@@ -15,7 +17,7 @@ import type { Player } from "../demo/player";
 import { whenWindow, type Frame } from "../demo/window";
 import { fitWindow, IDEAL } from "../demo/fit";
 import { LYRICS_MIN } from "./first-math";
-import { HOLDS, captionOpacity, phases, seg, settleTarget, storyProgress } from "./story-math";
+import { HOLDS, captionOpacity, easeGlide, glidePath, phases, seg, settleTarget, storyProgress } from "./story-math";
 import { hideNote, showNoteAt } from "./notes";
 
 export const STORY = "(min-width: 761px) and (min-height: 600px) and (prefers-reduced-motion: no-preference)";
@@ -272,6 +274,12 @@ export async function startStory(player: Player): Promise<void> {
     let gr: Rect = G.r1;
     // The snap's progress, in whichever move changes the app's layout (for the icon's fade).
     let k = b;
+    // Through a snap the app rides its ground: fitted inside it from its top, so the app
+    // fading out and the app fading back in travel with the ground (never left behind it).
+    const riding = (w: number, h: number, o: number): Frame => {
+      const sc = Math.min(gr.w / w, gr.h / h);
+      return { w, h, x: gr.x + (gr.w - w * sc) / 2, y: gr.y, s: sc, o };
+    };
     if (b <= 0 && (from.w !== L.w || from.h !== L.h)) {
       // The first screen's narrow window becoming the whole wide app: as the snap to narrow,
       // the app fades, its ground carries its icon from the first screen's rect to hold 1's,
@@ -280,10 +288,7 @@ export async function startStory(player: Player): Promise<void> {
       const r0 = { x: from.x, y: from.y, w: from.w * from.s, h: from.h * from.s };
       gr = { x: lerp(r0.x, G.r1.x, a), y: lerp(r0.y, G.r1.y, a), w: lerp(r0.w, G.r1.w, a), h: lerp(r0.h, G.r1.h, a) };
       ghostO = a > 0 ? Math.min(seg(a, 0, 0.2), 1 - seg(a, 0.85, 1)) : 0;
-      f =
-        a < 0.5
-          ? { w: from.w, h: from.h, x: gr.x, y: gr.y, s: gr.w / from.w, o: 1 - seg(a, 0, 0.35) }
-          : { ...G.r1, w: L.w, h: L.h, o: seg(a, 0.8, 1) };
+      f = a < 0.5 ? riding(from.w, from.h, 1 - seg(a, 0, 0.42)) : riding(L.w, L.h, seg(a, 0.58, 1));
     } else if (b <= 0) {
       f = { w: L.w, h: L.h, x: lerp(from.x, G.r1.x, a), y: lerp(from.y, G.r1.y, a), s: lerp(from.s, G.r1.s, a), o: 1 };
     } else if (c <= 0) {
@@ -291,8 +296,8 @@ export async function startStory(player: Player): Promise<void> {
       // back laid out narrow.
       gr = { x: lerp(G.r1.x, G.r2.x, b), y: lerp(G.r1.y, G.r2.y, b), w: lerp(G.r1.w, G.r2.w, b), h: lerp(G.r1.h, G.r2.h, b) };
       ghostO = Math.min(seg(b, 0, 0.2), 1 - seg(b, 0.85, 1));
-      // The rect gives the place and the scale; the size the app is laid out at is its own.
-      f = b < 0.5 ? { ...G.r1, w: L.w, h: L.h, o: 1 - seg(b, 0, 0.35) } : { ...G.r2, w: NARROW.w, h: NARROW.h, o: seg(b, 0.8, 1) };
+      // The size the app is laid out at is its own; its place and scale are its ground's.
+      f = b < 0.5 ? riding(L.w, L.h, 1 - seg(b, 0, 0.42)) : riding(NARROW.w, NARROW.h, seg(b, 0.58, 1));
     } else {
       // Into the tray: toward the capsule's song, smaller, then gone (where the song is, read
       // once as the move starts, not every frame).
@@ -309,7 +314,7 @@ export async function startStory(player: Player): Promise<void> {
       ghost.style.transform = `translate(${gr.x.toFixed(1)}px, ${gr.y.toFixed(1)}px) scale(${(gr.w / G.r1.w).toFixed(4)}, ${(gr.h / G.r1.h).toFixed(4)})`;
       icon.style.transform = `translate(${(gr.x + gr.w / 2 - 28).toFixed(1)}px, ${(gr.y + gr.h / 2 - 28).toFixed(1)}px)`;
     }
-    icon.style.opacity = (ghostO * Math.min(seg(k, 0.15, 0.35), 1 - seg(k, 0.7, 0.85))).toFixed(3);
+    icon.style.opacity = (ghostO * Math.min(seg(k, 0.2, 0.4), 1 - seg(k, 0.58, 0.76))).toFixed(3);
     const bRaw = seg(p, 0.27, 0.5);
     snap.style.opacity = (seg(bRaw, 0, 0.2) * (1 - seg(bRaw, 0.72, 1))).toFixed(3);
   }
@@ -321,55 +326,81 @@ export async function startStory(player: Player): Promise<void> {
   let last = 0;
   let lastY = scrollY;
   let dir = 1;
+  /** The page's own glide on to a hold, and where it last put the page. */
+  let glide: { from: number; edge: number; to: number; t0: number; ms: number; tail: number } | null = null;
+  let glideY = 0;
   const frame = (now: number) => {
     raf = 0;
     const dt = Math.min(64, now - (last || now));
     last = now;
+    if (glide && G) {
+      // To where the picture finishes, on the glide's curve; then the still stretch to the hold.
+      const t = now - (glide.t0 ||= now);
+      const u = glide.tail ? Math.min(1, (t - glide.ms) / glide.tail) : 1;
+      if (t < glide.ms) glideY = glide.from + (glide.edge - glide.from) * easeGlide(t / glide.ms);
+      else glideY = u >= 1 ? glide.to : glide.edge + (glide.to - glide.edge) * u * (2 - u);
+      if (t >= glide.ms && u >= 1) glide = null;
+      scrollTo(0, glideY);
+      target = storyProgress(glideY, G.top, LEN);
+    }
     // A jump of more than a third of the story (a section link) lands at once.
     if (Math.abs(target - cur) > 0.35) cur = target;
     cur += (target - cur) * (1 - Math.exp(-dt / 90));
     if (Math.abs(target - cur) < 0.0002) cur = target;
     render(cur);
-    if (cur !== target) raf = requestAnimationFrame(frame);
+    if (cur !== target || glide) raf = requestAnimationFrame(frame);
     else last = 0;
   };
   const wake = () => {
     if (!raf) raf = requestAnimationFrame(frame);
   };
   let settleTimer = 0;
-  let settlingUntil = 0;
   const settle = () => {
-    if (!G) return;
-    // The page's own settling glide is under way: ask again once it has had its time.
-    const wait = settlingUntil - performance.now();
-    if (wait > 0) {
-      clearTimeout(settleTimer);
-      settleTimer = window.setTimeout(settle, wait + 40);
-      return;
-    }
+    if (!G || glide) return;
     const to = settleTarget(target, dir);
     if (to == null) return;
-    settlingUntil = performance.now() + 600;
-    scrollTo({ top: Math.round(G.top + to * LEN), behavior: "smooth" });
+    const from = scrollY;
+    const end = Math.round(G.top + to * LEN);
+    if (Math.abs(end - from) < 1) return;
+    const path = glidePath(target, to);
+    glide = { from, edge: G.top + path.edge * LEN, to: end, t0: 0, ms: path.ms, tail: path.tail };
+    wake();
   };
   addEventListener(
     "scroll",
     () => {
       if (!G) return;
       const y = scrollY;
+      // The glide's own steps aren't the visitor's: they neither turn it nor ask for another.
+      // (A scroll far from where the glide put the page is the visitor's: the scrollbar.)
+      if (glide && Math.abs(y - glideY) < 48) {
+        lastY = y;
+        return;
+      }
+      glide = null;
       if (y !== lastY) dir = y > lastY ? 1 : -1;
       lastY = y;
       target = storyProgress(y, G.top, LEN);
       clearTimeout(settleTimer);
-      settleTimer = window.setTimeout(settle, 160);
+      settleTimer = window.setTimeout(settle, 90);
       wake();
     },
     { passive: true },
   );
   addEventListener("scrollend", () => {
+    if (glide) return;
     clearTimeout(settleTimer);
     settleTimer = window.setTimeout(settle, 40);
   });
+  // The visitor's hand on the page ends the glide at once: the scroll that follows is theirs,
+  // and if none follows (a key, a click) the page settles again from where it was left.
+  const letGo = () => {
+    if (!glide) return;
+    glide = null;
+    clearTimeout(settleTimer);
+    settleTimer = window.setTimeout(settle, 250);
+  };
+  for (const type of ["wheel", "touchstart", "pointerdown", "keydown"]) addEventListener(type, letGo, { passive: true });
 
   // "The app" in the bar goes to the first hold, the whole window, and the keys go there too.
   document.addEventListener("click", (e) => {
@@ -386,6 +417,7 @@ export async function startStory(player: Player): Promise<void> {
     if (mq.matches) requestAnimationFrame(measure);
     else {
       G = null;
+      glide = null;
       beat = false;
       endBeat();
       win.drive(null);
