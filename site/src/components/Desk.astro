@@ -139,10 +139,14 @@ const layers = ["k-ground", "m k-shade", "m k-lit", "m k-hi", "k-sheen", "k-calm
     background: linear-gradient(100deg, rgb(255 255 255 / 0.035), rgb(255 255 255 / 0) 34%);
   }
   /* The frost itself is sharp: a crisp grain, a step coarser than the panes'. Blended normally
-     (a full-screen blend costs every frame of the fade without a GPU). */
+     (a full-screen blend costs every frame of the fade without a GPU). In the dark it is the
+     sheet's one grain alone (.desk-grain, the tile at its own size): this second, enlarged
+     layer over it made soft clumps that read as a weave on the near-black ground, so it shows
+     in daylight only. */
   .k-grain {
     background: url("/img/desk/grain-a.png") 0 0 / 192px;
-    opacity: 0.26;
+    opacity: 0;
+    visibility: hidden;
   }
   /* Calm under reading (data-low): the field's lights covered by the slot's own ground, so the
      sections lie on a nearly even sheet with the song's colour barely there; the grain stays
@@ -171,7 +175,7 @@ const layers = ["k-ground", "m k-shade", "m k-lit", "m k-hi", "k-sheen", "k-calm
     inset: 0;
     z-index: 4;
     background: url("/img/desk/grain-a.png") 0 0 / 128px;
-    opacity: 0.28;
+    opacity: 0.38;
   }
   /* Daylight: its own deep, a soft tinted shadow; a brighter lift; finer grain. A slot keeps
      the theme its tones were made for (data-tones), so a theme switch can fade between them. */
@@ -194,9 +198,11 @@ const layers = ["k-ground", "m k-shade", "m k-lit", "m k-hi", "k-sheen", "k-calm
   :global(:root[data-theme="light"]) .slot:not([data-tones]) .k-grain,
   .slot[data-tones="light"] .k-grain {
     opacity: 0.18;
+    visibility: visible;
   }
   .slot[data-tones="dark"] .k-grain {
-    opacity: 0.26;
+    opacity: 0;
+    visibility: hidden;
   }
   :global(:root[data-theme="light"]) .desk-grain {
     opacity: 0.2;
