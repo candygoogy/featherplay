@@ -313,3 +313,15 @@ test("a selection in the window moves with it: its drawn pieces follow a drag", 
   const after = await sel();
   expect(Math.abs(after.dx - at.dx) + Math.abs(after.dy - at.dy)).toBeLessThan(3);
 });
+
+for (const [scheme, want] of [["light", "rgba(0, 0, 0, 0.18)"], ["dark", "rgba(0, 0, 0, 0.5)"]] as const) {
+  test(`the close question dims the page by the theme's own scrim (${scheme})`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme: scheme });
+    await page.goto("/");
+    await wake(page);
+    await caption(page, /^Close/).click();
+    const dialog = page.getByRole("dialog", { name: "Close featherplay?" });
+    await expect(dialog).toBeVisible();
+    expect(await dialog.evaluate((d) => getComputedStyle(d, "::backdrop").backgroundColor)).toBe(want);
+  });
+}
