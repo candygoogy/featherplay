@@ -188,8 +188,8 @@ const groups = [
     }
   }
   /* The small print: one quiet line under a hairline, its parts set apart by a dot, and the
-     way back up at its end: its words and a round tonal key with an arrow. Pointed at, the
-     words brighten, the key takes the tonal hover and its arrow leaves by the top as a second
+     way back up at its end: its words and a round key of the page's glass with an arrow.
+     Pointed at, the words brighten, the key takes a tonal tint and its arrow leaves by the top as a second
      one comes up from under it (the key clips them); pressed, the key gives as the page's buttons do. */
   .foot-legal {
     display: flex;
@@ -237,7 +237,10 @@ const groups = [
     padding: 10px;
     overflow: hidden;
     border-radius: 50%;
-    background: var(--tonal);
+    /* A key of the page's glass, as the media keys are: lit along its top, a rim, resting on
+       the panel; pointed at and pressed, the tonal steps tint it. */
+    background: var(--pane-hl) var(--mat-fly);
+    box-shadow: var(--pane-edge), var(--pane-rim), var(--pane-contact);
     color: var(--text);
     transition:
       background-color var(--t-hover) ease,
@@ -253,14 +256,14 @@ const groups = [
   }
   .to-top:hover .to-top-key,
   .to-top:focus-visible .to-top-key {
-    background: var(--tonal-hover);
+    background-color: color-mix(in srgb, var(--text) 7%, var(--mat-fly));
   }
   .to-top:hover .to-top-key svg,
   .to-top:focus-visible .to-top-key svg {
     translate: 0 -36px;
   }
   .to-top:active .to-top-key {
-    background: var(--tonal-pressed);
+    background-color: color-mix(in srgb, var(--text) 14%, var(--mat-fly));
     scale: var(--press-scale);
     transition-duration: var(--t-hover), var(--t-press);
   }
