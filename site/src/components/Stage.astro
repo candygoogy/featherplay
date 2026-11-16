@@ -160,8 +160,12 @@ const steps = [
 </script>
 
 <style>
+  /* Nothing placed on the stage (a note left where it was shown before a resize, the window
+     on its way in) can widen the page: clipped at the sides, not a scroll box (the pin stays
+     sticky). */
   .stage {
     position: relative;
+    overflow-x: clip;
   }
   .anchor {
     position: absolute;
