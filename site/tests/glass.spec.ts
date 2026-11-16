@@ -123,6 +123,14 @@ async function cornerPass(page: Page, label: string, from: number, step = 360) {
       let n = 0;
       for (const el of document.querySelectorAll<HTMLElement>("main :is(h1, h2, h3, p, li, a, td, th, dt, dd, figcaption, summary), footer :is(h2, p, a)")) {
         if (el.closest("[data-stage]")) continue;
+        // Kept for assistive technology only (clipped away where the story shows them).
+        let up: Element | null = el;
+        let clipped = false;
+        while (up && !clipped) {
+          clipped = getComputedStyle(up).clipPath === "inset(50%)";
+          up = up.parentElement;
+        }
+        if (clipped) continue;
           if (el.querySelector("p, li, h2, h3, a, td") || el.closest("[data-replica], [data-piece], .win-body, .explorer")) continue;
           // Its own words (not only a row of drawn buttons, each on its own ground).
           if (![...el.childNodes].some((c) => c.nodeType === 3 && c.textContent!.trim())) continue;

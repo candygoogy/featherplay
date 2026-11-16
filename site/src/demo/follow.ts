@@ -176,9 +176,7 @@ export function followLyrics(panel: HTMLElement, list: HTMLElement): LyricsFollo
     "wheel",
     (e) => {
       if (e.ctrlKey || Math.abs(e.deltaY) < Math.abs(e.deltaX)) return;
-      // On the hero's laptop while it's still rising, the wheel is the page's: it drives the
-      // scroll moment (src/scripts/lid.ts).
-      if (panel.closest("[data-laptop]:not([data-settled])")) return;
+
       const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? panel.clientHeight : 1;
       const dy = (e.deltaY * unit) / scale();
       const notch = isNotch(e as WheelEvent & { wheelDeltaY?: number });

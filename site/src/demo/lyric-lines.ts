@@ -1,5 +1,5 @@
 // A song's synced lines as buttons in a list, and which of them is sung now: one module for
-// the replica's lyrics (and its side panel), the lyrics showcase and the lyric card. Each line
+// the replica's lyrics (and its side panel) and the lyric card. Each line
 // is a button that seeks to it (its time in data-at); its state is "past", "current" or "next".
 
 import type { Song } from "../data/songs";

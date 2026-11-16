@@ -253,22 +253,6 @@ describe("colour helpers", () => {
   });
 });
 
-import { zoomTo } from "../../src/demo/features";
-describe("the features' zoom", () => {
-  const parse = (t: string) => t.match(/-?[\d.]+/g)!.map(Number);
-  it("brings a point to the middle when it can", () => {
-    const [tx, ty, z] = parse(zoomTo(1000, 600, 500, 300, 1.5));
-    expect(tx + z * 500).toBeCloseTo(500, 0);
-    expect(ty + z * 300).toBeCloseTo(300, 0);
-  });
-  it("never shows past the laptop's edges, even for a corner", () => {
-    const [tx, ty, z] = parse(zoomTo(1000, 600, 980, 590, 2));
-    expect(tx).toBeGreaterThanOrEqual(1000 * (1 - z) - 0.1);
-    expect(ty).toBeGreaterThanOrEqual(600 * (1 - z) - 0.1);
-    expect(tx).toBeLessThanOrEqual(0);
-  });
-});
-
 import { downloadOptions } from "../../src/data/release";
 describe("the download's options", () => {
   const file = { name: "f", bytes: 10_485_760, sizeMB: 10, url: "https://example.org/" };

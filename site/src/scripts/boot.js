@@ -42,16 +42,13 @@
   addEventListener("DOMContentLoaded", () =>
     requestAnimationFrame(() => requestAnimationFrame(() => document.documentElement.classList.remove("booting"))),
   );
-  // Loading part-way down: a reload or back/forward to where the hero last left the page
-  // scrolled (src/scripts/lid.ts keeps it), or a link to a #section. The hero then shows
-  // nothing of its first-load motion and waits to be placed (Hero.astro).
+  // Loading at a link to a #section: the first screen shows nothing of its arrival
+  // (src/scripts/first.ts). A reload or a step back or forward lands where the browser puts it.
   try {
     const nav = performance.getEntriesByType("navigation")[0];
     const again = nav && (nav.type === "reload" || nav.type === "back_forward");
-    const left = again ? Number(sessionStorage.getItem("fp-scroll:" + location.pathname)) : 0;
     const hash = location.hash.slice(1);
-    if (left > 4) document.documentElement.dataset.land = "restore";
-    else if (!again && hash && hash !== "top") document.documentElement.dataset.land = "hash";
+    if (!again && hash && hash !== "top") document.documentElement.dataset.land = "hash";
     // A fresh load at the top: the page's first layout is split (src/scripts/release.ts). Not
     // where the browser puts the page somewhere down it as it loads: that needs every section
     // at its real height.

@@ -1,5 +1,5 @@
-// The demo's one player store. Every place on the page that shows featherplay (the hero's
-// laptop, the lyrics showcase, the customise section, the tour) reads and drives this.
+// The demo's one player store. Every place on the page that shows featherplay (the window,
+// the pieces, the lyric card, Make it yours, the Download card) reads and drives this.
 // Time is a clock that runs on animation frames while a song plays and the page is
 // visible, and stands still otherwise. Sound, where a song has a clip, is a separate
 // listener (src/demo/audio.ts) that follows this clock; the store itself is silent.

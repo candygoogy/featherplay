@@ -14,11 +14,11 @@ for (const theme of ["dark", "light"] as const) {
       await page.goto(path);
       await page.waitForLoadState("networkidle");
       const tags = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa", "best-practice"];
-      // The laptops' screens are pictures of the app at its own 1440 px size, scaled down:
-      // their targets shrink with them (WCAG 2.5.8's "essential" presentation). Every other
-      // rule runs on them; target size runs on the rest of the page.
+      // The app's windows are the app at its own size, scaled down: their targets shrink with
+      // them (WCAG 2.5.8's "essential" presentation). Every other rule runs on them; target size
+      // runs on the rest of the page.
       const all = await new AxeBuilder({ page }).withTags(tags).disableRules(["target-size"]).analyze();
-      const sizes = await new AxeBuilder({ page }).withRules(["target-size"]).exclude("[data-desktop]").exclude("[data-replica]").analyze();
+      const sizes = await new AxeBuilder({ page }).withRules(["target-size"]).exclude("[data-replica]").analyze();
       const results = { violations: [...all.violations, ...sizes.violations], passes: [...all.passes, ...sizes.passes] };
       try {
         mkdirSync(out, { recursive: true });

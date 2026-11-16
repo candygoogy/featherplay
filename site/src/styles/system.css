@@ -81,7 +81,6 @@
      --spring-*, --t-hover, --t-press, --t-release, --t-morph) are in tokens.css; the song's
      colour changes on one clock, --t-glow (900 ms). ---- */
   --ease-window: cubic-bezier(0.32, 0.72, 0, 1); /* the window and the capsule */
-  --ease-move: cubic-bezier(0.37, 0, 0.63, 1); /* scroll-driven travel only */
   --ease-pen: cubic-bezier(0.45, 0.1, 0.3, 1); /* the hand */
   --t-small: 180ms;
   --t-medium: 280ms;

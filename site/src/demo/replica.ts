@@ -19,7 +19,6 @@ import { runLine } from "./lines";
 import { followLyrics } from "./follow";
 import { bindAudio } from "./audio";
 import { bindCredits } from "./credit";
-import { trayLines } from "./pieces";
 import { rendered } from "./bind-pieces";
 import { lineItems, markLines } from "./lyric-lines";
 
@@ -130,16 +129,11 @@ function bindReplica(root: HTMLElement, player: Player) {
   // Inert until now (Replica.astro): without script it is a still of the app, not a hundred
   // controls that do nothing.
   root.inert = false;
-  const desktop = root.closest<HTMLElement>("[data-desktop]");
-  // Only a window on a desktop with a taskbar to come back from can minimise (the hero's);
-  // the illustration (inert) and the bare window ("Make it yours") stay as they are, and
-  // the bare window has no minimise button.
-  const canMinimise = !!desktop?.querySelector("[data-taskbar-app]") && !root.parentElement?.closest("[inert]");
   // On the page's desktop (Window.astro) the caption buttons act on the window: minimise to
   // the tray, maximise and restore, close (which asks, as the app does). Elsewhere maximise and
-  // close are only drawn, and a window with no taskbar to return from has no minimise.
+  // close are only drawn, and there's no minimise.
   const inWindow = !!root.closest("[data-window]");
-  if (!desktop && !inWindow) setAll(root, '[data-act="minimise"]', (el) => (el.hidden = true));
+  if (!inWindow) setAll(root, '[data-act="minimise"]', (el) => (el.hidden = true));
   if (!inWindow) {
     for (const el of $$<HTMLButtonElement>(root, '[data-act="maximise"], [data-act="close"]')) {
       el.disabled = true;
@@ -436,13 +430,6 @@ function bindReplica(root: HTMLElement, player: Player) {
   toast?.addEventListener("pointerenter", () => holdToast(true, player));
   toast?.addEventListener("pointerleave", () => holdToast(false, player));
 
-  if (desktop) {
-    $(desktop, "[data-taskbar-app]")?.addEventListener("click", () =>
-      player.state.minimised ? player.restore() : player.minimise(),
-    );
-    $(desktop, "[data-tray-icon]")?.addEventListener("click", () => player.restore());
-  }
-
   // --- Drawing the state ----------------------------------------------------------------
   const keepFocus = (fallback: string) => {
     const active = document.activeElement as HTMLElement | null;
@@ -454,13 +441,6 @@ function bindReplica(root: HTMLElement, player: Player) {
     const li = index >= 0 ? (lines.children[index] as HTMLElement | undefined) : undefined;
     follower?.follow(li ?? null, instant);
     instant = false;
-  }
-
-  function tooltip(s: PlayerState) {
-    if (!desktop || !s.song) return;
-    const [a, b] = trayLines(s);
-    setAll(desktop, '[data-tray-line="1"]', (el) => (el.textContent = a));
-    setAll(desktop, '[data-tray-line="2"]', (el) => (el.textContent = b));
   }
 
   const fill = (list: HTMLElement | null, ids: string[], current: string | null) => {
@@ -610,7 +590,6 @@ function bindReplica(root: HTMLElement, player: Player) {
         setAll(root, "[data-resume-time]", (el) => (el.textContent = `${at} of ${formatTime(song.durationMs)}`));
         seek.value = String(s.positionMs);
         seek.setAttribute("aria-valuetext", `${at} of ${formatTime(song.durationMs)}`);
-        tooltip(s);
         last.second = second;
       }
       const line = currentLineIndex(song, s.positionMs);
@@ -742,12 +721,6 @@ function bindReplica(root: HTMLElement, player: Player) {
         if (s.toast) toastText.textContent = s.toast.text;
       }
       last.toast = s.toast?.id ?? null;
-    }
-
-    if (canMinimise && s.minimised !== last.minimised) {
-      root.toggleAttribute("data-minimised", s.minimised);
-      root.inert = s.minimised;
-      desktop?.toggleAttribute("data-minimised", s.minimised);
     }
 
     if (s.view === "search" && (s.query !== last.query || (s.result?.id ?? null) !== last.result)) {
