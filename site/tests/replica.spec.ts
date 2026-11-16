@@ -454,3 +454,42 @@ for (const scheme of ["dark", "light"] as const) {
     expect(image).toContain(scheme === "dark" ? "0.55" : "0.36");
   });
 }
+
+/** WCAG contrast of two computed colours (rgb() or color(srgb ...) strings, opaque). */
+function contrast(a: string, b: string) {
+  const lum = (c: string) => {
+    const unit = c.startsWith("color(") ? 1 : 255;
+    const [r, g, bl] = c.replace(/^color\(srgb/, "").match(/[\d.]+/g)!.slice(0, 3).map(Number).map((v) => {
+      const s = v / unit;
+      return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * bl;
+  };
+  const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p);
+  return (x + 0.05) / (y + 0.05);
+}
+
+test.describe("light", () => {
+  test.use({ colorScheme: "light" });
+  for (const song of ["california-lullabye", "she-dreams-in-blue", "invisible-light"]) {
+    test(`the focus ring shows on the song-coloured lyrics panel (${song})`, async ({ page }) => {
+      await page.goto("/");
+      await wake(page);
+      const r = replica(page);
+      if (song !== "california-lullabye") {
+        await page.evaluate((id) => document.querySelector<HTMLElement>(`#fly-song [data-song="${id}"]`)!.click(), song);
+        await expect(r).toHaveAttribute("data-song", song);
+      }
+      await expect(r).toHaveAttribute("data-view", "lyrics");
+      await page.waitForTimeout(1200);
+      await page.keyboard.press("Tab");
+      for (const sel of [".stage .back", ".stage .line", ".side-card .line"]) {
+        const el = r.locator(sel).first();
+        if (!(await el.isVisible())) continue;
+        await el.focus();
+        const [ring, ground] = await el.evaluate((e) => [getComputedStyle(e).outlineColor, getComputedStyle(e.closest(".side-card") ?? e.closest(".replica")!.querySelector(".stage-panel")!).backgroundColor]);
+        expect(contrast(ring, ground), `${sel}: ${ring} on ${ground}`).toBeGreaterThanOrEqual(3);
+      }
+    });
+  }
+});

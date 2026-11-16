@@ -83,6 +83,13 @@
   outline: 3px solid var(--accent);
   outline-offset: 2px;
 }
+/* On the song's deep colour (the lyrics view's panel, the side panel's lyrics card) the
+   accent can be as bright as the ground in either theme: the ring is white there, as on the
+   page's lyric card (pieces.css). */
+.replica[data-view="lyrics"][data-has-lyrics="true"] .stage :focus-visible,
+.replica .side-card :focus-visible {
+  outline-color: #fff;
+}
 .replica [hidden] {
   display: none !important;
 }
