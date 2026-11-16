@@ -238,14 +238,20 @@ test("while the window is away its shortcut lies where it stood and brings it ba
   await page.getByRole("dialog").getByRole("button", { name: "Close featherplay" }).click();
   await expect(place).toBeVisible();
   await expect(place).toContainText("now it really isn’t running");
-  // In the middle of where the window stood, with the desk's other things under it: each a
-  // real way on.
-  const b = (await place.boundingBox())!;
+  // Its shortcut in the middle of where the window stood, a listener's other icons about it,
+  // each inside that place: pressed, one says what it has to do with featherplay.
+  const b = (await place.getByRole("button", { name: "Open featherplay" }).boundingBox())!;
   expect(Math.abs(b.x + b.width / 2 - (home.x + home.width / 2))).toBeLessThan(2);
   expect(Math.abs(b.y + b.height / 2 - (home.y + home.height / 2))).toBeLessThan(2);
-  await expect(place.getByRole("link", { name: /^Recycle Bin/ })).toHaveAttribute("href", "#leaves");
-  await expect(place.getByRole("link", { name: /^how we measured\.txt/ })).toHaveAttribute("href", "/method");
-  await expect(place.getByRole("link", { name: /^Music credits/ })).toHaveAttribute("href", "/credits");
+  for (const name of ["Discord", "Last.fm", "OBS Studio", "Recycle Bin"]) {
+    const i = (await place.getByRole("button", { name }).boundingBox())!;
+    expect(i.x, name).toBeGreaterThanOrEqual(home.x);
+    expect(i.x + i.width, name).toBeLessThanOrEqual(home.x + home.width);
+    expect(i.y, name).toBeGreaterThanOrEqual(home.y);
+    expect(i.y + i.height, name).toBeLessThanOrEqual(home.y + home.height);
+  }
+  await place.getByRole("button", { name: "Last.fm" }).click();
+  await expect(place.getByRole("status")).toHaveText("Songs you play past halfway are scrobbled there.");
   await place.getByRole("button", { name: "Open featherplay" }).click();
   await expect(win(page)).not.toHaveAttribute("data-minimised", /.*/);
   await expect(place).toBeHidden();

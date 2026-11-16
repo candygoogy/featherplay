@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { wake } from "./helpers";
+import { laidOut, wake } from "./helpers";
 
 // The first screen (Stage.astro, src/scripts/first.ts): the study's composition, the shelf of
 // sleeves, its two notes, the arrival, and the desk's frosted glass behind it (Desk.astro).
@@ -295,6 +295,9 @@ test.describe("the desk", () => {
     const calm = page.locator("[data-desk] [data-slot].front .k-calm");
     await expect(desk).not.toHaveAttribute("data-low", /.*/);
     await expect(calm).toHaveCSS("visibility", "hidden");
+    // The sections laid out first: one still taking its height would move Make it yours (which
+    // has the light back) into the middle of the window after the scroll.
+    await laidOut(page);
     await page.evaluate(() => document.getElementById("kept")!.scrollIntoView());
     await expect(desk).toHaveAttribute("data-low", "");
     await expect.poll(() => calm.evaluate((c) => Number(getComputedStyle(c).opacity))).toBeGreaterThan(0.8);

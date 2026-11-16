@@ -5,14 +5,15 @@
 // with it, src/demo/window.ts sizes and scales it to fit, never past the viewport, and makes it
 // a window: dragged by its title bar, maximised and restored, minimised to the tray, closed
 // with the app's own question (the dialog below, at the page's size). Where the window stood
-// while it is away (in the tray, or closed) the desk shows what a desk has (.win-gone): the
-// app's shortcut, which brings it back, with the maker's hand over it taking the headline at
-// its word; and under it three more things lying about, each a real way on: the Recycle Bin
-// (what featherplay leaves out), a text file (how the numbers were measured) and a folder (the
-// music's credits). The screen is never left with nothing where the app was.
+// while it is away (in the tray, or closed) the desk shows what a desk has (.win-gone, the
+// size of the window it stands in for): the app's shortcut in the middle, which brings it
+// back, with the maker's hand over it taking the headline at its word; and about it, where
+// one leaves such things, the icons of a listener's desktop: the three apps featherplay works
+// with (Discord, Last.fm, OBS Studio: their own marks, from the Simple Icons set, shown as one
+// shows an app one connects to; no other brand's, and never Google's) and the Recycle Bin in
+// its corner. Pressed, each says in a word what it has to do with featherplay.
 import Replica from "./Replica.astro";
 import Logo from "./Logo.astro";
-import Icon from "./Icon.astro";
 import { notes } from "../data/notes";
 ---
 
@@ -22,30 +23,30 @@ import { notes } from "../data/notes";
   </div>
 </div>
 <div class="win-gone" data-win-gone>
-  <!-- Not one of the page's placed notes (no data-note: nothing judges or writes it but the
-       window's script, each time it shows). -->
-  <p class="hand gone-hand" data-judged data-gone-hand data-closed={notes.closed} data-tray={notes.tray} aria-hidden="true">
-    <span data-gone-words>{notes.closed}</span>
-    <svg viewBox="0 0 24 34"><path pathLength="1" d="M10 3 C 9 12, 11 20, 13 30 M6.5 23.5 L13.2 30.4 L18 22.4"></path></svg>
-  </p>
-  <button class="shortcut" type="button" data-win-back tabindex="-1" aria-label="Open featherplay">
-    <Logo size={44} /><span class="sc-name">featherplay</span>
-  </button>
-  <div class="sc-row">
-    <a class="shortcut" href="#leaves" aria-label="Recycle Bin: what featherplay leaves out">
-      <svg class="sc-glyph" viewBox="0 0 24 24" width="30" height="30" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"
-        ><path d="M4.5 7.5 H19.5 M9.5 7.5 V5.6 a1 1 0 0 1 1 -1 h3 a1 1 0 0 1 1 1 V7.5 M6.6 7.5 l0.8 10.9 a1.6 1.6 0 0 0 1.6 1.5 h6 a1.6 1.6 0 0 0 1.6 -1.5 l0.8 -10.9 M10.2 11 v5.6 M13.8 11 v5.6"></path></svg
-      ><span class="sc-name">Recycle Bin</span>
-    </a>
-    <a class="shortcut" href="/method" aria-label="how we measured.txt: how the numbers were measured">
-      <svg class="sc-glyph" viewBox="0 0 24 24" width="30" height="30" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"
-        ><path d="M7.6 3.5 H13.8 L18 7.7 V18.9 a1.6 1.6 0 0 1 -1.6 1.6 H7.6 A1.6 1.6 0 0 1 6 18.9 V5.1 A1.6 1.6 0 0 1 7.6 3.5 Z M13.8 3.5 V7.7 H18 M9 12 h6 M9 15 h6 M9 18 h3.5"></path></svg
-      ><span class="sc-name">how we measured.txt</span>
-    </a>
-    <a class="shortcut" href="/credits" aria-label="Music credits: the songs and their licences">
-      <Icon name="folder" size={30} class="sc-glyph" /><span class="sc-name">Music credits</span>
-    </a>
+  <div class="sc-main">
+    <!-- Not one of the page's placed notes (no data-note: nothing judges or writes it but the
+         window's script, each time it shows). -->
+    <p class="hand gone-hand" data-judged data-gone-hand data-say-closed={notes.closed} data-say-tray={notes.tray} aria-hidden="true">
+      <span data-gone-words>{notes.closed}</span>
+      <svg viewBox="0 0 24 34"><path pathLength="1" d="M10 3 C 9 12, 11 20, 13 30 M6.5 23.5 L13.2 30.4 L18 22.4"></path></svg>
+    </p>
+    <button class="shortcut" type="button" data-win-back tabindex="-1" aria-label="Open featherplay">
+      <Logo size={44} /><span class="sc-name">featherplay</span>
+    </button>
   </div>
+  <button class="shortcut sc-other at-1" type="button" data-say="Friends see what you’re playing there. Off until you turn it on.">
+    <span class="sc-app a-discord"><svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true" fill="currentColor"><path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z"></path></svg></span><span class="sc-name">Discord</span>
+  </button>
+  <button class="shortcut sc-other at-2" type="button" data-say="Songs you play past halfway are scrobbled there.">
+    <span class="sc-app a-lastfm"><svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true" fill="currentColor"><path d="M10.584 17.21l-.88-2.392s-1.43 1.594-3.573 1.594c-1.897 0-3.244-1.649-3.244-4.288 0-3.382 1.704-4.591 3.381-4.591 2.42 0 3.189 1.567 3.849 3.574l.88 2.749c.88 2.666 2.529 4.81 7.285 4.81 3.409 0 5.718-1.044 5.718-3.793 0-2.227-1.265-3.381-3.63-3.931l-1.758-.385c-1.21-.275-1.567-.77-1.567-1.595 0-.934.742-1.484 1.952-1.484 1.32 0 2.034.495 2.144 1.677l2.749-.33c-.22-2.474-1.924-3.492-4.729-3.492-2.474 0-4.893.935-4.893 3.932 0 1.87.907 3.051 3.189 3.601l1.87.44c1.402.33 1.869.907 1.869 1.704 0 1.017-.99 1.43-2.86 1.43-2.776 0-3.93-1.457-4.59-3.464l-.907-2.75c-1.155-3.573-2.997-4.893-6.653-4.893C2.144 5.333 0 7.89 0 12.233c0 4.18 2.144 6.434 5.993 6.434 3.106 0 4.591-1.457 4.591-1.457z"></path></svg></span><span class="sc-name">Last.fm</span>
+  </button>
+  <button class="shortcut sc-other at-3" type="button" data-say="The local API gives your overlay the song that’s playing.">
+    <span class="sc-app a-obs"><svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true" fill="currentColor"><path d="M12,24C5.383,24,0,18.617,0,12S5.383,0,12,0s12,5.383,12,12S18.617,24,12,24z M12,1.109 C5.995,1.109,1.11,5.995,1.11,12C1.11,18.005,5.995,22.89,12,22.89S22.89,18.005,22.89,12C22.89,5.995,18.005,1.109,12,1.109z M6.182,5.99c0.352-1.698,1.503-3.229,3.05-3.996c-0.269,0.273-0.595,0.483-0.844,0.78c-1.02,1.1-1.48,2.692-1.199,4.156 c0.355,2.235,2.455,4.06,4.732,4.028c1.765,0.079,3.485-0.937,4.348-2.468c1.848,0.063,3.645,1.017,4.7,2.548 c0.54,0.799,0.962,1.736,0.991,2.711c-0.342-1.295-1.202-2.446-2.375-3.095c-1.135-0.639-2.529-0.802-3.772-0.425 c-1.56,0.448-2.849,1.723-3.293,3.293c-0.377,1.25-0.216,2.628,0.377,3.772c-0.825,1.429-2.315,2.449-3.932,2.756 c-1.244,0.261-2.551,0.059-3.709-0.464c1.036,0.302,2.161,0.355,3.191-0.011c1.381-0.457,2.522-1.567,3.024-2.935 c0.556-1.49,0.345-3.261-0.591-4.54c-0.7-1.007-1.803-1.717-3.002-1.969c-0.38-0.068-0.764-0.098-1.148-0.134 c-0.611-1.231-0.834-2.66-0.528-3.996L6.182,5.99z"></path></svg></span><span class="sc-name">OBS Studio</span>
+  </button>
+  <button class="shortcut sc-other at-4" type="button" data-say="Empty. featherplay’s uninstaller leaves nothing behind.">
+    <span class="sc-app a-bin"><svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 7.5 H19.5 M9.5 7.5 V5.6 a1 1 0 0 1 1 -1 h3 a1 1 0 0 1 1 1 V7.5 M6.6 7.5 l0.8 10.9 a1.6 1.6 0 0 0 1.6 1.5 h6 a1.6 1.6 0 0 0 1.6 -1.5 l0.8 -10.9 M10.2 11 v5.6 M13.8 11 v5.6"></path></svg></span><span class="sc-name">Recycle Bin</span>
+  </button>
+  <p class="sc-say glass float" data-desk-say role="status"></p>
 </div>
 <dialog class="closer glass float live" data-closer aria-labelledby="closer-h" aria-describedby="closer-text">
   <h2 id="closer-h" class="closer-h">Close featherplay?</h2>
@@ -111,40 +112,82 @@ import { notes } from "../data/notes";
     visibility: hidden;
     transition: visibility 0s linear 400ms;
   }
-  /* Where the window stood while it is away (src/demo/window.ts places it at that middle): a
-     few things on the desk, each lit under the pointer as Windows lights a desktop icon. The
-     app's shortcut first, the maker's note over it with its arrow down to it; the other three
-     in a row under it, smaller in voice (the second ink). In once the window has gone, out at
-     once as it comes back. */
+  /* Where the window stood while it is away: a box of the window's own size and place
+     (src/demo/window.ts sets them), with a desk's things in it. The app's shortcut in the
+     middle, the maker's note over it with its arrow down to it; the others about it, each
+     where it was left, not in a row (a share of the box each, so they keep their places at
+     any size), in the second ink. Each is lit under the pointer as Windows lights a desktop
+     icon. In once the window has gone, out at once as it comes back. */
   .win-gone {
     position: absolute;
     left: 0;
     top: 0;
     z-index: 9;
-    display: grid;
-    justify-items: center;
-    gap: var(--s4);
     visibility: hidden;
     opacity: 0;
     transition: opacity 160ms ease;
   }
-  .sc-row {
-    display: flex;
-    align-items: start;
-    gap: var(--s1);
+  .sc-main,
+  .sc-other {
+    position: absolute;
+    translate: -50% -50%;
   }
-  .sc-row .shortcut {
+  .sc-main {
+    left: 50%;
+    top: 50%;
+  }
+  .at-1 {
+    left: 11%;
+    top: 19%;
+  }
+  .at-2 {
+    left: 23%;
+    top: 79%;
+  }
+  .at-3 {
+    left: 87%;
+    top: 27%;
+  }
+  .at-4 {
+    left: 91%;
+    top: 85%;
+  }
+  .sc-other {
     color: var(--ink2);
-    text-decoration: none;
   }
-  .sc-row .shortcut:hover,
-  .sc-row .shortcut:focus-visible {
+  .sc-other:hover,
+  .sc-other:focus-visible {
     color: var(--text);
   }
-  .shortcut :global(.sc-glyph) {
-    width: 30px;
-    height: 30px;
-    stroke-width: 1.4;
+  /* Where the window was too small to hold them clear of the note (a phone, a narrow screen:
+     window.ts marks it), the desk keeps to the shortcut and its note. */
+  .win-gone[data-slim] :is(.sc-other, .sc-say) {
+    display: none;
+  }
+  /* An app's icon as a desktop shows it: its own colour, its mark in white. */
+  .sc-app {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 11px;
+    color: #fff;
+    box-shadow:
+      inset 0 0 0 1px rgb(255 255 255 / 0.1),
+      0 1px 2px var(--shade-1),
+      0 6px 14px -6px var(--shade-3);
+  }
+  .a-discord {
+    background: #5865f2;
+  }
+  .a-lastfm {
+    background: #d51007;
+  }
+  .a-obs {
+    background: #302e31;
+  }
+  .a-bin {
+    background: linear-gradient(#7c8a98, #5c6976);
   }
   .sc-name {
     line-height: 1.25;
@@ -177,10 +220,9 @@ import { notes } from "../data/notes";
   .shortcut:active {
     background: var(--tonal-hover);
     scale: var(--press-scale);
-    transition-duration: var(--t-hover), var(--t-press);
+    transition-duration: var(--t-hover), var(--t-hover), var(--t-press);
   }
-  /* The note sits over the app's shortcut (the block's top), centred on it, its arrow under
-     its words. */
+  /* The note sits over the app's shortcut, centred on it, its arrow under its words. */
   .gone-hand {
     left: 50%;
     bottom: calc(100% + 0.1em);
@@ -192,6 +234,31 @@ import { notes } from "../data/notes";
   .gone-hand svg {
     width: 0.8em;
     height: 1.1333em;
+  }
+  /* What the one last pressed says: a small pane of the page's glass under it (window.ts puts
+     it there, inside the box), gone again after a few seconds. */
+  .sc-say {
+    --mat: var(--mat-solid);
+    position: absolute;
+    left: 0;
+    top: 0;
+    z-index: 1;
+    width: max-content;
+    max-width: 15rem;
+    padding: 6px var(--s3);
+    border-radius: var(--r-small);
+    color: var(--text);
+    font-size: var(--fs-small);
+    font-weight: var(--fw-medium);
+    line-height: 1.3;
+    text-align: center;
+    text-wrap: balance;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 160ms ease;
+  }
+  .sc-say[data-on] {
+    opacity: 1;
   }
   .win-gone[data-on] {
     visibility: visible;
@@ -205,7 +272,8 @@ import { notes } from "../data/notes";
   }
   @media (prefers-reduced-motion: reduce) {
     .win-gone,
-    .win-gone[data-on] {
+    .win-gone[data-on],
+    .sc-say {
       transition: none;
     }
   }

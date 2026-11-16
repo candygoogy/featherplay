@@ -55,6 +55,8 @@ const RESTORE_MS = 240;
 const MAX_MS = 340;
 const CLOSE_MS = 180;
 const OPEN_MS = 240;
+/** Opened from its shortcut on the desk: out of the icon, unhurried enough to be seen. */
+const SHORTCUT_MS = 460;
 const EASE_WINDOW = "cubic-bezier(0.32, 0.72, 0, 1)";
 /** The way into the tray quickens; the way back out lands. */
 const easeIn = bezier(0.5, 0, 0.75, 0.4);
@@ -389,8 +391,10 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
         icon.toggleAttribute("data-caught", true);
         setTimeout(() => icon.removeAttribute("data-caught"), MIN_MS + 600);
       }
-    } else if (closed) open(rest);
+    } else if (byShortcut) openFrom(rest);
+    else if (closed) open(rest);
     else fly(rest, false);
+    byShortcut = false;
     if (!on) closed = false;
     // The keys go where the window went: the tray icon, or the capsule's song.
     if (on && hadFocus) trayTarget()?.focus({ preventScroll: true });
@@ -407,28 +411,70 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
     if (!on) {
       goneWas = null;
       goneHand?.classList.remove("written");
+      goneSay?.removeAttribute("data-on");
       return;
     }
-    const x = rest.x + (rest.w * rest.s) / 2 - slotOff.x;
-    const y = rest.y + (rest.h * rest.s) / 2 - slotOff.y;
-    gone.style.translate = `calc(${x.toFixed(1)}px - 50%) calc(${y.toFixed(1)}px - 50%)`;
+    // The box is the window's own, as it is drawn: its things keep their shares of it.
+    const [bw, bh] = [rest.w * rest.s, rest.h * rest.s];
+    gone.style.width = `${bw.toFixed(1)}px`;
+    gone.style.height = `${bh.toFixed(1)}px`;
+    gone.style.translate = `${(rest.x - slotOff.x).toFixed(1)}px ${(rest.y - slotOff.y).toFixed(1)}px`;
+    // The others only where they lie clear of the note in the middle (its words are some
+    // 21 rem wide).
+    gone.toggleAttribute("data-slim", bw < 700 || bh < 420);
     // Placed again by a new measure, the note stays as it was written.
     const which = closed ? "closed" : "tray";
     if (which === goneWas) return;
     goneWas = which;
     goneBack.setAttribute("aria-label", closed ? "Open featherplay" : "Show featherplay’s window");
     if (goneHand) {
-      goneHand.querySelector("[data-gone-words]")!.textContent = goneHand.dataset[which]!;
+      goneHand.querySelector("[data-gone-words]")!.textContent = goneHand.dataset[which === "closed" ? "sayClosed" : "sayTray"]!;
       goneHand.classList.remove("written");
       // Once the window has gone and the shortcut is in (Window.astro's delay).
       setTimeout(() => goneWas === which && goneHand.classList.add("written"), 420);
     }
   }
+  /** The window is coming back by its shortcut on the desk (it opens out of that). */
+  let byShortcut = false;
   goneBack?.addEventListener("click", () => {
+    byShortcut = true;
     player.restore();
     // The keys go back into the window with it.
     replica.querySelector<HTMLElement>('[data-act="minimise"]')?.focus({ preventScroll: true });
   });
+  // The desk's other things: pressed, each says its line in a small pane under itself (kept
+  // inside the box), for a few seconds.
+  const goneSay = gone?.querySelector<HTMLElement>("[data-desk-say]");
+  let sayTimer = 0;
+  gone?.addEventListener("click", (e) => {
+    const b = (e.target as Element).closest<HTMLElement>("[data-say]");
+    if (!b || !goneSay || !gone) return;
+    goneSay.textContent = b.dataset.say!;
+    const w = goneSay.offsetWidth;
+    const left = Math.max(0, Math.min(b.offsetLeft + b.offsetWidth / 2 - w / 2 - b.offsetWidth / 2, gone.clientWidth - w));
+    // (The icon is placed by its middle: its offsets are its box's before that shift.)
+    goneSay.style.translate = `${Math.round(left)}px ${Math.round(b.offsetTop + b.offsetHeight / 2 + 4)}px`;
+    goneSay.toggleAttribute("data-on", true);
+    clearTimeout(sayTimer);
+    sayTimer = window.setTimeout(() => goneSay.removeAttribute("data-on"), 4200);
+  });
+  /** Opened by its shortcut: out of the icon in the middle of where it stands, growing to its
+   *  size, in sight from the first moment. */
+  const openFrom = (to: Frame) => {
+    stop();
+    draw(to);
+    if (reduced()) return;
+    const k = 0.18;
+    const from = { ...to, s: to.s * k, x: to.x + (to.w * to.s * (1 - k)) / 2, y: to.y + (to.h * to.s * (1 - k)) / 2 };
+    el.animate(
+      [
+        { transform: tf(from, slotOff), opacity: 0 },
+        { opacity: 1, offset: 0.25 },
+        { transform: tf(to, slotOff), opacity: 1 },
+      ],
+      { duration: SHORTCUT_MS, easing: EASE_WINDOW },
+    );
+  };
   /** Opened again after a close: as the app opens, from 0.9 by its top right (the tray's side). */
   const open = (to: Frame) => {
     stop();
