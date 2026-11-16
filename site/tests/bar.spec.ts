@@ -302,3 +302,32 @@ test("the keyboard brings the theme toggle into the capsule", async ({ page }) =
   await waitSettled(page);
   expect(await problems(page)).toEqual([]);
 });
+
+test.describe("on a phone", () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+  test("the capsule steps up out of the reading while the page moves down, and is back as soon as it moves up", async ({ page }) => {
+    await page.goto("/");
+    const bar = page.locator("[data-site-bar]");
+    for (let i = 0; i < 20; i++) {
+      await page.evaluate(() => scrollBy(0, 60));
+      await page.waitForTimeout(32);
+    }
+    await expect(bar).toHaveAttribute("data-state", "capsule");
+    await expect(bar).toHaveAttribute("data-tucked", "");
+    for (let i = 0; i < 3; i++) {
+      await page.evaluate(() => scrollBy(0, -30));
+      await page.waitForTimeout(32);
+    }
+    await expect(bar).not.toHaveAttribute("data-tucked");
+  });
+});
+
+test("on a desktop the capsule stays while the page moves down", async ({ page }) => {
+  await page.goto("/");
+  for (let i = 0; i < 20; i++) {
+    await page.mouse.wheel(0, 120);
+    await page.waitForTimeout(32);
+  }
+  await expect(page.locator("[data-site-bar]")).toHaveAttribute("data-state", "capsule");
+  await expect(page.locator("[data-site-bar]")).not.toHaveAttribute("data-tucked");
+});

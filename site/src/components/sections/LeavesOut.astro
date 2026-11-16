@@ -32,6 +32,9 @@ const notes: { word: string; why: string; group?: LeftOut }[] = [
 // A file's type, for its icon: a folder, an app, a library, data or text.
 const kind = (e: FolderEntry) =>
   e.files ? "folder" : /\.exe$/.test(e.name) ? "app" : /\.dll$/.test(e.name) ? "dll" : /\.(txt|html|json)$/.test(e.name) ? "text" : "data";
+// On a phone Pear's folder shows its first rows and a line for the rest (the list stays whole
+// for assistive technology; the totals under it are unchanged).
+const PHONE_ROWS = 6;
 const installedBytes = featherplay.bytes + featherplay.installed.uninstallerBytes + featherplay.installed.runtimeBytes;
 // The two installed folders to scale: Pear's bar is the whole length, featherplay's its share.
 const installedShare = `${((installedBytes / pear.bytes) * 100).toFixed(2)}%`;
@@ -78,6 +81,7 @@ import Note from "../Note.astro";
           ))
         }
       </ul>
+      <p class="more-files" aria-hidden="true">and {pear.entries.length - PHONE_ROWS} more</p>
       <p class="status"><strong>{pear.files} files</strong>, {mb(pear.bytes)}</p>
     </figure>
     <div class="side">
@@ -661,6 +665,27 @@ import Note from "../Note.astro";
     .side {
       position: relative;
       top: auto;
+    }
+  }
+  /* The rest of Pear's folder, said in one line where the phone shows only its first rows. */
+  .more-files {
+    display: none;
+  }
+  @media (width < 761px) {
+    .pear .files li:nth-child(n + 7) {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      min-height: 0;
+      padding: 0;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+    .more-files {
+      display: block;
+      padding: var(--s2) 28px 0 calc(var(--s3) + var(--s3) + 16px + var(--s3));
+      color: var(--ink2);
     }
   }
   @media (width < 560px) {

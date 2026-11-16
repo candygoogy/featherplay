@@ -255,3 +255,24 @@ test.describe("/method without JavaScript", () => {
     expect(text).not.toMatch(/not measured|provisional|latest measurements from development/i);
   });
 });
+
+test("on a phone the table shows the memory and the processes; its button brings the rest, and takes them away", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  const rows = numbers(page).locator("tbody tr");
+  const total = await rows.count();
+  await expect(rows.filter({ visible: true })).toHaveCount(3);
+  const all = numbers(page).locator("[data-all-rows]");
+  await expect(all).toHaveText(`All ${total} measurements`);
+  await expect(all).toHaveAttribute("aria-expanded", "false");
+  await all.click();
+  await expect(rows.filter({ visible: true })).toHaveCount(total);
+  await expect(all).toHaveAttribute("aria-expanded", "true");
+  await expect(all).toHaveText("Fewer measurements");
+  await all.click();
+  await expect(rows.filter({ visible: true })).toHaveCount(3);
+  // A wider screen has every row and no button.
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await expect(rows.filter({ visible: true })).toHaveCount(total);
+  await expect(all).toBeHidden();
+});

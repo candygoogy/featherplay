@@ -61,6 +61,8 @@ function parts(t: string) {
   return m ? { n: m[1], u: m[2] ? ` ${m[2]}` : m[3] } : { n: t, u: "" };
 }
 const r4 = (v: number) => +v.toFixed(4);
+// A phone shows the memory and the processes, and the rest when asked (below).
+const phoneRows = new Set<Metric>(["memoryMB", "memoryPausedMB", "processes"]);
 ---
 
 <section class="sec sec-numbers frame" id="light" aria-labelledby="light-title">
@@ -73,7 +75,7 @@ const r4 = (v: number) => +v.toFixed(4);
   </div>
   <div class="tbl panel">
     <span class="band glass float" aria-hidden="true"></span>
-    <table class="figures">
+    <table class="figures" id="figures">
       <caption class="visually-hidden">featherplay, Pear Desktop and YouTube Music in Edge, measured on one Windows PC. Lower is better.</caption>
       <colgroup><col class="c-m" /><col /><col /><col /></colgroup>
       <thead>
@@ -110,7 +112,7 @@ const r4 = (v: number) => +v.toFixed(4);
           rows.map((r) => {
             const bars = barsOf(r.metric);
             return (
-              <tr data-metric={r.metric} class:list={{ lead: r.lead, solo: !bars }}>
+              <tr data-metric={r.metric} data-phone={phoneRows.has(r.metric) ? "" : undefined} class:list={{ lead: r.lead, solo: !bars }}>
                 <th scope="row">
                   <span class="m">{r.title}</span>
                   <span class="n">{r.note}</span>
@@ -141,11 +143,31 @@ const r4 = (v: number) => +v.toFixed(4);
         }
       </tbody>
     </table>
+    <button class="btn tonal all-rows" type="button" aria-controls="figures" aria-expanded="false" data-all-rows hidden>
+      All {rows.length} measurements
+    </button>
     <p class="table-foot t-small">
       <span>We didn’t time Pear Desktop or Edge.</span><a class="text-link" href="/method">How these were measured</a>
     </p>
   </div>
 </section>
+
+<script>
+  // A phone: the rows past memory and processes wait behind a button (CSS hides them only
+  // with script, so without it every row shows).
+  const tbl = document.querySelector<HTMLElement>(".sec-numbers .tbl");
+  const all = tbl?.querySelector<HTMLButtonElement>("[data-all-rows]");
+  if (tbl && all) {
+    const label = all.textContent!.trim();
+    all.hidden = false;
+    all.addEventListener("click", () => {
+      const open = !tbl.hasAttribute("data-all");
+      tbl.toggleAttribute("data-all", open);
+      all.setAttribute("aria-expanded", String(open));
+      all.textContent = open ? "Fewer measurements" : label;
+    });
+  }
+</script>
 
 <style>
   .tbl {
@@ -500,6 +522,19 @@ const r4 = (v: number) => +v.toFixed(4);
     .bar,
     tr.lead .bar {
       margin-top: var(--s2);
+    }
+    :global(:root.js) .tbl:not([data-all]) tbody tr:not([data-phone]) {
+      display: none;
+    }
+    .all-rows {
+      width: 100%;
+      margin-block: var(--s2) var(--s4);
+    }
+  }
+  /* The button is a phone's alone. */
+  @media (width >= 760px) {
+    .all-rows {
+      display: none;
     }
   }
 </style>

@@ -29,6 +29,12 @@ const size = (f: Parameters<typeof sizeLabel>[0]) => sizeLabel(f).replace(" ", "
       <p class="dl-meta">
         <span>Version <span class="num" data-version>{release.version}</span></span><span>Windows 10 and 11, 64-bit</span><span>Free</span>
       </p>
+      <!-- A phone can't run it: the line says so, and the phone's share sheet sends the link on
+           (shown where the browser has one). -->
+      <p class="dl-phone">
+        <span>featherplay runs on your computer.</span>
+        <button class="send" type="button" data-send hidden>Send yourself the link</button>
+      </p>
       <ul class="dl-rows">
         {
           options.map((o) => (
@@ -106,6 +112,16 @@ const size = (f: Parameters<typeof sizeLabel>[0]) => sizeLabel(f).replace(" ", "
     <Note id="end" class="n-end" />
   </div>
 </section>
+
+<script>
+  const send = document.querySelector<HTMLButtonElement>("[data-send]");
+  if (send && "share" in navigator) {
+    send.hidden = false;
+    send.addEventListener("click", () => {
+      navigator.share({ title: "featherplay", url: `${location.origin}/#download` }).catch(() => {});
+    });
+  }
+</script>
 
 <style>
   .sec-dl {
@@ -375,6 +391,43 @@ const size = (f: Parameters<typeof sizeLabel>[0]) => sizeLabel(f).replace(" ", "
       flex-direction: column;
       align-items: flex-start;
       gap: var(--s5);
+    }
+  }
+  /* A phone: the cropped app goes (it would sit under the rows, cut on two sides, and read as
+     a broken picture), and a folder's path may break after its backslash to fit the card. */
+  .dl-phone {
+    display: none;
+  }
+  @media (width < 761px) {
+    .dl-shot {
+      display: none;
+    }
+    .dl-phone {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      column-gap: var(--s2);
+      margin-top: var(--s2);
+      color: var(--ink2);
+    }
+    .send {
+      min-height: 44px;
+      padding: 0;
+      border: 0;
+      background: none;
+      color: var(--text);
+      font: inherit;
+      font-weight: var(--fw-bold);
+      text-decoration: underline;
+      text-decoration-thickness: 1px;
+      text-underline-offset: 4px;
+      text-decoration-color: color-mix(in srgb, var(--text) 45%, transparent);
+      cursor: pointer;
+    }
+    .fr code {
+      white-space: normal;
+      -webkit-box-decoration-break: clone;
+      box-decoration-break: clone;
     }
   }
 </style>

@@ -187,6 +187,12 @@ section[data-away],
   position: relative;
   padding-top: var(--s9);
 }
+/* A phone reads the page as one column: less air between its sections. */
+@media (width < 761px) {
+  .sec {
+    padding-top: var(--s8);
+  }
+}
 .sec-head {
   display: grid;
   gap: var(--s4);

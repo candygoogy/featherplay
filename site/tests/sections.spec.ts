@@ -317,3 +317,18 @@ test("the questions' index stays in view beside them and marks the group being r
   await page.locator("#q-account").evaluate((g) => g.scrollIntoView({ block: "start" }));
   await expect(index.locator('a[aria-current="true"]')).toHaveText("Your account");
 });
+
+test("on a phone the download card leaves out the cropped app, and the footer what the page above already says", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  const foot = page.locator("footer");
+  await expect(page.locator(".dl-shot")).toBeHidden();
+  await expect(foot.getByRole("heading", { name: "Product" })).toBeHidden();
+  await expect(foot.getByText("Windows 10 and 11, 64-bit")).toBeHidden();
+  await expect(foot.getByRole("heading", { name: "Legal" })).toBeVisible();
+  // A desktop keeps them all.
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await expect(page.locator(".dl-shot")).toBeVisible();
+  await expect(foot.getByRole("heading", { name: "Product" })).toBeVisible();
+  await expect(foot.getByText("Windows 10 and 11, 64-bit")).toBeVisible();
+});

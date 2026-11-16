@@ -309,6 +309,31 @@ export function bindBar(bar: HTMLElement, player: Player | null): { readonly sta
     }),
   );
 
+  // ---- A phone: the capsule steps up out of the reading while the page moves down, and is
+  // back as soon as it moves up. Never while one of its flyouts is open or it holds focus. ----
+  const phone = matchMedia("(width < 761px)");
+  let lastY = scrollY;
+  let queued = false;
+  const tuck = (on: boolean) => bar.toggleAttribute("data-tucked", on);
+  addEventListener(
+    "scroll",
+    () => {
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(() => {
+        queued = false;
+        const dy = scrollY - lastY;
+        if (Math.abs(dy) < 8) return;
+        lastY = scrollY;
+        const busy = flyouts.some((f) => f.matches(":popover-open")) || bar.matches(":focus-within");
+        tuck(phone.matches && state === "capsule" && dy > 0 && !busy);
+      });
+    },
+    { passive: true },
+  );
+  bar.addEventListener("barstate", () => state === "docked" && tuck(false));
+  phone.addEventListener("change", () => tuck(false));
+
   // The app's own parts: on the pages with the app only.
   if (player && songFly && np && tray) bindApp(player, songFly, np, tray);
   return {

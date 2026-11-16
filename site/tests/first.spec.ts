@@ -72,17 +72,16 @@ test("at 1280 x 720, where the wide app's lyrics would fall under 13 px, the win
   expect(apart(shelf, win)).toBe(true);
 });
 
-test("on a phone: one column, the words, the window, then the shelf", async ({ page }) => {
+test("on a phone: one column, the words, then the window; no shelf (the bar's song button picks)", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
   await shown(page);
   await expect(page.locator("[data-first]")).toHaveAttribute("data-laid", "stack");
-  const [l1, col, win, shelf] = await Promise.all([box(page, "[data-head] .line"), box(page, "[data-col]"), box(page, "[data-window]"), box(page, "[data-shelf]")]);
+  const [l1, col, win] = await Promise.all([box(page, "[data-head] .line"), box(page, "[data-col]"), box(page, "[data-window]")]);
   // The headline's first line fits the width.
   expect(l1.right).toBeLessThanOrEqual(390);
   expect(win.top).toBeGreaterThan(col.bottom);
-  expect(shelf.top).toBeGreaterThan(win.bottom);
-  expect(shelf.right).toBeLessThanOrEqual(390);
+  await expect(page.locator("[data-shelf]")).toBeHidden();
 });
 
 test("Play a song plays the first song, then says Pause; pressed again it pauses", async ({ page }) => {
@@ -190,8 +189,9 @@ test.describe("the sleeves", () => {
   });
 });
 
+// A tablet: phones have no shelf.
 test.describe("the sleeves on a touch screen", () => {
-  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+  test.use({ viewport: { width: 820, height: 1180 }, hasTouch: true, isMobile: true });
   test("a swipe that starts on a sleeve scrolls the page, as one beside the shelf does", async ({ page }) => {
     await page.goto("/");
     await shown(page);
@@ -214,9 +214,10 @@ test.describe("the sleeves on a touch screen", () => {
     const b = (await s.boundingBox())!;
     const [x, y] = [b.x + b.width / 2, b.y + b.height / 2];
     expect(await page.evaluate(([x, y]) => !!document.elementFromPoint(x, y)?.closest("[data-sleeve]"), [x, y])).toBe(true);
-    expect(await swipe(x, y)).toBeGreaterThan(150);
+    // (A finger moves 250 px; the page follows by most of it, less where it nears its end.)
+    expect(await swipe(x, y)).toBeGreaterThan(100);
     // And beside the shelf, the same.
-    expect(await swipe(8, y)).toBeGreaterThan(150);
+    expect(await swipe(8, y)).toBeGreaterThan(100);
   });
 });
 

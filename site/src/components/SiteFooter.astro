@@ -311,4 +311,33 @@ const groups = [
       content: none;
     }
   }
+  /* A phone: what it runs on is said by the Download card just above, so featherplay's
+     column keeps its version and that it is free, on one line; Product's links lead back up
+     the page the visitor has just read, so they go; the groups sit closer. */
+  @media (width < 761px) {
+    .foot-cols {
+      row-gap: var(--s6);
+      padding-block: var(--s6) var(--s5);
+    }
+    .foot-links {
+      row-gap: var(--s5);
+    }
+    .about ul {
+      display: flex;
+      flex-wrap: wrap;
+      column-gap: 0;
+    }
+    .about li:nth-child(2),
+    .about li:nth-child(3),
+    .foot-links > .fgroup:first-child {
+      display: none;
+    }
+    .about li + li::before {
+      content: "·";
+      margin-inline: var(--s2);
+    }
+    .fgroup h2 {
+      margin-bottom: var(--s1);
+    }
+  }
 </style>

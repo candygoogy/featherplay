@@ -609,9 +609,30 @@ const steps = [
         "shelf";
       min-height: 0;
     }
-    .first > :global(.shelf) {
-      align-self: start;
-      margin-top: var(--s3);
+    /* The bar's song button picks a song on a phone: the shelf of sleeves would be a second
+       way to do it, and Make it yours has a third. */
+    .first > :global(.shelf),
+    .first > :global(.n-sleeves) {
+      display: none;
+    }
+    /* The three steps as one short run: smaller pictures, the headings a step down, closer. */
+    .steps-in {
+      gap: var(--s6);
+      padding-top: var(--s7);
+    }
+    .step {
+      gap: var(--s2);
+    }
+    .step > .t-title {
+      font-size: var(--fs-subtitle);
+      line-height: var(--lh-subtitle);
+      letter-spacing: var(--tr-subtitle);
+    }
+    .mini.wide {
+      width: min(15rem, 100%);
+    }
+    .mini.narrow {
+      width: 6.75rem;
     }
     /* The headline as large as lets its first line fit the phone's width. */
     .head {
