@@ -106,22 +106,21 @@ import Note from "./Note.astro";
   .c-tray .cell-text {
     align-content: center;
   }
-  /* Beside the keys, pointing back up at them. */
+  /* Under the keys (which stay centred under the overlay), from their middle on to the right,
+     its arrow pointing back up at them. */
   .c-keys :global(.n-keys) {
-    left: calc(100% + var(--s3));
-    top: 55%;
+    left: 50%;
+    top: calc(100% + 2.75rem);
+  }
+  @media (width >= 760px) {
+    .c-keys :global(.mk-board) {
+      padding-bottom: calc(var(--fs-pen) + var(--s3));
+    }
   }
   /* Phones and tablets: no media keys to try. */
   @media (width < 760px) {
     .c-keys :global(.n-keys) {
       display: none;
-    }
-  }
-  /* Where the note shows, the keys make room for it: the keys and the note are centred under
-     the overlay as one group, so the note stays inside the well. */
-  @media (width >= 760px) {
-    .c-keys :global(.mk-board) {
-      padding-inline-end: calc(var(--fs-pen) * 9.2);
     }
   }
   .cell-text p {

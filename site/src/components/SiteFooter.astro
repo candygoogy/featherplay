@@ -186,7 +186,7 @@ const groups = [
     }
   }
   /* The small print: one quiet line under a hairline, its parts set apart by a dot, and the
-     way back up at its end: its words and an arrow that lifts when pointed at. */
+     way back up at its end: its words and an arrow, brighter when pointed at. */
   .foot-legal {
     display: flex;
     flex-wrap: wrap;
@@ -227,15 +227,10 @@ const groups = [
   }
   .to-top svg {
     flex: none;
-    transition: translate var(--t-small) var(--ease-out);
   }
   .to-top:hover,
   .to-top:focus-visible {
     color: var(--text);
-  }
-  .to-top:hover svg,
-  .to-top:focus-visible svg {
-    translate: 0 -3px;
   }
   .to-top:focus-visible {
     outline-offset: 4px;
@@ -243,11 +238,6 @@ const groups = [
   @media (pointer: coarse) {
     .to-top {
       min-height: 2.75rem;
-    }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .to-top svg {
-      transition: none;
     }
   }
   @media (width < 1100px) {
