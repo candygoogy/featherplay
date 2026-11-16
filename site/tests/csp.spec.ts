@@ -113,3 +113,11 @@ async function watch(page: Page, missing?: string) {
   });
   return async () => [...seen, ...(await page.evaluate(() => (window as unknown as { __csp: string[] }).__csp))];
 }
+
+test("the page's unhashed files are cached for a week, the hashed build files for a year", async ({ request }) => {
+  for (const path of ["/fonts/manrope-latin-400-800.woff2", "/covers/california-lullabye.webp", "/img/desk/k2-lit.webp"]) {
+    const res = await request.get(`${cf}${path}`);
+    expect(res.status(), path).toBe(200);
+    expect(res.headers()["cache-control"], path).toBe("public, max-age=604800");
+  }
+});
