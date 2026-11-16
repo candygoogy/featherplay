@@ -246,9 +246,11 @@ const size = (f: Parameters<typeof sizeLabel>[0]) => sizeLabel(f).replace(" ", "
     font-weight: 400;
     white-space: nowrap;
   }
-  /* The app, cropped: its top left corner opens level with the rows, it runs out by the card's
-     right and bottom edges, and a soft shade along those inner edges makes the cut a crop.
-     Drawn at the app's own size and scaled, so it is sharp at any size. */
+  /* The app, cropped: its top left corner opens level with the rows and it runs out by the
+     card's right edge, under a soft shade that makes the cut a crop. Towards the card's foot
+     it dissolves into the card's own surface (painted over it: no mask on the live window),
+     so no line is sliced through. Drawn at the app's own size and scaled, so it is sharp at
+     any size. */
   .dl-shot {
     --k: 0.78;
     position: relative;
@@ -264,7 +266,7 @@ const size = (f: Parameters<typeof sizeLabel>[0]) => sizeLabel(f).replace(" ", "
     pointer-events: none;
     background:
       linear-gradient(to left, light-dark(rgb(70 48 24 / 0.09), rgb(0 0 0 / 0.3)), transparent 2.5rem),
-      linear-gradient(to top, light-dark(rgb(70 48 24 / 0.09), rgb(0 0 0 / 0.3)), transparent 2.5rem);
+      linear-gradient(to top, var(--panel-bg) 0.25rem, transparent 5rem);
   }
   .dl-win {
     position: absolute;
