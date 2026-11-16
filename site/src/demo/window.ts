@@ -331,6 +331,8 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
   };
   function setMax(on: boolean, ms = MAX_MS) {
     if ((on && !desk.matches) || driven || on === maxed) return;
+    // The note by the tray (how fast it opened) was placed clear of the window as it stood.
+    opensOff();
     markMax(on);
     if (on) drag = { x: 0, y: 0 };
     if (ms > 0 && !minimised) morph(ms);
@@ -341,7 +343,8 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
 
   // ---- Minimise to the tray, and back ----
   // "opens in 0.24 s": by the tray icon, the first time the window comes back from the tray
-  // (not when the story brings it back), for a few seconds or until the page moves.
+  // (not when the story brings it back), for a few seconds or until the page moves, or the
+  // window does (maximised, dragged, minimised again: it would lie over the note).
   const opensNote = document.querySelector<HTMLElement>("[data-note='opens']");
   let opensShown = false;
   const opensOff = () => {
@@ -365,6 +368,7 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
     if (on === minimised) return;
     minimised = on;
     if (!on) showOpens();
+    else opensOff();
     const hadFocus = el.contains(document.activeElement);
     el.toggleAttribute("data-minimised", on);
     document.documentElement.toggleAttribute("data-window-minimised", on);
@@ -470,6 +474,7 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
   titlebar.addEventListener("pointerdown", (e) => {
     if (e.button !== 0 || !desk.matches || minimised || driven || (e.target as Element).closest("button")) return;
     e.preventDefault();
+    opensOff();
     titlebar.setPointerCapture(e.pointerId);
     stop();
     if (maxed) {
