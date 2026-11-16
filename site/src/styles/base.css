@@ -111,11 +111,15 @@ main:focus {
    switch (.theme-quiet, src/scripts/theme.ts): Chrome works out a selection style for every
    element it restyles, which doubles the work of each frame of the switch. */
 :where(:not(:root, body, main, .theme-quiet, .theme-quiet *))::selection {
-  /* Written here, not as a token on the root: there --song is not yet the song's. */
-  background: light-dark(color-mix(in srgb, var(--song) 30%, transparent), color-mix(in srgb, var(--song) 44%, transparent));
+  /* The song's colour as it is (--glow, which changes once), not --song, which fades frame by
+     frame on the sections that wear it: every element restyled in that fade would work out a new
+     selection style each frame (a song change cost a third more). The drawn pieces fade. */
+  background: light-dark(color-mix(in srgb, var(--glow) 30%, transparent), color-mix(in srgb, var(--glow) 44%, transparent));
 }
-:is(.button, .btn):where(:not(.theme-quiet *))::selection,
-:is(.button, .btn) :where(:not(.theme-quiet *))::selection {
+.button:where(:not(.theme-quiet *))::selection,
+.button :where(:not(.theme-quiet *))::selection,
+.btn:where(:not(.theme-quiet *))::selection,
+.btn :where(:not(.theme-quiet *))::selection {
   background: color-mix(in srgb, currentColor 26%, transparent);
 }
 
@@ -124,11 +128,20 @@ main:focus {
    colour. The native highlight steps aside (it still selects, copies and reads out); fields
    keep it, and so does what floats over the page (the bar, flyouts, the menu, the dialog), which
    the drawn pieces lie under. */
-:root.sel-drawn :where(:not(body, main, .theme-quiet, .theme-quiet *, [popover] *, dialog *, [data-site-bar] *))::selection {
+:root.sel-drawn :where(:not(body, main, .theme-quiet, .theme-quiet *))::selection {
   background: transparent;
 }
+/* Descendant rules spelt out, never inside :not() or :is(): Chrome rules out a descendant rule
+   by the element's ancestors at a glance only when it can see the ancestor's selector, and
+   otherwise walks the ancestors of every element it restyles (a song's colour fade restyles
+   whole sections each frame: written with :is() it cost a fifth more style work). */
+:root.sel-drawn [popover] ::selection,
+:root.sel-drawn dialog ::selection,
+:root.sel-drawn [data-site-bar] ::selection {
+  background: light-dark(color-mix(in srgb, var(--glow) 30%, transparent), color-mix(in srgb, var(--glow) 44%, transparent));
+}
 :root.sel-drawn :is(input, textarea):where(:not(.theme-quiet *))::selection {
-  background: light-dark(color-mix(in srgb, var(--song) 30%, transparent), color-mix(in srgb, var(--song) 44%, transparent));
+  background: light-dark(color-mix(in srgb, var(--glow) 30%, transparent), color-mix(in srgb, var(--glow) 44%, transparent));
 }
 .sel-layer {
   position: absolute;

@@ -323,9 +323,11 @@
   stroke-dasharray: 1;
   stroke-dashoffset: 1;
 }
+/* scrobble-tick's timings: the ring tightens to 92 % in 100 ms and eases back by 500 ms while
+   the tick draws from 83 to 400 ms. */
 [data-scrobbled] .sc-ring {
   color: var(--accent);
-  animation: sc-tighten 680ms var(--ease-out);
+  animation: sc-tighten 500ms cubic-bezier(0.4, 0, 0.6, 1);
 }
 [data-scrobbled] .sc-fill {
   stroke-dashoffset: 0;
@@ -333,11 +335,12 @@
 }
 [data-scrobbled] .sc-tick {
   stroke-dashoffset: 0;
-  transition: stroke-dashoffset 500ms var(--ease-pen) 120ms;
+  transition: stroke-dashoffset 317ms cubic-bezier(0.35, 0, 0.1, 1) 83ms;
 }
 @keyframes sc-tighten {
-  40% {
+  20% {
     scale: 0.92;
+    animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
   }
 }
 .sc-past {

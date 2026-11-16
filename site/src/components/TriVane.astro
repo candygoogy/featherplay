@@ -1,0 +1,45 @@
+---
+// The Tri-vane in parts, for the bar: each vane and the play triangle its own layer (an HTML
+// span around one path of /tri-vane.svg), so the mark can come together at load and answer a
+// song starting (src/scripts/moves.ts, the Lottie files' timings) by transforms the compositor
+// runs. At rest it is exactly the drawing; the light ground's crimson ring under the play is
+// drawn in the light theme (on its own drawing, not the layer the intro fades). Decorative:
+// callers name it.
+interface Props {
+  size?: number;
+  class?: string;
+}
+const { size = 22, class: className = "" } = Astro.props;
+const layers = ["t1", "t2", "t3"] as const;
+---
+
+<span class:list={["tv", className]} style={`--tv:${size}px`} aria-hidden="true" data-trivane>
+  <span class="tv-l tv-ring" data-tv="ring"><svg class="only-light" viewBox="0 0 64 64"><use href="/tri-vane-light.svg#ring"></use></svg></span>
+  {layers.map((id) => <span class="tv-l" data-tv={id}><svg viewBox="0 0 64 64"><use href={`/tri-vane.svg#${id}`}></use></svg></span>)}
+  <span class="tv-l tv-play" data-tv="play"><svg viewBox="0 0 64 64"><use href="/tri-vane.svg#play"></use></svg></span>
+</span>
+
+<style>
+  .tv {
+    position: relative;
+    display: inline-block;
+    flex: none;
+    width: var(--tv);
+    height: var(--tv);
+  }
+  .tv-l {
+    position: absolute;
+    inset: 0;
+    /* The vanes turn round the mark's centre; the triangle grows from its own (31.5, 32). */
+    transform-origin: 50% 50%;
+  }
+  .tv-play,
+  .tv-ring {
+    transform-origin: 49.22% 50%;
+  }
+  .tv-l svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+</style>

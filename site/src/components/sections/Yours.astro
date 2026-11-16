@@ -12,6 +12,7 @@ const themes = [
   { value: "dark", label: "Dark", icon: "dark" },
   { value: "light", label: "Light", icon: "light" },
 ] as const;
+import Note from "../Note.astro";
 ---
 
 <section class="sec sec-yours frame" id="yours" aria-labelledby="yours-title">
@@ -41,6 +42,7 @@ const themes = [
       </form>
     </div>
     <div class="stage" data-yours-stage>
+      <Note id="actual" arrow="down-right" class="n-actual" />
       <div class="fit" data-yours-fit>
         <div class="win-body yours-win" data-yours-window>
           <Replica id="replica-yours" songId={demoStart.songId} positionMs={demoStart.positionMs} view="lyrics" />
@@ -65,6 +67,8 @@ const themes = [
       const room = e.contentBoxSize?.[0]?.inlineSize ?? stage.clientWidth;
       const k = Math.min(1, room / 480);
       fit.style.setProperty("--k", k.toFixed(4));
+      // Its note says "actual size" only while it is.
+      stage.toggleAttribute("data-actual", k >= 1);
     }).observe(stage);
   }
 </script>
@@ -144,6 +148,7 @@ const themes = [
   /* A recessed piece of the desk for the window to stand on: a step darker than the panel in
      dark, a warm shade of the paper in light. */
   .stage {
+    position: relative;
     display: grid;
     place-items: center;
     min-width: 0;
@@ -151,6 +156,14 @@ const themes = [
     padding: var(--s7);
     background: color-mix(in srgb, rgb(120 90 60 / 0.07) calc(var(--light) * 100%), rgb(0 0 0 / 0.26));
     box-shadow: inset 1px 0 0 var(--panel-edge);
+  }
+  /* In the well's top left, pointing down at the window, while it is at its actual size. */
+  .stage :global(.n-actual) {
+    left: var(--s4);
+    top: var(--s2);
+  }
+  .stage:not([data-actual]) :global(.n-actual) {
+    display: none;
   }
   .fit {
     --k: 1;

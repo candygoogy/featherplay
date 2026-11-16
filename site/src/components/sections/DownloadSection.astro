@@ -10,7 +10,8 @@ import Icon from "../Icon.astro";
 const options = downloadOptions();
 const linux = release.linux;
 const size = (f: Parameters<typeof sizeLabel>[0]) => sizeLabel(f).replace(" ", " ");
-const arrow = "M12 4.5 V15 M7.5 10.5 L12 15 L16.5 10.5 M5 19.5 H19";
+import Note from "../Note.astro";
+import DlGlyph from "../DlGlyph.astro";
 ---
 
 <section class="sec sec-dl frame" id="download" aria-labelledby="download-title">
@@ -35,9 +36,7 @@ const arrow = "M12 4.5 V15 M7.5 10.5 L12 15 L16.5 10.5 M5 19.5 H19";
                   <span data-size>{size(o.file)}</span>
                 </span>
                 <a class:list={["btn", o.primary ? "red" : "tonal"]} href={o.file.url} data-release-link>
-                  <svg class="dl-arrow" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d={arrow} />
-                  </svg>
+                  <DlGlyph class="dl-arrow" />
                   {o.action}
                 </a>
               </div>
@@ -88,15 +87,14 @@ const arrow = "M12 4.5 V15 M7.5 10.5 L12 15 L16.5 10.5 M5 19.5 H19";
             <span data-size>{size(linux.appImage)}</span>
           </span>
           <a class="btn tonal" href={linux.appImage.url} data-release-link>
-            <svg class="dl-arrow" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d={arrow} />
-            </svg>
+            <DlGlyph class="dl-arrow" />
             Download the AppImage
           </a>
         </div>
       </div>
     )
   }
+  <Note id="end" class="n-end" />
   <p class="fine t-small"><a class="text-link" href={release.url}>All releases and checksums on GitHub</a></p>
 </section>
 
@@ -172,14 +170,6 @@ const arrow = "M12 4.5 V15 M7.5 10.5 L12 15 L16.5 10.5 M5 19.5 H19";
   }
   .get .btn {
     min-width: 15.5rem;
-  }
-  /* The arrow drops into its tray as the button is pressed (download-arrow's timing). */
-  .dl-arrow {
-    transition: translate var(--t-release) var(--spring-release);
-  }
-  .btn:active .dl-arrow {
-    translate: 0 2px;
-    transition: translate var(--t-press) var(--ease-out);
   }
   .dl-notes {
     display: grid;
@@ -280,6 +270,20 @@ const arrow = "M12 4.5 V15 M7.5 10.5 L12 15 L16.5 10.5 M5 19.5 H19";
     .get .btn {
       min-width: 0;
       flex: 1;
+    }
+  }
+  /* The last word, on the right of the releases line. */
+  .sec-dl :global(.n-end) {
+    right: 0;
+    bottom: calc(-1 * var(--s2));
+  }
+  /* Narrower, under the releases line, in the room before the footer. */
+  @media (width < 900px) {
+    .sec-dl :global(.n-end) {
+      right: auto;
+      left: 0;
+      bottom: auto;
+      top: calc(100% + var(--s5));
     }
   }
 </style>

@@ -8,6 +8,7 @@
 import { figures, timings, type Metric } from "../../data/numbers";
 import { figureText, NOT_MEASURED } from "../../data/format";
 import { release } from "../../data/release";
+import Note from "../Note.astro";
 
 const s = (v: number) => `${v.toLocaleString("en-GB", { maximumSignificantDigits: 2 })} s`;
 const span = (t: { min: number; max: number }) => `${s(t.min)} to ${s(t.max)}`;
@@ -49,6 +50,7 @@ const ver = (f: (typeof figures)[number]) => (f.app === "YouTube Music in Edge" 
   </div>
   <div class="tbl panel">
     <span class="band" aria-hidden="true"></span>
+    <Note id="played" arrow="down-left" class="n-played" />
     <table class="figures">
       <caption class="visually-hidden">featherplay, Pear Desktop and YouTube Music in Edge, measured on one Windows PC. Lower is better.</caption>
       <colgroup><col class="c-m" /><col /><col /><col /></colgroup>
@@ -88,6 +90,14 @@ const ver = (f: (typeof figures)[number]) => (f.app === "YouTube Music in Edge" 
                         <span aria-hidden="true">{t}</span>
                         <span class="visually-hidden">not measured</span>
                       </>
+                    ) : f === ours && r.metric === "memoryMB" ? (
+                      // The one pen mark: featherplay's memory while playing, underlined.
+                      <span class="fig">
+                        {cell(t)}
+                        <svg class="pen-mark" viewBox="0 0 80 10" preserveAspectRatio="none" aria-hidden="true">
+                          <path pathLength="1" d="M3 6.2 C 20 4.4, 44 3.6, 77 5.4" />
+                        </svg>
+                      </span>
                     ) : (
                       cell(t)
                     )}
@@ -209,6 +219,22 @@ const ver = (f: (typeof figures)[number]) => (f.app === "YouTube Music in Edge" 
       opacity: 0.62;
     }
   }
+  /* The note over the band's right shoulder, pointing down at featherplay's column. */
+  .tbl :global(.n-played) {
+    left: calc(var(--panel-pad) + (100% - 2 * var(--panel-pad)) * 0.6 + 10px);
+    top: -70px;
+  }
+  .fig {
+    position: relative;
+    display: inline-block;
+  }
+  .fig .pen-mark {
+    position: absolute;
+    left: -3px;
+    bottom: -9px;
+    width: calc(100% + 6px);
+    height: 10px;
+  }
   .table-foot {
     position: relative;
     display: flex;
@@ -227,7 +253,8 @@ const ver = (f: (typeof figures)[number]) => (f.app === "YouTube Music in Edge" 
       padding: var(--s3);
     }
     .band,
-    thead {
+    thead,
+    .tbl :global(.n-played) {
       display: none;
     }
     .figures,

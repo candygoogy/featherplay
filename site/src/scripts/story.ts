@@ -15,6 +15,7 @@ import type { Player } from "../demo/player";
 import { whenWindow, type Frame } from "../demo/window";
 import { fitWindow } from "../demo/fit";
 import { HOLDS, captionOpacity, phases, seg, settleTarget, storyProgress } from "./story-math";
+import { hideNote, showNoteAt } from "./notes";
 
 export const STORY = "(min-width: 761px) and (min-height: 600px) and (prefers-reduced-motion: no-preference)";
 /** The pinned distance (Stage.astro --story-len). */
@@ -42,9 +43,11 @@ export async function startStory(player: Player): Promise<void> {
   const icon = stage.querySelector<HTMLElement>("[data-ghost-icon]")!;
   const snap = stage.querySelector<HTMLElement>("[data-snap]")!;
   const songFly = document.getElementById("fly-song");
+  const stillNote = stage.querySelector<HTMLElement>("[data-note='playing']");
   const steps = document.querySelector<HTMLElement>("[data-steps]");
   /** The story's flyout goes when its beat ends, or the story does. */
   const endBeat = () => {
+    if (stillNote) hideNote(stillNote);
     if (!songFly?.hasAttribute("data-story")) return;
     delete songFly.dataset.story;
     if (songFly.matches(":popover-open")) songFly.hidePopover();
@@ -138,6 +141,13 @@ export async function startStory(player: Player): Promise<void> {
         // Marked first: the bar places the story's flyout under the capsule's song.
         songFly.dataset.story = "";
         songFly.showPopover();
+        // "still playing" beside it, pointing back at it, where its words have room.
+        if (stillNote)
+          requestAnimationFrame(() => {
+            if (!beat || !songFly.matches(":popover-open")) return;
+            const f = songFly.getBoundingClientRect();
+            showNoteAt(stillNote, f.right + 12, f.top + 36);
+          });
       } else if (!inBeat) endBeat();
     }
     // The first screen's words leave first (keys that were in them go on from the steps).

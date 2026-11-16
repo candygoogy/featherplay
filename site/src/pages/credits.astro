@@ -1,7 +1,7 @@
 ---
 // The music in the demo, credited in full: each track with its cover (our own art), where it
 // comes from and its licence, then each artist's credit in their own requested wording. The
-// players on the home page carry the short credit and link here.
+// players on the home page carry the short credit and link here. Then the two typefaces.
 import Base from "../layouts/Base.astro";
 import Bar from "../components/Bar.astro";
 import SiteFooter from "../components/SiteFooter.astro";
@@ -52,6 +52,20 @@ import { musicCredits, musicCreditsNote, songs } from "../data/songs";
         }
       </ul>
       <p class="note">{musicCreditsNote} The covers are featherplay's own drawings, not the tracks' artwork.</p>
+    </section>
+
+    <section class="wording type" id="type" aria-labelledby="type-title">
+      <h2 id="type-title">The type</h2>
+      <ul class="lines">
+        <li>
+          The page is set in Manrope by Mikhail Sharanda and the Manrope Project Authors, under the SIL Open Font License 1.1
+          (<a href="/fonts/manrope-OFL.txt">licence</a>).
+        </li>
+        <li>
+          The handwritten notes are in Reenie Beanie by James Grieshaber (Typeco), cut to the letters they use, under the SIL Open Font
+          License 1.1 (<a href="/fonts/reenie-beanie-OFL.txt">licence</a>).
+        </li>
+      </ul>
     </section>
 
     <p class="back"><a href="/">Back to featherplay</a></p>

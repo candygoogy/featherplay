@@ -152,6 +152,25 @@ test("the story's flyout in the tray goes when the story stops (the screen made 
   await expect(page.locator("#fly-song")).toBeHidden();
 });
 
+test("the tray's flyout stays through its beat, though the pointer left the tray icon as the bar became the capsule", async ({ page }) => {
+  await page.goto("/");
+  await wake(page);
+  // The window sent to the tray and back by the tray icon, the pointer left resting on it.
+  const tray = page.locator("[data-tray]");
+  await tray.click();
+  await page.mouse.move(10, 500);
+  await tray.click();
+  await at(page, HOLDS[2]);
+  await page.waitForTimeout(600);
+  await expect(page.locator("#fly-song")).toBeVisible();
+  // And "still playing" beside it, wholly on the screen and clear of it.
+  const note = page.locator("[data-note='playing']");
+  await expect(note).toHaveAttribute("data-on", "");
+  const [n, f] = [(await note.locator("span").boundingBox())!, (await page.locator("#fly-song").boundingBox())!];
+  expect(n.x).toBeGreaterThan(f.x + f.width);
+  expect(n.x + n.width).toBeLessThanOrEqual(1440);
+});
+
 test("the keys in the first screen's words, as they leave, go on to the steps rather than to nowhere", async ({ page }) => {
   await page.goto("/");
   await wake(page);

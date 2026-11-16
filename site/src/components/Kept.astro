@@ -9,6 +9,7 @@ import ScrobbleRow from "./pieces/ScrobbleRow.astro";
 import SponsorBlock from "./pieces/SponsorBlock.astro";
 import TrayTip from "./pieces/TrayTip.astro";
 import { links } from "../data/links";
+import Note from "./Note.astro";
 ---
 
 <section id="kept" class="sec kept frame" aria-labelledby="kept-title">
@@ -19,7 +20,7 @@ import { links } from "../data/links";
   <div class="cells">
     <article class="cell c-keys">
       <div class="cell-text"><h3 class="t-subtitle">Media keys</h3><p>Play, pause and skip from your keyboard, the Windows media overlay or the taskbar.</p></div>
-      <div class="cell-piece"><MediaFlyout surface cover={88} /></div>
+      <div class="cell-piece"><div class="keys-hold"><MediaFlyout surface cover={88} /><Note id="keys" arrow="up-left" class="n-keys" /></div></div>
     </article>
     <article class="cell c-discord">
       <div class="cell-text"><h3 class="t-subtitle">Discord status</h3><p>Friends see what you’re playing, with a preview in Settings. Off until you turn it on.</p></div>
@@ -90,6 +91,20 @@ import { links } from "../data/links";
   }
   .c-tray .cell-text {
     align-content: center;
+  }
+  /* Beside the media keys' flyout, pointing back at it. */
+  .keys-hold {
+    position: relative;
+  }
+  .c-keys :global(.n-keys) {
+    left: calc(100% + var(--s2));
+    top: var(--s6);
+  }
+  /* Phones and tablets: no media keys to try. */
+  @media (width < 760px) {
+    .c-keys :global(.n-keys) {
+      display: none;
+    }
   }
   .cell-text p {
     max-width: 40ch;

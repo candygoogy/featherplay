@@ -33,6 +33,7 @@ const kind = (e: FolderEntry) =>
   e.files ? "folder" : /\.exe$/.test(e.name) ? "app" : /\.dll$/.test(e.name) ? "dll" : /\.(txt|html|json)$/.test(e.name) ? "text" : "data";
 const installedBytes = featherplay.bytes + featherplay.installed.uninstallerBytes + featherplay.installed.runtimeBytes;
 const exeLabel = release.portable ? sizeLabel(release.portable).replace(" ", " ") : mb(featherplay.bytes);
+import Note from "../Note.astro";
 ---
 
 <section class="sec sec-leaves frame" id="leaves" aria-labelledby="leaves-title" data-out data-lit="chromium" data-bar-sec="light">
@@ -76,6 +77,7 @@ const exeLabel = release.portable ? sizeLabel(release.portable).replace(" ", " 
       <p class="status"><strong>{pear.files} files</strong>, {mb(pear.bytes)}</p>
     </figure>
     <div class="side">
+      <Note id="onefile" arrow="down" class="n-onefile" />
       <figure class="explorer ours" aria-labelledby="fp-folder">
         <div class="ex-bar" aria-hidden="true">
           <svg viewBox="0 0 16 16" width="16" height="16"><use href="#g-folder"></use></svg><span>Downloads</span>
@@ -178,6 +180,7 @@ const exeLabel = release.portable ? sizeLabel(release.portable).replace(" ", " 
     margin-top: var(--s7);
   }
   .side {
+    position: relative;
     display: grid;
     gap: var(--s5);
     padding-top: var(--s8);
@@ -190,6 +193,11 @@ const exeLabel = release.portable ? sizeLabel(release.portable).replace(" ", " 
     box-shadow: var(--lit), var(--ring), var(--shadow);
     font-size: var(--fs-small);
     font-weight: var(--fw-medium);
+  }
+  /* Above featherplay's window, pointing down at its one file. */
+  .side :global(.n-onefile) {
+    left: 9.5rem;
+    top: var(--s2);
   }
   .explorer.ours {
     width: min(100%, 28rem);
@@ -365,8 +373,13 @@ const exeLabel = release.portable ? sizeLabel(release.portable).replace(" ", " 
     .desk {
       grid-template-columns: minmax(0, 1fr);
     }
+    /* Room above featherplay's window for its note. */
     .side {
-      padding-top: 0;
+      padding-top: var(--s7);
+    }
+    .side :global(.n-onefile) {
+      top: 0;
+      left: 8rem;
     }
   }
   @media (width < 560px) {

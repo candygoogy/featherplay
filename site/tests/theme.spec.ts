@@ -340,8 +340,8 @@ test("the art drawn per theme cross-fades with the colours, both copies in one b
   await page.goto("/");
   await page.waitForTimeout(400);
   const r = await page.evaluate(async () => {
-    const dark = document.querySelector<HTMLElement>("header .only-dark")!;
-    const light = document.querySelector<HTMLElement>("header .only-light")!;
+    const dark = document.querySelector<HTMLElement>("header [data-tray] .only-dark")!;
+    const light = document.querySelector<HTMLElement>("header [data-tray] .only-light")!;
     const o = (el: Element) => Number(getComputedStyle(el).opacity);
     const start = [o(dark), o(light)];
     document.querySelector<HTMLElement>("[data-theme-toggle]")!.click();

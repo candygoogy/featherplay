@@ -11,6 +11,7 @@
 
 import { clampInto, fitWindow, placeIn, type Box, type Fit } from "./fit";
 import type { Player } from "./player";
+import { hideNote, showNoteAt } from "../scripts/notes";
 
 export type Frame = { w: number; h: number; x: number; y: number; s: number; o: number };
 
@@ -209,9 +210,31 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
   const deskOnly = () => maxButton?.setAttribute("aria-disabled", String(!desk.matches));
 
   // ---- Minimise to the tray, and back ----
+  // "opens in 0.24 s": by the tray icon, the first time the window comes back from the tray
+  // (not when the story brings it back), for a few seconds or until the page moves.
+  const opensNote = document.querySelector<HTMLElement>("[data-note='opens']");
+  let opensShown = false;
+  const opensOff = () => {
+    if (opensNote) hideNote(opensNote);
+    removeEventListener("scroll", opensOff);
+  };
+  const showOpens = () => {
+    if (!opensNote || opensShown || driven) return;
+    const t = trayTarget()?.getBoundingClientRect();
+    if (!t) return;
+    const p = pinRect();
+    const f = rested();
+    const win = { left: p.left + f.x, top: p.top + f.y, right: p.left + f.x + f.w * f.s, bottom: p.top + f.y + f.h * f.s };
+    if (!showNoteAt(opensNote, t.left + t.width / 2 - 6, t.bottom + 2, [win])) return;
+    opensShown = true;
+    setTimeout(opensOff, 4500);
+    addEventListener("scroll", opensOff, { passive: true });
+  };
+
   const setMinimised = (on: boolean) => {
     if (on === minimised) return;
     minimised = on;
+    if (!on) showOpens();
     const hadFocus = el.contains(document.activeElement);
     el.toggleAttribute("data-minimised", on);
     document.documentElement.toggleAttribute("data-window-minimised", on);

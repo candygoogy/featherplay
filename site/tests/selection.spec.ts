@@ -74,7 +74,7 @@ test("text fields keep the native highlight", async ({ page }) => {
     }
     return null;
   });
-  expect(rule).toMatch(/--song/);
+  expect(rule).toMatch(/--glow/);
   expect(await page.locator("html").getAttribute("class")).toContain("sel-drawn");
 });
 
@@ -92,7 +92,15 @@ test.describe("reduced motion", () => {
     expect(alpha, sel.bg).not.toBeNull();
     expect(Number(alpha![1] ?? alpha![2])).toBeLessThan(0.5);
     expect(Number(alpha![1] ?? alpha![2])).toBeGreaterThan(0.1);
-    expect(sel.color).toBe(sel.text);
+    // The text keeps its own colour: no selection rule sets one. (Chrome's computed ::selection
+    // colour can come from a sibling's shared style, while the text is drawn in its own.)
+    const coloured = await page.evaluate(() =>
+      [...document.styleSheets]
+        .flatMap((s) => [...s.cssRules])
+        .filter((r) => r instanceof CSSStyleRule && r.selectorText.includes("::selection") && r.style.color)
+        .map((r) => (r as CSSStyleRule).selectorText),
+    );
+    expect(coloured).toEqual([]);
   });
   test("the native wash is the playing song's colour too", async ({ page }) => {
     await page.goto("/");

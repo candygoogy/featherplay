@@ -54,3 +54,14 @@ test("the 404 keeps its idea: the app's window on the desk, 404 by page not foun
     await expect(page.locator("[data-laptop]")).toHaveCount(0);
   }
 });
+
+test("/credits credits the handwriting's face, with its licence beside the font", async ({ page, request }) => {
+  await page.goto("/credits");
+  const type = page.locator("#type");
+  await expect(type).toContainText("Reenie Beanie by James Grieshaber");
+  const href = await type.getByRole("link", { name: "licence" }).nth(1).getAttribute("href");
+  expect(href).toBe("/fonts/reenie-beanie-OFL.txt");
+  const res = await request.get(href!);
+  expect(res.status()).toBe(200);
+  expect(await res.text()).toContain("SIL OPEN FONT LICENSE Version 1.1");
+});

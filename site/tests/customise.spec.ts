@@ -108,7 +108,7 @@ for (const theme of ["dark", "light"] as const) {
     await open(page);
     await page.waitForTimeout(400);
     const pairs = await page.evaluate(() => {
-      const texts = [...document.querySelectorAll<HTMLElement>("#yours :is(h2, p, legend, label span):not([data-replica] *)")].filter(
+      const texts = [...document.querySelectorAll<HTMLElement>("#yours :is(h2, p:not(.hand), legend, label span):not([data-replica] *)")].filter(
         (el) => el.offsetParent !== null && el.textContent!.trim() && !el.closest(".visually-hidden"),
       );
       // Each text against the first fill under it (a picked segment, the panel).

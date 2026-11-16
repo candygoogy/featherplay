@@ -367,3 +367,113 @@
 .skip:not(:focus-visible) {
   pointer-events: none;
 }
+
+/* ---------- The hand: the maker's notes and pen marks (Note.astro, src/scripts/notes.ts) ----------
+   Reenie Beanie, cut to the notes' own characters (src/data/notes.ts). Shown as soon as it is
+   here or never (it is decoration): no fallback face standing in for it. */
+@font-face {
+  font-family: "Reenie Beanie";
+  src: url("/fonts/reenie-beanie-subset.woff2") format("woff2");
+  font-weight: 400;
+  font-display: block;
+}
+:root {
+  --fs-pen: 1.875rem; /* 30: the hand, its own face, the stated exception to the six sizes */
+}
+.hand {
+  position: absolute;
+  z-index: 4;
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  margin: 0;
+  color: var(--hand);
+  font-family: "Reenie Beanie", cursive;
+  font-size: var(--fs-pen);
+  font-weight: 400;
+  font-synthesis: none;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+}
+.hand svg,
+.pen-mark {
+  flex: none;
+  overflow: visible;
+}
+.hand path,
+.pen-mark path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.pen-mark {
+  color: var(--hand);
+  pointer-events: none;
+}
+.pen-mark path {
+  vector-effect: non-scaling-stroke;
+}
+/* Arrows that sit beside the words' foot or head. */
+.hand.arrow-down svg,
+.hand.arrow-right svg {
+  margin-bottom: -26px;
+}
+.hand:is(.arrow-down-left, .arrow-up-left, .arrow-down-right) {
+  align-items: flex-start;
+}
+.hand:is(.arrow-down-left, .arrow-up-left) svg {
+  margin-top: 12px;
+}
+.hand.arrow-down-right svg {
+  margin-top: 14px;
+}
+/* Hidden where it would touch something, never drawn over it (and taking no room, so a
+   hidden note never widens the page). Without script there is no one to judge that: the notes
+   only decorate, so they wait for it. */
+.hand.note-off,
+:root:not(.js) .hand,
+.hand:not([data-judged], [data-note-manual]) {
+  display: none;
+}
+/* Written once (:root.pen: script and motion): the words revealed in the pen's direction, the
+   arrow drawn after them. */
+:root.pen .hand > span {
+  clip-path: inset(-40% 106% -40% -6%);
+}
+:root.pen .hand path,
+:root.pen .pen-mark path {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+}
+:root.pen .hand.written > span {
+  clip-path: inset(-40% -6% -40% -6%);
+  transition: clip-path var(--t-pen) var(--ease-pen);
+}
+:root.pen :is(.hand, .pen-mark).written path {
+  stroke-dashoffset: 0;
+  transition: stroke-dashoffset 500ms var(--ease-pen) 300ms;
+}
+@media (forced-colors: active) {
+  .hand,
+  .pen-mark {
+    color: CanvasText;
+  }
+}
+/* Notes placed by a script (the story's, the window's): over the window, under the bar, shown
+   only while their moment lasts. */
+.hand[data-note-manual] {
+  position: fixed;
+  z-index: 48;
+  left: 0;
+  top: 0;
+  opacity: 0;
+  transition: opacity var(--t-small) ease;
+}
+.hand[data-note-manual][data-on] {
+  opacity: 1;
+}

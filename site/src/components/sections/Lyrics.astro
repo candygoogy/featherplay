@@ -9,11 +9,15 @@ import { formatTime } from "../../demo/player";
 
 const song = songById(demoStart.songId)!;
 const withLyrics = songs.filter((s) => s.lyrics.length > 0);
+import Note from "../Note.astro";
 ---
 
 <section class="sec sec-lyrics frame" id="lyrics" aria-labelledby="lyrics-title">
   <div class="lyr">
-    <LyricCard class="lyr-card" />
+    <div class="lyr-hold">
+      <LyricCard class="lyr-card" />
+      <Note id="line" arrow="down" class="n-line" />
+    </div>
     <div class="lyr-text">
       <h2 id="lyrics-title" class="t-title">Lyrics, up close</h2>
       <p class="t-lede ink2">
@@ -62,6 +66,20 @@ const withLyrics = songs.filter((s) => s.lyrics.length > 0);
     grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
     align-items: center;
     gap: var(--s8);
+  }
+  /* Over the card's top right, pointing into its lines. */
+  .lyr-hold {
+    position: relative;
+    min-width: 0;
+  }
+  .lyr-hold :global(.n-line) {
+    right: var(--s7);
+    bottom: calc(100% + 10px);
+    transition: opacity var(--t-small) ease;
+  }
+  /* A song without lyrics has no line to click. */
+  .lyr-hold:has([data-has-lyrics="false"]) :global(.n-line) {
+    opacity: 0;
   }
   .lyr-text {
     display: grid;
@@ -188,6 +206,14 @@ const withLyrics = songs.filter((s) => s.lyrics.length > 0);
     }
     .lyr-text {
       order: -1;
+    }
+    /* The card under the words: its note in room of its own above it. */
+    .lyr-hold {
+      padding-top: var(--s7);
+    }
+    .lyr-hold :global(.n-line) {
+      top: 0;
+      bottom: auto;
     }
   }
 </style>
