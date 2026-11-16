@@ -3,7 +3,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { writeFileSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-// axe, WCAG 2.2 A and AA, on every page in both themes. Each page's results are also written
+// axe, WCAG 2.2 A and AA and its best practice, on every page in both themes. Each page's results are also written
 // as JSON to $A11Y_REPORT_DIR, else to site/test-results/a11y/ (gitignored).
 const out = process.env.A11Y_REPORT_DIR || fileURLToPath(new URL("../test-results/a11y", import.meta.url));
 
@@ -13,7 +13,7 @@ for (const theme of ["dark", "light"] as const) {
       await page.emulateMedia({ colorScheme: theme, reducedMotion: "reduce" });
       await page.goto(path);
       await page.waitForLoadState("networkidle");
-      const tags = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
+      const tags = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa", "best-practice"];
       // The laptops' screens are pictures of the app at its own 1440 px size, scaled down:
       // their targets shrink with them (WCAG 2.5.8's "essential" presentation). Every other
       // rule runs on them; target size runs on the rest of the page.

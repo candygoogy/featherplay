@@ -16,8 +16,10 @@ interface Props {
   positionMs?: number;
   view?: View;
   id?: string;
+  /** Its Now playing region's name: each replica's own, so the page's landmarks differ. */
+  nowLabel?: string;
 }
-const { songId = demoStart.songId, positionMs = demoStart.positionMs, view = "lyrics", id = "replica" } = Astro.props;
+const { songId = demoStart.songId, positionMs = demoStart.positionMs, view = "lyrics", id = "replica", nowLabel = "Now playing" } = Astro.props;
 const song: Song = songs.find((s) => s.id === songId) ?? songs[0];
 const current = currentLineIndex(song, positionMs);
 const lineState = (i: number) => (i < current ? "past" : i === current ? "current" : "next");
@@ -343,7 +345,7 @@ const pages: { page: View; icon: "home" | "library" | "explore" | "history"; lab
       </section>
 
       <!-- Now playing: the cover view, or the full lyrics view on the cover's colour -->
-      <section class="stage" data-pane="now" aria-label="Now playing" hidden={!isNow}>
+      <section class="stage" data-pane="now" aria-label={nowLabel} hidden={!isNow}>
         <span class="stage-wash" aria-hidden="true"></span>
         <span class="stage-panel" aria-hidden="true"></span>
         <button class="fp-ib back" type="button" data-act="back" aria-label="Back">

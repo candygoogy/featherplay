@@ -88,11 +88,12 @@ import { songs } from "../data/songs";
   .sleeve[data-current] {
     translate: 0 -3px;
   }
+  /* The ring stands off the cover by a gap of the real desk under it (an outline), not a
+     band of flat paper, which showed as a cream hairline on the blue songs. */
   .sleeve[data-current] img {
-    box-shadow:
-      0 0 0 2px var(--desk),
-      0 0 0 3.5px color-mix(in srgb, var(--text) 80%, transparent),
-      var(--sleeve-lift);
+    outline: 1.5px solid color-mix(in srgb, var(--text) 80%, transparent);
+    outline-offset: 2px;
+    box-shadow: var(--sleeve-lift);
   }
   .sl-mark {
     position: absolute;
@@ -104,7 +105,8 @@ import { songs } from "../data/songs";
     height: 28px;
     border-radius: 50%;
     background: light-dark(rgb(255 255 255 / 0.92), rgb(15 15 15 / 0.8));
-    box-shadow: 0 2px 8px rgb(0 0 0 / 0.3);
+    /* Warm in light, as every other light shadow. */
+    box-shadow: 0 2px 8px light-dark(rgb(70 48 24 / 0.22), rgb(0 0 0 / 0.3));
     opacity: 0;
     scale: 0.8;
     transition:
