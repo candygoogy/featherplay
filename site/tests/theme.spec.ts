@@ -99,14 +99,18 @@ test("back on System the page follows the OS live again; on Light or Dark it doe
   await page.emulateMedia({ colorScheme: "light" });
   await page.waitForTimeout(100);
   expect(await theme(page)).toBe("dark");
-  await page.locator(toggle).click(); // System: the OS is light now
+  // (The next press depends on the system: from its own theme, back to System.)
+  await page.emulateMedia({ colorScheme: "dark" });
+  await page.locator(toggle).click(); // System
+  await page.emulateMedia({ colorScheme: "light" });
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   await page.emulateMedia({ colorScheme: "dark" });
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await page.emulateMedia({ colorScheme: "light" });
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   expect(await page.evaluate(() => localStorage.getItem("fp-theme"))).toBeNull();
-  await expect(page.locator(toggle)).toHaveAttribute("aria-label", "Theme: System. Switch to Light");
+  // The system light now, the next press gives Dark.
+  await expect(page.locator(toggle)).toHaveAttribute("aria-label", "Theme: System. Switch to Dark");
 });
 
 test("the tooltip shows on hover and keyboard focus, and Escape puts it away", async ({ page }) => {
@@ -495,5 +499,20 @@ test.describe("reduced motion", () => {
     expect(r.theme).toBe("light");
     expect(rgb(r.bg)).toEqual([255, 255, 255]);
     expect(r.running).toBe(0);
+  });
+});
+
+test.describe("on a light system", () => {
+  test.use({ colorScheme: "light" });
+  test("the toggle's first press changes what shows: System, Dark, Light, System", async ({ page }) => {
+    await page.goto("/");
+    const toggle = page.locator("[data-site-bar] [data-theme-toggle]");
+    await expect(toggle).toHaveAttribute("aria-label", "Theme: System. Switch to Dark");
+    await toggle.click();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+    await expect(toggle).toHaveAttribute("aria-label", "Theme: Dark. Switch to Light");
+    await toggle.click();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+    await expect(toggle).toHaveAttribute("aria-label", "Theme: Light. Switch to System");
   });
 });

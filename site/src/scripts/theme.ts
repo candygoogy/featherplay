@@ -227,13 +227,19 @@ function syncPickers() {
 }
 
 // The header's toggle goes round the three: System (follow the OS), Light, Dark, System.
-const NEXT: Record<ThemeChoice, ThemeChoice> = { system: "light", light: "dark", dark: "system" };
+/** What a press of the toggle gives next: from System, the theme the system isn't showing (so
+ *  the first press always changes what shows), then the other, then System again. */
+function next(choice: ThemeChoice): ThemeChoice {
+  const sys: ThemeChoice = matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+  const other: ThemeChoice = sys === "light" ? "dark" : "light";
+  return choice === "system" ? other : choice === other ? sys : "system";
+}
 const NAME: Record<ThemeChoice, string> = { system: "System", light: "Light", dark: "Dark" };
 
 /** Names each toggle for the mode it's in and what a click does next; its icon is the mode (data-choice). */
 function labelToggles() {
   const choice = storedChoice();
-  const label = `Theme: ${NAME[choice]}. Switch to ${NAME[NEXT[choice]]}`;
+  const label = `Theme: ${NAME[choice]}. Switch to ${NAME[next(choice)]}`;
   for (const button of document.querySelectorAll<HTMLButtonElement>("[data-theme-toggle]")) {
     button.setAttribute("aria-label", label);
     button.dataset.choice = choice;
@@ -263,12 +269,14 @@ export function initTheme(): void {
   apply(resolve(storedChoice()));
   matchMedia(LIGHT).addEventListener("change", () => {
     if (storedChoice() === "system") switchTo(resolve("system"));
+    // What the next press gives depends on the system too.
+    labelToggles();
   });
   window.addEventListener("themechange", labelToggles);
   window.addEventListener("themechange", syncPickers);
   for (const button of document.querySelectorAll<HTMLButtonElement>("[data-theme-toggle]")) {
     button.hidden = false;
-    button.addEventListener("click", () => setTheme(NEXT[storedChoice()]));
+    button.addEventListener("click", () => setTheme(next(storedChoice())));
     bindTip(button);
   }
   labelToggles();
