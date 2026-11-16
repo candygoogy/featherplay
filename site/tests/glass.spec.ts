@@ -136,10 +136,14 @@ async function cornerPass(page: Page, label: string, from: number, step = 360) {
           if (![...el.childNodes].some((c) => c.nodeType === 3 && c.textContent!.trim())) continue;
           const r = el.getBoundingClientRect();
           if (!r.width || r.top < 0 || r.left > innerWidth * 0.5 || r.top > innerHeight * 0.45) continue;
-          // Shown, and not clipped away or covered (a closed answer, a pane over it).
+          // Shown, and not clipped away or covered (a closed answer, a pane over it), nor part
+          // under the floating bar as it passes: its top, middle and foot are all its own.
           if (!el.checkVisibility({ opacityProperty: true, visibilityProperty: true, contentVisibilityAuto: true })) continue;
-          const hit = document.elementFromPoint(r.left + Math.min(r.width, 40) / 2, r.top + r.height / 2);
-          if (!hit || !(el.contains(hit) || hit.contains(el))) continue;
+          const own = (y: number) => {
+            const hit = document.elementFromPoint(r.left + Math.min(r.width, 40) / 2, y);
+            return !!hit && (el.contains(hit) || hit.contains(el));
+          };
+          if (![r.top + 2, r.top + r.height / 2, r.bottom - 2].every(own)) continue;
           const cs = getComputedStyle(el);
           const px = parseFloat(cs.fontSize);
           const large = px >= 24 || (px >= 18.66 && Number(cs.fontWeight) >= 700);

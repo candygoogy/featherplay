@@ -47,7 +47,8 @@ export async function textContrast(page: Page, selector: string, max = 8): Promi
   );
   if (!items.length) return [];
   // The text made transparent (and anything drawn in its colour inside it), the ground captured.
-  const tag = await page.addStyleTag({ content: `${selector}, ${selector} * { color: transparent !important; -webkit-text-fill-color: transparent !important; text-decoration-color: transparent !important; } ${selector} svg { visibility: hidden !important; }` });
+  // At once: a text whose colour eases (a link) would still show faintly in the ground.
+  const tag = await page.addStyleTag({ content: `${selector}, ${selector} * { color: transparent !important; -webkit-text-fill-color: transparent !important; text-decoration-color: transparent !important; transition: none !important; } ${selector} svg { visibility: hidden !important; }` });
   await page.waitForTimeout(80);
   const shots = [];
   for (const it of items) shots.push((await page.screenshot({ clip: it.box, scale: "css" })).toString("base64"));
