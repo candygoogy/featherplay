@@ -1965,6 +1965,13 @@
     column-gap: 12px;
   }
 }
+/* Without the times (the bar under 526 px) its row comes up onto the cover's middle, one row
+   above the seek line along the foot, as the app's does. */
+@container app (width < 546px) {
+  .replica .bar {
+    padding-bottom: 12px;
+  }
+}
 @container pbar (width < 1100px) {
   .replica .seek {
     width: min(560px, max(280px, 100cqw - 720px));
@@ -2005,6 +2012,11 @@
 @container pbar (width < 526px) {
   .replica .bar-mid {
     padding-top: 0;
+  }
+  /* Without the times the song's tile ends above the seek line along the foot, as the app's
+     does (8 px from the top, 20 px from the foot), not on it. */
+  .replica .bar-song {
+    height: 60px;
   }
   .replica .seek {
     position: absolute;
