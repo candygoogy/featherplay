@@ -39,6 +39,8 @@ export async function startStory(player: Player): Promise<void> {
   root.toggleAttribute("data-story-live", true);
   const win = await whenWindow;
   const hero = [...stage.querySelectorAll<HTMLElement>(".first > .head, .first > .col, .first > [data-shelf], .first > .hand")];
+  // The notes only fade: their place is their translate (src/scripts/notes.ts showNoteAt).
+  const hand = (el: HTMLElement) => el.classList.contains("hand");
   const caps = [...stage.querySelectorAll<HTMLElement>("[data-cap]")];
   const ghost = stage.querySelector<HTMLElement>("[data-ghost]")!;
   const icon = stage.querySelector<HTMLElement>("[data-ghost-icon]")!;
@@ -166,7 +168,7 @@ export async function startStory(player: Player): Promise<void> {
     const out = seg(p, 0, 0.07);
     for (const el of hero) {
       el.style.opacity = out ? String(1 - out * out * (3 - 2 * out)) : "";
-      el.style.translate = out ? `0 ${(-out * 12).toFixed(1)}px` : "";
+      if (!hand(el)) el.style.translate = out ? `0 ${(-out * 12).toFixed(1)}px` : "";
       const gone = out > 0.5;
       if (gone && !el.inert && el.contains(document.activeElement)) steps?.focus({ preventScroll: true });
       el.inert = gone;
@@ -323,7 +325,10 @@ export async function startStory(player: Player): Promise<void> {
       beat = false;
       endBeat();
       win.drive(null);
-      for (const el of [...hero, ...caps, ghost, snap, icon]) el.removeAttribute("style");
+      for (const el of [...hero, ...caps, ghost, snap, icon]) {
+        if (hand(el)) el.style.opacity = "";
+        else el.removeAttribute("style");
+      }
       for (const el of hero) el.inert = false;
     }
   };

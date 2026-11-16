@@ -33,6 +33,8 @@ export function startFirst(): void {
   const noteShelf = first.querySelector<HTMLElement>("[data-note='sleeves']");
   let plan: Plan | null = null;
   let arrived = false;
+  /** The notes are written once everything has landed; till then a relayout doesn't show them. */
+  let landed = false;
 
   const px = (n: number) => `${Math.round(n * 100) / 100}px`;
   function measure() {
@@ -120,6 +122,7 @@ export function startFirst(): void {
     const again = root.dataset.land || scrollY > 4;
     first.toggleAttribute("data-shown", true);
     if (reduced() || again) {
+      landed = true;
       notes();
       return;
     }
@@ -143,7 +146,10 @@ export function startFirst(): void {
       all.push(s.animate([{ opacity: 0, translate: "0 6px", scale: "1.04" }, { opacity: 1, translate: "0 0", scale: "1" }], { duration: 480, delay: 650 + i * 50, easing: EASE_OUT, fill: "backwards" })),
     );
     // The notes write themselves in once everything has landed.
-    setTimeout(notes, 1000);
+    setTimeout(() => {
+      landed = true;
+      notes();
+    }, 1000);
   }
 
   // ---- On load, fonts and resize ----
@@ -155,7 +161,7 @@ export function startFirst(): void {
       measure();
       const win = await whenWindow;
       win.layout();
-      if (arrived) notes();
+      if (landed) notes();
     });
   };
   // At load, not while the scripts start (a measure would force the page's first layout inside

@@ -108,3 +108,34 @@ test("on a phone a few notes show, and none collides", async ({ page }) => {
   expect(shown).toBeGreaterThanOrEqual(2);
   expect(shown).toBeLessThanOrEqual(4);
 });
+
+// The first screen's notes while the page loads and after the story has run: never at the
+// page's top left (the story once wrote its lift over their place).
+const firstNotesNearCorner = (page: Page) =>
+  page.evaluate(() =>
+    [...document.querySelectorAll<HTMLElement>(".first > .hand[data-on]")]
+      .filter((n) => Number(getComputedStyle(n).opacity) > 0.05)
+      .map((n) => n.querySelector("span")!.getBoundingClientRect())
+      .filter((r) => r.width > 0 && r.left < 240 && r.top < 110).length,
+  );
+
+for (const [w, h] of [[1440, 900], [2560, 1270]] as const) {
+  test(`the first screen's notes never show at the top left, loading or after the story (${w}x${h})`, async ({ page }) => {
+    await page.setViewportSize({ width: w, height: h });
+    await page.goto("/");
+    for (let i = 0; i < 24; i++) {
+      expect(await firstNotesNearCorner(page)).toBe(0);
+      await page.waitForTimeout(60);
+    }
+    await expect(page.locator(".first > .hand[data-on]").first()).toBeVisible();
+    const before = await page.locator(".first > .hand[data-on] span").first().boundingBox();
+    // Into the story and back.
+    await page.mouse.wheel(0, 1600);
+    await page.waitForTimeout(500);
+    await page.mouse.wheel(0, -3000);
+    await page.waitForTimeout(800);
+    expect(await firstNotesNearCorner(page)).toBe(0);
+    const after = await page.locator(".first > .hand[data-on] span").first().boundingBox();
+    expect(Math.abs(after!.x - before!.x) + Math.abs(after!.y - before!.y)).toBeLessThan(2);
+  });
+}
