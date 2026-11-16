@@ -85,6 +85,19 @@ test("on a phone: one column, the words, the window, then the shelf", async ({ p
   expect(shelf.right).toBeLessThanOrEqual(390);
 });
 
+test("Play a song plays the first song, then says Pause; pressed again it pauses", async ({ page }) => {
+  await page.goto("/");
+  await shown(page);
+  const play = page.getByRole("button", { name: "Play a song" });
+  await play.click();
+  await expect(page.locator("html")).toHaveAttribute("data-playing", "true");
+  const pause = page.locator("[data-play-toggle]");
+  await expect(pause).toHaveText("Pause");
+  await pause.click();
+  await expect(page.locator("html")).toHaveAttribute("data-playing", "false");
+  await expect(pause).toHaveText("Play");
+});
+
 test.describe("the sleeves", () => {
   test.use({ viewport: { width: 1920, height: 1080 } });
   test.beforeEach(async ({ page }) => {
