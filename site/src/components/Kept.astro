@@ -37,21 +37,33 @@ import Note from "./Note.astro";
     <article class="cell c-tray">
       <div class="cell-text"><h3 class="t-subtitle">The tray</h3><p>Closing the window asks to quit or play on in the tray, until you tell it to remember.</p></div>
       <div class="cell-piece tray-piece">
-        <div class="m-close" aria-hidden="true">
-          <p class="mc-h">Close featherplay?</p>
-          <p class="mc-p">Choose what the close button does this time. featherplay will ask again next time.</p>
-          <p class="mc-check"><span class="box"></span>Remember my choice</p>
-          <p class="mc-btns"><span>Keep playing in the tray</span><span class="solid">Close featherplay</span></p>
+        <!-- The little story in order: the close button asks, then the song plays on in the tray. -->
+        <div class="step">
+          <p class="step-l"><span class="step-n">1</span>Close the window: it asks</p>
+          <div class="m-close" aria-hidden="true">
+            <p class="mc-h">Close featherplay?</p>
+            <p class="mc-p">Choose what the close button does this time. featherplay will ask again next time.</p>
+            <p class="mc-check"><span class="box"></span>Remember my choice</p>
+            <p class="mc-btns"><span class="chosen">Keep playing in the tray</span><span class="solid">Close featherplay</span></p>
+          </div>
         </div>
-        <TrayTip corner />
+        <svg class="step-arrow" viewBox="0 0 48 16" width="48" height="16" aria-hidden="true"
+          ><path d="M2 8h42M37 2l7 6-7 6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"
+          ></path></svg
+        >
+        <div class="step">
+          <p class="step-l"><span class="step-n">2</span>In the tray, still playing</p>
+          <TrayTip corner />
+        </div>
       </div>
     </article>
   </div>
-  <ul class="extras t-small">
-    <li><b>Local API.</b> Pear Desktop’s routes and WebSocket, for overlays and Stream&nbsp;Deck.</li>
-    <li><b>Opus streams.</b> About 130 to 140&nbsp;kbps where a song has one.</li>
-    <li><b>Starts with Windows,</b> if you ask it to.</li>
-    <li><b>Light and dark,</b> its accent from the cover.</li>
+  <h3 class="extras-h">And under the surface</h3>
+  <ul class="extras">
+    <li><b>Local API</b><span>Pear Desktop’s routes and WebSocket, for overlays and Stream&nbsp;Deck.</span></li>
+    <li><b>Opus streams</b><span>About 130 to 140&nbsp;kbps where a song has one.</span></li>
+    <li><b>Starts with Windows</b><span>If you ask it to.</span></li>
+    <li><b>Light and dark</b><span>Its accent from the cover.</span></li>
   </ul>
   <p class="more ink2">Coming from Pear Desktop? <a class="text-link" href={links.comingFromPear}>See what carries over</a>.</p>
 </section>
@@ -110,10 +122,19 @@ import Note from "./Note.astro";
     max-width: 40ch;
     color: var(--ink2);
   }
+  /* Each piece is its cell's subject: on a quiet well of its own, centred, with room. */
   .cell-piece {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
+    justify-content: center;
     min-width: 0;
+    min-height: 15rem;
+    padding: var(--s7) var(--s6);
+    border-radius: 14px;
+    background: light-dark(rgb(90 66 40 / 0.035), rgb(255 255 255 / 0.025));
+  }
+  .c-scrobble .cell-piece > :global(*) {
+    width: min(100%, 30rem);
   }
   .cell-piece > :global(*) {
     max-width: 100%;
@@ -133,9 +154,37 @@ import Note from "./Note.astro";
   }
   .tray-piece {
     align-items: flex-end;
-    justify-content: space-between;
+    justify-content: center;
     flex-wrap: wrap;
-    gap: var(--s6);
+    gap: var(--s5) var(--s7);
+  }
+  .step {
+    display: grid;
+    justify-items: start;
+    gap: var(--s3);
+  }
+  .step-l {
+    display: flex;
+    align-items: center;
+    gap: var(--s2);
+    color: var(--ink2);
+    font-weight: var(--fw-medium);
+  }
+  .step-n {
+    display: grid;
+    place-items: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 50%;
+    background: var(--tonal);
+    color: var(--text);
+    font-size: var(--fs-small);
+    font-weight: var(--fw-bold);
+  }
+  .step-arrow {
+    align-self: center;
+    margin-top: var(--s7);
+    color: var(--ink2);
   }
   /* The app's close dialog, drawn (close_dialog.slint). */
   .m-close {
@@ -185,18 +234,36 @@ import Note from "./Note.astro";
     background: var(--solid);
     color: var(--on-solid);
   }
+  /* The choice this story makes. */
+  .mc-btns .chosen {
+    box-shadow: 0 0 0 2px var(--accent);
+  }
+  .extras-h {
+    margin-top: var(--s7);
+    padding: 0 var(--panel-pad);
+    font-size: var(--fs-lede);
+    font-weight: var(--fw-bold);
+    letter-spacing: var(--tr-lede);
+  }
   .extras {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: var(--s5) var(--s6);
-    margin: var(--s6) 0 0;
+    margin: var(--s4) 0 0;
     padding: 0 var(--panel-pad);
-    color: var(--ink2);
     list-style: none;
   }
+  .extras li {
+    display: grid;
+    align-content: start;
+    gap: var(--s1);
+  }
   .extras b {
-    color: var(--text);
     font-weight: var(--fw-bold);
+  }
+  .extras span {
+    color: var(--ink2);
+    text-wrap: pretty;
   }
   .more {
     margin-top: var(--s5);
@@ -213,6 +280,10 @@ import Note from "./Note.astro";
     .c-tray {
       grid-template-columns: minmax(0, 1fr);
     }
+    .step-arrow {
+      rotate: 90deg;
+      margin-top: 0;
+    }
     .extras {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
@@ -220,6 +291,11 @@ import Note from "./Note.astro";
   @media (width < 560px) {
     .extras {
       grid-template-columns: minmax(0, 1fr);
+    }
+    /* A phone: the well gives the piece its whole width. */
+    .cell-piece {
+      min-height: 0;
+      padding: var(--s4) var(--s2);
     }
   }
 </style>
