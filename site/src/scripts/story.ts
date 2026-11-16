@@ -159,10 +159,22 @@ export async function startStory(player: Player): Promise<void> {
     }
     // Hold 2: the narrow window beside its words.
     const f2 = fitWindow({ w: Math.max(240, vw - fl - capW1 - 96 - 24), h: vh - CAP_B - 56 }, { want: NARROW });
-    const W2 = NARROW.w * f2.s;
-    const H2 = NARROW.h * f2.s;
-    const x2 = Math.max(fl + capW1 + 96, vw * 0.52 - W2 / 2);
-    const r2 = { x: Math.min(x2, vw - W2 - 24), y: CAP_B + (vh - CAP_B - H2) / 2, w: W2, h: H2, s: f2.s };
+    // A large screen: the narrow window grows with the screen's height, to about 70 % of it (a
+    // scale of 1.4 at most, smaller than the whole one before it), and its words and it are one
+    // group in the middle of the frame, the words 96 px from it. Elsewhere as it was.
+    let s2 = f2.s;
+    let capX1 = fl;
+    const grow = Math.min(1.4, (vh * 0.7) / NARROW.h);
+    const large = vw >= 1600 && grow > s2 && NARROW.w * grow * NARROW.h * grow < w1 * h1;
+    if (large) s2 = grow;
+    const W2 = NARROW.w * s2;
+    const H2 = NARROW.h * s2;
+    let x2 = Math.max(fl + capW1 + 96, vw * 0.52 - W2 / 2);
+    if (large) {
+      capX1 = fl + Math.max(0, (vw - 2 * fl - (capW1 + 96 + W2)) / 2);
+      x2 = capX1 + capW1 + 96;
+    }
+    const r2 = { x: Math.min(x2, vw - W2 - 24), y: CAP_B + (vh - CAP_B - H2) / 2, w: W2, h: H2, s: s2 };
     G = {
       top,
       L,
@@ -170,7 +182,7 @@ export async function startStory(player: Player): Promise<void> {
       r2,
       caps: [
         cap0,
-        { x: fl, y: r2.y + H2 / 2 - caps[1].offsetHeight / 2 },
+        { x: capX1, y: r2.y + H2 / 2 - caps[1].offsetHeight / 2 },
         { x: fl, y: CAP_B + (vh - CAP_B) / 2 - caps[2].offsetHeight / 2 },
       ],
     };
