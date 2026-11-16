@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { figures, metrics } from "../src/data/numbers";
+import { figures, installFolders, metrics } from "../src/data/numbers";
 import { figureText, NOT_MEASURED } from "../src/data/format";
 
 // The numbers (Numbers.astro) and what featherplay leaves out (LeavesOut.astro): a calm table
@@ -93,17 +93,50 @@ test("each note lights its files in Pear's folder: the first to begin with, then
   await expect(out).toHaveAttribute("data-lit", "electron");
 });
 
-test("the sizes are weighed like with like: installed against installed", async ({ page }) => {
+test("the sizes are weighed like with like, installed against installed, and drawn to scale", async ({ page }) => {
   await page.goto("/");
   const weigh = leaves(page).locator("[data-weigh]");
-  await expect(weigh).toContainText("Installed, about 34 MB against Pear Desktop’s 396 MB");
+  const ours = weigh.locator('[data-scale="featherplay"]');
+  const pear = weigh.locator('[data-scale="pear"]');
+  await expect(weigh.locator(".weigh-h")).toHaveText("Installed");
+  await expect(ours).toContainText("about 34 MB");
+  await expect(pear).toContainText("Pear Desktop");
+  await expect(pear).toContainText("396 MB");
   await expect(weigh).toContainText("uninstaller");
   await expect(weigh).toContainText("Visual C++ runtime");
   await expect(weigh).toContainText("12 times smaller");
+  // featherplay's bar is its installed size against Pear's whole bar.
+  await weigh.scrollIntoViewIfNeeded();
+  const [a, b] = await Promise.all([ours, pear].map((r) => r.locator(".fill").evaluate((f) => f.getBoundingClientRect().width)));
+  const installed = installFolders.featherplay.bytes + installFolders.featherplay.installed.uninstallerBytes + installFolders.featherplay.installed.runtimeBytes;
+  expect(a / b).toBeCloseTo(installed / installFolders.pear.bytes, 2);
   // The exe in its own window, its size as Explorer shows it.
   await expect(leaves(page).locator(".ours")).toContainText("featherplay.exe");
   await expect(leaves(page).locator(".ours .status")).toContainText("29.29 MB");
   await expect(leaves(page)).not.toContainText(/nothing to install|needs no install/i);
+});
+
+test("the one-file note points at featherplay's file", async ({ page }) => {
+  for (const [width, height] of [
+    [1440, 900],
+    [2560, 1270],
+  ]) {
+    await page.setViewportSize({ width, height });
+    await page.goto("/");
+    const note = page.locator("[data-note='onefile']");
+    await note.evaluate((n) => n.scrollIntoView({ block: "center" }));
+    await expect(note).toBeVisible();
+    const { tip, row } = await note.evaluate((n) => {
+      // The "right" arrow's head ends at (55.6, 9.1) of its 60 x 24 drawing (Note.astro).
+      const a = n.querySelector("svg")!.getBoundingClientRect();
+      const r = document.querySelector("#leaves .ours .files li")!.getBoundingClientRect();
+      return { tip: { x: a.left + (55.6 / 60) * a.width, y: a.top + (9.1 / 24) * a.height }, row: { left: r.left, right: r.right, top: r.top, bottom: r.bottom } };
+    });
+    expect(tip.x, `${width}`).toBeGreaterThan(row.left);
+    expect(tip.x, `${width}`).toBeLessThan(row.left + 40);
+    expect(tip.y, `${width}`).toBeGreaterThan(row.top);
+    expect(tip.y, `${width}`).toBeLessThan(row.bottom);
+  }
 });
 
 test("the method link opens /method", async ({ page }) => {

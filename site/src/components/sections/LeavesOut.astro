@@ -1,9 +1,10 @@
 ---
 // What featherplay leaves out: two folders as Explorer shows them, two solid windows on the
 // desk: Pear Desktop 3.12 installed, every entry tied to what it's there for, and featherplay's
-// one portable exe. Beside them the sizes weighed like with like and four plain notes on what
-// isn't there. Pointing at a note (or focusing, or tapping it) lights its files in Pear's
-// folder; the first is lit to begin with, so the idea shows itself. Facts: src/data/numbers.ts.
+// one portable exe. Under the exe the two installed sizes drawn to scale, like with like, and
+// four plain notes on what isn't there. Pointing at a note (or focusing, or tapping it) lights
+// its files in Pear's folder; the first is lit to begin with, so the idea shows itself. Facts:
+// src/data/numbers.ts.
 import { installFolders, leftOutTotals, type FolderEntry, type LeftOut } from "../../data/numbers";
 import { formatBytes } from "../../data/format";
 import { release, sizeLabel } from "../../data/release";
@@ -32,6 +33,8 @@ const notes: { word: string; why: string; group?: LeftOut }[] = [
 const kind = (e: FolderEntry) =>
   e.files ? "folder" : /\.exe$/.test(e.name) ? "app" : /\.dll$/.test(e.name) ? "dll" : /\.(txt|html|json)$/.test(e.name) ? "text" : "data";
 const installedBytes = featherplay.bytes + featherplay.installed.uninstallerBytes + featherplay.installed.runtimeBytes;
+// The two installed folders to scale: Pear's bar is the whole length, featherplay's its share.
+const installedShare = `${((installedBytes / pear.bytes) * 100).toFixed(2)}%`;
 const exeLabel = release.portable ? sizeLabel(release.portable).replace(" ", " ") : mb(featherplay.bytes);
 import Note from "../Note.astro";
 ---
@@ -78,7 +81,8 @@ import Note from "../Note.astro";
       <p class="status"><strong>{pear.files} files</strong>, {mb(pear.bytes)}</p>
     </figure>
     <div class="side">
-      <Note id="onefile" arrow="down" class="n-onefile" />
+      <div class="ours-hold">
+      <Note id="onefile" arrow="right" class="n-onefile" />
       <figure class="explorer ours" aria-labelledby="fp-folder">
         <div class="ex-bar" aria-hidden="true">
           <svg viewBox="0 0 16 16" width="16" height="16"><use href="#g-folder"></use></svg><span>Downloads</span>
@@ -104,12 +108,23 @@ import Note from "../Note.astro";
         </ul>
         <p class="status"><strong>{featherplay.files} file</strong>, {exeLabel}</p>
       </figure>
-      <p class="weigh" data-weigh>
-        Installed, about {Math.round(installedBytes / 1_048_576)}&nbsp;MB against Pear Desktop’s {mb(pear.bytes)}: the exe, its
-        uninstaller (about {mb(featherplay.installed.uninstallerBytes)}) and the Visual&nbsp;C++ runtime (about {
-          mb(featherplay.installed.runtimeBytes)
-        }), {Math.round(pear.bytes / installedBytes)} times smaller.
-      </p>
+      </div>
+      <figure class="weigh" data-weigh aria-labelledby="weigh-h">
+        <p class="weigh-h" id="weigh-h">Installed</p>
+        <p class="scale-row ours-row" data-scale="featherplay">
+          <span class="who">featherplay</span><span class="fig">about {Math.round(installedBytes / 1_048_576)}&nbsp;MB</span>
+          <svg class="bar" aria-hidden="true"><rect class="track" width="100%" height="100%" rx="3"></rect><rect class="fill" width={installedShare} height="100%" rx="3"></rect></svg>
+        </p>
+        <p class="scale-row pear-row" data-scale="pear">
+          <span class="who">Pear Desktop</span><span class="fig">{mb(pear.bytes)}</span>
+          <svg class="bar" aria-hidden="true"><rect class="track" width="100%" height="100%" rx="3"></rect><rect class="fill" width="100%" height="100%" rx="3"></rect></svg>
+        </p>
+        <figcaption>
+          The exe, its uninstaller (about {mb(featherplay.installed.uninstallerBytes)}) and the Visual&nbsp;C++ runtime (about {
+            mb(featherplay.installed.runtimeBytes)
+          }): {Math.round(pear.bytes / installedBytes)} times smaller than Pear Desktop installed.
+        </figcaption>
+      </figure>
     </div>
     </div>
     <div class="outs">
@@ -211,16 +226,22 @@ import Note from "../Note.astro";
   .pear {
     grid-area: pear;
   }
+  /* featherplay's half: its window and the two sizes to scale under it, one column on the
+     frame's right edge, with open desk between it and Pear's window (where the note sits). Its
+     window's title bar is level with Pear's; it stays in view while the list scrolls by and
+     comes to rest with its last line level with Pear's last. */
   .side {
+    --side-w: min(100%, max(26rem, 60%));
     grid-area: ours;
     position: sticky;
     top: calc(var(--cap-top) + var(--cap-h) + var(--s5));
     display: grid;
-    justify-items: center;
+    justify-items: end;
     gap: var(--s6);
-    /* Its window's top level with Pear's: the note's room above it hangs over the gap. */
-    margin-top: calc(-1 * var(--s8));
-    padding-top: var(--s8);
+  }
+  .ours-hold {
+    position: relative;
+    width: var(--side-w);
   }
   /* An app window: solid, as windows on Windows are, a faint tint of the song. */
   .explorer {
@@ -231,13 +252,12 @@ import Note from "../Note.astro";
     font-size: var(--fs-small);
     font-weight: var(--fw-medium);
   }
-  /* Above featherplay's window, pointing down at its one file. */
+  /* In the open desk left of featherplay's window, pointing across at its one file: the arrow's
+     head (Note.astro's "right") ends just inside the window, level with the file's row (the
+     window's bar, path and column heads above it are 36 + 46 + 30 px, the row 28). */
   .side :global(.n-onefile) {
-    left: 9.5rem;
-    top: var(--s2);
-  }
-  .explorer.ours {
-    width: min(100%, 26rem);
+    right: calc(100% - 1.25rem);
+    top: calc(129px - 1.4em);
   }
   .ex-bar {
     display: flex;
@@ -315,10 +335,89 @@ import Note from "../Note.astro";
     background: color-mix(in srgb, var(--paint) 18%, transparent);
     font-weight: var(--fw-bold);
   }
+  /* Its status bar carries the point: one file, at the size of a lede, its count in full ink. */
+  .explorer.ours .status {
+    padding-block: var(--s4) var(--s5);
+    font-size: var(--fs-lede);
+    line-height: var(--lh-subtitle);
+    letter-spacing: var(--tr-lede);
+  }
+  .explorer.ours .status strong {
+    font-size: var(--fs-subtitle);
+    letter-spacing: var(--tr-subtitle);
+  }
+
+  /* The two installed sizes to scale: a name and its figure over a bar whose length is that
+     size against Pear's (the whole bar). featherplay's in the playing song's colour, Pear's in
+     quiet ink, both on a faint track; then the caption. */
   .weigh {
-    max-width: 26rem;
+    display: grid;
+    gap: var(--s3);
+    width: var(--side-w);
+    margin: 0;
+    padding-inline: var(--s1);
+  }
+  .weigh-h {
     color: var(--ink2);
+    font-size: var(--fs-small);
+    font-weight: var(--fw-bold);
+    line-height: var(--lh-small);
+  }
+  .scale-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: baseline;
+    row-gap: 6px;
+    font-weight: var(--fw-medium);
+  }
+  .who {
+    color: var(--ink2);
+  }
+  .fig {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .ours-row .who,
+  .ours-row .fig {
+    color: var(--text);
+    font-weight: var(--fw-bold);
+  }
+  .bar {
+    grid-column: 1 / -1;
+    display: block;
+    width: 100%;
+    height: 6px;
+    overflow: visible;
+  }
+  .bar .track {
+    fill: var(--panel-tint);
+  }
+  .pear-row .fill {
+    fill: color-mix(in srgb, var(--text) 30%, transparent);
+  }
+  .ours-row .fill {
+    --paint: var(--song);
+    transition: --paint var(--t-glow) ease;
+    fill: light-dark(color-mix(in oklab, var(--paint) 86%, black), var(--paint));
+  }
+  .weigh figcaption {
+    margin-top: var(--s2);
+    padding-top: var(--s3);
+    border-top: 1px solid var(--hairline);
+    color: var(--ink2);
+    font-size: var(--fs-small);
+    font-weight: var(--fw-medium);
+    line-height: var(--lh-small);
     text-wrap: pretty;
+  }
+  @media (forced-colors: active) {
+    .bar .track {
+      fill: Canvas;
+      stroke: CanvasText;
+    }
+    .bar .fill {
+      fill: CanvasText;
+    }
   }
   .outs-head {
     display: flex;
@@ -435,16 +534,11 @@ import Note from "../Note.astro";
       grid-template-columns: minmax(0, 1fr);
       grid-template-areas: "pear" "ours";
     }
-    /* Room above featherplay's window for its note; no sticking where they stack. */
+    /* No sticking where they stack; the note keeps its place left of the window where the
+       width leaves it room (and is hidden where it doesn’t, src/scripts/notes.ts). */
     .side {
       position: relative;
       top: auto;
-      margin-top: 0;
-      padding-top: var(--s7);
-    }
-    .side :global(.n-onefile) {
-      top: 0;
-      left: 8rem;
     }
   }
   @media (width < 560px) {
