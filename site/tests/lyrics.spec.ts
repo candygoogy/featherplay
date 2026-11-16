@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { demoStart, songs } from "../src/data/songs";
 import { currentLineIndex } from "../src/demo/player";
+import { laidOut } from "./helpers";
 
 // Lyrics, up close (Lyrics.astro): the lyric card large, on the page's one player. Its lines
 // follow the song (src/demo/follow.ts), a click on one seeks there and plays, the wheel or a
@@ -17,6 +18,9 @@ const current = (page: Page) => lines(page).locator('.lc-line[data-state="curren
 async function open(page: Page) {
   await page.route("**/music/**", (r) => r.abort());
   await page.goto("/");
+  // Once the sections above have their heights: one laid out later would push the card out of
+  // view, where it waits to show a song change until it is seen again.
+  await laidOut(page);
   await sec(page).scrollIntoViewIfNeeded();
   await page.waitForTimeout(300);
 }
