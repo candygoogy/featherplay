@@ -461,19 +461,47 @@ section[data-away],
 .pen-mark path {
   vector-effect: non-scaling-stroke;
 }
-/* Arrows that sit beside the words' foot or head. */
+/* Arrows that sit beside the words' foot or head (in em: they grow with a larger hand). */
 .hand.arrow-down svg,
 .hand.arrow-right svg {
-  margin-bottom: -26px;
+  margin-bottom: -0.8667em;
+}
+/* An arrow its owner draws to what it points at (notes.ts penArrow): from the note's corner,
+   in the page's pixels, its stroke as heavy as the hand. */
+.hand svg.free {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+.hand svg.free path {
+  stroke-width: 0.05em;
+}
+/* The pen's underline under a note's first word, drawn after the words. */
+.hand .ul {
+  position: relative;
+}
+.hand .ul-line {
+  position: absolute;
+  left: -6%;
+  bottom: -0.04em;
+  width: 112%;
+  height: 0.28em;
+}
+.hand .ul-line path {
+  stroke-width: 0.05em;
+  vector-effect: non-scaling-stroke;
+}
+:root.pen .hand.written .ul-line path {
+  transition-delay: 800ms;
 }
 .hand:is(.arrow-down-left, .arrow-up-left, .arrow-down-right) {
   align-items: flex-start;
 }
 .hand:is(.arrow-down-left, .arrow-up-left) svg {
-  margin-top: 12px;
+  margin-top: 0.4em;
 }
 .hand.arrow-down-right svg {
-  margin-top: 14px;
+  margin-top: 0.4667em;
 }
 /* Hidden where it would touch something, never drawn over it (and taking no room, so a
    hidden note never widens the page). Without script there is no one to judge that: the notes
@@ -547,4 +575,12 @@ section[data-away],
     rotate: none;
     scale: none;
   }
+}
+
+/* A note set on two lines where one wouldn't fit (the first screen's sleeves note, beside the
+   window in a small room). */
+.hand.wrap > span {
+  max-width: 5.2em;
+  white-space: normal;
+  line-height: 1.05;
 }

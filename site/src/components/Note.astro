@@ -22,14 +22,40 @@ interface Props {
   class?: string;
   /** Written by its owner's script (the story, the window), not on coming into view. */
   manual?: boolean;
+  /** Its arrow drawn by its owner's script to what it points at (src/scripts/notes.ts penArrow). */
+  free?: boolean;
+  /** Its first word underlined with the pen, after the words. */
+  underline?: boolean;
 }
-const { id, arrow = "none", class: className, manual = false } = Astro.props;
-const a = arrow === "none" ? null : ARROWS[arrow];
+const { id, arrow = "none", class: className, manual = false, free = false, underline = false } = Astro.props;
+const a = free || arrow === "none" ? null : ARROWS[arrow];
+// The arrows are sized in em (drawn for the 30 px hand), so a larger hand has larger arrows.
+const em = (n: number) => `${+(n / 30).toFixed(4)}em`;
+const text = notes[id];
+const cut = text.indexOf(" ");
 ---
 
-<p class:list={["hand", className, a && `arrow-${arrow}`]} data-note={id} data-note-manual={manual ? "" : undefined} aria-hidden="true">
-  {a?.before && <svg viewBox={`0 0 ${a.w} ${a.h}`} width={a.w} height={a.h}><path pathLength="1" d={a.d} /></svg>}<span>{notes[id]}</span>{
-    a && !a.before && <svg viewBox={`0 0 ${a.w} ${a.h}`} width={a.w} height={a.h}><path pathLength="1" d={a.d} /></svg>
+<p class:list={["hand", className, a && `arrow-${arrow}`, free && "free-arrow"]} data-note={id} data-note-manual={manual ? "" : undefined} aria-hidden="true">
+  {a?.before && <svg viewBox={`0 0 ${a.w} ${a.h}`} style={`width:${em(a.w)};height:${em(a.h)}`}><path pathLength="1" d={a.d} /></svg>}<span
+    >{
+      underline && cut > 0 ? (
+        <>
+          <span class="ul">
+            {text.slice(0, cut)}
+            <svg class="ul-line" viewBox="0 0 100 10" preserveAspectRatio="none"><path pathLength="1" d="M2 6.5 C 28 3.5, 62 8, 98 4.5" /></svg>
+          </span>
+          {text.slice(cut)}
+        </>
+      ) : (
+        text
+      )
+    }</span
+  >{a && !a.before && <svg viewBox={`0 0 ${a.w} ${a.h}`} style={`width:${em(a.w)};height:${em(a.h)}`}><path pathLength="1" d={a.d} /></svg>}{
+    free && (
+      <svg class="free" width="1" height="1">
+        <path pathLength="1" d="M0 0" />
+      </svg>
+    )
   }
 </p>
 

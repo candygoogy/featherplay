@@ -128,3 +128,33 @@ export function showNoteAt(note: HTMLElement, x: number, y: number, avoid: Rect[
 export function hideNote(note: HTMLElement): void {
   note.removeAttribute("data-on");
 }
+
+type Pt = { x: number; y: number };
+
+/**
+ * Draws a note's free arrow (Note.astro `free`): a pen stroke from `from` to `to` (viewport
+ * px), bowed `bow` px to one side of the straight line (negative: the other side), with its
+ * head at `to`. It is written in with the words (the same pen reveal).
+ */
+export function penArrow(note: HTMLElement, from: Pt, to: Pt, bow: number): void {
+  const path = note.querySelector<SVGPathElement>("svg.free path");
+  if (!path) return;
+  const o = note.getBoundingClientRect();
+  const a = { x: from.x - o.left, y: from.y - o.top };
+  const b = { x: to.x - o.left, y: to.y - o.top };
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const len = Math.hypot(dx, dy) || 1;
+  const n = { x: -dy / len, y: dx / len };
+  const c1 = { x: a.x + dx * 0.3 + n.x * bow, y: a.y + dy * 0.3 + n.y * bow };
+  const c2 = { x: a.x + dx * 0.78 + n.x * bow * 0.55, y: a.y + dy * 0.78 + n.y * bow * 0.55 };
+  // The head: two short strokes back from the point, along the curve's last direction.
+  const tl = Math.hypot(b.x - c2.x, b.y - c2.y) || 1;
+  const u = { x: (b.x - c2.x) / tl, y: (b.y - c2.y) / tl };
+  const size = Math.min(14, Math.max(8, len * 0.12)) * (parseFloat(getComputedStyle(note).fontSize) / 30);
+  const turn = (ang: number) => ({ x: b.x - size * (u.x * Math.cos(ang) - u.y * Math.sin(ang)), y: b.y - size * (u.y * Math.cos(ang) + u.x * Math.sin(ang)) });
+  const h1 = turn(0.5);
+  const h2 = turn(-0.5);
+  const f = (p: Pt) => `${p.x.toFixed(1)} ${p.y.toFixed(1)}`;
+  path.setAttribute("d", `M${f(a)} C${f(c1)}, ${f(c2)}, ${f(b)} M${f(h1)} L${f(b)} L${f(h2)}`);
+}

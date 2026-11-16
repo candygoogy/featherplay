@@ -12,7 +12,7 @@
 import { compose, type Plan } from "./first-math";
 import { whenWindow } from "../demo/window";
 import { firstPlaced } from "../demo/lines";
-import { showNoteAt, hideNote } from "./notes";
+import { showNoteAt, hideNote, penArrow } from "./notes";
 
 const reduced = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 const EASE_OUT = "cubic-bezier(0.22, 1, 0.36, 1)";
@@ -96,9 +96,32 @@ export function startFirst(): void {
     delete slot.dataset.fit;
   }
 
-  /** The notes, in free ground: "not a screenshot" over the window's top, right of the
-   *  headline; "drop one on the player" over the shelf, pointing at the window. Hidden where
-   *  they would touch anything (showNoteAt). */
+  /** The hand's size for the first screen's two notes, from the window's laid-out width: about
+   *  36 px for the smallest desktop composition, 40 px at 1440 x 900, 50 px at the widest
+   *  frame (beside a 92 px headline: an aside, not a second headline). */
+  const PEN = [
+    [526, 36],
+    [804, 40],
+    [1155, 42],
+    [1295, 50],
+  ] as const;
+  const penFor = (w: number) => {
+    if (w <= PEN[0][0]) return PEN[0][1];
+    for (let i = 1; i < PEN.length; i++) {
+      const [w1, s1] = PEN[i];
+      const [w0, s0] = PEN[i - 1];
+      if (w <= w1) return s0 + ((w - w0) / (w1 - w0)) * (s1 - s0);
+    }
+    return PEN[PEN.length - 1][1];
+  };
+
+  /** The notes, in free ground, each with its arrow drawn to the window. "not a screenshot"
+   *  over the window's top, right of the headline, its first word underlined. "drop one on
+   *  the player" where there is room: in the ground between the credit line and the sleeves,
+   *  its arrow arcing to the window's left edge (the drag's path); else under the window's
+   *  lower left beside the sleeves, its arrow rising into it; else on two lines in the gap
+   *  between the sleeves and the window. Hidden where none is free (showNoteAt: never on the
+   *  words, the sleeves, the window or the bar, never off the screen). */
   function notes() {
     const p = plan;
     if (!p) {
@@ -108,17 +131,112 @@ export function startFirst(): void {
     }
     const top = stage!.getBoundingClientRect().top;
     const l1 = lines[0].getBoundingClientRect();
-    const words = [l1, lines[1].getBoundingClientRect(), col.getBoundingClientRect()];
+    const colBox = col.getBoundingClientRect();
+    const words = [l1, lines[1].getBoundingClientRect(), colBox];
     const win = { left: p.win.x, top: p.win.y + top, right: p.win.x + p.win.w, bottom: p.win.y + p.win.h + top };
     const sh = { left: p.shelf.x, top: p.shelf.y + top, right: p.shelf.x + p.shelf.w, bottom: p.shelf.y + p.shelf.h + top };
+    const fs = Math.round(penFor(p.win.w));
+    const size = (n: HTMLElement, wrap = false) => {
+      n.style.fontSize = `${fs}px`;
+      n.classList.toggle("wrap", wrap);
+      const r = n.querySelector(":scope > span")!.getBoundingClientRect();
+      return { w: r.width, h: r.height };
+    };
+    // (Each arrow stops just short of the window: the window is drawn over the notes.)
+    const wordsOf = (n: HTMLElement) => n.querySelector(":scope > span")!.getBoundingClientRect();
+
     if (noteWin) {
-      const x = Math.max(l1.right + 32, p.win.x + p.win.w * 0.42);
-      showNoteAt(noteWin, x, p.win.y - 44, [...words, win, sh]);
+      const { w, h } = size(noteWin);
+      // Clear of the headline, a little off the title bar, never flush with the window's edge.
+      const y = win.top - h - fs * 0.95;
+      const ww = win.right - win.left;
+      const right = win.right - fs * 1.2 - w;
+      // Right of the headline over the window's middle; else further right; else centred over
+      // the window (a tall room, the headline above).
+      const xs = [Math.max(l1.right + fs, win.left + ww * 0.48), win.left + ww * 0.6, win.left + (ww - w) / 2];
+      let shown = false;
+      for (const x of xs) {
+        if (x > right) continue;
+        if (showNoteAt(noteWin, x, y, [...words, win, sh])) {
+          shown = true;
+          break;
+        }
+      }
+      if (!shown) hideNote(noteWin);
+      else {
+        const r = wordsOf(noteWin);
+        // Just over the window (a tall room): a short stroke down; else a longer curve.
+        const near = win.top - r.bottom < fs * 1.5;
+        const tx = Math.min(r.right + fs * (near ? 0.7 : 1.5), win.right - fs * 0.8);
+        penArrow(noteWin, { x: r.right + fs * 0.25, y: r.top + r.height * 0.55 }, { x: tx, y: win.top - fs * 0.12 }, -fs * 0.55);
+      }
     }
+
     if (noteShelf && p.shelf.off) hideNote(noteShelf);
     else if (noteShelf) {
-      const w = noteShelf.offsetWidth || 260;
-      showNoteAt(noteShelf, Math.min(p.shelf.x + p.shelf.w - w + 40, p.win.x - w - 8), p.shelf.y - 56, [...words, sh, win]);
+      // (Clear of the other note too.)
+      const other = noteWin?.hasAttribute("data-on") ? wordsOf(noteWin) : null;
+      const avoid = [...words, sh, win, ...(other ? [other] : [])];
+      let placed = false;
+      // 1. Above the sleeves, in the ground under the credit line (optically nearer the sleeves).
+      {
+        const { w, h } = size(noteShelf);
+        const gap = sh.top - colBox.bottom;
+        if (gap >= h + fs * 0.9) {
+          const x = sh.left + Math.max(0, (sh.right - sh.left - w) / 2);
+          const y = colBox.bottom + (gap - h) * 0.6;
+          if (x + w + fs * 1.5 < win.left && showNoteAt(noteShelf, x, y, avoid)) {
+            const r = wordsOf(noteShelf);
+            const to = { x: win.left - fs * 0.15, y: clamp(r.top + r.height * 0.5 + fs * 1.6, win.top + fs, win.bottom - fs) };
+            penArrow(noteShelf, { x: r.right + fs * 0.3, y: r.top + r.height * 0.6 }, to, -fs * 0.9);
+            placed = true;
+          }
+        }
+      }
+      // 2. Under the window's lower left, beside the sleeves' lower row; the arrow rises into it.
+      if (!placed) {
+        const { w, h } = size(noteShelf);
+        const x = sh.right + fs * 0.7;
+        const row = (sh.bottom - sh.top) / 2;
+        const y = Math.max(win.bottom + fs * 1.4, sh.bottom - row / 2 - h / 2);
+        if (x + w < document.documentElement.clientWidth - 8 && y + h < innerHeight - 8 && showNoteAt(noteShelf, x, y, avoid)) {
+          const r = wordsOf(noteShelf);
+          const from = { x: r.left + r.width * 0.32, y: r.top - fs * 0.12 };
+          penArrow(noteShelf, from, { x: from.x + fs * 0.7, y: win.bottom + fs * 0.15 }, fs * 0.35);
+          placed = true;
+        }
+      }
+      // 3. On two lines in the gap between the sleeves' lower row and the window.
+      if (!placed) {
+        const { w, h } = size(noteShelf, true);
+        const x = win.left - w - fs * 1.4;
+        const row = (sh.bottom - sh.top) / 2;
+        const y = sh.bottom - row / 2 - h / 2;
+        if (x > sh.right + fs * 0.4 && showNoteAt(noteShelf, x, y, avoid)) {
+          const r = wordsOf(noteShelf);
+          penArrow(noteShelf, { x: r.right + fs * 0.2, y: r.top + r.height * 0.4 }, { x: win.left - fs * 0.15, y: r.top - fs * 0.2 }, -fs * 0.6);
+          placed = true;
+        }
+      }
+      // 4. A tall room (the window under the words and the sleeves): on two lines left of the
+      //    sleeves, the arrow down into the window.
+      if (!placed) {
+        const { w, h } = size(noteShelf, true);
+        const x = sh.left - w - fs;
+        // Above "not a screenshot" where that sits in the same gap.
+        const y = Math.min(sh.bottom - h, other ? other.top - fs * 0.7 - h : Infinity);
+        if (win.top > sh.bottom && x > colBox.right + fs * 0.4 && showNoteAt(noteShelf, x, y, avoid)) {
+          const r = wordsOf(noteShelf);
+          const from = { x: r.right + fs * 0.1, y: r.bottom - fs * 0.2 };
+          const tx = Math.max(from.x + fs * 0.6, (other?.right ?? 0) + fs * 2);
+          penArrow(noteShelf, from, { x: tx, y: win.top - fs * 0.15 }, -fs * 0.35);
+          placed = true;
+        }
+      }
+      if (!placed) {
+        noteShelf.classList.remove("wrap");
+        hideNote(noteShelf);
+      }
     }
   }
 

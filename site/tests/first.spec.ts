@@ -41,7 +41,7 @@ test.describe("at 2560 x 1270", () => {
     for (const id of ["screenshot", "sleeves"]) {
       const n = page.locator(`[data-note='${id}']`);
       await expect(n).toHaveAttribute("data-on", "");
-      const words = await n.locator("span").evaluate((e) => e.getBoundingClientRect().toJSON() as DOMRect);
+      const words = await n.locator(":scope > span").evaluate((e) => e.getBoundingClientRect().toJSON() as DOMRect);
       for (const b of [win, shelf, col, l2]) expect(apart(words, b), id).toBe(true);
     }
   });

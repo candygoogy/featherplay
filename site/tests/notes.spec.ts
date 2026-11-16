@@ -65,7 +65,7 @@ test("the notes are decoration: hidden from assistive technology, in the hand's 
   // Each note's words are the data's.
   for (const h of await hands.all()) {
     const id = (await h.getAttribute("data-note")) as keyof typeof notes;
-    await expect(h.locator("span")).toHaveText(notes[id]);
+    await expect(h.locator(":scope > span")).toHaveText(notes[id]);
   }
 });
 
@@ -119,15 +119,18 @@ const firstNotesNearCorner = (page: Page) =>
       .filter((r) => r.width > 0 && r.left < 240 && r.top < 110).length,
   );
 
-for (const [w, h] of [[1440, 900], [2560, 1270]] as const) {
-  test(`the first screen's notes never show at the top left, loading or after the story (${w}x${h})`, async ({ page }) => {
+// The common desktop sizes, half a 2560 screen among them: both first-screen notes are there to
+// be seen (the page's only hints that the window is live and the sleeves can be dragged).
+for (const [w, h] of [[1280, 720], [1366, 768], [1440, 900], [1536, 864], [1920, 1080], [2560, 1270], [1280, 1270]] as const) {
+  test(`the first screen's notes show, and never at the top left, loading or after the story (${w}x${h})`, async ({ page }) => {
     await page.setViewportSize({ width: w, height: h });
     await page.goto("/");
     for (let i = 0; i < 24; i++) {
       expect(await firstNotesNearCorner(page)).toBe(0);
       await page.waitForTimeout(60);
     }
-    await expect(page.locator(".first > .hand[data-on]").first()).toBeVisible();
+    await expect(page.locator(".first > .hand[data-note='screenshot']")).toHaveAttribute("data-on", "");
+    await expect(page.locator(".first > .hand[data-note='sleeves']")).toHaveAttribute("data-on", "");
     const before = await page.locator(".first > .hand[data-on] span").first().boundingBox();
     // Into the story and back.
     await page.mouse.wheel(0, 1600);
