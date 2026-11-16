@@ -129,6 +129,12 @@
   }
 }
 
+/* Without script the bar never turns into the capsule: docked over every section, it is solid,
+   so no section's text runs under its words (also the page's fallback when its scripts fail). */
+:root:not(.js) {
+  --mat-dock: light-dark(rgb(252 250 247), rgb(30 31 36));
+}
+
 /* The playing song's colour, for everything on the page that wears it: set on a few colour
    roots (each section, the bar, the footer; src/demo/glow.ts), never on the root, so a song
    change restyles those, not every element of the page; each thing that paints it fades its own

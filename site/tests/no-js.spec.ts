@@ -44,6 +44,25 @@ test("the app's window is a still to look at, not controls that do nothing; the 
     expect(focusable, `${width}`).toBe(0);
     await expect(page.locator("[data-site-bar] [data-np]")).toBeHidden();
     await expect(page.locator("[data-site-bar] [data-tray]")).toBeHidden();
+    // What featherplay leaves out: the names are words to read, not buttons that do nothing,
+    // and nothing asks to point at them.
+    await expect(page.locator("#leaves button")).toHaveCount(0);
+    await expect(page.locator("#leaves .hint").first()).toBeHidden();
+  }
+});
+
+test("the bar stays docked and solid over the sections, so nothing reads through its words", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  for (const scheme of ["dark", "light"] as const) {
+    await page.emulateMedia({ colorScheme: scheme });
+    await page.goto("/");
+    await page.evaluate(() => scrollTo(0, 4000));
+    const alpha = await page.locator("[data-site-bar] .dock").evaluate((d) => {
+      const c = getComputedStyle(d).backgroundColor;
+      const m = c.match(/[\d.]+/g)!.map(Number);
+      return c.startsWith("color(") ? (m[3] ?? 1) : (m[3] ?? 1);
+    });
+    expect(alpha, scheme).toBeGreaterThanOrEqual(0.97);
   }
 });
 

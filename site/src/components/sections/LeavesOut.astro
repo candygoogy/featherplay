@@ -36,7 +36,7 @@ const exeLabel = release.portable ? sizeLabel(release.portable).replace(" ", " 
 import Note from "../Note.astro";
 ---
 
-<section class="sec sec-leaves frame" id="leaves" aria-labelledby="leaves-title" data-out data-lit="chromium" data-bar-sec="light">
+<section class="sec sec-leaves frame" id="leaves" aria-labelledby="leaves-title" data-out data-lit="" data-bar-sec="light">
   <svg class="sprite" aria-hidden="true">
     <symbol id="g-folder" viewBox="0 0 16 16"><path d="M1.5 4a1 1 0 0 1 1-1h3.2l1.3 1.4h6.5a1 1 0 0 1 1 1V12a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1Z" fill="var(--folder)"></path></symbol>
     <symbol id="g-app" viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.2"></rect><path d="M2 5.6h12" stroke="currentColor" stroke-width="1.2"></path></symbol>
@@ -120,9 +120,9 @@ import Note from "../Note.astro";
             notes.map((n) => (
               <li>
                 {n.group ? (
-                  <button class="note-name" type="button" data-note-for={n.group} aria-pressed={String(n.group === "chromium")}>
+                  <span class="note-name" data-note-for={n.group}>
                     {n.word}
-                  </button>
+                  </span>
                 ) : (
                   <span class="note-name">{n.word}</span>
                 )}
@@ -140,10 +140,21 @@ import Note from "../Note.astro";
 
 <script>
   // A note lights its files while pointed at or focused; a press keeps it lit (a tap on a
-  // phone). The section names the group lit (data-lit); CSS does the rest.
+  // phone). The section names the group lit (data-lit); CSS does the rest. Without script the
+  // names are plain words and every file shows alike: they become buttons here.
   const out = document.querySelector<HTMLElement>("[data-out]");
   if (out) {
-    const notes = [...out.querySelectorAll<HTMLButtonElement>("[data-note-for]")];
+    const notes = [...out.querySelectorAll<HTMLElement>("[data-note-for]")].map((s) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = s.className;
+      b.dataset.noteFor = s.dataset.noteFor;
+      b.setAttribute("aria-pressed", String(s.dataset.noteFor === "chromium"));
+      b.append(...s.childNodes);
+      s.replaceWith(b);
+      return b;
+    });
+    out.dataset.lit = "chromium";
     const pressed = () => notes.find((n) => n.getAttribute("aria-pressed") === "true")?.dataset.noteFor ?? "";
     const light = (g: string) => (out.dataset.lit = g);
     for (const n of notes) {
@@ -293,6 +304,10 @@ import Note from "../Note.astro";
   .hint {
     color: var(--ink2);
     font-weight: var(--fw-medium);
+  }
+  /* Without script nothing answers a point or a tap. */
+  :global(:root:not(.js)) .hint {
+    display: none;
   }
   .hint-touch {
     display: none;
