@@ -2,8 +2,8 @@ import { defineConfig, devices } from "@playwright/test";
 
 // The browser tests run against the built site (`astro build` + `astro preview`), so they
 // see exactly what ships: no dev-server scripts, no HMR.
-const port = 4329;
-export const wranglerPort = 8788;
+const port = Number(process.env.SITE_PORT) || 4329;
+export const wranglerPort = Number(process.env.SITE_WRANGLER_PORT) || 8788;
 
 /** Specs that time motion or the page's cost in real time: the scroll story and its settling,
  *  the bar's glide, the window's glides, the theme switch, the lyrics' glide, the sound, the
