@@ -109,12 +109,17 @@ import Note from "../Note.astro";
           mb(featherplay.installed.runtimeBytes)
         }), {Math.round(pear.bytes / installedBytes)} times smaller.
       </p>
-      <div class="outs">
-        <h3 class="outs-h">
-          Not in featherplay’s folder<span class="hint hint-fine">. Point at one to find it in Pear’s.</span><span class="hint hint-touch"
-            >. Tap one to find it in Pear’s.</span
-          >
-        </h3>
+    </div>
+    <div class="outs">
+        <div class="outs-head">
+          <h3 class="outs-h">Not in featherplay’s folder</h3>
+          <p class="hint">
+            <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"
+              ><path d="M4.5 2.5v9l2.4-2.2 1.6 3.6 1.6-.7-1.6-3.5h3.2Z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"
+              ></path></svg
+            ><span class="hint-fine">Point at one to find it in Pear’s folder.</span><span class="hint-touch">Tap one to find it in Pear’s folder.</span>
+          </p>
+        </div>
         <ul data-leaves-out>
           {
             notes.map((n) => (
@@ -132,7 +137,6 @@ import Note from "../Note.astro";
             ))
           }
         </ul>
-      </div>
     </div>
   </div>
   <p class="source-line t-small ink2">Listed on the measuring PC on 1 November 2026, sizes as Explorer shows them.</p>
@@ -146,9 +150,9 @@ import Note from "../Note.astro";
   if (out) {
     const notes = [...out.querySelectorAll<HTMLElement>("[data-note-for]")].map((s) => {
       const b = document.createElement("button");
+      // Every attribute (the class, the group, the styles' scope).
+      for (const a of s.attributes) b.setAttribute(a.name, a.value);
       b.type = "button";
-      b.className = s.className;
-      b.dataset.noteFor = s.dataset.noteFor;
       b.setAttribute("aria-pressed", String(s.dataset.noteFor === "chromium"));
       b.append(...s.childNodes);
       s.replaceWith(b);
@@ -185,18 +189,29 @@ import Note from "../Note.astro";
     height: 0;
     overflow: hidden;
   }
+  /* The pair: Pear's tall folder and featherplay's one file, with air round it (the difference in
+     their sizes is the point); under both, the four things left out, each with room. */
   .desk {
     display: grid;
     grid-template-columns: minmax(0, 6fr) minmax(0, 5fr);
-    align-items: start;
-    gap: var(--s7) var(--s8);
+    grid-template-areas: "pear ours" "outs outs";
+    align-items: center;
+    gap: var(--s8) var(--s8);
     margin-top: var(--s7);
   }
+  .pear {
+    grid-area: pear;
+  }
   .side {
+    grid-area: ours;
     position: relative;
     display: grid;
-    gap: var(--s5);
+    justify-items: center;
+    gap: var(--s6);
     padding-top: var(--s8);
+  }
+  .outs {
+    grid-area: outs;
   }
   /* An app window: solid, as windows on Windows are, a faint tint of the song. */
   .explorer {
@@ -213,7 +228,7 @@ import Note from "../Note.astro";
     top: var(--s2);
   }
   .explorer.ours {
-    width: min(100%, 28rem);
+    width: min(100%, 26rem);
   }
   .ex-bar {
     display: flex;
@@ -292,17 +307,31 @@ import Note from "../Note.astro";
     font-weight: var(--fw-bold);
   }
   .weigh {
-    max-width: 46ch;
-  }
-  .outs-h {
-    font-size: var(--fs-text);
-    font-weight: var(--fw-bold);
-    letter-spacing: 0;
-    line-height: var(--lh-text);
+    max-width: 26rem;
+    color: var(--ink2);
     text-wrap: pretty;
   }
+  .outs-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--s2) var(--s5);
+  }
+  .outs-h {
+    font-size: var(--fs-subtitle);
+    font-weight: var(--fw-bold);
+    letter-spacing: var(--tr-subtitle);
+    line-height: var(--lh-subtitle);
+  }
+  /* The invitation, easy to see: a pointer and the text's own size. */
   .hint {
-    color: var(--ink2);
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s2);
+    padding: 0.25rem 0.75rem 0.25rem 0.6rem;
+    border-radius: var(--r-pill);
+    background: var(--tonal);
+    color: var(--text);
     font-weight: var(--fw-medium);
   }
   /* Without script nothing answers a point or a tap. */
@@ -322,9 +351,9 @@ import Note from "../Note.astro";
   }
   .outs ul {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--s5) var(--s6);
-    margin: var(--s4) 0 0;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--s6) var(--s7);
+    margin: var(--s5) 0 0;
     padding: 0;
     list-style: none;
   }
@@ -359,7 +388,8 @@ import Note from "../Note.astro";
     }
   }
   .why {
-    margin-top: 2px;
+    margin-top: var(--s1);
+    text-wrap: pretty;
   }
   .which {
     margin-top: 6px;
@@ -386,9 +416,15 @@ import Note from "../Note.astro";
     color: inherit;
   }
 
+  @media (width < 1200px) {
+    .outs ul {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
   @media (width < 900px) {
     .desk {
       grid-template-columns: minmax(0, 1fr);
+      grid-template-areas: "pear" "ours" "outs";
     }
     /* Room above featherplay's window for its note. */
     .side {
