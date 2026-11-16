@@ -78,8 +78,7 @@ test("the key caps press for the visitor's own media keys and for the overlay's 
   expect(await page.evaluate(() => (window as unknown as { pressed: string[] }).pressed)).toEqual(["toggle", "next", "toggle", "previous"]);
   // The caps are the keyboard's way in: real buttons, each named.
   await expect(stage.getByRole("button", { name: "Next" })).toHaveCount(2);
-  // Stop is a key too: it pauses, as the app answers it.
-  await stage.locator(".m-media [data-do='toggle']").click();
+  // Stop is a key too: it pauses, as the app answers it (Previous set the song playing).
   await expect(page.locator("html")).toHaveAttribute("data-playing", "true");
   await key(page, "stop");
   await expect(page.locator("html")).toHaveAttribute("data-playing", "false");
