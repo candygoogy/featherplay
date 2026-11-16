@@ -8,6 +8,8 @@ test.use({ viewport: { width: 1440, height: 900 } });
 const win = (page: Page) => page.locator("[data-window]");
 const replica = (page: Page) => win(page).locator("[data-replica]");
 const caption = (page: Page, name: RegExp) => replica(page).getByRole("button", { name });
+/** Maximise and restore are a transition of the window; it can be pressed again once it ends. */
+const morphed = (page: Page) => expect(page.locator("html")).not.toHaveAttribute("data-win-morph", /.*/);
 
 test("the window is never wider or taller than the viewport, and on a wide screen it lies wholly inside it", async ({ page }) => {
   for (const [w, h] of [
@@ -113,12 +115,17 @@ test("maximise fills the screen under the bar; restore and a double-click on the
   await expect(caption(page, /^Restore/)).toBeVisible();
   expect(await caption(page, /^Restore/).getAttribute("aria-pressed")).toBeNull();
   await expect.poll(async () => (await windowBox(page)).width).toBeGreaterThan(before.width + 200);
+  // The whole screen under the bar, the app laid out for it at its real size.
   const max = await windowBox(page);
-  expect(max.x).toBeGreaterThanOrEqual(-0.5);
-  expect(max.x + max.width).toBeLessThanOrEqual(1440.5);
-  expect(max.y + max.height).toBeLessThanOrEqual(900.5);
+  expect(max.x).toBeCloseTo(0, 0);
+  expect(max.width).toBeCloseTo(1440, 0);
+  expect(max.y + max.height).toBeCloseTo(900, 0);
+  expect(await replica(page).evaluate((el) => el.clientWidth)).toBe(1440);
+  await morphed(page);
   await caption(page, /^Restore/).click();
   await expect.poll(async () => Math.round((await windowBox(page)).width)).toBe(Math.round(before.width));
+  expect(await replica(page).evaluate((el) => el.clientWidth)).toBe(1440);
+  await morphed(page);
   await replica(page).locator(".titlebar-name").dblclick();
   await expect(win(page)).toHaveAttribute("data-max", "");
 });

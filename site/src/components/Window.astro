@@ -75,7 +75,7 @@ import Replica from "./Replica.astro";
   }
   .window[data-minimised] {
     visibility: hidden;
-    transition: visibility 0s linear 300ms;
+    transition: visibility 0s linear 400ms;
   }
   /* The caption buttons' targets are 32 page px tall whatever the window's scale (their width
      is Windows' 46 px, scaled). */
@@ -124,6 +124,27 @@ import Replica from "./Replica.astro";
   /* The theme's own scrim: black at a third turned light's warm paper a muddy grey. */
   .closer::backdrop {
     background: var(--scrim);
+  }
+  /* It comes up as the app's dialog does: a little smaller and lower, and in. */
+  @media (prefers-reduced-motion: no-preference) {
+    .closer[open] {
+      animation: closer-in 220ms var(--ease-out);
+    }
+    .closer[open]::backdrop {
+      animation: closer-dim 220ms ease-out;
+    }
+  }
+  @keyframes closer-in {
+    from {
+      opacity: 0;
+      scale: 0.96;
+      translate: 0 8px;
+    }
+  }
+  @keyframes closer-dim {
+    from {
+      opacity: 0;
+    }
   }
   .closer-h {
     font-family: var(--font);
@@ -179,6 +200,59 @@ import Replica from "./Replica.astro";
   @media (width < 420px) {
     .closer-btn {
       flex: 1 1 100%;
+    }
+  }
+</style>
+
+<style is:global>
+  /* Maximise and restore (src/demo/window.ts): a view transition of the window alone. The page
+     is left out of it (it goes on as it is; presses wait the third of a second it takes, since
+     a window in transition can't be pressed and they would land on what is under it), the
+     frame grows from the old size
+     to the new on the window curve, and the old layout, on top, dissolves quickly into the new
+     one under it. Each keeps its own proportions from the frame's top left: the new one fills
+     the frame, the old one keeps the frame's height, so the two are the same size where they
+     show together (the title bar and the player bar don't double). */
+  :root[data-win-morph] {
+    view-transition-name: none;
+  }
+  ::view-transition-group(fp-window) {
+    overflow: clip;
+    /* The window's own edge and shadow, which the clip would take off on the way. */
+    border-radius: 8px;
+    box-shadow:
+      0 0 0 1px var(--edge),
+      0 4px 16px var(--shade-2),
+      0 16px 56px var(--shade-3);
+    animation-duration: 340ms;
+    animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  ::view-transition-image-pair(fp-window) {
+    isolation: auto;
+  }
+  ::view-transition-old(fp-window),
+  ::view-transition-new(fp-window) {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: left top;
+    mix-blend-mode: normal;
+  }
+  ::view-transition-new(fp-window) {
+    animation: none;
+    opacity: 1;
+  }
+  /* Its own fade alone (the browser's pair of animations would also add the two layouts'
+     light together). */
+  ::view-transition-old(fp-window) {
+    z-index: 1;
+    width: auto;
+    object-fit: fill;
+    animation: win-old-out 140ms ease-out both;
+  }
+  @keyframes win-old-out {
+    to {
+      opacity: 0;
     }
   }
 </style>

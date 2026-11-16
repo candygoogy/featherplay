@@ -4,12 +4,22 @@
 // bar), minimised to the tray (and back from the bar's tray icon), and closed (the app's own
 // question first). The wheel over it scrolls the page until the visitor clicks into it.
 //
+// Each of the three caption buttons has its own move, as on a real desktop:
+// - minimise: the window goes to the tray icon along a curve, shrinking, and the icon takes it;
+//   it comes back the same way, landing a little past its size;
+// - maximise: the app at its real size fills the screen under the bar, laid out for that size
+//   as a real maximised window is. The frame grows while the old layout dissolves into the new
+//   (a view transition of the window alone; where the browser has none, the frame glides);
+// - close: "Close featherplay" closes it where it stands (and pauses), and the tray icon opens
+//   it again as the app opens; "Keep playing in the tray" is minimise.
+//
 // Every move is a transform of the one element (translate and scale, from its top left): the
 // app is laid out again only when the window's size really changes (a resize of the page, the
-// story's narrow hold). Coordinates are the pin's (Stage.astro): the viewport's while the story
+// story's narrow hold, maximise). Coordinates are the pin's (Stage.astro): the viewport's while the story
 // holds the stage, the stage's own otherwise.
 
-import { clampInto, fitWindow, placeIn, type Box, type Fit } from "./fit";
+import { MIN, clampInto, fitWindow, placeIn, type Box, type Fit } from "./fit";
+import { bezier } from "../scripts/story-math";
 import { fitFirst } from "../scripts/first-math";
 import type { Player } from "./player";
 import { hideNote, showNoteAt } from "../scripts/notes";
@@ -39,10 +49,18 @@ export type WindowController = {
   arrive(delay: number): void;
 };
 
-const MIN_MS = 300;
-const RESTORE_MS = 260;
-const MAX_MS = 280;
+const MIN_MS = 380;
+/** Back from the tray in the time the app opens in (the note by the tray says so). */
+const RESTORE_MS = 240;
+const MAX_MS = 340;
+const CLOSE_MS = 180;
+const OPEN_MS = 240;
 const EASE_WINDOW = "cubic-bezier(0.32, 0.72, 0, 1)";
+/** The way into the tray quickens; the way back out lands. */
+const easeIn = bezier(0.5, 0, 0.75, 0.4);
+const easeOut = bezier(0.2, 0.8, 0.2, 1);
+/** The widest the app is laid out when maximised (a larger screen shows that, scaled up). */
+const MAX_LAYOUT_W = 2560;
 /** A pointer-sized screen: the window can be dragged and maximised there. */
 const DESK = "(min-width: 761px)";
 /** The docked bar's height, which a maximised or dragged window stays under. */
@@ -70,6 +88,8 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
   let drag = { x: 0, y: 0 };
   let maxed = false;
   let minimised = false;
+  /** In the tray because it was closed (not minimised): it went where it stood, and opens again. */
+  let closed = false;
   let driven: Frame | null = null;
   let shown: Frame = home;
   let size = { w: 0, h: 0 };
@@ -93,9 +113,11 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
   };
   const rested = (): Frame => {
     if (maxed) {
+      // The app at its real size, laid out for the whole screen under the bar; scaled only
+      // where that is under its least size or over the widest it is laid out.
       const v = viewportBox();
-      const s = Math.min(v.w / home.w, v.h / home.h);
-      return { ...home, s, ...placeIn(v, { w: home.w, h: home.h, s }, "center", "center") };
+      const s = Math.min(Math.max(1, v.w / MAX_LAYOUT_W), v.w / MIN.w, v.h / MIN.h);
+      return { w: v.w / s, h: v.h / s, s, o: 1, x: v.x, y: v.y };
     }
     return { ...home, x: home.x + drag.x, y: home.y + drag.y };
   };
@@ -114,12 +136,22 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
   };
   const trayFrame = (from: Frame): Frame => {
     const t = trayPoint();
-    const s = from.s * 0.2;
+    // As small as the icon it goes into.
+    const s = Math.min(from.s * 0.2, 40 / from.w);
     return { ...from, s, o: 0, x: t.x - (from.w * s) / 2, y: t.y - (from.h * s) / 2 };
+  };
+  /** Closed where it stands: a little smaller about its middle, and gone. */
+  const closedFrame = (from: Frame): Frame => ({ ...from, s: from.s * 0.95, o: 0, x: from.x + from.w * from.s * 0.025, y: from.y + from.h * from.s * 0.025 });
+
+  /** Ends the window's own moves (the ones scripted here). Not the stylesheet's transitions:
+   *  the delay that keeps a minimised window in sight until it has reached the tray is one,
+   *  and ending it hid the window the moment minimise was pressed. */
+  const stop = () => {
+    for (const a of el.getAnimations()) if (!(a instanceof CSSTransition)) a.cancel();
   };
 
   // ---- Drawing: one transform, the size only when it changes ----
-  const draw = (f: Frame) => {
+  const draw = (f: Frame, scaleNow = false) => {
     if (f.w !== size.w || f.h !== size.h) {
       el.style.width = `${f.w}px`;
       el.style.height = `${f.h}px`;
@@ -133,10 +165,14 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
     // about it step aside.
     stage?.toggleAttribute("data-win-away", maxed || minimised || !!driven || !!(drag.x || drag.y));
     // The scale for the page-size caption targets and corners: written once the window rests
-    // (it changes their layout), not on every frame of a move.
+    // (it changes their layout), not on every frame of a move, and not for a frame it is gone
+    // in (the tray's: its corners would round to a pill on the way there).
     clearTimeout(scaleTimer);
     const s = f.s.toFixed(4);
-    if (el.style.getPropertyValue("--s") !== s) scaleTimer = window.setTimeout(() => el.style.setProperty("--s", s), 120);
+    if (f.o >= 1 && el.style.getPropertyValue("--s") !== s) {
+      if (scaleNow) el.style.setProperty("--s", s);
+      else scaleTimer = window.setTimeout(() => el.style.setProperty("--s", s), 120);
+    }
     shown = f;
   };
   /** Where the window is on screen now: in the middle of a glide, where the glide has got to. */
@@ -149,13 +185,87 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
   /** Glides from where the window is drawn now to `to`, then rests there. */
   const glide = (to: Frame, ms: number) => {
     const from = current();
-    for (const a of el.getAnimations()) a.cancel();
+    stop();
     draw(to);
     if (reduced() || ms <= 0) return;
     el.animate(
       [
         { transform: tf(from, slotOff), opacity: from.o },
         { transform: tf(to, slotOff), opacity: to.o },
+      ],
+      { duration: ms, easing: EASE_WINDOW },
+    );
+  };
+  /** To the tray and back along a curve: across first and then up into the icon (back: out of
+   *  it and then across), its size and place sampled into keyframes, since the two axes ease
+   *  differently. It fades only by the icon; coming back it lands a little past its size. */
+  const fly = (rest: Frame, toTray: boolean) => {
+    const tray = trayFrame(rest);
+    const from = current();
+    stop();
+    draw(toTray ? tray : rest);
+    if (reduced()) return;
+    // From wherever it is drawn now (a press in the middle of the other way turns it round).
+    const a = toTray || from.o > 0.02 ? from : tray;
+    const b = toTray ? tray : rest;
+    const mid = (f: Frame) => ({ x: f.x + (f.w * f.s) / 2, y: f.y + (f.h * f.s) / 2 });
+    const [ca, cb] = [mid(a), mid(b)];
+    const N = 18;
+    const frames: Keyframe[] = [];
+    for (let i = 0; i <= N; i++) {
+      const t = i / N;
+      const e = toTray ? easeIn(t) : easeOut(t);
+      // The axis that leads: across on the way in, up and out of the icon on the way back.
+      const lead = 1 - (1 - e) * (1 - e);
+      const lag = e * e;
+      const sc = a.s + (b.s - a.s) * (toTray ? e : e + 0.05 * Math.sin(Math.PI * e) * e);
+      const cx = ca.x + (cb.x - ca.x) * (toTray ? lead : lag);
+      const cy = ca.y + (cb.y - ca.y) * (toTray ? lag : lead);
+      const o = toTray ? a.o * (1 - Math.max(0, (e - 0.6) / 0.4) ** 2) : Math.max(a.o, Math.min(1, e / 0.3));
+      frames.push({ transform: tf({ ...b, s: sc, x: cx - (b.w * sc) / 2, y: cy - (b.h * sc) / 2 }, slotOff), opacity: o });
+    }
+    el.animate(frames, { duration: toTray ? MIN_MS : RESTORE_MS, easing: "linear" });
+  };
+  /** A change of the window's own size (maximise, restore): the app is laid out once for the new
+   *  size, and the frame grows from the old one to the new while the old layout dissolves into
+   *  it (a view transition of this one element: Window.astro has its rules). Elsewhere the new
+   *  layout's frame glides from the old frame's place, stretched to it at first. */
+  let morphs = 0;
+  const morph = (ms: number) => {
+    stop();
+    const from = shown;
+    // Drawn as the window's state is when the browser asks (a second press may have come
+    // before the first one's transition began: both then draw the same, latest, state).
+    const go = () => {
+      if (driven || minimised) return;
+      stop();
+      draw(rested(), true);
+    };
+    if (reduced() || ms <= 0) return go();
+    const doc = document as Document & { startViewTransition?: (fn: () => void) => { finished: Promise<void> } };
+    // Only in Chromium (told by an API only it has): Firefox and WebKit have view transitions
+    // too, but drew this one as a cut with a stray frame over it when checked (November 2026),
+    // and the plain glide below is better than that.
+    if (doc.startViewTransition && "userAgentData" in navigator) {
+      const root = document.documentElement;
+      const mine = ++morphs;
+      el.style.setProperty("view-transition-name", "fp-window");
+      root.toggleAttribute("data-win-morph", true);
+      // Only the latest one clears up: an earlier one, cut short by it, ends while it runs.
+      const done = () => {
+        if (mine !== morphs) return;
+        el.style.removeProperty("view-transition-name");
+        root.removeAttribute("data-win-morph");
+      };
+      doc.startViewTransition(go).finished.then(done, done);
+      return;
+    }
+    go();
+    const to = shown;
+    el.animate(
+      [
+        { transform: `translate(${(from.x - slotOff.x).toFixed(2)}px, ${(from.y - slotOff.y).toFixed(2)}px) scale(${((from.w * from.s) / to.w).toFixed(5)}, ${((from.h * from.s) / to.h).toFixed(5)})` },
+        { transform: tf(to, slotOff) },
       ],
       { duration: ms, easing: EASE_WINDOW },
     );
@@ -169,7 +279,7 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
     if (!ms && same && el.style.transform) return;
     if (ms) glide(f, ms);
     else {
-      for (const a of el.getAnimations()) a.cancel();
+      stop();
       draw(f);
     }
   };
@@ -220,10 +330,11 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
     maxButton?.setAttribute("aria-label", on ? "Restore featherplay" : "Maximise featherplay");
   };
   function setMax(on: boolean, ms = MAX_MS) {
-    if ((on && !desk.matches) || driven) return;
+    if ((on && !desk.matches) || driven || on === maxed) return;
     markMax(on);
     if (on) drag = { x: 0, y: 0 };
-    settle(ms);
+    if (ms > 0 && !minimised) morph(ms);
+    else settle();
   }
   // Too small a screen to maximise on: the button says it can't.
   const deskOnly = () => maxButton?.setAttribute("aria-disabled", String(!desk.matches));
@@ -258,16 +369,47 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
     el.toggleAttribute("data-minimised", on);
     document.documentElement.toggleAttribute("data-window-minimised", on);
     el.inert = on;
-    if (!driven) glide(on ? trayFrame(rested()) : rested(), on ? MIN_MS : RESTORE_MS);
+    // From where it rests, or from where the story holds it (the story leaves a minimised
+    // window alone, and draws it again as the page moves on).
+    const rest = driven ?? rested();
+    if (on && closed) glide(closedFrame(current()), CLOSE_MS);
+    else if (on) {
+      fly(rest, true);
+      // The icon takes it (Bar.astro: data-caught).
+      const icon = trayTarget();
+      if (icon && !reduced()) {
+        icon.toggleAttribute("data-caught", true);
+        setTimeout(() => icon.removeAttribute("data-caught"), MIN_MS + 600);
+      }
+    } else if (closed) open(rest);
+    else fly(rest, false);
+    if (!on) closed = false;
     // The keys go where the window went: the tray icon, or the capsule's song.
     if (on && hadFocus) trayTarget()?.focus({ preventScroll: true });
+  };
+  /** Opened again after a close: as the app opens, from 0.9 by its top right (the tray's side). */
+  const open = (to: Frame) => {
+    stop();
+    draw(to);
+    if (reduced()) return;
+    const from = { ...to, s: to.s * 0.9, x: to.x + to.w * to.s * 0.1 };
+    el.animate(
+      [
+        { transform: tf(from, slotOff), opacity: 0 },
+        { transform: tf(to, slotOff), opacity: 1 },
+      ],
+      { duration: OPEN_MS, easing: EASE_WINDOW },
+    );
   };
   player.subscribe((s) => setMinimised(s.minimised));
 
   // ---- Close: the app asks, then what was chosen; remembered for the visit if asked to ----
   let remembered: "tray" | "close" | null = null;
   const closeAs = (choice: "tray" | "close") => {
-    if (choice === "close" && player.state.playing) player.pause();
+    if (choice === "close") {
+      if (player.state.playing) player.pause();
+      closed = true;
+    }
     player.minimise();
   };
   const remember = dialog?.querySelector<HTMLInputElement>("[data-closer-remember]");
@@ -329,7 +471,7 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
     if (e.button !== 0 || !desk.matches || minimised || driven || (e.target as Element).closest("button")) return;
     e.preventDefault();
     titlebar.setPointerCapture(e.pointerId);
-    for (const a of el.getAnimations()) a.cancel();
+    stop();
     if (maxed) {
       // A maximised window comes back to its size under the pointer, as Windows does.
       const f = shown;
@@ -454,7 +596,7 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
       if (out && !el.inert && el.contains(document.activeElement)) document.querySelector<HTMLElement>("[data-steps]")?.focus({ preventScroll: true });
       el.inert = out;
       if (f) {
-        for (const a of el.getAnimations()) a.cancel();
+        stop();
         draw(f);
       } else settle();
     },

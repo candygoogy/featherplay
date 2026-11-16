@@ -82,6 +82,9 @@ test("the tray icon hides and shows the window; the close dialog's remembered ch
   await tray.click();
   await expect(win).not.toHaveAttribute("data-minimised", /.*/);
   await expect(win).toBeVisible();
+  // Landed (on its way back from the tray its buttons pass under the bar, where a press on
+  // one would have the test scroll the page to reach it).
+  await wake(page);
   const close = win.getByRole("button", { name: /^Close featherplay/ });
   await close.click();
   const dialog = page.getByRole("dialog");
@@ -90,6 +93,7 @@ test("the tray icon hides and shows the window; the close dialog's remembered ch
   await expect(win).toHaveAttribute("data-minimised", "");
   await tray.click();
   await expect(win).toBeVisible();
+  await wake(page);
   await close.click();
   await expect(dialog).toBeHidden();
   await expect(win).toHaveAttribute("data-minimised", "");
