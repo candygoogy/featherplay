@@ -14,6 +14,7 @@ import Logo from "./Logo.astro";
 import Note from "./Note.astro";
 import DlGlyph from "./DlGlyph.astro";
 import Shelf from "./Shelf.astro";
+import TrayTip from "./pieces/TrayTip.astro";
 import { release, sizeLabel } from "../data/release";
 
 const main = release.installer ?? release.portable;
@@ -89,8 +90,37 @@ const steps = [
 <section class="steps" id="after-app" tabindex="-1" aria-label="How featherplay steps back" data-steps>
   <div class="frame steps-in">
     {
-      steps.map((s) => (
+      steps.map((s, i) => (
         <div class="step">
+          {/* Each step's small picture: the whole app, the narrow one, the tray corner. */}
+          {i < 2 ? (
+            <div class:list={["mini", i === 0 ? "wide" : "narrow"]} aria-hidden="true">
+              <i class="m-title" />
+              <span class="m-body">
+                <i class="m-cover" />
+                <span class="m-lines">
+                  <i />
+                  <i />
+                  <i class="on" />
+                  <i />
+                  <i />
+                </span>
+                {i === 0 && (
+                  <span class="m-side">
+                    <i />
+                    <i />
+                    <i />
+                    <i />
+                  </span>
+                )}
+              </span>
+              <i class="m-bar" />
+            </div>
+          ) : (
+            <div class="mini-tray">
+              <TrayTip corner />
+            </div>
+          )}
           <h2 class="t-title">{s.h}</h2>
           <p class="t-lede ink2">{s.p}</p>
         </div>
@@ -265,6 +295,93 @@ const steps = [
     display: grid;
     gap: var(--s4);
     max-width: 36rem;
+  }
+  /* The small pictures: the app drawn plainly in the song's colour (the lyrics view), the whole
+     one wide with its side panel, the narrow one tall; the tray corner is the live piece. */
+  .mini {
+    display: grid;
+    grid-template-rows: 0.9rem 1fr 1.6rem;
+    overflow: hidden;
+    margin-bottom: var(--s2);
+    border-radius: 8px;
+    background: var(--surface);
+    box-shadow: var(--lit), var(--ring), var(--shadow);
+  }
+  .mini.wide {
+    width: min(17rem, 100%);
+    aspect-ratio: 16 / 10;
+  }
+  .mini.narrow {
+    width: 7.5rem;
+    aspect-ratio: 480 / 660;
+  }
+  .m-title {
+    background: color-mix(in srgb, var(--text) 6%, var(--surface));
+  }
+  .m-body {
+    display: flex;
+    gap: 8%;
+    padding: 9% 7%;
+    background: color-mix(in srgb, var(--song) 72%, #000);
+  }
+  .mini.narrow .m-body {
+    flex-direction: column;
+    gap: 9%;
+    padding: 12% 12%;
+  }
+  .m-cover {
+    flex: none;
+    width: 24%;
+    aspect-ratio: 1;
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--song) 55%, #fff);
+  }
+  .mini.narrow .m-cover {
+    width: 42%;
+  }
+  .m-lines {
+    display: grid;
+    flex: 1;
+    align-content: start;
+    gap: 9px;
+  }
+  .mini.narrow .m-lines {
+    gap: 7px;
+  }
+  .m-lines i {
+    height: 4px;
+    border-radius: 2px;
+    background: rgb(255 255 255 / 0.4);
+  }
+  .m-lines i:nth-child(2n) {
+    width: 78%;
+  }
+  .m-lines i.on {
+    background: #fff;
+  }
+  .m-side {
+    display: grid;
+    flex: none;
+    align-content: start;
+    gap: 8px;
+    width: 22%;
+    padding: 4px;
+    border-radius: 4px;
+    background: rgb(0 0 0 / 0.22);
+  }
+  .m-side i {
+    height: 9px;
+    border-radius: 2px;
+    background: rgb(255 255 255 / 0.18);
+  }
+  .m-bar {
+    margin: 0 6% 6%;
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--text) 8%, var(--surface));
+  }
+  .mini-tray {
+    justify-self: start;
+    margin-bottom: var(--s2);
   }
 
   @media (width < 761px) {

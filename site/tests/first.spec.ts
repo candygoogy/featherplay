@@ -337,3 +337,15 @@ test.describe("the desk", () => {
     await expect.poll(() => page.locator("[data-desk] [data-slot].front").getAttribute("data-tones"), { timeout: 2000 }).toBe("light");
   });
 });
+
+test.describe("on a phone, the three steps", () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+  test("each has its picture: the whole app, the narrow app, the tray corner", async ({ page }) => {
+    await page.goto("/");
+    const steps = page.locator("[data-steps] .step");
+    await expect(steps).toHaveCount(3);
+    await expect(steps.nth(0).locator(".mini.wide")).toBeVisible();
+    await expect(steps.nth(1).locator(".mini.narrow")).toBeVisible();
+    await expect(steps.nth(2).locator("[data-piece='tray']")).toBeVisible();
+  });
+});
