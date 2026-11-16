@@ -289,10 +289,15 @@ const size = (f: Parameters<typeof sizeLabel>[0]) => sizeLabel(f).replace(" ", "
     margin-top: var(--s5);
     padding-inline: var(--panel-pad);
   }
-  /* The page's last words in the hand: a step larger than the notes beside the sections. */
+  /* The page's last words in the hand: a step larger than the notes beside the sections,
+     where the line has the room (on a phone the larger words wouldn't fit beside the link). */
   .sec-dl :global(.n-end) {
     position: static;
-    font-size: calc(var(--fs-pen) * 1.25);
+  }
+  @media (width >= 761px) {
+    .sec-dl :global(.n-end) {
+      font-size: calc(var(--fs-pen) * 1.25);
+    }
   }
   .linux-row {
     display: grid;
