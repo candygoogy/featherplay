@@ -29,6 +29,8 @@ export const notes = {
   closed: "now it really isn’t running",
   /** The same place, with the window sent to the tray. */
   tray: "still running. easy to forget",
+  /** The same place, with the window only moved off it (the shortcut under the note brings it back). */
+  moved: "this takes it home",
   /** There too, by one of the desk's other icons (as Lyrics has "click a line"). */
   pick: "click one",
 } as const;

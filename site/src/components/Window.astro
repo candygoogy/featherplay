@@ -3,10 +3,12 @@
 // that is a size container, so the app lays itself out for the window's size as the real one
 // does (the end of replica.css). Without script it fills its slot, a still of the app at that size;
 // with it, src/demo/window.ts sizes and scales it to fit, never past the viewport, and makes it
-// a window: dragged by its title bar, maximised and restored, minimised to the tray, closed
-// with the app's own question (the dialog below, at the page's size). Where the window stood
-// while it is away (in the tray, or closed) the desk shows what a desk has (.win-gone, the
-// size of the window it stands in for): the app's shortcut in the middle, which brings it
+// a window: dragged by its title bar, maximised and restored, snapped to a half of the screen
+// (.win-snap shows the place it would take), minimised to the tray, closed
+// with the app's own question (the dialog below, at the page's size). In the window's place
+// while it isn't there (in the tray, closed, or moved off it: the desk lies under the window
+// and shows as it is uncovered) the desk shows what a desk has (.win-gone, the
+// size of the window at home): the app's shortcut in the middle, which brings it
 // back, with the maker's hand over it taking the headline at its word; and about it, where
 // one leaves such things, the icons of a listener's desktop: the three apps featherplay works
 // with (Discord, Last.fm, OBS Studio: their own marks, from the Simple Icons set, shown as one
@@ -23,11 +25,12 @@ import { notes } from "../data/notes";
     <Replica view="lyrics" />
   </div>
 </div>
+<div class="win-snap" data-win-snap aria-hidden="true"></div>
 <div class="win-gone" data-win-gone>
   <div class="sc-main">
     <!-- Not one of the page's placed notes (no data-note: nothing judges or writes it but the
          window's script, each time it shows). -->
-    <p class="hand gone-hand" data-judged data-gone-hand data-say-closed={notes.closed} data-say-tray={notes.tray} aria-hidden="true">
+    <p class="hand gone-hand" data-judged data-gone-hand data-say-closed={notes.closed} data-say-tray={notes.tray} data-say-moved={notes.moved} aria-hidden="true">
       <span data-gone-words>{notes.closed}</span>
       <svg viewBox="0 0 24 34"><path pathLength="1" d="M10 3 C 9 12, 11 20, 13 30 M6.5 23.5 L13.2 30.4 L18 22.4"></path></svg>
     </p>
@@ -109,8 +112,41 @@ import { notes } from "../data/notes";
     outline: calc(3px / var(--s)) solid color-mix(in srgb, var(--text) 70%, transparent);
     outline-offset: calc(4px / var(--s));
   }
-  .window[data-max] .win-body {
+  .window:is([data-max], [data-tile]) .win-body {
     border-radius: 0;
+  }
+  /* The place a dragged window would take if let go now (pushed against the screen's side or
+     top): a pane of light under it, opening from that side. */
+  .win-snap {
+    position: absolute;
+    left: 0;
+    top: 0;
+    z-index: 8;
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--text) 8%, transparent);
+    box-shadow:
+      inset 0 0 0 1px color-mix(in srgb, var(--text) 24%, transparent),
+      0 8px 32px var(--shade-2);
+    opacity: 0;
+    scale: 0.94;
+    transform-origin: 50% 0;
+    pointer-events: none;
+    transition:
+      opacity 120ms ease,
+      scale 120ms ease;
+  }
+  .win-snap[data-on] {
+    opacity: 1;
+    scale: 1;
+    transition:
+      opacity 160ms ease,
+      scale 220ms var(--ease-out);
+  }
+  .win-snap[data-on="left"] {
+    transform-origin: 0 50%;
+  }
+  .win-snap[data-on="right"] {
+    transform-origin: 100% 50%;
   }
   .window[data-minimised] {
     visibility: hidden;
@@ -286,12 +322,20 @@ import { notes } from "../data/notes";
       opacity 280ms ease 340ms,
       visibility 0s linear 340ms;
   }
+  /* Under a window being moved off it: there at once, for the window to uncover. */
+  .win-gone[data-on="moved"] {
+    transition:
+      opacity 160ms ease,
+      visibility 0s;
+  }
   :global(:root:not(.js)) .win-gone {
     display: none;
   }
   @media (prefers-reduced-motion: reduce) {
     .win-gone,
     .win-gone[data-on],
+    .win-snap,
+    .win-snap[data-on],
     .sc-say {
       transition: none;
     }

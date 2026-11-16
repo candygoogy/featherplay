@@ -95,14 +95,74 @@ test("dragged by its title bar, the window moves and stays wholly in view", asyn
   await page.mouse.up();
   const moved = await windowBox(page);
   expect(moved.x).toBeLessThan(before.x - 150);
-  // Far past the edges: it stops at them.
+  // Far past the bottom edge: it stops there.
   await page.mouse.move(moved.x + 60, moved.y + 10);
   await page.mouse.down();
-  await page.mouse.move(3000, 3000, { steps: 6 });
+  await page.mouse.move(moved.x + 60, 3000, { steps: 6 });
   await page.mouse.up();
   const end = await windowBox(page);
-  expect(end.x + end.width).toBeLessThanOrEqual(1440.5);
+  expect(end.width).toBeCloseTo(before.width, 0);
   expect(end.y + end.height).toBeLessThanOrEqual(900.5);
+});
+
+test("pushed against the screen's side the window snaps to that half, uncovering its desk; the shortcut there takes it home", async ({ page }) => {
+  await page.goto("/");
+  await wake(page);
+  const home = await windowBox(page);
+  const desk = page.locator("[data-win-gone]");
+  const grab = async () => {
+    const t = (await replica(page).locator(".titlebar-name").boundingBox())!;
+    await page.mouse.move(t.x + 5, t.y + t.height / 2);
+    await page.mouse.down();
+    return t;
+  };
+  await expect(desk).toBeHidden();
+  const t = await grab();
+  await page.mouse.move(-300, t.y + 100, { steps: 8 });
+  // The place it would take shows first.
+  await expect(page.locator("[data-win-snap]")).toHaveAttribute("data-on", "left");
+  await page.mouse.up();
+  await expect(win(page)).toHaveAttribute("data-tile", "left");
+  await expect.poll(async () => Math.round((await windowBox(page)).width)).toBe(720);
+  const half = await windowBox(page);
+  expect(half.x).toBeCloseTo(0, 0);
+  expect(half.y + half.height).toBeCloseTo(900, 0);
+  expect(await replica(page).evaluate((el) => el.clientWidth)).toBe(720);
+  await morphed(page);
+  // The desk is where the window lives (not where it went), its shortcut the way back.
+  const back = desk.getByRole("button", { name: "Move featherplay’s window back" });
+  await expect(back).toBeVisible();
+  await expect(desk).toContainText("this takes it home");
+  const b = (await back.boundingBox())!;
+  expect(Math.abs(b.x + b.width / 2 - (home.x + home.width / 2))).toBeLessThan(2);
+  // A press on its title bar alone leaves it snapped; a drag brings it back to its size.
+  const t2 = await grab();
+  await page.mouse.up();
+  await expect(win(page)).toHaveAttribute("data-tile", "left");
+  await grab();
+  await page.mouse.move(t2.x + 60, t2.y + 40, { steps: 6 });
+  await page.mouse.up();
+  await expect(win(page)).not.toHaveAttribute("data-tile", /.*/);
+  expect((await windowBox(page)).width).toBeCloseTo(home.width, 0);
+  await back.click();
+  await expect.poll(async () => Math.round((await windowBox(page)).x)).toBe(Math.round(home.x));
+  await expect(desk).toBeHidden();
+  // Snapped again and sent to the tray, it forgets the side: its shortcut opens it at home.
+  const t3 = await grab();
+  await page.mouse.move(-300, t3.y + 100, { steps: 8 });
+  await page.mouse.up();
+  await expect(win(page)).toHaveAttribute("data-tile", "left");
+  await morphed(page);
+  await caption(page, /^Minimise/).click();
+  const show = desk.getByRole("button", { name: "Show featherplay’s window" });
+  await expect(show).toBeVisible();
+  expect(Math.abs((await show.boundingBox())!.x - b.x)).toBeLessThan(2);
+  await show.click();
+  await expect(win(page)).not.toHaveAttribute("data-minimised", /.*/);
+  await expect(win(page)).not.toHaveAttribute("data-tile", /.*/);
+  await expect.poll(async () => Math.round((await windowBox(page)).x)).toBe(Math.round(home.x));
+  expect((await windowBox(page)).width).toBeCloseTo(home.width, 0);
+  await expect(desk).toBeHidden();
 });
 
 test("maximise fills the screen under the bar; restore and a double-click on the title bar bring it back", async ({ page }) => {

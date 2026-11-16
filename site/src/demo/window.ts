@@ -1,8 +1,10 @@
 // featherplay's window on the page (Window.astro): the replica laid out for the window's own size
 // and drawn scaled to fit (src/demo/fit.ts), always wholly inside the viewport. It can be dragged
 // by its title bar, maximised and restored (the caption button or a double-click on the title
-// bar), minimised to the tray (and back from the bar's tray icon), and closed (the app's own
-// question first). The wheel over it scrolls the page until the visitor clicks into it.
+// bar), snapped to a half of the screen or maximised by pushing it against the screen's side
+// or top (as Windows snaps a window: the place it will take shows first), minimised to the
+// tray (and back from the bar's tray icon), and closed (the app's own question first). The
+// wheel over it scrolls the page until the visitor clicks into it.
 //
 // Each of the three caption buttons has its own move, as on a real desktop:
 // - minimise: the window goes to the tray icon along a curve, shrinking, and the icon takes it;
@@ -32,7 +34,7 @@ export type WindowController = {
   readonly home: Frame;
   /** Where it is drawn now (the pin's coordinates). */
   readonly frame: Frame;
-  /** Where it rests by the visitor's own placement (home, dragged or maximised). */
+  /** Where it rests by the visitor's own placement (home, dragged, snapped or maximised). */
   readonly rested: Frame;
   readonly maximised: boolean;
   readonly minimised: boolean;
@@ -67,6 +69,11 @@ const MAX_LAYOUT_W = 2560;
 const DESK = "(min-width: 761px)";
 /** The docked bar's height, which a maximised or dragged window stays under. */
 const BAR = 52;
+/** How far past the screen's side the pointer pushes a dragged window before it offers to snap. */
+const PUSH = 40;
+/** The gap round the shown place a snap would take. */
+const SNAP_GAP = 8;
+type Side = "left" | "right";
 
 const reduced = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 const tf = (f: Frame, off: { x: number; y: number }) =>
@@ -84,6 +91,7 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
   const dialog = slot.querySelector<HTMLDialogElement>("[data-closer]");
   const gone = slot.querySelector<HTMLElement>("[data-win-gone]");
   const goneBack = gone?.querySelector<HTMLButtonElement>("[data-win-back]");
+  const snapEl = slot.querySelector<HTMLElement>("[data-win-snap]");
   const desk = matchMedia(DESK);
   const stage = el.closest<HTMLElement>("[data-stage]");
 
@@ -91,6 +99,8 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
   let home: Frame = { w: 1440, h: 852, x: 0, y: 0, s: 1, o: 1 };
   let drag = { x: 0, y: 0 };
   let maxed = false;
+  /** Snapped to a half of the screen. */
+  let tile: Side | null = null;
   let minimised = false;
   /** In the tray because it was closed (not minimised): it went where it stood, and opens again. */
   let closed = false;
@@ -115,11 +125,17 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
     const vw = document.documentElement.clientWidth;
     return { x: -pinRect().left, y: BAR - pinHome(), w: vw, h: innerHeight - BAR };
   };
+  /** The room a snapped window takes: a half of the screen under the bar, or all of it. */
+  const snapBox = (to: Side | "max"): Box => {
+    const v = viewportBox();
+    return to === "max" ? v : { ...v, w: v.w / 2, x: to === "right" ? v.x + v.w / 2 : v.x };
+  };
   const rested = (): Frame => {
-    if (maxed) {
-      // The app at its real size, laid out for the whole screen under the bar; scaled only
-      // where that is under its least size or over the widest it is laid out.
-      const v = viewportBox();
+    if (maxed || tile) {
+      // The app at its real size, laid out for the whole screen under the bar (or the half it
+      // is snapped to); scaled only where that is under its least size or over the widest it
+      // is laid out.
+      const v = snapBox(tile ?? "max");
       const s = Math.min(Math.max(1, v.w / MAX_LAYOUT_W), v.w / MIN.w, v.h / MIN.h);
       return { w: v.w / s, h: v.h / s, s, o: 1, x: v.x, y: v.y };
     }
@@ -167,7 +183,7 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
     dispatchEvent(new Event("placechange"));
     // Away from home (dragged, maximised, in the tray, the story's): the first screen's notes
     // about it step aside.
-    stage?.toggleAttribute("data-win-away", maxed || minimised || !!driven || !!(drag.x || drag.y));
+    stage?.toggleAttribute("data-win-away", maxed || !!tile || minimised || !!driven || !!(drag.x || drag.y));
     // The scale for the page-size caption targets and corners: written once the window rests
     // (it changes their layout), not on every frame of a move, and not for a frame it is gone
     // in (the tray's: its corners would round to a pill on the way there).
@@ -178,6 +194,8 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
       else scaleTimer = window.setTimeout(() => el.style.setProperty("--s", s), 120);
     }
     shown = f;
+    // The desk under it, where this uncovers it.
+    showGone();
   };
   /** Where the window is on screen now: in the middle of a glide, where the glide has got to. */
   const current = (): Frame => {
@@ -318,10 +336,11 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
     }
     if (!desk.matches) {
       drag = { x: 0, y: 0 };
+      markTile(null);
       setMax(false, 0);
     }
     settle();
-    if (minimised) showGone(true);
+    showGone(true);
     if (dialog?.open) placeDialog();
     for (const fn of layoutFns) fn();
   }
@@ -334,15 +353,31 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
     el.toggleAttribute("data-max", on);
     maxButton?.setAttribute("aria-label", on ? "Restore featherplay" : "Maximise featherplay");
   };
+  function markTile(side: Side | null) {
+    tile = side;
+    if (side) el.dataset.tile = side;
+    else delete el.dataset.tile;
+  }
   function setMax(on: boolean, ms = MAX_MS) {
     if ((on && !desk.matches) || driven || on === maxed) return;
     // The note by the tray (how fast it opened) was placed clear of the window as it stood.
     opensOff();
     markMax(on);
-    if (on) drag = { x: 0, y: 0 };
+    if (on) {
+      drag = { x: 0, y: 0 };
+      markTile(null);
+    }
     if (ms > 0 && !minimised) morph(ms);
     else settle();
   }
+  /** Snapped to a half of the screen: laid out for it, as a maximised window is for the whole. */
+  const snapTo = (side: Side) => {
+    if (driven || !desk.matches) return;
+    opensOff();
+    markTile(side);
+    drag = { x: 0, y: 0 };
+    morph(MAX_MS);
+  };
   // Too small a screen to maximise on: the button says it can't.
   const deskOnly = () => maxButton?.setAttribute("aria-disabled", String(!desk.matches));
 
@@ -381,7 +416,8 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
     // From where it rests, or from where the story holds it (the story leaves a minimised
     // window alone, and draws it again as the page moves on).
     const rest = driven ?? rested();
-    showGone(on, rest);
+    const deskAt = goneAt;
+    showGone();
     if (on && closed) glide(closedFrame(current()), CLOSE_MS);
     else if (on) {
       fly(rest, true);
@@ -391,66 +427,124 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
         icon.toggleAttribute("data-caught", true);
         setTimeout(() => icon.removeAttribute("data-caught"), MIN_MS + 600);
       }
-    } else if (byShortcut) openFrom(rest);
+    } else if (byShortcut) openFrom(rest, deskAt ?? rest);
     else if (closed) open(rest);
     else fly(rest, false);
     byShortcut = false;
     if (!on) closed = false;
+    // Put away, it forgets where the visitor had it (dragged, snapped, maximised): it goes
+    // from there, and comes back to its place on the first screen. (A real window would
+    // remember; on a page, coming back over the words is the worse surprise.)
+    else if (!driven) {
+      drag = { x: 0, y: 0 };
+      markTile(null);
+      if (maxed) markMax(false);
+    }
     // The keys go where the window went: the tray icon, or the capsule's song.
     if (on && hadFocus) trayTarget()?.focus({ preventScroll: true });
   };
-  /** While the window is away, its shortcut in the middle of where it stood, and the maker's
-   *  note over it for the way it went: closed (and paused), or in the tray, playing on. The note
-   *  is written each time (the pen's reveal starts over). */
+  /** The desk in the window's place on the first screen (its home), shown while the window
+   *  isn't on it: sent to the tray or closed, or moved off it by the visitor (dragged, snapped:
+   *  the desk lies under the window, and shows as far as the window uncovers it; never over
+   *  the page's words, wherever the window went). The app's shortcut in the middle and the
+   *  maker's note over it for the way the window went: closed (and paused), in the tray,
+   *  playing on, or only moved (the shortcut then takes it home). The note is written each
+   *  time it changes (the pen's reveal starts over); a moved window's, once the window has
+   *  uncovered it. */
+  type Away = "closed" | "tray" | "moved";
   const goneHand = gone?.querySelector<HTMLElement>("[data-gone-hand]");
   const gonePick = gone?.querySelector<HTMLElement>("[data-gone-pick]");
-  let goneWas: "closed" | "tray" | null = null;
-  function showGone(on: boolean, rest: Frame = driven ?? rested()) {
+  let goneWas: Away | null = null;
+  /** The desk's box while it shows. */
+  let goneAt: Frame | null = null;
+  let goneWritten = false;
+  const writeGone = (which: Away, delay: number) => {
+    goneWritten = true;
+    setTimeout(() => goneWas === which && goneHand?.classList.add("written"), delay);
+    // "click one" close behind it, as the first note's words end (once: it stays while the
+    // note over the shortcut changes).
+    setTimeout(() => goneWas && gonePick?.classList.add("written"), delay + 340);
+  };
+  function showGone(place = false) {
     if (!gone || !goneBack) return;
-    gone.toggleAttribute("data-on", on);
-    goneBack.tabIndex = on ? 0 : -1;
-    if (!on) {
-      goneWas = null;
-      goneHand?.classList.remove("written");
-      gonePick?.classList.remove("written");
-      goneSay?.removeAttribute("data-on");
-      return;
+    const which: Away | null = minimised ? (closed ? "closed" : "tray") : !driven && !maxed && (tile || drag.x || drag.y) ? "moved" : null;
+    if (which !== goneWas) {
+      goneWas = which;
+      if (which) gone.dataset.on = which;
+      else delete gone.dataset.on;
+      goneBack.tabIndex = which ? 0 : -1;
+      if (!which) {
+        goneAt = null;
+        goneHand?.classList.remove("written");
+        gonePick?.classList.remove("written");
+        sayOff();
+        return;
+      }
+      goneBack.setAttribute("aria-label", which === "closed" ? "Open featherplay" : which === "tray" ? "Show featherplay’s window" : "Move featherplay’s window back");
+      if (goneHand) {
+        goneHand.querySelector("[data-gone-words]")!.textContent = goneHand.dataset[which === "closed" ? "sayClosed" : which === "tray" ? "sayTray" : "sayMoved"]!;
+        goneHand.classList.remove("written");
+        goneWritten = false;
+        // Once the window has gone and the shortcut is in (Window.astro's delay).
+        if (which !== "moved") writeGone(which, 420);
+      }
+      place = true;
     }
-    // The box is the window's own, as it is drawn: its things keep their shares of it.
-    const [bw, bh] = [rest.w * rest.s, rest.h * rest.s];
-    gone.style.width = `${bw.toFixed(1)}px`;
-    gone.style.height = `${bh.toFixed(1)}px`;
-    gone.style.translate = `${(rest.x - slotOff.x).toFixed(1)}px ${(rest.y - slotOff.y).toFixed(1)}px`;
-    // The others only where the window had the room for them (they lie some 18.5 rem either
-    // side of its middle, 13 rem above and 11 below).
-    gone.toggleAttribute("data-slim", bw < 620 || bh < 430);
-    // Placed again by a new measure, the note stays as it was written.
-    const which = closed ? "closed" : "tray";
-    if (which === goneWas) return;
-    goneWas = which;
-    goneBack.setAttribute("aria-label", closed ? "Open featherplay" : "Show featherplay’s window");
-    if (goneHand) {
-      goneHand.querySelector("[data-gone-words]")!.textContent = goneHand.dataset[which === "closed" ? "sayClosed" : "sayTray"]!;
-      goneHand.classList.remove("written");
-      // Once the window has gone and the shortcut is in (Window.astro's delay).
-      setTimeout(() => goneWas === which && goneHand.classList.add("written"), 420);
-      // "click one" after it, once the first note is read.
-      gonePick?.classList.remove("written");
-      setTimeout(() => goneWas === which && gonePick?.classList.add("written"), 1500);
+    if (!which) return;
+    if (place) {
+      // The box is the window's own at home (the story's window: where the story holds it):
+      // its things are set from its middle.
+      const rest = (minimised && driven) || home;
+      goneAt = rest;
+      const [bw, bh] = [rest.w * rest.s, rest.h * rest.s];
+      gone.style.width = `${bw.toFixed(1)}px`;
+      gone.style.height = `${bh.toFixed(1)}px`;
+      gone.style.translate = `${(rest.x - slotOff.x).toFixed(1)}px ${(rest.y - slotOff.y).toFixed(1)}px`;
+      // The others only where the window had the room for them (they lie some 18.5 rem either
+      // side of its middle, 13 rem above and 11 below).
+      gone.toggleAttribute("data-slim", bw < 620 || bh < 430);
+    }
+    if (which === "moved" && !goneWritten && goneAt) {
+      // The note's place (over the shortcut in the middle), clear of the window as drawn now.
+      const [x, y] = [goneAt.x + (goneAt.w * goneAt.s) / 2, goneAt.y + (goneAt.h * goneAt.s) / 2 - 40];
+      const f = shown;
+      if (x < f.x || x > f.x + f.w * f.s || y < f.y || y > f.y + f.h * f.s) writeGone("moved", 120);
     }
   }
+  /** Back to its place on the first screen from wherever the visitor put it. */
+  const goHome = () => {
+    if (driven || minimised) return;
+    const sized = maxed || !!tile;
+    drag = { x: 0, y: 0 };
+    markTile(null);
+    if (maxed) markMax(false);
+    if (sized) morph(MAX_MS);
+    else glide(rested(), 320);
+  };
   /** The window is coming back by its shortcut on the desk (it opens out of that). */
   let byShortcut = false;
   goneBack?.addEventListener("click", () => {
-    byShortcut = true;
-    player.restore();
+    if (minimised) {
+      byShortcut = true;
+      player.restore();
+    } else goHome();
     // The keys go back into the window with it.
     replica.querySelector<HTMLElement>('[data-act="minimise"]')?.focus({ preventScroll: true });
   });
   // The desk's other things: pressed, each says its line in a small pane under itself (kept
-  // inside the box), for a few seconds.
+  // inside the box), for a few seconds, or until a press anywhere else, or Escape.
   const goneSay = gone?.querySelector<HTMLElement>("[data-desk-say]");
   let sayTimer = 0;
+  function sayOff() {
+    clearTimeout(sayTimer);
+    goneSay?.removeAttribute("data-on");
+  }
+  addEventListener("pointerdown", (e) => {
+    if (goneSay?.hasAttribute("data-on") && !(e.target as Element | null)?.closest?.("[data-say]")) sayOff();
+  });
+  addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && goneSay?.hasAttribute("data-on")) sayOff();
+  });
   gone?.addEventListener("click", (e) => {
     const b = (e.target as Element).closest<HTMLElement>("[data-say]");
     if (!b || !goneSay || !gone) return;
@@ -461,16 +555,17 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
     goneSay.style.translate = `${Math.round(left)}px ${Math.round(b.offsetTop + b.offsetHeight / 2 + 4)}px`;
     goneSay.toggleAttribute("data-on", true);
     clearTimeout(sayTimer);
-    sayTimer = window.setTimeout(() => goneSay.removeAttribute("data-on"), 4200);
+    sayTimer = window.setTimeout(sayOff, 4200);
   });
-  /** Opened by its shortcut: out of the icon in the middle of where it stands, growing to its
-   *  size, in sight from the first moment. */
-  const openFrom = (to: Frame) => {
+  /** Opened by its shortcut: out of the icon in the middle of the desk's box, growing to its
+   *  size and place, in sight from the first moment. */
+  const openFrom = (to: Frame, from0: Frame) => {
     stop();
     draw(to);
     if (reduced()) return;
     const k = 0.18;
-    const from = { ...to, s: to.s * k, x: to.x + (to.w * to.s * (1 - k)) / 2, y: to.y + (to.h * to.s * (1 - k)) / 2 };
+    const c = { x: from0.x + (from0.w * from0.s) / 2, y: from0.y + (from0.h * from0.s) / 2 };
+    const from = { ...to, s: to.s * k, x: c.x - (to.w * to.s * k) / 2, y: c.y - (to.h * to.s * k) / 2 };
     el.animate(
       [
         { transform: tf(from, slotOff), opacity: 0 },
@@ -559,47 +654,78 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
   });
 
   // ---- Dragging by the title bar: the window stays wholly in view ----
-  let dragFrom: { px: number; py: number; x: number; y: number } | null = null;
+  // Pushed on against the screen's side it offers to snap to that half, against the top to
+  // maximise (the place shows under it; let go there and it takes it), as on Windows.
+  let dragFrom: { px: number; py: number; x: number; y: number; held: boolean } | null = null;
+  let aimed: Side | "max" | null = null;
+  const aim = (to: Side | "max" | null) => {
+    if (to === aimed) return;
+    aimed = to;
+    if (!snapEl) return;
+    if (to) {
+      const b = snapBox(to);
+      snapEl.style.width = `${(b.w - 2 * SNAP_GAP).toFixed(1)}px`;
+      snapEl.style.height = `${(b.h - 2 * SNAP_GAP).toFixed(1)}px`;
+      snapEl.style.translate = `${(b.x + SNAP_GAP - slotOff.x).toFixed(1)}px ${(b.y + SNAP_GAP - slotOff.y).toFixed(1)}px`;
+      snapEl.dataset.on = to;
+    } else delete snapEl.dataset.on;
+  };
   titlebar.addEventListener("pointerdown", (e) => {
     if (e.button !== 0 || !desk.matches || minimised || driven || (e.target as Element).closest("button")) return;
     e.preventDefault();
     opensOff();
     titlebar.setPointerCapture(e.pointerId);
     stop();
-    if (maxed) {
-      // A maximised window comes back to its size under the pointer, as Windows does.
-      const f = shown;
-      const k = (e.clientX - pinRect().left - f.x) / (f.w * f.s);
-      markMax(false);
-      const w = home.w * home.s;
-      drag = { x: e.clientX - pinRect().left - k * w - home.x, y: f.y - home.y };
-      draw(rested());
-    }
-    dragFrom = { px: e.clientX, py: e.clientY, x: drag.x, y: drag.y };
+    // A maximised or snapped window stays as it is until the pointer moves (a press alone,
+    // or the first of a double-click, isn't a drag).
+    dragFrom = { px: e.clientX, py: e.clientY, x: drag.x, y: drag.y, held: maxed || !!tile };
     el.setAttribute("data-dragging", "");
   });
   let moveFrame = 0;
   titlebar.addEventListener("pointermove", (e) => {
     // The story took the window over (the page scrolled under the drag): it draws it now.
     if (!dragFrom || driven) return;
+    if (dragFrom.held) {
+      if (Math.hypot(e.clientX - dragFrom.px, e.clientY - dragFrom.py) < 4) return;
+      // It comes back to its size under the pointer, as Windows does.
+      const f = shown;
+      const left = pinRect().left;
+      const k = (e.clientX - left - f.x) / (f.w * f.s);
+      markMax(false);
+      markTile(null);
+      drag = { x: e.clientX - left - k * home.w * home.s - home.x, y: f.y - home.y };
+      draw(rested(), true);
+      dragFrom = { px: e.clientX, py: e.clientY, x: drag.x, y: drag.y, held: false };
+    }
     const want = { x: dragFrom.x + e.clientX - dragFrom.px, y: dragFrom.y + e.clientY - dragFrom.py };
     if (moveFrame) cancelAnimationFrame(moveFrame);
     moveFrame = requestAnimationFrame(() => {
       moveFrame = 0;
       const w = home.w * home.s;
       const h = home.h * home.s;
-      const at = clampInto({ x: home.x + want.x, y: home.y + want.y, w, h }, viewportBox());
+      const raw = { x: home.x + want.x, y: home.y + want.y };
+      const at = clampInto({ ...raw, w, h }, viewportBox());
       drag = { x: at.x - home.x, y: at.y - home.y };
       draw(rested());
+      aim(at.y - raw.y > PUSH ? "max" : at.x - raw.x > PUSH ? "left" : raw.x - at.x > PUSH ? "right" : null);
     });
   });
-  const endDrag = () => {
+  /** The drag ends: let go, the window takes the place it was offered; taken away (by the
+   *  story, a cancelled pointer), it stays where it is. */
+  function endDrag(letGo = false) {
     if (!dragFrom) return;
+    if (moveFrame) cancelAnimationFrame(moveFrame);
+    moveFrame = 0;
     dragFrom = null;
     el.removeAttribute("data-dragging");
-  };
-  titlebar.addEventListener("pointerup", endDrag);
-  titlebar.addEventListener("pointercancel", endDrag);
+    const to = aimed;
+    aim(null);
+    if (!letGo || !to) return;
+    if (to === "max") setMax(true);
+    else snapTo(to);
+  }
+  titlebar.addEventListener("pointerup", () => endDrag(true));
+  titlebar.addEventListener("pointercancel", () => endDrag());
 
   // ---- The wheel over the window scrolls the page until the visitor clicks into the app ----
   let idle = 0;
@@ -697,13 +823,14 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
     forget() {
       drag = { x: 0, y: 0 };
       if (maxed) markMax(false);
+      markTile(null);
     },
     trayPoint,
     onLayout(fn) {
       layoutFns.push(fn);
     },
     arrive(delay) {
-      if (reduced() || driven || minimised || maxed) return;
+      if (reduced() || driven || minimised || maxed || tile) return;
       // Drawn invisibly first (it never freezes), then from 0.9 by its top right, the tray's
       // side, in 240 ms on the window curve.
       const to = shown;

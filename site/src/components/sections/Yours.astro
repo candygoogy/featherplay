@@ -152,15 +152,24 @@ import Note from "../Note.astro";
     display: grid;
     place-items: center;
     min-width: 0;
+    container: yours-well / inline-size;
     margin: calc(-1 * var(--panel-pad)) calc(-1 * var(--panel-pad)) calc(-1 * var(--panel-pad)) 0;
     padding: var(--s7);
     background: color-mix(in srgb, rgb(120 90 60 / 0.07) calc(var(--light) * 100%), rgb(0 0 0 / 0.26));
     box-shadow: inset 1px 0 0 var(--panel-edge);
   }
-  /* In the well's top left, pointing down at the window, while it is at its actual size. */
+  /* In the well's top left, pointing down at the window, while it is at its actual size: a
+     little air over it from the well's edge, and the window that much lower to keep clear. */
   .stage :global(.n-actual) {
-    left: var(--s4);
-    top: calc(var(--s2) - 0.15em);
+    left: var(--s5);
+    top: calc(var(--s5) - 0.15em);
+  }
+  /* (By the well's own width, which says the window is at its size: 480 px and the well's
+     padding. Not by the script's mark for it, which would move the page under a reader.) */
+  @container yours-well (inline-size >= 576px) {
+    .fit {
+      margin-top: var(--s4);
+    }
   }
   /* Its arrow stops short of the window: the hand's ink is the page's, and on a window set to
      the other theme (a light window on the dark page) the head drawn over it couldn't be seen.

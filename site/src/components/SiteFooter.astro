@@ -92,8 +92,10 @@ const groups = [
           <li><a class="fl" href="/#connects">Privacy</a></li>
         </ul>
         <a class="to-top" href="#top">
-          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 13V3.5M3.75 7.5 8 3.25l4.25 4.25"></path></svg>
           Back to top
+          <span class="to-top-key" aria-hidden="true">
+            <svg viewBox="0 0 16 52" width="16" height="52" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M8 13V3.5M3.75 7.5 8 3.25l4.25 4.25M8 49V39.5M3.75 43.5 8 39.25l4.25 4.25"></path></svg>
+          </span>
         </a>
       </div>
     </div>
@@ -186,7 +188,9 @@ const groups = [
     }
   }
   /* The small print: one quiet line under a hairline, its parts set apart by a dot, and the
-     way back up at its end: its words and an arrow, brighter when pointed at. */
+     way back up at its end: its words and a round tonal key with an arrow. Pointed at, the
+     words brighten, the key takes the tonal hover and its arrow leaves by the top as a second
+     one comes up from under it (the key clips them); pressed, the key gives as the page's buttons do. */
   .foot-legal {
     display: flex;
     flex-wrap: wrap;
@@ -217,27 +221,65 @@ const groups = [
   .to-top {
     display: inline-flex;
     align-items: center;
-    gap: var(--s2);
-    min-height: 2.25rem;
+    gap: var(--s3);
+    min-height: 2.75rem;
     color: var(--ink2);
     font-weight: var(--fw-bold);
     text-decoration: none;
     white-space: nowrap;
     transition: color var(--t-hover) ease;
   }
-  .to-top svg {
+  .to-top-key {
+    display: block;
     flex: none;
+    width: 2.25rem;
+    height: 2.25rem;
+    padding: 10px;
+    overflow: hidden;
+    border-radius: 50%;
+    background: var(--tonal);
+    color: var(--text);
+    transition:
+      background-color var(--t-hover) ease,
+      scale var(--t-release) var(--spring-release);
+  }
+  .to-top-key svg {
+    display: block;
+    transition: translate 320ms var(--ease-out);
   }
   .to-top:hover,
   .to-top:focus-visible {
     color: var(--text);
   }
+  .to-top:hover .to-top-key,
+  .to-top:focus-visible .to-top-key {
+    background: var(--tonal-hover);
+  }
+  .to-top:hover .to-top-key svg,
+  .to-top:focus-visible .to-top-key svg {
+    translate: 0 -36px;
+  }
+  .to-top:active .to-top-key {
+    background: var(--tonal-pressed);
+    scale: var(--press-scale);
+    transition-duration: var(--t-hover), var(--t-press);
+  }
   .to-top:focus-visible {
     outline-offset: 4px;
+    border-radius: var(--r-pill);
   }
-  @media (pointer: coarse) {
-    .to-top {
-      min-height: 2.75rem;
+  @media (prefers-reduced-motion: reduce) {
+    .to-top-key svg {
+      transition: none;
+    }
+    .to-top:hover .to-top-key svg,
+    .to-top:focus-visible .to-top-key svg {
+      translate: none;
+    }
+  }
+  @media (forced-colors: active) {
+    .to-top-key {
+      border: 1px solid ButtonText;
     }
   }
   @media (width < 1100px) {
