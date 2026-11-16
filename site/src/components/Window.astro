@@ -4,14 +4,23 @@
 // does (the end of replica.css). Without script it fills its slot, a still of the app at that size;
 // with it, src/demo/window.ts sizes and scales it to fit, never past the viewport, and makes it
 // a window: dragged by its title bar, maximised and restored, minimised to the tray, closed
-// with the app's own question (the dialog below, at the page's size).
+// with the app's own question (the dialog below, at the page's size). Where the window stood
+// while it is away (in the tray, or closed) there is a way back and a line saying which
+// (.win-gone): the screen is never left with nothing where the app was.
 import Replica from "./Replica.astro";
+import Logo from "./Logo.astro";
 ---
 
 <div class="window" data-window>
   <div class="win-body" data-win-body>
     <Replica view="lyrics" />
   </div>
+</div>
+<div class="win-gone" data-win-gone>
+  <button class="btn tonal" type="button" data-win-back tabindex="-1">
+    <Logo size={18} /><span data-win-back-label>Open featherplay</span>
+  </button>
+  <p class="win-gone-p" data-win-gone-text>Closed. Nothing of it is left running.</p>
 </div>
 <dialog class="closer glass float live" data-closer aria-labelledby="closer-h" aria-describedby="closer-text">
   <h2 id="closer-h" class="closer-h">Close featherplay?</h2>
@@ -76,6 +85,45 @@ import Replica from "./Replica.astro";
   .window[data-minimised] {
     visibility: hidden;
     transition: visibility 0s linear 400ms;
+  }
+  /* Where the window stood while it is away (src/demo/window.ts places it at that middle): the
+     page's own tonal button brings it back, and a line says where it went. In once the window
+     has gone, out at once as it comes back. */
+  .win-gone {
+    position: absolute;
+    left: 0;
+    top: 0;
+    z-index: 9;
+    display: grid;
+    justify-items: center;
+    gap: var(--s3);
+    width: max-content;
+    max-width: min(22rem, 80vw);
+    text-align: center;
+    visibility: hidden;
+    opacity: 0;
+    transition: opacity 160ms ease;
+  }
+  .win-gone[data-on] {
+    visibility: visible;
+    opacity: 1;
+    transition:
+      opacity 280ms ease 340ms,
+      visibility 0s linear 340ms;
+  }
+  .win-gone-p {
+    color: var(--ink2);
+    font-size: var(--fs-small);
+    text-wrap: balance;
+  }
+  :global(:root:not(.js)) .win-gone {
+    display: none;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .win-gone,
+    .win-gone[data-on] {
+      transition: none;
+    }
   }
   /* The caption buttons' targets are 32 page px tall whatever the window's scale (their width
      is Windows' 46 px, scaled). */

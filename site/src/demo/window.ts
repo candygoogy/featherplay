@@ -80,6 +80,8 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
   const replica = el.querySelector<HTMLElement>("[data-replica]")!;
   const titlebar = replica.querySelector<HTMLElement>(".titlebar")!;
   const dialog = slot.querySelector<HTMLDialogElement>("[data-closer]");
+  const gone = slot.querySelector<HTMLElement>("[data-win-gone]");
+  const goneBack = gone?.querySelector<HTMLButtonElement>("[data-win-back]");
   const desk = matchMedia(DESK);
   const stage = el.closest<HTMLElement>("[data-stage]");
 
@@ -317,6 +319,7 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
       setMax(false, 0);
     }
     settle();
+    if (minimised) showGone(true);
     if (dialog?.open) placeDialog();
     for (const fn of layoutFns) fn();
   }
@@ -376,6 +379,7 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
     // From where it rests, or from where the story holds it (the story leaves a minimised
     // window alone, and draws it again as the page moves on).
     const rest = driven ?? rested();
+    showGone(on, rest);
     if (on && closed) glide(closedFrame(current()), CLOSE_MS);
     else if (on) {
       fly(rest, true);
@@ -391,6 +395,24 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
     // The keys go where the window went: the tray icon, or the capsule's song.
     if (on && hadFocus) trayTarget()?.focus({ preventScroll: true });
   };
+  /** While the window is away, the way back in the middle of where it stood, and which way it
+   *  went: closed (and paused), or in the tray, playing on. */
+  function showGone(on: boolean, rest: Frame = driven ?? rested()) {
+    if (!gone || !goneBack) return;
+    gone.toggleAttribute("data-on", on);
+    goneBack.tabIndex = on ? 0 : -1;
+    if (!on) return;
+    gone.querySelector("[data-win-back-label]")!.textContent = closed ? "Open featherplay" : "Show the window";
+    gone.querySelector("[data-win-gone-text]")!.textContent = closed ? "Closed. Nothing of it is left running." : "In the tray, and it plays on from there.";
+    const x = rest.x + (rest.w * rest.s) / 2 - slotOff.x;
+    const y = rest.y + (rest.h * rest.s) / 2 - slotOff.y;
+    gone.style.translate = `calc(${x.toFixed(1)}px - 50%) calc(${y.toFixed(1)}px - 50%)`;
+  }
+  goneBack?.addEventListener("click", () => {
+    player.restore();
+    // The keys go back into the window with it.
+    replica.querySelector<HTMLElement>('[data-act="minimise"]')?.focus({ preventScroll: true });
+  });
   /** Opened again after a close: as the app opens, from 0.9 by its top right (the tray's side). */
   const open = (to: Frame) => {
     stop();

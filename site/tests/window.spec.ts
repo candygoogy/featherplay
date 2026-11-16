@@ -228,6 +228,29 @@ test.describe("where the story doesn't run (a short screen)", () => {
   });
 });
 
+test("while the window is away its place holds the way back, saying whether it was closed or is in the tray", async ({ page }) => {
+  await page.goto("/");
+  await wake(page);
+  const home = await windowBox(page);
+  const place = page.locator("[data-win-gone]");
+  await expect(place).toBeHidden();
+  await caption(page, /^Close/).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Close featherplay" }).click();
+  await expect(place).toBeVisible();
+  await expect(place).toContainText("Closed");
+  // In the middle of where the window stood.
+  const b = (await place.boundingBox())!;
+  expect(Math.abs(b.x + b.width / 2 - (home.x + home.width / 2))).toBeLessThan(2);
+  expect(Math.abs(b.y + b.height / 2 - (home.y + home.height / 2))).toBeLessThan(2);
+  await place.getByRole("button", { name: "Open featherplay" }).click();
+  await expect(win(page)).not.toHaveAttribute("data-minimised", /.*/);
+  await expect(place).toBeHidden();
+  await wake(page);
+  await caption(page, /^Minimise/).click();
+  await expect(place.getByRole("button", { name: "Show the window" })).toBeVisible();
+  await expect(place).toContainText("In the tray");
+});
+
 test("minimise sends the window to the tray: hidden and out of the keyboard's way", async ({ page }) => {
   await page.goto("/");
   await wake(page);
