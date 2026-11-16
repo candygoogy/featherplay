@@ -151,7 +151,9 @@
   --tonal: light-dark(#0000001a, #ffffff21);
   --red-hover: light-dark(#b80d30, #ff5a70);
   --red-pressed: light-dark(#a30b2a, #e9304a);
-  --panel-bg: light-dark(rgb(253 252 250 / 0.92), rgb(24 24 24 / 0.94));
+  /* Solid: a panel is a content surface. (At 92 % the rim's radial gradient, painted under
+     the whole panel for its 1 px edge, showed through as faint rings.) */
+  --panel-bg: light-dark(rgb(253 252 250), rgb(24 24 24));
   --panel-edge: light-dark(rgb(120 96 70 / 0.16), rgb(255 255 255 / 0.05));
   /* A content surface lifts off the paper by a soft warm shadow in light; in dark it is flat. */
   --panel-lift: light-dark(rgb(80 56 30 / 0.09), rgb(0 0 0 / 0));
