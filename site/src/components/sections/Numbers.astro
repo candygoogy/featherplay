@@ -1,23 +1,33 @@
 ---
-// Light, and it shows: the measured figures as one calm table on one surface. featherplay's
-// column is a band in the playing cover's tint that breaks out above and below the table;
-// every figure the same size and weight, in tabular figures; the other rows step back under
-// the pointer. Every value comes from src/data/numbers.ts and is in the HTML; the method page
-// says how each was measured. On a phone each measure is a small table of its own, each
-// figure labelled.
-import { figures, timings, type Metric } from "../../data/numbers";
+// Light, and it shows: the measured figures as one real table on one surface, the page's main
+// argument. featherplay's column is the app's own floating glass, tinted by the playing song as
+// the window and the capsule are, rising above and below the panel with the mark at its head;
+// its figures larger, the other two columns quieter. Where a row compares (memory, CPU,
+// processes, download) each figure has a bar drawn to scale against the row's largest, so 39 MB
+// against 798 and 988 shows as a sliver against two long bars; a range of processes is solid to
+// its fewest and fainter to its most. The rows only featherplay has stay figures, and come last
+// beside the line that says so. The first row leads at a larger size. Every value comes from
+// src/data/numbers.ts and is in the HTML; the bars are decoration (hidden from assistive
+// technology); the method page says how each was measured. On a phone each measure is a small
+// table of its own, each figure labelled, with its bar.
+import { figures, timings, valueOf, type Metric } from "../../data/numbers";
 import { figureText, NOT_MEASURED } from "../../data/format";
 import { release } from "../../data/release";
 import Note from "../Note.astro";
 
-const s = (v: number) => `${v.toLocaleString("en-GB", { maximumSignificantDigits: 2 })} s`;
+const s = (v: number) => `${v.toLocaleString("en-GB", { maximumSignificantDigits: 2 })} s`;
 const span = (t: { min: number; max: number }) => `${s(t.min)} to ${s(t.max)}`;
-const rows: { metric: Metric; title: string; note: string }[] = [
-  { metric: "memoryMB", title: "Memory while playing", note: "Private memory of all its processes, window minimised." },
+const rows: { metric: Metric; title: string; note: string; lead?: boolean }[] = [
+  { metric: "memoryMB", title: "Memory while playing", note: "Private memory of all its processes, window minimised.", lead: true },
   { metric: "memoryPausedMB", title: "Memory while paused", note: "The same, with the song paused." },
   { metric: "cpuPlayingPct", title: "CPU while playing", note: "Share of the whole processor, window minimised." },
   { metric: "cpuPausedPct", title: "CPU while paused", note: "The same, with the song paused." },
   { metric: "processes", title: "Processes", note: "Running at once, fewest and most seen. The memory rows count all of them." },
+  {
+    metric: "downloadMB",
+    title: "Download",
+    note: `What you download to install it: featherplay ${release.version}’s installer. Edge comes with Windows.`,
+  },
   {
     metric: "startToSoundS",
     title: "Start to music playing",
@@ -28,16 +38,29 @@ const rows: { metric: Metric; title: string; note: string }[] = [
     title: "Click to sound",
     note: `From clicking a song’s play button to its first sound. Median of ${timings.clickToSoundS.n} clicks (${span(timings.clickToSoundS)}).`,
   },
-  {
-    metric: "downloadMB",
-    title: "Download",
-    note: `What you download to install it: featherplay ${release.version}’s installer. Edge comes with Windows.`,
-  },
 ];
 const [ours, ...others] = figures;
-const cell = (t: string) => t.replace(/ (MB|s)$/, " $1");
-const head = (app: string) => (app === "YouTube Music in Edge" ? "YouTube Music in Edge" : app);
-const ver = (f: (typeof figures)[number]) => (f.app === "YouTube Music in Edge" ? `Edge ${f.version.split(".")[0]}` : f.version);
+const isEdge = (f: (typeof figures)[number]) => f.app === "YouTube Music in Edge";
+const ver = (f: (typeof figures)[number]) => (isEdge(f) ? `Edge ${f.version.split(".")[0]}` : f.version);
+
+/** Each figure's bar in a row that compares: its share of the row's largest, from `lo` (a range's
+ *  fewest) to `hi`; null where only featherplay was measured. */
+function barsOf(m: Metric) {
+  const values = figures.map((f) => valueOf(f, m));
+  if (values.some((v) => v == null)) return null;
+  const top = Math.max(...(values as number[]));
+  return figures.map((f, i) => {
+    const hi = (values[i] as number) / top;
+    return { lo: m === "processes" ? f.processes.min / top : hi, hi };
+  });
+}
+/** A figure in its number and its unit ("39" "MB", "0.063" "%"), the unit set smaller. The
+ *  no-break space stays in the text. */
+function parts(t: string) {
+  const m = /^(.*?)(?: (MB|s)|(%))$/.exec(t);
+  return m ? { n: m[1], u: m[2] ? ` ${m[2]}` : m[3] } : { n: t, u: "" };
+}
+const r4 = (v: number) => +v.toFixed(4);
 ---
 
 <section class="sec sec-numbers frame" id="light" aria-labelledby="light-title">
@@ -49,63 +72,72 @@ const ver = (f: (typeof figures)[number]) => (f.app === "YouTube Music in Edge" 
     </p>
   </div>
   <div class="tbl panel">
-    <span class="band" aria-hidden="true"></span>
-    <Note id="played" arrow="down-left" class="n-played" />
+    <span class="band glass float" aria-hidden="true"></span>
     <table class="figures">
       <caption class="visually-hidden">featherplay, Pear Desktop and YouTube Music in Edge, measured on one Windows PC. Lower is better.</caption>
       <colgroup><col class="c-m" /><col /><col /><col /></colgroup>
       <thead>
         <tr>
-          <th scope="col" class="c-head"><span class="visually-hidden">Measure</span></th>
+          <th scope="col" class="c-head">
+            <span class="visually-hidden">Measure</span>
+            <Note id="played" arrow="down-right" class="n-played" />
+          </th>
           <th scope="col" class="ours">
             <span class="ours-h"
               ><span class="art" aria-hidden="true"
-                ><img class="only-dark" src="/tri-vane.svg" width="18" height="18" alt="" /><img
+                ><img class="only-dark" src="/tri-vane.svg" width="26" height="26" alt="" /><img
                   class="only-light"
                   src="/tri-vane-light.svg"
-                  width="18"
-                  height="18"
+                  width="26"
+                  height="26"
                   alt=""
                 /></span
-              >featherplay</span
-            ><span class="ver">{ver(ours)}</span>
+              ><span class="who">featherplay</span><span class="ver">{ver(ours)}</span></span
+            >
           </th>
-          {others.map((f) => <th scope="col">{head(f.app)}<span class="ver">{ver(f)}</span></th>)}
+          {
+            others.map((f) => (
+              <th scope="col">
+                <span class="who">{f.app}</span>
+                <span class="ver">{ver(f)}</span>
+              </th>
+            ))
+          }
         </tr>
       </thead>
       <tbody>
         {
-          rows.map((r) => (
-            <tr data-metric={r.metric}>
-              <th scope="row">
-                <span class="m">{r.title}</span>
-                <span class="n">{r.note}</span>
-              </th>
-              {figures.map((f) => {
-                const t = figureText(f, r.metric);
-                return (
-                  <td class:list={{ ours: f === ours }} data-who={f.app === "YouTube Music in Edge" ? "In Edge" : f.app} data-figure={`${f.app}:${r.metric}`}>
-                    {t === NOT_MEASURED ? (
-                      <>
-                        <span aria-hidden="true">{t}</span>
-                        <span class="visually-hidden">not measured</span>
-                      </>
-                    ) : f === ours && r.metric === "memoryMB" ? (
-                      // The one pen mark: featherplay's memory while playing, underlined.
-                      <span class="fig">
-                        {cell(t)}
-                        <svg class="pen-mark" viewBox="0 0 80 10" preserveAspectRatio="none" aria-hidden="true">
-                          <path pathLength="1" d="M3 6.2 C 20 4.4, 44 3.6, 77 5.4" />
-                        </svg>
-                      </span>
-                    ) : (
-                      cell(t)
-                    )}
-                  </td>
-                );
-              })}
-            </tr>
-          ))
+          rows.map((r) => {
+            const bars = barsOf(r.metric);
+            return (
+              <tr data-metric={r.metric} class:list={{ lead: r.lead, solo: !bars }}>
+                <th scope="row">
+                  <span class="m">{r.title}</span>
+                  <span class="n">{r.note}</span>
+                </th>
+                {figures.map((f, i) => {
+                  const t = figureText(f, r.metric);
+                  const p = parts(t);
+                  const b = bars?.[i];
+                  return (
+                    <td class:list={{ ours: f === ours }} data-who={isEdge(f) ? "In Edge" : f.app} data-figure={`${f.app}:${r.metric}`}>
+                      {t === NOT_MEASURED ? (
+                        <>
+                          <span class="dash" aria-hidden="true">
+                            {t}
+                          </span>
+                          <span class="visually-hidden">not measured</span>
+                        </>
+                      ) : (
+                        <span class="fig">{p.n}{p.u && <span class="u">{p.u}</span>}</span>
+                      )}
+                      {b && <span class="bar" style={`--lo:${r4(b.lo)};--hi:${r4(b.hi)}`} aria-hidden="true" />}
+                    </td>
+                  );
+                })}
+              </tr>
+            );
+          })
         }
       </tbody>
     </table>
@@ -117,28 +149,38 @@ const ver = (f: (typeof figures)[number]) => (f.app === "YouTube Music in Edge" 
 
 <style>
   .tbl {
-    /* The cover's tint on the panel, mixed on the theme's eased --light. */
-    --band-ground: color-mix(in oklab, var(--paint) calc(24% - 8% * var(--light)), color-mix(in srgb, #ffffff calc(var(--light) * 100%), #1c1c1c));
-    --hair: color-mix(in srgb, var(--text) 10%, transparent);
+    /* The columns: the measure, then the three players at one width each, so the bars, drawn
+       against their cell, compare across the row. */
+    --c-m: 0.34;
+    --c-app: 0.22;
+    --inner: calc(100% - 2 * var(--panel-pad));
+    /* featherplay's column rises this far above the panel and sinks as far below it. */
+    --rise: 30px;
+    --cell-x: var(--s5);
+    --hair: color-mix(in srgb, var(--text) 9%, transparent);
+    /* The bars: featherplay's in the accent, the others in neutral ink, on a faint track. */
+    --track: color-mix(in srgb, var(--text) 7%, transparent);
+    --bar-other: color-mix(in srgb, var(--text) 34%, transparent);
+    --bar-range: color-mix(in srgb, var(--text) 16%, transparent);
 
+    container: numbers / inline-size;
     position: relative;
-    margin-top: var(--s8);
+    margin-top: calc(var(--s8) + var(--rise));
     padding: var(--panel-pad);
   }
-  /* featherplay's column: the table's columns are fixed (40 % for the measure, 20 % each), so
-     the band sits over the second, reaching 28 px past the panel's top and bottom. */
+
+  /* ---- featherplay's column: the app's floating glass in the playing song's tint ---- */
   .band {
-    position: absolute;
-    top: -28px;
-    bottom: -28px;
-    left: calc(var(--panel-pad) + (100% - 2 * var(--panel-pad)) * 0.4);
-    width: calc((100% - 2 * var(--panel-pad)) * 0.2);
-    border-radius: var(--r-panel);
     /* It wears the song's colour, and fades to the next one itself (system.css --paint). */
     --paint: var(--song);
+    --mat: color-mix(in oklab, var(--paint) calc(11% - 1% * var(--light)), var(--mat-fly));
+    position: absolute;
+    top: calc(-1 * var(--rise));
+    bottom: calc(-1 * var(--rise));
+    left: calc(var(--panel-pad) + var(--inner) * var(--c-m));
+    width: calc(var(--inner) * var(--c-app));
+    border-radius: var(--r-float);
     transition: --paint var(--t-glow) ease;
-    background: var(--band-ground);
-    box-shadow: var(--lit), var(--ring);
   }
   .figures {
     position: relative;
@@ -148,70 +190,173 @@ const ver = (f: (typeof figures)[number]) => (f.app === "YouTube Music in Edge" 
     border-spacing: 0;
   }
   .c-m {
-    width: 40%;
+    width: calc(var(--c-m) * 100%);
   }
   th,
   td {
-    padding: var(--s4) var(--s5);
-    text-align: right;
+    padding: var(--s5) var(--cell-x);
+    text-align: left;
     vertical-align: baseline;
   }
+
+  /* ---- The heads: featherplay's mark and name in the glass's overhang, the others quiet ---- */
   thead th {
     padding-top: 0;
+    padding-bottom: var(--s4);
     color: var(--ink2);
     font-size: var(--fs-small);
     font-weight: var(--fw-medium);
     line-height: var(--lh-small);
     vertical-align: bottom;
   }
-  /* featherplay's heading rides up into the band's overhang. */
+  thead .who,
+  thead .ver {
+    display: block;
+  }
+  thead .ver {
+    color: var(--ink3);
+    font-variant-numeric: tabular-nums;
+  }
   thead th.ours {
     color: var(--text);
-    font-size: var(--fs-text);
-    font-weight: var(--fw-bold);
-  }
-  thead th.ours > span {
-    position: relative;
-    top: -40px;
   }
   .ours-h {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--s2);
+    display: grid;
+    justify-items: start;
+    /* Up into the overhang, so the mark sits near the glass's top. */
+    margin-top: calc(-1 * var(--rise) + var(--s2));
   }
-  .ver {
-    display: block;
-    color: var(--ink2);
-    font-size: var(--fs-small);
-    font-weight: var(--fw-medium);
+  .ours-h .art {
+    width: 26px;
+    height: 26px;
+    margin-bottom: var(--s3);
   }
+  .ours-h .art img {
+    width: 26px;
+    height: 26px;
+  }
+  .ours-h .who {
+    font-size: var(--fs-text);
+    font-weight: var(--fw-bold);
+    letter-spacing: -0.01em;
+  }
+  .c-head {
+    position: relative;
+  }
+
+  /* ---- The measures: the label, a quieter line under it ---- */
   tbody th {
     padding-left: 0;
-    text-align: left;
     font-weight: var(--fw-text);
   }
   .m {
     display: block;
-    font-weight: var(--fw-bold);
+    font-weight: var(--fw-medium);
   }
   .n {
     display: block;
-    max-width: 44ch;
+    max-width: 38ch;
     margin-top: 2px;
-    color: var(--ink2);
+    color: var(--ink3);
     font-size: var(--fs-small);
     font-weight: var(--fw-medium);
     line-height: var(--lh-small);
     text-wrap: pretty;
   }
+
+  /* ---- The figures: featherplay's the largest and in full ink, the others quieter ---- */
   td {
+    color: var(--ink2);
     font-size: var(--fs-lede);
     font-weight: var(--fw-medium);
+    line-height: 1.2;
     font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
     white-space: nowrap;
   }
+  td.ours {
+    color: var(--text);
+    font-size: var(--fs-subtitle);
+    font-weight: var(--fw-bold);
+    letter-spacing: var(--tr-subtitle);
+  }
+  .u {
+    margin-left: 0.04em;
+    color: var(--ink3);
+    font-size: 0.62em;
+    font-weight: var(--fw-medium);
+    letter-spacing: 0;
+  }
+  td.ours .u {
+    color: var(--ink2);
+  }
+  .dash {
+    color: var(--ink3);
+  }
+  /* The first row leads: its figures a size up, its label too. */
+  tr.lead > th .m {
+    font-size: var(--fs-lede);
+    font-weight: var(--fw-bold);
+    letter-spacing: var(--tr-lede);
+  }
+  tr.lead > td {
+    padding-top: var(--s6);
+    padding-bottom: var(--s6);
+    font-size: var(--fs-subtitle);
+    letter-spacing: var(--tr-subtitle);
+  }
+  tr.lead > td.ours {
+    font-size: clamp(var(--fs-subtitle), 3.4cqi, var(--fs-title));
+    font-weight: var(--fw-display);
+    letter-spacing: var(--tr-title);
+  }
+  tr.lead > th {
+    padding-top: var(--s6);
+  }
+
+  /* ---- The bars: each figure to scale against the row's largest ---- */
+  .bar {
+    position: relative;
+    display: block;
+    height: 4px;
+    margin-top: var(--s3);
+    border-radius: var(--r-pill);
+    background: var(--track);
+  }
+  .bar::before,
+  .bar::after {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    border-radius: inherit;
+  }
+  /* The most (a range's fainter end), then the least (or the one figure) over it. A sliver
+     never thins to nothing, but nothing (Edge's download) stays nothing. */
+  .bar::before {
+    width: max(min(4px, var(--hi) * 1e5px), var(--hi) * 100%);
+    background: var(--bar-range);
+  }
+  .bar::after {
+    width: max(min(4px, var(--lo) * 1e5px), var(--lo) * 100%);
+    background: var(--bar-other);
+  }
+  td.ours .bar::before {
+    background: color-mix(in srgb, var(--accent) 40%, transparent);
+  }
+  td.ours .bar::after {
+    background: var(--accent);
+  }
+  tr.lead .bar {
+    height: 6px;
+    margin-top: var(--s4);
+  }
+
   tbody tr + tr > * {
     box-shadow: inset 0 1px 0 var(--hair);
+  }
+  /* The column's glass carries no rules across it. */
+  tbody tr + tr > td.ours {
+    box-shadow: none;
   }
   tbody tr {
     transition: opacity var(--t-small) ease;
@@ -221,21 +366,19 @@ const ver = (f: (typeof figures)[number]) => (f.app === "YouTube Music in Edge" 
       opacity: 0.62;
     }
   }
-  /* The note over the band's right shoulder, pointing down at featherplay's column. */
+
+  /* The note in the table's empty corner, pointing down at featherplay's memory while playing. */
   .tbl :global(.n-played) {
-    left: calc(var(--panel-pad) + (100% - 2 * var(--panel-pad)) * 0.6 + 10px);
-    top: -70px;
+    right: -0.3em;
+    bottom: -1.2em;
   }
-  .fig {
-    position: relative;
-    display: inline-block;
+  /* Its arrow drawn longer, to reach the figure (the stroke stays the hand's). */
+  .tbl :global(.n-played svg) {
+    transform: scale(2);
+    transform-origin: 0 0;
   }
-  .fig .pen-mark {
-    position: absolute;
-    left: -3px;
-    bottom: -9px;
-    width: calc(100% + 6px);
-    height: 10px;
+  .tbl :global(.n-played path) {
+    vector-effect: non-scaling-stroke;
   }
   .table-foot {
     position: relative;
@@ -245,13 +388,51 @@ const ver = (f: (typeof figures)[number]) => (f.app === "YouTube Music in Edge" 
     gap: var(--s2) var(--s5);
     padding-top: var(--s5);
     color: var(--ink2);
-    box-shadow: inset 0 1px 0 var(--hair);
+    /* Its rule stops at featherplay's glass, as the rows' do. */
+    background: linear-gradient(
+        to right,
+        var(--hair) calc(var(--c-m) * 100%),
+        transparent 0 calc((var(--c-m) + var(--c-app)) * 100%),
+        var(--hair) 0
+      )
+      top / 100% 1px no-repeat;
   }
 
-  /* A phone: each measure a small table of its own, each figure labelled; featherplay's
-     figure on the band's tint. */
+  @media (forced-colors: active) {
+    .bar,
+    .bar::before,
+    .bar::after {
+      forced-color-adjust: none;
+    }
+    .bar {
+      background: Canvas;
+      outline: 1px solid GrayText;
+    }
+    .bar::before {
+      background: GrayText;
+    }
+    .bar::after,
+    td.ours .bar::after {
+      background: CanvasText;
+    }
+    td.ours .bar::before {
+      background: GrayText;
+    }
+  }
+
+  /* A narrower room: the cells closer. */
+  @container numbers (width < 1100px) {
+    .tbl {
+      --cell-x: var(--s4);
+    }
+  }
+
+  /* A phone: each measure a small table of its own, each figure labelled with its bar;
+     featherplay's figure on the column's tinted glass. */
   @media (width < 760px) {
     .tbl {
+      --rise: 0px;
+      margin-top: var(--s7);
       padding: var(--s3);
     }
     .band,
@@ -277,27 +458,48 @@ const ver = (f: (typeof figures)[number]) => (f.app === "YouTube Music in Edge" 
     tbody tr + tr {
       box-shadow: inset 0 1px 0 var(--hair);
     }
-    tbody th {
+    .table-foot {
+      background: linear-gradient(var(--hair), var(--hair)) top / 100% 1px no-repeat;
+    }
+    tbody th,
+    tr.lead > th {
       grid-column: 1 / -1;
       padding: 0 var(--s2) var(--s2);
     }
-    td {
+    td,
+    tr.lead > td {
       padding: var(--s2);
       border-radius: var(--r-small);
-      text-align: left;
       font-size: var(--fs-text);
       white-space: normal;
+    }
+    td.ours,
+    tr.lead > td.ours {
+      --paint: var(--song);
+      --mat: color-mix(in oklab, var(--paint) calc(11% - 1% * var(--light)), var(--mat-fly));
+      background: var(--pane-hl), var(--mat);
+      box-shadow: var(--pane-edge), var(--pane-rim);
+      font-size: var(--fs-lede);
+      transition: --paint var(--t-glow) ease;
+    }
+    tr.lead > td {
+      font-size: var(--fs-lede);
+    }
+    tr.lead > td.ours {
+      font-size: var(--fs-subtitle);
     }
     td::before {
       content: attr(data-who);
       display: block;
+      margin-bottom: 2px;
       color: var(--ink2);
       font-size: var(--fs-small);
+      font-weight: var(--fw-medium);
+      letter-spacing: 0;
     }
-    td.ours {
-      --paint: var(--song);
-      transition: --paint var(--t-glow) ease;
-      background: var(--band-ground);
+    .bar,
+    tr.lead .bar {
+      margin-top: var(--s2);
     }
   }
 </style>

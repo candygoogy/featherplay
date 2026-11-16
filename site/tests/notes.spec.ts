@@ -81,10 +81,6 @@ test("a note writes itself in once, when wholly in view, and stays written", asy
   await page.evaluate(() => scrollTo(0, 0));
   await page.waitForTimeout(200);
   await expect(note).toHaveClass(/written/);
-  // The pen mark under featherplay's memory is drawn the same way.
-  const mark = page.locator("#light .pen-mark");
-  await mark.scrollIntoViewIfNeeded();
-  await expect(mark).toHaveClass(/written/);
 });
 
 test.describe("reduced motion", () => {

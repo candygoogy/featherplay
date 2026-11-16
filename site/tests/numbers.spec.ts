@@ -53,6 +53,42 @@ test("pointed at, a row stays and the others step back", async ({ page }) => {
   expect(await row.evaluate((r) => Number(getComputedStyle(r).opacity))).toBe(1);
 });
 
+test("where a row compares, each figure has a bar to scale; featherplay's own timings have none", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/");
+  const widths = (m: string) =>
+    numbers(page)
+      .locator(`tr[data-metric="${m}"] td .bar`)
+      .evaluateAll((bs) => bs.map((b) => parseFloat(getComputedStyle(b, "::after").width) / b.getBoundingClientRect().width));
+  const mem = await widths("memoryMB");
+  const [fp, pear, edge] = figures.map((f) => f.memoryMB);
+  expect(mem[0]).toBeCloseTo(fp / edge, 2);
+  expect(mem[1]).toBeCloseTo(pear / edge, 2);
+  expect(mem[2]).toBeCloseTo(1, 2);
+  // Edge's download is nothing, and draws nothing.
+  expect((await widths("downloadMB"))[2]).toBe(0);
+  for (const m of ["startToSoundS", "clickToSoundS"]) await expect(numbers(page).locator(`tr[data-metric="${m}"] .bar`)).toHaveCount(0);
+});
+
+test("the note points at featherplay's memory while playing, at the owner's sizes", async ({ page }) => {
+  for (const [width, height] of [[1280, 1270], [1567, 870], [2560, 1270]]) {
+    await page.setViewportSize({ width, height });
+    await page.goto("/");
+    const note = numbers(page).locator("[data-note='played']");
+    await note.scrollIntoViewIfNeeded();
+    await page.evaluate(() => document.fonts.ready);
+    await expect(note, `${width}`).toBeVisible();
+    await expect(note).not.toHaveClass(/note-off/);
+    // (The stroke's own box: its head is its lower right.)
+    const tip = (await note.locator("svg path").boundingBox())!;
+    const fig = (await numbers(page).locator('[data-figure="featherplay:memoryMB"] .fig').boundingBox())!;
+    // The arrow ends at the figure's left, level with it.
+    expect(Math.abs(tip.x + tip.width - fig.x), `${width}`).toBeLessThan(16);
+    expect(tip.y + tip.height, `${width}`).toBeGreaterThan(fig.y);
+    expect(tip.y + tip.height, `${width}`).toBeLessThan(fig.y + fig.height);
+  }
+});
+
 test("what it leaves out: four plain notes, none struck through, and no ads wording", async ({ page }) => {
   await page.goto("/");
   await leaves(page).scrollIntoViewIfNeeded();
