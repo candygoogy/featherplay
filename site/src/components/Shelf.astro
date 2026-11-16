@@ -68,6 +68,12 @@ import { songs } from "../data/songs";
     /* Its shadow eases on hover; a theme switch's .theme-quiet holds it to the theme's clock. */
     transition: box-shadow calc(320ms * var(--colour-easing)) var(--ease-out);
   }
+  /* Pointed at or focused, a sleeve lies over its neighbours: its title, under it, would
+     otherwise be covered by the sleeve of the row below. */
+  .sleeve:hover,
+  .sleeve:focus-visible {
+    z-index: 3;
+  }
   @media (hover: hover) {
     .sleeve:hover {
       translate: 0 -4px;
