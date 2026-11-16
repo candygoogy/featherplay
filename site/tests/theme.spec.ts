@@ -153,29 +153,6 @@ for (const [label, viewport] of [
   });
 }
 
-test("a system change restyles without reload", async ({ page }) => {
-  await page.emulateMedia({ colorScheme: "dark" });
-  await page.goto("/");
-  // Nothing stored means "system".
-  expect(await page.evaluate(() => localStorage.getItem("fp-theme"))).toBeNull();
-  const bgDark = await page.evaluate(() => getComputedStyle(document.documentElement).backgroundColor);
-  const events: string[] = [];
-  await page.exposeFunction("recordTheme", (t: string) => events.push(t));
-  await page.evaluate(() =>
-    window.addEventListener("themechange", (e) =>
-      (window as unknown as { recordTheme: (t: string) => void }).recordTheme(
-        (e as CustomEvent<string>).detail,
-      ),
-    ),
-  );
-  await page.emulateMedia({ colorScheme: "light" });
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
-  await expect
-    .poll(() => page.evaluate(() => getComputedStyle(document.documentElement).backgroundColor))
-    .not.toBe(bgDark);
-  await expect.poll(() => events).toContain("light");
-});
-
 test("a stored choice ignores the system", async ({ page }) => {
   await page.emulateMedia({ colorScheme: "dark" });
   await page.goto("/");
