@@ -38,6 +38,7 @@ import Note from "./Note.astro";
       <div class="cell-text"><h3 class="t-subtitle">The tray</h3><p>Closing the window asks to quit or play on in the tray, until you tell it to remember.</p></div>
       <div class="cell-piece tray-piece">
         <!-- The little story in order: the close button asks, then the song plays on in the tray. -->
+        <div class="tray-story">
         <div class="step">
           <p class="step-l"><span class="step-n">1</span>Close the window: it asks</p>
           <div class="m-close" aria-hidden="true">
@@ -54,6 +55,7 @@ import Note from "./Note.astro";
         <div class="step">
           <p class="step-l"><span class="step-n">2</span>In the tray, still playing</p>
           <TrayTip corner />
+        </div>
         </div>
       </div>
     </article>
@@ -152,11 +154,27 @@ import Note from "./Note.astro";
     grid-template-rows: auto;
     grid-template-columns: minmax(0, 4fr) minmax(0, 8fr);
   }
+  /* The two steps beside each other wherever they fit, the arrow between them pointing on;
+     stacked where they don't, the arrow turned to point down (a size container: the cell's
+     own width decides, not the screen's). */
   .tray-piece {
+    container-type: inline-size;
+  }
+  .tray-story {
+    display: flex;
     align-items: flex-end;
     justify-content: center;
-    flex-wrap: wrap;
     gap: var(--s5) var(--s7);
+  }
+  @container (width < 46rem) {
+    .tray-story {
+      flex-direction: column;
+      align-items: center;
+    }
+    .tray-story .step-arrow {
+      rotate: 90deg;
+      margin-top: 0;
+    }
   }
   .step {
     display: grid;
@@ -279,10 +297,6 @@ import Note from "./Note.astro";
     }
     .c-tray {
       grid-template-columns: minmax(0, 1fr);
-    }
-    .step-arrow {
-      rotate: 90deg;
-      margin-top: 0;
     }
     .extras {
       grid-template-columns: repeat(2, minmax(0, 1fr));

@@ -77,3 +77,17 @@ test("the lyric card follows the song, and a click on a line plays from there", 
   await page.evaluate(() => scrollTo(0, 0));
   await expect(page.locator("[data-window] [data-lines] .line[data-state='current']")).toHaveText(/We'll put our toes up to the fire|And I will sing your cares away/);
 });
+
+test("the tray cell's arrow leads from the close question to the tray at every width", async ({ page }) => {
+  await page.goto("/");
+  const cell = page.locator("#kept .c-tray");
+  for (const w of [761, 900, 1024, 1100, 1280, 1440, 1600, 1800, 2000]) {
+    await page.setViewportSize({ width: w, height: 900 });
+    await cell.scrollIntoViewIfNeeded();
+    const [one, arrow, two] = await cell.locator(".step, .step-arrow").evaluateAll((els) => els.map((e) => e.getBoundingClientRect().toJSON() as DOMRect));
+    const side = two.left >= one.right;
+    // Beside: the arrow between them, left to right; stacked: between them, top to bottom.
+    if (side) expect(arrow.left >= one.right - 1 && arrow.right <= two.left + 1, `${w} beside`).toBe(true);
+    else expect(arrow.top >= one.bottom - 1 && arrow.bottom <= two.top + 1 && arrow.height > arrow.width, `${w} stacked`).toBe(true);
+  }
+});
