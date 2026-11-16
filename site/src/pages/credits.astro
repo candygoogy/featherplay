@@ -1,7 +1,9 @@
 ---
 // The music in the demo, credited in full: each track with its cover (our own art), where it
 // comes from and its licence, then each artist's credit in their own requested wording. The
-// players on the home page carry the short credit and link here. Then the two typefaces.
+// players on the home page carry the short credit and link here. Then the two typefaces. A wide
+// screen sets the tracks two to a row and the two credits' parts side by side (as /method uses
+// the width), the text in each at a reading measure.
 import Base from "../layouts/Base.astro";
 import Bar from "../components/Bar.astro";
 import DeskLite from "../components/DeskLite.astro";
@@ -44,6 +46,7 @@ import { musicCredits, musicCreditsNote, songs } from "../data/songs";
       }
     </ul>
 
+    <div class="parts">
     <section class="wording" aria-labelledby="wording-title">
       <h2 id="wording-title">As the artists ask to be credited</h2>
       <ul class="lines">
@@ -69,6 +72,7 @@ import { musicCredits, musicCreditsNote, songs } from "../data/songs";
         </li>
       </ul>
     </section>
+    </div>
 
     <p class="back"><a href="/">Back to featherplay</a></p>
   </main>
@@ -76,7 +80,7 @@ import { musicCredits, musicCreditsNote, songs } from "../data/songs";
 </Base>
 
 <style>
-  .doc > :not(.lede) {
+  .doc > :not(.lede, .tracks, .parts) {
     max-width: 60rem;
   }
   .credits-page {
@@ -105,6 +109,25 @@ import { musicCredits, musicCreditsNote, songs } from "../data/songs";
   }
   .track:nth-child(odd) {
     background: var(--surface);
+  }
+  /* A wide screen: the tracks two to a row, each on the surface; the two parts side by side. */
+  @media (width >= 1200px) {
+    .tracks {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: var(--s3) var(--s5);
+    }
+    .track:nth-child(n) {
+      background: var(--surface);
+    }
+    .track:target {
+      background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+    }
+    .parts {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: var(--s8);
+      align-items: start;
+    }
   }
   /* Arrived here from a player's credit: that track, marked. */
   .track:target {
