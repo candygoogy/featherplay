@@ -200,3 +200,38 @@ test("a piece is never drawn where its text is clipped away (the lyric card's li
     expect(r.y + r.height).toBeLessThanOrEqual(view.y + view.height + 3);
   }
 });
+
+// The wash must show on light paper for every song, the palest included: the drawn piece's
+// pixels against the paper just beside it.
+test.describe("light", () => {
+  test.use({ colorScheme: "light" });
+  test("the selection's wash shows on the paper for the palest song too", async ({ page }) => {
+    await page.route("**/music/**", (r) => r.abort());
+    await page.goto("/");
+    await laidOut(page);
+    await page.evaluate(() => document.querySelector<HTMLElement>('#fly-song [data-song="in-this-moment"]')!.click());
+    await page.waitForTimeout(1300);
+    await selectLede(page);
+    await expect(page.locator(".sel-layer > span").first()).toBeVisible();
+    await page.waitForTimeout(500);
+    const piece = (await page.locator(".sel-layer > span").first().boundingBox())!;
+    // A strip of the piece's lower edge (under the text's descenders) and one just above it.
+    const lum = async (y: number) => {
+      const shot = await page.screenshot({ clip: { x: piece.x + piece.width * 0.6, y, width: 40, height: 2 } });
+      return page.evaluate(async (b64) => {
+        const img = new Image();
+        img.src = "data:image/png;base64," + b64;
+        await img.decode();
+        const c = new OffscreenCanvas(img.width, img.height).getContext("2d")!;
+        c.drawImage(img, 0, 0);
+        const d = c.getImageData(0, 0, img.width, img.height).data;
+        let s = 0;
+        for (let i = 0; i < d.length; i += 4) s += 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+        return s / (d.length / 4);
+      }, shot.toString("base64"));
+    };
+    const inside = await lum(piece.y + piece.height - 4);
+    const outside = await lum(piece.y - 6);
+    expect(outside - inside).toBeGreaterThan(22);
+  });
+});

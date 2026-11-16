@@ -304,3 +304,17 @@ for (const [w, h] of [[1366, 768], [1024, 768], [1024, 600]] as const) {
     expect(whole.width * whole.height).toBeGreaterThan(narrow.width * narrow.height);
   });
 }
+
+for (const [w, h] of [[1100, 600], [1180, 1024], [1440, 900]] as const) {
+  test(`"still playing" shows beside the tray's flyout every time (${w}x${h})`, async ({ page }) => {
+    await page.setViewportSize({ width: w, height: h });
+    await page.goto("/");
+    await wake(page);
+    for (let i = 0; i < 3; i++) {
+      await at(page, HOLDS[1]);
+      await at(page, HOLDS[2]);
+      await expect(page.locator("#fly-song")).toBeVisible();
+      await expect(page.locator("[data-note='playing']")).toHaveAttribute("data-on", "");
+    }
+  });
+}
