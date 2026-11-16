@@ -423,6 +423,12 @@ section[data-away],
 :root {
   --fs-pen: 1.875rem; /* 30: the hand, its own face, the stated exception to the six sizes */
 }
+/* On a very wide screen the sections' notes go up a step, so they still read beside the page. */
+@media (min-width: 2200px) {
+  :root {
+    --fs-pen: 2.25rem; /* 36 */
+  }
+}
 .hand {
   position: absolute;
   z-index: 4;
