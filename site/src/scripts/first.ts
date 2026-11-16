@@ -118,7 +118,7 @@ export function startFirst(): void {
   /** The notes, in free ground, each with its arrow drawn to the window. "not a screenshot"
    *  over the window's top, right of the headline, its first word underlined. "drop one on
    *  the player" where there is room: in the ground between the credit line and the sleeves,
-   *  its arrow arcing to the window's left edge (the drag's path); else under the window's
+   *  its arrow a shallow arc across to the window's left edge; else under the window's
    *  lower left beside the sleeves, its arrow rising into it; else on two lines in the gap
    *  between the sleeves and the window. Hidden where none is free (showNoteAt: never on the
    *  words, the sleeves, the window or the bar, never off the screen). */
@@ -187,8 +187,10 @@ export function startFirst(): void {
           const y = colBox.bottom + (gap - h) * 0.6;
           if (x + w + fs * 1.5 < win.left && showNoteAt(noteShelf, x, y, avoid)) {
             const r = wordsOf(noteShelf);
-            const to = { x: win.left - fs * 0.15, y: clamp(r.top + r.height * 0.5 + fs * 1.6, win.top + fs, win.bottom - fs) };
-            penArrow(noteShelf, { x: r.right + fs * 0.3, y: r.top + r.height * 0.6 }, to, -fs * 0.9);
+            // A shallow arc across to the window, its head pointing at the window (not down).
+            const from = { x: r.right + fs * 0.3, y: r.top + r.height * 0.55 };
+            const to = { x: win.left - fs * 0.15, y: clamp(from.y + fs * 0.3, win.top + fs, win.bottom - fs) };
+            penArrow(noteShelf, from, to, -fs * 0.28);
             placed = true;
           }
         }
