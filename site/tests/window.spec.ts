@@ -300,7 +300,12 @@ test("while the window is away its shortcut lies where it stood and brings it ba
   await expect(place).toContainText("now it really isn’t running");
   // The bar's tray icon says it is closed, not in the tray.
   await expect(page.locator("html")).toHaveAttribute("data-window-closed", "");
-  await expect(page.locator("[data-site-bar] [data-tray]")).toHaveAccessibleName("featherplay is closed: open it");
+  const trayIcon = page.locator("[data-site-bar] [data-tray]");
+  await expect(trayIcon).toHaveAccessibleName("featherplay is closed: open it");
+  // No pop-up of the player from a closed app's icon.
+  await trayIcon.hover();
+  await page.waitForTimeout(500);
+  await expect(page.locator("#fly-song")).toBeHidden();
   // Its shortcut in the middle of where the window stood, a listener's other icons about it,
   // each inside that place: pressed, one says what it has to do with featherplay.
   const b = (await place.getByRole("button", { name: "Open featherplay" }).boundingBox())!;

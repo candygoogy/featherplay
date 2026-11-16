@@ -405,20 +405,34 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
     addEventListener("scroll", opensOff, { passive: true });
   };
 
-  const setMinimised = (on: boolean) => {
-    if (on === minimised) return;
-    minimised = on;
-    if (!on && !byShortcut) showOpens();
-    else opensOff();
-    // Closed, not in the tray: the bar's tray icon says so (Bar.astro dims it), and offers to
-    // open it.
-    const shut = on && closed;
+  /** Closed, not in the tray: the bar says so. Its tray icon is unlit and offers to open the
+   *  app (Bar.astro; its pop-up of the player stays shut: bar.ts), and the song's flyout
+   *  offers the same. */
+  const markShut = () => {
+    const shut = minimised && closed;
     document.documentElement.toggleAttribute("data-window-closed", shut);
     const trayIcon = document.querySelector<HTMLElement>("[data-site-bar] [data-tray]");
     if (trayIcon) {
       trayIcon.dataset.tip = shut ? "featherplay is closed: open it" : "featherplay: show or hide the window";
       trayIcon.setAttribute("aria-label", shut ? "featherplay is closed: open it" : "featherplay in the tray: show or hide the window");
     }
+    const show = document.querySelector<HTMLElement>("[data-site-bar] [data-show-window] span");
+    if (show) show.textContent = shut ? "Open featherplay" : "Show featherplay’s window";
+  };
+  // A song started from somewhere else on the page while it is closed: featherplay is running
+  // again, in the tray (the desk's note and the tray icon say so).
+  player.subscribe((s) => {
+    if (!(minimised && closed && s.playing)) return;
+    closed = false;
+    markShut();
+    showGone();
+  });
+  const setMinimised = (on: boolean) => {
+    if (on === minimised) return;
+    minimised = on;
+    if (!on && !byShortcut) showOpens();
+    else opensOff();
+    markShut();
     const hadFocus = el.contains(document.activeElement);
     el.toggleAttribute("data-minimised", on);
     document.documentElement.toggleAttribute("data-window-minimised", on);

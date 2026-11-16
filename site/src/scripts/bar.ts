@@ -279,6 +279,8 @@ export function bindBar(bar: HTMLElement, player: Player | null): { readonly sta
       clearTimeout(restTimer);
       clearTimeout(leaveTimer);
       if (part === tray && performance.now() - trayClickAt < 800) return;
+      // A closed featherplay has no pop-up in the tray: its icon's tooltip says it opens it.
+      if (part === tray && document.documentElement.hasAttribute("data-window-closed")) return;
       restTimer = window.setTimeout(() => open(fly, part), fly.matches(":popover-open") ? 0 : 280);
     });
     for (const el of [part, fly])
