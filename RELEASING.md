@@ -170,7 +170,8 @@ Make one commit with these changes, and push it after publishing (step 5):
   it, and in the "How light?" table's header; the table's Download row gets both files'
   sizes in MB of 1,048,576 bytes, to two decimals, and the note under the table says which
   release the Download row is. If you measured again, update the table's figures, the note's
-  dates and `site/src/data/numbers.ts` together; they must match.
+  dates, the figures in the README's first paragraph and `site/src/data/numbers.ts` together;
+  they must match (the header picture shows the same three).
 - `site/src/data/release.ts`: `version`, and each file's size in bytes, from the draft.
 - The site tests that pin the version and sizes: `site/tests/unit/data.test.ts`,
   `site/tests/sections.spec.ts`, `site/tests/compare.spec.ts` and `site/tests/seo.spec.ts`.
