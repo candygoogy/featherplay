@@ -38,9 +38,12 @@ import Replica from "./Replica.astro";
     inset: 0;
     z-index: 10;
   }
-  /* With script, unseen until placed at its size: no frame of the slot's layout first. */
+  /* With script, unseen until placed at its size: no frame of the slot's layout first, and the
+     app inside not laid out at all until then (it would be laid out twice at load, once at the
+     slot's size). */
   :global(.js) .window:not(:global(.placed)) {
     visibility: hidden;
+    content-visibility: hidden;
   }
   /* Placed by script: its own size and a transform from its top left. */
   .window:global(.placed) {

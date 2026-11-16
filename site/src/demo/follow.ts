@@ -18,6 +18,7 @@
 // line passing under a still pointer would otherwise light up and go out frame by frame.
 
 import { FINE_HOLD_MS, TAU_MS, isNotch } from "../scripts/smooth";
+import { onFrame } from "./lines";
 
 export type LyricsFollow = {
   /** The line being sung (its list item, or null for none yet): the list moves to keep it a
@@ -240,7 +241,7 @@ export function followLyrics(panel: HTMLElement, list: HTMLElement): LyricsFollo
           if (following) apply(target, !instant);
         };
       });
-      if (!queuedFrame) queuedFrame = requestAnimationFrame(flushFollows);
+      if (!queuedFrame) queuedFrame = onFrame(flushFollows);
     },
     release,
     get following() {

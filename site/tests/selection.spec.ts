@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { mergeLines } from "../src/scripts/selection";
+import { laidOut } from "./helpers";
 
 // Selected text: rounded pieces of a soft wash in the playing song's colour, drawn behind the
 // selected lines (src/scripts/selection.ts); native selection stays underneath, so copying
@@ -112,8 +113,9 @@ test.describe("reduced motion", () => {
 });
 
 /** Selects the text of the first element matching `sel` (scrolled into view first). */
-const selectIn = (page: Page, sel: string) =>
-  page.evaluate((sel) => {
+const selectIn = async (page: Page, sel: string) => {
+  await laidOut(page);
+  await page.evaluate((sel) => {
     const el = document.querySelector<HTMLElement>(sel)!;
     el.scrollIntoView({ block: "center", behavior: "instant" });
     const r = document.createRange();
@@ -122,6 +124,7 @@ const selectIn = (page: Page, sel: string) =>
     s.removeAllRanges();
     s.addRange(r);
   }, sel);
+};
 
 test("the pieces wear the playing song's colour, and ease to the next song's on the colour clock", async ({ page }) => {
   await page.route("**/music/**", (r) => r.abort());

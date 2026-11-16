@@ -65,3 +65,22 @@ test.describe("with the page's scripts failing to load (boot.js ran)", () => {
     expect(await page.locator("[data-stage]").evaluate((s) => s.getBoundingClientRect().height)).toBeLessThan(1400);
   });
 });
+
+test.describe("with one of the page's scripts failing", () => {
+  test.use({ javaScriptEnabled: true });
+  test("the first screen's own script failing leaves the page without script, not an empty first screen", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.route(/\/_astro\/Stage\.astro.*\.js$/, (r) => r.abort());
+    await page.goto("/", { waitUntil: "load" });
+    await expect(page.locator("html")).not.toHaveClass(/\bjs\b/);
+    await expect(page.locator("[data-first]")).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  });
+  test("with every script running, the page keeps its script look after it has loaded", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/", { waitUntil: "load" });
+    await page.waitForTimeout(600);
+    await expect(page.locator("html")).toHaveClass(/\bjs\b/);
+    await expect(page.locator("html")).toHaveAttribute("data-story", "");
+  });
+});

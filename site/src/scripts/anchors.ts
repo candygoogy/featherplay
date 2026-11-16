@@ -4,12 +4,11 @@
 // a #section, or back to where a reload left it) are instant. Reduced motion: every jump is
 // instant.
 //
-// The sections below the first screen wait to render (content-visibility, base.css) and hold
-// an estimate of their height until they have. A glide's end is fixed as it starts, so for
-// the jump every section is laid out at its real size (data-reach): the target is where the
-// link says, and nothing moves under the glide. Once it is over each keeps its real height as
-// its estimate (a section shown as visible leaves no remembered size behind), so nothing moves
-// when they go back to waiting.
+// A glide's end is fixed as it starts, so any section still waiting to be laid out just after
+// load (src/scripts/release.ts) is laid out first: the target is where the link says, and
+// nothing moves under the glide.
+
+import { releaseAll } from "./release";
 
 let started = false;
 
@@ -18,13 +17,9 @@ export function bindAnchors(): void {
   started = true;
   const root = document.documentElement;
   let clear = 0;
-  let waiting: HTMLElement[] = [];
   const done = () => {
     clearTimeout(clear);
     root.style.scrollBehavior = "";
-    if (!root.hasAttribute("data-reach")) return;
-    for (const el of waiting) el.style.containIntrinsicSize = `auto ${el.offsetHeight}px`;
-    root.removeAttribute("data-reach");
   };
   // Bubbling to the document: anything that handles the click itself has had its turn.
   document.addEventListener("click", (e) => {
@@ -32,11 +27,7 @@ export function bindAnchors(): void {
     const link = (e.target as Element | null)?.closest?.("a[href*='#']");
     if (!(link instanceof HTMLAnchorElement) || !link.hash) return;
     if (link.origin !== location.origin || link.pathname !== location.pathname || link.search !== location.search) return;
-    // Laid out at their real sizes before the browser works out where the link goes.
-    if (!root.hasAttribute("data-reach")) {
-      waiting = [...document.querySelectorAll<HTMLElement>("main > section, main > * > section, body > footer")].filter((el) => getComputedStyle(el).contentVisibility === "auto");
-      root.toggleAttribute("data-reach", true);
-    }
+    releaseAll();
     if (!matchMedia("(prefers-reduced-motion: reduce)").matches) root.style.scrollBehavior = "smooth";
     removeEventListener("scrollend", done);
     addEventListener("scrollend", done, { once: true });

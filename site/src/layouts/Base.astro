@@ -53,12 +53,14 @@ const glow = songById(demoStart.songId)!.colour;
       import { bindSelection } from "../scripts/selection";
       import { bindAnchors } from "../scripts/anchors";
       import { bindNotes } from "../scripts/notes";
+      import { releaseSections } from "../scripts/release";
       // The wheel scrolls natively: the redesign's scroll story settles into its holds on its
       // own, and a glide of the wheel on top of that would fight it.
       initTheme();
       bindSelection();
       bindAnchors();
       bindNotes();
+      releaseSections();
     </script>
   </body>
 </html>

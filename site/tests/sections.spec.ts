@@ -183,6 +183,7 @@ test("the first-run notes sit in the card side by side, each with its mark", asy
   await expect(notes.nth(0)).toContainText("Run anyway");
   await expect(notes.nth(1)).toContainText("%APPDATA%\\featherplay");
   for (const n of await notes.all()) await expect(n.locator("svg")).toHaveCount(1);
+  await notes.nth(0).scrollIntoViewIfNeeded();
   const [a, b] = [(await notes.nth(0).boundingBox())!, (await notes.nth(1).boundingBox())!];
   expect(Math.abs(a.y - b.y)).toBeLessThan(2);
 });

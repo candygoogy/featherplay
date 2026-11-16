@@ -1,10 +1,11 @@
 import { expect, test, type Page } from "@playwright/test";
+import { laidOut } from "./helpers";
 
 // Getting somewhere on the page: a link in the bar from the top, a link from outside to a
-// #section, a reload part-way down. The sections below the first screen wait to render with
-// an estimate of their height (content-visibility); a glide's end is fixed as it starts, so a
-// wrong estimate used to leave a link about 2,000 px short. Each is checked where it really
-// lands, with no second scroll to help it.
+// #section, a reload part-way down. Just after a fresh load the sections below the first screen
+// wait to be laid out, with an estimate of their height (content-visibility, release.ts); a
+// glide's end is fixed as it starts, so a wrong estimate used to leave a link about 2,000 px
+// short. Each is checked where it really lands, with no second scroll to help it.
 test.use({ viewport: { width: 1440, height: 900 } });
 
 /** Waits until the page has stopped moving (the same scrollY for 300 ms). */
@@ -93,4 +94,10 @@ test("as the page starts, nothing eases in from the browser's own colours", asyn
   await page.reload();
   expect(await page.evaluate(() => (window as unknown as { __boot: unknown }).__boot)).toEqual({ guard: true, easing: 0 });
   await expect(page.locator("html")).not.toHaveClass(/booting/);
+});
+
+test("soon after a fresh load no section is left waiting to be laid out", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.locator("html")).toHaveClass(/\bsplit\b/);
+  await laidOut(page);
 });

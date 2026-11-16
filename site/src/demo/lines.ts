@@ -21,6 +21,25 @@ const anims = new WeakMap<Element, Animation>();
 const jobs = new Map<Element, LineJob>();
 let frame = 0;
 
+// At load the first screen is placed first (src/scripts/first.ts), the layout that moves; the
+// lines and the lyrics start on the frame after, when the page's layout is done and reading it
+// costs nothing. In the same frame each read forced the layout again (at load, one task of
+// 150 ms at 4x CPU). If the first screen is never placed, they start anyway.
+let placed = false;
+let release = () => {};
+const whenPlaced = new Promise<void>((r) => (release = r)).then(() => {
+  placed = true;
+});
+setTimeout(() => release(), 1500);
+/** The first screen is placed: the lines and the lyrics may start. */
+export const firstPlaced = () => release();
+/** On the next frame; at load, once the first screen is placed. */
+export function onFrame(fn: FrameRequestCallback): number {
+  if (placed) return requestAnimationFrame(fn);
+  whenPlaced.then(() => requestAnimationFrame(fn));
+  return -1;
+}
+
 const rendered = (el: Element) => !el.checkVisibility || el.checkVisibility({ contentVisibilityAuto: true });
 
 function flush() {
@@ -42,7 +61,7 @@ function flush() {
 /** Restarts a line on the next frame (a later request for the same line replaces this one). */
 export function runLine(job: LineJob): void {
   jobs.set(job.el, job);
-  if (!frame) frame = requestAnimationFrame(flush);
+  if (!frame) frame = onFrame(flush);
 }
 
 /** Stops a line where it is (its place written at once). */

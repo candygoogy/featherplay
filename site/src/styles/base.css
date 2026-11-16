@@ -275,10 +275,14 @@ main:focus {
   transform: scale(0.97);
 }
 
-/* The sections below the first screen render with the page (no content-visibility): laying
-   them all out costs about 13 ms once, and skipping them cost more than it saved. Their
-   estimates threw links off by 2,000 px, and with sections waiting to render the page did
-   work on every frame while a song played (a measured 64 restyles a second at the top). */
+/* On a fresh load at the top (boot.js: "split"), the sections below the first screen wait to
+   be laid out only until just after the first paint (src/scripts/release.ts releases them one
+   per idle moment): the page's first layout is split into small tasks. Nothing waits for long:
+   with sections skipped, a playing song kept the page working on every frame. */
+:root.split :is(main[data-split] > section:not([data-stage]), main[data-split] ~ footer):not([data-released]) {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 900px;
+}
 
 /* Starting up (Base.astro, until the page's styles are in and two frames have run): nothing
    eases. A style worked out before the stylesheets arrive (an extension reading the page on a

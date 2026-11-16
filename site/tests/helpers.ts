@@ -20,6 +20,14 @@ export async function reach(page: Page, selector: string) {
   await page.waitForTimeout(100);
 }
 
+/** Waits until no section is left waiting to be laid out (just after a fresh load they are
+ *  released one at a time, src/scripts/release.ts). */
+export async function laidOut(page: Page) {
+  await expect
+    .poll(() => page.evaluate(() => [...document.querySelectorAll("main > section, body > footer")].filter((s) => getComputedStyle(s).contentVisibility === "auto").length), { timeout: 4000 })
+    .toBe(0);
+}
+
 /** The window's visible box on screen, in CSS px. */
 export async function windowBox(page: Page) {
   return (await page.locator("[data-window]").boundingBox())!;

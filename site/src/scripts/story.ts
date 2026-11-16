@@ -327,7 +327,11 @@ export async function startStory(player: Player): Promise<void> {
       for (const el of hero) el.inert = false;
     }
   };
-  mq.addEventListener("change", apply);
+
   win.onLayout(() => requestAnimationFrame(measure));
-  apply();
+  // On the first frame: a width query needs the page's layout to answer, and listening asks it.
+  requestAnimationFrame(() => {
+    mq.addEventListener("change", apply);
+    apply();
+  });
 }

@@ -11,6 +11,7 @@
 
 import { compose, type Plan } from "./first-math";
 import { whenWindow } from "../demo/window";
+import { firstPlaced } from "../demo/lines";
 import { showNoteAt, hideNote } from "./notes";
 
 const reduced = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -128,8 +129,9 @@ export function startFirst(): void {
     const rise = (el: Element | null, delay: number, extra: Keyframe = {}) =>
       el?.animate([{ opacity: 0, translate: "0 8px", ...extra }, { opacity: 1, translate: "0 0", filter: "none" }], { duration: 480, delay, easing: EASE_OUT, fill: "backwards" });
     // The light: the desk's lit layers come up under the words.
+    // (To the opacity they have: one keyframe, so no style is read.)
     for (const l of document.querySelectorAll(".desk .slot.front :is(.k-lit, .k-hi)"))
-      all.push(l.animate([{ opacity: 0 }, { opacity: getComputedStyle(l).opacity }], { duration: 900, easing: "ease-out", fill: "backwards" }));
+      all.push(l.animate([{ opacity: 0, offset: 0 }], { duration: 900, easing: "ease-out", fill: "backwards" }));
     // The headline, line by line, sharpening.
     lines.forEach((l, i) => all.push(l.animate([{ opacity: 0, filter: "blur(8px)", translate: "0 0.12em" }, { opacity: 1, filter: "blur(0)", translate: "0 0" }], { duration: 480, delay: i * 110, easing: EASE_OUT, fill: "backwards" })));
     // The sentence, the buttons, the line under them.
@@ -156,10 +158,19 @@ export function startFirst(): void {
       if (arrived) notes();
     });
   };
-  measure();
-  whenWindow.then((win) => {
-    win.layout();
-    arrive(win);
+  // At load, not while the scripts start (a measure would force the page's first layout inside
+  // their task): the composition on the first frame, the window placed in it on the next, and
+  // only then the lines and the lyrics (src/demo/lines.ts), each its own task, not one long
+  // one. The first screen is hidden until it is placed.
+  frame = requestAnimationFrame(() => {
+    frame = 0;
+    measure();
+    requestAnimationFrame(async () => {
+      const win = await whenWindow;
+      win.layout();
+      arrive(win);
+      firstPlaced();
+    });
   });
   document.fonts?.ready.then(relayout);
   addEventListener("resize", relayout);

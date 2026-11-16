@@ -389,8 +389,18 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
 
   // ---- Measuring ----
   let resizeFrame = 0;
+  // On the first screen the window is placed first by the composition (src/scripts/first.ts),
+  // once that is set; until then nothing here measures it (it would be placed twice at load,
+  // the first time at a size the composition then changes). If that never comes, the slot's
+  // own observation places it after a moment.
+  let waiting = !!slot.closest(".first");
+  if (waiting)
+    setTimeout(() => {
+      waiting = false;
+      relayout();
+    }, 1500);
   const relayout = () => {
-    if (resizeFrame) return;
+    if (waiting || resizeFrame) return;
     resizeFrame = requestAnimationFrame(() => {
       resizeFrame = 0;
       layout();
@@ -398,10 +408,17 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
   };
   new ResizeObserver(relayout).observe(slot);
   addEventListener("resize", relayout);
-  desk.addEventListener("change", relayout);
-  desk.addEventListener("change", deskOnly);
-  deskOnly();
-  layout();
+  // A width query needs the page's layout to answer (whether a scrollbar takes room), and
+  // listening to one asks it: both on the first frame, with the first measure.
+  requestAnimationFrame(() => {
+    desk.addEventListener("change", relayout);
+    desk.addEventListener("change", deskOnly);
+    deskOnly();
+  });
+  // Not measured while the page's scripts are starting: read now, it would force the page's
+  // first layout inside this script's task (a 50 ms task at load). The first screen places it
+  // on its first frame (src/scripts/first.ts); without that, the slot's first observation does.
+  // Hidden until then (Window.astro), so nothing shows unplaced.
   document.fonts?.ready.then(relayout);
 
   const controller: WindowController = {
@@ -421,7 +438,10 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
     get minimised() {
       return minimised;
     },
-    layout,
+    layout() {
+      waiting = false;
+      layout();
+    },
     drive(f) {
       driven = f;
       // The story takes over from a drag in progress.

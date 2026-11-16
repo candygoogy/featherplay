@@ -11,6 +11,8 @@ test.beforeEach(async ({ page }) => {
 test("pressing play anywhere plays the one song everywhere: the media keys, the tray's tooltip, Discord, the system's controls", async ({ page }) => {
   await page.goto("/");
   const kept = page.locator("#kept");
+  // The pieces in view (out of view they hold still).
+  await kept.locator("[data-piece='sponsor']").scrollIntoViewIfNeeded();
   await kept.locator(".m-media [data-do='toggle']").click();
   await expect(page.locator("html")).toHaveAttribute("data-playing", "true");
   await expect(page.locator("[data-play-label]").first()).toHaveAttribute("aria-label", "Pause");
@@ -37,6 +39,8 @@ test("the scrobble ring fills with the time heard, closes at half the song with 
   await page.goto("/");
   const sc = page.locator("[data-piece='scrobble']");
   await expect(sc.locator("[data-sc-label]")).toHaveText("Paused");
+  // In view (out of view the ring holds still).
+  await sc.scrollIntoViewIfNeeded();
   await page.locator("#kept .m-media [data-do='toggle']").click();
   await page.clock.runFor(10_000);
   await expect(sc.locator("[data-sc-label]")).toHaveText("Scrobbling now");
