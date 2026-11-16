@@ -3,6 +3,11 @@
 // the two measurements' (featherplay 0.4.0 on 14 November 2026, Pear Desktop and Edge on
 // 1 November; their write-ups are kept outside the repo), plus 0.2.0's one run with the sound
 // features on (9 November); the figures and the sizes come from numbers.ts and release.ts.
+// Laid out as a calm document that uses the width: the parts' index held in view on the left
+// (the part being read marked, as the Questions section's index does), the text at a reading
+// measure, and beside each part the measured facts it gives, pulled out as small spec sheets
+// and figure tables; the scripts and the raw measurements' files as folders in the site's own
+// Explorer style. Every fact stays in the text too, so the asides only gather it.
 import Base from "../layouts/Base.astro";
 import Bar from "../components/Bar.astro";
 import DeskLite from "../components/DeskLite.astro";
@@ -22,8 +27,6 @@ const names: Record<Metric, string> = {
   downloadMB: "Download",
 };
 const file = (path: string) => path.split("/").pop() ?? path;
-// A figure's source, by its path inside the measurements folder.
-const source = (path: string | null) => (path ? path.replace(/^measurements\//, "") : "Not part of this measurement");
 const fp = figureFor("featherplay");
 const pear = figureFor("Pear Desktop");
 const edge = figureFor("YouTube Music in Edge");
@@ -31,6 +34,58 @@ const procs = (f: (typeof figures)[number]) => figureText(f, "processes");
 // Seconds as the page writes them: two significant figures (0.73 s, 6.4 s, 0.003 s).
 const s = (v: number) => `${v.toLocaleString("en-GB", { maximumSignificantDigits: 2 })} s`;
 const { startToSoundS: start, clickToSoundS: click, hovered, notHovered, preparedAhead, hoveredOnly, cold } = timings;
+
+/** The page's parts, for the index. */
+const parts = [
+  ["setup", "The PC and the players"],
+  ["run", "How each one ran"],
+  ["start", "Start to music playing"],
+  ["click", "Click to sound"],
+  ["counted", "What’s counted"],
+  ["dropped", "Left out, and measured again"],
+  ["scripts", "The scripts"],
+  ["sources", "Every figure and its source"],
+] as const;
+const title = Object.fromEntries(parts) as Record<(typeof parts)[number][0], string>;
+
+/** The click timings as a small table: which clicks, how many, the median and the range. */
+const clickRows = [
+  { k: "All clicks", t: click, median: formatFigure("clickToSoundS", click.median) },
+  { k: "Hovered first", t: hovered },
+  { k: "Not hovered", t: notHovered },
+  { k: "Prepared ahead", t: preparedAhead },
+  { k: "Ready from a hover alone", t: hoveredOnly },
+  { k: "Cold", t: cold },
+].map((r) => ({ ...r, median: r.median ?? s(r.t.median), range: r.t.n > 1 ? `${s(r.t.min)} to ${s(r.t.max)}` : "" }));
+
+/** Each player's files: the folder they lie in (inside the measurements), each file with the
+ *  figures it gives; what wasn't part of a measurement on a line of its own. */
+function folderOf(f: (typeof figures)[number]) {
+  const byFile = new Map<string, Metric[]>();
+  const none: Metric[] = [];
+  for (const m of metrics) {
+    const src = f.sources[m];
+    if (!src) none.push(m);
+    else byFile.set(src, [...(byFile.get(src) ?? []), m]);
+  }
+  const paths = [...byFile.keys()].filter((p) => p.startsWith("measurements/"));
+  const dirs = paths.map((p) => p.split("/").slice(0, -1));
+  const common = dirs.reduce((a, d) => a.filter((x, i) => d[i] === x), dirs[0] ?? []);
+  const files = [...byFile].map(([path, ms]) => ({
+    name: path.startsWith("measurements/") ? path.split("/").slice(common.length).join("/") : path,
+    kind: path.startsWith("measurements/") ? (/\.md$/.test(path) ? "text" : "data") : "release",
+    ms,
+  }));
+  return { crumbs: common, files, none };
+}
+
+const scripts = [
+  { name: "measure-pear.ps1", what: "Pear Desktop, 1 November" },
+  { name: "measure-edge.ps1", what: "Edge, 1 November" },
+  { name: "measure-pass.ps1", what: "featherplay, 14 November" },
+  { name: "run-starts.ps1", what: "Start to music playing" },
+  { name: "run-clicks.ps1", what: "Click to sound" },
+];
 ---
 
 <Base
@@ -40,320 +95,904 @@ const { startToSoundS: start, clickToSoundS: click, hovered, notHovered, prepare
 >
   <DeskLite />
   <Bar home={false} />
-  <main id="main" tabindex="-1" class="frame doc method">
-    <h1 class="t-display">How these were measured</h1>
-    <p class="lede t-lede ink2">
-      All three players were measured on one PC: Pear Desktop and Edge on the evening of 1 November 2026, featherplay
-      {fp.version} early on 14 November. Every figure on the home page comes from those two measurements, and each one
-      names its files below.
-    </p>
+  <main id="main" tabindex="-1" class="frame method">
+    <svg class="sprite" aria-hidden="true">
+      <symbol id="m-folder" viewBox="0 0 16 16"><path d="M1.5 4a1 1 0 0 1 1-1h3.2l1.3 1.4h6.5a1 1 0 0 1 1 1V12a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1Z" fill="var(--folder)"></path></symbol>
+      <symbol id="m-data" viewBox="0 0 16 16"><path d="M4 1.8h5.2L12.5 5v9.2H4Z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"></path><path d="M6 8.5h4.5M6 11h4.5" stroke="currentColor" stroke-width="1.1"></path></symbol>
+      <symbol id="m-text" viewBox="0 0 16 16"><path d="M4 1.8h5.2L12.5 5v9.2H4Z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"></path><path d="M6 7.5h4.5M6 9.6h4.5M6 11.7h3" stroke="currentColor" stroke-width="1"></path></symbol>
+      <symbol id="m-release" viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.2"></rect><path d="M2 5.6h12" stroke="currentColor" stroke-width="1.2"></path></symbol>
+      <symbol id="m-script" viewBox="0 0 16 16"><path d="M4 1.8h5.2L12.5 5v9.2H4Z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"></path><path d="M6 8l1.6 1.4L6 10.8M8.6 11.4h2" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+    </svg>
 
-    <section aria-labelledby="setup">
-      <h2 id="setup">The PC and the players</h2>
-      <ul class="facts">
-        <li>
-          An AMD Ryzen 7 9800X3D (8 cores, 16 logical processors) with 32 GB of memory, running Windows 11 Pro for
-          Workstations, build 26300.
-        </li>
-        <li>
-          featherplay {fp.version}, built for release on that PC from the same code as the {fp.version} release, so not
-          that release's exe: its code differs from that one's only in the version it logs. {release.version} wasn't
-          measured again; its exe is{release.portable ? ` ${sizeLabel(release.portable)}` : ""}, the installer
-          {release.installer ? ` ${sizeLabel(release.installer)}` : ""}. It ran on a copy of a long-used featherplay
-          folder (settings, saved queue, kept streams and covers), with Streaming quality on High, so every song played
-          as Opus. The settings were its owner's (lyrics on, a 2 s crossfade, the equalizer, Even out loudness and Skip
-          silence off), with Discord status off and {fp.version}'s new features (quick search, the sleep timer, desktop
-          lyrics) off, as they are by default. Last.fm was off, as the folder wasn't signed in to it.
-        </li>
-        <li>Pear Desktop {pear.version}, installed, with its owner's settings left as they were.</li>
-        <li>
-          YouTube Music in Microsoft Edge {edge.version}: a separate Edge with a clean profile of its own and no
-          extensions, one tab, signed in.
-        </li>
-      </ul>
-    </section>
+    <nav class="index" aria-label="On this page">
+      <p class="index-h">On this page</p>
+      <ol data-method-index>
+        {parts.map(([id, t]) => <li><a href={`#${id}`}>{t}</a></li>)}
+      </ol>
+    </nav>
 
-    <section aria-labelledby="run">
-      <h2 id="run">How each one ran</h2>
-      <ul class="facts">
-        <li>
-          Pear Desktop and Edge, on 1 November: the same song in both, on repeat, at normal volume. Each was the only
-          player running. Pear Desktop stayed open but paused while Edge was measured, and wasn't counted.
-        </li>
-        <li>
-          featherplay, on 14 November: one song on repeat, at featherplay's volume of 2 % (Windows' own volume left as
-          it was), three runs. Each figure is the median of the three. Pear Desktop wasn't running at any point.
-          featherplay ran on a Windows desktop of its own, so its window never showed while the PC was in use; the
-          whole machine averaged 9 to 10 % CPU over each part of a run.
-        </li>
-        <li>The window was minimised, and no games were running.</li>
-        <li>Five minutes playing, then three minutes paused, with a sample every 5 seconds.</li>
-        <li>
-          With the equalizer, Even out loudness, Skip silence and a 5 s crossfade all on, one more run, of featherplay
-          0.2.0 on 9 November, used {withProcessing.memoryMB} MB of memory and{" "}
-          {formatFigure("cpuPlayingPct", withProcessing.cpuPlayingPct)} CPU while playing. That run is 0.2.0's, wasn't
-          repeated for {fp.version}, and isn't in the comparison.
-        </li>
-      </ul>
-    </section>
+    <div class="body">
+      <header class="head">
+        <h1 class="t-display">How these were measured</h1>
+        <p class="lede t-lede ink2">
+          All three players were measured on one PC: Pear Desktop and Edge on the evening of 1 November 2026, featherplay
+          {fp.version} early on 14 November. Every figure on the home page comes from those two measurements, and each one
+          names its files below.
+        </p>
+      </header>
 
-    <section aria-labelledby="start">
-      <h2 id="start">Start to music playing</h2>
-      <ul class="facts">
-        <li>
-          featherplay only: Pear Desktop and Edge weren't part of this measurement. Each start resumed the queue
-          featherplay had saved, which picks a song up at 0:04, so the song had to load and seek. 0.2.2's starts
-          resumed theirs at 0:49, a longer seek, so the two figures aren't directly comparable.
-        </li>
-        <li>
-          The clock starts when Windows creates featherplay's process and stops when its audio engine logs the first
-          sound: the moment Windows' audio output takes the song's first samples.
-        </li>
-        <li>
-          Play was sent the way the taskbar thumbnail's Play button sends it, as soon as the window would take it, 0.07
-          to 0.12 s after the start. The window was shown, not minimised.
-        </li>
-        <li>
-          Warm starts, with featherplay and its folder already used: one start to warm up, not counted, then{" "}
-          {start.n}. The median is {formatFigure("startToSoundS", start.median)}, and they took {s(start.min)} to{" "}
-          {s(start.max)}. All {start.n} played the stream featherplay had kept from the last session, with no lookup, so
-          from Play to the first sound was the stream's first request and the seek: 0.12 to 0.21 s.
-        </li>
-        <li>
-          A new install has nothing kept yet. In 0.2.0, a new install's very
-          first song took longer, about 12 s once, while featherplay downloaded the two helpers it used (yt-dlp and
-          Deno); the starts after it took 0.5 to 0.9 s. Since featherplay answers YouTube's player challenges with the
-          JavaScript engine built into it, the first song no longer waits for that download: a new install prepares
-          YouTube's player at startup, in about 5 s, and a first click after that is one request (0.2 to 0.6 s,
-          measured on 9 November 2026). About one fresh start in seven gets answers from YouTube without a stream,
-          and then plays through yt-dlp instead (4 to 9 s) until the next song.
-        </li>
-      </ul>
-    </section>
-
-    <section aria-labelledby="click">
-      <h2 id="click">Click to sound</h2>
-      <ul class="facts">
-        <li>
-          featherplay only: Pear Desktop and Edge weren't part of this measurement. In Liked songs, the play button on a
-          song's cover was clicked through the window itself, with the messages Windows sends for a mouse click (move,
-          press, release). The real pointer didn't move.
-        </li>
-        <li>
-          On featherplay's own desktop the first press and release after a move never counted (0.2.0 behaves the same
-          there), so each click was a move, then two presses and releases 40 ms apart. The second release plays the
-          song. The first press lets featherplay start on the song about 45 ms early, as a real click's press does.
-        </li>
-        <li>
-          The clock starts at the release, the moment a click counts, and stops at the same first sound as above.
-        </li>
-        <li>
-          Hovered first means the pointer rests on the song before the click; featherplay starts getting a song ready
-          120 ms into a hover, or at a press. For these clicks a press and release 1 s before the click stood in for a
-          1 s hover, which starts the same work. Not hovered means the click alone.
-        </li>
-        <li>
-          Two sessions of six clicks, {click.n} in all, alternating hovered and not. featherplay started paused, so each
-          session's first click came while nothing played; each next one came about 12 s into the song the last click
-          started. While a song plays, featherplay prepares the songs on screen, as it does in everyday use. Before each
-          session the songs' kept streams were removed, so only that session's work made a song ready.
-        </li>
-        <li>
-          All {click.n}: median {formatFigure("clickToSoundS", click.median)}, {s(click.min)} to {s(click.max)}. Hovered
-          first: median {s(hovered.median)} ({s(hovered.min)} to {s(hovered.max)}). Not hovered: median{" "}
-          {s(notHovered.median)} ({s(notHovered.min)} to {s(notHovered.max)}).
-        </li>
-        <li>
-          By what was ready: {preparedAhead.n} of the {click.n} songs had been prepared while another played (median{" "}
-          {s(preparedAhead.median)}, {s(preparedAhead.min)} to {s(preparedAhead.max)}). A prepared song's stream isn't
-          fetched ahead: the click's first press starts it, and a quick click may wait for it, as 2 of these did (0.12
-          and 0.29 s); a hovered one plays from memory. One
-          session's first click was ready from its hover alone ({s(hoveredOnly.median)}). The other session's first was
-          cold: it waited for its lookup and its stream's first request ({s(cold.median)}).
-        </li>
-      </ul>
-    </section>
-
-    <section aria-labelledby="counted">
-      <h2 id="counted">What's counted</h2>
-      <ul class="facts">
-        <li>
-          Every process each player runs: {procs(fp)} for featherplay, {procs(pear)} for Pear Desktop and{" "}
-          {procs(edge)} for Edge. Edge's are picked out by the profile folder, so no other Edge window gets counted.
-          featherplay's would include any helper it starts to find a song's stream; none ran while it was measured.
-        </li>
-        <li>
-          Memory is private memory, the memory those processes keep for themselves, averaged over the run. It's in MB
-          as Windows counts them: 1 MB is 1,048,576 bytes, here and for every size on the site.
-        </li>
-        <li>
-          CPU is a share of the whole processor: the CPU seconds the processes used, divided by the seconds measured,
-          divided by the 16 logical processors. Windows charges CPU time in 15.6 ms ticks, which can miss very short
-          wakes; 0.2.0's paused figure of 0% came from that. For {fp.version} the processor cycles were counted too, and
-          they agree with the CPU seconds: paused, where the CPU seconds are one to three of those ticks in three
-          minutes, both come to 0.002%.
-        </li>
-        <li>
-          Download is what you download to install it: featherplay {release.version}'s installer (or the{" "}
-          {release.portable ? sizeLabel(release.portable) : ""} portable exe), Pear Desktop's {figureText(pear, "downloadMB")}{" "}
-          installer. Edge comes with Windows, so there's nothing to download.
-        </li>
-        <li>
-          The two folders under the comparison are Pear Desktop's install folder on the same PC, listed on 1 November
-          2026 ({installFolders.pear.files} files, {formatBytes(installFolders.pear.bytes)}), and featherplay's portable
-          exe. Source: {file(installFolders.source)}. Installed, featherplay's folder is the same exe plus its
-          uninstaller (about {formatBytes(installFolders.featherplay.installed.uninstallerBytes)}) and the Visual C++
-          runtime the exe needs (about {formatBytes(installFolders.featherplay.installed.runtimeBytes)}), source:{" "}
-          {file(installFolders.featherplay.installed.source)}, so its installed size is given as an approximation.
-        </li>
-      </ul>
-    </section>
-
-    <section aria-labelledby="dropped">
-      <h2 id="dropped">Left out, and measured again</h2>
-      <p class="para">On 1 November, two runs were thrown away and done again:</p>
-      <ul class="facts">
-        <li>Edge's first playing run, because playback had stalled.</li>
-        <li>
-          Edge's second playing run, because a rounding bug in the script's CPU column spoiled its CPU figure. The bug
-          is fixed. That run's memory, 999 MB, agrees with the run that's used.
-        </li>
-      </ul>
-      <p class="para">On 14 November:</p>
-      <ul class="facts">
-        <li>
-          A trial run, which looked up the runs' song once so that every run played it from the stream featherplay had
-          kept, wasn't counted.
-        </li>
-        <li>
-          All three runs sat at 38 to 39 MB of memory while playing. Until 0.4.0, about one run in three sat some 15 MB
-          higher from the start (0.3.0's at 58 MB, 0.2.2's at 57 MB), and why wasn't known. It was the font cache: it
-          copied each fallback font a title drew with into private memory, 14 MB for Yu Gothic Bold when a Japanese
-          title showed in bold. 0.4.0 reads those fonts where Windows keeps them. No Japanese, Chinese or Korean title
-          was on screen in these runs, so they show the usual case rather than the fix at work.
-        </li>
-        <li>
-          Two earlier sets of three runs, on 13 November, of 0.4.0's code before that fix, all sat at 54 to 56 MB. They
-          aren't used.
-        </li>
-      </ul>
-    </section>
-
-    <section aria-labelledby="scripts">
-      <h2 id="scripts">The scripts</h2>
-      <p class="para">
-        PowerShell scripts took the samples and wrote them to CSV files. On 1 November, <code>measure-pear.ps1</code>{" "}
-        for Pear Desktop and <code>measure-edge.ps1</code> for Edge, which reads each process's CPU time from Windows'
-        own process list (Win32_Process). On 14 November, <code>measure-pass.ps1</code> for featherplay (the method of
-        the 1 November script, with more columns, the processor cycles among them), and <code>run-starts.ps1</code> and{" "}
-        <code>run-clicks.ps1</code> for the two timings.
-      </p>
-    </section>
-
-    <section aria-labelledby="sources">
-      <h2 id="sources">Every figure and its source</h2>
-      {
-        figures.map((f) => (
-          <div class="app">
-            <h3>
-              {f.app} {f.version}
-            </h3>
+      <section class="part" aria-labelledby="setup">
+        <h2 id="setup">{title.setup}</h2>
+        <div class="text">
+          <dl class="kv players">
+            <div>
+              <dt>featherplay {fp.version}</dt>
+              <dd>
+                Built for release on the same PC from the same code as the {fp.version} release, so not that release's exe:
+                its code differs from that one's only in the version it logs. {release.version} wasn't measured again; its exe
+                is{release.portable ? ` ${sizeLabel(release.portable)}` : ""}, the installer
+                {release.installer ? ` ${sizeLabel(release.installer)}` : ""}. It ran on a copy of a long-used featherplay
+                folder (settings, saved queue, kept streams and covers), with Streaming quality on High, so every song played
+                as Opus. The settings were its owner's (lyrics on, a 2 s crossfade, the equalizer, Even out loudness and Skip
+                silence off), with Discord status off and {fp.version}'s new features (quick search, the sleep timer, desktop
+                lyrics) off, as they are by default. Last.fm was off, as the folder wasn't signed in to it.
+              </dd>
+            </div>
+            <div>
+              <dt>Pear Desktop {pear.version}</dt>
+              <dd>Installed, with its owner's settings left as they were.</dd>
+            </div>
+            <div>
+              <dt>YouTube Music in Microsoft Edge {edge.version}</dt>
+              <dd>A separate Edge with a clean profile of its own and no extensions, one tab, signed in.</dd>
+            </div>
+          </dl>
+        </div>
+        <aside class="aside" aria-label="The PC">
+          <div class="sheet">
+            <p class="sheet-h">The PC</p>
             <dl>
-              {metrics.map((m) => (
-                <div class="fact">
-                  <dt>{names[m]}</dt>
-                  <dd>
-                    <span class="v">{figureText(f, m)}</span>
-                    <span class="src">{source(f.sources[m])}</span>
-                  </dd>
-                </div>
-              ))}
+              <div><dt>Processor</dt><dd>AMD Ryzen 7 9800X3D</dd></div>
+              <div><dt>Cores</dt><dd>8 cores, 16 logical processors</dd></div>
+              <div><dt>Memory</dt><dd>32 GB</dd></div>
+              <div><dt>Windows</dt><dd>Windows 11 Pro for Workstations, build 26300</dd></div>
             </dl>
           </div>
-        ))
-      }
-    </section>
+        </aside>
+      </section>
 
-    <p class="back"><a href="/#light">Back to the comparison</a></p>
+      <section class="part" aria-labelledby="run">
+        <h2 id="run">{title.run}</h2>
+        <div class="text">
+          <ul class="facts">
+            <li>
+              Pear Desktop and Edge, on 1 November: the same song in both, on repeat, at normal volume. Each was the only
+              player running. Pear Desktop stayed open but paused while Edge was measured, and wasn't counted.
+            </li>
+            <li>
+              featherplay, on 14 November: one song on repeat, at featherplay's volume of 2 % (Windows' own volume left as
+              it was), three runs. Each figure is the median of the three. Pear Desktop wasn't running at any point.
+              featherplay ran on a Windows desktop of its own, so its window never showed while the PC was in use; the
+              whole machine averaged 9 to 10 % CPU over each part of a run.
+            </li>
+            <li>The window was minimised, and no games were running.</li>
+            <li>Five minutes playing, then three minutes paused, with a sample every 5 seconds.</li>
+            <li>
+              With the equalizer, Even out loudness, Skip silence and a 5 s crossfade all on, one more run, of featherplay
+              0.2.0 on 9 November, used {withProcessing.memoryMB} MB of memory and{" "}
+              {formatFigure("cpuPlayingPct", withProcessing.cpuPlayingPct)} CPU while playing. That run is 0.2.0's, wasn't
+              repeated for {fp.version}, and isn't in the comparison.
+            </li>
+          </ul>
+        </div>
+        <aside class="aside" aria-label="Each run">
+          <div class="sheet">
+            <p class="sheet-h">Each run</p>
+            <dl>
+              <div><dt>Playing</dt><dd>5 minutes</dd></div>
+              <div><dt>Paused</dt><dd>3 minutes</dd></div>
+              <div><dt>A sample</dt><dd>every 5 seconds</dd></div>
+              <div><dt>The window</dt><dd>minimised</dd></div>
+              <div><dt>featherplay</dt><dd>3 runs, the median of each figure</dd></div>
+            </dl>
+          </div>
+          <div class="sheet">
+            <p class="sheet-h">The sound features on: featherplay 0.2.0, one run</p>
+            <dl>
+              <div><dt>Memory</dt><dd class="num">{withProcessing.memoryMB} MB</dd></div>
+              <div><dt>CPU while playing</dt><dd class="num">{formatFigure("cpuPlayingPct", withProcessing.cpuPlayingPct)}</dd></div>
+            </dl>
+          </div>
+        </aside>
+      </section>
+
+      <section class="part" aria-labelledby="start">
+        <h2 id="start">{title.start}</h2>
+        <div class="text">
+          <ul class="facts">
+            <li>
+              featherplay only: Pear Desktop and Edge weren't part of this measurement. Each start resumed the queue
+              featherplay had saved, which picks a song up at 0:04, so the song had to load and seek. 0.2.2's starts resumed
+              theirs at 0:49, a longer seek, so the two figures aren't directly comparable.
+            </li>
+            <li>
+              The clock starts when Windows creates featherplay's process and stops when its audio engine logs the first
+              sound: the moment Windows' audio output takes the song's first samples.
+            </li>
+            <li>
+              Play was sent the way the taskbar thumbnail's Play button sends it, as soon as the window would take it, 0.07
+              to 0.12 s after the start. The window was shown, not minimised.
+            </li>
+            <li>
+              Warm starts, with featherplay and its folder already used: one start to warm up, not counted, then{" "}
+              {start.n}. The median is {formatFigure("startToSoundS", start.median)}, and they took {s(start.min)} to{" "}
+              {s(start.max)}. All {start.n} played the stream featherplay had kept from the last session, with no lookup, so
+              from Play to the first sound was the stream's first request and the seek: 0.12 to 0.21 s.
+            </li>
+            <li>
+              A new install has nothing kept yet. In 0.2.0, a new install's very first song took longer, about 12 s once,
+              while featherplay downloaded the two helpers it used (yt-dlp and Deno); the starts after it took 0.5 to 0.9 s.
+              Since featherplay answers YouTube's player challenges with the JavaScript engine built into it, the first song
+              no longer waits for that download: a new install prepares YouTube's player at startup, in about 5 s, and a
+              first click after that is one request (0.2 to 0.6 s, measured on 9 November 2026). About one fresh start in
+              seven gets answers from YouTube without a stream, and then plays through yt-dlp instead (4 to 9 s) until the
+              next song.
+            </li>
+          </ul>
+        </div>
+        <aside class="aside" aria-label="Warm starts">
+          <div class="sheet">
+            <p class="sheet-h">featherplay {fp.version}, warm starts</p>
+            <dl>
+              <div class="big"><dt>Median</dt><dd class="num">{formatFigure("startToSoundS", start.median)}</dd></div>
+              <div><dt>All {start.n}</dt><dd class="num">{s(start.min)} to {s(start.max)}</dd></div>
+              <div><dt>Play to the first sound</dt><dd class="num">0.12 to 0.21 s</dd></div>
+              <div><dt>Play sent</dt><dd class="num">0.07 to 0.12 s after the start</dd></div>
+            </dl>
+          </div>
+        </aside>
+      </section>
+
+      <section class="part" aria-labelledby="click">
+        <h2 id="click">{title.click}</h2>
+        <div class="text">
+          <ul class="facts">
+            <li>
+              featherplay only: Pear Desktop and Edge weren't part of this measurement. In Liked songs, the play button on a
+              song's cover was clicked through the window itself, with the messages Windows sends for a mouse click (move,
+              press, release). The real pointer didn't move.
+            </li>
+            <li>
+              On featherplay's own desktop the first press and release after a move never counted (0.2.0 behaves the same
+              there), so each click was a move, then two presses and releases 40 ms apart. The second release plays the
+              song. The first press lets featherplay start on the song about 45 ms early, as a real click's press does.
+            </li>
+            <li>The clock starts at the release, the moment a click counts, and stops at the same first sound as above.</li>
+            <li>
+              Hovered first means the pointer rests on the song before the click; featherplay starts getting a song ready
+              120 ms into a hover, or at a press. For these clicks a press and release 1 s before the click stood in for a
+              1 s hover, which starts the same work. Not hovered means the click alone.
+            </li>
+            <li>
+              Two sessions of six clicks, {click.n} in all, alternating hovered and not. featherplay started paused, so each
+              session's first click came while nothing played; each next one came about 12 s into the song the last click
+              started. While a song plays, featherplay prepares the songs on screen, as it does in everyday use. Before each
+              session the songs' kept streams were removed, so only that session's work made a song ready.
+            </li>
+            <li>
+              All {click.n}: median {formatFigure("clickToSoundS", click.median)}, {s(click.min)} to {s(click.max)}. Hovered
+              first: median {s(hovered.median)} ({s(hovered.min)} to {s(hovered.max)}). Not hovered: median{" "}
+              {s(notHovered.median)} ({s(notHovered.min)} to {s(notHovered.max)}).
+            </li>
+            <li>
+              By what was ready: {preparedAhead.n} of the {click.n} songs had been prepared while another played (median{" "}
+              {s(preparedAhead.median)}, {s(preparedAhead.min)} to {s(preparedAhead.max)}). A prepared song's stream isn't
+              fetched ahead: the click's first press starts it, and a quick click may wait for it, as 2 of these did (0.12
+              and 0.29 s); a hovered one plays from memory. One session's first click was ready from its hover alone
+              ({s(hoveredOnly.median)}). The other session's first was cold: it waited for its lookup and its stream's
+              first request ({s(cold.median)}).
+            </li>
+          </ul>
+        </div>
+        <aside class="aside" aria-label="The clicks">
+          <div class="sheet">
+            <p class="sheet-h">featherplay {fp.version}, {click.n} clicks</p>
+            <table class="clicks">
+              <thead>
+                <tr><th scope="col">Clicks</th><th scope="col">Median</th><th scope="col">Range</th></tr>
+              </thead>
+              <tbody>
+                {
+                  clickRows.map((r, i) => (
+                    <tr class:list={{ all: i === 0 }}>
+                      <th scope="row">
+                        {r.k} <span class="n">{r.t.n}</span>
+                      </th>
+                      <td>{r.median}</td>
+                      <td>{r.range}</td>
+                    </tr>
+                  ))
+                }
+              </tbody>
+            </table>
+          </div>
+        </aside>
+      </section>
+
+      <section class="part" aria-labelledby="counted">
+        <h2 id="counted">{title.counted}</h2>
+        <div class="text">
+          <ul class="facts">
+            <li>
+              Every process each player runs: {procs(fp)} for featherplay, {procs(pear)} for Pear Desktop and {procs(edge)} for
+              Edge. Edge's are picked out by the profile folder, so no other Edge window gets counted. featherplay's would
+              include any helper it starts to find a song's stream; none ran while it was measured.
+            </li>
+            <li>
+              Memory is private memory, the memory those processes keep for themselves, averaged over the run. It's in MB as
+              Windows counts them: 1 MB is 1,048,576 bytes, here and for every size on the site.
+            </li>
+            <li>
+              CPU is a share of the whole processor: the CPU seconds the processes used, divided by the seconds measured,
+              divided by the 16 logical processors. Windows charges CPU time in 15.6 ms ticks, which can miss very short
+              wakes; 0.2.0's paused figure of 0% came from that. For {fp.version} the processor cycles were counted too, and
+              they agree with the CPU seconds: paused, where the CPU seconds are one to three of those ticks in three
+              minutes, both come to 0.002%.
+            </li>
+            <li>
+              Download is what you download to install it: featherplay {release.version}'s installer (or the{" "}
+              {release.portable ? sizeLabel(release.portable) : ""} portable exe), Pear Desktop's {figureText(pear, "downloadMB")}{" "}
+              installer. Edge comes with Windows, so there's nothing to download.
+            </li>
+            <li>
+              The two folders under the comparison are Pear Desktop's install folder on the same PC, listed on 1 November
+              2026 ({installFolders.pear.files} files, {formatBytes(installFolders.pear.bytes)}), and featherplay's portable
+              exe. Source: {file(installFolders.source)}. Installed, featherplay's folder is the same exe plus its uninstaller
+              (about {formatBytes(installFolders.featherplay.installed.uninstallerBytes)}) and the Visual C++ runtime the exe
+              needs (about {formatBytes(installFolders.featherplay.installed.runtimeBytes)}), source:{" "}
+              {file(installFolders.featherplay.installed.source)}, so its installed size is given as an approximation.
+            </li>
+          </ul>
+        </div>
+        <aside class="aside" aria-label="The units">
+          <div class="sheet">
+            <p class="sheet-h">The units</p>
+            <dl>
+              <div><dt>Memory</dt><dd>private memory, all processes, averaged</dd></div>
+              <div><dt>1 MB</dt><dd class="num">1,048,576 bytes</dd></div>
+              <div><dt>CPU</dt><dd>CPU seconds ÷ seconds measured ÷ 16 logical processors</dd></div>
+              <div><dt>Windows’ CPU tick</dt><dd class="num">15.6 ms</dd></div>
+            </dl>
+          </div>
+          <div class="sheet">
+            <p class="sheet-h">Processes</p>
+            <dl>
+              {figures.map((f) => <div><dt>{f === edge ? "Edge" : f.app}</dt><dd class="num">{procs(f)}</dd></div>)}
+            </dl>
+          </div>
+        </aside>
+      </section>
+
+      <section class="part" aria-labelledby="dropped">
+        <h2 id="dropped">{title.dropped}</h2>
+        <div class="text">
+          <p class="para">On 1 November, two runs were thrown away and done again:</p>
+          <ul class="facts">
+            <li>Edge's first playing run, because playback had stalled.</li>
+            <li>
+              Edge's second playing run, because a rounding bug in the script's CPU column spoiled its CPU figure. The bug is
+              fixed. That run's memory, 999 MB, agrees with the run that's used.
+            </li>
+          </ul>
+          <p class="para">On 14 November:</p>
+          <ul class="facts">
+            <li>
+              A trial run, which looked up the runs' song once so that every run played it from the stream featherplay had
+              kept, wasn't counted.
+            </li>
+            <li>
+              All three runs sat at 38 to 39 MB of memory while playing. Until 0.4.0, about one run in three sat some 15 MB
+              higher from the start (0.3.0's at 58 MB, 0.2.2's at 57 MB), and why wasn't known. It was the font cache: it
+              copied each fallback font a title drew with into private memory, 14 MB for Yu Gothic Bold when a Japanese title
+              showed in bold. 0.4.0 reads those fonts where Windows keeps them. No Japanese, Chinese or Korean title was on
+              screen in these runs, so they show the usual case rather than the fix at work.
+            </li>
+            <li>
+              Two earlier sets of three runs, on 13 November, of 0.4.0's code before that fix, all sat at 54 to 56 MB. They
+              aren't used.
+            </li>
+          </ul>
+        </div>
+        <aside class="aside" aria-label="featherplay's memory while playing, by run">
+          <div class="sheet">
+            <p class="sheet-h">featherplay’s memory while playing</p>
+            <dl>
+              <div><dt>0.4.0, the three runs used</dt><dd class="num">38 to 39 MB</dd></div>
+              <div><dt>0.4.0’s code before the font fix, 13 November</dt><dd class="num">54 to 56 MB</dd></div>
+              <div><dt>0.3.0’s higher run</dt><dd class="num">58 MB</dd></div>
+              <div><dt>0.2.2’s higher run</dt><dd class="num">57 MB</dd></div>
+            </dl>
+          </div>
+        </aside>
+      </section>
+
+      <section class="part" aria-labelledby="scripts">
+        <h2 id="scripts">{title.scripts}</h2>
+        <div class="text">
+          <p class="para">
+            PowerShell scripts took the samples and wrote them to CSV files. On 1 November, <code>measure-pear.ps1</code>{" "}
+            for Pear Desktop and <code>measure-edge.ps1</code> for Edge, which reads each process's CPU time from Windows' own
+            process list (Win32_Process). On 14 November, <code>measure-pass.ps1</code> for featherplay (the method of the 1
+            November script, with more columns, the processor cycles among them), and <code>run-starts.ps1</code> and{" "}
+            <code>run-clicks.ps1</code> for the two timings.
+          </p>
+        </div>
+        <aside class="aside" aria-label="The scripts, as files">
+          <figure class="folder">
+            <figcaption class="f-bar"><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><use href="#m-folder"></use></svg>The scripts</figcaption>
+            <ul class="f-list">
+              {
+                scripts.map((x) => (
+                  <li>
+                    <svg class="glyph" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+                      <use href="#m-script" />
+                    </svg>
+                    <span class="f-name">{x.name}</span>
+                    <span class="f-what">{x.what}</span>
+                  </li>
+                ))
+              }
+            </ul>
+          </figure>
+        </aside>
+      </section>
+
+      <section class="part wide" aria-labelledby="sources">
+        <h2 id="sources">{title.sources}</h2>
+        <p class="para text">
+          Each player’s files, by their place in the measurements’ write-ups, and the figures each one gives.
+        </p>
+        <div class="folders">
+          {
+            figures.map((f) => {
+              const d = folderOf(f);
+              return (
+                <figure class="folder" aria-labelledby={`src-${f.app.replace(/\W+/g, "-")}`}>
+                  <figcaption class="f-bar" id={`src-${f.app.replace(/\W+/g, "-")}`}>
+                    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+                      <use href="#m-folder" />
+                    </svg>
+                    <span>
+                      {f.app} {f.version}
+                    </span>
+                  </figcaption>
+                  <p class="crumbs">
+                    {d.crumbs.map((c, i) => (
+                      <span class:list={["crumb", { here: i === d.crumbs.length - 1 }]}>{c}</span>
+                    ))}
+                  </p>
+                  <ul class="f-list">
+                    {d.files.map((x) => (
+                      <li class="src">
+                        <svg class="glyph" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+                          <use href={`#m-${x.kind}`} />
+                        </svg>
+                        <span class="f-name">{x.name}</span>
+                        <dl class="gives">
+                          {x.ms.map((m) => (
+                            <div>
+                              <dt>{names[m]}</dt>
+                              <dd>{figureText(f, m)}</dd>
+                            </div>
+                          ))}
+                        </dl>
+                      </li>
+                    ))}
+                    {d.none.length > 0 && (
+                      <li class="src none">
+                        <span class="f-name">Not part of this measurement</span>
+                        <dl class="gives">
+                          {d.none.map((m) => (
+                            <div>
+                              <dt>{names[m]}</dt>
+                              <dd>{figureText(f, m)}</dd>
+                            </div>
+                          ))}
+                        </dl>
+                      </li>
+                    )}
+                  </ul>
+                </figure>
+              );
+            })
+          }
+        </div>
+      </section>
+
+      <p class="back"><a class="text-link" href="/#light">Back to the comparison</a></p>
+    </div>
   </main>
   <SiteFooter />
 </Base>
 
-<style>
-  .doc > :not(.lede) {
-    max-width: 60rem;
+<script>
+  // The index marks the part being read (as the Questions section's index does).
+  const links = new Map<Element, HTMLAnchorElement>();
+  for (const a of document.querySelectorAll<HTMLAnchorElement>("[data-method-index] a")) {
+    const part = document.getElementById(a.hash.slice(1))?.closest("section");
+    if (part) links.set(part, a);
   }
+  if (links.size && "IntersectionObserver" in window) {
+    const shown = new Set<Element>();
+    const io = new IntersectionObserver(
+      (es) => {
+        for (const e of es) e.isIntersecting ? shown.add(e.target) : shown.delete(e.target);
+        const at = [...links.keys()].find((p) => shown.has(p));
+        for (const [p, a] of links) {
+          if (p === at) a.setAttribute("aria-current", "true");
+          else a.removeAttribute("aria-current");
+        }
+      },
+      { rootMargin: "-30% 0px -55% 0px" },
+    );
+    for (const p of links.keys()) io.observe(p);
+  }
+</script>
+
+<style>
   .method {
+    --index-w: 15rem;
+    --gap: var(--s7);
+    --hair: color-mix(in srgb, var(--text) 10%, transparent);
+    display: grid;
+    grid-template-columns: var(--index-w) minmax(0, 1fr);
+    column-gap: var(--gap);
+    align-items: start;
     padding-block: calc(var(--bar-h) + var(--s8)) clamp(48px, 8vw, 120px);
   }
-  /* On the system: the page’s title and lede sizes, the column on the bar’s left edge. */
+  .sprite {
+    position: absolute;
+    width: 0;
+    height: 0;
+  }
+
+  /* ---- The index: held in view under the capsule, the part being read marked ---- */
+  .index {
+    position: sticky;
+    top: calc(var(--cap-top) + var(--cap-h) + var(--s6));
+  }
+  /* Its inks a step brighter than the page's quiet ink: in the dark it lies over the desk's lit
+     corner. */
+  .index {
+    --index-ink: color-mix(in srgb, var(--ink2) 72%, var(--text));
+  }
+  .index-h {
+    margin-bottom: var(--s3);
+    padding-left: var(--s4);
+    color: var(--index-ink);
+    font-size: var(--fs-small);
+    font-weight: var(--fw-medium);
+  }
+  .index ol {
+    display: grid;
+    gap: 2px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .index a {
+    position: relative;
+    display: flex;
+    align-items: center;
+    min-height: 36px;
+    padding-left: var(--s4);
+    color: var(--index-ink);
+    font-size: var(--fs-small);
+    font-weight: var(--fw-medium);
+    line-height: var(--lh-small);
+    text-decoration: none;
+    transition: color var(--t-hover) ease;
+  }
+  .index a::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 50%;
+    width: 3px;
+    height: 0;
+    border-radius: var(--r-pill);
+    background: var(--accent);
+    translate: 0 -50%;
+    transition: height var(--t-small) var(--ease-out);
+  }
+  .index a:hover,
+  .index a[aria-current="true"] {
+    color: var(--text);
+  }
+  .index a[aria-current="true"]::before {
+    height: 1.125rem;
+  }
+
+  /* ---- The document: the text at a reading measure, its facts beside it ---- */
+  .body {
+    --text-w: 40rem;
+    --aside-max: 30rem;
+    min-width: 0;
+  }
+  .head {
+    max-width: 72rem;
+  }
+  .head + .part {
+    margin-top: var(--s8);
+  }
   .lede {
-    max-width: 46ch;
+    max-width: 52ch;
     margin-top: var(--s5);
   }
-  .para {
-    max-width: 64ch;
-    margin-bottom: 14px;
+  .part {
+    display: grid;
+    grid-template-columns: minmax(0, var(--text-w)) minmax(20rem, 1fr);
+    grid-template-areas:
+      "h h"
+      "text aside";
+    column-gap: var(--gap);
+    align-items: start;
+    margin-top: var(--s9);
+    scroll-margin-top: calc(var(--cap-top) + var(--cap-h) + var(--s5));
   }
-  code {
-    font-size: 0.9375em;
-    white-space: nowrap;
+  .part > h2 {
+    grid-area: h;
+    margin-bottom: var(--s5);
+    font-size: var(--fs-title);
+    font-weight: var(--fw-bold);
+    line-height: var(--lh-title);
+    letter-spacing: var(--tr-title);
+    text-wrap: balance;
   }
-  section {
-    margin-top: clamp(56px, 7vw, 96px);
+  .text {
+    grid-area: text;
   }
-  h2 {
-    font-size: clamp(1.75rem, 3.4vw, 2.75rem);
-    margin-bottom: 24px;
+  /* Held beside its text while a long part scrolls past. */
+  .aside {
+    grid-area: aside;
+    position: sticky;
+    top: calc(var(--cap-top) + var(--cap-h) + var(--s6));
+    display: grid;
+    gap: var(--s4);
+    max-width: var(--aside-max);
   }
   .facts {
     display: grid;
-    gap: 14px;
-    max-width: 64ch;
-    padding-left: 1.2em;
+    gap: var(--s4);
+    margin: 0;
+    padding: 0;
+    list-style: none;
   }
-  .app {
-    margin-top: 40px;
+  .facts li,
+  .para,
+  .kv dd {
+    text-wrap: pretty;
   }
-  h3 {
-    font-size: 1.375rem;
-    margin-bottom: 12px;
+  .para {
+    margin-bottom: var(--s4);
   }
-  dl {
+  .facts + .para {
+    margin-top: var(--s6);
+  }
+  code {
+    font-size: 0.9375em;
+    font-weight: var(--fw-medium);
+    white-space: nowrap;
+  }
+
+  /* Key and value: the players, each named once, its setup beside or under it. */
+  .kv {
     display: grid;
-    gap: 8px;
-  }
-  .fact {
-    display: grid;
-    grid-template-columns: minmax(0, 14rem) 1fr;
-    gap: 4px 24px;
-    padding: 10px 0;
-  }
-  dt {
-    color: var(--text-muted);
-  }
-  dd {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px 16px;
     margin: 0;
   }
-  .v {
-    font-weight: 700;
+  .kv > div {
+    display: grid;
+    gap: var(--s1);
+    padding-block: var(--s4);
+  }
+  .kv > div + div {
+    box-shadow: inset 0 1px 0 var(--hair);
+  }
+  .kv > div:first-child {
+    padding-top: 0;
+  }
+  .kv dt {
+    font-weight: var(--fw-bold);
+  }
+  .kv dd {
+    margin: 0;
+    color: color-mix(in srgb, var(--text) 86%, transparent);
+  }
+
+  /* ---- A spec sheet: a small content surface, keys in the quieter ink ---- */
+  .sheet {
+    padding: var(--s4) var(--s5) var(--s2);
+    border: 1px solid transparent;
+    border-radius: var(--r-panel);
+    background:
+      linear-gradient(var(--panel-bg), var(--panel-bg)) padding-box,
+      radial-gradient(130% 100% at 50% 0%, var(--rim), var(--panel-edge) 70%) border-box;
+    box-shadow:
+      0 1px 2px var(--panel-lift),
+      0 16px 40px -24px var(--panel-lift);
+    font-size: var(--fs-small);
+    line-height: var(--lh-small);
+  }
+  .sheet-h {
+    margin-bottom: var(--s2);
+    color: var(--ink2);
+    font-weight: var(--fw-bold);
+  }
+  .sheet dl {
+    margin: 0;
+  }
+  .sheet dl > div {
+    display: grid;
+    grid-template-columns: minmax(6.5rem, 2fr) minmax(0, 3fr);
+    gap: var(--s1) var(--s4);
+    padding-block: var(--s2);
+  }
+  .sheet dl > div + div {
+    box-shadow: inset 0 1px 0 var(--hair);
+  }
+  .sheet dt {
+    color: var(--ink2);
+    font-weight: var(--fw-medium);
+  }
+  .sheet dd {
+    margin: 0;
+    color: var(--text);
+    font-weight: var(--fw-bold);
+  }
+  .num {
     font-variant-numeric: tabular-nums;
   }
-  .src {
-    color: var(--text-muted);
-    font-size: 0.9375rem;
+  /* One figure the sheet is about, at the figures' size. */
+  .sheet .big {
+    align-items: baseline;
+  }
+  .sheet .big dd {
+    font-size: var(--fs-subtitle);
+    letter-spacing: var(--tr-subtitle);
+    line-height: 1.1;
+  }
+
+  /* The clicks as a table: tabular figures, the first row (all twelve) in the full ink. */
+  .clicks {
+    width: 100%;
+    margin-bottom: var(--s2);
+    border-collapse: collapse;
+    font-variant-numeric: tabular-nums;
+  }
+  .clicks th,
+  .clicks td {
+    padding: var(--s2) 0;
+    text-align: left;
+    vertical-align: baseline;
+  }
+  .clicks td {
+    padding-left: var(--s3);
+    font-weight: var(--fw-bold);
+    white-space: nowrap;
+  }
+  .clicks td + td {
+    color: var(--ink2);
+    font-weight: var(--fw-medium);
+  }
+  .clicks thead th {
+    padding-top: 0;
+    color: var(--ink3);
+    font-weight: var(--fw-medium);
+  }
+  .clicks thead th + th {
+    padding-left: var(--s3);
+  }
+  .clicks tbody th {
+    color: var(--ink2);
+    font-weight: var(--fw-medium);
+  }
+  .clicks tbody tr {
+    box-shadow: inset 0 1px 0 var(--hair);
+  }
+  .clicks .n {
+    color: var(--ink3);
+  }
+  .clicks tr.all th,
+  .clicks tr.all td:first-of-type {
+    color: var(--text);
+  }
+
+  /* ---- Folders, in the site's Explorer style (What featherplay leaves out) ---- */
+  .folder {
+    --paint: var(--song);
+    overflow: hidden;
+    margin: 0;
+    border-radius: var(--r-small);
+    background: color-mix(in srgb, var(--paint) 4%, var(--surface));
+    box-shadow: var(--lit), var(--ring), var(--shadow);
+    font-size: var(--fs-small);
+    font-weight: var(--fw-medium);
+    line-height: var(--lh-small);
+  }
+  .f-bar {
+    display: flex;
+    align-items: center;
+    gap: var(--s2);
+    min-height: 36px;
+    padding: 0 var(--s4);
+    background: color-mix(in srgb, var(--paint) 6%, var(--panel-tint));
+    font-weight: var(--fw-bold);
+  }
+  .f-bar svg {
+    flex: none;
+  }
+  .crumbs {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px 6px;
+    margin: var(--s2) var(--s3) 6px;
+    padding: 6px var(--s3);
+    border-radius: var(--r-control);
+    background: var(--panel-tint);
+    color: var(--ink2);
     overflow-wrap: anywhere;
   }
-  .back {
-    margin-top: 64px;
-    font-weight: 700;
+  .crumb + .crumb::before {
+    content: "›";
+    margin-right: 6px;
   }
-  @media (max-width: 640px) {
-    .fact {
-      grid-template-columns: 1fr;
+  .crumb.here {
+    color: var(--text);
+    font-weight: var(--fw-bold);
+  }
+  .f-list {
+    display: grid;
+    margin: 0;
+    padding: var(--s1) var(--s3) var(--s3);
+    list-style: none;
+  }
+  .f-list li {
+    display: grid;
+    grid-template-columns: 16px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--s1) var(--s3);
+    min-height: 30px;
+    padding: var(--s1) var(--s3);
+    border-radius: var(--r-control);
+  }
+  .f-list li:nth-child(odd) {
+    background: color-mix(in srgb, var(--panel-tint) 60%, transparent);
+  }
+  .glyph {
+    color: var(--ink2);
+  }
+  .f-name {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .f-what {
+    color: var(--ink2);
+    text-align: right;
+  }
+  /* A source file and what it gives, under its name. */
+  .f-list li.src {
+    grid-template-columns: 16px minmax(0, 1fr);
+    align-items: start;
+    padding-block: var(--s2) var(--s3);
+  }
+  .f-list li.src .glyph {
+    margin-top: 1px;
+  }
+  .f-list li.src.none {
+    padding-left: calc(var(--s3) + 16px + var(--s3));
+    grid-template-columns: minmax(0, 1fr);
+    color: var(--ink2);
+  }
+  .gives {
+    grid-column: -2 / -1;
+    display: grid;
+    gap: 2px;
+    margin: 0;
+  }
+  .gives > div {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--s4);
+  }
+  .gives dt {
+    color: var(--ink2);
+  }
+  .gives dd {
+    margin: 0;
+    font-weight: var(--fw-bold);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .folders {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+    gap: var(--s5);
+    align-items: start;
+  }
+  .part.wide {
+    grid-template-areas:
+      "h h"
+      "text text";
+  }
+  .part.wide > .text {
+    max-width: var(--text-w);
+    margin-bottom: var(--s5);
+  }
+  .back {
+    margin-top: var(--s8);
+  }
+
+  /* A very wide screen: a longer measure and a wider aside. */
+  @media (min-width: 2200px) {
+    .body {
+      --text-w: 44rem;
+      --aside-max: 40rem;
+    }
+  }
+  /* No room for the index beside the text: it goes, the parts keep their facts beside them. */
+  @media (width < 1200px) {
+    .method {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .index {
+      display: none;
+    }
+  }
+  /* A narrow screen: one column, each part's facts after its text. */
+  @media (width < 900px) {
+    .part {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-areas:
+        "h"
+        "text"
+        "aside";
+      row-gap: var(--s5);
+      margin-top: var(--s8);
+    }
+    .part.wide {
+      grid-template-areas:
+        "h"
+        "text";
+    }
+    .part > h2 {
+      margin-bottom: 0;
+      font-size: clamp(1.75rem, 7vw, var(--fs-title));
+    }
+    .aside {
+      position: static;
+      max-width: 34rem;
+    }
+  }
+  @media (width < 520px) {
+    .sheet dl > div {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 0;
+    }
+    .gives > div {
+      flex-wrap: wrap;
+      gap: 0 var(--s3);
+    }
+  }
+  @media (forced-colors: active) {
+    .index a::before {
+      forced-color-adjust: none;
+      background: Highlight;
+    }
+    .sheet,
+    .folder {
+      border: 1px solid CanvasText;
     }
   }
 </style>

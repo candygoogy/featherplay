@@ -209,6 +209,21 @@ test("the method link opens /method", async ({ page }) => {
   }
 });
 
+test("/method: the index beside the text leads to each part and marks the one being read", async ({ page }) => {
+  await page.setViewportSize({ width: 1567, height: 870 });
+  await page.goto("/method");
+  const index = page.getByRole("navigation", { name: "On this page" });
+  const links = index.getByRole("link");
+  await expect(links).toHaveCount(await page.locator("main section h2").count());
+  await links.filter({ hasText: "Click to sound" }).click();
+  await expect(page).toHaveURL(/#click$/);
+  await expect(links.filter({ hasText: "Click to sound" })).toHaveAttribute("aria-current", "true");
+  // Held in view while the parts scroll past, beside the text, never over it.
+  const [nav, text] = [(await index.boundingBox())!, (await page.locator("#click ~ .text").boundingBox())!];
+  expect(nav.y).toBeGreaterThanOrEqual(0);
+  expect(nav.x + nav.width).toBeLessThan(text.x);
+});
+
 test.describe("/method without JavaScript", () => {
   test.use({ javaScriptEnabled: false });
 
