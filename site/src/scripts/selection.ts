@@ -60,14 +60,26 @@ const isField = (el: Element | null) => !!el && (el.matches("input, textarea") |
 /** What floats over the page (the top layer, the bar): its text keeps the native wash. */
 const FLOATS = "[popover], dialog, [data-site-bar]";
 
+/** Whether an element's text is both selectable and seen. A range spans everything between its
+ *  ends, also what `user-select: none` keeps out of the selection (the handwritten notes, a
+ *  sleeve's title) and what is hidden or faded out: none of that gets a piece. */
+function shows(el: Element): boolean {
+  if (el.checkVisibility && !el.checkVisibility({ opacityProperty: true, visibilityProperty: true })) return false;
+  // user-select: none on an ancestor holds for its text, but only Chromium reports it on the child.
+  for (let up: Element | null = el; up && up !== document.body; up = up.parentElement) {
+    const cs = getComputedStyle(up);
+    if ((cs.userSelect || cs.webkitUserSelect) === "none") return false;
+  }
+  return true;
+}
+
 type Clip = { left: number; top: number; right: number; bottom: number };
-/** What an element's ancestors leave of it on screen (overflow other than visible clips),
+/** What an element and its ancestors leave of its text on screen (overflow other than visible clips),
  *  or null where nothing clips it. Cached per ancestor for one drawing. */
-function clipOf(el: Element, cache: Map<Element, Clip | null>): Clip | null {
-  const up = el.parentElement;
+function clipOf(up: Element | null, cache: Map<Element, Clip | null>): Clip | null {
   if (!up || up === document.body) return null;
   if (cache.has(up)) return cache.get(up)!;
-  const outer = clipOf(up, cache);
+  const outer = clipOf(up.parentElement, cache);
   const cs = getComputedStyle(up);
   let clip = outer;
   if (cs.overflowX !== "visible" || cs.overflowY !== "visible") {
@@ -120,7 +132,7 @@ function lineBoxes(sel: Selection, kept: Kept): Box[] {
       // never taller than the line it's on, so lines don't overlap. Read once an element.
       let ink = lineOf.get(parent);
       if (ink === undefined) {
-        if (parent.closest(FLOATS)) ink = null;
+        if (parent.closest(FLOATS) || !shows(parent)) ink = null;
         else {
           const cs = getComputedStyle(parent);
           ink = { lh: parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.3, light: inkIsLight(cs.color) };
