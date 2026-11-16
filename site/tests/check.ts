@@ -6,7 +6,7 @@ import { expect, type Page } from "@playwright/test";
 
 /** Widths either side of every rule the bar and the window change at (the bar's container
  *  queries at 420, 560, 800 and 1,180 px, the story's 761), and a coarse step between. */
-export const WIDTHS = [320, 360, 390, 419, 421, 480, 559, 561, 640, 760, 761, 799, 801, 900, 1024, 1179, 1181, 1280, 1366, 1440, 1600, 1920, 2560, 3200, 3840];
+export const WIDTHS = [320, 360, 390, 419, 421, 480, 559, 561, 640, 760, 761, 799, 801, 839, 841, 900, 1024, 1179, 1181, 1239, 1241, 1280, 1366, 1440, 1600, 1920, 2560, 3200, 3840];
 
 /** No glide of the bar's parts in flight, and the capsule's ground grown to its size (two
  *  frames for any observer to answer first). */

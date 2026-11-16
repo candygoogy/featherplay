@@ -4,8 +4,9 @@
 // runs at rest; under reduced motion none of them plays.
 // - The bar's mark comes together once at load (mark-intro) and answers a song starting
 //   (mark-play): layers of TriVane.astro, transforms only.
-// - The bar's App, Numbers and Lyrics icons move once when their section becomes the current
-//   one, and when the pointer comes to them (icon-app, icon-numbers, icon-lyrics).
+// - The bar's App, Numbers, Lyrics and Features icons move once when their section becomes the
+//   current one, and when the pointer comes to them (icon-app, icon-numbers, icon-lyrics; the
+//   Features tile is ours, on the same clock).
 // - The download arrow drops into its tray on hover and on press (download-arrow).
 // The theme toggle's turn (icon-theme) and the scrobble ring's tick (scrobble-tick) are CSS
 // transitions where they are drawn (Bar.astro, pieces.css).
@@ -123,6 +124,14 @@ export function iconMove(svg: SVGElement): void {
       { at: 10, v: { transform: "rotate(-96deg)" }, ease: bez(0.2, 0, 0.1, 1) },
       { at: 32, v: { transform: "rotate(2.5deg)" }, ease: bez(0.4, 0, 0.4, 1) },
       { at: 43, v: { transform: "rotate(0deg)" } },
+    ]);
+  } else if (id === "kept") {
+    // The last tile draws back a little and comes home into its place among the others.
+    play(part("tile")[0], [
+      { at: 0, v: { transform: "translate(0px, 0px) scale(1)" }, ease: bez(0.5, 0, 0.7, 1) },
+      { at: 8, v: { transform: "translate(1.7px, 1.7px) scale(0.78)" }, ease: bez(0.22, 0, 0, 1) },
+      { at: 30, v: { transform: "translate(-0.25px, -0.25px) scale(1.03)" }, ease: bez(0.4, 0, 0.4, 1) },
+      { at: 40, v: { transform: "translate(0px, 0px) scale(1)" } },
     ]);
   } else if (id === "lyrics") {
     // The capsule lifts; two sound arcs draw out from their middles, drift out and fade.

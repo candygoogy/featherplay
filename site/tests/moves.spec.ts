@@ -36,7 +36,7 @@ test("a song starting presses the mark's triangle; a pause doesn't", async ({ pa
 
 test("the bar's icons move when the pointer comes to them, the question mark stays still", async ({ page }) => {
   await page.goto("/");
-  for (const id of ["app", "light", "lyrics"]) {
+  for (const id of ["app", "light", "lyrics", "kept"]) {
     await page.mouse.move(5, 600);
     await page.locator(`[data-site-bar] a[data-sec="${id}"]`).hover();
     expect(await running(page, `[data-site-bar] svg[data-icon="${id}"]`), id).toBeGreaterThan(0);

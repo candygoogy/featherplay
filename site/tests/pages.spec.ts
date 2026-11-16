@@ -15,6 +15,7 @@ for (const path of ["/method", "/credits", "/a-page-that-is-not-there"]) {
       ["The app", "/#app"],
       ["Numbers", "/#light"],
       ["Lyrics", "/#lyrics"],
+      ["Features", "/#kept"],
       ["Questions", "/#questions"],
       ["Download", "/#download"],
     ]) {

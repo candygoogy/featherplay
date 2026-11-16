@@ -42,6 +42,7 @@ const offBy = (page: Page, id: string) =>
 for (const [name, id] of [
   ["Numbers", "light"],
   ["Lyrics", "lyrics"],
+  ["Features", "kept"],
   ["Questions", "questions"],
   ["Download", "download"],
 ] as const) {
@@ -78,6 +79,11 @@ test("the section on screen is the one the bar marks", async ({ page }) => {
   await still(page);
   await expect(bar.locator('[data-sec][aria-current="true"]')).toHaveCount(1);
   await expect(bar.getByRole("link", { name: "Lyrics", exact: true })).toHaveAttribute("aria-current", "true");
+  // Make it yours has no entry of its own: Features, the section after it, is lit there too.
+  await page.evaluate(() => document.getElementById("yours")!.scrollIntoView({ block: "center" }));
+  await still(page);
+  await expect(bar.getByRole("link", { name: "Features", exact: true })).toHaveAttribute("aria-current", "true");
+  await expect(bar.locator('[data-sec][aria-current="true"]')).toHaveCount(1);
 });
 
 test("as the page starts, nothing eases in from the browser's own colours", async ({ page }) => {

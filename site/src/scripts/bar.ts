@@ -106,7 +106,8 @@ export function bindBar(bar: HTMLElement, player: Player | null): { readonly sta
     // The first answer (a load part-way down) is drawn at once: nothing glides on load.
     const born = performance.now();
     const draw = () => {
-      // A section may stand for another's link (What it leaves out is part of the numbers).
+      // A section may stand for another's link (What it leaves out is part of the numbers,
+      // Make it yours of the features).
       const key = inView?.dataset.barSec ?? inView?.id ?? "";
       const id = ids.has(key) ? key : null;
       if (id === shown) return;

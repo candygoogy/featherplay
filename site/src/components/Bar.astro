@@ -29,7 +29,9 @@ const pre = home ? "" : "/";
 const song = songById(demoStart.songId)!;
 // Each icon in parts: the part that moves when its section comes into view or the pointer
 // rests on it (the Lottie files' motion, src/scripts/moves.ts) is its own path. The question
-// mark has none: at 18 px its rewritten hook read as a broken icon.
+// mark has none: at 18 px its rewritten hook read as a broken icon. Features (what it keeps,
+// and Make it yours before it: Yours.astro's data-bar-sec) is four tiles, the last one the
+// piece that is already in.
 const sections = [
   {
     id: "app",
@@ -59,6 +61,12 @@ const sections = [
       { d: "M17.516 2.572 C 18.772 4.068, 19.365 6.01, 19.161 7.953", part: "arc", len: true },
       { d: "M6.484 2.572 C 5.228 4.068, 4.635 6.01, 4.839 7.953", part: "arc", len: true },
     ],
+  },
+  {
+    id: "kept",
+    label: "Features",
+    tip: "Everything you’d miss, kept",
+    parts: [{ d: "M5.85 4.25 h3.3 a1.6 1.6 0 0 1 1.6 1.6 v3.3 a1.6 1.6 0 0 1 -1.6 1.6 h-3.3 a1.6 1.6 0 0 1 -1.6 -1.6 v-3.3 a1.6 1.6 0 0 1 1.6 -1.6 Z M14.85 4.25 h3.3 a1.6 1.6 0 0 1 1.6 1.6 v3.3 a1.6 1.6 0 0 1 -1.6 1.6 h-3.3 a1.6 1.6 0 0 1 -1.6 -1.6 v-3.3 a1.6 1.6 0 0 1 1.6 -1.6 Z M5.85 13.25 h3.3 a1.6 1.6 0 0 1 1.6 1.6 v3.3 a1.6 1.6 0 0 1 -1.6 1.6 h-3.3 a1.6 1.6 0 0 1 -1.6 -1.6 v-3.3 a1.6 1.6 0 0 1 1.6 -1.6 Z" }, { d: "M14.85 13.25 h3.3 a1.6 1.6 0 0 1 1.6 1.6 v3.3 a1.6 1.6 0 0 1 -1.6 1.6 h-3.3 a1.6 1.6 0 0 1 -1.6 -1.6 v-3.3 a1.6 1.6 0 0 1 1.6 -1.6 Z", part: "tile" }],
   },
   {
     id: "questions",
@@ -413,6 +421,9 @@ const arrow = "M12 4.5 V15 M7.5 10.5 L12 15 L16.5 10.5 M5 19.5 H19";
   .b-sec path[data-ip="needle"] {
     transform-origin: 12px 14.2px;
   }
+  .b-sec path[data-ip="tile"] {
+    transform-origin: 16.5px 16.5px;
+  }
   .b-sec path[data-ip="arc"] {
     transform-origin: 12px 7.2px;
     stroke-dasharray: 0 1;
@@ -578,7 +589,9 @@ const arrow = "M12 4.5 V15 M7.5 10.5 L12 15 L16.5 10.5 M5 19.5 H19";
   }
 
   /* ---- Collapse by rule, by the bar's own width ---- */
-  @container bar (width < 1180px) {
+  /* (The widths at which the five sections, with their names and then as icons, still stand
+     in the bar's middle clear of its ends.) */
+  @container bar (width < 1240px) {
     .bar[data-state="docked"] .b-sec {
       width: 40px;
       padding: 0;
@@ -593,7 +606,7 @@ const arrow = "M12 4.5 V15 M7.5 10.5 L12 15 L16.5 10.5 M5 19.5 H19";
     }
   }
   /* The compact bar: the name, the song, the theme and Download. */
-  @container bar (width < 800px) {
+  @container bar (width < 840px) {
     .bar[data-state="docked"] .b-nav,
     .bar[data-state="docked"] .b-tray,
     .bar[data-state="docked"] .b-clock {
