@@ -13,12 +13,15 @@ const BAR = 56;
 export function bindShelf(shelf: HTMLElement, player: Player): void {
   const sleeves = [...shelf.querySelectorAll<HTMLButtonElement>("[data-sleeve]")];
   const win = () => document.querySelector<HTMLElement>("[data-window]");
-  const over = (x: number, y: number) => {
+  /** The window's box as a drop target, or null where it can't take one. Read at pick-up and
+   *  after a scroll, not on every move (each read restyled the page after the move's write). */
+  const target = (): DOMRect | null => {
     const w = win();
-    if (!w || w.hasAttribute("data-minimised") || getComputedStyle(w).visibility === "hidden") return false;
-    const r = w.getBoundingClientRect();
-    return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+    if (!w || w.hasAttribute("data-minimised") || getComputedStyle(w).visibility === "hidden") return null;
+    return w.getBoundingClientRect();
   };
+  let box: DOMRect | null = null;
+  const over = (x: number, y: number) => !!box && x >= box.left && x <= box.right && y >= box.top && y <= box.bottom;
   const play = (id: string) => player.play(id);
 
   // The one playing.
@@ -27,7 +30,12 @@ export function bindShelf(shelf: HTMLElement, player: Player): void {
     const id = s.song?.id ?? "";
     if (id === shown) return;
     shown = id;
-    for (const el of sleeves) el.toggleAttribute("data-current", el.dataset.sleeve === id);
+    for (const el of sleeves) {
+      const on = el.dataset.sleeve === id;
+      el.toggleAttribute("data-current", on);
+      if (on) el.setAttribute("aria-current", "true");
+      else el.removeAttribute("aria-current");
+    }
   });
 
   // Out of view, the playing sleeve's mark holds still (app-controls.css: [data-away]).
@@ -37,6 +45,17 @@ export function bindShelf(shelf: HTMLElement, player: Player): void {
     }).observe(shelf);
 
   let held: { el: HTMLElement; sx: number; sy: number; moved: boolean; carry?: HTMLElement; ox: number; oy: number } | null = null;
+  let dropOn = false;
+  const mark = (on: boolean) => {
+    if (on === dropOn) return;
+    dropOn = on;
+    win()?.toggleAttribute("data-drop", on);
+  };
+  addEventListener("scroll", () => held?.moved && (box = target()), { passive: true });
+  /** Escape puts the carried sleeve back. */
+  let cancel: (() => void) | null = null;
+  addEventListener("keydown", (e) => e.key === "Escape" && cancel?.());
+  const ghostTimers = new WeakMap<HTMLElement, number>();
   for (const el of sleeves) {
     const id = el.dataset.sleeve!;
     el.addEventListener("pointerdown", (e) => {
@@ -61,18 +80,24 @@ export function bindShelf(shelf: HTMLElement, player: Player): void {
         held.carry = c;
         held.ox = r.left - held.sx;
         held.oy = r.top - held.sy;
+        // (A second pick-up during the last drop's end: that drop's timer mustn't show it.)
+        clearTimeout(ghostTimers.get(el));
         el.classList.add("ghosted");
+        box = target();
+        cancel = () => end({ type: "cancel", clientX: 0, clientY: 0 });
       }
       held.carry!.style.transform = `translate(${e.clientX + held.ox}px, ${Math.max(BAR, e.clientY + held.oy)}px)`;
-      win()?.toggleAttribute("data-drop", over(e.clientX, e.clientY));
+      mark(over(e.clientX, e.clientY));
     });
-    const end = (e: PointerEvent) => {
+    const end = (e: { type: string; clientX: number; clientY: number }) => {
       if (!held || held.el !== el) return;
       const h = held;
       held = null;
+      cancel = null;
       el.classList.remove("held");
       const drop = h.moved && e.type === "pointerup" && over(e.clientX, e.clientY);
-      win()?.removeAttribute("data-drop");
+      mark(false);
+      box = null;
       if (!h.moved || !h.carry) return;
       const c = h.carry;
       const from = c.style.transform;
@@ -91,7 +116,7 @@ export function bindShelf(shelf: HTMLElement, player: Player): void {
         easing: drop ? "cubic-bezier(0.32, 0.72, 0, 1)" : "cubic-bezier(0.22, 1, 0.36, 1)",
         fill: "forwards",
       }).finished.then(() => c.remove());
-      setTimeout(() => el.classList.remove("ghosted"), drop ? 120 : ms);
+      ghostTimers.set(el, window.setTimeout(() => el.classList.remove("ghosted"), drop ? 120 : ms));
     };
     el.addEventListener("pointerup", end);
     el.addEventListener("pointercancel", end);

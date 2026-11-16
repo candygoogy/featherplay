@@ -104,6 +104,8 @@ test.describe("the sleeves", () => {
     await expect(title(page)).toHaveText("Origami");
     await expect(page.locator("html")).toHaveAttribute("data-playing", "true");
     await expect(s).toHaveAttribute("data-current", "");
+    // Said, not only shown.
+    await expect(s).toHaveAttribute("aria-current", "true");
     await expect(page.locator("[data-sleeve][data-current]")).toHaveCount(1);
   });
 
@@ -135,6 +137,45 @@ test.describe("the sleeves", () => {
     await page.mouse.up();
     await expect(page.locator("[data-window]")).not.toHaveAttribute("data-drop", "");
     await expect(title(page)).toHaveText("Watching Seabirds Soar (Harmony)");
+    await expect(page.locator(".carry")).toHaveCount(0);
+  });
+
+  test("carrying a sleeve reads no style on each move (the window's box is taken once, at pick-up)", async ({ page }) => {
+    const s = page.locator("[data-sleeve='origami']");
+    const from = (await s.boundingBox())!;
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send("Performance.enable");
+    await page.mouse.move(from.x + 20, from.y + 20);
+    await page.mouse.down();
+    await page.mouse.move(from.x + 30, from.y + 10, { steps: 2 });
+    const count = async () => (await cdp.send("Performance.getMetrics")).metrics.find((m) => m.name === "RecalcStyleCount")!.value;
+    const before = await count();
+    // Moves with no frame between them: only a forced read restyles inside each.
+    await page.evaluate(
+      ([x, y]) => {
+        const el = document.querySelector("[data-sleeve='origami']")!;
+        for (let i = 0; i < 40; i++) el.dispatchEvent(new PointerEvent("pointermove", { bubbles: true, clientX: x + i * 8, clientY: y - i * 4, pointerId: 1, pointerType: "mouse" }));
+      },
+      [from.x + 30, from.y + 10],
+    );
+    const forced = (await count()) - before;
+    await page.mouse.up();
+    expect(forced).toBeLessThan(5);
+  });
+
+  test("Escape puts a carried sleeve back, even over the window", async ({ page }) => {
+    const s = page.locator("[data-sleeve='origami']");
+    const from = (await s.boundingBox())!;
+    const win = (await page.locator("[data-window]").boundingBox())!;
+    await page.mouse.move(from.x + 20, from.y + 20);
+    await page.mouse.down();
+    await page.mouse.move(win.x + win.width / 2, win.y + win.height / 2, { steps: 8 });
+    await expect(page.locator("[data-window]")).toHaveAttribute("data-drop", "");
+    await page.keyboard.press("Escape");
+    await expect(page.locator("[data-window]")).not.toHaveAttribute("data-drop", "");
+    await page.mouse.up();
+    await page.waitForTimeout(400);
+    await expect(page.locator("html")).not.toHaveAttribute("data-playing", "true");
     await expect(page.locator(".carry")).toHaveCount(0);
   });
 });
