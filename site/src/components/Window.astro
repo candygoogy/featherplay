@@ -5,10 +5,15 @@
 // with it, src/demo/window.ts sizes and scales it to fit, never past the viewport, and makes it
 // a window: dragged by its title bar, maximised and restored, minimised to the tray, closed
 // with the app's own question (the dialog below, at the page's size). Where the window stood
-// while it is away (in the tray, or closed) there is a way back and a line saying which
-// (.win-gone): the screen is never left with nothing where the app was.
+// while it is away (in the tray, or closed) the desk shows what a desk has (.win-gone): the
+// app's shortcut, which brings it back, with the maker's hand over it taking the headline at
+// its word; and under it three more things lying about, each a real way on: the Recycle Bin
+// (what featherplay leaves out), a text file (how the numbers were measured) and a folder (the
+// music's credits). The screen is never left with nothing where the app was.
 import Replica from "./Replica.astro";
 import Logo from "./Logo.astro";
+import Icon from "./Icon.astro";
+import { notes } from "../data/notes";
 ---
 
 <div class="window" data-window>
@@ -17,10 +22,30 @@ import Logo from "./Logo.astro";
   </div>
 </div>
 <div class="win-gone" data-win-gone>
-  <button class="btn tonal" type="button" data-win-back tabindex="-1">
-    <Logo size={18} /><span data-win-back-label>Open featherplay</span>
+  <!-- Not one of the page's placed notes (no data-note: nothing judges or writes it but the
+       window's script, each time it shows). -->
+  <p class="hand gone-hand" data-judged data-gone-hand data-closed={notes.closed} data-tray={notes.tray} aria-hidden="true">
+    <span data-gone-words>{notes.closed}</span>
+    <svg viewBox="0 0 24 34"><path pathLength="1" d="M10 3 C 9 12, 11 20, 13 30 M6.5 23.5 L13.2 30.4 L18 22.4"></path></svg>
+  </p>
+  <button class="shortcut" type="button" data-win-back tabindex="-1" aria-label="Open featherplay">
+    <Logo size={44} /><span class="sc-name">featherplay</span>
   </button>
-  <p class="win-gone-p" data-win-gone-text>Closed. Nothing of it is left running.</p>
+  <div class="sc-row">
+    <a class="shortcut" href="#leaves" aria-label="Recycle Bin: what featherplay leaves out">
+      <svg class="sc-glyph" viewBox="0 0 24 24" width="30" height="30" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"
+        ><path d="M4.5 7.5 H19.5 M9.5 7.5 V5.6 a1 1 0 0 1 1 -1 h3 a1 1 0 0 1 1 1 V7.5 M6.6 7.5 l0.8 10.9 a1.6 1.6 0 0 0 1.6 1.5 h6 a1.6 1.6 0 0 0 1.6 -1.5 l0.8 -10.9 M10.2 11 v5.6 M13.8 11 v5.6"></path></svg
+      ><span class="sc-name">Recycle Bin</span>
+    </a>
+    <a class="shortcut" href="/method" aria-label="how we measured.txt: how the numbers were measured">
+      <svg class="sc-glyph" viewBox="0 0 24 24" width="30" height="30" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"
+        ><path d="M7.6 3.5 H13.8 L18 7.7 V18.9 a1.6 1.6 0 0 1 -1.6 1.6 H7.6 A1.6 1.6 0 0 1 6 18.9 V5.1 A1.6 1.6 0 0 1 7.6 3.5 Z M13.8 3.5 V7.7 H18 M9 12 h6 M9 15 h6 M9 18 h3.5"></path></svg
+      ><span class="sc-name">how we measured.txt</span>
+    </a>
+    <a class="shortcut" href="/credits" aria-label="Music credits: the songs and their licences">
+      <Icon name="folder" size={30} class="sc-glyph" /><span class="sc-name">Music credits</span>
+    </a>
+  </div>
 </div>
 <dialog class="closer glass float live" data-closer aria-labelledby="closer-h" aria-describedby="closer-text">
   <h2 id="closer-h" class="closer-h">Close featherplay?</h2>
@@ -86,9 +111,11 @@ import Logo from "./Logo.astro";
     visibility: hidden;
     transition: visibility 0s linear 400ms;
   }
-  /* Where the window stood while it is away (src/demo/window.ts places it at that middle): the
-     page's own tonal button brings it back, and a line says where it went. In once the window
-     has gone, out at once as it comes back. */
+  /* Where the window stood while it is away (src/demo/window.ts places it at that middle): a
+     few things on the desk, each lit under the pointer as Windows lights a desktop icon. The
+     app's shortcut first, the maker's note over it with its arrow down to it; the other three
+     in a row under it, smaller in voice (the second ink). In once the window has gone, out at
+     once as it comes back. */
   .win-gone {
     position: absolute;
     left: 0;
@@ -96,13 +123,75 @@ import Logo from "./Logo.astro";
     z-index: 9;
     display: grid;
     justify-items: center;
-    gap: var(--s3);
-    width: max-content;
-    max-width: min(22rem, 80vw);
-    text-align: center;
+    gap: var(--s4);
     visibility: hidden;
     opacity: 0;
     transition: opacity 160ms ease;
+  }
+  .sc-row {
+    display: flex;
+    align-items: start;
+    gap: var(--s1);
+  }
+  .sc-row .shortcut {
+    color: var(--ink2);
+    text-decoration: none;
+  }
+  .sc-row .shortcut:hover,
+  .sc-row .shortcut:focus-visible {
+    color: var(--text);
+  }
+  .shortcut :global(.sc-glyph) {
+    width: 30px;
+    height: 30px;
+    stroke-width: 1.4;
+  }
+  .sc-name {
+    line-height: 1.25;
+    text-align: center;
+    text-wrap: balance;
+  }
+  .shortcut {
+    display: grid;
+    justify-items: center;
+    gap: 6px;
+    width: 6.5rem;
+    padding: 10px 6px 8px;
+    border: 0;
+    border-radius: var(--r-small);
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    font-size: var(--fs-small);
+    font-weight: var(--fw-medium);
+    cursor: pointer;
+    transition:
+      background-color var(--t-hover) ease,
+      color var(--t-hover) ease,
+      scale var(--t-release) var(--spring-release);
+  }
+  .shortcut:hover,
+  .shortcut:focus-visible {
+    background: var(--tonal);
+  }
+  .shortcut:active {
+    background: var(--tonal-hover);
+    scale: var(--press-scale);
+    transition-duration: var(--t-hover), var(--t-press);
+  }
+  /* The note sits over the app's shortcut (the block's top), centred on it, its arrow under
+     its words. */
+  .gone-hand {
+    left: 50%;
+    bottom: calc(100% + 0.1em);
+    flex-direction: column;
+    align-items: center;
+    gap: 0.05em;
+    translate: -50% 0;
+  }
+  .gone-hand svg {
+    width: 0.8em;
+    height: 1.1333em;
   }
   .win-gone[data-on] {
     visibility: visible;
@@ -110,11 +199,6 @@ import Logo from "./Logo.astro";
     transition:
       opacity 280ms ease 340ms,
       visibility 0s linear 340ms;
-  }
-  .win-gone-p {
-    color: var(--ink2);
-    font-size: var(--fs-small);
-    text-wrap: balance;
   }
   :global(:root:not(.js)) .win-gone {
     display: none;

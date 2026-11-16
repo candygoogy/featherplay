@@ -395,18 +395,34 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
     // The keys go where the window went: the tray icon, or the capsule's song.
     if (on && hadFocus) trayTarget()?.focus({ preventScroll: true });
   };
-  /** While the window is away, the way back in the middle of where it stood, and which way it
-   *  went: closed (and paused), or in the tray, playing on. */
+  /** While the window is away, its shortcut in the middle of where it stood, and the maker's
+   *  note over it for the way it went: closed (and paused), or in the tray, playing on. The note
+   *  is written each time (the pen's reveal starts over). */
+  const goneHand = gone?.querySelector<HTMLElement>("[data-gone-hand]");
+  let goneWas: "closed" | "tray" | null = null;
   function showGone(on: boolean, rest: Frame = driven ?? rested()) {
     if (!gone || !goneBack) return;
     gone.toggleAttribute("data-on", on);
     goneBack.tabIndex = on ? 0 : -1;
-    if (!on) return;
-    gone.querySelector("[data-win-back-label]")!.textContent = closed ? "Open featherplay" : "Show the window";
-    gone.querySelector("[data-win-gone-text]")!.textContent = closed ? "Closed. Nothing of it is left running." : "In the tray, and it plays on from there.";
+    if (!on) {
+      goneWas = null;
+      goneHand?.classList.remove("written");
+      return;
+    }
     const x = rest.x + (rest.w * rest.s) / 2 - slotOff.x;
     const y = rest.y + (rest.h * rest.s) / 2 - slotOff.y;
     gone.style.translate = `calc(${x.toFixed(1)}px - 50%) calc(${y.toFixed(1)}px - 50%)`;
+    // Placed again by a new measure, the note stays as it was written.
+    const which = closed ? "closed" : "tray";
+    if (which === goneWas) return;
+    goneWas = which;
+    goneBack.setAttribute("aria-label", closed ? "Open featherplay" : "Show featherplay’s window");
+    if (goneHand) {
+      goneHand.querySelector("[data-gone-words]")!.textContent = goneHand.dataset[which]!;
+      goneHand.classList.remove("written");
+      // Once the window has gone and the shortcut is in (Window.astro's delay).
+      setTimeout(() => goneWas === which && goneHand.classList.add("written"), 420);
+    }
   }
   goneBack?.addEventListener("click", () => {
     player.restore();

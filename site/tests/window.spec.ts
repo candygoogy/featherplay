@@ -228,7 +228,7 @@ test.describe("where the story doesn't run (a short screen)", () => {
   });
 });
 
-test("while the window is away its place holds the way back, saying whether it was closed or is in the tray", async ({ page }) => {
+test("while the window is away its shortcut lies where it stood and brings it back, with the note for how it went", async ({ page }) => {
   await page.goto("/");
   await wake(page);
   const home = await windowBox(page);
@@ -237,18 +237,22 @@ test("while the window is away its place holds the way back, saying whether it w
   await caption(page, /^Close/).click();
   await page.getByRole("dialog").getByRole("button", { name: "Close featherplay" }).click();
   await expect(place).toBeVisible();
-  await expect(place).toContainText("Closed");
-  // In the middle of where the window stood.
+  await expect(place).toContainText("now it really isn’t running");
+  // In the middle of where the window stood, with the desk's other things under it: each a
+  // real way on.
   const b = (await place.boundingBox())!;
   expect(Math.abs(b.x + b.width / 2 - (home.x + home.width / 2))).toBeLessThan(2);
   expect(Math.abs(b.y + b.height / 2 - (home.y + home.height / 2))).toBeLessThan(2);
+  await expect(place.getByRole("link", { name: /^Recycle Bin/ })).toHaveAttribute("href", "#leaves");
+  await expect(place.getByRole("link", { name: /^how we measured\.txt/ })).toHaveAttribute("href", "/method");
+  await expect(place.getByRole("link", { name: /^Music credits/ })).toHaveAttribute("href", "/credits");
   await place.getByRole("button", { name: "Open featherplay" }).click();
   await expect(win(page)).not.toHaveAttribute("data-minimised", /.*/);
   await expect(place).toBeHidden();
   await wake(page);
   await caption(page, /^Minimise/).click();
-  await expect(place.getByRole("button", { name: "Show the window" })).toBeVisible();
-  await expect(place).toContainText("In the tray");
+  await expect(place.getByRole("button", { name: "Show featherplay’s window" })).toBeVisible();
+  await expect(place).toContainText("still running. easy to forget");
 });
 
 test("minimise sends the window to the tray: hidden and out of the keyboard's way", async ({ page }) => {

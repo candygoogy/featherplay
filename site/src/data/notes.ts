@@ -25,6 +25,10 @@ export const notes = {
   keys: "try your own media keys",
   /** The end of Download. */
   end: "that’s it. go listen to something",
+  /** Where the window stood, once the visitor has closed featherplay (the headline's own words). */
+  closed: "now it really isn’t running",
+  /** The same place, with the window sent to the tray. */
+  tray: "still running. easy to forget",
 } as const;
 
 export type NoteId = keyof typeof notes;
