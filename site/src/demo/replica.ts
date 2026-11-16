@@ -453,26 +453,31 @@ function bindReplica(root: HTMLElement, player: Player) {
     );
   };
 
+  /** The one view this window keeps (data-pin-view), if it keeps one. */
+  const pinned = (root.dataset.pinView as View | undefined) || null;
   function render(s: PlayerState) {
+    // A window held to one view (the download card's, on the cover) shows that, whatever the
+    // page's player is on.
+    const view = pinned ?? s.view;
     const song = s.song;
     const songChanged = (song?.id ?? null) !== last.song;
 
-    if (s.view !== last.view) {
+    if (view !== last.view) {
       // The lyrics toggle glides the cover and its words to their other place (t-lyrics,
       // ease-in-out), while the panel and the lines fade (replica.css).
-      const toggling = isNowView(s.view) && last.view !== undefined && isNowView(last.view);
+      const toggling = isNowView(view) && last.view !== undefined && isNowView(last.view);
       const fromCover = toggling && npCover ? npCover.getBoundingClientRect() : null;
       const fromText = toggling && npText ? npText.getBoundingClientRect() : null;
 
-      root.dataset.view = s.view;
-      const browse = !isNowView(s.view);
+      root.dataset.view = view;
+      const browse = !isNowView(view);
       setAll(root, '[data-chrome="browse"]', (el) => (el.hidden = !browse));
       for (const pane of $$(root, "[data-pane]")) {
         const name = pane.dataset.pane;
-        pane.hidden = name === "now" ? browse : name !== s.view;
+        pane.hidden = name === "now" ? browse : name !== view;
       }
       setAll(root, "[data-page]", (el) =>
-        el.dataset.page === s.view && !el.hasAttribute("data-liked-link")
+        el.dataset.page === view && !el.hasAttribute("data-liked-link")
           ? el.setAttribute("aria-current", "page")
           : el.removeAttribute("aria-current"),
       );
@@ -488,9 +493,9 @@ function bindReplica(root: HTMLElement, player: Player) {
     // view and the toggles say "No lyrics", never pressed; the note under the song is only for
     // a press on them, and goes with the song.
     const hasLyrics = !!song && song.lyrics.length > 0;
-    const lyricsKey = `${s.view}|${hasLyrics}`;
+    const lyricsKey = `${view}|${hasLyrics}`;
     if (lyricsKey !== last.lyricsKey) {
-      const showing = s.view === "lyrics" && hasLyrics;
+      const showing = view === "lyrics" && hasLyrics;
       setAll(root, "[data-lyrics-toggle]", (el) => el.setAttribute("aria-pressed", String(showing)));
       setAll(root, "[data-lyrics-tip]", (el) => (el.textContent = !hasLyrics ? "No lyrics" : showing ? "Hide lyrics" : "Lyrics"));
       last.lyricsKey = lyricsKey;
@@ -564,7 +569,7 @@ function bindReplica(root: HTMLElement, player: Player) {
       // compositor: one linear animation from here to the song's end, started again only when
       // the song, play, the place or the page shown changes. Nothing is restyled or laid out
       // per frame, and a line that isn't rendered (a page not shown) waits for its page.
-      const run = `${song.id}|${s.playing}|${s.jumps}|${s.retimes}|${s.view}`;
+      const run = `${song.id}|${s.playing}|${s.jumps}|${s.retimes}|${view}`;
       if (run !== last.run) {
         const fraction = Math.min(1, s.positionMs / song.durationMs);
         const left = Math.max(0, song.durationMs - s.positionMs);
@@ -598,7 +603,7 @@ function bindReplica(root: HTMLElement, player: Player) {
       // Out of view the lines wait (each mark is a colour fade, each glide a move).
       if (line !== last.line && !root.hasAttribute("data-away")) {
         for (const list of sideLines ? [lines, sideLines] : [lines]) markLines(list, ".line", line);
-        if (s.view === "lyrics") glide(line);
+        if (view === "lyrics") glide(line);
         last.line = line;
       }
       const liked = s.liked.includes(song.id);
@@ -638,7 +643,7 @@ function bindReplica(root: HTMLElement, player: Player) {
     if (s.queueOpen !== last.queueOpen || s.sideOpen !== last.sideOpen) {
       root.dataset.queueOpen = String(s.queueOpen);
       root.dataset.sideOpen = String(s.sideOpen);
-      const shown = isNowView(s.view) ? s.sideOpen : s.queueOpen;
+      const shown = isNowView(view) ? s.sideOpen : s.queueOpen;
       setAll(root, "[data-queue]", (el) => (el.hidden = !shown));
       setAll(root, '[data-act="queue"]', (el) => el.setAttribute("aria-pressed", String(shown)));
       last.queueOpen = s.queueOpen;
@@ -646,7 +651,7 @@ function bindReplica(root: HTMLElement, player: Player) {
     }
     // The tabs: while the full lyrics view shows the lines (or with lyrics off) the Lyrics tab
     // steps aside and Up next takes its place; the visitor's tab comes back after, as the app's.
-    const lyricsTab = s.lyricsOn && !(s.view === "lyrics" && hasLyrics);
+    const lyricsTab = s.lyricsOn && !(view === "lyrics" && hasLyrics);
     const tab: QueueTab = s.queueTab === "lyrics" && !lyricsTab ? "next" : s.queueTab;
     const tabs = `${tab}|${lyricsTab}`;
     if (tabs !== last.tabs) {
@@ -691,7 +696,7 @@ function bindReplica(root: HTMLElement, player: Player) {
     // tab opens (hidden, they have no layout to follow by).
     // The panel is narrower over a page than beside Now playing, so the lines re-wrap there:
     // a move between the two places them again too.
-    const onNow = isNowView(s.view);
+    const onNow = isNowView(view);
     const sideShown = !!sideFollower && hasLyrics && tab === "lyrics" && !s.minimised && (onNow ? s.sideOpen : s.queueOpen);
     if (sideShown && song && sideLines) {
       const line = lineNow(s);
@@ -725,7 +730,7 @@ function bindReplica(root: HTMLElement, player: Player) {
       last.toast = s.toast?.id ?? null;
     }
 
-    if (s.view === "search" && (s.query !== last.query || (s.result?.id ?? null) !== last.result)) {
+    if (view === "search" && (s.query !== last.query || (s.result?.id ?? null) !== last.result)) {
       const box = $(root, "[data-search-result]");
       const empty = $(root, "[data-search-empty]");
       box?.replaceChildren(...(s.result ? [songRow(rowTemplate, s.result, s.result.id === song?.id, s.playing)] : []));
@@ -735,7 +740,7 @@ function bindReplica(root: HTMLElement, player: Player) {
       last.result = s.result?.id ?? null;
     }
 
-    last.view = s.view;
+    last.view = view;
     last.song = song?.id ?? null;
     last.playing = s.playing;
     last.minimised = s.minimised;

@@ -4,8 +4,9 @@
 // "Recommended" badge, the portable exe second; each with its size and its button as one unit,
 // the sizes in one column of tabular figures and the two buttons one width. Under them the two
 // notes for the first run. On the right, the app itself: a third view of the page's one player
-// (the live replica, inert), opening level with the rows and cropped by the card's right and
-// bottom edges, so it follows the song and the theme and is sharp at any size. Linux in its own
+// (the live replica, inert, kept on the cover view so the crop cuts no line of lyrics), opening
+// level with the rows and cropped by the card's right and bottom edges, so it follows the song
+// and the theme and is sharp at any size. Linux in its own
 // row outside the card, on the same columns; then the releases and checksums. Every file and
 // size from src/data/release.ts.
 import { downloadOptions, release, sizeLabel } from "../../data/release";
@@ -74,7 +75,7 @@ const size = (f: Parameters<typeof sizeLabel>[0]) => sizeLabel(f).replace(" ", "
     </div>
     <div class="dl-shot" aria-hidden="true">
       <div class="dl-win win-body" inert>
-        <Replica id="replica-dl" songId={demoStart.songId} positionMs={demoStart.positionMs} view="lyrics" nowLabel="Now playing, by the download" />
+        <Replica id="replica-dl" songId={demoStart.songId} positionMs={demoStart.positionMs} view="now" pin nowLabel="Now playing, by the download" />
       </div>
     </div>
   </div>
