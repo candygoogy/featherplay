@@ -139,10 +139,13 @@ async function cornerPass(page: Page, label: string, from: number, step = 360) {
           // Shown, and not clipped away or covered (a closed answer, a pane over it), nor part
           // under the floating bar as it passes: its top, middle and foot are all its own.
           if (!el.checkVisibility({ opacityProperty: true, visibilityProperty: true, contentVisibilityAuto: true })) continue;
-          const own = (y: number) => {
-            const hit = document.elementFromPoint(r.left + Math.min(r.width, 40) / 2, y);
-            return !!hit && (el.contains(hit) || hit.contains(el));
-          };
+          // Across its width too: the capsule sits at the top centre, so a line can start clear
+          // of it at the left and run under it.
+          const own = (y: number) =>
+            [r.left + Math.min(r.width, 40) / 2, r.left + r.width / 2, r.right - Math.min(r.width, 40) / 2].every((x) => {
+              const hit = document.elementFromPoint(x, y);
+              return !!hit && (el.contains(hit) || hit.contains(el));
+            });
           if (![r.top + 2, r.top + r.height / 2, r.bottom - 2].every(own)) continue;
           const cs = getComputedStyle(el);
           const px = parseFloat(cs.fontSize);
