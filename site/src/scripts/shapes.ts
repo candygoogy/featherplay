@@ -4,7 +4,11 @@
 // moving (src/demo/window.ts: a change of shape morphs as maximise does, the tray is its own
 // minimise, both at once with reduced motion); this only says which. The pick follows the
 // window too: sent to the tray or brought back some other way (its caption button, the bar's
-// tray icon, the desk's shortcut), the switch says where it is.
+// tray icon, the desk's shortcut), the switch says where it is. On a desktop (reduced motion,
+// a short window) the switch is drawn right under the window it changes, at its right edge,
+// where the first screen has the room clear of its notes, instead of a screen further down
+// (its words stay under the first screen; its place in the page, for the keys and the ear,
+// stays where it is).
 
 import type { Player } from "../demo/player";
 import { whenWindow, type Shape } from "../demo/window";
@@ -68,4 +72,50 @@ export async function startShapes(player: Player): Promise<void> {
   });
   story.addEventListener("change", sync);
   sync();
+
+  // ---- Under the window, on a desktop ----
+  const first = document.querySelector<HTMLElement>("[data-first]");
+  const slot = document.querySelector<HTMLElement>("[data-win-slot]");
+  const block = box;
+  const deskMq = matchMedia("(min-width: 761px)");
+  const GAP = 14;
+  const lift = () => {
+    if (!first || !slot) return;
+    steps.removeAttribute("data-lifted");
+    block.style.removeProperty("left");
+    block.style.removeProperty("top");
+    // Only beside the words (the wide composition): stacked, the window is right above the steps.
+    if (!on() || !deskMq.matches || first.dataset.laid !== "wide") return;
+    const s = slot.getBoundingClientRect();
+    steps.toggleAttribute("data-lifted", true);
+    const w = block.offsetWidth;
+    const h = block.offsetHeight;
+    const st = steps.getBoundingClientRect();
+    const f = first.getBoundingClientRect();
+    // At the window's right edge (its notes lean on its left, towards the words), below any
+    // note that would be in the way.
+    const left = s.right - w;
+    let top = s.bottom + GAP;
+    for (const n of first.querySelectorAll<HTMLElement>(":scope > .hand")) {
+      if (getComputedStyle(n).opacity === "0" || !n.getClientRects().length) continue;
+      const r = n.getBoundingClientRect();
+      if (r.right > left && r.left < left + w && r.bottom > top && r.top < top + h) top = r.bottom + GAP;
+    }
+    if (top + h > f.bottom - GAP) {
+      steps.removeAttribute("data-lifted");
+      return;
+    }
+    block.style.left = `${Math.round(left - st.left)}px`;
+    block.style.top = `${Math.round(top - st.top)}px`;
+  };
+  let liftFrame = 0;
+  const relift = () => {
+    cancelAnimationFrame(liftFrame);
+    liftFrame = requestAnimationFrame(lift);
+  };
+  win.onLayout(relift);
+  story.addEventListener("change", relift);
+  addEventListener("resize", relift);
+  document.fonts?.ready.then(relift);
+  relift();
 }

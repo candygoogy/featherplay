@@ -371,6 +371,21 @@ test("on a phone a toolbar showing or hiding (the height alone changing) never r
   expect(await size()).toBe(before);
 });
 
+test.describe("reduced motion on a desktop", () => {
+  test.use({ viewport: { width: 1568, height: 880 }, reducedMotion: "reduce" });
+  test("the window's switch sits right under it, at its right edge, on the first screen", async ({ page }) => {
+    await page.goto("/");
+    const sw = page.locator("[data-shape-switch]");
+    await expect(page.locator("[data-steps]")).toHaveAttribute("data-lifted", "");
+    const s = (await page.locator("[data-win-slot]").boundingBox())!;
+    const b = (await sw.boundingBox())!;
+    expect(Math.abs(b.x + b.width - (s.x + s.width))).toBeLessThan(1.5);
+    expect(b.y - (s.y + s.height)).toBeGreaterThan(0);
+    expect(b.y - (s.y + s.height)).toBeLessThan(40);
+    expect(b.y + b.height).toBeLessThan(880);
+  });
+});
+
 test.describe("on a phone, the three steps", () => {
   test.use({ viewport: { width: 390, height: 844 } });
   test("put the page's one window in each shape, the step's words under the switch", async ({ page }) => {

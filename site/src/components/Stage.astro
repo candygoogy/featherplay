@@ -303,6 +303,14 @@ const steps = [
   :global(:root[data-shapes]) .steps-in {
     padding-top: var(--s5);
   }
+  /* On a desktop the switch is drawn right under the window (shapes.ts places it), its words
+     where they were. */
+  .steps[data-lifted] {
+    position: relative;
+  }
+  .steps[data-lifted] .shapes {
+    position: absolute;
+  }
   .shapes :global(legend) {
     position: absolute;
     width: 1px;
