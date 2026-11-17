@@ -39,12 +39,17 @@ export async function startShapes(player: Player): Promise<void> {
   const current = (): Pick => (min ? "tray" : (chosen ?? win.natural));
 
   const on = () => !story.matches;
+  /** A phone: no Whole to pick (Stage.astro). */
+  const phone = matchMedia("(width < 761px)");
   const sync = () => {
     const live = on();
     box.hidden = !live;
     root.toggleAttribute("data-shapes", live);
     // The story lays the window out itself.
-    if (!live && chosen) {
+    if ((!live || phone.matches) && chosen === "whole") {
+      chosen = null;
+      win.shape(null);
+    } else if (!live && chosen) {
       chosen = null;
       win.shape(null);
     }
@@ -71,6 +76,7 @@ export async function startShapes(player: Player): Promise<void> {
     if (on() && !chosen) show(current());
   });
   story.addEventListener("change", sync);
+  phone.addEventListener("change", sync);
   sync();
 
   // ---- Under the window, on a desktop ----

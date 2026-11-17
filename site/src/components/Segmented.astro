@@ -18,6 +18,8 @@ interface Option {
   value: string;
   label: string;
   icon?: "system" | "light" | "dark" | "match" | "whole" | "narrow" | "tray";
+  /** false: not offered on a phone. */
+  phone?: boolean;
 }
 interface Props {
   name: string;
@@ -54,7 +56,7 @@ const glyph = (o: Option) =>
   <div class="track" data-seg>
     {
       options.map((o) => (
-        <label class="seg-option" title={compact ? o.label : undefined}>
+        <label class:list={["seg-option", { "desk-only": o.phone === false }]} title={compact ? o.label : undefined}>
           <input type="radio" name={name} value={o.value} checked={o.value === checked} />
           <Fragment set:html={glyph(o)} />
           <span class="seg-word">{o.label}</span>
@@ -65,7 +67,7 @@ const glyph = (o: Option) =>
     <div class="lit" data-seg-lit aria-hidden="true">
       {
         options.map((o) => (
-          <span class="seg-option">
+          <span class:list={["seg-option", { "desk-only": o.phone === false }]}>
             <Fragment set:html={glyph(o)} />
             <span class="seg-word">{o.label}</span>
           </span>
@@ -142,6 +144,9 @@ const glyph = (o: Option) =>
   }
   /* Across a phone's width in equal parts, a little taller (its label a step up). */
   @media (width < 761px) {
+    .desk-only {
+      display: none !important;
+    }
     .stretch-phone {
       inline-size: 100%;
     }

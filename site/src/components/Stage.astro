@@ -92,7 +92,7 @@ const steps = [
      that puts the window above in each shape, with that step's words under it. -->
 <section class="steps" id="after-app" tabindex="-1" aria-label="How featherplay steps back" data-steps data-bar-sec="app">
   <div class="frame steps-in">
-    <Segmented class="shapes" name="win-shape" legend="featherplay’s window" options={steps.map((s) => ({ value: s.key, label: s.label, icon: s.key }))} checked="whole" stretch="phone" data-shape-switch hidden />
+    <Segmented class="shapes" name="win-shape" legend="featherplay’s window" options={steps.map((s) => ({ value: s.key, label: s.label, icon: s.key, phone: s.key !== "whole" }))} checked="whole" stretch="phone" data-shape-switch hidden />
     <div class="says" aria-live="polite">
       {
         steps.map((s) => (
@@ -343,9 +343,38 @@ const steps = [
       grid-template-areas:
         "head"
         "col"
-        "win"
-        "shelf";
+        "win";
       min-height: 0;
+      padding-bottom: 0;
+    }
+    /* As much room above the window as under it (the row gap and this; under it the steps'
+       own top, the same sum). */
+    .slot {
+      margin-top: var(--s3);
+    }
+    :global(:root[data-shapes]) .steps-in {
+      padding-top: calc(var(--s6) + var(--s3));
+      gap: var(--s5);
+      grid-template-areas:
+        "lead"
+        "switch"
+        "say";
+    }
+    /* On a phone there is no Whole to pick (drawn at a phone's width, a whole window's text is
+       a few px tall): its words lead the steps instead, under the window they describe (the
+       whole player, in its narrow form there), then the switch and the picked step's words. */
+    :global(:root[data-shapes]) .says {
+      display: contents;
+    }
+    :global(:root[data-shapes]) .shapes {
+      grid-area: switch;
+    }
+    :global(:root[data-shapes]) .says > .step {
+      grid-area: say;
+    }
+    :global(:root[data-shapes]) .says > .step[data-step="whole"] {
+      grid-area: lead;
+      visibility: visible;
     }
     /* The bar's song button picks a song on a phone: the shelf of sleeves would be a second
        way to do it, and Make it yours has a third. */
@@ -377,6 +406,13 @@ const steps = [
     }
   }
 
+  /* A short phone's closer rows: the same room under the window as above it (after the phone's
+     own rule, which it overrides). */
+  @media (width < 761px) and (height < 800px) {
+    :global(:root[data-shapes]) .steps-in {
+      padding-top: calc(var(--s4) + var(--s3));
+    }
+  }
   /* With script, the first screen shows once it is laid out (first.ts), never half-placed. */
   :global(:root.js) .first:not([data-shown]) {
     visibility: hidden;

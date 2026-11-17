@@ -388,28 +388,25 @@ test.describe("reduced motion on a desktop", () => {
 
 test.describe("on a phone, the three steps", () => {
   test.use({ viewport: { width: 390, height: 844 } });
-  test("put the page's one window in each shape, the step's words under the switch", async ({ page }) => {
+  test("the switch has the narrow window and the tray; Whole's words lead under the window", async ({ page }) => {
     await page.goto("/");
     const win = page.locator("[data-window]");
     const pick = (name: string) => page.getByRole("radio", { name, exact: true });
     const said = page.locator("[data-steps] .step[data-picked] h2");
-    // A phone's window is the narrow app already.
+    // A phone's window is the narrow app already; there is no Whole to pick (its text would be a
+    // few px tall), and its words stand first under the window.
     await expect(pick("Narrow")).toBeChecked();
+    await expect(pick("Whole")).toHaveCount(0);
+    await expect(page.getByRole("heading", { level: 2, name: "A whole player when you want one." })).toBeVisible();
     await expect(said).toHaveText("Narrow, beside your work.");
-    await pick("Whole").check();
-    await expect.poll(() => win.evaluate((el) => el.offsetWidth)).toBe(960);
-    await expect(said).toHaveText("A whole player when you want one.");
     await pick("In the tray").check();
     await expect(win).toHaveAttribute("data-minimised", "");
+    await expect(said).toHaveText("Or nothing at all.");
     // The bar has no tray icon on a phone: the desk has its tray, which brings the window back.
     const tray = page.getByRole("button", { name: "featherplay in the tray: show the window" });
     await expect(tray).toBeVisible();
     await tray.click();
     await expect(win).not.toHaveAttribute("data-minimised", /.*/);
-    await expect(pick("Whole")).toBeChecked();
-    await pick("In the tray").check();
-    await pick("Narrow").check();
-    await expect(win).not.toHaveAttribute("data-minimised", /.*/);
-    await expect.poll(() => win.evaluate((el) => el.offsetWidth)).toBeLessThanOrEqual(860);
+    await expect(pick("Narrow")).toBeChecked();
   });
 });
