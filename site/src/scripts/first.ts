@@ -37,6 +37,8 @@ export function startFirst(): void {
   let landed = false;
 
   const px = (n: number) => `${Math.round(n * 100) / 100}px`;
+  /** The phone's window height, for the width it was worked out at. */
+  let phoneH: { vw: number; h: string } | null = null;
   function measure() {
     const vw = root.clientWidth;
     const vh = innerHeight;
@@ -57,11 +59,18 @@ export function startFirst(): void {
       slot.dataset.fit = "first";
       slot.removeAttribute("style");
       // A phone: the window takes the rest of the first screen, so all of it shows there, its
-      // bar too, and Play a song is seen to play (never under 300 px: on a short phone it runs
-      // on below). By the layout viewport's height, so a toolbar showing doesn't resize it.
+      // bar too, and Play a song is seen to play (never under 300 px on a tall phone, 250 on a
+      // short one: there it runs on below). A browser's toolbar showing or hiding as the page
+      // moves changes the viewport's height (iOS Safari's layout viewport too: the window grew
+      // and shrank with it), so the height is the one the page loaded with.
+      // Worked out once for each width (a phone turned works it out again): a change of height
+      // alone is a toolbar, and keeps it.
       if (vw < 761) {
-        const top = slot.getBoundingClientRect().top + scrollY;
-        slot.style.height = px(clamp(root.clientHeight - top - 12, root.clientHeight < 800 ? 250 : 300, 752));
+        if (phoneH?.vw !== vw) {
+          const top = slot.getBoundingClientRect().top + scrollY;
+          phoneH = { vw, h: px(clamp(root.clientHeight - top - 12, root.clientHeight < 800 ? 250 : 300, 752)) };
+        }
+        slot.style.height = phoneH.h;
       }
       first.dataset.fl = String(first.getBoundingClientRect().left);
       // Stacked in a room too short for it (the first screen held to one screen by the story),

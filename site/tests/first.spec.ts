@@ -357,6 +357,18 @@ test.describe("the desk", () => {
   });
 });
 
+test("on a phone a toolbar showing or hiding (the height alone changing) never resizes the window", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 664 });
+  await page.goto("/");
+  const win = page.locator("[data-window]");
+  const size = () => win.evaluate((el) => `${Math.round(el.getBoundingClientRect().width)}x${Math.round(el.getBoundingClientRect().height)}`);
+  await expect.poll(size).not.toBe("0x0");
+  const before = await size();
+  await page.setViewportSize({ width: 390, height: 750 });
+  await page.waitForTimeout(400);
+  expect(await size()).toBe(before);
+});
+
 test.describe("on a phone, the three steps", () => {
   test.use({ viewport: { width: 390, height: 844 } });
   test("put the page's one window in each shape, the step's words under the switch", async ({ page }) => {
