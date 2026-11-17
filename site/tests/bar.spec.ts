@@ -328,9 +328,16 @@ test.describe("on a phone", () => {
     const part = bar(page).locator("[data-secs]");
     await expect(part).toBeVisible();
     await expect(bar(page).locator(".b-nav")).toBeHidden();
-    await page.evaluate(() => scrollTo(0, document.getElementById("lyrics")!.getBoundingClientRect().top + scrollY));
+    // (Well into the section: the touch back up below stays in it.)
+    await page.evaluate(() => scrollTo(0, document.getElementById("lyrics")!.getBoundingClientRect().top + scrollY + 240));
     await expect(part.locator("svg[data-on]")).toHaveAttribute("data-for", "lyrics");
-    await page.evaluate(() => scrollBy(0, -30));
+    // A touch back up, as a hand does, brings the tucked capsule back.
+    for (let i = 0; i < 3; i++) {
+      await page.evaluate(() => scrollBy(0, -30));
+      await page.waitForTimeout(32);
+    }
+    await expect(bar(page)).not.toHaveAttribute("data-tucked", /.*/);
+    await waitSettled(page);
     await part.tap();
     const fly = page.locator("#fly-secs");
     await expect(fly).toBeVisible();
