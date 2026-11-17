@@ -188,6 +188,23 @@ test("on a narrow phone the song's flyout stays inside the screen, its last row 
   expect(f.y + f.height).toBeLessThanOrEqual(640);
 });
 
+test("a press on Download opens its files (its chevron turned), a second press puts them away", async ({ page }) => {
+  await page.goto("/");
+  const dl = bar(page).getByRole("link", { name: "Download" });
+  const fly = page.locator("#fly-dl");
+  await dl.click();
+  await expect(fly).toBeVisible();
+  await expect(dl).toHaveAttribute("aria-expanded", "true");
+  // Held open: the pointer leaving doesn't close it.
+  await page.mouse.move(10, 500);
+  await page.waitForTimeout(400);
+  await expect(fly).toBeVisible();
+  await dl.click();
+  await expect(fly).toBeHidden();
+  await expect(dl).toHaveAttribute("aria-expanded", "false");
+  expect(new URL(page.url()).hash).toBe("");
+});
+
 test("Download's flyout opens for the keyboard and Tab goes on into it", async ({ page }) => {
   await page.goto("/");
   const dl = bar(page).getByRole("link", { name: "Download" });

@@ -44,7 +44,6 @@ for (const [name, id] of [
   ["Lyrics", "lyrics"],
   ["Features", "kept"],
   ["Questions", "questions"],
-  ["Download", "download"],
 ] as const) {
   test(`the bar's ${name} link, clicked at the top, lands on its section`, async ({ page }) => {
     await page.goto("/");
@@ -53,6 +52,23 @@ for (const [name, id] of [
     expect(Math.abs(await offBy(page, id))).toBeLessThanOrEqual(3);
   });
 }
+
+test("Download's \"All the ways to get it\", from the top, lands on its section", async ({ page }) => {
+  await page.goto("/");
+  // Download opens its files; the flyout's last link goes to the section.
+  await page.locator("[data-site-bar]").getByRole("link", { name: "Download", exact: true }).click();
+  await page.locator("#fly-dl").getByRole("link", { name: "All the ways to get it" }).click();
+  await still(page);
+  expect(Math.abs(await offBy(page, "download"))).toBeLessThanOrEqual(3);
+});
+
+test("landing on a section past the story doesn't open the story's last beat (the song's flyout, still playing)", async ({ page }) => {
+  for (const id of ["kept", "questions"]) {
+    await page.goto(`/#${id}`);
+    await still(page);
+    await expect(page.locator("#fly-song"), id).toBeHidden();
+  }
+});
 
 test("a link to a #section from outside lands on it", async ({ page }) => {
   await page.goto("/#questions");

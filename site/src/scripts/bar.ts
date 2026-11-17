@@ -12,6 +12,7 @@
 
 import type { Player } from "../demo/player";
 import { currentTheme, setTheme } from "./theme";
+import { visitorMoved } from "./settled";
 
 export type BarState = "docked" | "capsule";
 
@@ -78,11 +79,15 @@ export function bindBar(bar: HTMLElement, player: Player | null): { readonly sta
       // The latest answer: a busy start can deliver the page at the top and the page landed
       // further down (a #section, a reload) in one call.
       const e = es[es.length - 1];
-      // The first answer (a load part-way down) is the state as it is: its grounds don’t fade
-      // or grow in either (data-instant, for one frame).
-      if (first) bar.toggleAttribute("data-instant", true);
-      setState(e.isIntersecting ? "docked" : "capsule", !first);
-      if (first) {
+      // The first answer (a load part-way down) is the state as it is, and so is every answer
+      // before the visitor has moved the page (the browser restoring a reload's place a moment
+      // after the first paint, settled.ts): its grounds don’t fade or grow in either
+      // (data-instant, for one frame).
+      const instant = first || !visitorMoved();
+      if (instant) bar.toggleAttribute("data-instant", true);
+      setState(e.isIntersecting ? "docked" : "capsule", !instant);
+      bar.toggleAttribute("data-ready", true);
+      if (instant) {
         void bar.offsetWidth;
         requestAnimationFrame(() => bar.removeAttribute("data-instant"));
       }
@@ -319,6 +324,27 @@ export function bindBar(bar: HTMLElement, player: Player | null): { readonly sta
   };
   if (tray && songFly) rest(tray, songFly);
   rest(dl, dlFly);
+  // A press on Download opens its files (its chevron says it will), and a second press, once
+  // they are held open, puts them away. Without script, or a press that opens a new tab, it
+  // stays the link to the Download section.
+  // (The browser's light dismiss closes it as the press ends, just before the click: whether it
+  // was held open is noted as the press begins.)
+  let heldAtPress: boolean | null = null;
+  const heldOpen = () => dlFly.matches(":popover-open") && held.has(dlFly);
+  dl.addEventListener("pointerdown", () => (heldAtPress = heldOpen()));
+  dl.addEventListener("click", (e) => {
+    const was = heldAtPress ?? heldOpen();
+    heldAtPress = null;
+    if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    clearTimeout(restTimer);
+    if (was) {
+      if (dlFly.matches(":popover-open")) dlFly.hidePopover();
+      return;
+    }
+    held.add(dlFly);
+    open(dlFly, dl);
+  });
   // Download's flyout opens for the keyboard too, and Tab goes on into it (it follows the link).
   dl.addEventListener("focus", () => dl.matches(":focus-visible") && open(dlFly, dl));
   dlFly.addEventListener("focusout", () =>
