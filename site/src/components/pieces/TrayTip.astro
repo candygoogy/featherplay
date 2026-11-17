@@ -6,35 +6,42 @@
 // tooltip keeps one width whether the song plays or is paused and nothing beside it shifts.
 import "../../styles/pieces.css";
 import Logo from "../Logo.astro";
+import { demoStart, songById } from "../../data/songs";
+import { trayLines, trayWidest } from "../../demo/pieces";
 
 interface Props {
   corner?: boolean;
   class?: string;
 }
 const { corner = false, class: className } = Astro.props;
+// The tooltip as the page's player starts (the demo's song, paused where it starts), so the
+// script's first words change nothing about its size.
+const song = songById(demoStart.songId) ?? null;
+const [line1, line2] = trayLines({ song, playing: false, positionMs: demoStart.positionMs });
+const widest = trayWidest(song);
 ---
 
 {
   corner ? (
     <span class:list={["tray-corner", className]} data-piece="tray" role="img" aria-label="featherplay’s icon in the tray, its tooltip naming the song">
       <span class="tray-tip glass float" aria-hidden="true">
-        <span data-tray-1>featherplay</span>
-        <span data-tray-2>Nothing playing</span>
-        <span data-tray-size />
+        <span data-tray-1>{line1}</span>
+        <span data-tray-2>{line2}</span>
+        <span data-tray-size>{widest}</span>
       </span>
       <span class="tray-row" aria-hidden="true">
         <span class="tb">
           <svg viewBox="0 0 24 24" width="16" height="16"><path d="M7.5 14 L12 9.5 L16.5 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg>
         </span>
         <span class="tb lit"><Logo size={18} /></span>
-        <span class="tray-clock num" data-clock><span data-clock-time></span><span data-clock-date></span></span>
+        <span class="tray-clock num" data-clock><span data-clock-time>00:00</span><span data-clock-date>00/00/0000</span></span>
       </span>
     </span>
   ) : (
     <span class:list={["tray-tip glass float", className]} data-piece="tray">
-      <span data-tray-1>featherplay</span>
-      <span data-tray-2>Nothing playing</span>
-      <span data-tray-size aria-hidden="true" />
+      <span data-tray-1>{line1}</span>
+      <span data-tray-2>{line2}</span>
+      <span data-tray-size aria-hidden="true">{widest}</span>
     </span>
   )
 }

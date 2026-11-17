@@ -41,6 +41,7 @@ const layers = ["k-ground", "m k-shade", "m k-lit", "m k-hi", "k-sheen", "k-calm
 <script>
   import { bindReplicas } from "../demo/replica";
   import { bindDesk } from "../demo/desk";
+  import { visitorMoved } from "../scripts/settled";
   const desk = document.querySelector<HTMLElement>("[data-desk]");
   const player = bindReplicas();
   if (desk && player) bindDesk(desk, player);
@@ -56,7 +57,17 @@ const layers = ["k-ground", "m k-shade", "m k-lit", "m k-hi", "k-sheen", "k-calm
     let past = false;
     let atFoot = false;
     let atYours = false;
-    const set = () => desk.toggleAttribute("data-low", past && !atFoot && !atYours);
+    // Before the visitor has moved the page (a load or a reload partway down, settled.ts) the
+    // calm is there at once: the lit corner doesn't flare and fade where the page landed.
+    const set = () => {
+      const low = past && !atFoot && !atYours;
+      if (low === desk.hasAttribute("data-low") && desk.hasAttribute("data-ready")) return;
+      const instant = !visitorMoved();
+      desk.toggleAttribute("data-ready", true);
+      if (instant) desk.toggleAttribute("data-instant", true);
+      desk.toggleAttribute("data-low", low);
+      if (instant) requestAnimationFrame(() => requestAnimationFrame(() => desk.removeAttribute("data-instant")));
+    };
     new IntersectionObserver(([e]) => ((past = !e.isIntersecting), set()), { rootMargin: "-50% 0px 0px 0px" }).observe(stage);
     if (foot) new IntersectionObserver(([e]) => ((atFoot = e.isIntersecting), set()), { rootMargin: "0px 0px -15% 0px" }).observe(foot);
     if (yours) new IntersectionObserver(([e]) => ((atYours = e.isIntersecting), set()), { rootMargin: "-45% 0px -45% 0px" }).observe(yours);
@@ -167,9 +178,21 @@ const layers = ["k-ground", "m k-shade", "m k-lit", "m k-hi", "k-sheen", "k-calm
       visibility 0s linear 700ms;
   }
   .desk[data-low] .k-calm {
-    opacity: 0.86;
+    /* (0.86 left grey words at the very top of the window 4.48 over the teal song's light.) */
+    opacity: 0.9;
     visibility: visible;
     transition: opacity 700ms ease;
+  }
+  /* Settling where the page landed (Desk's script): the calm takes its state at once; landing
+     away from the top (boot.js data-away), it is calm from the first paint, until the script
+     knows. */
+  .desk[data-instant] .k-calm {
+    transition: none;
+  }
+  :global(:root[data-away]) .desk:not([data-ready]) .k-calm {
+    opacity: 0.9;
+    visibility: visible;
+    transition: none;
   }
   :global(:root[data-theme="light"]) .desk[data-low] .slot:not([data-tones]) .k-calm,
   .desk[data-low] .slot[data-tones="light"] .k-calm {

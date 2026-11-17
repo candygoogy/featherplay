@@ -9,6 +9,8 @@ function draw(el: HTMLElement, now: Date) {
   if (t) t.textContent = time;
   if (d) d.textContent = date;
   el.setAttribute("datetime", now.toISOString());
+  // Drawn: its placeholder (the room its words take, system.css) gives way to them.
+  el.toggleAttribute("data-on", true);
 }
 
 /** Starts the clock in `el`; the returned function stops it. */

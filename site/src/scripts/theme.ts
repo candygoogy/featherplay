@@ -275,7 +275,6 @@ export function initTheme(): void {
   window.addEventListener("themechange", labelToggles);
   window.addEventListener("themechange", syncPickers);
   for (const button of document.querySelectorAll<HTMLButtonElement>("[data-theme-toggle]")) {
-    button.hidden = false;
     button.addEventListener("click", () => setTheme(next(storedChoice())));
     bindTip(button);
   }

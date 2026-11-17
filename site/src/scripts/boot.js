@@ -9,6 +9,7 @@
   if (t !== "dark" && t !== "light") t = matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
   document.documentElement.dataset.theme = t;
   document.documentElement.classList.add("js", "booting");
+  if ("share" in navigator) document.documentElement.classList.add("share");
   // The app's own face (the replicas' --font-ui, tokens.css), looked up now, while the page is
   // still being read: the first lookup of a system font costs some 14 ms (Windows), and done
   // in the page's first layout it made that one long task.
@@ -28,13 +29,19 @@
   // first two frames, src/scripts/first.ts: the check waits for them.)
   if (matchMedia("(min-width: 761px) and (min-height: 600px) and (prefers-reduced-motion: no-preference)").matches)
     document.documentElement.dataset.story = "";
+  // Elsewhere the steps are a switch (src/scripts/shapes.ts keeps it): laid out as one from the
+  // first paint, not after the script arrives.
+  else document.documentElement.dataset.shapes = "";
   const check = () => {
     const r = document.documentElement;
     const win = document.querySelector("[data-window]");
     const first = document.querySelector("[data-first]");
     const ran = (!win || win.classList.contains("placed")) && (!first || first.hasAttribute("data-shown"));
     if (!win || !ran || !r.hasAttribute("data-story-live")) delete r.dataset.story;
-    if (!ran) r.classList.remove("js", "split");
+    if (!ran) {
+      r.classList.remove("js", "split");
+      delete r.dataset.shapes;
+    }
   };
   addEventListener("load", () => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(check, 0))));
   // Nothing eases until the styles are in (base.css): DOMContentLoaded comes after the module
@@ -49,6 +56,14 @@
     const again = nav && (nav.type === "reload" || nav.type === "back_forward");
     const hash = location.hash.slice(1);
     if (!again && hash && hash !== "top") document.documentElement.dataset.land = "hash";
+    // Landing away from the top (a #section, or a reload or a step back where the page was
+    // left partway down, settled.ts keeps where): the bar waits to show until its script has
+    // its state, and the desk is calm from the first paint, so neither is seen as at the top.
+    let left = 0;
+    try {
+      left = Number(sessionStorage.getItem("fp-y:" + location.pathname)) || 0;
+    } catch (e) {}
+    if ((!again && hash && hash !== "top") || (again && left > 8)) document.documentElement.dataset.away = "";
     // A fresh load at the top: the page's first layout is split (src/scripts/release.ts). Not
     // where the browser puts the page somewhere down it as it loads: that needs every section
     // at its real height.

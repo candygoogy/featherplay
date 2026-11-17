@@ -33,7 +33,7 @@ const size = (f: Parameters<typeof sizeLabel>[0]) => sizeLabel(f).replace(" ", "
            (shown where the browser has one). -->
       <p class="dl-phone">
         <span>featherplay runs on your computer.</span>
-        <button class="send" type="button" data-send hidden>Send yourself the link</button>
+        <button class="send" type="button" data-send>Send yourself the link</button>
       </p>
       <ul class="dl-rows">
         {
@@ -116,7 +116,6 @@ const size = (f: Parameters<typeof sizeLabel>[0]) => sizeLabel(f).replace(" ", "
 <script>
   const send = document.querySelector<HTMLButtonElement>("[data-send]");
   if (send && "share" in navigator) {
-    send.hidden = false;
     send.addEventListener("click", () => {
       navigator.share({ title: "featherplay", url: `${location.origin}/#download` }).catch(() => {});
     });
@@ -312,6 +311,16 @@ const size = (f: Parameters<typeof sizeLabel>[0]) => sizeLabel(f).replace(" ", "
      where the line has the room (on a phone the larger words wouldn't fit beside the link). */
   .sec-dl :global(.n-end) {
     position: static;
+  }
+  /* Shown where the browser can share (boot.js marks it before the first paint). */
+  :global(:root:not(.share)) .send {
+    display: none;
+  }
+  /* The closing note is in the flow: its room is held, unseen, from the first paint until its
+     script has judged it (notes.ts), so the card's foot doesn't grow under the visitor. */
+  :global(:root.js) .sec-dl :global(.n-end:not([data-judged], .note-off)) {
+    display: flex;
+    visibility: hidden;
   }
   @media (width >= 761px) {
     .sec-dl :global(.n-end) {
