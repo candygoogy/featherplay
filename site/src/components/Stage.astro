@@ -20,10 +20,10 @@ import { release, sizeLabel } from "../data/release";
 
 const main = release.installer ?? release.portable;
 const steps = [
-  { key: "whole", label: "Whole", h: "A whole player when you want one.", p: "Home, your library, synced lyrics and the queue, in one native window." },
-  { key: "narrow", label: "Narrow", h: "Narrow, beside your work.", p: "Down to 480 px wide it keeps the cover, the lyrics and the bar." },
+  { key: "whole" as const, label: "Whole", h: "A whole player when you want one.", p: "Home, your library, synced lyrics and the queue, in one native window." },
+  { key: "narrow" as const, label: "Narrow", h: "Narrow, beside your work.", p: "Down to 480 px wide it keeps the cover, the lyrics and the bar." },
   {
-    key: "tray",
+    key: "tray" as const,
     label: "In the tray",
     h: "Or nothing at all.",
     p: "Closed to the tray it keeps playing: 39 MB of memory, one process. Your media keys still work.",
@@ -92,7 +92,7 @@ const steps = [
      that puts the window above in each shape, with that step's words under it. -->
 <section class="steps" id="after-app" tabindex="-1" aria-label="How featherplay steps back" data-steps data-bar-sec="app">
   <div class="frame steps-in">
-    <Segmented class="shapes" name="win-shape" legend="featherplay’s window" options={steps.map((s) => ({ value: s.key, label: s.label }))} checked="whole" data-shape-switch hidden />
+    <Segmented class="shapes" name="win-shape" legend="featherplay’s window" options={steps.map((s) => ({ value: s.key, label: s.label, icon: s.key }))} checked="whole" stretch="phone" data-shape-switch hidden />
     <div class="says" aria-live="polite">
       {
         steps.map((s) => (

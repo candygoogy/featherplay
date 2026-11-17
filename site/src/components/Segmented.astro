@@ -10,12 +10,14 @@
 // (src/scripts/segmented.ts). Reduced motion: it moves at once. Without script the picked
 // segment simply has the pill's look. Each option may lead with an icon (half-disc for
 // following something, sun, moon); `compact` hides the words on narrow screens, leaving the icon and a
-// tooltip (the words stay the radio's name). Tones: "page" on the page's ground, "band" on
+// tooltip (the words stay the radio's name); `stretch="phone"` spans the width on a phone in
+// equal parts, as a phone's own segmented controls do. The window's shapes have glyphs of
+// their own (whole with its queue, narrow, folded to the taskbar with its icon). Tones: "page" on the page's ground, "band" on
 // the footer's dark band.
 interface Option {
   value: string;
   label: string;
-  icon?: "system" | "light" | "dark" | "match";
+  icon?: "system" | "light" | "dark" | "match" | "whole" | "narrow" | "tray";
 }
 interface Props {
   name: string;
@@ -24,10 +26,11 @@ interface Props {
   checked?: string;
   tone?: "page" | "band";
   compact?: boolean;
+  stretch?: "phone";
   class?: string;
   [attr: string]: unknown;
 }
-const { name, legend, options, checked, tone = "page", compact = false, class: className, ...attrs } = Astro.props;
+const { name, legend, options, checked, tone = "page", compact = false, stretch, class: className, ...attrs } = Astro.props;
 
 // 16 px glyphs on a 24 grid, drawn in the header toggle's line (1.8 stroke, round ends).
 const glyphs: Record<NonNullable<Option["icon"]>, string> = {
@@ -38,12 +41,15 @@ const glyphs: Record<NonNullable<Option["icon"]>, string> = {
   dark: '<path d="M19.5 14.6A8 8 0 0 1 9.4 4.5a8 8 0 1 0 10.1 10.1Z" fill="currentColor"/>',
   match:
     '<circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 4a8 8 0 0 1 0 16Z" fill="currentColor"/>',
+  whole: '<rect x="2.9" y="5.4" width="18.2" height="13.2" rx="2.6" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M14.6 5.6v12.8" stroke="currentColor" stroke-width="1.8"/>',
+  narrow: '<rect x="7.4" y="3.4" width="9.2" height="17.2" rx="2.6" fill="none" stroke="currentColor" stroke-width="1.8"/>',
+  tray: '<rect x="2.9" y="11.4" width="18.2" height="6.2" rx="2.4" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="16.6" cy="14.5" r="1.45" fill="currentColor"/>',
 };
 const glyph = (o: Option) =>
   o.icon ? `<svg class="seg-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">${glyphs[o.icon]}</svg>` : "";
 ---
 
-<fieldset class:list={["segmented", `tone-${tone}`, { compact }, className]} {...attrs}>
+<fieldset class:list={["segmented", `tone-${tone}`, { compact, "stretch-phone": stretch === "phone" }, className]} {...attrs}>
   <legend>{legend}</legend>
   <div class="track" data-seg>
     {
@@ -132,6 +138,24 @@ const glyph = (o: Option) =>
   @media (pointer: coarse) {
     .seg-option {
       min-height: 38px;
+    }
+  }
+  /* Across a phone's width in equal parts, a little taller (its label a step up). */
+  @media (width < 761px) {
+    .stretch-phone {
+      inline-size: 100%;
+    }
+    .stretch-phone .track,
+    .stretch-phone .track[data-glide] .lit {
+      grid-auto-columns: minmax(0, 1fr);
+    }
+    .stretch-phone .track {
+      display: grid;
+      inline-size: 100%;
+    }
+    .stretch-phone .seg-option {
+      min-height: 42px;
+      font-size: 0.875rem;
     }
   }
   /* Tight: the icon alone, the word in the tooltip and the radio's name. */
