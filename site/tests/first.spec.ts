@@ -372,6 +372,13 @@ test.describe("on a phone, the three steps", () => {
     await expect(said).toHaveText("A whole player when you want one.");
     await pick("In the tray").check();
     await expect(win).toHaveAttribute("data-minimised", "");
+    // The bar has no tray icon on a phone: the desk has its tray, which brings the window back.
+    const tray = page.getByRole("button", { name: "featherplay in the tray: show the window" });
+    await expect(tray).toBeVisible();
+    await tray.click();
+    await expect(win).not.toHaveAttribute("data-minimised", /.*/);
+    await expect(pick("Whole")).toBeChecked();
+    await pick("In the tray").check();
     await pick("Narrow").check();
     await expect(win).not.toHaveAttribute("data-minimised", /.*/);
     await expect.poll(() => win.evaluate((el) => el.offsetWidth)).toBeLessThanOrEqual(860);

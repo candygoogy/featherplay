@@ -162,9 +162,12 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
    *  state shows). */
   const trayTarget = () =>
     [...document.querySelectorAll<HTMLElement>("[data-tray-target]")].find((t) => t.getClientRects().length && getComputedStyle(t).visibility !== "hidden");
+  /** The desk's own tray (where the bar shows no tray icon, showGone marks it): its lit icon. */
+  const goneTray = gone?.querySelector<HTMLElement>("[data-gone-tray]");
+  const ownTray = () => (gone?.hasAttribute("data-own-tray") ? (goneTray?.querySelector<HTMLElement>(".tb.lit") ?? null) : null);
   const trayPoint = () => {
     const p = pinRect();
-    const icon = trayTarget();
+    const icon = ownTray() ?? trayTarget();
     if (icon) {
       const r = icon.getBoundingClientRect();
       return { x: r.left + r.width / 2 - p.left, y: r.top + r.height / 2 - p.top };
@@ -477,7 +480,7 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
     else if (on) {
       fly(rest, true);
       // The icon takes it (Bar.astro: data-caught).
-      const icon = trayTarget();
+      const icon = ownTray() ? null : trayTarget();
       if (icon && !reduced()) {
         icon.toggleAttribute("data-caught", true);
         setTimeout(() => icon.removeAttribute("data-caught"), MIN_MS + 600);
@@ -496,7 +499,7 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
       if (maxed) markMax(false);
     }
     // The keys go where the window went: the tray icon, or the capsule's song.
-    if (on && hadFocus) trayTarget()?.focus({ preventScroll: true });
+    if (on && hadFocus) (ownTray() ? goneTray : trayTarget())?.focus({ preventScroll: true });
   };
   /** The desk in the window's place on the first screen (its home), shown while the window
    *  isn't on it: sent to the tray or closed, or moved off it by the visitor (dragged, snapped:
@@ -528,6 +531,14 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
       if (which) gone.dataset.on = which;
       else delete gone.dataset.on;
       goneBack.tabIndex = which ? 0 : -1;
+      // Its own tray on a phone, where the bar shows none, in the steps' switch (Stage.astro);
+      // kept (unseen) as the window comes back, which it comes out of.
+      if (which) {
+        const barTray = document.querySelector<HTMLElement>("[data-site-bar] [data-tray]");
+        const barHas = !!barTray && barTray.getClientRects().length > 0 && getComputedStyle(barTray).visibility !== "hidden";
+        gone.toggleAttribute("data-own-tray", which === "tray" && !barHas && !desk.matches && document.documentElement.hasAttribute("data-shapes"));
+      }
+      if (goneTray) goneTray.tabIndex = which === "tray" && gone.hasAttribute("data-own-tray") ? 0 : -1;
       if (!which) {
         goneAt = null;
         goneHand?.classList.remove("written");
@@ -549,7 +560,10 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
     if (place) {
       // The box is the window's own at home (the story's window: where the story holds it):
       // its things are set from its middle.
-      const rest = (minimised && driven) || home;
+      // (With its own tray, the room the window had, whatever its shape: the shortcut, its note
+      // and the tray need the height a whole window on a phone doesn't have.)
+      const room = gone.hasAttribute("data-own-tray") ? slot.getBoundingClientRect() : null;
+      const rest: Frame = room ? { x: slotOff.x, y: slotOff.y, w: room.width, h: room.height, s: 1, o: 1 } : (minimised && driven) || home;
       goneAt = rest;
       const [bw, bh] = [rest.w * rest.s, rest.h * rest.s];
       gone.style.width = `${bw.toFixed(1)}px`;
@@ -578,6 +592,10 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
   };
   /** The window is coming back by its shortcut on the desk (it opens out of that). */
   let byShortcut = false;
+  goneTray?.addEventListener("click", () => {
+    player.restore();
+    replica.querySelector<HTMLElement>('[data-act="minimise"]')?.focus({ preventScroll: true });
+  });
   goneBack?.addEventListener("click", () => {
     if (minimised) {
       byShortcut = true;
