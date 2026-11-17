@@ -92,7 +92,7 @@ const groups = [
           <li><a class="fl" href="/#connects">Privacy</a></li>
         </ul>
         <a class="to-top" href="#top">
-          Back to top
+          <span class="to-top-words">Back to top</span>
           <span class="to-top-key" aria-hidden="true">
             <svg viewBox="0 0 16 52" width="16" height="52" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M8 13V3.5M3.75 7.5 8 3.25l4.25 4.25M8 49V39.5M3.75 43.5 8 39.25l4.25 4.25"></path></svg>
           </span>
@@ -305,13 +305,37 @@ const groups = [
     .foot-cols {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
-    /* A phone: the small print's parts one under the other, without the dots. */
-    .foot-fine {
-      display: grid;
-      gap: var(--s1);
+    /* A phone: the sentence first, then the page's last row: whose it is and Privacy on the
+       left, the key back up on the right, level with them (its words for the ear only: the
+       row has no room for them beside the two). */
+    .foot-legal {
+      flex-wrap: nowrap;
+      align-items: flex-end;
+      gap: var(--s4);
     }
-    .foot-fine li + li::before {
+    .foot-fine {
+      flex: 1;
+      min-width: 0;
+      row-gap: var(--s2);
+    }
+    .foot-fine li:nth-child(2) {
+      flex-basis: 100%;
+      order: -1;
+    }
+    .foot-fine li + li:nth-child(2)::before {
       content: none;
+    }
+    /* (Its middle on the last row's: the key is taller than the line.) */
+    .to-top {
+      margin-bottom: calc((1.5em - 2.75rem) / 2);
+    }
+    .to-top-words {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
     }
   }
   /* A phone: what it runs on is said by the Download card just above, so featherplay's
