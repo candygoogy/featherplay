@@ -362,6 +362,8 @@ test("on a phone a toolbar showing or hiding (the height alone changing) never r
   await page.goto("/");
   const win = page.locator("[data-window]");
   const size = () => win.evaluate((el) => `${Math.round(el.getBoundingClientRect().width)}x${Math.round(el.getBoundingClientRect().height)}`);
+  // At rest: its opening (from 0.9 of its size) done.
+  await expect.poll(() => win.evaluate((el) => el.getAnimations().length)).toBe(0);
   await expect.poll(size).not.toBe("0x0");
   const before = await size();
   await page.setViewportSize({ width: 390, height: 750 });
