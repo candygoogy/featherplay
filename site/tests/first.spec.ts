@@ -359,12 +359,21 @@ test.describe("the desk", () => {
 
 test.describe("on a phone, the three steps", () => {
   test.use({ viewport: { width: 390, height: 844 } });
-  test("each has its picture: the whole app, the narrow app, the tray corner", async ({ page }) => {
+  test("put the page's one window in each shape, the step's words under the switch", async ({ page }) => {
     await page.goto("/");
-    const steps = page.locator("[data-steps] .step");
-    await expect(steps).toHaveCount(3);
-    await expect(steps.nth(0).locator(".mini.wide")).toBeVisible();
-    await expect(steps.nth(1).locator(".mini.narrow")).toBeVisible();
-    await expect(steps.nth(2).locator("[data-piece='tray']")).toBeVisible();
+    const win = page.locator("[data-window]");
+    const pick = (name: string) => page.getByRole("radio", { name, exact: true });
+    const said = page.locator("[data-steps] .step[data-picked] h2");
+    // A phone's window is the narrow app already.
+    await expect(pick("Narrow")).toBeChecked();
+    await expect(said).toHaveText("Narrow, beside your work.");
+    await pick("Whole").check();
+    await expect.poll(() => win.evaluate((el) => el.offsetWidth)).toBe(1440);
+    await expect(said).toHaveText("A whole player when you want one.");
+    await pick("In the tray").check();
+    await expect(win).toHaveAttribute("data-minimised", "");
+    await pick("Narrow").check();
+    await expect(win).not.toHaveAttribute("data-minimised", /.*/);
+    await expect.poll(() => win.evaluate((el) => el.offsetWidth)).toBeLessThanOrEqual(860);
   });
 });

@@ -270,13 +270,12 @@ for (const [label, use] of [
 ] as const) {
   test.describe(label, () => {
     test.use(use);
-    test("no pinned story: the three steps are plain blocks to read, the window stays put", async ({ page }) => {
+    test("no pinned story: the steps are a switch for the window, the window stays put", async ({ page }) => {
       await page.goto("/");
       await wake(page);
       await expect(page.locator("html")).not.toHaveAttribute("data-story", /.*/);
-      for (const h of ["A whole player when you want one.", "Narrow, beside your work.", "Or nothing at all."]) {
-        await expect(page.getByRole("heading", { level: 2, name: h })).toBeVisible();
-      }
+      await expect(page.locator("[data-shape-switch]")).toBeVisible();
+      await expect(page.locator("[data-steps] .step[data-picked] h2")).toBeVisible();
       const before = await windowBox(page);
       await page.evaluate(() => scrollTo(0, 300));
       await page.waitForTimeout(300);

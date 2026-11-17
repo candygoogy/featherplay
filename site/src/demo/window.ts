@@ -20,13 +20,16 @@
 // story's narrow hold, maximise). Coordinates are the pin's (Stage.astro): the viewport's while the story
 // holds the stage, the stage's own otherwise.
 
-import { MIN, clampInto, fitWindow, placeIn, type Box, type Fit } from "./fit";
+import { IDEAL, MIN, clampInto, fitWindow, placeIn, type Box, type Fit } from "./fit";
 import { bezier } from "../scripts/story-math";
 import { fitFirst } from "../scripts/first-math";
 import type { Player } from "./player";
 import { hideNote, showNoteAt } from "../scripts/notes";
 
 export type Frame = { w: number; h: number; x: number; y: number; s: number; o: number };
+/** The two shapes the steps after the first screen show it in (Stage.astro), where the story
+ *  doesn't run: the whole app, or narrow beside the visitor's work. */
+export type Shape = "whole" | "narrow";
 
 export type WindowController = {
   readonly el: HTMLElement;
@@ -49,6 +52,12 @@ export type WindowController = {
   onLayout(fn: () => void): void;
   /** The first screen's arrival: the window opens from the tray, after `delay` ms. */
   arrive(delay: number): void;
+  /** Which of the two shapes the size the page gives it is: narrow up to 860 px of the app's
+   *  own (a phone's, src/scripts/first-math.ts narrowFit), whole above. */
+  readonly natural: Shape;
+  /** Laid out in that shape in its place (null: the size the page gives it), from wherever
+   *  the visitor had it. */
+  shape(to: Shape | null): void;
 };
 
 const MIN_MS = 380;
@@ -74,6 +83,11 @@ const PUSH = 40;
 /** The gap round the shown place a snap would take. */
 const SNAP_GAP = 8;
 type Side = "left" | "right";
+/** The narrow shape, in the app's px: its real least width, and a phone-like height (the
+ *  story's narrow hold is the same). */
+const NARROW = { w: 480, h: 660 };
+/** The widest layout of the app's own that is still its narrow one (no queue beside). */
+const NARROW_MAX = 860;
 
 const reduced = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 const tf = (f: Frame, off: { x: number; y: number }) =>
@@ -108,6 +122,9 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
   let shown: Frame = home;
   let size = { w: 0, h: 0 };
   let scaleTimer = 0;
+  /** The shape the visitor chose in the steps (null: the size the page gives it). */
+  let shape: Shape | null = null;
+  let natural: Shape = "whole";
   const layoutFns: (() => void)[] = [];
 
   // ---- Geometry ----
@@ -306,7 +323,9 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
     }
   };
 
-  function layout() {
+  /** Measures the room and places the window at rest; with `ms`, a change of shape it morphs
+   *  into (as maximise does). */
+  function layout(ms = 0) {
     el.classList.add("placed");
     const p = pinRect();
     const s = slot.getBoundingClientRect();
@@ -321,12 +340,20 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
     const box: Box = { x: slotOff.x, y: slotOff.y, w: Math.min(s.width, vw), h: Math.max(1, Math.min(s.height, room)) };
     // The first screen's composition decides the app's size (src/scripts/first.ts: the room is
     // the window); stacked, the first screen's own rule; elsewhere the general one.
-    const fit: Fit = slot.dataset.fitW
+    let fit: Fit = slot.dataset.fitW
       ? fitWindow(box, { want: { w: Number(slot.dataset.fitW), h: Number(slot.dataset.fitH) } })
       : slot.dataset.fit === "first"
         ? fitFirst(box)
         : fitWindow(box);
-    const at = placeIn(box, fit, desk.matches ? "end" : "center", "start");
+    natural = fit.w <= NARROW_MAX ? "narrow" : "whole";
+    // The other shape, drawn no larger than the page's own (the same window, another shape),
+    // and on a phone in the middle of the room it leaves.
+    const other = !!shape && shape !== natural;
+    if (other) {
+      const f = fitWindow(box, { want: shape === "narrow" ? NARROW : IDEAL });
+      fit = { ...f, s: Math.min(f.s, fit.s) };
+    }
+    const at = placeIn(box, fit, desk.matches ? "end" : "center", other && !desk.matches ? "center" : "start");
     home = { w: fit.w, h: fit.h, s: fit.s, o: 1, ...at };
     // A dragged window stays where it was put, as far as the new viewport allows.
     if (drag.x || drag.y) {
@@ -339,7 +366,8 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
       markTile(null);
       setMax(false, 0);
     }
-    settle();
+    if (ms && !minimised) morph(ms);
+    else settle();
     showGone(true);
     if (dialog?.open) placeDialog();
     for (const fn of layoutFns) fn();
@@ -855,6 +883,19 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
     trayPoint,
     onLayout(fn) {
       layoutFns.push(fn);
+    },
+    get natural() {
+      return natural;
+    },
+    shape(to) {
+      if (to === shape || driven) return;
+      shape = to;
+      opensOff();
+      drag = { x: 0, y: 0 };
+      markTile(null);
+      if (maxed) markMax(false);
+      waiting = false;
+      layout(MAX_MS);
     },
     arrive(delay) {
       if (reduced() || driven || minimised || maxed || tile) return;
