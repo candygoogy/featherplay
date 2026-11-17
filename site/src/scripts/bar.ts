@@ -6,7 +6,7 @@
 // are in both states glide from where they were (FLIP, by `translate`), the ones only in the
 // new state fade in, the grounds cross-fade (CSS). Measured once per change, never per frame.
 //
-// Also here: the section on screen lit, the theme toggle joining the capsule for the keyboard,
+// Also here: the section on screen lit, the theme toggle keeping the flyouts open,
 // Windows' tooltips with Windows' timing, the flyouts (the song, the downloads) as popovers
 // under their part, the tray icon showing and hiding the window, and the desktop's menu.
 
@@ -250,6 +250,24 @@ export function bindBar(bar: HTMLElement, player: Player | null): { readonly sta
     np.addEventListener("click", () => {
       anchor.set(songFly, np);
       held.add(songFly);
+  });
+  // The theme toggle is for looking at what is open in its new colours: a press on it keeps the
+  // flyouts that were open. The browser's light dismiss closes them on the press; they are
+  // shown again from the click, in the same task, so no frame is drawn without them. (Noted
+  // as the pointer comes onto the toggle, before the press closes anything.)
+  const themeToggle = bar.querySelector<HTMLElement>("[data-theme-toggle]");
+  let kept = new Set<HTMLElement>();
+  const note = () => {
+    for (const f of flyouts) if (f.matches(":popover-open")) kept.add(f);
+  };
+  themeToggle?.addEventListener("pointerover", () => {
+    kept = new Set();
+    note();
+  });
+  themeToggle?.addEventListener("pointerdown", note, true);
+  themeToggle?.addEventListener("click", () => {
+    for (const f of kept) if (!f.matches(":popover-open")) f.showPopover();
+    kept = new Set();
   });
   // A change of state: placed for the new layout at once (where the parts will rest, not where
   // their glide starts).

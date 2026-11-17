@@ -290,6 +290,27 @@ test("the sections' icons say their names in Windows' tooltip after a rest; Esca
   await expect(tip).not.toHaveAttribute("data-on", /.*/);
 });
 
+test("the theme toggle changes the theme under an open flyout, never closing it", async ({ page }) => {
+  await page.goto("/");
+  await page.evaluate(() => scrollTo(0, 800));
+  await expect(bar(page)).toHaveAttribute("data-state", "capsule");
+  const fly = page.locator("#fly-song");
+  await bar(page).locator("[data-np]").click();
+  await expect(fly).toBeVisible();
+  await waitSettled(page);
+  // Any closing on the way would show here (beforetoggle fires at once, a toggle is coalesced).
+  await fly.evaluate((el) => el.addEventListener("beforetoggle", (e) => (e as ToggleEvent).newState === "closed" && ((window as unknown as { shut: number }).shut = 1 + ((window as unknown as { shut?: number }).shut ?? 0))));
+  const toggle = bar(page).locator("[data-theme-toggle]");
+  const before = await toggle.getAttribute("data-choice");
+  await toggle.click();
+  await expect(toggle).not.toHaveAttribute("data-choice", before ?? "");
+  await expect(fly).toBeVisible();
+  const shut = await page.evaluate(() => (window as unknown as { shut?: number }).shut ?? 0);
+  // Closed by the press and shown again in the same task at most: never left closed.
+  expect(shut).toBeLessThanOrEqual(1);
+  expect(await fly.evaluate((el) => el.matches(":popover-open"))).toBe(true);
+});
+
 test("the theme toggle stays in the capsule", async ({ page }) => {
   await page.goto("/");
   await expect(bar(page).locator("[data-theme-toggle]")).toBeVisible();
