@@ -131,10 +131,7 @@ const arrow = "M12 4.5 V15 M7.5 10.5 L12 15 L16.5 10.5 M5 19.5 H19";
                       {s.parts.map((p) => <path d={p.d} />)}
                     </svg>
                   </span>
-                  <span class="fq-text">
-                    <span class="fq-title">{s.label}</span>
-                    <span class="fq-artist">{s.tip}</span>
-                  </span>
+                  <span class="fq-title">{s.label}</span>
                 </a>
               </li>
             ))
@@ -533,15 +530,17 @@ const arrow = "M12 4.5 V15 M7.5 10.5 L12 15 L16.5 10.5 M5 19.5 H19";
     padding: 0;
     list-style: none;
   }
+  /* Each section by its icon and name alone (its tooltip's words said the name again). */
   .fs {
-    grid-template-columns: 40px minmax(0, 1fr);
+    grid-template-columns: 34px minmax(0, 1fr);
+    min-height: 46px;
     text-decoration: none;
   }
   .fs-icon {
     display: grid;
     place-items: center;
-    width: 40px;
-    height: 40px;
+    width: 34px;
+    height: 34px;
     border-radius: var(--r-control);
     background: var(--tonal);
     color: var(--ink2);
