@@ -38,11 +38,11 @@ test("the bar's icons move when the pointer comes to them, the question mark sta
   await page.goto("/");
   for (const id of ["app", "light", "lyrics", "kept"]) {
     await page.mouse.move(5, 600);
-    await page.locator(`[data-site-bar] a[data-sec="${id}"]`).hover();
+    await page.locator(`[data-site-bar] a.b-sec[data-sec="${id}"]`).hover();
     expect(await running(page, `[data-site-bar] svg[data-icon="${id}"]`), id).toBeGreaterThan(0);
   }
   await page.mouse.move(5, 600);
-  await page.locator('[data-site-bar] a[data-sec="questions"]').hover();
+  await page.locator('[data-site-bar] a.b-sec[data-sec="questions"]').hover();
   expect(await running(page, '[data-site-bar] svg[data-icon="questions"]')).toBe(0);
 });
 
@@ -52,12 +52,12 @@ test("an icon moves once when its section first becomes the current one", async 
   // lands wherever they then push it.)
   await laidOut(page);
   await page.evaluate(() => document.getElementById("lyrics")!.scrollIntoView());
-  await expect(page.locator('[data-site-bar] a[data-sec="lyrics"]')).toHaveAttribute("aria-current", "true");
+  await expect(page.locator('[data-site-bar] a.b-sec[data-sec="lyrics"]')).toHaveAttribute("aria-current", "true");
   expect(await running(page, '[data-site-bar] svg[data-icon="lyrics"]')).toBeGreaterThan(0);
   await page.evaluate(() => document.getElementById("questions")!.scrollIntoView());
   await page.waitForTimeout(900);
   await page.evaluate(() => document.getElementById("lyrics")!.scrollIntoView());
-  await expect(page.locator('[data-site-bar] a[data-sec="lyrics"]')).toHaveAttribute("aria-current", "true");
+  await expect(page.locator('[data-site-bar] a.b-sec[data-sec="lyrics"]')).toHaveAttribute("aria-current", "true");
   expect(await running(page, '[data-site-bar] svg[data-icon="lyrics"]')).toBe(0);
 });
 
@@ -94,7 +94,7 @@ test.describe("reduced motion", () => {
     await page.goto("/");
     await page.waitForTimeout(300);
     expect(await running(page, "[data-site-bar] [data-trivane]")).toBe(0);
-    await page.locator('[data-site-bar] a[data-sec="light"]').hover();
+    await page.locator('[data-site-bar] a.b-sec[data-sec="light"]').hover();
     await page.locator("[data-site-bar] [data-dl]").hover();
     await page.locator("[data-window] .bar .fp-play").click();
     expect(await running(page, "[data-site-bar]")).toBe(0);

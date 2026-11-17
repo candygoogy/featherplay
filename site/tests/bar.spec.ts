@@ -323,6 +323,23 @@ test("the theme toggle stays in the capsule", async ({ page }) => {
 
 test.describe("on a phone", () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+  test("the sections' part wears the section on screen and opens the five; a pick goes there", async ({ page }) => {
+    await page.goto("/");
+    const part = bar(page).locator("[data-secs]");
+    await expect(part).toBeVisible();
+    await expect(bar(page).locator(".b-nav")).toBeHidden();
+    await page.evaluate(() => scrollTo(0, document.getElementById("lyrics")!.getBoundingClientRect().top + scrollY));
+    await expect(part.locator("svg[data-on]")).toHaveAttribute("data-for", "lyrics");
+    await page.evaluate(() => scrollBy(0, -30));
+    await part.tap();
+    const fly = page.locator("#fly-secs");
+    await expect(fly).toBeVisible();
+    await expect(part).toHaveAttribute("aria-expanded", "true");
+    await expect(fly.locator('[aria-current="true"]')).toHaveAttribute("data-sec", "lyrics");
+    await fly.getByRole("link", { name: /Questions/ }).tap();
+    await expect(fly).toBeHidden();
+    await expect.poll(() => page.evaluate(() => Math.abs(document.getElementById("questions")!.getBoundingClientRect().top) < 120)).toBe(true);
+  });
   test("the capsule steps up out of the reading while the page moves down, and is back as soon as it moves up", async ({ page }) => {
     await page.goto("/");
     const bar = page.locator("[data-site-bar]");

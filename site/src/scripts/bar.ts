@@ -97,7 +97,10 @@ export function bindBar(bar: HTMLElement, player: Player | null): { readonly sta
   });
 
   // ---- The section on screen, lit (the capsule shows its name) ----
+  // (The row's links and the sections flyout's: both lit.)
   const links = [...bar.querySelectorAll<HTMLAnchorElement>("[data-sec]")];
+  // The sections' one part (where the row doesn't fit) wears the icon of the section on screen.
+  const nowIcons = [...bar.querySelectorAll<SVGElement>("[data-secs] svg[data-for]")];
   const sections = [...document.querySelectorAll<HTMLElement>("main > section[id], main > [data-stage]")];
   if (links.length && "IntersectionObserver" in window) {
     const ids = new Set(links.map((a) => a.dataset.sec));
@@ -117,6 +120,8 @@ export function bindBar(bar: HTMLElement, player: Player | null): { readonly sta
           if (a.dataset.sec === id) a.setAttribute("aria-current", "true");
           else a.removeAttribute("aria-current");
         }
+        // Between the sections (the download at the foot), the last one it was.
+        if (id) for (const svg of nowIcons) svg.toggleAttribute("data-on", svg.dataset.for === id);
       }, state === "capsule" && performance.now() - born > 500);
     };
     const io = new IntersectionObserver(
@@ -170,14 +175,21 @@ export function bindBar(bar: HTMLElement, player: Player | null): { readonly sta
   // ---- The flyouts: popovers under their part ----
   const songFly = bar.querySelector<HTMLElement>("#fly-song");
   const dlFly = bar.querySelector<HTMLElement>("#fly-dl")!;
-  const flyouts = [songFly, dlFly].filter((f): f is HTMLElement => !!f);
+  const secsFly = bar.querySelector<HTMLElement>("#fly-secs");
+  const flyouts = [songFly, dlFly, secsFly].filter((f): f is HTMLElement => !!f);
   const np = bar.querySelector<HTMLElement>("[data-np]");
   const tray = bar.querySelector<HTMLElement>("[data-tray]");
   const dl = bar.querySelector<HTMLElement>("[data-dl]")!;
+  const secs = bar.querySelector<HTMLElement>("[data-secs]");
   const anchor = new Map<HTMLElement, HTMLElement>([
     ...(songFly && np ? [[songFly, np] as [HTMLElement, HTMLElement]] : []),
     [dlFly, dl],
+    ...(secsFly && secs ? [[secsFly, secs] as [HTMLElement, HTMLElement]] : []),
   ]);
+  // A section picked from the flyout: it goes, and the page glides there (anchors.ts).
+  secsFly?.addEventListener("click", (e) => {
+    if ((e.target as Element).closest("[data-secs-go]")) secsFly.hidePopover();
+  });
   /** Flyouts opened by something other than the pointer resting (kept on a state change). */
   const held = new Set<HTMLElement>();
   const shows = (el: HTMLElement) => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== "hidden";
@@ -230,6 +242,7 @@ export function bindBar(bar: HTMLElement, player: Player | null): { readonly sta
         hideTip();
       } else held.delete(fly);
       if (fly === songFly) np?.setAttribute("aria-expanded", String(open));
+      else if (fly === secsFly) secs?.setAttribute("aria-expanded", String(open));
       else dl.setAttribute("aria-expanded", String(open));
     });
   }

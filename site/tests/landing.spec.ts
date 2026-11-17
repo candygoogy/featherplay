@@ -77,13 +77,14 @@ test("the section on screen is the one the bar marks", async ({ page }) => {
   const bar = page.locator("[data-site-bar]");
   await bar.getByRole("link", { name: "Lyrics", exact: true }).click();
   await still(page);
-  await expect(bar.locator('[data-sec][aria-current="true"]')).toHaveCount(1);
+  // (The row's; the sections flyout marks the same one.)
+  await expect(bar.locator('.b-nav [data-sec][aria-current="true"]')).toHaveCount(1);
   await expect(bar.getByRole("link", { name: "Lyrics", exact: true })).toHaveAttribute("aria-current", "true");
   // Make it yours has no entry of its own: Features, the section after it, is lit there too.
   await page.evaluate(() => document.getElementById("yours")!.scrollIntoView({ block: "center" }));
   await still(page);
   await expect(bar.getByRole("link", { name: "Features", exact: true })).toHaveAttribute("aria-current", "true");
-  await expect(bar.locator('[data-sec][aria-current="true"]')).toHaveCount(1);
+  await expect(bar.locator('.b-nav [data-sec][aria-current="true"]')).toHaveCount(1);
 });
 
 test("as the page starts, nothing eases in from the browser's own colours", async ({ page }) => {
