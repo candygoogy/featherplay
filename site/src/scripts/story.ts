@@ -8,19 +8,19 @@
 //
 // The loop runs only while something moves (the scroll's smoothing settling), reads no layout
 // (geometry is measured on resize and when the window lays out) and moves the window, its
-// ground and the words by transform and opacity. The change of shape is Windows' snap: the
-// app fades into its ground, which travels from the whole rect to the narrow one, the app is
-// laid out narrow (once, at the middle, unseen) and fades back out of it. The ground is the
-// view's own: the song's colour on Now playing and lyrics (the window never turns into a blank
-// box on the way), the app's plain surface with its icon on a browsing page.
+// ground and the words by transform and opacity. The change of shape is a window resizing
+// (story-morph.ts): the frame goes from the whole rect to the narrow one with the title bar,
+// the cover and the player bar on screen all the way, the app laid out narrow once as the move
+// begins and its words swapping in for the whole one's.
 // A window the visitor dragged, maximised or sent to the tray joins in from where it is.
 
-import { isNowView, type Player } from "../demo/player";
+import type { Player } from "../demo/player";
 import { whenWindow, type Frame } from "../demo/window";
 import { fitWindow, IDEAL } from "../demo/fit";
 import { LYRICS_MIN } from "./first-math";
 import { HOLDS, captionOpacity, easeGlide, glidePath, phases, seg, settleTarget, storyProgress } from "./story-math";
 import { hideNote, showNoteAt } from "./notes";
+import { morpher } from "./story-morph";
 
 export const STORY = "(min-width: 761px) and (min-height: 600px) and (prefers-reduced-motion: no-preference)";
 /** The pinned distance (Stage.astro --story-len). */
@@ -47,12 +47,10 @@ export async function startStory(player: Player): Promise<void> {
   const hand = (el: HTMLElement) => el.classList.contains("hand");
   const caps = [...stage.querySelectorAll<HTMLElement>("[data-cap]")];
   const ghost = stage.querySelector<HTMLElement>("[data-ghost]")!;
-  const icon = stage.querySelector<HTMLElement>("[data-ghost-icon]")!;
+  const morph = morpher(win, ghost);
   const songFly = document.getElementById("fly-song");
   const stillNote = stage.querySelector<HTMLElement>("[data-note='playing']");
   const steps = document.querySelector<HTMLElement>("[data-steps]");
-  /** Whether the ground wears Now playing's colour (data-ghost-now on the stage). */
-  let ghostNow: boolean | null = null;
   /** The story's flyout goes when its beat ends, or the story does. */
   const endBeat = () => {
     if (stillNote) hideNote(stillNote);
@@ -198,8 +196,6 @@ export async function startStory(player: Player): Promise<void> {
         { x: fl, y: CAP_B + (vh - CAP_B) / 2 - caps[2].offsetHeight / 2 },
       ],
     };
-    ghost.style.width = `${w1}px`;
-    ghost.style.height = `${h1}px`;
     target = storyProgress(scrollY, G.top, LEN);
     cur = target;
     trayAt = null;
@@ -225,7 +221,9 @@ export async function startStory(player: Player): Promise<void> {
     if (!G) return;
     // Past its end the stage scrolls away with the tray's words still in sight: the flyout
     // stays with them, and goes as the next section comes up to it.
-    const gone = lastY - (G.top + LEN) > flyRoom;
+    // (Where the page is now, read here: a load straight to a section below, #kept, comes with
+    // no scroll event to tell the handler, and from the top the tray's beat would open far past it.)
+    const gone = scrollY - (G.top + LEN) > flyRoom;
     if (p === lastP && gone === lastGone && !force && !nudged) return;
     lastP = p;
     lastGone = gone;
@@ -286,12 +284,12 @@ export async function startStory(player: Player): Promise<void> {
         userMin = null;
         player.restore();
       }
-      if (win.minimised) return;
+      if (win.minimised) return morph.end();
     } else userMin = null;
 
     if (p <= 0) {
+      morph.end();
       win.drive(null);
-      ghost.style.opacity = "0";
       return;
     }
     // Leaving the first screen, the visitor's placement (dragged, maximised) is carried along;
@@ -299,36 +297,19 @@ export async function startStory(player: Player): Promise<void> {
     if (a >= 1) win.forget();
     const from = win.rested;
     const L = G.L;
+    const r1 = { ...G.r1, w: L.w, h: L.h };
     let f: Frame;
-    let ghostO = 0;
-    let gr: Rect = G.r1;
-    // The snap's progress, in whichever move changes the app's layout (for the icon's fade).
-    let k = b;
-    // Through a snap the app rides its ground: fitted inside it from its top, so the app
-    // fading out and the app fading back in travel with the ground (never left behind it).
-    const riding = (w: number, h: number, o: number): Frame => {
-      const sc = Math.min(gr.w / w, gr.h / h);
-      return { w, h, x: gr.x + (gr.w - w * sc) / 2, y: gr.y, s: sc, o };
-    };
-    if (b <= 0 && (from.w !== L.w || from.h !== L.h)) {
-      // The first screen's narrow window becoming the whole wide app: as the snap to narrow,
-      // the app fades, its ground carries its icon from the first screen's rect to hold 1's,
-      // the app is laid out wide once while hidden and fades back.
-      k = a;
-      const r0 = { x: from.x, y: from.y, w: from.w * from.s, h: from.h * from.s };
-      gr = { x: lerp(r0.x, G.r1.x, a), y: lerp(r0.y, G.r1.y, a), w: lerp(r0.w, G.r1.w, a), h: lerp(r0.h, G.r1.h, a) };
-      ghostO = a > 0 ? Math.min(seg(a, 0, 0.2), 1 - seg(a, 0.85, 1)) : 0;
-      f = a < 0.5 ? riding(from.w, from.h, 1 - seg(a, 0.06, 0.5)) : riding(L.w, L.h, seg(a, 0.5, 0.94));
+    if (b <= 0 && a > 0 && a < 1 && (from.w !== L.w || from.h !== L.h)) {
+      // The first screen's narrow window becoming the whole wide app: resized, as to narrow.
+      f = morph.frame("first", { w: from.w, h: from.h, x: from.x, y: from.y, s: from.s }, r1, a);
     } else if (b <= 0) {
+      morph.end();
       f = { w: L.w, h: L.h, x: lerp(from.x, G.r1.x, a), y: lerp(from.y, G.r1.y, a), s: lerp(from.s, G.r1.s, a), o: 1 };
-    } else if (c <= 0) {
-      // The snap: the app fades, its ground carries its icon to the narrow rect, the app comes
-      // back laid out narrow.
-      gr = { x: lerp(G.r1.x, G.r2.x, b), y: lerp(G.r1.y, G.r2.y, b), w: lerp(G.r1.w, G.r2.w, b), h: lerp(G.r1.h, G.r2.h, b) };
-      ghostO = Math.min(seg(b, 0, 0.2), 1 - seg(b, 0.85, 1));
-      // The size the app is laid out at is its own; its place and scale are its ground's.
-      f = b < 0.5 ? riding(L.w, L.h, 1 - seg(b, 0.06, 0.5)) : riding(NARROW.w, NARROW.h, seg(b, 0.5, 0.94));
+    } else if (b < 1) {
+      // To narrow: the window resizes from the whole rect to the narrow one.
+      f = morph.frame("narrow", r1, { ...G.r2, w: NARROW.w, h: NARROW.h }, b);
     } else {
+      morph.end();
       // Into the tray: toward the capsule's song, smaller, then gone (where the song is, read
       // once as the move starts, not every frame).
       const t = (trayAt ??= win.trayPoint());
@@ -339,15 +320,6 @@ export async function startStory(player: Player): Promise<void> {
     }
     if (c <= 0) trayAt = null;
     win.drive(f);
-    ghost.style.opacity = ghostO.toFixed(3);
-    if (ghostO > 0) {
-      // The ground of the view the window is on (read as the move begins).
-      const now = isNowView(player.state.view);
-      if (now !== ghostNow) stage!.toggleAttribute("data-ghost-now", (ghostNow = now));
-      ghost.style.transform = `translate(${gr.x.toFixed(1)}px, ${gr.y.toFixed(1)}px) scale(${(gr.w / G.r1.w).toFixed(4)}, ${(gr.h / G.r1.h).toFixed(4)})`;
-      icon.style.transform = `translate(${(gr.x + gr.w / 2 - 28).toFixed(1)}px, ${(gr.y + gr.h / 2 - 28).toFixed(1)}px)`;
-    }
-    icon.style.opacity = (ghostO * Math.min(seg(k, 0.2, 0.4), 1 - seg(k, 0.58, 0.76))).toFixed(3);
   }
 
   // ---- Scroll: a target from scrollY, smoothed; the loop sleeps when it arrives ----
@@ -470,11 +442,12 @@ export async function startStory(player: Player): Promise<void> {
       glide = null;
       beat = false;
       endBeat();
+      morph.end();
       win.drive(null);
       // Only what the story set: the shelf's own style holds its place (first.ts), and
       // clearing all of it left the sleeves at the screen's corner wherever the story is off
       // (reduced motion, a short window).
-      for (const el of [...hero, ...caps, ghost, icon]) {
+      for (const el of [...hero, ...caps]) {
         el.style.opacity = "";
         if (!hand(el)) for (const p of ["translate", "transform", "visibility"]) el.style.removeProperty(p);
       }

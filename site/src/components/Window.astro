@@ -82,6 +82,8 @@ import { notes } from "../data/notes";
 <style>
   .window {
     --s: 1;
+    /* 24 page px in the app's own (replica.css: its controls never smaller on screen). */
+    --tgt: calc(24px / var(--s));
     position: absolute;
     inset: 0;
     z-index: 10;
@@ -112,6 +114,24 @@ import { notes } from "../data/notes";
       0 calc(1px / var(--s)) calc(2px / var(--s)) var(--shade-1),
       0 calc(4px / var(--s)) calc(16px / var(--s)) var(--shade-2),
       0 calc(16px / var(--s)) calc(56px / var(--s)) var(--shade-3);
+  }
+  /* Resizing in the story (src/scripts/story-morph.ts): the frame under it (the stage's ghost)
+     is the window's ground, edge and shadow, and the window is cut to the frame by the script,
+     so the app's parts may reach past its layout (the caption buttons and the player bar's are
+     kept to the frame's right). */
+  .window[data-morph] .win-body {
+    overflow: visible;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .window[data-morph] :global(:is(.replica, .app)) {
+    overflow: visible;
+    background: none;
+  }
+  /* Its bar's capsule is drawn under it, as wide as the frame (the bar keeps its buttons). */
+  .window[data-morph] :global(.bar) {
+    background: none;
+    box-shadow: none;
   }
   /* A sleeve carried over it: a ring, the window saying it will take it. */
   .window[data-drop] .win-body {

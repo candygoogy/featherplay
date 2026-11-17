@@ -74,15 +74,16 @@ test("the window takes the three holds: whole and large, the app's real narrow l
   await expect(page.locator("#fly-song")).toBeHidden();
 });
 
-test("where the first screen shows the app's narrow layout (1280 x 720), hold 1 shows the whole wide app, by the snap, and the narrow one is home again at the top", async ({ page }) => {
+test("where the first screen shows the app's narrow layout (1280 x 720), hold 1 shows the whole wide app, resized to it, and the narrow one is home again at the top", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.goto("/");
   await wake(page);
   const home = await appWidth(page);
   expect(home).toBeLessThanOrEqual(720);
-  // Part-way through the first move: the app faded, its ground carrying its icon.
+  // Part-way through the first move: the window resizing, the frame under it.
   await page.evaluate((y) => scrollTo(0, y), Math.round(0.08 * LEN));
   await expect.poll(() => page.locator("[data-ghost]").evaluate((g) => Number(getComputedStyle(g).opacity))).toBeGreaterThan(0.5);
+  await expect(page.locator("[data-window]")).toHaveAttribute("data-morph", "");
   await at(page, HOLDS[0]);
   expect(await appWidth(page)).toBe(1440);
   await inViewport(page, "hold 1 wide at 1280 x 720");
@@ -91,6 +92,27 @@ test("where the first screen shows the app's narrow layout (1280 x 720), hold 1 
   expect(24 * s).toBeGreaterThanOrEqual(13);
   await at(page, 0);
   await expect.poll(() => appWidth(page)).toBe(home);
+});
+
+test("on the way to narrow the window resizes: laid out narrow once, the whole one's still copy fading under it, the cover and the bars on screen all the way", async ({ page }) => {
+  await page.goto("/");
+  await wake(page);
+  await at(page, HOLDS[0]);
+  const win = page.locator("[data-window]");
+  await page.evaluate((y) => scrollTo(0, y), Math.round(0.3 * LEN));
+  await expect(win).toHaveAttribute("data-morph", "", { timeout: 2000 });
+  expect(await appWidth(page)).toBe(480);
+  const mid = await page.evaluate(() => {
+    const w = document.querySelector<HTMLElement>("[data-window]")!;
+    const op = (sel: string) => Number(getComputedStyle(w.querySelector(sel)!).opacity);
+    return { copies: document.querySelectorAll("[data-ghost] .morph-copy").length, cover: op(".np-cover"), bar: op(".bar"), title: op(".titlebar") };
+  });
+  expect(mid).toEqual({ copies: 1, cover: 1, bar: 1, title: 1 });
+  // Settled in the narrow hold: the app as it is, nothing of the move left.
+  await at(page, HOLDS[1]);
+  await expect(win).not.toHaveAttribute("data-morph");
+  expect(await page.locator("[data-ghost]").evaluate((g) => g.childElementCount)).toBe(0);
+  expect(await win.evaluate((w) => w.style.clipPath)).toBe("");
 });
 
 test("a scroll that stops part-way through a move is finished the way it was going", async ({ page }) => {

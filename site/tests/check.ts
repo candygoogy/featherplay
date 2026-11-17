@@ -44,14 +44,17 @@ export function problems(page: Page, label = ""): Promise<string[]> {
 
     const winEl = document.querySelector<HTMLElement>("[data-window]");
     if (winEl && getComputedStyle(winEl).visibility !== "hidden" && !winEl.hasAttribute("data-minimised")) {
-      const win = winEl.getBoundingClientRect();
+      // Resizing in the story, the window is its frame (the app reaches past its layout to it).
+      const frame = winEl.hasAttribute("data-morph") ? document.querySelector<HTMLElement>("[data-ghost]") : null;
+      const win = (frame ?? winEl).getBoundingClientRect();
       if (win.width > vw + 0.5 || win.height > vh + 0.5) out.push(`${at}: the window is larger than the screen`);
       if (win.left < -0.5 || win.right > vw + 0.5) out.push(`${at}: the window runs off a side`);
       if (innerWidth >= 761 && scrollY === 0 && (win.top < -0.5 || win.bottom > vh + 0.5)) out.push(`${at}: the window runs off the top or bottom`);
       // The title bar's and the player bar's controls (the lists inside scroll, clipped).
       for (const c of winEl.querySelectorAll<HTMLElement>(".titlebar button, .bar button")) {
         const r = c.getBoundingClientRect();
-        if (!r.width || getComputedStyle(c).visibility === "hidden") continue;
+        // (Not the old shape's bar, inert, fading out under the new one as the story resizes it.)
+        if (!r.width || getComputedStyle(c).visibility === "hidden" || c.closest("[inert]")) continue;
         if (r.right > win.right + 0.5 || r.left < win.left - 0.5 || r.bottom > win.bottom + 0.5) {
           out.push(`${at}: the app's ${c.getAttribute("aria-label") ?? c.textContent!.trim().slice(0, 16)} outside the window`);
           break;
