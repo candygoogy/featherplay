@@ -290,14 +290,11 @@ test("the sections' icons say their names in Windows' tooltip after a rest; Esca
   await expect(tip).not.toHaveAttribute("data-on", /.*/);
 });
 
-test("the keyboard brings the theme toggle into the capsule", async ({ page }) => {
+test("the theme toggle stays in the capsule", async ({ page }) => {
   await page.goto("/");
+  await expect(bar(page).locator("[data-theme-toggle]")).toBeVisible();
   await page.evaluate(() => scrollTo(0, 800));
   await expect(bar(page)).toHaveAttribute("data-state", "capsule");
-  await expect(bar(page).locator("[data-theme-toggle]")).toBeHidden();
-  await page.keyboard.press("Tab"); // the skip link
-  await page.keyboard.press("Tab"); // the bar's mark
-  await expect(bar(page)).toHaveAttribute("data-kbd", "");
   await expect(bar(page).locator("[data-theme-toggle]")).toBeVisible();
   await waitSettled(page);
   expect(await problems(page)).toEqual([]);

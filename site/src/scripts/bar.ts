@@ -129,18 +129,6 @@ export function bindBar(bar: HTMLElement, player: Player | null): { readonly sta
     for (const s of sections) io.observe(s);
   }
 
-  // ---- The keyboard brings the theme toggle into the capsule ----
-  bar.addEventListener("focusin", (e) => {
-    if (bar.hasAttribute("data-kbd") || !(e.target as Element).matches(":focus-visible")) return;
-    relayout(() => bar.toggleAttribute("data-kbd", true), state === "capsule");
-  });
-  bar.addEventListener("focusout", () =>
-    setTimeout(() => {
-      if (bar.contains(document.activeElement)) return;
-      relayout(() => bar.removeAttribute("data-kbd"), state === "capsule");
-    }),
-  );
-
   // ---- Windows' tooltips ----
   const tip = bar.querySelector<HTMLElement>("[data-bar-tip]")!;
   let tipTimer = 0;
