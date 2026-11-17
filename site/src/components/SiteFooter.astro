@@ -305,6 +305,16 @@ const groups = [
     .foot-cols {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
+    /* Legal alone on its row: across the width, its four links in the two columns above. */
+    .foot-links > .fgroup:last-child {
+      grid-column: 1 / -1;
+    }
+    .foot-links > .fgroup:last-child ul {
+      grid-template-rows: repeat(2, auto);
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-auto-flow: column;
+      column-gap: var(--s6);
+    }
     /* A phone: the sentence first, then the page's last row: whose it is and Privacy on the
        left, the key back up on the right, level with them (its words for the ear only: the
        row has no room for them beside the two). */
