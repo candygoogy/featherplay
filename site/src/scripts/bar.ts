@@ -192,6 +192,7 @@ export function bindBar(bar: HTMLElement, player: Player | null): { readonly sta
   });
   /** Flyouts opened by something other than the pointer resting (kept on a state change). */
   const held = new Set<HTMLElement>();
+  const phone = matchMedia("(width < 761px)");
   const shows = (el: HTMLElement) => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== "hidden";
   /** Where a part rests in its layout: its box less the glide it may be in the middle of. */
   const restRect = (el: HTMLElement) => {
@@ -217,7 +218,9 @@ export function bindBar(bar: HTMLElement, player: Player | null): { readonly sta
     const vw = document.documentElement.clientWidth;
     fly.style.maxWidth = `${vw - 16}px`;
     const w = fly.offsetWidth || Math.min(22 * 16, vw - 16);
-    const left = Math.round(Math.max(8, Math.min(r.left + r.width / 2 - w / 2, vw - w - 8)));
+    // On a phone the flyout is nearly the screen's width: in its middle, as the capsule is
+    // (under its part it sat off to one side). Elsewhere under its part.
+    const left = phone.matches ? Math.round((vw - w) / 2) : Math.round(Math.max(8, Math.min(r.left + r.width / 2 - w / 2, vw - w - 8)));
     const top = Math.round(row.getBoundingClientRect().bottom + 8);
     fly.style.left = `${left}px`;
     fly.style.top = `${top}px`;
@@ -332,7 +335,6 @@ export function bindBar(bar: HTMLElement, player: Player | null): { readonly sta
   // ---- A phone: the capsule steps up out of the reading while the page moves down, and is
   // back as soon as it moves up. Never while one of its flyouts is open or it holds focus.
   // (The attribute moves it only on a phone, by CSS: elsewhere it is inert.) ----
-  const phone = matchMedia("(width < 761px)");
   let lastY = scrollY;
   addEventListener(
     "scroll",
