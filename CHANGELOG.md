@@ -6,6 +6,8 @@ Notable changes to featherplay, newest first. The format follows
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-11-17
+
 ### Added
 
 - On Linux, software centres and app catalogs that read featherplay's AppStream metadata show
@@ -745,7 +747,8 @@ as a per-user installer or a portable exe.
 - A Language setting. featherplay ships in English and is ready for translations
   (CONTRIBUTING.md says how to add one).
 
-[Unreleased]: https://github.com/candygoogy/featherplay/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/candygoogy/featherplay/compare/v0.4.2...HEAD
+[0.4.2]: https://github.com/candygoogy/featherplay/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/candygoogy/featherplay/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/candygoogy/featherplay/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/candygoogy/featherplay/compare/v0.2.2...v0.3.0
