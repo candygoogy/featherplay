@@ -520,10 +520,15 @@ mod tests {
     }
 
     /// The answer for `u`, once the lookups in flight are done.
+    /// Asks about `u` and waits for the answer. With no wait before asking again, the second
+    /// `found` asks once more; that lookup ends here too, so it can't read a setting the test
+    /// changes next.
     fn answer(lookups: &Arc<Lookups>, u: &str) -> Option<Found> {
         lookups.found(&url(u));
         lookups.settle();
-        lookups.found(&url(u))
+        let found = lookups.found(&url(u));
+        lookups.settle();
+        found
     }
 
     fn shown(found: Option<Found>) -> Option<(Source, String)> {
