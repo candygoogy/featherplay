@@ -370,7 +370,14 @@ export component UpNext inherits Rectangle {
                 root.end-drag();
             }
             cancel => { root.end-drag(); }
-            clicked => { QueueData.play(i); }
+            // The songs after this one are next, so they start at the top. Scrolled now, while
+            // the list is as it was last laid out: Slint's list (1.18.1) keeps placing the
+            // rows from where the first shown one was until it lays them out again, so rows
+            // taken from above a scrolled list leave the next one half hidden, or below a gap.
+            clicked => {
+                list.content-y = 0;
+                QueueData.play(i);
+            }
             remove => { QueueData.remove(i); }
         }
     }

@@ -47,6 +47,11 @@ fn track(i: usize) -> Track {
 
 /// `songs[0]` playing, the rest next.
 fn play(ctx: &Rc<Ctx>, songs: &[usize]) {
+    play_from(ctx, songs, usize::MAX);
+}
+
+/// `play`, with the songs from `autoplay` on added by autoplay.
+fn play_from(ctx: &Rc<Ctx>, songs: &[usize], autoplay: usize) {
     let tracks: Vec<Track> = songs.iter().map(|&i| track(i)).collect();
     let state = PlayerState {
         current: tracks.first().cloned(),
@@ -59,7 +64,10 @@ fn play(ctx: &Rc<Ctx>, songs: &[usize]) {
         repeat: Default::default(),
         radio: false,
         volume: 0.5,
-        queue: QueueInfo::default(),
+        queue: QueueInfo {
+            autoplay_at: songs[1..].iter().position(|&s| s >= autoplay),
+            ..QueueInfo::default()
+        },
         speed: 1.0,
     };
     queue_panel::update(ctx, &state);
@@ -185,6 +193,70 @@ fn up_next_loads_the_covers_on_screen_and_follows_the_queue_in_place() {
             shows(&row, song),
             "row {i} shows another song's cover: {:?}",
             shown_colour(&row)
+        );
+    }
+    let support::Bare { ui, runtime, .. } = bare;
+    drop(ui);
+    runtime.shutdown_timeout(Duration::from_secs(1));
+}
+
+/// Draws `n` frames 16 ms apart.
+fn draw(ui: &AppWindow, n: u32) {
+    for _ in 0..n {
+        featherplay::offscreen::advance(Duration::from_millis(16));
+        ui.window().request_redraw();
+        ui.window().take_snapshot().expect("snapshot");
+    }
+}
+
+/// Where row "Song `i`" is in the window, if it's shown.
+fn row_top(ui: &AppWindow, i: usize) -> Option<f32> {
+    support::label::find(ui.window(), &format!("Song {i}, "))
+        .map(|r| support::label::rect(&r).min_y().round())
+}
+
+/// Scrolls Up next down and clicks a song there: the songs after it start at the list's top,
+/// neither half under the playing song nor below a gap. Once with the queue that follows at
+/// once (the rows above edited away in place); once picking the last song before autoplay's,
+/// whose fresh songs then replace the old ones.
+#[test]
+fn a_song_picked_far_down_up_next_leaves_the_rest_at_the_top() {
+    const AUTOPLAY: usize = 31;
+    let home =
+        Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("upnext-pick-{}", std::process::id()));
+    let bare = support::bare(home.join("cache"), None);
+    queue_panel::init(&bare.ctx);
+    let (ui, ctx) = (&bare.ui, &bare.ctx);
+    ui.window().set_size(slint::PhysicalSize::new(1280, 800));
+    ui.global::<Theme>().set_still(true);
+    ui.global::<Frame>().set_queue_open(true);
+    ui.show().expect("show");
+    let w = ui.window();
+    let all: Vec<usize> = (0..SONGS).collect();
+    play_from(ctx, &all, AUTOPLAY);
+    draw(ui, 3);
+    let top = row_top(ui, 1).expect("the first row shows");
+    let on_list = support::label::centre(w, "Song 1, ");
+
+    for (pick, notches) in [(12, -8.0), (AUTOPLAY - 1, -16.0)] {
+        featherplay::offscreen::wheel(w, on_list, notches);
+        draw(ui, 15);
+        assert_eq!(row_top(ui, pick - 11), None, "the list scrolled");
+        support::label::click(w, &format!("Song {pick}, "));
+        play_from(ctx, &all[pick..], AUTOPLAY);
+        let next = if pick + 1 < AUTOPLAY {
+            pick + 1
+        } else {
+            draw(ui, 1);
+            let fresh: Vec<usize> = std::iter::once(pick).chain(100..150).collect();
+            play_from(ctx, &fresh, 100);
+            100
+        };
+        draw(ui, 3);
+        assert_eq!(
+            row_top(ui, next),
+            Some(top),
+            "after song {pick}, the next is at the top"
         );
     }
     let support::Bare { ui, runtime, .. } = bare;

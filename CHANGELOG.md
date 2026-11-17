@@ -30,6 +30,8 @@ Notable changes to featherplay, newest first. The format follows
 
 ### Fixed
 
+- A song picked in Up next after scrolling down the list no longer leaves the next song half
+  hidden under the playing one, or below an empty space: the songs after it start at the top.
 - A SponsorBlock reply holding a segment with an impossible time (far past any song's
   length) no longer stops the song's segments from being read: that segment is left out, as
   is one too short to skip.
