@@ -182,6 +182,31 @@ async fn within_gates<F: Future>(f: F) -> F::Output {
         .expect("the resolve didn't end")
 }
 
+/// Both clocks a gate test reads, started before its gates are set. A gate is set on the
+/// real clock (`available_at`, as YouTube's are) and waited out on tokio's paused one, so
+/// real time the test spends before the chain reads it (a busy runner can take a few
+/// hundred ms, more than `GATE_MARGIN`) comes off the paused wait: `waited` adds it back.
+struct Clocks {
+    paused: tokio::time::Instant,
+    real: std::time::Instant,
+}
+
+impl Clocks {
+    fn start() -> Self {
+        Self {
+            paused: tokio::time::Instant::now(),
+            real: std::time::Instant::now(),
+        }
+    }
+    /// How long the test had waited at `at` (the paused clock), real time included.
+    fn waited_until(&self, at: tokio::time::Instant) -> Duration {
+        at - self.paused + self.real.elapsed()
+    }
+    fn waited(&self) -> Duration {
+        self.waited_until(tokio::time::Instant::now())
+    }
+}
+
 /// `f`'s answer, or a failed test after a few seconds: some steps never answer, and a
 /// chain that waits for one must fail, not hang.
 async fn within<F: Future>(f: F) -> F::Output {
@@ -784,16 +809,17 @@ async fn after_a_refusal_a_failing_native_step_goes_to_a_checked_yt_dlp_url() {
 #[tokio::test(start_paused = true)]
 async fn a_resolve_ahead_waits_out_a_gated_native_url_with_no_yt_dlp() {
     let chain = Chain::default();
+    let t = Clocks::start();
     let s = Script::default()
         .native_gated(NATIVE_URL, 5)
         .check(Check::Plays);
-    let (urgent, song, t) = (Notify::new(), id(), tokio::time::Instant::now());
+    let (urgent, song) = (Notify::new(), id());
     let ahead = chain.resolve_ahead(&s, &song, &urgent, Ahead::Later);
     assert_eq!(url(within_gates(ahead).await), NATIVE_URL);
-    assert!(t.elapsed() >= Duration::from_secs(5), "{:?}", t.elapsed());
+    assert!(t.waited() >= Duration::from_secs(5), "{:?}", t.waited());
     assert_eq!(s.calls(), ["native", "check"]);
-    let checked = s.checked_at.lock().unwrap()[0];
-    assert!(checked - t >= Duration::from_secs(5), "{:?}", checked - t);
+    let checked = t.waited_until(s.checked_at.lock().unwrap()[0]);
+    assert!(checked >= Duration::from_secs(5), "{checked:?}");
     assert_eq!(chain.take_fallback_reason(&id()), None);
 }
 
@@ -837,6 +863,7 @@ async fn a_gate_too_long_to_wait_goes_on_to_yt_dlp() {
 #[tokio::test(start_paused = true)]
 async fn a_gated_tv_url_is_waited_out() {
     let chain = Chain::default();
+    let t = Clocks::start();
     let s = Script {
         no_native: true,
         ..Script::default()
@@ -845,9 +872,8 @@ async fn a_gated_tv_url_is_waited_out() {
     .default_clients(Ok(TV_URL));
     s.default.lock().unwrap()[0].as_mut().unwrap().available_at =
         Some(SystemTime::now() + Duration::from_secs(6));
-    let t = tokio::time::Instant::now();
     assert_eq!(url(within_gates(chain.resolve(&s, &id())).await), TV_URL);
-    assert!(t.elapsed() >= Duration::from_secs(6), "{:?}", t.elapsed());
+    assert!(t.waited() >= Duration::from_secs(6), "{:?}", t.waited());
 }
 
 /// A queue track resolved ahead is jumped to while its URL's gate runs: from then on a
@@ -990,20 +1016,19 @@ async fn without_the_helpers_yt_dlp_runs_only_after_the_native_step_failed() {
 #[tokio::test(start_paused = true)]
 async fn the_players_resolve_keeps_a_gated_native_url_that_opens_first() {
     let chain = Chain::default();
+    let t = Clocks::start();
     let s = Script::default()
         .native_gated(NATIVE_URL, 5)
         .embedded_gated(EMBEDDED_URL, 10)
         .check(Check::Plays);
-    let t = tokio::time::Instant::now();
     assert_eq!(
         url(within_gates(chain.resolve(&s, &id())).await),
         NATIVE_URL
     );
-    let took = t.elapsed();
-    assert!(
-        took >= Duration::from_secs(5) && took < Duration::from_secs(10),
-        "{took:?}"
-    );
+    // Real time only shortens the paused wait, so the upper bound is on the paused clock.
+    let (took, paused) = (t.waited(), t.paused.elapsed());
+    assert!(took >= Duration::from_secs(5), "{took:?}");
+    assert!(paused < Duration::from_secs(10), "{paused:?}");
 }
 
 /// The player waits for a gated native answer: one more native answer, from a fresh
@@ -1025,17 +1050,17 @@ async fn the_players_resolve_takes_a_fresh_native_answer_without_ads() {
 #[tokio::test(start_paused = true)]
 async fn a_fresh_native_answer_with_ads_too_leaves_the_gate_to_be_waited_out() {
     let chain = Chain::default();
+    let t = Clocks::start();
     let s = Script::default()
         .native_gated(NATIVE_URL, 5)
         .fresh(Ok(gated_stream(FRESH_URL, 5)))
         .embedded_hangs()
         .check(Check::Plays);
-    let t = tokio::time::Instant::now();
     assert_eq!(
         url(within_gates(chain.resolve(&s, &id())).await),
         NATIVE_URL
     );
-    assert!(t.elapsed() >= Duration::from_secs(5), "{:?}", t.elapsed());
+    assert!(t.waited() >= Duration::from_secs(5), "{:?}", t.waited());
 }
 
 /// In doubt, a gated URL is checked once it has opened, not before (it would be
@@ -1044,15 +1069,16 @@ async fn a_fresh_native_answer_with_ads_too_leaves_the_gate_to_be_waited_out() {
 async fn in_doubt_a_gated_url_is_checked_once_its_gate_has_passed() {
     let chain = Chain::default();
     chain.refused(&other(), NATIVE_URL);
+    let t = Clocks::start();
     let s = Script::default()
         .native_gated(NATIVE_URL, 5)
         .check(Check::Plays);
-    let (urgent, song, t) = (Notify::new(), id(), tokio::time::Instant::now());
+    let (urgent, song) = (Notify::new(), id());
     let ahead = chain.resolve_ahead(&s, &song, &urgent, Ahead::Later);
     assert_eq!(url(within_gates(ahead).await), NATIVE_URL);
     assert_eq!(s.calls(), ["native", "check"]);
-    let checked = s.checked_at.lock().unwrap()[0];
-    assert!(checked - t >= Duration::from_secs(5), "{:?}", checked - t);
+    let checked = t.waited_until(s.checked_at.lock().unwrap()[0]);
+    assert!(checked >= Duration::from_secs(5), "{checked:?}");
 }
 
 /// Resolves ahead take turns at yt-dlp, not at waiting for a gate: the next one's
@@ -1061,6 +1087,7 @@ async fn in_doubt_a_gated_url_is_checked_once_its_gate_has_passed() {
 async fn a_gates_wait_is_not_part_of_a_resolve_aheads_turn_at_yt_dlp() {
     let chain = Chain::default();
     let fail = || Err(NativeError::Failed("player API answered 500".into()));
+    let t = Clocks::start();
     let s = Script::default()
         .native(fail())
         .embedded_gated(EMBEDDED_URL, 5)
@@ -1069,8 +1096,7 @@ async fn a_gates_wait_is_not_part_of_a_resolve_aheads_turn_at_yt_dlp() {
         .check(Check::Plays);
     let (first_urgent, second_urgent) = (Notify::new(), Notify::new());
     let (first_song, second_song) = (id(), other());
-    let t = tokio::time::Instant::now();
-    let ended = |r: Result<ResolvedStream, ResolveError>| (url(r), t.elapsed());
+    let ended = |r: Result<ResolvedStream, ResolveError>| (url(r), tokio::time::Instant::now());
     let (first, second) = within_gates(async {
         tokio::join!(
             async {
@@ -1090,8 +1116,9 @@ async fn a_gates_wait_is_not_part_of_a_resolve_aheads_turn_at_yt_dlp() {
         )
     })
     .await;
-    assert!(first.1 >= Duration::from_secs(5), "{:?}", first.1);
-    assert!(second.1 < Duration::from_secs(1), "{:?}", second.1);
+    let (first, second) = (t.waited_until(first.1), second.1 - t.paused);
+    assert!(first >= Duration::from_secs(5), "{first:?}");
+    assert!(second < Duration::from_secs(1), "{second:?}");
 }
 
 #[test]
