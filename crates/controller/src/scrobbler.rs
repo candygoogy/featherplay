@@ -44,9 +44,15 @@ impl fmt::Debug for LastfmKeys {
 
 /// The compiled-in Last.fm API key and secret, if this build has them.
 pub fn build_keys() -> Option<(&'static str, &'static str)> {
-    option_env!("LASTFM_API_KEY")
-        .zip(option_env!("LASTFM_API_SECRET"))
-        .filter(|(k, s)| !k.is_empty() && !s.is_empty())
+    // A match, not `zip`: in a build missing either key, that side is `None` at compile time,
+    // and clippy's `option_zip_none` takes the zip for a mistake.
+    match (
+        option_env!("LASTFM_API_KEY"),
+        option_env!("LASTFM_API_SECRET"),
+    ) {
+        (Some(key), Some(secret)) if !key.is_empty() && !secret.is_empty() => Some((key, secret)),
+        _ => None,
+    }
 }
 
 /// Which keys to use: the user's when both their key and secret are set (blank counts as
