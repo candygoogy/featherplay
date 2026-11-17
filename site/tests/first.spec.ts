@@ -368,7 +368,7 @@ test.describe("on a phone, the three steps", () => {
     await expect(pick("Narrow")).toBeChecked();
     await expect(said).toHaveText("Narrow, beside your work.");
     await pick("Whole").check();
-    await expect.poll(() => win.evaluate((el) => el.offsetWidth)).toBe(1440);
+    await expect.poll(() => win.evaluate((el) => el.offsetWidth)).toBe(960);
     await expect(said).toHaveText("A whole player when you want one.");
     await pick("In the tray").check();
     await expect(win).toHaveAttribute("data-minimised", "");

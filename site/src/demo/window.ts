@@ -88,6 +88,10 @@ type Side = "left" | "right";
 const NARROW = { w: 480, h: 660 };
 /** The widest layout of the app's own that is still its narrow one (no queue beside). */
 const NARROW_MAX = 860;
+/** The whole shape on a phone: just wide enough for the queue beside the lyrics (the app's
+ *  panel-fit, 952 px, replica.css), as tall as the room, so it fills the room the narrow one
+ *  had instead of a 16:10 strip in the middle of it. */
+const WHOLE_PHONE_W = 960;
 
 const reduced = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 const tf = (f: Frame, off: { x: number; y: number }) =>
@@ -353,7 +357,9 @@ export function bindWindow(el: HTMLElement, player: Player): WindowController {
     // and on a phone in the middle of the room it leaves.
     const other = !!shape && shape !== natural;
     if (other) {
-      const f = fitWindow(box, { want: shape === "narrow" ? NARROW : IDEAL });
+      const phoneWhole = shape === "whole" && !desk.matches;
+      const want = shape === "narrow" ? NARROW : phoneWhole ? { w: WHOLE_PHONE_W, h: Math.max(MIN.h, Math.round((box.h * WHOLE_PHONE_W) / box.w)) } : IDEAL;
+      const f = fitWindow(box, { want });
       fit = { ...f, s: Math.min(f.s, fit.s) };
     }
     const at = placeIn(box, fit, desk.matches ? "end" : "center", other && !desk.matches ? "center" : "start");
