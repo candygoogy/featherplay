@@ -89,12 +89,12 @@ const groups = [
         <ul class="foot-fine">
           <li>© 2026&nbsp;<a class="fl" href={links.author}>candygoogy</a></li>
           <li>Free and unofficial. Not made by or affiliated with Google or YouTube.</li>
-          <li><a class="fl" href="/#connects">Privacy</a></li>
+          <li><a class="fl" href="/#privacy">Privacy</a></li>
         </ul>
         <a class="to-top" href="#top">
           <span class="to-top-words">Back to top</span>
           <span class="to-top-key" aria-hidden="true">
-            <svg viewBox="0 0 16 52" width="16" height="52" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M8 13V3.5M3.75 7.5 8 3.25l4.25 4.25M8 49V39.5M3.75 43.5 8 39.25l4.25 4.25"></path></svg>
+            <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M8 13V3.5M3.75 7.5 8 3.25l4.25 4.25"></path></svg>
           </span>
         </a>
       </div>
@@ -235,20 +235,19 @@ const groups = [
     width: 2.25rem;
     height: 2.25rem;
     padding: 10px;
-    overflow: hidden;
     border-radius: 50%;
     /* A key of the page's glass, as the media keys are: lit along its top, a rim, resting on
-       the panel; pointed at and pressed, the tonal steps tint it. */
+       the panel; pointed at, it lights up (nothing moves), and pressed it goes in. */
     background: var(--pane-hl) var(--mat-fly);
     box-shadow: var(--pane-edge), var(--pane-rim), var(--pane-contact);
-    color: var(--text);
+    color: var(--ink2);
     transition:
       background-color var(--t-hover) ease,
+      color var(--t-hover) ease,
       scale var(--t-release) var(--spring-release);
   }
   .to-top-key svg {
     display: block;
-    transition: translate 320ms var(--ease-out);
   }
   .to-top:hover,
   .to-top:focus-visible {
@@ -256,29 +255,17 @@ const groups = [
   }
   .to-top:hover .to-top-key,
   .to-top:focus-visible .to-top-key {
-    background-color: color-mix(in srgb, var(--text) 7%, var(--mat-fly));
-  }
-  .to-top:hover .to-top-key svg,
-  .to-top:focus-visible .to-top-key svg {
-    translate: 0 -36px;
+    background-color: color-mix(in srgb, var(--text) 12%, var(--mat-fly));
+    color: var(--text);
   }
   .to-top:active .to-top-key {
     background-color: color-mix(in srgb, var(--text) 14%, var(--mat-fly));
     scale: var(--press-scale);
-    transition-duration: var(--t-hover), var(--t-press);
+    transition-duration: var(--t-hover), var(--t-hover), var(--t-press);
   }
   .to-top:focus-visible {
     outline-offset: 4px;
     border-radius: var(--r-pill);
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .to-top-key svg {
-      transition: none;
-    }
-    .to-top:hover .to-top-key svg,
-    .to-top:focus-visible .to-top-key svg {
-      translate: none;
-    }
   }
   @media (forced-colors: active) {
     .to-top-key {
@@ -315,12 +302,12 @@ const groups = [
       grid-auto-flow: column;
       column-gap: var(--s6);
     }
-    /* A phone: the sentence first, then the page's last row: whose it is and Privacy on the
-       left, the key back up on the right, level with them (its words for the ear only: the
-       row has no room for them beside the two). */
+    /* A phone: the sentence, whose it is and Privacy, then Back to top on a row of its own,
+       its words with its key as on a desktop (a bare round key alone at the row's end read as
+       a stray control). */
     .foot-legal {
-      flex-wrap: nowrap;
-      align-items: flex-end;
+      flex-direction: column;
+      align-items: flex-start;
       gap: var(--s4);
     }
     .foot-fine {
@@ -334,18 +321,6 @@ const groups = [
     }
     .foot-fine li + li:nth-child(2)::before {
       content: none;
-    }
-    /* (Its middle on the last row's: the key is taller than the line.) */
-    .to-top {
-      margin-bottom: calc((1.5em - 2.75rem) / 2);
-    }
-    .to-top-words {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      overflow: hidden;
-      clip-path: inset(50%);
-      white-space: nowrap;
     }
   }
   /* A phone: what it runs on is said by the Download card just above, so featherplay's

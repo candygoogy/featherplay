@@ -88,6 +88,14 @@ export const faqGroups: FaqGroup[] = [
     title: "Using it",
     items: [
       {
+        id: "from-pear",
+        q: "I use Pear Desktop. What carries over?",
+        a: [
+          "Most of Pear’s plugins are settings in featherplay: the scrobbler (Last.fm and ListenBrainz), taskbar media controls, shortcuts and media keys, SponsorBlock, Discord status, synced lyrics and notifications are built in. Its local API uses the routes and WebSocket of Pear’s API Server, so overlays and Stream Deck plugins made for Pear work with it too. featherplay never shows the video, so if you watch the music videos, use YouTube Music itself.",
+        ],
+        link: { href: links.comingFromPear, text: "Plugin by plugin, in the README" },
+      },
+      {
         q: "Does it work with stream overlays and Stream Deck?",
         a: [
           "Yes, once you turn on the local API in *Settings > Local API*. It uses the port, routes and WebSocket of Pear Desktop’s API Server, with a token from Settings, so overlays, Stream Deck plugins and scripts on your PC can see what’s playing and control it.",

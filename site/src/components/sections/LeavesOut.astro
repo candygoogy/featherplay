@@ -27,7 +27,6 @@ const notes: { word: string; why: string; group?: LeftOut }[] = [
   },
   { word: "Electron", group: "electron", why: "One native program, written in Rust and drawn with Slint, instead of a web app in a frame." },
   { word: "Video", group: "video", why: "It never plays video. A music video with a song version plays as the song." },
-  { word: "Telemetry", why: "No analytics and no tracking, and no server of its own." },
 ];
 // A file's type, for its icon: a folder, an app, a library, data or text.
 const kind = (e: FolderEntry) =>
@@ -154,15 +153,23 @@ import Note from "../Note.astro";
                       {filesOf(n.group)}: <span class="of"><strong class="num">{mb(leftOutTotals(n.group).bytes)}</strong> of Pear’s folder</span>
                     </p>
                 </li>
-              ) : (
-                <li class="out-last">
-                  <span class="note-name">{n.word}</span>
-                  <p class="why">{n.why}</p>
-                </li>
-              ),
+              ) : null,
             )
           }
         </ul>
+    </div>
+    <!-- What it leaves out that is no file: anything sent to us. Its own heading, so a skim
+         finds it; what it does connect to, and when, is in the questions (#connects). -->
+    <div class="privacy" id="privacy">
+      <h3 class="t-subtitle">Nothing is sent to us</h3>
+      <ul class="priv">
+        <li><strong>No featherplay account.</strong> You sign in to YouTube&nbsp;Music, and that sign-in stays on your PC.</li>
+        <li><strong>No analytics and no tracking,</strong> in the app or on this site.</li>
+        <li>
+          <strong>No server of its own.</strong>
+          <a class="text-link" href="#connects">What it connects to, and when</a>
+        </li>
+      </ul>
     </div>
   </div>
   <p class="source-line t-small ink2">Listed on the measuring PC on 1 November 2026, sizes as Explorer shows them.</p>
@@ -520,6 +527,13 @@ import Note from "../Note.astro";
     color: var(--text);
     font-weight: var(--fw-bold);
   }
+  /* The word's row is the chip's height from the first paint, script or not: the chip it
+     becomes (below) changes nothing under it, so nothing on the page moves when it does. */
+  .card-top {
+    display: flex;
+    align-items: center;
+    min-height: 2rem;
+  }
   /* ---- With script: each word is a chip to press, and the whole note presses it ---- */
   .out-card.live {
     position: relative;
@@ -541,6 +555,9 @@ import Note from "../Note.astro";
     inset: calc(var(--s2) * -1) calc(var(--s3) * -1);
     border-radius: var(--r-small);
   }
+  /* (With script the chip's look is there from the first paint, :root.js, not from the moment
+     its script makes the word a button: the word never grows into it on the screen.) */
+  :global(:root.js) .out-card .note-name,
   .out-card.live .note-name {
     /* (--paint isn't inherited: the chip wears the song's colour itself.) */
     --paint: var(--song);
@@ -602,21 +619,30 @@ import Note from "../Note.astro";
     }
   }
 
-  /* Telemetry: no file, so no chip; the list's last word, its name run in. */
-  .out-last {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: 0 var(--s3);
-    grid-column: 1 / -1;
-    margin-top: var(--s4);
-    font-size: var(--fs-lede);
-    line-height: var(--lh-lede);
-    letter-spacing: var(--tr-lede);
+  /* Nothing sent to us: under the three files, its own heading, three short facts in a row
+     (the desk's own gap above its line, no margin of its own on top of it). */
+  .privacy {
+    padding-top: var(--s6);
+    border-top: 1px solid var(--hairline);
   }
-  .out-last .why {
+  .priv {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--s4) var(--s7);
+    margin: var(--s4) 0 0;
+    padding: 0;
+    list-style: none;
     color: var(--ink2);
-    font-weight: var(--fw-medium);
+    text-wrap: pretty;
+  }
+  .priv strong {
+    color: var(--text);
+    font-weight: var(--fw-bold);
+  }
+  @media (width < 900px) {
+    .priv {
+      grid-template-columns: 1fr;
+    }
   }
   .source-line {
     margin-top: var(--s7);

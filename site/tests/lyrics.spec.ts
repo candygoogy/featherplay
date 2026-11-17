@@ -134,6 +134,10 @@ test.describe("moving the lines by hand", () => {
 
 test("the lyrics in the Make it yours window glide too", async ({ page }) => {
   await page.goto("/");
+  // Every section at its real height first (on a fresh load they are laid out one by one,
+  // release.ts): a section above still taking its height after the jump pushed the window off
+  // the screen, and the wheel then scrolled the page instead of its lines.
+  await laidOut(page);
   const p = page.locator("#replica-yours [data-lyrics]");
   await p.evaluate((el) => el.scrollIntoView({ block: "center", behavior: "instant" }));
   await page.locator("#replica-yours .line").first().evaluate((b: HTMLElement) => b.click());

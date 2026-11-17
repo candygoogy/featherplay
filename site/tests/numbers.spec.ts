@@ -89,18 +89,20 @@ test("the note points at featherplay's memory while playing, at the owner's size
   }
 });
 
-test("what it leaves out: four plain notes, none struck through, and no ads wording", async ({ page }) => {
+test("what it leaves out: three plain notes, none struck through, no ads wording, and nothing sent to us under its own heading", async ({ page }) => {
   await page.goto("/");
   await leaves(page).scrollIntoViewIfNeeded();
   const notes = leaves(page).locator("[data-leaves-out] > li");
-  await expect(notes).toHaveCount(4);
-  await expect.poll(() => notes.locator(".note-name").allInnerTexts()).toEqual(["Chromium", "Electron", "Video", "Telemetry"]);
+  await expect(notes).toHaveCount(3);
+  await expect.poll(() => notes.locator(".note-name").allInnerTexts()).toEqual(["Chromium", "Electron", "Video"]);
   await expect(notes.locator("s, del")).toHaveCount(0);
-  expect(await leaves(page).innerText()).not.toMatch(/\bads\b/i);
-  // The three that are files are buttons, named by their word; telemetry, no file, is none.
+  expect(await leaves(page).innerText()).not.toMatch(/ads/i);
+  // Each is a file group: a button, named by its word.
   await expect(notes.getByRole("button")).toHaveCount(3);
   await expect(leaves(page).getByRole("button", { name: "Chromium", exact: true })).toHaveAttribute("aria-describedby", /out-chromium-why/);
-  await expect(notes.last().getByRole("button")).toHaveCount(0);
+  const privacy = leaves(page).locator("#privacy");
+  await expect(privacy.getByRole("heading", { name: "Nothing is sent to us" })).toBeVisible();
+  await expect(privacy.getByRole("link", { name: "What it connects to, and when" })).toHaveAttribute("href", "#connects");
 });
 
 test.describe("on a touch screen", () => {

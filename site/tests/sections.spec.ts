@@ -195,7 +195,7 @@ test("the questions and the sections say what the README says", async ({ page })
   expect(q).toContain("Once it has closed, featherplay opens that profile again without a window");
   expect(await text("#kept")).toContain("remember");
   const out = await text("[data-out]");
-  expect(out).toContain("no server of its own");
+  expect(out.toLowerCase()).toContain("no server of its own");
   expect(out).toContain("your own browser, which you close when you're in");
 });
 
@@ -269,7 +269,7 @@ test("the footer: its link columns, the unofficial line, the version and what it
     ["What it connects to", "/#connects"],
     ["Uninstalling", "/#uninstall"],
     ["Coming from Pear", "https://github.com/candygoogy/featherplay#coming-from-pear"],
-    ["Privacy", "/#connects"],
+    ["Privacy", "/#privacy"],
     ["candygoogy", "https://github.com/candygoogy"],
     ["Back to top", "#top"],
   ]) {
@@ -279,7 +279,7 @@ test("the footer: its link columns, the unofficial line, the version and what it
   await expect(footer).toContainText(`Version ${release.version}`);
   await expect(footer).toContainText("Windows 10 and 11, 64-bit");
   await expect(footer).toContainText("Linux (experimental), glibc 2.35+");
-  for (const id of ["download", "kept", "light", "lyrics", "yours", "questions", "official", "connects", "uninstall"]) {
+  for (const id of ["download", "kept", "light", "lyrics", "yours", "questions", "official", "connects", "uninstall", "privacy", "from-pear"]) {
     await expect(page.locator(`#${id}`)).toHaveCount(1);
   }
   await expect(footer).not.toContainText("Josh Woodward");

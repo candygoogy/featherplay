@@ -11,14 +11,17 @@
 // (src/scripts/shapes.ts); without script they are plain words.
 import Window from "./Window.astro";
 import NowPlaying from "./NowPlaying.astro";
-import Logo from "./Logo.astro";
 import Note from "./Note.astro";
 import DlGlyph from "./DlGlyph.astro";
 import Shelf from "./Shelf.astro";
 import Segmented from "./Segmented.astro";
 import { release, sizeLabel } from "../data/release";
+import { figures } from "../data/numbers";
 
 const main = release.installer ?? release.portable;
+// Its best fact, on the first screen: memory with a song playing and the window minimised, as
+// measured (the numbers section has the rest, and how).
+const memory = figures[0].memoryMB;
 const steps = [
   { key: "whole" as const, label: "Whole", h: "A whole player when you want one.", p: "Home, your library, synced lyrics and the queue, in one native window." },
   { key: "narrow" as const, label: "Narrow", h: "Narrow, beside your work.", p: "Down to 480 px wide it keeps the cover, the lyrics and the bar." },
@@ -37,7 +40,10 @@ const steps = [
     <div class="frame first" data-first>
       <h1 id="hero-title" class="t-display head" data-head><span class="line">Light enough to forget</span> <span class="line">it’s running.</span></h1>
       <div class="col" data-col>
-        <p class="t-lede">featherplay is a free, native player for YouTube&nbsp;Music on Windows and Linux.</p>
+        <p class="t-lede">
+          featherplay is a free, native player for YouTube&nbsp;Music on Windows and Linux. Minimised, it plays in
+          <a class="lede-link" href="#light">{memory}&nbsp;MB of memory</a>.
+        </p>
         <div class="actions">
           <a class="btn red" href="#download">
             <DlGlyph />
@@ -62,10 +68,9 @@ const steps = [
         <Window />
       </div>
     </div>
-    <!-- The story's change of shape: the window's ground carrying the app's icon, as Windows
-         draws a window snapping, and the snap outline where it goes. -->
-    <div class="ghost" data-ghost aria-hidden="true"></div>
-    <span class="ghost-icon" data-ghost-icon aria-hidden="true"><Logo size={56} /></span>
+    <!-- The story's change of shape (src/scripts/story-morph.ts): the window's frame, with a
+         still copy of the shape it leaves in it. -->
+    <div class="ghost" data-ghost aria-hidden="true" inert></div>
     <!-- The three holds' captions, laid out by the story (the same words are in the steps below,
          read in order). -->
     <div class="caps" aria-hidden="true">
@@ -92,7 +97,7 @@ const steps = [
      that puts the window above in each shape, with that step's words under it. -->
 <section class="steps" id="after-app" tabindex="-1" aria-label="How featherplay steps back" data-steps data-bar-sec="app">
   <div class="frame steps-in">
-    <Segmented class="shapes" name="win-shape" legend="featherplay’s window" options={steps.map((s) => ({ value: s.key, label: s.label, icon: s.key, phone: s.key !== "whole" }))} checked="whole" stretch="phone" data-shape-switch hidden />
+    <Segmented class="shapes" name="win-shape" legend="featherplay’s window" options={steps.map((s) => ({ value: s.key, label: s.label, icon: s.key, phone: s.key !== "whole" }))} checked="whole" stretch="phone" data-shape-switch />
     <div class="says" aria-live="polite">
       {
         steps.map((s) => (
@@ -202,6 +207,19 @@ const steps = [
     align-content: start;
     gap: var(--s4);
   }
+  /* The memory figure: the lede's own weight, a quiet underline to the numbers that prove it. */
+  .lede-link {
+    color: inherit;
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 4px;
+    text-decoration-color: color-mix(in srgb, currentColor 40%, transparent);
+    white-space: nowrap;
+    transition: text-decoration-color var(--t-hover) ease;
+  }
+  .lede-link:hover {
+    text-decoration-color: currentColor;
+  }
   .actions {
     display: flex;
     flex-wrap: wrap;
@@ -231,32 +249,16 @@ const steps = [
     inset: 0;
     pointer-events: none;
   }
-  .ghost,
-  .ghost-icon {
+  /* Its ground, shadow, size and place are the script's (the window's own, as it resizes). */
+  .ghost {
     position: absolute;
     left: 0;
     top: 0;
+    z-index: 9;
+    overflow: hidden;
     opacity: 0;
     pointer-events: none;
-  }
-  .ghost {
-    z-index: 9;
-    border-radius: var(--r-small);
-    background: var(--bg);
-    box-shadow: var(--ring), var(--shadow);
     transform-origin: 0 0;
-  }
-  .ghost-icon {
-    z-index: 11;
-  }
-  /* On Now playing and lyrics (story.ts marks the stage) the ground is that view's own, the
-     song's colour as the app paints it (replica.css --stage), and carries no icon: the window
-     keeps its colour all the way, where a plain ground read as a blank box. */
-  .stage[data-ghost-now] .ghost {
-    background: color-mix(in srgb, var(--song) 60%, #0f0f0f);
-  }
-  .stage[data-ghost-now] .ghost-icon {
-    display: none;
   }
   .cap {
     position: absolute;
@@ -289,6 +291,10 @@ const steps = [
     display: grid;
     align-content: start;
     gap: var(--s4);
+  }
+  /* The switch is there where the steps are one (boot.js decides before the first paint). */
+  :global(:root:not([data-shapes])) .shapes {
+    display: none;
   }
   /* The switch shows one step's words at a time, all three in one place (as tall as the
      longest), so nothing under it moves as the pick changes. */

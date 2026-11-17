@@ -61,6 +61,9 @@ function parts(t: string) {
   return m ? { n: m[1], u: m[2] ? ` ${m[2]}` : m[3] } : { n: t, u: "" };
 }
 const r4 = (v: number) => +v.toFixed(4);
+// The lead: memory while playing, the one figure a skim should take away, drawn before the table
+// as three bars to one scale (the table's first row has the same figures, with the rest).
+const memTop = Math.max(...figures.map((f) => f.memoryMB));
 // A phone shows the memory and the processes, and the rest when asked (below).
 const phoneRows = new Set<Metric>(["memoryMB", "memoryPausedMB", "processes"]);
 ---
@@ -73,6 +76,23 @@ const phoneRows = new Set<Metric>(["memoryMB", "memoryPausedMB", "processes"]);
       on every row.
     </p>
   </div>
+  <figure class="lead-mem" aria-labelledby="lead-mem-cap">
+    <figcaption class="lm-cap" id="lead-mem-cap">Memory with a song playing, window minimised</figcaption>
+    <ul class="lm-rows">
+      {
+        figures.map((f) => (
+          <li class:list={["lm-row", { ours: f === ours }]}>
+            <span class="lm-who">{f.app}</span>
+            <span class="lm-bar" style={`--v:${r4(f.memoryMB / memTop)}`} aria-hidden="true" />
+            <span class="lm-fig">
+              {f.memoryMB.toLocaleString("en-GB")}
+              <span class="u">&nbsp;MB</span>
+            </span>
+          </li>
+        ))
+      }
+    </ul>
+  </figure>
   <div class="tbl panel">
     <span class="band glass float" aria-hidden="true"></span>
     <table class="figures" id="figures">
@@ -143,7 +163,7 @@ const phoneRows = new Set<Metric>(["memoryMB", "memoryPausedMB", "processes"]);
         }
       </tbody>
     </table>
-    <button class="btn tonal all-rows" type="button" aria-controls="figures" aria-expanded="false" data-all-rows hidden>
+    <button class="btn tonal all-rows" type="button" aria-controls="figures" aria-expanded="false" data-all-rows>
       All {rows.length} measurements
     </button>
     <p class="table-foot t-small">
@@ -159,7 +179,6 @@ const phoneRows = new Set<Metric>(["memoryMB", "memoryPausedMB", "processes"]);
   const all = tbl?.querySelector<HTMLButtonElement>("[data-all-rows]");
   if (tbl && all) {
     const label = all.textContent!.trim();
-    all.hidden = false;
     all.addEventListener("click", () => {
       const open = !tbl.hasAttribute("data-all");
       tbl.toggleAttribute("data-all", open);
@@ -170,6 +189,100 @@ const phoneRows = new Set<Metric>(["memoryMB", "memoryPausedMB", "processes"]);
 </script>
 
 <style>
+  /* ---- The lead: three bars to one scale, featherplay's a sliver in the accent ---- */
+  .lead-mem {
+    --track: color-mix(in srgb, var(--text) 7%, transparent);
+    margin: var(--s7) 0 0;
+  }
+  .lm-cap {
+    color: var(--ink2);
+    font-size: var(--fs-small);
+    font-weight: var(--fw-medium);
+    line-height: var(--lh-small);
+  }
+  /* One grid for the three rows (each row its subgrid), so the bars start and end together and
+     the figures' column is as wide as the widest. */
+  .lm-rows {
+    display: grid;
+    grid-template-columns: minmax(10rem, 0.28fr) minmax(0, 1fr) auto;
+    gap: var(--s4) var(--s5);
+    margin: var(--s4) 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .lm-row {
+    display: grid;
+    grid-template-columns: subgrid;
+    grid-column: 1 / -1;
+    align-items: center;
+  }
+  .lm-who {
+    color: var(--ink2);
+    font-weight: var(--fw-medium);
+  }
+  .lm-bar {
+    position: relative;
+    height: 12px;
+    border-radius: var(--r-pill);
+    background: var(--track);
+  }
+  .lm-bar::after {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: max(12px, var(--v) * 100%);
+    border-radius: inherit;
+    background: color-mix(in srgb, var(--text) 34%, transparent);
+  }
+  .lm-fig {
+    color: var(--ink2);
+    font-size: var(--fs-subtitle);
+    font-weight: var(--fw-medium);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: var(--tr-subtitle);
+    text-align: right;
+    white-space: nowrap;
+  }
+  .lm-fig .u {
+    color: var(--ink3);
+    font-size: 0.62em;
+    letter-spacing: 0;
+  }
+  .lm-row.ours .lm-who {
+    color: var(--text);
+    font-weight: var(--fw-bold);
+  }
+  .lm-row.ours .lm-bar::after {
+    background: var(--accent);
+  }
+  .lm-row.ours .lm-fig {
+    color: var(--text);
+    font-size: var(--fs-title);
+    font-weight: var(--fw-bold);
+    letter-spacing: var(--tr-title);
+  }
+  @media (width < 640px) {
+    .lm-rows {
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+    .lm-row {
+      row-gap: var(--s2);
+    }
+    .lm-bar {
+      grid-column: 1 / -1;
+      grid-row: 2;
+    }
+  }
+  @media (forced-colors: active) {
+    .lm-bar {
+      border: 1px solid CanvasText;
+    }
+    .lm-bar::after {
+      background: CanvasText;
+    }
+  }
+
   .tbl {
     /* The columns: the measure, then the three players at one width each, so the bars, drawn
        against their cell, compare across the row. */
@@ -530,6 +643,10 @@ const phoneRows = new Set<Metric>(["memoryMB", "memoryPausedMB", "processes"]);
       width: 100%;
       margin-block: var(--s2) var(--s4);
     }
+  }
+  /* With script alone (it opens the rows): shown from the first paint, not after it. */
+  :global(:root:not(.js)) .all-rows {
+    display: none;
   }
   /* The button is a phone's alone. */
   @media (width >= 760px) {

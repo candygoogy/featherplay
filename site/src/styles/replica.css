@@ -1734,6 +1734,19 @@
    Where there's no `app` container (a replica on a laptop's screen, the 404) nothing here but the
    stage's and the bar's rules applies, and at those fixed sizes they don't. */
 
+/* ---------- Its controls never under 24 page px (WCAG 2.5.8) ----------
+   A window drawn small (the first screen's, Make it yours on a phone) would draw the app's
+   icon buttons and lyric lines under 24 px on the screen. Its own size wherever that reaches
+   24 px; where the window is drawn smaller, just enough larger (--tgt, 24 px in the app's px:
+   Window.astro, Yours.astro), the icons the same, a little more room between them. */
+.replica :is(.bar-end, .np-actions, .transport) .fp-ib {
+  min-width: var(--tgt, 0px);
+  min-height: var(--tgt, 0px);
+}
+.replica .line {
+  min-height: var(--tgt, 0px);
+}
+
 /* ---------- In a window: the app's height is the window's ---------- */
 .win-body > .replica {
   --app-h: calc(100cqh - var(--title-h));

@@ -8,6 +8,9 @@
   /* ---- Type: six sizes, four weights, each size with its leading and tracking ---- */
   --fs-display: clamp(3.4rem, min(5.6vw, 9.5vh), 5.75rem); /* 54 to 92 */
   --fs-title: 2.5rem; /* 40 */
+  /* The home page's section headings, a step up from the title: large enough that the sections
+     read apart when the page is skimmed (38 on a phone, below). */
+  --fs-section: 3.25rem; /* 52 */
   --fs-subtitle: 1.5rem; /* 24 */
   --fs-lede: 1.1875rem; /* 19 */
   --fs-text: 1rem; /* 16 */
@@ -189,6 +192,9 @@ section[data-away],
 }
 /* A phone reads the page as one column: less air between its sections. */
 @media (width < 761px) {
+  :root {
+    --fs-section: 2.375rem;
+  }
   .sec {
     padding-top: var(--s8);
   }
@@ -216,6 +222,9 @@ section[data-away],
   line-height: var(--lh-title);
   letter-spacing: var(--tr-title);
   text-wrap: balance;
+}
+.sec h2.t-title {
+  font-size: var(--fs-section);
 }
 .t-subtitle {
   font-size: var(--fs-subtitle);
@@ -584,4 +593,16 @@ section[data-away],
   max-width: 5.2em;
   white-space: normal;
   line-height: 1.05;
+}
+
+/* ---------- What script adds is there from the first paint ----------
+   boot.js marks the page (.js) before anything is drawn, so a part script will show is shown,
+   and a part it will fill holds its room, from the first frame: nothing moves as the scripts
+   arrive. Without script these parts aren't there. */
+:root:not(.js) [data-theme-toggle] {
+  display: none;
+}
+/* A clock holds its placeholder's room, unseen, until the visitor's own time is drawn. */
+[data-clock]:not([data-on]) > span {
+  visibility: hidden;
 }

@@ -27,6 +27,11 @@ const current = currentLineIndex(song, positionMs);
 const lineState = (i: number) => (i < current ? "past" : i === current ? "current" : "next");
 const fraction = positionMs / song.durationMs;
 const isNow = view === "now" || view === "lyrics";
+// A window kept to Now playing (the download card's) never shows the browse pages, the sidebar or
+// a list of lines: those are left out of it (their places stay, empty, for the script), so the
+// page carries the app's whole markup once less.
+const lite = pin && isNow;
+// (Every copy is data-nosnippet: the demo's lyrics and lists are no search result's summary.)
 const hasLyrics = song.lyrics.length > 0;
 // Up next: the song playing pinned at the top, then the demo's songs after it.
 const at = songs.indexOf(song);
@@ -71,6 +76,7 @@ const pages: { page: View; icon: "home" | "library" | "explore" | "history"; lab
 ---
 
 <div
+  data-nosnippet
   class="replica"
   id={id}
   inert
@@ -130,6 +136,7 @@ const pages: { page: View; icon: "home" | "library" | "explore" | "history"; lab
   <div class="app">
     <!-- Sidebar (the browse pages) -->
     <nav class="sidebar" aria-label="featherplay" data-chrome="browse" hidden={isNow}>
+      {!lite && (<>
       <ul class="side-nav">
         {
           pages.map((p) => (
@@ -196,9 +203,11 @@ const pages: { page: View; icon: "home" | "library" | "explore" | "history"; lab
         <span class="side-rule"></span>
         <span class="account"><span class="avatar">Y</span><span>You</span></span>
       </div>
+      </>)}
     </nav>
 
     <div class="main">
+      {!lite && (<>
       <!-- Top bar (the browse pages) -->
       <form class="topbar" role="search" data-search data-chrome="browse" hidden={isNow}>
         <label class="field">
@@ -347,6 +356,8 @@ const pages: { page: View; icon: "home" | "library" | "explore" | "history"; lab
         <p class="empty" data-search-empty hidden>No songs match that. Try a title, an artist or a song link.</p>
       </section>
 
+      </>)}
+
       <!-- Now playing: the cover view, or the full lyrics view on the cover's colour -->
       <section class="stage" data-pane="now" aria-label={nowLabel} hidden={!isNow}>
         <span class="stage-wash" aria-hidden="true"></span>
@@ -395,7 +406,7 @@ const pages: { page: View; icon: "home" | "library" | "explore" | "history"; lab
         <div class="lyrics" data-lyrics>
           <ol class="lines" data-lines style={`transform:translateY(calc(-1 * ${linesY}))`}>
             {
-              song.lyrics.map((l, i) => (
+              !lite && song.lyrics.map((l, i) => (
                 <li>
                   <button
                     class="line"
@@ -409,7 +420,7 @@ const pages: { page: View; icon: "home" | "library" | "explore" | "history"; lab
                 </li>
               ))
             }
-            <li class="source">{lyricsSource(song)}</li>
+            {!lite && <li class="source">{lyricsSource(song)}</li>}
           </ol>
         </div>
       </section>
@@ -477,7 +488,7 @@ const pages: { page: View; icon: "home" | "library" | "explore" | "history"; lab
           <div class="side-lyrics" data-side-lyrics>
             <ol class="lines" data-side-lines>
               {
-                song.lyrics.map((l, i) => (
+                !lite && song.lyrics.map((l, i) => (
                   <li>
                     <button class="line" type="button" data-at={l.atMs} data-state={lineState(i)}>
                       {l.line}
@@ -485,7 +496,7 @@ const pages: { page: View; icon: "home" | "library" | "explore" | "history"; lab
                   </li>
                 ))
               }
-              {hasLyrics && <li class="source">{lyricsSource(song)}</li>}
+              {!lite && hasLyrics && <li class="source">{lyricsSource(song)}</li>}
             </ol>
           </div>
         </div>

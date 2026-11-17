@@ -22,7 +22,15 @@ const pieces = (p: string) =>
       <p class="ask">Something else? <a class="text-link" href={`${repo}/issues`}>Ask on GitHub</a>.</p>
       <nav aria-label="Question groups">
         <ol class="faq-index" data-faq-index>
-          {faqGroups.map((g) => <li><a href={`#${g.id}`}>{g.title}</a></li>)}
+          {
+            faqGroups.map((g) => (
+              <li>
+                <a href={`#${g.id}`} data-count={g.items.length}>
+                  {g.title}
+                </a>
+              </li>
+            ))
+          }
         </ol>
       </nav>
     </div>
@@ -73,7 +81,9 @@ const pieces = (p: string) =>
     --hair: color-mix(in srgb, var(--text) 10%, transparent);
     --row-x: var(--s4);
     display: grid;
-    grid-template-columns: minmax(0, 4fr) minmax(0, 8fr);
+    /* The heading and the index need little room: a quarter of the width (never under 16 rem),
+       the rest the questions'. */
+    grid-template-columns: minmax(16rem, 3fr) minmax(0, 9fr);
     gap: var(--s7);
     align-items: start;
   }
@@ -125,6 +135,16 @@ const pieces = (p: string) =>
   .faq-index a[aria-current="true"] {
     color: var(--text);
   }
+  /* How many questions the group holds, quiet beside its name (drawn, not said: the link is
+     the group's name). */
+  .faq-index a::after {
+    content: attr(data-count) / "";
+    margin-left: var(--s2);
+    font-variant-numeric: tabular-nums;
+    color: var(--ink3);
+    font-size: var(--fs-small);
+    font-weight: var(--fw-medium);
+  }
   .faq-index a[aria-current="true"]::before {
     height: 1.25rem;
   }
@@ -141,7 +161,7 @@ const pieces = (p: string) =>
     scroll-margin-top: calc(var(--bar-h, 64px) + var(--s6));
   }
   .faq-group + .faq-group {
-    margin-top: var(--s8);
+    margin-top: var(--s7);
   }
   .g-title {
     margin: 0 var(--row-x) var(--s3);
@@ -239,12 +259,13 @@ const pieces = (p: string) =>
   details[open]:not([data-closing]) .pm::after {
     rotate: 0deg;
   }
-  /* Set for reading: about 64 characters a line, open leading, clear space between paragraphs;
-     the first paragraph, the short answer, in the full ink. */
+  /* Set for reading: about 68 characters a line (the open card's width, not half of it), open
+     leading, clear space between paragraphs; the first paragraph, the short answer, in the full
+     ink. */
   .answer {
     display: grid;
     gap: var(--s4);
-    max-width: 64ch;
+    max-width: 68ch;
     padding: var(--s1) var(--row-x) var(--s6);
     color: color-mix(in srgb, var(--text) 84%, transparent);
     line-height: 1.68;

@@ -67,6 +67,7 @@ import Note from "../Note.astro";
       const room = e.contentBoxSize?.[0]?.inlineSize ?? stage.clientWidth;
       const k = Math.min(1, room / 480);
       fit.style.setProperty("--k", k.toFixed(4));
+      fit.toggleAttribute("data-fit", true);
       // Its note says "actual size" only while it is.
       stage.toggleAttribute("data-actual", k >= 1);
     }).observe(stage);
@@ -183,8 +184,14 @@ import Note from "../Note.astro";
   }
   .fit {
     --k: 1;
-    width: calc(480px * var(--k));
-    height: calc(720px * var(--k));
+    /* 24 page px in the app's own (replica.css: its controls never smaller on screen). */
+    --tgt: calc(24px / var(--k));
+    width: min(480px, 100%);
+    aspect-ratio: 480 / 720;
+  }
+  /* Until its script has scaled it (a frame after the first paint), unseen in its room. */
+  :global(:root.js) .fit:not([data-fit]) .yours-win {
+    visibility: hidden;
   }
   .yours-win {
     position: relative;
