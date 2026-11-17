@@ -58,17 +58,20 @@ export function startFirst(): void {
       delete slot.dataset.fitW;
       slot.dataset.fit = "first";
       slot.removeAttribute("style");
-      // A phone: the window takes the rest of the first screen, so all of it shows there, its
-      // bar too, and Play a song is seen to play (never under 300 px on a tall phone, 250 on a
-      // short one: there it runs on below). A browser's toolbar showing or hiding as the page
-      // moves changes the viewport's height (iOS Safari's layout viewport too: the window grew
-      // and shrank with it), so the height is the one the page loaded with.
+      // A phone: the window as wide as the column, in the narrow app's own proportions (its
+      // 480 x 680 layout, lyrics at some 14 px), or the rest of the first screen where that is
+      // more; never taller than a screen under the bar. (Fitted into what was left of the
+      // first screen it shrank to a third of the app's size, its lyrics some 7 px: a short
+      // scroll to its bar reads better than that.) A browser's toolbar showing or hiding as the
+      // page moves changes the viewport's height (iOS Safari's layout viewport too: the window
+      // grew and shrank with it), so the height is the one the page loaded with.
       // Worked out once for each width (a phone turned works it out again): a change of height
       // alone is a toolbar, and keeps it.
       if (vw < 761) {
         if (phoneH?.vw !== vw) {
           const top = slot.getBoundingClientRect().top + scrollY;
-          phoneH = { vw, h: px(clamp(root.clientHeight - top - 12, root.clientHeight < 800 ? 250 : 300, 752)) };
+          const readable = Math.min((slot.getBoundingClientRect().width * 680) / 480, root.clientHeight - 88);
+          phoneH = { vw, h: px(clamp(Math.max(root.clientHeight - top - 12, readable), 250, 752)) };
         }
         slot.style.height = phoneH.h;
       }

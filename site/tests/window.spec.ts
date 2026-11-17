@@ -43,8 +43,8 @@ test("the window is never wider or taller than the viewport, and on a wide scree
   }
 });
 
-test("on a phone the window is the app's compact layout, whole on the first screen with its bar", async ({ page }) => {
-  for (const [w, h] of [[390, 844], [360, 740]] as const) {
+test("on a phone the window is the app's compact layout, as wide as the column, its lyrics readable, never taller than a screen", async ({ page }) => {
+  for (const [w, h] of [[390, 844], [390, 664], [360, 740]] as const) {
     await page.setViewportSize({ width: w, height: h });
     await page.goto("/");
     await wake(page);
@@ -54,11 +54,14 @@ test("on a phone the window is the app's compact layout, whole on the first scre
     const cover = (await r.locator(".np-cover").boundingBox())!;
     const lines = (await r.locator("[data-lyrics]").boundingBox())!;
     expect(lines.y).toBeGreaterThan(cover.y + cover.height - 1);
-    // The bar and its play button on the first screen, without scrolling. (Not a ratio of 1:
-    // the window is drawn scaled, and on CI’s Linux the button measured 0.9999987 of itself.)
-    await expect(r.locator(".bar .fp-play")).toBeInViewport({ ratio: 0.99 });
+    // The column's width, the lyrics at 13 px or more, and no taller than a screen.
     const box = await windowBox(page);
-    expect(box.y + box.height, `${w}x${h}`).toBeLessThanOrEqual(h);
+    const slot = (await page.locator("[data-win-slot]").boundingBox())!;
+    expect(box.width, `${w}x${h}`).toBeGreaterThan(slot.width - 1);
+    // (The app's own px times the scale the window is drawn at.)
+    const lyric = await r.locator("[data-lyrics] .line").first().evaluate((el) => (parseFloat(getComputedStyle(el).fontSize) * el.getBoundingClientRect().height) / (el as HTMLElement).offsetHeight);
+    expect(lyric, `${w}x${h}`).toBeGreaterThan(13);
+    expect(box.height, `${w}x${h}`).toBeLessThanOrEqual(h);
   }
 });
 
