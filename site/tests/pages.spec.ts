@@ -38,21 +38,14 @@ for (const path of ["/method", "/credits", "/a-page-that-is-not-there"]) {
   });
 }
 
-test("the 404 keeps its idea: the app's window on the desk, 404 by page not found, and Play from the start", async ({ page }) => {
+test("the 404 is the page's own words and two ways on, both in view on the first screen, with no window drawn", async ({ page }) => {
   for (const width of [1440, 390]) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto("/a-page-that-is-not-there");
-    const win = page.locator(".nf-win");
-    await expect(win).toBeVisible();
-    await expect(win.locator("[data-nf-title]")).toHaveText("404");
-    await expect(win.locator("[data-nf-artist]")).toHaveText("page not found");
-    const home = win.getByRole("link", { name: "Play from the start" });
-    await expect(home).toHaveAttribute("href", "/");
-    // The way back lies inside the window, clear of its player bar.
-    const [w, h, b] = [(await win.boundingBox())!, (await home.boundingBox())!, (await win.locator(".bar").boundingBox())!];
-    expect(h.x + h.width, `${width}`).toBeLessThanOrEqual(w.x + w.width);
-    expect(h.y + h.height, `${width}`).toBeLessThanOrEqual(b.y);
-    await expect(page.locator("[data-laptop]")).toHaveCount(0);
+    const main = page.locator("main");
+    await expect(main.locator("h1")).toHaveText("Not in the queue");
+    for (const name of ["Back to featherplay", "Download"]) await expect(main.getByRole("link", { name }), `${width} ${name}`).toBeInViewport();
+    await expect(page.locator(".nf-win, [data-replica], [data-laptop]")).toHaveCount(0);
   }
 });
 

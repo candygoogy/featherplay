@@ -1,16 +1,18 @@
 ---
-// The 404: a state the app really has, Now playing with nothing to play and nothing up next.
-// A blank cover, "404" by "page not found", the bar at 0:00 of 4:04, and one way back. The
-// app's window on the desk, as on the home page (no laptop): a still frame of the app
-// (replica.css) laid out for the window's size by the app's own container rules, no demo
-// script, so it stays light.
-import "../styles/app-controls.css";
-import "../styles/replica.css";
+// The 404 as the app's queue would show it: the song that should be playing is missing (a blank
+// cover, "404", page not found), and under it what is up next, the home page's five sections as
+// the app lists songs (each its icon, the bar's, its name and its own title). Beside the queue,
+// the page's own words and two ways on. The two are one spread, set side by side at their own
+// sizes in the middle of the frame, never pushed to its two ends; the spread sits in the room
+// between the bar and the footer, and the footer at the foot of the window: no desk under it.
+// No picture of the app (it read as something to play with, and carried the app's stylesheet).
 import Base from "../layouts/Base.astro";
 import Bar from "../components/Bar.astro";
 import DeskLite from "../components/DeskLite.astro";
 import SiteFooter from "../components/SiteFooter.astro";
+import DlGlyph from "../components/DlGlyph.astro";
 import Icon from "../components/Icon.astro";
+import { sections } from "../data/sections";
 ---
 
 <Base
@@ -24,164 +26,223 @@ import Icon from "../components/Icon.astro";
   <main id="main" tabindex="-1" class="nf frame">
     <div class="nf-head">
       <h1 class="t-display">Not in the queue</h1>
-      <p class="t-lede ink2">The page you asked for isn’t here. It may have moved, or the link may be wrong.</p>
-    </div>
-    <div class="nf-desk">
-      <div class="nf-win win-body" role="group" aria-label="featherplay showing an empty Now playing: 404, page not found">
-          <div class="replica" data-view="now" data-playing="false" data-lyrics-on="true" data-has-lyrics="false" style="--song:#808080">
-            <div class="titlebar">
-              <span class="art" aria-hidden="true">
-                <img class="only-dark" src="/tri-vane.svg" width="16" height="16" alt="" />
-                <img class="only-light" src="/tri-vane-light.svg" width="16" height="16" alt="" />
-              </span>
-              <span>featherplay</span>
-            </div>
-            <div class="app">
-              <div class="main">
-                <section class="stage" aria-label="Now playing">
-                  <span class="stage-wash" aria-hidden="true"></span>
-                  <div class="np">
-                    <div class="np-cover blank" aria-hidden="true"><Icon name="note" size={96} /></div>
-                    <div class="np-text">
-                      <div class="np-row"><p class="np-title" data-nf-title>404</p></div>
-                      <p class="np-artist" data-nf-artist>page not found</p>
-                      <p class="nf-line">This page isn't in the queue.</p>
-                      <a class="pill solid nf-home" href="/"><Icon name="play" size={18} /><span>Play from the start</span></a>
-                    </div>
-                  </div>
-                </section>
-              </div>
-              <aside class="queue" aria-label="Up next">
-                <div class="tabs" aria-hidden="true">
-                  <span class="tab-pill"></span><span class="tab">Up next</span><span class="tab">Related</span>
-                </div>
-                <p class="nf-empty">Nothing up next</p>
-              </aside>
-              <div class="bar" aria-hidden="true">
-                <span class="bar-song">
-                  <span class="bar-cover blank"></span>
-                  <span class="bar-text"><span class="bar-title">404</span><span class="bar-artist">page not found</span></span>
-                </span>
-                <div class="bar-mid">
-                  <div class="transport">
-                    <span class="fp-ib"><Icon name="shuffle" size={20} /></span>
-                    <span class="fp-ib t1"><Icon name="prev" size={20} /></span>
-                    <span class="fp-play"><Icon name="play" class="i-play" /></span>
-                    <span class="fp-ib t1"><Icon name="next" size={20} /></span>
-                    <span class="fp-ib"><Icon name="repeat" size={20} /></span>
-                  </div>
-                  <div class="seek">
-                    <span class="time" data-nf-time>0:00</span>
-                    <span class="seek-line"><span class="rail"></span></span>
-                    <span class="time end" data-nf-length>4:04</span>
-                  </div>
-                </div>
-                <div class="bar-end">
-                  <span class="fp-ib"><Icon name="heart" size={20} /></span>
-                  <span class="fp-ib"><Icon name="volume" size={20} /></span>
-                </div>
-              </div>
-            </div>
-          </div>
+      <p class="t-lede ink2">The page you asked for isn’t here.<br /> It may have moved, or the link may be wrong.</p>
+      <div class="nf-actions">
+        <a class="btn red" href="/">Back to featherplay</a>
+        <a class="btn tonal" href="/#download"><DlGlyph />Download</a>
       </div>
     </div>
+    <nav class="nf-queue panel" aria-labelledby="nf-next">
+      <p class="nf-label">Now playing</p>
+      <p class="nf-now">
+        <span class="nf-cover" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-linecap="round">
+            <circle cx="12" cy="12" r="8" stroke-width="1.6" stroke-dasharray="2.6 2.6" />
+            <circle cx="12" cy="12" r="2" stroke-width="1.6" />
+          </svg>
+        </span>
+        <span class="nf-text">
+          <b class="num" data-nf-code>404</b>
+          <span>Page not found</span>
+        </span>
+      </p>
+      <h2 class="nf-label nf-next" id="nf-next">Up next</h2>
+      <ul>
+        {
+          sections.map((s) => (
+            <li>
+              <a class="nf-row" href={`/#${s.id}`}>
+                <span class="nf-ic" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    {s.parts.map((p) => (
+                      <path d={p.d} />
+                    ))}
+                  </svg>
+                </span>
+                <span class="nf-text">
+                  <b>{s.label}</b>
+                  <span>{s.about}</span>
+                </span>
+                <span class="nf-go" aria-hidden="true"><Icon name="chevronRight" size={16} /></span>
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+    </nav>
   </main>
   <SiteFooter />
 </Base>
 
 <style>
-  /* The still picture's selected tab (Up next, on the tinted pill) in the full text colour,
-     as the live replica's selected tab is. */
-  .nf :global(.tabs .tab:nth-child(2)) {
-    color: var(--text);
+  /* The page as a column the window's height at least: the main part takes what the bar and the
+     footer leave, so the footer ends at the window's foot however short the page is. (The skip
+     link, the desk and the bar are fixed: they take no room in it.) */
+  :global(body:has(> main.nf)) {
+    display: flex;
+    flex-direction: column;
   }
+
+  /* One spread: the words and the queue side by side at their own widths, centred in the frame
+     with one measured gap between them, and level with each other; centred, too, in the room
+     between the bar and the footer, a little above its middle, as the eye sets a middle (the
+     footer's own margin is the space under it, the top a step less). One column on a phone and
+     a tablet. */
   .nf {
-    padding-top: calc(var(--bar-h) + var(--s8));
+    flex: 1 0 auto;
+    display: grid;
+    grid-template-columns: minmax(0, max-content) minmax(19rem, 23rem);
+    justify-content: center;
+    align-content: center;
+    align-items: center;
+    column-gap: clamp(var(--s7), 5vw, var(--s9));
+    padding-top: calc(var(--bar-h) + var(--s7));
   }
   .nf-head {
     display: grid;
+    justify-items: start;
     gap: var(--s4);
-    max-width: 46rem;
   }
+  /* Its two sentences on two lines where there is room (one line each), wrapped where not. */
   .nf-head .t-lede {
-    max-width: 44ch;
+    max-width: 46ch;
   }
-  /* The app's window on the desk: laid out at the window's own size by the app's container
-     rules (wide down to its narrow layout); on a phone, the narrow window drawn smaller. */
-  .nf-desk {
-    margin-top: var(--s7);
+  .nf-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s3);
+    margin-top: var(--s4);
   }
-  .nf-win {
-    position: relative;
-    width: min(100%, 1100px);
-    aspect-ratio: 1440 / 852;
-    margin-inline: auto;
-    overflow: hidden;
-    border-radius: 8px;
-    container: app / size;
-    box-shadow:
-      0 0 0 1px var(--edge),
-      0 1px 2px var(--shade-1),
-      0 4px 16px var(--shade-2),
-      0 16px 56px var(--shade-3);
+
+  /* The queue: the app's queue, the missing song first, then the site's places up next. */
+  .nf-queue {
+    display: grid;
+    padding: var(--s3);
   }
-  @media (width < 760px) {
-    .nf-win {
-      width: 480px;
-      aspect-ratio: auto;
-      height: 780px;
-      zoom: 0.8;
-    }
+  .nf-now,
+  .nf-row {
+    display: grid;
+    grid-template-columns: 2.5rem minmax(0, 1fr);
+    gap: var(--s4);
+    align-items: center;
+    padding: var(--s2) var(--s3);
+    border-radius: var(--r-small);
   }
-  @media (width < 440px) {
-    .nf-win {
-      zoom: 0.7;
-    }
+  /* What should be playing, on the playing row's tint. Its cover: the same tile as the places
+     under it, with the record drawn in dashes in it, the record that isn't there. */
+  .nf-now {
+    background: var(--part-hover);
   }
-  /* The empty cover: the app's cover-empty ground with its note. */
-  .blank {
+  .nf-cover {
     display: grid;
     place-items: center;
-    background: var(--cover-empty);
-    color: var(--text-faint);
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: var(--r-control);
+    background: var(--tonal);
+    color: var(--text);
   }
-  /* Wide: Now playing beside the queue, a smaller cover than the player's so the line and the
-     button under it clear the bar. Narrow, the app's own narrow layout. */
-  @container app (width >= 1000px) {
-    .nf :global(.replica .app) {
-      grid-template-columns: 1fr 400px;
-    }
-    .nf :global(.replica .np) {
-      top: 32px;
-      width: 272px;
-    }
+  /* The queue's two labels, as the app's queue names its parts. */
+  .nf-label {
+    margin: var(--s1) var(--s3) var(--s2);
+    color: var(--ink2);
+    font-size: var(--fs-small);
+    font-weight: var(--fw-bold);
+    line-height: var(--lh-small);
   }
-  /* Narrow: a smaller blank cover, so the words and the way back stay clear of the bar. */
-  @container app (width < 1000px) {
-    .nf :global(.replica .np-cover.blank) {
-      width: min(220px, 60%);
-    }
+  .nf-next {
+    margin-top: var(--s5);
   }
-  .nf :global(.replica .np-cover.blank) {
-    aspect-ratio: 1;
+  .nf-queue ul {
+    display: grid;
+    gap: 2px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
   }
-  .nf :global(.replica .bar-cover.blank) {
-    display: block;
-    width: 56px;
-    height: 56px;
-    border-radius: 10px;
-  }
-  .nf-line {
-    margin-top: 18px;
-    color: var(--text-muted);
-    font-size: 16px;
-  }
-  .nf-home {
-    margin-top: 18px;
+  .nf-row {
+    grid-template-columns: 2.5rem minmax(0, 1fr) auto;
+    color: var(--text);
     text-decoration: none;
+    transition: background-color var(--t-hover) ease;
   }
-  .nf-empty {
-    padding: 24px 8px;
-    color: var(--text-faint);
+  /* A row is a way somewhere: pointed at or focused, a chevron comes in at its end. */
+  .nf-go {
+    display: grid;
+    color: var(--ink2);
+    opacity: 0;
+    translate: -4px 0;
+    transition:
+      opacity var(--t-hover) ease,
+      translate var(--t-hover) var(--ease-out);
+  }
+  .nf-row:focus-visible .nf-go {
+    opacity: 1;
+    translate: none;
+  }
+  @media (hover: hover) {
+    .nf-row:hover {
+      background: var(--part-hover);
+    }
+    .nf-row:hover .nf-go {
+      opacity: 1;
+      translate: none;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .nf-go {
+      translate: none;
+    }
+  }
+  .nf-row:active {
+    background: var(--tonal);
+  }
+  .nf-row:focus-visible {
+    outline-offset: -2px;
+  }
+  .nf-ic {
+    display: grid;
+    place-items: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: var(--r-control);
+    background: var(--tonal);
+    color: var(--text);
+  }
+  .nf-text {
+    display: grid;
+    min-width: 0;
+    line-height: var(--lh-small);
+  }
+  .nf-text b {
+    font-weight: var(--fw-bold);
+  }
+  .nf-text span {
+    overflow: hidden;
+    color: var(--ink2);
+    font-size: var(--fs-small);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* A tablet and a phone: one column, the words first; the queue at a list's width, not the
+     page's. */
+  @media (width < 960px) {
+    .nf {
+      grid-template-columns: minmax(0, 1fr);
+      justify-content: stretch;
+      align-content: start;
+      row-gap: var(--s7);
+      padding-top: calc(var(--bar-h) + var(--s7));
+    }
+    .nf-queue {
+      max-width: 26rem;
+    }
+  }
+  /* A phone: the two ways on still share one row, with a step less room at their sides. */
+  @media (width < 600px) {
+    .nf-actions .btn {
+      padding-inline: var(--s4);
+    }
   }
 </style>
