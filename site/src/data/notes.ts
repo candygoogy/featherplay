@@ -21,8 +21,11 @@ export const notes = {
   line: "click a line",
   /** Make it yours, at the window. */
   actual: "this one’s actual size",
-  /** What it keeps, at the media flyout. */
+  /** What it keeps, at the media keys, once a song plays with sound (the visitor's own keys
+   *  reach the page only then). */
   keys: "try your own media keys",
+  /** The same place before that: what to do first. */
+  keysFirst: "press play first",
   /** The end of Download. */
   end: "that’s it. go listen to something",
   /** Where the window stood, once the visitor has closed featherplay (the headline's own words). */

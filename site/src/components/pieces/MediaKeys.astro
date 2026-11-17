@@ -165,6 +165,13 @@ const keys = [
   .kc:focus-visible {
     outline-offset: 3px;
   }
+  /* Before a song plays with sound (bind-pieces.ts), the play key asks for the first press: its
+     glyph in the accent, a quiet ring round it. */
+  [data-keys-stage][data-idle] .kc[data-key="toggle"]:not(:focus-visible) {
+    color: var(--accent);
+    outline: 2px solid color-mix(in srgb, var(--accent) 45%, transparent);
+    outline-offset: 3px;
+  }
   @media (prefers-reduced-motion: reduce) {
     .kc:active,
     .kc[data-pressed] {

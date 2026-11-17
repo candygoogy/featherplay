@@ -21,8 +21,9 @@ describe("the hand's font", () => {
   });
   it("keeps to eight to ten notes on the page (and four only a visitor who moves the window or puts it away sees), in the maker's plain lowercase voice", () => {
     const all = Object.values(notes);
-    const { closed, tray, moved, pick, ...onThePage } = notes;
-    expect(closed && tray && moved && pick).toBeTruthy();
+    // (keysFirst is the media keys' note before a song plays, in the same place: one note.)
+    const { closed, tray, moved, pick, keysFirst, ...onThePage } = notes;
+    expect(closed && tray && moved && pick && keysFirst).toBeTruthy();
     expect(Object.keys(onThePage).length).toBeGreaterThanOrEqual(8);
     expect(Object.keys(onThePage).length).toBeLessThanOrEqual(10);
     for (const n of all) expect(n).toBe(n.toLowerCase());

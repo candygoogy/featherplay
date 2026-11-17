@@ -399,7 +399,16 @@
   margin: 0;
   padding: var(--s6) var(--s5) 50cqh;
   list-style: none;
-  transition: transform var(--t-large) var(--ease-out);
+  transition:
+    transform var(--t-large) var(--ease-out),
+    opacity 160ms ease;
+}
+/* With script the lines are placed at the song's line once the page is drawn (follow.ts runs
+   after the first paint): until then they wait unseen, so they never show at the song's top and
+   then jump. Without script they are where the page puts them. */
+:root.js .lc-lines:not([data-placed]) {
+  opacity: 0;
+  transition: none;
 }
 .lc-line {
   display: block;

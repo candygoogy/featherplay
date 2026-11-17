@@ -261,9 +261,18 @@ export function bindPieces(player: Player): void {
     s?.addEventListener("contentvisibilityautostatechange", (e) => !(e as Event & { skipped: boolean }).skipped && again());
   }
 
+  // The media keys wait for a song heard (the visitor's own keys reach the page once it has
+  // played with sound, and still while it is paused; not while it is muted): until then, their
+  // note and the play key ask for one (MediaKeys.astro, Kept.astro).
+  const keyStages = $$("[data-keys-stage]");
+  let idle: boolean | null = null;
+  let heard = false;
   const render = (s: PlayerState) => {
     const song = s.song;
     if (!song) return;
+    if (s.playing && !s.muted && song.clip) heard = true;
+    const nowIdle = !heard || s.muted;
+    if (nowIdle !== idle) for (const k of keyStages) k.toggleAttribute("data-idle", (idle = nowIdle));
     const songChanged = song.id !== last.song;
     const playChanged = s.playing !== last.playing;
     // A jump, or the clock set back to the sound: the progress lines start again from here.
@@ -398,6 +407,17 @@ export function bindPieces(player: Player): void {
       const li = line >= 0 ? (c.list.children[line] as HTMLElement | undefined) : undefined;
       c.follow.follow(li ?? null, c.instant);
       c.instant = false;
+      // Placed once follow.ts has written where (a frame or more later): the lines may show
+      // (pieces.css). (Ten frames at most: a line with nowhere to go writes nothing.)
+      if (!c.list.hasAttribute("data-placed")) {
+        const list = c.list;
+        let frames = 0;
+        const wait = () => {
+          if (list.style.transform || ++frames > 10) list.toggleAttribute("data-placed", true);
+          else requestAnimationFrame(wait);
+        };
+        requestAnimationFrame(wait);
+      }
     }
 
     last = { song: song.id, playing: s.playing, jumps: s.jumps, retimes: s.retimes, second };
