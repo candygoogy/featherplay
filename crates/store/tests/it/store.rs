@@ -91,6 +91,8 @@ fn settings_defaults_when_missing() {
             tooltips: true,
             dns_over_https: false,
             settings_in_suggestions: true,
+            shortcuts: true,
+            shortcut_suggestions: true,
             lyrics_size: LyricsSize::Medium,
             main_window: None,
         }
@@ -189,6 +191,8 @@ fn every_setting_changed() -> Settings {
         tooltips: false,
         dns_over_https: true,
         settings_in_suggestions: false,
+        shortcuts: false,
+        shortcut_suggestions: false,
         lyrics_size: LyricsSize::Large,
         main_window: Some(WindowPlace {
             width: 1101.33,

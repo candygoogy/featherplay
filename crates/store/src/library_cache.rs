@@ -22,9 +22,17 @@ pub enum LibraryList {
     Playlists,
     Albums,
     Artists,
-    /// The playlists, albums and artists opened or played lately, for the sidebar's order
-    /// and Home's shortcuts. Kept on this device only.
+    /// The playlists, albums and artists opened or played lately, for the sidebar's order.
+    /// Kept on this device only.
     Recent,
+    /// The playlists, albums and artists played from lately (a song of theirs played long
+    /// enough to count), for Home's Shortcuts. Kept on this device only.
+    Played,
+    /// What was removed from Home's Shortcuts, by key, until it's played again.
+    Hidden,
+    /// What the pins name (their titles and covers), so Shortcuts can show a pin that isn't
+    /// in the library. The order is the settings' `pins`.
+    Pinned,
     /// Home's feed as last fetched, so Home shows at once at the next start.
     Home,
 }
@@ -37,6 +45,9 @@ impl LibraryList {
             LibraryList::Albums => "albums.json",
             LibraryList::Artists => "artists.json",
             LibraryList::Recent => "recent.json",
+            LibraryList::Played => "played.json",
+            LibraryList::Hidden => "hidden.json",
+            LibraryList::Pinned => "pinned.json",
             LibraryList::Home => "home.json",
         }
     }

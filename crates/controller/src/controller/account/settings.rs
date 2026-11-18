@@ -86,6 +86,10 @@ pub enum Change {
     Tooltips(bool),
     /// "Show settings in search suggestions": the top bar's suggestions end with settings.
     SettingsInSuggestions(bool),
+    /// "Shortcuts": Home's first row.
+    Shortcuts(bool),
+    /// "Suggest from what you play": Shortcuts' suggestions after the pins.
+    ShortcutSuggestions(bool),
     /// The equalizer's choice and the Custom bands (kept while another choice is picked).
     Equalizer(Equalizer, [i8; 5]),
     /// "Even out loudness", the compressor.
@@ -167,6 +171,8 @@ impl Change {
             Change::StartInTray(v) => s.start_in_tray = v,
             Change::Tooltips(v) => s.tooltips = v,
             Change::SettingsInSuggestions(v) => s.settings_in_suggestions = v,
+            Change::Shortcuts(v) => s.shortcuts = v,
+            Change::ShortcutSuggestions(v) => s.shortcut_suggestions = v,
             Change::Equalizer(v, bands) => {
                 s.equalizer = v;
                 s.equalizer_bands = bands;

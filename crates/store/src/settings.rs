@@ -197,6 +197,13 @@ pub struct Settings {
     /// "Show settings in search suggestions" (Settings > Window): the top bar's suggestions
     /// end with the settings that match (on by default).
     pub settings_in_suggestions: bool,
+    /// "Shortcuts" (Settings > Window, Home): the row of Liked songs, the pins and what's
+    /// played lately first on Home (on by default).
+    pub shortcuts: bool,
+    /// "Suggest from what you play" (Settings > Window, Home): Shortcuts adds what's played
+    /// lately and the library after the pins (on by default); off, Liked songs and the
+    /// pins only, and plays aren't recorded.
+    pub shortcut_suggestions: bool,
     /// The lyrics' text size (Settings > Lyrics and the lyrics menu): Small, Medium (the
     /// default) or Large. A value this build doesn't know loads as Medium.
     #[serde(deserialize_with = "lenient")]
@@ -464,6 +471,8 @@ impl Default for Settings {
             tooltips: true,
             dns_over_https: false,
             settings_in_suggestions: true,
+            shortcuts: true,
+            shortcut_suggestions: true,
             lyrics_size: LyricsSize::Medium,
             main_window: None,
         }
