@@ -212,8 +212,12 @@ impl Shown {
             if len == 0 || (part == 1 && !now_playing) {
                 continue;
             }
-            for i in first.saturating_sub(AHEAD)..=(last + AHEAD).min(len - 1) {
-                let slot = &mut self.slots[i];
+            let start = first.saturating_sub(AHEAD);
+            let end = (last + AHEAD).min(len - 1);
+            if start > end {
+                continue;
+            }
+            for (i, slot) in (start..).zip(&mut self.slots[start..=end]) {
                 if slot.asked {
                     continue;
                 }
