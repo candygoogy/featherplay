@@ -157,12 +157,12 @@ test("the sizes are weighed like with like, installed against installed, and dra
   const ours = weigh.locator('[data-scale="featherplay"]');
   const pear = weigh.locator('[data-scale="pear"]');
   await expect(weigh.locator(".weigh-h")).toHaveText("Installed");
-  await expect(ours).toContainText("about 34 MB");
+  await expect(ours).toContainText("about 35 MB");
   await expect(pear).toContainText("Pear Desktop");
   await expect(pear).toContainText("396 MB");
   await expect(weigh).toContainText("uninstaller");
   await expect(weigh).toContainText("Visual C++ runtime");
-  await expect(weigh).toContainText("12 times smaller");
+  await expect(weigh).toContainText("11 times smaller");
   // featherplay's bar is its installed size against Pear's whole bar.
   await weigh.scrollIntoViewIfNeeded();
   const [a, b] = await Promise.all([ours, pear].map((r) => r.locator(".fill").evaluate((f) => f.getBoundingClientRect().width)));
@@ -170,7 +170,7 @@ test("the sizes are weighed like with like, installed against installed, and dra
   expect(a / b).toBeCloseTo(installed / installFolders.pear.bytes, 2);
   // The exe in its own window, its size as Explorer shows it.
   await expect(leaves(page).locator(".ours")).toContainText("featherplay.exe");
-  await expect(leaves(page).locator(".ours .status")).toContainText("29.30 MB");
+  await expect(leaves(page).locator(".ours .status")).toContainText("29.50 MB");
   await expect(leaves(page)).not.toContainText(/nothing to install|needs no install/i);
 });
 
