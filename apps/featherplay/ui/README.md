@@ -27,7 +27,7 @@ touches another. The shared files below change only when a page needs something 
 | `close_dialog.slint` | The close dialog (`CloseDialog`, `CloseChoice`): what the close button does, asked on close until the user picks; `src/close.rs` | close |
 | `sign_in_window.slint` | `SignInWindow`, the sign-in window's slim browser frame: back, reload, the read-only address (padlock for https, the host in full weight, the path dimmed, "Google's page" for Google's sign-in hosts) and the status strip, round the room where the WebView2 page sits as a child window of another thread; `src/pages/sign_in/frame.rs`, the page in `webview.rs`, the address from the webview's `Source` in `address.rs` | account |
 | `not_for_me.slint` | `NotForMeButton`, the thumbs-down beside the heart (styled as it) in the bar and on Now playing, with its tooltip: rates Dislike and skips, the toast offers Undo; `src/not_for_me.rs` | frame (shared) |
-| `bar_tip.slint` | `BarTip`, the player bar's one tooltip (the name, then the shortcut, after a 500 ms rest; a click hides it until the pointer leaves), placed after its button; `Tooltips.on`, Settings' "Show tooltips" | frame (shared) |
+| `bar_tip.slint` | `BarTip`, the player bar's one tooltip (the name, then the shortcut, after a 500 ms rest; a click hides it until the pointer leaves), placed after its button, above it or `under` it (Now playing's Translate and Romanize); `Tooltips.on`, Settings' "Show tooltips" | frame (shared) |
 | `sleep_timer.slint` | The sleep timer (Settings › Playback › Sleep timer, off by default): `SleepButton`, the bar's crescent or its pill with the time left (the bar gives it its room), and `SleepLayer`, its popup, the speed popup's twin; `Sleep`, filled by `src/sleep.rs` (the timer runs in the controller) | frame |
 | `list_view.slint` | `ListView`, imported in place of std-widgets' one: the fluent style's ListView and scroll bars as they are, with the bars compiled once instead of into every list (their arrows drawn as paths) | frame (shared) |
 | `logo.slint` | `Logo` and `SmallLogo`, the Tri-vane in About, Sign in and the Discord preview, drawn with the paths of `logo/tri-vane*.svg`, so a release build has no SVG renderer; `tests/app/logo.rs` checks they match the drawings | frame (shared) |
@@ -207,11 +207,17 @@ synced lines from LRCLIB or YouTube Music, or plain lyrics. It appears in the Ly
   (`LyricsData.on`), the toggles and the tab are gone and nothing is looked up at all.
 - The text size (`LyricsData.size`: Small, Medium, Large) sets the lines in the tab and in
   the full view; Settings > Lyrics, the lyrics menu and Ctrl+= / Ctrl+- change it.
-- The full view's compact Translation and Romanization buttons sit beside Lyrics. They are
-  off by default and kept in settings; while on, `src/lyrics/enrich.rs` batches the displayed
+- Translate and Romanize are two round tonal buttons left of the full view's ⋯, built as it
+  is; on, they wear a ring in the lines' ink (the Lyrics pill stays the one solid), and while
+  an answer is on its way a quarter of the ring turns. Romanize shows only for lyrics in
+  another script (`has-non-latin`). Settings > Lyrics has the same two switches. They are off
+  by default and kept in settings; while on, `src/lyrics/enrich.rs` batches the displayed
   lines through `featherplay-lyrics`, caches the answer for the session and fills each
-  `LyricDecoration` a few rows per frame. A line keeps its large source text, then shows the
-  Latin rendering in a small outlined pill and the English translation below it.
+  `LyricDecoration` a few rows per frame. Under a line, plain text in its ink (so the line
+  being sung lights its own): the romanization in 400, the English in 600, at `t-body-l`
+  (`t-display-xs` for Large text, `LyricsData.extra-size`), and the lines stand `s4` apart.
+  While the English is on its way, a bar holds each line's place. A failure shows nothing
+  (it's logged).
 - The lyrics menu's timing moves the lines half a second at a time for the song
   (`LyricsData.timing` says how, "On time" or "0.5 s later", and the credit line notes it),
   and "Choose other lyrics…" replaces the automatic match. Both are kept per song on this PC

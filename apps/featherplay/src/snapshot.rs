@@ -768,7 +768,10 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
             }
             ("now-playing-lyrics-full-outage", _) => SnapshotLyrics::Outage,
             ("now-playing-lyrics-full-unavailable", _) => SnapshotLyrics::Unavailable,
-            ("now-playing-lyrics-full-enriched", _) => SnapshotLyrics::Enriched,
+            ("now-playing-lyrics-full-enriched" | "now-playing-lyrics-full-enriched-large", _) => {
+                SnapshotLyrics::Enriched
+            }
+            ("now-playing-lyrics-full-translating", _) => SnapshotLyrics::Translating,
             _ => SnapshotLyrics::Synced,
         };
         let lyrics = ui.global::<crate::ui::LyricsData>();
@@ -784,6 +787,7 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
             kind,
             SnapshotLyrics::Synced
                 | SnapshotLyrics::Enriched
+                | SnapshotLyrics::Translating
                 | SnapshotLyrics::Plain
                 | SnapshotLyrics::Outage
                 | SnapshotLyrics::ChoseNone

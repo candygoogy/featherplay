@@ -754,6 +754,15 @@ fn toggled(ctx: &Rc<Ctx>, key: SettingKey, on: bool) {
             desktop_lyrics::set_on(ctx, on);
             return;
         }
+        // The lyrics' own switch (`lyrics::enrich`) saves it and fetches what's missing.
+        SettingKey::LyricsTranslation => {
+            ui.global::<LyricsData>().invoke_set_translation(on);
+            return;
+        }
+        SettingKey::LyricsRomanization => {
+            ui.global::<LyricsData>().invoke_set_romanization(on);
+            return;
+        }
         SettingKey::LyricsLrclib => {
             data.set_lyrics_lrclib(on);
             commit(ctx, Change::LyricsLrclib(on));

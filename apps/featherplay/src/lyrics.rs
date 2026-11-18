@@ -17,7 +17,7 @@
 //! The lyrics menu (ui/lyrics_menu.slint) sets the text size (Settings' too) and moves the lines
 //! half a second sooner or later for the song (`nudge`), kept per song on this PC with what
 //! "Choose other lyrics" picked (`choose`), on top of any `[offset:]` the LRC carries.
-//! Translation and romanization (`enrich`) are off by default. Their compact buttons keep
+//! Translation and romanization (`enrich`) are off by default. Their round buttons keep
 //! their state in settings; while a main-window lyrics view is on screen, the displayed lines
 //! are sent in batches to Google Translate and the answers are cached for the session.
 //!
@@ -677,6 +677,8 @@ pub enum SnapshotLyrics {
     Synced,
     /// Synced Japanese sample lines with romanization and English translation under them.
     Enriched,
+    /// The same lines just after Translate was turned on: the English on its way.
+    Translating,
     Plain,
     None,
     /// The user chose no lyrics for the song ("None of these").
@@ -703,20 +705,18 @@ pub fn show_for_snapshot(ctx: &Rc<Ctx>, kind: SnapshotLyrics) {
     };
     let found = match kind {
         SnapshotLyrics::Synced => lookup(true),
-        SnapshotLyrics::Enriched => Ok(Found {
+        SnapshotLyrics::Enriched | SnapshotLyrics::Translating => Ok(Found {
             lyrics: Some(Lyrics::Synced(
-                [
-                    (0, "今ここで歌っている"),
-                    (12, "何度でも思い出す"),
-                    (24, "七色にきらめいて"),
-                    (36, "明日へ歩き出す"),
-                ]
-                .into_iter()
-                .map(|(seconds, text)| Line {
-                    start: Duration::from_secs(seconds),
-                    text: text.into(),
-                })
-                .collect(),
+                enrich::SNAPSHOT_LINES
+                    .iter()
+                    .zip(0u32..)
+                    // Four seconds apart, the sixth one playing at the bar's time.
+                    .map(|((text, _, _), n)| Line {
+                        start: (bar::position().unwrap_or_default() + Duration::from_secs(4) * n)
+                            .saturating_sub(Duration::from_secs(20)),
+                        text: (*text).into(),
+                    })
+                    .collect(),
             )),
             credit: tr!("Lyrics from LRCLIB").into(),
             keep: true,
@@ -767,8 +767,11 @@ pub fn show_for_snapshot(ctx: &Rc<Ctx>, kind: SnapshotLyrics) {
                 s.generation += 1;
             });
             live_changed(ctx, true);
-            if kind == SnapshotLyrics::Enriched {
-                enrich::show_for_snapshot(&ui.global::<LyricsData>());
+            if matches!(kind, SnapshotLyrics::Enriched | SnapshotLyrics::Translating) {
+                enrich::show_for_snapshot(
+                    &ui.global::<LyricsData>(),
+                    kind == SnapshotLyrics::Translating,
+                );
             }
         }
         Err(e) => log!("{e}"),

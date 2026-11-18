@@ -32,8 +32,8 @@ Every feature, with its keys and where its setting is. The
 - Synced lyrics, from LRCLIB or YouTube Music, follow the song in its cover's colour; click a
   line to jump there. They're looked up only while on screen, and never with Show lyrics off.
 - In Now playing's full lyrics view, Translate adds an English line under each lyric and
-  Romanize adds a compact Latin-script line under lyrics written in another script. Both are
-  off until you turn them on.
+  Romanize the line in Latin letters, for lyrics written in another script. Both are off until
+  you turn them on, with the round buttons beside the ⋯ or in Settings > Lyrics.
 - The ⋯ beside the Lyrics pill sets the lyrics' text size (also `Ctrl+=` and `Ctrl+-`), moves
   the lines half a second sooner or later for a song whose timing is off, and finds other
   lyrics on LRCLIB when the match is wrong. What you choose for a song is kept for it.

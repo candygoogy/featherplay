@@ -25,6 +25,7 @@ import { SkeletonList, FadeIn } from "content.slint";
 import { LyricsData, LyricsState, LyricsView } from "lyrics.slint";
 import { NotForMeButton, LikeButton } from "../not_for_me.slint";
 import { LyricsMenu, LyricsMoreButton } from "../lyrics_menu.slint";
+import { BarTip } from "../bar_tip.slint";
 
 export global NowPlayingData {
     // Related: loading and its error.
@@ -344,42 +345,66 @@ component LyricsToggle inherits Rectangle {
     }
 }
 
-// Translation and romanization beside the Lyrics pill. Inactive they are the panel's tonal
-// controls; active they turn solid, as the Lyrics pill itself does.
-component LyricsDecorationButton inherits Rectangle {
+// Translate or Romanize, left of the lyrics menu's ⋯ and built as it is: round, tonal, the
+// glyph in the lines' ink. On, a ring in that ink, not a fill: the Lyrics pill stays the one
+// solid on the panel. While the answer is on its way, a quarter of the ring turns on a
+// fainter track. Resting on it shows the bar's tooltip, under it.
+component LyricsExtraButton inherits Rectangle {
     in property <string> icon;
     in property <string> label;
-    in property <bool> active;
+    in property <string> hint;
+    in property <bool> on;
     in property <bool> loading;
     callback clicked();
     width: 40px;
     height: 40px;
     border-radius: self.height / 2;
-    property <brush> ground: root.active
-        ? (ta.pressed ? Theme.panel-solid-pressed : (ta.has-hover ? Theme.panel-solid-hover : Theme.panel-solid))
-        : (ta.pressed ? #FFFFFF40 : (ta.has-hover ? #FFFFFF33 : #FFFFFF26));
+    property <brush> ground: Theme.panel-tonal(ta.pressed, ta.has-hover);
     animate ground { duration: Theme.t-hover; }
     background: root.ground;
-    transform-scale: ta.pressed ? Theme.press-scale : 1.0;
-    animate transform-scale {
-        duration: ta.pressed ? Theme.t-press : Theme.t-release;
-        easing: ta.pressed ? Curves.ease-out : Curves.release;
-    }
     accessible-role: button;
     accessible-label: root.label;
-    accessible-checked: root.active;
+    accessible-checkable: true;
+    accessible-checked: root.on;
     accessible-action-default => { root.clicked(); }
     ta := TouchArea {
         mouse-cursor: pointer;
-        clicked => { root.clicked(); }
+        clicked => {
+            tip.dismiss();
+            root.clicked();
+        }
     }
     Icon {
         width: 19px;
         height: 19px;
         commands: root.icon;
         stroke-width: 1.8px;
-        stroke: root.active ? LyricsData.ink.ground : LyricsData.ink.current;
-        opacity: root.loading ? 0.65 : 1;
+        stroke: LyricsData.ink.current;
+    }
+    // The ring: the line ink when on; the track under the turning arc while loading.
+    if root.on: Rectangle {
+        border-radius: self.height / 2;
+        border-width: 1.5px;
+        border-color: root.loading ? Theme.panel-tonal(false, true) : LyricsData.ink.current;
+    }
+    if root.on && root.loading: Path {
+        width: root.width;
+        height: root.height;
+        viewbox-width: 40;
+        viewbox-height: 40;
+        // A quarter of the ring, 1.5 px wide along its inside edge.
+        commands: "M 20 0.75 A 19.25 19.25 0 0 1 39.25 20";
+        stroke: LyricsData.ink.current;
+        stroke-width: 1.5px;
+        stroke-line-cap: round;
+        fill: transparent;
+        transform-rotation: Theme.moving ? mod(animation-tick() / 1ms, 900) / 900 * 360deg : 30deg;
+    }
+    tip := BarTip {
+        over: ta.has-hover;
+        name: root.label;
+        hint: root.hint;
+        under: true;
     }
 }
 
@@ -907,25 +932,26 @@ export component NowPlayingPage inherits Rectangle {
             on: root.full;
             clicked => { LyricsData.toggle-view(); }
         }
-        // Translation, romanization and the lyrics menu, left of the pill while the lyrics
-        // show. Romanization only appears when at least one displayed line uses another
-        // writing system.
+        // Translate, Romanize and the lyrics menu's ⋯, left of the pill while the lyrics show.
+        // Romanize only when a line is in another script.
         lyrics-actions := HorizontalLayout {
             x: lyrics-pill.x - Theme.s3 - self.preferred-width;
             y: Theme.s4;
             spacing: Theme.s2;
             visible: root.full;
-            if LyricsData.has-lines: LyricsDecorationButton {
+            if LyricsData.has-lines: LyricsExtraButton {
                 icon: LyricsDecorationIcons.translation;
-                label: LyricsData.translation-loading ? @tr("Translating lyrics…") : @tr("Translate lyrics to English");
-                active: LyricsData.translation-on;
+                label: @tr("Translate to English");
+                hint: @tr("· An English line under each line");
+                on: LyricsData.translation-on;
                 loading: LyricsData.translation-loading;
                 clicked => { LyricsData.set-translation(!LyricsData.translation-on); }
             }
-            if LyricsData.has-lines && LyricsData.has-non-latin: LyricsDecorationButton {
+            if LyricsData.has-lines && LyricsData.has-non-latin: LyricsExtraButton {
                 icon: LyricsDecorationIcons.romanization;
-                label: LyricsData.romanization-loading ? @tr("Romanizing lyrics…") : @tr("Romanize lyrics");
-                active: LyricsData.romanization-on;
+                label: @tr("Romanize");
+                hint: @tr("· The lines in Latin letters");
+                on: LyricsData.romanization-on;
                 loading: LyricsData.romanization-loading;
                 clicked => { LyricsData.set-romanization(!LyricsData.romanization-on); }
             }

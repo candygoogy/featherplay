@@ -12,7 +12,8 @@ export global Tooltips {
     in property <bool> on: true;
 }
 
-// Placed after the button in the same parent, which it fills: the card hangs above it.
+// Placed after the button in the same parent, which it fills: the card hangs above it (or
+// under it, `under`).
 export component BarTip inherits Rectangle {
     // The pointer is on the button.
     in property <bool> over;
@@ -20,6 +21,9 @@ export component BarTip inherits Rectangle {
     in property <string> hint;
     // How far above the button the card ends (the bar lifts it clear of itself).
     in property <length> above: Theme.s2;
+    // Under the button instead, ending at its right edge (Now playing's header buttons, as
+    // the Lyrics pill's note).
+    in property <bool> under;
     // The pointer has rested long enough, and hasn't clicked since.
     property <bool> rested: false;
     property <bool> dismissed: false;
@@ -42,8 +46,8 @@ export component BarTip inherits Rectangle {
     // Placed by hand, not by a layout: each layout costs the exe code, and the bar has seven
     // of these.
     Rectangle {
-        x: (root.width - self.width) / 2;
-        y: -root.above - self.height;
+        x: root.under ? root.width - self.width : (root.width - self.width) / 2;
+        y: root.under ? root.height + root.above : -root.above - self.height;
         width: name.preferred-width + (root.hint != "" ? Theme.s2 + hint.preferred-width : 0) + 2 * Theme.s3;
         height: name.preferred-height + 2 * Theme.s2;
         border-radius: Theme.r-s;

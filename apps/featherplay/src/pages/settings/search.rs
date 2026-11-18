@@ -210,6 +210,20 @@ fn table() -> Vec<Row> {
             tr!("search keywords" => "karaoke, timed"),
         ),
         row(
+            SettingId::LyricsTranslation,
+            2,
+            tr!("Translate to English"),
+            &[],
+            tr!("search keywords" => "translation, meaning, language, lyrics"),
+        ),
+        row(
+            SettingId::LyricsRomanization,
+            2,
+            tr!("Romanize"),
+            &[],
+            tr!("search keywords" => "romanization, romaji, pinyin, transliteration, Latin, lyrics"),
+        ),
+        row(
             SettingId::LyricsSize,
             2,
             tr!("Text size"),
@@ -684,6 +698,12 @@ impl View {
             ),
             S::LyricsLrclib => tr!(
                 "Lines follow the song. While lyrics are on screen, LRCLIB gets the song's title, artist, album and length. Off: only the lyrics that come with the song, synced for some songs."
+            ),
+            S::LyricsTranslation => tr!(
+                "An English line under each line. While it's on, the lines on screen go to Google Translate."
+            ),
+            S::LyricsRomanization => tr!(
+                "Lyrics in another script, such as Japanese or Korean, also in Latin letters. Sent to Google Translate too."
             ),
             S::LyricsSize => tr!("The lines on Now playing and in the Lyrics tab."),
             S::DesktopLyrics if !self.desktop_lyrics_here => tr!("Not available on Wayland."),

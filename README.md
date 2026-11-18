@@ -126,9 +126,9 @@ The Linux build's figures, measured in WSL, are in
 - Synced lyrics, from LRCLIB or YouTube Music, follow the song in its cover's colour; click a
   line to jump there. Set their size, move a song's timing, find other lyrics when the match
   is wrong, or keep the line being sung in a small strip above other apps.
-- In the full lyrics view, Translate adds an English line and Romanize adds a compact
-  Latin-script line under lyrics written in another script. Both are off until you turn them
-  on.
+- In the full lyrics view, Translate adds an English line under each lyric and Romanize the
+  line in Latin letters, for lyrics written in another script. Both are off until you turn
+  them on, there or in Settings > Lyrics.
 - Songs play YouTube Music's Opus stream, and only the audio: a music video with a song
   version plays as the song, and SponsorBlock skips the talking in the music videos that
   remain.

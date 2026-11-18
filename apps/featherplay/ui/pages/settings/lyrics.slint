@@ -27,6 +27,24 @@ export component LyricsSection inherits Group {
             checked: SettingsData.lyrics-lrclib;
             enabled: SettingsData.lyrics;
         }
+        // Kept with the round buttons beside ⋯ in Now playing's lyrics (`LyricsData`); the lines
+        // say where they go.
+        ToggleRow {
+            label: @tr("Translate to English");
+            search: SettingId.lyrics-translation;
+            detail: @tr("An English line under each line. While it's on, the lines on screen go to Google Translate.");
+            key: SettingKey.lyrics-translation;
+            checked: LyricsData.translation-on;
+            enabled: SettingsData.lyrics;
+        }
+        ToggleRow {
+            label: @tr("Romanize");
+            search: SettingId.lyrics-romanization;
+            detail: @tr("Lyrics in another script, such as Japanese or Korean, also in Latin letters. Sent to Google Translate too.");
+            key: SettingKey.lyrics-romanization;
+            checked: LyricsData.romanization-on;
+            enabled: SettingsData.lyrics;
+        }
         // One size for the app, also in the lyrics menu (Now playing's ⋯). Hidden with lyrics off.
         if SettingsData.lyrics: SettingRow {
             label: @tr("Text size");

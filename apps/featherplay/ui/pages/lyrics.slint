@@ -48,13 +48,22 @@ export global LyricsData {
     // Plain: the whole text, and the same as lines ("" between verses).
     in property <string> plain;
     in property <[string]> plain-lines;
-    // The two compact buttons beside Lyrics in Now playing's full view. Their state is kept
-    // between starts. Results stay in memory for the session, never on disk.
+    // Translate and Romanize, the two round buttons beside ⋯ in Now playing's full view and
+    // the two rows in Settings > Lyrics. Their state is kept between starts. Results stay in
+    // memory for the session, never on disk.
     in property <bool> translation-on;
     in property <bool> romanization-on;
     in property <bool> has-non-latin;
     in property <bool> translation-loading;
     in property <bool> romanization-loading;
+    // The song's answers hold at least one line (an English song has no translation).
+    in property <bool> has-translation;
+    in property <bool> has-romanization;
+    // Some line shows text under it, or soon will: the lines stand further apart.
+    out property <bool> extras: (self.translation-on && (self.has-translation || self.translation-loading))
+        || (self.romanization-on && self.has-non-latin && (self.has-romanization || self.romanization-loading));
+    // The added lines' size: the body's large size, the display's smallest for Large text.
+    out property <length> extra-size: self.size == 2 ? Theme.t-display-xs : Theme.t-body-l;
     callback set-translation(bool);
     callback set-romanization(bool);
     // A main-window lyrics view (not the desktop strip) is on screen. Enrichment requests
@@ -224,6 +233,8 @@ component LyricLine inherits Rectangle {
     in property <string> text;
     in property <string> romanization;
     in property <string> translation;
+    // The English is on its way: a bar stands in for it.
+    in property <bool> waiting;
     in property <int> level: 1;
     in property <bool> plain;
     in property <length> size;
@@ -269,16 +280,16 @@ component LyricLine inherits Rectangle {
             }
         }
     }
-    // Better Lyrics' hierarchy: the original stays large, a romanization sits in a compact
-    // outlined pill, and the translation is a quieter line below it.
-    property <color> decoration-ink: root.ink.transparentize(root.level == 0 || root.plain ? 0.18 : 0.12);
+    // Under the line, plain text in its ink, so it lights up with it: the romanization in
+    // 400, then the English in 600, both at `LyricsData.extra-size`, `s1` apart. While the
+    // English is on its way (`waiting`), a bar holds its place, so nothing jumps when it lands.
     lay := VerticalLayout {
         padding-left: Theme.s3;
         padding-right: Theme.s3;
         // A sixth of the type above and below: the lines keep their spacing at any size.
         padding-top: root.size / 6;
         padding-bottom: root.size / 6;
-        spacing: root.size * 0.22;
+        spacing: Theme.s1;
         if !root.gap: Display {
             text: root.text;
             font-size: root.size;
@@ -294,34 +305,32 @@ component LyricLine inherits Rectangle {
             stroke: root.heavy ? self.color : transparent;
             stroke-width: 0.35px;
         }
-        if !root.gap && root.romanization != "": HorizontalLayout {
-            alignment: start;
-            Rectangle {
-                width: romanized.preferred-width + 16px;
-                height: max(22px, root.size * 0.9);
-                border-radius: 8px;
-                background: #FFFFFF0F;
-                border-width: 1px;
-                border-color: #FFFFFF24;
-                romanized := Body {
-                    x: 8px;
-                    width: parent.width - 16px;
-                    height: parent.height;
-                    text: root.romanization;
-                    font-size: max(11px, root.size * 0.52);
-                    font-weight: 600;
-                    color: root.decoration-ink.transparentize(1 - root.reveal);
-                    vertical-alignment: center;
-                }
-            }
+        if !root.gap && root.romanization != "": Body {
+            text: root.romanization;
+            font-size: LyricsData.extra-size;
+            color: root.ink.transparentize(1 - root.reveal);
+            wrap: word-wrap;
+            overflow: clip;
         }
         if !root.gap && root.translation != "": Body {
             text: root.translation;
-            font-size: max(12px, root.size * 0.66);
+            font-size: LyricsData.extra-size;
             font-weight: 600;
-            color: root.decoration-ink.transparentize(1 - root.reveal);
+            color: root.ink.transparentize(1 - root.reveal);
             wrap: word-wrap;
             overflow: clip;
+        }
+        if !root.gap && root.translation == "" && root.waiting: Rectangle {
+            height: LyricsData.extra-size * 1.375;
+            Rectangle {
+                x: 0;
+                // Roughly the English's width: more per character of another script than
+                // of a Latin one.
+                width: min(parent.width, root.text.character-count * LyricsData.extra-size * (LyricsData.has-non-latin ? 1.6 : 0.5));
+                height: 12px;
+                border-radius: Theme.r-s;
+                background: Theme.panel-skeleton.transparentize(1 - root.reveal);
+            }
         }
     }
 }
@@ -482,6 +491,8 @@ component SyncedLines inherits Rectangle {
     in property <length> size;
     in property <length> pad-x;
     in property <float> reveal: 1;
+    // The English is on its way (`LyricsView.waiting`).
+    in property <bool> waiting;
     // On screen. Hidden (a view kept alive out of sight), it follows the song without gliding.
     in property <bool> live: true;
     // Following the song, or held still by a manual scroll.
@@ -539,11 +550,12 @@ component SyncedLines inherits Rectangle {
             padding-bottom: root.height / 2;
             padding-left: root.pad-x - Theme.s3;
             padding-right: root.pad-x - Theme.s3;
-            spacing: root.size * 0.18;
+            spacing: LyricsData.extras ? Theme.s4 : root.size * 0.18;
             for line[i] in LyricsData.lines: LyricLine {
                 text: line;
                 romanization: LyricsData.romanization-on ? LyricsData.decorations[i].romanization : "";
                 translation: LyricsData.translation-on ? LyricsData.decorations[i].translation : "";
+                waiting: root.waiting;
                 size: root.size;
                 level: i == LyricsData.current ? 0 : (i < LyricsData.current ? -1 : 1);
                 hot: i == root.hot;
@@ -635,6 +647,21 @@ export component LyricsView inherits Rectangle {
     // Until then nothing of them shows.
     in property <float> reveal: 1;
     property <length> list-h: root.height - root.bottom;
+    // The English is on its way: after `t-skeleton-delay`, so a quick answer never flashes
+    // them, bars hold its lines' places.
+    property <bool> translating: LyricsData.translation-on && LyricsData.translation-loading;
+    property <bool> waited: false;
+    property <bool> waiting: root.translating && (root.waited || Theme.still);
+    changed translating => {
+        if !self.translating {
+            root.waited = false;
+        }
+    }
+    Timer {
+        interval: Theme.t-skeleton-delay;
+        running: root.translating && !root.waited;
+        triggered => { root.waited = true; }
+    }
     // The panel's box: the card's in the side tab, all of the view in the full one.
     property <length> box-x: root.card ? Theme.s4 : 0;
     property <length> box-w: root.card ? root.width - 2 * Theme.s4 : root.width;
@@ -693,7 +720,7 @@ export component LyricsView inherits Rectangle {
                 padding-right: root.pad-x - Theme.s3;
                 padding-top: Theme.s5;
                 padding-bottom: Theme.s6;
-                spacing: root.size * 0.18;
+                spacing: LyricsData.extras ? Theme.s4 : root.size * 0.18;
                 VerticalLayout {
                     padding-bottom: Theme.s3;
                     LyricsNote {
@@ -705,6 +732,7 @@ export component LyricsView inherits Rectangle {
                     text: line;
                     romanization: LyricsData.romanization-on ? LyricsData.decorations[i].romanization : "";
                     translation: LyricsData.translation-on ? LyricsData.decorations[i].translation : "";
+                    waiting: root.waiting;
                     size: root.size;
                     plain: true;
                     reveal: root.reveal;
@@ -721,6 +749,7 @@ export component LyricsView inherits Rectangle {
 
         if LyricsData.state == LyricsState.synced: SyncedLines {
             size: root.size;
+            waiting: root.waiting;
             pad-x: root.pad-x;
             reveal: root.reveal;
             live: root.shown;

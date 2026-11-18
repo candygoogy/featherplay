@@ -8,7 +8,6 @@ use std::sync::OnceLock;
 use std::time::Duration;
 
 use featherplay_core::model::TrackId;
-use featherplay_core::tr;
 use featherplay_lyrics::enrich::{self as service, Batch, Client};
 use slint::{ComponentHandle, Model, ModelRc, Timer, TimerMode, VecModel};
 
@@ -168,6 +167,8 @@ pub(super) fn clear(data: &LyricsData) {
     FEED.with(Timer::stop);
     data.set_decorations(ModelRc::new(VecModel::default()));
     data.set_has_non_latin(false);
+    data.set_has_translation(false);
+    data.set_has_romanization(false);
     data.set_translation_loading(false);
     data.set_romanization_loading(false);
 }
@@ -265,7 +266,7 @@ fn request(ctx: &Rc<Ctx>) {
     );
 }
 
-fn apply(ctx: &Rc<Ctx>, ui: &crate::ui::AppWindow, answer: Answer) {
+fn apply(_: &Rc<Ctx>, ui: &crate::ui::AppWindow, answer: Answer) {
     let mut translation_error = None;
     let mut romanization_error = None;
     let answered_translation = answer.translation.is_some();
@@ -313,17 +314,13 @@ fn apply(ctx: &Rc<Ctx>, ui: &crate::ui::AppWindow, answer: Answer) {
         return;
     }
     show_cached(&data);
+    // A failure shows nothing: the lines stay as they are, and the next time these lyrics
+    // come on screen they are asked for again.
     if let Some(error) = translation_error {
         log!("lyrics translation: {error}");
-        if data.get_translation_on() {
-            ctx.toast_error(tr!("Couldn't translate the lyrics. Try again later."));
-        }
     }
     if let Some(error) = romanization_error {
         log!("lyrics romanization: {error}");
-        if data.get_romanization_on() {
-            ctx.toast_error(tr!("Couldn't romanize the lyrics. Try again later."));
-        }
     }
 }
 
@@ -446,6 +443,8 @@ fn show_cached(data: &LyricsData) {
         )
     });
     if let Some(rows) = rows {
+        data.set_has_translation(rows.iter().any(|row| !row.translation.is_empty()));
+        data.set_has_romanization(rows.iter().any(|row| !row.romanization.is_empty()));
         feed(data, rows);
     }
 }
@@ -486,35 +485,90 @@ fn feed(data: &LyricsData, rows: Vec<LyricDecoration>) {
     });
 }
 
-/// `--snapshot now-playing-lyrics-full-enriched`: the reference hierarchy without asking
-/// the network. `show_for_snapshot` has already put the matching source lines on screen.
-pub(super) fn show_for_snapshot(data: &LyricsData) {
+/// The snapshots' made-up song: each line, its romanization and its English.
+pub(super) const SNAPSHOT_LINES: [(&str, &str, &str); 11] = [
+    (
+        "夜明け前の街を歩く",
+        "yoake mae no machi o aruku",
+        "Walking through the town before dawn",
+    ),
+    (
+        "誰もいない交差点",
+        "dare mo inai kōsaten",
+        "A crossing with no one there",
+    ),
+    (
+        "今ここで歌っている",
+        "ima koko de utatte iru",
+        "I'm singing here right now",
+    ),
+    (
+        "何度でも思い出す",
+        "nando demo omoidasu",
+        "I remember it again and again",
+    ),
+    (
+        "七色にきらめいて",
+        "nana-iro ni kirameite",
+        "Shining in seven colours",
+    ),
+    (
+        "明日へ歩き出す",
+        "ashita e arukidasu",
+        "I start walking towards tomorrow",
+    ),
+    (
+        "遠い空の向こうまで",
+        "tōi sora no mukō made",
+        "All the way past the distant sky",
+    ),
+    (
+        "君の声が聞こえる",
+        "kimi no koe ga kikoeru",
+        "I can hear your voice",
+    ),
+    (
+        "消えない光を抱いて",
+        "kienai hikari o daite",
+        "Holding a light that won't go out",
+    ),
+    ("風の中で", "kaze no naka de", "In the wind"),
+    ("もう一度", "mō ichido", "One more time"),
+];
+
+/// `--snapshot now-playing-lyrics-full-enriched` (and `-translating`): both on without
+/// asking the network, the answers in, or the English still on its way. `show_for_snapshot`
+/// has already put `SNAPSHOT_LINES` on screen.
+pub(super) fn show_for_snapshot(data: &LyricsData, translating: bool) {
     FEED.with(Timer::stop);
     data.set_translation_on(true);
-    data.set_romanization_on(true);
+    data.set_romanization_on(!translating);
     data.set_has_non_latin(true);
-    data.set_translation_loading(false);
     data.set_romanization_loading(false);
-    let samples = [
-        ("ima koko de utatte iru", "I'm singing here right now"),
-        ("nando demo omoidasu", "I remember it again and again"),
-        ("nana-shoku ni kirameite", "Seven colours sparkle"),
-        ("ashita e arukidasu", "I start walking towards tomorrow"),
-    ];
     let kept = STATE.with(|state| {
         let mut state = state.borrow_mut();
-        let Some(id) = state.current.as_ref().map(|current| current.id.clone()) else {
+        let Some(current) = state.current.clone() else {
             return false;
         };
-        let Some(cached) = state.cache.get_mut(&id) else {
+        if translating {
+            state.jobs.insert(Job {
+                id: current.id.clone(),
+                generation: current.generation,
+                kind: Kind::Translation,
+            });
+        }
+        let Some(cached) = state.cache.get_mut(&current.id) else {
             return false;
         };
-        cached.romanization = Some(samples.iter().map(|(text, _)| (*text).into()).collect());
-        cached.translation = Some(samples.iter().map(|(_, text)| (*text).into()).collect());
+        if !translating {
+            cached.romanization = Some(SNAPSHOT_LINES.iter().map(|l| l.1.into()).collect());
+            cached.translation = Some(SNAPSHOT_LINES.iter().map(|l| l.2.into()).collect());
+        }
         true
     });
     if kept {
         show_cached(data);
+        refresh_loading(data);
     }
 }
 

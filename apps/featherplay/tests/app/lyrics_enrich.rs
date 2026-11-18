@@ -1,41 +1,81 @@
-//! Translation and romanization keep their switches, and their line-aligned decorations use
-//! the reference hierarchy. No network: the enriched snapshot supplies made-up sample text.
+//! Translate and Romanize: the round buttons beside ⋯ in Now playing's lyrics and the two
+//! rows in Settings > Lyrics turn the same switches, and the lines under each lyric come and
+//! go with them. No network: the enriched snapshot supplies made-up answers.
 
 use featherplay::lyrics::{self, SnapshotLyrics};
 use featherplay::pages::settings;
 use featherplay::snapshot::Scene;
 use featherplay::ui::LyricsData;
-use slint::{ComponentHandle, Model};
+use i_slint_core::accessibility::AccessibilityAction;
+use i_slint_core::items::AccessibleRole;
+use slint::ComponentHandle;
+
+use crate::support::label;
+
+/// The element labelled `name` with `role`, pressed as a screen reader does (a settings row
+/// may be out of view).
+fn press_as(scene: &Scene, role: AccessibleRole, name: &str) {
+    label::any_where(scene, |item, l| l == name && item.accessible_role() == role)
+        .first()
+        .unwrap_or_else(|| panic!("no {role:?} says {name:?}"))
+        .accessible_action(&AccessibilityAction::Default);
+    scene.settle();
+}
 
 #[test]
-fn translation_and_romanization_toggle_and_line_up_with_the_lyrics() {
-    let scene = Scene::new(1280, 800, true, false).expect("scene");
+fn the_round_buttons_take_the_lines_under_each_lyric_away_and_back() {
+    let scene = Scene::new(1568, 900, true, false).expect("scene");
     let data = scene.ui.global::<LyricsData>();
-
-    assert!(!data.get_translation_on());
-    assert!(!data.get_romanization_on());
-    data.invoke_set_translation(true);
-    data.invoke_set_romanization(true);
-    assert!(settings::lyrics_translation());
-    assert!(settings::lyrics_romanization());
-
-    // Put the switches back before filling the snapshot: its helper turns them on without
-    // saving or asking Google.
-    data.invoke_set_translation(false);
-    data.invoke_set_romanization(false);
     scene.play(false).expect("player");
     scene.open("now-playing").expect("now playing");
     data.set_full(true);
     lyrics::show_for_snapshot(&scene.ctx, SnapshotLyrics::Enriched);
     scene.settle();
 
-    assert!(data.get_translation_on() && data.get_romanization_on());
-    assert!(data.get_has_non_latin());
-    let lines = data.get_lines();
-    let decorations = data.get_decorations();
-    assert_eq!(lines.row_count(), 4);
-    assert_eq!(decorations.row_count(), lines.row_count());
-    let first = decorations.row_data(0).expect("first decoration");
-    assert_eq!(first.romanization, "ima koko de utatte iru");
-    assert_eq!(first.translation, "I'm singing here right now");
+    let first = "明日へ歩き出す";
+    let both = format!("{first}. ashita e arukidasu. I start walking towards tomorrow");
+    assert!(
+        label::shows(&scene, &both),
+        "the line playing has no romanization and English"
+    );
+
+    press_as(&scene, AccessibleRole::Button, "Romanize");
+    assert!(!data.get_romanization_on() && !settings::lyrics_romanization());
+    let english = format!("{first}. I start walking towards tomorrow");
+    assert!(label::shows(&scene, &english), "the romanization stayed");
+
+    press_as(&scene, AccessibleRole::Button, "Translate to English");
+    assert!(!data.get_translation_on() && !settings::lyrics_translation());
+    assert!(label::shows(&scene, first), "the English stayed");
+    assert!(
+        !data.get_extras(),
+        "the lines stay spread apart with nothing under them"
+    );
+
+    // Back on, the session's answers return at once.
+    press_as(&scene, AccessibleRole::Button, "Translate to English");
+    assert!(data.get_translation_on() && settings::lyrics_translation());
+    assert!(label::shows(&scene, &english));
+}
+
+#[test]
+fn the_settings_rows_turn_the_same_switches() {
+    let scene = Scene::new(1568, 900, true, false).expect("scene");
+    let data = scene.ui.global::<LyricsData>();
+    scene.play(false).expect("player");
+    scene.open("settings").expect("settings");
+    // Lyrics is below the fold: its rows are made a frame or two after the page.
+    for _ in 0..8 {
+        scene.ui.window().take_snapshot().expect("a frame");
+        scene.settle_once();
+    }
+    scene.settle();
+
+    press_as(&scene, AccessibleRole::Switch, "Translate to English");
+    assert!(data.get_translation_on() && settings::lyrics_translation());
+    press_as(&scene, AccessibleRole::Switch, "Romanize");
+    assert!(data.get_romanization_on() && settings::lyrics_romanization());
+    press_as(&scene, AccessibleRole::Switch, "Translate to English");
+    assert!(!data.get_translation_on() && !settings::lyrics_translation());
+    assert!(data.get_romanization_on(), "Romanize kept its own switch");
 }
