@@ -194,7 +194,7 @@ fn radio_fetches_continuation() {
 
     run(
         &mut p,
-        Input::ContinuationLoaded(id("c"), tracks(&["d", "e", "f"])),
+        Input::ContinuationLoaded(id("c"), tracks(&["d", "e", "f", "g", "h", "i"])),
     );
     let upcoming: Vec<_> = p
         .queue()
@@ -202,16 +202,16 @@ fn radio_fetches_continuation() {
         .iter()
         .map(|t| t.id.0.as_str())
         .collect();
-    assert_eq!(upcoming, ["c", "d", "e", "f"]);
+    assert_eq!(upcoming, ["c", "d", "e", "f", "g", "h", "i"]);
 
-    // Two left again after two more tracks: the next batch follows the new last track.
+    // Five left again after two more tracks: the next batch follows the new last track.
     run(&mut p, Input::Next);
     let fx = run(&mut p, Input::Next);
     assert_eq!(
         fx.iter()
             .filter(|e| matches!(e, Effect::FetchContinuation(_)))
             .collect::<Vec<_>>(),
-        [&Effect::FetchContinuation(id("f"))]
+        [&Effect::FetchContinuation(id("i"))]
     );
 }
 
@@ -918,7 +918,7 @@ fn reorder_remove_and_clear_edit_upcoming() {
     run(
         &mut p,
         Input::PlayTracks {
-            tracks: tracks(&["a", "b", "c", "d", "e"]),
+            tracks: tracks(&["a", "b", "c", "d", "e", "f", "g"]),
             start: 0,
             radio: true,
         },

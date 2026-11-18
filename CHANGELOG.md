@@ -6,6 +6,11 @@ Notable changes to featherplay, newest first. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- A radio, and a list set to go on with autoplay, now fetch more songs when five are left in Up
+  next rather than two, so songs to come show up a few tracks ahead instead of only at the end.
+
 ## [0.4.2] - 2026-11-17
 
 ### Added

@@ -40,11 +40,11 @@ fn playing(list_end: ListEnd, ids: &[&str], start: usize) -> (Player, Vec<Effect
 }
 
 #[test]
-fn a_list_asks_for_autoplay_two_songs_before_its_end() {
-    let (mut p, fx) = playing(ListEnd::Autoplay, &["a", "b", "c", "d"], 0);
+fn a_list_asks_for_autoplay_five_songs_before_its_end() {
+    let (mut p, fx) = playing(ListEnd::Autoplay, &["a", "b", "c", "d", "e", "f", "g"], 0);
     assert!(fetches(&fx).is_empty());
     let fx = p.handle(Input::Next);
-    assert_eq!(fetches(&fx), ["d"]);
+    assert_eq!(fetches(&fx), ["g"]);
 }
 
 #[test]

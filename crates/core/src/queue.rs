@@ -12,6 +12,10 @@ use crate::model::{LikeStatus, ListEnd, RepeatMode, Track, TrackId, VideoType};
 /// Pressing "previous" more than this far into a track restarts it instead.
 const RESTART_THRESHOLD: Duration = Duration::from_secs(3);
 
+/// A radio (or a list that autoplays) fetches more tracks once this many or fewer are left
+/// after the current one, so Up next shows what's coming a few songs ahead.
+pub const REFILL_AT: usize = 5;
+
 /// Fallback xorshift state, used when a seed would otherwise give the all-zero state.
 const GOLDEN: u64 = 0x9E37_79B9_7F4A_7C15;
 
@@ -401,10 +405,10 @@ impl Queue {
         self.radio || (self.list_end == ListEnd::Autoplay && self.repeat != RepeatMode::All)
     }
 
-    /// Radio queues, and lists that autoplay, ask for more tracks when two or fewer are
-    /// left.
+    /// Radio queues, and lists that autoplay, ask for more tracks when `REFILL_AT` or fewer
+    /// are left.
     pub fn needs_continuation(&self) -> bool {
-        self.continues() && self.upcoming().len() <= 2
+        self.continues() && self.upcoming().len() <= REFILL_AT
     }
 
     /// Drops the upcoming tracks a continuation appended. Returns whether any were.

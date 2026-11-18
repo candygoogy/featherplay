@@ -122,7 +122,7 @@ fn needs_continuation_only_for_radio() {
     q.replace(tracks(&["a", "b", "c"]), 0, false);
     assert!(!q.needs_continuation());
 
-    q.replace(tracks(&["a", "b", "c", "d"]), 0, true);
+    q.replace(tracks(&["a", "b", "c", "d", "e", "f", "g"]), 0, true);
     assert!(!q.needs_continuation());
     q.advance();
     assert!(q.needs_continuation());
