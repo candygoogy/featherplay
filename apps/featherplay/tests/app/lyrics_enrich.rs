@@ -79,3 +79,25 @@ fn the_settings_rows_turn_the_same_switches() {
     assert!(!data.get_translation_on() && !settings::lyrics_translation());
     assert!(data.get_romanization_on(), "Romanize kept its own switch");
 }
+
+#[test]
+fn an_english_song_keeps_its_lines_while_the_translation_is_asked_for() {
+    let scene = Scene::new(1568, 900, true, false).expect("scene");
+    let data = scene.ui.global::<LyricsData>();
+    scene.play(false).expect("player");
+    scene.open("now-playing").expect("now playing");
+    data.set_full(true);
+    // The fixture's English lyrics, with Translate on and its answer on the way: it may come
+    // back English, with nothing to add, so no bars and no wider spacing meanwhile.
+    lyrics::show_for_snapshot(&scene.ctx, SnapshotLyrics::Synced);
+    data.set_translation_on(true);
+    data.set_translation_loading(true);
+    scene.settle();
+    assert!(!data.get_has_non_latin());
+    assert!(!data.get_awaiting_english() && !data.get_extras());
+
+    // Lyrics in another script can't be English: their bars show at once.
+    lyrics::show_for_snapshot(&scene.ctx, SnapshotLyrics::Translating);
+    scene.settle();
+    assert!(data.get_awaiting_english() && data.get_extras());
+}

@@ -216,8 +216,9 @@ synced lines from LRCLIB or YouTube Music, or plain lyrics. It appears in the Ly
   `LyricDecoration` a few rows per frame. Under a line, plain text in its ink (so the line
   being sung lights its own): the romanization in 400, the English in 600, at `t-body-l`
   (`t-display-xs` for Large text, `LyricsData.extra-size`), and the lines stand `s4` apart.
-  While the English is on its way, a bar holds each line's place. A failure shows nothing
-  (it's logged).
+  While the English is on its way for lyrics in another script, a bar holds each line's
+  place; Latin-script lyrics (maybe English, with nothing to add) stay as they are until it
+  lands. A failure shows nothing (it's logged).
 - The lyrics menu's timing moves the lines half a second at a time for the song
   (`LyricsData.timing` says how, "On time" or "0.5 s later", and the credit line notes it),
   and "Choose other lyrics…" replaces the automatic match. Both are kept per song on this PC

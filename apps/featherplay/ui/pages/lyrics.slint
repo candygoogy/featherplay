@@ -59,8 +59,12 @@ export global LyricsData {
     // The song's answers hold at least one line (an English song has no translation).
     in property <bool> has-translation;
     in property <bool> has-romanization;
+    // The English is on its way for lyrics in another script, which can't be English: bars
+    // hold its places. Latin-script lyrics may well be English (then no answer comes), so
+    // they stay as they are until the English lands.
+    out property <bool> awaiting-english: self.translation-on && self.translation-loading && self.has-non-latin;
     // Some line shows text under it, or soon will: the lines stand further apart.
-    out property <bool> extras: (self.translation-on && (self.has-translation || self.translation-loading))
+    out property <bool> extras: (self.translation-on && self.has-translation) || self.awaiting-english
         || (self.romanization-on && self.has-non-latin && (self.has-romanization || self.romanization-loading));
     // The added lines' size: the body's large size, the display's smallest for Large text.
     out property <length> extra-size: self.size == 2 ? Theme.t-display-xs : Theme.t-body-l;
@@ -649,7 +653,7 @@ export component LyricsView inherits Rectangle {
     property <length> list-h: root.height - root.bottom;
     // The English is on its way: after `t-skeleton-delay`, so a quick answer never flashes
     // them, bars hold its lines' places.
-    property <bool> translating: LyricsData.translation-on && LyricsData.translation-loading;
+    property <bool> translating: LyricsData.awaiting-english;
     property <bool> waited: false;
     property <bool> waiting: root.translating && (root.waited || Theme.still);
     changed translating => {
