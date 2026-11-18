@@ -14,6 +14,7 @@ import { Switch } from "pages/settings/rows.slint";
 import { Dialog } from "pages/settings/dialog.slint";
 import { LyricsData, LyricsState } from "pages/lyrics.slint";
 import { Skeleton, SkeletonBar } from "pages/content.slint";
+import { BarTip } from "bar_tip.slint";
 
 export global LyricsMenu {
     out property <bool> open;
@@ -751,7 +752,10 @@ export component LyricsMoreButton inherits Rectangle {
     accessible-action-default => { root.clicked(); }
     ta := TouchArea {
         mouse-cursor: pointer;
-        clicked => { root.clicked(); }
+        clicked => {
+            tip.dismiss();
+            root.clicked();
+        }
     }
     Icon {
         width: 20px;
@@ -759,6 +763,13 @@ export component LyricsMoreButton inherits Rectangle {
         commands: Icons.more;
         stroke: transparent;
         fill: LyricsData.ink.current;
+    }
+    // As Translate and Romanize beside it: the bar's tooltip, under it, not while its menu is open.
+    tip := BarTip {
+        over: ta.has-hover && !LyricsMenu.open;
+        name: @tr("Lyrics menu");
+        hint: @tr("· Text size, timing, other lyrics");
+        under: true;
     }
 }
 

@@ -168,6 +168,7 @@ pub(super) fn clear(data: &LyricsData) {
     data.set_decorations(ModelRc::new(VecModel::default()));
     data.set_has_non_latin(false);
     data.set_has_translation(false);
+    data.set_translation_needless(false);
     data.set_has_romanization(false);
     data.set_translation_loading(false);
     data.set_romanization_loading(false);
@@ -420,7 +421,14 @@ fn show_cached(data: &LyricsData) {
         let state = state.borrow();
         let current = state.current.as_ref()?;
         let cached = state.cache.get(&current.id)?;
-        Some(
+        // Answered, with no line to add: an English song (or one Google left as it is). A
+        // failure keeps no answer, so it never says so.
+        let needless = cached
+            .translation
+            .as_ref()
+            .is_some_and(|lines| lines.iter().all(String::is_empty));
+        Some((
+            needless,
             cached
                 .source
                 .iter()
@@ -440,9 +448,10 @@ fn show_cached(data: &LyricsData) {
                         .into(),
                 })
                 .collect::<Vec<_>>(),
-        )
+        ))
     });
-    if let Some(rows) = rows {
+    if let Some((needless, rows)) = rows {
+        data.set_translation_needless(needless);
         data.set_has_translation(rows.iter().any(|row| !row.translation.is_empty()));
         data.set_has_romanization(rows.iter().any(|row| !row.romanization.is_empty()));
         feed(data, rows);

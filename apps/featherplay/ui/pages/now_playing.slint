@@ -942,7 +942,7 @@ export component NowPlayingPage inherits Rectangle {
             if LyricsData.has-lines: LyricsExtraButton {
                 icon: LyricsDecorationIcons.translation;
                 label: @tr("Translate to English");
-                hint: @tr("· An English line under each line");
+                hint: LyricsData.translation-on && LyricsData.translation-needless ? @tr("· This song is already in English") : @tr("· An English line under each line");
                 on: LyricsData.translation-on;
                 loading: LyricsData.translation-loading;
                 clicked => { LyricsData.set-translation(!LyricsData.translation-on); }

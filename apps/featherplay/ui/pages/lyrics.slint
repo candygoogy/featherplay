@@ -59,6 +59,9 @@ export global LyricsData {
     // The song's answers hold at least one line (an English song has no translation).
     in property <bool> has-translation;
     in property <bool> has-romanization;
+    // The song's translation came back with no line to add (an English song): Translate's
+    // tooltip says so instead of promising lines.
+    in property <bool> translation-needless;
     // The English is on its way for lyrics in another script, which can't be English: bars
     // hold its places. Latin-script lyrics may well be English (then no answer comes), so
     // they stay as they are until the English lands.
