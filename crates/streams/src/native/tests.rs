@@ -270,18 +270,57 @@ fn unavailable_for_different_songs_in_a_row_turns_visionos_off() {
     assert!(!h.visionos_on(), "still on after three songs");
 }
 
-/// A refused visionOS URL leaves resolves to the embedded client for a while, at once.
+/// Two refused visionOS URLs in a row leave resolves to the embedded client for a while,
+/// at once.
 #[tokio::test]
-async fn a_refused_visionos_url_leaves_resolves_to_the_embedded_client() {
+async fn a_refused_visionos_url_twice_leaves_resolves_to_the_embedded_client() {
     let (base, log) = two_clients(VISIONOS_PLAYER.to_string());
     let Some((r, dir)) = seeded_with_visionos("visionos-refused", &base) else {
         return;
     };
     r.visionos_refused();
+    r.visionos_refused();
     let s = r.resolve(VIDEO, Quality::High).await.unwrap();
     assert_eq!(client(&s), "WEB_EMBEDDED_PLAYER");
     assert_eq!(log.lock().unwrap().len(), 1, "no visionOS request");
     std::fs::remove_dir_all(&dir).unwrap();
+}
+
+/// One refused visionOS URL (2026-11-18: one of 22 from one visitor) leaves visionOS on:
+/// its next URL is checked first. One that plays ends the checks; one refused there goes
+/// on to the embedded client in the same resolve, and turns visionOS off.
+#[tokio::test]
+async fn after_one_refused_visionos_url_the_next_is_checked_first() {
+    for (name, check, want, requests) in [
+        ("visionos-checked", Check::Plays, "VISIONOS", 1),
+        (
+            "visionos-checked-refused",
+            Check::Refused,
+            "WEB_EMBEDDED_PLAYER",
+            2,
+        ),
+    ] {
+        let (base, log) = two_clients(VISIONOS_PLAYER.to_string());
+        let Some((r, dir)) = seeded_with_visionos(name, &base) else {
+            return;
+        };
+        r.visionos_refused();
+        assert!(r.inner.health.lock().unwrap().visionos_on(), "{name}");
+        *r.inner.check_as.lock().unwrap() = Some(check);
+        let s = r.resolve(VIDEO, Quality::High).await.unwrap();
+        assert_eq!(client(&s), want, "{name}");
+        assert_eq!(log.lock().unwrap().len(), requests, "{name}");
+        assert_eq!(*r.inner.check_as.lock().unwrap(), None, "{name}: checked");
+        let h = r.inner.health.lock().unwrap();
+        let refused = check == Check::Refused;
+        assert_eq!(h.visionos_on(), !refused, "{name}");
+        assert_eq!(
+            h.visionos_check, refused,
+            "{name}: the next one checked too"
+        );
+        drop(h);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
 }
 
 /// A fresh answer asks with a new embed page's visitor, and leaves the kept page to

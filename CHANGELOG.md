@@ -25,6 +25,10 @@ Notable changes to featherplay, newest first. The format follows
   a second or two apart, beside yt-dlp, and the first stream that's ready plays. Before, a
   single failed request left the song to yt-dlp, whose answer can wait out 5 s of ads: one
   song took almost 13 s to start.
+- One refused stream from the quick ad-free source no longer turns that source off for 30
+  minutes. Its next stream is checked before it plays, and only a second refusal soon after
+  turns it off, for 5 minutes at first. While it was off, many songs waited out 5 s of ads
+  before they started.
 - Up next no longer shows its songs below an empty space after a new radio starts while the
   list was scrolled down: the radio's songs start at the top of the list.
 

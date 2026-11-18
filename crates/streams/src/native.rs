@@ -36,12 +36,13 @@ mod tests;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant, SystemTime};
 
 use featherplay_core::sync::LockExt;
 use serde_json::Value;
 
+use crate::chain::Check;
 use crate::js::{self, Solver};
 use crate::{Preprocessor, Quality, ResolvedStream, Via};
 use embed::parse_embed_page;
@@ -80,8 +81,17 @@ const VISIONOS_MAX_FAILURES: u32 = 3;
 /// Its answers took 91-154 ms (2026-11-10): one that takes longer goes on to the embedded
 /// client rather than hold the song up to `REQUEST_TIMEOUT`.
 const VISIONOS_TIMEOUT: Duration = Duration::from_secs(3);
-/// How long resolves ask the embedded client alone after a visionOS URL was refused: the
-/// way YouTube refused the other clients' URLs without a PO token (after the first MiB).
+/// Refused visionOS URLs this close count together (`Health::visionos_refused`). The first
+/// leaves visionOS on, its next URL checked first: on 2026-11-18 one URL of 22 from one
+/// visitor was refused at its first byte, the others played, and 30 min of the embedded
+/// client alone cost 6-7 s on each song whose answer had ads.
+const VISIONOS_REFUSALS_WITHIN: Duration = Duration::from_secs(30 * 60);
+/// How long resolves ask the embedded client alone after a second refused visionOS URL:
+/// `OFF_FOR`, as for other failures. Its first URL after is checked (~0.2 s), and a
+/// refusal there goes on to the embedded client in the same resolve.
+const VISIONOS_REFUSED_AGAIN_FOR: Duration = OFF_FOR;
+/// After a third: the way YouTube refused the other clients' URLs without a PO token
+/// (after the first MiB, which the check doesn't see).
 const VISIONOS_REFUSED_FOR: Duration = Duration::from_secs(30 * 60);
 const REFRESH_AFTER: Duration = Duration::from_secs(12 * 3600);
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
@@ -220,6 +230,11 @@ struct Inner {
     pages: AtomicU64,
     refreshing: AtomicBool,
     health: Mutex<Health>,
+    /// For `checked`, made at the first check.
+    checks: OnceLock<Option<reqwest::Client>>,
+    /// What the checks answer in tests: a visionOS URL is https, which the test server isn't.
+    #[cfg(test)]
+    check_as: Mutex<Option<Check>>,
 }
 
 /// Which kept page the next resolve drops.
@@ -249,6 +264,11 @@ struct Health {
     /// The songs visionOS said were unavailable since its last stream, the last
     /// `VISIONOS_MAX_FAILURES` at most.
     visionos_unavailable: Vec<String>,
+    /// Refused visionOS URLs within `VISIONOS_REFUSALS_WITHIN` of each other, and the last.
+    visionos_refusals: u32,
+    visionos_refused_at: Option<Instant>,
+    /// The next visionOS URL is checked before it's handed over (`Inner::checked`).
+    visionos_check: bool,
 }
 
 impl Health {
@@ -354,6 +374,36 @@ impl Health {
         }
     }
 
+    /// A visionOS URL was refused (HTTP 403). The first within `VISIONOS_REFUSALS_WITHIN`
+    /// leaves visionOS on, a second turns it off for `VISIONOS_REFUSED_AGAIN_FOR`, a third
+    /// for `VISIONOS_REFUSED_FOR`. Its next URL is checked first.
+    fn visionos_refused(&mut self) {
+        let now = Instant::now();
+        if self
+            .visionos_refused_at
+            .is_none_or(|at| now.duration_since(at) > VISIONOS_REFUSALS_WITHIN)
+        {
+            self.visionos_refusals = 0;
+        }
+        self.visionos_refused_at = Some(now);
+        self.visionos_refusals += 1;
+        self.visionos_check = true;
+        let off = match self.visionos_refusals {
+            1 => {
+                log::info!("a visionOS URL was refused: its next one is checked first");
+                return;
+            }
+            2 => VISIONOS_REFUSED_AGAIN_FOR,
+            _ => VISIONOS_REFUSED_FOR,
+        };
+        log::info!(
+            "a visionOS URL was refused again: the embedded client alone for {} min",
+            off.as_secs() / 60
+        );
+        self.visionos_failures = VISIONOS_MAX_FAILURES - 1;
+        self.visionos_off(off);
+    }
+
     /// visionOS off for `time`, or for longer if it's off for longer already.
     fn visionos_off(&mut self, time: Duration) {
         let until = Instant::now() + time;
@@ -393,6 +443,9 @@ impl NativeResolver {
                 pages: AtomicU64::new(0),
                 refreshing: AtomicBool::new(false),
                 health: Mutex::new(Health::default()),
+                checks: OnceLock::new(),
+                #[cfg(test)]
+                check_as: Mutex::new(None),
             }),
         })
     }
@@ -409,16 +462,9 @@ impl NativeResolver {
         self.inner.drop_page(None);
     }
 
-    /// A visionOS URL was refused: resolves ask the embedded client alone for
-    /// `VISIONOS_REFUSED_FOR`.
+    /// A visionOS URL was refused: see `Health::visionos_refused`.
     pub(crate) fn visionos_refused(&self) {
-        log::info!(
-            "a visionOS URL was refused: the embedded client alone for {} min",
-            VISIONOS_REFUSED_FOR.as_secs() / 60
-        );
-        let mut h = self.inner.health.lock_or_recover();
-        h.visionos_failures = VISIONOS_MAX_FAILURES - 1;
-        h.visionos_off(VISIONOS_REFUSED_FOR);
+        self.inner.health.lock_or_recover().visionos_refused();
     }
 
     /// For the app's start. With no player to answer with (a first run, or players made by
@@ -623,7 +669,10 @@ impl Inner {
                 .lock_or_recover()
                 .visionos_answered(video, &answer, counts);
             match answer {
-                Ok(stream) => return (Ok(stream), Some(ready.page)),
+                Ok(stream) if self.checked(&stream).await => {
+                    return (Ok(stream), Some(ready.page));
+                }
+                Ok(_) => log::info!("resolve {video}: its visionOS URL was refused, as the embed"),
                 Err(e) => {
                     let (NativeError::Skip(m)
                     | NativeError::Failed(m)
@@ -651,6 +700,39 @@ impl Inner {
                 (Err(NativeError::NotAvailable(m)), Some(ready.page))
             }
             result => (result, Some(ready.page)),
+        }
+    }
+
+    /// Whether `stream`, a visionOS one, may be handed over: after a refused visionOS URL
+    /// (`Health::visionos_check`), only once its first byte isn't refused. One that plays
+    /// ends the checks; a refused one counts as a refusal.
+    async fn checked(&self, stream: &ResolvedStream) -> bool {
+        if !self.health.lock_or_recover().visionos_check {
+            return true;
+        }
+        #[cfg(test)]
+        let scripted = self.check_as.lock_or_recover().take();
+        #[cfg(not(test))]
+        let scripted = None;
+        let check = match (
+            scripted,
+            self.checks.get_or_init(crate::ytdlp::check_client),
+        ) {
+            (Some(check), _) => check,
+            (None, Some(http)) => crate::ytdlp::first_byte(http, &stream.url).await,
+            (None, None) => Check::Unknown,
+        };
+        let mut h = self.health.lock_or_recover();
+        match check {
+            Check::Refused => {
+                h.visionos_refused();
+                false
+            }
+            Check::Plays => {
+                h.visionos_check = false;
+                true
+            }
+            Check::Unknown => true,
         }
     }
 

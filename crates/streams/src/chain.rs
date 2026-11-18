@@ -706,7 +706,7 @@ impl Chain {
     /// first byte plays. A refusal starts the doubt over; the native step's embed page is
     /// kept then (URLs from one page were refused and played in turn). A refused visionOS
     /// URL says nothing of the embedded client's: no doubt, and the song keeps its native
-    /// step (`Steps::check` turned visionOS off).
+    /// step (`Steps::check` told the native step: `NativeResolver::visionos_refused`).
     async fn native_ready(
         &self,
         s: &impl Steps,

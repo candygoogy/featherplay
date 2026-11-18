@@ -323,9 +323,9 @@ impl YtDlpResolver {
 
     /// The stream URL this resolver gave for `id` was refused (HTTP 403) before it
     /// expired: see `Chain::refused`. The native step starts from a fresh embed page next
-    /// time, checked; refused twice, `id` skips it for a while. A refused visionOS URL
-    /// leaves the native step to the embedded client for a while
-    /// (`NativeResolver::visionos_refused`), whichever step gave it (yt-dlp's default
+    /// time, checked; refused twice, `id` skips it for a while. A refused visionOS URL has
+    /// the next one checked, and another one soon leaves the native step to the embedded
+    /// client for a while (`NativeResolver::visionos_refused`), whichever step gave it (yt-dlp's default
     /// clients include visionOS).
     pub fn refused(&self, id: &TrackId, url: &str) {
         if query_param(url, "c").as_deref() == Some(VISIONOS) {
@@ -600,7 +600,7 @@ const CHECK_TIMEOUT: Duration = Duration::from_secs(3);
 
 /// The client for `first_byte`: like the engine's (no User-Agent), and keeping no
 /// connection idle, so no reaper timer runs while paused.
-fn check_client() -> Option<reqwest::Client> {
+pub(crate) fn check_client() -> Option<reqwest::Client> {
     featherplay_proxy::client()
         .connect_timeout(CHECK_TIMEOUT)
         .pool_max_idle_per_host(0)
@@ -609,7 +609,7 @@ fn check_client() -> Option<reqwest::Client> {
 }
 
 /// One `Range: bytes=0-0` request for `url`: the engine's first request, for one byte.
-async fn first_byte(http: &reqwest::Client, url: &str) -> Check {
+pub(crate) async fn first_byte(http: &reqwest::Client, url: &str) -> Check {
     let answer = http
         .get(url)
         .header(reqwest::header::RANGE, "bytes=0-0")
