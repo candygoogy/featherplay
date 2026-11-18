@@ -539,6 +539,16 @@ impl Steps for Live<'_> {
         )
     }
 
+    async fn native_again(&self, id: &TrackId) -> Option<Result<ResolvedStream, NativeError>> {
+        Some(
+            self.r
+                .native
+                .as_ref()?
+                .resolve_aside(&id.0, self.quality)
+                .await,
+        )
+    }
+
     fn helpers_ready(&self) -> bool {
         self.r.installer.is_none() || self.r.sidecars.installed()
     }

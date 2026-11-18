@@ -41,6 +41,17 @@ const GATE_RECHECK: Duration = Duration::from_secs(1);
 /// the TV clients). A longer one isn't waited for: an embedded URL goes on to the next step,
 /// a TV one is handed over after this.
 const MAX_GATE_WAIT: Duration = Duration::from_secs(20);
+/// The pauses before each try of the native step again after its request got no answer
+/// (`NativeError::Network`). On 2026-11-18 a DNS blip failed it and both yt-dlp steps at
+/// once; yt-dlp got through ~4 s later, and its answer opened 5 s after that (ads), while
+/// the next song's native resolve took 0.7 s.
+const NATIVE_AGAIN: [Duration; 3] = [
+    Duration::from_secs(1),
+    Duration::from_secs(2),
+    Duration::from_secs(2),
+];
+/// How long the tries again may run in all: a failed yt-dlp waits for them at most this.
+const NATIVE_AGAIN_FOR: Duration = Duration::from_secs(15);
 
 /// What a stream URL's first byte said (`Steps::check`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -61,6 +72,9 @@ pub(crate) trait Steps {
     /// The native step once more, from a fresh embed page (a new visitor, as each yt-dlp
     /// run is), kept for this one answer. `None` as for `native`.
     async fn native_fresh(&self, id: &TrackId) -> Option<Result<ResolvedStream, NativeError>>;
+    /// The native step once more after its request got no answer: as `native`, but its
+    /// failure doesn't count towards turning the step off. `None` as for `native`.
+    async fn native_again(&self, id: &TrackId) -> Option<Result<ResolvedStream, NativeError>>;
     /// Whether a yt-dlp step can run at once. False while the helpers aren't downloaded
     /// yet (a first run): such a step waits for them first, so it runs only when the
     /// native step gave nothing, never beside it.
@@ -141,6 +155,9 @@ enum One {
     Plays(ResolvedStream),
     /// Refused, or failed on our side: step 2 next.
     Next,
+    /// Its request got no answer (`NativeError::Network`): step 2 next, and step 1 again
+    /// beside it (`Chain::native_again`).
+    Offline,
     /// The client won't give this video (not embeddable): step 3 next.
     NotEmbeddable,
     /// The answer for the whole resolve (an age check).
@@ -278,6 +295,10 @@ impl Chain {
     /// fails: steps 1 and 2 are skipped for `EMBEDDED_OFF`. Meanwhile, a resolve the player
     /// waits for runs steps 1 and 2 at once (`race`).
     ///
+    /// A step 1 whose request got no answer (`NativeError::Network`: DNS, connect, a timeout)
+    /// is tried again a few times beside steps 2 and 3 (`beside_native_again`), as such a
+    /// blip passes in seconds while yt-dlp's answer may wait out ads after it.
+    ///
     /// A resolve ahead (`ahead`) runs its yt-dlp steps one resolve ahead at a time, unless
     /// the player asks for its song meanwhile; a gate's wait isn't part of its turn. One for
     /// a row that may not be clicked (`Ahead::Maybe`) runs none: it ends after step 1.
@@ -368,11 +389,12 @@ impl Chain {
                 None => None,
             }
         };
+        let offline = matches!(one, Some(One::Offline));
         match one {
             Some(One::Plays(stream)) => return Ok(stream),
             Some(One::Ends(e)) => return Err(e),
             Some(One::NotEmbeddable) => embedded = false,
-            Some(One::Next) | None => {}
+            Some(One::Next | One::Offline) | None => {}
         }
         if maybe && let Some(urgent) = ahead {
             // Unless the player asked meanwhile: then it goes on as the player's.
@@ -387,7 +409,24 @@ impl Chain {
             }
             ahead = None;
         }
-        // yt-dlp from here on.
+        let ytdlp = self.ytdlp_steps(s, id, embedded, doubt, by_song, ahead);
+        if offline {
+            self.beside_native_again(s, id, doubt, ytdlp).await
+        } else {
+            ytdlp.await
+        }
+    }
+
+    /// Steps 2 and 3. `embedded`: step 2 runs. `ahead`: see `turn`.
+    async fn ytdlp_steps(
+        &self,
+        s: &impl Steps,
+        id: &TrackId,
+        embedded: bool,
+        doubt: bool,
+        by_song: bool,
+        mut ahead: Option<&Notify>,
+    ) -> Result<ResolvedStream, ResolveError> {
         if embedded {
             let turn = self.turn(&mut ahead).await;
             let answer = self.embedded_answer(s, id).await;
@@ -418,6 +457,74 @@ impl Chain {
             wait_gate(stream).await;
         }
         result
+    }
+
+    /// The yt-dlp steps (`ytdlp`) beside the native step tried again (`native_again`), after
+    /// its request got no answer: the first URL that opens wins, and the other is dropped
+    /// (its yt-dlp run killed). A yt-dlp failure meanwhile (the same blip) waits for the
+    /// tries left, `NATIVE_AGAIN_FOR` at most.
+    async fn beside_native_again(
+        &self,
+        s: &impl Steps,
+        id: &TrackId,
+        doubt: bool,
+        ytdlp: impl Future<Output = Result<ResolvedStream, ResolveError>>,
+    ) -> Result<ResolvedStream, ResolveError> {
+        let again = async {
+            tokio::time::timeout(NATIVE_AGAIN_FOR, self.native_again(s, id, doubt))
+                .await
+                .ok()
+                .flatten()
+        };
+        tokio::pin!(again, ytdlp);
+        // `again` has ended.
+        let mut tried = false;
+        let stream = loop {
+            tokio::select! {
+                biased;
+                stream = &mut again, if !tried => match stream {
+                    Some(stream) => break stream,
+                    None => tried = true,
+                },
+                r = &mut ytdlp => match r {
+                    Err(e) if !tried => match again.await {
+                        Some(stream) => break stream,
+                        None => return Err(e),
+                    },
+                    r => return r,
+                },
+            }
+        };
+        // It plays natively after all: no yt-dlp reason for the log.
+        self.take_fallback_reason(id);
+        Ok(stream)
+    }
+
+    /// Step 1 again after each of `NATIVE_AGAIN`'s pauses while its request gets no
+    /// answer: its URL once it opens (and, in doubt, plays), else `None`. Any other answer
+    /// ends the tries, and yt-dlp decides.
+    async fn native_again(
+        &self,
+        s: &impl Steps,
+        id: &TrackId,
+        doubt: bool,
+    ) -> Option<ResolvedStream> {
+        for (n, pause) in NATIVE_AGAIN.into_iter().enumerate() {
+            tokio::time::sleep(pause).await;
+            let stream = match self.answer(s.native_again(id).await?, id) {
+                Answer::Now(stream) | Answer::Gated(stream) => stream,
+                Answer::Done(One::Offline) => continue,
+                Answer::Done(_) => return None,
+            };
+            return match self.native_ready(s, id, stream, doubt).await {
+                One::Plays(stream) => {
+                    log::info!("resolve {}: natively after all, try {}", id.0, n + 2);
+                    Some(stream)
+                }
+                _ => None,
+            };
+        }
+        None
     }
 
     /// Steps 1 and 2 at once, the player waiting: the first URL that plays wins, and the
@@ -469,7 +576,7 @@ impl Chain {
             Some(One::Ends(e)) => Some(Err(e)),
             // yt-dlp's embedded run would be refused too.
             Some(One::NotEmbeddable) => None,
-            Some(One::Next) | None => {
+            Some(One::Next | One::Offline) | None => {
                 let two = match two {
                     Some(two) => two,
                     None => ytdlp.await,
@@ -545,7 +652,12 @@ impl Chain {
 
     /// Step 1's answer, before its gate and check.
     async fn native_answer(&self, s: &impl Steps, id: &TrackId) -> Option<Answer> {
-        Some(match s.native(id).await? {
+        Some(self.answer(s.native(id).await?, id))
+    }
+
+    /// What a native step's `result` is for the chain.
+    fn answer(&self, result: Result<ResolvedStream, NativeError>, id: &TrackId) -> Answer {
+        match result {
             Ok(stream) => match gate_left(&stream) {
                 Some(gate) if gate > MAX_GATE_WAIT => {
                     // yt-dlp's request may come with shorter ads, or none.
@@ -562,7 +674,7 @@ impl Chain {
                 if let Some(m) = age_check(&e) {
                     let e = ResolveError::Unavailable(m.to_string());
                     log::info!("{}", stage_failed(id, Stage::Native, &e));
-                    return Some(Answer::Done(One::Ends(e)));
+                    return Answer::Done(One::Ends(e));
                 }
                 if let NativeError::NotAvailable(m) = &e {
                     // Both native clients refused the song. Since 2026-11-11 yt-dlp's default
@@ -574,20 +686,20 @@ impl Chain {
                     // step 3 decides as it did.
                     let e = ResolveError::Unavailable(m.clone());
                     log::info!("{}", stage_failed(id, Stage::Native, &e));
-                    return Some(Answer::Done(One::Ends(e)));
+                    return Answer::Done(One::Ends(e));
                 }
                 if matches!(e, NativeError::NoUrl(_)) {
                     self.native_refused(id);
                 }
                 self.fall_back(id, e.to_string());
-                // The client refused the video: yt-dlp's embedded run would too.
-                Answer::Done(if matches!(e, NativeError::Skip(_)) {
-                    One::NotEmbeddable
-                } else {
-                    One::Next
+                Answer::Done(match e {
+                    // The client refused the video: yt-dlp's embedded run would too.
+                    NativeError::Skip(_) => One::NotEmbeddable,
+                    NativeError::Network(_) => One::Offline,
+                    _ => One::Next,
                 })
             }
-        })
+        }
     }
 
     /// Step 1's URL once its gate has passed and, if it had one or URLs are in doubt, its

@@ -139,6 +139,13 @@ impl Steps for Script {
             None => std::future::pending().await,
         }
     }
+    /// From the native step's script.
+    async fn native_again(&self, _: &TrackId) -> Option<Result<ResolvedStream, NativeError>> {
+        match self.next("again", &self.native) {
+            Some(r) => Some(r),
+            None => std::future::pending().await,
+        }
+    }
     fn helpers_ready(&self) -> bool {
         !self.no_helpers
     }
@@ -1119,6 +1126,78 @@ async fn a_gates_wait_is_not_part_of_a_resolve_aheads_turn_at_yt_dlp() {
     let (first, second) = (t.waited_until(first.1), second.1 - t.paused);
     assert!(first >= Duration::from_secs(5), "{first:?}");
     assert!(second < Duration::from_secs(1), "{second:?}");
+}
+
+fn no_answer() -> Result<&'static str, NativeError> {
+    Err(NativeError::Network(
+        "player API: error sending request".into(),
+    ))
+}
+
+/// 2026-11-18: a DNS blip failed the native step and both yt-dlp steps at once, and
+/// yt-dlp's answer after its update waited out 5 s of ads. The native step tried again
+/// once the network is back plays first, and the log names no yt-dlp reason.
+#[tokio::test(start_paused = true)]
+async fn a_native_step_without_an_answer_is_tried_again_beside_yt_dlp() {
+    let chain = Chain::default();
+    let dns = || Err(failed("Failed to resolve 'www.youtube.com'"));
+    let s = Script::default()
+        .native(no_answer())
+        .embedded(dns())
+        .default_clients(dns())
+        .native(no_answer())
+        .native(Ok(NATIVE_URL));
+    s.default
+        .lock()
+        .unwrap()
+        .push_back(Ok(gated_stream(TV_URL, 5)));
+    let t = tokio::time::Instant::now();
+    assert_eq!(
+        url(within_gates(chain.resolve(&s, &id())).await),
+        NATIVE_URL
+    );
+    // After pauses of 1 s and 2 s; the TV URL opens at 5 s.
+    let took = t.elapsed();
+    assert!(took >= Duration::from_secs(3), "{took:?}");
+    assert!(took < Duration::from_secs(4), "{took:?}");
+    assert_eq!(
+        s.calls(),
+        [
+            "native", "embedded", "default", "update", "default", "again", "again"
+        ]
+    );
+    assert_eq!(chain.take_fallback_reason(&id()), None);
+}
+
+/// The tries again are few, a failed yt-dlp waits for them, and an answer that isn't the
+/// network's ends them.
+#[tokio::test(start_paused = true)]
+async fn a_native_step_is_tried_again_three_times_at_most() {
+    let chain = Chain::default();
+    let s = Script::default()
+        .native(no_answer())
+        .embedded(Err(failed("Failed to resolve 'www.youtube.com'")))
+        .default_clients(Err(ResolveError::Unavailable("Video unavailable".into())))
+        .native(no_answer())
+        .native(no_answer())
+        .native(no_answer());
+    let r = within_gates(chain.resolve(&s, &id())).await;
+    assert!(matches!(r, Err(ResolveError::Unavailable(_))), "{r:?}");
+    assert_eq!(
+        s.calls(),
+        ["native", "embedded", "default", "again", "again", "again"]
+    );
+
+    let s = Script::default()
+        .native(no_answer())
+        .embedded_gated(EMBEDDED_URL, 5)
+        .native(Err(NativeError::Failed("player API answered 500".into())))
+        .check(Check::Plays);
+    assert_eq!(
+        url(within_gates(chain.resolve(&s, &other())).await),
+        EMBEDDED_URL
+    );
+    assert_eq!(s.calls(), ["native", "embedded", "again", "check"]);
 }
 
 #[test]

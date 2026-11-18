@@ -10,6 +10,11 @@ Notable changes to featherplay, newest first. The format follows
 
 - A radio, and a list set to go on with autoplay, now fetch more songs when five are left in Up
   next rather than two, so songs to come show up a few tracks ahead instead of only at the end.
+- A song picked during a short network drop (a failed DNS lookup, say) starts sooner once the
+  network is back. featherplay's own request for its stream is now tried again a few times,
+  a second or two apart, beside yt-dlp, and the first stream that's ready plays. Before, a
+  single failed request left the song to yt-dlp, whose answer can wait out 5 s of ads: one
+  song took almost 13 s to start.
 
 ## [0.4.2] - 2026-11-17
 

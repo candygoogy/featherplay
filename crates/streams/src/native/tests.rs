@@ -352,6 +352,25 @@ async fn a_failed_request_forgets_the_config_and_three_turn_it_off() {
     std::fs::remove_dir_all(&dir).unwrap();
 }
 
+/// A request nobody answers is the network's failure, and keeps the page: the chain asks
+/// again once the network is back (`Chain::native_again`).
+#[tokio::test]
+async fn a_request_without_an_answer_is_the_networks_and_keeps_the_page() {
+    // A port nobody listens on any more.
+    let port = std::net::TcpListener::bind("127.0.0.1:0")
+        .unwrap()
+        .local_addr()
+        .unwrap()
+        .port();
+    let Some((r, dir)) = seeded("no-answer", &format!("http://127.0.0.1:{port}")) else {
+        return;
+    };
+    let e = r.resolve(VIDEO, Quality::High).await.unwrap_err();
+    assert!(matches!(e, NativeError::Network(_)), "{e:?}");
+    assert!(r.inner.forget.lock().unwrap().is_none(), "the page is kept");
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
 /// Songs prepared in case they're clicked fail without counting: a page of them can't
 /// turn the step off for the clicks.
 #[tokio::test]

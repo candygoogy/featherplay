@@ -109,8 +109,13 @@ pub(crate) enum NativeError {
     /// formats wanted):
     /// yt-dlp's embedded run would fail the same way, so its other clients go next.
     Skip(String),
-    /// Something on our side or the network failed: yt-dlp gets the whole resolve.
+    /// Something on our side failed, or YouTube answered with an error: yt-dlp gets the
+    /// whole resolve.
     Failed(String),
+    /// A request got no answer (DNS, connect, a timeout, a cut connection): as `Failed`, and
+    /// the chain asks again beside yt-dlp (`Chain::native_again`), as such blips pass in
+    /// seconds.
+    Network(String),
     /// The format wanted came without a URL (a SABR-only answer). yt-dlp gets the whole
     /// resolve, as for `Failed`; the same song tends to get such answers again.
     NoUrl(String),
@@ -124,7 +129,9 @@ impl std::fmt::Display for NativeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Skip(m) => write!(f, "not with the embedded client: {m}"),
-            Self::Failed(m) | Self::NoUrl(m) => write!(f, "native resolve failed: {m}"),
+            Self::Failed(m) | Self::Network(m) | Self::NoUrl(m) => {
+                write!(f, "native resolve failed: {m}")
+            }
             Self::NotAvailable(m) => write!(f, "not available to visionOS nor the embed: {m}"),
         }
     }
@@ -132,6 +139,10 @@ impl std::fmt::Display for NativeError {
 
 fn failed(m: impl std::fmt::Display) -> NativeError {
     NativeError::Failed(m.to_string())
+}
+
+fn network(m: impl std::fmt::Display) -> NativeError {
+    NativeError::Network(m.to_string())
 }
 
 /// What the embed page tells about the embedded client.
@@ -301,7 +312,7 @@ fn song_not_client(e: &NativeError) -> bool {
                 || m.contains("inappropriate")
         }
         NativeError::Failed(m) => m.starts_with("ERROR:"),
-        NativeError::NoUrl(_) => false,
+        NativeError::Network(_) | NativeError::NoUrl(_) => false,
         NativeError::NotAvailable(_) => true,
     }
 }
@@ -491,7 +502,7 @@ impl NativeResolver {
                 h.failed_page = None;
             }
             Err(_) if !counts => {}
-            Err(e @ (NativeError::Failed(_) | NativeError::NoUrl(_))) => {
+            Err(e) => {
                 // Other failures (a request, a player's challenges) count each time.
                 let page = page.filter(|_| matches!(e, NativeError::NoUrl(_)));
                 if page.is_none() || page != h.failed_page {
@@ -616,6 +627,7 @@ impl Inner {
                 Err(e) => {
                     let (NativeError::Skip(m)
                     | NativeError::Failed(m)
+                    | NativeError::Network(m)
                     | NativeError::NoUrl(m)
                     | NativeError::NotAvailable(m)) = &e;
                     log::info!("resolve {video}: no visionOS stream ({m}), asking as the embed");
@@ -666,6 +678,9 @@ impl Inner {
             Solver::start(&player.path).map_err(|e| failed(format!("starting the solver: {e}")))?;
         let body = match self.player_request(video, ready).await {
             Ok(b) => b,
+            // No answer says nothing of the page: the next try, once the network is back,
+            // needs no new one.
+            Err(e @ NativeError::Network(_)) => return Err(e),
             Err(e) => {
                 forget();
                 return Err(e);
@@ -902,13 +917,13 @@ impl Inner {
         if let Some(r) = referer {
             req = req.header("Referer", r);
         }
-        let resp = req.send().await.map_err(|e| failed(format!("GET: {e}")))?;
+        let resp = req.send().await.map_err(|e| network(format!("GET: {e}")))?;
         if !resp.status().is_success() {
             return Err(failed(format!("GET answered {}", resp.status())));
         }
         resp.text()
             .await
-            .map_err(|e| failed(format!("GET body: {e}")))
+            .map_err(|e| network(format!("GET body: {e}")))
     }
 
     async fn player_request(&self, video: &str, ready: &Ready) -> Result<String, NativeError> {
@@ -944,12 +959,12 @@ impl Inner {
             .body(body.to_string())
             .send()
             .await
-            .map_err(|e| failed(format!("player API: {e}")))?;
+            .map_err(|e| network(format!("player API: {e}")))?;
         let status = resp.status();
         let body = resp
             .text()
             .await
-            .map_err(|e| failed(format!("player API body: {e}")))?;
+            .map_err(|e| network(format!("player API body: {e}")))?;
         if !status.is_success() {
             return Err(failed(format!("player API answered {status}")));
         }
