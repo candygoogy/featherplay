@@ -15,6 +15,8 @@ Notable changes to featherplay, newest first. The format follows
   a second or two apart, beside yt-dlp, and the first stream that's ready plays. Before, a
   single failed request left the song to yt-dlp, whose answer can wait out 5 s of ads: one
   song took almost 13 s to start.
+- Up next no longer shows its songs below an empty space after a new radio starts while the
+  list was scrolled down: the radio's songs start at the top of the list.
 
 ## [0.4.2] - 2026-11-17
 

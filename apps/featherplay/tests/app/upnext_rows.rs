@@ -263,3 +263,40 @@ fn a_song_picked_far_down_up_next_leaves_the_rest_at_the_top() {
     drop(ui);
     runtime.shutdown_timeout(Duration::from_secs(1));
 }
+
+/// Up next scrolled down, then emptied and filled again, as a radio started from a song is
+/// (nothing up next until its songs come): the new songs start at the list's top, not below
+/// an empty space as tall as the scroll was.
+#[test]
+fn a_list_emptied_while_scrolled_fills_again_from_the_top() {
+    let home = Path::new(env!("CARGO_TARGET_TMPDIR"))
+        .join(format!("upnext-refill-{}", std::process::id()));
+    let bare = support::bare(home.join("cache"), None);
+    let (ui, ctx) = (&bare.ui, &bare.ctx);
+    ui.window().set_size(slint::PhysicalSize::new(1280, 800));
+    ui.global::<Theme>().set_still(true);
+    ui.global::<Frame>().set_queue_open(true);
+    ui.show().expect("show");
+    let w = ui.window();
+    let queue: Vec<usize> = (0..30).collect();
+    play_from(ctx, &queue, 6);
+    draw(ui, 3);
+    let top = row_top(ui, 1).expect("the first row shows");
+    featherplay::offscreen::wheel(w, support::label::centre(w, "Song 1, "), -3.0);
+    draw(ui, 15);
+    assert_eq!(row_top(ui, 1), None, "the list scrolled");
+
+    play_from(ctx, &[100], usize::MAX);
+    draw(ui, 2);
+    let radio: Vec<usize> = std::iter::once(100).chain(101..151).collect();
+    play_from(ctx, &radio, 101);
+    draw(ui, 3);
+    assert_eq!(
+        row_top(ui, 101),
+        Some(top),
+        "the new songs start at the top"
+    );
+    let support::Bare { ui, runtime, .. } = bare;
+    drop(ui);
+    runtime.shutdown_timeout(Duration::from_secs(1));
+}

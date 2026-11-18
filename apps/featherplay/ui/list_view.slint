@@ -217,6 +217,18 @@ export component ListView {
 
     callback scrolled <=> flickable.flicked;
 
+    // The content stays in view, as a Flickable keeps it itself. Slint (1.18.1) skips that,
+    // and its list's own check, for a content-y with a binding, and the scroll bar's two-way
+    // link here is one. Without it, rows taken out above a scrolled list, which then went
+    // empty and filled again (a new radio), started below a gap as tall as the old scroll.
+    property <length> lowest: min(0px, flickable.height - flickable.content-height);
+    property <bool> out-of-view: flickable.content-y > 0px || flickable.content-y < root.lowest;
+    changed out-of-view => {
+        if root.out-of-view {
+            flickable.content-y = clamp(flickable.content-y, root.lowest, 0px);
+        }
+    }
+
     min-height: 50px;
     min-width: 50px;
     horizontal-stretch: 1;
