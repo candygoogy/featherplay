@@ -174,7 +174,7 @@ bar gives up its groups in turn below 960 px (`apps/featherplay/ui/bottom_bar.sl
 | `featherplay-discord` | Discord's blocking IPC | `crates/controller/src/presence.rs` |
 | `featherplay-proxy` | Asks WinHTTP for a proxy script or auto-detection | `crates/proxy/src/lookups.rs` |
 | `featherplay-log` | Appends log lines to the file | `crates/controller/src/diagnostics.rs` |
-| `featherplay-writes` | The saves nobody waits for (the lyrics' choices, the sidebar's recent list, the session every 10 s of playback), one after another in the order they were made; started by the first | `crates/controller/src/task.rs` |
+| `featherplay-writes` | The saves nobody waits for (the lyrics' choices, the sidebar's records: what was opened and played lately, what was removed from Home's Shortcuts and what the pins name; the session every 10 s of playback), one after another in the order they were made; started by the first | `crates/controller/src/task.rs` |
 | `featherplay-endsession` | A hidden window that hears Windows' end-of-session messages and second launches (to show the window, or with `--quick-search` to open the quick search box) | `crates/platform/src/windows/session_end.rs` |
 | ksni's thread (Linux) | The tray icon's StatusNotifierItem and menu on the session bus; their events go to the main thread with `slint::invoke_from_event_loop` | `crates/platform/src/linux/tray.rs` |
 | global-hotkey's thread (Linux, X11) | The hotkeys' key grabs. global-hotkey takes one event handler per process, so featherplay installs one that looks each press up among the keys registered now (`ROUTES`): the three hotkeys send a `UiCommand`, the quick search's key opens the box | `crates/integrations/src/hotkeys.rs` |
@@ -281,7 +281,7 @@ after another on `featherplay-writes`, so the newer copy lands last.
 | `{config}/scrobble-queue.json`, `{config}/listenbrainz-queue.json` | Scrobbles waiting to be sent | `crates/controller/src/scrobbler.rs` |
 | `{state}/logs/` | `featherplay.log` and `featherplay.1.log` (about 1 MB each), crash files | `crates/controller/src/diagnostics/logfile.rs`, `crates/controller/src/diagnostics/crash.rs` |
 | `{cache}/covers/` | Cover art, an LRU disk cache | `apps/featherplay/src/covers.rs` |
-| `{cache}/library/` | Library lists and the Home feed, per identity | `crates/store/src/library_cache.rs` |
+| `{cache}/library/` | Library lists and the Home feed, per identity; the sidebar's and Home Shortcuts' records (`recent.json`, `played.json`, `hidden.json`, `pinned.json`) | `crates/store/src/library_cache.rs`, `apps/featherplay/src/sidebar.rs` |
 | `{cache}/streams.json` | Resolved streams kept for the next start | `crates/controller/src/controller/streams.rs` |
 | `{cache}/silences.json` | Silences found by skip silence | `crates/store/src/silence_cache.rs` |
 | `{cache}/client-version.txt` | The client version of the last session | `crates/store/src/session.rs` |

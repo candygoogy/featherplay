@@ -6,6 +6,25 @@ Notable changes to featherplay, newest first. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **Home's Shortcuts, redesigned**: always the first row under the band, as a compact grid of
+  small tiles, two rows of as many columns as fit, paged by the heading's arrows. Liked songs
+  comes first (its button shuffles), then what you pinned, then what you played from lately,
+  then your library: playlists, albums, singles, artists and your mixes, 24 at most. Opening a
+  page no longer counts; a song played 30 s (or to its end) from an album, a playlist or an
+  artist does. The row doesn't change while Home shows; new plays join on the next visit.
+  Right-click a tile to play, shuffle, queue it, pin it, move a pin, or remove a suggestion
+  (until you play it again, with Undo). Settings > Window has a Home group to turn the row or
+  its suggestions off, and to forget what it learned. Your mixes stay a shelf of their own.
+- One pin for the sidebar and Shortcuts: "Pin to top" is now "Pin", and the album page's ⋯
+  menu has it too.
+- Up next says "Playing from" the artist when you play an artist's top songs.
+
+### Fixed
+
+- A playlist cover made from a letterboxed video thumbnail no longer shows black bars.
+
 ## [0.5.0] - 2026-11-18
 
 ### Added
