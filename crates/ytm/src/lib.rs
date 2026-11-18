@@ -65,6 +65,10 @@ pub struct AlbumSummary {
     pub artists: Vec<ArtistRef>,
     pub year: Option<String>,
     pub thumbnail: Option<String>,
+    /// A single, as its page, the library and Home call it ("Single • …"); `false` where
+    /// it isn't said (search results), or for an album or an EP.
+    #[serde(default)]
+    pub single: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

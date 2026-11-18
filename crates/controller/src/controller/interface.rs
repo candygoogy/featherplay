@@ -15,6 +15,7 @@ use super::{
     AccountAction, LocalApiNotice, Mark, QueueAction, QueueInfo, SleepAction, SleepState, account,
 };
 use crate::catalog::Catalog;
+use crate::place::Place;
 use crate::updates;
 
 #[derive(Debug, Default)]
@@ -226,6 +227,14 @@ pub enum UiEvent {
     Silences(Vec<Mark>),
     /// The sleep timer started, changed its minutes or fade, or stopped (`None`).
     Sleep(Option<SleepState>),
+    /// A song played long enough to count (`scrobble::play_threshold`) from an album, a
+    /// playlist or an artist (`place`, which Up next calls `label`): Home's Shortcuts
+    /// suggest what's played.
+    Played {
+        place: Place,
+        label: String,
+        track: Box<Track>,
+    },
     /// The songs YouTube refuses to play now, all of them, each time one comes or goes:
     /// their rows show greyed (`streams.rs`).
     Refused(Vec<TrackId>),

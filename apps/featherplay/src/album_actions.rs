@@ -82,6 +82,15 @@ pub fn init(ctx: &Rc<Ctx>) {
     menu.on_confirm(move || confirm_with(&c, Account(c.clone())));
     let c = ctx.clone();
     menu.on_cancel(move || cancel(&c));
+    let c = ctx.clone();
+    menu.on_pin(move || {
+        let Some(ui) = c.window() else { return };
+        let data = ui.global::<AlbumData>();
+        let (id, title) = (data.get_id(), data.get_title());
+        let pinned = crate::sidebar::toggle_pin(&c, crate::library_list::Kind::Album, &id);
+        ui.global::<AlbumMenu>().set_pinned(pinned);
+        crate::playlist_menu::pin_toast(&c, &title, pinned);
+    });
 }
 
 /// What `action` sets a song to.

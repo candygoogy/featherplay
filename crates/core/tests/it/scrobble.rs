@@ -2,7 +2,7 @@ use std::time::{Duration, SystemTime};
 
 use featherplay_core::model::{Track, VideoType};
 use featherplay_core::scrobble::{
-    ScrobbleTracker, clean_title, display_title, eligible, threshold,
+    ScrobbleTracker, clean_title, display_title, eligible, play_threshold, threshold,
 };
 
 /// A song `secs` long.
@@ -136,6 +136,34 @@ fn display_title_shortens_only_video_titles() {
     ];
     for (raw, t, want) in cases {
         assert_eq!(display_title(raw, t), want, "{raw:?} as {t:?}");
+    }
+}
+
+/// A song counts as played after 30 s, or a short one when it's heard (nearly) to its end.
+#[test]
+fn play_threshold_values() {
+    let secs = Duration::from_secs;
+    assert_eq!(play_threshold(Some(secs(240))), secs(30));
+    assert_eq!(play_threshold(Some(secs(30))), secs(27));
+    assert_eq!(play_threshold(Some(secs(10))), secs(9));
+    assert_eq!(play_threshold(None), secs(30));
+}
+
+/// The play counter fires once at 30 s, for a song too short to scrobble too.
+#[test]
+fn the_play_counter_fires_once_for_any_song() {
+    let started = SystemTime::UNIX_EPOCH;
+    for (secs, at) in [(300, 30), (20, 18)] {
+        let t = track(secs);
+        let mut plays = ScrobbleTracker::plays();
+        plays.start(&t, started);
+        assert_eq!(plays.played(Duration::from_secs(at - 1)), None, "{secs} s");
+        assert_eq!(
+            plays.played(Duration::from_secs(1)),
+            Some((t.clone(), started)),
+            "{secs} s"
+        );
+        assert_eq!(plays.played(Duration::from_secs(60)), None, "{secs} s");
     }
 }
 

@@ -10,9 +10,9 @@
 // page's right padding to its edge, so the cut-off tile says there's more. Each takes the
 // shape of what it holds (`home.rs::arrange`): videos as wide 16:9 tiles, artists as round
 // faces with only their names, the rest square; quick picks stay a dense song grid of two
-// rows. Your mixes come first, opened by "Shuffle Liked songs" (a red tile with a white
-// heart, as on its own page, and a shuffle badge), and a community playlist wears its
-// creator's round photo over its collage's bottom-left corner.
+// rows. Your mixes come first, and a community playlist wears its creator's round photo over
+// its collage's bottom-left corner. Above them all, under the band, the Shortcuts row
+// (`ShortcutGrid`): Liked songs, the pins, what's played lately and the library.
 //
 // More shelves load as the user scrolls near the end (`home.rs::Paging`): a quiet skeleton
 // shelf while a page loads, a quiet Try again if it fails; Home itself never errors for it.
@@ -21,9 +21,11 @@
 import { ListView } from "../list_view.slint";
 import { Theme, Curves, Icons } from "../theme.slint";
 import { Frame } from "../nav.slint";
-import { CardItem, ItemKind, Body, Display, Card, Icon, Pill, SongRow, ShelfArrows, RowsShown, SongList, PageIntent } from "../parts.slint";
+import { CardItem, ItemKind, Body, Display, Card, Cover, Icon, Pill, PlayingMark, SongRow, ShelfArrows, RowsShown, SongList, PageIntent } from "../parts.slint";
 import { Skeleton, SkeletonBlock, SkeletonBar, SkeletonRow, SkeletonCard, ErrorState, EmptyState, Open } from "content.slint";
 import { SongMenu } from "../song_menu.slint";
+import { ShortcutMenu } from "../shortcut_menu.slint";
+import { Player } from "../player.slint";
 import { ShelfShape, MoreState, HomeShelfRow, HomeData } from "home/data.slint";
 import { Band, BandSizes } from "home/hero.slint";
 
@@ -180,83 +182,6 @@ global Tiles {
     }
 }
 
-// "Shuffle Liked songs", the first rail's first tile: the Liked songs tile (red, a white
-// heart) with a shuffle badge; a click plays Liked songs shuffled (the sidebar still opens
-// the page).
-component ShuffleLiked inherits Rectangle {
-    in property <length> size;
-    callback clicked();
-    width: root.size;
-    height: root.size + Theme.card-text-gap + 40px;
-    accessible-role: button;
-    accessible-label: @tr("Shuffle Liked songs");
-    accessible-action-default => { root.clicked(); }
-    Rectangle {
-        x: 0;
-        y: 0;
-        width: root.size;
-        height: root.size;
-        border-radius: Theme.r-m;
-        clip: true;
-        transform-scale: ta.pressed ? Theme.press-scale : 1.0;
-        animate transform-scale {
-            duration: ta.pressed ? Theme.t-press : Theme.t-release;
-            easing: ta.pressed ? Curves.ease-out : Curves.release;
-        }
-        background: @linear-gradient(135deg, Theme.brand-accent 0%, #7A0E20 100%);
-        Icon {
-            width: 56px;
-            height: 56px;
-            commands: Icons.heart;
-            fill: #FFFFFF;
-            stroke: transparent;
-        }
-        Rectangle {
-            x: Theme.s3;
-            y: parent.height - self.height - Theme.s3;
-            width: 44px;
-            height: 44px;
-            border-radius: self.width / 2;
-            background: #000000BF;
-            Icon {
-                width: 20px;
-                height: 20px;
-                commands: Icons.shuffle;
-                stroke: #FFFFFF;
-            }
-        }
-        Rectangle {
-            background: ta.pressed ? Theme.cover-pressed : (ta.has-hover ? Theme.cover-hover : transparent);
-            animate background { duration: Theme.t-hover; }
-        }
-    }
-    title := Body {
-        y: root.size + Theme.card-text-gap;
-        width: root.size;
-        text: @tr("Shuffle Liked songs");
-        font-weight: 600;
-    }
-    // From the title's left edge: without an x, Slint centres it in the tile.
-    if ta.has-hover: Rectangle {
-        x: 0;
-        y: root.size + Theme.card-text-gap + 18px;
-        width: min(root.size, title.preferred-width);
-        height: 1px;
-        background: Theme.text1;
-    }
-    Body {
-        y: root.size + Theme.card-text-gap + 20px;
-        width: root.size;
-        text: @tr("Everything you liked");
-        font-size: Theme.t-meta;
-        color: Theme.text2;
-    }
-    ta := TouchArea {
-        mouse-cursor: pointer;
-        clicked => { root.clicked(); }
-    }
-}
-
 // A rail of tiles shaped for its shelf (videos 16:9, artists round faces without a subtitle,
 // the rest square), paged a page of whole tiles at a time. The tiles run on past the shelf's
 // right edge by `bleed` (the page's padding), where the next one shows cut off.
@@ -322,11 +247,7 @@ component TileShelf inherits Rectangle {
                 height: parent.height - Rails.head-h;
                 // Shown, or partly shown while paging (the others draw nothing), and warm.
                 property <bool> on-page: i + 1 > root.at && i < root.at + root.in-view && (root.warmed || i - root.first < root.warm);
-                if it.id == "LM": ShuffleLiked {
-                    size: root.tile-w;
-                    clicked => { HomeData.shuffle-liked(); }
-                }
-                if it.id != "LM": Card {
+                Card {
                     size: root.tile-w;
                     art-h: Rails.art-h(root.shape, root.width);
                     subtitle: root.shape != ShelfShape.artists;
@@ -419,11 +340,303 @@ component SongGrid inherits Rectangle {
     }
 }
 
+// Home's Shortcuts row (layout A of the board of 2026-11-18): a compact grid of 64 px tiles,
+// as many columns of at least 240 px as fit and two rows (one when one is enough), paged a
+// whole grid at a time by the heading's arrows. Liked songs leads, then the pins (a pin
+// before the line), what's played lately and the library (`home.rs::show_shortcuts`).
+global ShortcutSizes {
+    out property <length> tile-h: 64px;
+    out property <length> col-min: 240px;
+    out property <length> gap: Theme.s3;
+    // An artist's round face in the cover's square.
+    out property <length> face-inset: 8px;
+    public pure function cols(w: length) -> int {
+        return max(1, floor((w + root.gap) / (root.col-min + root.gap)));
+    }
+    public pure function col-w(w: length) -> length {
+        return floor((w - (ShortcutSizes.cols(w) - 1) * root.gap) / ShortcutSizes.cols(w) / 1px) * 1px;
+    }
+    public pure function rows(n: int, w: length) -> int {
+        return n > ShortcutSizes.cols(w) ? 2 : 1;
+    }
+    public pure function height(n: int, w: length) -> length {
+        return Rails.head-h + ShortcutSizes.rows(n, w) * root.tile-h + (ShortcutSizes.rows(n, w) - 1) * root.gap;
+    }
+}
+
+// Glyphs only the Shortcuts row uses.
+global ShortcutIcons {
+    // The hint tile's and a pinned tile's pushpin.
+    out property <string> pin: "M9 4.5 H15 M10.2 4.5 V10 L7.5 13.5 H16.5 L13.8 10 V4.5 M12 13.5 V19.5";
+}
+
+// The cover's square of a tile: the art (an artist's a round face inset in it; Liked songs
+// its red tile with the heart). Hovered, a veil and play (Liked songs: shuffle) cover it, and
+// a click plays without opening; on the playing one, pause or play, which the player takes.
+// Resting on the playing one: the playing mark on its veil.
+component ShortcutCover inherits TouchArea {
+    in property <CardItem> item;
+    in property <bool> current;
+    in property <bool> tile-hovered;
+    callback play();
+    property <bool> liked: root.item.id == "LM";
+    property <bool> round: root.item.round;
+    property <length> inset: root.round ? ShortcutSizes.face-inset : 0px;
+    property <bool> pause: root.current && Player.playing;
+    width: ShortcutSizes.tile-h;
+    height: ShortcutSizes.tile-h;
+    mouse-cursor: pointer;
+    accessible-role: button;
+    accessible-label: root.pause ? @tr("Pause {}", root.item.title) : (root.liked ? @tr("Shuffle Liked songs") : @tr("Play {}", root.item.title));
+    accessible-action-default => { root.activate(); }
+    clicked => { root.activate(); }
+    function activate() {
+        if root.current {
+            Player.toggle();
+        } else {
+            root.play();
+        }
+    }
+    if root.liked: Rectangle {
+        background: @linear-gradient(135deg, Theme.brand-accent 0%, #7A0E20 100%);
+        Icon {
+            width: 22px;
+            height: 22px;
+            commands: Icons.heart;
+            fill: #FFFFFF;
+            stroke: transparent;
+        }
+    }
+    if !root.liked: Cover {
+        x: root.inset;
+        y: root.inset;
+        width: root.width - 2 * root.inset;
+        height: root.height - 2 * root.inset;
+        radius: 0px;
+        round: root.round;
+        source: root.item.cover;
+        layer-at-size: true;
+    }
+    // The veil: while hovered (play), or resting on the playing one (its mark).
+    Rectangle {
+        x: root.inset;
+        y: root.inset;
+        width: root.width - 2 * root.inset;
+        height: root.height - 2 * root.inset;
+        border-radius: root.round ? self.width / 2 : 0px;
+        background: root.pressed ? Theme.cover-button-pressed : (root.current && !root.tile-hovered ? Theme.cover-playing : Theme.cover-button);
+        opacity: root.tile-hovered || root.current ? 1 : 0;
+        visible: self.opacity > 0;
+        animate opacity { duration: Theme.t-hover; easing: Curves.ease-hover; }
+        animate background { duration: Theme.t-hover; easing: Curves.ease-hover; }
+    }
+    if root.current && !root.tile-hovered: PlayingMark {
+        width: 20px;
+        height: 20px;
+    }
+    // White on the dark veil, over any art in either theme.
+    Icon {
+        width: 22px;
+        height: 22px;
+        commands: root.pause ? Icons.pause : (root.liked && !root.current ? Icons.shuffle : Icons.play);
+        fill: root.liked && !root.current ? transparent : #FFFFFF;
+        stroke: root.liked && !root.current ? #FFFFFF : transparent;
+        stroke-width: 1.8px;
+        opacity: root.tile-hovered ? 1 : 0;
+        visible: self.opacity > 0;
+        animate opacity { duration: Theme.t-hover; easing: Curves.ease-hover; }
+    }
+}
+
+// One tile: the cover's square on the left, the title (in the accent while it plays) and its
+// line, a pin before the line when it's pinned. A click opens it; right-click opens its menu.
+component ShortcutTile inherits Rectangle {
+    in property <CardItem> item;
+    in property <bool> pinned;
+    property <bool> current: HomeData.playing-id != "" && HomeData.playing-id == root.item.id && HomeData.playing-kind == root.item.kind;
+    height: ShortcutSizes.tile-h;
+    border-radius: Theme.r-m;
+    clip: true;
+    // Animated as a private property: a root animating a public one is copied into each use.
+    // Lighter while hovered, or while its menu is open.
+    property <bool> menu-open: ShortcutMenu.open && ShortcutMenu.item.id == root.item.id && ShortcutMenu.item.kind == root.item.kind;
+    property <color> ground: ta.pressed ? Theme.card.mix(Theme.text1, 0.86) : (ta.has-hover || cover.has-hover || root.menu-open ? Theme.card.mix(Theme.text1, 0.92) : Theme.card);
+    animate ground { duration: Theme.t-hover; }
+    background: root.ground;
+    accessible-role: button;
+    accessible-label: root.item.title;
+    accessible-description: root.item.subtitle;
+    accessible-action-default => { Open.item(root.item); }
+    PageIntent {
+        hovered: ta.has-hover;
+        pressed: ta.pressed;
+        pointer-x: ta.mouse-x;
+        pointer-y: ta.mouse-y;
+        kind: root.item.kind;
+        id: root.item.id == "LM" ? "" : root.item.id;
+    }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { Open.item(root.item); }
+        pointer-event(e) => {
+            if e.button == PointerEventButton.right && e.kind == PointerEventKind.up {
+                ShortcutMenu.show(root.item, root.pinned, self.absolute-position.x + self.mouse-x, self.absolute-position.y + self.mouse-y, self.absolute-position.y + self.mouse-y);
+            }
+        }
+    }
+    VerticalLayout {
+        x: ShortcutSizes.tile-h + Theme.s3;
+        width: root.width - self.x - 14px;
+        alignment: center;
+        Body {
+            text: root.item.title;
+            font-weight: 600;
+            color: root.current ? Theme.accent : Theme.text1;
+            height: 19px;
+            vertical-alignment: center;
+        }
+        HorizontalLayout {
+            height: 17px;
+            spacing: Theme.s1;
+            if root.pinned: VerticalLayout {
+                alignment: center;
+                Icon {
+                    width: 13px;
+                    height: 13px;
+                    commands: ShortcutIcons.pin;
+                    stroke: Theme.text2;
+                    stroke-width: 1.8px;
+                    accessible-role: image;
+                    accessible-label: @tr("Pinned");
+                }
+            }
+            Body {
+                text: root.item.subtitle;
+                font-size: Theme.t-meta;
+                color: Theme.text2;
+                vertical-alignment: center;
+            }
+        }
+    }
+    cover := ShortcutCover {
+        x: 0;
+        y: 0;
+        item: root.item;
+        current: root.current;
+        tile-hovered: ta.has-hover || self.has-hover;
+        play => {
+            if root.item.id == "LM" {
+                HomeData.shuffle-liked();
+            } else {
+                HomeData.play-card(root.item);
+            }
+        }
+        // A right-click on the cover opens the menu too.
+        pointer-event(e) => {
+            if e.button == PointerEventButton.right && e.kind == PointerEventKind.up {
+                ShortcutMenu.show(root.item, root.pinned, self.absolute-position.x + self.mouse-x, self.absolute-position.y + self.mouse-y, self.absolute-position.y + self.mouse-y);
+            }
+        }
+    }
+}
+
+// A new account's last tile while the row doesn't fill one: how to pin.
+component ShortcutHint inherits Rectangle {
+    height: ShortcutSizes.tile-h;
+    border-radius: Theme.r-m;
+    border-width: 1.5px;
+    border-color: Theme.hairline;
+    accessible-role: text;
+    accessible-label: @tr("Pin what you play most");
+    accessible-description: @tr("Right-click one, then Pin");
+    Icon {
+        x: (ShortcutSizes.tile-h - self.width) / 2;
+        width: 20px;
+        height: 20px;
+        commands: ShortcutIcons.pin;
+        stroke: Theme.text2;
+    }
+    VerticalLayout {
+        x: ShortcutSizes.tile-h + Theme.s3;
+        width: root.width - self.x - 14px;
+        alignment: center;
+        Body {
+            text: @tr("Pin what you play most");
+            font-weight: 600;
+            height: 19px;
+            vertical-alignment: center;
+        }
+        Body {
+            text: @tr("Right-click one, then Pin");
+            font-size: Theme.t-meta;
+            color: Theme.text2;
+            height: 17px;
+            vertical-alignment: center;
+        }
+    }
+}
+
+component ShortcutGrid inherits Rectangle {
+    property <int> count: HomeData.shortcuts.length;
+    property <int> cols: ShortcutSizes.cols(root.width);
+    property <length> col-w: ShortcutSizes.col-w(root.width);
+    // The hint ends a row the tiles don't fill.
+    property <bool> hint: HomeData.shortcut-hint && root.count < root.cols;
+    property <int> n: root.count + (root.hint ? 1 : 0);
+    property <int> rows: ShortcutSizes.rows(root.n, root.width);
+    property <int> per-page: root.cols * root.rows;
+    property <int> pages: max(1, ceil(root.n / root.per-page));
+    property <int> page: 0;
+    // The page shown: a wider window may have fewer.
+    property <int> shown-page: min(root.page, root.pages - 1);
+    // The grid at the left edge, eased while paging.
+    property <float> at: root.shown-page;
+    animate at { duration: Theme.moving ? Theme.t-panel + 40ms : 0ms; easing: Curves.ease-in-out; }
+    height: ShortcutSizes.height(root.n, root.width);
+    accessible-role: list;
+    accessible-label: @tr("Shortcuts");
+    hover := TouchArea {
+        ShelfHead {
+            x: 0;
+            y: 0;
+            width: root.width;
+            title: @tr("Shortcuts");
+            arrows: hover.has-hover && root.pages > 1;
+            can-back: root.shown-page > 0;
+            can-forward: root.shown-page < root.pages - 1;
+            back => { root.page = max(0, root.shown-page - 1); }
+            forward => { root.page = min(root.pages - 1, root.shown-page + 1); }
+        }
+        Rectangle {
+            x: 0;
+            y: Rails.head-h;
+            width: root.width;
+            height: root.height - Rails.head-h;
+            clip: true;
+            for it[i] in HomeData.shortcuts: ShortcutTile {
+                property <int> on-page: mod(i, root.per-page);
+                x: (floor(i / root.per-page) - root.at) * (root.width + ShortcutSizes.gap) + mod(self.on-page, root.cols) * (root.col-w + ShortcutSizes.gap);
+                y: floor(self.on-page / root.cols) * (ShortcutSizes.tile-h + ShortcutSizes.gap);
+                width: root.col-w;
+                item: it;
+                pinned: i < HomeData.shortcut-pins.length && HomeData.shortcut-pins[i];
+            }
+            if root.hint: ShortcutHint {
+                x: mod(root.count, root.cols) * (root.col-w + ShortcutSizes.gap);
+                y: 0;
+                width: root.col-w;
+            }
+        }
+    }
+}
+
 // Home while the feed loads: on a fresh start the band's shape (nothing to show in it yet),
 // then one rail of tiles running to the page's edge. Laid out as the band and the rails lay
 // themselves out, so nothing jumps when the data lands.
 component HomeSkeleton inherits Skeleton {
     in property <bool> band;
+    // The rail under the band (off: the band's shape alone, above the Shortcuts row).
+    in property <bool> rail: true;
     in property <length> bleed;
     // The band's shape at this width: the narrow band's in a narrow page.
     property <bool> narrow: BandSizes.narrow(root.width);
@@ -433,7 +646,7 @@ component HomeSkeleton inherits Skeleton {
     property <length> rail-y: root.band ? BandSizes.height-for(root.width) + Rails.gap : 0px;
     property <length> tile: Rails.tile-w(ShelfShape.cards, root.width);
     property <int> tiles: ceil((root.width + root.bleed + Theme.card-gap) / (root.tile + Theme.card-gap));
-    height: root.rail-y + Rails.height(ShelfShape.cards, root.width);
+    height: root.rail ? root.rail-y + Rails.height(ShelfShape.cards, root.width) : BandSizes.height-for(root.width);
     // Not clipped as other skeletons are: the rail runs on to the page's edge (`bleed`).
     clip: false;
     if root.band: SkeletonBlock {
@@ -465,7 +678,7 @@ component HomeSkeleton inherits Skeleton {
             fade: root.fade;
         }
     }
-    SkeletonBlock {
+    if root.rail: SkeletonBlock {
         x: 0;
         y: root.rail-y + 8px;
         width: 180px;
@@ -474,7 +687,7 @@ component HomeSkeleton inherits Skeleton {
         sweep: root.sweep;
         fade: root.fade;
     }
-    for i in root.tiles: SkeletonCard {
+    for i in root.rail ? root.tiles : 0: SkeletonCard {
         x: i * (root.tile + Theme.card-gap);
         y: root.rail-y + Rails.head-h;
         size: root.tile;
@@ -553,15 +766,24 @@ component FeedShelf inherits Rectangle {
     }
 }
 
-// The top of the feed: the band, then the loading, error or empty state.
+// The top of the feed: the band, the Shortcuts row, then the loading, error or empty state.
 component HomeTop inherits VerticalLayout {
     in property <length> inner;
     in property <length> bleed;
+    property <bool> band: HomeData.resume || HomeData.has-featured;
+    property <bool> waiting: HomeData.loading && HomeData.shelves.length == 0;
     spacing: Rails.gap;
-    if HomeData.resume || HomeData.has-featured: Band { }
+    if root.band: Band { }
+    // The band's shape while it waits for a pick from the feed, above Shortcuts.
+    if root.waiting && !root.band && HomeData.shortcuts-shown: HomeSkeleton {
+        band: true;
+        rail: false;
+        bleed: root.bleed;
+    }
+    if HomeData.shortcuts-shown: ShortcutGrid { }
     // With a session the band shows at once (it's local); only the rails wait.
-    if HomeData.loading && HomeData.shelves.length == 0: HomeSkeleton {
-        band: !HomeData.resume && !HomeData.has-featured;
+    if root.waiting: HomeSkeleton {
+        band: !root.band && !HomeData.shortcuts-shown;
         bleed: root.bleed;
     }
     if !HomeData.loading && HomeData.error != "": ErrorState {
@@ -584,7 +806,7 @@ export component HomePage inherits Rectangle {
     // Rows: the top, the shelves, then the next page's row while it loads or failed.
     property <int> rows: HomeData.row-count;
     // `HomeTop` shows something (so the first shelf keeps a gap's distance from it).
-    property <bool> top-shown: HomeData.resume || HomeData.has-featured || (HomeData.loading && root.count == 0) || (!HomeData.loading && (HomeData.error != "" || HomeData.empty));
+    property <bool> top-shown: HomeData.resume || HomeData.has-featured || HomeData.shortcuts-shown || (HomeData.loading && root.count == 0) || (!HomeData.loading && (HomeData.error != "" || HomeData.empty));
 
     // The rows' model follows `rows`, a row at a time at its end. Not `for i in root.rows`:
     // Slint makes a new model of an int each time it changes, and a ListView given a new

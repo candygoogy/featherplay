@@ -1,6 +1,6 @@
-//! Home's rails do what cards do, on the offscreen platform (no window is shown): the first
-//! rail's "Shuffle Liked songs" tile shuffles Liked songs, a mix's play button on hover plays
-//! it without opening, and a 16:9 video tile plays its song.
+//! Home's rails do what cards do, on the offscreen platform (no window is shown): the
+//! Shortcuts row's Liked songs tile shuffles Liked songs from its cover, a mix's play button
+//! on hover plays it without opening, and a 16:9 video tile plays its song.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -37,7 +37,9 @@ fn the_liked_tile_shuffles_and_mix_and_video_tiles_play() {
     let ui = AppWindow::new().expect("window");
     // Home's rows, as the app's wiring gives them.
     featherplay::pages::home::bind_rows(&ui);
-    ui.window().set_size(slint::LogicalSize::new(1280.0, 800.0));
+    // Tall enough for the video shelf under the Shortcuts row and the mixes.
+    ui.window()
+        .set_size(slint::LogicalSize::new(1280.0, 1000.0));
     ui.global::<Theme>().set_still(true);
     ui.show().expect("show");
     let w = ui.window();
@@ -51,14 +53,16 @@ fn the_liked_tile_shuffles_and_mix_and_video_tiles_play() {
     let d = did.clone();
     data.on_play_song(move |id| d.borrow_mut().push(format!("song {id}")));
 
+    data.set_shortcuts_shown(true);
+    data.set_shortcuts(ModelRc::new(VecModel::from(vec![card(
+        "LM",
+        ItemKind::Playlist,
+    )])));
     data.set_shelves(ModelRc::new(VecModel::from(vec![
         shelf(
             "Your mixes",
             ShelfShape::Mixes,
-            vec![
-                card("LM", ItemKind::Playlist),
-                card("RDTMAK5uy_a", ItemKind::Playlist),
-            ],
+            vec![card("RDTMAK5uy_a", ItemKind::Playlist)],
         ),
         shelf(
             "Listen together",

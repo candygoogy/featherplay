@@ -1,0 +1,277 @@
+// The right-click menu of a tile in Home's Shortcuts row (2026-11-18), in the song menu's
+// style (song_menu.slint: the same panel, rows, motion, placement and dismissal): a header
+// with the tile's cover, title and line; Play, Shuffle, Play next, Add to queue; then Pin and
+// Remove from Shortcuts on a suggestion, or Unpin, Move left and Move right on a pin (only
+// the moves that can happen). Liked songs gets Play and Shuffle only. A right-click on a
+// tile opens it with `ShortcutMenu.show(item, pinned, x, y, top)` (window coordinates);
+// `ShortcutMenuLayer`, in app.slint, draws it over everything. `src/shortcut_menu.rs`
+// connects the actions.
+import { Theme, Icons, Curves } from "theme.slint";
+import { CardItem, Body, Cover, Icon } from "parts.slint";
+import { MenuItem, Divider, MenuIcons } from "song_menu.slint";
+
+export global ShortcutMenu {
+    out property <bool> open;
+    out property <CardItem> item;
+    // The tile is a pin (Unpin and the moves), not a suggestion (Pin and Remove).
+    out property <bool> pinned;
+    // Set by Rust on `opened`, before the panel lays out: the pin can move left, or right.
+    in property <bool> can-left;
+    in property <bool> can-right;
+    out property <length> anchor-x;
+    out property <length> anchor-y;
+    // Where a menu that opens upward ends; for a right-click, the pointer.
+    out property <length> anchor-top;
+
+    callback opened(CardItem);
+    callback play(CardItem);
+    callback shuffle(CardItem);
+    callback play-next(CardItem);
+    callback add-to-queue(CardItem);
+    // Pin, or Unpin.
+    callback pin(CardItem);
+    // Move left (false) or right (true) among the pins.
+    callback move(CardItem, bool);
+    // Remove from Shortcuts, until it's played again.
+    callback remove(CardItem);
+
+    public function show(it: CardItem, pinned: bool, x: length, y: length, top: length) {
+        self.item = it;
+        self.pinned = pinned;
+        self.anchor-x = x;
+        self.anchor-y = y;
+        self.anchor-top = top;
+        self.opened(it);
+        self.open = true;
+    }
+    public function close() {
+        self.open = false;
+    }
+}
+
+// Covers the window while the menu is open: a click outside closes it, Escape too.
+export component ShortcutMenuLayer inherits Rectangle {
+    callback closed();
+    // The menu stays above this (the bottom bar's top edge); the layer still covers the bar.
+    in property <length> bottom-limit: root.height;
+    property <length> w: 288px;
+    property <length> head-h: 56px;
+    property <bool> liked: ShortcutMenu.item.id == "LM";
+    // Play and Shuffle; for the rest Play next and Add to queue, a divider, and the pin's
+    // rows (Unpin and the moves that can happen) or a suggestion's (Pin, Remove).
+    property <int> rows: root.liked ? 2 : 4 + (ShortcutMenu.pinned ? 1 + (ShortcutMenu.can-left ? 1 : 0) + (ShortcutMenu.can-right ? 1 : 0) : 2);
+    property <int> dividers: root.liked ? 0 : 1;
+    property <length> actions-h: root.rows * 36px + root.dividers * 9px;
+    property <length> h: 2 * Theme.s2 + root.head-h + 9px + root.actions-h;
+
+    // Motion, as the song menu: the panel stays instantiated so it can fade out.
+    property <bool> open: ShortcutMenu.open;
+    property <bool> settled: true;
+    // Closed by Escape: keyboard actions don't animate.
+    property <bool> snap: false;
+    property <bool> left: ShortcutMenu.anchor-x + root.w + 8px > root.width;
+    property <bool> up: ShortcutMenu.anchor-y + root.h + 8px > root.bottom-limit;
+    changed open => {
+        if root.open {
+            root.snap = false;
+            root.settled = false;
+            settle.running = true;
+            keys.focus();
+        }
+    }
+    settle := Timer {
+        interval: 1ms;
+        running: false;
+        triggered => {
+            self.running = false;
+            root.settled = true;
+        }
+    }
+
+    function close() {
+        ShortcutMenu.close();
+        root.closed();
+    }
+
+    if ShortcutMenu.open: TouchArea {
+        width: root.width;
+        height: root.height;
+        pointer-event(e) => {
+            if e.kind == PointerEventKind.down {
+                root.close();
+            }
+        }
+        scroll-event(e) => {
+            root.close();
+            accept
+        }
+    }
+    panel := Rectangle {
+        property <length> nudge: root.open && !root.settled ? (root.up ? Theme.nudge : -Theme.nudge) : 0px;
+        x: root.left ? max(8px, ShortcutMenu.anchor-x - root.w) : ShortcutMenu.anchor-x;
+        y: (root.up ? max(8px, ShortcutMenu.anchor-top - self.height) : ShortcutMenu.anchor-y) + self.nudge;
+        width: root.w;
+        height: root.h;
+        opacity: root.open ? 1 : 0;
+        visible: self.opacity > 0;
+        transform-origin: { x: root.left ? self.width : 0px, y: root.up ? self.height : 0px };
+        transform-scale: !root.open ? (Theme.moving ? 0.98 : 1.0) : (root.settled ? 1.0 : Theme.pop-from);
+        animate opacity { duration: root.open ? Theme.t-menu : (root.snap ? 0ms : Theme.t-fast); easing: Curves.ease-out; }
+        animate transform-scale, nudge {
+            duration: !root.open ? Theme.t-fast : (root.settled ? Theme.t-menu : 0ms);
+            easing: Curves.ease-out;
+        }
+        border-radius: Theme.r-l;
+        background: Theme.panel;
+        border-width: 1px;
+        border-color: Theme.card-edge;
+        drop-shadow-blur: 24px;
+        drop-shadow-offset-y: 8px;
+        drop-shadow-color: Theme.cover-shadow;
+        accessible-role: list;
+        accessible-label: @tr("Shortcut menu");
+
+        // Swallows clicks on the panel's padding.
+        TouchArea { enabled: root.open; }
+        keys := FocusScope {
+            enabled: root.open;
+            key-pressed(e) => {
+                if e.text == Key.Escape {
+                    root.snap = true;
+                    root.close();
+                    return accept;
+                }
+                reject
+            }
+        }
+
+        // The tile's cover, or for Liked songs its red tile with the heart.
+        if !root.liked: Cover {
+            x: Theme.s2 + 8px;
+            y: Theme.s2 + 8px;
+            width: Theme.row-cover;
+            height: Theme.row-cover;
+            radius: Theme.r-s;
+            round: ShortcutMenu.item.round;
+            source: ShortcutMenu.item.cover;
+        }
+        if root.liked: Rectangle {
+            x: Theme.s2 + 8px;
+            y: Theme.s2 + 8px;
+            width: Theme.row-cover;
+            height: Theme.row-cover;
+            border-radius: Theme.r-s;
+            background: @linear-gradient(135deg, Theme.brand-accent 0%, #7A0E20 100%);
+            Icon {
+                width: 18px;
+                height: 18px;
+                commands: Icons.heart;
+                fill: #FFFFFF;
+                stroke: transparent;
+            }
+        }
+        VerticalLayout {
+            x: Theme.s2 + 8px + Theme.row-cover + 12px;
+            y: Theme.s2;
+            width: parent.width - self.x - Theme.s4;
+            height: root.head-h;
+            alignment: center;
+            spacing: 1px;
+            Body {
+                text: ShortcutMenu.item.title;
+                font-weight: 600;
+            }
+            if ShortcutMenu.item.subtitle != "": Body {
+                text: ShortcutMenu.item.subtitle;
+                font-size: Theme.t-meta;
+                color: Theme.text2;
+            }
+        }
+        Divider {
+            x: 0;
+            y: Theme.s2 + root.head-h;
+            width: parent.width;
+        }
+
+        VerticalLayout {
+            x: Theme.s2;
+            y: Theme.s2 + root.head-h + 9px;
+            width: parent.width - 2 * Theme.s2;
+            height: root.actions-h;
+            MenuItem {
+                enabled: root.open;
+                icon: Icons.play;
+                icon-filled: true;
+                label: @tr("Play");
+                clicked => {
+                    ShortcutMenu.play(ShortcutMenu.item);
+                    root.close();
+                }
+            }
+            MenuItem {
+                enabled: root.open;
+                icon: Icons.shuffle;
+                label: @tr("Shuffle");
+                clicked => {
+                    ShortcutMenu.shuffle(ShortcutMenu.item);
+                    root.close();
+                }
+            }
+            if !root.liked: MenuItem {
+                enabled: root.open;
+                icon: MenuIcons.play-next;
+                label: @tr("Play next");
+                clicked => {
+                    ShortcutMenu.play-next(ShortcutMenu.item);
+                    root.close();
+                }
+            }
+            if !root.liked: MenuItem {
+                enabled: root.open;
+                icon: MenuIcons.add-to-queue;
+                label: @tr("Add to queue");
+                clicked => {
+                    ShortcutMenu.add-to-queue(ShortcutMenu.item);
+                    root.close();
+                }
+            }
+            if !root.liked: Divider { }
+            if !root.liked: MenuItem {
+                enabled: root.open;
+                icon: ShortcutMenu.pinned ? MenuIcons.unpin : MenuIcons.pin;
+                label: ShortcutMenu.pinned ? @tr("Unpin") : @tr("Pin");
+                clicked => {
+                    ShortcutMenu.pin(ShortcutMenu.item);
+                    root.close();
+                }
+            }
+            if !root.liked && ShortcutMenu.pinned && ShortcutMenu.can-left: MenuItem {
+                enabled: root.open;
+                icon: Icons.chevron-left;
+                label: @tr("Move left");
+                clicked => {
+                    ShortcutMenu.move(ShortcutMenu.item, false);
+                    root.close();
+                }
+            }
+            if !root.liked && ShortcutMenu.pinned && ShortcutMenu.can-right: MenuItem {
+                enabled: root.open;
+                icon: Icons.chevron-right;
+                label: @tr("Move right");
+                clicked => {
+                    ShortcutMenu.move(ShortcutMenu.item, true);
+                    root.close();
+                }
+            }
+            if !root.liked && !ShortcutMenu.pinned: MenuItem {
+                enabled: root.open;
+                icon: Icons.close;
+                label: @tr("Remove from Shortcuts");
+                clicked => {
+                    ShortcutMenu.remove(ShortcutMenu.item);
+                    root.close();
+                }
+            }
+        }
+    }
+}

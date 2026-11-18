@@ -28,6 +28,7 @@ import { SignInPage } from "pages/sign_in.slint";
 import { SongMenu, SongMenuLayer } from "song_menu.slint";
 import { PlaylistMenu, PlaylistDialog } from "playlist_menu.slint";
 import { PlaylistMenuLayer, PlaylistDialogLayer } from "playlist_menu_layer.slint";
+import { ShortcutMenu, ShortcutMenuLayer } from "shortcut_menu.slint";
 import { AlbumMenu, AlbumMenuLayer, AlbumDialogLayer } from "album_menu.slint";
 import { AccountMenu, AccountMenuLayer, AccountPickerDialog, AccountPicker } from "account_menu.slint";
 import { ToastView } from "toast.slint";
@@ -54,6 +55,7 @@ export { HomeData, HomeShelfRow, ShelfShape, MoreState } from "pages/home.slint"
 export { SongMenu } from "song_menu.slint";
 
 export { PlaylistMenu, PlaylistKind, PlaylistDialog } from "playlist_menu.slint";
+export { ShortcutMenu } from "shortcut_menu.slint";
 
 export { AlbumMenu, AlbumAction } from "album_menu.slint";
 
@@ -316,7 +318,7 @@ export component AppWindow inherits Window {
     }
 
     // A menu, a popup or a dialog is open over the window: the transport keys and Ctrl+/ wait.
-    property <bool> overlay-open: CloseChoice.open || SettingsData.dialog != SettingsDialog.none || AlbumMenu.open || AlbumMenu.dialog || SongMenu.open || PlaylistMenu.open || PlaylistMenu.dialog != PlaylistDialog.none || AccountMenu.open || AccountPicker.open || Player.speed-open || Sleep.open || Frame.volume-open || root.drawer-shown || LyricsMenu.open || LyricsChoose.open || LyricsData.reset-asked;
+    property <bool> overlay-open: CloseChoice.open || SettingsData.dialog != SettingsDialog.none || AlbumMenu.open || AlbumMenu.dialog || SongMenu.open || PlaylistMenu.open || PlaylistMenu.dialog != PlaylistDialog.none || ShortcutMenu.open || AccountMenu.open || AccountPicker.open || Player.speed-open || Sleep.open || Frame.volume-open || root.drawer-shown || LyricsMenu.open || LyricsChoose.open || LyricsData.reset-asked;
 
     // The shortcuts, listed for Settings' "Keyboard shortcuts" in shortcuts.slint: each one
     // taken here is reported there (`Shortcuts.used`). A new one goes in both.
@@ -862,6 +864,14 @@ export component AppWindow inherits Window {
 
         // The sidebar's playlist menu, over everything while open, and its dialogs.
         PlaylistMenuLayer {
+            x: 0;
+            y: 0;
+            width: root.width;
+            height: root.height;
+            bottom-limit: root.bar-top;
+            closed => { keys.focus(); }
+        }
+        ShortcutMenuLayer {
             x: 0;
             y: 0;
             width: root.width;

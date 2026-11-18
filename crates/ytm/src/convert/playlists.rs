@@ -661,5 +661,6 @@ pub(super) fn library_album(item: &Value) -> Option<AlbumSummary> {
         thumbnail: best_raw(
             r.pointer("/thumbnailRenderer/musicThumbnailRenderer/thumbnail/thumbnails"),
         ),
+        single: values.first().is_some_and(|r| run_text(r) == super::SINGLE),
     })
 }

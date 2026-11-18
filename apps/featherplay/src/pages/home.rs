@@ -1,11 +1,15 @@
-//! Home (ui/pages/home.slint): the band, then the Home feed's shelves as rails, each in the
-//! shape of what it holds (`arrange`), your mixes first.
+//! Home (ui/pages/home.slint): the band, the Shortcuts row (Liked songs, the pins, what's
+//! played lately and the library: `sidebar::shortcuts`, shown in `shortcuts`), then the
+//! Home feed's shelves as rails, each in the shape of what it holds (`arrange`), your mixes
+//! first.
 //!
 //! The feed is fetched once and kept for `FEED_TTL` (Home is opened often; the feed changes
 //! slowly), and again after a sign-in. It goes on as the user scrolls near its end, a page at
 //! a time (`Paging`): never two at once, at most `MAX_PAGES` per feed, and none without a
-//! scroll. Liked songs is pinned as the first tile of your mixes, "Shuffle Liked songs"
-//! (`with_liked`). The band follows the player: `choose_hero` picks the session when there's
+//! scroll. The feed's own Liked Music tile goes (`without_liked`): Liked songs leads
+//! Shortcuts. Shortcuts takes what's been played when Home opens, never while it shows, so
+//! no tile moves under the pointer; a pin, a move or a removal shows at once. The band
+//! follows the player: `choose_hero` picks the session when there's
 //! a current track, else a featured pick from the first shelf.
 //!
 //! Signed in, the first pages' shelves are kept on disk for the identity (`CachedFeed`), so
@@ -18,7 +22,9 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
+use featherplay_controller::place::Place;
 use featherplay_core::model::{PlaylistId, Track, TrackId};
+use featherplay_core::tr;
 use featherplay_ytm::{HomeFeed, HomeItem, HomeShelf};
 use slint::{ComponentHandle, Model, ModelRc, VecModel};
 
@@ -28,8 +34,8 @@ use crate::pages::content;
 use crate::router::Page;
 use crate::sidebar;
 use crate::song_menu;
-use crate::ui::{AppWindow, HomeData, HomeShelfRow, MoreState, PageKind, ShelfShape};
-use crate::ui_bridge::model;
+use crate::ui::{AppWindow, CardItem, HomeData, HomeShelfRow, ItemKind, MoreState, PageKind};
+use crate::ui_bridge::{model, shown};
 
 mod feed;
 mod hero;
@@ -40,8 +46,7 @@ use feed::{Owner, account_news, fetch, more, owner_of, show_cached, show_feed};
 use hero::show_hero;
 pub use hero::{Hero, choose_hero};
 pub(crate) use shelves::shelf_row;
-pub use shelves::{arrange, with_liked};
-use shelves::{is_shortcuts, shape};
+pub use shelves::{arrange, without_liked};
 
 /// How long a fetched feed is shown before Home fetches it again.
 const FEED_TTL: Duration = Duration::from_secs(30 * 60);
@@ -124,6 +129,7 @@ pub fn init(ctx: &Rc<Ctx>) {
     data.on_band_column(move |room| hero::band_column(&c, room));
     let c = ctx.clone();
     data.on_shuffle_liked(move || content::shuffle_playlist(&c, PlaylistId("LM".into())));
+    crate::shortcut_menu::init(ctx);
     let c = ctx.clone();
     data.on_play_featured(move || {
         if let Some(item) = featured(0) {
@@ -216,6 +222,7 @@ pub fn open(ctx: &Rc<Ctx>) {
         return;
     }
     show_cached(ctx);
+    show_shortcuts(ctx, true);
     let fresh = STATE.with(|s| {
         let s = s.borrow();
         s.fetching || s.fetched.is_some_and(|t| t.elapsed() < FEED_TTL)
@@ -228,6 +235,8 @@ pub fn open(ctx: &Rc<Ctx>) {
 
 fn show_shelves(ctx: &Ctx, shelves: &[HomeShelf]) {
     let Some(ui) = ctx.window() else { return };
+    sidebar::seen_on_home(shelves);
+    let shelves = &without_liked(shelves);
     let rows: Vec<HomeShelfRow> = arrange(shelves)
         .into_iter()
         .map(|(i, shape)| shelf_row(ctx, &shelves[i], shape, PageKind::Home))
@@ -239,51 +248,83 @@ fn show_shelves(ctx: &Ctx, shelves: &[HomeShelf]) {
     STATE.with(|s| s.borrow_mut().rows = Some(rows));
 }
 
-/// The picks for the Shortcuts row changed (the library arrived, or something was opened):
-/// the row is put in, or its tiles replaced, in place. A feed with your mixes keeps them as
-/// its shortcuts, so nothing changes then.
+/// What Shortcuts is made of changed (the library arrived; a pin, a move, a removal; a
+/// setting): the row follows at once. What's been played since Home opened waits for its
+/// next visit.
 pub fn shortcuts_changed(ctx: &Ctx) {
-    let Some(rows) = STATE.with(|s| s.borrow().rows.clone()) else {
-        return;
-    };
-    let shelves = STATE.with(|s| s.borrow().shelves.clone());
-    let has_mixes = arrange(&with_liked(&shelves, &[]))
-        .first()
-        .is_some_and(|(_, shape)| *shape == ShelfShape::Mixes);
-    if has_mixes {
-        return;
-    }
-    let shown = with_liked(&shelves, &sidebar::shortcuts());
-    let Some(row) = shown
-        .first()
-        .filter(|s| is_shortcuts(s))
-        .map(|s| shelf_row(ctx, s, ShelfShape::Mixes, PageKind::Home))
-    else {
-        return;
-    };
-    let first_is_shortcuts = rows
-        .row_data(0)
-        .is_some_and(|r| r.shape == ShelfShape::Mixes);
-    if first_is_shortcuts {
-        rows.set_row_data(0, row);
-    } else {
-        rows.insert(0, row);
-    }
+    show_shortcuts(ctx, false);
 }
 
-/// `--snapshot home-shortcuts`: the feed without its mixes, as an account with none yet
-/// sees it, so the Shortcuts row shows.
-pub fn drop_mixes_for_snapshot(ctx: &Ctx) {
-    let shelves: Vec<HomeShelf> = STATE.with(|s| {
-        s.borrow()
-            .shelves
-            .iter()
-            .filter(|s| shape(&s.items) != ShelfShape::Mixes)
-            .cloned()
-            .collect()
-    });
-    STATE.with(|s| s.borrow_mut().shelves = shelves.clone());
-    show_shelves(ctx, &with_liked(&shelves, &sidebar::shortcuts()));
+/// Home's Shortcuts row: Liked songs, then `sidebar::shortcuts` (with what's been played
+/// since the last visit when `visit`), their covers on their way. None signed out or with
+/// the row turned off.
+fn show_shortcuts(ctx: &Ctx, visit: bool) {
+    let Some(ui) = ctx.window() else { return };
+    let data = ui.global::<HomeData>();
+    let on = ctx.signed_in() && crate::pages::settings::shortcuts();
+    data.set_shortcuts_shown(on);
+    if !on {
+        data.set_shortcuts(Default::default());
+        data.set_shortcut_pins(Default::default());
+        return;
+    }
+    let tiles = sidebar::shortcuts(visit);
+    let liked = CardItem {
+        id: "LM".into(),
+        kind: ItemKind::Playlist,
+        title: tr!("Liked songs").into(),
+        subtitle: tr!("Everything you liked").into(),
+        ..Default::default()
+    };
+    let cards: Vec<CardItem> = std::iter::once(liked)
+        .chain(tiles.iter().map(|t| CardItem {
+            id: t.entry.id.as_str().into(),
+            kind: sidebar::item_kind(t.entry.kind),
+            title: shown(&t.entry.title),
+            subtitle: shown(&crate::library_list::subtitle(&t.entry)),
+            cover: Default::default(),
+            round: t.entry.kind == crate::library_list::Kind::Artist,
+        }))
+        .collect();
+    let urls = std::iter::once(None)
+        .chain(tiles.iter().map(|t| t.entry.thumbnail.clone()))
+        .collect();
+    let pins: Vec<bool> = std::iter::once(false)
+        .chain(tiles.iter().map(|t| t.pinned))
+        .collect();
+    data.set_shortcut_hint(!pins.contains(&true));
+    data.set_shortcut_pins(ModelRc::new(VecModel::from(pins)));
+    let (rows, items) = model(cards);
+    data.set_shortcuts(items);
+    ctx.covers
+        .cards(PageKind::Home, &rows, urls, SHORTCUT_COVER);
+}
+
+/// `--snapshot home-shortcuts*`: the row as Home's next visit shows it.
+pub fn show_shortcuts_for_snapshot(ctx: &Ctx) {
+    show_shortcuts(ctx, true);
+}
+
+/// A Shortcuts tile's cover, in logical pixels (home.slint's `ShortcutGrid`).
+const SHORTCUT_COVER: u32 = 64;
+
+/// What plays now came from (`PlayingFrom::page`): its Shortcuts tile shows the playing mark.
+pub fn playing_from_changed(ctx: &Ctx, state: &PlayerState) {
+    let Some(ui) = ctx.window() else { return };
+    let (kind, id) = match &state.queue.playing_from.page {
+        Some(Place::Album(id)) => (ItemKind::Album, id.0.as_str()),
+        Some(Place::Playlist(id)) => (
+            ItemKind::Playlist,
+            featherplay_ytm::convert::bare_playlist_id(&id.0),
+        ),
+        Some(Place::Artist(id)) => (ItemKind::Artist, id.0.as_str()),
+        _ => (ItemKind::Song, ""),
+    };
+    let data = ui.global::<HomeData>();
+    if data.get_playing_id() != id || data.get_playing_kind() != kind {
+        data.set_playing_kind(kind);
+        data.set_playing_id(id.into());
+    }
 }
 
 /// A later page's shelves, under the ones shown.
@@ -291,6 +332,8 @@ fn add_shelves(ctx: &Ctx, shelves: &[HomeShelf]) {
     let Some(rows) = STATE.with(|s| s.borrow().rows.clone()) else {
         return;
     };
+    sidebar::seen_on_home(shelves);
+    let shelves = &without_liked(shelves);
     for (i, shape) in arrange(shelves) {
         rows.push(shelf_row(ctx, &shelves[i], shape, PageKind::Home));
     }
@@ -322,7 +365,8 @@ fn sync_rows(rows: &VecModel<i32>, count: i32) {
 /// The controller's state changed (track, play/pause, queue): the band follows it while Home
 /// is on screen. Elsewhere, minimised or in the tray, nothing is loaded for it (its cover,
 /// its rows' covers, the album's year); `open` and `shown_again` catch up.
-pub fn player_changed(ctx: &Rc<Ctx>, _state: &PlayerState) {
+pub fn player_changed(ctx: &Rc<Ctx>, state: &PlayerState) {
+    playing_from_changed(ctx, state);
     if on_screen(ctx) {
         show_hero(ctx);
     }
@@ -360,6 +404,7 @@ pub fn account_changed(ctx: &Rc<Ctx>, signed_in: bool) {
         data.set_empty(false);
         data.set_more(MoreState::Idle);
     }
+    show_shortcuts(ctx, true);
     if ctx.current_page() == Page::Home {
         open(ctx);
     }
@@ -389,6 +434,7 @@ mod test_items {
             artists: Vec::new(),
             year: None,
             thumbnail: None,
+            single: false,
         })
     }
 

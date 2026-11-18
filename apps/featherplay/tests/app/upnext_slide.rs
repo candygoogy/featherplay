@@ -66,6 +66,9 @@ fn the_page_narrows_once_the_panel_is_in() {
     scene.theme(true);
     scene.ui.show().expect("show");
     scene.settle();
+    // The feed's shelves as the fixtures lay them out: with the Shortcuts row, the narrow
+    // page brings a shelf into view whose covers fade in after the slide.
+    crate::support::no_shortcuts(&scene);
     offscreen::freeze_clock();
     let w = scene.ui.window();
     for _ in 0..10 {

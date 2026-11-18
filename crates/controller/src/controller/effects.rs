@@ -6,7 +6,8 @@ use std::time::{Duration, Instant};
 use featherplay_core::player::{Effect, Input, Status};
 use featherplay_integrations::notify_track;
 
-use super::{Controller, Msg, now_playing};
+use super::{Controller, Msg, UiEvent, now_playing};
+use crate::place::Place;
 
 impl Controller {
     pub(super) fn effect(&mut self, effect: Effect) -> Option<Input> {
@@ -101,6 +102,20 @@ impl Controller {
             Effect::Scrobble(t, started) => {
                 log!("scrobble {}: {}", t.id.0, t.title);
                 self.scrobblers.scrobble(&t, started);
+            }
+            Effect::Played(t) => {
+                // Played from an album, a playlist or an artist (not their radio or
+                // Autoplay after them): Home's Shortcuts learn from it.
+                let from = self.queue_info().playing_from;
+                if let Some(place @ (Place::Album(_) | Place::Playlist(_) | Place::Artist(_))) =
+                    from.page
+                {
+                    (self.ui.events)(UiEvent::Played {
+                        place,
+                        label: from.label,
+                        track: Box::new(t),
+                    });
+                }
             }
             Effect::ShowError(stop) => self.stopped(stop),
             Effect::SongsRefused => {

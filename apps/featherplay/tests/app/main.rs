@@ -104,6 +104,7 @@ mod settings_fold;
 mod settings_index;
 mod settings_search;
 mod shortcut_list;
+mod shortcuts_row;
 mod sidebar_chips;
 mod sign_in_page;
 mod sign_in_unsaved;

@@ -1,11 +1,11 @@
 // The album page's ⋯ menu (2026-11-04): Like all songs, Remove likes; Dislike all songs,
-// Remove dislikes. In the song menu's style (song_menu.slint: the same panel, rows, motion,
+// Remove dislikes; Pin (or Unpin), as the sidebar's and Shortcuts' menus pin. In the song menu's style (song_menu.slint: the same panel, rows, motion,
 // placement and dismissal), without a head, since it opens beside the album's own cover. The
 // header's ⋯ opens it with `AlbumMenu.show(x, y, top)` (window coordinates); each action asks
 // first in Settings' `Dialog`. `AlbumMenuLayer` and `AlbumDialogLayer` in app.slint draw them
 // over everything. `src/album_actions.rs` works out the songs, asks and sends the writes.
 import { Theme, Icons, Curves } from "theme.slint";
-import { MenuItem, Divider } from "song_menu.slint";
+import { MenuItem, Divider, MenuIcons } from "song_menu.slint";
 import { Dialog } from "pages/settings.slint";
 
 export enum AlbumAction { like-all, remove-likes, dislike-all, remove-dislikes }
@@ -25,11 +25,15 @@ export global AlbumMenu {
     in-out property <bool> dialog;
     in property <string> question;
     in property <string> ok-label;
+    // The album is pinned (the sidebar's list and Home's Shortcuts); set by Rust with the page.
+    in property <bool> pinned;
 
     // Rust works out which songs need it, then asks (`dialog`) or says there are none.
     callback pick(AlbumAction);
     callback confirm();
     callback cancel();
+    // Pin, or Unpin.
+    callback pin();
 
     public function show(x: length, y: length, top: length) {
         self.anchor-x = x;
@@ -54,7 +58,7 @@ export component AlbumMenuLayer inherits Rectangle {
     // The menu stays above this (the bottom bar's top edge); the layer still covers the bar.
     in property <length> bottom-limit: root.height;
     property <length> w: 232px;
-    property <length> h: 2 * Theme.s2 + 4 * 36px + 9px;
+    property <length> h: 2 * Theme.s2 + 5 * 36px + 2 * 9px;
 
     // Motion, as the song menu: the panel stays instantiated so it can fade out.
     property <bool> open: AlbumMenu.open;
@@ -175,6 +179,16 @@ export component AlbumMenuLayer inherits Rectangle {
                 icon: AlbumIcons.undislike;
                 label: @tr("Remove dislikes");
                 clicked => { root.pick(AlbumAction.remove-dislikes); }
+            }
+            Divider { }
+            MenuItem {
+                enabled: root.open;
+                icon: AlbumMenu.pinned ? MenuIcons.unpin : MenuIcons.pin;
+                label: AlbumMenu.pinned ? @tr("Unpin") : @tr("Pin");
+                clicked => {
+                    AlbumMenu.pin();
+                    root.close();
+                }
             }
         }
     }

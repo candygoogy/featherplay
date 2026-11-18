@@ -250,11 +250,17 @@ component HotkeyRow inherits Rectangle {
     }
 }
 
+// The Home group's rows the search finds, which the Window group's count leaves out.
+global HomeRows {
+    out property <int> found: (SettingsSearch.hit(SettingId.home-shortcuts).hidden ? 0 : 1) + (SettingsSearch.hit(SettingId.shortcut-suggestions).hidden ? 0 : 1) + (SettingsSearch.hit(SettingId.forget-suggestions).hidden ? 0 : 1);
+}
+
 export component WindowSection inherits Group {
     // How many of the sections below the fold the page has made (`SettingsPage.made`).
     in property <int> made;
     title: @tr("Window");
     section: 6;
+    found: !SettingsSearch.active || SettingsSearch.counts[6] > HomeRows.found;
     if root.made >= 4: VerticalLayout {
         // What happens when the app starts, then what happens when it's closed.
         ToggleRow {
@@ -398,5 +404,40 @@ export component WindowSection inherits Group {
         }
         // Its own row, apart from the three hotkeys: a taken key here never drops those.
         QuickKeyRows { }
+    }
+}
+
+// Window's Home group (2026-11-18): Home's Shortcuts row on or off, whether it suggests
+// from what's played, and forgetting what it learned.
+export component HomeSection inherits Group {
+    in property <int> made;
+    title: @tr("Home");
+    section: 6;
+    found: !SettingsSearch.active || HomeRows.found > 0;
+    if root.made >= 4: VerticalLayout {
+        ToggleRow {
+            divider: false;
+            label: @tr("Shortcuts");
+            search: SettingId.home-shortcuts;
+            detail: @tr("Liked songs, your pins and what you play lately, first on Home.");
+            key: SettingKey.home-shortcuts;
+            checked: SettingsData.home-shortcuts;
+        }
+        ToggleRow {
+            label: @tr("Suggest from what you play");
+            search: SettingId.shortcut-suggestions;
+            detail: @tr("Off: Shortcuts shows Liked songs and your pins only.");
+            key: SettingKey.shortcut-suggestions;
+            checked: SettingsData.shortcut-suggestions;
+        }
+        SettingRow {
+            label: @tr("Forget suggestions");
+            search: SettingId.forget-suggestions;
+            detail: @tr("Clears what Shortcuts learned from your plays. Your pins stay.");
+            RowButton {
+                label: @tr("Forget");
+                clicked => { SettingsData.forget-suggestions(); }
+            }
+        }
     }
 }

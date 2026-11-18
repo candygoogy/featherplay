@@ -40,6 +40,8 @@ export enum SettingKey {
     settings-in-suggestions,
     start-with-system,
     start-in-tray,
+    home-shortcuts,
+    shortcut-suggestions,
 }
 
 // The Discord connection, live from the presence worker.
@@ -203,6 +205,10 @@ export enum SettingId {
     shortcuts,
     hotkeys,
     quick-search,
+    // Window, its Home group.
+    home-shortcuts,
+    shortcut-suggestions,
+    forget-suggestions,
     // Account.
     account,
     check-for-updates,
@@ -376,6 +382,10 @@ export global SettingsData {
     in property <bool> tooltips: true;
     // "Show settings in search suggestions": the top bar's suggestions end with settings.
     in property <bool> settings-in-suggestions: true;
+    // Home: "Shortcuts", Home's first row; "Suggest from what you play", its suggestions
+    // after the pins.
+    in property <bool> home-shortcuts: true;
+    in property <bool> shortcut-suggestions: true;
     in property <Appearance> appearance;
     // The Language setting: Windows default, English, then the bundled languages by their
     // own names (Rust fills both lists); `language` is the picked one's index.
@@ -422,6 +432,8 @@ export global SettingsData {
     in property <bool> youtube-proxied;
 
     callback toggled(SettingKey, bool);
+    // "Forget suggestions": Shortcuts forgets the plays it learned from and what was removed.
+    callback forget-suggestions();
     callback pick-device(int);
     callback pick-appearance(Appearance);
     callback pick-language(int);

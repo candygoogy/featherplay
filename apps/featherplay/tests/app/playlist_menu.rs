@@ -2,7 +2,7 @@
 //! with fixture data (no window is shown, nothing goes out): the account's own playlist
 //! offers Rename and Delete, a saved one Remove from library, Liked songs neither. Copy link
 //! puts the playlist's link on the clipboard; Delete asks first; Rename refuses an empty
-//! name. Escape and a click outside close the menu. Pin to top moves an entry to the top of
+//! name. Escape and a click outside close the menu. Pin moves an entry to the top of
 //! the sidebar's list; the Albums chip's entries get Play, Shuffle, Go to album and Pin.
 
 use featherplay::offscreen;
@@ -189,13 +189,13 @@ fn the_sidebar_playlist_menu() {
         format!("Removed \u{201C}{}\u{201D} from your library", saved.title)
     );
 
-    // Pin to top: the second entry goes to the top of the list, marked; the menu then
-    // offers Unpin.
+    // Pin: the second entry goes to the top of the list, marked; the menu then offers
+    // Unpin.
     let sidebar = ui.global::<SidebarData>();
     let second = sidebar.get_items().row_data(1).expect("a second entry");
     right_click(&scene, &entry(&scene, 1));
     assert!(!menu.get_pinned());
-    label::click(&scene, "Pin to top");
+    label::click(&scene, "Pin");
     assert_eq!(
         sidebar.get_items().row_data(0).expect("first").id,
         second.id
@@ -203,7 +203,7 @@ fn the_sidebar_playlist_menu() {
     assert_eq!(sidebar.get_pinned().row_data(0), Some(true));
     assert_eq!(
         ui.global::<Toast>().get_text(),
-        format!("Pinned \u{201C}{}\u{201D} to the top", second.title)
+        format!("Pinned \u{201C}{}\u{201D}", second.title)
     );
     right_click(&scene, &entry(&scene, 0));
     assert!(menu.get_pinned());

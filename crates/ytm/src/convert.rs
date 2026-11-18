@@ -56,6 +56,8 @@ const MUSIC_VIDEO_TYPE: &str =
     "/watchEndpointMusicSupportedConfigs/watchEndpointMusicConfig/musicVideoType";
 const PLAY_WATCH_ENDPOINT: &str = "/overlay/musicItemThumbnailOverlayRenderer/content/musicPlayButtonRenderer/playNavigationEndpoint/watchEndpoint";
 const ROW_THUMBNAILS: &str = "/thumbnail/musicThumbnailRenderer/thumbnail/thumbnails";
+/// The kind word a single's subtitle starts with (the requests ask in English).
+const SINGLE: &str = "Single";
 
 // ---------------------------------------------------------------------------
 // Small conversions
@@ -410,6 +412,7 @@ fn album_summary(a: SearchResultAlbum, extra: &Extra) -> AlbumSummary {
         thumbnail: best(&a.thumbnails),
         title: a.title,
         id: AlbumId(id),
+        single: false,
     }
 }
 

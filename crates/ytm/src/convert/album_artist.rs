@@ -11,9 +11,9 @@ use super::playlists::{
 };
 use super::radio::browse_target;
 use super::{
-    Extra, MUSIC_VIDEO_TYPE, PLAY_WATCH_ENDPOINT, ROW_THUMBNAILS, Skipped, album_ref, artist_ref,
-    best, best_raw, check_error, json, layout, like, log_left_out, merge_skipped, non_empty,
-    process_lenient, unavailable, video_type,
+    Extra, MUSIC_VIDEO_TYPE, PLAY_WATCH_ENDPOINT, ROW_THUMBNAILS, SINGLE, Skipped, album_ref,
+    artist_ref, best, best_raw, check_error, json, layout, like, log_left_out, merge_skipped,
+    non_empty, process_lenient, unavailable, video_type,
 };
 use crate::{Album, AlbumSummary, ApiError, Artist, ArtistSummary};
 
@@ -64,6 +64,12 @@ pub fn album(raw: &str, id: &AlbumId) -> Result<Album, ApiError> {
             .map(str::to_string)
             .and_then(non_empty),
         thumbnail: best_raw(h.pointer(ROW_THUMBNAILS)),
+        // The header's subtitle starts with the kind: `Single • 2024`.
+        single: runs_of(h.get("subtitle"))
+            .first()
+            .and_then(|r| r.get("text"))
+            .and_then(Value::as_str)
+            == Some(SINGLE),
     };
     let album_ref = AlbumRef {
         id: id.clone(),
@@ -180,22 +186,24 @@ pub fn artist(raw: &str) -> Result<Artist, ApiError> {
         })
         .collect();
     let top_songs = merge_skipped("artist top songs", top_songs, song_rows, playlist_row);
-    let releases_of = |r: Option<ytmapi_rs::parse::GetArtistAlbums>| -> Vec<AlbumSummary> {
-        r.map(|r| r.results)
-            .unwrap_or_default()
-            .into_iter()
-            .map(|a: AlbumResult| AlbumSummary {
-                id: AlbumId(a.album_id.get_raw().to_string()),
-                title: a.title,
-                artists: vec![me.clone()],
-                year: non_empty(a.year),
-                thumbnail: best(&a.thumbnails),
-            })
-            .collect()
-    };
+    let releases_of =
+        |r: Option<ytmapi_rs::parse::GetArtistAlbums>, single: bool| -> Vec<AlbumSummary> {
+            r.map(|r| r.results)
+                .unwrap_or_default()
+                .into_iter()
+                .map(|a: AlbumResult| AlbumSummary {
+                    id: AlbumId(a.album_id.get_raw().to_string()),
+                    title: a.title,
+                    artists: vec![me.clone()],
+                    year: non_empty(a.year),
+                    thumbnail: best(&a.thumbnails),
+                    single,
+                })
+                .collect()
+        };
     Ok(Artist {
-        albums: releases_of(releases.albums),
-        singles: releases_of(releases.singles),
+        albums: releases_of(releases.albums, false),
+        singles: releases_of(releases.singles, true),
         summary,
         top_songs,
     })

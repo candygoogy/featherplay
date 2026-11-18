@@ -289,9 +289,16 @@ pub const PAGES: &[&str] = &[
     "sidebar-albums",
     "sidebar-artists",
     "sidebar-pinned",
-    // Home for an account whose feed has no mixes: the Shortcuts row, Liked songs and the
-    // library's playlists.
+    // Home's Shortcuts row with the first playlist, album and artist pinned and others
+    // played from; its menu on the first suggestion, and on the second pin; that suggestion
+    // removed (the toast with Undo); and a new account's, with the hint tile.
     "home-shortcuts",
+    "home-shortcuts-menu",
+    "home-shortcuts-menu-pinned",
+    "home-shortcuts-removed",
+    "home-shortcuts-fresh",
+    // Settings scrolled to Window's Home group.
+    "settings-home",
 ];
 
 pub(super) fn page(name: &str, f: &Fixtures) -> Result<Page, String> {
@@ -349,6 +356,10 @@ pub(super) fn page(name: &str, f: &Fixtures) -> Result<Page, String> {
         | "sidebar-artists"
         | "sidebar-pinned"
         | "home-shortcuts"
+        | "home-shortcuts-menu"
+        | "home-shortcuts-menu-pinned"
+        | "home-shortcuts-removed"
+        | "home-shortcuts-fresh"
         | "search-suggestions"
         | "search-suggestions-key"
         | "search-suggestions-settings" => Page::Home,
@@ -427,6 +438,7 @@ pub(super) fn page(name: &str, f: &Fixtures) -> Result<Page, String> {
         | "now-playing-lyrics-full-large"
         | "not-for-me" => Page::NowPlaying,
         "settings"
+        | "settings-home"
         | "settings-quick-search"
         | "settings-quick-search-listening"
         | "settings-quick-search-changed"

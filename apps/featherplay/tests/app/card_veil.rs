@@ -57,6 +57,8 @@ fn luma(shot: &SharedPixelBuffer<Rgba8Pixel>, at: LogicalPosition) -> f64 {
 #[test]
 fn a_card_shades_its_art_when_hovered_and_more_when_pressed() {
     let scene = home_at(1920, 1360, 1.0);
+    // The feed's rails under the band, where the fixtures put them.
+    crate::support::no_shortcuts(&scene);
     scene.theme(false);
     scene.ui.global::<Theme>().set_motion(true);
     let w = scene.ui.window();

@@ -357,6 +357,17 @@ pub fn bare(cache: PathBuf, fixtures: Option<Arc<Fixtures>>) -> Bare {
     }
 }
 
+/// Turns Home's Shortcuts row off ("Shortcuts", Settings > Window), as a test of the feed's
+/// shelves under the band needs: its layout is the fixtures' feed's, not the row's.
+pub fn no_shortcuts(scene: &Scene) {
+    use featherplay::ui::{SettingKey, SettingsData};
+    scene
+        .ui
+        .global::<SettingsData>()
+        .invoke_toggled(SettingKey::HomeShortcuts, false);
+    scene.settle();
+}
+
 /// `scene_at` on Home, silent.
 pub fn home_at(width: u32, height: u32, scale: f32) -> Scene {
     scene_at(width, height, scale, "home", false)

@@ -1,9 +1,9 @@
-//! Home's shelves: the shape each one shows in, their order (`arrange`), the Shortcuts row
-//! (`with_liked`), and the rows `HomeData` shows them as.
+//! Home's shelves: the shape each one shows in, their order (`arrange`), the feed without its
+//! Liked Music tile (`without_liked`), and the rows `HomeData` shows them as.
 
-use featherplay_core::model::{PlaylistId, Track, VideoType};
+use featherplay_core::model::{Track, VideoType};
 use featherplay_core::tr;
-use featherplay_ytm::{HomeItem, HomeShelf, PlaylistSummary};
+use featherplay_ytm::{HomeItem, HomeShelf};
 use slint::ModelRc;
 
 use crate::app::Ctx;
@@ -98,14 +98,7 @@ pub fn arrange(shelves: &[HomeShelf]) -> Vec<(usize, ShelfShape)> {
         .iter()
         .enumerate()
         .filter(|(_, s)| !s.items.is_empty())
-        .map(|(i, s)| {
-            let shape = if is_shortcuts(s) {
-                ShelfShape::Mixes
-            } else {
-                shape(&s.items)
-            };
-            (i, shape)
-        })
+        .map(|(i, s)| (i, shape(&s.items)))
         .collect();
     if let Some(at) = out.iter().position(|(_, s)| *s == ShelfShape::Mixes) {
         let mixes = out.remove(at);
@@ -142,70 +135,16 @@ pub(super) fn shape(items: &[HomeItem]) -> ShelfShape {
     }
 }
 
-/// Liked songs ("LM"), as Home pins it.
-fn liked_songs() -> HomeItem {
-    HomeItem::Playlist(PlaylistSummary {
-        id: PlaylistId(LIKED.into()),
-        title: tr!("Liked songs").into(),
-        author: None,
-        count: None,
-        views: None,
-        avatar: None,
-        thumbnail: None,
-        owned: false,
-    })
-}
-
 /// The id of Liked songs, and of the feed's own "Liked Music" tile.
 const LIKED: &str = "LM";
 
-/// Tiles in the Shortcuts row, Liked songs included.
-const SHORTCUTS: usize = 4;
-/// The Shortcuts row's title (`with_liked`).
-fn shortcuts_title() -> &'static str {
-    tr!("Shortcuts")
-}
-
-/// The row `with_liked` makes without mixes: Liked songs, then playlists and albums, shown
-/// as your mixes are, as a rail.
-pub(super) fn is_shortcuts(s: &HomeShelf) -> bool {
-    s.title == shortcuts_title()
-        && matches!(s.items.first(), Some(HomeItem::Playlist(p)) if p.id.0 == LIKED)
-}
-
-/// The feed as Home shows it: Liked songs pinned as the first of your mixes' shortcuts, so
-/// it's always one click away. The feed's own Liked Music tile goes, so it shows once.
-/// Without a shelf of mixes, Liked songs leads a "Shortcuts" row of its own, followed by
-/// `picks` (the playlists and albums opened or played lately, `sidebar::shortcuts`), four
-/// tiles at most; with no picks there's no row, never a lone tile. Nothing before the feed
-/// arrives.
-pub fn with_liked(shelves: &[HomeShelf], picks: &[HomeItem]) -> Vec<HomeShelf> {
-    if shelves.is_empty() {
-        return Vec::new();
-    }
+/// The feed as Home shows it: without the feed's own Liked Music tile, as Liked songs leads
+/// the Shortcuts row above the shelves.
+pub fn without_liked(shelves: &[HomeShelf]) -> Vec<HomeShelf> {
     let mut out = shelves.to_vec();
     for s in &mut out {
         s.items
             .retain(|i| !matches!(i, HomeItem::Playlist(p) if p.id.0 == LIKED));
-    }
-    match out
-        .iter()
-        .position(|s| !s.items.is_empty() && shape(&s.items) == ShelfShape::Mixes)
-    {
-        Some(at) => out[at].items.insert(0, liked_songs()),
-        None if !picks.is_empty() => {
-            let mut items = vec![liked_songs()];
-            items.extend(picks.iter().take(SHORTCUTS - 1).cloned());
-            out.insert(
-                0,
-                HomeShelf {
-                    title: shortcuts_title().into(),
-                    strapline: None,
-                    items,
-                },
-            );
-        }
-        None => {}
     }
     out
 }
@@ -320,82 +259,26 @@ mod tests {
         assert_eq!(lead(None), "");
     }
 
-    fn ids(shelf: &HomeShelf) -> Vec<&str> {
-        shelf
+    #[test]
+    fn the_feeds_liked_music_tile_goes_and_your_mixes_stay_a_shelf() {
+        let shelves = [shelf(
+            "Fresh finds, old favorites",
+            vec![
+                playlist("RDTMAK5uy_a"),
+                playlist("LM"),
+                playlist("RDTMAK5uy_b"),
+            ],
+        )];
+        let shown = without_liked(&shelves);
+        let ids: Vec<&str> = shown[0]
             .items
             .iter()
             .map(|i| match i {
                 HomeItem::Playlist(p) => p.id.0.as_str(),
                 _ => "?",
             })
-            .collect()
-    }
-
-    #[test]
-    fn liked_songs_is_the_first_shortcut_and_shows_once() {
-        let shelves = [
-            shelf(
-                "Quick picks",
-                (0..4).map(|i| song(&i.to_string())).collect(),
-            ),
-            shelf(
-                "Fresh finds, old favorites",
-                vec![
-                    playlist("RDTMAK5uy_a"),
-                    playlist("LM"),
-                    playlist("RDTMAK5uy_b"),
-                ],
-            ),
-        ];
-        // Recent picks don't join a feed that has your mixes.
-        let pinned = with_liked(&shelves, &[playlist("PLrecent")]);
-        let (first, shape) = arrange(&pinned)[0];
-        assert_eq!(shape, ShelfShape::Mixes);
-        assert_eq!(ids(&pinned[first]), ["LM", "RDTMAK5uy_a", "RDTMAK5uy_b"]);
-        let HomeItem::Playlist(liked) = &pinned[first].items[0] else {
-            unreachable!()
-        };
-        assert_eq!(liked.title, "Liked songs");
-    }
-
-    #[test]
-    fn without_mixes_the_shortcuts_are_liked_songs_and_recent_picks() {
-        let shelves = [shelf("Albums for you", vec![album(), album()])];
-        let recent = [playlist("PLa"), playlist("PLb"), playlist("PLc")];
-        let pinned = with_liked(&shelves, &recent);
-        let (first, shape) = arrange(&pinned)[0];
-        assert_eq!(shape, ShelfShape::Mixes);
-        assert_eq!(pinned[first].title, "Shortcuts");
-        assert_eq!(ids(&pinned[first]), ["LM", "PLa", "PLb", "PLc"]);
-        // Nothing to pin to before the feed arrives.
-        assert!(with_liked(&[], &recent).is_empty());
-    }
-
-    #[test]
-    fn the_shortcuts_row_shows_four_at_most() {
-        let shelves = [shelf("Albums for you", vec![album(), album()])];
-        let recent: Vec<HomeItem> = (0..6).map(|i| playlist(&format!("PL{i}"))).collect();
-        let pinned = with_liked(&shelves, &recent);
-        assert_eq!(pinned[0].items.len(), 4);
-    }
-
-    #[test]
-    fn the_shortcuts_row_is_never_a_single_tile() {
-        let shelves = [shelf("Albums for you", vec![album(), album()])];
-        let pinned = with_liked(&shelves, &[]);
-        assert_eq!(pinned.len(), 1, "a row with Liked songs alone was added");
-        assert_ne!(arrange(&pinned)[0].1, ShelfShape::Mixes);
-    }
-
-    #[test]
-    fn an_album_among_the_shortcuts_keeps_the_row_a_shortcut_row() {
-        let shelves = [shelf(
-            "Quick picks",
-            (0..4).map(|i| song(&i.to_string())).collect(),
-        )];
-        let pinned = with_liked(&shelves, &[album()]);
-        let (first, shape) = arrange(&pinned)[0];
-        assert_eq!(shape, ShelfShape::Mixes);
-        assert_eq!(pinned[first].items.len(), 2);
+            .collect();
+        assert_eq!(ids, ["RDTMAK5uy_a", "RDTMAK5uy_b"]);
+        assert_eq!(arrange(&shown), [(0, ShelfShape::Mixes)]);
     }
 }

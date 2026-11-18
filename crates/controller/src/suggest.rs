@@ -432,6 +432,7 @@ mod tests {
                         artists: Vec::new(),
                         year: None,
                         thumbnail: None,
+                        single: false,
                     }),
                     subtitle: "Album • Daft Punk".into(),
                 },

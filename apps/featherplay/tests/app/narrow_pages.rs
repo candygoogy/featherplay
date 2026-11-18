@@ -117,6 +117,9 @@ fn now_playing_stacks_below_800_with_lyrics_and_keeps_the_cover_in_place_without
 #[test]
 fn home_at_480_has_the_narrow_band_one_column_of_quick_picks_and_no_up_next_link() {
     let scene = page(480, 900, "home");
+    // The feed's Quick picks under the band, not the Shortcuts row.
+    crate::support::no_shortcuts(&scene);
+    frame(&scene);
     let width = scene.ui.window().size().width as f32;
     // The band's row (its actions) inside the page.
     let radio = first(&scene, "Start radio");

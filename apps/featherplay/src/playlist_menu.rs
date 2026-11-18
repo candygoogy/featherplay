@@ -1,8 +1,8 @@
 //! The sidebar's playlist menu (ui/playlist_menu.slint): Play, Shuffle, Start radio, Play
 //! next, Add to queue and Copy link for any library playlist and Liked songs; Rename and
-//! Delete for the account's own playlists; Remove from library for saved ones; Pin to top
-//! for every library playlist. The sidebar's albums and artists get Play, Shuffle, Go to
-//! album or artist, and Pin to top.
+//! Delete for the account's own playlists; Remove from library for saved ones; Pin (to the
+//! top of the list, and into Home's Shortcuts) for every library playlist. The sidebar's
+//! albums and artists get Play, Shuffle, Go to album or artist, and Pin.
 //!
 //! Playing fetches the playlist once (one read); the writes go out once each and are never
 //! retried. After a rename, delete or removal the sidebar's list is fetched again. Failures
@@ -78,6 +78,15 @@ pub fn failure_text(failed: &str, e: &ApiError) -> String {
     }
 }
 
+/// Says that `title` is pinned now (in the sidebar's list and Home's Shortcuts), or not.
+pub fn pin_toast(ctx: &Ctx, title: &str, pinned: bool) {
+    ctx.toast(&if pinned {
+        tr!("Pinned {}", quoted(title))
+    } else {
+        tr!("Unpinned {}", quoted(title))
+    });
+}
+
 /// `“Name”`, as toasts and the Delete dialog quote a playlist.
 fn quoted(name: &str) -> String {
     format!("\u{201C}{name}\u{201D}")
@@ -118,11 +127,7 @@ pub fn init(ctx: &Rc<Ctx>) {
         let Some(ui) = c.window() else { return };
         let item = ui.global::<PlaylistMenu>().get_item();
         let pinned = sidebar::toggle_pin(&c, entry_kind(item.kind), &id);
-        c.toast(&if pinned {
-            tr!("Pinned {} to the top", quoted(&item.title))
-        } else {
-            tr!("Unpinned {}", quoted(&item.title))
-        });
+        pin_toast(&c, &item.title, pinned);
     });
 
     let c = ctx.clone();
@@ -208,6 +213,19 @@ fn with_tracks(
         .window()
         .map(|ui| entry_kind(ui.global::<PlaylistMenu>().get_item().kind))
         .unwrap_or(Kind::Playlist);
+    tracks_of(ctx, kind, id, name, then);
+}
+
+/// Fetches the tracks of `kind` `id`, called `name` (one read: the playlist, the album, or
+/// the artist's top songs), then hands them to `then` with its name and page. A failure or
+/// no songs says so in a toast.
+pub fn tracks_of(
+    ctx: &Rc<Ctx>,
+    kind: Kind,
+    id: &str,
+    name: String,
+    then: impl FnOnce(&Ctx, PlayingFrom, Vec<Track>) + 'static,
+) {
     let from = PlayingFrom::on_page(name.clone(), place_of(kind, id));
     let id = id.to_string();
     let what = match kind {
@@ -235,7 +253,7 @@ fn with_tracks(
 }
 
 /// Plays `tracks` from the top, with Up next saying where they're from.
-fn play(ctx: &Ctx, from: PlayingFrom, tracks: Vec<Track>) {
+pub fn play(ctx: &Ctx, from: PlayingFrom, tracks: Vec<Track>) {
     ctx.send(Action::Queue(QueueAction::PlayFrom {
         tracks,
         start: 0,

@@ -22,6 +22,17 @@ pub fn threshold(duration: Duration) -> Option<Duration> {
     (duration > MIN_DURATION).then(|| (duration / 2).min(MAX_THRESHOLD))
 }
 
+/// The play time after which a song counts as played from where it was started (Home's
+/// Shortcuts learn from these): 30 s, or for a shorter song nine tenths of it, so one
+/// heard to its end counts (its last moments may pass between two ticks, or as silence
+/// skipped). A song of unknown length counts at 30 s.
+pub fn play_threshold(duration: Option<Duration>) -> Duration {
+    match duration {
+        Some(d) => MIN_DURATION.min(d.mul_f64(0.9)),
+        None => MIN_DURATION,
+    }
+}
+
 /// Bracketed tags in video titles that name the video, not the music, matched whole and
 /// case-insensitively. Version tags such as "(Live)" or "(Lyrics)" aren't among them.
 const VIDEO_TAGS: [&str; 13] = [
@@ -249,9 +260,19 @@ pub fn eligible(t: VideoType, scrobble_other_media: bool) -> bool {
 
 /// Counts real play time for the current track and fires a scrobble once it
 /// reaches the threshold. Seeks don't count: callers pass wall-clock play deltas.
+/// `ScrobbleTracker::plays` counts the same way to `play_threshold` instead.
 #[derive(Debug, Default)]
 pub struct ScrobbleTracker {
     current: Option<Current>,
+    rule: Rule,
+}
+
+/// Which threshold a tracker counts to.
+#[derive(Clone, Copy, Debug, Default)]
+enum Rule {
+    #[default]
+    Scrobble,
+    Play,
 }
 
 #[derive(Debug)]
@@ -264,13 +285,25 @@ struct Current {
 }
 
 impl ScrobbleTracker {
+    /// A tracker that fires when a song counts as played (`play_threshold`), for any
+    /// song, of any length.
+    pub fn plays() -> ScrobbleTracker {
+        ScrobbleTracker {
+            current: None,
+            rule: Rule::Play,
+        }
+    }
+
     /// Starts counting for `track`, which began playing at `started` (the scrobble timestamp).
     /// Call it again for each repeat-one loop so the track scrobbles again.
     pub fn start(&mut self, track: &Track, started: SystemTime) {
         self.current = Some(Current {
             track: track.clone(),
             started,
-            threshold: track.duration.and_then(threshold),
+            threshold: match self.rule {
+                Rule::Scrobble => track.duration.and_then(threshold),
+                Rule::Play => Some(play_threshold(track.duration)),
+            },
             played: Duration::ZERO,
             fired: false,
         });

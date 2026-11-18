@@ -59,6 +59,7 @@ pub mod refused;
 pub mod repaint;
 pub mod router;
 pub mod shell;
+pub mod shortcut_menu;
 pub mod sidebar;
 pub mod sleep;
 pub mod snapshot;

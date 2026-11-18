@@ -20,6 +20,7 @@ use std::rc::Rc;
 
 use featherplay_controller::presence::Status as DiscordStatus;
 use featherplay_controller::scrobbler::build_keys;
+use featherplay_core::tr;
 use featherplay_integrations::local_api::Token;
 use featherplay_platform::{Feature, supports};
 use featherplay_store::{CloseAction, DesktopLyrics, Equalizer, Paths, Settings, WindowPlace};
@@ -261,6 +262,17 @@ pub fn sleep_timer() -> bool {
     SETTINGS.with(|s| s.borrow().sleep_timer)
 }
 
+/// Whether Home shows its Shortcuts row ("Shortcuts", Window's Home group).
+pub fn shortcuts() -> bool {
+    SETTINGS.with(|s| s.borrow().shortcuts)
+}
+
+/// Whether Shortcuts suggests from what's played, after the pins ("Suggest from what you
+/// play"); off, nothing played is recorded.
+pub fn shortcut_suggestions() -> bool {
+    SETTINGS.with(|s| s.borrow().shortcut_suggestions)
+}
+
 /// Whether the player bar's buttons show their tooltips ("Show tooltips").
 pub fn tooltips() -> bool {
     SETTINGS.with(|s| s.borrow().tooltips)
@@ -308,6 +320,11 @@ pub fn init(ctx: &Rc<Ctx>) {
 
     let c = ctx.clone();
     data.on_toggled(move |key, on| toggled(&c, key, on));
+    let c = ctx.clone();
+    data.on_forget_suggestions(move || {
+        crate::sidebar::forget_suggestions(&c);
+        c.toast(tr!("Shortcuts forgot what you played"));
+    });
     let c = ctx.clone();
     data.on_pick_device(move |i| pick_device(&c, i));
     let c = ctx.clone();
@@ -546,6 +563,8 @@ fn show(ctx: &Ctx) {
     data.set_tooltips(s.tooltips);
     ui.global::<Tooltips>().set_on(s.tooltips);
     data.set_settings_in_suggestions(s.settings_in_suggestions);
+    data.set_home_shortcuts(s.shortcuts);
+    data.set_shortcut_suggestions(s.shortcut_suggestions);
     data.set_accent(accent_index(s.accent));
     data.set_appearance(appearance(s.theme));
     data.set_hotkeys(s.hotkeys.is_some());
@@ -707,6 +726,18 @@ fn toggled(ctx: &Rc<Ctx>, key: SettingKey, on: bool) {
         SettingKey::SettingsInSuggestions => {
             data.set_settings_in_suggestions(on);
             Change::SettingsInSuggestions(on)
+        }
+        SettingKey::HomeShortcuts => {
+            data.set_home_shortcuts(on);
+            commit(ctx, Change::Shortcuts(on));
+            crate::pages::home::shortcuts_changed(ctx);
+            return;
+        }
+        SettingKey::ShortcutSuggestions => {
+            data.set_shortcut_suggestions(on);
+            commit(ctx, Change::ShortcutSuggestions(on));
+            crate::pages::home::shortcuts_changed(ctx);
+            return;
         }
         SettingKey::DiscordAutoReconnect => {
             discord_options(ctx, |o| o.auto_reconnect = on);

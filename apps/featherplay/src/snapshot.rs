@@ -567,8 +567,25 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
             settle();
         }
     }
-    if o.page == "home-shortcuts" {
-        crate::pages::home::drop_mixes_for_snapshot(ctx);
+    if o.page.starts_with("home-shortcuts") {
+        // The albums' and artists' chips load their lists; then pins and plays from them.
+        use crate::library_list::Kind;
+        use slint::Model;
+        for kind in [Kind::Album, Kind::Artist, Kind::Playlist] {
+            crate::sidebar::show_for_snapshot(ctx, kind);
+            settle();
+        }
+        crate::sidebar::seed_for_snapshot(ctx, o.page == "home-shortcuts-fresh");
+        crate::pages::home::show_shortcuts_for_snapshot(ctx);
+        // The first suggestion plays: its tile wears the playing mark.
+        let data = ui.global::<crate::ui::HomeData>();
+        let playing = (1..data.get_shortcuts().row_count())
+            .find(|&i| !data.get_shortcut_pins().row_data(i).unwrap_or(false))
+            .and_then(|i| data.get_shortcuts().row_data(i));
+        if let Some(it) = playing {
+            data.set_playing_kind(it.kind);
+            data.set_playing_id(it.id);
+        }
         settle();
     }
     if o.page == "sign-in-expired" {
@@ -949,6 +966,8 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
     }
     if o.page == "settings-discord"
         || o.page.starts_with("settings-window")
+        || o.page == "settings-home"
+        || o.page.starts_with("home-shortcuts-")
         || o.page.starts_with("settings-lyrics")
         || o.page == "settings-picked"
         || quick_key
@@ -967,6 +986,16 @@ fn render(o: &SnapshotOptions) -> Result<(), String> {
     }
     if o.page.starts_with("settings-window") {
         scroll_to_group(window, "Window")?;
+        settle();
+    }
+    if o.page == "settings-home" {
+        scroll_to_group(window, "Home")?;
+        settle();
+    }
+    if let Some(which) = o.page.strip_prefix("home-shortcuts-")
+        && which != "fresh"
+    {
+        shortcut_for_snapshot(ui, which)?;
         settle();
     }
     if o.page.starts_with("settings-lyrics") {
@@ -1118,6 +1147,59 @@ fn quick_search_for_snapshot(
 /// Scrolls the page so the settings group titled `title` has its title just under the top
 /// bar. The group is found by its panel, as a screen reader finds it, because where it sits
 /// depends on how the text above it measures.
+/// `--snapshot home-shortcuts-menu`, `-menu-pinned`, `-removed`: a right-click on the first
+/// suggestion's tile (or the second pin's, which moves both ways), or that suggestion removed.
+fn shortcut_for_snapshot(ui: &crate::ui::AppWindow, which: &str) -> Result<(), String> {
+    use slint::Model;
+    let data = ui.global::<crate::ui::HomeData>();
+    let (items, pins) = (data.get_shortcuts(), data.get_shortcut_pins());
+    let pinned = which == "menu-pinned";
+    let i = (1..items.row_count())
+        .filter(|&i| pins.row_data(i).unwrap_or(false) == pinned)
+        .nth(usize::from(pinned))
+        .ok_or_else(|| format!("home-shortcuts-{which}: no such tile"))?;
+    let item = items.row_data(i).unwrap_or_default();
+    if which == "removed" {
+        ui.global::<crate::ui::ShortcutMenu>().invoke_remove(item);
+        return Ok(());
+    }
+    let window = ui.window();
+    let root = ItemRc::new_root(WindowInner::from_pub(window).component());
+    let mut at = None;
+    root.visit_descendants(|it| {
+        if it.accessible_role() == AccessibleRole::Button
+            && it
+                .accessible_string_property(AccessibleStringProperty::Label)
+                .is_some_and(|v| v == item.title)
+        {
+            let origin = it.map_to_window(it.geometry().origin);
+            let size = it.geometry().size;
+            at = Some(slint::LogicalPosition::new(
+                origin.x + 120.0,
+                origin.y + size.height - 12.0,
+            ));
+            return ControlFlow::Break(());
+        }
+        ControlFlow::Continue(())
+    });
+    let position = at.ok_or_else(|| format!("no {:?} tile", item.title))?;
+    window.dispatch_event(WindowEvent::PointerMoved { position });
+    for pressed in [true, false] {
+        window.dispatch_event(if pressed {
+            WindowEvent::PointerPressed {
+                position,
+                button: PointerEventButton::Right,
+            }
+        } else {
+            WindowEvent::PointerReleased {
+                position,
+                button: PointerEventButton::Right,
+            }
+        });
+    }
+    Ok(())
+}
+
 fn scroll_to_group(window: &slint::Window, title: &str) -> Result<(), String> {
     // The panel's top, in logical pixels from the window's: below the top bar (64 px,
     // `TOP_BAR` in tests/app/discord_card.rs) and the group's title row.

@@ -168,6 +168,9 @@ pub enum Effect {
     /// The track, which started at the given time, has played past its scrobble threshold.
     /// Emitted once per `TrackStarted`, and only for tracks `scrobble::eligible` allows.
     Scrobble(Track, SystemTime),
+    /// The track has played long enough to count as played (`scrobble::play_threshold`):
+    /// once per `TrackStarted`, for any track.
+    Played(Track),
     /// Playback stopped after failures; the window says why in plain words.
     ShowError(Stop),
     ShowReauth,
@@ -306,6 +309,8 @@ pub struct Player {
     /// The session changed since the last `PersistSession`.
     unsaved: bool,
     scrobble: ScrobbleTracker,
+    /// The same play time, counted to `scrobble::play_threshold`.
+    plays: ScrobbleTracker,
     /// The current track started before any tick; `start` the tracker on the next one.
     scrobble_start_pending: bool,
     /// `Input::PauseAtEnd`: the current song's end pauses.
@@ -345,6 +350,7 @@ impl Player {
             last_persist: None,
             unsaved: false,
             scrobble: ScrobbleTracker::default(),
+            plays: ScrobbleTracker::plays(),
             scrobble_start_pending: false,
             pause_at_end: false,
         }
@@ -861,13 +867,19 @@ impl Player {
             self.scrobble_start_pending = false;
             if let Some(t) = self.queue.current() {
                 self.scrobble.start(t, now);
+                self.plays.start(t, now);
             }
-        } else if self.status == Status::Playing
+        } else if self.status == Status::Playing {
             // The song's time heard, so the threshold means the same at any speed.
-            && let Some((track, started)) = self.scrobble.played(self.prefs.song_time(delta))
-            && eligible(track.video_type, self.prefs.scrobble_other_media)
-        {
-            out.push(Effect::Scrobble(track, started));
+            let heard = self.prefs.song_time(delta);
+            if let Some((track, started)) = self.scrobble.played(heard)
+                && eligible(track.video_type, self.prefs.scrobble_other_media)
+            {
+                out.push(Effect::Scrobble(track, started));
+            }
+            if let Some((track, _)) = self.plays.played(heard) {
+                out.push(Effect::Played(track));
+            }
         }
         if self.status == Status::Playing {
             self.maybe_preload(out);
@@ -1025,7 +1037,10 @@ impl Player {
             if let Some(t) = self.queue.current() {
                 // The scrobble timestamp is the latest tick, at most 250 ms early.
                 match self.now {
-                    Some(now) => self.scrobble.start(t, now),
+                    Some(now) => {
+                        self.scrobble.start(t, now);
+                        self.plays.start(t, now);
+                    }
                     None => self.scrobble_start_pending = true,
                 }
                 out.push(Effect::TrackStarted(t.clone()));
@@ -1138,6 +1153,7 @@ impl Player {
         self.fade_in = None;
         self.announced = false;
         self.scrobble = ScrobbleTracker::default();
+        self.plays = ScrobbleTracker::plays();
         self.scrobble_start_pending = false;
         self.failures.clear();
         self.expired_retries = 0;
@@ -1241,6 +1257,7 @@ impl Player {
         self.expired_retries = 0;
         // The previous entry's play time stops counting; the new one starts on `AudioStarted`.
         self.scrobble = ScrobbleTracker::default();
+        self.plays = ScrobbleTracker::plays();
         self.scrobble_start_pending = false;
         let preload = std::mem::replace(&mut self.preload, Preload::Idle);
         let Some(track) = self.queue.current() else {

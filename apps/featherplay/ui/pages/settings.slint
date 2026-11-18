@@ -23,7 +23,7 @@ import { LyricsSection } from "settings/lyrics.slint";
 import { ScrobblingSection } from "settings/scrobbling.slint";
 import { DiscordSection } from "settings/discord.slint";
 import { LocalApiSection } from "settings/local_api.slint";
-import { WindowSection } from "settings/window.slint";
+import { WindowSection, HomeSection } from "settings/window.slint";
 import { AccountSection } from "settings/account.slint";
 import { SessionStore, SignInData } from "sign_in.slint";
 
@@ -290,6 +290,10 @@ export component SettingsPage inherits Rectangle {
             local-api-section := LocalApiSection { }
 
             window-section := WindowSection {
+                made: root.made;
+            }
+
+            HomeSection {
                 made: root.made;
             }
 

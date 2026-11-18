@@ -262,6 +262,7 @@ fn suggested_result(r: &Value) -> Option<SuggestedResult> {
                     artists: byline(byline_runs).0,
                     year: None,
                     thumbnail,
+                    single: false,
                 })
             }
             "MUSIC_PAGE_TYPE_ARTIST" => HomeItem::Artist(ArtistSummary {

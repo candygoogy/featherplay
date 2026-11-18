@@ -15,6 +15,8 @@ use slint::{ComponentHandle, LogicalPosition, Model};
 #[test]
 fn resting_on_a_song_card_resolves_it_ahead() {
     let scene = home_at(1920, 1200, 1.0);
+    // The feed's song cards on screen, not under the Shortcuts row.
+    crate::support::no_shortcuts(&scene);
     let w = scene.ui.window();
     let (mut songs, mut others) = (HashSet::new(), HashSet::new());
     for shelf in scene.ui.global::<HomeData>().get_shelves().iter() {

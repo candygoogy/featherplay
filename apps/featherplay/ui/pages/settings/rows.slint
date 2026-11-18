@@ -216,7 +216,10 @@ export component Group inherits Rectangle {
     in property <length> extend: 0px;
     // Its place in the section index (0 Playback … 7 Account).
     in property <int> section;
-    property <bool> hidden: SettingsSearch.active && SettingsSearch.counts[root.section] == 0;
+    // The search finds some of its rows. A section of two groups (Window and Home) says
+    // which group's they are.
+    in property <bool> found: !SettingsSearch.active || SettingsSearch.counts[root.section] > 0;
+    property <bool> hidden: !root.found;
     min-width: lay.min-width;
     min-height: root.hidden ? 0px : lay.min-height;
     preferred-height: root.hidden ? 0px : lay.preferred-height;

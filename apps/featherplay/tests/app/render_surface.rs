@@ -95,6 +95,9 @@ fn the_window_never_shows_through() {
     scene.theme(true);
     scene.ui.show().expect("show");
     scene.settle();
+    // The feed's shelves as the fixtures lay them out: with the Shortcuts row, a maximize
+    // brings a shelf into view whose covers fade in.
+    crate::support::no_shortcuts(&scene);
     offscreen::freeze_clock();
     let w = scene.ui.window();
     opaque_frames(w, 10, "first frames", |_| {});

@@ -11,13 +11,11 @@ use serde::{Deserialize, Serialize};
 use slint::ComponentHandle;
 
 use super::hero::show_hero;
-use super::shelves::with_liked;
 use super::{STATE, State, add_shelves, show_shelves};
 use crate::app::Ctx;
 use crate::busy::Busy;
 use crate::pages::content;
 use crate::router::Page;
-use crate::sidebar;
 use crate::ui::{AppWindow, HomeData, MoreState};
 
 /// Pages of the feed per Home load, the first ones included. A cap against a token loop,
@@ -244,7 +242,7 @@ pub(super) fn show_cached(ctx: &Rc<Ctx>) {
             );
             // A refresh that failed first said so; with the cached feed, it stays quiet.
             ui.global::<HomeData>().set_error("".into());
-            show_shelves(&ctx, &with_liked(&shelves, &sidebar::shortcuts()));
+            show_shelves(&ctx, &shelves);
             STATE.with(|s| {
                 let mut s = s.borrow_mut();
                 s.shelves = shelves;
@@ -352,7 +350,7 @@ fn session_ended(ctx: &Ctx, ui: &AppWindow) {
 
 /// A fresh feed in place of the one shown.
 pub(super) fn show_feed(ctx: &Ctx, feed: HomeFeed) {
-    show_shelves(ctx, &with_liked(&feed.shelves, &sidebar::shortcuts()));
+    show_shelves(ctx, &feed.shelves);
     STATE.with(|s| {
         let mut s = s.borrow_mut();
         s.shelves = feed.shelves;

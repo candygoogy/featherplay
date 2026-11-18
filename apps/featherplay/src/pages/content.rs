@@ -539,7 +539,20 @@ pub fn play_artist(ctx: &Rc<Ctx>, id: featherplay_core::model::ArtistId) {
             ahead::or_fetch(ahead, ahead::Answer::artist, source.artist(&id)).await
         },
         |ctx, _, result| match result {
-            Ok(artist) => play_tracks(ctx, artist.top_songs),
+            Ok(artist) => {
+                if artist.top_songs.is_empty() {
+                    return;
+                }
+                started_play();
+                song_menu::remember(&artist.top_songs);
+                let page = Place::Artist(artist.summary.id.clone());
+                ctx.send(Action::Queue(QueueAction::PlayFrom {
+                    tracks: artist.top_songs,
+                    start: 0,
+                    radio: false,
+                    from: PlayingFrom::on_page(artist.summary.name, page),
+                }));
+            }
             Err(e) => log!("play artist: {e}"),
         },
     );

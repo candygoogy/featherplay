@@ -67,6 +67,11 @@ pub fn open(ctx: &Rc<Ctx>, id: &AlbumId) {
     let Some(ui) = ctx.window() else { return };
     let data = ui.global::<AlbumData>();
     data.set_id(id.0.as_str().into());
+    ui.global::<crate::ui::AlbumMenu>()
+        .set_pinned(crate::sidebar::is_pinned(
+            crate::library_list::Kind::Album,
+            &id.0,
+        ));
     data.set_loading(true);
     data.set_error("".into());
     data.set_title("".into());

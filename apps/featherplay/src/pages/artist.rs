@@ -5,13 +5,14 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Instant;
 
+use featherplay_controller::place::Place;
 use featherplay_core::model::ArtistId;
 use featherplay_core::tr;
 use featherplay_ytm::AlbumSummary;
 use slint::ComponentHandle;
 
 use crate::app::Ctx;
-use crate::controller::{Action, PlayerState};
+use crate::controller::{Action, PlayerState, PlayingFrom};
 use crate::pages::ahead;
 use crate::pages::content::{self, CARD_COVER, TrackList};
 use crate::router::Page;
@@ -122,6 +123,11 @@ pub fn open(ctx: &Rc<Ctx>, id: &ArtistId) {
                     });
             }
             let (mut list, model) = TrackList::new(artist.top_songs, ctx);
+            // Up next names the artist, and Shortcuts learns a play from here.
+            list.from = PlayingFrom::on_page(
+                artist.summary.name.clone(),
+                Place::Artist(artist.summary.id.clone()),
+            );
             list.hint_first(ctx);
             list.fill_covers(&ctx.covers);
             data.set_top_songs(model);

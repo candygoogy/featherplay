@@ -64,9 +64,11 @@ fn the_rows_on_screen_are_sent_once_a_list_settles_and_none_off_it() {
     featherplay::memory::hidden(&scene.ctx, false);
     assert_eq!(prepared(&scene).last(), Some(rows));
 
-    // Home: the songs of its song grids on screen, those of the grid's first page.
+    // Home: the songs of its song grids on screen, those of the grid's first page (with
+    // the Shortcuts row off, the feed's Quick picks are under the band).
     scene.open("home").expect("home");
     scene.settle();
+    crate::support::no_shortcuts(&scene);
     run_for(scene.ui.window(), 500);
     let grids: Vec<String> = scene
         .ui

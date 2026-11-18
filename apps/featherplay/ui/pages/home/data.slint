@@ -1,5 +1,5 @@
 // Home's data from `src/pages/home.rs`: the shelves' shapes and rows, and `HomeData`.
-import { TrackRow, CardItem } from "../../parts.slint";
+import { TrackRow, CardItem, ItemKind } from "../../parts.slint";
 import { LyricInk } from "../lyrics.slint";
 
 // How a shelf shows, from what it holds (`home.rs::shape`).
@@ -51,6 +51,18 @@ export global HomeData {
     // lyrics panel's own (`LyricsData.ink-dark`, `ink-tint`), which follow the current song.
     in property <LyricInk> featured-ink-dark;
     in property <LyricInk> featured-ink-light;
+    // The Shortcuts row under the band (`home.rs::show_shortcuts`): shown signed in with
+    // its setting on, whatever the feed holds. Liked songs first (id "LM"), then the pins,
+    // what's played lately and the library; which of them are pins, by index; and whether
+    // the hint tile ("Pin what you play most") may end the row when it doesn't fill one.
+    in property <bool> shortcuts-shown;
+    in property <[CardItem]> shortcuts;
+    in property <[bool]> shortcut-pins;
+    in property <bool> shortcut-hint;
+    // Where what plays came from (the queue's page): its Shortcuts tile shows the playing
+    // mark and its title in the accent. `song` and "" for none.
+    in property <ItemKind> playing-kind: ItemKind.song;
+    in property <string> playing-id;
     in property <[HomeShelfRow]> shelves;
     in property <MoreState> more;
     // How many rows the page has: the top, the shelves, then the next page's row while it
@@ -72,7 +84,7 @@ export global HomeData {
     // Up next panel or sheet opens or closes: `related` is asked for ahead of the Related tab
     // only while one of them would show it (`hero.rs::band_column`).
     callback band-column(bool);
-    // The Liked songs tile on the first rail: plays Liked songs shuffled.
+    // The Liked songs tile in Shortcuts: plays Liked songs shuffled.
     callback shuffle-liked();
     // A song card on a shelf: plays it, with radio after it.
     callback play-song(string);

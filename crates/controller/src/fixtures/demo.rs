@@ -195,6 +195,7 @@ impl Demo {
             artists: vec![Self::artist_ref(&t.artist)],
             year: None,
             thumbnail: Some(cover_url(&t.slug)),
+            single: true,
         }
     }
 

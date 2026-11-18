@@ -284,6 +284,7 @@ mod tests {
             }],
             year: Some("2024".into()),
             thumbnail: Some("https://img/album".into()),
+            single: false,
         });
         let card = home_card(&album);
         assert_eq!(card.kind, ItemKind::Album);

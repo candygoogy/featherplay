@@ -499,6 +499,28 @@ fn table() -> Vec<Row> {
             &[],
             tr!("search keywords" => "launcher, hotkey, shortcut"),
         ),
+        // Window, its Home group.
+        row(
+            SettingId::HomeShortcuts,
+            6,
+            tr!("Shortcuts"),
+            &[],
+            tr!("search keywords" => "home, pins, pinned, recent"),
+        ),
+        row(
+            SettingId::ShortcutSuggestions,
+            6,
+            tr!("Suggest from what you play"),
+            &[],
+            tr!("search keywords" => "home, shortcuts, recent, played lately"),
+        ),
+        row(
+            SettingId::ForgetSuggestions,
+            6,
+            tr!("Forget suggestions"),
+            &[tr!("Forget")],
+            tr!("search keywords" => "home, shortcuts, clear, history, privacy"),
+        ),
         // Account.
         row(
             SettingId::Account,
@@ -816,6 +838,15 @@ impl View {
             // Wayland's row says it isn't available there, which isn't searched.
             S::QuickSearch if self.has_hotkeys => {
                 tr!("Press the shortcut in any app to find a song and play it.")
+            }
+            S::HomeShortcuts => {
+                tr!("Liked songs, your pins and what you play lately, first on Home.")
+            }
+            S::ShortcutSuggestions => {
+                tr!("Off: Shortcuts shows Liked songs and your pins only.")
+            }
+            S::ForgetSuggestions => {
+                tr!("Clears what Shortcuts learned from your plays. Your pins stay.")
             }
             S::Account if !self.signed_in => tr!("Not signed in."),
             S::CheckForUpdates => tr!(

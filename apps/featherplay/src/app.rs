@@ -661,6 +661,11 @@ pub fn on_event(ev: UiEvent) {
         UiEvent::Silences(marks) => bar::show_silences(&ctx, &marks),
         UiEvent::Sleep(state) => crate::sleep::apply(&ctx, state),
         UiEvent::Refused(ids) => refused::show(&ctx, &ids),
+        UiEvent::Played {
+            place,
+            label,
+            track,
+        } => sidebar::played(&place, &label, &track),
         UiEvent::LocalApi(notice) => pages::settings::local_api_changed(&ctx, notice),
     }
     // The first page is up once the session is known and its loads have landed.

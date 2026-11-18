@@ -8,25 +8,33 @@
 //! (kept in the settings, per identity), then what they opened or played lately (kept in the
 //! library cache, per identity, on this device only), then the library's own order. A list
 //! is ordered when it's shown (signing in, a chip, a pin), not while the user clicks
-//! through it, so a row never jumps away under the pointer. The same record of what was
-//! opened gives Home its shortcuts (`shortcuts`).
+//! through it, so a row never jumps away under the pointer.
+//!
+//! Home's Shortcuts (`shortcuts`) share the pins, and learn from plays only, not opens: a
+//! song played long enough from an album, a playlist or an artist (`played`, from the
+//! controller's `UiEvent::Played`) puts it first in a record of its own. What's removed from
+//! Shortcuts stays out until it's played again (`hide`). Both are kept beside the recent
+//! record, with what the pins name (their titles and covers, for a pin outside the library).
 
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
 
 use featherplay_controller::catalog::Source;
+use featherplay_controller::place::Place;
+use featherplay_core::model::Track;
 use featherplay_core::tr;
 use featherplay_store::{LibraryCache, LibraryList, Paths};
-use featherplay_ytm::{AccountInfo, AlbumSummary, ArtistSummary, HomeItem, PlaylistSummary};
+use featherplay_ytm::{
+    AccountInfo, AlbumSummary, ArtistSummary, HomeItem, HomeShelf, PlaylistSummary,
+};
 use slint::{ComponentHandle, Image, ModelRc, VecModel};
 
 use crate::app::Ctx;
-use crate::library_list::{self, Entry, Kind};
+use crate::library_list::{self, Entry, Kind, Shortcut, Sources};
 use crate::pages::{home, settings};
 use crate::ui::{CardItem, ItemKind, SidebarData};
-use crate::ui_bridge::{
-    album_subtitle, artist_card, model, playlist_card, playlist_subtitle, shown,
-};
+use crate::ui_bridge::{artist_names, model, playlist_card, shown};
 use crate::{account_menu, playlist_menu};
 
 /// The sidebar's list covers, in logical pixels.
@@ -34,8 +42,6 @@ const COVER: u32 = 24;
 /// The account photo, in logical pixels: decoded for its largest use, the avatar on
 /// Settings' Discord card (76 inside its ring); the sidebar's 32 px row shows it smaller.
 const AVATAR: u32 = 76;
-/// Home's shortcuts after Liked songs.
-const SHORTCUTS: usize = 3;
 
 pub fn init(ctx: &Rc<Ctx>) {
     let Some(ui) = ctx.window() else { return };
@@ -102,6 +108,20 @@ struct Library {
     chip: Option<Kind>,
     pins: Vec<String>,
     recent: Vec<Entry>,
+    /// Played from lately, for Shortcuts; `played_shown` as Home last took it (`shortcuts`),
+    /// so new plays wait for Home's next visit.
+    played: Vec<Entry>,
+    played_shown: Vec<Entry>,
+    /// Removed from Shortcuts, by key.
+    hidden: Vec<String>,
+    /// What the pins name, so a pin outside the library still has its title and cover.
+    pinned: Vec<Entry>,
+    /// The Library page's albums and artists as last kept on disk, until the chips fetch
+    /// their own: Shortcuts' library after the playlists.
+    stored: Vec<Entry>,
+    /// The playlists, albums and artists seen this session (pages opened, Home's feed), by
+    /// key: what a play from one of them shows.
+    seen: HashMap<String, Entry>,
 }
 
 impl Library {
@@ -252,24 +272,37 @@ fn load_library(ctx: &Rc<Ctx>) {
         l.session
     });
     if let Some(key) = key {
-        let task = ctx.catalog.runtime().spawn_blocking(move || {
-            LibraryCache::new(&Paths::resolve()).load::<Vec<Entry>>(&key, LibraryList::Recent)
-        });
+        let task = ctx
+            .catalog
+            .runtime()
+            .spawn_blocking(move || Kept::load(&LibraryCache::new(&Paths::resolve()), &key));
         let c = ctx.clone();
         let spawned = slint::spawn_local(async move {
-            let recent = task.await.ok().flatten().unwrap_or_default();
+            let kept = task.await.unwrap_or_default();
             let current = LIBRARY.with_borrow_mut(|l| {
                 let current = l.session == session;
                 if current {
                     // Anything noted meanwhile stays in front.
                     let mut merged = l.recent.clone();
-                    for e in recent.into_iter().rev() {
+                    for e in kept.recent.into_iter().rev() {
                         if !merged.iter().any(|m| m.key() == e.key()) {
                             merged.push(e);
                         }
                     }
                     merged.truncate(library_list::MAX_RECENT);
                     l.recent = merged;
+                    let mut played = std::mem::take(&mut l.played);
+                    for e in kept.played {
+                        if !played.iter().any(|m| m.key() == e.key()) {
+                            played.push(e);
+                        }
+                    }
+                    played.truncate(library_list::MAX_RECENT);
+                    l.played_shown.clone_from(&played);
+                    l.played = played;
+                    l.hidden.extend(kept.hidden);
+                    l.pinned = kept.pinned;
+                    l.stored = kept.stored;
                 }
                 current
             });
@@ -286,6 +319,35 @@ fn load_library(ctx: &Rc<Ctx>) {
     let chip = LIBRARY.with_borrow(|l| l.chip).unwrap_or(Kind::Playlist);
     if chip != Kind::Playlist {
         fetch(ctx, chip);
+    }
+}
+
+/// What's kept per identity in the library cache: the records and the Library page's lists
+/// Shortcuts uses. Read off the UI thread.
+#[derive(Default)]
+struct Kept {
+    recent: Vec<Entry>,
+    played: Vec<Entry>,
+    hidden: Vec<String>,
+    pinned: Vec<Entry>,
+    stored: Vec<Entry>,
+}
+
+impl Kept {
+    fn load(cache: &LibraryCache, key: &str) -> Kept {
+        let albums: Vec<AlbumSummary> = cache.load(key, LibraryList::Albums).unwrap_or_default();
+        let artists: Vec<ArtistSummary> = cache.load(key, LibraryList::Artists).unwrap_or_default();
+        Kept {
+            recent: cache.load(key, LibraryList::Recent).unwrap_or_default(),
+            played: cache.load(key, LibraryList::Played).unwrap_or_default(),
+            hidden: cache.load(key, LibraryList::Hidden).unwrap_or_default(),
+            pinned: cache.load(key, LibraryList::Pinned).unwrap_or_default(),
+            stored: albums
+                .iter()
+                .map(album_entry)
+                .chain(artists.iter().map(artist_entry))
+                .collect(),
+        }
     }
 }
 
@@ -349,9 +411,7 @@ fn fetch(ctx: &Rc<Ctx>, kind: Kind) {
                 Kind::Artist => l.artists = Some(entries),
             });
             show(ctx);
-            if kind == Kind::Playlist {
-                home::shortcuts_changed(ctx);
-            }
+            home::shortcuts_changed(ctx);
         },
     );
 }
@@ -425,15 +485,19 @@ fn empty_text(kind: Kind) -> &'static str {
 fn card(e: &Entry) -> CardItem {
     CardItem {
         id: e.id.as_str().into(),
-        kind: match e.kind {
-            Kind::Playlist => ItemKind::Playlist,
-            Kind::Album => ItemKind::Album,
-            Kind::Artist => ItemKind::Artist,
-        },
+        kind: item_kind(e.kind),
         title: shown(&e.title),
-        subtitle: shown(&e.subtitle),
+        subtitle: shown(&library_list::subtitle(e)),
         cover: Image::default(),
         round: e.kind == Kind::Artist,
+    }
+}
+
+pub fn item_kind(kind: Kind) -> ItemKind {
+    match kind {
+        Kind::Playlist => ItemKind::Playlist,
+        Kind::Album => ItemKind::Album,
+        Kind::Artist => ItemKind::Artist,
     }
 }
 
@@ -442,7 +506,9 @@ pub fn playlist_entry(p: &PlaylistSummary) -> Entry {
         kind: Kind::Playlist,
         id: featherplay_ytm::convert::bare_playlist_id(&p.id.0).to_string(),
         title: p.title.clone(),
-        subtitle: playlist_subtitle(p),
+        subtitle: p.author.clone().unwrap_or_default(),
+        count: p.count,
+        single: false,
         thumbnail: p.thumbnail.clone(),
     }
 }
@@ -452,7 +518,9 @@ pub fn album_entry(a: &AlbumSummary) -> Entry {
         kind: Kind::Album,
         id: a.id.0.clone(),
         title: a.title.clone(),
-        subtitle: album_subtitle(a),
+        subtitle: artist_names(&a.artists),
+        count: None,
+        single: a.single,
         thumbnail: a.thumbnail.clone(),
     }
 }
@@ -462,95 +530,269 @@ pub fn artist_entry(a: &ArtistSummary) -> Entry {
         kind: Kind::Artist,
         id: a.id.0.clone(),
         title: a.name.clone(),
-        subtitle: artist_card(a).subtitle.to_string(),
+        subtitle: String::new(),
+        count: None,
+        single: false,
         thumbnail: a.thumbnail.clone(),
     }
 }
 
-/// A playlist, album or artist was opened or played: it goes to the front of the recent
-/// record (saved off the UI thread, in order, so two quick opens save the newer record
-/// last). The sidebar's order follows the next time a list is shown; Home's shortcuts follow
-/// now.
-pub fn opened(ctx: &Ctx, e: Entry) {
-    let saved = LIBRARY.with_borrow_mut(|l| {
-        library_list::note(&mut l.recent, e);
-        l.key.clone().map(|k| (k, l.recent.clone()))
+/// Saves `value` as `list` for the identity, off the UI thread and in order, so two quick
+/// changes save the newer one last. Nothing without an identity (fixtures).
+fn save<T: serde::Serialize + Send + 'static>(key: Option<String>, list: LibraryList, value: T) {
+    let Some(key) = key else { return };
+    featherplay_controller::task::write_in_order(move || {
+        let cache = LibraryCache::new(&Paths::resolve());
+        if let Err(e) = cache.save(&key, list, &value) {
+            log!("sidebar {list:?}: saving failed: {}", e.kind());
+        }
     });
-    if let Some((key, recent)) = saved {
-        featherplay_controller::task::write_in_order(move || {
-            let cache = LibraryCache::new(&Paths::resolve());
-            if let Err(e) = cache.save(&key, LibraryList::Recent, &recent) {
-                log!("sidebar recent: saving failed: {}", e.kind());
-            }
-        });
-    }
-    home::shortcuts_changed(ctx);
 }
 
-/// Home's shortcuts after Liked songs: the playlists and albums opened or played lately,
-/// then the library's playlists and albums.
-pub fn shortcuts() -> Vec<HomeItem> {
-    LIBRARY.with_borrow(|l| {
+/// Keeps what an entry seen this session shows, with what was known of it before.
+fn see(l: &mut Library, e: &Entry) {
+    let key = e.key();
+    let e = match l.seen.get(&key) {
+        Some(old) => e.clone().filled_from(old),
+        None => e.clone(),
+    };
+    l.seen.insert(key, e);
+}
+
+/// A playlist, album or artist was opened (its page, or a play started from it): it goes
+/// to the front of the recent record, for the sidebar's order, which follows the next time
+/// a list is shown. Opening doesn't change Home's Shortcuts: only plays do (`played`).
+pub fn opened(_ctx: &Ctx, e: Entry) {
+    let saved = LIBRARY.with_borrow_mut(|l| {
+        see(l, &e);
+        library_list::note(&mut l.recent, e);
+        (l.key.clone(), l.recent.clone())
+    });
+    save(saved.0, LibraryList::Recent, saved.1);
+}
+
+/// Home's feed showed these: what a play from one of them shows in Shortcuts (a mix's line
+/// is the feed's).
+pub fn seen_on_home(shelves: &[HomeShelf]) {
+    LIBRARY.with_borrow_mut(|l| {
+        for item in shelves.iter().flat_map(|s| &s.items) {
+            let e = match item {
+                HomeItem::Album(a) => album_entry(a),
+                HomeItem::Playlist(p) => playlist_entry(p),
+                HomeItem::Artist(a) => artist_entry(a),
+                HomeItem::Track(_) => continue,
+            };
+            see(l, &e);
+        }
+    });
+}
+
+/// What the library knows of `key`: the pins' records, the lists, then what was seen,
+/// played or opened.
+fn known(l: &Library, key: &str) -> Option<Entry> {
+    let lists = [
+        &l.pinned,
+        l.playlists.as_deref().unwrap_or_default(),
+        l.albums.as_deref().unwrap_or_default(),
+        l.artists.as_deref().unwrap_or_default(),
+        &l.stored,
+        &l.played,
+        &l.recent,
+    ];
+    let listed = lists
+        .iter()
+        .find_map(|list| list.iter().find(|e| e.key() == key));
+    match (l.seen.get(key), listed) {
+        (Some(seen), Some(listed)) => Some(seen.clone().filled_from(listed)),
+        (seen, listed) => seen.or(listed).cloned(),
+    }
+}
+
+/// A song played long enough from `place` (an album, a playlist or an artist; `label` is
+/// its name as Up next shows it): it goes first in the played record that Shortcuts
+/// suggests from (back in Shortcuts if it was removed), and in the sidebar's recent record.
+/// Home shows it from its next visit, so the row never changes under the pointer. With
+/// "Suggest from what you play" off, nothing is recorded.
+pub fn played(place: &Place, label: &str, track: &Track) {
+    let (kind, id) = match place {
+        Place::Album(id) => (Kind::Album, id.0.clone()),
+        Place::Playlist(id) => (
+            Kind::Playlist,
+            featherplay_ytm::convert::bare_playlist_id(&id.0).to_string(),
+        ),
+        Place::Artist(id) => (Kind::Artist, id.0.clone()),
+        Place::History => return,
+    };
+    if !settings::shortcut_suggestions() || (kind == Kind::Playlist && id == "LM") {
+        return;
+    }
+    let key = library_list::key(kind, &id);
+    let saved = LIBRARY.with_borrow_mut(|l| {
+        // What the song itself says, when nothing knows the place better.
+        let from_song = Entry {
+            kind,
+            id,
+            title: label.to_string(),
+            subtitle: if kind == Kind::Album {
+                artist_names(&track.artists)
+            } else {
+                String::new()
+            },
+            count: None,
+            single: false,
+            thumbnail: (kind == Kind::Album)
+                .then(|| track.thumbnail.clone())
+                .flatten(),
+        };
+        let e = match known(l, &key) {
+            Some(known) => known.filled_from(&from_song),
+            None => from_song,
+        };
+        library_list::note(&mut l.recent, e.clone());
+        library_list::played(&mut l.played, &mut l.hidden, e);
+        (
+            l.key.clone(),
+            l.recent.clone(),
+            l.played.clone(),
+            l.hidden.clone(),
+        )
+    });
+    let (identity, recent, played, hidden) = saved;
+    save(identity.clone(), LibraryList::Recent, recent);
+    save(identity.clone(), LibraryList::Played, played);
+    save(identity, LibraryList::Hidden, hidden);
+}
+
+/// Home's Shortcuts after Liked songs (`library_list::shortcuts`). `visit`: Home is being
+/// shown, so what was played since its last visit joins; otherwise the row keeps the plays
+/// it had and only the pins, removals and the library change.
+pub fn shortcuts(visit: bool) -> Vec<Shortcut> {
+    LIBRARY.with_borrow_mut(|l| {
+        if visit {
+            l.played_shown.clone_from(&l.played);
+        }
         let library: Vec<Entry> = l
             .playlists
             .iter()
             .chain(l.albums.iter())
+            .chain(l.artists.iter())
             .flatten()
+            .chain(&l.stored)
             .cloned()
             .collect();
-        library_list::shortcuts(&l.recent, &library, SHORTCUTS)
-            .iter()
-            .map(home_item)
-            .collect()
+        let seen: Vec<Entry> = l.seen.values().cloned().collect();
+        library_list::shortcuts(&Sources {
+            pins: &l.pins,
+            known: &[
+                l.pinned.as_slice(),
+                library.as_slice(),
+                seen.as_slice(),
+                l.played.as_slice(),
+                l.recent.as_slice(),
+            ],
+            played: &l.played_shown,
+            library: &library,
+            hidden: &l.hidden,
+            suggest: settings::shortcut_suggestions(),
+        })
     })
 }
 
-fn home_item(e: &Entry) -> HomeItem {
-    match e.kind {
-        Kind::Album => HomeItem::Album(AlbumSummary {
-            id: featherplay_core::model::AlbumId(e.id.clone()),
-            title: e.title.clone(),
-            artists: Vec::new(),
-            year: None,
-            thumbnail: e.thumbnail.clone(),
-        }),
-        Kind::Artist => HomeItem::Artist(ArtistSummary {
-            id: featherplay_core::model::ArtistId(e.id.clone()),
-            name: e.title.clone(),
-            thumbnail: e.thumbnail.clone(),
-        }),
-        Kind::Playlist => HomeItem::Playlist(PlaylistSummary {
-            id: featherplay_core::model::PlaylistId(e.id.clone()),
-            title: e.title.clone(),
-            author: None,
-            count: None,
-            views: None,
-            avatar: None,
-            thumbnail: e.thumbnail.clone(),
-            owned: false,
-        }),
-    }
-}
-
-/// Whether the entry is pinned to the top of the list.
+/// Whether the entry is pinned.
 pub fn is_pinned(kind: Kind, id: &str) -> bool {
     let key = library_list::key(kind, id);
     LIBRARY.with_borrow(|l| l.pins.contains(&key))
 }
 
-/// Pins the entry to the top of its list, or unpins it, and keeps that in the settings
-/// for this identity. True when it's pinned now.
+/// Pins the entry (first among the pins: the top of its sidebar list, first after Liked
+/// songs in Shortcuts), or unpins it, and keeps that in the settings for this identity,
+/// with what it names in the library cache. True when it's pinned now.
 pub fn toggle_pin(ctx: &Ctx, kind: Kind, id: &str) -> bool {
     let key = library_list::key(kind, id);
-    let (pinned, saved) = LIBRARY.with_borrow_mut(|l| {
+    let (pinned, identity, pins, entries, hidden) = LIBRARY.with_borrow_mut(|l| {
         let pinned = library_list::toggle_pin(&mut l.pins, &key);
-        (pinned, l.key.clone().map(|k| (k, l.pins.clone())))
+        if pinned {
+            // A pin is never a removed suggestion.
+            l.hidden.retain(|h| *h != key);
+            if let Some(e) = known(l, &key) {
+                l.pinned.retain(|p| p.key() != key);
+                l.pinned.push(e);
+            }
+        } else {
+            l.pinned.retain(|p| p.key() != key);
+        }
+        (
+            pinned,
+            l.key.clone(),
+            l.pins.clone(),
+            l.pinned.clone(),
+            l.hidden.clone(),
+        )
     });
+    if let Some(identity) = &identity {
+        settings::set_pins(ctx, identity, pins);
+    }
+    save(identity.clone(), LibraryList::Pinned, entries);
+    save(identity, LibraryList::Hidden, hidden);
+    show(ctx);
+    home::shortcuts_changed(ctx);
+    pinned
+}
+
+/// Moves a pin one place earlier or `later` (Shortcuts' Move left and Move right), in the
+/// sidebar's order too.
+pub fn move_pin(ctx: &Ctx, kind: Kind, id: &str, later: bool) {
+    let key = library_list::key(kind, id);
+    let saved = LIBRARY.with_borrow_mut(|l| {
+        library_list::move_pin(&mut l.pins, &key, later)
+            .then(|| l.key.clone().map(|k| (k, l.pins.clone())))
+    });
+    let Some(saved) = saved else { return };
     if let Some((identity, pins)) = saved {
         settings::set_pins(ctx, &identity, pins);
     }
     show(ctx);
-    pinned
+    home::shortcuts_changed(ctx);
+}
+
+/// Where a pin is among the pins, and how many there are.
+pub fn pin_place(kind: Kind, id: &str) -> Option<(usize, usize)> {
+    let key = library_list::key(kind, id);
+    LIBRARY.with_borrow(|l| {
+        l.pins
+            .iter()
+            .position(|p| *p == key)
+            .map(|at| (at, l.pins.len()))
+    })
+}
+
+/// Removes a suggestion from Shortcuts (`hidden: true`) until it's played again, or puts
+/// it back (Undo).
+pub fn hide(ctx: &Ctx, kind: Kind, id: &str, hidden: bool) {
+    let key = library_list::key(kind, id);
+    let saved = LIBRARY.with_borrow_mut(|l| {
+        if hidden {
+            library_list::hide(&mut l.hidden, &key);
+        } else {
+            l.hidden.retain(|h| *h != key);
+        }
+        (l.key.clone(), l.hidden.clone())
+    });
+    save(saved.0, LibraryList::Hidden, saved.1);
+    home::shortcuts_changed(ctx);
+}
+
+/// "Forget suggestions": the played record and the removed list go; the pins stay.
+pub fn forget_suggestions(ctx: &Ctx) {
+    let identity = LIBRARY.with_borrow_mut(|l| {
+        l.played.clear();
+        l.played_shown.clear();
+        l.hidden.clear();
+        l.key.clone()
+    });
+    save(identity.clone(), LibraryList::Played, Vec::<Entry>::new());
+    save(identity, LibraryList::Hidden, Vec::<String>::new());
+    home::shortcuts_changed(ctx);
 }
 
 /// `--snapshot sidebar-*`: the list on a chip, with the second entry pinned (in memory).
@@ -570,4 +812,54 @@ pub fn pin_for_snapshot(ctx: &Ctx) {
     {
         toggle_pin(ctx, e.kind, &e.id);
     }
+}
+
+/// `--snapshot home-shortcuts*` (in memory), once the chips' lists have loaded: the first
+/// playlist, album and artist pinned, and some of the others played from. `fresh`: a new
+/// account's, two playlists and nothing pinned or played.
+pub fn seed_for_snapshot(ctx: &Ctx, fresh: bool) {
+    LIBRARY.with_borrow_mut(|l| {
+        if fresh {
+            if let Some(p) = l.playlists.as_mut() {
+                p.truncate(2);
+            }
+            l.albums = Some(Vec::new());
+            l.artists = Some(Vec::new());
+            l.stored.clear();
+            l.pins.clear();
+            l.pinned.clear();
+            l.played.clear();
+            l.played_shown.clear();
+            return;
+        }
+        let list = |v: &Option<Vec<Entry>>| v.clone().unwrap_or_default();
+        let (p, a, r) = (list(&l.playlists), list(&l.albums), list(&l.artists));
+        let pins: Vec<Entry> = [p.first(), a.first(), r.first()]
+            .into_iter()
+            .flatten()
+            .cloned()
+            .collect();
+        let played: Vec<Entry> = [
+            p.get(1),
+            a.get(1),
+            p.get(2),
+            r.get(1),
+            a.get(2),
+            p.get(3),
+            r.get(2),
+            a.get(3),
+        ]
+        .into_iter()
+        .flatten()
+        .cloned()
+        .collect();
+        for e in played.iter().chain(&pins) {
+            see(l, e);
+        }
+        l.pins = pins.iter().map(Entry::key).collect();
+        l.pinned = pins;
+        l.played_shown.clone_from(&played);
+        l.played = played;
+    });
+    show(ctx);
 }
