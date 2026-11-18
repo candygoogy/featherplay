@@ -358,11 +358,15 @@ fn split_lines(text: &str, count: usize) -> Result<Vec<&str>, Error> {
     }
 }
 
-/// The answer, unless it is empty or only repeats the source line.
+/// The answer, unless it is empty or only repeats the source line. Google writes quotes as
+/// TeX does (``like this'', and `this' for 「」): they become the quotes people type.
 fn useful(source: &str, answer: &str) -> Option<String> {
-    let answer = answer.trim();
-    (!answer.is_empty() && answer.to_lowercase() != source.trim().to_lowercase())
-        .then(|| answer.to_owned())
+    let answer = answer
+        .trim()
+        .replace("``", "\u{201C}")
+        .replace("''", "\u{201D}")
+        .replace('`', "'");
+    (!answer.is_empty() && answer.to_lowercase() != source.trim().to_lowercase()).then_some(answer)
 }
 
 /// The language most lines came back with; on a tie, the one seen first.
@@ -476,6 +480,12 @@ mod tests {
         );
         assert_eq!(useful("Hello", " hello "), None);
         assert_eq!(useful("夜", ""), None);
+        // Google's TeX-style quotes, as for 「終わりにしたい」だなんてさ.
+        assert_eq!(
+            useful("「終わり」", "``I want to end it.''").as_deref(),
+            Some("\u{201C}I want to end it.\u{201D}")
+        );
+        assert_eq!(useful("「終わり」", "`owari'").as_deref(), Some("'owari'"));
     }
 
     #[test]
