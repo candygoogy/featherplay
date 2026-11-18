@@ -600,7 +600,10 @@ async fn fetch(
     .map_err(|e| e.to_string())?
 }
 
-/// Decodes, crops the centre to `width`:`height` and resizes to `width`×`height`.
+/// Decodes, crops the centre to `width`:`height` and resizes to `width`×`height`. A 4:3
+/// video thumbnail letterboxed around a 16:9 picture (YouTube's `hqdefault` and
+/// `sddefault`, which some playlists show) is cropped from the picture, not the bands, so a
+/// square cover shows no black bars.
 fn decode(bytes: &[u8], width: u32, height: u32) -> Result<SharedPixelBuffer<Rgba8Pixel>, String> {
     #[cfg(feature = "perf-harness")]
     let started = std::time::Instant::now();
@@ -609,9 +612,10 @@ fn decode(bytes: &[u8], width: u32, height: u32) -> Result<SharedPixelBuffer<Rgb
         .into_rgba8();
     #[cfg(feature = "perf-harness")]
     crate::perf::decoded_alone(started.elapsed().as_secs_f64() * 1000.0);
-    let (iw, ih) = (u64::from(img.width()), u64::from(img.height()));
+    let band = letterbox(&img);
+    let (iw, ih) = (u64::from(img.width()), u64::from(img.height() - 2 * band));
     let (w, h) = (u64::from(width), u64::from(height));
-    // The largest centred rectangle of the wanted shape.
+    // The largest centred rectangle of the wanted shape, inside the bands.
     let (cw, ch) = if iw * h > ih * w {
         (ih * w / h, ih)
     } else {
@@ -644,6 +648,27 @@ fn decode(bytes: &[u8], width: u32, height: u32) -> Result<SharedPixelBuffer<Rgb
         width,
         height,
     ))
+}
+
+/// The rows of black above (and as many below) a 16:9 picture in a 4:3 image, or 0 when the
+/// image isn't one: both bands, an eighth of the height each, are all but black.
+fn letterbox(img: &image::RgbaImage) -> u32 {
+    let (w, h) = (img.width(), img.height());
+    if w == 0 || u64::from(w) * 3 != u64::from(h) * 4 {
+        return 0;
+    }
+    let band = h / 8;
+    let dark = |y: u32| {
+        (0..w)
+            .step_by(4)
+            .all(|x| img.get_pixel(x, y).0[..3].iter().all(|&c| c < 24))
+    };
+    let rows = (0..band).chain(h - band..h);
+    if band > 0 && rows.step_by(2).all(dark) {
+        band
+    } else {
+        0
+    }
 }
 
 /// The height of a 16:9 picture `width` wide.

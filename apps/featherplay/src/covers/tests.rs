@@ -71,6 +71,19 @@ fn decode_wide_drops_a_4_3_thumbnails_letterbox() {
     );
 }
 
+#[test]
+fn a_square_cover_of_a_letterboxed_thumbnail_shows_no_band() {
+    // ytimg's hqdefault: 480×360, the 16:9 picture between 45-row bands.
+    let out = decode(&letterboxed(480, 360, 45), 64, 64).expect("decode");
+    assert!(
+        out.as_slice().iter().all(|p| p.r > 150 && p.g < 80),
+        "a band of the letterbox shows"
+    );
+    // A 4:3 picture without bands keeps its whole height.
+    let plain = decode(&letterboxed(480, 360, 0), 64, 64).expect("decode");
+    assert_eq!((plain.width(), plain.height()), (64, 64));
+}
+
 /// Resizing from the crop's view gives the pixels a resize of a copy of the crop gave.
 #[test]
 fn decode_resizes_the_crop_as_a_copy_of_it_would() {
