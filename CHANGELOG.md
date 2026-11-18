@@ -6,6 +6,16 @@ Notable changes to featherplay, newest first. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Lyrics translation and romanization**: two round buttons beside the lyrics menu's ⋯ in
+  Now playing's full lyrics view, also in Settings > Lyrics. Translate adds an English line
+  under every lyric; Romanize, offered for lyrics in another script, adds the line in Latin
+  letters. Both are plain text in the lyrics' colours, so they light up with the line being
+  sung, and grow with the Large text size. Both are off by default. While one is on, the
+  lines on screen go to Google Translate (an English song's first eight only, and it isn't
+  translated); the answers are kept only for the session.
+
 ### Fixed
 
 - A radio, and a list set to go on with autoplay, now fetch more songs when five are left in Up
@@ -22,12 +32,6 @@ Notable changes to featherplay, newest first. The format follows
 
 ### Added
 
-- **Lyrics translation and romanization**: two round buttons beside the lyrics menu's ⋯ in
-  Now playing's full lyrics view, also in Settings > Lyrics. Translate adds an English line
-  under every lyric; Romanize, offered for lyrics in another script, adds the line in Latin
-  letters. Both are plain text in the lyrics' colours, so they light up with the line being
-  sung, and grow with the Large text size. Both are off by default; the answers are kept
-  only for the session.
 - On Linux, software centres and app catalogs that read featherplay's AppStream metadata show
   four screenshots: Home, Now playing with lyrics, a playlist in the light theme, and search.
 
