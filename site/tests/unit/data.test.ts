@@ -157,7 +157,7 @@ describe("figures", () => {
       for (const m of metrics) {
         if (f[m as keyof typeof f] === null) expect(f.sources[m], `${f.app} ${m}`).toBeNull();
         // featherplay's download is the current release's file, not a measurement.
-        else if (f.app === "featherplay" && m === "downloadMB") expect(f.sources[m]).toBe("The v0.4.1 release's files");
+        else if (f.app === "featherplay" && m === "downloadMB") expect(f.sources[m]).toBe("The v0.4.2 release's files");
         else expect(f.sources[m], `${f.app} ${m}`).toMatch(/^measurements\/[^/]*final/);
       }
     }
@@ -269,19 +269,19 @@ describe("the download's options", () => {
     expect(o).toHaveLength(1);
     expect(o[0]).toMatchObject({ id: "portable", primary: true, action: "Download for Windows" });
   });
-  it("offers the per-user installer and the exe by name, with the v0.4.1 release's sizes and direct links", async () => {
+  it("offers the per-user installer and the exe by name, with the v0.4.2 release's sizes and direct links", async () => {
     const { release, sizeLabel } = await import("../../src/data/release");
     expect(release.installer?.name).toBe(`featherplay-setup-${release.version}.exe`);
-    expect(release.version).toBe("0.4.1");
-    expect(release.installer?.bytes).toBe(11_303_035);
-    expect(release.portable?.bytes).toBe(30_707_712);
+    expect(release.version).toBe("0.4.2");
+    expect(release.installer?.bytes).toBe(11_307_213);
+    expect(release.portable?.bytes).toBe(30_724_096);
     expect(release.installer?.url).toBe(
-      "https://github.com/candygoogy/featherplay/releases/download/v0.4.1/featherplay-setup-0.4.1.exe",
+      "https://github.com/candygoogy/featherplay/releases/download/v0.4.2/featherplay-setup-0.4.2.exe",
     );
-    expect(release.portable?.url).toBe("https://github.com/candygoogy/featherplay/releases/download/v0.4.1/featherplay.exe");
+    expect(release.portable?.url).toBe("https://github.com/candygoogy/featherplay/releases/download/v0.4.2/featherplay.exe");
     // MB as Windows counts them (1,048,576 bytes).
     expect(release.installer && sizeLabel(release.installer)).toBe("10.78 MB");
-    expect(release.portable && sizeLabel(release.portable)).toBe("29.29 MB");
+    expect(release.portable && sizeLabel(release.portable)).toBe("29.30 MB");
     // Search engines get the first size that's known: the installer's.
     expect(release.sizeMB).toBe(10.78);
   });

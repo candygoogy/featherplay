@@ -174,7 +174,9 @@ Make one commit with these changes, and push it after publishing (step 5):
   they must match (the header picture shows the same three).
 - `site/src/data/release.ts`: `version`, and each file's size in bytes, from the draft.
 - The site tests that pin the version and sizes: `site/tests/unit/data.test.ts`,
-  `site/tests/sections.spec.ts`, `site/tests/compare.spec.ts` and `site/tests/seo.spec.ts`.
+  `site/tests/seo.spec.ts`, `site/tests/numbers.spec.ts` (the portable exe's size) and
+  `site/tests/bar.spec.ts` (the Download flyout's link, written as a regular expression:
+  `v0\.4\.2`, so a search for the plain version misses it).
 
 Check the site:
 
