@@ -288,7 +288,7 @@ Most of Pear's plugins are settings in featherplay. Plugin by plugin, as of toda
 | Shortcuts | **Built in.** Media keys and the system's media controls always; your own global hotkeys in Settings > Window (off by default; not on Wayland), and a shortcut for quick search from any app. |
 | SponsorBlock | **Built in**, on by default: skips non-music segments in music videos. |
 | Discord Rich Presence | **Built in**, off by default, with Pear's options: status text, time display, links, the Play song button, clear after a pause, reconnect automatically. |
-| Synced Lyrics | **Built in.** LRCLIB and YouTube Music's own timed lyrics, with plain lyrics as the fallback; click a line to jump to it. Three text sizes, timing adjustments, other lyrics, desktop lyrics, English translation and romanization. |
+| Synced Lyrics | **Built in.** LRCLIB and YouTube Music's own timed lyrics, with plain lyrics as the fallback; click a line to jump to it. Three text sizes, the timing moved per song, other lyrics chosen from LRCLIB, and desktop lyrics in a strip above other apps; English translation and romanization of lyrics in another script, both off by default. A setting turns lyrics off completely. |
 | Notifications | **Built in.** Track-change notifications, off by default (Settings > Window). |
 | Custom Output Device | **Built in.** Pick the device in Settings > Sound; if it disappears, playback pauses and moves to the default one. |
 | Exponential Volume | **Built in.** The volume slider follows a perceptual curve. |
