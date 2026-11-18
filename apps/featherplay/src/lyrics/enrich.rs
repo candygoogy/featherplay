@@ -19,6 +19,9 @@ use crate::ui::{LyricDecoration, LyricsData};
 /// Translation follows the reference UI: English under the source line. A later language
 /// picker can pass another BCP-47 code without changing the service client.
 const TRANSLATION_TARGET: &str = "en";
+/// Non-blank lines in a song's first translation request; enough to tell its language, so
+/// an English song sends no more than these.
+const FIRST_CHUNK: usize = 8;
 const MAX_CACHED: usize = 64;
 const FEED_ROWS: usize = 4;
 const FEED_EVERY: Duration = Duration::from_millis(4);
@@ -231,8 +234,7 @@ fn request(ctx: &Rc<Ctx>) {
             let client = client();
             let translation_result = if translation {
                 Some(match &client {
-                    Ok(client) => client
-                        .translate(&work_source, TRANSLATION_TARGET)
+                    Ok(client) => translate_song(client, &work_source)
                         .await
                         .map_err(|e| e.to_string()),
                     Err(e) => Err(e.clone()),
@@ -323,6 +325,63 @@ fn apply(ctx: &Rc<Ctx>, ui: &crate::ui::AppWindow, answer: Answer) {
             ctx.toast_error(tr!("Couldn't romanize the lyrics. Try again later."));
         }
     }
+}
+
+/// Translates a song, its first few lines first: when those come back as English, the
+/// rest isn't sent and the song keeps no translation.
+async fn translate_song(client: &Client, lines: &[String]) -> Result<Batch, service::Error> {
+    let split = first_chunk_len(lines);
+    let mut batch = client
+        .translate(&lines[..split], TRANSLATION_TARGET)
+        .await?;
+    if is_english(&batch) {
+        batch.lines = vec![None; lines.len()];
+        return Ok(batch);
+    }
+    if split < lines.len() {
+        // A chorus already asked in the first request isn't sent again: it goes blank
+        // here and takes the first answer for its text.
+        let known: HashMap<&str, Option<String>> = lines[..split]
+            .iter()
+            .map(|line| line.trim())
+            .zip(batch.lines.iter().cloned())
+            .collect();
+        let rest: Vec<String> = lines[split..]
+            .iter()
+            .map(|line| {
+                if known.contains_key(line.trim()) {
+                    String::new()
+                } else {
+                    line.clone()
+                }
+            })
+            .collect();
+        let answered = client.translate(&rest, TRANSLATION_TARGET).await?;
+        batch.lines.extend(
+            lines[split..]
+                .iter()
+                .zip(answered.lines)
+                .map(|(line, answer)| known.get(line.trim()).cloned().unwrap_or(answer)),
+        );
+    }
+    Ok(batch)
+}
+
+/// The lines up to and including the `FIRST_CHUNK`th non-blank one.
+fn first_chunk_len(lines: &[String]) -> usize {
+    lines
+        .iter()
+        .enumerate()
+        .filter(|(_, line)| !line.trim().is_empty())
+        .nth(FIRST_CHUNK - 1)
+        .map_or(lines.len(), |(index, _)| index + 1)
+}
+
+fn is_english(batch: &Batch) -> bool {
+    batch
+        .detected_language
+        .as_deref()
+        .is_some_and(|language| language.starts_with("en"))
 }
 
 fn strings(batch: Batch) -> Vec<String> {
@@ -470,5 +529,68 @@ mod tests {
             detected_language: Some("ja".into()),
         };
         assert_eq!(strings(batch), ["ichi", "", "san"]);
+    }
+
+    #[test]
+    fn the_first_request_holds_the_first_eight_sung_lines() {
+        let mut lines: Vec<String> = (0..12).map(|n| format!("line {n}")).collect();
+        lines.insert(2, String::new());
+        lines.insert(5, "  ".into());
+        assert_eq!(first_chunk_len(&lines), 10);
+        assert_eq!(first_chunk_len(&lines[..4]), 4);
+    }
+
+    /// A local stand-in for `translate_a/t` that answers every request with eight English
+    /// lines, and counts the requests.
+    fn english_stand_in() -> (String, std::sync::Arc<std::sync::atomic::AtomicUsize>) {
+        use std::io::{BufRead, BufReader, Read, Write};
+        use std::sync::atomic::Ordering;
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("a local port");
+        let base = format!(
+            "http://{}/translate_a",
+            listener.local_addr().expect("address")
+        );
+        let count = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let seen = count.clone();
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let Ok(mut stream) = stream else { continue };
+                seen.fetch_add(1, Ordering::SeqCst);
+                let mut reader = BufReader::new(stream.try_clone().expect("clone"));
+                let mut length = 0;
+                let mut header = String::new();
+                while reader.read_line(&mut header).is_ok_and(|n| n > 2) {
+                    if let Some(value) = header.to_ascii_lowercase().strip_prefix("content-length:")
+                    {
+                        length = value.trim().parse().unwrap_or(0);
+                    }
+                    header.clear();
+                }
+                let _ = reader.read_exact(&mut vec![0; length]);
+                let body = format!("[{}]", [r#"["Hello","en"]"#; FIRST_CHUNK].join(","));
+                let reply = format!(
+                    "HTTP/1.1 200 OK
+content-type: application/json
+content-length: {}
+connection: close
+
+{body}",
+                    body.len()
+                );
+                let _ = stream.write_all(reply.as_bytes());
+            }
+        });
+        (base, count)
+    }
+
+    #[tokio::test]
+    async fn english_first_lines_stop_the_rest_of_the_song() {
+        let (base, requests) = english_stand_in();
+        let client = Client::with_base(&base).expect("client");
+        let lines: Vec<String> = (0..20).map(|n| format!("sung line {n}")).collect();
+        let batch = translate_song(&client, &lines).await.expect("an answer");
+        assert_eq!(batch.lines, vec![None; lines.len()]);
+        assert_eq!(batch.detected_language.as_deref(), Some("en"));
+        assert_eq!(requests.load(std::sync::atomic::Ordering::SeqCst), 1);
     }
 }
