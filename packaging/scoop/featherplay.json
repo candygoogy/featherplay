@@ -1,5 +1,5 @@
 {
-    "version": "0.4.1",
+    "version": "0.4.2",
     "description": "A fast, lightweight desktop player for YouTube Music. Not affiliated with Google or YouTube.",
     "homepage": "https://github.com/candygoogy/featherplay",
     "license": "MIT",
@@ -8,12 +8,12 @@
     },
     "architecture": {
         "64bit": {
-            "url": "https://github.com/candygoogy/featherplay/releases/download/v0.4.1/featherplay.exe",
-            "hash": "bdccdc43ee445047022c7c956c7fb94b9c61c9333367fa6f0ab2bb5b3bd690c1"
+            "url": "https://github.com/candygoogy/featherplay/releases/download/v0.4.2/featherplay.exe",
+            "hash": "4874b311316de0652c38b7d210a9422548fed6b60f5971959f99919d4104ce9f"
         },
         "arm64": {
-            "url": "https://github.com/candygoogy/featherplay/releases/download/v0.4.1/featherplay-arm64.exe#/featherplay.exe",
-            "hash": "77f018844e8c21aeb31090c68bde23421be0391554ad25b6541da2933faa7d3e"
+            "url": "https://github.com/candygoogy/featherplay/releases/download/v0.4.2/featherplay-arm64.exe#/featherplay.exe",
+            "hash": "930933fc1f63a491105844904ae9dd4dfa73cbbc92e50822c5f02ab5fa3fce54"
         }
     },
     "bin": "featherplay.exe",
