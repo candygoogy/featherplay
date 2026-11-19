@@ -110,14 +110,17 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo fmt --all --check
 ```
 
-CI runs the same four, plus `cargo deny check` against `deny.toml` (advisories, licences,
-crate sources). On pushes and pull requests it uses nextest's `ci` profile, which leaves out
-the slow frame-cost and CPU-time ceilings. The weekly run's and `release.yml`'s x64 tests
-run everything; their ARM64 jobs use the `ci` profile too. A `linux` job runs clippy and
-the tests on Ubuntu, x86_64 and aarch64, and CI also runs the Linux rigs in `scripts/rig/`:
-the sound output, the app on a real X11 and Wayland desktop, and the AppImage in several
-distributions' containers and on a bare Ubuntu 22.04 with no network, D-Bus or keyring, as
-the AppImage catalog tests it.
+CI runs the same four, plus `cargo deny check bans licenses sources` against `deny.toml`.
+The advisories (known vulnerabilities, unmaintained and yanked crates) change with the
+RustSec database, not with the code, so `.github/workflows/advisories.yml` checks them on
+the changes that touch a `Cargo.toml`, `Cargo.lock` or `deny.toml`, and every day, when a
+failure opens an issue instead of failing the run. On pushes and pull requests CI uses
+nextest's `ci` profile, which leaves out the slow frame-cost and CPU-time ceilings. The
+weekly run's and `release.yml`'s x64 tests run everything; their ARM64 jobs use the `ci`
+profile too. A `linux` job runs clippy and the tests on Ubuntu, x86_64 and aarch64, and CI
+also runs the Linux rigs in `scripts/rig/`: the sound output, the app on a real X11 and
+Wayland desktop, and the AppImage in several distributions' containers and on a bare Ubuntu
+22.04 with no network, D-Bus or keyring, as the AppImage catalog tests it.
 
 All of those are debug builds, and the frame-cost tests check their millisecond limits in
 optimised builds only (a debug build checks what they repaint, not what it costs). The run

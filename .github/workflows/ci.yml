@@ -26,10 +26,11 @@ env:
   # key, Discord status shows as unavailable. Only release.yml compiles them in.
 
 jobs:
-  # Known vulnerabilities, yanked crates, licences and crate sources, as deny.toml sets them.
-  # Its own job, on Linux (the action is a container), so it reports in a minute without
-  # waiting for the Windows build. The advisory database changes daily, so a run can fail
-  # on a dependency nobody touched: update it, or record the reason in deny.toml.
+  # Bans, licences and crate sources, as deny.toml sets them: they change only with the
+  # code, so they hold on every run. Its own job, on Linux (the action is a container), so
+  # it reports in a minute without waiting for the Windows build. The advisories (known
+  # vulnerabilities, unmaintained and yanked crates) are advisories.yml's: their database
+  # changes daily, so they'd fail runs on a dependency nobody touched.
   deny:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -40,7 +41,7 @@ jobs:
 
       - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
         with:
-          command: check
+          command: check bans licenses sources
           arguments: --all-features
 
   # Nothing in the repository points at a developer's machine or at planning notes that

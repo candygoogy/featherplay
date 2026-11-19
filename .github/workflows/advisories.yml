@@ -1,0 +1,92 @@
+name: Advisories
+
+# cargo-deny's advisories check, as deny.toml's [advisories] sets it: known vulnerabilities and
+# unmaintained, unsound or yanked crates in Cargo.lock, from the RustSec database. That
+# database changes every day, so the check can fail on a dependency nobody touched; it runs
+# here, not in ci.yml, whose `deny` job checks bans, licences and sources on every run.
+#
+# - A push to main or a pull request that changes the dependencies (a Cargo.toml, Cargo.lock
+#   or deny.toml): the check fails the run, so an advisory shows on the change that brought
+#   the crate in. It isn't a required check: the path filter leaves it pending on other pull
+#   requests.
+# - Every day, and by hand (Actions > Advisories > Run workflow): a failure opens the issue
+#   "Dependency advisories fail", or comments on the open one; the next run that passes
+#   closes it. These runs stay green, so main doesn't turn red over a new advisory.
+#
+# To clear a failure, update the crate (`cargo update -p <crate>`) or, when there's no fix,
+# add the advisory to `ignore` in deny.toml with the reason.
+
+on:
+  push:
+    branches: [main]
+    paths: [Cargo.lock, "**/Cargo.toml", deny.toml, .github/workflows/advisories.yml]
+  pull_request:
+    paths: [Cargo.lock, "**/Cargo.toml", deny.toml, .github/workflows/advisories.yml]
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+# Nothing by default; each job asks for what it needs. Only `report` can write, and only issues.
+permissions: {}
+
+concurrency:
+  group: advisories-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  advisories:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    outputs:
+      failed: ${{ steps.check.outcome == 'failure' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The daily and manual runs report through the issue instead of failing.
+      - id: check
+        uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
+        continue-on-error: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
+        with:
+          command: check advisories
+          arguments: --all-features
+
+  report:
+    needs: advisories
+    if: ${{ always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    steps:
+      - name: Open, update or close the issue
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # The check failed, or the job didn't get as far as running it.
+          FAILED: ${{ needs.advisories.outputs.failed == 'true' || needs.advisories.result != 'success' }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          title="Dependency advisories fail"
+          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
+            --search "\"$title\" in:title" --json number,title \
+            --jq "map(select(.title == \"$title\")) | .[0].number // empty")
+          if [ "$FAILED" = true ]; then
+            body=$(printf '%s\n' \
+              "The advisories check failed on $(date -u +%Y-%m-%d): $RUN_URL" "" \
+              "The run's \`check\` step lists each advisory. Update the crate (\`cargo update -p <crate>\`) or, when there's no fix, add the advisory to \`ignore\` in \`deny.toml\` with the reason. The next daily run that passes closes this issue.")
+            if [ -n "$existing" ]; then
+              gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body "$body"
+            else
+              gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "$body"
+            fi
+          elif [ -n "$existing" ]; then
+            gh issue close "$existing" --repo "$GITHUB_REPOSITORY" \
+              --comment "The advisories check passes again: $RUN_URL"
+          else
+            echo "The advisories check passes."
+          fi

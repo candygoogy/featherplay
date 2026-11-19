@@ -1,4 +1,6 @@
-# cargo-deny: `cargo deny check` (CI runs it on every push and pull request).
+# cargo-deny: `cargo deny check`. ci.yml's `deny` job checks bans, licences and sources on
+# every push and pull request; advisories.yml checks the advisories on the changes that touch
+# the dependencies and every day.
 # https://embarkstudios.github.io/cargo-deny/
 
 [graph]
