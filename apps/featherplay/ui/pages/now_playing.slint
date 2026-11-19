@@ -625,6 +625,11 @@ export component NowPlayingPage inherits Rectangle {
     init => {
         root.shown = true;
         root.side-in = Frame.side-shown;
+        // Set here and by their handlers, never bound: a binding to the eased toggle would last
+        // until a handler first set them, and mark what they show dirty in every frame of the
+        // first toggle (the card round its strips: `tests/app/lyrics_button.rs`).
+        root.opened = root.opened-at;
+        root.gut = root.gut-at;
         root.ask-cover();
         NowPlayingData.lyrics-drawn = root.drawn;
         root.tell-backdrop();
@@ -749,7 +754,7 @@ export component NowPlayingPage inherits Rectangle {
     // it don't mark what it shows and hides dirty.
     property <bool> pictured: SettingsData.lyrics-blur && NowPlayingData.backdrop.width > 0 && root.full && root.opened;
     property <bool> opened-at: root.lyr >= 1;
-    property <bool> opened: root.lyr >= 1;
+    property <bool> opened;
     changed opened-at => { root.opened = root.opened-at; }
 
     // "Cover behind the lyrics": the song's cover, blurred, in place of the panel's colour
@@ -1160,7 +1165,7 @@ export component NowPlayingPage inherits Rectangle {
     // the card under their joint repaint is drawn once, not in every frame of the stage's
     // colour change. The wash keeps the bands' stops, so it meets the stage's.
     property <bool> gut-at: root.tint >= 0.5;
-    property <bool> gut: root.tint >= 0.5;
+    property <bool> gut;
     changed gut-at => { root.gut = root.gut-at; }
     property <bool> gut-pictured: root.gut && SettingsData.lyrics-blur && NowPlayingData.backdrop.width > 0;
     property <bool> card-in: Frame.side-shown && root.side-in;
